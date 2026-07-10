@@ -19,6 +19,7 @@ export interface Player {
   mvp: number;
   impact: number;
   def: number;
+  absInj?: number; // absences injustifiées (discipline)
 }
 
 export interface RankedPlayer extends Player {
@@ -74,6 +75,30 @@ export function rankPlayers(players: Player[]): RankedPlayer[] {
       if (p.pp !== prev) {
         rank = i + 1;
         prev = p.pp;
+      }
+      return { ...p, rank };
+    });
+}
+
+// Classement générique sur une métrique : tri décroissant, égalités partagent le rang.
+export interface MetricRankedPlayer extends Player {
+  rank: number;
+  value: number;
+}
+
+export function rankByMetric(
+  players: Player[],
+  getValue: (p: Player) => number
+): MetricRankedPlayer[] {
+  let rank = 0;
+  let prev: number | null = null;
+  return [...players]
+    .map((p) => ({ ...p, value: getValue(p) }))
+    .sort((a, b) => b.value - a.value)
+    .map((p, i) => {
+      if (p.value !== prev) {
+        rank = i + 1;
+        prev = p.value;
       }
       return { ...p, rank };
     });
