@@ -3,9 +3,10 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "SFL",
+    name: "SFL — Sunday Five League",
     short_name: "SFL",
-    description: "Application SFL — une progressive web app rapide, installable et hors-ligne.",
+    description:
+      "Sunday Five League — classement Pépite d'Or, matchs, cartes joueurs et convocations.",
     start_url: "/",
     scope: "/",
     display: "standalone",

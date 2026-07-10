@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Anton, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme-provider";
@@ -9,6 +9,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { PlayerProvider } from "@/components/sfl/player-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,13 +21,26 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const anton = Anton({
+  weight: "400",
+  variable: "--font-anton",
+  subsets: ["latin"],
+});
+
+const barlow = Barlow_Condensed({
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-barlow",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://sfl.vercel.app"),
   title: {
-    default: "SFL",
+    default: "SFL — Sunday Five League",
     template: "%s · SFL",
   },
-  description: "SFL — une progressive web app rapide, installable et mobile-first.",
+  description:
+    "Sunday Five League — classement Pépite d'Or, matchs, cartes joueurs et convocations. Chaque dimanche compte.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -53,7 +67,7 @@ export default function RootLayout({
     <html
       lang="fr"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${anton.variable} ${barlow.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider
@@ -62,14 +76,16 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <TooltipProvider delay={200}>
-            <ServiceWorkerRegister />
-            <SiteHeader />
-            <main className="flex-1 pb-20 md:pb-0">{children}</main>
-            <BottomNav />
-            <InstallPrompt />
-            <Toaster position="top-center" />
-          </TooltipProvider>
+          <PlayerProvider>
+            <TooltipProvider delay={200}>
+              <ServiceWorkerRegister />
+              <SiteHeader />
+              <main className="flex-1 pb-28 md:pb-10">{children}</main>
+              <BottomNav />
+              <InstallPrompt />
+              <Toaster position="top-center" />
+            </TooltipProvider>
+          </PlayerProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -1,8 +1,27 @@
-# SFL
+# SFL — Sunday Five League
 
-Progressive Web App construite avec Next.js (App Router), Tailwind CSS et
+Progressive Web App de la Sunday Five League : classement Pépite d'Or,
+matchs et feuilles de match, cartes joueurs évolutives (EvoDay) et
+convocations. Construite avec Next.js (App Router), Tailwind CSS et
 shadcn/ui, pensée **mobile-first** (~80% des décisions d'interface partent du
 mobile, puis s'adaptent aux écrans plus larges).
+
+## Écrans (interface joueur)
+
+- **Accueil** (`/`) — convocation du prochain match à confirmer, dernier
+  résultat, top 3 Pépite d'Or, aperçu de sa carte.
+- **Stats** (`/stats`) — classement complet + journées jouées avec faits
+  marquants et feuille de match.
+- **Ma carte** (`/carte`) — carte joueur (Standard/Rare), cartes Boost
+  (MVP / Impact / Défensive), simulateur EvoDay de répartition de points,
+  barème Points Pépite.
+- **Admin** (`/admin`) — placeholder de la future interface administrateur
+  (convocations, feuilles de match, localisation, joueurs, EvoDay).
+
+Thème clair / sombre / système via le menu en haut à droite. Le profil
+joueur actif se choisit dans le sélecteur du header (persisté en local).
+Les données de démo viennent du classeur `SFL_Statistiques_Base_Propre.xlsx`
+(`src/lib/sfl/data.ts`) ; le moteur de règles est dans `src/lib/sfl/engine.ts`.
 
 ## Stack
 
