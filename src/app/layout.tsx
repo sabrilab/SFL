@@ -34,7 +34,7 @@ const barlow = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://sfl.vercel.app"),
+  metadataBase: new URL("https://sfl-eight.vercel.app"),
   title: {
     default: "SFL — Sunday Five League",
     template: "%s · SFL",
