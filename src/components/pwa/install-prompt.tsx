@@ -48,7 +48,7 @@ export function InstallPrompt() {
   }
 
   return (
-    <div className="fixed inset-x-4 bottom-24 z-50 mx-auto flex max-w-sm items-center gap-3 rounded-lg border bg-card p-3 text-card-foreground shadow-lg md:bottom-4">
+    <div className="fixed inset-x-4 bottom-24 z-50 mx-auto flex max-w-sm items-center gap-3 rounded-2xl bg-card p-4 text-card-foreground shadow-xl shadow-black/20 md:bottom-4">
       <Download className="size-5 shrink-0 text-primary" />
       <div className="flex-1 text-sm">
         {isIOS ? (

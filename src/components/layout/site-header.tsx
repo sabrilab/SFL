@@ -29,8 +29,8 @@ export function SiteHeader() {
   const { me, setMe } = useMyPlayer();
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4">
+    <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+      <div className="mx-auto flex h-16 max-w-5xl items-center gap-2 px-5">
         <Link href="/" className="mr-1 font-display text-xl italic tracking-wide">
           S<span className="text-primary">F</span>L
         </Link>
@@ -44,10 +44,10 @@ export function SiteHeader() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  "rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
                   active
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {item.label}
@@ -56,9 +56,16 @@ export function SiteHeader() {
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex items-center gap-1">
           <Select value={me} onValueChange={(v) => setMe(v as string)}>
-            <SelectTrigger size="sm" aria-label="Choisir mon profil joueur">
+            <SelectTrigger
+              size="sm"
+              aria-label="Choisir mon profil joueur"
+              className="rounded-full border-transparent bg-secondary px-3.5 font-medium dark:bg-secondary"
+            >
+              <span className="mr-1 flex size-4.5 items-center justify-center rounded-full bg-foreground/10 text-[9px] font-bold">
+                {me[0]}
+              </span>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -77,6 +84,7 @@ export function SiteHeader() {
                   variant="ghost"
                   size="icon"
                   aria-label="Espace admin"
+                  className="text-muted-foreground hover:text-foreground"
                   render={
                     <Link href="/admin">
                       <ShieldCheck className="size-5" />

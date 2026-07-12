@@ -54,13 +54,12 @@ const MODULES = [
 
 export default function AdminPage() {
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6 sm:py-10">
+    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-4 sm:py-8">
       <div>
-        <div className="flex items-center gap-2.5">
-          <h1 className="font-display text-3xl italic">
-            AD<span className="text-primary">MIN</span>
-          </h1>
-          <Badge variant="secondary">Bientôt</Badge>
+        <p className="text-[13px] font-medium text-muted-foreground">Espace administrateur</p>
+        <div className="flex items-center gap-3">
+          <h1 className="text-[34px] font-bold tracking-tight">Admin</h1>
+          <Badge variant="secondary" className="rounded-full">Bientôt</Badge>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
           L&apos;interface d&apos;administration arrive : elle permettra d&apos;envoyer les
@@ -71,7 +70,7 @@ export default function AdminPage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         {MODULES.map(({ icon: Icon, title, description }) => (
-          <Card key={title} className="opacity-80">
+          <Card key={title} className="rounded-3xl border-0 opacity-80 shadow-none">
             <CardHeader>
               <Icon className="size-5 text-primary" />
               <CardTitle className="pt-1 text-base">{title}</CardTitle>
