@@ -37,21 +37,76 @@ export interface BoostCardData {
   stats: Stats;
 }
 
+export interface MatchPlayerLine {
+  name: string;
+  buts: number;
+  passes: number;
+}
+
+export interface MatchTeam {
+  id: string;
+  name: string;
+  score: number;
+  players: MatchPlayerLine[];
+}
+
+export interface JourneeMatch {
+  id: string;
+  label: string;
+  teamA: MatchTeam;
+  teamB: MatchTeam;
+}
+
 export interface Journee {
   j: number;
   date: string;
   sflTime: boolean;
-  score: [number, number] | null;
+  // Composition en équipes du jour (undefined = feuille de match pas encore
+  // renseignée par l'admin : pas de vote de figures possible).
+  matches?: JourneeMatch[];
+  // Repli plat utilisé uniquement quand `matches` est absent.
+  lignes?: [string, "V" | "D" | "-", number, number][];
+  // Faits objectifs (issus des stats, pas d'un vote).
   faits: Partial<{
-    mvp: string;
-    impactA: string;
-    impactB: string;
-    defs: string;
     buteur: string;
     passeur: string;
   }>;
-  // [joueur, résultat V/D/-, buts, passes décisives]
-  lignes: [string, "V" | "D" | "-", number, number][];
+}
+
+// Localise le match et l'équipe (+ l'équipe adverse) d'un joueur pour une journée.
+export function findPlayerMatch(journee: Journee, playerName: string) {
+  for (const match of journee.matches ?? []) {
+    if (match.teamA.players.some((p) => p.name === playerName)) {
+      return { match, team: match.teamA, opponents: match.teamB };
+    }
+    if (match.teamB.players.some((p) => p.name === playerName)) {
+      return { match, team: match.teamB, opponents: match.teamA };
+    }
+  }
+  return null;
+}
+
+// Tous les participants d'une journée (toutes équipes, tous matchs confondus).
+export function journeeParticipants(journee: Journee): string[] {
+  const names = new Set<string>();
+  for (const match of journee.matches ?? []) {
+    match.teamA.players.forEach((p) => names.add(p.name));
+    match.teamB.players.forEach((p) => names.add(p.name));
+  }
+  return [...names];
+}
+
+// Résumé du score du jour : un seul match -> score direct, plusieurs -> "N matchs".
+export function journeeScoreSummary(
+  journee: Journee
+): { label: string; multi: boolean } | null {
+  const matches = journee.matches;
+  if (!matches || matches.length === 0) return null;
+  if (matches.length === 1) {
+    const m = matches[0];
+    return { label: `${m.teamA.score} – ${m.teamB.score}`, multi: false };
+  }
+  return { label: `${matches.length} matchs`, multi: true };
 }
 
 export const ovr = (s: Stats) =>

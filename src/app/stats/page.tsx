@@ -1,22 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, Star, Vote } from "lucide-react";
-import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import { ChevronRight } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { PlayerCard } from "@/components/sfl/player-card";
+import { ElectionPanel } from "@/components/sfl/election-panel";
 import { useMyPlayer } from "@/components/sfl/player-provider";
-import { useIsClient } from "@/hooks/use-is-client";
 import { JOURNEES, PLAYERS } from "@/lib/sfl/data";
-import { ovr, rankByMetric, type Journee, type Player } from "@/lib/sfl/engine";
+import { journeeScoreSummary, ovr, rankByMetric, type Player } from "@/lib/sfl/engine";
 
 /* ============================= CLASSEMENTS ============================= */
 
@@ -54,9 +46,30 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
     );
   }
 
+  const leader = ranked[0];
+
   return (
     <>
       <p className="mb-3 px-1 text-[13px] text-muted-foreground">{def.desc}</p>
+
+      {/* Carte du n°1 */}
+      <div className="mb-5 flex flex-col items-center gap-2.5">
+        <div className="flex items-center gap-1.5">
+          <span className="text-lg font-bold text-primary tabular-nums">#1</span>
+          <span className="text-sm font-bold tracking-tight tabular-nums">
+            {leader.value}
+            <span className="ml-0.5 text-[10px] font-medium text-muted-foreground">{def.unit}</span>
+          </span>
+          {leader.name === me && (
+            <span className="rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold tracking-wide text-primary-foreground uppercase">
+              Toi
+            </span>
+          )}
+        </div>
+        <PlayerCard player={leader} mode="simple" size={0.85} />
+      </div>
+
+      {/* Classement linéaire */}
       <div className="flex flex-col gap-1.5">
         {ranked.map((p) => {
           const isMe = p.name === me;
@@ -64,35 +77,34 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
             <div
               key={p.name}
               className={cn(
-                "flex items-center rounded-2xl bg-card px-4 py-3",
+                "flex items-center gap-3 rounded-2xl bg-card px-3 py-2.5",
                 isMe && "ring-1 ring-primary/50"
               )}
             >
               <span
                 className={cn(
-                  "w-8 text-base font-semibold tabular-nums",
+                  "w-7 text-base font-semibold tabular-nums",
                   p.rank <= 3 ? "text-primary" : "text-muted-foreground"
                 )}
               >
                 {p.rank}
               </span>
-              <span className="mr-3 flex size-9 items-center justify-center rounded-full bg-secondary text-sm font-semibold">
+              <span className="mr-0.5 flex size-7 items-center justify-center rounded-full bg-secondary text-xs font-semibold">
                 {p.name[0]}
               </span>
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="truncate text-[15px] font-semibold">{p.name}</span>
                 {p.statut !== "Actif" && (
-                  <Badge
-                    variant="secondary"
+                  <span
                     className={cn(
-                      "rounded-full px-2 text-[9px] tracking-wide uppercase",
+                      "rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide uppercase",
                       p.statut === "Suspendu"
                         ? "bg-destructive/10 text-destructive"
                         : "bg-sky-500/10 text-sky-600 dark:text-sky-400"
                     )}
                   >
                     {p.statut}
-                  </Badge>
+                  </span>
                 )}
               </span>
               <span className="w-12 text-xs font-medium text-muted-foreground">{p.poste}</span>
@@ -110,142 +122,7 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
   );
 }
 
-/* ============================= VOTES FIGURES ============================= */
-
-type VoteCategory = "mvp" | "impact" | "def";
-type Votes = Partial<Record<VoteCategory, string>>;
-
-const voteKey = (me: string, j: number) => `sfl-vote-${me}-j${j}`;
-
-function readVotes(me: string, j: number): Votes {
-  try {
-    return JSON.parse(localStorage.getItem(voteKey(me, j)) ?? "{}");
-  } catch {
-    return {};
-  }
-}
-
-function VotePanel({ journee, me }: { journee: Journee; me: string }) {
-  const isClient = useIsClient();
-  const [local, setLocal] = useState<Votes | null>(null);
-
-  const votes = local ?? (isClient ? readVotes(me, journee.j) : {});
-
-  const participants = journee.lignes.map(([name]) => name);
-  const myLine = journee.lignes.find(([name]) => name === me);
-  const teamsKnown = journee.lignes.some(([, r]) => r === "V" || r === "D");
-
-  // Joueur Impact : on vote pour un joueur de l'équipe ADVERSE.
-  const impactOptions =
-    myLine && teamsKnown
-      ? journee.lignes.filter(([, r]) => r !== myLine[1]).map(([name]) => name)
-      : participants.filter((name) => name !== me);
-
-  const categories: {
-    id: VoteCategory;
-    label: string;
-    rule: string;
-    options: string[];
-    disabled?: string;
-  }[] = [
-    {
-      id: "mvp",
-      label: "MVP du match",
-      rule: "Tout le monde vote",
-      options: participants.filter((n) => n !== me),
-    },
-    {
-      id: "def",
-      label: "Meilleur défenseur",
-      rule: "On vote pour le meilleur",
-      options: participants.filter((n) => n !== me),
-    },
-    {
-      id: "impact",
-      label: "Joueur Impact",
-      rule: "On vote pour l'adversaire",
-      options: impactOptions,
-      disabled: !myLine
-        ? "Réservé aux joueurs ayant participé à cette journée"
-        : undefined,
-    },
-  ];
-
-  function castVote(category: VoteCategory, name: string) {
-    const next = { ...votes, [category]: name };
-    localStorage.setItem(voteKey(me, journee.j), JSON.stringify(next));
-    setLocal(next);
-    toast.success(`Vote enregistré : ${name}`, {
-      description: categories.find((c) => c.id === category)?.label,
-    });
-  }
-
-  const complete = categories.every((c) => c.disabled || votes[c.id]);
-
-  return (
-    <div className="mt-4 rounded-2xl bg-secondary/60 p-4">
-      <div className="mb-1 flex items-center gap-2 text-sm font-semibold">
-        <Vote className="size-4 text-primary" /> Vote des figures
-        {complete && (
-          <span className="ml-auto rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-500">
-            Voté ✓
-          </span>
-        )}
-      </div>
-      <p className="mb-4 text-xs text-muted-foreground">
-        Tu votes en tant que <strong className="text-foreground">{me}</strong>. Vote
-        enregistré sur cet appareil — la centralisation arrivera avec l&apos;interface
-        admin.
-      </p>
-      <div className="flex flex-col gap-3.5">
-        {categories.map((c) => (
-          <div key={c.id} className="flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold">{c.label}</div>
-              <div className="text-[11px] text-muted-foreground">{c.rule}</div>
-            </div>
-            {c.disabled ? (
-              <span className="max-w-[45%] text-right text-xs text-muted-foreground italic">
-                {c.disabled}
-              </span>
-            ) : (
-              <Select
-                value={votes[c.id] ?? null}
-                onValueChange={(v) => castVote(c.id, v as string)}
-              >
-                <SelectTrigger
-                  size="sm"
-                  aria-label={`Voter — ${c.label}`}
-                  className="rounded-full bg-background dark:bg-background"
-                >
-                  <SelectValue placeholder="Choisir…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {c.options.map((name) => (
-                    <SelectItem key={name} value={name}>
-                      {name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /* ============================= PAGE ============================= */
-
-const FAIT_LABELS: [keyof Journee["faits"], string][] = [
-  ["mvp", "MVP du match"],
-  ["impactA", "Meilleur joueur — Équipe A"],
-  ["impactB", "Meilleur joueur — Équipe B"],
-  ["defs", "Meilleurs défenseurs"],
-  ["buteur", "Meilleur buteur"],
-  ["passeur", "Meilleur passeur"],
-];
 
 export default function StatsPage() {
   const { me } = useMyPlayer();
@@ -299,9 +176,7 @@ export default function StatsPage() {
           <div className="flex flex-col gap-3">
             {[...JOURNEES].reverse().map((j) => {
               const open = openJ === j.j;
-              const faits = FAIT_LABELS.map(([key, label]) =>
-                j.faits[key] ? ([label, j.faits[key]] as const) : null
-              ).filter(Boolean) as [string, string][];
+              const scoreSummary = journeeScoreSummary(j);
 
               return (
                 <div key={j.j} className="overflow-hidden rounded-3xl bg-card">
@@ -323,11 +198,14 @@ export default function StatsPage() {
                       <div className="text-[13px] text-muted-foreground">{j.date}</div>
                     </div>
                     <div className="flex items-center gap-3">
-                      {j.score ? (
-                        <span className="text-2xl font-bold tracking-tight tabular-nums">
-                          {j.score[0]}
-                          <span className="mx-1.5 text-muted-foreground">–</span>
-                          {j.score[1]}
+                      {scoreSummary ? (
+                        <span
+                          className={cn(
+                            "font-bold tracking-tight tabular-nums",
+                            scoreSummary.multi ? "text-sm text-muted-foreground" : "text-2xl"
+                          )}
+                        >
+                          {scoreSummary.label}
                         </span>
                       ) : (
                         <span className="rounded-full bg-secondary px-2.5 py-1 text-[10px] font-semibold text-muted-foreground uppercase">
@@ -344,55 +222,97 @@ export default function StatsPage() {
                   </button>
 
                   {open && (
-                    <div className="border-t border-border/60 px-5 py-4">
-                      {faits.length > 0 && (
-                        <div className="mb-4">
-                          <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-[#c9962e] dark:text-[#E8C87A]">
-                            <Star className="size-3.5" /> Faits marquants
-                          </div>
-                          <div className="flex flex-col">
-                            {faits.map(([label, value]) => (
-                              <div
-                                key={label}
-                                className="flex items-baseline justify-between gap-3 border-b border-border/60 py-2 last:border-0"
-                              >
-                                <div className="text-[13px] text-muted-foreground">{label}</div>
-                                <div className="text-right text-sm font-semibold">{value}</div>
+                    <div className="flex flex-col gap-4 border-t border-border/60 px-5 py-4">
+                      {j.faits?.buteur || j.faits?.passeur ? (
+                        <div className="flex flex-col gap-1.5">
+                          {j.faits.buteur && (
+                            <p className="text-[13px]">
+                              <span className="text-muted-foreground">Meilleur buteur — </span>
+                              <span className="font-semibold">{j.faits.buteur}</span>
+                            </p>
+                          )}
+                          {j.faits.passeur && (
+                            <p className="text-[13px]">
+                              <span className="text-muted-foreground">Meilleur passeur — </span>
+                              <span className="font-semibold">{j.faits.passeur}</span>
+                            </p>
+                          )}
+                        </div>
+                      ) : null}
+
+                      {j.matches && j.matches.length > 0 ? (
+                        <div className="flex flex-col gap-3">
+                          {j.matches.map((match) => (
+                            <div key={match.id} className="rounded-2xl bg-secondary/40 p-3.5">
+                              <p className="mb-2 text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                {match.label}
+                              </p>
+                              <div className="grid grid-cols-2 gap-3">
+                                {[match.teamA, match.teamB].map((team) => (
+                                  <div key={team.id}>
+                                    <div className="mb-1.5 flex items-baseline justify-between">
+                                      <span className="text-sm font-bold">{team.name}</span>
+                                      <span className="text-lg font-bold tabular-nums">{team.score}</span>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      {team.players.map((p) => (
+                                        <div
+                                          key={p.name}
+                                          className="flex items-center justify-between text-[13px]"
+                                        >
+                                          <span
+                                            className={cn(
+                                              "truncate font-medium",
+                                              p.name === me && "text-primary"
+                                            )}
+                                          >
+                                            {p.name}
+                                          </span>
+                                          <span className="shrink-0 text-xs text-muted-foreground">
+                                            {p.buts}b · {p.passes}pd
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col">
+                          {(j.lignes ?? []).map(([name, res, buts, passes]) => (
+                            <div
+                              key={name}
+                              className="flex items-center gap-2.5 border-b border-border/60 py-2 text-sm last:border-0"
+                            >
+                              <span
+                                className={cn(
+                                  "w-5 font-bold",
+                                  res === "V"
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : res === "D"
+                                      ? "text-destructive"
+                                      : "text-muted-foreground"
+                                )}
+                              >
+                                {res === "-" ? "·" : res}
+                              </span>
+                              <span className="flex-1 font-medium">{name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {buts} but{buts > 1 ? "s" : ""} · {passes} passe
+                                {passes > 1 ? "s" : ""} D.
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       )}
 
-                      <div className="mb-1 text-sm font-semibold">Feuille de match</div>
-                      <div className="flex flex-col">
-                        {j.lignes.map(([name, res, buts, passes]) => (
-                          <div
-                            key={name}
-                            className="flex items-center gap-2.5 border-b border-border/60 py-2 text-sm last:border-0"
-                          >
-                            <span
-                              className={cn(
-                                "w-5 font-bold",
-                                res === "V"
-                                  ? "text-emerald-600 dark:text-emerald-400"
-                                  : res === "D"
-                                    ? "text-destructive"
-                                    : "text-muted-foreground"
-                              )}
-                            >
-                              {res === "-" ? "·" : res}
-                            </span>
-                            <span className="flex-1 font-medium">{name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {buts} but{buts > 1 ? "s" : ""} · {passes} passe
-                              {passes > 1 ? "s" : ""} D.
-                            </span>
-                          </div>
-                        ))}
+                      <div>
+                        <p className="mb-2 text-sm font-semibold">Figures de match</p>
+                        <ElectionPanel journee={j} me={me} />
                       </div>
-
-                      <VotePanel journee={j} me={me} />
                     </div>
                   )}
                 </div>

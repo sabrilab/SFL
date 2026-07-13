@@ -1,280 +1,132 @@
-// Cartes Boost SFL : MVP (or), Joueur Impact (feu), Défensive (bleu).
-// Gagnées via les figures de match — n'altèrent pas la carte principale.
+// Cartes Boost SFL — même socle que les cartes joueur (taille, disposition,
+// écusson) mais un style "énergie radiante" nettement premium et distinct :
+// MVP (couronne, or double-anneau), Impact (flamme, édition spéciale),
+// Défensive (bouclier, glace bleue). Gagnées via les figures de match —
+// n'altèrent pas la carte principale du joueur.
 
-import { STAT_KEYS, type BoostCardData } from "@/lib/sfl/engine";
+import { CardShell, type CardTheme } from "./card-shell";
+import type { BoostCardData, BoostType } from "@/lib/sfl/engine";
 
-const display = {
-  fontFamily: "var(--font-anton), 'Arial Black', sans-serif",
-  textTransform: "uppercase" as const,
-  letterSpacing: 1,
-};
-const condensed = {
-  fontFamily: "var(--font-barlow), 'Arial Narrow', sans-serif",
-};
-
-const THEMES = {
+const BOOST_THEMES: Record<BoostType, CardTheme> = {
   mvp: {
-    label: "MVP DU MATCH",
-    edition: null as string | null,
-    ring: "#F4C542",
-    ring2: "#8A5A12",
-    bg: "radial-gradient(120% 90% at 50% 12%, #6A4E12 0%, #241A06 42%, #0B0803 100%)",
-    rays: "conic-gradient(from 210deg at 62% 34%, rgba(244,197,66,.55), transparent 42%, rgba(244,197,66,.32) 62%, transparent 82%)",
-    name: "linear-gradient(180deg,#FBE9A8,#C9962E)",
-    stat: "#F4C542",
-    statLabel: "#B98F32",
-    ovr: "#F4E4A6",
-    pos: "#F4C542",
-    crown: true,
-    laurel: true,
-    star: false,
+    motif: "rays",
+    frameBg:
+      "linear-gradient(160deg,#FFF3C6 0%,#F4C542 22%,#8A5A12 50%,#FBE9A8 75%,#C9962E 100%)",
+    framePad: 3.4,
+    bg: "radial-gradient(130% 110% at 50% 8%, #241A06 0%, #120C03 48%, #060402 100%)",
+    text: "#F4E4A6",
+    accent: "#F4C542",
+    label: "#B98F32",
+    nameColor: "#F4E4A6",
+    nameGrad: "linear-gradient(180deg,#FFF3C6 10%,#F4C542 55%,#9C6B14 100%)",
+    divider: "#F4C54240",
+    ballA: "#F4C542",
+    ballB: "#0C0804",
+    logoBar: "linear-gradient(90deg,#FFCF5C,#8A5A12)",
+    logoColor: "#FFFFFF",
+    wordmarkColor: "#ffffffcc",
+    diamondBg: "#0C0804",
+    diamondBorder: "#F4C542",
+    raysBg:
+      "conic-gradient(from 210deg at 60% 30%, rgba(244,197,66,.6), transparent 40%, rgba(244,197,66,.35) 60%, transparent 82%)",
+    grainOpacity: 0.18,
+    grainBlend: "screen",
+    fadeOverlay:
+      "linear-gradient(180deg, rgba(6,4,2,.5) 0%, rgba(6,4,2,0) 24%, rgba(6,4,2,0) 55%, rgba(6,4,2,.85) 78%, rgba(6,4,2,.96) 100%)",
+    photoFadeTo: "#120C03",
+    innerBorder: "#F4C54255",
+    glow: "0 0 34px rgba(244,197,66,.5), 0 16px 40px rgba(0,0,0,.65)",
+    banner: { label: "MVP du match", ring: "#FFDE83", ring2: "#8A5A12", text: "#FCEBB0" },
+    glyph: "crown",
+    glyphColor: "#F4C542",
   },
   impact: {
-    label: "JOUEUR IMPACT",
-    edition: "SPÉCIAL ÉDITION",
-    ring: "#FF5A1F",
-    ring2: "#7A1E05",
-    bg: "radial-gradient(120% 90% at 50% 10%, #5A1806 0%, #250A03 45%, #0A0402 100%)",
-    rays: "linear-gradient(115deg, transparent 30%, rgba(255,90,31,.5) 48%, rgba(255,150,60,.7) 55%, rgba(255,90,31,.4) 62%, transparent 78%)",
-    name: "linear-gradient(180deg,#F2EDE6,#B9B0A6)",
-    stat: "#F5EFE8",
-    statLabel: "#C77C4E",
-    ovr: "#F2EDE6",
-    pos: "#FF7A3F",
-    crown: false,
-    laurel: false,
-    star: true,
+    motif: "rays",
+    frameBg:
+      "linear-gradient(160deg,#FFB88A 0%,#FF5A1F 25%,#7A1E05 50%,#FF8A4A 75%,#B33E0E 100%)",
+    framePad: 3.4,
+    bg: "radial-gradient(130% 110% at 50% 6%, #360C02 0%, #1A0601 50%, #0A0402 100%)",
+    text: "#FCE9DD",
+    accent: "#FF8A4A",
+    label: "#C77C4E",
+    nameColor: "#FCE9DD",
+    nameGrad: "linear-gradient(180deg,#FFE3D0 10%,#FF8A4A 60%,#B33E0E 100%)",
+    divider: "#FF7A3F40",
+    ballA: "#FF8A4A",
+    ballB: "#120602",
+    logoBar: "linear-gradient(90deg,#FF8A4A,#7A1E05)",
+    logoColor: "#FFFFFF",
+    wordmarkColor: "#ffffffcc",
+    diamondBg: "#1A0601",
+    diamondBorder: "#FF7A3F",
+    raysBg:
+      "linear-gradient(115deg, transparent 25%, rgba(255,90,31,.55) 45%, rgba(255,160,70,.75) 55%, rgba(255,90,31,.4) 65%, transparent 82%)",
+    grainOpacity: 0.18,
+    grainBlend: "screen",
+    fadeOverlay:
+      "linear-gradient(180deg, rgba(10,4,2,.5) 0%, rgba(10,4,2,0) 24%, rgba(10,4,2,0) 55%, rgba(10,4,2,.85) 78%, rgba(10,4,2,.96) 100%)",
+    photoFadeTo: "#1A0601",
+    innerBorder: "#FF7A3F55",
+    glow: "0 0 34px rgba(255,110,40,.5), 0 16px 40px rgba(0,0,0,.65)",
+    banner: {
+      label: "Joueur Impact",
+      sub: "Édition spéciale",
+      ring: "#FFA36B",
+      ring2: "#7A1E05",
+      text: "#FEE3D2",
+    },
+    glyph: "flame",
+    glyphColor: "#FF7A3F",
   },
   def: {
-    label: "DÉFENSIVE",
-    edition: "DEFENSIVE SPECIAL",
-    ring: "#7FD4FF",
-    ring2: "#1C4E77",
-    bg: "radial-gradient(120% 90% at 50% 22%, #123A5C 0%, #0A1B30 48%, #04070F 100%)",
-    rays: "radial-gradient(60% 46% at 50% 30%, rgba(64,170,255,.5), transparent 62%)",
-    name: "linear-gradient(180deg,#EAF4FF,#9DB3C6)",
-    stat: "#EAF4FF",
-    statLabel: "#5B8FB5",
-    ovr: "#DCEBFB",
-    pos: "#7FD4FF",
-    crown: false,
-    laurel: false,
-    star: false,
+    motif: "rays",
+    frameBg:
+      "linear-gradient(160deg,#D8F1FF 0%,#7FD4FF 25%,#1C4E77 50%,#A6E3FF 75%,#2E6E99 100%)",
+    framePad: 3.4,
+    bg: "radial-gradient(130% 110% at 50% 14%, #0F2C42 0%, #081A28 50%, #04070F 100%)",
+    text: "#E2F4FF",
+    accent: "#7FD4FF",
+    label: "#5B8FB5",
+    nameColor: "#E2F4FF",
+    nameGrad: "linear-gradient(180deg,#EAF7FF 10%,#7FD4FF 60%,#2E6E99 100%)",
+    divider: "#7FD4FF40",
+    ballA: "#7FD4FF",
+    ballB: "#04070F",
+    logoBar: "linear-gradient(90deg,#7FD4FF,#1C4E77)",
+    logoColor: "#FFFFFF",
+    wordmarkColor: "#ffffffcc",
+    diamondBg: "#081A28",
+    diamondBorder: "#7FD4FF",
+    raysBg: "radial-gradient(65% 50% at 50% 26%, rgba(80,190,255,.5), transparent 62%)",
+    grainOpacity: 0.16,
+    grainBlend: "screen",
+    fadeOverlay:
+      "linear-gradient(180deg, rgba(3,10,16,.5) 0%, rgba(3,10,16,0) 24%, rgba(3,10,16,0) 55%, rgba(3,10,16,.85) 78%, rgba(3,10,16,.96) 100%)",
+    photoFadeTo: "#081A28",
+    innerBorder: "#7FD4FF55",
+    glow: "0 0 34px rgba(80,190,255,.45), 0 16px 40px rgba(0,0,0,.65)",
+    banner: { label: "Défensive", ring: "#A6E3FF", ring2: "#1C4E77", text: "#E2F4FF" },
+    glyph: "shield",
+    glyphColor: "#7FD4FF",
   },
 };
 
-export const BOOST_LABELS: Record<BoostCardData["type"], string> = {
+export const BOOST_LABELS: Record<BoostType, string> = {
   mvp: "MVP",
   impact: "Impact",
   def: "Défensive",
 };
 
 export function BoostCard({ card, size = 1 }: { card: BoostCardData; size?: number }) {
-  const th = THEMES[card.type];
-  const S = (n: number) => n * size;
-
   return (
-    <div
-      style={{
-        position: "relative",
-        width: S(260),
-        borderRadius: S(16),
-        overflow: "hidden",
-        background: th.bg,
-        border: `${S(2)}px solid ${th.ring}`,
-        boxShadow: `0 ${S(14)}px ${S(36)}px rgba(0,0,0,.55), inset 0 0 ${S(40)}px rgba(0,0,0,.5)`,
-        color: "#fff",
-        ...condensed,
-      }}
-    >
-      <div style={{ position: "absolute", inset: 0, background: th.rays, opacity: 0.9 }} />
-      <div
-        style={{
-          position: "absolute",
-          inset: S(6),
-          border: `1px solid ${th.ring}66`,
-          borderRadius: S(12),
-          pointerEvents: "none",
-        }}
-      />
-
-      {/* En-tête */}
-      <div style={{ position: "relative", padding: `${S(14)}px ${S(16)}px 0`, textAlign: "center" }}>
-        <div
-          style={{
-            ...display,
-            fontStyle: "italic",
-            fontSize: S(22),
-            color: "#fff",
-            textShadow: `0 0 ${S(14)}px ${th.ring}`,
-          }}
-        >
-          S<span style={{ color: th.ring }}>F</span>L
-        </div>
-        <div style={{ fontSize: S(8), letterSpacing: S(3), color: "#ffffffbb", fontWeight: 700 }}>
-          SUNDAY FIVE LEAGUE
-        </div>
-        {th.crown && (
-          <div style={{ fontSize: S(20), marginTop: S(2), filter: `drop-shadow(0 0 ${S(6)}px ${th.ring})` }}>
-            ♔
-          </div>
-        )}
-      </div>
-
-      {/* OVR + poste */}
-      <div style={{ position: "absolute", top: S(58), left: S(14), zIndex: 3, textAlign: "left" }}>
-        {card.type === "impact" && (
-          <div style={{ fontSize: S(11), letterSpacing: S(2), color: "#fff", fontWeight: 800 }}>OVR</div>
-        )}
-        <div
-          style={{
-            ...display,
-            fontSize: S(40),
-            lineHeight: 0.9,
-            color: th.ovr,
-            textShadow: `0 ${S(2)}px ${S(6)}px #000`,
-          }}
-        >
-          {card.ovr}
-        </div>
-        <div style={{ ...display, fontSize: S(15), color: th.pos }}>{card.poste}</div>
-        {card.type === "def" && (
-          <div style={{ marginTop: S(8), width: S(50), textAlign: "center" }}>
-            <div
-              style={{
-                width: S(46),
-                height: S(52),
-                margin: "0 auto",
-                background: "linear-gradient(180deg,#cfd8e2,#3a4a5c)",
-                clipPath: "polygon(50% 0,100% 22%,100% 74%,50% 100%,0 74%,0 22%)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                border: `1px solid ${th.ring}`,
-              }}
-            >
-              <span style={{ ...display, fontSize: S(15), color: "#1a2430" }}>DEF</span>
-            </div>
-            <div
-              style={{
-                fontSize: S(6.5),
-                letterSpacing: S(1),
-                color: th.ring,
-                fontWeight: 800,
-                marginTop: S(2),
-              }}
-            >
-              DEFENSIVE
-              <br />
-              SPECIAL
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Emplacement photo */}
-      <div
-        style={{
-          position: "relative",
-          height: S(150),
-          margin: `${S(6)}px ${S(10)}px 0`,
-          display: "flex",
-          alignItems: "flex-end",
-          justifyContent: "center",
-        }}
-      >
-        <div
-          style={{
-            width: S(120),
-            height: S(140),
-            borderRadius: `${S(60)}px ${S(60)}px ${S(12)}px ${S(12)}px`,
-            background: `linear-gradient(180deg, ${th.ring}22, transparent)`,
-            border: `1px dashed ${th.ring}55`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: S(9),
-            letterSpacing: S(2),
-            color: "#ffffff88",
-            textAlign: "center",
-            padding: S(8),
-          }}
-        >
-          PHOTO
-          <br />
-          {card.player.toUpperCase()}
-        </div>
-      </div>
-
-      {/* Nom */}
-      <div style={{ position: "relative", textAlign: "center", marginTop: S(-6) }}>
-        <div
-          style={{
-            ...display,
-            fontSize: S(34),
-            lineHeight: 1,
-            background: th.name,
-            WebkitBackgroundClip: "text",
-            backgroundClip: "text",
-            color: "transparent",
-            filter: `drop-shadow(0 ${S(2)}px ${S(3)}px #000)`,
-          }}
-        >
-          {card.player.toUpperCase()}
-        </div>
-      </div>
-
-      {/* Bannière du type */}
-      <div style={{ position: "relative", textAlign: "center", margin: `${S(6)}px auto ${S(4)}px`, width: "82%" }}>
-        <div
-          style={{
-            ...display,
-            fontSize: S(17),
-            color: "#fff",
-            padding: `${S(5)}px 0`,
-            background: `linear-gradient(90deg, transparent, ${th.ring2}, ${th.ring}, ${th.ring2}, transparent)`,
-            clipPath: "polygon(6% 0,94% 0,100% 50%,94% 100%,6% 100%,0 50%)",
-            textShadow: `0 ${S(1)}px ${S(2)}px #000`,
-          }}
-        >
-          {th.star ? "★ " : ""}
-          {th.label}
-          {th.star ? " ★" : ""}
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div
-        style={{
-          position: "relative",
-          display: "grid",
-          gridTemplateColumns: "repeat(6,1fr)",
-          padding: `${S(8)}px ${S(10)}px`,
-          borderTop: `1px solid ${th.ring}44`,
-          background: "rgba(0,0,0,.35)",
-        }}
-      >
-        {STAT_KEYS.map((k) => (
-          <div key={k} style={{ textAlign: "center" }}>
-            <div style={{ fontSize: S(8.5), letterSpacing: S(1), color: th.statLabel, fontWeight: 800 }}>
-              {k}
-            </div>
-            <div style={{ ...display, fontSize: S(18), color: th.stat, textShadow: `0 0 ${S(6)}px ${th.ring}55` }}>
-              {card.stats[k]}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Pied */}
-      <div style={{ position: "relative", textAlign: "center", padding: `${S(4)}px 0 ${S(8)}px` }}>
-        {th.laurel && <div style={{ fontSize: S(16), color: th.ring }}>🌿 ⚽ 🌿</div>}
-        {th.edition && (
-          <div style={{ fontSize: S(8), letterSpacing: S(4), color: `${th.ring}cc`, fontWeight: 800, marginTop: S(2) }}>
-            {th.edition}
-          </div>
-        )}
-      </div>
-    </div>
+    <CardShell
+      theme={BOOST_THEMES[card.type]}
+      size={size}
+      ovrValue={card.ovr}
+      poste={card.poste}
+      name={card.player}
+      stats={card.stats}
+      photoName={card.player}
+    />
   );
 }

@@ -1,7 +1,7 @@
 // Données Saison 1 — portées depuis SFL_Statistiques_Base_Propre.xlsx.
 // À terme, ces données viendront d'une base alimentée par l'interface admin.
 
-import type { BoostCardData, Journee, Player } from "./engine";
+import type { BoostCardData, Journee, MatchTeam, Player } from "./engine";
 
 export const PLAYERS: Player[] = [
   { name: "Smail", poste: "MC", pp: 22, matchs: 3, buts: 6, passes: 6, statut: "Actif", stats: { VIT: 76, TIR: 75, PAS: 76, DRI: 78, DEF: 87, PHY: 88 }, mvp: 0, impact: 1, def: 1 },
@@ -38,24 +38,41 @@ export const PLAYERS: Player[] = [
   { name: "Hasbi", poste: "G", pp: 0, matchs: 0, buts: 0, passes: 0, statut: "Actif", stats: { VIT: 85, TIR: 79, PAS: 79, DRI: 86, DEF: 92, PHY: 88 }, mvp: 0, impact: 0, def: 0 },
 ];
 
+function team(id: string, name: string, score: number, players: [string, number, number][]): MatchTeam {
+  return {
+    id,
+    name,
+    score,
+    players: players.map(([n, buts, passes]) => ({ name: n, buts, passes })),
+  };
+}
+
 export const JOURNEES: Journee[] = [
   {
     j: 1,
     date: "Dim. 22 juin",
     sflTime: true,
-    score: [5, 3],
-    faits: { mvp: "Kader", impactA: "Kader", impactB: "Badis", defs: "Smail & Sidali", buteur: "Ilyes — 4 buts", passeur: "Omar — 4 passes D." },
-    lignes: [
-      ["Ilyes", "V", 4, 1], ["Smail", "V", 2, 2], ["Omar", "V", 1, 4], ["Badis", "V", 1, 1], ["Naim", "V", 1, 1],
-      ["Kader", "D", 2, 3], ["Sidali", "D", 2, 2], ["Yanis", "D", 2, 2], ["Adil", "D", 1, 1], ["Mehdi", "D", 1, 0],
+    faits: { buteur: "Ilyes — 4 buts", passeur: "Omar — 4 passes D." },
+    matches: [
+      {
+        id: "j1-m1",
+        label: "Match unique",
+        teamA: team("j1-m1-a", "Équipe A", 5, [
+          ["Ilyes", 4, 1], ["Smail", 2, 2], ["Omar", 1, 4], ["Badis", 1, 1], ["Naim", 1, 1],
+        ]),
+        teamB: team("j1-m1-b", "Équipe B", 3, [
+          ["Kader", 2, 3], ["Sidali", 2, 2], ["Yanis", 2, 2], ["Adil", 1, 1], ["Mehdi", 1, 0],
+        ]),
+      },
     ],
   },
   {
     j: 2,
     date: "Dim. 29 juin",
     sflTime: false,
-    score: null,
     faits: { buteur: "Zakary — 6 buts", passeur: "Souley — 3 passes D." },
+    // Feuille de match pas encore renseignée : composition d'équipes inconnue,
+    // pas de vote de figures possible pour cette journée.
     lignes: [
       ["Zakary", "-", 6, 2], ["Ilies", "-", 4, 1], ["Kader", "-", 3, 1], ["Anis", "-", 2, 1], ["Souley", "-", 2, 3],
       ["Smail", "-", 2, 2], ["Yamin", "-", 1, 2], ["Ibrahim", "-", 1, 1], ["Moussa", "-", 1, 1],
@@ -65,10 +82,28 @@ export const JOURNEES: Journee[] = [
     j: 3,
     date: "Dim. 6 juil.",
     sflTime: false,
-    score: null,
-    faits: { impactA: "Smail", defs: "Franz", passeur: "Kylian — 4 passes D." },
-    lignes: [
-      ["Kylian", "V", 2, 4], ["Smail", "V", 2, 2], ["Ibrahim", "V", 2, 1], ["Ayman", "V", 2, 1], ["Franz", "V", 1, 0],
+    faits: { buteur: "Ilyes & Souley — 5 buts", passeur: "Ilies — 5 passes D." },
+    matches: [
+      {
+        id: "j3-m1",
+        label: "Match 1",
+        teamA: team("j3-m1-orange", "Orange", 9, [
+          ["Smail", 2, 2], ["Kylian", 2, 4], ["Ibrahim", 2, 1], ["Franz", 1, 0], ["Ayman", 2, 1], ["Bilal", 0, 1],
+        ]),
+        teamB: team("j3-m1-bleu", "Bleu", 6, [
+          ["Rezki", 0, 0], ["Kader", 0, 2], ["Ilyes", 5, 0], ["Moussa", 1, 2], ["Adil", 0, 0], ["Adrien", 0, 0],
+        ]),
+      },
+      {
+        id: "j3-m2",
+        label: "Match 2",
+        teamA: team("j3-m2-vert", "Vert", 8, [
+          ["Badis", 0, 0], ["Zakary", 2, 4], ["Yacine", 3, 2], ["Anis", 2, 0], ["Naim", 1, 2], ["Soffiane", 0, 0],
+        ]),
+        teamB: team("j3-m2-jaune", "Jaune", 12, [
+          ["Souley", 5, 1], ["Sidali", 0, 0], ["Ilies", 2, 5], ["Ryad", 2, 0], ["Yamin", 2, 1], ["Zakaria", 1, 1],
+        ]),
+      },
     ],
   },
 ];

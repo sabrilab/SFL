@@ -8,7 +8,7 @@ import { PlayerCard } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
 import { JOURNEES, NEXT_MATCH, PLAYERS } from "@/lib/sfl/data";
-import { ovr, rankPlayers, rareStats } from "@/lib/sfl/engine";
+import { journeeScoreSummary, ovr, rankPlayers, rareStats } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 
 const RANKED = rankPlayers(PLAYERS);
@@ -55,7 +55,9 @@ export default function Home() {
   }
 
   const myRank = RANKED.find((p) => p.name === player.name)?.rank ?? RANKED.length;
-  const lastPlayed = [...JOURNEES].reverse().find((j) => j.score) ?? JOURNEES[0];
+  const lastPlayed =
+    [...JOURNEES].reverse().find((j) => j.matches && j.matches.length > 0) ?? JOURNEES[0];
+  const lastScore = journeeScoreSummary(lastPlayed);
   const top3 = RANKED.slice(0, 3);
   const rankProgress = (RANKED.length - myRank + 1) / RANKED.length;
 
@@ -142,10 +144,13 @@ export default function Home() {
                 Dernier résultat · J{lastPlayed.j}
                 {lastPlayed.sflTime && <span className="ml-1.5 text-primary">SFL Time</span>}
               </p>
-              <div className="mt-1 text-3xl font-bold tracking-tight tabular-nums">
-                {lastPlayed.score?.[0]}
-                <span className="mx-2 text-muted-foreground">–</span>
-                {lastPlayed.score?.[1]}
+              <div
+                className={cn(
+                  "mt-1 font-bold tracking-tight tabular-nums",
+                  lastScore?.multi ? "text-xl" : "text-3xl"
+                )}
+              >
+                {lastScore?.label}
               </div>
               <p className="mt-0.5 text-sm text-muted-foreground">{lastPlayed.date}</p>
             </div>
