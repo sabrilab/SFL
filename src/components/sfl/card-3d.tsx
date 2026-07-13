@@ -139,6 +139,7 @@ export function Card3D({
           playerLayer={captured.playerLayer}
           stats={captured.stats}
           holo={mode === "rare"}
+          mode={mode}
         />
       ) : (
         <PlayerCard player={player} mode={mode} size={size} />

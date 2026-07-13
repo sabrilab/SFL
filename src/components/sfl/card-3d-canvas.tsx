@@ -22,10 +22,15 @@ const LERP = 0.16;
 const DRAG_RANGE_PX = 130; // glissement (px) pour atteindre le tilt maximum
 
 // Profondeur d'extrusion entre les trois calques (en unités monde, la
-// carte fait ~1.5 unité de haut) — volontairement marquée pour un vrai
-// effet de pop-out façon carte à collectionner, pas une simple nuance.
-const PLAYER_Z = 0.16;
-const STATS_Z = 0.3;
+// carte fait ~1.5 unité de haut) — un vrai pop-out façon carte à
+// collectionner, mais resserré pour rester crédible comme un seul bloc.
+const PLAYER_Z = 0.1;
+const STATS_Z = 0.18;
+
+const BEZEL_COLOR: Record<"simple" | "rare", string> = {
+  simple: "#B99D66",
+  rare: "#9C6F22",
+};
 
 const HOLO_VERTEX = /* glsl */ `
   varying vec2 vUv;
@@ -67,11 +72,13 @@ function CardMesh({
   playerLayer,
   stats,
   holo,
+  bezel,
 }: {
   background: string;
   playerLayer: string;
   stats: string;
   holo: boolean;
+  bezel: string;
 }) {
   const { camera, invalidate } = useThree();
   const bgTex = useLayerTexture(background);
@@ -155,8 +162,32 @@ function CardMesh({
     [invalidate]
   );
 
+  // Murs latéraux : referment les tranches entre le fond et le dessus,
+  // pour que la carte se lise comme un bloc hermétique plutôt que des
+  // plans flottants séparés.
+  const wallT = Math.min(width, height) * 0.012;
+  const wallDepth = STATS_Z;
+  const wallZ = STATS_Z / 2;
+
   return (
     <group ref={groupRef} onPointerDown={onDown}>
+      <mesh position={[-width / 2, 0, wallZ]}>
+        <boxGeometry args={[wallT, height, wallDepth]} />
+        <meshStandardMaterial color={bezel} roughness={0.45} metalness={0.35} />
+      </mesh>
+      <mesh position={[width / 2, 0, wallZ]}>
+        <boxGeometry args={[wallT, height, wallDepth]} />
+        <meshStandardMaterial color={bezel} roughness={0.45} metalness={0.35} />
+      </mesh>
+      <mesh position={[0, height / 2, wallZ]}>
+        <boxGeometry args={[width, wallT, wallDepth]} />
+        <meshStandardMaterial color={bezel} roughness={0.45} metalness={0.35} />
+      </mesh>
+      <mesh position={[0, -height / 2, wallZ]}>
+        <boxGeometry args={[width, wallT, wallDepth]} />
+        <meshStandardMaterial color={bezel} roughness={0.45} metalness={0.35} />
+      </mesh>
+
       <mesh position={[0, 0, 0]}>
         <planeGeometry args={[width, height, 24, 32]} />
         <meshStandardMaterial map={bgTex} roughness={0.4} metalness={0.06} transparent />
@@ -194,11 +225,13 @@ export function CardCanvas({
   playerLayer,
   stats,
   holo,
+  mode,
 }: {
   background: string;
   playerLayer: string;
   stats: string;
   holo: boolean;
+  mode: "simple" | "rare";
 }) {
   return (
     <Canvas
@@ -210,7 +243,13 @@ export function CardCanvas({
     >
       <ambientLight intensity={1.5} />
       <directionalLight position={[2, 3, 4]} intensity={0.7} />
-      <CardMesh background={background} playerLayer={playerLayer} stats={stats} holo={holo} />
+      <CardMesh
+        background={background}
+        playerLayer={playerLayer}
+        stats={stats}
+        holo={holo}
+        bezel={BEZEL_COLOR[mode]}
+      />
     </Canvas>
   );
 }
