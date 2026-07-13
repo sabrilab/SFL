@@ -5,28 +5,19 @@ import { useState } from "react";
 import { Check, ChevronRight, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlayerCard } from "@/components/sfl/player-card";
-import { BoostCard } from "@/components/sfl/boost-card";
+import { MvpBanner } from "@/components/sfl/mvp-banner";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
 import { JOURNEES, NEXT_MATCH, PLAYERS } from "@/lib/sfl/data";
-import { journeeScoreSummary, ovr, rankByMetric, rankPlayers, type BoostCardData } from "@/lib/sfl/engine";
+import { journeeScoreSummary, rankByMetric, rankPlayers } from "@/lib/sfl/engine";
 import { RANKINGS } from "@/lib/sfl/rankings";
 import { cn } from "@/lib/utils";
 
 const RANKED = rankPlayers(PLAYERS);
 const PRESENCE_KEY = `sfl-presence-j${NEXT_MATCH.journee}`;
 
-// MVP de la saison = leader du classement MVP, présenté avec sa vraie
-// carte Boost (pas une carte standard).
+// MVP de la saison = leader du classement MVP.
 const MVP_RANKED = rankByMetric(PLAYERS, (p) => p.mvp)[0];
-const MVP_CARD: BoostCardData = {
-  player: MVP_RANKED.name,
-  type: "mvp",
-  ovr: ovr(MVP_RANKED.stats),
-  poste: MVP_RANKED.poste,
-  date: "Saison 1",
-  stats: MVP_RANKED.stats,
-};
 
 // Un leader par classement (hors MVP, déjà mis en avant) pour l'aperçu
 // "meilleurs joueurs" — beaucoup de cartes différentes, un vrai overview.
@@ -62,29 +53,22 @@ export default function Home() {
         <h1 className="text-[34px] font-bold tracking-tight">Salut, {player.name}</h1>
       </div>
 
-      {/* Ma carte + MVP de la saison, côte à côte dès l'arrivée */}
-      <section className="flex items-start justify-center gap-4">
-        <Link href="/carte" className="flex flex-col items-center gap-2">
-          <span className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
-            Ma carte
-          </span>
-          <PlayerCard player={player} mode="rare" size={0.58} />
-          <span className="text-xs font-bold tracking-tight tabular-nums">
-            #{myRank} · {player.pp} pts
-          </span>
-        </Link>
-        <Link href="/stats" className="flex flex-col items-center gap-2">
-          <span className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
-            MVP de la saison
-          </span>
-          <BoostCard card={MVP_CARD} size={0.58} />
-          <span className="text-xs font-bold tracking-tight tabular-nums">
-            {MVP_RANKED.name} · {MVP_RANKED.mvp} titre{MVP_RANKED.mvp > 1 ? "s" : ""}
-          </span>
+      {/* Ma carte — dès l'arrivée */}
+      <section className="flex flex-col items-center gap-3">
+        <PlayerCard player={player} mode="rare" size={0.68} />
+        <Link
+          href="/carte"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold"
+        >
+          #{myRank} · {player.pp} pts
+          <ChevronRight className="size-4" />
         </Link>
       </section>
 
-      {/* Prochain match — juste sous la carte MVP */}
+      {/* MVP de la saison — bannière horizontale, juste au-dessus de la convocation */}
+      <MvpBanner player={MVP_RANKED} titles={MVP_RANKED.mvp} />
+
+      {/* Prochain match */}
       <section className="rounded-3xl bg-card p-5">
         <div className="flex items-start justify-between">
           <div>
