@@ -168,6 +168,7 @@ export function CardShell({
       }}
     >
       <div
+        data-card-part="frame"
         style={{
           padding: S(th.framePad),
           borderRadius: S(20),
@@ -176,6 +177,7 @@ export function CardShell({
         }}
       >
         <div
+          data-card-part="body"
           style={{
             position: "relative",
             width: S(254),
@@ -241,6 +243,7 @@ export function CardShell({
 
           {/* Photo (ou initiale) — buste cadré tête au centre-haut de la carte */}
           <div
+            data-card-part="player"
             style={{
               position: "absolute",
               top: S(32),
@@ -398,6 +401,7 @@ export function CardShell({
 
           {/* Stats */}
           <div
+            data-card-part="stats"
             style={{
               position: "absolute",
               left: S(14),
