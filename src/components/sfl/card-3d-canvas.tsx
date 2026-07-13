@@ -22,10 +22,10 @@ const LERP = 0.16;
 const DRAG_RANGE_PX = 130; // glissement (px) pour atteindre le tilt maximum
 
 // Profondeur d'extrusion entre les trois calques (en unités monde, la
-// carte fait ~1.5 unité de haut) — un vrai pop-out façon carte à
-// collectionner, mais resserré pour rester crédible comme un seul bloc.
-const PLAYER_Z = 0.06;
-const STATS_Z = 0.11;
+// carte fait ~1.5 unité de haut) — resserrée pour une carte fine, tout en
+// gardant une vraie parallaxe visible au tilt.
+const PLAYER_Z = 0.035;
+const STATS_Z = 0.065;
 
 // Marge autour de la carte dans le cadre (moins la carte remplit le
 // frustum, plus elle a de la place pour tourner sans que les bords ou
@@ -36,6 +36,58 @@ const BEZEL_COLOR: Record<"simple" | "rare", string> = {
   simple: "#B99D66",
   rare: "#9C6F22",
 };
+
+// Forme rectangle arrondi réutilisée pour la tranche (le bezel) — seule
+// géométrie non texturée, donc aucun risque d'UV : on peut l'arrondir
+// sans toucher à l'alignement des calques image.
+function roundedRectShape(w: number, h: number, r: number): THREE.Shape {
+  const shape = new THREE.Shape();
+  const x = -w / 2;
+  const y = -h / 2;
+  shape.moveTo(x, y + r);
+  shape.quadraticCurveTo(x, y, x + r, y);
+  shape.lineTo(x + w - r, y);
+  shape.quadraticCurveTo(x + w, y, x + w, y + r);
+  shape.lineTo(x + w, y + h - r);
+  shape.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  shape.lineTo(x + r, y + h);
+  shape.quadraticCurveTo(x, y + h, x, y + h - r);
+  shape.closePath();
+  return shape;
+}
+
+// Anneau latéral (tranche) construit à la main plutôt que via
+// ExtrudeGeometry : uniquement les faces de côté, aucune face avant/
+// arrière — pas d'ambiguïté de materialIndex, jamais de cap opaque qui
+// vienne couvrir les calques image devant ou derrière.
+function roundedWallGeometry(shape: THREE.Shape, depth: number, segments: number): THREE.BufferGeometry {
+  const points = shape.getPoints(segments);
+  const n = points.length;
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+
+  for (let i = 0; i < n; i++) {
+    const p0 = points[i];
+    const p1 = points[(i + 1) % n];
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = dy / len;
+    const ny = -dx / len;
+
+    positions.push(p0.x, p0.y, 0, p1.x, p1.y, 0, p1.x, p1.y, depth);
+    positions.push(p0.x, p0.y, 0, p1.x, p1.y, depth, p0.x, p0.y, depth);
+    for (let k = 0; k < 6; k++) normals.push(nx, ny, 0);
+    uvs.push(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  return geo;
+}
 
 const HOLO_VERTEX = /* glsl */ `
   varying vec2 vUv;
@@ -135,6 +187,9 @@ function useLayerTexture(url: string) {
   }, [url, invalidate]);
 }
 
+const PARTICLE_COUNT = 20;
+const BURST_DURATION = 0.7;
+
 function CardMesh({
   background,
   playerLayer,
@@ -163,10 +218,30 @@ function CardMesh({
   const groupRef = useRef<THREE.Group>(null);
   const holoMat = useRef<THREE.ShaderMaterial>(null);
   const target = useRef({ x: 0, y: 0, scale: 1 });
-  const current = useRef({ x: 0, y: 0, scale: 1 });
+  // Départ dramatique — la carte arrive tournée et réduite, puis se pose
+  // à plat avec l'amorti existant : effet d'intro "convoquée à l'écran".
+  const current = useRef({ x: -1.35, y: 0.22, scale: 0.72 });
   const drag = useRef({ active: false, startX: 0, startY: 0 });
+  const introDone = useRef(false);
 
-  useFrame(() => {
+  const particlesGeo = useRef<THREE.BufferGeometry>(null);
+  const particlesMat = useRef<THREE.PointsMaterial>(null);
+  const burst = useRef({
+    active: false,
+    t: 0,
+    origins: new Float32Array(PARTICLE_COUNT * 3),
+    velocities: new Float32Array(PARTICLE_COUNT * 3),
+  });
+  const particlePositions = useMemo(() => new Float32Array(PARTICLE_COUNT * 3), []);
+
+  useEffect(() => {
+    if (!introDone.current) {
+      introDone.current = true;
+      invalidate();
+    }
+  }, [invalidate]);
+
+  useFrame((_, delta) => {
     const c = current.current;
     const t = target.current;
     c.x += (t.x - c.x) * LERP;
@@ -187,7 +262,26 @@ function CardMesh({
       Math.abs(t.x - c.x) < 0.0006 &&
       Math.abs(t.y - c.y) < 0.0006 &&
       Math.abs(t.scale - c.scale) < 0.0006;
-    if (!settled) invalidate();
+
+    const b = burst.current;
+    if (b.active) {
+      b.t += delta;
+      const pos = particlesGeo.current?.attributes.position as THREE.BufferAttribute | undefined;
+      if (pos) {
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          pos.array[i * 3 + 0] = b.origins[i * 3 + 0] + b.velocities[i * 3 + 0] * b.t;
+          pos.array[i * 3 + 1] = b.origins[i * 3 + 1] + b.velocities[i * 3 + 1] * b.t - 0.4 * b.t * b.t;
+          pos.array[i * 3 + 2] = b.origins[i * 3 + 2];
+        }
+        pos.needsUpdate = true;
+      }
+      if (particlesMat.current) {
+        particlesMat.current.opacity = Math.max(0, 1 - b.t / BURST_DURATION);
+      }
+      if (b.t >= BURST_DURATION) b.active = false;
+    }
+
+    if (!settled || b.active) invalidate();
   });
 
   // Suivi du glissement au niveau window : robuste même si le pointeur
@@ -198,7 +292,9 @@ function CardMesh({
       const dx = e.clientX - drag.current.startX;
       const dy = e.clientY - drag.current.startY;
       target.current.x = THREE.MathUtils.clamp((dx / DRAG_RANGE_PX) * MAX_TILT_Y, -MAX_TILT_Y, MAX_TILT_Y);
-      target.current.y = THREE.MathUtils.clamp((-dy / DRAG_RANGE_PX) * MAX_TILT_X, -MAX_TILT_X, MAX_TILT_X);
+      // Inversé : glisser vers le bas incline le haut de la carte vers soi,
+      // comme quand on bascule une vraie carte tenue en main.
+      target.current.y = THREE.MathUtils.clamp((dy / DRAG_RANGE_PX) * MAX_TILT_X, -MAX_TILT_X, MAX_TILT_X);
       invalidate();
     }
     function onUp() {
@@ -219,23 +315,40 @@ function CardMesh({
     };
   }, [invalidate]);
 
+  const spawnBurst = useCallback(() => {
+    const b = burst.current;
+    b.active = true;
+    b.t = 0;
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.35 + Math.random() * 0.55;
+      b.origins[i * 3 + 0] = (Math.random() - 0.5) * width * 0.4;
+      b.origins[i * 3 + 1] = (Math.random() - 0.5) * height * 0.4;
+      b.origins[i * 3 + 2] = STATS_Z + 0.03;
+      b.velocities[i * 3 + 0] = Math.cos(angle) * speed;
+      b.velocities[i * 3 + 1] = Math.sin(angle) * speed + 0.25;
+      b.velocities[i * 3 + 2] = 0;
+    }
+  }, [width, height]);
+
   const onDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
       drag.current.active = true;
       drag.current.startX = e.nativeEvent.clientX;
       drag.current.startY = e.nativeEvent.clientY;
       target.current.scale = 1.045;
+      spawnBurst();
       invalidate();
     },
-    [invalidate]
+    [invalidate, spawnBurst]
   );
 
-  // Murs latéraux : referment les tranches entre le fond et le dessus,
-  // pour que la carte se lise comme un bloc hermétique plutôt que des
-  // plans flottants séparés.
-  const wallT = Math.min(width, height) * 0.012;
-  const wallDepth = STATS_Z;
-  const wallZ = STATS_Z / 2;
+  // Tranche (bezel) arrondie — une seule extrusion en anneau plutôt que
+  // quatre murs droits à coins carrés, pour matcher les coins arrondis
+  // du visuel de la carte.
+  const wallRadius = Math.min(width, height) * 0.07;
+  const wallShape = useMemo(() => roundedRectShape(width, height, wallRadius), [width, height, wallRadius]);
+  const wallGeo = useMemo(() => roundedWallGeometry(wallShape, STATS_Z, 10), [wallShape]);
 
   const bgUniforms = useMemo(() => ({ map: { value: bgTex } }), [bgTex]);
   const playerUniforms = useMemo(() => ({ map: { value: playerTex } }), [playerTex]);
@@ -243,21 +356,8 @@ function CardMesh({
 
   return (
     <group ref={groupRef} onPointerDown={onDown}>
-      <mesh position={[-width / 2, 0, wallZ]}>
-        <boxGeometry args={[wallT, height, wallDepth]} />
-        <meshStandardMaterial color={bezel} roughness={0.45} metalness={0.35} />
-      </mesh>
-      <mesh position={[width / 2, 0, wallZ]}>
-        <boxGeometry args={[wallT, height, wallDepth]} />
-        <meshStandardMaterial color={bezel} roughness={0.45} metalness={0.35} />
-      </mesh>
-      <mesh position={[0, height / 2, wallZ]}>
-        <boxGeometry args={[width, wallT, wallDepth]} />
-        <meshStandardMaterial color={bezel} roughness={0.45} metalness={0.35} />
-      </mesh>
-      <mesh position={[0, -height / 2, wallZ]}>
-        <boxGeometry args={[width, wallT, wallDepth]} />
-        <meshStandardMaterial color={bezel} roughness={0.45} metalness={0.35} />
+      <mesh geometry={wallGeo}>
+        <meshStandardMaterial color={bezel} roughness={0.45} metalness={0.35} side={THREE.DoubleSide} />
       </mesh>
 
       <mesh position={[0, 0, 0]}>
@@ -300,6 +400,22 @@ function CardMesh({
           depthWrite={false}
         />
       </mesh>
+
+      {/* Particules — petit éclat au début de la manipulation */}
+      <points>
+        <bufferGeometry ref={particlesGeo}>
+          <bufferAttribute attach="attributes-position" args={[particlePositions, 3]} />
+        </bufferGeometry>
+        <pointsMaterial
+          ref={particlesMat}
+          color={holo ? "#F4C542" : "#E8C87A"}
+          size={0.045}
+          sizeAttenuation
+          transparent
+          opacity={0}
+          depthWrite={false}
+        />
+      </points>
     </group>
   );
 }
