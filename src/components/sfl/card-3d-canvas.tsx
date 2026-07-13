@@ -24,8 +24,13 @@ const DRAG_RANGE_PX = 130; // glissement (px) pour atteindre le tilt maximum
 // Profondeur d'extrusion entre les trois calques (en unités monde, la
 // carte fait ~1.5 unité de haut) — un vrai pop-out façon carte à
 // collectionner, mais resserré pour rester crédible comme un seul bloc.
-const PLAYER_Z = 0.1;
-const STATS_Z = 0.18;
+const PLAYER_Z = 0.06;
+const STATS_Z = 0.11;
+
+// Marge autour de la carte dans le cadre (moins la carte remplit le
+// frustum, plus elle a de la place pour tourner sans que les bords ou
+// les coins arrondis ne sortent du canvas).
+const FILL_RATIO = 0.72;
 
 const BEZEL_COLOR: Record<"simple" | "rare", string> = {
   simple: "#B99D66",
@@ -54,6 +59,69 @@ const HOLO_FRAGMENT = /* glsl */ `
     float edge = clamp(abs(uTiltX) / 0.52 + abs(uTiltY) / 0.34, 0.0, 1.0);
     float alpha = (0.05 + edge * 0.22) * uStrength;
     gl_FragColor = vec4(rainbow, alpha);
+  }
+`;
+
+// Matériau "surface" — reprend la texture captée (déjà grainée en 2D) et
+// lui ajoute une vraie réponse à la lumière : un bump procédural (grain
+// qui accroche des micro-reflets), un spéculaire, et un liseré fresnel
+// chaud sur les tranches inclinées. Le tout donne l'impression d'une
+// carte physique plutôt que d'une image plaquée sur un plan.
+const SURFACE_VERTEX = /* glsl */ `
+  varying vec2 vUv;
+  varying vec3 vNormal;
+  varying vec3 vViewPosition;
+  void main() {
+    vUv = uv;
+    vNormal = normalize(normalMatrix * normal);
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    vViewPosition = -mvPosition.xyz;
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`;
+
+const SURFACE_FRAGMENT = /* glsl */ `
+  uniform sampler2D map;
+  varying vec2 vUv;
+  varying vec3 vNormal;
+  varying vec3 vViewPosition;
+
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float vnoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+  }
+
+  void main() {
+    vec4 tex = texture2D(map, vUv);
+    if (tex.a < 0.01) discard;
+
+    float e = 0.004;
+    float n0 = vnoise(vUv * 900.0);
+    float n1 = vnoise((vUv + vec2(e, 0.0)) * 900.0);
+    float n2 = vnoise((vUv + vec2(0.0, e)) * 900.0);
+    vec3 bump = normalize(vec3((n0 - n1) * 5.0, (n0 - n2) * 5.0, 1.0));
+
+    vec3 N = normalize(vNormal + bump * 0.045);
+    vec3 V = normalize(vViewPosition);
+    vec3 L = normalize(vec3(2.0, 3.0, 4.0));
+    vec3 H = normalize(L + V);
+
+    float diff = max(dot(N, L), 0.0);
+    float spec = pow(max(dot(N, H), 0.0), 60.0);
+    float fresnel = pow(1.0 - max(dot(N, V), 0.0), 2.5);
+
+    vec3 color = tex.rgb * (0.82 + 0.2 * diff)
+      + vec3(1.0) * spec * 0.1
+      + vec3(1.0, 0.9, 0.68) * fresnel * 0.16;
+
+    gl_FragColor = vec4(color, tex.a);
   }
 `;
 
@@ -89,7 +157,7 @@ function CardMesh({
   const distance = persp.position.z;
   const vFOV = THREE.MathUtils.degToRad(persp.fov);
   const visibleHeight = 2 * Math.tan(vFOV / 2) * distance;
-  const height = visibleHeight * 0.9;
+  const height = visibleHeight * FILL_RATIO;
   const width = height * persp.aspect;
 
   const groupRef = useRef<THREE.Group>(null);
@@ -169,6 +237,10 @@ function CardMesh({
   const wallDepth = STATS_Z;
   const wallZ = STATS_Z / 2;
 
+  const bgUniforms = useMemo(() => ({ map: { value: bgTex } }), [bgTex]);
+  const playerUniforms = useMemo(() => ({ map: { value: playerTex } }), [playerTex]);
+  const statsUniforms = useMemo(() => ({ map: { value: statsTex } }), [statsTex]);
+
   return (
     <group ref={groupRef} onPointerDown={onDown}>
       <mesh position={[-width / 2, 0, wallZ]}>
@@ -190,15 +262,27 @@ function CardMesh({
 
       <mesh position={[0, 0, 0]}>
         <planeGeometry args={[width, height, 24, 32]} />
-        <meshStandardMaterial map={bgTex} roughness={0.4} metalness={0.06} transparent />
+        <shaderMaterial vertexShader={SURFACE_VERTEX} fragmentShader={SURFACE_FRAGMENT} uniforms={bgUniforms} />
       </mesh>
       <mesh position={[0, 0, PLAYER_Z]}>
-        <planeGeometry args={[width, height]} />
-        <meshStandardMaterial map={playerTex} roughness={0.5} metalness={0.02} transparent depthWrite={false} />
+        <planeGeometry args={[width, height, 24, 32]} />
+        <shaderMaterial
+          vertexShader={SURFACE_VERTEX}
+          fragmentShader={SURFACE_FRAGMENT}
+          uniforms={playerUniforms}
+          transparent
+          depthWrite={false}
+        />
       </mesh>
       <mesh position={[0, 0, STATS_Z]}>
-        <planeGeometry args={[width, height]} />
-        <meshStandardMaterial map={statsTex} roughness={0.3} metalness={0.02} transparent depthWrite={false} />
+        <planeGeometry args={[width, height, 24, 32]} />
+        <shaderMaterial
+          vertexShader={SURFACE_VERTEX}
+          fragmentShader={SURFACE_FRAGMENT}
+          uniforms={statsUniforms}
+          transparent
+          depthWrite={false}
+        />
       </mesh>
       <mesh position={[0, 0, STATS_Z + 0.005]}>
         <planeGeometry args={[width, height]} />
