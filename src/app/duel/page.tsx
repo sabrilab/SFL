@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import gsap from "gsap";
 import { toast } from "sonner";
 import { RotateCcw, Swords } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,33 +13,70 @@ import { PLAYERS } from "@/lib/sfl/data";
 import type { Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { getRatings, pickPair, recordDuel, resetRatings } from "@/lib/sfl/duel";
+import { DUEL_CATEGORIES, pickCategory, type DuelCategory } from "@/lib/sfl/duel-categories";
+
+const cardVariants = {
+  idle: { scale: 1, y: 0, opacity: 1, filter: "grayscale(0)" },
+  winner: { scale: 1.08, y: -10, opacity: 1, filter: "grayscale(0)" },
+  loser: { scale: 0.88, y: 8, opacity: 0.4, filter: "grayscale(0.75)" },
+};
 
 export default function DuelPage() {
   const { me } = useMyPlayer();
   const isClient = useIsClient();
-  // Tirage au sort une seule fois par montage — le rendu reste masqué tant
-  // que isClient est faux, donc aucun désaccord serveur/client possible.
+
+  const [round, setRound] = useState(0);
   const [pair, setPair] = useState<[Player, Player]>(() => pickPair(PLAYERS));
+  const [category, setCategory] = useState<DuelCategory>(() => pickCategory());
+  const [resolvedWinner, setResolvedWinner] = useState<string | null>(null);
+  const [lastDelta, setLastDelta] = useState(0);
+
+  const burstRefs = useRef<(HTMLDivElement | null)[]>([null, null]);
+  const busy = resolvedWinner !== null;
 
   // Lu directement au rendu (comme les tallies de vote) : toujours à jour
   // après un duel ou un changement de profil, sans état dupliqué.
   const ratings = isClient ? getRatings(me) : {};
 
-  function choose(winnerName: string, loserName: string) {
-    recordDuel(me, winnerName, loserName);
-    setPair((prev) => pickPair(PLAYERS, [prev[0].name, prev[1].name]));
-    toast.success(`${winnerName} l'emporte`, { description: `Face à ${loserName}` });
-  }
+  function choose(index: 0 | 1) {
+    if (busy) return;
+    const winner = pair[index];
+    const loser = pair[1 - index];
+    setResolvedWinner(winner.name);
 
-  function reset() {
-    resetRatings(me);
-    setPair((prev) => pickPair(PLAYERS, [prev[0].name, prev[1].name]));
-    toast.success("Classement personnel réinitialisé");
+    const burst = burstRefs.current[index];
+    if (burst) {
+      gsap.fromTo(
+        burst,
+        { opacity: 0.9, scale: 0.3 },
+        { opacity: 0, scale: 2.2, duration: 0.6, ease: "power3.out" }
+      );
+    }
+
+    const { delta } = recordDuel(me, winner.name, loser.name, category.id);
+    setLastDelta(delta);
+    toast.success(`${winner.name} l'emporte`, {
+      description: `${category.label} · face à ${loser.name}`,
+    });
+
+    setTimeout(() => {
+      setPair((prev) => pickPair(PLAYERS, [prev[0].name, prev[1].name]));
+      setCategory((prev) => pickCategory(prev.id));
+      setResolvedWinner(null);
+      setRound((r) => r + 1);
+    }, 700);
   }
 
   const ranked = Object.entries(ratings)
     .filter(([, r]) => r.duels > 0)
     .sort((a, b) => b[1].elo - a[1].elo);
+
+  function reset() {
+    resetRatings(me);
+    setPair((prev) => pickPair(PLAYERS, [prev[0].name, prev[1].name]));
+    setCategory((prev) => pickCategory(prev.id));
+    toast.success("Classement personnel réinitialisé");
+  }
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-7 px-5 py-4 sm:py-8">
@@ -45,27 +84,81 @@ export default function DuelPage() {
         <p className="text-[13px] font-medium text-muted-foreground">Ton avis compte</p>
         <h1 className="text-[34px] font-bold tracking-tight">Duel</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Choisis le meilleur des deux joueurs. Chaque duel nourrit ton classement
-          personnel — l&apos;agrégation entre tous les joueurs arrivera avec le backend.
+          Choisis le meilleur des deux joueurs, statistique par statistique. Chaque duel
+          nourrit ton classement personnel — un seul niveau, pas de division par stat.
         </p>
       </div>
 
       {isClient ? (
-        <section className="flex items-center justify-center gap-3">
-          {pair.map((p, i) => {
-            const other = pair[1 - i];
-            return (
-              <button
-                key={p.name}
-                onClick={() => choose(p.name, other.name)}
-                className="flex flex-col items-center gap-2 rounded-3xl p-2 transition-transform active:scale-95"
-                aria-label={`Choisir ${p.name}`}
-              >
-                <PlayerCard player={p} mode="simple" size={0.56} />
-                <span className="text-sm font-semibold">{p.name}</span>
-              </button>
-            );
-          })}
+        <section className="flex flex-col items-center gap-5">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={round}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -14, transition: { duration: 0.16 } }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              className="flex flex-col items-center gap-5"
+            >
+              <div className="flex flex-col items-center gap-1 text-center">
+                <span className="rounded-full bg-primary/12 px-3 py-1 text-[11px] font-bold tracking-widest text-primary uppercase">
+                  {category.label}
+                </span>
+                <span className="text-lg font-bold tracking-tight">{category.question}</span>
+              </div>
+
+              <div className="flex items-center justify-center gap-3">
+                {pair.map((p, i) => {
+                  const variant =
+                    resolvedWinner === null ? "idle" : p.name === resolvedWinner ? "winner" : "loser";
+                  return (
+                    <motion.button
+                      key={p.name}
+                      onClick={() => choose(i as 0 | 1)}
+                      disabled={busy}
+                      whileTap={!busy ? { scale: 0.94 } : undefined}
+                      animate={variant}
+                      variants={cardVariants}
+                      transition={{ type: "spring", stiffness: 320, damping: 22 }}
+                      className="relative flex flex-col items-center gap-2 rounded-3xl p-2"
+                      aria-label={`Choisir ${p.name}`}
+                    >
+                      <div
+                        ref={(el) => {
+                          burstRefs.current[i] = el;
+                        }}
+                        className="pointer-events-none absolute inset-0 rounded-full opacity-0"
+                        style={{
+                          background:
+                            "radial-gradient(circle, rgba(255,90,31,.55) 0%, rgba(255,90,31,0) 70%)",
+                        }}
+                      />
+                      <PlayerCard
+                        player={p}
+                        mode="simple"
+                        size={0.56}
+                        highlightStats={category.statKeys}
+                      />
+                      <span className="text-sm font-semibold">{p.name}</span>
+                      <AnimatePresence>
+                        {resolvedWinner === p.name && (
+                          <motion.span
+                            initial={{ opacity: 0, y: 0 }}
+                            animate={{ opacity: 1, y: -14 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.4 }}
+                            className="absolute -top-2 rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-bold text-white"
+                          >
+                            +{lastDelta}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </section>
       ) : (
         <div className="flex justify-center py-10">
@@ -123,6 +216,22 @@ export default function DuelPage() {
           </div>
         )}
       </section>
+
+      <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {DUEL_CATEGORIES.map((c) => (
+          <span
+            key={c.id}
+            className={cn(
+              "shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap",
+              c.id === category.id
+                ? "bg-foreground text-background"
+                : "bg-card text-muted-foreground"
+            )}
+          >
+            {c.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

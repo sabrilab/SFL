@@ -5,7 +5,7 @@
 // disposition (logo, OVR, photo, nom, stats, pied). Seul le thème change.
 
 import { useId, useState } from "react";
-import { STAT_KEYS, type Stats } from "@/lib/sfl/engine";
+import { STAT_KEYS, type Stats, type StatKey } from "@/lib/sfl/engine";
 import { Crown, Flame, ShieldCheck } from "lucide-react";
 
 export const display = {
@@ -138,6 +138,7 @@ export function CardShell({
   name,
   stats,
   photoName,
+  highlightStats,
 }: {
   theme: CardTheme;
   size?: number;
@@ -146,6 +147,7 @@ export function CardShell({
   name: string;
   stats: Stats;
   photoName: string;
+  highlightStats?: StatKey[];
 }) {
   const rawId = useId();
   const fid = `sfl-brush-${rawId.replace(/[^a-zA-Z0-9]/g, "")}`;
@@ -408,24 +410,43 @@ export function CardShell({
               zIndex: 4,
             }}
           >
-            {STAT_KEYS.map((k) => (
-              <div key={k} style={{ textAlign: "center" }}>
+            {STAT_KEYS.map((k) => {
+              const active = highlightStats?.includes(k);
+              return (
                 <div
+                  key={k}
                   style={{
-                    fontSize: S(8.5),
-                    fontWeight: 800,
-                    letterSpacing: S(1),
-                    color: th.label,
-                    textTransform: "uppercase",
+                    textAlign: "center",
+                    borderRadius: S(8),
+                    padding: `${S(2)}px 0`,
+                    background: active ? `${th.accent}26` : "transparent",
+                    boxShadow: active ? `0 0 0 ${S(1.2)}px ${th.accent}66` : "none",
                   }}
                 >
-                  {k}
+                  <div
+                    style={{
+                      fontSize: S(8.5),
+                      fontWeight: 800,
+                      letterSpacing: S(1),
+                      color: active ? th.accent : th.label,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {k}
+                  </div>
+                  <div
+                    style={{
+                      ...display,
+                      fontSize: S(21),
+                      lineHeight: 1.15,
+                      color: active ? th.accent : th.text,
+                    }}
+                  >
+                    {stats[k]}
+                  </div>
                 </div>
-                <div style={{ ...display, fontSize: S(21), lineHeight: 1.15, color: th.text }}>
-                  {stats[k]}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

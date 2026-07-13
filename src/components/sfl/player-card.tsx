@@ -3,7 +3,7 @@
 // Indépendante du thème clair/sombre, comme une carte physique.
 
 import { CardShell, type CardTheme } from "./card-shell";
-import { ovr, rareStats, type Player } from "@/lib/sfl/engine";
+import { ovr, rareStats, type Player, type StatKey } from "@/lib/sfl/engine";
 
 const IDENTITY_THEMES: Record<"simple" | "rare", CardTheme> = {
   simple: {
@@ -72,10 +72,12 @@ export function PlayerCard({
   player,
   mode = "rare",
   size = 1,
+  highlightStats,
 }: {
   player: Player;
   mode?: CardMode;
   size?: number;
+  highlightStats?: StatKey[];
 }) {
   const stats = mode === "rare" ? rareStats(player.stats) : player.stats;
   return (
@@ -87,6 +89,7 @@ export function PlayerCard({
       name={player.name}
       stats={stats}
       photoName={player.name}
+      highlightStats={highlightStats}
     />
   );
 }
