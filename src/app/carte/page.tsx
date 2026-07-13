@@ -5,7 +5,8 @@ import { Lock, Minus, Plus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BoostCard, BOOST_LABELS } from "@/components/sfl/boost-card";
-import { PlayerCard, type CardMode } from "@/components/sfl/player-card";
+import { Card3D } from "@/components/sfl/card-3d";
+import { type CardMode } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { BAREME, BOOST_CARDS, PLAYERS } from "@/lib/sfl/data";
 import {
@@ -111,7 +112,7 @@ export default function CartePage() {
             </button>
           ))}
         </div>
-        <PlayerCard player={player} mode={mode} size={1.05} />
+        <Card3D player={player} mode={mode} size={1.05} />
       </section>
 
       {/* Cartes Boost */}

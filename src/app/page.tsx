@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Check, ChevronRight, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlayerCard } from "@/components/sfl/player-card";
+import { Card3D } from "@/components/sfl/card-3d";
 import { MvpBanner } from "@/components/sfl/mvp-banner";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
@@ -55,7 +56,7 @@ export default function Home() {
 
       {/* Ma carte — dès l'arrivée */}
       <section className="flex flex-col items-center gap-3">
-        <PlayerCard player={player} mode="rare" size={0.68} />
+        <Card3D player={player} mode="rare" size={0.68} />
         <Link
           href="/carte"
           className="inline-flex items-center gap-1.5 text-sm font-semibold"
