@@ -13,7 +13,7 @@ export function BottomNav() {
       className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/85 backdrop-blur-xl md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="mx-auto flex max-w-md items-center justify-around px-8 py-1.5">
+      <div className="mx-auto flex max-w-md items-center justify-around px-2 py-1.5">
         {NAV_ITEMS.map((item) => {
           const active =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -25,7 +25,7 @@ export function BottomNav() {
               aria-label={item.label}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex flex-col items-center gap-1 rounded-full px-5 py-2.5 transition-colors",
+                "flex flex-col items-center gap-1 rounded-full px-3.5 py-2.5 transition-colors",
                 active ? "text-foreground" : "text-muted-foreground/60 hover:text-muted-foreground"
               )}
             >
