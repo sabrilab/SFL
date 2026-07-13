@@ -5,17 +5,35 @@ import { useState } from "react";
 import { Check, ChevronRight, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlayerCard } from "@/components/sfl/player-card";
+import { BoostCard } from "@/components/sfl/boost-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
 import { JOURNEES, NEXT_MATCH, PLAYERS } from "@/lib/sfl/data";
-import { journeeScoreSummary, ovr, rankByMetric, rankPlayers, rareStats } from "@/lib/sfl/engine";
+import { journeeScoreSummary, ovr, rankByMetric, rankPlayers, type BoostCardData } from "@/lib/sfl/engine";
 import { RANKINGS } from "@/lib/sfl/rankings";
 import { cn } from "@/lib/utils";
 
 const RANKED = rankPlayers(PLAYERS);
 const PRESENCE_KEY = `sfl-presence-j${NEXT_MATCH.journee}`;
-// Un leader par classement, pour l'aperçu "meilleurs joueurs" de l'accueil.
-const LEADERS = RANKINGS.map((def) => ({ def, leader: rankByMetric(PLAYERS, def.value)[0] }));
+
+// MVP de la saison = leader du classement MVP, présenté avec sa vraie
+// carte Boost (pas une carte standard).
+const MVP_RANKED = rankByMetric(PLAYERS, (p) => p.mvp)[0];
+const MVP_CARD: BoostCardData = {
+  player: MVP_RANKED.name,
+  type: "mvp",
+  ovr: ovr(MVP_RANKED.stats),
+  poste: MVP_RANKED.poste,
+  date: "Saison 1",
+  stats: MVP_RANKED.stats,
+};
+
+// Un leader par classement (hors MVP, déjà mis en avant) pour l'aperçu
+// "meilleurs joueurs" — beaucoup de cartes différentes, un vrai overview.
+const LEADERS = RANKINGS.filter((def) => def.id !== "mvp").map((def) => ({
+  def,
+  leader: rankByMetric(PLAYERS, def.value)[0],
+}));
 
 export default function Home() {
   const { player } = useMyPlayer();
@@ -44,29 +62,29 @@ export default function Home() {
         <h1 className="text-[34px] font-bold tracking-tight">Salut, {player.name}</h1>
       </div>
 
-      {/* Ma carte — mise en avant, dès le début */}
-      <section className="flex flex-col items-center gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-lg font-bold text-primary tabular-nums">#{myRank}</span>
-          <span className="text-sm font-bold tracking-tight tabular-nums">
-            {player.pp}
-            <span className="ml-0.5 text-[10px] font-medium text-muted-foreground">pts</span>
+      {/* Ma carte + MVP de la saison, côte à côte dès l'arrivée */}
+      <section className="flex items-start justify-center gap-4">
+        <Link href="/carte" className="flex flex-col items-center gap-2">
+          <span className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
+            Ma carte
           </span>
-          <span className="rounded-full bg-[#E8C87A] px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#3a2a10]">
-            {ovr(rareStats(player.stats))} RARE
+          <PlayerCard player={player} mode="rare" size={0.58} />
+          <span className="text-xs font-bold tracking-tight tabular-nums">
+            #{myRank} · {player.pp} pts
           </span>
-        </div>
-        <PlayerCard player={player} mode="rare" size={0.85} />
-        <Link
-          href="/carte"
-          className="inline-flex items-center gap-0.5 text-sm font-medium text-foreground"
-        >
-          Voir et faire évoluer ma carte
-          <ChevronRight className="size-4" />
+        </Link>
+        <Link href="/stats" className="flex flex-col items-center gap-2">
+          <span className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
+            MVP de la saison
+          </span>
+          <BoostCard card={MVP_CARD} size={0.58} />
+          <span className="text-xs font-bold tracking-tight tabular-nums">
+            {MVP_RANKED.name} · {MVP_RANKED.mvp} titre{MVP_RANKED.mvp > 1 ? "s" : ""}
+          </span>
         </Link>
       </section>
 
-      {/* Prochain match */}
+      {/* Prochain match — juste sous la carte MVP */}
       <section className="rounded-3xl bg-card p-5">
         <div className="flex items-start justify-between">
           <div>
@@ -108,7 +126,7 @@ export default function Home() {
         </p>
       </section>
 
-      {/* Meilleurs joueurs — aperçu tiré des classements */}
+      {/* Meilleurs joueurs — aperçu tiré des classements, beaucoup de cartes */}
       <section>
         <div className="mb-3 flex items-baseline justify-between px-1">
           <h2 className="text-lg font-semibold tracking-tight">Meilleurs joueurs</h2>
