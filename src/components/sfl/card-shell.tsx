@@ -6,7 +6,7 @@
 
 import { useId, useState } from "react";
 import { STAT_KEYS, type Stats, type StatKey } from "@/lib/sfl/engine";
-import { Crown, Flame, ShieldCheck } from "lucide-react";
+import { Crown, Flame, ShieldCheck, Gem, Star, Target, Send, BadgeCheck, Scale } from "lucide-react";
 
 export const display = {
   fontFamily: "var(--font-anton), 'Arial Black', sans-serif",
@@ -50,7 +50,7 @@ export interface CardTheme {
   innerBorder?: string;
   glow: string;
   banner: { label: string; sub?: string; ring: string; ring2: string; text: string } | null;
-  glyph?: "crown" | "flame" | "shield";
+  glyph?: "crown" | "flame" | "shield" | "gem" | "star" | "target" | "send" | "badge" | "scale";
   glyphColor?: string;
 }
 
@@ -128,7 +128,17 @@ function EnergyParticles({ color }: { color: string }) {
   );
 }
 
-const GLYPHS = { crown: Crown, flame: Flame, shield: ShieldCheck };
+const GLYPHS = {
+  crown: Crown,
+  flame: Flame,
+  shield: ShieldCheck,
+  gem: Gem,
+  star: Star,
+  target: Target,
+  send: Send,
+  badge: BadgeCheck,
+  scale: Scale,
+};
 
 export function CardShell({
   theme,

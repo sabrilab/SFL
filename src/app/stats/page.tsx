@@ -5,12 +5,12 @@ import { ChevronRight } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { PlayerCard } from "@/components/sfl/player-card";
-import { BoostCard } from "@/components/sfl/boost-card";
+import { RankingCard, RANKING_THEMES } from "@/components/sfl/boost-card";
 import { ViewableCard } from "@/components/sfl/card-viewer";
 import { ElectionPanel } from "@/components/sfl/election-panel";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { JOURNEES, PLAYERS } from "@/lib/sfl/data";
-import { journeeScoreSummary, ovr, rankByMetric, type BoostType, type Player } from "@/lib/sfl/engine";
+import { journeeScoreSummary, rankByMetric, type Player } from "@/lib/sfl/engine";
 import { RANKINGS, type RankingDef } from "@/lib/sfl/rankings";
 
 /* ============================= CLASSEMENTS ============================= */
@@ -44,30 +44,11 @@ function CardBadges({ player }: { player: Player }) {
   );
 }
 
-// La carte du n°1 des classements MVP/Impact/Défensive s'affiche avec le
-// design hors-série correspondant, pas la carte Standard.
-const BOOST_RANKING_TYPE: Record<string, BoostType> = {
-  mvp: "mvp",
-  impact: "impact",
-  def: "def",
-};
-
+// La carte du n°1 de chaque classement s'affiche avec le design distinct
+// correspondant (un thème par classement), pas la carte Standard.
 function leaderCard(defId: string, leader: Player, size: number) {
-  const boostType = BOOST_RANKING_TYPE[defId];
-  if (boostType) {
-    return (
-      <BoostCard
-        card={{
-          player: leader.name,
-          type: boostType,
-          ovr: ovr(leader.stats),
-          poste: leader.poste,
-          date: "Saison 1",
-          stats: leader.stats,
-        }}
-        size={size}
-      />
-    );
+  if (RANKING_THEMES[defId]) {
+    return <RankingCard rankingId={defId} player={leader} size={size} />;
   }
   return <PlayerCard player={leader} mode="simple" size={size} />;
 }
@@ -107,7 +88,7 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
         </div>
         <ViewableCard
           cacheKey={`rank-${def.id}-${leader.name}`}
-          mode={BOOST_RANKING_TYPE[def.id] ? "rare" : "simple"}
+          mode={RANKING_THEMES[def.id] ? "rare" : "simple"}
           size={0.85}
           title={leader.name}
           subtitle={`${def.label} · ${leader.value} ${def.unit}`}
@@ -140,11 +121,10 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
               </span>
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="truncate text-[15px] font-semibold">{p.name}</span>
-                <CardBadges player={p} />
                 {p.statut !== "Actif" && (
                   <span
                     className={cn(
-                      "rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide uppercase",
+                      "shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide uppercase",
                       p.statut === "Suspendu"
                         ? "bg-destructive/10 text-destructive"
                         : "bg-sky-500/10 text-sky-600 dark:text-sky-400"
@@ -153,6 +133,9 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
                     {p.statut}
                   </span>
                 )}
+              </span>
+              <span className="flex w-11 shrink-0 items-center justify-end gap-1">
+                <CardBadges player={p} />
               </span>
               <span className="w-12 text-xs font-medium text-muted-foreground">{p.poste}</span>
               <span className="w-16 text-right text-lg font-bold tracking-tight tabular-nums">

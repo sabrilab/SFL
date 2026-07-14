@@ -36,21 +36,24 @@ function emitChange() {
   window.dispatchEvent(new Event("sfl-ballons"));
 }
 
-// Soldes de départ offerts à certains profils (crédités à la première
-// lecture du portefeuille sur l'appareil).
-const SEED_BALANCES: Record<string, number> = {
+// Comptes "illimités" : profils de test qui ne doivent jamais être
+// bloqués par leur solde. Leur portefeuille est remis à flot dès qu'il
+// passe sous ce plancher (même s'il existait déjà avec un petit solde).
+const BALANCE_FLOORS: Record<string, number> = {
   Ilyes: 12000,
 };
 
 export function getBalance(voter: string): number {
   const raw = localStorage.getItem(walletKey(voter));
-  if (raw === null && SEED_BALANCES[voter]) {
-    localStorage.setItem(walletKey(voter), String(SEED_BALANCES[voter]));
-    appendLog(voter, { amount: SEED_BALANCES[voter], reason: "Solde de bienvenue", ts: Date.now() });
-    return SEED_BALANCES[voter];
-  }
   const n = raw ? parseInt(raw, 10) : 0;
-  return Number.isFinite(n) ? n : 0;
+  const balance = Number.isFinite(n) ? n : 0;
+  const floor = BALANCE_FLOORS[voter];
+  if (floor && balance < floor) {
+    localStorage.setItem(walletKey(voter), String(floor));
+    appendLog(voter, { amount: floor - balance, reason: "Recharge compte test", ts: Date.now() });
+    return floor;
+  }
+  return balance;
 }
 
 export function getLog(voter: string): BallonsEntry[] {

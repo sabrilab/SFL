@@ -6,16 +6,16 @@
 // le backend (boutons "Bientôt" en attendant).
 
 import { useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence } from "motion/react";
 import { toast } from "sonner";
-import { PackageOpen, Sparkles } from "lucide-react";
+import { PackageOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Card3D } from "@/components/sfl/card-3d";
 import { CollectionCardVisual } from "@/components/sfl/collection-card-visual";
-import { PackOpening } from "@/components/sfl/pack-opening";
+import { PackOpening, PackVisual } from "@/components/sfl/pack-opening";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useBallons } from "@/hooks/use-ballons";
@@ -53,27 +53,6 @@ const FILTERS: { id: CardKind | "all"; label: string }[] = [
   { id: "impact", label: "Impact" },
   { id: "mvp", label: "MVP" },
 ];
-
-function CardReveal({ card, index }: { card: CollectionCard; index: number }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, rotateY: 90, scale: 0.7 }}
-      animate={{ opacity: 1, rotateY: 0, scale: 1 }}
-      transition={{ delay: 0.15 + index * 0.12, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="flex shrink-0 flex-col items-center gap-1.5"
-    >
-      <CollectionCardVisual card={card} size={0.42} />
-      <span
-        className={cn(
-          "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-          KIND_STYLES[card.kind]
-        )}
-      >
-        {KIND_LABELS[card.kind]} · n°{card.serial}/{card.total}
-      </span>
-    </motion.div>
-  );
-}
 
 function CardModal({
   card,
@@ -133,9 +112,7 @@ export default function CollectionPage() {
   const { me } = useMyPlayer();
   const isClient = useIsClient();
   const balance = useBallons(me);
-  const [opened, setOpened] = useState<CollectionCard[] | null>(null);
   const [opening, setOpening] = useState<CollectionCard[] | null>(null);
-  const [packSeq, setPackSeq] = useState(0);
   const [filter, setFilter] = useState<CardKind | "all">("all");
   const [ownedOnly, setOwnedOnly] = useState(false);
   const [selected, setSelected] = useState<CollectionCard | null>(null);
@@ -157,23 +134,20 @@ export default function CollectionPage() {
       });
       return;
     }
-    // La cérémonie plein écran prend le relais ; le récap "Ton tirage"
-    // n'apparaît qu'une fois la cérémonie terminée.
+    // La cérémonie plein écran prend le relais, récap "Ton tirage" en 3D inclus.
     setOpening(cards);
     setTick((n) => n + 1);
   }
 
   function finishOpening() {
     if (!opening) return;
-    setOpened(opening);
-    setOpening(null);
-    setPackSeq((n) => n + 1);
     const special = opening.find((c) => c.kind !== "simple" && c.kind !== "rare");
     if (special) {
       toast.success(`Carte hors-série ${KIND_LABELS[special.kind]} !`, {
         description: `${special.player.name} · n°${special.serial}/${special.total} — trouvaille rarissime`,
       });
     }
+    setOpening(null);
   }
 
   function handleBuy(card: CollectionCard) {
@@ -241,19 +215,10 @@ export default function CollectionPage() {
         {/* ===== PACKS ===== */}
         <TabsContent value="packs" className="mt-4 flex flex-col gap-4">
           <div className="flex flex-col items-center gap-4 rounded-3xl bg-card p-6">
-            <div
-              className="flex h-40 w-28 flex-col items-center justify-center gap-2 rounded-2xl"
-              style={{
-                background:
-                  "radial-gradient(120% 130% at 30% 20%, #241A06 0%, #120C03 60%, #060402 100%)",
-                boxShadow: "0 0 26px rgba(240,190,90,.25), inset 0 0 0 2px #F2CE7B44",
-              }}
-            >
-              <Sparkles className="size-6 text-[#F2CE7B]" />
-              <span className="font-display text-lg text-[#F2CE7B] italic">SFL</span>
-              <span className="text-[10px] font-bold tracking-widest text-[#C9964A] uppercase">
-                Booster ×{PACK_SIZE}
-              </span>
+            <div className="flex h-[159px] w-[109px] items-center justify-center overflow-visible">
+              <div className="scale-[0.62]">
+                <PackVisual />
+              </div>
             </div>
             <p className="text-center text-sm text-muted-foreground">
               {PACK_SIZE} cartes par pack — Standard, Rare, et une chance infime de
@@ -273,27 +238,6 @@ export default function CollectionPage() {
               </p>
             )}
           </div>
-
-          <AnimatePresence mode="wait">
-            {opened && (
-              <motion.div
-                key={packSeq}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="rounded-3xl bg-card p-4"
-              >
-                <p className="mb-3 px-1 text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
-                  Ton tirage
-                </p>
-                <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {opened.map((card, i) => (
-                    <CardReveal key={`${packSeq}-${i}`} card={card} index={i} />
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </TabsContent>
 
         {/* ===== CARTES ===== */}

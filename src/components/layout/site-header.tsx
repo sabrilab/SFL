@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { Lock, ShieldCheck } from "lucide-react";
+import { Lock, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/nav";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useBallons } from "@/hooks/use-ballons";
 import { useIsClient } from "@/hooks/use-is-client";
@@ -40,7 +39,7 @@ const PROFILE_PASSWORDS: Record<string, string> = {
   Ilyes: "azy",
 };
 
-// Ligues Goccer — l'utilisateur appartient à la SFL ; les autres sont
+// Ligues Golder — l'utilisateur appartient à la SFL ; les autres sont
 // visibles pour montrer qu'on peut changer de ligue (v1 locale).
 export const LEAGUES = ["SFL", "WFL", "KFL"] as const;
 export const LEAGUE_KEY = "sfl-league";
@@ -185,18 +184,18 @@ export function SiteHeader() {
   return (
     <header className="sticky top-3 z-40 px-4">
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-2">
-        {/* Bulle gauche : logo Goccer + ligue courante */}
-        <div className="flex items-center gap-2 rounded-full bg-background/75 py-1.5 pr-1.5 pl-4 shadow-lg shadow-black/20 ring-1 ring-border/60 backdrop-blur-xl">
+        {/* Bulle gauche : logo Golder + ligue courante */}
+        <div className="glass flex items-center gap-2 rounded-full py-1.5 pr-1.5 pl-4">
           <Link
             href="/"
             className="font-sans text-base font-extrabold tracking-tighter"
           >
-            Goccer
+            Golder
           </Link>
           <LeagueSwitcher />
         </div>
 
-        <nav className="hidden items-center gap-1 rounded-full bg-background/75 px-1.5 py-1.5 shadow-lg shadow-black/20 ring-1 ring-border/60 backdrop-blur-xl md:flex">
+        <nav className="glass hidden items-center gap-1 rounded-full px-1.5 py-1.5 md:flex">
           {NAV_ITEMS.map((item) => {
             const active =
               item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -217,8 +216,8 @@ export function SiteHeader() {
           })}
         </nav>
 
-        {/* Bulle droite : Ballons, profil, admin, thème */}
-        <div className="ml-auto flex items-center gap-1.5 rounded-full bg-background/75 px-1.5 py-1.5 shadow-lg shadow-black/20 ring-1 ring-border/60 backdrop-blur-xl">
+        {/* Bulle droite : Ballons, profil, réglages */}
+        <div className="glass ml-auto flex items-center gap-1.5 rounded-full px-1.5 py-1.5">
           <BallonsBadge me={me} />
           <Select value={me} onValueChange={(v) => selectProfile(v as string)}>
             <SelectTrigger
@@ -252,30 +251,24 @@ export function SiteHeader() {
             onSuccess={(name) => setMe(name)}
           />
 
-          {/* Admin + thème : cachés sur mobile pour que la bulle tienne à l'écran */}
-          <span className="hidden md:inline-flex">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Espace admin"
-                    className="text-muted-foreground hover:text-foreground"
-                    render={
-                      <Link href="/admin">
-                        <ShieldCheck className="size-5" />
-                      </Link>
-                    }
-                  />
-                }
-              />
-              <TooltipContent>Espace admin</TooltipContent>
-            </Tooltip>
-          </span>
-          <span className="hidden md:inline-flex">
-            <ThemeToggle />
-          </span>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Réglages"
+                  className="text-muted-foreground hover:text-foreground"
+                  render={
+                    <Link href="/reglages">
+                      <Settings className="size-5" />
+                    </Link>
+                  }
+                />
+              }
+            />
+            <TooltipContent>Réglages</TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </header>

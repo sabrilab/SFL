@@ -5,14 +5,14 @@ import { useState } from "react";
 import { Check, ChevronRight, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlayerCard } from "@/components/sfl/player-card";
-import { BoostCard } from "@/components/sfl/boost-card";
+import { RankingCard, RANKING_THEMES } from "@/components/sfl/boost-card";
 import { Card3D } from "@/components/sfl/card-3d";
 import { ViewableCard } from "@/components/sfl/card-viewer";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
 import { LEAGUE_KEY } from "@/components/layout/site-header";
 import { JOURNEES, NEXT_MATCH, PLAYERS } from "@/lib/sfl/data";
-import { journeeScoreSummary, ovr, rankByMetric, rankPlayers, type BoostType, type Player } from "@/lib/sfl/engine";
+import { journeeScoreSummary, ovr, rankByMetric, rankPlayers, type Player } from "@/lib/sfl/engine";
 import { RANKINGS } from "@/lib/sfl/rankings";
 import { cn } from "@/lib/utils";
 
@@ -25,30 +25,11 @@ const LEADERS = RANKINGS.map((def) => ({
   leader: rankByMetric(PLAYERS, def.value)[0],
 }));
 
-// Les classements MVP/Impact/Défensive mettent en avant la carte
-// hors-série correspondante (design distinct), pas la carte Standard.
-const BOOST_RANKING_TYPE: Record<string, BoostType> = {
-  mvp: "mvp",
-  impact: "impact",
-  def: "def",
-};
-
+// La carte du n°1 de chaque classement s'affiche avec le design distinct
+// correspondant (un thème par classement), pas la carte Standard.
 function leaderCard(defId: string, leader: Player, size: number) {
-  const boostType = BOOST_RANKING_TYPE[defId];
-  if (boostType) {
-    return (
-      <BoostCard
-        card={{
-          player: leader.name,
-          type: boostType,
-          ovr: ovr(leader.stats),
-          poste: leader.poste,
-          date: "Saison 1",
-          stats: leader.stats,
-        }}
-        size={size}
-      />
-    );
+  if (RANKING_THEMES[defId]) {
+    return <RankingCard rankingId={defId} player={leader} size={size} />;
   }
   return <PlayerCard player={leader} mode="simple" size={size} />;
 }
@@ -141,6 +122,49 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Meilleurs joueurs — aperçu tiré des classements, cartes 3D cliquables */}
+      <section>
+        <div className="mb-3 flex items-baseline justify-between px-1">
+          <h2 className="text-lg font-semibold tracking-tight">Meilleurs joueurs</h2>
+          <Link href="/stats" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+            Tous les classements
+          </Link>
+        </div>
+        <div className="-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {LEADERS.map(({ def, leader }) => (
+            <div
+              key={def.id}
+              className="flex shrink-0 snap-start flex-col items-center gap-2.5 rounded-3xl bg-card p-4"
+            >
+              <span className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
+                {def.label}
+              </span>
+              <ViewableCard
+                cacheKey={`leader-${def.id}-${leader.name}`}
+                mode={RANKING_THEMES[def.id] ? "rare" : "simple"}
+                size={0.5}
+                title={leader.name}
+                subtitle={`${def.label} · ${leader.value} ${def.unit}`}
+                render={(s) => leaderCard(def.id, leader, s)}
+              />
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold tracking-tight tabular-nums">
+                  {leader.value}
+                  <span className="ml-0.5 text-[10px] font-medium text-muted-foreground">
+                    {def.unit}
+                  </span>
+                </span>
+                {leader.name === player.name && (
+                  <span className="rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-primary-foreground uppercase">
+                    Toi
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <div className="flex flex-col gap-7 md:grid md:grid-cols-2 md:items-start md:gap-6">
         {/* Prochain match */}
         <section className="rounded-3xl bg-card p-5">
@@ -207,49 +231,6 @@ export default function Home() {
           <ChevronRight className="size-5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>
-
-      {/* Meilleurs joueurs — aperçu tiré des classements, cartes 3D cliquables */}
-      <section>
-        <div className="mb-3 flex items-baseline justify-between px-1">
-          <h2 className="text-lg font-semibold tracking-tight">Meilleurs joueurs</h2>
-          <Link href="/stats" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-            Tous les classements
-          </Link>
-        </div>
-        <div className="-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {LEADERS.map(({ def, leader }) => (
-            <div
-              key={def.id}
-              className="flex shrink-0 snap-start flex-col items-center gap-2.5 rounded-3xl bg-card p-4"
-            >
-              <span className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
-                {def.label}
-              </span>
-              <ViewableCard
-                cacheKey={`leader-${def.id}-${leader.name}`}
-                mode={BOOST_RANKING_TYPE[def.id] ? "rare" : "simple"}
-                size={0.5}
-                title={leader.name}
-                subtitle={`${def.label} · ${leader.value} ${def.unit}`}
-                render={(s) => leaderCard(def.id, leader, s)}
-              />
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold tracking-tight tabular-nums">
-                  {leader.value}
-                  <span className="ml-0.5 text-[10px] font-medium text-muted-foreground">
-                    {def.unit}
-                  </span>
-                </span>
-                {leader.name === player.name && (
-                  <span className="rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-primary-foreground uppercase">
-                    Toi
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/nav";
 
@@ -15,7 +16,7 @@ export function BottomNav() {
     >
       {/* Bulle flottante : la barre reste collée en bas mais vit dans sa
           propre pilule translucide, détachée des bords de l'écran. */}
-      <div className="mx-auto flex max-w-md items-center justify-around rounded-full bg-background/75 px-2 py-1.5 shadow-lg shadow-black/25 ring-1 ring-border/60 backdrop-blur-xl">
+      <div className="glass mx-auto flex max-w-md items-center justify-around rounded-full px-2 py-1.5">
         {NAV_ITEMS.map((item) => {
           const active =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -26,15 +27,25 @@ export function BottomNav() {
               href={item.href}
               aria-label={item.label}
               aria-current={active ? "page" : undefined}
-              className={cn(
-                "flex flex-col items-center gap-1 rounded-full px-3 py-2.5 transition-colors",
-                active ? "text-foreground" : "text-muted-foreground/60 hover:text-muted-foreground"
-              )}
+              className="relative flex flex-col items-center gap-1 rounded-full px-3 py-2.5"
             >
-              <Icon className="size-[22px]" strokeWidth={active ? 2.2 : 1.8} />
+              {active && (
+                <motion.span
+                  layoutId="bottom-nav-pill"
+                  className="absolute inset-0 rounded-full bg-foreground/10 ring-1 ring-foreground/10"
+                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                />
+              )}
+              <Icon
+                className={cn(
+                  "relative size-[22px] transition-colors",
+                  active ? "text-foreground" : "text-muted-foreground/60"
+                )}
+                strokeWidth={active ? 2.2 : 1.8}
+              />
               <span
                 className={cn(
-                  "size-1 rounded-full transition-all",
+                  "relative size-1 rounded-full transition-colors",
                   active ? "bg-primary" : "bg-transparent"
                 )}
               />

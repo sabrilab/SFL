@@ -137,7 +137,13 @@ function Card3DInner({
       if (!node) return;
       try {
         await document.fonts.ready;
-        const rect = node.getBoundingClientRect();
+        // offsetWidth/offsetHeight (boîte de mise en page) plutôt que
+        // getBoundingClientRect() : un ancêtre animé (ex. l'entrée d'une
+        // carte de pack, rotateY + scale) déforme temporairement le
+        // rectangle écran renvoyé par getBoundingClientRect(), ce qui
+        // donnait une carte 3D étirée/écrasée à la capture.
+        const width = node.offsetWidth;
+        const height = node.offsetHeight;
         // Séquentiel : chaque capture bascule temporairement le fond de
         // certains nœuds partagés, donc deux captures concurrentes sur le
         // même arbre se marcheraient dessus.
@@ -145,7 +151,7 @@ function Card3DInner({
         const playerLayer = await captureLayer(node, { isolatePart: "player" });
         const stats = await captureLayer(node, { isolatePart: "stats" });
         if (!cancelled) {
-          setCaptured({ background, playerLayer, stats, width: rect.width, height: rect.height });
+          setCaptured({ background, playerLayer, stats, width, height });
         }
       } catch {
         // rasterisation indisponible — la carte plate ci-dessous reste

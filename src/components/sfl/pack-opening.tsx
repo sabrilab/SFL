@@ -11,6 +11,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Card3D } from "./card-3d";
 import { CollectionCardVisual } from "./collection-card-visual";
 import { KIND_LABELS, PACK_COST, type CollectionCard } from "@/lib/sfl/collection";
 
@@ -26,6 +27,58 @@ const RARITY_RANK: Record<string, number> = { simple: 0, rare: 1, def: 2, impact
 
 function isSpecial(card: CollectionCard) {
   return card.kind !== "simple" && card.kind !== "rare";
+}
+
+// Éventail de cartes stylisé, façon vrai booster : quatre tranches de
+// couleurs différentes glissées derrière le rabat SFL, avec un reflet qui
+// balaie la surface — nettement plus engageant qu'un simple rectangle.
+const FAN_CARDS = [
+  { rot: -13, x: -32, bg: "linear-gradient(160deg,#7FD4FF,#1C4E77)" },
+  { rot: -5, x: -15, bg: "linear-gradient(160deg,#FFB88A,#7A1E05)" },
+  { rot: 5, x: 15, bg: "linear-gradient(160deg,#F4C542,#8A5A12)" },
+  { rot: 13, x: 32, bg: "linear-gradient(160deg,#E2CFA6,#8A6C3C)" },
+];
+
+export function PackVisual({ torn = false }: { torn?: boolean }) {
+  return (
+    <motion.div
+      animate={torn ? {} : { y: [0, -7, 0] }}
+      transition={{ repeat: Infinity, duration: 2.6, ease: "easeInOut" }}
+      className="relative flex h-64 w-44 items-center justify-center"
+    >
+      {FAN_CARDS.map((c, i) => (
+        <div
+          key={i}
+          className="absolute h-56 w-36 rounded-2xl opacity-80"
+          style={{
+            background: c.bg,
+            transform: `translateX(${c.x}px) rotate(${c.rot}deg)`,
+            boxShadow: "0 10px 26px rgba(0,0,0,.5)",
+          }}
+        />
+      ))}
+      <div
+        className="relative flex h-64 w-44 flex-col items-center justify-center gap-3 overflow-hidden rounded-3xl"
+        style={{
+          background: "radial-gradient(120% 130% at 30% 20%, #241A06 0%, #120C03 60%, #060402 100%)",
+          boxShadow:
+            "0 0 60px rgba(240,190,90,.45), 0 0 140px rgba(240,190,90,.2), inset 0 0 0 2.5px #F2CE7B66",
+        }}
+      >
+        <motion.div
+          className="pointer-events-none absolute -inset-y-10 left-0 w-16 -skew-x-12 bg-gradient-to-r from-transparent via-white/25 to-transparent"
+          initial={{ x: "-140%" }}
+          animate={{ x: "420%" }}
+          transition={{ repeat: Infinity, duration: 2.6, ease: "easeInOut", repeatDelay: 0.7 }}
+        />
+        <Sparkles className="size-8 text-[#F2CE7B]" />
+        <span className="font-display text-3xl text-[#F2CE7B] italic">SFL</span>
+        <span className="text-[11px] font-bold tracking-[0.3em] text-[#C9964A] uppercase">
+          Booster · 4 cartes
+        </span>
+      </div>
+    </motion.div>
+  );
 }
 
 export function PackOpening({
@@ -79,23 +132,7 @@ export function PackOpening({
             className="flex flex-col items-center gap-5"
             aria-label="Déchirer le pack"
           >
-            <motion.div
-              animate={torn ? {} : { scale: [1, 1.03, 1], rotate: [0, -1.2, 1.2, 0] }}
-              transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
-              className="flex h-64 w-44 flex-col items-center justify-center gap-3 rounded-3xl"
-              style={{
-                background:
-                  "radial-gradient(120% 130% at 30% 20%, #241A06 0%, #120C03 60%, #060402 100%)",
-                boxShadow:
-                  "0 0 60px rgba(240,190,90,.45), 0 0 140px rgba(240,190,90,.2), inset 0 0 0 2.5px #F2CE7B66",
-              }}
-            >
-              <Sparkles className="size-8 text-[#F2CE7B]" />
-              <span className="font-display text-3xl text-[#F2CE7B] italic">SFL</span>
-              <span className="text-[11px] font-bold tracking-[0.3em] text-[#C9964A] uppercase">
-                Booster
-              </span>
-            </motion.div>
+            <PackVisual torn={torn} />
             <span className="animate-pulse text-sm font-semibold text-white/85">
               Touche pour déchirer le pack
             </span>
@@ -135,7 +172,12 @@ export function PackOpening({
                 ✦ Hors-série ✦
               </motion.span>
             )}
-            <CollectionCardVisual card={current} size={0.95} />
+            <Card3D
+              cacheKey={`pack-reveal-${current.id}`}
+              mode={current.kind === "simple" ? "simple" : "rare"}
+              size={0.95}
+              render={(s) => <CollectionCardVisual card={current} size={s} />}
+            />
             <div className="flex flex-col items-center gap-0.5">
               <span className="text-sm font-bold text-white">
                 {KIND_LABELS[current.kind]} · n°{current.serial}/{current.total}
@@ -164,7 +206,12 @@ export function PackOpening({
                   transition={{ delay: i * 0.1 }}
                   className={cn("flex flex-col items-center gap-1", isSpecial(card) && "drop-shadow-[0_0_18px_rgba(244,197,66,.6)]")}
                 >
-                  <CollectionCardVisual card={card} size={0.42} />
+                  <Card3D
+                    cacheKey={`pack-summary-${card.id}-${i}`}
+                    mode={card.kind === "simple" ? "simple" : "rare"}
+                    size={0.42}
+                    render={(s) => <CollectionCardVisual card={card} size={s} />}
+                  />
                   <span className="text-[10px] font-bold text-white/75 uppercase">
                     {KIND_LABELS[card.kind]}
                   </span>

@@ -11,6 +11,7 @@ import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register"
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { PlayerProvider } from "@/components/sfl/player-provider";
 import { CardViewerProvider } from "@/components/sfl/card-viewer";
+import { AppSplash } from "@/components/sfl/app-splash";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -80,6 +81,7 @@ export default function RootLayout({
           <PlayerProvider>
             <CardViewerProvider>
               <TooltipProvider delay={200}>
+                <AppSplash />
                 <ServiceWorkerRegister />
                 <SiteHeader />
                 <main className="flex-1 pb-32 md:pb-10">{children}</main>
