@@ -1,7 +1,9 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { PLAYERS } from "@/lib/sfl/data";
+import { claimDailyLogin } from "@/lib/sfl/ballons";
 import { useIsClient } from "@/hooks/use-is-client";
 
 const STORAGE_KEY = "sfl-me";
@@ -24,6 +26,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const stored = isClient ? localStorage.getItem(STORAGE_KEY) : null;
   const candidate = selected ?? stored ?? DEFAULT_PLAYER;
   const me = PLAYERS.some((p) => p.name === candidate) ? candidate : DEFAULT_PLAYER;
+
+  // +2 Ballons à la première ouverture de l'app du jour.
+  useEffect(() => {
+    if (!isClient) return;
+    const credited = claimDailyLogin(me);
+    if (credited > 0) {
+      toast.success(`+${credited} Ballons ⚽`, { description: "Connexion du jour" });
+    }
+  }, [isClient, me]);
 
   function setMe(name: string) {
     localStorage.setItem(STORAGE_KEY, name);

@@ -1,14 +1,12 @@
 "use client";
 
 // Rendu Three.js de la carte en trois plans profonds (fond doré, joueur,
-// stats) — on incline l'ensemble au doigt/à la souris, la parallaxe entre
-// les plans crée l'effet d'extrusion façon carte à collectionner.
+// stats) fermés par une tranche arrondie, avec un dos "SFL" — on peut la
+// faire tourner librement (jusqu'à voir le dos), l'inertie s'amortit
+// naturellement et la carte se pose d'elle-même sur la face la plus proche.
 //
-// Le tilt suit le pointeur en delta (pixels glissés depuis l'appui), suivi
-// au niveau window plutôt que par raycast sur le mesh : un raycast qui rate
-// le plan (doigt sorti des bords pendant le geste) coupait le tilt net et
-// donnait cette sensation buguée sur mobile. Le suivi par delta ne dépend
-// plus jamais d'un hit.
+// Le geste est suivi en delta de pointeur au niveau window (pas de raycast
+// pendant le drag : un doigt qui sort du mesh ne coupe jamais la rotation).
 //
 // frameloop="demand" : aucun rendu tant que rien ne bouge.
 
@@ -16,10 +14,13 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
 
-const MAX_TILT_Y = 0.52; // rad, rotation autour de l'axe Y (glissement horizontal)
-const MAX_TILT_X = 0.34; // rad, rotation autour de l'axe X (glissement vertical)
-const LERP = 0.16;
-const DRAG_RANGE_PX = 130; // glissement (px) pour atteindre le tilt maximum
+const MAX_TILT_X = 0.3; // rad, bascule verticale (clampée, revient à plat)
+const ROT_PER_PX = 0.011; // rad de rotation Y par pixel glissé (libre, 360°)
+const DRAG_RANGE_PX = 150;
+const LERP_DRAG = 0.3; // suivi du doigt (réactif)
+const LERP_SETTLE = 0.09; // pose finale + intro (doux)
+const INERTIA_DAMPING = 0.93; // amortissement de la vitesse après relâche
+const SNAP_VELOCITY = 0.6; // rad/s — sous ce seuil, on se pose sur une face
 
 // Profondeur d'extrusion entre les trois calques (en unités monde, la
 // carte fait ~1.5 unité de haut) — resserrée pour une carte fine, tout en
@@ -37,9 +38,7 @@ const BEZEL_COLOR: Record<"simple" | "rare", string> = {
   rare: "#9C6F22",
 };
 
-// Forme rectangle arrondi réutilisée pour la tranche (le bezel) — seule
-// géométrie non texturée, donc aucun risque d'UV : on peut l'arrondir
-// sans toucher à l'alignement des calques image.
+// Forme rectangle arrondi réutilisée pour la tranche (le bezel).
 function roundedRectShape(w: number, h: number, r: number): THREE.Shape {
   const shape = new THREE.Shape();
   const x = -w / 2;
@@ -56,10 +55,9 @@ function roundedRectShape(w: number, h: number, r: number): THREE.Shape {
   return shape;
 }
 
-// Anneau latéral (tranche) construit à la main plutôt que via
-// ExtrudeGeometry : uniquement les faces de côté, aucune face avant/
-// arrière — pas d'ambiguïté de materialIndex, jamais de cap opaque qui
-// vienne couvrir les calques image devant ou derrière.
+// Anneau latéral (tranche) construit à la main : uniquement les faces de
+// côté, aucune face avant/arrière — pas de cap opaque qui couvrirait les
+// calques image.
 function roundedWallGeometry(shape: THREE.Shape, depth: number, segments: number): THREE.BufferGeometry {
   const points = shape.getPoints(segments);
   const n = points.length;
@@ -89,6 +87,60 @@ function roundedWallGeometry(shape: THREE.Shape, depth: number, segments: number
   return geo;
 }
 
+// Dos de la carte : fond noir arrondi, logo SFL "gravé" en relief.
+// Dessiné en canvas 2D (coins transparents inclus) et plaqué en texture.
+function makeBackTexture(bezel: string): THREE.CanvasTexture {
+  const w = 512;
+  const h = 664;
+  const r = 46;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.beginPath();
+  ctx.roundRect(0, 0, w, h, r);
+  ctx.clip();
+
+  const bg = ctx.createRadialGradient(w * 0.35, h * 0.25, 60, w / 2, h / 2, h * 0.85);
+  bg.addColorStop(0, "#171310");
+  bg.addColorStop(0.55, "#0B0906");
+  bg.addColorStop(1, "#050403");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = `${bezel}66`;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.roundRect(12, 12, w - 24, h - 24, r - 10);
+  ctx.stroke();
+
+  // "SFL" extrudé : plusieurs couches décalées (ombre profonde → face or)
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "italic 900 172px 'Arial Black', sans-serif";
+  for (let d = 9; d >= 3; d--) {
+    ctx.fillStyle = `rgba(0,0,0,${0.5 + (9 - d) * 0.05})`;
+    ctx.fillText("SFL", w / 2 + d, h / 2 - 20 + d);
+  }
+  const face = ctx.createLinearGradient(0, h / 2 - 120, 0, h / 2 + 80);
+  face.addColorStop(0, "#FBE9A8");
+  face.addColorStop(0.55, "#E8C266");
+  face.addColorStop(1, "#8A5A18");
+  ctx.fillStyle = face;
+  ctx.fillText("SFL", w / 2, h / 2 - 20);
+
+  ctx.font = "700 26px 'Arial Narrow', sans-serif";
+  ctx.fillStyle = "#C9964Acc";
+  const letterSpaced = "S U N D A Y   F I V E   L E A G U E";
+  ctx.fillText(letterSpaced, w / 2, h / 2 + 96);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
 const HOLO_VERTEX = /* glsl */ `
   varying vec2 vUv;
   void main() {
@@ -97,28 +149,40 @@ const HOLO_VERTEX = /* glsl */ `
   }
 `;
 
+// Masque rectangle-arrondi partagé : coupe les coins des plans texturés
+// pour qu'aucune face ne dépasse en rectangle du bloc arrondi.
+const ROUNDED_MASK_GLSL = /* glsl */ `
+  uniform float uAspect;
+  uniform float uRadius;
+  float roundedMask(vec2 uv) {
+    vec2 p = vec2((uv.x - 0.5) * uAspect, uv.y - 0.5);
+    vec2 half_ = vec2(uAspect * 0.5, 0.5) - uRadius;
+    vec2 q = abs(p) - half_;
+    return length(max(q, 0.0)) - uRadius;
+  }
+`;
+
 const HOLO_FRAGMENT = /* glsl */ `
   varying vec2 vUv;
   uniform float uTiltX;
   uniform float uTiltY;
   uniform float uStrength;
+  ${ROUNDED_MASK_GLSL}
 
   void main() {
+    if (roundedMask(vUv) > 0.0) discard;
     float diag = vUv.x * 0.7 + vUv.y * 0.3;
     float shift = uTiltX * 0.6 - uTiltY * 0.6;
     float band = fract((diag + shift) * 2.4);
     vec3 rainbow = 0.5 + 0.5 * cos(6.28318 * (vec3(band) + vec3(0.0, 0.33, 0.67)));
-    float edge = clamp(abs(uTiltX) / 0.52 + abs(uTiltY) / 0.34, 0.0, 1.0);
+    float edge = clamp(abs(uTiltX) / 0.52 + abs(uTiltY) / 0.3, 0.0, 1.0);
     float alpha = (0.05 + edge * 0.22) * uStrength;
     gl_FragColor = vec4(rainbow, alpha);
   }
 `;
 
-// Matériau "surface" — reprend la texture captée (déjà grainée en 2D) et
-// lui ajoute une vraie réponse à la lumière : un bump procédural (grain
-// qui accroche des micro-reflets), un spéculaire, et un liseré fresnel
-// chaud sur les tranches inclinées. Le tout donne l'impression d'une
-// carte physique plutôt que d'une image plaquée sur un plan.
+// Matériau "surface" — texture captée + réponse à la lumière (bump grain,
+// spéculaire, fresnel chaud) + masque de coins arrondis.
 const SURFACE_VERTEX = /* glsl */ `
   varying vec2 vUv;
   varying vec3 vNormal;
@@ -137,6 +201,7 @@ const SURFACE_FRAGMENT = /* glsl */ `
   varying vec2 vUv;
   varying vec3 vNormal;
   varying vec3 vViewPosition;
+  ${ROUNDED_MASK_GLSL}
 
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
   float vnoise(vec2 p) {
@@ -151,6 +216,7 @@ const SURFACE_FRAGMENT = /* glsl */ `
   }
 
   void main() {
+    if (roundedMask(vUv) > 0.0) discard;
     vec4 tex = texture2D(map, vUv);
     if (tex.a < 0.01) discard;
 
@@ -207,6 +273,7 @@ function CardMesh({
   const bgTex = useLayerTexture(background);
   const playerTex = useLayerTexture(playerLayer);
   const statsTex = useLayerTexture(stats);
+  const backTex = useMemo(() => makeBackTexture(bezel), [bezel]);
 
   const persp = camera as THREE.PerspectiveCamera;
   const distance = persp.position.z;
@@ -217,12 +284,13 @@ function CardMesh({
 
   const groupRef = useRef<THREE.Group>(null);
   const holoMat = useRef<THREE.ShaderMaterial>(null);
+  // Machine à états du mouvement : intro (arrivée lente) → idle ;
+  // drag (suivi du doigt) → inertia (élan amorti puis pose sur une face).
+  const mode = useRef<"intro" | "idle" | "drag" | "inertia">("intro");
+  const current = useRef({ x: 0.2, y: -2.6, scale: 0.7 });
   const target = useRef({ x: 0, y: 0, scale: 1 });
-  // Départ dramatique — la carte arrive tournée et réduite, puis se pose
-  // à plat avec l'amorti existant : effet d'intro "convoquée à l'écran".
-  const current = useRef({ x: -1.35, y: 0.22, scale: 0.72 });
-  const drag = useRef({ active: false, startX: 0, startY: 0 });
-  const introDone = useRef(false);
+  const velY = useRef(0);
+  const drag = useRef({ startX: 0, startY: 0, baseRotY: 0 });
 
   const particlesGeo = useRef<THREE.BufferGeometry>(null);
   const particlesMat = useRef<THREE.PointsMaterial>(null);
@@ -235,32 +303,57 @@ function CardMesh({
   const particlePositions = useMemo(() => new Float32Array(PARTICLE_COUNT * 3), []);
 
   useEffect(() => {
-    if (!introDone.current) {
-      introDone.current = true;
-      invalidate();
-    }
+    invalidate();
   }, [invalidate]);
 
   useFrame((_, delta) => {
     const c = current.current;
     const t = target.current;
-    c.x += (t.x - c.x) * LERP;
-    c.y += (t.y - c.y) * LERP;
-    c.scale += (t.scale - c.scale) * LERP;
+    const m = mode.current;
+    const dt = Math.min(delta, 0.05);
+
+    if (m === "drag") {
+      c.x += (t.x - c.x) * LERP_DRAG;
+      const prevY = c.y;
+      c.y += (t.y - c.y) * LERP_DRAG;
+      velY.current = (c.y - prevY) / Math.max(dt, 1e-4);
+      c.scale += (t.scale - c.scale) * LERP_DRAG;
+    } else if (m === "inertia") {
+      c.y += velY.current * dt;
+      velY.current *= Math.pow(INERTIA_DAMPING, dt * 60);
+      c.x += (0 - c.x) * LERP_SETTLE;
+      c.scale += (1 - c.scale) * LERP_SETTLE;
+      if (Math.abs(velY.current) < SNAP_VELOCITY) {
+        // Élan épuisé : on vise la face la plus proche (avant ou dos).
+        target.current = { x: 0, y: Math.round(c.y / Math.PI) * Math.PI, scale: 1 };
+        mode.current = "idle";
+      }
+    } else {
+      // intro + idle : pose douce vers la cible
+      const lerp = LERP_SETTLE;
+      c.x += (t.x - c.x) * lerp;
+      c.y += (t.y - c.y) * lerp;
+      c.scale += (t.scale - c.scale) * lerp;
+      if (m === "intro" && Math.abs(t.y - c.y) < 0.002 && Math.abs(t.x - c.x) < 0.002) {
+        mode.current = "idle";
+      }
+    }
 
     if (groupRef.current) {
-      groupRef.current.rotation.y = c.x;
-      groupRef.current.rotation.x = c.y;
+      groupRef.current.rotation.y = c.y;
+      groupRef.current.rotation.x = c.x;
       groupRef.current.scale.setScalar(c.scale);
     }
     if (holoMat.current) {
-      holoMat.current.uniforms.uTiltX.value = c.x;
-      holoMat.current.uniforms.uTiltY.value = c.y;
+      holoMat.current.uniforms.uTiltX.value = c.y % Math.PI;
+      holoMat.current.uniforms.uTiltY.value = c.x;
     }
 
     const settled =
-      Math.abs(t.x - c.x) < 0.0006 &&
+      mode.current !== "inertia" &&
+      mode.current !== "drag" &&
       Math.abs(t.y - c.y) < 0.0006 &&
+      Math.abs(t.x - c.x) < 0.0006 &&
       Math.abs(t.scale - c.scale) < 0.0006;
 
     const b = burst.current;
@@ -288,20 +381,22 @@ function CardMesh({
   // sort des limites du plan pendant le geste (cas fréquent au doigt).
   useEffect(() => {
     function onMove(e: PointerEvent) {
-      if (!drag.current.active) return;
+      if (mode.current !== "drag") return;
       const dx = e.clientX - drag.current.startX;
       const dy = e.clientY - drag.current.startY;
-      target.current.x = THREE.MathUtils.clamp((dx / DRAG_RANGE_PX) * MAX_TILT_Y, -MAX_TILT_Y, MAX_TILT_Y);
-      // Inversé : glisser vers le bas incline le haut de la carte vers soi,
-      // comme quand on bascule une vraie carte tenue en main.
-      target.current.y = THREE.MathUtils.clamp((dy / DRAG_RANGE_PX) * MAX_TILT_X, -MAX_TILT_X, MAX_TILT_X);
+      // Rotation libre autour de Y (on peut retourner la carte)…
+      target.current.y = drag.current.baseRotY + dx * ROT_PER_PX;
+      // …bascule verticale clampée, sens naturel (glisser bas = pencher vers soi).
+      target.current.x = THREE.MathUtils.clamp(
+        (dy / DRAG_RANGE_PX) * MAX_TILT_X,
+        -MAX_TILT_X,
+        MAX_TILT_X
+      );
       invalidate();
     }
     function onUp() {
-      if (!drag.current.active) return;
-      drag.current.active = false;
-      target.current.x = 0;
-      target.current.y = 0;
+      if (mode.current !== "drag") return;
+      mode.current = "inertia";
       target.current.scale = 1;
       invalidate();
     }
@@ -333,31 +428,73 @@ function CardMesh({
 
   const onDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
-      drag.current.active = true;
+      mode.current = "drag";
       drag.current.startX = e.nativeEvent.clientX;
       drag.current.startY = e.nativeEvent.clientY;
+      drag.current.baseRotY = current.current.y;
+      target.current.y = current.current.y;
       target.current.scale = 1.045;
+      velY.current = 0;
       spawnBurst();
       invalidate();
     },
     [invalidate, spawnBurst]
   );
 
-  // Tranche (bezel) arrondie — une seule extrusion en anneau plutôt que
-  // quatre murs droits à coins carrés, pour matcher les coins arrondis
-  // du visuel de la carte.
+  // Tranche (bezel) arrondie suivant les coins du visuel.
   const wallRadius = Math.min(width, height) * 0.07;
   const wallShape = useMemo(() => roundedRectShape(width, height, wallRadius), [width, height, wallRadius]);
   const wallGeo = useMemo(() => roundedWallGeometry(wallShape, STATS_Z, 10), [wallShape]);
 
-  const bgUniforms = useMemo(() => ({ map: { value: bgTex } }), [bgTex]);
-  const playerUniforms = useMemo(() => ({ map: { value: playerTex } }), [playerTex]);
-  const statsUniforms = useMemo(() => ({ map: { value: statsTex } }), [statsTex]);
+  const maskUniforms = useMemo(
+    () => ({ uAspect: width / height, uRadius: wallRadius / height }),
+    [width, height, wallRadius]
+  );
+  const bgUniforms = useMemo(
+    () => ({
+      map: { value: bgTex },
+      uAspect: { value: maskUniforms.uAspect },
+      uRadius: { value: maskUniforms.uRadius },
+    }),
+    [bgTex, maskUniforms]
+  );
+  const playerUniforms = useMemo(
+    () => ({
+      map: { value: playerTex },
+      uAspect: { value: maskUniforms.uAspect },
+      uRadius: { value: maskUniforms.uRadius },
+    }),
+    [playerTex, maskUniforms]
+  );
+  const statsUniforms = useMemo(
+    () => ({
+      map: { value: statsTex },
+      uAspect: { value: maskUniforms.uAspect },
+      uRadius: { value: maskUniforms.uRadius },
+    }),
+    [statsTex, maskUniforms]
+  );
+  const holoUniforms = useMemo(
+    () => ({
+      uTiltX: { value: 0 },
+      uTiltY: { value: 0 },
+      uStrength: { value: holo ? 1 : 0.3 },
+      uAspect: { value: maskUniforms.uAspect },
+      uRadius: { value: maskUniforms.uRadius },
+    }),
+    [holo, maskUniforms]
+  );
 
   return (
     <group ref={groupRef} onPointerDown={onDown}>
       <mesh geometry={wallGeo}>
         <meshStandardMaterial color={bezel} roughness={0.45} metalness={0.35} side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* Dos de la carte — SFL gravé sur fond noir, visible en la retournant */}
+      <mesh position={[0, 0, -0.004]} rotation={[0, Math.PI, 0]}>
+        <planeGeometry args={[width, height]} />
+        <meshStandardMaterial map={backTex} roughness={0.55} metalness={0.15} transparent />
       </mesh>
 
       <mesh position={[0, 0, 0]}>
@@ -390,11 +527,7 @@ function CardMesh({
           ref={holoMat}
           vertexShader={HOLO_VERTEX}
           fragmentShader={HOLO_FRAGMENT}
-          uniforms={{
-            uTiltX: { value: 0 },
-            uTiltY: { value: 0 },
-            uStrength: { value: holo ? 1 : 0.3 },
-          }}
+          uniforms={holoUniforms}
           transparent
           blending={THREE.AdditiveBlending}
           depthWrite={false}

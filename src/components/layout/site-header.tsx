@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useMyPlayer } from "@/components/sfl/player-provider";
+import { useBallons } from "@/hooks/use-ballons";
+import { useIsClient } from "@/hooks/use-is-client";
 import { PLAYERS } from "@/lib/sfl/data";
 import {
   Select,
@@ -23,6 +25,22 @@ import {
 } from "@/components/ui/tooltip";
 
 const PLAYER_NAMES = [...PLAYERS].sort((a, b) => a.name.localeCompare(b.name)).map((p) => p.name);
+
+function BallonsBadge({ me }: { me: string }) {
+  const isClient = useIsClient();
+  const balance = useBallons(me);
+
+  return (
+    <Link
+      href="/collection"
+      aria-label="Mes Ballons — ouvrir la collection"
+      className="flex items-center gap-1 rounded-full bg-secondary py-1.5 pr-3 pl-2 text-sm font-bold tabular-nums"
+    >
+      <span aria-hidden>⚽</span>
+      {isClient ? balance : 0}
+    </Link>
+  );
+}
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -56,7 +74,8 @@ export function SiteHeader() {
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1.5">
+          <BallonsBadge me={me} />
           <Select value={me} onValueChange={(v) => setMe(v as string)}>
             <SelectTrigger
               size="sm"

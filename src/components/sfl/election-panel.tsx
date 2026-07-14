@@ -27,6 +27,14 @@ import {
   tallyPhase2,
   type BoostCategory,
 } from "@/lib/sfl/votes";
+import { claimVoteReward } from "@/lib/sfl/ballons";
+
+// +1 Ballon au premier vote du jour, avec un toast dédié.
+function rewardVote(me: string) {
+  if (claimVoteReward(me) > 0) {
+    toast.success("+1 Ballon ⚽", { description: "Vote du jour validé" });
+  }
+}
 
 const CATEGORIES: BoostCategory[] = ["mvp", "impact", "def"];
 
@@ -57,6 +65,7 @@ function TeamNominationRow({
     toast.success(`Nomination enregistrée : ${candidate}`, {
       description: `${voters.name} → ${CATEGORY_LABELS[category]}`,
     });
+    rewardVote(me);
   }
 
   const sorted = [...candidates.players].sort(
@@ -158,6 +167,7 @@ function Phase2Panel({
     toast.success(`Vote final enregistré : ${candidate}`, {
       description: CATEGORY_LABELS[category],
     });
+    rewardVote(me);
   }
 
   const sorted = [...uniqueNames].sort((a, b) => (tally.votes[b] ?? 0) - (tally.votes[a] ?? 0));

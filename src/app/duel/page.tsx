@@ -14,6 +14,7 @@ import type { Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { getRatings, pickPair, recordDuel, resetRatings } from "@/lib/sfl/duel";
 import { DUEL_CATEGORIES, pickCategory, type DuelCategory } from "@/lib/sfl/duel-categories";
+import { DAILY_DUEL_CAP, getDailyDuelCount, recordDailyDuel } from "@/lib/sfl/ballons";
 
 const cardVariants = {
   idle: { scale: 1, y: 0, opacity: 1, filter: "grayscale(0)" },
@@ -38,8 +39,15 @@ export default function DuelPage() {
   // après un duel ou un changement de profil, sans état dupliqué.
   const ratings = isClient ? getRatings(me) : {};
 
+  // Compteur de duels du jour — relu à chaque round (round change → re-render).
+  const dailyCount = isClient ? getDailyDuelCount(me) : 0;
+  const capped = dailyCount >= DAILY_DUEL_CAP;
+
   function choose(index: 0 | 1) {
-    if (busy) return;
+    if (busy || capped) return;
+    const daily = recordDailyDuel(me);
+    if (!daily.allowed) return;
+
     const winner = pair[index];
     const loser = pair[1 - index];
     setResolvedWinner(winner.name);
@@ -55,9 +63,15 @@ export default function DuelPage() {
 
     const { delta } = recordDuel(me, winner.name, loser.name, category.id);
     setLastDelta(delta);
-    toast.success(`${winner.name} l'emporte`, {
-      description: `${category.label} · face à ${loser.name}`,
-    });
+    if (daily.rewarded > 0) {
+      toast.success(`+${daily.rewarded} Ballons ⚽`, {
+        description: `${DAILY_DUEL_CAP} duels du jour terminés — bien joué !`,
+      });
+    } else {
+      toast.success(`${winner.name} l'emporte`, {
+        description: `${category.label} · face à ${loser.name}`,
+      });
+    }
 
     setTimeout(() => {
       setPair((prev) => pickPair(PLAYERS, [prev[0].name, prev[1].name]));
@@ -89,7 +103,25 @@ export default function DuelPage() {
         </p>
       </div>
 
-      {isClient ? (
+      {isClient && (
+        <div className="flex items-center justify-between rounded-2xl bg-card px-4 py-2.5">
+          <span className="text-[13px] font-semibold">
+            Duels du jour&nbsp;
+            <span className="text-muted-foreground tabular-nums">
+              {dailyCount}/{DAILY_DUEL_CAP}
+            </span>
+          </span>
+          <span className="text-[12px] font-semibold text-muted-foreground">
+            {capped ? "Quota atteint · reviens demain" : "+5 ⚽ en terminant les 10"}
+          </span>
+        </div>
+      )}
+
+      {isClient && capped ? (
+        <div className="rounded-3xl bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+          Tes 10 duels du jour sont faits — les 5 Ballons sont à toi. Reviens demain !
+        </div>
+      ) : isClient ? (
         <section className="flex flex-col items-center gap-5">
           <AnimatePresence mode="wait">
             <motion.div
