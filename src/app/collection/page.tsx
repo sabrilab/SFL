@@ -1,8 +1,9 @@
 "use client";
 
-// Collection — packs booster, catalogue de cartes numérotées et boutique.
-// Économie 100% Ballons en v1 locale ; l'achat de Ballons en argent réel
-// arrivera avec le backend (boutons "Bientôt" en attendant).
+// Collection — packs booster, catalogue de cartes numérotées (avec le
+// vrai visuel de chaque carte, filtrable) et boutique. Économie 100%
+// Ballons en v1 locale ; l'achat de Ballons en argent réel arrivera avec
+// le backend (boutons "Bientôt" en attendant).
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -10,9 +11,11 @@ import { toast } from "sonner";
 import { PackageOpen, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { BoostCard } from "@/components/sfl/boost-card";
+import { Card3D } from "@/components/sfl/card-3d";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useBallons } from "@/hooks/use-ballons";
@@ -31,6 +34,7 @@ import {
   buyCard,
   getOwned,
   openPack,
+  type CardKind,
   type CollectionCard,
 } from "@/lib/sfl/collection";
 
@@ -42,8 +46,34 @@ const KIND_STYLES: Record<string, string> = {
   mvp: "bg-[#F4C542]/20 text-[#a87b12] dark:text-[#F4C542]",
 };
 
+const FILTERS: { id: CardKind | "all"; label: string }[] = [
+  { id: "all", label: "Toutes" },
+  { id: "simple", label: "Standard" },
+  { id: "rare", label: "Rare" },
+  { id: "def", label: "Défensive" },
+  { id: "impact", label: "Impact" },
+  { id: "mvp", label: "MVP" },
+];
+
+function renderFlat(card: CollectionCard, size: number) {
+  return card.kind === "simple" || card.kind === "rare" ? (
+    <PlayerCard player={card.player} mode={card.kind} size={size} />
+  ) : (
+    <BoostCard
+      card={{
+        player: card.player.name,
+        type: card.kind as BoostType,
+        ovr: ovr(card.player.stats),
+        poste: card.player.poste,
+        date: "Hors-série",
+        stats: card.player.stats,
+      }}
+      size={size}
+    />
+  );
+}
+
 function CardReveal({ card, index }: { card: CollectionCard; index: number }) {
-  const isSpecial = card.kind !== "simple" && card.kind !== "rare";
   return (
     <motion.div
       initial={{ opacity: 0, rotateY: 90, scale: 0.7 }}
@@ -51,21 +81,7 @@ function CardReveal({ card, index }: { card: CollectionCard; index: number }) {
       transition={{ delay: 0.25 + index * 0.35, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       className="flex shrink-0 flex-col items-center gap-1.5"
     >
-      {isSpecial ? (
-        <BoostCard
-          card={{
-            player: card.player.name,
-            type: card.kind as BoostType,
-            ovr: ovr(card.player.stats),
-            poste: card.player.poste,
-            date: "Hors-série",
-            stats: card.player.stats,
-          }}
-          size={0.42}
-        />
-      ) : (
-        <PlayerCard player={card.player} mode={card.kind === "rare" ? "rare" : "simple"} size={0.42} />
-      )}
+      {renderFlat(card, 0.42)}
       <span
         className={cn(
           "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
@@ -78,17 +94,78 @@ function CardReveal({ card, index }: { card: CollectionCard; index: number }) {
   );
 }
 
+function CardModal({
+  card,
+  count,
+  onOpenChange,
+  onBuy,
+}: {
+  card: CollectionCard | null;
+  count: number;
+  onOpenChange: (open: boolean) => void;
+  onBuy: (card: CollectionCard) => void;
+}) {
+  const has = count > 0;
+  return (
+    <Dialog open={card !== null} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-w-xs flex-col items-center gap-4 bg-transparent p-0 shadow-none ring-0">
+        <DialogTitle className="sr-only">
+          {card ? `${KIND_LABELS[card.kind]} ${card.player.name}` : "Carte"}
+        </DialogTitle>
+        {card && (
+          <>
+            <div className={cn("transition-opacity", !has && "opacity-40 grayscale")}>
+              <Card3D
+                cacheKey={card.id}
+                mode={card.kind === "simple" ? "simple" : "rare"}
+                size={1.15}
+                render={(s) => renderFlat(card, s)}
+              />
+            </div>
+            <div className="flex flex-col items-center gap-2 rounded-3xl bg-card px-5 py-4 text-center">
+              <span
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-[10px] font-bold uppercase",
+                  KIND_STYLES[card.kind]
+                )}
+              >
+                {KIND_LABELS[card.kind]}
+              </span>
+              <span className="text-lg font-bold">{card.player.name}</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                n°{card.serial}/{card.total} {has && `· ×${count} en collection`}
+              </span>
+              {!has && (
+                <Button size="sm" className="mt-1 font-semibold" onClick={() => onBuy(card)}>
+                  Acheter · {card.price.toLocaleString("fr-FR")} ⚽
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function CollectionPage() {
   const { me } = useMyPlayer();
   const isClient = useIsClient();
   const balance = useBallons(me);
   const [opened, setOpened] = useState<CollectionCard[] | null>(null);
   const [packSeq, setPackSeq] = useState(0);
+  const [filter, setFilter] = useState<CardKind | "all">("all");
+  const [ownedOnly, setOwnedOnly] = useState(false);
+  const [selected, setSelected] = useState<CollectionCard | null>(null);
   // tick de re-lecture après achat/ouverture (owned relu à chaque rendu)
   const [, setTick] = useState(0);
 
   const owned = isClient ? getOwned(me) : {};
   const uniqueOwned = Object.keys(owned).length;
+
+  const filtered = CATALOG.filter((c) => filter === "all" || c.kind === filter).filter(
+    (c) => !ownedOnly || (owned[c.id] ?? 0) > 0
+  );
 
   function handleOpenPack() {
     const cards = openPack(me);
@@ -100,6 +177,7 @@ export default function CollectionPage() {
     }
     setOpened(cards);
     setPackSeq((n) => n + 1);
+    setTick((n) => n + 1);
     const special = cards.find((c) => c.kind !== "simple" && c.kind !== "rare");
     if (special) {
       toast.success(`Carte hors-série ${KIND_LABELS[special.kind]} !`, {
@@ -111,6 +189,7 @@ export default function CollectionPage() {
   function handleBuy(card: CollectionCard) {
     if (buyCard(me, card.id)) {
       setTick((n) => n + 1);
+      setSelected(null);
       toast.success(`${KIND_LABELS[card.kind]} ${card.player.name} ajoutée à ta collection`, {
         description: `−${card.price} ⚽`,
       });
@@ -224,48 +303,81 @@ export default function CollectionPage() {
         </TabsContent>
 
         {/* ===== CARTES ===== */}
-        <TabsContent value="cartes" className="mt-4">
-          <p className="mb-3 px-1 text-sm text-muted-foreground">
+        <TabsContent value="cartes" className="mt-4 flex flex-col gap-3">
+          <p className="px-1 text-sm text-muted-foreground">
             <strong className="font-semibold text-foreground">
               {uniqueOwned}/{CATALOG.length}
             </strong>{" "}
-            cartes différentes dans ta collection.
+            cartes différentes dans ta collection. Touche une carte pour la voir en grand
+            et la manipuler.
           </p>
-          <div className="grid grid-cols-2 gap-2">
-            {CATALOG.map((card) => {
+
+          <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {FILTERS.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={cn(
+                  "shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors",
+                  filter === f.id
+                    ? "bg-foreground text-background"
+                    : "bg-card text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+            <button
+              onClick={() => setOwnedOnly((v) => !v)}
+              className={cn(
+                "shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors",
+                ownedOnly
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Possédées
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+            {filtered.map((card) => {
               const count = owned[card.id] ?? 0;
               const has = count > 0;
               return (
-                <div
+                <button
                   key={card.id}
-                  className={cn(
-                    "flex flex-col gap-1 rounded-2xl bg-card px-3.5 py-3",
-                    !has && "opacity-45"
-                  )}
+                  onClick={() => setSelected(card)}
+                  className="flex flex-col items-center gap-1.5 rounded-2xl bg-card px-2 py-3 text-center transition-transform active:scale-95"
                 >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="truncate text-sm font-bold">{card.player.name}</span>
-                    <span className="shrink-0 text-[10px] font-semibold text-muted-foreground tabular-nums">
-                      n°{card.serial}/{card.total}
-                    </span>
+                  <div className={cn("transition-opacity", !has && "opacity-30 grayscale")}>
+                    {renderFlat(card, 0.32)}
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[9px] font-bold uppercase",
-                        KIND_STYLES[card.kind]
-                      )}
-                    >
-                      {KIND_LABELS[card.kind]}
+                  <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
+                    n°{card.serial}/{card.total}
+                  </span>
+                  {has && count > 1 && (
+                    <span className="rounded-full bg-primary/12 px-1.5 py-0.5 text-[9px] font-bold text-primary">
+                      ×{count}
                     </span>
-                    <span className="text-[11px] font-semibold text-muted-foreground">
-                      {has ? `×${count}` : "—"}
-                    </span>
-                  </div>
-                </div>
+                  )}
+                </button>
               );
             })}
           </div>
+
+          {filtered.length === 0 && (
+            <div className="rounded-3xl bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+              Aucune carte pour ce filtre.
+            </div>
+          )}
+
+          <CardModal
+            card={selected}
+            count={selected ? (owned[selected.id] ?? 0) : 0}
+            onOpenChange={(open) => !open && setSelected(null)}
+            onBuy={handleBuy}
+          />
         </TabsContent>
 
         {/* ===== BOUTIQUE ===== */}
@@ -282,9 +394,10 @@ export default function CollectionPage() {
               {specials.map((card) => {
                 const has = (owned[card.id] ?? 0) > 0;
                 return (
-                  <div
+                  <button
                     key={card.id}
-                    className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3"
+                    onClick={() => setSelected(card)}
+                    className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3 text-left"
                   >
                     <span
                       className={cn(
@@ -303,11 +416,11 @@ export default function CollectionPage() {
                     {has ? (
                       <span className="text-xs font-semibold text-emerald-500">Obtenue ✓</span>
                     ) : (
-                      <Button size="sm" variant="secondary" onClick={() => handleBuy(card)}>
+                      <span className="rounded-full bg-secondary px-3 py-1.5 text-sm font-semibold">
                         {card.price.toLocaleString("fr-FR")} ⚽
-                      </Button>
+                      </span>
                     )}
-                  </div>
+                  </button>
                 );
               })}
             </div>

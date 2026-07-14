@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { PlayerCard } from "@/components/sfl/player-card";
+import { Card3D } from "@/components/sfl/card-3d";
 import { ElectionPanel } from "@/components/sfl/election-panel";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { JOURNEES, PLAYERS } from "@/lib/sfl/data";
@@ -46,7 +47,12 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
             </span>
           )}
         </div>
-        <PlayerCard player={leader} mode="simple" size={0.85} />
+        <Card3D
+          cacheKey={`simple-${leader.name}-${def.id}`}
+          mode="simple"
+          size={0.85}
+          render={(s) => <PlayerCard player={leader} mode="simple" size={s} />}
+        />
       </div>
 
       {/* Classement linéaire */}

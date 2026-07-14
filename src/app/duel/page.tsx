@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { RotateCcw, Swords } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlayerCard } from "@/components/sfl/player-card";
+import { Card3D } from "@/components/sfl/card-3d";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
 import { PLAYERS } from "@/lib/sfl/data";
@@ -165,11 +166,18 @@ export default function DuelPage() {
                             "radial-gradient(circle, rgba(255,90,31,.55) 0%, rgba(255,90,31,0) 70%)",
                         }}
                       />
-                      <PlayerCard
-                        player={p}
+                      <Card3D
+                        cacheKey={`simple-${p.name}-${category.id}`}
                         mode="simple"
                         size={0.56}
-                        highlightStats={category.statKeys}
+                        render={(s) => (
+                          <PlayerCard
+                            player={p}
+                            mode="simple"
+                            size={s}
+                            highlightStats={category.statKeys}
+                          />
+                        )}
                       />
                       <span className="text-sm font-semibold">{p.name}</span>
                       <AnimatePresence>

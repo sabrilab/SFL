@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BoostCard, BOOST_LABELS } from "@/components/sfl/boost-card";
 import { Card3D } from "@/components/sfl/card-3d";
-import { type CardMode } from "@/components/sfl/player-card";
+import { PlayerCard, type CardMode } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { BAREME, BOOST_CARDS, PLAYERS } from "@/lib/sfl/data";
 import {
@@ -112,7 +112,12 @@ export default function CartePage() {
             </button>
           ))}
         </div>
-        <Card3D player={player} mode={mode} size={1.05} />
+        <Card3D
+          cacheKey={`${mode}-${player.name}`}
+          mode={mode}
+          size={1.05}
+          render={(s) => <PlayerCard player={player} mode={mode} size={s} />}
+        />
       </section>
 
       {/* Cartes Boost */}
@@ -133,7 +138,12 @@ export default function CartePage() {
           <div className="-mx-5 flex gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {myBoosts.map((c, i) => (
               <div key={i} className="shrink-0 text-center">
-                <BoostCard card={c} size={0.82} />
+                <Card3D
+                  cacheKey={`${c.type}-${c.player}-${c.date}`}
+                  mode="rare"
+                  size={0.82}
+                  render={(s) => <BoostCard card={c} size={s} />}
+                />
                 <div className="mt-2 text-xs font-medium text-muted-foreground">
                   {BOOST_LABELS[c.type]} · {c.date}
                 </div>

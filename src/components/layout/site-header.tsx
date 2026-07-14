@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { ShieldCheck } from "lucide-react";
+import { Lock, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/nav";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -18,11 +19,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
+// Profils protégés par un petit mot de passe (pas de vraie sécurité —
+// juste de quoi éviter qu'on se fasse usurper son profil pour de rire).
+const PROFILE_PASSWORDS: Record<string, string> = {
+  Ilyes: "azy",
+};
 
 const PLAYER_NAMES = [...PLAYERS].sort((a, b) => a.name.localeCompare(b.name)).map((p) => p.name);
 
@@ -42,9 +58,90 @@ function BallonsBadge({ me }: { me: string }) {
   );
 }
 
+function ProfilePasswordDialog({
+  name,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  name: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: (name: string) => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState(false);
+
+  function reset() {
+    setPassword("");
+    setError(false);
+  }
+
+  function submit() {
+    if (!name) return;
+    if (password === PROFILE_PASSWORDS[name]) {
+      onSuccess(name);
+      onOpenChange(false);
+      reset();
+    } else {
+      setError(true);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        if (!next) reset();
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-1.5">
+            <Lock className="size-4" /> Profil protégé
+          </DialogTitle>
+          <DialogDescription>
+            Le profil {name} est protégé par un mot de passe.
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          type="password"
+          autoFocus
+          placeholder="Mot de passe"
+          value={password}
+          aria-invalid={error}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            setError(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit();
+          }}
+        />
+        {error && <p className="text-xs text-destructive">Mot de passe incorrect.</p>}
+        <DialogFooter>
+          <Button onClick={submit} className="font-semibold">
+            Se connecter
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function SiteHeader() {
   const pathname = usePathname();
   const { me, setMe } = useMyPlayer();
+  const [pendingProfile, setPendingProfile] = useState<string | null>(null);
+
+  function selectProfile(name: string) {
+    if (PROFILE_PASSWORDS[name]) {
+      setPendingProfile(name);
+    } else {
+      setMe(name);
+    }
+  }
 
   return (
     <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
@@ -76,7 +173,7 @@ export function SiteHeader() {
 
         <div className="ml-auto flex items-center gap-1.5">
           <BallonsBadge me={me} />
-          <Select value={me} onValueChange={(v) => setMe(v as string)}>
+          <Select value={me} onValueChange={(v) => selectProfile(v as string)}>
             <SelectTrigger
               size="sm"
               aria-label="Choisir mon profil joueur"
@@ -90,11 +187,23 @@ export function SiteHeader() {
             <SelectContent>
               {PLAYER_NAMES.map((name) => (
                 <SelectItem key={name} value={name}>
-                  {name}
+                  <span className="flex items-center gap-1.5">
+                    {name}
+                    {PROFILE_PASSWORDS[name] && <Lock className="size-3 text-muted-foreground" />}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+
+          <ProfilePasswordDialog
+            name={pendingProfile}
+            open={pendingProfile !== null}
+            onOpenChange={(open) => {
+              if (!open) setPendingProfile(null);
+            }}
+            onSuccess={(name) => setMe(name)}
+          />
 
           <Tooltip>
             <TooltipTrigger

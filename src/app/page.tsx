@@ -56,7 +56,12 @@ export default function Home() {
 
       {/* Ma carte — dès l'arrivée */}
       <section className="flex flex-col items-center gap-3">
-        <Card3D player={player} mode="rare" size={0.68} />
+        <Card3D
+          cacheKey={`rare-${player.name}`}
+          mode="rare"
+          size={0.68}
+          render={(s) => <PlayerCard player={player} mode="rare" size={s} />}
+        />
         <Link
           href="/carte"
           className="inline-flex items-center gap-1.5 text-sm font-semibold"
@@ -129,7 +134,12 @@ export default function Home() {
               <span className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
                 {def.label}
               </span>
-              <PlayerCard player={leader} mode="simple" size={0.5} />
+              <Card3D
+                cacheKey={`simple-${leader.name}`}
+                mode="simple"
+                size={0.5}
+                render={(s) => <PlayerCard player={leader} mode="simple" size={s} />}
+              />
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-bold tracking-tight tabular-nums">
                   {leader.value}
