@@ -191,7 +191,7 @@ export function SiteHeader() {
             href="/"
             className="font-sans text-base font-extrabold tracking-tighter"
           >
-            G<span className="text-primary">o</span>ccer
+            Goccer
           </Link>
           <LeagueSwitcher />
         </div>
