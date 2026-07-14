@@ -9,6 +9,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { ViewportLock } from "@/components/pwa/viewport-lock";
 import { PlayerProvider } from "@/components/sfl/player-provider";
 import { CardViewerProvider } from "@/components/sfl/card-viewer";
 import { AppSplash } from "@/components/sfl/app-splash";
@@ -89,10 +90,11 @@ export default function RootLayout({
             <CardViewerProvider>
               <TooltipProvider delay={200}>
                 <AppSplash />
+                <ViewportLock />
                 <ServiceWorkerRegister />
                 <div
                   id="app-scroll"
-                  className="flex h-full flex-col overflow-y-auto overscroll-y-contain"
+                  className="flex h-full flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain"
                   style={{ WebkitOverflowScrolling: "touch" }}
                 >
                   <SiteHeader />
