@@ -109,6 +109,8 @@ export function Card3D(props: {
   mode?: "simple" | "rare";
   cacheKey: string;
   render: (size: number) => ReactNode;
+  startFace?: "front" | "back";
+  interactive?: boolean;
 }) {
   return <Card3DInner key={props.cacheKey} {...props} />;
 }
@@ -117,12 +119,18 @@ function Card3DInner({
   size = 1,
   mode = "rare",
   render,
+  startFace = "front",
+  interactive = true,
 }: {
   size?: number;
   /** Contrôle la couleur du bezel et l'intensité de l'effet holo. */
   mode?: "simple" | "rare";
   /** Rend le contenu CardShell (PlayerCard/BoostCard) à la taille donnée. */
   render: (size: number) => ReactNode;
+  /** "back" démarre déjà retournée (dos SFL gravé) — pour les packs scellés. */
+  startFace?: "front" | "back";
+  /** false = décorative, ne répond pas au glissement (fans de pack). */
+  interactive?: boolean;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -190,6 +198,8 @@ function Card3DInner({
           stats={captured.stats}
           holo={mode === "rare"}
           mode={mode}
+          startFace={startFace}
+          interactive={interactive}
         />
       ) : (
         // Skeleton pendant la capture : jamais de carte 2D "flash" avant

@@ -182,7 +182,7 @@ export default function StatsPage() {
 
         {/* ===== CLASSEMENTS ===== */}
         <TabsContent value="classement" className="mt-4">
-          <div className="-mx-5 mb-4 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="-mx-5 mb-4 flex gap-2 overflow-x-auto overscroll-x-contain px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {RANKINGS.map((r) => (
               <button
                 key={r.id}

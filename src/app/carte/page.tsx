@@ -136,7 +136,7 @@ export default function CartePage() {
           .
         </p>
         {myBoosts.length > 0 ? (
-          <div className="-mx-5 flex gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="-mx-5 flex gap-4 overflow-x-auto overscroll-x-contain px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {myBoosts.map((c, i) => (
               <div key={i} className="shrink-0 text-center">
                 <ViewableCard

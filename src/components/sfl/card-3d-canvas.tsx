@@ -262,12 +262,18 @@ function CardMesh({
   stats,
   holo,
   bezel,
+  startFace = "front",
+  interactive = true,
 }: {
   background: string;
   playerLayer: string;
   stats: string;
   holo: boolean;
   bezel: string;
+  /** "back" démarre déjà retournée (dos SFL gravé) — pour les visuels de pack scellé. */
+  startFace?: "front" | "back";
+  /** false = décorative, ne répond pas au glissement (fans de pack). */
+  interactive?: boolean;
 }) {
   const { camera, invalidate } = useThree();
   const bgTex = useLayerTexture(background);
@@ -288,7 +294,7 @@ function CardMesh({
   // drag (suivi du doigt) → inertia (élan amorti puis pose sur une face).
   const mode = useRef<"intro" | "idle" | "drag" | "inertia">("intro");
   const current = useRef({ x: 0.2, y: -2.6, scale: 0.7 });
-  const target = useRef({ x: 0, y: 0, scale: 1 });
+  const target = useRef({ x: 0, y: startFace === "back" ? Math.PI : 0, scale: 1 });
   const velY = useRef(0);
   const drag = useRef({ startX: 0, startY: 0, baseRotY: 0 });
 
@@ -486,7 +492,7 @@ function CardMesh({
   );
 
   return (
-    <group ref={groupRef} onPointerDown={onDown}>
+    <group ref={groupRef} onPointerDown={interactive ? onDown : undefined}>
       <mesh geometry={wallGeo}>
         <meshStandardMaterial color={bezel} roughness={0.45} metalness={0.35} side={THREE.DoubleSide} />
       </mesh>
@@ -559,12 +565,16 @@ export function CardCanvas({
   stats,
   holo,
   mode,
+  startFace = "front",
+  interactive = true,
 }: {
   background: string;
   playerLayer: string;
   stats: string;
   holo: boolean;
   mode: "simple" | "rare";
+  startFace?: "front" | "back";
+  interactive?: boolean;
 }) {
   return (
     <Canvas
@@ -572,7 +582,7 @@ export function CardCanvas({
       frameloop="demand"
       camera={{ position: [0, 0, 3.4], fov: 28 }}
       gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
-      style={{ width: "100%", height: "100%", touchAction: "none" }}
+      style={{ width: "100%", height: "100%", touchAction: interactive ? "none" : "auto" }}
     >
       <ambientLight intensity={1.5} />
       <directionalLight position={[2, 3, 4]} intensity={0.7} />
@@ -582,6 +592,8 @@ export function CardCanvas({
         stats={stats}
         holo={holo}
         bezel={BEZEL_COLOR[mode]}
+        startFace={startFace}
+        interactive={interactive}
       />
     </Canvas>
   );

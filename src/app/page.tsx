@@ -130,7 +130,7 @@ export default function Home() {
             Tous les classements
           </Link>
         </div>
-        <div className="-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {LEADERS.map(({ def, leader }) => (
             <div
               key={def.id}

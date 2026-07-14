@@ -92,7 +92,7 @@ export function MatchArena({ me }: { me: string }) {
             {ready && <span className="ml-2 font-bold text-primary">{deckPower(deckCards)} PWR</span>}
           </span>
         </div>
-        <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="-mx-5 flex gap-3 overflow-x-auto overscroll-x-contain px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {deckCards.map((card) => (
             <button
               key={card.id}

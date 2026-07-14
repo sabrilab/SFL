@@ -164,8 +164,6 @@ export default function CollectionPage() {
     }
   }
 
-  const specials = CATALOG.filter((c) => c.kind !== "simple" && c.kind !== "rare");
-
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5 px-5 py-4 sm:py-8">
       <AnimatePresence>
@@ -250,7 +248,7 @@ export default function CollectionPage() {
             et la manipuler.
           </p>
 
-          <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="-mx-5 flex gap-2 overflow-x-auto overscroll-x-contain px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {FILTERS.map((f) => (
               <button
                 key={f.id}
@@ -322,39 +320,28 @@ export default function CollectionPage() {
         <TabsContent value="boutique" className="mt-4 flex flex-col gap-5">
           <section>
             <h2 className="mb-2 px-1 text-lg font-semibold tracking-tight">
-              Cartes hors-série
+              Cartes à l&apos;unité
             </h2>
             <p className="mb-3 px-1 text-sm text-muted-foreground">
-              Les pièces maîtresses de la collection, numérotées au-delà du
-              catalogue. Achat direct pour les plus déterminés.
+              Achète directement n&apos;importe quelle carte du catalogue — des
+              Standard/Rare jusqu&apos;aux pièces hors-série numérotées au-delà.
             </p>
-            <div className="flex flex-col gap-1.5">
-              {specials.map((card) => {
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+              {CATALOG.map((card) => {
                 const has = (owned[card.id] ?? 0) > 0;
                 return (
                   <button
                     key={card.id}
                     onClick={() => setSelected(card)}
-                    className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3 text-left"
+                    className="flex flex-col items-center gap-1.5 rounded-2xl bg-card px-2 py-3 text-center transition-transform active:scale-95"
                   >
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[9px] font-bold uppercase",
-                        KIND_STYLES[card.kind]
-                      )}
-                    >
-                      {KIND_LABELS[card.kind]}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-bold">
-                      {card.player.name}
-                      <span className="ml-1.5 text-[10px] font-semibold text-muted-foreground">
-                        n°{card.serial}/{card.total}
-                      </span>
-                    </span>
+                    <CollectionCardVisual card={card} size={0.32} />
                     {has ? (
-                      <span className="text-xs font-semibold text-emerald-500">Obtenue ✓</span>
+                      <span className="text-[10px] font-semibold text-emerald-500">
+                        Obtenue ✓
+                      </span>
                     ) : (
-                      <span className="rounded-full bg-secondary px-3 py-1.5 text-sm font-semibold">
+                      <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold tabular-nums">
                         {card.price.toLocaleString("fr-FR")} ⚽
                       </span>
                     )}

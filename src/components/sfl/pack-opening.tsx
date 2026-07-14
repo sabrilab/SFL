@@ -8,11 +8,12 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Card3D } from "./card-3d";
+import { PlayerCard } from "./player-card";
 import { CollectionCardVisual } from "./collection-card-visual";
+import { PLAYERS } from "@/lib/sfl/data";
 import { KIND_LABELS, PACK_COST, type CollectionCard } from "@/lib/sfl/collection";
 
 const GLOW: Record<string, string> = {
@@ -29,15 +30,17 @@ function isSpecial(card: CollectionCard) {
   return card.kind !== "simple" && card.kind !== "rare";
 }
 
-// Éventail de cartes stylisé, façon vrai booster : quatre tranches de
-// couleurs différentes glissées derrière le rabat SFL, avec un reflet qui
-// balaie la surface — nettement plus engageant qu'un simple rectangle.
-const FAN_CARDS = [
-  { rot: -13, x: -32, bg: "linear-gradient(160deg,#7FD4FF,#1C4E77)" },
-  { rot: -5, x: -15, bg: "linear-gradient(160deg,#FFB88A,#7A1E05)" },
-  { rot: 5, x: 15, bg: "linear-gradient(160deg,#F4C542,#8A5A12)" },
-  { rot: 13, x: 32, bg: "linear-gradient(160deg,#E2CFA6,#8A6C3C)" },
+// Éventail de vraies cartes 3D, dos scellé (gravure SFL) tourné vers
+// nous — un vrai bundle de cartes plutôt qu'un rectangle 2D. Décoratives
+// (interactive=false) : seule l'animation d'intro joue, elles ne captent
+// pas le glissement. Le contenu recto ne sert qu'à alimenter la capture,
+// jamais affiché puisqu'elles restent sur leur dos.
+const FAN_POSITIONS = [
+  { rot: -11, x: -28, z: 0 },
+  { rot: 0, x: 0, z: 2 },
+  { rot: 11, x: 28, z: 1 },
 ];
+const FAN_SEED = PLAYERS.slice(0, FAN_POSITIONS.length);
 
 export function PackVisual({ torn = false }: { torn?: boolean }) {
   return (
@@ -46,37 +49,26 @@ export function PackVisual({ torn = false }: { torn?: boolean }) {
       transition={{ repeat: Infinity, duration: 2.6, ease: "easeInOut" }}
       className="relative flex h-64 w-44 items-center justify-center"
     >
-      {FAN_CARDS.map((c, i) => (
+      <div
+        className="pointer-events-none absolute inset-0 -z-10 rounded-full"
+        style={{ background: "radial-gradient(circle, rgba(240,190,90,.4) 0%, transparent 68%)" }}
+      />
+      {FAN_POSITIONS.map((f, i) => (
         <div
           key={i}
-          className="absolute h-56 w-36 rounded-2xl opacity-80"
-          style={{
-            background: c.bg,
-            transform: `translateX(${c.x}px) rotate(${c.rot}deg)`,
-            boxShadow: "0 10px 26px rgba(0,0,0,.5)",
-          }}
-        />
+          className="absolute"
+          style={{ transform: `translateX(${f.x}px) rotate(${f.rot}deg)`, zIndex: f.z }}
+        >
+          <Card3D
+            cacheKey={`pack-fan-${i}`}
+            mode="rare"
+            size={0.62}
+            startFace="back"
+            interactive={false}
+            render={(s) => <PlayerCard player={FAN_SEED[i]} mode="simple" size={s} />}
+          />
+        </div>
       ))}
-      <div
-        className="relative flex h-64 w-44 flex-col items-center justify-center gap-3 overflow-hidden rounded-3xl"
-        style={{
-          background: "radial-gradient(120% 130% at 30% 20%, #241A06 0%, #120C03 60%, #060402 100%)",
-          boxShadow:
-            "0 0 60px rgba(240,190,90,.45), 0 0 140px rgba(240,190,90,.2), inset 0 0 0 2.5px #F2CE7B66",
-        }}
-      >
-        <motion.div
-          className="pointer-events-none absolute -inset-y-10 left-0 w-16 -skew-x-12 bg-gradient-to-r from-transparent via-white/25 to-transparent"
-          initial={{ x: "-140%" }}
-          animate={{ x: "420%" }}
-          transition={{ repeat: Infinity, duration: 2.6, ease: "easeInOut", repeatDelay: 0.7 }}
-        />
-        <Sparkles className="size-8 text-[#F2CE7B]" />
-        <span className="font-display text-3xl text-[#F2CE7B] italic">SFL</span>
-        <span className="text-[11px] font-bold tracking-[0.3em] text-[#C9964A] uppercase">
-          Booster · 4 cartes
-        </span>
-      </div>
     </motion.div>
   );
 }
