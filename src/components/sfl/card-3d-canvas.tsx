@@ -559,6 +559,19 @@ function CardMesh({
   );
 }
 
+// Force la compilation des programmes shader (surface + holo) dès le
+// montage, sans attendre un vrai draw call — utilisé par l'écran de
+// chargement pour préchauffer le rendu WebGL avant la première carte
+// visible, afin qu'elle apparaisse sans à-coup.
+function ShaderWarmup({ onReady }: { onReady: () => void }) {
+  const { gl, scene, camera } = useThree();
+  useEffect(() => {
+    gl.compile(scene, camera);
+    onReady();
+  }, [gl, scene, camera, onReady]);
+  return null;
+}
+
 export function CardCanvas({
   background,
   playerLayer,
@@ -567,6 +580,7 @@ export function CardCanvas({
   mode,
   startFace = "front",
   interactive = true,
+  onReady,
 }: {
   background: string;
   playerLayer: string;
@@ -575,6 +589,8 @@ export function CardCanvas({
   mode: "simple" | "rare";
   startFace?: "front" | "back";
   interactive?: boolean;
+  /** Appelé une fois les shaders compilés (préchauffe WebGL, voir AppSplash). */
+  onReady?: () => void;
 }) {
   return (
     <Canvas
@@ -595,6 +611,7 @@ export function CardCanvas({
         startFace={startFace}
         interactive={interactive}
       />
+      {onReady && <ShaderWarmup onReady={onReady} />}
     </Canvas>
   );
 }
