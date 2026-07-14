@@ -13,13 +13,12 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { PlayerCard } from "@/components/sfl/player-card";
-import { BoostCard } from "@/components/sfl/boost-card";
 import { Card3D } from "@/components/sfl/card-3d";
+import { CollectionCardVisual } from "@/components/sfl/collection-card-visual";
+import { PackOpening } from "@/components/sfl/pack-opening";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useBallons } from "@/hooks/use-ballons";
-import { ovr, type BoostType } from "@/lib/sfl/engine";
 import {
   DAILY_DUEL_CAP,
   DAILY_DUEL_REWARD,
@@ -55,33 +54,15 @@ const FILTERS: { id: CardKind | "all"; label: string }[] = [
   { id: "mvp", label: "MVP" },
 ];
 
-function renderFlat(card: CollectionCard, size: number) {
-  return card.kind === "simple" || card.kind === "rare" ? (
-    <PlayerCard player={card.player} mode={card.kind} size={size} />
-  ) : (
-    <BoostCard
-      card={{
-        player: card.player.name,
-        type: card.kind as BoostType,
-        ovr: ovr(card.player.stats),
-        poste: card.player.poste,
-        date: "Hors-série",
-        stats: card.player.stats,
-      }}
-      size={size}
-    />
-  );
-}
-
 function CardReveal({ card, index }: { card: CollectionCard; index: number }) {
   return (
     <motion.div
       initial={{ opacity: 0, rotateY: 90, scale: 0.7 }}
       animate={{ opacity: 1, rotateY: 0, scale: 1 }}
-      transition={{ delay: 0.25 + index * 0.35, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ delay: 0.15 + index * 0.12, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="flex shrink-0 flex-col items-center gap-1.5"
     >
-      {renderFlat(card, 0.42)}
+      <CollectionCardVisual card={card} size={0.42} />
       <span
         className={cn(
           "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
@@ -119,7 +100,7 @@ function CardModal({
                 cacheKey={card.id}
                 mode={card.kind === "simple" ? "simple" : "rare"}
                 size={1.15}
-                render={(s) => renderFlat(card, s)}
+                render={(s) => <CollectionCardVisual card={card} size={s} />}
               />
             </div>
             <div className="flex flex-col items-center gap-2 rounded-3xl bg-card px-5 py-4 text-center">
@@ -153,6 +134,7 @@ export default function CollectionPage() {
   const isClient = useIsClient();
   const balance = useBallons(me);
   const [opened, setOpened] = useState<CollectionCard[] | null>(null);
+  const [opening, setOpening] = useState<CollectionCard[] | null>(null);
   const [packSeq, setPackSeq] = useState(0);
   const [filter, setFilter] = useState<CardKind | "all">("all");
   const [ownedOnly, setOwnedOnly] = useState(false);
@@ -175,10 +157,18 @@ export default function CollectionPage() {
       });
       return;
     }
-    setOpened(cards);
-    setPackSeq((n) => n + 1);
+    // La cérémonie plein écran prend le relais ; le récap "Ton tirage"
+    // n'apparaît qu'une fois la cérémonie terminée.
+    setOpening(cards);
     setTick((n) => n + 1);
-    const special = cards.find((c) => c.kind !== "simple" && c.kind !== "rare");
+  }
+
+  function finishOpening() {
+    if (!opening) return;
+    setOpened(opening);
+    setOpening(null);
+    setPackSeq((n) => n + 1);
+    const special = opening.find((c) => c.kind !== "simple" && c.kind !== "rare");
     if (special) {
       toast.success(`Carte hors-série ${KIND_LABELS[special.kind]} !`, {
         description: `${special.player.name} · n°${special.serial}/${special.total} — trouvaille rarissime`,
@@ -204,6 +194,10 @@ export default function CollectionPage() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5 px-5 py-4 sm:py-8">
+      <AnimatePresence>
+        {opening && <PackOpening cards={opening} onDone={finishOpening} />}
+      </AnimatePresence>
+
       <div>
         <p className="text-[13px] font-medium text-muted-foreground">
           {isClient ? `${balance} Ballons disponibles` : "Ballons"}
@@ -351,7 +345,7 @@ export default function CollectionPage() {
                   className="flex flex-col items-center gap-1.5 rounded-2xl bg-card px-2 py-3 text-center transition-transform active:scale-95"
                 >
                   <div className={cn("transition-opacity", !has && "opacity-30 grayscale")}>
-                    {renderFlat(card, 0.32)}
+                    <CollectionCardVisual card={card} size={0.32} />
                   </div>
                   <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
                     n°{card.serial}/{card.total}

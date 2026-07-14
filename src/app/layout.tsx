@@ -10,6 +10,7 @@ import { BottomNav } from "@/components/layout/bottom-nav";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { PlayerProvider } from "@/components/sfl/player-provider";
+import { CardViewerProvider } from "@/components/sfl/card-viewer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -77,14 +78,16 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <PlayerProvider>
-            <TooltipProvider delay={200}>
-              <ServiceWorkerRegister />
-              <SiteHeader />
-              <main className="flex-1 pb-28 md:pb-10">{children}</main>
-              <BottomNav />
-              <InstallPrompt />
-              <Toaster position="top-center" />
-            </TooltipProvider>
+            <CardViewerProvider>
+              <TooltipProvider delay={200}>
+                <ServiceWorkerRegister />
+                <SiteHeader />
+                <main className="flex-1 pb-32 md:pb-10">{children}</main>
+                <BottomNav />
+                <InstallPrompt />
+                <Toaster position="top-center" />
+              </TooltipProvider>
+            </CardViewerProvider>
           </PlayerProvider>
         </ThemeProvider>
       </body>

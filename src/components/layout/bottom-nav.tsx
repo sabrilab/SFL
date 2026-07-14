@@ -10,10 +10,12 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/85 backdrop-blur-xl md:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="fixed inset-x-4 z-40 md:hidden"
+      style={{ bottom: "calc(env(safe-area-inset-bottom) + 12px)" }}
     >
-      <div className="mx-auto flex max-w-md items-center justify-around px-2 py-1.5">
+      {/* Bulle flottante : la barre reste collée en bas mais vit dans sa
+          propre pilule translucide, détachée des bords de l'écran. */}
+      <div className="mx-auto flex max-w-md items-center justify-around rounded-full bg-background/75 px-2 py-1.5 shadow-lg shadow-black/25 ring-1 ring-border/60 backdrop-blur-xl">
         {NAV_ITEMS.map((item) => {
           const active =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);

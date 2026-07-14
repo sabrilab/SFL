@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BoostCard, BOOST_LABELS } from "@/components/sfl/boost-card";
 import { Card3D } from "@/components/sfl/card-3d";
+import { ViewableCard } from "@/components/sfl/card-viewer";
 import { PlayerCard, type CardMode } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { BAREME, BOOST_CARDS, PLAYERS } from "@/lib/sfl/data";
@@ -138,10 +139,12 @@ export default function CartePage() {
           <div className="-mx-5 flex gap-4 overflow-x-auto px-5 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {myBoosts.map((c, i) => (
               <div key={i} className="shrink-0 text-center">
-                <Card3D
+                <ViewableCard
                   cacheKey={`${c.type}-${c.player}-${c.date}`}
                   mode="rare"
                   size={0.82}
+                  title={c.player}
+                  subtitle={`${BOOST_LABELS[c.type]} · ${c.date}`}
                   render={(s) => <BoostCard card={c} size={s} />}
                 />
                 <div className="mt-2 text-xs font-medium text-muted-foreground">

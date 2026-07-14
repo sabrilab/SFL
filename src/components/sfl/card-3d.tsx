@@ -158,8 +158,11 @@ function Card3DInner({
     };
   }, [inView]);
 
-  const width = captured ? captured.width * size : undefined;
-  const height = captured ? captured.height * size : undefined;
+  // Dimensions estimées avant capture (base CardShell ~260×376 avec
+  // bannière) pour que le skeleton occupe déjà la bonne place — la taille
+  // exacte prend le relais dès que la capture aboutit.
+  const width = (captured ? captured.width : 260) * size;
+  const height = (captured ? captured.height : 376) * size;
 
   return (
     <div ref={wrapperRef} style={{ position: "relative", width, height }}>
@@ -183,7 +186,22 @@ function Card3DInner({
           mode={mode}
         />
       ) : (
-        render(size)
+        // Skeleton pendant la capture : jamais de carte 2D "flash" avant
+        // le rendu 3D, juste un shimmer discret aux couleurs de la carte.
+        <div
+          aria-hidden
+          className="animate-pulse"
+          style={{
+            width,
+            height: height * 0.88,
+            borderRadius: 20 * size,
+            background:
+              mode === "rare"
+                ? "linear-gradient(160deg, #2a1f0d 0%, #171106 45%, #241a08 100%)"
+                : "linear-gradient(160deg, #3a342a 0%, #26221b 45%, #322c22 100%)",
+            boxShadow: "inset 0 0 0 1.5px rgba(242,206,123,.18)",
+          }}
+        />
       )}
     </div>
   );

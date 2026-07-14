@@ -40,6 +40,45 @@ const PROFILE_PASSWORDS: Record<string, string> = {
   Ilyes: "azy",
 };
 
+// Ligues Goccer — l'utilisateur appartient à la SFL ; les autres sont
+// visibles pour montrer qu'on peut changer de ligue (v1 locale).
+export const LEAGUES = ["SFL", "WFL", "KFL"] as const;
+export const LEAGUE_KEY = "sfl-league";
+
+function LeagueSwitcher() {
+  const isClient = useIsClient();
+  const [league, setLeague] = useState<string | null>(null);
+  const current = league ?? (isClient ? (localStorage.getItem(LEAGUE_KEY) ?? "SFL") : "SFL");
+
+  function change(next: string) {
+    localStorage.setItem(LEAGUE_KEY, next);
+    setLeague(next);
+    window.dispatchEvent(new Event("sfl-league"));
+  }
+
+  return (
+    <Select value={current} onValueChange={(v) => change(v as string)}>
+      <SelectTrigger
+        size="sm"
+        aria-label="Changer de ligue"
+        className="h-7 gap-1 rounded-full border-transparent bg-secondary px-2.5 dark:bg-secondary"
+      >
+        {/* Style "ligue de combat" : capitales larges et écrasées */}
+        <span className="scale-y-90 text-[11px] font-black tracking-[0.3em] uppercase">
+          {current}
+        </span>
+      </SelectTrigger>
+      <SelectContent>
+        {LEAGUES.map((l) => (
+          <SelectItem key={l} value={l}>
+            <span className="scale-y-90 text-xs font-black tracking-[0.25em] uppercase">{l}</span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 const PLAYER_NAMES = [...PLAYERS].sort((a, b) => a.name.localeCompare(b.name)).map((p) => p.name);
 
 function BallonsBadge({ me }: { me: string }) {
@@ -144,13 +183,20 @@ export function SiteHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto flex h-16 max-w-5xl items-center gap-2 px-5">
-        <Link href="/" className="mr-1 font-display text-xl italic tracking-wide">
-          S<span className="text-primary">F</span>L
-        </Link>
+    <header className="sticky top-3 z-40 px-4">
+      <div className="mx-auto flex h-14 max-w-5xl items-center gap-2">
+        {/* Bulle gauche : logo Goccer + ligue courante */}
+        <div className="flex items-center gap-2 rounded-full bg-background/75 py-1.5 pr-1.5 pl-4 shadow-lg shadow-black/20 ring-1 ring-border/60 backdrop-blur-xl">
+          <Link
+            href="/"
+            className="font-sans text-base font-extrabold tracking-tighter"
+          >
+            G<span className="text-primary">o</span>ccer
+          </Link>
+          <LeagueSwitcher />
+        </div>
 
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="hidden items-center gap-1 rounded-full bg-background/75 px-1.5 py-1.5 shadow-lg shadow-black/20 ring-1 ring-border/60 backdrop-blur-xl md:flex">
           {NAV_ITEMS.map((item) => {
             const active =
               item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -171,7 +217,8 @@ export function SiteHeader() {
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1.5">
+        {/* Bulle droite : Ballons, profil, admin, thème */}
+        <div className="ml-auto flex items-center gap-1.5 rounded-full bg-background/75 px-1.5 py-1.5 shadow-lg shadow-black/20 ring-1 ring-border/60 backdrop-blur-xl">
           <BallonsBadge me={me} />
           <Select value={me} onValueChange={(v) => selectProfile(v as string)}>
             <SelectTrigger
@@ -205,26 +252,30 @@ export function SiteHeader() {
             onSuccess={(name) => setMe(name)}
           />
 
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Espace admin"
-                  className="text-muted-foreground hover:text-foreground"
-                  render={
-                    <Link href="/admin">
-                      <ShieldCheck className="size-5" />
-                    </Link>
-                  }
-                />
-              }
-            />
-            <TooltipContent>Espace admin</TooltipContent>
-          </Tooltip>
-
-          <ThemeToggle />
+          {/* Admin + thème : cachés sur mobile pour que la bulle tienne à l'écran */}
+          <span className="hidden md:inline-flex">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Espace admin"
+                    className="text-muted-foreground hover:text-foreground"
+                    render={
+                      <Link href="/admin">
+                        <ShieldCheck className="size-5" />
+                      </Link>
+                    }
+                  />
+                }
+              />
+              <TooltipContent>Espace admin</TooltipContent>
+            </Tooltip>
+          </span>
+          <span className="hidden md:inline-flex">
+            <ThemeToggle />
+          </span>
         </div>
       </div>
     </header>

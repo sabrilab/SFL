@@ -5,14 +5,72 @@ import { ChevronRight } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { PlayerCard } from "@/components/sfl/player-card";
-import { Card3D } from "@/components/sfl/card-3d";
+import { BoostCard } from "@/components/sfl/boost-card";
+import { ViewableCard } from "@/components/sfl/card-viewer";
 import { ElectionPanel } from "@/components/sfl/election-panel";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { JOURNEES, PLAYERS } from "@/lib/sfl/data";
-import { journeeScoreSummary, rankByMetric } from "@/lib/sfl/engine";
+import { journeeScoreSummary, ovr, rankByMetric, type BoostType, type Player } from "@/lib/sfl/engine";
 import { RANKINGS, type RankingDef } from "@/lib/sfl/rankings";
 
 /* ============================= CLASSEMENTS ============================= */
+
+// Mini badges "cartes" — un coup d'œil suffit pour voir quels types de
+// cartes hors-série (MVP, Impact, Défensive) un joueur a décrochés.
+const BADGE_STYLES: [key: "mvp" | "impact" | "def", label: string, cls: string][] = [
+  ["mvp", "M", "bg-gradient-to-b from-[#FFF3C6] via-[#F4C542] to-[#8A5A12] text-[#3a2703]"],
+  ["impact", "I", "bg-gradient-to-b from-[#FFB88A] via-[#FF5A1F] to-[#7A1E05] text-[#2b0a01]"],
+  ["def", "D", "bg-gradient-to-b from-[#D8F1FF] via-[#7FD4FF] to-[#1C4E77] text-[#06202f]"],
+];
+
+function CardBadges({ player }: { player: Player }) {
+  const badges = BADGE_STYLES.filter(([key]) => player[key] > 0);
+  if (badges.length === 0) return null;
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      {badges.map(([key, label, cls]) => (
+        <span
+          key={key}
+          title={`Carte ${key === "mvp" ? "MVP" : key === "impact" ? "Impact" : "Défensive"} ×${player[key]}`}
+          className={cn(
+            "flex h-5 w-3.5 items-center justify-center rounded-[3px] text-[8px] font-black shadow-sm ring-1 ring-black/20",
+            cls
+          )}
+        >
+          {label}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+// La carte du n°1 des classements MVP/Impact/Défensive s'affiche avec le
+// design hors-série correspondant, pas la carte Standard.
+const BOOST_RANKING_TYPE: Record<string, BoostType> = {
+  mvp: "mvp",
+  impact: "impact",
+  def: "def",
+};
+
+function leaderCard(defId: string, leader: Player, size: number) {
+  const boostType = BOOST_RANKING_TYPE[defId];
+  if (boostType) {
+    return (
+      <BoostCard
+        card={{
+          player: leader.name,
+          type: boostType,
+          ovr: ovr(leader.stats),
+          poste: leader.poste,
+          date: "Saison 1",
+          stats: leader.stats,
+        }}
+        size={size}
+      />
+    );
+  }
+  return <PlayerCard player={leader} mode="simple" size={size} />;
+}
 
 function RankingList({ def, me }: { def: RankingDef; me: string }) {
   const ranked = rankByMetric(PLAYERS, def.value).filter(
@@ -47,11 +105,13 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
             </span>
           )}
         </div>
-        <Card3D
-          cacheKey={`simple-${leader.name}-${def.id}`}
-          mode="simple"
+        <ViewableCard
+          cacheKey={`rank-${def.id}-${leader.name}`}
+          mode={BOOST_RANKING_TYPE[def.id] ? "rare" : "simple"}
           size={0.85}
-          render={(s) => <PlayerCard player={leader} mode="simple" size={s} />}
+          title={leader.name}
+          subtitle={`${def.label} · ${leader.value} ${def.unit}`}
+          render={(s) => leaderCard(def.id, leader, s)}
         />
       </div>
 
@@ -80,6 +140,7 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
               </span>
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="truncate text-[15px] font-semibold">{p.name}</span>
+                <CardBadges player={p} />
                 {p.statut !== "Actif" && (
                   <span
                     className={cn(

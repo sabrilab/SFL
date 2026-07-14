@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { getRatings, pickPair, recordDuel, resetRatings } from "@/lib/sfl/duel";
 import { DUEL_CATEGORIES, pickCategory, type DuelCategory } from "@/lib/sfl/duel-categories";
 import { DAILY_DUEL_CAP, getDailyDuelCount, recordDailyDuel } from "@/lib/sfl/ballons";
+import { MatchArena } from "@/components/sfl/match-arena";
 
 const cardVariants = {
   idle: { scale: 1, y: 0, opacity: 1, filter: "grayscale(0)" },
@@ -27,6 +28,7 @@ export default function DuelPage() {
   const { me } = useMyPlayer();
   const isClient = useIsClient();
 
+  const [arenaMode, setArenaMode] = useState<"duel" | "match">("duel");
   const [round, setRound] = useState(0);
   const [pair, setPair] = useState<[Player, Player]>(() => pickPair(PLAYERS));
   const [category, setCategory] = useState<DuelCategory>(() => pickCategory());
@@ -96,14 +98,44 @@ export default function DuelPage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-7 px-5 py-4 sm:py-8">
       <div>
-        <p className="text-[13px] font-medium text-muted-foreground">Ton avis compte</p>
-        <h1 className="text-[34px] font-bold tracking-tight">Duel</h1>
+        <p className="text-[13px] font-medium text-muted-foreground">
+          {arenaMode === "duel" ? "Ton avis compte" : "Ton deck contre les leurs"}
+        </p>
+        <h1 className="text-[34px] font-bold tracking-tight">Arène</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Choisis le meilleur des deux joueurs, statistique par statistique. Chaque duel
-          nourrit ton classement personnel — un seul niveau, pas de division par stat.
+          {arenaMode === "duel"
+            ? "Choisis le meilleur des deux joueurs, statistique par statistique. Chaque duel nourrit ton classement personnel."
+            : "Compose un deck de 5 cartes issues de tes packs et affronte les decks préparés par les autres joueurs."}
         </p>
       </div>
 
+      {/* Sélecteur Duel / Match */}
+      <div className="flex w-full rounded-full bg-card p-1">
+        {(
+          [
+            ["duel", "Duel"],
+            ["match", "Match"],
+          ] as const
+        ).map(([mode, label]) => (
+          <button
+            key={mode}
+            onClick={() => setArenaMode(mode)}
+            className={cn(
+              "flex-1 rounded-full py-2 text-sm font-semibold transition-colors",
+              arenaMode === mode
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {arenaMode === "match" ? (
+        <MatchArena me={me} />
+      ) : (
+        <>
       {isClient && (
         <div className="flex items-center justify-between rounded-2xl bg-card px-4 py-2.5">
           <span className="text-[13px] font-semibold">
@@ -140,7 +172,7 @@ export default function DuelPage() {
                 <span className="text-lg font-bold tracking-tight">{category.question}</span>
               </div>
 
-              <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center justify-center gap-2">
                 {pair.map((p, i) => {
                   const variant =
                     resolvedWinner === null ? "idle" : p.name === resolvedWinner ? "winner" : "loser";
@@ -153,7 +185,7 @@ export default function DuelPage() {
                       animate={variant}
                       variants={cardVariants}
                       transition={{ type: "spring", stiffness: 320, damping: 22 }}
-                      className="relative flex flex-col items-center gap-2 rounded-3xl p-2"
+                      className="relative flex flex-col items-center gap-2 rounded-3xl p-1"
                       aria-label={`Choisir ${p.name}`}
                     >
                       <div
@@ -169,7 +201,7 @@ export default function DuelPage() {
                       <Card3D
                         cacheKey={`simple-${p.name}-${category.id}`}
                         mode="simple"
-                        size={0.56}
+                        size={0.62}
                         render={(s) => (
                           <PlayerCard
                             player={p}
@@ -272,6 +304,8 @@ export default function DuelPage() {
           </span>
         ))}
       </div>
+        </>
+      )}
     </div>
   );
 }
