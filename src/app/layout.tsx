@@ -72,7 +72,13 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${anton.variable} ${barlow.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      {/* body ne défile jamais lui-même (overflow hidden, hauteur figée à
+          celle de l'écran) : c'est le conteneur interne juste en dessous
+          qui porte tout le scroll. Sans ça, le rebond élastique iOS/PWA
+          s'applique au document entier et fait visuellement "sortir du
+          cadre" toute l'appli (header, tab bar) au lieu de rester contenu
+          dans une simple liste qui rebondit sur elle-même. */}
+      <body className="h-dvh overflow-hidden overscroll-none touch-manipulation">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -84,8 +90,14 @@ export default function RootLayout({
               <TooltipProvider delay={200}>
                 <AppSplash />
                 <ServiceWorkerRegister />
-                <SiteHeader />
-                <main className="flex-1 pb-32 md:pb-10">{children}</main>
+                <div
+                  id="app-scroll"
+                  className="flex h-full flex-col overflow-y-auto overscroll-y-contain"
+                  style={{ WebkitOverflowScrolling: "touch" }}
+                >
+                  <SiteHeader />
+                  <main className="flex-1 pb-32 md:pb-10">{children}</main>
+                </div>
                 <BottomNav />
                 <InstallPrompt />
                 <Toaster position="top-center" />

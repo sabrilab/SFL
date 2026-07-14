@@ -128,16 +128,16 @@
   html {
     @apply font-sans;
     height: 100%;
-    /* Empêche le rebond élastique (iOS/PWA) qui fait "sortir du cadre" le
-       contenu — la page se comporte comme un vrai écran d'app, pas une
-       page web qu'on peut tirer au-delà de ses bords. */
-    overscroll-behavior-y: none;
+    overflow: hidden;
+    /* body verrouille lui-même le scroll du document (voir layout.tsx) —
+       ce blindage ici couvre aussi les navigateurs qui ignoreraient cette
+       règle sur body, pour qu'aucun rebond élastique (iOS/PWA) ne fasse
+       jamais "sortir du cadre" le contenu de l'appli. */
+    overscroll-behavior: none;
   }
   body {
     @apply bg-background text-foreground;
-    min-height: 100%;
-    min-height: 100dvh;
-    overscroll-behavior-y: none;
+    overscroll-behavior: none;
   }
 }
 /* Liquid glass — pilules translucides façon Apple : flou + saturation,
