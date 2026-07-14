@@ -32,7 +32,7 @@ export function BottomNav() {
               {active && (
                 <motion.span
                   layoutId="bottom-nav-pill"
-                  className="glass absolute inset-0 rounded-2xl"
+                  className="pill-emboss absolute inset-0 rounded-lg"
                   transition={{ type: "spring", stiffness: 420, damping: 34 }}
                 />
               )}
