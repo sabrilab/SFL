@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Lock, Minus, Plus, RotateCcw } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Lock, Minus, PersonStanding, Plus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BoostCard, BOOST_LABELS } from "@/components/sfl/boost-card";
@@ -119,6 +120,26 @@ export default function CartePage() {
           size={1.05}
           render={(s) => <PlayerCard player={player} mode={mode} size={s} />}
         />
+      </section>
+
+      {/* Avatar 3D */}
+      <section>
+        <SectionTitle>Mon avatar</SectionTitle>
+        <Link
+          href="/avatar"
+          className="glass flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
+        >
+          <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
+            <PersonStanding className="size-[18px]" />
+          </span>
+          <span className="flex-1">
+            <span className="block text-[15px] font-semibold">Créer mon avatar 3D</span>
+            <span className="block text-[12px] text-muted-foreground">
+              Taille, corpulence, tête, peau — en 3D animée
+            </span>
+          </span>
+          <ChevronRight className="size-4 text-muted-foreground" />
+        </Link>
       </section>
 
       {/* Cartes Boost */}
