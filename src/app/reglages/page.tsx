@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { Moon, Sun, Monitor, ShieldCheck, ChevronRight, Settings } from "lucide-react";
+import { Moon, Sun, Monitor, ShieldCheck, ChevronRight, Settings, PersonStanding } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsClient } from "@/hooks/use-is-client";
 
@@ -52,6 +52,25 @@ export default function ReglagesPage() {
             );
           })}
         </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 px-1 text-sm font-semibold text-muted-foreground">Profil</h2>
+        <Link
+          href="/avatar"
+          className="glass flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
+        >
+          <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
+            <PersonStanding className="size-[18px]" />
+          </span>
+          <span className="flex-1">
+            <span className="block text-[15px] font-semibold">Mon avatar</span>
+            <span className="block text-[12px] text-muted-foreground">
+              Créer et personnaliser son avatar 3D
+            </span>
+          </span>
+          <ChevronRight className="size-4 text-muted-foreground" />
+        </Link>
       </section>
 
       <section>
