@@ -22,7 +22,7 @@ import {
   type Peau,
 } from "@/lib/sfl/avatar";
 
-const MODEL_URL = "/models/avatar-base.glb";
+const MODEL_URL = "/models/avatar-base-hbm.glb";
 const FACE_TEXTURE_URL: Record<Peau, string> = {
   claire: "/models/face_claire.png",
   medium: "/models/face_medium.png",
@@ -71,7 +71,12 @@ function AvatarModel({ config }: { config: AvatarConfig }) {
   }, [faceTextures]);
 
   // Conversion toon + contours — une seule fois par chargement du GLB.
+  // (idempotent : en dev, React ré-exécute ce memo sur la même scène)
   const toonMaterials = useMemo(() => {
+    const cached = gltf.scene.userData.__toonMaterials as
+      | Map<string, THREE.MeshToonMaterial>
+      | undefined;
+    if (cached) return cached;
     const gradientMap = makeGradientMap();
     const byName = new Map<string, THREE.MeshToonMaterial>();
     const outlineMat = new THREE.MeshBasicMaterial({
@@ -115,6 +120,7 @@ function AvatarModel({ config }: { config: AvatarConfig }) {
     for (const o of outlines) {
       gltf.scene.add(o);
     }
+    gltf.scene.userData.__toonMaterials = byName;
     return byName;
   }, [gltf]);
 
