@@ -63,12 +63,12 @@ def build(tone_name, tone):
               start=30 if s < 0 else 20, end=150 if s < 0 else 160,
               fill=line_dark, width=int(0.0028 * W))
 
-        # sourcil : trait épais anguleux, légèrement penché vers le nez
-        b_y = cy - eh * 2.5
-        inner = (cx - s * ew * 0.95, b_y + eh * 0.9)
-        mid = (cx + s * ew * 0.45, b_y - eh * 0.1)
-        outer = (cx + s * ew * 1.25, b_y + eh * 0.25)
-        d.line([inner, mid, outer], fill=DARK, width=int(0.011 * W), joint="curve")
+        # sourcil : trait net mais détendu (expression neutre, pas fâchée)
+        b_y = cy - eh * 2.9
+        inner = (cx - s * ew * 0.90, b_y + eh * 0.35)
+        mid = (cx + s * ew * 0.35, b_y - eh * 0.15)
+        outer = (cx + s * ew * 1.15, b_y + eh * 0.30)
+        d.line([inner, mid, outer], fill=DARK, width=int(0.0085 * W), joint="curve")
 
     # nez : arête discrète + ombre anguleuse à la base
     nx, ny = uv_px(0.5, 0.472)

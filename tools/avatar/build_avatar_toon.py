@@ -89,6 +89,21 @@ def ball(p, r):
     el.radius = r
     el.stiffness = 2.0
 
+def ellipsoid(p, r, sx, sy, sz):
+    """Masse musculaire orientable : demi-axes = r * (sx, sy, sz)."""
+    el = mball.elements.new()
+    el.type = "ELLIPSOID"
+    el.co = p
+    el.radius = r
+    el.size_x = sx
+    el.size_y = sy
+    el.size_z = sz
+    el.stiffness = 2.0
+
+def sstep(a, b, x):
+    t = max(0.0, min(1.0, (x - a) / max(b - a, 1e-9)))
+    return t * t * (3 - 2 * t)
+
 def chain(a, b, r0, r1, n=None):
     """Chaîne dense : l'espacement reste sous 0.5x le rayon local pour que
     les boules fusionnent en un volume continu (fini l'effet collier)."""
@@ -100,38 +115,66 @@ def chain(a, b, r0, r1, n=None):
         t = i / (n - 1)
         ball(a.lerp(b, t), r0 + (r1 - r0) * t)
 
-# Torse athlétique : épaules larges, taille marquée
-ball(HIPS, 0.12)
-ball(HIPS + Vector((0.06, 0, 0.01)), 0.085)
-ball(HIPS + Vector((-0.06, 0, 0.01)), 0.085)
-ball(SPINE, 0.112)
-ball(SPINE1, 0.105)
-ball(SPINE2, 0.12)
-ball(SPINE2 + Vector((0, 0.012, 0.055)), 0.118)  # pectoraux/haut du buste
-ball(L_SHO + (SPINE2 - L_SHO) * 0.25, 0.088)      # trapèzes
-ball(R_SHO + (SPINE2 - R_SHO) * 0.25, 0.088)
-ball(L_SHO, 0.085)                                 # deltoïdes
-ball(R_SHO, 0.085)
-ball(L_SHO + Vector((0.02, 0, -0.01)), 0.07)       # élargit la carrure
-ball(R_SHO + Vector((-0.02, 0, -0.01)), 0.07)
-# Colonne : assurer la continuité bassin -> poitrine
-chain(HIPS, SPINE2, 0.108, 0.115)
-# Cou
-chain(NECK, HEAD + Vector((0, 0, 0.015)), 0.062, 0.064)
-# Épaules -> torse continu
-chain(L_SHO, SPINE2, 0.075, 0.10)
-chain(R_SHO, SPINE2, 0.075, 0.10)
-# Bras
-for sho, elb, wri, tip in ((L_SHO, L_ELB, L_WRI, L_TIP), (R_SHO, R_ELB, R_WRI, R_TIP)):
-    chain(sho, elb, 0.072, 0.058)
-    chain(elb, wri, 0.058, 0.044)
-    chain(wri, tip, 0.048, 0.038)                  # main moufle
-# Jambes
+def chain_profile(a, b, fn):
+    """Chaîne dense à rayon variable fn(t) — espacement < 0.4x le rayon min."""
+    dist = (b - a).length
+    r_min = min(fn(i / 19) for i in range(20))
+    n = max(4, int(dist / (r_min * 0.4)) + 1)
+    for i in range(n):
+        t = i / (n - 1)
+        ball(a.lerp(b, t), fn(t))
+
+# NB échelle ellipsoïdes : demi-axe réel ~= 0.57 * radius * size_*
+# ============ TORSE ANATOMIQUE : carrure en V, taille marquée ============
+# Bassin large et plat + fessiers
+ellipsoid(HIPS + Vector((0, 0.005, -0.015)), 0.165, 1.15, 0.85, 0.75)
+ellipsoid(HIPS + Vector((0.05, 0.04, -0.03)), 0.10, 1.0, 0.9, 1.0)      # fessier G
+ellipsoid(HIPS + Vector((-0.05, 0.04, -0.03)), 0.10, 1.0, 0.9, 1.0)     # fessier D
+# Abdomen puis taille (plus étroite que la cage)
+ellipsoid(SPINE, 0.15, 1.0, 0.72, 0.95)
+ellipsoid(SPINE1, 0.145, 0.97, 0.70, 0.95)
+# Cage thoracique : LA masse du buste, large et profonde
+ellipsoid(SPINE2 + Vector((0, 0.005, -0.005)), 0.19, 1.2, 0.8, 1.0)
+# Plaque pectorale
+ellipsoid(SPINE2 + Vector((0, -0.03, 0.04)), 0.15, 1.3, 0.55, 0.75)
+# Dorsaux (le V du dos)
+ellipsoid(SPINE1 + Vector((0.06, 0.03, 0.06)), 0.10, 0.9, 0.7, 1.25)
+ellipsoid(SPINE1 + Vector((-0.06, 0.03, 0.06)), 0.10, 0.9, 0.7, 1.25)
+# Colonne interne (continuité verticale)
+chain(HIPS, SPINE2, 0.085, 0.095)
+# Trapèzes : pente cou -> épaules, dense
+for sho in (L_SHO, R_SHO):
+    chain(NECK + Vector((0, 0.012, -0.005)), sho + Vector((0, 0.005, 0.025)),
+          0.052, 0.062)
+# Deltoïdes : masse extérieure pour la carrure en V
+for sho, sx in ((L_SHO, 1), (R_SHO, -1)):
+    ellipsoid(sho + Vector((sx * 0.02, 0, 0.005)), 0.125, 1.1, 0.9, 1.0)
+# Cou court et épais, fondu dans les trapèzes
+chain(NECK - Vector((0, 0, 0.01)), HEAD + Vector((0, 0, 0.02)), 0.062, 0.056)
+ball(NECK + Vector((0, 0.015, -0.005)), 0.07)
+
+# ============ BRAS : biceps, avant-bras galbé, mains moufles ============
+for sho, elb, wri, tip, sx in ((L_SHO, L_ELB, L_WRI, L_TIP, 1),
+                               (R_SHO, R_ELB, R_WRI, R_TIP, -1)):
+    chain_profile(sho, elb,
+                  lambda t: (0.056 + 0.010 * math.sin(min(1.0, t / 0.75) * math.pi))
+                  * (1.0 - 0.10 * t))
+    ball(elb, 0.046)
+    chain_profile(elb, wri, lambda t: 0.050 - 0.016 * sstep(0.15, 1.0, t))
+    chain(wri, tip + (tip - wri) * 0.1, 0.041, 0.033)   # main moufle
+    ball(wri.lerp(tip, 0.35) + Vector((0, -0.03, 0)), 0.024)  # pouce
+
+# ============ JAMBES : quadriceps, mollets, chevilles fines ============
 for hip, knee, ank, toe in ((L_HIP, L_KNEE, L_ANK, L_TOE), (R_HIP, R_KNEE, R_ANK, R_TOE)):
-    chain(hip, knee, 0.105, 0.070)
-    chain(knee, ank, 0.070, 0.050)
+    chain_profile(hip, knee, lambda t: 0.094 - 0.038 * sstep(0.2, 1.0, t))
+    ellipsoid(hip.lerp(knee, 0.35) + Vector((0, -0.02, 0)), 0.09, 0.9, 0.8, 1.3)   # quadri
+    ball(knee, 0.056)
+    chain_profile(knee, ank, lambda t: 0.052 - 0.019 * sstep(0.3, 1.0, t))
+    ellipsoid(knee.lerp(ank, 0.28) + Vector((0, 0.02, 0)), 0.085, 0.85, 0.85, 1.25)  # mollet
+    # chaussure
     heel = ank + Vector((0, 0.035, -0.025))
-    chain(heel, toe + Vector((0, -0.01, 0.012)), 0.055, 0.046)  # pied/chaussure
+    chain(heel, toe + Vector((0, -0.01, 0.012)), 0.05, 0.043)
+    ellipsoid((heel + toe) / 2 + Vector((0, 0, 0.005)), 0.08, 0.9, 1.25, 0.65)
 
 bpy.context.view_layer.objects.active = mb_obj
 mb_obj.select_set(True)
@@ -139,6 +182,12 @@ bpy.ops.object.convert(target="MESH")
 body = bpy.context.object
 body.name = "Body"
 print("metaball -> mesh:", len(body.data.vertices), "vertices")
+
+# lissage des transitions metaball avant tout le reste
+sm = body.modifiers.new("smooth", "SMOOTH")
+sm.factor = 0.9
+sm.iterations = 8
+bpy.ops.object.modifier_apply(modifier="smooth")
 
 # lisse + allège
 dec = body.modifiers.new("dec", "DECIMATE")
@@ -152,12 +201,12 @@ SUBSEG = [
     ("Shorts", HIPS + Vector((0, 0, -0.02)), HIPS + Vector((0, 0, 0.05))),
     ("Shorts", L_HIP, L_HIP + (L_KNEE - L_HIP) * 0.42),
     ("Shorts", R_HIP, R_HIP + (R_KNEE - R_HIP) * 0.42),
-    ("Shirt", SPINE, SPINE2 + Vector((0, 0, 0.07))),
+    ("Shirt", SPINE, NECK + Vector((0, 0, 0.005))),
     ("Shirt", L_SHO + (SPINE2 - L_SHO) * 0.3, L_SHO + (L_ELB - L_SHO) * 0.42),
     ("Shirt", R_SHO + (SPINE2 - R_SHO) * 0.3, R_SHO + (R_ELB - R_SHO) * 0.42),
     ("Skin", L_SHO + (L_ELB - L_SHO) * 0.55, L_TIP),
     ("Skin", R_SHO + (R_ELB - R_SHO) * 0.55, R_TIP),
-    ("Skin", NECK, HEAD + Vector((0, 0, 0.03))),
+    ("Skin", NECK + Vector((0, 0, 0.035)), HEAD + Vector((0, 0, 0.03))),
     ("Skin", L_HIP + (L_KNEE - L_HIP) * 0.55, L_KNEE + (L_ANK - L_KNEE) * 0.12),
     ("Skin", R_HIP + (R_KNEE - R_HIP) * 0.55, R_KNEE + (R_ANK - R_KNEE) * 0.12),
     ("Socks", L_KNEE + (L_ANK - L_KNEE) * 0.25, L_ANK),
@@ -200,19 +249,34 @@ bpy.context.view_layer.objects.active = head_o
 bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 bpy.ops.object.shade_smooth()
 
-# menton/mâchoire : taper anime sous la ligne des yeux (plus étroit vers le bas,
-# menton légèrement en avant)
+# Crâne construit par zones (coords locales normalisées) :
+#  - mâchoire : la largeur tient jusqu'à mi-hauteur puis rejoint un menton
+#    arrondi (jamais pointu), angle de mâchoire marqué ;
+#  - crâne : légèrement plus large et plein à l'arrière ;
+#  - menton discret vers l'avant, bas du visage raccourci.
 me = head_o.data
+
+def _sstep(a, b, x):
+    t = max(0.0, min(1.0, (x - a) / max(b - a, 1e-9)))
+    return t * t * (3 - 2 * t)
+
 for v in me.vertices:
-    p = v.co  # local, centré
-    if p.z < 0:
-        t = min(1.0, -p.z / (head_r * 1.08))
-        s = 1.0 - 0.30 * (t ** 1.8)
-        v.co.x *= s
-        v.co.y *= 1.0 - 0.12 * (t ** 2.0)
-        if p.y < 0:
-            v.co.y -= head_r * 0.10 * (t ** 2.4)   # menton qui avance
-        v.co.z *= 0.96                              # menton moins long
+    p = v.co
+    xn = p.x / (head_r * 0.92)
+    yn = p.y / (head_r * 0.98)
+    zn = p.z / (head_r * 1.08)
+    if zn < 0:
+        t = min(1.0, -zn)
+        jaw = 1.0 - 0.30 * (_sstep(0.32, 1.0, t) ** 1.25)
+        v.co.x *= jaw
+        v.co.y *= 1.0 - 0.14 * _sstep(0.4, 1.0, t)
+        if yn < 0:
+            v.co.y -= head_r * 0.06 * (_sstep(0.55, 1.0, t) ** 1.5)
+        v.co.z *= 0.90
+    else:
+        v.co.x *= 1.0 + 0.05 * _sstep(0.05, 0.75, zn)
+        if yn > 0:
+            v.co.y *= 1.0 + 0.06 * _sstep(0.0, 0.9, zn)
 
 # UVs contrôlés : u = 0.5 + atan2(x, -y)/2pi, v = 0.5 + asin(z_norm)/pi
 # (on supprime d'abord l'unwrap par défaut de la uv_sphere, sinon c'est lui
@@ -246,7 +310,7 @@ for sx in (-1, 1):
 # ---------------------------------------------------------------- cheveux
 # Afro court en mèches : calotte + cônes distribués sur le crâne
 hair_objs = []
-bpy.ops.mesh.primitive_uv_sphere_add(radius=head_r * 1.02, location=head_c + Vector((0, 0.008, head_r * 0.06)),
+bpy.ops.mesh.primitive_uv_sphere_add(radius=head_r * 1.07, location=head_c + Vector((0, 0.008, head_r * 0.06)),
                                      segments=32, ring_count=24)
 cap = bpy.context.object
 cap.scale = (1.02, 1.02, 1.0)
@@ -285,7 +349,7 @@ for i in range(170):
         continue
     if dirv.z < 0.0 and front > -0.35:
         continue
-    base = head_c + Vector((0, 0.008, head_r * 0.06)) + dirv * head_r * 0.97
+    base = head_c + Vector((0, 0.008, head_r * 0.06)) + dirv * head_r * 0.92
     ln = head_r * random.uniform(0.28, 0.5)
     bpy.ops.mesh.primitive_cone_add(radius1=head_r * random.uniform(0.13, 0.2),
                                     radius2=0, depth=ln, location=base + dirv * ln * 0.3,
@@ -463,9 +527,9 @@ vl = bpy.context.view_layer
 fs = vl.freestyle_settings
 ls = fs.linesets.new("contours")
 ls.select_silhouette = True
-ls.select_border = True
+ls.select_border = False
 ls.select_crease = False
-ls.select_contour = True
+ls.select_contour = False
 ls.select_external_contour = True
 # tout lineset (y compris celui par défaut) doit avoir un linestyle,
 # sinon Freestyle plante à chaque rendu
