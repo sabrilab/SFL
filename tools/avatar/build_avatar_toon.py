@@ -79,7 +79,7 @@ face_mat.node_tree.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
 
 # ---------------------------------------------------------------- corps (metaballs)
 mball = bpy.data.metaballs.new("bodymb")
-mball.resolution = 0.010
+mball.resolution = 0.007
 mb_obj = bpy.data.objects.new("BodyMB", mball)
 bpy.context.collection.objects.link(mb_obj)
 
@@ -183,10 +183,11 @@ body = bpy.context.object
 body.name = "Body"
 print("metaball -> mesh:", len(body.data.vertices), "vertices")
 
-# lissage des transitions metaball avant tout le reste
+# lissage fort des transitions metaball : c'est lui qui gomme les
+# « grumeaux » entre masses musculaires (le bruit de surface)
 sm = body.modifiers.new("smooth", "SMOOTH")
-sm.factor = 0.9
-sm.iterations = 8
+sm.factor = 1.0
+sm.iterations = 30
 bpy.ops.object.modifier_apply(modifier="smooth")
 
 # lisse + allège
