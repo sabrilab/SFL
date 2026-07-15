@@ -89,3 +89,7 @@ src/
 public/
   sw.js           service worker (cache hors-ligne)
 ```
+
+---
+
+_Déployé en continu sur Vercel — les previews de la branche de travail apparaissent dans l'onglet Deployments._
