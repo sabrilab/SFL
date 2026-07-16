@@ -270,16 +270,29 @@ for v in verts:
     if abs(co.x) < 0.45:
         if sh_lo < co.z < sh_hi:
             b = ramp(1 - abs(co.z - sh_c) / (sh_hi - sh_c))
-            co.x *= 1 + 0.08 * b
+            co.x *= 1 + 0.05 * b
         # rehausse trapèzes/deltoïdes : la pente épaule-cou devient
         # plus horizontale, carrure moins tombante
         if co.z > delt_top - 0.14 and abs(co.x) > 0.09:
             lift = ramp((abs(co.x) - 0.09) / 0.12) * ramp((co.z - (delt_top - 0.14)) / 0.10)
-            co.z += 0.024 * lift
+            co.z += 0.014 * lift
         if wa_lo < co.z < wa_hi:
             b = ramp(1 - abs(co.z - (wa_lo + wa_hi) / 2) / ((wa_hi - wa_lo) / 2))
             co.x *= 1 - 0.06 * b
             co.y = y_c + (co.y - y_c) * (1 - 0.05 * b)
+# pieds : le corps HBM agrandi à l'échelle du squelette (x1,15) donne des
+# pieds trop longs/larges — on les réduit autour de chaque cheville
+for sign in (1, -1):
+    foot = [v for v in verts if v.co.z < 0.13 and sign * v.co.x > 0]
+    if not foot:
+        continue
+    cx = sum(v.co.x for v in foot) / len(foot)
+    ankle_y = sum(v.co.y for v in foot) / len(foot)
+    for v in foot:
+        f = ramp((0.13 - v.co.z) / 0.08)  # plein effet au sol, fondu à la cheville
+        v.co.x = cx + (v.co.x - cx) * (1 - 0.08 * f)
+        v.co.y = ankle_y + (v.co.y - ankle_y) * (1 - 0.12 * f)
+
 body.data.update()
 print("athletic build applied")
 
@@ -467,8 +480,11 @@ def vgw(vg, vi):
     except RuntimeError:
         return 0.0
 
-CAP_H = 0.16          # hauteur de la zone de transition au-dessus du pivot
-CAP_MAX = 0.90        # fraction max transférée au sommet
+CAP_H = 0.14          # hauteur de la zone de transition au-dessus du pivot
+CAP_MAX = 0.85        # fraction max transférée au sommet
+CAP_X = 0.10          # étendue latérale au-delà du pivot : deltoïde seulement,
+                      # surtout pas le tube du bras (sinon il « se déroule »
+                      # en ballon quand l'animation baisse les bras)
 for side, sign in (("Left", 1), ("Right", -1)):
     vg_arm = body.vertex_groups.get(f"mixamorig:{side}Arm")
     vg_sh = body.vertex_groups.get(f"mixamorig:{side}Shoulder")
@@ -485,7 +501,11 @@ for side, sign in (("Left", 1), ("Right", -1)):
         t = clamp01((v.co.z - sj_z) / CAP_H)
         if t <= 0.0:
             continue
-        move = w_arm * CAP_MAX * ramp(t)
+        # fondu latéral : plein effet sur le deltoïde, nul au-delà
+        lat = 1.0 - ramp((abs(v.co.x) - (sj_x + CAP_X)) / 0.06)
+        if lat <= 0.0:
+            continue
+        move = w_arm * CAP_MAX * ramp(t) * lat
         vg_arm.add([v.index], w_arm - move, 'REPLACE')
         vg_sh.add([v.index], move, 'ADD')
 print("shoulder cap reweighted to clavicle")
