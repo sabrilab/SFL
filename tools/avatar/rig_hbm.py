@@ -105,14 +105,22 @@ bpy.ops.object.select_all(action='DESELECT')
 armature.select_set(True)
 bpy.context.view_layer.objects.active = armature
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-if abs(arm_scale - 1.0) > 1e-6:
-    for action in bpy.data.actions:
-        for fc in action.fcurves:
-            if fc.data_path.endswith('.location'):
+for action in bpy.data.actions:
+    for fc in list(action.fcurves):
+        if not fc.data_path.endswith('.location'):
+            continue
+        if "mixamorig:Hips" in fc.data_path:
+            # le root garde sa translation (balancement de l'idle), à l'échelle
+            if abs(arm_scale - 1.0) > 1e-6:
                 for kp in fc.keyframe_points:
                     kp.co.y *= arm_scale
                     kp.handle_left.y *= arm_scale
                     kp.handle_right.y *= arm_scale
+        else:
+            # les autres os n'ont pas besoin de translation animée (squelette
+            # rigide) et ces clés figées écraseraient le repositionnement
+            # des os des épaules
+            action.fcurves.remove(fc)
 print(f"Armature transform applied (scale {arm_scale})")
 
 bone_zs = []
@@ -142,8 +150,29 @@ body.select_set(True)
 bpy.context.view_layer.objects.active = body
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
-# ------------------------------------------- 4. binding A-pose -> T-pose
-ARM_DROP = math.radians(62)
+# NB : on ne déplace PAS les os (toute édition du squelette, même une
+# translation pure, désynchronise les rotations baked de l'animation
+# Mixamo). Les épaules sont corrigées par sculpture du mesh, calée sur la
+# ligne des deltoïdes.
+delt_top = max(v.co.z for v in body.data.vertices if 0.13 < abs(v.co.x) < 0.30)
+print(f"deltoid top={delt_top:.3f}")
+
+# Angle réel de l'A-pose mesuré sur le mesh : direction moyenne des vertex
+# de bras/main par rapport au pivot de l'épaule (os mixamorig:LeftArm).
+shoulder_bone = armature.data.bones["mixamorig:LeftArm"]
+sj = armature.matrix_world @ shoulder_bone.head_local
+sj_x, sj_z = sj.x, sj.z
+arm_pts = []
+for v in body.data.vertices:
+    co = v.co
+    if co.x > sj_x + 0.04 and co.z < sj_z:
+        d = math.hypot(co.x - sj_x, co.z - sj_z)
+        if 0.35 < d < 0.80:
+            arm_pts.append((co.x, co.z))
+ax = sum(p[0] for p in arm_pts) / len(arm_pts)
+az = sum(p[1] for p in arm_pts) / len(arm_pts)
+ARM_DROP = math.atan2(sj_z - az, ax - sj_x)
+print(f"shoulder joint: x={sj_x:.3f} z={sj_z:.3f} | A-pose angle: {math.degrees(ARM_DROP):.1f}deg ({len(arm_pts)} pts)")
 
 def rotate_bone_world(pb, axis, angle):
     M = pb.matrix.copy()
@@ -222,21 +251,31 @@ head_y_c = sum(c.y for c in head_cos) / len(head_cos)
 torso_cos = [v.co for v in verts if v.co.z < neck_z and abs(v.co.x) < 0.30]
 y_c = sum(c.y for c in torso_cos) / len(torso_cos)
 
+# axe des bras du mesh converti en T (pour les morphs de corpulence)
 arm_cos = [v.co for v in verts if abs(v.co.x) > 0.5]
 arm_z = sum(c.z for c in arm_cos) / len(arm_cos)
+# ligne des deltoïdes recalculée sur le mesh en T
+delt_top = max(v.co.z for v in verts if 0.13 < abs(v.co.x) < 0.30)
 
-print(f"landmarks: z_top={z_top:.2f} eye_z={eye_cz:.2f} arm_z={arm_z:.2f}")
+print(f"landmarks: z_top={z_top:.2f} eye_z={eye_cz:.2f} arm_z={arm_z:.2f} delt_top={delt_top:.2f}")
 
 # --------------------------------------------------- 6. carrure athlétique
-# Épaules/pectoraux élargis, taille resserrée — sur le mesh de base.
-sh_lo, sh_hi = arm_z - 0.10, arm_z + 0.08     # bande épaules/torse haut
+# Épaules/deltoïdes élargis et rehaussés (carrure en V, trapèzes plus
+# horizontaux), taille resserrée — calé sur la ligne des deltoïdes du mesh.
+sh_c = delt_top - 0.06                        # centre bande épaules
+sh_lo, sh_hi = sh_c - 0.10, sh_c + 0.09
 wa_lo, wa_hi = z_top - 1.02, z_top - 0.72     # bande taille
 for v in verts:
     co = v.co
     if abs(co.x) < 0.45:
         if sh_lo < co.z < sh_hi:
-            b = ramp(1 - abs(co.z - (sh_lo + sh_hi) / 2) / ((sh_hi - sh_lo) / 2))
-            co.x *= 1 + 0.07 * b
+            b = ramp(1 - abs(co.z - sh_c) / (sh_hi - sh_c))
+            co.x *= 1 + 0.08 * b
+        # rehausse trapèzes/deltoïdes : la pente épaule-cou devient
+        # plus horizontale, carrure moins tombante
+        if co.z > delt_top - 0.14 and abs(co.x) > 0.09:
+            lift = ramp((abs(co.x) - 0.09) / 0.12) * ramp((co.z - (delt_top - 0.14)) / 0.10)
+            co.z += 0.024 * lift
         if wa_lo < co.z < wa_hi:
             b = ramp(1 - abs(co.z - (wa_lo + wa_hi) / 2) / ((wa_hi - wa_lo) / 2))
             co.x *= 1 - 0.06 * b
