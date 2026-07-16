@@ -454,6 +454,42 @@ except Exception as e:
     bpy.ops.object.mode_set(mode='OBJECT')
     print("weight smooth skipped:", e)
 
+# Correction deltoïde/trapèze : le sommet de l'épaule (au-dessus du pivot
+# du bras) est skinné sur l'os du bras, dont le pivot Mixamo est ~22 cm
+# plus bas que la ligne des deltoïdes. Quand l'idle baisse les bras, ces
+# vertices hauts pivotent autour du point bas et bombent. On transfère
+# progressivement leur poids « bras » vers la clavicule (quasi immobile
+# dans l'idle) : le sommet de l'épaule reste stable, seul le corps du
+# deltoïde (sous le pivot) suit le bras.
+def vgw(vg, vi):
+    try:
+        return vg.weight(vi)
+    except RuntimeError:
+        return 0.0
+
+CAP_H = 0.16          # hauteur de la zone de transition au-dessus du pivot
+CAP_MAX = 0.90        # fraction max transférée au sommet
+for side, sign in (("Left", 1), ("Right", -1)):
+    vg_arm = body.vertex_groups.get(f"mixamorig:{side}Arm")
+    vg_sh = body.vertex_groups.get(f"mixamorig:{side}Shoulder")
+    if vg_arm is None:
+        continue
+    if vg_sh is None:
+        vg_sh = body.vertex_groups.new(name=f"mixamorig:{side}Shoulder")
+    for v in body.data.vertices:
+        if sign * v.co.x <= 0.02:
+            continue
+        w_arm = vgw(vg_arm, v.index)
+        if w_arm <= 0.0:
+            continue
+        t = clamp01((v.co.z - sj_z) / CAP_H)
+        if t <= 0.0:
+            continue
+        move = w_arm * CAP_MAX * ramp(t)
+        vg_arm.add([v.index], w_arm - move, 'REPLACE')
+        vg_sh.add([v.index], move, 'ADD')
+print("shoulder cap reweighted to clavicle")
+
 # yeux rigides sur la tête + vertex orphelins -> tête
 pin_eyes_to_head()
 head_group = body.vertex_groups.get("mixamorig:Head")
