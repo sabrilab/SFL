@@ -10,6 +10,7 @@ import { PersonStanding } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   AVATAR_STORAGE_KEY,
+  CHEVEUX_OPTIONS,
   CORPULENCE_OPTIONS,
   DEFAULT_AVATAR_CONFIG,
   PEAU_HEX,
@@ -120,6 +121,15 @@ export default function AvatarPage() {
           <section>
             <h2 className="mb-2 px-1 text-sm font-semibold text-muted-foreground">Tête</h2>
             <Segmented options={TETE_OPTIONS} value={config.tete} onChange={(v) => set("tete", v)} />
+          </section>
+
+          <section>
+            <h2 className="mb-2 px-1 text-sm font-semibold text-muted-foreground">Coupe</h2>
+            <Segmented
+              options={CHEVEUX_OPTIONS}
+              value={config.cheveux}
+              onChange={(v) => set("cheveux", v)}
+            />
           </section>
 
           <section>

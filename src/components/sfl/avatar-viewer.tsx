@@ -14,6 +14,7 @@ import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import {
+  CHEVEUX_MESH,
   corpulenceMorphs,
   teteMorphs,
   PEAU_HEX,
@@ -110,6 +111,7 @@ function AvatarModel({ config }: { config: AvatarConfig }) {
 
       // Coque inversée : suit le squelette et les morphs du mesh d'origine.
       const outline = mesh.clone();
+      outline.name = `${mesh.name}__outline`;
       outline.material = outlineMat;
       if (mesh.morphTargetInfluences) {
         outline.morphTargetInfluences = mesh.morphTargetInfluences;
@@ -150,6 +152,13 @@ function AvatarModel({ config }: { config: AvatarConfig }) {
           if (idx !== undefined) mesh.morphTargetInfluences[idx] = value;
         }
       }
+    });
+
+    // Coupe de cheveux : on n'affiche que le mesh choisi (et son contour).
+    const hairTarget = CHEVEUX_MESH[config.cheveux];
+    gltf.scene.traverse((obj) => {
+      const base = obj.name.replace(/__outline$/, "");
+      if (base.startsWith("Cheveux")) obj.visible = base === hairTarget;
     });
 
     const skin = toonMaterials.get("Skin");

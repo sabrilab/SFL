@@ -6,12 +6,14 @@ export type Taille = "petit" | "moyen" | "grand";
 export type Corpulence = "fine" | "moyenne" | "forte";
 export type Tete = "ronde" | "carree" | "allongee";
 export type Peau = "claire" | "medium" | "foncee";
+export type Cheveux = "ras" | "court" | "crete";
 
 export interface AvatarConfig {
   taille: Taille;
   corpulence: Corpulence;
   tete: Tete;
   peau: Peau;
+  cheveux: Cheveux;
 }
 
 export const DEFAULT_AVATAR_CONFIG: AvatarConfig = {
@@ -19,6 +21,7 @@ export const DEFAULT_AVATAR_CONFIG: AvatarConfig = {
   corpulence: "moyenne",
   tete: "ronde",
   peau: "medium",
+  cheveux: "court",
 };
 
 export const AVATAR_STORAGE_KEY = "sfl-avatar-config";
@@ -53,6 +56,13 @@ export function teteMorphs(t: Tete): Record<string, number> {
   };
 }
 
+// Nom de l'objet 3D de coupe de cheveux à afficher dans le GLB.
+export const CHEVEUX_MESH: Record<Cheveux, string> = {
+  ras: "CheveuxRas",
+  court: "CheveuxCourt",
+  crete: "CheveuxCrete",
+};
+
 // Libellés pour l'éditeur.
 export const TAILLE_OPTIONS: { value: Taille; label: string }[] = [
   { value: "petit", label: "Petit" },
@@ -76,4 +86,10 @@ export const PEAU_OPTIONS: { value: Peau; label: string }[] = [
   { value: "claire", label: "Claire" },
   { value: "medium", label: "Médium" },
   { value: "foncee", label: "Foncée" },
+];
+
+export const CHEVEUX_OPTIONS: { value: Cheveux; label: string }[] = [
+  { value: "ras", label: "Ras" },
+  { value: "court", label: "Court" },
+  { value: "crete", label: "Crête" },
 ];
