@@ -2,7 +2,7 @@
 // Totaux (PP, matchs, buts, passes, MVP/Impact/Défensive) recalculés depuis la
 // feuille SAISIE MATCH ; stats de carte et postes depuis JOUEURS & RÈGLES.
 // Les joueurs invités sans carte renseignée dans le classeur ont une carte de
-// base neutre (74) en attendant une notation officielle — poste « — ».
+// base neutre (75) en attendant une notation officielle — poste « — ».
 // À terme, ces données viendront d'une base alimentée par l'interface admin.
 
 import type { BoostCardData, Journee, MatchTeam, Player } from "./engine";
@@ -24,7 +24,7 @@ export const PLAYERS: Player[] = [
   { name: "Yamin", poste: "MC/MDC", pp: 17, matchs: 3, buts: 6, passes: 4, statut: "Actif", stats: { VIT: 85, TIR: 80, PAS: 82, DRI: 78, DEF: 80, PHY: 83 }, mvp: 0, impact: 0, def: 1 },
   { name: "Wadi", poste: "AT", pp: 16, matchs: 2, buts: 1, passes: 6, statut: "Actif", stats: { VIT: 86, TIR: 80, PAS: 80, DRI: 78, DEF: 80, PHY: 80 }, mvp: 1, impact: 1, def: 1 },
   { name: "Naim", poste: "DC", pp: 15, matchs: 4, buts: 3, passes: 3, statut: "Actif", stats: { VIT: 65, TIR: 73, PAS: 78, DRI: 77, DEF: 76, PHY: 63 }, mvp: 0, impact: 0, def: 0 },
-  { name: "Jouneid", poste: "—", pp: 14, matchs: 1, buts: 6, passes: 2, statut: "Actif", stats: { VIT: 74, TIR: 74, PAS: 74, DRI: 74, DEF: 74, PHY: 74 }, mvp: 1, impact: 1, def: 0 },
+  { name: "Jouneid", poste: "—", pp: 14, matchs: 1, buts: 6, passes: 2, statut: "Actif", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 1, impact: 1, def: 0 },
   { name: "Zakaria", poste: "MC", pp: 14, matchs: 3, buts: 3, passes: 2, statut: "Actif", stats: { VIT: 77, TIR: 78, PAS: 77, DRI: 79, DEF: 76, PHY: 77 }, mvp: 0, impact: 0, def: 0 },
   { name: "Ibrahim", poste: "DC", pp: 13, matchs: 3, buts: 3, passes: 4, statut: "Actif", stats: { VIT: 72, TIR: 80, PAS: 79, DRI: 76, DEF: 83, PHY: 81 }, mvp: 0, impact: 0, def: 0 },
   { name: "Sofiane", poste: "AT", pp: 13, matchs: 2, buts: 4, passes: 3, statut: "Actif", stats: { VIT: 82, TIR: 81, PAS: 75, DRI: 77, DEF: 79, PHY: 80 }, mvp: 0, impact: 0, def: 2 },
@@ -33,27 +33,27 @@ export const PLAYERS: Player[] = [
   { name: "Ayman", poste: "DD", pp: 10, matchs: 3, buts: 3, passes: 1, statut: "Actif", stats: { VIT: 74, TIR: 73, PAS: 75, DRI: 74, DEF: 77, PHY: 80 }, mvp: 0, impact: 0, def: 1 },
   { name: "Azzedine", poste: "DG", pp: 10, matchs: 3, buts: 4, passes: 2, statut: "Actif", stats: { VIT: 68, TIR: 67, PAS: 67, DRI: 65, DEF: 69, PHY: 72 }, mvp: 0, impact: 0, def: 0 },
   { name: "Adil", poste: "MDC", pp: 9, matchs: 4, buts: 1, passes: 3, statut: "Actif", stats: { VIT: 77, TIR: 75, PAS: 72, DRI: 70, DEF: 77, PHY: 83 }, mvp: 0, impact: 0, def: 0 },
-  { name: "Kamil", poste: "—", pp: 9, matchs: 1, buts: 3, passes: 2, statut: "Actif", stats: { VIT: 74, TIR: 74, PAS: 74, DRI: 74, DEF: 74, PHY: 74 }, mvp: 0, impact: 1, def: 0 },
+  { name: "Kamil", poste: "—", pp: 9, matchs: 1, buts: 3, passes: 2, statut: "Actif", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 0, impact: 1, def: 0 },
   { name: "Kylian", poste: "MC", pp: 9, matchs: 1, buts: 2, passes: 4, statut: "Blessure", stats: { VIT: 86, TIR: 82, PAS: 86, DRI: 84, DEF: 75, PHY: 80 }, mvp: 0, impact: 0, def: 0 },
   { name: "Omar", poste: "MC", pp: 9, matchs: 1, buts: 1, passes: 4, statut: "Blessure", stats: { VIT: 81, TIR: 79, PAS: 85, DRI: 88, DEF: 72, PHY: 64 }, mvp: 0, impact: 0, def: 0 },
-  { name: "Anas", poste: "—", pp: 8, matchs: 1, buts: 1, passes: 2, statut: "Actif", stats: { VIT: 74, TIR: 74, PAS: 74, DRI: 74, DEF: 74, PHY: 74 }, mvp: 1, impact: 1, def: 1 },
+  { name: "Anas", poste: "—", pp: 8, matchs: 1, buts: 1, passes: 2, statut: "Actif", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 1, impact: 1, def: 1 },
   { name: "Adrien", poste: "DD", pp: 7, matchs: 3, buts: 0, passes: 2, statut: "Actif", stats: { VIT: 76, TIR: 71, PAS: 73, DRI: 73, DEF: 78, PHY: 88 }, mvp: 0, impact: 0, def: 0 },
-  { name: "Selim laouadi", poste: "—", pp: 6, matchs: 1, buts: 1, passes: 2, statut: "Actif", stats: { VIT: 74, TIR: 74, PAS: 74, DRI: 74, DEF: 74, PHY: 74 }, mvp: 0, impact: 0, def: 0 },
-  { name: "Abdel", poste: "—", pp: 5, matchs: 1, buts: 2, passes: 2, statut: "Actif", stats: { VIT: 74, TIR: 74, PAS: 74, DRI: 74, DEF: 74, PHY: 74 }, mvp: 0, impact: 0, def: 0 },
+  { name: "Selim laouadi", poste: "—", pp: 6, matchs: 1, buts: 1, passes: 2, statut: "Actif", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 0, impact: 0, def: 0 },
+  { name: "Abdel", poste: "—", pp: 5, matchs: 1, buts: 2, passes: 2, statut: "Actif", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 0, impact: 0, def: 0 },
   { name: "Franz", poste: "MDC/MC", pp: 5, matchs: 1, buts: 1, passes: 0, statut: "Actif", stats: { VIT: 76, TIR: 80, PAS: 77, DRI: 74, DEF: 83, PHY: 80 }, mvp: 0, impact: 0, def: 1 },
-  { name: "Sami", poste: "—", pp: 5, matchs: 1, buts: 1, passes: 1, statut: "Actif", stats: { VIT: 74, TIR: 74, PAS: 74, DRI: 74, DEF: 74, PHY: 74 }, mvp: 0, impact: 0, def: 0 },
-  { name: "Kais", poste: "—", pp: 4, matchs: 1, buts: 2, passes: 1, statut: "Actif", stats: { VIT: 74, TIR: 74, PAS: 74, DRI: 74, DEF: 74, PHY: 74 }, mvp: 0, impact: 0, def: 0 },
-  { name: "Sosso Abdel", poste: "—", pp: 4, matchs: 1, buts: 0, passes: 0, statut: "Actif", stats: { VIT: 74, TIR: 74, PAS: 74, DRI: 74, DEF: 74, PHY: 74 }, mvp: 0, impact: 0, def: 1 },
-  { name: "Adil Maimouni", poste: "—", pp: 3, matchs: 1, buts: 0, passes: 1, statut: "Actif", stats: { VIT: 74, TIR: 74, PAS: 74, DRI: 74, DEF: 74, PHY: 74 }, mvp: 0, impact: 1, def: 0 },
-  { name: "Adil Zerhoui", poste: "—", pp: 3, matchs: 1, buts: 0, passes: 0, statut: "Actif", stats: { VIT: 74, TIR: 74, PAS: 74, DRI: 74, DEF: 74, PHY: 74 }, mvp: 0, impact: 0, def: 0 },
-  { name: "Hassan Abdel", poste: "—", pp: 2, matchs: 1, buts: 0, passes: 0, statut: "Actif", stats: { VIT: 74, TIR: 74, PAS: 74, DRI: 74, DEF: 74, PHY: 74 }, mvp: 0, impact: 0, def: 1 },
+  { name: "Sami", poste: "—", pp: 5, matchs: 1, buts: 1, passes: 1, statut: "Actif", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 0, impact: 0, def: 0 },
+  { name: "Kais", poste: "—", pp: 4, matchs: 1, buts: 2, passes: 1, statut: "Actif", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 0, impact: 0, def: 0 },
+  { name: "Sosso Abdel", poste: "—", pp: 4, matchs: 1, buts: 0, passes: 0, statut: "Actif", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 0, impact: 0, def: 1 },
+  { name: "Adil Maimouni", poste: "—", pp: 3, matchs: 1, buts: 0, passes: 1, statut: "Actif", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 0, impact: 1, def: 0 },
+  { name: "Adil Zerhoui", poste: "—", pp: 3, matchs: 1, buts: 0, passes: 0, statut: "Actif", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 0, impact: 0, def: 0 },
+  { name: "Hassan Abdel", poste: "—", pp: 2, matchs: 1, buts: 0, passes: 0, statut: "Actif", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 0, impact: 0, def: 1 },
   { name: "Ariless", poste: "MC/AT", pp: 0, matchs: 0, buts: 0, passes: 0, statut: "Blessure", stats: { VIT: 77, TIR: 82, PAS: 88, DRI: 89, DEF: 81, PHY: 79 }, mvp: 0, impact: 0, def: 0 },
   { name: "Hasbi", poste: "G", pp: 0, matchs: 0, buts: 0, passes: 0, statut: "Actif", stats: { VIT: 85, TIR: 79, PAS: 79, DRI: 86, DEF: 92, PHY: 88 }, mvp: 0, impact: 0, def: 0 },
   { name: "Marwan", poste: "MDC/MC", pp: 0, matchs: 0, buts: 0, passes: 0, statut: "Actif", stats: { VIT: 76, TIR: 79, PAS: 78, DRI: 77, DEF: 82, PHY: 82 }, mvp: 0, impact: 0, def: 0 },
   { name: "Rezki", poste: "MDC", pp: 0, matchs: 0, buts: 0, passes: 0, statut: "Actif", stats: { VIT: 75, TIR: 77, PAS: 76, DRI: 75, DEF: 85, PHY: 79 }, mvp: 0, impact: 0, def: 0 },
-  { name: "Chouaib", poste: "—", pp: -2, matchs: 0, buts: 0, passes: 0, statut: "Suspendu", stats: { VIT: 74, TIR: 74, PAS: 74, DRI: 74, DEF: 74, PHY: 74 }, mvp: 0, impact: 0, def: 0, absInj: 1 },
+  { name: "Chouaib", poste: "—", pp: -2, matchs: 0, buts: 0, passes: 0, statut: "Suspendu", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 0, impact: 0, def: 0, absInj: 1 },
   { name: "Hugo", poste: "DG", pp: -2, matchs: 0, buts: 0, passes: 0, statut: "Suspendu", stats: { VIT: 77, TIR: 79, PAS: 76, DRI: 73, DEF: 77, PHY: 73 }, mvp: 0, impact: 0, def: 0, absInj: 1 },
-  { name: "Khadim", poste: "—", pp: -2, matchs: 0, buts: 0, passes: 0, statut: "Suspendu", stats: { VIT: 74, TIR: 74, PAS: 74, DRI: 74, DEF: 74, PHY: 74 }, mvp: 0, impact: 0, def: 0, absInj: 1 },
+  { name: "Khadim", poste: "—", pp: -2, matchs: 0, buts: 0, passes: 0, statut: "Suspendu", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 0, impact: 0, def: 0, absInj: 1 },
 ];
 
 function team(id: string, name: string, score: number, players: [string, number, number][]): MatchTeam {
@@ -182,17 +182,48 @@ export const BAREME: [string, string][] = [
   ["Absence injustifiée", "−2"],
 ];
 
-// Cartes Boost officielles gagnées (figures de match).
+// Cartes Boost officielles gagnées (figures de match) — une carte par honneur
+// MVP / Impact / Défensive décerné dans la feuille SAISIE MATCH. Les stats
+// reprennent la carte rare du joueur (« base fixe des cartes boost »).
 export const BOOST_CARDS: BoostCardData[] = [
-  { player: "Ilyes", type: "mvp", ovr: 85, poste: "MC", date: "J1 · 22 juin", stats: { VIT: 84, TIR: 93, PAS: 91, DRI: 96, DEF: 75, PHY: 69 } },
-  { player: "Ilies", type: "mvp", ovr: 88, poste: "AD", date: "J2 · 29 juin", stats: { VIT: 89, TIR: 87, PAS: 91, DRI: 95, DEF: 80, PHY: 83 } },
-  { player: "Kader", type: "mvp", ovr: 83, poste: "MC", date: "J1 · 22 juin", stats: { VIT: 80, TIR: 80, PAS: 81, DRI: 86, DEF: 82, PHY: 84 } },
-  { player: "Smail", type: "impact", ovr: 85, poste: "MC/MDC", date: "J3 · 6 juil.", stats: { VIT: 79, TIR: 80, PAS: 81, DRI: 81, DEF: 92, PHY: 93 } },
-  { player: "Zakary", type: "impact", ovr: 85, poste: "MC", date: "J1 · 22 juin", stats: { VIT: 75, TIR: 87, PAS: 89, DRI: 82, DEF: 90, PHY: 87 } },
-  { player: "Smail", type: "def", ovr: 82, poste: "MC/MDC", date: "J1 · 22 juin", stats: { VIT: 79, TIR: 77, PAS: 78, DRI: 80, DEF: 89, PHY: 90 } },
-  { player: "Anis", type: "def", ovr: 80, poste: "DC", date: "J2 · 29 juin", stats: { VIT: 74, TIR: 81, PAS: 73, DRI: 74, DEF: 88, PHY: 85 } },
-  { player: "Yamin", type: "def", ovr: 85, poste: "MC/MDC", date: "J1 · 22 juin", stats: { VIT: 89, TIR: 84, PAS: 85, DRI: 80, DEF: 84, PHY: 89 } },
-  { player: "Moussa", type: "def", ovr: 84, poste: "DC/MDC", date: "J1 · 22 juin", stats: { VIT: 79, TIR: 87, PAS: 78, DRI: 74, DEF: 93, PHY: 93 } },
-  { player: "Franz", type: "def", ovr: 82, poste: "MDC", date: "J3 · 6 juil.", stats: { VIT: 78, TIR: 83, PAS: 79, DRI: 76, DEF: 88, PHY: 85 } },
-  { player: "Sidali", type: "def", ovr: 81, poste: "MC", date: "J1 · 22 juin", stats: { VIT: 80, TIR: 77, PAS: 82, DRI: 85, DEF: 84, PHY: 79 } },
+  { player: "Kader", type: "mvp", ovr: 82, poste: "MC/AT", date: "J1 · 22 juin", stats: { VIT: 79, TIR: 79, PAS: 80, DRI: 87, DEF: 79, PHY: 85 } },
+  { player: "Badis", type: "impact", ovr: 83, poste: "MC/MDC", date: "J1 · 22 juin", stats: { VIT: 78, TIR: 77, PAS: 76, DRI: 78, DEF: 91, PHY: 93 } },
+  { player: "Kader", type: "impact", ovr: 82, poste: "MC/AT", date: "J1 · 22 juin", stats: { VIT: 79, TIR: 79, PAS: 80, DRI: 87, DEF: 79, PHY: 85 } },
+  { player: "Sidali", type: "def", ovr: 82, poste: "MC/AG", date: "J1 · 22 juin", stats: { VIT: 79, TIR: 78, PAS: 85, DRI: 88, DEF: 83, PHY: 78 } },
+  { player: "Smail", type: "def", ovr: 82, poste: "MC/MDC", date: "J1 · 22 juin", stats: { VIT: 77, TIR: 76, PAS: 77, DRI: 79, DEF: 90, PHY: 91 } },
+  { player: "Ilies", type: "mvp", ovr: 85, poste: "AD", date: "J3 · 6 juil.", stats: { VIT: 87, TIR: 83, PAS: 84, DRI: 92, DEF: 78, PHY: 81 } },
+  { player: "Ilyes", type: "mvp", ovr: 82, poste: "MC/AT", date: "J3 · 6 juil.", stats: { VIT: 82, TIR: 86, PAS: 89, DRI: 93, DEF: 73, PHY: 67 } },
+  { player: "Ilies", type: "impact", ovr: 85, poste: "AD", date: "J3 · 6 juil.", stats: { VIT: 87, TIR: 83, PAS: 84, DRI: 92, DEF: 78, PHY: 81 } },
+  { player: "Ilyes", type: "impact", ovr: 82, poste: "MC/AT", date: "J3 · 6 juil.", stats: { VIT: 82, TIR: 86, PAS: 89, DRI: 93, DEF: 73, PHY: 67 } },
+  { player: "Smail", type: "impact", ovr: 82, poste: "MC/MDC", date: "J3 · 6 juil.", stats: { VIT: 77, TIR: 76, PAS: 77, DRI: 79, DEF: 90, PHY: 91 } },
+  { player: "Zakary", type: "impact", ovr: 84, poste: "MC", date: "J3 · 6 juil.", stats: { VIT: 74, TIR: 84, PAS: 84, DRI: 81, DEF: 91, PHY: 88 } },
+  { player: "Anis", type: "def", ovr: 78, poste: "DC", date: "J3 · 6 juil.", stats: { VIT: 73, TIR: 78, PAS: 72, DRI: 73, DEF: 83, PHY: 86 } },
+  { player: "Franz", type: "def", ovr: 80, poste: "MDC/MC", date: "J3 · 6 juil.", stats: { VIT: 77, TIR: 81, PAS: 78, DRI: 75, DEF: 86, PHY: 83 } },
+  { player: "Moussa", type: "def", ovr: 83, poste: "DC/MDC", date: "J3 · 6 juil.", stats: { VIT: 78, TIR: 85, PAS: 76, DRI: 73, DEF: 91, PHY: 91 } },
+  { player: "Yamin", type: "def", ovr: 83, poste: "MC/MDC", date: "J3 · 6 juil.", stats: { VIT: 88, TIR: 81, PAS: 83, DRI: 79, DEF: 81, PHY: 86 } },
+  { player: "Ilyes", type: "mvp", ovr: 82, poste: "MC/AT", date: "J4 · 12 juil.", stats: { VIT: 82, TIR: 86, PAS: 89, DRI: 93, DEF: 73, PHY: 67 } },
+  { player: "Wadi", type: "mvp", ovr: 83, poste: "AT", date: "J4 · 12 juil.", stats: { VIT: 89, TIR: 83, PAS: 81, DRI: 79, DEF: 81, PHY: 81 } },
+  { player: "Badis", type: "impact", ovr: 83, poste: "MC/MDC", date: "J4 · 12 juil.", stats: { VIT: 78, TIR: 77, PAS: 76, DRI: 78, DEF: 91, PHY: 93 } },
+  { player: "Ilyes", type: "impact", ovr: 82, poste: "MC/AT", date: "J4 · 12 juil.", stats: { VIT: 82, TIR: 86, PAS: 89, DRI: 93, DEF: 73, PHY: 67 } },
+  { player: "Smail", type: "impact", ovr: 82, poste: "MC/MDC", date: "J4 · 12 juil.", stats: { VIT: 77, TIR: 76, PAS: 77, DRI: 79, DEF: 90, PHY: 91 } },
+  { player: "Wadi", type: "impact", ovr: 83, poste: "AT", date: "J4 · 12 juil.", stats: { VIT: 89, TIR: 83, PAS: 81, DRI: 79, DEF: 81, PHY: 81 } },
+  { player: "Anis", type: "def", ovr: 78, poste: "DC", date: "J4 · 12 juil.", stats: { VIT: 73, TIR: 78, PAS: 72, DRI: 73, DEF: 83, PHY: 86 } },
+  { player: "Ayman", type: "def", ovr: 78, poste: "DD", date: "J4 · 12 juil.", stats: { VIT: 75, TIR: 74, PAS: 76, DRI: 75, DEF: 80, PHY: 83 } },
+  { player: "Sofiane", type: "def", ovr: 81, poste: "AT", date: "J4 · 12 juil.", stats: { VIT: 85, TIR: 84, PAS: 76, DRI: 78, DEF: 80, PHY: 81 } },
+  { player: "Wadi", type: "def", ovr: 83, poste: "AT", date: "J4 · 12 juil.", stats: { VIT: 89, TIR: 83, PAS: 81, DRI: 79, DEF: 81, PHY: 81 } },
+  { player: "Anas", type: "mvp", ovr: 75, poste: "—", date: "J5 · 19 juil.", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 } },
+  { player: "Ilyes", type: "mvp", ovr: 82, poste: "MC/AT", date: "J5 · 19 juil.", stats: { VIT: 82, TIR: 86, PAS: 89, DRI: 93, DEF: 73, PHY: 67 } },
+  { player: "Jouneid", type: "mvp", ovr: 75, poste: "—", date: "J5 · 19 juil.", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 } },
+  { player: "Adil Maimouni", type: "impact", ovr: 75, poste: "—", date: "J5 · 19 juil.", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 } },
+  { player: "Anas", type: "impact", ovr: 75, poste: "—", date: "J5 · 19 juil.", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 } },
+  { player: "Ilies", type: "impact", ovr: 85, poste: "AD", date: "J5 · 19 juil.", stats: { VIT: 87, TIR: 83, PAS: 84, DRI: 92, DEF: 78, PHY: 81 } },
+  { player: "Ilyes", type: "impact", ovr: 82, poste: "MC/AT", date: "J5 · 19 juil.", stats: { VIT: 82, TIR: 86, PAS: 89, DRI: 93, DEF: 73, PHY: 67 } },
+  { player: "Jouneid", type: "impact", ovr: 75, poste: "—", date: "J5 · 19 juil.", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 } },
+  { player: "Kamil", type: "impact", ovr: 75, poste: "—", date: "J5 · 19 juil.", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 } },
+  { player: "Anas", type: "def", ovr: 75, poste: "—", date: "J5 · 19 juil.", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 } },
+  { player: "Badis", type: "def", ovr: 83, poste: "MC/MDC", date: "J5 · 19 juil.", stats: { VIT: 78, TIR: 77, PAS: 76, DRI: 78, DEF: 91, PHY: 93 } },
+  { player: "Hassan Abdel", type: "def", ovr: 75, poste: "—", date: "J5 · 19 juil.", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 } },
+  { player: "Sidali", type: "def", ovr: 82, poste: "MC/AG", date: "J5 · 19 juil.", stats: { VIT: 79, TIR: 78, PAS: 85, DRI: 88, DEF: 83, PHY: 78 } },
+  { player: "Sofiane", type: "def", ovr: 81, poste: "AT", date: "J5 · 19 juil.", stats: { VIT: 85, TIR: 84, PAS: 76, DRI: 78, DEF: 80, PHY: 81 } },
+  { player: "Sosso Abdel", type: "def", ovr: 75, poste: "—", date: "J5 · 19 juil.", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 } },
 ];
