@@ -454,37 +454,22 @@ armature.select_set(True)
 bpy.context.view_layer.objects.active = armature
 bpy.ops.object.parent_set(type='ARMATURE_AUTO')
 
-# lissage des poids (épaules/trapèzes moins anguleux)
-bpy.ops.object.select_all(action='DESELECT')
-body.select_set(True)
-bpy.context.view_layer.objects.active = body
-try:
-    bpy.ops.object.mode_set(mode='WEIGHT_PAINT')
-    bpy.ops.object.vertex_group_smooth(group_select_mode='BONE_DEFORM', factor=0.5, repeat=4, expand=0.0)
-    bpy.ops.object.mode_set(mode='OBJECT')
-    print("weights smoothed")
-except Exception as e:
-    bpy.ops.object.mode_set(mode='OBJECT')
-    print("weight smooth skipped:", e)
-
-# Correction deltoïde/trapèze : le sommet de l'épaule (au-dessus du pivot
-# du bras) est skinné sur l'os du bras, dont le pivot Mixamo est ~22 cm
-# plus bas que la ligne des deltoïdes. Quand l'idle baisse les bras, ces
-# vertices hauts pivotent autour du point bas et bombent. On transfère
-# progressivement leur poids « bras » vers la clavicule (quasi immobile
-# dans l'idle) : le sommet de l'épaule reste stable, seul le corps du
-# deltoïde (sous le pivot) suit le bras.
+# Correction deltoïde/trapèze (bind T-pose, l'idle baisse les bras ~59°).
+# Le pivot de l'os du bras Mixamo est ~22 cm sous la ligne des deltoïdes ;
+# le sommet de l'épaule, s'il suit 100% le bras, bombe (boule), s'il suit
+# 100% la clavicule, il fait étagère (spike). Compromis : transfert PARTIEL
+# vers la clavicule (le cap suit le bras à moitié) + fort lissage pour
+# fondre la frontière. Limité au deltoïde (fondu latéral) pour ne pas
+# gonfler le tube du bras.
 def vgw(vg, vi):
     try:
         return vg.weight(vi)
     except RuntimeError:
         return 0.0
 
-CAP_H = 0.14          # hauteur de la zone de transition au-dessus du pivot
-CAP_MAX = 0.85        # fraction max transférée au sommet
-CAP_X = 0.10          # étendue latérale au-delà du pivot : deltoïde seulement,
-                      # surtout pas le tube du bras (sinon il « se déroule »
-                      # en ballon quand l'animation baisse les bras)
+CAP_H = 0.13
+CAP_MAX = 0.50        # transfert partiel : le cap suit le bras à moitié
+CAP_X = 0.09
 for side, sign in (("Left", 1), ("Right", -1)):
     vg_arm = body.vertex_groups.get(f"mixamorig:{side}Arm")
     vg_sh = body.vertex_groups.get(f"mixamorig:{side}Shoulder")
@@ -501,14 +486,26 @@ for side, sign in (("Left", 1), ("Right", -1)):
         t = clamp01((v.co.z - sj_z) / CAP_H)
         if t <= 0.0:
             continue
-        # fondu latéral : plein effet sur le deltoïde, nul au-delà
         lat = 1.0 - ramp((abs(v.co.x) - (sj_x + CAP_X)) / 0.06)
         if lat <= 0.0:
             continue
         move = w_arm * CAP_MAX * ramp(t) * lat
         vg_arm.add([v.index], w_arm - move, 'REPLACE')
         vg_sh.add([v.index], move, 'ADD')
-print("shoulder cap reweighted to clavicle")
+print("shoulder cap partially reweighted")
+
+# fort lissage APRÈS le transfert : fond la frontière bras/clavicule
+bpy.ops.object.select_all(action='DESELECT')
+body.select_set(True)
+bpy.context.view_layer.objects.active = body
+try:
+    bpy.ops.object.mode_set(mode='WEIGHT_PAINT')
+    bpy.ops.object.vertex_group_smooth(group_select_mode='BONE_DEFORM', factor=0.6, repeat=9, expand=0.0)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    print("weights smoothed")
+except Exception as e:
+    bpy.ops.object.mode_set(mode='OBJECT')
+    print("weight smooth skipped:", e)
 
 # yeux rigides sur la tête + vertex orphelins -> tête
 pin_eyes_to_head()
