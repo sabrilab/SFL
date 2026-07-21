@@ -27,16 +27,24 @@ import {
   AddPlayerSheet,
   EntrySheet,
   JourneeMetaSheet,
+  NewPlayerSheet,
+  PlayerSheet,
 } from "@/components/sfl/admin/entry-sheet";
+import { NewJourneeSheet } from "@/components/sfl/admin/new-journee-sheet";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
 import {
   addEntry,
-  addJournee,
+  addJourneeWithTeams,
+  addRoster,
   deleteEntryAt,
   deleteJournee,
+  deleteRosterAt,
   newEntry,
+  newRosterPlayer,
+  rosterHasName,
   updateEntryAt,
   updateJournee,
+  updateRosterAt,
 } from "@/lib/sfl/saisie/mutations";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
@@ -94,6 +102,9 @@ export function AdminDashboard() {
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [addToJ, setAddToJ] = useState<number | null>(null);
   const [metaJ, setMetaJ] = useState<number | null>(null);
+  const [playerIndex, setPlayerIndex] = useState<number | null>(null);
+  const [newPlayerOpen, setNewPlayerOpen] = useState(false);
+  const [newJourneeOpen, setNewJourneeOpen] = useState(false);
 
   function commit(next: Saison) {
     setDraft(next);
@@ -145,8 +156,35 @@ export function AdminDashboard() {
     [saison]
   );
 
+  // Sélection « nouvelle journée » : nom + OVR carte + dispo (profil actif).
+  const journeeRoster = useMemo(
+    () =>
+      [...saison.roster]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((r) => ({
+          name: r.name,
+          ovr: Math.ceil((r.base ?? [75, 75, 75, 75, 75, 75]).reduce((a, b) => a + b, 0) / 6),
+          actif: r.profil !== "En attente" && r.profil !== "Blessure",
+        })),
+    [saison]
+  );
+
+  // Effectif : chaque fiche + ses totaux dérivés, triée (joués d'abord).
+  const rosterViews = useMemo(() => {
+    const byName = new Map(derived.players.map((p) => [p.name, p]));
+    return saison.roster
+      .map((r, i) => ({
+        r,
+        i,
+        d: byName.get(r.name),
+        ovr: Math.ceil((r.base ?? [75, 75, 75, 75, 75, 75]).reduce((a, b) => a + b, 0) / 6),
+      }))
+      .sort((a, b) => (b.d?.pp ?? -1) - (a.d?.pp ?? -1) || a.r.name.localeCompare(b.r.name));
+  }, [saison, derived]);
+
   const editEntry = editIndex != null ? saison.entries[editIndex] ?? null : null;
   const metaEntry = metaJ != null ? saison.journees.find((m) => m.j === metaJ) ?? null : null;
+  const playerEntry = playerIndex != null ? saison.roster[playerIndex] ?? null : null;
 
   if (!isClient) return null;
   if (!isAdmin(me)) {
@@ -250,14 +288,7 @@ export function AdminDashboard() {
 
         {/* ===================== FEUILLE DE MATCH (éditable) ===================== */}
         <TabsContent value="feuille" className="mt-4 flex flex-col gap-3">
-          <Button
-            onClick={() => {
-              const { saison: s, j } = addJournee(saison);
-              commit(s);
-              setAddToJ(j);
-            }}
-            className="rounded-full"
-          >
+          <Button onClick={() => setNewJourneeOpen(true)} className="rounded-full">
             <CalendarPlus className="mr-1.5 size-4" /> Nouvelle journée
           </Button>
 
@@ -336,32 +367,43 @@ export function AdminDashboard() {
           </p>
         </TabsContent>
 
-        {/* ===================== JOUEURS ===================== */}
-        <TabsContent value="joueurs" className="mt-4">
+        {/* ===================== JOUEURS (effectif) ===================== */}
+        <TabsContent value="joueurs" className="mt-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3 px-1">
+            <p className="text-[13px] text-muted-foreground">
+              {rosterViews.length} joueurs — touche une fiche pour éditer poste, statut et stats.
+            </p>
+            <Button size="sm" onClick={() => setNewPlayerOpen(true)} className="rounded-full">
+              <UserPlus className="mr-1.5 size-4" /> Ajouter
+            </Button>
+          </div>
           <div className="overflow-hidden rounded-3xl bg-card">
             <div className="flex items-center gap-3 border-b border-border/60 px-4 py-2.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-              <span className="w-6">#</span>
               <span className="flex-1">Joueur</span>
+              <span className="w-10 text-center">OVR</span>
               <span className="w-10 text-center">PP</span>
               <span className="w-8 text-center">MJ</span>
               <span className="w-8 text-center">B</span>
-              <span className="w-8 text-center">PD</span>
             </div>
-            {derived.players.map((p, i) => (
-              <div key={p.name} className="flex items-center gap-3 border-b border-border/40 px-4 py-2 last:border-0">
-                <span className={cn("w-6 text-sm font-semibold tabular-nums", i < 3 ? "text-primary" : "text-muted-foreground")}>{i + 1}</span>
+            {rosterViews.map(({ r, i, d, ovr }) => (
+              <button
+                key={r.name}
+                type="button"
+                onClick={() => setPlayerIndex(i)}
+                className="flex w-full items-center gap-3 border-b border-border/40 px-4 py-2 text-left last:border-0 active:bg-secondary"
+              >
                 <span className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="truncate text-[14px] font-semibold">{p.name}</span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">{p.poste}</span>
-                  {p.statut !== "Actif" && (
-                    <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase", p.statut === "Suspendu" ? "bg-destructive/10 text-destructive" : "bg-sky-500/10 text-sky-600 dark:text-sky-400")}>{p.statut}</span>
+                  <span className="truncate text-[14px] font-semibold">{r.name}</span>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">{r.poste ?? "—"}</span>
+                  {r.profil !== "Actif" && (
+                    <span className="shrink-0 rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[8px] font-bold text-sky-600 uppercase dark:text-sky-400">{r.profil}</span>
                   )}
                 </span>
-                <span className="w-10 text-center text-sm font-bold tabular-nums">{p.pp}</span>
-                <span className="w-8 text-center text-xs text-muted-foreground tabular-nums">{p.matchs}</span>
-                <span className="w-8 text-center text-xs text-muted-foreground tabular-nums">{p.buts}</span>
-                <span className="w-8 text-center text-xs text-muted-foreground tabular-nums">{p.passes}</span>
-              </div>
+                <span className="w-10 text-center text-sm font-bold tabular-nums">{ovr}</span>
+                <span className="w-10 text-center text-sm font-semibold tabular-nums">{d?.pp ?? "—"}</span>
+                <span className="w-8 text-center text-xs text-muted-foreground tabular-nums">{d?.matchs ?? 0}</span>
+                <span className="w-8 text-center text-xs text-muted-foreground tabular-nums">{d?.buts ?? 0}</span>
+              </button>
             ))}
           </div>
         </TabsContent>
@@ -394,6 +436,36 @@ export function AdminDashboard() {
         onDelete={() => {
           if (metaJ != null) commit(deleteJournee(saison, metaJ));
           setMetaJ(null);
+        }}
+      />
+      <PlayerSheet
+        entry={playerEntry}
+        onOpenChange={(o) => !o && setPlayerIndex(null)}
+        onPatch={(patch) => playerIndex != null && commit(updateRosterAt(saison, playerIndex, patch))}
+        onDelete={() => {
+          if (playerIndex != null) commit(deleteRosterAt(saison, playerIndex));
+          setPlayerIndex(null);
+        }}
+      />
+      <NewPlayerSheet
+        open={newPlayerOpen}
+        onOpenChange={setNewPlayerOpen}
+        exists={(name) => rosterHasName(saison, name)}
+        onCreate={(name) => {
+          const idx = saison.roster.length;
+          commit(addRoster(saison, newRosterPlayer(name)));
+          setNewPlayerOpen(false);
+          setPlayerIndex(idx); // ouvre directement la fiche pour compléter
+        }}
+      />
+      <NewJourneeSheet
+        open={newJourneeOpen}
+        onOpenChange={setNewJourneeOpen}
+        roster={journeeRoster}
+        onCreate={(teams) => {
+          const { saison: s } = addJourneeWithTeams(saison, teams);
+          commit(s);
+          setNewJourneeOpen(false);
         }}
       />
     </div>

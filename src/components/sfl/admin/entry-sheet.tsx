@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,11 @@ import type {
   MatchEntry,
   MatchResult,
   PlayerStatutSaisie,
+  RosterEntry,
 } from "@/lib/sfl/saisie/types";
+
+const STAT_LABELS = ["VIT", "TIR", "PAS", "DRI", "DEF", "PHY"] as const;
+const PROFILS = ["Actif", "Blessure", "En attente"];
 
 const STATUTS: PlayerStatutSaisie[] = [
   "Présent",
@@ -284,6 +289,133 @@ export function AddPlayerSheet({
               </button>
             );
           })}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+/** Édition de la fiche joueur (roster) : poste, profil, stats de base. */
+export function PlayerSheet({
+  entry,
+  onOpenChange,
+  onPatch,
+  onDelete,
+}: {
+  entry: RosterEntry | null;
+  onOpenChange: (open: boolean) => void;
+  onPatch: (patch: Partial<RosterEntry>) => void;
+  onDelete: () => void;
+}) {
+  const base = entry?.base ?? [75, 75, 75, 75, 75, 75];
+  const ovr = Math.ceil(base.reduce((a, b) => a + b, 0) / 6);
+  const setStat = (i: number, v: number) =>
+    onPatch({ base: base.map((x, idx) => (idx === i ? Math.max(0, Math.min(99, v)) : x)) });
+
+  return (
+    <Sheet open={!!entry} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="max-h-[88vh] overflow-y-auto rounded-t-3xl">
+        {entry && (
+          <>
+            <SheetHeader className="px-1">
+              <SheetTitle className="flex items-center gap-2 text-xl">
+                {entry.name}
+                <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-bold tabular-nums">
+                  OVR {ovr}
+                </span>
+              </SheetTitle>
+            </SheetHeader>
+            <div className="flex flex-col divide-y divide-border/60 px-1 pb-6">
+              <Row label="Poste">
+                <Input
+                  value={entry.poste ?? ""}
+                  placeholder="ex. MC/AT"
+                  onChange={(e) => onPatch({ poste: e.target.value || null })}
+                  className="w-40"
+                />
+              </Row>
+              <Row label="Profil">
+                <Select value={entry.profil} onValueChange={(v) => onPatch({ profil: (v as string) ?? "Actif" })}>
+                  <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PROFILS.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Row>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 pt-2">
+                {STAT_LABELS.map((label, i) => (
+                  <div key={label} className="flex items-center justify-between py-1.5">
+                    <span className="text-[13px] font-semibold text-muted-foreground">{label}</span>
+                    <Stepper value={base[i]} min={0} onChange={(v) => setStat(i, v)} />
+                  </div>
+                ))}
+              </div>
+              <div className="pt-3">
+                <Button
+                  variant="ghost"
+                  onClick={onDelete}
+                  className="w-full text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="mr-1.5 size-4" /> Supprimer le joueur
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+/** Création d'un joueur : saisie du nom (unicité vérifiée). */
+export function NewPlayerSheet({
+  open,
+  onOpenChange,
+  exists,
+  onCreate,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  exists: (name: string) => boolean;
+  onCreate: (name: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const trimmed = name.trim();
+  const taken = trimmed !== "" && exists(trimmed);
+  const valid = trimmed !== "" && !taken;
+
+  function submit() {
+    if (!valid) return;
+    onCreate(trimmed);
+    setName("");
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(o) => {
+        onOpenChange(o);
+        if (!o) setName("");
+      }}
+    >
+      <SheetContent side="bottom" className="rounded-t-3xl">
+        <SheetHeader className="px-1">
+          <SheetTitle className="text-xl">Nouveau joueur</SheetTitle>
+        </SheetHeader>
+        <div className="flex flex-col gap-3 px-1 pb-8">
+          <Input
+            autoFocus
+            value={name}
+            placeholder="Nom du joueur"
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+          />
+          {taken && <p className="text-xs text-destructive">Ce joueur existe déjà.</p>}
+          <Button disabled={!valid} onClick={submit} className="font-semibold">
+            Créer la fiche
+          </Button>
         </div>
       </SheetContent>
     </Sheet>

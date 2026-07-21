@@ -3,7 +3,7 @@
 // Les lignes sont identifiées par leur index dans `entries` — l'UI passe cet
 // index. Le store persiste le résultat.
 
-import type { MatchEntry, Saison } from "./types";
+import type { MatchEntry, RosterEntry, Saison } from "./types";
 
 export const TEAM_PRESETS = [
   "Orange",
@@ -84,4 +84,92 @@ export function deleteJournee(saison: Saison, j: number): Saison {
     journees: saison.journees.filter((m) => m.j !== j),
     entries: saison.entries.filter((e) => e.j !== j),
   };
+}
+
+/* ------------------------------ Roster ------------------------------ */
+
+export function newRosterPlayer(name: string): RosterEntry {
+  return { name, poste: "—", profil: "Actif", base: [75, 75, 75, 75, 75, 75] };
+}
+
+export function addRoster(saison: Saison, entry: RosterEntry): Saison {
+  return { ...saison, roster: [...saison.roster, entry] };
+}
+
+export function updateRosterAt(
+  saison: Saison,
+  index: number,
+  patch: Partial<RosterEntry>
+): Saison {
+  return {
+    ...saison,
+    roster: saison.roster.map((r, i) => (i === index ? { ...r, ...patch } : r)),
+  };
+}
+
+export function deleteRosterAt(saison: Saison, index: number): Saison {
+  return { ...saison, roster: saison.roster.filter((_, i) => i !== index) };
+}
+
+/** True si un joueur du même nom existe déjà (comparaison insensible à la casse/espaces). */
+export function rosterHasName(saison: Saison, name: string): boolean {
+  const n = name.trim().toLowerCase();
+  return saison.roster.some((r) => r.name.trim().toLowerCase() === n);
+}
+
+/* ------------------------ Génération d'équipes ------------------------ */
+
+export interface BalancedPlayer {
+  name: string;
+  ovr: number;
+}
+
+export interface BalancedTeam {
+  name: string;
+  players: BalancedPlayer[];
+  totalOvr: number;
+}
+
+/**
+ * Répartit les joueurs sélectionnés en `teamCount` équipes équilibrées selon
+ * l'OVR de leur carte : serpentin sur l'ordre OVR décroissant (1→N, N→1, …),
+ * avec un petit brassage aléatoire des joueurs de même OVR pour varier les
+ * compositions d'une génération à l'autre.
+ */
+export function generateBalancedTeams(
+  players: BalancedPlayer[],
+  teamCount: number,
+  teamNames: readonly string[] = TEAM_PRESETS
+): BalancedTeam[] {
+  const teams: BalancedTeam[] = Array.from({ length: teamCount }, (_, i) => ({
+    name: teamNames[i] ?? `Équipe ${i + 1}`,
+    players: [],
+    totalOvr: 0,
+  }));
+  const pool = [...players]
+    .map((p) => ({ p, r: Math.random() }))
+    .sort((a, b) => b.p.ovr - a.p.ovr || a.r - b.r)
+    .map(({ p }) => p);
+
+  // Serpentin, en plaçant chaque joueur dans l'équipe la plus faible du tour.
+  pool.forEach((p) => {
+    const target = [...teams].sort(
+      (a, b) => a.players.length - b.players.length || a.totalOvr - b.totalOvr
+    )[0];
+    target.players.push(p);
+    target.totalOvr += p.ovr;
+  });
+  return teams;
+}
+
+/** Crée une journée complète à partir d'équipes générées (une ligne par joueur). */
+export function addJourneeWithTeams(
+  saison: Saison,
+  teams: BalancedTeam[]
+): { saison: Saison; j: number } {
+  const { saison: withJournee, j } = addJournee(saison);
+  const entries: MatchEntry[] = teams.flatMap((t) =>
+    t.players.map((p) => newEntry(j, p.name, t.name))
+  );
+  return { saison: { ...withJournee, entries: [...withJournee.entries, ...entries] }, j };
 }
