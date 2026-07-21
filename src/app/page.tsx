@@ -80,7 +80,7 @@ export default function Home() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-7 px-5 py-4 sm:py-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-7 px-5 py-4 sm:py-8 lg:max-w-5xl">
       {/* Titre */}
       <div>
         <p className="flex items-center gap-2 text-[13px] font-medium text-muted-foreground">
@@ -91,7 +91,7 @@ export default function Home() {
       </div>
 
       {/* Ma carte + aperçu rapide, côte à côte */}
-      <section className="flex items-center gap-4">
+      <section className="flex items-center gap-4 lg:max-w-xl">
         <Card3D
           cacheKey={`rare-${player.name}`}
           mode="rare"

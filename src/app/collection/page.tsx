@@ -165,7 +165,7 @@ export default function CollectionPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-5 py-4 sm:py-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-5 py-4 sm:py-8 lg:max-w-5xl">
       <AnimatePresence>
         {opening && <PackOpening cards={opening} onDone={finishOpening} />}
       </AnimatePresence>
@@ -212,7 +212,7 @@ export default function CollectionPage() {
 
         {/* ===== PACKS ===== */}
         <TabsContent value="packs" className="mt-4 flex flex-col gap-4">
-          <div className="flex flex-col items-center gap-4 rounded-3xl bg-card p-6">
+          <div className="flex flex-col items-center gap-4 rounded-3xl bg-card p-6 lg:mx-auto lg:w-full lg:max-w-md">
             <div className="flex h-[159px] w-[109px] items-center justify-center overflow-visible">
               <div className="scale-[0.62]">
                 <PackVisual />
@@ -276,7 +276,7 @@ export default function CollectionPage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
             {filtered.map((card) => {
               const count = owned[card.id] ?? 0;
               const has = count > 0;

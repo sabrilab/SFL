@@ -162,7 +162,7 @@ export function AdminDashboard() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-5 py-4 sm:py-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-5 py-4 sm:py-8 lg:max-w-5xl">
       <div>
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -258,6 +258,7 @@ export function AdminDashboard() {
             <CalendarPlus className="mr-1.5 size-4" /> Nouvelle journée
           </Button>
 
+          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start">
           {journeeViews.map(({ meta, teams }) => (
             <div key={meta.j} className="overflow-hidden rounded-3xl bg-card">
               <div className="flex items-center justify-between gap-3 px-5 py-3.5">
@@ -325,6 +326,7 @@ export function AdminDashboard() {
               </div>
             </div>
           ))}
+          </div>
           <p className="px-1 text-[12px] text-muted-foreground">
             Touche un joueur pour éditer sa ligne (statut, buts, passes, honneurs…). Tout est
             sauvegardé et recalculé en direct.

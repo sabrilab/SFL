@@ -72,8 +72,10 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
     <>
       <p className="mb-3 px-1 text-[13px] text-muted-foreground">{def.desc}</p>
 
-      {/* Carte du n°1 */}
-      <div className="mb-5 flex flex-col items-center gap-2.5">
+      {/* Desktop : carte du n°1 à gauche (collante), classement à droite. */}
+      <div className="lg:grid lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start lg:gap-8">
+        {/* Carte du n°1 */}
+        <div className="mb-5 flex flex-col items-center gap-2.5 lg:sticky lg:top-24 lg:mb-0 lg:rounded-3xl lg:bg-card lg:py-6">
         <div className="flex items-center gap-1.5">
           <span className="text-lg font-bold text-primary tabular-nums">#1</span>
           <span className="text-sm font-bold tracking-tight tabular-nums">
@@ -147,6 +149,7 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
             </div>
           );
         })}
+        </div>
       </div>
     </>
   );
@@ -162,7 +165,7 @@ export default function StatsPage() {
   const rankingDef = RANKINGS.find((r) => r.id === ranking) ?? RANKINGS[0];
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 px-5 py-4 sm:py-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-4 px-5 py-4 sm:py-8 lg:max-w-5xl">
       <div className="mb-1">
         <p className="text-[13px] font-medium text-muted-foreground">
           Saison 1 · Après la journée {JOURNEES.length}
@@ -203,7 +206,7 @@ export default function StatsPage() {
 
         {/* ===== MATCHS ===== */}
         <TabsContent value="matchs" className="mt-4">
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start">
             {[...JOURNEES].reverse().map((j) => {
               const open = openJ === j.j;
               const scoreSummary = journeeScoreSummary(j);
