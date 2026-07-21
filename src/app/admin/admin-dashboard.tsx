@@ -31,16 +31,21 @@ import {
   PlayerSheet,
 } from "@/components/sfl/admin/entry-sheet";
 import { NewJourneeSheet } from "@/components/sfl/admin/new-journee-sheet";
+import { ConvocationSheet } from "@/components/sfl/admin/convocation-sheet";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
 import {
+  activeConvocation,
   addEntry,
   addJourneeWithTeams,
   addRoster,
+  closeConvocation,
+  createConvocation,
   deleteEntryAt,
   deleteJournee,
   deleteRosterAt,
   newEntry,
   newRosterPlayer,
+  respondConvocation,
   rosterHasName,
   updateEntryAt,
   updateJournee,
@@ -105,6 +110,9 @@ export function AdminDashboard() {
   const [playerIndex, setPlayerIndex] = useState<number | null>(null);
   const [newPlayerOpen, setNewPlayerOpen] = useState(false);
   const [newJourneeOpen, setNewJourneeOpen] = useState(false);
+  const [convocOpen, setConvocOpen] = useState(false);
+  // Pré-cochés à l'ouverture de l'assistant journée (confirmés de la convocation).
+  const [journeePrefill, setJourneePrefill] = useState<string[]>([]);
 
   function commit(next: Saison) {
     setDraft(next);
@@ -186,6 +194,30 @@ export function AdminDashboard() {
   const metaEntry = metaJ != null ? saison.journees.find((m) => m.j === metaJ) ?? null : null;
   const playerEntry = playerIndex != null ? saison.roster[playerIndex] ?? null : null;
 
+  // Convocation ouverte + réponses groupées.
+  const convoc = activeConvocation(saison);
+  const convocGroups = useMemo(() => {
+    if (!convoc) return null;
+    const present: string[] = [];
+    const absent: string[] = [];
+    const sans: string[] = [];
+    for (const name of rosterNames) {
+      const r = convoc.reponses[name];
+      if (r === "present") present.push(name);
+      else if (r === "absent") absent.push(name);
+      else sans.push(name);
+    }
+    return { present, absent, sans };
+  }, [convoc, rosterNames]);
+
+  // L'admin peut corriger une réponse : présent → absent → sans réponse.
+  function cycleReponse(name: string) {
+    if (!convoc) return;
+    const cur = convoc.reponses[name];
+    const next = cur === "present" ? "absent" : cur === "absent" ? null : "present";
+    commit(respondConvocation(saison, convoc.id, name, next));
+  }
+
   if (!isClient) return null;
   if (!isAdmin(me)) {
     return (
@@ -262,23 +294,97 @@ export function AdminDashboard() {
             )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            {[
-              { icon: Send, title: "Convocations", desc: "Programmer, inviter, suivre les confirmations." },
-              { icon: MapPin, title: "Localisation", desc: "Terrain du match et partage de position." },
-              { icon: Sparkles, title: "EvoDay", desc: "Évolution mensuelle des cartes." },
-            ].map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="flex items-start gap-3 rounded-2xl bg-card/60 p-3.5 opacity-70">
-                <Icon className="mt-0.5 size-5 text-primary" />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[15px] font-semibold">{title}</span>
-                    <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">Bientôt</Badge>
-                  </div>
-                  <p className="text-[12px] text-muted-foreground">{desc}</p>
+          {/* Convocation du prochain match */}
+          <div className="rounded-3xl bg-card p-4">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Send className="size-4 text-primary" /> Convocation
                 </div>
+                {convoc ? (
+                  <p className="mt-1 text-[13px] text-muted-foreground">
+                    <span className="font-semibold text-foreground">
+                      {convoc.jour} {convoc.date} · {convoc.heure}
+                    </span>
+                    <span className="mx-1">·</span>
+                    <MapPin className="mr-0.5 inline size-3.5" />
+                    {convoc.lieu}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[13px] text-muted-foreground">
+                    Aucune convocation ouverte.
+                  </p>
+                )}
               </div>
-            ))}
+              <Button size="sm" onClick={() => setConvocOpen(true)} className="shrink-0 rounded-full">
+                Nouvelle
+              </Button>
+            </div>
+
+            {convoc && convocGroups && (
+              <>
+                <div className="mb-3 flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      ["present", convocGroups.present, "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"],
+                      ["absent", convocGroups.absent, "bg-destructive/10 text-destructive"],
+                      ["sans", convocGroups.sans, "bg-secondary text-muted-foreground"],
+                    ] as const
+                  ).map(([key, list, cls]) =>
+                    list.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => cycleReponse(name)}
+                        title="Toucher pour basculer présent / absent / sans réponse"
+                        className={cn("rounded-full px-2.5 py-1 text-[12px] font-semibold transition-colors", cls)}
+                      >
+                        {key === "present" ? "✓ " : key === "absent" ? "✗ " : ""}
+                        {name}
+                      </button>
+                    ))
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[12px] text-muted-foreground tabular-nums">
+                    {convocGroups.present.length} confirmés · {convocGroups.absent.length} absents ·{" "}
+                    {convocGroups.sans.length} sans réponse
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => commit(closeConvocation(saison, convoc.id))}
+                      className="rounded-full"
+                    >
+                      Clôturer
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={convocGroups.present.length < 2}
+                      onClick={() => {
+                        setJourneePrefill(convocGroups.present);
+                        setNewJourneeOpen(true);
+                      }}
+                      className="rounded-full"
+                    >
+                      <CalendarPlus className="mr-1 size-3.5" /> Préparer la journée
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="flex items-start gap-3 rounded-2xl bg-card/60 p-3.5 opacity-70">
+            <Sparkles className="mt-0.5 size-5 text-primary" />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[15px] font-semibold">EvoDay</span>
+                <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">Bientôt</Badge>
+              </div>
+              <p className="text-[12px] text-muted-foreground">Évolution mensuelle des cartes.</p>
+            </div>
           </div>
 
           <Button variant="ghost" size="sm" onClick={() => commit(saisieStore.reset())} className="self-start text-muted-foreground">
@@ -459,13 +565,27 @@ export function AdminDashboard() {
         }}
       />
       <NewJourneeSheet
+        key={`${newJourneeOpen}-${journeePrefill.join(",")}`}
         open={newJourneeOpen}
-        onOpenChange={setNewJourneeOpen}
+        onOpenChange={(o) => {
+          setNewJourneeOpen(o);
+          if (!o) setJourneePrefill([]);
+        }}
         roster={journeeRoster}
+        initialChecked={journeePrefill}
         onCreate={(teams) => {
           const { saison: s } = addJourneeWithTeams(saison, teams);
           commit(s);
           setNewJourneeOpen(false);
+          setJourneePrefill([]);
+        }}
+      />
+      <ConvocationSheet
+        open={convocOpen}
+        onOpenChange={setConvocOpen}
+        onCreate={(info) => {
+          commit(createConvocation(saison, info));
+          setConvocOpen(false);
         }}
       />
     </div>

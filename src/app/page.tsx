@@ -11,13 +11,13 @@ import { ViewableCard } from "@/components/sfl/card-viewer";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
 import { LEAGUE_KEY } from "@/components/layout/site-header";
-import { useSeason } from "@/components/sfl/season-provider";
+import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
 import { NEXT_MATCH } from "@/lib/sfl/data";
 import { journeeScoreSummary, ovr, rankByMetric, rankPlayers, type Player } from "@/lib/sfl/engine";
+import { activeConvocation, respondConvocation } from "@/lib/sfl/saisie/mutations";
+import { saisieStore } from "@/lib/sfl/saisie/store";
 import { RANKINGS } from "@/lib/sfl/rankings";
 import { cn } from "@/lib/utils";
-
-const PRESENCE_KEY = `sfl-presence-j${NEXT_MATCH.journee}`;
 
 // La carte du n°1 de chaque classement s'affiche avec le design distinct
 // correspondant (un thème par classement), pas la carte Standard.
@@ -30,7 +30,7 @@ function leaderCard(defId: string, leader: Player, size: number) {
 
 export default function Home() {
   const { player } = useMyPlayer();
-  const { players, journees } = useSeason();
+  const { players, journees, saison } = useSeason();
   const isClient = useIsClient();
 
   const RANKED = rankPlayers(players);
@@ -49,13 +49,26 @@ export default function Home() {
     setLeagueTick((n) => n + 1);
   }
 
-  const present =
-    presentOverride ?? (isClient && localStorage.getItem(PRESENCE_KEY) === "1");
+  // Convocation ouverte (source : saisie admin) ; repli sur le match statique.
+  const convoc = activeConvocation(saison);
+  const nextMatch = convoc
+    ? { jour: convoc.jour, date: convoc.date, heure: convoc.heure, lieu: convoc.lieu }
+    : { jour: NEXT_MATCH.jour, date: NEXT_MATCH.date, heure: NEXT_MATCH.heure, lieu: NEXT_MATCH.lieu };
+  const nextLabel = convoc ? "Convocation" : `Prochain match · J${NEXT_MATCH.journee}`;
+
+  const present = convoc
+    ? convoc.reponses[player.name] === "present"
+    : (presentOverride ?? false);
 
   function togglePresence() {
-    const next = !present;
-    localStorage.setItem(PRESENCE_KEY, next ? "1" : "0");
-    setPresentOverride(next);
+    if (convoc) {
+      // La réponse est écrite dans la convocation : l'admin la voit en direct.
+      const next = present ? null : "present";
+      saisieStore.save(respondConvocation(saison, convoc.id, player.name, next));
+      window.dispatchEvent(new Event(SAISIE_EVENT));
+      return;
+    }
+    setPresentOverride(!present);
   }
 
   const myRank = RANKED.find((p) => p.name === player.name)?.rank ?? RANKED.length;
@@ -169,17 +182,15 @@ export default function Home() {
         <section className="rounded-3xl bg-card p-5">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-[13px] font-medium text-muted-foreground">
-                Prochain match · J{NEXT_MATCH.journee}
-              </p>
+              <p className="text-[13px] font-medium text-muted-foreground">{nextLabel}</p>
               <div className="mt-1 text-2xl font-bold tracking-tight">
-                {NEXT_MATCH.jour} {NEXT_MATCH.date}
+                {nextMatch.jour} {nextMatch.date}
               </div>
               <div className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">{NEXT_MATCH.heure}</span>
+                <span className="font-medium text-foreground">{nextMatch.heure}</span>
                 <span>·</span>
                 <MapPin className="size-3.5" />
-                {NEXT_MATCH.lieu}
+                {nextMatch.lieu}
               </div>
             </div>
             {present && (

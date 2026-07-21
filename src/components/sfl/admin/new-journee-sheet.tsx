@@ -35,15 +35,18 @@ export function NewJourneeSheet({
   open,
   onOpenChange,
   roster,
+  initialChecked = [],
   onCreate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Joueurs sélectionnables (nom + OVR de la carte + dispo). */
   roster: { name: string; ovr: number; actif: boolean }[];
+  /** Pré-cochés à l'ouverture (ex. confirmés de la convocation). */
+  initialChecked?: string[];
   onCreate: (teams: BalancedTeam[]) => void;
 }) {
-  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [checked, setChecked] = useState<Set<string>>(() => new Set(initialChecked));
   const [teamCount, setTeamCount] = useState(2);
   const [teams, setTeams] = useState<BalancedTeam[] | null>(null);
 
@@ -73,7 +76,7 @@ export function NewJourneeSheet({
   }
 
   function reset() {
-    setChecked(new Set());
+    setChecked(new Set(initialChecked));
     setTeams(null);
     setTeamCount(2);
   }

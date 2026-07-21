@@ -16,7 +16,25 @@ export function seedSaison(): Saison {
     journees: structuredClone(SEED_JOURNEES),
     roster: structuredClone(SEED_ROSTER),
     entries: structuredClone(SEED_ENTRIES),
+    // Convocation de démo pour la J6 — quelques réponses déjà arrivées.
+    convocations: [
+      {
+        id: 1,
+        jour: "Dimanche",
+        date: "26 juillet",
+        heure: "13h00",
+        lieu: "Terrain extérieur — 5 vs 5",
+        statut: "ouverte",
+        reponses: { Ilies: "present", Kader: "present", Naim: "absent" },
+      },
+    ],
   };
+}
+
+/** Complète les champs apparus après une sauvegarde plus ancienne. */
+function migrate(s: Saison): Saison {
+  if (!s.convocations) s.convocations = [];
+  return s;
 }
 
 export interface SaisieStore {
@@ -38,7 +56,7 @@ export const localStorageStore: SaisieStore = {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return seedSaison();
     try {
-      return JSON.parse(raw) as Saison;
+      return migrate(JSON.parse(raw) as Saison);
     } catch {
       return seedSaison();
     }

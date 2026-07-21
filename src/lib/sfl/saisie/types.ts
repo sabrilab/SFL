@@ -49,11 +49,26 @@ export interface JourneeMeta {
   sflTime: boolean;
 }
 
+// Convocation d'un match à venir : date/heure/lieu + réponses des joueurs.
+// La liste des confirmés pré-remplit ensuite l'assistant « Nouvelle journée ».
+export type ConvocationReponse = "present" | "absent";
+
+export interface Convocation {
+  id: number;
+  jour: string; // "Dimanche"
+  date: string; // "26 juillet"
+  heure: string; // "13h00"
+  lieu: string;
+  statut: "ouverte" | "clôturée";
+  reponses: Record<string, ConvocationReponse>;
+}
+
 // État complet de la saison, unité de stockage (localStorage / Supabase).
 export interface Saison {
   journees: JourneeMeta[];
   roster: RosterEntry[];
   entries: MatchEntry[];
+  convocations: Convocation[];
 }
 
 export type AlertLevel = "error" | "warning";

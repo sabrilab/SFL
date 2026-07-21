@@ -3,7 +3,13 @@
 // Les lignes sont identifiées par leur index dans `entries` — l'UI passe cet
 // index. Le store persiste le résultat.
 
-import type { MatchEntry, RosterEntry, Saison } from "./types";
+import type {
+  Convocation,
+  ConvocationReponse,
+  MatchEntry,
+  RosterEntry,
+  Saison,
+} from "./types";
 
 export const TEAM_PRESETS = [
   "Orange",
@@ -172,4 +178,55 @@ export function addJourneeWithTeams(
     t.players.map((p) => newEntry(j, p.name, t.name))
   );
   return { saison: { ...withJournee, entries: [...withJournee.entries, ...entries] }, j };
+}
+
+/* ----------------------------- Convocations ----------------------------- */
+
+/** Convocation ouverte la plus récente (celle affichée aux joueurs). */
+export function activeConvocation(saison: Saison): Convocation | null {
+  const open = saison.convocations.filter((c) => c.statut === "ouverte");
+  return open.length ? open[open.length - 1] : null;
+}
+
+export function createConvocation(
+  saison: Saison,
+  info: Pick<Convocation, "jour" | "date" | "heure" | "lieu">
+): Saison {
+  const id = saison.convocations.reduce((m, c) => Math.max(m, c.id), 0) + 1;
+  // Une seule convocation ouverte à la fois : les précédentes sont clôturées.
+  const closed = saison.convocations.map((c) =>
+    c.statut === "ouverte" ? { ...c, statut: "clôturée" as const } : c
+  );
+  return {
+    ...saison,
+    convocations: [...closed, { id, ...info, statut: "ouverte", reponses: {} }],
+  };
+}
+
+/** Réponse d'un joueur (ou saisie par l'admin) ; null efface la réponse. */
+export function respondConvocation(
+  saison: Saison,
+  id: number,
+  player: string,
+  reponse: ConvocationReponse | null
+): Saison {
+  return {
+    ...saison,
+    convocations: saison.convocations.map((c) => {
+      if (c.id !== id) return c;
+      const reponses = { ...c.reponses };
+      if (reponse === null) delete reponses[player];
+      else reponses[player] = reponse;
+      return { ...c, reponses };
+    }),
+  };
+}
+
+export function closeConvocation(saison: Saison, id: number): Saison {
+  return {
+    ...saison,
+    convocations: saison.convocations.map((c) =>
+      c.id === id ? { ...c, statut: "clôturée" as const } : c
+    ),
+  };
 }
