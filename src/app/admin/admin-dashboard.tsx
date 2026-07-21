@@ -6,6 +6,7 @@ import {
   CalendarPlus,
   ClipboardList,
   LayoutDashboard,
+  Lock,
   MapPin,
   RotateCcw,
   Send,
@@ -17,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useIsClient } from "@/hooks/use-is-client";
+import { useMyPlayer } from "@/components/sfl/player-provider";
+import { isAdmin } from "@/lib/sfl/admin";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
@@ -70,6 +73,7 @@ function Stat({ label, value, tone }: { label: string; value: string | number; t
 
 export function AdminDashboard() {
   const isClient = useIsClient();
+  const { me } = useMyPlayer();
   const [override, setOverride] = useState<Saison | null>(null);
   const loaded = useMemo(() => (isClient ? saisieStore.load() : seedSaison()), [isClient]);
   const saison = override ?? loaded;
@@ -97,6 +101,24 @@ export function AdminDashboard() {
 
   function reset() {
     setOverride(saisieStore.reset());
+  }
+
+  // Réservé à l'admin (Ilyes pour l'instant). Tant que le client n'a pas
+  // résolu le profil, on n'affiche rien pour éviter tout flash.
+  if (!isClient) return null;
+  if (!isAdmin(me)) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center gap-3 px-5 py-24 text-center">
+        <span className="flex size-14 items-center justify-center rounded-2xl bg-card">
+          <Lock className="size-6 text-muted-foreground" />
+        </span>
+        <h1 className="text-xl font-bold tracking-tight">Espace réservé</h1>
+        <p className="text-sm text-muted-foreground">
+          L&apos;espace administrateur est réservé au profil admin. Connecte-toi avec le
+          profil admin (Ilyes) pour y accéder.
+        </p>
+      </div>
+    );
   }
 
   return (
