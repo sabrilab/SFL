@@ -2,9 +2,9 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { PLAYERS } from "@/lib/sfl/data";
 import { claimDailyLogin } from "@/lib/sfl/ballons";
 import { useIsClient } from "@/hooks/use-is-client";
+import { useSeason } from "@/components/sfl/season-provider";
 
 const STORAGE_KEY = "sfl-me";
 const DEFAULT_PLAYER = "Smail";
@@ -21,11 +21,12 @@ const PlayerContext = createContext<PlayerContextValue>({
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const isClient = useIsClient();
+  const { players } = useSeason();
   const [selected, setSelected] = useState<string | null>(null);
 
   const stored = isClient ? localStorage.getItem(STORAGE_KEY) : null;
   const candidate = selected ?? stored ?? DEFAULT_PLAYER;
-  const me = PLAYERS.some((p) => p.name === candidate) ? candidate : DEFAULT_PLAYER;
+  const me = players.some((p) => p.name === candidate) ? candidate : DEFAULT_PLAYER;
 
   // +2 Ballons à la première ouverture de l'app du jour.
   useEffect(() => {
@@ -50,6 +51,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
 export function useMyPlayer() {
   const { me, setMe } = useContext(PlayerContext);
-  const player = PLAYERS.find((p) => p.name === me) ?? PLAYERS[0];
+  const { players } = useSeason();
+  const player = players.find((p) => p.name === me) ?? players[0];
   return { me, setMe, player };
 }

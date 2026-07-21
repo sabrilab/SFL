@@ -7,9 +7,9 @@ import { Lock, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/nav";
 import { useMyPlayer } from "@/components/sfl/player-provider";
+import { useSeason } from "@/components/sfl/season-provider";
 import { useBallons } from "@/hooks/use-ballons";
 import { useIsClient } from "@/hooks/use-is-client";
-import { PLAYERS } from "@/lib/sfl/data";
 import {
   Select,
   SelectContent,
@@ -78,7 +78,6 @@ function LeagueSwitcher() {
   );
 }
 
-const PLAYER_NAMES = [...PLAYERS].sort((a, b) => a.name.localeCompare(b.name)).map((p) => p.name);
 
 function BallonsBadge({ me }: { me: string }) {
   const isClient = useIsClient();
@@ -171,6 +170,10 @@ function ProfilePasswordDialog({
 export function SiteHeader() {
   const pathname = usePathname();
   const { me, setMe } = useMyPlayer();
+  const { players } = useSeason();
+  const playerNames = [...players]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((p) => p.name);
   const [pendingProfile, setPendingProfile] = useState<string | null>(null);
 
   function selectProfile(name: string) {
@@ -231,7 +234,7 @@ export function SiteHeader() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {PLAYER_NAMES.map((name) => (
+              {playerNames.map((name) => (
                 <SelectItem key={name} value={name}>
                   <span className="flex items-center gap-1.5">
                     {name}

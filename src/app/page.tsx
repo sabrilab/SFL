@@ -11,19 +11,13 @@ import { ViewableCard } from "@/components/sfl/card-viewer";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
 import { LEAGUE_KEY } from "@/components/layout/site-header";
-import { JOURNEES, NEXT_MATCH, PLAYERS } from "@/lib/sfl/data";
+import { useSeason } from "@/components/sfl/season-provider";
+import { NEXT_MATCH } from "@/lib/sfl/data";
 import { journeeScoreSummary, ovr, rankByMetric, rankPlayers, type Player } from "@/lib/sfl/engine";
 import { RANKINGS } from "@/lib/sfl/rankings";
 import { cn } from "@/lib/utils";
 
-const RANKED = rankPlayers(PLAYERS);
 const PRESENCE_KEY = `sfl-presence-j${NEXT_MATCH.journee}`;
-
-// Un leader par classement pour l'aperçu "meilleurs joueurs".
-const LEADERS = RANKINGS.map((def) => ({
-  def,
-  leader: rankByMetric(PLAYERS, def.value)[0],
-}));
 
 // La carte du n°1 de chaque classement s'affiche avec le design distinct
 // correspondant (un thème par classement), pas la carte Standard.
@@ -36,7 +30,12 @@ function leaderCard(defId: string, leader: Player, size: number) {
 
 export default function Home() {
   const { player } = useMyPlayer();
+  const { players, journees } = useSeason();
   const isClient = useIsClient();
+
+  const RANKED = rankPlayers(players);
+  // Un leader par classement pour l'aperçu "meilleurs joueurs".
+  const LEADERS = RANKINGS.map((def) => ({ def, leader: rankByMetric(players, def.value)[0] }));
   const [presentOverride, setPresentOverride] = useState<boolean | null>(null);
   const [leagueTick, setLeagueTick] = useState(0);
 
@@ -61,7 +60,7 @@ export default function Home() {
 
   const myRank = RANKED.find((p) => p.name === player.name)?.rank ?? RANKED.length;
   const lastPlayed =
-    [...JOURNEES].reverse().find((j) => j.matches && j.matches.length > 0) ?? JOURNEES[0];
+    [...journees].reverse().find((j) => j.matches && j.matches.length > 0) ?? journees[0];
   const lastScore = journeeScoreSummary(lastPlayed);
 
   if (isClient && league !== "SFL") {

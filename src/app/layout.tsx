@@ -11,6 +11,7 @@ import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register"
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { ViewportLock } from "@/components/pwa/viewport-lock";
 import { PlayerProvider } from "@/components/sfl/player-provider";
+import { SeasonProvider } from "@/components/sfl/season-provider";
 import { CardViewerProvider } from "@/components/sfl/card-viewer";
 import { AppSplash } from "@/components/sfl/app-splash";
 
@@ -86,7 +87,8 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <PlayerProvider>
+          <SeasonProvider>
+            <PlayerProvider>
             <CardViewerProvider>
               <TooltipProvider delay={200}>
                 <AppSplash />
@@ -105,7 +107,8 @@ export default function RootLayout({
                 <Toaster position="top-center" />
               </TooltipProvider>
             </CardViewerProvider>
-          </PlayerProvider>
+            </PlayerProvider>
+          </SeasonProvider>
         </ThemeProvider>
       </body>
     </html>

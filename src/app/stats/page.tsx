@@ -9,7 +9,7 @@ import { RankingCard, RANKING_THEMES } from "@/components/sfl/boost-card";
 import { ViewableCard } from "@/components/sfl/card-viewer";
 import { ElectionPanel } from "@/components/sfl/election-panel";
 import { useMyPlayer } from "@/components/sfl/player-provider";
-import { JOURNEES, PLAYERS } from "@/lib/sfl/data";
+import { useSeason } from "@/components/sfl/season-provider";
 import { journeeScoreSummary, rankByMetric, type Player } from "@/lib/sfl/engine";
 import { RANKINGS, type RankingDef } from "@/lib/sfl/rankings";
 
@@ -54,7 +54,8 @@ function leaderCard(defId: string, leader: Player, size: number) {
 }
 
 function RankingList({ def, me }: { def: RankingDef; me: string }) {
-  const ranked = rankByMetric(PLAYERS, def.value).filter(
+  const { players } = useSeason();
+  const ranked = rankByMetric(players, def.value).filter(
     (p) => def.showAll || p.value > 0
   );
 
@@ -159,10 +160,13 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
 
 export default function StatsPage() {
   const { me } = useMyPlayer();
-  const [openJ, setOpenJ] = useState<number>(JOURNEES[JOURNEES.length - 1].j);
+  const { journees: JOURNEES } = useSeason();
+  // 0 = état par défaut (dernière journée ouverte), -1 = tout fermé, N = journée N.
+  const [openJ, setOpenJ] = useState<number>(0);
   const [ranking, setRanking] = useState<string>("pp");
 
   const rankingDef = RANKINGS.find((r) => r.id === ranking) ?? RANKINGS[0];
+  const lastJ = JOURNEES[JOURNEES.length - 1]?.j;
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 px-5 py-4 sm:py-8 lg:max-w-5xl">
@@ -208,13 +212,13 @@ export default function StatsPage() {
         <TabsContent value="matchs" className="mt-4">
           <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start">
             {[...JOURNEES].reverse().map((j) => {
-              const open = openJ === j.j;
+              const open = openJ === 0 ? j.j === lastJ : openJ === j.j;
               const scoreSummary = journeeScoreSummary(j);
 
               return (
                 <div key={j.j} className="overflow-hidden rounded-3xl bg-card">
                   <button
-                    onClick={() => setOpenJ(open ? 0 : j.j)}
+                    onClick={() => setOpenJ(open ? -1 : j.j)}
                     className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
                   >
                     <div>

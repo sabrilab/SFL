@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { isAdmin } from "@/lib/sfl/admin";
+import { SAISIE_EVENT } from "@/components/sfl/season-provider";
 import {
   AddPlayerSheet,
   EntrySheet,
@@ -97,6 +98,8 @@ export function AdminDashboard() {
   function commit(next: Saison) {
     setDraft(next);
     saisieStore.save(next);
+    // Prévient l'app joueur (SeasonProvider) de re-dériver en direct.
+    window.dispatchEvent(new Event(SAISIE_EVENT));
   }
 
   const totals = useMemo(() => {

@@ -10,7 +10,8 @@ import { Card3D } from "@/components/sfl/card-3d";
 import { ViewableCard } from "@/components/sfl/card-viewer";
 import { PlayerCard, type CardMode } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
-import { BAREME, BOOST_CARDS, PLAYERS } from "@/lib/sfl/data";
+import { useSeason } from "@/components/sfl/season-provider";
+import { BAREME } from "@/lib/sfl/data";
 import {
   STAT_KEYS,
   buildTargetStats,
@@ -23,8 +24,6 @@ import {
   type Allocation,
   type StatKey,
 } from "@/lib/sfl/engine";
-
-const RANKED = rankPlayers(PLAYERS);
 
 function SectionTitle({
   children,
@@ -43,11 +42,13 @@ function SectionTitle({
 
 export default function CartePage() {
   const { player } = useMyPlayer();
+  const { players, boostCards } = useSeason();
   const [mode, setMode] = useState<CardMode>("rare");
   const [alloc, setAlloc] = useState<Allocation>(emptyAllocation());
 
+  const RANKED = rankPlayers(players);
   const myRank = RANKED.find((p) => p.name === player.name)?.rank ?? RANKED.length;
-  const myBoosts = BOOST_CARDS.filter((c) => c.player === player.name);
+  const myBoosts = boostCards.filter((c) => c.player === player.name);
 
   const pool = freePool(player);
   const fixed = useMemo(() => fixedBonuses(player), [player]);
