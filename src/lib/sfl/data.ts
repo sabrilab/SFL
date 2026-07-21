@@ -20,7 +20,7 @@ export const PLAYERS: Player[] = [
   { name: "Mehdi", poste: "MDC", pp: 18, matchs: 3, buts: 6, passes: 5, statut: "Actif", stats: { VIT: 74, TIR: 73, PAS: 75, DRI: 76, DEF: 83, PHY: 88 }, mvp: 0, impact: 0, def: 0 },
   { name: "Zakary", poste: "MC", pp: 18, matchs: 2, buts: 8, passes: 6, statut: "Actif", stats: { VIT: 73, TIR: 83, PAS: 83, DRI: 80, DEF: 88, PHY: 85 }, mvp: 0, impact: 1, def: 0 },
   { name: "Bilal", poste: "MC", pp: 17, matchs: 3, buts: 2, passes: 8, statut: "Actif", stats: { VIT: 76, TIR: 77, PAS: 74, DRI: 78, DEF: 78, PHY: 77 }, mvp: 0, impact: 0, def: 0 },
-  { name: "Ryad", poste: "MC", pp: 17, matchs: 4, buts: 3, passes: 5, statut: "Actif", stats: { VIT: 77, TIR: 80, PAS: 79, DRI: 81, DEF: 77, PHY: 78 }, mvp: 0, impact: 0, def: 0 },
+  { name: "Ryad", poste: "MC", pp: 18, matchs: 4, buts: 4, passes: 5, statut: "Actif", stats: { VIT: 77, TIR: 80, PAS: 79, DRI: 81, DEF: 77, PHY: 78 }, mvp: 0, impact: 0, def: 0 },
   { name: "Yamin", poste: "MC/MDC", pp: 17, matchs: 3, buts: 6, passes: 4, statut: "Actif", stats: { VIT: 85, TIR: 80, PAS: 82, DRI: 78, DEF: 80, PHY: 83 }, mvp: 0, impact: 0, def: 1 },
   { name: "Wadi", poste: "AT", pp: 16, matchs: 2, buts: 1, passes: 6, statut: "Actif", stats: { VIT: 86, TIR: 80, PAS: 80, DRI: 78, DEF: 80, PHY: 80 }, mvp: 1, impact: 1, def: 1 },
   { name: "Naim", poste: "DC", pp: 15, matchs: 4, buts: 3, passes: 3, statut: "Actif", stats: { VIT: 65, TIR: 73, PAS: 78, DRI: 77, DEF: 76, PHY: 63 }, mvp: 0, impact: 0, def: 0 },
@@ -28,7 +28,7 @@ export const PLAYERS: Player[] = [
   { name: "Zakaria", poste: "MC", pp: 14, matchs: 3, buts: 3, passes: 2, statut: "Actif", stats: { VIT: 77, TIR: 78, PAS: 77, DRI: 79, DEF: 76, PHY: 77 }, mvp: 0, impact: 0, def: 0 },
   { name: "Ibrahim", poste: "DC", pp: 13, matchs: 3, buts: 3, passes: 4, statut: "Actif", stats: { VIT: 72, TIR: 80, PAS: 79, DRI: 76, DEF: 83, PHY: 81 }, mvp: 0, impact: 0, def: 0 },
   { name: "Sofiane", poste: "AT", pp: 13, matchs: 2, buts: 4, passes: 3, statut: "Actif", stats: { VIT: 82, TIR: 81, PAS: 75, DRI: 77, DEF: 79, PHY: 80 }, mvp: 0, impact: 0, def: 2 },
-  { name: "Yacine", poste: "MC/AT", pp: 13, matchs: 4, buts: 4, passes: 4, statut: "Actif", stats: { VIT: 79, TIR: 80, PAS: 83, DRI: 83, DEF: 79, PHY: 79 }, mvp: 0, impact: 0, def: 0 },
+  { name: "Yacine", poste: "MC/AT", pp: 13, matchs: 4, buts: 3, passes: 4, statut: "Actif", stats: { VIT: 79, TIR: 80, PAS: 83, DRI: 83, DEF: 79, PHY: 79 }, mvp: 0, impact: 0, def: 0 },
   { name: "Moussa", poste: "DC/MDC", pp: 11, matchs: 3, buts: 2, passes: 4, statut: "Actif", stats: { VIT: 77, TIR: 84, PAS: 75, DRI: 72, DEF: 89, PHY: 89 }, mvp: 0, impact: 0, def: 1 },
   { name: "Ayman", poste: "DD", pp: 10, matchs: 3, buts: 3, passes: 1, statut: "Actif", stats: { VIT: 74, TIR: 73, PAS: 75, DRI: 74, DEF: 77, PHY: 80 }, mvp: 0, impact: 0, def: 1 },
   { name: "Azzedine", poste: "DG", pp: 10, matchs: 3, buts: 4, passes: 2, statut: "Actif", stats: { VIT: 68, TIR: 67, PAS: 67, DRI: 65, DEF: 69, PHY: 72 }, mvp: 0, impact: 0, def: 0 },
@@ -56,12 +56,22 @@ export const PLAYERS: Player[] = [
   { name: "Khadim", poste: "—", pp: -2, matchs: 0, buts: 0, passes: 0, statut: "Suspendu", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 0, impact: 0, def: 0, absInj: 1 },
 ];
 
-function team(id: string, name: string, score: number, players: [string, number, number][]): MatchTeam {
+function team(
+  id: string,
+  name: string,
+  score: number,
+  players: [string, number, number, string?][]
+): MatchTeam {
   return {
     id,
     name,
     score,
-    players: players.map(([n, buts, passes]) => ({ name: n, buts, passes })),
+    players: players.map(([n, buts, passes, note]) => ({
+      name: n,
+      buts,
+      passes,
+      ...(note ? { note } : {}),
+    })),
   };
 }
 
@@ -154,18 +164,18 @@ export const JOURNEES: Journee[] = [
         id: "j5-m1",
         label: "Match 1",
         teamA: team("j5-m1-orange", "Orange", 9, [["Badis", 2, 1], ["Sami", 1, 1], ["Ilies", 2, 2], ["Souley", 3, 1], ["Selim laouadi", 1, 2]]),
-        teamB: team("j5-m1-bleu", "Bleu", 8, [["Abdel", 2, 2], ["Ibrahim", 0, 2], ["Sidali", 2, 1], ["Ilyes", 3, 2], ["Yacine", 1, 0]]),
+        teamB: team("j5-m1-bleu", "Bleu", 7, [["Abdel", 2, 2], ["Ibrahim", 0, 2], ["Sidali", 2, 1], ["Ilyes", 3, 2], ["Yacine", 0, 0]]),
       },
       {
         id: "j5-m2",
         label: "Match 2",
         teamA: team("j5-m2-vert", "Vert", 2, [["Bilal", 0, 1], ["Azzedine", 1, 0], ["Adil Maimouni", 0, 1], ["Ayman", 1, 0], ["Hassan Abdel", 0, 0]]),
-        teamB: team("j5-m2-jaune", "Jaune", 15, [["Mehdi", 3, 4], ["Jouneid", 6, 2], ["Ryad", 1, 3], ["Yanis", 3, 3], ["Sofiane", 2, 3]]),
+        teamB: team("j5-m2-jaune", "Jaune", 16, [["Mehdi", 3, 4], ["Jouneid", 6, 2], ["Ryad", 2, 3], ["Yanis", 3, 3], ["Sofiane", 2, 3]]),
       },
       {
         id: "j5-m3",
         label: "Match 3",
-        teamA: team("j5-m3-rouge", "Rouge", 3, [["Anas", 1, 2], ["Adrien", 0, 1], ["Kais", 2, 1]]),
+        teamA: team("j5-m3-rouge", "Rouge", 4, [["Anas", 1, 2], ["Adrien", 0, 1], ["Kais", 2, 1], ["Yacine", 0, 0, "Extra time"]]),
         teamB: team("j5-m3-gris", "Gris", 6, [["Zakaria", 2, 1], ["Anis", 1, 2], ["Kamil", 3, 2], ["Adil Zerhoui", 0, 0], ["Sosso Abdel", 0, 0]]),
       },
     ],

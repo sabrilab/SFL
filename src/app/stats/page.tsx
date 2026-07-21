@@ -290,13 +290,20 @@ export default function StatsPage() {
                                           key={p.name}
                                           className="flex items-center justify-between text-[13px]"
                                         >
-                                          <span
-                                            className={cn(
-                                              "truncate font-medium",
-                                              p.name === me && "text-primary"
+                                          <span className="flex min-w-0 items-center gap-1.5">
+                                            <span
+                                              className={cn(
+                                                "truncate font-medium",
+                                                p.name === me && "text-primary"
+                                              )}
+                                            >
+                                              {p.name}
+                                            </span>
+                                            {p.note && (
+                                              <span className="shrink-0 rounded-full bg-primary/12 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-primary uppercase">
+                                                {p.note}
+                                              </span>
                                             )}
-                                          >
-                                            {p.name}
                                           </span>
                                           <span className="shrink-0 text-xs text-muted-foreground">
                                             {p.buts}b · {p.passes}pd
