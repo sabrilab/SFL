@@ -129,15 +129,19 @@ export const JOURNEES: Journee[] = [
     date: "Dim. 12 juil.",
     sflTime: false,
     faits: { buteur: "Ilyes — 8 buts", passeur: "Anis & Bilal — 6 passes D." },
-    lignes: [
-      ["Ilyes", "V", 8, 3], ["Ilies", "V", 6, 2], ["Badis", "D", 4, 2],
-      ["Anis", "V", 3, 6], ["Kader", "D", 3, 1], ["Sidali", "V", 3, 1],
-      ["Yamin", "D", 3, 1], ["Yanis", "V", 3, 1], ["Smail", "D", 3, 0],
-      ["Bilal", "V", 2, 6], ["Mehdi", "V", 2, 1], ["Sofiane", "D", 2, 0],
-      ["Wadi", "V", 1, 5], ["Azzedine", "D", 1, 2], ["Naim", "-", 1, 0],
-      ["Yacine", "D", 0, 2], ["Adil", "D", 0, 1], ["Adrien", "V", 0, 1],
-      ["Moussa", "D", 0, 1], ["Ryad", "D", 0, 1], ["Ayman", "D", 0, 0],
-      ["Zakaria", "V", 0, 0],
+    matches: [
+      {
+        id: "j4-m1",
+        label: "Match 1",
+        teamA: team("j4-m1-orange", "Orange", 19, [["Anis", 3, 6], ["Ilies", 6, 2], ["Bilal", 2, 6], ["Adrien", 0, 1], ["Ilyes", 8, 3]]),
+        teamB: team("j4-m1-bleu", "Bleu", 11, [["Badis", 4, 2], ["Yamin", 3, 1], ["Ayman", 0, 0], ["Kader", 3, 1], ["Azzedine", 1, 2]]),
+      },
+      {
+        id: "j4-m2",
+        label: "Match 2",
+        teamA: team("j4-m2-vert", "Vert", 9, [["Wadi", 1, 5], ["Zakaria", 0, 0], ["Mehdi", 2, 1], ["Yanis", 3, 1], ["Sidali", 3, 1]]),
+        teamB: team("j4-m2-jaune", "Jaune", 5, [["Sofiane", 2, 0], ["Adil", 0, 1], ["Yacine", 0, 2], ["Moussa", 0, 1], ["Ryad", 0, 1], ["Smail", 3, 0]]),
+      },
     ],
   },
   {
@@ -145,17 +149,25 @@ export const JOURNEES: Journee[] = [
     date: "Dim. 19 juil.",
     sflTime: false,
     faits: { buteur: "Jouneid — 6 buts", passeur: "Mehdi — 4 passes D." },
-    lignes: [
-      ["Jouneid", "V", 6, 2], ["Mehdi", "V", 3, 4], ["Yanis", "V", 3, 3],
-      ["Ilyes", "D", 3, 2], ["Kamil", "V", 3, 2], ["Souley", "V", 3, 1],
-      ["Sofiane", "V", 2, 3], ["Abdel", "D", 2, 2], ["Ilies", "V", 2, 2],
-      ["Badis", "V", 2, 1], ["Kais", "D", 2, 1], ["Sidali", "D", 2, 1],
-      ["Zakaria", "V", 2, 1], ["Ryad", "V", 1, 3], ["Anas", "D", 1, 2],
-      ["Anis", "V", 1, 2], ["Selim laouadi", "V", 1, 2], ["Sami", "V", 1, 1],
-      ["Ayman", "D", 1, 0], ["Azzedine", "D", 1, 0], ["Yacine", "D", 1, 0],
-      ["Ibrahim", "D", 0, 2], ["Adil Maimouni", "D", 0, 1], ["Adrien", "D", 0, 1],
-      ["Bilal", "D", 0, 1], ["Adil Zerhoui", "V", 0, 0], ["Hassan Abdel", "D", 0, 0],
-      ["Sosso Abdel", "V", 0, 0],
+    matches: [
+      {
+        id: "j5-m1",
+        label: "Match 1",
+        teamA: team("j5-m1-orange", "Orange", 9, [["Badis", 2, 1], ["Sami", 1, 1], ["Ilies", 2, 2], ["Souley", 3, 1], ["Selim laouadi", 1, 2]]),
+        teamB: team("j5-m1-bleu", "Bleu", 8, [["Abdel", 2, 2], ["Ibrahim", 0, 2], ["Sidali", 2, 1], ["Ilyes", 3, 2], ["Yacine", 1, 0]]),
+      },
+      {
+        id: "j5-m2",
+        label: "Match 2",
+        teamA: team("j5-m2-vert", "Vert", 2, [["Bilal", 0, 1], ["Azzedine", 1, 0], ["Adil Maimouni", 0, 1], ["Ayman", 1, 0], ["Hassan Abdel", 0, 0]]),
+        teamB: team("j5-m2-jaune", "Jaune", 15, [["Mehdi", 3, 4], ["Jouneid", 6, 2], ["Ryad", 1, 3], ["Yanis", 3, 3], ["Sofiane", 2, 3]]),
+      },
+      {
+        id: "j5-m3",
+        label: "Match 3",
+        teamA: team("j5-m3-rouge", "Rouge", 3, [["Anas", 1, 2], ["Adrien", 0, 1], ["Kais", 2, 1]]),
+        teamB: team("j5-m3-gris", "Gris", 6, [["Zakaria", 2, 1], ["Anis", 1, 2], ["Kamil", 3, 2], ["Adil Zerhoui", 0, 0], ["Sosso Abdel", 0, 0]]),
+      },
     ],
   },
 ];
