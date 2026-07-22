@@ -122,12 +122,80 @@ export function journeeScoreSummary(
 export const ovr = (s: Stats) =>
   Math.ceil(STAT_KEYS.reduce((a, k) => a + s[k], 0) / 6);
 
+// Départage des ex æquo pour « les 2 meilleures stats » : ordre de priorité
+// stable (physique/défense d'abord) pour un résultat déterministe.
+const TIE_ORDER: StatKey[] = ["PHY", "DEF", "DRI", "PAS", "TIR", "VIT"];
+
+// Les deux meilleures stats d'une carte (valeur décroissante, ex æquo départagés).
+export function topTwoStats(s: Stats): StatKey[] {
+  return [...STAT_KEYS]
+    .sort((a, b) => s[b] - s[a] || TIE_ORDER.indexOf(a) - TIE_ORDER.indexOf(b))
+    .slice(0, 2);
+}
+
 // Version "Rare" de la carte : +3 sur les 2 meilleures stats, +1 ailleurs.
+// Règle unique de la SFL — la carte simple est l'unique source de vérité.
 export function rareStats(s: Stats): Stats {
-  const top2 = [...STAT_KEYS].sort((a, b) => s[b] - s[a]).slice(0, 2);
+  const top2 = topTwoStats(s);
   const out = {} as Stats;
   for (const k of STAT_KEYS) out[k] = s[k] + (top2.includes(k) ? 3 : 1);
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Générateur de cartes Boost (figures de match), calculées À PARTIR DE LA RARE.
+//   ⚡ Impact    : +2 aux 2 meilleures, +1 ailleurs
+//   🛡️ Défensive : +2 PHY, +2 DEF, puis VIT auto +2 et DRI auto +1
+//   🏆 MVP       : +3 aux 2 meilleures, +2 ailleurs
+// Dans tous les cas : + buts du match sur TIR, + passes D. sur PAS.
+// ---------------------------------------------------------------------------
+export interface MatchLine {
+  goals: number;
+  assists: number;
+}
+
+// Règle auto SFL : chaque (+1 DEF ET +1 PHY) simultané donne +1 VIT ;
+// chaque (+1 DEF, +1 PHY, +1 VIT) simultané donne +0,5 DRI (arrondi).
+function applyAuto(out: Stats, addDef: number, addPhy: number) {
+  const autoVit = Math.min(addDef, addPhy);
+  out.VIT += autoVit;
+  out.DRI += Math.round(0.5 * autoVit);
+}
+
+export function boostFromRare(
+  rare: Stats,
+  kind: BoostType,
+  { goals, assists }: MatchLine
+): Stats {
+  const out = { ...rare };
+  const top2 = topTwoStats(rare);
+
+  if (kind === "impact") {
+    for (const k of STAT_KEYS) out[k] += top2.includes(k) ? 2 : 1;
+  } else if (kind === "mvp") {
+    for (const k of STAT_KEYS) out[k] += top2.includes(k) ? 3 : 2;
+  } else {
+    // défensive : on ne pousse que PHY/DEF, VIT et DRI montent en auto.
+    out.PHY += 2;
+    out.DEF += 2;
+    applyAuto(out, 2, 2);
+  }
+
+  out.TIR += goals; // buts du match
+  out.PAS += assists; // passes décisives du match
+  return out;
+}
+
+// Chaîne complète : à partir des seules stats simples, génère les 4 cartes.
+export function generateCards(simple: Stats, match: MatchLine = { goals: 0, assists: 0 }) {
+  const rare = rareStats(simple);
+  return {
+    simple,
+    rare,
+    impact: boostFromRare(rare, "impact", match),
+    def: boostFromRare(rare, "def", match),
+    mvp: boostFromRare(rare, "mvp", match),
+  };
 }
 
 // Classement Pépite d'Or : tri par PP décroissant, égalités partagent le rang.
