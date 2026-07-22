@@ -79,7 +79,8 @@ export function PlayerCard({
   size?: number;
   highlightStats?: StatKey[];
 }) {
-  const stats = mode === "rare" ? rareStats(player.stats) : player.stats;
+  const stats =
+    mode === "rare" ? player.rareStats ?? rareStats(player.stats) : player.stats;
   return (
     <CardShell
       theme={IDENTITY_THEMES[mode]}

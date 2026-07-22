@@ -16,10 +16,20 @@ export interface Player {
   passes: number;
   statut: PlayerStatus;
   stats: Stats;
+  // Version Rare officielle saisie dans le classeur. Si absente, on retombe
+  // sur la règle calculée `rareStats()`.
+  rareStats?: Stats;
   mvp: number;
   impact: number;
   def: number;
   absInj?: number; // absences injustifiées (discipline)
+}
+
+// Joueur de l'effectif pas encore noté : on ne connaît que son identité.
+// Il n'a pas de carte jouable tant que ses stats n'ont pas été saisies.
+export interface UnratedPlayer {
+  name: string;
+  poste?: string;
 }
 
 export interface RankedPlayer extends Player {
