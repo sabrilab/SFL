@@ -122,21 +122,38 @@ export function journeeScoreSummary(
 export const ovr = (s: Stats) =>
   Math.ceil(STAT_KEYS.reduce((a, k) => a + s[k], 0) / 6);
 
-// Départage des ex æquo pour « les 2 meilleures stats » : à valeur égale, les
-// stats offensives priment (ordre calé sur les choix de notation de la SFL).
-const TIE_ORDER: StatKey[] = ["TIR", "PAS", "DRI", "DEF", "VIT", "PHY"];
+// Profil du joueur déduit du poste : sert à départager les ex æquo.
+export type Profile = "off" | "def";
+const OFF_TOKENS = ["AT", "AD", "AG", "BU"];
+const DEF_TOKENS = ["DC", "DD", "DG", "DEF", "MDC", "MD", "G"];
 
-// Les deux meilleures stats d'une carte (valeur décroissante, ex æquo départagés).
-export function topTwoStats(s: Stats): StatKey[] {
+export function playerProfile(poste: string): Profile {
+  const tokens = poste.toUpperCase().split(/[\/\-\s]+/);
+  if (tokens.some((t) => OFF_TOKENS.includes(t))) return "off";
+  if (tokens.some((t) => DEF_TOKENS.includes(t))) return "def";
+  return "off"; // milieu central pur : traité comme offensif
+}
+
+// Départage des ex æquo pour « les 2 meilleures stats » : à valeur égale, un
+// joueur offensif pousse sa stat offensive, un défensif sa stat défensive.
+const TIE_ORDER: Record<Profile, StatKey[]> = {
+  off: ["TIR", "DRI", "PAS", "VIT", "DEF", "PHY"],
+  def: ["DEF", "PHY", "TIR", "DRI", "PAS", "VIT"],
+};
+
+// Les deux meilleures stats d'une carte (valeur décroissante, ex æquo départagés
+// selon le profil). `poste` optionnel : par défaut, profil offensif.
+export function topTwoStats(s: Stats, poste?: string): StatKey[] {
+  const order = TIE_ORDER[poste ? playerProfile(poste) : "off"];
   return [...STAT_KEYS]
-    .sort((a, b) => s[b] - s[a] || TIE_ORDER.indexOf(a) - TIE_ORDER.indexOf(b))
+    .sort((a, b) => s[b] - s[a] || order.indexOf(a) - order.indexOf(b))
     .slice(0, 2);
 }
 
 // Version "Rare" de la carte : +3 sur les 2 meilleures stats, +1 ailleurs.
 // Règle unique de la SFL — la carte simple est l'unique source de vérité.
-export function rareStats(s: Stats): Stats {
-  const top2 = topTwoStats(s);
+export function rareStats(s: Stats, poste?: string): Stats {
+  const top2 = topTwoStats(s, poste);
   const out = {} as Stats;
   for (const k of STAT_KEYS) out[k] = s[k] + (top2.includes(k) ? 3 : 1);
   return out;
@@ -165,10 +182,11 @@ function applyAuto(out: Stats, addDef: number, addPhy: number) {
 export function boostFromRare(
   rare: Stats,
   kind: BoostType,
-  { goals, assists }: MatchLine
+  { goals, assists }: MatchLine,
+  poste?: string
 ): Stats {
   const out = { ...rare };
-  const top2 = topTwoStats(rare);
+  const top2 = topTwoStats(rare, poste);
 
   if (kind === "impact") {
     for (const k of STAT_KEYS) out[k] += top2.includes(k) ? 2 : 1;
@@ -186,15 +204,19 @@ export function boostFromRare(
   return out;
 }
 
-// Chaîne complète : à partir des seules stats simples, génère les 4 cartes.
-export function generateCards(simple: Stats, match: MatchLine = { goals: 0, assists: 0 }) {
-  const rare = rareStats(simple);
+// Chaîne complète : à partir des seules stats simples (+ poste), génère les 4 cartes.
+export function generateCards(
+  simple: Stats,
+  poste?: string,
+  match: MatchLine = { goals: 0, assists: 0 }
+) {
+  const rare = rareStats(simple, poste);
   return {
     simple,
     rare,
-    impact: boostFromRare(rare, "impact", match),
-    def: boostFromRare(rare, "def", match),
-    mvp: boostFromRare(rare, "mvp", match),
+    impact: boostFromRare(rare, "impact", match, poste),
+    def: boostFromRare(rare, "def", match, poste),
+    mvp: boostFromRare(rare, "mvp", match, poste),
   };
 }
 
