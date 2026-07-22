@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import {
+  ChevronRight,
   ClipboardList,
   MapPin,
   Send,
   Sparkles,
   Users,
+  Wand2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -67,6 +70,26 @@ export default function AdminPage() {
           Excel.
         </p>
       </div>
+
+      {/* Outil déjà disponible */}
+      <Link
+        href="/generateur"
+        className="flex items-center gap-3 rounded-3xl bg-card px-5 py-4 transition-opacity active:opacity-70"
+      >
+        <span className="flex size-10 items-center justify-center rounded-full bg-primary/15">
+          <Wand2 className="size-5 text-primary" />
+        </span>
+        <span className="flex-1">
+          <span className="flex items-center gap-2">
+            <span className="text-base font-semibold">Générateur de cartes</span>
+            <Badge className="rounded-full">Dispo</Badge>
+          </span>
+          <span className="block text-[13px] text-muted-foreground">
+            6 stats de base → Rare + les 3 Boost, avec export PNG.
+          </span>
+        </span>
+        <ChevronRight className="size-5 text-muted-foreground" />
+      </Link>
 
       <div className="grid gap-4 sm:grid-cols-2">
         {MODULES.map(({ icon: Icon, title, description }) => (
