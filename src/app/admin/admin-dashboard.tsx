@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Send,
   Sparkles,
+  Undo2,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -113,12 +114,27 @@ export function AdminDashboard() {
   const [convocOpen, setConvocOpen] = useState(false);
   // Pré-cochés à l'ouverture de l'assistant journée (confirmés de la convocation).
   const [journeePrefill, setJourneePrefill] = useState<string[]>([]);
+  // Historique d'annulation : on empile l'état PRÉCÉDENT + le libellé de l'action.
+  const [history, setHistory] = useState<{ saison: Saison; label: string; at: number }[]>([]);
 
-  function commit(next: Saison) {
+  function persist(next: Saison) {
     setDraft(next);
     saisieStore.save(next);
     // Prévient l'app joueur (SeasonProvider) de re-dériver en direct.
     window.dispatchEvent(new Event(SAISIE_EVENT));
+  }
+
+  function commit(next: Saison, label = "Modification") {
+    setHistory((h) => [...h, { saison, label, at: Date.now() }].slice(-50));
+    persist(next);
+  }
+
+  function undo() {
+    setHistory((h) => {
+      if (h.length === 0) return h;
+      persist(h[h.length - 1].saison);
+      return h.slice(0, -1);
+    });
   }
 
   const totals = useMemo(() => {
@@ -215,7 +231,7 @@ export function AdminDashboard() {
     if (!convoc) return;
     const cur = convoc.reponses[name];
     const next = cur === "present" ? "absent" : cur === "absent" ? null : "present";
-    commit(respondConvocation(saison, convoc.id, name, next));
+    commit(respondConvocation(saison, convoc.id, name, next), `Réponse — ${name}`);
   }
 
   if (!isClient) return null;
@@ -354,7 +370,7 @@ export function AdminDashboard() {
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() => commit(closeConvocation(saison, convoc.id))}
+                      onClick={() => commit(closeConvocation(saison, convoc.id), "Clôture convocation")}
                       className="rounded-full"
                     >
                       Clôturer
@@ -376,6 +392,44 @@ export function AdminDashboard() {
             )}
           </div>
 
+          {/* Historique / annulation */}
+          <div className="rounded-3xl bg-card p-4">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                <Undo2 className="size-4 text-primary" /> Historique
+              </span>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={history.length === 0}
+                onClick={undo}
+                className="rounded-full"
+              >
+                <Undo2 className="mr-1.5 size-4" /> Annuler
+                {history.length > 0 && ` — ${history[history.length - 1].label}`}
+              </Button>
+            </div>
+            {history.length === 0 ? (
+              <p className="text-[13px] text-muted-foreground">
+                Aucune modification cette session. Chaque changement est annulable ici.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {[...history]
+                  .slice(-6)
+                  .reverse()
+                  .map((h, i) => (
+                    <div key={h.at + "-" + i} className="flex items-center justify-between text-[13px]">
+                      <span className={cn(i === 0 && "font-semibold")}>{h.label}</span>
+                      <span className="text-[11px] text-muted-foreground tabular-nums">
+                        {new Date(h.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
           <div className="flex items-start gap-3 rounded-2xl bg-card/60 p-3.5 opacity-70">
             <Sparkles className="mt-0.5 size-5 text-primary" />
             <div>
@@ -387,7 +441,7 @@ export function AdminDashboard() {
             </div>
           </div>
 
-          <Button variant="ghost" size="sm" onClick={() => commit(saisieStore.reset())} className="self-start text-muted-foreground">
+          <Button variant="ghost" size="sm" onClick={() => { persist(saisieStore.reset()); setHistory([]); }} className="self-start text-muted-foreground">
             <RotateCcw className="mr-1.5 size-4" /> Réinitialiser les données de démo
           </Button>
         </TabsContent>
@@ -519,9 +573,9 @@ export function AdminDashboard() {
       <EntrySheet
         entry={editEntry}
         onOpenChange={(o) => !o && setEditIndex(null)}
-        onPatch={(patch) => editIndex != null && commit(updateEntryAt(saison, editIndex, patch))}
+        onPatch={(patch) => editIndex != null && commit(updateEntryAt(saison, editIndex, patch), "Édition ligne")}
         onDelete={() => {
-          if (editIndex != null) commit(deleteEntryAt(saison, editIndex));
+          if (editIndex != null) commit(deleteEntryAt(saison, editIndex), "Retrait joueur (journée)");
           setEditIndex(null);
         }}
       />
@@ -531,25 +585,25 @@ export function AdminDashboard() {
         roster={rosterNames}
         existing={addToJ != null ? journeeViews.find((v) => v.meta.j === addToJ)?.players ?? new Set() : new Set()}
         onAdd={(player, team) => {
-          if (addToJ != null) commit(addEntry(saison, newEntry(addToJ, player, team)));
+          if (addToJ != null) commit(addEntry(saison, newEntry(addToJ, player, team)), `Ajout — ${player}`);
           setAddToJ(null);
         }}
       />
       <JourneeMetaSheet
         meta={metaEntry}
         onOpenChange={(o) => !o && setMetaJ(null)}
-        onPatch={(patch) => metaJ != null && commit(updateJournee(saison, metaJ, patch))}
+        onPatch={(patch) => metaJ != null && commit(updateJournee(saison, metaJ, patch), "Édition journée")}
         onDelete={() => {
-          if (metaJ != null) commit(deleteJournee(saison, metaJ));
+          if (metaJ != null) commit(deleteJournee(saison, metaJ), `Suppression journée ${metaJ}`);
           setMetaJ(null);
         }}
       />
       <PlayerSheet
         entry={playerEntry}
         onOpenChange={(o) => !o && setPlayerIndex(null)}
-        onPatch={(patch) => playerIndex != null && commit(updateRosterAt(saison, playerIndex, patch))}
+        onPatch={(patch) => playerIndex != null && commit(updateRosterAt(saison, playerIndex, patch), "Édition fiche")}
         onDelete={() => {
-          if (playerIndex != null) commit(deleteRosterAt(saison, playerIndex));
+          if (playerIndex != null) commit(deleteRosterAt(saison, playerIndex), "Suppression joueur");
           setPlayerIndex(null);
         }}
       />
@@ -559,7 +613,7 @@ export function AdminDashboard() {
         exists={(name) => rosterHasName(saison, name)}
         onCreate={(name) => {
           const idx = saison.roster.length;
-          commit(addRoster(saison, newRosterPlayer(name)));
+          commit(addRoster(saison, newRosterPlayer(name)), `Nouveau joueur — ${name}`);
           setNewPlayerOpen(false);
           setPlayerIndex(idx); // ouvre directement la fiche pour compléter
         }}
@@ -574,8 +628,8 @@ export function AdminDashboard() {
         roster={journeeRoster}
         initialChecked={journeePrefill}
         onCreate={(teams) => {
-          const { saison: s } = addJourneeWithTeams(saison, teams);
-          commit(s);
+          const { saison: s, j } = addJourneeWithTeams(saison, teams);
+          commit(s, `Nouvelle journée ${j}`);
           setNewJourneeOpen(false);
           setJourneePrefill([]);
         }}
@@ -584,7 +638,7 @@ export function AdminDashboard() {
         open={convocOpen}
         onOpenChange={setConvocOpen}
         onCreate={(info) => {
-          commit(createConvocation(saison, info));
+          commit(createConvocation(saison, info), "Nouvelle convocation");
           setConvocOpen(false);
         }}
       />
