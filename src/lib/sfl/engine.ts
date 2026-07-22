@@ -122,9 +122,9 @@ export function journeeScoreSummary(
 export const ovr = (s: Stats) =>
   Math.ceil(STAT_KEYS.reduce((a, k) => a + s[k], 0) / 6);
 
-// Départage des ex æquo pour « les 2 meilleures stats » : ordre de priorité
-// stable (physique/défense d'abord) pour un résultat déterministe.
-const TIE_ORDER: StatKey[] = ["PHY", "DEF", "DRI", "PAS", "TIR", "VIT"];
+// Départage des ex æquo pour « les 2 meilleures stats » : à valeur égale, les
+// stats offensives priment (ordre calé sur les choix de notation de la SFL).
+const TIE_ORDER: StatKey[] = ["TIR", "PAS", "DRI", "DEF", "VIT", "PHY"];
 
 // Les deux meilleures stats d'une carte (valeur décroissante, ex æquo départagés).
 export function topTwoStats(s: Stats): StatKey[] {
