@@ -2,7 +2,18 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Lock, Minus, PersonStanding, Plus, RotateCcw } from "lucide-react";
+import {
+  ChevronRight,
+  Download,
+  Loader2,
+  Lock,
+  Minus,
+  Package,
+  PersonStanding,
+  Plus,
+  RotateCcw,
+} from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BoostCard, BOOST_LABELS } from "@/components/sfl/boost-card";
@@ -10,6 +21,7 @@ import { Card3D } from "@/components/sfl/card-3d";
 import { ViewableCard } from "@/components/sfl/card-viewer";
 import { PlayerCard, type CardMode } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
+import { cardToPng, downloadPng, exportCardsZip, safeFileName } from "@/lib/sfl/card-export";
 import { BAREME, BOOST_CARDS, PLAYERS } from "@/lib/sfl/data";
 import {
   STAT_KEYS,
@@ -45,6 +57,44 @@ export default function CartePage() {
   const { player } = useMyPlayer();
   const [mode, setMode] = useState<CardMode>("rare");
   const [alloc, setAlloc] = useState<Allocation>(emptyAllocation());
+  const [exportingOne, setExportingOne] = useState(false);
+  const [batch, setBatch] = useState<{ done: number; total: number } | null>(null);
+
+  async function exportCurrent() {
+    if (exportingOne) return;
+    setExportingOne(true);
+    try {
+      const edition = mode === "rare" ? "Rare" : "Standard";
+      const dataUrl = await cardToPng(<PlayerCard player={player} mode={mode} size={1} />);
+      downloadPng(dataUrl, `SFL_${safeFileName(player.name)}_${edition}`);
+      toast.success("Carte exportée en PNG");
+    } catch {
+      toast.error("Export impossible");
+    } finally {
+      setExportingOne(false);
+    }
+  }
+
+  async function exportAll() {
+    if (batch) return;
+    const edition = mode === "rare" ? "Rare" : "Standard";
+    setBatch({ done: 0, total: PLAYERS.length });
+    try {
+      await exportCardsZip(
+        PLAYERS.map((p) => ({
+          node: <PlayerCard player={p} mode={mode} size={1} />,
+          name: `${p.name}_${edition}`,
+        })),
+        `SFL_cartes_${edition}`,
+        (done, total) => setBatch({ done, total })
+      );
+      toast.success(`${PLAYERS.length} cartes exportées (ZIP)`);
+    } catch {
+      toast.error("Export en lot impossible");
+    } finally {
+      setBatch(null);
+    }
+  }
 
   const myRank = RANKED.find((p) => p.name === player.name)?.rank ?? RANKED.length;
   const myBoosts = BOOST_CARDS.filter((c) => c.player === player.name);
@@ -120,6 +170,36 @@ export default function CartePage() {
           size={1.05}
           render={(s) => <PlayerCard player={player} mode={mode} size={s} />}
         />
+
+        {/* Export image */}
+        <div className="flex w-full max-w-xs flex-col gap-2">
+          <button
+            onClick={exportCurrent}
+            disabled={exportingOne || batch !== null}
+            className="flex items-center justify-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-opacity active:opacity-70 disabled:opacity-60"
+          >
+            {exportingOne ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
+            Télécharger ma carte ({mode === "rare" ? "Rare" : "Standard"})
+          </button>
+          <button
+            onClick={exportAll}
+            disabled={batch !== null || exportingOne}
+            className="flex items-center justify-center gap-2 rounded-full bg-card px-5 py-2.5 text-sm font-semibold transition-opacity active:opacity-70 disabled:opacity-60"
+          >
+            {batch ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Package className="size-4" />
+            )}
+            {batch
+              ? `Export ${batch.done}/${batch.total}…`
+              : `Exporter les ${PLAYERS.length} cartes (ZIP)`}
+          </button>
+        </div>
       </section>
 
       {/* Avatar 3D */}

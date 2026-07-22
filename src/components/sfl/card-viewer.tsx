@@ -6,7 +6,10 @@
 // pratique `<ViewableCard>` qui rend une Card3D cliquable.
 
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { Download, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { cardToPng, downloadPng, safeFileName } from "@/lib/sfl/card-export";
 import { Card3D } from "./card-3d";
 
 interface ViewedCard {
@@ -27,7 +30,23 @@ export function useCardViewer() {
 
 export function CardViewerProvider({ children }: { children: ReactNode }) {
   const [viewed, setViewed] = useState<ViewedCard | null>(null);
+  const [exporting, setExporting] = useState(false);
   const open = useCallback((card: ViewedCard) => setViewed(card), []);
+
+  async function downloadViewed() {
+    if (!viewed || exporting) return;
+    setExporting(true);
+    try {
+      const name = [viewed.title, viewed.subtitle].filter(Boolean).join(" ");
+      const dataUrl = await cardToPng(viewed.render(1));
+      downloadPng(dataUrl, `SFL_${safeFileName(name)}`);
+      toast.success("Carte exportée en PNG");
+    } catch {
+      toast.error("Export impossible");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <CardViewerContext.Provider value={{ open }}>
@@ -51,6 +70,18 @@ export function CardViewerProvider({ children }: { children: ReactNode }) {
                   </span>
                 )}
               </div>
+              <button
+                onClick={downloadViewed}
+                disabled={exporting}
+                className="flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-opacity active:opacity-70 disabled:opacity-60"
+              >
+                {exporting ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Download className="size-4" />
+                )}
+                {exporting ? "Export…" : "Télécharger PNG"}
+              </button>
             </>
           )}
         </DialogContent>
