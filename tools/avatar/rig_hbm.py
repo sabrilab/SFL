@@ -265,17 +265,14 @@ print(f"landmarks: z_top={z_top:.2f} eye_z={eye_cz:.2f} arm_z={arm_z:.2f} delt_t
 sh_c = delt_top - 0.06                        # centre bande épaules
 sh_lo, sh_hi = sh_c - 0.10, sh_c + 0.09
 wa_lo, wa_hi = z_top - 1.02, z_top - 0.72     # bande taille
+# NB : pas de « rehausse » du trapèze -> elle créait une étagère d'acromion
+# qui, une fois les bras baissés par l'idle, ressortait en marche d'escalier.
 for v in verts:
     co = v.co
     if abs(co.x) < 0.45:
         if sh_lo < co.z < sh_hi:
             b = ramp(1 - abs(co.z - sh_c) / (sh_hi - sh_c))
-            co.x *= 1 + 0.05 * b
-        # rehausse trapèzes/deltoïdes : la pente épaule-cou devient
-        # plus horizontale, carrure moins tombante
-        if co.z > delt_top - 0.14 and abs(co.x) > 0.09:
-            lift = ramp((abs(co.x) - 0.09) / 0.12) * ramp((co.z - (delt_top - 0.14)) / 0.10)
-            co.z += 0.014 * lift
+            co.x *= 1 + 0.035 * b
         if wa_lo < co.z < wa_hi:
             b = ramp(1 - abs(co.z - (wa_lo + wa_hi) / 2) / ((wa_hi - wa_lo) / 2))
             co.x *= 1 - 0.06 * b
@@ -294,7 +291,27 @@ for sign in (1, -1):
         v.co.y = ankle_y + (v.co.y - ankle_y) * (1 - 0.12 * f)
 
 body.data.update()
-print("athletic build applied")
+
+# Lissage géométrique de la jonction épaule<->bras (arrondit l'étagère de
+# l'acromion et le creux deltoïde/biceps). Laplacien local sur la région,
+# vertex d'yeux exclus.
+region = set()
+for v in verts:
+    if v.index in eye_idx:
+        continue
+    if v.co.z > delt_top - 0.22 and abs(v.co.x) > 0.11:
+        region.add(v.index)
+bm = bmesh.new()
+bm.from_mesh(body.data)
+bm.verts.ensure_lookup_table()
+sel = [bm.verts[i] for i in region]
+for _ in range(6):
+    bmesh.ops.smooth_vert(bm, verts=sel, factor=0.5,
+                          use_axis_x=True, use_axis_y=True, use_axis_z=True)
+bm.to_mesh(body.data)
+bm.free()
+body.data.update()
+print(f"athletic build applied (+shoulder smooth on {len(region)} verts)")
 
 # ------------------------------------- 7. cheveux / sourcils / pupilles
 hair_mat = make_mat("Hair", (0.055, 0.032, 0.018, 1.0))
@@ -468,7 +485,7 @@ def vgw(vg, vi):
         return 0.0
 
 CAP_H = 0.13
-CAP_MAX = 0.50        # transfert partiel : le cap suit le bras à moitié
+CAP_MAX = 0.30        # transfert léger : le cap suit surtout le bras
 CAP_X = 0.09
 for side, sign in (("Left", 1), ("Right", -1)):
     vg_arm = body.vertex_groups.get(f"mixamorig:{side}Arm")
