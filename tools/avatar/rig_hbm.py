@@ -265,18 +265,31 @@ print(f"landmarks: z_top={z_top:.2f} eye_z={eye_cz:.2f} arm_z={arm_z:.2f} delt_t
 sh_c = delt_top - 0.06                        # centre bande épaules
 sh_lo, sh_hi = sh_c - 0.10, sh_c + 0.09
 wa_lo, wa_hi = z_top - 1.02, z_top - 0.72     # bande taille
-# NB : pas de « rehausse » du trapèze -> elle créait une étagère d'acromion
-# qui, une fois les bras baissés par l'idle, ressortait en marche d'escalier.
 for v in verts:
     co = v.co
     if abs(co.x) < 0.45:
         if sh_lo < co.z < sh_hi:
             b = ramp(1 - abs(co.z - sh_c) / (sh_hi - sh_c))
-            co.x *= 1 + 0.035 * b
+            co.x *= 1 + 0.045 * b
         if wa_lo < co.z < wa_hi:
             b = ramp(1 - abs(co.z - (wa_lo + wa_hi) / 2) / ((wa_hi - wa_lo) / 2))
             co.x *= 1 - 0.06 * b
             co.y = y_c + (co.y - y_c) * (1 - 0.05 * b)
+
+# Remonter la LIGNE d'épaule (trapèze + masse du deltoïde) : les bras
+# baissés par l'idle donnent des épaules tombantes « batracien ». On
+# comble la pente cou->épaule en soulevant une bande LARGE et profonde
+# (pas seulement le bord = pas d'étagère), avec fort fondu haut et latéral.
+LIFT = 0.045
+for v in verts:
+    if v.index in eye_idx:
+        continue
+    co = v.co
+    ax = abs(co.x)
+    if 0.03 < ax < 0.32 and co.z > delt_top - 0.22:
+        fz = ramp((co.z - (delt_top - 0.22)) / 0.16)        # 0 en bas -> 1 en haut
+        fx = ramp((ax - 0.03) / 0.09) * (1 - ramp((ax - 0.20) / 0.12))
+        co.z += LIFT * fz * fx
 # pieds : le corps HBM agrandi à l'échelle du squelette (x1,15) donne des
 # pieds trop longs/larges — on les réduit autour de chaque cheville
 for sign in (1, -1):
@@ -305,7 +318,7 @@ bm = bmesh.new()
 bm.from_mesh(body.data)
 bm.verts.ensure_lookup_table()
 sel = [bm.verts[i] for i in region]
-for _ in range(6):
+for _ in range(3):
     bmesh.ops.smooth_vert(bm, verts=sel, factor=0.5,
                           use_axis_x=True, use_axis_y=True, use_axis_z=True)
 bm.to_mesh(body.data)
