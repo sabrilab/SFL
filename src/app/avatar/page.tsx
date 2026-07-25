@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { PersonStanding } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { FacePhotos } from "@/lib/sfl/face-projection";
 import {
   AVATAR_STORAGE_KEY,
   CHEVEUX_OPTIONS,
@@ -22,6 +23,12 @@ import {
 
 const AvatarViewer = dynamic(
   () => import("@/components/sfl/avatar-viewer").then((m) => m.AvatarViewer),
+  { ssr: false }
+);
+
+// L'import de photos tire MediaPipe (WASM) : chargé à la demande, côté client.
+const PhotoImport = dynamic(
+  () => import("@/components/sfl/photo-import").then((m) => m.PhotoImport),
   { ssr: false }
 );
 
@@ -61,6 +68,9 @@ function Segmented<T extends string>({
 export default function AvatarPage() {
   const [config, setConfig] = useState<AvatarConfig>(DEFAULT_AVATAR_CONFIG);
   const [loaded, setLoaded] = useState(false);
+  // Photos volontairement hors localStorage : ce sont des images lourdes et
+  // des données personnelles, elles restent dans la session.
+  const [photos, setPhotos] = useState<FacePhotos | undefined>();
 
   // Restaure la config sauvegardée (après montage, pour éviter tout
   // décalage d'hydratation).
@@ -96,7 +106,7 @@ export default function AvatarPage() {
       <div className="flex flex-col gap-6 md:flex-row md:items-start">
         {/* Aperçu 3D — plein cadre sur mobile, colonne principale sur desktop */}
         <div className="glass relative h-[46vh] min-h-[320px] overflow-hidden rounded-3xl md:h-[560px] md:flex-1">
-          <AvatarViewer config={config} />
+          <AvatarViewer config={config} photos={photos} />
           <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-[11px] text-muted-foreground">
             Glisse pour faire tourner
           </p>
@@ -104,6 +114,12 @@ export default function AvatarPage() {
 
         {/* Panneau de réglages — en dessous sur mobile, à droite sur desktop */}
         <aside className="flex flex-col gap-5 md:w-64 md:shrink-0">
+          <PhotoImport
+            applied={photos !== undefined}
+            onApply={setPhotos}
+            onReset={() => setPhotos(undefined)}
+          />
+
           <section>
             <h2 className="mb-2 px-1 text-sm font-semibold text-muted-foreground">Taille</h2>
             <Segmented options={TAILLE_OPTIONS} value={config.taille} onChange={(v) => set("taille", v)} />

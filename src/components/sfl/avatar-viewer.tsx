@@ -9,7 +9,7 @@
 //  - morph targets (corpulence, forme de tête) et échelle (taille)
 //    appliqués à chaud ; idle Mixamo en boucle ; drag pour tourner.
 
-import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -22,6 +22,7 @@ import {
   type AvatarConfig,
   type Peau,
 } from "@/lib/sfl/avatar";
+import { headFrame, makeFaceProjectionMaterial, type FacePhotos } from "@/lib/sfl/face-projection";
 
 const MODEL_URL = "/models/avatar-base-hbm.glb";
 const FACE_TEXTURE_URL: Record<Peau, string> = {
@@ -53,7 +54,41 @@ interface RotState {
   current: number;
 }
 
-function AvatarModel({ config }: { config: AvatarConfig }) {
+/** Charge les trois photos en textures ; `null` tant qu'il n'y en a pas. */
+function usePhotoTextures(photos?: FacePhotos) {
+  const [textures, setTextures] = useState<{
+    front: THREE.Texture;
+    left: THREE.Texture;
+    right: THREE.Texture;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!photos) {
+      setTextures(null);
+      return;
+    }
+    let cancelled = false;
+    const loader = new THREE.TextureLoader();
+    const load = (url: string) =>
+      new Promise<THREE.Texture>((resolve, reject) => loader.load(url, resolve, undefined, reject));
+    Promise.all([load(photos.front.url), load(photos.left.url), load(photos.right.url)])
+      .then(([front, left, right]) => {
+        if (cancelled) {
+          for (const t of [front, left, right]) t.dispose();
+          return;
+        }
+        setTextures({ front, left, right });
+      })
+      .catch(() => setTextures(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [photos]);
+
+  return textures;
+}
+
+function AvatarModel({ config, photos }: { config: AvatarConfig; photos?: FacePhotos }) {
   const gltf = useLoader(GLTFLoader, MODEL_URL);
   const faceTextures = useLoader(THREE.TextureLoader, [
     FACE_TEXTURE_URL.claire,
@@ -172,6 +207,45 @@ function AvatarModel({ config }: { config: AvatarConfig }) {
     }
   }, [gltf, config, toonMaterials, faceTextures]);
 
+  // Photos de l'utilisateur : le corps passe du toon uni à la projection des
+  // trois clichés. Les cheveux et les traits dessinés gardent leur matériau —
+  // la photo apporte déjà yeux et sourcils.
+  const photoTextures = usePhotoTextures(photos);
+  useEffect(() => {
+    const bodies: THREE.Mesh[] = [];
+    gltf.scene.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!(mesh as unknown as { isMesh?: boolean }).isMesh) return;
+      const base = mesh.name.replace(/__outline$/, "");
+      if (base.startsWith("Cheveux") || base === "Traits") return;
+      if (mesh.name.endsWith("__outline")) return;
+      bodies.push(mesh);
+    });
+
+    if (!photos || !photoTextures) {
+      // retour au rendu toon
+      for (const mesh of bodies) {
+        const saved = mesh.userData.__toonMat as THREE.Material | undefined;
+        if (saved) mesh.material = saved;
+      }
+      return;
+    }
+
+    // La carnation vient de la photo, pas du réglage « Peau » : sinon le
+    // visage photographié tranche avec le reste du corps.
+    const [r, g, b] = photos.front.meanColor;
+    const skin = new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace);
+    const frame = headFrame(gltf.scene);
+    const mat = makeFaceProjectionMaterial(photos, photoTextures, frame, skin);
+    for (const mesh of bodies) {
+      if (!mesh.userData.__toonMat) mesh.userData.__toonMat = mesh.material;
+      mesh.material = mat;
+    }
+    return () => {
+      mat.dispose();
+    };
+  }, [gltf, photos, photoTextures, config.peau]);
+
   return <primitive object={gltf.scene} scale={TAILLE_SCALE[config.taille]} />;
 }
 
@@ -194,7 +268,7 @@ function Turntable({
   return <group ref={group}>{children}</group>;
 }
 
-export function AvatarViewer({ config }: { config: AvatarConfig }) {
+export function AvatarViewer({ config, photos }: { config: AvatarConfig; photos?: FacePhotos }) {
   const rot = useRef<RotState>({ target: 0.5, current: 0.5 });
   const drag = useRef<{ lastX: number } | null>(null);
 
@@ -234,7 +308,7 @@ export function AvatarViewer({ config }: { config: AvatarConfig }) {
         <directionalLight position={[3, 5, 4]} intensity={2.2} />
         <Suspense fallback={null}>
           <Turntable rot={rot}>
-            <AvatarModel config={config} />
+            <AvatarModel config={config} photos={photos} />
             {/* Fausse ombre de contact, bien moins chère qu'une vraie */}
             <mesh rotation-x={-Math.PI / 2} position={[0, 0.005, 0]}>
               <circleGeometry args={[0.55, 40]} />
