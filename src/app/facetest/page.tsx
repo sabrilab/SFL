@@ -8,6 +8,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { cropToDataUrl } from "@/lib/sfl/face-crop";
 
 const MODEL_URL = "/models/avatar-base-hbm.glb";
 const DEFAULTS = {
@@ -111,7 +112,11 @@ function Head({ urls, rot }: { urls: Urls; rot: React.RefObject<number> }) {
   );
 }
 
-function Slot({ label, url, onPick }: { label: string; url: string; onPick: (f: File) => void }) {
+function Slot({
+  label, url, status, onPick,
+}: {
+  label: string; url: string; status: string; onPick: (f: File) => void;
+}) {
   return (
     <label
       style={{
@@ -124,6 +129,9 @@ function Slot({ label, url, onPick }: { label: string; url: string; onPick: (f: 
         <img src={url} alt={label} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       </div>
       {label}
+      <span style={{ fontSize: 10, fontWeight: 500, color: status.startsWith("✓") ? "#128a4a" : "#999" }}>
+        {status}
+      </span>
       <input type="file" accept="image/*" style={{ display: "none" }}
         onChange={(e) => e.target.files?.[0] && onPick(e.target.files[0])} />
     </label>
@@ -132,6 +140,9 @@ function Slot({ label, url, onPick }: { label: string; url: string; onPick: (f: 
 
 export default function FaceTestPage() {
   const [urls, setUrls] = useState<Urls>(DEFAULTS);
+  const [status, setStatus] = useState<Record<keyof Urls, string>>({
+    front: "test", left: "test", right: "test",
+  });
   const rot = useRef(0.35);
   const drag = useRef<{ x: number } | null>(null);
 
@@ -145,16 +156,32 @@ export default function FaceTestPage() {
     return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
   }, []);
 
-  const pick = (slot: keyof Urls) => (f: File) => {
-    setUrls((u) => ({ ...u, [slot]: URL.createObjectURL(f) }));
+  // Chaque photo importée passe par la détection de visage : on projette le
+  // recadrage normalisé, pas l'original (fonds et cadrages sont quelconques).
+  const pick = (slot: keyof Urls) => async (f: File) => {
+    const raw = URL.createObjectURL(f);
+    setUrls((u) => ({ ...u, [slot]: raw }));
+    setStatus((s) => ({ ...s, [slot]: "analyse…" }));
+    try {
+      const cropped = await cropToDataUrl(raw);
+      if (cropped) {
+        setUrls((u) => ({ ...u, [slot]: cropped }));
+        setStatus((s) => ({ ...s, [slot]: "✓ visage détecté" }));
+      } else {
+        setStatus((s) => ({ ...s, [slot]: "aucun visage — photo brute" }));
+      }
+    } catch (err) {
+      setStatus((s) => ({ ...s, [slot]: "erreur détection" }));
+      console.error(err);
+    }
   };
 
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#eaeaea", position: "relative" }}>
       <div style={{ position: "absolute", top: 70, left: 0, right: 0, display: "flex", justifyContent: "center", gap: 20, zIndex: 10 }}>
-        <Slot label="Face" url={urls.front} onPick={pick("front")} />
-        <Slot label="Profil gauche" url={urls.left} onPick={pick("left")} />
-        <Slot label="Profil droit" url={urls.right} onPick={pick("right")} />
+        <Slot label="Face" url={urls.front} status={status.front} onPick={pick("front")} />
+        <Slot label="Profil gauche" url={urls.left} status={status.left} onPick={pick("left")} />
+        <Slot label="Profil droit" url={urls.right} status={status.right} onPick={pick("right")} />
       </div>
       <div style={{ position: "absolute", inset: 0 }} onPointerDown={(e) => (drag.current = { x: e.clientX })}>
         <Canvas camera={{ fov: 20, position: [0, 1.92, 1.15] }} onCreated={({ camera }) => camera.lookAt(0, 1.9, 0.15)}>
