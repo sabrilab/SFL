@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
-import { ChevronRight, Lock, Minus, PersonStanding, Plus, RotateCcw } from "lucide-react";
+import { Lock, Minus, Plus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BoostCard, BOOST_LABELS } from "@/components/sfl/boost-card";
@@ -123,25 +122,9 @@ export default function CartePage() {
         />
       </section>
 
-      {/* Avatar 3D */}
-      <section>
-        <SectionTitle>Mon avatar</SectionTitle>
-        <Link
-          href="/avatar"
-          className="glass flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-        >
-          <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-            <PersonStanding className="size-[18px]" />
-          </span>
-          <span className="flex-1">
-            <span className="block text-[15px] font-semibold">Créer mon avatar 3D</span>
-            <span className="block text-[12px] text-muted-foreground">
-              Taille, corpulence, tête, peau — en 3D animée
-            </span>
-          </span>
-          <ChevronRight className="size-4 text-muted-foreground" />
-        </Link>
-      </section>
+      {/* Avatar 3D — point d'entrée masqué volontairement : la création
+          d'avatar n'est pas encore prête à être montrée (pas de visage,
+          pas de photos). L'écran reste accessible en direct sur /avatar. */}
 
       {/* Cartes Boost */}
       <section>
