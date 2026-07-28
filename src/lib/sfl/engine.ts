@@ -41,6 +41,9 @@ export interface MatchPlayerLine {
   name: string;
   buts: number;
   passes: number;
+  // Mention affichée à côté du joueur (ex. "Extra time" : a joué la prolongation
+  // sans se voir attribuer de but, mais gagne un point Pépite).
+  note?: string;
 }
 
 export interface MatchTeam {

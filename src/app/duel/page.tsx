@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { Card3D } from "@/components/sfl/card-3d";
 import { useMyPlayer } from "@/components/sfl/player-provider";
+import { useSeason } from "@/components/sfl/season-provider";
 import { useIsClient } from "@/hooks/use-is-client";
-import { PLAYERS } from "@/lib/sfl/data";
 import type { Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { getRatings, pickPair, recordDuel, resetRatings } from "@/lib/sfl/duel";
@@ -26,11 +26,12 @@ const cardVariants = {
 
 export default function DuelPage() {
   const { me } = useMyPlayer();
+  const { players } = useSeason();
   const isClient = useIsClient();
 
   const [arenaMode, setArenaMode] = useState<"duel" | "match">("duel");
   const [round, setRound] = useState(0);
-  const [pair, setPair] = useState<[Player, Player]>(() => pickPair(PLAYERS));
+  const [pair, setPair] = useState<[Player, Player]>(() => pickPair(players));
   const [category, setCategory] = useState<DuelCategory>(() => pickCategory());
   const [resolvedWinner, setResolvedWinner] = useState<string | null>(null);
   const [lastDelta, setLastDelta] = useState(0);
@@ -77,7 +78,7 @@ export default function DuelPage() {
     }
 
     setTimeout(() => {
-      setPair((prev) => pickPair(PLAYERS, [prev[0].name, prev[1].name]));
+      setPair((prev) => pickPair(players, [prev[0].name, prev[1].name]));
       setCategory((prev) => pickCategory(prev.id));
       setResolvedWinner(null);
       setRound((r) => r + 1);
@@ -90,7 +91,7 @@ export default function DuelPage() {
 
   function reset() {
     resetRatings(me);
-    setPair((prev) => pickPair(PLAYERS, [prev[0].name, prev[1].name]));
+    setPair((prev) => pickPair(players, [prev[0].name, prev[1].name]));
     setCategory((prev) => pickCategory(prev.id));
     toast.success("Classement personnel réinitialisé");
   }

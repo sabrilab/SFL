@@ -5,6 +5,8 @@ import { useTheme } from "next-themes";
 import { Moon, Sun, Monitor, ShieldCheck, ChevronRight, Settings, PersonStanding } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsClient } from "@/hooks/use-is-client";
+import { useMyPlayer } from "@/components/sfl/player-provider";
+import { isAdmin } from "@/lib/sfl/admin";
 
 const THEME_OPTIONS = [
   { value: "light", label: "Clair", icon: Sun },
@@ -16,6 +18,8 @@ export default function ReglagesPage() {
   const { theme, setTheme } = useTheme();
   const isClient = useIsClient();
   const current = isClient ? (theme ?? "system") : "system";
+  const { me } = useMyPlayer();
+  const admin = isClient && isAdmin(me);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-7 px-5 py-4 sm:py-8">
@@ -73,24 +77,26 @@ export default function ReglagesPage() {
         </Link>
       </section>
 
-      <section>
-        <h2 className="mb-3 px-1 text-sm font-semibold text-muted-foreground">Général</h2>
-        <Link
-          href="/admin"
-          className="glass flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
-        >
-          <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-            <ShieldCheck className="size-[18px]" />
-          </span>
-          <span className="flex-1">
-            <span className="block text-[15px] font-semibold">Espace admin</span>
-            <span className="block text-[12px] text-muted-foreground">
-              Gérer les matchs, convocations et résultats
+      {admin && (
+        <section>
+          <h2 className="mb-3 px-1 text-sm font-semibold text-muted-foreground">Général</h2>
+          <Link
+            href="/admin"
+            className="glass flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
+          >
+            <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
+              <ShieldCheck className="size-[18px]" />
             </span>
-          </span>
-          <ChevronRight className="size-4 text-muted-foreground" />
-        </Link>
-      </section>
+            <span className="flex-1">
+              <span className="block text-[15px] font-semibold">Espace admin</span>
+              <span className="block text-[12px] text-muted-foreground">
+                Gérer les matchs, convocations et résultats
+              </span>
+            </span>
+            <ChevronRight className="size-4 text-muted-foreground" />
+          </Link>
+        </section>
+      )}
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { RankingCard, RANKING_THEMES } from "@/components/sfl/boost-card";
 import { ViewableCard } from "@/components/sfl/card-viewer";
 import { ElectionPanel } from "@/components/sfl/election-panel";
 import { useMyPlayer } from "@/components/sfl/player-provider";
-import { JOURNEES, PLAYERS } from "@/lib/sfl/data";
+import { useSeason } from "@/components/sfl/season-provider";
 import { journeeScoreSummary, rankByMetric, type Player } from "@/lib/sfl/engine";
 import { RANKINGS, type RankingDef } from "@/lib/sfl/rankings";
 
@@ -54,7 +54,8 @@ function leaderCard(defId: string, leader: Player, size: number) {
 }
 
 function RankingList({ def, me }: { def: RankingDef; me: string }) {
-  const ranked = rankByMetric(PLAYERS, def.value).filter(
+  const { players } = useSeason();
+  const ranked = rankByMetric(players, def.value).filter(
     (p) => def.showAll || p.value > 0
   );
 
@@ -72,8 +73,10 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
     <>
       <p className="mb-3 px-1 text-[13px] text-muted-foreground">{def.desc}</p>
 
-      {/* Carte du n°1 */}
-      <div className="mb-5 flex flex-col items-center gap-2.5">
+      {/* Desktop : carte du n°1 à gauche (collante), classement à droite. */}
+      <div className="lg:grid lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start lg:gap-8">
+        {/* Carte du n°1 */}
+        <div className="mb-5 flex flex-col items-center gap-2.5 lg:sticky lg:top-24 lg:mb-0 lg:rounded-3xl lg:bg-card lg:py-6">
         <div className="flex items-center gap-1.5">
           <span className="text-lg font-bold text-primary tabular-nums">#1</span>
           <span className="text-sm font-bold tracking-tight tabular-nums">
@@ -147,6 +150,7 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
             </div>
           );
         })}
+        </div>
       </div>
     </>
   );
@@ -156,13 +160,16 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
 
 export default function StatsPage() {
   const { me } = useMyPlayer();
-  const [openJ, setOpenJ] = useState<number>(JOURNEES[JOURNEES.length - 1].j);
+  const { journees: JOURNEES } = useSeason();
+  // 0 = état par défaut (dernière journée ouverte), -1 = tout fermé, N = journée N.
+  const [openJ, setOpenJ] = useState<number>(0);
   const [ranking, setRanking] = useState<string>("pp");
 
   const rankingDef = RANKINGS.find((r) => r.id === ranking) ?? RANKINGS[0];
+  const lastJ = JOURNEES[JOURNEES.length - 1]?.j;
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 px-5 py-4 sm:py-8">
+    <div className="mx-auto flex max-w-3xl flex-col gap-4 px-5 py-4 sm:py-8 lg:max-w-5xl">
       <div className="mb-1">
         <p className="text-[13px] font-medium text-muted-foreground">
           Saison 1 · Après la journée {JOURNEES.length}
@@ -203,15 +210,15 @@ export default function StatsPage() {
 
         {/* ===== MATCHS ===== */}
         <TabsContent value="matchs" className="mt-4">
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start">
             {[...JOURNEES].reverse().map((j) => {
-              const open = openJ === j.j;
+              const open = openJ === 0 ? j.j === lastJ : openJ === j.j;
               const scoreSummary = journeeScoreSummary(j);
 
               return (
                 <div key={j.j} className="overflow-hidden rounded-3xl bg-card">
                   <button
-                    onClick={() => setOpenJ(open ? 0 : j.j)}
+                    onClick={() => setOpenJ(open ? -1 : j.j)}
                     className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
                   >
                     <div>
@@ -290,13 +297,20 @@ export default function StatsPage() {
                                           key={p.name}
                                           className="flex items-center justify-between text-[13px]"
                                         >
-                                          <span
-                                            className={cn(
-                                              "truncate font-medium",
-                                              p.name === me && "text-primary"
+                                          <span className="flex min-w-0 items-center gap-1.5">
+                                            <span
+                                              className={cn(
+                                                "truncate font-medium",
+                                                p.name === me && "text-primary"
+                                              )}
+                                            >
+                                              {p.name}
+                                            </span>
+                                            {p.note && (
+                                              <span className="shrink-0 rounded-full bg-primary/12 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-primary uppercase">
+                                                {p.note}
+                                              </span>
                                             )}
-                                          >
-                                            {p.name}
                                           </span>
                                           <span className="shrink-0 text-xs text-muted-foreground">
                                             {p.buts}b · {p.passes}pd
