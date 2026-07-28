@@ -19,6 +19,18 @@ const CardCanvas = dynamic(() => import("./card-3d-canvas").then((m) => m.CardCa
   ssr: false,
 });
 
+// Le voile de chargement est en z-[200] : tout ce qui doit s'afficher
+// par-dessus l'app au démarrage (pop-up, invite d'installation…) doit
+// attendre sa disparition, sinon ça s'ouvre derrière lui sans être vu.
+export const SPLASH_DONE_EVENT = "sfl-splash-done";
+
+let splashFinished = false;
+
+/** Vrai une fois l'écran de chargement retiré (pour les montages tardifs). */
+export function isSplashDone() {
+  return splashFinished;
+}
+
 const MIN_DISPLAY_MS = 650;
 const PRELOAD_COUNT = 10;
 
@@ -79,7 +91,10 @@ export function AppSplash() {
 
       const wait = Math.max(0, MIN_DISPLAY_MS - (Date.now() - start));
       setTimeout(() => {
-        if (!cancelled) setReady(true);
+        if (cancelled) return;
+        setReady(true);
+        splashFinished = true;
+        window.dispatchEvent(new Event(SPLASH_DONE_EVENT));
       }, wait);
     }
 
