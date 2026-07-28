@@ -14,18 +14,6 @@ import { PlayerProvider } from "@/components/sfl/player-provider";
 import { SeasonProvider } from "@/components/sfl/season-provider";
 import { CardViewerProvider } from "@/components/sfl/card-viewer";
 import { AppSplash } from "@/components/sfl/app-splash";
-import { DeployTestDialog } from "@/components/sfl/deploy-test-dialog";
-
-// TEMPORAIRE — repères du build pour la pop-up de test de déploiement.
-// Évalués ici, dans un composant serveur, donc figés au `next build` :
-// la même valeur part dans le HTML prérendu et dans l'hydratation.
-// Vercel expose le SHA du commit déployé ; en local on affiche "local".
-const BUILD_COMMIT = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";
-const BUILD_AT = new Intl.DateTimeFormat("fr-FR", {
-  dateStyle: "short",
-  timeStyle: "short",
-  timeZone: "Europe/Paris",
-}).format(new Date());
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -116,7 +104,6 @@ export default function RootLayout({
                 </div>
                 <BottomNav />
                 <InstallPrompt />
-                <DeployTestDialog commit={BUILD_COMMIT} builtAt={BUILD_AT} />
                 <Toaster position="top-center" />
               </TooltipProvider>
             </CardViewerProvider>
