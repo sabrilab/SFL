@@ -489,11 +489,35 @@ passe en clair dans le code pour le seul profil admin.
   au classement avec leur historique. Une fiche non revendiquée n'est pas une
   fiche morte, juste une fiche sans compte associé.
 
-### Visibilité
+### Visibilité — tranché ✅ : ligue publique
 
-Feed, classements et cartes consultables **sans compte** — c'est le levier de
-partage et de croissance. Tout ce qui écrit (voter, discuter, répondre à une
-convocation, publier une vidéo) exige un compte.
+Classements, cartes et récaps de journée sont consultables **sans compte**.
+C'est le levier de partage et de croissance : une carte partageable par lien,
+c'est le réflexe qu'on veut capter.
+
+Tout ce qui **écrit** (voter, discuter, répondre à une convocation, publier une
+vidéo) exige un compte.
+
+> 🔴 **« Public » ne peut pas s'appliquer à tout le feed.** Le feed contiendra
+> des vidéos de personnes réelles, identifiées nommément. Une ligue publique ne
+> veut pas dire des vidéos publiques : diffuser sans compte des vidéos de
+> joueurs identifiés, c'est un problème de vie privée, pas un choix de produit.
+>
+> **Découpage à appliquer :**
+>
+> | Contenu | Sans compte |
+> |---|:--:|
+> | Classements, statistiques, cartes joueurs | ✅ |
+> | Récap de journée (résultats, faits marquants) | ✅ |
+> | Profils publics (carte, badges, palmarès) | ✅ |
+> | **Vidéos** | ❌ réservé aux membres |
+> | **Discussions** | ❌ réservé aux membres |
+> | **Votes et convocations** | ❌ réservé aux membres |
+>
+> Concrètement : le feed est public, mais **filtré** — un visiteur sans compte
+> voit les modules d'information, de récompense et de classement, jamais les
+> vidéos ni les discussions. À confirmer, mais c'est le défaut que je poserai
+> faute d'instruction contraire.
 
 ---
 
@@ -575,16 +599,41 @@ faire. Le roster à 59 entrées est correct en l'état.
 **Tranché ✅ — Contre-poids à l'inflation.** Ce sera un **reset saisonnier avec
 réévaluation des joueurs par des tests**. Voir §7.
 
+**Tranché ✅ — Ligue publique.** Classements, cartes et récaps consultables sans
+compte ; vidéos, discussions et votes réservés aux membres. Voir §9.
+
+**Reporté ⏸️ — Honneurs de la J6.** La répartition Impact / Défensive reste celle
+déduite de la position des colonnes (§13). Sera revue plus tard, à l'occasion de
+la reprise de la saisie.
+
 **Encore ouvert :**
 
-1. **Honneurs de la J6** : la répartition Impact / Défensive est déduite de la position des colonnes. À confirmer (voir §12).
-2. **Le nœud « Contenu »** de la mind map d'origine était coupé sur l'image.
-3. **Ligue publique ou fermée** : le feed et les classements sont-ils consultables sans compte ?
-4. **Les tests de réévaluation** : quelle forme prennent-ils concrètement (voir §7) ?
+1. **Le nœud « Contenu »** de la mind map d'origine était coupé sur l'image.
+2. **Les tests de réévaluation** : quelle forme prennent-ils concrètement (voir §7) ?
 
 ---
 
-## 12. Journée 6 — saisie ✅
+## 12 bis. Méthode de validation
+
+**Pas de suite de tests automatisés pour l'instant.** La validation se fait
+manuellement sur le déploiement Vercel : chaque commit part en production, et le
+rendu est vérifié à l'œil sur l'app en ligne.
+
+Conséquence à assumer : les seuls filets automatiques sont `tsc`, `eslint` et
+`next build`, qui sont systématiquement passés avant chaque push. Ils attrapent
+les erreurs de type et de compilation, **jamais une régression visuelle ou de
+comportement**. Toute régression d'affichage sera découverte par un humain, sur
+le site.
+
+C'est un choix raisonnable au stade actuel. Il le sera beaucoup moins quand le
+moteur de cartes, le vote irréversible et les paiements de points Pépite seront
+en place : à ce moment-là, un test de non-régression sur `deriveSeason()` (le
+« test golden » du lot 0) devient indispensable, parce qu'une erreur y réécrit
+silencieusement l'historique de toute la ligue.
+
+---
+
+## 13. Journée 6 — saisie ✅
 
 **26/07/2026**, 22 joueurs, 2 matchs (Orange vs Bleu, Vert vs Jaune).
 
