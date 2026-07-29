@@ -140,6 +140,20 @@ const GLYPHS = {
   scale: Scale,
 };
 
+/**
+ * Disposition du bloc des 6 stats.
+ * - `row`   : les 6 alignées sur une seule ligne (disposition d'origine)
+ * - `fut`   : 2 colonnes de 3, libellé à gauche / valeur à droite — la
+ *             convention des vraies cartes de foot, la plus lisible
+ * - `stack` : 2 colonnes de 3, libellé au-dessus de la valeur, centré
+ * - `bars`  : comme `fut`, plus une micro-jauge de niveau sous chaque stat
+ */
+export type StatsLayout = "row" | "fut" | "stack" | "bars";
+
+// Échelle des jauges : on part de 50 plutôt que de 0, sinon toutes les
+// barres sont pleines aux trois quarts et ne distinguent plus rien.
+const BAR_FLOOR = 50;
+
 export function CardShell({
   theme,
   size = 1,
@@ -149,6 +163,7 @@ export function CardShell({
   stats,
   photoName,
   highlightStats,
+  statsLayout = "row",
 }: {
   theme: CardTheme;
   size?: number;
@@ -158,6 +173,7 @@ export function CardShell({
   stats: Stats;
   photoName: string;
   highlightStats?: StatKey[];
+  statsLayout?: StatsLayout;
 }) {
   const rawId = useId();
   const fid = `sfl-brush-${rawId.replace(/[^a-zA-Z0-9]/g, "")}`;
@@ -416,48 +432,133 @@ export function CardShell({
               position: "absolute",
               left: S(14),
               right: S(14),
-              top: S(252),
+              // Trois lignes au lieu d'une : le bloc remonte pour tenir
+              // sous le nom sans déborder du bas de la carte.
+              top: S(statsLayout === "row" ? 252 : 240),
               borderTop: `1px solid ${th.divider}`,
-              paddingTop: S(9),
+              paddingTop: S(statsLayout === "row" ? 9 : 7),
               display: "grid",
-              gridTemplateColumns: "repeat(6,1fr)",
+              // `column` remplit colonne par colonne : VIT/TIR/PAS à gauche,
+              // DRI/DEF/PHY à droite — et non en zigzag ligne par ligne.
+              ...(statsLayout === "row"
+                ? { gridTemplateColumns: "repeat(6,1fr)" }
+                : {
+                    gridTemplateColumns: "repeat(2,1fr)",
+                    gridTemplateRows: "repeat(3,1fr)",
+                    gridAutoFlow: "column",
+                    columnGap: S(12),
+                  }),
               zIndex: 4,
             }}
           >
             {STAT_KEYS.map((k) => {
               const active = highlightStats?.includes(k);
+              const labelColor = active ? th.accent : th.label;
+              const valueColor = active ? th.accent : th.text;
+              const cell = {
+                borderRadius: S(7),
+                background: active ? `${th.accent}26` : "transparent",
+                boxShadow: active ? `0 0 0 ${S(1.2)}px ${th.accent}66` : "none",
+              };
+
+              if (statsLayout === "row") {
+                return (
+                  <div key={k} style={{ ...cell, textAlign: "center", padding: `${S(2)}px 0` }}>
+                    <div
+                      style={{
+                        fontSize: S(8.5),
+                        fontWeight: 800,
+                        letterSpacing: S(1),
+                        color: labelColor,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {k}
+                    </div>
+                    <div style={{ ...display, fontSize: S(21), lineHeight: 1.15, color: valueColor }}>
+                      {stats[k]}
+                    </div>
+                  </div>
+                );
+              }
+
+              if (statsLayout === "stack") {
+                return (
+                  <div key={k} style={{ ...cell, textAlign: "center", padding: `${S(1)}px 0` }}>
+                    <div
+                      style={{
+                        fontSize: S(8),
+                        fontWeight: 800,
+                        letterSpacing: S(1),
+                        color: labelColor,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {k}
+                    </div>
+                    <div style={{ ...display, fontSize: S(19), lineHeight: 1.05, color: valueColor }}>
+                      {stats[k]}
+                    </div>
+                  </div>
+                );
+              }
+
+              // `fut` et `bars` : libellé à gauche, valeur à droite, alignés
+              // sur la même ligne de base — la lecture se fait en colonne.
               return (
-                <div
-                  key={k}
-                  style={{
-                    textAlign: "center",
-                    borderRadius: S(8),
-                    padding: `${S(2)}px 0`,
-                    background: active ? `${th.accent}26` : "transparent",
-                    boxShadow: active ? `0 0 0 ${S(1.2)}px ${th.accent}66` : "none",
-                  }}
-                >
+                <div key={k} style={{ ...cell, padding: `${S(1)}px ${S(3)}px` }}>
                   <div
                     style={{
-                      fontSize: S(8.5),
-                      fontWeight: 800,
-                      letterSpacing: S(1),
-                      color: active ? th.accent : th.label,
-                      textTransform: "uppercase",
+                      display: "flex",
+                      alignItems: "baseline",
+                      justifyContent: "space-between",
+                      gap: S(4),
                     }}
                   >
-                    {k}
+                    <span
+                      style={{
+                        fontSize: S(9),
+                        fontWeight: 800,
+                        letterSpacing: S(0.8),
+                        color: labelColor,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {k}
+                    </span>
+                    <span
+                      style={{
+                        ...display,
+                        fontSize: S(20),
+                        lineHeight: 1,
+                        color: valueColor,
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {stats[k]}
+                    </span>
                   </div>
-                  <div
-                    style={{
-                      ...display,
-                      fontSize: S(21),
-                      lineHeight: 1.15,
-                      color: active ? th.accent : th.text,
-                    }}
-                  >
-                    {stats[k]}
-                  </div>
+                  {statsLayout === "bars" && (
+                    <div
+                      style={{
+                        height: S(2),
+                        marginTop: S(1.5),
+                        borderRadius: S(2),
+                        background: `${th.label}33`,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${Math.max(0, Math.min(100, ((stats[k] - BAR_FLOOR) / (99 - BAR_FLOOR)) * 100))}%`,
+                          background: active ? th.accent : th.text,
+                          opacity: active ? 1 : 0.55,
+                          borderRadius: S(2),
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}

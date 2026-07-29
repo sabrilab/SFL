@@ -2,7 +2,7 @@
 // Standard (parchemin, coups de pinceau orange/noir) et Rare (noir & or).
 // Indépendante du thème clair/sombre, comme une carte physique.
 
-import { CardShell, type CardTheme } from "./card-shell";
+import { CardShell, type CardTheme, type StatsLayout } from "./card-shell";
 import { ovr, rareStats, type Player, type StatKey } from "@/lib/sfl/engine";
 
 const IDENTITY_THEMES: Record<"simple" | "rare", CardTheme> = {
@@ -73,11 +73,13 @@ export function PlayerCard({
   mode = "rare",
   size = 1,
   highlightStats,
+  statsLayout,
 }: {
   player: Player;
   mode?: CardMode;
   size?: number;
   highlightStats?: StatKey[];
+  statsLayout?: StatsLayout;
 }) {
   const stats = mode === "rare" ? rareStats(player.stats) : player.stats;
   return (
@@ -90,6 +92,7 @@ export function PlayerCard({
       stats={stats}
       photoName={player.name}
       highlightStats={highlightStats}
+      statsLayout={statsLayout}
     />
   );
 }
