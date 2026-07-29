@@ -287,8 +287,30 @@ Un joueur régulier qui prend MVP + Impact chaque mois via EvoDay
 le système continue de verser des points dans le vide. L'écart de gains
 mensuels entre un régulier et un occasionnel atteint **16 contre 1**.
 
-**Il manque un contre-poids** : reset saisonnier, décroissance pour les absents,
-ou budget global de points par journée. À trancher.
+### Le contre-poids retenu : reset saisonnier + tests ✅
+
+**Décision : à chaque fin de saison, les cartes sont remises à plat et les
+joueurs sont réévalués par des tests.** La note de base ne se traîne pas d'une
+saison à l'autre ; elle est re-mesurée.
+
+C'est le bon choix, et pour une raison qui dépasse l'équilibrage : il transforme
+une contrainte technique en **événement de ligue**. La journée de tests devient
+un rendez-vous, un contenu pour le feed, une source de vidéos et de badges. On
+récupère de l'engagement là où un simple « decay » automatique n'aurait produit
+que de la frustration.
+
+Points à spécifier :
+
+- **Forme des tests** : épreuves physiques et techniques ? vote entre joueurs ?
+  notation par l'admin ? mixte ? *(question ouverte)*
+- **Ce qui est remis à zéro** : les stats de base seulement, ou aussi les PP, la
+  collection, les badges ? Recommandation : les stats et les PP repartent, la
+  **collection et les badges se conservent** — c'est le capital qui donne envie
+  de rester d'une saison à l'autre.
+- **Archivage** : chaque saison passée doit rester consultable (palmarès,
+  anciennes cartes). D'où le besoin de `saison_id` dès le lot 0.
+- **Nouveaux arrivants** : ils entrent par les mêmes tests, ce qui règle
+  élégamment le problème du « nouveau à 75 » sans rattrapage.
 
 ### Points Pépite discrétionnaires (nouveau)
 
@@ -416,23 +438,55 @@ badges et le Profil.
 
 ---
 
-## 9. Authentification — la stratégie retenue
+## 9. Authentification et revendication de profil ✅ *(spécifié)*
 
-Les joueurs **existent déjà** avec 6 journées d'historique. Il ne faut donc pas
-créer des comptes vierges mais permettre de **revendiquer** un profil existant.
+Les joueurs **existent déjà** avec 6 journées d'historique et 59 fiches. On ne
+crée donc pas des comptes vierges : chacun **revendique** le profil qui lui
+correspond.
 
-- **Joueur existant** : il se connecte, choisit son nom dans le roster, et la
-  revendication est validée par un **code d'invitation**. Il récupère son
-  historique, ses PP, ses cartes.
-- **Nouveau joueur** : compte créé, carte de base neutre à 75, en attente de
-  notation. C'est déjà la convention du code (`base: null` → 75).
-- **La validation n'est pas optionnelle.** Toute l'app repose sur l'ego et le
-  classement : si n'importe qui peut se déclarer « Ilyes », le système perd sa
-  valeur.
-- **Méthode** : Google/Apple OAuth, lien magique e-mail en secours. Pas de SMS
-  (coût par envoi, aucun bénéfice à cette échelle).
-- **Visibilité** : feed, classements et cartes consultables **sans compte**
-  (levier de partage et de croissance) ; tout ce qui écrit exige un compte.
+### Le parcours de première connexion
+
+1. Le joueur se connecte (Google/Apple OAuth, lien magique e-mail en secours —
+   **pas de SMS**, coût par envoi sans bénéfice à cette échelle).
+2. **Écran « Qui es-tu ? »** — la liste de **tous les joueurs du roster** encore
+   disponibles. Recherche indispensable : 59 entrées, ce n'est pas une liste
+   qu'on parcourt au doigt.
+3. Il choisit sa fiche. **Elle disparaît immédiatement de la liste des autres.**
+4. Il récupère tout son historique : PP, matchs, buts, passes, cartes, badges.
+5. **« Je ne suis pas dans la liste »** → création d'une fiche neuve, sans note,
+   évaluée aux prochains tests (voir §7).
+
+C'est ce parcours qui remplace l'actuel sélecteur de profil du header — lequel
+laisse aujourd'hui n'importe qui incarner n'importe quel joueur, avec un mot de
+passe en clair dans le code pour le seul profil admin.
+
+### Les pièges à traiter
+
+- **🔴 L'exclusivité doit être atomique côté serveur.** Deux joueurs qui
+  choisissent la même fiche à la même seconde, c'est une contrainte
+  `UNIQUE(player_id)` sur la table des revendications, pas une vérification en
+  JavaScript. Une revendication est un `INSERT` qui échoue proprement.
+- **🔴 Rien n'empêche quelqu'un de se déclarer « Ilyes ».** Premier arrivé,
+  premier servi, sur le n°1 du classement. Il faut un garde-fou. Trois options,
+  à trancher :
+  1. **Code d'invitation** distribué par l'admin — le plus simple, le plus sûr.
+  2. **Validation a posteriori** par l'admin : la revendication est en attente
+     tant qu'elle n'est pas approuvée.
+  3. **Fenêtre de contestation** : la fiche est attribuée mais reste
+     contestable quelques jours par le groupe.
+- **Se tromper de fiche est inévitable.** L'admin doit pouvoir **libérer** une
+  fiche revendiquée par erreur. Prévoir l'opération inverse dès le départ.
+- **Traçabilité** : qui a revendiqué quoi et quand. C'est une opération
+  sensible, elle doit être journalisée.
+- **Fiches jamais revendiquées** : les joueurs qui ne s'inscrivent pas restent
+  au classement avec leur historique. Une fiche non revendiquée n'est pas une
+  fiche morte, juste une fiche sans compte associé.
+
+### Visibilité
+
+Feed, classements et cartes consultables **sans compte** — c'est le levier de
+partage et de croissance. Tout ce qui écrit (voter, discuter, répondre à une
+convocation, publier une vidéo) exige un compte.
 
 ---
 
@@ -441,7 +495,7 @@ créer des comptes vierges mais permettre de **revendiquer** un profil existant.
 ### Lot 0 — Assainissement (⚠️ point de non-retour, purement local)
 
 1. UUID `player_id` + `display_name` + `username` unique ; `id` sur chaque ligne de match.
-2. Fusionner / arbitrer les doublons : `Selim` / `Selim laouadi`, `Sofiane` / `Soffiane`, `Yacine` / `Yacine Ben`.
+2. ~~Fusionner les doublons~~ — **sans objet** : tous les homonymes sont des joueurs distincts (§11).
 3. Dates en ISO, ajout de `saison_id`, versionnement du barème (`ruleset_id`).
 4. Supprimer `data.ts` (double source de vérité).
 5. **Test golden** : `deriveSeason(seed)` doit reproduire les PP actuels au point près.
@@ -452,8 +506,9 @@ créer des comptes vierges mais permettre de **revendiquer** un profil existant.
 ### Lot 1 — Fondations serveur
 6. Schéma Postgres + RLS + rôle admin serveur.
 7. `SaisieStore` asynchrone et à grain fin.
-8. Auth + revendication de profil + usernames.
-9. Migration des 6 journées historiques.
+8. **Auth + écran de revendication de profil** (§9) + usernames.
+9. Libération d'une fiche par l'admin + journal des revendications.
+10. Migration des 6 journées historiques.
 
 ### Lot 2 — Moteur de jeu
 10. Cartes Boost à partir de la Rare **et différenciation réelle des 3 cartes**.
@@ -501,13 +556,24 @@ créer des comptes vierges mais permettre de **revendiquer** un profil existant.
 
 ## 11. Questions ouvertes
 
-1. **`Yacine` / `Yacine Ben`** : deux personnes distinctes ? *(hypothèse retenue : oui — le classeur les distingue, sous l'orthographe « Yassine Ben »)*
-2. **`Sofiane` / `Soffiane`** : deux personnes distinctes ? *(le classeur donne deux jeux de notes différents)*
-3. **`Selim` / `Selim laouadi`** : même personne ?
-4. **Honneurs de la J6** : la répartition Impact / Défensive est déduite de la position des colonnes. À confirmer (voir §12).
-5. **Contre-poids à l'inflation** : reset saisonnier, décroissance, ou budget global ?
-6. **Le nœud « Contenu »** de la mind map d'origine était coupé sur l'image.
-7. **Ligue publique ou fermée** : le feed et les classements sont-ils consultables sans compte ?
+**Tranché ✅ — Homonymes.** `Yacine` / `Yacine Ben`, `Sofiane` / `Soffiane`,
+`Selim` / `Selim laouadi` sont **tous des joueurs différents**. Aucune fusion à
+faire. Le roster à 59 entrées est correct en l'état.
+
+> ⚠️ Cela ne supprime pas le besoin d'UUID : dès qu'on introduit les usernames,
+> un joueur qui change de pseudo casserait son historique tant que le nom sert
+> de clé primaire. Le lot 0 reste obligatoire, seule l'étape « fusion des
+> doublons » disparaît.
+
+**Tranché ✅ — Contre-poids à l'inflation.** Ce sera un **reset saisonnier avec
+réévaluation des joueurs par des tests**. Voir §7.
+
+**Encore ouvert :**
+
+1. **Honneurs de la J6** : la répartition Impact / Défensive est déduite de la position des colonnes. À confirmer (voir §12).
+2. **Le nœud « Contenu »** de la mind map d'origine était coupé sur l'image.
+3. **Ligue publique ou fermée** : le feed et les classements sont-ils consultables sans compte ?
+4. **Les tests de réévaluation** : quelle forme prennent-ils concrètement (voir §7) ?
 
 ---
 
