@@ -6,6 +6,7 @@
 
 import { useId, useState } from "react";
 import { STAT_KEYS, type Stats, type StatKey } from "@/lib/sfl/engine";
+import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { Crown, Flame, ShieldCheck, Gem, Star, Target, Send, BadgeCheck, Scale } from "lucide-react";
 
 export const display = {
@@ -177,7 +178,14 @@ export function CardShell({
 }) {
   const rawId = useId();
   const fid = `sfl-brush-${rawId.replace(/[^a-zA-Z0-9]/g, "")}`;
-  const [photoState, setPhotoState] = useState<"loading" | "ok" | "none">("loading");
+  const photoUrl = usePlayerPhoto(photoName);
+  // On mémorise l'URL chargée / en échec plutôt qu'un simple état : quand le
+  // joueur ajoute sa photo, l'URL change et la carte retente le chargement.
+  // Avec un booléen, une carte passée en échec le serait restée pour toujours.
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const photoOk = loadedUrl === photoUrl;
+  const photoFailed = failedUrl === photoUrl;
   const S = (n: number) => n * size;
   const th = theme;
   const Glyph = th.glyph ? GLYPHS[th.glyph] : null;
@@ -281,24 +289,24 @@ export function CardShell({
               zIndex: 2,
             }}
           >
-            {photoState !== "none" && (
+            {!photoFailed && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={`/players/${photoName}.png`}
+                src={photoUrl}
                 alt=""
-                onLoad={() => setPhotoState("ok")}
-                onError={() => setPhotoState("none")}
+                onLoad={() => setLoadedUrl(photoUrl)}
+                onError={() => setFailedUrl(photoUrl)}
                 style={{
                   width: "100%",
                   height: "100%",
                   objectFit: "cover",
                   objectPosition: "50% 12%",
                   filter: "drop-shadow(0 6px 14px rgba(0,0,0,.35))",
-                  visibility: photoState === "ok" ? "visible" : "hidden",
+                  visibility: photoOk ? "visible" : "hidden",
                 }}
               />
             )}
-            {photoState !== "ok" && (
+            {!photoOk && (
               <div
                 style={{
                   ...display,

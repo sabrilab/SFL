@@ -163,6 +163,23 @@ Deux experts indépendants l'ont pointé : **c'est la seule fonctionnalité du p
 qui peut réellement prendre la place de Snapchat.** Snapchat ne se bat pas sur du
 texte. Un avatar 3D sans visage ne remplace pas un snap.
 
+### Photos de profil ✅ *(livré)*
+
+**Décidé : un système de photo de profil façon réseau social**, en attendant de
+reprendre l'avatar 3D. Chaque joueur choisit une image, recadrée en carré et
+recompressée automatiquement (512 px, JPEG) ; elle alimente sa carte et la
+bannière MVP.
+
+- `lib/sfl/photos.ts` isole le stockage, comme `saisie/store.ts` : aujourd'hui
+  des data URL en `localStorage`, demain des URL Supabase Storage. **Aucun
+  composant ne construit plus le chemin `/players/{nom}.png` lui-même** — tout
+  passe par `photoSrc()`.
+- ⚠️ **Limite actuelle** : la photo reste sur l'appareil qui l'a choisie. Les
+  autres joueurs ne la voient pas tant que le stockage n'est pas distant. C'est
+  le lot 1 qui lève cette limite, sans toucher à l'interface.
+- ⚠️ Le quota `localStorage` (~5 Mo pour tout le domaine, saison comprise) est
+  la raison de la recompression. Un dépassement est intercepté et signalé.
+
 ### À spécifier avant de coder
 
 - Stockage (Supabase Storage), quotas, formats, compression, durée max.

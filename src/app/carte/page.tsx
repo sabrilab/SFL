@@ -9,6 +9,7 @@ import { Card3D } from "@/components/sfl/card-3d";
 import { ViewableCard } from "@/components/sfl/card-viewer";
 import { PlayerCard, type CardMode } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
+import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { useSeason } from "@/components/sfl/season-provider";
 import { BAREME } from "@/lib/sfl/data";
 import {
@@ -122,9 +123,14 @@ export default function CartePage() {
         />
       </section>
 
-      {/* Avatar 3D — point d'entrée masqué volontairement : la création
-          d'avatar n'est pas encore prête à être montrée (pas de visage,
-          pas de photos). L'écran reste accessible en direct sur /avatar. */}
+      {/* Photo de profil. En attendant l'avatar 3D (point d'entrée masqué
+          volontairement, écran toujours accessible sur /avatar), c'est elle
+          qui donne un visage à la carte. */}
+      <section>
+        <div className="glass rounded-2xl p-4">
+          <ProfilePhoto name={player.name} />
+        </div>
+      </section>
 
       {/* Cartes Boost */}
       <section>

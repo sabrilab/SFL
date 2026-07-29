@@ -9,9 +9,16 @@ import Link from "next/link";
 import { Crown } from "lucide-react";
 import { display, condensed } from "./card-shell";
 import { ovr, type Player } from "@/lib/sfl/engine";
+import { usePlayerPhoto } from "@/hooks/use-player-photo";
 
 export function MvpBanner({ player, titles }: { player: Player; titles: number }) {
-  const [photoState, setPhotoState] = useState<"loading" | "ok" | "none">("loading");
+  const photoUrl = usePlayerPhoto(player.name);
+  // Voir card-shell : on suit l'URL et non un état, pour que l'ajout d'une
+  // photo relance le chargement au lieu de rester bloqué sur l'échec.
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const photoOk = loadedUrl === photoUrl;
+  const photoFailed = failedUrl === photoUrl;
   const note = ovr(player.stats);
 
   return (
@@ -40,18 +47,18 @@ export function MvpBanner({ player, titles }: { player: Player; titles: number }
 
       {/* Photo, à droite, qui déborde jusqu'au bord */}
       <div className="absolute inset-y-0 right-0 w-[46%]">
-        {photoState !== "none" && (
+        {!photoFailed && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={`/players/${player.name}.png`}
+            src={photoUrl}
             alt=""
-            onLoad={() => setPhotoState("ok")}
-            onError={() => setPhotoState("none")}
+            onLoad={() => setLoadedUrl(photoUrl)}
+            onError={() => setFailedUrl(photoUrl)}
             className="absolute inset-0 h-full w-full object-cover object-top"
-            style={{ visibility: photoState === "ok" ? "visible" : "hidden" }}
+            style={{ visibility: photoOk ? "visible" : "hidden" }}
           />
         )}
-        {photoState !== "ok" && (
+        {!photoOk && (
           <div
             style={{
               ...display,
