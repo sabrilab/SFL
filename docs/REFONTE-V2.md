@@ -460,20 +460,27 @@ C'est ce parcours qui remplace l'actuel sélecteur de profil du header — leque
 laisse aujourd'hui n'importe qui incarner n'importe quel joueur, avec un mot de
 passe en clair dans le code pour le seul profil admin.
 
+> **Calendrier — tranché ✅ : cet écran arrive avec le lot 1, pas avant.**
+> L'exclusivité (« une fois pris, plus disponible ») exige un état partagé entre
+> appareils : elle est **impossible à honorer sans serveur**. En construire une
+> version locale donnerait une fausse impression de fonctionnement, deux
+> téléphones pouvant choisir la même fiche. Le sélecteur de profil actuel reste
+> donc en place jusqu'à l'arrivée de Supabase.
+
 ### Les pièges à traiter
 
 - **🔴 L'exclusivité doit être atomique côté serveur.** Deux joueurs qui
   choisissent la même fiche à la même seconde, c'est une contrainte
   `UNIQUE(player_id)` sur la table des revendications, pas une vérification en
   JavaScript. Une revendication est un `INSERT` qui échoue proprement.
-- **🔴 Rien n'empêche quelqu'un de se déclarer « Ilyes ».** Premier arrivé,
-  premier servi, sur le n°1 du classement. Il faut un garde-fou. Trois options,
-  à trancher :
-  1. **Code d'invitation** distribué par l'admin — le plus simple, le plus sûr.
-  2. **Validation a posteriori** par l'admin : la revendication est en attente
-     tant qu'elle n'est pas approuvée.
-  3. **Fenêtre de contestation** : la fiche est attribuée mais reste
-     contestable quelques jours par le groupe.
+- **Usurpation — tranché ✅ : code d'invitation.** Sans garde-fou, le premier
+  connecté peut se déclarer « Ilyes » et récupérer les PP du leader. La
+  revendication exigera donc un **code distribué par l'admin**. C'est la seule
+  option qui bloque *avant* que le mal soit fait, et elle protège en prime
+  contre les inconnus qui tomberaient sur l'app.
+  À préciser au moment de l'implémentation : un code unique pour la ligue, ou
+  un code par joueur (plus sûr, plus lourd à distribuer). Prévoir dans tous les
+  cas une **limitation du nombre d'essais** — un code court se devine.
 - **Se tromper de fiche est inévitable.** L'admin doit pouvoir **libérer** une
   fiche revendiquée par erreur. Prévoir l'opération inverse dès le départ.
 - **Traçabilité** : qui a revendiqué quoi et quand. C'est une opération
