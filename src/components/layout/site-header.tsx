@@ -185,7 +185,13 @@ export function SiteHeader() {
   }
 
   return (
-    <header className="sticky top-3 z-40 px-4">
+    // Le seuil de `sticky` se mesure depuis le haut réel du conteneur, que le
+    // padding ne décale pas : il faut donc y réintégrer l'inset haut, sinon le
+    // header revient se coller sous l'encoche dès qu'on défile.
+    <header
+      className="sticky z-40 px-4"
+      style={{ top: "calc(env(safe-area-inset-top) + 0.75rem)" }}
+    >
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-2">
         {/* Bulle gauche : logo Golder + ligue courante */}
         <div className="glass flex items-center gap-2 rounded-full py-1.5 pr-1.5 pl-4">

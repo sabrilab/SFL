@@ -164,7 +164,9 @@ export function CardShell({
   stats,
   photoName,
   highlightStats,
-  statsLayout = "row",
+  // Deux colonnes de trois, libellé à gauche et valeur à droite : la
+  // convention des vraies cartes de foot, et le double de largeur par nombre.
+  statsLayout = "fut",
 }: {
   theme: CardTheme;
   size?: number;
@@ -275,17 +277,20 @@ export function CardShell({
             </div>
           )}
 
-          {/* Photo (ou initiale) — buste cadré tête au centre-haut de la carte */}
+          {/* Photo (ou initiale) — médaillon rond, décalé à droite pour
+              laisser le bloc identité (logo, note, poste) respirer à gauche. */}
           <div
             data-card-part="player"
             style={{
               position: "absolute",
-              top: S(32),
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: S(232),
-              height: S(160),
+              top: S(44),
+              right: S(14),
+              width: S(130),
+              height: S(130),
+              borderRadius: "50%",
               overflow: "hidden",
+              boxShadow: `0 0 0 ${S(2)}px ${th.accent}55, 0 ${S(6)}px ${S(16)}px rgba(0,0,0,.35)`,
+              background: `${th.text}0c`,
               zIndex: 2,
             }}
           >
@@ -300,8 +305,9 @@ export function CardShell({
                   width: "100%",
                   height: "100%",
                   objectFit: "cover",
-                  objectPosition: "50% 12%",
-                  filter: "drop-shadow(0 6px 14px rgba(0,0,0,.35))",
+                  // Le visage est haut dans un portrait : on remonte le
+                  // cadrage pour le centrer dans le médaillon.
+                  objectPosition: "50% 22%",
                   visibility: photoOk ? "visible" : "hidden",
                 }}
               />
@@ -315,24 +321,18 @@ export function CardShell({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: S(120),
+                  fontSize: S(66),
                   lineHeight: 1,
-                  color: `${th.text}14`,
-                  WebkitTextStroke: `${S(1.5)}px ${th.text}66`,
+                  color: `${th.text}22`,
+                  WebkitTextStroke: `${S(1.2)}px ${th.text}66`,
                 }}
               >
                 {photoName[0]}
               </div>
             )}
-            {/* Fondu bas de photo : évite la coupe nette du buste détouré */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                background: `linear-gradient(180deg, transparent 68%, ${th.photoFadeTo} 100%)`,
-                pointerEvents: "none",
-              }}
-            />
+            {/* Plus de fondu bas : il servait à masquer la coupe nette d'un
+                buste détouré rectangulaire. Le médaillon rond n'en a pas
+                besoin, et le dégradé y dessinait une ombre disgracieuse. */}
           </div>
 
           {/* Logo + note + poste */}

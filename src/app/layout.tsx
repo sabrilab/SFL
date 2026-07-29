@@ -94,10 +94,19 @@ export default function RootLayout({
                 <AppSplash />
                 <ViewportLock />
                 <ServiceWorkerRegister />
+                {/* En PWA installée, `viewportFit: cover` + barre d'état
+                    translucide font commencer le contenu SOUS l'encoche et la
+                    Dynamic Island. Sans ce décalage, le header (et donc le
+                    sélecteur de profil et le bouton de thème) se retrouve
+                    derrière la barre d'état, difficile voire impossible à
+                    toucher. La tab bar, elle, gère déjà son inset bas. */}
                 <div
                   id="app-scroll"
                   className="flex h-full flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain"
-                  style={{ WebkitOverflowScrolling: "touch" }}
+                  style={{
+                    WebkitOverflowScrolling: "touch",
+                    paddingTop: "env(safe-area-inset-top)",
+                  }}
                 >
                   <SiteHeader />
                   <main className="flex-1 pb-32 md:pb-10">{children}</main>
