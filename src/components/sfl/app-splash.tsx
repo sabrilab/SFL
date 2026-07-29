@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "motion/react";
 import { PLAYERS } from "@/lib/sfl/data";
+import { photoSrc } from "@/lib/sfl/photos";
 
 const CardCanvas = dynamic(() => import("./card-3d-canvas").then((m) => m.CardCanvas), {
   ssr: false,
@@ -62,8 +63,10 @@ export function AppSplash() {
     async function run() {
       const fontsP = document.fonts.ready.then(() => bump(WEIGHTS.fonts));
 
+      // On passe par le résolveur : une photo de profil personnalisée est une
+      // data URL, déjà locale, donc préchauffée sans requête réseau.
       const photos = PLAYERS.slice(0, PRELOAD_COUNT).map((p) =>
-        preloadImage(`/players/${p.name}.png`)
+        preloadImage(photoSrc(p.name))
       );
       const photoStep = WEIGHTS.photos / photos.length;
       const photosP = Promise.all(photos.map((p) => p.then(() => bump(photoStep))));

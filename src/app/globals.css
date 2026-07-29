@@ -200,3 +200,20 @@
       0 5px 12px -8px rgba(20, 12, 4, 0.25);
   }
 }
+
+/* Respect du réglage système « réduire les animations ».
+   L'app anime beaucoup (splash, cartes 3D, transitions de tab bar, bientôt
+   du scrollytelling) : sans cette règle, un utilisateur sensible au
+   mouvement — ou simplement sur un appareil lent — n'a aucun moyen de
+   calmer l'interface. On neutralise les animations et transitions plutôt
+   que de les supprimer, pour que les états finaux restent atteints. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
