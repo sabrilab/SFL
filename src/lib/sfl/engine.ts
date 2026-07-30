@@ -179,19 +179,30 @@ export const emptyAllocation = (): Allocation => ({
   PHY: 0,
 });
 
+/** Plafond du gain de VIT automatique sur un EvoDay (règle officielle). */
+export const AUTO_VIT_MAX = 1;
+
 // Applique une répartition de points sur les stats de base.
-// Règle VIT auto : chaque (+1 DEF ET +1 PHY) simultané offre +1 VIT.
+// Règle VIT auto : un (+1 DEF ET +1 PHY) simultané offre +1 VIT, mais le
+// barème plafonne ce gain à +1 par EvoDay — sans quoi une Défensive
+// (+2 DEF, +2 PHY) offrirait +2 VIT gratuits chaque mois.
 export function buildTargetStats(base: Stats, alloc: Allocation) {
   const out = { ...base };
   for (const k of STAT_KEYS) out[k] += alloc[k] || 0;
-  const autoVit = Math.min(alloc.DEF || 0, alloc.PHY || 0);
+  const autoVit = Math.min(alloc.DEF || 0, alloc.PHY || 0, AUTO_VIT_MAX);
   out.VIT += autoVit;
+  // Plafond d'une statistique : 99.
+  for (const k of STAT_KEYS) out[k] = Math.min(99, out[k]);
   return { out, autoVit };
 }
 
-// Pool de points libres du mois : MVP = 6, Joueur Impact = 3.
-export function freePool(p: Player) {
-  return (p.mvp > 0 ? 6 : 0) + (p.impact > 0 ? 3 : 0);
+/**
+ * Points libres du mois : bonus de tiers au classement Pépite d'Or
+ * (3 / 2 / 1 selon le tiers), + 6 si MVP du mois, + 2 si Joueur Impact.
+ * Le bonus de tiers est passé par l'appelant, qui seul connaît le rang.
+ */
+export function freePool(p: Player, tierPoints = 0) {
+  return tierPoints + (p.mvp > 0 ? 6 : 0) + (p.impact > 0 ? 2 : 0);
 }
 
 // Bonus fixes du mois (appliqués automatiquement, hors pool libre).
@@ -200,8 +211,8 @@ export function fixedBonuses(p: Player): Allocation {
     VIT: 0,
     TIR: p.buts >= 6 ? 3 : 0, // meilleur buteur
     PAS: p.passes >= 6 ? 3 : 0, // meilleur passeur
-    DRI: 0,
+    DRI: p.impact > 0 ? 1 : 0, // Joueur Impact du mois
     DEF: p.def > 0 ? 2 : 0, // titre Défensive
-    PHY: (p.matchs >= 3 ? 1 : 0) + (p.def > 0 ? 2 : 0), // présence 100% + Défensive
+    PHY: (p.matchs >= 3 ? 1 : 0) + (p.def > 0 ? 2 : 0), // présence parfaite + Défensive
   };
 }

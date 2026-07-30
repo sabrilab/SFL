@@ -50,7 +50,10 @@ export default function CartePage() {
   const myRank = RANKED.find((p) => p.name === player.name)?.rank ?? RANKED.length;
   const myBoosts = boostCards.filter((c) => c.player === player.name);
 
-  const pool = freePool(player);
+  // Le bonus de tiers fait partie des points libres du mois : il était
+  // calculé et affiché, mais jamais versé au joueur.
+  const tierPts = tierBonus(myRank, RANKED.length);
+  const pool = freePool(player, tierPts);
   const fixed = useMemo(() => fixedBonuses(player), [player]);
   const used = STAT_KEYS.reduce((a, k) => a + alloc[k], 0);
   const remaining = pool - used;
@@ -77,13 +80,14 @@ export default function CartePage() {
     player.mvp > 0 && (["MVP du mois", "6 pts OVR — libres", "text-[#c9962e] dark:text-[#E8C87A]"] as const),
     player.buts >= 6 && (["Meilleur buteur", "+3 en TIR", "text-primary"] as const),
     player.passes >= 6 && (["Meilleur passeur", "+3 en PAS", "text-primary"] as const),
-    player.impact > 0 && (["Impact du mois", "3 pts OVR — libres", "text-sky-600 dark:text-sky-400"] as const),
+    player.impact > 0 &&
+      (["Impact du mois", "2 pts libres · +1 DRI", "text-sky-600 dark:text-sky-400"] as const),
     player.def > 0 &&
-      (["Défensive du mois", "+2 DEF · +2 PHY (→ +2 VIT)", "text-violet-600 dark:text-violet-400"] as const),
-    player.matchs >= 3 && (["Présence 100%", "+1 PHY", "text-emerald-600 dark:text-emerald-400"] as const),
+      (["Défensive du mois", "+2 DEF · +2 PHY (→ +1 VIT)", "text-violet-600 dark:text-violet-400"] as const),
+    player.matchs >= 3 && (["Présence parfaite", "+1 PHY", "text-emerald-600 dark:text-emerald-400"] as const),
     [
       "Tiers Pépite d'Or",
-      `+${tierBonus(myRank, RANKED.length)} pts OVR`,
+      `${tierPts} pts libres`,
       "text-[#c9962e] dark:text-[#E8C87A]",
     ] as const,
   ].filter(Boolean) as (readonly [string, string, string])[];
