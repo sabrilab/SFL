@@ -180,6 +180,37 @@ bannière MVP.
 - ⚠️ Le quota `localStorage` (~5 Mo pour tout le domaine, saison comprise) est
   la raison de la recompression. Un dépassement est intercepté et signalé.
 
+**Le médaillon rond est une étape, pas la cible.** Sur la carte, la photo
+s'affiche en médaillon de 130 px décalé à droite. C'est une solution d'attente.
+
+### Cible — portrait stylisé généré ⏳ *(à faire)*
+
+**L'intention :** à la création du compte, le joueur se prend en photo ; cette
+photo sert d'**entrée à un modèle de génération d'image** qui produit un
+portrait stylisé. C'est ce visuel — lui, mais stylisé — qui devient le fond de
+sa carte, et non la photo brute.
+
+C'est la bonne réponse au problème de fond identifié plus haut : une carte sans
+visage ne peut pas fonctionner, et des photos brutes hétérogènes (cadrages,
+lumières et fonds différents) donneraient un jeu de cartes incohérent. Un
+traitement génératif uniformise le rendu tout en gardant l'identité de chacun.
+
+À trancher au moment de l'implémentation :
+
+- **Le modèle et le fournisseur.** Il faut une API d'image à partir d'image
+  (*image-to-image*), appelée **côté serveur** : une clé d'API ne peut pas
+  vivre dans le navigateur.
+- **Le coût.** Chaque génération se paie. Avec ~59 joueurs et des reprises,
+  prévoir une limite du nombre de régénérations par personne.
+- **La latence.** Plusieurs secondes par image : il faut une file d'attente et
+  un état « en cours », pas une attente bloquante à l'inscription.
+- **Le consentement et la modération.** Ce sont les visages de vraies
+  personnes ; il faut pouvoir refuser, régénérer et supprimer.
+- **Le style.** Un seul parti pris visuel, appliqué à tous, sinon on retombe
+  sur l'hétérogénéité qu'on cherchait à corriger.
+- **Le repli.** Que voit-on tant que la génération n'a pas eu lieu ? Le
+  médaillon actuel joue ce rôle.
+
 ### À spécifier avant de coder
 
 - Stockage (Supabase Storage), quotas, formats, compression, durée max.
@@ -258,31 +289,59 @@ D'où le +2 VIT de la Défensive. Cette règle existe déjà dans
 
 `+1 TIR par but marqué`, `+1 PAS par passe décisive`, puis **plafond à 99**.
 
-### 🔴 Bug vérifié n°1 — les cartes Boost partent de la mauvaise base
+### ✅ Bug n°1 — corrigé : les cartes Boost partent désormais de la Rare
 
-`saisie/engine.ts:boostStats` applique les bonus sur la base **standard**, pas
-sur la Rare. Conséquence : **la carte Impact est mathématiquement identique à la
-carte Rare.** Elle n'existe pas.
+`saisie/engine.ts:boostStats` appliquait les bonus sur la base **standard**. La
+carte Impact était donc rigoureusement identique à la carte Rare — elle
+n'existait pas. Le calcul part maintenant de `rareStats()`, la même fonction que
+partout ailleurs, pour éviter deux formules divergentes.
 
-### 🔴 Bug vérifié n°2 — corriger ne suffira pas : les 3 cartes resteront identiques
+Effet mesuré sur les cartes réellement attribuées en J6 :
 
-Recalcul avec la spec **corrigée** :
+| Joueur | Type | OVR avant | OVR après |
+|---|---|:--:|:--:|
+| Ilyes | Impact | 83 | **84** |
+| Jouneid | Défensive | 89 | **90** |
+| Sosso Coach | MVP | 87 | **89** |
+| Sosso Coach | Impact | 86 | **88** |
+| Adil Maimouni | Impact | 81 | **83** |
+| Souley | Défensive | 88 | **89** |
+| Selim laouadi | MVP | 83 | **85** |
+| Selim laouadi | Impact | 83 | **84** |
 
-| Joueur | Base | Rare | MVP | Impact | Défensive |
-|---|---|---|---|---|---|
-| Ilyes | 80 | 82 | **84** | **84** | **84** |
-| Ilies | 83 | 84 | 87 | **86** | **86** |
-| Anis | 76 | 78 | **80** | **80** | 79 |
-| Smail | 80 | 82 | **84** | **84** | **84** |
-| Yanis | 77 | 78 | 81 | **80** | **80** |
-| Non évalué (75) | 75 | 77 | **79** | **79** | **79** |
+### 🔴 Bug n°2 — toujours ouvert : les 3 cartes rendent le même OVR
 
-**6 collisions sur 6.** Cause : `ovr = ceil(somme / 6)` — il faut 6 points de
-stats pour bouger d'un point d'OVR, or l'écart MVP↔Impact n'est que de 4.
+La correction ne règle pas la collision. Recalcul **après correction**, sans
+performance du jour (le cas d'un joueur primé qui n'a ni marqué ni passé) :
 
-**Conclusion : il faut différencier les trois cartes par *nature*, pas par
-*quantité*.** MVP = polyvalence, Impact = pointe offensive, Défensive =
-DEF/PHY/VIT. Et affiner l'OVR (pondéré par poste, ou avec une décimale).
+| Joueur | MVP | Impact | Défensive |
+|---|:--:|:--:|:--:|
+| Ilyes | **84** | **84** | **84** |
+| Ilies | 87 | **86** | **86** |
+| Anis | **80** | **80** | 79 |
+| Smail | **84** | **84** | **84** |
+| Yanis | 81 | **80** | **80** |
+| Jouneid | 90 | **89** | **89** |
+| Souley | 89 | **88** | **88** |
+| Non évalué (75) | **79** | **79** | **79** |
+
+**8 collisions sur 8.** Cause : `ovr = ceil(somme / 6)` exige 6 points de stats
+pour bouger d'un point, or les trois types n'écartent que de 14, 10 et 9 points
+au total. Dès qu'un joueur marque, les cartes se séparent — mais un joueur primé
+sans statistique reçoit trois cartes d'apparence identique.
+
+**Ce n'est pas un bug technique, c'est une règle de jeu à trancher.** Trois
+pistes, à décider :
+
+1. **Différencier par nature plutôt que par quantité** — MVP = polyvalence
+   (bonus uniforme), Impact = pointe offensive (bonus concentré sur TIR/PAS/DRI),
+   Défensive = DEF/PHY/VIT. Les cartes prennent des *formes* distinctes, pas
+   seulement des totaux distincts.
+2. **Écarter davantage les totaux** — par exemple MVP +18, Impact +12,
+   Défensive +9, pour dépasser le seuil de 6 points par point d'OVR.
+3. **Affiner l'OVR** — pondération par poste, ou une décimale affichée.
+
+Les options 1 et 3 se combinent bien. L'option 2 seule relance l'inflation.
 
 ### 🔴 Bug vérifié n°3 — `tierBonus` affiché mais jamais appliqué
 

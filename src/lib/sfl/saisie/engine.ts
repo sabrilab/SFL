@@ -10,6 +10,8 @@
 
 import {
   ovr,
+  rareStats,
+  STAT_KEYS,
   type BoostCardData,
   type BoostType,
   type Journee,
@@ -238,9 +240,25 @@ export function computeJournees(saison: Saison): Journee[] {
 
 const TYPE_ORDER: Record<BoostType, number> = { mvp: 0, impact: 1, def: 2 };
 
+/**
+ * Stats d'une carte Boost.
+ *
+ * Ordre de dérivation : base du roster → carte **Rare** → bonus du type →
+ * performance du jour → plafond 99.
+ *
+ * Le passage par la Rare est essentiel : appliquer les bonus directement sur
+ * la base produisait, pour le type « impact », exactement la formule de
+ * `rareStats` — autrement dit une carte Impact rigoureusement identique à la
+ * carte Rare du joueur.
+ */
 function boostStats(base: number[], type: BoostType, buts: number, passes: number): Stats {
-  const s = [...base];
+  // On part de la carte Rare, calculée par la même fonction que partout
+  // ailleurs dans l'app pour éviter deux formules divergentes.
+  const rare = rareStats(toStats(base));
+  const s = STAT_KEYS.map((k) => rare[k]);
+
   if (type === "mvp" || type === "impact") {
+    // +3 sur les deux meilleures stats de la Rare, le reste uniformément.
     const top2 = new Set(
       s
         .map((v, i) => [v, i] as const)
@@ -251,6 +269,8 @@ function boostStats(base: number[], type: BoostType, buts: number, passes: numbe
     const other = type === "mvp" ? 2 : 1;
     for (let i = 0; i < 6; i++) s[i] += top2.has(i) ? 3 : other;
   } else {
+    // Défensive : +2 DEF et +2 PHY, la vitesse suivant automatiquement
+    // (chaque +1 DEF conjugué à un +1 PHY donne +1 VIT), +1 sur le reste.
     s[4] += 2; // DEF
     s[5] += 2; // PHY
     s[0] += 2; // VIT (auto)
@@ -258,8 +278,11 @@ function boostStats(base: number[], type: BoostType, buts: number, passes: numbe
     s[2] += 1; // PAS
     s[3] += 1; // DRI
   }
+
+  // Performance du jour.
   s[1] += buts;
   s[2] += passes;
+
   const c = s.map((v) => Math.min(STAT_CAP, v));
   return { VIT: c[0], TIR: c[1], PAS: c[2], DRI: c[3], DEF: c[4], PHY: c[5] };
 }
