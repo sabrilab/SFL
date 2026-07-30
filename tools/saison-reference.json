@@ -1,0 +1,1730 @@
+{
+  "joueurs": [
+    {
+      "nom": "Abdel",
+      "poste": "MC",
+      "pp": 5,
+      "matchs": 1,
+      "buts": 2,
+      "passes": 2,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 76,
+        "TIR": 80,
+        "PAS": 79,
+        "DRI": 79,
+        "DEF": 79,
+        "PHY": 80
+      }
+    },
+    {
+      "nom": "Adil",
+      "poste": "MDC",
+      "pp": 9,
+      "matchs": 4,
+      "buts": 1,
+      "passes": 3,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 77,
+        "TIR": 75,
+        "PAS": 72,
+        "DRI": 70,
+        "DEF": 77,
+        "PHY": 83
+      }
+    },
+    {
+      "nom": "Adil Maimouni",
+      "poste": "DC",
+      "pp": 10,
+      "matchs": 2,
+      "buts": 1,
+      "passes": 3,
+      "mvp": 0,
+      "impact": 2,
+      "def": 0,
+      "stats": {
+        "VIT": 75,
+        "TIR": 78,
+        "PAS": 83,
+        "DRI": 78,
+        "DEF": 79,
+        "PHY": 77
+      }
+    },
+    {
+      "nom": "Adil Zerhoui",
+      "poste": "MD",
+      "pp": 3,
+      "matchs": 1,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 79,
+        "TIR": 75,
+        "PAS": 77,
+        "DRI": 78,
+        "DEF": 93,
+        "PHY": 84
+      }
+    },
+    {
+      "nom": "Adrien",
+      "poste": "DD",
+      "pp": 7,
+      "matchs": 3,
+      "buts": 0,
+      "passes": 2,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 76,
+        "TIR": 71,
+        "PAS": 73,
+        "DRI": 73,
+        "DEF": 88,
+        "PHY": 78
+      }
+    },
+    {
+      "nom": "Anas",
+      "poste": "MDC",
+      "pp": 8,
+      "matchs": 1,
+      "buts": 1,
+      "passes": 2,
+      "mvp": 1,
+      "impact": 1,
+      "def": 1,
+      "stats": {
+        "VIT": 82,
+        "TIR": 77,
+        "PAS": 78,
+        "DRI": 80,
+        "DEF": 85,
+        "PHY": 84
+      }
+    },
+    {
+      "nom": "Anis",
+      "poste": "DC",
+      "pp": 38,
+      "matchs": 5,
+      "buts": 13,
+      "passes": 11,
+      "mvp": 0,
+      "impact": 0,
+      "def": 2,
+      "stats": {
+        "VIT": 72,
+        "TIR": 77,
+        "PAS": 71,
+        "DRI": 72,
+        "DEF": 80,
+        "PHY": 83
+      }
+    },
+    {
+      "nom": "Ariless",
+      "poste": "MC/AT",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 77,
+        "TIR": 82,
+        "PAS": 88,
+        "DRI": 89,
+        "DEF": 81,
+        "PHY": 79
+      }
+    },
+    {
+      "nom": "Ayman",
+      "poste": "DD",
+      "pp": 10,
+      "matchs": 3,
+      "buts": 3,
+      "passes": 1,
+      "mvp": 0,
+      "impact": 0,
+      "def": 1,
+      "stats": {
+        "VIT": 74,
+        "TIR": 73,
+        "PAS": 75,
+        "DRI": 74,
+        "DEF": 77,
+        "PHY": 80
+      }
+    },
+    {
+      "nom": "Azzedine",
+      "poste": "DG",
+      "pp": 10,
+      "matchs": 3,
+      "buts": 4,
+      "passes": 2,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 68,
+        "TIR": 67,
+        "PAS": 67,
+        "DRI": 65,
+        "DEF": 69,
+        "PHY": 72
+      }
+    },
+    {
+      "nom": "Badis",
+      "poste": "MC/MDC",
+      "pp": 22,
+      "matchs": 3,
+      "buts": 7,
+      "passes": 4,
+      "mvp": 0,
+      "impact": 2,
+      "def": 1,
+      "stats": {
+        "VIT": 77,
+        "TIR": 76,
+        "PAS": 75,
+        "DRI": 78,
+        "DEF": 88,
+        "PHY": 90
+      }
+    },
+    {
+      "nom": "Bilal",
+      "poste": "MC",
+      "pp": 18,
+      "matchs": 4,
+      "buts": 2,
+      "passes": 8,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 76,
+        "TIR": 77,
+        "PAS": 74,
+        "DRI": 78,
+        "DEF": 77,
+        "PHY": 78
+      }
+    },
+    {
+      "nom": "Chouaib",
+      "poste": "DEF",
+      "pp": -2,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 75,
+        "TIR": 75,
+        "PAS": 75,
+        "DRI": 75,
+        "DEF": 75,
+        "PHY": 75
+      }
+    },
+    {
+      "nom": "Farid",
+      "poste": "DG",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 77,
+        "TIR": 73,
+        "PAS": 74,
+        "DRI": 75,
+        "DEF": 81,
+        "PHY": 79
+      }
+    },
+    {
+      "nom": "Franz",
+      "poste": "MDC/MC",
+      "pp": 5,
+      "matchs": 1,
+      "buts": 1,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 1,
+      "stats": {
+        "VIT": 76,
+        "TIR": 80,
+        "PAS": 77,
+        "DRI": 74,
+        "DEF": 83,
+        "PHY": 80
+      }
+    },
+    {
+      "nom": "Gaïl",
+      "poste": "MDC",
+      "pp": 6,
+      "matchs": 1,
+      "buts": 1,
+      "passes": 2,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 79,
+        "TIR": 76,
+        "PAS": 77,
+        "DRI": 75,
+        "DEF": 80,
+        "PHY": 78
+      }
+    },
+    {
+      "nom": "Hasbi",
+      "poste": "G",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 85,
+        "TIR": 79,
+        "PAS": 79,
+        "DRI": 86,
+        "DEF": 92,
+        "PHY": 88
+      }
+    },
+    {
+      "nom": "Hassan Abdel",
+      "poste": "MC",
+      "pp": 2,
+      "matchs": 1,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 1,
+      "stats": {
+        "VIT": 75,
+        "TIR": 75,
+        "PAS": 75,
+        "DRI": 75,
+        "DEF": 75,
+        "PHY": 75
+      }
+    },
+    {
+      "nom": "Hugo",
+      "poste": "DG",
+      "pp": -2,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 77,
+        "TIR": 79,
+        "PAS": 76,
+        "DRI": 73,
+        "DEF": 77,
+        "PHY": 73
+      }
+    },
+    {
+      "nom": "Ibrahim",
+      "poste": "DC",
+      "pp": 20,
+      "matchs": 4,
+      "buts": 5,
+      "passes": 6,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 72,
+        "TIR": 80,
+        "PAS": 79,
+        "DRI": 76,
+        "DEF": 83,
+        "PHY": 81
+      }
+    },
+    {
+      "nom": "Ilies",
+      "poste": "AD",
+      "pp": 39,
+      "matchs": 4,
+      "buts": 14,
+      "passes": 10,
+      "mvp": 1,
+      "impact": 2,
+      "def": 0,
+      "stats": {
+        "VIT": 84,
+        "TIR": 82,
+        "PAS": 83,
+        "DRI": 88,
+        "DEF": 77,
+        "PHY": 80
+      }
+    },
+    {
+      "nom": "Ilyes",
+      "poste": "MC/AT",
+      "pp": 50,
+      "matchs": 5,
+      "buts": 23,
+      "passes": 7,
+      "mvp": 3,
+      "impact": 4,
+      "def": 0,
+      "stats": {
+        "VIT": 81,
+        "TIR": 85,
+        "PAS": 86,
+        "DRI": 90,
+        "DEF": 72,
+        "PHY": 66
+      }
+    },
+    {
+      "nom": "Jouneid",
+      "poste": "MC",
+      "pp": 26,
+      "matchs": 2,
+      "buts": 10,
+      "passes": 6,
+      "mvp": 1,
+      "impact": 1,
+      "def": 1,
+      "stats": {
+        "VIT": 85,
+        "TIR": 86,
+        "PAS": 92,
+        "DRI": 83,
+        "DEF": 85,
+        "PHY": 82
+      }
+    },
+    {
+      "nom": "K2R",
+      "poste": "MC",
+      "pp": 5,
+      "matchs": 1,
+      "buts": 1,
+      "passes": 1,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 78,
+        "TIR": 77,
+        "PAS": 77,
+        "DRI": 76,
+        "DEF": 77,
+        "PHY": 79
+      }
+    },
+    {
+      "nom": "Kader",
+      "poste": "MC/AT",
+      "pp": 27,
+      "matchs": 5,
+      "buts": 9,
+      "passes": 9,
+      "mvp": 1,
+      "impact": 1,
+      "def": 0,
+      "stats": {
+        "VIT": 78,
+        "TIR": 78,
+        "PAS": 79,
+        "DRI": 84,
+        "DEF": 80,
+        "PHY": 82
+      }
+    },
+    {
+      "nom": "Kais",
+      "poste": "DD",
+      "pp": 4,
+      "matchs": 1,
+      "buts": 2,
+      "passes": 1,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 81,
+        "TIR": 77,
+        "PAS": 78,
+        "DRI": 77,
+        "DEF": 74,
+        "PHY": 80
+      }
+    },
+    {
+      "nom": "Kamil",
+      "poste": "MC",
+      "pp": 9,
+      "matchs": 1,
+      "buts": 3,
+      "passes": 2,
+      "mvp": 0,
+      "impact": 1,
+      "def": 0,
+      "stats": {
+        "VIT": 81,
+        "TIR": 78,
+        "PAS": 75,
+        "DRI": 79,
+        "DEF": 91,
+        "PHY": 82
+      }
+    },
+    {
+      "nom": "Khadim",
+      "poste": "MDC",
+      "pp": -2,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 75,
+        "TIR": 75,
+        "PAS": 75,
+        "DRI": 75,
+        "DEF": 75,
+        "PHY": 75
+      }
+    },
+    {
+      "nom": "Kylian",
+      "poste": "AT",
+      "pp": 9,
+      "matchs": 1,
+      "buts": 2,
+      "passes": 4,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 86,
+        "TIR": 82,
+        "PAS": 86,
+        "DRI": 84,
+        "DEF": 80,
+        "PHY": 75
+      }
+    },
+    {
+      "nom": "Marwan",
+      "poste": "MDC/MC",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 76,
+        "TIR": 79,
+        "PAS": 78,
+        "DRI": 77,
+        "DEF": 82,
+        "PHY": 82
+      }
+    },
+    {
+      "nom": "Mehdi",
+      "poste": "MDC",
+      "pp": 19,
+      "matchs": 4,
+      "buts": 6,
+      "passes": 5,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 74,
+        "TIR": 73,
+        "PAS": 75,
+        "DRI": 76,
+        "DEF": 83,
+        "PHY": 88
+      }
+    },
+    {
+      "nom": "Moussa",
+      "poste": "DC/MDC",
+      "pp": 11,
+      "matchs": 3,
+      "buts": 2,
+      "passes": 4,
+      "mvp": 0,
+      "impact": 0,
+      "def": 1,
+      "stats": {
+        "VIT": 77,
+        "TIR": 84,
+        "PAS": 75,
+        "DRI": 72,
+        "DEF": 89,
+        "PHY": 89
+      }
+    },
+    {
+      "nom": "Moustapha",
+      "poste": "DG",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 76,
+        "TIR": 77,
+        "PAS": 78,
+        "DRI": 73,
+        "DEF": 75,
+        "PHY": 78
+      }
+    },
+    {
+      "nom": "Naim",
+      "poste": "DC",
+      "pp": 17,
+      "matchs": 5,
+      "buts": 4,
+      "passes": 3,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 65,
+        "TIR": 73,
+        "PAS": 78,
+        "DRI": 77,
+        "DEF": 76,
+        "PHY": 63
+      }
+    },
+    {
+      "nom": "Omar",
+      "poste": "MC",
+      "pp": 9,
+      "matchs": 1,
+      "buts": 1,
+      "passes": 4,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 81,
+        "TIR": 79,
+        "PAS": 85,
+        "DRI": 88,
+        "DEF": 72,
+        "PHY": 64
+      }
+    },
+    {
+      "nom": "Rezki",
+      "poste": "MDC",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 75,
+        "TIR": 77,
+        "PAS": 76,
+        "DRI": 75,
+        "DEF": 85,
+        "PHY": 79
+      }
+    },
+    {
+      "nom": "Ryad",
+      "poste": "MC",
+      "pp": 23,
+      "matchs": 5,
+      "buts": 6,
+      "passes": 5,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 77,
+        "TIR": 80,
+        "PAS": 79,
+        "DRI": 81,
+        "DEF": 77,
+        "PHY": 78
+      }
+    },
+    {
+      "nom": "Sami",
+      "poste": "MC",
+      "pp": 5,
+      "matchs": 1,
+      "buts": 1,
+      "passes": 1,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 76,
+        "TIR": 77,
+        "PAS": 80,
+        "DRI": 78,
+        "DEF": 80,
+        "PHY": 79
+      }
+    },
+    {
+      "nom": "Selim laouadi",
+      "poste": "MC",
+      "pp": 16,
+      "matchs": 2,
+      "buts": 5,
+      "passes": 4,
+      "mvp": 1,
+      "impact": 1,
+      "def": 0,
+      "stats": {
+        "VIT": 69,
+        "TIR": 77,
+        "PAS": 85,
+        "DRI": 87,
+        "DEF": 83,
+        "PHY": 76
+      }
+    },
+    {
+      "nom": "Sidali",
+      "poste": "MC/AG",
+      "pp": 30,
+      "matchs": 5,
+      "buts": 10,
+      "passes": 8,
+      "mvp": 0,
+      "impact": 0,
+      "def": 2,
+      "stats": {
+        "VIT": 78,
+        "TIR": 77,
+        "PAS": 82,
+        "DRI": 85,
+        "DEF": 82,
+        "PHY": 77
+      }
+    },
+    {
+      "nom": "Simon Ribeiro",
+      "poste": "MC",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 80,
+        "TIR": 84,
+        "PAS": 88,
+        "DRI": 84,
+        "DEF": 79,
+        "PHY": 86
+      }
+    },
+    {
+      "nom": "Smail",
+      "poste": "MC/MDC",
+      "pp": 28,
+      "matchs": 4,
+      "buts": 9,
+      "passes": 6,
+      "mvp": 0,
+      "impact": 2,
+      "def": 1,
+      "stats": {
+        "VIT": 76,
+        "TIR": 75,
+        "PAS": 76,
+        "DRI": 78,
+        "DEF": 87,
+        "PHY": 88
+      }
+    },
+    {
+      "nom": "Soffiane",
+      "poste": "AT",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 80,
+        "TIR": 83,
+        "PAS": 84,
+        "DRI": 85,
+        "DEF": 76,
+        "PHY": 77
+      }
+    },
+    {
+      "nom": "Sofiane",
+      "poste": "AT",
+      "pp": 17,
+      "matchs": 3,
+      "buts": 5,
+      "passes": 5,
+      "mvp": 0,
+      "impact": 0,
+      "def": 2,
+      "stats": {
+        "VIT": 82,
+        "TIR": 81,
+        "PAS": 75,
+        "DRI": 77,
+        "DEF": 79,
+        "PHY": 80
+      }
+    },
+    {
+      "nom": "Sosso Abdel",
+      "poste": "DC",
+      "pp": 8,
+      "matchs": 2,
+      "buts": 1,
+      "passes": 2,
+      "mvp": 0,
+      "impact": 0,
+      "def": 1,
+      "stats": {
+        "VIT": 79,
+        "TIR": 79,
+        "PAS": 85,
+        "DRI": 86,
+        "DEF": 79,
+        "PHY": 86
+      }
+    },
+    {
+      "nom": "Sosso Coach",
+      "poste": "AT/BU",
+      "pp": 8,
+      "matchs": 1,
+      "buts": 1,
+      "passes": 1,
+      "mvp": 1,
+      "impact": 1,
+      "def": 0,
+      "stats": {
+        "VIT": 87,
+        "TIR": 82,
+        "PAS": 83,
+        "DRI": 83,
+        "DEF": 81,
+        "PHY": 88
+      }
+    },
+    {
+      "nom": "Souley",
+      "poste": "AT",
+      "pp": 35,
+      "matchs": 4,
+      "buts": 15,
+      "passes": 9,
+      "mvp": 0,
+      "impact": 0,
+      "def": 1,
+      "stats": {
+        "VIT": 78,
+        "TIR": 80,
+        "PAS": 84,
+        "DRI": 86,
+        "DEF": 86,
+        "PHY": 91
+      }
+    },
+    {
+      "nom": "Wadi",
+      "poste": "AT",
+      "pp": 16,
+      "matchs": 2,
+      "buts": 1,
+      "passes": 6,
+      "mvp": 1,
+      "impact": 1,
+      "def": 1,
+      "stats": {
+        "VIT": 86,
+        "TIR": 80,
+        "PAS": 80,
+        "DRI": 78,
+        "DEF": 80,
+        "PHY": 80
+      }
+    },
+    {
+      "nom": "Yacine",
+      "poste": "MC/AT",
+      "pp": 13,
+      "matchs": 4,
+      "buts": 3,
+      "passes": 4,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 79,
+        "TIR": 80,
+        "PAS": 83,
+        "DRI": 83,
+        "DEF": 79,
+        "PHY": 79
+      }
+    },
+    {
+      "nom": "Yacine Ben",
+      "poste": "DD",
+      "pp": 3,
+      "matchs": 1,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 72,
+        "TIR": 68,
+        "PAS": 69,
+        "DRI": 73,
+        "DEF": 80,
+        "PHY": 77
+      }
+    },
+    {
+      "nom": "Yamin",
+      "poste": "MC/MDC",
+      "pp": 18,
+      "matchs": 4,
+      "buts": 6,
+      "passes": 4,
+      "mvp": 0,
+      "impact": 0,
+      "def": 1,
+      "stats": {
+        "VIT": 85,
+        "TIR": 80,
+        "PAS": 82,
+        "DRI": 78,
+        "DEF": 80,
+        "PHY": 83
+      }
+    },
+    {
+      "nom": "Yanis",
+      "poste": "MC/MDC",
+      "pp": 26,
+      "matchs": 5,
+      "buts": 10,
+      "passes": 6,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 73,
+        "TIR": 74,
+        "PAS": 77,
+        "DRI": 77,
+        "DEF": 79,
+        "PHY": 78
+      }
+    },
+    {
+      "nom": "Zakaria",
+      "poste": "MC",
+      "pp": 18,
+      "matchs": 4,
+      "buts": 4,
+      "passes": 4,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 77,
+        "TIR": 78,
+        "PAS": 77,
+        "DRI": 79,
+        "DEF": 77,
+        "PHY": 76
+      }
+    },
+    {
+      "nom": "Zakary",
+      "poste": "MC",
+      "pp": 18,
+      "matchs": 2,
+      "buts": 8,
+      "passes": 6,
+      "mvp": 0,
+      "impact": 1,
+      "def": 0,
+      "stats": {
+        "VIT": 73,
+        "TIR": 83,
+        "PAS": 83,
+        "DRI": 80,
+        "DEF": 88,
+        "PHY": 85
+      }
+    }
+  ],
+  "cartesBoost": [
+    {
+      "joueur": "Badis",
+      "type": "impact",
+      "date": "J1 · 22 juin",
+      "ovr": 85,
+      "stats": {
+        "VIT": 79,
+        "TIR": 79,
+        "PAS": 78,
+        "DRI": 80,
+        "DEF": 94,
+        "PHY": 96
+      }
+    },
+    {
+      "joueur": "Kader",
+      "type": "impact",
+      "date": "J1 · 22 juin",
+      "ovr": 85,
+      "stats": {
+        "VIT": 80,
+        "TIR": 82,
+        "PAS": 84,
+        "DRI": 90,
+        "DEF": 82,
+        "PHY": 88
+      }
+    },
+    {
+      "joueur": "Kader",
+      "type": "mvp",
+      "date": "J1 · 22 juin",
+      "ovr": 85,
+      "stats": {
+        "VIT": 81,
+        "TIR": 83,
+        "PAS": 85,
+        "DRI": 90,
+        "DEF": 83,
+        "PHY": 88
+      }
+    },
+    {
+      "joueur": "Sidali",
+      "type": "def",
+      "date": "J1 · 22 juin",
+      "ovr": 84,
+      "stats": {
+        "VIT": 81,
+        "TIR": 81,
+        "PAS": 88,
+        "DRI": 89,
+        "DEF": 85,
+        "PHY": 80
+      }
+    },
+    {
+      "joueur": "Smail",
+      "type": "def",
+      "date": "J1 · 22 juin",
+      "ovr": 84,
+      "stats": {
+        "VIT": 79,
+        "TIR": 79,
+        "PAS": 80,
+        "DRI": 80,
+        "DEF": 92,
+        "PHY": 93
+      }
+    },
+    {
+      "joueur": "Anis",
+      "type": "def",
+      "date": "J3 · 6 juil.",
+      "ovr": 80,
+      "stats": {
+        "VIT": 75,
+        "TIR": 81,
+        "PAS": 73,
+        "DRI": 74,
+        "DEF": 85,
+        "PHY": 88
+      }
+    },
+    {
+      "joueur": "Franz",
+      "type": "def",
+      "date": "J3 · 6 juil.",
+      "ovr": 82,
+      "stats": {
+        "VIT": 79,
+        "TIR": 85,
+        "PAS": 79,
+        "DRI": 76,
+        "DEF": 88,
+        "PHY": 83
+      }
+    },
+    {
+      "joueur": "Ilies",
+      "type": "impact",
+      "date": "J3 · 6 juil.",
+      "ovr": 87,
+      "stats": {
+        "VIT": 90,
+        "TIR": 86,
+        "PAS": 90,
+        "DRI": 94,
+        "DEF": 79,
+        "PHY": 82
+      }
+    },
+    {
+      "joueur": "Ilies",
+      "type": "mvp",
+      "date": "J3 · 6 juil.",
+      "ovr": 88,
+      "stats": {
+        "VIT": 90,
+        "TIR": 87,
+        "PAS": 91,
+        "DRI": 94,
+        "DEF": 80,
+        "PHY": 83
+      }
+    },
+    {
+      "joueur": "Ilyes",
+      "type": "impact",
+      "date": "J3 · 6 juil.",
+      "ovr": 85,
+      "stats": {
+        "VIT": 83,
+        "TIR": 92,
+        "PAS": 92,
+        "DRI": 96,
+        "DEF": 74,
+        "PHY": 68
+      }
+    },
+    {
+      "joueur": "Ilyes",
+      "type": "mvp",
+      "date": "J3 · 6 juil.",
+      "ovr": 85,
+      "stats": {
+        "VIT": 84,
+        "TIR": 93,
+        "PAS": 92,
+        "DRI": 96,
+        "DEF": 75,
+        "PHY": 69
+      }
+    },
+    {
+      "joueur": "Moussa",
+      "type": "def",
+      "date": "J3 · 6 juil.",
+      "ovr": 85,
+      "stats": {
+        "VIT": 80,
+        "TIR": 87,
+        "PAS": 79,
+        "DRI": 74,
+        "DEF": 94,
+        "PHY": 94
+      }
+    },
+    {
+      "joueur": "Smail",
+      "type": "impact",
+      "date": "J3 · 6 juil.",
+      "ovr": 84,
+      "stats": {
+        "VIT": 78,
+        "TIR": 79,
+        "PAS": 80,
+        "DRI": 80,
+        "DEF": 93,
+        "PHY": 94
+      }
+    },
+    {
+      "joueur": "Yamin",
+      "type": "def",
+      "date": "J3 · 6 juil.",
+      "ovr": 85,
+      "stats": {
+        "VIT": 90,
+        "TIR": 84,
+        "PAS": 85,
+        "DRI": 80,
+        "DEF": 83,
+        "PHY": 88
+      }
+    },
+    {
+      "joueur": "Zakary",
+      "type": "impact",
+      "date": "J3 · 6 juil.",
+      "ovr": 87,
+      "stats": {
+        "VIT": 75,
+        "TIR": 87,
+        "PAS": 89,
+        "DRI": 82,
+        "DEF": 94,
+        "PHY": 91
+      }
+    },
+    {
+      "joueur": "Anis",
+      "type": "def",
+      "date": "J4 · 12 juil.",
+      "ovr": 81,
+      "stats": {
+        "VIT": 75,
+        "TIR": 82,
+        "PAS": 79,
+        "DRI": 74,
+        "DEF": 85,
+        "PHY": 88
+      }
+    },
+    {
+      "joueur": "Ayman",
+      "type": "def",
+      "date": "J4 · 12 juil.",
+      "ovr": 79,
+      "stats": {
+        "VIT": 77,
+        "TIR": 75,
+        "PAS": 77,
+        "DRI": 76,
+        "DEF": 82,
+        "PHY": 85
+      }
+    },
+    {
+      "joueur": "Badis",
+      "type": "impact",
+      "date": "J4 · 12 juil.",
+      "ovr": 85,
+      "stats": {
+        "VIT": 79,
+        "TIR": 82,
+        "PAS": 79,
+        "DRI": 80,
+        "DEF": 94,
+        "PHY": 96
+      }
+    },
+    {
+      "joueur": "Ilyes",
+      "type": "impact",
+      "date": "J4 · 12 juil.",
+      "ovr": 86,
+      "stats": {
+        "VIT": 83,
+        "TIR": 95,
+        "PAS": 95,
+        "DRI": 96,
+        "DEF": 74,
+        "PHY": 68
+      }
+    },
+    {
+      "joueur": "Ilyes",
+      "type": "mvp",
+      "date": "J4 · 12 juil.",
+      "ovr": 86,
+      "stats": {
+        "VIT": 84,
+        "TIR": 96,
+        "PAS": 95,
+        "DRI": 96,
+        "DEF": 75,
+        "PHY": 69
+      }
+    },
+    {
+      "joueur": "Smail",
+      "type": "impact",
+      "date": "J4 · 12 juil.",
+      "ovr": 84,
+      "stats": {
+        "VIT": 78,
+        "TIR": 80,
+        "PAS": 78,
+        "DRI": 80,
+        "DEF": 93,
+        "PHY": 94
+      }
+    },
+    {
+      "joueur": "Sofiane",
+      "type": "def",
+      "date": "J4 · 12 juil.",
+      "ovr": 83,
+      "stats": {
+        "VIT": 87,
+        "TIR": 87,
+        "PAS": 77,
+        "DRI": 79,
+        "DEF": 82,
+        "PHY": 83
+      }
+    },
+    {
+      "joueur": "Wadi",
+      "type": "def",
+      "date": "J4 · 12 juil.",
+      "ovr": 85,
+      "stats": {
+        "VIT": 91,
+        "TIR": 85,
+        "PAS": 87,
+        "DRI": 80,
+        "DEF": 83,
+        "PHY": 83
+      }
+    },
+    {
+      "joueur": "Wadi",
+      "type": "impact",
+      "date": "J4 · 12 juil.",
+      "ovr": 85,
+      "stats": {
+        "VIT": 92,
+        "TIR": 87,
+        "PAS": 87,
+        "DRI": 80,
+        "DEF": 82,
+        "PHY": 82
+      }
+    },
+    {
+      "joueur": "Wadi",
+      "type": "mvp",
+      "date": "J4 · 12 juil.",
+      "ovr": 86,
+      "stats": {
+        "VIT": 92,
+        "TIR": 87,
+        "PAS": 88,
+        "DRI": 81,
+        "DEF": 83,
+        "PHY": 83
+      }
+    },
+    {
+      "joueur": "Adil Maimouni",
+      "type": "impact",
+      "date": "J5 · 19 juil.",
+      "ovr": 82,
+      "stats": {
+        "VIT": 77,
+        "TIR": 80,
+        "PAS": 90,
+        "DRI": 80,
+        "DEF": 85,
+        "PHY": 79
+      }
+    },
+    {
+      "joueur": "Anas",
+      "type": "def",
+      "date": "J5 · 19 juil.",
+      "ovr": 85,
+      "stats": {
+        "VIT": 85,
+        "TIR": 80,
+        "PAS": 82,
+        "DRI": 82,
+        "DEF": 90,
+        "PHY": 89
+      }
+    },
+    {
+      "joueur": "Anas",
+      "type": "impact",
+      "date": "J5 · 19 juil.",
+      "ovr": 85,
+      "stats": {
+        "VIT": 84,
+        "TIR": 80,
+        "PAS": 82,
+        "DRI": 82,
+        "DEF": 91,
+        "PHY": 90
+      }
+    },
+    {
+      "joueur": "Anas",
+      "type": "mvp",
+      "date": "J5 · 19 juil.",
+      "ovr": 86,
+      "stats": {
+        "VIT": 85,
+        "TIR": 81,
+        "PAS": 83,
+        "DRI": 83,
+        "DEF": 91,
+        "PHY": 90
+      }
+    },
+    {
+      "joueur": "Badis",
+      "type": "def",
+      "date": "J5 · 19 juil.",
+      "ovr": 85,
+      "stats": {
+        "VIT": 80,
+        "TIR": 80,
+        "PAS": 78,
+        "DRI": 80,
+        "DEF": 93,
+        "PHY": 95
+      }
+    },
+    {
+      "joueur": "Hassan Abdel",
+      "type": "def",
+      "date": "J5 · 19 juil.",
+      "ovr": 79,
+      "stats": {
+        "VIT": 80,
+        "TIR": 79,
+        "PAS": 77,
+        "DRI": 77,
+        "DEF": 78,
+        "PHY": 78
+      }
+    },
+    {
+      "joueur": "Ilies",
+      "type": "impact",
+      "date": "J5 · 19 juil.",
+      "ovr": 87,
+      "stats": {
+        "VIT": 90,
+        "TIR": 86,
+        "PAS": 87,
+        "DRI": 94,
+        "DEF": 79,
+        "PHY": 82
+      }
+    },
+    {
+      "joueur": "Ilyes",
+      "type": "impact",
+      "date": "J5 · 19 juil.",
+      "ovr": 85,
+      "stats": {
+        "VIT": 83,
+        "TIR": 90,
+        "PAS": 94,
+        "DRI": 96,
+        "DEF": 74,
+        "PHY": 68
+      }
+    },
+    {
+      "joueur": "Ilyes",
+      "type": "mvp",
+      "date": "J5 · 19 juil.",
+      "ovr": 85,
+      "stats": {
+        "VIT": 84,
+        "TIR": 91,
+        "PAS": 94,
+        "DRI": 96,
+        "DEF": 75,
+        "PHY": 69
+      }
+    },
+    {
+      "joueur": "Jouneid",
+      "type": "impact",
+      "date": "J5 · 19 juil.",
+      "ovr": 90,
+      "stats": {
+        "VIT": 87,
+        "TIR": 98,
+        "PAS": 99,
+        "DRI": 85,
+        "DEF": 87,
+        "PHY": 84
+      }
+    },
+    {
+      "joueur": "Jouneid",
+      "type": "mvp",
+      "date": "J5 · 19 juil.",
+      "ovr": 91,
+      "stats": {
+        "VIT": 88,
+        "TIR": 98,
+        "PAS": 99,
+        "DRI": 86,
+        "DEF": 88,
+        "PHY": 85
+      }
+    },
+    {
+      "joueur": "Kamil",
+      "type": "impact",
+      "date": "J5 · 19 juil.",
+      "ovr": 86,
+      "stats": {
+        "VIT": 83,
+        "TIR": 83,
+        "PAS": 79,
+        "DRI": 81,
+        "DEF": 97,
+        "PHY": 88
+      }
+    },
+    {
+      "joueur": "Sidali",
+      "type": "def",
+      "date": "J5 · 19 juil.",
+      "ovr": 84,
+      "stats": {
+        "VIT": 81,
+        "TIR": 81,
+        "PAS": 87,
+        "DRI": 89,
+        "DEF": 85,
+        "PHY": 80
+      }
+    },
+    {
+      "joueur": "Sofiane",
+      "type": "def",
+      "date": "J5 · 19 juil.",
+      "ovr": 83,
+      "stats": {
+        "VIT": 87,
+        "TIR": 87,
+        "PAS": 80,
+        "DRI": 79,
+        "DEF": 82,
+        "PHY": 83
+      }
+    },
+    {
+      "joueur": "Sosso Abdel",
+      "type": "def",
+      "date": "J5 · 19 juil.",
+      "ovr": 86,
+      "stats": {
+        "VIT": 82,
+        "TIR": 81,
+        "PAS": 87,
+        "DRI": 90,
+        "DEF": 82,
+        "PHY": 91
+      }
+    },
+    {
+      "joueur": "Adil Maimouni",
+      "type": "impact",
+      "date": "J6 · 26 juil.",
+      "ovr": 83,
+      "stats": {
+        "VIT": 77,
+        "TIR": 81,
+        "PAS": 91,
+        "DRI": 80,
+        "DEF": 85,
+        "PHY": 79
+      }
+    },
+    {
+      "joueur": "Ilyes",
+      "type": "impact",
+      "date": "J6 · 26 juil.",
+      "ovr": 84,
+      "stats": {
+        "VIT": 83,
+        "TIR": 90,
+        "PAS": 93,
+        "DRI": 96,
+        "DEF": 74,
+        "PHY": 68
+      }
+    },
+    {
+      "joueur": "Jouneid",
+      "type": "def",
+      "date": "J6 · 26 juil.",
+      "ovr": 90,
+      "stats": {
+        "VIT": 88,
+        "TIR": 94,
+        "PAS": 99,
+        "DRI": 85,
+        "DEF": 88,
+        "PHY": 85
+      }
+    },
+    {
+      "joueur": "Selim laouadi",
+      "type": "impact",
+      "date": "J6 · 26 juil.",
+      "ovr": 84,
+      "stats": {
+        "VIT": 71,
+        "TIR": 83,
+        "PAS": 93,
+        "DRI": 93,
+        "DEF": 85,
+        "PHY": 78
+      }
+    },
+    {
+      "joueur": "Selim laouadi",
+      "type": "mvp",
+      "date": "J6 · 26 juil.",
+      "ovr": 85,
+      "stats": {
+        "VIT": 72,
+        "TIR": 84,
+        "PAS": 93,
+        "DRI": 93,
+        "DEF": 86,
+        "PHY": 79
+      }
+    },
+    {
+      "joueur": "Sosso Coach",
+      "type": "impact",
+      "date": "J6 · 26 juil.",
+      "ovr": 88,
+      "stats": {
+        "VIT": 93,
+        "TIR": 85,
+        "PAS": 86,
+        "DRI": 85,
+        "DEF": 83,
+        "PHY": 94
+      }
+    },
+    {
+      "joueur": "Sosso Coach",
+      "type": "mvp",
+      "date": "J6 · 26 juil.",
+      "ovr": 89,
+      "stats": {
+        "VIT": 93,
+        "TIR": 86,
+        "PAS": 87,
+        "DRI": 86,
+        "DEF": 84,
+        "PHY": 94
+      }
+    },
+    {
+      "joueur": "Souley",
+      "type": "def",
+      "date": "J6 · 26 juil.",
+      "ovr": 89,
+      "stats": {
+        "VIT": 81,
+        "TIR": 87,
+        "PAS": 90,
+        "DRI": 90,
+        "DEF": 89,
+        "PHY": 96
+      }
+    }
+  ],
+  "journees": [
+    {
+      "numero": 1,
+      "date": "22 juin"
+    },
+    {
+      "numero": 2,
+      "date": "29 juin"
+    },
+    {
+      "numero": 3,
+      "date": "6 juil."
+    },
+    {
+      "numero": 4,
+      "date": "12 juil."
+    },
+    {
+      "numero": 5,
+      "date": "19 juil."
+    },
+    {
+      "numero": 6,
+      "date": "26 juil."
+    }
+  ]
+}
