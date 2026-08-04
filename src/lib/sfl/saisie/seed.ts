@@ -6,12 +6,13 @@
 import type { JourneeMeta, MatchEntry, RosterEntry } from "./types";
 
 export const SEED_JOURNEES: JourneeMeta[] = [
-  { j: 1, date: "22 juin", sflTime: true },
-  { j: 2, date: "29 juin", sflTime: false },
-  { j: 3, date: "6 juil.", sflTime: false },
+  { j: 1, date: "21 juin", sflTime: true },
+  { j: 2, date: "28 juin", sflTime: false },
+  { j: 3, date: "5 juil.", sflTime: false },
   { j: 4, date: "12 juil.", sflTime: false },
   { j: 5, date: "19 juil.", sflTime: false },
   { j: 6, date: "26 juil.", sflTime: false },
+  { j: 7, date: "2 août", sflTime: false },
 ];
 
 export const SEED_ROSTER: RosterEntry[] = [
@@ -65,7 +66,8 @@ export const SEED_ROSTER: RosterEntry[] = [
   { name: "Farid", poste: "DG", profil: "Actif", base: [77, 73, 74, 75, 81, 79] },
   { name: "Abdel", poste: "MC", profil: "Actif", base: [76, 80, 79, 79, 79, 80] },
   { name: "Guillaume", poste: "DG", profil: "Actif", base: null },
-  { name: "Sami", poste: "MC", profil: "Actif", base: [76, 77, 80, 78, 80, 79] },
+  // « Samy » : orthographe du classeur actuel (anciennement « Sami »).
+  { name: "Samy", poste: "MC", profil: "Actif", base: [76, 77, 80, 78, 80, 79] },
   { name: "Kais", poste: "DD", profil: "Actif", base: [81, 77, 78, 77, 74, 80] },
   // Arrivés / notés via le classeur JOUEURS. Une base à `null` signifie
   // « pas encore évalué » : le moteur applique alors une carte neutre à 75.
@@ -76,9 +78,28 @@ export const SEED_ROSTER: RosterEntry[] = [
   { name: "Soffiane", poste: "AT", profil: "Actif", base: [80, 83, 84, 85, 76, 77] },
   { name: "Simon Ribeiro", poste: "MC", profil: "Actif", base: [80, 84, 88, 84, 79, 86] },
   { name: "Lyes Korogli", poste: "AG/MC", profil: "Actif", base: null },
+  // Arrivés en J7 — absents de JOUEURS & RÈGLES, donc non évalués (carte 75).
+  // Orthographe reprise TELLE QUELLE du classeur (« illiasse », « kevin Raes ») :
+  // le nom sert de clé d'identité jusqu'à la migration UUID, toute retouche
+  // cosmétique casserait le rapprochement avec les prochains imports.
+  { name: "Henri", poste: null, profil: "Actif", base: null },
+  { name: "Aghiless", poste: null, profil: "Actif", base: null },
+  { name: "Yazid", poste: null, profil: "Actif", base: null },
+  { name: "Giovani", poste: null, profil: "Actif", base: null },
+  { name: "Malik", poste: null, profil: "Actif", base: null },
+  { name: "illiasse", poste: null, profil: "Actif", base: null },
+  { name: "kevin Raes", poste: null, profil: "Actif", base: null },
 ];
 
 export const SEED_ENTRIES: MatchEntry[] = [
+  // Regénéré intégralement depuis SFL_Statistiques_Base_Propre.xlsx (SAISIE
+  // MATCH) — le classeur est la source de vérité et corrige aussi l'historique
+  // (buts réattribués, Sami→Samy, extra time J5 devenu but réel de Yacine).
+  // Équipes lues dans les couleurs de fond ; lignes XTRATIME agrégées en
+  // teamScoreBonus en fin de journée ; équipes A/B de la J1 préservées de la
+  // saisie d'origine (le classeur n'a plus de couleurs sur cette journée).
+  // Chaque ligne est recoupée avec la colonne « PP du match », chaque total
+  // avec CLASSEMENTS — voir tools/saison-snapshot.ts.
   { j: 1, player: "Badis", team: "Équipe A", statut: "Présent", result: "Victoire", sflTime: true, buts: 1, passes: 1, cleanSheet: false, mvp: false, impact: true, def: false, retard: false },
   { j: 1, player: "Ilyes", team: "Équipe A", statut: "Présent", result: "Victoire", sflTime: true, buts: 4, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 1, player: "Smail", team: "Équipe A", statut: "Présent", result: "Victoire", sflTime: true, buts: 2, passes: 2, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
@@ -89,6 +110,7 @@ export const SEED_ENTRIES: MatchEntry[] = [
   { j: 1, player: "Adil", team: "Équipe B", statut: "Présent", result: "Défaite", sflTime: true, buts: 1, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 1, player: "Mehdi", team: "Équipe B", statut: "Présent", result: "Défaite", sflTime: true, buts: 1, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 1, player: "Sidali", team: "Équipe B", statut: "Présent", result: "Défaite", sflTime: true, buts: 2, passes: 2, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
+
   { j: 2, player: "Adil", team: null, statut: "Présent", result: "Nul", sflTime: false, buts: 0, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 2, player: "Azzedine", team: null, statut: "Présent", result: "Nul", sflTime: false, buts: 2, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 2, player: "Ilies", team: null, statut: "Présent", result: "Nul", sflTime: false, buts: 4, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
@@ -109,6 +131,7 @@ export const SEED_ENTRIES: MatchEntry[] = [
   { j: 2, player: "Omar", team: null, statut: "Absent justifié", result: null, sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 2, player: "Mehdi", team: null, statut: "Absent justifié", result: null, sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 2, player: "Hugo", team: null, statut: "Absence injustifiée", result: null, sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+
   { j: 3, player: "Smail", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 2, cleanSheet: false, mvp: false, impact: true, def: false, retard: false },
   { j: 3, player: "Kylian", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 4, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 3, player: "Ibrahim", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
@@ -126,13 +149,14 @@ export const SEED_ENTRIES: MatchEntry[] = [
   { j: 3, player: "Yacine", team: "Vert", statut: "Présent", result: "Défaite", sflTime: false, buts: 3, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 3, player: "Anis", team: "Vert", statut: "Présent", result: "Défaite", sflTime: false, buts: 2, passes: 0, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
   { j: 3, player: "Naim", team: "Vert", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-  { j: 3, player: "Sofiane", team: null, statut: "Absent justifié", result: null, sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 3, player: "Soffiane", team: null, statut: "Absent justifié", result: null, sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 3, player: "Souley", team: "Jaune", statut: "Présent", result: "Victoire", sflTime: false, buts: 5, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 3, player: "Sidali", team: "Jaune", statut: "Absent justifié", result: null, sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 3, player: "Ilies", team: "Jaune", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 5, cleanSheet: false, mvp: true, impact: true, def: false, retard: false },
   { j: 3, player: "Ryad", team: "Jaune", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 3, player: "Yamin", team: "Jaune", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 1, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
   { j: 3, player: "Zakaria", team: "Jaune", statut: "Présent", result: "Victoire", sflTime: false, buts: 1, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+
   { j: 4, player: "Anis", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 3, passes: 6, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
   { j: 4, player: "Ilies", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 6, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 4, player: "Bilal", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 6, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
@@ -148,15 +172,16 @@ export const SEED_ENTRIES: MatchEntry[] = [
   { j: 4, player: "Mehdi", team: "Vert", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 4, player: "Yanis", team: "Vert", statut: "Présent", result: "Victoire", sflTime: false, buts: 3, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 4, player: "Sidali", team: "Vert", statut: "Présent", result: "Victoire", sflTime: false, buts: 3, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-  { j: 4, player: "Sofiane", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 2, passes: 0, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
+  { j: 4, player: "Soffiane", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 2, passes: 0, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
   { j: 4, player: "Adil", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 4, player: "Yacine", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 4, player: "Moussa", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 4, player: "Ryad", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 4, player: "Smail", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 3, passes: 0, cleanSheet: false, mvp: false, impact: true, def: false, retard: false },
   { j: 4, player: "Naim", team: null, statut: "Présent", result: "Nul", sflTime: false, buts: 1, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+
   { j: 5, player: "Badis", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 1, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
-  { j: 5, player: "Sami", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 1, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 5, player: "Samy", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 1, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Ilies", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 2, cleanSheet: false, mvp: false, impact: true, def: false, retard: false },
   { j: 5, player: "Souley", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 3, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: true },
   { j: 5, player: "Selim laouadi", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 1, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
@@ -164,56 +189,80 @@ export const SEED_ENTRIES: MatchEntry[] = [
   { j: 5, player: "Ibrahim", team: "Bleu", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Sidali", team: "Bleu", statut: "Présent", result: "Défaite", sflTime: false, buts: 2, passes: 1, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
   { j: 5, player: "Ilyes", team: "Bleu", statut: "Présent", result: "Défaite", sflTime: false, buts: 3, passes: 2, cleanSheet: false, mvp: true, impact: true, def: false, retard: false },
-  { j: 5, player: "Yacine", team: "Bleu", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-  { j: 5, player: "Bilal", team: "Vert", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-  { j: 5, player: "Azzedine", team: "Vert", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-  { j: 5, player: "Adil Maimouni", team: "Vert", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 1, cleanSheet: false, mvp: false, impact: true, def: false, retard: false },
-  { j: 5, player: "Ayman", team: "Vert", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 5, player: "Yacine", team: "Bleu", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 5, player: "Bilal", team: "Vert", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 5, player: "Azzedine", team: "Vert", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 5, player: "Adil Maimouni", team: "Vert", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 0, cleanSheet: false, mvp: false, impact: true, def: false, retard: false },
+  { j: 5, player: "Ayman", team: "Vert", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Hassan Abdel", team: "Vert", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
   { j: 5, player: "Mehdi", team: "Jaune", statut: "Présent", result: "Victoire", sflTime: false, buts: 3, passes: 4, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Jouneid", team: "Jaune", statut: "Présent", result: "Victoire", sflTime: false, buts: 6, passes: 2, cleanSheet: false, mvp: true, impact: true, def: false, retard: false },
-  { j: 5, player: "Ryad", team: "Jaune", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 3, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 5, player: "Ryad", team: "Jaune", statut: "Présent", result: "Victoire", sflTime: false, buts: 1, passes: 3, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Yanis", team: "Jaune", statut: "Présent", result: "Victoire", sflTime: false, buts: 3, passes: 3, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-  { j: 5, player: "Sofiane", team: "Jaune", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 3, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
+  { j: 5, player: "Soffiane", team: "Jaune", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 3, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
   { j: 5, player: "Anas", team: "Rouge", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 2, cleanSheet: false, mvp: true, impact: true, def: true, retard: false },
   { j: 5, player: "Adrien", team: "Rouge", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Kais", team: "Rouge", statut: "Présent", result: "Défaite", sflTime: false, buts: 2, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-  { j: 5, player: "Chouaib", team: "Rouge", statut: "Absence injustifiée", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-  { j: 5, player: "Khadim", team: "Rouge", statut: "Absence injustifiée", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 5, player: "Chouaib", team: "Rouge", statut: "Suspendu", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 5, player: "Khadim", team: "Rouge", statut: "Suspendu", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Naim", team: "Rouge", statut: "Blessure", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Zakaria", team: "Gris", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Anis", team: "Gris", statut: "Présent", result: "Victoire", sflTime: false, buts: 1, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Kamil", team: "Gris", statut: "Présent", result: "Victoire", sflTime: false, buts: 3, passes: 2, cleanSheet: false, mvp: false, impact: true, def: false, retard: false },
   { j: 5, player: "Adil Zerhoui", team: "Gris", statut: "Présent", result: "Victoire", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Sosso Abdel", team: "Gris", statut: "Présent", result: "Victoire", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
-  { j: 5, player: "Yacine", team: "Rouge", statut: "Présent", result: null, sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false, note: "Extra time", teamScoreBonus: 1, pepiteBonus: 1, extraTime: true },
 
-  // ---- Journée 6 — 26/07/2026 ----
-  // Deux matchs : Orange vs Bleu, puis Vert vs Jaune.
-  // Chaque ligne est recoupée avec la colonne « PP du match » du classeur.
   { j: 6, player: "Ilyes", team: "Orange", statut: "Présent", result: "Défaite", sflTime: false, buts: 3, passes: 1, cleanSheet: false, mvp: false, impact: true, def: false, retard: false },
   { j: 6, player: "Sofiane", team: "Orange", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-  { j: 6, player: "Yamin", team: "Orange", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 6, player: "Yamin", team: "Orange", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
   { j: 6, player: "Yanis", team: "Orange", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 6, player: "Sosso Abdel", team: "Orange", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-
   { j: 6, player: "Sidali", team: "Bleu", statut: "Présent", result: "Victoire", sflTime: false, buts: 3, passes: 3, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 6, player: "Jouneid", team: "Bleu", statut: "Présent", result: "Victoire", sflTime: false, buts: 4, passes: 4, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
   { j: 6, player: "Anis", team: "Bleu", statut: "Présent", result: "Victoire", sflTime: false, buts: 5, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 6, player: "K2R", team: "Bleu", statut: "Présent", result: "Victoire", sflTime: false, buts: 1, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 6, player: "Sosso Coach", team: "Bleu", statut: "Présent", result: "Victoire", sflTime: false, buts: 1, passes: 1, cleanSheet: false, mvp: true, impact: true, def: false, retard: false },
-
   { j: 6, player: "Gaïl", team: "Vert", statut: "Présent", result: "Victoire", sflTime: false, buts: 1, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 6, player: "Yacine Ben", team: "Vert", statut: "Présent", result: "Victoire", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 6, player: "Adil Maimouni", team: "Vert", statut: "Présent", result: "Victoire", sflTime: false, buts: 1, passes: 2, cleanSheet: false, mvp: false, impact: true, def: false, retard: false },
   { j: 6, player: "Souley", team: "Vert", statut: "Présent", result: "Victoire", sflTime: false, buts: 5, passes: 4, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
   { j: 6, player: "Ryad", team: "Vert", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 6, player: "Ibrahim", team: "Vert", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-
   { j: 6, player: "Naim", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 6, player: "Kader", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 6, player: "Mehdi", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 6, player: "Bilal", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 6, player: "Zakaria", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 6, player: "Selim laouadi", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 4, passes: 2, cleanSheet: false, mvp: true, impact: true, def: false, retard: false },
+
+  { j: 7, player: "Ilyes", team: "Orange", statut: "Présent", result: "Défaite", sflTime: false, buts: 3, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Sidali", team: "Orange", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Sofiane", team: "Orange", statut: "Présent", result: "Défaite", sflTime: false, buts: 3, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Lyes Korogli", team: "Orange", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Zakary", team: "Orange", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Naim", team: "Orange", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
+  { j: 7, player: "Ilies", team: "Bleu", statut: "Présent", result: "Victoire", sflTime: false, buts: 4, passes: 3, cleanSheet: false, mvp: true, impact: true, def: false, retard: false },
+  { j: 7, player: "Anis", team: "Bleu", statut: "Présent", result: "Victoire", sflTime: false, buts: 8, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Henri", team: "Bleu", statut: "Présent", result: "Victoire", sflTime: false, buts: 7, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Sosso Coach", team: "Bleu", statut: "Présent", result: "Victoire", sflTime: false, buts: 1, passes: 4, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
+  { j: 7, player: "Moussa", team: "Bleu", statut: "Présent", result: "Victoire", sflTime: false, buts: 0, passes: 6, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Soffiane", team: "Vert", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 1, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
+  { j: 7, player: "Selim laouadi", team: "Vert", statut: "Présent", result: "Victoire", sflTime: false, buts: 4, passes: 2, cleanSheet: false, mvp: false, impact: true, def: false, retard: false },
+  { j: 7, player: "Aghiless", team: "Vert", statut: "Présent", result: "Victoire", sflTime: false, buts: 1, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Adil Maimouni", team: "Vert", statut: "Présent", result: "Victoire", sflTime: false, buts: 4, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Mehdi", team: "Vert", statut: "Présent", result: "Victoire", sflTime: false, buts: 3, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Yazid", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 1, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
+  { j: 7, player: "Adrien", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Zakaria", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 4, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Ibrahim", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Abdel", team: "Jaune", statut: "Présent", result: "Défaite", sflTime: false, buts: 7, passes: 2, cleanSheet: false, mvp: true, impact: true, def: false, retard: false },
+  { j: 7, player: "Gaïl", team: "Rouge", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 2, cleanSheet: false, mvp: true, impact: true, def: false, retard: false },
+  { j: 7, player: "Adil Zerhoui", team: "Rouge", statut: "Présent", result: "Victoire", sflTime: false, buts: 1, passes: 1, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
+  { j: 7, player: "Giovani", team: "Gris", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Malik", team: "Gris", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 1, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
+  { j: 7, player: "illiasse", team: "Gris", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "Yacine Ben", team: "Gris", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
+  { j: 7, player: "kevin Raes", team: "Gris", statut: "Présent", result: "Défaite", sflTime: false, buts: 2, passes: 1, cleanSheet: false, mvp: false, impact: true, def: false, retard: false },
+  { j: 7, player: "Giovani", team: "Gris", statut: "Présent", result: null, sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false, note: "Extra time", teamScoreBonus: 2, extraTime: true },
+  { j: 7, player: "Gaïl", team: "Rouge", statut: "Présent", result: null, sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false, note: "Extra time", teamScoreBonus: 5, extraTime: true },
 ];

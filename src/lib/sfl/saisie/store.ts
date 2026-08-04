@@ -16,7 +16,7 @@ const SEED_VERSION_KEY = "sfl-saisie-seed";
 // journée ajoutée dans seed.ts, on incrémente ce numéro pour que les
 // appareils qui ont déjà une saison en cache repartent des données à jour
 // au lieu de rester bloqués sur l'ancienne.
-const SEED_VERSION = 6;
+const SEED_VERSION = 7;
 
 /** Copie fraîche du seed (données initiales). */
 export function seedSaison(): Saison {
@@ -24,12 +24,12 @@ export function seedSaison(): Saison {
     journees: structuredClone(SEED_JOURNEES),
     roster: structuredClone(SEED_ROSTER),
     entries: structuredClone(SEED_ENTRIES),
-    // Convocation de démo pour la J7 — quelques réponses déjà arrivées.
+    // Convocation de démo pour la J8 — quelques réponses déjà arrivées.
     convocations: [
       {
         id: 1,
         jour: "Dimanche",
-        date: "2 août",
+        date: "9 août",
         heure: "13h00",
         lieu: "Terrain extérieur — 5 vs 5",
         statut: "ouverte",
