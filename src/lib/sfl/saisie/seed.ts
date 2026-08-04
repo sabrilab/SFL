@@ -23,7 +23,6 @@ export const SEED_ROSTER: RosterEntry[] = [
   { name: "Azzedine", poste: "DG", profil: "Actif", base: [68, 67, 67, 65, 69, 72] },
   { name: "Badis", poste: "MC/MDC", profil: "Actif", base: [77, 76, 75, 78, 88, 90] },
   { name: "Franz", poste: "MDC/MC", profil: "Actif", base: [76, 80, 77, 74, 83, 80] },
-  { name: "Hugo", poste: "DG", profil: "Actif", base: [77, 79, 76, 73, 77, 73] },
   { name: "Ilies", poste: "AD", profil: "Actif", base: [84, 82, 83, 88, 77, 80] },
   { name: "Ilyes", poste: "MC/AT", profil: "Actif", base: [81, 85, 86, 90, 72, 66] },
   { name: "Ibrahim", poste: "DC", profil: "Actif", base: [72, 80, 79, 76, 83, 81] },
@@ -57,7 +56,6 @@ export const SEED_ROSTER: RosterEntry[] = [
   { name: "Anas", poste: "MDC", profil: "Actif", base: [82, 77, 78, 80, 85, 84] },
   { name: "Selim", poste: null, profil: "Actif", base: null },
   { name: "Ziad", poste: "MDC", profil: "Actif", base: null },
-  { name: "Chouaib", poste: "DEF", profil: "Actif", base: null },
   { name: "Moustapha", poste: "DG", profil: "Actif", base: [76, 77, 78, 73, 75, 78] },
   { name: "Khadim", poste: "MDC", profil: "Actif", base: null },
   { name: "Adil Maimouni", poste: "DC", profil: "Actif", base: [75, 78, 83, 78, 79, 77] },
@@ -89,6 +87,9 @@ export const SEED_ROSTER: RosterEntry[] = [
   { name: "Malik", poste: null, profil: "Actif", base: null },
   { name: "illiasse", poste: null, profil: "Actif", base: null },
   { name: "kevin Raes", poste: null, profil: "Actif", base: null },
+  // Membres inscrits au classeur (onglet CLASSEMENTS) sans match joué.
+  { name: "Isma", poste: null, profil: "Actif", base: null },
+  { name: "Sebovic", poste: null, profil: "Actif", base: null },
 ];
 
 export const SEED_ENTRIES: MatchEntry[] = [
@@ -130,7 +131,6 @@ export const SEED_ENTRIES: MatchEntry[] = [
   { j: 2, player: "Anis", team: null, statut: "Présent", result: "Nul", sflTime: false, buts: 2, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 2, player: "Omar", team: null, statut: "Absent justifié", result: null, sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 2, player: "Mehdi", team: null, statut: "Absent justifié", result: null, sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-  { j: 2, player: "Hugo", team: null, statut: "Absence injustifiée", result: null, sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
 
   { j: 3, player: "Smail", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 2, cleanSheet: false, mvp: false, impact: true, def: false, retard: false },
   { j: 3, player: "Kylian", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 4, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
@@ -203,7 +203,6 @@ export const SEED_ENTRIES: MatchEntry[] = [
   { j: 5, player: "Anas", team: "Rouge", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 2, cleanSheet: false, mvp: true, impact: true, def: true, retard: false },
   { j: 5, player: "Adrien", team: "Rouge", statut: "Présent", result: "Défaite", sflTime: false, buts: 0, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Kais", team: "Rouge", statut: "Présent", result: "Défaite", sflTime: false, buts: 2, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-  { j: 5, player: "Chouaib", team: "Rouge", statut: "Suspendu", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Khadim", team: "Rouge", statut: "Suspendu", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Naim", team: "Rouge", statut: "Blessure", result: "Défaite", sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 5, player: "Zakaria", team: "Gris", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },

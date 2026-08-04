@@ -248,25 +248,6 @@
       }
     },
     {
-      "nom": "Chouaib",
-      "poste": "DEF",
-      "pp": 0,
-      "matchs": 0,
-      "buts": 0,
-      "passes": 0,
-      "mvp": 0,
-      "impact": 0,
-      "def": 0,
-      "stats": {
-        "VIT": 75,
-        "TIR": 75,
-        "PAS": 75,
-        "DRI": 75,
-        "DEF": 75,
-        "PHY": 75
-      }
-    },
-    {
       "nom": "Farid",
       "poste": "DG",
       "pp": 0,
@@ -397,25 +378,6 @@
         "DRI": 75,
         "DEF": 75,
         "PHY": 75
-      }
-    },
-    {
-      "nom": "Hugo",
-      "poste": "DG",
-      "pp": -2,
-      "matchs": 0,
-      "buts": 0,
-      "passes": 0,
-      "mvp": 0,
-      "impact": 0,
-      "def": 0,
-      "stats": {
-        "VIT": 77,
-        "TIR": 79,
-        "PAS": 76,
-        "DRI": 73,
-        "DEF": 77,
-        "PHY": 73
       }
     },
     {

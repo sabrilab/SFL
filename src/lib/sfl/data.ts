@@ -51,8 +51,6 @@ export const PLAYERS: Player[] = [
   { name: "Hasbi", poste: "G", pp: 0, matchs: 0, buts: 0, passes: 0, statut: "Actif", stats: { VIT: 85, TIR: 79, PAS: 79, DRI: 86, DEF: 92, PHY: 88 }, mvp: 0, impact: 0, def: 0 },
   { name: "Marwan", poste: "MDC/MC", pp: 0, matchs: 0, buts: 0, passes: 0, statut: "Actif", stats: { VIT: 76, TIR: 79, PAS: 78, DRI: 77, DEF: 82, PHY: 82 }, mvp: 0, impact: 0, def: 0 },
   { name: "Rezki", poste: "MDC", pp: 0, matchs: 0, buts: 0, passes: 0, statut: "Actif", stats: { VIT: 75, TIR: 77, PAS: 76, DRI: 75, DEF: 85, PHY: 79 }, mvp: 0, impact: 0, def: 0 },
-  { name: "Chouaib", poste: "—", pp: -2, matchs: 0, buts: 0, passes: 0, statut: "Suspendu", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 0, impact: 0, def: 0, absInj: 1 },
-  { name: "Hugo", poste: "DG", pp: -2, matchs: 0, buts: 0, passes: 0, statut: "Suspendu", stats: { VIT: 77, TIR: 79, PAS: 76, DRI: 73, DEF: 77, PHY: 73 }, mvp: 0, impact: 0, def: 0, absInj: 1 },
   { name: "Khadim", poste: "—", pp: -2, matchs: 0, buts: 0, passes: 0, statut: "Suspendu", stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 }, mvp: 0, impact: 0, def: 0, absInj: 1 },
 ];
 
