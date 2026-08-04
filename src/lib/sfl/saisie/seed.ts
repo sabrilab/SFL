@@ -16,6 +16,10 @@ export const SEED_JOURNEES: JourneeMeta[] = [
 ];
 
 export const SEED_ROSTER: RosterEntry[] = [
+  // Roster synchronisé sur JOUEURS & RÈGLES de SFL_Statistiques_Base_Propre.xlsx
+  // (70 membres, joueurs sans match compris). Hugo exclu à la demande de
+  // l'admin bien que le classeur le liste encore ; « Wadie » du classeur = le
+  // « Wadi » de SAISIE MATCH, conservé sous ce dernier nom (clé des matchs).
   { name: "Adil", poste: "MDC", profil: "Actif", base: [77, 75, 72, 70, 77, 83] },
   { name: "Anis", poste: "DC", profil: "Actif", base: [72, 77, 71, 72, 80, 83] },
   { name: "Ariless", poste: "MC/AT", profil: "Blessure", base: [77, 82, 88, 89, 81, 79] },
@@ -31,7 +35,7 @@ export const SEED_ROSTER: RosterEntry[] = [
   { name: "Mehdi", poste: "MDC", profil: "Actif", base: [74, 73, 75, 76, 83, 88] },
   { name: "Moussa", poste: "DC/MDC", profil: "Actif", base: [77, 84, 75, 72, 89, 89] },
   { name: "Naim", poste: "DC", profil: "Actif", base: [65, 73, 78, 77, 76, 63] },
-  { name: "Omar", poste: "MC", profil: "Blessure", base: [81, 79, 85, 88, 72, 64] },
+  { name: "Omar", poste: "MC", profil: "Actif", base: [81, 79, 85, 88, 72, 64] },
   { name: "Rezki", poste: "MDC", profil: "Actif", base: [75, 77, 76, 75, 85, 79] },
   { name: "Ryad", poste: "MC", profil: "Actif", base: [77, 80, 79, 81, 77, 78] },
   { name: "Sidali", poste: "MC/AG", profil: "Actif", base: [78, 77, 82, 85, 82, 77] },
@@ -44,52 +48,47 @@ export const SEED_ROSTER: RosterEntry[] = [
   { name: "Yanis", poste: "MC/MDC", profil: "Actif", base: [73, 74, 77, 77, 79, 78] },
   { name: "Hasbi", poste: "G", profil: "Actif", base: [85, 79, 79, 86, 92, 88] },
   { name: "Zakary", poste: "MC", profil: "Actif", base: [73, 83, 83, 80, 88, 85] },
-  { name: "Bilal", poste: "MC", profil: "Actif", base: [76, 77, 74, 78, 77, 78] },
-  { name: "Zakaria", poste: "MC", profil: "Actif", base: [77, 78, 77, 79, 77, 76] },
-  { name: "Kylian", poste: "AT", profil: "Blessure", base: [86, 82, 86, 84, 80, 75] },
-  { name: "Adrien", poste: "DD", profil: "Actif", base: [76, 71, 73, 73, 88, 78] },
-  { name: "Houssyne", poste: "G", profil: "En attente", base: null },
-  { name: "Adil Zerhoui", poste: "MD", profil: "Actif", base: [79, 75, 77, 78, 93, 84] },
-  { name: "Kamil", poste: "MC", profil: "Actif", base: [81, 78, 75, 79, 91, 82] },
+  { name: "Soffiane", poste: "AT", profil: "Actif", base: [80, 83, 84, 85, 77, 76] },
+  { name: "Bilal", poste: "MC", profil: "Actif", base: [76, 77, 74, 78, 78, 77] },
+  { name: "Zakaria", poste: "MC", profil: "Actif", base: [77, 78, 77, 79, 76, 77] },
+  { name: "Kylian", poste: "MC", profil: "Actif", base: [86, 82, 86, 84, 75, 80] },
+  { name: "Adrien", poste: "DD", profil: "Actif", base: [76, 71, 73, 73, 78, 88] },
+  { name: "Houssyne", poste: "G", profil: "Actif", base: null },
+  { name: "Adil Zerhoui", poste: "MD", profil: "Actif", base: [79, 75, 77, 78, 84, 93] },
+  { name: "Kamil", poste: "MC", profil: "Actif", base: [82, 78, 75, 79, 82, 91] },
   { name: "Hassan Abdel", poste: "MC", profil: "Actif", base: null },
-  { name: "Sosso Abdel", poste: "DC", profil: "Actif", base: [79, 79, 85, 86, 79, 86] },
-  { name: "Anas", poste: "MDC", profil: "Actif", base: [82, 77, 78, 80, 85, 84] },
+  { name: "Sosso Abdel", poste: "DC", profil: "Actif", base: [79, 79, 85, 86, 86, 79] },
+  { name: "Anas", poste: "MDC", profil: "Actif", base: [82, 77, 78, 80, 84, 85] },
+  { name: "Samy", poste: "MC", profil: "Actif", base: [76, 77, 79, 78, 79, 80] },
+  { name: "Kais", poste: "DD", profil: "Actif", base: [81, 77, 78, 77, 80, 74] },
+  { name: "Adil Maimouni", poste: "DC", profil: "Actif", base: [75, 78, 83, 78, 77, 79] },
+  { name: "Jouneid", poste: "MC", profil: "Actif", base: [85, 86, 92, 83, 82, 85] },
+  { name: "Selim laouadi", poste: "MC", profil: "Actif", base: [69, 83, 86, 87, 77, 72] },
+  { name: "Farid", poste: "DG", profil: "Actif", base: [77, 73, 74, 75, 79, 81] },
+  { name: "Abdel", poste: "MC", profil: "Actif", base: [76, 80, 79, 79, 80, 79] },
+  { name: "Moustapha", poste: "DG", profil: "Actif", base: [76, 77, 78, 73, 78, 75] },
   { name: "Selim", poste: null, profil: "Actif", base: null },
   { name: "Ziad", poste: "MDC", profil: "Actif", base: null },
-  { name: "Moustapha", poste: "DG", profil: "Actif", base: [76, 77, 78, 73, 75, 78] },
   { name: "Khadim", poste: "MDC", profil: "Actif", base: null },
-  { name: "Adil Maimouni", poste: "DC", profil: "Actif", base: [75, 78, 83, 78, 79, 77] },
-  { name: "Jouneid", poste: "MC", profil: "Actif", base: [85, 86, 92, 83, 85, 82] },
-  { name: "Selim laouadi", poste: "MC", profil: "Actif", base: [69, 77, 85, 87, 83, 76] },
-  { name: "Farid", poste: "DG", profil: "Actif", base: [77, 73, 74, 75, 81, 79] },
-  { name: "Abdel", poste: "MC", profil: "Actif", base: [76, 80, 79, 79, 79, 80] },
   { name: "Guillaume", poste: "DG", profil: "Actif", base: null },
-  // « Samy » : orthographe du classeur actuel (anciennement « Sami »).
-  { name: "Samy", poste: "MC", profil: "Actif", base: [76, 77, 80, 78, 80, 79] },
-  { name: "Kais", poste: "DD", profil: "Actif", base: [81, 77, 78, 77, 74, 80] },
-  // Arrivés / notés via le classeur JOUEURS. Une base à `null` signifie
-  // « pas encore évalué » : le moteur applique alors une carte neutre à 75.
-  { name: "K2R", poste: "MC", profil: "Actif", base: [78, 77, 77, 76, 77, 79] },
-  { name: "Sosso Coach", poste: "AT/BU", profil: "Actif", base: [87, 82, 83, 83, 81, 88] },
-  { name: "Gaïl", poste: "MDC", profil: "Actif", base: [79, 76, 77, 75, 80, 78] },
-  { name: "Yacine Ben", poste: "DD", profil: "Actif", base: [72, 68, 69, 73, 80, 77] },
-  { name: "Soffiane", poste: "AT", profil: "Actif", base: [80, 83, 84, 85, 76, 77] },
-  { name: "Simon Ribeiro", poste: "MC", profil: "Actif", base: [80, 84, 88, 84, 79, 86] },
+  { name: "Sosso Coach", poste: "AT/BU", profil: "Actif", base: [87, 82, 83, 83, 88, 81] },
+  { name: "Yacine Ben", poste: "DD", profil: "Actif", base: [72, 68, 69, 73, 77, 80] },
   { name: "Lyes Korogli", poste: "AG/MC", profil: "Actif", base: null },
-  // Arrivés en J7 — absents de JOUEURS & RÈGLES, donc non évalués (carte 75).
-  // Orthographe reprise TELLE QUELLE du classeur (« illiasse », « kevin Raes ») :
-  // le nom sert de clé d'identité jusqu'à la migration UUID, toute retouche
-  // cosmétique casserait le rapprochement avec les prochains imports.
-  { name: "Henri", poste: null, profil: "Actif", base: null },
-  { name: "Aghiless", poste: null, profil: "Actif", base: null },
+  { name: "K2R", poste: "MC", profil: "Actif", base: [78, 77, 77, 76, 79, 77] },
+  { name: "Gaïl", poste: "MDC", profil: "Actif", base: [79, 76, 77, 75, 78, 80] },
   { name: "Yazid", poste: null, profil: "Actif", base: null },
-  { name: "Giovani", poste: null, profil: "Actif", base: null },
+  { name: "Henri", poste: null, profil: "Actif", base: null },
+  { name: "Isma", poste: null, profil: "Actif", base: null },
   { name: "Malik", poste: null, profil: "Actif", base: null },
   { name: "illiasse", poste: null, profil: "Actif", base: null },
+  { name: "Giovani", poste: null, profil: "Actif", base: null },
+  { name: "Aghiless", poste: null, profil: "Actif", base: null },
+  { name: "Simon Ribeiro", poste: "MC", profil: "Actif", base: [80, 84, 88, 84, 86, 79] },
   { name: "kevin Raes", poste: null, profil: "Actif", base: null },
-  // Membres inscrits au classeur (onglet CLASSEMENTS) sans match joué.
-  { name: "Isma", poste: null, profil: "Actif", base: null },
   { name: "Sebovic", poste: null, profil: "Actif", base: null },
+  { name: "Kevin B", poste: null, profil: "En attente", base: null },
+  { name: "Anis R", poste: null, profil: "En attente", base: null },
+  { name: "Sami D", poste: null, profil: "En attente", base: null },
 ];
 
 export const SEED_ENTRIES: MatchEntry[] = [
