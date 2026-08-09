@@ -10,6 +10,7 @@ import { Card3D } from "@/components/sfl/card-3d";
 import { ViewableCard } from "@/components/sfl/card-viewer";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
+import { Locked } from "@/components/sfl/locked";
 import { LEAGUE_KEY } from "@/components/layout/site-header";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
 import { NEXT_MATCH } from "@/lib/sfl/data";
@@ -38,6 +39,8 @@ export default function Home() {
   const LEADERS = RANKINGS.map((def) => ({ def, leader: rankByMetric(players, def.value)[0] }));
   const [presentOverride, setPresentOverride] = useState<boolean | null>(null);
   const [leagueTick, setLeagueTick] = useState(0);
+  // Le Feed a deux vues (design Kickoff) : la journée, et le classement.
+  const [view, setView] = useState<"journee" | "classement">("journee");
 
   void leagueTick;
   const league = isClient ? (localStorage.getItem(LEAGUE_KEY) ?? "SFL") : "SFL";
@@ -102,6 +105,68 @@ export default function Home() {
         <h1 className="text-[34px] font-bold tracking-tight">Salut, {player.name}</h1>
       </div>
 
+      {/* Sélecteur de vue du Feed (design Kickoff) */}
+      <div className="flex gap-1.5 rounded-full bg-card p-1.5" role="tablist" aria-label="Vue du feed">
+        {(
+          [
+            ["journee", "Journée"],
+            ["classement", "Classement"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            role="tab"
+            aria-selected={view === id}
+            onClick={() => setView(id)}
+            className={cn(
+              "flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-colors",
+              view === id
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {view === "classement" && (
+        <section className="rounded-3xl bg-card p-2">
+          {RANKED.slice(0, 10).map((p) => (
+            <div
+              key={p.name}
+              className="flex items-center gap-3 border-b border-border/40 px-3 py-3 last:border-0"
+            >
+              <span className="w-6 text-center text-[13px] font-bold text-muted-foreground tabular-nums">
+                {p.rank}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">
+                {p.name}
+                {p.name === player.name && (
+                  <span className="ml-2 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-primary-foreground uppercase">
+                    Toi
+                  </span>
+                )}
+              </span>
+              <span className="shrink-0 text-[12px] text-muted-foreground tabular-nums">
+                {p.buts} b · {p.passes} pd
+              </span>
+              <span className="w-14 shrink-0 text-right text-[15px] font-bold tabular-nums">
+                {p.pp} pts
+              </span>
+            </div>
+          ))}
+          <Link
+            href="/stats"
+            className="flex items-center justify-center gap-1 px-3 py-3 text-sm font-semibold text-primary"
+          >
+            Tous les classements <ChevronRight className="size-4" />
+          </Link>
+        </section>
+      )}
+
+      {view === "journee" && (
+      <>
       {/* Ma carte + aperçu rapide, côte à côte */}
       <section className="flex items-center gap-4 lg:max-w-xl">
         <Card3D
@@ -241,6 +306,53 @@ export default function Home() {
           <ChevronRight className="size-5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>
+
+      {/* Modules à venir (design Kickoff) : le vote de la journée et les
+          clips du vestiaire — visibles mais verrouillés tant que leurs
+          moteurs (comptes, vidéos) n'existent pas. */}
+      <Locked label="Bientôt">
+        <section className="rounded-3xl bg-card p-5">
+          <p className="text-[11px] font-bold tracking-widest text-primary uppercase">
+            Vote ouvert · fin dans 2 j
+          </p>
+          <h2 className="mt-1 text-xl font-bold tracking-tight">
+            Qui a fait la journée&nbsp;?
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            MVP, Joueur Impact, Défenseur — un seul vote, sans retour en arrière.
+          </p>
+          <div className="mt-4 h-11 rounded-full bg-foreground/10 text-center text-[14px] leading-[44px] font-semibold">
+            Voter pour la J{NEXT_MATCH.journee - 1}
+          </div>
+        </section>
+      </Locked>
+
+      <Locked label="Bientôt">
+        <section className="rounded-3xl bg-card p-5">
+          <p className="text-[11px] font-bold tracking-widest text-muted-foreground uppercase">
+            Les clips de la journée
+          </p>
+          <h2 className="mt-1 text-xl font-bold tracking-tight">
+            Filmés par le vestiaire
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Les vidéos du dimanche, identifiées joueur par joueur, directement
+            dans le feed.
+          </p>
+          <div className="mt-4 flex gap-2.5">
+            {["La reprise de la 88e", "Le double contact", "L'arrêt du siècle"].map((t) => (
+              <div
+                key={t}
+                className="flex h-28 flex-1 items-end rounded-2xl bg-foreground/10 p-2.5 text-[11px] leading-tight font-semibold"
+              >
+                {t}
+              </div>
+            ))}
+          </div>
+        </section>
+      </Locked>
+      </>
+      )}
     </div>
   );
 }

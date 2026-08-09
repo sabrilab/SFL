@@ -39,7 +39,10 @@ export function BottomNav() {
               <Icon
                 className={cn(
                   "relative size-[22px] transition-colors",
-                  active ? "text-foreground" : "text-muted-foreground/60"
+                  active ? "text-foreground" : "text-muted-foreground/60",
+                  // Section verrouillée : l'onglet mène à l'aperçu, mais son
+                  // icône reste éteinte pour signaler l'indisponibilité.
+                  item.locked && !active && "opacity-45"
                 )}
                 strokeWidth={active ? 2.2 : 1.8}
               />

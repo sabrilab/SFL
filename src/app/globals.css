@@ -88,9 +88,11 @@
 
 /* Thème sombre — noir neutre profond, cartes anthracite, accent orange SFL */
 .dark {
-  --background: oklch(0.13 0 0);
+  /* Noir profond du design Kickoff : le fond descend presque au noir pur,
+     les cartes restent mates juste au-dessus. */
+  --background: oklch(0.1 0 0);
   --foreground: oklch(0.96 0 0);
-  --card: oklch(0.185 0 0);
+  --card: oklch(0.17 0 0);
   --card-foreground: oklch(0.96 0 0);
   --popover: oklch(0.2 0 0);
   --popover-foreground: oklch(0.96 0 0);

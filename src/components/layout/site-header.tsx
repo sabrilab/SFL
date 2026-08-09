@@ -216,7 +216,10 @@ export function SiteHeader() {
                   "rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
                   active
                     ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                  // Section pas encore ouverte : la page d'aperçu existe mais
+                  // la fonctionnalité est verrouillée — l'onglet le montre.
+                  item.locked && !active && "opacity-45"
                 )}
               >
                 {item.label}
