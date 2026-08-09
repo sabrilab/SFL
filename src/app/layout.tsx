@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Anton, Barlow_Condensed } from "next/font/google";
+import { Geist, Geist_Mono, Anton, Barlow_Condensed, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme-provider";
@@ -28,6 +28,13 @@ const geistMono = Geist_Mono({
 const anton = Anton({
   weight: "400",
   variable: "--font-anton",
+  subsets: ["latin"],
+});
+
+// Police « données » des cartes éditoriales (design Kickoff).
+const jbMono = JetBrains_Mono({
+  weight: ["400", "600", "700"],
+  variable: "--font-jbmono",
   subsets: ["latin"],
 });
 
@@ -72,7 +79,7 @@ export default function RootLayout({
     <html
       lang="fr"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${anton.variable} ${barlow.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${anton.variable} ${barlow.variable} ${jbMono.variable} h-full antialiased`}
     >
       {/* body ne défile jamais lui-même (overflow hidden, hauteur figée à
           celle de l'écran) : c'est le conteneur interne juste en dessous
