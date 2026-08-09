@@ -181,9 +181,9 @@ export const JOURNEES: Journee[] = [
 ];
 
 export const NEXT_MATCH = {
-  journee: 8,
+  journee: 9,
   jour: "Dimanche",
-  date: "9 août",
+  date: "16 août",
   heure: "13h00",
   lieu: "Terrain extérieur — 5 vs 5",
 };
