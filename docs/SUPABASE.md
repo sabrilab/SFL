@@ -82,6 +82,12 @@ route ne peut appliquer QUE le schéma figé au build, jamais du SQL arbitraire.
 
 ### Activer (une seule fois)
 
+**Voie la plus simple : l'intégration Vercel × Supabase** (Vercel →
+Integrations → Supabase → connecter le projet). Elle injecte
+automatiquement `POSTGRES_URL` et ses déclinaisons — la migration les
+reconnaît sans autre réglage. Les étapes ci-dessous ne servent que si tu
+préfères poser la variable à la main.
+
 1. Tableau de bord Supabase → bouton **Connect** (en haut) → onglet
    **Transaction pooler** → copier l'URI (elle commence par
    `postgresql://postgres.tpfusliksgxcvfrodchk:...@aws-...pooler.supabase.com:6543/postgres`)

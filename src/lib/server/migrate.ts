@@ -5,10 +5,11 @@
 // l'empreinte SHA-256 du script est mémorisée dans public.schema_migrations,
 // si elle est déjà là on ne touche à rien.
 //
-// La connexion passe par SUPABASE_DB_URL (chaîne « Transaction pooler » du
-// tableau de bord, avec le mot de passe base de données). C'est un secret :
-// il ne vit QUE dans les variables d'environnement de Vercel — jamais dans le
-// code, jamais dans le navigateur (pas de préfixe NEXT_PUBLIC).
+// La connexion vient des variables d'environnement de Vercel — jamais du
+// code, jamais du navigateur (pas de préfixe NEXT_PUBLIC). Deux sources :
+//   · SUPABASE_DB_URL, posée à la main (chaîne « Transaction pooler ») ;
+//   · les variables injectées par l'intégration Vercel × Supabase
+//     (POSTGRES_URL et déclinaisons) — reconnues automatiquement.
 
 import { createHash } from "node:crypto";
 import { Client } from "pg";
@@ -19,8 +20,18 @@ export interface MigrateResult {
   message?: string;
 }
 
+/** Première chaîne de connexion disponible, selon la façon dont elle a été posée. */
+function resolveDbUrl(): string | undefined {
+  return (
+    process.env.SUPABASE_DB_URL ??
+    process.env.POSTGRES_URL ??
+    process.env.POSTGRES_URL_NON_POOLING ??
+    process.env.POSTGRES_PRISMA_URL
+  );
+}
+
 export async function migrateSchema(sql: string, dbUrl?: string): Promise<MigrateResult> {
-  const url = dbUrl ?? process.env.SUPABASE_DB_URL;
+  const url = dbUrl ?? resolveDbUrl();
   if (!url) return { status: "not-configured" };
 
   const hash = createHash("sha256").update(sql).digest("hex");
