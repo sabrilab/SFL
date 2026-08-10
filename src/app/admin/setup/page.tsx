@@ -8,7 +8,7 @@
 // de bord : réveiller le projet, décocher « Confirm email », coller le schéma
 // SQL, puis refermer les inscriptions à la fin.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Copy, ExternalLink, Loader2, RefreshCw, Rocket } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "@/hooks/use-session";
@@ -75,6 +75,25 @@ export default function SetupPage() {
   const { saison } = useSeason();
   const [status, setStatus] = useState<Status | null>(null);
   const [checking, setChecking] = useState(false);
+  const [db, setDb] = useState<string | null>(null);
+
+  // Migration automatique : à l'ouverture de la page, le serveur applique le
+  // schéma s'il a changé (sans SUPABASE_DB_URL, il répond « not-configured »
+  // et le copier-coller reste le repli).
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/migrate", { method: "POST" })
+      .then((r) => r.json())
+      .then((r) => {
+        if (!cancelled) setDb(r.status ?? "error");
+      })
+      .catch(() => {
+        if (!cancelled) setDb("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [bilan, setBilan] = useState<string | null>(null);
@@ -184,6 +203,20 @@ export default function SetupPage() {
           ok={status ? status.convocation != null : null}
           label={status?.convocation != null ? `Convocation J${status.convocation}` : "Convocation"}
         />
+        <Pill
+          ok={db === null ? null : db === "applied" || db === "up-to-date"}
+          label={
+            db === "applied"
+              ? "Base mise à jour"
+              : db === "up-to-date"
+                ? "Base à jour"
+                : db === "not-configured"
+                  ? "Base : manuel"
+                  : db === "error"
+                    ? "Base : erreur"
+                    : "Base"
+          }
+        />
         <button
           onClick={verifier}
           disabled={checking}
@@ -213,12 +246,27 @@ export default function SetupPage() {
         </a>
       </Step>
 
-      <Step n={2} title="Créer les tables (un copier-coller)">
-        <p>
-          Copie le script, ouvre l&apos;éditeur SQL, colle, puis{" "}
-          <strong className="text-foreground">Run</strong>. Une seule fois — le rôle admin est
-          posé automatiquement.
-        </p>
+      <Step n={2} title="Créer les tables">
+        {db === "applied" || db === "up-to-date" ? (
+          <p className="flex items-center gap-2 rounded-2xl bg-primary/10 px-3.5 py-2.5 text-[12.5px] text-primary">
+            <Check className="size-3.5 shrink-0" />
+            {db === "applied"
+              ? "Base mise à jour automatiquement — rien à faire ici."
+              : "Base déjà à jour — rien à faire ici."}
+          </p>
+        ) : (
+          <p>
+            {db === "not-configured" && (
+              <span className="mb-2 block text-[12px] text-foreground/40">
+                (Astuce : ajoute SUPABASE_DB_URL dans Vercel et cette étape deviendra
+                automatique à chaque déploiement — voir docs/SUPABASE.md.)
+              </span>
+            )}
+            Copie le script, ouvre l&apos;éditeur SQL, colle, puis{" "}
+            <strong className="text-foreground">Run</strong>. Le rôle admin est posé
+            automatiquement.
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           <button
             onClick={copierSchema}

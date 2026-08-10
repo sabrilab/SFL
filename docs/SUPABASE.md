@@ -69,3 +69,30 @@ Table `activity` (login / open / presence), lisible par l'admin seulement.
 Tableau de bord : Réglages → Activité & rétention — actifs du jour / 7 j /
 30 j, courbe 14 jours, détail par joueur (dernière venue, jours actifs),
 emails collectés.
+
+## Migrations automatiques (plus jamais de copier-coller SQL)
+
+Le schéma s'applique tout seul, à deux moments :
+- **à chaque déploiement** (scripts/prebuild.ts, avant le build Vercel) ;
+- **à l'ouverture de la page /admin/setup** (route /api/migrate).
+
+Dans les deux cas : empreinte SHA-256 du script mémorisée dans
+`schema_migrations` — si le schéma n'a pas changé, rien n'est exécuté. La
+route ne peut appliquer QUE le schéma figé au build, jamais du SQL arbitraire.
+
+### Activer (une seule fois)
+
+1. Tableau de bord Supabase → bouton **Connect** (en haut) → onglet
+   **Transaction pooler** → copier l'URI (elle commence par
+   `postgresql://postgres.tpfusliksgxcvfrodchk:...@aws-...pooler.supabase.com:6543/postgres`)
+   et remplacer `[YOUR-PASSWORD]` par le mot de passe de la base
+   (Settings → Database → Reset database password si tu ne l'as plus).
+2. Vercel → ton projet → **Settings → Environment Variables** → ajouter
+   `SUPABASE_DB_URL` = cette URI, sur les trois environnements.
+3. Redéployer (ou attendre le prochain push).
+
+⚠️ **C'est un secret au même titre que la clé service_role** : il ne va QUE
+dans Vercel. Jamais dans le code, jamais dans une conversation.
+
+Sans cette variable, rien ne casse : la page d'installation garde le bouton
+« Copier le script SQL » en repli.

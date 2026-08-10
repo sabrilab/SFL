@@ -9,7 +9,7 @@
     "lint": "eslint",
     "saison:check": "tsx tools/saison-snapshot.ts",
     "saison:bless": "tsx tools/saison-snapshot.ts --bless",
-    "prebuild": "node -e \"require('fs').copyFileSync('supabase/schema.sql','public/supabase-schema.sql')\""
+    "prebuild": "tsx scripts/prebuild.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -23,6 +23,7 @@
     "motion": "^12.42.2",
     "next": "16.2.10",
     "next-themes": "^0.4.6",
+    "pg": "8.23.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "shadcn": "^4.13.0",
@@ -34,6 +35,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "8.21.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/three": "^0.185.1",
