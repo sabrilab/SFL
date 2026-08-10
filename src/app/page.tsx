@@ -16,7 +16,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronRight, MapPin, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BoostCard } from "@/components/sfl/boost-card";
+import { BoostCard, RankingCard } from "@/components/sfl/boost-card";
+import { PlayerCard } from "@/components/sfl/player-card";
 import { Card3D } from "@/components/sfl/card-3d";
 import { Locked } from "@/components/sfl/locked";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -36,9 +37,16 @@ import {
 import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
 import {
   AbsentsModule,
+  CouleursModule,
   CourseModule,
+  FidelesModule,
   FormeModule,
+  MilestonesModule,
   MouvementsModule,
+  PulseModule,
+  RaceModule,
+  RadarModule,
+  RecordsModule,
   useAnalyse,
 } from "@/components/sfl/feed/analyse";
 import { activeConvocation, respondConvocation } from "@/lib/sfl/saisie/mutations";
@@ -250,7 +258,22 @@ export default function Ligue() {
     .filter((d) => d.best.length === 2)
     .sort((a, b) => b.total - a.total)[0];
 
-  const analyse = useAnalyse(saison, players, lastJ);
+  const analyse = useAnalyse(saison, players, journees, lastJ);
+
+  // Le scanner : les stats de la carte MVP contre la moyenne des joueurs
+  // qui ont foulé le terrain cette saison.
+  const actifs = players.filter((p) => p.matchs > 0);
+  const avgStats = Object.fromEntries(
+    STAT_KEYS.map((k) => [
+      k,
+      Math.round(actifs.reduce((s, p) => s + p.stats[k], 0) / Math.max(1, actifs.length)),
+    ])
+  ) as Player["stats"];
+
+  // Le leader du Pépite d'Or, pour sa carte de classement en 3D dans la course.
+  const leader = analyse.course ? byName.get(analyse.course.top[0].name) : undefined;
+  // Le joueur en forme, pour sa carte dans le module des séries.
+  const formePlayer = analyse.forme.length > 0 ? byName.get(analyse.forme[0].name) : undefined;
 
   // Synthèse du classement : mon rang, son évolution sur la journée, et ma
   // forme sur les cinq derniers matchs joués (V/N/D).
@@ -529,27 +552,47 @@ export default function Ligue() {
             </section>
           )}
 
-          {/* 6 · Cartes débloquées — posées nues, jamais dans un cadre */}
+          {/* 6 · Cartes débloquées — posées nues, en 3D, manipulables */}
           {unlocked.length > 0 && (
             <section>
               <ModuleTitle
                 label={`${jBoosts.length} carte${jBoosts.length > 1 ? "s" : ""} débloquée${jBoosts.length > 1 ? "s" : ""}`}
                 title="Les cartes de la journée"
               />
-              <div className="-mx-5 flex snap-x gap-4 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {unlocked.map((c) => (
-                  <div key={`${c.player}-${c.type}`} className="shrink-0 snap-start">
-                    <BoostCard card={c} size={0.52} />
+              <div className="flex justify-center gap-2.5">
+                {unlocked.slice(0, 3).map((c) => (
+                  <div key={`${c.player}-${c.type}`} className="flex flex-col items-center">
+                    <Card3D
+                      cacheKey={`feed-unlock-${c.player}-${c.type}`}
+                      mode="rare"
+                      size={0.42}
+                      render={(s) => <BoostCard card={c} size={s} />}
+                    />
                     {feat(c.player) && (
                       <p className="mono-label mt-2 text-center text-primary">{feat(c.player)}</p>
                     )}
                   </div>
                 ))}
               </div>
+              <p className="mono-label mt-3 text-center text-foreground/30">
+                Glisse une carte pour la faire tourner
+              </p>
             </section>
           )}
 
-          <CourseModule course={analyse.course} />
+          <CourseModule
+            course={analyse.course}
+            card={
+              leader && (
+                <Card3D
+                  cacheKey={`feed-leader-${leader.name}`}
+                  mode="rare"
+                  size={0.44}
+                  render={(s) => <RankingCard rankingId="pp" player={leader} size={s} />}
+                />
+              )
+            }
+          />
 
           {/* 7 · La feuille de match */}
           <section className="glass rounded-3xl p-5">
@@ -586,6 +629,8 @@ export default function Ligue() {
               <Check className="size-3.5 text-primary" /> Feuille validée par l&apos;admin
             </p>
           </section>
+
+          <PulseModule pulse={analyse.pulse} />
 
           {/* 8 · Ailleurs dans la ligue */}
           {others.length > 0 && (
@@ -657,6 +702,8 @@ export default function Ligue() {
             </div>
           </section>
 
+          <RaceModule race={analyse.race} />
+
           {/* 9 bis · Les tops de la journée — au barème des Points Pépite */}
           {tops.length > 0 && (
             <section>
@@ -698,15 +745,27 @@ export default function Ligue() {
           {duelA && duelB && (
             <section className="glass rounded-3xl p-5">
               <ModuleTitle title="Le duel de la journée" />
+              <div className="mb-4 flex items-center justify-center gap-2.5">
+                <Card3D
+                  cacheKey={`feed-duel-${duelA.name}`}
+                  mode="rare"
+                  size={0.46}
+                  render={(s) => <PlayerCard player={duelA} mode="rare" size={s} />}
+                />
+                <span className="mono-label shrink-0 text-foreground/40">VS</span>
+                <Card3D
+                  cacheKey={`feed-duel-${duelB.name}`}
+                  mode="rare"
+                  size={0.46}
+                  render={(s) => <PlayerCard player={duelB} mode="rare" size={s} />}
+                />
+              </div>
               <div className="mb-3 flex items-center justify-between">
                 {[duelA, duelB].map((p) => (
-                  <div key={p.name} className="flex items-center gap-2">
-                    <Avatar name={p.name} size={34} />
-                    <div>
-                      <div className="text-[14px] font-bold">{p.name}</div>
-                      <div className="mono-label text-muted-foreground">
-                        {feat(p.name) ?? p.poste}
-                      </div>
+                  <div key={p.name} className="text-center first:text-left last:text-right">
+                    <div className="text-[14px] font-bold">{p.name}</div>
+                    <div className="mono-label text-muted-foreground">
+                      {feat(p.name) ?? p.poste}
                     </div>
                   </div>
                 ))}
@@ -802,7 +861,29 @@ export default function Ligue() {
             </section>
           )}
 
-          <FormeModule forme={analyse.forme} />
+          {mvpCard && (
+            <RadarModule
+              name={mvpCard.player}
+              stats={mvpCard.stats}
+              avg={avgStats}
+              ovrValue={mvpCard.ovr}
+              avgOvr={ovr(avgStats)}
+            />
+          )}
+
+          <FormeModule
+            forme={analyse.forme}
+            card={
+              formePlayer && (
+                <Card3D
+                  cacheKey={`feed-forme-${formePlayer.name}`}
+                  mode="rare"
+                  size={0.42}
+                  render={(s) => <PlayerCard player={formePlayer} mode="rare" size={s} />}
+                />
+              )
+            }
+          />
 
           {/* 12 · Les clips */}
           <section>
@@ -896,7 +977,11 @@ export default function Ligue() {
             </section>
           )}
 
+          <MilestonesModule milestones={analyse.milestones} />
+
           <AbsentsModule absents={analyse.absents} />
+
+          <FidelesModule fideles={analyse.fideles} />
 
           {/* 14 · Le but du match */}
           <section>
@@ -918,6 +1003,10 @@ export default function Ligue() {
               </div>
             </Locked>
           </section>
+
+          <CouleursModule couleurs={analyse.couleurs} />
+
+          <RecordsModule records={analyse.records} />
 
           {/* 15 · Le vestiaire */}
           <section>
