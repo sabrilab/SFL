@@ -20,54 +20,81 @@ export interface MigrateResult {
   message?: string;
 }
 
-/** Première chaîne de connexion disponible, selon la façon dont elle a été posée. */
-function resolveDbUrl(): string | undefined {
-  return (
-    process.env.SUPABASE_DB_URL ??
-    process.env.POSTGRES_URL ??
-    process.env.POSTGRES_URL_NON_POOLING ??
-    process.env.POSTGRES_PRISMA_URL
-  );
+/**
+ * Chaînes de connexion candidates, dans l'ordre de préférence. Toutes ne
+ * passent pas depuis les fonctions Vercel (la connexion directe à la base est
+ * IPv6 seulement, par exemple) : on les essaie l'une après l'autre.
+ */
+function candidateUrls(): { name: string; url: string }[] {
+  return [
+    { name: "SUPABASE_DB_URL", url: process.env.SUPABASE_DB_URL },
+    { name: "POSTGRES_URL", url: process.env.POSTGRES_URL },
+    { name: "POSTGRES_URL_NON_POOLING", url: process.env.POSTGRES_URL_NON_POOLING },
+    { name: "POSTGRES_PRISMA_URL", url: process.env.POSTGRES_PRISMA_URL },
+  ].filter((c): c is { name: string; url: string } => !!c.url);
 }
 
 export async function migrateSchema(sql: string, dbUrl?: string): Promise<MigrateResult> {
-  const url = dbUrl ?? resolveDbUrl();
-  if (!url) return { status: "not-configured" };
+  const candidates = dbUrl ? [{ name: "explicite", url: dbUrl }] : candidateUrls();
+  if (candidates.length === 0) return { status: "not-configured" };
 
   const hash = createHash("sha256").update(sql).digest("hex");
-  const client = new Client({
-    connectionString: url,
-    // Le pooler Supabase chiffre toujours ; on ne vérifie pas la chaîne de CA
-    // (absente des environnements serverless), l'authentification reste le
-    // mot de passe de la base.
-    ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: 8000,
-  });
+  const connectErrors: string[] = [];
 
-  try {
-    await client.connect();
-    await client.query(
-      `create table if not exists public.schema_migrations (
-         hash text primary key,
-         applied_at timestamptz not null default now()
-       )`
-    );
-    const seen = await client.query("select 1 from public.schema_migrations where hash = $1", [
-      hash,
-    ]);
-    if ((seen.rowCount ?? 0) > 0) return { status: "up-to-date", hash };
+  for (const c of candidates) {
+    const client = new Client({
+      connectionString: c.url,
+      // Le pooler Supabase chiffre toujours ; on ne vérifie pas la chaîne de
+      // CA (absente des environnements serverless), l'authentification reste
+      // le mot de passe de la base.
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 8000,
+    });
 
-    // Sans paramètres, pg utilise le protocole « simple » : le script
-    // multi-instructions (DO $$ compris) passe en un seul appel.
-    await client.query(sql);
-    await client.query(
-      "insert into public.schema_migrations (hash) values ($1) on conflict do nothing",
-      [hash]
-    );
-    return { status: "applied", hash };
-  } catch (e) {
-    return { status: "error", hash, message: e instanceof Error ? e.message : String(e) };
-  } finally {
-    await client.end().catch(() => {});
+    // Échec de CONNEXION → on tente l'adresse suivante. Échec SQL → on
+    // s'arrête et on remonte l'erreur : c'est le schéma qu'il faut corriger.
+    try {
+      await client.connect();
+    } catch (e) {
+      connectErrors.push(`${c.name}: ${e instanceof Error ? e.message : String(e)}`);
+      await client.end().catch(() => {});
+      continue;
+    }
+
+    try {
+      await client.query(
+        `create table if not exists public.schema_migrations (
+           hash text primary key,
+           applied_at timestamptz not null default now()
+         )`
+      );
+      const seen = await client.query("select 1 from public.schema_migrations where hash = $1", [
+        hash,
+      ]);
+      if ((seen.rowCount ?? 0) > 0) return { status: "up-to-date", hash };
+
+      // Sans paramètres, pg utilise le protocole « simple » : le script
+      // multi-instructions (DO $$ compris) passe en un seul appel.
+      await client.query(sql);
+      await client.query(
+        "insert into public.schema_migrations (hash) values ($1) on conflict do nothing",
+        [hash]
+      );
+      return { status: "applied", hash };
+    } catch (e) {
+      return {
+        status: "error",
+        hash,
+        message: `${c.name} · ${e instanceof Error ? e.message : String(e)}`,
+      };
+    } finally {
+      await client.end().catch(() => {});
+    }
   }
+
+  return {
+    status: "error",
+    hash,
+    message: `connexion impossible — ${connectErrors.join(" | ")}`,
+  };
 }

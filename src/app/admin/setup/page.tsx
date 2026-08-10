@@ -76,19 +76,37 @@ export default function SetupPage() {
   const [status, setStatus] = useState<Status | null>(null);
   const [checking, setChecking] = useState(false);
   const [db, setDb] = useState<string | null>(null);
+  const [dbMessage, setDbMessage] = useState<string | null>(null);
+
+  function runMigrate() {
+    return fetch("/api/migrate", { method: "POST" })
+      .then((r) => r.json())
+      .then((r) => {
+        setDb(r.status ?? "error");
+        setDbMessage(r.message ?? null);
+      })
+      .catch(() => {
+        setDb("error");
+        setDbMessage("Le serveur n'a pas répondu.");
+      });
+  }
 
   // Migration automatique : à l'ouverture de la page, le serveur applique le
-  // schéma s'il a changé (sans SUPABASE_DB_URL, il répond « not-configured »
-  // et le copier-coller reste le repli).
+  // schéma s'il a changé (sans variable de connexion, il répond
+  // « not-configured » et le copier-coller reste le repli).
   useEffect(() => {
     let cancelled = false;
     fetch("/api/migrate", { method: "POST" })
       .then((r) => r.json())
       .then((r) => {
-        if (!cancelled) setDb(r.status ?? "error");
+        if (cancelled) return;
+        setDb(r.status ?? "error");
+        setDbMessage(r.message ?? null);
       })
       .catch(() => {
-        if (!cancelled) setDb("error");
+        if (cancelled) return;
+        setDb("error");
+        setDbMessage("Le serveur n'a pas répondu.");
       });
     return () => {
       cancelled = true;
@@ -101,6 +119,8 @@ export default function SetupPage() {
   async function verifier() {
     setChecking(true);
     try {
+      // La migration d'abord (elle peut débloquer le reste), l'état ensuite.
+      await runMigrate();
       setStatus(await api({ action: "status" }));
     } catch {
       setStatus({ reachable: false });
@@ -226,6 +246,12 @@ export default function SetupPage() {
           Vérifier
         </button>
       </section>
+
+      {db === "error" && dbMessage && (
+        <p className="glass-soft rounded-2xl p-3.5 font-mono text-[11px] leading-relaxed break-all text-[#FF6B5E]">
+          Migration : {dbMessage}
+        </p>
+      )}
 
       <Step n={1} title="Réveiller le projet, ouvrir la porte">
         <p>
