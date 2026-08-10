@@ -1,61 +1,69 @@
 "use client";
 
+// Tab bar — répliquée du design Kickoff : « le seul élément liquid glass ».
+// Quatre icônes sans libellé ; l'onglet actif est une pilule blanche pleine
+// avec l'icône noire, les inactifs sont des traits blancs à 58 %. La bulle
+// des Discussions porte la pastille bleue de notification.
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "motion/react";
-import { cn } from "@/lib/utils";
-import { NAV_ITEMS } from "@/lib/nav";
+import { BallIcon, BubbleIcon, PersonIcon, BagIcon } from "./nav-icons";
+
+const TABS = [
+  { href: "/", Icon: BallIcon, label: "Feed" },
+  { href: "/discussions", Icon: BubbleIcon, label: "Discussions", dot: true },
+  { href: "/profil", Icon: PersonIcon, label: "Profil" },
+  { href: "/boutique", Icon: BagIcon, label: "Boutique" },
+];
 
 export function BottomNav() {
   const pathname = usePathname();
 
   return (
     <nav
-      className="fixed inset-x-4 z-40 md:hidden"
-      style={{ bottom: "calc(env(safe-area-inset-bottom) + 12px)" }}
+      className="fixed inset-x-[18px] z-40 md:hidden"
+      style={{
+        bottom: "calc(env(safe-area-inset-bottom) + 12px)",
+        display: "flex",
+        gap: 4,
+        padding: 6,
+        borderRadius: 999,
+        background: "rgba(255,255,255,0.07)",
+        backdropFilter: "blur(28px) saturate(180%)",
+        WebkitBackdropFilter: "blur(28px) saturate(180%)",
+        border: "1px solid rgba(255,255,255,0.1)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.16), 0 16px 36px rgba(0,0,0,0.7)",
+      }}
     >
-      {/* Bulle flottante : la barre reste collée en bas mais vit dans sa
-          propre pilule translucide, détachée des bords de l'écran. */}
-      <div className="glass mx-auto flex max-w-md items-center justify-around rounded-full px-2 py-1.5">
-        {NAV_ITEMS.map((item) => {
-          const active =
-            item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-label={item.label}
-              aria-current={active ? "page" : undefined}
-              className="relative flex flex-col items-center gap-1 rounded-full px-3 py-2.5"
-            >
-              {active && (
-                <motion.span
-                  layoutId="bottom-nav-pill"
-                  className="pill-emboss absolute inset-0 rounded-lg"
-                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                />
-              )}
-              <Icon
-                className={cn(
-                  "relative size-[22px] transition-colors",
-                  active ? "text-foreground" : "text-muted-foreground/60",
-                  // Section verrouillée : l'onglet mène à l'aperçu, mais son
-                  // icône reste éteinte pour signaler l'indisponibilité.
-                  item.locked && !active && "opacity-45"
-                )}
-                strokeWidth={active ? 2.2 : 1.8}
-              />
+      {TABS.map(({ href, Icon, label, dot }) => {
+        const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-label={label}
+            aria-current={active ? "page" : undefined}
+            className="relative flex flex-1 items-center justify-center rounded-full py-3 transition-transform active:scale-[0.94]"
+            style={active ? { background: "#fff" } : undefined}
+          >
+            <Icon stroke={active ? "#0A0A0A" : "rgba(255,255,255,0.58)"} />
+            {dot && !active && (
               <span
-                className={cn(
-                  "relative size-1 rounded-full transition-colors",
-                  active ? "bg-primary" : "bg-transparent"
-                )}
+                className="absolute"
+                style={{
+                  top: 10,
+                  right: 22,
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background: "#6FA8FF",
+                  boxShadow: "0 0 8px rgba(111,168,255,0.7)",
+                }}
               />
-            </Link>
-          );
-        })}
-      </div>
+            )}
+          </Link>
+        );
+      })}
     </nav>
   );
 }

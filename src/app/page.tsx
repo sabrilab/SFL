@@ -33,7 +33,7 @@ import {
   type JourneeMatch,
   type Player,
 } from "@/lib/sfl/engine";
-import { entryPP } from "@/lib/sfl/saisie/engine";
+import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
 import {
   AbsentsModule,
   CourseModule,
@@ -109,7 +109,7 @@ function ModuleTitle({ label, title }: { label?: string; title: string }) {
   return (
     <div className="mb-3 px-1">
       {label && <p className="mono-label text-primary">{label}</p>}
-      <h2 className="mt-0.5 text-xl font-bold tracking-tight">{title}</h2>
+      <h2 className="mt-0.5 text-[17px] font-bold tracking-tight">{title}</h2>
     </div>
   );
 }
@@ -252,6 +252,19 @@ export default function Ligue() {
 
   const analyse = useAnalyse(saison, players, lastJ);
 
+  // Synthèse du classement : mon rang, son évolution sur la journée, et ma
+  // forme sur les cinq derniers matchs joués (V/N/D).
+  const myRank = RANKED.find((p) => p.name === player.name)?.rank ?? RANKED.length;
+  const rankBefore = rankPlayers(
+    computeStandings({ ...saison, entries: saison.entries.filter((e) => e.j !== lastJ.j) })
+  ).find((p) => p.name === player.name)?.rank;
+  const myDelta = rankBefore ? rankBefore - myRank : 0;
+  const myForm = saison.entries
+    .filter((e) => e.player === player.name && e.statut === "Présent" && !e.extraTime && e.result)
+    .sort((a, b) => a.j - b.j)
+    .slice(-5)
+    .map((e) => (e.result === "Victoire" ? "V" : e.result === "Nul" ? "N" : "D"));
+
   /* ----------------------------- Convocation ----------------------------- */
 
   const convoc = activeConvocation(saison);
@@ -312,56 +325,104 @@ export default function Ligue() {
 
       {view === "classement" ? (
         <>
-          {/* Synthèse de la saison */}
-          <section className="glass rounded-3xl p-5">
-            <p className="mono-label text-muted-foreground">SFL · Saison 1</p>
-            <div className="mt-2 flex items-end gap-6">
-              <div>
-                <div className="text-4xl font-bold tabular-nums">{journees.length}</div>
-                <p className="mono-label mt-1 text-muted-foreground">Journées</p>
-              </div>
-              <div>
-                <div className="text-4xl font-bold tabular-nums">
-                  {players.reduce((s, p) => s + p.buts, 0)}
-                </div>
-                <p className="mono-label mt-1 text-muted-foreground">Buts</p>
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-4xl font-bold">{RANKED[0]?.name}</div>
-                <p className="mono-label mt-1 text-primary">Leader · {RANKED[0]?.pp} pts</p>
-              </div>
-            </div>
-          </section>
+          <p className="px-1 text-[13px] text-foreground/40">
+            Sunday Five League · après {journees.length} journées
+          </p>
 
-          <section className="glass rounded-3xl p-2">
-            {RANKED.slice(0, 10).map((p) => (
-              <div
-                key={p.name}
-                className="flex items-center gap-3 border-b border-border/40 px-3 py-3 last:border-0"
-              >
-                <span className="w-6 text-center text-[13px] font-bold text-muted-foreground tabular-nums">
-                  {p.rank}
-                </span>
-                <Avatar name={p.name} size={26} />
-                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">
-                  {p.name}
-                  {p.name === player.name && (
-                    <span className="ml-2 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-primary-foreground uppercase">
-                      Toi
+          {/* Ma synthèse — rang, points, forme sur 5 matchs (design Kickoff) */}
+          <section className="glass rounded-[26px] p-[18px]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="mono-label text-foreground/40">{player.name}</p>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-[34px] leading-none font-extrabold tracking-tight">
+                    {myRank}
+                    <span className="text-[17px] text-foreground/40">e</span>
+                  </span>
+                  {myDelta !== 0 && (
+                    <span className={cn("mono-label", myDelta > 0 ? "text-primary" : "text-foreground/40")}>
+                      {myDelta > 0 ? `▲ ${myDelta}` : `▼ ${-myDelta}`}
                     </span>
                   )}
-                </span>
-                <span className="mono-label shrink-0 text-muted-foreground">
-                  {p.buts}b · {p.passes}p
-                </span>
-                <span className="w-14 shrink-0 text-right text-[15px] font-bold tabular-nums">
-                  {p.pp} pts
-                </span>
+                </div>
               </div>
-            ))}
+              <div className="text-right">
+                <p className="mono-label text-foreground/40">Points</p>
+                <div className="mt-1 text-[34px] leading-none font-extrabold tracking-tight tabular-nums">
+                  {player.pp}
+                </div>
+              </div>
+            </div>
+            {myForm.length > 0 && (
+              <>
+                <div className="mt-4 flex gap-[5px]">
+                  {myForm.map((r, i) => (
+                    <span
+                      key={i}
+                      className="flex h-[30px] flex-1 items-center justify-center rounded-[9px]"
+                      style={
+                        r === "V"
+                          ? { background: "var(--primary)", color: "#0A0B0E" }
+                          : r === "N"
+                            ? { background: "rgba(255,255,255,0.14)", color: "#fff" }
+                            : { background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.45)" }
+                      }
+                    >
+                      <span className="mono-label">{r}</span>
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-[11px] text-[12.5px] text-foreground/40">
+                  Cinq derniers matchs · {myForm.filter((r) => r === "V").length} victoire
+                  {myForm.filter((r) => r === "V").length > 1 ? "s" : ""},{" "}
+                  {myForm.filter((r) => r === "N").length} nul
+                  {myForm.filter((r) => r === "N").length > 1 ? "s" : ""},{" "}
+                  {myForm.filter((r) => r === "D").length} défaite
+                  {myForm.filter((r) => r === "D").length > 1 ? "s" : ""}
+                </p>
+              </>
+            )}
+          </section>
+
+          {/* La table de la ligue */}
+          <section>
+            <div className="flex items-center gap-3 px-2 pb-2.5">
+              <span className="mono-label w-[22px] text-[9px] text-foreground/30">#</span>
+              <span className="mono-label flex-1 text-[9px] text-foreground/30">Joueur</span>
+              <span className="mono-label w-[26px] text-center text-[9px] text-foreground/30">M</span>
+              <span className="mono-label w-[44px] text-center text-[9px] text-foreground/30">B·P</span>
+              <span className="mono-label w-[30px] text-right text-[9px] text-foreground/30">PTS</span>
+            </div>
+            <div className="glass-soft overflow-hidden rounded-[24px]">
+              {RANKED.slice(0, 12).map((p) => (
+                <div
+                  key={p.name}
+                  className={cn(
+                    "flex items-center gap-3 border-b border-white/5 px-3.5 py-3 last:border-0",
+                    p.name === player.name && "bg-primary/10"
+                  )}
+                >
+                  <span className="w-[22px] text-[13px] font-bold text-foreground/50 tabular-nums">
+                    {p.rank}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">
+                    {p.name}
+                  </span>
+                  <span className="mono-label w-[26px] text-center text-foreground/40">
+                    {p.matchs}
+                  </span>
+                  <span className="mono-label w-[44px] text-center text-foreground/40">
+                    {p.buts}·{p.passes}
+                  </span>
+                  <span className="w-[30px] text-right text-[14px] font-bold tabular-nums">
+                    {p.pp}
+                  </span>
+                </div>
+              ))}
+            </div>
             <Link
               href="/stats"
-              className="flex items-center justify-center gap-1 px-3 py-3 text-sm font-semibold text-primary"
+              className="flex items-center justify-center gap-1 px-3 py-3.5 text-sm font-semibold text-primary"
             >
               Tous les classements <ChevronRight className="size-4" />
             </Link>
@@ -369,34 +430,36 @@ export default function Ligue() {
         </>
       ) : (
         <>
-          {/* 1 · Barre de présence */}
-          <div className="flex items-center gap-3 px-1">
-            <div className="flex -space-x-2">
-              {participants.slice(0, 5).map((n) => (
-                <Avatar key={n} name={n} />
-              ))}
-            </div>
-            <span className="mono-label flex items-center gap-1.5 text-muted-foreground">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
-                <span className="relative inline-flex size-2 rounded-full bg-primary" />
+          {/* 1 · Barre de présence — pilule douce du design */}
+          <div className="glass-soft flex items-center justify-between gap-3 rounded-full px-3.5 py-2.5">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <div className="flex -space-x-1.5">
+                {participants.slice(0, 4).map((n) => (
+                  <Avatar key={n} name={n} size={24} />
+                ))}
+              </div>
+              <span className="truncate text-[12.5px] text-foreground/60">
+                {participants.slice(0, 2).join(", ")} et {participants.length - 2} autres ont joué
               </span>
-              {participants.length} au dernier match
+            </div>
+            <span className="flex shrink-0 items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary)]" />
+              <span className="mono-label text-primary">{participants.length} en ligne</span>
             </span>
           </div>
 
           {/* 2 · Titre éditorial + progression de lecture */}
           <div className="px-1">
-            <h2 className="text-[26px] leading-tight font-bold tracking-tight">
+            <h2 className="text-[22px] leading-[1.15] font-extrabold tracking-tight">
               Journée {lastJ.j} : le récap
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-[7px] text-[13px] leading-snug text-foreground/40">
               SFL · Sunday Five League · {matches.length} match{matches.length > 1 ? "s" : ""} ·{" "}
               {totalButs} buts
             </p>
-            <div className="mt-3 h-1 overflow-hidden rounded-full bg-foreground/10">
+            <div className="mt-3 h-[2px] rounded-[2px] bg-foreground/8">
               <div
-                className="h-full rounded-full bg-primary transition-[width] duration-150"
+                className="h-[2px] rounded-[2px] bg-foreground transition-[width] duration-150"
                 style={{ width: `${Math.round(progress * 100)}%` }}
               />
             </div>

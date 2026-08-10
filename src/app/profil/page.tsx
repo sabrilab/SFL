@@ -43,18 +43,38 @@ export default function Profil() {
         </p>
       </div>
 
-      {/* Identité : photo + carte côte à côte */}
-      <section className="rounded-3xl bg-card p-4">
+      {/* Héros du profil (design Kickoff) : la carte en grand, la légende
+          de manipulation, puis les deux actions. */}
+      <section className="flex flex-col items-center gap-4">
+        <Card3D
+          cacheKey={`profil-${player.name}`}
+          mode="rare"
+          size={0.88}
+          render={(s) => <PlayerCard player={player} mode="rare" size={s} />}
+        />
+        <p className="mono-label text-center text-[9.5px] text-foreground/40">
+          Glisse pour tourner · double-clic pour retourner
+        </p>
+        <div className="flex w-full gap-2.5">
+          <Locked label="Bientôt" className="flex-1">
+            <span className="block rounded-full bg-foreground py-3.5 text-center text-[15px] font-bold text-background">
+              Partager ma carte
+            </span>
+          </Locked>
+          <Link
+            href="/stats"
+            className="glass flex flex-1 items-center justify-center rounded-full py-3.5 text-[15px] font-semibold"
+          >
+            Historique
+          </Link>
+        </div>
+      </section>
+
+      <section className="glass rounded-[26px] p-4">
         <ProfilePhoto name={player.name} />
       </section>
 
       <section className="flex items-center gap-4">
-        <Card3D
-          cacheKey={`profil-${player.name}`}
-          mode="rare"
-          size={0.55}
-          render={(s) => <PlayerCard player={player} mode="rare" size={s} />}
-        />
         <div className="flex min-w-0 flex-1 flex-col gap-2.5">
           {(
             [
