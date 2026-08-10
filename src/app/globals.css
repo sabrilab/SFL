@@ -96,8 +96,8 @@
   --card-foreground: oklch(0.96 0 0);
   --popover: oklch(0.2 0 0);
   --popover-foreground: oklch(0.96 0 0);
-  --primary: oklch(0.68 0.19 38);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: #6FA8FF; /* accent unique du design Kickoff */
+  --primary-foreground: #0A0B0E;
   --secondary: oklch(0.24 0 0);
   --secondary-foreground: oklch(0.96 0 0);
   --muted: oklch(0.24 0 0);
@@ -107,7 +107,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 7%);
   --input: oklch(1 0 0 / 11%);
-  --ring: oklch(0.62 0.15 38);
+  --ring: #6FA8FF;
   --chart-1: oklch(0.7 0.19 38);
   --chart-2: oklch(0.78 0.12 220);
   --chart-3: oklch(0.82 0.11 85);
@@ -115,7 +115,7 @@
   --chart-5: oklch(0.72 0.13 150);
   --sidebar: oklch(0.185 0 0);
   --sidebar-foreground: oklch(0.96 0 0);
-  --sidebar-primary: oklch(0.68 0.19 38);
+  --sidebar-primary: #6FA8FF;
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.26 0 0);
   --sidebar-accent-foreground: oklch(0.96 0 0);
@@ -218,4 +218,31 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Orbes lumineux flottants du design Kickoff — trois halos blancs très
+   diffus qui dérivent lentement derrière le contenu (thème sombre). */
+@keyframes glassFloat {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, -18px, 0) scale(1.06); }
+}
+.orbs { position: fixed; inset: 0; pointer-events: none; z-index: 0; display: none; }
+.dark .orbs { display: block; }
+.orbs > i {
+  position: absolute; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0) 70%);
+  filter: blur(20px);
+  animation: glassFloat 16s ease-in-out infinite;
+}
+.orbs > i:nth-child(1) { top: -90px; left: -70px; width: 300px; height: 300px; }
+.orbs > i:nth-child(2) { top: 330px; right: -110px; width: 280px; height: 280px; filter: blur(24px); animation-duration: 21s; animation-direction: reverse; background: radial-gradient(circle, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 70%); }
+.orbs > i:nth-child(3) { bottom: -80px; left: 30px; width: 320px; height: 260px; filter: blur(30px); animation-duration: 25s; background: radial-gradient(circle, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 70%); }
+
+/* Micro-label du design Kickoff : JetBrains Mono, capitales espacées. */
+.mono-label {
+  font-family: var(--font-jbmono), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }

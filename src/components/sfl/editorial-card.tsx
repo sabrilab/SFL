@@ -126,7 +126,8 @@ export function EditorialCard({
         position: "relative",
         width: u(W),
         height: u(H),
-        borderRadius: u(56),
+        // RAD 0.13 sur une carte de 1.4 de large dans card3d.js → 95 unités.
+        borderRadius: u(95),
         overflow: "hidden",
         background: `linear-gradient(135deg, ${t[0]} 0%, ${t[1]} 50%, ${t[2]} 100%)`,
         boxShadow: light
@@ -175,19 +176,32 @@ export function EditorialCard({
               background: `radial-gradient(circle at 50% 34%, ${ACCENT}3a, transparent 70%)`,
             }}
           />
+          {/* Libellé d'attente du design (« PHOTO JOUEUR · PLEIN CADRE ») */}
           <div
             style={{
               position: "absolute",
-              top: "24%",
+              top: "38%",
               left: 0,
               right: 0,
               textAlign: "center",
-              fontSize: u(340),
-              lineHeight: 1,
-              color: "rgba(255,255,255,0.14)",
+              fontFamily: JBMONO,
+              fontWeight: 700,
+              fontSize: u(34),
+              letterSpacing: u(4),
+              color: "rgba(255,255,255,0.42)",
             }}
           >
-            {nameUp[0]}
+            PHOTO JOUEUR
+            <div
+              style={{
+                marginTop: u(16),
+                fontWeight: 500,
+                fontSize: u(26),
+                color: "rgba(255,255,255,0.28)",
+              }}
+            >
+              PLEIN CADRE
+            </div>
           </div>
         </div>
       )}

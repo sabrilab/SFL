@@ -99,6 +99,10 @@ export default function RootLayout({
             <CardViewerProvider>
               <TooltipProvider delay={200}>
                 <AppSplash />
+                {/* Orbes lumineux du design Kickoff, derrière tout le contenu */}
+                <div className="orbs" aria-hidden>
+                  <i /><i /><i />
+                </div>
                 <ViewportLock />
                 <ServiceWorkerRegister />
                 {/* En PWA installée, `viewportFit: cover` + barre d'état
