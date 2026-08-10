@@ -41,13 +41,25 @@ export async function migrateSchema(sql: string, dbUrl?: string): Promise<Migrat
   const hash = createHash("sha256").update(sql).digest("hex");
   const connectErrors: string[] = [];
 
+  // Les URLs de l'intégration portent `sslmode=require` : avec le pilote pg,
+  // ce paramètre PREND LE PAS sur l'option `ssl` du code (bug connu) et
+  // impose la vérification de la chaîne de certificats — que les fonctions
+  // serverless ne peuvent pas faire (le pooler Supabase présente un
+  // certificat auto-signé). `no-verify` garde le chiffrement, sans la
+  // vérification de chaîne ; l'authentification reste le mot de passe.
+  const normalize = (url: string): string => {
+    try {
+      const u = new URL(url);
+      u.searchParams.set("sslmode", "no-verify");
+      return u.toString();
+    } catch {
+      return url;
+    }
+  };
+
   for (const c of candidates) {
     const client = new Client({
-      connectionString: c.url,
-      // Le pooler Supabase chiffre toujours ; on ne vérifie pas la chaîne de
-      // CA (absente des environnements serverless), l'authentification reste
-      // le mot de passe de la base.
-      ssl: { rejectUnauthorized: false },
+      connectionString: normalize(c.url),
       connectionTimeoutMillis: 8000,
     });
 
