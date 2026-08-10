@@ -738,3 +738,24 @@ renseignées ou corrigées. ⚠️ Le classeur ordonne les stats
 
 **Encore non évalués** (base à 75) : Houssyne, Hassan Abdel, Selim, Ziad,
 Chouaib, Khadim, Guillaume, Lyes Korogli.
+
+## Buts minutés — ce qu'il faut ajouter au classeur
+
+Deux modules du récap attendent les minutes des buts : **la minute par minute**
+et **le tournant du match**. Ils restent masqués tant que la donnée n'existe
+pas ; le reste du récap est inchangé.
+
+Pour les activer, ajouter au classeur un onglet `MINUTES` avec une ligne par
+but :
+
+| Colonne | Exemple | Rôle |
+|---|---|---|
+| Journée | 8 | numéro de journée |
+| Minute | 34 | minute du but |
+| Équipe | Orange | couleur qui marque |
+| Buteur | Anas | nom exactement comme dans le roster |
+| Passeur | Ilyes | facultatif |
+
+L'import remplit `saison.events` (type `MatchEvent`, voir
+`src/lib/sfl/saisie/types.ts`). Le champ `matchId` est facultatif : sans lui,
+les buts sont rattachés au match principal de la journée.

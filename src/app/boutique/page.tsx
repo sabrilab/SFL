@@ -130,7 +130,7 @@ export default function Boutique() {
               <p className="mono-label text-foreground/40">Ton solde</p>
               <div className="mt-1.5 flex items-baseline gap-[7px]">
                 <span className="text-[26px] leading-none font-extrabold tracking-tight tabular-nums">
-                  {ballons.toLocaleString("fr-FR")}
+                  {String(ballons).replace(/\B(?=(\d{3})+(?!\d))/g, "\u202f")}
                 </span>
                 <span className="text-[15px]">⚽</span>
               </div>

@@ -49,6 +49,19 @@ export interface JourneeMeta {
   sflTime: boolean;
 }
 
+// Événement minuté d'un match — alimente la timeline et la détection du
+// tournant. Optionnel : tant que le classeur ne porte pas les minutes, les
+// modules concernés ne s'affichent pas, le reste du récap est inchangé.
+export interface MatchEvent {
+  j: number;
+  matchId?: string; // id du match dans la journée (si plusieurs)
+  minute: number;
+  team: string; // couleur qui marque
+  player: string;
+  passeur?: string;
+  type?: "but" | "csc"; // défaut : but
+}
+
 // Convocation d'un match à venir : date/heure/lieu + réponses des joueurs.
 // La liste des confirmés pré-remplit ensuite l'assistant « Nouvelle journée ».
 export type ConvocationReponse = "present" | "absent";
@@ -69,6 +82,8 @@ export interface Saison {
   roster: RosterEntry[];
   entries: MatchEntry[];
   convocations: Convocation[];
+  /** Buts minutés, quand le classeur les fournit. */
+  events?: MatchEvent[];
 }
 
 export type AlertLevel = "error" | "warning";

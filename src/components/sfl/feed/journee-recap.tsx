@@ -43,6 +43,29 @@ import {
   RecordsModule,
   useAnalyse,
 } from "@/components/sfl/feed/analyse";
+import {
+  AffichesModule,
+  AlternatifModule,
+  BeteNoireModule,
+  CinqModule,
+  CitationModule,
+  EvolutionModule,
+  FacteurXModule,
+  FairplayModule,
+  JumeauModule,
+  MercatoModule,
+  MeteoModule,
+  MonDimancheModule,
+  PairesModule,
+  ProjectionModule,
+  RecordPersoModule,
+  SeriesModule,
+  TimelineModule,
+  TournantModule,
+  useAnalysePlus,
+} from "@/components/sfl/feed/analyse-plus";
+import { buildQuiz, PronosticModule, QuizModule } from "@/components/sfl/feed/jeux";
+import { NEXT_MATCH } from "@/lib/sfl/data";
 import { Reveal } from "@/components/sfl/feed/reveal";
 import { cn } from "@/lib/utils";
 
@@ -244,6 +267,24 @@ export function JourneeRecap({ j }: { j: number }) {
     .sort((a, b) => b.total - a.total)[0];
 
   const analyse = useAnalyse(saisonAtJ, players, journeesAtJ, lastJ);
+  const plus = useAnalysePlus(saisonAtJ, players, journeesAtJ, lastJ, player.name);
+
+  // Le pronostic porte sur la journée suivante : la prochaine convocation
+  // quand on lit le dernier récap, la journée d'après sinon (déjà jouée, donc
+  // résolue tout de suite).
+  const nextJ = journees.find((x) => x.j === j + 1);
+  const pronoJ = nextJ ? nextJ.j : NEXT_MATCH.journee;
+  const pronoDate = nextJ ? nextJ.date : `${NEXT_MATCH.jour} ${NEXT_MATCH.date}`;
+  const pronoCandidates = [...players]
+    .filter((p) => p.matchs > 0)
+    .sort((a, b) => b.pp - a.pp)
+    .slice(0, 6);
+  const pronoResolved =
+    saison.entries.find((e) => e.j === pronoJ && e.mvp && !e.extraTime)?.player ?? null;
+  const quiz = buildQuiz(
+    lastJ,
+    jEntries.map((e) => ({ name: e.player, buts: e.buts }))
+  );
 
   // Le scanner : les stats de la carte MVP contre la moyenne des joueurs
   // qui avaient foulé le terrain à cette date.
@@ -259,7 +300,6 @@ export function JourneeRecap({ j }: { j: number }) {
   const leader = analyse.course ? byName.get(analyse.course.top[0].name) : undefined;
   // Le joueur en forme, pour sa carte dans le module des séries.
   const formePlayer = analyse.forme.length > 0 ? byName.get(analyse.forme[0].name) : undefined;
-  void player;
 
   return (
     <>
@@ -327,6 +367,24 @@ export function JourneeRecap({ j }: { j: number }) {
           </section>
         </Reveal>
       )}
+      {plus.timeline && (
+        <Reveal>
+          <TimelineModule timeline={plus.timeline} />
+        </Reveal>
+      )}
+
+      {plus.tournant && (
+        <Reveal>
+          <TournantModule tournant={plus.tournant} />
+        </Reveal>
+      )}
+
+      {plus.monDimanche && (
+        <Reveal>
+          <MonDimancheModule mine={plus.monDimanche} me={player.name} />
+        </Reveal>
+      )}
+
       {/* 4 · Réactions du match */}
       <Reveal delay={0.14}>
         <ReactionRow id={`j${lastJ.j}-match`} className="-mt-2 px-1" />
@@ -464,6 +522,18 @@ export function JourneeRecap({ j }: { j: number }) {
         </Reveal>
       )}
 
+      {plus.citation && (
+        <Reveal>
+          <CitationModule citation={plus.citation} />
+        </Reveal>
+      )}
+
+      {plus.recordPerso && (
+        <Reveal>
+          <RecordPersoModule record={plus.recordPerso} />
+        </Reveal>
+      )}
+
       {/* 8 · Ailleurs dans la ligue */}
       {others.length > 0 && (
         <Reveal>
@@ -545,6 +615,18 @@ export function JourneeRecap({ j }: { j: number }) {
       {analyse.race && (
         <Reveal>
           <RaceModule race={analyse.race} />
+        </Reveal>
+      )}
+
+      {plus.projection && (
+        <Reveal>
+          <ProjectionModule projection={plus.projection} />
+        </Reveal>
+      )}
+
+      {quiz.length > 0 && (
+        <Reveal>
+          <QuizModule journee={lastJ.j} questions={quiz} me={player.name} />
         </Reveal>
       )}
 
@@ -713,6 +795,18 @@ export function JourneeRecap({ j }: { j: number }) {
         </Reveal>
       )}
 
+      {plus.facteurX.length > 0 && (
+        <Reveal>
+          <FacteurXModule facteurX={plus.facteurX} />
+        </Reveal>
+      )}
+
+      {plus.beteNoire && (
+        <Reveal>
+          <BeteNoireModule beteNoire={plus.beteNoire} me={player.name} />
+        </Reveal>
+      )}
+
       {mvpCard && (
         <Reveal>
           <RadarModule
@@ -722,6 +816,28 @@ export function JourneeRecap({ j }: { j: number }) {
             ovrValue={mvpCard.ovr}
             avgOvr={ovr(avgStats)}
           />
+        </Reveal>
+      )}
+
+      {plus.jumeau && byName.get(player.name) && (
+        <Reveal>
+          <JumeauModule
+            jumeau={plus.jumeau}
+            mine={byName.get(player.name)!.stats}
+            me={player.name}
+          />
+        </Reveal>
+      )}
+
+      {plus.evolution && (
+        <Reveal>
+          <EvolutionModule evolution={plus.evolution} />
+        </Reveal>
+      )}
+
+      {plus.series.length > 0 && (
+        <Reveal>
+          <SeriesModule series={plus.series} />
         </Reveal>
       )}
 
@@ -841,6 +957,18 @@ export function JourneeRecap({ j }: { j: number }) {
         </Reveal>
       )}
 
+      {plus.paires.length > 0 && (
+        <Reveal>
+          <PairesModule paires={plus.paires} />
+        </Reveal>
+      )}
+
+      {plus.mercato.length > 0 && (
+        <Reveal>
+          <MercatoModule mercato={plus.mercato} />
+        </Reveal>
+      )}
+
       {analyse.milestones.length > 0 && (
         <Reveal>
           <MilestonesModule milestones={analyse.milestones} />
@@ -882,6 +1010,24 @@ export function JourneeRecap({ j }: { j: number }) {
         </section>
       </Reveal>
 
+      {plus.affiches.length > 0 && (
+        <Reveal>
+          <AffichesModule affiches={plus.affiches} />
+        </Reveal>
+      )}
+
+      {plus.cinq.length >= 3 && (
+        <Reveal>
+          <CinqModule cinq={plus.cinq} />
+        </Reveal>
+      )}
+
+      {plus.fairplay && (
+        <Reveal>
+          <FairplayModule fairplay={plus.fairplay} />
+        </Reveal>
+      )}
+
       {analyse.couleurs.length >= 2 && (
         <Reveal>
           <CouleursModule couleurs={analyse.couleurs} />
@@ -893,6 +1039,28 @@ export function JourneeRecap({ j }: { j: number }) {
           <RecordsModule records={analyse.records} />
         </Reveal>
       )}
+
+      {plus.meteo && (
+        <Reveal>
+          <MeteoModule meteo={plus.meteo} />
+        </Reveal>
+      )}
+
+      {plus.alternatif && (
+        <Reveal>
+          <AlternatifModule alternatif={plus.alternatif} />
+        </Reveal>
+      )}
+
+      <Reveal>
+        <PronosticModule
+          journee={pronoJ}
+          date={pronoDate}
+          candidates={pronoCandidates}
+          me={player.name}
+          resolvedMvp={pronoResolved}
+        />
+      </Reveal>
 
       {/* 15 · Le vestiaire */}
       <Reveal>
