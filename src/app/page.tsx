@@ -34,6 +34,13 @@ import {
   type Player,
 } from "@/lib/sfl/engine";
 import { entryPP } from "@/lib/sfl/saisie/engine";
+import {
+  AbsentsModule,
+  CourseModule,
+  FormeModule,
+  MouvementsModule,
+  useAnalyse,
+} from "@/components/sfl/feed/analyse";
 import { activeConvocation, respondConvocation } from "@/lib/sfl/saisie/mutations";
 import { saisieStore } from "@/lib/sfl/saisie/store";
 import { cn } from "@/lib/utils";
@@ -242,6 +249,8 @@ export default function Ligue() {
     })
     .filter((d) => d.best.length === 2)
     .sort((a, b) => b.total - a.total)[0];
+
+  const analyse = useAnalyse(saison, players, lastJ);
 
   /* ----------------------------- Convocation ----------------------------- */
 
@@ -477,6 +486,8 @@ export default function Ligue() {
             </section>
           )}
 
+          <CourseModule course={analyse.course} />
+
           {/* 7 · La feuille de match */}
           <section className="glass rounded-3xl p-5">
             <ModuleTitle title="La feuille de match" />
@@ -534,6 +545,8 @@ export default function Ligue() {
             </section>
           )}
 
+          <MouvementsModule mouvements={analyse.mouvements} />
+
           {/* 9 · La journée en chiffres — bento */}
           <section>
             <ModuleTitle title="La journée en chiffres" />
@@ -569,6 +582,13 @@ export default function Ligue() {
                 <div key={label} className="glass rounded-3xl p-4">
                   <p className="mono-label text-muted-foreground">{label}</p>
                   <div className="mt-1 truncate text-lg font-bold">{value}</div>
+                </div>
+              ))}
+              {analyse.insolites.map((t) => (
+                <div key={t.label} className="glass rounded-3xl p-4">
+                  <p className="mono-label text-primary">{t.label}</p>
+                  <div className="mt-1 text-2xl font-bold tabular-nums">{t.value}</div>
+                  <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{t.sub}</p>
                 </div>
               ))}
             </div>
@@ -719,6 +739,8 @@ export default function Ligue() {
             </section>
           )}
 
+          <FormeModule forme={analyse.forme} />
+
           {/* 12 · Les clips */}
           <section>
             <ModuleTitle label="Filmés par le vestiaire" title="Les clips de la journée" />
@@ -810,6 +832,8 @@ export default function Ligue() {
               </div>
             </section>
           )}
+
+          <AbsentsModule absents={analyse.absents} />
 
           {/* 14 · Le but du match */}
           <section>

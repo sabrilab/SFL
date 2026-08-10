@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useTheme } from "next-themes";
 import { Moon, Sun, Monitor, ShieldCheck, ChevronRight, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Locked } from "@/components/sfl/locked";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { isAdmin } from "@/lib/sfl/admin";
@@ -35,6 +36,9 @@ export default function ReglagesPage() {
 
       <section>
         <h2 className="mb-3 px-1 text-sm font-semibold text-muted-foreground">Apparence</h2>
+        {/* Sombre uniquement pour l'instant : le clair sera réactivé quand
+            toutes les pages seront portées sur le design. */}
+        <Locked label="Bientôt" note="La version claire arrive — l'app reste en sombre pour l'instant.">
         <div className="glass flex rounded-2xl p-1">
           {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
             const active = current === value;
@@ -56,6 +60,7 @@ export default function ReglagesPage() {
             );
           })}
         </div>
+        </Locked>
       </section>
 
       {/* Section « Profil » (accès à l'avatar 3D) masquée volontairement,
