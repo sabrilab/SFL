@@ -5,6 +5,7 @@
 
 import { EditorialCard } from "./editorial-card";
 import { ovr, rareStats, type Player, type StatKey } from "@/lib/sfl/engine";
+import { username } from "@/lib/sfl/usernames";
 
 export type CardMode = "simple" | "rare";
 
@@ -26,6 +27,7 @@ export function PlayerCard({
       tint={mode === "rare" ? "or" : "standard"}
       badge={mode === "rare" ? "RARE" : undefined}
       name={player.name}
+      username={username(player.name)}
       position={player.poste}
       overall={ovr(stats)}
       stats={stats}

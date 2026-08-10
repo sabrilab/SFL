@@ -5,6 +5,7 @@
 
 import { EditorialCard, type CardTint } from "./editorial-card";
 import { ovr, type BoostCardData, type BoostType, type Player } from "@/lib/sfl/engine";
+import { username } from "@/lib/sfl/usernames";
 
 export const BOOST_LABELS: Record<BoostType, string> = {
   mvp: "MVP",
@@ -44,6 +45,7 @@ export function BoostCard({ card, size = 1 }: { card: BoostCardData; size?: numb
       tint={th.tint}
       badge={th.badge}
       name={card.player}
+      username={username(card.player)}
       position={`${card.poste} · ${card.date}`.toUpperCase()}
       overall={card.ovr}
       stats={card.stats}
@@ -70,6 +72,7 @@ export function RankingCard({
       tint={th.tint}
       badge={th.badge}
       name={player.name}
+      username={username(player.name)}
       position={player.poste.toUpperCase()}
       overall={ovr(player.stats)}
       stats={player.stats}

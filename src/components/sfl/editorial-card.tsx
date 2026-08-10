@@ -7,14 +7,18 @@
 //
 // Le moteur du design travaille sur un canvas de 1024×1536 : toutes les
 // cotes ci-dessous sont exprimées dans ces unités et converties en pixels
-// par `u()` — ainsi la spec du design reste lisible et vérifiable ligne à
-// ligne contre card3d.js.
+// par `u()` — la spec reste vérifiable ligne à ligne contre card3d.js.
 //
-// Deux variantes, comme dans le design : « sombre » (encre blanche, voiles
-// noirs) et « clair » (encre noire, plaques ivoire). Les cartes restent des
-// objets — elles ne suivent pas le thème de l'app, la variante est un choix.
+// Calques du pipeline 3D (card-3d.tsx) — l'ordre est essentiel :
+//   fond  (body sans player/stats)  : teinte + motif d'attente
+//   player                          : photo, filigrane, voiles, vignette, grain
+//   stats                           : TOUT le texte — club, note, badge, nom,
+//                                     pseudo, rangée de stats
+// Le texte vit au premier plan pour rester lisible quand la photo est là :
+// dans une version précédente il était dans le fond, et la photo chargée le
+// recouvrait entièrement.
 
-import { useId, useState } from "react";
+import { useState } from "react";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
 
@@ -85,8 +89,6 @@ export function EditorialCard({
   photoName,
   size = 1,
 }: EditorialCardProps) {
-  const rid = useId();
-  void rid;
   const light = variant === "clair";
   // 254 px de large à taille 1 (largeur historique des cartes de l'app).
   const u = (n: number) => n * size * (254 / W);
@@ -136,30 +138,7 @@ export function EditorialCard({
         fontFamily: ANTON,
       }}
     >
-      {/* Calque « joueur » du pipeline 3D : photo, filigrane et voile bas
-          voyagent ensemble pour que la photo reste assombrie sous le nom
-          une fois les calques séparés. */}
-      <div data-card-part="player" style={{ position: "absolute", inset: 0 }}>
-      {/* Photo plein cadre (ou motif d'attente du design) */}
-      {!photoFailed && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={photoUrl}
-          alt=""
-          onLoad={() => setLoadedUrl(photoUrl)}
-          onError={() => setFailedUrl(photoUrl)}
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            objectPosition: "50% 10%",
-            transform: "scale(1.04)",
-            visibility: photoOk ? "visible" : "hidden",
-          }}
-        />
-      )}
+      {/* Motif d'attente du design — dans le fond : la photo le recouvre. */}
       {!photoOk && (
         <div aria-hidden style={{ position: "absolute", inset: 0 }}>
           <div
@@ -176,7 +155,6 @@ export function EditorialCard({
               background: `radial-gradient(circle at 50% 34%, ${ACCENT}3a, transparent 70%)`,
             }}
           />
-          {/* Libellé d'attente du design (« PHOTO JOUEUR · PLEIN CADRE ») */}
           <div
             style={{
               position: "absolute",
@@ -206,268 +184,293 @@ export function EditorialCard({
         </div>
       )}
 
-      {/* Filigrane géant */}
-      <div
-        style={{
-          position: "absolute",
-          lineHeight: 1,
-          color: ACCENT,
-          ...(isLegend
-            ? {
-                left: 0,
-                right: 0,
-                textAlign: "center" as const,
-                top: u(H * 0.72 - 900 * 0.8),
-                fontSize: u(900),
-                opacity: light ? 0.5 : 0.62,
-                mixBlendMode: (light ? "multiply" : "overlay") as React.CSSProperties["mixBlendMode"],
-              }
-            : {
-                right: u(40),
-                textAlign: "right" as const,
-                top: u((light ? H - 620 : H - 300) - (light ? 500 : 640) * 0.8),
-                fontSize: u(light ? 500 : 640),
-                opacity: light ? 0.16 : 0.3,
-                mixBlendMode: (light ? "multiply" : "screen") as React.CSSProperties["mixBlendMode"],
-              }),
-        }}
-      >
-        {watermark}
-      </div>
+      {/* Calque « joueur » : photo, filigrane, voiles, vignette et grain
+          voyagent ensemble — la photo reste habillée dans le rendu 3D. */}
+      <div data-card-part="player" style={{ position: "absolute", inset: 0 }}>
+        {!photoFailed && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photoUrl}
+            alt=""
+            onLoad={() => setLoadedUrl(photoUrl)}
+            onError={() => setFailedUrl(photoUrl)}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "50% 10%",
+              transform: "scale(1.04)",
+              visibility: photoOk ? "visible" : "hidden",
+            }}
+          />
+        )}
 
-      {/* Voile bas — dans le calque joueur (voir plus haut) */}
-      {(isLegend || !light) && (
+        {/* Filigrane géant */}
         <div
           style={{
             position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            top: u(H * (isLegend ? 0.46 : 0.42)),
-            background: isLegend
-              ? `linear-gradient(180deg, ${SCRIM(0)}, ${SCRIM(0.68)} 50%, ${SCRIM(0.97)})`
-              : `linear-gradient(180deg, ${SCRIM(0)}, ${SCRIM(0.72)} 55%, ${SCRIM(0.96)})`,
+            lineHeight: 1,
+            color: ACCENT,
+            ...(isLegend
+              ? {
+                  left: 0,
+                  right: 0,
+                  textAlign: "center" as const,
+                  top: u(H * 0.72 - 900 * 0.8),
+                  fontSize: u(900),
+                  opacity: light ? 0.5 : 0.62,
+                  mixBlendMode: (light ? "multiply" : "overlay") as React.CSSProperties["mixBlendMode"],
+                }
+              : {
+                  right: u(40),
+                  textAlign: "right" as const,
+                  top: u((light ? H - 620 : H - 300) - (light ? 500 : 640) * 0.8),
+                  fontSize: u(light ? 500 : 640),
+                  opacity: light ? 0.16 : 0.3,
+                  mixBlendMode: (light ? "multiply" : "screen") as React.CSSProperties["mixBlendMode"],
+                }),
           }}
-        />
-      )}
-      </div>
+        >
+          {watermark}
+        </div>
 
-      {/* Voile haut */}
-      {!isLegend && (
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: u(380),
-            background: `linear-gradient(180deg, ${SCRIM(light ? 0 : 0.82)}, ${SCRIM(0)})`,
-          }}
-        />
-      )}
-
-      {/* Plaques ivoire de la variante claire (éditorial uniquement) */}
-      {light && !isLegend && (
-        <>
-          <div style={{ position: "absolute", left: u(44), top: u(44), width: u(W - 88), height: u(216), borderRadius: u(44), background: "rgba(250,249,246,0.82)", border: `${u(2)}px solid rgba(20,21,22,0.1)` }} />
-          <div style={{ position: "absolute", left: u(44), top: u(H - 480), width: u(W - 88), height: u(436), borderRadius: u(44), background: "rgba(250,249,246,0.82)", border: `${u(2)}px solid rgba(20,21,22,0.1)` }} />
-        </>
-      )}
-
-      {isLegend ? (
-        <>
-          {/* Bandeau du titre */}
+        {/* Voile haut (éditorial) */}
+        {!isLegend && (
           <div
             style={{
               position: "absolute",
               top: 0,
               left: 0,
               right: 0,
-              height: u(128),
-              background: ACCENT,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              height: u(380),
+              background: `linear-gradient(180deg, ${SCRIM(light ? 0 : 0.82)}, ${SCRIM(0)})`,
             }}
-          >
-            <span
+          />
+        )}
+        {/* Voile bas */}
+        {(isLegend || !light) && (
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              top: u(H * (isLegend ? 0.46 : 0.42)),
+              background: isLegend
+                ? `linear-gradient(180deg, ${SCRIM(0)}, ${SCRIM(0.68)} 50%, ${SCRIM(0.97)})`
+                : `linear-gradient(180deg, ${SCRIM(0)}, ${SCRIM(0.72)} 55%, ${SCRIM(0.96)})`,
+            }}
+          />
+        )}
+
+        {/* Vignette + grain du design */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "none",
+            background: `radial-gradient(120% 120% at 50% 45%, transparent 60%, rgba(0,0,0,${isLegend ? 0.44 : 0.4}))`,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "none",
+            backgroundImage: `url("${GRAIN}")`,
+            backgroundSize: u(192),
+            opacity: isLegend ? 0.18 : 0.16,
+            mixBlendMode: "overlay",
+          }}
+        />
+      </div>
+
+      {/* Calque avant : tout le texte de la carte. */}
+      <div data-card-part="stats" style={{ position: "absolute", inset: 0 }}>
+        {/* Plaques ivoire de la variante claire (éditorial uniquement) */}
+        {light && !isLegend && (
+          <>
+            <div style={{ position: "absolute", left: u(44), top: u(44), width: u(W - 88), height: u(216), borderRadius: u(44), background: "rgba(250,249,246,0.82)", border: `${u(2)}px solid rgba(20,21,22,0.1)` }} />
+            <div style={{ position: "absolute", left: u(44), top: u(H - 480), width: u(W - 88), height: u(436), borderRadius: u(44), background: "rgba(250,249,246,0.82)", border: `${u(2)}px solid rgba(20,21,22,0.1)` }} />
+          </>
+        )}
+
+        {isLegend ? (
+          <>
+            {/* Bandeau du titre */}
+            <div
               style={{
-                fontSize: u(fitName(badge ?? "LEGENDARY", 82, W - 120)),
-                letterSpacing: u(12),
-                color: onAccent,
-                lineHeight: 1,
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                height: u(128),
+                background: ACCENT,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              {badge ?? "LEGENDARY"}
-            </span>
-          </div>
+              <span
+                style={{
+                  fontSize: u(fitName(badge ?? "LEGENDARY", 82, W - 120)),
+                  letterSpacing: u(12),
+                  color: onAccent,
+                  lineHeight: 1,
+                }}
+              >
+                {badge ?? "LEGENDARY"}
+              </span>
+            </div>
 
-          {/* Encart d'identité */}
-          <div
-            style={{
-              position: "absolute",
-              left: u(PAD),
-              top: u(168),
-              minWidth: u(300),
-              borderRadius: u(22),
-              background: SCRIM(0.72),
-              padding: `${u(24)}px ${u(26)}px ${u(20)}px`,
-              display: "flex",
-              flexDirection: "column",
-              gap: u(16),
-              alignItems: "flex-start",
-            }}
-          >
-            <span style={mono(30, 700, 5, INK(1))}>{club}</span>
-            <span style={mono(26, 600, 0, INK(0.55))}>
-              {position}
-              {username ? ` · ${username}` : ""}
-            </span>
-            <span style={{ fontSize: u(54), lineHeight: 1, color: ACCENT }}>GÉN {overall}</span>
-          </div>
-
-          {/* Nom centré */}
-          <div
-            style={{
-              position: "absolute",
-              left: u(PAD),
-              right: u(PAD),
-              top: u(H - 250 - nameSize * 0.8),
-              textAlign: "center",
-              fontSize: u(nameSize),
-              letterSpacing: u(2),
-              lineHeight: 1,
-              color: INK(1),
-              whiteSpace: "nowrap",
-            }}
-          >
-            {nameUp}
-          </div>
-          <div style={{ position: "absolute", left: u(PAD), right: u(PAD), top: u(H - 214), height: u(2), background: INK(0.16) }} />
-        </>
-      ) : (
-        <>
-          {/* En-tête : club, poste, disque de note */}
-          <div style={{ position: "absolute", left: u(PAD), top: u(132 - 32 * 0.8), ...mono(32, 700, 9, INK(0.86)) }}>
-            {club}
-          </div>
-          <div style={{ position: "absolute", left: u(PAD), top: u(182 - 30 * 0.8), ...mono(30, 700, 5, ACCENT) }}>
-            {position.toUpperCase()}
-          </div>
-          <div
-            style={{
-              position: "absolute",
-              left: u(W - PAD - 168),
-              top: u(72),
-              width: u(168),
-              height: u(168),
-              borderRadius: "50%",
-              background: ACCENT,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: u(4),
-            }}
-          >
-            <span style={{ fontSize: u(89), lineHeight: 1, color: onAccent }}>{overall}</span>
-            <span style={mono(18, 700, 3, onAccent)}>GÉN</span>
-          </div>
-
-          {/* Badge éventuel, puis nom et username */}
-          {badge && (
+            {/* Encart d'identité */}
             <div
               style={{
                 position: "absolute",
                 left: u(PAD),
-                top: u(ny - 96 - 64),
-                height: u(64),
-                borderRadius: u(32),
-                background: ACCENT,
-                display: "inline-flex",
-                alignItems: "center",
-                padding: `0 ${u(28)}px`,
-                ...mono(28, 700, 4, onAccent),
+                top: u(168),
+                minWidth: u(300),
+                borderRadius: u(22),
+                background: SCRIM(0.72),
+                padding: `${u(24)}px ${u(26)}px ${u(20)}px`,
+                display: "flex",
+                flexDirection: "column",
+                gap: u(16),
+                alignItems: "flex-start",
               }}
             >
-              {badge}
+              <span style={mono(30, 700, 5, INK(1))}>{club}</span>
+              <span style={mono(26, 600, 0, INK(0.55))}>
+                {position}
+                {username ? ` · ${username}` : ""}
+              </span>
+              <span style={{ fontSize: u(54), lineHeight: 1, color: ACCENT }}>GÉN {overall}</span>
             </div>
-          )}
-          <div
-            style={{
-              position: "absolute",
-              left: u(PAD - 4),
-              right: u(PAD),
-              top: u(ny - nameSize * 0.8),
-              fontSize: u(nameSize),
-              lineHeight: 1,
-              color: INK(1),
-              whiteSpace: "nowrap",
-            }}
-          >
-            {nameUp}
-          </div>
-          {username && (
-            <div style={{ position: "absolute", left: u(PAD), top: u(ny + 58 - 40 * 0.8), ...mono(40, 600, 0, INK(0.6)) }}>
-              {username}
-            </div>
-          )}
-          <div style={{ position: "absolute", left: u(PAD), right: u(PAD), top: u(ny + 104), height: u(2), background: INK(0.22) }} />
-        </>
-      )}
 
-      {/* Rangée des six stats */}
-      <div
-        data-card-part="stats"
-        style={{
-          position: "absolute",
-          left: u(PAD),
-          right: u(PAD),
-          top: u((isLegend ? H - 118 : H - 130) - 60 * 0.8),
-          display: "grid",
-          gridTemplateColumns: "repeat(6, 1fr)",
-        }}
-      >
-        {STAT_KEYS.map((k, i) => {
-          const active = highlightStats?.includes(k);
-          return (
+            {/* Nom centré */}
             <div
-              key={k}
               style={{
-                position: "relative",
+                position: "absolute",
+                left: u(PAD),
+                right: u(PAD),
+                top: u(H - 250 - nameSize * 0.8),
                 textAlign: "center",
-                borderLeft: i > 0 ? `${u(2)}px solid ${INK(isLegend ? 0.12 : 0.14)}` : "none",
+                fontSize: u(nameSize),
+                letterSpacing: u(2),
+                lineHeight: 1,
+                color: INK(1),
+                whiteSpace: "nowrap",
               }}
             >
-              <div style={{ fontSize: u(60), lineHeight: 1, color: active ? ACCENT : INK(1), textShadow: active ? `0 0 ${u(18)}px ${ACCENT}88` : "none" }}>
-                {stats[k]}
-              </div>
-              <div style={{ marginTop: u(10), ...mono(24, 700, 3, active ? ACCENT : INK(0.55)) }}>{k}</div>
+              {nameUp}
             </div>
-          );
-        })}
-      </div>
+            <div style={{ position: "absolute", left: u(PAD), right: u(PAD), top: u(H - 214), height: u(2), background: INK(0.16) }} />
+          </>
+        ) : (
+          <>
+            {/* En-tête : club, poste, disque de note */}
+            <div style={{ position: "absolute", left: u(PAD), top: u(132 - 32 * 0.8), ...mono(32, 700, 9, INK(0.86)) }}>
+              {club}
+            </div>
+            <div style={{ position: "absolute", left: u(PAD), top: u(182 - 30 * 0.8), ...mono(30, 700, 5, ACCENT) }}>
+              {position.toUpperCase()}
+            </div>
+            <div
+              style={{
+                position: "absolute",
+                left: u(W - PAD - 168),
+                top: u(72),
+                width: u(168),
+                height: u(168),
+                borderRadius: "50%",
+                background: ACCENT,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: u(4),
+              }}
+            >
+              <span style={{ fontSize: u(89), lineHeight: 1, color: onAccent }}>{overall}</span>
+              <span style={mono(18, 700, 3, onAccent)}>GÉN</span>
+            </div>
 
-      {/* Vignette + grain du design */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          background: `radial-gradient(120% 120% at 50% 45%, transparent 60%, rgba(0,0,0,${isLegend ? 0.44 : 0.4}))`,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          backgroundImage: `url("${GRAIN}")`,
-          backgroundSize: u(192),
-          opacity: isLegend ? 0.18 : 0.16,
-          mixBlendMode: "overlay",
-        }}
-      />
+            {/* Badge éventuel, puis nom et pseudo */}
+            {badge && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: u(PAD),
+                  top: u(ny - 96 - 64),
+                  height: u(64),
+                  borderRadius: u(32),
+                  background: ACCENT,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: `0 ${u(28)}px`,
+                  ...mono(28, 700, 4, onAccent),
+                }}
+              >
+                {badge}
+              </div>
+            )}
+            <div
+              style={{
+                position: "absolute",
+                left: u(PAD - 4),
+                right: u(PAD),
+                top: u(ny - nameSize * 0.8),
+                fontSize: u(nameSize),
+                lineHeight: 1,
+                color: INK(1),
+                whiteSpace: "nowrap",
+                textShadow: light ? "none" : `0 ${u(4)}px ${u(18)}px rgba(0,0,0,0.55)`,
+              }}
+            >
+              {nameUp}
+            </div>
+            {username && (
+              <div style={{ position: "absolute", left: u(PAD), top: u(ny + 58 - 40 * 0.8), ...mono(40, 600, 0, INK(0.6)) }}>
+                {username}
+              </div>
+            )}
+            <div style={{ position: "absolute", left: u(PAD), right: u(PAD), top: u(ny + 104), height: u(2), background: INK(0.22) }} />
+          </>
+        )}
+
+        {/* Rangée des six stats */}
+        <div
+          style={{
+            position: "absolute",
+            left: u(PAD),
+            right: u(PAD),
+            top: u((isLegend ? H - 118 : H - 130) - 60 * 0.8),
+            display: "grid",
+            gridTemplateColumns: "repeat(6, 1fr)",
+          }}
+        >
+          {STAT_KEYS.map((k, i) => {
+            const active = highlightStats?.includes(k);
+            return (
+              <div
+                key={k}
+                style={{
+                  position: "relative",
+                  textAlign: "center",
+                  borderLeft: i > 0 ? `${u(2)}px solid ${INK(isLegend ? 0.12 : 0.14)}` : "none",
+                }}
+              >
+                <div style={{ fontSize: u(60), lineHeight: 1, color: active ? ACCENT : INK(1), textShadow: active ? `0 0 ${u(18)}px ${ACCENT}88` : "none" }}>
+                  {stats[k]}
+                </div>
+                <div style={{ marginTop: u(10), ...mono(24, 700, 3, active ? ACCENT : INK(0.55)) }}>{k}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
