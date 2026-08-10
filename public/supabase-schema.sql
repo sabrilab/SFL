@@ -40,7 +40,11 @@ begin
     new.id,
     coalesce(new.raw_user_meta_data ->> 'name', split_part(new.email, '@', 1)),
     coalesce(new.raw_user_meta_data ->> 'username', '@' || split_part(new.email, '@', 1)),
-    false
+    -- L'admin est reconnu par son email technique EXACT (jamais par les
+    -- métadonnées, modifiables par l'utilisateur). La fenêtre de risque se
+    -- limite à la période d'inscriptions ouvertes, refermée sitôt les comptes
+    -- créés — et le compte ilyes est créé en premier.
+    new.email = 'ilyes@sfl.local'
   )
   on conflict (id) do nothing;
   return new;

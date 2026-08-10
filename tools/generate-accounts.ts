@@ -124,6 +124,32 @@ function main() {
   ].join("\n");
   writeFileSync("src/lib/sfl/auth/accounts.ts", ts);
 
+  /* --------------------- Graine serveur (API /api/setup) --------------------- */
+  // Mots de passe PAR DÉFAUT en clair, réservés au serveur : ce module n'est
+  // importé que par la route d'installation, jamais par du code client. Même
+  // niveau d'exposition que docs/COMPTES.md (le dépôt), aucun secret nouveau.
+  const seed = [
+    "// GÉNÉRÉ par tools/generate-accounts.ts — ne pas modifier à la main.",
+    "// SERVEUR UNIQUEMENT : importé par app/api/setup/route.ts. Ce sont les",
+    "// mots de passe PAR DÉFAUT (déjà listés dans docs/COMPTES.md) ; chacun",
+    "// est invité à changer le sien à la première connexion.",
+    "",
+    "export interface SeedAccount {",
+    "  user: string;",
+    "  name: string;",
+    "  password: string;",
+    "}",
+    "",
+    "export const SEED_ACCOUNTS: SeedAccount[] = [",
+    ...rows.map(
+      (r) =>
+        `  { user: ${JSON.stringify(r.user)}, name: ${JSON.stringify(r.name)}, password: ${JSON.stringify(r.password)} },`
+    ),
+    "];",
+    "",
+  ].join("\n");
+  writeFileSync("src/lib/sfl/auth/seed.server.ts", seed);
+
   console.log(`${rows.length} comptes générés.`);
   console.log(rows.slice(0, 3).map((r) => `  ${r.name} → ${r.user} / ${r.password}`).join("\n"));
 }
