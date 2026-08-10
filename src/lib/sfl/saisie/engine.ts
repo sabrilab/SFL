@@ -76,7 +76,7 @@ const emptyAgg = (): Agg => ({
   absInj: 0,
 });
 
-function entryPP(e: MatchEntry): number {
+export function entryPP(e: MatchEntry): number {
   let pp = BAREME.presence;
   if (e.result === "Victoire") pp += e.sflTime ? BAREME.victoireSflTime : BAREME.victoire;
   else if (e.result === "Nul") pp += BAREME.nul;

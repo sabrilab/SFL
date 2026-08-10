@@ -37,7 +37,7 @@ export default function Profil() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-5 py-4 sm:py-8">
       <div>
-        <h1 className="text-[34px] font-bold tracking-tight">Profil</h1>
+        <h1 className="text-[30px] font-bold tracking-tight">Profil</h1>
         <p className="text-sm text-muted-foreground">
           {player.poste} · #{myRank} au Pépite d&apos;Or · OVR {ovr(player.stats)}
         </p>

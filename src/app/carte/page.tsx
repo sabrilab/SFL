@@ -98,7 +98,7 @@ export default function CartePage() {
         <p className="text-[13px] font-medium text-muted-foreground">
           Évolue chaque mois à l&apos;EvoDay
         </p>
-        <h1 className="text-[34px] font-bold tracking-tight">Ma carte</h1>
+        <h1 className="text-[30px] font-bold tracking-tight">Ma carte</h1>
       </div>
 
       {/* Carte principale */}

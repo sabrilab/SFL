@@ -30,7 +30,7 @@ export default function Discussions() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-5 py-4 sm:py-8">
       <div>
-        <h1 className="text-[34px] font-bold tracking-tight">Discussions</h1>
+        <h1 className="text-[30px] font-bold tracking-tight">Discussions</h1>
         <p className="text-sm text-muted-foreground">
           Les canaux de la ligue — en privé, par équipe, ou tous ensemble.
         </p>

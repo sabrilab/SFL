@@ -33,6 +33,7 @@ import {
   type JourneeMatch,
   type Player,
 } from "@/lib/sfl/engine";
+import { entryPP } from "@/lib/sfl/saisie/engine";
 import { activeConvocation, respondConvocation } from "@/lib/sfl/saisie/mutations";
 import { saisieStore } from "@/lib/sfl/saisie/store";
 import { cn } from "@/lib/utils";
@@ -208,6 +209,39 @@ export default function Ligue() {
   typeTeam.forEach((p) => pitchRows[row(p)].push(p));
 
   const participants = journeeParticipants(lastJ);
+
+  // Lignes brutes de la journée (avec honneurs et résultat) : elles portent
+  // les modules narratifs — tops au barème, débuts, duo, record.
+  const jEntries = saison.entries.filter(
+    (e) => e.j === lastJ.j && e.statut === "Présent" && !e.extraTime
+  );
+  const tops = [...jEntries]
+    .map((e) => ({ e, pp: entryPP(e) }))
+    .sort((a, b) => b.pp - a.pp)
+    .slice(0, 3);
+  // Record : la journée la plus prolifique de la saison jusqu'ici ?
+  const priorMax = Math.max(
+    0,
+    ...journees
+      .filter((j) => j.j !== lastJ.j)
+      .map((j) => (j.matches ?? []).reduce((s, m) => s + m.teamA.score + m.teamB.score, 0))
+  );
+  const isRecord = totalButs > priorMax;
+  // Les débuts : premier match joué cette journée.
+  const debuts = jEntries.filter((e) => (byName.get(e.player)?.matchs ?? 0) === 1);
+  // Le duo : la meilleure paire d'une même équipe (buts + passes cumulés).
+  const teams = new Map<string, typeof jEntries>();
+  for (const e of jEntries) {
+    if (!e.team) continue;
+    teams.set(e.team, [...(teams.get(e.team) ?? []), e]);
+  }
+  const duo = [...teams.entries()]
+    .map(([team, list]) => {
+      const best = [...list].sort((a, b) => b.buts + b.passes - (a.buts + a.passes)).slice(0, 2);
+      return { team, best, total: best.reduce((s, e) => s + e.buts + e.passes, 0) };
+    })
+    .filter((d) => d.best.length === 2)
+    .sort((a, b) => b.total - a.total)[0];
 
   /* ----------------------------- Convocation ----------------------------- */
 
@@ -507,6 +541,11 @@ export default function Ligue() {
               <div className="glass row-span-2 flex flex-col justify-between rounded-3xl p-4">
                 <p className="mono-label text-muted-foreground">Buts inscrits</p>
                 <div className="text-5xl font-bold tabular-nums">{totalButs}</div>
+                <p className={cn("mono-label", isRecord ? "text-primary" : "text-muted-foreground")}>
+                  {isRecord
+                    ? `Record de la saison · +${totalButs - priorMax}`
+                    : `Meilleure marque : ${priorMax}`}
+                </p>
                 <div className="flex items-end gap-1.5" style={{ height: 44 }}>
                   {matches.map((m) => {
                     const v = m.teamA.score + m.teamB.score;
@@ -534,6 +573,43 @@ export default function Ligue() {
               ))}
             </div>
           </section>
+
+          {/* 9 bis · Les tops de la journée — au barème des Points Pépite */}
+          {tops.length > 0 && (
+            <section>
+              <ModuleTitle label="Au barème Pépite" title="Les tops de la journée" />
+              <div className="flex flex-col gap-2">
+                {tops.map(({ e, pp }, i) => (
+                  <div
+                    key={e.player}
+                    className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3"
+                  >
+                    <span className="w-5 text-center text-[13px] font-bold text-muted-foreground tabular-nums">
+                      {i + 1}
+                    </span>
+                    <Avatar name={e.player} size={28} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-semibold">{e.player}</span>
+                      <span className="mono-label text-muted-foreground">
+                        {[
+                          e.buts > 0 && `${e.buts}B`,
+                          e.passes > 0 && `${e.passes}P`,
+                          e.mvp && "MVP",
+                          e.impact && "IMPACT",
+                          e.def && "DÉF",
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || e.result}
+                      </span>
+                    </span>
+                    <span className="mono-label rounded-full bg-primary/15 px-2.5 py-1 text-primary">
+                      +{pp} PP
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* 10 · Le duel de la journée */}
           {duelA && duelB && (
@@ -578,6 +654,33 @@ export default function Ligue() {
                     </div>
                   );
                 })}
+              </div>
+            </section>
+          )}
+
+          {/* 10 bis · Les débuts — premiers matchs de la journée */}
+          {debuts.length > 0 && (
+            <section className="glass rounded-3xl p-5">
+              <p className="mono-label text-primary">
+                Première{debuts.length > 1 ? "s" : ""} apparition{debuts.length > 1 ? "s" : ""}
+              </p>
+              <h2 className="mt-1 text-xl font-bold tracking-tight">
+                {debuts.map((e) => e.player).join(" et ")} débarque
+                {debuts.length > 1 ? "nt" : ""}
+              </h2>
+              <div className="mt-3 flex flex-col gap-2">
+                {debuts.map((e) => (
+                  <div key={e.player} className="flex items-center gap-2.5">
+                    <Avatar name={e.player} size={26} />
+                    <p className="text-[13px] text-muted-foreground">
+                      <span className="font-semibold text-foreground">{e.player}</span>{" "}
+                      {e.buts > 0
+                        ? `plante ${e.buts} but${e.buts > 1 ? "s" : ""} pour sa première`
+                        : "joue son premier match"}
+                      {e.mvp || e.impact || e.def ? " — et repart avec un titre." : "."}
+                    </p>
+                  </div>
+                ))}
               </div>
             </section>
           )}
@@ -680,6 +783,33 @@ export default function Ligue() {
               )}
             </div>
           </section>
+
+          {/* 13 bis · Le duo qui a fait la journée */}
+          {duo && (
+            <section className="glass rounded-3xl p-5">
+              <p className="mono-label text-primary">Équipe {duo.team}</p>
+              <h2 className="mt-1 text-xl font-bold tracking-tight">
+                Le duo qui a fait la journée
+              </h2>
+              <div className="mt-3 flex items-center gap-3">
+                <div className="flex -space-x-2">
+                  {duo.best.map((e) => (
+                    <Avatar key={e.player} name={e.player} size={34} />
+                  ))}
+                </div>
+                <p className="min-w-0 flex-1 text-[13px] leading-snug text-muted-foreground">
+                  <span className="font-semibold text-foreground">
+                    {duo.best.map((e) => e.player).join(" et ")}
+                  </span>{" "}
+                  combinent {duo.total} actions décisives —{" "}
+                  {duo.best
+                    .map((e) => `${e.buts}B ${e.passes}P`)
+                    .join(" et ")}
+                  .
+                </p>
+              </div>
+            </section>
+          )}
 
           {/* 14 · Le but du match */}
           <section>

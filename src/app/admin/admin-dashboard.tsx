@@ -256,7 +256,7 @@ export function AdminDashboard() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-[13px] font-medium text-muted-foreground">Espace administrateur</p>
-            <h1 className="text-[34px] font-bold tracking-tight">Admin</h1>
+            <h1 className="text-[30px] font-bold tracking-tight">Admin</h1>
           </div>
           <Badge variant="secondary" className="rounded-full">Maquette</Badge>
         </div>

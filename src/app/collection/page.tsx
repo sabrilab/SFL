@@ -174,7 +174,7 @@ export default function CollectionPage() {
         <p className="text-[13px] font-medium text-muted-foreground">
           {isClient ? `${balance} Ballons disponibles` : "Ballons"}
         </p>
-        <h1 className="text-[34px] font-bold tracking-tight">Collection</h1>
+        <h1 className="text-[30px] font-bold tracking-tight">Collection</h1>
       </div>
 
       {/* Comment gagner des Ballons */}
@@ -198,7 +198,7 @@ export default function CollectionPage() {
       </div>
 
       <Tabs defaultValue="packs">
-        <TabsList className="w-full rounded-full bg-card p-1 dark:bg-card">
+        <TabsList className="glass w-full rounded-full p-1">
           <TabsTrigger value="packs" className="flex-1 rounded-full">
             Packs
           </TabsTrigger>

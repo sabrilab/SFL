@@ -14,7 +14,7 @@ export default function Boutique() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-5 py-4 sm:py-8">
       <div>
-        <h1 className="text-[34px] font-bold tracking-tight">Boutique</h1>
+        <h1 className="text-[30px] font-bold tracking-tight">Boutique</h1>
         <p className="text-sm text-muted-foreground">
           Maillots, survêts, montres — payables avec les points gagnés sur le terrain.
         </p>

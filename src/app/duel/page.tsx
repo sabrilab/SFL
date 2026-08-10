@@ -102,7 +102,7 @@ export default function DuelPage() {
         <p className="text-[13px] font-medium text-muted-foreground">
           {arenaMode === "duel" ? "Ton avis compte" : "Ton deck contre les leurs"}
         </p>
-        <h1 className="text-[34px] font-bold tracking-tight">Arène</h1>
+        <h1 className="text-[30px] font-bold tracking-tight">Arène</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {arenaMode === "duel"
             ? "Choisis le meilleur des deux joueurs, statistique par statistique. Chaque duel nourrit ton classement personnel."

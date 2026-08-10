@@ -174,11 +174,11 @@ export default function StatsPage() {
         <p className="text-[13px] font-medium text-muted-foreground">
           Saison 1 · Après la journée {JOURNEES.length}
         </p>
-        <h1 className="text-[34px] font-bold tracking-tight">Statistiques</h1>
+        <h1 className="text-[30px] font-bold tracking-tight">Statistiques</h1>
       </div>
 
       <Tabs defaultValue="classement">
-        <TabsList className="w-full rounded-full bg-card p-1 dark:bg-card">
+        <TabsList className="glass w-full rounded-full p-1">
           <TabsTrigger value="classement" className="flex-1 rounded-full">
             Classement
           </TabsTrigger>
