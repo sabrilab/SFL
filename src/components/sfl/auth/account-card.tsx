@@ -41,7 +41,9 @@ export function AccountCard() {
       toast.error(
         res.reason === "too-short"
           ? "Six caractères minimum."
-          : "Mot de passe actuel incorrect."
+          : res.reason === "unavailable"
+            ? "Serveur injoignable — réessaie dans un instant."
+            : "Mot de passe actuel incorrect."
       );
     }
   }

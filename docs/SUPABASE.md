@@ -1,46 +1,40 @@
-# Brancher Supabase
+# Supabase — état du branchement
 
-## Ce dont j'ai besoin de toi
+## Fait
 
-Crée le projet sur [supabase.com](https://supabase.com) (plan gratuit suffisant),
-puis donne-moi **deux valeurs**, prises dans *Project Settings → API* :
+- **Client** : `src/lib/supabase.ts` — URL et clé publishable embarquées
+  (publiques par conception, la sécurité est dans les règles RLS).
+  Surclassables par `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  dans Vercel si besoin.
+- **Connexion** : `signIn` vérifie d'abord côté serveur
+  (`auth.signInWithPassword`), et retombe sur la vérification locale tant que
+  les comptes serveur n'existent pas (`ENFORCE_SERVER_AUTH = false` dans
+  `src/lib/sfl/auth/session.ts` — à passer à true une fois l'installation
+  terminée).
+- **Présence** : `src/hooks/use-presence.ts` — partagée et temps réel quand une
+  convocation est publiée en base, locale sinon. Le panneau affiche « En
+  direct » quand la liste est commune.
+- **Schéma** : `supabase/schema.sql` (copié dans `public/supabase-schema.sql`
+  au build pour le bouton « Copier » de la page d'installation).
+- **Installation guidée** : `/admin/setup` (lien dans Réglages → zone admin).
 
-| Valeur | Où | Sensible ? |
-| --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Project URL | Non — publique par nature |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Project API keys → `anon` `public` | Non — protégée par les règles RLS |
+## Ce que l'admin fait, une seule fois (page /admin/setup)
 
-**Ne me donne jamais la clé `service_role`.** Elle contourne toutes les règles de
-sécurité ; elle n'a rien à faire dans une application web.
+1. Restore project + désactiver « Confirm email »
+2. Coller le script SQL dans l'éditeur → Run
+3. Coller le tableau de docs/COMPTES.md → « Créer les comptes »
+4. Rejouer la dernière ligne SQL (rôle admin)
+5. Se reconnecter, publier la convocation depuis le panneau Ma présence
+6. Désactiver « Allow new users to sign up »
 
-Ajoute-les aussi dans Vercel (*Settings → Environment Variables*), sur les trois
-environnements, sinon la version en ligne ne verra pas la base.
+## Ensuite (moi)
 
-## Ce que je fais ensuite
+- Passer `ENFORCE_SERVER_AUTH` à true (le serveur devient l'unique juge).
+- Étapes suivantes : photos de profil (Storage), saison complète, chat.
 
-1. J'exécute `supabase/schema.sql` (tables `profiles`, `convocations`,
-   `presence`, règles RLS, temps réel).
-2. Je crée les 71 comptes depuis `docs/COMPTES.md` (email technique
-   `identifiant@sfl.local` + mot de passe par défaut), et leur profil associé.
-3. Je remplace le contenu de `src/lib/sfl/presence.ts` par les appels Supabase.
-   **Aucun écran ne change** : le service expose déjà `listPresence`,
-   `setPresence` et le drapeau `PRESENCE_IS_SHARED`.
-4. Je remplace `signIn` / `signOut` / `getSession` de
-   `src/lib/sfl/auth/session.ts` par Supabase Auth. Les mots de passe cessent
-   alors d'être vérifiés sur l'appareil : c'est le serveur qui tranche.
+## Sécurité
 
-## Ce que ça change concrètement
-
-| Aujourd'hui | Avec Supabase |
-| --- | --- |
-| Chacun voit ses propres réponses | Toute la ligue voit la même liste |
-| L'admin relance à la main | L'admin voit en direct qui n'a pas répondu |
-| Le mot de passe est vérifié sur le téléphone | Vérifié par le serveur |
-| Les données vivent dans le navigateur | Les données survivent au changement de téléphone |
-
-## Ordre de bascule conseillé
-
-1. **Présence** (le besoin urgent) — tables + auth, une soirée de travail.
-2. Photos de profil (Supabase Storage).
-3. Saison complète (journées, lignes de match) : la saisie admin y passe aussi.
-4. Chat du vestiaire, votes, commentaires.
+- Jamais la clé `service_role` dans l'app ni dans la conversation.
+- `is_admin` ne vient jamais des métadonnées utilisateur (modifiables) :
+  posé en SQL, colonne protégée par grant de colonnes.
+- Inscriptions ouvertes UNIQUEMENT le temps de l'étape 3, refermées en 6.

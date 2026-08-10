@@ -8,11 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "saison:check": "tsx tools/saison-snapshot.ts",
-    "saison:bless": "tsx tools/saison-snapshot.ts --bless"
+    "saison:bless": "tsx tools/saison-snapshot.ts --bless",
+    "prebuild": "node -e \"require('fs').copyFileSync('supabase/schema.sql','public/supabase-schema.sql')\""
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
     "@react-three/fiber": "^9.6.1",
+    "@supabase/supabase-js": "2.112.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "gsap": "^3.15.0",
