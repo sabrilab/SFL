@@ -99,11 +99,8 @@ export default function DuelPage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-7 px-5 py-4 sm:py-8">
       <div>
-        <p className="text-[13px] font-medium text-muted-foreground">
-          {arenaMode === "duel" ? "Ton avis compte" : "Ton deck contre les leurs"}
-        </p>
         <h1 className="text-[30px] font-bold tracking-tight">Arène</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-[13px] leading-snug text-foreground/42">
           {arenaMode === "duel"
             ? "Choisis le meilleur des deux joueurs, statistique par statistique. Chaque duel nourrit ton classement personnel."
             : "Compose un deck de 5 cartes issues de tes packs et affronte les decks préparés par les autres joueurs."}
@@ -111,7 +108,7 @@ export default function DuelPage() {
       </div>
 
       {/* Sélecteur Duel / Match */}
-      <div className="flex w-full rounded-full bg-card p-1">
+      <div className="glass flex w-full rounded-full p-1">
         {(
           [
             ["duel", "Duel"],
@@ -125,7 +122,7 @@ export default function DuelPage() {
               "flex-1 rounded-full py-2 text-sm font-semibold transition-colors",
               arenaMode === mode
                 ? "bg-foreground text-background"
-                : "text-muted-foreground hover:text-foreground"
+                : "text-foreground/45 hover:text-foreground"
             )}
           >
             {label}
@@ -138,21 +135,21 @@ export default function DuelPage() {
       ) : (
         <>
       {isClient && (
-        <div className="flex items-center justify-between rounded-2xl bg-card px-4 py-2.5">
+        <div className="flex items-center justify-between glass-soft rounded-[18px] px-4 py-2.5">
           <span className="text-[13px] font-semibold">
             Duels du jour&nbsp;
-            <span className="text-muted-foreground tabular-nums">
+            <span className="text-foreground/45 tabular-nums">
               {dailyCount}/{DAILY_DUEL_CAP}
             </span>
           </span>
-          <span className="text-[12px] font-semibold text-muted-foreground">
+          <span className="text-[12px] font-semibold text-foreground/45">
             {capped ? "Quota atteint · reviens demain" : "+5 ⚽ en terminant les 10"}
           </span>
         </div>
       )}
 
       {isClient && capped ? (
-        <div className="rounded-3xl bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+        <div className="glass rounded-[26px] px-6 py-10 text-center text-sm text-foreground/45">
           Tes 10 duels du jour sont faits — les 5 Ballons sont à toi. Reviens demain !
         </div>
       ) : isClient ? (
@@ -235,7 +232,7 @@ export default function DuelPage() {
         </section>
       ) : (
         <div className="flex justify-center py-10">
-          <Swords className="size-8 animate-pulse text-muted-foreground" />
+          <Swords className="size-8 animate-pulse text-foreground/45" />
         </div>
       )}
 
@@ -243,14 +240,14 @@ export default function DuelPage() {
         <div className="mb-3 flex items-baseline justify-between px-1">
           <h2 className="text-lg font-semibold tracking-tight">Ton classement personnel</h2>
           {ranked.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={reset} className="text-muted-foreground">
+            <Button variant="ghost" size="sm" onClick={reset} className="text-foreground/45">
               <RotateCcw /> Réinitialiser
             </Button>
           )}
         </div>
 
         {ranked.length === 0 ? (
-          <div className="rounded-3xl bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+          <div className="glass rounded-[26px] px-6 py-10 text-center text-sm text-foreground/45">
             Choisis un vainqueur ci-dessus pour démarrer ton classement.
           </div>
         ) : (
@@ -261,14 +258,14 @@ export default function DuelPage() {
                 <div
                   key={name}
                   className={cn(
-                    "flex items-center gap-3 rounded-2xl bg-card px-3 py-2.5",
+                    "flex items-center gap-3 glass-soft rounded-[18px] px-3 py-2.5",
                     isMe && "ring-1 ring-primary/50"
                   )}
                 >
                   <span
                     className={cn(
                       "w-7 text-base font-semibold tabular-nums",
-                      i < 3 ? "text-primary" : "text-muted-foreground"
+                      i < 3 ? "text-primary" : "text-foreground/45"
                     )}
                   >
                     {i + 1}
@@ -277,7 +274,7 @@ export default function DuelPage() {
                     {name[0]}
                   </span>
                   <span className="flex-1 truncate text-[15px] font-semibold">{name}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-foreground/45">
                     {r.duels} duel{r.duels > 1 ? "s" : ""}
                   </span>
                   <span className="w-16 text-right text-lg font-bold tracking-tight tabular-nums">
@@ -298,7 +295,7 @@ export default function DuelPage() {
               "shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap",
               c.id === category.id
                 ? "bg-foreground text-background"
-                : "bg-card text-muted-foreground"
+                : "glass-soft text-foreground/45"
             )}
           >
             {c.label}

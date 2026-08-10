@@ -40,7 +40,7 @@ import {
 const KIND_STYLES: Record<string, string> = {
   simple: "bg-secondary text-foreground",
   rare: "bg-[#F2CE7B]/15 text-[#c9962e] dark:text-[#E8C87A]",
-  def: "bg-sky-500/12 text-sky-600 dark:text-sky-400",
+  def: "bg-primary/15 text-primary",
   impact: "bg-primary/12 text-primary",
   mvp: "bg-[#F4C542]/20 text-[#a87b12] dark:text-[#F4C542]",
 };
@@ -82,7 +82,7 @@ function CardModal({
                 render={(s) => <CollectionCardVisual card={card} size={s} />}
               />
             </div>
-            <div className="flex flex-col items-center gap-2 rounded-3xl bg-card px-5 py-4 text-center">
+            <div className="flex flex-col items-center gap-2 glass rounded-[26px] px-5 py-4 text-center">
               <span
                 className={cn(
                   "rounded-full px-2.5 py-1 text-[10px] font-bold uppercase",
@@ -92,7 +92,7 @@ function CardModal({
                 {KIND_LABELS[card.kind]}
               </span>
               <span className="text-lg font-bold">{card.player.name}</span>
-              <span className="text-xs font-medium text-muted-foreground">
+              <span className="text-xs font-medium text-foreground/45">
                 n°{card.serial}/{card.total} {has && `· ×${count} en collection`}
               </span>
               {!has && (
@@ -171,14 +171,14 @@ export default function CollectionPage() {
       </AnimatePresence>
 
       <div>
-        <p className="text-[13px] font-medium text-muted-foreground">
+        <h1 className="text-[30px] font-bold tracking-tight">Collection</h1>
+        <p className="mt-1 text-[13px] text-foreground/42">
           {isClient ? `${balance} Ballons disponibles` : "Ballons"}
         </p>
-        <h1 className="text-[30px] font-bold tracking-tight">Collection</h1>
       </div>
 
       {/* Comment gagner des Ballons */}
-      <div className="overflow-hidden rounded-3xl bg-card text-sm">
+      <div className="overflow-hidden glass rounded-[26px] text-sm">
         {[
           [`Connexion du jour`, `+${DAILY_LOGIN_REWARD} ⚽`],
           [`Premier vote du jour (figures de match)`, `+${DAILY_VOTE_REWARD} ⚽`],
@@ -188,7 +188,7 @@ export default function CollectionPage() {
             key={label}
             className={cn(
               "flex items-center justify-between px-5 py-3",
-              i < 2 && "border-b border-border/60"
+              i < 2 && "border-b border-white/8"
             )}
           >
             <span className="font-medium">{label}</span>
@@ -212,13 +212,13 @@ export default function CollectionPage() {
 
         {/* ===== PACKS ===== */}
         <TabsContent value="packs" className="mt-4 flex flex-col gap-4">
-          <div className="flex flex-col items-center gap-4 rounded-3xl bg-card p-6 lg:mx-auto lg:w-full lg:max-w-md">
+          <div className="flex flex-col items-center gap-4 glass rounded-[26px] p-6 lg:mx-auto lg:w-full lg:max-w-md">
             <div className="flex h-[159px] w-[109px] items-center justify-center overflow-visible">
               <div className="scale-[0.62]">
                 <PackVisual />
               </div>
             </div>
-            <p className="text-center text-sm text-muted-foreground">
+            <p className="text-center text-sm text-foreground/45">
               {PACK_SIZE} cartes par pack — Standard, Rare, et une chance infime de
               tomber sur une hors-série Défensive, Impact ou MVP.
             </p>
@@ -231,7 +231,7 @@ export default function CollectionPage() {
               <PackageOpen /> Ouvrir un pack · {PACK_COST} ⚽
             </Button>
             {isClient && balance < PACK_COST && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-foreground/45">
                 Il te manque {PACK_COST - balance} ⚽ — reviens après tes duels du jour.
               </p>
             )}
@@ -240,7 +240,7 @@ export default function CollectionPage() {
 
         {/* ===== CARTES ===== */}
         <TabsContent value="cartes" className="mt-4 flex flex-col gap-3">
-          <p className="px-1 text-sm text-muted-foreground">
+          <p className="px-1 text-sm text-foreground/45">
             <strong className="font-semibold text-foreground">
               {uniqueOwned}/{CATALOG.length}
             </strong>{" "}
@@ -257,7 +257,7 @@ export default function CollectionPage() {
                   "shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors",
                   filter === f.id
                     ? "bg-foreground text-background"
-                    : "bg-card text-muted-foreground hover:text-foreground"
+                    : "glass-soft text-foreground/60"
                 )}
               >
                 {f.label}
@@ -269,7 +269,7 @@ export default function CollectionPage() {
                 "shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors",
                 ownedOnly
                   ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:text-foreground"
+                  : "glass-soft text-foreground/60"
               )}
             >
               Possédées
@@ -284,12 +284,12 @@ export default function CollectionPage() {
                 <button
                   key={card.id}
                   onClick={() => setSelected(card)}
-                  className="flex flex-col items-center gap-1.5 rounded-2xl bg-card px-2 py-3 text-center transition-transform active:scale-95"
+                  className="flex flex-col items-center gap-1.5 glass-soft rounded-[18px] px-2 py-3 text-center transition-transform active:scale-95"
                 >
                   <div className={cn("transition-opacity", !has && "opacity-30 grayscale")}>
                     <CollectionCardVisual card={card} size={0.32} />
                   </div>
-                  <span className="text-[10px] font-semibold text-muted-foreground tabular-nums">
+                  <span className="text-[10px] font-semibold text-foreground/45 tabular-nums">
                     n°{card.serial}/{card.total}
                   </span>
                   {has && count > 1 && (
@@ -303,7 +303,7 @@ export default function CollectionPage() {
           </div>
 
           {filtered.length === 0 && (
-            <div className="rounded-3xl bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+            <div className="glass rounded-[26px] px-6 py-10 text-center text-sm text-foreground/45">
               Aucune carte pour ce filtre.
             </div>
           )}
@@ -322,7 +322,7 @@ export default function CollectionPage() {
             <h2 className="mb-2 px-1 text-lg font-semibold tracking-tight">
               Cartes à l&apos;unité
             </h2>
-            <p className="mb-3 px-1 text-sm text-muted-foreground">
+            <p className="mb-3 px-1 text-sm text-foreground/45">
               Achète directement n&apos;importe quelle carte du catalogue — des
               Standard/Rare jusqu&apos;aux pièces hors-série numérotées au-delà.
             </p>
@@ -333,11 +333,11 @@ export default function CollectionPage() {
                   <button
                     key={card.id}
                     onClick={() => setSelected(card)}
-                    className="flex flex-col items-center gap-1.5 rounded-2xl bg-card px-2 py-3 text-center transition-transform active:scale-95"
+                    className="flex flex-col items-center gap-1.5 glass-soft rounded-[18px] px-2 py-3 text-center transition-transform active:scale-95"
                   >
                     <CollectionCardVisual card={card} size={0.32} />
                     {has ? (
-                      <span className="text-[10px] font-semibold text-emerald-500">
+                      <span className="text-[10px] font-semibold text-primary">
                         Obtenue ✓
                       </span>
                     ) : (
@@ -355,7 +355,7 @@ export default function CollectionPage() {
             <h2 className="mb-2 px-1 text-lg font-semibold tracking-tight">
               Packs de Ballons
             </h2>
-            <p className="mb-3 px-1 text-sm text-muted-foreground">
+            <p className="mb-3 px-1 text-sm text-foreground/45">
               Pour compléter ta collection plus vite. Paiement réel disponible
               avec la prochaine version.
             </p>
@@ -367,10 +367,10 @@ export default function CollectionPage() {
               ].map(([amount, price]) => (
                 <div
                   key={amount}
-                  className="flex flex-col items-center gap-1.5 rounded-2xl bg-card px-3 py-4"
+                  className="flex flex-col items-center gap-1.5 glass-soft rounded-[18px] px-3 py-4"
                 >
                   <span className="text-xl font-bold tabular-nums">{amount} ⚽</span>
-                  <span className="text-xs text-muted-foreground">{price}</span>
+                  <span className="text-xs text-foreground/45">{price}</span>
                   <Button size="sm" variant="secondary" disabled className="mt-1 w-full">
                     Bientôt
                   </Button>

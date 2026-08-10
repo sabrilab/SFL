@@ -35,7 +35,7 @@ function SectionTitle({
   return (
     <div className="mb-3 flex items-baseline justify-between px-1">
       <h2 className="text-lg font-semibold tracking-tight">{children}</h2>
-      {right && <span className="text-sm font-medium text-muted-foreground">{right}</span>}
+      {right && <span className="text-sm font-medium text-foreground/45">{right}</span>}
     </div>
   );
 }
@@ -81,10 +81,10 @@ export default function CartePage() {
     player.buts >= 6 && (["Meilleur buteur", "+3 en TIR", "text-primary"] as const),
     player.passes >= 6 && (["Meilleur passeur", "+3 en PAS", "text-primary"] as const),
     player.impact > 0 &&
-      (["Impact du mois", "2 pts libres · +1 DRI", "text-sky-600 dark:text-sky-400"] as const),
+      (["Impact du mois", "2 pts libres · +1 DRI", "text-primary"] as const),
     player.def > 0 &&
       (["Défensive du mois", "+2 DEF · +2 PHY (→ +1 VIT)", "text-violet-600 dark:text-violet-400"] as const),
-    player.matchs >= 3 && (["Présence parfaite", "+1 PHY", "text-emerald-600 dark:text-emerald-400"] as const),
+    player.matchs >= 3 && (["Présence parfaite", "+1 PHY", "text-primary"] as const),
     [
       "Tiers Pépite d'Or",
       `${tierPts} pts libres`,
@@ -95,15 +95,15 @@ export default function CartePage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-4 sm:py-8">
       <div>
-        <p className="text-[13px] font-medium text-muted-foreground">
+        <h1 className="text-[30px] font-bold tracking-tight">Ma carte</h1>
+        <p className="mt-1 text-[13px] text-foreground/42">
           Évolue chaque mois à l&apos;EvoDay
         </p>
-        <h1 className="text-[30px] font-bold tracking-tight">Ma carte</h1>
       </div>
 
       {/* Carte principale */}
       <section className="flex flex-col items-center gap-6">
-        <div className="flex w-full max-w-xs rounded-full bg-card p-1">
+        <div className="glass flex w-full max-w-xs rounded-full p-1">
           {(["simple", "rare"] as const).map((m) => (
             <button
               key={m}
@@ -112,7 +112,7 @@ export default function CartePage() {
                 "flex-1 rounded-full py-2 text-sm font-semibold transition-colors",
                 mode === m
                   ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-foreground/45 hover:text-foreground"
               )}
             >
               {m === "simple" ? "Standard" : "Rare"}
@@ -143,7 +143,7 @@ export default function CartePage() {
         >
           Mes cartes Boost
         </SectionTitle>
-        <p className="mb-3 px-1 text-sm text-muted-foreground">
+        <p className="mb-3 px-1 text-sm text-foreground/45">
           Gagnées grâce aux figures de match. Elles célèbrent une perf précise{" "}
           <strong className="font-semibold text-foreground">
             sans modifier ta carte principale
@@ -162,14 +162,14 @@ export default function CartePage() {
                   subtitle={`${BOOST_LABELS[c.type]} · ${c.date}`}
                   render={(s) => <BoostCard card={c} size={s} />}
                 />
-                <div className="mt-2 text-xs font-medium text-muted-foreground">
+                <div className="mt-2 text-xs font-medium text-foreground/45">
                   {BOOST_LABELS[c.type]} · {c.date}
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="flex items-center justify-center gap-2 rounded-3xl bg-card px-6 py-10 text-sm text-muted-foreground">
+          <div className="flex items-center justify-center gap-2 glass rounded-[26px] px-6 py-10 text-sm text-foreground/45">
             <Lock className="size-4" /> Aucune carte Boost — vise une figure de match !
           </div>
         )}
@@ -178,21 +178,21 @@ export default function CartePage() {
       {/* Sources d'évolution */}
       <section>
         <SectionTitle>Comment ma carte évolue</SectionTitle>
-        <p className="mb-3 px-1 text-sm text-muted-foreground">
+        <p className="mb-3 px-1 text-sm text-foreground/45">
           Chaque mois à l&apos;EvoDay, tes titres rapportent des{" "}
           <strong className="font-semibold text-foreground">points OVR</strong>.{" "}
           <strong className="font-semibold text-foreground">6 points de stats = +1 OVR.</strong>{" "}
           Et chaque fois que tu montes{" "}
           <strong className="font-semibold text-foreground">+1 DEF ET +1 PHY</strong>, tu gagnes{" "}
-          <strong className="font-semibold text-sky-600 dark:text-sky-400">+1 VIT offert</strong>.
+          <strong className="font-semibold text-primary">+1 VIT offert</strong>.
         </p>
-        <div className="overflow-hidden rounded-3xl bg-card">
+        <div className="overflow-hidden glass rounded-[26px]">
           {sources.map(([label, detail, color], i) => (
             <div
               key={label}
               className={cn(
                 "flex items-center justify-between gap-3 px-5 py-3.5",
-                i < sources.length - 1 && "border-b border-border/60"
+                i < sources.length - 1 && "border-b border-white/8"
               )}
             >
               <span className="text-sm font-semibold">
@@ -202,7 +202,7 @@ export default function CartePage() {
               <span className={cn("text-right text-[13px] font-semibold", color)}>{detail}</span>
             </div>
           ))}
-          <p className="border-t border-border/60 bg-secondary/40 px-5 py-3 text-xs text-muted-foreground">
+          <p className="border-t border-white/8 bg-secondary/40 px-5 py-3 text-xs text-foreground/45">
             Non-titré dans une catégorie ? Tu reçois des points{" "}
             <strong className="font-semibold text-foreground">au prorata</strong> de ton rang.
           </p>
@@ -218,25 +218,25 @@ export default function CartePage() {
         >
           Répartis tes points
         </SectionTitle>
-        <div className="rounded-3xl bg-card p-5">
+        <div className="glass rounded-[26px] p-5">
           {pool === 0 ? (
-            <p className="mb-1 text-sm text-muted-foreground">
+            <p className="mb-1 text-sm text-foreground/45">
               Pas de points libres ce mois-ci (aucun titre MVP/Impact). Les bonus fixes
               s&apos;appliquent automatiquement ci-dessous.
             </p>
           ) : (
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-[13px] font-medium text-muted-foreground">
+              <span className="text-[13px] font-medium text-foreground/45">
                 Pool libre (MVP/Impact)
               </span>
               <span
                 className={cn(
                   "text-2xl font-bold tracking-tight tabular-nums",
-                  remaining === 0 ? "text-emerald-500" : "text-primary"
+                  remaining === 0 ? "text-primary" : "text-primary"
                 )}
               >
                 {remaining}
-                <span className="text-sm font-medium text-muted-foreground"> / {pool}</span>
+                <span className="text-sm font-medium text-foreground/45"> / {pool}</span>
               </span>
             </div>
           )}
@@ -247,9 +247,9 @@ export default function CartePage() {
             return (
               <div
                 key={k}
-                className="flex items-center gap-3 border-b border-border/60 py-2.5 last:border-0"
+                className="flex items-center gap-3 border-b border-white/8 py-2.5 last:border-0"
               >
-                <span className="w-9 text-[13px] font-semibold text-muted-foreground">{k}</span>
+                <span className="w-9 text-[13px] font-semibold text-foreground/45">{k}</span>
                 <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
                   <div
                     className="absolute inset-y-0 left-0 rounded-full bg-foreground/30"
@@ -292,7 +292,7 @@ export default function CartePage() {
                   </div>
                 )}
                 {isAutoVit && (
-                  <span className="rounded-full bg-sky-500/12 px-2 py-0.5 text-[10px] font-bold whitespace-nowrap text-sky-600 dark:text-sky-400">
+                  <span className="rounded-full bg-sky-500/12 px-2 py-0.5 text-[10px] font-bold whitespace-nowrap text-primary">
                     +{autoVit} auto
                   </span>
                 )}
@@ -305,7 +305,7 @@ export default function CartePage() {
               <RotateCcw /> Réinitialiser
             </Button>
             <div className="flex items-baseline gap-2.5">
-              <span className="text-2xl font-semibold text-muted-foreground tabular-nums">
+              <span className="text-2xl font-semibold text-foreground/45 tabular-nums">
                 {before}
               </span>
               <span className="text-primary">→</span>
@@ -317,7 +317,7 @@ export default function CartePage() {
               >
                 {after}
               </span>
-              <span className="text-xs font-medium text-muted-foreground">OVR</span>
+              <span className="text-xs font-medium text-foreground/45">OVR</span>
             </div>
           </div>
         </div>
@@ -326,13 +326,13 @@ export default function CartePage() {
       {/* Barème */}
       <section>
         <SectionTitle>Barème Points Pépite</SectionTitle>
-        <div className="overflow-hidden rounded-3xl bg-card">
+        <div className="overflow-hidden glass rounded-[26px]">
           {BAREME.map(([action, value], i) => (
             <div
               key={action}
               className={cn(
                 "flex items-center justify-between px-5 py-3.5",
-                i < BAREME.length - 1 && "border-b border-border/60"
+                i < BAREME.length - 1 && "border-b border-white/8"
               )}
             >
               <span className="text-sm font-medium">{action}</span>

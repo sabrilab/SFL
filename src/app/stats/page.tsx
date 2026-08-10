@@ -61,7 +61,7 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
 
   if (ranked.length === 0) {
     return (
-      <div className="rounded-3xl bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+      <div className="glass-soft rounded-3xl px-6 py-10 text-center text-sm text-foreground/45">
         Personne dans ce classement — tout le monde est clean ✓
       </div>
     );
@@ -71,12 +71,12 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
 
   return (
     <>
-      <p className="mb-3 px-1 text-[13px] text-muted-foreground">{def.desc}</p>
+      <p className="mb-3 px-1 text-[13px] text-foreground/42">{def.desc}</p>
 
       {/* Desktop : carte du n°1 à gauche (collante), classement à droite. */}
       <div className="lg:grid lg:grid-cols-[340px_minmax(0,1fr)] lg:items-start lg:gap-8">
         {/* Carte du n°1 */}
-        <div className="mb-5 flex flex-col items-center gap-2.5 lg:sticky lg:top-24 lg:mb-0 lg:rounded-3xl lg:bg-card lg:py-6">
+        <div className="mb-5 flex flex-col items-center gap-2.5 lg:glass lg:sticky lg:top-24 lg:mb-0 lg:rounded-[26px] lg:py-6">
         <div className="flex items-center gap-1.5">
           <span className="text-lg font-bold text-primary tabular-nums">#1</span>
           <span className="text-sm font-bold tracking-tight tabular-nums">
@@ -107,14 +107,14 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
             <div
               key={p.name}
               className={cn(
-                "flex items-center gap-3 rounded-2xl bg-card px-3 py-2.5",
-                isMe && "ring-1 ring-primary/50"
+                "glass-soft flex items-center gap-3 rounded-[18px] px-3.5 py-3",
+                isMe && "bg-primary/10"
               )}
             >
               <span
                 className={cn(
-                  "w-7 text-base font-semibold tabular-nums",
-                  p.rank <= 3 ? "text-primary" : "text-muted-foreground"
+                  "w-7 text-[15px] font-bold tabular-nums",
+                  p.rank <= 3 ? "text-primary" : "text-foreground/40"
                 )}
               >
                 {p.rank}
@@ -140,12 +140,10 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
               <span className="flex w-11 shrink-0 items-center justify-end gap-1">
                 <CardBadges player={p} />
               </span>
-              <span className="w-12 text-xs font-medium text-muted-foreground">{p.poste}</span>
+              <span className="mono-label w-12 text-foreground/40">{p.poste}</span>
               <span className="w-16 text-right text-lg font-bold tracking-tight tabular-nums">
                 {p.value}
-                <span className="ml-1 text-[10px] font-medium text-muted-foreground">
-                  {def.unit}
-                </span>
+                <span className="mono-label ml-1 text-foreground/40">{def.unit}</span>
               </span>
             </div>
           );
@@ -171,10 +169,10 @@ export default function StatsPage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4 px-5 py-4 sm:py-8 lg:max-w-5xl">
       <div className="mb-1">
-        <p className="text-[13px] font-medium text-muted-foreground">
-          Saison 1 · Après la journée {JOURNEES.length}
-        </p>
         <h1 className="text-[30px] font-bold tracking-tight">Statistiques</h1>
+        <p className="mt-1 text-[13px] text-foreground/42">
+          Sunday Five League · après {JOURNEES.length} journées
+        </p>
       </div>
 
       <Tabs defaultValue="classement">
@@ -198,7 +196,7 @@ export default function StatsPage() {
                   "shrink-0 rounded-full px-4 py-2 text-[13px] font-semibold whitespace-nowrap transition-colors",
                   ranking === r.id
                     ? "bg-foreground text-background"
-                    : "bg-card text-muted-foreground hover:text-foreground"
+                    : "glass-soft text-foreground/60"
                 )}
               >
                 {r.label}
@@ -216,7 +214,7 @@ export default function StatsPage() {
               const scoreSummary = journeeScoreSummary(j);
 
               return (
-                <div key={j.j} className="overflow-hidden rounded-3xl bg-card">
+                <div key={j.j} className="glass overflow-hidden rounded-[26px]">
                   <button
                     onClick={() => setOpenJ(open ? -1 : j.j)}
                     className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
@@ -227,12 +225,12 @@ export default function StatsPage() {
                           Journée {j.j}
                         </span>
                         {j.sflTime && (
-                          <span className="rounded-full bg-primary/12 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-primary uppercase">
+                          <span className="mono-label rounded-full bg-primary/15 px-2.5 py-1 text-primary">
                             SFL Time
                           </span>
                         )}
                       </div>
-                      <div className="text-[13px] text-muted-foreground">{j.date}</div>
+                      <div className="mt-0.5 text-[13px] text-foreground/42">{j.date}</div>
                     </div>
                     <div className="flex items-center gap-3">
                       {scoreSummary ? (
@@ -245,7 +243,7 @@ export default function StatsPage() {
                           {scoreSummary.label}
                         </span>
                       ) : (
-                        <span className="rounded-full bg-secondary px-2.5 py-1 text-[10px] font-semibold text-muted-foreground uppercase">
+                        <span className="mono-label glass-soft rounded-full px-2.5 py-1 text-foreground/40">
                           Saisie incomplète
                         </span>
                       )}
@@ -259,7 +257,7 @@ export default function StatsPage() {
                   </button>
 
                   {open && (
-                    <div className="flex flex-col gap-4 border-t border-border/60 px-5 py-4">
+                    <div className="flex flex-col gap-4 border-t border-white/8 px-5 py-4">
                       {j.faits?.buteur || j.faits?.passeur ? (
                         <div className="flex flex-col gap-1.5">
                           {j.faits.buteur && (
@@ -280,10 +278,8 @@ export default function StatsPage() {
                       {j.matches && j.matches.length > 0 ? (
                         <div className="flex flex-col gap-3">
                           {j.matches.map((match) => (
-                            <div key={match.id} className="rounded-2xl bg-secondary/40 p-3.5">
-                              <p className="mb-2 text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
-                                {match.label}
-                              </p>
+                            <div key={match.id} className="glass-soft rounded-[20px] p-3.5">
+                              <p className="mono-label mb-2 text-foreground/40">{match.label}</p>
                               <div className="grid grid-cols-2 gap-3">
                                 {[match.teamA, match.teamB].map((team) => (
                                   <div key={team.id}>
@@ -307,12 +303,12 @@ export default function StatsPage() {
                                               {p.name}
                                             </span>
                                             {p.note && (
-                                              <span className="shrink-0 rounded-full bg-primary/12 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-primary uppercase">
+                                              <span className="mono-label shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-primary">
                                                 {p.note}
                                               </span>
                                             )}
                                           </span>
-                                          <span className="shrink-0 text-xs text-muted-foreground">
+                                          <span className="mono-label shrink-0 text-foreground/40">
                                             {p.buts}b · {p.passes}pd
                                           </span>
                                         </div>
@@ -329,22 +325,22 @@ export default function StatsPage() {
                           {(j.lignes ?? []).map(([name, res, buts, passes]) => (
                             <div
                               key={name}
-                              className="flex items-center gap-2.5 border-b border-border/60 py-2 text-sm last:border-0"
+                              className="flex items-center gap-2.5 border-b border-white/6 py-2 text-sm last:border-0"
                             >
                               <span
                                 className={cn(
                                   "w-5 font-bold",
                                   res === "V"
-                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    ? "text-primary"
                                     : res === "D"
-                                      ? "text-destructive"
-                                      : "text-muted-foreground"
+                                      ? "text-foreground/30"
+                                      : "text-foreground/50"
                                 )}
                               >
                                 {res === "-" ? "·" : res}
                               </span>
                               <span className="flex-1 font-medium">{name}</span>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="mono-label text-foreground/40">
                                 {buts} but{buts > 1 ? "s" : ""} · {passes} passe
                                 {passes > 1 ? "s" : ""} D.
                               </span>
@@ -354,7 +350,7 @@ export default function StatsPage() {
                       )}
 
                       <div>
-                        <p className="mb-2 text-sm font-semibold">Figures de match</p>
+                        <p className="mono-label mb-2 text-primary">Figures de match</p>
                         <ElectionPanel journee={j} me={me} />
                       </div>
                     </div>

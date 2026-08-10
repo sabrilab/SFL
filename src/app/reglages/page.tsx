@@ -29,13 +29,13 @@ export default function ReglagesPage() {
           <Settings className="size-5" />
         </span>
         <div>
-          <p className="text-[13px] font-medium text-muted-foreground">Personnalisation</p>
+          <p className="text-[13px] font-medium text-foreground/45">Personnalisation</p>
           <h1 className="text-[28px] font-bold tracking-tight">Réglages</h1>
         </div>
       </div>
 
       <section>
-        <h2 className="mb-3 px-1 text-sm font-semibold text-muted-foreground">Apparence</h2>
+        <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Apparence</h2>
         {/* Sombre uniquement pour l'instant : le clair sera réactivé quand
             toutes les pages seront portées sur le design. */}
         <Locked label="Bientôt" note="La version claire arrive — l'app reste en sombre pour l'instant.">
@@ -48,7 +48,7 @@ export default function ReglagesPage() {
                 onClick={() => setTheme(value)}
                 className={cn(
                   "relative flex flex-1 flex-col items-center gap-1.5 rounded-xl py-3 text-xs font-semibold transition-colors",
-                  active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                  active ? "text-foreground" : "text-foreground/45 hover:text-foreground"
                 )}
               >
                 {active && (
@@ -69,7 +69,7 @@ export default function ReglagesPage() {
 
       {admin && (
         <section>
-          <h2 className="mb-3 px-1 text-sm font-semibold text-muted-foreground">Général</h2>
+          <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Général</h2>
           <Link
             href="/admin"
             className="glass flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
@@ -79,11 +79,11 @@ export default function ReglagesPage() {
             </span>
             <span className="flex-1">
               <span className="block text-[15px] font-semibold">Espace admin</span>
-              <span className="block text-[12px] text-muted-foreground">
+              <span className="block text-[12px] text-foreground/45">
                 Gérer les matchs, convocations et résultats
               </span>
             </span>
-            <ChevronRight className="size-4 text-muted-foreground" />
+            <ChevronRight className="size-4 text-foreground/45" />
           </Link>
         </section>
       )}
