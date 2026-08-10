@@ -1,7 +1,7 @@
 "use client";
 
 // Atelier de design des cartes — page de travail, non reliée à la navigation.
-// Montre la carte éditoriale (design Kickoff retenu) sous ses variantes :
+// Montre la carte éditoriale (design de référence retenu) sous ses variantes :
 // Standard / Rare, sombre / clair, et le layout « legend » des cartes à titre.
 
 import { useState } from "react";
@@ -26,7 +26,7 @@ export default function DesignCartes() {
       <header className="mb-6">
         <h1 className="font-heading text-2xl font-bold">Atelier — design des cartes</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          La carte éditoriale du design Kickoff, sur un vrai joueur, dans ses
+          La carte éditoriale du design de référence, sur un vrai joueur, dans ses
           variantes. Page de travail, non reliée à la navigation.
         </p>
       </header>

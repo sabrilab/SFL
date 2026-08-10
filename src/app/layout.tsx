@@ -31,7 +31,7 @@ const anton = Anton({
   subsets: ["latin"],
 });
 
-// Police « données » des cartes éditoriales (design Kickoff).
+// Police « données » des cartes éditoriales (design de référence).
 const jbMono = JetBrains_Mono({
   weight: ["400", "600", "700"],
   variable: "--font-jbmono",
@@ -94,7 +94,7 @@ export default function RootLayout({
             <CardViewerProvider>
               <TooltipProvider delay={200}>
                 <AppSplash />
-                {/* Orbes lumineux du design Kickoff, derrière tout le contenu */}
+                {/* Orbes lumineux du design de référence, derrière tout le contenu */}
                 <div className="orbs" aria-hidden>
                   <i /><i /><i />
                 </div>

@@ -9,7 +9,7 @@ export interface NavItem {
   locked?: boolean;
 }
 
-// Les quatre sections de l'app (réorganisation issue du design Kickoff) :
+// Les quatre sections de l'app (réorganisation issue du design de référence) :
 // 1. Feed — la vie de la ligue : journées, classements, convocations
 // 2. Discussions — les canaux du vestiaire (verrouillé : nécessite les comptes)
 // 3. Profil — sa carte, sa collection, ses matchs

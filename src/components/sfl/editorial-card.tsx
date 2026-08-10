@@ -1,7 +1,7 @@
 "use client";
 
 // Carte joueur « éditoriale » — portage DOM/CSS fidèle de la carte retenue
-// dans le design Kickoff (card3d.js, layouts « editorial » et « legend »,
+// dans le design de référence (card3d.js, layouts « editorial » et « legend »,
 // police sans-serif). Photo plein cadre sur fond teinté, typo Anton +
 // JetBrains Mono, rangée de six stats, filigrane géant, vignette et grain.
 //

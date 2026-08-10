@@ -88,7 +88,7 @@
 
 /* Thème sombre — noir neutre profond, cartes anthracite, accent orange SFL */
 .dark {
-  /* Noir profond du design Kickoff : le fond descend presque au noir pur,
+  /* Noir profond du design de référence : le fond descend presque au noir pur,
      les cartes restent mates juste au-dessus. */
   --background: oklch(0.1 0 0);
   --foreground: oklch(0.96 0 0);
@@ -96,7 +96,7 @@
   --card-foreground: oklch(0.96 0 0);
   --popover: oklch(0.2 0 0);
   --popover-foreground: oklch(0.96 0 0);
-  --primary: #6FA8FF; /* accent unique du design Kickoff */
+  --primary: #6FA8FF; /* accent unique du design de référence */
   --primary-foreground: #0A0B0E;
   --secondary: oklch(0.24 0 0);
   --secondary-foreground: oklch(0.96 0 0);
@@ -145,7 +145,7 @@
 /* Liquid glass — pilules translucides façon Apple : flou + saturation,
    liseré lumineux en haut, bord interne subtil, ombre douce et diffuse. */
 @layer components {
-  /* Recette exacte du design Kickoff (cartes fortes). */
+  /* Recette exacte du design de référence (cartes fortes). */
   .glass {
     backdrop-filter: blur(28px) saturate(1.75);
     -webkit-backdrop-filter: blur(28px) saturate(1.75);
@@ -224,7 +224,7 @@
   }
 }
 
-/* Orbes lumineux flottants du design Kickoff — trois halos blancs très
+/* Orbes lumineux flottants du design de référence — trois halos blancs très
    diffus qui dérivent lentement derrière le contenu (thème sombre). */
 @keyframes glassFloat {
   0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
@@ -242,7 +242,7 @@
 .orbs > i:nth-child(2) { top: 330px; right: -110px; width: 280px; height: 280px; filter: blur(24px); animation-duration: 21s; animation-direction: reverse; background: radial-gradient(circle, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 70%); }
 .orbs > i:nth-child(3) { bottom: -80px; left: 30px; width: 320px; height: 260px; filter: blur(30px); animation-duration: 25s; background: radial-gradient(circle, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 70%); }
 
-/* Micro-label du design Kickoff : JetBrains Mono, capitales espacées. */
+/* Micro-label du design de référence : JetBrains Mono, capitales espacées. */
 .mono-label {
   font-family: var(--font-jbmono), ui-monospace, monospace;
   font-size: 11px;

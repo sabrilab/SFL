@@ -1,6 +1,6 @@
 "use client";
 
-// Tab bar — répliquée du design Kickoff : « le seul élément liquid glass ».
+// Tab bar — répliquée du design de référence : « le seul élément liquid glass ».
 // Quatre icônes sans libellé ; l'onglet actif est une pilule blanche pleine
 // avec l'icône noire, les inactifs sont des traits blancs à 58 %. La bulle
 // des Discussions porte la pastille bleue de notification.

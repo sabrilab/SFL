@@ -1,4 +1,4 @@
-// Icônes de la tab bar — tracés SVG copiés tels quels du design Kickoff
+// Icônes de la tab bar — tracés SVG copiés tels quels du design de référence
 // (ballon de foot pour le feed, bulle, joueur, sac de la boutique).
 
 interface IconProps {

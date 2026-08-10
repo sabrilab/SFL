@@ -1,6 +1,6 @@
 "use client";
 
-// Section Profil — réplique de l'écran « PROFIL matte » du design Kickoff :
+// Section Profil — réplique de l'écran « PROFIL matte » du design de référence :
 // la carte 3D plein cadre, les deux actions, la rangée d'identité, la carte
 // « PROFIL DE JEU » avec le radar hexagonal (point faible en bleu), le bento
 // de stats, la série de dimanches, la photo de profil, les mini-jeux « Les

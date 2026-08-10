@@ -1,5 +1,5 @@
 // Cartes à titre — cartes Boost (MVP / Impact / Défensive) et cartes de
-// n°1 de classement. Portées sur le layout « legend » du design Kickoff :
+// n°1 de classement. Portées sur le layout « legend » du design de référence :
 // bandeau de titre plein accent, encart d'identité, nom centré, rangée de
 // six stats. Chaque titre garde sa teinte propre.
 

@@ -1,5 +1,5 @@
 // Carte joueur — deux éditions sur le layout « éditorial » du design
-// Kickoff : Standard (teinte verte) et Rare (teinte or, badge RARE).
+// design de référence : Standard (teinte verte) et Rare (teinte or, badge RARE).
 // La carte est un objet : elle ne suit pas le thème clair/sombre de l'app
 // (variante « clair » disponible via EditorialCard pour les usages dédiés).
 
