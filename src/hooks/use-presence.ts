@@ -18,6 +18,7 @@ import { listPresence, setPresence, type Reponse } from "@/lib/sfl/presence";
 import { activeConvocation } from "@/lib/sfl/saisie/mutations";
 import { NEXT_MATCH } from "@/lib/sfl/data";
 import { supabase } from "@/lib/supabase";
+import { logActivity } from "@/lib/sfl/activity";
 
 interface ServerConvocation {
   id: number;
@@ -141,6 +142,7 @@ export function usePresence(): PresenceView {
             { convocation_id: server.convocation.id, player_id: uid, reponse: r },
             { onConflict: "convocation_id,player_id" }
           );
+          if (!error) logActivity("presence");
           return !error;
         } catch {
           return false;

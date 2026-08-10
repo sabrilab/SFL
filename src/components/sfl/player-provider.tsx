@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { claimDailyLogin } from "@/lib/sfl/ballons";
+import { logActivity } from "@/lib/sfl/activity";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useSession } from "@/hooks/use-session";
@@ -44,6 +45,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // de savoir qui joue.
   useEffect(() => {
     if (!isClient || !sessionName) return;
+    logActivity("open");
     const credited = claimDailyLogin(me);
     if (credited > 0) {
       toast.success(`+${credited} Ballons ⚽`, { description: "Connexion du jour" });

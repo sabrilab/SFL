@@ -3,10 +3,17 @@
 // Bloc « Mon compte » des réglages : qui est connecté, changement du mot de
 // passe par défaut, déconnexion.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { LogOut, KeyRound } from "lucide-react";
-import { changePassword, hasCustomPassword, signOut } from "@/lib/sfl/auth/session";
+import { LogOut, KeyRound, Link2, Mail } from "lucide-react";
+import {
+  changePassword,
+  getContactEmail,
+  hasCustomPassword,
+  saveContactEmail,
+  signOut,
+} from "@/lib/sfl/auth/session";
+import { supabase } from "@/lib/supabase";
 import { useSession } from "@/hooks/use-session";
 import { useIsClient } from "@/hooks/use-is-client";
 import { username } from "@/lib/sfl/usernames";
@@ -20,6 +27,60 @@ export function AccountCard() {
   const [next, setNext] = useState("");
   const [busy, setBusy] = useState(false);
   const [tick, setTick] = useState(0);
+  const [email, setEmail] = useState<string | null>(null);
+  const [emailInput, setEmailInput] = useState("");
+  const [emailBusy, setEmailBusy] = useState(false);
+  const serverSession = !!session?.server;
+
+  // L'email vit en base (système extérieur) : lecture au montage, mise à jour
+  // via les callbacks — pas de setState synchrone dans l'effet.
+  useEffect(() => {
+    if (!serverSession) return;
+    let cancelled = false;
+    getContactEmail().then((e) => {
+      if (!cancelled && e) setEmail(e);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [serverSession]);
+
+  async function submitEmail(e: React.FormEvent) {
+    e.preventDefault();
+    const value = emailInput.trim();
+    if (!/^\S+@\S+\.\S+$/.test(value)) {
+      toast.error("Cet email n'a pas l'air valide.");
+      return;
+    }
+    setEmailBusy(true);
+    const ok = await saveContactEmail(value);
+    setEmailBusy(false);
+    if (ok) {
+      setEmail(value.toLowerCase());
+      setEmailInput("");
+      toast.success("Email enregistré 📬");
+    } else {
+      toast.error("Impossible d'enregistrer — reconnecte-toi et réessaie.");
+    }
+  }
+
+  async function linkProvider(provider: "google" | "apple") {
+    try {
+      const { error } = await supabase().auth.linkIdentity({
+        provider,
+        options: { redirectTo: `${window.location.origin}/reglages` },
+      });
+      if (error) {
+        toast.error(
+          /manual linking/i.test(error.message)
+            ? "La liaison de comptes n'est pas encore activée par l'admin."
+            : `Liaison ${provider === "google" ? "Google" : "Apple"} pas encore disponible.`
+        );
+      }
+    } catch {
+      toast.error("Liaison impossible pour l'instant.");
+    }
+  }
 
   if (!session) return null;
   void tick;
@@ -71,6 +132,51 @@ export function AccountCard() {
             Tu utilises encore le mot de passe donné par l&apos;admin. Change-le : il est
             écrit en clair sur sa liste.
           </p>
+        )}
+
+        {/* Email de contact — la clé de la future connexion Google/Apple */}
+        {serverSession && (
+          <div className="mt-3 border-t border-white/8 pt-3">
+            {email ? (
+              <p className="flex items-center gap-2 text-[13px] text-foreground/60">
+                <Mail className="size-3.5 shrink-0 text-primary" />
+                <span className="min-w-0 truncate">{email}</span>
+              </p>
+            ) : (
+              <form onSubmit={submitEmail} className="flex gap-2">
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  placeholder="Ton email (pour Google/Apple)"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  className="glass-soft min-w-0 flex-1 rounded-full px-4 py-2.5 text-[13.5px] font-medium outline-none placeholder:text-foreground/30"
+                />
+                <button
+                  type="submit"
+                  disabled={emailBusy || !emailInput}
+                  className="shrink-0 rounded-full bg-foreground px-4 py-2.5 text-[13px] font-bold text-background disabled:opacity-40"
+                >
+                  OK
+                </button>
+              </form>
+            )}
+            <div className="mt-2.5 flex gap-2">
+              <button
+                onClick={() => linkProvider("google")}
+                className="glass-soft mono-label flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-foreground/60"
+              >
+                <Link2 className="size-3" /> Lier Google
+              </button>
+              <button
+                onClick={() => linkProvider("apple")}
+                className="glass-soft mono-label flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-foreground/60"
+              >
+                <Link2 className="size-3" /> Lier Apple
+              </button>
+            </div>
+          </div>
         )}
 
         {open ? (

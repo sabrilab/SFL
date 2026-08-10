@@ -38,3 +38,34 @@
 - `is_admin` ne vient jamais des métadonnées utilisateur (modifiables) :
   posé en SQL, colonne protégée par grant de colonnes.
 - Inscriptions ouvertes UNIQUEMENT le temps de l'étape 3, refermées en 6.
+
+## Google / Apple (connexion sans mot de passe)
+
+Le code est prêt (boutons sur l'écran de connexion, liaison dans Réglages,
+capture d'email automatique). Pour l'activer :
+
+1. **Rejouer le script SQL** (il ajoute `profiles.contact_email` et la table
+   `activity`) — il est réexécutable sans danger.
+2. Dashboard → **Authentication → Sign In / Providers** :
+   - activer **Google** : il faut créer des identifiants OAuth dans la
+     [console Google Cloud](https://console.cloud.google.com/apis/credentials)
+     (client ID + secret) avec l'URL de redirection affichée par Supabase
+     (`https://tpfusliksgxcvfrodchk.supabase.co/auth/v1/callback`) ;
+   - **Apple** : nécessite un compte Apple Developer payant (99 $/an) — à
+     décider plus tard, le bouton affiche un message clair en attendant.
+3. Authentication → **Settings** : activer **Allow manual linking** (c'est ce
+   qui permet à un joueur déjà connecté de LIER son Google à son compte).
+4. Authentication → **URL Configuration** : ajouter
+   `https://sfl-eight.vercel.app` aux Redirect URLs.
+
+Parcours joueur : il se connecte une première fois avec identifiant + mot de
+passe → laisse son email (invite en tête du fil) → lie Google dans Réglages →
+les fois suivantes, bouton Google direct. Les inscriptions restant fermées,
+un Google inconnu de la ligue ne peut PAS créer de compte.
+
+## Activité & rétention
+
+Table `activity` (login / open / presence), lisible par l'admin seulement.
+Tableau de bord : Réglages → Activité & rétention — actifs du jour / 7 j /
+30 j, courbe 14 jours, détail par joueur (dernière venue, jours actifs),
+emails collectés.

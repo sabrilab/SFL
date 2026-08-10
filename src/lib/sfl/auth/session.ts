@@ -15,7 +15,7 @@
 // L'interface (signIn / signOut / getSession / changePassword) ne bouge pas :
 // le reste de l'app ignore d'où vient la vérification.
 
-import { findAccount, type Account } from "./accounts";
+import { ACCOUNTS, findAccount, type Account } from "./accounts";
 import { loginEmail, supabase } from "@/lib/supabase";
 
 /**
@@ -141,6 +141,7 @@ export async function signIn(user: string, password: string): Promise<SignInResu
         server: true,
       };
       storeSession(session);
+      afterServerSignIn(data.user.id);
       return { ok: true, session };
     }
     // Identifiants refusés par le serveur : en mode strict, on s'arrête là.
@@ -218,5 +219,104 @@ export function hasCustomPassword(user: string): boolean {
     return localStorage.getItem(`${OVERRIDE_PREFIX}${user}`) !== null;
   } catch {
     return false;
+  }
+}
+
+/* ────────────────── Connexion Google / Apple (OAuth) ────────────────── */
+
+/**
+ * Après une connexion serveur : journalise l'événement et capture l'email
+ * réel du joueur (celui de son identité Google/Apple s'il en a lié une).
+ * Fire-and-forget : jamais bloquant.
+ */
+function afterServerSignIn(userId: string) {
+  const sb = supabase();
+  sb.from("activity").insert({ player_id: userId, kind: "login" }).then(undefined, () => {});
+  sb.auth
+    .getUser()
+    .then(async ({ data }) => {
+      const identities = data.user?.identities ?? [];
+      const oauthEmail = identities.find(
+        (i) => i.provider !== "email" && i.identity_data?.email
+      )?.identity_data?.email as string | undefined;
+      if (!oauthEmail) return;
+      await sb
+        .from("profiles")
+        .update({ contact_email: oauthEmail })
+        .eq("id", userId)
+        .is("contact_email", null);
+    })
+    .catch(() => {});
+}
+
+/**
+ * Reprend une session Supabase déjà présente (retour d'une connexion
+ * Google/Apple, ou session persistée) et la reflète dans la session locale.
+ * Appelée au chargement de l'app ; sans effet si rien n'est en attente.
+ */
+export async function bootstrapServerSession(): Promise<boolean> {
+  try {
+    if (getSession()) return true;
+    const { data } = await supabase().auth.getSession();
+    const user = data.session?.user;
+    if (!user) return false;
+
+    const { data: profile } = await supabase()
+      .from("profiles")
+      .select("name, is_admin")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (!profile?.name) return false;
+
+    const account = ACCOUNTS.find((a) => a.name === profile.name);
+    const session: Session = {
+      user: account?.user ?? profile.name.toLowerCase(),
+      name: profile.name,
+      admin: !!profile.is_admin,
+      since: Date.now(),
+      server: true,
+    };
+    storeSession(session);
+    afterServerSignIn(user.id);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Enregistre (ou met à jour) l'email de contact du joueur connecté. */
+export async function saveContactEmail(email: string): Promise<boolean> {
+  const session = getSession();
+  if (!session?.server) return false;
+  try {
+    const { data } = await supabase().auth.getUser();
+    const uid = data.user?.id;
+    if (!uid) return false;
+    const { error } = await supabase()
+      .from("profiles")
+      .update({ contact_email: email.trim().toLowerCase() })
+      .eq("id", uid);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+/** Email de contact du joueur connecté (null si absent ou hors serveur). */
+export async function getContactEmail(): Promise<string | null> {
+  const session = getSession();
+  if (!session?.server) return null;
+  try {
+    const { data: auth } = await supabase().auth.getUser();
+    const uid = auth.user?.id;
+    if (!uid) return null;
+    const { data } = await supabase()
+      .from("profiles")
+      .select("contact_email")
+      .eq("id", uid)
+      .maybeSingle();
+    return (data?.contact_email as string | null) ?? null;
+  } catch {
+    return null;
   }
 }

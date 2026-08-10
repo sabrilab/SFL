@@ -21,6 +21,7 @@ import { rankPlayers } from "@/lib/sfl/engine";
 import { computeStandings } from "@/lib/sfl/saisie/engine";
 import { JourneeRecap } from "@/components/sfl/feed/journee-recap";
 import { PresencePanel } from "@/components/sfl/presence-panel";
+import { EmailNudge } from "@/components/sfl/auth/email-nudge";
 import { JourneeOpening } from "@/components/sfl/feed/journee-opening";
 import { cn } from "@/lib/utils";
 
@@ -238,6 +239,8 @@ export default function Ligue() {
         </>
       ) : (
         <>
+          <EmailNudge />
+
           {/* Les capsules de journées — touche pour en ouvrir une autre */}
           <div className="-mt-1">
             <p className="mono-label mb-2 px-1 text-foreground/30">

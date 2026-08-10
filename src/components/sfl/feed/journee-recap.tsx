@@ -67,6 +67,7 @@ import {
 import { buildQuiz, PronosticModule, QuizModule } from "@/components/sfl/feed/jeux";
 import { NEXT_MATCH } from "@/lib/sfl/data";
 import { Reveal } from "@/components/sfl/feed/reveal";
+import { PitchSynthese } from "@/components/sfl/feed/pitch-synthese";
 import { cn } from "@/lib/utils";
 
 /* ----------------------------- Réactions ------------------------------ */
@@ -216,21 +217,6 @@ export function JourneeRecap({ j }: { j: number }) {
     .map((l) => byName.get(l.name))
     .filter(Boolean) as Player[];
 
-  // L'équipe type : les 5 plus décisifs, placés par poste sur le demi-terrain.
-  const typeTeam = [...lines]
-    .sort((a, b) => b.buts * 2 + b.passes - (a.buts * 2 + a.passes))
-    .slice(0, 5)
-    .map((l) => byName.get(l.name))
-    .filter(Boolean) as Player[];
-  const row = (p: Player) => {
-    const poste = p.poste.toUpperCase();
-    if (poste.startsWith("G")) return 2;
-    if (/^(DC|DD|DG|DEF|MDC)/.test(poste)) return 1;
-    return 0; // attaque et milieux offensifs devant
-  };
-  const pitchRows: Player[][] = [[], [], []];
-  typeTeam.forEach((p) => pitchRows[row(p)].push(p));
-
   const participants = journeeParticipants(lastJ);
 
   // Lignes brutes de la journée (avec honneurs et résultat) : elles portent
@@ -265,6 +251,12 @@ export function JourneeRecap({ j }: { j: number }) {
     })
     .filter((d) => d.best.length === 2)
     .sort((a, b) => b.total - a.total)[0];
+
+  // Lignes enrichies des honneurs, pour la synthèse sur le terrain.
+  const pitchLines = lines.map((l) => {
+    const e = jEntries.find((x) => x.player === l.name);
+    return { name: l.name, buts: l.buts, passes: l.passes, mvp: e?.mvp, impact: e?.impact, def: e?.def };
+  });
 
   const analyse = useAnalyse(saisonAtJ, players, journeesAtJ, lastJ);
   const plus = useAnalysePlus(saisonAtJ, players, journeesAtJ, lastJ, player.name);
@@ -340,6 +332,18 @@ export function JourneeRecap({ j }: { j: number }) {
             />
           </div>
         </div>
+      </Reveal>
+
+      {/* 2 bis · La synthèse sur le terrain — onglets sur demi-terrain */}
+      <Reveal delay={0.08}>
+        <PitchSynthese
+          journee={lastJ.j}
+          lines={pitchLines}
+          byName={byName}
+          totalButs={totalButs}
+          matchesCount={matches.length}
+          participants={participants.length}
+        />
       </Reveal>
 
       {/* 3 · Le match de la journée */}
@@ -881,50 +885,6 @@ export function JourneeRecap({ j }: { j: number }) {
               ))}
             </div>
           </Locked>
-        </section>
-      </Reveal>
-
-      {/* 13 · L'équipe type */}
-      <Reveal>
-        <section className="glass overflow-hidden rounded-3xl">
-          <div className="p-5 pb-0">
-            <div className="flex items-start justify-between">
-              <ModuleTitle title="L'équipe type" />
-              <span className="mono-label flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1.5 text-primary">
-                Vote ouvert · bientôt
-              </span>
-            </div>
-          </div>
-          <div
-            className="relative mx-4 mb-4 rounded-2xl border border-primary/20"
-            style={{
-              height: 240,
-              background:
-                "radial-gradient(120% 90% at 50% 0%, rgba(111,168,255,0.14), transparent 60%), linear-gradient(180deg, rgba(111,168,255,0.05), transparent)",
-            }}
-          >
-            {/* demi-terrain : rond central en haut, surface en bas */}
-            <div className="absolute -top-10 left-1/2 size-24 -translate-x-1/2 rounded-full border border-primary/25" />
-            <div className="absolute bottom-0 left-1/2 h-12 w-40 -translate-x-1/2 rounded-t-xl border border-b-0 border-primary/25" />
-            {pitchRows.map((rowPlayers, ri) =>
-              rowPlayers.map((p, i) => (
-                <div
-                  key={p.name}
-                  className="absolute flex -translate-x-1/2 flex-col items-center gap-1"
-                  style={{
-                    top: 26 + ri * 72,
-                    left: `${(100 / (rowPlayers.length + 1)) * (i + 1)}%`,
-                  }}
-                >
-                  <Avatar name={p.name} size={34} />
-                  <span className="text-[11px] font-bold">{p.name}</span>
-                  <span className="mono-label rounded bg-primary px-1 py-px text-[9px] text-primary-foreground">
-                    {ovr(p.stats)}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
         </section>
       </Reveal>
 

@@ -92,6 +92,40 @@ create policy "profiles: mise à jour de soi"
   using ((select auth.uid()) = id)
   with check ((select auth.uid()) = id);
 
+-- Email de contact du joueur — collecté après la première connexion, ou
+-- automatiquement quand il lie Google/Apple. C'est LA table des emails.
+alter table public.profiles add column if not exists contact_email text;
+
+-- ──────────────────────────── Activité ───────────────────────────────
+-- Journal d'usage : connexions, ouvertures quotidiennes, réponses de
+-- présence. Alimente le tableau de bord admin (qui vient, quand, rétention).
+create table if not exists public.activity (
+  id         bigint generated always as identity primary key,
+  player_id  uuid not null references public.profiles(id) on delete cascade,
+  kind       text not null check (kind in ('login', 'open', 'presence')),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists activity_player_created_idx
+  on public.activity (player_id, created_at desc);
+create index if not exists activity_created_idx
+  on public.activity (created_at desc);
+
+alter table public.activity enable row level security;
+
+-- Chacun écrit ses propres événements ; seul l'admin lit le journal.
+drop policy if exists "activity: j'écris pour moi" on public.activity;
+create policy "activity: j'écris pour moi"
+  on public.activity for insert
+  to authenticated
+  with check ((select auth.uid()) = player_id);
+
+drop policy if exists "activity: lecture admin" on public.activity;
+create policy "activity: lecture admin"
+  on public.activity for select
+  to authenticated
+  using ((select public.is_league_admin()));
+
 -- ─────────────────────────── Convocations ────────────────────────────
 create table if not exists public.convocations (
   id          bigint generated always as identity primary key,
@@ -191,6 +225,8 @@ create trigger presence_touch before update on public.presence
 grant usage on schema public to anon, authenticated;
 grant select on public.profiles, public.convocations, public.presence to authenticated;
 grant update (name, username) on public.profiles to authenticated;
+grant update (contact_email) on public.profiles to authenticated;
+grant insert, select on public.activity to authenticated;
 grant insert, update, delete on public.presence to authenticated;
 grant insert, update, delete on public.convocations to authenticated;
 

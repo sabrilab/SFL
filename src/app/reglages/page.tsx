@@ -103,6 +103,21 @@ export default function ReglagesPage() {
             </span>
             <ChevronRight className="size-4 text-foreground/45" />
           </Link>
+          <Link
+            href="/admin/activite"
+            className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
+          >
+            <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
+              <ShieldCheck className="size-[18px]" />
+            </span>
+            <span className="flex-1">
+              <span className="block text-[15px] font-semibold">Activité &amp; rétention</span>
+              <span className="block text-[12px] text-foreground/45">
+                Qui se connecte, quand — et les emails collectés
+              </span>
+            </span>
+            <ChevronRight className="size-4 text-foreground/45" />
+          </Link>
         </section>
       )}
     </div>
