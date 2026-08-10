@@ -68,6 +68,27 @@ export type SignInResult =
   | { ok: true; session: Session }
   | { ok: false; reason: "unknown-user" | "bad-password" | "unavailable" };
 
+/**
+ * Borne une promesse dans le temps. Un projet Supabase en pause peut laisser
+ * la requête pendre : sans ce garde-fou, l'écran de connexion resterait à
+ * tourner indéfiniment au lieu de basculer sur la vérification locale.
+ */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("timeout")), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
+
 async function signInLocal(account: Account, password: string): Promise<SignInResult> {
   if (typeof crypto === "undefined" || !crypto.subtle) return { ok: false, reason: "unavailable" };
   const hash = await hashPassword(account.user, password);
@@ -87,20 +108,30 @@ export async function signIn(user: string, password: string): Promise<SignInResu
   const account = findAccount(user);
   if (!account) return { ok: false, reason: "unknown-user" };
 
-  // 1 · Le serveur d'abord.
+  // 1 · Le serveur d'abord — 5 secondes maximum, sinon repli local.
   try {
-    const { data, error } = await supabase().auth.signInWithPassword({
-      email: loginEmail(account.user),
-      password,
-    });
+    const { data, error } = await withTimeout(
+      supabase().auth.signInWithPassword({
+        email: loginEmail(account.user),
+        password,
+      }),
+      5000
+    );
     if (!error && data.user) {
       // Le rôle admin vient de la table profiles (jamais des métadonnées).
       let admin = false;
-      const { data: profile } = await supabase()
-        .from("profiles")
-        .select("is_admin, name")
-        .eq("id", data.user.id)
-        .maybeSingle();
+      // PostgrestBuilder est un « thenable », pas une vraie promesse :
+      // Promise.resolve le convertit pour le garde-fou de temps.
+      const profileQuery = Promise.resolve(
+        supabase()
+          .from("profiles")
+          .select("is_admin, name")
+          .eq("id", data.user.id)
+          .maybeSingle()
+      );
+      const profile = await withTimeout(profileQuery, 5000)
+        .then((r) => r.data as { is_admin: boolean; name: string } | null)
+        .catch(() => null);
       if (profile) admin = !!profile.is_admin;
       const session: Session = {
         user: account.user,
