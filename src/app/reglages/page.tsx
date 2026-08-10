@@ -8,6 +8,7 @@ import { Locked } from "@/components/sfl/locked";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { isAdmin } from "@/lib/sfl/admin";
+import { AccountCard } from "@/components/sfl/auth/account-card";
 
 const THEME_OPTIONS = [
   { value: "light", label: "Clair", icon: Sun },
@@ -33,6 +34,8 @@ export default function ReglagesPage() {
           <h1 className="text-[28px] font-bold tracking-tight">Réglages</h1>
         </div>
       </div>
+
+      <AccountCard />
 
       <section>
         <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Apparence</h2>

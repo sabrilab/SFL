@@ -7,6 +7,7 @@ import { Lock, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/nav";
 import { useMyPlayer } from "@/components/sfl/player-provider";
+import { useSession } from "@/hooks/use-session";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useBallons } from "@/hooks/use-ballons";
 import { useIsClient } from "@/hooks/use-is-client";
@@ -171,6 +172,10 @@ export function SiteHeader() {
   const pathname = usePathname();
   const { me, setMe } = useMyPlayer();
   const { players } = useSeason();
+  const session = useSession();
+  // Depuis les comptes, chacun est lié à son profil : la bascule de profil ne
+  // sert plus qu'à l'admin, pour vérifier ce que voient les autres.
+  const canSwitch = !!session?.admin;
   const playerNames = [...players]
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((p) => p.name);
@@ -231,28 +236,41 @@ export function SiteHeader() {
         {/* Bulle droite : Ballons, profil, réglages */}
         <div className="glass ml-auto flex items-center gap-1.5 rounded-full px-1.5 py-1.5">
           <BallonsBadge me={me} />
-          <Select value={me} onValueChange={(v) => selectProfile(v as string)}>
-            <SelectTrigger
-              size="sm"
-              aria-label="Choisir mon profil joueur"
-              className="rounded-full border-transparent bg-secondary px-3.5 font-medium dark:bg-secondary"
+          {canSwitch ? (
+            <Select value={me} onValueChange={(v) => selectProfile(v as string)}>
+              <SelectTrigger
+                size="sm"
+                aria-label="Voir l'app comme un autre joueur (admin)"
+                className="rounded-full border-transparent bg-secondary px-3.5 font-medium dark:bg-secondary"
+              >
+                <span className="mr-1 flex size-4.5 items-center justify-center rounded-full bg-foreground/10 text-[9px] font-bold">
+                  {me[0]}
+                </span>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {playerNames.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    <span className="flex items-center gap-1.5">
+                      {name}
+                      {PROFILE_PASSWORDS[name] && <Lock className="size-3 text-muted-foreground" />}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Link
+              href="/profil"
+              aria-label="Mon profil"
+              className="flex items-center gap-1.5 rounded-full bg-secondary py-1.5 pr-3.5 pl-1.5 text-sm font-medium"
             >
-              <span className="mr-1 flex size-4.5 items-center justify-center rounded-full bg-foreground/10 text-[9px] font-bold">
+              <span className="flex size-4.5 items-center justify-center rounded-full bg-foreground/10 text-[9px] font-bold">
                 {me[0]}
               </span>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {playerNames.map((name) => (
-                <SelectItem key={name} value={name}>
-                  <span className="flex items-center gap-1.5">
-                    {name}
-                    {PROFILE_PASSWORDS[name] && <Lock className="size-3 text-muted-foreground" />}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              {me}
+            </Link>
+          )}
 
           <ProfilePasswordDialog
             name={pendingProfile}

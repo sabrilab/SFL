@@ -10,19 +10,18 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
-import { Check, ChevronRight, MapPin } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
 import { LEAGUE_KEY } from "@/components/layout/site-header";
-import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
+import { useSeason } from "@/components/sfl/season-provider";
 import { NEXT_MATCH } from "@/lib/sfl/data";
 import { rankPlayers } from "@/lib/sfl/engine";
 import { computeStandings } from "@/lib/sfl/saisie/engine";
 import { JourneeRecap } from "@/components/sfl/feed/journee-recap";
+import { PresencePanel } from "@/components/sfl/presence-panel";
 import { JourneeOpening } from "@/components/sfl/feed/journee-opening";
-import { activeConvocation, respondConvocation } from "@/lib/sfl/saisie/mutations";
-import { saisieStore } from "@/lib/sfl/saisie/store";
 import { cn } from "@/lib/utils";
 
 export default function Ligue() {
@@ -80,23 +79,6 @@ export default function Ligue() {
     .sort((a, b) => a.j - b.j)
     .slice(-5)
     .map((e) => (e.result === "Victoire" ? "V" : e.result === "Nul" ? "N" : "D"));
-
-  /* ----------------------------- Convocation ----------------------------- */
-
-  const convoc = activeConvocation(saison);
-  const next = convoc
-    ? { jour: convoc.jour, date: convoc.date, heure: convoc.heure, lieu: convoc.lieu }
-    : { jour: NEXT_MATCH.jour, date: NEXT_MATCH.date, heure: NEXT_MATCH.heure, lieu: NEXT_MATCH.lieu };
-  const myRsvp = convoc ? (convoc.reponses[player.name] ?? null) : null;
-  const confirmed = convoc
-    ? Object.values(convoc.reponses).filter((r) => r === "present").length
-    : 0;
-  function rsvp(value: "present" | "absent") {
-    if (!convoc) return;
-    const nextVal = myRsvp === value ? null : value;
-    saisieStore.save(respondConvocation(saison, convoc.id, player.name, nextVal));
-    window.dispatchEvent(new Event(SAISIE_EVENT));
-  }
 
   if (isClient && league !== "SFL") {
     return (
@@ -310,56 +292,7 @@ export default function Ligue() {
             <div className="mb-3 px-1">
               <h2 className="text-[17px] font-bold tracking-tight">Les prochaines journées</h2>
             </div>
-            <div className="glass rounded-3xl p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="mono-label text-primary">J{NEXT_MATCH.journee} · Convocation</p>
-                  <div className="mt-1 text-2xl font-bold tracking-tight">
-                    {next.jour} {next.date}
-                  </div>
-                  <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">{next.heure}</span>
-                    <span>·</span>
-                    <MapPin className="size-3.5" />
-                    {next.lieu}
-                  </div>
-                </div>
-                {myRsvp === "present" && (
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                    <Check className="size-4.5" strokeWidth={2.5} />
-                  </span>
-                )}
-              </div>
-              <div className="mt-4 flex gap-2">
-                <button
-                  onClick={() => rsvp("present")}
-                  className={cn(
-                    "flex-1 rounded-full py-3 text-sm font-bold transition-colors",
-                    myRsvp === "present"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-foreground text-background"
-                  )}
-                >
-                  {myRsvp === "present" ? "Je viens ✓" : "Je viens"}
-                </button>
-                <button
-                  onClick={() => rsvp("absent")}
-                  className={cn(
-                    "flex-1 rounded-full py-3 text-sm font-semibold transition-colors",
-                    myRsvp === "absent" ? "bg-destructive/20 text-destructive" : "bg-foreground/10"
-                  )}
-                >
-                  Pas dispo
-                </button>
-              </div>
-              <p className="mono-label mt-3 text-center text-muted-foreground">
-                {myRsvp === "present"
-                  ? `Tu es dans la compo · ${confirmed}/10`
-                  : myRsvp === "absent"
-                    ? "Tu passes ton tour"
-                    : `${confirmed} déjà confirmés · +1 Point Pépite dimanche`}
-              </p>
-            </div>
+            <PresencePanel />
             <div className="mt-2.5 flex flex-col gap-2 opacity-50">
               {[
                 [`J${NEXT_MATCH.journee + 1}`, "Dimanche 23 août"],

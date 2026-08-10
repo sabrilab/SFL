@@ -11,6 +11,7 @@ import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register"
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { ViewportLock } from "@/components/pwa/viewport-lock";
 import { PlayerProvider } from "@/components/sfl/player-provider";
+import { AuthGate } from "@/components/sfl/auth/auth-gate";
 import { SeasonProvider } from "@/components/sfl/season-provider";
 import { CardViewerProvider } from "@/components/sfl/card-viewer";
 import { AppSplash } from "@/components/sfl/app-splash";
@@ -93,6 +94,7 @@ export default function RootLayout({
             <PlayerProvider>
             <CardViewerProvider>
               <TooltipProvider delay={200}>
+                <AuthGate>
                 <AppSplash />
                 {/* Orbes lumineux du design de référence, derrière tout le contenu */}
                 <div className="orbs" aria-hidden>
@@ -119,6 +121,7 @@ export default function RootLayout({
                 </div>
                 <BottomNav />
                 <InstallPrompt />
+                </AuthGate>
                 <Toaster position="top-center" />
               </TooltipProvider>
             </CardViewerProvider>
