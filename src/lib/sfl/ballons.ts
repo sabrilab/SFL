@@ -119,6 +119,20 @@ export function debit(voter: string, amount: number, reason: string): boolean {
 
 /* ---------------- Récompenses journalières ---------------- */
 
+/**
+ * +2 Ballons pour avoir répondu à la convocation — oui OU non : la récompense
+ * paie le geste de répondre, pas la présence. Une seule fois par convocation.
+ */
+export const CONVOCATION_REPLY_REWARD = 2;
+
+export function rewardConvocationReply(voter: string, convocationId: number | string): number {
+  const key = `sfl-convoc-reward-${voter}-${convocationId}`;
+  if (localStorage.getItem(key)) return 0;
+  localStorage.setItem(key, "1");
+  credit(voter, CONVOCATION_REPLY_REWARD, "Réponse à la convocation");
+  return CONVOCATION_REPLY_REWARD;
+}
+
 // +2 Ballons, une fois par jour. Renvoie le montant crédité (0 si déjà pris).
 export function claimDailyLogin(voter: string): number {
   const key = `sfl-daily-login-${voter}`;

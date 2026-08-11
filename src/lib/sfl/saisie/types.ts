@@ -70,6 +70,12 @@ export interface MatchEvent {
 // La liste des confirmés pré-remplit ensuite l'assistant « Nouvelle journée ».
 export type ConvocationReponse = "present" | "absent";
 
+/** Une équipe composée pour dimanche — révélée aux joueurs vendredi 19h. */
+export interface ConvocationTeam {
+  name: string; // couleur ("Orange", "Bleu", …)
+  players: string[];
+}
+
 export interface Convocation {
   id: number;
   jour: string; // "Dimanche"
@@ -78,6 +84,9 @@ export interface Convocation {
   lieu: string;
   statut: "ouverte" | "clôturée";
   reponses: Record<string, ConvocationReponse>;
+  // Composées par l'admin depuis les confirmés ; l'app les révèle aux joueurs
+  // à partir du vendredi 19h (voir lib/sfl/convocation-temps.ts).
+  teams?: ConvocationTeam[];
 }
 
 // État complet de la saison, unité de stockage (localStorage / Supabase).

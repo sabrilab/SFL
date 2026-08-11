@@ -37,6 +37,7 @@ import { NewJourneeSheet } from "@/components/sfl/admin/new-journee-sheet";
 import { GrilleSaisie } from "@/components/sfl/admin/grille";
 import { FeuilleDirecte } from "@/components/sfl/admin/feuille-directe";
 import { ConvocationSheet } from "@/components/sfl/admin/convocation-sheet";
+import { EquipesDimanche } from "@/components/sfl/admin/equipes-dimanche";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
 import {
   activeConvocation,
@@ -434,6 +435,9 @@ export function AdminDashboard() {
               </>
             )}
           </div>
+
+          {/* Les équipes de dimanche — générées depuis les « oui » */}
+          <EquipesDimanche />
 
           {/* Historique / annulation */}
           <div className="rounded-3xl bg-card p-4">

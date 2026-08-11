@@ -168,6 +168,10 @@ create table if not exists public.convocations (
   created_at  timestamptz not null default now()
 );
 
+-- Les équipes composées par l'admin (couleur + joueurs), révélées aux
+-- joueurs à partir du vendredi 19h — la fenêtre est jugée côté app.
+alter table public.convocations add column if not exists teams jsonb;
+
 alter table public.convocations enable row level security;
 
 drop policy if exists "convocations: lecture ligue" on public.convocations;

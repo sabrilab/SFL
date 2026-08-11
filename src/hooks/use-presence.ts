@@ -14,8 +14,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSession } from "@/hooks/use-session";
+import { toast } from "sonner";
 import { listPresence, setPresence, type Reponse } from "@/lib/sfl/presence";
-import { activeConvocation } from "@/lib/sfl/saisie/mutations";
+import { activeConvocation, setConvocationTeams } from "@/lib/sfl/saisie/mutations";
+import { saisieStore } from "@/lib/sfl/saisie/store";
+import { SAISIE_EVENT } from "@/components/sfl/season-provider";
+import type { ConvocationTeam } from "@/lib/sfl/saisie/types";
+import { equipesVisibles, reponsesOuvertes } from "@/lib/sfl/convocation-temps";
+import { rewardConvocationReply } from "@/lib/sfl/ballons";
 import { NEXT_MATCH } from "@/lib/sfl/data";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/sfl/activity";
@@ -29,6 +35,7 @@ interface ServerConvocation {
   heure: string;
   lieu: string;
   effectif: number;
+  teams: ConvocationTeam[] | null;
 }
 
 interface ServerState {
@@ -48,9 +55,17 @@ export interface PresenceView {
   presents: string[];
   absents: string[];
   sansReponse: string[];
+  /** Vrai du lundi au vendredi minuit — après, la conversation est expirée. */
+  reponsesOuvertes: boolean;
+  /** Vrai à partir du vendredi 19h : les équipes composées sont révélées. */
+  equipesVisibles: boolean;
+  /** Les équipes composées par l'admin (null tant qu'il n'a rien validé). */
+  teams: ConvocationTeam[] | null;
   answer: (r: Reponse | null) => Promise<boolean>;
   /** Publie la convocation locale vers Supabase (admin, session serveur). */
   publish: (() => Promise<boolean>) | null;
+  /** Enregistre les équipes composées (admin seulement, sinon null). */
+  saveTeams: ((teams: ConvocationTeam[] | null) => Promise<boolean>) | null;
 }
 
 export function usePresence(): PresenceView {
@@ -60,6 +75,20 @@ export function usePresence(): PresenceView {
   const serverActive = !!session?.server;
 
   const [server, setServer] = useState<ServerState | null>(null);
+
+  // L'horloge du rythme hebdomadaire. Nulle au premier rendu (le serveur ne
+  // doit pas figer une heure), posée en micro-tâche puis retenue à la minute.
+  const [maintenant, setMaintenant] = useState<Date | null>(null);
+  useEffect(() => {
+    const tick = () => setMaintenant(new Date());
+    Promise.resolve().then(tick);
+    const timer = setInterval(tick, 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  // Avant la première mesure : réponses ouvertes, équipes cachées — l'état le
+  // plus fréquent de la semaine, corrigé à la microseconde où l'horloge tombe.
+  const ouvert = maintenant ? reponsesOuvertes(maintenant) : true;
+  const revele = maintenant ? equipesVisibles(maintenant) : false;
 
   useEffect(() => {
     // Pas de session serveur : rien à charger. L'éventuel `server` d'une
@@ -73,7 +102,7 @@ export function usePresence(): PresenceView {
       try {
         const { data: convs } = await sb
           .from("convocations")
-          .select("id, journee, jour, date_label, heure, lieu, effectif")
+          .select("id, journee, jour, date_label, heure, lieu, effectif, teams")
           .eq("statut", "ouverte")
           .order("id", { ascending: false })
           .limit(1);
@@ -125,6 +154,20 @@ export function usePresence(): PresenceView {
 
   const answer = useCallback(
     async (r: Reponse | null): Promise<boolean> => {
+      // Conversation expirée (vendredi minuit) : plus rien ne bouge, dans un
+      // sens comme dans l'autre — sans réponse = non-participation.
+      if (!ouvert) return false;
+      // +2 Ballons pour avoir répondu — oui ou non — une fois par convocation.
+      const convocId = serverActive && server ? server.convocation.id : (activeConvocation(saison)?.id ?? null);
+      const recompense = () => {
+        if (r === null || convocId === null) return;
+        const credited = rewardConvocationReply(player.name, `${serverActive ? "s" : "l"}${convocId}`);
+        if (credited > 0) {
+          toast.success(`+${credited} Ballons ⚽`, {
+            description: "Merci d'avoir répondu à la convocation",
+          });
+        }
+      };
       if (serverActive && server) {
         try {
           const sb = supabase();
@@ -143,15 +186,20 @@ export function usePresence(): PresenceView {
             { convocation_id: server.convocation.id, player_id: uid, reponse: r },
             { onConflict: "convocation_id,player_id" }
           );
-          if (!error) logActivity("presence");
+          if (!error) {
+            logActivity("presence");
+            recompense();
+          }
           return !error;
         } catch {
           return false;
         }
       }
-      return setPresence(saison, player.name, r);
+      const ok = setPresence(saison, player.name, r);
+      if (ok) recompense();
+      return ok;
     },
-    [serverActive, server, saison, player.name]
+    [serverActive, server, saison, player.name, ouvert]
   );
 
   const publish = useCallback(async (): Promise<boolean> => {
@@ -174,6 +222,30 @@ export function usePresence(): PresenceView {
     }
   }, [localConv]);
 
+  const saveTeams = useCallback(
+    async (teams: ConvocationTeam[] | null): Promise<boolean> => {
+      // En mode partagé, la vérité vit en base ; en local, dans la saison.
+      if (serverActive && server) {
+        try {
+          const { error } = await supabase()
+            .from("convocations")
+            .update({ teams })
+            .eq("id", server.convocation.id);
+          if (error) return false;
+        } catch {
+          return false;
+        }
+      }
+      const localId = activeConvocation(saison)?.id;
+      if (localId !== undefined) {
+        saisieStore.save(setConvocationTeams(saison, localId, teams));
+        window.dispatchEvent(new Event(SAISIE_EVENT));
+      }
+      return true;
+    },
+    [serverActive, server, saison]
+  );
+
   /* -------------------------------- La vue -------------------------------- */
 
   if (serverActive && server) {
@@ -190,8 +262,12 @@ export function usePresence(): PresenceView {
       presents: names.filter((n) => rep[n.name] === "present").map((n) => n.name),
       absents: names.filter((n) => rep[n.name] === "absent").map((n) => n.name),
       sansReponse: names.filter((n) => !rep[n.name] && n.actif).map((n) => n.name),
+      reponsesOuvertes: ouvert,
+      equipesVisibles: revele,
+      teams: server.convocation.teams ?? null,
       answer,
       publish: null,
+      saveTeams: session?.admin ? saveTeams : null,
     };
   }
 
@@ -206,8 +282,12 @@ export function usePresence(): PresenceView {
     presents: local.presents,
     absents: local.absents,
     sansReponse: local.sansReponse,
+    reponsesOuvertes: ouvert,
+    equipesVisibles: revele,
+    teams: localConv?.teams ?? null,
     answer,
     // Publier n'a de sens que pour l'admin, connecté côté serveur.
     publish: serverActive && session?.admin ? publish : null,
+    saveTeams: session?.admin ? saveTeams : null,
   };
 }

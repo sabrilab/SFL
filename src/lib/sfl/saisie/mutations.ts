@@ -9,6 +9,7 @@ import type {
   MatchEntry,
   RosterEntry,
   Saison,
+  ConvocationTeam,
 } from "./types";
 
 export const TEAM_PRESETS = [
@@ -230,6 +231,20 @@ export function respondConvocation(
       else reponses[player] = reponse;
       return { ...c, reponses };
     }),
+  };
+}
+
+/** Pose (ou retire, avec null) les équipes composées d'une convocation. */
+export function setConvocationTeams(
+  saison: Saison,
+  id: number,
+  teams: ConvocationTeam[] | null
+): Saison {
+  return {
+    ...saison,
+    convocations: saison.convocations.map((c) =>
+      c.id === id ? { ...c, teams: teams ?? undefined } : c
+    ),
   };
 }
 

@@ -14,6 +14,23 @@
 import { createHash } from "node:crypto";
 import { Client } from "pg";
 
+/**
+ * Réécrit l'URL avec `sslmode=no-verify` : les URLs de l'intégration portent
+ * `sslmode=require`, et avec le pilote pg ce paramètre PREND LE PAS sur
+ * l'option `ssl` du code — or les fonctions serverless ne peuvent pas vérifier
+ * la chaîne de certificats du pooler Supabase (auto-signée). `no-verify` garde
+ * le chiffrement ; l'authentification reste le mot de passe.
+ */
+export function normalizeDbUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.set("sslmode", "no-verify");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 export interface MigrateResult {
   status: "applied" | "up-to-date" | "not-configured" | "error";
   hash?: string;
@@ -25,7 +42,7 @@ export interface MigrateResult {
  * passent pas depuis les fonctions Vercel (la connexion directe à la base est
  * IPv6 seulement, par exemple) : on les essaie l'une après l'autre.
  */
-function candidateUrls(): { name: string; url: string }[] {
+export function candidateUrls(): { name: string; url: string }[] {
   return [
     { name: "SUPABASE_DB_URL", url: process.env.SUPABASE_DB_URL },
     { name: "POSTGRES_URL", url: process.env.POSTGRES_URL },
@@ -47,19 +64,10 @@ export async function migrateSchema(sql: string, dbUrl?: string): Promise<Migrat
   // serverless ne peuvent pas faire (le pooler Supabase présente un
   // certificat auto-signé). `no-verify` garde le chiffrement, sans la
   // vérification de chaîne ; l'authentification reste le mot de passe.
-  const normalize = (url: string): string => {
-    try {
-      const u = new URL(url);
-      u.searchParams.set("sslmode", "no-verify");
-      return u.toString();
-    } catch {
-      return url;
-    }
-  };
 
   for (const c of candidates) {
     const client = new Client({
-      connectionString: normalize(c.url),
+      connectionString: normalizeDbUrl(c.url),
       connectionTimeoutMillis: 8000,
     });
 

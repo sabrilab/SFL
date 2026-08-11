@@ -11,6 +11,7 @@
 // temps réel, il arrive après la présence.
 
 import { toast } from "sonner";
+import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { Locked } from "@/components/sfl/locked";
 import { usePresence } from "@/hooks/use-presence";
@@ -30,6 +31,7 @@ function initials(name: string) {
 
 export default function Discussions() {
   const { players, journees, saison } = useSeason();
+  const { player } = useMyPlayer();
   const ranked = rankPlayers(players);
   const presence = usePresence();
   const session = useSession();
@@ -146,7 +148,9 @@ export default function Discussions() {
               </div>
             </div>
             <p className="mt-[11px] text-[13.5px] leading-[1.45] text-foreground/62">
-              Dimanche on remet ça. Réponds vite, la compo se fait dans l&apos;ordre.
+              Salut {player.name.split(" ")[0]}, dispo ce {presence.jour.toLowerCase()} pour la J
+              {presence.journee} de la SFL ? Réponds avant vendredi minuit — oui ou non, ça
+              rapporte 2 ⚽.
             </p>
           </div>
 
@@ -179,31 +183,72 @@ export default function Discussions() {
                 </span>
               )}
             </div>
-            <div className="flex gap-2 px-3 pb-3">
-              <button
-                onClick={() => answer("present")}
-                className={cn(
-                  "flex-1 rounded-full py-2.5 text-center text-[13px] font-bold transition-transform active:scale-[0.98]",
-                  presence.mine === "present"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-foreground text-background"
-                )}
-              >
-                {presence.mine === "present" ? "Je viens ✓" : "Je viens"}
-              </button>
-              <button
-                onClick={() => answer("absent")}
-                className={cn(
-                  "flex-1 rounded-full py-2.5 text-center text-[13px] font-semibold transition-transform active:scale-[0.98]",
-                  presence.mine === "absent"
-                    ? "bg-[#FF6B5E]/20 text-[#FF6B5E]"
-                    : "glass-soft text-foreground/70"
-                )}
-              >
-                {presence.mine === "absent" ? "Pas dispo ✓" : "Pas dispo"}
-              </button>
-            </div>
+            {presence.reponsesOuvertes ? (
+              <div className="flex gap-2 px-3 pb-3">
+                <button
+                  onClick={() => answer("present")}
+                  className={cn(
+                    "flex-1 rounded-full py-2.5 text-center text-[13px] font-bold transition-transform active:scale-[0.98]",
+                    presence.mine === "present"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-foreground text-background"
+                  )}
+                >
+                  {presence.mine === "present" ? "Je viens ✓" : "Je viens"}
+                </button>
+                <button
+                  onClick={() => answer("absent")}
+                  className={cn(
+                    "flex-1 rounded-full py-2.5 text-center text-[13px] font-semibold transition-transform active:scale-[0.98]",
+                    presence.mine === "absent"
+                      ? "bg-[#FF6B5E]/20 text-[#FF6B5E]"
+                      : "glass-soft text-foreground/70"
+                  )}
+                >
+                  {presence.mine === "absent" ? "Pas dispo ✓" : "Pas dispo"}
+                </button>
+              </div>
+            ) : (
+              // Vendredi minuit est passé : la conversation est close, la
+              // règle est la règle — sans réponse, pas de dimanche.
+              <p className="mx-3 mb-3 rounded-[14px] bg-white/5 px-3.5 py-2.5 text-[12.5px] leading-snug text-foreground/45">
+                Conversation clôturée vendredi à minuit.
+                {presence.mine === "present"
+                  ? " Tu es sur la liste — à dimanche ⚽"
+                  : presence.mine === "absent"
+                    ? " Tu as passé ton tour — à la prochaine."
+                    : " Sans réponse, tu n'es pas retenu pour dimanche. Elle rouvre lundi."}
+              </p>
+            )}
           </div>
+
+          {/* Vendredi 19h : les équipes composées tombent dans la conversation */}
+          {presence.equipesVisibles && presence.teams && presence.teams.length > 0 && (
+            <div className="border-t border-white/8 px-4 py-3.5">
+              <p className="mono-label text-primary">Les équipes de dimanche</p>
+              <div className="mt-2.5 flex flex-col gap-2.5">
+                {presence.teams.map((t) => {
+                  const mine = t.players.includes(player.name);
+                  return (
+                    <div key={t.name}>
+                      <p
+                        className={cn(
+                          "text-[12.5px] font-bold",
+                          mine ? "text-primary" : "text-foreground/70"
+                        )}
+                      >
+                        {t.name}
+                        {mine && " · ton équipe"}
+                      </p>
+                      <p className="mt-0.5 text-[12.5px] leading-snug text-foreground/45">
+                        {t.players.join(" · ")}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* L'admin voit d'un coup d'œil qui manque à l'appel */}
           {session?.admin && (

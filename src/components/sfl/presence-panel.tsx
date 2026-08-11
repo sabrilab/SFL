@@ -83,27 +83,43 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
         )}
       </div>
 
-      {/* Les deux boutons — la réponse est modifiable jusqu'au coup d'envoi. */}
-      <div className="mt-4 flex gap-2">
-        <button
-          onClick={() => answer("present")}
-          className={cn(
-            "flex-1 rounded-full py-3.5 text-[15px] font-bold transition-transform active:scale-[0.98]",
-            p.mine === "present" ? "bg-primary text-primary-foreground" : "bg-foreground text-background"
-          )}
-        >
-          {p.mine === "present" ? "Je viens ✓" : "Je viens"}
-        </button>
-        <button
-          onClick={() => answer("absent")}
-          className={cn(
-            "flex-1 rounded-full py-3.5 text-[15px] font-semibold transition-transform active:scale-[0.98]",
-            p.mine === "absent" ? "bg-[#FF6B5E]/20 text-[#FF6B5E]" : "glass-soft text-foreground/70"
-          )}
-        >
-          {p.mine === "absent" ? "Pas dispo ✓" : "Pas dispo"}
-        </button>
-      </div>
+      {/* Les deux boutons — la réponse est modifiable jusqu'à vendredi minuit. */}
+      {p.reponsesOuvertes ? (
+        <>
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={() => answer("present")}
+              className={cn(
+                "flex-1 rounded-full py-3.5 text-[15px] font-bold transition-transform active:scale-[0.98]",
+                p.mine === "present" ? "bg-primary text-primary-foreground" : "bg-foreground text-background"
+              )}
+            >
+              {p.mine === "present" ? "Je viens ✓" : "Je viens"}
+            </button>
+            <button
+              onClick={() => answer("absent")}
+              className={cn(
+                "flex-1 rounded-full py-3.5 text-[15px] font-semibold transition-transform active:scale-[0.98]",
+                p.mine === "absent" ? "bg-[#FF6B5E]/20 text-[#FF6B5E]" : "glass-soft text-foreground/70"
+              )}
+            >
+              {p.mine === "absent" ? "Pas dispo ✓" : "Pas dispo"}
+            </button>
+          </div>
+          <p className="mono-label mt-2.5 text-center text-foreground/30">
+            Réponses jusqu&apos;à vendredi minuit · répondre rapporte 2 ⚽
+          </p>
+        </>
+      ) : (
+        <p className="mt-4 rounded-[14px] bg-white/5 px-3.5 py-3 text-[12.5px] leading-snug text-foreground/45">
+          Les réponses sont closes depuis vendredi minuit.
+          {p.mine === "present"
+            ? " Tu es sur la liste — à dimanche ⚽"
+            : p.mine === "absent"
+              ? " Tu as passé ton tour."
+              : " Sans réponse, tu n'es pas retenu. La conversation rouvre lundi."}
+        </p>
+      )}
 
       {/* La jauge de l'effectif */}
       <div className="mt-4">
@@ -121,6 +137,20 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
           />
         </div>
       </div>
+
+      {p.equipesVisibles && p.teams && p.teams.length > 0 && (
+        <div className="mt-4 border-t border-white/8 pt-3.5">
+          <p className="mono-label text-primary">Les équipes de dimanche</p>
+          <div className="mt-2 flex flex-col gap-2">
+            {p.teams.map((t) => (
+              <p key={t.name} className="text-[12.5px] leading-snug text-foreground/55">
+                <strong className="font-bold text-foreground/85">{t.name}</strong>{" "}
+                — {t.players.join(" · ")}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
 
       {p.shared ? (
         <p className="mono-label mt-3 flex items-center gap-1.5 text-primary">
@@ -161,7 +191,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
           <div className="mt-3 grid grid-cols-3 gap-2">
             {(
               [
-                [p.presents.length, "Présents", "text-primary"],
+                [p.presents.length, "Présents", "text-emerald-400"],
                 [p.absents.length, "Absents", "text-foreground/60"],
                 [p.sansReponse.length, "Sans réponse", "text-[#FF6B5E]"],
               ] as const
@@ -177,7 +207,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
 
           {(
             [
-              ["Présents", p.presents, "bg-primary/15 text-primary"],
+              ["Présents", p.presents, "bg-emerald-500/15 text-emerald-400"],
               ["Absents", p.absents, "glass-soft text-foreground/50"],
               ["Sans réponse", p.sansReponse, "bg-[#FF6B5E]/12 text-[#FF6B5E]"],
             ] as const
