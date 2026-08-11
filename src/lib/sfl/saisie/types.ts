@@ -29,6 +29,10 @@ export interface MatchEntry {
   impact: boolean;
   def: boolean;
   retard: boolean; // retard non prévenu
+  // Feuille de match en direct. Barème : 2 arrêts = 1 point Pépite, et
+  // 2 interceptions = 1 point Pépite (les deux comptent séparément).
+  arrets?: number;
+  interceptions?: number;
   note?: string; // mention affichée (ex. « Extra time »)
   teamScoreBonus?: number; // buts d'équipe non attribués à un joueur (ex. but d'extra time)
   pepiteBonus?: number; // points Pépite manuels (ex. +1 pour un extra time)

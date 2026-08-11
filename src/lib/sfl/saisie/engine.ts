@@ -38,6 +38,10 @@ const BAREME = {
   cleanSheet: 3,
   retard: -1,
   absenceInjustifiee: -2,
+  // Feuille de match : chaque PAIRE d'arrêts vaut 1 point Pépite, chaque
+  // paire d'interceptions aussi. Les deux compteurs sont indépendants.
+  parPaireDefensive: 1,
+  paire: 2,
 } as const;
 
 const STAT_CAP = 99;
@@ -86,6 +90,10 @@ export function entryPP(e: MatchEntry): number {
   if (e.impact) pp += BAREME.impact;
   if (e.def) pp += BAREME.def;
   if (e.retard) pp += BAREME.retard;
+  pp +=
+    (Math.floor((e.arrets ?? 0) / BAREME.paire) +
+      Math.floor((e.interceptions ?? 0) / BAREME.paire)) *
+    BAREME.parPaireDefensive;
   return pp + (e.pepiteBonus ?? 0);
 }
 

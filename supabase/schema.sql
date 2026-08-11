@@ -40,11 +40,11 @@ begin
     new.id,
     coalesce(new.raw_user_meta_data ->> 'name', split_part(new.email, '@', 1)),
     coalesce(new.raw_user_meta_data ->> 'username', '@' || split_part(new.email, '@', 1)),
-    -- L'admin est reconnu par son email technique EXACT (jamais par les
-    -- métadonnées, modifiables par l'utilisateur). La fenêtre de risque se
-    -- limite à la période d'inscriptions ouvertes, refermée sitôt les comptes
-    -- créés — et le compte ilyes est créé en premier.
-    new.email = 'ilyes@sfl.local'
+    -- Les admins sont reconnus par leur email technique EXACT (jamais par
+    -- les métadonnées, modifiables par l'utilisateur). La fenêtre de risque
+    -- se limite à la période d'inscriptions ouvertes, refermée sitôt les
+    -- comptes créés — et les comptes admin sont créés en premier.
+    new.email in ('ilyes@sfl.local', 'sabri@sfl.local')
   )
   on conflict (id) do nothing;
   return new;
@@ -271,4 +271,4 @@ $$;
 -- ───────────────────────── Rôle admin ────────────────────────────────
 -- À exécuter APRÈS la création des comptes (l'étape « Créer les comptes »
 -- de la page /admin/setup). Sans effet tant que le compte n'existe pas.
-update public.profiles set is_admin = true where username = '@ilyes';
+update public.profiles set is_admin = true where username in ('@ilyes', '@sabri');

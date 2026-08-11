@@ -54,7 +54,18 @@ export function newEntry(j: number, player: string, team: string | null): MatchE
     impact: false,
     def: false,
     retard: false,
+    arrets: 0,
+    interceptions: 0,
   };
+}
+
+/** Duplique une ligne juste en dessous — le geste le plus courant en saisie. */
+export function duplicateEntryAt(saison: Saison, index: number): Saison {
+  const source = saison.entries[index];
+  if (!source) return saison;
+  const entries = [...saison.entries];
+  entries.splice(index + 1, 0, { ...source });
+  return { ...saison, entries };
 }
 
 function shortToday(): string {

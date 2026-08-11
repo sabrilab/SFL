@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CalendarPlus,
@@ -12,6 +12,8 @@ import {
   RotateCcw,
   Send,
   Sparkles,
+  Redo2,
+  Table2,
   Undo2,
   UserPlus,
   Users,
@@ -32,6 +34,8 @@ import {
   PlayerSheet,
 } from "@/components/sfl/admin/entry-sheet";
 import { NewJourneeSheet } from "@/components/sfl/admin/new-journee-sheet";
+import { GrilleSaisie } from "@/components/sfl/admin/grille";
+import { FeuilleDirecte } from "@/components/sfl/admin/feuille-directe";
 import { ConvocationSheet } from "@/components/sfl/admin/convocation-sheet";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
 import {
@@ -112,30 +116,66 @@ export function AdminDashboard() {
   const [newPlayerOpen, setNewPlayerOpen] = useState(false);
   const [newJourneeOpen, setNewJourneeOpen] = useState(false);
   const [convocOpen, setConvocOpen] = useState(false);
+  const [feuilleMode, setFeuilleMode] = useState<"direct" | "revue">("direct");
   // Pré-cochés à l'ouverture de l'assistant journée (confirmés de la convocation).
   const [journeePrefill, setJourneePrefill] = useState<string[]>([]);
-  // Historique d'annulation : on empile l'état PRÉCÉDENT + le libellé de l'action.
-  const [history, setHistory] = useState<{ saison: Saison; label: string; at: number }[]>([]);
+  // Historique : deux piles. `history` porte les états PRÉCÉDENTS (annuler),
+  // `future` les états repris d'une annulation (rétablir). Toute nouvelle
+  // action vide `future` — c'est le comportement attendu partout ailleurs.
+  type Step = { saison: Saison; label: string; at: number };
+  const [history, setHistory] = useState<Step[]>([]);
+  const [future, setFuture] = useState<Step[]>([]);
 
-  function persist(next: Saison) {
+  const persist = useCallback((next: Saison) => {
     setDraft(next);
     saisieStore.save(next);
     // Prévient l'app joueur (SeasonProvider) de re-dériver en direct.
     window.dispatchEvent(new Event(SAISIE_EVENT));
-  }
+  }, []);
 
-  function commit(next: Saison, label = "Modification") {
-    setHistory((h) => [...h, { saison, label, at: Date.now() }].slice(-50));
-    persist(next);
-  }
+  const commit = useCallback(
+    (next: Saison, label = "Modification") => {
+      setHistory((h) => [...h, { saison, label, at: Date.now() }].slice(-200));
+      // Toute nouvelle action referme la branche « rétablir ».
+      setFuture([]);
+      persist(next);
+    },
+    [saison, persist]
+  );
 
-  function undo() {
-    setHistory((h) => {
-      if (h.length === 0) return h;
-      persist(h[h.length - 1].saison);
-      return h.slice(0, -1);
-    });
-  }
+  // Les deux piles bougent ensemble, mais JAMAIS depuis la fonction de mise à
+  // jour d'un autre setState : celle-ci s'exécute pendant le rendu, et y
+  // déclencher un second setState est précisément ce que React reproche.
+  const undo = useCallback(() => {
+    if (history.length === 0) return;
+    const step = history[history.length - 1];
+    setHistory(history.slice(0, -1));
+    setFuture([...future, { saison, label: step.label, at: Date.now() }].slice(-200));
+    persist(step.saison);
+  }, [history, future, saison, persist]);
+
+  const redo = useCallback(() => {
+    if (future.length === 0) return;
+    const step = future[future.length - 1];
+    setFuture(future.slice(0, -1));
+    setHistory([...history, { saison, label: step.label, at: Date.now() }].slice(-200));
+    persist(step.saison);
+  }, [history, future, saison, persist]);
+
+  // ⌘Z / ⌘⇧Z partout dans l'espace admin — y compris depuis une cellule de la
+  // grille. On laisse la main aux champs de texte en cours d'édition seulement
+  // si l'utilisateur est en train de composer (sinon annuler la saisie du
+  // navigateur prendrait le pas sur l'annulation de la journée).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
+      e.preventDefault();
+      if (e.shiftKey) redo();
+      else undo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo, redo]);
 
   const totals = useMemo(() => {
     const p = derived.players;
@@ -243,8 +283,8 @@ export function AdminDashboard() {
         </span>
         <h1 className="text-xl font-bold tracking-tight">Espace réservé</h1>
         <p className="text-sm text-muted-foreground">
-          L&apos;espace administrateur est réservé au profil admin. Connecte-toi avec le
-          profil admin (Ilyes) pour y accéder.
+          L&apos;espace administrateur est réservé aux administrateurs de la ligue.
+          Connecte-toi avec un compte admin pour y accéder.
         </p>
       </div>
     );
@@ -270,6 +310,9 @@ export function AdminDashboard() {
         <TabsList className="w-full rounded-full bg-card p-1">
           <TabsTrigger value="overview" className="flex-1 rounded-full text-[13px]">
             <LayoutDashboard className="mr-1.5 size-4" /> Vue d&apos;ensemble
+          </TabsTrigger>
+          <TabsTrigger value="grille" className="flex-1 rounded-full text-[13px]">
+            <Table2 className="mr-1.5 size-4" /> Saisie
           </TabsTrigger>
           <TabsTrigger value="feuille" className="flex-1 rounded-full text-[13px]">
             <ClipboardList className="mr-1.5 size-4" /> Feuille de match
@@ -398,20 +441,33 @@ export function AdminDashboard() {
               <span className="flex items-center gap-2 text-sm font-semibold">
                 <Undo2 className="size-4 text-primary" /> Historique
               </span>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={history.length === 0}
-                onClick={undo}
-                className="rounded-full"
-              >
-                <Undo2 className="mr-1.5 size-4" /> Annuler
-                {history.length > 0 && ` — ${history[history.length - 1].label}`}
-              </Button>
+              <span className="flex shrink-0 gap-1.5">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={history.length === 0}
+                  onClick={undo}
+                  title="⌘Z"
+                  className="rounded-full"
+                >
+                  <Undo2 className="mr-1.5 size-4" /> Annuler
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={future.length === 0}
+                  onClick={redo}
+                  title="⌘⇧Z"
+                  className="rounded-full"
+                >
+                  <Redo2 className="mr-1.5 size-4" /> Rétablir
+                </Button>
+              </span>
             </div>
             {history.length === 0 ? (
               <p className="text-[13px] text-muted-foreground">
-                Aucune modification cette session. Chaque changement est annulable ici.
+                Aucune modification cette session. Chaque changement est annulable — ⌘Z pour
+                revenir en arrière, ⌘⇧Z pour rétablir, autant de fois qu&apos;il faut.
               </p>
             ) : (
               <div className="flex flex-col gap-1">
@@ -441,13 +497,44 @@ export function AdminDashboard() {
             </div>
           </div>
 
-          <Button variant="ghost" size="sm" onClick={() => { persist(saisieStore.reset()); setHistory([]); }} className="self-start text-muted-foreground">
+          <Button variant="ghost" size="sm" onClick={() => { persist(saisieStore.reset()); setHistory([]); setFuture([]); }} className="self-start text-muted-foreground">
             <RotateCcw className="mr-1.5 size-4" /> Réinitialiser les données de démo
           </Button>
         </TabsContent>
 
+        {/* ===================== SAISIE (la grille) ===================== */}
+        <TabsContent value="grille" className="mt-4 flex flex-col gap-3">
+          <GrilleSaisie saison={saison} commit={commit} />
+        </TabsContent>
+
         {/* ===================== FEUILLE DE MATCH (éditable) ===================== */}
         <TabsContent value="feuille" className="mt-4 flex flex-col gap-3">
+          {/* Deux usages, deux écrans : le direct au bord du terrain, la
+              consultation après coup. */}
+          <div className="glass flex w-full rounded-full p-1">
+            {(
+              [
+                ["direct", "En direct"],
+                ["revue", "Consulter"],
+              ] as const
+            ).map(([mode, label]) => (
+              <button
+                key={mode}
+                onClick={() => setFeuilleMode(mode)}
+                className={cn(
+                  "flex-1 rounded-full py-2 text-[13px] font-semibold transition-colors",
+                  feuilleMode === mode ? "bg-foreground text-background" : "text-foreground/45"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {feuilleMode === "direct" ? (
+            <FeuilleDirecte saison={saison} commit={commit} />
+          ) : (
+          <>
           <Button onClick={() => setNewJourneeOpen(true)} className="rounded-full">
             <CalendarPlus className="mr-1.5 size-4" /> Nouvelle journée
           </Button>
@@ -525,6 +612,8 @@ export function AdminDashboard() {
             Touche un joueur pour éditer sa ligne (statut, buts, passes, honneurs…). Tout est
             sauvegardé et recalculé en direct.
           </p>
+          </>
+          )}
         </TabsContent>
 
         {/* ===================== JOUEURS (effectif) ===================== */}
