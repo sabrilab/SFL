@@ -16,6 +16,7 @@ import { SeasonProvider } from "@/components/sfl/season-provider";
 import { CardViewerProvider } from "@/components/sfl/card-viewer";
 import { AppSplash } from "@/components/sfl/app-splash";
 import { ActivityTracker } from "@/components/sfl/activity-tracker";
+import { NouvellesCartes } from "@/components/sfl/nouvelle-carte";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -98,6 +99,7 @@ export default function RootLayout({
                 <AuthGate>
                 <AppSplash />
                 <ActivityTracker />
+                <NouvellesCartes />
                 {/* Orbes lumineux du design de référence, derrière tout le contenu */}
                 <div className="orbs" aria-hidden>
                   <i /><i /><i />

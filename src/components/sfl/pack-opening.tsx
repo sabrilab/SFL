@@ -6,7 +6,7 @@
 // rareté ; les hors-série arrivent avec un temps de suspense et un halo
 // démesuré. On termine sur le tirage complet.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ import { PlayerCard } from "./player-card";
 import { CollectionCardVisual } from "./collection-card-visual";
 import { PLAYERS } from "@/lib/sfl/data";
 import { KIND_LABELS, PACK_COST, type CollectionCard } from "@/lib/sfl/collection";
+import { sonDechirure, sonRevelation } from "@/lib/sfl/son";
 
 const GLOW: Record<string, string> = {
   simple: "rgba(226,207,166,.42)",
@@ -92,6 +93,8 @@ export function PackOpening({
 
   function tearPack() {
     if (torn) return;
+    // Premier geste de la cérémonie : il déverrouille l'audio au passage.
+    sonDechirure();
     setTorn(true);
     setTimeout(() => setPhase("reveal"), 550);
   }
@@ -100,6 +103,13 @@ export function PackOpening({
     if (index < ordered.length - 1) setIndex((i) => i + 1);
     else setPhase("summary");
   }
+
+  // Chaque carte sonne à son apparition — la couleur suit la rareté. L'audio
+  // a été déverrouillé par le geste de la déchirure.
+  useEffect(() => {
+    if (phase === "reveal" && current) sonRevelation(current.kind);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, index]);
 
   return (
     <motion.div
