@@ -130,7 +130,8 @@ alter table public.activity add constraint activity_kind_check
     'match',      -- un match d'Arène
     'pack',       -- ouverture d'un pack
     'achat',      -- achat d'une carte
-    'recherche'   -- une recherche lancée
+    'recherche',  -- une recherche lancée
+    'compo'       -- une composition 5v5 déposée dans l'Arène
   ));
 
 create index if not exists activity_player_created_idx
@@ -154,6 +155,45 @@ create policy "activity: lecture admin"
   on public.activity for select
   to authenticated
   using ((select public.is_league_admin()));
+
+-- ─────────────────────────── Compositions ────────────────────────────
+-- Les compositions 5v5 déposées dans l'Arène : une par joueur et par
+-- dimanche (la nouvelle remplace l'ancienne). Elles serviront à générer les
+-- matchs populaires et les équipes « selon l'avis des joueurs ».
+create table if not exists public.compositions (
+  id         bigint generated always as identity primary key,
+  player_id  uuid not null references public.profiles(id) on delete cascade,
+  dimanche   date not null,   -- le dimanche visé (clé stable)
+  slots      jsonb not null,  -- { "G": "Hasbi", "DG": "...", ... }
+  created_at timestamptz not null default now(),
+  unique (player_id, dimanche)
+);
+
+create index if not exists compositions_dimanche_idx
+  on public.compositions (dimanche);
+
+alter table public.compositions enable row level security;
+
+-- Chacun dépose la sienne ; toute la ligue peut les lire (elles ont vocation
+-- à nourrir des choix collectifs, pas à rester secrètes).
+drop policy if exists "compositions: lecture ligue" on public.compositions;
+create policy "compositions: lecture ligue"
+  on public.compositions for select
+  to authenticated
+  using (true);
+
+drop policy if exists "compositions: je dépose la mienne" on public.compositions;
+create policy "compositions: je dépose la mienne"
+  on public.compositions for insert
+  to authenticated
+  with check ((select auth.uid()) = player_id);
+
+drop policy if exists "compositions: je remplace la mienne" on public.compositions;
+create policy "compositions: je remplace la mienne"
+  on public.compositions for update
+  to authenticated
+  using ((select auth.uid()) = player_id)
+  with check ((select auth.uid()) = player_id);
 
 -- ─────────────────────────── Convocations ────────────────────────────
 create table if not exists public.convocations (
@@ -261,6 +301,7 @@ grant update (name, username) on public.profiles to authenticated;
 grant update (contact_email) on public.profiles to authenticated;
 grant insert, select on public.activity to authenticated;
 grant insert, update, delete on public.presence to authenticated;
+grant insert, update, select on public.compositions to authenticated;
 grant insert, update, delete on public.convocations to authenticated;
 
 -- Diffusion temps réel : les réponses apparaissent sans rafraîchir.

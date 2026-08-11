@@ -112,11 +112,21 @@ function drawScorer(cards: CollectionCard[]): string {
   return cards[cards.length - 1].player.name;
 }
 
-export function simulateMatch(mine: CollectionCard[], opp: CollectionCard[]): MatchResult {
+/**
+ * `formeBonus` : l'écart de forme réelle entre les deux propriétaires de deck
+ * (points Pépite de la saison), déjà ramené à quelques points. Les cartes
+ * décident d'abord, le classement de la vraie ligue fait pencher la balance.
+ */
+export function simulateMatch(
+  mine: CollectionCard[],
+  opp: CollectionCard[],
+  formeBonus = 0
+): MatchResult {
   const powerMe = deckPower(mine);
   const powerOpp = deckPower(opp);
-  // Espérance de buts : base 2.3, modulée par l'écart de puissance.
-  const diff = powerMe - powerOpp;
+  // Espérance de buts : base 2.3, modulée par l'écart de puissance des decks
+  // puis par la forme réelle des deux joueurs.
+  const diff = powerMe - powerOpp + formeBonus;
   const expMe = Math.max(0.4, 2.3 + diff / 14);
   const expOpp = Math.max(0.4, 2.3 - diff / 14);
 

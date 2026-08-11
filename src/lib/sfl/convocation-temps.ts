@@ -74,6 +74,16 @@ export function prochainDimanche(date: Date): Date {
   return d;
 }
 
+/** « 2026-08-23 » — clé stable d'un dimanche (heure de Paris), pour stocker. */
+export function cleDimanche(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 /** « 23 août » — le format des convocations, en français, heure de Paris. */
 export function labelDateFr(date: Date): string {
   return new Intl.DateTimeFormat("fr-FR", {

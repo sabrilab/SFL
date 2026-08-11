@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { Card3D } from "@/components/sfl/card-3d";
 import { CollectionPanel } from "@/components/sfl/collection-panel";
+import { CompoArena } from "@/components/sfl/compo-arena";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useIsClient } from "@/hooks/use-is-client";
@@ -37,6 +38,7 @@ const cardVariants = {
 const MODES = [
   ["duel", "Duel"],
   ["match", "Match"],
+  ["compo", "Compo"],
   ["collection", "Collection"],
 ] as const;
 
@@ -46,12 +48,14 @@ const BASELINE: Record<ArenaMode, string> = {
   duel: "Choisis le meilleur des deux joueurs, statistique par statistique. Chaque duel nourrit ton classement personnel.",
   match:
     "Compose un deck de 5 cartes issues de tes packs et affronte les decks préparés par les autres joueurs.",
+  compo:
+    "Compose ton cinq idéal pour dimanche et dépose-le. Les compositions de la ligue créeront les matchs populaires.",
   collection:
     "Tes packs, ton catalogue et tes achats. Seules les cartes que tu possèdes peuvent entrer dans un match.",
 };
 
 function isMode(v: string | null): v is ArenaMode {
-  return v === "duel" || v === "match" || v === "collection";
+  return v === "duel" || v === "match" || v === "compo" || v === "collection";
 }
 
 function Arene() {
@@ -153,7 +157,7 @@ function Arene() {
             key={mode}
             onClick={() => changeMode(mode)}
             className={cn(
-              "flex-1 rounded-full py-2 text-sm font-semibold transition-colors",
+              "flex-1 rounded-full py-2 text-[13px] font-semibold transition-colors",
               arenaMode === mode
                 ? "bg-foreground text-background"
                 : "text-foreground/45 hover:text-foreground"
@@ -166,6 +170,8 @@ function Arene() {
 
       {arenaMode === "collection" ? (
         <CollectionPanel me={me} />
+      ) : arenaMode === "compo" ? (
+        <CompoArena me={me} />
       ) : arenaMode === "match" ? (
         <MatchArena me={me} />
       ) : (

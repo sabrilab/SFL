@@ -25,7 +25,8 @@ export type ActivityKind =
   | "match"
   | "pack"
   | "achat"
-  | "recherche";
+  | "recherche"
+  | "compo";
 
 const SESSION_KEY = "sfl-activity-session";
 

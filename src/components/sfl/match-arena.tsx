@@ -13,7 +13,12 @@ import { PackageOpen, Play, Swords } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CollectionCardVisual } from "./collection-card-visual";
+import { Locked } from "@/components/sfl/locked";
+import { useSeason } from "@/components/sfl/season-provider";
 import { useIsClient } from "@/hooks/use-is-client";
+import { useBallonsBleus } from "@/hooks/use-ballons-bleus";
+import { creditBlue, DUEL_DIRECT_BLUE, MATCH_WIN_BLUE, blueMatchWins } from "@/lib/sfl/ballons-bleus";
+import { logActivity } from "@/lib/sfl/activity";
 import { CATALOG, CATALOG_BY_ID, getOwned, KIND_LABELS } from "@/lib/sfl/collection";
 import {
   DECK_SIZE,
@@ -28,6 +33,8 @@ import {
 
 export function MatchArena({ me }: { me: string }) {
   const isClient = useIsClient();
+  const { allPlayers } = useSeason();
+  const bleus = useBallonsBleus(me);
   const [tick, setTick] = useState(0);
   const [opponent, setOpponent] = useState<OpponentDeck | null>(null);
   const [result, setResult] = useState<MatchResult | null>(null);
@@ -59,13 +66,27 @@ export function MatchArena({ me }: { me: string }) {
   function launch() {
     if (!ready) return;
     const opp = pickOpponentDeck(me);
-    const res = simulateMatch(deckCards, opp.cards);
+    // Le classement réel pèse sur le résultat : l'écart de points Pépite
+    // entre les deux joueurs, ramené à quelques points de puissance.
+    const ppOf = (name: string) => allPlayers.find((p) => p.name === name)?.pp ?? 0;
+    const formeBonus = Math.max(-4, Math.min(4, (ppOf(me) - ppOf(opp.owner)) / 12));
+    const res = simulateMatch(deckCards, opp.cards, formeBonus);
     setOpponent(opp);
     setResult(res);
     setPlaying(true);
-    // Fin du "direct" une fois tous les événements déroulés.
+    logActivity("match", { meta: { contre: opp.owner, score: `${res.scoreMe}-${res.scoreOpp}` } });
+    // Fin du "direct" une fois tous les événements déroulés — c'est là que la
+    // victoire paie : +1 Ballon bleu au coup de sifflet final.
     const total = 1200 + res.events.length * 900 + 600;
-    setTimeout(() => setPlaying(false), total);
+    setTimeout(() => {
+      setPlaying(false);
+      if (res.scoreMe > res.scoreOpp) {
+        creditBlue(me, MATCH_WIN_BLUE, "Match d'Arène gagné");
+        toast.success(`+${MATCH_WIN_BLUE} Ballon bleu 🔵`, {
+          description: `Victoire ${res.scoreMe}–${res.scoreOpp} contre ${opp.owner}`,
+        });
+      }
+    }, total);
   }
 
   if (myCards.length < DECK_SIZE) {
@@ -85,8 +106,34 @@ export function MatchArena({ me }: { me: string }) {
     );
   }
 
+  const victoires = blueMatchWins(me);
+
   return (
     <div className="flex flex-col gap-5">
+      {/* Le portefeuille bleu — la monnaie qui ne s'achète pas */}
+      <div className="glass flex items-center justify-between gap-3 rounded-[20px] px-4 py-3">
+        <div className="min-w-0">
+          <p className="mono-label text-[#6FA8FF]">Ballons bleus</p>
+          <p className="mt-1 text-[12.5px] leading-snug text-foreground/45">
+            +{MATCH_WIN_BLUE} par match gagné · {victoires} victoire{victoires > 1 ? "s" : ""}.
+            Ils débloqueront l&apos;échange de cartes entre joueurs.
+          </p>
+        </div>
+        <span className="shrink-0 text-[26px] leading-none font-extrabold tracking-tight tabular-nums text-[#6FA8FF]">
+          {bleus} <span className="text-[15px]">🔵</span>
+        </span>
+      </div>
+
+      <Locked
+        label="Bientôt"
+        note="Ajoute des amis pour les défier en direct — le duel direct rapporte 5 🔵."
+      >
+        <div className="glass-soft flex items-center justify-between rounded-[18px] px-4 py-3">
+          <span className="text-[13.5px] font-semibold">Duel direct contre un ami</span>
+          <span className="mono-label text-[#6FA8FF]">+{DUEL_DIRECT_BLUE} 🔵</span>
+        </div>
+      </Locked>
+
       {/* Deck actuel */}
       <section>
         <div className="mb-2 flex items-baseline justify-between px-1">
