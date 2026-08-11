@@ -3,12 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { Lock, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/nav";
 import { useMyPlayer } from "@/components/sfl/player-provider";
-import { useSession } from "@/hooks/use-session";
-import { useSeason } from "@/components/sfl/season-provider";
 import { useBallons } from "@/hooks/use-ballons";
 import { useIsClient } from "@/hooks/use-is-client";
 import {
@@ -16,29 +14,13 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-// Profils protégés par un petit mot de passe (pas de vraie sécurité —
-// juste de quoi éviter qu'on se fasse usurper son profil pour de rire).
-const PROFILE_PASSWORDS: Record<string, string> = {
-  Ilyes: "azy",
-};
 
 // Ligues Golder — l'utilisateur appartient à la SFL ; les autres sont
 // visibles pour montrer qu'on peut changer de ligue (v1 locale).
@@ -96,98 +78,11 @@ function BallonsBadge({ me }: { me: string }) {
   );
 }
 
-function ProfilePasswordDialog({
-  name,
-  open,
-  onOpenChange,
-  onSuccess,
-}: {
-  name: string | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSuccess: (name: string) => void;
-}) {
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
-
-  function reset() {
-    setPassword("");
-    setError(false);
-  }
-
-  function submit() {
-    if (!name) return;
-    if (password === PROFILE_PASSWORDS[name]) {
-      onSuccess(name);
-      onOpenChange(false);
-      reset();
-    } else {
-      setError(true);
-    }
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        onOpenChange(next);
-        if (!next) reset();
-      }}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-1.5">
-            <Lock className="size-4" /> Profil protégé
-          </DialogTitle>
-          <DialogDescription>
-            Le profil {name} est protégé par un mot de passe.
-          </DialogDescription>
-        </DialogHeader>
-        <Input
-          type="password"
-          autoFocus
-          placeholder="Mot de passe"
-          value={password}
-          aria-invalid={error}
-          onChange={(e) => {
-            setPassword(e.target.value);
-            setError(false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") submit();
-          }}
-        />
-        {error && <p className="text-xs text-destructive">Mot de passe incorrect.</p>}
-        <DialogFooter>
-          <Button onClick={submit} className="font-semibold">
-            Se connecter
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export function SiteHeader() {
   const pathname = usePathname();
-  const { me, setMe } = useMyPlayer();
-  const { players } = useSeason();
-  const session = useSession();
-  // Depuis les comptes, chacun est lié à son profil : la bascule de profil ne
-  // sert plus qu'à l'admin, pour vérifier ce que voient les autres.
-  const canSwitch = !!session?.admin;
-  const playerNames = [...players]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((p) => p.name);
-  const [pendingProfile, setPendingProfile] = useState<string | null>(null);
-
-  function selectProfile(name: string) {
-    if (PROFILE_PASSWORDS[name]) {
-      setPendingProfile(name);
-    } else {
-      setMe(name);
-    }
-  }
+  // Chacun est lié à son compte : l'en-tête affiche le sien, sans choix
+  // possible. (Le nom vient de la session ; il mène au profil.)
+  const { me } = useMyPlayer();
 
   return (
     // Le seuil de `sticky` se mesure depuis le haut réel du conteneur, que le
@@ -236,50 +131,16 @@ export function SiteHeader() {
         {/* Bulle droite : Ballons, profil, réglages */}
         <div className="glass ml-auto flex items-center gap-1.5 rounded-full px-1.5 py-1.5">
           <BallonsBadge me={me} />
-          {canSwitch ? (
-            <Select value={me} onValueChange={(v) => selectProfile(v as string)}>
-              <SelectTrigger
-                size="sm"
-                aria-label="Voir l'app comme un autre joueur (admin)"
-                className="rounded-full border-transparent bg-secondary px-3.5 font-medium dark:bg-secondary"
-              >
-                <span className="mr-1 flex size-4.5 items-center justify-center rounded-full bg-foreground/10 text-[9px] font-bold">
-                  {me[0]}
-                </span>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {playerNames.map((name) => (
-                  <SelectItem key={name} value={name}>
-                    <span className="flex items-center gap-1.5">
-                      {name}
-                      {PROFILE_PASSWORDS[name] && <Lock className="size-3 text-muted-foreground" />}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <Link
-              href="/profil"
-              aria-label="Mon profil"
-              className="flex items-center gap-1.5 rounded-full bg-secondary py-1.5 pr-3.5 pl-1.5 text-sm font-medium"
-            >
-              <span className="flex size-4.5 items-center justify-center rounded-full bg-foreground/10 text-[9px] font-bold">
-                {me[0]}
-              </span>
-              {me}
-            </Link>
-          )}
-
-          <ProfilePasswordDialog
-            name={pendingProfile}
-            open={pendingProfile !== null}
-            onOpenChange={(open) => {
-              if (!open) setPendingProfile(null);
-            }}
-            onSuccess={(name) => setMe(name)}
-          />
+          <Link
+            href="/profil"
+            aria-label="Mon compte"
+            className="flex items-center gap-1.5 rounded-full bg-secondary py-1.5 pr-3.5 pl-1.5 text-sm font-medium"
+          >
+            <span className="flex size-4.5 items-center justify-center rounded-full bg-foreground/10 text-[9px] font-bold">
+              {me[0]}
+            </span>
+            {me}
+          </Link>
 
           <Tooltip>
             <TooltipTrigger
