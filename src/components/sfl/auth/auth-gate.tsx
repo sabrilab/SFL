@@ -6,14 +6,19 @@
 // connexion n'apparaît que si rien n'est en attente.
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useSession } from "@/hooks/use-session";
 import { bootstrapServerSession } from "@/lib/sfl/auth/session";
 import { LoginScreen } from "./login-screen";
 
+/** Pages ouvertes à tous : le lien d'accueil personnel envoyé par l'admin. */
+const PUBLIC_ROUTES = ["/bienvenue"];
+
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const isClient = useIsClient();
   const session = useSession();
+  const pathname = usePathname();
   const [bootstrapped, setBootstrapped] = useState(false);
 
   useEffect(() => {
@@ -30,6 +35,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   // Avant hydratation (et pendant la reprise de session) on ne rend rien :
   // ni flash de contenu privé, ni formulaire qui clignote.
+  if (PUBLIC_ROUTES.some((r) => pathname?.startsWith(r))) return <>{children}</>;
   if (!isClient) return null;
   if (!session && !bootstrapped) return null;
   if (!session)
