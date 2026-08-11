@@ -19,6 +19,7 @@ import { activeConvocation } from "@/lib/sfl/saisie/mutations";
 import { NEXT_MATCH } from "@/lib/sfl/data";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/sfl/activity";
+import { publicOnly } from "@/lib/sfl/hidden";
 
 interface ServerConvocation {
   id: number;
@@ -115,7 +116,7 @@ export function usePresence(): PresenceView {
   /* ------------------------------ Repli local ------------------------------ */
 
   const local = useMemo(
-    () => listPresence(saison, saison.roster.map((r) => ({ name: r.name, profil: r.profil }))),
+    () => listPresence(saison, publicOnly(saison.roster).map((r) => ({ name: r.name, profil: r.profil }))),
     [saison]
   );
   const localConv = activeConvocation(saison);
@@ -176,7 +177,7 @@ export function usePresence(): PresenceView {
   /* -------------------------------- La vue -------------------------------- */
 
   if (serverActive && server) {
-    const names = saison.roster.map((r) => ({ name: r.name, actif: r.profil === "Actif" }));
+    const names = publicOnly(saison.roster).map((r) => ({ name: r.name, actif: r.profil === "Actif" }));
     const rep = server.reponses;
     return {
       shared: true,

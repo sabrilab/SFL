@@ -29,6 +29,7 @@ import {
   type Player,
 } from "@/lib/sfl/engine";
 import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
+import { publicOnly } from "@/lib/sfl/hidden";
 import {
   AbsentsModule,
   CouleursModule,
@@ -178,7 +179,8 @@ export function JourneeRecap({ j }: { j: number }) {
     () => ({ ...saison, entries: saison.entries.filter((e) => e.j <= j) }),
     [saison, j]
   );
-  const players = useMemo(() => computeStandings(saisonAtJ), [saisonAtJ]);
+  // Liste publique : un joueur masqué ne remonte dans aucun module du récap.
+  const players = useMemo(() => publicOnly(computeStandings(saisonAtJ)), [saisonAtJ]);
   const journeesAtJ = useMemo(() => journees.filter((x) => x.j <= j), [journees, j]);
 
   const byName = new Map(players.map((p) => [p.name, p]));

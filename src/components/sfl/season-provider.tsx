@@ -11,11 +11,19 @@ import { useIsClient } from "@/hooks/use-is-client";
 import { deriveSeason, type DerivedSeason } from "@/lib/sfl/saisie/engine";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
 import type { Saison } from "@/lib/sfl/saisie/types";
+import type { Player } from "@/lib/sfl/engine";
+import { isHidden, publicOnly } from "@/lib/sfl/hidden";
 
 export const SAISIE_EVENT = "sfl-saisie";
 
 interface SeasonValue extends DerivedSeason {
   saison: Saison;
+  /**
+   * TOUS les joueurs, masqués compris. Réservé aux écrans où quelqu'un se
+   * regarde lui-même (sa fiche, sa carte) : partout ailleurs, `players` est la
+   * liste publique et c'est elle qu'il faut utiliser.
+   */
+  allPlayers: Player[];
 }
 
 const SeasonContext = createContext<SeasonValue | null>(null);
@@ -40,7 +48,18 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     return isClient ? saisieStore.load() : seedSaison();
   }, [isClient, version]);
   const derived = useMemo(() => deriveSeason(saison), [saison]);
-  const value = useMemo<SeasonValue>(() => ({ ...derived, saison }), [derived, saison]);
+  // `players` est la liste PUBLIQUE : les joueurs masqués n'y sont pas, donc
+  // aucun classement, aucune recherche, aucun duel ne peut les faire remonter.
+  const value = useMemo<SeasonValue>(
+    () => ({
+      ...derived,
+      players: publicOnly(derived.players),
+      boostCards: derived.boostCards.filter((c) => !isHidden(c.player)),
+      allPlayers: derived.players,
+      saison,
+    }),
+    [derived, saison]
+  );
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
 }

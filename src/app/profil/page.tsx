@@ -126,10 +126,18 @@ function ProfilRadar({ stats, overall }: { stats: Player["stats"]; overall: numb
       </svg>
 
       <div className="mt-3.5 flex w-full items-center justify-between border-t border-white/9 pt-3.5">
-        <p className="text-[12.5px] text-foreground/45">Point faible : {STAT_FR[worst]}</p>
-        <p className="mono-label text-primary">
-          −{stats[best] - stats[worst]} VS {best}
-        </p>
+        {/* Une carte parfaitement plate n'a pas de point faible : le dire, plutôt
+            que d'annoncer « −0 » sur un critère pris au hasard. */}
+        {stats[best] === stats[worst] ? (
+          <p className="text-[12.5px] text-foreground/45">Profil parfaitement équilibré</p>
+        ) : (
+          <>
+            <p className="text-[12.5px] text-foreground/45">Point faible : {STAT_FR[worst]}</p>
+            <p className="mono-label text-primary">
+              −{stats[best] - stats[worst]} VS {best}
+            </p>
+          </>
+        )}
       </div>
     </section>
   );
@@ -164,8 +172,11 @@ function AvatarPhoto({ name }: { name: string }) {
 
 export default function Profil() {
   const { player } = useMyPlayer();
-  const { players, journees, boostCards, saison } = useSeason();
-  const myRank = rankPlayers(players).find((p) => p.name === player.name)?.rank ?? players.length;
+  const { allPlayers, journees, boostCards, saison } = useSeason();
+  // Sur sa propre fiche, on se classe parmi tout le monde — y compris les
+  // joueurs masqués ailleurs dans l'app.
+  const myRank =
+    rankPlayers(allPlayers).find((p) => p.name === player.name)?.rank ?? allPlayers.length;
   const myCards = boostCards.filter((c) => c.player === player.name);
   const cardStats = rareStats(player.stats);
   // Les deux visages de la carte : la simple (les notes brutes) et la rare

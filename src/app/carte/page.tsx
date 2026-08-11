@@ -42,11 +42,12 @@ function SectionTitle({
 
 export default function CartePage() {
   const { player } = useMyPlayer();
-  const { players, boostCards } = useSeason();
+  const { allPlayers, boostCards } = useSeason();
   const [mode, setMode] = useState<CardMode>("rare");
   const [alloc, setAlloc] = useState<Allocation>(emptyAllocation());
 
-  const RANKED = rankPlayers(players);
+  // Sa carte, sa page : le rang se calcule sur tout le monde.
+  const RANKED = rankPlayers(allPlayers);
   const myRank = RANKED.find((p) => p.name === player.name)?.rank ?? RANKED.length;
   const myBoosts = boostCards.filter((c) => c.player === player.name);
 

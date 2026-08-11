@@ -116,10 +116,11 @@ export const ovr = (s: Stats) =>
   Math.ceil(STAT_KEYS.reduce((a, k) => a + s[k], 0) / 6);
 
 // Version "Rare" de la carte : +3 sur les 2 meilleures stats, +1 ailleurs.
+// Plafonnée à 99 comme les cartes boost : une base déjà à 99 y reste.
 export function rareStats(s: Stats): Stats {
   const top2 = [...STAT_KEYS].sort((a, b) => s[b] - s[a]).slice(0, 2);
   const out = {} as Stats;
-  for (const k of STAT_KEYS) out[k] = s[k] + (top2.includes(k) ? 3 : 1);
+  for (const k of STAT_KEYS) out[k] = Math.min(99, s[k] + (top2.includes(k) ? 3 : 1));
   return out;
 }
 

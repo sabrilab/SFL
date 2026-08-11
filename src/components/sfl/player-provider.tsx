@@ -23,7 +23,9 @@ const PlayerContext = createContext<PlayerContextValue>({
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const isClient = useIsClient();
-  const { players } = useSeason();
+  // Un joueur masqué doit pouvoir se connecter et se voir : l'identité se
+  // résout donc sur la liste complète, pas sur la liste publique.
+  const { allPlayers: players } = useSeason();
   const session = useSession();
   // La bascule de profil (réservée à l'admin) est mémorisée AVEC la session
   // pour laquelle elle a été faite : changer de compte l'invalide d'elle-même,
@@ -66,7 +68,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
 export function useMyPlayer() {
   const { me, setMe } = useContext(PlayerContext);
-  const { players } = useSeason();
-  const player = players.find((p) => p.name === me) ?? players[0];
+  const { allPlayers } = useSeason();
+  const player = allPlayers.find((p) => p.name === me) ?? allPlayers[0];
   return { me, setMe, player };
 }
