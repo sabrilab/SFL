@@ -16,7 +16,7 @@ const SEED_VERSION_KEY = "sfl-saisie-seed";
 // journée ajoutée dans seed.ts, on incrémente ce numéro pour que les
 // appareils qui ont déjà une saison en cache repartent des données à jour
 // au lieu de rester bloqués sur l'ancienne.
-const SEED_VERSION = 11;
+const SEED_VERSION = 12;
 
 /** Copie fraîche du seed (données initiales). */
 export function seedSaison(): Saison {

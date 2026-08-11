@@ -93,10 +93,10 @@ export const SEED_ROSTER: RosterEntry[] = [
   { name: "Kevin B", poste: null, profil: "En attente", base: null },
   { name: "Anis R", poste: null, profil: "En attente", base: null },
   { name: "Sami D", poste: null, profil: "En attente", base: null },
-  // Ajouté à la demande de l'admin. Base de départ à 75 partout (la valeur des
-  // joueurs pas encore évalués) : elle suffit à lui donner une carte et une
-  // place dans les classements, en attendant sa première journée.
-  { name: "Sabri", poste: null, profil: "Actif", base: [75, 75, 75, 75, 75, 75] },
+  // Ajoutés à la demande de l'admin.
+  { name: "Miken", poste: null, profil: "Actif", base: null },
+  // Carte à 99 partout, décision de l'admin.
+  { name: "Sabri", poste: null, profil: "Actif", base: [99, 99, 99, 99, 99, 99] },
 ];
 
 export const SEED_ENTRIES: MatchEntry[] = [
@@ -288,8 +288,8 @@ export const SEED_ENTRIES: MatchEntry[] = [
   { j: 7, player: "Anas", team: null, statut: "Présent", result: null, sflTime: false, buts: 0, passes: 0, cleanSheet: false, mvp: false, impact: false, def: false, retard: false, note: "Bonus extra time", pepiteBonus: 1, extraTime: true },
 
   { j: 8, player: "Ilyes", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 4, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-  { j: 8, player: "Anis", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 4, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
-  { j: 8, player: "Isma", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 4, passes: 0, cleanSheet: false, mvp: false, impact: true, def: true, retard: false },
+  { j: 8, player: "Anis", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 4, passes: 2, cleanSheet: false, mvp: false, impact: true, def: false, retard: false },
+  { j: 8, player: "Isma", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 4, passes: 0, cleanSheet: false, mvp: false, impact: false, def: true, retard: false },
   { j: 8, player: "Yamin", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 2, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 8, player: "Zakaria", team: "Orange", statut: "Présent", result: "Victoire", sflTime: false, buts: 2, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },
   { j: 8, player: "Ilies", team: "Bleu", statut: "Présent", result: "Défaite", sflTime: false, buts: 1, passes: 1, cleanSheet: false, mvp: false, impact: false, def: false, retard: false },

@@ -136,12 +136,12 @@
     {
       "nom": "Anis",
       "poste": "DC",
-      "pp": 59,
+      "pp": 60,
       "matchs": 7,
       "buts": 25,
       "passes": 13,
       "mvp": 0,
-      "impact": 0,
+      "impact": 1,
       "def": 2,
       "stats": {
         "VIT": 72,
@@ -459,12 +459,12 @@
     {
       "nom": "Isma",
       "poste": "—",
-      "pp": 9,
+      "pp": 8,
       "matchs": 1,
       "buts": 4,
       "passes": 0,
       "mvp": 0,
-      "impact": 1,
+      "impact": 0,
       "def": 1,
       "stats": {
         "VIT": 75,
@@ -828,12 +828,12 @@
       "impact": 0,
       "def": 0,
       "stats": {
-        "VIT": 75,
-        "TIR": 75,
-        "PAS": 75,
-        "DRI": 75,
-        "DEF": 75,
-        "PHY": 75
+        "VIT": 99,
+        "TIR": 99,
+        "PAS": 99,
+        "DRI": 99,
+        "DEF": 99,
+        "PHY": 99
       }
     },
     {
@@ -2138,6 +2138,20 @@
       }
     },
     {
+      "joueur": "Anis",
+      "type": "impact",
+      "date": "J8 · 9 août",
+      "ovr": 81,
+      "stats": {
+        "VIT": 74,
+        "TIR": 83,
+        "PAS": 75,
+        "DRI": 74,
+        "DEF": 86,
+        "PHY": 89
+      }
+    },
+    {
       "joueur": "Franz",
       "type": "def",
       "date": "J8 · 9 août",
@@ -2177,20 +2191,6 @@
         "DRI": 77,
         "DEF": 78,
         "PHY": 78
-      }
-    },
-    {
-      "joueur": "Isma",
-      "type": "impact",
-      "date": "J8 · 9 août",
-      "ovr": 79,
-      "stats": {
-        "VIT": 81,
-        "TIR": 85,
-        "PAS": 77,
-        "DRI": 77,
-        "DEF": 77,
-        "PHY": 77
       }
     },
     {

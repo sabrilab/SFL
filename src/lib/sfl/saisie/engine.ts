@@ -81,6 +81,15 @@ const emptyAgg = (): Agg => ({
 });
 
 export function entryPP(e: MatchEntry): number {
+  // Une ligne qui n'est pas une présence ne rapporte pas le point de présence :
+  // un blessé, un suspendu ou un absent justifié est à zéro, comme dans la
+  // colonne « PP du match » du classeur. L'absence injustifiée, elle, coûte.
+  // (Les classements passaient déjà par ce chemin ; c'est l'affichage ligne à
+  // ligne de la grille qui exigeait de le dire ici.)
+  if (e.statut !== "Présent") {
+    const penalite = e.statut === "Absence injustifiée" ? BAREME.absenceInjustifiee : 0;
+    return penalite + (e.pepiteBonus ?? 0);
+  }
   let pp = BAREME.presence;
   if (e.result === "Victoire") pp += e.sflTime ? BAREME.victoireSflTime : BAREME.victoire;
   else if (e.result === "Nul") pp += BAREME.nul;
