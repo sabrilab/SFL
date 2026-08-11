@@ -68,6 +68,7 @@ import { buildQuiz, PronosticModule, QuizModule } from "@/components/sfl/feed/je
 import { NEXT_MATCH } from "@/lib/sfl/data";
 import { Reveal } from "@/components/sfl/feed/reveal";
 import { PitchSynthese } from "@/components/sfl/feed/pitch-synthese";
+import { LaUne } from "@/components/sfl/feed/la-une";
 import { cn } from "@/lib/utils";
 
 /* ----------------------------- Réactions ------------------------------ */
@@ -252,6 +253,20 @@ export function JourneeRecap({ j }: { j: number }) {
     .filter((d) => d.best.length === 2)
     .sort((a, b) => b.total - a.total)[0];
 
+  // Lignes de la « une » : tout le monde, avec ses honneurs et ses points du
+  // jour. C'est le palmarès du dimanche, celui qu'on lit en dernier.
+  const uneLines = jEntries.map((e) => ({
+    player: e.player,
+    team: e.team,
+    buts: e.buts,
+    passes: e.passes,
+    pp: entryPP(e),
+    mvp: e.mvp,
+    impact: e.impact,
+    def: e.def,
+    result: e.result,
+  }));
+
   // Lignes enrichies des honneurs, pour la synthèse sur le terrain.
   const pitchLines = lines.map((l) => {
     const e = jEntries.find((x) => x.player === l.name);
@@ -343,6 +358,18 @@ export function JourneeRecap({ j }: { j: number }) {
           totalButs={totalButs}
           matchesCount={matches.length}
           participants={participants.length}
+        />
+      </Reveal>
+
+      {/* 2 ter · La « une » — les cartes gagnées et le dimanche de tout le monde */}
+      <Reveal delay={0.09}>
+        <LaUne
+          journee={lastJ.j}
+          date={lastJ.date}
+          lines={uneLines}
+          boosts={jBoosts}
+          totalButs={totalButs}
+          record={isRecord}
         />
       </Reveal>
 

@@ -23,13 +23,14 @@ import { JourneeRecap } from "@/components/sfl/feed/journee-recap";
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { EmailNudge } from "@/components/sfl/auth/email-nudge";
 import { JourneeOpening } from "@/components/sfl/feed/journee-opening";
+import { CarteJournee } from "@/components/sfl/carte-journee";
 import { cn } from "@/lib/utils";
 
 export default function Ligue() {
   const { player } = useMyPlayer();
   const { players, journees, saison } = useSeason();
   const isClient = useIsClient();
-  const [view, setView] = useState<"journee" | "classement">("journee");
+  const [view, setView] = useState<"journee" | "classement" | "matchs">("journee");
   const [leagueTick, setLeagueTick] = useState(0);
   void leagueTick;
 
@@ -115,6 +116,7 @@ export default function Ligue() {
           [
             ["journee", "Journée"],
             ["classement", "Classement"],
+            ["matchs", "Matchs"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -132,7 +134,26 @@ export default function Ligue() {
         ))}
       </div>
 
-      {view === "classement" ? (
+      {view === "matchs" ? (
+        <>
+          <p className="px-1 text-[13px] text-foreground/40">
+            Chaque dimanche sur son terrain · {played.length} journée
+            {played.length > 1 ? "s" : ""} jouée{played.length > 1 ? "s" : ""}
+          </p>
+          <div className="flex flex-col gap-3.5">
+            {[...played].reverse().map((jn) => (
+              <CarteJournee
+                key={jn.j}
+                journee={jn}
+                onOuvrir={() => {
+                  setView("journee");
+                  openJournee(jn.j);
+                }}
+              />
+            ))}
+          </div>
+        </>
+      ) : view === "classement" ? (
         <>
           <p className="px-1 text-[13px] text-foreground/40">
             Sunday Five League · après {journees.length} journées
