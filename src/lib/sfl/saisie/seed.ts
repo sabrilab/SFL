@@ -93,6 +93,10 @@ export const SEED_ROSTER: RosterEntry[] = [
   { name: "Kevin B", poste: null, profil: "En attente", base: null },
   { name: "Anis R", poste: null, profil: "En attente", base: null },
   { name: "Sami D", poste: null, profil: "En attente", base: null },
+  // Ajouté à la demande de l'admin. Base de départ à 75 partout (la valeur des
+  // joueurs pas encore évalués) : elle suffit à lui donner une carte et une
+  // place dans les classements, en attendant sa première journée.
+  { name: "Sabri", poste: null, profil: "Actif", base: [75, 75, 75, 75, 75, 75] },
 ];
 
 export const SEED_ENTRIES: MatchEntry[] = [

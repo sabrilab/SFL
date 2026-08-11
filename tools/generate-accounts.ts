@@ -24,6 +24,14 @@ const MOTS = [
   "pointu", "gardien", "buteur", "capitaine", "terrain", "sifflet", "maillot", "crampon",
 ];
 
+/**
+ * Mots de passe imposés par l'admin, par nom de joueur. Ils remplacent le mot
+ * de passe généré : à utiliser quand quelqu'un a déjà reçu ses accès.
+ */
+const MOTS_DE_PASSE_IMPOSES: Record<string, string> = {
+  Sabri: "59Sabrii!",
+};
+
 /** Générateur déterministe : même nom = même mot de passe à chaque exécution. */
 function seededInt(seed: string, max: number) {
   const h = createHash("sha256").update(seed).digest();
@@ -46,7 +54,7 @@ function main() {
 
     const mot = MOTS[seededInt(`${r.name}|mot`, MOTS.length)];
     const num = 10 + seededInt(`${r.name}|num`, 90);
-    const password = `${mot}${num}`;
+    const password = MOTS_DE_PASSE_IMPOSES[r.name] ?? `${mot}${num}`;
 
     return {
       user,

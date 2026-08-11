@@ -14,7 +14,7 @@ le mot de passe lui-même.
 
 Régénérer ce fichier : `npx tsx tools/generate-accounts.ts`
 
-**71 comptes.**
+**72 comptes.**
 
 | Joueur | Identifiant | Mot de passe | Rôle |
 | --- | --- | --- | --- |
@@ -66,6 +66,7 @@ Régénérer ce fichier : `npx tsx tools/generate-accounts.ts`
 | Omar | `omar` | `ballon29` | Actif |
 | Rezki | `rezki` | `corner17` | Actif |
 | Ryad | `ryad` | `sifflet90` | Actif |
+| Sabri | `sabri` | `59Sabrii!` | Actif |
 | Sami D | `samid` | `sprint57` | En attente |
 | Samy | `samy` | `buteur28` | Actif |
 | Sebovic | `sebovic` | `crampon95` | Actif |

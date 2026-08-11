@@ -818,6 +818,25 @@
       }
     },
     {
+      "nom": "Sabri",
+      "poste": "—",
+      "pp": 0,
+      "matchs": 0,
+      "buts": 0,
+      "passes": 0,
+      "mvp": 0,
+      "impact": 0,
+      "def": 0,
+      "stats": {
+        "VIT": 75,
+        "TIR": 75,
+        "PAS": 75,
+        "DRI": 75,
+        "DEF": 75,
+        "PHY": 75
+      }
+    },
+    {
       "nom": "Samy",
       "poste": "MC",
       "pp": 5,

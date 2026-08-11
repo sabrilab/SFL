@@ -1,15 +1,19 @@
 "use client";
 
-// Section Profil — réplique de l'écran « PROFIL matte » du design de référence :
-// la carte 3D plein cadre, les deux actions, la rangée d'identité, la carte
-// « PROFIL DE JEU » avec le radar hexagonal (point faible en bleu), le bento
-// de stats, la série de dimanches, la photo de profil, les mini-jeux « Les
-// bases » (verrouillés) et la grille Collection. Les écrans existants restent
-// leurs propres pages ; ici on oriente.
+// Section Profil — l'identité du joueur, rien d'autre.
+//
+// Ordre de lecture : qui je suis → mes deux cartes (simple et rare, au choix)
+// → mon profil de jeu (le radar hexagonal, point faible en bleu) → mes
+// chiffres → ma série de dimanches → ma photo → les mini-jeux « Les bases »
+// (verrouillés) → les raccourcis.
+//
+// Tout le gameplay numérique (packs, catalogue, duels, matchs) a déménagé dans
+// l'Arène : le profil ne porte plus de grille Collection, seulement le lien.
 
 import Link from "next/link";
 import { useState } from "react";
 import { Check, ChevronRight, Dumbbell, IdCard, Swords } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Card3D } from "@/components/sfl/card-3d";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { BOOST_LABELS } from "@/components/sfl/boost-card";
@@ -164,6 +168,9 @@ export default function Profil() {
   const myRank = rankPlayers(players).find((p) => p.name === player.name)?.rank ?? players.length;
   const myCards = boostCards.filter((c) => c.player === player.name);
   const cardStats = rareStats(player.stats);
+  // Les deux visages de la carte : la simple (les notes brutes) et la rare
+  // (celle qui sert partout ailleurs dans l'app).
+  const [face, setFace] = useState<"simple" | "rare">("rare");
 
   // Série de dimanches : journées jouées consécutives, en remontant depuis
   // la dernière journée disputée.
@@ -179,48 +186,12 @@ export default function Profil() {
     else break;
   }
 
-  // Grille Collection : ma carte rare + mes derniers titres, complétés de
-  // tuiles « à venir » pour garder les quatre cases du design.
-  const tiles: string[] = [
-    `RARE · ${ovr(cardStats)}`,
-    ...myCards
-      .slice(-3)
-      .reverse()
-      .map((c) => `${BOOST_LABELS[c.type].toUpperCase()} · ${c.date.split(" ·")[0]}`),
-  ];
-  while (tiles.length < 4) tiles.push("À VENIR");
+  const nbTitres = myCards.length;
+  const dernierTitre = myCards[myCards.length - 1];
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-[18px] px-5 py-4 sm:py-8">
       <h1 className="text-[30px] font-bold tracking-tight">Profil</h1>
-
-      {/* La carte en grand + la légende de manipulation */}
-      <section className="flex flex-col items-center gap-3">
-        <Card3D
-          cacheKey={`profil-${player.name}`}
-          mode="rare"
-          size={0.88}
-          render={(s) => <PlayerCard player={player} mode="rare" size={s} />}
-        />
-        <p className="mono-label text-center text-[9px] tracking-[0.12em] text-foreground/30">
-          Glisse pour tourner · double-clic pour retourner
-        </p>
-      </section>
-
-      {/* Les deux actions du design : partage (bientôt) + historique */}
-      <div className="flex gap-[9px]">
-        <Locked label="Bientôt" className="flex-1" chipClassName="-top-2.5 right-1">
-          <span className="block rounded-full bg-foreground py-[15px] text-center text-[15px] font-bold text-background">
-            Partager ma carte
-          </span>
-        </Locked>
-        <Link
-          href="/stats"
-          className="glass-soft w-[128px] rounded-full py-[15px] text-center text-[15px] font-semibold text-foreground/70"
-        >
-          Historique
-        </Link>
-      </div>
 
       {/* Rangée d'identité : photo, nom, pseudo, menu réglages */}
       <div className="flex items-center justify-between">
@@ -241,6 +212,54 @@ export default function Profil() {
           {[0, 1, 2].map((i) => (
             <span key={i} className="size-[3.5px] rounded-full bg-foreground/60" />
           ))}
+        </Link>
+      </div>
+
+      {/* Mes deux cartes : la simple et la rare, au choix */}
+      <section className="flex flex-col items-center gap-3.5">
+        <div className="glass flex w-full max-w-[240px] rounded-full p-1">
+          {(
+            [
+              ["simple", "Simple"],
+              ["rare", "Rare"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setFace(id)}
+              className={cn(
+                "flex-1 rounded-full py-1.5 text-[13px] font-semibold transition-colors",
+                face === id ? "bg-foreground text-background" : "text-foreground/45"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <Card3D
+          key={face}
+          cacheKey={`profil-${face}-${player.name}`}
+          mode={face}
+          size={0.88}
+          render={(s) => <PlayerCard player={player} mode={face} size={s} />}
+        />
+        <p className="mono-label text-center text-[9px] tracking-[0.12em] text-foreground/30">
+          Glisse pour tourner · double-clic pour retourner
+        </p>
+      </section>
+
+      {/* Les deux actions du design : partage (bientôt) + historique */}
+      <div className="flex gap-[9px]">
+        <Locked label="Bientôt" className="flex-1" chipClassName="-top-2.5 right-1">
+          <span className="block rounded-full bg-foreground py-[15px] text-center text-[15px] font-bold text-background">
+            Partager ma carte
+          </span>
+        </Locked>
+        <Link
+          href="/stats"
+          className="glass-soft w-[128px] rounded-full py-[15px] text-center text-[15px] font-semibold text-foreground/70"
+        >
+          Historique
         </Link>
       </div>
 
@@ -353,39 +372,24 @@ export default function Profil() {
         </Locked>
       </section>
 
-      {/* Collection — les quatre dernières tuiles, la page complète au clic */}
-      <section>
-        <div className="mb-[11px] flex items-center justify-between">
-          <h2 className="text-[16px] font-bold tracking-tight">Collection</h2>
-          <Link href="/collection" className="flex items-center gap-1 text-[13px] text-foreground/40">
-            {myCards.length + 1} carte{myCards.length > 0 ? "s" : ""}
-            <ChevronRight className="size-3.5" />
-          </Link>
-        </div>
-        <Link href="/collection" className="grid grid-cols-4 gap-[9px]">
-          {tiles.map((label, i) => (
-            <span
-              key={`${label}-${i}`}
-              className="flex items-end rounded-[14px] border border-white/11 p-2"
-              style={{
-                aspectRatio: "3/4",
-                background:
-                  "repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 6px, rgba(255,255,255,0.012) 6px 12px), linear-gradient(168deg, rgba(255,255,255,0.1), rgba(255,255,255,0.025))",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), 0 8px 20px rgba(0,0,0,0.35)",
-              }}
-            >
-              <span className="mono-label text-[9px] text-foreground/55">{label}</span>
-            </span>
-          ))}
-        </Link>
-      </section>
-
       {/* Navigation du profil */}
       <section className="flex flex-col gap-2.5">
         {(
           [
-            { href: "/carte", icon: IdCard, label: "Ma carte", note: "Carte, boosts et évolution EvoDay" },
-            { href: "/duel", icon: Swords, label: "Arène", note: "Duels de cartes et simulation de match" },
+            {
+              href: "/carte",
+              icon: IdCard,
+              label: "Ma carte",
+              note: dernierTitre
+                ? `${nbTitres} titre${nbTitres > 1 ? "s" : ""} · dernier : ${BOOST_LABELS[dernierTitre.type]}`
+                : "Carte, boosts et évolution EvoDay",
+            },
+            {
+              href: "/duel",
+              icon: Swords,
+              label: "Arène",
+              note: "Duels, matchs et collection de cartes",
+            },
           ] as const
         ).map((l) => (
           <Link

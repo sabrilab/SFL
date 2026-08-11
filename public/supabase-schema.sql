@@ -106,10 +106,39 @@ create table if not exists public.activity (
   created_at timestamptz not null default now()
 );
 
+-- Enrichissement du journal (migration idempotente) : de quelle page vient
+-- l'événement, à quelle session d'usage il appartient, et un sachet libre pour
+-- le détail. C'est ce qui permet de mesurer un temps de connexion — la durée
+-- d'une session, c'est l'écart entre son premier et son dernier événement.
+alter table public.activity add column if not exists path       text;
+alter table public.activity add column if not exists session_id text;
+alter table public.activity add column if not exists meta       jsonb;
+
+-- Le vocabulaire d'événements s'élargit : on remplace la contrainte fermée
+-- plutôt que d'en ajouter une seconde (rejouable sans erreur).
+alter table public.activity drop constraint if exists activity_kind_check;
+alter table public.activity add constraint activity_kind_check
+  check (kind in (
+    'login',      -- une connexion réussie
+    'open',       -- première ouverture de l'app du jour
+    'heartbeat',  -- l'app est ouverte et visible (toutes les 90 s)
+    'close',      -- l'onglet passe en arrière-plan ou se ferme
+    'view',       -- une page consultée
+    'presence',   -- réponse à une convocation
+    'vote',       -- vote des figures de match
+    'duel',       -- un duel joué dans l'Arène
+    'match',      -- un match d'Arène
+    'pack',       -- ouverture d'un pack
+    'achat',      -- achat d'une carte
+    'recherche'   -- une recherche lancée
+  ));
+
 create index if not exists activity_player_created_idx
   on public.activity (player_id, created_at desc);
 create index if not exists activity_created_idx
   on public.activity (created_at desc);
+create index if not exists activity_session_idx
+  on public.activity (session_id, created_at);
 
 alter table public.activity enable row level security;
 

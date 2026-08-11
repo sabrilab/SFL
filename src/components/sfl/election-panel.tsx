@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { Trophy, Vote } from "lucide-react";
 import { toast } from "sonner";
+import { logActivity } from "@/lib/sfl/activity";
 import {
   Select,
   SelectContent,
@@ -66,6 +67,7 @@ function TeamNominationRow({
       description: `${voters.name} → ${CATEGORY_LABELS[category]}`,
     });
     rewardVote(me);
+    logActivity("vote", { meta: { categorie: category } });
   }
 
   const sorted = [...candidates.players].sort(
@@ -168,6 +170,7 @@ function Phase2Panel({
       description: CATEGORY_LABELS[category],
     });
     rewardVote(me);
+    logActivity("vote", { meta: { categorie: category } });
   }
 
   const sorted = [...uniqueNames].sort((a, b) => (tally.votes[b] ?? 0) - (tally.votes[a] ?? 0));

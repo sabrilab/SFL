@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { Settings } from "lucide-react";
+import { Search, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/nav";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -68,8 +68,8 @@ function BallonsBadge({ me }: { me: string }) {
 
   return (
     <Link
-      href="/collection"
-      aria-label="Mes Ballons — ouvrir la collection"
+      href="/boutique"
+      aria-label="Mes Ballons — ouvrir la boutique"
       className="flex items-center gap-1 rounded-full bg-secondary py-1.5 pr-3 pl-2 text-sm font-bold tabular-nums"
     >
       <span aria-hidden>⚽</span>
@@ -102,6 +102,13 @@ export function SiteHeader() {
             Golder
           </Link>
           <LeagueSwitcher />
+          <Link
+            href="/recherche"
+            aria-label="Rechercher un joueur ou une journée"
+            className="flex size-7 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Search className="size-4" />
+          </Link>
         </div>
 
         <nav className="glass hidden items-center gap-1 rounded-full px-1.5 py-1.5 md:flex">
