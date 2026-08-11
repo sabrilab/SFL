@@ -12,7 +12,12 @@ import { PLAYERS } from "./data";
 import type { BoostType, Player } from "./engine";
 import { debit } from "./ballons";
 
-export const PACK_COST = 7;
+// Un pack tire 4 cartes ; avec les taux ci-dessous et la grille de prix, une
+// carte tirée vaut en moyenne ~29 ⚽, soit ~116 ⚽ le pack. À 60 ⚽ le pack est
+// donc environ moitié prix par rapport à l'achat à l'unité : le hasard reste
+// le bon plan, sans rendre la boutique inutile. Environ un pack par semaine
+// en ne jouant que les gains quotidiens (~8 ⚽/jour).
+export const PACK_COST = 60;
 export const PACK_SIZE = 4;
 
 export type CardKind = "simple" | "rare" | BoostType;
@@ -26,12 +31,18 @@ export interface CollectionCard {
   price: number; // prix boutique en Ballons
 }
 
+// Grille de prix fixée par l'admin. Repère : une recharge de 10 € donne
+// 1 000 Ballons, donc une Standard coûte 20 centimes et une MVP 2,50 € —
+// assez pour se faire plaisir sans que la carte d'un copain soit hors de prix.
+//
+// Acheter la carte d'un autre joueur en donne une COPIE : le propriétaire
+// d'origine garde la sienne. Personne ne se fait dépouiller de sa propre carte.
 export const CARD_PRICES: Record<CardKind, number> = {
-  simple: 15,
-  rare: 40,
-  def: 800,
-  impact: 1500,
-  mvp: 2500,
+  simple: 20,
+  rare: 45,
+  def: 100,
+  impact: 120,
+  mvp: 250,
 };
 
 // Probabilités de tirage d'une carte de pack (somme = 1).

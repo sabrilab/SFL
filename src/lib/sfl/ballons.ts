@@ -15,6 +15,37 @@ export const DAILY_VOTE_REWARD = 1;
 export const DAILY_DUEL_REWARD = 5;
 export const DAILY_DUEL_CAP = 10;
 
+/**
+ * Ancrage monétaire de la ligue : 10 € = 1 000 Ballons, donc **1 Ballon vaut
+ * 1 centime**. C'est ce taux qui donne son prix à tout ce qui s'achète :
+ *   · une carte Standard à 20 ⚽ = 20 centimes ;
+ *   · un textile affiché 29 € = 2 900 ⚽.
+ * La marge se décide au moment de fixer le prix en euros de l'article ; la
+ * conversion, elle, ne bouge pas — sinon plus personne ne s'y retrouve.
+ */
+export const BALLONS_PAR_EURO = 100;
+
+/** Prix en Ballons d'un article dont on connaît le prix de vente en euros. */
+export const ballonsPourEuros = (euros: number) => Math.round(euros * BALLONS_PAR_EURO);
+
+export interface Recharge {
+  euros: number;
+  ballons: number;
+  /** Ballons offerts en plus du taux normal (mis en avant dans la boutique). */
+  bonus?: number;
+}
+
+/**
+ * Recharges proposées. Le taux est le même partout — seule la plus grosse
+ * porte un geste commercial, pour donner une raison de la préférer.
+ */
+export const RECHARGES: Recharge[] = [
+  { euros: 2, ballons: 200 },
+  { euros: 5, ballons: 500 },
+  { euros: 10, ballons: 1000 },
+  { euros: 20, ballons: 2200, bonus: 200 },
+];
+
 export interface BallonsEntry {
   amount: number; // positif = gain, négatif = dépense
   reason: string;

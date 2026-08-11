@@ -97,9 +97,14 @@ function CardModal({
                 n°{card.serial}/{card.total} {has && `· ×${count} en collection`}
               </span>
               {!has && (
-                <Button size="sm" className="mt-1 font-semibold" onClick={() => onBuy(card)}>
-                  Acheter · {card.price} ⚽
-                </Button>
+                <>
+                  <Button size="sm" className="mt-1 font-semibold" onClick={() => onBuy(card)}>
+                    Acheter · {card.price} ⚽
+                  </Button>
+                  <span className="text-[11px] text-foreground/35">
+                    Tu en reçois une copie — {card.player.name} garde la sienne
+                  </span>
+                </>
               )}
             </div>
           </>
@@ -224,7 +229,9 @@ export function CollectionPanel({ me }: { me: string }) {
           {uniqueOwned}/{CATALOG.length}
         </strong>{" "}
         cartes différentes dans ta collection. Touche une carte pour la voir en grand — et
-        l&apos;acheter si elle te manque.
+        l&apos;acheter si elle te manque. Acheter la carte d&apos;un autre joueur t&apos;en donne
+        une <strong className="font-semibold text-foreground">copie</strong> : il garde la sienne.
+        En match, tu ne peux aligner que des cartes que tu possèdes.
       </p>
 
       <div className="-mx-5 flex gap-2 overflow-x-auto overscroll-x-contain px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -296,8 +303,8 @@ export function CollectionPanel({ me }: { me: string }) {
       <div className="glass-soft rounded-[22px] px-4 py-3.5">
         <p className="text-[13px] font-semibold">Besoin de Ballons ?</p>
         <p className="mt-1 text-[12.5px] leading-snug text-foreground/45">
-          Les recharges en argent réel arrivent dans la Boutique. En attendant, tout se gagne :
-          connexion, votes et duels du jour.
+          Les recharges arrivent dans la Boutique — 10 € pour 1 000 ⚽, de quoi se faire plaisir.
+          En attendant, tout se gagne : connexion, votes et duels du jour.
         </p>
       </div>
     </div>

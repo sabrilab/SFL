@@ -73,10 +73,14 @@ export function MatchArena({ me }: { me: string }) {
       <div className="flex flex-col items-center gap-3 rounded-3xl bg-card px-6 py-10 text-center">
         <PackageOpen className="size-7 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
-          Il te faut au moins {DECK_SIZE} cartes en collection pour composer un deck.
-          Tu en as {myCards.length}.
+          Seules les cartes que tu possèdes peuvent entrer dans un deck. Il t&apos;en faut{" "}
+          {DECK_SIZE} ; tu en as {myCards.length}.
         </p>
-        <Button size="sm" className="font-semibold" render={<Link href="/collection">Ouvrir des packs</Link>} />
+        <Button
+          size="sm"
+          className="font-semibold"
+          render={<Link href="/duel?mode=collection">Ouvrir des packs</Link>}
+        />
       </div>
     );
   }
