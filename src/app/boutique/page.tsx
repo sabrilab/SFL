@@ -38,7 +38,7 @@ export default function Boutique() {
   const ballons = useBallons(player.name);
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-5 py-4 sm:py-8">
+    <div className="shell flex flex-col gap-4 py-4 sm:py-8">
       <div>
         <h1 className="text-[30px] font-bold tracking-tight">Boutique</h1>
         <p className="mt-1 text-[13px] text-foreground/42">
@@ -111,7 +111,7 @@ export default function Boutique() {
           label="Bientôt"
           note="Le paiement n'est pas encore branché — tout se gagne en attendant : connexion, votes, duels."
         >
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
             {RECHARGES.map((r) => (
               <div key={r.euros} className="glass rounded-[22px] px-4 py-3.5">
                 <div className="flex items-baseline justify-between">
@@ -190,7 +190,7 @@ export default function Boutique() {
           </div>
 
           {/* La grille */}
-          <div className="grid grid-cols-2 gap-[11px]">
+          <div className="grid grid-cols-2 gap-[11px] lg:grid-cols-4">
             {ITEMS.map((it) => (
               <div key={it.name} className="glass overflow-hidden rounded-[22px]">
                 <div

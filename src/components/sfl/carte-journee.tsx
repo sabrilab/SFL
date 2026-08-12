@@ -79,23 +79,30 @@ function Bulle({
       style={{ left: `${x}%`, top: `${y}%` }}
     >
       <span
-        className="flex items-center justify-center rounded-full text-[11px] font-black text-[#0A0A0A]"
+        className="flex items-center justify-center rounded-full font-black text-[#0A0A0A]"
         style={{
-          width: decisif ? 26 : 22,
-          height: decisif ? 26 : 22,
+          width: decisif ? "clamp(19px, 7.4cqw, 26px)" : "clamp(16px, 6.2cqw, 22px)",
+          height: decisif ? "clamp(19px, 7.4cqw, 26px)" : "clamp(16px, 6.2cqw, 22px)",
+          fontSize: "clamp(8.5px, 3.2cqw, 11px)",
           background: teinte,
           boxShadow: decisif ? `0 0 12px ${teinte}66` : "none",
         }}
       >
         {nom[0]}
       </span>
-      <span className="max-w-[58px] truncate text-[9.5px] leading-none font-bold text-white/85">
+      <span
+        className="truncate leading-none font-bold text-white/85"
+        style={{ maxWidth: "15cqw", fontSize: "clamp(7.5px, 2.7cqw, 9.5px)" }}
+      >
         {nom}
       </span>
       {decisif && (
         // « B » et « P » plutôt que des émojis : lisibles partout, et c'est le
         // vocabulaire déjà employé sur le terrain de la synthèse.
-        <span className="mono-label text-[8px] leading-none text-white/55">
+        <span
+          className="mono-label leading-none text-white/55"
+          style={{ fontSize: "clamp(6.5px, 2.2cqw, 8px)" }}
+        >
           {buts > 0 && `${buts}B`}
           {buts > 0 && passes > 0 && " "}
           {passes > 0 && `${passes}P`}
@@ -112,6 +119,10 @@ function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
     <div
       className="relative overflow-hidden rounded-[18px] border border-white/10"
       style={{
+        // Les bulles se dimensionnent sur la largeur DU TERRAIN : la même
+        // carte tient en pleine largeur sur mobile et en grille de trois sur
+        // un grand écran, sans que les noms se chevauchent.
+        containerType: "inline-size",
         aspectRatio: "16 / 10",
         background:
           "radial-gradient(90% 120% at 50% 50%, rgba(111,168,255,0.10), transparent 70%), linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012))",

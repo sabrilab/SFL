@@ -19,6 +19,7 @@ import { PlayerCard } from "@/components/sfl/player-card";
 import { Locked } from "@/components/sfl/locked";
 import { useSeason } from "@/components/sfl/season-provider";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
+import { useGrandEcran } from "@/hooks/use-media-query";
 import { logActivity } from "@/lib/sfl/activity";
 import { username } from "@/lib/sfl/usernames";
 import {
@@ -94,6 +95,7 @@ function StatBar({ label, value }: { label: string; value: number }) {
 function FicheJoueur({ player, rank }: { player: Player; rank: number }) {
   const { saison, journees } = useSeason();
   const cardStats = rareStats(player.stats);
+  const grand = useGrandEcran();
 
   const mine = useMemo(
     () =>
@@ -115,14 +117,15 @@ function FicheJoueur({ player, rank }: { player: Player; rank: number }) {
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-      className="flex flex-col gap-[18px]"
+      className="grid grid-cols-1 gap-[18px] lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start lg:gap-6"
     >
+      <div className="flex min-w-0 flex-col gap-[18px] lg:sticky lg:top-4">
       {/* La carte en grand */}
       <section className="flex flex-col items-center gap-3">
         <Card3D
           cacheKey={`recherche-${player.name}`}
           mode="rare"
-          size={0.8}
+          size={grand ? 1.05 : 0.8}
           render={(s) => <PlayerCard player={player} mode="rare" size={s} />}
         />
         <p className="mono-label text-center text-[9px] tracking-[0.12em] text-foreground/30">
@@ -147,6 +150,9 @@ function FicheJoueur({ player, rank }: { player: Player; rank: number }) {
         </div>
       </div>
 
+      </div>
+
+      <div className="flex min-w-0 flex-col gap-[18px]">
       {/* Les six critères */}
       <section className="glass flex flex-col gap-2.5 rounded-[26px] px-[18px] py-[17px]">
         <p className="mono-label text-foreground/40">Profil de jeu</p>
@@ -247,6 +253,7 @@ function FicheJoueur({ player, rank }: { player: Player; rank: number }) {
           </p>
         </div>
       </Locked>
+      </div>
     </motion.div>
   );
 }
@@ -390,7 +397,7 @@ export default function RecherchePage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-5 py-4 sm:py-8">
+    <div className="shell flex flex-col gap-4 py-4 sm:py-8">
       {fiche ? (
         <button
           onClick={close}
@@ -462,7 +469,7 @@ export default function RecherchePage() {
                 <h2 className="mb-2.5 px-1 text-[14px] font-bold tracking-tight text-foreground/60">
                   Journées
                 </h2>
-                <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
                   {journeesTrouvees.map((j) => {
                     const score = journeeScoreSummary(j);
                     return (
@@ -504,7 +511,7 @@ export default function RecherchePage() {
                 <h2 className="mb-2.5 px-1 text-[14px] font-bold tracking-tight text-foreground/60">
                   Joueurs · {joueurs.length}
                 </h2>
-                <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
                   {joueurs.map((p) => (
                     <button
                       key={p.name}

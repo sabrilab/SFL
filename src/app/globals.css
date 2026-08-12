@@ -250,3 +250,41 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+/* ─────────────────────── Le gabarit de page ────────────────────────
+   Mobile d'abord — une colonne confortable, 20 px de marge. Puis l'écran
+   grandit et la page grandit avec lui, au lieu de laisser la moitié d'un
+   MacBook vide de chaque côté. Les paliers suivent les vraies machines :
+   1024 (petit portable), 1440 (14 pouces), 1728 (grand écran). */
+.shell {
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: 20px;
+  max-width: 768px;
+}
+@media (min-width: 1024px) {
+  .shell {
+    max-width: 1000px;
+    padding-inline: 32px;
+  }
+}
+@media (min-width: 1440px) {
+  .shell {
+    max-width: 1200px;
+    padding-inline: 40px;
+  }
+}
+@media (min-width: 1728px) {
+  .shell {
+    max-width: 1320px;
+  }
+}
+
+/* Le récap se lit en colonne : au-delà d'une certaine largeur, une ligne de
+   texte devient illisible. On borne la mesure et on centre, même quand la
+   page, elle, est large. */
+.mesure {
+  width: 100%;
+  margin-inline: auto;
+  max-width: 760px;
+}

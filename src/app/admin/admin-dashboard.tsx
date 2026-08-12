@@ -297,7 +297,7 @@ export function AdminDashboard() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5 px-5 py-4 sm:py-8 lg:max-w-5xl">
+    <div className="shell flex flex-col gap-5 py-4 sm:py-8">
       <div>
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -334,17 +334,21 @@ export function AdminDashboard() {
       </div>
 
       <Tabs defaultValue="overview">
-        <TabsList className="w-full rounded-full bg-card p-1">
-          <TabsTrigger value="overview" className="flex-1 rounded-full text-[13px]">
-            <LayoutDashboard className="mr-1.5 size-4" /> Vue d&apos;ensemble
+        {/* Quatre onglets ne tiennent pas sur un téléphone : les libellés
+            s'abrègent, et la barre défile en dernier recours. */}
+        <TabsList className="w-full overflow-x-auto rounded-full bg-card p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsTrigger value="overview" className="flex-1 shrink-0 rounded-full text-[13px] whitespace-nowrap">
+            <LayoutDashboard className="mr-1.5 size-4" /> Vue
+            <span className="hidden sm:inline">&nbsp;d&apos;ensemble</span>
           </TabsTrigger>
-          <TabsTrigger value="grille" className="flex-1 rounded-full text-[13px]">
+          <TabsTrigger value="grille" className="flex-1 shrink-0 rounded-full text-[13px] whitespace-nowrap">
             <Table2 className="mr-1.5 size-4" /> Saisie
           </TabsTrigger>
-          <TabsTrigger value="feuille" className="flex-1 rounded-full text-[13px]">
-            <ClipboardList className="mr-1.5 size-4" /> Feuille de match
+          <TabsTrigger value="feuille" className="flex-1 shrink-0 rounded-full text-[13px] whitespace-nowrap">
+            <ClipboardList className="mr-1.5 size-4" /> Feuille
+            <span className="hidden sm:inline">&nbsp;de match</span>
           </TabsTrigger>
-          <TabsTrigger value="joueurs" className="flex-1 rounded-full text-[13px]">
+          <TabsTrigger value="joueurs" className="flex-1 shrink-0 rounded-full text-[13px] whitespace-nowrap">
             <Users className="mr-1.5 size-4" /> Joueurs
           </TabsTrigger>
         </TabsList>

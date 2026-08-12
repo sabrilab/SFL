@@ -167,7 +167,7 @@ export default function StatsPage() {
   const lastJ = JOURNEES[JOURNEES.length - 1]?.j;
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 px-5 py-4 sm:py-8 lg:max-w-5xl">
+    <div className="shell flex flex-col gap-4 py-4 sm:py-8">
       <div className="mb-1">
         <h1 className="text-[30px] font-bold tracking-tight">Statistiques</h1>
         <p className="mt-1 text-[13px] text-foreground/42">

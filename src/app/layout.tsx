@@ -121,7 +121,7 @@ export default function RootLayout({
                   }}
                 >
                   <SiteHeader />
-                  <main className="flex-1 pb-32 md:pb-10">{children}</main>
+                  <main className="flex-1 pb-32 lg:pb-10">{children}</main>
                 </div>
                 <BottomNav />
                 <InstallPrompt />

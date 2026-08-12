@@ -101,7 +101,7 @@ export default function Ligue() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-5 py-2 sm:py-6">
+    <div className="shell flex flex-col gap-6 py-2 sm:py-6">
       {/* Rideau d'ouverture d'une journée */}
       {opening !== null && (
         <JourneeOpening
@@ -165,8 +165,8 @@ export default function Ligue() {
               if (j === currentJ) return;
               openJournee(j);
             }}
+            aside={<PresencePanel />}
           />
-          <PresencePanel />
         </>
       ) : view === "matchs" ? (
         <>
@@ -174,7 +174,7 @@ export default function Ligue() {
             Chaque dimanche sur son terrain · {played.length} journée
             {played.length > 1 ? "s" : ""} jouée{played.length > 1 ? "s" : ""}
           </p>
-          <div className="flex flex-col gap-3.5">
+          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3">
             {[...played].reverse().map((jn) => (
               <CarteJournee
                 key={jn.j}
@@ -193,8 +193,9 @@ export default function Ligue() {
             Sunday Five League · après {journees.length} journées
           </p>
 
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] lg:items-start">
           {/* Ma synthèse — rang, points, forme sur 5 matchs */}
-          <section className="glass rounded-[26px] p-[18px]">
+          <section className="glass rounded-[26px] p-[18px] lg:sticky lg:top-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="mono-label text-foreground/40">{player.name}</p>
@@ -291,6 +292,7 @@ export default function Ligue() {
               Tous les classements <ChevronRight className="size-4" />
             </Link>
           </section>
+          </div>
         </>
       ) : (
         <>
@@ -340,11 +342,14 @@ export default function Ligue() {
             </div>
           </div>
 
-          {/* Le récap de la journée ouverte — remonté à neuf à chaque ouverture */}
-          <JourneeRecap key={currentJ} j={currentJ} />
+          {/* Le récap de la journée ouverte — remonté à neuf à chaque ouverture.
+              Borné en largeur : au-delà, une ligne de texte devient illisible. */}
+          <div className="mesure flex flex-col gap-6">
+            <JourneeRecap key={currentJ} j={currentJ} />
+          </div>
 
           {/* 16 · Les prochaines journées */}
-          <section>
+          <section className="mesure">
             <div className="mb-3 px-1">
               <h2 className="text-[17px] font-bold tracking-tight">Les prochaines journées</h2>
             </div>

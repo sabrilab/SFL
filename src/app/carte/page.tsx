@@ -94,7 +94,7 @@ export default function CartePage() {
   ].filter(Boolean) as (readonly [string, string, string])[];
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-4 sm:py-8">
+    <div className="shell flex flex-col gap-6 py-4 sm:py-8">
       <div>
         <h1 className="text-[30px] font-bold tracking-tight">Ma carte</h1>
         <p className="mt-1 text-[13px] text-foreground/42">

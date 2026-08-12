@@ -29,9 +29,8 @@ function PhotoHero({ name }: { name: string }) {
   const [broken, setBroken] = useState(false);
   return (
     <div
-      className="relative shrink-0 overflow-hidden rounded-[18px] border border-white/10"
+      className="relative w-[124px] shrink-0 overflow-hidden rounded-[18px] border border-white/10 lg:w-[188px] lg:rounded-[24px]"
       style={{
-        width: 124,
         aspectRatio: "3 / 4",
         background:
           "repeating-linear-gradient(122deg, rgba(255,255,255,0.055) 0 8px, rgba(255,255,255,0.012) 8px 16px), linear-gradient(168deg, rgba(255,255,255,0.1), rgba(255,255,255,0.025))",
@@ -236,6 +235,41 @@ function CarteCompacte({ journee, onOuvrir }: { journee: Journee; onOuvrir: () =
   );
 }
 
+/** Les trois chiffres de la saison — même bloc en mobile et en colonne. */
+function Chiffres({
+  general,
+  matchs,
+  rank,
+}: {
+  general: number;
+  matchs: number;
+  rank: number;
+}) {
+  return (
+    <div className="flex items-stretch">
+      {(
+        [
+          [String(general), "Général", false],
+          [String(matchs), "Matchs", false],
+          [`${rank}e`, "Classement", true],
+        ] as const
+      ).map(([valeur, label, accent], i) => (
+        <div key={label} className={cn("flex-1", i > 0 && "border-l border-white/9 pl-4")}>
+          <div
+            className={cn(
+              "text-[30px] leading-none font-extrabold tracking-tight tabular-nums lg:text-[34px]",
+              accent && "text-primary"
+            )}
+          >
+            {valeur}
+          </div>
+          <p className="mono-label mt-1.5 text-foreground/35">{label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* --------------------------------- l'écran -------------------------------- */
 
 export function Accueil({
@@ -245,6 +279,7 @@ export function Accueil({
   onVoirClassement,
   onOuvrirLigue,
   dernieres,
+  aside,
 }: {
   player: Player;
   rank: number;
@@ -254,6 +289,8 @@ export function Accueil({
   onOuvrirLigue: () => void;
   /** Les journées jouées, de la plus récente à la plus ancienne. */
   dernieres: Journee[];
+  /** Contenu du rail de droite, sous « Tes ligues ». */
+  aside?: React.ReactNode;
 }) {
   const presence = usePresence();
   const [une, ...suivantes] = dernieres;
@@ -264,49 +301,38 @@ export function Accueil({
   return (
     <div className="flex flex-col gap-7">
       {/* ---------------------------- Toi ---------------------------- */}
-      <section className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <p className="text-[15px] text-foreground/45">Bienvenue,</p>
-          <h1
-            className="mt-0.5 truncate text-[46px] leading-[0.92] font-black tracking-[-0.01em] uppercase"
-            style={{ fontFamily: "var(--font-anton)" }}
-          >
-            {player.name.split(" ")[0]}
-          </h1>
-          <p className="mono-label mt-2 truncate text-foreground/40">
-            {username(player.name)} · Sunday Five League
-          </p>
+      {/* Sur grand écran le bloc d'identité et les trois chiffres partagent
+          la même hauteur que la photo : plus de vide sous le pseudo. */}
+      <section className="flex items-start justify-between gap-4 lg:gap-8">
+        <div className="flex min-w-0 flex-1 flex-col lg:min-h-[188px] lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-[15px] text-foreground/45">Bienvenue,</p>
+            <h1
+              className="mt-0.5 truncate text-[46px] leading-[0.92] font-black tracking-[-0.01em] uppercase lg:text-[68px]"
+              style={{ fontFamily: "var(--font-anton)" }}
+            >
+              {player.name.split(" ")[0]}
+            </h1>
+            <p className="mono-label mt-2 truncate text-foreground/40">
+              {username(player.name)} · Sunday Five League
+            </p>
+          </div>
+          {/* Les trois chiffres remontent dans la colonne à partir de lg. */}
+          <div className="mt-5 hidden border-t border-white/9 pt-4 lg:block">
+            <Chiffres general={general} matchs={player.matchs} rank={rank} />
+          </div>
         </div>
         <PhotoHero name={player.name} />
       </section>
 
-      {/* Les trois chiffres */}
-      <section className="-mt-2 border-t border-white/9 pt-4">
-        <div className="flex items-stretch">
-          {(
-            [
-              [String(general), "Général", false],
-              [String(player.matchs), "Matchs", false],
-              [`${rank}e`, "Classement", true],
-            ] as const
-          ).map(([valeur, label, accent], i) => (
-            <div key={label} className={cn("flex-1", i > 0 && "border-l border-white/9 pl-4")}>
-              <div
-                className={cn(
-                  "text-[30px] leading-none font-extrabold tracking-tight tabular-nums",
-                  accent && "text-primary"
-                )}
-              >
-                {valeur}
-              </div>
-              <p className="mono-label mt-1.5 text-foreground/35">{label}</p>
-            </div>
-          ))}
-        </div>
+      {/* Les trois chiffres — version mobile, pleine largeur sous la photo */}
+      <section className="-mt-2 border-t border-white/9 pt-4 lg:hidden">
+        <Chiffres general={general} matchs={player.matchs} rank={rank} />
       </section>
 
-      {/* -------------------------- À la une -------------------------- */}
-      <section className="flex flex-col gap-2.5">
+      {/* --------- À la une + le rail — deux colonnes sur grand écran --------- */}
+      <div className="grid grid-cols-1 gap-7 lg:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)] lg:items-start lg:gap-8">
+      <section className="flex min-w-0 flex-col gap-2.5">
         <p className="mono-label px-1 text-foreground/35">À la une</p>
 
         {/* La vidéo tient la une tant qu'il y en a une. */}
@@ -361,7 +387,8 @@ export function Accueil({
         )}
       </section>
 
-      {/* ------------------------- Tes ligues ------------------------- */}
+      {/* ------------------- Le rail : tes ligues + la suite ------------------- */}
+      <aside className="flex min-w-0 flex-col gap-7 lg:sticky lg:top-4">
       <section className="flex flex-col gap-2.5">
         <div className="flex items-baseline justify-between px-1">
           <p className="mono-label text-foreground/35">Tes ligues</p>
@@ -401,6 +428,11 @@ export function Accueil({
           </span>
         </div>
       </section>
+
+      {/* Ce que la page veut mettre à côté — la convocation, aujourd'hui. */}
+      {aside}
+      </aside>
+      </div>
     </div>
   );
 }

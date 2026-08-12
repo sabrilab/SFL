@@ -92,12 +92,12 @@ export function SiteHeader() {
       className="sticky z-40 px-4"
       style={{ top: "calc(env(safe-area-inset-top) + 0.75rem)" }}
     >
-      <div className="mx-auto flex h-14 max-w-5xl items-center gap-2">
+      <div className="mx-auto flex h-14 max-w-5xl min-w-0 items-center gap-2">
         {/* Bulle gauche : logo Golder + ligue courante */}
-        <div className="glass flex items-center gap-2 rounded-full py-1.5 pr-1.5 pl-4">
+        <div className="glass flex min-w-0 items-center gap-2 rounded-full py-1.5 pr-1.5 pl-4">
           <Link
             href="/"
-            className="font-sans text-base font-extrabold tracking-tighter"
+            className="truncate font-sans text-base font-extrabold tracking-tighter"
           >
             Golder
           </Link>
@@ -111,7 +111,7 @@ export function SiteHeader() {
           </Link>
         </div>
 
-        <nav className="glass hidden items-center gap-1 rounded-full px-1.5 py-1.5 md:flex">
+        <nav className="glass hidden items-center gap-1 rounded-full px-1.5 py-1.5 lg:flex">
           {NAV_ITEMS.map((item) => {
             const active =
               item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -136,27 +136,30 @@ export function SiteHeader() {
         </nav>
 
         {/* Bulle droite : Ballons, profil, réglages */}
-        <div className="glass ml-auto flex items-center gap-1.5 rounded-full px-1.5 py-1.5">
+        <div className="glass ml-auto flex shrink-0 items-center gap-1.5 rounded-full px-1.5 py-1.5">
           <BallonsBadge me={me} />
           <Link
             href="/profil"
             aria-label="Mon compte"
-            className="flex items-center gap-1.5 rounded-full bg-secondary py-1.5 pr-3.5 pl-1.5 text-sm font-medium"
+            className="flex items-center gap-1.5 rounded-full bg-secondary py-1.5 pr-1.5 pl-1.5 text-sm font-medium sm:pr-3.5"
           >
             <span className="flex size-4.5 items-center justify-center rounded-full bg-foreground/10 text-[9px] font-bold">
               {me[0]}
             </span>
-            {me}
+            {/* Sous 640 px, l'initiale suffit : le nom reprend sa place dès
+                qu'il y a de quoi l'afficher sans pousser la bulle dehors. */}
+            <span className="hidden max-w-[110px] truncate sm:inline">{me}</span>
           </Link>
 
           <Tooltip>
+            {/* Masqués sous 640 px : Profil → ⋯ y mène aussi. */}
             <TooltipTrigger
               render={
                 <Button
                   variant="ghost"
                   size="icon"
                   aria-label="Réglages"
-                  className="text-muted-foreground hover:text-foreground"
+                  className="hidden text-muted-foreground hover:text-foreground sm:inline-flex"
                   render={
                     <Link href="/reglages">
                       <Settings className="size-5" />

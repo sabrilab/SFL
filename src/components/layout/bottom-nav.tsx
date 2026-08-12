@@ -21,10 +21,12 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-[18px] z-40 md:hidden"
+      // `flex` doit vivre dans la classe, pas dans le style : un `display`
+      // en ligne écraserait `md:hidden` et la tab bar resterait affichée sur
+      // les grands écrans, par-dessus la navigation de l'en-tête.
+      className="fixed inset-x-[18px] z-40 flex lg:hidden"
       style={{
         bottom: "calc(env(safe-area-inset-bottom) + 12px)",
-        display: "flex",
         gap: 4,
         padding: 6,
         borderRadius: 999,

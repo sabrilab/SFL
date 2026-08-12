@@ -22,6 +22,7 @@ import { Locked } from "@/components/sfl/locked";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
+import { useGrandEcran } from "@/hooks/use-media-query";
 import { username } from "@/lib/sfl/usernames";
 import { ovr, rankPlayers, rareStats, STAT_KEYS, type Player } from "@/lib/sfl/engine";
 
@@ -182,6 +183,8 @@ export default function Profil() {
   // Les deux visages de la carte : la simple (les notes brutes) et la rare
   // (celle qui sert partout ailleurs dans l'app).
   const [face, setFace] = useState<"simple" | "rare">("rare");
+  // La carte est le sujet de la page : elle profite de la place quand il y en a.
+  const grand = useGrandEcran();
 
   // Série de dimanches : journées jouées consécutives, en remontant depuis
   // la dernière journée disputée.
@@ -201,8 +204,14 @@ export default function Profil() {
   const dernierTitre = myCards[myCards.length - 1];
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-[18px] px-5 py-4 sm:py-8">
-      <h1 className="text-[30px] font-bold tracking-tight">Profil</h1>
+    <div className="shell py-4 sm:py-8">
+      <h1 className="mb-[18px] text-[30px] font-bold tracking-tight">Profil</h1>
+      {/* Deux colonnes dès qu'il y a la place : l'identité et les cartes à
+          gauche, le profil de jeu et les chiffres à droite. */}
+      <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-2 lg:items-start lg:gap-6">
+      {/* La colonne d'identité reste à l'écran pendant qu'on parcourt le
+          reste : la carte est le sujet de la page. */}
+      <div className="flex min-w-0 flex-col gap-[18px] lg:sticky lg:top-4">
 
       {/* Rangée d'identité : photo, nom, pseudo, menu réglages */}
       <div className="flex items-center justify-between">
@@ -251,7 +260,7 @@ export default function Profil() {
           key={face}
           cacheKey={`profil-${face}-${player.name}`}
           mode={face}
-          size={0.88}
+          size={grand ? 1.15 : 0.88}
           render={(s) => <PlayerCard player={player} mode={face} size={s} />}
         />
         <p className="mono-label text-center text-[9px] tracking-[0.12em] text-foreground/30">
@@ -274,6 +283,9 @@ export default function Profil() {
         </Link>
       </div>
 
+      </div>
+
+      <div className="flex min-w-0 flex-col gap-[18px]">
       {/* PROFIL DE JEU — le radar hexagonal du design */}
       <ProfilRadar stats={cardStats} overall={ovr(cardStats)} />
 
@@ -436,6 +448,8 @@ export default function Profil() {
           </div>
         </Locked>
       </section>
+      </div>
+      </div>
     </div>
   );
 }

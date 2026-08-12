@@ -121,11 +121,12 @@ export default function Discussions() {
   const unreadCount = CHATS.filter((c) => c.unread).length;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-5 py-4 sm:py-8">
-      <h1 className="text-[30px] font-bold tracking-tight">Discussions</h1>
+    <div className="shell py-4 sm:py-8">
+      <h1 className="mb-5 text-[30px] font-bold tracking-tight">Discussions</h1>
 
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-start lg:gap-6">
       {/* L'invitation de match — VIVANTE : répond à la vraie convocation */}
-      <section className="flex flex-col gap-[9px]">
+      <section className="flex min-w-0 flex-col gap-[9px] lg:sticky lg:top-4">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-[7px]">
             <span className="size-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(111,168,255,0.8)]" />
@@ -252,7 +253,7 @@ export default function Discussions() {
 
           {/* L'admin voit d'un coup d'œil qui manque à l'appel */}
           {session?.admin && (
-            <div className="flex items-center gap-3 border-t border-white/8 px-4 py-2.5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/8 px-4 py-2.5">
               <span className="mono-label text-primary">{presence.presents.length} présents</span>
               <span className="mono-label text-foreground/45">{presence.absents.length} absents</span>
               <span className="mono-label text-[#FF6B5E]">
@@ -323,6 +324,7 @@ export default function Discussions() {
           </div>
         </div>
       </Locked>
+      </div>
     </div>
   );
 }

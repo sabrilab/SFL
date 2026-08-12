@@ -135,7 +135,7 @@ export default function ComptesPage() {
   );
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 px-5 py-4 sm:py-8">
+    <div className="shell flex flex-col gap-4 py-4 sm:py-8">
       <div>
         <h1 className="text-[30px] font-bold tracking-tight">Les accès</h1>
         <p className="mt-1 text-[13px] text-foreground/42">

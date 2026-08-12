@@ -200,7 +200,7 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-5 py-4 sm:py-8">
+    <div className="shell flex flex-col gap-4 py-4 sm:py-8">
       <div>
         <h1 className="text-[30px] font-bold tracking-tight">Installation Supabase</h1>
         <p className="mt-1 text-[13px] text-foreground/42">

@@ -144,7 +144,7 @@ function Arene() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-5 py-4 sm:py-8">
+    <div className="shell flex flex-col gap-6 py-4 sm:py-8">
       <div>
         <h1 className="text-[30px] font-bold tracking-tight">Arène</h1>
         <p className="mt-1 text-[13px] leading-snug text-foreground/42">{BASELINE[arenaMode]}</p>
