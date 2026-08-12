@@ -10,6 +10,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useIsClient } from "@/hooks/use-is-client";
 import { deriveSeason, type DerivedSeason } from "@/lib/sfl/saisie/engine";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
+import { startSaisonSync } from "@/lib/sfl/saisie/sync";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import type { Player } from "@/lib/sfl/engine";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
@@ -40,6 +41,21 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener(SAISIE_EVENT, refresh);
       window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
+  // Synchronisation avec la base : tirage immédiat + temps réel. Relancée à
+  // chaque changement de session (une connexion serveur peut arriver après).
+  useEffect(() => {
+    let stop = startSaisonSync();
+    const restart = () => {
+      stop();
+      stop = startSaisonSync();
+    };
+    window.addEventListener("sfl-session", restart);
+    return () => {
+      stop();
+      window.removeEventListener("sfl-session", restart);
     };
   }, []);
 

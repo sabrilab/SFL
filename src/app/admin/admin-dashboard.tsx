@@ -18,6 +18,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -58,6 +59,8 @@ import {
   updateRosterAt,
 } from "@/lib/sfl/saisie/mutations";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
+import { pushSaison } from "@/lib/sfl/saisie/sync";
+import { useSession } from "@/hooks/use-session";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
 const TEAM_COLORS: Record<string, string> = {
@@ -103,6 +106,8 @@ function Stat({ label, value, tone }: { label: string; value: string | number; t
 export function AdminDashboard() {
   const isClient = useIsClient();
   const { me } = useMyPlayer();
+  const session = useSession();
+  const partage = !!session?.server && !!session.admin;
   const [draft, setDraft] = useState<Saison | null>(null);
   const loaded = useMemo(() => (isClient ? saisieStore.load() : seedSaison()), [isClient]);
   const saison = draft ?? loaded;
@@ -299,12 +304,33 @@ export function AdminDashboard() {
             <p className="text-[13px] font-medium text-muted-foreground">Espace administrateur</p>
             <h1 className="text-[30px] font-bold tracking-tight">Admin</h1>
           </div>
-          <Badge variant="secondary" className="rounded-full">Maquette</Badge>
+          <Badge
+            variant="secondary"
+            className={cn("rounded-full", partage && "bg-emerald-500/15 text-emerald-400")}
+          >
+            {partage ? "Partagé" : "Local"}
+          </Badge>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Saisie des matchs directement dans l&apos;app — plus besoin d&apos;Excel. Les
-          classements et cartes se recalculent en direct. Stockage local pour l&apos;instant.
+          {partage
+            ? "Saisie directement dans l'app — chaque modification part en base et corrige pour toute la ligue, en direct."
+            : "Saisie directement dans l'app. ATTENTION : sans session serveur, tes corrections restent sur cet appareil — reconnecte-toi pour corriger pour tout le monde."}
         </p>
+        {partage && (
+          <button
+            onClick={async () => {
+              const ok = await pushSaison(saison);
+              if (ok)
+                toast.success("Saison envoyée en base", {
+                  description: "Toute la ligue est maintenant sur cette version.",
+                });
+              else toast.error("Envoi impossible — vérifie l'installation (base).");
+            }}
+            className="glass-soft mono-label mt-2 rounded-full px-3 py-1.5 text-foreground/60"
+          >
+            Envoyer la saison en base maintenant
+          </button>
+        )}
       </div>
 
       <Tabs defaultValue="overview">

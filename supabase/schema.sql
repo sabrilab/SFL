@@ -156,6 +156,37 @@ create policy "activity: lecture admin"
   to authenticated
   using ((select public.is_league_admin()));
 
+-- ────────────────────────────── Saison ───────────────────────────────
+-- LA saison entière — journées, lignes de match, effectif, convocations
+-- locales — en un seul document jsonb versionné. C'est le format exact du
+-- stockage local (types.ts) : l'admin corrige, pousse, tout le monde reçoit.
+--   · version : horodatage croissant, départage les écritures ;
+--   · seed    : la version du seed embarqué dont ce document est issu — un
+--     client au seed plus récent refuse un document plus ancien.
+create table if not exists public.saison (
+  id         int primary key default 1 check (id = 1),
+  data       jsonb not null,
+  version    bigint not null,
+  seed       int not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.saison enable row level security;
+
+-- Toute la ligue lit la même saison ; seuls les admins écrivent.
+drop policy if exists "saison: lecture ligue" on public.saison;
+create policy "saison: lecture ligue"
+  on public.saison for select
+  to authenticated
+  using (true);
+
+drop policy if exists "saison: écriture admin" on public.saison;
+create policy "saison: écriture admin"
+  on public.saison for all
+  to authenticated
+  using ((select public.is_league_admin()))
+  with check ((select public.is_league_admin()));
+
 -- ─────────────────────────── Compositions ────────────────────────────
 -- Les compositions 5v5 déposées dans l'Arène : une par joueur et par
 -- dimanche (la nouvelle remplace l'ancienne). Elles serviront à générer les
@@ -302,9 +333,19 @@ grant update (contact_email) on public.profiles to authenticated;
 grant insert, select on public.activity to authenticated;
 grant insert, update, delete on public.presence to authenticated;
 grant insert, update, select on public.compositions to authenticated;
+grant select, insert, update on public.saison to authenticated;
 grant insert, update, delete on public.convocations to authenticated;
 
 -- Diffusion temps réel : les réponses apparaissent sans rafraîchir.
+do $$
+begin
+  alter publication supabase_realtime add table public.saison;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
+
 do $$
 begin
   alter publication supabase_realtime add table public.presence;

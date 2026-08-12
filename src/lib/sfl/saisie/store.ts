@@ -87,5 +87,29 @@ export const localStorageStore: SaisieStore = {
   },
 };
 
-// Point de bascule unique le jour où Supabase arrive.
-export const saisieStore: SaisieStore = localStorageStore;
+/** Version du seed embarqué — la synchro s'en sert pour arbitrer. */
+export const CURRENT_SEED_VERSION = SEED_VERSION;
+
+/**
+ * Adopte une saison venue de la base : elle remplace la copie locale et
+ * marque le seed comme à jour (sinon load() croirait la copie périmée et la
+ * réécraserait par le seed au prochain chargement).
+ */
+export function adoptSaison(saison: Saison) {
+  if (!hasWindow()) return;
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saison));
+  window.localStorage.setItem(SEED_VERSION_KEY, String(SEED_VERSION));
+}
+
+// Le stockage local reste la mémoire de travail ; chaque sauvegarde part
+// AUSSI vers la base quand l'appelant est un admin en session serveur (la
+// synchro refuse silencieusement sinon). Import paresseux pour ne pas créer
+// de cycle : sync.ts importe ce module.
+export const saisieStore: SaisieStore = {
+  load: () => localStorageStore.load(),
+  save(saison) {
+    localStorageStore.save(saison);
+    void import("./sync").then((m) => m.pushSaison(saison)).catch(() => {});
+  },
+  reset: () => localStorageStore.reset(),
+};
