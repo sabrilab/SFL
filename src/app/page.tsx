@@ -1,16 +1,19 @@
 "use client";
 
-// Onglet Ligue — le fil de vie de la ligue.
+// Accueil — la page d'arrivée de l'app.
 //
-// Chaque journée jouée est une capsule qu'on ouvre : la dernière est ouverte
-// par défaut, les précédentes se lancent avec le rideau d'ouverture (GSAP)
-// puis se racontent avec le même scrollytelling que la dernière — classement,
-// course et records recalculés comme au soir de ce dimanche-là.
+// On arrive sur SOI : prénom en grand, photo, les trois chiffres de la
+// saison. Puis « À la une », où le récap du dernier dimanche est une carte
+// qu'on ouvre — le rideau (GSAP) se lève et le scrollytelling se déroule,
+// classement, course et records recalculés comme au soir de ce dimanche-là.
+//
+// Les autres vues (Journée, Classement, Matchs) vivent derrière l'accueil et
+// se rejoignent par le sélecteur, avec un retour permanent vers l'accueil.
 // Le récap lui-même vit dans feed/journee-recap.tsx.
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
@@ -24,13 +27,14 @@ import { PresencePanel } from "@/components/sfl/presence-panel";
 import { EmailNudge } from "@/components/sfl/auth/email-nudge";
 import { JourneeOpening } from "@/components/sfl/feed/journee-opening";
 import { CarteJournee } from "@/components/sfl/carte-journee";
+import { Accueil } from "@/components/sfl/feed/accueil";
 import { cn } from "@/lib/utils";
 
 export default function Ligue() {
   const { player } = useMyPlayer();
   const { players, journees, saison } = useSeason();
   const isClient = useIsClient();
-  const [view, setView] = useState<"journee" | "classement" | "matchs">("journee");
+  const [view, setView] = useState<"accueil" | "journee" | "classement" | "matchs">("accueil");
   const [leagueTick, setLeagueTick] = useState(0);
   void leagueTick;
 
@@ -108,33 +112,62 @@ export default function Ligue() {
         />
       )}
 
-      {/* En-tête de section : titre 30px + segmented control verre.
-          (Pilule de points, profil et réglages vivent dans l'en-tête global.) */}
-      <h1 className="text-[30px] font-bold tracking-tight">Ligue</h1>
-      <div className="glass -mt-2 flex gap-1 rounded-full p-1" role="tablist" aria-label="Vue de la ligue">
-        {(
-          [
-            ["journee", "Journée"],
-            ["classement", "Classement"],
-            ["matchs", "Matchs"],
-          ] as const
-        ).map(([id, label]) => (
+      {/* Hors accueil : un retour permanent + le sélecteur de vue. */}
+      {view !== "accueil" && (
+        <>
           <button
-            key={id}
-            role="tab"
-            aria-selected={view === id}
-            onClick={() => setView(id)}
-            className={cn(
-              "flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-colors",
-              view === id ? "bg-foreground text-background" : "text-muted-foreground"
-            )}
+            onClick={() => setView("accueil")}
+            className="glass-soft flex w-fit items-center gap-2 rounded-full py-2 pr-4 pl-3 text-[13px] font-semibold text-foreground/60"
           >
-            {label}
+            <ArrowLeft className="size-4" /> Accueil
           </button>
-        ))}
-      </div>
+          <div
+            className="glass -mt-2 flex gap-1 rounded-full p-1"
+            role="tablist"
+            aria-label="Vue de la ligue"
+          >
+            {(
+              [
+                ["journee", "Journée"],
+                ["classement", "Classement"],
+                ["matchs", "Matchs"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={view === id}
+                onClick={() => setView(id)}
+                className={cn(
+                  "flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-colors",
+                  view === id ? "bg-foreground text-background" : "text-muted-foreground"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
-      {view === "matchs" ? (
+      {view === "accueil" ? (
+        <>
+          <EmailNudge />
+          <Accueil
+            player={player}
+            rank={myRank}
+            dernieres={[...played].reverse()}
+            onVoirClassement={() => setView("classement")}
+            onOuvrirRecap={(j) => {
+              setView("journee");
+              // Déjà sur cette journée : pas de rideau, on entre directement.
+              if (j === currentJ) return;
+              openJournee(j);
+            }}
+          />
+          <PresencePanel />
+        </>
+      ) : view === "matchs" ? (
         <>
           <p className="px-1 text-[13px] text-foreground/40">
             Chaque dimanche sur son terrain · {played.length} journée
@@ -260,8 +293,6 @@ export default function Ligue() {
         </>
       ) : (
         <>
-          <EmailNudge />
-
           {/* Les capsules de journées — touche pour en ouvrir une autre */}
           <div className="-mt-1">
             <p className="mono-label mb-2 px-1 text-foreground/30">
