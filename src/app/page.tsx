@@ -158,6 +158,7 @@ export default function Ligue() {
             rank={myRank}
             dernieres={[...played].reverse()}
             onVoirClassement={() => setView("classement")}
+            onOuvrirLigue={() => setView("journee")}
             onOuvrirRecap={(j) => {
               setView("journee");
               // Déjà sur cette journée : pas de rideau, on entre directement.

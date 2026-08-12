@@ -12,13 +12,14 @@
 // que hiérarchiser — le joueur d'abord, la ligue ensuite.
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "motion/react";
-import { ArrowUpRight, ChevronRight, Lock } from "lucide-react";
+import { ArrowUpRight, ChevronRight, Lock, Play } from "lucide-react";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { usePresence } from "@/hooks/use-presence";
 import { username } from "@/lib/sfl/usernames";
 import { journeeScoreSummary, ovr, rareStats, type Journee, type Player } from "@/lib/sfl/engine";
+import { dureeLisible, VIDEOS_UNE, type VideoUne } from "@/lib/sfl/une";
 import { cn } from "@/lib/utils";
 
 /* -------------------------------- la photo ------------------------------- */
@@ -85,61 +86,130 @@ function butsDe(j: Journee): number {
 
 /* ------------------------------- les cartes ------------------------------ */
 
-function CarteUne({
-  journee,
-  onOuvrir,
-}: {
-  journee: Journee;
-  onOuvrir: () => void;
-}) {
+/**
+ * La grande carte de la une : une vidéo. Elle ne charge RIEN tant qu'on ne
+ * la lance pas (`preload="none"`) — seule l'image de couverture s'affiche.
+ * Au premier toucher, la lecture démarre en place et les contrôles natifs
+ * prennent le relais ; `playsInline` évite le plein écran forcé sur iOS.
+ */
+function CarteVideo({ video }: { video: VideoUne }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [lance, setLance] = useState(false);
+
+  function lire() {
+    const el = ref.current;
+    if (!el) return;
+    // On passe en mode lecteur dans tous les cas : si play() est refusé
+    // (règle d'autoplay, codec absent), les contrôles natifs restent
+    // affichés et offrent un bouton de lecture — jamais un écran mort.
+    setLance(true);
+    void el.play().catch(() => {});
+  }
+
+  return (
+    <div className="glass relative w-full overflow-hidden rounded-[26px] text-left">
+      <div className="relative bg-black" style={{ aspectRatio: "16 / 10" }}>
+        <video
+          ref={ref}
+          poster={video.poster}
+          preload="none"
+          playsInline
+          controls={lance}
+          onEnded={() => setLance(false)}
+          className="size-full object-cover"
+          // Le recadrage 16/9 → 16/10 se prend sur le bas : les visages
+          // vivent en haut du cadre, on ne leur coupe pas la tête.
+          style={{ objectPosition: "center 28%" }}
+        >
+          <source src={video.src} type="video/mp4" />
+          {video.srcWebm && <source src={video.srcWebm} type="video/webm" />}
+        </video>
+
+        {!lance && (
+          <button
+            onClick={lire}
+            aria-label={`Lire : ${video.titre}`}
+            className="absolute inset-0 flex items-center justify-center"
+          >
+            {/* Un voile qui garde le texte lisible par-dessus l'image */}
+            <span
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.08) 42%, rgba(0,0,0,0.55) 100%)",
+              }}
+            />
+            <span className="absolute top-3.5 left-3.5 flex gap-2">
+              <span className="mono-label rounded-full border border-primary/40 bg-primary/18 px-2.5 py-1.5 text-primary backdrop-blur-sm">
+                {video.rubrique}
+                {video.journee ? ` · J${video.journee}` : ""}
+              </span>
+              <span className="mono-label flex items-center gap-1 rounded-full border border-white/16 bg-black/45 px-2.5 py-1.5 text-foreground/85 backdrop-blur-sm">
+                <Play className="size-2.5 fill-current" /> {dureeLisible(video.duree)}
+              </span>
+            </span>
+            <motion.span
+              animate={{ scale: [1, 1.06, 1] }}
+              transition={{ repeat: Infinity, duration: 2.6, ease: "easeInOut" }}
+              className="relative flex size-[68px] items-center justify-center rounded-full bg-primary/90 shadow-[0_0_34px_rgba(111,168,255,0.5)]"
+            >
+              <Play className="size-7 fill-primary-foreground text-primary-foreground" />
+            </motion.span>
+          </button>
+        )}
+      </div>
+
+      <div className="p-4">
+        <h3 className="text-[19px] leading-[1.22] font-bold tracking-tight">{video.titre}</h3>
+        <p className="mt-1.5 text-[12.5px] text-foreground/42">
+          {video.journee ? `Journée ${video.journee} · ` : ""}
+          {video.meta}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Le récap du dernier dimanche — l'entrée dans la section Ligue, qui vit
+ * désormais sous l'accueil. Le terrain stylisé tient lieu de visuel.
+ */
+function CarteRecap({ journee, onOuvrir }: { journee: Journee; onOuvrir: () => void }) {
   const score = journeeScoreSummary(journee);
   return (
     <motion.button
       onClick={onOuvrir}
       whileTap={{ scale: 0.985 }}
-      className="glass relative w-full overflow-hidden rounded-[26px] text-left"
+      className="glass relative flex w-full items-center gap-3.5 overflow-hidden rounded-[22px] p-3.5 text-left"
     >
-      {/* Le « visuel » : le terrain stylisé, en attendant les vidéos */}
-      <div
-        className="relative"
+      <span
+        className="pointer-events-none absolute inset-0"
         style={{
-          height: 190,
           background:
-            "radial-gradient(90% 130% at 50% 8%, rgba(111,168,255,0.20), transparent 62%), repeating-linear-gradient(115deg, rgba(255,255,255,0.05) 0 11px, rgba(255,255,255,0.012) 11px 22px)",
+            "radial-gradient(70% 160% at 88% 50%, rgba(111,168,255,0.16), transparent 60%)",
         }}
-      >
-        <span className="pointer-events-none absolute -top-16 left-1/2 size-40 -translate-x-1/2 rounded-full border border-white/10" />
-        <span className="pointer-events-none absolute bottom-0 left-1/2 h-16 w-52 -translate-x-1/2 rounded-t-2xl border border-b-0 border-white/10" />
-
-        <span className="absolute top-3.5 left-3.5 flex gap-2">
-          <span className="mono-label rounded-full border border-primary/35 bg-primary/15 px-2.5 py-1.5 text-primary">
+      />
+      <span className="relative min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="mono-label rounded-full border border-primary/35 bg-primary/15 px-2 py-1 text-primary">
             Récap · J{journee.j}
           </span>
-          {score && (
-            <span className="mono-label rounded-full border border-white/14 bg-black/40 px-2.5 py-1.5 text-foreground/75">
-              {score.label}
-            </span>
-          )}
+          {score && <span className="mono-label text-foreground/35">{score.label}</span>}
         </span>
-
-        {/* L'affordance d'ouverture, à la place du bouton de lecture */}
-        <motion.span
-          animate={{ scale: [1, 1.06, 1] }}
-          transition={{ repeat: Infinity, duration: 2.6, ease: "easeInOut" }}
-          className="absolute top-1/2 left-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary/90 shadow-[0_0_30px_rgba(111,168,255,0.45)]"
-        >
-          <ArrowUpRight className="size-7 text-primary-foreground" strokeWidth={2.5} />
-        </motion.span>
-      </div>
-
-      <div className="p-4">
-        <h3 className="text-[19px] leading-[1.22] font-bold tracking-tight">
-          {titreJournee(journee)}
-        </h3>
-        <p className="mt-1.5 text-[12.5px] text-foreground/42">
-          {journee.date} · {butsDe(journee)} buts · Sunday Five League
-        </p>
-      </div>
+        <span className="mt-2 block text-[15px] leading-[1.25] font-bold tracking-tight">
+          {titreJournee(journee).replace(" — le récap", "")}
+        </span>
+        <span className="mt-1 block text-[12px] text-foreground/40">
+          {journee.date} · {butsDe(journee)} buts · ouvrir la Ligue
+        </span>
+      </span>
+      <motion.span
+        animate={{ scale: [1, 1.07, 1] }}
+        transition={{ repeat: Infinity, duration: 2.6, ease: "easeInOut" }}
+        className="relative flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/90"
+      >
+        <ArrowUpRight className="size-5 text-primary-foreground" strokeWidth={2.5} />
+      </motion.span>
     </motion.button>
   );
 }
@@ -173,12 +243,15 @@ export function Accueil({
   rank,
   onOuvrirRecap,
   onVoirClassement,
+  onOuvrirLigue,
   dernieres,
 }: {
   player: Player;
   rank: number;
   onOuvrirRecap: (j: number) => void;
   onVoirClassement: () => void;
+  /** Entrer dans la section Ligue — elle vit sous cet écran. */
+  onOuvrirLigue: () => void;
   /** Les journées jouées, de la plus récente à la plus ancienne. */
   dernieres: Journee[];
 }) {
@@ -186,6 +259,7 @@ export function Accueil({
   const [une, ...suivantes] = dernieres;
   const seconde = suivantes[0];
   const general = ovr(rareStats(player.stats));
+  const vedette = VIDEOS_UNE[0];
 
   return (
     <div className="flex flex-col gap-7">
@@ -232,11 +306,16 @@ export function Accueil({
       </section>
 
       {/* -------------------------- À la une -------------------------- */}
-      {une && (
-        <section className="flex flex-col gap-2.5">
-          <p className="mono-label px-1 text-foreground/35">À la une</p>
-          <CarteUne journee={une} onOuvrir={() => onOuvrirRecap(une.j)} />
+      <section className="flex flex-col gap-2.5">
+        <p className="mono-label px-1 text-foreground/35">À la une</p>
 
+        {/* La vidéo tient la une tant qu'il y en a une. */}
+        {vedette && <CarteVideo video={vedette} />}
+
+        {/* Puis le récap du dernier dimanche : la porte de la Ligue. */}
+        {une && <CarteRecap journee={une} onOuvrir={() => onOuvrirRecap(une.j)} />}
+
+        {une && (
           <div className="grid grid-cols-2 gap-2.5">
             {seconde && (
               <CarteCompacte journee={seconde} onOuvrir={() => onOuvrirRecap(seconde.j)} />
@@ -279,8 +358,8 @@ export function Accueil({
               </div>
             </Link>
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       {/* ------------------------- Tes ligues ------------------------- */}
       <section className="flex flex-col gap-2.5">
@@ -292,7 +371,7 @@ export function Accueil({
         </div>
 
         <button
-          onClick={onVoirClassement}
+          onClick={onOuvrirLigue}
           className="glass flex items-center gap-3.5 rounded-[22px] px-4 py-3.5 text-left"
         >
           <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15">
