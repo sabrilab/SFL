@@ -55,33 +55,57 @@ export interface SaisieStore {
 }
 
 function hasWindow(): boolean {
-  return typeof window !== "undefined" && !!window.localStorage;
+  try {
+    return typeof window !== "undefined" && !!window.localStorage;
+  } catch {
+    // Safari « bloquer tous les cookies » : le simple accès lève une erreur.
+    return false;
+  }
+}
+
+/**
+ * Écrit sans jamais lever.
+ *
+ * `load()` est appelé PENDANT le rendu (useMemo du provider de saison) et
+ * peut avoir à réécrire le stockage. Si l'écriture échoue — quota dépassé,
+ * stockage interdit par le navigateur — une exception à cet endroit fait
+ * tomber l'app entière sur l'écran d'erreur. Or la saison est parfaitement
+ * utilisable en mémoire : ne pas réussir à la mettre en cache n'est pas une
+ * raison de refuser de l'afficher.
+ */
+function ecrire(cle: string, valeur: string): void {
+  try {
+    window.localStorage.setItem(cle, valeur);
+  } catch {
+    // Tant pis pour le cache : la saison vit en mémoire pour cette session.
+  }
 }
 
 export const localStorageStore: SaisieStore = {
   load() {
     if (!hasWindow()) return seedSaison();
-    // Seed plus récent que la copie locale : on repart des données livrées.
-    const stored = Number(window.localStorage.getItem(SEED_VERSION_KEY) ?? 0);
-    if (stored < SEED_VERSION) return this.reset();
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return seedSaison();
     try {
+      // Seed plus récent que la copie locale : on repart des données livrées.
+      const stored = Number(window.localStorage.getItem(SEED_VERSION_KEY) ?? 0);
+      if (stored < SEED_VERSION) return this.reset();
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return seedSaison();
       return migrate(JSON.parse(raw) as Saison);
     } catch {
+      // Stockage illisible, corrompu ou interdit : le seed reste jouable.
       return seedSaison();
     }
   },
   save(saison) {
     if (!hasWindow()) return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saison));
-    window.localStorage.setItem(SEED_VERSION_KEY, String(SEED_VERSION));
+    ecrire(STORAGE_KEY, JSON.stringify(saison));
+    ecrire(SEED_VERSION_KEY, String(SEED_VERSION));
   },
   reset() {
     const fresh = seedSaison();
     if (hasWindow()) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
-      window.localStorage.setItem(SEED_VERSION_KEY, String(SEED_VERSION));
+      ecrire(STORAGE_KEY, JSON.stringify(fresh));
+      ecrire(SEED_VERSION_KEY, String(SEED_VERSION));
     }
     return fresh;
   },
@@ -97,8 +121,8 @@ export const CURRENT_SEED_VERSION = SEED_VERSION;
  */
 export function adoptSaison(saison: Saison) {
   if (!hasWindow()) return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saison));
-  window.localStorage.setItem(SEED_VERSION_KEY, String(SEED_VERSION));
+  ecrire(STORAGE_KEY, JSON.stringify(saison));
+  ecrire(SEED_VERSION_KEY, String(SEED_VERSION));
 }
 
 // Le stockage local reste la mémoire de travail ; chaque sauvegarde part

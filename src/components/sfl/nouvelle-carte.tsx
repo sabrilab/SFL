@@ -57,7 +57,10 @@ export function NouvellesCartes() {
 
     let seen: string[];
     try {
-      seen = JSON.parse(raw);
+      const parsed: unknown = JSON.parse(raw);
+      // Un stockage abîmé ne doit pas faire tomber l'écran : sans tableau,
+      // on repart d'une liste vide plutôt que de laisser `new Set` échouer.
+      seen = Array.isArray(parsed) ? parsed : [];
     } catch {
       seen = [];
     }

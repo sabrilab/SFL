@@ -110,6 +110,7 @@ export default function GlobalError({
           >
             {error.name}: {error.message}
             {error.digest ? `\ndigest ${error.digest}` : ""}
+            {error.stack ? `\n${error.stack.split("\n").slice(1, 7).join("\n")}` : ""}
           </pre>
         </div>
       </body>
