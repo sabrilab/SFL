@@ -99,6 +99,12 @@ export async function pushSaison(saison: Saison): Promise<boolean> {
  * Démarre la synchro : un tirage immédiat, puis le temps réel sur la table.
  * Renvoie la fonction d'arrêt. Sans session serveur : ne fait rien.
  */
+// Compteur de noms de canaux : redemander un nom déjà pris renvoie le canal
+// existant, déjà souscrit, et son `.on()` lève. Le redémarrage de la synchro
+// (événement sfl-session) recréait « sfl-saison » avant que l'ancien soit
+// vraiment retiré — chaque démarrage reçoit donc son propre nom.
+let saisonSeq = 0;
+
 export function startSaisonSync(): () => void {
   const session = getSession();
   if (!session?.server) return () => {};
@@ -107,7 +113,7 @@ export function startSaisonSync(): () => void {
   try {
     const sb = supabase();
     const channel = sb
-      .channel("sfl-saison")
+      .channel(`sfl-saison-${++saisonSeq}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "saison" }, () => {
         void pullSaison();
       })

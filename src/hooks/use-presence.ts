@@ -43,6 +43,9 @@ interface ServerState {
   reponses: Record<string, Reponse>;
 }
 
+// Compteur de noms de canaux : chaque abonné temps réel reçoit le sien.
+let presenceSeq = 0;
+
 export interface PresenceView {
   /** true = tout le monde voit la même liste (Supabase branché). */
   shared: boolean;
@@ -131,14 +134,23 @@ export function usePresence(): PresenceView {
     }
 
     load();
-    const channel = sb
-      .channel("sfl-presence")
-      .on("postgres_changes", { event: "*", schema: "public", table: "presence" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "convocations" }, load)
-      .subscribe();
+    // Nom de canal UNIQUE par abonné. supabase-js renvoie le canal existant
+    // quand on redemande un nom déjà pris : le deuxième écran qui montait ce
+    // hook (l'accueil affiche l'annonce ET le panneau de présence) récupérait
+    // un canal déjà souscrit, et son `.on()` levait — tout l'écran tombait.
+    let channel: ReturnType<typeof sb.channel> | null = null;
+    try {
+      channel = sb
+        .channel(`sfl-presence-${++presenceSeq}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "presence" }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "convocations" }, load)
+        .subscribe();
+    } catch {
+      // Sans temps réel, la liste reste juste : elle se recharge à l'ouverture.
+    }
     return () => {
       cancelled = true;
-      sb.removeChannel(channel);
+      if (channel) sb.removeChannel(channel);
     };
   }, [serverActive]);
 
