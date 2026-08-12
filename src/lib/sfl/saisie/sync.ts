@@ -96,6 +96,32 @@ export async function pushSaison(saison: Saison): Promise<boolean> {
 }
 
 /**
+ * S'assure que la base PORTE une saison à jour — admin en session serveur
+ * uniquement. Si la table est vide (installation neuve) ou bâtie sur un seed
+ * plus ancien que celui de l'app (déploiement correctif), la copie locale de
+ * l'admin part en base sans qu'il ait rien à presser : ouvrir l'app suffit.
+ */
+export async function ensureRemoteSaison(): Promise<void> {
+  const session = getSession();
+  if (!session?.server || !session.admin) return;
+  try {
+    const { data, error } = await supabase()
+      .from("saison")
+      .select("version, seed")
+      .eq("id", 1)
+      .maybeSingle();
+    if (error) return;
+    const doc = data as { version: number; seed: number } | null;
+    if (!doc || doc.seed < CURRENT_SEED_VERSION) {
+      const { saisieStore } = await import("./store");
+      await pushSaison(saisieStore.load());
+    }
+  } catch {
+    // Base injoignable : le prochain passage réessaiera.
+  }
+}
+
+/**
  * Démarre la synchro : un tirage immédiat, puis le temps réel sur la table.
  * Renvoie la fonction d'arrêt. Sans session serveur : ne fait rien.
  */
@@ -109,7 +135,9 @@ export function startSaisonSync(): () => void {
   const session = getSession();
   if (!session?.server) return () => {};
 
-  void pullSaison();
+  // Tirer d'abord (adopter le plus récent), puis garantir que la base est
+  // peuplée — l'ordre évite d'écraser une base plus fraîche que soi.
+  void pullSaison().then(() => ensureRemoteSaison());
   try {
     const sb = supabase();
     const channel = sb

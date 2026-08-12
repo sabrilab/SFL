@@ -20,6 +20,7 @@ import { activeConvocation, setConvocationTeams } from "@/lib/sfl/saisie/mutatio
 import { saisieStore } from "@/lib/sfl/saisie/store";
 import { SAISIE_EVENT } from "@/components/sfl/season-provider";
 import type { ConvocationTeam } from "@/lib/sfl/saisie/types";
+import { assurerConvocationOuverte } from "@/lib/sfl/convocation-auto";
 import { equipesVisibles, reponsesOuvertes } from "@/lib/sfl/convocation-temps";
 import { rewardConvocationReply } from "@/lib/sfl/ballons";
 import { NEXT_MATCH } from "@/lib/sfl/data";
@@ -133,6 +134,12 @@ export function usePresence(): PresenceView {
       }
     }
 
+    // La ceinture de sécurité du cron : un admin qui ouvre l'app garantit que
+    // la semaine est ouverte. Si elle vient d'être créée, on recharge — le
+    // temps réel le ferait aussi, mais autant ne pas dépendre de lui ici.
+    void assurerConvocationOuverte().then((creee) => {
+      if (creee) load();
+    });
     load();
     // Nom de canal UNIQUE par abonné. supabase-js renvoie le canal existant
     // quand on redemande un nom déjà pris : le deuxième écran qui montait ce
