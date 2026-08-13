@@ -1,0 +1,874 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Note de travail : accessible à qui a l'adresse, jamais indexée, et
+     reliée depuis nulle part dans l'app sauf l'espace admin. -->
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>Le Labo SFL — note de direction produit</title>
+<style>
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; }
+</style>
+</head>
+<body>
+<style>
+  /* ─────────────── Jetons — palette claire complète ─────────────── */
+  :root {
+    --ground:   #EDF1F4;
+    --surface:  #FFFFFF;
+    --surface-2:#F5F8FA;
+    --line:     #D3DCE3;
+    --line-soft:#E4EAEF;
+    --ink:      #0F151A;
+    --ink-2:    #38454F;
+    --muted:    #5B6874;
+    --faint:    #8493A0;
+    --accent:   #1F55C4;
+    --accent-w: #E5EDFC;
+    --signal:   #0B6E5B;
+    --signal-w: #DCEFEA;
+    --warn:     #96550A;
+    --warn-w:   #F6EBDA;
+    --off:      #6C7A86;
+    --off-w:    #E6EAEE;
+
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    --fs-xs:  0.7rem;
+    --fs-sm:  0.82rem;
+    --fs-md:  1.0rem;
+    --fs-lg:  1.22rem;
+    --fs-xl:  1.6rem;
+    --fs-2xl: 2.3rem;
+    --fs-3xl: 3.1rem;
+
+    --measure: 67ch;
+    --pad: clamp(1.15rem, 4vw, 2.5rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #080B0E;
+      --surface:  #101519;
+      --surface-2:#161C22;
+      --line:     #28323B;
+      --line-soft:#1C242B;
+      --ink:      #E9EFF4;
+      --ink-2:    #C0CCD6;
+      --muted:    #8A98A5;
+      --faint:    #6A7885;
+      --accent:   #7FB2FF;
+      --accent-w: #16233A;
+      --signal:   #3ECBA8;
+      --signal-w: #0F2B26;
+      --warn:     #E2A75A;
+      --warn-w:   #2E2415;
+      --off:      #7C8A96;
+      --off-w:    #1B2229;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:   #080B0E;
+    --surface:  #101519;
+    --surface-2:#161C22;
+    --line:     #28323B;
+    --line-soft:#1C242B;
+    --ink:      #E9EFF4;
+    --ink-2:    #C0CCD6;
+    --muted:    #8A98A5;
+    --faint:    #6A7885;
+    --accent:   #7FB2FF;
+    --accent-w: #16233A;
+    --signal:   #3ECBA8;
+    --signal-w: #0F2B26;
+    --warn:     #E2A75A;
+    --warn-w:   #2E2415;
+    --off:      #7C8A96;
+    --off-w:    #1B2229;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--fs-md);
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 74rem; margin: 0 auto; padding: 0 var(--pad); }
+  .measure { max-width: var(--measure); }
+
+  /* ─────────────── En-tête ─────────────── */
+  .top {
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .top-in {
+    max-width: 74rem; margin: 0 auto; padding: clamp(2.6rem, 7vw, 5rem) var(--pad) clamp(2rem, 5vw, 3.4rem);
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 1.15rem;
+  }
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(2rem, 6.2vw, var(--fs-3xl));
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+    color: var(--ink);
+  }
+  .lede {
+    margin: 1.5rem 0 0;
+    max-width: var(--measure);
+    font-size: clamp(1.02rem, 2.1vw, 1.16rem);
+    line-height: 1.6;
+    color: var(--ink-2);
+  }
+
+  /* ─────────────── Sections ─────────────── */
+  section { padding: clamp(2.8rem, 6vw, 4.6rem) 0; border-bottom: 1px solid var(--line-soft); }
+  section:last-of-type { border-bottom: 0; }
+
+  .shead { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 1.5rem; }
+  .snum {
+    font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.14em;
+    color: var(--faint); flex-shrink: 0; padding-top: 0.35rem;
+  }
+  h2 {
+    font-size: clamp(1.35rem, 3.4vw, var(--fs-xl));
+    line-height: 1.2; letter-spacing: -0.022em; font-weight: 680;
+    margin: 0; text-wrap: balance; color: var(--ink);
+  }
+  h3 {
+    font-size: var(--fs-md); font-weight: 680; letter-spacing: -0.01em;
+    margin: 0 0 0.45rem; color: var(--ink);
+  }
+  p { margin: 0 0 1.05rem; }
+  p:last-child { margin-bottom: 0; }
+  strong { font-weight: 660; color: var(--ink); }
+  em { font-style: normal; color: var(--accent); font-weight: 600; }
+
+  .flow > * + * { margin-top: 1.05rem; }
+
+  /* ─────────────── Verdict ─────────────── */
+  .verdict {
+    display: flex; flex-direction: column; gap: 0.5rem;
+    border-left: 3px solid var(--accent);
+    background: var(--accent-w);
+    padding: 1.1rem 1.3rem;
+    border-radius: 0 10px 10px 0;
+    margin: 1.6rem 0;
+    max-width: var(--measure);
+  }
+  .verdict-k {
+    font-family: var(--mono); font-size: var(--fs-xs);
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent);
+  }
+  .verdict p { margin: 0; color: var(--ink); font-size: 1.04rem; }
+
+  /* ─────────────── Tableau comparatif ─────────────── */
+  .scroll { overflow-x: auto; margin-top: 1.7rem; }
+  table { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: var(--fs-sm); }
+  th, td { text-align: left; padding: 0.78rem 0.95rem; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  thead th {
+    font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.13em;
+    text-transform: uppercase; color: var(--faint); font-weight: 500;
+    border-bottom: 1px solid var(--line);
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td:first-child { color: var(--ink); font-weight: 600; width: 30%; }
+  .win { color: var(--signal); font-weight: 640; }
+  .lose { color: var(--off); }
+
+  /* ─────────────── Cartes de test ─────────────── */
+  .grid {
+    display: grid; gap: 0.85rem; margin-top: 1.5rem;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 46rem) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 68rem) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    padding: 1.05rem 1.1rem 1.1rem;
+    display: flex; flex-direction: column; gap: 0.6rem;
+  }
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.7rem; }
+  .proto {
+    font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--faint); margin: 0 0 0.3rem;
+  }
+  .card p { font-size: var(--fs-sm); color: var(--muted); line-height: 1.55; margin: 0; }
+  .card-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.7rem;
+    margin-top: auto; padding-top: 0.7rem; border-top: 1px solid var(--line-soft);
+  }
+  .feeds { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+  .stat-chip {
+    font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.08em;
+    padding: 0.16rem 0.42rem; border-radius: 4px;
+    background: var(--accent-w); color: var(--accent); font-weight: 600;
+  }
+  .dur { font-family: var(--mono); font-size: var(--fs-xs); color: var(--faint); white-space: nowrap; }
+
+  /* Jauge de fiabilité — trois barres, information réelle */
+  .meter { display: flex; align-items: center; gap: 0.34rem; }
+  .meter-bars { display: flex; gap: 2px; }
+  .meter-bars i {
+    display: block; width: 4px; height: 11px; border-radius: 1px;
+    background: var(--line);
+  }
+  .meter[data-level="3"] i:nth-child(-n+3) { background: var(--signal); }
+  .meter[data-level="2"] i:nth-child(-n+2) { background: var(--warn); }
+  .meter[data-level="1"] i:nth-child(-n+1) { background: var(--off); }
+  .meter span {
+    font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+  .meter[data-level="3"] span { color: var(--signal); }
+  .meter[data-level="2"] span { color: var(--warn); }
+  .meter[data-level="1"] span { color: var(--off); }
+
+  .group-label {
+    font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--ink); font-weight: 600;
+    margin: 2.2rem 0 0.1rem; display: flex; align-items: center; gap: 0.7rem;
+  }
+  .group-label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .group-note { font-size: var(--fs-sm); color: var(--muted); margin: 0.45rem 0 0; max-width: var(--measure); }
+
+  /* ─────────────── Carte : les 6 stats ─────────────── */
+  .stats { margin-top: 1.6rem; display: flex; flex-direction: column; gap: 0.5rem; max-width: 44rem; }
+  .srow {
+    display: grid; grid-template-columns: 3.1rem 1fr auto; align-items: center; gap: 0.9rem;
+  }
+  .skey {
+    font-family: var(--mono); font-size: var(--fs-sm); font-weight: 640;
+    letter-spacing: 0.08em; color: var(--ink);
+  }
+  .strack { height: 8px; border-radius: 4px; background: var(--off-w); overflow: hidden; }
+  .sfill { height: 100%; border-radius: 4px; }
+  .sfill.hi { background: var(--signal); width: 100%; }
+  .sfill.mid { background: var(--warn); width: 62%; }
+  .sfill.lo { background: var(--off); width: 22%; }
+  .slabel { font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.06em; white-space: nowrap; }
+  .slabel.hi { color: var(--signal); }
+  .slabel.mid { color: var(--warn); }
+  .slabel.lo { color: var(--off); }
+
+  /* ─────────────── Règles numérotées ─────────────── */
+  .rules { display: grid; gap: 1.1rem; margin-top: 1.5rem; }
+  @media (min-width: 52rem) { .rules { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+  .rule { border-top: 2px solid var(--accent); padding-top: 0.85rem; }
+  .rule h3 { margin-bottom: 0.35rem; }
+  .rule p { font-size: var(--fs-sm); color: var(--muted); margin: 0; }
+
+  /* ─────────────── Maquettes téléphone ─────────────── */
+  .mocks { display: grid; gap: 1.6rem; margin-top: 1.7rem; }
+  @media (min-width: 44rem) { .mocks { grid-template-columns: repeat(2, minmax(0,1fr)); align-items: start; } }
+
+  .mock-cap {
+    font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--faint); margin: 0 0 0.7rem;
+  }
+  /* Le téléphone reproduit l'app : sombre en toutes circonstances. */
+  .phone {
+    background: #07090B; border: 1px solid #232B33; border-radius: 26px;
+    padding: 0.85rem 0.7rem; color: #EDF2F6; max-width: 21rem;
+  }
+  .p-header { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
+  .pill {
+    background: #171D23; border: 1px solid #262F38; border-radius: 999px;
+    display: flex; align-items: center; gap: 0.4rem; padding: 0.34rem 0.6rem;
+    font-size: 0.7rem; font-weight: 650;
+  }
+  .pill.solo { padding: 0.34rem 0.44rem; }
+  .pill .dim { color: #7C8A96; font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.1em; }
+  .pill.hl { background: #E9EEF3; color: #0B0E11; border-color: #E9EEF3; }
+  .p-body {
+    margin: 0.8rem 0; border: 1px dashed #262F38; border-radius: 14px;
+    padding: 1.5rem 0.8rem; text-align: center;
+    font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.13em;
+    text-transform: uppercase; color: #5F6D79;
+  }
+  .p-nav {
+    background: #12181D; border: 1px solid #232B33; border-radius: 999px;
+    display: flex; align-items: center; justify-content: space-between; padding: 0.3rem;
+  }
+  .p-tab {
+    flex: 1; text-align: center; padding: 0.42rem 0.2rem; border-radius: 999px;
+    font-size: 0.62rem; font-weight: 640; color: #7C8A96;
+    display: flex; flex-direction: column; align-items: center; gap: 0.16rem;
+  }
+  .p-tab.on { background: #EDF2F6; color: #0B0E11; }
+  .p-tab.new { background: #1D3557; color: #9CC4FF; }
+  .p-ico { display: block; }
+  .strike { text-decoration: line-through; opacity: 0.42; }
+
+  /* ─────────────── Modèle ─────────────── */
+  .tiers { display: grid; gap: 0.9rem; margin-top: 1.5rem; }
+  @media (min-width: 44rem) { .tiers { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+  .tier { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px; padding: 1.1rem 1.2rem; }
+  .tier.paid { border-color: var(--accent); }
+  .tier h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; }
+  .tier ul { margin: 0.7rem 0 0; padding-left: 1.05rem; font-size: var(--fs-sm); color: var(--muted); }
+  .tier li { margin-bottom: 0.34rem; }
+  .tier li:last-child { margin-bottom: 0; }
+  .price { font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.1em; color: var(--accent); }
+
+  /* ─────────────── Questions ouvertes ─────────────── */
+  .asks { margin: 1.4rem 0 0; padding: 0; list-style: none; max-width: var(--measure); }
+  .asks li {
+    display: flex; gap: 0.75rem; padding: 0.7rem 0; border-top: 1px solid var(--line-soft);
+    font-size: var(--fs-sm); color: var(--ink-2);
+  }
+  .asks li::before {
+    content: "?"; font-family: var(--mono); color: var(--accent); font-weight: 700;
+    flex-shrink: 0; width: 0.9rem;
+  }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 2rem 0 3rem;
+    font-family: var(--mono); font-size: var(--fs-xs);
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    section, .top-in > * { animation: rise 0.5s cubic-bezier(0.16,1,0.3,1) both; }
+    @keyframes rise { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+  }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+</style>
+
+<header class="top">
+  <div class="top-in">
+    <p class="eyebrow">Note de direction produit · SFL</p>
+    <h1>Le joueur se mesure<br>avant de jouer</h1>
+    <p class="lede">
+      Faire de la carte le produit, et de la ligue un mode. Réponse à la question centrale —
+      faut-il de la vidéo ? — puis la batterie de tests, ce qu'elle peut réellement noter,
+      et l'emplacement du Labo dans l'app.
+    </p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- 1 ───────────────────────────────────────────── -->
+  <section>
+    <div class="shead"><span class="snum">01</span><h2>Le renversement</h2></div>
+    <div class="measure flow">
+      <p>
+        Aujourd'hui, un joueur qui télécharge la SFL sans ligue et sans équipe n'a rien à faire.
+        Il regarde les classements d'inconnus. C'est un produit à un seul public : les vingt gars
+        du dimanche.
+      </p>
+      <p>
+        Inverse la charge : <strong>l'app te mesure, puis te donne ta carte.</strong> Là, un
+        inconnu a une boucle complète le premier jour — il se teste, il obtient une note, il
+        recommence pour la faire monter. La ligue devient ce qu'elle aurait toujours dû être :
+        <em>l'endroit où la carte se confronte au réel</em>, pas la condition d'entrée.
+      </p>
+      <div class="verdict">
+        <span class="verdict-k">Ce que ça change</span>
+        <p>
+          Deux cartes, une progression : la <strong>carte Labo</strong> (ce dont tu es capable,
+          mesuré seul) devient <strong>carte Match</strong> quand tu joues. Le solo n'est pas une
+          version dégradée — c'est la porte d'entrée, et elle mène naturellement à la ligue.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 ───────────────────────────────────────────── -->
+  <section>
+    <div class="shead"><span class="snum">02</span><h2>La vidéo : non — et c'est une bonne nouvelle</h2></div>
+    <div class="measure flow">
+      <p>
+        Les briques existent (MediaPipe, MoveNet, YOLO tournent sur téléphone). Le problème n'est
+        pas technique, il est <strong>humain</strong> : filmer un sprint suppose un trépied ou
+        quelqu'un pour tenir le téléphone. Tu viens précisément d'expliquer que l'intérêt est le
+        joueur <em>seul</em>. La vidéo casse ça au premier test.
+      </p>
+      <p>
+        Et sur le fond, la vidéo est souvent <strong>moins bonne</strong> que les capteurs déjà
+        dans le téléphone. L'accéléromètre échantillonne à 100 Hz ; une caméra, à 30 images par
+        seconde. Pour un temps de vol de détente ou un changement d'appui, c'est trois fois plus
+        fin — sans cadrage, sans lumière, sans calibration.
+      </p>
+    </div>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Ce qu'on veut mesurer</th><th>Capteurs du téléphone</th><th>Vidéo</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Détente verticale</td>
+            <td class="win">Temps de vol à 100 Hz — référence</td>
+            <td class="lose">30 i/s, marge d'erreur double</td>
+          </tr>
+          <tr>
+            <td>VMA / endurance</td>
+            <td class="win">Bips + tap + GPS, protocole exact</td>
+            <td class="lose">Sans objet</td>
+          </tr>
+          <tr>
+            <td>Agilité, appuis</td>
+            <td class="win">Gyroscope, chaque changement d'axe</td>
+            <td class="lose">Cadrage large, perte de précision</td>
+          </tr>
+          <tr>
+            <td>Temps de réaction</td>
+            <td class="win">Tactile, à la milliseconde</td>
+            <td class="lose">Sans objet</td>
+          </tr>
+          <tr>
+            <td>Sprint chronométré</td>
+            <td class="lose">GPS imprécis sous 30 m</td>
+            <td class="win">Ligne fixe filmée = fiable</td>
+          </tr>
+          <tr>
+            <td>Jonglage, conduite, frappe</td>
+            <td class="lose">Le ballon est invisible aux capteurs</td>
+            <td class="win">Détection ballon + posture</td>
+          </tr>
+          <tr>
+            <td>Anti-triche (classements)</td>
+            <td class="lose">Une signature peut s'imiter</td>
+            <td class="win">Preuve visuelle</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="measure flow" style="margin-top:1.7rem">
+      <p>
+        Donc : <strong>capteurs d'abord pour tout le socle athlétique</strong>, vidéo réservée à
+        deux usages précis — la technique avec ballon, et la validation des tentatives classées.
+        Ça en fait un argument premium plus tard, pas une dépendance aujourd'hui.
+      </p>
+      <div class="verdict">
+        <span class="verdict-k">Contrainte à connaître</span>
+        <p>
+          La SFL est une PWA, pas une app native. iOS demande une autorisation explicite pour
+          l'accéléromètre, et bride les capteurs écran éteint. Conséquence de conception :
+          <strong>les tests doivent être courts, écran allumé, téléphone en main ou posé au sol.</strong>
+          Ton idée du gros bouton au sol tombe exactement dans ce que le navigateur sait faire.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 ───────────────────────────────────────────── -->
+  <section>
+    <div class="shead"><span class="snum">03</span><h2>La batterie</h2></div>
+    <p class="measure">
+      Des protocoles <strong>réels et nommés</strong>, pas inventés. Un joueur français connaît le
+      Luc Léger ; un éducateur aussi. C'est ce qui sépare le laboratoire du jeu de téléphone.
+    </p>
+
+    <p class="group-label">Socle athlétique · sans ballon</p>
+    <p class="group-note">Le cœur. Rien à acheter, rien à filmer, personne pour t'aider.</p>
+    <div class="grid">
+
+      <article class="card">
+        <div class="card-top">
+          <div><p class="proto">Test Luc Léger · navette 20 m</p><h3>VMA</h3></div>
+          <span class="dur">6–15 min</span>
+        </div>
+        <p>Bips émis par le téléphone posé au sol. Le joueur tape à chaque passage. Le palier atteint donne la VMA en km/h, puis l'estimation de VO₂max.</p>
+        <div class="card-foot">
+          <div class="meter" data-level="3"><span class="meter-bars"><i></i><i></i><i></i></span><span>Fiable</span></div>
+          <div class="feeds"><span class="stat-chip">PHY</span></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-top">
+          <div><p class="proto">CMJ · saut avec contre-mouvement</p><h3>Détente</h3></div>
+          <span class="dur">30 s</span>
+        </div>
+        <p>Trois sauts, téléphone contre la poitrine. Le temps de vol donne la hauteur au centimètre. Le test le plus court et le plus spectaculaire de la batterie.</p>
+        <div class="card-foot">
+          <div class="meter" data-level="3"><span class="meter-bars"><i></i><i></i><i></i></span><span>Fiable</span></div>
+          <div class="feeds"><span class="stat-chip">PHY</span><span class="stat-chip">VIT</span></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-top">
+          <div><p class="proto">Test en T · 4 plots</p><h3>Agilité</h3></div>
+          <span class="dur">2 min</span>
+        </div>
+        <p>Départ et arrivée au tap, le gyroscope compte les changements d'appui et valide que le parcours a bien été fait. Plots improvisables — sacs, bouteilles.</p>
+        <div class="card-foot">
+          <div class="meter" data-level="3"><span class="meter-bars"><i></i><i></i><i></i></span><span>Fiable</span></div>
+          <div class="feeds"><span class="stat-chip">DRI</span><span class="stat-chip">VIT</span></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-top">
+          <div><p class="proto">RSA · 6 × 20 m, 20 s de récup</p><h3>Répétition de sprints</h3></div>
+          <span class="dur">4 min</span>
+        </div>
+        <p>Mesure la chute de performance entre le premier et le dernier sprint. C'est la qualité qui décide vraiment d'un match de 5 contre 5 — et personne ne la mesure.</p>
+        <div class="card-foot">
+          <div class="meter" data-level="2"><span class="meter-bars"><i></i><i></i><i></i></span><span>Correcte</span></div>
+          <div class="feeds"><span class="stat-chip">PHY</span></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-top">
+          <div><p class="proto">Sprint 30 m · GPS</p><h3>Vitesse de pointe</h3></div>
+          <span class="dur">1 min</span>
+        </div>
+        <p>En extérieur, la vitesse maximale relevée est exploitable ; les temps de passage ne le sont pas. On affiche la pointe, jamais un chrono qu'on ne peut pas tenir.</p>
+        <div class="card-foot">
+          <div class="meter" data-level="2"><span class="meter-bars"><i></i><i></i><i></i></span><span>Correcte</span></div>
+          <div class="feeds"><span class="stat-chip">VIT</span></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-top">
+          <div><p class="proto">Test de Cooper · 12 min</p><h3>Endurance longue</h3></div>
+          <span class="dur">12 min</span>
+        </div>
+        <p>La variante extérieure du Luc Léger, au GPS. Utile pour ceux qui n'ont pas 20 m de couloir — et c'est le test le plus universellement connu.</p>
+        <div class="card-foot">
+          <div class="meter" data-level="2"><span class="meter-bars"><i></i><i></i><i></i></span><span>Correcte</span></div>
+          <div class="feeds"><span class="stat-chip">PHY</span></div>
+        </div>
+      </article>
+    </div>
+
+    <p class="group-label">Socle cognitif · écran seul</p>
+    <p class="group-note">
+      Jouables dans le métro, en 40 secondes. C'est l'habitude quotidienne — le socle athlétique
+      se fait une fois par mois, celui-ci tous les jours. Et personne ne mesure l'intelligence de
+      jeu chez le joueur amateur.
+    </p>
+    <div class="grid">
+      <article class="card">
+        <div class="card-top">
+          <div><p class="proto">Temps de réaction simple</p><h3>Vivacité</h3></div>
+          <span class="dur">40 s</span>
+        </div>
+        <p>Signal, tap. Précision à la milliseconde, cinq essais, médiane retenue. Norme adulte : 250 ms ; gardien entraîné : sous 200 ms.</p>
+        <div class="card-foot">
+          <div class="meter" data-level="3"><span class="meter-bars"><i></i><i></i><i></i></span><span>Fiable</span></div>
+          <div class="feeds"><span class="stat-chip">DEF</span><span class="stat-chip">VIT</span></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-top">
+          <div><p class="proto">Go / No-Go · inhibition</p><h3>Sang-froid</h3></div>
+          <span class="dur">60 s</span>
+        </div>
+        <p>Réagir à un signal, se retenir sur l'autre. Mesure la capacité à ne pas partir au tacle. Un vrai marqueur défensif, validé en sciences du sport.</p>
+        <div class="card-foot">
+          <div class="meter" data-level="3"><span class="meter-bars"><i></i><i></i><i></i></span><span>Fiable</span></div>
+          <div class="feeds"><span class="stat-chip">DEF</span></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-top">
+          <div><p class="proto">Flash tactique · 400 ms</p><h3>Vision de jeu</h3></div>
+          <span class="dur">90 s</span>
+        </div>
+        <p>Une situation de jeu apparaît 4 dixièmes de seconde. Où est l'homme libre ? Mesure la lecture, pas les réflexes. C'est le test le plus différenciant de toute la batterie.</p>
+        <div class="card-foot">
+          <div class="meter" data-level="3"><span class="meter-bars"><i></i><i></i><i></i></span><span>Fiable</span></div>
+          <div class="feeds"><span class="stat-chip">PAS</span></div>
+        </div>
+      </article>
+    </div>
+
+    <p class="group-label">Couche ballon · vidéo</p>
+    <p class="group-note">Plus tard, et en option. C'est ici — et seulement ici — que la vidéo gagne sa place.</p>
+    <div class="grid">
+      <article class="card">
+        <div class="card-top">
+          <div><p class="proto">Comptage automatique</p><h3>Jonglage</h3></div>
+          <span class="dur">2 min</span>
+        </div>
+        <p>Détection ballon + posture. Le micro peut faire un premier comptage sans vidéo, en repérant les contacts — un repli léger et surprenant.</p>
+        <div class="card-foot">
+          <div class="meter" data-level="2"><span class="meter-bars"><i></i><i></i><i></i></span><span>Correcte</span></div>
+          <div class="feeds"><span class="stat-chip">DRI</span></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-top">
+          <div><p class="proto">Slalom chronométré</p><h3>Conduite de balle</h3></div>
+          <span class="dur">3 min</span>
+        </div>
+        <p>Téléphone posé, parcours filmé. Chrono automatique au franchissement des lignes de départ et d'arrivée.</p>
+        <div class="card-foot">
+          <div class="meter" data-level="2"><span class="meter-bars"><i></i><i></i><i></i></span><span>Correcte</span></div>
+          <div class="feeds"><span class="stat-chip">DRI</span></div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-top">
+          <div><p class="proto">Cible · précision et puissance</p><h3>Frappe</h3></div>
+          <span class="dur">5 min</span>
+        </div>
+        <p>Le seul moyen honnête de noter TIR. Nécessite un mur ou un but, et de la vidéo. À garder pour une version ultérieure.</p>
+        <div class="card-foot">
+          <div class="meter" data-level="1"><span class="meter-bars"><i></i><i></i><i></i></span><span>À valider</span></div>
+          <div class="feeds"><span class="stat-chip">TIR</span></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- 4 ───────────────────────────────────────────── -->
+  <section>
+    <div class="shead"><span class="snum">04</span><h2>Deux stats se mesurent, deux s'approchent, deux exigent le terrain</h2></div>
+    <div class="measure flow">
+      <p>
+        Voilà l'honnêteté qu'il faut regarder en face — et c'est là que se trouve la meilleure
+        idée produit du projet. Sur tes six stats, le solo n'en couvre pas six.
+      </p>
+    </div>
+
+    <div class="stats">
+      <div class="srow">
+        <span class="skey">VIT</span>
+        <span class="strack"><span class="sfill hi"></span></span>
+        <span class="slabel hi">Mesurée</span>
+      </div>
+      <div class="srow">
+        <span class="skey">PHY</span>
+        <span class="strack"><span class="sfill hi"></span></span>
+        <span class="slabel hi">Mesurée</span>
+      </div>
+      <div class="srow">
+        <span class="skey">DRI</span>
+        <span class="strack"><span class="sfill mid"></span></span>
+        <span class="slabel mid">Approchée · agilité</span>
+      </div>
+      <div class="srow">
+        <span class="skey">PAS</span>
+        <span class="strack"><span class="sfill mid"></span></span>
+        <span class="slabel mid">Approchée · vision</span>
+      </div>
+      <div class="srow">
+        <span class="skey">DEF</span>
+        <span class="strack"><span class="sfill lo"></span></span>
+        <span class="slabel lo">Terrain</span>
+      </div>
+      <div class="srow">
+        <span class="skey">TIR</span>
+        <span class="strack"><span class="sfill lo"></span></span>
+        <span class="slabel lo">Terrain ou vidéo</span>
+      </div>
+    </div>
+
+    <div class="measure flow" style="margin-top:1.7rem">
+      <p>
+        Ne cache pas ce trou : <strong>montre-le.</strong> Une carte à quatre faces éclairées et
+        deux en attente, c'est un objet incomplet — et un objet incomplet donne envie d'être
+        complété. « Il te manque DEF et TIR. Ils se gagnent en match. »
+      </p>
+      <div class="verdict">
+        <span class="verdict-k">L'entonnoir</span>
+        <p>
+          Le solo attire et retient. La carte incomplète pousse vers la ligue. La ligue est ton
+          produit d'origine, et il devient <em>la récompense</em> au lieu d'être le péage
+          d'entrée.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 ───────────────────────────────────────────── -->
+  <section>
+    <div class="shead"><span class="snum">05</span><h2>Ce qui fait « labo » et pas « gadget »</h2></div>
+    <p class="measure">
+      Trois règles. Sans elles, la même batterie de tests ressemble à un jouet — et un jouet ne se
+      paye pas par abonnement.
+    </p>
+    <div class="rules">
+      <div class="rule">
+        <h3>Des protocoles qui existent</h3>
+        <p>
+          Luc Léger, Cooper, CMJ, test en T : des noms qu'un éducateur reconnaît. Ne jamais
+          inventer un test maison — la crédibilité vient de l'extérieur, pas de nous.
+        </p>
+      </div>
+      <div class="rule">
+        <h3>Un percentile, pas un score</h3>
+        <p>
+          « 14,2 km/h » ne dit rien. « 14,2 km/h — 68ᵉ percentile des amateurs de 25–30 ans »
+          dit tout. Les tables de référence existent dans la littérature.
+        </p>
+      </div>
+      <div class="rule">
+        <h3>Une mesure qui doute d'elle-même</h3>
+        <p>
+          Quand le GPS décroche ou que le téléphone a bougé, le test le dit et propose de
+          recommencer. Avouer l'incertitude est exactement ce qui fait sérieux.
+        </p>
+      </div>
+    </div>
+
+    <div class="measure flow" style="margin-top:1.9rem">
+      <h3>Deux points à trancher tôt</h3>
+      <p>
+        <strong>La triche.</strong> On peut secouer un téléphone pour simuler un saut. Tant que
+        les résultats restent personnels, aucune importance. Dès qu'il y a un classement, il en
+        faut une réponse : signature du mouvement (un vrai saut a une trace de décollage
+        reconnaissable), recoupement entre capteurs, et vidéo obligatoire pour les tentatives
+        classées uniquement.
+      </p>
+      <p>
+        <strong>Le socle est universel.</strong> VMA, détente, agilité, réaction, inhibition : ce
+        sont des qualités d'athlète, pas de footballeur. Seule la couche ballon est spécifique.
+        Si tu sépares les deux dès maintenant — <em>socle athlétique</em> d'un côté,
+        <em>couche technique par sport</em> de l'autre — le basket ne demandera qu'une nouvelle
+        couche, pas une nouvelle app.
+      </p>
+    </div>
+  </section>
+
+  <!-- 6 ───────────────────────────────────────────── -->
+  <section>
+    <div class="shead"><span class="snum">06</span><h2>Où ça se pose dans l'app</h2></div>
+    <p class="measure">
+      La Boutique quitte la barre du bas pour une icône en haut à droite, à côté du solde. Le
+      quatrième onglet devient le Labo.
+    </p>
+
+    <div class="mocks">
+      <div>
+        <p class="mock-cap">Aujourd'hui</p>
+        <div class="phone">
+          <div class="p-header">
+            <span class="pill"><strong>Golder</strong><span class="dim">SFL</span></span>
+            <span class="pill">⚽ 12 002<span class="dim">I</span></span>
+          </div>
+          <div class="p-body">Contenu</div>
+          <div class="p-nav">
+            <span class="p-tab on"><span class="p-ico">⬤</span>Feed</span>
+            <span class="p-tab"><span class="p-ico">◗</span>Discussions</span>
+            <span class="p-tab"><span class="p-ico">◍</span>Profil</span>
+            <span class="p-tab strike"><span class="p-ico">▤</span>Boutique</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <p class="mock-cap">Proposition</p>
+        <div class="phone">
+          <div class="p-header">
+            <span class="pill"><strong>Golder</strong><span class="dim">SFL</span></span>
+            <span style="display:flex;gap:0.3rem;align-items:center">
+              <span class="pill solo" title="Boutique">▤</span>
+              <span class="pill">⚽ 12 002<span class="dim">I</span></span>
+            </span>
+          </div>
+          <div class="p-body">Contenu</div>
+          <div class="p-nav">
+            <span class="p-tab on"><span class="p-ico">⬤</span>Feed</span>
+            <span class="p-tab"><span class="p-ico">◗</span>Discussions</span>
+            <span class="p-tab"><span class="p-ico">◍</span>Profil</span>
+            <span class="p-tab new"><span class="p-ico">◈</span>Labo</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="measure flow" style="margin-top:1.8rem">
+      <p>
+        <strong>Le nom.</strong> « Labo » dit exactement ce que tu décris et se prononce bien.
+        « Combine » est le terme des sciences du sport — plus juste techniquement, moins lisible
+        pour un joueur du dimanche. Je prends <em>Labo</em>.
+      </p>
+      <p>
+        <strong>Une réserve.</strong> Si le Labo devient le moteur d'engagement, la quatrième
+        place est la moins vue de la barre. À l'usage, il mériterait la deuxième — juste après
+        Feed. À décider quand on verra les chiffres d'usage.
+      </p>
+    </div>
+  </section>
+
+  <!-- 7 ───────────────────────────────────────────── -->
+  <section>
+    <div class="shead"><span class="snum">07</span><h2>Le modèle</h2></div>
+    <p class="measure">
+      Ce qui se vend n'est pas le test — c'est <strong>la progression</strong>. Un test qu'on
+      passe une fois ne vaut rien ; une courbe qu'on fait monter vaut un abonnement.
+    </p>
+    <div class="tiers">
+      <div class="tier">
+        <h3>Gratuit</h3>
+        <ul>
+          <li>Un test par catégorie</li>
+          <li>Génération de la carte Labo</li>
+          <li>Un nouveau passage tous les 30 jours</li>
+          <li>Tests cognitifs illimités — c'est l'habitude quotidienne, on ne la taxe pas</li>
+        </ul>
+      </div>
+      <div class="tier paid">
+        <h3>Abonnement <span class="price">à définir</span></h3>
+        <ul>
+          <li>Tous les protocoles, passages illimités</li>
+          <li>Courbes de progression et comparaison par cohorte</li>
+          <li><strong>Programme d'entraînement dérivé de la stat la plus faible</strong></li>
+          <li>Analyse vidéo de la technique</li>
+        </ul>
+      </div>
+    </div>
+    <div class="measure flow" style="margin-top:1.5rem">
+      <p>
+        La ligne en gras est le vrai produit. Mesurer une faiblesse sans proposer d'y remédier,
+        c'est un diagnostic sans ordonnance — et c'est le moment exact où l'utilisateur décroche.
+      </p>
+    </div>
+  </section>
+
+  <!-- 8 ───────────────────────────────────────────── -->
+  <section>
+    <div class="shead"><span class="snum">08</span><h2>Ce que j'ai besoin de savoir de toi</h2></div>
+    <ul class="asks">
+      <li>On démarre par quoi ? Mon conseil : <strong>détente + réaction</strong> — 30 et 40 secondes, zéro matériel, effet immédiat. Le Luc Léger est le plus crédible mais demande 15 minutes et de la motivation.</li>
+      <li>La carte Labo est-elle la même carte que la carte SFL, ou deux objets distincts qui fusionnent ?</li>
+      <li>Les tables de percentiles : on part de la littérature publiée, ou on construit nos propres normes à partir des premiers utilisateurs ?</li>
+      <li>Classements publics dès le début ? Ça change tout sur la triche — et donc sur la vidéo.</li>
+    </ul>
+  </section>
+
+</main>
+
+<footer class="wrap">Note de travail — aucune ligne de code écrite</footer>
+
+</body>
+</html>

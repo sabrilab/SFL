@@ -2,7 +2,16 @@
 
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { Moon, Sun, Monitor, ShieldCheck, ChevronRight, Settings } from "lucide-react";
+import {
+  Moon,
+  Sun,
+  Monitor,
+  ShieldCheck,
+  ChevronRight,
+  Settings,
+  FlaskConical,
+  ArrowUpRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Locked } from "@/components/sfl/locked";
 import { useIsClient } from "@/hooks/use-is-client";
@@ -133,6 +142,26 @@ export default function ReglagesPage() {
             </span>
             <ChevronRight className="size-4 text-foreground/45" />
           </Link>
+          {/* Page statique servie depuis public/ : une vraie navigation, pas
+              une route Next — d'où le <a> et non <Link>. Elle s'ouvre à qui a
+              l'adresse, sans compte : c'est le lien qu'on transmet. */}
+          <a
+            href="/note-labo.html"
+            target="_blank"
+            rel="noreferrer"
+            className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
+          >
+            <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
+              <FlaskConical className="size-[18px]" />
+            </span>
+            <span className="flex-1">
+              <span className="block text-[15px] font-semibold">Note — Le Labo</span>
+              <span className="block text-[12px] text-foreground/45">
+                Direction produit : la carte par les tests · lien partageable
+              </span>
+            </span>
+            <ArrowUpRight className="size-4 text-foreground/45" />
+          </a>
         </section>
       )}
     </div>
