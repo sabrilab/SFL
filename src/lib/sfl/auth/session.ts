@@ -135,7 +135,10 @@ export async function signIn(user: string, password: string): Promise<SignInResu
       if (profile) admin = !!profile.is_admin;
       const session: Session = {
         user: account.user,
-        name: profile?.name ?? account.name,
+        // Le nom CANONIQUE vient du compte (généré depuis l'effectif) : un
+        // profil serveur créé sans métadonnées porte un nom déduit de l'email
+        // (« sabri ») qui ne correspond à rien dans la saison.
+        name: account.name,
         admin,
         since: Date.now(),
         server: true,
@@ -153,6 +156,38 @@ export async function signIn(user: string, password: string): Promise<SignInResu
 
   // 2 · Repli local (transition, tant que les comptes serveur n'existent pas).
   return signInLocal(account, password);
+}
+
+/**
+ * Rafraîchit la session depuis le serveur — appelée à chaque ouverture de
+ * l'app. Le rôle admin vit dans la table profiles : quand il change en base
+ * (migration, promotion), les sessions déjà ouvertes doivent le voir sans
+ * que personne n'ait à se déconnecter. Corrige aussi un nom de session
+ * hérité d'un ancien profil mal formé.
+ */
+export async function refreshSession(): Promise<void> {
+  const session = getSession();
+  if (!session?.server) return;
+  const account = findAccount(session.user);
+  if (!account) return;
+  try {
+    const { data: auth } = await withTimeout(supabase().auth.getUser(), 5000);
+    const uid = auth.user?.id;
+    if (!uid) return;
+    const profileQuery = Promise.resolve(
+      supabase().from("profiles").select("is_admin").eq("id", uid).maybeSingle()
+    );
+    const profile = await withTimeout(profileQuery, 5000)
+      .then((r) => r.data as { is_admin: boolean } | null)
+      .catch(() => null);
+    if (!profile) return;
+    const admin = !!profile.is_admin;
+    if (session.admin !== admin || session.name !== account.name) {
+      storeSession({ ...session, admin, name: account.name });
+    }
+  } catch {
+    // Hors ligne : la session actuelle reste ce qu'elle est.
+  }
 }
 
 export function signOut() {

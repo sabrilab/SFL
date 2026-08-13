@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { claimDailyLogin } from "@/lib/sfl/ballons";
+import { refreshSession } from "@/lib/sfl/auth/session";
 import { logActivity } from "@/lib/sfl/activity";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -45,6 +46,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // +2 Ballons à la première ouverture de l'app du jour — une fois connecté
   // seulement : sinon la récompense tombe sur l'écran de connexion, avant même
   // de savoir qui joue.
+  // La session se remet à jour depuis le serveur à chaque ouverture : un rôle
+  // admin accordé en base est vu sans se déconnecter.
+  useEffect(() => {
+    void refreshSession();
+  }, []);
+
   useEffect(() => {
     if (!isClient || !sessionName) return;
     logActivity("open");

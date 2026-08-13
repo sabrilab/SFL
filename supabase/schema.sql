@@ -355,6 +355,38 @@ end;
 $$;
 
 -- ───────────────────────── Rôle admin ────────────────────────────────
--- À exécuter APRÈS la création des comptes (l'étape « Créer les comptes »
--- de la page /admin/setup). Sans effet tant que le compte n'existe pas.
-update public.profiles set is_admin = true where username in ('@ilyes', '@sabri');
+-- Remise d'aplomb des comptes admin — rejouée à chaque migration, donc à
+-- chaque déploiement qui touche ce fichier. Elle répare TOUS les états de
+-- départ : compte créé avant le trigger (profil absent), profil créé sans
+-- métadonnées (nom « sabri » déduit de l'email au lieu de « Sabri »), ou
+-- promotion jouée avant que le compte existe. Reconnaissance par email
+-- technique EXACT, jamais par métadonnées ni par pseudo.
+do $$
+declare
+  a record;
+begin
+  for a in
+    select * from (values
+      ('ilyes@sfl.local', 'Ilyes', '@ilyes'),
+      ('sabri@sfl.local', 'Sabri', '@sabri')
+    ) as t(email, name, username)
+  loop
+    begin
+      insert into public.profiles (id, name, username, is_admin)
+      select u.id, a.name, a.username, true
+        from auth.users u
+       where u.email = a.email
+      on conflict (id) do update
+        set is_admin = true, name = excluded.name, username = excluded.username;
+    exception
+      -- Un autre profil porte déjà ce nom ou ce pseudo : on ne casse pas la
+      -- migration pour ça, on promeut au moins le rôle.
+      when unique_violation then
+        update public.profiles p
+           set is_admin = true
+          from auth.users u
+         where u.id = p.id and u.email = a.email;
+    end;
+  end loop;
+end;
+$$;
