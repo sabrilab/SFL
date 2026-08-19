@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Mail, RefreshCw } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
+import { isAdmin } from "@/lib/sfl/admin";
 import { supabase } from "@/lib/supabase";
 import { ACCOUNTS } from "@/lib/sfl/auth/accounts";
 import { cn } from "@/lib/utils";
@@ -399,9 +400,22 @@ export default function ActivitePage() {
   }, [data, periode]);
 
   if (!session?.admin) {
+    // Le rôle qui compte ici est celui de la BASE : c'est lui que les règles
+    // de lecture appliquent. Un compte admin dans l'app mais pas encore
+    // reconnu en base lit un écran vide sans comprendre pourquoi — on le lui
+    // dit, avec le geste qui répare.
+    const adminConnu = isAdmin(session?.name);
     return (
       <div className="mx-auto max-w-2xl px-5 py-16 text-center text-sm text-foreground/45">
-        Cette page est réservée à l&apos;admin de la ligue.
+        {adminConnu ? (
+          <>
+            Ton compte est administrateur dans l&apos;app, mais la base ne le sait pas encore.
+            Déconnecte-toi puis reconnecte-toi — si ça ne suffit pas, passe une fois par
+            Réglages → Installation Supabase.
+          </>
+        ) : (
+          <>Cette page est réservée à l&apos;admin de la ligue.</>
+        )}
       </div>
     );
   }

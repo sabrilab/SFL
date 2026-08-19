@@ -1,19 +1,20 @@
 "use client";
 
-// Assistant « Nouvelle journée » : sélection rapide des présents (coches,
-// tout sélectionner/désélectionner), choix du nombre d'équipes, génération
-// d'équipes équilibrées selon l'OVR des cartes, relance, puis création de la
-// journée complète (une ligne par joueur, équipes pré-remplies).
+// Assistant « Nouvelle journée ».
+//
+// On compose DIRECTEMENT : on choisit une équipe, on touche les joueurs, ils
+// y entrent. Auparavant il fallait générer un tirage aléatoire pour pouvoir
+// créer la journée — et le tirage obtenu n'était même pas modifiable. Quand
+// on sait déjà qui joue avec qui, passer par le hasard pour ensuite tout
+// corriger à la main dans la grille n'a aucun sens.
+//
+// Le tirage équilibré reste là, mais à sa place : un coup de main pour les
+// joueurs qu'on n'a pas encore placés, jamais un passage obligé.
 
 import { useMemo, useState } from "react";
-import { Dices, Users } from "lucide-react";
+import { Dices, Users, Eraser } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import {
   generateBalancedTeams,
@@ -31,6 +32,9 @@ const TEAM_COLORS: Record<string, string> = {
   Gris: "#CCCCCC",
 };
 
+/** Le vestiaire : les joueurs retenus qu'on n'a pas encore placés. */
+const A_PLACER = "—";
+
 export function NewJourneeSheet({
   open,
   onOpenChange,
@@ -46,42 +50,91 @@ export function NewJourneeSheet({
   initialChecked?: string[];
   onCreate: (teams: BalancedTeam[]) => void;
 }) {
-  const [checked, setChecked] = useState<Set<string>>(() => new Set(initialChecked));
   const [teamCount, setTeamCount] = useState(2);
-  const [teams, setTeams] = useState<BalancedTeam[] | null>(null);
+  // joueur → équipe (ou A_PLACER). Absent de la table = pas retenu.
+  const [affectation, setAffectation] = useState<Record<string, string>>(() =>
+    Object.fromEntries(initialChecked.map((n) => [n, A_PLACER]))
+  );
+  const [pinceau, setPinceau] = useState<string>(TEAM_PRESETS[0]);
 
-  const selectable = useMemo(() => roster.filter((r) => r.actif), [roster]);
-  const allSelected = checked.size === selectable.length && selectable.length > 0;
+  const equipes = useMemo(() => TEAM_PRESETS.slice(0, teamCount), [teamCount]);
+  const ovrDe = useMemo(() => new Map(roster.map((r) => [r.name, r.ovr])), [roster]);
 
-  function toggle(name: string) {
-    setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
+  const retenus = Object.keys(affectation);
+  const aPlacer = retenus.filter((n) => affectation[n] === A_PLACER);
+  const parEquipe = useMemo(() => {
+    const m = new Map<string, string[]>(equipes.map((e) => [e, []]));
+    for (const [nom, eq] of Object.entries(affectation)) m.get(eq)?.push(nom);
+    return m;
+  }, [affectation, equipes]);
+
+  /** Touche un joueur : il entre dans l'équipe au pinceau, ou en ressort. */
+  function toucher(nom: string) {
+    setAffectation((prev) => {
+      const next = { ...prev };
+      if (next[nom] === pinceau) delete next[nom];
+      else next[nom] = pinceau;
       return next;
     });
-    setTeams(null);
   }
 
-  function toggleAll() {
-    setChecked(allSelected ? new Set() : new Set(selectable.map((r) => r.name)));
-    setTeams(null);
+  /** Répartit les joueurs encore au vestiaire, équilibrés selon l'OVR. */
+  function repartir() {
+    const restants: BalancedPlayer[] = aPlacer.map((n) => ({ name: n, ovr: ovrDe.get(n) ?? 75 }));
+    if (restants.length === 0) return;
+    // On repart des équipes déjà composées pour que le tirage les complète
+    // au lieu de les écraser : ce qui a été placé à la main est acquis.
+    const tirage = generateBalancedTeams(restants, teamCount, equipes);
+    setAffectation((prev) => {
+      const next = { ...prev };
+      // La plus légère d'abord, pour rattraper un déséquilibre existant.
+      const ordre = [...equipes].sort(
+        (a, b) => (parEquipe.get(a)?.length ?? 0) - (parEquipe.get(b)?.length ?? 0)
+      );
+      tirage.forEach((t, i) => {
+        for (const p of t.players) next[p.name] = ordre[i % ordre.length];
+      });
+      return next;
+    });
   }
 
-  function generate() {
-    const players: BalancedPlayer[] = roster
-      .filter((r) => checked.has(r.name))
-      .map((r) => ({ name: r.name, ovr: r.ovr }));
-    setTeams(generateBalancedTeams(players, teamCount, TEAM_PRESETS));
+  function viderEquipes() {
+    setAffectation((prev) =>
+      Object.fromEntries(Object.keys(prev).map((n) => [n, A_PLACER]))
+    );
   }
 
   function reset() {
-    setChecked(new Set(initialChecked));
-    setTeams(null);
+    setAffectation(Object.fromEntries(initialChecked.map((n) => [n, A_PLACER])));
     setTeamCount(2);
+    setPinceau(TEAM_PRESETS[0]);
   }
 
-  const perTeam = checked.size > 0 ? Math.floor(checked.size / teamCount) : 0;
+  const equipesGarnies = equipes.filter((e) => (parEquipe.get(e)?.length ?? 0) > 0);
+  const pret = aPlacer.length === 0 && equipesGarnies.length === teamCount;
+  const blocage =
+    retenus.length === 0
+      ? "Touche des joueurs pour les faire entrer dans l'équipe choisie."
+      : aPlacer.length > 0
+        ? `${aPlacer.length} joueur${aPlacer.length > 1 ? "s" : ""} encore au vestiaire.`
+        : equipesGarnies.length < teamCount
+          ? "Chaque équipe doit avoir au moins un joueur."
+          : null;
+
+  function creer() {
+    const teams: BalancedTeam[] = equipes.map((nom) => {
+      const joueurs = (parEquipe.get(nom) ?? []).map((n) => ({
+        name: n,
+        ovr: ovrDe.get(n) ?? 75,
+      }));
+      return {
+        name: nom,
+        players: joueurs,
+        totalOvr: joueurs.reduce((s, p) => s + p.ovr, 0),
+      };
+    });
+    onCreate(teams);
+  }
 
   return (
     <Sheet
@@ -97,59 +150,7 @@ export function NewJourneeSheet({
         </SheetHeader>
 
         <div className="flex flex-col gap-4 px-1 pb-8">
-          {/* Étape 1 — présents */}
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-sm font-semibold">
-                <Users className="size-4" /> Présents
-                <span className="text-muted-foreground tabular-nums">({checked.size})</span>
-              </span>
-              <button
-                type="button"
-                onClick={toggleAll}
-                className="text-[13px] font-semibold text-primary"
-              >
-                {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-              {roster.map((r) => {
-                const on = checked.has(r.name);
-                return (
-                  <button
-                    key={r.name}
-                    type="button"
-                    disabled={!r.actif}
-                    onClick={() => toggle(r.name)}
-                    className={cn(
-                      "flex items-center justify-between rounded-xl border px-3 py-2 text-left text-[13px] font-medium transition-colors",
-                      !r.actif && "opacity-35",
-                      on
-                        ? "border-primary bg-primary/10"
-                        : "border-border/60 bg-card hover:bg-secondary"
-                    )}
-                  >
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <span
-                        className={cn(
-                          "flex size-4 shrink-0 items-center justify-center rounded-[5px] border text-[9px] font-black",
-                          on
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border"
-                        )}
-                      >
-                        {on ? "✓" : ""}
-                      </span>
-                      <span className="truncate">{r.name}</span>
-                    </span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{r.ovr}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Étape 2 — nombre d'équipes */}
+          {/* Combien d'équipes */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold">Équipes</span>
             <div className="flex gap-1">
@@ -159,13 +160,22 @@ export function NewJourneeSheet({
                   type="button"
                   onClick={() => {
                     setTeamCount(n);
-                    setTeams(null);
+                    // Les joueurs placés dans une équipe qui disparaît
+                    // retournent au vestiaire plutôt que de s'évaporer.
+                    const gardees = TEAM_PRESETS.slice(0, n) as readonly string[];
+                    setAffectation((prev) =>
+                      Object.fromEntries(
+                        Object.entries(prev).map(([nom, eq]) => [
+                          nom,
+                          gardees.includes(eq) ? eq : A_PLACER,
+                        ])
+                      )
+                    );
+                    setPinceau(TEAM_PRESETS[0]);
                   }}
                   className={cn(
                     "rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors",
-                    teamCount === n
-                      ? "bg-foreground text-background"
-                      : "bg-card text-muted-foreground"
+                    teamCount === n ? "bg-foreground text-background" : "bg-card text-muted-foreground"
                   )}
                 >
                   {n}
@@ -174,63 +184,123 @@ export function NewJourneeSheet({
             </div>
           </div>
 
-          {/* Étape 3 — génération équilibrée */}
-          <Button
-            variant="secondary"
-            disabled={checked.size < teamCount}
-            onClick={generate}
-            className="font-semibold"
-          >
-            <Dices className="mr-1.5 size-4" />
-            {teams ? "Regénérer les équipes" : "Générer des équipes équilibrées"}
-          </Button>
-          {checked.size > 0 && checked.size < teamCount && (
-            <p className="-mt-2 text-center text-xs text-destructive">
-              Il faut au moins {teamCount} joueurs pour {teamCount} équipes.
+          {/* Le pinceau : l'équipe dans laquelle les joueurs touchés entrent. */}
+          <div>
+            <p className="mb-2 text-sm font-semibold">
+              Je compose{" "}
+              <span className="font-normal text-muted-foreground">
+                — choisis une équipe, puis touche les joueurs
+              </span>
             </p>
-          )}
-          {checked.size >= teamCount && !teams && (
-            <p className="-mt-2 text-center text-xs text-muted-foreground">
-              ~{perTeam} joueurs par équipe, équilibrés selon l&apos;OVR des cartes.
-            </p>
-          )}
-
-          {teams && (
-            <div className="grid grid-cols-2 gap-2">
-              {teams.map((t) => (
-                <div key={t.name} className="rounded-2xl bg-secondary/40 p-3">
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-sm font-bold">
+            <div className="flex flex-wrap gap-1.5">
+              {[...equipes, A_PLACER].map((eq) => {
+                const actif = pinceau === eq;
+                const n = eq === A_PLACER ? aPlacer.length : (parEquipe.get(eq)?.length ?? 0);
+                const membres = eq === A_PLACER ? aPlacer : (parEquipe.get(eq) ?? []);
+                const moyenne = membres.length
+                  ? Math.round(
+                      membres.reduce((s, m) => s + (ovrDe.get(m) ?? 75), 0) / membres.length
+                    )
+                  : 0;
+                return (
+                  <button
+                    key={eq}
+                    type="button"
+                    onClick={() => setPinceau(eq)}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-colors",
+                      actif
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border/60 bg-card text-muted-foreground"
+                    )}
+                  >
+                    {eq !== A_PLACER && (
                       <span
-                        className="size-2.5 rounded-full ring-1 ring-black/10"
-                        style={{ background: TEAM_COLORS[t.name] ?? "#ddd" }}
+                        className="size-2.5 rounded-full ring-1 ring-black/20"
+                        style={{ background: TEAM_COLORS[eq] ?? "#ddd" }}
                       />
-                      {t.name}
-                    </span>
-                    <span className="text-[11px] font-semibold text-muted-foreground tabular-nums">
-                      Ø {t.players.length ? Math.round(t.totalOvr / t.players.length) : 0} OVR
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    {t.players.map((p) => (
-                      <div key={p.name} className="flex items-center justify-between text-[13px]">
-                        <span className="truncate font-medium">{p.name}</span>
-                        <span className="text-[11px] text-muted-foreground tabular-nums">{p.ovr}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                    )}
+                    {eq === A_PLACER ? "Vestiaire" : eq}
+                    <span className="tabular-nums opacity-70">{n}</span>
+                    {moyenne > 0 && eq !== A_PLACER && (
+                      <span className="text-[10px] opacity-55 tabular-nums">Ø{moyenne}</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-          )}
+          </div>
 
-          {/* Étape 4 — création */}
-          <Button
-            disabled={!teams}
-            onClick={() => teams && onCreate(teams)}
-            className="font-semibold"
-          >
-            Créer la journée ({checked.size} joueurs)
+          {/* Le vivier */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-sm font-semibold">
+                <Users className="size-4" /> Effectif
+                <span className="text-muted-foreground tabular-nums">({retenus.length} retenus)</span>
+              </span>
+              <div className="flex gap-2.5">
+                <button
+                  type="button"
+                  onClick={repartir}
+                  disabled={aPlacer.length === 0}
+                  className="flex items-center gap-1 text-[13px] font-semibold text-primary disabled:opacity-35"
+                >
+                  <Dices className="size-3.5" /> Répartir le vestiaire
+                </button>
+                <button
+                  type="button"
+                  onClick={viderEquipes}
+                  disabled={retenus.length === 0}
+                  className="flex items-center gap-1 text-[13px] font-semibold text-muted-foreground disabled:opacity-35"
+                >
+                  <Eraser className="size-3.5" /> Vider
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              {roster.map((r) => {
+                const eq = affectation[r.name];
+                const place = eq !== undefined && eq !== A_PLACER;
+                const auVestiaire = eq === A_PLACER;
+                return (
+                  <button
+                    key={r.name}
+                    type="button"
+                    disabled={!r.actif}
+                    onClick={() => toucher(r.name)}
+                    className={cn(
+                      "flex items-center justify-between rounded-xl border px-3 py-2 text-left text-[13px] font-medium transition-colors",
+                      !r.actif && "opacity-35",
+                      place
+                        ? "border-foreground/25 bg-secondary"
+                        : auVestiaire
+                          ? "border-primary/60 bg-primary/8"
+                          : "border-border/60 bg-card hover:bg-secondary"
+                    )}
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span
+                        className={cn(
+                          "size-2.5 shrink-0 rounded-full ring-1",
+                          place ? "ring-black/20" : "ring-border"
+                        )}
+                        style={place ? { background: TEAM_COLORS[eq] ?? "#ddd" } : undefined}
+                      />
+                      <span className="truncate">{r.name}</span>
+                    </span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                      {r.ovr}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {blocage && <p className="text-center text-xs text-muted-foreground">{blocage}</p>}
+
+          <Button disabled={!pret} onClick={creer} className="font-semibold">
+            Créer la journée ({retenus.length} joueurs)
           </Button>
         </div>
       </SheetContent>
