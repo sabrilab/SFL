@@ -173,7 +173,16 @@ export async function refreshSession(): Promise<void> {
   try {
     const { data: auth } = await withTimeout(supabase().auth.getUser(), 5000);
     const uid = auth.user?.id;
-    if (!uid) return;
+    // Le jeton Supabase a disparu — expiré, révoqué, ou effacé par le
+    // navigateur (iOS purge le stockage des sites peu visités). Notre propre
+    // session, elle, survit indéfiniment : elle continuerait d'affirmer
+    // « vérifiée par le serveur » pendant que chaque écriture est refusée,
+    // en silence. On la remet à la vérité tout de suite, pour que l'écran
+    // affiche « Local » et réclame une reconnexion.
+    if (!uid) {
+      storeSession({ ...session, server: false });
+      return;
+    }
     const profileQuery = Promise.resolve(
       supabase().from("profiles").select("is_admin").eq("id", uid).maybeSingle()
     );

@@ -155,16 +155,52 @@ export function dernierEnvoiAuto(): EnvoiAuto | null {
   return dernier;
 }
 
+// Une sauvegarde qui n'a pas atteint la base laisse une marque. Sans elle,
+// l'envoi raté était perdu pour de bon : il fallait que quelqu'un pense à
+// rouvrir l'espace admin et à presser « Publier ». Avec elle, l'app rattrape
+// toute seule dès que la connexion au serveur revient.
+const EN_ATTENTE_KEY = "sfl-saison-a-publier";
+
+function marquerAPublier(oui: boolean) {
+  try {
+    if (oui) localStorage.setItem(EN_ATTENTE_KEY, "1");
+    else localStorage.removeItem(EN_ATTENTE_KEY);
+  } catch {
+    /* stockage indisponible */
+  }
+}
+
+export function publicationEnAttente(): boolean {
+  try {
+    return localStorage.getItem(EN_ATTENTE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 /** Envoi automatique — appelé par saisieStore.save à chaque sauvegarde. */
 export async function pushSaison(saison: Saison): Promise<boolean> {
   const r = await publierSaison(saison);
   dernier = { at: Date.now(), ok: r.ok, ...(r.ok ? {} : { raison: r.raison }) };
+  marquerAPublier(!r.ok);
   try {
     window.dispatchEvent(new Event(SYNC_EVENT));
   } catch {
     /* hors navigateur */
   }
   return r.ok;
+}
+
+/**
+ * Rattrape une sauvegarde restée en local. Appelée à l'ouverture de l'app et
+ * à chaque changement de session : dès qu'un admin retrouve une session
+ * serveur, ce qu'il avait saisi hors ligne part enfin.
+ */
+export async function rattraperPublication(): Promise<boolean> {
+  if (!publicationEnAttente()) return false;
+  if (blocage()) return false;
+  const { saisieStore } = await import("./store");
+  return pushSaison(saisieStore.load());
 }
 
 /* ------------------------------ Diagnostic ------------------------------ */
@@ -339,7 +375,10 @@ export function startSaisonSync(): () => void {
 
   // Tirer d'abord (adopter le plus récent), puis garantir que la base est
   // peuplée — l'ordre évite d'écraser une base plus fraîche que soi.
-  void pullSaison().then(() => ensureRemoteSaison());
+  void pullSaison()
+    .then(() => ensureRemoteSaison())
+    // Puis on rattrape ce qui n'était jamais parti.
+    .then(() => rattraperPublication());
   try {
     const sb = supabase();
     const channel = sb

@@ -24,6 +24,7 @@ import {
   dernierEnvoiAuto,
   dernierePublication,
   diagnostic,
+  publicationEnAttente,
   publierSaison,
   reprendreDeLaBase,
   SYNC_EVENT,
@@ -69,6 +70,9 @@ export function Synchro({ saison }: { saison: Saison }) {
   const [etapes, setEtapes] = useState<Etape[] | null>(null);
   const [examen, setExamen] = useState(false);
   const envoi = useDernierEnvoi();
+  // La marque survit au rechargement : elle dit qu'une saisie attend encore
+  // son voyage vers la base, même si l'envoi raté date d'une autre session.
+  const enAttente = publicationEnAttente();
   // Lu à chaque rendu plutôt que mémorisé : la valeur change quand on publie.
   const derniere = quand(dernierePublication());
   const empeche = blocage();
@@ -135,6 +139,13 @@ export function Synchro({ saison }: { saison: Saison }) {
             </span>
           </p>
         </div>
+      )}
+      {!envoi && enAttente && (
+        <p className="mt-1.5 flex items-start gap-1.5 text-[12.5px] leading-snug text-amber-400">
+          <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
+          Des saisies ne sont pas encore publiées. Elles partiront d&apos;elles-mêmes dès que ta
+          session serveur sera rétablie.
+        </p>
       )}
       {envoi?.ok && (
         <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] text-emerald-400">
