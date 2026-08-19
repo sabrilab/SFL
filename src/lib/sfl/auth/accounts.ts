@@ -60,6 +60,7 @@ export const ACCOUNTS: Account[] = [
   { user: "malik", name: "Malik", hash: "633b652203c4c94d63c1f15bf69b2784af2a48200ee32c917d6debd1cb08bb2e" },
   { user: "marwan", name: "Marwan", hash: "2adcceec8b24ddd422f29460168874150dfb9068007df137b2c8310e96e06ed6" },
   { user: "mehdi", name: "Mehdi", hash: "dbb59711f91e6e735ab8ab2ddd48a576f0ff4f98d04014a637ae8686e1d09889" },
+  { user: "miken", name: "Miken", hash: "a6dc3effdb2d7d9a39e7d9b6ccf0c1b60fa0ff48da879ed0e90ce51bb54d0163" },
   { user: "moussa", name: "Moussa", hash: "eddb7248c1f24a81959c89c699e8a490e4b265f919cc2cbbeaefcf4826252f4f" },
   { user: "moustapha", name: "Moustapha", hash: "44baaf1a51b498f5cabc1a6f68f79510ed8b00670cc16fa5532c3af4952aa722" },
   { user: "naim", name: "Naim", hash: "5788a35331b3c1b1645099713f8ab62b4c0222f992d206b4b45b2b42111b9f26" },

@@ -10,12 +10,21 @@ import type { Saison } from "./types";
 
 const STORAGE_KEY = "sfl-saisie-v1";
 const SEED_VERSION_KEY = "sfl-saisie-seed";
+// Posé dès la première sauvegarde d'un admin. Il marque une saison qui
+// contient du travail humain — et qu'on n'écrase donc jamais tout seul.
+const EDITED_KEY = "sfl-saisie-edite";
 
-// Version du seed livré avec le code. Tant que la saisie admin n'est pas
-// persistée côté serveur, le seed reste la source de vérité : à chaque
-// journée ajoutée dans seed.ts, on incrémente ce numéro pour que les
-// appareils qui ont déjà une saison en cache repartent des données à jour
-// au lieu de rester bloqués sur l'ancienne.
+// Version du seed livré avec le code. On l'incrémente à chaque correction
+// de données pour que les appareils qui ont une saison en cache repartent
+// des données à jour.
+//
+// MAIS il ne remplace JAMAIS une saison éditée par un admin. Ce reset
+// automatique a coûté cher : chaque déploiement qui incrémentait ce numéro
+// effaçait en silence les feuilles de match saisies à la main, et les
+// joueurs se retrouvaient avec moins de points qu'ils n'en avaient gagné.
+// Une correction livrée ne vaut jamais la perte du travail de quelqu'un :
+// pour repartir des données livrées, l'admin le demande explicitement
+// (bouton « Réinitialiser » de l'espace admin).
 const SEED_VERSION = 12;
 
 /** Copie fraîche du seed (données initiales). */
@@ -85,11 +94,13 @@ export const localStorageStore: SaisieStore = {
   load() {
     if (!hasWindow()) return seedSaison();
     try {
-      // Seed plus récent que la copie locale : on repart des données livrées.
-      const stored = Number(window.localStorage.getItem(SEED_VERSION_KEY) ?? 0);
-      if (stored < SEED_VERSION) return this.reset();
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (!raw) return seedSaison();
+      // Seed plus récent que la copie locale : on repart des données livrées,
+      // SAUF si cette copie porte des saisies — elles priment sur tout.
+      const stored = Number(window.localStorage.getItem(SEED_VERSION_KEY) ?? 0);
+      const editee = window.localStorage.getItem(EDITED_KEY) === "1";
+      if (stored < SEED_VERSION && !editee) return this.reset();
       return migrate(JSON.parse(raw) as Saison);
     } catch {
       // Stockage illisible, corrompu ou interdit : le seed reste jouable.
@@ -100,12 +111,19 @@ export const localStorageStore: SaisieStore = {
     if (!hasWindow()) return;
     ecrire(STORAGE_KEY, JSON.stringify(saison));
     ecrire(SEED_VERSION_KEY, String(SEED_VERSION));
+    ecrire(EDITED_KEY, "1");
   },
   reset() {
     const fresh = seedSaison();
     if (hasWindow()) {
       ecrire(STORAGE_KEY, JSON.stringify(fresh));
       ecrire(SEED_VERSION_KEY, String(SEED_VERSION));
+      // Repartir des données livrées, c'est repartir d'une saison non éditée.
+      try {
+        window.localStorage.removeItem(EDITED_KEY);
+      } catch {
+        /* stockage indisponible : sans importance ici */
+      }
     }
     return fresh;
   },
@@ -123,6 +141,9 @@ export function adoptSaison(saison: Saison) {
   if (!hasWindow()) return;
   ecrire(STORAGE_KEY, JSON.stringify(saison));
   ecrire(SEED_VERSION_KEY, String(SEED_VERSION));
+  // Elle vient de l'admin : elle vaut une saisie, et ne doit pas plus
+  // qu'une autre être écrasée par un seed livré plus tard.
+  ecrire(EDITED_KEY, "1");
 }
 
 // Le stockage local reste la mémoire de travail ; chaque sauvegarde part

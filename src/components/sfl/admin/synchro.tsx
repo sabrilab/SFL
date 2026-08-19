@@ -1,0 +1,185 @@
+"use client";
+
+// Synchronisation de la saison — le panneau que l'admin regarde quand il se
+// demande « est-ce que tout le monde voit ce que je vois ? ».
+//
+// Trois choses, et rien d'autre : où en est la saison, un bouton pour la
+// publier partout, un bouton pour reprendre celle de la base quand une
+// saisie a dérapé. Aucun passage par l'installation : elle sert à créer les
+// tables et les comptes, pas à publier des données.
+//
+// Les échecs sont affichés AVEC LEUR MOTIF, en toutes lettres. Un « échec de
+// synchronisation » sans cause laisse l'admin sans rien à faire, et c'est
+// justement le moment où il a besoin d'agir.
+
+import { useState } from "react";
+import { CloudUpload, RotateCcw, Check, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { useSession } from "@/hooks/use-session";
+import { saisieStore } from "@/lib/sfl/saisie/store";
+import { SAISIE_EVENT } from "@/components/sfl/season-provider";
+import {
+  blocage,
+  dernierePublication,
+  publierSaison,
+  reprendreDeLaBase,
+} from "@/lib/sfl/saisie/sync";
+import type { Saison } from "@/lib/sfl/saisie/types";
+
+type Etat =
+  | { phase: "repos" }
+  | { phase: "envoi" }
+  | { phase: "reprise" }
+  | { phase: "ok"; message: string }
+  | { phase: "erreur"; message: string };
+
+function quand(ts: number | null): string {
+  if (!ts) return "jamais";
+  const d = new Date(ts);
+  return d.toLocaleString("fr-FR", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function Synchro({ saison }: { saison: Saison }) {
+  const session = useSession();
+  const partage = !!session?.server && !!session.admin;
+  const [etat, setEtat] = useState<Etat>({ phase: "repos" });
+  // Lu à chaque rendu plutôt que mémorisé : la valeur change quand on publie.
+  const derniere = quand(dernierePublication());
+  const empeche = blocage();
+
+  async function publier() {
+    setEtat({ phase: "envoi" });
+    const r = await publierSaison(saison);
+    if (r.ok) {
+      setEtat({ phase: "ok", message: "Publiée. Toute la ligue est sur cette version." });
+      toast.success("Saison publiée", { description: "Tout le monde voit la même chose." });
+    } else {
+      setEtat({ phase: "erreur", message: r.raison });
+    }
+  }
+
+  async function reprendre() {
+    setEtat({ phase: "reprise" });
+    const r = await reprendreDeLaBase();
+    if (r.ok) {
+      window.dispatchEvent(new Event(SAISIE_EVENT));
+      setEtat({ phase: "ok", message: "Version de la base reprise sur cet appareil." });
+      toast.success("Version de la base reprise");
+    } else {
+      setEtat({ phase: "erreur", message: r.raison });
+    }
+  }
+
+  const occupe = etat.phase === "envoi" || etat.phase === "reprise";
+
+  return (
+    <div className="glass rounded-3xl p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-[16px] font-bold tracking-tight">Synchronisation</h2>
+          <p className="mt-1 text-[12.5px] leading-snug text-foreground/45">
+            {partage
+              ? "Chaque sauvegarde part déjà en base toute seule. Ce bouton force l'envoi — après une coupure réseau, ou pour en avoir le cœur net."
+              : "Tes corrections restent sur cet appareil tant que ta session n'est pas vérifiée par le serveur."}
+          </p>
+        </div>
+        <span
+          className={cn(
+            "mono-label shrink-0 rounded-full px-2.5 py-1",
+            partage ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"
+          )}
+        >
+          {partage ? "Partagé" : "Local"}
+        </span>
+      </div>
+
+      <p className="mono-label mt-3 text-foreground/35">Dernière publication · {derniere}</p>
+
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <button
+          onClick={publier}
+          disabled={occupe || !!empeche}
+          className="flex flex-1 items-center justify-center gap-2 rounded-full bg-foreground py-3 text-[14px] font-bold text-background transition-transform active:scale-[0.98] disabled:opacity-40"
+        >
+          <CloudUpload className="size-4" strokeWidth={2.5} />
+          {etat.phase === "envoi" ? "Publication…" : "Publier pour toute la ligue"}
+        </button>
+        <button
+          onClick={reprendre}
+          disabled={occupe || !session?.server}
+          className="glass-soft flex items-center justify-center gap-2 rounded-full px-4 py-3 text-[13.5px] font-semibold text-foreground/70 transition-transform active:scale-[0.98] disabled:opacity-40"
+        >
+          <RotateCcw className="size-4" />
+          {etat.phase === "reprise" ? "Reprise…" : "Reprendre la base"}
+        </button>
+      </div>
+
+      {empeche && (
+        <p className="mt-2.5 flex items-start gap-1.5 text-[12.5px] leading-snug text-amber-400/90">
+          <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
+          {empeche}
+        </p>
+      )}
+
+      {etat.phase === "ok" && (
+        <p className="mt-2.5 flex items-start gap-1.5 text-[12.5px] leading-snug text-emerald-400">
+          <Check className="mt-[2px] size-3.5 shrink-0" />
+          {etat.message}
+        </p>
+      )}
+
+      {etat.phase === "erreur" && (
+        <div className="mt-2.5 rounded-2xl border border-red-500/25 bg-red-500/8 px-3 py-2.5">
+          <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-red-300">
+            <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
+            <span>
+              <b className="font-semibold">Publication impossible.</b> {etat.message}
+            </span>
+          </p>
+          <button
+            onClick={publier}
+            className="mono-label mt-2 rounded-full bg-white/8 px-3 py-1.5 text-foreground/70"
+          >
+            Réessayer
+          </button>
+        </div>
+      )}
+
+      <p className="mt-3 border-t border-white/8 pt-2.5 text-[11.5px] leading-relaxed text-foreground/30">
+        « Reprendre la base » remplace la saison de cet appareil par celle que voit la ligue.
+        À utiliser quand une saisie a dérapé — puis corrige et republie.
+      </p>
+    </div>
+  );
+}
+
+/** Repart des données livrées avec le code — geste rare, donc confirmé. */
+export function ReinitialiserSaison() {
+  const [confirme, setConfirme] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        if (!confirme) {
+          setConfirme(true);
+          return;
+        }
+        saisieStore.reset();
+        window.dispatchEvent(new Event(SAISIE_EVENT));
+        toast.success("Saison remise aux données livrées");
+        setConfirme(false);
+      }}
+      className={cn(
+        "mono-label rounded-full px-3 py-1.5",
+        confirme ? "bg-red-500/20 text-red-300" : "glass-soft text-foreground/45"
+      )}
+    >
+      {confirme ? "Confirmer — tes saisies seront perdues" : "Repartir des données livrées"}
+    </button>
+  );
+}

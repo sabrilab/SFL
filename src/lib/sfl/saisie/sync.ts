@@ -65,14 +65,43 @@ export async function pullSaison(): Promise<boolean> {
   }
 }
 
+/** Issue d'une synchronisation — le motif sert à l'afficher tel quel. */
+export type Resultat = { ok: true } | { ok: false; raison: string };
+
+/** Date de la dernière publication réussie, pour l'afficher à l'admin. */
+const PUBLIE_KEY = "sfl-saison-publiee-le";
+
+export function dernierePublication(): number | null {
+  try {
+    const n = Number(localStorage.getItem(PUBLIE_KEY) ?? 0);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Pourquoi la publication est impossible — null si elle l'est. */
+export function blocage(): string | null {
+  const session = getSession();
+  if (!session) return "Personne n'est connecté sur cet appareil.";
+  if (!session.server)
+    return "Ta session n'est pas vérifiée par le serveur. Déconnecte-toi puis reconnecte-toi.";
+  if (!session.admin) return "Ce compte n'est pas administrateur.";
+  return null;
+}
+
 /**
  * Pousse la saison en base — admin en session serveur uniquement, refus
  * silencieux sinon (c'est ce qui permet à saisieStore.save de l'appeler sans
  * réfléchir). Écriture document entier : la dernière sauvegarde gagne.
+ *
+ * Renvoie le MOTIF de l'échec : « ça n'a pas marché » sans dire pourquoi
+ * laisse l'admin sans rien à faire, et c'est exactement la situation où il a
+ * besoin d'agir.
  */
-export async function pushSaison(saison: Saison): Promise<boolean> {
-  const session = getSession();
-  if (!session?.server || !session.admin) return false;
+export async function publierSaison(saison: Saison): Promise<Resultat> {
+  const empeche = blocage();
+  if (empeche) return { ok: false, raison: empeche };
   try {
     const version = Date.now();
     const { error } = await supabase().from("saison").upsert(
@@ -85,13 +114,53 @@ export async function pushSaison(saison: Saison): Promise<boolean> {
       },
       { onConflict: "id" }
     );
-    if (error) return false;
+    if (error) {
+      const manque = /relation .*saison.* does not exist|schema cache/i.test(error.message);
+      return {
+        ok: false,
+        raison: manque
+          ? "La table « saison » n'existe pas encore en base. Passe une fois par Réglages → Installation Supabase."
+          : error.message,
+      };
+    }
     // Se souvenir de sa propre version : l'écho temps réel ne re-adoptera pas
     // ce qu'on vient d'écrire.
     localStorage.setItem(VERSION_KEY, String(version));
-    return true;
-  } catch {
-    return false;
+    localStorage.setItem(PUBLIE_KEY, String(version));
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, raison: e instanceof Error ? e.message : "Base injoignable." };
+  }
+}
+
+/** Ancienne signature booléenne — utilisée par les appels automatiques. */
+export async function pushSaison(saison: Saison): Promise<boolean> {
+  return (await publierSaison(saison)).ok;
+}
+
+/**
+ * Reprend la version en base, quoi qu'il arrive localement. C'est la sortie
+ * de secours quand une saisie a dérapé : on ne répare pas à la main, on
+ * revient à ce que la ligue voit.
+ */
+export async function reprendreDeLaBase(): Promise<Resultat> {
+  const session = getSession();
+  if (!session?.server) return { ok: false, raison: "Session serveur requise." };
+  try {
+    const { data, error } = await supabase()
+      .from("saison")
+      .select("data, version, seed")
+      .eq("id", 1)
+      .maybeSingle();
+    if (error) return { ok: false, raison: error.message };
+    if (!data) return { ok: false, raison: "Aucune saison en base pour l'instant." };
+    const doc = data as { data: Saison; version: number; seed: number };
+    adoptSaison(doc.data);
+    localStorage.setItem(VERSION_KEY, String(doc.version));
+    window.dispatchEvent(new Event(SAISIE_EVENT));
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, raison: e instanceof Error ? e.message : "Base injoignable." };
   }
 }
 

@@ -52,6 +52,7 @@ export const SEED_ACCOUNTS: SeedAccount[] = [
   { user: "malik", name: "Malik", password: "praline39" },
   { user: "marwan", name: "Marwan", password: "buteur33" },
   { user: "mehdi", name: "Mehdi", password: "volee18" },
+  { user: "miken", name: "Miken", password: "buteur24" },
   { user: "moussa", name: "Moussa", password: "louche76" },
   { user: "moustapha", name: "Moustapha", password: "ballon59" },
   { user: "naim", name: "Naim", password: "louche82" },

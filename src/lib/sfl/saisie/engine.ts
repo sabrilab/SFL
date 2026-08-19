@@ -127,8 +127,13 @@ export function computeStandings(saison: Saison): Player[] {
       a.pp += e.pepiteBonus ?? 0; // extra time : ni présence ni match, juste le bonus
       continue;
     }
+    // UNE SEULE formule de points, celle de `entryPP` — la même que la colonne
+    // PP de la grille de saisie. Le classement recalculait auparavant les
+    // absences de son côté et ignorait purement le bonus manuel posé sur une
+    // ligne de blessure ou d'absence justifiée : la grille affichait un total,
+    // le classement en affichait un autre.
+    a.pp += entryPP(e);
     if (e.statut === "Présent") {
-      a.pp += entryPP(e);
       a.matchs += 1;
       a.buts += e.buts;
       a.passes += e.passes;
@@ -136,7 +141,6 @@ export function computeStandings(saison: Saison): Player[] {
       if (e.impact) a.impact += 1;
       if (e.def) a.def += 1;
     } else if (e.statut === "Absence injustifiée") {
-      a.pp += BAREME.absenceInjustifiee + (e.pepiteBonus ?? 0);
       a.absInj += 1;
     }
   }

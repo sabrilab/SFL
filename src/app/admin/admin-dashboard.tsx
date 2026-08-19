@@ -18,7 +18,6 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -59,7 +58,7 @@ import {
   updateRosterAt,
 } from "@/lib/sfl/saisie/mutations";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
-import { pushSaison } from "@/lib/sfl/saisie/sync";
+import { Synchro } from "@/components/sfl/admin/synchro";
 import { useSession } from "@/hooks/use-session";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
@@ -311,27 +310,14 @@ export function AdminDashboard() {
             {partage ? "Partagé" : "Local"}
           </Badge>
         </div>
+        {/* L'état du partage est dit une seule fois, par le panneau de
+            synchronisation juste en dessous. */}
         <p className="mt-1 text-sm text-muted-foreground">
-          {partage
-            ? "Saisie directement dans l'app — chaque modification part en base et corrige pour toute la ligue, en direct."
-            : "Saisie directement dans l'app. ATTENTION : sans session serveur, tes corrections restent sur cet appareil — reconnecte-toi pour corriger pour tout le monde."}
+          Feuilles de match, convocations et effectif — la saisie se fait ici.
         </p>
-        {partage && (
-          <button
-            onClick={async () => {
-              const ok = await pushSaison(saison);
-              if (ok)
-                toast.success("Saison envoyée en base", {
-                  description: "Toute la ligue est maintenant sur cette version.",
-                });
-              else toast.error("Envoi impossible — vérifie l'installation (base).");
-            }}
-            className="glass-soft mono-label mt-2 rounded-full px-3 py-1.5 text-foreground/60"
-          >
-            Envoyer la saison en base maintenant
-          </button>
-        )}
       </div>
+
+      <Synchro saison={saison} />
 
       <Tabs defaultValue="overview">
         {/* Quatre onglets ne tiennent pas sur un téléphone : les libellés
