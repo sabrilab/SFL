@@ -12,8 +12,8 @@
 // synchronisation » sans cause laisse l'admin sans rien à faire, et c'est
 // justement le moment où il a besoin d'agir.
 
-import { useState } from "react";
-import { CloudUpload, RotateCcw, Check, AlertTriangle } from "lucide-react";
+import { useCallback, useState, useSyncExternalStore } from "react";
+import { CloudUpload, RotateCcw, Check, AlertTriangle, Stethoscope } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/hooks/use-session";
@@ -21,9 +21,13 @@ import { saisieStore } from "@/lib/sfl/saisie/store";
 import { SAISIE_EVENT } from "@/components/sfl/season-provider";
 import {
   blocage,
+  dernierEnvoiAuto,
   dernierePublication,
+  diagnostic,
   publierSaison,
   reprendreDeLaBase,
+  SYNC_EVENT,
+  type Etape,
 } from "@/lib/sfl/saisie/sync";
 import type { Saison } from "@/lib/sfl/saisie/types";
 
@@ -33,6 +37,19 @@ type Etat =
   | { phase: "reprise" }
   | { phase: "ok"; message: string }
   | { phase: "erreur"; message: string };
+
+/**
+ * L'issue du dernier envoi automatique. C'est un état extérieur à React
+ * (module de synchro) : on s'y abonne plutôt que d'en recopier une version
+ * dans un effet.
+ */
+function useDernierEnvoi() {
+  const subscribe = useCallback((onChange: () => void) => {
+    window.addEventListener(SYNC_EVENT, onChange);
+    return () => window.removeEventListener(SYNC_EVENT, onChange);
+  }, []);
+  return useSyncExternalStore(subscribe, dernierEnvoiAuto, () => null);
+}
 
 function quand(ts: number | null): string {
   if (!ts) return "jamais";
@@ -49,6 +66,9 @@ export function Synchro({ saison }: { saison: Saison }) {
   const session = useSession();
   const partage = !!session?.server && !!session.admin;
   const [etat, setEtat] = useState<Etat>({ phase: "repos" });
+  const [etapes, setEtapes] = useState<Etape[] | null>(null);
+  const [examen, setExamen] = useState(false);
+  const envoi = useDernierEnvoi();
   // Lu à chaque rendu plutôt que mémorisé : la valeur change quand on publie.
   const derniere = quand(dernierePublication());
   const empeche = blocage();
@@ -101,6 +121,28 @@ export function Synchro({ saison }: { saison: Saison }) {
 
       <p className="mono-label mt-3 text-foreground/35">Dernière publication · {derniere}</p>
 
+      {/* L'envoi automatique de la dernière sauvegarde. Il partait sans rien
+          dire et son échec était avalé : on enregistrait sa journée, la base
+          ne la voyait jamais, et l'écran affichait la même chose dans les
+          deux cas. */}
+      {envoi && !envoi.ok && (
+        <div className="mt-2.5 rounded-2xl border border-red-500/25 bg-red-500/8 px-3 py-2.5">
+          <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-red-300">
+            <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
+            <span>
+              <b className="font-semibold">Ta dernière sauvegarde n&apos;est pas partie en base.</b>{" "}
+              {envoi.raison}
+            </span>
+          </p>
+        </div>
+      )}
+      {envoi?.ok && (
+        <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] text-emerald-400">
+          <Check className="size-3.5 shrink-0" />
+          Dernière sauvegarde publiée à {quand(envoi.at)}.
+        </p>
+      )}
+
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <button
           onClick={publier}
@@ -148,6 +190,41 @@ export function Synchro({ saison }: { saison: Saison }) {
           >
             Réessayer
           </button>
+        </div>
+      )}
+
+      {/* Le diagnostic : quel maillon casse, exactement. */}
+      <button
+        onClick={async () => {
+          setExamen(true);
+          setEtapes(await diagnostic());
+          setExamen(false);
+        }}
+        disabled={examen}
+        className="mono-label mt-3 flex items-center gap-1.5 rounded-full bg-white/6 px-3 py-1.5 text-foreground/60 disabled:opacity-40"
+      >
+        <Stethoscope className="size-3.5" />
+        {examen ? "Examen…" : "Pourquoi ça ne se publie pas ?"}
+      </button>
+
+      {etapes && (
+        <div className="mt-2.5 flex flex-col gap-1.5 rounded-2xl bg-white/4 px-3 py-2.5">
+          {etapes.map((e) => (
+            <div key={e.titre} className="flex items-start gap-2">
+              <span
+                className={cn(
+                  "mt-[3px] flex size-3.5 shrink-0 items-center justify-center rounded-full text-[9px] font-black",
+                  e.ok ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+                )}
+              >
+                {e.ok ? "✓" : "✕"}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[12.5px] font-semibold">{e.titre}</span>
+                <span className="block text-[12px] leading-snug text-foreground/45">{e.detail}</span>
+              </span>
+            </div>
+          ))}
         </div>
       )}
 

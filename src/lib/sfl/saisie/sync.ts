@@ -133,9 +133,142 @@ export async function publierSaison(saison: Saison): Promise<Resultat> {
   }
 }
 
-/** Ancienne signature booléenne — utilisée par les appels automatiques. */
+/* --------------------- Mémoire du dernier envoi auto --------------------- */
+//
+// Chaque sauvegarde de l'admin part en base toute seule, sans rien attendre.
+// C'était une bonne idée avec un défaut grave : l'échec était avalé. On
+// enregistrait sa journée, le localStorage la gardait, la base ne la voyait
+// jamais, et l'écran affichait la même chose dans les deux cas. On garde donc
+// l'issue du dernier envoi, et l'espace admin l'affiche.
+
+export const SYNC_EVENT = "sfl-synchro";
+
+export interface EnvoiAuto {
+  at: number;
+  ok: boolean;
+  raison?: string;
+}
+
+let dernier: EnvoiAuto | null = null;
+
+export function dernierEnvoiAuto(): EnvoiAuto | null {
+  return dernier;
+}
+
+/** Envoi automatique — appelé par saisieStore.save à chaque sauvegarde. */
 export async function pushSaison(saison: Saison): Promise<boolean> {
-  return (await publierSaison(saison)).ok;
+  const r = await publierSaison(saison);
+  dernier = { at: Date.now(), ok: r.ok, ...(r.ok ? {} : { raison: r.raison }) };
+  try {
+    window.dispatchEvent(new Event(SYNC_EVENT));
+  } catch {
+    /* hors navigateur */
+  }
+  return r.ok;
+}
+
+/* ------------------------------ Diagnostic ------------------------------ */
+
+export interface Etape {
+  titre: string;
+  ok: boolean;
+  detail: string;
+}
+
+/**
+ * Remonte la chaîne complète, maillon par maillon, et dit lequel casse.
+ * C'est la réponse à « pourquoi ça ne se publie pas ? » — une question à
+ * laquelle personne ne pouvait répondre depuis un téléphone.
+ */
+export async function diagnostic(): Promise<Etape[]> {
+  const etapes: Etape[] = [];
+  const session = getSession();
+
+  etapes.push(
+    session
+      ? { titre: "Session sur cet appareil", ok: true, detail: `Connecté comme ${session.name}.` }
+      : { titre: "Session sur cet appareil", ok: false, detail: "Personne n'est connecté." }
+  );
+  if (!session) return etapes;
+
+  etapes.push({
+    titre: "Vérifiée par le serveur",
+    ok: !!session.server,
+    detail: session.server
+      ? "Ta connexion a été validée par Supabase."
+      : "Connexion validée sur l'appareil seulement — c'est ce qui empêche toute écriture en base. Déconnecte-toi puis reconnecte-toi.",
+  });
+
+  let uid: string | null = null;
+  try {
+    const { data, error } = await supabase().auth.getUser();
+    uid = data.user?.id ?? null;
+    etapes.push({
+      titre: "Compte Supabase",
+      ok: !!uid,
+      detail: uid
+        ? "Le serveur reconnaît ta session."
+        : `Aucune session Supabase active${error ? ` (${error.message})` : ""}. Le compte existe-t-il ? Sinon, passe par Réglages → Installation Supabase.`,
+    });
+  } catch (e) {
+    etapes.push({
+      titre: "Compte Supabase",
+      ok: false,
+      detail: `Base injoignable : ${e instanceof Error ? e.message : "réseau"}.`,
+    });
+    return etapes;
+  }
+  if (!uid) return etapes;
+
+  try {
+    const { data, error } = await supabase()
+      .from("profiles")
+      .select("name, is_admin")
+      .eq("id", uid)
+      .maybeSingle();
+    const prof = data as { name: string; is_admin: boolean } | null;
+    etapes.push({
+      titre: "Rôle administrateur en base",
+      ok: !!prof?.is_admin,
+      detail: !prof
+        ? `Aucun profil en base pour ce compte${error ? ` (${error.message})` : ""}.`
+        : prof.is_admin
+          ? `« ${prof.name} » est administrateur.`
+          : `« ${prof.name} » n'est pas administrateur en base : les règles de sécurité refusent l'écriture.`,
+    });
+  } catch (e) {
+    etapes.push({
+      titre: "Rôle administrateur en base",
+      ok: false,
+      detail: e instanceof Error ? e.message : "Lecture impossible.",
+    });
+  }
+
+  try {
+    const { data, error } = await supabase()
+      .from("saison")
+      .select("version, seed, updated_at")
+      .eq("id", 1)
+      .maybeSingle();
+    const doc = data as { version: number; updated_at: string } | null;
+    etapes.push({
+      titre: "Table de la saison",
+      ok: !error,
+      detail: error
+        ? `Illisible : ${error.message}`
+        : doc
+          ? `Dernière version en base : ${new Date(doc.updated_at).toLocaleString("fr-FR")}.`
+          : "La table existe mais ne contient encore aucune saison.",
+    });
+  } catch (e) {
+    etapes.push({
+      titre: "Table de la saison",
+      ok: false,
+      detail: e instanceof Error ? e.message : "Lecture impossible.",
+    });
+  }
+
+  return etapes;
 }
 
 /**
