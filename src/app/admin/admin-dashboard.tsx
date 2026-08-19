@@ -59,6 +59,7 @@ import {
 } from "@/lib/sfl/saisie/mutations";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
 import { Synchro } from "@/components/sfl/admin/synchro";
+import { DetailPoints } from "@/components/sfl/admin/detail-points";
 import { useSession } from "@/hooks/use-session";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
@@ -638,6 +639,7 @@ export function AdminDashboard() {
 
         {/* ===================== JOUEURS (effectif) ===================== */}
         <TabsContent value="joueurs" className="mt-4 flex flex-col gap-3">
+          <DetailPoints saison={saison} />
           <div className="flex items-center justify-between gap-3 px-1">
             <p className="text-[13px] text-muted-foreground">
               {rosterViews.length} joueurs — touche une fiche pour éditer poste, statut et stats.
