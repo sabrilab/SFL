@@ -24,6 +24,29 @@ import type { Saison } from "./types";
 const SAISIE_EVENT = "sfl-saisie";
 const VERSION_KEY = "sfl-saison-remote-version";
 
+// Une sauvegarde qui n'a pas atteint la base laisse une marque. Sans elle,
+// l'envoi raté était perdu pour de bon : il fallait que quelqu'un pense à
+// rouvrir l'espace admin et à presser « Publier ». Avec elle, l'app rattrape
+// toute seule dès que la connexion au serveur revient.
+const EN_ATTENTE_KEY = "sfl-saison-a-publier";
+
+function marquerAPublier(oui: boolean) {
+  try {
+    if (oui) localStorage.setItem(EN_ATTENTE_KEY, "1");
+    else localStorage.removeItem(EN_ATTENTE_KEY);
+  } catch {
+    /* stockage indisponible */
+  }
+}
+
+export function publicationEnAttente(): boolean {
+  try {
+    return localStorage.getItem(EN_ATTENTE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function localVersion(): number {
   const n = parseInt(localStorage.getItem(VERSION_KEY) ?? "0", 10);
   return Number.isFinite(n) ? n : 0;
@@ -43,10 +66,19 @@ export function accepteRemote(
   return remoteSeed >= seedApp && remoteVersion > versionLocale;
 }
 
-/** Tire la saison distante et l'adopte si elle est plus récente. */
+/**
+ * Tire la saison distante et l'adopte si elle est plus récente.
+ *
+ * SAUF si cet appareil porte une saisie qui n'a pas encore été publiée :
+ * adopter écraserait un travail que personne d'autre n'a. Une journée saisie
+ * hors ligne serait effacée par la version de la base au premier retour du
+ * réseau — la perte la plus bête qui soit. On la laisse tranquille ; c'est
+ * elle qui partira en base au rattrapage.
+ */
 export async function pullSaison(): Promise<boolean> {
   const session = getSession();
   if (!session?.server) return false;
+  if (publicationEnAttente()) return false;
   try {
     const { data, error } = await supabase()
       .from("saison")
@@ -153,29 +185,6 @@ let dernier: EnvoiAuto | null = null;
 
 export function dernierEnvoiAuto(): EnvoiAuto | null {
   return dernier;
-}
-
-// Une sauvegarde qui n'a pas atteint la base laisse une marque. Sans elle,
-// l'envoi raté était perdu pour de bon : il fallait que quelqu'un pense à
-// rouvrir l'espace admin et à presser « Publier ». Avec elle, l'app rattrape
-// toute seule dès que la connexion au serveur revient.
-const EN_ATTENTE_KEY = "sfl-saison-a-publier";
-
-function marquerAPublier(oui: boolean) {
-  try {
-    if (oui) localStorage.setItem(EN_ATTENTE_KEY, "1");
-    else localStorage.removeItem(EN_ATTENTE_KEY);
-  } catch {
-    /* stockage indisponible */
-  }
-}
-
-export function publicationEnAttente(): boolean {
-  try {
-    return localStorage.getItem(EN_ATTENTE_KEY) === "1";
-  } catch {
-    return false;
-  }
 }
 
 /** Envoi automatique — appelé par saisieStore.save à chaque sauvegarde. */
