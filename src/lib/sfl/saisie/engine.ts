@@ -174,11 +174,18 @@ export function computeStandings(saison: Saison): Player[] {
 
 /* ------------------------------ Journées ------------------------------ */
 
-function bestFait(entries: MatchEntry[], key: "buts" | "passes", suffix: string) {
+// Le pluriel est porté par l'appelant : coller un « s » à la fin de
+// « passe D. » donnait « 4 passe D.s ».
+function bestFait(
+  entries: MatchEntry[],
+  key: "buts" | "passes",
+  singulier: string,
+  pluriel: string
+) {
   const max = Math.max(0, ...entries.map((e) => e[key]));
   if (max <= 0) return undefined;
   const who = entries.filter((e) => e[key] === max).map((e) => e.player);
-  return `${who.join(" & ")} — ${max} ${suffix}${max > 1 ? "s" : ""}`;
+  return `${who.join(" & ")} — ${max} ${max > 1 ? pluriel : singulier}`;
 }
 
 function buildTeam(j: number, mi: number, name: string, members: MatchEntry[]): MatchTeam {
@@ -211,8 +218,8 @@ export function computeJournees(saison: Saison): Journee[] {
       const entries = byJ.get(meta.j) ?? [];
       const played = entries.filter((e) => e.statut === "Présent" && !e.extraTime);
       const faits = {
-        buteur: bestFait(played, "buts", "but"),
-        passeur: bestFait(played, "passes", "passe D."),
+        buteur: bestFait(played, "buts", "but", "buts"),
+        passeur: bestFait(played, "passes", "passe D.", "passes D."),
       };
 
       const teamEntries = entries.filter(

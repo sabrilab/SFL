@@ -156,9 +156,10 @@ export default function Ligue() {
           <Accueil
             player={player}
             rank={myRank}
-            dernieres={[...played].reverse()}
+            // Toutes les journées, pas seulement celles qui ont des équipes :
+            // la rubrique sait afficher une journée « à plat ».
+            dernieres={[...journees].reverse()}
             onVoirClassement={() => setView("classement")}
-            onOuvrirLigue={() => setView("journee")}
             onOuvrirRecap={(j) => {
               setView("journee");
               // Déjà sur cette journée : pas de rideau, on entre directement.
