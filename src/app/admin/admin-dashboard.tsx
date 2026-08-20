@@ -109,9 +109,26 @@ export function AdminDashboard() {
   const { me } = useMyPlayer();
   const session = useSession();
   const partage = !!session?.server && !!session.admin;
-  const [draft, setDraft] = useState<Saison | null>(null);
-  const loaded = useMemo(() => (isClient ? saisieStore.load() : seedSaison()), [isClient]);
-  const saison = draft ?? loaded;
+  // La saison vient du MÊME stockage que l'app joueur, relu à chaque
+  // changement. Auparavant l'espace admin en prenait une photo au premier
+  // affichage et vivait dessus : dès que la synchronisation ramenait une
+  // autre version, la grille de saisie et le classement montraient deux
+  // saisons différentes — 30 buts d'un côté, 17 de l'autre — sans que rien
+  // ne l'indique. Une seule source, forcément d'accord avec elle-même.
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const relire = () => setVersion((v) => v + 1);
+    window.addEventListener(SAISIE_EVENT, relire);
+    window.addEventListener("storage", relire);
+    return () => {
+      window.removeEventListener(SAISIE_EVENT, relire);
+      window.removeEventListener("storage", relire);
+    };
+  }, []);
+  const saison = useMemo(() => {
+    void version; // relit le stockage à chaque changement
+    return isClient ? saisieStore.load() : seedSaison();
+  }, [isClient, version]);
 
   const derived = useMemo(() => deriveSeason(saison), [saison]);
 
@@ -138,9 +155,9 @@ export function AdminDashboard() {
   const [future, setFuture] = useState<Step[]>([]);
 
   const persist = useCallback((next: Saison) => {
-    setDraft(next);
     saisieStore.save(next);
-    // Prévient l'app joueur (SeasonProvider) de re-dériver en direct.
+    // Prévient l'app joueur (SeasonProvider) ET cet écran : tous deux
+    // relisent le stockage, personne ne garde de copie à part.
     window.dispatchEvent(new Event(SAISIE_EVENT));
   }, []);
 
