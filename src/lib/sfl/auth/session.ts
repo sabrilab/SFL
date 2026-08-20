@@ -105,14 +105,17 @@ async function signInLocal(account: Account, password: string): Promise<SignInRe
 }
 
 export async function signIn(user: string, password: string): Promise<SignInResult> {
+  // La table embarquée est figée à la compilation : un joueur ajouté à
+  // l'effectif en cours de saison n'y figure pas. Elle sert donc de REPLI,
+  // plus de portail — le serveur, lui, connaît tout le monde.
   const account = findAccount(user);
-  if (!account) return { ok: false, reason: "unknown-user" };
+  const identifiant = account?.user ?? user.trim().toLowerCase();
 
   // 1 · Le serveur d'abord — 5 secondes maximum, sinon repli local.
   try {
     const { data, error } = await withTimeout(
       supabase().auth.signInWithPassword({
-        email: loginEmail(account.user),
+        email: loginEmail(identifiant),
         password,
       }),
       5000
@@ -134,11 +137,12 @@ export async function signIn(user: string, password: string): Promise<SignInResu
         .catch(() => null);
       if (profile) admin = !!profile.is_admin;
       const session: Session = {
-        user: account.user,
-        // Le nom CANONIQUE vient du compte (généré depuis l'effectif) : un
+        user: identifiant,
+        // Le nom CANONIQUE vient du compte embarqué quand il existe : un
         // profil serveur créé sans métadonnées porte un nom déduit de l'email
-        // (« sabri ») qui ne correspond à rien dans la saison.
-        name: account.name,
+        // (« sabri ») qui ne correspond à rien dans la saison. Pour un joueur
+        // ajouté après coup, le profil est la seule source.
+        name: account?.name ?? profile?.name ?? identifiant,
         admin,
         since: Date.now(),
         server: true,
@@ -154,7 +158,9 @@ export async function signIn(user: string, password: string): Promise<SignInResu
     if (ENFORCE_SERVER_AUTH) return { ok: false, reason: "unavailable" };
   }
 
-  // 2 · Repli local (transition, tant que les comptes serveur n'existent pas).
+  // 2 · Repli local — impossible sans empreinte embarquée : un compte créé
+  //     en cours de saison n'existe que sur le serveur.
+  if (!account) return { ok: false, reason: "unknown-user" };
   return signInLocal(account, password);
 }
 
@@ -169,7 +175,6 @@ export async function refreshSession(): Promise<void> {
   const session = getSession();
   if (!session?.server) return;
   const account = findAccount(session.user);
-  if (!account) return;
   try {
     const { data: auth } = await withTimeout(supabase().auth.getUser(), 5000);
     const uid = auth.user?.id;
@@ -191,8 +196,9 @@ export async function refreshSession(): Promise<void> {
       .catch(() => null);
     if (!profile) return;
     const admin = !!profile.is_admin;
-    if (session.admin !== admin || session.name !== account.name) {
-      storeSession({ ...session, admin, name: account.name });
+    const nom = account?.name ?? session.name;
+    if (session.admin !== admin || session.name !== nom) {
+      storeSession({ ...session, admin, name: nom });
     }
   } catch {
     // Hors ligne : la session actuelle reste ce qu'elle est.
@@ -214,7 +220,9 @@ export function getSession(): Session | null {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as Session;
-    return findAccount(s.user) ? s : null;
+    // Un compte créé en cours de saison n'est pas dans la table embarquée :
+    // sa session, vérifiée par le serveur, reste parfaitement valable.
+    return findAccount(s.user) || s.server ? s : null;
   } catch {
     return null;
   }

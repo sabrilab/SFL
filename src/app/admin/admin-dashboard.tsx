@@ -60,6 +60,7 @@ import {
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
 import { Synchro } from "@/components/sfl/admin/synchro";
 import { DetailPoints } from "@/components/sfl/admin/detail-points";
+import { AccesJoueur } from "@/components/sfl/admin/acces-joueur";
 import { useSession } from "@/hooks/use-session";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
@@ -120,6 +121,10 @@ export function AdminDashboard() {
   const [metaJ, setMetaJ] = useState<number | null>(null);
   const [playerIndex, setPlayerIndex] = useState<number | null>(null);
   const [newPlayerOpen, setNewPlayerOpen] = useState(false);
+  // Le joueur qui vient d'être ajouté : ses accès s'affichent aussitôt, et
+  // sa fiche n'ouvre qu'après — sinon elle se pose par-dessus et les masque.
+  const [accesPour, setAccesPour] = useState<string | null>(null);
+  const [ficheApresAcces, setFicheApresAcces] = useState<number | null>(null);
   const [newJourneeOpen, setNewJourneeOpen] = useState(false);
   const [convocOpen, setConvocOpen] = useState(false);
   const [feuilleMode, setFeuilleMode] = useState<"direct" | "revue">("direct");
@@ -726,7 +731,22 @@ export function AdminDashboard() {
           const idx = saison.roster.length;
           commit(addRoster(saison, newRosterPlayer(name)), `Nouveau joueur — ${name}`);
           setNewPlayerOpen(false);
-          setPlayerIndex(idx); // ouvre directement la fiche pour compléter
+          // Ajouter quelqu'un à l'effectif sans lui donner de quoi se
+          // connecter n'a aucun sens : ses accès arrivent d'abord, la fiche
+          // à compléter juste après.
+          setAccesPour(name);
+          setFicheApresAcces(idx);
+        }}
+      />
+      <AccesJoueur
+        key={accesPour ?? "aucun"}
+        nom={accesPour}
+        onClose={() => {
+          setAccesPour(null);
+          if (ficheApresAcces !== null) {
+            setPlayerIndex(ficheApresAcces);
+            setFicheApresAcces(null);
+          }
         }}
       />
       <NewJourneeSheet
