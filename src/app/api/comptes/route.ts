@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SEED_ACCOUNTS } from "@/lib/sfl/auth/seed.server";
+import { motDePassePour } from "@/lib/sfl/auth/derive.server";
 
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://tpfusliksgxcvfrodchk.supabase.co";
@@ -42,7 +43,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Réservé à l'admin." }, { status: 403 });
   }
 
-  return NextResponse.json({
-    accounts: SEED_ACCOUNTS.map((a) => ({ name: a.name, user: a.user, password: a.password })),
-  });
+  // La liste embarquée est figée à la compilation : les joueurs ajoutés en
+  // cours de saison n'y sont pas, et leurs accès seraient perdus dès la
+  // fenêtre de création refermée. On complète donc avec les profils que la
+  // base connaît en plus — leur mot de passe se déduit de leur nom, par le
+  // même algorithme, donc rien n'a besoin d'être stocké.
+  const connus = new Set(SEED_ACCOUNTS.map((a) => a.name));
+  const { data: profils } = await sb.from("profiles").select("name, username");
+
+  const ajoutes = ((profils ?? []) as { name: string; username: string }[])
+    .filter((p) => !connus.has(p.name))
+    .map((p) => ({
+      name: p.name,
+      user: p.username.replace(/^@/, ""),
+      password: motDePassePour(p.name),
+      ajoute: true as const,
+    }));
+
+  const accounts = [
+    ...SEED_ACCOUNTS.map((a) => ({ name: a.name, user: a.user, password: a.password })),
+    ...ajoutes,
+  ].sort((a, b) => a.name.localeCompare(b.name, "fr"));
+
+  return NextResponse.json({ accounts });
 }

@@ -21,6 +21,8 @@ interface Compte {
   name: string;
   user: string;
   password: string;
+  /** Ajouté à l'effectif en cours de saison, hors liste d'origine. */
+  ajoute?: boolean;
 }
 
 /** Le contenu du bloc — c'est exactement ce que copie l'icône. */
@@ -55,6 +57,13 @@ function Fenetre({ c }: { c: Compte }) {
         <span className="min-w-0 flex-1 truncate text-[13.5px] font-bold tracking-tight">
           {c.name}
         </span>
+        {/* Distingue les joueurs arrivés après la liste d'origine : leurs
+            accès viennent d'être fabriqués, ils n'ont encore rien reçu. */}
+        {c.ajoute && (
+          <span className="mono-label shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-primary">
+            Nouveau
+          </span>
+        )}
         <button
           onClick={copier}
           aria-label={`Copier les accès de ${c.name}`}
