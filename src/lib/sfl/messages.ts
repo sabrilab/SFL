@@ -61,22 +61,36 @@ interface Brut {
   created_at: string;
 }
 
+/** Traduit une erreur Postgres en phrase utile, avec le geste qui répare. */
+export function expliquer(message: string): string {
+  if (/relation .*messages.* does not exist|schema cache|could not find the table/i.test(message)) {
+    return "La messagerie n'est pas encore installée en base. Ouvre Réglages → Installation Supabase une fois : le schéma s'applique tout seul.";
+  }
+  if (/jwt|token|not authenticated|auth session/i.test(message)) {
+    return "Ta session serveur a expiré. Déconnecte-toi puis reconnecte-toi.";
+  }
+  return message;
+}
+
 /**
  * Tout ce que je peux lire, en une fois : le salon et mes conversations.
- * Renvoie null si la base est injoignable — à distinguer d'une messagerie
- * simplement vide.
+ * En cas d'échec, on rend le MOTIF : « pas joignable » ne dit pas si la table
+ * manque, si la session a expiré, ou si le réseau est coupé — et ce sont
+ * trois gestes différents.
  */
 export async function chargerTout(
   moi: string,
   profils: Profil[],
   limite = 400
-): Promise<{ salon: Fil; prives: Fil[] } | null> {
+): Promise<
+  { ok: true; salon: Fil; prives: Fil[] } | { ok: false; raison: string }
+> {
   const { data, error } = await supabase()
     .from("messages")
     .select("id, canal, auteur, destinataire, texte, created_at")
     .order("created_at", { ascending: false })
     .limit(limite);
-  if (error) return null;
+  if (error) return { ok: false, raison: expliquer(error.message) };
 
   const nomDe = new Map(profils.map((p) => [p.id, p.name]));
   const tous: Message[] = ((data ?? []) as Brut[])
@@ -115,6 +129,7 @@ export async function chargerTout(
     .sort((a, b) => (b.dernier?.at ?? 0) - (a.dernier?.at ?? 0));
 
   return {
+    ok: true,
     salon: {
       cle: SALON,
       titre: "Salon SFL",
@@ -158,15 +173,7 @@ export async function envoyer(
       destinataire: destinataireId,
       texte: propre,
     });
-    if (error) {
-      const manque = /relation .*messages.* does not exist|schema cache/i.test(error.message);
-      return {
-        ok: false,
-        raison: manque
-          ? "La messagerie n'est pas encore installée en base. Passe une fois par Réglages → Installation Supabase."
-          : error.message,
-      };
-    }
+    if (error) return { ok: false, raison: expliquer(error.message) };
     return { ok: true };
   } catch (e) {
     return { ok: false, raison: e instanceof Error ? e.message : "Base injoignable." };

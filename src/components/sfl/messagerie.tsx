@@ -8,6 +8,7 @@
 // n'a encore écrit à personne.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { ArrowLeft, Send, Plus, Search, Hash, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/hooks/use-session";
@@ -61,8 +62,8 @@ export function Messagerie() {
 
   const recharger = useCallback(async (uid: string, liste: Profil[]) => {
     const tout = await chargerTout(uid, liste);
-    if (!tout) {
-      setErreur("La messagerie n'est pas joignable pour l'instant.");
+    if (!tout.ok) {
+      setErreur(tout.raison);
       setPrete(true);
       return;
     }
@@ -86,6 +87,9 @@ export function Messagerie() {
       if (!vivant) return;
       setMoi(uid);
       if (!uid) {
+        // La session de l'app se croit vérifiée mais le jeton Supabase a
+        // disparu. Sans ce message, l'écran restait vide sans rien expliquer.
+        setErreur("Ta session serveur a expiré. Déconnecte-toi puis reconnecte-toi.");
         setPrete(true);
         return;
       }
@@ -314,10 +318,20 @@ export function Messagerie() {
       </div>
 
       {erreur && (
-        <p className="flex items-start gap-1.5 px-1 text-[12.5px] leading-snug text-amber-400">
-          <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
-          {erreur}
-        </p>
+        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/8 px-3.5 py-3">
+          <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-amber-300">
+            <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
+            {erreur}
+          </p>
+          {erreur.includes("Installation Supabase") && (
+            <Link
+              href="/admin/setup"
+              className="glass-soft mt-2.5 block rounded-full py-2 text-center text-[13px] font-semibold text-foreground/75"
+            >
+              Ouvrir l&apos;installation
+            </Link>
+          )}
+        </div>
       )}
 
       {!prete && <p className="px-1 text-[13px] text-foreground/35">Chargement…</p>}
