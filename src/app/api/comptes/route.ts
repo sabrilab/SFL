@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SEED_ACCOUNTS } from "@/lib/sfl/auth/seed.server";
-import { motDePassePour } from "@/lib/sfl/auth/derive.server";
+import { identifiantPour, motDePassePour } from "@/lib/sfl/auth/derive.server";
 
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://tpfusliksgxcvfrodchk.supabase.co";
@@ -43,27 +43,62 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Réservé à l'admin." }, { status: 403 });
   }
 
-  // La liste embarquée est figée à la compilation : les joueurs ajoutés en
-  // cours de saison n'y sont pas, et leurs accès seraient perdus dès la
-  // fenêtre de création refermée. On complète donc avec les profils que la
-  // base connaît en plus — leur mot de passe se déduit de leur nom, par le
-  // même algorithme, donc rien n'a besoin d'être stocké.
-  const connus = new Set(SEED_ACCOUNTS.map((a) => a.name));
+  // La liste part de L'EFFECTIF, pas des comptes existants.
+  //
+  // Longtemps elle ne montrait que les comptes déjà créés : un joueur ajouté
+  // à l'effectif dont l'inscription avait échoué n'apparaissait nulle part,
+  // et ses accès restaient introuvables. Or ils n'ont jamais besoin d'être
+  // stockés — identifiant et mot de passe se déduisent du nom. On peut donc
+  // les donner à tout le monde, compte créé ou non, et signaler ceux qui
+  // restent à inscrire.
   const { data: profils } = await sb.from("profiles").select("name, username");
+  const profilsListe = (profils ?? []) as { name: string; username: string }[];
+  const aUnCompte = new Map(profilsListe.map((p) => [p.name, p.username.replace(/^@/, "")]));
 
-  const ajoutes = ((profils ?? []) as { name: string; username: string }[])
-    .filter((p) => !connus.has(p.name))
-    .map((p) => ({
-      name: p.name,
-      user: p.username.replace(/^@/, ""),
-      password: motDePassePour(p.name),
-      ajoute: true as const,
-    }));
+  const { data: doc } = await sb.from("saison").select("data").eq("id", 1).maybeSingle();
+  const roster =
+    (doc as { data?: { roster?: { name: string }[] } } | null)?.data?.roster ?? [];
 
-  const accounts = [
-    ...SEED_ACCOUNTS.map((a) => ({ name: a.name, user: a.user, password: a.password })),
-    ...ajoutes,
-  ].sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  interface Ligne {
+    name: string;
+    user: string;
+    password: string;
+    ajoute?: boolean;
+    sansCompte?: boolean;
+  }
 
-  return NextResponse.json({ accounts });
+  const parNom = new Map<string, Ligne>();
+  const pris = new Set<string>();
+
+  // 1 · La liste d'origine fait foi pour ceux qu'elle contient.
+  for (const a of SEED_ACCOUNTS) {
+    parNom.set(a.name, { name: a.name, user: a.user, password: a.password });
+    pris.add(a.user);
+  }
+  // 2 · Les comptes créés depuis : leur identifiant vient de la base.
+  for (const p of profilsListe) {
+    if (parNom.has(p.name)) continue;
+    const user = p.username.replace(/^@/, "");
+    parNom.set(p.name, { name: p.name, user, password: motDePassePour(p.name), ajoute: true });
+    pris.add(user);
+  }
+  // 3 · Le reste de l'effectif : accès calculés, compte encore à créer.
+  for (const r of [...roster].sort((a, b) => a.name.localeCompare(b.name, "fr"))) {
+    if (parNom.has(r.name)) continue;
+    const user = identifiantPour(r.name, pris);
+    pris.add(user);
+    parNom.set(r.name, {
+      name: r.name,
+      user,
+      password: motDePassePour(r.name),
+      ajoute: true,
+      sansCompte: true,
+    });
+  }
+
+  const accounts = [...parNom.values()]
+    .map((l) => (aUnCompte.has(l.name) ? { ...l, sansCompte: false } : l))
+    .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+
+  return NextResponse.json({ accounts, sansCompte: accounts.filter((a) => a.sansCompte).length });
 }

@@ -23,6 +23,8 @@ interface Compte {
   password: string;
   /** Ajouté à l'effectif en cours de saison, hors liste d'origine. */
   ajoute?: boolean;
+  /** Dans l'effectif, mais pas encore inscrit côté serveur. */
+  sansCompte?: boolean;
 }
 
 /** Le contenu du bloc — c'est exactement ce que copie l'icône. */
@@ -59,10 +61,16 @@ function Fenetre({ c }: { c: Compte }) {
         </span>
         {/* Distingue les joueurs arrivés après la liste d'origine : leurs
             accès viennent d'être fabriqués, ils n'ont encore rien reçu. */}
-        {c.ajoute && (
-          <span className="mono-label shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-primary">
-            Nouveau
+        {c.sansCompte ? (
+          <span className="mono-label shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-400">
+            À inscrire
           </span>
+        ) : (
+          c.ajoute && (
+            <span className="mono-label shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-primary">
+              Nouveau
+            </span>
+          )
         )}
         <button
           onClick={copier}
@@ -95,6 +103,11 @@ export default function ComptesPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
+  const [inscription, setInscription] = useState<{
+    faits: number;
+    total: number;
+    erreur: string | null;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -137,6 +150,47 @@ export default function ComptesPage() {
         Cette page est réservée à l&apos;admin de la ligue.
       </div>
     );
+  }
+
+  const manquants = (comptes ?? []).filter((c) => c.sansCompte);
+
+  /**
+   * Inscrit ceux qui n'ont pas encore de compte. En série et sans se
+   * presser : le plan gratuit de Supabase n'aime pas les rafales, et un
+   * échec au milieu ne doit pas emporter les suivants.
+   */
+  async function inscrireManquants() {
+    setInscription({ faits: 0, total: manquants.length, erreur: null });
+    const { data } = await supabase().auth.getSession();
+    const accessToken = data.session?.access_token ?? null;
+    if (!accessToken) {
+      setInscription({ faits: 0, total: manquants.length, erreur: "Session serveur requise." });
+      return;
+    }
+    let faits = 0;
+    for (const c of manquants) {
+      try {
+        const res = await fetch("/api/comptes/creer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ accessToken, name: c.name }),
+        });
+        const j = await res.json();
+        if (j.error) {
+          setInscription({ faits, total: manquants.length, erreur: j.error });
+          return;
+        }
+        faits += 1;
+        setInscription({ faits, total: manquants.length, erreur: null });
+      } catch {
+        setInscription({ faits, total: manquants.length, erreur: "Serveur injoignable." });
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    setInscription(null);
+    await load();
+    toast.success(`${faits} compte${faits > 1 ? "s" : ""} créé${faits > 1 ? "s" : ""}`);
   }
 
   const filtered = (comptes ?? []).filter((c) =>
@@ -187,6 +241,35 @@ export default function ComptesPage() {
       )}
 
       {/* Les fenêtres, une par joueur */}
+      {/* Ceux dont l'inscription reste à faire. Leurs accès sont déjà là —
+          ils se déduisent du nom — mais tant que le compte n'existe pas côté
+          serveur, la personne ne peut pas entrer. */}
+      {manquants.length > 0 && (
+        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/8 px-3.5 py-3">
+          <p className="text-[13px] leading-snug text-amber-300">
+            <b className="font-semibold">
+              {manquants.length} joueur{manquants.length > 1 ? "s" : ""} sans compte.
+            </b>{" "}
+            Leurs identifiants sont déjà calculés ci-dessous, mais ils ne pourront pas se
+            connecter tant que l&apos;inscription n&apos;est pas faite.
+          </p>
+          <button
+            onClick={() => void inscrireManquants()}
+            disabled={!!inscription && !inscription.erreur}
+            className="mt-2.5 w-full rounded-full bg-foreground py-2.5 text-[13.5px] font-bold text-background disabled:opacity-50"
+          >
+            {inscription && !inscription.erreur
+              ? `Inscription… ${inscription.faits}/${inscription.total}`
+              : `Créer les ${manquants.length} comptes manquants`}
+          </button>
+          {inscription?.erreur && (
+            <p className="mt-2 text-[12.5px] leading-snug text-red-300">
+              Arrêté après {inscription.faits} sur {inscription.total} — {inscription.erreur}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-col gap-2.5 sm:grid sm:grid-cols-2">
         {filtered.map((c) => (
           <Fenetre key={c.user} c={c} />
