@@ -7,32 +7,22 @@
 //
 // L'INVITATION DE MATCH EST VIVANTE : ses boutons répondent vraiment à la
 // convocation (même liste partagée que le panneau du fil, via usePresence).
-// Le reste — les fils de discussion — reste verrouillé : le chat exige le
-// temps réel, il arrive après la présence.
+// Et la messagerie l'est aussi désormais : le salon de la ligue et les
+// conversations à deux vivent en base, en temps réel (voir messagerie.tsx).
 
 import { toast } from "sonner";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
-import { Locked } from "@/components/sfl/locked";
+import { Messagerie } from "@/components/sfl/messagerie";
 import { usePresence } from "@/hooks/use-presence";
 import { useSession } from "@/hooks/use-session";
 import { NEXT_MATCH } from "@/lib/sfl/data";
-import { rankPlayers } from "@/lib/sfl/engine";
 import { activeConvocation } from "@/lib/sfl/saisie/mutations";
 import { cn } from "@/lib/utils";
 
-const FILTERS = ["Tous", "Snaps", "Groupes", "Équipes"] as const;
-
-/** Initiales façon design : deux lettres max, majuscules. */
-function initials(name: string) {
-  const w = name.trim().split(/\s+/);
-  return (w.length > 1 ? `${w[0][0]}${w[1][0]}` : w[0].slice(0, 2)).toUpperCase();
-}
-
 export default function Discussions() {
-  const { players, journees, saison } = useSeason();
+  const { saison } = useSeason();
   const { player } = useMyPlayer();
-  const ranked = rankPlayers(players);
   const presence = usePresence();
   const session = useSession();
 
@@ -40,9 +30,6 @@ export default function Discussions() {
   const next = convoc
     ? { date: convoc.date, heure: convoc.heure, lieu: convoc.lieu }
     : { date: NEXT_MATCH.date, heure: NEXT_MATCH.heure, lieu: NEXT_MATCH.lieu };
-  const confirmed = convoc
-    ? Object.values(convoc.reponses).filter((r) => r === "present").length
-    : 0;
   // « 09/08 » à partir de « 16 août » : jour + mois, comme le design.
   const MOIS: Record<string, string> = {
     janv: "01", févr: "02", mars: "03", avr: "04", mai: "05", juin: "06",
@@ -70,55 +57,7 @@ export default function Discussions() {
     );
   }
 
-  const lastJ = [...journees].reverse().find((j) => (j.matches ?? []).length > 0);
-  // « Sosso Coach — 5 buts » → « Sosso Coach » : le fait porte la stat,
-  // ici on ne veut que le nom.
-  const buteur = (lastJ?.faits.buteur ?? ranked[0]?.name ?? "Ilyes").split("—")[0].trim();
 
-  const CHATS = [
-    {
-      name: "Le vestiaire",
-      initials: "SFL",
-      preview: `Convocation J${NEXT_MATCH.journee} — ${next.date}, ${next.heure}`,
-      time: "12:04",
-      unread: true,
-      streak: `${confirmed}/10`,
-    },
-    {
-      name: "Ligue générale",
-      initials: "LG",
-      preview: `${buteur} : la reprise de volée à la 88e 🔥`,
-      time: "10:41",
-      unread: true,
-      streak: "🔥 12",
-    },
-    {
-      name: ranked[0]?.name ?? "Ilyes",
-      initials: initials(ranked[0]?.name ?? "Ilyes"),
-      preview: "T'as vu ma carte après dimanche ? 😮‍💨",
-      time: "Hier",
-      unread: false,
-      streak: "🔥 5",
-    },
-    {
-      name: "Équipe Orange",
-      initials: "OR",
-      preview: `${ranked[1]?.name ?? "Anis"} : on garde la même compo`,
-      time: "Hier",
-      unread: false,
-      streak: null,
-    },
-    {
-      name: ranked[2]?.name ?? "Ilies",
-      initials: initials(ranked[2]?.name ?? "Ilies"),
-      preview: "Photo · ouverte",
-      time: "Sam.",
-      unread: false,
-      streak: null,
-    },
-  ];
-
-  const unreadCount = CHATS.filter((c) => c.unread).length;
 
   return (
     <div className="shell py-4 sm:py-8">
@@ -264,66 +203,7 @@ export default function Discussions() {
         </div>
       </section>
 
-      <Locked
-        label="Bientôt"
-        chipClassName="-top-9 right-0"
-        note="La discussion ouvrira bientôt : l'invitation ci-dessus est déjà active, le chat arrive après."
-      >
-        <div className="flex flex-col gap-5">
-          {/* Ligne d'état + bouton appareil photo */}
-          <div className="flex items-start justify-between">
-            <p className="text-[13px] text-foreground/42">
-              {CHATS.length} fils · {unreadCount} message{unreadCount > 1 ? "s" : ""} non lu
-              {unreadCount > 1 ? "s" : ""}
-            </p>
-            <span className="glass-soft mt-[3px] flex size-[38px] items-center justify-center rounded-full">
-              <span className="size-3 rounded-full border-[1.5px] border-foreground/65" />
-            </span>
-          </div>
-
-          {/* Filtres */}
-          <div className="flex gap-2">
-            {FILTERS.map((f, i) => (
-              <span
-                key={f}
-                className={
-                  i === 0
-                    ? "rounded-full bg-foreground px-4 py-2.5 text-[13px] font-bold text-background"
-                    : "glass-soft rounded-full px-4 py-2.5 text-[13px] font-semibold text-foreground/55"
-                }
-              >
-                {f}
-              </span>
-            ))}
-          </div>
-
-          {/* Les fils */}
-          <div className="flex flex-col gap-2.5">
-            {CHATS.map((c) => (
-              <div key={c.name} className="glass flex items-center gap-3.5 rounded-[22px] px-[15px] py-3.5">
-                <span className="glass-soft flex size-[46px] shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-foreground/75">
-                  {c.initials}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[15px] font-bold tracking-tight">{c.name}</div>
-                  <div className="mt-1 flex items-center gap-[7px]">
-                    {c.unread && <span className="size-1.5 shrink-0 rounded-full bg-primary" />}
-                    <span className="truncate text-[12.5px] text-foreground/42">{c.preview}</span>
-                  </div>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  <span className="mono-label text-foreground/32">{c.time}</span>
-                  {c.streak && (
-                    <span className="glass-soft mono-label rounded-full px-2 py-[3px] text-foreground/60">
-                      {c.streak}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Locked>
+      <Messagerie />
       </div>
     </div>
   );

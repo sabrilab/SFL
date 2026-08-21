@@ -354,6 +354,71 @@ exception
 end;
 $$;
 
+do $$
+begin
+  alter publication supabase_realtime add table public.messages;
+exception
+  when duplicate_object then null;
+end;
+$$;
+
+
+-- ────────────────────────────── Messages ─────────────────────────────
+-- Le salon de la ligue et les messages privés, dans une seule table : un
+-- message appartient soit au salon (canal 'sfl', lu par tout le monde),
+-- soit à une conversation à deux (canal 'dm', avec un destinataire). Deux
+-- tables auraient dupliqué les règles de sécurité sans rien apporter.
+create table if not exists public.messages (
+  id           bigint generated always as identity primary key,
+  canal        text not null check (canal in ('sfl', 'dm')),
+  auteur       uuid not null references public.profiles(id) on delete cascade,
+  destinataire uuid references public.profiles(id) on delete cascade,
+  texte        text not null check (char_length(btrim(texte)) between 1 and 2000),
+  created_at   timestamptz not null default now(),
+  -- Le salon n'a pas de destinataire ; un privé en a forcément un, et on ne
+  -- s'écrit pas à soi-même.
+  constraint messages_destinataire_coherent check (
+    (canal = 'sfl' and destinataire is null)
+    or (canal = 'dm' and destinataire is not null and destinataire <> auteur)
+  )
+);
+
+create index if not exists messages_salon_idx
+  on public.messages (created_at desc) where canal = 'sfl';
+create index if not exists messages_prive_idx
+  on public.messages (auteur, destinataire, created_at desc) where canal = 'dm';
+create index if not exists messages_recu_idx
+  on public.messages (destinataire, created_at desc) where canal = 'dm';
+
+alter table public.messages enable row level security;
+
+-- Lecture : le salon appartient à la ligue ; un privé n'est lu que par ses
+-- deux extrémités. Personne d'autre, admin compris.
+drop policy if exists "messages: lecture" on public.messages;
+create policy "messages: lecture"
+  on public.messages for select
+  to authenticated
+  using (
+    canal = 'sfl'
+    or auteur = (select auth.uid())
+    or destinataire = (select auth.uid())
+  );
+
+-- Écriture : sous son propre nom, jamais sous celui d'un autre.
+drop policy if exists "messages: j'écris pour moi" on public.messages;
+create policy "messages: j'écris pour moi"
+  on public.messages for insert
+  to authenticated
+  with check (auteur = (select auth.uid()));
+
+-- Retrait : son propre message. L'admin peut retirer n'importe lequel du
+-- salon — la modération d'un lieu public lui revient.
+drop policy if exists "messages: je retire le mien" on public.messages;
+create policy "messages: je retire le mien"
+  on public.messages for delete
+  to authenticated
+  using (auteur = (select auth.uid()) or (select public.is_league_admin()));
+
 -- ───────────────────────── Rôle admin ────────────────────────────────
 -- Remise d'aplomb des comptes admin — rejouée à chaque migration, donc à
 -- chaque déploiement qui touche ce fichier. Elle répare TOUS les états de
