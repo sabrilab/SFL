@@ -22,8 +22,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "app.golder.sfl",
-      "userInterfaceStyle": "dark",
-      "edgeToEdgeEnabled": true
+      "userInterfaceStyle": "dark"
     },
     "web": {
       "output": "static",
