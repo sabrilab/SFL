@@ -21,18 +21,23 @@ import { C } from '@/da/theme';
 SplashScreen.preventAutoHideAsync();
 
 export default function Racine() {
-  const [pretes] = useFonts({
+  const [pretes, erreur] = useFonts({
     Archivo_700Bold,
     Archivo_800ExtraBold,
     DMMono_400Regular,
     DMMono_500Medium,
   });
 
-  useEffect(() => {
-    if (pretes) SplashScreen.hideAsync();
-  }, [pretes]);
+  // Une police qui ne se charge pas ne doit jamais retenir l'app : on afficherait
+  // un écran noir sans fin, impossible à distinguer d'un plantage. Mieux vaut
+  // démarrer avec la police du système que ne pas démarrer du tout.
+  const pret = pretes || !!erreur;
 
-  if (!pretes) return <View style={{ flex: 1, backgroundColor: C.noir }} />;
+  useEffect(() => {
+    if (pret) SplashScreen.hideAsync().catch(() => {});
+  }, [pret]);
+
+  if (!pret) return <View style={{ flex: 1, backgroundColor: C.noir }} />;
 
   return (
     <>
