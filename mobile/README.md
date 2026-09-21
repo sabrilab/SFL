@@ -35,6 +35,32 @@ build* :
 npx eas build --profile development --platform ios
 ```
 
+## Voir le rendu iOS sans Mac
+
+Trois façons, de la plus simple à la plus lourde.
+
+**Expo Go, sur ton iPhone.** Gratuit, dix minutes, et c'est du vrai iOS : le
+Liquid Glass, la barre d'onglets du système, les gestes. `expo-glass-effect` est
+inclus dans Expo Go, donc rien ne manque. C'est la bonne réponse dans presque
+tous les cas.
+
+**Un simulateur iOS dans le navigateur.** Utile quand on veut montrer l'app à
+quelqu'un qui n'a pas d'iPhone, ou la regarder depuis un ordinateur. Un build
+« simulateur » n'est pas signé et **ne demande aucun compte Apple Developer** :
+
+```bash
+export APPETIZE_TOKEN=<ton-jeton-appetize>
+./outils/simulateur.sh
+```
+
+Le script lance le build sur EAS, confie l'archive à Appetize et rend un lien
+public. Le palier gratuit d'Appetize donne 30 minutes par mois et deux
+appareils — de quoi regarder, pas de quoi travailler dedans toute la journée.
+
+**Un appareil réel dans le cloud** (BrowserStack, LambdaTest). Ces services font
+tourner de vrais iPhone, mais ils exigent un `.ipa` signé, donc un compte Apple
+Developer à 99 $/an. À ne considérer qu'une fois l'app prête à sortir.
+
 ## Regarder l'app sans téléphone
 
 Le serveur de développement sert aussi l'app en web. `outils/apercu.mjs` ouvre
