@@ -10,6 +10,7 @@
  */
 import { useSyncExternalStore } from 'react';
 
+import { MAX_JOUEURS, MIN_JOUEURS, probleme, type Ecusson, type Equipe as EquipeJoueurs } from '@/donnees/equipes';
 import {
   feuilleVierge, lignesDepuisButs, type Equipe, type Feuille,
 } from '@/donnees/feuille';
@@ -28,6 +29,10 @@ interface Etat {
   vitesseGagnee: boolean;
   /** Les feuilles des matchs que l'utilisateur héberge, par id de match. */
   feuilles: Record<string, Feuille>;
+  /** L'équipe de l'utilisateur, s'il en a monté une. Une seule pour l'instant. */
+  equipe: EquipeJoueurs | null;
+  /** Les joueurs ajoutés en amis. */
+  amis: string[];
 }
 
 // Les matchs créés reviennent avec leur photo d'asset : un identifiant
@@ -44,6 +49,8 @@ let etat: Etat = {
   vitesseGagnee: false,
   // Les feuilles survivent à la fermeture de l'app : un but marqué reste marqué.
   feuilles: sauve.feuilles,
+  equipe: sauve.equipe,
+  amis: sauve.amis,
 };
 
 const idsCrees = new Set(matchsCrees.map((m) => m.id));
@@ -53,8 +60,13 @@ const publier = () => abonnes.forEach((f) => f());
 
 function poser(suite: Partial<Etat>) {
   etat = { ...etat, ...suite };
-  if (suite.feuilles || suite.matchs) {
-    ecrire({ feuilles: etat.feuilles, matchsCrees: etat.matchs.filter((m) => idsCrees.has(m.id)) });
+  if (suite.feuilles || suite.matchs || 'equipe' in suite || suite.amis) {
+    ecrire({
+      feuilles: etat.feuilles,
+      matchsCrees: etat.matchs.filter((m) => idsCrees.has(m.id)),
+      equipe: etat.equipe,
+      amis: etat.amis,
+    });
   }
   publier();
 }
@@ -108,6 +120,67 @@ export const actions = {
       feuilles: { ...etat.feuilles, [id]: feuille },
     });
     return id;
+  },
+
+  /* ── Les amis ── */
+
+  /** Ajoute ou retire un ami. Renvoie true s'il est ami après l'action. */
+  basculerAmi(joueurId: string): boolean {
+    if (joueurId === MOI_ID) return false;
+    const dedans = etat.amis.includes(joueurId);
+    poser({ amis: dedans ? etat.amis.filter((a) => a !== joueurId) : [...etat.amis, joueurId] });
+    return !dedans;
+  },
+
+  /* ── L'équipe ── */
+
+  /**
+   * Monte l'équipe. Refuse en dessous de cinq et au-dessus de sept : la règle
+   * vit ici, l'écran ne fait que l'expliquer. Renvoie le problème, ou null.
+   */
+  creerEquipe(champs: { nom: string; ecusson: Ecusson; joueurs: string[] }): string | null {
+    const joueurs = [MOI_ID, ...champs.joueurs.filter((j) => j !== MOI_ID)];
+    const souci = probleme(champs.nom, joueurs);
+    if (souci) return souci;
+    poser({ equipe: { id: 'moi', nom: champs.nom.trim(), ecusson: champs.ecusson, joueurs, creeLe: Date.now() } });
+    return null;
+  },
+
+  modifierEquipe(champs: Partial<Pick<EquipeJoueurs, 'nom' | 'ecusson'>>): string | null {
+    if (!etat.equipe) return "Tu n'as pas encore d'équipe.";
+    const nom = champs.nom ?? etat.equipe.nom;
+    const souci = probleme(nom, etat.equipe.joueurs);
+    if (souci) return souci;
+    poser({ equipe: { ...etat.equipe, nom: nom.trim(), ecusson: champs.ecusson ?? etat.equipe.ecusson } });
+    return null;
+  },
+
+  /** Ajoute ou retire un joueur, dans les bornes 5–7. Le capitaine ne part pas. */
+  basculerJoueurEquipe(joueurId: string): string | null {
+    const e = etat.equipe;
+    if (!e) return "Tu n'as pas encore d'équipe.";
+    if (joueurId === MOI_ID) return 'Le capitaine reste dans son équipe.';
+    const dedans = e.joueurs.includes(joueurId);
+    if (dedans && e.joueurs.length <= MIN_JOUEURS) return `Une équipe garde au moins ${MIN_JOUEURS} joueurs.`;
+    if (!dedans && e.joueurs.length >= MAX_JOUEURS) return `Pas plus de ${MAX_JOUEURS} joueurs.`;
+    poser({ equipe: { ...e, joueurs: dedans ? e.joueurs.filter((j) => j !== joueurId) : [...e.joueurs, joueurId] } });
+    return null;
+  },
+
+  dissoudreEquipe() {
+    poser({ equipe: null });
+  },
+
+  /** Inscrit toute l'équipe sur la feuille d'un match qu'on héberge, côté A. */
+  inscrireEquipeSurMatch(matchId: string) {
+    const e = etat.equipe;
+    if (!e) return;
+    surFeuille(matchId, (f) => {
+      const deja = new Set(f.lignes.map((l) => l.joueurId));
+      const ajouts = e.joueurs.filter((j) => !deja.has(j))
+        .map((joueurId) => ({ joueurId, equipe: 'A' as Equipe, buts: 0, passes: 0, mvp: false }));
+      return { ...f, equipes: { ...f.equipes, A: { nom: e.nom } }, lignes: [...f.lignes, ...ajouts] };
+    });
   },
 
   /* ── La feuille de match, côté hôte ── */

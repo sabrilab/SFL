@@ -14,6 +14,7 @@
  */
 import Storage from 'expo-sqlite/kv-store';
 
+import type { Equipe } from '@/donnees/equipes';
 import type { Feuille } from '@/donnees/feuille';
 import type { Match } from '@/donnees/matchs';
 
@@ -22,9 +23,11 @@ export interface Sauvegarde {
   feuilles: Record<string, Feuille>;
   /** Les matchs ouverts par l'utilisateur : sans eux, leurs feuilles n'auraient plus de sens. */
   matchsCrees: Match[];
+  equipe: Equipe | null;
+  amis: string[];
 }
 
-const VIDE: Sauvegarde = { feuilles: {}, matchsCrees: [] };
+const VIDE: Sauvegarde = { feuilles: {}, matchsCrees: [], equipe: null, amis: [] };
 
 const CLE = 'golder.sauvegarde.v2';
 

@@ -208,6 +208,33 @@ inventé, et deux lectures de la même journée donnent le même titre.
 Les chiffres sont ceux de la démonstration : les totaux d'Ilyes correspondent à
 la vraie saison, les autres joueurs sont plausibles mais inventés.
 
+## Les équipes
+
+Une équipe, c'est **cinq à sept joueurs**, un nom et un écusson. La règle des
+bornes est tenue par le store (`src/etat/store.ts`), pas seulement par l'écran :
+on ne peut ni créer en dessous de cinq, ni dépasser sept, ni descendre sous cinq
+en retirant quelqu'un.
+
+Monter une équipe est **secondaire** dans l'app. « Jouer » reste l'entrée
+principale ; l'équipe est *proposée* au moment d'ouvrir un match (une ligne en
+second plan sous le bouton, ou une case « Inscrire mon équipe » si on en a une,
+qui met tout le monde sur la feuille), et elle se **gère dans Ligue → Équipes**,
+où elle prend son sens : c'est là qu'est le classement des équipes.
+
+**L'écusson est composé, pas généré** (`src/composants/Ecusson.skia.tsx`) : une
+forme (écu, rond, pointe), un motif (uni, bandes, diagonale, moitié), deux
+couleurs parmi huit, un monogramme déduit du nom et modifiable. Dix secondes à
+faire, lisible à 22 px dans une ligne de classement, aucune dépendance à un
+service, et tous les écussons appartiennent visiblement à la même ligue. Une
+génération par IA reste possible plus tard comme option — elle coûterait un
+appel par équipe pour un résultat moins cohérent et moins lisible en petit.
+
+Le **classement des équipes** (`src/donnees/equipes.ts`) : 3 points la
+victoire, 1 le nul, départage à la différence de buts puis aux buts marqués. Il
+se nourrit des rencontres entre équipes ; celles de la démonstration sont
+inventées. Brancher les feuilles validées dessus demande d'attacher une équipe à
+chaque côté d'un match — c'est la suite naturelle.
+
 ## Regarder l'app sans téléphone
 
 Le serveur de développement sert aussi l'app en web. `outils/apercu.mjs` ouvre

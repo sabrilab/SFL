@@ -69,7 +69,7 @@ function cheminChromium() {
  * on vérifie ce que l'utilisateur voit, pas ce que le code prétend afficher.
  */
 /** Les scènes qui sont des feuilles natives, et l'écran dont elles partent. */
-const FEUILLES = { fiche: 'jouer', rejoint: 'jouer', ouvrir: 'jouer', joueur: 'carte', hote: 'jouer', valider: 'jouer' };
+const FEUILLES = { fiche: 'jouer', rejoint: 'jouer', ouvrir: 'jouer', joueur: 'carte', hote: 'jouer', valider: 'jouer', equipeCreer: 'equipes', ami: 'carte' };
 
 const SCENES = {
   async jouer(p) {
@@ -140,6 +140,48 @@ const SCENES = {
     await SCENES.hote(p);
     await p.getByText('Terminer le match', { exact: true }).click();
     await p.waitForTimeout(900);
+  },
+  /** Les équipes : l'invitation, puis la création, puis le classement avec la sienne. */
+  async equipes(p) {
+    await SCENES.ligue(p);
+    await p.getByText('Équipes', { exact: true }).first().click();
+    await p.waitForTimeout(1500);
+  },
+  async equipeCreer(p) {
+    await aller(p, '/');
+    await p.evaluate(() => localStorage.clear());
+    await SCENES.equipes(p);
+    await p.getByText('Monter une équipe', { exact: true }).click();
+    await p.waitForTimeout(1800);
+    await p.getByPlaceholder('Les Renards').fill('Les Loups de Saint-Denis');
+    await p.getByText('Pointe', { exact: true }).click();
+    await p.getByText('Diagonale', { exact: true }).click();
+    for (const n of ['YACINE', 'KADER', 'NAIM', 'BENSOU']) {
+      await p.getByLabel(new RegExp('^' + n)).first().click();
+      await p.waitForTimeout(150);
+    }
+    await p.waitForTimeout(800);
+    await deshabiller(p);
+  },
+  async equipeMonte(p) {
+    await SCENES.equipeCreer(p);
+    await p.getByText("Monter l'équipe", { exact: true }).click();
+    await p.waitForTimeout(1600);
+  },
+  /** Le classement avec son équipe dedans (après equipeMonte). */
+  async equipesAvec(p) {
+    await SCENES.equipes(p);
+  },
+  /** Ajouter un ami depuis sa carte, puis le retrouver dans Ma carte. */
+  async ami(p) {
+    await aller(p, '/');
+    await p.getByText('Ma carte', { exact: true }).first().click();
+    await p.waitForTimeout(2500);
+    await p.getByLabel('Carte de YACINE').first().click();
+    await p.waitForTimeout(2000);
+    await p.getByText('Ajouter en ami', { exact: true }).click();
+    await p.waitForTimeout(700);
+    await deshabiller(p);
   },
   async journal(p) {
     await SCENES.ligue(p);

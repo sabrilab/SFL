@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FaceCarte } from '@/composants/carte/face';
 import { CarteVolume } from '@/composants/carte/volume';
+import { Ecusson } from '@/composants/Ecusson';
 import { Ligne } from '@/composants/Ligne';
 import { TestReaction } from '@/composants/TestReaction';
 import { Corps, Libelle, Titre } from '@/composants/Texte';
@@ -17,7 +18,7 @@ import { JOUEURS, MOI_ID, ROSTER_DEMO, type CarteJoueur } from '@/donnees/joueur
 import { useEtat } from '@/etat/store';
 
 export default function MaCarte() {
-  const { stats, vitesseGagnee } = useEtat();
+  const { stats, vitesseGagnee, amis, equipe } = useEtat();
   const { top, bottom } = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const router = useRouter();
@@ -68,23 +69,38 @@ export default function MaCarte() {
         </Pressable>
       )}
 
+      {/* Ses gens : l'équipe d'abord, les amis ensuite, la ligue pour en trouver d'autres. */}
+      {equipe && (
+        <>
+          <View style={[styles.section, styles.sectionEquipe]}>
+            <Ecusson ecusson={equipe.ecusson} taille={34} />
+            <View style={{ flex: 1 }}>
+              <Libelle>MON ÉQUIPE · {equipe.joueurs.length} JOUEURS</Libelle>
+              <Text style={styles.sectionTitre}>{equipe.nom}</Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/equipe')}>
+              <Text style={styles.lien}>Gérer</Text>
+            </Pressable>
+          </View>
+          <RangeeCartes ids={equipe.joueurs.filter((j) => j !== MOI_ID)} onOuvrir={(id) => router.push({ pathname: '/joueur/[id]', params: { id } })} />
+        </>
+      )}
+
       <View style={styles.section}>
-        <Libelle>LES CARTES DE LA LIGUE</Libelle>
+        <Libelle>MES AMIS{amis.length ? ` · ${amis.length}` : ''}</Libelle>
+        <Corps style={{ marginTop: 4 }}>
+          {amis.length ? 'Ceux que tu as ajoutés depuis leur carte.' : "Ouvre la carte de quelqu'un et touche « Ajouter en ami »."}
+        </Corps>
+      </View>
+      {amis.length > 0 && (
+        <RangeeCartes ids={amis} onOuvrir={(id) => router.push({ pathname: '/joueur/[id]', params: { id } })} />
+      )}
+
+      <View style={styles.section}>
+        <Libelle>LA LIGUE</Libelle>
         <Corps style={{ marginTop: 4 }}>Ceux avec qui tu joues le dimanche.</Corps>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={132 + 10}
-        decelerationRate="fast"
-        contentContainerStyle={styles.rangee}>
-        {ROSTER_DEMO.map((id) => (
-          <Pressable key={id} onPress={() => router.push({ pathname: '/joueur/[id]', params: { id } })} accessibilityRole="button"
-            accessibilityLabel={`Carte de ${JOUEURS[id].nom}`}>
-            <FaceCarte joueur={JOUEURS[id]} largeur={132} />
-          </Pressable>
-        ))}
-      </ScrollView>
+      <RangeeCartes ids={ROSTER_DEMO} onOuvrir={(id) => router.push({ pathname: '/joueur/[id]', params: { id } })} />
 
       <View style={styles.lignes}>
         {stats.map((s) => (
@@ -103,6 +119,20 @@ export default function MaCarte() {
   );
 }
 
+function RangeeCartes({ ids, onOuvrir }: { ids: string[]; onOuvrir: (id: string) => void }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={132 + 10}
+      decelerationRate="fast" contentContainerStyle={styles.rangee}>
+      {ids.filter((id) => JOUEURS[id]).map((id) => (
+        <Pressable key={id} onPress={() => onOuvrir(id)} accessibilityRole="button"
+          accessibilityLabel={`Carte de ${JOUEURS[id].nom}`}>
+          <FaceCarte joueur={JOUEURS[id]} largeur={132} />
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
+
 const styles = StyleSheet.create({
   defile: { paddingHorizontal: ESP.quatre },
   entete: { paddingBottom: ESP.trois },
@@ -116,6 +146,9 @@ const styles = StyleSheet.create({
   appelTitre: { fontFamily: P.titre, fontSize: 21, letterSpacing: -0.6, color: C.encre, marginTop: 6 },
   appelTexte: { fontSize: 12.5, color: C.encre60, marginTop: 3 },
   section: { marginTop: ESP.six },
+  sectionEquipe: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  sectionTitre: { fontFamily: P.titre, fontSize: 18, letterSpacing: -0.5, color: C.blanc, marginTop: 3 },
+  lien: { fontSize: 13, fontWeight: '600', color: C.braise },
   rangee: { gap: 10, paddingVertical: ESP.trois },
   lignes: { marginTop: ESP.cinq, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.blanc12 },
   note: { fontSize: 12, color: C.blanc34, paddingTop: ESP.quatre, lineHeight: 18 },

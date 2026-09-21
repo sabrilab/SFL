@@ -71,6 +71,16 @@ export default function Racine() {
           }}
         />
         <Stack.Screen
+          name="equipe"
+          options={{
+            presentation: 'formSheet',
+            sheetAllowedDetents: [0.94],
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 34,
+            contentStyle: { backgroundColor: C.clair },
+          }}
+        />
+        <Stack.Screen
           name="ouvrir"
           options={{
             presentation: 'formSheet',
