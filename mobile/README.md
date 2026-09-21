@@ -35,6 +35,30 @@ build* :
 npx eas build --profile development --platform ios
 ```
 
+## Regarder l'app sans téléphone
+
+Le serveur de développement sert aussi l'app en web. `outils/apercu.mjs` ouvre
+cette version dans un navigateur sans fenêtre, joue huit parcours réels — ouvrir
+une fiche, rejoindre un match, répondre à la convocation, parcourir les trois
+rubriques de la ligue — et enregistre une capture de chacun plus une planche
+contact dans `.apercu/`.
+
+```bash
+npx expo start --web --port 8081   # dans un terminal, laissé tourner
+node outils/apercu.mjs             # dans un autre, autant de fois qu'on veut
+node outils/apercu.mjs ligue carte # ou seulement certaines scènes
+```
+
+Le rafraîchissement d'Expo étant automatique, il n'y a rien à reconstruire entre
+deux modifications : on réexécute le script.
+
+**Ce n'est pas le rendu iOS.** Trois choses diffèrent, et il faut les avoir en
+tête en regardant les images : la barre d'onglets native passe en haut et
+recouvre le titre (en vrai elle est en bas), le verre du système devient une
+surface opaque, et les feuilles natives deviennent des pages entières. Tout le
+reste — mise en page, typographie, couleurs, textes, comportement — est fidèle.
+Pour juger du verre, des gestes et des vraies transitions, il faut un appareil.
+
 ## Vérifier avant de livrer
 
 ```bash

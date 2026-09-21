@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# Captures de l'aperçu (outils/apercu.mjs)
+.apercu/
