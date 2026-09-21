@@ -38,8 +38,9 @@ npx eas build --profile development --platform ios
 ## Voir l'app sur son téléphone, et la retrouver
 
 ```bash
-npx expo login       # une fois, dans le terminal
-npm run tel          # à chaque session
+cd mobile            # le script vit ici, pas dans le dossier personnel
+npx expo login       # une fois
+npx expo start       # à chaque session — ou `npm run tel`, qui fait pareil
 ```
 
 **Sur iPhone, Expo Go n'ouvre un projet que si le terminal et l'application sont
@@ -48,10 +49,14 @@ rouvrir l'app » : sans cette connexion, le QR code ne donne rien. Une fois les
 deux côtés connectés au même compte, le projet apparaît tout seul dans l'onglet
 *Development servers* de Expo Go — plus besoin de chercher un QR code.
 
-`npm run tel` vérifie ce point avant de démarrer, puis lance le serveur **en
-tunnel**. Le tunnel passe par internet plutôt que par le réseau local : beaucoup
-de box opérateur isolent les appareils entre eux, et le téléphone ne voit pas
-l'ordinateur alors qu'ils sont sur le même wifi.
+`npm run tel` n'est qu'un raccourci : il rappelle ce point puis démarre le
+serveur. En cas de doute, `npx expo start` fait exactement le même travail et ne
+dépend d'aucun script maison.
+
+Si le téléphone ne voit pas l'ordinateur alors qu'ils sont sur le même wifi —
+beaucoup de box opérateur isolent les appareils entre eux — ajoute le tunnel,
+qui passe par internet : `npx expo start --tunnel` (plus lent, et il installe
+`@expo/ngrok` au premier lancement).
 
 Une fois l'app ouverte : secouer le téléphone affiche le menu de développement,
 et chaque enregistrement de fichier se recharge tout seul.
