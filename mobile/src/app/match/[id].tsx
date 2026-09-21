@@ -11,8 +11,10 @@ import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { FaceCarte } from '@/composants/carte/face';
 import { Jeton } from '@/composants/Jeton';
 import { C, P, R } from '@/da/theme';
+import { JOUEURS, MOI_ID, ROSTER_DEMO } from '@/donnees/joueurs';
 import { manque } from '@/donnees/matchs';
 import { actions, useEtat } from '@/etat/store';
 
@@ -95,21 +97,26 @@ export default function FicheMatch() {
         </View>
       </View>
 
-      <View style={styles.tetes}>
-        {match.gens.map((g) => (
-          <View key={g} style={styles.tete}><Text style={styles.teteTexte}>{g}</Text></View>
+      {/* Qui vient : les cartes, pas des initiales. On reconnaît les gens à leur badge. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}
+        snapToInterval={108 + 8} decelerationRate="fast" contentContainerStyle={styles.cartes}>
+        {ROSTER_DEMO.slice(0, match.pris).map((id) => (
+          <Pressable key={id} onPress={() => router.push({ pathname: '/joueur/[id]', params: { id } })} accessibilityRole="button"
+            accessibilityLabel={`Carte de ${JOUEURS[id].nom}`}>
+            <FaceCarte joueur={JOUEURS[id]} largeur={108} />
+          </Pressable>
         ))}
-        {dedans && (
-          <View style={[styles.tete, styles.teteToi]}>
-            <Text style={[styles.teteTexte, { color: C.clair }]}>TOI</Text>
+        {match.pris > ROSTER_DEMO.length && (
+          <View style={styles.reste}>
+            <Text style={styles.resteN}>+{match.pris - ROSTER_DEMO.length}</Text>
+            <Text style={styles.resteTexte}>sans carte</Text>
           </View>
         )}
+        {dedans && <FaceCarte joueur={JOUEURS[MOI_ID]} largeur={108} />}
         {Array.from({ length: Math.max(0, n - (dedans ? 1 : 0)) }).map((_, i) => (
-          <View key={`v${i}`} style={[styles.tete, styles.teteVide]}>
-            <Text style={styles.teteTexteVide}>+</Text>
-          </View>
+          <View key={`v${i}`} style={styles.place}><Text style={styles.placeTexte}>+</Text></View>
         ))}
-      </View>
+      </ScrollView>
 
       {match.seuls > 0 && !dedans && (
         <View style={styles.seul}>
@@ -181,12 +188,13 @@ const styles = StyleSheet.create({
   valeurG: { fontSize: 14, fontWeight: '500', color: C.encre, marginTop: 2 },
   valeurD: { fontSize: 13.5, fontWeight: '500', color: C.encre, textAlign: 'right' },
   petit: { fontSize: 11.5, color: C.encre60, marginTop: 1 },
-  tetes: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 14 },
-  tete: { width: 31, height: 31, borderRadius: 999, backgroundColor: C.encre06, alignItems: 'center', justifyContent: 'center' },
-  teteToi: { backgroundColor: C.encre },
-  teteVide: { backgroundColor: 'transparent', borderWidth: StyleSheet.hairlineWidth * 2, borderColor: 'rgba(10,11,13,0.18)', borderStyle: 'dashed' },
-  teteTexte: { fontSize: 10.5, fontWeight: '600', color: C.encre60 },
-  teteTexteVide: { fontSize: 12, color: 'rgba(10,11,13,0.3)' },
+  cartes: { gap: 8, paddingVertical: 14 },
+  reste: { width: 108, height: 162, borderRadius: 12, backgroundColor: C.encre06, alignItems: 'center', justifyContent: 'center' },
+  resteN: { fontFamily: P.titre, fontSize: 22, letterSpacing: -0.6, color: C.encre },
+  resteTexte: { fontSize: 11, color: C.encre60, marginTop: 2 },
+  place: { width: 108, height: 162, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth * 2,
+           borderColor: 'rgba(10,11,13,0.18)', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+  placeTexte: { fontSize: 18, color: 'rgba(10,11,13,0.3)' },
   seul: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 12 },
   point: { width: 5, height: 5, borderRadius: 999, backgroundColor: C.braise },
   seulTexte: { fontSize: 12.5, color: C.braiseEncre },

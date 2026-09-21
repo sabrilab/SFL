@@ -69,7 +69,7 @@ function cheminChromium() {
  * on vérifie ce que l'utilisateur voit, pas ce que le code prétend afficher.
  */
 /** Les scènes qui sont des feuilles natives, et l'écran dont elles partent. */
-const FEUILLES = { fiche: 'jouer', rejoint: 'jouer', ouvrir: 'jouer' };
+const FEUILLES = { fiche: 'jouer', rejoint: 'jouer', ouvrir: 'jouer', joueur: 'carte' };
 
 const SCENES = {
   async jouer(p) {
@@ -97,7 +97,15 @@ const SCENES = {
   async carte(p) {
     await aller(p, '/');
     await p.getByText('Ma carte', { exact: true }).first().click();
-    await p.waitForTimeout(1500);
+    await p.waitForTimeout(3500);
+  },
+  async joueur(p) {
+    await aller(p, '/');
+    await p.getByText('Ma carte', { exact: true }).first().click();
+    await p.waitForTimeout(2500);
+    await p.getByLabel('Carte de YACINE').first().click();
+    await p.waitForTimeout(2200);
+    await deshabiller(p);
   },
   async ligue(p) {
     await aller(p, '/');
@@ -229,7 +237,13 @@ if (demandees.length && aJouer.length !== demandees.length) {
 const { chromium } = await chargerPlaywright();
 mkdirSync(SORTIE, { recursive: true });
 
-const navigateur = await chromium.launch({ executablePath: cheminChromium() });
+// Le rendu web de Skia charge CanvasKit depuis un CDN ; derrière un proxy
+// d'entreprise le certificat n'est pas reconnu par Chromium. C'est un outil
+// de développement : on accepte le certificat plutôt que d'échouer en silence.
+const navigateur = await chromium.launch({
+  executablePath: cheminChromium(),
+  args: ['--ignore-certificate-errors'],
+});
 const page = await navigateur.newPage({ viewport: ECRAN, deviceScaleFactor: 2 });
 page.setDefaultTimeout(8000);
 

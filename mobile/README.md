@@ -128,6 +128,41 @@ appareils — de quoi regarder, pas de quoi travailler dedans toute la journée.
 tourner de vrais iPhone, mais ils exigent un `.ipa` signé, donc un compte Apple
 Developer à 99 $/an. À ne considérer qu'une fois l'app prête à sortir.
 
+## La carte joueur
+
+Le badge social de l'app : elle rend visible ce qu'un joueur a mis dans la ligue,
+et on reconnaît les gens à leur carte plutôt qu'à des initiales. Elle vit en tête
+de *Ma carte* (en volume), dans la fiche d'un match à la place des pastilles de
+joueurs (en petit, à faire défiler), et en feuille quand on touche la carte de
+quelqu'un.
+
+Le design suit le document `docs/carte/SPEC.md`, livré avec le kit `player-card-3d`, sur sa
+grille de référence 1024 × 1536 (`src/composants/carte/grille.ts`).
+
+- **La face** (`face.skia.tsx`) est peinte en Skia. Deux effets imposaient Skia
+  plutôt que des vues empilées : le numéro géant fondu dans la photo en
+  `screen`, et le grain en `overlay` — sans eux, la typographie a l'air collée
+  sur l'image. Anton et JetBrains Mono sont celles du kit ; la carte a sa propre
+  typographie, distincte de celle de l'app, parce qu'elle est un objet, pas un
+  écran.
+- **Le volume** (`volume.tsx`) n'a pas de moteur 3D : perspective, deux rotations,
+  inertie au lâcher, retour lent à l'angle de repos, retournement au
+  double-toucher. Les valeurs de manipulation sont celles du document.
+- **Sur le web** (`face.web.tsx`), Skia tourne sur CanvasKit, qui doit être chargé
+  *avant* que le module soit importé — d'où un import différé. C'est ce qui
+  permet à l'aperçu de montrer les cartes.
+
+Les joueurs et leurs cartes sont dans `src/donnees/joueurs.ts`. Un joueur sans
+photo — l'état de tout nouvel inscrit — a une face propre et un appel à créer sa
+photo. Le seul portrait présent est celui de Yacine, déjà dans l'app Next
+(`public/players/Yacine.png`) : c'est un membre de la ligue, avec le cadrage et
+la lumière qu'on voudra obtenir pour tous.
+
+**À venir** : la création du portrait à l'inscription (photos de l'utilisateur en
+entrée, prompt système, modèle de génération côté serveur — jamais de clé dans
+l'app), et les raretés du système de cartes existant du PWA (Standard, Rare,
+Défensive, Impact, MVP).
+
 ## Regarder l'app sans téléphone
 
 Le serveur de développement sert aussi l'app en web. `outils/apercu.mjs` ouvre

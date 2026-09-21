@@ -15,6 +15,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { C } from '@/da/theme';
 
@@ -40,7 +41,7 @@ export default function Racine() {
   if (!pret) return <View style={{ flex: 1, backgroundColor: C.noir }} />;
 
   return (
-    <>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       {/* L'app assume un seul monde, sombre : la barre système suit. */}
       <StatusBar style="light" />
       <Stack
@@ -60,6 +61,16 @@ export default function Racine() {
           }}
         />
         <Stack.Screen
+          name="joueur/[id]"
+          options={{
+            presentation: 'formSheet',
+            sheetAllowedDetents: [0.78],
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 34,
+            contentStyle: { backgroundColor: C.noir },
+          }}
+        />
+        <Stack.Screen
           name="ouvrir"
           options={{
             presentation: 'formSheet',
@@ -70,6 +81,6 @@ export default function Racine() {
           }}
         />
       </Stack>
-    </>
+    </GestureHandlerRootView>
   );
 }
