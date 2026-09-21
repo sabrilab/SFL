@@ -37,7 +37,9 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "verifier": "tsc --noEmit && expo export --platform ios --platform android --output-dir .verif && rm -rf .verif"
+    "verifier": "tsc --noEmit && expo export --platform ios --platform android --output-dir .verif && rm -rf .verif",
+    "tel": "./outils/telephone.sh",
+    "apercu": "node outils/apercu.mjs"
   },
   "private": true
 }
