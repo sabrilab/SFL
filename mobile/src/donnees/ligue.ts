@@ -61,7 +61,7 @@ export const JOURNEES: Journee[] = [
   { n: 5, date: '9 août', score: 'Bleu 8 — 4 Orange', pp: 9 },
   { n: 4, date: '2 août', score: 'Orange 6 — 6 Noir', pp: 8 },
   { n: 3, date: '26 juil.', score: 'Blanc 7 — 4 Bleu', pp: 5 },
-  { n: 2, date: '19 juil.', score: 'Noir 5 — 8 Orange', pp: 10 },
+  { n: 2, date: '19 juil.', score: 'Noir 4 — 7 Orange', pp: 10 },
   { n: 1, date: '12 juil.', score: 'Bleu 6 — 3 Blanc', pp: 8 },
 ];
 

@@ -9,8 +9,10 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
 import { C } from '@/da/theme';
+import { feuillesEnAttente, useEtat } from '@/etat/store';
 
 export default function Onglets() {
+  const enAttente = feuillesEnAttente(useEtat()).length;
   return (
     <NativeTabs
       backgroundColor={C.noir}
@@ -20,6 +22,7 @@ export default function Onglets() {
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Jouer</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="soccerball" drawable="ic_menu_compass" />
+        {enAttente > 0 && <NativeTabs.Trigger.Badge>{String(enAttente)}</NativeTabs.Trigger.Badge>}
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="carte">

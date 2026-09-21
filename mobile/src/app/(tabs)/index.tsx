@@ -14,10 +14,12 @@ import { Tuile } from '@/composants/Tuile';
 import { Verre } from '@/composants/Verre';
 import { C, ESP, P, R } from '@/da/theme';
 import { manque } from '@/donnees/matchs';
-import { useEtat } from '@/etat/store';
+import { feuillesEnAttente, useEtat } from '@/etat/store';
 
 export default function Jouer() {
-  const { matchs, rejoints } = useEtat();
+  const etat = useEtat();
+  const { matchs, rejoints } = etat;
+  const enAttente = feuillesEnAttente(etat);
   const [filtre, setFiltre] = useState<Filtre>('tout');
   const router = useRouter();
   const { top, bottom } = useSafeAreaInsets();
@@ -43,6 +45,28 @@ export default function Jouer() {
               : `${vus.length} MATCH${vus.length > 1 ? 'S' : ''} OUVERT${vus.length > 1 ? 'S' : ''} · SAINT-DENIS`}
           </Libelle>
         </View>
+
+        {/* Une feuille qui attend, c'est des résultats qui n'existent pas encore
+            pour la ligue. Le rappel reste tant que l'hôte n'a pas validé. */}
+        {enAttente.map(({ match: m, feuille }) => (
+          <Pressable key={m.id} accessibilityRole="button"
+            onPress={() => router.push({ pathname: '/match/[id]', params: { id: m.id } })}
+            style={({ pressed }) => [styles.rappel, pressed && { opacity: 0.9 }]}>
+            <View style={styles.rappelPoint} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rappelCle}>
+                {feuille.statut === 'en_cours' ? 'MATCH EN COURS' : 'FEUILLE DE MATCH À VALIDER'}
+              </Text>
+              <Text style={styles.rappelTitre}>{m.titre} · {m.lieu}</Text>
+              <Text style={styles.rappelTexte}>
+                {feuille.statut === 'en_cours'
+                  ? 'Reprendre la feuille et marquer les buts.'
+                  : 'Sans validation, rien ne remonte aux classements.'}
+              </Text>
+            </View>
+            <Text style={styles.rappelFleche}>→</Text>
+          </Pressable>
+        ))}
 
         <Filtres valeur={filtre} onChange={setFiltre} />
 
@@ -95,6 +119,15 @@ const styles = StyleSheet.create({
   rien: { paddingVertical: ESP.six, alignItems: 'center', gap: ESP.un },
   rienTexte: { fontSize: 13.5, color: C.blanc60, textAlign: 'center' },
   ouvrir: { borderRadius: R.tuile },
+  rappel: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16,
+    borderRadius: R.carte, backgroundColor: C.clair,
+  },
+  rappelPoint: { width: 8, height: 8, borderRadius: 999, backgroundColor: C.braise },
+  rappelCle: { fontFamily: P.mono, fontSize: 9.5, letterSpacing: 1.4, color: C.braiseEncre },
+  rappelTitre: { fontFamily: P.titre, fontSize: 16, letterSpacing: -0.4, color: C.encre, marginTop: 3 },
+  rappelTexte: { fontSize: 12, color: C.encre60, marginTop: 2 },
+  rappelFleche: { fontSize: 18, color: C.encre },
   ouvrirVerre: { height: 148 },
   ouvrirDedans: { flex: 1, padding: 13, justifyContent: 'space-between' },
   ouvrirGeant: {

@@ -32,7 +32,7 @@ export default function MaCarte() {
     };
   }, [stats]);
 
-  const largeurHero = Math.min(316, width - ESP.quatre * 2 - 24);
+  const largeurHero = Math.min(236, width * 0.6);
 
   return (
     <ScrollView

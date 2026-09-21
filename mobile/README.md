@@ -80,7 +80,8 @@ modification vienne de l'éditeur ou d'un `git pull` ne fait aucune différence.
 
 Il faut en revanche **relancer le serveur** quand `app.json` change ou qu'un
 paquet est installé (`npm install`), parce que ces deux-là ne sont lus qu'au
-démarrage. Et si l'app se perd, secouer le téléphone ouvre le menu de
+démarrage. Après un `git pull` qui touche `package.json`, faire `npm install`
+puis relancer. Et si l'app se perd, secouer le téléphone ouvre le menu de
 développement, où **Reload** repart d'un écran propre.
 
 ### Quand Expo Go reste bloqué sur « Opening project »
@@ -162,6 +163,50 @@ la lumière qu'on voudra obtenir pour tous.
 entrée, prompt système, modèle de génération côté serveur — jamais de clé dans
 l'app), et les raretés du système de cartes existant du PWA (Standard, Rare,
 Défensive, Impact, MVP).
+
+## La feuille de match, côté hôte
+
+Celui qui ouvre un match tient sa feuille. C'est l'acte sans lequel rien ne
+remonte — ni les buts, ni les passes, ni les classements — et l'app le traite
+comme tel.
+
+Quatre états, dans l'ordre, définis dans `src/donnees/feuille.ts` :
+
+```
+ouvert ──démarrer──▶ en_cours ──terminer──▶ a_valider ──valider──▶ validee
+```
+
+- **Ouvert** : l'hôte compose. Il touche les cartes des joueurs de la ligue pour
+  les ajouter, et l'équipe sous chaque carte pour la changer.
+- **En cours** : un bouton « + But » par joueur. Chaque but s'enregistre à
+  l'instant, le score s'en déduit (il ne peut pas se désynchroniser), et un
+  bandeau propose d'attribuer la passe à un coéquipier. « Annuler le dernier »
+  répare une erreur.
+- **À valider** : le match est fini, l'hôte peut encore corriger et désigner
+  l'homme du match. C'est le délai voulu : on valide à froid, pas dans le
+  vestiaire. Le bouton **Valider la feuille de match** reste collé en bas de
+  l'écran, quoi qu'on fasse défiler.
+- **Validée** : figée. Plus aucune modification n'est acceptée.
+
+Tant qu'une feuille est en cours ou à valider, un rappel occupe le haut de
+l'onglet *Jouer* et une pastille marque l'onglet dans la barre. Il ne disparaît
+qu'à la validation.
+
+**Tout est sauvegardé à chaque geste** — la feuille et le match créé — dans le
+stockage clé-valeur d'expo-sqlite (`src/etat/persistance.native.ts`, natif,
+inclus dans Expo Go ; localStorage sur le web). Un but marqué survit à la
+fermeture de l'app. Le passage à Supabase se fera dans ce seul fichier.
+
+## Le journal de la ligue
+
+Dans *Ligue → Matchs*, chaque dimanche est une rubrique qu'on déplie : la
+manchette et son chapeau, le score, meilleur buteur, meilleur passeur et homme
+du match, les tops au barème Pépite, et les faits du jour. Repris de la version
+web : la manchette se déduit des chiffres (`src/donnees/journal.ts`), rien n'est
+inventé, et deux lectures de la même journée donnent le même titre.
+
+Les chiffres sont ceux de la démonstration : les totaux d'Ilyes correspondent à
+la vraie saison, les autres joueurs sont plausibles mais inventés.
 
 ## Regarder l'app sans téléphone
 

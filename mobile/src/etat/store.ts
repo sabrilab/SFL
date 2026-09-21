@@ -10,8 +10,13 @@
  */
 import { useSyncExternalStore } from 'react';
 
+import {
+  feuilleVierge, lignesDepuisButs, type Equipe, type Feuille,
+} from '@/donnees/feuille';
+import { MOI_ID } from '@/donnees/joueurs';
 import { MATCHS_INITIAUX, PHOTOS, type Match } from '@/donnees/matchs';
 import { CONVOCATION, STATS_JOUEUR } from '@/donnees/ligue';
+import { ecrire, lire } from './persistance';
 
 export type Reponse = 'present' | 'absent' | null;
 
@@ -21,22 +26,44 @@ interface Etat {
   reponse: Reponse;
   stats: { cle: string; nom: string; valeur: number }[];
   vitesseGagnee: boolean;
+  /** Les feuilles des matchs que l'utilisateur héberge, par id de match. */
+  feuilles: Record<string, Feuille>;
 }
 
+// Les matchs créés reviennent avec leur photo d'asset : un identifiant
+// d'asset peut changer d'un build à l'autre, on ne fait pas confiance à celui
+// qui a été sauvegardé.
+const sauve = lire();
+const matchsCrees = sauve.matchsCrees.map((m) => ({ ...m, photo: PHOTOS.mien }));
+
 let etat: Etat = {
-  matchs: MATCHS_INITIAUX,
+  matchs: [...matchsCrees, ...MATCHS_INITIAUX],
   rejoints: [],
   reponse: null,
   stats: STATS_JOUEUR,
   vitesseGagnee: false,
+  // Les feuilles survivent à la fermeture de l'app : un but marqué reste marqué.
+  feuilles: sauve.feuilles,
 };
+
+const idsCrees = new Set(matchsCrees.map((m) => m.id));
 
 const abonnes = new Set<() => void>();
 const publier = () => abonnes.forEach((f) => f());
 
 function poser(suite: Partial<Etat>) {
   etat = { ...etat, ...suite };
+  if (suite.feuilles || suite.matchs) {
+    ecrire({ feuilles: etat.feuilles, matchsCrees: etat.matchs.filter((m) => idsCrees.has(m.id)) });
+  }
   publier();
+}
+
+/** Modifie la feuille d'un match et la range. Ne fait rien si elle est validée. */
+function surFeuille(matchId: string, f: (feuille: Feuille) => Feuille) {
+  const actuelle = etat.feuilles[matchId] ?? feuilleVierge(matchId);
+  if (actuelle.statut === 'validee') return;
+  poser({ feuilles: { ...etat.feuilles, [matchId]: f(actuelle) } });
 }
 
 export function useEtat(): Etat {
@@ -72,8 +99,91 @@ export const actions = {
       hote: 'Toi', init: 'TOI', hoteNote: 'Ton premier match organisé',
       prix: 'Gratuit', prixNote: 'terrain libre', seuls: 0, gens: [],
     };
-    poser({ matchs: [neuf, ...etat.matchs], rejoints: [...etat.rejoints, id] });
+    const feuille = feuilleVierge(id);
+    feuille.lignes = [{ joueurId: MOI_ID, equipe: 'A', buts: 0, passes: 0, mvp: false }];
+    idsCrees.add(id);
+    poser({
+      matchs: [neuf, ...etat.matchs],
+      rejoints: [...etat.rejoints, id],
+      feuilles: { ...etat.feuilles, [id]: feuille },
+    });
     return id;
+  },
+
+  /* ── La feuille de match, côté hôte ── */
+
+  /** Ajoute un joueur de la ligue au match, ou l'en retire. */
+  basculerPresent(matchId: string, joueurId: string) {
+    surFeuille(matchId, (f) => {
+      const present = f.lignes.some((l) => l.joueurId === joueurId);
+      if (present) {
+        return { ...f, lignes: f.lignes.filter((l) => l.joueurId !== joueurId),
+          buts: f.buts.filter((b) => b.joueurId !== joueurId)
+            .map((b) => (b.passeurId === joueurId ? { ...b, passeurId: undefined } : b)) };
+      }
+      // On équilibre : le nouveau va dans l'équipe la moins nombreuse.
+      const nA = f.lignes.filter((l) => l.equipe === 'A').length;
+      const nB = f.lignes.length - nA;
+      const equipe: Equipe = nA <= nB ? 'A' : 'B';
+      return { ...f, lignes: [...f.lignes, { joueurId, equipe, buts: 0, passes: 0, mvp: false }] };
+    });
+  },
+
+  /** Change un joueur d'équipe. */
+  changerEquipe(matchId: string, joueurId: string) {
+    surFeuille(matchId, (f) => ({
+      ...f,
+      lignes: f.lignes.map((l) => l.joueurId === joueurId ? { ...l, equipe: l.equipe === 'A' ? 'B' : 'A' } : l),
+    }));
+  },
+
+  demarrerMatch(matchId: string) {
+    surFeuille(matchId, (f) => (f.statut === 'ouvert' ? { ...f, statut: 'en_cours' } : f));
+  },
+
+  /** Un but, à l'instant où il est marqué. Le score et les compteurs suivent. */
+  marquerBut(matchId: string, joueurId: string, passeurId?: string) {
+    surFeuille(matchId, (f) => {
+      const ligne = f.lignes.find((l) => l.joueurId === joueurId);
+      if (!ligne) return f;
+      const buts = [...f.buts, { t: Date.now(), equipe: ligne.equipe, joueurId, passeurId }];
+      return { ...f, buts, lignes: lignesDepuisButs(f.lignes, buts) };
+    });
+  },
+
+  /** Attribue (ou retire) la passe du dernier but. */
+  passeurDuDernierBut(matchId: string, passeurId?: string) {
+    surFeuille(matchId, (f) => {
+      if (!f.buts.length) return f;
+      const buts = f.buts.map((b, i) => (i === f.buts.length - 1 ? { ...b, passeurId } : b));
+      return { ...f, buts, lignes: lignesDepuisButs(f.lignes, buts) };
+    });
+  },
+
+  annulerDernierBut(matchId: string) {
+    surFeuille(matchId, (f) => {
+      const buts = f.buts.slice(0, -1);
+      return { ...f, buts, lignes: lignesDepuisButs(f.lignes, buts) };
+    });
+  },
+
+  basculerMvp(matchId: string, joueurId: string) {
+    surFeuille(matchId, (f) => ({
+      ...f,
+      // Un seul homme du match.
+      lignes: f.lignes.map((l) => ({ ...l, mvp: l.joueurId === joueurId ? !l.mvp : false })),
+    }));
+  },
+
+  /** Fin du match : la feuille passe « à valider ». On peut encore corriger. */
+  terminerMatch(matchId: string) {
+    surFeuille(matchId, (f) => (f.statut === 'en_cours' ? { ...f, statut: 'a_valider' } : f));
+  },
+
+  /** L'acte qui fige tout. Après ça, plus aucune modification n'est acceptée. */
+  validerFeuille(matchId: string) {
+    surFeuille(matchId, (f) =>
+      f.statut === 'a_valider' ? { ...f, statut: 'validee', valideeLe: Date.now() } : f);
   },
 
   /** Répondre à la convocation de la journée — retoucher annule la réponse. */
@@ -92,6 +202,14 @@ export const actions = {
     return true;
   },
 };
+
+/** Les matchs hébergés par l'utilisateur dont la feuille attend encore une action. */
+export function feuillesEnAttente(e: Etat): { match: Match; feuille: Feuille }[] {
+  return Object.values(e.feuilles)
+    .filter((f) => f.statut === 'en_cours' || f.statut === 'a_valider')
+    .map((f) => ({ feuille: f, match: e.matchs.find((m) => m.id === f.matchId) }))
+    .filter((x): x is { match: Match; feuille: Feuille } => !!x.match);
+}
 
 export function compteConvocation(reponse: Reponse) {
   const presents = CONVOCATION.presents.length + (reponse === 'present' ? 1 : 0);

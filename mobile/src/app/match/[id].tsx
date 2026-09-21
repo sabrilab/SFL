@@ -12,6 +12,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FaceCarte } from '@/composants/carte/face';
+import { FeuilleHote } from '@/composants/feuille/FeuilleHote';
 import { Jeton } from '@/composants/Jeton';
 import { C, P, R } from '@/da/theme';
 import { JOUEURS, MOI_ID, ROSTER_DEMO } from '@/donnees/joueurs';
@@ -20,9 +21,10 @@ import { actions, useEtat } from '@/etat/store';
 
 export default function FicheMatch() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { matchs, rejoints } = useEtat();
+  const { matchs, rejoints, feuilles } = useEtat();
   const router = useRouter();
   const match = matchs.find((m) => m.id === id);
+  const feuille = id ? feuilles[id] : undefined;
 
   if (!match) {
     return (
@@ -31,6 +33,9 @@ export default function FicheMatch() {
       </View>
     );
   }
+
+  // L'hôte ne voit pas la fiche : il tient la feuille.
+  if (feuille) return <FeuilleHote match={match} feuille={feuille} />;
 
   const dedans = rejoints.includes(match.id);
   const n = manque(match);

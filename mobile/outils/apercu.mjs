@@ -69,7 +69,7 @@ function cheminChromium() {
  * on vérifie ce que l'utilisateur voit, pas ce que le code prétend afficher.
  */
 /** Les scènes qui sont des feuilles natives, et l'écran dont elles partent. */
-const FEUILLES = { fiche: 'jouer', rejoint: 'jouer', ouvrir: 'jouer', joueur: 'carte' };
+const FEUILLES = { fiche: 'jouer', rejoint: 'jouer', ouvrir: 'jouer', joueur: 'carte', hote: 'jouer', valider: 'jouer' };
 
 const SCENES = {
   async jouer(p) {
@@ -106,6 +106,45 @@ const SCENES = {
     await p.getByLabel('Carte de YACINE').first().click();
     await p.waitForTimeout(2200);
     await deshabiller(p);
+  },
+  /** L'hôte : ouvrir un match, composer, démarrer, marquer, terminer. */
+  async hote(p) {
+    await aller(p, '/');
+    // Chaque passage repart d'une sauvegarde vide : sinon les matchs créés
+    // par les passages précédents s'empilent dans la liste.
+    await p.evaluate(() => localStorage.clear());
+    await aller(p, '/');
+    await p.getByText('OUVRIR', { exact: true }).click();
+    await p.waitForTimeout(1200);
+    await p.getByText('Ouvrir le match', { exact: true }).click();
+    await p.waitForTimeout(1500);
+    // le match créé est en tête de liste : « DEMAIN »
+    await p.getByText('DEMAIN', { exact: true }).first().click();
+    await p.waitForTimeout(2500);
+    await p.getByLabel(/^YACINE/).first().click();
+    await p.getByLabel(/^KADER/).first().click();
+    await p.waitForTimeout(600);
+    await p.getByText('Démarrer le match', { exact: true }).click();
+    await p.waitForTimeout(800);
+    await p.getByLabel('But de ILYES').first().click();
+    await p.waitForTimeout(500);
+    await p.getByText('Sans passe', { exact: true }).click();
+    await p.getByLabel('But de YACINE').first().click();
+    await p.waitForTimeout(500);
+    await p.getByText('KADER', { exact: true }).first().click();  // la passe
+    await p.waitForTimeout(600);
+    await deshabiller(p);
+  },
+  /** Même chemin, jusqu'à la feuille à valider. */
+  async valider(p) {
+    await SCENES.hote(p);
+    await p.getByText('Terminer le match', { exact: true }).click();
+    await p.waitForTimeout(900);
+  },
+  async journal(p) {
+    await SCENES.ligue(p);
+    await p.getByText('Matchs', { exact: true }).first().click();
+    await p.waitForTimeout(1200);
   },
   async ligue(p) {
     await aller(p, '/');
