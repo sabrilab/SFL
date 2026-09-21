@@ -61,6 +61,25 @@ qui passe par internet : `npx expo start --tunnel` (plus lent, et il installe
 Une fois l'app ouverte : secouer le téléphone affiche le menu de développement,
 et chaque enregistrement de fichier se recharge tout seul.
 
+### Quand Expo Go reste bloqué sur « Opening project »
+
+Le téléphone a bien reçu l'adresse du projet mais n'arrive pas à télécharger le
+code depuis l'ordinateur. Deux causes, dans cet ordre :
+
+1. **Le pare-feu de macOS** bloque les connexions entrantes vers `node`
+   (Réglages Système → Réseau → Pare-feu).
+2. **La box** isole les appareils du wifi entre eux.
+
+Dans les deux cas, le tunnel règle le problème sans rien avoir à configurer :
+
+```bash
+npx expo start --tunnel
+```
+
+Pour savoir laquelle des deux : `ipconfig getifaddr en0` donne l'adresse du Mac,
+et `http://<cette-adresse>:8081` ouvert dans Safari sur le téléphone doit
+afficher quelque chose. Si ça tourne dans le vide, c'est bien le réseau.
+
 ## Voir le rendu iOS sans Mac
 
 Trois façons, de la plus simple à la plus lourde.
