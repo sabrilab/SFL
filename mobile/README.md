@@ -61,6 +61,28 @@ qui passe par internet : `npx expo start --tunnel` (plus lent, et il installe
 Une fois l'app ouverte : secouer le téléphone affiche le menu de développement,
 et chaque enregistrement de fichier se recharge tout seul.
 
+### Le cycle de travail
+
+Le serveur reste allumé. On ne le relance pas entre deux modifications, et on ne
+rescanne jamais de QR code.
+
+```bash
+# onglet 1 — on le laisse tourner toute la session
+npx expo start --tunnel
+
+# onglet 2 — à chaque fois que du code arrive
+git pull
+```
+
+Metro surveille les fichiers : dès qu'ils changent, l'app se recharge sur le
+téléphone en une seconde ou deux, en gardant l'écran où on était. Que la
+modification vienne de l'éditeur ou d'un `git pull` ne fait aucune différence.
+
+Il faut en revanche **relancer le serveur** quand `app.json` change ou qu'un
+paquet est installé (`npm install`), parce que ces deux-là ne sont lus qu'au
+démarrage. Et si l'app se perd, secouer le téléphone ouvre le menu de
+développement, où **Reload** repart d'un écran propre.
+
 ### Quand Expo Go reste bloqué sur « Opening project »
 
 Le téléphone a bien reçu l'adresse du projet mais n'arrive pas à télécharger le
