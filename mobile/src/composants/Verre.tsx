@@ -9,7 +9,7 @@
  */
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import type { ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { C } from '@/da/theme';
 
@@ -51,5 +51,11 @@ const styles = StyleSheet.create({
     backgroundColor: C.verre,
     borderColor: C.verreBord,
     overflow: 'hidden',
+    // Le navigateur sait flouter ce qu'il y a derrière : autant s'en servir,
+    // c'est ce qui rapproche le plus l'aperçu web du verre du système.
+    ...Platform.select({
+      web: { backdropFilter: 'blur(24px) saturate(160%)' } as ViewStyle,
+      default: {},
+    }),
   },
 });

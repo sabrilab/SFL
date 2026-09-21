@@ -52,12 +52,17 @@ node outils/apercu.mjs ligue carte # ou seulement certaines scènes
 Le rafraîchissement d'Expo étant automatique, il n'y a rien à reconstruire entre
 deux modifications : on réexécute le script.
 
-**Ce n'est pas le rendu iOS.** Trois choses diffèrent, et il faut les avoir en
-tête en regardant les images : la barre d'onglets native passe en haut et
-recouvre le titre (en vrai elle est en bas), le verre du système devient une
-surface opaque, et les feuilles natives deviennent des pages entières. Tout le
-reste — mise en page, typographie, couleurs, textes, comportement — est fidèle.
-Pour juger du verre, des gestes et des vraies transitions, il faut un appareil.
+Le script corrige les artefacts du web *vers* la vérité : il redescend la barre
+d'onglets en capsule flottante, réserve la place de l'encoche et de la barre
+d'accueil, et recompose les feuilles natives par-dessus l'écran d'où elles
+sortent — deux captures réelles superposées, comme iOS les empile. Il ne corrige
+rien d'autre : ce qui reste à l'écran est ce que le code produit.
+
+**Ce n'est pas pour autant le rendu iOS.** Le verre du système est approché par
+un `backdrop-filter`, les icônes SF Symbols n'existent pas côté web, et aucune
+transition ni aucun geste n'est reproduit. Ces images servent à juger la mise en
+page, la typographie, les textes et le comportement. Pour la matière et le
+toucher, il faut un appareil — Expo Go suffit.
 
 ## Vérifier avant de livrer
 

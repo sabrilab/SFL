@@ -68,6 +68,9 @@ function cheminChromium() {
  * Les scènes. Chacune part de l'écran d'accueil et joue un parcours réel :
  * on vérifie ce que l'utilisateur voit, pas ce que le code prétend afficher.
  */
+/** Les scènes qui sont des feuilles natives, et l'écran dont elles partent. */
+const FEUILLES = { fiche: 'jouer', rejoint: 'jouer', ouvrir: 'jouer' };
+
 const SCENES = {
   async jouer(p) {
     await aller(p, '/');
@@ -76,6 +79,7 @@ const SCENES = {
     await aller(p, '/');
     await p.getByText('CE SOIR').click();
     await p.waitForTimeout(1500);
+    await deshabiller(p);
   },
   async rejoint(p) {
     await aller(p, '/');
@@ -88,6 +92,7 @@ const SCENES = {
     await aller(p, '/');
     await p.getByText('OUVRIR', { exact: true }).click();
     await p.waitForTimeout(1500);
+    await deshabiller(p);
   },
   async carte(p) {
     await aller(p, '/');
@@ -111,11 +116,102 @@ const SCENES = {
   },
 };
 
+/**
+ * L'habillage iOS de l'aperçu.
+ *
+ * Le rendu web place la barre d'onglets en haut et ne réserve pas la place des
+ * barres système : deux différences qui n'existent que sur le web et qui
+ * faussent le jugement. On les corrige VERS la vérité — la barre redescend en
+ * bas sous forme de capsule, et l'écran réserve l'encoche et la barre d'accueil,
+ * comme sur un iPhone.
+ *
+ * On ne corrige rien d'autre : ce qui reste à l'écran est ce que le code produit.
+ */
+async function habiller(p) {
+  await p.addStyleTag({
+    content: `
+      /* La barre d'onglets : en bas, en capsule, comme sur l'appareil. */
+      [role="tablist"][class*="navigationMenuRoot"] {
+        position: fixed !important;
+        top: auto !important; bottom: 26px !important;
+        left: 50% !important; transform: translateX(-50%) !important;
+        width: calc(100% - 52px) !important;
+        display: flex !important; justify-content: space-between !important;
+        gap: 2px !important; padding: 5px !important;
+        background: rgba(18,21,25,0.82) !important;
+        backdrop-filter: blur(26px) saturate(170%) !important;
+        border: 1px solid rgba(255,255,255,0.16) !important;
+        border-radius: 999px !important;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 10px 30px rgba(0,0,0,0.55) !important;
+        z-index: 9000 !important;
+      }
+      [role="tablist"][class*="navigationMenuRoot"] [role="tab"] {
+        flex: 1 !important; border-radius: 999px !important; height: 34px !important;
+      }
+      [role="tablist"][class*="navigationMenuRoot"] [role="tab"][aria-selected="true"],
+      [role="tablist"][class*="navigationMenuRoot"] [role="tab"][data-state="active"] {
+        background: #EFEFEC !important;
+      }
+      [role="tablist"][class*="navigationMenuRoot"] [role="tab"][aria-selected="true"] *,
+      [role="tablist"][class*="navigationMenuRoot"] [role="tab"][data-state="active"] * {
+        color: #0A0B0D !important;
+      }
+      /* La place de l'encoche, que le web ne réserve pas. */
+      [class*="nativeTabsContainer"] { padding-top: 54px !important; box-sizing: border-box !important; }
+      #apercu-systeme {
+        position: fixed; top: 0; left: 0; right: 0; height: 54px; z-index: 9500;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 14px 30px 0; font: 600 15px -apple-system, system-ui, sans-serif;
+        color: #F4F5F2; pointer-events: none;
+      }
+      #apercu-ile {
+        position: fixed; top: 11px; left: 50%; transform: translateX(-50%);
+        width: 124px; height: 35px; border-radius: 999px; background: #000;
+        z-index: 9600; pointer-events: none;
+      }
+      #apercu-accueil {
+        position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%);
+        width: 138px; height: 5px; border-radius: 999px;
+        background: rgba(244,245,242,0.65); z-index: 9700; pointer-events: none;
+      }
+    `,
+  });
+  await p.evaluate(() => {
+    if (document.getElementById('apercu-systeme')) return;
+    const barre = document.createElement('div');
+    barre.id = 'apercu-systeme';
+    barre.innerHTML =
+      '<span>19:42</span><span style="display:flex;gap:6px;align-items:center;opacity:.9">' +
+      '<svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/>' +
+      '<rect x="4.5" y="5" width="3" height="6" rx="1" fill="currentColor"/>' +
+      '<rect x="9" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/>' +
+      '<rect x="13.5" y="0" width="3" height="11" rx="1" fill="currentColor" opacity=".4"/></svg>' +
+      '<svg width="25" height="12" viewBox="0 0 25 12"><rect x=".5" y=".5" width="21" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".5"/>' +
+      '<rect x="2" y="2" width="15" height="8" rx="2" fill="currentColor"/>' +
+      '<path d="M23 4v4a2.6 2.6 0 0 0 0-4z" fill="currentColor" opacity=".5"/></svg></span>';
+    const ile = document.createElement('div');
+    ile.id = 'apercu-ile';
+    const accueil = document.createElement('div');
+    accueil.id = 'apercu-accueil';
+    document.body.append(barre, ile, accueil);
+  });
+  await p.waitForTimeout(400);
+}
+
+async function deshabiller(p) {
+  await p.evaluate(() => {
+    ['apercu-systeme', 'apercu-ile', 'apercu-accueil'].forEach((id) =>
+      document.getElementById(id)?.remove());
+  });
+  await p.waitForTimeout(200);
+}
+
 async function aller(p, route) {
   await p.goto(BASE + route, { waitUntil: 'networkidle' });
   // Le premier rendu attend les polices embarquées ; sans cette pause, la
   // capture montre un écran vide et on croit à tort que l'écran est cassé.
   await p.waitForTimeout(2200);
+  await habiller(p);
 }
 
 const demandees = process.argv.slice(2);
@@ -154,20 +250,37 @@ for (const nom of aJouer) {
 }
 
 // La planche contact : toutes les scènes côte à côte, pour juger d'un coup
-// d'œil si l'app tient debout plutôt que de les ouvrir une par une.
+// d'œil si l'app tient debout plutôt que de les ouvrir une par une. Les
+// feuilles sont recomposées sur l'écran d'où elles sortent — deux captures
+// réelles superposées, comme iOS les empile.
 const planche = path.join(SORTIE, 'planche.html');
+const cadre = (n) => {
+  const dessous = FEUILLES[n];
+  const pile = dessous
+    ? `<img src="${dessous}.png" class="ecran">
+       <div class="voile"></div>
+       <img src="${n}.png" class="ecran feuille">`
+    : `<img src="${n}.png" class="ecran">`;
+  return `<figure><div class="tel">${pile}</div><figcaption>${n}</figcaption></figure>`;
+};
 writeFileSync(
   planche,
-  `<html><body style="margin:0;background:#08090B;color:#F4F5F2;font:12px system-ui;
-   display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:10px">` +
-    aJouer
-      .map(
-        (n) =>
-          `<div><img src="${n}.png" style="width:100%;border-radius:10px;display:block">
-           <div style="padding:5px 2px;opacity:.6">${n}</div></div>`,
-      )
-      .join('') +
-    `</body></html>`,
+  `<html><body style="margin:0;background:#08090B;color:#F4F5F2;
+    font:12px -apple-system,system-ui,sans-serif;padding:16px">
+   <style>
+     .grille{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+     figure{margin:0}
+     .tel{position:relative;aspect-ratio:393/852;border-radius:44px;overflow:hidden;
+          background:#08090B;border:1px solid rgba(255,255,255,.12);
+          box-shadow:0 0 0 7px #17181C,0 24px 50px rgba(0,0,0,.7)}
+     .ecran{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+     .voile{position:absolute;inset:0;background:rgba(2,3,5,.55)}
+     .feuille{top:7%;height:93%;border-radius:30px 30px 0 0;object-fit:cover;object-position:top}
+     figcaption{padding:8px 2px 0;opacity:.55}
+   </style>
+   <div class="grille">` +
+    aJouer.map(cadre).join('') +
+    `</div></body></html>`,
 );
 const pp = await navigateur.newPage({ viewport: { width: 1200, height: 900 } });
 await pp.goto('file://' + planche);
