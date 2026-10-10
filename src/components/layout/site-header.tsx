@@ -7,8 +7,6 @@ import { Search, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/nav";
 import { useMyPlayer } from "@/components/sfl/player-provider";
-import { useBallons } from "@/hooks/use-ballons";
-import { useIsClient } from "@/hooks/use-is-client";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -34,21 +32,6 @@ function BadgeLigue() {
 }
 
 
-function BallonsBadge({ me }: { me: string }) {
-  const isClient = useIsClient();
-  const balance = useBallons(me);
-
-  // La boutique n'est plus mise en avant : le solde s'affiche sans y mener.
-  return (
-    <span
-      aria-label="Mes Ballons"
-      className="flex items-center gap-1 rounded-full bg-secondary py-1.5 pr-3 pl-2 text-sm font-bold tabular-nums"
-    >
-      <span aria-hidden>⚽</span>
-      {isClient ? balance : 0}
-    </span>
-  );
-}
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -109,7 +92,6 @@ export function SiteHeader() {
 
         {/* Bulle droite : Ballons, profil, réglages */}
         <div className="glass ml-auto flex shrink-0 items-center gap-1.5 rounded-full px-1.5 py-1.5">
-          <BallonsBadge me={me} />
           <Link
             href="/profil"
             aria-label="Mon compte"

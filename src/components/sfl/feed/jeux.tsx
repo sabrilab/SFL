@@ -89,10 +89,6 @@ export function PronosticModule({
           </h2>
           <p className="mt-1 text-[12.5px] text-foreground/45">{date}</p>
         </div>
-        <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/32 bg-primary/14 px-3 py-1.5">
-          <span className="text-[12px] leading-none">⚽</span>
-          <span className="mono-label font-semibold text-primary">+{PRONO_REWARD}</span>
-        </span>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -125,7 +121,7 @@ export function PronosticModule({
           ? "Choisis ton MVP avant le coup d'envoi."
           : resolvedMvp
             ? won === true
-              ? `Bien vu — ${resolvedMvp} était bien MVP. +${PRONO_REWARD} Ballons.`
+              ? `Bien vu — ${resolvedMvp} était bien MVP.`
               : won === false
                 ? `Raté : c'est ${resolvedMvp} qui a été élu.`
                 : `Tu n'avais pas pronostiqué — c'est ${resolvedMvp} qui a été élu.`
@@ -241,10 +237,6 @@ export function QuizModule({
             {done ? `${score}/${questions.length} — bien joué` : "Tu as suivi dimanche ?"}
           </h2>
         </div>
-        <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/32 bg-primary/14 px-3 py-1.5">
-          <span className="text-[12px] leading-none">⚽</span>
-          <span className="mono-label font-semibold text-primary">+{QUIZ_REWARD}</span>
-        </span>
       </div>
 
       <div className="mt-4 flex flex-col gap-4">
@@ -289,8 +281,8 @@ export function QuizModule({
       {done && (
         <p className="mt-4 text-[12.5px] text-foreground/45">
           {score === questions.length
-            ? `Sans faute — +${QUIZ_REWARD} Ballons pour toi.`
-            : `+${QUIZ_REWARD} Ballons quand même. Nouveau quiz la semaine prochaine.`}
+            ? "Sans faute."
+            : "Nouveau quiz la semaine prochaine."}
         </p>
       )}
     </section>

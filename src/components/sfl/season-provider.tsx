@@ -85,3 +85,22 @@ export function useSeason(): SeasonValue {
   if (!value) throw new Error("useSeason doit être utilisé dans un SeasonProvider");
   return value;
 }
+
+/**
+ * Une saison close, servie comme la saison en cours : tout ce qui lit
+ * `useSeason()` dessous (le récap éditorial d'une journée, par exemple) voit
+ * l'archive. Lecture seule — l'archive ne se modifie pas.
+ */
+export function SaisonArchiveProvider({ saison, children }: { saison: Saison; children: React.ReactNode }) {
+  const value = useMemo<SeasonValue>(() => {
+    const derived = deriveSeason(saison);
+    return {
+      ...derived,
+      players: publicOnly(derived.players),
+      boostCards: derived.boostCards.filter((c) => !isHidden(c.player)),
+      allPlayers: derived.players,
+      saison,
+    };
+  }, [saison]);
+  return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
+}

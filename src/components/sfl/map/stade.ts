@@ -152,6 +152,7 @@ export function stickerHtml(s: StickerPlan, choisi: boolean): string {
     ${choisi ? etiquette : badge}
   </div>
   <span class="stk__queue"></span>
+  <span class="stk__nom">${echapper(s.nom)}</span>
 </div>`;
 }
 
@@ -162,9 +163,13 @@ export function toiHtml(note: number, teinte: string): string {
   return `<div class="toi"><div class="toi__carte"><span class="toi__symbole">${symboleSvg()}</span><span class="toi__note">${note}</span><span class="toi__bande" style="background:${teinte}"></span></div><span class="toi__anneau"></span></div>`;
 }
 
-/** Un terrain sans match : un point, et son nom. */
+/**
+ * Un terrain enregistré sans match ce jour : le mini-stade en plus petit,
+ * désaturé, et son nom dans une étiquette blanche — qu'on le repère d'un
+ * coup d'œil sur le plan comme sur le satellite.
+ */
 export function pointHtml(nom: string): string {
-  return `<span class="pt__dot"></span><span class="pt__nom">${echapper(nom)}</span>`;
+  return `<div class="ter"><div class="ter__vignette"><div class="ter__stade">${stadeSvg("semaine")}</div></div><span class="ter__queue"></span><span class="ter__nom">${echapper(nom)}</span></div>`;
 }
 
 /**

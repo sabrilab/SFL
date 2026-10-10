@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { toast } from "sonner";
 import { claimDailyLogin } from "@/lib/sfl/ballons";
 import { refreshSession } from "@/lib/sfl/auth/session";
 import { logActivity } from "@/lib/sfl/activity";
@@ -55,10 +54,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isClient || !sessionName) return;
     logActivity("open");
-    const credited = claimDailyLogin(me);
-    if (credited > 0) {
-      toast.success(`+${credited} Ballons ⚽`, { description: "Connexion du jour" });
-    }
+    // Les Ballons sont retirés de l'app : plus de récompense affichée à
+    // l'ouverture. Le compteur interne reste, sans rien montrer.
+    claimDailyLogin(me);
   }, [isClient, me, sessionName]);
 
   function setMe(name: string) {

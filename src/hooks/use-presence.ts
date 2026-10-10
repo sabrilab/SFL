@@ -14,7 +14,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSession } from "@/hooks/use-session";
-import { toast } from "sonner";
 import { listPresence, setPresence, type Reponse } from "@/lib/sfl/presence";
 import { activeConvocation, setConvocationTeams } from "@/lib/sfl/saisie/mutations";
 import { saisieStore } from "@/lib/sfl/saisie/store";
@@ -180,12 +179,8 @@ export function usePresence(): PresenceView {
       const convocId = serverActive && server ? server.convocation.id : (activeConvocation(saison)?.id ?? null);
       const recompense = () => {
         if (r === null || convocId === null) return;
-        const credited = rewardConvocationReply(player.name, `${serverActive ? "s" : "l"}${convocId}`);
-        if (credited > 0) {
-          toast.success(`+${credited} Ballons ⚽`, {
-            description: "Merci d'avoir répondu à la convocation",
-          });
-        }
+        // Les Ballons ne s'affichent plus : on garde le compte, sans toast.
+        rewardConvocationReply(player.name, `${serverActive ? "s" : "l"}${convocId}`);
       };
       if (serverActive && server) {
         try {

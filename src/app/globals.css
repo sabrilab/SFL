@@ -321,6 +321,7 @@
 }
 .leaflet-container .leaflet-marker-icon.stk-ancre,
 .leaflet-container .leaflet-marker-icon.pt,
+.leaflet-container .leaflet-marker-icon.ter-ancre,
 .leaflet-container .leaflet-marker-icon.toi-ancre {
   background: none;
   border: 0;
@@ -559,4 +560,67 @@
   border: 3px solid #f4f5f2;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
   cursor: grab;
+}
+
+/* Un terrain enregistré : un mini-stade plus petit, son nom en étiquette. */
+.ter {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.25));
+}
+.ter__vignette {
+  width: 50px;
+  height: 50px;
+  padding: 3px;
+  background: #f4f5f2;
+  border-radius: 13px;
+}
+.ter__stade {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  filter: saturate(0.25);
+}
+.ter__queue {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #f4f5f2;
+}
+.ter__nom {
+  position: absolute;
+  left: 46px;
+  top: 12px;
+  white-space: nowrap;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #f4f5f2;
+  color: #0a0b0d;
+  font: 700 12px/1 var(--font-sans), system-ui, sans-serif;
+  letter-spacing: -0.1px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Le nom du terrain sous le sticker du match. */
+.stk__nom {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: 4px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #0a0b0d;
+  color: #f4f5f2;
+  font: 700 11.5px/1 var(--font-sans), system-ui, sans-serif;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }

@@ -22,6 +22,8 @@ import { rankPlayers } from "@/lib/sfl/engine";
 import { computeStandings } from "@/lib/sfl/saisie/engine";
 import { JourneeRecap } from "@/components/sfl/feed/journee-recap";
 import { StatsAVenir } from "@/components/sfl/feed/stats-a-venir";
+import { SaisonArchiveProvider } from "@/components/sfl/season-provider";
+import { journeeJouee, saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { EmailNudge } from "@/components/sfl/auth/email-nudge";
 import { JourneeOpening } from "@/components/sfl/feed/journee-opening";
@@ -32,7 +34,8 @@ import { cn } from "@/lib/utils";
 export default function Ligue() {
   const { player } = useMyPlayer();
   const { players, journees, saison } = useSeason();
-  const [view, setView] = useState<"accueil" | "journee" | "classement" | "matchs">("accueil");
+  // L'onglet Ligue s'ouvre sur le récap éditorial de la dernière journée.
+  const [view, setView] = useState<"accueil" | "journee" | "classement" | "matchs">("journee");
   // Une seule ligue, la SFL : un ancien choix d'une autre ligue (WFL, KFL)
   // masquait tout le fil. On l'efface.
   useEffect(() => {
@@ -54,6 +57,15 @@ export default function Ligue() {
     [journees, saison.entries]
   );
   const latestJ = played[played.length - 1]?.j ?? journees[0]?.j ?? 1;
+
+  // La saison passée, pour son dernier récap tant que rien n'est joué.
+  const derniereArchive = saison.archives?.[saison.archives.length - 1];
+  const saisonArchive = useMemo(() => (derniereArchive ? saisonDepuisArchive(derniereArchive) : null), [derniereArchive]);
+  const dernierJArchive = useMemo(() => {
+    if (!saisonArchive) return 1;
+    const joues = saisonArchive.journees.filter((m) => journeeJouee(saisonArchive, m.j)).map((m) => m.j);
+    return joues.length ? Math.max(...joues) : (saisonArchive.journees[saisonArchive.journees.length - 1]?.j ?? 1);
+  }, [saisonArchive]);
   const [selectedJ, setSelectedJ] = useState<number | null>(null);
   const currentJ = selectedJ ?? latestJ;
   const [opening, setOpening] = useState<number | null>(null);
@@ -296,7 +308,7 @@ export default function Ligue() {
       ) : (
         <>
           {/* Les capsules de journées — touche pour en ouvrir une autre */}
-          <div className="-mt-1">
+          <div className={played.length === 0 ? "hidden" : "-mt-1"}>
             <p className="mono-label mb-2 px-1 text-foreground/30">
               Les journées · touche pour ouvrir
             </p>
@@ -344,7 +356,20 @@ export default function Ligue() {
           {/* Le récap de la journée ouverte — remonté à neuf à chaque ouverture.
               Borné en largeur : au-delà, une ligne de texte devient illisible. */}
           <div className="mesure flex flex-col gap-6">
-            <JourneeRecap key={currentJ} j={currentJ} />
+            {played.length === 0 && derniereArchive ? (
+              // Rien de joué cette saison : le dernier récap de la saison
+              // passée, en attendant le premier de la nouvelle.
+              <>
+                <p className="mono-label px-1 text-foreground/40">
+                  {derniereArchive.nom} · le dernier récap — la saison {saison.numero ?? 0} commence
+                </p>
+                <SaisonArchiveProvider saison={saisonArchive!}>
+                  <JourneeRecap key={`a${dernierJArchive}`} j={dernierJArchive} />
+                </SaisonArchiveProvider>
+              </>
+            ) : (
+              <JourneeRecap key={currentJ} j={currentJ} />
+            )}
           </div>
 
           {/* 16 · Les prochaines journées */}

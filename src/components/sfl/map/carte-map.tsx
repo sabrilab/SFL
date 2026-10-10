@@ -108,7 +108,7 @@ export function CarteMap({
     groupe.clearLayers();
 
     for (const p of points) {
-      const icone = L.divIcon({ className: "pt", iconSize: [0, 0], iconAnchor: [0, 0], html: pointHtml(p.nom) });
+      const icone = L.divIcon({ className: "ter-ancre", iconSize: [0, 0], iconAnchor: [0, 0], html: pointHtml(p.nom) });
       L.marker([p.lat, p.lng], { icon: icone, keyboard: false, interactive: false }).addTo(groupe);
     }
     // Du nord au sud : le sud passe devant.
