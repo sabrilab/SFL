@@ -1,9 +1,10 @@
-// Carte joueur — deux éditions sur le layout « éditorial » du design
-// design de référence : Standard (teinte verte) et Rare (teinte or, badge RARE).
-// La carte est un objet : elle ne suit pas le thème clair/sombre de l'app
-// (variante « clair » disponible via EditorialCard pour les usages dédiés).
+// Carte joueur — la carte Bola gris et blanc (bola-card.tsx), en deux
+// éditions : base (papier blanc) et rare (argent, repères pleins). Elle
+// reprend la carte officielle de l'app iPhone Bola, mêlée aux rayures et au
+// nom en Anton de la carte d'avant. Pas encore de photo.
+// La carte est un objet : elle ne suit pas le thème de l'app.
 
-import { EditorialCard } from "./editorial-card";
+import { BolaCard } from "./bola-card";
 import { ovr, rareStats, type Player, type StatKey } from "@/lib/sfl/engine";
 import { username } from "@/lib/sfl/usernames";
 
@@ -22,17 +23,14 @@ export function PlayerCard({
 }) {
   const stats = mode === "rare" ? rareStats(player.stats) : player.stats;
   return (
-    <EditorialCard
-      layout="editorial"
-      tint={mode === "rare" ? "or" : "standard"}
-      badge={mode === "rare" ? "RARE" : undefined}
+    <BolaCard
+      edition={mode === "rare" ? "rare" : "base"}
       name={player.name}
       username={username(player.name)}
       position={player.poste}
       overall={ovr(stats)}
       stats={stats}
       highlightStats={highlightStats}
-      photoName={player.name}
       size={size}
     />
   );

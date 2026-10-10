@@ -33,10 +33,15 @@ const STATS_Z = 0.065;
 // les coins arrondis ne sortent du canvas).
 const FILL_RATIO = 0.72;
 
+// La tranche : argent, comme la carte gris et blanc de Bola.
 const BEZEL_COLOR: Record<"simple" | "rare", string> = {
-  simple: "#B99D66",
-  rare: "#9C6F22",
+  simple: "#C9CAC5",
+  rare: "#A7A8A3",
 };
+
+// Le symbole Bola (public/bola/symbole-blanc.svg), pour le dos de la carte.
+const SYMBOLE_BOLA =
+  "M451.133,255.531c0-108.009-87.559-195.567-195.567-195.567S60,147.522,60,255.531s87.558,195.566,195.566,195.566c8.771,0,17.407-.577,25.872-1.696-57.091-9.652-100.572-59.334-100.572-119.17,0-66.753,54.113-120.867,120.866-120.867s120.867,54.114,120.867,120.867c0,12.206-1.81,23.99-5.175,35.098,21.275-31.301,33.707-69.097,33.707-109.797Z";
 
 // Forme rectangle arrondi réutilisée pour la tranche (le bezel).
 function roundedRectShape(w: number, h: number, r: number): THREE.Shape {
@@ -102,38 +107,34 @@ function makeBackTexture(bezel: string): THREE.CanvasTexture {
   ctx.roundRect(0, 0, w, h, r);
   ctx.clip();
 
+  // Le dos de la carte Bola : noir, le symbole blanc au centre.
   const bg = ctx.createRadialGradient(w * 0.35, h * 0.25, 60, w / 2, h / 2, h * 0.85);
-  bg.addColorStop(0, "#171310");
-  bg.addColorStop(0.55, "#0B0906");
-  bg.addColorStop(1, "#050403");
+  bg.addColorStop(0, "#1d2024");
+  bg.addColorStop(0.55, "#16181c");
+  bg.addColorStop(1, "#0d0f12");
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, w, h);
 
-  ctx.strokeStyle = `${bezel}66`;
-  ctx.lineWidth = 5;
+  ctx.strokeStyle = `${bezel}55`;
+  ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.roundRect(12, 12, w - 24, h - 24, r - 10);
   ctx.stroke();
 
-  // "SFL" extrudé : plusieurs couches décalées (ombre profonde → face or)
+  const taille = w * 0.44;
+  ctx.save();
+  ctx.translate((w - taille) / 2, (h - taille) / 2 - 30);
+  ctx.scale(taille / 391.133, taille / 391.133);
+  ctx.translate(-60, -59.964);
+  ctx.fillStyle = "rgba(247,246,244,0.9)";
+  ctx.fill(new Path2D(SYMBOLE_BOLA), "evenodd");
+  ctx.restore();
+
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = "italic 900 172px 'Arial Black', sans-serif";
-  for (let d = 9; d >= 3; d--) {
-    ctx.fillStyle = `rgba(0,0,0,${0.5 + (9 - d) * 0.05})`;
-    ctx.fillText("SFL", w / 2 + d, h / 2 - 20 + d);
-  }
-  const face = ctx.createLinearGradient(0, h / 2 - 120, 0, h / 2 + 80);
-  face.addColorStop(0, "#FBE9A8");
-  face.addColorStop(0.55, "#E8C266");
-  face.addColorStop(1, "#8A5A18");
-  ctx.fillStyle = face;
-  ctx.fillText("SFL", w / 2, h / 2 - 20);
-
-  ctx.font = "700 26px 'Arial Narrow', sans-serif";
-  ctx.fillStyle = "#C9964Acc";
-  const letterSpaced = "S U N D A Y   F I V E   L E A G U E";
-  ctx.fillText(letterSpaced, w / 2, h / 2 + 96);
+  ctx.font = "700 26px ui-monospace, 'Courier New', monospace";
+  ctx.fillStyle = "rgba(244,245,242,0.55)";
+  ctx.fillText("sunday five league", w / 2, h / 2 + taille / 2 + 40);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -547,7 +548,7 @@ function CardMesh({
         </bufferGeometry>
         <pointsMaterial
           ref={particlesMat}
-          color={holo ? "#F4C542" : "#E8C87A"}
+          color={holo ? "#F4F5F2" : "#D9DAD5"}
           size={0.045}
           sizeAttenuation
           transparent
