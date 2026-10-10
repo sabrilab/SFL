@@ -154,7 +154,41 @@ function Avatar({ name, size = 30 }: { name: string; size?: number }) {
 
 /* ------------------------------- Le récap ------------------------------- */
 
+/**
+ * Une saison qui vient d'ouvrir n'a aucune journée : il n'y a rien à
+ * récapituler, et le récap complet suppose une journée sous la main. On le
+ * garde derrière ce seuil — le nombre de hooks du récap ne change jamais —
+ * et on dit à la place où en est la saison.
+ */
 export function JourneeRecap({ j }: { j: number }) {
+  const { journees, saison } = useSeason();
+  const existe = journees.some((x) => x.j === j) || journees.length > 0;
+  if (!existe) {
+    const numero = saison.numero ?? 0;
+    const derniere = saison.archives?.[saison.archives.length - 1];
+    return (
+      <section className="glass rounded-[26px] px-5 py-8 text-center">
+        <p className="mono-label text-primary">Saison {numero}</p>
+        <h2 className="mt-1 text-[20px] font-bold tracking-tight">Rien n&apos;est encore joué</h2>
+        <p className="mx-auto mt-2 max-w-[34ch] text-[13px] text-muted-foreground">
+          Le premier récap s&apos;écrira au soir de la première journée. Les compteurs et le
+          classement repartent de zéro.
+        </p>
+        {derniere && (
+          <Link
+            href={`/saisons/${derniere.numero}`}
+            className="mt-4 inline-flex items-center gap-1 rounded-full bg-secondary px-4 py-2 text-[13px] font-semibold"
+          >
+            Revoir {derniere.nom} ›
+          </Link>
+        )}
+      </section>
+    );
+  }
+  return <JourneeRecapComplet j={j} />;
+}
+
+function JourneeRecapComplet({ j }: { j: number }) {
   const { player } = useMyPlayer();
   const { journees, boostCards, saison } = useSeason();
 
