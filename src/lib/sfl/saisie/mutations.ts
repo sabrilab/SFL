@@ -349,6 +349,11 @@ export function ajouterTerrain(saison: Saison, t: Omit<Terrain, "id">): Saison {
   };
 }
 
+/** Repose un terrain au point exact (l'épingle ajustée sur la photo satellite). */
+export function deplacerTerrain(saison: Saison, id: number, lat: number, lng: number): Saison {
+  return { ...saison, terrains: (saison.terrains ?? []).map((t) => (t.id === id ? { ...t, lat, lng } : t)) };
+}
+
 export function retirerTerrain(saison: Saison, id: number): Saison {
   const restants = (saison.terrains ?? []).filter((x) => x.id !== id);
   // Le terrain par défaut ne disparaît pas avec celui qu'on retire.

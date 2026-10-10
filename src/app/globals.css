@@ -538,3 +538,25 @@
     1.3px 3.2px 0 #f4f5f2, -1.3px 3.2px 0 #f4f5f2, 1.3px -3.2px 0 #f4f5f2, -1.3px -3.2px 0 #f4f5f2;
   filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.22));
 }
+
+/* L'épingle qu'on déplace sur la photo satellite (ajuster-point.tsx). */
+.leaflet-container .leaflet-marker-icon.ajuster-ancre {
+  background: none;
+  border: 0;
+  overflow: visible;
+}
+.ajuster-pin {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -100%) rotate(-45deg);
+  transform-origin: 50% 50%;
+  margin-top: -2px;
+  border-radius: 50% 50% 50% 0;
+  background: #ff8a4c;
+  border: 3px solid #f4f5f2;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+  cursor: grab;
+}

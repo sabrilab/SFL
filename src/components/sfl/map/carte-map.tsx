@@ -32,9 +32,13 @@ export interface ToiPlan {
 
 const FOND = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}";
 const LIBELLES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
-const ATTRIBUTION = 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
-/** Le « Light Gray » s'arrête au niveau 16 : assez pour voir le quartier du terrain. */
-const ZOOM_MAX = 16;
+/** La vue satellite d'Esri, sans clé : on y voit le terrain lui-même. */
+export const SATELLITE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+const ATTRIBUTION = 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, Maxar, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+/** Le « Light Gray » s'arrête au niveau 16 ; le satellite descend au terrain. */
+const ZOOM_MAX = { plan: 16, satellite: 18 } as const;
+
+export type FondCarte = "plan" | "satellite";
 /** Le centre quand rien n'est posé : la France entière. */
 const FRANCE: L.LatLngTuple = [46.6, 2.4];
 
@@ -44,8 +48,10 @@ export function CarteMap({
   toi,
   choisi,
   onChoisir,
+  fond = "plan",
   className,
 }: {
+  fond?: FondCarte;
   stickers: StickerPlan[];
   points: PointPlan[];
   toi: ToiPlan | null;
@@ -56,6 +62,7 @@ export function CarteMap({
   const conteneur = useRef<HTMLDivElement>(null);
   const carte = useRef<L.Map | null>(null);
   const calque = useRef<L.LayerGroup | null>(null);
+  const tuiles = useRef<L.LayerGroup | null>(null);
   const choisirRef = useRef(onChoisir);
   useEffect(() => {
     choisirRef.current = onChoisir;
@@ -65,19 +72,33 @@ export function CarteMap({
   useEffect(() => {
     if (!conteneur.current || carte.current) return;
     const map = L.map(conteneur.current, { zoomControl: false, attributionControl: true });
-    L.tileLayer(FOND, { attribution: ATTRIBUTION, maxZoom: ZOOM_MAX }).addTo(map);
-    L.tileLayer(LIBELLES, { maxZoom: ZOOM_MAX, pane: "shadowPane" }).addTo(map);
-    map.setMaxZoom(ZOOM_MAX);
     map.attributionControl.setPrefix(false);
     map.setView(FRANCE, 5);
     carte.current = map;
+    tuiles.current = L.layerGroup().addTo(map);
     calque.current = L.layerGroup().addTo(map);
     return () => {
       map.remove();
       carte.current = null;
       calque.current = null;
+      tuiles.current = null;
     };
   }, []);
+
+  // Le fond : le plan clair, ou la vue satellite.
+  useEffect(() => {
+    const map = carte.current;
+    const groupe = tuiles.current;
+    if (!map || !groupe) return;
+    groupe.clearLayers();
+    if (fond === "satellite") {
+      L.tileLayer(SATELLITE, { attribution: ATTRIBUTION, maxZoom: ZOOM_MAX.satellite }).addTo(groupe);
+    } else {
+      L.tileLayer(FOND, { attribution: ATTRIBUTION, maxZoom: ZOOM_MAX.plan }).addTo(groupe);
+      L.tileLayer(LIBELLES, { maxZoom: ZOOM_MAX.plan, pane: "shadowPane" }).addTo(groupe);
+    }
+    map.setMaxZoom(ZOOM_MAX[fond]);
+  }, [fond]);
 
   // Tout ce qui est posé, à chaque changement de la liste (la page la mémorise).
   useEffect(() => {

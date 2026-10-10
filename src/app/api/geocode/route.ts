@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
 
   const [ban, photon] = await Promise.all([
     lire<Ban>(`https://data.geopf.fr/geocodage/search?q=${encodeURIComponent(q)}&limit=5&autocomplete=1${pres}`),
-    lire<Photon>(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lang=fr${pres}`),
+    lire<Photon>(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&lang=fr${pres}`),
   ]);
 
   const adresses: LieuGeocode[] = (ban?.features ?? []).map((f) => ({
@@ -96,9 +96,15 @@ export async function GET(req: NextRequest) {
       };
     });
 
+  // Une saisie qui commence par un numéro est une adresse : les adresses
+  // d'abord. Sinon on cherche un lieu (« hippodrome marcq ») : les lieux
+  // nommés d'abord, puis les adresses.
+  const parAdresse = /^\s*\d/.test(q);
+  const ordre = parAdresse ? [...adresses, ...lieux] : [...lieux, ...adresses];
+
   // Sans doublon : deux résultats à moins de ~50 m et de même libellé n'en font qu'un.
   const vus = new Set<string>();
-  const resultats = [...adresses, ...lieux]
+  const resultats = ordre
     .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng))
     .filter((r) => {
       const cle = `${r.libelle.toLowerCase()}|${r.lat.toFixed(3)}|${r.lng.toFixed(3)}`;
@@ -106,7 +112,7 @@ export async function GET(req: NextRequest) {
       vus.add(cle);
       return true;
     })
-    .slice(0, 8);
+    .slice(0, 10);
 
   if (!ban && !photon) {
     return NextResponse.json(

@@ -18,7 +18,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { LocateFixed, MapPin, Navigation, Plus, Search, Settings2, Star, Trash2 } from "lucide-react";
+import { Crosshair, Layers, LocateFixed, MapPin, Navigation, Plus, Search, Settings2, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ import { saisieStore } from "@/lib/sfl/saisie/store";
 import {
   ajouterTerrain,
   definirTerrainParDefaut,
+  deplacerTerrain,
   journeeJouee,
   placerJourneeSurNouveauTerrain,
   retirerTerrain,
@@ -42,12 +43,17 @@ import {
 import type { JourneeMeta, Saison, Terrain } from "@/lib/sfl/saisie/types";
 import { ovr } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
-import { FOND_MOMENT, heureCourte, stadeSvg, type EtatSticker, type Moment, type StickerPlan } from "@/components/sfl/map/stade";
-import type { PointPlan, ToiPlan } from "@/components/sfl/map/carte-map";
+import { FOND_MOMENT, heureCourte, itineraires, photoSatellite, stadeSvg, type EtatSticker, type Moment, type StickerPlan } from "@/components/sfl/map/stade";
+import type { FondCarte, PointPlan, ToiPlan } from "@/components/sfl/map/carte-map";
 
 const CarteMap = dynamic(() => import("@/components/sfl/map/carte-map").then((m) => m.CarteMap), {
   ssr: false,
   loading: () => <div className="h-full w-full bg-[#e9eae6]" aria-hidden />,
+});
+
+const AjusterPoint = dynamic(() => import("@/components/sfl/map/ajuster-point").then((m) => m.AjusterPoint), {
+  ssr: false,
+  loading: () => <div className="h-full w-full animate-pulse bg-secondary" aria-hidden />,
 });
 
 interface Lieu {
@@ -294,6 +300,7 @@ export default function MapPage() {
   }
 
   // La fiche du match : la feuille qui monte du bas, comme dans l'app.
+  const [fond, setFond] = useState<FondCarte>("plan");
   const [fiche, setFiche] = useState(false);
   const [ficheAdmin, setFicheAdmin] = useState(false);
   const ouvrirFiche = (admin = false) => {
@@ -311,7 +318,7 @@ export default function MapPage() {
       {/* ─── Le plan, tout l'écran ─── */}
       <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] lg:top-[5.5rem]">
         <div className="absolute inset-0">
-          <CarteMap stickers={stickers} points={points} toi={toi} choisi={choisi?.cle ?? null} onChoisir={choisirSticker} className="h-full w-full" />
+          <CarteMap fond={fond} stickers={stickers} points={points} toi={toi} choisi={choisi?.cle ?? null} onChoisir={choisirSticker} className="h-full w-full" />
         </div>
         {/* Voile en haut : la barre d'état et le lettrage restent lisibles.
             Tout ce qui est posé sur le plan passe au-dessus des calques de
@@ -319,10 +326,10 @@ export default function MapPage() {
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-32 bg-gradient-to-b from-[rgba(8,9,11,0.42)] to-transparent" />
 
         {/* En haut à gauche : la commune en lettrage, le compte en étiquette */}
-        <div className="pointer-events-none absolute left-5 z-[510] flex flex-col items-start" style={{ top: haut }}>
+        <div className="pointer-events-none absolute left-5 z-[510] flex max-w-[calc(100%-8.5rem)] flex-col items-start" style={{ top: `calc(${haut} + 8px)` }}>
           <span
             className="lettrage -rotate-[4deg]"
-            style={{ ["--taille" as string]: commune.length <= 7 ? "34px" : commune.length <= 10 ? "28px" : commune.length <= 14 ? "22px" : "18px" }}
+            style={{ ["--taille" as string]: commune.length <= 7 ? "34px" : commune.length <= 10 ? "28px" : commune.length <= 13 ? "22px" : "17px" }}
           >
             {commune}
           </span>
@@ -334,23 +341,34 @@ export default function MapPage() {
           </span>
         </div>
 
-        {/* En haut à droite : le logo, et pour l'admin le réglage des matchs */}
-        <div className="absolute right-4 z-[510] flex items-center gap-2" style={{ top: haut }}>
+        {/* En haut à droite : le logo, puis en colonne la bascule plan / satellite
+            et, pour l'admin, le réglage des matchs — le lettrage garde sa place. */}
+        <div className="absolute right-4 z-[510] flex flex-col items-end gap-2" style={{ top: haut }}>
+          <span className="flex h-9 items-center rounded-full px-3 shadow-[0_3px_8px_rgba(0,0,0,0.16)] lg:hidden" style={{ background: ENCRE }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/bola/logo-blanc.svg" alt="Bola" width={58} height={14} />
+          </span>
+          <button
+            type="button"
+            onClick={() => setFond((f) => (f === "plan" ? "satellite" : "plan"))}
+            aria-label={fond === "plan" ? "Voir la photo satellite" : "Revenir au plan"}
+            aria-pressed={fond === "satellite"}
+            className="grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
+            style={fond === "satellite" ? { background: ENCRE, color: CLAIR, borderColor: "rgba(255,255,255,0.2)" } : { background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
+          >
+            <Layers className="size-[18px]" strokeWidth={2.2} />
+          </button>
           {admin && (
             <button
               type="button"
               onClick={() => ouvrirFiche(true)}
               aria-label="Régler les matchs et les terrains"
-              className="grid size-9 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
+              className="grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
               style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
             >
-              <Settings2 className="size-4" strokeWidth={2.2} />
+              <Settings2 className="size-[18px]" strokeWidth={2.2} />
             </button>
           )}
-          <span className="flex h-9 items-center rounded-full px-3 shadow-[0_3px_8px_rgba(0,0,0,0.16)] lg:hidden" style={{ background: ENCRE }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/bola/logo-blanc.svg" alt="Bola" width={58} height={14} />
-          </span>
         </div>
 
         {/* En bas : les boutons, les cartes des matchs, les pastilles */}
@@ -461,16 +479,7 @@ export default function MapPage() {
               </>
             ) : (
               <>
-                {choisi?.terrain && (
-                  <a
-                    href={urlItineraire(choisi.terrain, ios)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex h-12 items-center justify-center gap-2 rounded-full bg-primary text-[15px] font-semibold text-primary-foreground"
-                  >
-                    <Navigation className="size-4" /> Y aller
-                  </a>
-                )}
+                {choisi?.terrain && <Itineraire terrain={choisi.terrain} ios={ios} />}
                 {/* Une journée : ses joueurs. La convocation : on y répond, comme avant. */}
                 {choisi?.j != null ? <Presents m={choisi} /> : <PresencePanel />}
                 {admin && (
@@ -518,10 +527,21 @@ function CarteMatch({
         aria-pressed={choisi}
       >
         <div className="relative h-[140px] w-[196px] overflow-hidden rounded-[19px]" style={{ background: `linear-gradient(180deg, ${c0}, ${c1} 50%, ${c2})` }}>
-          <div
-            className={cn("absolute top-1/2 left-1/2 size-[118px] -translate-x-1/2 -translate-y-[calc(50%+14px)]", complet && "saturate-0")}
-            dangerouslySetInnerHTML={{ __html: stadeSvg(m.quand.moment, { fond: false }) }}
-          />
+          {m.terrain ? (
+            // La vue aérienne du vrai terrain, comme dans l'app iPhone.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={photoSatellite(m.terrain.lat, m.terrain.lng, 392, 280, 0.0009)}
+              alt=""
+              loading="lazy"
+              className={cn("absolute inset-0 h-full w-full object-cover", complet && "saturate-[0.35]")}
+            />
+          ) : (
+            <div
+              className={cn("absolute top-1/2 left-1/2 size-[118px] -translate-x-1/2 -translate-y-[calc(50%+14px)]", complet && "saturate-0")}
+              dangerouslySetInnerHTML={{ __html: stadeSvg(m.quand.moment, { fond: false }) }}
+            />
+          )}
           <div className="absolute inset-x-0 bottom-0 h-[62%] bg-gradient-to-b from-transparent via-[rgba(4,5,7,0.4)] to-[rgba(3,4,6,0.82)]" />
           <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-1 p-2.5">
             <Jeton texte={m.etatTexte} ton={m.etat.genre} />
@@ -562,6 +582,47 @@ function CarteMatch({
         </div>
       )}
     </div>
+  );
+}
+
+/** La photo satellite du terrain, et les trois façons d'y aller. */
+function Itineraire({ terrain, ios }: { terrain: Terrain; ios: boolean }) {
+  const liens = itineraires(terrain.lat, terrain.lng, terrain.nom);
+  // Sur iPhone, Plans d'abord ; ailleurs, Google Maps d'abord.
+  const ordre = ios ? liens : [liens[1], liens[0], liens[2]];
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="relative h-[200px] overflow-hidden rounded-[22px] border border-border bg-secondary">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={photoSatellite(terrain.lat, terrain.lng, 800, 400, 0.0011)} alt={`Vue satellite de ${terrain.nom}`} className="h-full w-full object-cover" />
+        {/* L'épingle sur le terrain : la photo est centrée sur lui. */}
+        <span className="ajuster-pin pointer-events-none" style={{ left: "50%", top: "50%", cursor: "default" }} aria-hidden />
+        <span className="absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
+          {terrain.adresse || terrain.nom}
+        </span>
+      </div>
+      <a
+        href={ordre[0].url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex h-12 items-center justify-center gap-2 rounded-full bg-primary text-[15px] font-semibold text-primary-foreground"
+      >
+        <Navigation className="size-4" /> Itinéraire avec {ordre[0].libelle}
+      </a>
+      <div className="grid grid-cols-2 gap-2">
+        {ordre.slice(1).map((l) => (
+          <a
+            key={l.id}
+            href={l.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-11 items-center justify-center rounded-full bg-secondary text-[14px] font-semibold"
+          >
+            {l.libelle}
+          </a>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -723,9 +784,19 @@ function ChercheAdresse({
         )}
         {vide && <p className="text-[12px] text-muted-foreground">Rien pour cette saisie : ajoute la ville ou le code postal.</p>}
         {choisi && (
-          <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-            <span className="size-1.5 rounded-full bg-vert" /> Adresse retenue
-          </p>
+          <div className="flex flex-col gap-2">
+            <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+              <Crosshair className="size-3.5" /> Pose l&apos;épingle pile sur le terrain : glisse-la, ou touche le terrain.
+            </p>
+            <div className="h-[240px] overflow-hidden rounded-2xl border border-border">
+              <AjusterPoint
+                lat={choisi.lat}
+                lng={choisi.lng}
+                onChange={(lat, lng) => setChoisi((c) => (c ? { ...c, lat, lng } : c))}
+                className="h-full w-full"
+              />
+            </div>
+          </div>
         )}
       </div>
 
@@ -874,6 +945,7 @@ function Terrains({
   terrains: Terrain[];
   onSauver: (next: Saison, message: string) => void;
 }) {
+  const [ajuste, setAjuste] = useState<number | null>(null);
   return (
     <section className="overflow-hidden rounded-[26px] bg-card">
       <div className="px-5 pt-4 pb-3">
@@ -884,7 +956,7 @@ function Terrains({
       {terrains.length > 0 && (
         <ul className="border-t border-border/60">
           {terrains.map((t) => (
-            <li key={t.id} className="flex items-center gap-3 border-b border-border/60 px-5 py-3 last:border-b-0">
+            <li key={t.id} className="flex flex-wrap items-center gap-3 border-b border-border/60 px-5 py-3 last:border-b-0">
               <MapPin className="size-4 shrink-0 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[14px] font-semibold">
@@ -905,12 +977,33 @@ function Terrains({
               )}
               <button
                 type="button"
+                aria-label={`Ajuster ${t.nom} sur la photo satellite`}
+                aria-pressed={ajuste === t.id}
+                onClick={() => setAjuste((x) => (x === t.id ? null : t.id))}
+                className={cn("grid size-8 place-items-center rounded-full", ajuste === t.id ? "bg-foreground text-background" : "bg-secondary text-muted-foreground")}
+              >
+                <Crosshair className="size-4" />
+              </button>
+              <button
+                type="button"
                 aria-label={`Retirer ${t.nom}`}
                 onClick={() => onSauver(retirerTerrain(saison, t.id), `${t.nom} retiré de la Map.`)}
                 className="grid size-8 place-items-center rounded-full bg-secondary text-muted-foreground"
               >
                 <Trash2 className="size-4" />
               </button>
+              {ajuste === t.id && (
+                <div className="mt-2 basis-full">
+                  <div className="h-[260px] overflow-hidden rounded-2xl border border-border">
+                    <AjusterPoint
+                      lat={t.lat}
+                      lng={t.lng}
+                      onChange={(lat, lng) => onSauver(deplacerTerrain(saison, t.id, lat, lng), `${t.nom} : épingle posée.`)}
+                      className="h-full w-full"
+                    />
+                  </div>
+                </div>
+              )}
             </li>
           ))}
         </ul>

@@ -166,3 +166,23 @@ export function toiHtml(note: number, teinte: string): string {
 export function pointHtml(nom: string): string {
   return `<span class="pt__dot"></span><span class="pt__nom">${echapper(nom)}</span>`;
 }
+
+/**
+ * La photo satellite centrée sur un point (Esri World Imagery, sans clé) :
+ * une image de `l` × `h` pixels qui couvre ~`demi` degrés de latitude de part
+ * et d'autre. C'est la « vue aérienne du vrai terrain » de l'app iPhone.
+ */
+export function photoSatellite(lat: number, lng: number, l = 600, h = 450, demi = 0.0012): string {
+  const dl = (demi / Math.cos((lat * Math.PI) / 180)) * (l / h);
+  const bbox = [lng - dl, lat - demi, lng + dl, lat + demi].map((n) => n.toFixed(6)).join(",");
+  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bbox}&bboxSR=4326&imageSR=3857&size=${l},${h}&format=jpg&f=image`;
+}
+
+/** Les trois façons d'y aller : Plans (Apple), Google Maps, Waze. */
+export function itineraires(lat: number, lng: number, nom: string) {
+  return [
+    { id: "plans", libelle: "Plans", url: `https://maps.apple.com/?daddr=${lat},${lng}&q=${encodeURIComponent(nom)}` },
+    { id: "google", libelle: "Google Maps", url: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}` },
+    { id: "waze", libelle: "Waze", url: `https://waze.com/ul?ll=${lat},${lng}&navigate=yes` },
+  ] as const;
+}
