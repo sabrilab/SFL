@@ -17,6 +17,8 @@
 import { useMemo, useState } from "react";
 import { Minus, Plus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RechercheJoueur } from "@/components/sfl/admin/recherche-joueur";
+import { chercherJoueurs } from "@/lib/sfl/recherche-joueur";
 import { computeStandings } from "@/lib/sfl/saisie/engine";
 import { saisonDepuisArchive, updateRosterAt } from "@/lib/sfl/saisie/mutations";
 import type { RosterEntry, Saison } from "@/lib/sfl/saisie/types";
@@ -35,6 +37,7 @@ export function Requalification({
   onCommit: (next: Saison, label: string) => void;
 }) {
   const [ouvert, setOuvert] = useState(false);
+  const [recherche, setRecherche] = useState("");
   const derniere = saison.archives?.[saison.archives.length - 1];
 
   // Ce que chacun a produit la saison passée : la référence pour requalifier.
@@ -52,6 +55,7 @@ export function Requalification({
         .sort((a, b) => a.r.name.localeCompare(b.r.name)),
     [saison.roster]
   );
+  const visibles = useMemo(() => chercherJoueurs(lignes, (l) => l.r.name, recherche), [lignes, recherche]);
 
   function poser(i: number, r: RosterEntry, k: number, v: number) {
     const base = [...(r.base ?? BASE_DEFAUT)];
@@ -79,13 +83,16 @@ export function Requalification({
 
       {ouvert && (
         <div className="border-t border-border/60">
+          <div className="px-4 pt-3">
+            <RechercheJoueur valeur={recherche} onChange={setRecherche} resultats={visibles.length} autoFocus />
+          </div>
           <div className="flex items-center gap-2 px-4 py-2 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
             <span className="w-[88px] shrink-0">Joueur</span>
             {derniere && <span className="w-[72px] shrink-0 text-center">{derniere.nom.replace("Saison ", "S")} pp·b·p</span>}
             <span className="flex-1" />
             <span className="w-9 text-center">OVR</span>
           </div>
-          {lignes.map(({ r, i }) => {
+          {visibles.map(({ r, i }) => {
             const base = r.base ?? BASE_DEFAUT;
             const ref = reference.get(r.name);
             return (

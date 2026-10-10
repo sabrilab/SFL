@@ -7,10 +7,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* Typographie BOLA : Inter pour tout ce qui se lit, Courier Prime (la
-     machine à écrire, en minuscules) pour ce qui s'étiquette. */
+  /* Typographie de l'app BOLA : une sans neutre (Inter) pour tout ce qui se
+     lit, une monospace en capitales pour ce qui s'étiquette. */
   --font-sans: var(--font-inter);
-  --font-mono: var(--font-courier);
+  --font-mono: var(--font-jbmono);
   --font-heading: var(--font-sans);
   --font-display: var(--font-anton);
   --color-vert: var(--vert);
@@ -96,27 +96,26 @@
   --mauve: #5b2141;
 }
 
-/* Thème sombre — l'app BOLA : Noir Nuit, cartes à peine plus claires, texte
-   Blanc Craie. L'accent principal est le blanc lui-même (boutons pleins,
-   repères) ; le vert dit ce qui monte, la braise est réservée au manque, le
-   mauve à l'homme du match. */
+/* Thème sombre — l'app BOLA (DA/Theme.swift) : noir profond, neutres purs,
+   le bouton plein en clair sur encre. Une seule couleur chaude, la braise,
+   réservée au manque ; le vert et le mauve restent ceux des cartes. */
 .dark {
   --background: #08090b;
   --foreground: #f4f5f2;
-  --card: #131519;
+  --card: #0d0f12;
   --card-foreground: #f4f5f2;
-  --popover: #15181c;
+  --popover: #14171b;
   --popover-foreground: #f4f5f2;
-  --primary: #f4f5f2;
-  --primary-foreground: #08090b;
-  --secondary: #1c1f24;
+  --primary: #efefec;
+  --primary-foreground: #0a0b0d;
+  --secondary: #17181b;
   --secondary-foreground: #f4f5f2;
-  --muted: #1c1f24;
+  --muted: #14171b;
   --muted-foreground: #8f908b;
-  --accent: #22262b;
+  --accent: #1c1f24;
   --accent-foreground: #f4f5f2;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: rgba(244, 245, 242, 0.08);
+  --border: rgba(244, 245, 242, 0.12);
   --input: rgba(244, 245, 242, 0.12);
   --ring: #f4f5f2;
   --chart-1: #a9cba9;
@@ -256,15 +255,14 @@
 .orbs > i:nth-child(2) { top: 330px; right: -110px; width: 280px; height: 280px; filter: blur(24px); animation-duration: 21s; animation-direction: reverse; background: radial-gradient(circle, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 70%); }
 .orbs > i:nth-child(3) { bottom: -80px; left: 30px; width: 320px; height: 260px; filter: blur(30px); animation-duration: 25s; background: radial-gradient(circle, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 70%); }
 
-/* Micro-label — la seconde typo de la charte BOLA : Courier Prime, en
-   minuscules, « un peu écriture de dactylo ». Les sur-titres, les compteurs,
-   les relevés : tout ce qui s'étiquette passe par elle. */
+/* Micro-label — comme les étiquettes de l'app BOLA : monospace (SF Mono sur
+   iPhone, JetBrains Mono ailleurs), capitales espacées, en gras. */
 .mono-label {
-  font-family: var(--font-courier), "Courier New", ui-monospace, monospace;
-  font-size: 12px;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: lowercase;
+  font-family: ui-monospace, "SF Mono", var(--font-jbmono), monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 /* ─────────────────────── Le gabarit de page ────────────────────────
@@ -305,89 +303,238 @@
   max-width: 760px;
 }
 
-/* ─────────────── La Map (Leaflet) : fond sombre, repères BOLA ───────────────
-   Un point Blanc Craie cerclé de nuit, le nom à la machine à écrire ; le
-   terrain du prochain match bat doucement. */
+/* ─────────────────────── La Map : le plan clair et ses stickers ───────────────────────
+   Repris de la carte de « Jouer » de l'app iOS : des objets de papier blanc
+   posés sur un plan clair — le sticker mini-stade, sa pastille calendrier,
+   le badge braise du manque, le lettrage de la commune, « toi ». */
 .leaflet-container {
-  background: #08090b;
-  font-family: var(--font-courier), "Courier New", ui-monospace, monospace;
+  background: #e9eae6;
+  font-family: var(--font-sans), system-ui, sans-serif;
 }
 .leaflet-container .leaflet-control-attribution {
-  background: rgba(8, 9, 11, 0.72);
+  background: rgba(244, 245, 242, 0.75);
   color: #8f908b;
   font-size: 9px;
 }
 .leaflet-container .leaflet-control-attribution a {
-  color: #c9cac5;
+  color: #5c5d59;
 }
-.leaflet-touch .leaflet-bar {
-  border: 1px solid rgba(244, 245, 242, 0.12);
-}
-.leaflet-bar a,
-.leaflet-bar a:hover,
-.leaflet-bar a:focus {
-  background: #131519;
-  color: #f4f5f2;
-  border-bottom-color: rgba(244, 245, 242, 0.1);
-}
-.leaflet-popup-content-wrapper,
-.leaflet-popup-tip {
-  background: #131519;
-  color: #f4f5f2;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
-}
-.leaflet-popup-content {
-  margin: 10px 14px;
-  font-size: 12px;
-  line-height: 1.35;
-}
-.leaflet-container a.leaflet-popup-close-button {
-  color: #8f908b;
-}
-.bola-pin {
+.leaflet-container .leaflet-marker-icon.stk-ancre,
+.leaflet-container .leaflet-marker-icon.pt,
+.leaflet-container .leaflet-marker-icon.toi-ancre {
   background: none;
   border: 0;
+  overflow: visible;
 }
-.bola-pin__dot {
+
+/* Le sticker du match : 71 de large, la pointe de la queue sur le terrain. */
+.stk {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 71px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%) rotate(var(--penche, 0deg));
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2));
+  transition: transform 0.3s ease, filter 0.3s ease;
+  cursor: pointer;
+}
+.stk--choisi {
+  transform: translateX(-50%) rotate(0deg) scale(1.2);
+  filter: drop-shadow(0 9px 12px rgba(0, 0, 0, 0.28));
+}
+.stk__vignette {
+  position: relative;
+  width: 71px;
+  height: 71px;
+  padding: 3.5px;
+  background: #f4f5f2;
+  border-radius: 17px;
+}
+.stk__stade {
+  width: 64px;
+  height: 64px;
+  border-radius: 13.5px;
+  overflow: hidden;
+  background: #14171b;
+}
+.stk--complet .stk__stade {
+  filter: saturate(0);
+  opacity: 0.8;
+}
+.stk__queue {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 7px solid #f4f5f2;
+}
+.stk__cal {
+  position: absolute;
+  left: -14px;
+  top: -11px;
+  width: 40px;
+  height: 31px;
+  display: flex;
+  flex-direction: column;
+  transform: rotate(-7deg);
+  border-radius: 7px;
+  overflow: hidden;
+  border: 1.5px solid #f4f5f2;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.18);
+}
+.stk__cal-jour {
+  height: 11px;
+  background: #0a0b0d;
+  color: #f4f5f2;
+  font: 700 7px/11px ui-monospace, "SF Mono", var(--font-jbmono), monospace;
+  letter-spacing: 0.4px;
+  text-align: center;
+  text-transform: uppercase;
+}
+.stk__cal-heure {
+  flex: 1;
+  background: #f4f5f2;
+  color: #0a0b0d;
+  font: 900 12px/17px var(--font-sans), system-ui, sans-serif;
+  letter-spacing: -0.5px;
+  text-align: center;
+}
+.stk__badge {
+  position: absolute;
+  right: -9px;
+  top: -9px;
+  width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px solid #f4f5f2;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  font: 900 11.5px/1 var(--font-sans), system-ui, sans-serif;
+}
+.stk__badge--manque {
+  background: #ff8a4c;
+  color: #0a0b0d;
+}
+.stk__badge--dedans {
+  background: #0a0b0d;
+}
+.stk__etiquette {
+  position: absolute;
+  left: 45px;
+  top: 38px;
+  transform: rotate(6deg);
+  white-space: nowrap;
+  height: 19px;
+  padding: 0 7px;
+  border-radius: 5.5px;
+  border: 2px solid #f4f5f2;
+  box-shadow: 0 1.5px 2.5px rgba(0, 0, 0, 0.2);
+  font: 900 italic 10.5px/15px var(--font-sans), system-ui, sans-serif;
+  letter-spacing: -0.1px;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+.stk__etiquette--manque { background: #ff8a4c; color: #0a0b0d; }
+.stk__etiquette--dedans { background: #0a0b0d; color: #f4f5f2; }
+.stk__etiquette--complet { background: #8f908b; color: #f4f5f2; }
+
+/* Un terrain sans match : un point, et son nom. */
+.pt__dot {
   position: absolute;
   left: 0;
   top: 0;
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: #f4f5f2;
-  box-shadow:
-    0 0 0 3px rgba(8, 9, 11, 0.92),
-    0 0 0 4px rgba(244, 245, 242, 0.35),
-    0 6px 16px rgba(0, 0, 0, 0.6);
+  border: 2px solid #0a0b0d;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
-.bola-pin__dot--match {
-  width: 18px;
-  height: 18px;
-}
-.bola-pin__dot--match::after {
-  content: "";
+.pt__nom {
   position: absolute;
-  inset: -10px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(244, 245, 242, 0.7);
-  animation: bolaPulse 2.2s ease-out infinite;
-}
-@keyframes bolaPulse {
-  0% { transform: scale(0.55); opacity: 0.9; }
-  100% { transform: scale(1.5); opacity: 0; }
-}
-.bola-pin__nom {
-  position: absolute;
-  left: 14px;
+  left: 10px;
   top: 0;
   transform: translateY(-50%);
   white-space: nowrap;
-  font-family: var(--font-courier), "Courier New", ui-monospace, monospace;
-  font-size: 11px;
-  color: #f4f5f2;
+  font: 600 11px/1 var(--font-sans), system-ui, sans-serif;
+  color: #0a0b0d;
+  text-shadow: 0 0 3px #f4f5f2, 0 0 6px #f4f5f2;
+}
+
+/* Toi : ta carte en miniature, debout là où tu es, un anneau au sol. */
+.toi {
+  position: relative;
+  width: 44px;
+  height: 59px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+.toi__carte {
+  position: relative;
+  width: 29px;
+  height: 41px;
+  padding: 2.5px;
+  box-sizing: border-box;
+  background: #f4f5f2;
+  border-radius: 6.5px;
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  overflow: hidden;
+}
+.toi__carte::before {
+  content: "";
+  position: absolute;
+  inset: 2.5px;
+  border-radius: 4.5px;
+  background: linear-gradient(135deg, #2a2f36, #181c21 55%, #0d1013);
+}
+.toi__symbole { position: relative; width: 12px; height: 12px; display: block; }
+.toi__note {
+  position: relative;
+  font: 900 11px/1 var(--font-sans), system-ui, sans-serif;
+  letter-spacing: -0.4px;
+  color: rgba(244, 245, 242, 0.92);
+}
+.toi__bande {
+  position: absolute;
+  left: 2.5px;
+  right: 2.5px;
+  bottom: 2.5px;
+  height: 2.5px;
+}
+.toi__anneau {
+  width: 44px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(10, 11, 13, 0.22);
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.12);
+}
+
+/* Le lettrage découpé façon sticker : encre, cerné de blanc, ombre portée. */
+.lettrage {
+  display: inline-block;
+  font: 900 italic var(--taille, 34px) / 1 var(--font-sans), system-ui, sans-serif;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  color: #0a0b0d;
+  white-space: nowrap;
   text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.9),
-    0 0 8px rgba(0, 0, 0, 0.8);
+    3.5px 0 0 #f4f5f2, -3.5px 0 0 #f4f5f2, 0 3.5px 0 #f4f5f2, 0 -3.5px 0 #f4f5f2,
+    2.5px 2.5px 0 #f4f5f2, -2.5px 2.5px 0 #f4f5f2, 2.5px -2.5px 0 #f4f5f2, -2.5px -2.5px 0 #f4f5f2,
+    3.2px 1.3px 0 #f4f5f2, -3.2px 1.3px 0 #f4f5f2, 3.2px -1.3px 0 #f4f5f2, -3.2px -1.3px 0 #f4f5f2,
+    1.3px 3.2px 0 #f4f5f2, -1.3px 3.2px 0 #f4f5f2, 1.3px -3.2px 0 #f4f5f2, -1.3px -3.2px 0 #f4f5f2;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.22));
 }

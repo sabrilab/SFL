@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Courier_Prime, Anton, Barlow_Condensed } from "next/font/google";
+import { Inter, JetBrains_Mono, Anton, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme-provider";
@@ -18,16 +18,17 @@ import { AppSplash } from "@/components/sfl/app-splash";
 import { ActivityTracker } from "@/components/sfl/activity-tracker";
 import { NouvellesCartes } from "@/components/sfl/nouvelle-carte";
 
-// Typographie de la charte BOLA : Inter (titres serrés, texte) et Courier
-// Prime, la machine à écrire en minuscules, pour tout ce qui s'étiquette.
+// Typographie de l'app BOLA : une sans neutre pour tout ce qui se lit (Inter,
+// celle du site), et une monospace pour les étiquettes en capitales — SF Mono
+// sur iPhone, JetBrains Mono partout ailleurs.
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
 });
 
-const courier = Courier_Prime({
-  weight: ["400", "700"],
-  variable: "--font-courier",
+const jbMono = JetBrains_Mono({
+  weight: ["400", "600", "700"],
+  variable: "--font-jbmono",
   subsets: ["latin"],
 });
 
@@ -77,7 +78,7 @@ export default function RootLayout({
     <html
       lang="fr"
       suppressHydrationWarning
-      className={`${inter.variable} ${courier.variable} ${anton.variable} ${barlow.variable} h-full antialiased`}
+      className={`${inter.variable} ${jbMono.variable} ${anton.variable} ${barlow.variable} h-full antialiased`}
     >
       {/* body ne défile jamais lui-même (overflow hidden, hauteur figée à
           celle de l'écran) : c'est le conteneur interne juste en dessous

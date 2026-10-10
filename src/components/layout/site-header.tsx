@@ -23,7 +23,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// Ligues Golder — l'utilisateur appartient à la SFL ; les autres sont
+// Ligues Bola — l'utilisateur appartient à la SFL ; les autres sont
 // visibles pour montrer qu'on peut changer de ligue (v1 locale).
 export const LEAGUES = ["SFL", "WFL", "KFL"] as const;
 export const LEAGUE_KEY = "sfl-league";

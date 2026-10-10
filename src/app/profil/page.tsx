@@ -102,7 +102,7 @@ function ProfilRadar({ stats, overall }: { stats: Player["stats"]; overall: numb
           />
         ))}
         <g
-          style={{ fontFamily: "var(--font-courier)", fontSize: 9, letterSpacing: 1.4 }}
+          style={{ fontFamily: "var(--font-jbmono)", fontSize: 9, letterSpacing: 1.4 }}
           fill="rgba(255,255,255,0.45)"
         >
           {STAT_KEYS.map((k, i) => (

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RechercheJoueur } from "@/components/sfl/admin/recherche-joueur";
+import { chercherJoueurs } from "@/lib/sfl/recherche-joueur";
 import {
   Select,
   SelectContent,
@@ -264,6 +266,9 @@ export function AddPlayerSheet({
   existing: Set<string>;
   onAdd: (player: string, team: string | null) => void;
 }) {
+  const [recherche, setRecherche] = useState("");
+  const trouves = chercherJoueurs(roster, (n) => n, recherche);
+  const premierLibre = trouves.find((n) => !existing.has(n));
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-3xl">
@@ -271,7 +276,20 @@ export function AddPlayerSheet({
           <SheetTitle className="text-xl">Ajouter un joueur</SheetTitle>
         </SheetHeader>
         <div className="flex flex-col gap-1 px-1 pb-8">
-          {roster.map((name) => {
+          <RechercheJoueur
+            valeur={recherche}
+            onChange={setRecherche}
+            resultats={trouves.length}
+            autoFocus
+            onEntree={() => {
+              if (premierLibre) {
+                onAdd(premierLibre, null);
+                setRecherche("");
+              }
+            }}
+            className="mb-2"
+          />
+          {trouves.map((name) => {
             const already = existing.has(name);
             return (
               <button

@@ -137,6 +137,8 @@ export interface Terrain {
   adresse: string;
   lat: number;
   lng: number;
+  /** La commune, pour le lettrage de la Map (« LILLE »). */
+  commune?: string;
   /** Le terrain habituel : celui des matchs dont le lieu ne nomme aucun autre. */
   defaut?: boolean;
 }

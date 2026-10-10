@@ -21,6 +21,7 @@ import { Locked } from "@/components/sfl/locked";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useSeason } from "@/components/sfl/season-provider";
+import { StatsAVenir } from "@/components/sfl/feed/stats-a-venir";
 import {
   journeeParticipants,
   ovr,
@@ -162,27 +163,19 @@ function Avatar({ name, size = 30 }: { name: string; size?: number }) {
  */
 export function JourneeRecap({ j }: { j: number }) {
   const { journees, saison } = useSeason();
-  const existe = journees.some((x) => x.j === j) || journees.length > 0;
-  if (!existe) {
-    const numero = saison.numero ?? 0;
-    const derniere = saison.archives?.[saison.archives.length - 1];
+  // Une journée existe-t-elle, et a-t-elle été jouée ? Une journée ouverte par
+  // l'admin avec ses présents mais sans un résultat ni un but n'a rien à
+  // récapituler : on attend que ses actions soient saisies.
+  const cible = journees.find((x) => x.j === j) ?? journees[0];
+  const jouee =
+    !!cible && saison.entries.some((e) => e.j === cible.j && (e.result || e.buts > 0 || e.passes > 0));
+  if (!jouee) {
     return (
-      <section className="glass rounded-[26px] px-5 py-8 text-center">
-        <p className="mono-label text-primary">Saison {numero}</p>
-        <h2 className="mt-1 text-[20px] font-bold tracking-tight">Rien n&apos;est encore joué</h2>
-        <p className="mx-auto mt-2 max-w-[34ch] text-[13px] text-muted-foreground">
-          Le premier récap s&apos;écrira au soir de la première journée. Les compteurs et le
-          classement repartent de zéro.
-        </p>
-        {derniere && (
-          <Link
-            href={`/saisons/${derniere.numero}`}
-            className="mt-4 inline-flex items-center gap-1 rounded-full bg-secondary px-4 py-2 text-[13px] font-semibold"
-          >
-            Revoir {derniere.nom} ›
-          </Link>
-        )}
-      </section>
+      <StatsAVenir
+        numero={saison.numero ?? 0}
+        quoi="recap"
+        archive={saison.archives?.[saison.archives.length - 1]}
+      />
     );
   }
   return <JourneeRecapComplet j={j} />;

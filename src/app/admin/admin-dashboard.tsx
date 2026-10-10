@@ -63,6 +63,8 @@ import { DetailPoints } from "@/components/sfl/admin/detail-points";
 import { Requalification } from "@/components/sfl/admin/requalification";
 import { Saisons } from "@/components/sfl/admin/saisons";
 import { AccesJoueur } from "@/components/sfl/admin/acces-joueur";
+import { RechercheJoueur } from "@/components/sfl/admin/recherche-joueur";
+import { chercherJoueurs } from "@/lib/sfl/recherche-joueur";
 import { useSession } from "@/hooks/use-session";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
@@ -275,6 +277,13 @@ export function AdminDashboard() {
       }))
       .sort((a, b) => (b.d?.pp ?? -1) - (a.d?.pp ?? -1) || a.r.name.localeCompare(b.r.name));
   }, [saison, derived]);
+
+  // « Trouver un joueur » : la table se filtre à la frappe, Entrée ouvre le premier.
+  const [rechercheJoueur, setRechercheJoueur] = useState("");
+  const rosterTrouves = useMemo(
+    () => chercherJoueurs(rosterViews, (v) => v.r.name, rechercheJoueur),
+    [rosterViews, rechercheJoueur]
+  );
 
   const editEntry = editIndex != null ? saison.entries[editIndex] ?? null : null;
   const metaEntry = metaJ != null ? saison.journees.find((m) => m.j === metaJ) ?? null : null;
@@ -674,6 +683,12 @@ export function AdminDashboard() {
               <UserPlus className="mr-1.5 size-4" /> Ajouter
             </Button>
           </div>
+          <RechercheJoueur
+            valeur={rechercheJoueur}
+            onChange={setRechercheJoueur}
+            resultats={rosterTrouves.length}
+            onEntree={() => rosterTrouves[0] && setPlayerIndex(rosterTrouves[0].i)}
+          />
           <div className="overflow-hidden rounded-3xl bg-card">
             <div className="flex items-center gap-3 border-b border-border/60 px-4 py-2.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
               <span className="flex-1">Joueur</span>
@@ -682,7 +697,12 @@ export function AdminDashboard() {
               <span className="w-8 text-center">MJ</span>
               <span className="w-8 text-center">B</span>
             </div>
-            {rosterViews.map(({ r, i, d, ovr }) => (
+            {rosterTrouves.length === 0 && (
+              <p className="px-4 py-6 text-center text-[13px] text-muted-foreground">
+                Personne ne répond à « {rechercheJoueur} ».
+              </p>
+            )}
+            {rosterTrouves.map(({ r, i, d, ovr }) => (
               <button
                 key={r.name}
                 type="button"

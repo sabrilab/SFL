@@ -23,6 +23,7 @@ import { NEXT_MATCH } from "@/lib/sfl/data";
 import { rankPlayers } from "@/lib/sfl/engine";
 import { computeStandings } from "@/lib/sfl/saisie/engine";
 import { JourneeRecap } from "@/components/sfl/feed/journee-recap";
+import { StatsAVenir } from "@/components/sfl/feed/stats-a-venir";
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { EmailNudge } from "@/components/sfl/auth/email-nudge";
 import { JourneeOpening } from "@/components/sfl/feed/journee-opening";
@@ -47,9 +48,15 @@ export default function Ligue() {
 
   /* --------------------- Les capsules de journées --------------------- */
 
+  // Une journée compte comme jouée quand ses actions sont saisies : un résultat,
+  // un but ou une passe. Une journée ouverte par l'admin avec ses présents n'en
+  // est pas une — rien à récapituler, rien à classer, « stats à venir ».
   const played = useMemo(
-    () => journees.filter((j) => (j.matches ?? []).length > 0),
-    [journees]
+    () =>
+      journees.filter((j) =>
+        saison.entries.some((e) => e.j === j.j && (e.result || e.buts > 0 || e.passes > 0))
+      ),
+    [journees, saison.entries]
   );
   const latestJ = played[played.length - 1]?.j ?? journees[0]?.j ?? 1;
   const [selectedJ, setSelectedJ] = useState<number | null>(null);
@@ -160,6 +167,8 @@ export default function Ligue() {
             // la rubrique sait afficher une journée « à plat ».
             dernieres={[...journees].reverse()}
             archives={saison.archives ?? []}
+            numero={saison.numero ?? 0}
+            aVenir={played.length === 0}
             onVoirClassement={() => setView("classement")}
             onOuvrirRecap={(j) => {
               setView("journee");
@@ -189,7 +198,13 @@ export default function Ligue() {
             ))}
           </div>
         </>
-      ) : view === "classement" ? (
+      ) : view === "classement" ? played.length === 0 ? (
+        <StatsAVenir
+          numero={saison.numero ?? 0}
+          quoi="classement"
+          archive={saison.archives?.[saison.archives.length - 1]}
+        />
+      ) : (
         <>
           <p className="px-1 text-[13px] text-foreground/40">
             Sunday Five League · après {journees.length} journées

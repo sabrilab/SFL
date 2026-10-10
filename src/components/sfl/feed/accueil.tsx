@@ -18,6 +18,7 @@ import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { username } from "@/lib/sfl/usernames";
 import { ovr, rareStats, type Journee, type Player } from "@/lib/sfl/engine";
 import { dureeLisible, VIDEOS_UNE, type VideoUne } from "@/lib/sfl/une";
+import { StatsAVenir } from "@/components/sfl/feed/stats-a-venir";
 import Link from "next/link";
 import { JourneesDepliables } from "@/components/sfl/feed/journees-depliables";
 import type { SaisonArchivee } from "@/lib/sfl/saisie/types";
@@ -153,23 +154,27 @@ function CarteVideo({ video }: { video: VideoUne }) {
 
 
 
-/** Les trois chiffres de la saison — même bloc en mobile et en colonne. */
+/** Les trois chiffres de la saison — même bloc en mobile et en colonne.
+ *  Tant que rien n'est joué, seule la note de la carte a un sens : les deux
+ *  autres cases disent « à venir » plutôt qu'un zéro ou un « 1er » qui ment. */
 function Chiffres({
   general,
   matchs,
   rank,
+  aVenir = false,
 }: {
   general: number;
   matchs: number;
   rank: number;
+  aVenir?: boolean;
 }) {
   return (
     <div className="flex items-stretch">
       {(
         [
           [String(general), "Général", false],
-          [String(matchs), "Matchs", false],
-          [`${rank}e`, "Classement", true],
+          [aVenir ? "—" : String(matchs), aVenir ? "Matchs · à venir" : "Matchs", false],
+          [aVenir ? "—" : `${rank}e`, aVenir ? "Classement · à venir" : "Classement", !aVenir],
         ] as const
       ).map(([valeur, label, accent], i) => (
         <div key={label} className={cn("flex-1", i > 0 && "border-l border-white/9 pl-4")}>
@@ -198,6 +203,8 @@ export function Accueil({
   dernieres,
   aside,
   archives = [],
+  numero = 0,
+  aVenir = false,
 }: {
   player: Player;
   rank: number;
@@ -209,9 +216,15 @@ export function Accueil({
   archives?: SaisonArchivee[];
   /** Contenu du rail de droite, sous « Tes ligues ». */
   aside?: React.ReactNode;
+  /** Le numéro de la saison en cours, pour la carte « Stats à venir ». */
+  numero?: number;
+  /** Rien de joué cette saison (une journée saisie sans résultat ne compte pas) :
+   *  pas de rang, pas de chiffres, « à venir ». */
+  aVenir?: boolean;
 }) {
   const general = ovr(rareStats(player.stats));
   const vedette = VIDEOS_UNE[0];
+  const derniereArchive = archives[archives.length - 1];
 
   return (
     <div className="flex flex-col gap-7">
@@ -234,7 +247,7 @@ export function Accueil({
           </div>
           {/* Les trois chiffres remontent dans la colonne à partir de lg. */}
           <div className="mt-5 hidden border-t border-white/9 pt-4 lg:block">
-            <Chiffres general={general} matchs={player.matchs} rank={rank} />
+            <Chiffres general={general} matchs={player.matchs} rank={rank} aVenir={aVenir} />
           </div>
         </div>
         <PhotoHero name={player.name} />
@@ -242,7 +255,7 @@ export function Accueil({
 
       {/* Les trois chiffres — version mobile, pleine largeur sous la photo */}
       <section className="-mt-2 border-t border-white/9 pt-4 lg:hidden">
-        <Chiffres general={general} matchs={player.matchs} rank={rank} />
+        <Chiffres general={general} matchs={player.matchs} rank={rank} aVenir={aVenir} />
       </section>
 
       {/* ------- La une, puis les journées — deux colonnes sur grand écran ------- */}
@@ -261,8 +274,10 @@ export function Accueil({
           <JourneesDepliables
             journees={dernieres}
             onOuvrir={onOuvrirRecap}
-            rangDuJoueur={`${rank}e au Pépite d'Or · ${player.pp} pts`}
+            rangDuJoueur={aVenir ? undefined : `${rank}e au Pépite d'Or · ${player.pp} pts`}
           />
+
+          {aVenir && <StatsAVenir numero={numero} quoi="accueil" archive={derniereArchive} />}
 
           <button
             onClick={onVoirClassement}

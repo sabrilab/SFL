@@ -14,12 +14,14 @@ interface LieuNominatim {
   lat: string;
   lon: string;
   display_name: string;
+  address?: { city?: string; town?: string; village?: string; municipality?: string; suburb?: string };
 }
 
 export interface LieuGeocode {
   lat: number;
   lng: number;
   libelle: string;
+  commune?: string;
 }
 
 export async function GET(req: NextRequest) {
@@ -30,6 +32,7 @@ export async function GET(req: NextRequest) {
   url.searchParams.set("format", "jsonv2");
   url.searchParams.set("q", q);
   url.searchParams.set("limit", "5");
+  url.searchParams.set("addressdetails", "1");
   url.searchParams.set("accept-language", "fr");
 
   try {
@@ -48,7 +51,12 @@ export async function GET(req: NextRequest) {
     }
     const data = (await res.json()) as LieuNominatim[];
     const resultats: LieuGeocode[] = data
-      .map((d) => ({ lat: Number(d.lat), lng: Number(d.lon), libelle: d.display_name }))
+      .map((d) => ({
+        lat: Number(d.lat),
+        lng: Number(d.lon),
+        libelle: d.display_name,
+        commune: d.address?.city ?? d.address?.town ?? d.address?.village ?? d.address?.municipality,
+      }))
       .filter((d) => Number.isFinite(d.lat) && Number.isFinite(d.lng));
     return NextResponse.json({ resultats });
   } catch {
