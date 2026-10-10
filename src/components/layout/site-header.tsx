@@ -89,8 +89,11 @@ export function SiteHeader() {
     // Le seuil de `sticky` se mesure depuis le haut réel du conteneur, que le
     // padding ne décale pas : il faut donc y réintégrer l'inset haut, sinon le
     // header revient se coller sous l'encoche dès qu'on défile.
+    // Sur la Map, comme dans l'app iPhone, le plan prend tout l'écran : pas
+    // d'en-tête sur téléphone (la barre d'onglets suffit). Sur grand écran,
+    // l'en-tête porte la navigation : il reste.
     <header
-      className="sticky z-40 px-4"
+      className={cn("sticky z-40 px-4", (pathname === "/" || pathname === "/map") && "max-lg:hidden")}
       style={{ top: "calc(env(safe-area-inset-top) + 0.75rem)" }}
     >
       <div className="mx-auto flex h-14 max-w-5xl min-w-0 items-center gap-2">
@@ -112,7 +115,7 @@ export function SiteHeader() {
         <nav className="glass hidden items-center gap-1 rounded-full px-1.5 py-1.5 lg:flex">
           {NAV_ITEMS.map((item) => {
             const active =
-              item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              item.href === "/" ? pathname === "/" || pathname === "/map" : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}

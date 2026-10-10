@@ -114,9 +114,10 @@ export function CarteMap({
     ];
     // Le sticker choisi mérite l'écran : on cadre large autour de lui, les
     // surcouches (lettrage en haut, carrousel en bas) prennent leur place.
-    const pad: L.FitBoundsOptions = { paddingTopLeft: [40, 120], paddingBottomRight: [40, 230], maxZoom: 15 };
-    if (tous.length === 1) map.setView(tous[0], 15, { animate: true });
-    else if (tous.length > 1) map.fitBounds(L.latLngBounds(tous), { ...pad, animate: true });
+    const pad: L.FitBoundsOptions = { paddingTopLeft: [40, 140], paddingBottomRight: [40, 380], maxZoom: 15 };
+    // Un seul point compris : la boîte est réduite à lui, le zoom plafonne à 15
+    // et le point se pose au-dessus des cartes du bas, pas derrière.
+    if (tous.length) map.fitBounds(L.latLngBounds(tous), { ...pad, animate: true });
     else map.setView(FRANCE, 5);
   }, [stickers, points, toi, choisi]);
 

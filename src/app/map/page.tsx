@@ -18,10 +18,11 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
-import { LocateFixed, MapPin, Navigation, Plus, Search, Star, Trash2 } from "lucide-react";
+import { LocateFixed, MapPin, Navigation, Plus, Search, Settings2, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
@@ -287,22 +288,33 @@ export default function MapPage() {
     toast.success(message);
   }
 
-  const versAdresse = () => document.getElementById("ou-se-joue")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  // La fiche du match : la feuille qui monte du bas, comme dans l'app.
+  const [fiche, setFiche] = useState(false);
+  const [ficheAdmin, setFicheAdmin] = useState(false);
+  const ouvrirFiche = (admin = false) => {
+    setFicheAdmin(admin);
+    setFiche(true);
+  };
+
+  // Les surcouches se posent sous l'encoche en haut, au-dessus de la barre
+  // d'onglets en bas (qui flotte sur le plan, comme sur l'iPhone).
+  const haut = "calc(env(safe-area-inset-top, 0px) + 14px)";
+  const bas = "calc(env(safe-area-inset-bottom, 0px) + 92px)";
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* ─── Le plan, pleine largeur sur téléphone ─── */}
-      <section className="relative isolate h-[calc(100dvh-14.5rem)] min-h-[560px] w-full overflow-hidden bg-[#e9eae6] sm:mx-auto sm:h-[640px] sm:max-w-[1000px] sm:rounded-[28px]">
+    <>
+      {/* ─── Le plan, tout l'écran ─── */}
+      <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] lg:top-[5.5rem]">
         <div className="absolute inset-0">
           <CarteMap stickers={stickers} points={points} toi={toi} choisi={choisi?.cle ?? null} onChoisir={choisirSticker} className="h-full w-full" />
         </div>
-        {/* Voile en haut : le lettrage et l'en-tête restent lisibles sur le plan.
+        {/* Voile en haut : la barre d'état et le lettrage restent lisibles.
             Tout ce qui est posé sur le plan passe au-dessus des calques de
             Leaflet (z-index 400 et plus). */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-36 bg-gradient-to-b from-[rgba(8,9,11,0.45)] to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-32 bg-gradient-to-b from-[rgba(8,9,11,0.42)] to-transparent" />
 
-        {/* La commune en lettrage, le compte en étiquette — sous l'en-tête de l'app */}
-        <div className="pointer-events-none absolute top-[4.75rem] left-5 z-[510] flex flex-col items-start">
+        {/* En haut à gauche : la commune en lettrage, le compte en étiquette */}
+        <div className="pointer-events-none absolute left-5 z-[510] flex flex-col items-start" style={{ top: haut }}>
           <span
             className="lettrage -rotate-[4deg]"
             style={{ ["--taille" as string]: commune.length <= 7 ? "34px" : commune.length <= 10 ? "28px" : commune.length <= 14 ? "22px" : "18px" }}
@@ -317,8 +329,27 @@ export default function MapPage() {
           </span>
         </div>
 
+        {/* En haut à droite : le logo, et pour l'admin le réglage des matchs */}
+        <div className="absolute right-4 z-[510] flex items-center gap-2" style={{ top: haut }}>
+          {admin && (
+            <button
+              type="button"
+              onClick={() => ouvrirFiche(true)}
+              aria-label="Régler les matchs et les terrains"
+              className="grid size-9 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
+              style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
+            >
+              <Settings2 className="size-4" strokeWidth={2.2} />
+            </button>
+          )}
+          <span className="flex h-9 items-center rounded-full px-3 shadow-[0_3px_8px_rgba(0,0,0,0.16)] lg:hidden" style={{ background: ENCRE }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/bola/logo-blanc.svg" alt="Bola" width={58} height={14} />
+          </span>
+        </div>
+
         {/* En bas : les boutons, les cartes des matchs, les pastilles */}
-        <div className="absolute inset-x-0 bottom-0 z-[510] flex flex-col items-center gap-3 pb-4">
+        <div className="absolute inset-x-0 z-[510] flex flex-col items-center gap-3" style={{ bottom: bas }}>
           <div className="flex w-full items-center justify-center px-4">
             {admin && (
               <Link
@@ -343,7 +374,8 @@ export default function MapPage() {
             </button>
           </div>
 
-          {/* Le carrousel : une carte par match, celle du centre est la choisie. */}
+          {/* Le carrousel : une carte par match, celle du centre est la choisie.
+              Toucher la choisie ouvre sa fiche. */}
           <div className="flex w-full snap-x snap-mandatory gap-3 overflow-x-auto px-[max(1rem,calc(50%-103px))] pb-3 [scrollbar-width:none]">
             {matchs.map((m) => (
               <div key={m.cle} className="shrink-0 snap-center">
@@ -351,10 +383,7 @@ export default function MapPage() {
                   m={m}
                   choisi={m.cle === choisi?.cle}
                   loin={toi && m.terrain ? `à ${distanceLisible(toi, m.terrain)}` : null}
-                  onToucher={() => {
-                    if (m.cle !== choisi?.cle) setChoix(m.cle);
-                    else document.getElementById("presence")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
+                  onToucher={() => (m.cle !== choisi?.cle ? setChoix(m.cle) : ouvrirFiche())}
                 />
               </div>
             ))}
@@ -364,10 +393,15 @@ export default function MapPage() {
             <div className="flex max-w-full items-center gap-2 px-4">
               {choisi.terrain ? (
                 <>
-                  <span className="flex h-[30px] min-w-0 items-center gap-[7px] rounded-full px-3.5 shadow-[0_3px_6px_rgba(0,0,0,0.14)]" style={{ background: BLANC, color: ENCRE }}>
+                  <button
+                    type="button"
+                    onClick={() => ouvrirFiche()}
+                    className="flex h-[30px] min-w-0 items-center gap-[7px] rounded-full px-3.5 shadow-[0_3px_6px_rgba(0,0,0,0.14)]"
+                    style={{ background: BLANC, color: ENCRE }}
+                  >
                     <span className="size-1.5 shrink-0 rounded-full" style={{ background: ENCRE }} />
                     <span className="truncate text-[13px] font-semibold tracking-[-0.2px]">{choisi.terrain.nom}</span>
-                  </span>
+                  </button>
                   <a
                     href={urlItineraire(choisi.terrain, ios)}
                     target="_blank"
@@ -381,7 +415,7 @@ export default function MapPage() {
               ) : admin ? (
                 <button
                   type="button"
-                  onClick={versAdresse}
+                  onClick={() => ouvrirFiche(true)}
                   className="flex h-[30px] items-center gap-[7px] rounded-full px-3.5 text-[13px] font-semibold shadow-[0_3px_6px_rgba(0,0,0,0.14)]"
                   style={{ background: BRAISE, color: ENCRE }}
                 >
@@ -397,15 +431,58 @@ export default function MapPage() {
         </div>
       </section>
 
-      {/* ─── Sous le plan : répondre à la convocation, comme avant ─── */}
-      <div className="shell flex flex-col gap-5">
-        {admin && <OuSeJouent saison={saison} matchs={matchs} terrains={terrains} onSauver={sauver} />}
-        <div id="presence" className="scroll-mt-4">
-          <PresencePanel />
-        </div>
-        {admin && <Terrains saison={saison} terrains={terrains} onSauver={sauver} />}
-      </div>
-    </div>
+      {/* ─── La fiche : présence, lieu, et pour l'admin les réglages ─── */}
+      <Sheet open={fiche} onOpenChange={setFiche}>
+        <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
+          <SheetHeader className="px-5 pt-5 pb-0">
+            <p className="mono-label text-muted-foreground">
+              {choisi?.j != null ? `J${choisi.j} · ` : ""}Sunday Five League
+            </p>
+            <SheetTitle className="text-[26px] font-bold tracking-tight">
+              {ficheAdmin ? "Les matchs" : (choisi?.terrain?.nom ?? (choisi?.j != null ? `Journée ${choisi.j}` : "Le match"))}
+            </SheetTitle>
+            {!ficheAdmin && choisi && (
+              <p className="text-[14px] text-muted-foreground">
+                {choisi.quand.titre} · {choisi.heure}
+                {choisi.terrain ? ` · ${choisi.terrain.adresse}` : " · lieu à venir"}
+              </p>
+            )}
+          </SheetHeader>
+          <div className="flex flex-col gap-5 px-4">
+            {ficheAdmin ? (
+              <>
+                <OuSeJouent saison={saison} matchs={matchs} terrains={terrains} onSauver={sauver} />
+                <Terrains saison={saison} terrains={terrains} onSauver={sauver} />
+              </>
+            ) : (
+              <>
+                {choisi?.terrain && (
+                  <a
+                    href={urlItineraire(choisi.terrain, ios)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex h-12 items-center justify-center gap-2 rounded-full bg-primary text-[15px] font-semibold text-primary-foreground"
+                  >
+                    <Navigation className="size-4" /> Y aller
+                  </a>
+                )}
+                {/* Une journée : ses joueurs. La convocation : on y répond, comme avant. */}
+                {choisi?.j != null ? <Presents m={choisi} /> : <PresencePanel />}
+                {admin && (
+                  <button
+                    type="button"
+                    onClick={() => setFicheAdmin(true)}
+                    className="flex h-11 items-center justify-center gap-2 rounded-full bg-secondary text-[14px] font-semibold"
+                  >
+                    <Settings2 className="size-4" /> Date, heure et adresse des matchs
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
 
@@ -480,6 +557,33 @@ function CarteMatch({
         </div>
       )}
     </div>
+  );
+}
+
+/** Les joueurs d'une journée, tels que l'admin les a convoqués. */
+function Presents({ m }: { m: MatchMap }) {
+  return (
+    <section className="rounded-[26px] bg-card p-5">
+      <div className="flex items-baseline justify-between">
+        <p className="mono-label text-muted-foreground">Les joueurs</p>
+        <p className="text-[22px] font-bold tabular-nums">
+          {m.presents.length}
+          <span className="text-muted-foreground">/{m.effectif}</span>
+        </p>
+      </div>
+      {m.presents.length ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {m.presents.map((nom) => (
+            <span key={nom} className="rounded-full bg-secondary px-3 py-1.5 text-[13px] font-medium">
+              {nom}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 text-[13px] text-muted-foreground">Les joueurs arrivent avec la composition des équipes.</p>
+      )}
+      {m.dedans && <p className="mono-label mt-3 text-foreground">Tu y es</p>}
+    </section>
   );
 }
 

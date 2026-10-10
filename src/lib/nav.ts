@@ -19,7 +19,7 @@ export interface NavItem {
 // Les anciennes routes (/stats, /carte, /collection, /duel, /reglages)
 // restent accessibles depuis le Feed et le Profil.
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/map", label: "Map", icon: MapPin },
+  { href: "/", label: "Map", icon: MapPin },
   { href: "/profil", label: "Ma carte", icon: CircleUserRound },
-  { href: "/", label: "Ligue", icon: Newspaper },
+  { href: "/ligue", label: "Ligue", icon: Newspaper },
 ];

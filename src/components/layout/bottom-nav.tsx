@@ -11,9 +11,9 @@ import { usePathname } from "next/navigation";
 import { BallIcon, MapIcon, PersonIcon } from "./nav-icons";
 
 const TABS: { href: string; Icon: typeof BallIcon; label: string; dot?: boolean }[] = [
-  { href: "/map", Icon: MapIcon, label: "Map" },
+  { href: "/", Icon: MapIcon, label: "Map" },
   { href: "/profil", Icon: PersonIcon, label: "Ma carte" },
-  { href: "/", Icon: BallIcon, label: "Ligue" },
+  { href: "/ligue", Icon: BallIcon, label: "Ligue" },
 ];
 
 export function BottomNav() {
@@ -30,7 +30,9 @@ export function BottomNav() {
         gap: 4,
         padding: 6,
         borderRadius: 999,
-        background: "rgba(255,255,255,0.07)",
+        // Verre sombre : lisible sur les pages noires comme sur le plan clair
+        // de la Map, où un verre blanc à 7 % disparaissait.
+        background: "rgba(14,17,21,0.78)",
         backdropFilter: "blur(28px) saturate(180%)",
         WebkitBackdropFilter: "blur(28px) saturate(180%)",
         border: "1px solid rgba(255,255,255,0.1)",
@@ -38,7 +40,7 @@ export function BottomNav() {
       }}
     >
       {TABS.map(({ href, Icon, label, dot }) => {
-        const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+        const active = href === "/" ? pathname === "/" || pathname === "/map" : pathname.startsWith(href);
         return (
           <Link
             key={href}

@@ -342,10 +342,10 @@ function FicheJournee({ journee }: { journee: Journee }) {
       )}
 
       <Link
-        href="/"
+        href="/ligue"
         className="block rounded-full bg-foreground py-4 text-center text-[15px] font-bold text-background transition-transform active:scale-[0.98]"
       >
-        Ouvrir le récap dans le Feed
+        Ouvrir le récap dans la Ligue
       </Link>
     </motion.div>
   );
