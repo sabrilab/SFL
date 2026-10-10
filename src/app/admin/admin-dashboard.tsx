@@ -747,6 +747,7 @@ export function AdminDashboard() {
         }}
       />
       <JourneeMetaSheet
+        terrains={saison.terrains ?? []}
         meta={metaEntry}
         onOpenChange={(o) => !o && setMetaJ(null)}
         onPatch={(patch) => metaJ != null && commit(updateJournee(saison, metaJ, patch), "Édition journée")}

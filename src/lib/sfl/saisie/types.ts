@@ -51,6 +51,10 @@ export interface JourneeMeta {
   j: number;
   date: string;
   sflTime: boolean;
+  /** Coup d'envoi, « 13h00 ». Absent : celui de la convocation. */
+  heure?: string;
+  /** Le terrain où elle se joue (saison.terrains) ; absent : le terrain par défaut. */
+  terrainId?: number;
 }
 
 // Événement minuté d'un match — alimente la timeline et la détection du

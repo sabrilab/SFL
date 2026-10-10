@@ -89,7 +89,7 @@ export function addJournee(saison: Saison): { saison: Saison; j: number } {
 export function updateJournee(
   saison: Saison,
   j: number,
-  patch: Partial<{ date: string; sflTime: boolean }>
+  patch: Partial<{ date: string; sflTime: boolean; heure: string; terrainId: number | undefined }>
 ): Saison {
   return {
     ...saison,
@@ -370,4 +370,33 @@ export function terrainDuMatch(saison: Pick<Saison, "terrains">, lieu: string | 
   const l = normaliser(lieu ?? "");
   const nomme = l ? terrains.find((t) => l.includes(normaliser(t.nom))) : undefined;
   return nomme ?? terrains.find((t) => t.defaut) ?? terrains[0];
+}
+
+/**
+ * Pose une journée sur un nouveau terrain (créé depuis son adresse) : le
+ * terrain rejoint la liste de la ligue, la journée s'y rattache.
+ */
+export function placerJourneeSurNouveauTerrain(
+  saison: Saison,
+  j: number,
+  t: Omit<Terrain, "id" | "defaut">
+): Saison {
+  const avec = ajouterTerrain(saison, t);
+  const id = (avec.terrains ?? []).reduce((m, x) => Math.max(m, x.id), 0);
+  return updateJournee(avec, j, { terrainId: id });
+}
+
+/** Une journée est jouée quand ses actions sont saisies : un résultat, un but ou une passe. */
+export function journeeJouee(saison: Pick<Saison, "entries">, j: number): boolean {
+  return saison.entries.some((e) => e.j === j && (!!e.result || e.buts > 0 || e.passes > 0));
+}
+
+/** Le terrain d'une journée : le sien, sinon celui du lieu de la convocation, sinon le défaut. */
+export function terrainDeJournee(
+  saison: Pick<Saison, "terrains">,
+  meta: { terrainId?: number },
+  lieuConvocation?: string | null
+): Terrain | null {
+  const propre = meta.terrainId != null ? (saison.terrains ?? []).find((t) => t.id === meta.terrainId) : undefined;
+  return propre ?? terrainDuMatch(saison, lieuConvocation);
 }

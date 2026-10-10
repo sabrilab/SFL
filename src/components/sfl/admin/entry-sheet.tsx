@@ -206,17 +206,19 @@ export function EntrySheet({
   );
 }
 
-/** Réglages d'une journée : date, SFL Time, suppression. */
+/** Réglages d'une journée : date, heure, terrain (la Map), SFL Time, suppression. */
 export function JourneeMetaSheet({
   meta,
   onOpenChange,
   onPatch,
   onDelete,
+  terrains = [],
 }: {
-  meta: { j: number; date: string; sflTime: boolean } | null;
+  meta: { j: number; date: string; sflTime: boolean; heure?: string; terrainId?: number } | null;
   onOpenChange: (open: boolean) => void;
-  onPatch: (patch: { date?: string; sflTime?: boolean }) => void;
+  onPatch: (patch: { date?: string; sflTime?: boolean; heure?: string; terrainId?: number | undefined }) => void;
   onDelete: () => void;
+  terrains?: { id: number; nom: string; defaut?: boolean }[];
 }) {
   return (
     <Sheet open={!!meta} onOpenChange={onOpenChange}>
@@ -234,6 +236,30 @@ export function JourneeMetaSheet({
                   className="w-40"
                 />
               </Row>
+              <Row label="Heure">
+                <Input
+                  value={meta.heure ?? ""}
+                  placeholder="13h00"
+                  onChange={(e) => onPatch({ heure: e.target.value })}
+                  className="w-40"
+                />
+              </Row>
+              {terrains.length > 0 && (
+                <Row label="Terrain">
+                  <select
+                    value={meta.terrainId ?? ""}
+                    onChange={(e) => onPatch({ terrainId: e.target.value ? Number(e.target.value) : undefined })}
+                    className="h-9 w-40 rounded-md border border-input bg-transparent px-2 text-sm"
+                  >
+                    <option value="">Par défaut</option>
+                    {terrains.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.nom}
+                      </option>
+                    ))}
+                  </select>
+                </Row>
+              )}
               <Toggle label="SFL Time" checked={meta.sflTime} onChange={(v) => onPatch({ sflTime: v })} />
               <div className="pt-3">
                 <Button
