@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Bola",
     description:
       "Bola, l'app de la Sunday Five League — la Map des matchs, le classement Pépite d'Or, les cartes joueurs et les convocations.",
-    start_url: "/",
+    start_url: "/map",
     scope: "/",
     display: "standalone",
     orientation: "portrait",

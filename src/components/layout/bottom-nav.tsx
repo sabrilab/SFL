@@ -12,8 +12,8 @@ import { BallIcon, MapIcon, PersonIcon } from "./nav-icons";
 
 const TABS: { href: string; Icon: typeof BallIcon; label: string; dot?: boolean }[] = [
   { href: "/map", Icon: MapIcon, label: "Map" },
-  { href: "/", Icon: BallIcon, label: "Feed" },
-  { href: "/profil", Icon: PersonIcon, label: "Profil" },
+  { href: "/profil", Icon: PersonIcon, label: "Ma carte" },
+  { href: "/", Icon: BallIcon, label: "Ligue" },
 ];
 
 export function BottomNav() {
