@@ -114,6 +114,11 @@ export function dernierePublication(): number | null {
 
 /** Pourquoi la publication est impossible — null si elle l'est. */
 export function blocage(): string | null {
+  // Un environnement de travail (poste de dev, tests de bout en bout) pointe
+  // par défaut sur la base de la ligue : ce verrou empêche d'y écrire sans
+  // changer de projet Supabase. La lecture et le temps réel restent actifs.
+  if (process.env.NEXT_PUBLIC_SFL_LECTURE_SEULE === "1")
+    return "Publication désactivée sur cet environnement (NEXT_PUBLIC_SFL_LECTURE_SEULE=1).";
   const session = getSession();
   if (!session) return "Personne n'est connecté sur cet appareil.";
   if (!session.server)

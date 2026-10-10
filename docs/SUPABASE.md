@@ -6,6 +6,10 @@
   (publiques par conception, la sécurité est dans les règles RLS).
   Surclassables par `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   dans Vercel si besoin.
+- **Verrou de travail** : un poste de dev ou un test de bout en bout parle
+  donc à la base de la ligue. `NEXT_PUBLIC_SFL_LECTURE_SEULE=1` (dans
+  `.env.local`) coupe la publication — la lecture et le temps réel restent —
+  et l'admin voit le motif à la place du bouton « Publier ».
 - **Connexion** : `signIn` vérifie d'abord côté serveur
   (`auth.signInWithPassword`), et retombe sur la vérification locale tant que
   les comptes serveur n'existent pas (`ENFORCE_SERVER_AUTH = false` dans

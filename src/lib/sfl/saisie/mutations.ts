@@ -3,6 +3,7 @@
 // Les lignes sont identifiées par leur index dans `entries` — l'UI passe cet
 // index. Le store persiste le résultat.
 
+import { numeroSaison, type SaisonArchivee } from "./types";
 import type {
   Convocation,
   ConvocationReponse,
@@ -255,4 +256,69 @@ export function closeConvocation(saison: Saison, id: number): Saison {
       c.id === id ? { ...c, statut: "clôturée" as const } : c
     ),
   };
+}
+
+/* ------------------------------ Saisons ------------------------------ */
+
+/**
+ * Clôture la saison en cours et ouvre la suivante.
+ *
+ * Ce qui part en archive : les journées, les lignes, les buts minutés, et
+ * l'effectif tel qu'il est ce jour-là. Ce qui continue : l'effectif (mêmes
+ * joueurs, mêmes cartes — on les requalifie à part), et les convocations
+ * ouvertes, qui concernent déjà le prochain dimanche.
+ *
+ * Rien n'est perdu : `restaurerSaison` refait le chemin inverse tant que la
+ * nouvelle saison est encore vierge.
+ */
+export function cloturerSaison(saison: Saison, nom?: string): Saison {
+  const numero = numeroSaison(saison);
+  const archive: SaisonArchivee = {
+    numero,
+    nom: nom?.trim() || `Saison ${numero}`,
+    cloturee: new Date().toISOString(),
+    journees: structuredClone(saison.journees),
+    roster: structuredClone(saison.roster),
+    entries: structuredClone(saison.entries),
+    ...(saison.events?.length ? { events: structuredClone(saison.events) } : {}),
+  };
+  return {
+    ...saison,
+    numero: numero + 1,
+    journees: [],
+    entries: [],
+    events: [],
+    archives: [...(saison.archives ?? []), archive],
+  };
+}
+
+/** Le dernier instant où une clôture peut encore être annulée sans rien perdre. */
+export function restaurationPossible(saison: Saison): boolean {
+  const derniere = saison.archives?.[saison.archives.length - 1];
+  return !!derniere && saison.entries.length === 0 && saison.journees.length === 0;
+}
+
+/**
+ * Annule la dernière clôture : la saison archivée redevient la saison en cours.
+ * Refuse si la saison ouverte depuis a déjà des journées — on n'écrase jamais
+ * du travail saisi.
+ */
+export function restaurerSaison(saison: Saison): Saison {
+  if (!restaurationPossible(saison)) return saison;
+  const archives = [...(saison.archives ?? [])];
+  const derniere = archives.pop()!;
+  return {
+    ...saison,
+    numero: derniere.numero,
+    journees: derniere.journees,
+    entries: derniere.entries,
+    events: derniere.events ?? [],
+    archives,
+  };
+}
+
+/** Une archive relue comme une saison, pour que le moteur la dérive telle quelle. */
+export function saisonDepuisArchive(a: SaisonArchivee): Saison {
+  return { numero: a.numero, journees: a.journees, roster: a.roster, entries: a.entries,
+    events: a.events ?? [], convocations: [], archives: [] };
 }

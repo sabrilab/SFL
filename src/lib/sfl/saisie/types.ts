@@ -89,14 +89,44 @@ export interface Convocation {
   teams?: ConvocationTeam[];
 }
 
+/**
+ * Une saison close, gardée telle quelle : ses journées, ses lignes, et l'effectif
+ * tel qu'il était ce jour-là. On la relit, on ne la modifie plus. Le moteur la
+ * dérive exactement comme une saison en cours.
+ */
+export interface SaisonArchivee {
+  numero: number;
+  nom: string; // « Saison 0 »
+  /** Date de clôture, ISO. */
+  cloturee: string;
+  journees: JourneeMeta[];
+  roster: RosterEntry[];
+  entries: MatchEntry[];
+  events?: MatchEvent[];
+}
+
 // État complet de la saison, unité de stockage (localStorage / Supabase).
+//
+// Les saisons closes voyagent DANS le même document que la saison en cours :
+// une seule ligne en base, une seule synchro, aucune migration de schéma, et
+// chaque appareil reçoit l'archive avec la saison nouvelle. Le document grossit
+// d'une saison à chaque clôture — quelques dizaines de Ko, sans conséquence.
 export interface Saison {
+  /** Numéro de la saison en cours. Absent = 0, la toute première. */
+  numero?: number;
   journees: JourneeMeta[];
   roster: RosterEntry[];
   entries: MatchEntry[];
   convocations: Convocation[];
   /** Buts minutés, quand le classeur les fournit. */
   events?: MatchEvent[];
+  /** Les saisons closes, de la plus ancienne à la plus récente. */
+  archives?: SaisonArchivee[];
+}
+
+/** Le numéro d'une saison, 0 quand il n'a jamais été posé. */
+export function numeroSaison(s: Pick<Saison, "numero">): number {
+  return s.numero ?? 0;
 }
 
 export type AlertLevel = "error" | "warning";

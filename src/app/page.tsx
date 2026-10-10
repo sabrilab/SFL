@@ -159,6 +159,7 @@ export default function Ligue() {
             // Toutes les journées, pas seulement celles qui ont des équipes :
             // la rubrique sait afficher une journée « à plat ».
             dernieres={[...journees].reverse()}
+            archives={saison.archives ?? []}
             onVoirClassement={() => setView("classement")}
             onOuvrirRecap={(j) => {
               setView("journee");

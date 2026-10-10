@@ -60,6 +60,8 @@ import {
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
 import { Synchro } from "@/components/sfl/admin/synchro";
 import { DetailPoints } from "@/components/sfl/admin/detail-points";
+import { Requalification } from "@/components/sfl/admin/requalification";
+import { Saisons } from "@/components/sfl/admin/saisons";
 import { AccesJoueur } from "@/components/sfl/admin/acces-joueur";
 import { useSession } from "@/hooks/use-session";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
@@ -364,6 +366,7 @@ export function AdminDashboard() {
 
         {/* ===================== VUE D'ENSEMBLE ===================== */}
         <TabsContent value="overview" className="mt-4 flex flex-col gap-4">
+          <Saisons saison={saison} onCommit={commit} />
           <div className="grid grid-cols-3 gap-2">
             <Stat label="Journées" value={totals.journees} />
             <Stat label="Joueurs" value={totals.joueurs} />
@@ -661,6 +664,7 @@ export function AdminDashboard() {
 
         {/* ===================== JOUEURS (effectif) ===================== */}
         <TabsContent value="joueurs" className="mt-4 flex flex-col gap-3">
+          <Requalification saison={saison} onCommit={commit} />
           <DetailPoints saison={saison} />
           <div className="flex items-center justify-between gap-3 px-1">
             <p className="text-[13px] text-muted-foreground">

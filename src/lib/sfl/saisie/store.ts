@@ -51,6 +51,7 @@ export function seedSaison(): Saison {
 /** Complète les champs apparus après une sauvegarde plus ancienne. */
 function migrate(s: Saison): Saison {
   if (!s.convocations) s.convocations = [];
+  if (!s.archives) s.archives = [];
   return s;
 }
 
