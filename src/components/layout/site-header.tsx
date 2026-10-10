@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { Search, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -10,12 +9,6 @@ import { NAV_ITEMS } from "@/lib/nav";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useBallons } from "@/hooks/use-ballons";
 import { useIsClient } from "@/hooks/use-is-client";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -23,42 +16,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// Ligues Bola — l'utilisateur appartient à la SFL ; les autres sont
-// visibles pour montrer qu'on peut changer de ligue (v1 locale).
-export const LEAGUES = ["SFL", "WFL", "KFL"] as const;
+// Une seule ligue : la SFL. Le choix de ligue est retiré — choisir une
+// autre ligue masquait tout le fil. La clé reste pour effacer l'ancien choix.
+export const LEAGUES = ["SFL"] as const;
 export const LEAGUE_KEY = "sfl-league";
 
-function LeagueSwitcher() {
-  const isClient = useIsClient();
-  const [league, setLeague] = useState<string | null>(null);
-  const current = league ?? (isClient ? (localStorage.getItem(LEAGUE_KEY) ?? "SFL") : "SFL");
-
-  function change(next: string) {
-    localStorage.setItem(LEAGUE_KEY, next);
-    setLeague(next);
-    window.dispatchEvent(new Event("sfl-league"));
-  }
-
+/** Le badge de la ligue : capitales grasses, en italique. */
+function BadgeLigue() {
   return (
-    <Select value={current} onValueChange={(v) => change(v as string)}>
-      <SelectTrigger
-        size="sm"
-        aria-label="Changer de ligue"
-        className="h-7 gap-1 rounded-full border-transparent bg-secondary px-2.5 dark:bg-secondary"
-      >
-        {/* Style "ligue de combat" : capitales larges et écrasées */}
-        <span className="scale-y-90 text-[11px] font-black tracking-[0.3em] uppercase">
-          {current}
-        </span>
-      </SelectTrigger>
-      <SelectContent>
-        {LEAGUES.map((l) => (
-          <SelectItem key={l} value={l}>
-            <span className="scale-y-90 text-xs font-black tracking-[0.25em] uppercase">{l}</span>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <span
+      aria-label="Sunday Five League"
+      className="flex h-7 items-center rounded-full bg-secondary px-3 text-[13px] font-black tracking-[0.04em] uppercase italic"
+    >
+      SFL
+    </span>
   );
 }
 
@@ -102,7 +73,7 @@ export function SiteHeader() {
           <Link href="/" aria-label="Bola — accueil" className="flex shrink-0 items-center">
             <Image src="/bola/logo-blanc.svg" alt="Bola" width={72} height={17} priority />
           </Link>
-          <LeagueSwitcher />
+          <BadgeLigue />
           <Link
             href="/recherche"
             aria-label="Rechercher un joueur ou une journée"

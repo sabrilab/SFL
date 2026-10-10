@@ -17,7 +17,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { LocateFixed, MapPin, Navigation, Plus, Search, Settings2, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -55,6 +55,9 @@ interface Lieu {
   lng: number;
   libelle: string;
   commune?: string;
+  /** Le nom d'un lieu (« Urban Soccer »), qui propose le nom du terrain. */
+  nom?: string;
+  genre?: "adresse" | "lieu";
 }
 
 const ENCRE = "#0A0B0D";
@@ -63,6 +66,8 @@ const BLANC = "#F4F5F2";
 const BRAISE = "#FF8A4C";
 /** Les teintes des avatars de la grappe (des gris, comme dans l'app). */
 const TEINTES = ["#CFCFCF", "#A4A4A4", "#F0F0F0", "#C4C4C4", "#E2E2DE", "#B8B8B4"];
+/** Là où joue la ligue : les adresses proches passent devant. */
+const PRES_DE = { lat: 50.6366, lng: 3.0632 };
 /** Une équipe de cinq contre cinq : le compte des places quand rien n'est composé. */
 const EFFECTIF = 10;
 
@@ -601,7 +606,12 @@ function Jeton({ texte, ton }: { texte: string; ton: "manque" | "dedans" | "comp
 
 /* ----------------------------- Côté admin ----------------------------- */
 
-/** Une adresse → les lieux possibles ; l'admin choisit le bon. */
+/**
+ * Le nom du terrain, et son adresse qui se complète pendant la frappe : les
+ * adresses de la Base Adresse Nationale, puis les lieux nommés
+ * d'OpenStreetMap (un five, un city stade). Toucher une proposition la
+ * retient ; un lieu nommé propose aussi son nom pour le terrain.
+ */
 function ChercheAdresse({
   onPlacer,
   bouton,
@@ -616,24 +626,46 @@ function ChercheAdresse({
   const [lieux, setLieux] = useState<Lieu[]>([]);
   const [choisi, setChoisi] = useState<Lieu | null>(null);
   const [cherche, setCherche] = useState(false);
+  const [vide, setVide] = useState(false);
+  const derniere = useRef(0);
+  const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function chercher() {
-    const q = adresse.trim();
-    if (q.length < 3) return;
-    setCherche(true);
+  function taper(v: string) {
+    setAdresse(v);
     setChoisi(null);
-    try {
-      const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
-      const data = (await res.json()) as { resultats: Lieu[]; erreur?: string };
-      if (data.erreur) toast.error(data.erreur);
-      setLieux(data.resultats ?? []);
-      if (data.resultats?.length) setChoisi(data.resultats[0]);
-      if (!data.erreur && !data.resultats?.length) toast.error("Aucun lieu trouvé pour cette adresse. Ajoute la ville.");
-    } catch {
-      toast.error("Le service d'adresses est injoignable.");
-    } finally {
-      setCherche(false);
+    setVide(false);
+    if (minuteur.current) clearTimeout(minuteur.current);
+    const q = v.trim();
+    if (q.length < 3) {
+      setLieux([]);
+      return;
     }
+    // Une requête par pause de frappe ; une réponse en retard ne remplace
+    // jamais une plus récente.
+    minuteur.current = setTimeout(async () => {
+      const n = ++derniere.current;
+      setCherche(true);
+      try {
+        // Les propositions proches de la ligue passent devant (Lille).
+        const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}&lat=${PRES_DE.lat}&lon=${PRES_DE.lng}`);
+        const data = (await res.json()) as { resultats: Lieu[]; erreur?: string };
+        if (n !== derniere.current) return;
+        if (data.erreur) toast.error(data.erreur);
+        setLieux(data.resultats ?? []);
+        setVide(!data.erreur && !(data.resultats ?? []).length);
+      } catch {
+        if (n === derniere.current) toast.error("Les services d'adresses ne répondent pas.");
+      } finally {
+        if (n === derniere.current) setCherche(false);
+      }
+    }, 250);
+  }
+
+  function retenir(l: Lieu) {
+    setChoisi(l);
+    setAdresse(l.libelle);
+    setLieux([]);
+    if (!nom.trim() && l.nom) setNom(l.nom);
   }
 
   return (
@@ -642,55 +674,66 @@ function ChercheAdresse({
         <span className="text-[13px] font-semibold">Nom du terrain</span>
         <Input value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Five du canal" maxLength={40} />
       </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[13px] font-semibold">Adresse</span>
-        <div className="flex gap-2">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="adresse-terrain" className="text-[13px] font-semibold">
+          Adresse
+        </label>
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            id="adresse-terrain"
             value={adresse}
-            onChange={(e) => {
-              setAdresse(e.target.value);
-              setLieux([]);
-              setChoisi(null);
-            }}
+            onChange={(e) => taper(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
+              if (e.key === "Enter" && lieux[0]) {
                 e.preventDefault();
-                void chercher();
+                retenir(lieux[0]);
               }
             }}
-            placeholder="12 rue du Stade, Lille"
+            placeholder="Une adresse ou le nom du terrain"
+            autoComplete="off"
+            className="pl-9"
+            role="combobox"
+            aria-expanded={lieux.length > 0}
+            aria-controls="adresses-proposees"
           />
-          <Button type="button" variant="secondary" disabled={cherche || adresse.trim().length < 3} onClick={chercher}>
-            <Search className="size-4" /> {cherche ? "…" : "Chercher"}
-          </Button>
+          {cherche && <span className="absolute top-1/2 right-3 size-3 -translate-y-1/2 animate-pulse rounded-full bg-muted-foreground/60" aria-hidden />}
         </div>
-      </label>
-
-      {lieux.length > 0 && (
-        <ul className="flex flex-col gap-1.5">
-          {lieux.map((l) => (
-            <li key={`${l.lat},${l.lng}`}>
-              <button
-                type="button"
-                onClick={() => setChoisi(l)}
-                aria-pressed={choisi === l}
-                className={cn(
-                  "w-full rounded-xl border px-3 py-2 text-left text-[12px] leading-snug",
-                  choisi === l ? "border-foreground bg-secondary" : "border-border text-muted-foreground"
-                )}
-              >
-                {l.libelle}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+        {lieux.length > 0 && (
+          <ul id="adresses-proposees" role="listbox" className="overflow-hidden rounded-2xl border border-border bg-popover">
+            {lieux.map((l) => (
+              <li key={`${l.lat},${l.lng},${l.libelle}`} role="option" aria-selected={false}>
+                <button
+                  type="button"
+                  onClick={() => retenir(l)}
+                  className="flex w-full items-start gap-2.5 border-b border-border/60 px-3 py-2.5 text-left last:border-0 hover:bg-secondary"
+                >
+                  <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13.5px] font-semibold">{l.nom ?? l.libelle.split(",")[0]}</span>
+                    <span className="block truncate text-[12px] text-muted-foreground">
+                      {l.nom ? l.libelle.split(", ").slice(1).join(", ") : (l.commune ?? "")}
+                      {l.genre === "lieu" ? " · lieu" : ""}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {vide && <p className="text-[12px] text-muted-foreground">Rien pour cette saisie : ajoute la ville ou le code postal.</p>}
+        {choisi && (
+          <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+            <span className="size-1.5 rounded-full bg-vert" /> Adresse retenue
+          </p>
+        )}
+      </div>
 
       <Button
         disabled={!choisi || !nom.trim()}
         onClick={() => {
           if (!choisi || !nom.trim()) return;
-          onPlacer(nom.trim(), adresse.trim(), choisi);
+          onPlacer(nom.trim(), choisi.libelle, choisi);
           setNom("");
           setAdresse("");
           setLieux([]);

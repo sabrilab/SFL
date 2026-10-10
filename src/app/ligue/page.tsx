@@ -12,11 +12,9 @@
 // Le récap lui-même vit dans feed/journee-recap.tsx.
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useMyPlayer } from "@/components/sfl/player-provider";
-import { useIsClient } from "@/hooks/use-is-client";
 import { LEAGUE_KEY } from "@/components/layout/site-header";
 import { useSeason } from "@/components/sfl/season-provider";
 import { NEXT_MATCH } from "@/lib/sfl/data";
@@ -34,17 +32,14 @@ import { cn } from "@/lib/utils";
 export default function Ligue() {
   const { player } = useMyPlayer();
   const { players, journees, saison } = useSeason();
-  const isClient = useIsClient();
   const [view, setView] = useState<"accueil" | "journee" | "classement" | "matchs">("accueil");
-  const [leagueTick, setLeagueTick] = useState(0);
-  void leagueTick;
-
-  const league = isClient ? (localStorage.getItem(LEAGUE_KEY) ?? "SFL") : "SFL";
-  function backToSFL() {
-    localStorage.setItem(LEAGUE_KEY, "SFL");
-    window.dispatchEvent(new Event("sfl-league"));
-    setLeagueTick((n) => n + 1);
-  }
+  // Une seule ligue, la SFL : un ancien choix d'une autre ligue (WFL, KFL)
+  // masquait tout le fil. On l'efface.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(LEAGUE_KEY) && localStorage.getItem(LEAGUE_KEY) !== "SFL") localStorage.setItem(LEAGUE_KEY, "SFL");
+    } catch {}
+  }, []);
 
   /* --------------------- Les capsules de journées --------------------- */
 
@@ -93,19 +88,6 @@ export default function Ligue() {
     .slice(-5)
     .map((e) => (e.result === "Victoire" ? "V" : e.result === "Nul" ? "N" : "D"));
 
-  if (isClient && league !== "SFL") {
-    return (
-      <div className="mx-auto flex max-w-3xl flex-col items-center gap-4 px-5 py-16 text-center">
-        <span className="scale-y-90 text-2xl font-black tracking-[0.35em] uppercase">{league}</span>
-        <p className="text-sm text-muted-foreground">
-          Tu n&apos;es pas membre de la {league}. Ta ligue, c&apos;est la SFL.
-        </p>
-        <Button onClick={backToSFL} className="font-semibold">
-          Revenir à la SFL
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div className="shell flex flex-col gap-6 py-2 sm:py-6">
