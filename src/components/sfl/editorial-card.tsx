@@ -47,7 +47,7 @@ const GRAIN =
   );
 
 const ANTON = "var(--font-anton), Anton, sans-serif";
-const JBMONO = "var(--font-jbmono), ui-monospace, monospace";
+const JBMONO = "var(--font-courier), ui-monospace, monospace";
 
 /** Réduit la taille du nom pour tenir dans la largeur (fitFont du design). */
 function fitName(name: string, max: number, width: number) {

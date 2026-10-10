@@ -122,6 +122,23 @@ export interface Saison {
   events?: MatchEvent[];
   /** Les saisons closes, de la plus ancienne à la plus récente. */
   archives?: SaisonArchivee[];
+  /** Les terrains de la ligue, posés sur la Map. */
+  terrains?: Terrain[];
+}
+
+/**
+ * Un terrain où la ligue joue : un nom, une adresse, un point sur la Map.
+ * La convocation garde son `lieu` en texte libre ; la Map retrouve le terrain
+ * par ce nom, et à défaut prend celui marqué par défaut.
+ */
+export interface Terrain {
+  id: number;
+  nom: string;
+  adresse: string;
+  lat: number;
+  lng: number;
+  /** Le terrain habituel : celui des matchs dont le lieu ne nomme aucun autre. */
+  defaut?: boolean;
 }
 
 /** Le numéro d'une saison, 0 quand il n'a jamais été posé. */

@@ -787,6 +787,7 @@ export function AdminDashboard() {
         }}
       />
       <ConvocationSheet
+        terrains={saison.terrains ?? []}
         open={convocOpen}
         onOpenChange={setConvocOpen}
         onCreate={(info) => {

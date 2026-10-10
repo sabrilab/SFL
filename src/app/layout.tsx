@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Anton, Barlow_Condensed, JetBrains_Mono } from "next/font/google";
+import { Inter, Courier_Prime, Anton, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme-provider";
@@ -18,29 +18,27 @@ import { AppSplash } from "@/components/sfl/app-splash";
 import { ActivityTracker } from "@/components/sfl/activity-tracker";
 import { NouvellesCartes } from "@/components/sfl/nouvelle-carte";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Typographie de la charte BOLA : Inter (titres serrés, texte) et Courier
+// Prime, la machine à écrire en minuscules, pour tout ce qui s'étiquette.
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const courier = Courier_Prime({
+  weight: ["400", "700"],
+  variable: "--font-courier",
   subsets: ["latin"],
 });
 
+// Chiffres de l'arène de duel, seul usage restant d'une typo d'affiche.
 const anton = Anton({
   weight: "400",
   variable: "--font-anton",
   subsets: ["latin"],
 });
 
-// Police « données » des cartes éditoriales (design de référence).
-const jbMono = JetBrains_Mono({
-  weight: ["400", "600", "700"],
-  variable: "--font-jbmono",
-  subsets: ["latin"],
-});
-
+// La typo des cartes joueurs (card-shell.tsx) : on ne retouche pas les cartes.
 const barlow = Barlow_Condensed({
   weight: ["400", "500", "600", "700", "800"],
   variable: "--font-barlow",
@@ -50,15 +48,15 @@ const barlow = Barlow_Condensed({
 export const metadata: Metadata = {
   metadataBase: new URL("https://sfl-eight.vercel.app"),
   title: {
-    default: "SFL — Sunday Five League",
-    template: "%s · SFL",
+    default: "Bola — Sunday Five League",
+    template: "%s · Bola",
   },
   description:
-    "Sunday Five League — classement Pépite d'Or, matchs, cartes joueurs et convocations. Chaque dimanche compte.",
+    "Bola, l'app de la Sunday Five League — la Map des matchs, le classement Pépite d'Or, les cartes joueurs et les convocations. Chaque dimanche compte.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "SFL",
+    title: "Bola",
   },
 };
 
@@ -67,7 +65,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#070707",
+  themeColor: "#08090B",
 };
 
 export default function RootLayout({
@@ -79,7 +77,7 @@ export default function RootLayout({
     <html
       lang="fr"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${anton.variable} ${barlow.variable} ${jbMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${courier.variable} ${anton.variable} ${barlow.variable} h-full antialiased`}
     >
       {/* body ne défile jamais lui-même (overflow hidden, hauteur figée à
           celle de l'écran) : c'est le conteneur interne juste en dessous

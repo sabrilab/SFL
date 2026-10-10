@@ -52,6 +52,7 @@ export function seedSaison(): Saison {
 function migrate(s: Saison): Saison {
   if (!s.convocations) s.convocations = [];
   if (!s.archives) s.archives = [];
+  if (!s.terrains) s.terrains = [];
   return s;
 }
 

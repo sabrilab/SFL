@@ -8,9 +8,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BallIcon, PersonIcon } from "./nav-icons";
+import { BallIcon, MapIcon, PersonIcon } from "./nav-icons";
 
 const TABS: { href: string; Icon: typeof BallIcon; label: string; dot?: boolean }[] = [
+  { href: "/map", Icon: MapIcon, label: "Map" },
   { href: "/", Icon: BallIcon, label: "Feed" },
   { href: "/profil", Icon: PersonIcon, label: "Profil" },
 ];

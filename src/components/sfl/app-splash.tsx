@@ -10,6 +10,7 @@
 // La barre de progression reflète le vrai travail effectué (chaque étape
 // a un poids) plutôt qu'une animation décorative minutée à l'aveugle.
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "motion/react";
@@ -122,13 +123,11 @@ export function AppSplash() {
             <motion.span
               animate={{ scale: [1, 1.05, 1], opacity: [0.82, 1, 0.82] }}
               transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-              className="font-sans text-3xl font-extrabold tracking-tighter"
+              className="flex items-center"
             >
-              Golder
+              <Image src="/bola/logo-blanc.svg" alt="Bola" width={126} height={30} priority />
             </motion.span>
-            <span className="scale-y-90 text-[11px] font-black tracking-[0.35em] text-muted-foreground uppercase">
-              Sunday Five League
-            </span>
+            <span className="mono-label text-muted-foreground">sunday five league</span>
             <div className="mt-3 h-1 w-40 overflow-hidden rounded-full bg-foreground/10">
               <motion.div
                 className="h-full rounded-full bg-primary"

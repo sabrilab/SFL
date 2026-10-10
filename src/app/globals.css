@@ -7,11 +7,15 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Typographie BOLA : Inter pour tout ce qui se lit, Courier Prime (la
+     machine à écrire, en minuscules) pour ce qui s'étiquette. */
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-courier);
   --font-heading: var(--font-sans);
   --font-display: var(--font-anton);
-  --font-condensed: var(--font-barlow);
+  --color-vert: var(--vert);
+  --color-braise: var(--braise);
+  --color-mauve: var(--mauve);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -50,77 +54,87 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Thème clair — off-white doux, cartes blanches, accent orange SFL (#FF5A1F) */
+/* Thème clair — la charte BOLA sur papier : Blanc Craie, encre Noir Nuit,
+   le gris béton pour ce qui s'efface. Le site tourne en sombre (voir
+   layout.tsx) ; ce clair reste prêt, dans la même famille de couleurs. */
 :root {
-  --background: oklch(0.972 0.002 80);
-  --foreground: oklch(0.16 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.16 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.16 0 0);
-  --primary: oklch(0.62 0.2 38);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.945 0.002 80);
-  --secondary-foreground: oklch(0.22 0 0);
-  --muted: oklch(0.945 0.002 80);
-  --muted-foreground: oklch(0.5 0 0);
-  --accent: oklch(0.93 0.004 60);
-  --accent-foreground: oklch(0.22 0 0);
+  --background: #f4f5f2;
+  --foreground: #08090b;
+  --card: #ffffff;
+  --card-foreground: #08090b;
+  --popover: #ffffff;
+  --popover-foreground: #08090b;
+  --primary: #08090b;
+  --primary-foreground: #f4f5f2;
+  --secondary: #e9eae6;
+  --secondary-foreground: #08090b;
+  --muted: #e9eae6;
+  --muted-foreground: #8f908b;
+  --accent: #e3e4e0;
+  --accent-foreground: #08090b;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.91 0.002 80);
-  --input: oklch(0.91 0.002 80);
-  --ring: oklch(0.72 0.14 38);
-  --chart-1: oklch(0.66 0.2 38);
-  --chart-2: oklch(0.75 0.12 220);
-  --chart-3: oklch(0.78 0.11 85);
-  --chart-4: oklch(0.6 0.18 295);
-  --chart-5: oklch(0.68 0.14 150);
+  --border: #e0e1dd;
+  --input: #e0e1dd;
+  --ring: #08090b;
+  --chart-1: #3f5e40;
+  --chart-2: #ff8a4c;
+  --chart-3: #5b2141;
+  --chart-4: #8f908b;
+  --chart-5: #8b7e83;
   --radius: 1rem;
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.16 0 0);
-  --sidebar-primary: oklch(0.62 0.2 38);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.93 0.004 60);
-  --sidebar-accent-foreground: oklch(0.22 0 0);
-  --sidebar-border: oklch(0.91 0.002 80);
-  --sidebar-ring: oklch(0.72 0.14 38);
+  --sidebar: #ffffff;
+  --sidebar-foreground: #08090b;
+  --sidebar-primary: #08090b;
+  --sidebar-primary-foreground: #f4f5f2;
+  --sidebar-accent: #e3e4e0;
+  --sidebar-accent-foreground: #08090b;
+  --sidebar-border: #e0e1dd;
+  --sidebar-ring: #08090b;
+  /* Les trois accents de la charte, par leur nom. */
+  --vert: #3f5e40;
+  --braise: #ff8a4c;
+  --mauve: #5b2141;
 }
 
-/* Thème sombre — noir neutre profond, cartes anthracite, accent orange SFL */
+/* Thème sombre — l'app BOLA : Noir Nuit, cartes à peine plus claires, texte
+   Blanc Craie. L'accent principal est le blanc lui-même (boutons pleins,
+   repères) ; le vert dit ce qui monte, la braise est réservée au manque, le
+   mauve à l'homme du match. */
 .dark {
-  /* Noir profond du design de référence : le fond descend presque au noir pur,
-     les cartes restent mates juste au-dessus. */
-  --background: oklch(0.1 0 0);
-  --foreground: oklch(0.96 0 0);
-  --card: oklch(0.17 0 0);
-  --card-foreground: oklch(0.96 0 0);
-  --popover: oklch(0.2 0 0);
-  --popover-foreground: oklch(0.96 0 0);
-  --primary: #6FA8FF; /* accent unique du design de référence */
-  --primary-foreground: #0A0B0E;
-  --secondary: oklch(0.24 0 0);
-  --secondary-foreground: oklch(0.96 0 0);
-  --muted: oklch(0.24 0 0);
-  --muted-foreground: oklch(0.63 0 0);
-  --accent: oklch(0.26 0 0);
-  --accent-foreground: oklch(0.96 0 0);
+  --background: #08090b;
+  --foreground: #f4f5f2;
+  --card: #131519;
+  --card-foreground: #f4f5f2;
+  --popover: #15181c;
+  --popover-foreground: #f4f5f2;
+  --primary: #f4f5f2;
+  --primary-foreground: #08090b;
+  --secondary: #1c1f24;
+  --secondary-foreground: #f4f5f2;
+  --muted: #1c1f24;
+  --muted-foreground: #8f908b;
+  --accent: #22262b;
+  --accent-foreground: #f4f5f2;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 7%);
-  --input: oklch(1 0 0 / 11%);
-  --ring: #6FA8FF;
-  --chart-1: oklch(0.7 0.19 38);
-  --chart-2: oklch(0.78 0.12 220);
-  --chart-3: oklch(0.82 0.11 85);
-  --chart-4: oklch(0.65 0.17 295);
-  --chart-5: oklch(0.72 0.13 150);
-  --sidebar: oklch(0.185 0 0);
-  --sidebar-foreground: oklch(0.96 0 0);
-  --sidebar-primary: #6FA8FF;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.26 0 0);
-  --sidebar-accent-foreground: oklch(0.96 0 0);
-  --sidebar-border: oklch(1 0 0 / 7%);
-  --sidebar-ring: oklch(0.62 0.15 38);
+  --border: rgba(244, 245, 242, 0.08);
+  --input: rgba(244, 245, 242, 0.12);
+  --ring: #f4f5f2;
+  --chart-1: #a9cba9;
+  --chart-2: #ff8a4c;
+  --chart-3: #e0b3cb;
+  --chart-4: #8f908b;
+  --chart-5: #8b7e83;
+  --sidebar: #0f1114;
+  --sidebar-foreground: #f4f5f2;
+  --sidebar-primary: #f4f5f2;
+  --sidebar-primary-foreground: #08090b;
+  --sidebar-accent: #22262b;
+  --sidebar-accent-foreground: #f4f5f2;
+  --sidebar-border: rgba(244, 245, 242, 0.08);
+  --sidebar-ring: #f4f5f2;
+  --vert: #a9cba9;
+  --braise: #ff8a4c;
+  --mauve: #e0b3cb;
 }
 
 @layer base {
@@ -242,13 +256,15 @@
 .orbs > i:nth-child(2) { top: 330px; right: -110px; width: 280px; height: 280px; filter: blur(24px); animation-duration: 21s; animation-direction: reverse; background: radial-gradient(circle, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 70%); }
 .orbs > i:nth-child(3) { bottom: -80px; left: 30px; width: 320px; height: 260px; filter: blur(30px); animation-duration: 25s; background: radial-gradient(circle, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 70%); }
 
-/* Micro-label du design de référence : JetBrains Mono, capitales espacées. */
+/* Micro-label — la seconde typo de la charte BOLA : Courier Prime, en
+   minuscules, « un peu écriture de dactylo ». Les sur-titres, les compteurs,
+   les relevés : tout ce qui s'étiquette passe par elle. */
 .mono-label {
-  font-family: var(--font-jbmono), ui-monospace, monospace;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-family: var(--font-courier), "Courier New", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: lowercase;
 }
 
 /* ─────────────────────── Le gabarit de page ────────────────────────
@@ -287,4 +303,91 @@
   width: 100%;
   margin-inline: auto;
   max-width: 760px;
+}
+
+/* ─────────────── La Map (Leaflet) : fond sombre, repères BOLA ───────────────
+   Un point Blanc Craie cerclé de nuit, le nom à la machine à écrire ; le
+   terrain du prochain match bat doucement. */
+.leaflet-container {
+  background: #08090b;
+  font-family: var(--font-courier), "Courier New", ui-monospace, monospace;
+}
+.leaflet-container .leaflet-control-attribution {
+  background: rgba(8, 9, 11, 0.72);
+  color: #8f908b;
+  font-size: 9px;
+}
+.leaflet-container .leaflet-control-attribution a {
+  color: #c9cac5;
+}
+.leaflet-touch .leaflet-bar {
+  border: 1px solid rgba(244, 245, 242, 0.12);
+}
+.leaflet-bar a,
+.leaflet-bar a:hover,
+.leaflet-bar a:focus {
+  background: #131519;
+  color: #f4f5f2;
+  border-bottom-color: rgba(244, 245, 242, 0.1);
+}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: #131519;
+  color: #f4f5f2;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+}
+.leaflet-popup-content {
+  margin: 10px 14px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.leaflet-container a.leaflet-popup-close-button {
+  color: #8f908b;
+}
+.bola-pin {
+  background: none;
+  border: 0;
+}
+.bola-pin__dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #f4f5f2;
+  box-shadow:
+    0 0 0 3px rgba(8, 9, 11, 0.92),
+    0 0 0 4px rgba(244, 245, 242, 0.35),
+    0 6px 16px rgba(0, 0, 0, 0.6);
+}
+.bola-pin__dot--match {
+  width: 18px;
+  height: 18px;
+}
+.bola-pin__dot--match::after {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(244, 245, 242, 0.7);
+  animation: bolaPulse 2.2s ease-out infinite;
+}
+@keyframes bolaPulse {
+  0% { transform: scale(0.55); opacity: 0.9; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+.bola-pin__nom {
+  position: absolute;
+  left: 14px;
+  top: 0;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font-family: var(--font-courier), "Courier New", ui-monospace, monospace;
+  font-size: 11px;
+  color: #f4f5f2;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 8px rgba(0, 0, 0, 0.8);
 }

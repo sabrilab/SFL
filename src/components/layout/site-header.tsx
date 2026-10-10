@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
@@ -93,13 +94,10 @@ export function SiteHeader() {
       style={{ top: "calc(env(safe-area-inset-top) + 0.75rem)" }}
     >
       <div className="mx-auto flex h-14 max-w-5xl min-w-0 items-center gap-2">
-        {/* Bulle gauche : logo Golder + ligue courante */}
+        {/* Bulle gauche : le logo BOLA + ligue courante */}
         <div className="glass flex min-w-0 items-center gap-2 rounded-full py-1.5 pr-1.5 pl-4">
-          <Link
-            href="/"
-            className="truncate font-sans text-base font-extrabold tracking-tighter"
-          >
-            Golder
+          <Link href="/" aria-label="Bola — accueil" className="flex shrink-0 items-center">
+            <Image src="/bola/logo-blanc.svg" alt="Bola" width={72} height={17} priority />
           </Link>
           <LeagueSwitcher />
           <Link

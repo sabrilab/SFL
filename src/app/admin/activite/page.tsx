@@ -61,6 +61,7 @@ const KIND_FR: Record<string, string> = {
 
 /** Libellés lisibles des pages. */
 const PATH_FR: Record<string, string> = {
+  "/map": "Map",
   "/": "Feed",
   "/profil": "Profil",
   "/duel": "Arène",

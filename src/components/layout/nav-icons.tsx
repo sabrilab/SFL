@@ -1,5 +1,6 @@
 // Icônes de la tab bar — tracés SVG copiés tels quels du design de référence
-// (ballon de foot pour le feed, bulle, joueur, sac de la boutique).
+// (ballon de foot pour le feed, bulle, joueur, sac de la boutique), plus
+// l'épingle de la Map.
 
 interface IconProps {
   stroke: string;
@@ -37,6 +38,15 @@ export function BagIcon({ stroke }: IconProps) {
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5.4 8.2h13.2l-1 12.1H6.4z" />
       <path d="M9.1 8.2V6.5a2.9 2.9 0 0 1 5.8 0v1.7" />
+    </svg>
+  );
+}
+
+export function MapIcon({ stroke }: IconProps) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 21s-6.5-5.7-6.5-10.4a6.5 6.5 0 0 1 13 0C18.5 15.3 12 21 12 21z" />
+      <circle cx="12" cy="10.6" r="2.4" />
     </svg>
   );
 }

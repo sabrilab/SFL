@@ -3,7 +3,7 @@
 // Les lignes sont identifiées par leur index dans `entries` — l'UI passe cet
 // index. Le store persiste le résultat.
 
-import { numeroSaison, type SaisonArchivee } from "./types";
+import { numeroSaison, type SaisonArchivee, type Terrain } from "./types";
 import type {
   Convocation,
   ConvocationReponse,
@@ -321,4 +321,53 @@ export function restaurerSaison(saison: Saison): Saison {
 export function saisonDepuisArchive(a: SaisonArchivee): Saison {
   return { numero: a.numero, journees: a.journees, roster: a.roster, entries: a.entries,
     events: a.events ?? [], convocations: [], archives: [] };
+}
+
+/* -------------------------------- Terrains -------------------------------- */
+//
+// La Map montre les matchs de la ligue là où ils se jouent. Un terrain, c'est
+// un nom, une adresse et un point ; le premier ajouté devient le terrain par
+// défaut, et il n'y en a jamais qu'un.
+
+const normaliser = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+
+export function ajouterTerrain(saison: Saison, t: Omit<Terrain, "id">): Saison {
+  const terrains = saison.terrains ?? [];
+  const id = terrains.reduce((m, x) => Math.max(m, x.id), 0) + 1;
+  const defaut = terrains.length === 0 || !!t.defaut;
+  return {
+    ...saison,
+    terrains: [
+      ...terrains.map((x) => (defaut ? { ...x, defaut: false } : x)),
+      { ...t, id, defaut },
+    ],
+  };
+}
+
+export function retirerTerrain(saison: Saison, id: number): Saison {
+  const restants = (saison.terrains ?? []).filter((x) => x.id !== id);
+  // Le terrain par défaut ne disparaît pas avec celui qu'on retire.
+  if (restants.length && !restants.some((x) => x.defaut)) restants[0] = { ...restants[0], defaut: true };
+  return { ...saison, terrains: restants };
+}
+
+export function definirTerrainParDefaut(saison: Saison, id: number): Saison {
+  return { ...saison, terrains: (saison.terrains ?? []).map((x) => ({ ...x, defaut: x.id === id })) };
+}
+
+/**
+ * Le terrain d'un match, d'après le lieu écrit sur sa convocation : celui dont
+ * le nom y figure, sinon le terrain par défaut, sinon le premier connu.
+ */
+export function terrainDuMatch(saison: Pick<Saison, "terrains">, lieu: string | null | undefined): Terrain | null {
+  const terrains = saison.terrains ?? [];
+  if (!terrains.length) return null;
+  const l = normaliser(lieu ?? "");
+  const nomme = l ? terrains.find((t) => l.includes(normaliser(t.nom))) : undefined;
+  return nomme ?? terrains.find((t) => t.defaut) ?? terrains[0];
 }
