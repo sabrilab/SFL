@@ -8,6 +8,9 @@
 // d'un coup, avec sous les yeux ce que le joueur a produit la saison passée —
 // on requalifie sur des faits, pas de mémoire.
 //
+// Six tuiles sur grand écran, trois par rangée sur téléphone : chaque tuile
+// doit loger « − valeur + » (72 px) sans empiéter sur sa voisine.
+//
 // Chaque modification passe par `commit` : elle s'annule au ⌘Z comme le reste,
 // et part en base comme le reste.
 
@@ -99,7 +102,7 @@ export function Requalification({
                     {ovrDe(base)}
                   </span>
                 </div>
-                <div className="mt-1.5 grid grid-cols-6 gap-1">
+                <div className="mt-1.5 grid grid-cols-3 gap-1 sm:grid-cols-6">
                   {STATS.map((nom, k) => (
                     <div key={nom} className="flex flex-col items-center rounded-xl bg-secondary/60 py-1">
                       <span className="text-[9px] font-bold tracking-wider text-muted-foreground">{nom}</span>

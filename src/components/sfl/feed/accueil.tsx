@@ -286,7 +286,7 @@ export function Accueil({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[14px] font-bold tracking-tight">{a.nom}</span>
                     <span className="block text-[12px] text-muted-foreground">
-                      {a.journees.length} journées · l&apos;archive complète, classements et journées
+                      {`${a.journees.length} journée${a.journees.length > 1 ? "s" : ""} · l'archive complète, classements et journées`}
                     </span>
                   </span>
                   <ChevronRight className="size-4 text-muted-foreground" />

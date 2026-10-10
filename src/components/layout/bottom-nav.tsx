@@ -1,19 +1,18 @@
 "use client";
 
 // Tab bar — répliquée du design de référence : « le seul élément liquid glass ».
-// Quatre icônes sans libellé ; l'onglet actif est une pilule blanche pleine
-// avec l'icône noire, les inactifs sont des traits blancs à 58 %. La bulle
-// des Discussions porte la pastille bleue de notification.
+// Icônes sans libellé ; l'onglet actif est une pilule blanche pleine avec
+// l'icône noire, les inactifs sont des traits blancs à 58 %. Discussions et
+// Boutique sont retirées de la barre à la demande de la ligue (la pastille
+// bleue de notification reste prête pour le jour où elles reviennent).
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BallIcon, BubbleIcon, PersonIcon, BagIcon } from "./nav-icons";
+import { BallIcon, PersonIcon } from "./nav-icons";
 
-const TABS = [
+const TABS: { href: string; Icon: typeof BallIcon; label: string; dot?: boolean }[] = [
   { href: "/", Icon: BallIcon, label: "Feed" },
-  { href: "/discussions", Icon: BubbleIcon, label: "Discussions", dot: true },
   { href: "/profil", Icon: PersonIcon, label: "Profil" },
-  { href: "/boutique", Icon: BagIcon, label: "Boutique" },
 ];
 
 export function BottomNav() {

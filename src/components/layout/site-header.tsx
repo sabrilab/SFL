@@ -66,15 +66,15 @@ function BallonsBadge({ me }: { me: string }) {
   const isClient = useIsClient();
   const balance = useBallons(me);
 
+  // La boutique n'est plus mise en avant : le solde s'affiche sans y mener.
   return (
-    <Link
-      href="/boutique"
-      aria-label="Mes Ballons — ouvrir la boutique"
+    <span
+      aria-label="Mes Ballons"
       className="flex items-center gap-1 rounded-full bg-secondary py-1.5 pr-3 pl-2 text-sm font-bold tabular-nums"
     >
       <span aria-hidden>⚽</span>
       {isClient ? balance : 0}
-    </Link>
+    </span>
   );
 }
 
