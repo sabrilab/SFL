@@ -74,7 +74,7 @@ function expectedHash(account: Account): string {
 
 export type SignInResult =
   | { ok: true; session: Session }
-  | { ok: false; reason: "unknown-user" | "bad-password" | "unavailable" };
+  | { ok: false; reason: "unknown-user" | "bad-password" | "unavailable" | "mot-de-passe-local" };
 
 /**
  * Borne une promesse dans le temps. Un projet Supabase en pause peut laisser
@@ -189,7 +189,14 @@ export async function signIn(user: string, password: string): Promise<SignInResu
   try {
     local = localStorage.getItem(`${OVERRIDE_PREFIX}${account.user}`) !== null;
   } catch {}
-  return signInLocal(account, password, refusServeur === "refuse" && local ? "mot-de-passe-local" : refusServeur);
+  // Ce mot de passe n'existe que sur cet appareil : une session locale ne
+  // lirait plus rien de la ligue (la base ne s'ouvre qu'aux connexions
+  // vérifiées) et n'écrirait rien non plus. On refuse, en disant pourquoi.
+  if (refusServeur === "refuse" && local) {
+    const tape = await hashPassword(account.user, password);
+    if (tape === expectedHash(account)) return { ok: false, reason: "mot-de-passe-local" };
+  }
+  return signInLocal(account, password, refusServeur);
 }
 
 /**
@@ -283,11 +290,10 @@ export async function changePassword(
     }
   }
 
-  // Mode local.
-  const hash = await hashPassword(account.user, current);
-  if (hash !== expectedHash(account)) return { ok: false, reason: "bad-password" };
-  localStorage.setItem(`${OVERRIDE_PREFIX}${account.user}`, await hashPassword(account.user, next));
-  return { ok: true };
+  // Hors connexion vérifiée, on ne change plus le mot de passe : un mot de
+  // passe changé sur l'appareil seulement est celui que le serveur refuse
+  // ensuite, et la personne se retrouve coupée de la ligue sans le savoir.
+  return { ok: false, reason: "unavailable" };
 }
 
 /** Le joueur a-t-il déjà changé son mot de passe par défaut ? (mode local) */

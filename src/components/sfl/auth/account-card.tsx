@@ -103,7 +103,9 @@ export function AccountCard() {
         res.reason === "too-short"
           ? "Six caractères minimum."
           : res.reason === "unavailable"
-            ? "Serveur injoignable — réessaie dans un instant."
+            ? session.server
+              ? "Serveur injoignable — réessaie dans un instant."
+              : "Reconnecte-toi d'abord avec ton mot de passe d'origine : le mot de passe ne se change qu'avec une connexion vérifiée."
             : "Mot de passe actuel incorrect."
       );
     }

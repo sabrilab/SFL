@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 const MESSAGES: Record<string, string> = {
   "unknown-user": "Cet identifiant n'existe pas dans la ligue.",
   "bad-password": "Mot de passe incorrect.",
+  "mot-de-passe-local":
+    "Ce mot de passe a été changé sur cet appareil seulement : la ligue ne le connaît pas. Utilise ton mot de passe d'origine, celui donné par l'admin.",
   unavailable:
     "Connexion impossible depuis cette adresse. Ouvre l'app en https (ou en localhost).",
 };

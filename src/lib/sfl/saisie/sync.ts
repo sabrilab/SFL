@@ -252,24 +252,24 @@ export async function diagnostic(): Promise<Etape[]> {
     titre: "Vérifiée par le serveur",
     ok: !!session.server,
     detail: session.server
-      ? "Ta connexion a été validée par Supabase."
-      : "Connexion validée sur l'appareil seulement — c'est ce qui empêche toute écriture en base. Déconnecte-toi puis reconnecte-toi.",
+      ? "Ta connexion a été validée par le serveur de la ligue."
+      : "Connexion validée sur l'appareil seulement : tu ne vois pas les dernières données de la ligue et tes modifications ne partent pas. Déconnecte-toi puis reconnecte-toi.",
   });
 
   let uid: string | null = null;
   try {
-    const { data, error } = await supabase().auth.getUser();
+    const { data } = await supabase().auth.getUser();
     uid = data.user?.id ?? null;
     etapes.push({
-      titre: "Compte Supabase",
+      titre: "Compte de la ligue",
       ok: !!uid,
       detail: uid
         ? "Le serveur reconnaît ta session."
-        : `Aucune session Supabase active${error ? ` (${error.message})` : ""}. Le compte existe-t-il ? Sinon, passe par Réglages → Installation Supabase.`,
+        : "Le serveur de la ligue ne te reconnaît pas sur cet appareil. Déconnecte-toi et reconnecte-toi avec ton mot de passe d'origine.",
     });
   } catch (e) {
     etapes.push({
-      titre: "Compte Supabase",
+      titre: "Compte de la ligue",
       ok: false,
       detail: `Base injoignable : ${e instanceof Error ? e.message : "réseau"}.`,
     });
