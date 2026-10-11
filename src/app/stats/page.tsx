@@ -12,6 +12,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { journeeScoreSummary, rankByMetric, type Player } from "@/lib/sfl/engine";
 import { RANKINGS, type RankingDef } from "@/lib/sfl/rankings";
+import { MiniCarte } from "@/components/sfl/mini-carte";
 import { BadgesLigne, IlsSeDemarquent } from "@/components/sfl/distinctions";
 import { distinctions } from "@/lib/sfl/distinctions";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
@@ -115,7 +116,7 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
             <div
               key={p.name}
               className={cn(
-                "glass-soft flex items-center gap-3 rounded-[18px] px-3.5 py-3",
+                "glass-soft flex items-center gap-3 rounded-[18px] px-3.5 py-2.5",
                 isMe && "bg-primary/10"
               )}
             >
@@ -127,9 +128,7 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
               >
                 {p.rank}
               </span>
-              <span className="mr-0.5 flex size-7 items-center justify-center rounded-full bg-secondary text-xs font-semibold">
-                {p.name[0]}
-              </span>
+              <MiniCarte player={p} size={0.17} detail={`${def.label} · ${p.value} ${def.unit}`} />
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="truncate text-[15px] font-semibold">{p.name}</span>
                 <BadgesLigne ds={parNom.get(p.name)} />

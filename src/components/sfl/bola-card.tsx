@@ -219,7 +219,7 @@ export function BolaCard({
                   width: "100%",
                   height: "100%",
                   objectFit: "cover",
-                  objectPosition: "50% 20%",
+                  objectPosition: "50% 50%",
                 }}
               />
               {/* Un voile clair en haut et en bas : l'étiquette et le poste restent lisibles. */}

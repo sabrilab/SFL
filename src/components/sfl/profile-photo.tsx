@@ -8,29 +8,39 @@
 // monde (voir lib/sfl/photos).
 
 import { useRef, useState } from "react";
-import { Camera, Trash2 } from "lucide-react";
+import { Camera, Crop, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { usePhotoPerso, usePlayerPhoto } from "@/hooks/use-player-photo";
-import { preparePhoto, removePhoto, setPhoto } from "@/lib/sfl/photos";
+import { removePhoto, setPhoto } from "@/lib/sfl/photos";
+import { RecadrerPhoto } from "@/components/sfl/recadrer-photo";
+import { useSeason } from "@/components/sfl/season-provider";
+import { ovr, rareStats } from "@/lib/sfl/engine";
+import { username } from "@/lib/sfl/usernames";
 
 export function ProfilePhoto({ name }: { name: string }) {
   const src = usePlayerPhoto(name);
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [broken, setBroken] = useState(false);
-  const hasCustom = usePhotoPerso(name) !== null;
+  const perso = usePhotoPerso(name);
+  const hasCustom = perso !== null;
+  const { allPlayers } = useSeason();
+  const joueur = allPlayers.find((p) => p.name === name);
+  const stats = rareStats(joueur?.stats ?? { VIT: 60, TIR: 60, PAS: 60, DRI: 60, DEF: 60, PHY: 60 });
+  // L'image en cours de recadrage (le fichier choisi, ou la photo actuelle).
+  const [aRecadrer, setARecadrer] = useState<string | null>(null);
 
-  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    // On réinitialise tout de suite : sans ça, rechoisir le même fichier
-    // ne déclenche pas de nouvel événement.
-    e.target.value = "";
-    if (!file) return;
+  function fermer() {
+    if (aRecadrer?.startsWith("blob:")) URL.revokeObjectURL(aRecadrer);
+    setARecadrer(null);
+  }
 
+  async function valider(dataUrl: string) {
+    fermer();
     setBusy(true);
     try {
-      const r = await setPhoto(name, await preparePhoto(file));
+      const r = await setPhoto(name, dataUrl);
       setBroken(false);
       if (r.partagee) toast.success("Photo mise à jour", { description: "Elle est sur ta carte, chez tout le monde." });
       else toast.warning("Photo gardée sur cet appareil", { description: r.raison });
@@ -39,6 +49,17 @@ export function ProfilePhoto({ name }: { name: string }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // On réinitialise tout de suite : sans ça, rechoisir le même fichier
+    // ne déclenche pas de nouvel événement.
+    e.target.value = "";
+    if (!file) return;
+
+    // D'abord on la place : le visage là où on le veut, puis elle part.
+    setARecadrer(URL.createObjectURL(file));
   }
 
   return (
@@ -91,7 +112,24 @@ export function ProfilePhoto({ name }: { name: string }) {
             <Trash2 className="size-3.5" /> Retirer
           </Button>
         )}
+        {hasCustom && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-1.5 h-7 gap-1.5 px-2 text-[12px] text-muted-foreground"
+            onClick={() => setARecadrer(perso)}
+          >
+            <Crop className="size-3.5" /> Recadrer
+          </Button>
+        )}
       </div>
+
+      <RecadrerPhoto
+        src={aRecadrer}
+        carte={{ name, username: username(name), position: joueur?.poste ?? "", overall: ovr(stats), stats }}
+        onValider={valider}
+        onFermer={fermer}
+      />
 
       <input
         ref={input}

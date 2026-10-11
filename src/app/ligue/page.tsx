@@ -24,6 +24,7 @@ import { JourneeRecap } from "@/components/sfl/feed/journee-recap";
 import { StatsAVenir } from "@/components/sfl/feed/stats-a-venir";
 import { BadgesLigne, IlsSeDemarquent } from "@/components/sfl/distinctions";
 import { Ecarts } from "@/components/sfl/ecarts";
+import { MiniCarte } from "@/components/sfl/mini-carte";
 import { distinctions } from "@/lib/sfl/distinctions";
 import { SaisonArchiveProvider } from "@/components/sfl/season-provider";
 import { journeeJouee, saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
@@ -291,6 +292,7 @@ export default function Ligue() {
           <section>
             <div className="flex items-center gap-3 px-2 pb-2.5">
               <span className="mono-label w-[22px] text-[9px] text-foreground/30">#</span>
+              <span className="w-[38px]" aria-hidden />
               <span className="mono-label flex-1 text-[9px] text-foreground/30">Joueur</span>
               <span className="mono-label w-[26px] text-center text-[9px] text-foreground/30">M</span>
               <span className="mono-label w-[44px] text-center text-[9px] text-foreground/30">B·P</span>
@@ -309,6 +311,7 @@ export default function Ligue() {
                   <span className="w-[22px] text-[13px] font-bold text-foreground/50 tabular-nums">
                     {p.rank}
                   </span>
+                  <MiniCarte player={p} size={0.15} detail={`${p.rank}e au Pépite d'Or · ${p.pp} pts`} />
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <span className="truncate text-[14px] font-semibold">{p.name}</span>
                     <BadgesLigne ds={distinctionsLigue.get(p.name)} />

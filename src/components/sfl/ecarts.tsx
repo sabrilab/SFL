@@ -13,6 +13,7 @@
 import { useMemo } from "react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
+import { MiniCarte } from "@/components/sfl/mini-carte";
 import { rankPlayers, type RankedPlayer } from "@/lib/sfl/engine";
 import { publicOnly } from "@/lib/sfl/hidden";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
@@ -66,6 +67,7 @@ export function Ecarts({ className, max = 8 }: { className?: string; max?: numbe
     return (
       <li key={p.name} className={cn("flex items-center gap-3 px-3.5 py-2.5", estMoi && "bg-foreground/[0.07]")}>
         <span className="w-[20px] text-[13px] font-bold text-foreground/45 tabular-nums">{p.rank}</span>
+        <MiniCarte player={p} size={0.17} detail={`${p.rank}e au Pépite d'Or · ${pts(p.pp)}`} />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
             <span className={cn("truncate text-[14px] font-semibold", estMoi && "font-bold")}>{p.name}</span>
