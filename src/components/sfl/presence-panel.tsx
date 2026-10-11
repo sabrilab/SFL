@@ -107,7 +107,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
             </button>
           </div>
           <p className="mono-label mt-2.5 text-center text-foreground/30">
-            Réponses jusqu&apos;à vendredi minuit · répondre rapporte 2 ⚽
+            Réponses jusqu&apos;à vendredi minuit
           </p>
         </>
       ) : (

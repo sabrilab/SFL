@@ -48,10 +48,14 @@ export function instantParis(date: Date): InstantParis {
 
 /**
  * La conversation accepte-t-elle encore des réponses ?
- * Du lundi 00h00 au vendredi 23h59 inclus ; le week-end, c'est clos.
+ * Du dimanche 16h (après le match) au vendredi 23h59 ; le samedi et le
+ * dimanche avant le match, c'est clos.
  */
 export function reponsesOuvertes(date: Date): boolean {
-  return instantParis(date).jourIso <= 5;
+  const { jourIso, heure } = instantParis(date);
+  // Le dimanche, une fois le match joué (16h), la convocation du dimanche
+  // suivant prend le relais : on peut déjà dire si on est chaud.
+  return jourIso <= 5 || (jourIso === 7 && heure >= 16);
 }
 
 /**

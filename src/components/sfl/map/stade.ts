@@ -118,7 +118,7 @@ const echapper = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
 
 /** L'état d'un match SFL vu du sticker : il manque N, tu y es, complet. */
-export type EtatSticker = { genre: "manque"; n: number } | { genre: "dedans" } | { genre: "complet" };
+export type EtatSticker = { genre: "manque"; n: number } | { genre: "dedans" } | { genre: "complet" } | { genre: "joue" };
 
 export interface StickerPlan {
   id: string;
@@ -144,8 +144,8 @@ export function stickerHtml(s: StickerPlan, choisi: boolean): string {
       ? `<span class="stk__etiquette stk__etiquette--manque">il manque ${s.etat.n}</span>`
       : s.etat.genre === "dedans"
         ? `<span class="stk__etiquette stk__etiquette--dedans">tu y es</span>`
-        : `<span class="stk__etiquette stk__etiquette--complet">complet</span>`;
-  return `<div class="stk${choisi ? " stk--choisi" : ""}${s.etat.genre === "complet" ? " stk--complet" : ""}" style="--penche:${penche(s.id)}deg">
+        : `<span class="stk__etiquette stk__etiquette--complet">${s.etat.genre === "joue" ? "joué" : "complet"}</span>`;
+  return `<div class="stk${choisi ? " stk--choisi" : ""}${s.etat.genre === "complet" || s.etat.genre === "joue" ? " stk--complet" : ""}" style="--penche:${penche(s.id)}deg">
   <div class="stk__vignette">
     <div class="stk__stade">${stadeSvg(s.moment)}</div>
     <span class="stk__cal"><span class="stk__cal-jour">${echapper(s.jourCourt)}</span><span class="stk__cal-heure">${echapper(heureCourte(s.heure))}</span></span>

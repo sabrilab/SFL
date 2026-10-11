@@ -354,13 +354,6 @@ exception
 end;
 $$;
 
-do $$
-begin
-  alter publication supabase_realtime add table public.messages;
-exception
-  when duplicate_object then null;
-end;
-$$;
 
 
 -- ────────────────────────────── Messages ─────────────────────────────
@@ -418,6 +411,18 @@ create policy "messages: je retire le mien"
   on public.messages for delete
   to authenticated
   using (auteur = (select auth.uid()) or (select public.is_league_admin()));
+
+-- Le salon en temps réel — APRÈS la création de la table (ajoutée plus
+-- haut, elle faisait échouer toute la migration sur une base neuve).
+do $$
+begin
+  alter publication supabase_realtime add table public.messages;
+exception
+  when duplicate_object then null;
+  when undefined_table then null;
+  when undefined_object then null;
+end;
+$$;
 
 -- ────────────────────────────── Photos ───────────────────────────────
 -- Les photos de profil, partagées : celle qu'un joueur pose apparaît sur sa

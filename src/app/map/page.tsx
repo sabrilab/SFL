@@ -96,6 +96,9 @@ function aujourdhuiParis(): string {
 // du même point, puis vraies au premier rendu client.
 const rienAEcouter = () => () => {};
 const useAujourdhui = () => useSyncExternalStore(rienAEcouter, aujourdhuiParis, () => "");
+/** L'heure qu'il est à Paris (0–23), -1 côté serveur. */
+const heureParis = () => Number(new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "numeric", hour12: false }).format(new Date())) % 24;
+const useHeure = () => useSyncExternalStore(rienAEcouter, heureParis, () => -1);
 const useEstIos = () =>
   useSyncExternalStore(rienAEcouter, () => /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent), () => false);
 
@@ -137,7 +140,8 @@ function quand(dateLabel: string, jourTexte: string | null, aujourdhui: string):
     if (ecart === 1) return { titre: "Demain", jourCourt: "DEMAIN", moment: weekend ? "weekend" : "semaine" };
     if (ecart > 1 && ecart < 7)
       return { titre: nom[0].toUpperCase() + nom.slice(1), jourCourt: `${nom.slice(0, 3).toUpperCase()}.`, moment: weekend ? "weekend" : "semaine" };
-    return { titre: dateLabel, jourCourt: dateLabel.toUpperCase().slice(0, 7), moment: weekend ? "weekend" : "semaine" };
+    const court = `${d.getUTCDate()} ${MOIS[d.getUTCMonth()]}.`;
+    return { titre: court, jourCourt: court.toUpperCase().slice(0, 7), moment: weekend ? "weekend" : "semaine" };
   }
   const t = jourTexte ?? dateLabel;
   return { titre: t, jourCourt: `${t.slice(0, 3).toUpperCase()}.`, moment: /dim|sam/i.test(t) ? "weekend" : "semaine" };
@@ -177,6 +181,32 @@ interface MatchMap {
   dedans: boolean;
   etat: EtatSticker;
   etatTexte: string;
+  /** Le match est passé : on montre qui a joué, et le chemin vers le récap. */
+  joue?: boolean;
+  /** Une journée datée du dimanche de la convocation : on y répond comme à la convocation. */
+  convoquee?: boolean;
+}
+
+/** « 13h00 », « 13:30 » → 13 ; 13 à défaut. */
+function heureDe(heure: string): number {
+  const m = heure.match(/(\d{1,2})\s*[h:]/i);
+  return m ? Number(m[1]) : 13;
+}
+
+/** Les jours entre aujourd'hui et une date (négatif : passée) ; null si illisible. */
+function ecartJours(dateLabel: string, aujourdhui: string): number | null {
+  const d = lireDate(dateLabel, aujourdhui);
+  if (!d || !aujourdhui) return null;
+  const [a, mo, j] = aujourdhui.split("-").map(Number);
+  return Math.round((d.getTime() - Date.UTC(a, mo - 1, j)) / 86400000);
+}
+
+const MOIS_LONGS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+
+/** « 11 oct. » → « 11 octobre ». */
+function dateLongue(dateLabel: string, aujourdhui: string): string {
+  const d = lireDate(dateLabel, aujourdhui);
+  return d ? `${d.getUTCDate()} ${MOIS_LONGS[d.getUTCMonth()]}` : dateLabel;
 }
 
 function etatDe(dedans: boolean, manque: number): { etat: EtatSticker; texte: string } {
@@ -192,34 +222,63 @@ export default function MapPage() {
   const p = usePresence();
   const { player } = useMyPlayer();
   const aujourdhui = useAujourdhui();
+  const heure = useHeure();
 
   const terrains = useMemo(() => saison.terrains ?? [], [saison.terrains]);
 
-  // Les journées pas encore jouées, chacune sur son terrain ; sinon la convocation.
+  // Les journées à venir, chacune sur son terrain ; sinon la convocation du
+  // dimanche. Une journée est passée quand elle est jouée (résultat saisi) ou
+  // quand sa date est derrière nous — le jour même, deux heures après le coup
+  // d'envoi. La dernière passée (de moins d'une semaine) reste sur la Map,
+  // « jouée », avec ses joueurs et le chemin vers le récap.
   const matchs = useMemo<MatchMap[]>(() => {
-    const ouvertes = saison.journees.filter((m) => !journeeJouee(saison, m.j)).sort((a, b) => a.j - b.j);
-    if (ouvertes.length) {
-      return ouvertes.map((m) => {
-        const lignes = saison.entries.filter((e) => e.j === m.j);
-        const presents = lignes.filter((e) => e.statut === "Présent").map((e) => e.player);
-        const effectif = Math.max(EFFECTIF, lignes.length);
-        const dedans = presents.includes(player.name);
-        const { etat, texte } = etatDe(dedans, Math.max(0, effectif - presents.length));
-        return {
-          cle: `j${m.j}`,
-          j: m.j,
-          quand: quand(m.date, null, aujourdhui),
-          dateLabel: m.date,
-          heure: m.heure || p.heure,
-          terrain: terrainDeJournee(saison, m, p.lieu),
-          presents,
-          effectif,
-          dedans,
-          etat,
-          etatTexte: texte,
-        };
-      });
-    }
+    const passee = (m: (typeof saison.journees)[number]) => {
+      if (journeeJouee(saison, m.j)) return true;
+      const e = ecartJours(m.date, aujourdhui);
+      if (e == null) return false;
+      if (e < 0) return true;
+      return e === 0 && heure >= 0 && heure >= heureDe(m.heure || p.heure) + 2;
+    };
+    const ecartConvocation = ecartJours(p.jour.replace(/^\S+\s+/, ""), aujourdhui);
+    const versMatch = (m: (typeof saison.journees)[number], joue: boolean): MatchMap => {
+      const lignes = saison.entries.filter((e) => e.j === m.j);
+      const presents = lignes.filter((e) => e.statut === "Présent").map((e) => e.player);
+      const effectif = Math.max(EFFECTIF, lignes.length);
+      const dedans = presents.includes(player.name);
+      const e = ecartJours(m.date, aujourdhui);
+      const convoquee = !joue && e != null && e === ecartConvocation;
+      const { etat, texte } = joue
+        ? { etat: { genre: "joue" } as EtatSticker, texte: dedans ? "Joué · tu y étais" : "Joué" }
+        : convoquee
+          ? etatDe(p.mine === "present", Math.max(0, p.effectif - p.presents.length))
+          : etatDe(dedans, Math.max(0, effectif - presents.length));
+      return {
+        cle: `j${m.j}`,
+        j: m.j,
+        quand: joue ? { titre: m.date, jourCourt: m.date.toUpperCase().slice(0, 7), moment: "weekend" } : quand(m.date, null, aujourdhui),
+        dateLabel: m.date,
+        heure: m.heure || p.heure,
+        terrain: terrainDeJournee(saison, m, p.lieu),
+        presents: convoquee ? p.presents : presents,
+        effectif: convoquee ? p.effectif : effectif,
+        dedans: convoquee ? p.mine === "present" : dedans,
+        etat,
+        etatTexte: texte,
+        joue,
+        convoquee,
+      };
+    };
+
+    const parDate = [...saison.journees].sort((a, b) => a.j - b.j);
+    const aVenir = parDate.filter((m) => !passee(m)).map((m) => versMatch(m, false));
+    const derniere = parDate.filter(passee).at(-1);
+    const eDerniere = derniere ? ecartJours(derniere.date, aujourdhui) : null;
+    const recente = derniere && (eDerniere == null || eDerniere >= -6) ? [versMatch(derniere, true)] : [];
+
+    if (aVenir.length) return [...aVenir, ...recente];
+    // Pas de journée à venir : la convocation du dimanche, si elle n'est pas
+    // elle-même passée (l'admin ouvre la suivante en ouvrant l'app).
+    if (ecartConvocation != null && ecartConvocation < 0) return recente;
     const dedans = p.mine === "present";
     const { etat, texte } = etatDe(dedans, Math.max(0, p.effectif - p.presents.length));
     return [
@@ -236,13 +295,15 @@ export default function MapPage() {
         etat,
         etatTexte: texte,
       },
+      ...recente,
     ];
-  }, [saison, player.name, aujourdhui, p.heure, p.lieu, p.jour, p.mine, p.effectif, p.presents]);
+  }, [saison, player.name, aujourdhui, heure, p.heure, p.lieu, p.jour, p.mine, p.effectif, p.presents]);
 
   const stickers = useMemo<StickerPlan[]>(
     () =>
       matchs
-        .filter((m) => m.terrain)
+        // Un match joué sur le terrain d'un match à venir : on ne les empile pas.
+        .filter((m) => m.terrain && !(m.joue && matchs.some((x) => !x.joue && x.terrain?.id === m.terrain!.id)))
         .map((m) => ({
           id: m.cle,
           lat: m.terrain!.lat,
@@ -290,8 +351,8 @@ export default function MapPage() {
   const ios = useEstIos();
 
   const commune = choisi?.terrain?.commune ?? terrains.find((t) => t.commune)?.commune ?? "SFL";
-  const n = matchs.length;
-  const compte = `${n} MATCH${n > 1 ? "S" : ""} OUVERT${n > 1 ? "S" : ""}`;
+  const n = matchs.filter((m) => !m.joue).length;
+  const compte = n ? `${n} MATCH${n > 1 ? "S" : ""} OUVERT${n > 1 ? "S" : ""}` : "MATCH JOUÉ";
 
   function sauver(next: Saison, message: string) {
     saisieStore.save(next);
@@ -466,7 +527,7 @@ export default function MapPage() {
             </SheetTitle>
             {!ficheAdmin && choisi && (
               <p className="text-[14px] text-muted-foreground">
-                {choisi.quand.titre} · {choisi.heure}
+                {choisi.joue ? `Le match du ${dateLongue(choisi.dateLabel, aujourdhui)} · joué` : choisi.quand.titre} · {choisi.heure}
                 {choisi.terrain ? ` · ${choisi.terrain.adresse}` : " · lieu à venir"}
               </p>
             )}
@@ -481,7 +542,15 @@ export default function MapPage() {
               <>
                 {choisi?.terrain && <Itineraire terrain={choisi.terrain} ios={ios} />}
                 {/* Une journée : ses joueurs. La convocation : on y répond, comme avant. */}
-                {choisi?.j != null ? <Presents m={choisi} /> : <PresencePanel />}
+                {choisi?.j != null && !choisi.convoquee ? <Presents m={choisi} /> : <PresencePanel />}
+                {choisi?.joue && (
+                  <Link
+                    href="/ligue"
+                    className="flex h-12 items-center justify-center gap-2 rounded-full bg-foreground text-[15px] font-semibold text-background"
+                  >
+                    Voir le récap de la journée
+                  </Link>
+                )}
                 {admin && (
                   <button
                     type="button"
@@ -631,7 +700,7 @@ function Presents({ m }: { m: MatchMap }) {
   return (
     <section className="rounded-[26px] bg-card p-5">
       <div className="flex items-baseline justify-between">
-        <p className="mono-label text-muted-foreground">Les joueurs</p>
+        <p className="mono-label text-muted-foreground">{m.joue ? "Ils ont joué" : "Les joueurs"}</p>
         <p className="text-[22px] font-bold tabular-nums">
           {m.presents.length}
           <span className="text-muted-foreground">/{m.effectif}</span>
@@ -648,12 +717,12 @@ function Presents({ m }: { m: MatchMap }) {
       ) : (
         <p className="mt-2 text-[13px] text-muted-foreground">Les joueurs arrivent avec la composition des équipes.</p>
       )}
-      {m.dedans && <p className="mono-label mt-3 text-foreground">Tu y es</p>}
+      {m.dedans && <p className="mono-label mt-3 text-foreground">{m.joue ? "Tu y étais" : "Tu y es"}</p>}
     </section>
   );
 }
 
-function Jeton({ texte, ton }: { texte: string; ton: "manque" | "dedans" | "complet" | "neutre" }) {
+function Jeton({ texte, ton }: { texte: string; ton: "manque" | "dedans" | "complet" | "joue" | "neutre" }) {
   const style =
     ton === "dedans"
       ? { background: CLAIR, color: ENCRE }

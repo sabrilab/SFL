@@ -3,7 +3,7 @@
 // Section Profil — l'identité du joueur, rien d'autre.
 //
 // Ordre de lecture : qui je suis → mes deux cartes (simple et rare, au choix)
-// → mon profil de jeu (le radar hexagonal, point faible en bleu) → mes
+// → mes badges → mon profil de jeu (le radar hexagonal, point faible en bleu) → mes
 // chiffres → ma série de dimanches → ma photo → les mini-jeux « Les bases »
 // (verrouillés) → les raccourcis.
 //
@@ -18,6 +18,7 @@ import { Card3D } from "@/components/sfl/card-3d";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { BOOST_LABELS } from "@/components/sfl/boost-card";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
+import { VitrineBadges } from "@/components/sfl/vitrine";
 import { Locked } from "@/components/sfl/locked";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -286,6 +287,11 @@ export default function Profil() {
       </div>
 
       <div className="flex min-w-0 flex-col gap-[18px]">
+      {/* Mes badges — la vitrine, comme dans l'app iPhone */}
+      <div id="badges" className="scroll-mt-4">
+        <VitrineBadges nom={player.name} />
+      </div>
+
       {/* PROFIL DE JEU — le radar hexagonal du design */}
       <ProfilRadar stats={cardStats} overall={ovr(cardStats)} />
 

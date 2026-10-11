@@ -12,17 +12,18 @@
 // Le récap lui-même vit dans feed/journee-recap.tsx.
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { LEAGUE_KEY } from "@/components/layout/site-header";
 import { useSeason } from "@/components/sfl/season-provider";
-import { NEXT_MATCH } from "@/lib/sfl/data";
+import { labelDateFr, prochainDimanche } from "@/lib/sfl/convocation-temps";
 import { rankPlayers } from "@/lib/sfl/engine";
 import { computeStandings } from "@/lib/sfl/saisie/engine";
 import { JourneeRecap } from "@/components/sfl/feed/journee-recap";
 import { StatsAVenir } from "@/components/sfl/feed/stats-a-venir";
 import { BadgesLigne, IlsSeDemarquent } from "@/components/sfl/distinctions";
+import { Ecarts } from "@/components/sfl/ecarts";
 import { distinctions } from "@/lib/sfl/distinctions";
 import { SaisonArchiveProvider } from "@/components/sfl/season-provider";
 import { journeeJouee, saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
@@ -32,6 +33,15 @@ import { JourneeOpening } from "@/components/sfl/feed/journee-opening";
 import { CarteJournee } from "@/components/sfl/carte-journee";
 import { Accueil } from "@/components/sfl/feed/accueil";
 import { cn } from "@/lib/utils";
+
+// Les deux dimanches après celui de la convocation, lus côté client
+// (vides au rendu serveur, pour que l'hydratation concorde).
+const rienAEcouter = () => () => {};
+function lireDimanches(): string {
+  const d1 = prochainDimanche(prochainDimanche(new Date()));
+  const d2 = prochainDimanche(d1);
+  return `${labelDateFr(d1)}|${labelDateFr(d2)}`;
+}
 
 export default function Ligue() {
   const { player } = useMyPlayer();
@@ -87,6 +97,13 @@ export default function Ligue() {
   }, []);
   const onDone = useCallback(() => setOpening(null), []);
   const openingMeta = opening !== null ? journees.find((x) => x.j === opening) : undefined;
+
+  // La convocation porte la prochaine journée ; puis les deux suivantes.
+  const dimanches = useSyncExternalStore(rienAEcouter, lireDimanches, () => "");
+  const prochainJ = Math.max(0, ...saison.journees.map((m) => m.j)) + 1;
+  const dimanchesSuivants = dimanches
+    ? dimanches.split("|").map((d, i) => [`J${prochainJ + 1 + i}`, `Dimanche ${d}`] as const)
+    : [];
 
   /* -------------------------- Le classement --------------------------- */
 
@@ -204,10 +221,12 @@ export default function Ligue() {
           />
           {/* En attendant : ceux qui se sont démarqués la saison passée. */}
           <IlsSeDemarquent />
+          <Ecarts />
         </>
       ) : (
         <>
           <IlsSeDemarquent />
+          <Ecarts />
           <p className="px-1 text-[13px] text-foreground/40">
             Sunday Five League · après {journees.length} journées
           </p>
@@ -276,6 +295,7 @@ export default function Ligue() {
               <span className="mono-label w-[26px] text-center text-[9px] text-foreground/30">M</span>
               <span className="mono-label w-[44px] text-center text-[9px] text-foreground/30">B·P</span>
               <span className="mono-label w-[30px] text-right text-[9px] text-foreground/30">PTS</span>
+              <span className="mono-label w-[30px] text-right text-[9px] text-foreground/30">ÉC.</span>
             </div>
             <div className="glass-soft overflow-hidden rounded-[24px]">
               {RANKED.slice(0, 12).map((p) => (
@@ -301,6 +321,9 @@ export default function Ligue() {
                   </span>
                   <span className="w-[30px] text-right text-[14px] font-bold tabular-nums">
                     {p.pp}
+                  </span>
+                  <span className="w-[30px] text-right font-mono text-[11px] text-foreground/45 tabular-nums">
+                    {RANKED[0].pp - p.pp ? `−${RANKED[0].pp - p.pp}` : "—"}
                   </span>
                 </div>
               ))}
@@ -365,6 +388,8 @@ export default function Ligue() {
           {/* Le récap de la journée ouverte — remonté à neuf à chaque ouverture.
               Borné en largeur : au-delà, une ligne de texte devient illisible. */}
           <div className="mesure flex flex-col gap-6">
+            {/* Les écarts d'abord : c'est là que la saison se raconte. */}
+            <Ecarts />
             {played.length === 0 && derniereArchive ? (
               // Rien de joué cette saison : le dernier récap de la saison
               // passée, en attendant le premier de la nouvelle.
@@ -388,10 +413,7 @@ export default function Ligue() {
             </div>
             <PresencePanel />
             <div className="mt-2.5 flex flex-col gap-2 opacity-50">
-              {[
-                [`J${NEXT_MATCH.journee + 1}`, "Dimanche 23 août"],
-                [`J${NEXT_MATCH.journee + 2}`, "Dimanche 30 août"],
-              ].map(([jj, d]) => (
+              {dimanchesSuivants.map(([jj, d]) => (
                 <div key={jj} className="flex items-center justify-between rounded-2xl bg-card px-4 py-3">
                   <span className="mono-label text-muted-foreground">{jj}</span>
                   <span className="text-[14px] font-semibold">{d}</span>

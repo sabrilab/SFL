@@ -267,7 +267,7 @@ export function usePresence(): PresenceView {
     const rep = server.reponses;
     return {
       shared: true,
-      journee: server.convocation.journee,
+      journee: numeroDuDimanche(saison, server.convocation.date_label),
       jour: `${server.convocation.jour} ${server.convocation.date_label}`,
       heure: server.convocation.heure,
       lieu: server.convocation.lieu,
@@ -304,4 +304,26 @@ export function usePresence(): PresenceView {
     publish: serverActive && session?.admin ? publish : null,
     saveTeams: session?.admin ? saveTeams : null,
   };
+}
+
+/** « 18 octobre », « 18 oct. » → « 18 oct » : de quoi comparer deux dates écrites autrement. */
+function jourMois(label: string): string | null {
+  const m = label
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .match(/(\d{1,2})\s*([a-z]{3})/);
+  return m ? `${Number(m[1])} ${m[2]}` : null;
+}
+
+/**
+ * Le numéro de journée d'une convocation, lu dans la saison : la journée du
+ * même dimanche si l'admin l'a déjà ouverte, sinon la suivante. Le numéro
+ * stocké en base suit les convocations d'une saison à l'autre (J18 pour la
+ * deuxième journée de la saison 1) — il ne sert plus à l'affichage.
+ */
+function numeroDuDimanche(saison: { journees: { j: number; date: string }[] }, dateLabel: string): number {
+  const cle = jourMois(dateLabel);
+  const meme = cle ? saison.journees.find((m) => jourMois(m.date) === cle) : undefined;
+  return meme?.j ?? Math.max(0, ...saison.journees.map((m) => m.j)) + 1;
 }
