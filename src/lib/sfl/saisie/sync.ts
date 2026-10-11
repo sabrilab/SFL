@@ -121,8 +121,15 @@ export function blocage(): string | null {
     return "Publication désactivée sur cet environnement (NEXT_PUBLIC_SFL_LECTURE_SEULE=1).";
   const session = getSession();
   if (!session) return "Personne n'est connecté sur cet appareil.";
-  if (!session.server)
+  if (!session.server) {
+    if (session.refus === "mot-de-passe-local")
+      return "Ton mot de passe a été changé sur cet appareil seulement : le serveur ne le connaît pas. Déconnecte-toi, reconnecte-toi avec ton mot de passe d'origine (celui donné par l'admin), puis change-le dans Réglages : il vaudra partout.";
+    if (session.refus === "refuse")
+      return "Le serveur ne reconnaît pas ce mot de passe. Déconnecte-toi et reconnecte-toi avec ton mot de passe d'origine (celui donné par l'admin).";
+    if (session.refus === "injoignable")
+      return "Le serveur n'a pas répondu à la connexion. Déconnecte-toi puis reconnecte-toi quand le réseau revient.";
     return "Ta session n'est pas vérifiée par le serveur. Déconnecte-toi puis reconnecte-toi.";
+  }
   if (!session.admin) return "Ce compte n'est pas administrateur.";
   return null;
 }

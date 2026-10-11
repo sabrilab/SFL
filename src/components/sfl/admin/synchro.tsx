@@ -110,7 +110,7 @@ export function Synchro({ saison }: { saison: Saison }) {
           <p className="mt-1 text-[12.5px] leading-snug text-foreground/45">
             {partage
               ? "Chaque sauvegarde part déjà en base toute seule. Ce bouton force l'envoi — après une coupure réseau, ou pour en avoir le cœur net."
-              : "Tes corrections restent sur cet appareil tant que ta session n'est pas vérifiée par le serveur."}
+              : `Tes corrections restent sur cet appareil. ${blocage() ?? ""}`}
           </p>
         </div>
         <span

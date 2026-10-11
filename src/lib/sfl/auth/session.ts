@@ -35,6 +35,14 @@ export interface Session {
   since: number;
   /** true = vérifié par le serveur Supabase, false = repli local. */
   server?: boolean;
+  /**
+   * Pourquoi le serveur n'a pas pris la connexion (repli local seulement) :
+   * « mot-de-passe-local » — le mot de passe tapé n'existe que sur cet
+   * appareil (changé ici quand la session était locale) ; « refuse » — le
+   * serveur ne reconnaît pas ce mot de passe ; « injoignable » — pas de
+   * réponse du serveur.
+   */
+  refus?: "mot-de-passe-local" | "refuse" | "injoignable";
 }
 
 function emit() {
@@ -89,7 +97,11 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-async function signInLocal(account: Account, password: string): Promise<SignInResult> {
+async function signInLocal(
+  account: Account,
+  password: string,
+  refus?: Session["refus"]
+): Promise<SignInResult> {
   if (typeof crypto === "undefined" || !crypto.subtle) return { ok: false, reason: "unavailable" };
   const hash = await hashPassword(account.user, password);
   if (hash !== expectedHash(account)) return { ok: false, reason: "bad-password" };
@@ -99,6 +111,7 @@ async function signInLocal(account: Account, password: string): Promise<SignInRe
     admin: !!account.admin,
     since: Date.now(),
     server: false,
+    ...(refus ? { refus } : {}),
   };
   storeSession(session);
   return { ok: true, session };
@@ -112,6 +125,7 @@ export async function signIn(user: string, password: string): Promise<SignInResu
   const identifiant = account?.user ?? user.trim().toLowerCase();
 
   // 1 · Le serveur d'abord — 5 secondes maximum, sinon repli local.
+  let refusServeur: Session["refus"];
   try {
     const { data, error } = await withTimeout(
       supabase().auth.signInWithPassword({
@@ -148,20 +162,34 @@ export async function signIn(user: string, password: string): Promise<SignInResu
         server: true,
       };
       storeSession(session);
+      // Le serveur fait foi : un mot de passe changé autrefois sur cet
+      // appareil seulement (en session locale) ne doit plus ouvrir de
+      // session locale qui contredit le serveur.
+      try {
+        localStorage.removeItem(`${OVERRIDE_PREFIX}${identifiant}`);
+      } catch {}
       afterServerSignIn(data.user.id);
       return { ok: true, session };
     }
     // Identifiants refusés par le serveur : en mode strict, on s'arrête là.
     if (ENFORCE_SERVER_AUTH) return { ok: false, reason: "bad-password" };
+    refusServeur = "refuse";
   } catch {
     // Réseau ou projet en pause : on tente le repli local.
     if (ENFORCE_SERVER_AUTH) return { ok: false, reason: "unavailable" };
+    refusServeur = "injoignable";
   }
 
   // 2 · Repli local — impossible sans empreinte embarquée : un compte créé
   //     en cours de saison n'existe que sur le serveur.
   if (!account) return { ok: false, reason: "unknown-user" };
-  return signInLocal(account, password);
+  // Le serveur a refusé un mot de passe que cet appareil connaît parce qu'il
+  // y a été changé : on le dit, pour que la personne sache quoi faire.
+  let local = false;
+  try {
+    local = localStorage.getItem(`${OVERRIDE_PREFIX}${account.user}`) !== null;
+  } catch {}
+  return signInLocal(account, password, refusServeur === "refuse" && local ? "mot-de-passe-local" : refusServeur);
 }
 
 /**
