@@ -1,70 +1,63 @@
 "use client";
 
-// Tab bar — répliquée du design de référence : « le seul élément liquid glass ».
-// Icônes sans libellé ; l'onglet actif est une pilule blanche pleine avec
-// l'icône noire, les inactifs sont des traits blancs à 58 %. Discussions et
-// Boutique sont retirées de la barre à la demande de la ligue (la pastille
-// bleue de notification reste prête pour le jour où elles reviennent).
+// La barre d'onglets — celle d'iOS 26, « Liquid Glass », comme dans l'app
+// iPhone Bola (GolderApp.swift, un TabView natif) : une capsule de verre qui
+// flotte au-dessus du contenu, trois onglets icône + libellé, et sous
+// l'onglet choisi une lentille de verre plus claire qui glisse d'un onglet à
+// l'autre avec un ressort. Le symbole choisi est plein, les autres au trait.
+//
+// Sur la Map (plan clair), le verre devient clair et l'encre noire ;
+// ailleurs, l'app est sombre : verre fumé, encre blanche — exactement le
+// `toolbarColorScheme` de l'onglet Jouer dans l'app.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BallIcon, MapIcon, PersonIcon } from "./nav-icons";
+import { CarteIcon, MapIcon, TropheeIcon } from "./nav-icons";
 
-const TABS: { href: string; Icon: typeof BallIcon; label: string; dot?: boolean }[] = [
+const TABS = [
   { href: "/", Icon: MapIcon, label: "Map" },
-  { href: "/profil", Icon: PersonIcon, label: "Ma carte" },
-  { href: "/ligue", Icon: BallIcon, label: "Ligue" },
-];
+  { href: "/profil", Icon: CarteIcon, label: "Ma carte" },
+  { href: "/ligue", Icon: TropheeIcon, label: "Ligue" },
+] as const;
 
 export function BottomNav() {
   const pathname = usePathname();
+  const actif = TABS.findIndex(({ href }) =>
+    href === "/" ? pathname === "/" || pathname === "/map" : pathname.startsWith(href)
+  );
+  const clair = actif === 0;
+  const encre = clair ? "#0a0b0d" : "#ffffff";
 
   return (
     <nav
-      // `flex` doit vivre dans la classe, pas dans le style : un `display`
-      // en ligne écraserait `md:hidden` et la tab bar resterait affichée sur
-      // les grands écrans, par-dessus la navigation de l'en-tête.
-      className="fixed inset-x-[18px] z-40 flex lg:hidden"
+      aria-label="Onglets"
+      // `flex` vit dans la classe : un `display` en ligne écraserait `lg:hidden`.
+      className="liquid-tabbar fixed left-1/2 z-40 flex -translate-x-1/2 lg:hidden"
+      data-clair={clair ? "" : undefined}
       style={{
-        bottom: "calc(env(safe-area-inset-bottom) + 12px)",
-        gap: 4,
-        padding: 6,
-        borderRadius: 999,
-        // Verre sombre : lisible sur les pages noires comme sur le plan clair
-        // de la Map, où un verre blanc à 7 % disparaissait.
-        background: "rgba(14,17,21,0.78)",
-        backdropFilter: "blur(28px) saturate(180%)",
-        WebkitBackdropFilter: "blur(28px) saturate(180%)",
-        border: "1px solid rgba(255,255,255,0.1)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.16), 0 16px 36px rgba(0,0,0,0.7)",
+        bottom: "max(calc(env(safe-area-inset-bottom) - 4px), 14px)",
+        width: "min(calc(100% - 42px), 380px)",
+        // La place de la lentille : un tiers, décalé de l'onglet choisi.
+        ["--onglet" as string]: Math.max(0, actif),
       }}
     >
-      {TABS.map(({ href, Icon, label, dot }) => {
-        const active = href === "/" ? pathname === "/" || pathname === "/map" : pathname.startsWith(href);
+      {/* La lentille de l'onglet choisi */}
+      {actif >= 0 && <span aria-hidden className="liquid-tabbar__lentille" />}
+
+      {TABS.map(({ href, Icon, label }, i) => {
+        const choisi = i === actif;
         return (
           <Link
             key={href}
             href={href}
-            aria-label={label}
-            aria-current={active ? "page" : undefined}
-            className="relative flex flex-1 items-center justify-center rounded-full py-3 transition-transform active:scale-[0.94]"
-            style={active ? { background: "#fff" } : undefined}
+            aria-current={choisi ? "page" : undefined}
+            className="liquid-tabbar__onglet"
+            style={{ color: encre }}
           >
-            <Icon stroke={active ? "#0A0A0A" : "rgba(255,255,255,0.58)"} />
-            {dot && !active && (
-              <span
-                className="absolute"
-                style={{
-                  top: 10,
-                  right: 22,
-                  width: 7,
-                  height: 7,
-                  borderRadius: "50%",
-                  background: "#6FA8FF",
-                  boxShadow: "0 0 8px rgba(111,168,255,0.7)",
-                }}
-              />
-            )}
+            <Icon plein={choisi} />
+            <span className="liquid-tabbar__libelle" style={{ fontWeight: choisi ? 600 : 500 }}>
+              {label}
+            </span>
           </Link>
         );
       })}

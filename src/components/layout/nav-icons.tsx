@@ -42,11 +42,57 @@ export function BagIcon({ stroke }: IconProps) {
   );
 }
 
-export function MapIcon({ stroke }: IconProps) {
+
+/* ── La barre d'onglets iOS 26 : symboles au trait, pleins quand choisis ── */
+// Dessinés d'après les SF Symbols de l'app iPhone : mappin, person.text.rectangle,
+// trophy. currentColor : la barre décide de l'encre (noire sur verre clair).
+
+interface SymboleProps {
+  plein?: boolean;
+}
+
+const symbole = {
+  width: 26,
+  height: 26,
+  viewBox: "0 0 24 24",
+  stroke: "currentColor",
+  strokeWidth: 1.7,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+export function MapIcon({ plein }: SymboleProps) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 21s-6.5-5.7-6.5-10.4a6.5 6.5 0 0 1 13 0C18.5 15.3 12 21 12 21z" />
-      <circle cx="12" cy="10.6" r="2.4" />
+    <svg {...symbole} fill="none">
+      <path
+        d="M12 21.2s-6.6-5.8-6.6-10.6a6.6 6.6 0 0 1 13.2 0c0 4.8-6.6 10.6-6.6 10.6z"
+        fill={plein ? "currentColor" : "none"}
+      />
+      <circle cx="12" cy="10.5" r="2.4" fill={plein ? "var(--tabbar-trou)" : "none"} stroke={plein ? "none" : "currentColor"} />
+    </svg>
+  );
+}
+
+export function CarteIcon({ plein }: SymboleProps) {
+  return (
+    <svg {...symbole} fill="none">
+      <rect x="2.6" y="5" width="18.8" height="14" rx="3.2" fill={plein ? "currentColor" : "none"} />
+      <g stroke={plein ? "var(--tabbar-trou)" : "currentColor"} fill="none">
+        <circle cx="8.6" cy="10.4" r="1.9" fill={plein ? "var(--tabbar-trou)" : "none"} />
+        <path d="M5.6 15.6c.5-1.6 1.6-2.4 3-2.4s2.5.8 3 2.4" />
+        <path d="M14.4 10h3.6M14.4 13.4h3.6" />
+      </g>
+    </svg>
+  );
+}
+
+export function TropheeIcon({ plein }: SymboleProps) {
+  return (
+    <svg {...symbole} fill="none">
+      <path d="M7.4 4h9.2v5.2a4.6 4.6 0 0 1-9.2 0z" fill={plein ? "currentColor" : "none"} />
+      <path d="M7.4 6H4.6v1.4a3 3 0 0 0 3 3M16.6 6h2.8v1.4a3 3 0 0 1-3 3" />
+      <path d="M12 13.8v3.4M8.6 20.2h6.8M9.6 20.2c0-1.7 1-3 2.4-3s2.4 1.3 2.4 3" fill={plein ? "currentColor" : "none"} />
     </svg>
   );
 }
