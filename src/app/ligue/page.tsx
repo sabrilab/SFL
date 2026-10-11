@@ -22,6 +22,8 @@ import { rankPlayers } from "@/lib/sfl/engine";
 import { computeStandings } from "@/lib/sfl/saisie/engine";
 import { JourneeRecap } from "@/components/sfl/feed/journee-recap";
 import { StatsAVenir } from "@/components/sfl/feed/stats-a-venir";
+import { BadgesLigne, IlsSeDemarquent } from "@/components/sfl/distinctions";
+import { distinctions } from "@/lib/sfl/distinctions";
 import { SaisonArchiveProvider } from "@/components/sfl/season-provider";
 import { journeeJouee, saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
 import { PresencePanel } from "@/components/sfl/presence-panel";
@@ -89,6 +91,7 @@ export default function Ligue() {
   /* -------------------------- Le classement --------------------------- */
 
   const RANKED = rankPlayers(players);
+  const distinctionsLigue = useMemo(() => distinctions(players), [players]);
   const myRank = RANKED.find((p) => p.name === player.name)?.rank ?? RANKED.length;
   const rankBefore = rankPlayers(
     computeStandings({ ...saison, entries: saison.entries.filter((e) => e.j !== latestJ) })
@@ -193,13 +196,18 @@ export default function Ligue() {
           </div>
         </>
       ) : view === "classement" ? played.length === 0 ? (
-        <StatsAVenir
-          numero={saison.numero ?? 0}
-          quoi="classement"
-          archive={saison.archives?.[saison.archives.length - 1]}
-        />
+        <>
+          <StatsAVenir
+            numero={saison.numero ?? 0}
+            quoi="classement"
+            archive={saison.archives?.[saison.archives.length - 1]}
+          />
+          {/* En attendant : ceux qui se sont démarqués la saison passée. */}
+          <IlsSeDemarquent />
+        </>
       ) : (
         <>
+          <IlsSeDemarquent />
           <p className="px-1 text-[13px] text-foreground/40">
             Sunday Five League · après {journees.length} journées
           </p>
@@ -281,8 +289,9 @@ export default function Ligue() {
                   <span className="w-[22px] text-[13px] font-bold text-foreground/50 tabular-nums">
                     {p.rank}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">
-                    {p.name}
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className="truncate text-[14px] font-semibold">{p.name}</span>
+                    <BadgesLigne ds={distinctionsLigue.get(p.name)} />
                   </span>
                   <span className="mono-label w-[26px] text-center text-foreground/40">
                     {p.matchs}

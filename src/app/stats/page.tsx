@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,9 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { journeeScoreSummary, rankByMetric, type Player } from "@/lib/sfl/engine";
 import { RANKINGS, type RankingDef } from "@/lib/sfl/rankings";
+import { BadgesLigne, IlsSeDemarquent } from "@/components/sfl/distinctions";
+import { distinctions } from "@/lib/sfl/distinctions";
+import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 
 /* ============================= CLASSEMENTS ============================= */
 
@@ -54,7 +57,12 @@ function leaderCard(defId: string, leader: Player, size: number) {
 }
 
 function RankingList({ def, me }: { def: RankingDef; me: string }) {
-  const { players } = useSeason();
+  const { players, saison } = useSeason();
+  // Pas de badges tant que la saison n'a rien de joué : tout le monde serait à égalité.
+  const parNom = useMemo(
+    () => (saison.journees.some((m) => journeeJouee(saison, m.j)) ? distinctions(players) : new Map()),
+    [players, saison]
+  );
   const ranked = rankByMetric(players, def.value).filter(
     (p) => def.showAll || p.value > 0
   );
@@ -124,6 +132,7 @@ function RankingList({ def, me }: { def: RankingDef; me: string }) {
               </span>
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="truncate text-[15px] font-semibold">{p.name}</span>
+                <BadgesLigne ds={parNom.get(p.name)} />
                 {p.statut !== "Actif" && (
                   <span
                     className={cn(
@@ -187,6 +196,7 @@ export default function StatsPage() {
 
         {/* ===== CLASSEMENTS ===== */}
         <TabsContent value="classement" className="mt-4">
+          <IlsSeDemarquent className="mb-5" />
           <div className="-mx-5 mb-4 flex gap-2 overflow-x-auto overscroll-x-contain px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {RANKINGS.map((r) => (
               <button
