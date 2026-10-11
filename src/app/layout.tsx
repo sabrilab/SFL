@@ -18,6 +18,7 @@ import { AppSplash } from "@/components/sfl/app-splash";
 import { ActivityTracker } from "@/components/sfl/activity-tracker";
 import { NouvellesCartes } from "@/components/sfl/nouvelle-carte";
 import { ConnexionLocale } from "@/components/sfl/auth/connexion-locale";
+import { PhotosSync } from "@/components/sfl/photos-sync";
 
 // Typographie de l'app BOLA : une sans neutre pour tout ce qui se lit (Inter,
 // celle du site), et une monospace pour les étiquettes en capitales — SF Mono
@@ -101,6 +102,7 @@ export default function RootLayout({
                 <ActivityTracker />
                 <NouvellesCartes />
                 <ConnexionLocale />
+                <PhotosSync />
                 {/* Orbes lumineux du design de référence, derrière tout le contenu */}
                 <div className="orbs" aria-hidden>
                   <i /><i /><i />

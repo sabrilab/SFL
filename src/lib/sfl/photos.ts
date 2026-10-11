@@ -1,24 +1,34 @@
 "use client";
 
-// Photos de profil des joueurs.
+// Photos de profil des joueurs — partagées par toute la ligue.
 //
-// Même principe que saisie/store.ts : le stockage est isolé derrière une petite
-// interface pour que le passage à Supabase Storage ne touche ni aux cartes ni
-// à l'interface. Aujourd'hui les photos vivent en localStorage sous forme de
-// data URL ; demain elles seront des URL distantes et seul ce fichier changera.
+// Une photo posée par un joueur part dans le bucket Storage public « photos »
+// de Supabase (voir supabase/schema.sql) : chacun la voit ensuite sur sa
+// carte, sur tous les téléphones. Un fichier par joueur, nommé d'après son
+// nom en hexadécimal (les clés Storage refusent accents et espaces).
 //
-// Les images sont recadrées en carré et recompressées avant stockage : une
-// photo brute d'iPhone pèse plusieurs mégaoctets, très au-delà du quota
-// localStorage (~5 Mo pour TOUT le domaine, saison de la ligue comprise).
+// Ce module tient trois couches, de la plus proche à la plus lointaine :
+//   · la photo LOCALE (localStorage, data URL) — posée sur cet appareil et
+//     pas encore envoyée (session non vérifiée, réseau absent) ;
+//   · la liste DISTANTE — nom → URL publique versionnée, relue au lancement
+//     et au retour sur l'app, gardée en cache pour un affichage immédiat ;
+//   · le portrait livré dans public/players, en dernier recours.
+//
+// Les images sont recadrées en carré et recompressées avant envoi : une
+// photo brute d'iPhone pèse plusieurs mégaoctets.
+
+import { SUPABASE_URL, supabase } from "@/lib/supabase";
 
 const KEY_PREFIX = "sfl-photo-";
+const CACHE_KEY = "sfl-photos-distantes";
+const BUCKET = "photos";
 
 /** Émis à chaque ajout ou suppression de photo, pour rafraîchir les cartes. */
 export const PHOTO_EVENT = "sfl-photo";
 
 /** Côté carré de l'image stockée, en pixels. */
-const OUTPUT_SIZE = 512;
-const JPEG_QUALITY = 0.82;
+const OUTPUT_SIZE = 640;
+const JPEG_QUALITY = 0.84;
 
 function key(name: string) {
   return `${KEY_PREFIX}${name}`;
@@ -28,20 +38,121 @@ function hasWindow() {
   return typeof window !== "undefined" && !!window.localStorage;
 }
 
-/** Photo personnalisée d'un joueur, ou null s'il n'en a pas. */
+/** La clé Storage d'un joueur : son nom en hexadécimal UTF-8. */
+function cleStorage(name: string): string {
+  return Array.from(new TextEncoder().encode(name), (b) => b.toString(16).padStart(2, "0")).join("") + ".jpg";
+}
+
+function nomDeCle(cle: string): string | null {
+  const hex = cle.replace(/\.[a-z]+$/i, "");
+  if (!/^([0-9a-f]{2})+$/i.test(hex)) return null;
+  try {
+    const octets = new Uint8Array(hex.match(/../g)!.map((h) => parseInt(h, 16)));
+    return new TextDecoder("utf-8", { fatal: true }).decode(octets);
+  } catch {
+    return null;
+  }
+}
+
+function urlPublique(cle: string, version: string | number): string {
+  return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${cle}?v=${version}`;
+}
+
+// ─────────────────────────── La liste distante ───────────────────────────
+
+let distantes: Record<string, string> | null = null;
+/** Change à chaque modification des photos : la 3D s'en sert pour recapturer. */
+let revision = 0;
+
+function lireDistantes(): Record<string, string> {
+  if (distantes) return distantes;
+  distantes = {};
+  if (hasWindow()) {
+    try {
+      const brut = window.localStorage.getItem(CACHE_KEY);
+      if (brut) distantes = JSON.parse(brut) as Record<string, string>;
+    } catch {}
+  }
+  return distantes;
+}
+
+function ecrireDistantes(next: Record<string, string>) {
+  distantes = next;
+  try {
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(next));
+  } catch {}
+  signaler();
+}
+
+function signaler() {
+  revision++;
+  window.dispatchEvent(new Event(PHOTO_EVENT));
+}
+
+export function photoRevision(): number {
+  return revision;
+}
+
+let enCours: Promise<void> | null = null;
+
+/**
+ * Relit la liste des photos de la ligue. Lisible par tous, connecté ou non :
+ * les photos sont publiques comme les portraits livrés avec l'app.
+ */
+export function rafraichirPhotos(): Promise<void> {
+  if (!hasWindow()) return Promise.resolve();
+  enCours ??= (async () => {
+    try {
+      const { data, error } = await supabase().storage.from(BUCKET).list("", { limit: 1000 });
+      if (error || !data) return;
+      const next: Record<string, string> = {};
+      for (const f of data) {
+        const nom = nomDeCle(f.name);
+        if (!nom) continue;
+        const v = Date.parse(f.updated_at ?? f.created_at ?? "") || 0;
+        next[nom] = urlPublique(f.name, v);
+      }
+      const avant = lireDistantes();
+      const pareil =
+        Object.keys(next).length === Object.keys(avant).length && Object.entries(next).every(([n, u]) => avant[n] === u);
+      if (!pareil) ecrireDistantes(next);
+    } catch {
+      // Hors ligne : le cache suffit.
+    } finally {
+      enCours = null;
+    }
+  })();
+  return enCours;
+}
+
+// ───────────────────────────── Lecture ─────────────────────────────
+
+/** La photo posée sur cet appareil et pas encore partagée, ou null. */
 export function getPhoto(name: string): string | null {
   if (!hasWindow()) return null;
-  return window.localStorage.getItem(key(name));
+  try {
+    return window.localStorage.getItem(key(name));
+  } catch {
+    return null;
+  }
+}
+
+/** La photo d'un joueur — locale en attente, sinon partagée — ou null s'il n'en a pas posé. */
+export function photoPerso(name: string): string | null {
+  if (!hasWindow()) return null;
+  return getPhoto(name) ?? lireDistantes()[name] ?? null;
 }
 
 /**
- * Source d'image à afficher pour un joueur : sa photo personnalisée si elle
- * existe, sinon le fichier livré dans public/players. C'est le point d'entrée
+ * Source d'image à afficher pour un joueur : sa photo s'il en a posé une,
+ * sinon le fichier livré dans public/players. C'est le point d'entrée
  * unique — aucun composant ne doit construire ce chemin lui-même.
  */
 export function photoSrc(name: string): string {
-  return getPhoto(name) ?? `/players/${name}.png`;
+  return photoPerso(name) ?? `/players/${name}.png`;
 }
+
+// ───────────────────────────── Écriture ─────────────────────────────
 
 export class PhotoQuotaError extends Error {
   constructor() {
@@ -50,8 +161,7 @@ export class PhotoQuotaError extends Error {
   }
 }
 
-export function setPhoto(name: string, dataUrl: string) {
-  if (!hasWindow()) return;
+function garderLocale(name: string, dataUrl: string) {
   try {
     window.localStorage.setItem(key(name), dataUrl);
   } catch {
@@ -59,18 +169,78 @@ export function setPhoto(name: string, dataUrl: string) {
     window.localStorage.removeItem(key(name));
     throw new PhotoQuotaError();
   }
-  window.dispatchEvent(new Event(PHOTO_EVENT));
 }
 
-export function removePhoto(name: string) {
+/** Ce que l'envoi a donné : partagée avec la ligue, ou gardée sur cet appareil. */
+export type PhotoResultat = { partagee: true } | { partagee: false; raison: string };
+
+async function envoyer(name: string, dataUrl: string): Promise<PhotoResultat> {
+  const { data: auth } = await supabase().auth.getSession();
+  if (!auth.session) {
+    return { partagee: false, raison: "Connexion non vérifiée : reconnecte-toi pour la partager avec la ligue." };
+  }
+  const blob = await (await fetch(dataUrl)).blob();
+  const cle = cleStorage(name);
+  const { error } = await supabase()
+    .storage.from(BUCKET)
+    .upload(cle, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "31536000" });
+  if (error) {
+    return { partagee: false, raison: "Le serveur de la ligue a refusé l'envoi — réessaie dans un instant." };
+  }
+  window.localStorage.removeItem(key(name));
+  ecrireDistantes({ ...lireDistantes(), [name]: urlPublique(cle, Date.now()) });
+  // La version exacte du serveur, pour que tout le monde pointe la même URL.
+  void rafraichirPhotos();
+  return { partagee: true };
+}
+
+/**
+ * Pose la photo d'un joueur : affichée tout de suite sur cet appareil, puis
+ * envoyée à la ligue. Si l'envoi échoue, elle reste ici et repartira au
+ * prochain lancement (voir envoyerPhotosEnAttente).
+ */
+export async function setPhoto(name: string, dataUrl: string): Promise<PhotoResultat> {
+  if (!hasWindow()) return { partagee: false, raison: "Indisponible." };
+  garderLocale(name, dataUrl);
+  signaler();
+  try {
+    return await envoyer(name, dataUrl);
+  } catch {
+    return { partagee: false, raison: "Pas de réseau : elle partira à la prochaine ouverture de l'app." };
+  }
+}
+
+export async function removePhoto(name: string): Promise<void> {
   if (!hasWindow()) return;
   window.localStorage.removeItem(key(name));
-  window.dispatchEvent(new Event(PHOTO_EVENT));
+  const avant = lireDistantes();
+  if (avant[name]) {
+    const { error } = await supabase().storage.from(BUCKET).remove([cleStorage(name)]);
+    if (!error) {
+      const next = { ...avant };
+      delete next[name];
+      ecrireDistantes(next);
+      return;
+    }
+  }
+  signaler();
+}
+
+/**
+ * Au lancement : une photo restée sur cet appareil (posée avant le partage,
+ * ou hors ligne) part à la ligue — seulement celle du joueur connecté.
+ */
+export async function envoyerPhotosEnAttente(name: string): Promise<void> {
+  const locale = getPhoto(name);
+  if (!locale) return;
+  try {
+    await envoyer(name, locale);
+  } catch {}
 }
 
 /**
  * Recadre un fichier image en carré centré, le réduit à OUTPUT_SIZE et le
- * recompresse en JPEG. Renvoie une data URL prête à être stockée.
+ * recompresse en JPEG. Renvoie une data URL prête à être envoyée.
  */
 export function preparePhoto(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

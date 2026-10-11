@@ -4,21 +4,22 @@
 // sur les réseaux sociaux. Choix d'une image depuis la galerie ou l'appareil
 // photo, recadrage carré automatique, recompression, puis stockage.
 //
-// La photo alimente ensuite toutes les cartes du joueur (voir lib/sfl/photos).
+// La photo part à la ligue : elle remplit la carte du joueur chez tout le
+// monde (voir lib/sfl/photos).
 
 import { useRef, useState } from "react";
 import { Camera, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { usePlayerPhoto } from "@/hooks/use-player-photo";
-import { getPhoto, preparePhoto, removePhoto, setPhoto } from "@/lib/sfl/photos";
+import { usePhotoPerso, usePlayerPhoto } from "@/hooks/use-player-photo";
+import { preparePhoto, removePhoto, setPhoto } from "@/lib/sfl/photos";
 
 export function ProfilePhoto({ name }: { name: string }) {
   const src = usePlayerPhoto(name);
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [broken, setBroken] = useState(false);
-  const hasCustom = getPhoto(name) !== null;
+  const hasCustom = usePhotoPerso(name) !== null;
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -29,9 +30,10 @@ export function ProfilePhoto({ name }: { name: string }) {
 
     setBusy(true);
     try {
-      setPhoto(name, await preparePhoto(file));
+      const r = await setPhoto(name, await preparePhoto(file));
       setBroken(false);
-      toast.success("Photo mise à jour");
+      if (r.partagee) toast.success("Photo mise à jour", { description: "Elle est sur ta carte, chez tout le monde." });
+      else toast.warning("Photo gardée sur cet appareil", { description: r.raison });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Photo impossible à enregistrer.");
     } finally {
@@ -72,16 +74,16 @@ export function ProfilePhoto({ name }: { name: string }) {
       <div className="min-w-0 flex-1">
         <p className="text-[15px] font-semibold">Ma photo</p>
         <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
-          Elle apparaît sur ta carte et dans le feed. Recadrée en carré
-          automatiquement.
+          Elle apparaît sur ta carte, chez tous les joueurs de la ligue.
+          Recadrée en carré automatiquement.
         </p>
         {hasCustom && (
           <Button
             variant="ghost"
             size="sm"
             className="mt-1.5 -ml-2 h-7 gap-1.5 px-2 text-[12px] text-muted-foreground"
-            onClick={() => {
-              removePhoto(name);
+            onClick={async () => {
+              await removePhoto(name);
               setBroken(false);
               toast.success("Photo retirée");
             }}

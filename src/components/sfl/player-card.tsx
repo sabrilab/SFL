@@ -1,10 +1,14 @@
 // Carte joueur — la carte Bola gris et blanc (bola-card.tsx), en deux
 // éditions : base (papier blanc) et rare (argent, repères pleins). Elle
 // reprend la carte officielle de l'app iPhone Bola, mêlée aux rayures et au
-// nom en Anton de la carte d'avant. Pas encore de photo.
+// nom en Anton de la carte d'avant. La photo posée par le joueur (partagée
+// avec toute la ligue, voir lib/sfl/photos) remplit le cadre.
 // La carte est un objet : elle ne suit pas le thème de l'app.
 
+"use client";
+
 import { BolaCard } from "./bola-card";
+import { usePhotoPerso } from "@/hooks/use-player-photo";
 import { ovr, rareStats, type Player, type StatKey } from "@/lib/sfl/engine";
 import { username } from "@/lib/sfl/usernames";
 
@@ -22,6 +26,7 @@ export function PlayerCard({
   highlightStats?: StatKey[];
 }) {
   const stats = mode === "rare" ? rareStats(player.stats) : player.stats;
+  const photo = usePhotoPerso(player.name);
   return (
     <BolaCard
       edition={mode === "rare" ? "rare" : "base"}
@@ -32,6 +37,7 @@ export function PlayerCard({
       stats={stats}
       highlightStats={highlightStats}
       size={size}
+      photo={photo}
     />
   );
 }

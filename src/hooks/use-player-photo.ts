@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
-import { PHOTO_EVENT, photoSrc } from "@/lib/sfl/photos";
+import { PHOTO_EVENT, photoPerso, photoRevision, photoSrc } from "@/lib/sfl/photos";
 
 function subscribe(onChange: () => void) {
   window.addEventListener(PHOTO_EVENT, onChange);
@@ -24,4 +24,17 @@ export function usePlayerPhoto(name: string): string {
   const getSnapshot = useCallback(() => photoSrc(name), [name]);
   const getServerSnapshot = useCallback(() => `/players/${name}.png`, [name]);
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
+const aucune = () => null;
+
+/** La photo qu'un joueur a posée lui-même, ou null — sans portrait de repli. */
+export function usePhotoPerso(name: string): string | null {
+  const getSnapshot = useCallback(() => photoPerso(name), [name]);
+  return useSyncExternalStore(subscribe, getSnapshot, aucune);
+}
+
+/** Un compteur qui change avec les photos : de quoi recapturer les cartes 3D. */
+export function usePhotoRevision(): number {
+  return useSyncExternalStore(subscribe, photoRevision, () => 0);
 }

@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { toPng } from "html-to-image";
+import { usePhotoRevision } from "@/hooks/use-player-photo";
 
 const CardCanvas = dynamic(() => import("./card-3d-canvas").then((m) => m.CardCanvas), {
   ssr: false,
@@ -112,7 +113,10 @@ export function Card3D(props: {
   startFace?: "front" | "back";
   interactive?: boolean;
 }) {
-  return <Card3DInner key={props.cacheKey} {...props} />;
+  // Une photo posée ou changée (chez soi ou par un autre joueur) : la capture
+  // repart, sinon la 3D garderait l'ancienne image.
+  const revision = usePhotoRevision();
+  return <Card3DInner key={`${props.cacheKey}~${revision}`} {...props} />;
 }
 
 function Card3DInner({

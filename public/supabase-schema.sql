@@ -419,6 +419,111 @@ create policy "messages: je retire le mien"
   to authenticated
   using (auteur = (select auth.uid()) or (select public.is_league_admin()));
 
+-- ────────────────────────────── Photos ───────────────────────────────
+-- Les photos de profil, partagées : celle qu'un joueur pose apparaît sur sa
+-- carte chez tout le monde. Un bucket Storage PUBLIC « photos » (les images
+-- sont servies par le CDN, comme les portraits de public/players), un fichier
+-- par joueur : <nom du joueur en hexadécimal UTF-8>.jpg — l'hexadécimal évite
+-- les accents et les espaces que les clés Storage refusent.
+--   · tout le monde liste le bucket (c'est ainsi que l'app sait qui a une photo) ;
+--   · chacun ne pose, remplace ou retire QUE la sienne ;
+--   · l'admin peut corriger celle de n'importe qui.
+-- Chaque bloc rattrape ses erreurs : un projet où Storage refuserait ces
+-- règles ne doit pas faire échouer le reste de la migration.
+
+-- Le nom du joueur porté par une clé de photo (null si la clé est mal formée).
+create or replace function public.photo_joueur(cle text)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+begin
+  return convert_from(decode(split_part(cle, '.', 1), 'hex'), 'UTF8');
+exception
+  when others then return null;
+end;
+$$;
+
+revoke execute on function public.photo_joueur(text) from public;
+grant execute on function public.photo_joueur(text) to anon, authenticated;
+
+do $$
+begin
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('photos', 'photos', true, 1048576, array['image/jpeg', 'image/png', 'image/webp'])
+  on conflict (id) do update
+    set public = true,
+        file_size_limit = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types;
+exception
+  when others then raise warning 'photos : bucket non créé (%)', sqlerrm;
+end;
+$$;
+
+do $$
+begin
+  drop policy if exists "photos: lecture ligue" on storage.objects;
+  create policy "photos: lecture ligue"
+    on storage.objects for select
+    to anon, authenticated
+    using (bucket_id = 'photos');
+
+  drop policy if exists "photos: je pose la mienne" on storage.objects;
+  create policy "photos: je pose la mienne"
+    on storage.objects for insert
+    to authenticated
+    with check (
+      bucket_id = 'photos'
+      and (
+        lower(public.photo_joueur(name)) = (
+          select lower(p.name) from public.profiles p where p.id = (select auth.uid())
+        )
+        or (select public.is_league_admin())
+      )
+    );
+
+  drop policy if exists "photos: je remplace la mienne" on storage.objects;
+  create policy "photos: je remplace la mienne"
+    on storage.objects for update
+    to authenticated
+    using (
+      bucket_id = 'photos'
+      and (
+        lower(public.photo_joueur(name)) = (
+          select lower(p.name) from public.profiles p where p.id = (select auth.uid())
+        )
+        or (select public.is_league_admin())
+      )
+    )
+    with check (
+      bucket_id = 'photos'
+      and (
+        lower(public.photo_joueur(name)) = (
+          select lower(p.name) from public.profiles p where p.id = (select auth.uid())
+        )
+        or (select public.is_league_admin())
+      )
+    );
+
+  drop policy if exists "photos: je retire la mienne" on storage.objects;
+  create policy "photos: je retire la mienne"
+    on storage.objects for delete
+    to authenticated
+    using (
+      bucket_id = 'photos'
+      and (
+        lower(public.photo_joueur(name)) = (
+          select lower(p.name) from public.profiles p where p.id = (select auth.uid())
+        )
+        or (select public.is_league_admin())
+      )
+    );
+exception
+  when others then raise warning 'photos : règles Storage non posées (%)', sqlerrm;
+end;
+$$;
+
 -- ───────────────────────── Rôle admin ────────────────────────────────
 -- Remise d'aplomb des comptes admin — rejouée à chaque migration, donc à
 -- chaque déploiement qui touche ce fichier. Elle répare TOUS les états de

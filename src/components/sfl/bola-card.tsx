@@ -8,7 +8,7 @@
 // officielle » en tête, cadre blanc à repères d'angle, puce argent, note en
 // italique à frange, six stats, filet pointillé et numéro de série — et la
 // carte SFL d'avant : rayures diagonales, grand chiffre en filigrane, nom en
-// Anton. Ni photo ni portrait en points pour l'instant : le cadre porte les
+// Anton. Le cadre porte la photo du joueur s'il en a posé une ; sinon les
 // rayures et la note en filigrane.
 //
 // Mêmes proportions et mêmes calques que la carte éditoriale (1024 × 1536,
@@ -65,6 +65,7 @@ export function BolaCard({
   edition = "base",
   highlightStats,
   size = 1,
+  photo,
 }: {
   name: string;
   username?: string;
@@ -74,6 +75,8 @@ export function BolaCard({
   edition?: BolaEdition;
   highlightStats?: StatKey[];
   size?: number;
+  /** La photo posée par le joueur (URL ou data URL), recadrée en carré. */
+  photo?: string | null;
 }) {
   // 254 px de large à taille 1, comme les autres cartes de l'app.
   const u = (n: number) => n * size * (254 / W);
@@ -203,6 +206,33 @@ export function BolaCard({
           >
             {overall}
           </div>
+          {photo && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photo}
+                alt=""
+                crossOrigin={photo.startsWith("data:") ? undefined : "anonymous"}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  objectPosition: "50% 20%",
+                }}
+              />
+              {/* Un voile clair en haut et en bas : l'étiquette et le poste restent lisibles. */}
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background:
+                    "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 22%, rgba(255,255,255,0) 75%, rgba(255,255,255,0.6) 100%)",
+                }}
+              />
+            </>
+          )}
           {coin({ left: u(26), top: u(26) }, 0)}
           {coin({ right: u(26), top: u(26) }, 90)}
           {coin({ right: u(26), bottom: u(26) }, 180)}
