@@ -106,3 +106,24 @@ dans Vercel. Jamais dans le code, jamais dans une conversation.
 
 Sans cette variable, rien ne casse : la page d'installation garde le bouton
 « Copier le script SQL » en repli.
+
+## Inscription autonome (/inscription)
+
+Un joueur crée son compte lui-même : prénom, nom, pseudo (= identifiant),
+email, naissance, gabarit (taille, poids, pointure, maillot), poste, pied
+fort, photo de carte, puis les quatre photos en pied imposées (face, droite,
+gauche, dos) pour le futur personnage de référence des skins.
+
+- **Création côté serveur** : `/api/inscription` utilise la clé secrète
+  (`SUPABASE_SECRET_KEY` ou `SUPABASE_SERVICE_ROLE_KEY`, déjà dans Vercel en
+  production). « Allow new users to sign up » reste donc FERMÉ dans Supabase.
+  Sans la clé (préversions), la page dit que les inscriptions ne sont pas
+  ouvertes.
+- **Compte en attente** : `profiles.valide` naît à false. La base ne lui ouvre
+  rien de la ligue (`est_membre()` dans les règles de lecture) ; l'app lui
+  montre sa carte et « Tu es sur la liste. ». Les comptes existants sont
+  validés d'office ; ceux que l'admin crée (`/api/comptes/creer`) aussi.
+- **Validation** : Admin → Vue d'ensemble → Inscriptions → « Accepter »
+  (`valider_inscription`) ; le joueur entre dans l'effectif avec son poste.
+- **Données privées** : table `fiches` (joueur + admin seulement) et bucket
+  privé `references` (`<uuid>/<angle>.jpg`, joueur + admin).

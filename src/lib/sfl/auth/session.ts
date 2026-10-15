@@ -43,6 +43,12 @@ export interface Session {
    * réponse du serveur.
    */
   refus?: "mot-de-passe-local" | "refuse" | "injoignable";
+  /**
+   * true = compte créé par le joueur lui-même (/inscription), pas encore
+   * accepté par l'admin. La base ne lui ouvre rien de la ligue : AuthGate lui
+   * montre sa carte et l'écran d'attente à la place de l'app.
+   */
+  enAttente?: boolean;
 }
 
 function emit() {
@@ -69,6 +75,25 @@ function expectedHash(account: Account): string {
     return localStorage.getItem(`${OVERRIDE_PREFIX}${account.user}`) ?? account.hash;
   } catch {
     return account.hash;
+  }
+}
+
+/**
+ * Le compte est-il accepté dans la ligue ? Lu À PART du reste du profil : si
+ * la colonne manque (migration pas encore passée), la requête échoue et on
+ * répond « oui » — l'erreur ne doit jamais enfermer dehors un membre, ni
+ * faire perdre son rôle à l'admin dont le profil se lit dans la même requête.
+ */
+async function estValide(uid: string): Promise<boolean> {
+  try {
+    const r = await withTimeout(
+      Promise.resolve(supabase().from("profiles").select("valide").eq("id", uid).maybeSingle()),
+      5000
+    );
+    if (r.error || !r.data) return true;
+    return (r.data as { valide?: boolean }).valide !== false;
+  } catch {
+    return true;
   }
 }
 
@@ -150,6 +175,7 @@ export async function signIn(user: string, password: string): Promise<SignInResu
         .then((r) => r.data as { is_admin: boolean; name: string } | null)
         .catch(() => null);
       if (profile) admin = !!profile.is_admin;
+      const valide = await estValide(data.user.id);
       const session: Session = {
         user: identifiant,
         // Le nom CANONIQUE vient du compte embarqué quand il existe : un
@@ -160,6 +186,7 @@ export async function signIn(user: string, password: string): Promise<SignInResu
         admin,
         since: Date.now(),
         server: true,
+        ...(valide ? {} : { enAttente: true }),
       };
       storeSession(session);
       // Le serveur fait foi : un mot de passe changé autrefois sur cet
@@ -232,8 +259,11 @@ export async function refreshSession(): Promise<void> {
     if (!profile) return;
     const admin = !!profile.is_admin;
     const nom = account?.name ?? session.name;
-    if (session.admin !== admin || session.name !== nom) {
-      storeSession({ ...session, admin, name: nom });
+    const enAttente = !(await estValide(uid));
+    if (session.admin !== admin || session.name !== nom || !!session.enAttente !== enAttente) {
+      const { enAttente: _avant, ...reste } = session;
+      void _avant;
+      storeSession({ ...reste, admin, name: nom, ...(enAttente ? { enAttente: true } : {}) });
     }
   } catch {
     // Hors ligne : la session actuelle reste ce qu'elle est.
@@ -349,18 +379,20 @@ export async function bootstrapServerSession(): Promise<boolean> {
 
     const { data: profile } = await supabase()
       .from("profiles")
-      .select("name, is_admin")
+      .select("name, username, is_admin")
       .eq("id", user.id)
       .maybeSingle();
     if (!profile?.name) return false;
 
     const account = ACCOUNTS.find((a) => a.name === profile.name);
+    const valide = await estValide(user.id);
     const session: Session = {
-      user: account?.user ?? profile.name.toLowerCase(),
+      user: account?.user ?? (profile.username as string | null)?.replace(/^@/, "") ?? profile.name.toLowerCase(),
       name: profile.name,
       admin: !!profile.is_admin,
       since: Date.now(),
       server: true,
+      ...(valide ? {} : { enAttente: true }),
     };
     storeSession(session);
     afterServerSignIn(user.id);
