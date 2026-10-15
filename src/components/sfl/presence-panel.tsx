@@ -13,6 +13,7 @@ import { Check, Copy, Radio, X } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "@/hooks/use-session";
 import { usePresence } from "@/hooks/use-presence";
+import { QuiVient } from "@/components/sfl/qui-vient";
 import { cn } from "@/lib/utils";
 
 export function PresencePanel({ compact = false }: { compact?: boolean }) {
@@ -138,18 +139,25 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
         </div>
       </div>
 
-      {p.equipesVisibles && p.teams && p.teams.length > 0 && (
+      {p.equipesVisibles && p.teams && p.teams.length > 0 ? (
         <div className="mt-4 border-t border-white/8 pt-3.5">
           <p className="mono-label text-primary">Les équipes de dimanche</p>
-          <div className="mt-2 flex flex-col gap-2">
+          <div className="mt-2 flex flex-col gap-3">
             {p.teams.map((t) => (
-              <p key={t.name} className="text-[12.5px] leading-snug text-foreground/55">
-                <strong className="font-bold text-foreground/85">{t.name}</strong>{" "}
-                — {t.players.join(" · ")}
-              </p>
+              <div key={t.name}>
+                <p className="mb-1.5 text-[12.5px] font-bold text-foreground/85">{t.name}</p>
+                <QuiVient noms={t.players} />
+              </div>
             ))}
           </div>
         </div>
+      ) : (
+        p.presents.length > 0 && (
+          <div className="mt-4 border-t border-white/8 pt-3.5">
+            <p className="mono-label mb-2 text-foreground/40">Qui vient</p>
+            <QuiVient noms={p.presents} places={Math.max(0, p.effectif - p.presents.length)} />
+          </div>
+        )
       )}
 
       {p.shared ? (
@@ -191,9 +199,9 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
           <div className="mt-3 grid grid-cols-3 gap-2">
             {(
               [
-                [p.presents.length, "Présents", "text-emerald-400"],
+                [p.presents.length, "Présents", "text-foreground"],
                 [p.absents.length, "Absents", "text-foreground/60"],
-                [p.sansReponse.length, "Sans réponse", "text-[#FF6B5E]"],
+                [p.sansReponse.length, "Sans réponse", "text-foreground/60"],
               ] as const
             ).map(([n, label, cls]) => (
               <div key={label} className="glass-soft rounded-2xl px-2 py-3 text-center">
@@ -207,9 +215,9 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
 
           {(
             [
-              ["Présents", p.presents, "bg-emerald-500/15 text-emerald-400"],
+              // Les présents sont déjà en cartes plus haut ; ici, qui manque.
               ["Absents", p.absents, "glass-soft text-foreground/50"],
-              ["Sans réponse", p.sansReponse, "bg-[#FF6B5E]/12 text-[#FF6B5E]"],
+              ["Sans réponse", p.sansReponse, "glass-soft text-foreground/80"],
             ] as const
           ).map(([label, list, cls]) =>
             list.length > 0 ? (

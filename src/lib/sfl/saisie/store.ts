@@ -6,6 +6,7 @@
 // interface `SaisieStore` et changer le seul export `saisieStore`.
 
 import { SEED_ENTRIES, SEED_JOURNEES, SEED_ROSTER } from "./seed";
+import { appliquerMvpAuto } from "./mvp";
 import type { Saison } from "./types";
 
 const STORAGE_KEY = "sfl-saisie-v1";
@@ -152,9 +153,13 @@ export function adoptSaison(saison: Saison) {
 // AUSSI vers la base quand l'appelant est un admin en session serveur (la
 // synchro refuse silencieusement sinon). Import paresseux pour ne pas créer
 // de cycle : sync.ts importe ce module.
+//
+// C'est aussi le seul chemin d'écriture : les MVP automatiques y sont posés,
+// pour que la grille, les classements et la base lisent les mêmes lignes.
 export const saisieStore: SaisieStore = {
   load: () => localStorageStore.load(),
-  save(saison) {
+  save(input) {
+    const saison = appliquerMvpAuto(input);
     localStorageStore.save(saison);
     void import("./sync").then((m) => m.pushSaison(saison)).catch(() => {});
   },

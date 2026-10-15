@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PresencePanel } from "@/components/sfl/presence-panel";
+import { QuiVient } from "@/components/sfl/qui-vient";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
 import { usePresence } from "@/hooks/use-presence";
@@ -707,13 +708,7 @@ function Presents({ m }: { m: MatchMap }) {
         </p>
       </div>
       {m.presents.length ? (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {m.presents.map((nom) => (
-            <span key={nom} className="rounded-full bg-secondary px-3 py-1.5 text-[13px] font-medium">
-              {nom}
-            </span>
-          ))}
-        </div>
+        <QuiVient className="mt-3" noms={m.presents} places={m.joue ? 0 : Math.max(0, m.effectif - m.presents.length)} />
       ) : (
         <p className="mt-2 text-[13px] text-muted-foreground">Les joueurs arrivent avec la composition des équipes.</p>
       )}
