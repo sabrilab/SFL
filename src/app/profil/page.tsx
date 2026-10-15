@@ -437,22 +437,21 @@ export default function Profil() {
           </Link>
         ))}
 
-        {/* Les épreuves — verrouillées : les défis filmés qui rempliront la
-            carte critère par critère arrivent avec la V2. */}
-        <Locked label="Bientôt">
-          <div className="glass-soft flex items-center gap-3.5 rounded-3xl p-4">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground/10">
-              <Dumbbell className="size-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold">Les épreuves</span>
-              <span className="block text-[13px] text-muted-foreground">
-                Jonglage, sprint… tes stats mesurées sur le terrain
-              </span>
-            </span>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          </div>
-        </Locked>
+        {/* Le Labo — réflexes et détente, mesurés par le téléphone seul
+            (src/app/labo). Les épreuves filmées viendront après. */}
+        <Link
+          href="/labo"
+          className="glass-soft flex items-center gap-3.5 rounded-3xl p-4 transition-colors active:opacity-80"
+        >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground/10">
+            <Dumbbell className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold">Le Labo</span>
+            <span className="block text-[13px] text-muted-foreground">Réflexes · Détente</span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+        </Link>
       </section>
       </div>
       </div>
