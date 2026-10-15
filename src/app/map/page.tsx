@@ -371,20 +371,23 @@ export default function MapPage() {
 
   // Les surcouches se posent sous l'encoche en haut, au-dessus de la barre
   // d'onglets en bas (qui flotte sur le plan, comme sur l'iPhone).
-  const haut = "calc(env(safe-area-inset-top, 0px) + 14px)";
+  // L'en-tête commun (logo à gauche, compte à droite) flotte en haut : sur
+  // téléphone, les surcouches se posent dessous ; sur grand écran, le plan
+  // commence déjà sous lui.
+  const haut = "calc(env(safe-area-inset-top, 0px) + var(--sous-entete))";
   const bas = "calc(env(safe-area-inset-bottom, 0px) + 92px)";
 
   return (
     <>
       {/* ─── Le plan, tout l'écran ─── */}
-      <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] lg:top-[5.5rem]">
+      <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] [--sous-entete:5.25rem] lg:top-[5.5rem] lg:[--sous-entete:14px]">
         <div className="absolute inset-0">
           <CarteMap fond={fond} stickers={stickers} points={points} toi={toi} choisi={choisi?.cle ?? null} onChoisir={choisirSticker} className="h-full w-full" />
         </div>
         {/* Voile en haut : la barre d'état et le lettrage restent lisibles.
             Tout ce qui est posé sur le plan passe au-dessus des calques de
             Leaflet (z-index 400 et plus). */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-32 bg-gradient-to-b from-[rgba(8,9,11,0.42)] to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-44 bg-gradient-to-b lg:h-32 from-[rgba(8,9,11,0.42)] to-transparent" />
 
         {/* En haut à gauche : la commune en lettrage, le compte en étiquette */}
         <div className="pointer-events-none absolute left-5 z-[510] flex max-w-[calc(100%-8.5rem)] flex-col items-start" style={{ top: `calc(${haut} + 8px)` }}>
@@ -402,13 +405,10 @@ export default function MapPage() {
           </span>
         </div>
 
-        {/* En haut à droite : le logo, puis en colonne la bascule plan / satellite
-            et, pour l'admin, le réglage des matchs — le lettrage garde sa place. */}
+        {/* En haut à droite : la bascule plan / satellite et, pour l'admin, le
+            réglage des matchs — le lettrage garde sa place. Le logo, lui, est
+            dans l'en-tête commun, à la même place que sur toutes les pages. */}
         <div className="absolute right-4 z-[510] flex flex-col items-end gap-2" style={{ top: haut }}>
-          <span className="flex h-9 items-center rounded-full px-3 shadow-[0_3px_8px_rgba(0,0,0,0.16)] lg:hidden" style={{ background: ENCRE }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/bola/logo-blanc.svg" alt="Bola" width={58} height={14} />
-          </span>
           <button
             type="button"
             onClick={() => setFond((f) => (f === "plan" ? "satellite" : "plan"))}

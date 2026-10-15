@@ -12,7 +12,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Check, ChevronRight, Dumbbell, IdCard, Swords } from "lucide-react";
+import { Check, ChevronRight, Dumbbell, IdCard, Swords, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card3D } from "@/components/sfl/card-3d";
 import { PlayerCard } from "@/components/sfl/player-card";
@@ -412,6 +412,12 @@ export default function Profil() {
               note: dernierTitre
                 ? `${nbTitres} titre${nbTitres > 1 ? "s" : ""} · dernier : ${BOOST_LABELS[dernierTitre.type]}`
                 : "Carte, boosts et évolution EvoDay",
+            },
+            {
+              href: "/palmares",
+              icon: Trophy,
+              label: "Wall of Fame",
+              note: "Ton parcours, saison après saison",
             },
             {
               href: "/duel",

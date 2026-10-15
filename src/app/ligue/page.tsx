@@ -13,7 +13,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { LEAGUE_KEY } from "@/components/layout/site-header";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -134,43 +134,32 @@ export default function Ligue() {
         />
       )}
 
-      {/* Hors accueil : un retour permanent + le sélecteur de vue. */}
-      {view !== "accueil" && (
-        <>
+      {/* Un seul sélecteur, toujours là : l'accueil est une vue comme les
+          autres. Avant, un bouton retour s'empilait au-dessus des onglets —
+          deux niveaux de navigation pour quatre vues. */}
+      <div className="glass flex gap-1 rounded-full p-1" role="tablist" aria-label="Vue de la ligue">
+        {(
+          [
+            ["accueil", "Accueil"],
+            ["journee", "Journée"],
+            ["classement", "Classement"],
+            ["matchs", "Matchs"],
+          ] as const
+        ).map(([id, label]) => (
           <button
-            onClick={() => setView("accueil")}
-            className="glass-soft flex w-fit items-center gap-2 rounded-full py-2 pr-4 pl-3 text-[13px] font-semibold text-foreground/60"
+            key={id}
+            role="tab"
+            aria-selected={view === id}
+            onClick={() => setView(id)}
+            className={cn(
+              "flex-auto rounded-full px-2.5 py-2 text-[13px] whitespace-nowrap font-semibold transition-colors sm:px-4 sm:text-sm",
+              view === id ? "bg-foreground text-background" : "text-muted-foreground"
+            )}
           >
-            <ArrowLeft className="size-4" /> Accueil
+            {label}
           </button>
-          <div
-            className="glass -mt-2 flex gap-1 rounded-full p-1"
-            role="tablist"
-            aria-label="Vue de la ligue"
-          >
-            {(
-              [
-                ["journee", "Journée"],
-                ["classement", "Classement"],
-                ["matchs", "Matchs"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                role="tab"
-                aria-selected={view === id}
-                onClick={() => setView(id)}
-                className={cn(
-                  "flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-colors",
-                  view === id ? "bg-foreground text-background" : "text-muted-foreground"
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+        ))}
+      </div>
 
       {view === "accueil" ? (
         <>
