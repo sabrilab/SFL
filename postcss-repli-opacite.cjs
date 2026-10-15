@@ -38,18 +38,36 @@ module.exports = () => ({
       if (sures.has(d.prop.slice(2))) d.cloneAfter({ prop: `${d.prop}-rgb`, value: canaux(d.value.trim()) });
     });
 
-    // 2 · Les replis pleins des utilitaires à opacité.
+    // 2 · Les replis pleins des utilitaires à opacité. L'optimiseur fusionne
+    // les règles aux replis identiques : `.text-foreground` et
+    // `.text-foreground\/15` finissent dans la même règle. On la sépare donc
+    // par opacité, sélecteur par sélecteur, pour ne jamais rendre
+    // transparente la couleur pleine qui partage la règle.
     root.walkRules((r) => {
       if (dansSupports(r)) return;
-      const m = r.selector.match(/\\\/(\\\[)?([0-9]+(?:\\\.[0-9]+)?)(\\\])?/);
-      if (!m) return;
-      const n = parseFloat(m[2].replace(/\\/g, ""));
-      const alpha = m[1] ? n : n / 100;
-      if (!(alpha >= 0 && alpha <= 1)) return;
-      r.walkDecls((d) => {
-        const v = d.value.trim().match(/^var\(--([a-z0-9-]+)\)$/);
-        if (v && sures.has(v[1])) d.value = `rgb(var(--${v[1]}-rgb) / ${alpha})`;
-      });
+      const groupes = new Map();
+      for (const sel of r.selectors) {
+        const m = sel.match(/\\\/(\\\[)?([0-9]+(?:\\\.[0-9]+)?)(\\\])?/);
+        let alpha = null;
+        if (m) {
+          const n = parseFloat(m[2].replace(/\\/g, ""));
+          const a = m[1] ? n : n / 100;
+          if (a >= 0 && a <= 1) alpha = a;
+        }
+        if (!groupes.has(alpha)) groupes.set(alpha, []);
+        groupes.get(alpha).push(sel);
+      }
+      if (groupes.size === 1 && groupes.has(null)) return;
+      for (const [alpha, sels] of groupes) {
+        if (alpha === null) continue;
+        const copie = r.cloneBefore({ selectors: sels });
+        copie.walkDecls((d) => {
+          const v = d.value.trim().match(/^var\(--([a-z0-9-]+)\)$/);
+          if (v && sures.has(v[1])) d.value = `rgb(var(--${v[1]}-rgb) / ${alpha})`;
+        });
+      }
+      if (groupes.has(null)) r.selectors = groupes.get(null);
+      else r.remove();
     });
   },
 });
