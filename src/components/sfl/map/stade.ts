@@ -15,14 +15,16 @@
 //   - nuit    : fini, quatre projecteurs et leurs faisceaux ;
 //   - marbre  : fini sur fond clair, le blanc du site ;
 //   - mono    : fini en noir et blanc, pelouse grise.
-// `VARIANTE_STADE` est celle de l'app ; les autres restent pour comparer.
+// 16/10, Sabri : « Tu mets les deux. » Noir et blanc sur le plan clair (et
+// dans la fiche du match), marbre sur la vue satellite, sombre. `VARIANTE_STADE`
+// est celle par défaut ; les autres restent pour comparer.
 
 export type Moment = "jour" | "weekend" | "semaine";
 export type VarianteStade = "origine" | "fini" | "proche" | "nuit" | "marbre" | "mono";
 export const VARIANTES_STADE: VarianteStade[] = ["origine", "fini", "proche", "nuit", "marbre", "mono"];
 
 /** La variante dessinée dans l'app. */
-export const VARIANTE_STADE: VarianteStade = "proche";
+export const VARIANTE_STADE: VarianteStade = "mono";
 
 /** Le fond de la vignette selon le moment du match (comme la tuile de match). */
 export const FOND_MOMENT: Record<Moment, [string, string, string]> = {
@@ -193,7 +195,7 @@ export interface StickerPlan {
 }
 
 /** Le HTML d'un sticker de match pour Leaflet (le CSS est dans globals.css). */
-export function stickerHtml(s: StickerPlan, choisi: boolean): string {
+export function stickerHtml(s: StickerPlan, choisi: boolean, variante?: VarianteStade): string {
   const badge =
     s.etat.genre === "manque"
       ? `<span class="stk__badge stk__badge--manque">${s.etat.n}</span>`
@@ -208,7 +210,7 @@ export function stickerHtml(s: StickerPlan, choisi: boolean): string {
         : `<span class="stk__etiquette stk__etiquette--complet">${s.etat.genre === "joue" ? "joué" : "complet"}</span>`;
   return `<div class="stk${choisi ? " stk--choisi" : ""}${s.etat.genre === "complet" || s.etat.genre === "joue" ? " stk--complet" : ""}" style="--penche:${penche(s.id)}deg">
   <div class="stk__vignette">
-    <div class="stk__stade">${stadeSvg(s.moment)}</div>
+    <div class="stk__stade">${stadeSvg(s.moment, { variante })}</div>
     <span class="stk__cal"><span class="stk__cal-jour">${echapper(s.jourCourt)}</span><span class="stk__cal-heure">${echapper(heureCourte(s.heure))}</span></span>
     ${choisi ? etiquette : badge}
   </div>
@@ -229,8 +231,8 @@ export function toiHtml(note: number, teinte: string): string {
  * désaturé, et son nom dans une étiquette blanche — qu'on le repère d'un
  * coup d'œil sur le plan comme sur le satellite.
  */
-export function pointHtml(nom: string): string {
-  return `<div class="ter"><div class="ter__vignette"><div class="ter__stade">${stadeSvg("semaine")}</div></div><span class="ter__queue"></span><span class="ter__nom">${echapper(nom)}</span></div>`;
+export function pointHtml(nom: string, variante?: VarianteStade): string {
+  return `<div class="ter"><div class="ter__vignette"><div class="ter__stade">${stadeSvg("semaine", { variante })}</div></div><span class="ter__queue"></span><span class="ter__nom">${echapper(nom)}</span></div>`;
 }
 
 /**
