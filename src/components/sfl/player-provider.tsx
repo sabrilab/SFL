@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { claimDailyLogin } from "@/lib/sfl/ballons";
-import { refreshSession } from "@/lib/sfl/auth/session";
+import { refreshSession, suivreSessionServeur } from "@/lib/sfl/auth/session";
 import { logActivity } from "@/lib/sfl/activity";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -54,9 +54,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (document.visibilityState === "visible") void refreshSession();
     };
     verifier();
+    const arreter = suivreSessionServeur();
     document.addEventListener("visibilitychange", verifier);
     window.addEventListener("online", verifier);
     return () => {
+      arreter();
       document.removeEventListener("visibilitychange", verifier);
       window.removeEventListener("online", verifier);
     };

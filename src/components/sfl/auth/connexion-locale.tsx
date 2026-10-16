@@ -23,8 +23,14 @@ export function ConnexionLocale() {
     >
       <span className="size-2 shrink-0 rounded-full bg-[#ff8a4c]" aria-hidden />
       <p className="min-w-0 flex-1">
-        <strong className="font-semibold">Connexion non vérifiée.</strong> Tu ne vois pas les dernières données de
-        la ligue{session.admin ? " et tes modifications ne partent pas" : ""}.
+        <strong className="font-semibold">Connexion non vérifiée.</strong>{" "}
+        {session.refus === "injoignable"
+          ? "Le serveur n'a pas répondu à ta connexion"
+          : session.refus === "refuse"
+            ? "Le serveur a refusé ton mot de passe"
+            : "Ta connexion a expiré"}
+        {" : "}tu ne vois pas les dernières données de la ligue
+        {session.admin ? " et tes modifications ne partent pas" : ""}.
       </p>
       <button
         type="button"
