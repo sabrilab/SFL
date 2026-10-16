@@ -16,6 +16,7 @@
 // le reste de l'app ignore d'où vient la vérification.
 
 import { ACCOUNTS, findAccount, type Account } from "./accounts";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { loginEmail, supabase } from "@/lib/supabase";
 
 /**
@@ -228,38 +229,65 @@ export async function signIn(user: string, password: string): Promise<SignInResu
 
 /**
  * Rafraîchit la session depuis le serveur — appelée à chaque ouverture de
- * l'app. Le rôle admin vit dans la table profiles : quand il change en base
- * (migration, promotion), les sessions déjà ouvertes doivent le voir sans
- * que personne n'ait à se déconnecter. Corrige aussi un nom de session
- * hérité d'un ancien profil mal formé.
+ * l'app et à chaque retour au premier plan. Le rôle admin vit dans la table
+ * profiles : quand il change en base (migration, promotion), les sessions
+ * déjà ouvertes doivent le voir sans que personne n'ait à se déconnecter.
+ * Corrige aussi un nom de session hérité d'un ancien profil mal formé.
+ *
+ * Elle répare aussi une session marquée « non vérifiée » à tort : si le
+ * jeton Supabase du même joueur est toujours là et valide, la session
+ * redevient vérifiée, sans reconnexion.
  */
 export async function refreshSession(): Promise<void> {
   const session = getSession();
-  if (!session?.server) return;
+  if (!session) return;
   const account = findAccount(session.user);
   try {
-    const { data: auth } = await withTimeout(supabase().auth.getUser(), 5000);
-    const uid = auth.user?.id;
-    // Le jeton Supabase a disparu — expiré, révoqué, ou effacé par le
-    // navigateur (iOS purge le stockage des sites peu visités). Notre propre
-    // session, elle, survit indéfiniment : elle continuerait d'affirmer
-    // « vérifiée par le serveur » pendant que chaque écriture est refusée,
-    // en silence. On la remet à la vérité tout de suite, pour que l'écran
-    // affiche « Local » et réclame une reconnexion.
-    if (!uid) {
-      storeSession({ ...session, server: false });
+    const { data: auth, error } = await withTimeout(supabase().auth.getUser(), 5000);
+    const user = auth.user;
+    if (!user) {
+      // getUser ne lève pas sur une panne de réseau : il rend « pas
+      // d'utilisateur » avec une erreur réessayable. Ce n'est pas une
+      // déconnexion — c'est un iPhone en 5G qui rouvre l'app après une heure,
+      // le jeton à rafraîchir et la requête qui échoue. Rétrograder la
+      // session là-dessus la coupait de la ligue pour de bon (elle ne se
+      // revérifiait plus), bandeau « Connexion non vérifiée » et Map vide.
+      // On ne rétrograde que si le serveur dit vraiment non.
+      if (isAuthRetryableFetchError(error)) return;
+      // Le jeton Supabase a disparu — expiré, révoqué, ou effacé par le
+      // navigateur (iOS purge le stockage des sites peu visités). Notre propre
+      // session, elle, survit indéfiniment : elle continuerait d'affirmer
+      // « vérifiée par le serveur » pendant que chaque écriture est refusée,
+      // en silence. On la remet à la vérité, pour que l'écran réclame une
+      // reconnexion.
+      if (session.server) storeSession({ ...session, server: false });
       return;
     }
     const profileQuery = Promise.resolve(
-      supabase().from("profiles").select("is_admin").eq("id", uid).maybeSingle()
+      supabase().from("profiles").select("is_admin, name").eq("id", user.id).maybeSingle()
     );
     const profile = await withTimeout(profileQuery, 5000)
-      .then((r) => r.data as { is_admin: boolean } | null)
+      .then((r) => r.data as { is_admin: boolean; name: string } | null)
       .catch(() => null);
+
+    if (!session.server) {
+      // Le jeton est valide : est-ce bien celui de ce joueur ? Identifiant
+      // (connexion par mot de passe) ou nom du profil (Google / Apple).
+      const memeJoueur =
+        user.email === loginEmail(session.user) || (!!profile?.name && profile.name === session.name);
+      if (!memeJoueur || !profile) return;
+      const { refus: _refus, enAttente: _avant, ...reste } = session;
+      void _refus;
+      void _avant;
+      const attente = !(await estValide(user.id));
+      storeSession({ ...reste, admin: !!profile.is_admin, server: true, ...(attente ? { enAttente: true } : {}) });
+      return;
+    }
+
     if (!profile) return;
     const admin = !!profile.is_admin;
     const nom = account?.name ?? session.name;
-    const enAttente = !(await estValide(uid));
+    const enAttente = !(await estValide(user.id));
     if (session.admin !== admin || session.name !== nom || !!session.enAttente !== enAttente) {
       const { enAttente: _avant, ...reste } = session;
       void _avant;
