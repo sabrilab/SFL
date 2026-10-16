@@ -11,9 +11,13 @@ import { useIsClient } from "@/hooks/use-is-client";
 import { useSession } from "@/hooks/use-session";
 import { bootstrapServerSession } from "@/lib/sfl/auth/session";
 import { LoginScreen } from "./login-screen";
+import { EnAttente } from "./en-attente";
 
-/** Pages ouvertes à tous : le lien d'accueil personnel envoyé par l'admin. */
-const PUBLIC_ROUTES = ["/bienvenue"];
+/**
+ * Pages ouvertes à tous : le lien d'accueil personnel envoyé par l'admin, et
+ * la création de compte.
+ */
+const PUBLIC_ROUTES = ["/bienvenue", "/inscription"];
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const isClient = useIsClient();
@@ -47,6 +51,14 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
         <LoginScreen />
+      </div>
+    );
+  // Inscrit, pas encore accepté : sa carte et l'état de sa demande, rien
+  // d'autre (la base ne lui ouvre pas la ligue de toute façon).
+  if (session.enAttente)
+    return (
+      <div className="h-full overflow-y-auto" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        <EnAttente session={session} />
       </div>
     );
   return <>{children}</>;
