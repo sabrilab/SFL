@@ -5,8 +5,26 @@
 // isométrie 2:1, dans une boîte de 64. Ordre de dessin : fond, socle, piliers
 // du fond, pelouse, lignes, piliers de devant. Une chaîne SVG, pour servir à
 // la fois aux composants React et aux repères Leaflet (qui veulent du HTML).
+//
+// Variantes (15/10, Sabri garde le mini-stade « en plus beau ») : la même
+// construction, avec des finitions — ombre portée sous le socle, pelouse
+// éclairée au centre, piliers à chapiteau et base, tranche du socle :
+//   - origine : le dessin d'avant, à l'identique ;
+//   - fini    : le dessin d'avant, fini (ombre, lumière, chapiteaux) ;
+//   - proche  : fini, et resserré : le stade remplit la vignette ;
+//   - nuit    : fini, quatre projecteurs et leurs faisceaux ;
+//   - marbre  : fini sur fond clair, le blanc du site ;
+//   - mono    : fini en noir et blanc, pelouse grise.
+// 16/10, Sabri : « Tu mets les deux. » Noir et blanc sur le plan clair (et
+// dans la fiche du match), marbre sur la vue satellite, sombre. `VARIANTE_STADE`
+// est celle par défaut ; les autres restent pour comparer.
 
 export type Moment = "jour" | "weekend" | "semaine";
+export type VarianteStade = "origine" | "fini" | "proche" | "nuit" | "marbre" | "mono";
+export const VARIANTES_STADE: VarianteStade[] = ["origine", "fini", "proche", "nuit", "marbre", "mono"];
+
+/** La variante dessinée dans l'app. */
+export const VARIANTE_STADE: VarianteStade = "mono";
 
 /** Le fond de la vignette selon le moment du match (comme la tuile de match). */
 export const FOND_MOMENT: Record<Moment, [string, string, string]> = {
@@ -20,30 +38,54 @@ const BLANC = "#F4F5F2";
 
 const f = (n: number) => Number(n.toFixed(2));
 
-export function stadeSvg(moment: Moment, opts: { fantome?: boolean; fond?: boolean } = {}): string {
+export function stadeSvg(
+  moment: Moment,
+  opts: { fantome?: boolean; fond?: boolean; variante?: VarianteStade } = {},
+): string {
   const fantome = !!opts.fantome;
   const fond = opts.fond !== false;
-  const id = `bola-${moment}`;
+  const v = opts.variante ?? VARIANTE_STADE;
+  const fini = v !== "origine";
+  const id = `bola-${moment}-${v}`;
   const out: string[] = [];
   const push = (s: string) => out.push(s);
 
+  // Les couleurs de la variante.
+  const [c0, c1, c2] =
+    v === "marbre"
+      ? ["#FBFBF9", "#EEEEEA", "#DCDDD8"]
+      : v === "mono"
+        ? ["#45474B", "#2A2C2F", "#151619"]
+        : v === "nuit"
+          ? ["#1A1F27", "#0D1015", "#05070A"]
+          : FOND_MOMENT[moment];
+  const socle = v === "marbre" ? ["#E4E5E0", "#C9CAC4"] : ["#2B2F35", "#16191D"];
+  const tranche = v === "marbre" ? "#AFB0AA" : "#050607";
+  const herbe = v === "mono" ? ["#6E7073", "#626467"] : v === "nuit" ? ["#5E8C52", "#527D47"] : ["#4F6F48", "#45633F"];
+  const hPilier = v === "proche" ? 12 : 11;
+
   push(`<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">`);
-  const [c0, c1, c2] = FOND_MOMENT[moment];
   push(`<defs>
     <linearGradient id="${id}-fond" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c0}"/><stop offset=".5" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient>
-    <linearGradient id="${id}-socle" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2B2F35"/><stop offset="1" stop-color="#16191D"/></linearGradient>
+    <linearGradient id="${id}-socle" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${socle[0]}"/><stop offset="1" stop-color="${socle[1]}"/></linearGradient>
     <radialGradient id="${id}-proj" cx="32" cy="37" r="17" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity=".3"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="${id}-ombre" cx="32" cy="44" r="31" gradientTransform="matrix(1 0 0 .42 0 25.5)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#000" stop-opacity="${v === "marbre" ? ".28" : ".55"}"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+    <radialGradient id="${id}-faisceau" cx="32" cy="37" r="22" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#FFF6DC" stop-opacity=".42"/><stop offset="1" stop-color="#FFF6DC" stop-opacity="0"/></radialGradient>
   </defs>`);
 
   // 1. Fond
   if (!fantome && fond) push(`<rect width="64" height="64" fill="url(#${id}-fond)"/>`);
 
-  // 2. Socle : ovale (2 ; 23,5 ; 60 x 30), sa tranche d'abord
+  // Resserré : tout le stade grandit autour de son centre.
+  if (v === "proche") push(`<g transform="translate(32 38.6) scale(1.08) translate(-32 -38)">`);
+
+  // 2. Socle : ovale (2 ; 23,5 ; 60 x 30), son ombre et sa tranche d'abord
   if (fantome) {
     push(`<ellipse cx="32" cy="38.5" rx="30" ry="15" fill="none" stroke="${ENCRE}" stroke-opacity=".32" stroke-width="1" stroke-dasharray="3 2.5"/>`);
   } else {
-    push(`<ellipse cx="32" cy="42" rx="30" ry="15" fill="#050607"/>`);
-    push(`<ellipse cx="32" cy="38.5" rx="30" ry="15" fill="url(#${id}-socle)" stroke="#fff" stroke-opacity=".1" stroke-width=".6"/>`);
+    if (fini) push(`<ellipse cx="32" cy="45" rx="31" ry="13" fill="url(#${id}-ombre)"/>`);
+    push(`<ellipse cx="32" cy="42" rx="30" ry="15" fill="${tranche}"/>`);
+    push(`<ellipse cx="32" cy="38.5" rx="30" ry="15" fill="url(#${id}-socle)" stroke="#fff" stroke-opacity="${v === "marbre" ? ".7" : ".1"}" stroke-width=".6"/>`);
   }
 
   // 3. Piliers : 20 sur l'ovale rx 26,5 ry 13,25 centre (32, 38)
@@ -52,7 +94,7 @@ export function stadeSvg(moment: Moment, opts: { fantome?: boolean; fond?: boole
     return { x: 32 + 26.5 * Math.cos(a), y: 38 + 13.25 * Math.sin(a), devant: Math.sin(a) > 0 };
   });
   const pilier = (c: { x: number; y: number; devant: boolean }) => {
-    const h = 11;
+    const h = hPilier;
     if (fantome) {
       push(`<rect x="${f(c.x - 1.3)}" y="${f(c.y - h)}" width="2.6" height="${h}" fill="none" stroke="${ENCRE}" stroke-opacity=".32" stroke-width=".7"/>`);
       push(`<rect x="${f(c.x - 1.9)}" y="${f(c.y - h - 1.3)}" width="3.8" height="1.4" fill="none" stroke="${ENCRE}" stroke-opacity=".32" stroke-width=".7"/>`);
@@ -62,6 +104,14 @@ export function stadeSvg(moment: Moment, opts: { fantome?: boolean; fond?: boole
     const ombre = c.devant ? "#BFC0BA" : "#A9AAA4";
     push(`<rect x="${f(c.x - 1.3)}" y="${f(c.y - h)}" width="2.6" height="${h}" fill="${clair}"/>`);
     push(`<rect x="${f(c.x)}" y="${f(c.y - h)}" width="1.3" height="${h}" fill="${ombre}"/>`);
+    if (fini) {
+      // Une cannelure, et le chapiteau en deux plateaux.
+      push(`<rect x="${f(c.x - 0.55)}" y="${f(c.y - h + 0.6)}" width=".35" height="${f(h - 1.6)}" fill="${ombre}" opacity=".7"/>`);
+      push(`<rect x="${f(c.x - 1.6)}" y="${f(c.y - h - 0.6)}" width="3.2" height=".8" fill="${ombre}"/>`);
+      push(`<rect x="${f(c.x - 2)}" y="${f(c.y - h - 1.5)}" width="4" height="1" fill="${clair}"/>`);
+      push(`<rect x="${f(c.x - 2)}" y="${f(c.y - 0.9)}" width="4" height="1.2" fill="${ombre}"/>`);
+      return;
+    }
     push(`<rect x="${f(c.x - 1.9)}" y="${f(c.y - h - 1.3)}" width="3.8" height="1.4" fill="${clair}"/>`);
     push(`<rect x="${f(c.x - 1.9)}" y="${f(c.y - 0.9)}" width="3.8" height="1.2" fill="${ombre}"/>`);
   };
@@ -72,16 +122,19 @@ export function stadeSvg(moment: Moment, opts: { fantome?: boolean; fond?: boole
   const quad = (a0: number, a1: number) => `${q(a0, -1)} ${q(a1, -1)} ${q(a1, 1)} ${q(a0, 1)}`;
   const pelouse = quad(-1, 1);
   if (!fantome) {
-    push(`<polygon points="${pelouse}" fill="#4F6F48"/>`);
+    // Fini : la tranche de la pelouse, posée sur le socle.
+    if (fini) push(`<polygon points="${q(-1, 1)} ${q(1, 1)} ${q(1, -1)} ${f(32 + 14 + 7.6)},${f(37 + 7 - 3.8 + 1.2)} ${f(32 - 14 - 7.6)},${f(37 - 7 + 3.8 + 1.2)}" fill="#000" opacity=".28"/>`);
+    push(`<polygon points="${pelouse}" fill="${herbe[0]}"/>`);
     for (const i of [1, 3, 5]) {
       const a0 = -1 + i / 3;
-      push(`<polygon points="${quad(a0, a0 + 1 / 3)}" fill="#45633F"/>`);
+      push(`<polygon points="${quad(a0, a0 + 1 / 3)}" fill="${herbe[1]}"/>`);
     }
-    if (moment === "jour") push(`<polygon points="${pelouse}" fill="url(#${id}-proj)"/>`);
+    if (moment === "jour" || fini) push(`<polygon points="${pelouse}" fill="url(#${id}-proj)"/>`);
+    if (v === "nuit") push(`<ellipse cx="32" cy="37" rx="24" ry="12" fill="url(#${id}-faisceau)"/>`);
   }
 
   // 5. Lignes
-  const trait = fantome ? `stroke="${ENCRE}" stroke-opacity=".4"` : `stroke="#fff" stroke-opacity=".85"`;
+  const trait = fantome ? `stroke="${ENCRE}" stroke-opacity=".4"` : `stroke="#fff" stroke-opacity="${fini ? ".92" : ".85"}"`;
   push(`<polygon points="${pelouse}" fill="none" ${trait} stroke-width=".8"/>`);
   push(`<polyline points="${q(0, -1)} ${q(0, 1)}" fill="none" ${trait} stroke-width=".7"/>`);
   push(`<ellipse cx="32" cy="37" rx="3.6" ry="1.8" fill="none" ${trait} stroke-width=".7"/>`);
@@ -92,6 +145,16 @@ export function stadeSvg(moment: Moment, opts: { fantome?: boolean; fond?: boole
   // 6. Piliers de devant, du plus loin au plus proche
   piliers.filter((c) => c.devant).sort((a, b) => a.y - b.y).forEach(pilier);
 
+  // 7. Nuit : quatre mâts aux coins, leur tête allumée
+  if (v === "nuit" && !fantome) {
+    for (const [x, y] of [[9, 31], [55, 31], [12, 47], [52, 47]]) {
+      push(`<line x1="${x}" y1="${y}" x2="${x}" y2="${y - 17}" stroke="#C9CAC4" stroke-width=".9"/>`);
+      push(`<rect x="${x - 2.2}" y="${y - 19}" width="4.4" height="2.2" rx=".5" fill="#FFF6DC"/>`);
+      push(`<circle cx="${x}" cy="${y - 18}" r="4.5" fill="#FFF6DC" opacity=".22"/>`);
+    }
+  }
+
+  if (v === "proche") push(`</g>`);
   push(`</svg>`);
   return out.join("");
 }
@@ -132,7 +195,7 @@ export interface StickerPlan {
 }
 
 /** Le HTML d'un sticker de match pour Leaflet (le CSS est dans globals.css). */
-export function stickerHtml(s: StickerPlan, choisi: boolean): string {
+export function stickerHtml(s: StickerPlan, choisi: boolean, variante?: VarianteStade): string {
   const badge =
     s.etat.genre === "manque"
       ? `<span class="stk__badge stk__badge--manque">${s.etat.n}</span>`
@@ -147,7 +210,7 @@ export function stickerHtml(s: StickerPlan, choisi: boolean): string {
         : `<span class="stk__etiquette stk__etiquette--complet">${s.etat.genre === "joue" ? "joué" : "complet"}</span>`;
   return `<div class="stk${choisi ? " stk--choisi" : ""}${s.etat.genre === "complet" || s.etat.genre === "joue" ? " stk--complet" : ""}" style="--penche:${penche(s.id)}deg">
   <div class="stk__vignette">
-    <div class="stk__stade">${stadeSvg(s.moment)}</div>
+    <div class="stk__stade">${stadeSvg(s.moment, { variante })}</div>
     <span class="stk__cal"><span class="stk__cal-jour">${echapper(s.jourCourt)}</span><span class="stk__cal-heure">${echapper(heureCourte(s.heure))}</span></span>
     ${choisi ? etiquette : badge}
   </div>
@@ -168,8 +231,8 @@ export function toiHtml(note: number, teinte: string): string {
  * désaturé, et son nom dans une étiquette blanche — qu'on le repère d'un
  * coup d'œil sur le plan comme sur le satellite.
  */
-export function pointHtml(nom: string): string {
-  return `<div class="ter"><div class="ter__vignette"><div class="ter__stade">${stadeSvg("semaine")}</div></div><span class="ter__queue"></span><span class="ter__nom">${echapper(nom)}</span></div>`;
+export function pointHtml(nom: string, variante?: VarianteStade): string {
+  return `<div class="ter"><div class="ter__vignette"><div class="ter__stade">${stadeSvg("semaine", { variante })}</div></div><span class="ter__queue"></span><span class="ter__nom">${echapper(nom)}</span></div>`;
 }
 
 /**
