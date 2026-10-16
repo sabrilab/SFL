@@ -47,8 +47,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // de savoir qui joue.
   // La session se remet à jour depuis le serveur à chaque ouverture : un rôle
   // admin accordé en base est vu sans se déconnecter.
+  // Une PWA sur iPhone ne se recharge pas en revenant au premier plan : on
+  // revérifie aussi au retour dans l'app et au retour du réseau.
   useEffect(() => {
-    void refreshSession();
+    const verifier = () => {
+      if (document.visibilityState === "visible") void refreshSession();
+    };
+    verifier();
+    document.addEventListener("visibilitychange", verifier);
+    window.addEventListener("online", verifier);
+    return () => {
+      document.removeEventListener("visibilitychange", verifier);
+      window.removeEventListener("online", verifier);
+    };
   }, []);
 
   useEffect(() => {
