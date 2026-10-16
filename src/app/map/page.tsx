@@ -18,12 +18,18 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Crosshair, Layers, LocateFixed, MapPin, Navigation, Plus, Search, Settings2, Star, Trash2 } from "lucide-react";
+import { CalendarDays, Crosshair, Layers, LocateFixed, MapPin, Navigation, Plus, Search, Settings2, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PresencePanel } from "@/components/sfl/presence-panel";
+import { QuiVient } from "@/components/sfl/qui-vient";
+import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
+import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
+import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
+import { useParties } from "@/hooks/use-parties";
+import { inscrits, libelleJour, placesLibres, type Partie } from "@/lib/sfl/matchs";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
 import { usePresence } from "@/hooks/use-presence";
@@ -185,6 +191,8 @@ interface MatchMap {
   joue?: boolean;
   /** Une journée datée du dimanche de la convocation : on y répond comme à la convocation. */
   convoquee?: boolean;
+  /** Un match ouvert par un joueur (pas une journée de ligue). */
+  partie?: Partie;
 }
 
 /** « 13h00 », « 13:30 » → 13 ; 13 à défaut. */
@@ -231,7 +239,7 @@ export default function MapPage() {
   // quand sa date est derrière nous — le jour même, deux heures après le coup
   // d'envoi. La dernière passée (de moins d'une semaine) reste sur la Map,
   // « jouée », avec ses joueurs et le chemin vers le récap.
-  const matchs = useMemo<MatchMap[]>(() => {
+  const ligue = useMemo<MatchMap[]>(() => {
     const passee = (m: (typeof saison.journees)[number]) => {
       if (journeeJouee(saison, m.j)) return true;
       const e = ecartJours(m.date, aujourdhui);
@@ -299,6 +307,44 @@ export default function MapPage() {
     ];
   }, [saison, player.name, aujourdhui, heure, p.heure, p.lieu, p.jour, p.mine, p.effectif, p.presents]);
 
+  // Les matchs ouverts par les joueurs : un public montre ses places libres,
+  // un privé n'apparaît qu'à ceux qui en sont.
+  const { parties, moi, actif: partiesActives, recharger } = useParties();
+  const matchs = useMemo<MatchMap[]>(() => {
+    const ouverts = parties.map((x): MatchMap => {
+      const venus = inscrits(x).map((j) => j.name);
+      const moiLa = x.joueurs.find((j) => j.id === moi);
+      const libres = placesLibres(x);
+      const { etat, texte } =
+        moiLa?.statut === "invite"
+          ? { etat: { genre: "manque", n: libres } as EtatSticker, texte: "Tu es invité" }
+          : moiLa
+            ? { etat: { genre: "dedans" } as EtatSticker, texte: "Tu y es" }
+            : x.visibilite === "prive"
+              ? { etat: { genre: "complet" } as EtatSticker, texte: "Privé" }
+              : etatDe(false, libres);
+      const dateLabel = libelleJour(x.jour);
+      return {
+        cle: `m${x.id}`,
+        j: null,
+        quand: quand(dateLabel, null, aujourdhui),
+        dateLabel,
+        heure: x.heure,
+        terrain:
+          x.lat != null && x.lng != null
+            ? { id: -x.id, nom: x.lieu, adresse: x.adresse ?? "", lat: x.lat, lng: x.lng }
+            : null,
+        presents: venus,
+        effectif: x.places,
+        dedans: moiLa?.statut === "inscrit",
+        etat,
+        etatTexte: texte,
+        partie: x,
+      };
+    });
+    return [...ligue, ...ouverts];
+  }, [ligue, parties, moi, aujourdhui]);
+
   const stickers = useMemo<StickerPlan[]>(
     () =>
       matchs
@@ -316,10 +362,25 @@ export default function MapPage() {
         })),
     [matchs]
   );
+  // Les terrains libres : des matchs possibles. Les toucher en ouvre un.
   const points = useMemo<PointPlan[]>(() => {
     const occupes = new Set(matchs.map((m) => m.terrain?.id));
-    return terrains.filter((t) => !occupes.has(t.id)).map((t) => ({ id: `p${t.id}`, lat: t.lat, lng: t.lng, nom: t.nom }));
+    const pris = new Set(matchs.filter((m) => m.terrain).map((m) => `${m.terrain!.lat.toFixed(5)},${m.terrain!.lng.toFixed(5)}`));
+    return terrains
+      .filter((t) => !occupes.has(t.id) && !pris.has(`${t.lat.toFixed(5)},${t.lng.toFixed(5)}`))
+      .map((t) => ({ id: `p${t.id}`, lat: t.lat, lng: t.lng, nom: t.nom }));
   }, [terrains, matchs]);
+
+  // Ouvrir un match : n'importe quel joueur, d'un bouton ou d'un terrain libre.
+  const [ouvrir, setOuvrir] = useState<{ terrain: Terrain | null; jour?: string; heure?: string; n: number } | null>(null);
+  const [dispos, setDispos] = useState(false);
+  const ouvrirIci = useCallback(
+    (id: string) => {
+      const t = terrains.find((x) => `p${x.id}` === id) ?? null;
+      setOuvrir((o) => ({ terrain: t, n: (o?.n ?? 0) + 1 }));
+    },
+    [terrains]
+  );
 
   const [choix, setChoix] = useState<string | null>(null);
   const choisirSticker = useCallback((id: string) => setChoix(id), []);
@@ -379,7 +440,7 @@ export default function MapPage() {
       {/* ─── Le plan, tout l'écran ─── */}
       <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] lg:top-[5.5rem]">
         <div className="absolute inset-0">
-          <CarteMap fond={fond} stickers={stickers} points={points} toi={toi} choisi={choisi?.cle ?? null} onChoisir={choisirSticker} className="h-full w-full" />
+          <CarteMap fond={fond} stickers={stickers} points={points} toi={toi} choisi={choisi?.cle ?? null} onChoisir={choisirSticker} onPoint={partiesActives ? ouvrirIci : undefined} className="h-full w-full" />
         </div>
         {/* Voile en haut : la barre d'état et le lettrage restent lisibles.
             Tout ce qui est posé sur le plan passe au-dessus des calques de
@@ -419,6 +480,17 @@ export default function MapPage() {
           >
             <Layers className="size-[18px]" strokeWidth={2.2} />
           </button>
+          {partiesActives && (
+            <button
+              type="button"
+              onClick={() => setDispos(true)}
+              aria-label="Mes dispos"
+              className="grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
+              style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
+            >
+              <CalendarDays className="size-[18px]" strokeWidth={2.2} />
+            </button>
+          )}
           {admin && (
             <button
               type="button"
@@ -434,10 +506,12 @@ export default function MapPage() {
 
         {/* En bas : les boutons, les cartes des matchs, les pastilles */}
         <div className="absolute inset-x-0 z-[510] flex flex-col items-center gap-3" style={{ bottom: bas }}>
-          <div className="flex w-full items-center justify-center px-4">
-            {admin && (
-              <Link
-                href="/admin"
+          <div className="flex w-full items-center justify-center gap-2 px-4">
+            {/* Tout joueur ouvre un match ; l'admin garde en plus la journée de ligue. */}
+            {partiesActives && (
+              <button
+                type="button"
+                onClick={() => setOuvrir((o) => ({ terrain: choisi?.partie ? null : (choisi?.terrain ?? null), n: (o?.n ?? 0) + 1 }))}
                 className="flex h-11 items-center gap-2 rounded-full pr-[18px] pl-2 text-[15.5px] font-semibold shadow-[0_6px_10px_rgba(0,0,0,0.22)]"
                 style={{ background: ENCRE, color: CLAIR }}
               >
@@ -445,6 +519,15 @@ export default function MapPage() {
                   <Plus className="size-[13px]" strokeWidth={3} />
                 </span>
                 Ouvrir un match
+              </button>
+            )}
+            {admin && (
+              <Link
+                href="/admin"
+                className="flex h-11 items-center gap-2 rounded-full px-[18px] text-[15.5px] font-semibold shadow-[0_6px_10px_rgba(0,0,0,0.22)]"
+                style={partiesActives ? { background: BLANC, color: ENCRE } : { background: ENCRE, color: CLAIR }}
+              >
+                {partiesActives ? "Journée" : "Ouvrir un match"}
               </Link>
             )}
             <button
@@ -496,6 +579,15 @@ export default function MapPage() {
                     <Navigation className="size-[11px]" strokeWidth={2.6} /> Y aller
                   </a>
                 </>
+              ) : choisi.partie ? (
+                <button
+                  type="button"
+                  onClick={() => ouvrirFiche()}
+                  className="flex h-[30px] items-center rounded-full px-3.5 text-[13px] font-semibold shadow-[0_3px_6px_rgba(0,0,0,0.14)]"
+                  style={{ background: BLANC, color: ENCRE }}
+                >
+                  {choisi.partie.lieu}
+                </button>
               ) : admin ? (
                 <button
                   type="button"
@@ -520,10 +612,10 @@ export default function MapPage() {
         <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
           <SheetHeader className="px-5 pt-5 pb-0">
             <p className="mono-label text-muted-foreground">
-              {choisi?.j != null ? `J${choisi.j} · ` : ""}Sunday Five League
+              {choisi?.partie ? `Ouvert par ${choisi.partie.organisateur}` : `${choisi?.j != null ? `J${choisi.j} · ` : ""}Sunday Five League`}
             </p>
             <SheetTitle className="text-[26px] font-bold tracking-tight">
-              {ficheAdmin ? "Les matchs" : (choisi?.terrain?.nom ?? (choisi?.j != null ? `Journée ${choisi.j}` : "Le match"))}
+              {ficheAdmin ? "Les matchs" : (choisi?.terrain?.nom ?? choisi?.partie?.lieu ?? (choisi?.j != null ? `Journée ${choisi.j}` : "Le match"))}
             </SheetTitle>
             {!ficheAdmin && choisi && (
               <p className="text-[14px] text-muted-foreground">
@@ -535,14 +627,20 @@ export default function MapPage() {
           <div className="flex flex-col gap-5 px-4">
             {ficheAdmin ? (
               <>
-                <OuSeJouent saison={saison} matchs={matchs} terrains={terrains} onSauver={sauver} />
+                <OuSeJouent saison={saison} matchs={ligue} terrains={terrains} onSauver={sauver} />
                 <Terrains saison={saison} terrains={terrains} onSauver={sauver} />
               </>
             ) : (
               <>
                 {choisi?.terrain && <Itineraire terrain={choisi.terrain} ios={ios} />}
                 {/* Une journée : ses joueurs. La convocation : on y répond, comme avant. */}
-                {choisi?.j != null && !choisi.convoquee ? <Presents m={choisi} /> : <PresencePanel />}
+                {choisi?.partie ? (
+                  <FichePartie partie={choisi.partie} moi={moi} onChange={recharger} />
+                ) : choisi?.j != null && !choisi.convoquee ? (
+                  <Presents m={choisi} />
+                ) : (
+                  <PresencePanel />
+                )}
                 {choisi?.joue && (
                   <Link
                     href="/ligue"
@@ -551,7 +649,7 @@ export default function MapPage() {
                     Voir le récap de la journée
                   </Link>
                 )}
-                {admin && (
+                {admin && !choisi?.partie && (
                   <button
                     type="button"
                     onClick={() => setFicheAdmin(true)}
@@ -565,6 +663,32 @@ export default function MapPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {ouvrir && (
+        <OuvrirMatch
+          key={ouvrir.n}
+          open
+          onOpenChange={(o) => !o && setOuvrir(null)}
+          terrains={terrains}
+          terrainInitial={ouvrir.terrain}
+          jourInitial={ouvrir.jour}
+          heureInitial={ouvrir.heure}
+          moi={moi}
+          onOuvert={(id) => {
+            recharger();
+            setChoix(`m${id}`);
+          }}
+        />
+      )}
+      <MesDispos
+        open={dispos}
+        onOpenChange={setDispos}
+        moi={moi}
+        onOuvrir={(jour, h) => {
+          setDispos(false);
+          setOuvrir((o) => ({ terrain: null, jour, heure: h, n: (o?.n ?? 0) + 1 }));
+        }}
+      />
     </>
   );
 }
@@ -624,7 +748,10 @@ function CarteMatch({
               {titre}
             </p>
             <p className="mt-1 truncate font-mono text-[9.5px] font-bold tracking-[1px] text-white/70 uppercase">
-              {heureCourte(m.heure)} · {m.j != null ? `J${m.j} · ` : ""}Sunday Five
+              {heureCourte(m.heure)} ·{" "}
+              {m.partie
+                ? `${m.partie.genre === "exhibition" ? "Exhibition" : m.partie.visibilite === "prive" ? "Privé" : "Public"} · ${m.partie.organisateur}`
+                : `${m.j != null ? `J${m.j} · ` : ""}Sunday Five`}
             </p>
           </div>
         </div>
@@ -707,13 +834,7 @@ function Presents({ m }: { m: MatchMap }) {
         </p>
       </div>
       {m.presents.length ? (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {m.presents.map((nom) => (
-            <span key={nom} className="rounded-full bg-secondary px-3 py-1.5 text-[13px] font-medium">
-              {nom}
-            </span>
-          ))}
-        </div>
+        <QuiVient className="mt-3" noms={m.presents} places={m.joue ? 0 : Math.max(0, m.effectif - m.presents.length)} />
       ) : (
         <p className="mt-2 text-[13px] text-muted-foreground">Les joueurs arrivent avec la composition des équipes.</p>
       )}

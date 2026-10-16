@@ -67,6 +67,8 @@ export interface Journee {
   // Composition en équipes du jour (undefined = feuille de match pas encore
   // renseignée par l'admin : pas de vote de figures possible).
   matches?: JourneeMatch[];
+  // MVP choisi par l'app d'après les stats (saisie/mvp.ts) : pas de vote MVP.
+  mvpAuto?: boolean;
   // Repli plat utilisé uniquement quand `matches` est absent.
   lignes?: [string, "V" | "D" | "-", number, number][];
   // Faits objectifs (issus des stats, pas d'un vote).

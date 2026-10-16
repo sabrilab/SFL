@@ -80,7 +80,7 @@ export function addJournee(saison: Saison): { saison: Saison; j: number } {
   return {
     saison: {
       ...saison,
-      journees: [...saison.journees, { j, date: shortToday(), sflTime: false }],
+      journees: [...saison.journees, { j, date: shortToday(), sflTime: false, mvpAuto: true }],
     },
     j,
   };

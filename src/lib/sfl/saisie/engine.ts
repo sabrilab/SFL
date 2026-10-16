@@ -239,16 +239,19 @@ export function computeJournees(saison: Saison): Journee[] {
           groups.get(t)!.push(e);
         }
         const matches: JourneeMatch[] = [];
+        // Plusieurs matchs le même jour se jouent côte à côte : chacun porte
+        // le nom de son terrain (« Terrain 1 », « Terrain 2 »…).
+        const plusieurs = order.length > 3;
         for (let i = 0; i + 1 < order.length; i += 2) {
           const mi = i / 2 + 1;
           matches.push({
             id: `j${meta.j}-m${mi}`,
-            label: `Match ${mi}`,
+            label: plusieurs ? `Terrain ${mi}` : `Match ${mi}`,
             teamA: buildTeam(meta.j, mi, order[i], groups.get(order[i])!),
             teamB: buildTeam(meta.j, mi, order[i + 1], groups.get(order[i + 1])!),
           });
         }
-        return { j: meta.j, date: meta.date, sflTime: meta.sflTime, matches, faits };
+        return { j: meta.j, date: meta.date, sflTime: meta.sflTime, matches, faits, ...(meta.mvpAuto ? { mvpAuto: true } : {}) };
       }
 
       // Pas d'équipes : repli plat.
@@ -260,7 +263,7 @@ export function computeJournees(saison: Saison): Journee[] {
           e.passes,
         ]
       );
-      return { j: meta.j, date: meta.date, sflTime: meta.sflTime, lignes, faits };
+      return { j: meta.j, date: meta.date, sflTime: meta.sflTime, lignes, faits, ...(meta.mvpAuto ? { mvpAuto: true } : {}) };
     });
 }
 
