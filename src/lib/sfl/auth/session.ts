@@ -150,7 +150,10 @@ export async function signIn(user: string, password: string): Promise<SignInResu
   const account = findAccount(user);
   const identifiant = account?.user ?? user.trim().toLowerCase();
 
-  // 1 · Le serveur d'abord — 5 secondes maximum, sinon repli local.
+  // 1 · Le serveur d'abord — 12 secondes maximum, sinon repli local. Une
+  //     session locale ne lit plus rien de la ligue : mieux vaut attendre un
+  //     peu un réseau lent (5G, navigateur intégré de Snapchat ou d'Instagram)
+  //     que d'ouvrir une app vide.
   let refusServeur: Session["refus"];
   try {
     const { data, error } = await withTimeout(
@@ -158,7 +161,7 @@ export async function signIn(user: string, password: string): Promise<SignInResu
         email: loginEmail(identifiant),
         password,
       }),
-      5000
+      12000
     );
     if (!error && data.user) {
       // Le rôle admin vient de la table profiles (jamais des métadonnées).
@@ -217,13 +220,18 @@ export async function signIn(user: string, password: string): Promise<SignInResu
   try {
     local = localStorage.getItem(`${OVERRIDE_PREFIX}${account.user}`) !== null;
   } catch {}
-  // Ce mot de passe n'existe que sur cet appareil : une session locale ne
-  // lirait plus rien de la ligue (la base ne s'ouvre qu'aux connexions
-  // vérifiées) et n'écrirait rien non plus. On refuse, en disant pourquoi.
-  if (refusServeur === "refuse" && local) {
+  // Le serveur a répondu non : une session locale ne lirait plus rien de la
+  // ligue (la base ne s'ouvre qu'aux connexions vérifiées) et n'écrirait rien
+  // non plus — c'était le bandeau « Connexion non vérifiée » sur une Map vide,
+  // par exemple avec l'ancien mot de passe d'un joueur qui l'a changé depuis.
+  // On refuse, en disant pourquoi.
+  if (refusServeur === "refuse") {
     const tape = await hashPassword(account.user, password);
-    if (tape === expectedHash(account)) return { ok: false, reason: "mot-de-passe-local" };
+    if (local && tape === expectedHash(account)) return { ok: false, reason: "mot-de-passe-local" };
+    return { ok: false, reason: "bad-password" };
   }
+  // Serveur injoignable : repli local, en attendant qu'il réponde (voir
+  // suivreSessionServeur, qui la revérifie dès que Supabase se connecte).
   return signInLocal(account, password, refusServeur);
 }
 
@@ -296,6 +304,21 @@ export async function refreshSession(): Promise<void> {
   } catch {
     // Hors ligne : la session actuelle reste ce qu'elle est.
   }
+}
+
+/**
+ * Suit la connexion Supabase : une connexion qui aboutit après le délai de
+ * l'écran de connexion, un jeton rafraîchi ou perdu remettent la session à la
+ * vérité sans attendre la prochaine ouverture de l'app. Renvoie l'arrêt.
+ */
+export function suivreSessionServeur(): () => void {
+  const { data } = supabase().auth.onAuthStateChange((event) => {
+    if (event !== "SIGNED_IN" && event !== "TOKEN_REFRESHED" && event !== "SIGNED_OUT") return;
+    // Jamais d'appel Supabase dans ce rappel (il tient le verrou d'auth) :
+    // on attend le tour suivant.
+    setTimeout(() => void refreshSession(), 0);
+  });
+  return () => data.subscription.unsubscribe();
 }
 
 export function signOut() {
