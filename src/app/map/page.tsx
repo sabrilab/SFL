@@ -17,7 +17,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { CalendarDays, Crosshair, Layers, LocateFixed, MapPin, Navigation, Plus, Search, Settings2, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,7 @@ import { ovr } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { FOND_MOMENT, heureCourte, itineraires, photoSatellite, stadeSvg, type EtatSticker, type Moment, type StickerPlan } from "@/components/sfl/map/stade";
 import type { FondCarte, PointPlan, ToiPlan } from "@/components/sfl/map/carte-map";
+import "./animations.css";
 
 /** Les terrains enregistrés ne s'affichent plus sur le plan : seuls les matchs. */
 const AUCUN_POINT: PointPlan[] = [];
@@ -380,14 +381,51 @@ export default function MapPage() {
   const [fiche, setFiche] = useState(false);
   const [ficheAdmin, setFicheAdmin] = useState(false);
   const [choix, setChoix] = useState<string | null>(null);
-  // Toucher un match sur le plan le choisit et ouvre sa fiche.
+  // Toucher un match sur le plan le choisit et ouvre sa fiche — un instant
+  // après, qu'on voie le sticker grandir et l'onde partir.
   const choisirSticker = useCallback((id: string) => {
     setChoix(id);
     setFicheAdmin(false);
-    setFiche(true);
+    const calme = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.setTimeout(() => setFiche(true), calme ? 0 : 320);
   }, []);
   // Le match choisi : celui qu'on a touché s'il est encore là, sinon le premier.
   const choisi = affiches.find((m) => m.cle === choix) ?? affiches[0];
+
+  // Le carrousel et le plan vont ensemble : faire glisser les cartes choisit
+  // celle qui s'arrête au centre (le plan suit), et choisir sur le plan amène
+  // sa carte au centre.
+  const carrousel = useRef<HTMLDivElement>(null);
+  const choisiCle = useRef<string | undefined>(undefined);
+  const arretCarrousel = useRef(0);
+  const suivreCarrousel = useCallback(() => {
+    window.clearTimeout(arretCarrousel.current);
+    arretCarrousel.current = window.setTimeout(() => {
+      const boite = carrousel.current;
+      if (!boite) return;
+      const milieu = boite.getBoundingClientRect().left + boite.clientWidth / 2;
+      let proche: HTMLElement | null = null;
+      let ecart = Infinity;
+      for (const el of boite.querySelectorAll<HTMLElement>("[data-cle]")) {
+        const r = el.getBoundingClientRect();
+        const e = Math.abs(r.left + r.width / 2 - milieu);
+        if (e < ecart) [proche, ecart] = [el, e];
+      }
+      const cle = proche?.dataset.cle;
+      if (cle && cle !== choisiCle.current) {
+        navigator.vibrate?.(5);
+        setChoix(cle);
+      }
+    }, 140);
+  }, []);
+  const cleChoisie = choisi?.cle;
+  useEffect(() => {
+    choisiCle.current = cleChoisie;
+    const el = cleChoisie && carrousel.current?.querySelector<HTMLElement>(`[data-cle="${cleChoisie}"]`);
+    if (!el) return;
+    const calme = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ inline: "center", block: "nearest", behavior: calme ? "auto" : "smooth" });
+  }, [cleChoisie]);
   const stickers = useMemo<StickerPlan[]>(
     () =>
       affiches
@@ -484,13 +522,15 @@ export default function MapPage() {
         {/* En haut à gauche : la commune en lettrage, le compte en étiquette */}
         <div className="pointer-events-none absolute left-5 z-[510] flex max-w-[calc(100%-8.5rem)] flex-col items-start" style={{ top: `calc(${haut} + 8px)` }}>
           <span
-            className="lettrage -rotate-[4deg]"
+            key={commune}
+            className="lettrage lettrage-entre -rotate-[4deg]"
             style={{ ["--taille" as string]: commune.length <= 7 ? "34px" : commune.length <= 10 ? "28px" : commune.length <= 13 ? "22px" : "17px" }}
           >
             {commune}
           </span>
           <span
-            className="-mt-1 ml-2.5 inline-flex h-[19px] rotate-[3deg] items-center rounded-full border-[1.5px] px-2 font-mono text-[9px] font-bold tracking-[1.2px] shadow-[0_1px_2px_rgba(0,0,0,0.18)]"
+            key={compte}
+            className="compte-entre -mt-1 ml-2.5 inline-flex h-[19px] rotate-[3deg] items-center rounded-full border-[1.5px] px-2 font-mono text-[9px] font-bold tracking-[1.2px] shadow-[0_1px_2px_rgba(0,0,0,0.18)]"
             style={{ background: ENCRE, color: BLANC, borderColor: BLANC }}
           >
             {compte}
@@ -506,7 +546,7 @@ export default function MapPage() {
             onClick={() => setFond((f) => (f === "plan" ? "satellite" : "plan"))}
             aria-label={fond === "plan" ? "Voir la photo satellite" : "Revenir au plan"}
             aria-pressed={fond === "satellite"}
-            className="grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
+            className="map-bord map-touche map-calques grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
             style={fond === "satellite" ? { background: ENCRE, color: CLAIR, borderColor: "rgba(255,255,255,0.2)" } : { background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
           >
             <Layers className="size-[18px]" strokeWidth={2.2} />
@@ -516,7 +556,7 @@ export default function MapPage() {
               type="button"
               onClick={() => setDispos(true)}
               aria-label="Mes dispos"
-              className="grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
+              className="map-bord map-touche grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
               style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
             >
               <CalendarDays className="size-[18px]" strokeWidth={2.2} />
@@ -527,7 +567,7 @@ export default function MapPage() {
               type="button"
               onClick={() => ouvrirFiche(true)}
               aria-label="Régler les matchs et les terrains"
-              className="grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
+              className="map-bord map-touche grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
               style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
             >
               <Settings2 className="size-[18px]" strokeWidth={2.2} />
@@ -543,7 +583,7 @@ export default function MapPage() {
               <button
                 type="button"
                 onClick={() => setOuvrir((o) => ({ terrain: choisi?.partie ? null : (choisi?.terrain ?? null), n: (o?.n ?? 0) + 1 }))}
-                className="flex h-11 items-center gap-2 rounded-full pr-[18px] pl-2 text-[15.5px] font-semibold shadow-[0_6px_10px_rgba(0,0,0,0.22)]"
+                className="map-monte map-touche flex h-11 items-center gap-2 rounded-full pr-[18px] pl-2 text-[15.5px] font-semibold shadow-[0_6px_10px_rgba(0,0,0,0.22)]"
                 style={{ background: ENCRE, color: CLAIR }}
               >
                 <span className="grid size-7 place-items-center rounded-full" style={{ background: CLAIR, color: ENCRE }}>
@@ -555,7 +595,7 @@ export default function MapPage() {
             {admin && (
               <Link
                 href="/admin"
-                className="flex h-11 items-center gap-2 rounded-full px-[18px] text-[15.5px] font-semibold shadow-[0_6px_10px_rgba(0,0,0,0.22)]"
+                className="map-monte map-touche flex h-11 items-center gap-2 rounded-full px-[18px] text-[15.5px] font-semibold shadow-[0_6px_10px_rgba(0,0,0,0.22)]"
                 style={partiesActives ? { background: BLANC, color: ENCRE } : { background: ENCRE, color: CLAIR }}
               >
                 {partiesActives ? "Journée" : "Ouvrir un match"}
@@ -565,7 +605,7 @@ export default function MapPage() {
               type="button"
               onClick={localiser}
               aria-label={toi ? "Revenir sur toi" : "Activer la localisation"}
-              className="absolute right-4 grid size-11 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
+              className="map-monte map-touche absolute right-4 grid size-11 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
               style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
             >
               <LocateFixed className={cn("size-4", cherchePosition && "animate-pulse")} strokeWidth={2.4} />
@@ -574,9 +614,13 @@ export default function MapPage() {
 
           {/* Le carrousel : une carte par match, celle du centre est la choisie.
               Toucher la choisie ouvre sa fiche. */}
-          <div className="flex w-full snap-x snap-mandatory gap-3 overflow-x-auto px-[max(1rem,calc(50%-103px))] pb-3 [scrollbar-width:none]">
-            {affiches.map((m) => (
-              <div key={m.cle} className="shrink-0 snap-center">
+          <div
+            ref={carrousel}
+            onScroll={suivreCarrousel}
+            className="flex w-full snap-x snap-mandatory gap-3 overflow-x-auto px-[max(1rem,calc(50%-103px))] pb-3 [scrollbar-width:none]"
+          >
+            {affiches.map((m, i) => (
+              <div key={m.cle} data-cle={m.cle} className="map-monte shrink-0 snap-center" style={{ ["--i" as string]: i + 1 }}>
                 <CarteMatch
                   m={m}
                   choisi={m.cle === choisi?.cle}
@@ -754,7 +798,7 @@ function CarteMatch({
   const complet = m.etat.genre === "complet";
   const titre = m.quand.titre;
   return (
-    <div className={cn("relative transition-transform duration-300", !choisi && "scale-[0.88] opacity-80")}>
+    <div className={cn("carte-match relative", choisi && "carte-match--choisie")}>
       <button
         type="button"
         onClick={onToucher}
