@@ -84,7 +84,7 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
           onClick={() => {
             if (window.confirm("Annuler ce match pour tout le monde ?")) void faire(() => annuler(partie.id), "Match annulé.");
           }}
-          className={cn(bouton, "bg-secondary text-muted-foreground")}
+          className={cn(bouton, "bg-secondary text-foreground/80")}
         >
           Annuler le match
         </button>

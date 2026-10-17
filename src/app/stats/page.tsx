@@ -358,10 +358,14 @@ export default function StatsPage() {
                         </div>
                       )}
 
-                      <div>
-                        <p className="mono-label mb-2 text-primary">Figures de match</p>
-                        <ElectionPanel journee={j} me={me} />
-                      </div>
+                      {/* Journée Bola : le MVP sort des stats, rien ne se vote
+                          (le vote reviendra avec le mode Team). */}
+                      {!j.mvpAuto && (
+                        <div>
+                          <p className="mono-label mb-2 text-primary">Figures de match</p>
+                          <ElectionPanel journee={j} me={me} />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

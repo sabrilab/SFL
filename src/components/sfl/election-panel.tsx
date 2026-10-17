@@ -243,10 +243,7 @@ function Phase2Panel({
 
 export function ElectionPanel({ journee, me }: { journee: Journee; me: string }) {
   const isClient = useIsClient();
-  // Journée Bola : le MVP est déjà choisi par l'app d'après les stats, il ne
-  // se vote pas. Restent l'Impact et la Défensive.
-  const categories = journee.mvpAuto ? CATEGORIES.filter((c) => c !== "mvp") : CATEGORIES;
-  const [category, setCategory] = useState<BoostCategory>(categories[0]);
+  const [category, setCategory] = useState<BoostCategory>("mvp");
   // Un seul "tick" partagé : toute nomination ou vote final force le
   // recalcul de TOUS les panneaux (nominations + finale), qui lisent tous
   // localStorage directement au rendu — sinon la finale ne verrait pas
@@ -268,7 +265,7 @@ export function ElectionPanel({ journee, me }: { journee: Journee; me: string })
   return (
     <div className="flex flex-col gap-3">
       <div className="flex gap-2">
-        {categories.map((c) => (
+        {CATEGORIES.map((c) => (
           <button
             key={c}
             onClick={() => setCategory(c)}
