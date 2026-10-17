@@ -52,6 +52,9 @@ import { cn } from "@/lib/utils";
 import { FOND_MOMENT, heureCourte, itineraires, photoSatellite, stadeSvg, type EtatSticker, type Moment, type StickerPlan } from "@/components/sfl/map/stade";
 import type { FondCarte, PointPlan, ToiPlan } from "@/components/sfl/map/carte-map";
 
+/** Les terrains enregistrés ne s'affichent plus sur le plan : seuls les matchs. */
+const AUCUN_POINT: PointPlan[] = [];
+
 const CarteMap = dynamic(() => import("@/components/sfl/map/carte-map").then((m) => m.CarteMap), {
   ssr: false,
   loading: () => <div className="h-full w-full bg-[#e9eae6]" aria-hidden />,
@@ -345,11 +348,17 @@ export default function MapPage() {
     return [...ligue, ...ouverts];
   }, [ligue, parties, moi, aujourdhui]);
 
+  // Sur la carte, seulement ce qui arrive : les matchs à venir, sans les
+  // terrains enregistrés ni le match déjà joué — on ne noie pas celui qui
+  // arrive. Le joué ne revient que s'il n'y a rien d'autre.
+  const affiches = useMemo(() => {
+    const aVenir = matchs.filter((m) => !m.joue);
+    return aVenir.length ? aVenir : matchs;
+  }, [matchs]);
   const stickers = useMemo<StickerPlan[]>(
     () =>
-      matchs
-        // Un match joué sur le terrain d'un match à venir : on ne les empile pas.
-        .filter((m) => m.terrain && !(m.joue && matchs.some((x) => !x.joue && x.terrain?.id === m.terrain!.id)))
+      affiches
+        .filter((m) => m.terrain)
         .map((m) => ({
           id: m.cle,
           lat: m.terrain!.lat,
@@ -360,32 +369,17 @@ export default function MapPage() {
           etat: m.etat,
           nom: m.terrain!.nom,
         })),
-    [matchs]
+    [affiches]
   );
-  // Les terrains libres : des matchs possibles. Les toucher en ouvre un.
-  const points = useMemo<PointPlan[]>(() => {
-    const occupes = new Set(matchs.map((m) => m.terrain?.id));
-    const pris = new Set(matchs.filter((m) => m.terrain).map((m) => `${m.terrain!.lat.toFixed(5)},${m.terrain!.lng.toFixed(5)}`));
-    return terrains
-      .filter((t) => !occupes.has(t.id) && !pris.has(`${t.lat.toFixed(5)},${t.lng.toFixed(5)}`))
-      .map((t) => ({ id: `p${t.id}`, lat: t.lat, lng: t.lng, nom: t.nom }));
-  }, [terrains, matchs]);
 
   // Ouvrir un match : n'importe quel joueur, d'un bouton ou d'un terrain libre.
   const [ouvrir, setOuvrir] = useState<{ terrain: Terrain | null; jour?: string; heure?: string; n: number } | null>(null);
   const [dispos, setDispos] = useState(false);
-  const ouvrirIci = useCallback(
-    (id: string) => {
-      const t = terrains.find((x) => `p${x.id}` === id) ?? null;
-      setOuvrir((o) => ({ terrain: t, n: (o?.n ?? 0) + 1 }));
-    },
-    [terrains]
-  );
 
   const [choix, setChoix] = useState<string | null>(null);
   const choisirSticker = useCallback((id: string) => setChoix(id), []);
   // Le match choisi : celui qu'on a touché s'il est encore là, sinon le premier.
-  const choisi = matchs.find((m) => m.cle === choix) ?? matchs[0];
+  const choisi = affiches.find((m) => m.cle === choix) ?? affiches[0];
 
   // Toi : ta position, quand tu la donnes.
   const [toi, setToi] = useState<ToiPlan | null>(null);
@@ -412,7 +406,7 @@ export default function MapPage() {
   const ios = useEstIos();
 
   const commune = choisi?.terrain?.commune ?? terrains.find((t) => t.commune)?.commune ?? "SFL";
-  const n = matchs.filter((m) => !m.joue).length;
+  const n = affiches.filter((m) => !m.joue).length;
   const compte = n ? `${n} MATCH${n > 1 ? "S" : ""} OUVERT${n > 1 ? "S" : ""}` : "MATCH JOUÉ";
 
   function sauver(next: Saison, message: string) {
@@ -443,7 +437,7 @@ export default function MapPage() {
       {/* ─── Le plan, tout l'écran ─── */}
       <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] [--sous-entete:5.25rem] lg:top-[5.5rem] lg:[--sous-entete:14px]">
         <div className="absolute inset-0">
-          <CarteMap fond={fond} stickers={stickers} points={points} toi={toi} choisi={choisi?.cle ?? null} onChoisir={choisirSticker} onPoint={partiesActives ? ouvrirIci : undefined} className="h-full w-full" />
+          <CarteMap fond={fond} stickers={stickers} points={AUCUN_POINT} toi={toi} choisi={choisi?.cle ?? null} onChoisir={choisirSticker} className="h-full w-full" />
         </div>
         {/* Voile en haut : la barre d'état et le lettrage restent lisibles.
             Tout ce qui est posé sur le plan passe au-dessus des calques de
@@ -544,7 +538,7 @@ export default function MapPage() {
           {/* Le carrousel : une carte par match, celle du centre est la choisie.
               Toucher la choisie ouvre sa fiche. */}
           <div className="flex w-full snap-x snap-mandatory gap-3 overflow-x-auto px-[max(1rem,calc(50%-103px))] pb-3 [scrollbar-width:none]">
-            {matchs.map((m) => (
+            {affiches.map((m) => (
               <div key={m.cle} className="shrink-0 snap-center">
                 <CarteMatch
                   m={m}
