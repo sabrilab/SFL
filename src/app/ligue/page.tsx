@@ -26,7 +26,8 @@ import { StatsAVenir } from "@/components/sfl/feed/stats-a-venir";
 import { IlsSeDemarquent } from "@/components/sfl/distinctions";
 import { Ecarts } from "@/components/sfl/ecarts";
 import { Classements } from "@/components/sfl/classements";
-import { ElectionPanel } from "@/components/sfl/election-panel";
+import { VoteFigures } from "@/components/sfl/vote-figures";
+import { journeeAvecVote } from "@/lib/sfl/votes";
 import { useIsClient } from "@/hooks/use-is-client";
 import { SaisonArchiveProvider } from "@/components/sfl/season-provider";
 import { journeeJouee, saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
@@ -67,7 +68,7 @@ function VoteDuJour({ me }: { me: string }) {
   const { journees } = useSeason();
   if (!isClient) return null;
   const maintenant = new Date();
-  const ouvertes = journees.filter((j) => !j.mvpAuto && (j.matches?.length ?? 0) > 0 && voteOuvert(j.date, maintenant));
+  const ouvertes = journees.filter((j) => journeeAvecVote(j) && voteOuvert(j.date, maintenant));
   if (ouvertes.length === 0) return null;
   return (
     <>
@@ -76,7 +77,7 @@ function VoteDuJour({ me }: { me: string }) {
           <h2 className="text-[17px] font-bold tracking-tight">
             Vote du jour <span className="text-foreground/40">· J{j.j}</span>
           </h2>
-          <ElectionPanel journee={j} me={me} />
+          <VoteFigures journee={j} me={me} />
         </section>
       ))}
     </>
