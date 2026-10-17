@@ -26,6 +26,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
+import { FeuilleDeMatch } from "@/components/sfl/matchs/feuille-de-match";
+import { feuilleDeConvocation, feuilleDeJournee } from "@/lib/sfl/feuille";
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
 import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
 import { useParties } from "@/hooks/use-parties";
@@ -51,6 +53,11 @@ import { ovr } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { FOND_MOMENT, heureCourte, itineraires, photoSatellite, stadeSvg, type EtatSticker, type Moment, type StickerPlan } from "@/components/sfl/map/stade";
 import type { FondCarte, PointPlan, ToiPlan } from "@/components/sfl/map/carte-map";
+
+/** Les terrains enregistrés ne s'affichent plus sur le plan : seuls les matchs. */
+const AUCUN_POINT: PointPlan[] = [];
+/** Combien de jours un match joué reste sur la Map. */
+const JOURS_APRES_MATCH = 2;
 
 const CarteMap = dynamic(() => import("@/components/sfl/map/carte-map").then((m) => m.CarteMap), {
   ssr: false,
@@ -217,6 +224,14 @@ function dateLongue(dateLabel: string, aujourdhui: string): string {
   return d ? `${d.getUTCDate()} ${MOIS_LONGS[d.getUTCMonth()]}` : dateLabel;
 }
 
+/** « 19 oct. » → « Dimanche 19 octobre », pour la feuille de match partagée. */
+function dateComplete(dateLabel: string, aujourdhui: string): string {
+  const d = lireDate(dateLabel, aujourdhui);
+  if (!d) return dateLabel;
+  const nom = JOURS[d.getUTCDay()];
+  return `${nom[0].toUpperCase()}${nom.slice(1)} ${dateLongue(dateLabel, aujourdhui)}`;
+}
+
 function etatDe(dedans: boolean, manque: number): { etat: EtatSticker; texte: string } {
   if (dedans) return { etat: { genre: "dedans" }, texte: "Tu y es" };
   if (manque > 0) return { etat: { genre: "manque", n: manque }, texte: `Il manque ${manque}` };
@@ -224,7 +239,7 @@ function etatDe(dedans: boolean, manque: number): { etat: EtatSticker; texte: st
 }
 
 export default function MapPage() {
-  const { saison } = useSeason();
+  const { saison, journees } = useSeason();
   const session = useSession();
   const admin = !!session?.admin;
   const p = usePresence();
@@ -345,11 +360,44 @@ export default function MapPage() {
     return [...ligue, ...ouverts];
   }, [ligue, parties, moi, aujourdhui]);
 
+  // Sur la carte, ce qui arrive, et ce qui vient d'être joué : un match joué
+  // reste deux jours, badgé « Joué », pour retrouver sa fiche et son récap.
+  // Les terrains enregistrés n'y sont plus — on ne noie pas le match.
+  const affiches = useMemo(() => {
+    const recents = matchs.filter((m) => {
+      if (!m.joue) return true;
+      const e = ecartJours(m.dateLabel, aujourdhui);
+      return e == null || e >= -JOURS_APRES_MATCH;
+    });
+    // Le match qui vient d'être joué passe devant : c'est lui qu'on cherche.
+    return recents.length ? [...recents.filter((m) => m.joue), ...recents.filter((m) => !m.joue)] : matchs.filter((m) => m.joue).slice(-1);
+  }, [matchs, aujourdhui]);
+
+  // Ouvrir un match : n'importe quel joueur, d'un bouton ou d'un terrain libre.
+  const [ouvrir, setOuvrir] = useState<{ terrain: Terrain | null; jour?: string; heure?: string; n: number } | null>(null);
+  const [dispos, setDispos] = useState(false);
+
+  const [fiche, setFiche] = useState(false);
+  const [ficheAdmin, setFicheAdmin] = useState(false);
+  const [choix, setChoix] = useState<string | null>(null);
+  // Toucher un match sur le plan le choisit et ouvre sa fiche.
+  const choisirSticker = useCallback((id: string) => {
+    setChoix(id);
+    setFicheAdmin(false);
+    setFiche(true);
+  }, []);
+  // Le match choisi : celui qu'on a touché s'il est encore là, sinon le premier.
+  const choisi = affiches.find((m) => m.cle === choix) ?? affiches[0];
   const stickers = useMemo<StickerPlan[]>(
     () =>
-      matchs
-        // Un match joué sur le terrain d'un match à venir : on ne les empile pas.
-        .filter((m) => m.terrain && !(m.joue && matchs.some((x) => !x.joue && x.terrain?.id === m.terrain!.id)))
+      affiches
+        // Deux matchs sur le même terrain (le joué, le suivant) : on ne les
+        // empile pas ; le plan montre le choisi, sinon le premier.
+        .filter((m, i) => {
+          if (!m.terrain) return false;
+          const memes = affiches.filter((x) => x.terrain?.id === m.terrain!.id);
+          return memes.some((x) => x.cle === choisi?.cle) ? m.cle === choisi?.cle : affiches.indexOf(memes[0]) === i;
+        })
         .map((m) => ({
           id: m.cle,
           lat: m.terrain!.lat,
@@ -360,32 +408,8 @@ export default function MapPage() {
           etat: m.etat,
           nom: m.terrain!.nom,
         })),
-    [matchs]
+    [affiches, choisi]
   );
-  // Les terrains libres : des matchs possibles. Les toucher en ouvre un.
-  const points = useMemo<PointPlan[]>(() => {
-    const occupes = new Set(matchs.map((m) => m.terrain?.id));
-    const pris = new Set(matchs.filter((m) => m.terrain).map((m) => `${m.terrain!.lat.toFixed(5)},${m.terrain!.lng.toFixed(5)}`));
-    return terrains
-      .filter((t) => !occupes.has(t.id) && !pris.has(`${t.lat.toFixed(5)},${t.lng.toFixed(5)}`))
-      .map((t) => ({ id: `p${t.id}`, lat: t.lat, lng: t.lng, nom: t.nom }));
-  }, [terrains, matchs]);
-
-  // Ouvrir un match : n'importe quel joueur, d'un bouton ou d'un terrain libre.
-  const [ouvrir, setOuvrir] = useState<{ terrain: Terrain | null; jour?: string; heure?: string; n: number } | null>(null);
-  const [dispos, setDispos] = useState(false);
-  const ouvrirIci = useCallback(
-    (id: string) => {
-      const t = terrains.find((x) => `p${x.id}` === id) ?? null;
-      setOuvrir((o) => ({ terrain: t, n: (o?.n ?? 0) + 1 }));
-    },
-    [terrains]
-  );
-
-  const [choix, setChoix] = useState<string | null>(null);
-  const choisirSticker = useCallback((id: string) => setChoix(id), []);
-  // Le match choisi : celui qu'on a touché s'il est encore là, sinon le premier.
-  const choisi = matchs.find((m) => m.cle === choix) ?? matchs[0];
 
   // Toi : ta position, quand tu la donnes.
   const [toi, setToi] = useState<ToiPlan | null>(null);
@@ -411,8 +435,17 @@ export default function MapPage() {
 
   const ios = useEstIos();
 
+  // La feuille de match du choisi : les équipes de sa journée, sinon celles
+  // de la convocation une fois révélées (vendredi 19h ; l'admin, toujours).
+  const feuille = useMemo(() => {
+    if (!choisi || choisi.partie) return [];
+    const deJournee = choisi.j != null ? feuilleDeJournee(journees.find((x) => x.j === choisi.j)) : [];
+    if (deJournee.length || (choisi.j != null && !choisi.convoquee)) return deJournee;
+    return p.equipesVisibles || admin ? feuilleDeConvocation(p.teams) : [];
+  }, [choisi, journees, p.equipesVisibles, p.teams, admin]);
+
   const commune = choisi?.terrain?.commune ?? terrains.find((t) => t.commune)?.commune ?? "SFL";
-  const n = matchs.filter((m) => !m.joue).length;
+  const n = affiches.filter((m) => !m.joue).length;
   const compte = n ? `${n} MATCH${n > 1 ? "S" : ""} OUVERT${n > 1 ? "S" : ""}` : "MATCH JOUÉ";
 
   function sauver(next: Saison, message: string) {
@@ -423,8 +456,6 @@ export default function MapPage() {
 
   // La fiche du match : la feuille qui monte du bas, comme dans l'app.
   const [fond, setFond] = useState<FondCarte>("plan");
-  const [fiche, setFiche] = useState(false);
-  const [ficheAdmin, setFicheAdmin] = useState(false);
   const ouvrirFiche = (admin = false) => {
     setFicheAdmin(admin);
     setFiche(true);
@@ -432,23 +463,23 @@ export default function MapPage() {
 
   // Les surcouches se posent sous l'encoche en haut, au-dessus de la barre
   // d'onglets en bas (qui flotte sur le plan, comme sur l'iPhone).
-  // L'en-tête commun (logo à gauche, compte à droite) flotte en haut : sur
-  // téléphone, les surcouches se posent dessous ; sur grand écran, le plan
-  // commence déjà sous lui.
+  // L'en-tête commun (logo à gauche, compte à droite) flotte en haut, sur
+  // téléphone comme sur ordinateur : le plan prend tout l'écran et les
+  // surcouches se posent sous l'en-tête.
   const haut = "calc(env(safe-area-inset-top, 0px) + var(--sous-entete))";
   const bas = "calc(env(safe-area-inset-bottom, 0px) + 92px)";
 
   return (
     <>
       {/* ─── Le plan, tout l'écran ─── */}
-      <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] [--sous-entete:5.25rem] lg:top-[5.5rem] lg:[--sous-entete:14px]">
+      <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] [--sous-entete:5.25rem] lg:[--sous-entete:5.5rem]">
         <div className="absolute inset-0">
-          <CarteMap fond={fond} stickers={stickers} points={points} toi={toi} choisi={choisi?.cle ?? null} onChoisir={choisirSticker} onPoint={partiesActives ? ouvrirIci : undefined} className="h-full w-full" />
+          <CarteMap fond={fond} stickers={stickers} points={AUCUN_POINT} toi={toi} choisi={choisi?.cle ?? null} onChoisir={choisirSticker} className="h-full w-full" />
         </div>
         {/* Voile en haut : la barre d'état et le lettrage restent lisibles.
             Tout ce qui est posé sur le plan passe au-dessus des calques de
             Leaflet (z-index 400 et plus). */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-44 bg-gradient-to-b lg:h-32 from-[rgba(8,9,11,0.42)] to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-44 bg-gradient-to-b from-[rgba(8,9,11,0.42)] to-transparent" />
 
         {/* En haut à gauche : la commune en lettrage, le compte en étiquette */}
         <div className="pointer-events-none absolute left-5 z-[510] flex max-w-[calc(100%-8.5rem)] flex-col items-start" style={{ top: `calc(${haut} + 8px)` }}>
@@ -544,7 +575,7 @@ export default function MapPage() {
           {/* Le carrousel : une carte par match, celle du centre est la choisie.
               Toucher la choisie ouvre sa fiche. */}
           <div className="flex w-full snap-x snap-mandatory gap-3 overflow-x-auto px-[max(1rem,calc(50%-103px))] pb-3 [scrollbar-width:none]">
-            {matchs.map((m) => (
+            {affiches.map((m) => (
               <div key={m.cle} className="shrink-0 snap-center">
                 <CarteMatch
                   m={m}
@@ -637,9 +668,22 @@ export default function MapPage() {
                 {choisi?.partie ? (
                   <FichePartie partie={choisi.partie} moi={moi} onChange={recharger} />
                 ) : choisi?.j != null && !choisi.convoquee ? (
-                  <Presents m={choisi} />
+                  // Les équipes faites, la feuille de match dit déjà qui vient.
+                  feuille.length === 0 && <Presents m={choisi} />
                 ) : (
                   <PresencePanel />
+                )}
+                {choisi && feuille.length > 0 && (
+                  <FeuilleDeMatch
+                    key={choisi.cle}
+                    terrains={feuille}
+                    moi={player.name}
+                    entete={{
+                      surtitre: `${choisi.j != null ? `J${choisi.j} · ` : ""}Sunday Five League`,
+                      quand: `${dateComplete(choisi.dateLabel, aujourdhui)} · ${choisi.heure}`,
+                      ou: choisi.terrain ? choisi.terrain.nom : null,
+                    }}
+                  />
                 )}
                 {choisi?.joue && (
                   <Link
