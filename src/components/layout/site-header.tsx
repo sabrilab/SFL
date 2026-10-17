@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS } from "@/lib/nav";
+import { NAV_ITEMS, ongletActif } from "@/lib/nav";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,21 +38,27 @@ export function SiteHeader() {
   // Chacun est lié à son compte : l'en-tête affiche le sien, sans choix
   // possible. (Le nom vient de la session ; il mène au profil.)
   const { me } = useMyPlayer();
+  const onglet = ongletActif(pathname);
+  // Sur le plan clair de la Map (téléphone), le verre fumé ne se lirait plus :
+  // les bulles prennent l'encre pleine des boutons du plan. Même forme, même
+  // place, seule la teinte s'adapte.
+  const plan = cn((pathname === "/" || pathname === "/map") && "max-lg:bg-[rgba(10,11,13,0.86)]!");
 
   return (
     // Le seuil de `sticky` se mesure depuis le haut réel du conteneur, que le
     // padding ne décale pas : il faut donc y réintégrer l'inset haut, sinon le
     // header revient se coller sous l'encoche dès qu'on défile.
-    // Sur la Map, comme dans l'app iPhone, le plan prend tout l'écran : pas
-    // d'en-tête sur téléphone (la barre d'onglets suffit). Sur grand écran,
-    // l'en-tête porte la navigation : il reste.
+    // Le même en-tête partout, Map comprise : le logo BOLA ne bouge jamais
+    // d'une page à l'autre. Avant, la Map cachait l'en-tête sur téléphone et
+    // posait son propre logo en haut à droite — changer d'onglet donnait
+    // l'impression de changer de site. Sur la Map, il flotte sur le plan.
     <header
-      className={cn("sticky z-40 px-4", (pathname === "/" || pathname === "/map") && "max-lg:hidden")}
+      className="sticky z-40 px-4"
       style={{ top: "calc(env(safe-area-inset-top) + 0.75rem)" }}
     >
       <div className="mx-auto flex h-14 max-w-5xl min-w-0 items-center gap-2">
         {/* Bulle gauche : le logo BOLA + ligue courante */}
-        <div className="glass flex min-w-0 items-center gap-2 rounded-full py-1.5 pr-1.5 pl-4">
+        <div className={cn("glass flex min-w-0 items-center gap-2 rounded-full py-1.5 pr-1.5 pl-4", plan)}>
           <Link href="/" aria-label="Bola — accueil" className="flex shrink-0 items-center">
             <Image src="/bola/logo-blanc.svg" alt="Bola" width={72} height={17} priority />
           </Link>
@@ -68,8 +74,7 @@ export function SiteHeader() {
 
         <nav className="glass hidden items-center gap-1 rounded-full px-1.5 py-1.5 lg:flex">
           {NAV_ITEMS.map((item) => {
-            const active =
-              item.href === "/" ? pathname === "/" || pathname === "/map" : pathname.startsWith(item.href);
+            const active = onglet === item.href;
             return (
               <Link
                 key={item.href}
@@ -91,7 +96,7 @@ export function SiteHeader() {
         </nav>
 
         {/* Bulle droite : Ballons, profil, réglages */}
-        <div className="glass ml-auto flex shrink-0 items-center gap-1.5 rounded-full px-1.5 py-1.5">
+        <div className={cn("glass ml-auto flex shrink-0 items-center gap-1.5 rounded-full px-1.5 py-1.5", plan)}>
           <Link
             href="/profil"
             aria-label="Mon compte"
