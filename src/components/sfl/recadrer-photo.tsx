@@ -228,7 +228,7 @@ export function RecadrerPhoto({
 
           {/* L'aperçu : la carte telle que la ligue la verra */}
           <div className="flex items-center gap-4 rounded-[22px] bg-secondary/60 p-3">
-            <BolaCard {...carte} edition="rare" size={0.42} photo={apercu} />
+            <BolaCard {...carte} edition="base" size={0.42} photo={apercu} />
             <p className="text-[13px] leading-snug text-muted-foreground">
               Ta carte, telle que toute la ligue la verra.
             </p>

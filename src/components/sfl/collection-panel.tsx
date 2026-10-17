@@ -40,7 +40,6 @@ import {
 
 const KIND_STYLES: Record<string, string> = {
   simple: "bg-secondary text-foreground",
-  rare: "bg-[#F2CE7B]/15 text-[#c9962e] dark:text-[#E8C87A]",
   def: "bg-primary/15 text-primary",
   impact: "bg-primary/12 text-primary",
   mvp: "bg-[#F4C542]/20 text-[#a87b12] dark:text-[#F4C542]",
@@ -49,7 +48,6 @@ const KIND_STYLES: Record<string, string> = {
 const FILTERS: { id: CardKind | "all"; label: string }[] = [
   { id: "all", label: "Toutes" },
   { id: "simple", label: "Standard" },
-  { id: "rare", label: "Rare" },
   { id: "def", label: "Défensive" },
   { id: "impact", label: "Impact" },
   { id: "mvp", label: "MVP" },
@@ -147,7 +145,7 @@ export function CollectionPanel({ me }: { me: string }) {
 
   function finishOpening() {
     if (!opening) return;
-    const special = opening.find((c) => c.kind !== "simple" && c.kind !== "rare");
+    const special = opening.find((c) => c.kind !== "simple");
     if (special) {
       toast.success(`Carte hors-série ${KIND_LABELS[special.kind]} !`, {
         description: `${special.player.name} · n°${special.serial}/${special.total} — trouvaille rarissime`,

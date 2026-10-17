@@ -19,16 +19,15 @@ import { sonDechirure, sonRevelation } from "@/lib/sfl/son";
 
 const GLOW: Record<string, string> = {
   simple: "rgba(226,207,166,.42)",
-  rare: "rgba(242,206,123,.6)",
   def: "rgba(127,212,255,.75)",
   impact: "rgba(255,90,31,.75)",
   mvp: "rgba(244,197,66,.85)",
 };
 
-const RARITY_RANK: Record<string, number> = { simple: 0, rare: 1, def: 2, impact: 3, mvp: 4 };
+const RARITY_RANK: Record<string, number> = { simple: 0, def: 1, impact: 2, mvp: 3 };
 
 function isSpecial(card: CollectionCard) {
-  return card.kind !== "simple" && card.kind !== "rare";
+  return card.kind !== "simple";
 }
 
 // Éventail de vraies cartes 3D, dos scellé (gravure SFL) tourné vers
@@ -62,7 +61,7 @@ export function PackVisual({ torn = false }: { torn?: boolean }) {
         >
           <Card3D
             cacheKey={`pack-fan-${i}`}
-            mode="rare"
+            mode="simple"
             size={0.62}
             startFace="back"
             interactive={false}

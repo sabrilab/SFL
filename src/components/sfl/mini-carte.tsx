@@ -32,16 +32,16 @@ export function MiniCarte({
         e.stopPropagation();
         open({
           cacheKey: `mini-${player.name}`,
-          mode: "rare",
+          mode: "simple",
           title: player.name,
           subtitle: detail,
-          render: (s) => <PlayerCard player={player} mode="rare" size={s} />,
+          render: (s) => <PlayerCard player={player} size={s} />,
         });
       }}
       aria-label={`Voir la carte de ${player.name}`}
       className={cn("shrink-0 transition-transform active:scale-95", className)}
     >
-      <PlayerCard player={player} mode="simple" size={size} onglet={onglet} />
+      <PlayerCard player={player} size={size} onglet={onglet} />
     </button>
   );
 }
