@@ -4,16 +4,20 @@
 // sur les réseaux sociaux. Choix d'une image depuis la galerie ou l'appareil
 // photo, recadrage carré automatique, recompression, puis stockage.
 //
+// « Photo officielle » ouvre le studio (photo-studio.tsx) : la photo faite
+// là-bas repasse par le même recadrage avant de partir.
+//
 // La photo part à la ligue : elle remplit la carte du joueur chez tout le
 // monde (voir lib/sfl/photos).
 
 import { useRef, useState } from "react";
-import { Camera, Crop, Trash2 } from "lucide-react";
+import { Camera, Crop, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { usePhotoPerso, usePlayerPhoto } from "@/hooks/use-player-photo";
 import { removePhoto, setPhoto } from "@/lib/sfl/photos";
 import { RecadrerPhoto } from "@/components/sfl/recadrer-photo";
+import { PhotoStudio } from "@/components/sfl/photo-studio";
 import { useSeason } from "@/components/sfl/season-provider";
 import { ovr } from "@/lib/sfl/engine";
 import { username } from "@/lib/sfl/usernames";
@@ -30,6 +34,7 @@ export function ProfilePhoto({ name }: { name: string }) {
   const stats = joueur?.stats ?? { VIT: 60, TIR: 60, PAS: 60, DRI: 60, DEF: 60, PHY: 60 };
   // L'image en cours de recadrage (le fichier choisi, ou la photo actuelle).
   const [aRecadrer, setARecadrer] = useState<string | null>(null);
+  const [studio, setStudio] = useState(false);
 
   function fermer() {
     if (aRecadrer?.startsWith("blob:")) URL.revokeObjectURL(aRecadrer);
@@ -98,11 +103,19 @@ export function ProfilePhoto({ name }: { name: string }) {
           Elle apparaît sur ta carte, chez tous les joueurs de la ligue.
           Recadrée en carré automatiquement.
         </p>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mt-1.5 -ml-2 h-7 gap-1.5 px-2 text-[12px] text-muted-foreground"
+          onClick={() => setStudio(true)}
+        >
+          <Sparkles className="size-3.5" /> Photo officielle
+        </Button>
         {hasCustom && (
           <Button
             variant="ghost"
             size="sm"
-            className="mt-1.5 -ml-2 h-7 gap-1.5 px-2 text-[12px] text-muted-foreground"
+            className="mt-1.5 h-7 gap-1.5 px-2 text-[12px] text-muted-foreground"
             onClick={async () => {
               await removePhoto(name);
               setBroken(false);
@@ -123,6 +136,15 @@ export function ProfilePhoto({ name }: { name: string }) {
           </Button>
         )}
       </div>
+
+      <PhotoStudio
+        ouvert={studio}
+        onFermer={() => setStudio(false)}
+        onChoisir={(dataUrl) => {
+          setStudio(false);
+          setARecadrer(dataUrl);
+        }}
+      />
 
       <RecadrerPhoto
         src={aRecadrer}
