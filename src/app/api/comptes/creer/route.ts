@@ -79,11 +79,17 @@ export async function POST(req: NextRequest) {
   const neuf = createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { error } = await neuf.auth.signUp({
+  const { data: inscrit, error } = await neuf.auth.signUp({
     email: email(user),
     password,
     options: { data: { name: joueur, username: username(joueur) } },
   });
+
+  // Tout compte naît en attente (inscription autonome) ; celui-ci, c'est
+  // l'admin qui le crée : il est accepté d'office.
+  if (!error && inscrit.user) {
+    await sb.rpc("valider_inscription", { joueur: inscrit.user.id });
+  }
 
   if (error) {
     const ferme = /signup|not allowed|disabled/i.test(error.message);

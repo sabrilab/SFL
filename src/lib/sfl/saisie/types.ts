@@ -55,6 +55,12 @@ export interface JourneeMeta {
   heure?: string;
   /** Le terrain où elle se joue (saison.terrains) ; absent : le terrain par défaut. */
   terrainId?: number;
+  /**
+   * MVP choisi par l'app d'après les stats du match, sans vote (saisie/mvp.ts).
+   * Posé sur chaque journée créée depuis le 15/10 ; absent sur les anciennes,
+   * qui gardent leurs MVP tels qu'ils ont été désignés.
+   */
+  mvpAuto?: boolean;
 }
 
 // Événement minuté d'un match — alimente la timeline et la détection du

@@ -13,7 +13,7 @@
 
 import { useRef, useState } from "react";
 import { motion } from "motion/react";
-import { ChevronRight, Play } from "lucide-react";
+import { ChevronRight, Play, Trophy } from "lucide-react";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { username } from "@/lib/sfl/usernames";
 import { ovr, rareStats, type Journee, type Player } from "@/lib/sfl/engine";
@@ -286,29 +286,20 @@ export function Accueil({
             Voir le classement complet <ChevronRight className="size-3.5" />
           </button>
 
-          {/* Les saisons passées ne disparaissent pas : elles se relisent. */}
-          {archives.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {[...archives].reverse().map((a) => (
-                <Link
-                  key={a.numero}
-                  href={`/saisons/${a.numero}`}
-                  className="glass flex items-center gap-3 rounded-2xl px-4 py-3"
-                >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15">
-                    <span className="mono-label text-[10px] text-primary">S{a.numero}</span>
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-bold tracking-tight">{a.nom}</span>
-                    <span className="block text-[12px] text-muted-foreground">
-                      {`${a.journees.length} journée${a.journees.length > 1 ? "s" : ""} · l'archive complète, classements et journées`}
-                    </span>
-                  </span>
-                  <ChevronRight className="size-4 text-muted-foreground" />
-                </Link>
-              ))}
-            </div>
-          )}
+          {/* Les saisons passées ne disparaissent pas : elles vivent dans le
+              Wall of Fame, une seule entrée, qui mène à chacune. */}
+          <Link href="/palmares" className="glass flex items-center gap-3.5 rounded-3xl px-4 py-3.5">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground/10">
+              <Trophy className="size-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-bold tracking-tight">Wall of Fame</span>
+              <span className="block truncate text-[12.5px] text-muted-foreground">
+                Champions, légendes, ton parcours
+              </span>
+            </span>
+            <ChevronRight className="size-4 text-muted-foreground" />
+          </Link>
         </section>
 
         <aside className="flex min-w-0 flex-col gap-7 lg:sticky lg:top-4">

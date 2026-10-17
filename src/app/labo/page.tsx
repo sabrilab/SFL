@@ -3,6 +3,7 @@
 // Le Labo : deux mesures que le téléphone fait seul, réflexes et détente.
 // La logique (percentiles, détection des sauts, enregistrement) est dans
 // src/lib/sfl/labo.ts ; cette page ne fait que l'interface des deux tests.
+// Aucun lien n'y mène pour l'instant : voir layout.tsx.
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";

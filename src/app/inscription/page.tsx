@@ -1,0 +1,835 @@
+"use client";
+
+// Créer son compte — l'inscription autonome, de bout en bout.
+//
+// Avant, seul l'admin fabriquait les comptes et distribuait les accès. Ici le
+// joueur crée le sien, une question par écran, et voit sa carte se remplir à
+// chaque réponse : son nom, son pseudo, son poste, puis sa photo. Viennent
+// ensuite les quatre photos en pied imposées (face, droite, gauche, dos), le
+// personnage de référence des futurs skins, et le mot de passe.
+//
+// Proportions : tout suit le nombre d'or. La carte occupe le petit segment de
+// l'écran (0,382), la question le grand (0,618) ; espacements 8 · 13 · 21 ·
+// 34 · 55, titres en 34 px, texte en 13 et 21.
+//
+// Le compte naît en attente (voir lib/sfl/inscription.ts) : la fin du parcours
+// le dit, et l'app montre l'écran d'attente jusqu'à l'accord de l'admin.
+//
+// Page publique (hors de la porte de connexion, voir AuthGate).
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Check, ChevronLeft, Eye, EyeOff, Loader2, Minus, Plus, RotateCcw } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { BolaCard } from "@/components/sfl/bola-card";
+import { RecadrerPhoto } from "@/components/sfl/recadrer-photo";
+import { PriseReference } from "@/components/sfl/inscription/prise-reference";
+import { ovr, type Stats } from "@/lib/sfl/engine";
+import { signIn } from "@/lib/sfl/auth/session";
+import { setPhoto } from "@/lib/sfl/photos";
+import { envoyerReferences } from "@/lib/sfl/references";
+import { useSession } from "@/hooks/use-session";
+import {
+  ANGLES,
+  BORNES,
+  MAILLOTS,
+  PIEDS,
+  POSTES,
+  age,
+  capitaliser,
+  emailValide,
+  erreurPseudo,
+  nettoyerNom,
+  normaliserPseudo,
+  type Angle,
+  type Inscription,
+} from "@/lib/sfl/inscription";
+
+const ETAPES = ["accueil", "identite", "contact", "naissance", "gabarit", "jeu", "photo", "angles", "secret", "fini"] as const;
+type Etape = (typeof ETAPES)[number];
+
+/** Les étapes comptées par la barre de progression (ni l'accueil, ni la fin). */
+const PARCOURS = ETAPES.slice(1, -1);
+
+/** La carte d'un joueur qui arrive : base 75 partout, comme newRosterPlayer. */
+const STATS_DEPART: Stats = { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 };
+
+const BROUILLON = "sfl-inscription";
+
+type Formulaire = Omit<Inscription, "motDePasse">;
+
+const VIDE: Formulaire = {
+  prenom: "",
+  nom: "",
+  pseudo: "",
+  naissance: "",
+  email: "",
+  taille: BORNES.taille.defaut,
+  poids: BORNES.poids.defaut,
+  pointure: BORNES.pointure.defaut,
+  maillot: "M",
+  pied: "droit",
+  poste: "MC",
+};
+
+/* ───────────────────────────── Briques ───────────────────────────── */
+
+function Champ({
+  label,
+  children,
+  note,
+}: {
+  label: string;
+  children: React.ReactNode;
+  note?: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="glass-soft flex flex-col gap-[8px] rounded-[21px] px-[21px] py-[13px]">
+        <span className="mono-label text-foreground/40">{label}</span>
+        {children}
+      </span>
+      {note && <span className="mt-[8px] block px-[13px] text-[12.5px] font-medium">{note}</span>}
+    </label>
+  );
+}
+
+const SAISIE =
+  "w-full bg-transparent text-[21px] font-bold tracking-tight outline-none placeholder:text-foreground/20";
+
+function Puces<T extends string>({
+  options,
+  valeur,
+  onChange,
+  colonnes = 3,
+}: {
+  options: readonly { id: T; label: string; detail?: string }[];
+  valeur: T;
+  onChange: (v: T) => void;
+  colonnes?: number;
+}) {
+  return (
+    <div className="grid gap-[8px]" style={{ gridTemplateColumns: `repeat(${colonnes}, minmax(0, 1fr))` }}>
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => {
+            navigator.vibrate?.(6);
+            onChange(o.id);
+          }}
+          className={cn(
+            "flex min-h-[55px] flex-col items-center justify-center rounded-[13px] px-[8px] py-[8px] transition-all active:scale-[0.97]",
+            valeur === o.id ? "bg-foreground text-background" : "glass-soft text-foreground/70"
+          )}
+        >
+          <span className="text-[15px] font-extrabold tracking-tight">{o.label}</span>
+          {o.detail && (
+            <span className={cn("mt-0.5 text-[10.5px] leading-tight", valeur === o.id ? "text-background/60" : "text-foreground/35")}>
+              {o.detail}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Un nombre qu'on règle au pouce : − / + et glissière. */
+function Reglage({
+  label,
+  unite,
+  valeur,
+  min,
+  max,
+  pas = 1,
+  onChange,
+}: {
+  label: string;
+  unite: string;
+  valeur: number;
+  min: number;
+  max: number;
+  pas?: number;
+  onChange: (v: number) => void;
+}) {
+  const borne = (v: number) => Math.min(max, Math.max(min, Math.round(v / pas) * pas));
+  return (
+    <div className="glass-soft rounded-[21px] px-[21px] pt-[13px] pb-[21px]">
+      <div className="flex items-center justify-between">
+        <span className="mono-label text-foreground/40">{label}</span>
+        <div className="flex items-center gap-[13px]">
+          <button
+            type="button"
+            onClick={() => onChange(borne(valeur - pas))}
+            aria-label={`${label} moins`}
+            className="grid size-[34px] place-items-center rounded-full bg-foreground/10"
+          >
+            <Minus className="size-4" />
+          </button>
+          <span className="min-w-[89px] text-center text-[34px] leading-none font-black tracking-tight tabular-nums">
+            {String(valeur).replace(".", ",")}
+            <span className="ml-1 text-[13px] font-bold text-foreground/40">{unite}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange(borne(valeur + pas))}
+            aria-label={`${label} plus`}
+            className="grid size-[34px] place-items-center rounded-full bg-foreground/10"
+          >
+            <Plus className="size-4" />
+          </button>
+        </div>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={pas}
+        value={valeur}
+        onChange={(e) => onChange(borne(Number(e.target.value)))}
+        aria-label={label}
+        className="mt-[13px] w-full accent-foreground"
+      />
+    </div>
+  );
+}
+
+/* ───────────────────────────── La page ───────────────────────────── */
+
+export default function InscriptionPage() {
+  const router = useRouter();
+  const session = useSession();
+  const [etape, setEtape] = useState<Etape>("accueil");
+  const [f, setF] = useState<Formulaire>(VIDE);
+  const [motDePasse, setMotDePasse] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [voir, setVoir] = useState(false);
+  const [piege, setPiege] = useState("");
+  const [photo, setPhotoCarte] = useState<string | null>(null);
+  const [aRecadrer, setARecadrer] = useState<string | null>(null);
+  const [refs, setRefs] = useState<Partial<Record<Angle, string>>>({});
+  const [prise, setPrise] = useState<Angle | null>(null);
+  const [pseudoEtat, setPseudoEtat] = useState<"?" | "libre" | "pris" | "verif">("?");
+  const [ouvert, setOuvert] = useState<boolean | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [envoi, setEnvoi] = useState(false);
+  const [nomFinal, setNomFinal] = useState<string | null>(null);
+  const [avertissement, setAvertissement] = useState<string | null>(null);
+  const [aRenvoyer, setARenvoyer] = useState(false);
+  const fichierPhoto = useRef<HTMLInputElement>(null);
+  const fini = etape === "fini";
+
+  // Un membre déjà connecté n'a rien à faire ici.
+  useEffect(() => {
+    if (session && !session.enAttente && !fini) router.replace("/");
+  }, [session, fini, router]);
+
+  // Brouillon : une page rechargée ne fait pas tout recommencer (le mot de
+  // passe et les photos ne sont jamais gardés).
+  useEffect(() => {
+    try {
+      const brut = sessionStorage.getItem(BROUILLON);
+      if (!brut) return;
+      const b = JSON.parse(brut) as { f: Formulaire; etape: Etape };
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique d'un stockage externe au montage
+      setF({ ...VIDE, ...b.f });
+      if (ETAPES.indexOf(b.etape) > 0 && ETAPES.indexOf(b.etape) <= ETAPES.indexOf("photo")) setEtape(b.etape);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    if (fini) return;
+    try {
+      sessionStorage.setItem(BROUILLON, JSON.stringify({ f, etape }));
+    } catch {}
+  }, [f, etape, fini]);
+
+  // Les inscriptions sont-elles ouvertes (clé serveur posée) ?
+  useEffect(() => {
+    fetch("/api/inscription?pseudo=___")
+      .then((r) => setOuvert(r.status !== 503))
+      .catch(() => setOuvert(true));
+  }, []);
+
+  // Le pseudo est-il libre ? Vérifié en tapant, sans attendre la fin.
+  const pseudo = normaliserPseudo(f.pseudo);
+  useEffect(() => {
+    if (erreurPseudo(pseudo)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- réinitialise l'état d'une requête réseau
+      setPseudoEtat("?");
+      return;
+    }
+    setPseudoEtat("verif");
+    const ctrl = new AbortController();
+    const t = setTimeout(() => {
+      fetch(`/api/inscription?pseudo=${encodeURIComponent(pseudo)}`, { signal: ctrl.signal })
+        .then((r) => r.json())
+        .then((d: { libre?: boolean }) => setPseudoEtat(d.libre === false ? "pris" : d.libre ? "libre" : "?"))
+        .catch(() => {});
+    }, 420);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [pseudo]);
+
+  const maj = useCallback(<K extends keyof Formulaire>(k: K, v: Formulaire[K]) => {
+    setF((x) => ({ ...x, [k]: v }));
+    setErreur(null);
+  }, []);
+
+  const nomCarte = nomFinal ?? (capitaliser(nettoyerNom(f.prenom)) || "Toi");
+  const ans = age(f.naissance);
+  const carte = useMemo(
+    () => ({
+      name: nomCarte,
+      username: pseudo ? `@${pseudo}` : undefined,
+      position: f.poste,
+      overall: ovr(STATS_DEPART),
+      stats: STATS_DEPART,
+    }),
+    [nomCarte, pseudo, f.poste]
+  );
+
+  /** L'étape peut-elle être quittée ? Renvoie la raison sinon. */
+  function bloquant(e: Etape): string | null {
+    switch (e) {
+      case "identite":
+        if (!nettoyerNom(f.prenom)) return "Ton prénom.";
+        if (!nettoyerNom(f.nom)) return "Ton nom.";
+        return null;
+      case "contact": {
+        const ep = erreurPseudo(pseudo);
+        if (ep) return `Pseudo : ${ep}`;
+        if (pseudoEtat === "pris") return "Ce pseudo est déjà pris.";
+        if (!emailValide(f.email)) return "Ton email.";
+        return null;
+      }
+      case "naissance":
+        if (ans === null) return "Ta date de naissance.";
+        if (ans < BORNES.ageMin || ans > 90) return "Vérifie ta date de naissance.";
+        return null;
+      case "photo":
+        return photo ? null : "Ta photo de carte.";
+      case "angles":
+        return ANGLES.every((a) => refs[a.id]) ? null : "Les quatre photos.";
+      case "secret":
+        if (motDePasse.length < BORNES.motDePasse) return `${BORNES.motDePasse} caractères au moins.`;
+        if (motDePasse !== confirmation) return "Les deux mots de passe diffèrent.";
+        return null;
+      default:
+        return null;
+    }
+  }
+
+  function aller(sens: 1 | -1) {
+    const i = ETAPES.indexOf(etape);
+    if (sens === 1) {
+      const b = bloquant(etape);
+      if (b) {
+        setErreur(b);
+        navigator.vibrate?.([10, 40, 10]);
+        return;
+      }
+    }
+    setErreur(null);
+    const suivante = ETAPES[Math.min(ETAPES.length - 1, Math.max(0, i + sens))];
+    setEtape(suivante);
+    document.getElementById("inscription-scroll")?.scrollTo({ top: 0 });
+  }
+
+  async function creer() {
+    const b = bloquant("secret");
+    if (b) {
+      setErreur(b);
+      return;
+    }
+    setEnvoi(true);
+    setErreur(null);
+    try {
+      const r = await fetch("/api/inscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...f, pseudo, motDePasse, site: piege }),
+      });
+      const d = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string; champ?: string; name?: string };
+      if (!r.ok || !d.ok || !d.name) {
+        setErreur(d.error ?? "Création impossible pour l'instant.");
+        if (d.champ === "pseudo" || d.champ === "email") {
+          if (d.champ === "pseudo") setPseudoEtat("pris");
+          setEtape("contact");
+        }
+        return;
+      }
+      const nom = d.name;
+      // Connexion immédiate, puis la photo de carte et les quatre prises,
+      // envoyées sous sa propre session.
+      const connexion = await signIn(pseudo, motDePasse);
+      if (connexion.ok) await envoyerPhotos(nom);
+      else setAvertissement(`Ton compte est créé. Connecte-toi avec @${pseudo} pour entrer.`);
+      try {
+        sessionStorage.removeItem(BROUILLON);
+      } catch {}
+      setNomFinal(nom);
+      setEtape("fini");
+      navigator.vibrate?.([12, 60, 24]);
+    } catch {
+      setErreur("Pas de réseau. Réessaie dans un instant.");
+    } finally {
+      setEnvoi(false);
+    }
+  }
+
+  /** La photo de carte et les quatre prises, sous la session du joueur. */
+  async function envoyerPhotos(nom: string) {
+    let ok = true;
+    if (photo) ok = (await setPhoto(nom, photo)).partagee && ok;
+    ok = (await envoyerReferences(refs)).length === 0 && ok;
+    setARenvoyer(!ok);
+    setAvertissement(ok ? null : "Certaines photos ne sont pas parties.");
+  }
+
+  function choisirPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setARecadrer(URL.createObjectURL(file));
+  }
+
+  /* ─────────────── Le contenu de chaque étape ─────────────── */
+
+  const titres: Record<Etape, [string, string?]> = {
+    accueil: ["Crée ta carte."],
+    identite: ["Qui es-tu ?"],
+    contact: ["Ton nom de joueur."],
+    naissance: ["Ta date de naissance."],
+    gabarit: ["Ton gabarit."],
+    jeu: ["Ton jeu."],
+    photo: ["Ta photo de carte."],
+    angles: ["Tes quatre angles.", "Même cadre pour toute la ligue : tes skins naîtront de ces quatre photos."],
+    secret: ["Ton mot de passe."],
+    fini: [`Bienvenue, ${nomCarte}.`],
+  };
+
+  const etapeIndex = PARCOURS.indexOf(etape as (typeof PARCOURS)[number]);
+  const avecCarte = etape !== "angles";
+  // Les étapes longues (gabarit, jeu) passent la carte au segment suivant de
+  // la suite d'or : 0,236 de l'écran, carte à 0,382.
+  const compacte = etape === "gabarit" || etape === "jeu";
+  const [titre, sousTitre] = titres[etape];
+
+  let corps: React.ReactNode = null;
+  switch (etape) {
+    case "identite":
+      corps = (
+        <div className="flex flex-col gap-[13px]">
+          <Champ label="Prénom">
+            <input
+              autoFocus
+              value={f.prenom}
+              onChange={(e) => maj("prenom", e.target.value)}
+              autoComplete="given-name"
+              placeholder="Prénom"
+              className={SAISIE}
+            />
+          </Champ>
+          <Champ label="Nom">
+            <input
+              value={f.nom}
+              onChange={(e) => maj("nom", e.target.value)}
+              autoComplete="family-name"
+              placeholder="Nom"
+              className={SAISIE}
+            />
+          </Champ>
+        </div>
+      );
+      break;
+    case "contact":
+      corps = (
+        <div className="flex flex-col gap-[13px]">
+          <Champ
+            label="Pseudo"
+            note={
+              pseudoEtat === "pris" ? (
+                <span className="text-[#FF6B5E]">Déjà pris.</span>
+              ) : pseudoEtat === "libre" ? (
+                <span className="text-foreground/55">
+                  <Check className="mr-1 inline size-3.5" />
+                  Libre. C&apos;est aussi ton identifiant.
+                </span>
+              ) : null
+            }
+          >
+            <span className="flex items-center">
+              <span className="text-[21px] font-bold text-foreground/30">@</span>
+              <input
+                autoFocus
+                value={f.pseudo}
+                onChange={(e) => maj("pseudo", normaliserPseudo(e.target.value))}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoComplete="username"
+                maxLength={20}
+                placeholder="pseudo"
+                className={SAISIE}
+              />
+              {pseudoEtat === "verif" && <Loader2 className="size-4 shrink-0 animate-spin text-foreground/30" />}
+            </span>
+          </Champ>
+          <Champ label="Email">
+            <input
+              type="email"
+              inputMode="email"
+              value={f.email}
+              onChange={(e) => maj("email", e.target.value.trim())}
+              autoCapitalize="none"
+              autoComplete="email"
+              placeholder="toi@exemple.fr"
+              className={SAISIE}
+            />
+          </Champ>
+        </div>
+      );
+      break;
+    case "naissance":
+      corps = (
+        <Champ
+          label="Né le"
+          note={ans !== null && ans >= 0 ? <span className="text-foreground/45">{ans} ans</span> : null}
+        >
+          <input
+            autoFocus
+            type="date"
+            value={f.naissance}
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => maj("naissance", e.target.value)}
+            autoComplete="bday"
+            className={cn(SAISIE, "[color-scheme:dark]")}
+          />
+        </Champ>
+      );
+      break;
+    case "gabarit":
+      corps = (
+        <div className="flex flex-col gap-[13px]">
+          <Reglage label="Taille" unite="cm" valeur={f.taille} min={BORNES.taille.min} max={BORNES.taille.max} onChange={(v) => maj("taille", v)} />
+          <Reglage label="Poids" unite="kg" valeur={f.poids} min={BORNES.poids.min} max={BORNES.poids.max} onChange={(v) => maj("poids", v)} />
+          <Reglage label="Pointure" unite="EU" valeur={f.pointure} min={BORNES.pointure.min} max={BORNES.pointure.max} pas={0.5} onChange={(v) => maj("pointure", v)} />
+          <div>
+            <p className="mono-label mb-[8px] px-[13px] text-foreground/40">Maillot</p>
+            <Puces
+              options={MAILLOTS.map((m) => ({ id: m, label: m }))}
+              valeur={f.maillot}
+              onChange={(v) => maj("maillot", v)}
+              colonnes={6}
+            />
+          </div>
+        </div>
+      );
+      break;
+    case "jeu":
+      corps = (
+        <div className="flex flex-col gap-[21px]">
+          <div>
+            <p className="mono-label mb-[8px] px-[13px] text-foreground/40">Poste</p>
+            <Puces
+              options={POSTES.map((p) => ({ id: p.id, label: p.id, detail: p.label }))}
+              valeur={f.poste}
+              onChange={(v) => maj("poste", v)}
+            />
+          </div>
+          <div>
+            <p className="mono-label mb-[8px] px-[13px] text-foreground/40">Pied fort</p>
+            <Puces
+              options={PIEDS.map((p) => ({ id: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))}
+              valeur={f.pied}
+              onChange={(v) => maj("pied", v)}
+            />
+          </div>
+        </div>
+      );
+      break;
+    case "photo":
+      corps = (
+        <div className="flex flex-col gap-[13px]">
+          <button
+            type="button"
+            onClick={() => fichierPhoto.current?.click()}
+            className="flex items-center justify-center gap-2 rounded-full bg-foreground py-[17px] text-[15px] font-bold text-background active:scale-[0.98]"
+          >
+            {photo ? "Changer de photo" : "Choisir ma photo"}
+          </button>
+          {photo && (
+            <button
+              type="button"
+              onClick={() => setARecadrer(photo)}
+              className="glass-soft rounded-full py-[13px] text-[14px] font-semibold"
+            >
+              Recadrer
+            </button>
+          )}
+          <input ref={fichierPhoto} type="file" accept="image/*" onChange={choisirPhoto} className="hidden" />
+        </div>
+      );
+      break;
+    case "angles":
+      corps = (
+        <div className="grid grid-cols-2 gap-[13px]">
+          {ANGLES.map((a, i) => {
+            const src = refs[a.id];
+            const prochaine = !src && ANGLES.findIndex((x) => !refs[x.id]) === i;
+            return (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => setPrise(a.id)}
+                className={cn(
+                  "relative aspect-[3/4] overflow-hidden rounded-[21px] text-left transition-all active:scale-[0.98]",
+                  src ? "bg-black" : "glass-soft",
+                  prochaine && "ring-2 ring-foreground"
+                )}
+              >
+                {src ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- data URL locale
+                  <img src={src} alt={a.label} className="absolute inset-0 size-full object-cover" />
+                ) : (
+                  <span className="absolute inset-0 grid place-items-center">
+                    <span className="text-[55px] leading-none font-black text-foreground/10 tabular-nums">{i + 1}</span>
+                  </span>
+                )}
+                <span className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-[13px] pt-[21px] pb-[13px]">
+                  <span className="text-[13px] font-bold text-white">{a.label}</span>
+                  {src ? <RotateCcw className="size-3.5 text-white/70" /> : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      );
+      break;
+    case "secret":
+      corps = (
+        <div className="flex flex-col gap-[13px]">
+          <Champ label="Mot de passe">
+            <span className="flex items-center gap-2">
+              <input
+                autoFocus
+                type={voir ? "text" : "password"}
+                value={motDePasse}
+                onChange={(e) => {
+                  setMotDePasse(e.target.value);
+                  setErreur(null);
+                }}
+                autoComplete="new-password"
+                placeholder="••••••••"
+                className={SAISIE}
+              />
+              <button type="button" onClick={() => setVoir((v) => !v)} aria-label={voir ? "Masquer" : "Afficher"} className="text-foreground/40">
+                {voir ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </span>
+          </Champ>
+          <Champ label="Encore une fois">
+            <input
+              type={voir ? "text" : "password"}
+              value={confirmation}
+              onChange={(e) => {
+                setConfirmation(e.target.value);
+                setErreur(null);
+              }}
+              autoComplete="new-password"
+              placeholder="••••••••"
+              className={SAISIE}
+            />
+          </Champ>
+          {/* Champ piège : invisible pour un humain, rempli par les robots. */}
+          <input
+            tabIndex={-1}
+            aria-hidden
+            autoComplete="off"
+            value={piege}
+            onChange={(e) => setPiege(e.target.value)}
+            className="absolute -left-[9999px] h-0 w-0 opacity-0"
+          />
+          <p className="px-[13px] text-[12.5px] text-foreground/40">
+            Tu te connecteras avec <span className="font-bold text-foreground/70">@{pseudo}</span> et ce mot de passe.
+          </p>
+        </div>
+      );
+      break;
+    case "fini":
+      corps = (
+        <div className="flex flex-col gap-[13px]">
+          <div className="glass-soft rounded-[21px] px-[21px] py-[13px]">
+            <p className="mono-label text-foreground/40">En attente</p>
+            <p className="mt-[8px] text-[15px] leading-snug font-semibold">
+              La ligue valide ton entrée. Ta carte s&apos;ouvre dès que c&apos;est fait.
+            </p>
+          </div>
+          {avertissement && <p className="px-[13px] text-[12.5px] text-[#FF6B5E]">{avertissement}</p>}
+          {aRenvoyer && nomFinal && (
+            <button
+              type="button"
+              disabled={envoi}
+              onClick={async () => {
+                setEnvoi(true);
+                await envoyerPhotos(nomFinal);
+                setEnvoi(false);
+              }}
+              className="glass-soft rounded-full py-[13px] text-[14px] font-semibold"
+            >
+              Renvoyer les photos
+            </button>
+          )}
+        </div>
+      );
+      break;
+  }
+
+  /* ─────────────── La mise en page ─────────────── */
+
+  const accueil = etape === "accueil";
+  const action = accueil ? "Commencer" : etape === "secret" ? "Créer mon compte" : fini ? "Entrer" : "Continuer";
+
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-background" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      <div className="orbs" aria-hidden>
+        <i />
+        <i />
+        <i />
+      </div>
+
+      {/* Barre du haut : retour + progression */}
+      {!accueil && !fini && (
+        <div className="relative z-10 mx-auto flex w-full max-w-[420px] items-center gap-[13px] px-[21px] pt-[8px] pb-[8px]">
+          <button
+            type="button"
+            onClick={() => aller(-1)}
+            aria-label="Retour"
+            className="-ml-2 grid size-[34px] shrink-0 place-items-center rounded-full text-foreground/70"
+          >
+            <ChevronLeft className="size-5" />
+          </button>
+          <div className="flex flex-1 gap-[5px]">
+            {PARCOURS.map((p, i) => (
+              <span
+                key={p}
+                className={cn(
+                  "h-[3px] flex-1 rounded-full transition-colors duration-500",
+                  i <= etapeIndex ? "bg-foreground" : "bg-foreground/15"
+                )}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div id="inscription-scroll" className="relative z-10 flex-1 overflow-y-auto overscroll-contain">
+        <div className="mx-auto flex min-h-full w-full max-w-[420px] flex-col px-[21px]">
+          {/* Le petit segment (0,382) : la carte qui se remplit */}
+          {avecCarte && (
+            <div
+              className={cn(
+                "flex items-end justify-center transition-[height] duration-500",
+                accueil || fini
+                  ? "h-[52dvh] min-h-[340px]"
+                  : compacte
+                    ? "h-[23.6dvh] min-h-[150px]"
+                    : "h-[38.2dvh] min-h-[230px]"
+              )}
+            >
+              <div
+                key={fini ? "fini" : "carte"}
+                className={cn(fini && "animate-in zoom-in-90 fade-in duration-700")}
+                style={{ filter: "drop-shadow(0 21px 34px rgba(0,0,0,.55))" }}
+              >
+                <BolaCard {...carte} photo={photo} size={accueil || fini ? 1 : compacte ? 0.382 : 0.618} />
+              </div>
+            </div>
+          )}
+
+          {/* Le grand segment (0,618) : la question */}
+          <div className="flex flex-1 flex-col pt-[34px]">
+            {accueil && <p className="mono-label text-foreground/40">Bola · Sunday Five League</p>}
+            {/* La taille AVANT l'interligne : tailwind-merge retire un leading-*
+                placé avant un text-[…], qui peut porter le sien. */}
+            <h1 className={cn("font-extrabold tracking-tight", accueil || fini ? "mt-[8px] text-[42px]" : "text-[34px]", "leading-[1.05]")}>
+              {titre}
+            </h1>
+            {sousTitre && <p className="mt-[8px] text-[13px] leading-snug text-foreground/45">{sousTitre}</p>}
+            <div className="mt-[21px]">{corps}</div>
+            {accueil && ouvert === false && (
+              <p className="mt-[13px] text-[13px] text-foreground/50">
+                Les inscriptions ouvrent bientôt. En attendant, l&apos;admin te donne ton accès.
+              </p>
+            )}
+            {erreur && <p className="mt-[13px] px-[13px] text-[12.5px] font-medium text-[#FF6B5E]">{erreur}</p>}
+            <div className="min-h-[34px] flex-1" />
+          </div>
+        </div>
+      </div>
+
+      {/* L'action, toujours sous le pouce */}
+      <div
+        className="relative z-10 mx-auto w-full max-w-[420px] px-[21px] pt-[13px]"
+        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 21px)" }}
+      >
+        <button
+          type="button"
+          disabled={envoi || (accueil && ouvert === false)}
+          onClick={() => {
+            if (fini) router.replace("/");
+            else if (etape === "secret") void creer();
+            else aller(1);
+          }}
+          className={cn(
+            "flex w-full items-center justify-center gap-2 rounded-full bg-foreground py-[17px] text-[15px] font-bold text-background transition-transform active:scale-[0.98]",
+            (envoi || (accueil && ouvert === false)) && "opacity-40"
+          )}
+        >
+          {envoi && <Loader2 className="size-4 animate-spin" />}
+          {action}
+        </button>
+        {accueil && (
+          <Link href="/" className="mt-[13px] block py-[8px] text-center text-[13px] font-semibold text-foreground/50">
+            J&apos;ai déjà un compte
+          </Link>
+        )}
+      </div>
+
+      {prise && (
+        <PriseReference
+          angle={prise}
+          onFermer={() => setPrise(null)}
+          onPrise={(dataUrl) => {
+            const nouvelles = { ...refs, [prise]: dataUrl };
+            setRefs(nouvelles);
+            setErreur(null);
+            // Enchaîne sur l'angle suivant qui manque : on ne quitte la caméra
+            // qu'une fois les quatre faites.
+            const suivant = ANGLES.find((a) => !nouvelles[a.id]);
+            setPrise(suivant ? suivant.id : null);
+          }}
+        />
+      )}
+
+      <RecadrerPhoto
+        src={aRecadrer}
+        carte={carte}
+        onFermer={() => {
+          if (aRecadrer?.startsWith("blob:")) URL.revokeObjectURL(aRecadrer);
+          setARecadrer(null);
+        }}
+        onValider={(dataUrl) => {
+          if (aRecadrer?.startsWith("blob:")) URL.revokeObjectURL(aRecadrer);
+          setARecadrer(null);
+          setPhotoCarte(dataUrl);
+          setErreur(null);
+        }}
+      />
+    </div>
+  );
+}

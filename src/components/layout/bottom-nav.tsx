@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CarteIcon, MapIcon, TropheeIcon } from "./nav-icons";
+import { ongletActif } from "@/lib/nav";
 
 const TABS = [
   { href: "/", Icon: MapIcon, label: "Map" },
@@ -22,9 +23,8 @@ const TABS = [
 
 export function BottomNav() {
   const pathname = usePathname();
-  const actif = TABS.findIndex(({ href }) =>
-    href === "/" ? pathname === "/" || pathname === "/map" : pathname.startsWith(href)
-  );
+  const onglet = ongletActif(pathname);
+  const actif = TABS.findIndex(({ href }) => href === onglet);
   const clair = actif === 0;
   const encre = clair ? "#0a0b0d" : "#ffffff";
 

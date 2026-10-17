@@ -38,35 +38,47 @@ module.exports = () => ({
       if (sures.has(d.prop.slice(2))) d.cloneAfter({ prop: `${d.prop}-rgb`, value: canaux(d.value.trim()) });
     });
 
-    // 2 · Les replis pleins des utilitaires à opacité. L'optimiseur fusionne
-    // les règles aux replis identiques : `.text-foreground` et
-    // `.text-foreground\/15` finissent dans la même règle. On la sépare donc
-    // par opacité, sélecteur par sélecteur, pour ne jamais rendre
-    // transparente la couleur pleine qui partage la règle.
+    // 2 · Les replis pleins des utilitaires à opacité.
+    //
+    // L'optimiseur de Tailwind fusionne les règles aux déclarations
+    // identiques AVANT ce plugin : le repli de `bg-foreground/8` (la couleur
+    // pleine) partage alors la règle de `bg-foreground` —
+    // `.bg-foreground,.bg-foreground\/8{…}`. Réécrire la règle entière
+    // rendait `bg-foreground` transparent à 8 % partout (boutons blancs de
+    // l'écran de connexion devenus gris). On sépare donc les sélecteurs selon
+    // leur opacité, et seuls ceux qui en portent une sont réécrits.
+    const alphaDe = (sel) => {
+      const m = sel.match(/\\\/(\\\[)?([0-9]+(?:\\\.[0-9]+)?)(\\\])?/);
+      if (!m) return null;
+      const n = parseFloat(m[2].replace(/\\/g, ""));
+      const alpha = m[1] ? n : n / 100;
+      return alpha >= 0 && alpha <= 1 ? alpha : null;
+    };
+    const reecrire = (r, alpha) =>
+      r.walkDecls((d) => {
+        const v = d.value.trim().match(/^var\(--([a-z0-9-]+)\)$/);
+        if (v && sures.has(v[1])) d.value = `rgb(var(--${v[1]}-rgb) / ${alpha})`;
+      });
     root.walkRules((r) => {
       if (dansSupports(r)) return;
+      if (r.parent && r.parent.type === "atrule" && /keyframes$/i.test(r.parent.name)) return;
       const groupes = new Map();
       for (const sel of r.selectors) {
-        const m = sel.match(/\\\/(\\\[)?([0-9]+(?:\\\.[0-9]+)?)(\\\])?/);
-        let alpha = null;
-        if (m) {
-          const n = parseFloat(m[2].replace(/\\/g, ""));
-          const a = m[1] ? n : n / 100;
-          if (a >= 0 && a <= 1) alpha = a;
-        }
-        if (!groupes.has(alpha)) groupes.set(alpha, []);
-        groupes.get(alpha).push(sel);
+        const a = alphaDe(sel);
+        groupes.set(a, [...(groupes.get(a) ?? []), sel]);
       }
-      if (groupes.size === 1 && groupes.has(null)) return;
-      for (const [alpha, sels] of groupes) {
-        if (alpha === null) continue;
-        const copie = r.cloneBefore({ selectors: sels });
-        copie.walkDecls((d) => {
-          const v = d.value.trim().match(/^var\(--([a-z0-9-]+)\)$/);
-          if (v && sures.has(v[1])) d.value = `rgb(var(--${v[1]}-rgb) / ${alpha})`;
-        });
+      if (groupes.size === 1) {
+        const [a] = groupes.keys();
+        if (a !== null) reecrire(r, a);
+        return;
       }
-      if (groupes.has(null)) r.selectors = groupes.get(null);
+      for (const [a, sels] of groupes) {
+        if (a === null) continue;
+        const copie = r.cloneAfter({ selectors: sels });
+        reecrire(copie, a);
+      }
+      const pleins = groupes.get(null);
+      if (pleins) r.selectors = pleins;
       else r.remove();
     });
   },

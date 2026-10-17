@@ -11,7 +11,7 @@
 // Le tirage équilibré reste là, mais à sa place : un coup de main pour les
 // joueurs qu'on n'a pas encore placés, jamais un passage obligé.
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Dices, Users, Eraser } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -152,7 +152,7 @@ export function NewJourneeSheet({
         <div className="flex flex-col gap-4 px-1 pb-8">
           {/* Combien d'équipes */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold">Équipes</span>
+            <span className="text-sm font-semibold">Terrains</span>
             <div className="flex gap-1">
               {[2, 4, 6].map((n) => (
                 <button
@@ -178,7 +178,7 @@ export function NewJourneeSheet({
                     teamCount === n ? "bg-foreground text-background" : "bg-card text-muted-foreground"
                   )}
                 >
-                  {n}
+                  {n / 2}
                 </button>
               ))}
             </div>
@@ -192,8 +192,8 @@ export function NewJourneeSheet({
                 — choisis une équipe, puis touche les joueurs
               </span>
             </p>
-            <div className="flex flex-wrap gap-1.5">
-              {[...equipes, A_PLACER].map((eq) => {
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[...equipes, A_PLACER].map((eq, i) => {
                 const actif = pinceau === eq;
                 const n = eq === A_PLACER ? aPlacer.length : (parEquipe.get(eq)?.length ?? 0);
                 const membres = eq === A_PLACER ? aPlacer : (parEquipe.get(eq) ?? []);
@@ -202,9 +202,17 @@ export function NewJourneeSheet({
                       membres.reduce((s, m) => s + (ovrDe.get(m) ?? 75), 0) / membres.length
                     )
                   : 0;
+                // Un match par terrain : les équipes vont deux par deux.
+                const terrain = eq !== A_PLACER && i % 2 === 0 && teamCount > 2 ? i / 2 + 1 : null;
                 return (
+                  <Fragment key={eq}>
+                  {terrain != null && (
+                    <span className={cn("mono-label w-full text-muted-foreground", i > 0 && "mt-1")}>
+                      Terrain {terrain}
+                    </span>
+                  )}
+                  {eq === A_PLACER && teamCount > 2 && <span className="mt-1 w-full" />}
                   <button
-                    key={eq}
                     type="button"
                     onClick={() => setPinceau(eq)}
                     className={cn(
@@ -226,6 +234,7 @@ export function NewJourneeSheet({
                       <span className="text-[10px] opacity-55 tabular-nums">Ø{moyenne}</span>
                     )}
                   </button>
+                  </Fragment>
                 );
               })}
             </div>

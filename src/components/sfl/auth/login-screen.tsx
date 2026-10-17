@@ -5,6 +5,7 @@
 // en JetBrains Mono, une seule action blanche.
 
 import { useState } from "react";
+import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { signIn } from "@/lib/sfl/auth/session";
 import { supabase } from "@/lib/supabase";
@@ -67,13 +68,13 @@ export function LoginScreen() {
           ça se joue ici.
         </h1>
         <p className="mt-3 text-[13.5px] leading-snug text-foreground/45">
-          Connecte-toi avec l&apos;identifiant que l&apos;admin t&apos;a transmis. Tu retrouveras
+          Connecte-toi avec ton pseudo, ou l&apos;identifiant que l&apos;admin t&apos;a transmis. Tu retrouveras
           ta carte, tes points, et tu pourras répondre aux convocations.
         </p>
 
         <form onSubmit={submit} className="mt-7 flex flex-col gap-3">
           <label className="glass-soft flex flex-col gap-1.5 rounded-[18px] px-4 py-3">
-            <span className="mono-label text-foreground/40">Identifiant</span>
+            <span className="mono-label text-foreground/40">Pseudo ou identifiant</span>
             <input
               value={user}
               onChange={(e) => {
@@ -164,6 +165,13 @@ export function LoginScreen() {
         <p className="mt-3 text-center text-[11.5px] text-foreground/30">
           Uniquement si tu as déjà lié Google ou Apple à ton compte (Réglages).
         </p>
+
+        <Link
+          href="/inscription"
+          className="glass-soft mt-6 flex items-center justify-center rounded-full py-3.5 text-[14px] font-bold"
+        >
+          Créer mon compte
+        </Link>
 
         <p className="mt-6 text-[12.5px] leading-snug text-foreground/35">
           Mot de passe oublié ? Demande à Ilyes de te le redonner — il a la liste des

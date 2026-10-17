@@ -87,14 +87,16 @@ function Toggle({
   label,
   checked,
   onChange,
+  disabled,
 }: {
   label: string;
   checked: boolean;
   onChange: (v: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <Row label={label}>
-      <Switch checked={checked} onCheckedChange={onChange} />
+      <Switch checked={checked} onCheckedChange={onChange} disabled={disabled} />
     </Row>
   );
 }
@@ -102,11 +104,14 @@ function Toggle({
 /** Édition complète d'une ligne de match (une bottom-sheet). */
 export function EntrySheet({
   entry,
+  mvpAuto = false,
   onOpenChange,
   onPatch,
   onDelete,
 }: {
   entry: MatchEntry | null;
+  /** Journée Bola : le MVP se calcule sur les stats, il ne se coche pas. */
+  mvpAuto?: boolean;
   onOpenChange: (open: boolean) => void;
   onPatch: (patch: Partial<MatchEntry>) => void;
   onDelete: () => void;
@@ -174,7 +179,12 @@ export function EntrySheet({
                   <Stepper value={entry.passes} onChange={(v) => onPatch({ passes: v })} />
                 </Row>
                 <Toggle label="Clean sheet" checked={entry.cleanSheet} onChange={(v) => onPatch({ cleanSheet: v })} />
-                <Toggle label="MVP du match" checked={entry.mvp} onChange={(v) => onPatch({ mvp: v })} />
+                <Toggle
+                  label={mvpAuto ? "MVP du match · auto" : "MVP du match"}
+                  checked={entry.mvp}
+                  disabled={mvpAuto}
+                  onChange={(v) => onPatch({ mvp: v })}
+                />
                 <Toggle label="Joueur Impact" checked={entry.impact} onChange={(v) => onPatch({ impact: v })} />
                 <Toggle label="Défensive" checked={entry.def} onChange={(v) => onPatch({ def: v })} />
                 <Toggle label="Retard non prévenu" checked={entry.retard} onChange={(v) => onPatch({ retard: v })} />
