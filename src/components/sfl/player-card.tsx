@@ -20,11 +20,14 @@ export function PlayerCard({
   mode = "rare",
   size = 1,
   highlightStats,
+  onglet,
 }: {
   player: Player;
   mode?: CardMode;
   size?: number;
   highlightStats?: StatKey[];
+  /** En pastille : la note aux couleurs d'une équipe. */
+  onglet?: { fond: string; encre: string };
 }) {
   const stats = mode === "rare" ? rareStats(player.stats) : player.stats;
   const photo = usePhotoPerso(player.name);
@@ -39,6 +42,7 @@ export function PlayerCard({
       highlightStats={highlightStats}
       size={size}
       photo={photo}
+      onglet={onglet}
     />
   );
 }

@@ -1,9 +1,12 @@
 "use client";
 
 // La feuille de match dans la fiche du match (Map) : chaque match sur son
-// terrain, chaque joueur posé à son poste avec sa carte en pastille. Mon
-// équipe joue en bas, ma carte est cerclée. Plusieurs terrains le même
-// jour : on passe de l'un à l'autre, la fiche s'ouvre sur le mien.
+// terrain, vu en légère perspective (le terrain couché, les cartes debout
+// dessus, chacune avec son ombre), le logo BOLA au rond central. Chaque joueur
+// est posé à son poste avec sa carte en pastille, la note aux couleurs de son
+// équipe (noire chez les Noirs, blanche chez les Blancs). Mon équipe joue en
+// bas, devant ; ma carte est cerclée. Plusieurs terrains le même jour : on
+// passe de l'un à l'autre, la fiche s'ouvre sur le mien.
 //
 // « Partager la feuille » en fait une image au format story (1080 × 1920,
 // noir, logo BOLA), celle qu'on envoyait dans le groupe Snap : la feuille de
@@ -37,9 +40,22 @@ export interface EnTeteFeuille {
 }
 
 /** Une carte en pastille ; un joueur absent du vestiaire garde son initiale. */
-function Pastille({ player, nom, cote, cliquable }: { player: Player | undefined; nom: string; cote: number; cliquable: boolean }) {
-  if (player && cliquable) return <MiniCarte player={player} size={cote / 254} />;
-  if (player) return <PlayerCard player={player} mode="simple" size={cote / 254} />;
+function Pastille({
+  player,
+  nom,
+  cote,
+  cliquable,
+  onglet,
+}: {
+  player: Player | undefined;
+  nom: string;
+  cote: number;
+  cliquable: boolean;
+  /** La note aux couleurs de l'équipe. */
+  onglet: { fond: string; encre: string };
+}) {
+  if (player && cliquable) return <MiniCarte player={player} size={cote / 254} onglet={onglet} />;
+  if (player) return <PlayerCard player={player} mode="simple" size={cote / 254} onglet={onglet} />;
   return (
     <div
       className="flex items-center justify-center bg-[#f4f3ef] font-bold text-[#0A0B0D]"
@@ -69,7 +85,13 @@ function Lignes({ vertical, couche }: { vertical: boolean; couche: string }) {
           <div className="absolute right-[10px] top-1/2 h-[42%] w-[9%] -translate-y-1/2 rounded-l-[999px] border-[1.5px] border-r-0" style={trait} />
         </>
       )}
-      <div className="absolute left-1/2 top-1/2 aspect-square w-[18%] -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px]" style={{ ...trait, width: vertical ? "22%" : "13%" }} />
+      <div
+        className="absolute left-1/2 top-1/2 flex aspect-square -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px]"
+        style={{ ...trait, width: vertical ? "33%" : "17%" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- photographié par html-to-image */}
+        <img src="/bola/symbole-blanc.svg" alt="" style={{ width: "52%", height: "52%", opacity: 0.85 }} />
+      </div>
     </div>
   );
 }
@@ -84,11 +106,20 @@ interface Pose {
   y: number;
 }
 
-/** Le terrain de l'app : assez haut pour trois lignes de cartes par moitié. */
-const TERRAIN_H = 540;
+/** Le cadre du terrain de l'app ; le terrain couché dedans, et son inclinaison. */
+const CADRE_H = 540;
+const TERRAIN = { l: 270, h: 540, incline: 56 };
 
-/** Vertical : la profondeur (8 le but, 40 l'attaque) en px depuis la médiane. */
-const depuisMediane = (profondeur: number) => 42 + ((40 - profondeur) / 32) * (TERRAIN_H / 2 - 90);
+/** Vertical : la profondeur (8 le but, 40 l'attaque) en px depuis la médiane du terrain couché. */
+const depuisMediane = (profondeur: number) => 62 + ((40 - profondeur) / 32) * (TERRAIN.h / 2 - 98);
+
+/**
+ * Vertical : en perspective, les lignes qui se font face à la médiane se
+ * chevaucheraient ; on les décale. Chez moi (devant), l'attaque se resserre ;
+ * en face (au fond, donc plus petit), elle s'écarte.
+ */
+const ecart = (profondeur: number, chezMoi: boolean) =>
+  profondeur < 16 ? 1 : chezMoi ? (profondeur < 32 ? 1.4 : 0.56) : profondeur < 32 ? 0.9 : 1.36;
 
 /**
  * Les joueurs d'un terrain, posés. Vertical (l'app) : `bas` joue en bas.
@@ -107,7 +138,13 @@ function poser(t: TerrainFeuille, vertical: boolean, basEstA: boolean): Pose[] {
       const p = chezMoi ? profondeur : 100 - profondeur;
       out.push(
         vertical
-          ? { nom, couleur: eq.couleur, encre: eq.encre, x: largeur, y: (chezMoi ? 1 : -1) * depuisMediane(profondeur) }
+          ? {
+              nom,
+              couleur: eq.couleur,
+              encre: eq.encre,
+              x: 50 + (largeur - 50) * ecart(profondeur, chezMoi),
+              y: (chezMoi ? 1 : -1) * depuisMediane(profondeur),
+            }
           : { nom, couleur: eq.couleur, encre: eq.encre, x: p, y: largeur }
       );
     });
@@ -153,32 +190,62 @@ export function FeuilleDeMatch({ terrains, moi, entete }: { terrains: TerrainFeu
         )}
       </div>
 
-      <div className="relative w-full overflow-hidden rounded-[22px] bg-[#dcdbd6] dark:bg-[#1b1d21]" style={{ height: TERRAIN_H }}>
+      <div
+        className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#e9e8e3_0%,#d6d5d0_70%)] dark:bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
+        style={{ height: CADRE_H, perspective: 1000, perspectiveOrigin: "50% 25%" }}
+      >
         <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{ backgroundImage: "repeating-linear-gradient(180deg, rgba(255,255,255,0.12) 0 8.33%, transparent 8.33% 16.66%)" }}
-        />
-        <Lignes vertical couche="rgba(255,255,255,0.85)" />
-        <NomEquipe nom={haut.nom} couleur={haut.couleur} className="left-6 top-5" />
-        <NomEquipe nom={bas.nom} couleur={bas.couleur} className="bottom-5 left-6" />
-        {poses.map((p) => (
+          className="absolute left-1/2"
+          style={{
+            top: -34,
+            width: TERRAIN.l,
+            height: TERRAIN.h,
+            marginLeft: -TERRAIN.l / 2,
+            transformStyle: "preserve-3d",
+            transform: `rotateX(${TERRAIN.incline}deg)`,
+          }}
+        >
+          <div aria-hidden className="absolute inset-0 rounded-[10px] bg-[linear-gradient(180deg,#c4c3be_0%,#d2d1cc_100%)] dark:bg-[linear-gradient(180deg,#17191d_0%,#24272c_100%)]" />
           <div
-            key={p.nom}
-            className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
-            style={{ left: `${p.x}%`, top: `calc(50% + ${p.y}px)` }}
-          >
-            <div className={cn("rounded-[12px]", p.nom === moi && "ring-[3px] ring-foreground ring-offset-2 ring-offset-[#dcdbd6] dark:ring-offset-[#1b1d21]")}>
-              <Pastille player={parNom.get(p.nom)} nom={p.nom} cote={48} cliquable />
+            aria-hidden
+            className="absolute inset-0 rounded-[10px]"
+            style={{ backgroundImage: "repeating-linear-gradient(180deg, rgba(255,255,255,0.06) 0 50px, transparent 50px 100px)" }}
+          />
+          {/* L'épaisseur du terrain, vue par le bord avant. */}
+          <div
+            aria-hidden
+            className="absolute inset-x-0 bottom-0 h-[14px] rounded-b-[6px] bg-[#a9a8a3] dark:bg-[#08090b]"
+            style={{ transformOrigin: "50% 100%", transform: "rotateX(-90deg)" }}
+          />
+          <Lignes vertical couche="rgba(255,255,255,0.7)" />
+          {poses.map((p) => (
+            <div key={p.nom} className="absolute size-0" style={{ left: `${p.x}%`, top: TERRAIN.h / 2 + p.y, transformStyle: "preserve-3d" }}>
+              <div
+                aria-hidden
+                className="absolute left-[-22px] top-[-9px] h-[18px] w-[44px] rounded-full"
+                style={{ background: "radial-gradient(closest-side, rgba(0,0,0,0.55), transparent)" }}
+              />
+              {/* La carte se relève face à nous. */}
+              <div
+                className="absolute bottom-0 left-0 flex flex-col items-center gap-1"
+                style={{ transformOrigin: "50% 100%", transform: `translateX(-50%) rotateX(-${TERRAIN.incline}deg)` }}
+              >
+                {/* Ma carte, cerclée : un vrai cadre, les ombres portées se découpent mal en 3D. */}
+                <div className={cn("flex rounded-[14px]", p.nom === moi && "bg-foreground p-[3px]")}>
+                  <Pastille player={parNom.get(p.nom)} nom={p.nom} cote={44} cliquable onglet={{ fond: p.couleur, encre: p.encre }} />
+                </div>
+                <span
+                  className="whitespace-nowrap rounded-full px-[7px] py-[2px] text-[11px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
+                  style={{ background: p.couleur, color: p.encre, fontWeight: p.nom === moi ? 800 : 600 }}
+                >
+                  {p.nom === moi ? "Toi" : prenom(p.nom)}
+                </span>
+              </div>
             </div>
-            <span
-              className="whitespace-nowrap rounded-full px-[7px] py-[2px] text-[11.5px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
-              style={{ background: p.couleur, color: p.encre, fontWeight: p.nom === moi ? 800 : 600 }}
-            >
-              {p.nom === moi ? "Toi" : prenom(p.nom)}
-            </span>
-          </div>
-        ))}
+          ))}
+        </div>
+        <NomEquipe nom={haut.nom} couleur={haut.couleur} className="left-[18px] top-4" />
+        <NomEquipe nom={bas.nom} couleur={bas.couleur} className="bottom-10 left-[18px]" />
       </div>
 
       <button
@@ -327,7 +394,7 @@ function ImageFeuille({ terrains, entete, parNom }: { terrains: TerrainFeuille[]
                   gap: 4,
                 }}
               >
-                <Pastille player={parNom.get(p.nom)} nom={p.nom} cote={cote} cliquable={false} />
+                <Pastille player={parNom.get(p.nom)} nom={p.nom} cote={cote} cliquable={false} onglet={{ fond: p.couleur, encre: p.encre }} />
                 <span
                   style={{
                     padding: "2px 6px",
