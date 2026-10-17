@@ -1,0 +1,209 @@
+/* ───────────── La Map en mouvement ─────────────
+   Ce qui bouge sur la Map, à part du dessin (globals.css) : au chargement,
+   le plan vole jusqu'aux matchs, puis les stickers tombent et se collent un
+   à un, du nord au sud ; la pastille du jour et le badge arrivent ensuite.
+   Toucher un sticker l'écrase d'un rien, puis il se redresse en grand avec
+   un ressort, et une onde part du terrain. Le lettrage de la commune se colle
+   comme un autocollant, chaque fois que la commune change. Le carrousel monte
+   carte par carte. Rien ne tremble : chaque mouvement part, dépasse un peu,
+   se pose. « Réduire les animations » coupe tout (le vol aussi, côté JS).
+
+   Les stickers sont refaits par Leaflet à chaque changement : on n'anime
+   que des classes posées au bon moment (`stk--entre`, `stk--vient`,
+   `stk--part`), jamais la transformation de Leaflet. Le mouvement passe par
+   la propriété `scale` et `translate`, qui s'ajoutent au `transform` du
+   dessin (penché, agrandi quand il est choisi). */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Derrière l'écran de chargement, rien ne part : tout attend qu'il se lève. */
+  html:not([data-splash="fini"]) :is(.stk--entre, .stk--entre *, .lettrage-entre, .compte-entre, .map-bord, .map-monte, .toi--entre) {
+    animation-play-state: paused;
+  }
+
+  /* ── Un sticker arrive : il tombe d'un peu plus haut, s'écrase, se pose. ── */
+  .stk--entre {
+    animation: stk-entre 0.62s cubic-bezier(0.2, 0.9, 0.3, 1.25) var(--delai, 0ms) backwards;
+  }
+  .stk--entre .stk__cal {
+    animation: stk-pastille 0.42s cubic-bezier(0.3, 1.5, 0.5, 1) calc(var(--delai, 0ms) + 0.3s) backwards;
+  }
+  .stk--entre .stk__badge,
+  .stk--entre .stk__etiquette {
+    animation: stk-pastille 0.42s cubic-bezier(0.3, 1.5, 0.5, 1) calc(var(--delai, 0ms) + 0.42s) backwards;
+  }
+  .stk--entre .stk__nom {
+    animation: stk-nom 0.4s ease-out calc(var(--delai, 0ms) + 0.36s) backwards;
+  }
+
+  /* ── Le choisi grandit avec un ressort ; l'ancien redescend. ── */
+  .stk--vient {
+    animation: stk-vient 0.52s cubic-bezier(0.3, 1.45, 0.5, 1) backwards;
+  }
+  .stk--vient .stk__etiquette {
+    animation: stk-etiquette 0.44s cubic-bezier(0.3, 1.6, 0.5, 1) 0.14s backwards;
+  }
+  .stk--part {
+    animation: stk-part 0.38s cubic-bezier(0.3, 1.3, 0.5, 1) backwards;
+  }
+  /* Le doigt sur un sticker : il s'enfonce. */
+  .stk:active {
+    scale: 0.93;
+    transition: scale 0.12s ease-out;
+  }
+
+  /* ── « Il manque N » respire, doucement, sur le choisi seulement. ── */
+  .stk--choisi .stk__etiquette--manque {
+    animation: stk-respire 2.6s ease-in-out 1s infinite;
+  }
+  .stk--entre.stk--choisi .stk__etiquette--manque {
+    animation:
+      stk-pastille 0.42s cubic-bezier(0.3, 1.5, 0.5, 1) calc(var(--delai, 0ms) + 0.42s) both,
+      stk-respire 2.6s ease-in-out calc(var(--delai, 0ms) + 1.4s) infinite;
+  }
+
+  /* ── L'onde qui part du terrain touché. ── */
+  .onde {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 120px;
+    height: 48px;
+    margin: -24px 0 0 -60px;
+    border-radius: 50%;
+    border: 2px solid rgba(10, 11, 13, 0.55);
+    pointer-events: none;
+    animation: onde 0.75s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  }
+  .onde--clair {
+    border-color: rgba(244, 245, 242, 0.85);
+  }
+  .onde + .onde {
+    animation-delay: 0.14s;
+  }
+
+  /* ── « Toi » : l'anneau au sol bat lentement, comme un point bleu sans bleu. ── */
+  .toi__anneau {
+    animation: toi-bat 2.4s ease-out infinite;
+  }
+  .toi--entre {
+    animation: stk-entre 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.25) backwards;
+  }
+
+  /* ── Le lettrage se colle ; l'étiquette du compte suit. ── */
+  .lettrage-entre {
+    animation: lettrage-colle 0.6s cubic-bezier(0.25, 1.4, 0.5, 1) 0.15s backwards;
+  }
+  .compte-entre {
+    animation: stk-pastille 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) 0.45s backwards;
+  }
+
+  /* ── Les boutons du haut glissent depuis le bord ; ceux du bas montent. ── */
+  .map-bord {
+    animation: map-bord 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.1) calc(0.25s + var(--i, 0) * 70ms) backwards;
+  }
+  .map-monte {
+    animation: map-monte 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.1) calc(0.35s + var(--i, 0) * 80ms) backwards;
+  }
+  /* Tous les boutons ronds de la Map s'enfoncent au doigt. */
+  .map-touche {
+    transition:
+      scale 0.18s cubic-bezier(0.3, 1.5, 0.5, 1),
+      background-color 0.3s ease,
+      color 0.3s ease;
+  }
+  .map-touche:active {
+    scale: 0.9;
+    transition-duration: 0.08s;
+  }
+  /* La bascule plan / satellite : l'icône fait un demi-tour. */
+  .map-calques svg {
+    transition: rotate 0.5s cubic-bezier(0.3, 1.4, 0.5, 1);
+  }
+  .map-calques[aria-pressed="true"] svg {
+    rotate: 180deg;
+  }
+
+  /* ── Les cartes du carrousel : la choisie grandit avec un ressort. ── */
+  .carte-match {
+    transition:
+      scale 0.45s cubic-bezier(0.3, 1.35, 0.5, 1),
+      opacity 0.35s ease,
+      translate 0.45s cubic-bezier(0.3, 1.35, 0.5, 1);
+  }
+  .carte-match:active {
+    scale: 0.96;
+    transition-duration: 0.1s;
+  }
+
+  /* ── Le fond qui change : le nouveau fond monte en fondu sur l'ancien. ── */
+  .fond-entre {
+    animation: fondu 0.5s ease-out backwards;
+  }
+}
+
+/* La carte du carrousel, au repos : la choisie en avant. */
+.carte-match {
+  scale: 0.88;
+  opacity: 0.8;
+}
+.carte-match--choisie {
+  scale: 1;
+  opacity: 1;
+}
+
+@keyframes stk-entre {
+  0% { opacity: 0; scale: 0.4; translate: 0 -38px; }
+  55% { opacity: 1; scale: 1.06; translate: 0 2px; }
+  75% { scale: 0.97 1.03; translate: 0 0; }
+  100% { opacity: 1; scale: 1; translate: 0 0; }
+}
+@keyframes stk-pastille {
+  0% { opacity: 0; scale: 0.3; }
+  100% { opacity: 1; scale: 1; }
+}
+@keyframes stk-nom {
+  0% { opacity: 0; translate: 0 -6px; }
+  100% { opacity: 1; translate: 0 0; }
+}
+/* `scale` s'ajoute au scale(1.2) du choisi : 0,83 → 1, c'est 1 → 1,2. */
+@keyframes stk-vient {
+  0% { scale: 0.8; }
+  100% { scale: 1; }
+}
+@keyframes stk-part {
+  0% { scale: 1.2; }
+  100% { scale: 1; }
+}
+@keyframes stk-etiquette {
+  0% { opacity: 0; scale: 0.5; translate: -8px -4px; }
+  100% { opacity: 1; scale: 1; translate: 0 0; }
+}
+@keyframes stk-respire {
+  0%, 100% { box-shadow: 0 1.5px 2.5px rgba(0, 0, 0, 0.2), 0 0 0 0 rgba(255, 138, 76, 0.55); }
+  50% { box-shadow: 0 1.5px 2.5px rgba(0, 0, 0, 0.2), 0 0 0 5px rgba(255, 138, 76, 0); }
+}
+@keyframes onde {
+  0% { opacity: 0.9; scale: 0.2; }
+  100% { opacity: 0; scale: 1.6; }
+}
+@keyframes toi-bat {
+  0% { box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.12), 0 0 0 0 rgba(10, 11, 13, 0.28); }
+  70%, 100% { box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.12), 0 0 0 10px rgba(10, 11, 13, 0); }
+}
+@keyframes lettrage-colle {
+  0% { opacity: 0; scale: 1.5; rotate: -8deg; translate: -10px -6px; }
+  60% { opacity: 1; }
+  100% { opacity: 1; scale: 1; rotate: 0deg; translate: 0 0; }
+}
+@keyframes map-bord {
+  0% { opacity: 0; translate: 24px 0; scale: 0.8; }
+  100% { opacity: 1; translate: 0 0; scale: 1; }
+}
+@keyframes map-monte {
+  0% { opacity: 0; translate: 0 40px; }
+  100% { opacity: 1; translate: 0 0; }
+}
+@keyframes fondu {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
