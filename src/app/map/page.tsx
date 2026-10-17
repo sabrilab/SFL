@@ -376,8 +376,15 @@ export default function MapPage() {
   const [ouvrir, setOuvrir] = useState<{ terrain: Terrain | null; jour?: string; heure?: string; n: number } | null>(null);
   const [dispos, setDispos] = useState(false);
 
+  const [fiche, setFiche] = useState(false);
+  const [ficheAdmin, setFicheAdmin] = useState(false);
   const [choix, setChoix] = useState<string | null>(null);
-  const choisirSticker = useCallback((id: string) => setChoix(id), []);
+  // Toucher un match sur le plan le choisit et ouvre sa fiche.
+  const choisirSticker = useCallback((id: string) => {
+    setChoix(id);
+    setFicheAdmin(false);
+    setFiche(true);
+  }, []);
   // Le match choisi : celui qu'on a touché s'il est encore là, sinon le premier.
   const choisi = affiches.find((m) => m.cle === choix) ?? affiches[0];
 
@@ -417,8 +424,6 @@ export default function MapPage() {
 
   // La fiche du match : la feuille qui monte du bas, comme dans l'app.
   const [fond, setFond] = useState<FondCarte>("plan");
-  const [fiche, setFiche] = useState(false);
-  const [ficheAdmin, setFicheAdmin] = useState(false);
   const ouvrirFiche = (admin = false) => {
     setFicheAdmin(admin);
     setFiche(true);
@@ -426,23 +431,23 @@ export default function MapPage() {
 
   // Les surcouches se posent sous l'encoche en haut, au-dessus de la barre
   // d'onglets en bas (qui flotte sur le plan, comme sur l'iPhone).
-  // L'en-tête commun (logo à gauche, compte à droite) flotte en haut : sur
-  // téléphone, les surcouches se posent dessous ; sur grand écran, le plan
-  // commence déjà sous lui.
+  // L'en-tête commun (logo à gauche, compte à droite) flotte en haut, sur
+  // téléphone comme sur ordinateur : le plan prend tout l'écran et les
+  // surcouches se posent sous l'en-tête.
   const haut = "calc(env(safe-area-inset-top, 0px) + var(--sous-entete))";
   const bas = "calc(env(safe-area-inset-bottom, 0px) + 92px)";
 
   return (
     <>
       {/* ─── Le plan, tout l'écran ─── */}
-      <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] [--sous-entete:5.25rem] lg:top-[5.5rem] lg:[--sous-entete:14px]">
+      <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] [--sous-entete:5.25rem] lg:[--sous-entete:5.5rem]">
         <div className="absolute inset-0">
           <CarteMap fond={fond} stickers={stickers} points={AUCUN_POINT} toi={toi} choisi={choisi?.cle ?? null} onChoisir={choisirSticker} className="h-full w-full" />
         </div>
         {/* Voile en haut : la barre d'état et le lettrage restent lisibles.
             Tout ce qui est posé sur le plan passe au-dessus des calques de
             Leaflet (z-index 400 et plus). */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-44 bg-gradient-to-b lg:h-32 from-[rgba(8,9,11,0.42)] to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-44 bg-gradient-to-b from-[rgba(8,9,11,0.42)] to-transparent" />
 
         {/* En haut à gauche : la commune en lettrage, le compte en étiquette */}
         <div className="pointer-events-none absolute left-5 z-[510] flex max-w-[calc(100%-8.5rem)] flex-col items-start" style={{ top: `calc(${haut} + 8px)` }}>

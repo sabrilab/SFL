@@ -39,10 +39,11 @@ export function SiteHeader() {
   // possible. (Le nom vient de la session ; il mène au profil.)
   const { me } = useMyPlayer();
   const onglet = ongletActif(pathname);
-  // Sur le plan clair de la Map (téléphone), le verre fumé ne se lirait plus :
-  // les bulles prennent l'encre pleine des boutons du plan. Même forme, même
-  // place, seule la teinte s'adapte.
-  const plan = cn((pathname === "/" || pathname === "/map") && "max-lg:bg-[rgba(10,11,13,0.86)]!");
+  // Sur le plan clair de la Map, le verre fumé ne se lirait plus : les bulles
+  // prennent l'encre pleine des boutons du plan. Même forme, même place, seule
+  // la teinte s'adapte — sur téléphone comme sur ordinateur, où la carte passe
+  // aussi sous l'en-tête.
+  const plan = cn((pathname === "/" || pathname === "/map") && "bg-[rgba(10,11,13,0.86)]!");
 
   return (
     // Le seuil de `sticky` se mesure depuis le haut réel du conteneur, que le
@@ -72,7 +73,7 @@ export function SiteHeader() {
           </Link>
         </div>
 
-        <nav className="glass hidden items-center gap-1 rounded-full px-1.5 py-1.5 lg:flex">
+        <nav className={cn("glass hidden items-center gap-1 rounded-full px-1.5 py-1.5 lg:flex", plan)}>
           {NAV_ITEMS.map((item) => {
             const active = onglet === item.href;
             return (
