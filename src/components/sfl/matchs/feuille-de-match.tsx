@@ -77,6 +77,7 @@ function Lignes({ vertical, couche }: { vertical: boolean; couche: string }) {
 interface Pose {
   nom: string;
   couleur: string;
+  encre: string;
   /** En % de la largeur. */
   x: number;
   /** En % de la hauteur (image) ; en px depuis la ligne médiane (app). */
@@ -106,8 +107,8 @@ function poser(t: TerrainFeuille, vertical: boolean, basEstA: boolean): Pose[] {
       const p = chezMoi ? profondeur : 100 - profondeur;
       out.push(
         vertical
-          ? { nom, couleur: eq.couleur, x: largeur, y: (chezMoi ? 1 : -1) * depuisMediane(profondeur) }
-          : { nom, couleur: eq.couleur, x: p, y: largeur }
+          ? { nom, couleur: eq.couleur, encre: eq.encre, x: largeur, y: (chezMoi ? 1 : -1) * depuisMediane(profondeur) }
+          : { nom, couleur: eq.couleur, encre: eq.encre, x: p, y: largeur }
       );
     });
   }
@@ -171,8 +172,8 @@ export function FeuilleDeMatch({ terrains, moi, entete }: { terrains: TerrainFeu
               <Pastille player={parNom.get(p.nom)} nom={p.nom} cote={48} cliquable />
             </div>
             <span
-              className="whitespace-nowrap rounded-full px-[7px] py-[2px] text-[11.5px] text-[#0A0B0D]"
-              style={{ background: p.couleur, fontWeight: p.nom === moi ? 800 : 600 }}
+              className="whitespace-nowrap rounded-full px-[7px] py-[2px] text-[11.5px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
+              style={{ background: p.couleur, color: p.encre, fontWeight: p.nom === moi ? 800 : 600 }}
             >
               {p.nom === moi ? "Toi" : prenom(p.nom)}
             </span>
@@ -197,7 +198,7 @@ export function FeuilleDeMatch({ terrains, moi, entete }: { terrains: TerrainFeu
 function NomEquipe({ nom, couleur, className }: { nom: string; couleur: string; className: string }) {
   return (
     <div className={cn("absolute flex items-center gap-[7px]", className)}>
-      <span aria-hidden className="size-3 rounded-full shadow-[inset_0_0_0_1px_rgba(0,0,0,0.15)]" style={{ background: couleur }} />
+      <span aria-hidden className="size-3 rounded-full shadow-[inset_0_0_0_1px_rgba(128,128,128,0.6)]" style={{ background: couleur }} />
       <span className="text-[14px] font-extrabold text-[#0A0B0D] dark:text-white">{nom}</span>
     </div>
   );
@@ -332,7 +333,8 @@ function ImageFeuille({ terrains, entete, parNom }: { terrains: TerrainFeuille[]
                     padding: "2px 6px",
                     borderRadius: 999,
                     background: p.couleur,
-                    color: "#0A0B0D",
+                    color: p.encre,
+                    boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.35)",
                     fontSize: n >= 3 ? 10 : 11,
                     fontWeight: 700,
                     whiteSpace: "nowrap",
@@ -358,7 +360,7 @@ function ImageFeuille({ terrains, entete, parNom }: { terrains: TerrainFeuille[]
 function EquipeImage({ nom, couleur, droite }: { nom: string; couleur: string; droite?: boolean }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, flexDirection: droite ? "row-reverse" : "row" }}>
-      <span style={{ width: 13, height: 13, borderRadius: "50%", background: couleur }} />
+      <span style={{ width: 13, height: 13, borderRadius: "50%", background: couleur, boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.6)" }} />
       <span style={{ font: "400 24px/1 var(--font-anton), Anton, sans-serif", textTransform: "uppercase", letterSpacing: 0.4 }}>{nom}</span>
     </div>
   );
