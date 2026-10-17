@@ -57,6 +57,7 @@ import {
   updateJournee,
   updateRosterAt,
 } from "@/lib/sfl/saisie/mutations";
+import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
 import { Synchro } from "@/components/sfl/admin/synchro";
 import { DetailPoints } from "@/components/sfl/admin/detail-points";
@@ -731,6 +732,7 @@ export function AdminDashboard() {
       {/* ===================== SHEETS ===================== */}
       <EntrySheet
         entry={editEntry}
+        mvpAuto={editEntry ? mvpAutomatique(saison, editEntry.j) : false}
         onOpenChange={(o) => !o && setEditIndex(null)}
         onPatch={(patch) => editIndex != null && commit(updateEntryAt(saison, editIndex, patch), "Édition ligne")}
         onDelete={() => {

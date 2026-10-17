@@ -48,6 +48,7 @@ export function CarteMap({
   toi,
   choisi,
   onChoisir,
+  onPoint,
   fond = "plan",
   className,
 }: {
@@ -57,6 +58,8 @@ export function CarteMap({
   toi: ToiPlan | null;
   choisi: string | null;
   onChoisir: (id: string) => void;
+  /** Toucher un terrain libre (un match possible) ; sans elle, les terrains ne réagissent pas. */
+  onPoint?: (id: string) => void;
   className?: string;
 }) {
   const conteneur = useRef<HTMLDivElement>(null);
@@ -64,12 +67,15 @@ export function CarteMap({
   const calque = useRef<L.LayerGroup | null>(null);
   const tuiles = useRef<L.LayerGroup | null>(null);
   const choisirRef = useRef(onChoisir);
+  const pointRef = useRef(onPoint);
   // Ce qui a été cadré la dernière fois : changer de fond redessine les
   // stades sans recadrer.
   const cadre = useRef<unknown[]>([]);
   useEffect(() => {
     choisirRef.current = onChoisir;
-  }, [onChoisir]);
+    pointRef.current = onPoint;
+  }, [onChoisir, onPoint]);
+  const pointsActifs = !!onPoint;
 
   // La carte, une fois.
   useEffect(() => {
@@ -115,7 +121,8 @@ export function CarteMap({
 
     for (const p of points) {
       const icone = L.divIcon({ className: "ter-ancre", iconSize: [0, 0], iconAnchor: [0, 0], html: pointHtml(p.nom, variante) });
-      L.marker([p.lat, p.lng], { icon: icone, keyboard: false, interactive: false }).addTo(groupe);
+      const m = L.marker([p.lat, p.lng], { icon: icone, keyboard: false, interactive: pointsActifs }).addTo(groupe);
+      if (pointsActifs) m.on("click", () => pointRef.current?.(p.id));
     }
     // Du nord au sud : le sud passe devant.
     for (const s of [...stickers].sort((a, b) => b.lat - a.lat)) {
@@ -150,7 +157,7 @@ export function CarteMap({
     // et le point se pose au-dessus des cartes du bas, pas derrière.
     if (tous.length) map.fitBounds(L.latLngBounds(tous), { ...pad, animate: true });
     else map.setView(FRANCE, 5);
-  }, [stickers, points, toi, choisi, fond]);
+  }, [stickers, points, toi, choisi, fond, pointsActifs]);
 
   return <div ref={conteneur} className={className} role="region" aria-label="La Map des matchs" />;
 }

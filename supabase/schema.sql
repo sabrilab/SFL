@@ -685,6 +685,244 @@ exception
 end;
 $$;
 
+-- ─────────────────────── Matchs créés par les joueurs ───────────────────────
+-- N'importe quel joueur ouvre un match, sans être admin (demande de Sabri,
+-- 15/10) :
+--   · privé  : l'organisateur ajoute les joueurs par leur identifiant ;
+--     personne d'autre ne le voit ni n'y entre ;
+--   · public : il invite qui il veut, et les places restantes s'affichent
+--     sur la Map ; n'importe qui de la ligue peut prendre une place libre.
+-- Ces matchs vivent à côté de la saison (document admin) : ils ne touchent
+-- pas aux classements tant que l'admin ne les reprend pas en journée.
+create table if not exists public.matchs (
+  id            bigint generated always as identity primary key,
+  organisateur  uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  genre         text not null default 'match' check (genre in ('match', 'exhibition')),
+  visibilite    text not null check (visibilite in ('public', 'prive')),
+  jour          date not null,
+  heure         text not null,
+  lieu          text not null check (char_length(btrim(lieu)) between 1 and 120),
+  adresse       text,
+  lat           double precision,
+  lng           double precision,
+  places        int not null default 10 check (places between 2 and 22),
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists matchs_jour_idx on public.matchs (jour);
+create index if not exists matchs_organisateur_idx on public.matchs (organisateur);
+
+-- Les joueurs d'un match : invités par l'organisateur, ou inscrits (ils ont
+-- accepté l'invitation, ou pris une place libre d'un match public).
+create table if not exists public.match_joueurs (
+  match_id   bigint not null references public.matchs(id) on delete cascade,
+  player_id  uuid   not null references public.profiles(id) on delete cascade,
+  statut     text   not null default 'invite' check (statut in ('invite', 'inscrit')),
+  created_at timestamptz not null default now(),
+  primary key (match_id, player_id)
+);
+
+create index if not exists match_joueurs_player_idx on public.match_joueurs (player_id);
+
+alter table public.matchs enable row level security;
+alter table public.match_joueurs enable row level security;
+
+-- Helpers SECURITY DEFINER : les règles des deux tables se lisent l'une
+-- l'autre, ce qui bouclerait en RLS. L'identité est vérifiée DANS la fonction.
+create or replace function public.organise_match(m bigint)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select exists (
+    select 1 from public.matchs x where x.id = m and x.organisateur = (select auth.uid())
+  );
+$$;
+
+create or replace function public.voit_match(m bigint)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select exists (
+    select 1 from public.matchs x
+     where x.id = m
+       and (
+         x.visibilite = 'public'
+         or x.organisateur = (select auth.uid())
+         or exists (
+           select 1 from public.match_joueurs j
+            where j.match_id = x.id and j.player_id = (select auth.uid())
+         )
+       )
+  ) or public.is_league_admin();
+$$;
+
+revoke execute on function public.organise_match(bigint) from public, anon;
+revoke execute on function public.voit_match(bigint) from public, anon;
+grant execute on function public.organise_match(bigint) to authenticated;
+grant execute on function public.voit_match(bigint) to authenticated;
+
+drop policy if exists "matchs: lecture" on public.matchs;
+create policy "matchs: lecture"
+  on public.matchs for select
+  to authenticated
+  -- Les colonnes de la ligne d'abord : un match qu'on vient d'ouvrir doit se
+  -- relire dans la même requête (insert … returning), avant que la fonction
+  -- puisse le voir.
+  using (
+    visibilite = 'public'
+    or organisateur = (select auth.uid())
+    or (select public.voit_match(id))
+  );
+
+drop policy if exists "matchs: j'ouvre le mien" on public.matchs;
+create policy "matchs: j'ouvre le mien"
+  on public.matchs for insert
+  to authenticated
+  with check (organisateur = (select auth.uid()));
+
+drop policy if exists "matchs: je modifie le mien" on public.matchs;
+create policy "matchs: je modifie le mien"
+  on public.matchs for update
+  to authenticated
+  using (organisateur = (select auth.uid()) or (select public.is_league_admin()))
+  with check (organisateur = (select auth.uid()) or (select public.is_league_admin()));
+
+drop policy if exists "matchs: j'annule le mien" on public.matchs;
+create policy "matchs: j'annule le mien"
+  on public.matchs for delete
+  to authenticated
+  using (organisateur = (select auth.uid()) or (select public.is_league_admin()));
+
+drop policy if exists "match_joueurs: lecture" on public.match_joueurs;
+create policy "match_joueurs: lecture"
+  on public.match_joueurs for select
+  to authenticated
+  using ((select public.voit_match(match_id)));
+
+-- L'organisateur invite (et inscrit) qui il veut ; un joueur ne prend
+-- lui-même qu'une place d'un match public. La capacité est gardée par le
+-- trigger plus bas, pas par la règle.
+drop policy if exists "match_joueurs: on entre" on public.match_joueurs;
+create policy "match_joueurs: on entre"
+  on public.match_joueurs for insert
+  to authenticated
+  with check (
+    (select public.organise_match(match_id))
+    or (
+      player_id = (select auth.uid())
+      and statut = 'inscrit'
+      and exists (select 1 from public.matchs x where x.id = match_id and x.visibilite = 'public')
+    )
+  );
+
+-- Accepter une invitation : on ne touche qu'à sa propre ligne.
+drop policy if exists "match_joueurs: j'accepte" on public.match_joueurs;
+create policy "match_joueurs: j'accepte"
+  on public.match_joueurs for update
+  to authenticated
+  using (player_id = (select auth.uid()) or (select public.organise_match(match_id)))
+  with check (player_id = (select auth.uid()) or (select public.organise_match(match_id)));
+
+-- On se retire soi-même ; l'organisateur retire n'importe qui de son match.
+drop policy if exists "match_joueurs: on sort" on public.match_joueurs;
+create policy "match_joueurs: on sort"
+  on public.match_joueurs for delete
+  to authenticated
+  using (
+    player_id = (select auth.uid())
+    or (select public.organise_match(match_id))
+    or (select public.is_league_admin())
+  );
+
+-- Jamais plus de joueurs que de places : verrou sur le match, puis compte.
+create or replace function public.match_complet()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cap int;
+  n   int;
+begin
+  select places into cap from public.matchs where id = new.match_id for update;
+  select count(*) into n from public.match_joueurs where match_id = new.match_id;
+  if n >= cap then
+    raise exception 'match complet' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+revoke execute on function public.match_complet() from public, anon, authenticated;
+
+drop trigger if exists match_joueurs_capacite on public.match_joueurs;
+create trigger match_joueurs_capacite before insert on public.match_joueurs
+  for each row execute function public.match_complet();
+
+grant select, insert, update, delete on public.matchs to authenticated;
+grant select, insert, update, delete on public.match_joueurs to authenticated;
+
+-- ─────────────────────────── Disponibilités ──────────────────────────
+-- Chaque joueur dit quand il peut jouer : un jour, un moment. La ligue s'en
+-- sert pour composer des matchs et inviter (matchmaking), et chacun voit,
+-- en ouvrant l'app, qui est libre en même temps que lui.
+create table if not exists public.disponibilites (
+  player_id  uuid not null references public.profiles(id) on delete cascade,
+  jour       date not null,
+  moment     text not null check (moment in ('matin', 'apres-midi', 'soir')),
+  created_at timestamptz not null default now(),
+  primary key (player_id, jour, moment)
+);
+
+create index if not exists disponibilites_jour_idx on public.disponibilites (jour);
+
+alter table public.disponibilites enable row level security;
+
+drop policy if exists "disponibilites: lecture ligue" on public.disponibilites;
+create policy "disponibilites: lecture ligue"
+  on public.disponibilites for select
+  to authenticated
+  using (true);
+
+drop policy if exists "disponibilites: je dis les miennes" on public.disponibilites;
+create policy "disponibilites: je dis les miennes"
+  on public.disponibilites for insert
+  to authenticated
+  with check (player_id = (select auth.uid()));
+
+drop policy if exists "disponibilites: je retire les miennes" on public.disponibilites;
+create policy "disponibilites: je retire les miennes"
+  on public.disponibilites for delete
+  to authenticated
+  using (player_id = (select auth.uid()));
+
+grant select, insert, delete on public.disponibilites to authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.matchs;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.match_joueurs;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
+
 -- ───────────────────────── Rôle admin ────────────────────────────────
 -- Remise d'aplomb des comptes admin — rejouée à chaque migration, donc à
 -- chaque déploiement qui touche ce fichier. Elle répare TOUS les états de

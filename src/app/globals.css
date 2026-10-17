@@ -108,7 +108,9 @@
   --popover-foreground: #f4f5f2;
   --primary: #efefec;
   --primary-foreground: #0a0b0d;
-  --secondary: #17181b;
+  /* Les boutons secondaires doivent se voir au repos, sur la page comme dans
+     les feuilles (popover #14171b) : #17181b s'y confondait. */
+  --secondary: #26282d;
   --secondary-foreground: #f4f5f2;
   --muted: #14171b;
   --muted-foreground: #8f908b;
