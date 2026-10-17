@@ -23,7 +23,7 @@ export function MvpBanner({ player, titles }: { player: Player; titles: number }
 
   return (
     <Link
-      href="/stats"
+      href="/ligue?vue=classements"
       className="relative block h-[148px] w-full overflow-hidden rounded-3xl"
       style={{
         background: "radial-gradient(120% 140% at 18% 30%, #241A06 0%, #120C03 55%, #060402 100%)",

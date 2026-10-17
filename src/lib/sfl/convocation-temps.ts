@@ -96,3 +96,38 @@ export function labelDateFr(date: Date): string {
     month: "long",
   }).format(date);
 }
+
+/* ------------------------------- Le vote ------------------------------- */
+
+// Règle de la ligue : on vote le jour du match, et seulement ce jour-là.
+// Le vote s'ouvre le dimanche de la journée et se ferme à minuit, heure de
+// Paris. Qui n'a pas voté le soir même ne vote plus.
+
+export const REGLE_VOTE = "Le vote s'ouvre le jour du match et se ferme à minuit. Pas voté le soir même : c'est fini.";
+
+const MOIS_COURTS = ["jan", "fev", "mar", "avr", "mai", "juin", "juil", "aou", "sep", "oct", "nov", "dec"];
+
+/** Jour et mois (1–12) d'un libellé de journée, « 11 oct. » ou « J3 · 11 octobre » ; null s'il n'en porte pas. */
+export function jourMoisDuLibelle(libelle: string): { jour: number; mois: number } | null {
+  const m = libelle
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .match(/(\d{1,2})\s*([a-z]{3,})/);
+  if (!m) return null;
+  const mois = MOIS_COURTS.findIndex((p) => m[2].startsWith(p));
+  return mois < 0 ? null : { jour: Number(m[1]), mois: mois + 1 };
+}
+
+/** Le vote d'une journée est-il ouvert à cet instant ? Seulement le jour même, jusqu'à minuit (Paris). */
+export function voteOuvert(libelleJournee: string, maintenant: Date): boolean {
+  const jm = jourMoisDuLibelle(libelleJournee);
+  if (!jm) return false;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris",
+    day: "numeric",
+    month: "numeric",
+  }).formatToParts(maintenant);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return get("day") === jm.jour && get("month") === jm.mois;
+}

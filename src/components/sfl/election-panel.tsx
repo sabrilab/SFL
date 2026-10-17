@@ -3,6 +3,8 @@
 // Élection des figures de match en 2 phases, adverse uniquement :
 // Phase 1 — chaque équipe nomine un adversaire (par match).
 // Phase 2 — finale du jour, tous les participants votent parmi les nominés.
+// On ne vote que le jour du match, jusqu'à minuit heure de Paris (voteOuvert) ;
+// après, le panneau ne montre plus que les résultats.
 
 import { useState } from "react";
 import { Trophy, Vote } from "lucide-react";
@@ -29,6 +31,7 @@ import {
   type BoostCategory,
 } from "@/lib/sfl/votes";
 import { claimVoteReward } from "@/lib/sfl/ballons";
+import { REGLE_VOTE, voteOuvert } from "@/lib/sfl/convocation-temps";
 
 // +1 Ballon au premier vote du jour, avec un toast dédié.
 function rewardVote(me: string) {
@@ -45,6 +48,7 @@ function TeamNominationRow({
   category,
   me,
   voterTeamKey,
+  ouvert,
   onVoteCast,
 }: {
   j: number;
@@ -52,6 +56,7 @@ function TeamNominationRow({
   category: BoostCategory;
   me: string;
   voterTeamKey: "fromA" | "fromB";
+  ouvert: boolean;
   onVoteCast: () => void;
 }) {
   const tally = tallyMatch(j, match, category)[voterTeamKey];
@@ -85,7 +90,7 @@ function TeamNominationRow({
         </span>
       </div>
 
-      {iAmVoter && (
+      {iAmVoter && ouvert && (
         <Select value={myVote ?? null} onValueChange={(v) => vote(v as string)}>
           <SelectTrigger
             size="sm"
@@ -132,11 +137,13 @@ function Phase2Panel({
   journee,
   category,
   me,
+  ouvert,
   onVoteCast,
 }: {
   journee: Journee;
   category: BoostCategory;
   me: string;
+  ouvert: boolean;
   onVoteCast: () => void;
 }) {
   const tally = tallyPhase2(journee, category);
@@ -192,7 +199,8 @@ function Phase2Panel({
         </div>
       ) : (
         options.length > 0 &&
-        isParticipant && (
+        isParticipant &&
+        ouvert && (
           <Select value={myVote ?? null} onValueChange={(v) => vote(v as string)}>
             <SelectTrigger
               size="sm"
@@ -262,8 +270,19 @@ export function ElectionPanel({ journee, me }: { journee: Journee; me: string })
 
   if (!isClient) return null;
 
+  // Lu au rendu : passé minuit, le prochain rendu ferme le vote.
+  const ouvert = voteOuvert(journee.date, new Date());
+
   return (
     <div className="flex flex-col gap-3">
+      <p
+        className={cn(
+          "rounded-2xl px-3.5 py-2.5 text-[12.5px] font-medium",
+          ouvert ? "bg-primary/10 text-primary" : "bg-secondary/50 text-muted-foreground"
+        )}
+      >
+        <span className="font-bold">{ouvert ? "Vote ouvert jusqu'à minuit" : "Vote fermé"}</span> · {REGLE_VOTE}
+      </p>
       <div className="flex gap-2">
         {CATEGORIES.map((c) => (
           <button
@@ -293,6 +312,7 @@ export function ElectionPanel({ journee, me }: { journee: Journee; me: string })
             category={category}
             me={me}
             voterTeamKey="fromA"
+            ouvert={ouvert}
             onVoteCast={refresh}
           />
           <TeamNominationRow
@@ -301,12 +321,13 @@ export function ElectionPanel({ journee, me }: { journee: Journee; me: string })
             category={category}
             me={me}
             voterTeamKey="fromB"
+            ouvert={ouvert}
             onVoteCast={refresh}
           />
         </div>
       ))}
 
-      <Phase2Panel journee={journee} category={category} me={me} onVoteCast={refresh} />
+      <Phase2Panel journee={journee} category={category} me={me} ouvert={ouvert} onVoteCast={refresh} />
     </div>
   );
 }
