@@ -54,6 +54,8 @@ import type { FondCarte, PointPlan, ToiPlan } from "@/components/sfl/map/carte-m
 
 /** Les terrains enregistrés ne s'affichent plus sur le plan : seuls les matchs. */
 const AUCUN_POINT: PointPlan[] = [];
+/** Combien de jours un match joué reste sur la Map. */
+const JOURS_APRES_MATCH = 2;
 
 const CarteMap = dynamic(() => import("@/components/sfl/map/carte-map").then((m) => m.CarteMap), {
   ssr: false,
@@ -348,29 +350,18 @@ export default function MapPage() {
     return [...ligue, ...ouverts];
   }, [ligue, parties, moi, aujourdhui]);
 
-  // Sur la carte, seulement ce qui arrive : les matchs à venir, sans les
-  // terrains enregistrés ni le match déjà joué — on ne noie pas celui qui
-  // arrive. Le joué ne revient que s'il n'y a rien d'autre.
+  // Sur la carte, ce qui arrive, et ce qui vient d'être joué : un match joué
+  // reste deux jours, badgé « Joué », pour retrouver sa fiche et son récap.
+  // Les terrains enregistrés n'y sont plus — on ne noie pas le match.
   const affiches = useMemo(() => {
-    const aVenir = matchs.filter((m) => !m.joue);
-    return aVenir.length ? aVenir : matchs;
-  }, [matchs]);
-  const stickers = useMemo<StickerPlan[]>(
-    () =>
-      affiches
-        .filter((m) => m.terrain)
-        .map((m) => ({
-          id: m.cle,
-          lat: m.terrain!.lat,
-          lng: m.terrain!.lng,
-          moment: m.quand.moment,
-          jourCourt: m.quand.jourCourt,
-          heure: m.heure,
-          etat: m.etat,
-          nom: m.terrain!.nom,
-        })),
-    [affiches]
-  );
+    const recents = matchs.filter((m) => {
+      if (!m.joue) return true;
+      const e = ecartJours(m.dateLabel, aujourdhui);
+      return e == null || e >= -JOURS_APRES_MATCH;
+    });
+    // Le match qui vient d'être joué passe devant : c'est lui qu'on cherche.
+    return recents.length ? [...recents.filter((m) => m.joue), ...recents.filter((m) => !m.joue)] : matchs.filter((m) => m.joue).slice(-1);
+  }, [matchs, aujourdhui]);
 
   // Ouvrir un match : n'importe quel joueur, d'un bouton ou d'un terrain libre.
   const [ouvrir, setOuvrir] = useState<{ terrain: Terrain | null; jour?: string; heure?: string; n: number } | null>(null);
@@ -387,6 +378,28 @@ export default function MapPage() {
   }, []);
   // Le match choisi : celui qu'on a touché s'il est encore là, sinon le premier.
   const choisi = affiches.find((m) => m.cle === choix) ?? affiches[0];
+  const stickers = useMemo<StickerPlan[]>(
+    () =>
+      affiches
+        // Deux matchs sur le même terrain (le joué, le suivant) : on ne les
+        // empile pas ; le plan montre le choisi, sinon le premier.
+        .filter((m, i) => {
+          if (!m.terrain) return false;
+          const memes = affiches.filter((x) => x.terrain?.id === m.terrain!.id);
+          return memes.some((x) => x.cle === choisi?.cle) ? m.cle === choisi?.cle : affiches.indexOf(memes[0]) === i;
+        })
+        .map((m) => ({
+          id: m.cle,
+          lat: m.terrain!.lat,
+          lng: m.terrain!.lng,
+          moment: m.quand.moment,
+          jourCourt: m.quand.jourCourt,
+          heure: m.heure,
+          etat: m.etat,
+          nom: m.terrain!.nom,
+        })),
+    [affiches, choisi]
+  );
 
   // Toi : ta position, quand tu la donnes.
   const [toi, setToi] = useState<ToiPlan | null>(null);
