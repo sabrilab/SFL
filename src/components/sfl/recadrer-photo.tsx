@@ -13,10 +13,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { BolaCard } from "@/components/sfl/bola-card";
 import type { Stats } from "@/lib/sfl/engine";
 
-/** Les proportions du cadre de la carte (bola-card.tsx : 896 × 760). */
-export const RATIO_CADRE = 760 / 896;
+/** Les proportions du portrait de la carte (bola-card.tsx : un carré). */
+export const RATIO_CADRE = 1;
 /** La taille de l'image découpée, en pixels. */
-const SORTIE = { l: 896, h: 760 };
+const SORTIE = { l: 896, h: 896 };
 const ZOOM_MAX = 4;
 
 interface Position {
@@ -199,13 +199,11 @@ export function RecadrerPhoto({
                 style={{ width: dw, height: dh, left: (largeur - dw) / 2 + pos.x, top: (hauteur - dh) / 2 + pos.y }}
               />
             )}
-            {/* Repères : les tiers, et l'ovale du visage */}
+            {/* Repères : la ligne des yeux (0,382 du portrait, le nombre d'or de la carte) et l'ovale du visage */}
             <div aria-hidden className="pointer-events-none absolute inset-0">
-              <div className="absolute inset-y-0 left-1/3 w-px bg-white/25" />
-              <div className="absolute inset-y-0 left-2/3 w-px bg-white/25" />
-              <div className="absolute inset-x-0 top-1/3 h-px bg-white/25" />
-              <div className="absolute inset-x-0 top-2/3 h-px bg-white/25" />
-              <div className="absolute top-[12%] left-1/2 h-[58%] w-[34%] -translate-x-1/2 rounded-[50%] border-2 border-dashed border-white/55" />
+              <div className="absolute inset-x-0 top-[38.2%] h-px bg-white/35" />
+              <div className="absolute inset-y-0 left-1/2 w-px bg-white/15" />
+              <div className="absolute top-[13%] left-1/2 h-[52%] w-[40%] -translate-x-1/2 rounded-[50%] border-2 border-dashed border-white/55" />
             </div>
           </div>
 

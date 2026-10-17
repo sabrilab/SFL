@@ -14,7 +14,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { pointHtml, stickerHtml, toiHtml, type StickerPlan } from "./stade";
+import { pointHtml, stickerHtml, toiHtml, type StickerPlan, type VarianteStade } from "./stade";
 
 export interface PointPlan {
   id: string;
@@ -64,6 +64,9 @@ export function CarteMap({
   const calque = useRef<L.LayerGroup | null>(null);
   const tuiles = useRef<L.LayerGroup | null>(null);
   const choisirRef = useRef(onChoisir);
+  // Ce qui a été cadré la dernière fois : changer de fond redessine les
+  // stades sans recadrer.
+  const cadre = useRef<unknown[]>([]);
   useEffect(() => {
     choisirRef.current = onChoisir;
   }, [onChoisir]);
@@ -82,6 +85,7 @@ export function CarteMap({
       carte.current = null;
       calque.current = null;
       tuiles.current = null;
+      cadre.current = [];
     };
   }, []);
 
@@ -106,9 +110,11 @@ export function CarteMap({
     const groupe = calque.current;
     if (!map || !groupe) return;
     groupe.clearLayers();
+    // Noir et blanc sur le plan clair, marbre sur le satellite sombre.
+    const variante: VarianteStade = fond === "satellite" ? "marbre" : "mono";
 
     for (const p of points) {
-      const icone = L.divIcon({ className: "ter-ancre", iconSize: [0, 0], iconAnchor: [0, 0], html: pointHtml(p.nom) });
+      const icone = L.divIcon({ className: "ter-ancre", iconSize: [0, 0], iconAnchor: [0, 0], html: pointHtml(p.nom, variante) });
       L.marker([p.lat, p.lng], { icon: icone, keyboard: false, interactive: false }).addTo(groupe);
     }
     // Du nord au sud : le sud passe devant.
@@ -118,7 +124,7 @@ export function CarteMap({
         className: "stk-ancre",
         iconSize: [0, 0],
         iconAnchor: [0, 0],
-        html: stickerHtml(s, est),
+        html: stickerHtml(s, est, variante),
       });
       const m = L.marker([s.lat, s.lng], { icon: icone, keyboard: false, zIndexOffset: est ? 1000 : 0 }).addTo(groupe);
       m.on("click", () => choisirRef.current(s.id));
@@ -127,6 +133,10 @@ export function CarteMap({
       const icone = L.divIcon({ className: "toi-ancre", iconSize: [44, 59], iconAnchor: [22, 52], html: toiHtml(toi.note, toi.teinte) });
       L.marker([toi.lat, toi.lng], { icon: icone, keyboard: false, interactive: false }).addTo(groupe);
     }
+
+    const deps = [stickers, points, toi, choisi];
+    if (deps.every((d, i) => d === cadre.current[i])) return;
+    cadre.current = deps;
 
     const tous: L.LatLngTuple[] = [
       ...stickers.map((s) => [s.lat, s.lng] as L.LatLngTuple),
@@ -140,7 +150,7 @@ export function CarteMap({
     // et le point se pose au-dessus des cartes du bas, pas derrière.
     if (tous.length) map.fitBounds(L.latLngBounds(tous), { ...pad, animate: true });
     else map.setView(FRANCE, 5);
-  }, [stickers, points, toi, choisi]);
+  }, [stickers, points, toi, choisi, fond]);
 
   return <div ref={conteneur} className={className} role="region" aria-label="La Map des matchs" />;
 }
