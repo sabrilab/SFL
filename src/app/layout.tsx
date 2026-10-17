@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { SiteHeader } from "@/components/layout/site-header";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
-import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { GuideInstallation } from "@/components/pwa/guide-installation";
 import { ViewportLock } from "@/components/pwa/viewport-lock";
 import { PlayerProvider } from "@/components/sfl/player-provider";
 import { AuthGate } from "@/components/sfl/auth/auth-gate";
@@ -129,8 +129,10 @@ export default function RootLayout({
                   <main className="flex-1 pb-32 lg:pb-10">{children}</main>
                 </div>
                 <BottomNav />
-                <InstallPrompt />
                 </AuthGate>
+                {/* Hors de la porte de connexion : le guide passe avant le
+                    compte, pour ne pas se connecter dans Snapchat. */}
+                <GuideInstallation />
                 <Toaster position="top-center" />
               </TooltipProvider>
             </CardViewerProvider>
