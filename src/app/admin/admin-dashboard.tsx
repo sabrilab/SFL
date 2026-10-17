@@ -63,6 +63,7 @@ import { Synchro } from "@/components/sfl/admin/synchro";
 import { DetailPoints } from "@/components/sfl/admin/detail-points";
 import { Requalification } from "@/components/sfl/admin/requalification";
 import { Saisons } from "@/components/sfl/admin/saisons";
+import { Inscriptions } from "@/components/sfl/admin/inscriptions";
 import { AccesJoueur } from "@/components/sfl/admin/acces-joueur";
 import { RechercheJoueur } from "@/components/sfl/admin/recherche-joueur";
 import { chercherJoueurs } from "@/lib/sfl/recherche-joueur";
@@ -376,6 +377,7 @@ export function AdminDashboard() {
 
         {/* ===================== VUE D'ENSEMBLE ===================== */}
         <TabsContent value="overview" className="mt-4 flex flex-col gap-4">
+          <Inscriptions saison={saison} onCommit={commit} partage={partage} />
           <Saisons saison={saison} onCommit={commit} />
           <div className="grid grid-cols-3 gap-2">
             <Stat label="Journées" value={totals.journees} />

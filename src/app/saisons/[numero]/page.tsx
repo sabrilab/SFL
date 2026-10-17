@@ -46,7 +46,7 @@ export default function SaisonArchiveePage() {
     return (
       <main className="mx-auto max-w-lg px-4 py-10 text-center">
         <p className="text-muted-foreground">Cette saison n&apos;est pas dans les archives.</p>
-        <Button render={<Link href="/ligue" />} variant="ghost" className="mt-4 rounded-full">Retour</Button>
+        <Button render={<Link href="/palmares" />} variant="ghost" className="mt-4 rounded-full">Retour</Button>
       </main>
     );
   }
@@ -54,7 +54,7 @@ export default function SaisonArchiveePage() {
   return (
     <main className="mx-auto flex max-w-lg flex-col gap-4 px-4 pt-3 pb-24">
       <div className="flex items-center gap-2">
-        <Button render={<Link href="/ligue" aria-label="Retour" />} variant="ghost" size="icon" className="rounded-full">
+        <Button render={<Link href="/palmares" aria-label="Retour au Wall of Fame" />} variant="ghost" size="icon" className="rounded-full">
           <ArrowLeft className="size-5" />
         </Button>
         <div className="min-w-0">
