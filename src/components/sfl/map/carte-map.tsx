@@ -55,7 +55,7 @@ const MARGE_HAUT = 140;
 const MARGE_BAS = 380;
 /** Le premier vol, et l'écart entre deux stickers qui tombent. */
 const VOL = 1.5;
-const CADENCE = 70;
+const CADENCE = 110;
 
 const calme = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -212,16 +212,16 @@ export function CarteMap({
       toiVu.current = true;
     }
 
-    // L'onde : deux anneaux qui partent du terrain touché, et un petit coup
+    // L'onde : trois anneaux qui partent du terrain touché, et un petit coup
     // sous le doigt là où le téléphone sait le faire.
     function onde(lat: number, lng: number) {
       navigator.vibrate?.(8);
       if (!doux || !effets.current) return;
       const clair = fond === "satellite" ? " onde--clair" : "";
-      const icone = L.divIcon({ className: "stk-ancre", iconSize: [0, 0], iconAnchor: [0, 0], html: `<span class="onde${clair}"></span><span class="onde${clair}"></span>` });
+      const icone = L.divIcon({ className: "stk-ancre", iconSize: [0, 0], iconAnchor: [0, 0], html: `<span class="onde${clair}"></span>`.repeat(3) });
       const fx = effets.current;
       const r = L.marker([lat, lng], { icon: icone, keyboard: false, interactive: false }).addTo(fx);
-      window.setTimeout(() => fx.removeLayer(r), 1000);
+      window.setTimeout(() => fx.removeLayer(r), 1150);
     }
 
     const deps = [stickers, points, toi, choisi];

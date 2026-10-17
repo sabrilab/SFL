@@ -22,7 +22,7 @@
 
   /* ── Un sticker arrive : il tombe d'un peu plus haut, s'écrase, se pose. ── */
   .stk--entre {
-    animation: stk-entre 0.62s cubic-bezier(0.2, 0.9, 0.3, 1.25) var(--delai, 0ms) backwards;
+    animation: stk-entre 0.78s cubic-bezier(0.2, 0.9, 0.3, 1.25) var(--delai, 0ms) backwards;
   }
   .stk--entre .stk__cal {
     animation: stk-pastille 0.42s cubic-bezier(0.3, 1.5, 0.5, 1) calc(var(--delai, 0ms) + 0.3s) backwards;
@@ -37,7 +37,7 @@
 
   /* ── Le choisi grandit avec un ressort ; l'ancien redescend. ── */
   .stk--vient {
-    animation: stk-vient 0.52s cubic-bezier(0.3, 1.45, 0.5, 1) backwards;
+    animation: stk-vient 0.6s cubic-bezier(0.3, 1.8, 0.5, 1) backwards;
   }
   .stk--vient .stk__etiquette {
     animation: stk-etiquette 0.44s cubic-bezier(0.3, 1.6, 0.5, 1) 0.14s backwards;
@@ -47,7 +47,7 @@
   }
   /* Le doigt sur un sticker : il s'enfonce. */
   .stk:active {
-    scale: 0.93;
+    scale: 0.88;
     transition: scale 0.12s ease-out;
   }
 
@@ -80,6 +80,14 @@
   .onde + .onde {
     animation-delay: 0.14s;
   }
+  .onde + .onde + .onde {
+    animation-delay: 0.28s;
+  }
+
+  /* ── Le choisi flotte, lentement, au-dessus de son terrain. ── */
+  .stk--choisi .stk__vignette {
+    animation: stk-flotte 3.2s ease-in-out 0.8s infinite;
+  }
 
   /* ── « Toi » : l'anneau au sol bat lentement, comme un point bleu sans bleu. ── */
   .toi__anneau {
@@ -102,7 +110,7 @@
     animation: map-bord 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.1) calc(0.25s + var(--i, 0) * 70ms) backwards;
   }
   .map-monte {
-    animation: map-monte 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.1) calc(0.35s + var(--i, 0) * 80ms) backwards;
+    animation: map-monte 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.25) calc(0.35s + var(--i, 0) * 80ms) backwards;
   }
   /* Tous les boutons ronds de la Map s'enfoncent au doigt. */
   .map-touche {
@@ -126,7 +134,7 @@
   /* ── Les cartes du carrousel : la choisie grandit avec un ressort. ── */
   .carte-match {
     transition:
-      scale 0.45s cubic-bezier(0.3, 1.35, 0.5, 1),
+      scale 0.5s cubic-bezier(0.3, 1.6, 0.5, 1),
       opacity 0.35s ease,
       translate 0.45s cubic-bezier(0.3, 1.35, 0.5, 1);
   }
@@ -143,8 +151,8 @@
 
 /* La carte du carrousel, au repos : la choisie en avant. */
 .carte-match {
-  scale: 0.88;
-  opacity: 0.8;
+  scale: 0.84;
+  opacity: 0.72;
 }
 .carte-match--choisie {
   scale: 1;
@@ -152,9 +160,10 @@
 }
 
 @keyframes stk-entre {
-  0% { opacity: 0; scale: 0.4; translate: 0 -38px; }
-  55% { opacity: 1; scale: 1.06; translate: 0 2px; }
-  75% { scale: 0.97 1.03; translate: 0 0; }
+  0% { opacity: 0; scale: 0.2; translate: 0 -72px; }
+  50% { opacity: 1; scale: 1.12; translate: 0 3px; }
+  68% { scale: 1.08 0.9; translate: 0 0; }
+  84% { scale: 0.97 1.04; }
   100% { opacity: 1; scale: 1; translate: 0 0; }
 }
 @keyframes stk-pastille {
@@ -167,7 +176,7 @@
 }
 /* `scale` s'ajoute au scale(1.2) du choisi : 0,83 → 1, c'est 1 → 1,2. */
 @keyframes stk-vient {
-  0% { scale: 0.8; }
+  0% { scale: 0.7; }
   100% { scale: 1; }
 }
 @keyframes stk-part {
@@ -180,28 +189,32 @@
 }
 @keyframes stk-respire {
   0%, 100% { box-shadow: 0 1.5px 2.5px rgba(0, 0, 0, 0.2), 0 0 0 0 rgba(255, 138, 76, 0.55); }
-  50% { box-shadow: 0 1.5px 2.5px rgba(0, 0, 0, 0.2), 0 0 0 5px rgba(255, 138, 76, 0); }
+  50% { box-shadow: 0 1.5px 2.5px rgba(0, 0, 0, 0.2), 0 0 0 8px rgba(255, 138, 76, 0); }
+}
+@keyframes stk-flotte {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -4px; }
 }
 @keyframes onde {
-  0% { opacity: 0.9; scale: 0.2; }
-  100% { opacity: 0; scale: 1.6; }
+  0% { opacity: 0.95; scale: 0.2; }
+  100% { opacity: 0; scale: 2.3; }
 }
 @keyframes toi-bat {
   0% { box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.12), 0 0 0 0 rgba(10, 11, 13, 0.28); }
-  70%, 100% { box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.12), 0 0 0 10px rgba(10, 11, 13, 0); }
+  70%, 100% { box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.12), 0 0 0 16px rgba(10, 11, 13, 0); }
 }
 @keyframes lettrage-colle {
-  0% { opacity: 0; scale: 1.5; rotate: -8deg; translate: -10px -6px; }
+  0% { opacity: 0; scale: 1.9; rotate: -14deg; translate: -16px -10px; }
   60% { opacity: 1; }
   100% { opacity: 1; scale: 1; rotate: 0deg; translate: 0 0; }
 }
 @keyframes map-bord {
-  0% { opacity: 0; translate: 24px 0; scale: 0.8; }
+  0% { opacity: 0; translate: 44px 0; scale: 0.6; }
   100% { opacity: 1; translate: 0 0; scale: 1; }
 }
 @keyframes map-monte {
-  0% { opacity: 0; translate: 0 40px; }
-  100% { opacity: 1; translate: 0 0; }
+  0% { opacity: 0; translate: 0 70px; scale: 0.92; }
+  100% { opacity: 1; translate: 0 0; scale: 1; }
 }
 @keyframes fondu {
   0% { opacity: 0; }
