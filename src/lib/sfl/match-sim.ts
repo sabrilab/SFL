@@ -15,7 +15,6 @@ export const DECK_SIZE = 5;
 // c'est tout l'intérêt de les chasser en pack.
 const KIND_BONUS: Record<string, number> = {
   simple: 0,
-  rare: 2,
   def: 5,
   impact: 7,
   mvp: 10,
@@ -28,7 +27,10 @@ function deckKey(voter: string) {
 export function getDeck(voter: string): string[] {
   try {
     const ids: string[] = JSON.parse(localStorage.getItem(deckKey(voter)) ?? "[]");
-    return ids.filter((id) => CATALOG_BY_ID.has(id));
+    // Une Rare d'avant le 17/10 devient la Standard du même joueur.
+    return ids
+      .map((id) => (id.startsWith("rare-") ? `simple-${id.slice(5)}` : id))
+      .filter((id) => CATALOG_BY_ID.has(id));
   } catch {
     return [];
   }
@@ -72,8 +74,8 @@ export function pickOpponentDeck(me: string): OpponentDeck {
 
   const others = PLAYERS.filter((p) => p.name !== me);
   const owner = others[Math.floor(Math.random() * others.length)].name;
-  // Deck par défaut : 5 cartes du catalogue, à dominante Standard/Rare.
-  const pool = CATALOG.filter((c) => c.kind === "simple" || c.kind === "rare");
+  // Deck par défaut : 5 cartes Standard du catalogue.
+  const pool = CATALOG.filter((c) => c.kind === "simple");
   const cards: CollectionCard[] = [];
   const used = new Set<string>();
   while (cards.length < DECK_SIZE) {

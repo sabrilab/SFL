@@ -15,7 +15,7 @@ import { usePhotoPerso, usePlayerPhoto } from "@/hooks/use-player-photo";
 import { removePhoto, setPhoto } from "@/lib/sfl/photos";
 import { RecadrerPhoto } from "@/components/sfl/recadrer-photo";
 import { useSeason } from "@/components/sfl/season-provider";
-import { ovr, rareStats } from "@/lib/sfl/engine";
+import { ovr } from "@/lib/sfl/engine";
 import { username } from "@/lib/sfl/usernames";
 
 export function ProfilePhoto({ name }: { name: string }) {
@@ -27,7 +27,7 @@ export function ProfilePhoto({ name }: { name: string }) {
   const hasCustom = perso !== null;
   const { allPlayers } = useSeason();
   const joueur = allPlayers.find((p) => p.name === name);
-  const stats = rareStats(joueur?.stats ?? { VIT: 60, TIR: 60, PAS: 60, DRI: 60, DEF: 60, PHY: 60 });
+  const stats = joueur?.stats ?? { VIT: 60, TIR: 60, PAS: 60, DRI: 60, DEF: 60, PHY: 60 };
   // L'image en cours de recadrage (le fichier choisi, ou la photo actuelle).
   const [aRecadrer, setARecadrer] = useState<string | null>(null);
 

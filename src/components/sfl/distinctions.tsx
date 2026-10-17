@@ -83,10 +83,10 @@ export function IlsSeDemarquent({ className }: { className?: string }) {
   const ouvrir = (p: Player, d: Distinction) =>
     open({
       cacheKey: `distinction-${source ?? "s"}-${p.name}`,
-      mode: d.id === "pepite" ? "rare" : "simple",
+      mode: "simple",
       title: p.name,
       subtitle: d.detail,
-      render: (s) => <PlayerCard player={p} mode={d.id === "pepite" ? "rare" : "simple"} size={s} />,
+      render: (s) => <PlayerCard player={p} size={s} />,
     });
 
   return (
@@ -105,7 +105,7 @@ export function IlsSeDemarquent({ className }: { className?: string }) {
             aria-label={`${player.name} — ${ds.map((d) => d.detail).join(", ")}. Voir sa carte`}
           >
             <Badge d={ds[0]} />
-            <PlayerCard player={player} mode={ds[0].id === "pepite" ? "rare" : "simple"} size={0.56} />
+            <PlayerCard player={player} size={0.56} />
             <span className="max-w-[142px] truncate text-center text-[12px] text-foreground/55">{ds[0].detail}</span>
             {ds.length > 1 && (
               <span className="flex flex-wrap justify-center gap-1">

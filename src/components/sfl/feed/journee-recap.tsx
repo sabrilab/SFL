@@ -737,16 +737,16 @@ function JourneeRecapComplet({ j }: { j: number }) {
             <div className="mb-4 flex items-center justify-center gap-2.5">
               <Card3D
                 cacheKey={`feed-duel-${lastJ.j}-${duelA.name}`}
-                mode="rare"
+                mode="simple"
                 size={0.46}
-                render={(s) => <PlayerCard player={duelA} mode="rare" size={s} />}
+                render={(s) => <PlayerCard player={duelA} size={s} />}
               />
               <span className="mono-label shrink-0 text-foreground/40">VS</span>
               <Card3D
                 cacheKey={`feed-duel-${lastJ.j}-${duelB.name}`}
-                mode="rare"
+                mode="simple"
                 size={0.46}
-                render={(s) => <PlayerCard player={duelB} mode="rare" size={s} />}
+                render={(s) => <PlayerCard player={duelB} size={s} />}
               />
             </div>
             <div className="mb-3 flex items-center justify-between">
@@ -909,9 +909,9 @@ function JourneeRecapComplet({ j }: { j: number }) {
               formePlayer && (
                 <Card3D
                   cacheKey={`feed-forme-${lastJ.j}-${formePlayer.name}`}
-                  mode="rare"
+                  mode="simple"
                   size={0.42}
-                  render={(s) => <PlayerCard player={formePlayer} mode="rare" size={s} />}
+                  render={(s) => <PlayerCard player={formePlayer} size={s} />}
                 />
               )
             }

@@ -26,7 +26,6 @@ import {
   journeeScoreSummary,
   ovr,
   rankPlayers,
-  rareStats,
   STAT_KEYS,
   type Journee,
   type Player,
@@ -94,7 +93,7 @@ function StatBar({ label, value }: { label: string; value: number }) {
 
 function FicheJoueur({ player, rank }: { player: Player; rank: number }) {
   const { saison, journees } = useSeason();
-  const cardStats = rareStats(player.stats);
+  const cardStats = player.stats;
   const grand = useGrandEcran();
 
   const mine = useMemo(
@@ -124,9 +123,9 @@ function FicheJoueur({ player, rank }: { player: Player; rank: number }) {
       <section className="flex flex-col items-center gap-3">
         <Card3D
           cacheKey={`recherche-${player.name}`}
-          mode="rare"
+          mode="simple"
           size={grand ? 1.05 : 0.8}
-          render={(s) => <PlayerCard player={player} mode="rare" size={s} />}
+          render={(s) => <PlayerCard player={player} size={s} />}
         />
         <p className="mono-label text-center text-[9px] tracking-[0.12em] text-foreground/30">
           Glisse pour tourner · double-clic pour retourner
@@ -530,7 +529,7 @@ export default function RecherchePage() {
                       </span>
                       <span className="shrink-0 text-right">
                         <span className="block text-[17px] leading-none font-extrabold tabular-nums">
-                          {ovr(rareStats(p.stats))}
+                          {ovr(p.stats)}
                         </span>
                         <span className="mono-label mt-1 block text-foreground/35">Gén</span>
                       </span>

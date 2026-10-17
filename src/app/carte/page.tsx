@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { BoostCard, BOOST_LABELS } from "@/components/sfl/boost-card";
 import { Card3D } from "@/components/sfl/card-3d";
 import { ViewableCard } from "@/components/sfl/card-viewer";
-import { PlayerCard, type CardMode } from "@/components/sfl/player-card";
+import { PlayerCard } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -43,7 +43,6 @@ function SectionTitle({
 export default function CartePage() {
   const { player } = useMyPlayer();
   const { allPlayers, boostCards } = useSeason();
-  const [mode, setMode] = useState<CardMode>("rare");
   const [alloc, setAlloc] = useState<Allocation>(emptyAllocation());
 
   // Sa carte, sa page : le rang se calcule sur tout le monde.
@@ -104,27 +103,11 @@ export default function CartePage() {
 
       {/* Carte principale */}
       <section className="flex flex-col items-center gap-6">
-        <div className="glass flex w-full max-w-xs rounded-full p-1">
-          {(["simple", "rare"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={cn(
-                "flex-1 rounded-full py-2 text-sm font-semibold transition-colors",
-                mode === m
-                  ? "bg-foreground text-background"
-                  : "text-foreground/45 hover:text-foreground"
-              )}
-            >
-              {m === "simple" ? "Standard" : "Rare"}
-            </button>
-          ))}
-        </div>
         <Card3D
-          cacheKey={`${mode}-${player.name}`}
-          mode={mode}
+          cacheKey={`simple-${player.name}`}
+          mode="simple"
           size={1.05}
-          render={(s) => <PlayerCard player={player} mode={mode} size={s} />}
+          render={(s) => <PlayerCard player={player} size={s} />}
         />
       </section>
 
