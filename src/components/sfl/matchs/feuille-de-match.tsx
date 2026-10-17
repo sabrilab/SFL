@@ -6,7 +6,8 @@
 // est posé à son poste avec sa carte en pastille, la note aux couleurs de son
 // équipe (noire chez les Noirs, blanche chez les Blancs). Mon équipe joue en
 // bas, devant ; ma carte est cerclée. Plusieurs terrains le même jour : on
-// passe de l'un à l'autre, la fiche s'ouvre sur le mien.
+// passe de l'un à l'autre, la fiche s'ouvre sur le mien. Toucher une carte
+// ouvre la fiche du joueur (fiche-joueur.tsx).
 //
 // « Partager la feuille » en fait une image au format story (1080 × 1920,
 // noir, logo BOLA), celle qu'on envoyait dans le groupe Snap : la feuille de
@@ -23,7 +24,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toBlob } from "html-to-image";
 import { toast } from "sonner";
 import { Share } from "lucide-react";
-import { MiniCarte } from "@/components/sfl/mini-carte";
+import { FicheJoueurSheet, type EquipeDuJour } from "@/components/sfl/fiche-joueur";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
 import { placesSurDemiTerrain, monTerrain, type TerrainFeuille } from "@/lib/sfl/feuille";
@@ -44,18 +45,32 @@ function Pastille({
   player,
   nom,
   cote,
-  cliquable,
   onglet,
+  onChoisir,
 }: {
   player: Player | undefined;
   nom: string;
   cote: number;
-  cliquable: boolean;
   /** La note aux couleurs de l'équipe. */
   onglet: { fond: string; encre: string };
+  /** Toucher la carte ouvre la fiche du joueur ; absent dans l'image. */
+  onChoisir?: (p: Player) => void;
 }) {
-  if (player && cliquable) return <MiniCarte player={player} size={cote / 254} onglet={onglet} />;
-  if (player) return <PlayerCard player={player} mode="simple" size={cote / 254} onglet={onglet} />;
+  if (player && onChoisir)
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onChoisir(player);
+        }}
+        aria-label={`Voir la fiche de ${player.name}`}
+        className="shrink-0 transition-transform active:scale-95 motion-reduce:transition-none"
+      >
+        <PlayerCard player={player} size={cote / 254} onglet={onglet} />
+      </button>
+    );
+  if (player) return <PlayerCard player={player} size={cote / 254} onglet={onglet} />;
   return (
     <div
       className="flex items-center justify-center bg-[#f4f3ef] font-bold text-[#0A0B0D]"
@@ -98,6 +113,7 @@ function Lignes({ vertical, couche }: { vertical: boolean; couche: string }) {
 
 interface Pose {
   nom: string;
+  equipe: string;
   couleur: string;
   encre: string;
   /** En % de la largeur. */
@@ -140,12 +156,13 @@ function poser(t: TerrainFeuille, vertical: boolean, basEstA: boolean): Pose[] {
         vertical
           ? {
               nom,
+              equipe: eq.nom,
               couleur: eq.couleur,
               encre: eq.encre,
               x: 50 + (largeur - 50) * ecart(profondeur, chezMoi),
               y: (chezMoi ? 1 : -1) * depuisMediane(profondeur),
             }
-          : { nom, couleur: eq.couleur, encre: eq.encre, x: p, y: largeur }
+          : { nom, equipe: eq.nom, couleur: eq.couleur, encre: eq.encre, x: p, y: largeur }
       );
     });
   }
@@ -161,6 +178,7 @@ export function FeuilleDeMatch({ terrains, moi, entete }: { terrains: TerrainFeu
   const t = terrains[Math.min(choix, terrains.length - 1)];
 
   const image = useImage(terrains, entete, parNom);
+  const [fiche, setFiche] = useState<{ player: Player; equipe: EquipeDuJour } | null>(null);
 
   if (!t) return null;
   const basEstA = !t.b.joueurs.includes(moi);
@@ -232,7 +250,18 @@ export function FeuilleDeMatch({ terrains, moi, entete }: { terrains: TerrainFeu
               >
                 {/* Ma carte, cerclée : un vrai cadre, les ombres portées se découpent mal en 3D. */}
                 <div className={cn("flex rounded-[14px]", p.nom === moi && "bg-foreground p-[3px]")}>
-                  <Pastille player={parNom.get(p.nom)} nom={p.nom} cote={44} cliquable onglet={{ fond: p.couleur, encre: p.encre }} />
+                  <Pastille
+                    player={parNom.get(p.nom)}
+                    nom={p.nom}
+                    cote={44}
+                    onglet={{ fond: p.couleur, encre: p.encre }}
+                    onChoisir={(player) =>
+                      setFiche({
+                        player,
+                        equipe: { nom: p.equipe, couleur: p.couleur, encre: p.encre, terrain: terrains.length > 1 ? t.label : null },
+                      })
+                    }
+                  />
                 </div>
                 <span
                   className="whitespace-nowrap rounded-full px-[7px] py-[2px] text-[11px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
@@ -258,6 +287,7 @@ export function FeuilleDeMatch({ terrains, moi, entete }: { terrains: TerrainFeu
         Partager la feuille
       </button>
       {image.calque}
+      <FicheJoueurSheet player={fiche?.player ?? null} equipe={fiche?.equipe ?? null} onClose={() => setFiche(null)} />
     </section>
   );
 }
@@ -394,7 +424,7 @@ function ImageFeuille({ terrains, entete, parNom }: { terrains: TerrainFeuille[]
                   gap: 4,
                 }}
               >
-                <Pastille player={parNom.get(p.nom)} nom={p.nom} cote={cote} cliquable={false} onglet={{ fond: p.couleur, encre: p.encre }} />
+                <Pastille player={parNom.get(p.nom)} nom={p.nom} cote={cote} onglet={{ fond: p.couleur, encre: p.encre }} />
                 <span
                   style={{
                     padding: "2px 6px",
