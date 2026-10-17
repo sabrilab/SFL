@@ -2,7 +2,7 @@
 
 // Section Profil — l'identité du joueur, rien d'autre.
 //
-// Ordre de lecture : qui je suis → mes deux cartes (simple et rare, au choix)
+// Ordre de lecture : qui je suis → ma carte (la simple)
 // → mes badges → mon profil de jeu (le radar hexagonal, point faible en bleu) → mes
 // chiffres → ma série de dimanches → ma photo → les mini-jeux « Les bases »
 // (verrouillés) → les raccourcis.
@@ -13,7 +13,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Check, ChevronRight, Dumbbell, IdCard, Swords, Trophy } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Card3D } from "@/components/sfl/card-3d";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { BOOST_LABELS } from "@/components/sfl/boost-card";
@@ -25,7 +24,7 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { useGrandEcran } from "@/hooks/use-media-query";
 import { username } from "@/lib/sfl/usernames";
-import { ovr, rankPlayers, rareStats, STAT_KEYS, type Player } from "@/lib/sfl/engine";
+import { ovr, rankPlayers, STAT_KEYS, type Player } from "@/lib/sfl/engine";
 
 /* ------------------------- Radar « PROFIL DE JEU » ------------------------ */
 // Géométrie reprise du design : hexagone pointe en haut, centre (110,110),
@@ -180,10 +179,8 @@ export default function Profil() {
   const myRank =
     rankPlayers(allPlayers).find((p) => p.name === player.name)?.rank ?? allPlayers.length;
   const myCards = boostCards.filter((c) => c.player === player.name);
-  const cardStats = rareStats(player.stats);
-  // Les deux visages de la carte : la simple (les notes brutes) et la rare
-  // (celle qui sert partout ailleurs dans l'app).
-  const [face, setFace] = useState<"simple" | "rare">("rare");
+  // La carte affichée est la simple : les notes brutes du joueur.
+  const cardStats = player.stats;
   // La carte est le sujet de la page : elle profite de la place quand il y en a.
   const grand = useGrandEcran();
 
@@ -236,33 +233,13 @@ export default function Profil() {
         </Link>
       </div>
 
-      {/* Mes deux cartes : la simple et la rare, au choix */}
+      {/* Ma carte */}
       <section className="flex flex-col items-center gap-3.5">
-        <div className="glass flex w-full max-w-[240px] rounded-full p-1">
-          {(
-            [
-              ["simple", "Simple"],
-              ["rare", "Rare"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              onClick={() => setFace(id)}
-              className={cn(
-                "flex-1 rounded-full py-1.5 text-[13px] font-semibold transition-colors",
-                face === id ? "bg-foreground text-background" : "text-foreground/45"
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
         <Card3D
-          key={face}
-          cacheKey={`profil-${face}-${player.name}`}
-          mode={face}
+          cacheKey={`profil-simple-${player.name}`}
+          mode="simple"
           size={grand ? 1.15 : 0.88}
-          render={(s) => <PlayerCard player={player} mode={face} size={s} />}
+          render={(s) => <PlayerCard player={player} size={s} />}
         />
         <p className="mono-label text-center text-[9px] tracking-[0.12em] text-foreground/30">
           Glisse pour tourner · double-clic pour retourner

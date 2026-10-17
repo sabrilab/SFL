@@ -1,7 +1,9 @@
 // Carte joueur — la carte Bola gris et blanc (bola-card.tsx), construite au
-// nombre d'or : le visage d'abord, puis la note, le nom et les stats. Deux
-// éditions ici : base (papier blanc) et rare (argent, repères pleins) ;
-// bola-card sait aussi faire l'édition mvp. La photo posée par le joueur
+// nombre d'or : le visage d'abord, puis la note, le nom et les stats. Une
+// seule édition s'affiche : la simple (papier blanc, les notes brutes). La
+// rare n'est plus montrée depuis le 17/10 (décision de Sabri) ; ses stats
+// (rareStats) restent le point de départ des cartes MVP, Impact et Défensive
+// (computeBoostCards). `mode` n'est gardé que pour les appels existants. La photo posée par le joueur
 // (partagée avec toute la ligue, voir lib/sfl/photos) remplit le portrait
 // carré. En petit, la carte se simplifie d'elle-même (voir palierCarte).
 // La carte est un objet : elle ne suit pas le thème de l'app.
@@ -10,27 +12,27 @@
 
 import { BolaCard } from "./bola-card";
 import { usePhotoPerso } from "@/hooks/use-player-photo";
-import { ovr, rareStats, type Player, type StatKey } from "@/lib/sfl/engine";
+import { ovr, type Player, type StatKey } from "@/lib/sfl/engine";
 import { username } from "@/lib/sfl/usernames";
 
 export type CardMode = "simple" | "rare";
 
 export function PlayerCard({
   player,
-  mode = "rare",
   size = 1,
   highlightStats,
 }: {
   player: Player;
+  /** Sans effet : la carte affichée est toujours la simple. */
   mode?: CardMode;
   size?: number;
   highlightStats?: StatKey[];
 }) {
-  const stats = mode === "rare" ? rareStats(player.stats) : player.stats;
+  const stats = player.stats;
   const photo = usePhotoPerso(player.name);
   return (
     <BolaCard
-      edition={mode === "rare" ? "rare" : "base"}
+      edition="base"
       name={player.name}
       username={username(player.name)}
       position={player.poste}
