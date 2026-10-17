@@ -1,18 +1,20 @@
 "use client";
 
-// Section Profil — l'identité du joueur, rien d'autre.
+// Ma carte — l'identité du joueur, rien d'autre.
 //
-// Ordre de lecture : qui je suis → ma carte (la simple)
-// → mes badges → mon profil de jeu (le radar hexagonal, point faible en bleu) → mes
-// chiffres → ma série de dimanches → ma photo → les mini-jeux « Les bases »
-// (verrouillés) → les raccourcis.
+// Ordre de lecture : qui je suis → ma carte (la simple) → mes badges (le
+// prochain à viser, puis la fin de saison et les paliers, voir vitrine.tsx)
+// → mon profil de jeu (le radar hexagonal, point faible en bleu) → les
+// raccourcis. Les chiffres et la série sont dans les paliers ; la photo se
+// change en touchant l'avatar.
 //
 // Tout le gameplay numérique (packs, catalogue, duels, matchs) a déménagé dans
 // l'Arène : le profil ne porte plus de grille Collection, seulement le lien.
 
 import Link from "next/link";
 import { useState } from "react";
-import { Check, ChevronRight, Dumbbell, IdCard, Swords, Trophy } from "lucide-react";
+import { ChevronRight, Dumbbell, IdCard, Swords, Trophy } from "lucide-react";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Card3D } from "@/components/sfl/card-3d";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { BOOST_LABELS } from "@/components/sfl/boost-card";
@@ -173,7 +175,7 @@ function AvatarPhoto({ name }: { name: string }) {
 
 export default function Profil() {
   const { player } = useMyPlayer();
-  const { allPlayers, journees, boostCards, saison } = useSeason();
+  const { allPlayers, boostCards } = useSeason();
   // Sur sa propre fiche, on se classe parmi tout le monde — y compris les
   // joueurs masqués ailleurs dans l'app.
   const myRank =
@@ -183,27 +185,14 @@ export default function Profil() {
   const cardStats = player.stats;
   // La carte est le sujet de la page : elle profite de la place quand il y en a.
   const grand = useGrandEcran();
-
-  // Série de dimanches : journées jouées consécutives, en remontant depuis
-  // la dernière journée disputée.
-  const playedJs = journees.filter((j) => (j.matches ?? []).length > 0).map((j) => j.j);
-  const mine = new Set(
-    saison.entries
-      .filter((e) => e.player === player.name && e.statut === "Présent" && !e.extraTime)
-      .map((e) => e.j)
-  );
-  let streak = 0;
-  for (let i = playedJs.length - 1; i >= 0; i--) {
-    if (mine.has(playedJs[i])) streak += 1;
-    else break;
-  }
+  const [photoOuverte, setPhotoOuverte] = useState(false);
 
   const nbTitres = myCards.length;
   const dernierTitre = myCards[myCards.length - 1];
 
   return (
     <div className="shell py-4 sm:py-8">
-      <h1 className="mb-[18px] text-[30px] font-bold tracking-tight">Profil</h1>
+      <h1 className="mb-[18px] text-[30px] font-bold tracking-tight">Ma carte</h1>
       {/* Deux colonnes dès qu'il y a la place : l'identité et les cartes à
           gauche, le profil de jeu et les chiffres à droite. */}
       <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-2 lg:items-start lg:gap-6">
@@ -214,7 +203,14 @@ export default function Profil() {
       {/* Rangée d'identité : photo, nom, pseudo, menu réglages */}
       <div className="flex items-center justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <AvatarPhoto name={player.name} />
+          <button
+            type="button"
+            onClick={() => setPhotoOuverte(true)}
+            aria-label="Changer ma photo"
+            className="shrink-0 rounded-full"
+          >
+            <AvatarPhoto name={player.name} />
+          </button>
           <div className="min-w-0">
             <div className="truncate text-[19px] font-extrabold tracking-tight">{player.name}</div>
             <div className="mt-0.5 truncate text-[12.5px] text-foreground/42">
@@ -264,119 +260,13 @@ export default function Profil() {
       </div>
 
       <div className="flex min-w-0 flex-col gap-[18px]">
-      {/* Mes badges — la vitrine, comme dans l'app iPhone */}
+      {/* Mes badges : le prochain, la fin de saison, les paliers */}
       <div id="badges" className="scroll-mt-4">
         <VitrineBadges nom={player.name} />
       </div>
 
       {/* PROFIL DE JEU — le radar hexagonal du design */}
       <ProfilRadar stats={cardStats} overall={ovr(cardStats)} />
-
-      {/* Bento de stats 2×2 */}
-      <div className="grid grid-cols-2 gap-2.5">
-        {(
-          [
-            [player.pp, "Points Pépite"],
-            [player.buts, "Buts"],
-            [player.passes, "Passes décisives"],
-            [player.matchs, "Matchs joués"],
-          ] as const
-        ).map(([value, label]) => (
-          <div key={label} className="glass rounded-[22px] p-[15px]">
-            <div className="flex items-start justify-between">
-              <div className="text-[28px] leading-none font-extrabold tracking-tight tabular-nums">
-                {value}
-              </div>
-              <span className="glass-soft size-[26px] rounded-full" />
-            </div>
-            <p className="mono-label mt-2.5 text-foreground/40">{label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* La série de dimanches */}
-      {streak > 0 && (
-        <div className="glass flex items-center justify-between rounded-[22px] p-4">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[26px] leading-none font-extrabold tracking-tight text-primary tabular-nums">
-              {streak}
-            </span>
-            <span className="mono-label text-foreground/40">
-              Dimanche{streak > 1 ? "s" : ""} de série
-            </span>
-          </div>
-          <div className="flex items-center gap-[9px]">
-            <span className="text-[13px] font-semibold text-foreground/55">Actif</span>
-            <span className="flex size-[30px] items-center justify-center rounded-full bg-foreground">
-              <Check className="size-3.5 text-background" strokeWidth={3} />
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Photo de profil — l'interim façon réseaux sociaux */}
-      <section className="glass rounded-[26px] p-4">
-        <ProfilePhoto name={player.name} />
-      </section>
-
-      {/* Les bases — mini-jeux à ballons, verrouillés pour l'instant */}
-      <section>
-        <div className="mb-3 flex items-end justify-between">
-          <div>
-            <h2 className="text-[16px] font-bold tracking-tight">Les bases</h2>
-            <p className="mt-1 text-[12.5px] text-foreground/42">
-              Mini-jeux · chaque module rapporte des ballons
-            </p>
-          </div>
-          <span className="glass-soft flex shrink-0 items-center gap-[5px] rounded-full px-[11px] py-1.5">
-            <span className="text-[12px] leading-none">⚽</span>
-            <span className="mono-label text-primary">Bientôt</span>
-          </span>
-        </div>
-        <Locked label="Bientôt" note="Les mini-jeux à ballons arrivent avec les comptes joueurs.">
-          <div className="glass relative overflow-hidden rounded-[26px]">
-            <div
-              className="absolute inset-0"
-              style={{
-                background:
-                  "repeating-linear-gradient(115deg, rgba(255,255,255,0.045) 0 10px, rgba(255,255,255,0.01) 10px 20px)",
-              }}
-            />
-            <div className="relative flex flex-col gap-10 p-[17px]">
-              <div className="flex items-start justify-between gap-2.5">
-                <span className="mono-label rounded-full border border-white/16 bg-white/10 px-[11px] py-[5px] text-foreground/75">
-                  Module 1
-                </span>
-                <span className="flex shrink-0 items-center gap-[5px] rounded-full border border-primary/32 bg-primary/14 px-2.5 py-[5px]">
-                  <span className="text-[11px] leading-none">⚽</span>
-                  <span className="mono-label text-primary">+40</span>
-                </span>
-              </div>
-              <div>
-                <p className="mono-label text-foreground/38">Étape 1/4</p>
-                <h3 className="mt-[7px] text-[25px] leading-[1.12] font-extrabold tracking-tight">
-                  Lis ta carte comme un pro
-                </h3>
-                <p className="mt-[7px] text-[13px] leading-[1.45] text-foreground/50">
-                  GÉN, critères, boosts : comprends tout ce que ta carte raconte.
-                </p>
-                <div className="mt-3.5 flex items-center justify-between gap-2.5">
-                  <span className="mono-label text-foreground/42">3 min · Quiz</span>
-                  <span className="rounded-full bg-foreground px-[17px] py-2.5 text-[13px] font-bold text-background">
-                    Commencer
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="mt-3 flex items-center justify-center gap-1.5">
-            <span className="h-1.5 w-[18px] rounded-full bg-foreground/70" />
-            {[0, 1, 2].map((i) => (
-              <span key={i} className="size-1.5 rounded-full bg-foreground/20" />
-            ))}
-          </div>
-        </Locked>
-      </section>
 
       {/* Navigation du profil */}
       <section className="flex flex-col gap-2.5">
@@ -385,7 +275,7 @@ export default function Profil() {
             {
               href: "/carte",
               icon: IdCard,
-              label: "Ma carte",
+              label: "Cartes de match",
               note: dernierTitre
                 ? `${nbTitres} titre${nbTitres > 1 ? "s" : ""} · dernier : ${BOOST_LABELS[dernierTitre.type]}`
                 : "Carte, boosts et évolution EvoDay",
@@ -439,6 +329,14 @@ export default function Profil() {
       </section>
       </div>
       </div>
+
+      {/* La photo de profil, à part : on y entre en touchant l'avatar */}
+      <Sheet open={photoOuverte} onOpenChange={setPhotoOuverte}>
+        <SheetContent side="bottom" className="mx-auto w-full rounded-t-[28px] px-5 pt-6 pb-8 sm:max-w-md">
+          <SheetTitle className="text-[19px] font-extrabold tracking-tight">Ma photo</SheetTitle>
+          <ProfilePhoto name={player.name} />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
