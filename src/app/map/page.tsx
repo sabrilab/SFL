@@ -26,6 +26,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
+import { FeuilleDeMatch } from "@/components/sfl/matchs/feuille-de-match";
+import { feuilleDeConvocation, feuilleDeJournee } from "@/lib/sfl/feuille";
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
 import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
 import { useParties } from "@/hooks/use-parties";
@@ -222,6 +224,14 @@ function dateLongue(dateLabel: string, aujourdhui: string): string {
   return d ? `${d.getUTCDate()} ${MOIS_LONGS[d.getUTCMonth()]}` : dateLabel;
 }
 
+/** « 19 oct. » → « Dimanche 19 octobre », pour la feuille de match partagée. */
+function dateComplete(dateLabel: string, aujourdhui: string): string {
+  const d = lireDate(dateLabel, aujourdhui);
+  if (!d) return dateLabel;
+  const nom = JOURS[d.getUTCDay()];
+  return `${nom[0].toUpperCase()}${nom.slice(1)} ${dateLongue(dateLabel, aujourdhui)}`;
+}
+
 function etatDe(dedans: boolean, manque: number): { etat: EtatSticker; texte: string } {
   if (dedans) return { etat: { genre: "dedans" }, texte: "Tu y es" };
   if (manque > 0) return { etat: { genre: "manque", n: manque }, texte: `Il manque ${manque}` };
@@ -229,7 +239,7 @@ function etatDe(dedans: boolean, manque: number): { etat: EtatSticker; texte: st
 }
 
 export default function MapPage() {
-  const { saison } = useSeason();
+  const { saison, journees } = useSeason();
   const session = useSession();
   const admin = !!session?.admin;
   const p = usePresence();
@@ -424,6 +434,15 @@ export default function MapPage() {
   }
 
   const ios = useEstIos();
+
+  // La feuille de match du choisi : les équipes de sa journée, sinon celles
+  // de la convocation une fois révélées (vendredi 19h ; l'admin, toujours).
+  const feuille = useMemo(() => {
+    if (!choisi || choisi.partie) return [];
+    const deJournee = choisi.j != null ? feuilleDeJournee(journees.find((x) => x.j === choisi.j)) : [];
+    if (deJournee.length || (choisi.j != null && !choisi.convoquee)) return deJournee;
+    return p.equipesVisibles || admin ? feuilleDeConvocation(p.teams) : [];
+  }, [choisi, journees, p.equipesVisibles, p.teams, admin]);
 
   const commune = choisi?.terrain?.commune ?? terrains.find((t) => t.commune)?.commune ?? "SFL";
   const n = affiches.filter((m) => !m.joue).length;
@@ -649,9 +668,22 @@ export default function MapPage() {
                 {choisi?.partie ? (
                   <FichePartie partie={choisi.partie} moi={moi} onChange={recharger} />
                 ) : choisi?.j != null && !choisi.convoquee ? (
-                  <Presents m={choisi} />
+                  // Les équipes faites, la feuille de match dit déjà qui vient.
+                  feuille.length === 0 && <Presents m={choisi} />
                 ) : (
                   <PresencePanel />
+                )}
+                {choisi && feuille.length > 0 && (
+                  <FeuilleDeMatch
+                    key={choisi.cle}
+                    terrains={feuille}
+                    moi={player.name}
+                    entete={{
+                      surtitre: `${choisi.j != null ? `J${choisi.j} · ` : ""}Sunday Five League`,
+                      quand: `${dateComplete(choisi.dateLabel, aujourdhui)} · ${choisi.heure}`,
+                      ou: choisi.terrain ? choisi.terrain.nom : null,
+                    }}
+                  />
                 )}
                 {choisi?.joue && (
                   <Link
