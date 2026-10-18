@@ -6,11 +6,14 @@
 // (computeBoostCards). `mode` n'est gardé que pour les appels existants. La photo posée par le joueur
 // (partagée avec toute la ligue, voir lib/sfl/photos) remplit le portrait
 // carré. En petit, la carte se simplifie d'elle-même (voir palierCarte).
+// En haut à droite du portrait, le badge que le joueur a choisi (son meilleur
+// par défaut, voir lib/sfl/badge-carte).
 // La carte est un objet : elle ne suit pas le thème de l'app.
 
 "use client";
 
 import { BolaCard } from "./bola-card";
+import { useBadgeCarte } from "@/hooks/use-badge-carte";
 import { usePhotoPerso } from "@/hooks/use-player-photo";
 import { ovr, type Player, type StatKey } from "@/lib/sfl/engine";
 import { username } from "@/lib/sfl/usernames";
@@ -30,6 +33,7 @@ export function PlayerCard({
 }) {
   const stats = player.stats;
   const photo = usePhotoPerso(player.name);
+  const badge = useBadgeCarte(player.name);
   return (
     <BolaCard
       edition="base"
@@ -41,6 +45,7 @@ export function PlayerCard({
       highlightStats={highlightStats}
       size={size}
       photo={photo}
+      badge={badge}
     />
   );
 }
