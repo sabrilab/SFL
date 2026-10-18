@@ -1051,6 +1051,44 @@ create policy "photo_studio: je note la mienne"
   on public.photo_studio for insert to authenticated
   with check (user_id = (select auth.uid()));
 
+-- ───────────────────── Notifications (web push) ─────────────────────
+-- Un téléphone qui a accepté les notifications laisse ici son abonnement
+-- (l'adresse du service de push de son navigateur et ses deux clés). Le
+-- joueur n'écrit et n'efface que les siens ; seul l'admin les lit tous, avec
+-- ses propres droits, pour envoyer depuis /api/push/envoyer, et efface ceux
+-- que le service de push dit morts (appli supprimée, permission retirée).
+create table if not exists public.push_abonnements (
+  endpoint    text primary key,
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  p256dh      text not null,
+  auth        text not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists push_abonnements_user on public.push_abonnements (user_id);
+
+alter table public.push_abonnements enable row level security;
+
+drop policy if exists "push: je lis les miens, l'admin tout" on public.push_abonnements;
+create policy "push: je lis les miens, l'admin tout"
+  on public.push_abonnements for select to authenticated
+  using (user_id = (select auth.uid()) or public.is_league_admin());
+
+drop policy if exists "push: j'ajoute le mien" on public.push_abonnements;
+create policy "push: j'ajoute le mien"
+  on public.push_abonnements for insert to authenticated
+  with check (user_id = (select auth.uid()));
+
+drop policy if exists "push: je remplace le mien" on public.push_abonnements;
+create policy "push: je remplace le mien"
+  on public.push_abonnements for update to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
+drop policy if exists "push: j'efface le mien, l'admin les morts" on public.push_abonnements;
+create policy "push: j'efface le mien, l'admin les morts"
+  on public.push_abonnements for delete to authenticated
+  using (user_id = (select auth.uid()) or public.is_league_admin());
+
 -- ───────────────────────── Rôle admin ────────────────────────────────
 -- Remise d'aplomb des comptes admin — rejouée à chaque migration, donc à
 -- chaque déploiement qui touche ce fichier. Elle répare TOUS les états de

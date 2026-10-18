@@ -11,7 +11,7 @@
 // renvoyait 404, ce 404 était mis en cache — et l'appareil restait bloqué sur
 // « Quelque chose a cassé » à chaque visite, indéfiniment.
 
-const CACHE_NAME = "sfl-cache-v4";
+const CACHE_NAME = "sfl-cache-v5";
 const OFFLINE_URL = "/offline";
 
 /** Une réponse digne d'être gardée : la nôtre, complète, et sans erreur. */
@@ -121,5 +121,37 @@ self.addEventListener("fetch", (event) => {
         return cached || reseau;
       })
     )
+  );
+});
+
+// Les notifications (web push, voir lib/server/web-push.ts) : le message
+// arrive chiffré, le navigateur le déchiffre et nous le passe en JSON
+// { titre, texte, url }. Au toucher, on ramène l'app au premier plan sur la
+// bonne page, ou on l'ouvre.
+self.addEventListener("push", (event) => {
+  let n = {};
+  try {
+    n = event.data ? event.data.json() : {};
+  } catch {}
+  event.waitUntil(
+    self.registration.showNotification(n.titre || "Bola", {
+      body: n.texte || "",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url: typeof n.url === "string" && n.url.startsWith("/") ? n.url : "/" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((fenetres) => {
+      for (const f of fenetres) {
+        if ("focus" in f) return f.navigate(url).then((g) => (g || f).focus());
+      }
+      return self.clients.openWindow(url);
+    })
   );
 });
