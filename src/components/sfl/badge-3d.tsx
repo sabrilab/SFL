@@ -61,6 +61,29 @@ const POLI: Record<Metal, string> = {
   legende: "linear-gradient(140deg, #ff8f80 0%, #9a1712 48%, #e2493c 72%, #5a0806 100%)",
 };
 
+/** Le halo sous un objet gagné : la lumière de son métal, posée sur le fond. */
+const AURA: Record<Metal, string> = {
+  bronze: "rgba(224,122,58,0.42)",
+  argent: "rgba(190,205,255,0.34)",
+  or: "rgba(255,185,56,0.45)",
+  legende: "rgba(255,59,47,0.48)",
+};
+
+function Aura({ matiere, taille }: { matiere: Matiere; taille: number }) {
+  if (matiere === "fantome") return null;
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute"
+      style={{
+        inset: -taille * 0.12,
+        background: `radial-gradient(closest-side, ${AURA[matiere]} 0%, transparent 100%)`,
+        transform: "translateY(12%) scaleY(0.8)",
+      }}
+    />
+  );
+}
+
 /** Le nom du badge, en toutes lettres (lecteur d'écran, feuille de choix). */
 export function nomBadge(b: BadgeCarte): string {
   if (b.famille === "saison") return `${CLASSEMENTS.find((c) => c.id === b.id)!.nom}, ${ordinal(b.rang)}`;
@@ -97,14 +120,27 @@ export function Objet3D({
   taille,
   embleme: Embleme,
   ombre = true,
+  aura = false,
 }: {
   objet: Objet;
   matiere: Matiere;
   taille: number;
   embleme: typeof EMBLEMES.buts;
   ombre?: boolean;
+  /** Le halo du métal sous l'objet (la vitrine, les feuilles). */
+  aura?: boolean;
 }) {
   const src = useImageBadge(objet, matiere);
+  if (aura) {
+    return (
+      <span className="relative block" style={{ width: taille, height: taille }}>
+        <Aura matiere={matiere} taille={taille} />
+        <span className="absolute inset-0">
+          <Objet3D objet={objet} matiere={matiere} taille={taille} embleme={Embleme} ombre={ombre} />
+        </span>
+      </span>
+    );
+  }
   if (!src) {
     return (
       <span className="grid place-items-center" style={{ width: taille, height: taille }} aria-hidden>
@@ -269,6 +305,8 @@ export function Objet3DVivant({
         vitesse += (repos - vitesse) * Math.min(1, dt * 2.2);
         pivot.rotation.y += vitesse * dt;
       }
+      // Il flotte, à peine : une respiration lente.
+      if (!reduit) pivot.position.y = Math.sin(t / 900) * 0.05;
       renderer.render(scene, cam);
       if (premiere) {
         premiere = false;
@@ -292,6 +330,7 @@ export function Objet3DVivant({
 
   return (
     <span className="relative block" style={{ width: taille, height: taille }}>
+      <Aura matiere={matiere} taille={taille} />
       {!pret && (
         <span className="absolute inset-0">
           <Objet3D objet={objet} matiere={matiere} taille={taille} embleme={embleme} />

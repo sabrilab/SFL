@@ -98,7 +98,7 @@ export function Medaille({ e, diametre = 60, vivant = false }: { e: EtatTrophee;
         </svg>
       )}
       <span className={cn("absolute inset-0", !m && "opacity-80")} style={!m ? { transform: "scale(0.78)" } : undefined}>
-        {vivant ? <Objet3DVivant {...props} /> : <Objet3D {...props} />}
+        {vivant ? <Objet3DVivant {...props} /> : <Objet3D {...props} aura={!!m} />}
       </span>
     </span>
   );
@@ -118,7 +118,7 @@ export function Ecusson({ id, rang, largeur = 58, vivant = false }: { id: Classe
   return (
     <span className="relative block shrink-0" style={{ width: w, height: w }}>
       <span className={cn("absolute inset-0", !m && "opacity-80")} style={!m ? { transform: "scale(0.78)" } : undefined}>
-        {vivant ? <Objet3DVivant {...props} /> : <Objet3D {...props} />}
+        {vivant ? <Objet3DVivant {...props} /> : <Objet3D {...props} aura={!!m} />}
       </span>
       {rang && (
         <span className="pointer-events-none absolute" style={{ right: -w * 0.04, bottom: -w * 0.02 }}>
@@ -307,7 +307,7 @@ function FeuillePalier({ e, moi }: { e: EtatTrophee; moi: string }) {
   const m = metal(e.palier);
   return (
     <div className="flex flex-col items-center gap-4">
-      <Medaille e={e} diametre={150} vivant />
+      <Medaille e={e} diametre={180} vivant />
       <div className="text-center">
         <SheetTitle className="text-[22px] font-extrabold tracking-tight">
           {e.def.nom}
@@ -367,7 +367,7 @@ function FeuilleSaison({ e, moi }: { e: EtatClassement; moi: string }) {
   const unite = (n: number) => `${n} ${n > 1 ? e.def.unite[1] : e.def.unite[0]}`;
   return (
     <div className="flex flex-col items-center gap-4">
-      <Ecusson id={e.def.id} rang={e.meilleur?.rang ?? null} largeur={150} vivant />
+      <Ecusson id={e.def.id} rang={e.meilleur?.rang ?? null} largeur={180} vivant />
       <div className="text-center">
         <SheetTitle className="text-[22px] font-extrabold tracking-tight">{e.def.nom}</SheetTitle>
         <SheetDescription className="mt-1 text-[15px] text-foreground/75">{sousTitre(e)}</SheetDescription>

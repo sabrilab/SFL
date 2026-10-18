@@ -31,10 +31,10 @@ export type Matiere = Metal | "fantome";
 /** L'orientation de chaque objet : de trois quarts, pour que le relief se lise. */
 const POSE: Record<Objet, [number, number, number]> = {
   ballon: [0.42, 0.55, 0.1],
-  crampon: [0.28, -0.62, 0.04],
+  crampon: [0.24, 0.55, 0.04],
   cage: [0.2, -0.5, 0],
   trophee: [0.16, 0.3, 0],
-  pepite: [0.5, 0.2, 0.12],
+  pepite: [0.42, 0.35, 0.1],
   etoile: [0.22, -0.55, 0.06],
   bouclier: [0.2, -0.5, 0],
   eclair: [0.18, -0.6, 0.12],
@@ -56,27 +56,43 @@ const CORPS: Record<Metal, string> = {
 export function environnement(renderer: THREE.WebGLRenderer): THREE.Texture {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#040406");
+  // Des boîtes à lumière de studio : le centre franc, les bords qui tombent
+  // doucement (un dégradé radial en texture), pour des reflets lisses.
+  const toile = document.createElement("canvas");
+  toile.width = toile.height = 128;
+  const ctx = toile.getContext("2d")!;
+  const deg = ctx.createRadialGradient(64, 64, 8, 64, 64, 64);
+  deg.addColorStop(0, "#fff");
+  deg.addColorStop(0.55, "#bbb");
+  deg.addColorStop(1, "#000");
+  ctx.fillStyle = deg;
+  ctx.fillRect(0, 0, 128, 128);
+  const doux = new THREE.CanvasTexture(toile);
+  doux.colorSpace = THREE.SRGBColorSpace;
   const panneau = (couleur: string, force: number, w: number, h: number, x: number, y: number, z: number) => {
-    const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(couleur).multiplyScalar(force), side: THREE.DoubleSide });
+    const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(couleur).multiplyScalar(force), map: doux, side: THREE.DoubleSide });
     const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m);
     p.position.set(x, y, z);
     p.lookAt(0, 0, 0);
     scene.add(p);
   };
-  panneau("#3b6cff", 2.6, 4, 7, -7, 1, -1); // le bleu, à gauche, en arrière
-  panneau("#9b4dff", 2.6, 5, 4, 5, 5, -4); // le violet, en haut à droite, derrière
-  panneau("#ff7a3d", 3, 4, 3, 6, -4, 1); // l'orange, en bas à droite, de côté
-  panneau("#ffffff", 10, 7, 3, 0, 7, 4); // la boîte à lumière, au-dessus, devant
-  panneau("#ffffff", 7, 0.8, 9, 4.5, 0, 6); // un filet blanc, de côté
-  panneau("#fff6ee", 2.2, 16, 10, 0, 0, 9); // un grand voile doux, face à l'objet
+  panneau("#ffffff", 14, 8, 4, 0, 7, 4); // la boîte à lumière, au-dessus, devant
+  panneau("#ffffff", 10, 1.2, 10, 5, 0, 5.5); // un filet blanc, de côté
+  panneau("#fff6ee", 4.2, 18, 12, 0, 0, 9); // un grand voile doux, face à l'objet
   // Un grand voile blanc à gauche : les faces planes, tournées de trois quarts,
   // s'y reflètent et prennent la couleur franche du métal.
-  panneau("#f4f1ff", 2.6, 9, 6, -8, 0.5, 4);
-  panneau("#ffffff", 2.4, 10, 10, 0, 9, -1); // le plafond : le dessus des objets à plat
-  panneau("#ff4fa3", 2, 4, 4, -3, -6, -4); // un rose, sous l'objet
+  panneau("#f4f1ff", 3.6, 10, 8, -8, 0.5, 4);
+  panneau("#ffffff", 3, 12, 12, 0, 9, -1); // le plafond : le dessus des objets à plat
+  // Les couleurs des références, derrière et sur les côtés : elles filent sur
+  // les arêtes et les bords tournés, comme un contre-jour.
+  panneau("#3b6cff", 9, 3, 10, -6, 1, -5); // le bleu, à gauche, derrière
+  panneau("#9b4dff", 7, 6, 3, 3, 6, -5); // le violet, en haut, derrière
+  panneau("#ff7a3d", 9, 3, 8, 6, -2, -4); // l'orange, à droite, derrière
+  panneau("#ff4fa3", 4, 6, 3, -2, -7, -2); // un rose, sous l'objet
   const pmrem = new THREE.PMREMGenerator(renderer);
   const tex = pmrem.fromScene(scene, 0.035).texture;
   pmrem.dispose();
+  doux.dispose();
   scene.traverse((o) => {
     if (o instanceof THREE.Mesh) {
       o.geometry.dispose();
@@ -195,7 +211,7 @@ export function eclat(): THREE.DirectionalLight {
 /* -------------------------------- Les images ------------------------------- */
 
 /** Le côté des images, en pixels : net jusqu'à ~100 px à l'écran sur un iPhone. */
-const COTE = 320;
+const COTE = 384;
 
 const IMAGE_EVENT = "sfl-badge-3d";
 export { IMAGE_EVENT };

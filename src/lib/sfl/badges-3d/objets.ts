@@ -10,7 +10,8 @@
 // (« corps », « verre », « sombre ») : rendu.ts leur donne leur matière.
 
 import * as THREE from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { ParametricGeometry } from "three/examples/jsm/geometries/ParametricGeometry.js";
 
 export type Objet =
   | "ballon"
@@ -65,36 +66,80 @@ function cadrer(pieces: Piece[], taille = 2): Piece[] {
 
 /* --------------------------------- Ballon --------------------------------- */
 
-/** Le ballon : une sphère et les coutures d'un icosaèdre tronqué (pentagones et hexagones). */
+/**
+ * Le ballon : 32 panneaux bombés (12 pentagones, 20 hexagones) séparés par
+ * des coutures creusées dans la sphère, comme un vrai ballon cousu. Chaque
+ * point de la sphère appartient au panneau que touche son rayon sur
+ * l'icosaèdre tronqué ; près du bord entre deux panneaux, la surface plonge.
+ * Les pentagones sont en chrome sombre, les hexagones dans le métal.
+ */
 function ballon(): Piece[] {
+  // Les centres des panneaux : sommets (pentagones) et faces (hexagones) d'un icosaèdre.
   const ico = new THREE.IcosahedronGeometry(1, 0);
-  const pos = ico.getAttribute("position");
-  const sommets: THREE.Vector3[] = [];
+  const p = ico.getAttribute("position");
+  const pentas: THREE.Vector3[] = [];
+  const hexas: THREE.Vector3[] = [];
+  for (let i = 0; i < p.count; i += 3) {
+    const tri = [0, 1, 2].map((k) => new THREE.Vector3().fromBufferAttribute(p, i + k));
+    for (const v of tri) if (!pentas.some((q) => q.distanceTo(v) < 1e-4)) pentas.push(v.clone().normalize());
+    hexas.push(tri[0].clone().add(tri[1]).add(tri[2]).normalize());
+  }
+  // Distance du centre aux plans des faces d'un icosaèdre tronqué (arête 1).
+  const faces = [
+    ...pentas.map((n) => ({ n, h: 2.32744, penta: true })),
+    ...hexas.map((n) => ({ n, h: 2.26728, penta: false })),
+  ];
+  const panneau = (d: THREE.Vector3) => {
+    let s1 = -1;
+    let s2 = -1;
+    let f1 = 0;
+    for (let f = 0; f < faces.length; f++) {
+      const s = d.dot(faces[f].n) / faces[f].h;
+      if (s > s1) {
+        s2 = s1;
+        s1 = s;
+        f1 = f;
+      } else if (s > s2) s2 = s;
+    }
+    return { f: f1, ecart: (s1 - s2) / s1 };
+  };
+  const g = mergeVertices(new THREE.IcosahedronGeometry(1, 32));
+  const pos = g.getAttribute("position");
+  const d = new THREE.Vector3();
   for (let i = 0; i < pos.count; i++) {
-    const v = new THREE.Vector3().fromBufferAttribute(pos, i);
-    if (!sommets.some((s) => s.distanceTo(v) < 1e-4)) sommets.push(v);
+    d.fromBufferAttribute(pos, i).normalize();
+    const { ecart } = panneau(d);
+    // La couture : un sillon doux, et les panneaux un peu bombés.
+    const sillon = Math.exp(-((ecart / 0.012) ** 2));
+    const bombe = 1 - Math.exp(-ecart / 0.05);
+    d.multiplyScalar(0.975 + 0.025 * bombe - 0.035 * sillon);
+    pos.setXYZ(i, d.x, d.y, d.z);
   }
-  const arete = Math.min(...sommets.slice(1).map((s) => s.distanceTo(sommets[0])));
-  const voisins = (a: THREE.Vector3) => sommets.filter((b) => Math.abs(a.distanceTo(b) - arete) < 1e-3);
-  const segments: [THREE.Vector3, THREE.Vector3][] = [];
-  const tiers = (a: THREE.Vector3, b: THREE.Vector3) => a.clone().lerp(b, 1 / 3);
-  for (const a of sommets) {
-    const vs = voisins(a);
-    // Les pentagones : autour de chaque sommet, entre voisins adjacents.
-    for (let i = 0; i < vs.length; i++)
-      for (let j = i + 1; j < vs.length; j++)
-        if (Math.abs(vs[i].distanceTo(vs[j]) - arete) < 1e-3) segments.push([tiers(a, vs[i]), tiers(a, vs[j])]);
-    // Le tiers du milieu de chaque arête (une seule fois).
-    for (const b of vs) if (sommets.indexOf(b) > sommets.indexOf(a)) segments.push([tiers(a, b), tiers(b, a)]);
+  g.computeVertexNormals();
+  // On sépare les triangles : pentagones d'un côté, hexagones de l'autre.
+  const plat = g.toNonIndexed();
+  const P = plat.getAttribute("position");
+  const N = plat.getAttribute("normal");
+  const parts = { penta: { p: [] as number[], n: [] as number[] }, hexa: { p: [] as number[], n: [] as number[] } };
+  const c = new THREE.Vector3();
+  for (let i = 0; i < P.count; i += 3) {
+    c.set(0, 0, 0);
+    for (let k = 0; k < 3; k++) c.add(d.fromBufferAttribute(P, i + k));
+    const cible = faces[panneau(c.normalize()).f].penta ? parts.penta : parts.hexa;
+    for (let k = 0; k < 3; k++) {
+      cible.p.push(P.getX(i + k), P.getY(i + k), P.getZ(i + k));
+      cible.n.push(N.getX(i + k), N.getY(i + k), N.getZ(i + k));
+    }
   }
-  const coutures = segments.map(([a, b]) => {
-    const pts: THREE.Vector3[] = [];
-    for (let t = 0; t <= 8; t++) pts.push(a.clone().lerp(b, t / 8).normalize().multiplyScalar(1.004));
-    return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 8, 0.018, 5, false);
-  });
+  const geo = (x: { p: number[]; n: number[] }) => {
+    const r = new THREE.BufferGeometry();
+    r.setAttribute("position", new THREE.Float32BufferAttribute(x.p, 3));
+    r.setAttribute("normal", new THREE.Float32BufferAttribute(x.n, 3));
+    return r;
+  };
   return [
-    { geo: new THREE.SphereGeometry(1, 96, 64), role: "corps" },
-    { geo: mergeGeometries(coutures), role: "sombre" },
+    { geo: geo(parts.hexa), role: "corps" },
+    { geo: geo(parts.penta), role: "sombre" },
   ];
 }
 
@@ -102,43 +147,91 @@ function ballon(): Piece[] {
 
 /** Le crampon : la chaussure de profil, extrudée, sa semelle et ses crampons. */
 function crampon(): Piece[] {
-  const s = new THREE.Shape();
-  s.moveTo(-1.0, -0.35);
-  s.lineTo(1.05, -0.35);
-  s.bezierCurveTo(1.3, -0.33, 1.32, -0.05, 1.12, 0.02);
-  s.bezierCurveTo(0.75, 0.14, 0.35, 0.22, 0.05, 0.42);
-  s.lineTo(-0.35, 0.72);
-  s.bezierCurveTo(-0.55, 0.82, -0.8, 0.82, -0.95, 0.66);
-  s.bezierCurveTo(-1.1, 0.4, -1.12, 0.0, -1.0, -0.35);
-  const corps = extrude(s, 0.62, 0.14);
-  const semelle = new THREE.Shape();
-  semelle.moveTo(-1.02, -0.52);
-  semelle.lineTo(1.12, -0.52);
-  semelle.bezierCurveTo(1.32, -0.5, 1.32, -0.36, 1.12, -0.36);
-  semelle.lineTo(-1.02, -0.36);
-  semelle.lineTo(-1.02, -0.52);
-  const sem = extrude(semelle, 0.66, 0.05);
-  sem.translate(0, -0.4, 0);
+  // La chaussure, tirée d'une surface : le long du pied (u, du talon à la
+  // pointe), une section en carré arrondi (v), dont la hauteur et la
+  // largeur suivent le profil d'un crampon — talon, col, cou-de-pied qui
+  // descend, pointe relevée. Les deux bouts se referment en douceur.
+  const lerp = (pts: [number, number][], u: number) => {
+    for (let i = 1; i < pts.length; i++)
+      if (u <= pts[i][0]) {
+        const t = (u - pts[i - 1][0]) / (pts[i][0] - pts[i - 1][0]);
+        const k = t * t * (3 - 2 * t);
+        return pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * k;
+      }
+    return pts[pts.length - 1][1];
+  };
+  const HAUT: [number, number][] = [[0, 0.5], [0.12, 0.86], [0.24, 0.84], [0.42, 0.56], [0.62, 0.38], [0.82, 0.28], [1, 0.22]];
+  const LARGE: [number, number][] = [[0, 0.26], [0.2, 0.3], [0.55, 0.34], [0.8, 0.33], [1, 0.22]];
+  const BAS = (u: number) => (u > 0.8 ? ((u - 0.8) / 0.2) ** 2 * 0.12 : 0);
+  const X = (u: number) => -1 + 2.2 * u;
+  const bout = (u: number) => Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, u))), 0.32);
+  const sp = (c: number, e: number) => Math.sign(c) * Math.pow(Math.abs(c), e);
+  const surface = (u: number, v: number, cible: THREE.Vector3) => {
+    const a = v * Math.PI * 2;
+    const yb = BAS(u);
+    const yh = lerp(HAUT, u);
+    const mid = (yb + yh) / 2;
+    const k = bout(u);
+    cible.set(X(u), mid + ((yh - yb) / 2) * k * sp(Math.sin(a), 0.55), lerp(LARGE, u) * k * sp(Math.cos(a), 0.55));
+  };
+  const corps = new ParametricGeometry(surface, 160, 64);
+  // La semelle : le contour du pied, un peu plus large, en plaque fine.
+  const contour = new THREE.Shape();
+  const N = 80;
+  for (let i = 0; i <= N; i++) {
+    const u = i / N;
+    const pt = [X(u), lerp(LARGE, u) * bout(u) * 1.06 + 0.01];
+    if (i === 0) contour.moveTo(pt[0], pt[1]);
+    else contour.lineTo(pt[0], pt[1]);
+  }
+  for (let i = N; i >= 0; i--) {
+    const u = i / N;
+    contour.lineTo(X(u), -(lerp(LARGE, u) * bout(u) * 1.06 + 0.01));
+  }
+  const semelle = new THREE.ExtrudeGeometry(contour, { depth: 0.05, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02, bevelSegments: 3, curveSegments: 4 });
+  semelle.rotateX(Math.PI / 2);
+  semelle.translate(0, -0.005, 0);
+  // Les crampons : des cônes sous la semelle.
   const plots: THREE.BufferGeometry[] = [];
-  for (const x of [-0.82, -0.5, 0.2, 0.55, 0.9])
-    for (const z of [-0.18, 0.18]) {
-      const c = new THREE.CylinderGeometry(0.07, 0.09, 0.2, 16);
-      c.translate(x, -0.92, z);
-      plots.push(c);
+  for (const [u, z] of [[0.06, -0.13], [0.06, 0.13], [0.2, 0], [0.55, -0.2], [0.55, 0.2], [0.72, -0.2], [0.72, 0.2], [0.88, 0]]) {
+    const c = new THREE.CylinderGeometry(0.07, 0.045, 0.11, 24);
+    c.translate(X(u), -0.11, z);
+    plots.push(c.toNonIndexed());
+  }
+  // La bande sur le côté, en verre : une virgule du talon vers les lacets.
+  const bande = (cote: number) => {
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= 24; i++) {
+      const t = i / 24;
+      const u = 0.1 + t * 0.56;
+      const h = 0.08 + Math.sin(t * Math.PI * 0.9) * 0.26 + t * 0.06;
+      const p = new THREE.Vector3();
+      surface(u, 0, p);
+      pts.push(new THREE.Vector3(X(u), h, cote * (p.z + 0.012)));
     }
-  // Les lacets : trois barrettes sur le cou-de-pied.
+    const t = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 64, 0.04, 10, false);
+    t.scale(1, 1, 0.35);
+    return t.toNonIndexed();
+  };
+  // Le col, en verre, et quatre lacets en travers du cou-de-pied.
+  const col = new THREE.TorusGeometry(0.2, 0.045, 16, 64);
+  col.scale(1.2, 1, 1.05);
+  col.rotateX(Math.PI / 2);
+  col.rotateZ(0.12);
+  col.translate(X(0.17), 0.75, 0);
   const lacets: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < 3; i++) {
-    const b = new THREE.CapsuleGeometry(0.035, 0.42, 6, 12);
-    b.rotateX(Math.PI / 2);
-    b.translate(-0.05 + i * 0.2, 0.34 - i * 0.11, 0);
-    lacets.push(b);
+  for (let i = 0; i < 4; i++) {
+    const u = 0.32 + i * 0.075;
+    const l = new THREE.CapsuleGeometry(0.026, 0.3, 6, 12);
+    l.rotateX(Math.PI / 2);
+    l.rotateZ(-0.6);
+    l.translate(X(u), lerp(HAUT, u) + 0.01, 0);
+    lacets.push(l.toNonIndexed());
   }
   return [
     { geo: corps, role: "corps" },
-    { geo: sem, role: "sombre" },
-    { geo: mergeGeometries(plots), role: "corps" },
-    { geo: mergeGeometries(lacets), role: "verre" },
+    { geo: mergeGeometries([semelle, ...plots]), role: "sombre" },
+    { geo: mergeGeometries([bande(1), bande(-1), col.toNonIndexed(), ...lacets]), role: "verre" },
   ];
 }
 
@@ -201,23 +294,32 @@ function cage(): Piece[] {
 
 /** Le trophée : une coupe tournée, deux anses, un socle. */
 function trophee(): Piece[] {
-  const profil = [
-    [0, -1.0], [0.62, -1.0], [0.62, -0.78], [0.42, -0.74], [0.4, -0.62],
-    [0.14, -0.55], [0.1, -0.2], [0.16, -0.08], [0.55, 0.08], [0.78, 0.42],
-    [0.84, 0.86], [0.78, 0.88], [0.7, 0.5], [0.5, 0.18], [0, 0.1],
-  ].map(([x, y]) => new THREE.Vector2(x, y));
-  const coupe = new THREE.LatheGeometry(profil, 96);
-  const anses = [-1, 1].map((cote) => {
-    const t = new THREE.TorusGeometry(0.3, 0.06, 16, 48, Math.PI * 1.15);
-    t.rotateZ(cote > 0 ? -Math.PI * 0.55 : Math.PI * 0.4 + Math.PI * 0.15);
-    t.translate(cote * 0.8, 0.5, 0);
-    return t;
+  // Le profil, lissé par une courbe : la coupe évasée, la lèvre, le nœud
+  // de la tige. Le socle à deux marches est à part, en chrome sombre.
+  const courbe = new THREE.SplineCurve(
+    [
+      [0, -0.42], [0.2, -0.42], [0.2, -0.36], [0.07, -0.3], [0.06, -0.12],
+      [0.13, -0.06], [0.07, 0.0], [0.09, 0.12], [0.36, 0.26], [0.58, 0.52],
+      [0.68, 0.86], [0.72, 1.02], [0.66, 1.03], [0.6, 0.88], [0.48, 0.56],
+      [0.2, 0.34], [0, 0.32],
+    ].map(([x, y]) => new THREE.Vector2(x, y))
+  );
+  const coupe = new THREE.LatheGeometry(courbe.getPoints(100), 96);
+  // Les anses : deux longues oreilles, d'un tube qui suit la coupe.
+  const anses = [-1, 1].map((k) => {
+    const pts = [
+      [0.5, 0.42], [0.86, 0.46], [1.04, 0.66], [0.98, 0.88], [0.7, 0.92],
+    ].map(([x, y]) => new THREE.Vector3(k * x, y, 0));
+    return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 64, 0.045, 16, false);
   });
-  const socle = new THREE.CylinderGeometry(0.7, 0.75, 0.22, 64);
-  socle.translate(0, -1.1, 0);
+  const marche = (r1: number, r2: number, h: number, y: number) => {
+    const c = new THREE.CylinderGeometry(r1, r2, h, 96);
+    c.translate(0, y, 0);
+    return c;
+  };
   return [
-    { geo: mergeGeometries([coupe, ...anses]), role: "corps" },
-    { geo: socle, role: "sombre" },
+    { geo: mergeGeometries([coupe.index ? coupe.toNonIndexed() : coupe, ...anses.map((t) => t.toNonIndexed())]), role: "corps" },
+    { geo: mergeGeometries([marche(0.34, 0.4, 0.16, -0.5), marche(0.44, 0.48, 0.14, -0.64)]), role: "sombre" },
   ];
 }
 
@@ -226,15 +328,17 @@ function trophee(): Piece[] {
 /** La pépite d'or : une pierre taillée en brillant. */
 function pepite(): Piece[] {
   // Taillée comme un brillant : la table, la couronne, le rondiste, la
-  // culasse en pointe. Huit pans, à facettes franches.
+  // culasse en pointe. Douze pans, deux rangs de facettes, franches.
   const profil = [
     new THREE.Vector2(0, -1),
-    new THREE.Vector2(1, 0.12),
-    new THREE.Vector2(1, 0.24),
-    new THREE.Vector2(0.62, 0.62),
-    new THREE.Vector2(0, 0.62),
+    new THREE.Vector2(0.62, -0.42),
+    new THREE.Vector2(1, 0.1),
+    new THREE.Vector2(1, 0.2),
+    new THREE.Vector2(0.84, 0.42),
+    new THREE.Vector2(0.55, 0.58),
+    new THREE.Vector2(0, 0.58),
   ];
-  const g = new THREE.LatheGeometry(profil, 8);
+  const g = new THREE.LatheGeometry(profil, 12);
   const plate = g.toNonIndexed();
   plate.computeVertexNormals();
   return [{ geo: plate, role: "corps" }];
