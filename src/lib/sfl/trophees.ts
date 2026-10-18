@@ -162,3 +162,23 @@ export function prochain(etats: EtatTrophee[]): EtatTrophee | null {
 export function clesGagnees(etats: EtatTrophee[]): string[] {
   return etats.flatMap((e) => Array.from({ length: e.palier }, (_, i) => `${e.def.id}:${i + 1}`));
 }
+
+/**
+ * Qui d'autre a un badge de palier : chaque joueur de la liste qui a atteint
+ * au moins `palierMin`, avec son propre palier, du plus haut au plus bas.
+ */
+export function detenteurs(
+  saison: Saison,
+  id: TropheeId,
+  noms: string[],
+  palierMin = 1,
+  maintenant?: Date
+): { nom: string; palier: number; valeur: number }[] {
+  return noms
+    .map((nom) => {
+      const e = vitrine(saison, nom, maintenant).find((x) => x.def.id === id)!;
+      return { nom, palier: e.palier, valeur: e.valeur };
+    })
+    .filter((d) => d.palier >= Math.max(1, palierMin))
+    .sort((a, b) => b.palier - a.palier || b.valeur - a.valeur || a.nom.localeCompare(b.nom));
+}
