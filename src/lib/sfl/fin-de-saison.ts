@@ -73,6 +73,23 @@ export function finsDeSaison(saison: Saison, nom: string, players: Player[]): Et
   });
 }
 
+/** Tous les podiums d'un classement, saison close par saison close, de la plus récente à la plus ancienne. */
+export function podiumsDe(saison: Saison, id: ClassementId, noms?: Set<string>): { nom: string; rang: number; saison: string }[] {
+  const def = CLASSEMENTS.find((c) => c.id === id)!;
+  const out: { nom: string; rang: number; saison: string }[] = [];
+  for (const a of [...(saison.archives ?? [])].reverse()) {
+    const players = deriveSeason(saisonDepuisArchive(a)).players;
+    const podium: { nom: string; rang: number; saison: string }[] = [];
+    for (const p of players) {
+      if (noms && !noms.has(p.name)) continue;
+      const r = rang(players, p.name, def.valeur);
+      if (r && r.rang <= 3) podium.push({ nom: p.name, rang: r.rang, saison: a.nom });
+    }
+    out.push(...podium.sort((x, y) => x.rang - y.rang || x.nom.localeCompare(y.nom)));
+  }
+  return out;
+}
+
 /** « 1er », « 2e »… */
 export function ordinal(n: number): string {
   return n === 1 ? "1er" : `${n}e`;

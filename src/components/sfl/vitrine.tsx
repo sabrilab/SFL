@@ -20,28 +20,20 @@
 // gagné depuis la dernière visite.
 
 import { useEffect, useId, useMemo, useState } from "react";
-import {
-  Award,
-  CalendarCheck,
-  Check,
-  Crown,
-  Flame,
-  Forward,
-  Goal,
-  Hourglass,
-  Shield,
-  ShieldCheck,
-  Trophy,
-  Zap,
-} from "lucide-react";
+import { Check } from "lucide-react";
+import { EMBLEMES, EMBLEMES_SAISON } from "@/components/sfl/emblemes";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useSession } from "@/hooks/use-session";
-import { finsDeSaison, ordinal, type ClassementId, type EtatClassement } from "@/lib/sfl/fin-de-saison";
+import { finsDeSaison, ordinal, podiumsDe, type ClassementId, type EtatClassement } from "@/lib/sfl/fin-de-saison";
+import { PlayerCard } from "@/components/sfl/player-card";
+import { useCardViewer } from "@/components/sfl/card-viewer";
+import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import {
   clesGagnees,
+  detenteurs,
   metal,
   METAUX,
   NOM_METAL,
@@ -54,27 +46,6 @@ import {
   type TropheeId,
 } from "@/lib/sfl/trophees";
 import { cn } from "@/lib/utils";
-
-const EMBLEMES: Record<TropheeId, typeof Crown> = {
-  buts: Goal,
-  passes: Forward,
-  matchs: CalendarCheck,
-  victoires: Trophy,
-  mvp: Award,
-  mur: Shield,
-  impact: Zap,
-  cleanSheet: ShieldCheck,
-  serie: Flame,
-  saisons: Hourglass,
-};
-
-const EMBLEMES_SAISON: Record<ClassementId, typeof Crown> = {
-  pepite: Crown,
-  buteur: Goal,
-  passeur: Forward,
-  defenseur: Shield,
-  mvp: Award,
-};
 
 /** Les métaux : le dégradé, l'encre gravée dessus, le listel du bord. */
 const METAL: Record<Metal, { stops: [string, string, string]; encre: string; listel: string; trait: string }> = {
@@ -315,8 +286,8 @@ export function VitrineBadges({ nom }: { nom: string }) {
 
       <Sheet open={!!choix} onOpenChange={(o) => !o && setChoix(null)}>
         <SheetContent side="bottom" className="mx-auto max-h-[90vh] w-full overflow-y-auto rounded-t-[28px] px-5 pt-6 pb-8 sm:max-w-md">
-          {detailPalier && <FeuillePalier e={detailPalier} />}
-          {detailSaison && <FeuilleSaison e={detailSaison} />}
+          {detailPalier && <FeuillePalier e={detailPalier} moi={nom} />}
+          {detailSaison && <FeuilleSaison e={detailSaison} moi={nom} />}
         </SheetContent>
       </Sheet>
     </div>
@@ -366,7 +337,7 @@ function ProchainBadge({ e, onOpen }: { e: EtatTrophee; onOpen: () => void }) {
 }
 
 /** La feuille d'un badge de palier : ses quatre marches. */
-function FeuillePalier({ e }: { e: EtatTrophee }) {
+function FeuillePalier({ e, moi }: { e: EtatTrophee; moi: string }) {
   const m = metal(e.palier);
   return (
     <div className="flex flex-col items-center gap-4">
@@ -420,12 +391,13 @@ function FeuillePalier({ e }: { e: EtatTrophee }) {
           );
         })}
       </ol>
+      <AussiPalier e={e} moi={moi} />
     </div>
   );
 }
 
 /** La feuille d'un classement de fin de saison : ses podiums, et le rang du moment. */
-function FeuilleSaison({ e }: { e: EtatClassement }) {
+function FeuilleSaison({ e, moi }: { e: EtatClassement; moi: string }) {
   const unite = (n: number) => `${n} ${n > 1 ? e.def.unite[1] : e.def.unite[0]}`;
   return (
     <div className="flex flex-col items-center gap-4">
@@ -472,8 +444,105 @@ function FeuilleSaison({ e }: { e: EtatClassement }) {
           </li>
         )}
       </ol>
+      <AussiSaison id={e.def.id} moi={moi} />
     </div>
   );
+}
+
+/* ---------------------------- Qui d'autre l'a ---------------------------- */
+
+/** Un joueur qui a le badge : sa photo, son nom, son métal. Le toucher ouvre sa carte. */
+function Detenteur({ nom, m, detail }: { nom: string; m: Metal; detail: string }) {
+  const { players } = useSeason();
+  const { open } = useCardViewer();
+  const src = usePlayerPhoto(nom);
+  const [cassee, setCassee] = useState(false);
+  const p = players.find((x) => x.name === nom);
+  return (
+    <li>
+      <button
+        type="button"
+        disabled={!p}
+        onClick={() =>
+          p &&
+          open({
+            cacheKey: `badge-${nom}`,
+            mode: "simple",
+            title: nom,
+            subtitle: detail,
+            render: (s) => <PlayerCard player={p} size={s} />,
+          })
+        }
+        aria-label={`${nom}, ${detail}. Voir sa carte`}
+        className="flex w-full min-h-11 items-center gap-3 rounded-[14px] px-1 py-1.5 text-left active:bg-foreground/[0.06]"
+      >
+        <span className="relative size-9 shrink-0">
+          <span className="flex size-9 items-center justify-center overflow-hidden rounded-full bg-foreground/10 text-[13px] font-bold">
+            {cassee ? (
+              nom[0]
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={src} alt="" className="size-full object-cover" onError={() => setCassee(true)} />
+            )}
+          </span>
+          <span
+            className="absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-popover"
+            style={{ background: fond(m) }}
+            aria-hidden
+          />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{nom}</span>
+        <span className="shrink-0 text-[13px] text-foreground/70">{detail}</span>
+      </button>
+    </li>
+  );
+}
+
+function ListeDetenteurs({ titre, gens }: { titre: string; gens: { nom: string; m: Metal; detail: string }[] }) {
+  return (
+    <section className="w-full" aria-label={titre}>
+      <h3 className="mb-1.5 flex items-baseline justify-between px-1 text-[15px] font-bold">
+        {titre}
+        <span className="font-mono text-[12px] text-foreground/65 tabular-nums">{gens.length}</span>
+      </h3>
+      {gens.length ? (
+        <ul className="flex flex-col">
+          {gens.map((g) => (
+            <Detenteur key={g.nom + g.detail} {...g} />
+          ))}
+        </ul>
+      ) : (
+        <p className="px-1 text-[14px] text-foreground/70">Personne pour l&apos;instant</p>
+      )}
+    </section>
+  );
+}
+
+/** Qui d'autre a ce badge de palier, à n'importe quel palier. */
+function AussiPalier({ e, moi }: { e: EtatTrophee; moi: string }) {
+  const { saison, players } = useSeason();
+  const gens = useMemo(
+    () =>
+      detenteurs(
+        saison,
+        e.def.id,
+        players.map((p) => p.name).filter((n) => n !== moi),
+        1,
+        new Date()
+      ).map((d) => ({ nom: d.nom, m: metal(d.palier)!, detail: `${NOM_METAL[metal(d.palier)!]} · ${quantite(e.def, d.valeur)}` })),
+    [saison, players, e.def, moi]
+  );
+  return <ListeDetenteurs titre={e.palier ? "Ils l'ont aussi" : "Ils l'ont déjà"} gens={gens} />;
+}
+
+/** Qui d'autre est monté sur ce podium de fin de saison. */
+function AussiSaison({ id, moi }: { id: ClassementId; moi: string }) {
+  const { saison, players } = useSeason();
+  const gens = useMemo(() => {
+    const noms = new Set(players.map((p) => p.name).filter((n) => n !== moi));
+    return podiumsDe(saison, id, noms).map((p) => ({ nom: p.nom, m: METAL_RANG[p.rang], detail: `${ordinal(p.rang)} · ${p.saison}` }));
+  }, [saison, players, id, moi]);
+  return <ListeDetenteurs titre="Sur ce podium" gens={gens} />;
 }
 
 /* ----------------------------- Nouveaux badges ---------------------------- */
@@ -525,4 +594,27 @@ export function NouveauxBadges() {
   }, [actif, saison, me]);
 
   return null;
+}
+
+/**
+ * La feuille d'un badge pour n'importe quel joueur (fiche joueur, par
+ * exemple) : ses paliers ou ses podiums, et qui d'autre l'a. À poser dans un
+ * SheetContent.
+ */
+export function FeuilleBadge({
+  nom,
+  badge,
+}: {
+  nom: string;
+  badge: { famille: "palier"; id: TropheeId } | { famille: "saison"; id: ClassementId };
+}) {
+  const { saison, allPlayers } = useSeason();
+  const e = useMemo(
+    () =>
+      badge.famille === "palier"
+        ? { famille: "palier" as const, e: vitrine(saison, nom, new Date()).find((x) => x.def.id === badge.id)! }
+        : { famille: "saison" as const, e: finsDeSaison(saison, nom, allPlayers).find((x) => x.def.id === badge.id)! },
+    [saison, allPlayers, nom, badge.famille, badge.id]
+  );
+  return e.famille === "palier" ? <FeuillePalier e={e.e} moi={nom} /> : <FeuilleSaison e={e.e} moi={nom} />;
 }
