@@ -265,6 +265,8 @@ function CardMesh({
   bezel,
   startFace = "front",
   interactive = true,
+  posee = false,
+  onAffichee,
 }: {
   background: string;
   playerLayer: string;
@@ -275,11 +277,16 @@ function CardMesh({
   startFace?: "front" | "back";
   /** false = décorative, ne répond pas au glissement (fans de pack). */
   interactive?: boolean;
+  /** true = déjà posée de face, sans l'arrivée en tournant (elle prend la place de la carte plate). */
+  posee?: boolean;
+  /** Appelé dès la première image avec les trois calques chargés. */
+  onAffichee?: () => void;
 }) {
   const { camera, invalidate } = useThree();
   const bgTex = useLayerTexture(background);
   const playerTex = useLayerTexture(playerLayer);
   const statsTex = useLayerTexture(stats);
+  const affichee = useRef(false);
   const backTex = useMemo(() => makeBackTexture(bezel), [bezel]);
 
   const persp = camera as THREE.PerspectiveCamera;
@@ -294,8 +301,9 @@ function CardMesh({
   // Machine à états du mouvement : intro (arrivée lente) → idle ;
   // drag (suivi du doigt) → inertia (élan amorti puis pose sur une face).
   const mode = useRef<"intro" | "idle" | "drag" | "inertia">("intro");
-  const current = useRef({ x: 0.2, y: -2.6, scale: 0.7 });
-  const target = useRef({ x: 0, y: startFace === "back" ? Math.PI : 0, scale: 1 });
+  const face = startFace === "back" ? Math.PI : 0;
+  const current = useRef(posee ? { x: 0, y: face, scale: 1 } : { x: 0.2, y: -2.6, scale: 0.7 });
+  const target = useRef({ x: 0, y: face, scale: 1 });
   const velY = useRef(0);
   const drag = useRef({ startX: 0, startY: 0, baseRotY: 0 });
 
@@ -314,6 +322,12 @@ function CardMesh({
   }, [invalidate]);
 
   useFrame((_, delta) => {
+    // TextureLoader ne pose `image` qu'une fois le calque chargé.
+    if (!affichee.current && bgTex.image && playerTex.image && statsTex.image) {
+      // Cette image-ci est la première complète : on le dit une fois dessinée.
+      affichee.current = true;
+      requestAnimationFrame(() => onAffichee?.());
+    }
     const c = current.current;
     const t = target.current;
     const m = mode.current;
@@ -581,6 +595,8 @@ export function CardCanvas({
   mode,
   startFace = "front",
   interactive = true,
+  posee,
+  onAffichee,
   onReady,
 }: {
   background: string;
@@ -592,6 +608,8 @@ export function CardCanvas({
   interactive?: boolean;
   /** Appelé une fois les shaders compilés (préchauffe WebGL, voir AppSplash). */
   onReady?: () => void;
+  posee?: boolean;
+  onAffichee?: () => void;
 }) {
   return (
     <Canvas
@@ -611,6 +629,8 @@ export function CardCanvas({
         bezel={BEZEL_COLOR[mode]}
         startFace={startFace}
         interactive={interactive}
+        posee={posee}
+        onAffichee={onAffichee}
       />
       {onReady && <ShaderWarmup onReady={onReady} />}
     </Canvas>

@@ -7,7 +7,7 @@
 
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Card3D } from "./card-3d";
+import { Card3D, prechaufferCarte } from "./card-3d";
 
 interface ViewedCard {
   cacheKey: string;
@@ -42,6 +42,7 @@ export function CardViewerProvider({ children }: { children: ReactNode }) {
                 mode={viewed.mode}
                 size={1.15}
                 render={viewed.render}
+                apercu
               />
               <div className="flex flex-col items-center gap-0.5 rounded-3xl bg-card px-5 py-3 text-center">
                 <span className="text-base font-bold">{viewed.title}</span>
@@ -85,7 +86,10 @@ export function ViewableCard({
       role="button"
       tabIndex={0}
       aria-label={`Voir la carte ${title} en grand`}
-      onPointerDown={(e) => setDownAt({ x: e.clientX, y: e.clientY })}
+      onPointerDown={(e) => {
+        setDownAt({ x: e.clientX, y: e.clientY });
+        prechaufferCarte();
+      }}
       onPointerUp={(e) => {
         if (downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 8) {
           open({ cacheKey, mode, title, subtitle, render });

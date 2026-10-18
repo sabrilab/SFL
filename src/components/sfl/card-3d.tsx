@@ -11,16 +11,133 @@
 // WebGL ne démarrent que quand la carte entre dans le viewport, et le
 // montage reste acquis ensuite — utile dès qu'on affiche ce composant en
 // nombre (accueil, classements) sans épuiser les contextes WebGL.
+//
+// Vitesse d'ouverture : les polices de la carte sont mises en ligne une
+// seule fois par session (policesEnLigne), et la photo vient du cache du
+// navigateur — son URL est déjà versionnée (lib/sfl/photos), aucun besoin
+// de « cacheBust », qui re-téléchargeait polices et photo à chaque calque.
+// prechaufferCarte() lance tout ça dès qu'on pose le doigt sur une carte.
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { toPng } from "html-to-image";
 import { useBadgeRevision } from "@/hooks/use-badge-carte";
 import { usePhotoRevision } from "@/hooks/use-player-photo";
+import { IMAGE_EVENT } from "@/lib/sfl/badges-3d/rendu";
 
-const CardCanvas = dynamic(() => import("./card-3d-canvas").then((m) => m.CardCanvas), {
+const chargerCanvas = () => import("./card-3d-canvas");
+
+const CardCanvas = dynamic(() => chargerCanvas().then((m) => m.CardCanvas), {
   ssr: false,
 });
+
+/** Les familles de polices d'un nœud et de ses enfants (style calculé). */
+function familles(node: HTMLElement): Set<string> {
+  const set = new Set<string>();
+  const parcourir = (el: Element) => {
+    getComputedStyle(el)
+      .fontFamily.split(",")
+      .forEach((f) => set.add(f.trim().replace(/["']/g, "")));
+    for (const enfant of el.children) parcourir(enfant);
+  };
+  parcourir(node);
+  return set;
+}
+
+/** Vrai si un `unicode-range` (« U+0-FF, U+131, U+4?? ») couvre l'un des caractères. */
+function couvre(plages: string, caracteres: Set<number>): boolean {
+  if (!plages) return true;
+  return plages.split(",").some((p) => {
+    const [a, b] = p.trim().replace(/^U\+/i, "").split("-");
+    const debut = parseInt(a.replace(/\?/g, "0"), 16);
+    const fin = parseInt((b ?? a).replace(/\?/g, "F"), 16);
+    for (const c of caracteres) if (c >= debut && c <= fin) return true;
+    return false;
+  });
+}
+
+const fichiersPolice = new Map<string, Promise<string>>();
+
+function enDataUrl(url: string): Promise<string> {
+  let p = fichiersPolice.get(url);
+  if (!p) {
+    p = fetch(url)
+      .then((r) => r.blob())
+      .then(
+        (blob) =>
+          new Promise<string>((ok, ko) => {
+            const lecteur = new FileReader();
+            lecteur.onload = () => ok(lecteur.result as string);
+            lecteur.onerror = ko;
+            lecteur.readAsDataURL(blob);
+          })
+      );
+    p.catch(() => fichiersPolice.delete(url));
+    fichiersPolice.set(url, p);
+  }
+  return p;
+}
+
+const policesParJeu = new Map<string, Promise<string | undefined>>();
+
+/**
+ * Le CSS des polices d'une carte, fichiers inclus en data URL, à donner à
+ * html-to-image (fontEmbedCSS). Seuls les @font-face des familles de la
+ * carte ET des alphabets de son texte sont gardés : Next découpe chaque
+ * police en sous-ensembles (latin, cyrillique, grec, vietnamien…) et
+ * html-to-image les embarquait tous — près de 30 fichiers, ~600 Ko,
+ * relus pour chaque calque. Ici, quatre fichiers, préparés une fois par
+ * session.
+ */
+function policesEnLigne(node: HTMLElement): Promise<string | undefined> {
+  const fams = familles(node);
+  const caracteres = new Set<number>();
+  for (const c of node.textContent ?? "") caracteres.add(c.codePointAt(0)!);
+  const regles: { css: string; url: string; src: string }[] = [];
+  for (const feuille of Array.from(document.styleSheets)) {
+    let liste: CSSRuleList;
+    try {
+      liste = feuille.cssRules;
+    } catch {
+      continue;
+    }
+    for (const r of Array.from(liste)) {
+      if (!(r instanceof CSSFontFaceRule)) continue;
+      if (!fams.has(r.style.getPropertyValue("font-family").trim().replace(/["']/g, ""))) continue;
+      if (!couvre(r.style.getPropertyValue("unicode-range"), caracteres)) continue;
+      const src = r.style.getPropertyValue("src");
+      const m = /url\(["']?([^"')]+)["']?\)/.exec(src);
+      if (!m) continue;
+      regles.push({ css: r.cssText, src: m[0], url: new URL(m[1], feuille.href ?? document.baseURI).href });
+    }
+  }
+  const cle = regles.map((r) => r.css).join("\n");
+  let css = policesParJeu.get(cle);
+  if (!css) {
+    css = Promise.all(regles.map(async (r) => r.css.replace(r.src, `url("${await enDataUrl(r.url)}")`)))
+      .then((l) => l.join("\n"))
+      // Échec : html-to-image cherchera les polices lui-même, comme avant.
+      .catch(() => {
+        policesParJeu.delete(cle);
+        return undefined;
+      });
+    policesParJeu.set(cle, css);
+  }
+  return css;
+}
+
+/**
+ * À appeler dès qu'on touche une carte qui va s'ouvrir en grand : le code
+ * 3D se charge et les polices se préparent pendant que la pop-up s'ouvre.
+ * `node` = la carte touchée (mêmes polices que la grande).
+ */
+export function prechaufferCarte(node?: HTMLElement | null) {
+  void chargerCanvas();
+  if (node) void document.fonts.ready.then(() => policesEnLigne(node));
+}
+
+/** La part du canvas qu'occupe la carte 3D posée (FILL_RATIO de card-3d-canvas, recopié pour ne pas charger three ici). */
+const REMPLISSAGE_3D = 0.72;
 
 const TRANSPARENT_PX =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
@@ -39,7 +156,8 @@ interface CapturedLayers {
 // leur fond est rendu transparent le temps de la capture).
 async function captureLayer(
   node: HTMLElement,
-  opts: { isolatePart?: "player" | "stats"; excludeParts?: string[] }
+  opts: { isolatePart?: "player" | "stats"; excludeParts?: string[] },
+  fontEmbedCSS: string | undefined
 ): Promise<string> {
   const transparentEls: HTMLElement[] = [];
   let isolateEl: HTMLElement | null = null;
@@ -61,7 +179,10 @@ async function captureLayer(
   try {
     return await toPng(node, {
       pixelRatio: 2,
-      cacheBust: true,
+      fontEmbedCSS,
+      // La photo change d'URL (?v=…) quand le joueur la change : sans ça,
+      // le cache interne de html-to-image garderait l'ancienne.
+      includeQueryParams: true,
       imagePlaceholder: TRANSPARENT_PX,
       filter: (n) => {
         if (isolateEl) {
@@ -82,6 +203,26 @@ async function captureLayer(
       el.style.boxShadow = shadow;
     });
   }
+}
+
+/**
+ * Attend que les badges 3D de la carte aient leur image (badge-3d.tsx
+ * marque l'emblème d'attente) : capturer avant, c'était capturer deux fois.
+ * Vrai si tout est prêt, faux si le délai passe avant.
+ */
+function attendreBadges(node: HTMLElement, delai: number): Promise<boolean> {
+  const pret = () => !node.querySelector("[data-attente-3d]");
+  if (pret()) return Promise.resolve(true);
+  return new Promise((fin) => {
+    const verifier = () => requestAnimationFrame(() => pret() && finir(true));
+    const minuterie = Number.isFinite(delai) ? setTimeout(() => finir(false), delai) : undefined;
+    function finir(ok: boolean) {
+      window.removeEventListener(IMAGE_EVENT, verifier);
+      clearTimeout(minuterie);
+      fin(ok);
+    }
+    window.addEventListener(IMAGE_EVENT, verifier);
+  });
 }
 
 function useInView(ref: React.RefObject<HTMLElement | null>) {
@@ -113,10 +254,17 @@ export function Card3D(props: {
   render: (size: number) => ReactNode;
   startFace?: "front" | "back";
   interactive?: boolean;
+  /**
+   * true = la carte plate s'affiche tout de suite, photo comprise, à la place
+   * du squelette ; la 3D la remplace, déjà posée, dès qu'elle est prête.
+   * Pour la pop-up d'une carte qu'on vient de toucher.
+   */
+  apercu?: boolean;
 }) {
   // Une photo posée ou changée (chez soi ou par un autre joueur) : la capture
   // repart, sinon la 3D garderait l'ancienne image. Même chose pour le badge
-  // choisi pour la carte, et son image 3D quand elle est prête.
+  // choisi pour la carte. Son image 3D, elle, est attendue par la capture
+  // (attendreBadges) : la moindre image prête ailleurs ne relance plus tout.
   const revision = usePhotoRevision();
   const badges = useBadgeRevision();
   return <Card3DInner key={`${props.cacheKey}~${revision}~${badges}`} {...props} />;
@@ -128,6 +276,7 @@ function Card3DInner({
   render,
   startFace = "front",
   interactive = true,
+  apercu = false,
 }: {
   size?: number;
   /** Contrôle la couleur du bezel et l'intensité de l'effet holo. */
@@ -138,11 +287,24 @@ function Card3DInner({
   startFace?: "front" | "back";
   /** false = décorative, ne répond pas au glissement (fans de pack). */
   interactive?: boolean;
+  apercu?: boolean;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
   const [captured, setCaptured] = useState<CapturedLayers | null>(null);
+  /** Monte quand un badge 3D arrive après la capture : on recapture, sans repasser par le squelette. */
+  const [essai, setEssai] = useState(0);
   const inView = useInView(wrapperRef);
+  /** Taille de la carte source, lue dès son montage (l'aperçu en a besoin avant la capture). */
+  const [source, setSource] = useState<{ width: number; height: number } | null>(null);
+  /** La 3D a dessiné sa première image : l'aperçu plat peut s'effacer. */
+  const [affichee, setAffichee] = useState(false);
+
+  useLayoutEffect(() => {
+    const node = captureRef.current;
+    if (!apercu || !inView || !node) return;
+    setSource({ width: node.offsetWidth, height: node.offsetHeight });
+  }, [apercu, inView]);
 
   useEffect(() => {
     if (!inView) return;
@@ -162,12 +324,17 @@ function Card3DInner({
         // Séquentiel : chaque capture bascule temporairement le fond de
         // certains nœuds partagés, donc deux captures concurrentes sur le
         // même arbre se marcheraient dessus.
-        const background = await captureLayer(node, { excludeParts: ["player", "stats"] });
-        const playerLayer = await captureLayer(node, { isolatePart: "player" });
-        const stats = await captureLayer(node, { isolatePart: "stats" });
-        if (!cancelled) {
-          setCaptured({ background, playerLayer, stats, width, height });
-        }
+        const prets = await attendreBadges(node, 600);
+        if (cancelled) return;
+        const polices = await policesEnLigne(node);
+        const background = await captureLayer(node, { excludeParts: ["player", "stats"] }, polices);
+        if (cancelled) return;
+        const playerLayer = await captureLayer(node, { isolatePart: "player" }, polices);
+        if (cancelled) return;
+        const stats = await captureLayer(node, { isolatePart: "stats" }, polices);
+        if (cancelled) return;
+        setCaptured({ background, playerLayer, stats, width, height });
+        if (!prets) void attendreBadges(node, Infinity).then(() => !cancelled && setEssai((n) => n + 1));
       } catch {
         // rasterisation indisponible — la carte plate ci-dessous reste
         // affichée en repli
@@ -177,13 +344,14 @@ function Card3DInner({
     return () => {
       cancelled = true;
     };
-  }, [inView]);
+  }, [inView, essai]);
 
   // Dimensions estimées avant capture (base CardShell ~260×376 avec
   // bannière) pour que le skeleton occupe déjà la bonne place — la taille
   // exacte prend le relais dès que la capture aboutit.
-  const width = (captured ? captured.width : 260) * size;
-  const height = (captured ? captured.height : 376) * size;
+  const dims = captured ?? source;
+  const width = (dims ? dims.width : 260) * size;
+  const height = (dims ? dims.height : 376) * size;
 
   return (
     <div ref={wrapperRef} style={{ position: "relative", width, height }}>
@@ -198,6 +366,28 @@ function Card3DInner({
         </div>
       )}
 
+      {apercu && source && (
+        // La carte plate, à la taille exacte de la 3D posée, par-dessus le
+        // canvas jusqu'à sa première image, puis fondue.
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            width: source.width,
+            height: source.height,
+            transform: `translate(-50%, -50%) scale(${size * REMPLISSAGE_3D})`,
+            opacity: affichee ? 0 : 1,
+            transition: "opacity 220ms ease-out",
+            pointerEvents: "none",
+            zIndex: 1,
+          }}
+        >
+          {render(1)}
+        </div>
+      )}
+
       {captured ? (
         <CardCanvas
           background={captured.background}
@@ -207,8 +397,10 @@ function Card3DInner({
           mode={mode}
           startFace={startFace}
           interactive={interactive}
+          posee={apercu}
+          onAffichee={() => setAffichee(true)}
         />
-      ) : (
+      ) : apercu ? null : (
         // Skeleton pendant la capture : jamais de carte 2D "flash" avant
         // le rendu 3D, juste un shimmer discret aux couleurs de la carte.
         <div
