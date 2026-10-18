@@ -234,6 +234,7 @@ export function BolaCard({
   size = 1,
   photo,
   numero,
+  onglet,
   badge,
 }: {
   name: string;
@@ -248,6 +249,8 @@ export function BolaCard({
   photo?: string | null;
   /** Le numéro de maillot, quand le joueur en a un. */
   numero?: number | null;
+  /** Pastille seulement : l'onglet de la note aux couleurs d'une équipe (feuille de match). */
+  onglet?: { fond: string; encre: string };
   /** Le badge du coin ; null = coin vide ; absent = l'ancienne mise en page (numéro ou poste). */
   badge?: BadgeCarte | null;
 }) {
@@ -308,8 +311,10 @@ export function BolaCard({
             padding: "0 7%",
             boxSizing: "border-box",
             borderTopLeftRadius: largeur * 0.12,
-            background: encre(1),
-            color: edition === "mvp" ? "#08090b" : "#f4f5f2",
+            background: onglet?.fond ?? encre(1),
+            color: onglet?.encre ?? (edition === "mvp" ? "#08090b" : "#f4f5f2"),
+            // Un onglet clair sur le papier clair : un filet le détache.
+            boxShadow: onglet ? `inset 1px 1px 0 ${onglet.encre}33` : undefined,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
