@@ -8,8 +8,9 @@
 //     photo du maillot Bola (public/avatars/maillot-<coloris>.png, capturé sur
 //     bola-site /sponsoring sans sponsor : avec un sponsor sur la référence,
 //     le modèle le recopie) donnent la photo de studio ;
-//   · { filtre: "argentique" | "marbre" | "manga", source: dataURL } : la photo
-//     de studio passe par le filtre, visage et maillot gardés.
+//   · { filtre: "drapeau", pays, source: dataURL } : le fond gris de la photo
+//     de studio devient le drapeau du pays choisi, le reste gardé ;
+//   · { filtre: "manga", source: dataURL } : la photo de studio redessinée.
 //
 // Le crédit fal est celui de Sabri : chaque appel est noté dans la table
 // photo_studio, et un joueur s'arrête à LIMITE_JOUR générations sur 24 h.
@@ -20,10 +21,11 @@ import { createClient } from "@supabase/supabase-js";
 import {
   LIMITE_JOUR,
   SELFIES_MAX,
+  PAYS,
   estColoris,
   estFiltre,
+  estPays,
   type Coloris,
-  type Filtre,
 } from "@/lib/sfl/photo-studio";
 
 export const maxDuration = 120;
@@ -53,14 +55,12 @@ function promptStudio(coloris: Coloris): string {
   ].join(" ");
 }
 
-const PROMPTS_FILTRES: Record<Exclude<Filtre, "studio">, string> = {
-  argentique:
-    "Turn this exact photo into a black and white silver-gelatin studio portrait: same person, same face, same pose, same framing and jersey with its BOLA and SFL marks. Rich deep blacks, clean whites, fine film grain, slightly harder light with a defined shadow side, plain light grey backdrop. Classic 1960s football team photographer look. No text.",
-  marbre:
-    "Turn this exact photo into a white Carrara marble bust: same person, same face and expression, same hairstyle carved in stone, same pose and framing, the football jersey carved in marble with its collar, cuffs and small chest marks in low relief. Soft museum light, subtle grey veins in the marble, plain light grey backdrop. Classical sculpture, photographed. No text.",
-  manga:
-    "Redraw this exact photo as a black and white manga panel: same person, recognisable face, same hairstyle and facial hair, same pose, same framing, same jersey with its BOLA and SFL marks. Clean confident ink lines, screentone shading, speed lines radiating softly behind the head, pure white paper. Sports manga cover style. No speech bubbles, no extra text.",
-};
+function promptDrapeau(pays: string): string {
+  return `Keep this exact photo: same person, same face, same expression, same pose, same framing, same BOLA jersey with its marks, same studio lighting on the person. Only replace the plain grey backdrop with the national flag of ${pays}, large and gently waving, filling the whole background behind the player, slightly out of focus like a backdrop in a football team photo shoot. The flag colours and emblem must be accurate. No text, no other people.`;
+}
+
+const PROMPT_MANGA =
+  "Redraw this exact photo as a black and white manga panel: same person, recognisable face, same hairstyle and facial hair, same pose, same framing, same jersey with its BOLA and SFL marks. Clean confident ink lines, screentone shading, speed lines radiating softly behind the head, pure white paper. Sports manga cover style. No speech bubbles, no extra text.";
 
 function estImage(v: unknown): v is string {
   return (
@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
     coloris?: unknown;
     selfies?: unknown;
     source?: unknown;
+    pays?: unknown;
   };
   if (!corps.accessToken) return erreur("Session requise.", 401);
   if (!estFiltre(corps.filtre)) return erreur("Filtre inconnu.", 400);
@@ -113,7 +114,13 @@ export async function POST(req: NextRequest) {
   } else {
     if (!estImage(corps.source)) return erreur("Photo de studio manquante.", 400);
     images = [corps.source];
-    prompt = PROMPTS_FILTRES[filtre];
+    if (filtre === "drapeau") {
+      const pays = corps.pays;
+      if (!estPays(pays)) return erreur("Choisis un pays.", 400);
+      prompt = promptDrapeau(PAYS.find((p) => p.id === pays)!.en);
+    } else {
+      prompt = PROMPT_MANGA;
+    }
   }
 
   // L'appelant : un joueur accepté, avec ses propres droits (RLS).

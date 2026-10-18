@@ -2,12 +2,13 @@
 
 // Photo officielle : le joueur donne une à trois photos de son visage, choisit
 // le maillot (blanc ou noir) et reçoit une photo de studio au maillot Bola,
-// la même mise en scène pour toutes les cartes. Il peut ensuite la passer par
-// un filtre (Argentique, Marbre, Manga), puis la poser sur sa carte : elle
-// repart alors dans le recadrage habituel (recadrer-photo.tsx).
+// la même mise en scène pour toutes les cartes, sur fond gris (Neutre). Il
+// peut ensuite mettre le drapeau de son pays derrière lui (Drapeau) ou la
+// passer en Manga, puis la poser sur sa carte : elle repart alors dans le
+// recadrage habituel (recadrer-photo.tsx).
 //
 // Les images sont faites côté serveur (/api/photo-studio, fal.ai) ; chaque
-// variante n'est demandée qu'une fois, au premier toucher, puis gardée.
+// variante (un drapeau par pays) n'est demandée qu'une fois, puis gardée.
 
 import { useRef, useState } from "react";
 import { Loader2, Plus, RotateCcw, X } from "lucide-react";
@@ -19,11 +20,19 @@ import { supabase } from "@/lib/supabase";
 import {
   COLORIS,
   FILTRES,
+  PAYS,
   SELFIES_MAX,
   SELFIE_COTE,
+  emojiDrapeau,
   type Coloris,
   type Filtre,
+  type Pays,
 } from "@/lib/sfl/photo-studio";
+
+/** La clé d'une variante : le filtre, et le pays pour un drapeau. */
+function cle(filtre: Filtre, pays: Pays | null): string {
+  return filtre === "drapeau" ? `drapeau-${pays}` : filtre;
+}
 
 /** Un selfie réduit à SELFIE_COTE de côté et recompressé : moins à envoyer. */
 async function reduire(fichier: File): Promise<string> {
@@ -64,17 +73,19 @@ export function PhotoStudio({
   const input = useRef<HTMLInputElement>(null);
   const [selfies, setSelfies] = useState<string[]>([]);
   const [coloris, setColoris] = useState<Coloris>("blanc");
-  const [variantes, setVariantes] = useState<Partial<Record<Filtre, string>>>({});
+  const [variantes, setVariantes] = useState<Record<string, string>>({});
   const [filtre, setFiltre] = useState<Filtre>("studio");
+  const [pays, setPays] = useState<Pays | null>(null);
   const [enCours, setEnCours] = useState<Filtre | null>(null);
 
   const studio = variantes.studio;
-  const affichee = variantes[filtre];
+  const affichee = filtre === "drapeau" && !pays ? undefined : variantes[cle(filtre, pays)];
 
   function reinitialiser() {
     setSelfies([]);
     setVariantes({});
     setFiltre("studio");
+    setPays(null);
     setEnCours(null);
   }
 
@@ -104,19 +115,30 @@ export function PhotoStudio({
     }
   }
 
-  async function choisirFiltre(f: Filtre) {
-    setFiltre(f);
-    if (f === "studio" || variantes[f] || !studio || enCours) return;
+  async function generer(f: Exclude<Filtre, "studio">, p: Pays | null) {
+    const k = cle(f, p);
+    if (variantes[k] || !studio || enCours) return;
     setEnCours(f);
     try {
-      const image = await demander({ filtre: f, source: studio });
-      setVariantes((v) => ({ ...v, [f]: image }));
+      const image = await demander({ filtre: f, source: studio, pays: p ?? undefined });
+      setVariantes((v) => ({ ...v, [k]: image }));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Le filtre n'a pas pu être appliqué.");
-      setFiltre("studio");
+      if (f !== "drapeau") setFiltre("studio");
     } finally {
       setEnCours(null);
     }
+  }
+
+  function choisirFiltre(f: Filtre) {
+    setFiltre(f);
+    if (f === "studio" || (f === "drapeau" && !pays)) return;
+    void generer(f, f === "drapeau" ? pays : null);
+  }
+
+  function choisirPays(p: Pays) {
+    setPays(p);
+    void generer("drapeau", p);
   }
 
   return (
@@ -216,6 +238,11 @@ export function PhotoStudio({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={affichee} alt="Ma photo officielle" className="size-full object-cover" />
                 )}
+                {!affichee && studio && !enCours && (
+                  // Le fond attend : la photo neutre, voilée, sous le choix du pays.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={studio} alt="" className="size-full object-cover opacity-35" />
+                )}
                 {enCours && (
                   <div className="absolute inset-0 grid place-items-center bg-background/40 backdrop-blur-sm">
                     <Loader2 className="size-6 animate-spin" />
@@ -223,7 +250,7 @@ export function PhotoStudio({
                 )}
               </div>
 
-              <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Filtre">
+              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Filtre">
                 {FILTRES.map((f) => (
                   <button
                     key={f.id}
@@ -240,9 +267,9 @@ export function PhotoStudio({
                         filtre === f.id ? "ring-foreground" : "ring-transparent"
                       )}
                     >
-                      {variantes[f.id] && (
+                      {variantes[cle(f.id, pays)] && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={variantes[f.id]} alt="" className="size-full object-cover" />
+                        <img src={variantes[cle(f.id, pays)]} alt="" className="size-full object-cover" />
                       )}
                     </span>
                     <span
@@ -256,6 +283,34 @@ export function PhotoStudio({
                   </button>
                 ))}
               </div>
+
+              {/* Drapeau : le pays, en une rangée qui défile */}
+              {filtre === "drapeau" && (
+                <div
+                  className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none]"
+                  role="radiogroup"
+                  aria-label="Pays"
+                >
+                  {PAYS.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={pays === p.id}
+                      aria-label={p.nom}
+                      disabled={!!enCours}
+                      onClick={() => choisirPays(p.id)}
+                      className={cn(
+                        "flex shrink-0 flex-col items-center gap-1 rounded-2xl px-2.5 py-2 transition-colors",
+                        pays === p.id ? "bg-foreground/10 ring-1 ring-foreground/30" : "bg-secondary/60"
+                      )}
+                    >
+                      <span className="text-[26px] leading-none">{emojiDrapeau(p.id)}</span>
+                      <span className="text-[11px] font-semibold whitespace-nowrap text-muted-foreground">{p.nom}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <div className="flex gap-2.5">
                 <Button
