@@ -22,6 +22,8 @@ const CardCanvas = dynamic(() => import("./card-3d-canvas").then((m) => m.CardCa
 });
 
 const MIN_DISPLAY_MS = 650;
+/** Émis quand le voile se lève (et `data-splash="fini"` posé sur <html>). */
+export const SPLASH_FINI = "sfl-splash-fini";
 const PRELOAD_COUNT = 10;
 
 // Poids de chaque étape (somme = 100) — le préchauffage des shaders est
@@ -83,7 +85,11 @@ export function AppSplash() {
 
       const wait = Math.max(0, MIN_DISPLAY_MS - (Date.now() - start));
       setTimeout(() => {
-        if (!cancelled) setReady(true);
+        if (cancelled) return;
+        setReady(true);
+        // La Map attend ce signal pour lancer son vol et ses entrées.
+        document.documentElement.dataset.splash = "fini";
+        window.dispatchEvent(new Event(SPLASH_FINI));
       }, wait);
     }
 

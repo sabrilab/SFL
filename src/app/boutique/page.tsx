@@ -95,7 +95,6 @@ function GuichetBallons({
             {(
               [
                 ["Carte Standard", CARD_PRICES.simple],
-                ["Carte Rare", CARD_PRICES.rare],
                 ["Carte Défensive", CARD_PRICES.def],
                 ["Carte Impact", CARD_PRICES.impact],
                 ["Carte MVP", CARD_PRICES.mvp],
