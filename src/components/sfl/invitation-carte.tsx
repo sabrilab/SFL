@@ -41,24 +41,27 @@ function enPause(nom: string): boolean {
 export function InvitationCarte() {
   const session = useSession();
   const { player } = useMyPlayer();
-  const nom = session?.server && session.name === player.name ? player.name : null;
+  // En dev, `?invitation` la montre sans compte vérifié (captures d'écran).
+  const apercu =
+    process.env.NODE_ENV !== "production" && typeof window !== "undefined" && window.location.search.includes("invitation");
+  const nom = apercu || (session?.server && session.name === player.name) ? player.name : null;
 
   const [visible, setVisible] = useState(false);
   const [flux, setFlux] = useState(false);
 
   useEffect(() => {
-    if (!nom || enPause(nom)) return;
+    if (!nom || (!apercu && enPause(nom))) return;
     let annule = false;
     const timer = setTimeout(() => {
       void rafraichirPhotos().then(() => {
-        if (!annule && photoPerso(nom) === null) setVisible(true);
+        if (!annule && (apercu || photoPerso(nom) === null)) setVisible(true);
       });
     }, DELAI_MS);
     return () => {
       annule = true;
       clearTimeout(timer);
     };
-  }, [nom]);
+  }, [nom, apercu]);
 
   if (!nom) return null;
 
