@@ -595,3 +595,26 @@ export function NouveauxBadges() {
 
   return null;
 }
+
+/**
+ * La feuille d'un badge pour n'importe quel joueur (fiche joueur, par
+ * exemple) : ses paliers ou ses podiums, et qui d'autre l'a. À poser dans un
+ * SheetContent.
+ */
+export function FeuilleBadge({
+  nom,
+  badge,
+}: {
+  nom: string;
+  badge: { famille: "palier"; id: TropheeId } | { famille: "saison"; id: ClassementId };
+}) {
+  const { saison, allPlayers } = useSeason();
+  const e = useMemo(
+    () =>
+      badge.famille === "palier"
+        ? { famille: "palier" as const, e: vitrine(saison, nom, new Date()).find((x) => x.def.id === badge.id)! }
+        : { famille: "saison" as const, e: finsDeSaison(saison, nom, allPlayers).find((x) => x.def.id === badge.id)! },
+    [saison, allPlayers, nom, badge.famille, badge.id]
+  );
+  return e.famille === "palier" ? <FeuillePalier e={e.e} moi={nom} /> : <FeuilleSaison e={e.e} moi={nom} />;
+}

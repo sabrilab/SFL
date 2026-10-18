@@ -384,6 +384,11 @@ create trigger presence_touch before update on public.presence
 -- aux tables via l'API (certains projets ne l'accordent pas d'office).
 grant usage on schema public to anon, authenticated;
 grant select on public.profiles, public.convocations, public.presence to authenticated;
+-- Le projet accorde d'office UPDATE sur toute la table : un joueur pouvait
+-- alors se passer lui-même admin (is_admin) ou se valider (valide), et écrire
+-- la saison. On retire le droit de table ; seules les colonnes ci-dessous
+-- restent modifiables par le joueur, sur sa propre ligne (RLS).
+revoke insert, update, delete, truncate on public.profiles from anon, authenticated;
 grant update (name, username) on public.profiles to authenticated;
 grant update (contact_email) on public.profiles to authenticated;
 grant update (badge) on public.profiles to authenticated;
@@ -930,6 +935,32 @@ exception
 end;
 $$;
 
+-- ─────────────────────── Photos officielles (studio) ───────────────────────
+-- Chaque photo de studio ou filtre généré par fal.ai (route /api/photo-studio)
+-- laisse une ligne ici : la route compte les dernières 24 h du joueur pour
+-- tenir le crédit fal. Le joueur n'écrit et ne lit que ses lignes ; personne
+-- ne les efface (pas de politique delete), donc on ne remet pas son compteur
+-- à zéro soi-même.
+create table if not exists public.photo_studio (
+  id          bigint generated always as identity primary key,
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  filtre      text not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists photo_studio_user_date on public.photo_studio (user_id, created_at desc);
+
+alter table public.photo_studio enable row level security;
+
+drop policy if exists "photo_studio: je lis les miennes" on public.photo_studio;
+create policy "photo_studio: je lis les miennes"
+  on public.photo_studio for select to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists "photo_studio: je note la mienne" on public.photo_studio;
+create policy "photo_studio: je note la mienne"
+  on public.photo_studio for insert to authenticated
+  with check (user_id = (select auth.uid()));
+
 -- ───────────────────────── Rôle admin ────────────────────────────────
 -- Remise d'aplomb des comptes admin — rejouée à chaque migration, donc à
 -- chaque déploiement qui touche ce fichier. Elle répare TOUS les états de
@@ -964,5 +995,87 @@ begin
          where u.id = p.id and u.email = a.email;
     end;
   end loop;
+end;
+$$;
+
+-- ─────────────────────── Votes des figures de match ───────────────────────
+-- Remis le 17/10 à la demande de Sabri : dans les journées dont le MVP sort
+-- des stats, les joueurs élisent encore le Joueur Impact et le meilleur
+-- défenseur. Un vote par joueur, par journée et par titre, pour un adversaire
+-- de son match (contrôlé par l'app, qui connaît les équipes). Le plus voté de
+-- chaque match prend la carte ; à égalité, tous les ex æquo.
+--
+-- Règle : on vote le jour du match, jusqu'à minuit heure de Paris. La base le
+-- garde aussi : `jour` doit être aujourd'hui à Paris, à l'écriture comme à la
+-- modification — passé minuit, plus rien ne s'écrit pour ce jour-là. (Que ce
+-- jour soit bien celui de la journée, c'est l'app qui le vérifie : la date de
+-- la journée vit dans le document de saison.)
+create table if not exists public.votes_figures (
+  saison     integer not null,
+  j          integer not null,
+  categorie  text    not null check (categorie in ('impact', 'def')),
+  -- Les noms de joueurs de la saison, la clé utilisée partout dans l'app.
+  votant     text    not null,
+  candidat   text    not null,
+  match_id   text    not null,
+  jour       date    not null,
+  votant_id  uuid    not null default auth.uid() references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (saison, j, categorie, votant),
+  check (candidat <> votant)
+);
+
+alter table public.votes_figures enable row level security;
+
+-- Le nom de joueur de l'appelant (profiles.name).
+create or replace function public.mon_nom()
+returns text
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select p.name from public.profiles p where p.id = (select auth.uid());
+$$;
+
+revoke execute on function public.mon_nom() from public, anon;
+grant execute on function public.mon_nom() to authenticated;
+
+drop policy if exists "votes_figures: la ligue lit" on public.votes_figures;
+create policy "votes_figures: la ligue lit"
+  on public.votes_figures for select
+  to authenticated
+  using ((select public.est_membre()));
+
+drop policy if exists "votes_figures: je vote aujourd'hui" on public.votes_figures;
+create policy "votes_figures: je vote aujourd'hui"
+  on public.votes_figures for insert
+  to authenticated
+  with check (
+    (select public.est_membre())
+    and votant_id = (select auth.uid())
+    and votant = (select public.mon_nom())
+    and jour = (now() at time zone 'Europe/Paris')::date
+  );
+
+drop policy if exists "votes_figures: je change d'avis aujourd'hui" on public.votes_figures;
+create policy "votes_figures: je change d'avis aujourd'hui"
+  on public.votes_figures for update
+  to authenticated
+  using (votant_id = (select auth.uid()) and jour = (now() at time zone 'Europe/Paris')::date)
+  with check (
+    votant_id = (select auth.uid())
+    and votant = (select public.mon_nom())
+    and jour = (now() at time zone 'Europe/Paris')::date
+  );
+
+grant select, insert, update on public.votes_figures to authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.votes_figures;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
 end;
 $$;
