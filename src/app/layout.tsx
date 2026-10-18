@@ -5,8 +5,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
-import { SiteHeader } from "@/components/layout/site-header";
-import { BottomNav } from "@/components/layout/bottom-nav";
+import { BottomNav, VoileEtat } from "@/components/layout/bottom-nav";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { GuideInstallation } from "@/components/pwa/guide-installation";
 import { ViewportLock } from "@/components/pwa/viewport-lock";
@@ -113,10 +112,10 @@ export default function RootLayout({
                 <ServiceWorkerRegister />
                 {/* En PWA installée, `viewportFit: cover` + barre d'état
                     translucide font commencer le contenu SOUS l'encoche et la
-                    Dynamic Island. Sans ce décalage, le header (et donc le
-                    sélecteur de profil et le bouton de thème) se retrouve
-                    derrière la barre d'état, difficile voire impossible à
-                    toucher. La tab bar, elle, gère déjà son inset bas. */}
+                    Dynamic Island : le conteneur se décale de l'inset haut.
+                    Rien n'est collé en haut (ni logo ni en-tête, comme dans
+                    une app iOS) : toute la navigation est dans la barre
+                    d'onglets en bas, qui gère son inset bas. */}
                 <div
                   id="app-scroll"
                   className="flex h-full flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain"
@@ -125,9 +124,9 @@ export default function RootLayout({
                     paddingTop: "env(safe-area-inset-top)",
                   }}
                 >
-                  <SiteHeader />
-                  <main className="flex-1 pb-32 lg:pb-10">{children}</main>
+                  <main className="flex-1 pt-3 pb-32">{children}</main>
                 </div>
+                <VoileEtat />
                 <BottomNav />
                 </AuthGate>
                 {/* Hors de la porte de connexion : le guide passe avant le

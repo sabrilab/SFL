@@ -501,16 +501,15 @@ export default function MapPage() {
 
   // Les surcouches se posent sous l'encoche en haut, au-dessus de la barre
   // d'onglets en bas (qui flotte sur le plan, comme sur l'iPhone).
-  // L'en-tête commun (logo à gauche, compte à droite) flotte en haut, sur
-  // téléphone comme sur ordinateur : le plan prend tout l'écran et les
-  // surcouches se posent sous l'en-tête.
+  // Rien en haut de l'écran (plus d'en-tête, comme dans une app iOS) : le
+  // plan prend tout l'écran et les surcouches se posent juste sous l'encoche.
   const haut = "calc(env(safe-area-inset-top, 0px) + var(--sous-entete))";
   const bas = "calc(env(safe-area-inset-bottom, 0px) + 92px)";
 
   return (
     <>
       {/* ─── Le plan, tout l'écran ─── */}
-      <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] [--sous-entete:5.25rem] lg:[--sous-entete:5.5rem]">
+      <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] [--sous-entete:0.75rem] lg:[--sous-entete:1.25rem]">
         <div className="absolute inset-0">
           <CarteMap fond={fond} stickers={stickers} points={AUCUN_POINT} toi={toi} choisi={choisi?.cle ?? null} onChoisir={choisirSticker} className="h-full w-full" />
         </div>
@@ -538,8 +537,7 @@ export default function MapPage() {
         </div>
 
         {/* En haut à droite : la bascule plan / satellite et, pour l'admin, le
-            réglage des matchs — le lettrage garde sa place. Le logo, lui, est
-            dans l'en-tête commun, à la même place que sur toutes les pages. */}
+            réglage des matchs — le lettrage garde sa place. */}
         <div className="absolute right-4 z-[510] flex flex-col items-end gap-2" style={{ top: haut }}>
           <button
             type="button"
