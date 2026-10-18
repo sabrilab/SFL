@@ -7,27 +7,30 @@
 // rien ne l'explique ; puis « de vraies scènes 3D, avec de la perspective, la
 // carte sur le côté, un peu de data ».
 //
-// Chaque section est une petite scène en CSS 3D (perspective, sans WebGL) sur
-// un plateau sombre, comme la carte, qui ne suit pas le thème de l'app :
-//   · l'homme du dimanche : la carte de biais sous un projecteur, les
-//     chiffres du jour à côté en grand ;
-//   · ils ont décroché    : une vitrine par joueur, la carte tournée vers son
-//     badge qui flotte devant, la lumière du métal au sol ;
-//   · l'équipe type       : les cinq debout sur un terrain en perspective, leur
-//     nom peint sur la pelouse comme à la télé ;
-//   · le duo              : les deux cartes face à face, la trajectoire du ballon ;
+// Chaque section est une petite scène sur un plateau sombre (sol qui fuit
+// vers l'horizon, projecteur, pelouse en perspective), comme la carte, qui ne
+// suit pas le thème de l'app. Les cartes, elles, sont toujours de face, à
+// leur vrai rapport 1 × φ : jamais tournées au repos, jamais écrasées ni
+// coupées (Sabri, 18/10 : « ne déforme pas la carte »).
+//   · l'homme du dimanche : la grande carte sous un projecteur, les chiffres
+//     du jour à côté en grand ;
+//   · ils ont décroché    : une vitrine par joueur, la carte et son badge qui
+//     flotte à côté, la lumière du métal au sol ;
+//   · l'équipe type       : les cinq sur la pelouse, le meilleur du jour au
+//     centre en carte moyenne ;
+//   · le duo              : les deux cartes, la trajectoire du ballon ;
 //   · ils montent         : des marches, plus haute est la remontée ;
-//   · dans la surface     : la surface de réparation, le badge en verre au-dessus
-//     de chaque joueur qui l'attend.
+//   · dans la surface     : devant le but, le badge en verre au-dessus de
+//     chaque joueur qui l'attend.
 // Trois tailles de carte, au nombre d'or : la grande, la moyenne = grande ÷ φ,
 // la petite = moyenne ÷ φ. Toucher une carte l'ouvre en grand. Une section
 // sans rien à montrer ne s'affiche pas. « Réduire les animations » coupe le
-// balancement lent des cartes et des badges (globals.css, .honneur-*).
+// flottement lent des cartes et des badges (globals.css, .honneur-*).
 // Les cartes en vedette (homme du dimanche, badges décrochés, duo) se font
 // tourner au doigt, avec un peu d'élan, puis reviennent à leur pose (Sabri,
 // 18/10 : « rendre certaines cartes un peu manipulables »).
 
-import { Fragment, useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import { Badge3D, Objet3D, OBJET_PALIER } from "@/components/sfl/badge-3d";
 import { EMBLEMES } from "@/components/sfl/emblemes";
 import { MiniCarte } from "@/components/sfl/mini-carte";
@@ -71,7 +74,8 @@ function Scene({
   style,
   children,
 }: {
-  hauteur: number;
+  /** Sans hauteur, la scène prend celle de son contenu. */
+  hauteur?: number;
   lumiere?: string;
   /** Hauteur de l'horizon, de 0 (haut) à 1 (bas). */
   horizon?: number;
@@ -160,76 +164,75 @@ function Rangee({ children }: { children: ReactNode }) {
   );
 }
 
-/* --------------------------- Le terrain en 3D ---------------------------- */
-
-const INCLINAISON = 60;
+/* ------------------------------- La pelouse ------------------------------ */
 
 /**
- * Un plan de pelouse couché en perspective. Ses enfants y sont posés par leurs
- * coordonnées (x, y en px sur le plan) ; `Debout` les relève face à nous.
+ * La pelouse en perspective, dessinée à plat (SVG) : le terrain fuit vers le
+ * haut, tondu en bandes, tracé à la craie. Les cartes se posent devant, de
+ * face, sans jamais être déformées ni coupées (le 18/10, la vraie 3D les
+ * écrasait et Safari les tranchait dans le plan).
  */
-function Pelouse({ largeur, profondeur, bas, children }: { largeur: number; profondeur: number; bas: number; children: ReactNode }) {
+function Pelouse({ surface = false, haut = "72%" }: { surface?: boolean; haut?: string }) {
+  // Le trapèze : 22 → 78 en haut, -6 → 106 en bas (repère 100 × 100).
+  const x = (u: number, v: number) => 22 - 28 * v + u * (56 + 56 * v);
+  const ligne = (u0: number, v0: number, u1: number, v1: number) => `M ${x(u0, v0)} ${v0 * 100} L ${x(u1, v1)} ${v1 * 100}`;
+  const cadre = (u0: number, v0: number, u1: number, v1: number) =>
+    `${ligne(u0, v0, u1, v0)} ${ligne(u1, v0, u1, v1)} ${ligne(u1, v1, u0, v1)} ${ligne(u0, v1, u0, v0)}`;
+  // Les bandes de tonte s'élargissent vers nous.
+  const bandes = Array.from({ length: 8 }, (_, i) => {
+    const v0 = (i / 8) ** 1.35;
+    const v1 = ((i + 1) / 8) ** 1.35;
+    return { d: `M ${x(0, v0)} ${v0 * 100} L ${x(1, v0)} ${v0 * 100} L ${x(1, v1)} ${v1 * 100} L ${x(0, v1)} ${v1 * 100} Z`, clair: i % 2 === 0 };
+  });
   return (
-    <div
-      className="absolute left-1/2"
-      style={{
-        width: largeur,
-        height: profondeur,
-        bottom: bas,
-        marginLeft: -largeur / 2,
-        transformStyle: "preserve-3d",
-        transformOrigin: "50% 100%",
-        transform: `rotateX(${INCLINAISON}deg)`,
-      }}
-    >
-      {children}
+    <svg aria-hidden viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-x-0 bottom-0 w-full" style={{ height: haut }}>
+      <defs>
+        <linearGradient id="pelouse-fondu" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#0b0c0f" stopOpacity="1" />
+          <stop offset="0.3" stopColor="#0b0c0f" stopOpacity="0" />
+          <stop offset="0.85" stopColor="#050506" stopOpacity="0" />
+          <stop offset="1" stopColor="#050506" stopOpacity="0.9" />
+        </linearGradient>
+      </defs>
+      {bandes.map((b, i) => (
+        <path key={i} d={b.d} fill={b.clair ? "#1a3a22" : "#163220"} />
+      ))}
+      <g fill="none" stroke="rgba(255,255,255,0.42)" strokeWidth="1.2" vectorEffect="non-scaling-stroke">
+        <path d={cadre(0.02, 0.02, 0.98, 1.2)} vectorEffect="non-scaling-stroke" />
+        {surface ? (
+          <>
+            <path d={cadre(0.14, 0.02, 0.86, 0.62)} vectorEffect="non-scaling-stroke" />
+            <path d={cadre(0.34, 0.02, 0.66, 0.24)} vectorEffect="non-scaling-stroke" />
+          </>
+        ) : (
+          <>
+            <path d={cadre(0.27, 0.02, 0.73, 0.2)} vectorEffect="non-scaling-stroke" />
+            <path d={ligne(0.02, 0.9, 0.98, 0.9)} vectorEffect="non-scaling-stroke" />
+          </>
+        )}
+      </g>
+      <rect x="-10" y="0" width="120" height="100" fill="url(#pelouse-fondu)" />
+    </svg>
+  );
+}
+
+/** Un joueur posé sur la pelouse : sa carte de face, son ombre, son nom en entier. */
+function Joueur({ p, size, moi, detail, chiffre, dessus }: { p: Player; size: number; moi: boolean; detail: string; chiffre?: string; dessus?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center" style={{ width: W(size) + 21 }}>
+      {dessus}
+      <div className={cn("relative flex rounded-[6px]", moi && "ring-2 ring-primary ring-offset-2 ring-offset-transparent")}>
+        <Ombre largeur={W(size)} />
+        <MiniCarte player={p} size={size} detail={detail} />
+      </div>
+      <span
+        className={cn("mt-[var(--fib-8)] w-full text-center leading-[1.05] break-words uppercase", moi ? "text-primary" : "text-white")}
+        style={{ fontFamily: ANTON, fontSize: size >= MOYENNE ? 17 : 13, letterSpacing: "0.02em" }}
+      >
+        {p.name}
+      </span>
+      {chiffre && <span className="mono-label mt-0.5 text-[9px] text-white/55 tabular-nums">{chiffre}</span>}
     </div>
-  );
-}
-
-function Debout({ x, y, children, className }: { x: number; y: number; children: ReactNode; className?: string }) {
-  return (
-    <div
-      className={cn("absolute flex flex-col items-center", className)}
-      style={{ left: x, top: y, transformOrigin: "0 0", transform: `rotateX(${-INCLINAISON}deg) translate(-50%, -100%)`, transformStyle: "preserve-3d" }}
-    >
-      {children}
-    </div>
-  );
-}
-
-/** Ce qu'on peint sur la pelouse, au pied d'un joueur. */
-function Peint({ x, y, children }: { x: number; y: number; children: ReactNode }) {
-  return (
-    <div className="pointer-events-none absolute flex -translate-x-1/2 flex-col items-center text-center" style={{ left: x, top: y + 8 }}>
-      {children}
-    </div>
-  );
-}
-
-/** L'ombre d'un joueur debout, sur la pelouse. */
-function OmbrePelouse({ x, y }: { x: number; y: number }) {
-  return (
-    <span
-      aria-hidden
-      className="absolute -translate-x-1/2 -translate-y-1/2"
-      style={{ left: x, top: y, width: W(PETITE) * 1.4, height: W(PETITE) * 0.8, background: "radial-gradient(closest-side, rgba(0,0,0,0.7), transparent)" }}
-    />
-  );
-}
-
-/** Le gazon, tondu en bandes, qui se perd dans le noir. */
-function Gazon({ bande }: { bande: number }) {
-  return (
-    <div
-      aria-hidden
-      className="absolute -inset-x-20 -inset-y-12"
-      style={{
-        background: `repeating-linear-gradient(180deg, #15301d 0 ${bande}px, #19381f ${bande}px ${bande * 2}px)`,
-        maskImage: "radial-gradient(70% 70% at 50% 55%, #000 50%, transparent 100%)",
-        WebkitMaskImage: "radial-gradient(70% 70% at 50% 55%, #000 50%, transparent 100%)",
-      }}
-    />
   );
 }
 
@@ -392,7 +395,7 @@ export function ALHonneur({ j }: { j: number }) {
 
 type Mvp = { nom: string; buts: number; passes: number; pp: number };
 
-/** La carte de biais, sous le projecteur ; les chiffres du jour à droite. */
+/** La carte de face, sous le projecteur ; les chiffres du jour à droite. */
 function HommeDuDimanche({ j, m, p, moi }: { j: number; m: Mvp; p: Player; moi: string }) {
   const largeur = W(GRANDE);
   const hauteur = H(GRANDE);
@@ -413,8 +416,8 @@ function HommeDuDimanche({ j, m, p, moi }: { j: number; m: Mvp; p: Player; moi: 
           }}
         />
         <div className="absolute" style={{ left: 14, bottom: 48, transformStyle: "preserve-3d" }}>
-          <Manipulable pose={22}>
-            <div className="honneur-balance relative flex" style={{ transformStyle: "preserve-3d" }}>
+          <Manipulable pose={0}>
+            <div className="honneur-flotte relative flex" style={{ transformStyle: "preserve-3d" }}>
               <Ombre largeur={largeur} />
               <MiniCarte player={p} size={GRANDE} detail={`MVP · J${j}`} />
             </div>
@@ -428,7 +431,7 @@ function HommeDuDimanche({ j, m, p, moi }: { j: number; m: Mvp; p: Player; moi: 
           <Chiffre n={`+${m.pp}`} label="pts" taille={34} couleur="rgba(255,255,255,0.55)" />
         </div>
         <span
-          className={cn("absolute right-5 bottom-[var(--fib-13)] max-w-[40%] truncate text-right uppercase", m.nom === moi ? "text-primary" : "text-white")}
+          className={cn("absolute right-5 bottom-[var(--fib-13)] max-w-[40%] leading-none break-words text-right uppercase", m.nom === moi ? "text-primary" : "text-white")}
           style={{ fontFamily: ANTON, fontSize: 21, letterSpacing: "0.01em" }}
         >
           {m.nom}
@@ -438,7 +441,7 @@ function HommeDuDimanche({ j, m, p, moi }: { j: number; m: Mvp; p: Player; moi: 
   );
 }
 
-/** Plusieurs matchs, plusieurs MVP : les cartes se font face, chacune ses chiffres. */
+/** Plusieurs matchs, plusieurs MVP : côte à côte, chacun ses chiffres. */
 function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player })[]; moi: string }) {
   const deux = mvp.slice(0, 2);
   const hauteur = H(MOYENNE);
@@ -447,8 +450,8 @@ function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player 
       <Scene hauteur={hauteur + 150} horizon={(hauteur + 96) / (hauteur + 150)}>
         <Titre j={j}>Les hommes du dimanche</Titre>
         <div className="absolute inset-x-0 flex justify-center gap-[var(--fib-34)]" style={{ bottom: 58, transformStyle: "preserve-3d" }}>
-          {deux.map((m, i) => (
-            <Manipulable key={m.nom} pose={i === 0 ? 26 : -26}>
+          {deux.map((m) => (
+            <Manipulable key={m.nom} pose={0}>
               <Ombre largeur={W(MOYENNE)} />
               <MiniCarte player={m.p} size={MOYENNE} detail={`MVP · J${j}`} />
             </Manipulable>
@@ -457,7 +460,7 @@ function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player 
         <div className="absolute inset-x-0 bottom-[var(--fib-13)] flex justify-center gap-[var(--fib-34)]">
           {deux.map((m) => (
             <div key={m.nom} className="flex flex-col items-center" style={{ width: W(MOYENNE) }}>
-              <span className={cn("max-w-full truncate uppercase", m.nom === moi ? "text-primary" : "text-white")} style={{ fontFamily: ANTON, fontSize: 17 }}>
+              <span className={cn("max-w-full text-center leading-none break-words uppercase", m.nom === moi ? "text-primary" : "text-white")} style={{ fontFamily: ANTON, fontSize: 17 }}>
                 {m.nom}
               </span>
               <span className="mono-label text-[9px] text-white/45 tabular-nums">
@@ -471,7 +474,7 @@ function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player 
   );
 }
 
-/** Un badge tombé ce dimanche : la carte tournée vers lui, lui qui flotte devant. */
+/** Un badge tombé ce dimanche : la carte, et lui qui flotte à côté. */
 function Vitrine({ d, p, moi, premier }: { d: { nom: string; id: TropheeId; palier: number }; p: Player; moi: string; premier: boolean }) {
   const def = DEF[d.id];
   const m = metal(d.palier)!;
@@ -489,7 +492,7 @@ function Vitrine({ d, p, moi, premier }: { d: { nom: string; id: TropheeId; pali
     >
       {premier && <Titre>Ils ont décroché</Titre>}
       <div className="absolute" style={{ left: 16, bottom: 46, transformStyle: "preserve-3d" }}>
-        <Manipulable pose={28}>
+        <Manipulable pose={0}>
           <Ombre largeur={largeur} />
           <MiniCarte player={p} size={MOYENNE} detail={`${def.nom} · ${NOM_METAL[m]} · ${seuil} ${unite(d.id, seuil)}`} />
         </Manipulable>
@@ -515,7 +518,7 @@ function Vitrine({ d, p, moi, premier }: { d: { nom: string; id: TropheeId; pali
         </span>
       </div>
       <span
-        className={cn("absolute bottom-[var(--fib-13)] left-[var(--fib-21)] max-w-[70%] truncate uppercase", d.nom === moi ? "text-primary" : "text-white")}
+        className={cn("absolute bottom-[var(--fib-13)] left-[var(--fib-21)] max-w-[70%] leading-none break-words uppercase", d.nom === moi ? "text-primary" : "text-white")}
         style={{ fontFamily: ANTON, fontSize: 17 }}
       >
         {d.nom}
@@ -524,56 +527,38 @@ function Vitrine({ d, p, moi, premier }: { d: { nom: string; id: TropheeId; pali
   );
 }
 
-/** Les cinq du jour, debout sur la pelouse, leur nom peint à leurs pieds. */
+/**
+ * Les cinq du jour sur la pelouse : deux devant le but adverse, trois plus
+ * près de nous ; le meilleur du jour au centre, en carte moyenne, les autres
+ * en petites. Toutes de face, rien n'est coupé.
+ */
 function EquipeType({ j, equipe, moi }: { j: number; equipe: { nom: string; pp: number; p: Player }[]; moi: string }) {
-  const L = 330;
-  const P = 470;
-  // Deux devant le but adverse (au fond), trois plus près de nous.
-  const places = [
-    [L * 0.3, P * 0.3],
-    [L * 0.7, P * 0.3],
-    [L * 0.16, P * 0.76],
-    [L * 0.5, P * 0.82],
-    [L * 0.84, P * 0.76],
-  ];
+  const meilleur = equipe.reduce((a, b) => (b.pp > a.pp ? b : a));
+  const autres = equipe.filter((e) => e !== meilleur);
+  const fond = autres.slice(0, 2);
+  const [gauche, droite] = autres.slice(2);
+  const joueur = (e: { nom: string; pp: number; p: Player }, size: number) => (
+    <Joueur key={e.nom} p={e.p} size={size} moi={e.nom === moi} detail={`Équipe type · J${j} · ${e.pp} pts`} chiffre={`+${e.pp} pts`} />
+  );
   return (
     <section>
-      <Scene hauteur={480} horizon={0.3} sol={false} lumiere="rgba(160,255,190,0.10)">
+      <Scene sol={false} lumiere="rgba(160,255,190,0.10)">
+        <Pelouse haut="86%" />
         <Titre j={j}>L&apos;équipe type</Titre>
-        <Pelouse largeur={L} profondeur={P} bas={44}>
-          <Gazon bande={40} />
-          <svg aria-hidden viewBox={`0 0 ${L} ${P}`} className="absolute inset-0 size-full text-white/35">
-            <g fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="4" y="4" width={L - 8} height={P - 8} rx="3" />
-              <rect x={L * 0.26} y="4" width={L * 0.48} height={P * 0.17} />
-              <path d={`M ${L * 0.4} ${P * 0.17 + 4} A ${L * 0.12} ${L * 0.12} 0 0 0 ${L * 0.6} ${P * 0.17 + 4}`} />
-              <path d={`M ${L * 0.35} ${P - 4} A ${L * 0.15} ${L * 0.15} 0 0 1 ${L * 0.65} ${P - 4}`} />
-            </g>
-          </svg>
-          {equipe.map((e, i) => {
-            const [x, y] = places[i];
-            return (
-              <Fragment key={e.nom}>
-                <OmbrePelouse x={x} y={y} />
-                <Peint x={x} y={y}>
-                  <span className={cn("max-w-[100px] truncate uppercase", e.nom === moi ? "text-primary" : "text-white/90")} style={{ fontFamily: ANTON, fontSize: 19, letterSpacing: "0.02em" }}>
-                    {e.nom}
-                  </span>
-                  <span className="mono-label text-[10px] text-white/55 tabular-nums">+{e.pp} pts</span>
-                </Peint>
-                <Debout x={x} y={y}>
-                  <MiniCarte player={e.p} size={PETITE} detail={`Équipe type · J${j} · ${e.pp} pts`} />
-                </Debout>
-              </Fragment>
-            );
-          })}
-        </Pelouse>
+        <div className="relative flex flex-col items-center gap-[var(--fib-13)] px-[var(--fib-13)] pt-[var(--fib-55)] pb-[var(--fib-21)]">
+          <div className="flex justify-center gap-[var(--fib-55)]">{fond.map((e) => joueur(e, PETITE))}</div>
+          <div className="flex items-end justify-center gap-[var(--fib-8)]">
+            {gauche && joueur(gauche, PETITE)}
+            {joueur(meilleur, MOYENNE)}
+            {droite && joueur(droite, PETITE)}
+          </div>
+        </div>
       </Scene>
     </section>
   );
 }
 
-/** La passe et le but : les cartes face à face, la courbe du ballon entre elles. */
+/** La passe et le but : les deux cartes, la courbe du ballon entre elles. */
 function Duo({ j, duo, passeur, buteur, moi }: { j: number; duo: { passeur: string; buteur: string; n: number }; passeur: Player; buteur: Player; moi: string }) {
   const hauteur = H(MOYENNE);
   return (
@@ -587,8 +572,8 @@ function Duo({ j, duo, passeur, buteur, moi }: { j: number; duo: { passeur: stri
           ×{duo.n}
         </span>
         <div className="absolute inset-x-0 flex justify-center gap-[var(--fib-55)]" style={{ bottom: 58, transformStyle: "preserve-3d" }}>
-          {[passeur, buteur].map((p, i) => (
-            <Manipulable key={p.name} pose={i === 0 ? 32 : -32}>
+          {[passeur, buteur].map((p) => (
+            <Manipulable key={p.name} pose={0}>
               <Ombre largeur={W(MOYENNE)} />
               <MiniCarte player={p} size={MOYENNE} detail={`Le duo · J${j}`} />
             </Manipulable>
@@ -600,7 +585,7 @@ function Duo({ j, duo, passeur, buteur, moi }: { j: number; duo: { passeur: stri
             { nom: duo.buteur, label: unite("buts", duo.n) },
           ].map((x) => (
             <div key={x.nom} className="flex flex-col items-center" style={{ width: W(MOYENNE) }}>
-              <span className={cn("max-w-full truncate uppercase", x.nom === moi ? "text-primary" : "text-white")} style={{ fontFamily: ANTON, fontSize: 17 }}>
+              <span className={cn("max-w-full text-center leading-none break-words uppercase", x.nom === moi ? "text-primary" : "text-white")} style={{ fontFamily: ANTON, fontSize: 17 }}>
                 {x.nom}
               </span>
               <span className="mono-label text-[9px] text-white/45">{x.label}</span>
@@ -624,20 +609,15 @@ function IlsMontent({ montent, moi }: { montent: { nom: string; gain: number; ra
         <Titre>Ils montent</Titre>
         <div
           className="absolute inset-x-0 flex items-end justify-center gap-[var(--fib-8)]"
-          style={{ bottom: 22, transformStyle: "preserve-3d", transform: "rotateY(-16deg)" }}
+          style={{ bottom: 22 }}
         >
           {marches.map((m) => {
-            const haut = 34 + (m.gain / max) * 55;
+            const haut = 55 + (m.gain / max) * 34;
             return (
               <div key={m.nom} className="flex flex-col items-center" style={{ width: largeur + 4, transformStyle: "preserve-3d" }}>
                 <MiniCarte player={m.p} size={PETITE} detail={`${m.rang}e · ▲ ${m.gain}`} />
-                {/* La marche : son dessus, puis sa face où le gain est gravé. */}
-                <div className="relative w-full" style={{ transformStyle: "preserve-3d" }}>
-                  <div
-                    aria-hidden
-                    className="absolute inset-x-0 top-0 h-[30px]"
-                    style={{ transformOrigin: "50% 0%", transform: "rotateX(90deg)", background: "linear-gradient(180deg, #3a3d45, #24262c)" }}
-                  />
+                {/* La marche, où le gain est gravé. */}
+                <div className="relative w-full">
                   <div
                     className="flex w-full flex-col items-center justify-start pt-1.5"
                     style={{ height: haut, background: "linear-gradient(180deg, #2a2c33 0%, #101115 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22)" }}
@@ -645,7 +625,7 @@ function IlsMontent({ montent, moi }: { montent: { nom: string; gain: number; ra
                     <span className="text-primary tabular-nums" style={{ fontFamily: ANTON, fontSize: 21, lineHeight: 1 }}>
                       ▲{m.gain}
                     </span>
-                    <span className={cn("mt-0.5 max-w-full truncate px-1 text-[10px] font-semibold", m.nom === moi ? "text-primary" : "text-white/75")}>{m.nom}</span>
+                    <span className={cn("mt-0.5 max-w-full px-1 text-center text-[10px] leading-tight font-semibold break-words", m.nom === moi ? "text-primary" : "text-white/75")}>{m.nom}</span>
                     <span className="mono-label text-[8.5px] text-white/40 tabular-nums">{m.rang}e</span>
                   </div>
                 </div>
@@ -658,61 +638,42 @@ function IlsMontent({ montent, moi }: { montent: { nom: string; gain: number; ra
   );
 }
 
-/** Dans la surface : debout dans la surface de réparation, le prochain badge en verre au-dessus d'eux. */
+/** Dans la surface : devant le but, le prochain badge en verre au-dessus de chacun. */
 function Surface({ surface, moi }: { surface: { nom: string; id: TropheeId; reste: number; p: Player }[]; moi: string }) {
-  const L = 340;
-  const P = 230;
-  const n = surface.length;
   return (
     <section>
-      <Scene hauteur={410} horizon={0.4} sol={false} lumiere="rgba(160,255,190,0.08)">
+      <Scene sol={false} lumiere="rgba(160,255,190,0.08)">
+        <Pelouse surface />
         <Titre>Dans la surface</Titre>
-        <Pelouse largeur={L} profondeur={P} bas={40}>
-          <Gazon bande={36} />
-          {/* La ligne de but au fond, la surface, le point de penalty. */}
-          <svg aria-hidden viewBox={`0 0 ${L} ${P}`} overflow="visible" className="absolute inset-0 size-full text-white/40">
-            <g fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="-80" y1="4" x2={L + 80} y2="4" />
-              <rect x="10" y="4" width={L - 20} height={P - 30} />
-              <rect x={L * 0.3} y="4" width={L * 0.4} height={P * 0.3} />
-              <path d={`M ${L * 0.38} ${P - 26} A ${L * 0.14} ${L * 0.14} 0 0 0 ${L * 0.62} ${P - 26}`} />
-            </g>
-            <circle cx={L / 2} cy={P * 0.55} r="3" fill="currentColor" />
-          </svg>
-          {/* Le but, debout sur sa ligne. */}
-          <Debout x={L / 2} y={4} className="pointer-events-none">
-            <div
-              className="h-[50px] w-[150px] rounded-t-[3px] border-[3px] border-b-0 border-white/85"
-              style={{ background: "repeating-linear-gradient(90deg, rgba(255,255,255,0.14) 0 1px, transparent 1px 8px), repeating-linear-gradient(0deg, rgba(255,255,255,0.14) 0 1px, transparent 1px 8px)" }}
-            />
-          </Debout>
-          {surface.map((s, i) => {
-            const x = (L / (n + 1)) * (i + 1);
-            const y = P * 0.74;
+        {/* Le but, au fond de la surface. */}
+        <div
+          aria-hidden
+          className="absolute left-1/2 h-[34px] w-[89px] -translate-x-1/2 rounded-t-[2px] border-[2.5px] border-b-0 border-white/85"
+          style={{
+            top: 52,
+            background: "repeating-linear-gradient(90deg, rgba(255,255,255,0.16) 0 1px, transparent 1px 6px), repeating-linear-gradient(0deg, rgba(255,255,255,0.16) 0 1px, transparent 1px 6px)",
+          }}
+        />
+        <div className="relative flex items-end justify-center gap-[var(--fib-13)] px-[var(--fib-13)] pt-[118px] pb-[var(--fib-21)]">
+          {surface.map((s) => {
             const def = DEF[s.id];
             return (
-              <Fragment key={`${s.nom}-${s.id}`}>
-                <OmbrePelouse x={x} y={y} />
-                <Peint x={x} y={y}>
-                  <span className={cn("max-w-[84px] truncate uppercase", s.nom === moi ? "text-primary" : "text-white/90")} style={{ fontFamily: ANTON, fontSize: 16 }}>
-                    {s.nom}
-                  </span>
-                </Peint>
-                <Debout x={x} y={y}>
-                  <span className="honneur-flotte mb-1 block">
+              <Joueur
+                key={`${s.nom}-${s.id}`}
+                p={s.p}
+                size={PETITE}
+                moi={s.nom === moi}
+                detail={`${def.nom} · encore ${s.reste} ${unite(s.id, s.reste)}`}
+                chiffre={`${s.reste} ${unite(s.id, s.reste)}`}
+                dessus={
+                  <span className="honneur-flotte mb-[var(--fib-8)] block">
                     <Objet3D objet={OBJET_PALIER[s.id]} matiere="fantome" taille={W(PETITE) / PHI} embleme={EMBLEMES[s.id]} />
                   </span>
-                  <span className="mono-label mb-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[9px] text-white/85 tabular-nums">
-                    {s.reste} {unite(s.id, s.reste)}
-                  </span>
-                  <span className={cn("block rounded-[7px]", s.nom === moi && "ring-2 ring-primary")}>
-                    <MiniCarte player={s.p} size={PETITE} detail={`${def.nom} · encore ${s.reste} ${unite(s.id, s.reste)}`} />
-                  </span>
-                </Debout>
-              </Fragment>
+                }
+              />
             );
           })}
-        </Pelouse>
+        </div>
       </Scene>
     </section>
   );

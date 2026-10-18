@@ -3,7 +3,9 @@
 // La carte-journée — un dimanche tient sur un terrain.
 //
 // Le match est dessiné : les deux camps, le rond central, les surfaces, et
-// chaque joueur en bulle à sa place, avec ses buts et ses passes du jour. Une
+// chaque joueur avec sa carte Bola, en entier, ses buts et ses passes du jour
+// (Sabri, 18/10 : « même dans Matchs, la nouvelle DA », les cartes en petit
+// ou en moyen). Une équipe par moitié de terrain, les décisifs devant. Une
 // journée qui a compté plusieurs matchs garde UNE carte : les matchs
 // deviennent des onglets, le terrain reste.
 //
@@ -12,7 +14,9 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
-import type { Journee, MatchTeam } from "@/lib/sfl/engine";
+import { CarteDe, FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
+import { useSeason } from "@/components/sfl/season-provider";
+import type { Journee, MatchPlayerLine, MatchTeam } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 
 const TEAM_COLORS: Record<string, string> = {
@@ -28,136 +32,113 @@ const TEAM_COLORS: Record<string, string> = {
 
 const couleur = (name: string) => TEAM_COLORS[name] ?? "#B9B9B9";
 
-/**
- * Place les joueurs d'une équipe sur sa moitié de terrain. Le premier reste
- * au fond, les autres montent en quinconce : ça n'a pas la prétention d'être
- * une composition, seulement de se lire comme une équipe.
- */
-function positions(n: number, gauche: boolean): { x: number; y: number }[] {
-  if (n === 0) return [];
-  // Assez rentré pour que le nom sous la bulle ne soit pas rogné par le bord.
-  const fond = gauche ? 14 : 86;
-  const proche = gauche ? 30 : 70;
-  const loin = gauche ? 43 : 57;
-  const out: { x: number; y: number }[] = [{ x: fond, y: 50 }];
-  const restants = n - 1;
-  for (let i = 0; i < restants; i++) {
-    const colonne = i % 2 === 0 ? proche : loin;
-    const rang = Math.floor(i / 2);
-    const parColonne = Math.ceil(restants / 2);
-    const y = parColonne <= 1 ? 50 : 18 + (rang * 64) / Math.max(1, parColonne - 1);
-    out.push({ x: colonne, y });
-  }
-  return out;
-}
+const PHI = (1 + Math.sqrt(5)) / 2;
 
-function Bulle({
-  nom,
-  buts,
-  passes,
-  teinte,
-  x,
-  y,
-  delai,
-}: {
-  nom: string;
-  buts: number;
-  passes: number;
-  teinte: string;
-  x: number;
-  y: number;
-  delai: number;
-}) {
-  const decisif = buts > 0 || passes > 0;
+/** L'encre de la note sur la couleur d'une équipe : toutes sont claires. */
+const onglet = (name: string) => ({ fond: couleur(name), encre: "#0A0A0A" });
+
+/**
+ * Un joueur sur la feuille : sa vraie carte Bola, son nom en entier, ses
+ * buts et ses passes. Le meilleur de son équipe passe au format moyen (la
+ * réduite) ; les autres gardent la pastille, la note aux couleurs de l'équipe.
+ */
+function Joueur({ ligne, equipe, delai, star }: { ligne: MatchPlayerLine; equipe: string; delai: number; star: boolean }) {
+  const { allPlayers } = useSeason();
+  const cle = ligne.name.trim().toLowerCase();
+  const player = allPlayers.find((p) => p.name.toLowerCase() === cle);
+  const decisif = ligne.buts > 0 || ligne.passes > 0;
+  const size = star ? FORMAT_CARTE.moyenne : FORMAT_CARTE.petite;
+  const largeur = 254 * size;
+  const teinte = couleur(equipe);
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.7 }}
-      whileInView={{ opacity: 1, scale: 1 }}
+      initial={{ opacity: 0, y: 8 }}
+      whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-30px" }}
-      transition={{ duration: 0.35, delay: delai, ease: [0.22, 1, 0.36, 1] }}
-      className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-[3px]"
-      style={{ left: `${x}%`, top: `${y}%` }}
+      transition={{ duration: 0.4, delay: delai, ease: [0.22, 1, 0.36, 1] }}
+      className="flex flex-col items-center [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]"
+      // Le nom a sa place, même sous une pastille : rien n'est coupé.
+      style={{ width: Math.max(largeur, 64) }}
     >
-      <span
-        className="flex items-center justify-center rounded-full font-black text-[#0A0A0A]"
-        style={{
-          width: decisif ? "clamp(19px, 7.4cqw, 26px)" : "clamp(16px, 6.2cqw, 22px)",
-          height: decisif ? "clamp(19px, 7.4cqw, 26px)" : "clamp(16px, 6.2cqw, 22px)",
-          fontSize: "clamp(8.5px, 3.2cqw, 11px)",
-          background: teinte,
-          boxShadow: decisif ? `0 0 12px ${teinte}66` : "none",
-        }}
-      >
-        {nom[0]}
+      <span className="relative" style={{ filter: "drop-shadow(0 8px 10px rgba(0,0,0,0.45))" }}>
+        {player ? (
+          <MiniCarte player={player} size={size} onglet={onglet(equipe)} detail={ligne.buts || ligne.passes ? `${ligne.buts} B · ${ligne.passes} P` : undefined} />
+        ) : (
+          <CarteDe name={ligne.name} size={size} />
+        )}
       </span>
+      {/* Le filet de l'équipe, sous les cartes que la note ne colore pas. */}
+      {star && <span className="mt-[5px] h-[3px] rounded-full" style={{ width: largeur / PHI, background: teinte }} />}
       <span
-        className="truncate leading-none font-bold text-white/85"
-        style={{ maxWidth: "15cqw", fontSize: "clamp(7.5px, 2.7cqw, 9.5px)" }}
+        className="mt-[5px] max-w-full text-center leading-[1.1] font-bold break-words text-white/90"
+        style={{ fontSize: star ? 12 : 10 }}
       >
-        {nom}
+        {ligne.name}
       </span>
       {decisif && (
         // « B » et « P » plutôt que des émojis : lisibles partout, et c'est le
         // vocabulaire déjà employé sur le terrain de la synthèse.
-        <span
-          className="mono-label leading-none text-white/55"
-          style={{ fontSize: "clamp(6.5px, 2.2cqw, 8px)" }}
-        >
-          {buts > 0 && `${buts}B`}
-          {buts > 0 && passes > 0 && " "}
-          {passes > 0 && `${passes}P`}
+        <span className="mono-label mt-[3px] text-[9px] leading-none text-white/55 tabular-nums">
+          {ligne.buts > 0 && `${ligne.buts}B`}
+          {ligne.buts > 0 && ligne.passes > 0 && " "}
+          {ligne.passes > 0 && `${ligne.passes}P`}
         </span>
       )}
+      {ligne.note && <span className="mono-label mt-[3px] text-[8px] leading-none text-white/40">{ligne.note}</span>}
     </motion.div>
   );
 }
 
+/**
+ * Une moitié de terrain : au fond, près du but, l'équipe en pastilles ;
+ * devant, vers la ligne médiane, son meilleur joueur du jour, en plus grand
+ * (deux s'ils sont à égalité).
+ */
+function Moitie({ equipe, haut, delai }: { equipe: MatchTeam; haut: boolean; delai: number }) {
+  const poids = (p: MatchPlayerLine) => p.buts * 2 + p.passes;
+  const ordre = [...equipe.players].sort((x, y) => poids(y) - poids(x));
+  const top = poids(ordre[0] ?? { name: "", buts: 0, passes: 0 });
+  const devant = top > 0 ? ordre.filter((p) => poids(p) === top).slice(0, 2) : [];
+  const fond = ordre.filter((p) => !devant.includes(p));
+  const rangee = (lignes: MatchPlayerLine[], d: number, star: boolean) =>
+    lignes.length > 0 && (
+      <div className="flex flex-wrap items-start justify-center gap-x-[5px] gap-y-[var(--fib-13)]">
+        {lignes.map((l, i) => (
+          <Joueur key={l.name} ligne={l} equipe={equipe.name} delai={d + i * 0.05} star={star} />
+        ))}
+      </div>
+    );
+  return (
+    <div className={cn("relative flex gap-[var(--fib-13)] px-[var(--fib-8)]", haut ? "flex-col pt-[var(--fib-34)] pb-[var(--fib-21)]" : "flex-col-reverse pt-[var(--fib-21)] pb-[var(--fib-34)]")}>
+      {rangee(fond, delai, false)}
+      {rangee(devant, delai + 0.1, true)}
+    </div>
+  );
+}
+
+/**
+ * Le terrain, vu d'en haut et debout : une équipe par moitié, chacun avec sa
+ * carte. Tondu en bandes, tracé à la craie.
+ */
 function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
-  const posA = positions(a.players.length, true);
-  const posB = positions(b.players.length, false);
   return (
     <div
       className="relative overflow-hidden rounded-[18px] border border-white/10"
       style={{
-        // Les bulles se dimensionnent sur la largeur DU TERRAIN : la même
-        // carte tient en pleine largeur sur mobile et en grille de trois sur
-        // un grand écran, sans que les noms se chevauchent.
-        containerType: "inline-size",
-        aspectRatio: "16 / 10",
         background:
-          "radial-gradient(90% 120% at 50% 50%, rgba(111,168,255,0.10), transparent 70%), linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012))",
+          "repeating-linear-gradient(180deg, #17331f 0 34px, #143019 34px 68px)",
+        boxShadow: "inset 0 0 60px rgba(0,0,0,0.55)",
       }}
     >
       {/* Le tracé */}
-      <span className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/12" />
-      <span className="pointer-events-none absolute top-1/2 left-1/2 size-[22%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/12" />
-      <span className="pointer-events-none absolute top-1/2 left-0 h-[46%] w-[13%] -translate-y-1/2 rounded-r-md border border-l-0 border-white/12" />
-      <span className="pointer-events-none absolute top-1/2 right-0 h-[46%] w-[13%] -translate-y-1/2 rounded-l-md border border-r-0 border-white/12" />
+      <div aria-hidden className="pointer-events-none absolute inset-[var(--fib-8)] rounded-[12px] border border-white/30" />
+      <span aria-hidden className="pointer-events-none absolute inset-x-[var(--fib-8)] top-1/2 h-px -translate-y-1/2 bg-white/30" />
+      <span aria-hidden className="pointer-events-none absolute top-1/2 left-1/2 size-[89px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30" />
+      <span aria-hidden className="pointer-events-none absolute top-[var(--fib-8)] left-1/2 h-[34px] w-[38%] -translate-x-1/2 rounded-b-[6px] border border-t-0 border-white/30" />
+      <span aria-hidden className="pointer-events-none absolute bottom-[var(--fib-8)] left-1/2 h-[34px] w-[38%] -translate-x-1/2 rounded-t-[6px] border border-b-0 border-white/30" />
 
-      {a.players.map((p, i) => (
-        <Bulle
-          key={`a-${p.name}`}
-          nom={p.name}
-          buts={p.buts}
-          passes={p.passes}
-          teinte={couleur(a.name)}
-          x={posA[i]?.x ?? 20}
-          y={posA[i]?.y ?? 50}
-          delai={i * 0.05}
-        />
-      ))}
-      {b.players.map((p, i) => (
-        <Bulle
-          key={`b-${p.name}`}
-          nom={p.name}
-          buts={p.buts}
-          passes={p.passes}
-          teinte={couleur(b.name)}
-          x={posB[i]?.x ?? 80}
-          y={posB[i]?.y ?? 50}
-          delai={0.1 + i * 0.05}
-        />
-      ))}
+      <Moitie equipe={a} haut delai={0} />
+      <Moitie equipe={b} haut={false} delai={0.15} />
     </div>
   );
 }
@@ -230,13 +211,13 @@ export function CarteJournee({
             className="size-2.5 shrink-0 rounded-full"
             style={{ background: couleur(match.teamA.name) }}
           />
-          <span className="truncate text-[13px] font-bold">{match.teamA.name}</span>
+          <span className="text-[13px] leading-tight font-bold break-words">{match.teamA.name}</span>
         </span>
         <span className="shrink-0 text-[22px] leading-none font-extrabold tracking-tight tabular-nums">
           {match.teamA.score}<span className="mx-1 text-foreground/25">–</span>{match.teamB.score}
         </span>
         <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
-          <span className="truncate text-[13px] font-bold">{match.teamB.name}</span>
+          <span className="text-right text-[13px] leading-tight font-bold break-words">{match.teamB.name}</span>
           <span
             className="size-2.5 shrink-0 rounded-full"
             style={{ background: couleur(match.teamB.name) }}
