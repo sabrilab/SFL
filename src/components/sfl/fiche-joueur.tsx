@@ -3,22 +3,23 @@
 // La fiche d'un joueur, ouverte en touchant sa carte sur la feuille de match :
 // sa carte, son nom et son équipe du jour, une phrase qui le résume, ses trois
 // points forts, ses faits marquants, puis ses badges, les plus rares d'abord
-// (les écussons et médailles de Ma carte). « Voir sa carte en grand » ouvre
-// la carte en 3D, comme partout ailleurs.
+// (les écussons et médailles de Ma carte ; toucher un badge ouvre son détail,
+// avec qui d'autre l'a). « Voir sa carte en grand » ouvre la carte en 3D,
+// comme partout ailleurs.
 //
 // Le calcul est dans lib/sfl/fiche-joueur.ts.
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useCardViewer } from "@/components/sfl/card-viewer";
 import { useSeason } from "@/components/sfl/season-provider";
-import { Ecusson, Medaille } from "@/components/sfl/vitrine";
+import { Ecusson, FeuilleBadge, Medaille } from "@/components/sfl/vitrine";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import type { Player } from "@/lib/sfl/engine";
 import { ficheJoueur } from "@/lib/sfl/fiche-joueur";
-import { finsDeSaison, ordinal } from "@/lib/sfl/fin-de-saison";
+import { finsDeSaison, ordinal, type ClassementId } from "@/lib/sfl/fin-de-saison";
 import { POSTES } from "@/lib/sfl/inscription";
-import { vitrine } from "@/lib/sfl/trophees";
+import { vitrine, type TropheeId } from "@/lib/sfl/trophees";
 import { username } from "@/lib/sfl/usernames";
 
 export interface EquipeDuJour {
@@ -66,6 +67,7 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
     [saison, player.name]
   );
   const poste = POSTES.find((p) => p.id === player.poste)?.label;
+  const [badge, setBadge] = useState<{ famille: "palier"; id: TropheeId } | { famille: "saison"; id: ClassementId } | null>(null);
 
   function voirEnGrand() {
     onClose();
@@ -134,21 +136,31 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
           <h3 className="mono-label text-muted-foreground">Badges</h3>
           <div className="flex items-end gap-3 overflow-x-auto pb-1">
             {ecussons.map((e) => (
-              <div key={e.def.id} className="flex shrink-0 flex-col items-center gap-1">
+              <button
+                key={e.def.id}
+                type="button"
+                onClick={() => setBadge({ famille: "saison", id: e.def.id })}
+                className="flex shrink-0 flex-col items-center gap-1 transition-transform active:scale-95 motion-reduce:transition-none"
+              >
                 <Ecusson id={e.def.id} rang={e.meilleur!.rang} largeur={46} />
                 <span className="text-[10.5px] font-bold">{e.def.nom}</span>
                 <span className="font-mono text-[10px] text-muted-foreground">
                   {ordinal(e.meilleur!.rang)} · {e.meilleur!.saison}
                 </span>
-              </div>
+              </button>
             ))}
             {ecussons.length > 0 && medailles.length > 0 && <span aria-hidden className="mb-9 h-10 w-px shrink-0 bg-foreground/15" />}
             {medailles.slice(0, MEDAILLES).map((e) => (
-              <div key={e.def.id} className="flex shrink-0 flex-col items-center gap-1">
+              <button
+                key={e.def.id}
+                type="button"
+                onClick={() => setBadge({ famille: "palier", id: e.def.id })}
+                className="flex shrink-0 flex-col items-center gap-1 transition-transform active:scale-95 motion-reduce:transition-none"
+              >
                 <Medaille e={e} diametre={44} />
                 <span className="text-[10.5px] font-bold">{e.def.nom}</span>
                 <span className="font-mono text-[10px] text-muted-foreground tabular-nums">{e.valeur}</span>
-              </div>
+              </button>
             ))}
             {medailles.length > MEDAILLES && (
               <span className="mb-9 ml-auto shrink-0 font-mono text-[12px] font-bold text-muted-foreground">+{medailles.length - MEDAILLES}</span>
@@ -164,6 +176,12 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
       >
         Voir sa carte en grand
       </button>
+
+      <Sheet open={!!badge} onOpenChange={(o) => !o && setBadge(null)}>
+        <SheetContent side="bottom" className="mx-auto max-h-[90vh] w-full overflow-y-auto rounded-t-[28px] px-5 pt-6 pb-8 sm:max-w-md">
+          {badge && <FeuilleBadge nom={player.name} badge={badge} />}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
