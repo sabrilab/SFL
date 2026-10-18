@@ -38,7 +38,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { honneurDe } from "@/lib/sfl/a-l-honneur";
 import type { Player } from "@/lib/sfl/engine";
-import { metal, NOM_METAL, TROPHEES, type Metal, type TropheeId } from "@/lib/sfl/trophees";
+import { metal, NOM_METAL, TROPHEES, type TropheeId } from "@/lib/sfl/trophees";
 import { cn } from "@/lib/utils";
 
 const PHI = (1 + Math.sqrt(5)) / 2;
@@ -54,13 +54,6 @@ const ANTON = "var(--font-anton), Anton, sans-serif";
 const DEF = Object.fromEntries(TROPHEES.map((t) => [t.id, t]));
 const unite = (id: TropheeId, n: number) => (n > 1 ? DEF[id].unite[1] : DEF[id].unite[0]);
 
-/** La lumière de chaque métal, pour le sol et les chiffres. */
-const TEINTE: Record<Metal, string> = {
-  bronze: "#e9925a",
-  argent: "#d5dcf5",
-  or: "#ffc75a",
-  legende: "#ff5a4a",
-};
 
 /* ------------------------------- Le plateau ------------------------------- */
 
@@ -158,7 +151,7 @@ function Ombre({ largeur }: { largeur: number }) {
 /** Une rangée de scènes qui défile sur téléphone et passe à la ligne sur ordinateur. */
 function Rangee({ children }: { children: ReactNode }) {
   return (
-    <div className="-mx-5 flex snap-x snap-mandatory gap-[var(--fib-13)] overflow-x-auto px-5 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:px-0 [&::-webkit-scrollbar]:hidden">
+    <div className="-mx-5 flex snap-x snap-mandatory scroll-px-5 gap-[var(--fib-13)] overflow-x-auto px-5 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:px-0 [&::-webkit-scrollbar]:hidden">
       {children}
     </div>
   );
@@ -373,10 +366,13 @@ export function ALHonneur({ j }: { j: number }) {
       {mvp.length > 1 && <HommesDuDimanche j={j} mvp={mvp.map((m) => ({ ...m, p: carte(m.nom)! }))} moi={moi.name} />}
 
       {decroches.length > 0 && (
-        <section>
+        <section className="flex flex-col gap-[var(--fib-13)]">
+          <h2 className="px-1 text-[17px] font-bold tracking-tight">
+            Ils ont décroché <span className="text-foreground/40">· J{j}</span>
+          </h2>
           <Rangee>
-            {decroches.map((d, i) => (
-              <Vitrine key={`${d.nom}-${d.id}`} premier={i === 0} d={d} p={carte(d.nom)!} moi={moi.name} />
+            {decroches.map((d) => (
+              <Vitrine key={`${d.nom}-${d.id}`} d={d} p={carte(d.nom)!} />
             ))}
           </Rangee>
         </section>
@@ -474,8 +470,12 @@ function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player 
   );
 }
 
-/** Un badge tombé ce dimanche : la carte, et lui qui flotte à côté. */
-function Vitrine({ d, p, moi, premier }: { d: { nom: string; id: TropheeId; palier: number }; p: Player; moi: string; premier: boolean }) {
+/**
+ * Un badge tombé ce dimanche. Noir mat, sans décor (Sabri, 18/10 : la
+ * vitrine voûtée ne lui plaisait pas) : la carte à gauche, le badge et son
+ * chiffre à droite. Noir et blanc strict, seul le badge garde son métal.
+ */
+function Vitrine({ d, p }: { d: { nom: string; id: TropheeId; palier: number }; p: Player }) {
   const def = DEF[d.id];
   const m = metal(d.palier)!;
   const seuil = def.paliers[d.palier - 1];
@@ -483,47 +483,26 @@ function Vitrine({ d, p, moi, premier }: { d: { nom: string; id: TropheeId; pali
   const hauteur = H(MOYENNE);
   const badge = largeur / PHI;
   return (
-    <Scene
-      hauteur={hauteur + 112}
-      horizon={(hauteur + 58) / (hauteur + 112)}
-      lumiere={`${TEINTE[m]}33`}
-      className="shrink-0 snap-start"
-      style={{ width: largeur + badge + 70 }}
+    <div
+      className="relative flex shrink-0 snap-start gap-[var(--fib-21)] rounded-[21px] border border-white/[0.08] bg-[#0a0a0b] p-[var(--fib-21)] text-white"
+      style={{ height: hauteur + 42 }}
     >
-      {premier && <Titre>Ils ont décroché</Titre>}
-      <div className="absolute" style={{ left: 16, bottom: 46, transformStyle: "preserve-3d" }}>
-        <Manipulable pose={0}>
-          <Ombre largeur={largeur} />
-          <MiniCarte player={p} size={MOYENNE} detail={`${def.nom} · ${NOM_METAL[m]} · ${seuil} ${unite(d.id, seuil)}`} />
-        </Manipulable>
-      </div>
-      {/* Le badge, devant, qui flotte au-dessus de son halo. */}
-      <div className="pointer-events-none absolute" style={{ right: 18, bottom: 64 }}>
-        <span
-          aria-hidden
-          className="absolute left-1/2 -translate-x-1/2"
-          style={{ bottom: -30, width: badge * 1.3, height: badge * 0.3, background: `radial-gradient(closest-side, ${TEINTE[m]}66, transparent)` }}
-        />
-        <span className="honneur-flotte block">
+      <Manipulable pose={0}>
+        <MiniCarte player={p} size={MOYENNE} detail={`${def.nom} · ${NOM_METAL[m]} · ${seuil} ${unite(d.id, seuil)}`} />
+      </Manipulable>
+      <div className="flex flex-col justify-between" style={{ width: badge * 1.2 }}>
+        <span className="honneur-flotte pointer-events-none block self-center">
           <Badge3D badge={{ famille: "palier", id: d.id, palier: d.palier }} largeur={badge} />
         </span>
+        <div className="flex flex-col border-t border-white/10 pt-[var(--fib-13)]">
+          <span style={{ fontFamily: ANTON, fontSize: 55, lineHeight: 0.85 }} className="tabular-nums">
+            {seuil}
+          </span>
+          <span className="mono-label mt-[var(--fib-8)] text-[9px] text-white/55">{unite(d.id, seuil)}</span>
+          <span className="mono-label text-[9px] text-white/30">{NOM_METAL[m]}</span>
+        </div>
       </div>
-      <div className="absolute flex flex-col items-end text-right" style={{ right: 18, top: premier ? 44 : 18 }}>
-        <span style={{ fontFamily: ANTON, fontSize: 44, lineHeight: 0.9, color: TEINTE[m] }} className="tabular-nums">
-          {seuil}
-        </span>
-        <span className="mono-label mt-1 text-[9px] text-white/50">{unite(d.id, seuil)}</span>
-        <span className="mono-label text-[9px]" style={{ color: TEINTE[m] }}>
-          {NOM_METAL[m]}
-        </span>
-      </div>
-      <span
-        className={cn("absolute bottom-[var(--fib-13)] left-[var(--fib-21)] max-w-[70%] leading-none break-words uppercase", d.nom === moi ? "text-primary" : "text-white")}
-        style={{ fontFamily: ANTON, fontSize: 17 }}
-      >
-        {d.nom}
-      </span>
-    </Scene>
+    </div>
   );
 }
 
