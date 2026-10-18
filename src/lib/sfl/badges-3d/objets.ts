@@ -64,6 +64,92 @@ function cadrer(pieces: Piece[], taille = 2): Piece[] {
   return pieces;
 }
 
+/* ----------------------------- Le symbole BOLA ----------------------------- */
+
+/**
+ * Le symbole BOLA (public/bola/symbole-noir.svg) : un disque que mord un
+ * second cercle, la lune du logo. Les points du chemin SVG sont recopiés en
+ * absolu, ramenés au cercle de rayon 1 centré sur l'origine (y vers le haut).
+ * Il est gravé sur les objets comme la marque d'un équipementier.
+ */
+function formeSymbole(): THREE.Shape {
+  const cx = 255.566;
+  const cy = 255.531;
+  const r = 195.567;
+  const P = (x: number, y: number) => [(x - cx) / r, -(y - cy) / r] as const;
+  const s = new THREE.Shape();
+  s.moveTo(...P(451.133, 255.531));
+  const c = (a: [number, number], b: [number, number], e: [number, number]) => s.bezierCurveTo(...P(...a), ...P(...b), ...P(...e));
+  c([451.133, 147.522], [363.574, 59.964], [255.566, 59.964]);
+  c([147.558, 59.964], [60, 147.522], [60, 255.531]);
+  c([60, 363.54], [147.558, 451.097], [255.566, 451.097]);
+  c([264.337, 451.097], [272.973, 450.52], [281.438, 449.401]);
+  c([224.347, 439.749], [180.866, 390.067], [180.866, 330.231]);
+  c([180.866, 263.478], [234.979, 209.364], [301.732, 209.364]);
+  c([368.485, 209.364], [422.599, 263.478], [422.599, 330.231]);
+  c([422.599, 342.437], [420.789, 354.221], [417.424, 365.329]);
+  c([438.699, 334.028], [451.131, 296.232], [451.133, 255.531]);
+  return s;
+}
+
+/** Le symbole en relief : rayon, épaisseur ; dos à z = 0, face vers +z. */
+function symbole(rayon: number, epaisseur: number): THREE.BufferGeometry {
+  const b = epaisseur * 0.35;
+  const g = new THREE.ExtrudeGeometry(formeSymbole(), {
+    depth: Math.max(0.001, (epaisseur - 2 * b) / rayon),
+    bevelEnabled: true,
+    bevelThickness: b / rayon,
+    bevelSize: (b / rayon) * 0.6,
+    bevelSegments: 3,
+    curveSegments: 16,
+  });
+  g.translate(0, 0, b / rayon);
+  g.scale(rayon, rayon, rayon);
+  g.computeVertexNormals();
+  return g;
+}
+
+/** La même géométrie, sans index (pour la fusionner avec d'autres). */
+function plat(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  return g.index ? g.toNonIndexed() : g;
+}
+
+/** Sans coordonnées de texture : pour fusionner avec une géométrie qui n'en a pas. */
+function sansUv(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const r = plat(g);
+  r.deleteAttribute("uv");
+  return r;
+}
+
+/** Pose une géométrie (face vers +z) sur une surface : centre et direction de la normale. */
+function poser(g: THREE.BufferGeometry, centre: THREE.Vector3, normale: THREE.Vector3, tourne = 0) {
+  g.rotateZ(tourne);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normale.clone().normalize()));
+  g.translate(centre.x, centre.y, centre.z);
+  return g;
+}
+
+/** L'orientation de chaque objet à l'image : de trois quarts, pour que le relief se lise. */
+export const POSE: Record<Objet, [number, number, number]> = {
+  ballon: [0.42, 0.55, 0.1],
+  crampon: [0.3, 0.22, 0.04],
+  cage: [0.2, -0.5, 0],
+  trophee: [0.16, 0.3, 0],
+  pepite: [0.5, 0.35, 0.1],
+  etoile: [0.12, -0.32, 0.06],
+  bouclier: [0.2, -0.5, 0],
+  eclair: [0.18, -0.6, 0.12],
+  terrain: [0.8, -0.5, 0],
+  flamme: [0.16, -0.55, 0],
+  sablier: [0.22, 0.4, 0.12],
+};
+
+/** La direction, dans le repère de l'objet, qui fait face à la caméra une fois posé. */
+function face(objet: Objet): THREE.Vector3 {
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(...POSE[objet]));
+  return new THREE.Vector3(0, 0, 1).applyQuaternion(q.invert());
+}
+
 /* --------------------------------- Ballon --------------------------------- */
 
 /**
@@ -137,9 +223,13 @@ function ballon(): Piece[] {
     r.setAttribute("normal", new THREE.Float32BufferAttribute(x.n, 3));
     return r;
   };
+  // La marque : le symbole BOLA sur l'hexagone qui fait face.
+  const devant = face("ballon");
+  const h0 = hexas.reduce((m, h) => (h.dot(devant) > m.dot(devant) ? h : m), hexas[0]);
+  const marque = poser(symbole(0.15, 0.035), h0.clone().multiplyScalar(0.985), h0);
   return [
     { geo: geo(parts.hexa), role: "corps" },
-    { geo: geo(parts.penta), role: "sombre" },
+    { geo: mergeGeometries([geo(parts.penta), sansUv(marque)]), role: "sombre" },
   ];
 }
 
@@ -198,20 +288,12 @@ function crampon(): Piece[] {
     c.translate(X(u), -0.11, z);
     plots.push(c.toNonIndexed());
   }
-  // La bande sur le côté, en verre : une virgule du talon vers les lacets.
-  const bande = (cote: number) => {
-    const pts: THREE.Vector3[] = [];
-    for (let i = 0; i <= 24; i++) {
-      const t = i / 24;
-      const u = 0.1 + t * 0.56;
-      const h = 0.08 + Math.sin(t * Math.PI * 0.9) * 0.26 + t * 0.06;
-      const p = new THREE.Vector3();
-      surface(u, 0, p);
-      pts.push(new THREE.Vector3(X(u), h, cote * (p.z + 0.012)));
-    }
-    const t = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 64, 0.04, 10, false);
-    t.scale(1, 1, 0.35);
-    return t.toNonIndexed();
+  // La marque sur chaque côté : le symbole BOLA, comme un équipementier.
+  const cote = (k: number) => {
+    const u = 0.46;
+    const p = new THREE.Vector3();
+    surface(u, k > 0 ? 0 : 0.5, p);
+    return poser(symbole(0.15, 0.04), new THREE.Vector3(X(u), 0.24, p.z - k * 0.012), new THREE.Vector3(0, 0, k), k > 0 ? 0 : Math.PI);
   };
   // Le col, en verre, et quatre lacets en travers du cou-de-pied.
   const col = new THREE.TorusGeometry(0.2, 0.045, 16, 64);
@@ -230,8 +312,8 @@ function crampon(): Piece[] {
   }
   return [
     { geo: corps, role: "corps" },
-    { geo: mergeGeometries([semelle, ...plots]), role: "sombre" },
-    { geo: mergeGeometries([bande(1), bande(-1), col.toNonIndexed(), ...lacets]), role: "verre" },
+    { geo: mergeGeometries([semelle, ...plots, cote(1), cote(-1)].map(sansUv)), role: "sombre" },
+    { geo: mergeGeometries([plat(col), ...lacets].map(sansUv)), role: "verre" },
   ];
 }
 
@@ -317,8 +399,14 @@ function trophee(): Piece[] {
     c.translate(0, y, 0);
     return c;
   };
+  // Sur la coupe, face à l'objectif : le symbole BOLA en relief sombre.
+  const d = face("trophee");
+  d.y = 0;
+  d.normalize();
+  const marque = poser(symbole(0.2, 0.06), d.clone().multiplyScalar(0.585).setY(0.64), d.clone().setY(-0.25));
   return [
-    { geo: mergeGeometries([coupe.index ? coupe.toNonIndexed() : coupe, ...anses.map((t) => t.toNonIndexed())]), role: "corps" },
+    { geo: mergeGeometries([plat(coupe), ...anses.map(plat)].map(sansUv)), role: "corps" },
+    { geo: plat(marque), role: "sombre" },
     { geo: mergeGeometries([marche(0.34, 0.4, 0.16, -0.5), marche(0.44, 0.48, 0.14, -0.64)]), role: "sombre" },
   ];
 }
@@ -339,48 +427,63 @@ function pepite(): Piece[] {
     new THREE.Vector2(0, 0.58),
   ];
   const g = new THREE.LatheGeometry(profil, 12);
-  const plate = g.toNonIndexed();
-  plate.computeVertexNormals();
-  return [{ geo: plate, role: "corps" }];
+  const taille = g.toNonIndexed();
+  taille.computeVertexNormals();
+  // Sur la table, le symbole BOLA gravé en sombre : la pépite de la marque.
+  const marque = poser(symbole(0.3, 0.04), new THREE.Vector3(0, 0.575, 0), new THREE.Vector3(0, 1, 0));
+  return [
+    { geo: taille, role: "corps" },
+    { geo: marque, role: "sombre" },
+  ];
 }
 
 /* ----------------------- Formes plates, extrudées ------------------------ */
 
 function etoile(): Piece[] {
-  const s = new THREE.Shape();
+  // L'étoile taillée : dix pointes, et deux sommets (devant, derrière) d'où
+  // partent des facettes franches, comme une étoile de joaillier.
+  const pts: THREE.Vector3[] = [];
   for (let i = 0; i < 10; i++) {
-    const r = i % 2 ? 0.46 : 1;
+    const r = i % 2 ? 0.44 : 1;
     const a = Math.PI / 2 + (i * Math.PI) / 5;
-    const p = [Math.cos(a) * r, Math.sin(a) * r] as const;
-    if (i) s.lineTo(...p);
-    else s.moveTo(...p);
+    pts.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, 0));
   }
-  s.closePath();
-  return [{ geo: extrude(s, 0.32, 0.12), role: "corps" }];
+  const avant = new THREE.Vector3(0, 0, 0.24);
+  const arriere = new THREE.Vector3(0, 0, -0.24);
+  const v: number[] = [];
+  for (let i = 0; i < 10; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % 10];
+    v.push(...avant.toArray(), ...a.toArray(), ...b.toArray());
+    v.push(...arriere.toArray(), ...b.toArray(), ...a.toArray());
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(v, 3));
+  g.computeVertexNormals();
+  return [{ geo: g, role: "corps" }];
 }
 
 function bouclier(): Piece[] {
-  const s = new THREE.Shape();
-  s.moveTo(0, 1);
-  s.bezierCurveTo(0.35, 0.86, 0.6, 0.84, 0.82, 0.86);
-  s.lineTo(0.82, 0.1);
-  s.bezierCurveTo(0.82, -0.45, 0.4, -0.8, 0, -1);
-  s.bezierCurveTo(-0.4, -0.8, -0.82, -0.45, -0.82, 0.1);
-  s.lineTo(-0.82, 0.86);
-  s.bezierCurveTo(-0.6, 0.84, -0.35, 0.86, 0, 1);
-  const corps = extrude(s, 0.3, 0.12);
-  // La bande du milieu, en verre, en relief.
-  const b = new THREE.Shape();
-  b.moveTo(-0.16, 0.86);
-  b.lineTo(0.16, 0.86);
-  b.lineTo(0.16, -0.78);
-  b.bezierCurveTo(0.08, -0.84, -0.08, -0.84, -0.16, -0.78);
-  b.closePath();
-  const bande = extrude(b, 0.1, 0.04);
-  bande.translate(0, 0.02, 0.24);
+  const forme = (k: number) => {
+    const s = new THREE.Shape();
+    s.moveTo(0, 1 * k);
+    s.bezierCurveTo(0.35 * k, 0.86 * k, 0.6 * k, 0.84 * k, 0.82 * k, 0.86 * k);
+    s.lineTo(0.82 * k, 0.1 * k);
+    s.bezierCurveTo(0.82 * k, -0.45 * k, 0.4 * k, -0.8 * k, 0, -1 * k);
+    s.bezierCurveTo(-0.4 * k, -0.8 * k, -0.82 * k, -0.45 * k, -0.82 * k, 0.1 * k);
+    s.lineTo(-0.82 * k, 0.86 * k);
+    s.bezierCurveTo(-0.6 * k, 0.84 * k, -0.35 * k, 0.86 * k, 0, 1 * k);
+    return s;
+  };
+  // Le corps en métal, puis un champ de verre serti dedans, et sur le
+  // verre, le symbole BOLA en relief, dans le métal.
+  const corps = extrude(forme(1), 0.3, 0.12);
+  const champ = extrude(forme(0.76), 0.05, 0.03);
+  champ.translate(0, 0.01, 0.27);
+  const marque = poser(symbole(0.36, 0.09), new THREE.Vector3(0, 0.04, 0.31), new THREE.Vector3(0, 0, 1));
   return [
-    { geo: corps, role: "corps" },
-    { geo: bande, role: "verre" },
+    { geo: mergeGeometries([corps, marque]), role: "corps" },
+    { geo: champ, role: "verre" },
   ];
 }
 
@@ -393,7 +496,11 @@ function eclair(): Piece[] {
   s.lineTo(0.62, 0.18);
   s.lineTo(0.06, 0.18);
   s.closePath();
-  return [{ geo: extrude(s, 0.3, 0.1), role: "corps" }];
+  // Un chanfrein net (un seul pan) plutôt qu'un arrondi : l'éclair est taillé.
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.14, bevelSize: 0.09, bevelSegments: 1 });
+  g.center();
+  g.computeVertexNormals();
+  return [{ geo: g, role: "corps" }];
 }
 
 /** Le terrain : une plaque dans le métal du badge, ses lignes en chrome sombre (le tour, la médiane, le rond central). */
@@ -441,11 +548,11 @@ function terrain(): Piece[] {
   const rond = new THREE.TorusGeometry(0.2, e / 2, 10, 64);
   rond.rotateX(Math.PI / 2);
   rond.translate(0, y + h / 2 - e / 2, 0);
-  const point = new THREE.CylinderGeometry(0.04, 0.04, h, 20);
-  point.translate(0, y, 0);
+  // Au rond central, le symbole BOLA, comme sur la feuille de match.
+  const point = poser(symbole(0.13, h), new THREE.Vector3(0, y - h / 2, 0), new THREE.Vector3(0, 1, 0), 0);
   return [
     { geo: plateau, role: "corps" },
-    { geo: mergeGeometries([...lignes, rond.toNonIndexed(), point.toNonIndexed()]), role: "sombre" },
+    { geo: mergeGeometries([...lignes, rond.toNonIndexed(), plat(point)]), role: "sombre" },
   ];
 }
 
@@ -458,7 +565,7 @@ function flamme(): Piece[] {
   s.bezierCurveTo(0.06, 0.52, -0.08, 0.8, -0.04, 1.0);
   s.bezierCurveTo(-0.5, 0.7, -0.78, 0.26, -0.76, -0.2);
   s.bezierCurveTo(-0.74, -0.64, -0.44, -1, 0, -1);
-  const corps = extrude(s, 0.34, 0.12);
+  const corps = extrude(s, 0.1, 0.2); // un biseau large : la flamme est gonflée
   // Le cœur de la flamme, en verre.
   const c = new THREE.Shape();
   c.moveTo(0, -0.78);
@@ -475,32 +582,51 @@ function flamme(): Piece[] {
 }
 
 function sablier(): Piece[] {
-  const verre = new THREE.LatheGeometry(
-    [
-      [0.02, -0.86], [0.5, -0.82], [0.62, -0.6], [0.5, -0.24], [0.1, -0.02],
-      [0.1, 0.02], [0.5, 0.24], [0.62, 0.6], [0.5, 0.82], [0.02, 0.86],
-    ].map(([x, y]) => new THREE.Vector2(x, y)),
-    64,
+  // Le verre : deux ampoules tournées d'un profil lissé, le col fin.
+  const ampoule = new THREE.SplineCurve(
+    [[0.02, -0.84], [0.44, -0.8], [0.58, -0.56], [0.46, -0.24], [0.12, -0.05], [0.08, 0], [0.12, 0.05], [0.46, 0.24], [0.58, 0.56], [0.44, 0.8], [0.02, 0.84]].map(
+      ([x, y]) => new THREE.Vector2(x, y)
+    )
   );
-  const sable = new THREE.LatheGeometry(
-    [[0.01, -0.82], [0.47, -0.78], [0.55, -0.6], [0.4, -0.42], [0.01, -0.42]].map(([x, y]) => new THREE.Vector2(x, y)),
-    64,
+  const verre = new THREE.LatheGeometry(ampoule.getPoints(80), 72);
+  // Le sable : un tas en bas, un reste en haut, et le filet qui coule.
+  const tas = new THREE.LatheGeometry(
+    new THREE.SplineCurve([[0.01, -0.8], [0.4, -0.77], [0.52, -0.6], [0.3, -0.46], [0.01, -0.4]].map(([x, y]) => new THREE.Vector2(x, y))).getPoints(30),
+    72
   );
-  const plateaux = [-1, 1].map((k) => {
-    const c = new THREE.CylinderGeometry(0.78, 0.78, 0.14, 64);
-    c.translate(0, k * 0.93, 0);
-    return c;
-  });
-  const montants = [0, 1, 2].map((i) => {
-    const c = new THREE.CylinderGeometry(0.05, 0.05, 1.8, 16);
+  const reste = new THREE.LatheGeometry(
+    new THREE.SplineCurve([[0.01, 0.12], [0.24, 0.22], [0.36, 0.34], [0.01, 0.34]].map(([x, y]) => new THREE.Vector2(x, y))).getPoints(20),
+    72
+  );
+  const filet = new THREE.CylinderGeometry(0.012, 0.012, 0.5, 8);
+  filet.translate(0, -0.18, 0);
+  // Le cadre : deux plateaux à bord arrondi, trois colonnes tournées.
+  const plateau = (k: number) => {
+    const p = new THREE.LatheGeometry(
+      [[0, -0.07], [0.7, -0.07], [0.76, -0.04], [0.78, 0], [0.76, 0.04], [0.7, 0.07], [0, 0.07]].map(([x, y]) => new THREE.Vector2(x, y)),
+      72
+    );
+    p.translate(0, k * 0.92, 0);
+    return plat(p);
+  };
+  const colonne = (i: number) => {
+    const c = new THREE.LatheGeometry(
+      [[0, -0.86], [0.06, -0.86], [0.04, -0.7], [0.035, 0], [0.04, 0.7], [0.06, 0.86], [0, 0.86]].map(([x, y]) => new THREE.Vector2(x, y)),
+      20
+    );
     const a = (i * Math.PI * 2) / 3 + 0.4;
-    c.translate(Math.cos(a) * 0.68, 0, Math.sin(a) * 0.68);
-    return c;
-  });
+    c.translate(Math.cos(a) * 0.64, 0, Math.sin(a) * 0.64);
+    return plat(c);
+  };
+  // La marque, sur la tranche du plateau du haut, face à l'objectif.
+  const d = face("sablier");
+  d.y = 0;
+  d.normalize();
+  const marque = poser(symbole(0.06, 0.02), d.clone().multiplyScalar(0.775).setY(0.92), d);
   return [
-    { geo: mergeGeometries([...plateaux, ...montants]), role: "corps" },
+    { geo: mergeGeometries([plateau(-1), plateau(1), colonne(0), colonne(1), colonne(2)]), role: "corps" },
     { geo: verre, role: "verre" },
-    { geo: sable, role: "sombre" },
+    { geo: mergeGeometries([plat(tas), plat(reste), plat(filet), plat(marque)].map(sansUv)), role: "sombre" },
   ];
 }
 

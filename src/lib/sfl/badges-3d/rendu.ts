@@ -23,25 +23,11 @@
 // le badge pas encore gagné : tout en verre dépoli, sans couleur.
 
 import * as THREE from "three";
-import { piecesDe, type Objet, type Role } from "./objets";
+import { piecesDe, POSE, type Objet, type Role } from "./objets";
 import type { Metal } from "@/lib/sfl/trophees";
 
 export type Matiere = Metal | "fantome";
 
-/** L'orientation de chaque objet : de trois quarts, pour que le relief se lise. */
-const POSE: Record<Objet, [number, number, number]> = {
-  ballon: [0.42, 0.55, 0.1],
-  crampon: [0.24, 0.55, 0.04],
-  cage: [0.2, -0.5, 0],
-  trophee: [0.16, 0.3, 0],
-  pepite: [0.42, 0.35, 0.1],
-  etoile: [0.22, -0.55, 0.06],
-  bouclier: [0.2, -0.5, 0],
-  eclair: [0.18, -0.6, 0.12],
-  terrain: [0.8, -0.5, 0],
-  flamme: [0.16, -0.55, 0],
-  sablier: [0.22, 0.4, 0.12],
-};
 
 const CORPS: Record<Metal, string> = {
   or: "#ffbf3a",
@@ -83,6 +69,8 @@ export function environnement(renderer: THREE.WebGLRenderer): THREE.Texture {
   // s'y reflètent et prennent la couleur franche du métal.
   panneau("#f4f1ff", 3.6, 10, 8, -8, 0.5, 4);
   panneau("#ffffff", 3, 12, 12, 0, 9, -1); // le plafond : le dessus des objets à plat
+  panneau("#f2f0ff", 3.4, 8, 8, -6, 6, 1); // en haut à gauche : les facettes tournées vers le haut
+  panneau("#fff1e6", 2.2, 14, 8, 0, -8, 3); // le sol, doux : le dessous des pierres taillées
   // Les couleurs des références, derrière et sur les côtés : elles filent sur
   // les arêtes et les bords tournés, comme un contre-jour.
   panneau("#3b6cff", 9, 3, 10, -6, 1, -5); // le bleu, à gauche, derrière

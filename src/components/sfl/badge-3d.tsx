@@ -271,8 +271,7 @@ export function Objet3DVivant({
     scene.add(pivot);
 
     const reduit = mouvementReduit();
-    let vitesse = reduit ? 0 : 0.5; // rad/s
-    const repos = vitesse;
+    let vitesse = 0; // rad/s, l'élan du doigt
     let tire: { x: number; t: number } | null = null;
     const bas = (e: PointerEvent) => {
       tire = { x: e.clientX, t: performance.now() };
@@ -301,9 +300,16 @@ export function Objet3DVivant({
       const dt = Math.min(0.05, (t - avant) / 1000);
       avant = t;
       if (!tire) {
-        // L'élan du doigt retombe doucement vers la rotation de repos.
-        vitesse += (repos - vitesse) * Math.min(1, dt * 2.2);
+        // L'élan du doigt retombe, puis l'objet revient de face et se balance
+        // autour de sa pose : un bouclier ou une étoile ne passe jamais par la
+        // tranche, où leur face (verre, logo) disparaît dans le noir.
+        vitesse *= Math.exp(-dt * 2.4);
         pivot.rotation.y += vitesse * dt;
+        const tour = Math.PI * 2;
+        const face = Math.round(pivot.rotation.y / tour) * tour;
+        const cible = face + (reduit ? 0 : Math.sin(t / 1700) * 0.5);
+        const rappel = Math.max(0, 1 - Math.abs(vitesse) / 1.5);
+        pivot.rotation.y += (cible - pivot.rotation.y) * Math.min(1, dt * 1.8) * rappel;
       }
       // Il flotte, à peine : une respiration lente.
       if (!reduit) pivot.position.y = Math.sin(t / 900) * 0.05;
