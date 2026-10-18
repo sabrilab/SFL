@@ -21,6 +21,7 @@ import {
 import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
 import type { MatchEntry, MatchEvent, Saison } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
+import { CarteDe } from "@/components/sfl/mini-carte";
 
 /* ============================== Types ============================== */
 
@@ -551,15 +552,9 @@ export function useAnalysePlus(
 
 /* ============================ Modules ============================ */
 
-function Avatar({ name, size = 28 }: { name: string; size?: number }) {
-  return (
-    <span
-      className="flex shrink-0 items-center justify-center rounded-full bg-secondary text-[11px] font-bold ring-2 ring-background"
-      style={{ width: size, height: size }}
-    >
-      {name[0]}
-    </span>
-  );
+/** Le joueur, en petite carte (la pastille de la hiérarchie des cartes). */
+function Avatar({ name }: { name: string; size?: number }) {
+  return <CarteDe name={name} />;
 }
 
 function Head({ label, title }: { label: string; title: string }) {

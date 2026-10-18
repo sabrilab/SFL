@@ -63,10 +63,10 @@ const POLI: Record<Metal, string> = {
 
 /** Le halo sous un objet gagné : la lumière de son métal, posée sur le fond. */
 const AURA: Record<Metal, string> = {
-  bronze: "rgba(224,122,58,0.42)",
-  argent: "rgba(190,205,255,0.34)",
-  or: "rgba(255,185,56,0.45)",
-  legende: "rgba(255,59,47,0.48)",
+  bronze: "rgba(224,122,58,0.16)",
+  argent: "rgba(190,205,255,0.13)",
+  or: "rgba(255,185,56,0.17)",
+  legende: "rgba(255,59,47,0.18)",
 };
 
 function Aura({ matiere, taille }: { matiere: Matiere; taille: number }) {
@@ -76,9 +76,11 @@ function Aura({ matiere, taille }: { matiere: Matiere; taille: number }) {
       aria-hidden
       className="pointer-events-none absolute"
       style={{
-        inset: -taille * 0.12,
+        // Discrète (Sabri, 18/10 : « la lueur un peu moins prépondérante ») :
+        // un reflet du métal resserré sous l'objet, pas un halo.
+        inset: taille * 0.08,
         background: `radial-gradient(closest-side, ${AURA[matiere]} 0%, transparent 100%)`,
-        transform: "translateY(12%) scaleY(0.8)",
+        transform: "translateY(16%) scaleY(0.7)",
       }}
     />
   );

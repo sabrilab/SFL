@@ -7,7 +7,7 @@
 // Un nom que la saison ne connaît pas encore (joueur pas évalué) garde une
 // carte neutre à 75 : il est là, il a sa place dans la rangée.
 
-import { MiniCarte } from "@/components/sfl/mini-carte";
+import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import type { Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
@@ -31,20 +31,21 @@ function carteNeutre(name: string): Player {
 export function QuiVient({
   noms,
   places = 0,
-  size = 0.24,
+  size = FORMAT_CARTE.petite,
   className,
 }: {
   noms: string[];
   /** Places encore libres : des cadres vides en bout de rangée. */
   places?: number;
-  /** Échelle de la carte (0.24 ≈ 61 × 91 px). */
+  /** Échelle de la carte (voir FORMAT_CARTE ; 0.24 ≈ une pastille de 61 px). */
   size?: number;
   className?: string;
 }) {
   const { allPlayers } = useSeason();
   const parNom = new Map(allPlayers.map((p) => [p.name, p]));
-  const w = Math.round(255 * size);
-  const h = Math.round(380 * size);
+  // Le cadre libre a la silhouette de la carte au même format : carré en pastille.
+  const w = Math.round(254 * size);
+  const h = w < 70 ? w : Math.round(w * 1.617);
   return (
     <div className={cn("-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]", className)}>
       {noms.map((nom) => (
@@ -56,8 +57,8 @@ export function QuiVient({
       {Array.from({ length: Math.min(places, 10) }, (_, i) => (
         <div key={`libre-${i}`} className="flex shrink-0 flex-col items-center gap-1" aria-hidden>
           <span
-            className="rounded-[10px] border-[1.5px] border-dashed border-foreground/20"
-            style={{ width: w, height: h }}
+            className="border-[1.5px] border-dashed border-foreground/20"
+            style={{ width: w, height: h, borderRadius: w < 70 ? w * 0.24 : 10 }}
           />
           <span className="text-[11px] text-muted-foreground">libre</span>
         </div>

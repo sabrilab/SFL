@@ -18,6 +18,7 @@ import { demarques, type Distinction, type DistinctionId } from "@/lib/sfl/disti
 import type { Player } from "@/lib/sfl/engine";
 import { publicOnly } from "@/lib/sfl/hidden";
 import { cn } from "@/lib/utils";
+import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 
 const ICONES: Record<DistinctionId, typeof Crown> = {
   pepite: Crown,
@@ -105,7 +106,7 @@ export function IlsSeDemarquent({ className }: { className?: string }) {
             aria-label={`${player.name} — ${ds.map((d) => d.detail).join(", ")}. Voir sa carte`}
           >
             <Badge d={ds[0]} />
-            <PlayerCard player={player} size={0.56} />
+            <PlayerCard player={player} size={FORMAT_CARTE.grande} />
             <span className="max-w-[142px] truncate text-center text-[12px] text-foreground/55">{ds[0].detail}</span>
             {ds.length > 1 && (
               <span className="flex flex-wrap justify-center gap-1">

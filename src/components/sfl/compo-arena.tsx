@@ -28,6 +28,7 @@ import {
 } from "@/lib/sfl/compositions";
 import { cleDimanche } from "@/lib/sfl/convocation-temps";
 import { cn } from "@/lib/utils";
+import { CarteDe } from "@/components/sfl/mini-carte";
 
 const fold = (s: string) =>
   s
@@ -181,20 +182,22 @@ export function CompoArena({ me }: { me: string }) {
               className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
               style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
             >
-              <motion.span
-                animate={actif ? { scale: [1, 1.12, 1] } : { scale: 1 }}
-                transition={actif ? { repeat: Infinity, duration: 1.1 } : undefined}
-                className={cn(
-                  "flex size-12 items-center justify-center rounded-full text-[15px] font-black transition-colors",
-                  nom
-                    ? "bg-primary text-primary-foreground shadow-[0_0_16px_rgba(111,168,255,0.45)]"
-                    : actif
-                      ? "border-2 border-primary bg-primary/15 text-primary"
-                      : "border-2 border-dashed border-white/25 text-foreground/30"
-                )}
-              >
-                {nom ? nom[0] : "+"}
-              </motion.span>
+              {nom ? (
+                <motion.span animate={{ scale: 1 }}>
+                  <CarteDe name={nom} inerte />
+                </motion.span>
+              ) : (
+                <motion.span
+                  animate={actif ? { scale: [1, 1.12, 1] } : { scale: 1 }}
+                  transition={actif ? { repeat: Infinity, duration: 1.1 } : undefined}
+                  className={cn(
+                    "flex size-12 items-center justify-center rounded-full text-[15px] font-black transition-colors",
+                    actif ? "border-2 border-primary bg-primary/15 text-primary" : "border-2 border-dashed border-white/25 text-foreground/30"
+                  )}
+                >
+                  +
+                </motion.span>
+              )}
               <span
                 className={cn(
                   "max-w-[76px] truncate text-[11px] leading-none font-bold",

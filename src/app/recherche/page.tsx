@@ -18,7 +18,7 @@ import { Card3D } from "@/components/sfl/card-3d";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { Locked } from "@/components/sfl/locked";
 import { useSeason } from "@/components/sfl/season-provider";
-import { usePlayerPhoto } from "@/hooks/use-player-photo";
+import { CarteDe } from "@/components/sfl/mini-carte";
 import { useGrandEcran } from "@/hooks/use-media-query";
 import { logActivity } from "@/lib/sfl/activity";
 import { username } from "@/lib/sfl/usernames";
@@ -48,30 +48,9 @@ function parseJournee(q: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
-function Avatar({ name, size = 40 }: { name: string; size?: number }) {
-  const src = usePlayerPhoto(name);
-  const [broken, setBroken] = useState(false);
-  return (
-    <span
-      className="glass-soft flex shrink-0 items-center justify-center overflow-hidden rounded-full font-bold"
-      style={{ width: size, height: size, fontSize: size * 0.32 }}
-    >
-      {broken ? (
-        name[0]
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={src}
-          alt=""
-          className="size-full object-cover"
-          ref={(el) => {
-            if (el && el.complete && el.naturalWidth === 0) setBroken(true);
-          }}
-          onError={() => setBroken(true)}
-        />
-      )}
-    </span>
-  );
+/** Le joueur, en petite carte (la pastille de la hiérarchie des cartes). */
+function Avatar({ name }: { name: string; size?: number }) {
+  return <CarteDe name={name} inerte />;
 }
 
 /* ------------------------------ fiche joueur ------------------------------ */
@@ -134,7 +113,6 @@ function FicheJoueur({ player, rank }: { player: Player; rank: number }) {
 
       {/* Identité */}
       <div className="flex items-center gap-3">
-        <Avatar name={player.name} size={46} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[19px] font-extrabold tracking-tight">{player.name}</div>
           <div className="mt-0.5 truncate text-[12.5px] text-foreground/42">

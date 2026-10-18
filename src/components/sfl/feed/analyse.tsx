@@ -22,6 +22,7 @@ import {
 import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
+import { CarteDe } from "@/components/sfl/mini-carte";
 
 /* ------------------------------ Calculs ------------------------------ */
 
@@ -419,15 +420,9 @@ export function useAnalyse(
 
 /* ------------------------------ Modules ------------------------------ */
 
-function Avatar({ name, size = 28 }: { name: string; size?: number }) {
-  return (
-    <span
-      className="flex shrink-0 items-center justify-center rounded-full bg-secondary text-[11px] font-bold ring-2 ring-background"
-      style={{ width: size, height: size }}
-    >
-      {name[0]}
-    </span>
-  );
+/** Le joueur, en petite carte (la pastille de la hiérarchie des cartes). */
+function Avatar({ name }: { name: string; size?: number }) {
+  return <CarteDe name={name} />;
 }
 
 /** La course au Pépite d'Or — barres de course + gains, carte du leader en 3D. */
