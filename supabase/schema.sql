@@ -378,6 +378,11 @@ create trigger presence_touch before update on public.presence
 -- aux tables via l'API (certains projets ne l'accordent pas d'office).
 grant usage on schema public to anon, authenticated;
 grant select on public.profiles, public.convocations, public.presence to authenticated;
+-- Le projet accorde d'office UPDATE sur toute la table : un joueur pouvait
+-- alors se passer lui-même admin (is_admin) ou se valider (valide), et écrire
+-- la saison. On retire le droit de table ; seules les colonnes ci-dessous
+-- restent modifiables par le joueur, sur sa propre ligne (RLS).
+revoke insert, update, delete, truncate on public.profiles from anon, authenticated;
 grant update (name, username) on public.profiles to authenticated;
 grant update (contact_email) on public.profiles to authenticated;
 grant insert, select on public.activity to authenticated;
