@@ -923,6 +923,32 @@ exception
 end;
 $$;
 
+-- ─────────────────────── Photos officielles (studio) ───────────────────────
+-- Chaque photo de studio ou filtre généré par fal.ai (route /api/photo-studio)
+-- laisse une ligne ici : la route compte les dernières 24 h du joueur pour
+-- tenir le crédit fal. Le joueur n'écrit et ne lit que ses lignes ; personne
+-- ne les efface (pas de politique delete), donc on ne remet pas son compteur
+-- à zéro soi-même.
+create table if not exists public.photo_studio (
+  id          bigint generated always as identity primary key,
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  filtre      text not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists photo_studio_user_date on public.photo_studio (user_id, created_at desc);
+
+alter table public.photo_studio enable row level security;
+
+drop policy if exists "photo_studio: je lis les miennes" on public.photo_studio;
+create policy "photo_studio: je lis les miennes"
+  on public.photo_studio for select to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists "photo_studio: je note la mienne" on public.photo_studio;
+create policy "photo_studio: je note la mienne"
+  on public.photo_studio for insert to authenticated
+  with check (user_id = (select auth.uid()));
+
 -- ───────────────────────── Rôle admin ────────────────────────────────
 -- Remise d'aplomb des comptes admin — rejouée à chaque migration, donc à
 -- chaque déploiement qui touche ce fichier. Elle répare TOUS les états de
