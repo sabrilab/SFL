@@ -23,8 +23,11 @@
 // la petite = moyenne ÷ φ. Toucher une carte l'ouvre en grand. Une section
 // sans rien à montrer ne s'affiche pas. « Réduire les animations » coupe le
 // balancement lent des cartes et des badges (globals.css, .honneur-*).
+// Les cartes en vedette (homme du dimanche, badges décrochés, duo) se font
+// tourner au doigt, avec un peu d'élan, puis reviennent à leur pose (Sabri,
+// 18/10 : « rendre certaines cartes un peu manipulables »).
 
-import { Fragment, useMemo, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import { Badge3D, Objet3D, OBJET_PALIER } from "@/components/sfl/badge-3d";
 import { EMBLEMES } from "@/components/sfl/emblemes";
 import { MiniCarte } from "@/components/sfl/mini-carte";
@@ -239,6 +242,107 @@ function rangPoste(poste: string): number {
   return 2;
 }
 
+/* ------------------------------ Au doigt ------------------------------- */
+
+function mouvementReduit() {
+  return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/**
+ * Une carte qu'on fait tourner au doigt : glisser à l'horizontale la fait
+ * pivoter sur elle-même (le défilement vertical reste à la page), lâcher lui
+ * laisse son élan, puis un ressort la ramène à sa pose. Un vrai glissé n'ouvre
+ * pas la carte ; un simple toucher, si.
+ */
+function Manipulable({ pose, children, className }: { pose: number; children: ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let angle = pose;
+    let vitesse = 0;
+    let doigt: { x: number; angle: number; t: number; dernier: number } | null = null;
+    let glisse = false;
+    let raf = 0;
+    const poser = () => {
+      el.style.transform = `rotateY(${angle}deg)`;
+    };
+    const ressort = () => {
+      cancelAnimationFrame(raf);
+      if (mouvementReduit()) {
+        angle = pose;
+        poser();
+        return;
+      }
+      const pas = () => {
+        // Ressort amorti vers la pose (60 i/s).
+        vitesse += (pose - angle) * 0.045;
+        vitesse *= 0.9;
+        angle += vitesse;
+        poser();
+        if (Math.abs(vitesse) > 0.02 || Math.abs(pose - angle) > 0.05) raf = requestAnimationFrame(pas);
+        else {
+          angle = pose;
+          poser();
+        }
+      };
+      raf = requestAnimationFrame(pas);
+    };
+    const bas = (e: PointerEvent) => {
+      cancelAnimationFrame(raf);
+      doigt = { x: e.clientX, angle, t: performance.now(), dernier: e.clientX };
+      glisse = false;
+      vitesse = 0;
+    };
+    const bouge = (e: PointerEvent) => {
+      if (!doigt) return;
+      const dx = e.clientX - doigt.x;
+      if (!glisse && Math.abs(dx) < 6) return;
+      if (!glisse) el.setPointerCapture?.(e.pointerId);
+      glisse = true;
+      const t = performance.now();
+      const neuf = doigt.angle + dx * 0.6;
+      vitesse = ((e.clientX - doigt.dernier) * 0.6 * 16) / Math.max(8, t - doigt.t);
+      doigt.t = t;
+      doigt.dernier = e.clientX;
+      angle = neuf;
+      poser();
+    };
+    const haut = () => {
+      if (!doigt) return;
+      doigt = null;
+      if (glisse) ressort();
+    };
+    // Un glissé n'est pas un toucher : on avale le clic qui le suit.
+    const clic = (e: MouseEvent) => {
+      if (glisse) {
+        e.stopPropagation();
+        e.preventDefault();
+        glisse = false;
+      }
+    };
+    poser();
+    el.addEventListener("pointerdown", bas);
+    el.addEventListener("pointermove", bouge);
+    el.addEventListener("pointerup", haut);
+    el.addEventListener("pointercancel", haut);
+    el.addEventListener("click", clic, true);
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener("pointerdown", bas);
+      el.removeEventListener("pointermove", bouge);
+      el.removeEventListener("pointerup", haut);
+      el.removeEventListener("pointercancel", haut);
+      el.removeEventListener("click", clic, true);
+    };
+  }, [pose]);
+  return (
+    <div ref={ref} className={cn("relative flex cursor-grab touch-pan-y select-none active:cursor-grabbing", className)} style={{ transformStyle: "preserve-3d", transform: `rotateY(${pose}deg)` }}>
+      {children}
+    </div>
+  );
+}
+
 /* -------------------------------- Les scènes ------------------------------ */
 
 export function ALHonneur({ j }: { j: number }) {
@@ -308,11 +412,13 @@ function HommeDuDimanche({ j, m, p, moi }: { j: number; m: Mvp; p: Player; moi: 
             clipPath: "polygon(38% 0, 62% 0, 100% 100%, 0 100%)",
           }}
         />
-        <div className="absolute" style={{ left: 14, bottom: 48, transformStyle: "preserve-3d", transform: "rotateY(22deg)" }}>
-          <div className="honneur-balance relative flex" style={{ transformStyle: "preserve-3d" }}>
-            <Ombre largeur={largeur} />
-            <MiniCarte player={p} size={GRANDE} detail={`MVP · J${j}`} />
-          </div>
+        <div className="absolute" style={{ left: 14, bottom: 48, transformStyle: "preserve-3d" }}>
+          <Manipulable pose={22}>
+            <div className="honneur-balance relative flex" style={{ transformStyle: "preserve-3d" }}>
+              <Ombre largeur={largeur} />
+              <MiniCarte player={p} size={GRANDE} detail={`MVP · J${j}`} />
+            </div>
+          </Manipulable>
         </div>
         {/* Les chiffres du jour. */}
         <div className="absolute flex flex-col items-end gap-[var(--fib-13)]" style={{ right: 20, top: 52 }}>
@@ -342,10 +448,10 @@ function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player 
         <Titre j={j}>Les hommes du dimanche</Titre>
         <div className="absolute inset-x-0 flex justify-center gap-[var(--fib-34)]" style={{ bottom: 58, transformStyle: "preserve-3d" }}>
           {deux.map((m, i) => (
-            <div key={m.nom} className="relative flex" style={{ transform: `rotateY(${i === 0 ? 26 : -26}deg)`, transformStyle: "preserve-3d" }}>
+            <Manipulable key={m.nom} pose={i === 0 ? 26 : -26}>
               <Ombre largeur={W(MOYENNE)} />
               <MiniCarte player={m.p} size={MOYENNE} detail={`MVP · J${j}`} />
-            </div>
+            </Manipulable>
           ))}
         </div>
         <div className="absolute inset-x-0 bottom-[var(--fib-13)] flex justify-center gap-[var(--fib-34)]">
@@ -383,10 +489,10 @@ function Vitrine({ d, p, moi, premier }: { d: { nom: string; id: TropheeId; pali
     >
       {premier && <Titre>Ils ont décroché</Titre>}
       <div className="absolute" style={{ left: 16, bottom: 46, transformStyle: "preserve-3d" }}>
-        <div className="relative flex" style={{ transform: "rotateY(28deg)", transformStyle: "preserve-3d" }}>
+        <Manipulable pose={28}>
           <Ombre largeur={largeur} />
           <MiniCarte player={p} size={MOYENNE} detail={`${def.nom} · ${NOM_METAL[m]} · ${seuil} ${unite(d.id, seuil)}`} />
-        </div>
+        </Manipulable>
       </div>
       {/* Le badge, devant, qui flotte au-dessus de son halo. */}
       <div className="pointer-events-none absolute" style={{ right: 18, bottom: 64 }}>
@@ -482,10 +588,10 @@ function Duo({ j, duo, passeur, buteur, moi }: { j: number; duo: { passeur: stri
         </span>
         <div className="absolute inset-x-0 flex justify-center gap-[var(--fib-55)]" style={{ bottom: 58, transformStyle: "preserve-3d" }}>
           {[passeur, buteur].map((p, i) => (
-            <div key={p.name} className="relative flex" style={{ transform: `rotateY(${i === 0 ? 32 : -32}deg)`, transformStyle: "preserve-3d" }}>
+            <Manipulable key={p.name} pose={i === 0 ? 32 : -32}>
               <Ombre largeur={W(MOYENNE)} />
               <MiniCarte player={p} size={MOYENNE} detail={`Le duo · J${j}`} />
-            </div>
+            </Manipulable>
           ))}
         </div>
         <div className="absolute inset-x-0 bottom-[var(--fib-13)] flex justify-center gap-[var(--fib-55)]">
