@@ -21,6 +21,7 @@ import { finsDeSaison, ordinal, type ClassementId } from "@/lib/sfl/fin-de-saiso
 import { POSTES } from "@/lib/sfl/inscription";
 import { vitrine, type TropheeId } from "@/lib/sfl/trophees";
 import { username } from "@/lib/sfl/usernames";
+import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 
 export interface EquipeDuJour {
   nom: string;
@@ -83,7 +84,7 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
     <div className="flex flex-col gap-5">
       <div className="flex items-end gap-4">
         <button type="button" onClick={voirEnGrand} aria-label={`Voir la carte de ${player.name} en grand`} className="shrink-0 transition-transform active:scale-95">
-          <PlayerCard player={player} size={120 / 254} />
+          <PlayerCard player={player} size={FORMAT_CARTE.grande} />
         </button>
         <div className="flex min-w-0 flex-col gap-2 pb-1">
           {equipe && (

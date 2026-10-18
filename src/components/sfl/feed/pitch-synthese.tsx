@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { ovr, type Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
+import { CarteDe } from "@/components/sfl/mini-carte";
 
 export interface PitchLine {
   name: string;
@@ -30,15 +31,9 @@ const MODES: [Mode, string][] = [
   ["titres", "Titres"],
 ];
 
-function Avatar({ name, size = 34 }: { name: string; size?: number }) {
-  return (
-    <span
-      className="flex items-center justify-center rounded-full bg-secondary text-[12px] font-bold ring-2 ring-background"
-      style={{ width: size, height: size }}
-    >
-      {name[0]}
-    </span>
-  );
+/** Le joueur, en petite carte (la pastille de la hiérarchie des cartes). */
+function Avatar({ name }: { name: string; size?: number }) {
+  return <CarteDe name={name} />;
 }
 
 /** Rang vertical sur le demi-terrain, selon le poste. */

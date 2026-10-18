@@ -11,6 +11,7 @@ import {
   Settings,
   FlaskConical,
   ArrowUpRight,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Locked } from "@/components/sfl/locked";
@@ -18,6 +19,7 @@ import { useIsClient } from "@/hooks/use-is-client";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { isAdmin } from "@/lib/sfl/admin";
 import { AccountCard } from "@/components/sfl/auth/account-card";
+import { ReglageNotifications } from "@/components/sfl/notifications/reglage-notifications";
 
 const THEME_OPTIONS = [
   { value: "light", label: "Clair", icon: Sun },
@@ -45,6 +47,11 @@ export default function ReglagesPage() {
       </div>
 
       <AccountCard />
+
+      <section>
+        <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Notifications</h2>
+        <ReglageNotifications />
+      </section>
 
       <section>
         <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Apparence</h2>
@@ -93,6 +100,21 @@ export default function ReglagesPage() {
               <span className="block text-[15px] font-semibold">Espace admin</span>
               <span className="block text-[12px] text-foreground/45">
                 Gérer les matchs, convocations et résultats
+              </span>
+            </span>
+            <ChevronRight className="size-4 text-foreground/45" />
+          </Link>
+          <Link
+            href="/admin/notifications"
+            className="glass mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
+          >
+            <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
+              <Bell className="size-[18px]" />
+            </span>
+            <span className="flex-1">
+              <span className="block text-[15px] font-semibold">Envoyer une notification</span>
+              <span className="block text-[12px] text-foreground/45">
+                Sur le téléphone des joueurs qui les ont activées
               </span>
             </span>
             <ChevronRight className="size-4 text-foreground/45" />

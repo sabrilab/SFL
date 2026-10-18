@@ -1,7 +1,8 @@
 "use client";
 
 // La Ligue — trois vues sous un seul sélecteur, sans tiroir dans un tiroir :
-//   · Journée     : le récap du dernier dimanche (le rideau GSAP se lève et
+//   · Journée     : les joueurs à l'honneur, en cartes (a-l-honneur.tsx), puis
+//                   le récap du dernier dimanche (le rideau GSAP se lève et
 //                   le scrollytelling se déroule) et les prochaines journées ;
 //   · Classements : tous les classements, directement — podium en cartes,
 //                   le vote du jour quand il est ouvert ;
@@ -35,6 +36,7 @@ import { PresencePanel } from "@/components/sfl/presence-panel";
 import { EmailNudge } from "@/components/sfl/auth/email-nudge";
 import { JourneeOpening } from "@/components/sfl/feed/journee-opening";
 import { CarteJournee } from "@/components/sfl/carte-journee";
+import { ALHonneur } from "@/components/sfl/a-l-honneur";
 import { cn } from "@/lib/utils";
 
 // Les deux dimanches après celui de la convocation, lus côté client
@@ -382,7 +384,8 @@ function Ligue() {
             {/* Le récap de la journée ouverte — remonté à neuf à chaque ouverture.
                 Borné en largeur : au-delà, une ligne de texte devient illisible. */}
             <div className="mesure flex min-w-0 flex-col gap-6 lg:col-start-1 lg:row-start-1 lg:max-w-none">
-              {/* Les écarts d'abord : c'est là que la saison se raconte. */}
+              {/* Les joueurs d'abord, en cartes ; puis les écarts, où la saison se raconte. */}
+              {played.length > 0 && <ALHonneur j={currentJ} />}
               <Ecarts />
               {played.length === 0 && derniereArchive ? (
                 // Rien de joué cette saison : le dernier récap de la saison

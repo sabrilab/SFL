@@ -33,6 +33,7 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { useSession } from "@/hooks/use-session";
 import { finsDeSaison, ordinal, podiumsDe, type ClassementId, type EtatClassement } from "@/lib/sfl/fin-de-saison";
 import { PlayerCard } from "@/components/sfl/player-card";
+import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { useCardViewer } from "@/components/sfl/card-viewer";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import {
@@ -417,7 +418,7 @@ function FeuilleSaison({ e, moi }: { e: EtatClassement; moi: string }) {
 
 /* ---------------------------- Qui d'autre l'a ---------------------------- */
 
-/** Un joueur qui a le badge : sa photo, son nom, son métal. Le toucher ouvre sa carte. */
+/** Un joueur qui a le badge : sa petite carte, son nom, son métal. Le toucher ouvre sa carte. */
 function Detenteur({ nom, m, detail }: { nom: string; m: Metal; detail: string }) {
   const { players } = useSeason();
   const { open } = useCardViewer();
@@ -442,17 +443,21 @@ function Detenteur({ nom, m, detail }: { nom: string; m: Metal; detail: string }
         aria-label={`${nom}, ${detail}. Voir sa carte`}
         className="flex w-full min-h-11 items-center gap-3 rounded-[14px] px-1 py-1.5 text-left active:bg-foreground/[0.06]"
       >
-        <span className="relative size-9 shrink-0">
-          <span className="flex size-9 items-center justify-center overflow-hidden rounded-full bg-foreground/10 text-[13px] font-bold">
-            {cassee ? (
-              nom[0]
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={src} alt="" className="size-full object-cover" onError={() => setCassee(true)} />
-            )}
-          </span>
+        <span className="relative shrink-0">
+          {p ? (
+            <PlayerCard player={p} size={FORMAT_CARTE.petite} />
+          ) : (
+            <span className="flex size-12 items-center justify-center overflow-hidden rounded-[10px] bg-foreground/10 text-[13px] font-bold">
+              {cassee ? (
+                nom[0]
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={src} alt="" className="size-full object-cover" onError={() => setCassee(true)} />
+              )}
+            </span>
+          )}
           <span
-            className="absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-popover"
+            className="absolute -right-1 -bottom-1 size-3.5 rounded-full border-2 border-popover"
             style={{ background: fond(m) }}
             aria-hidden
           />

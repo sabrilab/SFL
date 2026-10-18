@@ -15,7 +15,7 @@
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronRight } from "lucide-react";
-import { MiniCarte } from "@/components/sfl/mini-carte";
+import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { Medaille } from "@/components/sfl/vitrine";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -23,9 +23,9 @@ import { legendes, parcours, saisonsPalmares, type Legende, type SaisonPalmares 
 import { vitrine } from "@/lib/sfl/trophees";
 import { cn } from "@/lib/utils";
 
-const PHI = 1.618;
-const DAUPHIN = 0.21;
-const CHAMPION = DAUPHIN * PHI;
+// Le podium d'une saison : le champion en carte moyenne, ses dauphins en petite.
+const DAUPHIN = FORMAT_CARTE.petite;
+const CHAMPION = FORMAT_CARTE.moyenne;
 
 function dateCourte(iso: string) {
   try {
@@ -93,10 +93,14 @@ function CarteSaison({ s }: { s: SaisonPalmares }) {
       <div className="flex flex-wrap justify-center gap-1.5 px-4 pt-4">
         {lauriers.map(([titre, l]) =>
           l ? (
-            <span key={titre} className="inline-flex h-7 items-center gap-1.5 rounded-full border border-foreground/15 bg-foreground/[0.05] px-3 text-[12px]">
-              <span className="mono-label text-foreground/45">{titre}</span>
-              <span className="font-semibold">{l.player.name}</span>
-              <span className="text-foreground/50 tabular-nums">{l.n}</span>
+            <span key={titre} className="inline-flex items-center gap-2 rounded-[16px] border border-foreground/15 bg-foreground/[0.05] py-1 pr-3 pl-1 text-[12px]">
+              <MiniCarte player={l.player} size={FORMAT_CARTE.petite} detail={`${titre} · ${l.n}`} />
+              <span className="flex flex-col leading-tight">
+                <span className="mono-label text-foreground/45">{titre}</span>
+                <span>
+                  <span className="font-semibold">{l.player.name}</span> <span className="text-foreground/50 tabular-nums">{l.n}</span>
+                </span>
+              </span>
             </span>
           ) : null
         )}
@@ -160,7 +164,7 @@ function Legendes({ liste, onChoisir }: { liste: Legende[]; onChoisir: (nom: str
         {top.map((l, i) => (
           <div key={l.player.name} className={cn("flex items-center gap-3 px-4 py-2.5", i > 0 && "border-t border-foreground/[0.08]")}>
             <span className="w-4 text-[12px] text-foreground/40 tabular-nums">{i + 1}</span>
-            <MiniCarte player={l.player} size={0.16} />
+            <MiniCarte player={l.player} size={FORMAT_CARTE.petite} />
             <button type="button" onClick={() => onChoisir(l.player.name)} className="flex min-w-0 flex-1 flex-col items-start text-left">
               <span className="max-w-full truncate text-[15px] font-semibold">{l.player.name}</span>
               <span className="text-[12px] text-foreground/45 tabular-nums">

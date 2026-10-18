@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { RankingCard, RANKING_THEMES } from "@/components/sfl/boost-card";
 import { ViewableCard } from "@/components/sfl/card-viewer";
-import { MiniCarte } from "@/components/sfl/mini-carte";
+import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { BadgesLigne } from "@/components/sfl/distinctions";
 import { useSeason } from "@/components/sfl/season-provider";
 import { rankByMetric, type Player } from "@/lib/sfl/engine";
@@ -21,9 +21,8 @@ import { RANKINGS, type RankingDef } from "@/lib/sfl/rankings";
 import { distinctions } from "@/lib/sfl/distinctions";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 
-const PHI = 1.618;
-const DAUPHIN = 0.3;
-const CHAMPION = DAUPHIN * PHI;
+const DAUPHIN = FORMAT_CARTE.moyenne;
+const CHAMPION = FORMAT_CARTE.grande;
 
 // Mini badges "cartes" — un coup d'œil suffit pour voir quels types de
 // cartes hors-série (MVP, Impact, Défensive) un joueur a décrochés.
@@ -143,7 +142,7 @@ function Liste({ def, me }: { def: RankingDef; me: string }) {
             )}
           >
             <span className="w-7 text-[15px] font-bold text-foreground/40 tabular-nums">{p.rank}</span>
-            <MiniCarte player={p} size={0.17} detail={`${def.label} · ${p.value} ${def.unit}`} />
+            <MiniCarte player={p} size={FORMAT_CARTE.petite} detail={`${def.label} · ${p.value} ${def.unit}`} />
             <span className="flex min-w-0 flex-1 items-center gap-2">
               <span className="truncate text-[15px] font-semibold">{p.name}</span>
               <BadgesLigne ds={parNom.get(p.name)} />
