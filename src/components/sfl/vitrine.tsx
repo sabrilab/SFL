@@ -447,7 +447,7 @@ function Detenteur({ nom, m, detail }: { nom: string; m: Metal; detail: string }
           {p ? (
             <PlayerCard player={p} size={FORMAT_CARTE.petite} />
           ) : (
-            <span className="flex size-[43px] items-center justify-center overflow-hidden rounded-[10px] bg-foreground/10 text-[13px] font-bold">
+            <span className="flex size-12 items-center justify-center overflow-hidden rounded-[10px] bg-foreground/10 text-[13px] font-bold">
               {cassee ? (
                 nom[0]
               ) : (
