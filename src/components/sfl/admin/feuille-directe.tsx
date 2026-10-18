@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { entryPP } from "@/lib/sfl/saisie/engine";
 import { updateEntryAt } from "@/lib/sfl/saisie/mutations";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
+import { useFeuillesDirect } from "@/hooks/use-direct";
 
 const TEAM_COLORS: Record<string, string> = {
   Orange: "#F9CB9C",
@@ -130,6 +131,9 @@ export function FeuilleDirecte({ saison, commit }: Props) {
     [equipes, rows]
   );
 
+  // Une feuille tenue par un joueur (Map) passe avant ces compteurs pour son match.
+  const tenues = useFeuillesDirect().filter((f) => f.saison === (saison.numero ?? 0) && f.j === j);
+
   function set(index: number, patch: Partial<MatchEntry>, label: string) {
     commit(updateEntryAt(saison, index, patch), label);
   }
@@ -166,6 +170,14 @@ export function FeuilleDirecte({ saison, commit }: Props) {
           )}
         </div>
       </div>
+
+      {tenues.map((f) => (
+        <p key={f.match_id} className="glass-soft rounded-[18px] px-4 py-2.5 text-[12.5px] text-foreground/60">
+          Feuille en direct tenue par <span className="font-bold text-foreground">{f.teneur}</span>
+          {f.finie ? " (terminée)" : ""} : ses buts, passes, arrêts et interceptions font foi pour son
+          match. Pour corriger, reprends-la depuis la fiche du match sur la Map.
+        </p>
+      ))}
 
       {/* L'équipe qu'on suit */}
       {equipes.length > 1 && (

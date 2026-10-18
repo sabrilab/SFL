@@ -16,6 +16,8 @@ import type { Player } from "@/lib/sfl/engine";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
 import { appliquerVotes } from "@/lib/sfl/votes";
 import { useSuiviVotes, useVotes } from "@/hooks/use-votes";
+import { appliquerDirect } from "@/lib/sfl/direct";
+import { useFeuillesDirect, useSuiviDirect } from "@/hooks/use-direct";
 
 export const SAISIE_EVENT = "sfl-saisie";
 
@@ -75,12 +77,17 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     const id = window.setInterval(() => setHorloge((h) => h + 1), 5 * 60 * 1000);
     return () => window.clearInterval(id);
   }, []);
+  // Les feuilles de match tenues en direct par un joueur (lib/sfl/direct.ts) :
+  // leurs chiffres passent avant ceux du document pour leur match.
+  useSuiviDirect(saison.numero ?? 0);
+  const feuilles = useFeuillesDirect();
   const derived = useMemo(() => {
     void horloge;
-    const brut = deriveSeason(saison);
-    const vote = appliquerVotes(saison, brut.journees, votes, new Date());
-    return vote === saison ? brut : deriveSeason(vote);
-  }, [saison, votes, horloge]);
+    const vivante = appliquerDirect(saison, feuilles);
+    const brut = deriveSeason(vivante);
+    const vote = appliquerVotes(vivante, brut.journees, votes, new Date());
+    return vote === vivante ? brut : deriveSeason(vote);
+  }, [saison, feuilles, votes, horloge]);
   // `players` est la liste PUBLIQUE : les joueurs masqués n'y sont pas, donc
   // aucun classement, aucune recherche, aucun duel ne peut les faire remonter.
   const value = useMemo<SeasonValue>(

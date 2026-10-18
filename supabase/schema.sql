@@ -1072,3 +1072,223 @@ exception
   when undefined_object then null;
 end;
 $$;
+
+-- ─────────────────────── Feuille de match en direct ───────────────────────
+-- Demande de Sabri (18/10) : un joueur du match tient la feuille au bord du
+-- terrain — buts, passes décisives, arrêts, interceptions. Le premier qui
+-- l'ouvre la garde : les autres la suivent en direct, sans pouvoir y écrire.
+-- Un admin peut la reprendre.
+--
+-- Une ligne par match d'une journée, À CÔTÉ du document de saison : les
+-- chiffres sont posés sur les lignes de la journée au moment de la dériver
+-- (lib/sfl/direct.ts, appelé par le SeasonProvider). Une publication admin
+-- partie d'une vieille copie ne peut donc pas les effacer, et la feuille ne
+-- réécrit jamais rien d'autre que son propre match.
+--
+-- Toute écriture passe par les fonctions ci-dessous (SECURITY DEFINER) : la
+-- table elle-même n'est ouverte qu'en lecture. `match_id` est celui du moteur
+-- (« j12-m1 ») : les équipes de la journée, dans leur ordre d'apparition,
+-- appariées deux à deux.
+create table if not exists public.feuilles_direct (
+  saison      integer not null,
+  j           integer not null,
+  match_id    text    not null,
+  teneur_id   uuid    not null references public.profiles(id) on delete cascade,
+  teneur      text    not null,
+  -- { "<joueur>": { "buts": 1, "passes": 0, "arrets": 2, "interceptions": 1 } }
+  stats       jsonb   not null default '{}'::jsonb,
+  finie       boolean not null default false,
+  prise_le    timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  primary key (saison, j, match_id)
+);
+
+create index if not exists feuilles_direct_teneur_idx on public.feuilles_direct (teneur_id);
+
+alter table public.feuilles_direct enable row level security;
+
+drop policy if exists "feuilles_direct: la ligue lit" on public.feuilles_direct;
+create policy "feuilles_direct: la ligue lit"
+  on public.feuilles_direct for select
+  to authenticated
+  using ((select public.est_membre()));
+
+revoke insert, update, delete on public.feuilles_direct from anon, authenticated;
+grant select on public.feuilles_direct to authenticated;
+
+-- L'appelant joue-t-il ce match ? Lu dans le document de saison, avec la
+-- règle du moteur : équipes des lignes présentes (ou d'extra time) dans leur
+-- ordre d'apparition, la 1re contre la 2e (m1), la 3e contre la 4e (m2)…
+create or replace function public.joue_match(p_saison integer, p_j integer, p_match text)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  with lignes as (
+    select t.e, t.ord
+      from public.saison s,
+           jsonb_array_elements(s.data -> 'entries') with ordinality as t(e, ord)
+     where s.id = 1
+       and coalesce((s.data ->> 'numero')::integer, 0) = p_saison
+       and (t.e ->> 'j')::integer = p_j
+       and t.e ->> 'team' is not null
+       and (t.e ->> 'statut' = 'Présent' or (t.e ->> 'extraTime')::boolean is true)
+  ),
+  equipes as (
+    select l.e ->> 'team' as team, min(l.ord) as premier from lignes l group by 1
+  ),
+  rangs as (
+    select q.team, row_number() over (order by q.premier) as r,
+           count(*) over () as n
+      from equipes q
+  )
+  select exists (
+    select 1
+      from lignes l
+      join rangs r on r.team = l.e ->> 'team'
+     where l.e ->> 'player' = (select public.mon_nom())
+       -- une équipe sans adversaire (nombre impair) ne joue pas de match
+       and (r.r % 2 = 0 or r.r < r.n)
+       and 'j' || p_j || '-m' || ((r.r + 1) / 2) = p_match
+  );
+$$;
+
+-- Compteurs nettoyés : quatre entiers de 0 à 99, rien d'autre.
+create or replace function public.compteurs_direct(v jsonb)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'buts',          least(99, greatest(0, coalesce((v ->> 'buts')::integer, 0))),
+    'passes',        least(99, greatest(0, coalesce((v ->> 'passes')::integer, 0))),
+    'arrets',        least(99, greatest(0, coalesce((v ->> 'arrets')::integer, 0))),
+    'interceptions', least(99, greatest(0, coalesce((v ->> 'interceptions')::integer, 0)))
+  );
+$$;
+
+-- Prendre la feuille : la première demande gagne, les suivantes reçoivent
+-- la feuille telle qu'elle est (avec le nom de celui qui la tient).
+-- `p_stats` : les chiffres déjà saisis par l'admin, pour ne rien perdre.
+create or replace function public.prendre_feuille(p_saison integer, p_j integer, p_match text, p_stats jsonb)
+returns public.feuilles_direct
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  nom text := (select public.mon_nom());
+  depart jsonb := '{}'::jsonb;
+  k text;
+  v jsonb;
+  ligne public.feuilles_direct;
+begin
+  if not (select public.est_membre()) or nom is null then
+    raise exception 'réservé aux joueurs de la ligue' using errcode = '42501';
+  end if;
+  if not (public.joue_match(p_saison, p_j, p_match) or (select public.is_league_admin())) then
+    raise exception 'tu ne joues pas ce match' using errcode = '42501';
+  end if;
+  if jsonb_typeof(p_stats) = 'object' then
+    for k, v in select * from jsonb_each(p_stats) loop
+      depart := depart || jsonb_build_object(k, public.compteurs_direct(v));
+    end loop;
+  end if;
+  insert into public.feuilles_direct (saison, j, match_id, teneur_id, teneur, stats)
+  values (p_saison, p_j, p_match, (select auth.uid()), nom, depart)
+  on conflict (saison, j, match_id) do nothing;
+  select * into ligne from public.feuilles_direct
+   where saison = p_saison and j = p_j and match_id = p_match;
+  return ligne;
+end;
+$$;
+
+-- Noter : les compteurs d'un joueur. Seul celui qui tient la feuille, tant
+-- qu'elle n'est pas finie — ou un admin, toujours.
+create or replace function public.noter_feuille(p_saison integer, p_j integer, p_match text, p_joueur text, p_valeurs jsonb)
+returns public.feuilles_direct
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  ligne public.feuilles_direct;
+begin
+  update public.feuilles_direct
+     set stats = stats || jsonb_build_object(p_joueur, public.compteurs_direct(p_valeurs)),
+         updated_at = now()
+   where saison = p_saison and j = p_j and match_id = p_match
+     and ((teneur_id = (select auth.uid()) and not finie) or (select public.is_league_admin()))
+  returning * into ligne;
+  if ligne is null then
+    raise exception 'feuille fermée ou tenue par un autre joueur' using errcode = '42501';
+  end if;
+  return ligne;
+end;
+$$;
+
+-- Siffler la fin (ou, pour un admin, rouvrir la feuille).
+create or replace function public.finir_feuille(p_saison integer, p_j integer, p_match text, p_finie boolean)
+returns public.feuilles_direct
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  ligne public.feuilles_direct;
+begin
+  update public.feuilles_direct
+     set finie = p_finie, updated_at = now()
+   where saison = p_saison and j = p_j and match_id = p_match
+     and ((teneur_id = (select auth.uid()) and not finie and p_finie) or (select public.is_league_admin()))
+  returning * into ligne;
+  if ligne is null then
+    raise exception 'feuille fermée ou tenue par un autre joueur' using errcode = '42501';
+  end if;
+  return ligne;
+end;
+$$;
+
+-- Reprendre la feuille d'un autre : admin seulement.
+create or replace function public.reprendre_feuille(p_saison integer, p_j integer, p_match text)
+returns public.feuilles_direct
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  ligne public.feuilles_direct;
+begin
+  if not (select public.is_league_admin()) then
+    raise exception 'réservé à l''admin' using errcode = '42501';
+  end if;
+  update public.feuilles_direct
+     set teneur_id = (select auth.uid()), teneur = (select public.mon_nom()), prise_le = now(), updated_at = now()
+   where saison = p_saison and j = p_j and match_id = p_match
+  returning * into ligne;
+  return ligne;
+end;
+$$;
+
+revoke execute on function public.joue_match(integer, integer, text) from public, anon;
+revoke execute on function public.prendre_feuille(integer, integer, text, jsonb) from public, anon;
+revoke execute on function public.noter_feuille(integer, integer, text, text, jsonb) from public, anon;
+revoke execute on function public.finir_feuille(integer, integer, text, boolean) from public, anon;
+revoke execute on function public.reprendre_feuille(integer, integer, text) from public, anon;
+grant execute on function public.joue_match(integer, integer, text) to authenticated;
+grant execute on function public.prendre_feuille(integer, integer, text, jsonb) to authenticated;
+grant execute on function public.noter_feuille(integer, integer, text, text, jsonb) to authenticated;
+grant execute on function public.finir_feuille(integer, integer, text, boolean) to authenticated;
+grant execute on function public.reprendre_feuille(integer, integer, text) to authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.feuilles_direct;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;

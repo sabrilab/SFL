@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cloturerSaison, restaurationPossible, restaurerSaison } from "@/lib/sfl/saisie/mutations";
+import { appliquerDirect } from "@/lib/sfl/direct";
+import { useFeuillesDirect } from "@/hooks/use-direct";
 import { numeroSaison, type Saison } from "@/lib/sfl/saisie/types";
 
 function dateCourte(iso: string) {
@@ -39,6 +41,8 @@ export function Saisons({
 }) {
   const numero = numeroSaison(saison);
   const archives = saison.archives ?? [];
+  // Les feuilles tenues en direct vivent hors du document : l'archive les emporte.
+  const feuilles = useFeuillesDirect();
   const [ouvert, setOuvert] = useState(false);
   const [nom, setNom] = useState(`Saison ${numero}`);
   const journees = saison.journees.length;
@@ -125,7 +129,7 @@ export function Saisons({
             <Button
               className="rounded-full"
               onClick={() => {
-                onCommit(cloturerSaison(saison, nom), `Clôture de la saison ${numero}`);
+                onCommit(cloturerSaison(appliquerDirect(saison, feuilles), nom), `Clôture de la saison ${numero}`);
                 setOuvert(false);
               }}
             >

@@ -27,6 +27,7 @@ import { PresencePanel } from "@/components/sfl/presence-panel";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
 import { FeuilleDeMatch } from "@/components/sfl/matchs/feuille-de-match";
+import { SaisieDirecte } from "@/components/sfl/matchs/saisie-directe";
 import { feuilleDeConvocation, feuilleDeJournee } from "@/lib/sfl/feuille";
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
 import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
@@ -729,6 +730,8 @@ export default function MapPage() {
                     }}
                   />
                 )}
+                {/* Le jour du match, un joueur du match tient la feuille en direct. */}
+                {choisi?.j != null && !choisi.partie && <SaisieDirecte j={choisi.j} />}
                 {choisi?.joue && (
                   <Link
                     href="/ligue"
