@@ -4,6 +4,7 @@ import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useSeason } from "@/components/sfl/season-provider";
 import { badgeDeCarte, type BadgeCarte, type ChoixBadge } from "@/lib/sfl/badge-carte";
 import { BADGE_EVENT, badgeChoisi, badgeRevision } from "@/lib/sfl/badges-choisis";
+import { IMAGE_EVENT, imageRevision } from "@/lib/sfl/badges-3d/rendu";
 
 function subscribe(onChange: () => void) {
   window.addEventListener(BADGE_EVENT, onChange);
@@ -29,7 +30,18 @@ export function useBadgeCarte(nom: string): BadgeCarte | null {
   return useMemo(() => badgeDeCarte(saison, nom, choix), [saison, nom, choix]);
 }
 
-/** Un compteur qui change avec les choix de badge : de quoi recapturer les cartes 3D. */
+function subscribeImages(onChange: () => void) {
+  const off = subscribe(onChange);
+  window.addEventListener(IMAGE_EVENT, onChange);
+  return () => {
+    off();
+    window.removeEventListener(IMAGE_EVENT, onChange);
+  };
+}
+
+const revisions = () => badgeRevision() * 100000 + imageRevision();
+
+/** Un compteur qui change avec les choix de badge et les images 3D prêtes : de quoi recapturer les cartes 3D. */
 export function useBadgeRevision(): number {
-  return useSyncExternalStore(subscribe, badgeRevision, () => 0);
+  return useSyncExternalStore(subscribeImages, revisions, () => 0);
 }

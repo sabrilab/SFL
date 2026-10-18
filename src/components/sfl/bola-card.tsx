@@ -32,8 +32,8 @@
 // son poste prend la place.
 //
 // Avec `badge` (les cartes de la ligue, PlayerCard), le haut à droite est au
-// badge en verre que le joueur a choisi (badge-verre.tsx, demande de Sabri,
-// 17/10), et le poste passe en haut à gauche, à la place de l'étiquette
+// badge que le joueur a choisi, un objet en 3D (badge-3d.tsx, demandes de Sabri,
+// 17 et 18/10), et le poste passe en haut à gauche, à la place de l'étiquette
 // d'édition. `badge: null` : le coin reste vide.
 //
 // Mêmes calques que la carte éditoriale (`data-card-part` body / player /
@@ -41,7 +41,7 @@
 // avec sa parallaxe — le portrait flotte au-dessus du papier, le texte
 // au-dessus du portrait.
 
-import { BadgeVerre } from "@/components/sfl/badge-verre";
+import { Badge3D } from "@/components/sfl/badge-3d";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
 
@@ -363,7 +363,7 @@ export function BolaCard({
   // Le haut à droite du portrait : le numéro de maillot ; sinon le poste, en grand format seulement.
   const avecBadge = badge !== undefined;
   const marque = avecBadge ? null : numero != null ? String(numero) : complete ? position.toUpperCase() : null;
-  // Le badge en verre, au nombre d'or lui aussi : le portrait ÷ φ⁵ (85), et
+  // Le badge, au nombre d'or lui aussi : le portrait ÷ φ⁵ (85), et
   // autant ÷ φ jusqu'aux bords (52). En compacte, un cran au-dessus (÷ φ⁴,
   // 137) pour rester lisible ; rien en réduite.
   const coteBadge = PORTRAIT.c / PHI ** (complete ? 5 : 4);
@@ -485,14 +485,9 @@ export function BolaCard({
             </div>
           )}
           {badgeCoin && (
-            <BadgeVerre
-              badge={badgeCoin}
-              largeur={largeurBadge}
-              left={u(PORTRAIT.c - margeBadge - coteBadge)}
-              top={u(margeBadge)}
-              cote={u(PORTRAIT.c)}
-              fond={<Portrait {...portraitProps} />}
-            />
+            <span className="absolute" style={{ left: u(PORTRAIT.c - margeBadge - coteBadge), top: u(margeBadge) }}>
+              <Badge3D badge={badgeCoin} largeur={largeurBadge} socle />
+            </span>
           )}
           {complete && (
             <>

@@ -5,23 +5,27 @@
 //
 // 1. Fin de saison (fin-de-saison.ts) : les trois premiers du Pépite d'Or et
 //    des classements buteur, passeur, défenseur et MVP, une fois par saison.
-//    C'est l'écusson : or au 1er, argent au 2e, bronze au 3e. Pendant la
-//    saison, un petit rond creux donne le rang du moment.
-// 2. Paliers (trophees.ts) : gagnés au fil des dimanches. C'est la médaille
-//    ronde, quatre paliers pour tous : bronze, argent, or, puis rouge et or.
+//    Son objet en 3D porte une pastille gravée du rang : or au 1er, argent
+//    au 2e, bronze au 3e. Pendant la saison, un petit rond creux donne le
+//    rang du moment.
+// 2. Paliers (trophees.ts) : gagnés au fil des dimanches. Quatre paliers pour
+//    tous : bronze, argent, or, puis rouge et or.
 //
-// La forme dit la famille, le métal dit le niveau, et le niveau est toujours
-// écrit en toutes lettres : on n'a pas besoin de distinguer les couleurs pour
-// lire un badge. Le rang du moment (rond creux) s'écrit en entier sous le
-// Pépite d'Or, en abrégé sous les quatre autres. Pas encore gagné, un badge est en pointillés. Toucher un
-// badge ouvre sa feuille : ses paliers, ou ses podiums.
+// Chaque badge est un objet de foot en 3D (badge-3d.tsx) : l'objet dit ce
+// qu'il récompense, le métal dit le niveau, et le niveau est toujours écrit
+// en toutes lettres : on n'a pas besoin de distinguer les couleurs pour lire
+// un badge. Le rang du moment (rond creux) s'écrit en entier sous le Pépite
+// d'Or, en abrégé sous les quatre autres. Pas encore gagné, l'objet est en
+// verre dépoli. Toucher un badge ouvre sa feuille : l'objet y tourne en
+// vraie 3D, avec ses paliers ou ses podiums.
 //
 // NouveauxBadges, monté une fois dans la mise en page, annonce chaque palier
 // gagné depuis la dernière visite.
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import { EMBLEMES, EMBLEMES_SAISON } from "@/components/sfl/emblemes";
+import { Objet3D, Objet3DVivant, OBJET_PALIER, OBJET_SAISON, PastilleRang } from "@/components/sfl/badge-3d";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -65,100 +69,62 @@ const METAL_RANG: Record<number, Metal> = { 1: "or", 2: "argent", 3: "bronze" };
 
 /* -------------------------------- Médaille -------------------------------- */
 
-/** Une médaille de palier. palier 0 = pas encore gagnée : en pointillés, son arc montre le chemin. */
-export function Medaille({ e, diametre = 60 }: { e: EtatTrophee; diametre?: number }) {
-  const Embleme = EMBLEMES[e.def.id];
+/**
+ * Un badge de palier : son objet en 3D, dans le métal du palier atteint
+ * (badge-3d.tsx). palier 0 = pas encore gagné : l'objet en verre dépoli, et
+ * un arc autour montre le chemin vers le bronze.
+ */
+export function Medaille({ e, diametre = 60, vivant = false }: { e: EtatTrophee; diametre?: number; vivant?: boolean }) {
   const d = diametre;
   const m = metal(e.palier);
-  if (!m) {
-    const r = d / 2 - 2;
-    const tour = 2 * Math.PI * r;
-    return (
-      <span className="relative block shrink-0" style={{ width: d, height: d }}>
-        <span className="absolute inset-[1px] rounded-full border-[1.5px] border-dashed border-foreground/40" />
-        {e.progression > 0 && (
-          <svg className="absolute inset-0 -rotate-90" width={d} height={d} aria-hidden>
-            <circle
-              cx={d / 2}
-              cy={d / 2}
-              r={r}
-              fill="none"
-              stroke={METAL.bronze.trait}
-              strokeWidth={2.5}
-              strokeLinecap="round"
-              strokeDasharray={`${tour * e.progression} ${tour}`}
-            />
-          </svg>
-        )}
-        <Embleme
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-foreground/55"
-          style={{ width: d * 0.4, height: d * 0.4 }}
-          strokeWidth={1.8}
-          aria-hidden
-        />
-      </span>
-    );
-  }
-  const t = METAL[m];
+  const props = { objet: OBJET_PALIER[e.def.id], matiere: m ?? ("fantome" as const), taille: d, embleme: EMBLEMES[e.def.id] };
+  const r = d / 2 - 1.5;
+  const tour = 2 * Math.PI * r;
   return (
-    <span
-      className="relative block shrink-0 rounded-full shadow-[0_6px_14px_rgba(0,0,0,0.35)]"
-      style={{ width: d, height: d, background: fond(m), color: t.encre, boxShadow: `inset 0 0 0 2px ${t.listel}` }}
-    >
-      <span className="absolute rounded-full border" style={{ inset: d * 0.12, borderColor: t.encre, opacity: 0.3 }} />
-      <Embleme
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-        style={{ width: d * 0.4, height: d * 0.4 }}
-        strokeWidth={2.2}
-        aria-hidden
-      />
-      {/* Le reflet, à peine */}
-      <span className="absolute inset-0 rounded-full bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.3)_48%,transparent_60%)]" />
+    <span className="relative block shrink-0" style={{ width: d, height: d }}>
+      {!m && e.progression > 0 && (
+        <svg className="absolute inset-0 -rotate-90" width={d} height={d} aria-hidden>
+          <circle cx={d / 2} cy={d / 2} r={r} fill="none" stroke="currentColor" strokeOpacity={0.14} strokeWidth={2} />
+          <circle
+            cx={d / 2}
+            cy={d / 2}
+            r={r}
+            fill="none"
+            stroke={METAL.bronze.trait}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeDasharray={`${tour * e.progression} ${tour}`}
+          />
+        </svg>
+      )}
+      <span className={cn("absolute inset-0", !m && "opacity-80")} style={!m ? { transform: "scale(0.78)" } : undefined}>
+        {vivant ? <Objet3DVivant {...props} /> : <Objet3D {...props} />}
+      </span>
     </span>
   );
 }
 
 /* -------------------------------- Écusson -------------------------------- */
 
-const ECU = "M32 3 L59 11 V36 C59 52 47 63 32 69 C17 63 5 52 5 36 V11 Z";
-const ECU_LISTEL = "M32 8 L54 14.5 V36 C54 49 44 58.5 32 63.5 C20 58.5 10 49 10 36 V14.5 Z";
-
-/** Un écusson de fin de saison. rang null = jamais sur le podium : en pointillés. */
-export function Ecusson({ id, rang, largeur = 58 }: { id: ClassementId; rang: number | null; largeur?: number }) {
-  const gid = useId();
-  const Embleme = EMBLEMES_SAISON[id];
+/**
+ * Un badge de fin de saison : son objet en 3D, dans le métal du meilleur rang
+ * (1er or, 2e argent, 3e bronze), et ce rang gravé sur une pastille.
+ * rang null = jamais sur le podium : l'objet en verre dépoli.
+ */
+export function Ecusson({ id, rang, largeur = 58, vivant = false }: { id: ClassementId; rang: number | null; largeur?: number; vivant?: boolean }) {
   const w = largeur;
-  const h = (w * 72) / 64;
   const m = rang ? METAL_RANG[rang] : null;
-  const t = m ? METAL[m] : null;
+  const props = { objet: OBJET_SAISON[id], matiere: m ?? ("fantome" as const), taille: w, embleme: EMBLEMES_SAISON[id] };
   return (
-    <span className="relative block shrink-0" style={{ width: w, height: h }}>
-      <svg className="absolute inset-0" width={w} height={h} viewBox="0 0 64 72" aria-hidden>
-        {t ? (
-          <>
-            <defs>
-              <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor={t.stops[0]} />
-                <stop offset="0.5" stopColor={t.stops[1]} />
-                <stop offset="1" stopColor={t.stops[2]} />
-              </linearGradient>
-            </defs>
-            <path d={ECU} fill={`url(#${gid})`} />
-            <path d={ECU_LISTEL} fill="none" stroke={t.encre} strokeOpacity={0.3} strokeWidth={1} />
-            <text x="32" y="57" textAnchor="middle" fontSize="11" fontWeight="800" fill={t.encre} fontFamily="var(--font-sans), system-ui, sans-serif">
-              {ordinal(rang!)}
-            </text>
-          </>
-        ) : (
-          <path d={ECU} fill="none" stroke="currentColor" strokeOpacity={0.4} strokeWidth={1.6} strokeDasharray="4 4" />
-        )}
-      </svg>
-      <Embleme
-        className={cn("absolute left-1/2 -translate-x-1/2", !t && "text-foreground/55")}
-        style={{ width: w * 0.38, height: w * 0.38, top: t ? h * 0.2 : h * 0.3, color: t?.encre }}
-        strokeWidth={t ? 2.3 : 1.8}
-        aria-hidden
-      />
+    <span className="relative block shrink-0" style={{ width: w, height: w }}>
+      <span className={cn("absolute inset-0", !m && "opacity-80")} style={!m ? { transform: "scale(0.78)" } : undefined}>
+        {vivant ? <Objet3DVivant {...props} /> : <Objet3D {...props} />}
+      </span>
+      {rang && (
+        <span className="pointer-events-none absolute" style={{ right: -w * 0.04, bottom: -w * 0.02 }}>
+          <PastilleRang rang={rang} taille={w * 0.38} />
+        </span>
+      )}
     </span>
   );
 }
@@ -312,7 +278,7 @@ function ProchainBadge({ e, onOpen }: { e: EtatTrophee; onOpen: () => void }) {
         style={{ borderColor: METAL[cible].trait }}
         aria-hidden
       >
-        <Embleme className="size-6" style={{ color: METAL[cible].trait }} strokeWidth={2.2} />
+        <Objet3D objet={OBJET_PALIER[e.def.id]} matiere="fantome" taille={40} embleme={Embleme} ombre={false} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="mono-label block text-[11px] text-foreground/65">Prochain badge</span>
@@ -341,7 +307,7 @@ function FeuillePalier({ e, moi }: { e: EtatTrophee; moi: string }) {
   const m = metal(e.palier);
   return (
     <div className="flex flex-col items-center gap-4">
-      <Medaille e={e} diametre={96} />
+      <Medaille e={e} diametre={150} vivant />
       <div className="text-center">
         <SheetTitle className="text-[22px] font-extrabold tracking-tight">
           {e.def.nom}
@@ -401,7 +367,7 @@ function FeuilleSaison({ e, moi }: { e: EtatClassement; moi: string }) {
   const unite = (n: number) => `${n} ${n > 1 ? e.def.unite[1] : e.def.unite[0]}`;
   return (
     <div className="flex flex-col items-center gap-4">
-      <Ecusson id={e.def.id} rang={e.meilleur?.rang ?? null} largeur={92} />
+      <Ecusson id={e.def.id} rang={e.meilleur?.rang ?? null} largeur={150} vivant />
       <div className="text-center">
         <SheetTitle className="text-[22px] font-extrabold tracking-tight">{e.def.nom}</SheetTitle>
         <SheetDescription className="mt-1 text-[15px] text-foreground/75">{sousTitre(e)}</SheetDescription>
