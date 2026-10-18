@@ -24,12 +24,15 @@ export function PlayerCard({
   player,
   size = 1,
   highlightStats,
+  onglet,
 }: {
   player: Player;
   /** Sans effet : la carte affichée est toujours la simple. */
   mode?: CardMode;
   size?: number;
   highlightStats?: StatKey[];
+  /** En pastille : la note aux couleurs d'une équipe. */
+  onglet?: { fond: string; encre: string };
 }) {
   const stats = player.stats;
   const photo = usePhotoPerso(player.name);
@@ -45,6 +48,7 @@ export function PlayerCard({
       highlightStats={highlightStats}
       size={size}
       photo={photo}
+      onglet={onglet}
       badge={badge}
     />
   );

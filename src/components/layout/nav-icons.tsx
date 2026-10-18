@@ -96,3 +96,12 @@ export function TropheeIcon({ plein }: SymboleProps) {
     </svg>
   );
 }
+
+export function RechercheIcon({ plein }: SymboleProps) {
+  return (
+    <svg {...symbole} width={24} height={24} fill="none" strokeWidth={plein ? 2.4 : 1.9}>
+      <circle cx="10.8" cy="10.8" r="6.3" />
+      <path d="M15.6 15.6l4.6 4.6" />
+    </svg>
+  );
+}

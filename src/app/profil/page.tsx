@@ -244,13 +244,13 @@ export default function Profil() {
         </p>
       </section>
 
-      {/* Les actions : la carte officielle (photo au maillot Bola), l'historique,
-          le badge de la carte */}
+      {/* L'appel principal, pleine largeur juste sous la carte : la carte
+          officielle (photo au maillot Bola). Puis l'historique et le badge. */}
+      <CarteOfficielle player={player} className="-mt-1 w-full" />
       <div className="flex gap-[9px]">
-        <CarteOfficielle player={player} className="flex-1" />
         <Link
           href="/ligue?vue=matchs"
-          className="glass-soft w-[128px] rounded-full py-[15px] text-center text-[15px] font-semibold text-foreground/70"
+          className="glass-soft flex-1 rounded-full py-[15px] text-center text-[15px] font-semibold text-foreground/70"
         >
           Historique
         </Link>

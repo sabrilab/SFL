@@ -56,6 +56,7 @@ const SANS = "var(--font-inter), Inter, system-ui, sans-serif";
 const MONO = "var(--font-jbmono), ui-monospace, monospace";
 
 // Le nombre d'or, cote par cote (repère 1024 × 1656).
+const PHI = (1 + Math.sqrt(5)) / 2;
 const PORTRAIT = { x: M, y: M, c: W - M * 2 }; // 942
 const BANDE = PORTRAIT.y + PORTRAIT.c + M; // 1024
 const NOTE_C = 581; // 942 ÷ φ
@@ -233,6 +234,7 @@ export function BolaCard({
   size = 1,
   photo,
   numero,
+  onglet,
   badge,
 }: {
   name: string;
@@ -247,6 +249,8 @@ export function BolaCard({
   photo?: string | null;
   /** Le numéro de maillot, quand le joueur en a un. */
   numero?: number | null;
+  /** Pastille seulement : l'onglet de la note aux couleurs d'une équipe (feuille de match). */
+  onglet?: { fond: string; encre: string };
   /** Le badge du coin ; null = coin vide ; absent = l'ancienne mise en page (numéro ou poste). */
   badge?: BadgeCarte | null;
 }) {
@@ -307,8 +311,10 @@ export function BolaCard({
             padding: "0 7%",
             boxSizing: "border-box",
             borderTopLeftRadius: largeur * 0.12,
-            background: encre(1),
-            color: edition === "mvp" ? "#08090b" : "#f4f5f2",
+            background: onglet?.fond ?? encre(1),
+            color: onglet?.encre ?? (edition === "mvp" ? "#08090b" : "#f4f5f2"),
+            // Un onglet clair sur le papier clair : un filet le détache.
+            boxShadow: onglet ? `inset 1px 1px 0 ${onglet.encre}33` : undefined,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -357,8 +363,12 @@ export function BolaCard({
   // Le haut à droite du portrait : le numéro de maillot ; sinon le poste, en grand format seulement.
   const avecBadge = badge !== undefined;
   const marque = avecBadge ? null : numero != null ? String(numero) : complete ? position.toUpperCase() : null;
-  // Le badge en verre : un peu plus grand en compacte, pour rester lisible ; rien en réduite.
-  const largeurBadge = u(complete ? 172 : 230);
+  // Le badge en verre, au nombre d'or lui aussi : le portrait ÷ φ⁵ (85), et
+  // autant ÷ φ jusqu'aux bords (52). En compacte, un cran au-dessus (÷ φ⁴,
+  // 137) pour rester lisible ; rien en réduite.
+  const coteBadge = PORTRAIT.c / PHI ** (complete ? 5 : 4);
+  const margeBadge = coteBadge / PHI;
+  const largeurBadge = u(coteBadge);
   const badgeCoin = badge && !reduite ? badge : null;
   const portraitProps = {
     photo,
@@ -478,8 +488,8 @@ export function BolaCard({
             <BadgeVerre
               badge={badgeCoin}
               largeur={largeurBadge}
-              left={u(PORTRAIT.c - (complete ? 58 : 52)) - largeurBadge}
-              top={u(complete ? 54 : 48)}
+              left={u(PORTRAIT.c - margeBadge - coteBadge)}
+              top={u(margeBadge)}
               cote={u(PORTRAIT.c)}
               fond={<Portrait {...portraitProps} />}
             />

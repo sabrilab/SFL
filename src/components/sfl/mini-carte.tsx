@@ -13,6 +13,7 @@ export function MiniCarte({
   size = 0.2,
   detail,
   className,
+  onglet,
 }: {
   player: Player;
   /** 0.2 ≈ 51 × 76 px. */
@@ -20,6 +21,8 @@ export function MiniCarte({
   /** Le sous-titre du grand format (« 1er au Pépite d'Or · 12 pts »). */
   detail?: string;
   className?: string;
+  /** La note aux couleurs d'une équipe (feuille de match). */
+  onglet?: { fond: string; encre: string };
 }) {
   const { open } = useCardViewer();
   return (
@@ -38,7 +41,7 @@ export function MiniCarte({
       aria-label={`Voir la carte de ${player.name}`}
       className={cn("shrink-0 transition-transform active:scale-95", className)}
     >
-      <PlayerCard player={player} size={size} />
+      <PlayerCard player={player} size={size} onglet={onglet} />
     </button>
   );
 }

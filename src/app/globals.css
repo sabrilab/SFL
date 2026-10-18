@@ -707,13 +707,35 @@
   line-height: 12px;
   letter-spacing: 0.1px;
 }
+/* La pastille de la Recherche, détachée à droite de la capsule : même verre,
+   même hauteur, ronde. Choisie, elle prend la lentille. */
+.liquid-tabbar--rond {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 62px;
+  padding: 0;
+  transition: transform 0.35s cubic-bezier(0.32, 1.35, 0.42, 1), background-color 0.25s ease;
+}
+.liquid-tabbar--rond[data-choisi] {
+  background-image: linear-gradient(var(--tabbar-lentille), var(--tabbar-lentille));
+}
+.liquid-tabbar--rond:active {
+  transform: scale(1.08);
+  transition-duration: 0.12s;
+}
+.liquid-tabbar--rond:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
 .liquid-tabbar__onglet:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: -3px;
 }
 @media (prefers-reduced-motion: reduce) {
   .liquid-tabbar__lentille,
-  .liquid-tabbar__onglet {
+  .liquid-tabbar__onglet,
+  .liquid-tabbar--rond {
     transition: none;
   }
 }

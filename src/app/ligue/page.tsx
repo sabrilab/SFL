@@ -16,7 +16,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalSto
 import { useSearchParams } from "next/navigation";
 import { ChevronRight, Crown } from "lucide-react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
-import { LEAGUE_KEY } from "@/components/layout/site-header";
+import { LEAGUE_KEY } from "@/lib/nav";
 import { useSeason } from "@/components/sfl/season-provider";
 import { labelDateFr, prochainDimanche, voteOuvert } from "@/lib/sfl/convocation-temps";
 import { rankPlayers } from "@/lib/sfl/engine";

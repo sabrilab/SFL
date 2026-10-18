@@ -9,6 +9,10 @@
 //   · la convocation du dimanche, tant qu'aucune journée n'existe : les
 //     équipes composées par l'admin, révélées le vendredi à 19h.
 //
+// Sur la feuille, chaque match se joue les Noirs contre les Blancs (décision
+// de Sabri, 17/10) : la couleur du jour de l'admin (Orange, Bleu…) n'y paraît
+// pas ; la première équipe de chaque paire prend le noir, la seconde le blanc.
+//
 // Ici, rien que des calculs : les terrains, et où poser chaque joueur sur son
 // demi-terrain.
 
@@ -17,7 +21,9 @@ import type { ConvocationTeam } from "@/lib/sfl/saisie/types";
 
 export interface EquipeFeuille {
   nom: string;
+  /** Le fond de l'équipe (pastille du nom, point), et l'encre posée dessus. */
   couleur: string;
+  encre: string;
   joueurs: string[];
 }
 
@@ -27,21 +33,8 @@ export interface TerrainFeuille {
   b: EquipeFeuille;
 }
 
-/** Les couleurs des équipes du jour, les mêmes que sur la carte-journée. */
-const COULEURS: Record<string, string> = {
-  Orange: "#F9CB9C",
-  Bleu: "#8FB6F5",
-  Vert: "#9FD49B",
-  Jaune: "#F2DC8B",
-  Rouge: "#F09A96",
-  Gris: "#C9C9C9",
-  "Équipe A": "#F9CB9C",
-  "Équipe B": "#8FB6F5",
-};
-
-export const couleurEquipe = (nom: string) => COULEURS[nom] ?? "#B9B9B9";
-
-const equipe = (nom: string, joueurs: string[]): EquipeFeuille => ({ nom, couleur: couleurEquipe(nom), joueurs });
+const noirs = (joueurs: string[]): EquipeFeuille => ({ nom: "Noirs", couleur: "#0A0B0D", encre: "#F4F5F2", joueurs });
+const blancs = (joueurs: string[]): EquipeFeuille => ({ nom: "Blancs", couleur: "#F4F3EF", encre: "#0A0B0D", joueurs });
 
 /** Les terrains d'une journée de ligue ; vide tant que les équipes ne sont pas faites. */
 export function feuilleDeJournee(journee: Journee | undefined): TerrainFeuille[] {
@@ -49,8 +42,8 @@ export function feuilleDeJournee(journee: Journee | undefined): TerrainFeuille[]
   const plusieurs = journee.matches.length > 1;
   return journee.matches.map((m, i) => ({
     label: plusieurs ? `Terrain ${i + 1}` : "Le match",
-    a: equipe(m.teamA.name, m.teamA.players.map((p) => p.name)),
-    b: equipe(m.teamB.name, m.teamB.players.map((p) => p.name)),
+    a: noirs(m.teamA.players.map((p) => p.name)),
+    b: blancs(m.teamB.players.map((p) => p.name)),
   }));
 }
 
@@ -62,8 +55,8 @@ export function feuilleDeConvocation(teams: ConvocationTeam[] | null): TerrainFe
   for (let i = 0; i + 1 < pleines.length; i += 2) {
     out.push({
       label: plusieurs ? `Terrain ${i / 2 + 1}` : "Le match",
-      a: equipe(pleines[i].name, pleines[i].players),
-      b: equipe(pleines[i + 1].name, pleines[i + 1].players),
+      a: noirs(pleines[i].players),
+      b: blancs(pleines[i + 1].players),
     });
   }
   return out;
