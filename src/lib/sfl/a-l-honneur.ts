@@ -37,7 +37,7 @@ export interface Surface {
 
 export interface Honneur {
   j: number;
-  mvp: { nom: string; buts: number; passes: number }[];
+  mvp: { nom: string; buts: number; passes: number; pp: number }[];
   decroches: Decroche[];
   equipeType: { nom: string; pp: number }[];
   duo: { passeur: string; buteur: string; n: number } | null;
@@ -71,7 +71,12 @@ export function honneurDe(saison: Saison, j: number, moi?: string): Honneur {
   // L'homme du dimanche — un par match quand la journée en a plusieurs.
   const mvp = lignes
     .filter((e) => e.mvp && !e.extraTime)
-    .map((e) => ({ nom: e.player, buts: e.buts, passes: e.passes }));
+    .map((e) => ({
+      nom: e.player,
+      buts: e.buts,
+      passes: e.passes,
+      pp: lignes.filter((x) => x.player === e.player).reduce((t, x) => t + entryPP(x), 0),
+    }));
 
   // Les badges : la vitrine au soir de J, et la veille.
   const apres = jusqua(saison, j);
