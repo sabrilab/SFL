@@ -8,10 +8,12 @@ import { toast } from "sonner";
 import { LogOut, KeyRound, Link2, Mail } from "lucide-react";
 import {
   changePassword,
+  fournisseursActifs,
   getContactEmail,
   hasCustomPassword,
   saveContactEmail,
   signOut,
+  type Fournisseur,
 } from "@/lib/sfl/auth/session";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/hooks/use-session";
@@ -32,6 +34,17 @@ export function AccountCard() {
   const [emailInput, setEmailInput] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
   const serverSession = !!session?.server;
+  // « Lier Google / Apple » seulement pour un fournisseur activé dans Supabase.
+  const [actifs, setActifs] = useState<Fournisseur[]>([]);
+  useEffect(() => {
+    let annule = false;
+    fournisseursActifs().then((r) => {
+      if (!annule) setActifs(r.actifs);
+    });
+    return () => {
+      annule = true;
+    };
+  }, []);
 
   // L'email vit en base (système extérieur) : lecture au montage, mise à jour
   // via les callbacks — pas de setState synchrone dans l'effet.
@@ -167,20 +180,19 @@ export function AccountCard() {
                 </button>
               </form>
             )}
-            <div className="mt-2.5 flex gap-2">
-              <button
-                onClick={() => linkProvider("google")}
-                className="glass-soft mono-label flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-foreground/60"
-              >
-                <Link2 className="size-3" /> Lier Google
-              </button>
-              <button
-                onClick={() => linkProvider("apple")}
-                className="glass-soft mono-label flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-foreground/60"
-              >
-                <Link2 className="size-3" /> Lier Apple
-              </button>
-            </div>
+            {actifs.length > 0 && (
+              <div className="mt-2.5 flex gap-2">
+                {actifs.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => linkProvider(p)}
+                    className="glass-soft mono-label flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-foreground/60"
+                  >
+                    <Link2 className="size-3" /> Lier {p === "google" ? "Google" : "Apple"}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
