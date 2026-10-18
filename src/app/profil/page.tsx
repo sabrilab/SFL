@@ -250,7 +250,7 @@ export default function Profil() {
           </span>
         </Locked>
         <Link
-          href="/stats"
+          href="/ligue?vue=matchs"
           className="glass-soft w-[128px] rounded-full py-[15px] text-center text-[15px] font-semibold text-foreground/70"
         >
           Historique
