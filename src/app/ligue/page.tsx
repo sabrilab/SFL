@@ -165,8 +165,64 @@ function Ligue() {
     .map((e) => (e.result === "Victoire" ? "V" : e.result === "Nul" ? "N" : "D"));
 
 
+  // Les capsules de journées — touche pour en ouvrir une autre. En ligne
+  // qui défile sur téléphone ; en grille dans la petite colonne sur ordinateur.
+  const capsules = (grille: boolean) => (
+    <div>
+      <p className="mono-label mb-2 px-1 text-foreground/30">
+        Les journées · touche pour ouvrir
+      </p>
+      <div
+        className={cn(
+          "flex gap-2",
+          grille
+            ? "grid grid-cols-[repeat(auto-fill,minmax(78px,1fr))]"
+            : "-mx-5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        )}
+      >
+        {[...played].reverse().map((jn) => {
+          const active = jn.j === currentJ;
+          const buts = (jn.matches ?? []).reduce(
+            (s, m) => s + m.teamA.score + m.teamB.score,
+            0
+          );
+          return (
+            <button
+              key={jn.j}
+              onClick={() => openJournee(jn.j)}
+              className={cn(
+                "flex shrink-0 flex-col items-start gap-0.5 rounded-2xl px-3.5 py-2.5 text-left transition-transform active:scale-[0.96]",
+                active ? "bg-foreground" : "glass-soft"
+              )}
+            >
+              <span className={cn("mono-label", active ? "text-background" : "text-primary")}>
+                J{jn.j}
+              </span>
+              <span
+                className={cn(
+                  "text-[12.5px] font-semibold whitespace-nowrap",
+                  active ? "text-background" : "text-foreground/70"
+                )}
+              >
+                {jn.date}
+              </span>
+              <span
+                className={cn(
+                  "mono-label text-[8px]",
+                  active ? "text-background/60" : "text-foreground/30"
+                )}
+              >
+                {buts} buts
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="shell flex flex-col gap-6 py-2 sm:py-6">
+    <div className="shell flex flex-col gap-6 py-2 sm:py-6 lg:gap-[var(--fib-34)] lg:pt-[var(--fib-55)]">
       {/* Rideau d'ouverture d'une journée */}
       {opening !== null && (
         <JourneeOpening
@@ -177,9 +233,12 @@ function Ligue() {
         />
       )}
 
-      {/* Un seul sélecteur, toujours là, et le Wall of Fame au bout. */}
-      <div className="flex items-center gap-2">
-      <div className="glass flex flex-1 gap-1 rounded-full p-1" role="tablist" aria-label="Vue de la ligue">
+      {/* Un seul sélecteur, toujours là, et le Wall of Fame au bout. Sur
+          ordinateur, le titre de la page à gauche (comme Ma carte), et le
+          sélecteur ramené à sa juste largeur au lieu de traverser l'écran. */}
+      <div className="flex items-center gap-2 lg:gap-[var(--fib-13)]">
+      <h1 className="hidden text-[34px] font-bold tracking-tight lg:mr-auto lg:block">Ligue</h1>
+      <div className="glass flex flex-1 gap-1 rounded-full p-1 lg:w-[420px] lg:flex-none" role="tablist" aria-label="Vue de la ligue">
         {VUES.map(([id, label]) => (
           <button
             key={id}
@@ -211,7 +270,7 @@ function Ligue() {
             Chaque dimanche sur son terrain · {played.length} journée
             {played.length > 1 ? "s" : ""} jouée{played.length > 1 ? "s" : ""}
           </p>
-          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 lg:gap-[var(--fib-21)] xl:grid-cols-3">
             {[...played].reverse().map((jn) => (
               <CarteJournee
                 key={jn.j}
@@ -238,8 +297,8 @@ function Ligue() {
               <IlsSeDemarquent />
             </>
           ) : (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] lg:items-start">
-              <div className="flex flex-col gap-6 lg:sticky lg:top-4">
+            <div className="grille-or grid grid-cols-1 gap-6">
+              <div className="colonne-fixe flex flex-col gap-6">
           {/* Ma synthèse — rang, points, forme sur 5 matchs */}
           <section className="glass rounded-[26px] p-[18px] ">
             <div className="flex items-center justify-between">
@@ -315,89 +374,52 @@ function Ligue() {
       ) : (
         <>
           <EmailNudge />
-          {/* Les capsules de journées — touche pour en ouvrir une autre */}
-          <div className={played.length === 0 ? "hidden" : "-mt-1"}>
-            <p className="mono-label mb-2 px-1 text-foreground/30">
-              Les journées · touche pour ouvrir
-            </p>
-            <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {[...played].reverse().map((jn) => {
-                const active = jn.j === currentJ;
-                const buts = (jn.matches ?? []).reduce(
-                  (s, m) => s + m.teamA.score + m.teamB.score,
-                  0
-                );
-                return (
-                  <button
-                    key={jn.j}
-                    onClick={() => openJournee(jn.j)}
-                    className={cn(
-                      "flex shrink-0 flex-col items-start gap-0.5 rounded-2xl px-3.5 py-2.5 text-left transition-transform active:scale-[0.96]",
-                      active ? "bg-foreground" : "glass-soft"
-                    )}
-                  >
-                    <span className={cn("mono-label", active ? "text-background" : "text-primary")}>
-                      J{jn.j}
-                    </span>
-                    <span
-                      className={cn(
-                        "text-[12.5px] font-semibold whitespace-nowrap",
-                        active ? "text-background" : "text-foreground/70"
-                      )}
-                    >
-                      {jn.date}
-                    </span>
-                    <span
-                      className={cn(
-                        "mono-label text-[8px]",
-                        active ? "text-background/60" : "text-foreground/30"
-                      )}
-                    >
-                      {buts} buts
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {played.length > 0 && <div className="-mt-1 lg:hidden">{capsules(false)}</div>}
 
-          {/* Le récap de la journée ouverte — remonté à neuf à chaque ouverture.
-              Borné en largeur : au-delà, une ligne de texte devient illisible. */}
-          <div className="mesure flex flex-col gap-6">
-            {/* Les écarts d'abord : c'est là que la saison se raconte. */}
-            <Ecarts />
-            {played.length === 0 && derniereArchive ? (
-              // Rien de joué cette saison : le dernier récap de la saison
-              // passée, en attendant le premier de la nouvelle.
-              <>
-                <p className="mono-label px-1 text-foreground/40">
-                  {derniereArchive.nom} · le dernier récap — la saison {saison.numero ?? 0} commence
-                </p>
-                <SaisonArchiveProvider saison={saisonArchive!}>
-                  <JourneeRecap key={`a${dernierJArchive}`} j={dernierJArchive} />
-                </SaisonArchiveProvider>
-              </>
-            ) : (
-              <JourneeRecap key={currentJ} j={currentJ} />
-            )}
-          </div>
-
-          {/* 16 · Les prochaines journées */}
-          <section className="mesure">
-            <div className="mb-3 px-1">
-              <h2 className="text-[17px] font-bold tracking-tight">Les prochaines journées</h2>
+          {/* Sur ordinateur, au nombre d'or : le récap dans la grande colonne,
+              les journées et les prochaines dans la petite, à côté. */}
+          <div className="grille-or grille-or--inverse flex flex-col gap-6">
+            {/* Le récap de la journée ouverte — remonté à neuf à chaque ouverture.
+                Borné en largeur : au-delà, une ligne de texte devient illisible. */}
+            <div className="mesure flex min-w-0 flex-col gap-6 lg:col-start-1 lg:row-start-1 lg:max-w-none">
+              {/* Les écarts d'abord : c'est là que la saison se raconte. */}
+              <Ecarts />
+              {played.length === 0 && derniereArchive ? (
+                // Rien de joué cette saison : le dernier récap de la saison
+                // passée, en attendant le premier de la nouvelle.
+                <>
+                  <p className="mono-label px-1 text-foreground/40">
+                    {derniereArchive.nom} · le dernier récap — la saison {saison.numero ?? 0} commence
+                  </p>
+                  <SaisonArchiveProvider saison={saisonArchive!}>
+                    <JourneeRecap key={`a${dernierJArchive}`} j={dernierJArchive} />
+                  </SaisonArchiveProvider>
+                </>
+              ) : (
+                <JourneeRecap key={currentJ} j={currentJ} />
+              )}
             </div>
-            <PresencePanel />
-            <div className="mt-2.5 flex flex-col gap-2 opacity-50">
-              {dimanchesSuivants.map(([jj, d]) => (
-                <div key={jj} className="flex items-center justify-between rounded-2xl bg-card px-4 py-3">
-                  <span className="mono-label text-muted-foreground">{jj}</span>
-                  <span className="text-[14px] font-semibold">{d}</span>
-                  <span className="mono-label text-muted-foreground">À venir</span>
+
+            <aside className="flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-start-1 lg:gap-[var(--fib-34)]">
+              {played.length > 0 && <div className="hidden lg:block">{capsules(true)}</div>}
+              {/* 16 · Les prochaines journées */}
+              <section className="mesure lg:max-w-none">
+                <div className="mb-3 px-1">
+                  <h2 className="text-[17px] font-bold tracking-tight">Les prochaines journées</h2>
                 </div>
-              ))}
-            </div>
-          </section>
+                <PresencePanel />
+                <div className="mt-2.5 flex flex-col gap-2 opacity-50">
+                  {dimanchesSuivants.map(([jj, d]) => (
+                    <div key={jj} className="flex items-center justify-between rounded-2xl bg-card px-4 py-3">
+                      <span className="mono-label text-muted-foreground">{jj}</span>
+                      <span className="text-[14px] font-semibold">{d}</span>
+                      <span className="mono-label text-muted-foreground">À venir</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </aside>
+          </div>
         </>
       )}
     </div>
