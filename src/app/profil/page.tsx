@@ -193,14 +193,15 @@ export default function Profil() {
   const dernierTitre = myCards[myCards.length - 1];
 
   return (
-    <div className="shell py-4 sm:py-8">
-      <h1 className="mb-[18px] text-[30px] font-bold tracking-tight">Ma carte</h1>
-      {/* Deux colonnes dès qu'il y a la place : l'identité et les cartes à
-          gauche, le profil de jeu et les chiffres à droite. */}
-      <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-2 lg:items-start lg:gap-6">
+    <div className="shell py-4 sm:py-8 lg:pt-[var(--fib-55)]">
+      <h1 className="mb-[18px] text-[30px] font-bold tracking-tight lg:mb-[var(--fib-34)] lg:text-[34px]">Ma carte</h1>
+      {/* Deux colonnes dès qu'il y a la place, dans le rapport 1 : φ
+          (grille-or, globals.css) : l'identité et la carte à gauche, les
+          badges, le profil de jeu et les raccourcis à droite. */}
+      <div className="grille-or grid grid-cols-1 gap-[18px] lg:gap-y-[var(--fib-21)]">
       {/* La colonne d'identité reste à l'écran pendant qu'on parcourt le
           reste : la carte est le sujet de la page. */}
-      <div className="flex min-w-0 flex-col gap-[18px] lg:sticky lg:top-4">
+      <div className="flex min-w-0 flex-col gap-[18px] colonne-fixe lg:gap-[var(--fib-21)]">
 
       {/* Rangée d'identité : photo, nom, pseudo, menu réglages */}
       <div className="flex items-center justify-between">
@@ -259,7 +260,7 @@ export default function Profil() {
 
       </div>
 
-      <div className="flex min-w-0 flex-col gap-[18px]">
+      <div className="flex min-w-0 flex-col gap-[18px] lg:gap-[var(--fib-21)]">
       {/* Mes badges : le prochain, la fin de saison, les paliers */}
       <div id="badges" className="scroll-mt-4">
         <VitrineBadges nom={player.name} />

@@ -296,6 +296,72 @@
   }
 }
 
+/* ─────────────────────── Le nombre d'or, sur ordinateur ────────────────────────
+   Dès 1024 px, les pages se partagent en deux colonnes dans le rapport
+   1 : φ (38,2 % / 61,8 %), comme le logo et la carte joueur. Les écarts
+   suivent la suite de Fibonacci (8, 13, 21, 34, 55) : chacun est le
+   précédent multiplié par φ. Le téléphone ne lit rien de tout ça. */
+:root {
+  --phi: 1.618;
+  --fib-8: 8px;
+  --fib-13: 13px;
+  --fib-21: 21px;
+  --fib-34: 34px;
+  --fib-55: 55px;
+}
+@media (min-width: 1024px) {
+  /* Petite colonne à gauche, grande à droite (Ma carte, Classements). */
+  .grille-or {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.618fr);
+    column-gap: var(--fib-34);
+    align-items: start;
+  }
+  /* Grande colonne à gauche, petite à droite (le récap d'une journée). */
+  .grille-or--inverse {
+    grid-template-columns: minmax(0, 1.618fr) minmax(0, 1fr);
+  }
+}
+@media (min-width: 1440px) {
+  .grille-or {
+    column-gap: var(--fib-55);
+  }
+}
+/* La petite colonne reste à l'écran pendant qu'on parcourt la grande —
+   seulement quand elle y tient en entier, sinon son bas serait inatteignable. */
+@media (min-width: 1024px) and (min-height: 860px) {
+  .colonne-fixe {
+    position: sticky;
+    top: var(--fib-21);
+  }
+}
+
+/* Les fiches « du bas » (Sheet side="bottom"), sur ordinateur : au lieu de
+   traverser tout l'écran, un panneau posé à droite, large de 1/φ² de
+   l'écran (38,2 %, entre 400 et 560 px), à 21 px des bords, arrondi partout,
+   qui glisse depuis la droite. Sur la Map, le plan reste visible à côté de la
+   fiche du match. Hors des calques de Tailwind : ces règles l'emportent sur
+   les classes de chaque fiche (hauteur, arrondi du haut, largeur bornée). */
+@media (min-width: 1024px) {
+  [data-slot="sheet-content"][data-side="bottom"] {
+    left: auto;
+    top: auto;
+    right: var(--fib-21);
+    bottom: var(--fib-21);
+    margin: 0;
+    width: clamp(400px, 38.2vw, 560px);
+    max-width: none;
+    max-height: calc(100dvh - 2 * var(--fib-21));
+    overflow-y: auto;
+    border-radius: 28px;
+    border-width: 1px;
+  }
+  [data-slot="sheet-content"][data-side="bottom"][data-starting-style],
+  [data-slot="sheet-content"][data-side="bottom"][data-ending-style] {
+    translate: 2.5rem 0;
+  }
+}
+
 /* Le récap se lit en colonne : au-delà d'une certaine largeur, une ligne de
    texte devient illisible. On borne la mesure et on centre, même quand la
    page, elle, est large. */
