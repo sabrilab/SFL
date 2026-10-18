@@ -10,22 +10,23 @@
 // photographiée par html-to-image, qui ne sait pas le rendre ; ce calque-là
 // passe tel quel dans la photo.
 //
-// Par-dessus : une teinte blanche à peine dégradée, un liseré de métal d'un
-// trait (or, argent, bronze ; rouge et or au dernier palier), un filet
-// intérieur blanc et un reflet en haut. Deux formes, comme dans la vitrine :
-//   · l'écusson (fin de saison) porte le rang en chiffre, en Anton, et le nom
-//     court du classement ;
-//   · le disque (palier) porte l'emblème d'un trait fin, et le palier en
-//     crans sur le bord, de 10 h à 2 h : pleins jusqu'au palier atteint.
+// Par-dessus : le verre teinté du métal (or, argent, bronze ; rouge et or
+// au dernier palier), un bord de métal épais, un filet intérieur blanc et un
+// reflet en haut. Reconnaissable d'un coup d'œil, même à 20 px (demande de
+// Sabri, 18/10) : la forme dit la famille, le métal le niveau, l'emblème ce
+// que le badge récompense (les mêmes que dans la vitrine) :
+//   · l'écusson (fin de saison) porte l'emblème du classement et, sur sa
+//     pointe, une pastille de métal avec le rang en chiffre ;
+//   · le disque (palier) porte l'emblème, et le palier en points blancs sur
+//     le bas du bord (un point au bronze… quatre au rouge et or).
 
 import { useId, type ReactNode } from "react";
-import { EMBLEMES } from "@/components/sfl/emblemes";
+import { EMBLEMES, EMBLEMES_SAISON } from "@/components/sfl/emblemes";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
-import { CLASSEMENTS, ordinal } from "@/lib/sfl/fin-de-saison";
-import { metal, NOM_METAL, TROPHEES, type Metal } from "@/lib/sfl/trophees";
+import { CLASSEMENTS, ordinal, type ClassementId } from "@/lib/sfl/fin-de-saison";
+import { metal, NOM_METAL, TROPHEES, type Metal, type TropheeId } from "@/lib/sfl/trophees";
 
 const ANTON = "var(--font-anton), Anton, sans-serif";
-const MONO = "var(--font-jbmono), ui-monospace, monospace";
 
 /** Le liseré de chaque métal : un dégradé à deux éclats, comme un métal poli. */
 const LISERE: Record<Metal, [string, string, string, string]> = {
@@ -37,21 +38,14 @@ const LISERE: Record<Metal, [string, string, string, string]> = {
 
 /** La teinte prise par le verre : à peine colorée, sauf le rouge et or. */
 const TEINTE: Record<Metal, string> = {
-  bronze: "rgba(176,106,53,0.10)",
-  argent: "rgba(180,186,194,0.10)",
-  or: "rgba(226,177,60,0.12)",
-  legende: "rgba(150,20,20,0.5)",
+  bronze: "rgba(176,106,53,0.34)",
+  argent: "rgba(190,196,204,0.3)",
+  or: "rgba(226,177,60,0.38)",
+  legende: "rgba(150,20,20,0.62)",
 };
 
 const RANG_METAL: Record<number, Metal> = { 1: "or", 2: "argent", 3: "bronze" };
 
-const COURT: Record<string, string> = {
-  pepite: "pépite",
-  buteur: "buteur",
-  passeur: "passeur",
-  defenseur: "défense",
-  mvp: "mvp",
-};
 
 // L'écusson, dans un repère 100 × 112.
 const ECU = "50,1 99,12 99,56 92,78 76,96 50,111 24,96 8,78 1,56 1,12";
@@ -96,6 +90,7 @@ export function BadgeVerre({
   const w = largeur;
   const h = ecusson ? (w * 112) / 100 : w;
   const encre = m === "legende" ? "#f7e3a6" : "#0b0c0e";
+  const Embleme = ecusson ? EMBLEMES_SAISON[badge.id as ClassementId] : EMBLEMES[badge.id as TropheeId];
   // La loupe : le portrait grossi de 6 % autour du centre du badge.
   const cx = left + w / 2;
   const cy = top + h / 2;
@@ -179,90 +174,57 @@ export function BadgeVerre({
           <>
             <polygon points={ECU} fill={`url(#${gid}s)`} />
             <polygon points={ECU_REFLET} fill={`url(#${gid}r)`} />
-            <polygon points={ECU_FILET} fill="none" stroke="#fff" strokeOpacity={0.6} strokeWidth={0.8} />
-            <polygon points={ECU} fill="none" stroke={`url(#${gid}m)`} strokeWidth={2.2} strokeLinejoin="round" />
+            <polygon points={ECU_FILET} fill="none" stroke="#fff" strokeOpacity={0.7} strokeWidth={1.2} />
+            <polygon points={ECU} fill="none" stroke={`url(#${gid}m)`} strokeWidth={7} strokeLinejoin="round" />
+            {/* Le rang : une pastille de métal sur la pointe */}
+            <circle cx={50} cy={93} r={23} fill={`url(#${gid}m)`} stroke="#fff" strokeOpacity={0.75} strokeWidth={1.4} />
           </>
         ) : (
           <>
             <circle cx={50} cy={50} r={49} fill={`url(#${gid}s)`} />
             <path d="M7 36 A 45 45 0 0 1 71 7 L 50 50 Z" fill={`url(#${gid}r)`} />
-            <circle cx={50} cy={50} r={41} fill="none" stroke="#fff" strokeOpacity={0.6} strokeWidth={0.8} />
-            <circle cx={50} cy={50} r={49} fill="none" stroke={`url(#${gid}m)`} strokeWidth={2.2} />
-            <g stroke={`url(#${gid}m)`} strokeWidth={2.8} strokeLinecap="round">
-              {[0, 1, 2, 3].map((i) => {
-                const t = ((-135 + i * 30) * Math.PI) / 180;
-                return (
-                  <line
-                    key={i}
-                    x1={50 + 43.5 * Math.cos(t)}
-                    y1={50 + 43.5 * Math.sin(t)}
-                    x2={50 + 46.5 * Math.cos(t)}
-                    y2={50 + 46.5 * Math.sin(t)}
-                    strokeOpacity={i < badge.palier ? 1 : 0.22}
-                  />
-                );
-              })}
-            </g>
+            <circle cx={50} cy={50} r={40} fill="none" stroke="#fff" strokeOpacity={0.7} strokeWidth={1.2} />
+            <circle cx={50} cy={50} r={46} fill="none" stroke={`url(#${gid}m)`} strokeWidth={8} />
+            {/* Le palier : autant de points blancs sur le bas du bord */}
+            {Array.from({ length: badge.palier }, (_, i) => {
+              const t = ((90 + (i - (badge.palier - 1) / 2) * 24) * Math.PI) / 180;
+              return <circle key={i} cx={50 + 46 * Math.cos(t)} cy={50 + 46 * Math.sin(t)} r={4.6} fill="#fff" stroke="#0b0c0e" strokeOpacity={0.5} strokeWidth={1} />;
+            })}
           </>
         )}
       </svg>
 
-      {/* Ce que dit le badge */}
-      {ecusson ? (
-        <>
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              top: h * 0.17,
-              textAlign: "center",
-              fontFamily: ANTON,
-              fontSize: w * 0.5,
-              lineHeight: 1,
-              color: encre,
-            }}
-          >
-            {badge.rang}
-          </div>
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              top: h * 0.68,
-              textAlign: "center",
-              fontFamily: MONO,
-              fontWeight: 500,
-              fontSize: w * 0.075,
-              letterSpacing: w * 0.012,
-              textTransform: "uppercase",
-              lineHeight: 1,
-              color: encre,
-              opacity: 0.8,
-            }}
-          >
-            {COURT[badge.id]}
-          </div>
-        </>
-      ) : (
-        (() => {
-          const Embleme = EMBLEMES[badge.id];
-          return (
-            <Embleme
-              aria-hidden
-              strokeWidth={1.3}
-              style={{
-                position: "absolute",
-                left: w * 0.31,
-                top: w * 0.31,
-                width: w * 0.38,
-                height: w * 0.38,
-                color: encre,
-              }}
-            />
-          );
-        })()
+      {/* Ce que récompense le badge : son emblème, d'un trait franc */}
+      <Embleme
+        aria-hidden
+        strokeWidth={2.6}
+        style={{
+          position: "absolute",
+          left: w * (ecusson ? 0.25 : 0.22),
+          top: ecusson ? h * 0.14 : w * 0.22,
+          width: w * (ecusson ? 0.5 : 0.56),
+          height: w * (ecusson ? 0.5 : 0.56),
+          color: encre,
+        }}
+      />
+      {ecusson && (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: (h * 93) / 112 - w * 0.15,
+            height: w * 0.3,
+            display: "grid",
+            placeItems: "center",
+            fontFamily: ANTON,
+            fontSize: w * 0.34,
+            lineHeight: 1,
+            color: m === "legende" ? "#f7e3a6" : "#0b0c0e",
+          }}
+        >
+          {badge.rang}
+        </div>
       )}
     </div>
   );
