@@ -158,7 +158,7 @@ function Ombre({ largeur }: { largeur: number }) {
 /** Une rangée de scènes qui défile sur téléphone et passe à la ligne sur ordinateur. */
 function Rangee({ children }: { children: ReactNode }) {
   return (
-    <div className="-mx-5 flex snap-x snap-mandatory gap-[var(--fib-13)] overflow-x-auto px-5 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:px-0 [&::-webkit-scrollbar]:hidden">
+    <div className="-mx-5 flex snap-x snap-mandatory scroll-px-5 gap-[var(--fib-13)] overflow-x-auto px-5 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:px-0 [&::-webkit-scrollbar]:hidden">
       {children}
     </div>
   );
@@ -373,10 +373,13 @@ export function ALHonneur({ j }: { j: number }) {
       {mvp.length > 1 && <HommesDuDimanche j={j} mvp={mvp.map((m) => ({ ...m, p: carte(m.nom)! }))} moi={moi.name} />}
 
       {decroches.length > 0 && (
-        <section>
+        <section className="flex flex-col gap-[var(--fib-13)]">
+          <h2 className="px-1 text-[17px] font-bold tracking-tight">
+            Ils ont décroché <span className="text-foreground/40">· J{j}</span>
+          </h2>
           <Rangee>
-            {decroches.map((d, i) => (
-              <Vitrine key={`${d.nom}-${d.id}`} premier={i === 0} d={d} p={carte(d.nom)!} moi={moi.name} />
+            {decroches.map((d) => (
+              <Vitrine key={`${d.nom}-${d.id}`} d={d} p={carte(d.nom)!} moi={moi.name} />
             ))}
           </Rangee>
         </section>
@@ -474,56 +477,100 @@ function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player 
   );
 }
 
-/** Un badge tombé ce dimanche : la carte, et lui qui flotte à côté. */
-function Vitrine({ d, p, moi, premier }: { d: { nom: string; id: TropheeId; palier: number }; p: Player; moi: string; premier: boolean }) {
+/**
+ * Un badge tombé ce dimanche, dans sa niche : une vitrine voûtée, éclairée
+ * d'en haut à la couleur du métal, cerclée d'un filet de ce métal. Le chiffre
+ * sous la voûte, la carte posée sur le socle, le badge sur son piédestal.
+ * Les proportions suivent φ : la voûte fait la largeur / φ de haut.
+ */
+function Vitrine({ d, p, moi }: { d: { nom: string; id: TropheeId; palier: number }; p: Player; moi: string }) {
   const def = DEF[d.id];
   const m = metal(d.palier)!;
   const seuil = def.paliers[d.palier - 1];
+  const teinte = TEINTE[m];
   const largeur = W(MOYENNE);
   const hauteur = H(MOYENNE);
   const badge = largeur / PHI;
+  const l = Math.round(largeur + badge + 89);
+  const voute = Math.round(l / PHI / 2);
+  const socle = 55;
+  const sousVoute = 89;
   return (
-    <Scene
-      hauteur={hauteur + 112}
-      horizon={(hauteur + 58) / (hauteur + 112)}
-      lumiere={`${TEINTE[m]}33`}
-      className="shrink-0 snap-start"
-      style={{ width: largeur + badge + 70 }}
+    <div
+      className="relative isolate shrink-0 snap-start overflow-hidden text-white"
+      style={{
+        width: l,
+        height: sousVoute + hauteur + socle,
+        borderRadius: `${l / 2}px ${l / 2}px 21px 21px / ${voute}px ${voute}px 21px 21px`,
+        border: "1px solid transparent",
+        background: [
+          // Le projecteur, tombé de la voûte.
+          `radial-gradient(70% 55% at 50% 0%, ${teinte}38 0%, ${teinte}10 45%, transparent 75%) padding-box`,
+          // Les cannelures du fond, à peine.
+          "repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 13px) padding-box",
+          "linear-gradient(180deg, #15161b 0%, #0b0c10 60%, #060608 100%) padding-box",
+          // Le filet de métal : vif à la voûte, éteint vers le socle.
+          `linear-gradient(180deg, ${teinte}cc 0%, ${teinte}33 38%, rgba(255,255,255,0.06) 100%) border-box`,
+        ].join(", "),
+        boxShadow: `0 21px 34px -21px ${teinte}40, inset 0 1px 0 rgba(255,255,255,0.08)`,
+      }}
     >
-      {premier && <Titre>Ils ont décroché</Titre>}
-      <div className="absolute" style={{ left: 16, bottom: 46, transformStyle: "preserve-3d" }}>
+      {/* Le chiffre, sous la voûte. */}
+      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: 21 }}>
+        <span style={{ fontFamily: ANTON, fontSize: 44, lineHeight: 0.9, color: teinte, textShadow: `0 0 21px ${teinte}55` }} className="tabular-nums">
+          {seuil}
+        </span>
+        <span className="mono-label mt-[5px] text-[9px] text-white/55">
+          {unite(d.id, seuil)} <span style={{ color: teinte }}>· {NOM_METAL[m]}</span>
+        </span>
+      </div>
+
+      {/* Le socle : une marche sombre, son arête prise dans la lumière. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0"
+        style={{
+          height: socle,
+          background: "linear-gradient(180deg, #121318 0%, #08080a 100%)",
+          boxShadow: `inset 0 1px 0 ${teinte}55`,
+        }}
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0"
+        style={{ bottom: socle - 1, height: 34, background: `radial-gradient(50% 100% at 50% 100%, ${teinte}22, transparent)` }}
+      />
+
+      <div className="absolute" style={{ left: 21, bottom: socle, transformStyle: "preserve-3d" }}>
         <Manipulable pose={0}>
           <Ombre largeur={largeur} />
           <MiniCarte player={p} size={MOYENNE} detail={`${def.nom} · ${NOM_METAL[m]} · ${seuil} ${unite(d.id, seuil)}`} />
         </Manipulable>
       </div>
-      {/* Le badge, devant, qui flotte au-dessus de son halo. */}
-      <div className="pointer-events-none absolute" style={{ right: 18, bottom: 64 }}>
-        <span
-          aria-hidden
-          className="absolute left-1/2 -translate-x-1/2"
-          style={{ bottom: -30, width: badge * 1.3, height: badge * 0.3, background: `radial-gradient(closest-side, ${TEINTE[m]}66, transparent)` }}
-        />
-        <span className="honneur-flotte block">
+
+      {/* Le badge, sur son piédestal. */}
+      <div className="pointer-events-none absolute flex flex-col items-center" style={{ right: 21, bottom: socle, width: badge * 1.2 }}>
+        <span className="honneur-flotte mb-[var(--fib-13)] block">
           <Badge3D badge={{ famille: "palier", id: d.id, palier: d.palier }} largeur={badge} />
         </span>
+        <span
+          aria-hidden
+          className="block w-full rounded-t-[3px]"
+          style={{
+            height: 21,
+            background: `linear-gradient(180deg, #2a2b31 0%, #121317 100%)`,
+            boxShadow: `inset 0 1px 0 ${teinte}88, 0 -8px 21px -8px ${teinte}55`,
+          }}
+        />
       </div>
-      <div className="absolute flex flex-col items-end text-right" style={{ right: 18, top: premier ? 44 : 18 }}>
-        <span style={{ fontFamily: ANTON, fontSize: 44, lineHeight: 0.9, color: TEINTE[m] }} className="tabular-nums">
-          {seuil}
-        </span>
-        <span className="mono-label mt-1 text-[9px] text-white/50">{unite(d.id, seuil)}</span>
-        <span className="mono-label text-[9px]" style={{ color: TEINTE[m] }}>
-          {NOM_METAL[m]}
-        </span>
-      </div>
+
       <span
-        className={cn("absolute bottom-[var(--fib-13)] left-[var(--fib-21)] max-w-[70%] leading-none break-words uppercase", d.nom === moi ? "text-primary" : "text-white")}
+        className={cn("absolute inset-x-[var(--fib-21)] bottom-[var(--fib-13)] leading-none break-words uppercase", d.nom === moi ? "text-primary" : "text-white")}
         style={{ fontFamily: ANTON, fontSize: 17 }}
       >
         {d.nom}
       </span>
-    </Scene>
+    </div>
   );
 }
 
