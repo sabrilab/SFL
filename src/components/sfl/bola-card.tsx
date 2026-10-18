@@ -31,11 +31,18 @@
 // droite du portrait quand le joueur en a un ; sinon, sur la carte complète,
 // son poste prend la place.
 //
+// Avec `badge` (les cartes de la ligue, PlayerCard), le haut à droite est au
+// badge en verre que le joueur a choisi (badge-verre.tsx, demande de Sabri,
+// 17/10), et le poste passe en haut à gauche, à la place de l'étiquette
+// d'édition. `badge: null` : le coin reste vide.
+//
 // Mêmes calques que la carte éditoriale (`data-card-part` body / player /
 // stats) : la 3D de card-3d.tsx mesure la carte et la prend telle quelle,
 // avec sa parallaxe — le portrait flotte au-dessus du papier, le texte
 // au-dessus du portrait.
 
+import { BadgeVerre } from "@/components/sfl/badge-verre";
+import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
 
 export type BolaEdition = "base" | "rare" | "mvp";
@@ -226,6 +233,7 @@ export function BolaCard({
   size = 1,
   photo,
   numero,
+  badge,
 }: {
   name: string;
   username?: string;
@@ -239,6 +247,8 @@ export function BolaCard({
   photo?: string | null;
   /** Le numéro de maillot, quand le joueur en a un. */
   numero?: number | null;
+  /** Le badge du coin ; null = coin vide ; absent = l'ancienne mise en page (numéro ou poste). */
+  badge?: BadgeCarte | null;
 }) {
   // 254 px de large à taille 1, comme les autres cartes de l'app.
   const largeur = 254 * size;
@@ -345,7 +355,21 @@ export function BolaCard({
   );
 
   // Le haut à droite du portrait : le numéro de maillot ; sinon le poste, en grand format seulement.
-  const marque = numero != null ? String(numero) : complete ? position.toUpperCase() : null;
+  const avecBadge = badge !== undefined;
+  const marque = avecBadge ? null : numero != null ? String(numero) : complete ? position.toUpperCase() : null;
+  // Le badge en verre : un peu plus grand en compacte, pour rester lisible ; rien en réduite.
+  const largeurBadge = u(complete ? 172 : 230);
+  const badgeCoin = badge && !reduite ? badge : null;
+  const portraitProps = {
+    photo,
+    nom: name,
+    resserre: !complete,
+    encre: p.encre,
+    rayures: p.rayures,
+    lueur: p.lueur,
+    pas: u(34),
+    cote: u(PORTRAIT.c),
+  };
   const tailleMarque = numero != null ? (complete ? 164 : compacte ? 225 : 287) : 80;
 
   // La note : dans son carré, centrée sur toute la largeur en réduite.
@@ -419,16 +443,7 @@ export function BolaCard({
             boxShadow: `inset 0 0 0 ${u(3)}px ${encre(0.2)}`,
           }}
         >
-          <Portrait
-            photo={photo}
-            nom={name}
-            resserre={!complete}
-            encre={p.encre}
-            rayures={p.rayures}
-            lueur={p.lueur}
-            pas={u(34)}
-            cote={u(PORTRAIT.c)}
-          />
+          <Portrait {...portraitProps} />
           {photo && (
             // Un voile clair en haut : le symbole, l'étiquette et le numéro restent lisibles.
             <div
@@ -459,6 +474,16 @@ export function BolaCard({
               {marque}
             </div>
           )}
+          {badgeCoin && (
+            <BadgeVerre
+              badge={badgeCoin}
+              largeur={largeurBadge}
+              left={u(PORTRAIT.c - (complete ? 58 : 52)) - largeurBadge}
+              top={u(complete ? 54 : 48)}
+              cote={u(PORTRAIT.c)}
+              fond={<Portrait {...portraitProps} />}
+            />
+          )}
           {complete && (
             <>
               {coin({ left: u(31), top: u(31) }, 0)}
@@ -471,7 +496,25 @@ export function BolaCard({
                 alt=""
                 style={{ position: "absolute", left: u(61), top: u(61), width: u(51), height: u(51) }}
               />
-              {/* L'étiquette d'édition */}
+              {/* Le poste, à la place de l'étiquette, quand le coin droit est au badge */}
+              {avecBadge ? (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: u(133),
+                    top: u(56),
+                    fontFamily: ANTON,
+                    fontSize: u(62),
+                    lineHeight: 1,
+                    letterSpacing: u(1),
+                    color: encre(1),
+                    textShadow: photo ? `0 0 ${u(18)}px ${edition === "mvp" ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)"}` : undefined,
+                  }}
+                >
+                  {position.toUpperCase()}
+                </div>
+              ) : (
+              /* L'étiquette d'édition */
               <div
                 style={{
                   position: "absolute",
@@ -491,6 +534,7 @@ export function BolaCard({
               >
                 {edition}
               </div>
+              )}
               {/* La puce argent */}
               <div
                 style={{

@@ -146,6 +146,12 @@ create policy "profiles: mise à jour de soi"
 -- automatiquement quand il lie Google/Apple. C'est LA table des emails.
 alter table public.profiles add column if not exists contact_email text;
 
+-- Le badge que le joueur pose sur sa carte (src/lib/sfl/badge-carte.ts) :
+-- « auto » (le meilleur), « aucun », « s:<classement> » ou « p:<palier> ».
+-- Lu par toute la ligue, modifiable par le joueur seul (grant plus bas).
+alter table public.profiles add column if not exists badge text
+  check (badge is null or badge ~ '^(auto|aucun|s:[a-z]+|p:[a-zA-Z]+)$');
+
 -- ──────────────────────────── Activité ───────────────────────────────
 -- Journal d'usage : connexions, ouvertures quotidiennes, réponses de
 -- présence. Alimente le tableau de bord admin (qui vient, quand, rétention).
@@ -380,6 +386,7 @@ grant usage on schema public to anon, authenticated;
 grant select on public.profiles, public.convocations, public.presence to authenticated;
 grant update (name, username) on public.profiles to authenticated;
 grant update (contact_email) on public.profiles to authenticated;
+grant update (badge) on public.profiles to authenticated;
 grant insert, select on public.activity to authenticated;
 grant insert, update, delete on public.presence to authenticated;
 grant insert, update, select on public.compositions to authenticated;

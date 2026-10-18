@@ -20,6 +20,7 @@ import { PlayerCard } from "@/components/sfl/player-card";
 import { BOOST_LABELS } from "@/components/sfl/boost-card";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { VitrineBadges } from "@/components/sfl/vitrine";
+import { ChoixBadge } from "@/components/sfl/choix-badge";
 import { Locked } from "@/components/sfl/locked";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -242,7 +243,7 @@ export default function Profil() {
         </p>
       </section>
 
-      {/* Les deux actions du design : partage (bientôt) + historique */}
+      {/* Les actions : partage (bientôt), historique, le badge de la carte */}
       <div className="flex gap-[9px]">
         <Locked label="Bientôt" className="flex-1" chipClassName="-top-2.5 right-1">
           <span className="block rounded-full bg-foreground py-[15px] text-center text-[15px] font-bold text-background">
@@ -255,6 +256,7 @@ export default function Profil() {
         >
           Historique
         </Link>
+        <ChoixBadge player={player} />
       </div>
 
       </div>

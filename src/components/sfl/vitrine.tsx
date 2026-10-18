@@ -20,20 +20,8 @@
 // gagné depuis la dernière visite.
 
 import { useEffect, useId, useMemo, useState } from "react";
-import {
-  Award,
-  CalendarCheck,
-  Check,
-  Crown,
-  Flame,
-  Forward,
-  Goal,
-  Hourglass,
-  Shield,
-  ShieldCheck,
-  Trophy,
-  Zap,
-} from "lucide-react";
+import { Check } from "lucide-react";
+import { EMBLEMES, EMBLEMES_SAISON } from "@/components/sfl/emblemes";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -58,27 +46,6 @@ import {
   type TropheeId,
 } from "@/lib/sfl/trophees";
 import { cn } from "@/lib/utils";
-
-const EMBLEMES: Record<TropheeId, typeof Crown> = {
-  buts: Goal,
-  passes: Forward,
-  matchs: CalendarCheck,
-  victoires: Trophy,
-  mvp: Award,
-  mur: Shield,
-  impact: Zap,
-  cleanSheet: ShieldCheck,
-  serie: Flame,
-  saisons: Hourglass,
-};
-
-const EMBLEMES_SAISON: Record<ClassementId, typeof Crown> = {
-  pepite: Crown,
-  buteur: Goal,
-  passeur: Forward,
-  defenseur: Shield,
-  mvp: Award,
-};
 
 /** Les métaux : le dégradé, l'encre gravée dessus, le listel du bord. */
 const METAL: Record<Metal, { stops: [string, string, string]; encre: string; listel: string; trait: string }> = {
