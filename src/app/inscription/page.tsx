@@ -26,7 +26,16 @@ import { BolaCard } from "@/components/sfl/bola-card";
 import { RecadrerPhoto } from "@/components/sfl/recadrer-photo";
 import { PriseReference } from "@/components/sfl/inscription/prise-reference";
 import { ovr, type Stats } from "@/lib/sfl/engine";
-import { signIn } from "@/lib/sfl/auth/session";
+import {
+  bootstrapServerSession,
+  inscriptionSocialeEnCours,
+  jetonServeur,
+  oublierSessionServeur,
+  refusAuRetour,
+  signIn,
+  type Fournisseur,
+} from "@/lib/sfl/auth/session";
+import { BoutonsSociaux } from "@/components/sfl/auth/boutons-sociaux";
 import { setPhoto } from "@/lib/sfl/photos";
 import { envoyerReferences } from "@/lib/sfl/references";
 import { useSession } from "@/hooks/use-session";
@@ -49,8 +58,10 @@ import {
 const ETAPES = ["accueil", "identite", "contact", "naissance", "gabarit", "jeu", "photo", "angles", "secret", "fini"] as const;
 type Etape = (typeof ETAPES)[number];
 
-/** Les étapes comptées par la barre de progression (ni l'accueil, ni la fin). */
-const PARCOURS = ETAPES.slice(1, -1);
+/** Par Google ou Apple : ni email (le fournisseur le donne), ni mot de passe. */
+const ETAPES_SOCIALES = ETAPES.filter((e) => e !== "secret");
+
+const NOM_FOURNISSEUR: Record<Fournisseur, string> = { google: "Google", apple: "Apple" };
 
 /** La carte d'un joueur qui arrive : base 75 partout, comme newRosterPlayer. */
 const STATS_DEPART: Stats = { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 };
@@ -219,7 +230,14 @@ export default function InscriptionPage() {
   const [avertissement, setAvertissement] = useState<string | null>(null);
   const [aRenvoyer, setARenvoyer] = useState(false);
   const fichierPhoto = useRef<HTMLInputElement>(null);
+  // Revenu de Google ou Apple : le compte existe déjà, provisoire.
+  const [sociale, setSociale] = useState<Fournisseur | null>(null);
   const fini = etape === "fini";
+  const etapes: readonly Etape[] = sociale ? ETAPES_SOCIALES : ETAPES;
+  /** Les étapes comptées par la barre de progression (ni l'accueil, ni la fin). */
+  const parcours = etapes.slice(1, -1);
+  /** L'étape qui crée le compte. */
+  const derniere = etapes[etapes.length - 2];
 
   // Un membre déjà connecté n'a rien à faire ici.
   useEffect(() => {
@@ -244,6 +262,52 @@ export default function InscriptionPage() {
       sessionStorage.setItem(BROUILLON, JSON.stringify({ f, etape }));
     } catch {}
   }, [f, etape, fini]);
+
+  // Retour de Google ou Apple : un refus à dire, ou un compte provisoire à
+  // finir. Un membre qui s'est trompé de bouton (même email qu'un compte de
+  // la ligue) est renvoyé à sa connexion, et le compte provisoire supprimé.
+  useEffect(() => {
+    const refus = refusAuRetour();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique de l'adresse au retour du fournisseur
+    if (refus) setErreur(refus);
+    let annule = false;
+    void (async () => {
+      const fournisseur = await inscriptionSocialeEnCours();
+      const jeton = fournisseur && (await jetonServeur());
+      if (!fournisseur || !jeton || annule) return;
+      const r = await fetch("/api/inscription/sociale", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jeton}` },
+        body: JSON.stringify({ action: "verifier" }),
+      }).catch(() => null);
+      const d = (await r?.json().catch(() => null)) as
+        | { ok?: boolean; dejaMembre?: boolean; email?: string | null; prenom?: string; nom?: string; error?: string }
+        | null;
+      if (annule) return;
+      if (!r?.ok || !d?.ok) {
+        setErreur(d?.error ?? "Serveur de la ligue injoignable.");
+        return;
+      }
+      if (d.dejaMembre) {
+        await oublierSessionServeur();
+        setErreur(
+          `Tu as déjà un compte avec cet email. Connecte-toi avec ton pseudo, puis lie ${NOM_FOURNISSEUR[fournisseur]} dans Réglages.`
+        );
+        return;
+      }
+      setSociale(fournisseur);
+      setF((x) => ({
+        ...x,
+        prenom: x.prenom || d.prenom || "",
+        nom: x.nom || d.nom || "",
+        email: d.email ?? x.email,
+      }));
+      setEtape((e) => (e === "accueil" ? "identite" : e));
+    })();
+    return () => {
+      annule = true;
+    };
+  }, []);
 
   // Les inscriptions sont-elles ouvertes (clé serveur posée) ?
   useEffect(() => {
@@ -303,7 +367,7 @@ export default function InscriptionPage() {
         const ep = erreurPseudo(pseudo);
         if (ep) return `Pseudo : ${ep}`;
         if (pseudoEtat === "pris") return "Ce pseudo est déjà pris.";
-        if (!emailValide(f.email)) return "Ton email.";
+        if (!sociale && !emailValide(f.email)) return "Ton email.";
         return null;
       }
       case "naissance":
@@ -324,7 +388,7 @@ export default function InscriptionPage() {
   }
 
   function aller(sens: 1 | -1) {
-    const i = ETAPES.indexOf(etape);
+    const i = etapes.indexOf(etape);
     if (sens === 1) {
       const b = bloquant(etape);
       if (b) {
@@ -334,7 +398,7 @@ export default function InscriptionPage() {
       }
     }
     setErreur(null);
-    const suivante = ETAPES[Math.min(ETAPES.length - 1, Math.max(0, i + sens))];
+    const suivante = etapes[Math.min(etapes.length - 1, Math.max(0, i + sens))];
     setEtape(suivante);
     document.getElementById("inscription-scroll")?.scrollTo({ top: 0 });
   }
@@ -381,6 +445,71 @@ export default function InscriptionPage() {
     }
   }
 
+  /** Par Google ou Apple : la route pose le nom, le pseudo et la fiche. */
+  async function finirSociale() {
+    const b = bloquant(derniere);
+    if (b) {
+      setErreur(b);
+      return;
+    }
+    setEnvoi(true);
+    setErreur(null);
+    try {
+      const jeton = await jetonServeur();
+      if (!jeton) {
+        setSociale(null);
+        setEtape("accueil");
+        setErreur("La connexion a expiré. Recommence avec Google ou Apple.");
+        return;
+      }
+      const { email: _email, ...fiche } = f;
+      void _email;
+      const r = await fetch("/api/inscription/sociale", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jeton}` },
+        body: JSON.stringify({ action: "finir", ...fiche, pseudo, site: piege }),
+      });
+      const d = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string; champ?: string; name?: string };
+      if (!r.ok || !d.ok || !d.name) {
+        setErreur(d.error ?? "Création impossible pour l'instant.");
+        if (d.champ === "pseudo") {
+          setPseudoEtat("pris");
+          setEtape("contact");
+        }
+        return;
+      }
+      const nom = d.name;
+      // La session Supabase est déjà là : elle devient la session de ligue
+      // (en attente), puis les photos partent sous elle.
+      await bootstrapServerSession();
+      await envoyerPhotos(nom);
+      try {
+        sessionStorage.removeItem(BROUILLON);
+      } catch {}
+      setNomFinal(nom);
+      setEtape("fini");
+      navigator.vibrate?.([12, 60, 24]);
+    } catch {
+      setErreur("Pas de réseau. Réessaie dans un instant.");
+    } finally {
+      setEnvoi(false);
+    }
+  }
+
+  /** Demi-tour d'un compte provisoire : il est supprimé. */
+  async function annulerSociale() {
+    const jeton = await jetonServeur();
+    if (jeton) {
+      await fetch("/api/inscription/sociale", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jeton}` },
+        body: JSON.stringify({ action: "annuler" }),
+      }).catch(() => {});
+    }
+    await oublierSessionServeur();
+    router.replace("/");
+  }
+
   /** La photo de carte et les quatre prises, sous la session du joueur. */
   async function envoyerPhotos(nom: string) {
     let ok = true;
@@ -412,7 +541,7 @@ export default function InscriptionPage() {
     fini: [`Bienvenue, ${nomCarte}.`],
   };
 
-  const etapeIndex = PARCOURS.indexOf(etape as (typeof PARCOURS)[number]);
+  const etapeIndex = parcours.indexOf(etape);
   const avecCarte = etape !== "angles";
   // Les étapes longues (gabarit, jeu) passent la carte au segment suivant de
   // la suite d'or : 0,236 de l'écran, carte à 0,382.
@@ -457,7 +586,7 @@ export default function InscriptionPage() {
               ) : pseudoEtat === "libre" ? (
                 <span className="text-foreground/55">
                   <Check className="mr-1 inline size-3.5" />
-                  Libre. C&apos;est aussi ton identifiant.
+                  {sociale ? "Libre." : "Libre. C\u2019est aussi ton identifiant."}
                 </span>
               ) : null
             }
@@ -479,18 +608,20 @@ export default function InscriptionPage() {
               {pseudoEtat === "verif" && <Loader2 className="size-4 shrink-0 animate-spin text-foreground/30" />}
             </span>
           </Champ>
-          <Champ label="Email">
-            <input
-              type="email"
-              inputMode="email"
-              value={f.email}
-              onChange={(e) => maj("email", e.target.value.trim())}
-              autoCapitalize="none"
-              autoComplete="email"
-              placeholder="toi@exemple.fr"
-              className={SAISIE}
-            />
-          </Champ>
+          {!sociale && (
+            <Champ label="Email">
+              <input
+                type="email"
+                inputMode="email"
+                value={f.email}
+                onChange={(e) => maj("email", e.target.value.trim())}
+                autoCapitalize="none"
+                autoComplete="email"
+                placeholder="toi@exemple.fr"
+                className={SAISIE}
+              />
+            </Champ>
+          )}
         </div>
       );
       break;
@@ -692,7 +823,7 @@ export default function InscriptionPage() {
   /* ─────────────── La mise en page ─────────────── */
 
   const accueil = etape === "accueil";
-  const action = accueil ? "Commencer" : etape === "secret" ? "Créer mon compte" : fini ? "Entrer" : "Continuer";
+  const action = accueil ? "Commencer" : etape === derniere ? "Créer mon compte" : fini ? "Entrer" : "Continuer";
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-background" style={{ paddingTop: "env(safe-area-inset-top)" }}>
@@ -714,7 +845,7 @@ export default function InscriptionPage() {
             <ChevronLeft className="size-5" />
           </button>
           <div className="flex flex-1 gap-[5px]">
-            {PARCOURS.map((p, i) => (
+            {parcours.map((p, i) => (
               <span
                 key={p}
                 className={cn(
@@ -782,7 +913,7 @@ export default function InscriptionPage() {
           disabled={envoi || (accueil && ouvert === false)}
           onClick={() => {
             if (fini) router.replace("/");
-            else if (etape === "secret") void creer();
+            else if (etape === derniere) void (sociale ? finirSociale() : creer());
             else aller(1);
           }}
           className={cn(
@@ -793,11 +924,23 @@ export default function InscriptionPage() {
           {envoi && <Loader2 className="size-4 animate-spin" />}
           {action}
         </button>
-        {accueil && (
-          <Link href="/" className="mt-[13px] block py-[8px] text-center text-[13px] font-semibold text-foreground/50">
-            J&apos;ai déjà un compte
-          </Link>
+        {accueil && !sociale && ouvert !== false && (
+          <BoutonsSociaux retour="/inscription" inscription enLigne onErreur={setErreur} className="mt-[8px]" />
         )}
+        {accueil &&
+          (sociale ? (
+            <button
+              type="button"
+              onClick={() => void annulerSociale()}
+              className="mt-[13px] block w-full py-[8px] text-center text-[13px] font-semibold text-foreground/50"
+            >
+              Annuler
+            </button>
+          ) : (
+            <Link href="/" className="mt-[13px] block py-[8px] text-center text-[13px] font-semibold text-foreground/50">
+              J&apos;ai déjà un compte
+            </Link>
+          ))}
       </div>
 
       {prise && (
