@@ -72,6 +72,7 @@ import { Reveal } from "@/components/sfl/feed/reveal";
 import { PitchSynthese } from "@/components/sfl/feed/pitch-synthese";
 import { LaUne } from "@/components/sfl/feed/la-une";
 import { cn } from "@/lib/utils";
+import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 
 /* ----------------------------- Réactions ------------------------------ */
 // Réactions locales à l'appareil (le multi-joueurs attend les comptes) :
@@ -142,15 +143,9 @@ function ModuleTitle({ label, title }: { label?: string; title: string }) {
   );
 }
 
-function Avatar({ name, size = 30 }: { name: string; size?: number }) {
-  return (
-    <span
-      className="flex items-center justify-center rounded-full bg-secondary text-[11px] font-bold ring-2 ring-background"
-      style={{ width: size, height: size }}
-    >
-      {name[0]}
-    </span>
-  );
+/** Le joueur, en petite carte (la pastille de la hiérarchie des cartes). */
+function Avatar({ name }: { name: string; size?: number }) {
+  return <CarteDe name={name} />;
 }
 
 /* ------------------------------- Le récap ------------------------------- */
@@ -738,14 +733,14 @@ function JourneeRecapComplet({ j }: { j: number }) {
               <Card3D
                 cacheKey={`feed-duel-${lastJ.j}-${duelA.name}`}
                 mode="simple"
-                size={0.46}
+                size={FORMAT_CARTE.grande}
                 render={(s) => <PlayerCard player={duelA} size={s} />}
               />
               <span className="mono-label shrink-0 text-foreground/40">VS</span>
               <Card3D
                 cacheKey={`feed-duel-${lastJ.j}-${duelB.name}`}
                 mode="simple"
-                size={0.46}
+                size={FORMAT_CARTE.grande}
                 render={(s) => <PlayerCard player={duelB} size={s} />}
               />
             </div>
@@ -910,7 +905,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                 <Card3D
                   cacheKey={`feed-forme-${lastJ.j}-${formePlayer.name}`}
                   mode="simple"
-                  size={0.42}
+                  size={FORMAT_CARTE.grande}
                   render={(s) => <PlayerCard player={formePlayer} size={s} />}
                 />
               )

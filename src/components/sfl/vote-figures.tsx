@@ -26,6 +26,7 @@ import {
   type CategorieVote,
 } from "@/lib/sfl/votes";
 import { cn } from "@/lib/utils";
+import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 
 export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
   const { saison, allPlayers } = useSeason();
@@ -91,7 +92,7 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
                       )}
                     >
                       {joueur ? (
-                        <PlayerCard player={joueur} mode="simple" size={0.3} />
+                        <PlayerCard player={joueur} mode="simple" size={FORMAT_CARTE.moyenne} />
                       ) : (
                         <span className="flex h-[114px] w-[77px] items-center justify-center rounded-xl bg-secondary text-2xl font-bold">
                           {p.name[0]}

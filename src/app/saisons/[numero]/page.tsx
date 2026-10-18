@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { JourneesDepliables } from "@/components/sfl/feed/journees-depliables";
 import { useSeason } from "@/components/sfl/season-provider";
+import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { rankByMetric } from "@/lib/sfl/engine";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
 import { saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
@@ -95,6 +96,7 @@ export default function SaisonArchiveePage() {
                 {classes.slice(0, 10).map((p) => (
                   <div key={p.name} className="flex items-center gap-3 border-t border-border/40 px-4 py-2">
                     <span className="w-5 text-[12px] text-muted-foreground tabular-nums">{p.rank}</span>
+                    <MiniCarte player={p} size={FORMAT_CARTE.petite} detail={`${def.label} · ${def.value(p)} ${def.unit}`} />
                     <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{p.name}</span>
                     <span className="text-[14px] font-bold tabular-nums">{def.value(p)}</span>
                   </div>

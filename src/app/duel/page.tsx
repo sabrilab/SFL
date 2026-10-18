@@ -28,6 +28,7 @@ import { DUEL_CATEGORIES, pickCategory, type DuelCategory } from "@/lib/sfl/duel
 import { DAILY_DUEL_CAP, getDailyDuelCount, recordDailyDuel } from "@/lib/sfl/ballons";
 import { logActivity } from "@/lib/sfl/activity";
 import { MatchArena } from "@/components/sfl/match-arena";
+import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 
 const cardVariants = {
   idle: { scale: 1, y: 0, opacity: 1, filter: "grayscale(0)" },
@@ -245,7 +246,7 @@ function Arene() {
                           <Card3D
                             cacheKey={`simple-${p.name}-${category.id}`}
                             mode="simple"
-                            size={0.62}
+                            size={FORMAT_CARTE.grande}
                             render={(s) => (
                               <PlayerCard
                                 player={p}
@@ -316,9 +317,7 @@ function Arene() {
                       >
                         {i + 1}
                       </span>
-                      <span className="mr-0.5 flex size-7 items-center justify-center rounded-full bg-secondary text-xs font-semibold">
-                        {name[0]}
-                      </span>
+                      <CarteDe name={name} className="mr-0.5" />
                       <span className="flex-1 truncate text-[15px] font-semibold">{name}</span>
                       <span className="text-xs text-foreground/45">
                         {r.duels} duel{r.duels > 1 ? "s" : ""}
