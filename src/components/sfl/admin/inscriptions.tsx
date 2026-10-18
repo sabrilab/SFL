@@ -144,6 +144,8 @@ export function Inscriptions({
       .from("profiles")
       .select("id, name, username, contact_email, created_at")
       .eq("valide", false)
+      // Passé par Google ou Apple sans finir : pas encore une demande.
+      .eq("pseudo_a_choisir", false)
       .order("created_at", { ascending: true });
     // Colonne absente (migration pas encore passée) : rien à montrer.
     if (error || !data) return;

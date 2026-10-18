@@ -6,10 +6,10 @@
 // connexion n'apparaît que si rien n'est en attente.
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useSession } from "@/hooks/use-session";
-import { bootstrapServerSession } from "@/lib/sfl/auth/session";
+import { bootstrapServerSession, inscriptionSocialeEnCours } from "@/lib/sfl/auth/session";
 import { LoginScreen } from "./login-screen";
 import { EnAttente } from "./en-attente";
 
@@ -23,19 +23,27 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const isClient = useIsClient();
   const session = useSession();
   const pathname = usePathname();
+  const router = useRouter();
   const [bootstrapped, setBootstrapped] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     // Externe à React (Supabase + localStorage) : le résultat arrive par
     // l'événement de session ; ce flag n'évite que l'écran de connexion furtif.
-    bootstrapServerSession().finally(() => {
-      if (!cancelled) setBootstrapped(true);
-    });
+    bootstrapServerSession()
+      .then(async (ok) => {
+        // Revenu de Google ou Apple sans avoir fini son inscription (app
+        // fermée en route) : la suite est sur l'inscription.
+        if (ok || cancelled || PUBLIC_ROUTES.some((r) => window.location.pathname.startsWith(r))) return;
+        if (await inscriptionSocialeEnCours()) router.replace("/inscription");
+      })
+      .finally(() => {
+        if (!cancelled) setBootstrapped(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   // Avant hydratation (et pendant la reprise de session) on ne rend rien :
   // ni flash de contenu privé, ni formulaire qui clignote.

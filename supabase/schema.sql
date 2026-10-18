@@ -32,16 +32,47 @@ alter table public.profiles enable row level security;
 alter table public.profiles add column if not exists valide boolean not null default true;
 alter table public.profiles alter column valide set default false;
 
+-- Pseudo. Il est unique (contrainte de la colonne username) et ne se change
+-- pas tout le temps : une fois tous les 30 jours, comme sur les réseaux
+-- sociaux. La règle vit ICI, dans la base (trigger garde_pseudo plus bas) :
+-- aucun appel, de l'app ou d'ailleurs, ne la contourne.
+--   · pseudo_change_le : date du dernier pseudo choisi (null = jamais choisi
+--     par le joueur, le premier choix est libre) ;
+--   · pseudo_a_choisir : compte né d'une connexion Google ou Apple, qui
+--     porte un nom et un pseudo provisoires tant que le joueur n'a pas fini
+--     son inscription (son premier choix ne compte pas dans les 30 jours).
+alter table public.profiles add column if not exists pseudo_change_le timestamptz;
+alter table public.profiles add column if not exists pseudo_a_choisir boolean not null default false;
+alter table public.profiles add column if not exists contact_email text;
+
 -- À l'inscription, le profil est créé par trigger depuis les métadonnées
 -- d'identité (nom, pseudo). is_admin est FORCÉ à false : les métadonnées sont
 -- modifiables par l'utilisateur, elles ne portent jamais d'autorisation.
+--
+-- Connexion Google ou Apple : les métadonnées viennent du fournisseur (nom
+-- complet, email réel) et ne disent rien du nom de ligue ni du pseudo. Le
+-- profil naît avec un nom et un pseudo PROVISOIRES, uniques par construction
+-- (tirés de l'identifiant du compte), et pseudo_a_choisir : l'écran
+-- d'inscription demande la suite, et la route serveur pose les vrais
+-- (/api/inscription/sociale). Sans cela, deux « Thomas Martin » de Google se
+-- heurteraient à l'unicité du nom et la connexion échouerait.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  fournisseur text := coalesce(new.raw_app_meta_data ->> 'provider', 'email');
+  court text := left(replace(new.id::text, '-', ''), 12);
 begin
+  if fournisseur <> 'email' then
+    insert into public.profiles (id, name, username, is_admin, valide, pseudo_a_choisir, contact_email)
+    values (new.id, 'Nouveau ' || court, '@n' || court, false, false, true, lower(new.email))
+    on conflict (id) do nothing;
+    return new;
+  end if;
+
   insert into public.profiles (id, name, username, is_admin, valide)
   values (
     new.id,
@@ -143,8 +174,63 @@ create policy "profiles: mise à jour de soi"
   with check ((select auth.uid()) = id);
 
 -- Email de contact du joueur — collecté après la première connexion, ou
--- automatiquement quand il lie Google/Apple. C'est LA table des emails.
-alter table public.profiles add column if not exists contact_email text;
+-- automatiquement quand il lie Google/Apple (colonne ajoutée plus haut, avec
+-- le pseudo). C'est LA table des emails.
+
+-- La règle du pseudo, appliquée à TOUTE modification (joueur, route serveur
+-- ou admin en SQL) : un format propre, et un changement tous les 30 jours.
+-- Le premier choix d'un compte Google/Apple ne compte pas. Pour débloquer un
+-- joueur à la main : update profiles set pseudo_change_le = null where … ;
+create or replace function public.garde_pseudo()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.username is not distinct from old.username then
+    return new;
+  end if;
+  if new.username !~ '^@[a-z0-9][a-z0-9._]{2,19}$' then
+    raise exception 'Pseudo : 3 à 20 caractères, lettres, chiffres, point ou tiret bas.'
+      using errcode = '22023';
+  end if;
+  if not old.pseudo_a_choisir
+     and old.pseudo_change_le is not null
+     and old.pseudo_change_le > now() - interval '30 days' then
+    raise exception 'Pseudo : prochain changement possible le %.',
+      to_char(old.pseudo_change_le + interval '30 days', 'DD/MM/YYYY')
+      using errcode = 'P0001', hint = 'pseudo-30-jours';
+  end if;
+  new.pseudo_change_le := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_garde_pseudo on public.profiles;
+create trigger profiles_garde_pseudo before update of username on public.profiles
+  for each row execute function public.garde_pseudo();
+
+-- Connexion par pseudo. Les comptes à mot de passe se connectent avec un
+-- email technique (pseudo@sfl.local) qui garde le PREMIER pseudo : après un
+-- changement, l'écran de connexion demande ici à quel identifiant correspond
+-- le nouveau. Ne répond que pour les emails techniques (jamais un email réel).
+create or replace function public.identifiant_de_connexion(pseudo text)
+returns text
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select split_part(u.email, '@', 1)
+  from public.profiles p
+  join auth.users u on u.id = p.id
+  where p.username = '@' || lower(btrim(pseudo, ' @'))
+    and u.email like '%@sfl.local'
+  limit 1;
+$$;
+
+revoke execute on function public.identifiant_de_connexion(text) from public;
+grant execute on function public.identifiant_de_connexion(text) to anon, authenticated;
 
 -- Le badge que le joueur pose sur sa carte (src/lib/sfl/badge-carte.ts) :
 -- « auto » (le meilleur), « aucun », « s:<classement> » ou « p:<palier> ».
@@ -389,7 +475,11 @@ grant select on public.profiles, public.convocations, public.presence to authent
 -- la saison. On retire le droit de table ; seules les colonnes ci-dessous
 -- restent modifiables par le joueur, sur sa propre ligne (RLS).
 revoke insert, update, delete, truncate on public.profiles from anon, authenticated;
-grant update (name, username) on public.profiles to authenticated;
+-- Le pseudo ne passe plus que par la route serveur (/api/pseudo), qui vérifie
+-- aussi les pseudos réservés aux comptes prévus ; la règle des 30 jours, elle,
+-- est dans la base (garde_pseudo).
+revoke update (username) on public.profiles from authenticated;
+grant update (name) on public.profiles to authenticated;
 grant update (contact_email) on public.profiles to authenticated;
 grant update (badge) on public.profiles to authenticated;
 grant insert, select on public.activity to authenticated;

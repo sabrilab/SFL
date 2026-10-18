@@ -16,9 +16,7 @@
 // GET ?pseudo=… dit seulement si un pseudo est libre (pour l'écran).
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { ACCOUNTS } from "@/lib/sfl/auth/accounts";
-import { username } from "@/lib/sfl/usernames";
+import { dejaPris, serveur } from "@/lib/sfl/serveur-ligue.server";
 import {
   capitaliser,
   erreurInscription,
@@ -29,48 +27,10 @@ import {
   type Inscription,
 } from "@/lib/sfl/inscription";
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL ??
-  process.env.NEXT_PUBLIC_SUPABASE_URL ??
-  "https://tpfusliksgxcvfrodchk.supabase.co";
-const SECRET = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-function serveur(): SupabaseClient | null {
-  if (!SECRET) return null;
-  return createClient(SUPABASE_URL, SECRET, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
-
 const FERME = NextResponse.json(
   { error: "Les inscriptions ne sont pas encore ouvertes. Demande ton accès à l'admin." },
   { status: 503 }
 );
-
-/** Identifiants et noms déjà pris : comptes, effectif, et comptes prévus. */
-async function dejaPris(sb: SupabaseClient) {
-  const { data: profils, error } = await sb.from("profiles").select("name, username");
-  if (error) throw error;
-  const { data: doc } = await sb.from("saison").select("data").eq("id", 1).maybeSingle();
-  const roster = ((doc as { data?: { roster?: { name: string }[] } } | null)?.data?.roster ?? []).map(
-    (r) => r.name
-  );
-  const liste = (profils ?? []) as { name: string; username: string }[];
-
-  const pseudos = new Set<string>();
-  for (const p of liste) pseudos.add(p.username.replace(/^@/, "").toLowerCase());
-  // Les comptes prévus par l'admin, même pas encore créés côté serveur : leur
-  // identifiant leur est réservé.
-  for (const a of ACCOUNTS) pseudos.add(a.user);
-  for (const n of roster) pseudos.add(username(n).slice(1));
-  for (const r of ["admin", "sfl", "bola", "ligue", "support"]) pseudos.add(r);
-
-  const noms = new Set<string>();
-  for (const p of liste) noms.add(p.name.toLowerCase());
-  for (const n of roster) noms.add(n.toLowerCase());
-  for (const a of ACCOUNTS) noms.add(a.name.toLowerCase());
-  return { pseudos, noms };
-}
 
 export async function GET(req: NextRequest) {
   const sb = serveur();
@@ -124,6 +84,8 @@ export async function POST(req: NextRequest) {
     .from("profiles")
     .select("id")
     .eq("contact_email", f.email)
+    // Un passage par Google/Apple laissé en plan ne bloque pas l'email.
+    .eq("pseudo_a_choisir", false)
     .limit(1);
   if (memeEmail && memeEmail.length > 0) {
     return NextResponse.json(
@@ -154,7 +116,10 @@ export async function POST(req: NextRequest) {
 
   // Le trigger a posé le profil (en attente). On complète, et on annule tout
   // si la fiche ne passe pas : pas de compte à moitié créé.
-  const { error: errProfil } = await sb.from("profiles").update({ contact_email: f.email }).eq("id", id);
+  const { error: errProfil } = await sb
+    .from("profiles")
+    .update({ contact_email: f.email, pseudo_change_le: new Date().toISOString() })
+    .eq("id", id);
   const { error: errFiche } = await sb.from("fiches").insert({
     player_id: id,
     prenom: f.prenom,

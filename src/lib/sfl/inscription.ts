@@ -125,8 +125,15 @@ export function nomDeLigue(prenom: string, nom: string, pris: Set<string>): stri
   return `${p} ${n} ${i}`;
 }
 
-/** Tous les contrôles d'une inscription. null = tout est bon. */
-export function erreurInscription(f: Inscription, aujourdhui = new Date()): string | null {
+/**
+ * Tous les contrôles d'une inscription. null = tout est bon.
+ * `sansMotDePasse` : inscription par Google ou Apple, qui n'en a pas.
+ */
+export function erreurInscription(
+  f: Inscription,
+  aujourdhui = new Date(),
+  { sansMotDePasse = false } = {}
+): string | null {
   if (!nettoyerNom(f.prenom)) return "Ton prénom manque.";
   if (!nettoyerNom(f.nom)) return "Ton nom manque.";
   const ep = erreurPseudo(normaliserPseudo(f.pseudo));
@@ -141,6 +148,6 @@ export function erreurInscription(f: Inscription, aujourdhui = new Date()): stri
   if (!MAILLOTS.includes(f.maillot)) return "Choisis ta taille de maillot.";
   if (!PIEDS.includes(f.pied)) return "Choisis ton pied fort.";
   if (!POSTES.some((p) => p.id === f.poste)) return "Choisis ton poste.";
-  if ((f.motDePasse ?? "").length < BORNES.motDePasse) return `Mot de passe : ${BORNES.motDePasse} caractères au moins.`;
+  if (!sansMotDePasse && (f.motDePasse ?? "").length < BORNES.motDePasse) return `Mot de passe : ${BORNES.motDePasse} caractères au moins.`;
   return null;
 }

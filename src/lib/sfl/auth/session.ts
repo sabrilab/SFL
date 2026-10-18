@@ -17,7 +17,7 @@
 
 import { ACCOUNTS, findAccount, type Account } from "./accounts";
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
-import { loginEmail, supabase } from "@/lib/supabase";
+import { loginEmail, supabase, SUPABASE_KEY, SUPABASE_URL } from "@/lib/supabase";
 
 /**
  * false : Supabase d'abord, repli sur la vérification locale si indisponible.
@@ -148,18 +148,26 @@ export async function signIn(user: string, password: string): Promise<SignInResu
   // l'effectif en cours de saison n'y figure pas. Elle sert donc de REPLI,
   // plus de portail — le serveur, lui, connaît tout le monde.
   const account = findAccount(user);
-  const identifiant = account?.user ?? user.trim().toLowerCase();
+  let identifiant = account?.user ?? user.trim().replace(/^@+/, "").toLowerCase();
 
   // 1 · Le serveur d'abord — 5 secondes maximum, sinon repli local.
   let refusServeur: Session["refus"];
   try {
-    const { data, error } = await withTimeout(
-      supabase().auth.signInWithPassword({
-        email: loginEmail(identifiant),
-        password,
-      }),
-      5000
-    );
+    const essai = (id: string) =>
+      withTimeout(supabase().auth.signInWithPassword({ email: loginEmail(id), password }), 5000);
+    let { data, error } = await essai(identifiant);
+    // Un joueur qui a changé de pseudo garde son identifiant technique
+    // d'origine : la base dit lequel correspond au pseudo tapé.
+    if (error && !isAuthRetryableFetchError(error)) {
+      const { data: origine } = await withTimeout(
+        Promise.resolve(supabase().rpc("identifiant_de_connexion", { pseudo: identifiant })),
+        5000
+      ).catch(() => ({ data: null }));
+      if (typeof origine === "string" && origine && origine !== identifiant) {
+        ({ data, error } = await essai(origine));
+        if (!error) identifiant = origine;
+      }
+    }
     if (!error && data.user) {
       // Le rôle admin vient de la table profiles (jamais des métadonnées).
       let admin = false;
@@ -407,10 +415,13 @@ export async function bootstrapServerSession(): Promise<boolean> {
 
     const { data: profile } = await supabase()
       .from("profiles")
-      .select("name, username, is_admin")
+      .select("name, username, is_admin, pseudo_a_choisir")
       .eq("id", user.id)
       .maybeSingle();
     if (!profile?.name) return false;
+    // Arrivé par Google ou Apple sans avoir fini son inscription : pas encore
+    // de session de ligue, l'écran d'inscription demande la suite.
+    if (profile.pseudo_a_choisir) return false;
 
     const account = ACCOUNTS.find((a) => a.name === profile.name);
     const valide = await estValide(user.id);
@@ -465,4 +476,104 @@ export async function getContactEmail(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+/* ────────────────── Inscription par Google / Apple ────────────────── */
+
+export type Fournisseur = "google" | "apple";
+
+/**
+ * Les fournisseurs que Supabase a vraiment activés, et si les nouveaux
+ * comptes y sont permis. Lu dans les réglages publics du projet
+ * (/auth/v1/settings) : un bouton n'apparaît que quand l'admin a branché le
+ * fournisseur, sans rien changer dans l'app.
+ */
+export async function fournisseursActifs(): Promise<{ actifs: Fournisseur[]; inscriptions: boolean }> {
+  try {
+    const r = await withTimeout(
+      fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY } }),
+      5000
+    );
+    if (!r.ok) return { actifs: [], inscriptions: false };
+    const d = (await r.json()) as { external?: Record<string, boolean>; disable_signup?: boolean };
+    return {
+      actifs: (["apple", "google"] as const).filter((p) => d.external?.[p]),
+      inscriptions: !d.disable_signup,
+    };
+  } catch {
+    return { actifs: [], inscriptions: false };
+  }
+}
+
+/**
+ * Le refus rapporté par Supabase au retour du fournisseur (dans l'adresse),
+ * en clair. null si rien n'a été refusé.
+ */
+export function refusAuRetour(): string | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(
+    `${window.location.search.slice(1)}&${window.location.hash.replace(/^#/, "")}`
+  );
+  const code = params.get("error_code") ?? params.get("error");
+  if (!code) return null;
+  if (/signup/i.test(code + (params.get("error_description") ?? ""))) return "Les inscriptions sont fermées pour l'instant.";
+  if (code === "access_denied") return null; // le joueur a fait demi-tour chez le fournisseur
+  return "La connexion n'a pas abouti. Réessaie.";
+}
+
+/**
+ * Part chez Google ou Apple ; on revient sur `retour` (même origine). Au
+ * retour, un membre qui avait lié ce compte entre dans la ligue ; un nouveau
+ * venu arrive sur l'inscription, où il choisit son pseudo.
+ */
+export async function connexionSociale(fournisseur: Fournisseur, retour = "/inscription"): Promise<string | null> {
+  try {
+    const { error } = await supabase().auth.signInWithOAuth({
+      provider: fournisseur,
+      options: { redirectTo: `${window.location.origin}${retour}` },
+    });
+    return error ? "Connexion impossible pour l'instant." : null;
+  } catch {
+    return "Pas de réseau. Réessaie dans un instant.";
+  }
+}
+
+/** Le jeton de la session Supabase en cours, pour les routes serveur. */
+export async function jetonServeur(): Promise<string | null> {
+  try {
+    const { data } = await supabase().auth.getSession();
+    return data.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Revenu de Google ou Apple sans compte fini ? Renvoie le fournisseur, sinon
+ * null. Sert à l'inscription (mode « sans mot de passe ») et à la porte
+ * d'entrée (qui l'y renvoie).
+ */
+export async function inscriptionSocialeEnCours(): Promise<Fournisseur | null> {
+  try {
+    const { data } = await supabase().auth.getSession();
+    const user = data.session?.user;
+    if (!user) return null;
+    const fournisseur = user.app_metadata?.provider as string | undefined;
+    if (fournisseur !== "google" && fournisseur !== "apple") return null;
+    const { data: profil } = await supabase()
+      .from("profiles")
+      .select("pseudo_a_choisir")
+      .eq("id", user.id)
+      .maybeSingle();
+    return (profil as { pseudo_a_choisir?: boolean } | null)?.pseudo_a_choisir ? fournisseur : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Ferme la session Supabase (compte provisoire abandonné). */
+export async function oublierSessionServeur(): Promise<void> {
+  try {
+    await supabase().auth.signOut({ scope: "local" });
+  } catch {}
 }

@@ -18,6 +18,7 @@ import { useSession } from "@/hooks/use-session";
 import { useIsClient } from "@/hooks/use-is-client";
 import { username } from "@/lib/sfl/usernames";
 import { cn } from "@/lib/utils";
+import { PseudoCard } from "./pseudo-card";
 
 export function AccountCard() {
   const session = useSession();
@@ -123,11 +124,13 @@ export function AccountCard() {
           <div className="min-w-0 flex-1">
             <div className="truncate text-[16px] font-bold tracking-tight">{session.name}</div>
             <div className="mono-label mt-0.5 text-foreground/40">
-              {session.user} · {username(session.name)}
+              {serverSession ? session.user : `${session.user} · ${username(session.name)}`}
               {session.admin && " · Admin"}
             </div>
           </div>
         </div>
+
+        {serverSession && <PseudoCard />}
 
         {isClient && !custom && (
           <p className="mt-3 rounded-2xl bg-primary/10 px-3.5 py-2.5 text-[12.5px] leading-snug text-primary">
