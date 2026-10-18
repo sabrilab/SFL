@@ -212,6 +212,10 @@ interface Pose {
 /** Le cadre du terrain de l'app ; le terrain couché dedans, et son inclinaison. */
 const CADRE_H = 540;
 const TERRAIN = { l: 270, h: 540, incline: 56 };
+/** L'œil : à 1000 px, visant le quart haut du cadre (posé à 34 px au-dessus du terrain). */
+const PERSPECTIVE = 1000;
+const TERRAIN_TOP = -34;
+const VISEE = CADRE_H * 0.25 - TERRAIN_TOP;
 
 /** Vertical : la profondeur (8 le but, 40 l'attaque) en px depuis la médiane du terrain couché. */
 const depuisMediane = (profondeur: number) =>
@@ -333,19 +337,22 @@ export function FeuilleDeMatch({
         className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#e9e8e3_0%,#d6d5d0_70%)] dark:bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
         style={{
           height: CADRE_H,
-          perspective: 1000,
-          perspectiveOrigin: "50% 25%",
         }}
       >
         <div
           className="absolute left-1/2"
           style={{
-            top: -34,
+            top: TERRAIN_TOP,
             width: TERRAIN.l,
             height: TERRAIN.h,
             marginLeft: -TERRAIN.l / 2,
             transformStyle: "preserve-3d",
-            transform: `rotateX(${TERRAIN.incline}deg)`,
+            // La perspective est dans la transformation du terrain, pas sur le cadre :
+            // Safari l'ignore sur un parent arrondi qui coupe ce qui dépasse, et le
+            // terrain y restait à plat. Point de fuite au quart haut du cadre
+            // (VISEE, en px dans le terrain), bascule autour du centre du terrain.
+            transformOrigin: `50% ${VISEE}px`,
+            transform: `perspective(${PERSPECTIVE}px) translateY(${TERRAIN.h / 2 - VISEE}px) rotateX(${TERRAIN.incline}deg) translateY(${VISEE - TERRAIN.h / 2}px)`,
           }}
         >
           <div
