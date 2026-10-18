@@ -5,6 +5,7 @@
 
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useCardViewer } from "@/components/sfl/card-viewer";
+import { prechaufferCarte } from "@/components/sfl/card-3d";
 import type { Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ export function MiniCarte({
   return (
     <button
       type="button"
+      onPointerDown={(e) => prechaufferCarte(e.currentTarget)}
       onClick={(e) => {
         e.stopPropagation();
         open({

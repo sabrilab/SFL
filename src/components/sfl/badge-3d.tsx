@@ -24,7 +24,7 @@ import * as THREE from "three";
 import { EMBLEMES, EMBLEMES_SAISON } from "@/components/sfl/emblemes";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import type { Objet } from "@/lib/sfl/badges-3d/objets";
-import { camera, construire, eclat, environnement, IMAGE_EVENT, imageBadge, liberer, regler, type Matiere } from "@/lib/sfl/badges-3d/rendu";
+import { camera, construire, eclat, environnement, IMAGE_EVENT, imageBadge, liberer, regler, sansTroisD, type Matiere } from "@/lib/sfl/badges-3d/rendu";
 import { CLASSEMENTS, ordinal, type ClassementId } from "@/lib/sfl/fin-de-saison";
 import { metal, NOM_METAL, TROPHEES, type Metal, type TropheeId } from "@/lib/sfl/trophees";
 
@@ -143,7 +143,8 @@ export function Objet3D({
   }
   if (!src) {
     return (
-      <span className="grid place-items-center" style={{ width: taille, height: taille }} aria-hidden>
+      // data-attente-3d : la carte 3D attend l'image avant de se capturer (card-3d).
+      <span className="grid place-items-center" style={{ width: taille, height: taille }} aria-hidden data-attente-3d={sansTroisD() ? undefined : ""}>
         <Embleme style={{ width: taille * 0.5, height: taille * 0.5 }} strokeWidth={2} className="opacity-60" />
       </span>
     );

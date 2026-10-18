@@ -258,8 +258,15 @@ function planifier() {
   if (planifie) return;
   planifie = true;
   const ric = (window as unknown as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
-  if (ric) ric(travailler, { timeout: 120 });
-  else setTimeout(travailler, 16);
+  // Une image peinte d'abord : l'écran qui vient de demander le badge (la
+  // pop-up d'une carte, avec sa photo) s'affiche avant que le moteur ne
+  // prenne la main.
+  requestAnimationFrame(() =>
+    setTimeout(() => {
+      if (ric) ric(travailler, { timeout: 120 });
+      else travailler();
+    }, 0)
+  );
 }
 
 /**
