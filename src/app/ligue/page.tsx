@@ -1,38 +1,40 @@
 "use client";
 
-// Accueil — la page d'arrivée de l'app.
-//
-// On arrive sur SOI : prénom en grand, photo, les trois chiffres de la
-// saison. Puis « À la une », où le récap du dernier dimanche est une carte
-// qu'on ouvre — le rideau (GSAP) se lève et le scrollytelling se déroule,
-// classement, course et records recalculés comme au soir de ce dimanche-là.
-//
-// Les autres vues (Journée, Classement, Matchs) vivent derrière l'accueil et
-// se rejoignent par le sélecteur, avec un retour permanent vers l'accueil.
+// La Ligue — trois vues sous un seul sélecteur, sans tiroir dans un tiroir :
+//   · Journée     : le récap du dernier dimanche (le rideau GSAP se lève et
+//                   le scrollytelling se déroule) et les prochaines journées ;
+//   · Classements : tous les classements, directement — podium en cartes,
+//                   le vote du jour quand il est ouvert ;
+//   · Matchs      : les journées jouées, une carte chacune.
+// Le Wall of Fame est au bout du sélecteur, toujours à portée.
+// L'ancienne vue Accueil a été retirée le 17/10 (plus pertinente) ; /stats
+// renvoie ici, sur Classements (?vue=classements).
 // Le récap lui-même vit dans feed/journee-recap.tsx.
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { ChevronRight } from "lucide-react";
+import { Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useSearchParams } from "next/navigation";
+import { ChevronRight, Crown } from "lucide-react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { LEAGUE_KEY } from "@/components/layout/site-header";
 import { useSeason } from "@/components/sfl/season-provider";
-import { labelDateFr, prochainDimanche } from "@/lib/sfl/convocation-temps";
+import { labelDateFr, prochainDimanche, voteOuvert } from "@/lib/sfl/convocation-temps";
 import { rankPlayers } from "@/lib/sfl/engine";
 import { computeStandings } from "@/lib/sfl/saisie/engine";
 import { JourneeRecap } from "@/components/sfl/feed/journee-recap";
 import { StatsAVenir } from "@/components/sfl/feed/stats-a-venir";
-import { BadgesLigne, IlsSeDemarquent } from "@/components/sfl/distinctions";
+import { IlsSeDemarquent } from "@/components/sfl/distinctions";
 import { Ecarts } from "@/components/sfl/ecarts";
-import { MiniCarte } from "@/components/sfl/mini-carte";
-import { distinctions } from "@/lib/sfl/distinctions";
+import { Classements } from "@/components/sfl/classements";
+import { VoteFigures } from "@/components/sfl/vote-figures";
+import { journeeAvecVote } from "@/lib/sfl/votes";
+import { useIsClient } from "@/hooks/use-is-client";
 import { SaisonArchiveProvider } from "@/components/sfl/season-provider";
 import { journeeJouee, saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { EmailNudge } from "@/components/sfl/auth/email-nudge";
 import { JourneeOpening } from "@/components/sfl/feed/journee-opening";
 import { CarteJournee } from "@/components/sfl/carte-journee";
-import { Accueil } from "@/components/sfl/feed/accueil";
 import { cn } from "@/lib/utils";
 
 // Les deux dimanches après celui de la convocation, lus côté client
@@ -44,11 +46,53 @@ function lireDimanches(): string {
   return `${labelDateFr(d1)}|${labelDateFr(d2)}`;
 }
 
-export default function Ligue() {
-  const { player } = useMyPlayer();
+type Vue = "journee" | "classements" | "matchs";
+const VUES: [Vue, string][] = [
+  ["journee", "Journée"],
+  ["classements", "Classements"],
+  ["matchs", "Matchs"],
+];
+
+export default function LiguePage() {
+  // useSearchParams impose une frontière Suspense côté App Router.
+  return (
+    <Suspense fallback={null}>
+      <Ligue />
+    </Suspense>
+  );
+}
+
+/** Le vote du jour : les journées dont le vote est ouvert maintenant (jour du match, jusqu'à minuit). */
+function VoteDuJour({ me }: { me: string }) {
+  const isClient = useIsClient();
+  const { journees } = useSeason();
+  if (!isClient) return null;
+  const maintenant = new Date();
+  const ouvertes = journees.filter((j) => journeeAvecVote(j) && voteOuvert(j.date, maintenant));
+  if (ouvertes.length === 0) return null;
+  return (
+    <>
+      {ouvertes.map((j) => (
+        <section key={j.j} className="glass flex flex-col gap-3 rounded-[26px] p-[18px]">
+          <h2 className="text-[17px] font-bold tracking-tight">
+            Vote du jour <span className="text-foreground/40">· J{j.j}</span>
+          </h2>
+          <VoteFigures journee={j} me={me} />
+        </section>
+      ))}
+    </>
+  );
+}
+
+function Ligue() {
+  const { player, me } = useMyPlayer();
   const { players, journees, saison } = useSeason();
-  // L'onglet Ligue s'ouvre sur le récap éditorial de la dernière journée.
-  const [view, setView] = useState<"accueil" | "journee" | "classement" | "matchs">("journee");
+  // L'onglet Ligue s'ouvre sur le récap éditorial de la dernière journée ;
+  // ?vue=classements (les anciens liens vers /stats) ouvre les classements.
+  const vueDemandee = useSearchParams().get("vue");
+  const [view, setView] = useState<Vue>(
+    VUES.some(([id]) => id === vueDemandee) ? (vueDemandee as Vue) : "journee"
+  );
   // Une seule ligue, la SFL : un ancien choix d'une autre ligue (WFL, KFL)
   // masquait tout le fil. On l'efface.
   useEffect(() => {
@@ -109,7 +153,6 @@ export default function Ligue() {
   /* -------------------------- Le classement --------------------------- */
 
   const RANKED = rankPlayers(players);
-  const distinctionsLigue = useMemo(() => distinctions(players), [players]);
   const myRank = RANKED.find((p) => p.name === player.name)?.rank ?? RANKED.length;
   const rankBefore = rankPlayers(
     computeStandings({ ...saison, entries: saison.entries.filter((e) => e.j !== latestJ) })
@@ -134,18 +177,10 @@ export default function Ligue() {
         />
       )}
 
-      {/* Un seul sélecteur, toujours là : l'accueil est une vue comme les
-          autres. Avant, un bouton retour s'empilait au-dessus des onglets —
-          deux niveaux de navigation pour quatre vues. */}
-      <div className="glass flex gap-1 rounded-full p-1" role="tablist" aria-label="Vue de la ligue">
-        {(
-          [
-            ["accueil", "Accueil"],
-            ["journee", "Journée"],
-            ["classement", "Classement"],
-            ["matchs", "Matchs"],
-          ] as const
-        ).map(([id, label]) => (
+      {/* Un seul sélecteur, toujours là, et le Wall of Fame au bout. */}
+      <div className="flex items-center gap-2">
+      <div className="glass flex flex-1 gap-1 rounded-full p-1" role="tablist" aria-label="Vue de la ligue">
+        {VUES.map(([id, label]) => (
           <button
             key={id}
             role="tab"
@@ -160,30 +195,17 @@ export default function Ligue() {
           </button>
         ))}
       </div>
+        <Link
+          href="/palmares"
+          aria-label="Wall of Fame"
+          className="glass flex h-11 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold sm:px-4 sm:text-sm"
+        >
+          <Crown className="size-4" />
+          <span className="hidden sm:inline">Wall of Fame</span>
+        </Link>
+      </div>
 
-      {view === "accueil" ? (
-        <>
-          <EmailNudge />
-          <Accueil
-            player={player}
-            rank={myRank}
-            // Toutes les journées, pas seulement celles qui ont des équipes :
-            // la rubrique sait afficher une journée « à plat ».
-            dernieres={[...journees].reverse()}
-            archives={saison.archives ?? []}
-            numero={saison.numero ?? 0}
-            aVenir={played.length === 0}
-            onVoirClassement={() => setView("classement")}
-            onOuvrirRecap={(j) => {
-              setView("journee");
-              // Déjà sur cette journée : pas de rideau, on entre directement.
-              if (j === currentJ) return;
-              openJournee(j);
-            }}
-            aside={<PresencePanel />}
-          />
-        </>
-      ) : view === "matchs" ? (
+      {view === "matchs" ? (
         <>
           <p className="px-1 text-[13px] text-foreground/40">
             Chaque dimanche sur son terrain · {played.length} journée
@@ -202,28 +224,24 @@ export default function Ligue() {
             ))}
           </div>
         </>
-      ) : view === "classement" ? played.length === 0 ? (
+      ) : view === "classements" ? (
         <>
-          <StatsAVenir
-            numero={saison.numero ?? 0}
-            quoi="classement"
-            archive={saison.archives?.[saison.archives.length - 1]}
-          />
-          {/* En attendant : ceux qui se sont démarqués la saison passée. */}
-          <IlsSeDemarquent />
-          <Ecarts />
-        </>
-      ) : (
-        <>
-          <IlsSeDemarquent />
-          <Ecarts />
-          <p className="px-1 text-[13px] text-foreground/40">
-            Sunday Five League · après {journees.length} journées
-          </p>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] lg:items-start">
+          <VoteDuJour me={me} />
+          {played.length === 0 ? (
+            <>
+              <StatsAVenir
+                numero={saison.numero ?? 0}
+                quoi="classement"
+                archive={saison.archives?.[saison.archives.length - 1]}
+              />
+              {/* En attendant : ceux qui se sont démarqués la saison passée. */}
+              <IlsSeDemarquent />
+            </>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] lg:items-start">
+              <div className="flex flex-col gap-6 lg:sticky lg:top-4">
           {/* Ma synthèse — rang, points, forme sur 5 matchs */}
-          <section className="glass rounded-[26px] p-[18px] lg:sticky lg:top-4">
+          <section className="glass rounded-[26px] p-[18px] ">
             <div className="flex items-center justify-between">
               <div>
                 <p className="mono-label text-foreground/40">{player.name}</p>
@@ -277,60 +295,26 @@ export default function Ligue() {
             )}
           </section>
 
-          {/* La table de la ligue */}
-          <section>
-            <div className="flex items-center gap-3 px-2 pb-2.5">
-              <span className="mono-label w-[22px] text-[9px] text-foreground/30">#</span>
-              <span className="w-[38px]" aria-hidden />
-              <span className="mono-label flex-1 text-[9px] text-foreground/30">Joueur</span>
-              <span className="mono-label w-[26px] text-center text-[9px] text-foreground/30">M</span>
-              <span className="mono-label w-[44px] text-center text-[9px] text-foreground/30">B·P</span>
-              <span className="mono-label w-[30px] text-right text-[9px] text-foreground/30">PTS</span>
-              <span className="mono-label w-[30px] text-right text-[9px] text-foreground/30">ÉC.</span>
+              </div>
+              <Classements me={me} />
             </div>
-            <div className="glass-soft overflow-hidden rounded-[24px]">
-              {RANKED.slice(0, 12).map((p) => (
-                <div
-                  key={p.name}
-                  className={cn(
-                    "flex items-center gap-3 border-b border-white/5 px-3.5 py-3 last:border-0",
-                    p.name === player.name && "bg-primary/10"
-                  )}
-                >
-                  <span className="w-[22px] text-[13px] font-bold text-foreground/50 tabular-nums">
-                    {p.rank}
-                  </span>
-                  <MiniCarte player={p} size={0.15} detail={`${p.rank}e au Pépite d'Or · ${p.pp} pts`} />
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className="truncate text-[14px] font-semibold">{p.name}</span>
-                    <BadgesLigne ds={distinctionsLigue.get(p.name)} />
-                  </span>
-                  <span className="mono-label w-[26px] text-center text-foreground/40">
-                    {p.matchs}
-                  </span>
-                  <span className="mono-label w-[44px] text-center text-foreground/40">
-                    {p.buts}·{p.passes}
-                  </span>
-                  <span className="w-[30px] text-right text-[14px] font-bold tabular-nums">
-                    {p.pp}
-                  </span>
-                  <span className="w-[30px] text-right font-mono text-[11px] text-foreground/45 tabular-nums">
-                    {RANKED[0].pp - p.pp ? `−${RANKED[0].pp - p.pp}` : "—"}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <Link
-              href="/stats"
-              className="flex items-center justify-center gap-1 px-3 py-3.5 text-sm font-semibold text-primary"
-            >
-              Tous les classements <ChevronRight className="size-4" />
-            </Link>
-          </section>
-          </div>
+          )}
+          <Link href="/palmares" className="glass flex items-center gap-3.5 rounded-3xl px-4 py-3.5">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground/10">
+              <Crown className="size-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-bold tracking-tight">Wall of Fame</span>
+              <span className="block truncate text-[12.5px] text-muted-foreground">
+                Champions, légendes, ton parcours
+              </span>
+            </span>
+            <ChevronRight className="size-4 text-muted-foreground" />
+          </Link>
         </>
       ) : (
         <>
+          <EmailNudge />
           {/* Les capsules de journées — touche pour en ouvrir une autre */}
           <div className={played.length === 0 ? "hidden" : "-mt-1"}>
             <p className="mono-label mb-2 px-1 text-foreground/30">

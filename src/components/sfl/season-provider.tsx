@@ -14,6 +14,8 @@ import { startSaisonSync } from "@/lib/sfl/saisie/sync";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import type { Player } from "@/lib/sfl/engine";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
+import { appliquerVotes } from "@/lib/sfl/votes";
+import { useSuiviVotes, useVotes } from "@/hooks/use-votes";
 
 export const SAISIE_EVENT = "sfl-saisie";
 
@@ -63,7 +65,22 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     void version; // relit le store à chaque incrément de version (édition admin)
     return isClient ? saisieStore.load() : seedSaison();
   }, [isClient, version]);
-  const derived = useMemo(() => deriveSeason(saison), [saison]);
+  // Les votes Impact / Défensive : leurs élus sont posés sur les lignes une
+  // fois le vote fermé (minuit, heure de Paris). L'horloge avance toutes les
+  // cinq minutes pour que la fermeture se voie sans recharger.
+  useSuiviVotes(saison.numero ?? 0);
+  const votes = useVotes();
+  const [horloge, setHorloge] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setHorloge((h) => h + 1), 5 * 60 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const derived = useMemo(() => {
+    void horloge;
+    const brut = deriveSeason(saison);
+    const vote = appliquerVotes(saison, brut.journees, votes, new Date());
+    return vote === saison ? brut : deriveSeason(vote);
+  }, [saison, votes, horloge]);
   // `players` est la liste PUBLIQUE : les joueurs masqués n'y sont pas, donc
   // aucun classement, aucune recherche, aucun duel ne peut les faire remonter.
   const value = useMemo<SeasonValue>(

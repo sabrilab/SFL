@@ -1,10 +1,12 @@
-// Les badges d'un joueur — sa vitrine, comme dans l'app iPhone Bola
-// (Modeles/Trophee.swift) : des médailles à paliers, gagnées sur le terrain,
-// sur toute sa carrière SFL (saisons archivées comprises). Une médaille
-// verrouillée montre déjà le chemin : l'arc de progression jusqu'au premier
-// palier. Calculé à partir de la saison, rien n'est stocké.
+// Les badges de palier d'un joueur, gagnés au fil des dimanches sur toute sa
+// carrière SFL (saisons archivées comprises). Quatre paliers pour tous, dans
+// le même ordre : bronze, argent, or, puis rouge et or. Une médaille pas
+// encore gagnée montre déjà le chemin jusqu'au bronze. Calculé à partir de la
+// saison, rien n'est stocké.
+//
+// Les classements de fin de saison (1er, 2e, 3e), plus rares, vivent à part :
+// voir fin-de-saison.ts.
 
-import { deriveSeason } from "./saisie/engine";
 import { journeeJouee, saisonDepuisArchive } from "./saisie/mutations";
 import type { Saison } from "./saisie/types";
 
@@ -18,8 +20,6 @@ export type TropheeId =
   | "victoires"
   | "cleanSheet"
   | "serie"
-  | "podium"
-  | "pepite"
   | "saisons";
 
 export interface DefTrophee {
@@ -34,19 +34,27 @@ export interface DefTrophee {
 }
 
 export const TROPHEES: DefTrophee[] = [
-  { id: "matchs", nom: "Matchs joués", inscription: "des dimanches sur le terrain.", paliers: [1, 10, 25, 50, 100], unite: ["match", "matchs"] },
-  { id: "buts", nom: "Buteur", inscription: "des buts marqués.", paliers: [1, 10, 25, 50, 100], unite: ["but", "buts"] },
-  { id: "passes", nom: "Passeur", inscription: "des passes décisives.", paliers: [1, 10, 25, 50], unite: ["passe", "passes"] },
-  { id: "victoires", nom: "Victoires", inscription: "des matchs gagnés.", paliers: [1, 10, 25, 50], unite: ["victoire", "victoires"] },
-  { id: "mvp", nom: "MVP", inscription: "meilleur joueur du match.", paliers: [1, 3, 10], unite: ["mvp", "mvp"] },
-  { id: "mur", nom: "Le Mur", inscription: "meilleur défenseur du match.", paliers: [1, 3, 10], unite: ["titre", "titres"] },
-  { id: "impact", nom: "Impact", inscription: "le joueur qui change le match.", paliers: [1, 3, 10], unite: ["titre", "titres"] },
-  { id: "cleanSheet", nom: "Cage inviolée", inscription: "des matchs sans encaisser.", paliers: [1, 5, 15], unite: ["match", "matchs"] },
-  { id: "serie", nom: "Série", inscription: "des dimanches d'affilée.", paliers: [3, 6, 10], unite: ["dimanche", "dimanches"] },
-  { id: "podium", nom: "Podium", inscription: "dans le top 3 du pépite d'or.", paliers: [1, 2, 3], unite: ["saison", "saisons"] },
-  { id: "pepite", nom: "Pépite d'Or", inscription: "premier d'une saison.", paliers: [1, 2], unite: ["saison", "saisons"] },
+  { id: "buts", nom: "Buts", inscription: "des buts marqués.", paliers: [5, 10, 25, 50], unite: ["but", "buts"] },
+  { id: "passes", nom: "Passes", inscription: "des passes décisives.", paliers: [5, 10, 25, 50], unite: ["passe", "passes"] },
+  { id: "matchs", nom: "Matchs", inscription: "des dimanches sur le terrain.", paliers: [5, 10, 25, 50], unite: ["match", "matchs"] },
+  { id: "victoires", nom: "Victoires", inscription: "des matchs gagnés.", paliers: [5, 10, 25, 50], unite: ["victoire", "victoires"] },
+  { id: "mvp", nom: "MVP du match", inscription: "meilleur joueur du match.", paliers: [1, 3, 5, 10], unite: ["fois", "fois"] },
+  { id: "mur", nom: "Le Mur", inscription: "meilleur défenseur du match.", paliers: [1, 3, 5, 10], unite: ["fois", "fois"] },
+  { id: "impact", nom: "Impact", inscription: "le joueur qui change le match.", paliers: [1, 3, 5, 10], unite: ["fois", "fois"] },
+  { id: "cleanSheet", nom: "Cage inviolée", inscription: "des matchs sans encaisser.", paliers: [3, 5, 10, 20], unite: ["match", "matchs"] },
+  { id: "serie", nom: "Série", inscription: "des dimanches d'affilée.", paliers: [3, 5, 8, 12], unite: ["dimanche", "dimanches"] },
   { id: "saisons", nom: "Ancienneté", inscription: "des saisons jouées.", paliers: [1, 2, 3, 5], unite: ["saison", "saisons"] },
 ];
+
+/** Les quatre paliers, du plus courant au plus rare. */
+export type Metal = "bronze" | "argent" | "or" | "legende";
+export const METAUX: Metal[] = ["bronze", "argent", "or", "legende"];
+export const NOM_METAL: Record<Metal, string> = { bronze: "Bronze", argent: "Argent", or: "Or", legende: "Rouge et or" };
+
+/** Le métal d'un palier (1 = bronze… 4 = rouge et or) ; null avant le premier. */
+export function metal(palier: number): Metal | null {
+  return palier > 0 ? METAUX[Math.min(palier, METAUX.length) - 1] : null;
+}
 
 export interface EtatTrophee {
   def: DefTrophee;
@@ -93,8 +101,8 @@ function datePassee(label: string, maintenant: Date): boolean {
   return fin.getTime() <= maintenant.getTime();
 }
 
-/** Une saison, vue d'un joueur. `finie` : seules les saisons closes comptent pour le podium. */
-function compter(s: Saison, nom: string, finie: boolean, c: Compteurs, maintenant?: Date) {
+/** Une saison, vue d'un joueur. */
+function compter(s: Saison, nom: string, c: Compteurs, maintenant?: Date) {
   const passee = (j: number) => {
     if (journeeJouee(s, j)) return true;
     if (!maintenant) return false;
@@ -123,20 +131,13 @@ function compter(s: Saison, nom: string, finie: boolean, c: Compteurs, maintenan
     suite = presentes.has(j) ? suite + 1 : 0;
     c.serie = Math.max(c.serie, suite);
   }
-  if (finie) {
-    const pps = [...new Set(deriveSeason(s).players.map((p) => p.pp))].filter((n) => n > 0).sort((a, b) => b - a);
-    const moi = deriveSeason(s).players.find((p) => p.name === nom)?.pp ?? 0;
-    const rang = pps.indexOf(moi);
-    if (moi > 0 && rang >= 0 && rang < 3) c.podium += 1;
-    if (moi > 0 && rang === 0) c.pepite += 1;
-  }
 }
 
 /** La vitrine d'un joueur : toutes les médailles, gagnées ou en chemin. */
 export function vitrine(saison: Saison, nom: string, maintenant?: Date): EtatTrophee[] {
   const c = Object.fromEntries(TROPHEES.map((t) => [t.id, 0])) as Compteurs;
-  for (const a of saison.archives ?? []) compter(saisonDepuisArchive(a), nom, true, c);
-  compter(saison, nom, false, c, maintenant);
+  for (const a of saison.archives ?? []) compter(saisonDepuisArchive(a), nom, c);
+  compter(saison, nom, c, maintenant);
 
   return TROPHEES.map((def) => {
     const valeur = c[def.id];
@@ -152,7 +153,7 @@ export function vitrine(saison: Saison, nom: string, maintenant?: Date): EtatTro
 export function prochain(etats: EtatTrophee[]): EtatTrophee | null {
   return (
     etats
-      .filter((e) => e.cible != null && e.def.id !== "pepite" && e.def.id !== "podium" && e.def.id !== "saisons")
+      .filter((e) => e.cible != null && e.def.id !== "saisons")
       .sort((a, b) => b.progression - a.progression || a.cible! - a.valeur - (b.cible! - b.valeur))[0] ?? null
   );
 }
