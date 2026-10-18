@@ -2,25 +2,26 @@
 
 // La feuille de match dans la fiche du match (Map) : chaque match sur son
 // terrain, vu en légère perspective (le terrain couché, les cartes debout
-// dessus, chacune avec son ombre), le logo BOLA au rond central. Chaque joueur
-// est posé à son poste avec sa carte en pastille, la note aux couleurs de son
-// équipe (noire chez les Noirs, blanche chez les Blancs). Mon équipe joue en
-// bas, devant ; ma carte est cerclée. Plusieurs terrains le même jour : on
-// passe de l'un à l'autre, la fiche s'ouvre sur le mien. Toucher une carte
-// ouvre la fiche du joueur (fiche-joueur.tsx).
+// dessus, chacune avec son ombre), le logo BOLA au rond central. La
+// perspective est calculée à la main (lib/sfl/terrain-vu.ts) et non laissée à
+// la 3D CSS, que Safari aplatissait et que l'image ne savait pas photographier.
+// Chaque joueur est posé à son poste avec sa carte en pastille, la note aux
+// couleurs de son équipe (noire chez les Noirs, blanche chez les Blancs). Mon
+// équipe joue en bas, devant ; ma carte est cerclée. Plusieurs terrains le
+// même jour : on passe de l'un à l'autre, la fiche s'ouvre sur le mien.
+// Toucher une carte ouvre la fiche du joueur (fiche-joueur.tsx).
 //
 // « Partager la feuille » en fait une image au format story (1080 × 1920,
-// noir, logo BOLA), celle qu'on envoyait dans le groupe Snap : la feuille de
-// partage du téléphone s'ouvre, on choisit Snap. L'image est préparée dès que
-// la fiche s'ouvre, pour que le geste de partage parte tout de suite (Safari
-// refuse de partager si le geste a attendu trop longtemps) ; sans feuille de
-// partage (ordinateur), elle se télécharge.
+// noir, logo BOLA) : le terrain qu'on regarde, dessiné comme dans l'app et
+// agrandi. La feuille de partage du téléphone s'ouvre, on choisit Snap.
+// L'image est préparée dès que la fiche s'ouvre, pour que le geste de partage
+// parte tout de suite (Safari refuse de partager si le geste a attendu trop
+// longtemps) ; sans feuille de partage (ordinateur), elle se télécharge.
 //
-// Les terrains viennent de lib/sfl/feuille.ts ; l'image est la même
-// composition, dessinée hors écran puis photographiée par html-to-image
-// (déjà là pour la carte 3D).
+// Les terrains viennent de lib/sfl/feuille.ts ; l'image est dessinée hors
+// écran puis photographiée par html-to-image (déjà là pour la carte 3D).
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { toBlob } from "html-to-image";
 import { toast } from "sonner";
 import { Share } from "lucide-react";
@@ -37,6 +38,7 @@ import {
 } from "@/lib/sfl/feuille";
 import { ovr, type Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
+import { arc, projeter, rectArrondi, trace, TERRAIN } from "@/lib/sfl/terrain-vu";
 
 export interface EnTeteFeuille {
   /** « J8 · Sunday Five League ». */
@@ -135,87 +137,19 @@ function Pastille({
   );
 }
 
-/** Le dessin du terrain, en traits blancs ; `couche` les dit plus ou moins forts. */
-function Lignes({
-  vertical,
-  couche,
-  epais = 1.5,
-}: {
-  vertical: boolean;
-  couche: string;
-  epais?: number;
-}) {
-  const trait = { borderColor: couche, borderWidth: epais };
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0">
-      <div
-        className="absolute inset-[10px] rounded-[5px] border"
-        style={trait}
-      />
-      {vertical ? (
-        <>
-          <div
-            className="absolute inset-x-[10px] top-1/2 border-t-[1.5px]"
-            style={trait}
-          />
-          <div
-            className="absolute left-1/2 top-[10px] h-[11%] w-[40%] -translate-x-1/2 rounded-b-[999px] border border-t-0"
-            style={trait}
-          />
-          <div
-            className="absolute bottom-[10px] left-1/2 h-[11%] w-[40%] -translate-x-1/2 rounded-t-[999px] border border-b-0"
-            style={trait}
-          />
-        </>
-      ) : (
-        <>
-          <div
-            className="absolute inset-y-[10px] left-1/2 border-l-[1.5px]"
-            style={trait}
-          />
-          <div
-            className="absolute left-[10px] top-1/2 h-[42%] w-[9%] -translate-y-1/2 rounded-r-[999px] border border-l-0"
-            style={trait}
-          />
-          <div
-            className="absolute right-[10px] top-1/2 h-[42%] w-[9%] -translate-y-1/2 rounded-l-[999px] border border-r-0"
-            style={trait}
-          />
-        </>
-      )}
-      <div
-        className="absolute left-1/2 top-1/2 flex aspect-square -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border"
-        style={{ ...trait, width: vertical ? "33%" : "17%" }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element -- photographié par html-to-image */}
-        <img
-          src="/bola/symbole-blanc.svg"
-          alt=""
-          style={{ width: "52%", height: "52%", opacity: 0.85 }}
-        />
-      </div>
-    </div>
-  );
-}
-
 interface Pose {
   nom: string;
   equipe: string;
   couleur: string;
   encre: string;
-  /** En % de la largeur. */
+  /** En % de la largeur du terrain. */
   x: number;
-  /** En % de la hauteur (image) ; en px depuis la ligne médiane (app). */
+  /** En px depuis la ligne médiane. */
   y: number;
 }
 
-/** Le cadre du terrain de l'app ; le terrain couché dedans, et son inclinaison. */
+/** Le cadre du terrain, dans l'app comme dans l'image. */
 const CADRE_H = 540;
-const TERRAIN = { l: 270, h: 540, incline: 56 };
-/** L'œil : à 1000 px, visant le quart haut du cadre (posé à 34 px au-dessus du terrain). */
-const PERSPECTIVE = 1000;
-const TERRAIN_TOP = -34;
-const VISEE = CADRE_H * 0.25 - TERRAIN_TOP;
 
 /** Vertical : la profondeur (8 le but, 40 l'attaque) en px depuis la médiane du terrain couché. */
 const depuisMediane = (profondeur: number) =>
@@ -237,11 +171,8 @@ const ecart = (profondeur: number, chezMoi: boolean) =>
         ? 0.9
         : 1.36;
 
-/**
- * Les joueurs d'un terrain, posés. Vertical (l'app) : `bas` joue en bas.
- * Horizontal (l'image) : `bas` joue à gauche.
- */
-function poser(t: TerrainFeuille, vertical: boolean, basEstA: boolean): Pose[] {
+/** Les joueurs d'un terrain, posés : `bas` joue en bas, devant. */
+function poser(t: TerrainFeuille, basEstA: boolean): Pose[] {
   const [bas, haut] = basEstA ? [t.a, t.b] : [t.b, t.a];
   const out: Pose[] = [];
   for (const [eq, chezMoi] of [
@@ -251,26 +182,14 @@ function poser(t: TerrainFeuille, vertical: boolean, basEstA: boolean): Pose[] {
     const places = placesSurDemiTerrain(eq.joueurs.length);
     eq.joueurs.forEach((nom, i) => {
       const { profondeur, largeur } = places[i];
-      const p = chezMoi ? profondeur : 100 - profondeur;
-      out.push(
-        vertical
-          ? {
-              nom,
-              equipe: eq.nom,
-              couleur: eq.couleur,
-              encre: eq.encre,
-              x: 50 + (largeur - 50) * ecart(profondeur, chezMoi),
-              y: (chezMoi ? 1 : -1) * depuisMediane(profondeur),
-            }
-          : {
-              nom,
-              equipe: eq.nom,
-              couleur: eq.couleur,
-              encre: eq.encre,
-              x: p,
-              y: largeur,
-            },
-      );
+      out.push({
+        nom,
+        equipe: eq.nom,
+        couleur: eq.couleur,
+        encre: eq.encre,
+        x: 50 + (largeur - 50) * ecart(profondeur, chezMoi),
+        y: (chezMoi ? 1 : -1) * depuisMediane(profondeur),
+      });
     });
   }
   return out;
@@ -295,16 +214,21 @@ export function FeuilleDeMatch({
   const [choix, setChoix] = useState(() => monTerrain(terrains, moi));
   const t = terrains[Math.min(choix, terrains.length - 1)];
 
-  const image = useImage(terrains, entete, parNom);
+  const basEstA = !t?.b.joueurs.includes(moi);
+  // L'image montre le terrain qu'on regarde, tel qu'on le voit.
+  const image = useImage(
+    t ? { terrain: t, basEstA, label: terrains.length > 1 ? t.label : null } : null,
+    entete,
+    parNom,
+  );
   const [fiche, setFiche] = useState<{
     player: Player;
     equipe: EquipeDuJour;
   } | null>(null);
 
   if (!t) return null;
-  const basEstA = !t.b.joueurs.includes(moi);
   const [bas, haut] = basEstA ? [t.a, t.b] : [t.b, t.a];
-  const poses = poser(t, true, basEstA);
+  const poses = poser(t, basEstA);
 
   return (
     <section className="flex flex-col gap-3">
@@ -333,133 +257,24 @@ export function FeuilleDeMatch({
         )}
       </div>
 
-      <div
-        className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#e9e8e3_0%,#d6d5d0_70%)] dark:bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
-        style={{
-          height: CADRE_H,
-        }}
-      >
-        <div
-          className="absolute left-1/2"
-          style={{
-            top: TERRAIN_TOP,
-            width: TERRAIN.l,
-            height: TERRAIN.h,
-            marginLeft: -TERRAIN.l / 2,
-            transformStyle: "preserve-3d",
-            // La perspective est dans la transformation du terrain, pas sur le cadre :
-            // Safari l'ignore sur un parent arrondi qui coupe ce qui dépasse, et le
-            // terrain y restait à plat. Point de fuite au quart haut du cadre
-            // (VISEE, en px dans le terrain), bascule autour du centre du terrain.
-            transformOrigin: `50% ${VISEE}px`,
-            transform: `perspective(${PERSPECTIVE}px) translateY(${TERRAIN.h / 2 - VISEE}px) rotateX(${TERRAIN.incline}deg) translateY(${VISEE - TERRAIN.h / 2}px)`,
-          }}
-        >
-          <div
-            aria-hidden
-            className="absolute inset-0 rounded-[10px] bg-[linear-gradient(180deg,#c4c3be_0%,#d2d1cc_100%)] dark:bg-[linear-gradient(180deg,#17191d_0%,#24272c_100%)]"
-          />
-          <div
-            aria-hidden
-            className="absolute inset-0 rounded-[10px]"
-            style={{
-              backgroundImage:
-                "repeating-linear-gradient(180deg, rgba(255,255,255,0.04) 0 50px, transparent 50px 100px)",
-            }}
-          />
-          {/* L'épaisseur du terrain, vue par le bord avant. */}
-          <div
-            aria-hidden
-            className="absolute inset-x-0 bottom-0 h-[14px] rounded-b-[6px] bg-[#a9a8a3] dark:bg-[#08090b]"
-            style={{
-              transformOrigin: "50% 100%",
-              transform: "rotateX(-90deg)",
-            }}
-          />
-          <Lignes vertical couche="rgba(255,255,255,0.55)" epais={2} />
-          {poses.map((p) => (
-            <div
-              key={p.nom}
-              className="absolute size-0"
-              style={{
-                left: `${p.x}%`,
-                top: TERRAIN.h / 2 + p.y,
-                transformStyle: "preserve-3d",
-              }}
-            >
-              <div
-                aria-hidden
-                className="absolute left-[-22px] top-[-9px] h-[18px] w-[44px] rounded-full"
-                style={{
-                  background:
-                    "radial-gradient(closest-side, rgba(0,0,0,0.55), transparent)",
-                }}
-              />
-              {/* La carte se relève face à nous. */}
-              <div
-                className="absolute bottom-0 left-0 flex flex-col items-center gap-1"
-                style={{
-                  transformOrigin: "50% 100%",
-                  transform: `translateX(-50%) rotateX(-${TERRAIN.incline}deg)`,
-                }}
-              >
-                {/* Ma carte, cerclée : un vrai cadre, les ombres portées se découpent mal en 3D. */}
-                <div
-                  className={cn(
-                    "flex rounded-[15px]",
-                    p.nom === moi && "bg-foreground p-[3px]",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "flex rounded-[12px]",
-                      p.nom === moi && "bg-[#1b1d21] p-[2px]",
-                    )}
-                  >
-                    <Pastille
-                      player={parNom.get(p.nom)}
-                      nom={p.nom}
-                      cote={42}
-                      onglet={{ fond: p.couleur, encre: p.encre }}
-                      onChoisir={(player) =>
-                        setFiche({
-                          player,
-                          equipe: {
-                            nom: p.equipe,
-                            couleur: p.couleur,
-                            encre: p.encre,
-                            terrain: terrains.length > 1 ? t.label : null,
-                          },
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <span
-                  className="whitespace-nowrap rounded-full px-[7px] py-[2px] text-[11px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
-                  style={{
-                    background: p.couleur,
-                    color: p.encre,
-                    fontWeight: p.nom === moi ? 800 : 600,
-                  }}
-                >
-                  {p.nom === moi ? "Toi" : prenom(p.nom)}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-        <NomEquipe
-          nom={haut.nom}
-          couleur={haut.couleur}
-          className="left-[18px] top-4"
-        />
-        <NomEquipe
-          nom={bas.nom}
-          couleur={bas.couleur}
-          className="bottom-[70px] left-[18px]"
-        />
-      </div>
+      <TerrainVu
+        poses={poses}
+        haut={haut}
+        bas={bas}
+        moi={moi}
+        parNom={parNom}
+        onChoisir={(p, player) =>
+          setFiche({
+            player,
+            equipe: {
+              nom: p.equipe,
+              couleur: p.couleur,
+              encre: p.encre,
+              terrain: terrains.length > 1 ? t.label : null,
+            },
+          })
+        }
+      />
 
       <button
         type="button"
@@ -477,6 +292,165 @@ export function FeuilleDeMatch({
         onClose={() => setFiche(null)}
       />
     </section>
+  );
+}
+
+/**
+ * Le terrain vu en perspective (lib/sfl/terrain-vu.ts) : le terrain est un
+ * dessin SVG déjà projeté, chaque carte un point projeté et une échelle, les
+ * plus proches devant. Le même dans l'app et dans l'image partagée.
+ */
+function TerrainVu({
+  poses,
+  haut,
+  bas,
+  moi,
+  parNom,
+  onChoisir,
+}: {
+  poses: Pose[];
+  haut: { nom: string; couleur: string };
+  bas: { nom: string; couleur: string };
+  /** Ma carte, cerclée et nommée « Toi » ; absent dans l'image. */
+  moi?: string;
+  parNom: Map<string, Player>;
+  onChoisir?: (p: Pose, player: Player) => void;
+}) {
+  const id = useId().replace(/:/g, "");
+  const { l, h } = TERRAIN;
+  const places = poses
+    .map((p) => {
+      const u = (p.x / 100) * l;
+      const v = h / 2 + p.y;
+      return { p, u, v, ...projeter(u, v) };
+    })
+    .sort((a, b) => a.v - b.v);
+  const centre = projeter(l / 2, h / 2);
+  const logo = { l: 46 * centre.k, h: projeter(l / 2, h / 2 + 23).y - projeter(l / 2, h / 2 - 23).y };
+  const but = (v: number, sens: 1 | -1): [number, number][] => [
+    [82, v],
+    [82, v + sens * 5.4],
+    ...arc(135, v + sens * 5.4, 53, 180, sens === 1 ? 0 : 360),
+    [188, v],
+  ];
+  return (
+    <div
+      className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
+      style={{ height: CADRE_H }}
+    >
+      <svg aria-hidden className="absolute inset-0 size-full">
+        <defs>
+          <linearGradient id={`${id}f`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#17191d" />
+            <stop offset="1" stopColor="#24272c" />
+          </linearGradient>
+          <radialGradient id={`${id}o`}>
+            <stop offset="0" stopColor="#000" stopOpacity="0.55" />
+            <stop offset="1" stopColor="#000" stopOpacity="0" />
+          </radialGradient>
+          <clipPath id={`${id}c`}>
+            <path d={trace(rectArrondi(0, 0, l, h, 10), true)} />
+          </clipPath>
+        </defs>
+        <svg x="50%" overflow="visible">
+          {/* L'épaisseur du terrain, sous le bord avant. */}
+          <path
+            d={trace([[4, h], [l - 4, h], [l - 4, h, -14], [4, h, -14]], true)}
+            fill="#08090b"
+          />
+          <path d={trace(rectArrondi(0, 0, l, h, 10), true)} fill={`url(#${id}f)`} />
+          <g clipPath={`url(#${id}c)`} fill="rgba(255,255,255,0.04)">
+            {Array.from({ length: Math.ceil(h / 100) }, (_, i) => (
+              <path
+                key={i}
+                d={trace([[0, i * 100], [l, i * 100], [l, i * 100 + 50], [0, i * 100 + 50]], true)}
+              />
+            ))}
+          </g>
+          <g
+            fill="none"
+            stroke="rgba(255,255,255,0.55)"
+            strokeWidth={1.7}
+            strokeLinejoin="round"
+          >
+            <path d={trace(rectArrondi(11, 11, l - 11, h - 11, 4), true)} />
+            <path d={trace([[11, h / 2], [l - 11, h / 2]])} />
+            <path d={trace(but(11, 1))} />
+            <path d={trace(but(h - 11, -1))} />
+            <path d={trace(arc(l / 2, h / 2, 43.5, 0, 360, 40), true)} />
+          </g>
+          {places.map(({ p, u, v, x, y, k }) => (
+            <ellipse
+              key={p.nom}
+              cx={x}
+              cy={y}
+              rx={22 * k}
+              ry={(projeter(u, v + 9).y - projeter(u, v - 9).y) / 2}
+              fill={`url(#${id}o)`}
+            />
+          ))}
+        </svg>
+      </svg>
+      {/* Le logo couché au rond central ; en <img>, que html-to-image sait embarquer. */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- photographié par html-to-image */}
+      <img
+        src="/bola/symbole-blanc.svg"
+        alt=""
+        aria-hidden
+        className="absolute"
+        style={{
+          left: `calc(50% - ${logo.l / 2}px)`,
+          top: centre.y - logo.l / 2,
+          width: logo.l,
+          height: logo.l,
+          transform: `scaleY(${logo.h / logo.l})`,
+          opacity: 0.85,
+        }}
+      />
+      {places.map(({ p, x, y, k }) => {
+        const player = parNom.get(p.nom);
+        return (
+          <div
+            key={p.nom}
+            className="absolute size-0"
+            style={{ left: `calc(50% + ${x}px)`, top: y }}
+          >
+            <div
+              className="absolute bottom-0 left-0 flex flex-col items-center gap-1"
+              style={{
+                transformOrigin: "50% 100%",
+                transform: `translateX(-50%) scale(${k})`,
+              }}
+            >
+              {/* Ma carte, cerclée d'un vrai cadre. */}
+              <div className={cn("flex rounded-[15px]", p.nom === moi && "bg-white p-[3px]")}>
+                <div className={cn("flex rounded-[12px]", p.nom === moi && "bg-[#1b1d21] p-[2px]")}>
+                  <Pastille
+                    player={player}
+                    nom={p.nom}
+                    cote={42}
+                    onglet={{ fond: p.couleur, encre: p.encre }}
+                    onChoisir={onChoisir && ((pl) => onChoisir(p, pl))}
+                  />
+                </div>
+              </div>
+              <span
+                className="whitespace-nowrap rounded-full px-[7px] py-[2px] text-[11px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
+                style={{
+                  background: p.couleur,
+                  color: p.encre,
+                  fontWeight: p.nom === moi ? 800 : 600,
+                }}
+              >
+                {p.nom === moi ? "Toi" : prenom(p.nom)}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+      <NomEquipe nom={haut.nom} couleur={haut.couleur} className="left-[18px] top-4" />
+      <NomEquipe nom={bas.nom} couleur={bas.couleur} className="bottom-[70px] left-[18px]" />
+    </div>
   );
 }
 
@@ -508,18 +482,28 @@ function NomEquipe({
 const LARGEUR = 540; // × 2 à l'export : 1080 × 1920
 const HAUTEUR = 960;
 const GRIS = "#8a8985";
+/** Le terrain de l'image : le cadre de l'app sur un téléphone (358 px), agrandi. */
+const CADRE_APP = 358;
+const ZOOM = 1.3;
+
+interface SujetImage {
+  terrain: TerrainFeuille;
+  basEstA: boolean;
+  /** « Terrain 2 » quand il y en a plusieurs. */
+  label: string | null;
+}
 
 /**
  * Dessine l'image hors écran, la photographie dès que la fiche est ouverte,
  * et rend le geste de partage immédiat.
  */
 function useImage(
-  terrains: TerrainFeuille[],
+  sujet: SujetImage | null,
   entete: EnTeteFeuille,
   parNom: Map<string, Player>,
 ) {
   const ref = useRef<HTMLDivElement>(null);
-  const cle = JSON.stringify([terrains, entete]);
+  const cle = JSON.stringify([sujet, entete]);
   // L'image tient à la feuille qu'elle montre : une autre feuille, et elle est périmée.
   const [pris, setPris] = useState<{ cle: string; fichier: File } | null>(null);
   const fichier = pris?.cle === cle ? pris.fichier : null;
@@ -578,14 +562,14 @@ function useImage(
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  const calque = (
+  const calque = sujet && (
     <div
       aria-hidden
       className="pointer-events-none fixed top-0"
       style={{ left: -10000 }}
     >
       <div ref={ref}>
-        <ImageFeuille terrains={terrains} entete={entete} parNom={parNom} />
+        <ImageFeuille sujet={sujet} entete={entete} parNom={parNom} />
       </div>
     </div>
   );
@@ -593,35 +577,38 @@ function useImage(
   return { pret: !!fichier, partager, calque };
 }
 
-/** L'image story : noir, logo BOLA, un terrain par match vu de côté. */
+/**
+ * L'image story : noir, logo BOLA, et le terrain tel qu'il est dans l'app
+ * (le même dessin, agrandi), celui qu'on regarde quand on partage.
+ */
 function ImageFeuille({
-  terrains,
+  sujet,
   entete,
   parNom,
 }: {
-  terrains: TerrainFeuille[];
+  sujet: SujetImage;
   entete: EnTeteFeuille;
   parNom: Map<string, Player>;
 }) {
-  const n = Math.max(1, terrains.length);
-  const terrainH = Math.min(320, Math.floor((640 - (n - 1) * 18) / n) - 34);
-  const cote = n >= 3 ? 40 : 50;
+  const { terrain: t, basEstA } = sujet;
+  const [bas, haut] = basEstA ? [t.a, t.b] : [t.b, t.a];
   return (
     <div
       style={{
         width: LARGEUR,
         height: HAUTEUR,
         boxSizing: "border-box",
-        padding: "48px 32px 32px",
+        padding: "40px 32px 28px",
         background: "#08090b",
         color: "#fff",
         fontFamily: "var(--font-inter), Inter, system-ui, sans-serif",
         display: "flex",
         flexDirection: "column",
-        gap: 18,
+        alignItems: "center",
+        gap: 20,
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ alignSelf: "stretch", display: "flex", flexDirection: "column", gap: 12 }}>
         <div
           style={{
             display: "flex",
@@ -650,7 +637,7 @@ function ImageFeuille({
         </div>
         <div
           style={{
-            font: "400 50px/1 var(--font-anton), Anton, sans-serif",
+            font: "400 46px/1 var(--font-anton), Anton, sans-serif",
             letterSpacing: 0.5,
             textTransform: "uppercase",
           }}
@@ -658,6 +645,7 @@ function ImageFeuille({
           Feuille de match
         </div>
         <div style={{ fontSize: 16, fontWeight: 600 }}>
+          {sujet.label && <span>{sujet.label} · </span>}
           {entete.quand}
           {entete.ou && (
             <span style={{ fontWeight: 500, color: GRIS }}> · {entete.ou}</span>
@@ -665,83 +653,21 @@ function ImageFeuille({
         </div>
       </div>
 
-      {terrains.map((t) => (
+      <div style={{ width: CADRE_APP * ZOOM, height: CADRE_H * ZOOM, flexShrink: 0 }}>
         <div
-          key={t.label}
-          style={{ display: "flex", flexDirection: "column", gap: 10 }}
+          style={{
+            width: CADRE_APP,
+            transform: `scale(${ZOOM})`,
+            transformOrigin: "0 0",
+          }}
         >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0,1fr) auto minmax(0,1fr)",
-              alignItems: "center",
-            }}
-          >
-            <EquipeImage nom={t.a.nom} couleur={t.a.couleur} />
-            <span
-              style={{
-                font: "700 11px/1 var(--font-jbmono), monospace",
-                letterSpacing: 1,
-                color: GRIS,
-                textTransform: "uppercase",
-              }}
-            >
-              {t.label}
-            </span>
-            <EquipeImage nom={t.b.nom} couleur={t.b.couleur} droite />
-          </div>
-          <div
-            style={{
-              position: "relative",
-              height: terrainH,
-              borderRadius: 18,
-              overflow: "hidden",
-              background: "#17191d",
-            }}
-          >
-            <Lignes vertical={false} couche="rgba(255,255,255,0.22)" />
-            {poser(t, false, true).map((p) => (
-              <div
-                key={p.nom}
-                style={{
-                  position: "absolute",
-                  left: `${p.x}%`,
-                  top: `${p.y}%`,
-                  transform: "translate(-50%, -50%)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                <Pastille
-                  player={parNom.get(p.nom)}
-                  nom={p.nom}
-                  cote={cote}
-                  onglet={{ fond: p.couleur, encre: p.encre }}
-                />
-                <span
-                  style={{
-                    padding: "2px 6px",
-                    borderRadius: 999,
-                    background: p.couleur,
-                    color: p.encre,
-                    boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.35)",
-                    fontSize: n >= 3 ? 10 : 11,
-                    fontWeight: 700,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {prenom(p.nom)}
-                </span>
-              </div>
-            ))}
-          </div>
+          <TerrainVu poses={poser(t, basEstA)} haut={haut} bas={bas} parNom={parNom} />
         </div>
-      ))}
+      </div>
 
       <div
         style={{
+          alignSelf: "stretch",
           marginTop: "auto",
           display: "flex",
           alignItems: "center",
@@ -760,46 +686,6 @@ function ImageFeuille({
           sfl-eight.vercel.app
         </span>
       </div>
-    </div>
-  );
-}
-
-function EquipeImage({
-  nom,
-  couleur,
-  droite,
-}: {
-  nom: string;
-  couleur: string;
-  droite?: boolean;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        flexDirection: droite ? "row-reverse" : "row",
-      }}
-    >
-      <span
-        style={{
-          width: 13,
-          height: 13,
-          borderRadius: "50%",
-          background: couleur,
-          boxShadow: "inset 0 0 0 1.5px rgba(255,255,255,0.6)",
-        }}
-      />
-      <span
-        style={{
-          font: "400 24px/1 var(--font-anton), Anton, sans-serif",
-          textTransform: "uppercase",
-          letterSpacing: 0.4,
-        }}
-      >
-        {nom}
-      </span>
     </div>
   );
 }
