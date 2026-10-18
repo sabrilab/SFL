@@ -241,6 +241,7 @@ const SURFACE_FRAGMENT = /* glsl */ `
       + vec3(1.0, 0.9, 0.68) * fresnel * 0.16;
 
     gl_FragColor = vec4(color, tex.a);
+    #include <colorspace_fragment>
   }
 `;
 
