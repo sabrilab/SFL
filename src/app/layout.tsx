@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { BottomNav, VoileEtat } from "@/components/layout/bottom-nav";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
+import { MiseAJour } from "@/components/pwa/mise-a-jour";
 import { GuideInstallation } from "@/components/pwa/guide-installation";
 import { ViewportLock } from "@/components/pwa/viewport-lock";
 import { PlayerProvider } from "@/components/sfl/player-provider";
@@ -132,6 +133,8 @@ export default function RootLayout({
                 {/* Hors de la porte de connexion : le guide passe avant le
                     compte, pour ne pas se connecter dans Snapchat. */}
                 <GuideInstallation />
+                {/* Hors de la porte aussi : l'écran de connexion se met à jour. */}
+                <MiseAJour />
                 <Toaster position="top-center" />
               </TooltipProvider>
             </CardViewerProvider>
