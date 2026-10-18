@@ -116,7 +116,7 @@ export function Card3D(props: {
 }) {
   // Une photo posée ou changée (chez soi ou par un autre joueur) : la capture
   // repart, sinon la 3D garderait l'ancienne image. Même chose pour le badge
-  // choisi pour la carte.
+  // choisi pour la carte, et son image 3D quand elle est prête.
   const revision = usePhotoRevision();
   const badges = useBadgeRevision();
   return <Card3DInner key={`${props.cacheKey}~${revision}~${badges}`} {...props} />;

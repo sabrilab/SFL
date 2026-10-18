@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { Check } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { BadgeVerre, nomBadge } from "@/components/sfl/badge-verre";
+import { Badge3D, nomBadge } from "@/components/sfl/badge-3d";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useBadgeCarte, useChoixBadge } from "@/hooks/use-badge-carte";
@@ -18,12 +18,7 @@ import type { Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 
 function Mini({ badge, taille }: { badge: BadgeCarte; taille: number }) {
-  const h = badge.famille === "saison" ? (taille * 112) / 100 : taille;
-  return (
-    <span className="relative block shrink-0" style={{ width: taille, height: h }}>
-      <BadgeVerre badge={badge} largeur={taille} left={0} top={0} cote={taille} />
-    </span>
-  );
+  return <Badge3D badge={badge} largeur={taille} socle />;
 }
 
 function Option({
@@ -73,7 +68,7 @@ export function ChoixBadge({ player }: { player: Player }) {
         aria-label={badge ? `Badge de ma carte : ${nomBadge(badge)}. Changer` : "Choisir le badge de ma carte"}
         className="glass-soft flex size-[52px] shrink-0 items-center justify-center rounded-full"
       >
-        {badge ? <Mini badge={badge} taille={26} /> : <span className="size-[22px] rounded-full border-[1.5px] border-dashed border-foreground/45" />}
+        {badge ? <Mini badge={badge} taille={34} /> : <span className="size-[22px] rounded-full border-[1.5px] border-dashed border-foreground/45" />}
       </button>
 
       <Sheet open={ouvert} onOpenChange={setOuvert}>
@@ -84,11 +79,11 @@ export function ChoixBadge({ player }: { player: Player }) {
           </div>
           <div className="mt-5 flex flex-col gap-2">
             <Option actif={actif === "auto"} onClick={() => choisir("auto")} label={meilleur ? `Le meilleur · ${nomBadge(meilleur)}` : "Le meilleur"}>
-              {meilleur ? <Mini badge={meilleur} taille={36} /> : <span className="size-9 shrink-0" />}
+              {meilleur ? <Mini badge={meilleur} taille={44} /> : <span className="size-9 shrink-0" />}
             </Option>
             {gagnes.map((b) => (
               <Option key={cleBadge(b)} actif={actif === cleBadge(b)} onClick={() => choisir(cleBadge(b))} label={nomBadge(b)}>
-                <Mini badge={b} taille={36} />
+                <Mini badge={b} taille={44} />
               </Option>
             ))}
             <Option actif={actif === "aucun"} onClick={() => choisir("aucun")} label="Aucun">
