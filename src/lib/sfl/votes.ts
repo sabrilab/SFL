@@ -1,183 +1,180 @@
 "use client";
 
-// Moteur d'élection des figures de match (MVP, Joueur Impact, Défensive).
+// Le vote des figures de match — Joueur Impact et meilleur défenseur.
 //
-// Principe : on ne peut voter que pour un adversaire (jamais un coéquipier).
+// Remis le 17/10 à la demande de Sabri, partagé en base (supabase/schema.sql,
+// table votes_figures) : avant, chaque vote restait sur le téléphone de son
+// auteur et personne ne voyait celui des autres.
 //
-// Phase 1 — Nomination par équipe : dans chaque match de la journée, les
-// joueurs de l'équipe A votent pour un joueur de l'équipe B (et vice-versa).
-// Le joueur le plus voté de chaque côté devient le "nominé" de son équipe.
-// Une journée à plusieurs matchs produit donc plusieurs nominés (2 par match).
+// Règles :
+//   · seulement dans les journées dont le MVP sort des stats (mvpAuto) : le
+//     MVP ne se vote pas, Impact et Défensive si ;
+//   · on vote pour un adversaire de son match, jamais un coéquipier ;
+//   · un vote par joueur, par journée et par titre ; on peut changer d'avis
+//     tant que le vote est ouvert ;
+//   · ouvert le jour du match, fermé à minuit heure de Paris (voteOuvert) —
+//     la base refuse aussi toute écriture qui n'est pas du jour même ;
+//   · à la fermeture, le plus voté de chaque match prend la carte ; à
+//     égalité, tous les ex æquo. Personne si personne n'a voté.
 //
-// Phase 2 — Finale du jour : tous les participants de la journée votent parmi
-// l'ensemble des nominés (toutes équipes confondues) pour élire le vainqueur
-// unique qui recevra la carte Boost.
-//
-// Stockage : localStorage, un vote par (journée, [match], catégorie, votant).
-// C'est un premier jet fonctionnel en attendant un vrai backend multi-utilisateurs.
+// Les élus sont posés sur les lignes de la saison au moment de la dériver
+// (appliquerVotes, appelé par le SeasonProvider) : rien n'est réécrit dans
+// le document de saison, et l'admin n'a rien à saisir.
 
-import type { BoostType, Journee, JourneeMatch, MatchTeam } from "./engine";
-import { journeeParticipants } from "./engine";
+import type { Journee, JourneeMatch } from "./engine";
+import type { Saison } from "./saisie/types";
+import { voteOuvert } from "./convocation-temps";
+import { supabase } from "@/lib/supabase";
 
-export type BoostCategory = BoostType;
-
-export const CATEGORY_LABELS: Record<BoostCategory, string> = {
-  mvp: "MVP du match",
+export type CategorieVote = "impact" | "def";
+export const CATEGORIES_VOTE: CategorieVote[] = ["impact", "def"];
+export const LIBELLES_VOTE: Record<CategorieVote, string> = {
   impact: "Joueur Impact",
   def: "Meilleur défenseur",
 };
 
-function phase1Key(j: number, matchId: string, cat: BoostCategory, voter: string) {
-  return `sfl-vote1-j${j}-${matchId}-${cat}-${voter}`;
-}
-function phase2Key(j: number, cat: BoostCategory, voter: string) {
-  return `sfl-vote2-j${j}-${cat}-${voter}`;
-}
-
-export function getPhase1Vote(
-  j: number,
-  matchId: string,
-  cat: BoostCategory,
-  voter: string
-): string | null {
-  return localStorage.getItem(phase1Key(j, matchId, cat, voter));
+export interface VoteFigure {
+  saison: number;
+  j: number;
+  categorie: CategorieVote;
+  votant: string;
+  candidat: string;
+  match_id: string;
 }
 
-export function castPhase1Vote(
-  j: number,
-  matchId: string,
-  cat: BoostCategory,
-  voter: string,
-  candidate: string
-) {
-  localStorage.setItem(phase1Key(j, matchId, cat, voter), candidate);
+/* ------------------------------ Le magasin ------------------------------ */
+// Les votes de la saison en cours, en mémoire, rechargés en temps réel.
+// Quelques dizaines de lignes par journée : on prend tout d'un coup.
+
+export const VOTES_EVENT = "sfl-votes";
+let cache: VoteFigure[] = [];
+let charge = false;
+
+function emit() {
+  window.dispatchEvent(new Event(VOTES_EVENT));
 }
 
-export function getPhase2Vote(j: number, cat: BoostCategory, voter: string): string | null {
-  return localStorage.getItem(phase2Key(j, cat, voter));
+export function votesEnMemoire(): VoteFigure[] {
+  return cache;
 }
 
-export function castPhase2Vote(
-  j: number,
-  cat: BoostCategory,
-  voter: string,
-  candidate: string
-) {
-  localStorage.setItem(phase2Key(j, cat, voter), candidate);
+export async function chargerVotes(saison: number): Promise<void> {
+  const { data, error } = await supabase()
+    .from("votes_figures")
+    .select("saison, j, categorie, votant, candidat, match_id")
+    .eq("saison", saison);
+  if (error) throw error;
+  cache = (data ?? []) as VoteFigure[];
+  charge = true;
+  emit();
 }
 
-export interface SideTally {
-  voters: MatchTeam;
-  candidates: MatchTeam;
-  votes: Record<string, number>;
-  votedCount: number;
-  totalVoters: number;
-  /** Nominé de ce côté — null si égalité ou aucun vote. */
-  leader: string | null;
+export function votesCharges(): boolean {
+  return charge;
 }
 
-function tallySide(j: number, match: JourneeMatch, cat: BoostCategory, voters: MatchTeam, candidates: MatchTeam): SideTally {
-  const votes: Record<string, number> = {};
-  for (const c of candidates.players) votes[c.name] = 0;
-  let votedCount = 0;
-  for (const voter of voters.players) {
-    const choice = getPhase1Vote(j, match.id, cat, voter.name);
-    if (choice && choice in votes) {
-      votes[choice]++;
-      votedCount++;
-    }
+/** Aujourd'hui à Paris, « 2026-10-18 » — la base n'accepte que ce jour-là. */
+function aujourdhuiParis(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
+}
+
+/** Pose (ou remplace) mon vote. Lève une erreur lisible si la base refuse. */
+export async function voter(v: VoteFigure): Promise<void> {
+  const { error } = await supabase()
+    .from("votes_figures")
+    .upsert({ ...v, jour: aujourdhuiParis() }, { onConflict: "saison,j,categorie,votant" });
+  if (error) throw new Error("Vote refusé : il ne s'ouvre que le jour du match, jusqu'à minuit.");
+  // Mis à jour tout de suite, sans attendre le temps réel.
+  cache = [
+    ...cache.filter((x) => !(x.saison === v.saison && x.j === v.j && x.categorie === v.categorie && x.votant === v.votant)),
+    v,
+  ];
+  emit();
+}
+
+/* ------------------------------ Le décompte ----------------------------- */
+
+export interface Decompte {
+  /** Voix par candidat, du plus voté au moins voté (les candidats à 0 exclus). */
+  voix: [nom: string, n: number][];
+  votants: number;
+  inscrits: number;
+  /** Les plus votés (ex æquo compris) ; vide si personne n'a voté. */
+  elus: string[];
+}
+
+/** Le décompte d'un match pour un titre : seules comptent les voix d'un joueur du match pour un adversaire. */
+export function decompterMatch(votes: VoteFigure[], saison: number, j: number, match: JourneeMatch, cat: CategorieVote): Decompte {
+  const equipeDe = new Map<string, "A" | "B">();
+  match.teamA.players.forEach((p) => equipeDe.set(p.name, "A"));
+  match.teamB.players.forEach((p) => equipeDe.set(p.name, "B"));
+  const compte = new Map<string, number>();
+  let votants = 0;
+  for (const v of votes) {
+    if (v.saison !== saison || v.j !== j || v.categorie !== cat) continue;
+    const a = equipeDe.get(v.votant);
+    const b = equipeDe.get(v.candidat);
+    if (!a || !b || a === b) continue;
+    votants++;
+    compte.set(v.candidat, (compte.get(v.candidat) ?? 0) + 1);
   }
-  const max = Math.max(0, ...Object.values(votes));
-  const leaders = Object.entries(votes).filter(([, n]) => n === max && max > 0).map(([n]) => n);
+  const voix = [...compte.entries()].sort((x, y) => y[1] - x[1]);
+  const max = voix[0]?.[1] ?? 0;
   return {
-    voters,
-    candidates,
-    votes,
-    votedCount,
-    totalVoters: voters.players.length,
-    leader: leaders.length === 1 ? leaders[0] : null,
+    voix,
+    votants,
+    inscrits: equipeDe.size,
+    elus: max > 0 ? voix.filter(([, n]) => n === max).map(([nom]) => nom) : [],
   };
 }
 
-export interface MatchTally {
-  match: JourneeMatch;
-  fromA: SideTally; // voté par teamA, candidats = teamB
-  fromB: SideTally; // voté par teamB, candidats = teamA
+/** Mon vote pour un titre dans une journée, s'il existe. */
+export function monVote(votes: VoteFigure[], saison: number, j: number, cat: CategorieVote, moi: string): string | null {
+  return votes.find((v) => v.saison === saison && v.j === j && v.categorie === cat && v.votant === moi)?.candidat ?? null;
 }
 
-export function tallyMatch(j: number, match: JourneeMatch, cat: BoostCategory): MatchTally {
-  return {
-    match,
-    fromA: tallySide(j, match, cat, match.teamA, match.teamB),
-    fromB: tallySide(j, match, cat, match.teamB, match.teamA),
-  };
+/** Une journée où l'on vote : MVP calculé, équipes connues. */
+export function journeeAvecVote(j: Journee): boolean {
+  return !!j.mvpAuto && (j.matches?.length ?? 0) > 0;
 }
 
-export interface Nominee {
-  name: string;
-  matchLabel: string;
-  nominatedBy: string; // nom de l'équipe qui l'a désigné
-}
+/* ------------------------------ Les élus -------------------------------- */
 
-export function getNominees(journee: Journee, cat: BoostCategory): Nominee[] {
-  const out: Nominee[] = [];
-  for (const match of journee.matches ?? []) {
-    const t = tallyMatch(journee.j, match, cat);
-    if (t.fromA.leader) {
-      out.push({ name: t.fromA.leader, matchLabel: match.label, nominatedBy: match.teamA.name });
-    }
-    if (t.fromB.leader) {
-      out.push({ name: t.fromB.leader, matchLabel: match.label, nominatedBy: match.teamB.name });
-    }
-  }
-  return out;
-}
-
-export interface Phase2Tally {
-  nominees: Nominee[];
-  votes: Record<string, number>;
-  votedCount: number;
-  totalVoters: number;
-  /** Candidat actuellement en tête (peut encore être dépassé). */
-  leader: string | null;
-  tie: boolean;
-  /** true si tous les matchs de la journée ont produit un nominé de chaque côté. */
-  allNominationsReady: boolean;
-  /** true une fois que tous les participants ont voté et qu'il n'y a pas d'égalité — la carte est attribuée. */
-  decided: boolean;
-}
-
-export function tallyPhase2(journee: Journee, cat: BoostCategory): Phase2Tally {
-  const matches = journee.matches ?? [];
-  const nominees = getNominees(journee, cat);
-  const allNominationsReady =
-    matches.length > 0 && nominees.length === matches.length * 2;
-
-  const uniqueNames = [...new Set(nominees.map((n) => n.name))];
-  const votes: Record<string, number> = {};
-  for (const n of uniqueNames) votes[n] = 0;
-
-  const voters = journeeParticipants(journee);
-  let votedCount = 0;
-  for (const voter of voters) {
-    const choice = getPhase2Vote(journee.j, cat, voter);
-    if (choice && choice in votes) {
-      votes[choice]++;
-      votedCount++;
+/**
+ * Pose les élus des votes fermés sur les lignes de la saison (Impact,
+ * Défensive), journée par journée, match par match — comme appliquerMvpAuto
+ * pour le MVP. Une journée sans aucune voix valable pour un titre garde ce que
+ * l'admin a saisi. Même référence renvoyée si rien ne change.
+ */
+export function appliquerVotes(saison: Saison, journees: Journee[], votes: VoteFigure[], maintenant: Date): Saison {
+  if (!votes.length) return saison;
+  const numero = saison.numero ?? 0;
+  // j → titre → élus (par nom), seulement pour les votes fermés.
+  const elus = new Map<number, Map<CategorieVote, Set<string>>>();
+  for (const jn of journees) {
+    if (!journeeAvecVote(jn) || voteOuvert(jn.date, maintenant)) continue;
+    for (const cat of CATEGORIES_VOTE) {
+      if (!votes.some((v) => v.saison === numero && v.j === jn.j && v.categorie === cat)) continue;
+      const set = new Set<string>();
+      for (const m of jn.matches ?? []) decompterMatch(votes, numero, jn.j, m, cat).elus.forEach((n) => set.add(n));
+      if (!set.size) continue;
+      if (!elus.has(jn.j)) elus.set(jn.j, new Map());
+      elus.get(jn.j)!.set(cat, set);
     }
   }
-  const max = Math.max(0, ...Object.values(votes));
-  const leaders = Object.entries(votes).filter(([, n]) => n === max && max > 0).map(([n]) => n);
-  const leader = leaders.length === 1 ? leaders[0] : null;
+  if (!elus.size) return saison;
 
-  return {
-    nominees,
-    votes,
-    votedCount,
-    totalVoters: voters.length,
-    leader,
-    tie: leaders.length > 1,
-    allNominationsReady,
-    decided: voters.length > 0 && votedCount === voters.length && leader !== null,
-  };
+  let change = false;
+  const entries = saison.entries.map((e) => {
+    const parCat = elus.get(e.j);
+    if (!parCat || e.extraTime) return e;
+    let next = e;
+    for (const [cat, set] of parCat) {
+      const doit = set.has(e.player);
+      if (!!next[cat] !== doit) next = { ...next, [cat]: doit };
+    }
+    if (next !== e) change = true;
+    return next;
+  });
+  return change ? { ...saison, entries } : saison;
 }
