@@ -38,7 +38,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { honneurDe } from "@/lib/sfl/a-l-honneur";
 import type { Player } from "@/lib/sfl/engine";
-import { metal, NOM_METAL, TROPHEES, type Metal, type TropheeId } from "@/lib/sfl/trophees";
+import { metal, NOM_METAL, TROPHEES, type TropheeId } from "@/lib/sfl/trophees";
 import { cn } from "@/lib/utils";
 
 const PHI = (1 + Math.sqrt(5)) / 2;
@@ -54,13 +54,6 @@ const ANTON = "var(--font-anton), Anton, sans-serif";
 const DEF = Object.fromEntries(TROPHEES.map((t) => [t.id, t]));
 const unite = (id: TropheeId, n: number) => (n > 1 ? DEF[id].unite[1] : DEF[id].unite[0]);
 
-/** La lumière de chaque métal, pour le sol et les chiffres. */
-const TEINTE: Record<Metal, string> = {
-  bronze: "#e9925a",
-  argent: "#d5dcf5",
-  or: "#ffc75a",
-  legende: "#ff5a4a",
-};
 
 /* ------------------------------- Le plateau ------------------------------- */
 
@@ -379,7 +372,7 @@ export function ALHonneur({ j }: { j: number }) {
           </h2>
           <Rangee>
             {decroches.map((d) => (
-              <Vitrine key={`${d.nom}-${d.id}`} d={d} p={carte(d.nom)!} moi={moi.name} />
+              <Vitrine key={`${d.nom}-${d.id}`} d={d} p={carte(d.nom)!} />
             ))}
           </Rangee>
         </section>
@@ -478,98 +471,37 @@ function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player 
 }
 
 /**
- * Un badge tombé ce dimanche, dans sa niche : une vitrine voûtée, éclairée
- * d'en haut à la couleur du métal, cerclée d'un filet de ce métal. Le chiffre
- * sous la voûte, la carte posée sur le socle, le badge sur son piédestal.
- * Les proportions suivent φ : la voûte fait la largeur / φ de haut.
+ * Un badge tombé ce dimanche. Noir mat, sans décor (Sabri, 18/10 : la
+ * vitrine voûtée ne lui plaisait pas) : la carte à gauche, le badge et son
+ * chiffre à droite. Noir et blanc strict, seul le badge garde son métal.
  */
-function Vitrine({ d, p, moi }: { d: { nom: string; id: TropheeId; palier: number }; p: Player; moi: string }) {
+function Vitrine({ d, p }: { d: { nom: string; id: TropheeId; palier: number }; p: Player }) {
   const def = DEF[d.id];
   const m = metal(d.palier)!;
   const seuil = def.paliers[d.palier - 1];
-  const teinte = TEINTE[m];
   const largeur = W(MOYENNE);
   const hauteur = H(MOYENNE);
   const badge = largeur / PHI;
-  const l = Math.round(largeur + badge + 89);
-  const voute = Math.round(l / PHI / 2);
-  const socle = 55;
-  const sousVoute = 89;
   return (
     <div
-      className="relative isolate shrink-0 snap-start overflow-hidden text-white"
-      style={{
-        width: l,
-        height: sousVoute + hauteur + socle,
-        borderRadius: `${l / 2}px ${l / 2}px 21px 21px / ${voute}px ${voute}px 21px 21px`,
-        border: "1px solid transparent",
-        background: [
-          // Le projecteur, tombé de la voûte.
-          `radial-gradient(70% 55% at 50% 0%, ${teinte}38 0%, ${teinte}10 45%, transparent 75%) padding-box`,
-          // Les cannelures du fond, à peine.
-          "repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 13px) padding-box",
-          "linear-gradient(180deg, #15161b 0%, #0b0c10 60%, #060608 100%) padding-box",
-          // Le filet de métal : vif à la voûte, éteint vers le socle.
-          `linear-gradient(180deg, ${teinte}cc 0%, ${teinte}33 38%, rgba(255,255,255,0.06) 100%) border-box`,
-        ].join(", "),
-        boxShadow: `0 21px 34px -21px ${teinte}40, inset 0 1px 0 rgba(255,255,255,0.08)`,
-      }}
+      className="relative flex shrink-0 snap-start gap-[var(--fib-21)] rounded-[21px] border border-white/[0.08] bg-[#0a0a0b] p-[var(--fib-21)] text-white"
+      style={{ height: hauteur + 42 }}
     >
-      {/* Le chiffre, sous la voûte. */}
-      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: 21 }}>
-        <span style={{ fontFamily: ANTON, fontSize: 44, lineHeight: 0.9, color: teinte, textShadow: `0 0 21px ${teinte}55` }} className="tabular-nums">
-          {seuil}
-        </span>
-        <span className="mono-label mt-[5px] text-[9px] text-white/55">
-          {unite(d.id, seuil)} <span style={{ color: teinte }}>· {NOM_METAL[m]}</span>
-        </span>
-      </div>
-
-      {/* Le socle : une marche sombre, son arête prise dans la lumière. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0"
-        style={{
-          height: socle,
-          background: "linear-gradient(180deg, #121318 0%, #08080a 100%)",
-          boxShadow: `inset 0 1px 0 ${teinte}55`,
-        }}
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0"
-        style={{ bottom: socle - 1, height: 34, background: `radial-gradient(50% 100% at 50% 100%, ${teinte}22, transparent)` }}
-      />
-
-      <div className="absolute" style={{ left: 21, bottom: socle, transformStyle: "preserve-3d" }}>
-        <Manipulable pose={0}>
-          <Ombre largeur={largeur} />
-          <MiniCarte player={p} size={MOYENNE} detail={`${def.nom} · ${NOM_METAL[m]} · ${seuil} ${unite(d.id, seuil)}`} />
-        </Manipulable>
-      </div>
-
-      {/* Le badge, sur son piédestal. */}
-      <div className="pointer-events-none absolute flex flex-col items-center" style={{ right: 21, bottom: socle, width: badge * 1.2 }}>
-        <span className="honneur-flotte mb-[var(--fib-13)] block">
+      <Manipulable pose={0}>
+        <MiniCarte player={p} size={MOYENNE} detail={`${def.nom} · ${NOM_METAL[m]} · ${seuil} ${unite(d.id, seuil)}`} />
+      </Manipulable>
+      <div className="flex flex-col justify-between" style={{ width: badge * 1.2 }}>
+        <span className="honneur-flotte pointer-events-none block self-center">
           <Badge3D badge={{ famille: "palier", id: d.id, palier: d.palier }} largeur={badge} />
         </span>
-        <span
-          aria-hidden
-          className="block w-full rounded-t-[3px]"
-          style={{
-            height: 21,
-            background: `linear-gradient(180deg, #2a2b31 0%, #121317 100%)`,
-            boxShadow: `inset 0 1px 0 ${teinte}88, 0 -8px 21px -8px ${teinte}55`,
-          }}
-        />
+        <div className="flex flex-col border-t border-white/10 pt-[var(--fib-13)]">
+          <span style={{ fontFamily: ANTON, fontSize: 55, lineHeight: 0.85 }} className="tabular-nums">
+            {seuil}
+          </span>
+          <span className="mono-label mt-[var(--fib-8)] text-[9px] text-white/55">{unite(d.id, seuil)}</span>
+          <span className="mono-label text-[9px] text-white/30">{NOM_METAL[m]}</span>
+        </div>
       </div>
-
-      <span
-        className={cn("absolute inset-x-[var(--fib-21)] bottom-[var(--fib-13)] leading-none break-words uppercase", d.nom === moi ? "text-primary" : "text-white")}
-        style={{ fontFamily: ANTON, fontSize: 17 }}
-      >
-        {d.nom}
-      </span>
     </div>
   );
 }
