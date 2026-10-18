@@ -41,3 +41,7 @@ export function ongletActif(pathname: string): string | null {
   }
   return null;
 }
+
+// Une seule ligue : la SFL. Le choix de ligue est retiré — choisir une
+// autre ligue masquait tout le fil. La clé reste pour effacer l'ancien choix.
+export const LEAGUE_KEY = "sfl-league";
