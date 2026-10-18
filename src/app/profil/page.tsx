@@ -21,6 +21,7 @@ import { BOOST_LABELS } from "@/components/sfl/boost-card";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { VitrineBadges } from "@/components/sfl/vitrine";
 import { ChoixBadge } from "@/components/sfl/choix-badge";
+import { CarteOfficielle } from "@/components/sfl/carte-officielle";
 import { Locked } from "@/components/sfl/locked";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -243,16 +244,13 @@ export default function Profil() {
         </p>
       </section>
 
-      {/* Les actions : partage (bientôt), historique, le badge de la carte */}
+      {/* L'appel principal, pleine largeur juste sous la carte : la carte
+          officielle (photo au maillot Bola). Puis l'historique et le badge. */}
+      <CarteOfficielle player={player} className="-mt-1 w-full" />
       <div className="flex gap-[9px]">
-        <Locked label="Bientôt" className="flex-1" chipClassName="-top-2.5 right-1">
-          <span className="block rounded-full bg-foreground py-[15px] text-center text-[15px] font-bold text-background">
-            Partager ma carte
-          </span>
-        </Locked>
         <Link
           href="/ligue?vue=matchs"
-          className="glass-soft w-[128px] rounded-full py-[15px] text-center text-[15px] font-semibold text-foreground/70"
+          className="glass-soft flex-1 rounded-full py-[15px] text-center text-[15px] font-semibold text-foreground/70"
         >
           Historique
         </Link>
