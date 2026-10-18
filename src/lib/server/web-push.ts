@@ -7,7 +7,10 @@
 //   · le chiffrement aes128gcm (RFC 8291 + 8188) — seul le téléphone abonné
 //     peut lire le message ; le service de push ne voit qu'un bloc opaque.
 //
-// SERVEUR UNIQUEMENT : la clé privée vient de VAPID_PRIVATE_KEY (Vercel).
+// SERVEUR UNIQUEMENT : la clé privée vient de VAPID_PRIVATE_KEY (Vercel) ;
+// la clé publique s'en déduit. L'admin crée la paire dans son navigateur
+// (page « Envoyer une notification ») et colle la clé privée dans Vercel.
+// Changer la clé oblige tous les téléphones à se réabonner.
 
 import { createCipheriv, createECDH, createPrivateKey, hkdfSync, randomBytes, sign } from "node:crypto";
 
@@ -28,6 +31,23 @@ export interface CleVapid {
 
 const b64 = (b: Buffer) => b.toString("base64url");
 const deB64 = (s: string) => Buffer.from(s, "base64url");
+
+/** La paire VAPID du serveur, ou null tant que VAPID_PRIVATE_KEY manque. */
+export function cleVapid(): CleVapid | null {
+  const privee = process.env.VAPID_PRIVATE_KEY?.trim();
+  if (!privee) return null;
+  try {
+    const ecdh = createECDH("prime256v1");
+    ecdh.setPrivateKey(deB64(privee));
+    return {
+      publique: b64(ecdh.getPublicKey()),
+      privee,
+      sujet: process.env.VAPID_SUBJECT ?? "https://sfl-eight.vercel.app",
+    };
+  } catch {
+    return null;
+  }
+}
 
 /** Jeton VAPID pour l'origine du service de push, valable 12 h. */
 export function jetonVapid(endpoint: string, cle: CleVapid, maintenant = Date.now()): string {

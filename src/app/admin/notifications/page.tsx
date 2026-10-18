@@ -15,6 +15,8 @@ import { useSession } from "@/hooks/use-session";
 import { supabase } from "@/lib/supabase";
 import { TEXTE_MAX, TITRE_MAX, type Notif } from "@/lib/sfl/push";
 import { ReglageNotifications } from "@/components/sfl/notifications/reglage-notifications";
+import { CreerCle } from "@/components/sfl/notifications/creer-cle";
+import { notificationsBranchees } from "@/lib/sfl/notifications";
 
 const PAGES = [
   { url: "/profil", label: "Ma carte" },
@@ -39,6 +41,11 @@ export default function NotificationsAdmin() {
   const [abonnes, setAbonnes] = useState<{ telephones: number; joueurs: number } | null>(null);
   const [busy, setBusy] = useState<"essai" | "tous" | null>(null);
   const [confirmer, setConfirmer] = useState(false);
+  const [branchees, setBranchees] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    void notificationsBranchees().then(setBranchees);
+  }, []);
 
   const [tour, setTour] = useState(0);
   const compter = useCallback(() => setTour((t) => t + 1), []);
@@ -95,6 +102,8 @@ export default function NotificationsAdmin() {
           <h1 className="text-[28px] font-bold tracking-tight">Notification</h1>
         </div>
       </div>
+
+      {branchees === false && <CreerCle />}
 
       <ReglageNotifications />
 
@@ -155,7 +164,7 @@ export default function NotificationsAdmin() {
       <div className="flex flex-col gap-2.5">
         <button
           type="button"
-          disabled={!valide || busy !== null}
+          disabled={!valide || busy !== null || !branchees}
           onClick={() => envoyer(true)}
           className="glass flex items-center justify-center gap-2 rounded-full py-[14px] text-[15px] font-bold disabled:opacity-40"
         >
@@ -165,7 +174,7 @@ export default function NotificationsAdmin() {
         {!confirmer ? (
           <button
             type="button"
-            disabled={!valide || busy !== null || !abonnes?.telephones}
+            disabled={!valide || busy !== null || !branchees || !abonnes?.telephones}
             onClick={() => setConfirmer(true)}
             className="rounded-full bg-foreground py-[15px] text-[15px] font-bold text-background disabled:opacity-40"
           >

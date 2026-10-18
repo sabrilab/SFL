@@ -11,8 +11,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { envoyer, type Abonnement } from "@/lib/server/web-push";
-import { estNotif, VAPID_PUBLIC_KEY } from "@/lib/sfl/push";
+import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
+import { estNotif } from "@/lib/sfl/push";
 
 export const maxDuration = 60;
 
@@ -27,8 +27,8 @@ function erreur(message: string, status: number) {
 }
 
 export async function POST(req: NextRequest) {
-  const privee = process.env.VAPID_PRIVATE_KEY;
-  if (!privee) return erreur("Les notifications ne sont pas encore branchées.", 503);
+  const cle = cleVapid();
+  if (!cle) return erreur("Les notifications ne sont pas encore branchées.", 503);
 
   const corps = (await req.json().catch(() => ({}))) as {
     accessToken?: string;
@@ -53,11 +53,6 @@ export async function POST(req: NextRequest) {
   const { data: abonnements, error } = await requete;
   if (error) return erreur("Abonnements illisibles.", 500);
 
-  const cle = {
-    publique: VAPID_PUBLIC_KEY,
-    privee,
-    sujet: process.env.VAPID_SUBJECT ?? "https://sfl-eight.vercel.app",
-  };
   const resultats = await Promise.all(
     (abonnements as Abonnement[]).map(async (ab) => ({ ab, r: await envoyer(ab, notif, cle) }))
   );

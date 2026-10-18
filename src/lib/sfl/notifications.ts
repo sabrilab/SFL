@@ -10,11 +10,12 @@
 
 import { lireEnvironnement } from "@/lib/pwa/environnement";
 import { supabase } from "@/lib/supabase";
-import { VAPID_PUBLIC_KEY } from "@/lib/sfl/push";
 
 export type EtatNotifications =
   /** Ce navigateur ne sait pas faire. */
   | "indisponible"
+  /** Le serveur n'a pas encore sa clé (VAPID_PRIVATE_KEY). */
+  | "bientot"
   /** iPhone dans Safari : il faut d'abord ajouter Bola à l'écran d'accueil. */
   | "a-installer"
   /** Refusées dans les réglages du téléphone. */
@@ -38,14 +39,28 @@ export async function etatNotifications(): Promise<EtatNotifications> {
     return env.systeme === "ios" && !env.installee ? "a-installer" : "indisponible";
   }
   if (Notification.permission === "denied") return "refusees";
+  if (!(await notificationsBranchees())) return "bientot";
   if (Notification.permission !== "granted") return "inactives";
   const reg = await navigator.serviceWorker.getRegistration();
   const abo = await reg?.pushManager.getSubscription();
   return abo ? "actives" : "inactives";
 }
 
-function cleServeur(): Uint8Array<ArrayBuffer> {
-  const b64 = VAPID_PUBLIC_KEY.replace(/-/g, "+").replace(/_/g, "/");
+/** Vrai si le serveur sait envoyer (sa clé VAPID est posée). */
+export async function notificationsBranchees(): Promise<boolean> {
+  try {
+    return (await fetch("/api/push/cle")).ok;
+  } catch {
+    return false;
+  }
+}
+
+/** La clé publique VAPID du serveur, en octets. */
+async function cleServeur(): Promise<Uint8Array<ArrayBuffer>> {
+  const r = await fetch("/api/push/cle");
+  const { cle } = (await r.json().catch(() => ({}))) as { cle?: string };
+  if (!r.ok || !cle) throw new Error("Notifications pas encore branchées.");
+  const b64 = cle.replace(/-/g, "+").replace(/_/g, "/");
   const brut = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
   const octets = new Uint8Array(new ArrayBuffer(brut.length));
   for (let i = 0; i < brut.length; i++) octets[i] = brut.charCodeAt(i);
@@ -77,7 +92,7 @@ export async function activerNotifications(): Promise<EtatNotifications> {
   const reg = await navigator.serviceWorker.ready;
   const abo =
     (await reg.pushManager.getSubscription()) ??
-    (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: cleServeur() }));
+    (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: await cleServeur() }));
   return (await enregistrer(abo)) ? "actives" : "inactives";
 }
 

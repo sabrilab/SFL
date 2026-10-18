@@ -1,15 +1,10 @@
 // Notifications sur le téléphone (web push) : ce que l'app et le serveur
 // partagent.
 //
-// La clé publique VAPID n'a rien de secret : le navigateur la reçoit à
-// l'abonnement et le service de push (Apple, Google, Mozilla) vérifie avec
-// elle que les envois viennent bien de nous. Sa moitié privée, elle, ne vit
-// que dans Vercel (VAPID_PRIVATE_KEY) ; les deux se changent ensemble, et
-// tous les téléphones doivent alors se réabonner.
-
-export const VAPID_PUBLIC_KEY =
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ??
-  "BJbJeGL7DsKU4uMAiOw2-rE0xKgdjsKfOJDX-3s6FzjEs4bKicVguBtq86TCvUzhaWIe-sMlNsgU4_VzMo3w46M";
+// La clé publique VAPID n'a rien de secret : le téléphone la demande à
+// /api/push/cle au moment de s'abonner, et le service de push (Apple,
+// Google, Mozilla) vérifie avec elle que les envois viennent bien de nous.
+// La paire vit côté serveur (lib/server/web-push.ts, cleVapid).
 
 /** Ce que porte une notification (lu par public/sw.js). */
 export interface Notif {

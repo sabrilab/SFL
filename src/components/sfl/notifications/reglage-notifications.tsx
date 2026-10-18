@@ -11,6 +11,7 @@ import { activerNotifications, etatNotifications, type EtatNotifications } from 
 
 const LIBELLE: Record<EtatNotifications, string> = {
   indisponible: "Pas disponibles sur ce navigateur",
+  bientot: "Bientôt",
   "a-installer": "Ajoute d'abord Bola à ton écran d'accueil",
   refusees: "Refusées dans les réglages du téléphone",
   actives: "Activées sur ce téléphone",
@@ -43,7 +44,7 @@ export function ReglageNotifications() {
   return (
     <div className="glass flex items-center gap-3 rounded-2xl px-4 py-3.5">
       <span className="flex size-9 items-center justify-center rounded-full bg-foreground/10">
-        {etat === "refusees" || etat === "indisponible" ? (
+        {etat === "refusees" || etat === "indisponible" || etat === "bientot" ? (
           <BellOff className="size-[18px]" />
         ) : (
           <Bell className="size-[18px]" />
