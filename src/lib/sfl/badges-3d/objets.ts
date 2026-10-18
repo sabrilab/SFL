@@ -83,7 +83,19 @@ function coussin(shape: THREE.Shape, epaisseur: number, gonfle: number): THREE.B
     curveSegments: 24,
   });
   g.center();
-  return lisser(g);
+  const m = lisser(g);
+  // Les faces avant et arrière sont planes : leurs normales restent droites.
+  // Sans ça, les sommets du bord, soudés au biseau, inclinent les grands
+  // triangles de la face et y dessinent des rayures (l'étoile, 18/10).
+  const pos = m.getAttribute("position");
+  const nor = m.getAttribute("normal");
+  const z = epaisseur / 2 + gonfle;
+  for (let i = 0; i < pos.count; i++) {
+    const pz = pos.getZ(i);
+    if (Math.abs(Math.abs(pz) - z) < 1e-4) nor.setXYZ(i, 0, 0, Math.sign(pz));
+  }
+  nor.needsUpdate = true;
+  return m;
 }
 
 /** Un profil tourné, aux coins arrondis (rayon r) : socles, plateaux, colonnes. */
@@ -194,7 +206,7 @@ function poser(g: THREE.BufferGeometry, centre: THREE.Vector3, normale: THREE.Ve
 /** L'orientation de chaque objet à l'image : de trois quarts, pour que le relief se lise. */
 export const POSE: Record<Objet, [number, number, number]> = {
   ballon: [0.42, 0.55, 0.1],
-  crampon: [0.3, 0.22, 0.04],
+  crampon: [0.5, 0.42, 0.06],
   cage: [0.2, -0.5, 0],
   trophee: [0.16, 0.3, 0],
   pepite: [0.42, 0.35, 0.08],
@@ -298,16 +310,15 @@ function ballon(): Piece[] {
 /* --------------------------------- Crampon -------------------------------- */
 
 /**
- * Le crampon : une chaussure trapue, presque un jouet de collection — le pied
- * court, le talon haut, la pointe ronde. Sa longueur vaut environ φ fois sa
- * hauteur (semelle et crampons compris).
+ * Le crampon : une chaussure de foot basse et trapue, comme un objet de
+ * collection. Tout part d'une seule surface (la tige), décrite le long du pied
+ * (u, du talon à la pointe) par sa ligne du haut, sa largeur et sa section ;
+ * la semelle, le col, les lacets, la marque et les crampons sont posés
+ * exactement sur elle, sans rien qui flotte. Longueur : φ² fois la hauteur
+ * de la tige.
  */
 function crampon(): Piece[] {
-  // La chaussure, tirée d'une surface : le long du pied (u, du talon à la
-  // pointe), une section en carré arrondi (v), dont la hauteur et la
-  // largeur suivent le profil d'un crampon — talon, col, cou-de-pied qui
-  // descend, pointe relevée. Les deux bouts se referment en douceur.
-  const lerp = (pts: [number, number][], u: number) => {
+  const lisse = (pts: [number, number][], u: number) => {
     for (let i = 1; i < pts.length; i++)
       if (u <= pts[i][0]) {
         const t = (u - pts[i - 1][0]) / (pts[i][0] - pts[i - 1][0]);
@@ -316,69 +327,108 @@ function crampon(): Piece[] {
       }
     return pts[pts.length - 1][1];
   };
-  const HAUT: [number, number][] = [[0, 0.56], [0.12, 0.98], [0.26, 0.95], [0.44, 0.66], [0.64, 0.48], [0.84, 0.38], [1, 0.3]];
-  const LARGE: [number, number][] = [[0, 0.3], [0.2, 0.36], [0.55, 0.41], [0.8, 0.39], [1, 0.27]];
-  const BAS = (u: number) => (u > 0.78 ? ((u - 0.78) / 0.22) ** 2 * 0.1 : 0);
+  const H = 2 / (PHI * PHI); // hauteur de la tige au talon
+  // La ligne du haut : le talon, le col, le cou-de-pied qui descend, la pointe ronde.
+  const HAUT: [number, number][] = [[0, 0.82 * H], [0.08, H], [0.24, 0.98 * H], [0.4, 0.84 * H], [0.6, 0.62 * H], [0.8, 0.46 * H], [1, 0.36 * H]];
+  const LARGE: [number, number][] = [[0, 0.26], [0.18, 0.29], [0.55, 0.36], [0.8, 0.35], [1, 0.25]];
+  // Le dessous : plat, la pointe qui se relève (le « toe spring »), le talon un peu aussi.
+  const BAS = (u: number) => (u > 0.72 ? ((u - 0.72) / 0.28) ** 2 * 0.1 : u < 0.08 ? ((0.08 - u) / 0.08) ** 2 * 0.02 : 0);
   const X = (u: number) => -1 + 2 * u;
-  const bout = (u: number) => Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, u))), 0.4);
+  const bout = (u: number) => Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, u))), 0.42);
   const sp = (c: number, e: number) => Math.sign(c) * Math.pow(Math.abs(c), e);
-  const surface = (u: number, v: number, cible: THREE.Vector3) => {
+  /** Un point de la tige : u le long du pied, v autour de la section (0,25 = le dessus, 0 = le côté +z). */
+  const tige = (u: number, v: number, cible: THREE.Vector3) => {
     const a = v * Math.PI * 2;
     const yb = BAS(u);
-    const yh = lerp(HAUT, u);
+    const yh = lisse(HAUT, u);
     const mid = (yb + yh) / 2;
     const k = bout(u);
-    cible.set(X(u), mid + ((yh - yb) / 2) * k * sp(Math.sin(a), 0.6), lerp(LARGE, u) * k * sp(Math.cos(a), 0.6));
+    const sn = Math.sin(a);
+    // Le dessus est rond, le dessous presque plat : une forme de pied, pas un galet.
+    const ys = sn >= 0 ? sp(sn, 0.75) : sp(sn, 0.28);
+    cible.set(X(u), mid + ((yh - yb) / 2) * k * ys, lisse(LARGE, u) * k * sp(Math.cos(a), 0.6));
   };
-  const corps = new ParametricGeometry(surface, 180, 72);
-  // La semelle : le contour du pied, un peu plus large, en plaque ronde.
-  const contour = new THREE.Shape();
-  const N = 80;
-  for (let i = 0; i <= N; i++) {
-    const u = i / N;
-    const pt = [X(u), lerp(LARGE, u) * bout(u) * 1.06 + 0.015];
-    if (i === 0) contour.moveTo(pt[0], pt[1]);
-    else contour.lineTo(pt[0], pt[1]);
-  }
-  for (let i = N; i >= 0; i--) {
-    const u = i / N;
-    contour.lineTo(X(u), -(lerp(LARGE, u) * bout(u) * 1.06 + 0.015));
-  }
-  const semelle = lisser(
-    new THREE.ExtrudeGeometry(contour, { depth: 0.04, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.025, bevelSegments: 5, curveSegments: 4 })
+  const corps = new ParametricGeometry(tige, 200, 96);
+  const normale = (u: number, v: number) => {
+    const p = new THREE.Vector3();
+    const du = new THREE.Vector3();
+    const dv = new THREE.Vector3();
+    tige(u, v, p);
+    tige(u + 1e-3, v, du);
+    tige(u, v + 1e-3, dv);
+    const n = du.sub(p).cross(dv.sub(p)).normalize();
+    // Vers l'extérieur : à l'opposé de l'axe du pied.
+    const axe = new THREE.Vector3(X(u), (BAS(u) + lisse(HAUT, u)) / 2, 0);
+    return n.dot(p.clone().sub(axe)) < 0 ? n.negate() : n;
+  };
+  // La semelle : une galette qui suit le dessous, un peu plus large que la tige.
+  const semelle = new ParametricGeometry(
+    (u, v, cible) => {
+      const a = v * Math.PI * 2;
+      const yb = BAS(u);
+      const k = bout(u);
+      cible.set(X(u) * 1.02, yb - 0.02 + 0.045 * k * sp(Math.sin(a), 0.3), (lisse(LARGE, u) * 1.05 + 0.012) * k * sp(Math.cos(a), 0.45));
+    },
+    160,
+    48
   );
-  semelle.rotateX(Math.PI / 2);
-  semelle.translate(0, -0.005, 0);
-  // Les crampons : des plots ronds sous la semelle.
+  // Les crampons : des plots coniques arrondis, sous la semelle, qui suivent sa courbe.
   const plots: THREE.BufferGeometry[] = [];
-  for (const [u, z] of [[0.08, -0.15], [0.08, 0.15], [0.22, 0], [0.55, -0.22], [0.55, 0.22], [0.72, -0.22], [0.72, 0.22], [0.88, 0]]) {
-    const c = tour([[0, 0], [0.085, 0], [0.06, -0.14], [0, -0.14]], 0.035, 24);
-    c.translate(X(u), -0.04, z);
+  for (const [u, z] of [[0.08, -0.13], [0.08, 0.13], [0.2, 0], [0.5, -0.21], [0.5, 0.21], [0.66, -0.22], [0.66, 0.22], [0.82, -0.12], [0.82, 0.12]]) {
+    const c = tour([[0, 0.02], [0.08, 0.02], [0.065, -0.085], [0, -0.085]], 0.03, 28);
+    c.translate(X(u), BAS(u) - 0.045, z);
     plots.push(c);
   }
-  // La marque sur chaque côté : le symbole BOLA, comme un équipementier.
-  const cote = (k: number) => {
-    const u = 0.5;
+  // Le col : l'ouverture, un creux sombre, bordée d'un bourrelet de métal, posés sur la tige.
+  const bordure: THREE.Vector3[] = [];
+  const N = 64;
+  for (let i = 0; i < N; i++) {
+    const t = (i / N) * Math.PI * 2;
     const p = new THREE.Vector3();
-    surface(u, k > 0 ? 0 : 0.5, p);
-    return poser(symbole(0.22, 0.05), new THREE.Vector3(X(u), 0.3, p.z - k * 0.014), new THREE.Vector3(0, 0, k), k > 0 ? 0 : Math.PI);
-  };
-  // L'ouverture du col, en creux sombre, et quatre lacets de verre en travers du cou-de-pied.
-  const col = new THREE.SphereGeometry(1, 32, 12);
-  col.scale(0.2, 0.035, 0.17);
-  col.translate(X(0.17), lerp(HAUT, 0.17) - 0.012, 0);
+    tige(0.16 + 0.11 * Math.cos(t), 0.25 + 0.12 * Math.sin(t), p);
+    bordure.push(p);
+  }
+  const bourrelet = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(bordure, true), 128, 0.035, 12, true);
+  const centre = new THREE.Vector3();
+  tige(0.16, 0.25, centre);
+  centre.y -= 0.06;
+  const creux: number[] = [];
+  for (let i = 0; i < N; i++) {
+    const a = bordure[i];
+    const b = bordure[(i + 1) % N];
+    creux.push(...centre.toArray(), ...b.toArray(), ...a.toArray());
+  }
+  const ouverture = new THREE.BufferGeometry();
+  ouverture.setAttribute("position", new THREE.Float32BufferAttribute(creux, 3));
+  ouverture.computeVertexNormals();
+  // Les lacets : cinq barrettes de verre en travers du cou-de-pied, d'un bord à l'autre.
   const lacets: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < 4; i++) {
-    const u = 0.34 + i * 0.075;
-    const l = new THREE.CapsuleGeometry(0.032, 0.34, 8, 16);
-    l.rotateX(Math.PI / 2);
-    l.rotateZ(-0.6);
-    l.translate(X(u), lerp(HAUT, u) + 0.01, 0);
+  for (let i = 0; i < 5; i++) {
+    const u = 0.32 + i * 0.065;
+    const g = new THREE.Vector3();
+    const d = new THREE.Vector3();
+    tige(u + 0.02, 0.25 + 0.085, g);
+    tige(u - 0.02, 0.25 - 0.085, d);
+    const n = normale(u, 0.25);
+    g.addScaledVector(n, 0.02);
+    d.addScaledVector(n, 0.02);
+    const l = new THREE.CapsuleGeometry(0.03, g.distanceTo(d), 8, 16);
+    l.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.clone().sub(g).normalize()));
+    l.translate((g.x + d.x) / 2, (g.y + d.y) / 2, (g.z + d.z) / 2);
     lacets.push(l);
   }
+  // La marque, de chaque côté : le symbole BOLA posé à plat sur la tige, comme un équipementier.
+  const cote = (k: number) => {
+    const u = 0.5;
+    const v = k > 0 ? 0.02 : 0.48;
+    const p = new THREE.Vector3();
+    tige(u, v, p);
+    const n = normale(u, v);
+    return poser(symbole(0.2, 0.035), p.addScaledVector(n, -0.012), n, k > 0 ? 0 : Math.PI);
+  };
   return [
-    { geo: corps, role: "corps" },
-    { geo: mergeGeometries([semelle, ...plots, col, cote(1), cote(-1)].map(sansUv)), role: "sombre" },
+    { geo: mergeGeometries([corps, bourrelet].map(sansUv)), role: "corps" },
+    { geo: mergeGeometries([semelle, ...plots, ouverture, cote(1), cote(-1)].map(sansUv)), role: "sombre" },
     { geo: mergeGeometries(lacets.map(sansUv)), role: "verre" },
   ];
 }
