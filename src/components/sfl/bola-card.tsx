@@ -463,7 +463,7 @@ export function BolaCard({
                 background:
                   edition === "mvp"
                     ? "linear-gradient(180deg, rgba(8,9,11,0.5) 0%, rgba(8,9,11,0) 24%)"
-                    : "linear-gradient(180deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 24%)",
+                    : "linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 20%)",
               }}
             />
           )}

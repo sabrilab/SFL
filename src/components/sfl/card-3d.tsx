@@ -178,7 +178,7 @@ async function captureLayer(
 
   try {
     return await toPng(node, {
-      pixelRatio: 2,
+      pixelRatio: 3,
       fontEmbedCSS,
       // La photo change d'URL (?v=…) quand le joueur la change : sans ça,
       // le cache interne de html-to-image garderait l'ancienne.
