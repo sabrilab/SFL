@@ -4,7 +4,8 @@
 // photo officielle (photo-studio.tsx : visage à l'appareil photo, maillot,
 // filtres), puis le recadrage habituel, et la photo part sur la carte chez
 // tout le monde (lib/sfl/photos). Une fois une photo posée, le même bouton
-// sert à la refaire.
+// sert à la refaire. Le parcours seul (FluxCarteOfficielle) sert aussi à
+// l'invitation de l'ouverture (invitation-carte.tsx).
 
 import { useState } from "react";
 import { Sparkles } from "lucide-react";
@@ -19,19 +20,7 @@ import { cn } from "@/lib/utils";
 
 export function CarteOfficielle({ player, className }: { player: Player; className?: string }) {
   const [studio, setStudio] = useState(false);
-  const [aRecadrer, setARecadrer] = useState<string | null>(null);
   const aUnePhoto = usePhotoPerso(player.name) !== null;
-
-  async function valider(dataUrl: string) {
-    setARecadrer(null);
-    try {
-      const r = await setPhoto(player.name, dataUrl);
-      if (r.partagee) toast.success("Ta carte officielle est prête", { description: "Elle est sur ta carte, chez tout le monde." });
-      else toast.warning("Photo gardée sur cet appareil", { description: r.raison });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Photo impossible à enregistrer.");
-    }
-  }
 
   return (
     <>
@@ -46,12 +35,41 @@ export function CarteOfficielle({ player, className }: { player: Player; classNa
         <Sparkles className="size-4" />
         {aUnePhoto ? "Refaire ma carte officielle" : "Créer ma carte officielle"}
       </button>
+      <FluxCarteOfficielle player={player} ouvert={studio} onFermer={() => setStudio(false)} />
+    </>
+  );
+}
 
+/** Le parcours : photo officielle, recadrage, puis la photo part sur la carte. */
+export function FluxCarteOfficielle({
+  player,
+  ouvert,
+  onFermer,
+}: {
+  player: Player;
+  ouvert: boolean;
+  onFermer: () => void;
+}) {
+  const [aRecadrer, setARecadrer] = useState<string | null>(null);
+
+  async function valider(dataUrl: string) {
+    setARecadrer(null);
+    try {
+      const r = await setPhoto(player.name, dataUrl);
+      if (r.partagee) toast.success("Ta carte officielle est prête", { description: "Elle est sur ta carte, chez tout le monde." });
+      else toast.warning("Photo gardée sur cet appareil", { description: r.raison });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Photo impossible à enregistrer.");
+    }
+  }
+
+  return (
+    <>
       <PhotoStudio
-        ouvert={studio}
-        onFermer={() => setStudio(false)}
+        ouvert={ouvert}
+        onFermer={onFermer}
         onChoisir={(dataUrl) => {
-          setStudio(false);
+          onFermer();
           setARecadrer(dataUrl);
         }}
       />
