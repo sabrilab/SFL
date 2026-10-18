@@ -11,7 +11,7 @@
 // renvoyait 404, ce 404 était mis en cache — et l'appareil restait bloqué sur
 // « Quelque chose a cassé » à chaque visite, indéfiniment.
 
-const CACHE_NAME = "sfl-cache-v3";
+const CACHE_NAME = "sfl-cache-v4";
 const OFFLINE_URL = "/offline";
 
 /** Une réponse digne d'être gardée : la nôtre, complète, et sans erreur. */
@@ -46,10 +46,25 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// L'app peut demander un nettoyage complet (bouton « Réparer l'app »).
+// L'app peut demander un nettoyage complet (bouton « Réparer l'app »), ou,
+// juste avant de se recharger sur une nouvelle version (`mise-a-jour.tsx`),
+// l'oubli des fichiers gardés : les photos et vidéos du dossier public n'ont
+// pas d'empreinte dans leur nom, une nouvelle version peut les avoir changés.
+// La page hors ligne est remise aussitôt.
 self.addEventListener("message", (event) => {
-  if (event.data?.type !== "sfl-vider-cache") return;
-  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))));
+  if (event.data?.type === "sfl-vider-cache") {
+    event.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))));
+  } else if (event.data?.type === "sfl-nouvelle-version") {
+    event.waitUntil(
+      caches
+        .delete(CACHE_NAME)
+        .then(() => caches.open(CACHE_NAME))
+        .then((cache) => cache.add(OFFLINE_URL))
+        .catch(() => {})
+        // La page attend cette réponse pour se recharger.
+        .then(() => event.ports[0]?.postMessage("ok"))
+    );
+  }
 });
 
 self.addEventListener("fetch", (event) => {

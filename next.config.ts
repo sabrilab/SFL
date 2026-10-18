@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 
+// La version de ce déploiement : son identifiant sur Vercel, l'heure du build
+// ailleurs. Gravée dans le client ET dans /api/version : c'est en les
+// comparant que l'app installée sait qu'une mise à jour est sortie
+// (`src/components/pwa/mise-a-jour.tsx`).
+const BOLA_VERSION =
+  process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA ?? String(Date.now());
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_BOLA_VERSION: BOLA_VERSION },
   async headers() {
     return [
       {
