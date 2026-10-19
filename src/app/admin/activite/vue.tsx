@@ -53,6 +53,18 @@ const PERIODES = [
 ] as const;
 type PeriodeId = (typeof PERIODES)[number]["id"];
 
+/**
+ * Qui on regarde. Par défaut les joueurs seuls : les admins (Sabri, Ilyes)
+ * ouvrent l'app bien plus que les autres pour la faire tourner, et leurs
+ * connexions gonfleraient les courbes, la rétention et les conclusions.
+ */
+const PUBLICS = [
+  { id: "joueurs", label: "Joueurs" },
+  { id: "admins", label: "Admins" },
+  { id: "tous", label: "Tout le monde" },
+] as const;
+type PublicId = (typeof PUBLICS)[number]["id"];
+
 /** Teinte de chaque famille dans la barre (et sa pastille dans la légende). */
 const TEINTE: Record<FamilleId, number> = {
   nouveaux: 1,
@@ -62,6 +74,11 @@ const TEINTE: Record<FamilleId, number> = {
   decroches: 0.18,
   jamais: 0.07,
 };
+
+/** « Sabri et Ilyes ». */
+function listeNoms(noms: string[]): string {
+  return noms.length <= 1 ? noms.join("") : `${noms.slice(0, -1).join(", ")} et ${noms.at(-1)}`;
+}
 
 function relative(ts: number, now: number): string {
   const d = now - ts;
@@ -168,15 +185,30 @@ export function ActiviteVue({
   error: string | null;
 }) {
   const [periode, setPeriode] = useState<PeriodeId>("30");
+  const [public_, setPublic] = useState<PublicId>("joueurs");
   const [metrique, setMetrique] = useState<MetriqueId>("hebdo");
   const [tri, setTri] = useState<"recent" | "temps" | "actions">("recent");
   const [ouverte, setOuverte] = useState<FamilleId | null>(null);
   const [toutes, setToutes] = useState(false);
 
   const jours = PERIODES.find((p) => p.id === periode)?.days ?? null;
+  // Le journal et les comptes du public choisi, et la part des admins dans
+  // tout le journal (pour dire de combien ils faussaient les chiffres).
+  const vu = useMemo(() => {
+    if (!data) return null;
+    const admins = new Set(data.profiles.filter((p) => p.admin).map((p) => p.name));
+    const garde = (name: string) =>
+      public_ === "tous" ? true : public_ === "admins" ? admins.has(name) : !admins.has(name);
+    const evenements = data.evenements.filter((e) => garde(e.name));
+    const profiles = data.profiles.filter((p) => garde(p.name));
+    const partAdmins = data.evenements.length
+      ? data.evenements.filter((e) => admins.has(e.name)).length / data.evenements.length
+      : 0;
+    return { evenements, profiles, admins: [...admins].sort(), partAdmins };
+  }, [data, public_]);
   const a = useMemo(
-    () => (data ? analyser(data.evenements, data.profiles, data.now, jours) : null),
-    [data, jours]
+    () => (data && vu ? analyser(vu.evenements, vu.profiles, data.now, jours) : null),
+    [data, vu, jours]
   );
 
   /* ------------------------------- la courbe ----------------------------- */
@@ -220,7 +252,7 @@ export function ActiviteVue({
   const libellePeriode = jours === null ? "depuis le début" : `sur ${jours} jours`;
   const comparaison = jours === null ? "" : ` · évolution par rapport aux ${jours} jours d'avant`;
   const totalFamilles = a ? a.familles.reduce((s, f) => s + f.noms.length, 0) : 0;
-  const emails = data?.profiles.filter((p) => p.contact_email) ?? [];
+  const emails = vu?.profiles.filter((p) => p.contact_email) ?? [];
 
   return (
     <div className="shell flex flex-col gap-4 py-4 sm:py-8">
@@ -238,6 +270,30 @@ export function ActiviteVue({
           Actualiser
         </button>
       </div>
+
+      <div className="glass flex w-full rounded-full p-1">
+        {PUBLICS.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => setPublic(p.id)}
+            className={cn(
+              "flex-1 rounded-full py-1.5 text-[13px] font-semibold transition-colors",
+              public_ === p.id ? "bg-foreground text-background" : "text-foreground/45"
+            )}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      {vu && vu.admins.length > 0 && (
+        <p className="-mt-1.5 px-1 text-[11.5px] leading-snug text-foreground/45">
+          {public_ === "joueurs"
+            ? `Sans ${listeNoms(vu.admins)}, qui font ${pct(vu.partAdmins)} de l'activité enregistrée.`
+            : public_ === "admins"
+              ? `${listeNoms(vu.admins)} seulement.`
+              : `Admins compris : ${listeNoms(vu.admins)} font ${pct(vu.partAdmins)} de l'activité enregistrée.`}
+        </p>
+      )}
 
       <div className="glass flex w-full rounded-full p-1">
         {PERIODES.map((p) => (

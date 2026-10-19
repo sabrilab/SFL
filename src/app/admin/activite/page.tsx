@@ -59,7 +59,7 @@ export default function ActivitePage() {
       };
       const [actData, prof] = await Promise.all([
         lireTout(),
-        sb.from("profiles").select("name, contact_email, created_at"),
+        sb.from("profiles").select("name, contact_email, created_at, is_admin"),
       ]);
       if (prof.error) throw new Error(prof.error.message);
 
@@ -80,11 +80,18 @@ export default function ActivitePage() {
           at: new Date(r.created_at).getTime(),
         };
       });
-      type ProfilBrut = { name: string; contact_email: string | null; created_at: string | null };
+      type ProfilBrut = {
+        name: string;
+        contact_email: string | null;
+        created_at: string | null;
+        is_admin: boolean | null;
+      };
       const profiles = ((prof.data ?? []) as ProfilBrut[]).map((p) => ({
         name: p.name,
         contact_email: p.contact_email,
         created_at: p.created_at ? new Date(p.created_at).getTime() : null,
+        // Le rôle en base, ou la liste en dur de l'app (Sabri, Ilyes).
+        admin: !!p.is_admin || isAdmin(p.name),
       }));
       setData({ evenements, profiles, now: Date.now() });
     } catch (e) {
