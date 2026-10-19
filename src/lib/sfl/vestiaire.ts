@@ -64,7 +64,19 @@ export interface PieceVideo {
   /** En secondes. */
   duree: number;
 }
-export type Piece = PieceCarte | PieceFeuille | PieceClassement | PieceVocal | PiecePhoto | PieceVideo;
+/**
+ * Un élément de la Ligue (19/10) : l'homme du dimanche, l'équipe type, les
+ * badges décrochés, la course… figé tel qu'il était au partage, comme le
+ * podium d'un classement. Chaque ligne est un joueur (n) ou un chiffre (l).
+ */
+export interface PieceLigue {
+  type: "ligue";
+  titre: string;
+  j?: number;
+  lignes: { n?: string; l?: string; v: string }[];
+}
+export const LIGNES_MAX = 6;
+export type Piece = PieceCarte | PieceFeuille | PieceClassement | PieceVocal | PiecePhoto | PieceVideo | PieceLigue;
 
 export function estPiece(v: unknown): v is Piece {
   if (!v || typeof v !== "object") return false;
@@ -76,6 +88,15 @@ export function estPiece(v: unknown): v is Piece {
   if (p.type === "vocal") return typeof p.chemin === "string" && typeof p.duree === "number";
   if (p.type === "photo")
     return typeof p.chemin === "string" && typeof p.l === "number" && typeof p.h === "number" && p.l > 0 && p.h > 0;
+  if (p.type === "ligue")
+    return (
+      typeof p.titre === "string" &&
+      p.titre.length > 0 &&
+      Array.isArray(p.lignes) &&
+      p.lignes.length > 0 &&
+      p.lignes.length <= LIGNES_MAX &&
+      p.lignes.every((l) => !!l && typeof l === "object" && typeof (l as { v?: unknown }).v === "string")
+    );
   if (p.type === "video")
     return (
       typeof p.chemin === "string" &&

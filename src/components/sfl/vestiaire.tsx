@@ -12,7 +12,9 @@
 // Depuis le 19/10 (Sabri) : répondre à un message précis (glisser la bulle
 // vers la droite, ou la flèche sous elle), réagir d'un émoji (le visage sous
 // chaque bulle, ou toucher la bulle), et les vocaux (le micro quand le champ
-// est vide ; une minute au plus, bucket « vocaux »).
+// est vide ; une minute au plus, bucket « vocaux »), puis les photos et
+// vidéos, et tout élément de la Ligue (bouton rond « Au Vestiaire » de chaque
+// rubrique : au-vestiaire.tsx), figé tel qu'il était au partage.
 //
 // Noir et blanc, comme la Ligue : ma bulle en blanc, celles des autres en
 // verre. Un écran de discussion, comme Messages : le titre en haut, le fil
@@ -70,6 +72,7 @@ import {
   type ModeNotifs,
   type Piece,
   type PiecePhoto,
+  type PieceLigue,
   type PieceVideo,
   type PieceVocal,
   type ProfilV,
@@ -95,6 +98,7 @@ const minutes = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60
 /** Ce qu'une réponse montre de l'original, en une ligne. */
 function apercu(m: MessageV): string {
   if (m.texte.trim()) return m.texte.trim();
+  if (m.piece?.type === "ligue") return m.piece.titre;
   const t = m.piece?.type;
   return t === "vocal" ? "🎤 Message vocal" : t === "photo" ? "📷 Photo" : t === "video" ? "🎬 Vidéo" : t === "carte" ? "Une carte" : t === "feuille" ? "Une feuille de match" : "Un classement";
 }
@@ -393,6 +397,7 @@ function PieceVue({ piece, onOuvrirJournee, mien = false }: { piece: Piece; onOu
   if (piece.type === "vocal") return <VocalVue piece={piece} mien={mien} />;
   if (piece.type === "photo") return <PhotoVue piece={piece} />;
   if (piece.type === "video") return <VideoVue piece={piece} />;
+  if (piece.type === "ligue") return <LigueVue piece={piece} onOuvrirJournee={onOuvrirJournee} />;
 
   if (piece.type === "carte") {
     return (
@@ -427,6 +432,65 @@ function PieceVue({ piece, onOuvrirJournee, mien = false }: { piece: Piece; onOu
   const jn = journees.find((x) => x.j === piece.j);
   if (!jn) return <p className="px-3 py-3 text-[13px] text-foreground/45">Journée {piece.j}</p>;
   return <FeuilleVue journee={jn} onOuvrir={onOuvrirJournee ? () => onOuvrirJournee(jn.j) : undefined} />;
+}
+
+/**
+ * Un élément de la Ligue, figé au partage. La hiérarchie des cartes : un
+ * joueur seul en grande carte, deux en moyennes côte à côte, plus en petites
+ * sur des lignes, comme un podium. Toucher ouvre la journée dans la Ligue.
+ */
+function LigueVue({ piece, onOuvrirJournee }: { piece: PieceLigue; onOuvrirJournee?: (j: number) => void }) {
+  const joueurs = piece.lignes.filter((l) => l.n);
+  const chiffres = piece.lignes.filter((l) => !l.n);
+  const ouvrir = piece.j != null && onOuvrirJournee ? () => onOuvrirJournee(piece.j!) : undefined;
+  const Corps = ouvrir ? "button" : "div";
+  return (
+    <Corps
+      {...(ouvrir ? { type: "button" as const, onClick: (e: React.MouseEvent) => (e.stopPropagation(), ouvrir()) } : {})}
+      className="flex w-full flex-col gap-2.5 px-3 py-3 text-left"
+    >
+      <span>
+        <span className="mono-label block text-foreground/45">Ligue{piece.j != null && ` · J${piece.j}`}</span>
+        <span className="block text-[15px] leading-tight font-bold">{piece.titre}</span>
+      </span>
+      {joueurs.length === 1 ? (
+        <span className="flex flex-col items-center gap-1.5 pt-1">
+          <CarteDe name={joueurs[0].n!} size={FORMAT_CARTE.grande} detail={piece.titre} inerte />
+          <span className="text-center text-[13px] font-semibold text-foreground/70">{joueurs[0].v}</span>
+        </span>
+      ) : joueurs.length === 2 ? (
+        <span className="flex justify-center gap-4 pt-1">
+          {joueurs.map((l) => (
+            <span key={l.n} className="flex flex-col items-center gap-1.5">
+              <CarteDe name={l.n!} size={FORMAT_CARTE.moyenne} detail={piece.titre} inerte />
+              <span className="max-w-[110px] text-center text-[12.5px] leading-tight font-semibold text-foreground/70">{l.v}</span>
+            </span>
+          ))}
+        </span>
+      ) : (
+        joueurs.map((l, i) => (
+          <span key={l.n} className="flex items-center gap-2.5">
+            <span className="w-4 text-[13px] font-bold text-foreground/40 tabular-nums">{i + 1}</span>
+            <CarteDe name={l.n!} size={FORMAT_CARTE.petite} inerte />
+            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">
+              <Nom n={l.n!} />
+            </span>
+            <span className="shrink-0 text-right text-[13px] font-bold tabular-nums">{l.v}</span>
+          </span>
+        ))
+      )}
+      {chiffres.length > 0 && (
+        <span className="grid grid-cols-2 gap-2">
+          {chiffres.map((l) => (
+            <span key={l.l} className="flex flex-col rounded-2xl bg-white/[0.06] px-3 py-2.5">
+              <span className="text-[22px] leading-none font-bold tabular-nums">{l.v}</span>
+              <span className="mono-label mt-1 text-foreground/45">{l.l}</span>
+            </span>
+          ))}
+        </span>
+      )}
+    </Corps>
+  );
 }
 
 /** Une feuille de match en résumé : les scores, puis les décisifs en cartes. */
@@ -1510,6 +1574,8 @@ function messagesDemo(noms: string[], journees: Journee[]): MessageV[] {
     [n(5), "Regarde le classement avant de parler", { type: "classement", id: "buts", top: [{ n: n(0), v: 20 }, { n: n(1), v: 14 }, { n: n(5), v: 10 }] }, { "🐐": ["a"] }, null],
     ["moi", "@" + n(5).toLowerCase() + " ta carte elle sort du pack de Noël", { type: "carte", joueur: n(1) }, { "🔥": ["a", "b"], "🤡": ["c"] }, null],
     [n(3), "", { type: "vocal", chemin: "blob:demo", duree: 14.2 }, { "😂": ["a"] }, null],
+    [n(4), "Tu le crois ça ?", { type: "ligue", titre: "L'équipe type", j: jn?.j, lignes: [0, 1, 2, 3, 4].map((k) => ({ n: n(k), v: `+${30 - k * 4} pts` })) }, { "🔥": ["a", "b"] }, null],
+    [n(0), "", { type: "ligue", titre: "L'homme du dimanche", j: jn?.j, lignes: [{ n: n(0), v: "3 buts · 1 passe · +42 pts" }] }, { "🐐": ["a", "b", "c"] }, null],
     [n(1), "La preuve", { type: "photo", chemin: "/players/Yacine.png", l: 1024, h: 1536 }, { "💀": ["a", "b"] }, null],
     [n(2), "", { type: "video", chemin: "/videos/j8-bensou.webm", l: 1280, h: 720, duree: 17.2 }, { "🔥": ["a", "b", "c"] }, null],
     ["moi", "Dimanche on règle ça sur le terrain", null, {}, 6],
