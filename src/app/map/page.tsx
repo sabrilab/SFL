@@ -231,6 +231,13 @@ function dateComplete(dateLabel: string, aujourdhui: string): string {
   return `${nom[0].toUpperCase()}${nom.slice(1)} ${dateLongue(dateLabel, aujourdhui)}`;
 }
 
+/** Une journée de ligue : ouverte à tous, sans plafond — on montre qui vient déjà. */
+function etatLigue(dedans: boolean, n: number): { etat: EtatSticker; texte: string } {
+  if (dedans) return { etat: { genre: "dedans" }, texte: "Tu y es" };
+  return { etat: { genre: "inscrits", n }, texte: n ? `${n} participant${n > 1 ? "s" : ""} déjà` : "Ouvert à tous" };
+}
+
+/** Un match ouvert par un joueur : un nombre de places, donc ce qu'il manque. */
 function etatDe(dedans: boolean, manque: number): { etat: EtatSticker; texte: string } {
   if (dedans) return { etat: { genre: "dedans" }, texte: "Tu y es" };
   if (manque > 0) return { etat: { genre: "manque", n: manque }, texte: `Il manque ${manque}` };
@@ -272,8 +279,8 @@ export default function MapPage() {
       const { etat, texte } = joue
         ? { etat: { genre: "joue" } as EtatSticker, texte: dedans ? "Joué · tu y étais" : "Joué" }
         : convoquee
-          ? etatDe(p.mine === "present", Math.max(0, p.effectif - p.presents.length))
-          : etatDe(dedans, Math.max(0, effectif - presents.length));
+          ? etatLigue(p.mine === "present", p.presents.length)
+          : etatLigue(dedans, presents.length);
       return {
         cle: `j${m.j}`,
         j: m.j,
@@ -302,7 +309,7 @@ export default function MapPage() {
     // elle-même passée (l'admin ouvre la suivante en ouvrant l'app).
     if (ecartConvocation != null && ecartConvocation < 0) return recente;
     const dedans = p.mine === "present";
-    const { etat, texte } = etatDe(dedans, Math.max(0, p.effectif - p.presents.length));
+    const { etat, texte } = etatLigue(dedans, p.presents.length);
     return [
       {
         cle: "convocation",
@@ -826,13 +833,15 @@ function CarteMatch({
 }) {
   const [c0, c1, c2] = FOND_MOMENT[m.quand.moment];
   const complet = m.etat.genre === "complet";
+  const inscrits = m.etat.genre === "inscrits";
   const joue = !!m.joue;
   const titre = m.quand.titre;
   const rebours = compteARebours(dans);
   const [l, h] = joue ? [LARGEUR_JOUE, 104] : [196, 140];
-  // Les places du match : une encoche par joueur attendu ; les vides sont
-  // celles qu'il manque, en braise.
-  const places = joue ? 0 : Math.min(m.effectif, 14);
+  // Les places d'un match ouvert par un joueur : une encoche par joueur
+  // attendu ; les vides sont celles qu'il manque, en braise. Une journée de
+  // ligue n'a pas de plafond : pas de jauge, le compte des participants.
+  const places = joue || !m.partie ? 0 : Math.min(m.effectif, 14);
   const venus = Math.min(m.presents.length, places);
   return (
     <div className={cn("carte-match relative", choisi && "carte-match--choisie", joue && "carte-match--joue")}>
@@ -866,11 +875,12 @@ function CarteMatch({
           <div
             className={cn(
               "absolute inset-x-0 bottom-0 bg-gradient-to-b from-transparent via-[rgba(4,5,7,0.4)] to-[rgba(3,4,6,0.82)]",
-              une ? "h-[78%]" : "h-[62%]"
+              une || inscrits ? "h-[78%]" : "h-[62%]"
             )}
           />
           <div className={cn("absolute inset-x-0 top-0 flex items-center justify-between gap-1", joue ? "p-2" : "p-2.5")}>
-            <Jeton texte={m.etatTexte} ton={m.etat.genre} petit={joue} />
+            {/* Une journée de ligue : le compte des participants va en bas, en grand. */}
+            {!inscrits && <Jeton texte={m.etatTexte} ton={m.etat.genre} petit={joue} />}
             {!joue && (loin || rebours) && <Jeton texte={loin ?? rebours!} ton="neutre" />}
           </div>
           <div className={cn("absolute inset-x-0 bottom-0", joue ? "px-2.5 pb-2.5" : "px-3 pb-3")}>
@@ -886,6 +896,18 @@ function CarteMatch({
                 ? `${m.partie.genre === "exhibition" ? "Exhibition" : m.partie.visibilite === "prive" ? "Privé" : "Public"} · ${m.partie.organisateur}`
                 : `${m.j != null ? `J${m.j} · ` : ""}Sunday Five`}
             </p>
+            {inscrits && (
+              <p className="mt-1.5 flex items-baseline gap-1.5 text-white">
+                {m.presents.length > 0 ? (
+                  <>
+                    <span className="text-[20px] leading-none font-black tracking-[-0.6px] tabular-nums">{m.presents.length}</span>
+                    <span className="text-[12px] font-semibold text-white/85">participant{m.presents.length > 1 ? "s" : ""} déjà</span>
+                  </>
+                ) : (
+                  <span className="text-[12px] font-semibold text-white/85">{m.etatTexte}</span>
+                )}
+              </p>
+            )}
             {une && places > 0 && (
               <div className="mt-2 flex gap-[3px]" aria-hidden>
                 {Array.from({ length: places }, (_, i) => (
@@ -982,7 +1004,7 @@ function Presents({ m }: { m: MatchMap }) {
         </p>
       </div>
       {m.presents.length ? (
-        <QuiVient className="mt-3" noms={m.presents} places={m.joue ? 0 : Math.max(0, m.effectif - m.presents.length)} />
+        <QuiVient className="mt-3" noms={m.presents} />
       ) : (
         <p className="mt-2 text-[13px] text-muted-foreground">Les joueurs arrivent avec la composition des équipes.</p>
       )}
@@ -991,7 +1013,7 @@ function Presents({ m }: { m: MatchMap }) {
   );
 }
 
-function Jeton({ texte, ton, petit }: { texte: string; ton: "manque" | "dedans" | "complet" | "joue" | "neutre"; petit?: boolean }) {
+function Jeton({ texte, ton, petit }: { texte: string; ton: EtatSticker["genre"] | "neutre"; petit?: boolean }) {
   const style =
     ton === "dedans"
       ? { background: CLAIR, color: ENCRE }

@@ -180,8 +180,14 @@ export function heureCourte(heure: string): string {
 const echapper = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
 
-/** L'état d'un match SFL vu du sticker : il manque N, tu y es, complet. */
-export type EtatSticker = { genre: "manque"; n: number } | { genre: "dedans" } | { genre: "complet" } | { genre: "joue" };
+/** L'état d'un match SFL vu du sticker : il manque N, N participants, tu y es, complet. */
+export type EtatSticker =
+  | { genre: "manque"; n: number }
+  /** Une journée de ligue, sans plafond : qui vient déjà. */
+  | { genre: "inscrits"; n: number }
+  | { genre: "dedans" }
+  | { genre: "complet" }
+  | { genre: "joue" };
 
 export interface StickerPlan {
   id: string;
@@ -199,15 +205,19 @@ export function stickerHtml(s: StickerPlan, choisi: boolean, variante?: Variante
   const badge =
     s.etat.genre === "manque"
       ? `<span class="stk__badge stk__badge--manque">${s.etat.n}</span>`
-      : s.etat.genre === "dedans"
-        ? `<span class="stk__badge stk__badge--dedans">${COCHE}</span>`
-        : "";
+      : s.etat.genre === "inscrits" && s.etat.n > 0
+        ? `<span class="stk__badge stk__badge--inscrits">${s.etat.n}</span>`
+        : s.etat.genre === "dedans"
+          ? `<span class="stk__badge stk__badge--dedans">${COCHE}</span>`
+          : "";
   const etiquette =
     s.etat.genre === "manque"
       ? `<span class="stk__etiquette stk__etiquette--manque">il manque ${s.etat.n}</span>`
-      : s.etat.genre === "dedans"
-        ? `<span class="stk__etiquette stk__etiquette--dedans">tu y es</span>`
-        : `<span class="stk__etiquette stk__etiquette--complet">${s.etat.genre === "joue" ? "joué" : "complet"}</span>`;
+      : s.etat.genre === "inscrits"
+        ? `<span class="stk__etiquette stk__etiquette--inscrits">${s.etat.n ? `${s.etat.n} participant${s.etat.n > 1 ? "s" : ""}` : "ouvert"}</span>`
+        : s.etat.genre === "dedans"
+          ? `<span class="stk__etiquette stk__etiquette--dedans">tu y es</span>`
+          : `<span class="stk__etiquette stk__etiquette--complet">${s.etat.genre === "joue" ? "joué" : "complet"}</span>`;
   return `<div class="stk${choisi ? " stk--choisi" : ""}${s.etat.genre === "complet" || s.etat.genre === "joue" ? " stk--complet" : ""}" style="--penche:${penche(s.id)}deg">
   <div class="stk__vignette">
     <div class="stk__stade">${stadeSvg(s.moment, { variante })}</div>
