@@ -6,17 +6,18 @@
 //                   le scrollytelling se déroule) et les prochaines journées ;
 //   · Classements : tous les classements, directement — podium en cartes,
 //                   le vote du jour quand il est ouvert ;
-//   · Matchs      : les journées jouées, une carte chacune ;
-//   · Vestiaire   : la discussion de toute la ligue, où l'on se chambre
-//                   (vestiaire.tsx), avec sa pastille quand il y a du nouveau.
-// Le Wall of Fame est au bout du sélecteur, toujours à portée.
+//   · Matchs      : les journées jouées, une carte chacune.
+// Le Wall of Fame est au bout du sélecteur, toujours à portée, puis la loupe.
+// Le Vestiaire, qui a été une quatrième vue ici, a sa page depuis le 19/10
+// (/vestiaire, la bulle de la barre d'onglets) : ?vue=vestiaire y renvoie.
+// ?j=N ouvre la journée N (une feuille de match touchée au Vestiaire).
 // L'ancienne vue Accueil a été retirée le 17/10 (plus pertinente) ; /stats
 // renvoie ici, sur Classements (?vue=classements).
 // Le récap lui-même vit dans feed/journee-recap.tsx.
 
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronRight, Crown } from "lucide-react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { LEAGUE_KEY } from "@/lib/nav";
@@ -40,9 +41,7 @@ import { CarteJournee } from "@/components/sfl/carte-journee";
 import { ALHonneur } from "@/components/sfl/a-l-honneur";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
-import { Vestiaire } from "@/components/sfl/vestiaire";
-import { useVestiaireNonLus } from "@/hooks/use-vestiaire-non-lus";
-import { EVT_PIECE } from "@/lib/sfl/vestiaire";
+import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 
 // Les deux dimanches après celui de la convocation, lus côté client
 // (vides au rendu serveur, pour que l'hydratation concorde).
@@ -53,12 +52,11 @@ function lireDimanches(): string {
   return `${labelDateFr(d1)}|${labelDateFr(d2)}`;
 }
 
-type Vue = "journee" | "classements" | "matchs" | "vestiaire";
+type Vue = "journee" | "classements" | "matchs";
 const VUES: [Vue, string][] = [
   ["journee", "Journée"],
   ["classements", "Classements"],
   ["matchs", "Matchs"],
-  ["vestiaire", "Vestiaire"],
 ];
 
 export default function LiguePage() {
@@ -97,18 +95,17 @@ function Ligue() {
   const { players, journees, saison } = useSeason();
   // L'onglet Ligue s'ouvre sur le récap éditorial de la dernière journée ;
   // ?vue=classements (les anciens liens vers /stats) ouvre les classements.
-  const vueDemandee = useSearchParams().get("vue");
+  const params = useSearchParams();
+  const router = useRouter();
+  const vueDemandee = params.get("vue");
   const [view, setView] = useState<Vue>(
     VUES.some(([id]) => id === vueDemandee) ? (vueDemandee as Vue) : "journee"
   );
-  const nonLus = useVestiaireNonLus();
-  // « Au Vestiaire » sur un classement ou une feuille : on y passe, la pièce
-  // attend dans la barre d'écriture.
+  // Les anciens liens (et les notifications d'avant le 19/10) vers la vue
+  // Vestiaire de la Ligue.
   useEffect(() => {
-    const aller = () => setView("vestiaire");
-    window.addEventListener(EVT_PIECE, aller);
-    return () => window.removeEventListener(EVT_PIECE, aller);
-  }, []);
+    if (vueDemandee === "vestiaire") router.replace("/vestiaire");
+  }, [vueDemandee, router]);
   // Une seule ligue, la SFL : un ancien choix d'une autre ligue (WFL, KFL)
   // masquait tout le fil. On l'efface.
   useEffect(() => {
@@ -139,7 +136,8 @@ function Ligue() {
     const joues = saisonArchive.journees.filter((m) => journeeJouee(saisonArchive, m.j)).map((m) => m.j);
     return joues.length ? Math.max(...joues) : (saisonArchive.journees[saisonArchive.journees.length - 1]?.j ?? 1);
   }, [saisonArchive]);
-  const [selectedJ, setSelectedJ] = useState<number | null>(null);
+  const jDemandee = Number(params.get("j"));
+  const [selectedJ, setSelectedJ] = useState<number | null>(Number.isInteger(jDemandee) && jDemandee > 0 ? jDemandee : null);
   const currentJ = selectedJ ?? latestJ;
   const [opening, setOpening] = useState<number | null>(null);
 
@@ -252,7 +250,7 @@ function Ligue() {
       {/* Un seul sélecteur, toujours là, et le Wall of Fame au bout. Sur
           ordinateur, le titre de la page à gauche (comme Ma carte), et le
           sélecteur ramené à sa juste largeur au lieu de traverser l'écran. */}
-      <div className="flex items-center gap-2 lg:gap-[var(--fib-13)]">
+      <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-[var(--fib-13)]">
       <h1 className="hidden text-[34px] font-bold tracking-tight lg:mr-auto lg:block">Ligue</h1>
       <div className="glass flex flex-1 gap-1 rounded-full p-1 lg:w-[420px] lg:flex-none" role="tablist" aria-label="Vue de la ligue">
         {VUES.map(([id, label]) => (
@@ -262,40 +260,26 @@ function Ligue() {
             aria-selected={view === id}
             onClick={() => setView(id)}
             className={cn(
-              "flex-auto rounded-full px-[7px] py-2 text-[13px] whitespace-nowrap font-semibold transition-colors min-[400px]:px-2.5 sm:px-4 sm:text-sm",
+              "flex-auto rounded-full px-[7px] py-2 text-[12.5px] whitespace-nowrap font-semibold transition-colors min-[400px]:px-2.5 min-[400px]:text-[13px] sm:px-4 sm:text-sm",
               view === id ? "bg-foreground text-background" : "text-muted-foreground"
             )}
           >
             {label}
-            {id === "vestiaire" && nonLus > 0 && view !== "vestiaire" && (
-              <span
-                aria-label={`${nonLus} nouveaux`}
-                className="ml-1 inline-block size-[7px] -translate-y-[1px] rounded-full bg-foreground align-middle"
-              />
-            )}
           </button>
         ))}
       </div>
         <Link
           href="/palmares"
           aria-label="Wall of Fame"
-          className="glass flex h-11 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold sm:px-4 sm:text-sm"
+          className="glass flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] sm:h-11 font-semibold sm:px-4 sm:text-sm"
         >
           <Crown className="size-4" />
           <span className="hidden sm:inline">Wall of Fame</span>
         </Link>
+        <BoutonRecherche className="size-10 sm:size-11" />
       </div>
 
-      {view === "vestiaire" ? (
-        <div className="mesure w-full lg:mx-auto lg:max-w-[640px]">
-          <Vestiaire
-            onOuvrirJournee={(j) => {
-              setView("journee");
-              openJournee(j);
-            }}
-          />
-        </div>
-      ) : view === "matchs" ? (
+      {view === "matchs" ? (
         <>
           <p className="px-1 text-[13px] text-foreground/40">
             Chaque dimanche sur son terrain · {played.length} journée

@@ -541,9 +541,18 @@ export default function MapPage() {
           </span>
         </div>
 
-        {/* En haut à droite : la bascule plan / satellite et, pour l'admin, le
-            réglage des matchs — le lettrage garde sa place. */}
+        {/* En haut à droite : la loupe (la Recherche, montée de la barre
+            d'onglets le 19/10), la bascule plan / satellite et, pour
+            l'admin, le réglage des matchs — le lettrage garde sa place. */}
         <div className="absolute right-4 z-[510] flex flex-col items-end gap-2" style={{ top: haut }}>
+          <Link
+            href="/recherche"
+            aria-label="Recherche"
+            className="map-bord map-touche grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
+            style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
+          >
+            <Search className="size-[18px]" strokeWidth={2.2} />
+          </Link>
           <button
             type="button"
             onClick={() => setFond((f) => (f === "plan" ? "satellite" : "plan"))}

@@ -5,12 +5,14 @@
 // flotte au-dessus du contenu, trois onglets icône + libellé, et sous
 // l'onglet choisi une lentille de verre plus claire qui glisse d'un onglet à
 // l'autre avec un ressort. Le symbole choisi est plein, les autres au trait.
-// À droite, détachée, la pastille ronde de la Recherche : l'onglet de
-// recherche d'iOS 26 (Tab(role: .search)).
+// À droite, détachée, la pastille ronde du Vestiaire (la discussion de la
+// ligue), avec le nombre de messages pas encore lus. La Recherche, qui était
+// là, est montée en haut des écrans (BoutonRecherche, à la demande de Sabri
+// le 19/10) : le Vestiaire, où l'on revient sans cesse, reste sous le pouce.
 //
-// C'est la seule navigation de l'app, sur téléphone comme sur ordinateur :
-// rien en haut de l'écran, ni logo ni en-tête collant (les guidelines
-// d'Apple). Sur ordinateur, la même capsule, posée en bas au centre.
+// Sur ordinateur, la même capsule, posée en bas au centre. Pendant qu'on
+// écrit au Vestiaire (le clavier ouvert), la barre s'efface : data-clavier
+// sur <html>, posé par le Vestiaire.
 //
 // Sur la Map (plan clair), le verre devient clair et l'encre noire ;
 // ailleurs, l'app est sombre : verre fumé, encre blanche — exactement le
@@ -18,7 +20,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CarteIcon, MapIcon, RechercheIcon, TropheeIcon } from "./nav-icons";
+import { CarteIcon, MapIcon, TropheeIcon, VestiaireIcon } from "./nav-icons";
 import { ongletActif } from "@/lib/nav";
 import { useVestiaireNonLus } from "@/hooks/use-vestiaire-non-lus";
 
@@ -34,15 +36,15 @@ export function BottomNav() {
   const pathname = usePathname();
   const onglet = ongletActif(pathname);
   const actif = TABS.findIndex(({ href }) => href === onglet);
-  const recherche = pathname === "/recherche" || pathname.startsWith("/recherche/");
+  const vestiaire = pathname === "/vestiaire";
   const clair = surMap(pathname);
   const encre = clair ? "#0a0b0d" : "#ffffff";
-  // La pastille du Vestiaire, sur l'onglet Ligue : du nouveau dans la discussion.
+  // Du nouveau dans la discussion : le nombre, sur la bulle.
   const nonLus = useVestiaireNonLus();
 
   return (
     <div
-      className="fixed left-1/2 z-40 flex -translate-x-1/2 items-center gap-2"
+      className="fixed left-1/2 z-40 flex [html[data-clavier]_&]:hidden -translate-x-1/2 items-center gap-2"
       style={{
         bottom: "max(calc(env(safe-area-inset-bottom) - 4px), 14px)",
         width: "min(calc(100% - 32px), 430px)",
@@ -68,18 +70,7 @@ export function BottomNav() {
               className="liquid-tabbar__onglet"
               style={{ color: encre }}
             >
-              <span className="relative">
-                <Icon plein={choisi} />
-                {href === "/ligue" && nonLus > 0 && (
-                  <span
-                    aria-label={`${nonLus} nouveaux messages au Vestiaire`}
-                    className="absolute -top-1 -right-2.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full px-1 text-[10.5px] font-bold tabular-nums"
-                    style={{ background: encre, color: clair ? "#ffffff" : "#0a0b0d" }}
-                  >
-                    {nonLus > 9 ? "9+" : nonLus}
-                  </span>
-                )}
-              </span>
+              <Icon plein={choisi} />
               <span className="liquid-tabbar__libelle" style={{ fontWeight: choisi ? 600 : 500 }}>
                 {label}
               </span>
@@ -89,15 +80,26 @@ export function BottomNav() {
       </nav>
 
       <Link
-        href="/recherche"
-        aria-label="Recherche"
-        aria-current={recherche ? "page" : undefined}
+        href="/vestiaire"
+        aria-label={nonLus > 0 ? `Vestiaire, ${nonLus} nouveaux messages` : "Vestiaire"}
+        aria-current={vestiaire ? "page" : undefined}
         className="liquid-tabbar liquid-tabbar--rond"
         data-clair={clair ? "" : undefined}
-        data-choisi={recherche ? "" : undefined}
+        data-choisi={vestiaire ? "" : undefined}
         style={{ color: encre }}
       >
-        <RechercheIcon plein={recherche} />
+        <span className="relative">
+          <VestiaireIcon plein={vestiaire} />
+          {nonLus > 0 && !vestiaire && (
+            <span
+              aria-hidden
+              className="absolute -top-1.5 -right-2.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10.5px] font-bold tabular-nums"
+              style={{ background: encre, color: clair ? "#ffffff" : "#0a0b0d" }}
+            >
+              {nonLus > 9 ? "9+" : nonLus}
+            </span>
+          )}
+        </span>
       </Link>
     </div>
   );

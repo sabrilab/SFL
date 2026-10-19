@@ -1,17 +1,21 @@
 "use client";
 
-// Les invitations de l'ouverture : la carte officielle, puis les
-// notifications. Une seule par ouverture, jamais les deux.
+// Les invitations de l'ouverture : les notifications, puis la carte
+// officielle. Une seule par ouverture, jamais les deux.
 //
-// 1. La carte officielle. Tant que le joueur connecté n'a pas de photo à lui
-//    sur sa carte, l'app se voile, sa carte actuelle arrive, et un bouton
-//    ouvre directement le parcours (carte-officielle.tsx). On ne décide
-//    qu'après avoir relu la liste des photos de la ligue : un cache vide sur
-//    un nouvel appareil ne doit pas inviter quelqu'un qui a déjà sa photo.
-// 2. Les notifications. Une fois la photo là, si ce téléphone peut recevoir
-//    des notifications et ne les a ni activées ni refusées, la même carte
-//    propose de les activer (lib/sfl/notifications). Un iPhone dans Safari
-//    ne peut pas : le guide d'installation s'en charge d'abord.
+// 1. Les notifications, d'abord (Sabri, 19/10 : « quand quelqu'un
+//    télécharge l'application, fais-lui autoriser les notifs directement »).
+//    Dès la première ouverture où ce téléphone peut en recevoir sans les
+//    avoir ni activées ni refusées — l'app installée sur l'écran d'accueil,
+//    pour un iPhone —, l'app se voile et propose de les activer
+//    (lib/sfl/notifications). Le bouton est indispensable : iOS ne demande
+//    la permission qu'après un toucher. Un iPhone dans Safari ne peut pas :
+//    le guide d'installation s'en charge d'abord.
+// 2. La carte officielle. Tant que le joueur connecté n'a pas de photo à lui
+//    sur sa carte, sa carte actuelle arrive, et un bouton ouvre directement
+//    le parcours (carte-officielle.tsx). On ne décide qu'après avoir relu la
+//    liste des photos de la ligue : un cache vide sur un nouvel appareil ne
+//    doit pas inviter quelqu'un qui a déjà sa photo.
 //
 // Le prénom, le nom, le pseudo et l'email passent avant tout (identite.tsx) :
 // rien ne s'ouvre ici tant que le joueur ne les a pas confirmés.
@@ -49,7 +53,7 @@ const TEXTES: Record<Invitation, { titre: string; ligne: string; bouton: string 
   },
   notifs: {
     titre: "Les notifications",
-    ligne: "Bola te prévient sur ton téléphone quand il se passe quelque chose dans la ligue.",
+    ligne: "Quand on te cite au Vestiaire, quand on réagit à ton message, quand la ligue bouge.",
     bouton: "Activer les notifications",
   },
 };
@@ -89,15 +93,14 @@ export function InvitationCarte() {
         setVisible(forcee);
         return;
       }
-      await Promise.all([rafraichirPhotos(), rafraichirIdentites()]);
+      const [etat] = await Promise.all([
+        etatNotifications().catch(() => "indisponible" as const),
+        rafraichirPhotos(),
+        rafraichirIdentites(),
+      ]);
       if (annule || identiteConfirmee(nom) === false) return;
-      if (photoPerso(nom) === null) {
-        if (!enPause("carte", nom)) setVisible("carte");
-        return;
-      }
-      if (enPause("notifs", nom)) return;
-      const etat = await etatNotifications().catch(() => "indisponible" as const);
-      if (!annule && etat === "inactives") setVisible("notifs");
+      if (etat === "inactives" && !enPause("notifs", nom)) setVisible("notifs");
+      else if (photoPerso(nom) === null && !enPause("carte", nom)) setVisible("carte");
     }, DELAI_MS);
     return () => {
       annule = true;

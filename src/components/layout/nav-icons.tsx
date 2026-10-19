@@ -105,3 +105,20 @@ export function RechercheIcon({ plein }: SymboleProps) {
     </svg>
   );
 }
+
+/** La bulle du Vestiaire (bubble.left.and.bubble.right) : deux bulles, la
+ *  sienne devant celle d'un pote. Pleine quand on y est. */
+export function VestiaireIcon({ plein }: SymboleProps) {
+  return (
+    <svg {...symbole} fill="none">
+      <path
+        d="M16.9 8.2c2.5.5 4.3 2.4 4.3 4.7 0 1.2-.5 2.3-1.3 3.1l.6 2.6-2.6-1.2c-.6.2-1.3.3-2 .3-1.6 0-3-.5-4-1.4"
+        fill="none"
+      />
+      <path
+        d="M10.2 4.4c3.7 0 6.6 2.4 6.6 5.4s-2.9 5.4-6.6 5.4c-.8 0-1.6-.1-2.3-.3l-3.4 1.6.8-3.1C4.2 12.4 3.6 11.2 3.6 9.8c0-3 2.9-5.4 6.6-5.4z"
+        fill={plein ? "currentColor" : "none"}
+      />
+    </svg>
+  );
+}
