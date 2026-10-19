@@ -136,6 +136,18 @@ export function prechaufferCarte(node?: HTMLElement | null) {
   if (node) void document.fonts.ready.then(() => policesEnLigne(node));
 }
 
+/**
+ * WebKit : Safari, et tout navigateur d'iPhone (Chrome, Firefox… y tournent
+ * sur WebKit). Il peint les images d'une capture html-to-image (photo,
+ * symbole, badge) après coup : la première capture d'un calque sort sans
+ * elles, les suivantes les ont. C'est ce qui rendait la photo absente de la
+ * 3D sur iPhone alors que la carte plate l'affichait.
+ */
+const WEBKIT =
+  typeof navigator !== "undefined" &&
+  /AppleWebKit/.test(navigator.userAgent) &&
+  !/Chrome|Chromium|Android/.test(navigator.userAgent);
+
 /** La part du canvas qu'occupe la carte 3D posée (FILL_RATIO de card-3d-canvas, recopié pour ne pas charger three ici). */
 const REMPLISSAGE_3D = 0.72;
 
@@ -329,6 +341,14 @@ function Card3DInner({
         const polices = await policesEnLigne(node);
         const background = await captureLayer(node, { excludeParts: ["player", "stats"] }, polices);
         if (cancelled) return;
+        // Sur WebKit, une capture à blanc du calque joueur d'abord : elle
+        // lui fait décoder la photo, que la vraie capture trouve prête.
+        // (Avant, la carte se capturait deux fois par accident, ce qui le
+        // masquait.)
+        if (WEBKIT && node.querySelector('[data-card-part="player"] img')) {
+          await captureLayer(node, { isolatePart: "player" }, polices);
+          if (cancelled) return;
+        }
         const playerLayer = await captureLayer(node, { isolatePart: "player" }, polices);
         if (cancelled) return;
         const stats = await captureLayer(node, { isolatePart: "stats" }, polices);
