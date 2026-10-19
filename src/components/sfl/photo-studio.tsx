@@ -11,22 +11,28 @@
 //
 // Les images sont faites côté serveur (/api/photo-studio, fal.ai) ; chaque
 // variante (un drapeau par pays) n'est demandée qu'une fois, puis gardée.
+// Pendant qu'elles se font, le joueur regarde sa séance (attente-studio.tsx),
+// et la photo arrive dans un flash. Le pays du drapeau se cherche parmi tous
+// les pays du monde ; ceux de la ligue sont proposés d'abord.
 
-import { useRef, useState } from "react";
-import { ImageUp, Loader2, Plus, RotateCcw, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ImageUp, Plus, RotateCcw, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { CameraVisage } from "@/components/sfl/camera-visage";
+import { AttenteFiltre, AttenteStudio } from "@/components/sfl/attente-studio";
 import {
   COLORIS,
   FILTRES,
   PAYS,
   SELFIES_MAX,
   SELFIE_COTE,
+  chercherPays,
   emojiDrapeau,
+  unPays,
   type Coloris,
   type Filtre,
   type Pays,
@@ -53,6 +59,13 @@ async function reduire(fichier: File): Promise<string> {
 const POSES = ["De face, regarde l'objectif", "Tourne un peu la tête à gauche", "Puis un peu à droite"];
 
 const ETAPES = ["Visage", "Maillot", "Photo"] as const;
+
+/** Les légendes d'un filtre en cours. */
+function seanceFiltre(f: Exclude<Filtre, "studio">, pays: Pays | null): string[] {
+  if (f === "manga") return ["On sort l'encre", "Les traits", "Les trames", "Derniers coups de plume"];
+  const p = pays ? unPays(pays) : undefined;
+  return ["On déplie le drapeau", p ? `${emojiDrapeau(p.id)}  ${p.nom}` : "Le drapeau", "Mise au point"];
+}
 
 async function demander(corps: Record<string, unknown>): Promise<string> {
   const { data } = await supabase().auth.getSession();
@@ -88,6 +101,20 @@ export function PhotoStudio({
   const [etape, setEtape] = useState<"visage" | "maillot">("visage");
   // Pas de caméra (refusée ou absente) : on passe par la galerie.
   const [sansCamera, setSansCamera] = useState(false);
+  const [recherche, setRecherche] = useState("");
+  // La variante qui vient d'arriver : elle sort du flash, une fois.
+  const [revelee, setRevelee] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!revelee) return;
+    const id = window.setTimeout(() => setRevelee(null), 1300);
+    return () => window.clearTimeout(id);
+  }, [revelee]);
+
+  function reveler(k: string) {
+    setRevelee(k);
+    navigator.vibrate?.([14, 70, 14]);
+  }
 
   const studio = variantes.studio;
   const affichee = filtre === "drapeau" && !pays ? undefined : variantes[cle(filtre, pays)];
@@ -99,6 +126,7 @@ export function PhotoStudio({
     setFiltre("studio");
     setPays(null);
     setEnCours(null);
+    setRecherche("");
   }
 
   async function ajouter(e: React.ChangeEvent<HTMLInputElement>) {
@@ -126,6 +154,7 @@ export function PhotoStudio({
       // Nouvelle photo de studio : les filtres faits sur l'ancienne ne valent plus.
       setVariantes({ studio: image });
       setFiltre("studio");
+      reveler("studio");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "La photo n'a pas pu être faite.");
     } finally {
@@ -140,6 +169,7 @@ export function PhotoStudio({
     try {
       const image = await demander({ filtre: f, source: studio, pays: p ?? undefined });
       setVariantes((v) => ({ ...v, [k]: image }));
+      reveler(k);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Le filtre n'a pas pu être appliqué.");
       if (f !== "drapeau") setFiltre("studio");
@@ -178,7 +208,7 @@ export function PhotoStudio({
           {/* Où on en est : Visage, Maillot, Photo */}
           <ol className="flex gap-1.5" aria-label="Étapes">
             {ETAPES.map((nom, i) => {
-              const actuelle = studio ? 2 : etape === "maillot" ? 1 : 0;
+              const actuelle = studio || enCours === "studio" ? 2 : etape === "maillot" ? 1 : 0;
               return (
                 <li key={nom} className="flex flex-1 flex-col gap-1.5" aria-current={i === actuelle ? "step" : undefined}>
                   <span className={cn("h-1 rounded-full", i <= actuelle ? "bg-foreground" : "bg-foreground/15")} />
@@ -276,6 +306,14 @@ export function PhotoStudio({
                 </Button>
               </div>
             </>
+          ) : !studio && enCours === "studio" ? (
+            <>
+              {/* La séance : la photo arrivera exactement à cette place. */}
+              <AttenteStudio visage={selfies[0]} />
+              <p className="text-center text-[13px] text-muted-foreground">
+                Moins d&apos;une minute. Garde l&apos;app ouverte.
+              </p>
+            </>
           ) : !studio ? (
             <>
               {/* Les visages retenus, en rappel */}
@@ -320,13 +358,7 @@ export function PhotoStudio({
                 disabled={selfies.length === 0 || !!enCours}
                 onClick={faireStudio}
               >
-                {enCours ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" /> Photo en cours…
-                  </>
-                ) : (
-                  "Créer ma photo"
-                )}
+                Créer ma photo
               </Button>
               <Button
                 variant="ghost"
@@ -343,18 +375,22 @@ export function PhotoStudio({
               <div className="relative aspect-square w-full overflow-hidden rounded-[22px] bg-secondary">
                 {affichee && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={affichee} alt="Ma photo officielle" className="size-full object-cover" />
+                  <img
+                    key={cle(filtre, pays)}
+                    src={affichee}
+                    alt="Ma photo officielle"
+                    className={cn("size-full object-cover", revelee === cle(filtre, pays) && "studio-revelation")}
+                  />
                 )}
-                {!affichee && studio && !enCours && (
+                {affichee && revelee === cle(filtre, pays) && (
+                  <div aria-hidden className="studio-revelation-flash pointer-events-none absolute inset-0 bg-white" />
+                )}
+                {!affichee && studio && (
                   // Le fond attend : la photo neutre, voilée, sous le choix du pays.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={studio} alt="" className="size-full object-cover opacity-35" />
                 )}
-                {enCours && (
-                  <div className="absolute inset-0 grid place-items-center bg-background/40 backdrop-blur-sm">
-                    <Loader2 className="size-6 animate-spin" />
-                  </div>
-                )}
+                {enCours && enCours !== "studio" && <AttenteFiltre legendes={seanceFiltre(enCours, pays)} />}
               </div>
 
               <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Filtre">
@@ -391,31 +427,33 @@ export function PhotoStudio({
                 ))}
               </div>
 
-              {/* Drapeau : le pays, en une rangée qui défile */}
+              {/* Drapeau : le pays, cherché parmi tous, ou pris dans la rangée de la ligue */}
               {filtre === "drapeau" && (
-                <div
-                  className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none]"
-                  role="radiogroup"
-                  aria-label="Pays"
-                >
-                  {PAYS.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={pays === p.id}
-                      aria-label={p.nom}
+                <div className="flex flex-col gap-2.5">
+                  <label className="flex h-11 items-center gap-2 rounded-full bg-secondary/70 px-4">
+                    <Search className="size-4 shrink-0 text-muted-foreground" />
+                    <input
+                      type="search"
+                      value={recherche}
+                      onChange={(e) => setRecherche(e.target.value)}
+                      placeholder="Chercher un pays"
+                      enterKeyHint="search"
+                      autoComplete="off"
                       disabled={!!enCours}
-                      onClick={() => choisirPays(p.id)}
-                      className={cn(
-                        "flex shrink-0 flex-col items-center gap-1 rounded-2xl px-2.5 py-2 transition-colors",
-                        pays === p.id ? "bg-foreground/10 ring-1 ring-foreground/30" : "bg-secondary/60"
-                      )}
-                    >
-                      <span className="text-[26px] leading-none">{emojiDrapeau(p.id)}</span>
-                      <span className="text-[11px] font-semibold whitespace-nowrap text-muted-foreground">{p.nom}</span>
-                    </button>
-                  ))}
+                      className="min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
+                    />
+                    {recherche && (
+                      <button
+                        type="button"
+                        aria-label="Effacer"
+                        onClick={() => setRecherche("")}
+                        className="grid size-5 place-items-center rounded-full bg-muted-foreground/40 text-background"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    )}
+                  </label>
+                  <ListePays recherche={recherche} choisi={pays} bloque={!!enCours} onChoisir={choisirPays} />
                 </div>
               )}
 
@@ -443,5 +481,57 @@ export function PhotoStudio({
         <input ref={input} type="file" accept="image/*" multiple onChange={ajouter} className="hidden" />
       </SheetContent>
     </Sheet>
+  );
+}
+
+/**
+ * La rangée des pays : ceux de la ligue (et le pays choisi s'il n'en est pas)
+ * quand rien n'est cherché, sinon tous ceux qui répondent à la recherche.
+ */
+function ListePays({
+  recherche,
+  choisi,
+  bloque,
+  onChoisir,
+}: {
+  recherche: string;
+  choisi: Pays | null;
+  bloque: boolean;
+  onChoisir: (p: Pays) => void;
+}) {
+  const cherche = recherche.trim() !== "";
+  let liste: { id: Pays; nom: string }[] = cherche ? chercherPays(recherche) : [...PAYS];
+  if (!cherche && choisi && !PAYS.some((p) => p.id === choisi)) {
+    const p = unPays(choisi);
+    if (p) liste = [p, ...liste];
+  }
+  if (cherche && liste.length === 0) {
+    return <p className="py-3 text-center text-[13px] text-muted-foreground">Aucun pays à ce nom.</p>;
+  }
+  return (
+    <div
+      className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none]"
+      role="radiogroup"
+      aria-label="Pays"
+    >
+      {liste.map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          role="radio"
+          aria-checked={choisi === p.id}
+          aria-label={p.nom}
+          disabled={bloque}
+          onClick={() => onChoisir(p.id)}
+          className={cn(
+            "flex max-w-[132px] shrink-0 flex-col items-center gap-1 rounded-2xl px-2.5 py-2 transition-colors",
+            choisi === p.id ? "bg-foreground/10 ring-1 ring-foreground/30" : "bg-secondary/60"
+          )}
+        >
+          <span className="text-[26px] leading-none">{emojiDrapeau(p.id)}</span>
+          <span className="max-w-full truncate text-[11px] font-semibold text-muted-foreground">{p.nom}</span>
+        </button>
+      ))}
+    </div>
   );
 }

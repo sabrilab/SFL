@@ -830,3 +830,49 @@
 @media (prefers-reduced-motion: reduce) {
   .honneur-balance, .honneur-flotte { animation: none; }
 }
+
+/* Photo officielle en cours (components/sfl/attente-studio.tsx) : le visage
+   flou s'approche lentement, une bande de lumière balaie le cadre, un flash
+   part de temps en temps comme pendant une séance ; à l'arrivée, la photo
+   sort du flash (studio-revelation). Avec « Réduire les animations », rien ne
+   bouge : seule la barre avance. */
+@keyframes studio-approche {
+  from { transform: scale(1.14); }
+  to { transform: scale(1.02); }
+}
+@keyframes studio-balayage {
+  0% { transform: translateX(-120%) skewX(-18deg); }
+  60%, 100% { transform: translateX(220%) skewX(-18deg); }
+}
+@keyframes studio-flash {
+  0%, 88%, 100% { opacity: 0; }
+  90% { opacity: 0.55; }
+}
+@keyframes studio-viseur {
+  0%, 88%, 100% { inset: 14px; }
+  90% { inset: 22px; }
+}
+@keyframes studio-legende {
+  from { opacity: 0; transform: translateY(6px); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes studio-revelation {
+  0% { filter: blur(14px) brightness(1.9); transform: scale(1.06); }
+  100% { filter: none; transform: none; }
+}
+@keyframes studio-revelation-flash {
+  from { opacity: 0.9; }
+  to { opacity: 0; }
+}
+.studio-approche { animation: studio-approche 40s cubic-bezier(0.2, 0.6, 0.3, 1) forwards; }
+.studio-balayage { animation: studio-balayage 2.6s cubic-bezier(0.45, 0, 0.2, 1) infinite; }
+.studio-flash { animation: studio-flash 5.2s linear infinite; }
+.studio-viseur { animation: studio-viseur 5.2s cubic-bezier(0.3, 0, 0.2, 1) infinite; }
+.studio-legende { animation: studio-legende 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.studio-revelation { animation: studio-revelation 1.1s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.studio-revelation-flash { animation: studio-revelation-flash 0.9s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .studio-approche, .studio-balayage, .studio-flash, .studio-viseur,
+  .studio-legende, .studio-revelation, .studio-revelation-flash { animation: none; }
+  .studio-balayage, .studio-flash, .studio-revelation-flash { display: none; }
+}
