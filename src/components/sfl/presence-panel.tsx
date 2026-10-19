@@ -42,7 +42,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
     navigator.clipboard
       ?.writeText(
         `Convocation J${p.journee} — ${p.jour}, ${p.heure}, ${p.lieu}.\n` +
-          `${p.presents.length}/${p.effectif} confirmés.\n` +
+          `${p.presents.length} confirmés.\n` +
           `Sans réponse : ${list || "personne"}`
       )
       .then(() => toast.success("Relance copiée"))
@@ -55,8 +55,6 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
     if (ok) toast.success("Convocation publiée — la liste devient commune à toute la ligue.");
     else toast.error("Publication impossible. Vérifie l'installation (Réglages → Espace admin).");
   }
-
-  const jauge = Math.min(100, Math.round((p.presents.length / p.effectif) * 100));
 
   return (
     <section className="glass rounded-3xl p-5">
@@ -122,21 +120,11 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
         </p>
       )}
 
-      {/* La jauge de l'effectif */}
-      <div className="mt-4">
-        <div className="flex items-baseline justify-between">
-          <span className="mono-label text-foreground/40">Effectif confirmé</span>
-          <span className="text-[13px] font-bold tabular-nums">
-            {p.presents.length}
-            <span className="text-foreground/35">/{p.effectif}</span>
-          </span>
-        </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-foreground/10">
-          <div
-            className="h-full rounded-full bg-primary transition-[width] duration-300"
-            style={{ width: `${jauge}%` }}
-          />
-        </div>
+      {/* Le compte des participants : la journée reste ouverte, on peut
+          toujours s'ajouter — pas de plafond affiché. */}
+      <div className="mt-4 flex items-baseline justify-between">
+        <span className="mono-label text-foreground/40">Participants</span>
+        <span className="text-[13px] font-bold tabular-nums">{p.presents.length} déjà</span>
       </div>
 
       {p.equipesVisibles && p.teams && p.teams.length > 0 ? (
@@ -155,7 +143,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
         p.presents.length > 0 && (
           <div className="mt-4 border-t border-white/8 pt-3.5">
             <p className="mono-label mb-2 text-foreground/40">Qui vient</p>
-            <QuiVient noms={p.presents} places={Math.max(0, p.effectif - p.presents.length)} />
+            <QuiVient noms={p.presents} />
           </div>
         )
       )}

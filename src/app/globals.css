@@ -492,6 +492,11 @@
 .stk__badge--dedans {
   background: #0a0b0d;
 }
+.stk__badge--inscrits {
+  background: #f4f5f2;
+  color: #0a0b0d;
+  border-color: #0a0b0d;
+}
 .stk__etiquette {
   position: absolute;
   left: 45px;
@@ -510,6 +515,7 @@
 }
 .stk__etiquette--manque { background: #ff8a4c; color: #0a0b0d; }
 .stk__etiquette--dedans { background: #0a0b0d; color: #f4f5f2; }
+.stk__etiquette--inscrits { background: #f4f5f2; color: #0a0b0d; border-color: #0a0b0d; }
 .stk__etiquette--complet { background: #8f908b; color: #f4f5f2; }
 
 /* Un terrain sans match : un point, et son nom. */
