@@ -167,6 +167,22 @@ export async function POST(req: NextRequest) {
 
   if (envois.size === 0) return NextResponse.json({ envoyes: 0 });
 
+  // Le nombre de non lus de chacun, pour la pastille de l'icône (même compte
+  // que la pastille de la barre : lib/sfl/vestiaire.ts, compterNonLus).
+  const depuis = new Date(maintenant - 3 * 24 * HEURE).toISOString();
+  const { data: recents } = await sb
+    .from("messages")
+    .select("auteur, created_at")
+    .eq("canal", "sfl")
+    .gt("created_at", depuis);
+  for (const [uid, notif] of envois) {
+    const lu = new Date(suivis.get(uid)?.lu_jusqua ?? depuis).getTime();
+    const n = ((recents ?? []) as { auteur: string; created_at: string }[]).filter(
+      (m) => m.auteur !== uid && new Date(m.created_at).getTime() > lu
+    ).length;
+    if (n > 0) envois.set(uid, { ...notif, pastille: n });
+  }
+
   const { data: abonnements } = await sb
     .from("push_abonnements")
     .select("endpoint, p256dh, auth, user_id")

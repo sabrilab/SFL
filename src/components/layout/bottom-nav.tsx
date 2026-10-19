@@ -93,8 +93,10 @@ export function BottomNav() {
           {nonLus > 0 && !vestiaire && (
             <span
               aria-hidden
-              className="absolute -top-1.5 -right-2.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10.5px] font-bold tabular-nums"
-              style={{ background: encre, color: clair ? "#ffffff" : "#0a0b0d" }}
+              className="absolute -top-2 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] text-[11.5px] leading-none font-bold tabular-nums text-white"
+              // Le rouge des pastilles d'iOS, cerclé du fond pour se détacher
+              // du verre (seule couleur de la barre : c'est une alerte).
+              style={{ background: "#FF3B30", boxShadow: `0 0 0 2px ${clair ? "#ffffff" : "#0a0b0d"}` }}
             >
               {nonLus > 9 ? "9+" : nonLus}
             </span>

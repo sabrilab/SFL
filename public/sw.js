@@ -126,15 +126,21 @@ self.addEventListener("fetch", (event) => {
 
 // Les notifications (web push, voir lib/server/web-push.ts) : le message
 // arrive chiffré, le navigateur le déchiffre et nous le passe en JSON
-// { titre, texte, url, tag? }. Au toucher, on ramène l'app au premier plan sur la
+// { titre, texte, url, tag?, pastille? }. Au toucher, on ramène l'app au premier plan sur la
 // bonne page, ou on l'ouvre.
 self.addEventListener("push", (event) => {
   let n = {};
   try {
     n = event.data ? event.data.json() : {};
   } catch {}
+  // La pastille rouge sur l'icône de l'app (iOS 16.4+, Android) : le nombre
+  // de messages non lus que le serveur a compté pour ce joueur.
+  const pastille =
+    typeof n.pastille === "number" && n.pastille > 0 && self.navigator.setAppBadge
+      ? self.navigator.setAppBadge(Math.min(n.pastille, 99)).catch(() => {})
+      : Promise.resolve();
   event.waitUntil(
-    self.registration.showNotification(n.titre || "Bola", {
+    pastille.then(() => self.registration.showNotification(n.titre || "Bola", {
       body: n.texte || "",
       icon: "/icon-192.png",
       badge: "/icon-192.png",
@@ -142,7 +148,7 @@ self.addEventListener("push", (event) => {
       // Même étiquette (le Vestiaire) : la nouvelle remplace l'ancienne au
       // lieu de s'empiler, et le téléphone sonne quand même.
       ...(typeof n.tag === "string" ? { tag: n.tag, renotify: true } : {}),
-    })
+    }))
   );
 });
 
