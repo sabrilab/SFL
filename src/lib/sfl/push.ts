@@ -14,6 +14,8 @@ export interface Notif {
   url: string;
   /** Une notification de même étiquette remplace la précédente. */
   tag?: string;
+  /** Messages non lus : le nombre à poser sur l'icône de l'app. */
+  pastille?: number;
 }
 
 export const TITRE_MAX = 60;
