@@ -9,10 +9,14 @@
 // En haut à droite du portrait, le badge que le joueur a choisi (son meilleur
 // par défaut, voir lib/sfl/badge-carte).
 // La carte est un objet : elle ne suit pas le thème de l'app.
+// Le style (classique, ou une variante épurée : bola-card-variantes.tsx) est
+// celui choisi sur cet appareil, depuis Ma carte (lib/sfl/style-carte).
 
 "use client";
 
 import { BolaCard } from "./bola-card";
+import { CarteVariante } from "./bola-card-variantes";
+import { useStyleCarte } from "@/hooks/use-style-carte";
 import { useBadgeCarte } from "@/hooks/use-badge-carte";
 import { usePhotoPerso } from "@/hooks/use-player-photo";
 import { ovr, type Player, type StatKey } from "@/lib/sfl/engine";
@@ -43,6 +47,22 @@ export function PlayerCard({
   const photo = usePhotoPerso(player.name);
   const badge = useBadgeCarte(player.name);
   const identite = useIdentites();
+  const style = useStyleCarte();
+  if (style !== "classique")
+    return (
+      <CarteVariante
+        variante={style}
+        name={player.name}
+        affiche={affiche ?? identite.nom(player.name)}
+        username={pseudo ?? identite.pseudo(player.name)}
+        position={player.poste}
+        overall={ovr(stats)}
+        size={size}
+        photo={photo}
+        onglet={onglet}
+        badge={badge}
+      />
+    );
   return (
     <BolaCard
       edition="base"
