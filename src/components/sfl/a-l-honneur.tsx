@@ -31,6 +31,7 @@
 // 18/10 : « rendre certaines cartes un peu manipulables »).
 
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
+import { AuVestiaireRond } from "@/components/sfl/au-vestiaire";
 import { Badge3D, Objet3D, OBJET_PALIER } from "@/components/sfl/badge-3d";
 import { EMBLEMES } from "@/components/sfl/emblemes";
 import { MiniCarte } from "@/components/sfl/mini-carte";
@@ -39,6 +40,7 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { honneurDe } from "@/lib/sfl/a-l-honneur";
 import type { Player } from "@/lib/sfl/engine";
 import { metal, NOM_METAL, TROPHEES, type TropheeId } from "@/lib/sfl/trophees";
+import type { PieceLigue } from "@/lib/sfl/vestiaire";
 import { cn } from "@/lib/utils";
 
 const PHI = (1 + Math.sqrt(5)) / 2;
@@ -111,12 +113,21 @@ function Scene({
 }
 
 /** Le titre d'une scène, posé en haut à gauche sur le plateau. */
-function Titre({ children, j }: { children: string; j?: number }) {
+/** Le titre d'une scène, et en face le bouton rond qui la partage au Vestiaire. */
+function Titre({ children, j, partage }: { children: string; j?: number; partage?: PieceLigue["lignes"] }) {
   return (
-    <h2 className="absolute top-[var(--fib-13)] left-[var(--fib-21)] z-10 text-[15px] font-bold tracking-tight text-white/90">
-      {children}
-      {j != null && <span className="text-white/40"> · J{j}</span>}
-    </h2>
+    <>
+      <h2 className="absolute top-[var(--fib-13)] left-[var(--fib-21)] z-10 text-[15px] font-bold tracking-tight text-white/90">
+        {children}
+        {j != null && <span className="text-white/40"> · J{j}</span>}
+      </h2>
+      {partage && partage.length > 0 && (
+        <AuVestiaireRond
+          piece={{ type: "ligue", titre: children, j, lignes: partage.slice(0, 6) }}
+          className="absolute top-[var(--fib-8)] right-[var(--fib-13)] z-10"
+        />
+      )}
+    </>
   );
 }
 
@@ -367,9 +378,22 @@ export function ALHonneur({ j }: { j: number }) {
 
       {decroches.length > 0 && (
         <section className="flex flex-col gap-[var(--fib-13)]">
-          <h2 className="px-1 text-[17px] font-bold tracking-tight">
-            Ils ont décroché <span className="text-foreground/40">· J{j}</span>
-          </h2>
+          <div className="flex items-center justify-between gap-2 px-1">
+            <h2 className="text-[17px] font-bold tracking-tight">
+              Ils ont décroché <span className="text-foreground/40">· J{j}</span>
+            </h2>
+            <AuVestiaireRond
+              piece={{
+                type: "ligue",
+                titre: "Ils ont décroché",
+                j,
+                lignes: decroches.slice(0, 6).map((d) => ({
+                  n: d.nom,
+                  v: `${DEF[d.id].nom} · ${NOM_METAL[metal(d.palier)!]}`,
+                })),
+              }}
+            />
+          </div>
           <Rangee>
             {decroches.map((d) => (
               <Vitrine key={`${d.nom}-${d.id}`} d={d} p={carte(d.nom)!} />
@@ -391,6 +415,12 @@ export function ALHonneur({ j }: { j: number }) {
 
 type Mvp = { nom: string; buts: number; passes: number; pp: number };
 
+/** Les chiffres du jour d'un MVP, en une ligne. */
+const chiffresMvp = (m: Mvp) =>
+  [m.buts > 0 && `${m.buts} ${unite("buts", m.buts)}`, m.passes > 0 && `${m.passes} ${unite("passes", m.passes)}`, `+${m.pp} pts`]
+    .filter(Boolean)
+    .join(" · ");
+
 /** La carte de face, sous le projecteur ; les chiffres du jour à droite. */
 function HommeDuDimanche({ j, m, p, moi }: { j: number; m: Mvp; p: Player; moi: string }) {
   const largeur = W(GRANDE);
@@ -398,7 +428,9 @@ function HommeDuDimanche({ j, m, p, moi }: { j: number; m: Mvp; p: Player; moi: 
   return (
     <section>
       <Scene hauteur={hauteur + 110} horizon={(hauteur + 62) / (hauteur + 110)}>
-        <Titre j={j}>L&apos;homme du dimanche</Titre>
+        <Titre j={j} partage={[{ n: m.nom, v: chiffresMvp(m) }]}>
+          L&apos;homme du dimanche
+        </Titre>
         {/* Le cône du projecteur, sur la carte. */}
         <div
           aria-hidden
@@ -444,7 +476,9 @@ function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player 
   return (
     <section>
       <Scene hauteur={hauteur + 150} horizon={(hauteur + 96) / (hauteur + 150)}>
-        <Titre j={j}>Les hommes du dimanche</Titre>
+        <Titre j={j} partage={deux.map((m) => ({ n: m.nom, v: chiffresMvp(m) }))}>
+          Les hommes du dimanche
+        </Titre>
         <div className="absolute inset-x-0 flex justify-center gap-[var(--fib-34)]" style={{ bottom: 58, transformStyle: "preserve-3d" }}>
           {deux.map((m) => (
             <Manipulable key={m.nom} pose={0}>
@@ -523,7 +557,9 @@ function EquipeType({ j, equipe, moi }: { j: number; equipe: { nom: string; pp: 
     <section>
       <Scene sol={false} lumiere="rgba(160,255,190,0.10)">
         <Pelouse haut="86%" />
-        <Titre j={j}>L&apos;équipe type</Titre>
+        <Titre j={j} partage={[...equipe].sort((a, b) => b.pp - a.pp).map((e) => ({ n: e.nom, v: `+${e.pp} pts` }))}>
+          L&apos;équipe type
+        </Titre>
         <div className="relative flex flex-col items-center gap-[var(--fib-13)] px-[var(--fib-13)] pt-[var(--fib-55)] pb-[var(--fib-21)]">
           <div className="flex justify-center gap-[var(--fib-55)]">{fond.map((e) => joueur(e, PETITE))}</div>
           <div className="flex items-end justify-center gap-[var(--fib-8)]">
@@ -543,7 +579,15 @@ function Duo({ j, duo, passeur, buteur, moi }: { j: number; duo: { passeur: stri
   return (
     <section>
       <Scene hauteur={hauteur + 150} horizon={(hauteur + 96) / (hauteur + 150)}>
-        <Titre j={j}>Le duo</Titre>
+        <Titre
+          j={j}
+          partage={[
+            { n: duo.passeur, v: `${duo.n} ${unite("passes", duo.n)}` },
+            { n: duo.buteur, v: `${duo.n} ${unite("buts", duo.n)}` },
+          ]}
+        >
+          Le duo
+        </Titre>
         <svg aria-hidden viewBox="0 0 100 40" preserveAspectRatio="none" className="pointer-events-none absolute inset-x-[18%] top-[50px] h-[70px] text-white/50">
           <path d="M 4 38 Q 50 -14 96 38" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />
         </svg>
@@ -585,7 +629,7 @@ function IlsMontent({ montent, moi }: { montent: { nom: string; gain: number; ra
   return (
     <section>
       <Scene hauteur={H(PETITE) + 160} horizon={0.84}>
-        <Titre>Ils montent</Titre>
+        <Titre partage={montent.map((m) => ({ n: m.nom, v: `▲ ${m.gain} · ${m.rang}e` }))}>Ils montent</Titre>
         <div
           className="absolute inset-x-0 flex items-end justify-center gap-[var(--fib-8)]"
           style={{ bottom: 22 }}
@@ -623,7 +667,9 @@ function Surface({ surface, moi }: { surface: { nom: string; id: TropheeId; rest
     <section>
       <Scene sol={false} lumiere="rgba(160,255,190,0.08)">
         <Pelouse surface />
-        <Titre>Dans la surface</Titre>
+        <Titre partage={surface.map((s) => ({ n: s.nom, v: `${DEF[s.id].nom} dans ${s.reste} ${unite(s.id, s.reste)}` }))}>
+          Dans la surface
+        </Titre>
         {/* Le but, au fond de la surface. */}
         <div
           aria-hidden

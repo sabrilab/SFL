@@ -5,7 +5,8 @@
 // Cette page lit le journal `activity` (réservé à l'admin par RLS) et la table
 // des profils, puis passe le tout à la vue (`vue.tsx`), qui analyse
 // (`lib/sfl/retention.ts`) et affiche : conclusions, courbes de croissance,
-// rétention par cohorte, gestes qui font revenir, joueurs à relancer.
+// rétention par cohorte, gestes qui font revenir, joueurs à relancer. En
+// dessous, les sujets de Bola Agent (./agent.tsx), sans le contenu.
 // Rien n'est agrégé en base, donc rien à maintenir quand on ajoute un type
 // d'événement.
 //
@@ -17,6 +18,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSession } from "@/hooks/use-session";
 import { isAdmin } from "@/lib/sfl/admin";
 import { supabase } from "@/lib/supabase";
+import { AgentStats } from "./agent";
 import { ActiviteVue, type DonneesActivite } from "./vue";
 
 /** Lignes rendues au plus par une requête au serveur (réglage Supabase). */
@@ -134,5 +136,12 @@ export default function ActivitePage() {
     );
   }
 
-  return <ActiviteVue data={data} loading={loading} onRefresh={load} error={error} />;
+  return (
+    <>
+      <ActiviteVue data={data} loading={loading} onRefresh={load} error={error} />
+      <div className="shell pb-8">
+        <AgentStats />
+      </div>
+    </>
+  );
 }

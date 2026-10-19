@@ -175,7 +175,7 @@ export function PackOpening({
             )}
             <Card3D
               cacheKey={`pack-reveal-${current.id}`}
-              mode={current.kind === "simple" ? "simple" : "rare"}
+              mode={"simple"}
               size={0.95}
               render={(s) => <CollectionCardVisual card={current} size={s} />}
             />
@@ -209,7 +209,7 @@ export function PackOpening({
                 >
                   <Card3D
                     cacheKey={`pack-summary-${card.id}-${i}`}
-                    mode={card.kind === "simple" ? "simple" : "rare"}
+                    mode={"simple"}
                     size={0.42}
                     render={(s) => <CollectionCardVisual card={card} size={s} />}
                   />
