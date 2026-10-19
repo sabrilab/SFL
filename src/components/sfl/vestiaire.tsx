@@ -49,6 +49,7 @@ import {
   chargerVestiaire,
   couperLaParole,
   deposerPhoto,
+  deposerVideo,
   deposerVocal,
   direDevant,
   ecouterVestiaire,
@@ -59,6 +60,7 @@ import {
   marquerVestiaireLu,
   posterAuVestiaire,
   preparerPhoto,
+  preparerVideo,
   prendrePiece,
   reagir,
   reglerNotifsVestiaire,
@@ -68,6 +70,7 @@ import {
   type ModeNotifs,
   type Piece,
   type PiecePhoto,
+  type PieceVideo,
   type PieceVocal,
   type ProfilV,
   VOCAL_MAX_S,
@@ -93,7 +96,7 @@ const minutes = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60
 function apercu(m: MessageV): string {
   if (m.texte.trim()) return m.texte.trim();
   const t = m.piece?.type;
-  return t === "vocal" ? "🎤 Message vocal" : t === "photo" ? "📷 Photo" : t === "carte" ? "Une carte" : t === "feuille" ? "Une feuille de match" : "Un classement";
+  return t === "vocal" ? "🎤 Message vocal" : t === "photo" ? "📷 Photo" : t === "video" ? "🎬 Vidéo" : t === "carte" ? "Une carte" : t === "feuille" ? "Une feuille de match" : "Un classement";
 }
 
 /* -------------------------------- Vocaux -------------------------------- */
@@ -322,6 +325,66 @@ function PhotoVue({ piece }: { piece: PiecePhoto }) {
   );
 }
 
+/** Une vidéo dans le fil : sa première image et sa durée ; au toucher, en grand, avec le son. */
+function VideoVue({ piece }: { piece: PieceVideo }) {
+  const directe = piece.chemin.startsWith("blob:") || piece.chemin.startsWith("/");
+  const [src, setSrc] = useState<string | null>(directe ? piece.chemin : null);
+  const [grand, setGrand] = useState(false);
+
+  useEffect(() => {
+    if (src) return;
+    let vivant = true;
+    void lienPhoto(piece.chemin).then((l) => vivant && setSrc(l));
+    return () => {
+      vivant = false;
+    };
+  }, [piece.chemin, src]);
+
+  const ratio = Math.min(16 / 9, Math.max(4 / 5, piece.l / piece.h));
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (src) setGrand(true);
+        }}
+        aria-label="Lire la vidéo"
+        className="relative block w-[min(260px,64vw)] overflow-hidden rounded-[20px] bg-white/8"
+        style={{ aspectRatio: ratio }}
+      >
+        {/* #t=0.1 : Safari montre alors la première image au lieu d'un cadre noir. */}
+        {src && <video src={`${src}#t=0.1`} muted playsInline preload="metadata" className="size-full object-cover" />}
+        <span className="absolute inset-0 flex items-center justify-center">
+          <span className="flex size-12 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm">
+            <Play className="ml-0.5 size-5 fill-current" />
+          </span>
+        </span>
+        <span className="absolute right-2.5 bottom-2 rounded-full bg-black/55 px-2 py-0.5 text-[11.5px] font-bold text-white tabular-nums">
+          {minutes(piece.duree)}
+        </span>
+      </button>
+      {grand &&
+        src &&
+        createPortal(
+          <div role="dialog" aria-label="Vidéo" className="fixed inset-0 z-[60] flex items-center justify-center bg-black">
+            <video src={src} controls autoPlay playsInline className="max-h-full max-w-full" />
+            <button
+              type="button"
+              onClick={() => setGrand(false)}
+              aria-label="Fermer"
+              className="glass absolute top-[max(env(safe-area-inset-top),14px)] right-4 flex size-10 items-center justify-center rounded-full"
+            >
+              <X className="size-5" />
+            </button>
+          </div>,
+          document.body
+        )}
+    </>
+  );
+}
+
 /* -------------------------------- Pièces -------------------------------- */
 
 function PieceVue({ piece, onOuvrirJournee, mien = false }: { piece: Piece; onOuvrirJournee?: (j: number) => void; mien?: boolean }) {
@@ -329,6 +392,7 @@ function PieceVue({ piece, onOuvrirJournee, mien = false }: { piece: Piece; onOu
 
   if (piece.type === "vocal") return <VocalVue piece={piece} mien={mien} />;
   if (piece.type === "photo") return <PhotoVue piece={piece} />;
+  if (piece.type === "video") return <VideoVue piece={piece} />;
 
   if (piece.type === "carte") {
     return (
@@ -444,7 +508,7 @@ function ChoixPiece({ onChoix, onPhoto, onFermer }: { onChoix: (p: Piece) => voi
         {etape === "menu" && (
           <>
             <button type="button" className={ligne} onClick={onPhoto}>
-              Une photo
+              Une photo ou une vidéo
             </button>
             <button type="button" className={ligne} onClick={() => onChoix({ type: "carte", joueur: me })}>
               Ma carte
@@ -679,7 +743,7 @@ function Bulle({
           {/* La pièce à part, sous la phrase : une carte se montre nue, une
               feuille ou un classement dans son verre. */}
           {m.piece &&
-            (m.piece.type === "carte" || m.piece.type === "vocal" || m.piece.type === "photo" ? (
+            (m.piece.type === "carte" || m.piece.type === "vocal" || m.piece.type === "photo" || m.piece.type === "video" ? (
               <PieceVue piece={m.piece} mien={m.mien} />
             ) : (
               <div className="glass-soft w-[min(280px,68vw)] overflow-hidden rounded-[20px]">
@@ -797,7 +861,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
   const fil = useRef<HTMLDivElement>(null);
   const champ = useRef<HTMLTextAreaElement>(null);
   const choixPhoto = useRef<HTMLInputElement>(null);
-  /** La photo choisie, en attente d'envoi (la pièce porte son lien local). */
+  /** La photo ou la vidéo choisie, en attente d'envoi (la pièce porte son lien local). */
   const photoLocale = useRef<{ url: string; blob: Blob } | null>(null);
   /** Le fil est-il tenu au plus récent ? (faux dès qu'on remonte lire.) */
   const enBas = useRef(true);
@@ -939,14 +1003,15 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
   async function envoyer(vocal?: PieceVocal) {
     let p = vocal ?? piece;
     if (envoi || (!texte.trim() && !p)) return;
-    // Une photo choisie part d'abord dans le stockage, puis avec le message.
+    // Une photo ou une vidéo choisie part d'abord dans le stockage, puis avec le message.
     const locale = photoLocale.current;
-    if (!vocal && !demo && p?.type === "photo" && locale && p.chemin === locale.url) {
+    if (!vocal && !demo && (p?.type === "photo" || p?.type === "video") && locale && p.chemin === locale.url) {
       setEnvoi(true);
-      const deposee = await deposerPhoto(locale.blob, p.l, p.h);
+      const deposee =
+        p.type === "photo" ? await deposerPhoto(locale.blob, p.l, p.h) : await deposerVideo(locale.blob, p.l, p.h, p.duree);
       setEnvoi(false);
       if (!deposee) {
-        toast.error("Photo pas envoyée. Réessaie.");
+        toast.error(p.type === "photo" ? "Photo pas envoyée. Réessaie." : "Vidéo pas envoyée. Réessaie.");
         return;
       }
       p = deposee;
@@ -983,13 +1048,26 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
       return;
     }
     if (navigator.vibrate) navigator.vibrate(8);
-    if (p?.type === "photo") oublierPhoto();
+    if (p?.type === "photo" || p?.type === "video") oublierPhoto();
     if (moi) await recharger(moi, profils);
   }
 
-  /** Une photo choisie dans la photothèque ou prise à l'instant. */
+  /** Une photo ou une vidéo choisie dans la photothèque, ou prise à l'instant. */
   async function choisirPhoto(fichier: File | undefined) {
     if (!fichier) return;
+    if (fichier.type.startsWith("video/")) {
+      const v = await preparerVideo(fichier);
+      if (!v.ok) {
+        toast.error(v.raison);
+        return;
+      }
+      oublierPhoto();
+      const url = URL.createObjectURL(fichier);
+      photoLocale.current = { url, blob: fichier };
+      setPiece({ type: "video", chemin: url, l: v.l, h: v.h, duree: v.duree });
+      setChoix(false);
+      return;
+    }
     const prete = await preparerPhoto(fichier);
     if (!prete) {
       toast.error("Cette image ne s'ouvre pas.");
@@ -1233,10 +1311,19 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
             </div>
           )}
 
-          {piece?.type === "photo" && (
+          {(piece?.type === "photo" || piece?.type === "video") && (
             <div className="glass mb-2 flex items-start gap-2 rounded-3xl p-2">
-              {/* eslint-disable-next-line @next/next/no-img-element -- aperçu local */}
-              <img src={piece.chemin} alt="" className="h-24 max-w-[60%] rounded-[16px] object-cover" />
+              {piece.type === "photo" ? (
+                // eslint-disable-next-line @next/next/no-img-element -- aperçu local
+                <img src={piece.chemin} alt="" className="h-24 max-w-[60%] rounded-[16px] object-cover" />
+              ) : (
+                <span className="relative h-24 max-w-[60%] overflow-hidden rounded-[16px]">
+                  <video src={`${piece.chemin}#t=0.1`} muted playsInline preload="metadata" className="h-full object-cover" />
+                  <span className="absolute right-1.5 bottom-1.5 rounded-full bg-black/55 px-1.5 text-[11px] font-bold text-white tabular-nums">
+                    {minutes(piece.duree)}
+                  </span>
+                </span>
+              )}
               <div className="flex-1" />
               <button
                 type="button"
@@ -1244,7 +1331,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                   oublierPhoto();
                   setPiece(null);
                 }}
-                aria-label="Retirer la photo"
+                aria-label="Retirer"
                 className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/10"
               >
                 <X className="size-3.5" />
@@ -1252,7 +1339,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
             </div>
           )}
 
-          {piece && piece.type !== "photo" && (
+          {piece && piece.type !== "photo" && piece.type !== "video" && (
             <div className="glass mb-2 flex max-h-[38dvh] items-start gap-2 overflow-y-auto rounded-3xl">
               <div className="min-w-0 flex-1">
                 <PieceVue piece={piece} />
@@ -1334,7 +1421,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
               <input
                 ref={choixPhoto}
                 type="file"
-                accept="image/*"
+                accept="image/*,video/*"
                 hidden
                 onChange={(e) => {
                   void choisirPhoto(e.target.files?.[0]);
@@ -1347,7 +1434,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                   type="button"
                   onClick={() => choixPhoto.current?.click()}
                   disabled={envoi}
-                  aria-label="Envoyer une photo"
+                  aria-label="Envoyer une photo ou une vidéo"
                   className="flex size-10 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95 disabled:opacity-25"
                 >
                   <Camera className="size-5" strokeWidth={2.25} />
@@ -1424,6 +1511,7 @@ function messagesDemo(noms: string[], journees: Journee[]): MessageV[] {
     ["moi", "@" + n(5).toLowerCase() + " ta carte elle sort du pack de Noël", { type: "carte", joueur: n(1) }, { "🔥": ["a", "b"], "🤡": ["c"] }, null],
     [n(3), "", { type: "vocal", chemin: "blob:demo", duree: 14.2 }, { "😂": ["a"] }, null],
     [n(1), "La preuve", { type: "photo", chemin: "/players/Yacine.png", l: 1024, h: 1536 }, { "💀": ["a", "b"] }, null],
+    [n(2), "", { type: "video", chemin: "/videos/j8-bensou.webm", l: 1280, h: 720, duree: 17.2 }, { "🔥": ["a", "b", "c"] }, null],
     ["moi", "Dimanche on règle ça sur le terrain", null, {}, 6],
   ];
   return lignes.map(([auteur, texte, piece, reactions, reponseA], i) => ({

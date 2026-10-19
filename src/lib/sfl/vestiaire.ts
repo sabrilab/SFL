@@ -54,7 +54,17 @@ export interface PiecePhoto {
   l: number;
   h: number;
 }
-export type Piece = PieceCarte | PieceFeuille | PieceClassement | PieceVocal | PiecePhoto;
+/** Une vidéo (19/10) : 30 s au plus, dans le même bucket que les photos. */
+export interface PieceVideo {
+  type: "video";
+  /** <uuid de l'auteur>/<horodatage>.<ext> */
+  chemin: string;
+  l: number;
+  h: number;
+  /** En secondes. */
+  duree: number;
+}
+export type Piece = PieceCarte | PieceFeuille | PieceClassement | PieceVocal | PiecePhoto | PieceVideo;
 
 export function estPiece(v: unknown): v is Piece {
   if (!v || typeof v !== "object") return false;
@@ -66,6 +76,15 @@ export function estPiece(v: unknown): v is Piece {
   if (p.type === "vocal") return typeof p.chemin === "string" && typeof p.duree === "number";
   if (p.type === "photo")
     return typeof p.chemin === "string" && typeof p.l === "number" && typeof p.h === "number" && p.l > 0 && p.h > 0;
+  if (p.type === "video")
+    return (
+      typeof p.chemin === "string" &&
+      typeof p.l === "number" &&
+      typeof p.h === "number" &&
+      typeof p.duree === "number" &&
+      p.l > 0 &&
+      p.h > 0
+    );
   return false;
 }
 
@@ -326,8 +345,52 @@ export async function deposerPhoto(blob: Blob, l: number, h: number): Promise<Pi
   return { type: "photo", chemin, l, h };
 }
 
-/** Le lien d'une photo. */
+/** Le lien d'une photo ou d'une vidéo. */
 export const lienPhoto = (chemin: string) => lienSigne(BUCKET_IMAGES, chemin);
+
+/* -------------------------------- Vidéos -------------------------------- */
+
+/** 30 secondes et 25 Mo au plus : le stockage gratuit tient ainsi des centaines de vidéos. */
+export const VIDEO_MAX_S = 30;
+const VIDEO_MAX_OCTETS = 25 * 1024 * 1024;
+
+/** Lit la forme et la durée d'une vidéo choisie, ou dit pourquoi elle ne part pas. */
+export async function preparerVideo(
+  fichier: File
+): Promise<{ ok: true; l: number; h: number; duree: number } | { ok: false; raison: string }> {
+  if (fichier.size > VIDEO_MAX_OCTETS) return { ok: false, raison: "Vidéo trop lourde : 25 Mo au plus. Coupe-la." };
+  const url = URL.createObjectURL(fichier);
+  try {
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.muted = true;
+    const lue = await new Promise<boolean>((ok) => {
+      v.onloadedmetadata = () => ok(true);
+      v.onerror = () => ok(false);
+      setTimeout(() => ok(v.readyState >= 1), 8000);
+      v.src = url;
+    });
+    if (!lue) return { ok: false, raison: "Cette vidéo ne s'ouvre pas." };
+    if (v.duration > VIDEO_MAX_S + 0.5) return { ok: false, raison: `Vidéo trop longue : ${VIDEO_MAX_S} s au plus. Coupe-la.` };
+    return { ok: true, l: v.videoWidth || 9, h: v.videoHeight || 16, duree: Math.round((v.duration || 0) * 10) / 10 };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Dépose une vidéo et renvoie sa pièce. */
+export async function deposerVideo(fichier: Blob, l: number, h: number, duree: number): Promise<PieceVideo | null> {
+  const sb = supabase();
+  const { data: auth } = await sb.auth.getUser();
+  const uid = auth.user?.id;
+  if (!uid) return null;
+  const type = (fichier.type || "video/mp4").split(";")[0];
+  const ext = type === "video/quicktime" ? "mov" : type === "video/webm" ? "webm" : "mp4";
+  const chemin = `${uid}/${Date.now()}.${ext}`;
+  const { error } = await sb.storage.from(BUCKET_IMAGES).upload(chemin, fichier, { contentType: type });
+  if (error) return null;
+  return { type: "video", chemin, l, h, duree };
+}
 
 /** Pose ou retire ma réaction. */
 export async function reagir(id: number, emoji: Emoji, poser: boolean): Promise<boolean> {

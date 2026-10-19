@@ -611,7 +611,7 @@ alter table public.messages add constraint messages_piece_forme check (
   piece is null
   or (
     jsonb_typeof(piece) = 'object'
-    and piece->>'type' in ('carte', 'feuille', 'classement', 'vocal', 'photo')
+    and piece->>'type' in ('carte', 'feuille', 'classement', 'vocal', 'photo', 'video')
     and pg_column_size(piece) <= 4000
   )
 );
@@ -788,13 +788,15 @@ exception
 end;
 $$;
 
--- Les photos du Vestiaire (19/10) : bucket PRIVÉ « images », même rangement
--- et mêmes règles que les vocaux. L'app réduit chaque photo à 1600 px en JPEG
--- avant l'envoi (≈ 300 Ko) ; 2 Mo au plus.
+-- Les photos et les vidéos du Vestiaire (19/10) : bucket PRIVÉ « images »,
+-- même rangement et mêmes règles que les vocaux. L'app réduit chaque photo à
+-- 1600 px en JPEG avant l'envoi (≈ 300 Ko) ; une vidéo dure 30 s au plus et
+-- pèse 25 Mo au plus.
 do $$
 begin
   insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-  values ('images', 'images', false, 2097152, array['image/jpeg', 'image/webp', 'image/png'])
+  values ('images', 'images', false, 26214400,
+          array['image/jpeg', 'image/webp', 'image/png', 'video/mp4', 'video/quicktime', 'video/webm'])
   on conflict (id) do update
     set public = false,
         file_size_limit = excluded.file_size_limit,

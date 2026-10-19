@@ -50,6 +50,7 @@ function resume(texte: string, piece: unknown): string {
   const type = (piece as { type?: string } | null)?.type;
   if (type === "vocal") return "🎤 Message vocal";
   if (type === "photo") return "📷 Photo";
+  if (type === "video") return "🎬 Vidéo";
   return type === "carte"
     ? "a partagé une carte"
     : type === "feuille"
