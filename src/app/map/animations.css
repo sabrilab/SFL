@@ -138,6 +138,10 @@
       opacity 0.35s ease,
       translate 0.45s cubic-bezier(0.3, 1.35, 0.5, 1);
   }
+  /* Les places vides du prochain match respirent, l'une après l'autre. */
+  .places-vide {
+    animation: place-vide 2.4s ease-in-out calc(var(--i, 0) * 120ms) infinite;
+  }
   .carte-match:active {
     scale: 0.96;
     transition-duration: 0.1s;
@@ -157,6 +161,14 @@
 .carte-match--choisie {
   scale: 1;
   opacity: 1;
+}
+/* Le match joué reste là, en retrait. */
+.carte-match--joue:not(.carte-match--choisie) {
+  opacity: 0.6;
+}
+@keyframes place-vide {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }
 
 @keyframes stk-entre {
