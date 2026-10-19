@@ -1476,3 +1476,37 @@ exception
   when undefined_object then null;
 end;
 $$;
+
+-- ─────────────────────────── Bola Agent ───────────────────────────
+-- La conversation d'un joueur avec son coach (/agent, route /api/agent) :
+-- ses questions et les réponses du coach, avec leurs cartes (programme,
+-- débrief, panier, santé). Privée : chacun ne lit et n'écrit que la sienne,
+-- avec ses propres droits ; la route y compte aussi les questions du jour
+-- (le crédit du modèle est celui de Sabri).
+create table if not exists public.agent_messages (
+  id          bigint generated always as identity primary key,
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  role        text not null check (role in ('joueur', 'coach')),
+  texte       text not null default '' check (length(texte) <= 8000),
+  cartes      jsonb not null default '[]'::jsonb,
+  created_at  timestamptz not null default now()
+);
+create index if not exists agent_messages_user_date on public.agent_messages (user_id, created_at desc);
+
+alter table public.agent_messages enable row level security;
+
+drop policy if exists "agent: je lis la mienne" on public.agent_messages;
+create policy "agent: je lis la mienne"
+  on public.agent_messages for select to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists "agent: j'écris la mienne" on public.agent_messages;
+create policy "agent: j'écris la mienne"
+  on public.agent_messages for insert to authenticated
+  with check (user_id = (select auth.uid()));
+
+-- Pas d'effacement : les questions du jour y sont comptées.
+drop policy if exists "agent: j'efface la mienne" on public.agent_messages;
+
+revoke all on public.agent_messages from anon, authenticated;
+grant select, insert on public.agent_messages to authenticated;
