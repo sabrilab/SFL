@@ -36,7 +36,8 @@ export function BottomNav() {
   const pathname = usePathname();
   const onglet = ongletActif(pathname);
   const actif = TABS.findIndex(({ href }) => href === onglet);
-  const vestiaire = pathname === "/vestiaire";
+  // La bulle ouvre la discussion : le Vestiaire, et Bola Agent à côté.
+  const vestiaire = pathname === "/vestiaire" || pathname === "/agent";
   const clair = surMap(pathname);
   const encre = clair ? "#0a0b0d" : "#ffffff";
   // Du nouveau dans la discussion : le nombre, sur la bulle.

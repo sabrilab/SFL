@@ -9,6 +9,7 @@
 
 import { useMemo } from "react";
 import { Award, Crown, Flame, Medal, Shield, Target, Repeat, Zap } from "lucide-react";
+import { AuVestiaireRond } from "@/components/sfl/au-vestiaire";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useCardViewer } from "@/components/sfl/card-viewer";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -92,9 +93,18 @@ export function IlsSeDemarquent({ className }: { className?: string }) {
 
   return (
     <section className={cn("flex flex-col gap-2.5", className)}>
-      <div className="flex items-baseline justify-between px-1">
+      <div className="flex items-center justify-between gap-2 px-1">
         <h2 className="text-[17px] font-bold tracking-tight">Ils se démarquent</h2>
-        {source && <span className="mono-label text-foreground/40">{source}</span>}
+        <span className="flex items-center gap-2">
+          {source && <span className="mono-label text-foreground/40">{source}</span>}
+          <AuVestiaireRond
+            piece={{
+              type: "ligue",
+              titre: source ? `Ils se démarquent · ${source}` : "Ils se démarquent",
+              lignes: liste.slice(0, 6).map(({ player, distinctions: ds }) => ({ n: player.name, v: ds[0].detail })),
+            }}
+          />
+        </span>
       </div>
       <div className="-mx-5 flex snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 pb-2 [scrollbar-width:none]">
         {liste.map(({ player, distinctions: ds }) => (

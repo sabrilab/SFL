@@ -14,6 +14,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Check, Play } from "lucide-react";
+import { AuVestiaireRond } from "@/components/sfl/au-vestiaire";
 import { BoostCard, RankingCard } from "@/components/sfl/boost-card";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { Card3D } from "@/components/sfl/card-3d";
@@ -71,6 +72,7 @@ import { NEXT_MATCH } from "@/lib/sfl/data";
 import { Reveal } from "@/components/sfl/feed/reveal";
 import { PitchSynthese } from "@/components/sfl/feed/pitch-synthese";
 import { LaUne } from "@/components/sfl/feed/la-une";
+import type { Piece } from "@/lib/sfl/vestiaire";
 import { cn } from "@/lib/utils";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
@@ -135,11 +137,15 @@ function ReactionRow({ id, className }: { id: string; className?: string }) {
 
 /* --------------------------- Petits éléments --------------------------- */
 
-function ModuleTitle({ label, title }: { label?: string; title: string }) {
+/** Le titre d'un module ; en face, le bouton rond qui le partage au Vestiaire. */
+function ModuleTitle({ label, title, partage }: { label?: string; title: string; partage?: Piece }) {
   return (
-    <div className="mb-3 px-1">
-      {label && <p className="mono-label text-primary">{label}</p>}
-      <h2 className="mt-0.5 text-[17px] font-bold tracking-tight">{title}</h2>
+    <div className="mb-3 flex items-start justify-between gap-2 px-1">
+      <div>
+        {label && <p className="mono-label text-primary">{label}</p>}
+        <h2 className="mt-0.5 text-[17px] font-bold tracking-tight">{title}</h2>
+      </div>
+      {partage && <AuVestiaireRond piece={partage} />}
     </div>
   );
 }
@@ -358,9 +364,12 @@ function JourneeRecapComplet({ j }: { j: number }) {
       {/* 2 · Titre éditorial + progression de lecture */}
       <Reveal delay={0.05}>
         <div className="px-1">
-          <h2 className="text-[22px] leading-[1.15] font-extrabold tracking-tight">
-            Journée {lastJ.j} : le récap
-          </h2>
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="text-[22px] leading-[1.15] font-extrabold tracking-tight">
+              Journée {lastJ.j} : le récap
+            </h2>
+            <AuVestiaireRond piece={{ type: "feuille", j: lastJ.j }} />
+          </div>
           <p className="mt-[7px] text-[13px] leading-snug text-foreground/40">
             SFL · Sunday Five League · {matches.length} match{matches.length > 1 ? "s" : ""} ·{" "}
             {totalButs} buts
@@ -622,7 +631,20 @@ function JourneeRecapComplet({ j }: { j: number }) {
       {/* 9 · La journée en chiffres — bento */}
       <Reveal>
         <section>
-          <ModuleTitle title="La journée en chiffres" />
+          <ModuleTitle
+            title="La journée en chiffres"
+            partage={{
+              type: "ligue",
+              titre: "La journée en chiffres",
+              j: lastJ.j,
+              lignes: [
+                { l: isRecord ? "Buts · record" : "Buts inscrits", v: String(totalButs) },
+                ...(lastJ.faits.buteur ? [{ l: "Meilleur buteur", v: lastJ.faits.buteur }] : []),
+                ...(lastJ.faits.passeur ? [{ l: "Meilleur passeur", v: lastJ.faits.passeur }] : []),
+                ...analyse.insolites.map((t) => ({ l: t.label, v: String(t.value) })),
+              ].slice(0, 6),
+            }}
+          />
           <div className="grid grid-cols-2 gap-2.5">
             <div className="glass row-span-2 flex flex-col justify-between rounded-3xl p-4">
               <p className="mono-label text-muted-foreground">Buts inscrits</p>
@@ -690,7 +712,16 @@ function JourneeRecapComplet({ j }: { j: number }) {
       {tops.length > 0 && (
         <Reveal>
           <section>
-            <ModuleTitle label="Au barème Pépite" title="Les tops de la journée" />
+            <ModuleTitle
+              label="Au barème Pépite"
+              title="Les tops de la journée"
+              partage={{
+                type: "ligue",
+                titre: "Les tops de la journée",
+                j: lastJ.j,
+                lignes: tops.map(({ e, pp }) => ({ n: e.player, v: `+${pp} PP` })),
+              }}
+            />
             <div className="flex flex-col gap-2">
               {tops.map(({ e, pp }, i) => (
                 <div
@@ -729,7 +760,15 @@ function JourneeRecapComplet({ j }: { j: number }) {
       {duelA && duelB && (
         <Reveal>
           <section className="glass rounded-3xl p-5">
-            <ModuleTitle title="Le duel de la journée" />
+            <ModuleTitle
+              title="Le duel de la journée"
+              partage={{
+                type: "ligue",
+                titre: "Le duel de la journée",
+                j: lastJ.j,
+                lignes: [duelA, duelB].map((p) => ({ n: p.name, v: feat(p.name) ?? p.poste })),
+              }}
+            />
             <div className="mb-4 flex items-center justify-center gap-2.5">
               <Card3D
                 cacheKey={`feed-duel-${lastJ.j}-${duelA.name}`}
@@ -819,7 +858,16 @@ function JourneeRecapComplet({ j }: { j: number }) {
       {mvpCard && (
         <Reveal>
           <section>
-            <ModuleTitle label="Le moment de la journée" title={`Bravo ${mvpCard.player}`} />
+            <ModuleTitle
+              label="Le moment de la journée"
+              title={`Bravo ${mvpCard.player}`}
+              partage={{
+                type: "ligue",
+                titre: "Le moment de la journée",
+                j: lastJ.j,
+                lignes: [{ n: mvpCard.player, v: feat(mvpCard.player) ?? "MVP" }],
+              }}
+            />
             <div className="flex flex-col items-center gap-3">
               <Card3D
                 cacheKey={`feed-mvp-${lastJ.j}-${mvpCard.player}-${mvpCard.type}`}

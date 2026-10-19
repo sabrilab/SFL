@@ -5,7 +5,8 @@
 // Cette page lit le journal `activity` (réservé à l'admin par RLS) et la table
 // des profils, puis passe le tout à la vue (`vue.tsx`), qui analyse
 // (`lib/sfl/retention.ts`) et affiche : conclusions, courbes de croissance,
-// rétention par cohorte, gestes qui font revenir, joueurs à relancer.
+// rétention par cohorte, gestes qui font revenir, joueurs à relancer. En
+// dessous, les sujets de Bola Agent (./agent.tsx), sans le contenu.
 // Rien n'est agrégé en base, donc rien à maintenir quand on ajoute un type
 // d'événement.
 //
@@ -17,6 +18,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSession } from "@/hooks/use-session";
 import { isAdmin } from "@/lib/sfl/admin";
 import { supabase } from "@/lib/supabase";
+import { AgentStats } from "./agent";
 import { ActiviteVue, type DonneesActivite } from "./vue";
 
 /** Lignes rendues au plus par une requête au serveur (réglage Supabase). */
@@ -59,7 +61,7 @@ export default function ActivitePage() {
       };
       const [actData, prof] = await Promise.all([
         lireTout(),
-        sb.from("profiles").select("name, contact_email, created_at"),
+        sb.from("profiles").select("name, contact_email, created_at, is_admin"),
       ]);
       if (prof.error) throw new Error(prof.error.message);
 
@@ -80,11 +82,18 @@ export default function ActivitePage() {
           at: new Date(r.created_at).getTime(),
         };
       });
-      type ProfilBrut = { name: string; contact_email: string | null; created_at: string | null };
+      type ProfilBrut = {
+        name: string;
+        contact_email: string | null;
+        created_at: string | null;
+        is_admin: boolean | null;
+      };
       const profiles = ((prof.data ?? []) as ProfilBrut[]).map((p) => ({
         name: p.name,
         contact_email: p.contact_email,
         created_at: p.created_at ? new Date(p.created_at).getTime() : null,
+        // Le rôle en base, ou la liste en dur de l'app (Sabri, Ilyes).
+        admin: !!p.is_admin || isAdmin(p.name),
       }));
       setData({ evenements, profiles, now: Date.now() });
     } catch (e) {
@@ -127,5 +136,13 @@ export default function ActivitePage() {
     );
   }
 
-  return <ActiviteVue data={data} loading={loading} onRefresh={load} error={error} />;
+  return (
+    <ActiviteVue
+      data={data}
+      loading={loading}
+      onRefresh={load}
+      error={error}
+      pied={(public_, admins) => <AgentStats public={public_} admins={admins} />}
+    />
+  );
 }
