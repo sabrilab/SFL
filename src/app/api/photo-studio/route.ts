@@ -26,10 +26,10 @@ import { createClient } from "@supabase/supabase-js";
 import {
   LIMITE_JOUR,
   SELFIES_MAX,
-  PAYS,
   estColoris,
   estFiltre,
   estPays,
+  unPays,
   type Coloris,
 } from "@/lib/sfl/photo-studio";
 
@@ -125,7 +125,9 @@ export async function POST(req: NextRequest) {
     if (filtre === "drapeau") {
       const pays = corps.pays;
       if (!estPays(pays)) return erreur("Choisis un pays.", 400);
-      prompt = promptDrapeau(PAYS.find((p) => p.id === pays)!.en);
+      const p = unPays(pays)!;
+      // Le code ISO lève les doutes sur les pays au nom ambigu ou peu connu.
+      prompt = promptDrapeau(p.id.length === 2 ? `${p.en} (ISO country code ${p.id.toUpperCase()})` : p.en);
     } else {
       prompt = PROMPT_MANGA;
     }
