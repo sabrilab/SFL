@@ -48,13 +48,14 @@ const couper = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}�
 function resume(texte: string, piece: unknown): string {
   if (texte.trim()) return texte.trim();
   const type = (piece as { type?: string } | null)?.type;
-  return type === "vocal"
-    ? "🎤 Message vocal"
-    : type === "carte"
-      ? "a partagé une carte"
-      : type === "feuille"
-        ? "a partagé une feuille de match"
-        : "a partagé un classement";
+  if (type === "vocal") return "🎤 Message vocal";
+  if (type === "photo") return "📷 Photo";
+  if (type === "video") return "🎬 Vidéo";
+  return type === "carte"
+    ? "a partagé une carte"
+    : type === "feuille"
+      ? "a partagé une feuille de match"
+      : "a partagé un classement";
 }
 
 export async function POST(req: NextRequest) {
