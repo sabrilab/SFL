@@ -37,6 +37,7 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { Nom } from "@/components/sfl/nom";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
+import { TitreDiscussion } from "@/components/sfl/titre-discussion";
 import { useSession } from "@/hooks/use-session";
 import { RANKINGS } from "@/lib/sfl/rankings";
 import { rankByMetric, type Journee } from "@/lib/sfl/engine";
@@ -1234,7 +1235,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
 
   const enTete = (
     <header className="relative mx-auto flex w-full max-w-[640px] shrink-0 items-center justify-between gap-3 px-5 pt-3 pb-2">
-      <h1 className="text-[30px] font-bold tracking-tight lg:text-[34px]">Vestiaire</h1>
+      <TitreDiscussion actif="/vestiaire" />
       {!empeche && (
         <div className="flex items-center gap-2">
           <button
@@ -1537,7 +1538,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
 /** La partie de la page qu'on voit vraiment : sa hauteur et son décalage
  *  (le clavier d'iPhone les change sans redimensionner la page), et si
  *  l'écran est tactile. */
-function useVueVisible() {
+export function useVueVisible() {
   const [vue, setVue] = useState({ hauteur: 0, haut: 0, tactile: false });
   useEffect(() => {
     const vv = window.visualViewport;
