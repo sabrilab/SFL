@@ -17,10 +17,27 @@ export const TERRAIN = { l: 270, h: 540, incline: 56 };
 const HAUT = -34;
 /** L'œil, à 1000 px, vise le quart haut d'un cadre de 540 px. */
 const RECUL = 1000;
-const VISEE = 540 * 0.25 - HAUT;
 
-const sin = Math.sin((TERRAIN.incline * Math.PI) / 180);
-const cos = Math.cos((TERRAIN.incline * Math.PI) / 180);
+/**
+ * Un point de vue : la taille du terrain et sa bascule. La feuille de match
+ * garde celui par défaut ; les terrains de la Ligue en prennent un plus court
+ * et moins couché, pour que les rangs de cartes debout ne se cachent pas.
+ */
+export interface Vue {
+  l: number;
+  h: number;
+  incline: number;
+  sin: number;
+  cos: number;
+  visee: number;
+}
+
+export function vue(l = TERRAIN.l, h = TERRAIN.h, incline = TERRAIN.incline): Vue {
+  const r = (incline * Math.PI) / 180;
+  return { l, h, incline, sin: Math.sin(r), cos: Math.cos(r), visee: h * 0.25 - HAUT };
+}
+
+const DEFAUT = vue();
 
 export interface Projete {
   x: number;
@@ -30,14 +47,14 @@ export interface Projete {
 }
 
 /** Un point du terrain (u, v), à la hauteur w, vu dans le cadre. */
-export function projeter(u: number, v: number, w = 0): Projete {
-  const y0 = v - TERRAIN.h / 2;
+export function projeter(u: number, v: number, w = 0, { l, h, sin, cos, visee }: Vue = DEFAUT): Projete {
+  const y0 = v - h / 2;
   const y1 = y0 * cos - w * sin;
   const z1 = y0 * sin + w * cos;
   const k = 1 / (1 - z1 / RECUL);
   return {
-    x: (u - TERRAIN.l / 2) * k,
-    y: HAUT + VISEE + (y1 + TERRAIN.h / 2 - VISEE) * k,
+    x: (u - l / 2) * k,
+    y: HAUT + visee + (y1 + h / 2 - visee) * k,
     k,
   };
 }
@@ -45,11 +62,11 @@ export function projeter(u: number, v: number, w = 0): Projete {
 const f = (n: number) => Math.round(n * 100) / 100;
 
 /** Un tracé SVG à partir de points du terrain. */
-export function trace(points: [number, number, number?][], ferme = false): string {
+export function trace(points: [number, number, number?][], ferme = false, vu: Vue = DEFAUT): string {
   return (
     points
       .map(([u, v, w], i) => {
-        const p = projeter(u, v, w ?? 0);
+        const p = projeter(u, v, w ?? 0, vu);
         return `${i ? "L" : "M"}${f(p.x)} ${f(p.y)}`;
       })
       .join(" ") + (ferme ? " Z" : "")

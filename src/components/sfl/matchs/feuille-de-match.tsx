@@ -21,7 +21,7 @@
 // Les terrains viennent de lib/sfl/feuille.ts ; l'image est dessinée hors
 // écran puis photographiée par html-to-image (déjà là pour la carte 3D).
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toBlob } from "html-to-image";
 import { toast } from "sonner";
 import { Share } from "lucide-react";
@@ -38,7 +38,8 @@ import {
 } from "@/lib/sfl/feuille";
 import { ovr, type Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
-import { arc, projeter, rectArrondi, trace, TERRAIN } from "@/lib/sfl/terrain-vu";
+import { projeter, TERRAIN } from "@/lib/sfl/terrain-vu";
+import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
 import { Nom } from "@/components/sfl/nom";
 
 export interface EnTeteFeuille {
@@ -317,7 +318,6 @@ function TerrainVu({
   parNom: Map<string, Player>;
   onChoisir?: (p: Pose, player: Player) => void;
 }) {
-  const id = useId().replace(/:/g, "");
   const { l, h } = TERRAIN;
   const places = poses
     .map((p) => {
@@ -328,70 +328,12 @@ function TerrainVu({
     .sort((a, b) => a.v - b.v);
   const centre = projeter(l / 2, h / 2);
   const logo = { l: 46 * centre.k, h: projeter(l / 2, h / 2 + 23).y - projeter(l / 2, h / 2 - 23).y };
-  const but = (v: number, sens: 1 | -1): [number, number][] => [
-    [82, v],
-    [82, v + sens * 5.4],
-    ...arc(135, v + sens * 5.4, 53, 180, sens === 1 ? 0 : 360),
-    [188, v],
-  ];
   return (
     <div
       className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
       style={{ height: CADRE_H }}
     >
-      <svg aria-hidden className="absolute inset-0 size-full">
-        <defs>
-          <linearGradient id={`${id}f`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#17191d" />
-            <stop offset="1" stopColor="#24272c" />
-          </linearGradient>
-          <radialGradient id={`${id}o`}>
-            <stop offset="0" stopColor="#000" stopOpacity="0.55" />
-            <stop offset="1" stopColor="#000" stopOpacity="0" />
-          </radialGradient>
-          <clipPath id={`${id}c`}>
-            <path d={trace(rectArrondi(0, 0, l, h, 10), true)} />
-          </clipPath>
-        </defs>
-        <svg x="50%" overflow="visible">
-          {/* L'épaisseur du terrain, sous le bord avant. */}
-          <path
-            d={trace([[4, h], [l - 4, h], [l - 4, h, -14], [4, h, -14]], true)}
-            fill="#08090b"
-          />
-          <path d={trace(rectArrondi(0, 0, l, h, 10), true)} fill={`url(#${id}f)`} />
-          <g clipPath={`url(#${id}c)`} fill="rgba(255,255,255,0.04)">
-            {Array.from({ length: Math.ceil(h / 100) }, (_, i) => (
-              <path
-                key={i}
-                d={trace([[0, i * 100], [l, i * 100], [l, i * 100 + 50], [0, i * 100 + 50]], true)}
-              />
-            ))}
-          </g>
-          <g
-            fill="none"
-            stroke="rgba(255,255,255,0.55)"
-            strokeWidth={1.7}
-            strokeLinejoin="round"
-          >
-            <path d={trace(rectArrondi(11, 11, l - 11, h - 11, 4), true)} />
-            <path d={trace([[11, h / 2], [l - 11, h / 2]])} />
-            <path d={trace(but(11, 1))} />
-            <path d={trace(but(h - 11, -1))} />
-            <path d={trace(arc(l / 2, h / 2, 43.5, 0, 360, 40), true)} />
-          </g>
-          {places.map(({ p, u, v, x, y, k }) => (
-            <ellipse
-              key={p.nom}
-              cx={x}
-              cy={y}
-              rx={22 * k}
-              ry={(projeter(u, v + 9).y - projeter(u, v - 9).y) / 2}
-              fill={`url(#${id}o)`}
-            />
-          ))}
-        </svg>
-      </svg>
+      <SolTerrain ombres={places} />
       {/* Le logo couché au rond central ; en <img>, que html-to-image sait embarquer. */}
       {/* eslint-disable-next-line @next/next/no-img-element -- photographié par html-to-image */}
       <img

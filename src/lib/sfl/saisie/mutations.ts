@@ -33,6 +33,45 @@ export function updateEntryAt(
   return { ...saison, entries };
 }
 
+/**
+ * Feuille en direct : le joueur d'une ligne n'est pas venu, un autre a joué à
+ * sa place. La ligne garde son équipe et ce qui y est déjà noté (c'est le
+ * remplaçant qui était sur le terrain) ; seul le nom change, dans la ligne et
+ * dans les buts minutés de la journée.
+ */
+export function remplacerJoueurAt(saison: Saison, index: number, nouveau: string): Saison {
+  const ligne = saison.entries[index];
+  if (!ligne || ligne.player === nouveau) return saison;
+  const ancien = ligne.player;
+  const entries = saison.entries.map((e, i) => (i === index ? { ...e, player: nouveau } : e));
+  const events = saison.events?.map((ev) =>
+    ev.j !== ligne.j
+      ? ev
+      : {
+          ...ev,
+          player: ev.player === ancien ? nouveau : ev.player,
+          passeur: ev.passeur === ancien ? nouveau : ev.passeur,
+        }
+  );
+  return { ...saison, entries, ...(events ? { events } : {}) };
+}
+
+/**
+ * Feuille en direct : un joueur passe dans une autre équipe, avec ses chiffres.
+ * Si le résultat du match est déjà posé, il prend celui de sa nouvelle équipe.
+ */
+export function changerEquipeAt(saison: Saison, index: number, team: string): Saison {
+  const ligne = saison.entries[index];
+  if (!ligne || ligne.team === team) return saison;
+  const coequipier = saison.entries.find(
+    (e, i) => i !== index && e.j === ligne.j && e.team === team && !e.extraTime
+  );
+  return updateEntryAt(saison, index, {
+    team,
+    ...(coequipier ? { result: coequipier.result, cleanSheet: coequipier.cleanSheet } : {}),
+  });
+}
+
 export function deleteEntryAt(saison: Saison, index: number): Saison {
   return { ...saison, entries: saison.entries.filter((_, i) => i !== index) };
 }

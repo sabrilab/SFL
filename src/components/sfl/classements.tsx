@@ -10,8 +10,6 @@
 
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { PlayerCard } from "@/components/sfl/player-card";
-import { ViewableCard } from "@/components/sfl/card-viewer";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { BadgesLigne } from "@/components/sfl/distinctions";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -25,11 +23,6 @@ import { AuVestiaire } from "@/components/sfl/au-vestiaire";
 const DAUPHIN = FORMAT_CARTE.moyenne;
 const CHAMPION = FORMAT_CARTE.grande;
 
-// Le n°1 de chaque classement montre sa carte actuelle, la même que partout
-// (plus de carte à thème par classement depuis le 19/10, Sabri).
-function leaderCard(leader: Player, size: number) {
-  return <PlayerCard player={leader} size={size} />;
-}
 
 type Classe = Player & { rank: number; value: number };
 
@@ -46,18 +39,8 @@ function Podium({ def, top, me }: { def: RankingDef; top: Classe[]; me: string }
       {marches.map(({ p, size }, i) =>
         p ? (
           <div key={p.name} className="flex min-w-0 flex-col items-center gap-1.5">
-            {p === premier ? (
-              <ViewableCard
-                cacheKey={`rank-${def.id}-${p.name}`}
-                mode={"simple"}
-                size={size}
-                title={p.name}
-                subtitle={`${def.label} · ${p.value} ${def.unit}`}
-                render={(s) => leaderCard(p, s)}
-              />
-            ) : (
-              <MiniCarte player={p} size={size} detail={`${def.label} · ${p.value} ${def.unit}`} />
-            )}
+            {/* Le champion aussi en carte photo : la toucher l'ouvre en grand, en classique. */}
+            <MiniCarte player={p} size={size} detail={`${def.label} · ${p.value} ${def.unit}`} />
             <span
               className={cn(
                 "max-w-[120px] truncate font-semibold",

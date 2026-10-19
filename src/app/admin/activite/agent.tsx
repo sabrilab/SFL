@@ -7,8 +7,8 @@
 // La source est `agent_sujets` (lecture réservée à l'admin par RLS) : une
 // ligne par réponse du coach, avec le sujet rangé par le coach lui-même, le
 // raccourci touché, les types de cartes posées, le schéma et l'image. Aucun texte n'y
-// est gardé. Les admins sont retirés des chiffres. On compare les 30 derniers
-// jours aux 30 d'avant.
+// est gardé. Le public suit le choix du haut de la page (Joueurs par défaut,
+// Admins, Tout le monde). On compare les 30 derniers jours aux 30 d'avant.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
@@ -82,7 +82,15 @@ function Tuile({ label, valeur }: { label: string; valeur: number }) {
   );
 }
 
-export function AgentStats() {
+export function AgentStats({
+  public: public_ = "joueurs",
+  admins,
+}: {
+  /** Qui on regarde : le choix du haut de la page Activité. */
+  public?: "joueurs" | "admins" | "tous";
+  /** Les comptes admins connus de la base ; à défaut, la liste en dur. */
+  admins?: ReadonlySet<string>;
+} = {}) {
   const [lignes, setLignes] = useState<Ligne[] | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [maintenant, setMaintenant] = useState(0);
@@ -113,7 +121,7 @@ export function AgentStats() {
       if (!data || data.length < PAGE) break;
     }
     setMaintenant(Date.now());
-    setLignes(lu.filter((l) => !isAdmin(l.nom)));
+    setLignes(lu);
   }, []);
 
   useEffect(() => {
@@ -122,8 +130,12 @@ export function AgentStats() {
 
   const a = useMemo(() => {
     if (!lignes) return null;
-    const recents = lignes.filter((l) => l.at >= maintenant - FENETRE);
-    const avant = lignes.filter((l) => l.at < maintenant - FENETRE);
+    const estAdmin = (nom: string) => (admins ? admins.has(nom) : isAdmin(nom));
+    const vues = lignes.filter((l) =>
+      public_ === "tous" ? true : public_ === "admins" ? estAdmin(l.nom) : !estAdmin(l.nom)
+    );
+    const recents = vues.filter((l) => l.at >= maintenant - FENETRE);
+    const avant = vues.filter((l) => l.at < maintenant - FENETRE);
     const sujets = compter(recents, (l) => [l.sujet]);
     const sujetsAvant = compter(avant, (l) => [l.sujet]);
     const raccourcis = compter(recents, (l) => (l.raccourci ? [l.raccourci] : ["libre"]));
@@ -163,7 +175,7 @@ export function AgentStats() {
       monte: monte ? LIBELLE_SUJET[monte.s] : null,
       premier: [...sujets].sort((x, y) => y[1] - x[1])[0]?.[0] as Sujet | undefined,
     };
-  }, [lignes, maintenant]);
+  }, [lignes, maintenant, public_, admins]);
 
   return (
     <section className="glass rounded-3xl p-5">
