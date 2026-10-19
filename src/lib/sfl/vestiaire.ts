@@ -1,6 +1,7 @@
 "use client";
 
-// Le Vestiaire — la discussion de toute la ligue, dans l'onglet Ligue.
+// Le Vestiaire — la discussion de toute la ligue (/vestiaire, la bulle de la
+// barre d'onglets).
 //
 // C'est le salon de la table `messages` (canal 'sfl'), rebaptisé : on y
 // chambre, comme les joueurs le faisaient sur Snap. Ce que Snap n'a pas, et

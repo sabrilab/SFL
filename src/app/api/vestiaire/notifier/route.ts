@@ -24,7 +24,7 @@ import type { Notif } from "@/lib/sfl/push";
 
 export const maxDuration = 30;
 
-const URL_VESTIAIRE = "/ligue?vue=vestiaire";
+const URL_VESTIAIRE = "/vestiaire";
 const HEURE = 3600_000;
 /** Le Vestiaire est « ouvert » chez qui l'a lu depuis moins que ça. */
 const DEVANT = 2 * 60_000;

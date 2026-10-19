@@ -1,6 +1,7 @@
 "use client";
 
-// Le Vestiaire — la discussion de toute la ligue (onglet Ligue).
+// Le Vestiaire — la discussion de toute la ligue, sa page à elle (/vestiaire,
+// la bulle de la barre d'onglets).
 //
 // On y chambre. Chaque message porte la carte de son auteur en pastille (la
 // hiérarchie des cartes : petite ici, moyenne pour une carte partagée), et
@@ -9,19 +10,25 @@
 // le retrait ; pour l'admin, la sourdine de 24 h).
 //
 // Noir et blanc, comme la Ligue : ma bulle en blanc, celles des autres en
-// verre. Le fil se lit de haut en bas, le plus récent juste au-dessus de la
-// barre d'écriture, qui reste collée au-dessus des onglets.
+// verre. Un écran de discussion, comme Messages : le titre en haut, le fil
+// au milieu (seul à défiler, le plus récent en bas), la barre d'écriture
+// toujours en bas, même quand le fil est vide. Clavier fermé, elle se pose
+// au-dessus des onglets ; clavier ouvert, les onglets s'effacent et elle
+// monte juste au-dessus du clavier. L'écran suit la partie visible de la
+// page (visualViewport) : sur iPhone, en PWA, le clavier ne la redimensionne
+// pas, il la recouvre.
 //
 // Données : lib/sfl/vestiaire.ts. En développement seulement, ?demo=vestiaire
 // remplit le fil de messages d'essai, sans base, pour juger le rendu.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowUp, Bell, BellOff, Check, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { Nom } from "@/components/sfl/nom";
+import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { useSession } from "@/hooks/use-session";
 import { RANKINGS } from "@/lib/sfl/rankings";
 import { rankByMetric, type Journee } from "@/lib/sfl/engine";
@@ -241,7 +248,7 @@ function ReglageNotifs({ mode, onMode, onFermer }: { mode: ModeNotifs; onMode: (
     void etatNotifications().then(setEtat);
   }, []);
   return (
-    <div className="glass absolute top-12 right-0 z-20 w-[248px] rounded-3xl p-1.5 shadow-2xl">
+    <div className="glass absolute top-[52px] right-0 z-20 w-[248px] rounded-3xl p-1.5 shadow-2xl">
       {MODES.map(([m, label]) => (
         <button
           key={m}
@@ -430,10 +437,17 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
   const [reglage, setReglage] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const [sourdine, setSourdine] = useState<number | null>(null);
-  const bas = useRef<HTMLDivElement>(null);
+  const fil = useRef<HTMLDivElement>(null);
   const champ = useRef<HTMLTextAreaElement>(null);
+  /** Le fil est-il tenu au plus récent ? (faux dès qu'on remonte lire.) */
+  const enBas = useRef(true);
+  const vue = useVueVisible();
+  const [ecrit, setEcrit] = useState(false);
+  const clavier = ecrit && vue.tactile;
 
-  const demo = useMemo(() => DEMO && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo") === "vestiaire", []);
+  // ?demo=vestiaire : un fil d'essai ; ?demo=vestiaire-vide : le fil vide.
+  const demoVal = useMemo(() => (DEMO && typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("demo") : null), []);
+  const demo = demoVal === "vestiaire" || demoVal === "vestiaire-vide";
   const empeche = demo ? null : blocageVestiaire();
   const admin = !!session?.admin;
 
@@ -452,7 +466,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
     if (demo) {
       Promise.resolve().then(() => {
         setMoi("moi");
-        setMessages(messagesDemo(players.map((p) => p.name), journees));
+        setMessages(demoVal === "vestiaire-vide" ? [] : messagesDemo(players.map((p) => p.name), journees));
         setPrete(true);
       });
       return;
@@ -492,7 +506,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
       vivant = false;
       stop();
     };
-  }, [session?.server, recharger, demo, players, journees]);
+  }, [session?.server, recharger, demo, demoVal, players, journees]);
 
   // Le Vestiaire ouvert devant moi : tout ce qui arrive est lu.
   const dernier = messages[messages.length - 1]?.at ?? 0;
@@ -501,11 +515,24 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
     void marquerVestiaireLu(Math.max(Date.now(), dernier));
   }, [dernier, prete, demo, session?.server]);
 
-  // Descendre au plus récent, à l'ouverture et quand un message arrive.
+  // Rester au plus récent : à l'ouverture, quand un message arrive (si on ne
+  // lit pas plus haut), quand c'est le mien, et quand le clavier pousse.
+  const dernierMien = messages[messages.length - 1]?.mien ?? false;
+  useLayoutEffect(() => {
+    const f = fil.current;
+    if (!prete || !f) return;
+    if (enBas.current || dernierMien) f.scrollTop = f.scrollHeight;
+  }, [prete, messages.length, dernierMien, vue.hauteur, piece, choix]);
+
+  // Les onglets s'effacent pendant qu'on écrit (bottom-nav.tsx).
   useEffect(() => {
-    if (!prete) return;
-    bas.current?.scrollIntoView({ block: "end" });
-  }, [prete, messages.length]);
+    const html = document.documentElement;
+    if (clavier) html.dataset.clavier = "";
+    else delete html.dataset.clavier;
+    return () => {
+      delete html.dataset.clavier;
+    };
+  }, [clavier]);
 
   // Une pièce préparée ailleurs (« Au Vestiaire » d'un classement, d'une
   // feuille de match) attend dans la barre d'écriture.
@@ -605,161 +632,224 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
     if (!demo && !(await reglerNotifsVestiaire(m))) toast.error("Réglage pas enregistré.");
   }
 
-  if (empeche) {
-    return (
-      <p className="glass flex items-start gap-1.5 rounded-3xl p-4 text-[13.5px] leading-snug text-foreground/70">
-        <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
-        {empeche}
-      </p>
-    );
-  }
+  const enTete = (
+    <header className="relative mx-auto flex w-full max-w-[640px] shrink-0 items-center justify-between gap-3 px-5 pt-3 pb-2">
+      <h1 className="text-[30px] font-bold tracking-tight lg:text-[34px]">Vestiaire</h1>
+      {!empeche && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setReglage((v) => !v)}
+            aria-label="Notifications du Vestiaire"
+            aria-expanded={reglage}
+            className="glass flex size-11 items-center justify-center rounded-full"
+          >
+            {mode === "rien" ? <BellOff className="size-[18px]" /> : <Bell className="size-[18px]" />}
+          </button>
+          <BoutonRecherche />
+        </div>
+      )}
+      {reglage && <ReglageNotifs mode={mode} onMode={changerMode} onFermer={() => setReglage(false)} />}
+    </header>
+  );
 
   return (
-    // -mb-8 : au bout du fil, la barre d'écriture descend se poser juste
-    // au-dessus des onglets au lieu de flotter dans le vide de la page.
-    <section className="-mb-8 flex flex-col">
-      <div className="relative flex items-center justify-end">
-        <button
-          type="button"
-          onClick={() => setReglage((v) => !v)}
-          aria-label="Notifications du Vestiaire"
-          className="glass flex size-11 items-center justify-center rounded-full"
+    // Tout l'écran, à la hauteur de ce qui est visible : clavier ouvert, la
+    // barre d'écriture est juste au-dessus de lui.
+    <section
+      className="fixed inset-x-0 top-0 z-[35] flex flex-col bg-background"
+      style={{
+        height: vue.hauteur ? `${vue.hauteur}px` : "100dvh",
+        transform: vue.haut ? `translateY(${vue.haut}px)` : undefined,
+        paddingTop: "env(safe-area-inset-top)",
+      }}
+    >
+      {enTete}
+
+      <div
+        ref={fil}
+        onScroll={(e) => {
+          const f = e.currentTarget;
+          enBas.current = f.scrollHeight - f.scrollTop - f.clientHeight < 80;
+        }}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      >
+        <div
+          className="mx-auto flex min-h-full w-full max-w-[640px] flex-col justify-end px-5 pb-3"
+          onClick={(e) => e.target === e.currentTarget && setOuvert(null)}
         >
-          {mode === "rien" ? <BellOff className="size-[18px]" /> : <Bell className="size-[18px]" />}
-        </button>
-        {reglage && <ReglageNotifs mode={mode} onMode={changerMode} onFermer={() => setReglage(false)} />}
+          {empeche && (
+            <p className="glass my-auto flex items-start gap-1.5 rounded-3xl p-4 text-[13.5px] leading-snug text-foreground/70">
+              <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
+              {empeche}
+            </p>
+          )}
+          {erreur && !empeche && (
+            <p className="mb-auto flex items-start gap-1.5 rounded-2xl border border-white/10 px-3.5 py-3 text-[13px] leading-snug text-foreground/70">
+              <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
+              {erreur}
+            </p>
+          )}
+          {!empeche && prete && messages.length === 0 && !erreur && (
+            <p className="my-auto text-center text-[15px] font-semibold text-foreground/35">Le Vestiaire est vide.</p>
+          )}
+          {messages.map((m, i) => {
+            const avant = messages[i - 1];
+            const suite = !!avant && avant.auteurId === m.auteurId && m.at - avant.at < 5 * 60_000;
+            return (
+              <Bulle
+                key={m.id}
+                m={m}
+                suite={suite}
+                ouvert={ouvert === m.id}
+                moi={moi}
+                admin={admin}
+                onToucher={() => setOuvert((o) => (o === m.id ? null : m.id))}
+                onReagir={(e) => void basculerReaction(m, e)}
+                onRetirer={() => void retirer(m)}
+                onCouper={() => void couper(m)}
+                onOuvrirJournee={onOuvrirJournee}
+              />
+            );
+          })}
+        </div>
       </div>
 
-      {erreur && (
-        <p className="mt-3 flex items-start gap-1.5 rounded-2xl border border-white/10 px-3.5 py-3 text-[13px] leading-snug text-foreground/70">
-          <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
-          {erreur}
-        </p>
-      )}
-
-      <div className="flex min-h-[40dvh] flex-col justify-end pb-3" onClick={(e) => e.target === e.currentTarget && setOuvert(null)}>
-        {prete && messages.length === 0 && !erreur && (
-          <p className="py-16 text-center text-[15px] font-semibold text-foreground/35">Le Vestiaire est vide.</p>
-        )}
-        {messages.map((m, i) => {
-          const avant = messages[i - 1];
-          const suite = !!avant && avant.auteurId === m.auteurId && m.at - avant.at < 5 * 60_000;
-          return (
-            <Bulle
-              key={m.id}
-              m={m}
-              suite={suite}
-              ouvert={ouvert === m.id}
-              moi={moi}
-              admin={admin}
-              onToucher={() => setOuvert((o) => (o === m.id ? null : m.id))}
-              onReagir={(e) => void basculerReaction(m, e)}
-              onRetirer={() => void retirer(m)}
-              onCouper={() => void couper(m)}
-              onOuvrirJournee={onOuvrirJournee}
-            />
-          );
-        })}
-        <div ref={bas} className="scroll-mb-40" />
-      </div>
-
-      {/* La barre d'écriture, collée au-dessus des onglets */}
-      <div className="sticky z-10 pt-2" style={{ bottom: "calc(max(calc(env(safe-area-inset-bottom) - 4px), 14px) + 74px)" }}>
-        {/* Le fil s'efface sous la barre au lieu de passer à travers le verre. */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-x-[-20px] -top-6 -bottom-[120px] -z-10"
-          style={{ background: "linear-gradient(to bottom, transparent, var(--background) 34px)" }}
-        />
-        {choix && (
-          <ChoixPiece
-            onFermer={() => setChoix(false)}
-            onChoix={(p) => {
-              setPiece(p);
-              setChoix(false);
-              champ.current?.focus();
-            }}
-          />
-        )}
-
-        {suggestions.length > 0 && (
-          <div className="mb-2 flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
-            {suggestions.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  setTexte((t) => t.replace(/@([\p{L}0-9_.-]*)$/u, `@${p.pseudo} `));
-                  champ.current?.focus();
-                }}
-                className="glass flex shrink-0 items-center gap-2 rounded-full py-1 pr-3.5 pl-1"
-              >
-                <CarteDe name={p.name} size={FORMAT_CARTE.petite * 0.62} inerte />
-                <span className="text-[13px] font-semibold">@{p.pseudo}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {piece && (
-          <div className="glass mb-2 flex items-start gap-2 overflow-hidden rounded-3xl">
-            <div className="min-w-0 flex-1">
-              <PieceVue piece={piece} />
-            </div>
-            <button type="button" onClick={() => setPiece(null)} aria-label="Retirer la pièce" className="m-2 flex size-7 shrink-0 items-center justify-center rounded-full bg-white/10">
-              <X className="size-3.5" />
-            </button>
-          </div>
-        )}
-
-        {sourdine ? (
-          <p className="glass rounded-full px-4 py-3 text-center text-[13.5px] font-semibold text-foreground/55">
-            Parole coupée jusqu&apos;à {quand(sourdine)}
-          </p>
-        ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void envoyer();
-            }}
-            className="glass flex items-end gap-1.5 rounded-[26px] p-1.5"
-          >
-            <button
-              type="button"
-              onClick={() => setChoix((v) => !v)}
-              aria-label="Partager une carte, une feuille, un classement"
-              className={cn("flex size-10 shrink-0 items-center justify-center rounded-full transition-colors", choix ? "bg-foreground text-background" : "bg-white/10")}
-            >
-              <Plus className="size-5" strokeWidth={2.5} />
-            </button>
-            <textarea
-              ref={champ}
-              value={texte}
-              onChange={(e) => setTexte(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  void envoyer();
-                }
+      {/* La barre d'écriture : au-dessus des onglets, ou du clavier. */}
+      {!empeche && (
+        <div
+          className="mx-auto w-full max-w-[640px] shrink-0 px-3 pt-2"
+          style={{
+            paddingBottom: clavier ? "8px" : "calc(max(calc(env(safe-area-inset-bottom) - 4px), 14px) + 62px + 10px)",
+          }}
+        >
+          {choix && (
+            <ChoixPiece
+              onFermer={() => setChoix(false)}
+              onChoix={(p) => {
+                setPiece(p);
+                setChoix(false);
+                champ.current?.focus();
               }}
-              rows={1}
-              maxLength={2000}
-              placeholder="Message"
-              className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-[9px] text-[16px] leading-snug outline-none placeholder:text-foreground/30 [field-sizing:content]"
             />
-            <button
-              type="submit"
-              disabled={envoi || (!texte.trim() && !piece)}
-              aria-label="Envoyer"
-              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-95 disabled:opacity-25"
+          )}
+
+          {suggestions.length > 0 && (
+            <div className="mb-2 flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+              {suggestions.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  // Garder le clavier ouvert : le champ ne perd pas la main.
+                  onPointerDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setTexte((t) => t.replace(/@([\p{L}0-9_.-]*)$/u, `@${p.pseudo} `));
+                    champ.current?.focus();
+                  }}
+                  className="glass flex shrink-0 items-center gap-2 rounded-full py-1 pr-3.5 pl-1"
+                >
+                  <CarteDe name={p.name} size={FORMAT_CARTE.petite * 0.62} inerte />
+                  <span className="text-[13px] font-semibold">@{p.pseudo}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {piece && (
+            <div className="glass mb-2 flex max-h-[38dvh] items-start gap-2 overflow-y-auto rounded-3xl">
+              <div className="min-w-0 flex-1">
+                <PieceVue piece={piece} />
+              </div>
+              <button type="button" onClick={() => setPiece(null)} aria-label="Retirer la pièce" className="m-2 flex size-7 shrink-0 items-center justify-center rounded-full bg-white/10">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          )}
+
+          {sourdine ? (
+            <p className="glass rounded-full px-4 py-3 text-center text-[13.5px] font-semibold text-foreground/55">
+              Parole coupée jusqu&apos;à {quand(sourdine)}
+            </p>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void envoyer();
+              }}
+              className="glass flex items-end gap-1.5 rounded-[26px] p-1.5"
             >
-              <ArrowUp className="size-5" strokeWidth={2.75} />
-            </button>
-          </form>
-        )}
-      </div>
+              <button
+                type="button"
+                onClick={() => setChoix((v) => !v)}
+                aria-label="Partager une carte, une feuille, un classement"
+                aria-expanded={choix}
+                className={cn("flex size-10 shrink-0 items-center justify-center rounded-full transition-colors", choix ? "bg-foreground text-background" : "bg-white/10")}
+              >
+                <Plus className="size-5" strokeWidth={2.5} />
+              </button>
+              <textarea
+                ref={champ}
+                value={texte}
+                onChange={(e) => setTexte(e.target.value)}
+                onFocus={() => setEcrit(true)}
+                onBlur={() => {
+                  setEcrit(false);
+                  // iOS laisse parfois la page décalée après le clavier.
+                  if (vue.tactile) window.scrollTo(0, 0);
+                }}
+                onKeyDown={(e) => {
+                  // Entrée envoie sur ordinateur ; au téléphone, elle va à la ligne.
+                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !vue.tactile) {
+                    e.preventDefault();
+                    void envoyer();
+                  }
+                }}
+                rows={1}
+                maxLength={2000}
+                placeholder="Message"
+                className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-[9px] text-[16px] leading-snug outline-none placeholder:text-foreground/30 [field-sizing:content]"
+              />
+              <button
+                type="submit"
+                // Envoyer sans fermer le clavier, comme dans Messages.
+                onPointerDown={(e) => e.preventDefault()}
+                disabled={envoi || (!texte.trim() && !piece)}
+                aria-label="Envoyer"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-95 disabled:opacity-25"
+              >
+                <ArrowUp className="size-5" strokeWidth={2.75} />
+              </button>
+            </form>
+          )}
+        </div>
+      )}
     </section>
   );
+}
+
+/** La partie de la page qu'on voit vraiment : sa hauteur et son décalage
+ *  (le clavier d'iPhone les change sans redimensionner la page), et si
+ *  l'écran est tactile. */
+function useVueVisible() {
+  const [vue, setVue] = useState({ hauteur: 0, haut: 0, tactile: false });
+  useEffect(() => {
+    const vv = window.visualViewport;
+    const tactile = window.matchMedia("(pointer: coarse)").matches;
+    const maj = () =>
+      setVue({
+        hauteur: vv ? Math.round(vv.height) : 0,
+        haut: vv ? Math.max(0, Math.round(vv.offsetTop)) : 0,
+        tactile,
+      });
+    maj();
+    vv?.addEventListener("resize", maj);
+    vv?.addEventListener("scroll", maj);
+    return () => {
+      vv?.removeEventListener("resize", maj);
+      vv?.removeEventListener("scroll", maj);
+    };
+  }, []);
+  return vue;
 }
 
 /* ---------------------------------- Démo -------------------------------- */
