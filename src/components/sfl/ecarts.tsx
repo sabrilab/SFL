@@ -11,6 +11,7 @@
 // de la saison passée, annoncée comme telle.
 
 import { useMemo } from "react";
+import { AuVestiaireRond } from "@/components/sfl/au-vestiaire";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
@@ -92,9 +93,18 @@ export function Ecarts({ className, max = 8 }: { className?: string; max?: numbe
 
   return (
     <section className={cn("glass flex flex-col gap-3.5 rounded-[26px] p-[18px]", className)}>
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <h2 className="text-[17px] font-bold tracking-tight">La course au Pépite d&apos;Or</h2>
-        {source && <span className="mono-label shrink-0 text-foreground/40">{source}</span>}
+        <span className="flex items-center gap-2">
+          {source && <span className="mono-label shrink-0 text-foreground/40">{source}</span>}
+          <AuVestiaireRond
+            piece={{
+              type: "ligue",
+              titre: "La course au Pépite d'Or",
+              lignes: tete.slice(0, 5).map((p) => ({ n: p.name, v: p.pp === leader.pp ? `${p.pp} pts` : `−${leader.pp - p.pp}` })),
+            }}
+          />
+        </span>
       </div>
       <p className="text-[15px] leading-snug font-semibold text-balance">{titre}</p>
 
