@@ -2,8 +2,8 @@
 
 // Recherche — un seul champ pour deux mondes.
 //
-//   · un nom, un pseudo, un poste  → la fiche du joueur : sa carte, ses notes,
-//     ses chiffres de saison, sa forme, son dimanche par dimanche
+//   · un nom, un pseudo, un poste  → le profil du joueur (profil-joueur.tsx) :
+//     sa carte en grand, ses trophées, sa saison, son parcours, son jeu
 //   · « J6 », « journée 6 », « 6 »  → la fiche de la journée : les matchs, les
 //     buteurs, les passeurs, et le lien vers son récap dans le Feed
 //
@@ -14,21 +14,16 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, CalendarDays, Search, X } from "lucide-react";
-import { Card3D } from "@/components/sfl/card-3d";
-import { PlayerCard } from "@/components/sfl/player-card";
-import { Locked } from "@/components/sfl/locked";
+import { ProfilJoueur } from "@/components/sfl/profil-joueur";
 import { useSeason } from "@/components/sfl/season-provider";
 import { CarteDe } from "@/components/sfl/mini-carte";
-import { useGrandEcran } from "@/hooks/use-media-query";
 import { logActivity } from "@/lib/sfl/activity";
 import { nomAffiche, pseudoAffiche } from "@/lib/sfl/identites";
 import {
   journeeScoreSummary,
   ovr,
   rankPlayers,
-  STAT_KEYS,
   type Journee,
-  type Player,
 } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
@@ -52,188 +47,6 @@ function parseJournee(q: string): number | null {
 /** Le joueur, en petite carte (la pastille de la hiérarchie des cartes). */
 function Avatar({ name }: { name: string; size?: number }) {
   return <CarteDe name={name} inerte />;
-}
-
-/* ------------------------------ fiche joueur ------------------------------ */
-
-function StatBar({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <span className="mono-label w-8 shrink-0 text-foreground/40">{label}</span>
-      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/8">
-        <span
-          className="block h-full rounded-full bg-foreground/80"
-          style={{ width: `${Math.min(100, value)}%` }}
-        />
-      </span>
-      <span className="w-7 shrink-0 text-right text-[13px] font-bold tabular-nums">{value}</span>
-    </div>
-  );
-}
-
-function FicheJoueur({ player, rank }: { player: Player; rank: number }) {
-  const { saison, journees } = useSeason();
-  const cardStats = player.stats;
-  const grand = useGrandEcran();
-
-  const mine = useMemo(
-    () =>
-      saison.entries
-        .filter((e) => e.player === player.name && !e.extraTime && e.statut === "Présent")
-        .sort((a, b) => a.j - b.j),
-    [saison.entries, player.name]
-  );
-
-  const forme = mine
-    .filter((e) => e.result)
-    .slice(-5)
-    .map((e) => (e.result === "Victoire" ? "V" : e.result === "Nul" ? "N" : "D"));
-
-  const dates = new Map(journees.map((j) => [j.j, j.date]));
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-      className="grid grid-cols-1 gap-[18px] lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start lg:gap-6"
-    >
-      <div className="flex min-w-0 flex-col gap-[18px] lg:sticky lg:top-4">
-      {/* La carte en grand */}
-      <section className="flex flex-col items-center gap-3">
-        <Card3D
-          cacheKey={`recherche-${player.name}`}
-          mode="simple"
-          size={grand ? 1.05 : 0.8}
-          render={(s) => <PlayerCard player={player} size={s} />}
-        />
-        <p className="mono-label text-center text-[9px] tracking-[0.12em] text-foreground/30">
-          Glisse pour tourner · double-clic pour retourner
-        </p>
-      </section>
-
-      {/* Identité */}
-      <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[19px] font-extrabold tracking-tight"><Nom n={player.name} /></div>
-          <div className="mt-0.5 truncate text-[12.5px] text-foreground/42">
-            {pseudoAffiche(player.name)} · {player.poste} · {rank}e au Pépite d&apos;Or
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-[26px] leading-none font-extrabold tracking-tight tabular-nums">
-            {ovr(cardStats)}
-          </div>
-          <p className="mono-label mt-1 text-foreground/40">Général</p>
-        </div>
-      </div>
-
-      </div>
-
-      <div className="flex min-w-0 flex-col gap-[18px]">
-      {/* Les six critères */}
-      <section className="glass flex flex-col gap-2.5 rounded-[26px] px-[18px] py-[17px]">
-        <p className="mono-label text-foreground/40">Profil de jeu</p>
-        {STAT_KEYS.map((k) => (
-          <StatBar key={k} label={k} value={cardStats[k]} />
-        ))}
-      </section>
-
-      {/* Chiffres de saison */}
-      <div className="grid grid-cols-4 gap-2.5">
-        {(
-          [
-            [player.pp, "Pépite"],
-            [player.buts, "Buts"],
-            [player.passes, "Passes"],
-            [player.matchs, "Matchs"],
-          ] as const
-        ).map(([value, label]) => (
-          <div key={label} className="glass rounded-[20px] px-3 py-3.5 text-center">
-            <div className="text-[22px] leading-none font-extrabold tracking-tight tabular-nums">
-              {value}
-            </div>
-            <p className="mono-label mt-2 text-foreground/40">{label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Forme */}
-      {forme.length > 0 && (
-        <div className="glass-soft flex items-center justify-between rounded-[20px] px-4 py-3">
-          <span className="mono-label text-foreground/40">Forme · 5 derniers</span>
-          <span className="flex gap-1.5">
-            {forme.map((r, i) => (
-              <span
-                key={i}
-                className={cn(
-                  "flex size-6 items-center justify-center rounded-full text-[11px] font-bold",
-                  r === "V"
-                    ? "bg-primary text-primary-foreground"
-                    : r === "N"
-                      ? "bg-white/12 text-foreground/70"
-                      : "bg-white/6 text-foreground/35"
-                )}
-              >
-                {r}
-              </span>
-            ))}
-          </span>
-        </div>
-      )}
-
-      {/* Dimanche par dimanche */}
-      {mine.length > 0 && (
-        <section>
-          <h2 className="mb-2.5 px-1 text-[16px] font-bold tracking-tight">
-            Dimanche par dimanche
-          </h2>
-          <div className="glass overflow-hidden rounded-[22px]">
-            {mine.map((e, i) => (
-              <div
-                key={e.j}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-2.5 text-[13px]",
-                  i < mine.length - 1 && "border-b border-white/8"
-                )}
-              >
-                <span className="mono-label w-7 shrink-0 text-foreground/40">J{e.j}</span>
-                <span className="min-w-0 flex-1 truncate text-foreground/45">
-                  {dates.get(e.j) ?? ""}
-                </span>
-                <span className="shrink-0 tabular-nums text-foreground/70">
-                  {e.buts}⚽ {e.passes}🅰
-                </span>
-                <span
-                  className={cn(
-                    "w-5 shrink-0 text-right font-bold",
-                    e.result === "Victoire"
-                      ? "text-primary"
-                      : e.result === "Nul"
-                        ? "text-foreground/50"
-                        : "text-foreground/30"
-                  )}
-                >
-                  {e.result ? e.result[0] : "–"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Les vidéos arrivent avec les uploads */}
-      <Locked label="Bientôt" note="Les vidéos taguées de ce joueur apparaîtront ici.">
-        <div className="glass rounded-[22px] px-4 py-5">
-          <p className="text-[15px] font-semibold">Vidéos</p>
-          <p className="mt-1 text-[12.5px] text-foreground/45">
-            Les actions filmées où ce joueur est identifié.
-          </p>
-        </div>
-      </Locked>
-      </div>
-    </motion.div>
-  );
 }
 
 /* ----------------------------- fiche journée ----------------------------- */
@@ -529,7 +342,7 @@ export default function RecherchePage() {
       )}
 
       {selectedPlayer && (
-        <FicheJoueur
+        <ProfilJoueur
           player={selectedPlayer}
           rank={rankOf.get(selectedPlayer.name) ?? players.length}
         />
