@@ -1268,8 +1268,11 @@ begin
       select u.id, a.name, a.username, true, true
         from auth.users u
        where u.email = a.email
+      -- Le pseudo n'est posé qu'à la création : ensuite il appartient au
+      -- joueur (garde_pseudo). Le réécrire ici faisait échouer TOUTE la
+      -- migration dès qu'un admin avait changé le sien (19/10).
       on conflict (id) do update
-        set is_admin = true, valide = true, name = excluded.name, username = excluded.username;
+        set is_admin = true, valide = true, name = excluded.name;
     exception
       -- Un autre profil porte déjà ce nom ou ce pseudo : on ne casse pas la
       -- migration pour ça, on promeut au moins le rôle.
