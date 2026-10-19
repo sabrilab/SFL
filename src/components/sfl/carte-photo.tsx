@@ -10,7 +10,8 @@
 // visage, et seul l'essentiel reste en bas, en blanc sur un voile léger qui
 // ne commence qu'à la section d'or (1/φ de la hauteur) :
 //   · compacte (100–170 px) : le poste, le nom, la note ; le badge en haut ;
-//   · réduite  (70–100)     : la note seule ;
+//   · réduite  (70–100)     : la note seule (dans l'onglet de l'équipe sur
+//                             les terrains) ;
 //   · pastille (< 70)       : un carré, le visage, la note dans un onglet
 //                             (aux couleurs de l'équipe sur les terrains).
 //
@@ -195,6 +196,33 @@ export function CartePhoto({
       </div>
 
       <div data-card-part="stats" style={{ position: "absolute", inset: 0 }}>
+        {reduite && onglet ? (
+          // Sur un terrain : la note dans l'onglet aux couleurs de l'équipe, comme la pastille.
+          <div
+            style={{
+              position: "absolute",
+              right: 0,
+              bottom: 0,
+              minWidth: u(W * 0.46),
+              height: u(W * 0.34),
+              padding: `0 ${u(W * 0.07)}px`,
+              boxSizing: "border-box",
+              borderTopLeftRadius: u(W * 0.12),
+              background: onglet.fond,
+              color: onglet.encre,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 800,
+              fontSize: u(W * 0.23),
+              letterSpacing: "-0.04em",
+              lineHeight: 1,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {overall}
+          </div>
+        ) : (
         <div
           style={{
             position: "absolute",
@@ -241,6 +269,7 @@ export function CartePhoto({
           )}
           <div style={note}>{overall}</div>
         </div>
+        )}
       </div>
     </div>
   );

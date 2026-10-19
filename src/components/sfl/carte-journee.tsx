@@ -39,13 +39,14 @@ const PHI = (1 + Math.sqrt(5)) / 2;
 const onglet = (name: string) => ({ fond: couleur(name), encre: "#0A0A0A" });
 
 /**
- * Les deux tailles du terrain, toutes deux en pastille (le visage, la note
- * aux couleurs de l'équipe) : le meilleur de l'équipe n'est qu'un cran au-
- * dessus des autres (×1,25), pas un autre format (Sabri, 19/10 : « mettre en
- * avant, mais ne pas abuser »).
+ * Les deux tailles du terrain, toutes deux en carte verticale (palier
+ * réduite : la photo, la note dans l'onglet de l'équipe) : le meilleur de
+ * l'équipe n'est qu'un cran au-dessus des autres (×1,15), pas un autre
+ * format (Sabri, 19/10 : « mettre en avant, mais ne pas abuser » ; « on
+ * préfère le format vertical, un peu plus grand »).
  */
-const PASTILLE = 0.22; // 56 px
-const VEDETTE = 0.27; // 69 px, juste sous le palier de la réduite (70 px)
+const PASTILLE = 0.29; // 74 × 119 px
+const VEDETTE = 0.335; // 85 × 138 px, sous le palier de la compacte (100 px)
 
 /**
  * Un joueur sur la feuille : sa vraie carte Bola, son nom en entier, ses
@@ -68,7 +69,7 @@ function Joueur({ ligne, equipe, delai, star }: { ligne: MatchPlayerLine; equipe
       transition={{ duration: 0.4, delay: delai, ease: [0.22, 1, 0.36, 1] }}
       className="flex flex-col items-center [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]"
       // Le nom a sa place, même sous une pastille : rien n'est coupé.
-      style={{ width: Math.max(largeur, 64) }}
+      style={{ width: Math.max(largeur, 74) }}
     >
       <span className="relative" style={{ filter: "drop-shadow(0 8px 10px rgba(0,0,0,0.45))" }}>
         {player ? (
