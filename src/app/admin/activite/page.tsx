@@ -33,6 +33,11 @@ import { cn } from "@/lib/utils";
 
 const DAY = 24 * 3600 * 1000;
 
+/** Lignes rendues au plus par une requête au serveur (réglage Supabase). */
+const PAGE = 1000;
+/** Garde-fou : on ne lit pas plus que ça d'événements. */
+const MAX_EVENEMENTS = 200000;
+
 /** Périodes proposées. `days: null` = depuis le tout début. */
 const PERIODES = [
   { id: "7", label: "7 j", days: 7 },
@@ -186,15 +191,30 @@ export default function ActivitePage() {
       const sb = supabase();
       // On lit tout l'historique disponible et on découpe côté navigateur :
       // le filtre de période devient instantané, sans nouvelle requête.
-      const [act, prof] = await Promise.all([
+      // Le serveur ne rend jamais plus de PAGE lignes par requête, quel que
+      // soit le `limit` demandé : on lit donc le journal page par page, sans
+      // quoi seuls les derniers jours remontaient.
+      const lirePage = (debut: number) =>
         sb
           .from("activity")
           .select("kind, created_at, path, session_id, profiles ( name )")
           .order("created_at", { ascending: false })
-          .limit(20000),
+          .order("id", { ascending: false })
+          .range(debut, debut + PAGE - 1);
+      const lireTout = async () => {
+        const lignes: unknown[] = [];
+        for (let debut = 0; debut < MAX_EVENEMENTS; debut += PAGE) {
+          const { data, error } = await lirePage(debut);
+          if (error) throw new Error(error.message);
+          lignes.push(...(data ?? []));
+          if (!data || data.length < PAGE) break;
+        }
+        return lignes;
+      };
+      const [actData, prof] = await Promise.all([
+        lireTout(),
         sb.from("profiles").select("name, contact_email"),
       ]);
-      if (act.error) throw new Error(act.error.message);
       if (prof.error) throw new Error(prof.error.message);
 
       type Brut = {
@@ -204,7 +224,7 @@ export default function ActivitePage() {
         session_id: string | null;
         profiles: { name: string } | { name: string }[] | null;
       };
-      const evenements = ((act.data ?? []) as unknown as Brut[]).map((r) => {
+      const evenements = (actData as Brut[]).map((r) => {
         const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
         return {
           name: p?.name ?? "?",
