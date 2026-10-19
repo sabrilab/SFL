@@ -5,7 +5,7 @@
 // l'un à l'autre, titre-discussion.tsx).
 //
 // En haut du fil, toujours, la fiche que le coach a sous les yeux : la carte
-// du joueur et ses six stats, de la meilleure à la pire. Puis la conversation :
+// du joueur et ses six stats, de la plus haute à la plus basse. Puis la conversation :
 // mes messages en blanc à droite, les siens en verre à gauche. Il discute
 // surtout ; parfois il montre une image (une zone du corps, du terrain, une
 // posture : faite à la demande, gardée dans le bucket privé « agent ») ou
@@ -13,7 +13,7 @@
 // l'app met en page elle-même (lib/sfl/agent.ts).
 // Après un match récent, le coach ouvre : « J11 : victoire, 2 buts. Alors,
 // c'était comment ? ». Au-dessus de la barre d'écriture, quatre départs :
-// ma pire stat, le débrief, mes courses, une douleur.
+// la stat à faire monter, le débrief, mes courses, une douleur.
 //
 // Comme le Vestiaire : un écran de discussion à la hauteur de ce qui est
 // visible (le clavier d'iPhone recouvre la page), la barre d'écriture en bas,
@@ -50,6 +50,7 @@ import {
   questionDebrief,
   type CarteCoach,
   type DossierJoueur,
+  type Raccourci,
   type ImageCoach,
   type MessageAgent,
 } from "@/lib/sfl/agent";
@@ -62,7 +63,7 @@ const horloge = () => Date.now();
 
 /* --------------------------------- La fiche ------------------------------- */
 
-/** La carte du joueur et ses six stats, de la meilleure à la pire. */
+/** La carte du joueur et ses six stats, de la plus haute à la plus basse. */
 function Fiche({ dossier }: { dossier: DossierJoueur }) {
   const n = dossier.stats.length;
   return (
@@ -75,7 +76,7 @@ function Fiche({ dossier }: { dossier: DossierJoueur }) {
             <span className="relative h-[5px] min-w-0 flex-1 overflow-hidden rounded-full bg-white/[0.08]">
               <span
                 className="absolute inset-y-0 left-0 rounded-full bg-foreground"
-                // La pire en dernier, et plus pâle à mesure qu'on descend.
+                // La plus basse en dernier, et plus pâle à mesure qu'on descend.
                 style={{ width: `${Math.min(100, (s.valeur / 99) * 100)}%`, opacity: 1 - (i / Math.max(1, n - 1)) * 0.6 }}
               />
             </span>
@@ -323,7 +324,7 @@ export function Agent() {
     };
   }, [clavier]);
 
-  async function demander(question: string) {
+  async function demander(question: string, raccourci?: Raccourci) {
     const q = question.trim();
     if (!q || envoi || !pret || !connecte) return;
     const ouv = ouverture;
@@ -354,6 +355,7 @@ export function Agent() {
             question: q,
             dossier,
             ouverture: ouv ?? undefined,
+            raccourci,
             historique: avant.slice(-HISTORIQUE_MAX).map(({ role, texte, cartes, image }) => ({ role, texte, cartes, image: image?.legende || undefined })),
           }),
         });
@@ -373,12 +375,12 @@ export function Agent() {
     }
   }
 
-  const pire = dossier.stats[dossier.stats.length - 1];
+  const cap = dossier.stats[dossier.stats.length - 1];
   const departs = [
-    { label: `Ma pire stat : ${pire.nom}`, question: `Ma pire stat, c'est ${pire.nom.toLowerCase()} (${pire.valeur}). Fais-moi un programme pour la travailler cette semaine.` },
-    ...(dossier.dernierMatch ? [{ label: `Débrief J${dossier.dernierMatch.j}`, question: `Débriefe mon dernier match, la J${dossier.dernierMatch.j}.` }] : []),
-    { label: "Mes courses", question: "Fais-moi le panier de courses de la semaine pour être en forme dimanche." },
-    { label: "J'ai mal", question: "J'ai une douleur depuis le dernier match." },
+    { id: "progression" as const, label: `Faire monter : ${cap.nom}`, question: `Je veux faire monter ma stat ${cap.nom} (${cap.valeur}). Tu me proposes quoi cette semaine ?` },
+    ...(dossier.dernierMatch ? [{ id: "debrief" as const, label: `Débrief J${dossier.dernierMatch.j}`, question: `Débriefe mon dernier match, la J${dossier.dernierMatch.j}.` }] : []),
+    { id: "courses" as const, label: "Mes courses", question: "Fais-moi le panier de courses de la semaine pour être en forme dimanche." },
+    { id: "douleur" as const, label: "J'ai mal", question: "J'ai une douleur depuis le dernier match." },
   ];
   const peutEcrire = connecte && pret === true;
 
@@ -434,7 +436,7 @@ export function Agent() {
                   <button
                     key={d.label}
                     type="button"
-                    onClick={() => void demander(d.question)}
+                    onClick={() => void demander(d.question, d.id)}
                     className="glass shrink-0 rounded-full px-3.5 py-2 text-[13.5px] font-semibold transition-transform active:scale-95"
                   >
                     {d.label}
@@ -492,7 +494,7 @@ export function Agent() {
 // dossier du joueur, pour juger la mise en page des cartes sans modèle.
 function conversationDemo(d: DossierJoueur): MessageAgent[] {
   const t0 = Date.now() - 26 * 3600_000;
-  const pire = d.stats[d.stats.length - 1];
+  const cap = d.stats[d.stats.length - 1];
   const m = (id: string, role: MessageAgent["role"], texte: string, minutes: number, cartes: CarteCoach[] = []): MessageAgent => ({
     id,
     role,
@@ -501,15 +503,15 @@ function conversationDemo(d: DossierJoueur): MessageAgent[] {
     at: t0 + minutes * 60_000,
   });
   return [
-    m("d1", "joueur", `Coach, ma ${pire.nom.toLowerCase()} est à ${pire.valeur}, c'est ma pire stat. On fait quoi ?`, 0),
-    m("d2", "coach", `${pire.valeur}, c'est là qu'on gagne le plus vite. Tu as un city ou un parc près de chez toi ? Et tu peux te libérer combien de fois dans la semaine, à peu près ?`, 1),
+    m("d1", "joueur", `Coach, je veux faire monter ma stat ${cap.nom}, elle est à ${cap.valeur}. On fait quoi ?`, 0),
+    m("d2", "coach", `Bonne idée, c'est là que tu peux gagner le plus vite, et ton ${d.stats[0].nom} à ${d.stats[0].valeur} va t'aider. Tu as un city ou un parc près de chez toi ? Et tu peux te libérer combien de fois dans la semaine ?`, 1),
     m("d3", "joueur", "Y'a un city à 5 min. Lundi, mercredi, vendredi le soir ça passe.", 3),
-    m("d4", "coach", "Parfait, on cale ça. Trois séances de 40 minutes, tu me dis vendredi comment tu te sens.", 4, [
+    m("d4", "coach", "Parfait. Je te propose trois séances de 40 minutes ; si c'est trop, on passe à deux. Tu me dis vendredi comment tu te sens.", 4, [
       {
         type: "programme",
-        titre: `${pire.nom} : semaine 1`,
+        titre: `${cap.nom} : semaine 1`,
         sousTitre: "3 séances · 40 min",
-        cible: pire.id,
+        cible: cap.id,
         lignes: [
           { label: "Lundi : appuis", detail: "Plots tous les 50 cm, pieds rapides, regard haut.", valeur: "6 × 30 s" },
           { label: "Mercredi : duels", detail: "À deux, 1 contre 1 sur 10 m, tu défends sans te jeter.", valeur: "8 × 45 s" },
