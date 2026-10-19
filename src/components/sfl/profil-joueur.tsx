@@ -187,9 +187,8 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
                   >
                     <Medaille e={e} diametre={52} />
                     <span className="w-full text-[12px] leading-tight font-bold">{e.def.nom}</span>
-                    <span className="font-mono text-[11px] text-white/55 tabular-nums">
-                      {e.valeur} · {NOM_METAL[metal(e.palier)!]}
-                    </span>
+                    <span className="font-mono text-[12px] font-bold tabular-nums">{e.valeur}</span>
+                    <span className="text-[11px] font-semibold text-white/55">{NOM_METAL[metal(e.palier)!]}</span>
                   </button>
                 ))}
               </div>
