@@ -28,6 +28,7 @@ import { STAT_KEYS, ovr, type Player, type StatKey } from "./engine";
 import { jourMoisDuLibelle } from "./convocation-temps";
 import { ficheJoueur } from "./fiche-joueur";
 import { RANKINGS } from "./rankings";
+import type { SchemaCoach } from "./schemas-coach";
 import { quantite, vitrine } from "./trophees";
 import { journeeJouee } from "./saisie/mutations";
 import type { Saison } from "./saisie/types";
@@ -310,6 +311,8 @@ export interface ReponseCoach {
   texte: string;
   cartes: CarteCoach[];
   image: ImageCoach | null;
+  /** Le corps ou le terrain, dessinés par l'app (schemas-coach.ts). */
+  schema: SchemaCoach | null;
 }
 
 /** Un message de la conversation, tel que l'écran l'affiche et le garde. */
@@ -319,6 +322,7 @@ export interface MessageAgent {
   texte: string;
   cartes: CarteCoach[];
   image?: ImageCoach | null;
+  schema?: SchemaCoach | null;
   at: number;
 }
 

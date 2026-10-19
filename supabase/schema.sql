@@ -1496,6 +1496,9 @@ create index if not exists agent_messages_user_date on public.agent_messages (us
 -- terrain, une posture) : { chemin, legende }, le fichier dans le bucket
 -- « agent » plus bas.
 alter table public.agent_messages add column if not exists image jsonb;
+-- Le schéma que l'app dessine elle-même (le corps ou le terrain, cf.
+-- lib/sfl/schemas-coach.ts) : { type, zones | joueurs, fleches, zone, ballon, legende }.
+alter table public.agent_messages add column if not exists schema jsonb;
 
 alter table public.agent_messages enable row level security;
 
@@ -1564,6 +1567,9 @@ create table if not exists public.agent_sujets (
 );
 create index if not exists agent_sujets_date on public.agent_sujets (created_at desc);
 create index if not exists agent_sujets_user on public.agent_sujets (user_id);
+
+-- Le schéma dessiné dans la réponse (corps, terrain), s'il y en a un.
+alter table public.agent_sujets add column if not exists schema text check (schema in ('corps', 'terrain'));
 
 alter table public.agent_sujets enable row level security;
 

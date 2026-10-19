@@ -6,7 +6,7 @@
 //
 // La source est `agent_sujets` (lecture réservée à l'admin par RLS) : une
 // ligne par réponse du coach, avec le sujet rangé par le coach lui-même, le
-// raccourci touché, les types de cartes posées et l'image. Aucun texte n'y
+// raccourci touché, les types de cartes posées, le schéma et l'image. Aucun texte n'y
 // est gardé. Les admins sont retirés des chiffres. On compare les 30 derniers
 // jours aux 30 d'avant.
 
@@ -35,6 +35,7 @@ interface Ligne {
   raccourci: string | null;
   cartes: string[];
   image: boolean;
+  schema: string | null;
   at: number;
 }
 
@@ -93,7 +94,7 @@ export function AgentStats() {
     for (let debut = 0; ; debut += PAGE) {
       const { data, error } = await sb
         .from("agent_sujets")
-        .select("sujet, raccourci, cartes, image, created_at, profiles ( name )")
+        .select("sujet, raccourci, cartes, image, schema, created_at, profiles ( name )")
         .gte("created_at", depuis)
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
@@ -104,10 +105,10 @@ export function AgentStats() {
         setLignes([]);
         return;
       }
-      type Brut = { sujet: Sujet; raccourci: string | null; cartes: string[] | null; image: boolean; created_at: string; profiles: { name: string } | { name: string }[] | null };
+      type Brut = { sujet: Sujet; raccourci: string | null; cartes: string[] | null; image: boolean; schema?: string | null; created_at: string; profiles: { name: string } | { name: string }[] | null };
       for (const r of (data ?? []) as Brut[]) {
         const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
-        lu.push({ nom: p?.name ?? "?", sujet: r.sujet, raccourci: r.raccourci, cartes: r.cartes ?? [], image: r.image, at: new Date(r.created_at).getTime() });
+        lu.push({ nom: p?.name ?? "?", sujet: r.sujet, raccourci: r.raccourci, cartes: r.cartes ?? [], image: r.image, schema: r.schema ?? null, at: new Date(r.created_at).getTime() });
       }
       if (!data || data.length < PAGE) break;
     }
@@ -128,7 +129,11 @@ export function AgentStats() {
     const raccourcis = compter(recents, (l) => (l.raccourci ? [l.raccourci] : ["libre"]));
     const cartes = compter(recents, (l) => l.cartes as TypeCarte[]);
     const joueurs = new Set(recents.map((l) => l.nom)).size;
-    const images = recents.filter((l) => l.image).length;
+    const visuels = {
+      corps: recents.filter((l) => l.schema === "corps").length,
+      terrain: recents.filter((l) => l.schema === "terrain").length,
+      image: recents.filter((l) => l.image).length,
+    };
 
     // La tendance : le sujet qui gagne le plus de place d'une période à l'autre.
     const part = (m: Map<Sujet, number>, n: number, s: Sujet) => (n ? (m.get(s) ?? 0) / n : 0);
@@ -141,7 +146,12 @@ export function AgentStats() {
     return {
       echanges: recents.length,
       joueurs,
-      images,
+      visuels: visuels.corps + visuels.terrain + visuels.image,
+      montres: [
+        { label: "Schéma du corps", n: visuels.corps },
+        { label: "Schéma du terrain", n: visuels.terrain },
+        { label: "Image générée", n: visuels.image },
+      ].filter((v) => v.n),
       sujets: SUJETS.filter((s) => sujets.get(s))
         .map((s) => ({ label: LIBELLE_SUJET[s], n: sujets.get(s)!, avant: avant.length >= 10 ? Math.round(part(sujetsAvant, avant.length, s) * recents.length) : undefined }))
         .sort((x, y) => y.n - x.n),
@@ -167,7 +177,7 @@ export function AgentStats() {
           <div className="grid grid-cols-3 gap-2">
             <Tuile label="Échanges" valeur={a.echanges} />
             <Tuile label="Joueurs" valeur={a.joueurs} />
-            <Tuile label="Images" valeur={a.images} />
+            <Tuile label="Visuels" valeur={a.visuels} />
           </div>
           {a.premier && (
             <p className="text-[13.5px] leading-snug font-semibold">
@@ -182,6 +192,10 @@ export function AgentStats() {
           <div>
             <p className="mono-label mb-2.5 text-[8.5px] text-foreground/45">Comment ils demandent</p>
             <Barres lignes={a.raccourcis} total={a.echanges} />
+          </div>
+          <div className={cn(!a.montres.length && "hidden")}>
+            <p className="mono-label mb-2.5 text-[8.5px] text-foreground/45">Ce qu&apos;il montre</p>
+            <Barres lignes={a.montres} total={a.visuels} />
           </div>
           <div className={cn(!a.cartes.length && "hidden")}>
             <p className="mono-label mb-2.5 text-[8.5px] text-foreground/45">Cartes posées</p>
