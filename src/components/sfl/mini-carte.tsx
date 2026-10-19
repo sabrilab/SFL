@@ -29,6 +29,7 @@ export function MiniCarte({
   detail,
   className,
   onglet,
+  cle,
   vertical,
 }: {
   player: Player;
@@ -39,6 +40,8 @@ export function MiniCarte({
   className?: string;
   /** La note aux couleurs d'une équipe (feuille de match). */
   onglet?: { fond: string; encre: string };
+  /** La clé de la 3D en cache, quand la carte n'est pas l'actuelle (une carte d'une saison passée). */
+  cle?: string;
   /** En petit, la carte reste debout (les terrains). */
   vertical?: boolean;
 }) {
@@ -50,7 +53,7 @@ export function MiniCarte({
       onClick={(e) => {
         e.stopPropagation();
         open({
-          cacheKey: `mini-${player.name}`,
+          cacheKey: cle ?? `mini-${player.name}`,
           mode: "simple",
           title: player.name,
           subtitle: detail,
