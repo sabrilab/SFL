@@ -57,8 +57,6 @@ import "./animations.css";
 
 /** Les terrains enregistrés ne s'affichent plus sur le plan : seuls les matchs. */
 const AUCUN_POINT: PointPlan[] = [];
-/** Combien de jours un match joué reste sur la Map. */
-const JOURS_APRES_MATCH = 2;
 
 const CarteMap = dynamic(() => import("@/components/sfl/map/carte-map").then((m) => m.CarteMap), {
   ssr: false,
@@ -361,18 +359,24 @@ export default function MapPage() {
     return [...ligue, ...ouverts];
   }, [ligue, parties, moi, aujourdhui]);
 
-  // Sur la carte, ce qui arrive, et ce qui vient d'être joué : un match joué
-  // reste deux jours, badgé « Joué », pour retrouver sa fiche et son récap.
-  // Les terrains enregistrés n'y sont plus — on ne noie pas le match.
+  // Sur la carte, dans l'ordre du temps : le dernier match joué à gauche, en
+  // petit, puis ce qui arrive, du plus proche au plus loin. Le match « à la
+  // une » est le prochain : c'est lui qu'on voit en ouvrant la Map, avec ce
+  // qu'il lui manque. Le jour même, après le coup de sifflet, le match joué
+  // garde la une jusqu'à minuit (on y cherche le récap) ; dès le lendemain,
+  // la une passe au suivant. Les terrains enregistrés n'y sont plus — on ne
+  // noie pas le match.
   const affiches = useMemo(() => {
-    const recents = matchs.filter((m) => {
-      if (!m.joue) return true;
-      const e = ecartJours(m.dateLabel, aujourdhui);
-      return e == null || e >= -JOURS_APRES_MATCH;
-    });
-    // Le match qui vient d'être joué passe devant : c'est lui qu'on cherche.
-    return recents.length ? [...recents.filter((m) => m.joue), ...recents.filter((m) => !m.joue)] : matchs.filter((m) => m.joue).slice(-1);
+    const ordre = (m: MatchMap) => (ecartJours(m.dateLabel, aujourdhui) ?? 99) * 24 + heureDe(m.heure);
+    const aVenir = matchs.filter((m) => !m.joue).sort((a, b) => ordre(a) - ordre(b));
+    const joue = matchs.filter((m) => m.joue).at(-1);
+    return joue ? [joue, ...aVenir] : aVenir;
   }, [matchs, aujourdhui]);
+  const une = useMemo(() => {
+    const joue = affiches.find((m) => m.joue);
+    if (joue && ecartJours(joue.dateLabel, aujourdhui) === 0) return joue;
+    return affiches.find((m) => !m.joue) ?? affiches[0];
+  }, [affiches, aujourdhui]);
 
   // Ouvrir un match : n'importe quel joueur, d'un bouton ou d'un terrain libre.
   const [ouvrir, setOuvrir] = useState<{ terrain: Terrain | null; jour?: string; heure?: string; n: number } | null>(null);
@@ -389,8 +393,8 @@ export default function MapPage() {
     const calme = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.setTimeout(() => setFiche(true), calme ? 0 : 320);
   }, []);
-  // Le match choisi : celui qu'on a touché s'il est encore là, sinon le premier.
-  const choisi = affiches.find((m) => m.cle === choix) ?? affiches[0];
+  // Le match choisi : celui qu'on a touché s'il est encore là, sinon la une.
+  const choisi = affiches.find((m) => m.cle === choix) ?? une;
 
   // Le carrousel et le plan vont ensemble : faire glisser les cartes choisit
   // celle qui s'arrête au centre (le plan suit), et choisir sur le plan amène
@@ -434,7 +438,8 @@ export default function MapPage() {
         .filter((m, i) => {
           if (!m.terrain) return false;
           const memes = affiches.filter((x) => x.terrain?.id === m.terrain!.id);
-          return memes.some((x) => x.cle === choisi?.cle) ? m.cle === choisi?.cle : affiches.indexOf(memes[0]) === i;
+          if (memes.some((x) => x.cle === choisi?.cle)) return m.cle === choisi?.cle;
+          return affiches.indexOf(memes.find((x) => !x.joue) ?? memes[0]) === i;
         })
         .map((m) => ({
           id: m.cle,
@@ -615,13 +620,16 @@ export default function MapPage() {
           <div
             ref={carrousel}
             onScroll={suivreCarrousel}
-            className="flex w-full snap-x snap-mandatory gap-3 overflow-x-auto px-[max(1rem,calc(50%-103px))] pb-3 [scrollbar-width:none]"
+            className="flex w-full snap-x snap-mandatory items-end gap-3 overflow-x-auto pr-[max(1rem,calc(50%-103px))] pb-3 [scrollbar-width:none]"
+            style={{ paddingLeft: `max(1rem, calc(50% - ${affiches[0]?.joue ? LARGEUR_JOUE / 2 + 5 : 103}px))` }}
           >
             {affiches.map((m, i) => (
               <div key={m.cle} data-cle={m.cle} className="map-monte shrink-0 snap-center" style={{ ["--i" as string]: i + 1 }}>
                 <CarteMatch
                   m={m}
                   choisi={m.cle === choisi?.cle}
+                  une={m.cle === une?.cle && !m.joue}
+                  dans={m.joue ? null : ecartJours(m.dateLabel, aujourdhui)}
                   loin={toi && m.terrain ? `à ${distanceLisible(toi, m.terrain)}` : null}
                   onToucher={() => (m.cle !== choisi?.cle ? setChoix(m.cle) : ouvrirFiche())}
                 />
@@ -781,31 +789,56 @@ export default function MapPage() {
 
 /* ------------------------- La carte d'un match ------------------------- */
 
+/** La carte du match joué, en retrait : plus petite, en gris. */
+const LARGEUR_JOUE = 150;
+
+/** « dans 6 j », « demain » : ce qu'il reste avant le coup d'envoi. */
+function compteARebours(dans: number | null): string | null {
+  if (dans == null || dans < 1) return null;
+  return dans === 1 ? "demain" : `dans ${dans} j`;
+}
+
 function CarteMatch({
   m,
   choisi,
+  une,
+  dans,
   loin,
   onToucher,
 }: {
   m: MatchMap;
   choisi: boolean;
+  /** Le prochain match : la une de la Map, avec ses places. */
+  une: boolean;
+  /** Les jours avant le match (null : joué ou date illisible). */
+  dans: number | null;
   loin: string | null;
   onToucher: () => void;
 }) {
   const [c0, c1, c2] = FOND_MOMENT[m.quand.moment];
   const complet = m.etat.genre === "complet";
+  const joue = !!m.joue;
   const titre = m.quand.titre;
+  const rebours = compteARebours(dans);
+  const [l, h] = joue ? [LARGEUR_JOUE, 104] : [196, 140];
+  // Les places du match : une encoche par joueur attendu ; les vides sont
+  // celles qu'il manque, en braise.
+  const places = joue ? 0 : Math.min(m.effectif, 14);
+  const venus = Math.min(m.presents.length, places);
   return (
-    <div className={cn("carte-match relative", choisi && "carte-match--choisie")}>
+    <div className={cn("carte-match relative", choisi && "carte-match--choisie", joue && "carte-match--joue")}>
       <button
         type="button"
         onClick={onToucher}
-        className="block rounded-[24px] p-[5px] text-left shadow-[0_8px_12px_rgba(0,0,0,0.22)]"
+        className={cn("block p-[5px] text-left", joue ? "rounded-[20px] shadow-[0_5px_9px_rgba(0,0,0,0.18)]" : "rounded-[24px] shadow-[0_8px_12px_rgba(0,0,0,0.22)]")}
         style={{ background: BLANC }}
         aria-label={`${titre} ${m.heure}${m.terrain ? `, ${m.terrain.nom}` : ""}, ${m.etatTexte}`}
         aria-pressed={choisi}
       >
-        <div className="relative h-[140px] w-[196px] overflow-hidden rounded-[19px]" style={{ background: `linear-gradient(180deg, ${c0}, ${c1} 50%, ${c2})` }}>
+        <div
+          className={cn("relative overflow-hidden", joue ? "rounded-[15px]" : "rounded-[19px]")}
+          style={{ width: l, height: h, background: `linear-gradient(180deg, ${c0}, ${c1} 50%, ${c2})` }}
+        >
           {m.terrain ? (
             // La vue aérienne du vrai terrain, comme dans l'app iPhone.
             // eslint-disable-next-line @next/next/no-img-element
@@ -813,36 +846,56 @@ function CarteMatch({
               src={photoSatellite(m.terrain.lat, m.terrain.lng, 392, 280, 0.0009)}
               alt=""
               loading="lazy"
-              className={cn("absolute inset-0 h-full w-full object-cover", complet && "saturate-[0.35]")}
+              className={cn("absolute inset-0 h-full w-full object-cover", joue ? "grayscale" : complet && "saturate-[0.35]")}
             />
           ) : (
             <div
-              className={cn("absolute top-1/2 left-1/2 size-[118px] -translate-x-1/2 -translate-y-[calc(50%+14px)]", complet && "saturate-0")}
+              className={cn("absolute top-1/2 left-1/2 size-[118px] -translate-x-1/2 -translate-y-[calc(50%+14px)]", (complet || joue) && "saturate-0")}
               dangerouslySetInnerHTML={{ __html: stadeSvg(m.quand.moment, { fond: false }) }}
             />
           )}
-          <div className="absolute inset-x-0 bottom-0 h-[62%] bg-gradient-to-b from-transparent via-[rgba(4,5,7,0.4)] to-[rgba(3,4,6,0.82)]" />
-          <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-1 p-2.5">
-            <Jeton texte={m.etatTexte} ton={m.etat.genre} />
-            {loin && <Jeton texte={loin} ton="neutre" />}
+          <div
+            className={cn(
+              "absolute inset-x-0 bottom-0 bg-gradient-to-b from-transparent via-[rgba(4,5,7,0.4)] to-[rgba(3,4,6,0.82)]",
+              une ? "h-[78%]" : "h-[62%]"
+            )}
+          />
+          <div className={cn("absolute inset-x-0 top-0 flex items-center justify-between gap-1", joue ? "p-2" : "p-2.5")}>
+            <Jeton texte={m.etatTexte} ton={m.etat.genre} petit={joue} />
+            {!joue && (loin || rebours) && <Jeton texte={loin ?? rebours!} ton="neutre" />}
           </div>
-          <div className="absolute inset-x-0 bottom-0 px-3 pb-3.5">
+          <div className={cn("absolute inset-x-0 bottom-0", joue ? "px-2.5 pb-2.5" : "px-3 pb-3")}>
             <p
               className="truncate font-black uppercase text-white/85"
-              style={{ fontSize: titre.length > 8 ? 26 : 34, letterSpacing: -1.4, lineHeight: 1 }}
+              style={{ fontSize: joue ? 22 : titre.length > 10 ? 22 : titre.length > 7 ? 28 : 34, letterSpacing: joue ? -0.9 : -1.4, lineHeight: 1 }}
             >
               {titre}
             </p>
-            <p className="mt-1 truncate font-mono text-[9.5px] font-bold tracking-[1px] text-white/70 uppercase">
+            <p className={cn("mt-1 truncate font-mono font-bold text-white/70 uppercase", joue ? "text-[8.5px] tracking-[0.8px]" : "text-[9.5px] tracking-[1px]")}>
               {heureCourte(m.heure)} ·{" "}
               {m.partie
                 ? `${m.partie.genre === "exhibition" ? "Exhibition" : m.partie.visibilite === "prive" ? "Privé" : "Public"} · ${m.partie.organisateur}`
                 : `${m.j != null ? `J${m.j} · ` : ""}Sunday Five`}
             </p>
+            {une && places > 0 && (
+              <div className="mt-2 flex gap-[3px]" aria-hidden>
+                {Array.from({ length: places }, (_, i) => (
+                  <span
+                    key={i}
+                    className={cn("h-[5px] flex-1 rounded-full", i >= venus && "places-vide")}
+                    style={
+                      i < venus
+                        ? { background: "rgba(255,255,255,0.9)" }
+                        : { background: complet ? "rgba(255,255,255,0.25)" : "rgba(255,138,76,0.28)", boxShadow: complet ? undefined : `inset 0 0 0 1px ${BRAISE}`, ["--i" as string]: i - venus }
+                    }
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </button>
-      {m.presents.length > 0 && (
+      {!joue && m.presents.length > 0 && (
         <div className="pointer-events-none absolute -bottom-3 left-1/2 flex -translate-x-1/2 items-center" aria-hidden>
           {m.presents.slice(0, 3).map((nom, i) => (
             <span
@@ -929,13 +982,13 @@ function Presents({ m }: { m: MatchMap }) {
   );
 }
 
-function Jeton({ texte, ton }: { texte: string; ton: "manque" | "dedans" | "complet" | "joue" | "neutre" }) {
+function Jeton({ texte, ton, petit }: { texte: string; ton: "manque" | "dedans" | "complet" | "joue" | "neutre"; petit?: boolean }) {
   const style =
     ton === "dedans"
       ? { background: CLAIR, color: ENCRE }
       : { background: "rgba(14,17,21,0.72)", color: ton === "manque" ? BRAISE : ton === "complet" ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.92)", boxShadow: "inset 0 0 0 0.5px rgba(255,255,255,0.15)" };
   return (
-    <span className="truncate rounded-full px-2.5 py-[4.5px] text-[11px] font-medium" style={style}>
+    <span className={cn("truncate rounded-full font-medium", petit ? "px-2 py-[3px] text-[10px]" : "px-2.5 py-[4.5px] text-[11px]")} style={style}>
       {texte}
     </span>
   );
