@@ -45,7 +45,16 @@ export interface PieceVocal {
   /** En secondes. */
   duree: number;
 }
-export type Piece = PieceCarte | PieceFeuille | PieceClassement | PieceVocal;
+/** Une photo (19/10) : le fichier dans le bucket privé « images ». */
+export interface PiecePhoto {
+  type: "photo";
+  /** <uuid de l'auteur>/<horodatage>.jpg */
+  chemin: string;
+  /** Largeur et hauteur en pixels : la bulle garde sa place avant le chargement. */
+  l: number;
+  h: number;
+}
+export type Piece = PieceCarte | PieceFeuille | PieceClassement | PieceVocal | PiecePhoto;
 
 export function estPiece(v: unknown): v is Piece {
   if (!v || typeof v !== "object") return false;
@@ -55,6 +64,8 @@ export function estPiece(v: unknown): v is Piece {
   if (p.type === "classement")
     return typeof p.id === "string" && Array.isArray(p.top) && p.top.length <= 3;
   if (p.type === "vocal") return typeof p.chemin === "string" && typeof p.duree === "number";
+  if (p.type === "photo")
+    return typeof p.chemin === "string" && typeof p.l === "number" && typeof p.h === "number" && p.l > 0 && p.h > 0;
   return false;
 }
 
@@ -249,21 +260,74 @@ export async function deposerVocal(blob: Blob, duree: number, ext: string): Prom
   return { type: "vocal", chemin, duree: Math.round(duree * 10) / 10 };
 }
 
-const liensVocaux = new Map<string, Promise<string | null>>();
+const liens = new Map<string, Promise<string | null>>();
 
-/** Le lien d'écoute d'un vocal (signé une heure, gardé en mémoire). */
-export function lienVocal(chemin: string): Promise<string | null> {
-  let lien = liensVocaux.get(chemin);
+/** Un lien de lecture signé une heure, gardé en mémoire 50 minutes. */
+function lienSigne(bucket: string, chemin: string): Promise<string | null> {
+  const cle = `${bucket}/${chemin}`;
+  let lien = liens.get(cle);
   if (!lien) {
     lien = supabase()
-      .storage.from(BUCKET_VOCAUX)
+      .storage.from(bucket)
       .createSignedUrl(chemin, 3600)
       .then(({ data }) => data?.signedUrl ?? null);
-    liensVocaux.set(chemin, lien);
-    setTimeout(() => liensVocaux.delete(chemin), 50 * 60_000);
+    liens.set(cle, lien);
+    setTimeout(() => liens.delete(cle), 50 * 60_000);
   }
   return lien;
 }
+
+/** Le lien d'écoute d'un vocal. */
+export const lienVocal = (chemin: string) => lienSigne(BUCKET_VOCAUX, chemin);
+
+/* -------------------------------- Photos -------------------------------- */
+
+const BUCKET_IMAGES = "images";
+/** Le plus grand côté d'une photo envoyée : net sur iPhone, ≈ 300 Ko. */
+const PHOTO_MAX_PX = 1600;
+
+/** La photo choisie, redressée et réduite en JPEG, prête à partir. */
+export async function preparerPhoto(fichier: File): Promise<{ blob: Blob; l: number; h: number } | null> {
+  const url = URL.createObjectURL(fichier);
+  try {
+    // Une <img> applique l'orientation de l'appareil photo (EXIF) et lit le
+    // HEIC de l'iPhone dans Safari.
+    const img = new Image();
+    img.decoding = "async";
+    img.src = url;
+    await img.decode();
+    const k = Math.min(1, PHOTO_MAX_PX / Math.max(img.naturalWidth, img.naturalHeight));
+    const l = Math.max(1, Math.round(img.naturalWidth * k));
+    const h = Math.max(1, Math.round(img.naturalHeight * k));
+    const toile = document.createElement("canvas");
+    toile.width = l;
+    toile.height = h;
+    const ctx = toile.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, l, h);
+    const blob = await new Promise<Blob | null>((ok) => toile.toBlob(ok, "image/jpeg", 0.82));
+    return blob ? { blob, l, h } : null;
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Dépose une photo préparée et renvoie sa pièce. */
+export async function deposerPhoto(blob: Blob, l: number, h: number): Promise<PiecePhoto | null> {
+  const sb = supabase();
+  const { data: auth } = await sb.auth.getUser();
+  const uid = auth.user?.id;
+  if (!uid) return null;
+  const chemin = `${uid}/${Date.now()}.jpg`;
+  const { error } = await sb.storage.from(BUCKET_IMAGES).upload(chemin, blob, { contentType: "image/jpeg" });
+  if (error) return null;
+  return { type: "photo", chemin, l, h };
+}
+
+/** Le lien d'une photo. */
+export const lienPhoto = (chemin: string) => lienSigne(BUCKET_IMAGES, chemin);
 
 /** Pose ou retire ma réaction. */
 export async function reagir(id: number, emoji: Emoji, poser: boolean): Promise<boolean> {

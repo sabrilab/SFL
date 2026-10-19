@@ -611,7 +611,7 @@ alter table public.messages add constraint messages_piece_forme check (
   piece is null
   or (
     jsonb_typeof(piece) = 'object'
-    and piece->>'type' in ('carte', 'feuille', 'classement', 'vocal')
+    and piece->>'type' in ('carte', 'feuille', 'classement', 'vocal', 'photo')
     and pg_column_size(piece) <= 4000
   )
 );
@@ -785,6 +785,54 @@ begin
     );
 exception
   when others then raise warning 'vocaux : règles Storage non posées (%)', sqlerrm;
+end;
+$$;
+
+-- Les photos du Vestiaire (19/10) : bucket PRIVÉ « images », même rangement
+-- et mêmes règles que les vocaux. L'app réduit chaque photo à 1600 px en JPEG
+-- avant l'envoi (≈ 300 Ko) ; 2 Mo au plus.
+do $$
+begin
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('images', 'images', false, 2097152, array['image/jpeg', 'image/webp', 'image/png'])
+  on conflict (id) do update
+    set public = false,
+        file_size_limit = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types;
+exception
+  when others then raise warning 'images : bucket non créé (%)', sqlerrm;
+end;
+$$;
+
+do $$
+begin
+  drop policy if exists "images: la ligue regarde" on storage.objects;
+  create policy "images: la ligue regarde"
+    on storage.objects for select
+    to authenticated
+    using (bucket_id = 'images' and (select public.est_membre()));
+
+  drop policy if exists "images: je pose les miennes" on storage.objects;
+  create policy "images: je pose les miennes"
+    on storage.objects for insert
+    to authenticated
+    with check (
+      bucket_id = 'images'
+      and (storage.foldername(name))[1] = (select auth.uid())::text
+      and (select public.est_membre())
+      and (select public.peut_parler_au_vestiaire())
+    );
+
+  drop policy if exists "images: je retire les miennes" on storage.objects;
+  create policy "images: je retire les miennes"
+    on storage.objects for delete
+    to authenticated
+    using (
+      bucket_id = 'images'
+      and ((storage.foldername(name))[1] = (select auth.uid())::text or (select public.is_league_admin()))
+    );
+exception
+  when others then raise warning 'images : règles Storage non posées (%)', sqlerrm;
 end;
 $$;
 
