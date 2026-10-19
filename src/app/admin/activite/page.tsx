@@ -137,11 +137,12 @@ export default function ActivitePage() {
   }
 
   return (
-    <>
-      <ActiviteVue data={data} loading={loading} onRefresh={load} error={error} />
-      <div className="shell pb-8">
-        <AgentStats />
-      </div>
-    </>
+    <ActiviteVue
+      data={data}
+      loading={loading}
+      onRefresh={load}
+      error={error}
+      pied={(public_, admins) => <AgentStats public={public_} admins={admins} />}
+    />
   );
 }

@@ -63,7 +63,7 @@ const PUBLICS = [
   { id: "admins", label: "Admins" },
   { id: "tous", label: "Tout le monde" },
 ] as const;
-type PublicId = (typeof PUBLICS)[number]["id"];
+export type PublicId = (typeof PUBLICS)[number]["id"];
 
 /** Teinte de chaque famille dans la barre (et sa pastille dans la légende). */
 const TEINTE: Record<FamilleId, number> = {
@@ -178,11 +178,14 @@ export function ActiviteVue({
   loading,
   onRefresh,
   error,
+  pied,
 }: {
   data: DonneesActivite | null;
   loading: boolean;
   onRefresh: () => void;
   error: string | null;
+  /** Ce qui suit la page (Bola Agent), filtré sur le même public. */
+  pied?: (public_: PublicId, admins: ReadonlySet<string>) => React.ReactNode;
 }) {
   const [periode, setPeriode] = useState<PeriodeId>("30");
   const [public_, setPublic] = useState<PublicId>("joueurs");
@@ -204,7 +207,7 @@ export function ActiviteVue({
     const partAdmins = data.evenements.length
       ? data.evenements.filter((e) => admins.has(e.name)).length / data.evenements.length
       : 0;
-    return { evenements, profiles, admins: [...admins].sort(), partAdmins };
+    return { evenements, profiles, admins: [...admins].sort(), ensembleAdmins: admins, partAdmins };
   }, [data, public_]);
   const a = useMemo(
     () => (data && vu ? analyser(vu.evenements, vu.profiles, data.now, jours) : null),
@@ -605,6 +608,8 @@ export function ActiviteVue({
           </p>
         </>
       )}
+
+      {pied && vu && pied(public_, vu.ensembleAdmins)}
     </div>
   );
 }
