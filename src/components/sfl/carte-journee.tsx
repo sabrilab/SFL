@@ -165,7 +165,7 @@ function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
       style={{ height: bas - haut + MARGE * 2 }}
     >
       <div className="absolute inset-x-0" style={{ top: decalage, height: bas + MARGE }}>
-        <SolTerrain ombres={places} rayon={30} vue={VUE} />
+        <SolTerrain ombres={places} rayon={30} vue={VUE} gazon="vert" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/bola/symbole-blanc.svg"
