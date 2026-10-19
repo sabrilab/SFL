@@ -2,8 +2,9 @@
 // ou une réaction (lib/sfl/vestiaire.ts, notifier).
 //
 // Qui est prévenu, et comment :
-//   · un joueur CITÉ (@pseudo), ou celui à qui l'on RÉPOND : tout de suite,
-//     avec la phrase ;
+//   · un joueur CITÉ (@pseudo), celui à qui l'on RÉPOND, ou celui que la
+//     pièce partagée MET EN AVANT (sa carte, un podium, un élément de la
+//     Ligue) : tout de suite, avec la phrase ;
 //   · l'auteur d'un message qui reçoit une RÉACTION : tout de suite, et la
 //     suivante remplace la précédente sur son écran (même étiquette) ;
 //   · tous les autres : chaque message, comme Snap ou WhatsApp (Sabri,
@@ -12,7 +13,7 @@
 //     (devant_le, redit toutes les 20 s par l'app), et pas deux
 //     notifications au même joueur à moins de RAFALE d'écart.
 // Chacun règle les siennes (vestiaire_suivi.notifs) : 'tout', 'cite'
-// (cité, réponses et réactions seulement) ou 'rien'.
+// (cité, mis en avant, réponses et réactions seulement) ou 'rien'.
 //
 // La route agit avec la clé secrète (lire les abonnements de tout le monde),
 // donc elle ne croit pas l'appelant sur parole : le message ou la réaction
@@ -23,6 +24,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { pseudosCites } from "@/lib/sfl/pseudos-cites";
+import { joueursDePiece } from "@/lib/sfl/pieces-joueurs";
 import type { Notif } from "@/lib/sfl/push";
 
 export const maxDuration = 30;
@@ -51,6 +53,10 @@ function resume(texte: string, piece: unknown): string {
   if (type === "vocal") return "🎤 Message vocal";
   if (type === "photo") return "📷 Photo";
   if (type === "video") return "🎬 Vidéo";
+  if (type === "ligue") {
+    const p = piece as { titre?: unknown; j?: unknown };
+    return `a partagé « ${String(p.titre ?? "la Ligue")}${typeof p.j === "number" ? ` · J${p.j}` : ""} »`;
+  }
   return type === "carte"
     ? "a partagé une carte"
     : type === "feuille"
@@ -148,6 +154,23 @@ export async function POST(req: NextRequest) {
         url: URL_VESTIAIRE,
         tag: `vestiaire-cite-${msg.id}`,
       });
+    }
+
+    // Ceux que la pièce met en avant (un élément de la Ligue, un podium, une
+    // carte) : prévenus comme des cités. Le nom de saison est la clé.
+    const enAvant = new Set(joueursDePiece(msg.piece));
+    if (enAvant.size > 0) {
+      const quoi = resume("", msg.piece).replace(/^a partagé /, "");
+      const texte = msg.texte.trim() ? `${quoi} : ${msg.texte.trim()}` : quoi;
+      for (const p of tous) {
+        if (p.id === moi.id || envois.has(p.id) || !enAvant.has(p.name) || modeDe(p.id) === "rien" || devant(p.id)) continue;
+        envois.set(p.id, {
+          titre: `${auteur} t'a mis en avant au Vestiaire`,
+          texte: couper(texte, 180),
+          url: URL_VESTIAIRE,
+          tag: `vestiaire-cite-${msg.id}`,
+        });
+      }
     }
 
     // Tous les autres : ce message, sauf à qui le regarde ou vient d'en recevoir un.

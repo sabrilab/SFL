@@ -611,7 +611,7 @@ alter table public.messages add constraint messages_piece_forme check (
   piece is null
   or (
     jsonb_typeof(piece) = 'object'
-    and piece->>'type' in ('carte', 'feuille', 'classement', 'vocal', 'photo', 'video')
+    and piece->>'type' in ('carte', 'feuille', 'classement', 'vocal', 'photo', 'video', 'ligue')
     and pg_column_size(piece) <= 4000
   )
 );
