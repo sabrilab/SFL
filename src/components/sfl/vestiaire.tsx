@@ -9,6 +9,11 @@
 // toucher sur un message ouvre ses réactions (et, pour l'auteur ou l'admin,
 // le retrait ; pour l'admin, la sourdine de 24 h).
 //
+// Depuis le 19/10 (Sabri) : répondre à un message précis (glisser la bulle
+// vers la droite, ou la flèche sous elle), réagir d'un émoji (le visage sous
+// chaque bulle, ou toucher la bulle), et les vocaux (le micro quand le champ
+// est vide ; une minute au plus, bucket « vocaux »).
+//
 // Noir et blanc, comme la Ligue : ma bulle en blanc, celles des autres en
 // verre. Un écran de discussion, comme Messages : le titre en haut, le fil
 // au milieu (seul à défiler, le plus récent en bas), la barre d'écriture
@@ -22,7 +27,7 @@
 // remplit le fil de messages d'essai, sans base, pour juger le rendu.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowUp, Bell, BellOff, Check, Plus, X } from "lucide-react";
+import { AlertTriangle, ArrowUp, Bell, BellOff, Check, Mic, Pause, Play, Plus, Reply, SmilePlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -42,7 +47,11 @@ import {
   chargerProfilsV,
   chargerVestiaire,
   couperLaParole,
+  deposerVocal,
+  direDevant,
   ecouterVestiaire,
+  formatVocal,
+  lienVocal,
   lireSuivi,
   marquerVestiaireLu,
   posterAuVestiaire,
@@ -54,7 +63,9 @@ import {
   type MessageV,
   type ModeNotifs,
   type Piece,
+  type PieceVocal,
   type ProfilV,
+  VOCAL_MAX_S,
 } from "@/lib/sfl/vestiaire";
 import { cn } from "@/lib/utils";
 
@@ -70,10 +81,184 @@ function quand(at: number) {
   return `${d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} ${h}`;
 }
 
+/** Mm:ss d'une durée en secondes. */
+const minutes = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+/** Ce qu'une réponse montre de l'original, en une ligne. */
+function apercu(m: MessageV): string {
+  if (m.texte.trim()) return m.texte.trim();
+  const t = m.piece?.type;
+  return t === "vocal" ? "🎤 Message vocal" : t === "carte" ? "Une carte" : t === "feuille" ? "Une feuille de match" : "Un classement";
+}
+
+/* -------------------------------- Vocaux -------------------------------- */
+
+/** Une onde fixe, tirée du chemin du fichier : chaque vocal a la sienne. */
+function onde(graine: string, n = 28): number[] {
+  let h = 2166136261;
+  for (let i = 0; i < graine.length; i++) h = Math.imul(h ^ graine.charCodeAt(i), 16777619);
+  return Array.from({ length: n }, (_, i) => {
+    h = Math.imul(h ^ (i + 1), 2654435761);
+    return 0.28 + ((h >>> 0) % 1000) / 1400;
+  });
+}
+
+function VocalVue({ piece, mien }: { piece: PieceVocal; mien: boolean }) {
+  const [src, setSrc] = useState<string | null>(piece.chemin.startsWith("blob:") ? piece.chemin : null);
+  const [lecture, setLecture] = useState(false);
+  const [pos, setPos] = useState(0);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const barres = useMemo(() => onde(piece.chemin), [piece.chemin]);
+
+  // Le lien est prêt avant le toucher : sur iPhone, le son ne part que dans
+  // le geste lui-même, pas après une attente.
+  useEffect(() => {
+    if (src) return;
+    let vivant = true;
+    void lienVocal(piece.chemin).then((l) => vivant && setSrc(l));
+    return () => {
+      vivant = false;
+    };
+  }, [piece.chemin, src]);
+  useEffect(() => () => audio.current?.pause(), []);
+
+  function basculer(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!src) return;
+    if (!audio.current) {
+      const a = new Audio(src);
+      a.ontimeupdate = () => setPos(a.currentTime);
+      a.onended = () => {
+        setLecture(false);
+        setPos(0);
+      };
+      audio.current = a;
+    }
+    const a = audio.current;
+    if (lecture) {
+      a.pause();
+      setLecture(false);
+    } else {
+      void a.play().then(
+        () => setLecture(true),
+        () => toast.error("Lecture impossible.")
+      );
+    }
+  }
+
+  const fait = piece.duree > 0 ? Math.min(1, pos / piece.duree) : 0;
+  return (
+    <div
+      className={cn(
+        "flex w-[min(250px,64vw)] items-center gap-2.5 rounded-[20px] py-1.5 pr-3.5 pl-1.5",
+        mien ? "bg-foreground text-background" : "glass-soft"
+      )}
+    >
+      <button
+        type="button"
+        onClick={basculer}
+        disabled={!src}
+        aria-label={lecture ? "Pause" : "Écouter"}
+        className={cn(
+          "flex size-9 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90 disabled:opacity-40",
+          mien ? "bg-background text-foreground" : "bg-foreground text-background"
+        )}
+      >
+        {lecture ? <Pause className="size-4" fill="currentColor" /> : <Play className="ml-0.5 size-4" fill="currentColor" />}
+      </button>
+      <span aria-hidden className="flex h-7 min-w-0 flex-1 items-center gap-[2px]">
+        {barres.map((h, i) => (
+          <span
+            key={i}
+            className="flex-1 rounded-full transition-opacity"
+            style={{ height: `${h * 100}%`, background: "currentColor", opacity: i / barres.length < fait ? 1 : 0.35 }}
+          />
+        ))}
+      </span>
+      <span className="shrink-0 text-[11.5px] font-semibold tabular-nums opacity-70">
+        {minutes(lecture || pos > 0 ? pos : piece.duree)}
+      </span>
+    </div>
+  );
+}
+
+/** Le micro : enregistrer, annuler, ou finir (renvoie le son et sa durée).
+ *  Au bout d'une minute, `auBout` est appelé (le vocal part tout seul). */
+function useEnregistreur(auBout: () => void) {
+  const [secondes, setSecondes] = useState<number | null>(null);
+  const rappel = useRef(auBout);
+  useEffect(() => {
+    rappel.current = auBout;
+  });
+  const rec = useRef<{ r: MediaRecorder; flux: MediaStream; bouts: Blob[]; t0: number; minuteur: number; ext: string } | null>(null);
+  const finir = useRef<((v: { blob: Blob; duree: number; ext: string } | null) => void) | null>(null);
+
+  const couper = useCallback((garder: boolean) => {
+    const e = rec.current;
+    if (!e) return;
+    window.clearInterval(e.minuteur);
+    const duree = (Date.now() - e.t0) / 1000;
+    e.r.onstop = () => {
+      e.flux.getTracks().forEach((t) => t.stop());
+      const blob = new Blob(e.bouts, { type: e.r.mimeType || e.bouts[0]?.type || "audio/mp4" });
+      finir.current?.(garder && duree >= 0.6 && blob.size > 0 ? { blob, duree, ext: e.ext } : null);
+      finir.current = null;
+    };
+    if (e.r.state !== "inactive") e.r.stop();
+    else e.r.onstop.call(e.r, new Event("stop"));
+    rec.current = null;
+    setSecondes(null);
+  }, []);
+
+  const commencer = useCallback(async () => {
+    const format = formatVocal();
+    if (!format || !navigator.mediaDevices?.getUserMedia) {
+      toast.error("Ce téléphone n'enregistre pas de vocal ici.");
+      return;
+    }
+    try {
+      const flux = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const r = new MediaRecorder(flux, { mimeType: format.mime });
+      const bouts: Blob[] = [];
+      r.ondataavailable = (ev) => ev.data.size > 0 && bouts.push(ev.data);
+      r.start(250);
+      const t0 = Date.now();
+      const minuteur = window.setInterval(() => {
+        const s = (Date.now() - t0) / 1000;
+        setSecondes(s);
+        if (s >= VOCAL_MAX_S) {
+          window.clearInterval(minuteur);
+          rappel.current();
+        }
+      }, 200);
+      rec.current = { r, flux, bouts, t0, minuteur, ext: format.ext };
+      setSecondes(0);
+      if (navigator.vibrate) navigator.vibrate(10);
+    } catch {
+      toast.error("Micro refusé : autorise-le dans les réglages du téléphone.");
+    }
+  }, []);
+
+  /** Arrête et rend l'enregistrement (null s'il est trop court). */
+  const terminer = useCallback(
+    () =>
+      new Promise<{ blob: Blob; duree: number; ext: string } | null>((res) => {
+        finir.current = res;
+        couper(true);
+      }),
+    [couper]
+  );
+
+  useEffect(() => () => couper(false), [couper]);
+  return { secondes, commencer, terminer, annuler: () => couper(false) };
+}
+
 /* -------------------------------- Pièces -------------------------------- */
 
-function PieceVue({ piece, onOuvrirJournee }: { piece: Piece; onOuvrirJournee?: (j: number) => void }) {
+function PieceVue({ piece, onOuvrirJournee, mien = false }: { piece: Piece; onOuvrirJournee?: (j: number) => void; mien?: boolean }) {
   const { journees } = useSeason();
+
+  if (piece.type === "vocal") return <VocalVue piece={piece} mien={mien} />;
 
   if (piece.type === "carte") {
     return (
@@ -284,6 +469,8 @@ function ReglageNotifs({ mode, onMode, onFermer }: { mode: ModeNotifs; onMode: (
 
 function Bulle({
   m,
+  cite,
+  surligne,
   suite,
   ouvert,
   moi,
@@ -292,9 +479,15 @@ function Bulle({
   onReagir,
   onRetirer,
   onCouper,
+  onRepondre,
+  onAllerA,
   onOuvrirJournee,
 }: {
   m: MessageV;
+  /** Le message auquel celui-ci répond (s'il est dans le fil). */
+  cite?: MessageV;
+  /** Un instant mis en avant : on vient d'y sauter depuis une réponse. */
+  surligne: boolean;
   /** Même auteur que le message d'avant, de peu : pas de carte ni de nom. */
   suite: boolean;
   ouvert: boolean;
@@ -304,12 +497,63 @@ function Bulle({
   onReagir: (e: Emoji) => void;
   onRetirer: () => void;
   onCouper: () => void;
+  onRepondre: () => void;
+  onAllerA: (id: number) => void;
   onOuvrirJournee?: (j: number) => void;
 }) {
   const pastille = 254 * FORMAT_CARTE.petite;
   const reactions = EMOJIS.filter((e) => (m.reactions[e]?.length ?? 0) > 0);
+
+  // Glisser la bulle vers la droite : répondre, comme dans WhatsApp.
+  const depart = useRef<{ x: number; y: number; horizontal: boolean | null } | null>(null);
+  const [tire, setTire] = useState(0);
+  const SEUIL = 56;
+  const touche = {
+    onTouchStart: (e: React.TouchEvent) => {
+      const t = e.touches[0];
+      depart.current = { x: t.clientX, y: t.clientY, horizontal: null };
+    },
+    onTouchMove: (e: React.TouchEvent) => {
+      const d = depart.current;
+      if (!d) return;
+      const t = e.touches[0];
+      const dx = t.clientX - d.x;
+      const dy = t.clientY - d.y;
+      if (d.horizontal === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) d.horizontal = dx > 0 && Math.abs(dx) > Math.abs(dy) * 1.4;
+      if (!d.horizontal) return;
+      const v = Math.min(72, Math.max(0, dx));
+      if (v >= SEUIL && tire < SEUIL && navigator.vibrate) navigator.vibrate(6);
+      setTire(v);
+    },
+    onTouchEnd: () => {
+      if (tire >= SEUIL) onRepondre();
+      depart.current = null;
+      setTire(0);
+    },
+  };
+
   return (
-    <div className={cn("flex items-end gap-2", m.mien ? "flex-row-reverse" : "flex-row", suite ? "mt-1" : "mt-[var(--fib-13)]")}>
+    <div
+      id={`m-${m.id}`}
+      {...touche}
+      onTouchCancel={touche.onTouchEnd}
+      className={cn(
+        "relative flex touch-pan-y items-end gap-2 rounded-3xl transition-colors duration-700",
+        m.mien ? "flex-row-reverse" : "flex-row",
+        suite ? "mt-1" : "mt-[var(--fib-13)]",
+        surligne && "bg-white/[0.07]"
+      )}
+      style={{ transform: tire ? `translateX(${tire}px)` : undefined, transition: tire ? "none" : "transform 0.25s ease" }}
+    >
+      {tire > 0 && (
+        <span
+          aria-hidden
+          className="absolute top-1/2 -left-10 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/10"
+          style={{ opacity: Math.min(1, tire / SEUIL) }}
+        >
+          <Reply className="size-4" />
+        </span>
+      )}
       {!m.mien &&
         (suite ? (
           <span className="shrink-0" style={{ width: pastille }} />
@@ -334,6 +578,21 @@ function Bulle({
             m.mien ? "items-end" : "items-start"
           )}
         >
+          {cite && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAllerA(cite.id);
+              }}
+              className="max-w-full rounded-2xl border-l-[3px] border-foreground/45 bg-white/[0.06] py-1.5 pr-3 pl-2.5 text-left"
+            >
+              <span className="block text-[11.5px] font-bold text-foreground/65">
+                {cite.mien ? "Toi" : cite.auteur ? <Nom n={cite.auteur} /> : "Quelqu'un"}
+              </span>
+              <span className="line-clamp-2 text-[13px] leading-snug text-foreground/55">{apercu(cite)}</span>
+            </button>
+          )}
           {m.texte && (
             <p
               className={cn(
@@ -347,8 +606,8 @@ function Bulle({
           {/* La pièce à part, sous la phrase : une carte se montre nue, une
               feuille ou un classement dans son verre. */}
           {m.piece &&
-            (m.piece.type === "carte" ? (
-              <PieceVue piece={m.piece} />
+            (m.piece.type === "carte" || m.piece.type === "vocal" ? (
+              <PieceVue piece={m.piece} mien={m.mien} />
             ) : (
               <div className="glass-soft w-[min(280px,68vw)] overflow-hidden rounded-[20px]">
                 <PieceVue piece={m.piece} onOuvrirJournee={onOuvrirJournee} />
@@ -411,7 +670,27 @@ function Bulle({
           </div>
         )}
 
-        <span className="mt-1 px-1 text-[10.5px] font-medium text-foreground/30 tabular-nums">{quand(m.at)}</span>
+        {/* L'heure, et sous chaque bulle les deux gestes : répondre, réagir. */}
+        <div className={cn("mt-0.5 flex items-center gap-0.5", m.mien ? "flex-row-reverse" : "flex-row")}>
+          <span className="px-1 text-[10.5px] font-medium text-foreground/30 tabular-nums">{quand(m.at)}</span>
+          <button
+            type="button"
+            onClick={onRepondre}
+            aria-label="Répondre"
+            className="flex size-7 items-center justify-center rounded-full text-foreground/35 active:bg-white/10"
+          >
+            <Reply className="size-[15px]" />
+          </button>
+          <button
+            type="button"
+            onClick={onToucher}
+            aria-label="Réagir"
+            aria-expanded={ouvert}
+            className={cn("flex size-7 items-center justify-center rounded-full active:bg-white/10", ouvert ? "text-foreground" : "text-foreground/35")}
+          >
+            <SmilePlus className="size-[15px]" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -431,7 +710,12 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
   const [erreur, setErreur] = useState<string | null>(null);
   const [texte, setTexte] = useState("");
   const [piece, setPiece] = useState<Piece | null>(null);
+  const [reponse, setReponse] = useState<MessageV | null>(null);
+  const [surligne, setSurligne] = useState<number | null>(null);
   const [choix, setChoix] = useState(false);
+  // Une minute : le vocal part tout seul.
+  const micro = useEnregistreur(() => void envoyerVocal());
+  const peutVocal = useMemo(() => typeof window !== "undefined" && !!formatVocal(), []);
   const [ouvert, setOuvert] = useState<number | null>(null);
   const [mode, setMode] = useState<ModeNotifs>("tout");
   const [reglage, setReglage] = useState(false);
@@ -515,6 +799,26 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
     void marquerVestiaireLu(Math.max(Date.now(), dernier));
   }, [dernier, prete, demo, session?.server]);
 
+  // Sous mes yeux : pas de notification tant que je regarde. Redit toutes
+  // les 20 s quand l'écran est visible, effacé dès qu'il ne l'est plus.
+  useEffect(() => {
+    if (demo || !session?.server) return;
+    let minuteur = 0;
+    const suivre = () => {
+      window.clearInterval(minuteur);
+      const visible = document.visibilityState === "visible";
+      void direDevant(visible);
+      if (visible) minuteur = window.setInterval(() => void direDevant(true), 20_000);
+    };
+    suivre();
+    document.addEventListener("visibilitychange", suivre);
+    return () => {
+      window.clearInterval(minuteur);
+      document.removeEventListener("visibilitychange", suivre);
+      void direDevant(false);
+    };
+  }, [demo, session?.server]);
+
   // Rester au plus récent : à l'ouverture, quand un message arrive (si on ne
   // lit pas plus haut), quand c'est le mien, et quand le clavier pousse.
   const dernierMien = messages[messages.length - 1]?.mien ?? false;
@@ -522,7 +826,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
     const f = fil.current;
     if (!prete || !f) return;
     if (enBas.current || dernierMien) f.scrollTop = f.scrollHeight;
-  }, [prete, messages.length, dernierMien, vue.hauteur, piece, choix]);
+  }, [prete, messages.length, dernierMien, vue.hauteur, piece, choix, reponse]);
 
   // Les onglets s'effacent pendant qu'on écrit (bottom-nav.tsx).
   useEffect(() => {
@@ -556,32 +860,74 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
       ? profils.filter((p) => p.id !== moi && (p.pseudo.startsWith(enCours) || p.name.toLowerCase().startsWith(enCours))).slice(0, 5)
       : [];
 
-  async function envoyer() {
-    if (envoi || (!texte.trim() && !piece)) return;
+  async function envoyer(vocal?: PieceVocal) {
+    const p = vocal ?? piece;
+    if (envoi || (!texte.trim() && !p)) return;
+    const corps = vocal ? "" : texte;
+    const rep = reponse;
     if (demo) {
       setMessages((ms) => [
         ...ms,
-        { id: Date.now(), auteurId: "moi", auteur: "", texte: texte.trim(), piece, at: Date.now(), mien: true, reactions: {} },
+        { id: Date.now(), auteurId: "moi", auteur: "", texte: corps.trim(), piece: p, at: Date.now(), mien: true, reponseA: rep?.id ?? null, reactions: {} },
       ]);
-      setTexte("");
-      setPiece(null);
+      if (!vocal) {
+        setTexte("");
+        setPiece(null);
+      }
+      setReponse(null);
       return;
     }
     setEnvoi(true);
-    const corps = texte;
-    const p = piece;
-    setTexte("");
-    setPiece(null);
-    const r = await posterAuVestiaire(corps, p);
+    if (!vocal) {
+      setTexte("");
+      setPiece(null);
+    }
+    setReponse(null);
+    const r = await posterAuVestiaire(corps, p, rep?.id ?? null);
     setEnvoi(false);
     if (!r.ok) {
-      setTexte(corps);
-      setPiece(p);
+      if (!vocal) {
+        setTexte(corps);
+        setPiece(p);
+      }
+      setReponse(rep);
       toast.error(r.raison);
       return;
     }
     if (navigator.vibrate) navigator.vibrate(8);
     if (moi) await recharger(moi, profils);
+  }
+
+  /** Le vocal fini : on le dépose, puis il part comme un message. */
+  async function envoyerVocal() {
+    const fin = await micro.terminer();
+    if (!fin) return;
+    if (demo) {
+      void envoyer({ type: "vocal", chemin: URL.createObjectURL(fin.blob), duree: Math.round(fin.duree * 10) / 10 });
+      return;
+    }
+    setEnvoi(true);
+    const p = await deposerVocal(fin.blob, fin.duree, fin.ext);
+    setEnvoi(false);
+    if (!p) {
+      toast.error("Vocal pas envoyé. Réessaie.");
+      return;
+    }
+    await envoyer(p);
+  }
+
+  function repondreA(m: MessageV) {
+    setOuvert(null);
+    setReponse(m);
+    champ.current?.focus();
+  }
+
+  function allerA(id: number) {
+    const el = document.getElementById(`m-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    setSurligne(id);
+    window.setTimeout(() => setSurligne((x) => (x === id ? null : x)), 1400);
   }
 
   async function basculerReaction(m: MessageV, e: Emoji) {
@@ -631,6 +977,8 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
     setMode(m);
     if (!demo && !(await reglerNotifsVestiaire(m))) toast.error("Réglage pas enregistré.");
   }
+
+  const parId = new Map(messages.map((m) => [m.id, m]));
 
   const enTete = (
     <header className="relative mx-auto flex w-full max-w-[640px] shrink-0 items-center justify-between gap-3 px-5 pt-3 pb-2">
@@ -700,6 +1048,10 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
               <Bulle
                 key={m.id}
                 m={m}
+                cite={m.reponseA ? parId.get(m.reponseA) : undefined}
+                surligne={surligne === m.id}
+                onRepondre={() => repondreA(m)}
+                onAllerA={allerA}
                 suite={suite}
                 ouvert={ouvert === m.id}
                 moi={moi}
@@ -755,6 +1107,21 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
             </div>
           )}
 
+          {reponse && (
+            <div className="glass mb-2 flex items-center gap-2 rounded-3xl py-2 pr-2 pl-3.5">
+              <Reply className="size-4 shrink-0 text-foreground/50" />
+              <div className="min-w-0 flex-1 border-l-[3px] border-foreground/45 pl-2.5">
+                <span className="block text-[11.5px] font-bold text-foreground/65">
+                  {reponse.mien ? "Toi" : reponse.auteur ? <Nom n={reponse.auteur} /> : "Quelqu'un"}
+                </span>
+                <span className="block truncate text-[13px] text-foreground/55">{apercu(reponse)}</span>
+              </div>
+              <button type="button" onClick={() => setReponse(null)} aria-label="Ne plus répondre" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/10">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          )}
+
           {piece && (
             <div className="glass mb-2 flex max-h-[38dvh] items-start gap-2 overflow-y-auto rounded-3xl">
               <div className="min-w-0 flex-1">
@@ -770,6 +1137,31 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
             <p className="glass rounded-full px-4 py-3 text-center text-[13.5px] font-semibold text-foreground/55">
               Parole coupée jusqu&apos;à {quand(sourdine)}
             </p>
+          ) : micro.secondes !== null ? (
+            // L'enregistrement en cours : annuler, la durée, envoyer.
+            <div className="glass flex items-center gap-1.5 rounded-[26px] p-1.5">
+              <button
+                type="button"
+                onClick={micro.annuler}
+                aria-label="Annuler le vocal"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/10"
+              >
+                <X className="size-5" />
+              </button>
+              <span className="flex min-w-0 flex-1 items-center gap-2.5 px-2">
+                <span className="size-2.5 shrink-0 animate-pulse rounded-full bg-foreground motion-reduce:animate-none" />
+                <span className="text-[16px] font-semibold tabular-nums">{minutes(micro.secondes)}</span>
+                <span className="text-[13px] font-medium text-foreground/35 tabular-nums">/ {minutes(VOCAL_MAX_S)}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => void envoyerVocal()}
+                aria-label="Envoyer le vocal"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-95"
+              >
+                <ArrowUp className="size-5" strokeWidth={2.75} />
+              </button>
+            </div>
           ) : (
             <form
               onSubmit={(e) => {
@@ -809,16 +1201,29 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                 placeholder="Message"
                 className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-[9px] text-[16px] leading-snug outline-none placeholder:text-foreground/30 [field-sizing:content]"
               />
-              <button
-                type="submit"
-                // Envoyer sans fermer le clavier, comme dans Messages.
-                onPointerDown={(e) => e.preventDefault()}
-                disabled={envoi || (!texte.trim() && !piece)}
-                aria-label="Envoyer"
-                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-95 disabled:opacity-25"
-              >
-                <ArrowUp className="size-5" strokeWidth={2.75} />
-              </button>
+              {/* Champ vide : le micro, comme dans WhatsApp. */}
+              {peutVocal && !texte.trim() && !piece ? (
+                <button
+                  type="button"
+                  onClick={() => void micro.commencer()}
+                  disabled={envoi}
+                  aria-label="Enregistrer un vocal"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/10 transition-transform active:scale-95 disabled:opacity-25"
+                >
+                  <Mic className="size-5" strokeWidth={2.25} />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  // Envoyer sans fermer le clavier, comme dans Messages.
+                  onPointerDown={(e) => e.preventDefault()}
+                  disabled={envoi || (!texte.trim() && !piece)}
+                  aria-label="Envoyer"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-95 disabled:opacity-25"
+                >
+                  <ArrowUp className="size-5" strokeWidth={2.75} />
+                </button>
+              )}
             </form>
           )}
         </div>
@@ -860,15 +1265,16 @@ function messagesDemo(noms: string[], journees: Journee[]): MessageV[] {
   const n = (i: number) => noms[i % Math.max(1, noms.length)] ?? "Ilyes";
   const t0 = Date.now() - 50 * 60_000;
   const jn = [...journees].reverse().find((j) => (j.matches?.length ?? 0) > 0);
-  const lignes: [string, string, Piece | null, Partial<Record<Emoji, string[]>>][] = [
-    [n(3), "Qui a vu le retourné de dimanche ? Je l'attends encore au ralenti", null, { "😂": ["a", "b"] }],
-    [n(0), "Personne parce que c'était un centre raté 😭", null, { "💀": ["a", "b", "c"] }],
-    [n(0), "", jn ? { type: "feuille", j: jn.j } : null, {}],
-    [n(5), "Regarde le classement avant de parler", { type: "classement", id: "buts", top: [{ n: n(0), v: 20 }, { n: n(1), v: 14 }, { n: n(5), v: 10 }] }, { "🐐": ["a"] }],
-    ["moi", "@" + n(5).toLowerCase() + " ta carte elle sort du pack de Noël", { type: "carte", joueur: n(1) }, { "🔥": ["a", "b"], "🤡": ["c"] }],
-    [n(3), "Dimanche on règle ça sur le terrain", null, {}],
+  const lignes: [string, string, Piece | null, Partial<Record<Emoji, string[]>>, number | null][] = [
+    [n(3), "Qui a vu le retourné de dimanche ? Je l'attends encore au ralenti", null, { "😂": ["a", "b"] }, null],
+    [n(0), "Personne parce que c'était un centre raté 😭", null, { "💀": ["a", "b", "c"] }, 1],
+    [n(0), "", jn ? { type: "feuille", j: jn.j } : null, {}, null],
+    [n(5), "Regarde le classement avant de parler", { type: "classement", id: "buts", top: [{ n: n(0), v: 20 }, { n: n(1), v: 14 }, { n: n(5), v: 10 }] }, { "🐐": ["a"] }, null],
+    ["moi", "@" + n(5).toLowerCase() + " ta carte elle sort du pack de Noël", { type: "carte", joueur: n(1) }, { "🔥": ["a", "b"], "🤡": ["c"] }, null],
+    [n(3), "", { type: "vocal", chemin: "blob:demo", duree: 14.2 }, { "😂": ["a"] }, null],
+    ["moi", "Dimanche on règle ça sur le terrain", null, {}, 6],
   ];
-  return lignes.map(([auteur, texte, piece, reactions], i) => ({
+  return lignes.map(([auteur, texte, piece, reactions, reponseA], i) => ({
     id: i + 1,
     auteurId: auteur,
     auteur: auteur === "moi" ? "" : auteur,
@@ -876,6 +1282,7 @@ function messagesDemo(noms: string[], journees: Journee[]): MessageV[] {
     piece,
     at: t0 + i * 7 * 60_000,
     mien: auteur === "moi",
+    reponseA,
     reactions,
   }));
 }

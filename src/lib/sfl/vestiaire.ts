@@ -37,7 +37,15 @@ export interface PieceClassement {
   /** Le podium au moment du partage : on chambre sur ce qui était vrai. */
   top: { n: string; v: number }[];
 }
-export type Piece = PieceCarte | PieceFeuille | PieceClassement;
+/** Un message vocal (19/10) : le fichier dans le bucket privé « vocaux ». */
+export interface PieceVocal {
+  type: "vocal";
+  /** <uuid de l'auteur>/<horodatage>.<ext> */
+  chemin: string;
+  /** En secondes. */
+  duree: number;
+}
+export type Piece = PieceCarte | PieceFeuille | PieceClassement | PieceVocal;
 
 export function estPiece(v: unknown): v is Piece {
   if (!v || typeof v !== "object") return false;
@@ -46,6 +54,7 @@ export function estPiece(v: unknown): v is Piece {
   if (p.type === "feuille") return typeof p.j === "number";
   if (p.type === "classement")
     return typeof p.id === "string" && Array.isArray(p.top) && p.top.length <= 3;
+  if (p.type === "vocal") return typeof p.chemin === "string" && typeof p.duree === "number";
   return false;
 }
 
@@ -72,6 +81,8 @@ export interface MessageV {
   piece: Piece | null;
   at: number;
   mien: boolean;
+  /** Le message auquel celui-ci répond, s'il existe encore. */
+  reponseA: number | null;
   /** Par émoji : qui a réagi (identifiants). */
   reactions: Partial<Record<Emoji, string[]>>;
 }
@@ -91,6 +102,7 @@ interface Brut {
   auteur: string;
   texte: string;
   piece?: unknown;
+  reponse_a?: number | null;
   created_at: string;
 }
 
@@ -111,7 +123,8 @@ export async function chargerVestiaire(
   // on relit sans elle plutôt que de laisser le Vestiaire vide.
   const lire = (colonnes: string) =>
     sb.from("messages").select(colonnes).eq("canal", "sfl").order("created_at", { ascending: false }).limit(limite);
-  let r = await lire("id, auteur, texte, piece, created_at");
+  let r = await lire("id, auteur, texte, piece, reponse_a, created_at");
+  if (r.error && /reponse_a/.test(r.error.message)) r = await lire("id, auteur, texte, piece, created_at");
   if (r.error && /piece/.test(r.error.message)) r = await lire("id, auteur, texte, created_at");
   if (r.error) return { ok: false, raison: expliquer(r.error.message) };
   const bruts = (r.data ?? []) as unknown as Brut[];
@@ -142,6 +155,7 @@ export async function chargerVestiaire(
       piece: estPiece(b.piece) ? b.piece : null,
       at: new Date(b.created_at).getTime(),
       mien: b.auteur === moi,
+      reponseA: b.reponse_a ?? null,
       reactions: reactions.get(b.id) ?? {},
     }))
     .reverse();
@@ -179,7 +193,7 @@ function notifier(corps: { type: "message"; id: number } | { type: "reaction"; i
   })();
 }
 
-export async function posterAuVestiaire(texte: string, piece: Piece | null): Promise<Resultat> {
+export async function posterAuVestiaire(texte: string, piece: Piece | null, reponseA: number | null = null): Promise<Resultat> {
   const propre = texte.trim();
   if (!propre && !piece) return { ok: false, raison: "Message vide." };
   if (propre.length > 2000) return { ok: false, raison: "Message trop long." };
@@ -192,6 +206,7 @@ export async function posterAuVestiaire(texte: string, piece: Piece | null): Pro
     if (!uid) return { ok: false, raison: expliquer("jwt") };
     const ligne: Record<string, unknown> = { canal: "sfl", auteur: uid, destinataire: null, texte: propre };
     if (piece) ligne.piece = piece;
+    if (reponseA) ligne.reponse_a = reponseA;
     const { data, error } = await sb.from("messages").insert(ligne).select("id").single();
     if (error) return { ok: false, raison: expliquer(error.message) };
     notifier({ type: "message", id: (data as { id: number }).id });
@@ -199,6 +214,55 @@ export async function posterAuVestiaire(texte: string, piece: Piece | null): Pro
   } catch {
     return { ok: false, raison: expliquer("") };
   }
+}
+
+/* -------------------------------- Vocaux -------------------------------- */
+
+const BUCKET_VOCAUX = "vocaux";
+/** Une minute au plus : au-delà, l'enregistrement s'arrête tout seul. */
+export const VOCAL_MAX_S = 60;
+
+/** Le format que ce téléphone sait enregistrer : mp4/aac sur iPhone. */
+export function formatVocal(): { mime: string; ext: string } | null {
+  if (typeof window === "undefined" || typeof MediaRecorder === "undefined") return null;
+  const choix: [string, string][] = [
+    ["audio/mp4", "m4a"],
+    ["audio/webm;codecs=opus", "webm"],
+    ["audio/webm", "webm"],
+    ["audio/ogg;codecs=opus", "ogg"],
+  ];
+  for (const [mime, ext] of choix) if (MediaRecorder.isTypeSupported(mime)) return { mime, ext };
+  return null;
+}
+
+/** Dépose un vocal et renvoie sa pièce, prête à partir. */
+export async function deposerVocal(blob: Blob, duree: number, ext: string): Promise<PieceVocal | null> {
+  const sb = supabase();
+  const { data: auth } = await sb.auth.getUser();
+  const uid = auth.user?.id;
+  if (!uid) return null;
+  const chemin = `${uid}/${Date.now()}.${ext}`;
+  // Le type sans ses paramètres (« ;codecs=opus ») : c'est lui que le bucket filtre.
+  const contentType = (blob.type || "audio/mp4").split(";")[0];
+  const { error } = await sb.storage.from(BUCKET_VOCAUX).upload(chemin, blob, { contentType });
+  if (error) return null;
+  return { type: "vocal", chemin, duree: Math.round(duree * 10) / 10 };
+}
+
+const liensVocaux = new Map<string, Promise<string | null>>();
+
+/** Le lien d'écoute d'un vocal (signé une heure, gardé en mémoire). */
+export function lienVocal(chemin: string): Promise<string | null> {
+  let lien = liensVocaux.get(chemin);
+  if (!lien) {
+    lien = supabase()
+      .storage.from(BUCKET_VOCAUX)
+      .createSignedUrl(chemin, 3600)
+      .then(({ data }) => data?.signedUrl ?? null);
+    liensVocaux.set(chemin, lien);
+    setTimeout(() => liensVocaux.delete(chemin), 50 * 60_000);
+  }
+  return lien;
 }
 
 /** Pose ou retire ma réaction. */
@@ -275,6 +339,23 @@ export async function marquerVestiaireLu(at = Date.now()) {
   await supabase()
     .from("vestiaire_suivi")
     .upsert({ user_id: auth.user.id, lu_jusqua: new Date(at).toISOString() }, { onConflict: "user_id" });
+}
+
+/**
+ * Le Vestiaire est sous mes yeux (vrai, redit toutes les 20 s) ou plus
+ * (faux) : le serveur ne notifie pas qui le regarde.
+ */
+export async function direDevant(devant: boolean) {
+  try {
+    const { data } = await supabase().auth.getSession();
+    const uid = data.session?.user.id;
+    if (!uid) return;
+    await supabase()
+      .from("vestiaire_suivi")
+      .upsert({ user_id: uid, devant_le: devant ? new Date().toISOString() : null }, { onConflict: "user_id" });
+  } catch {
+    /* au pire, une notification de trop ou de moins */
+  }
 }
 
 export async function reglerNotifsVestiaire(mode: ModeNotifs): Promise<boolean> {

@@ -594,7 +594,12 @@ $$;
 --   · {"type":"carte","joueur":"Kader"}
 --   · {"type":"feuille","j":11}
 --   · {"type":"classement","id":"buts","top":[{"n":"Ilyes","v":20},…]}
+--   · {"type":"vocal","chemin":"<uuid>/<horodatage>.m4a","duree":12.4}
+--     (19/10 : les vocaux, fichier dans le bucket « vocaux » plus bas)
 alter table public.messages add column if not exists piece jsonb;
+-- Répondre à un message précis (19/10) : la réponse cite l'original. Si
+-- l'original est retiré, la réponse reste, sans citation.
+alter table public.messages add column if not exists reponse_a bigint references public.messages(id) on delete set null;
 alter table public.messages drop constraint if exists messages_texte_check;
 alter table public.messages drop constraint if exists messages_texte_ou_piece;
 alter table public.messages add constraint messages_texte_ou_piece check (
@@ -606,7 +611,7 @@ alter table public.messages add constraint messages_piece_forme check (
   piece is null
   or (
     jsonb_typeof(piece) = 'object'
-    and piece->>'type' in ('carte', 'feuille', 'classement')
+    and piece->>'type' in ('carte', 'feuille', 'classement', 'vocal')
     and pg_column_size(piece) <= 4000
   )
 );
@@ -712,6 +717,10 @@ create table if not exists public.vestiaire_suivi (
   notifs      text not null default 'tout' check (notifs in ('tout', 'cite', 'rien')),
   notifie_le  timestamptz
 );
+-- Le Vestiaire ouvert à l'écran (19/10) : l'app le redit toutes les 20 s
+-- tant qu'il est visible, et l'efface en partant. Pas de notification à qui
+-- l'a sous les yeux, mais dès qu'il quitte, les messages le rattrapent.
+alter table public.vestiaire_suivi add column if not exists devant_le timestamptz;
 
 alter table public.vestiaire_suivi enable row level security;
 
@@ -725,9 +734,59 @@ create policy "suivi: le mien"
 -- que sa lecture et ses notifications. Révoquer le droit de table AVANT de
 -- donner les colonnes, sinon le droit de table les annule.
 revoke insert, update on public.vestiaire_suivi from authenticated, anon;
-grant insert (user_id, lu_jusqua, notifs) on public.vestiaire_suivi to authenticated;
+grant insert (user_id, lu_jusqua, notifs, devant_le) on public.vestiaire_suivi to authenticated;
 -- user_id aussi : un upsert le réécrit (à l'identique, la RLS y veille).
-grant update (user_id, lu_jusqua, notifs) on public.vestiaire_suivi to authenticated;
+grant update (user_id, lu_jusqua, notifs, devant_le) on public.vestiaire_suivi to authenticated;
+
+-- Les vocaux du Vestiaire (19/10) : bucket PRIVÉ « vocaux »,
+-- <uuid de l'auteur>/<horodatage>.<ext>. Toute la ligue les écoute (liens
+-- signés), chacun ne pose et ne retire que les siens. Une minute au plus,
+-- donc 3 Mo suffisent ; mp4/aac pour l'iPhone, webm/ogg pour le reste.
+do $$
+begin
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('vocaux', 'vocaux', false, 3145728,
+          array['audio/mp4', 'audio/aac', 'audio/x-m4a', 'audio/webm', 'audio/ogg', 'audio/mpeg'])
+  on conflict (id) do update
+    set public = false,
+        file_size_limit = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types;
+exception
+  when others then raise warning 'vocaux : bucket non créé (%)', sqlerrm;
+end;
+$$;
+
+do $$
+begin
+  drop policy if exists "vocaux: la ligue écoute" on storage.objects;
+  create policy "vocaux: la ligue écoute"
+    on storage.objects for select
+    to authenticated
+    using (bucket_id = 'vocaux' and (select public.est_membre()));
+
+  drop policy if exists "vocaux: je pose les miens" on storage.objects;
+  create policy "vocaux: je pose les miens"
+    on storage.objects for insert
+    to authenticated
+    with check (
+      bucket_id = 'vocaux'
+      and (storage.foldername(name))[1] = (select auth.uid())::text
+      and (select public.est_membre())
+      and (select public.peut_parler_au_vestiaire())
+    );
+
+  drop policy if exists "vocaux: je retire les miens" on storage.objects;
+  create policy "vocaux: je retire les miens"
+    on storage.objects for delete
+    to authenticated
+    using (
+      bucket_id = 'vocaux'
+      and ((storage.foldername(name))[1] = (select auth.uid())::text or (select public.is_league_admin()))
+    );
+exception
+  when others then raise warning 'vocaux : règles Storage non posées (%)', sqlerrm;
+end;
+$$;
 
 -- ────────────────────────────── Photos ───────────────────────────────
 -- Les photos de profil, partagées : celle qu'un joueur pose apparaît sur sa
