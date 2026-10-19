@@ -140,7 +140,7 @@ export default function CartePage() {
               <div key={i} className="shrink-0 text-center">
                 <ViewableCard
                   cacheKey={`${c.type}-${c.player}-${c.date}`}
-                  mode="rare"
+                  mode="simple"
                   size={0.82}
                   title={c.player}
                   subtitle={`${BOOST_LABELS[c.type]} · ${c.date}`}

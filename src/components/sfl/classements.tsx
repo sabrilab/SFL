@@ -4,14 +4,13 @@
 // directement (onglet Classements), sans page intermédiaire.
 //
 // Un sélecteur de classement (Pépite d'Or, Buteurs, Passeurs…), puis le
-// podium en cartes de tailles différentes — le n°1 dans le design de son
-// classement, φ fois plus grand que ses dauphins — et la suite en lignes,
+// podium en cartes de tailles différentes — le n°1 avec sa carte actuelle,
+// φ fois plus grande que celles de ses dauphins — et la suite en lignes,
 // chacune avec sa carte en vignette. Toucher une carte l'ouvre en grand.
 
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { PlayerCard } from "@/components/sfl/player-card";
-import { RankingCard, RANKING_THEMES } from "@/components/sfl/boost-card";
 import { ViewableCard } from "@/components/sfl/card-viewer";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { BadgesLigne } from "@/components/sfl/distinctions";
@@ -26,42 +25,10 @@ import { AuVestiaire } from "@/components/sfl/au-vestiaire";
 const DAUPHIN = FORMAT_CARTE.moyenne;
 const CHAMPION = FORMAT_CARTE.grande;
 
-// Mini badges "cartes" — un coup d'œil suffit pour voir quels types de
-// cartes hors-série (MVP, Impact, Défensive) un joueur a décrochés.
-const BADGE_STYLES: [key: "mvp" | "impact" | "def", label: string, cls: string][] = [
-  ["mvp", "M", "bg-gradient-to-b from-[#FFF3C6] via-[#F4C542] to-[#8A5A12] text-[#3a2703]"],
-  ["impact", "I", "bg-gradient-to-b from-[#FFB88A] via-[#FF5A1F] to-[#7A1E05] text-[#2b0a01]"],
-  ["def", "D", "bg-gradient-to-b from-[#D8F1FF] via-[#7FD4FF] to-[#1C4E77] text-[#06202f]"],
-];
-
-function CardBadges({ player }: { player: Player }) {
-  const badges = BADGE_STYLES.filter(([key]) => player[key] > 0);
-  if (badges.length === 0) return null;
-  return (
-    <span className="flex shrink-0 items-center gap-1">
-      {badges.map(([key, label, cls]) => (
-        <span
-          key={key}
-          title={`Carte ${key === "mvp" ? "MVP" : key === "impact" ? "Impact" : "Défensive"} ×${player[key]}`}
-          className={cn(
-            "flex h-5 w-3.5 items-center justify-center rounded-[3px] text-[8px] font-black shadow-sm ring-1 ring-black/20",
-            cls
-          )}
-        >
-          {label}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-// La carte du n°1 de chaque classement s'affiche avec le design distinct
-// correspondant (un thème par classement), pas la carte Standard.
-function leaderCard(defId: string, leader: Player, size: number) {
-  if (RANKING_THEMES[defId]) {
-    return <RankingCard rankingId={defId} player={leader} size={size} />;
-  }
-  return <PlayerCard player={leader} mode="simple" size={size} />;
+// Le n°1 de chaque classement montre sa carte actuelle, la même que partout
+// (plus de carte à thème par classement depuis le 19/10, Sabri).
+function leaderCard(leader: Player, size: number) {
+  return <PlayerCard player={leader} size={size} />;
 }
 
 type Classe = Player & { rank: number; value: number };
@@ -82,11 +49,11 @@ function Podium({ def, top, me }: { def: RankingDef; top: Classe[]; me: string }
             {p === premier ? (
               <ViewableCard
                 cacheKey={`rank-${def.id}-${p.name}`}
-                mode={RANKING_THEMES[def.id] ? "rare" : "simple"}
+                mode={"simple"}
                 size={size}
                 title={p.name}
                 subtitle={`${def.label} · ${p.value} ${def.unit}`}
-                render={(s) => leaderCard(def.id, p, s)}
+                render={(s) => leaderCard(p, s)}
               />
             ) : (
               <MiniCarte player={p} size={size} detail={`${def.label} · ${p.value} ${def.unit}`} />
@@ -165,7 +132,6 @@ function Liste({ def, me }: { def: RankingDef; me: string }) {
                 </span>
               )}
             </span>
-            <CardBadges player={p} />
             <span className="w-16 text-right text-lg font-bold tracking-tight tabular-nums">
               {p.value}
               <span className="mono-label ml-1 text-foreground/40">{def.unit}</span>

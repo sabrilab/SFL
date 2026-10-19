@@ -287,7 +287,7 @@ export function Card3D(props: {
 
 function Card3DInner({
   size = 1,
-  mode = "rare",
+  mode = "simple",
   render,
   startFace = "front",
   interactive = true,

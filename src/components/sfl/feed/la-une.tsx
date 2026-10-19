@@ -163,7 +163,7 @@ export function LaUne({
               >
                 <Card3D
                   cacheKey={`une-${journee}-${c.type}-${c.player}`}
-                  mode="rare"
+                  mode="simple"
                   size={0.52}
                   render={(s) => <BoostCard card={c} size={s} />}
                 />

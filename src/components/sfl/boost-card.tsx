@@ -1,11 +1,15 @@
-// Cartes à titre — cartes Boost (MVP / Impact / Défensive) et cartes de
-// n°1 de classement. Portées sur le layout « legend » du design de référence :
-// bandeau de titre plein accent, encart d'identité, nom centré, rangée de
-// six stats. Chaque titre garde sa teinte propre.
+// Cartes à titre — MVP / Impact / Défensive et n°1 de classement. Depuis le
+// 19/10 (Sabri : « ce sont toutes les mêmes cartes »), elles ne gardent plus
+// de design à part : elles montrent la carte actuelle du joueur (PlayerCard,
+// la carte Bola), la même partout. Le titre reste dit à côté de la carte par
+// l'écran qui l'affiche. Les anciennes cartes éditoriales (editorial-card)
+// ne servent plus qu'à la page de travail /design-cartes.
 
-import { EditorialCard, type CardTint } from "./editorial-card";
-import { ovr, type BoostCardData, type BoostType, type Player } from "@/lib/sfl/engine";
-import { useIdentites } from "@/hooks/use-identites";
+"use client";
+
+import { PlayerCard } from "./player-card";
+import { useSeason } from "./season-provider";
+import type { BoostCardData, BoostType, Player } from "@/lib/sfl/engine";
 
 export const BOOST_LABELS: Record<BoostType, string> = {
   mvp: "MVP",
@@ -13,73 +17,51 @@ export const BOOST_LABELS: Record<BoostType, string> = {
   def: "Défensive",
 };
 
-interface TitleTheme {
-  tint: CardTint;
-  badge: string;
+// Les classements qui avaient une carte de n°1 à eux. Gardé pour les écrans
+// qui nomment le titre ; la carte, elle, est la même pour tous.
+export const RANKING_THEMES: Record<string, { badge: string }> = {
+  mvp: { badge: "MVP DU MATCH" },
+  impact: { badge: "JOUEUR IMPACT" },
+  def: { badge: "DÉFENSIVE" },
+  pp: { badge: "PÉPITE D'OR" },
+  ovr: { badge: "NOTE GÉNÉRALE" },
+  buts: { badge: "MEILLEUR BUTEUR" },
+  passes: { badge: "MEILLEUR PASSEUR" },
+  presences: { badge: "TOUJOURS LÀ" },
+  discipline: { badge: "DISCIPLINE" },
+};
+
+/** Le joueur tel qu'il est aujourd'hui, à défaut tel que la carte l'a figé. */
+function useJoueurActuel(nom: string, repli: () => Player): Player {
+  const { allPlayers } = useSeason();
+  return allPlayers.find((p) => p.name === nom) ?? repli();
 }
 
-const BOOST_THEMES: Record<BoostType, TitleTheme> = {
-  mvp: { tint: "or", badge: "MVP DU MATCH" },
-  impact: { tint: "violet", badge: "JOUEUR IMPACT" },
-  def: { tint: "standard", badge: "DÉFENSIVE" },
-};
-
-// Un thème par classement — même famille visuelle, teintes réparties.
-export const RANKING_THEMES: Record<string, TitleTheme> = {
-  mvp: BOOST_THEMES.mvp,
-  impact: BOOST_THEMES.impact,
-  def: BOOST_THEMES.def,
-  pp: { tint: "or", badge: "PÉPITE D'OR" },
-  ovr: { tint: "violet", badge: "NOTE GÉNÉRALE" },
-  buts: { tint: "rouge", badge: "MEILLEUR BUTEUR" },
-  passes: { tint: "standard", badge: "MEILLEUR PASSEUR" },
-  presences: { tint: "standard", badge: "TOUJOURS LÀ" },
-  discipline: { tint: "rouge", badge: "DISCIPLINE" },
-};
-
 export function BoostCard({ card, size = 1 }: { card: BoostCardData; size?: number }) {
-  const th = BOOST_THEMES[card.type];
-  const identite = useIdentites();
-  return (
-    <EditorialCard
-      layout="legend"
-      tint={th.tint}
-      badge={th.badge}
-      name={identite.nom(card.player)}
-      username={identite.pseudo(card.player)}
-      position={`${card.poste} · ${card.date}`.toUpperCase()}
-      overall={card.ovr}
-      stats={card.stats}
-      photoName={card.player}
-      size={size}
-    />
-  );
+  const player = useJoueurActuel(card.player, () => ({
+    name: card.player,
+    poste: card.poste,
+    pp: 0,
+    matchs: 0,
+    buts: 0,
+    passes: 0,
+    statut: "Actif",
+    stats: card.stats,
+    mvp: 0,
+    impact: 0,
+    def: 0,
+  }));
+  return <PlayerCard player={player} size={size} />;
 }
 
 export function RankingCard({
-  rankingId,
   player,
   size = 1,
 }: {
-  rankingId: string;
+  rankingId?: string;
   player: Player;
   size?: number;
 }) {
-  const th = RANKING_THEMES[rankingId];
-  const identite = useIdentites();
-  if (!th) return null;
-  return (
-    <EditorialCard
-      layout="legend"
-      tint={th.tint}
-      badge={th.badge}
-      name={identite.nom(player.name)}
-      username={identite.pseudo(player.name)}
-      position={player.poste.toUpperCase()}
-      overall={ovr(player.stats)}
-      stats={player.stats}
-      photoName={player.name}
-      size={size}
-    />
-  );
+  const actuel = useJoueurActuel(player.name, () => player);
+  return <PlayerCard player={actuel} size={size} />;
 }
