@@ -37,6 +37,7 @@ import {
   type CardKind,
   type CollectionCard,
 } from "@/lib/sfl/collection";
+import { Nom } from "@/components/sfl/nom";
 
 const KIND_STYLES: Record<string, string> = {
   simple: "bg-secondary text-foreground",
@@ -90,7 +91,7 @@ function CardModal({
               >
                 {KIND_LABELS[card.kind]}
               </span>
-              <span className="text-lg font-bold">{card.player.name}</span>
+              <span className="text-lg font-bold"><Nom n={card.player.name} /></span>
               <span className="text-xs font-medium text-foreground/45">
                 n°{card.serial}/{card.total} {has && `· ×${count} en collection`}
               </span>

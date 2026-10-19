@@ -39,6 +39,7 @@ import {
 import { ovr, type Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { arc, projeter, rectArrondi, trace, TERRAIN } from "@/lib/sfl/terrain-vu";
+import { Nom } from "@/components/sfl/nom";
 
 export interface EnTeteFeuille {
   /** « J8 · Sunday Five League ». */
@@ -471,7 +472,7 @@ function NomEquipe({
         style={{ background: couleur }}
       />
       <span className="text-[14px] font-extrabold text-[#0A0B0D] dark:text-white">
-        {nom}
+        <Nom n={nom} />
       </span>
     </div>
   );

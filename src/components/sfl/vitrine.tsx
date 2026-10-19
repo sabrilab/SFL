@@ -51,6 +51,7 @@ import {
   type TropheeId,
 } from "@/lib/sfl/trophees";
 import { cn } from "@/lib/utils";
+import { Nom } from "@/components/sfl/nom";
 
 /** Les métaux : le dégradé, l'encre gravée dessus, le listel du bord. */
 const METAL: Record<Metal, { stops: [string, string, string]; encre: string; listel: string; trait: string }> = {
@@ -462,7 +463,7 @@ function Detenteur({ nom, m, detail }: { nom: string; m: Metal; detail: string }
             aria-hidden
           />
         </span>
-        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{nom}</span>
+        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold"><Nom n={nom} /></span>
         <span className="shrink-0 text-[13px] text-foreground/70">{detail}</span>
       </button>
     </li>

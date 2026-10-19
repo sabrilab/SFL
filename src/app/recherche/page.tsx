@@ -21,7 +21,7 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { CarteDe } from "@/components/sfl/mini-carte";
 import { useGrandEcran } from "@/hooks/use-media-query";
 import { logActivity } from "@/lib/sfl/activity";
-import { username } from "@/lib/sfl/usernames";
+import { nomAffiche, pseudoAffiche } from "@/lib/sfl/identites";
 import {
   journeeScoreSummary,
   ovr,
@@ -31,6 +31,7 @@ import {
   type Player,
 } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
+import { Nom } from "@/components/sfl/nom";
 
 /* ------------------------------- outillage ------------------------------- */
 
@@ -114,9 +115,9 @@ function FicheJoueur({ player, rank }: { player: Player; rank: number }) {
       {/* Identité */}
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[19px] font-extrabold tracking-tight">{player.name}</div>
+          <div className="truncate text-[19px] font-extrabold tracking-tight"><Nom n={player.name} /></div>
           <div className="mt-0.5 truncate text-[12.5px] text-foreground/42">
-            {username(player.name)} · {player.poste} · {rank}e au Pépite d&apos;Or
+            {pseudoAffiche(player.name)} · {player.poste} · {rank}e au Pépite d&apos;Or
           </div>
         </div>
         <div className="text-right">
@@ -300,7 +301,7 @@ function FicheJournee({ journee }: { journee: Journee }) {
                   <div className="flex flex-col gap-1.5">
                     {team.players.map((p) => (
                       <div key={p.name} className="flex items-baseline gap-1.5 text-[12.5px]">
-                        <span className="min-w-0 flex-1 truncate font-medium">{p.name}</span>
+                        <span className="min-w-0 flex-1 truncate font-medium"><Nom n={p.name} /></span>
                         {(p.buts > 0 || p.passes > 0) && (
                           <span className="shrink-0 text-[11px] tabular-nums text-primary">
                             {p.buts > 0 && `${p.buts}⚽`}
@@ -351,7 +352,8 @@ export default function RecherchePage() {
       .filter(
         (p) =>
           fold(p.name).includes(needle) ||
-          fold(username(p.name)).includes(needle) ||
+          fold(pseudoAffiche(p.name)).includes(needle) ||
+          fold(nomAffiche(p.name)).includes(needle) ||
           fold(p.poste).includes(needle)
       )
       .slice(0, 20);
@@ -500,9 +502,9 @@ export default function RecherchePage() {
                     >
                       <Avatar name={p.name} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[15px] font-semibold">{p.name}</span>
+                        <span className="block truncate text-[15px] font-semibold"><Nom n={p.name} /></span>
                         <span className="block truncate text-[12.5px] text-foreground/42">
-                          {username(p.name)} · {p.poste} · {rankOf.get(p.name)}e
+                          {pseudoAffiche(p.name)} · {p.poste} · {rankOf.get(p.name)}e
                         </span>
                       </span>
                       <span className="shrink-0 text-right">

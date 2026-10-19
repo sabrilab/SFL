@@ -19,6 +19,7 @@ import { ActivityTracker } from "@/components/sfl/activity-tracker";
 import { NouvellesCartes } from "@/components/sfl/nouvelle-carte";
 import { ConnexionLocale } from "@/components/sfl/auth/connexion-locale";
 import { PhotosSync } from "@/components/sfl/photos-sync";
+import { IdentiteObligatoire } from "@/components/sfl/identite";
 import { NouveauxBadges } from "@/components/sfl/vitrine";
 import { InvitationCarte } from "@/components/sfl/invitation-carte";
 
@@ -107,6 +108,7 @@ export default function RootLayout({
                 <PhotosSync />
                 <NouveauxBadges />
                 <InvitationCarte />
+                <IdentiteObligatoire />
                 {/* Orbes lumineux du design de référence, derrière tout le contenu */}
                 <div className="orbs" aria-hidden>
                   <i /><i /><i />

@@ -22,6 +22,7 @@ import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
 import type { MatchEntry, MatchEvent, Saison } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
 import { CarteDe } from "@/components/sfl/mini-carte";
+import { Nom } from "@/components/sfl/nom";
 
 /* ============================== Types ============================== */
 
@@ -651,7 +652,7 @@ export function FacteurXModule({ facteurX }: { facteurX: AnalysePlus["facteurX"]
         {facteurX.map((f) => (
           <div key={f.name} className="flex items-center gap-3">
             <Avatar name={f.name} size={26} />
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{f.name}</span>
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold"><Nom n={f.name} /></span>
             <div className="h-1.5 w-[84px] overflow-hidden rounded-full bg-foreground/10">
               <div className="h-full rounded-full bg-primary" style={{ width: `${f.winRate}%` }} />
             </div>
@@ -702,7 +703,7 @@ export function BeteNoireModule({ beteNoire, me }: { beteNoire: AnalysePlus["bet
   return (
     <section className="glass rounded-3xl p-5">
       <p className="mono-label text-primary">Ta bête noire</p>
-      <h2 className="mt-1 text-xl font-bold tracking-tight">{beteNoire.name} te réussit mal</h2>
+      <h2 className="mt-1 text-xl font-bold tracking-tight"><Nom n={beteNoire.name} /> te réussit mal</h2>
       <div className="mt-4 flex items-center gap-3.5">
         <Avatar name={beteNoire.name} size={40} />
         <p className="min-w-0 flex-1 text-[13px] leading-snug text-foreground/50">
@@ -752,7 +753,7 @@ export function FairplayModule({ fairplay }: { fairplay: AnalysePlus["fairplay"]
                   className="glass-soft flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-semibold"
                 >
                   <Avatar name={e.name} size={20} />
-                  {e.name}
+                  <Nom n={e.name} />
                   <span className="mono-label text-foreground/40">{e.matchs}M</span>
                 </span>
               ))}
@@ -1028,7 +1029,7 @@ export function MercatoModule({ mercato }: { mercato: AnalysePlus["mercato"] }) 
         {mercato.map((m) => (
           <div key={m.name} className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3">
             <Avatar name={m.name} size={28} />
-            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{m.name}</span>
+            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold"><Nom n={m.name} /></span>
             <span className="text-[14px] font-bold tabular-nums">{fmt(m.value)}</span>
             <span
               className={cn(
@@ -1121,7 +1122,7 @@ export function SeriesModule({ series }: { series: AnalysePlus["series"] }) {
             <div className="text-[28px] leading-none font-extrabold tabular-nums">{s.count}</div>
             <p className="mono-label text-[8px] text-foreground/35">{s.unit}</p>
             <span className="mt-0.5 w-full truncate text-center text-[12px] font-semibold">
-              {s.name}
+              <Nom n={s.name} />
             </span>
           </div>
         ))}
@@ -1200,7 +1201,7 @@ export function AlternatifModule({ alternatif }: { alternatif: AnalysePlus["alte
               {i + 1}
             </span>
             <Avatar name={t.name} size={26} />
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{t.name}</span>
+            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold"><Nom n={t.name} /></span>
             <span className="text-[13px] font-bold tabular-nums">{t.value}</span>
             <span className="mono-label w-[68px] text-right text-foreground/35">
               {alternatif.unit}

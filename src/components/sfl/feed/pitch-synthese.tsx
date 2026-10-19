@@ -12,6 +12,7 @@ import { useState } from "react";
 import { ovr, type Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { CarteDe } from "@/components/sfl/mini-carte";
+import { Nom } from "@/components/sfl/nom";
 
 export interface PitchLine {
   name: string;
@@ -151,7 +152,7 @@ export function PitchSynthese({
               }}
             >
               <Avatar name={pl.name} size={pl.hot ? 38 : 34} />
-              <span className="max-w-[74px] truncate text-[11px] font-bold">{pl.name}</span>
+              <span className="max-w-[74px] truncate text-[11px] font-bold"><Nom n={pl.name} /></span>
               <span
                 className={cn(
                   "mono-label rounded px-1.5 py-px text-[9px]",

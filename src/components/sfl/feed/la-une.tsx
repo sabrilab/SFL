@@ -16,6 +16,8 @@ import { BoostCard } from "@/components/sfl/boost-card";
 import { Card3D } from "@/components/sfl/card-3d";
 import type { BoostCardData } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
+import { Nom } from "@/components/sfl/nom";
+import { nomAffiche } from "@/lib/sfl/identites";
 
 export interface UneLine {
   player: string;
@@ -40,11 +42,11 @@ function manchette(lines: UneLine[], totalButs: number, record: boolean) {
   const best = [...lines].sort((a, b) => b.buts * 2 + b.passes - (a.buts * 2 + a.passes))[0];
   if (!best) return { titre: "Dimanche blanc", chapeau: "Aucune feuille de match ce jour-là." };
 
-  const nom = best.player.toUpperCase();
+  const nom = nomAffiche(best.player).toUpperCase();
   if (record) {
     return {
       titre: `${totalButs} BUTS, ET UN RECORD`,
-      chapeau: `Jamais un dimanche n'avait tant marqué. ${best.player} termine la journée avec ${best.buts} but${best.buts > 1 ? "s" : ""} et ${best.passes} passe${best.passes > 1 ? "s" : ""}.`,
+      chapeau: `Jamais un dimanche n'avait tant marqué. ${nomAffiche(best.player)} termine la journée avec ${best.buts} but${best.buts > 1 ? "s" : ""} et ${best.passes} passe${best.passes > 1 ? "s" : ""}.`,
     };
   }
   if (best.buts >= 5) {
@@ -167,7 +169,7 @@ export function LaUne({
                 />
                 <figcaption className="max-w-[130px] text-center">
                   <span className="mono-label block text-primary">{TITRES[c.type] ?? c.type}</span>
-                  <span className="mt-0.5 block truncate text-[12.5px] font-bold">{c.player}</span>
+                  <span className="mt-0.5 block truncate text-[12.5px] font-bold"><Nom n={c.player} /></span>
                 </figcaption>
               </motion.figure>
             ))}

@@ -19,6 +19,7 @@ import { publicOnly } from "@/lib/sfl/hidden";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
 import { journeeJouee, saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
 import { cn } from "@/lib/utils";
+import { Nom } from "@/components/sfl/nom";
 
 const pts = (n: number) => `${n} pt${n > 1 ? "s" : ""}`;
 
@@ -70,7 +71,7 @@ export function Ecarts({ className, max = 8 }: { className?: string; max?: numbe
         <MiniCarte player={p} size={FORMAT_CARTE.petite} detail={`${p.rank}e au Pépite d'Or · ${pts(p.pp)}`} />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <span className={cn("truncate text-[14px] font-semibold", estMoi && "font-bold")}>{p.name}</span>
+            <span className={cn("truncate text-[14px] font-semibold", estMoi && "font-bold")}><Nom n={p.name} /></span>
             <span className="shrink-0 text-[14px] font-bold tabular-nums">{p.pp}</span>
           </div>
           <div className="mt-1.5 flex items-center gap-2">

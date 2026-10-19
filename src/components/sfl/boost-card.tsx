@@ -5,7 +5,7 @@
 
 import { EditorialCard, type CardTint } from "./editorial-card";
 import { ovr, type BoostCardData, type BoostType, type Player } from "@/lib/sfl/engine";
-import { username } from "@/lib/sfl/usernames";
+import { useIdentites } from "@/hooks/use-identites";
 
 export const BOOST_LABELS: Record<BoostType, string> = {
   mvp: "MVP",
@@ -39,13 +39,14 @@ export const RANKING_THEMES: Record<string, TitleTheme> = {
 
 export function BoostCard({ card, size = 1 }: { card: BoostCardData; size?: number }) {
   const th = BOOST_THEMES[card.type];
+  const identite = useIdentites();
   return (
     <EditorialCard
       layout="legend"
       tint={th.tint}
       badge={th.badge}
-      name={card.player}
-      username={username(card.player)}
+      name={identite.nom(card.player)}
+      username={identite.pseudo(card.player)}
       position={`${card.poste} · ${card.date}`.toUpperCase()}
       overall={card.ovr}
       stats={card.stats}
@@ -65,14 +66,15 @@ export function RankingCard({
   size?: number;
 }) {
   const th = RANKING_THEMES[rankingId];
+  const identite = useIdentites();
   if (!th) return null;
   return (
     <EditorialCard
       layout="legend"
       tint={th.tint}
       badge={th.badge}
-      name={player.name}
-      username={username(player.name)}
+      name={identite.nom(player.name)}
+      username={identite.pseudo(player.name)}
       position={player.poste.toUpperCase()}
       overall={ovr(player.stats)}
       stats={player.stats}

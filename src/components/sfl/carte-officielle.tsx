@@ -15,7 +15,7 @@ import { RecadrerPhoto } from "@/components/sfl/recadrer-photo";
 import { usePhotoPerso } from "@/hooks/use-player-photo";
 import { setPhoto } from "@/lib/sfl/photos";
 import { ovr, type Player } from "@/lib/sfl/engine";
-import { username } from "@/lib/sfl/usernames";
+import { useIdentites } from "@/hooks/use-identites";
 import { cn } from "@/lib/utils";
 
 export function CarteOfficielle({ player, className }: { player: Player; className?: string }) {
@@ -51,6 +51,7 @@ export function FluxCarteOfficielle({
   onFermer: () => void;
 }) {
   const [aRecadrer, setARecadrer] = useState<string | null>(null);
+  const identite = useIdentites();
 
   async function valider(dataUrl: string) {
     setARecadrer(null);
@@ -78,7 +79,8 @@ export function FluxCarteOfficielle({
         src={aRecadrer}
         carte={{
           name: player.name,
-          username: username(player.name),
+          affiche: identite.nom(player.name),
+          username: identite.pseudo(player.name),
           position: player.poste,
           overall: ovr(player.stats),
           stats: player.stats,

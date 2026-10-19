@@ -22,6 +22,7 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { legendes, parcours, saisonsPalmares, type Legende, type SaisonPalmares } from "@/lib/sfl/palmares";
 import { vitrine } from "@/lib/sfl/trophees";
 import { cn } from "@/lib/utils";
+import { Nom } from "@/components/sfl/nom";
 
 // Le podium d'une saison : le champion en carte moyenne, ses dauphins en petite.
 const DAUPHIN = FORMAT_CARTE.petite;
@@ -98,7 +99,7 @@ function CarteSaison({ s }: { s: SaisonPalmares }) {
               <span className="flex flex-col leading-tight">
                 <span className="mono-label text-foreground/45">{titre}</span>
                 <span>
-                  <span className="font-semibold">{l.player.name}</span> <span className="text-foreground/50 tabular-nums">{l.n}</span>
+                  <span className="font-semibold"><Nom n={l.player.name} /></span> <span className="text-foreground/50 tabular-nums">{l.n}</span>
                 </span>
               </span>
             </span>
@@ -166,7 +167,7 @@ function Legendes({ liste, onChoisir }: { liste: Legende[]; onChoisir: (nom: str
             <span className="w-4 text-[12px] text-foreground/40 tabular-nums">{i + 1}</span>
             <MiniCarte player={l.player} size={FORMAT_CARTE.petite} />
             <button type="button" onClick={() => onChoisir(l.player.name)} className="flex min-w-0 flex-1 flex-col items-start text-left">
-              <span className="max-w-full truncate text-[15px] font-semibold">{l.player.name}</span>
+              <span className="max-w-full truncate text-[15px] font-semibold"><Nom n={l.player.name} /></span>
               <span className="text-[12px] text-foreground/45 tabular-nums">
                 {l.saisons} saison{l.saisons > 1 ? "s" : ""} · {l.matchs} match{l.matchs > 1 ? "s" : ""}
               </span>

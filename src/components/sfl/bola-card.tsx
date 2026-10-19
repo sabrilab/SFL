@@ -225,6 +225,7 @@ function Portrait({
 
 export function BolaCard({
   name,
+  affiche,
   username,
   position,
   overall,
@@ -238,6 +239,8 @@ export function BolaCard({
   badge,
 }: {
   name: string;
+  /** Le nom montré sur la carte, s'il diffère du nom de saison (voir lib/sfl/identites). */
+  affiche?: string;
   username?: string;
   position: string;
   overall: number;
@@ -262,7 +265,7 @@ export function BolaCard({
   const encre = (a: number) => `rgba(${p.encre},${a})`;
   const seed = graine(name);
   const serie = `bola-fr-${String(seed % 1000000).padStart(6, "0")}`;
-  const nomUp = name.toUpperCase();
+  const nomUp = (affiche ?? name).toUpperCase();
 
   // La pastille : un carré, le visage, la note dans un onglet.
   if (palier === "pastille") {

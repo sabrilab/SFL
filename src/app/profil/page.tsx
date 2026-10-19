@@ -27,7 +27,8 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { useGrandEcran } from "@/hooks/use-media-query";
-import { username } from "@/lib/sfl/usernames";
+import { FormulaireIdentite } from "@/components/sfl/identite";
+import { useIdentites } from "@/hooks/use-identites";
 import { ovr, rankPlayers, STAT_KEYS, type Player } from "@/lib/sfl/engine";
 
 /* ------------------------- Radar « PROFIL DE JEU » ------------------------ */
@@ -188,6 +189,8 @@ export default function Profil() {
   // La carte est le sujet de la page : elle profite de la place quand il y en a.
   const grand = useGrandEcran();
   const [photoOuverte, setPhotoOuverte] = useState(false);
+  const [identiteOuverte, setIdentiteOuverte] = useState(false);
+  const identite = useIdentites();
 
   const nbTitres = myCards.length;
   const dernierTitre = myCards[myCards.length - 1];
@@ -214,12 +217,18 @@ export default function Profil() {
           >
             <AvatarPhoto name={player.name} />
           </button>
-          <div className="min-w-0">
-            <div className="truncate text-[19px] font-extrabold tracking-tight">{player.name}</div>
+          {/* Le nom et le pseudo se corrigent en les touchant (identite.tsx). */}
+          <button
+            type="button"
+            onClick={() => setIdentiteOuverte(true)}
+            aria-label="Modifier mon nom et mon pseudo"
+            className="min-w-0 text-left"
+          >
+            <div className="truncate text-[19px] font-extrabold tracking-tight">{identite.nom(player.name)}</div>
             <div className="mt-0.5 truncate text-[12.5px] text-foreground/42">
-              {`${username(player.name)} · ${player.poste} · ${myRank}e au Pépite d'Or`}
+              {`${identite.pseudo(player.name)} · ${player.poste} · ${myRank}e au Pépite d'Or`}
             </div>
-          </div>
+          </button>
         </div>
         <Link
           href="/reglages"
@@ -330,6 +339,14 @@ export default function Profil() {
       </section>
       </div>
       </div>
+
+      {/* Le prénom, le nom, le pseudo et l'email : on y entre en touchant le nom */}
+      <Sheet open={identiteOuverte} onOpenChange={setIdentiteOuverte}>
+        <SheetContent side="bottom" className="mx-auto max-h-[92dvh] w-full overflow-y-auto rounded-t-[28px] px-6 pt-7 pb-8 sm:max-w-md">
+          <SheetTitle className="sr-only">Mon nom et mon pseudo</SheetTitle>
+          <FormulaireIdentite onFini={() => setIdentiteOuverte(false)} />
+        </SheetContent>
+      </Sheet>
 
       {/* La photo de profil, à part : on y entre en touchant l'avatar */}
       <Sheet open={photoOuverte} onOpenChange={setPhotoOuverte}>

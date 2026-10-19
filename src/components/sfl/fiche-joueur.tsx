@@ -20,7 +20,7 @@ import { ficheJoueur } from "@/lib/sfl/fiche-joueur";
 import { finsDeSaison, ordinal, type ClassementId } from "@/lib/sfl/fin-de-saison";
 import { POSTES } from "@/lib/sfl/inscription";
 import { vitrine, type TropheeId } from "@/lib/sfl/trophees";
-import { username } from "@/lib/sfl/usernames";
+import { useIdentites } from "@/hooks/use-identites";
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 
 export interface EquipeDuJour {
@@ -55,6 +55,7 @@ export function FicheJoueurSheet({
 function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJour | null; onClose: () => void }) {
   const { saison, allPlayers } = useSeason();
   const { open } = useCardViewer();
+  const identite = useIdentites();
   const fiche = useMemo(() => ficheJoueur(saison, player, allPlayers), [saison, player, allPlayers]);
   const ecussons = useMemo(
     () => finsDeSaison(saison, player.name, allPlayers).filter((e) => e.meilleur),
@@ -75,7 +76,7 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
     open({
       cacheKey: `mini-${player.name}`,
       mode: "simple",
-      title: player.name,
+      title: identite.nom(player.name),
       render: (s) => <PlayerCard player={player} size={s} />,
     });
   }
@@ -83,7 +84,7 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-end gap-4">
-        <button type="button" onClick={voirEnGrand} aria-label={`Voir la carte de ${player.name} en grand`} className="shrink-0 transition-transform active:scale-95">
+        <button type="button" onClick={voirEnGrand} aria-label={`Voir la carte de ${identite.nom(player.name)} en grand`} className="shrink-0 transition-transform active:scale-95">
           <PlayerCard player={player} size={FORMAT_CARTE.grande} />
         </button>
         <div className="flex min-w-0 flex-col gap-2 pb-1">
@@ -97,10 +98,10 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
             </span>
           )}
           <SheetTitle className="font-[family-name:var(--font-anton)] text-[38px] leading-[0.95] font-normal tracking-[0.3px] break-words uppercase">
-            {player.name}
+            {identite.nom(player.name)}
           </SheetTitle>
           <SheetDescription className="font-mono text-[12px] text-muted-foreground">
-            {username(player.name)}
+            {identite.pseudo(player.name)}
             {poste && ` · ${poste.toLowerCase()}`}
           </SheetDescription>
         </div>

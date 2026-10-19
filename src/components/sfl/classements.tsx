@@ -20,6 +20,7 @@ import { rankByMetric, type Player } from "@/lib/sfl/engine";
 import { RANKINGS, type RankingDef } from "@/lib/sfl/rankings";
 import { distinctions } from "@/lib/sfl/distinctions";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
+import { Nom } from "@/components/sfl/nom";
 
 const DAUPHIN = FORMAT_CARTE.moyenne;
 const CHAMPION = FORMAT_CARTE.grande;
@@ -96,7 +97,7 @@ function Podium({ def, top, me }: { def: RankingDef; top: Classe[]; me: string }
                 p.name === me && "text-primary"
               )}
             >
-              <span className="text-foreground/40 tabular-nums">{p.rank}</span> {p.name}
+              <span className="text-foreground/40 tabular-nums">{p.rank}</span> <Nom n={p.name} />
             </span>
             <span className={cn("font-bold tabular-nums", p === premier ? "text-[20px]" : "text-[15px]")}>
               {p.value}
@@ -144,7 +145,7 @@ function Liste({ def, me }: { def: RankingDef; me: string }) {
             <span className="w-7 text-[15px] font-bold text-foreground/40 tabular-nums">{p.rank}</span>
             <MiniCarte player={p} size={FORMAT_CARTE.petite} detail={`${def.label} · ${p.value} ${def.unit}`} />
             <span className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="truncate text-[15px] font-semibold">{p.name}</span>
+              <span className="truncate text-[15px] font-semibold"><Nom n={p.name} /></span>
               <BadgesLigne ds={parNom.get(p.name)} />
               {p.statut !== "Actif" && (
                 <span

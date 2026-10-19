@@ -22,10 +22,11 @@ import { RecadrerPhoto } from "@/components/sfl/recadrer-photo";
 import { PhotoStudio } from "@/components/sfl/photo-studio";
 import { useSeason } from "@/components/sfl/season-provider";
 import { ovr } from "@/lib/sfl/engine";
-import { username } from "@/lib/sfl/usernames";
+import { useIdentites } from "@/hooks/use-identites";
 
 export function ProfilePhoto({ name }: { name: string }) {
   const src = usePlayerPhoto(name);
+  const identite = useIdentites();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [broken, setBroken] = useState(false);
@@ -161,7 +162,7 @@ export function ProfilePhoto({ name }: { name: string }) {
 
       <RecadrerPhoto
         src={aRecadrer}
-        carte={{ name, username: username(name), position: joueur?.poste ?? "", overall: ovr(stats), stats }}
+        carte={{ name, affiche: identite.nom(name), username: identite.pseudo(name), position: joueur?.poste ?? "", overall: ovr(stats), stats }}
         onValider={valider}
         onFermer={fermer}
       />

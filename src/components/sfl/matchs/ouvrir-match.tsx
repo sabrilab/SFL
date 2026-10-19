@@ -29,6 +29,7 @@ import {
 } from "@/lib/sfl/matchs";
 import type { Terrain } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
+import { Nom } from "@/components/sfl/nom";
 
 function Choix<T extends string>({
   valeur,
@@ -280,7 +281,7 @@ export function OuvrirMatch({
                         onClick={() => ajouter(p)}
                         className="flex items-center gap-1 rounded-full border border-border/60 bg-card px-3 py-1.5 text-[13px] font-medium"
                       >
-                        <Plus className="size-3" /> {p.name}
+                        <Plus className="size-3" /> <Nom n={p.name} />
                       </button>
                     ))}
                 </div>

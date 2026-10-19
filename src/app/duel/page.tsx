@@ -29,6 +29,7 @@ import { DAILY_DUEL_CAP, getDailyDuelCount, recordDailyDuel } from "@/lib/sfl/ba
 import { logActivity } from "@/lib/sfl/activity";
 import { MatchArena } from "@/components/sfl/match-arena";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
+import { Nom } from "@/components/sfl/nom";
 
 const cardVariants = {
   idle: { scale: 1, y: 0, opacity: 1, filter: "grayscale(0)" },
@@ -256,7 +257,7 @@ function Arene() {
                               />
                             )}
                           />
-                          <span className="text-sm font-semibold">{p.name}</span>
+                          <span className="text-sm font-semibold"><Nom n={p.name} /></span>
                           <AnimatePresence>
                             {resolvedWinner === p.name && (
                               <motion.span
@@ -318,7 +319,7 @@ function Arene() {
                         {i + 1}
                       </span>
                       <CarteDe name={name} className="mr-0.5" />
-                      <span className="flex-1 truncate text-[15px] font-semibold">{name}</span>
+                      <span className="flex-1 truncate text-[15px] font-semibold"><Nom n={name} /></span>
                       <span className="text-xs text-foreground/45">
                         {r.duels} duel{r.duels > 1 ? "s" : ""}
                       </span>
