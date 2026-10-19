@@ -9,10 +9,14 @@
 // En haut à droite du portrait, le badge que le joueur a choisi (son meilleur
 // par défaut, voir lib/sfl/badge-carte).
 // La carte est un objet : elle ne suit pas le thème de l'app.
+// En dessous du grand format (palier « complète », < 170 px : la Ligue, les
+// terrains, les listes), c'est la carte photo (carte-photo.tsx) : la photo
+// resserrée sur le visage, la note et le nom en bas (Sabri, 19/10).
 
 "use client";
 
-import { BolaCard } from "./bola-card";
+import { BolaCard, palierCarte } from "./bola-card";
+import { CartePhoto } from "./carte-photo";
 import { useBadgeCarte } from "@/hooks/use-badge-carte";
 import { usePhotoPerso } from "@/hooks/use-player-photo";
 import { ovr, type Player, type StatKey } from "@/lib/sfl/engine";
@@ -27,6 +31,7 @@ export function PlayerCard({
   onglet,
   affiche,
   pseudo,
+  vertical,
 }: {
   player: Player;
   /** Aperçu : le nom et le pseudo en cours de saisie (identite.tsx). */
@@ -38,11 +43,27 @@ export function PlayerCard({
   highlightStats?: StatKey[];
   /** En pastille : la note aux couleurs d'une équipe. */
   onglet?: { fond: string; encre: string };
+  /** En petit, la carte reste debout (les terrains) au lieu de la pastille. */
+  vertical?: boolean;
 }) {
   const stats = player.stats;
   const photo = usePhotoPerso(player.name);
   const badge = useBadgeCarte(player.name);
   const identite = useIdentites();
+  if (palierCarte(254 * size) !== "complete")
+    return (
+      <CartePhoto
+        name={player.name}
+        affiche={affiche ?? identite.nom(player.name)}
+        position={player.poste}
+        overall={ovr(stats)}
+        size={size}
+        photo={photo}
+        onglet={onglet}
+        badge={badge}
+        vertical={vertical}
+      />
+    );
   return (
     <BolaCard
       edition="base"

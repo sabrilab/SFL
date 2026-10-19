@@ -13,10 +13,11 @@
 // mains vides d'un match sans but.
 
 import { useMemo, useState } from "react";
-import { Minus, Plus } from "lucide-react";
+import { ChevronDown, Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { entryPP } from "@/lib/sfl/saisie/engine";
-import { updateEntryAt } from "@/lib/sfl/saisie/mutations";
+import { ChangerJoueurSheet } from "@/components/sfl/admin/changer-joueur-sheet";
+import { changerEquipeAt, remplacerJoueurAt, TEAM_PRESETS, updateEntryAt } from "@/lib/sfl/saisie/mutations";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
 const TEAM_COLORS: Record<string, string> = {
@@ -111,7 +112,12 @@ export function FeuilleDirecte({ saison, commit }: Props) {
   const equipes = useMemo(() => {
     const order: string[] = [];
     for (const { e } of rows) if (e.team && !order.includes(e.team)) order.push(e.team);
-    return order;
+    // Ordre fixe des couleurs : un joueur qui change d'équipe ne déplace pas les onglets.
+    const rang = (t: string) => {
+      const i = (TEAM_PRESETS as readonly string[]).indexOf(t);
+      return i < 0 ? TEAM_PRESETS.length : i;
+    };
+    return order.sort((x, y) => rang(x) - rang(y));
   }, [rows]);
 
   const [team, setTeam] = useState<string | null>(null);
@@ -133,6 +139,10 @@ export function FeuilleDirecte({ saison, commit }: Props) {
   function set(index: number, patch: Partial<MatchEntry>, label: string) {
     commit(updateEntryAt(saison, index, patch), label);
   }
+
+  // La ligne dont on a touché le nom : remplacer le joueur, ou le changer d'équipe.
+  const [choix, setChoix] = useState<number | null>(null);
+  const ligneChoisie = choix != null ? (saison.entries[choix] ?? null) : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -203,9 +213,16 @@ export function FeuilleDirecte({ saison, commit }: Props) {
             return (
               <div key={index} className="glass rounded-[22px] px-3.5 pt-3 pb-3.5">
                 <div className="mb-2.5 flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-tight">
-                    {e.player}
-                  </span>
+                  <button
+                    onClick={() => setChoix(index)}
+                    aria-label={`Changer ${e.player}`}
+                    className="flex min-w-0 flex-1 items-center gap-1 text-left transition-opacity active:opacity-60"
+                  >
+                    <span className="min-w-0 truncate text-[15px] font-bold tracking-tight">
+                      {e.player}
+                    </span>
+                    <ChevronDown className="size-3.5 shrink-0 text-foreground/35" />
+                  </button>
                   {bonusDefensif > 0 && (
                     <span className="mono-label shrink-0 rounded-full bg-primary/14 px-2 py-1 text-primary">
                       +{bonusDefensif} défensif
@@ -261,6 +278,24 @@ export function FeuilleDirecte({ saison, commit }: Props) {
           })}
         </div>
       )}
+
+      <ChangerJoueurSheet
+        saison={saison}
+        ligne={ligneChoisie}
+        equipes={equipes}
+        couleur={(t) => TEAM_COLORS[t] ?? "#ddd"}
+        onOpenChange={(o) => !o && setChoix(null)}
+        onRemplacer={(nom) => {
+          if (choix == null || !ligneChoisie) return;
+          commit(remplacerJoueurAt(saison, choix, nom), `${ligneChoisie.player} → ${nom}`);
+          setChoix(null);
+        }}
+        onChangerEquipe={(t) => {
+          if (choix == null || !ligneChoisie) return;
+          commit(changerEquipeAt(saison, choix, t), `${ligneChoisie.player} → ${t}`);
+          setChoix(null);
+        }}
+      />
 
       <p className="px-1 text-[12px] leading-relaxed text-foreground/35">
         Chaque geste est enregistré tout de suite et annulable (⌘Z). Deux arrêts ou deux

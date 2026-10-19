@@ -13,11 +13,12 @@
 // terrains, pas des tableaux. Toucher la carte ouvre le récap de la journée.
 
 import { useState } from "react";
-import { motion } from "motion/react";
-import { CarteDe, FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
+import { CarteDe, MiniCarte } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import type { Journee, MatchPlayerLine, MatchTeam } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
+import { projeter, vue } from "@/lib/sfl/terrain-vu";
+import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
 import { AuVestiaire } from "@/components/sfl/au-vestiaire";
 
 const TEAM_COLORS: Record<string, string> = {
@@ -33,113 +34,186 @@ const TEAM_COLORS: Record<string, string> = {
 
 const couleur = (name: string) => TEAM_COLORS[name] ?? "#B9B9B9";
 
-const PHI = (1 + Math.sqrt(5)) / 2;
 
 /** L'encre de la note sur la couleur d'une équipe : toutes sont claires. */
 const onglet = (name: string) => ({ fond: couleur(name), encre: "#0A0A0A" });
 
 /**
- * Un joueur sur la feuille : sa vraie carte Bola, son nom en entier, ses
- * buts et ses passes. Le meilleur de son équipe passe au format moyen (la
- * réduite) ; les autres gardent la pastille, la note aux couleurs de l'équipe.
+ * Les deux tailles du terrain, toutes deux en carte debout (la photo, la
+ * note dans l'onglet de l'équipe) : le meilleur de l'équipe n'est qu'un cran
+ * au-dessus des autres (×1,15), pas un autre format (Sabri, 19/10 : « mettre
+ * en avant, mais ne pas abuser » ; « on préfère le format vertical »).
  */
-function Joueur({ ligne, equipe, delai, star }: { ligne: MatchPlayerLine; equipe: string; delai: number; star: boolean }) {
-  const { allPlayers } = useSeason();
-  const cle = ligne.name.trim().toLowerCase();
-  const player = allPlayers.find((p) => p.name.toLowerCase() === cle);
-  const decisif = ligne.buts > 0 || ligne.passes > 0;
-  const size = star ? FORMAT_CARTE.moyenne : FORMAT_CARTE.petite;
-  const largeur = 254 * size;
-  const teinte = couleur(equipe);
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-30px" }}
-      transition={{ duration: 0.4, delay: delai, ease: [0.22, 1, 0.36, 1] }}
-      className="flex flex-col items-center [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]"
-      // Le nom a sa place, même sous une pastille : rien n'est coupé.
-      style={{ width: Math.max(largeur, 64) }}
-    >
-      <span className="relative" style={{ filter: "drop-shadow(0 8px 10px rgba(0,0,0,0.45))" }}>
-        {player ? (
-          <MiniCarte player={player} size={size} onglet={onglet(equipe)} detail={ligne.buts || ligne.passes ? `${ligne.buts} B · ${ligne.passes} P` : undefined} />
-        ) : (
-          <CarteDe name={ligne.name} size={size} />
-        )}
-      </span>
-      {/* Le filet de l'équipe, sous les cartes que la note ne colore pas. */}
-      {star && <span className="mt-[5px] h-[3px] rounded-full" style={{ width: largeur / PHI, background: teinte }} />}
-      <span
-        className="mt-[5px] max-w-full text-center leading-[1.1] font-bold break-words text-white/90"
-        style={{ fontSize: star ? 12 : 10 }}
-      >
-        {ligne.name}
-      </span>
-      {decisif && (
-        // « B » et « P » plutôt que des émojis : lisibles partout, et c'est le
-        // vocabulaire déjà employé sur le terrain de la synthèse.
-        <span className="mono-label mt-[3px] text-[9px] leading-none text-white/55 tabular-nums">
-          {ligne.buts > 0 && `${ligne.buts}B`}
-          {ligne.buts > 0 && ligne.passes > 0 && " "}
-          {ligne.passes > 0 && `${ligne.passes}P`}
-        </span>
-      )}
-      {ligne.note && <span className="mono-label mt-[3px] text-[8px] leading-none text-white/40">{ligne.note}</span>}
-    </motion.div>
-  );
+const PASTILLE = 50 / 254; // 50 × 81 px à l'échelle 1
+const VEDETTE = 58 / 254; // 58 × 94 px
+
+/** La ligne d'un poste, du but vers l'avant : 0 gardien … 3 attaque. Sans poste connu : le milieu. */
+function ligneDuPoste(poste: string | undefined): number {
+  const p = (poste ?? "").split("/")[0].trim().toUpperCase();
+  if (p === "G" || p === "GB") return 0;
+  if (p === "MDC") return 1.5;
+  if (p.startsWith("D") || p === "LAT") return 1;
+  if (p === "MOC") return 2.5;
+  if (p.startsWith("M")) return 2;
+  if (p.startsWith("A") || p === "BU") return 3;
+  return 2;
 }
 
 /**
- * Une moitié de terrain : au fond, près du but, l'équipe en pastilles ;
- * devant, vers la ligne médiane, son meilleur joueur du jour, en plus grand
- * (deux s'ils sont à égalité).
+ * Les joueurs de champ par ligne, défense → attaque, comme une compo de foot
+ * à cinq, six ou sept. Deux lignes qui se suivent n'ont jamais le même
+ * nombre de joueurs : chaque carte tombe dans l'intervalle de la ligne de
+ * devant et ne cache personne.
  */
-function Moitie({ equipe, haut, delai }: { equipe: MatchTeam; haut: boolean; delai: number }) {
-  const poids = (p: MatchPlayerLine) => p.buts * 2 + p.passes;
-  const ordre = [...equipe.players].sort((x, y) => poids(y) - poids(x));
-  const top = poids(ordre[0] ?? { name: "", buts: 0, passes: 0 });
-  const devant = top > 0 ? ordre.filter((p) => poids(p) === top).slice(0, 2) : [];
-  const fond = ordre.filter((p) => !devant.includes(p));
-  const rangee = (lignes: MatchPlayerLine[], d: number, star: boolean) =>
-    lignes.length > 0 && (
-      <div className="flex flex-wrap items-start justify-center gap-x-[5px] gap-y-[var(--fib-13)]">
-        {lignes.map((l, i) => (
-          <Joueur key={l.name} ligne={l} equipe={equipe.name} delai={d + i * 0.05} star={star} />
-        ))}
-      </div>
-    );
-  return (
-    <div className={cn("relative flex gap-[var(--fib-13)] px-[var(--fib-8)]", haut ? "flex-col pt-[var(--fib-34)] pb-[var(--fib-21)]" : "flex-col-reverse pt-[var(--fib-21)] pb-[var(--fib-34)]")}>
-      {rangee(fond, delai, false)}
-      {rangee(devant, delai + 0.1, true)}
-    </div>
-  );
+const SCHEMAS: Record<number, number[]> = { 1: [1], 2: [2], 3: [2, 1], 4: [1, 2, 1], 5: [2, 1, 2], 6: [3, 2, 1], 7: [2, 3, 2] };
+/** La place en largeur (en %) des joueurs d'une ligne, selon leur nombre. */
+const LARGEURS: Record<number, number[]> = { 1: [50], 2: [27, 73], 3: [17, 50, 83] };
+
+/**
+ * La compo d'une équipe : le gardien près du but s'il y en a un, puis la
+ * défense, le milieu et l'attaque, chacun rangé selon son poste. Chaque
+ * joueur reçoit sa profondeur (8 le but, 40 la médiane, comme la feuille de
+ * match) et sa place en largeur (en %).
+ */
+function compo(equipe: MatchTeam, poste: (l: MatchPlayerLine) => string | undefined) {
+  const tries = [...equipe.players].sort((x, y) => ligneDuPoste(poste(x)) - ligneDuPoste(poste(y)));
+  const gardien = tries[0] && ligneDuPoste(poste(tries[0])) === 0 ? tries.shift()! : null;
+  const n = tries.length;
+  const tiers = Math.ceil(n / 3);
+  const schema = SCHEMAS[n] ?? [tiers, Math.ceil((n - tiers) / 2), n - tiers - Math.ceil((n - tiers) / 2)];
+  const lignes: MatchPlayerLine[][] = [];
+  let i = 0;
+  for (const k of schema) {
+    if (k > 0) lignes.push(tries.slice(i, i + k));
+    i += k;
+  }
+  const out: { ligne: MatchPlayerLine; profondeur: number; largeur: number }[] = [];
+  if (gardien) out.push({ ligne: gardien, profondeur: 5, largeur: 50 });
+  const debut = gardien ? 22 : 10;
+  lignes.forEach((rang, r) => {
+    const profondeur = lignes.length === 1 ? 32 : debut + ((40 - debut) * r) / (lignes.length - 1);
+    rang.forEach((ligne, j) => {
+      const largeur = LARGEURS[rang.length]?.[j] ?? 12 + (j * 76) / (rang.length - 1);
+      out.push({ ligne, profondeur, largeur });
+    });
+  });
+  return out;
 }
 
 /**
- * Le terrain, vu d'en haut et debout : une équipe par moitié, chacun avec sa
- * carte. Tondu en bandes, tracé à la craie.
+ * Le point de vue des terrains de la Ligue : plus court que celui de la
+ * feuille de match (500 px au lieu de 540) et moins couché (38° au lieu de
+ * 56°), pour que les rangs de cartes debout s'étagent au lieu de s'empiler
+ * (Sabri, 19/10 : « le terrain est un peu trop grand »).
+ */
+const VUE = vue(270, 500, 38);
+
+/** La profondeur (8 le but, 40 la médiane) en px depuis la médiane du terrain couché. */
+const depuisMediane = (profondeur: number) => 74 + ((40 - profondeur) / 32) * (VUE.h / 2 - 104);
+
+/** Le haut d'une carte debout et de son nom, à l'échelle 1 : la carte (1 × φ) et l'étiquette. */
+const hauteurCarte = (size: number) => 254 * size * PHI + 24;
+/** La marge autour du terrain et des cartes, dans le cadre. */
+const MARGE = 14;
+const PHI = (1 + Math.sqrt(5)) / 2;
+
+/**
+ * Le terrain du match en légère perspective, comme la feuille de match de la
+ * Map (lib/sfl/terrain-vu.ts) : le terrain couché avec son ombre sous chaque
+ * carte, les cartes debout, plus petites au fond. Une équipe par moitié,
+ * chacune en vraie compo ; le meilleur du jour de chaque équipe (buts et
+ * passes), un seul, à peine plus grand, son nom en gras.
  */
 function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
+  const { allPlayers } = useSeason();
+  const trouver = (l: MatchPlayerLine) => allPlayers.find((p) => p.name.toLowerCase() === l.name.trim().toLowerCase());
+  const poids = (p: MatchPlayerLine) => p.buts * 2 + p.passes;
+  const vedette = (eq: MatchTeam) => {
+    const m = [...eq.players].sort((x, y) => poids(y) - poids(x))[0];
+    return m && poids(m) > 0 ? m : null;
+  };
+  const { l, h } = VUE;
+  const places = (
+    [
+      [a, -1],
+      [b, 1],
+    ] as const
+  )
+    .flatMap(([eq, sens]) => {
+      const star = vedette(eq);
+      return compo(eq, (x) => trouver(x)?.poste).map(({ ligne, profondeur, largeur }) => {
+        const u = (largeur / 100) * l;
+        const v = h / 2 + sens * depuisMediane(profondeur);
+        return { ligne, equipe: eq.name, star: ligne === star, u, v, ...projeter(u, v, 0, VUE) };
+      });
+    })
+    .sort((x, y) => x.v - y.v);
+  const centre = projeter(l / 2, h / 2, 0, VUE);
+  const logo = { l: 46 * centre.k, h: projeter(l / 2, h / 2 + 23, 0, VUE).y - projeter(l / 2, h / 2 - 23, 0, VUE).y };
+  // Le cadre épouse ce qu'il montre : du haut de la carte la plus haute
+  // (ou du bord du fond) jusqu'à l'épaisseur du bord avant.
+  const haut = Math.min(
+    projeter(0, 0, 0, VUE).y,
+    ...places.map(({ y, k, star }) => y - hauteurCarte(star ? VEDETTE : PASTILLE) * k),
+  );
+  const bas = projeter(l / 2, h, -14, VUE).y;
+  const decalage = MARGE - haut;
+
   return (
     <div
-      className="relative overflow-hidden rounded-[18px] border border-white/10"
-      style={{
-        background:
-          "repeating-linear-gradient(180deg, #17331f 0 34px, #143019 34px 68px)",
-        boxShadow: "inset 0 0 60px rgba(0,0,0,0.55)",
-      }}
+      className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
+      style={{ height: bas - haut + MARGE * 2 }}
     >
-      {/* Le tracé */}
-      <div aria-hidden className="pointer-events-none absolute inset-[var(--fib-8)] rounded-[12px] border border-white/30" />
-      <span aria-hidden className="pointer-events-none absolute inset-x-[var(--fib-8)] top-1/2 h-px -translate-y-1/2 bg-white/30" />
-      <span aria-hidden className="pointer-events-none absolute top-1/2 left-1/2 size-[89px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30" />
-      <span aria-hidden className="pointer-events-none absolute top-[var(--fib-8)] left-1/2 h-[34px] w-[38%] -translate-x-1/2 rounded-b-[6px] border border-t-0 border-white/30" />
-      <span aria-hidden className="pointer-events-none absolute bottom-[var(--fib-8)] left-1/2 h-[34px] w-[38%] -translate-x-1/2 rounded-t-[6px] border border-b-0 border-white/30" />
-
-      <Moitie equipe={a} haut delai={0} />
-      <Moitie equipe={b} haut={false} delai={0.15} />
+      <div className="absolute inset-x-0" style={{ top: decalage, height: bas + MARGE }}>
+        <SolTerrain ombres={places} rayon={30} vue={VUE} gazon="vert" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/bola/symbole-blanc.svg"
+          alt=""
+          aria-hidden
+          className="absolute"
+          style={{
+            left: `calc(50% - ${logo.l / 2}px)`,
+            top: centre.y - logo.l / 2,
+            width: logo.l,
+            height: logo.l,
+            transform: `scaleY(${logo.h / logo.l})`,
+            opacity: 0.85,
+          }}
+        />
+        {places.map(({ ligne, equipe, star, x, y, k }) => {
+          const player = trouver(ligne);
+          const size = star ? VEDETTE : PASTILLE;
+          const teinte = couleur(equipe);
+          return (
+            <div key={ligne.name} className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y }}>
+              <div
+                className="absolute bottom-0 left-0 flex flex-col items-center"
+                style={{ transformOrigin: "50% 100%", transform: `translateX(-50%) scale(${k})` }}
+              >
+                {player ? (
+                  <MiniCarte player={player} size={size} onglet={onglet(equipe)} vertical detail={ligne.buts || ligne.passes ? `${ligne.buts} B · ${ligne.passes} P` : undefined} />
+                ) : (
+                  <CarteDe name={ligne.name} size={size} />
+                )}
+                <span
+                  className="mt-[4px] flex items-center gap-[5px] whitespace-nowrap rounded-full px-[7px] py-[2px] text-[10.5px] leading-[1.2] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
+                  style={{ background: teinte, color: "#0A0A0A", fontWeight: star ? 800 : 600 }}
+                >
+                  {ligne.name.split(" ")[0]}
+                  {(ligne.buts > 0 || ligne.passes > 0) && (
+                    <span className="font-mono text-[9px] font-semibold opacity-60 tabular-nums">
+                      {ligne.buts > 0 && `${ligne.buts}B`}
+                      {ligne.buts > 0 && ligne.passes > 0 && " "}
+                      {ligne.passes > 0 && `${ligne.passes}P`}
+                    </span>
+                  )}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

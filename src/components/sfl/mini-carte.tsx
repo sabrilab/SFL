@@ -30,6 +30,7 @@ export function MiniCarte({
   className,
   onglet,
   cle,
+  vertical,
 }: {
   player: Player;
   /** La largeur, en fraction de 254 px (voir FORMAT_CARTE). */
@@ -41,6 +42,8 @@ export function MiniCarte({
   onglet?: { fond: string; encre: string };
   /** La clé de la 3D en cache, quand la carte n'est pas l'actuelle (une carte d'une saison passée). */
   cle?: string;
+  /** En petit, la carte reste debout (les terrains). */
+  vertical?: boolean;
 }) {
   const { open } = useCardViewer();
   return (
@@ -60,7 +63,7 @@ export function MiniCarte({
       aria-label={`Voir la carte de ${player.name}`}
       className={cn("shrink-0 transition-transform active:scale-95", className)}
     >
-      <PlayerCard player={player} size={size} onglet={onglet} />
+      <PlayerCard player={player} size={size} onglet={onglet} vertical={vertical} />
     </button>
   );
 }
