@@ -13,10 +13,12 @@
 // calcule sur la saison et envoie avec chaque question, la forme des réponses
 // (un texte court et des cartes que l'app dessine elle-même) et les limites.
 //
-// Pourquoi des cartes plutôt que des images générées : un programme, un panier
-// ou un débrief sont des listes et des chiffres. L'app les met en page dans sa
-// propre charte (noir et blanc, verre), en une seconde, sans coût d'image, et
-// le modèle ne peut pas y inventer de faux chiffres dessinés.
+// Un accompagnateur avant tout (Sabri, 19/10 au soir) : il discute avec le
+// joueur, pose des questions, se souvient. Parfois il pose une carte, que
+// l'app met en page elle-même dans sa charte (un programme, un panier, un
+// débrief : des listes et des chiffres qu'aucune image n'écrit juste), et
+// parfois il fait faire une image pour montrer une zone : du corps (la
+// cheville, le muscle à étirer), du terrain (où couvrir), une posture.
 
 import { STAT_KEYS, ovr, type Player, type StatKey } from "./engine";
 import { jourMoisDuLibelle } from "./convocation-temps";
@@ -26,6 +28,9 @@ import type { Saison } from "./saisie/types";
 
 /** Questions au coach par joueur sur 24 h glissantes (le crédit est celui de Sabri). */
 export const LIMITE_AGENT_JOUR = 30;
+/** Images que le coach fait faire par joueur sur 24 h glissantes. */
+export const LIMITE_IMAGES_JOUR = 8;
+export const BUCKET_AGENT = "agent";
 /** Messages de la conversation renvoyés au modèle à chaque question. */
 export const HISTORIQUE_MAX = 16;
 /** Longueur d'une question. */
@@ -165,9 +170,19 @@ export interface CarteCoach {
   lignes: LigneCarte[];
 }
 
+/** Une image que le coach fait faire pour montrer une zone (le corps, le terrain, une posture). */
+export interface ImageCoach {
+  /** Le fichier dans le bucket privé « agent » (conversation gardée). */
+  chemin?: string;
+  /** Ou l'image elle-même, en data URL (aperçus, sans stockage). */
+  url?: string;
+  legende: string;
+}
+
 export interface ReponseCoach {
   texte: string;
   cartes: CarteCoach[];
+  image: ImageCoach | null;
 }
 
 /** Un message de la conversation, tel que l'écran l'affiche et le garde. */
@@ -176,6 +191,7 @@ export interface MessageAgent {
   role: "joueur" | "coach";
   texte: string;
   cartes: CarteCoach[];
+  image?: ImageCoach | null;
   at: number;
 }
 
@@ -203,4 +219,14 @@ export function lireCarte(v: unknown): CarteCoach | null {
 
 export function lireCartes(v: unknown): CarteCoach[] {
   return Array.isArray(v) ? v.map(lireCarte).filter((c): c is CarteCoach => !!c).slice(0, 4) : [];
+}
+
+/** Une image relue (réponse de la route ou ligne en base), vérifiée. */
+export function lireImage(v: unknown): ImageCoach | null {
+  if (!v || typeof v !== "object") return null;
+  const i = v as Record<string, unknown>;
+  const chemin = typeof i.chemin === "string" && /^[0-9a-f-]{36}\/[\w.-]+$/.test(i.chemin) ? i.chemin : undefined;
+  const url = typeof i.url === "string" && i.url.startsWith("data:image/") ? i.url : undefined;
+  if (!chemin && !url) return null;
+  return { chemin, url, legende: typeof i.legende === "string" ? i.legende.slice(0, 200) : "" };
 }

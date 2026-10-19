@@ -6,9 +6,11 @@
 //
 // En haut du fil, toujours, la fiche que le coach a sous les yeux : la carte
 // du joueur et ses six stats, de la meilleure à la pire. Puis la conversation :
-// mes questions en blanc à droite, ses réponses en verre à gauche, et sous
-// elles ses cartes (programme, exercice, débrief, panier, santé, bilan), que
-// l'app met en page elle-même (lib/sfl/agent.ts dit pourquoi pas d'images).
+// mes messages en blanc à droite, les siens en verre à gauche. Il discute
+// surtout ; parfois il montre une image (une zone du corps, du terrain, une
+// posture : faite à la demande, gardée dans le bucket privé « agent ») ou
+// pose une carte (programme, exercice, débrief, panier, santé, bilan), que
+// l'app met en page elle-même (lib/sfl/agent.ts).
 // Après un match récent, le coach ouvre : « J11 : victoire, 2 buts. Alors,
 // c'était comment ? ». Au-dessus de la barre d'écriture, quatre départs :
 // ma pire stat, le débrief, mes courses, une douleur.
@@ -42,10 +44,13 @@ import {
   QUESTION_MAX,
   debriefFrais,
   dossierJoueur,
+  BUCKET_AGENT,
   lireCartes,
+  lireImage,
   questionDebrief,
   type CarteCoach,
   type DossierJoueur,
+  type ImageCoach,
   type MessageAgent,
 } from "@/lib/sfl/agent";
 import { supabase } from "@/lib/supabase";
@@ -120,6 +125,63 @@ function CarteVue({ carte, dossier }: { carte: CarteCoach; dossier: DossierJoueu
   );
 }
 
+/* -------------------------------- Les images ------------------------------ */
+
+const liens = new Map<string, Promise<string | null>>();
+
+/** Un lien signé une heure vers une image du coach, gardé en mémoire 50 minutes. */
+function lienImage(chemin: string): Promise<string | null> {
+  let lien = liens.get(chemin);
+  if (!lien) {
+    lien = supabase()
+      .storage.from(BUCKET_AGENT)
+      .createSignedUrl(chemin, 3600)
+      .then(({ data }) => data?.signedUrl ?? null);
+    liens.set(chemin, lien);
+    setTimeout(() => liens.delete(chemin), 50 * 60_000);
+  }
+  return lien;
+}
+
+function ImageVue({ image }: { image: ImageCoach }) {
+  const [signe, setSigne] = useState<string | null>(null);
+  const [grand, setGrand] = useState(false);
+  useEffect(() => {
+    if (image.url || !image.chemin) return;
+    let vivant = true;
+    void lienImage(image.chemin).then((l) => vivant && setSigne(l));
+    return () => {
+      vivant = false;
+    };
+  }, [image.chemin, image.url]);
+  const src = image.url ?? signe;
+  return (
+    <figure className="w-[min(300px,74vw)]">
+      <button
+        type="button"
+        onClick={() => src && setGrand(true)}
+        aria-label={image.legende || "Agrandir l'image"}
+        className="block aspect-square w-full overflow-hidden rounded-[22px] bg-white/[0.06]"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- lien signé ou data URL */}
+        {src && <img src={src} alt={image.legende} className="size-full object-cover" />}
+      </button>
+      {image.legende && <figcaption className="mt-1.5 px-1 text-[12.5px] leading-snug text-foreground/50">{image.legende}</figcaption>}
+      {grand && src && (
+        <button
+          type="button"
+          onClick={() => setGrand(false)}
+          aria-label="Fermer"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- lien signé ou data URL */}
+          <img src={src} alt={image.legende} className="max-h-full max-w-full rounded-[22px]" />
+        </button>
+      )}
+    </figure>
+  );
+}
+
 /* --------------------------------- Le fil --------------------------------- */
 
 function Message({ m, dossier }: { m: MessageAgent; dossier: DossierJoueur }) {
@@ -136,6 +198,7 @@ function Message({ m, dossier }: { m: MessageAgent; dossier: DossierJoueur }) {
           {m.texte}
         </p>
       )}
+      {m.image && <ImageVue image={m.image} />}
       {m.cartes.map((c, i) => (
         <CarteVue key={i} carte={c} dossier={dossier} />
       ))}
@@ -209,13 +272,20 @@ export function Agent() {
     (async () => {
       const { data } = await supabase()
         .from("agent_messages")
-        .select("id, role, texte, cartes, created_at")
+        .select("id, role, texte, cartes, image, created_at")
         .order("created_at", { ascending: false })
         .limit(100);
       if (!vivant) return;
-      const lus = ((data ?? []) as { id: number; role: "joueur" | "coach"; texte: string; cartes: unknown; created_at: string }[])
+      const lus = ((data ?? []) as { id: number; role: "joueur" | "coach"; texte: string; cartes: unknown; image: unknown; created_at: string }[])
         .reverse()
-        .map((r) => ({ id: String(r.id), role: r.role, texte: r.texte, cartes: lireCartes(r.cartes), at: new Date(r.created_at).getTime() }));
+        .map((r) => ({
+          id: String(r.id),
+          role: r.role,
+          texte: r.texte,
+          cartes: lireCartes(r.cartes),
+          image: lireImage(r.image),
+          at: new Date(r.created_at).getTime(),
+        }));
       setMessages(lus);
       setCharge(true);
     })();
@@ -268,7 +338,7 @@ export function Agent() {
     setEnvoi(true);
     enBas.current = true;
     try {
-      let rep: { texte: string; cartes: CarteCoach[] };
+      let rep: { texte: string; cartes: CarteCoach[]; image: ImageCoach | null };
       if (demo) {
         await new Promise((r) => setTimeout(r, 1400));
         rep = reponseDemo(dossier);
@@ -284,15 +354,15 @@ export function Agent() {
             question: q,
             dossier,
             ouverture: ouv ?? undefined,
-            historique: avant.slice(-HISTORIQUE_MAX).map(({ role, texte, cartes }) => ({ role, texte, cartes })),
+            historique: avant.slice(-HISTORIQUE_MAX).map(({ role, texte, cartes, image }) => ({ role, texte, cartes, image: image?.legende || undefined })),
           }),
         });
-        const d = (await r.json().catch(() => ({}))) as { texte?: string; cartes?: unknown; error?: string };
+        const d = (await r.json().catch(() => ({}))) as { texte?: string; cartes?: unknown; image?: unknown; error?: string };
         if (!r.ok) throw new Error(d.error ?? "Le coach n'a pas pu répondre. Réessaie.");
-        rep = { texte: d.texte ?? "", cartes: lireCartes(d.cartes) };
+        rep = { texte: d.texte ?? "", cartes: lireCartes(d.cartes), image: lireImage(d.image) };
       }
       if (navigator.vibrate) navigator.vibrate(8);
-      setMessages((ms) => [...ms, { id: `r-${Date.now()}`, role: "coach", texte: rep.texte, cartes: rep.cartes, at: Date.now() }]);
+      setMessages((ms) => [...ms, { id: `r-${Date.now()}`, role: "coach", texte: rep.texte, cartes: rep.cartes, image: rep.image, at: Date.now() }]);
     } catch (e) {
       // La question revient dans le champ, le fil reprend son état.
       setMessages(avant);
@@ -396,7 +466,7 @@ export function Agent() {
                 }}
                 rows={1}
                 maxLength={QUESTION_MAX}
-                placeholder="Demande à ton coach"
+                placeholder="Écris à ton coach"
                 className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent py-[9px] text-[16px] leading-snug outline-none placeholder:text-foreground/30 [field-sizing:content]"
               />
               <button
@@ -421,73 +491,64 @@ export function Agent() {
 // Développement seulement (?demo=agent) : une conversation d'essai sur le vrai
 // dossier du joueur, pour juger la mise en page des cartes sans modèle.
 function conversationDemo(d: DossierJoueur): MessageAgent[] {
-  const t0 = Date.now() - 3 * 3600_000;
+  const t0 = Date.now() - 26 * 3600_000;
   const pire = d.stats[d.stats.length - 1];
+  const m = (id: string, role: MessageAgent["role"], texte: string, minutes: number, cartes: CarteCoach[] = []): MessageAgent => ({
+    id,
+    role,
+    texte,
+    cartes,
+    at: t0 + minutes * 60_000,
+  });
   return [
-    { id: "d1", role: "joueur", texte: `Ma pire stat, c'est ${pire.nom.toLowerCase()} (${pire.valeur}). Fais-moi un programme pour la travailler cette semaine.`, cartes: [], at: t0 },
-    {
-      id: "d2",
-      role: "coach",
-      texte: `${pire.nom} à ${pire.valeur}, c'est là qu'on gagne le plus vite. Trois séances courtes au city d'à côté, et dimanche tu le sens.`,
-      cartes: [
+    m("d1", "joueur", `Coach, ma ${pire.nom.toLowerCase()} est à ${pire.valeur}, c'est ma pire stat. On fait quoi ?`, 0),
+    m("d2", "coach", `${pire.valeur}, c'est là qu'on gagne le plus vite. Tu as un city ou un parc près de chez toi ? Et tu peux te libérer combien de fois dans la semaine, à peu près ?`, 1),
+    m("d3", "joueur", "Y'a un city à 5 min. Lundi, mercredi, vendredi le soir ça passe.", 3),
+    m("d4", "coach", "Parfait, on cale ça. Trois séances de 40 minutes, tu me dis vendredi comment tu te sens.", 4, [
+      {
+        type: "programme",
+        titre: `${pire.nom} : semaine 1`,
+        sousTitre: "3 séances · 40 min",
+        cible: pire.id,
+        lignes: [
+          { label: "Lundi : appuis", detail: "Plots tous les 50 cm, pieds rapides, regard haut.", valeur: "6 × 30 s" },
+          { label: "Mercredi : duels", detail: "À deux, 1 contre 1 sur 10 m, tu défends sans te jeter.", valeur: "8 × 45 s" },
+          { label: "Vendredi : explosivité", detail: "Sprints départ arrêté, récup marchée.", valeur: "10 × 15 m" },
+        ],
+      },
+    ]),
+    m("d5", "joueur", "Par contre j'ai encore un peu mal à la cheville depuis dimanche.", 60 * 24),
+    m("d6", "coach", "Aïe. Elle a gonflé ? Tu arrives à poser le pied et à marcher normalement ?", 60 * 24 + 1),
+    m("d7", "joueur", "Un peu gonflé le soir, là je marche mais je la sens quand je tourne.", 60 * 24 + 3),
+    m(
+      "d8",
+      "coach",
+      "Ok. Si ça regonfle, si tu boites ou si la douleur monte, tu vas voir un kiné, sans attendre. Sinon on la remet en route doucement, deux fois par jour, et on décale les duels de mercredi.",
+      60 * 24 + 4,
+      [
         {
-          type: "programme",
-          titre: `${pire.nom} : semaine 1`,
-          sousTitre: "3 séances · 40 min",
-          cible: pire.id,
-          lignes: [
-            { label: "Lundi : appuis", detail: "Échelle de rythme ou plots tous les 50 cm, pieds rapides, regard haut.", valeur: "6 × 30 s" },
-            { label: "Mercredi : duels", detail: "À deux, 1 contre 1 sur 10 m, tu défends sans te jeter.", valeur: "8 × 45 s" },
-            { label: "Vendredi : explosivité", detail: "Sprints départ arrêté, récup marchée.", valeur: "10 × 15 m" },
-            { label: "Gainage", detail: "Planche face et côtés, à la fin de chaque séance.", valeur: "3 × 40 s" },
-          ],
-        },
-      ],
-      at: t0 + 60_000,
-    },
-    { id: "d3", role: "joueur", texte: "Et pour manger avant dimanche ?", cartes: [], at: t0 + 120_000 },
-    {
-      id: "d4",
-      role: "coach",
-      texte: "Simple et pas cher. Les prix sont estimés, supermarché classique.",
-      cartes: [
-        {
-          type: "panier",
-          titre: "Le panier de la semaine",
-          sousTitre: "Total ≈ 31 €",
+          type: "sante",
+          titre: "Cheville : remise en route",
+          sousTitre: "2 fois par jour · 10 min",
           cible: "",
           lignes: [
-            { label: "Riz complet", detail: "", valeur: "1 kg · 2,10 €" },
-            { label: "Blancs de poulet", detail: "", valeur: "1 kg · 9,90 €" },
-            { label: "Œufs", detail: "", valeur: "12 · 3,60 €" },
-            { label: "Bananes", detail: "Une avant le match, une à la mi-temps.", valeur: "1 kg · 1,90 €" },
-            { label: "Flocons d'avoine", detail: "", valeur: "1 kg · 1,80 €" },
-            { label: "Légumes de saison", detail: "", valeur: "≈ 7 €" },
-            { label: "Fromage blanc", detail: "Le soir, pour la récup.", valeur: "1 kg · 2,40 €" },
+            { label: "Alphabet du pied", detail: "Assis, tu écris l'alphabet avec la pointe du pied.", valeur: "2 ×" },
+            { label: "Équilibre sur un pied", detail: "Pieds nus, près d'un mur, sans douleur.", valeur: "3 × 30 s" },
+            { label: "Montées sur pointes", detail: "Lentement, sur les deux pieds d'abord.", valeur: "3 × 15" },
           ],
         },
-      ],
-      at: t0 + 180_000,
-    },
+      ]
+    ),
   ];
 }
 
-function reponseDemo(d: DossierJoueur): { texte: string; cartes: CarteCoach[] } {
+function reponseDemo(d: DossierJoueur): { texte: string; cartes: CarteCoach[]; image: ImageCoach | null } {
   const m = d.dernierMatch;
   return {
-    texte: "Bien joué d'avoir tenu jusqu'au bout. Voilà ce que je retiens.",
-    cartes: [
-      {
-        type: "debrief",
-        titre: m ? `Débrief J${m.j}` : "Débrief",
-        sousTitre: m ? [m.resultat, m.buts ? `${m.buts} but${m.buts > 1 ? "s" : ""}` : "", m.passes ? `${m.passes} passe${m.passes > 1 ? "s" : ""}` : ""].filter(Boolean).join(" · ") : "",
-        cible: "",
-        lignes: [
-          { label: "Ce qui a marché", detail: "Tes appels dans le dos, tu as fait courir leur défense.", valeur: "" },
-          { label: "Ce qui a coincé", detail: "Les replis après la perte, surtout en fin de match.", valeur: "" },
-          { label: "Avant dimanche", detail: "Deux séances de fractionné pour finir aussi fort que tu commences.", valeur: "2 × 20 min" },
-        ],
-      },
-    ],
+    texte: m
+      ? `J${m.j}, ${m.resultat?.toLowerCase() ?? "joué"}${m.buts ? `, ${m.buts} but${m.buts > 1 ? "s" : ""}` : ""}. Franchement c'est propre. Et toi, tu l'as senti comment ? T'as fini fort ou t'étais cuit sur la fin ?`
+      : "Raconte-moi, t'as joué quand pour la dernière fois ?",
+    cartes: [],
+    image: null,
   };
 }

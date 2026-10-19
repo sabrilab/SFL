@@ -1476,3 +1476,74 @@ exception
   when undefined_object then null;
 end;
 $$;
+
+-- ─────────────────────────── Bola Agent ───────────────────────────
+-- La conversation d'un joueur avec son coach (/agent, route /api/agent) :
+-- ses questions et les réponses du coach, avec leurs cartes (programme,
+-- débrief, panier, santé). Privée : chacun ne lit et n'écrit que la sienne,
+-- avec ses propres droits ; la route y compte aussi les questions du jour
+-- (le crédit du modèle est celui de Sabri).
+create table if not exists public.agent_messages (
+  id          bigint generated always as identity primary key,
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  role        text not null check (role in ('joueur', 'coach')),
+  texte       text not null default '' check (length(texte) <= 8000),
+  cartes      jsonb not null default '[]'::jsonb,
+  created_at  timestamptz not null default now()
+);
+create index if not exists agent_messages_user_date on public.agent_messages (user_id, created_at desc);
+-- L'image que le coach a fait faire pour montrer une zone (le corps, le
+-- terrain, une posture) : { chemin, legende }, le fichier dans le bucket
+-- « agent » plus bas.
+alter table public.agent_messages add column if not exists image jsonb;
+
+alter table public.agent_messages enable row level security;
+
+drop policy if exists "agent: je lis la mienne" on public.agent_messages;
+create policy "agent: je lis la mienne"
+  on public.agent_messages for select to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists "agent: j'écris la mienne" on public.agent_messages;
+create policy "agent: j'écris la mienne"
+  on public.agent_messages for insert to authenticated
+  with check (user_id = (select auth.uid()));
+
+-- Pas d'effacement : les questions du jour y sont comptées.
+drop policy if exists "agent: j'efface la mienne" on public.agent_messages;
+
+revoke all on public.agent_messages from anon, authenticated;
+grant select, insert on public.agent_messages to authenticated;
+
+-- Les images du coach : bucket PRIVÉ « agent », <uuid du joueur>/<horodatage>.jpg.
+-- La route /api/agent les y pose avec les droits du joueur ; lui seul les voit.
+do $$
+begin
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('agent', 'agent', false, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+  on conflict (id) do update
+    set public = false,
+        file_size_limit = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types;
+exception
+  when others then raise warning 'agent : bucket non créé (%)', sqlerrm;
+end;
+$$;
+
+do $$
+begin
+  drop policy if exists "agent: je vois les miennes" on storage.objects;
+  create policy "agent: je vois les miennes"
+    on storage.objects for select
+    to authenticated
+    using (bucket_id = 'agent' and (storage.foldername(name))[1] = (select auth.uid())::text);
+
+  drop policy if exists "agent: le coach pose les miennes" on storage.objects;
+  create policy "agent: le coach pose les miennes"
+    on storage.objects for insert
+    to authenticated
+    with check (bucket_id = 'agent' and (storage.foldername(name))[1] = (select auth.uid())::text);
+exception
+  when others then raise warning 'agent : règles Storage non posées (%)', sqlerrm;
+end;
+$$;

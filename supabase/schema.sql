@@ -1492,6 +1492,10 @@ create table if not exists public.agent_messages (
   created_at  timestamptz not null default now()
 );
 create index if not exists agent_messages_user_date on public.agent_messages (user_id, created_at desc);
+-- L'image que le coach a fait faire pour montrer une zone (le corps, le
+-- terrain, une posture) : { chemin, legende }, le fichier dans le bucket
+-- « agent » plus bas.
+alter table public.agent_messages add column if not exists image jsonb;
 
 alter table public.agent_messages enable row level security;
 
@@ -1510,3 +1514,36 @@ drop policy if exists "agent: j'efface la mienne" on public.agent_messages;
 
 revoke all on public.agent_messages from anon, authenticated;
 grant select, insert on public.agent_messages to authenticated;
+
+-- Les images du coach : bucket PRIVÉ « agent », <uuid du joueur>/<horodatage>.jpg.
+-- La route /api/agent les y pose avec les droits du joueur ; lui seul les voit.
+do $$
+begin
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('agent', 'agent', false, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+  on conflict (id) do update
+    set public = false,
+        file_size_limit = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types;
+exception
+  when others then raise warning 'agent : bucket non créé (%)', sqlerrm;
+end;
+$$;
+
+do $$
+begin
+  drop policy if exists "agent: je vois les miennes" on storage.objects;
+  create policy "agent: je vois les miennes"
+    on storage.objects for select
+    to authenticated
+    using (bucket_id = 'agent' and (storage.foldername(name))[1] = (select auth.uid())::text);
+
+  drop policy if exists "agent: le coach pose les miennes" on storage.objects;
+  create policy "agent: le coach pose les miennes"
+    on storage.objects for insert
+    to authenticated
+    with check (bucket_id = 'agent' and (storage.foldername(name))[1] = (select auth.uid())::text);
+exception
+  when others then raise warning 'agent : règles Storage non posées (%)', sqlerrm;
+end;
+$$;
