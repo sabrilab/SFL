@@ -1547,3 +1547,35 @@ exception
   when others then raise warning 'agent : règles Storage non posées (%)', sqlerrm;
 end;
 $$;
+
+-- Les sujets de Bola Agent, pour l'admin (Activité & rétention) : de quoi
+-- parlent les joueurs avec leur coach et ce qui leur sert le plus, SANS ce
+-- qu'ils se disent. Une ligne par réponse du coach : le sujet (un mot, rangé
+-- par le coach lui-même), le raccourci touché, les types de cartes posées,
+-- une image ou non. Le joueur l'écrit (via /api/agent) ; seul l'admin lit.
+create table if not exists public.agent_sujets (
+  id          bigint generated always as identity primary key,
+  user_id     uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  sujet       text not null check (sujet in ('debrief', 'progression', 'tactique', 'physique', 'nutrition', 'sante', 'recuperation', 'mental', 'ligue', 'autre')),
+  raccourci   text check (raccourci in ('progression', 'debrief', 'courses', 'douleur', 'debrief-auto')),
+  cartes      text[] not null default '{}',
+  image       boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+create index if not exists agent_sujets_date on public.agent_sujets (created_at desc);
+create index if not exists agent_sujets_user on public.agent_sujets (user_id);
+
+alter table public.agent_sujets enable row level security;
+
+drop policy if exists "agent_sujets: j'écris le mien" on public.agent_sujets;
+create policy "agent_sujets: j'écris le mien"
+  on public.agent_sujets for insert to authenticated
+  with check (user_id = (select auth.uid()));
+
+drop policy if exists "agent_sujets: lecture admin" on public.agent_sujets;
+create policy "agent_sujets: lecture admin"
+  on public.agent_sujets for select to authenticated
+  using ((select public.is_league_admin()));
+
+revoke all on public.agent_sujets from anon, authenticated;
+grant select, insert on public.agent_sujets to authenticated;

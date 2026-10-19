@@ -19,10 +19,16 @@
 // débrief : des listes et des chiffres qu'aucune image n'écrit juste), et
 // parfois il fait faire une image pour montrer une zone : du corps (la
 // cheville, le muscle à étirer), du terrain (où couvrir), une posture.
+//
+// Jamais un juge (Sabri, 19/10) : il encourage, tire le joueur vers son
+// dépassement et lui propose des options. Ses stats les plus basses sont sa
+// marge de progression, pas « sa pire stat » : l'écran le dit ainsi aussi.
 
 import { STAT_KEYS, ovr, type Player, type StatKey } from "./engine";
 import { jourMoisDuLibelle } from "./convocation-temps";
 import { ficheJoueur } from "./fiche-joueur";
+import { RANKINGS } from "./rankings";
+import { quantite, vitrine } from "./trophees";
 import { journeeJouee } from "./saisie/mutations";
 import type { Saison } from "./saisie/types";
 
@@ -70,6 +76,90 @@ export interface DossierJoueur {
   synthese: string;
   pointsForts: string[];
   dernierMatch: DernierMatch | null;
+  /** Ses derniers dimanches, du plus récent au plus ancien : avec qui, contre qui. */
+  matchs: MatchDossier[];
+  /** Où il en est face aux autres, classement par classement. */
+  classements: PlaceClassement[];
+  /** Les badges de palier pas encore atteints, du plus proche au plus loin. */
+  objectifs: ObjectifDossier[];
+}
+
+export interface MatchDossier {
+  j: number;
+  date: string;
+  equipe: string | null;
+  resultats: string[];
+  buts: number;
+  passes: number;
+  mvp: boolean;
+  coequipiers: string[];
+  adversaires: string[];
+}
+
+export interface PlaceClassement {
+  classement: string;
+  valeur: number;
+  rang: number;
+  sur: number;
+  /** Le joueur juste devant lui (personne s'il est premier) et l'écart. */
+  devant: { nom: string; valeur: number } | null;
+}
+
+export interface ObjectifDossier {
+  badge: string;
+  actuel: string;
+  prochainPalier: string;
+  manque: number;
+}
+
+/** Dimanches gardés dans le dossier, et joueurs cités par équipe. */
+const MATCHS_DOSSIER = 5;
+const NOMS_PAR_EQUIPE = 7;
+const CLASSEMENTS_DOSSIER = ["pp", "ovr", "buts", "passes", "mvp", "def", "presences"];
+
+function sesMatchs(saison: Saison, nom: string, js: number[]): MatchDossier[] {
+  return js.slice(0, MATCHS_DOSSIER).map((j) => {
+    const du = saison.entries.filter((e) => e.j === j && !e.extraTime && e.statut === "Présent");
+    const lui = du.filter((e) => e.player === nom);
+    const equipe = lui.find((e) => e.team)?.team ?? null;
+    const noms = (f: (team: string | null) => boolean) =>
+      [...new Set(du.filter((e) => e.player !== nom && f(e.team)).map((e) => e.player))].slice(0, NOMS_PAR_EQUIPE * 2);
+    return {
+      j,
+      date: saison.journees.find((x) => x.j === j)?.date ?? "",
+      equipe,
+      resultats: lui.map((e) => e.result).filter((r): r is NonNullable<typeof r> => !!r),
+      buts: lui.reduce((a, e) => a + e.buts, 0),
+      passes: lui.reduce((a, e) => a + e.passes, 0),
+      mvp: lui.some((e) => e.mvp),
+      coequipiers: equipe ? noms((t) => t === equipe).slice(0, NOMS_PAR_EQUIPE) : [],
+      adversaires: equipe ? noms((t) => !!t && t !== equipe) : [],
+    };
+  });
+}
+
+function sesPlaces(moi: Player, players: Player[]): PlaceClassement[] {
+  return RANKINGS.filter((r) => CLASSEMENTS_DOSSIER.includes(r.id)).flatMap((r) => {
+    const tries = players.filter((p) => p.matchs > 0 || p.name === moi.name).sort((a, b) => r.value(b) - r.value(a));
+    const valeur = r.value(moi);
+    if (!tries.length) return [];
+    const rang = tries.filter((p) => r.value(p) > valeur).length + 1;
+    const devantLui = tries.filter((p) => r.value(p) > valeur).at(-1);
+    return [{ classement: r.label, valeur, rang, sur: tries.length, devant: devantLui ? { nom: devantLui.name, valeur: r.value(devantLui) } : null }];
+  });
+}
+
+function sesObjectifs(saison: Saison, nom: string, maintenant: Date): ObjectifDossier[] {
+  return vitrine(saison, nom, maintenant)
+    .filter((e) => e.cible != null)
+    .sort((a, b) => b.progression - a.progression)
+    .slice(0, 5)
+    .map((e) => ({
+      badge: e.def.nom,
+      actuel: quantite(e.def, e.valeur),
+      prochainPalier: quantite(e.def, e.cible!),
+      manque: e.cible! - e.valeur,
+    }));
 }
 
 /** Les stats d'une carte, de la meilleure à la pire (à égalité, l'ordre de la carte). */
@@ -93,7 +183,8 @@ export function dossierJoueur(saison: Saison, moi: Player, players: Player[], ma
   const lignes = saison.entries.filter(
     (e) => e.player === moi.name && !e.extraTime && e.statut === "Présent" && journeeJouee(saison, e.j)
   );
-  const dernierJ = Math.max(0, ...lignes.map((e) => e.j));
+  const jouees = [...new Set(lignes.map((e) => e.j))].sort((a, b) => b - a);
+  const dernierJ = jouees[0] ?? 0;
   let dernierMatch: DernierMatch | null = null;
   if (dernierJ) {
     const ce = lignes.filter((e) => e.j === dernierJ);
@@ -119,6 +210,9 @@ export function dossierJoueur(saison: Saison, moi: Player, players: Player[], ma
     synthese: fiche.synthese,
     pointsForts: fiche.forts.map((f) => `${f.chiffre} ${f.quoi} (${f.rang})`),
     dernierMatch,
+    matchs: sesMatchs(saison, moi.name, jouees),
+    classements: sesPlaces(moi, players),
+    objectifs: sesObjectifs(saison, moi.name, maintenant),
   };
 }
 
@@ -138,6 +232,39 @@ export function questionDebrief(m: DernierMatch): string {
 }
 
 /* ------------------------------ Les réponses ----------------------------- */
+
+/**
+ * De quoi parle un échange, d'après le coach lui-même. Seul ce mot est gardé
+ * pour les stats de l'admin (agent_sujets), jamais ce qui s'est dit.
+ */
+export const SUJETS = ["debrief", "progression", "tactique", "physique", "nutrition", "sante", "recuperation", "mental", "ligue", "autre"] as const;
+export type Sujet = (typeof SUJETS)[number];
+
+export const LIBELLE_SUJET: Record<Sujet, string> = {
+  debrief: "Débrief de match",
+  progression: "Progression, exercices",
+  tactique: "Tactique, placement",
+  physique: "Forme physique",
+  nutrition: "Nutrition, courses",
+  sante: "Douleurs, blessures",
+  recuperation: "Récupération",
+  mental: "Mental, confiance",
+  ligue: "Classements, objectifs",
+  autre: "Autre",
+};
+
+/** Les raccourcis sous la fiche (et la question d'ouverture après un match). */
+export const RACCOURCIS = ["progression", "debrief", "courses", "douleur"] as const;
+export type Raccourci = (typeof RACCOURCIS)[number];
+
+export const LIBELLE_RACCOURCI: Record<Raccourci | "debrief-auto", string> = {
+  progression: "Faire monter une stat",
+  debrief: "Débrief",
+  courses: "Mes courses",
+  douleur: "J'ai mal",
+  "debrief-auto": "Question d'après-match",
+};
+
 
 export const TYPES_CARTE = ["programme", "exercice", "debrief", "panier", "sante", "bilan"] as const;
 export type TypeCarte = (typeof TYPES_CARTE)[number];
