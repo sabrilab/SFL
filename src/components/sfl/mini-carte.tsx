@@ -29,6 +29,7 @@ export function MiniCarte({
   detail,
   className,
   onglet,
+  vertical,
 }: {
   player: Player;
   /** La largeur, en fraction de 254 px (voir FORMAT_CARTE). */
@@ -38,6 +39,8 @@ export function MiniCarte({
   className?: string;
   /** La note aux couleurs d'une équipe (feuille de match). */
   onglet?: { fond: string; encre: string };
+  /** En petit, la carte reste debout (les terrains). */
+  vertical?: boolean;
 }) {
   const { open } = useCardViewer();
   return (
@@ -57,7 +60,7 @@ export function MiniCarte({
       aria-label={`Voir la carte de ${player.name}`}
       className={cn("shrink-0 transition-transform active:scale-95", className)}
     >
-      <PlayerCard player={player} size={size} onglet={onglet} />
+      <PlayerCard player={player} size={size} onglet={onglet} vertical={vertical} />
     </button>
   );
 }

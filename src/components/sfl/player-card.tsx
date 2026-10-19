@@ -31,6 +31,7 @@ export function PlayerCard({
   onglet,
   affiche,
   pseudo,
+  vertical,
 }: {
   player: Player;
   /** Aperçu : le nom et le pseudo en cours de saisie (identite.tsx). */
@@ -42,6 +43,8 @@ export function PlayerCard({
   highlightStats?: StatKey[];
   /** En pastille : la note aux couleurs d'une équipe. */
   onglet?: { fond: string; encre: string };
+  /** En petit, la carte reste debout (les terrains) au lieu de la pastille. */
+  vertical?: boolean;
 }) {
   const stats = player.stats;
   const photo = usePhotoPerso(player.name);
@@ -58,6 +61,7 @@ export function PlayerCard({
         photo={photo}
         onglet={onglet}
         badge={badge}
+        vertical={vertical}
       />
     );
   return (

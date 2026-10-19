@@ -83,6 +83,7 @@ export function CartePhoto({
   photo,
   onglet,
   badge,
+  vertical = false,
 }: {
   name: string;
   affiche?: string;
@@ -92,10 +93,13 @@ export function CartePhoto({
   photo?: string | null;
   onglet?: { fond: string; encre: string };
   badge?: BadgeCarte | null;
+  /** Debout même en tout petit : la réduite au lieu de la pastille (les terrains). */
+  vertical?: boolean;
 }) {
   const largeur = 254 * size;
   const u = (n: number) => n * size * (254 / W);
-  const palier = palierCarte(largeur);
+  const p0 = palierCarte(largeur);
+  const palier = vertical && p0 === "pastille" ? "reduite" : p0;
 
   if (palier === "pastille") {
     return (
