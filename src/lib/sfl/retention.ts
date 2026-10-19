@@ -39,6 +39,8 @@ export interface Profil {
   contact_email: string | null;
   /** Création du compte (ms), si connue. */
   created_at: number | null;
+  /** Compte admin (Sabri, Ilyes) : ses connexions faussent les chiffres des joueurs. */
+  admin?: boolean;
 }
 
 export interface PointJour {
