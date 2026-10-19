@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { accepter, annuler, direErreur, inscrits, placesLibres, quitter, rejoindre, type Partie } from "@/lib/sfl/matchs";
 import { cn } from "@/lib/utils";
+import { Nom } from "@/components/sfl/nom";
 
 export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: string | null; onChange: () => void }) {
   const [occupe, setOccupe] = useState(false);
@@ -51,7 +52,7 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
             <span className="mono-label mr-1 text-muted-foreground">Invités</span>
             {attendus.map((j) => (
               <span key={j.id} className="rounded-full bg-secondary px-2.5 py-1 text-[12.5px] font-medium">
-                {j.name}
+                <Nom n={j.name} />
               </span>
             ))}
           </div>

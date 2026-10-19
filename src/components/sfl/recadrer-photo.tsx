@@ -34,7 +34,7 @@ export function RecadrerPhoto({
   /** L'image à recadrer (URL d'objet, data URL, ou URL publique avec CORS). */
   src: string | null;
   /** De quoi dessiner l'aperçu de la carte. */
-  carte: { name: string; username?: string; position: string; overall: number; stats: Stats };
+  carte: { name: string; affiche?: string; username?: string; position: string; overall: number; stats: Stats };
   onValider: (dataUrl: string) => void;
   onFermer: () => void;
 }) {

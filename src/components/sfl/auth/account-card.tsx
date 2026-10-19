@@ -18,13 +18,14 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/hooks/use-session";
 import { useIsClient } from "@/hooks/use-is-client";
-import { username } from "@/lib/sfl/usernames";
+import { useIdentites } from "@/hooks/use-identites";
 import { cn } from "@/lib/utils";
 import { PseudoCard } from "./pseudo-card";
 
 export function AccountCard() {
   const session = useSession();
   const isClient = useIsClient();
+  const identite = useIdentites();
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -135,9 +136,9 @@ export function AccountCard() {
             {session.name[0]}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[16px] font-bold tracking-tight">{session.name}</div>
+            <div className="truncate text-[16px] font-bold tracking-tight">{identite.nom(session.name)}</div>
             <div className="mono-label mt-0.5 text-foreground/40">
-              {serverSession ? session.user : `${session.user} · ${username(session.name)}`}
+              {serverSession ? session.user : `${session.user} · ${identite.pseudo(session.name)}`}
               {session.admin && " · Admin"}
             </div>
           </div>

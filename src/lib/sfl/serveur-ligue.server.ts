@@ -37,13 +37,18 @@ const RESERVES = ["admin", "sfl", "bola", "ligue", "support"];
  * `sauf` : le joueur qui demande (son propre pseudo ne compte pas comme pris).
  */
 export async function dejaPris(sb: SupabaseClient, sauf?: string) {
-  const { data: profils, error } = await sb.from("profiles").select("id, name, username");
+  // nom_affiche : le nom que l'app montre (voir /api/identite). Avant la
+  // migration de la base (aperçus), la colonne n'existe pas encore.
+  let { data: profils, error } = await sb.from("profiles").select("id, name, username, nom_affiche");
+  if (error) ({ data: profils, error } = await sb.from("profiles").select("id, name, username"));
   if (error) throw error;
   const { data: doc } = await sb.from("saison").select("data").eq("id", 1).maybeSingle();
   const roster = ((doc as { data?: { roster?: { name: string }[] } } | null)?.data?.roster ?? []).map(
     (r) => r.name
   );
-  const liste = ((profils ?? []) as { id: string; name: string; username: string }[]).filter((p) => p.id !== sauf);
+  const liste = ((profils ?? []) as { id: string; name: string; username: string; nom_affiche?: string | null }[]).filter(
+    (p) => p.id !== sauf
+  );
   const moi = ((profils ?? []) as { id: string; name: string }[]).find((p) => p.id === sauf);
 
   const pseudos = new Set<string>();
@@ -55,7 +60,10 @@ export async function dejaPris(sb: SupabaseClient, sauf?: string) {
   for (const r of RESERVES) pseudos.add(r);
 
   const noms = new Set<string>();
-  for (const p of liste) noms.add(p.name.toLowerCase());
+  for (const p of liste) {
+    noms.add(p.name.toLowerCase());
+    if (p.nom_affiche) noms.add(p.nom_affiche.toLowerCase());
+  }
   for (const n of roster) noms.add(n.toLowerCase());
   for (const a of ACCOUNTS) noms.add(a.name.toLowerCase());
   return { pseudos, noms };

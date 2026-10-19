@@ -15,6 +15,7 @@ import { useState } from "react";
 import { ChevronDown, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Journee } from "@/lib/sfl/engine";
+import { Nom } from "@/components/sfl/nom";
 
 /** « Orange 7 — 5 Bleu », ou le nombre de matchs si la journée en a plusieurs. */
 function resume(j: Journee): string {
@@ -111,7 +112,7 @@ function Rubrique({
             <div className="glass-soft flex flex-col gap-1 rounded-2xl px-3.5 py-2.5">
               {(journee.lignes ?? []).slice(0, 6).map(([nom, res, b, p]) => (
                 <div key={nom} className="flex items-baseline justify-between gap-3 text-[13px]">
-                  <span className="min-w-0 truncate font-medium">{nom}</span>
+                  <span className="min-w-0 truncate font-medium"><Nom n={nom} /></span>
                   <span className="mono-label shrink-0 text-foreground/40">
                     {res} · {b}b {p}p
                   </span>

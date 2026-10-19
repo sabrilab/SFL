@@ -13,6 +13,9 @@
 //    propose de les activer (lib/sfl/notifications). Un iPhone dans Safari
 //    ne peut pas : le guide d'installation s'en charge d'abord.
 //
+// Le prénom, le nom, le pseudo et l'email passent avant tout (identite.tsx) :
+// rien ne s'ouvre ici tant que le joueur ne les a pas confirmés.
+//
 // « Plus tard » fait taire chaque invitation deux jours, sur cet appareil.
 // À chaque ouverture, un téléphone déjà abonné redonne son abonnement.
 
@@ -25,6 +28,7 @@ import { FluxCarteOfficielle } from "@/components/sfl/carte-officielle";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSession } from "@/hooks/use-session";
+import { identiteConfirmee, rafraichirIdentites } from "@/lib/sfl/identites";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
 import { activerNotifications, etatNotifications, rafraichirAbonnement } from "@/lib/sfl/notifications";
 
@@ -85,8 +89,8 @@ export function InvitationCarte() {
         setVisible(forcee);
         return;
       }
-      await rafraichirPhotos();
-      if (annule) return;
+      await Promise.all([rafraichirPhotos(), rafraichirIdentites()]);
+      if (annule || identiteConfirmee(nom) === false) return;
       if (photoPerso(nom) === null) {
         if (!enPause("carte", nom)) setVisible("carte");
         return;

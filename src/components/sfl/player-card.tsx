@@ -16,7 +16,7 @@ import { BolaCard } from "./bola-card";
 import { useBadgeCarte } from "@/hooks/use-badge-carte";
 import { usePhotoPerso } from "@/hooks/use-player-photo";
 import { ovr, type Player, type StatKey } from "@/lib/sfl/engine";
-import { username } from "@/lib/sfl/usernames";
+import { useIdentites } from "@/hooks/use-identites";
 
 export type CardMode = "simple" | "rare";
 
@@ -25,8 +25,13 @@ export function PlayerCard({
   size = 1,
   highlightStats,
   onglet,
+  affiche,
+  pseudo,
 }: {
   player: Player;
+  /** Aperçu : le nom et le pseudo en cours de saisie (identite.tsx). */
+  affiche?: string;
+  pseudo?: string;
   /** Sans effet : la carte affichée est toujours la simple. */
   mode?: CardMode;
   size?: number;
@@ -37,11 +42,13 @@ export function PlayerCard({
   const stats = player.stats;
   const photo = usePhotoPerso(player.name);
   const badge = useBadgeCarte(player.name);
+  const identite = useIdentites();
   return (
     <BolaCard
       edition="base"
       name={player.name}
-      username={username(player.name)}
+      affiche={affiche ?? identite.nom(player.name)}
+      username={pseudo ?? identite.pseudo(player.name)}
       position={player.poste}
       overall={ovr(stats)}
       stats={stats}

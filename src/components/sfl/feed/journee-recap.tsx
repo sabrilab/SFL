@@ -73,6 +73,7 @@ import { PitchSynthese } from "@/components/sfl/feed/pitch-synthese";
 import { LaUne } from "@/components/sfl/feed/la-une";
 import { cn } from "@/lib/utils";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
+import { Nom } from "@/components/sfl/nom";
 
 /* ----------------------------- Réactions ------------------------------ */
 // Réactions locales à l'appareil (le multi-joueurs attend les comptes) :
@@ -701,7 +702,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                   </span>
                   <Avatar name={e.player} size={28} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-semibold">{e.player}</span>
+                    <span className="block truncate text-[14px] font-semibold"><Nom n={e.player} /></span>
                     <span className="mono-label text-muted-foreground">
                       {[
                         e.buts > 0 && `${e.buts}B`,
@@ -747,7 +748,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
             <div className="mb-3 flex items-center justify-between">
               {[duelA, duelB].map((p) => (
                 <div key={p.name} className="text-center first:text-left last:text-right">
-                  <div className="text-[14px] font-bold">{p.name}</div>
+                  <div className="text-[14px] font-bold"><Nom n={p.name} /></div>
                   <div className="mono-label text-muted-foreground">
                     {feat(p.name) ?? p.poste}
                   </div>
@@ -801,7 +802,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                 <div key={e.player} className="flex items-center gap-2.5">
                   <Avatar name={e.player} size={26} />
                   <p className="text-[13px] text-muted-foreground">
-                    <span className="font-semibold text-foreground">{e.player}</span>{" "}
+                    <span className="font-semibold text-foreground"><Nom n={e.player} /></span>{" "}
                     {e.buts > 0
                       ? `plante ${e.buts} but${e.buts > 1 ? "s" : ""} pour sa première`
                       : "joue son premier match"}

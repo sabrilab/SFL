@@ -45,6 +45,20 @@ alter table public.profiles add column if not exists pseudo_change_le timestampt
 alter table public.profiles add column if not exists pseudo_a_choisir boolean not null default false;
 alter table public.profiles add column if not exists contact_email text;
 
+-- Identité affichée. Le nom de saison (name) reste la clé de toute l'app
+-- (journées, photos, compositions) : il ne change jamais, sinon les stats
+-- d'un joueur se perdraient. Le joueur corrige plutôt son prénom et son nom
+-- (dans sa fiche, privée) et l'app affiche partout nom_affiche, tiré de ce
+-- prénom selon l'usage de la ligue (prénom seul, puis l'initiale du nom en
+-- cas d'homonyme, voir nomDeLigue). Seule la route serveur /api/identite
+-- l'écrit, après avoir vérifié qu'aucun autre joueur ne le porte.
+--   · identite_le : quand le joueur a confirmé son prénom, son nom et son
+--     pseudo (null = jamais : Ma carte le lui demande).
+alter table public.profiles add column if not exists nom_affiche text;
+alter table public.profiles add column if not exists identite_le timestamptz;
+create unique index if not exists profiles_nom_affiche_unique
+  on public.profiles (lower(nom_affiche)) where nom_affiche is not null;
+
 -- À l'inscription, le profil est créé par trigger depuis les métadonnées
 -- d'identité (nom, pseudo). is_admin est FORCÉ à false : les métadonnées sont
 -- modifiables par l'utilisateur, elles ne portent jamais d'autorisation.
@@ -703,6 +717,10 @@ create table if not exists public.fiches (
 );
 
 alter table public.fiches enable row level security;
+
+-- Les joueurs inscrits avant les fiches n'y ont que leur prénom et leur nom,
+-- posés en confirmant leur identité depuis Ma carte : la naissance attend.
+alter table public.fiches alter column naissance drop not null;
 
 drop policy if exists "fiches: la mienne ou admin" on public.fiches;
 create policy "fiches: la mienne ou admin"

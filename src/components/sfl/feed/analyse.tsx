@@ -23,6 +23,7 @@ import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
 import { CarteDe } from "@/components/sfl/mini-carte";
+import { Nom } from "@/components/sfl/nom";
 
 /* ------------------------------ Calculs ------------------------------ */
 
@@ -448,7 +449,7 @@ export function CourseModule({
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-[13px] font-semibold">{p.name}</span>
+                  <span className="truncate text-[13px] font-semibold"><Nom n={p.name} /></span>
                   <span className="text-[13px] font-bold tabular-nums">
                     {p.pp}
                     {p.earned > 0 && (
@@ -636,7 +637,7 @@ export function RadarModule({
   return (
     <section className="glass rounded-3xl p-5">
       <p className="mono-label text-primary">Sous le capot</p>
-      <h2 className="mt-1 text-xl font-bold tracking-tight">{name}, au scanner</h2>
+      <h2 className="mt-1 text-xl font-bold tracking-tight"><Nom n={name} />, au scanner</h2>
       <svg viewBox="0 0 260 224" className="mx-auto mt-2 w-full max-w-[300px]" aria-hidden>
         {[0.33, 0.66, 1].map((f) => (
           <polygon key={f} points={ring(f)} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
@@ -676,7 +677,7 @@ export function RadarModule({
       </svg>
       <div className="mt-2 flex items-center justify-center gap-4">
         <span className="flex items-center gap-1.5 text-[12.5px] font-semibold">
-          <span className="size-2 rounded-full bg-primary" /> {name} · GÉN {ovrValue}
+          <span className="size-2 rounded-full bg-primary" /> <Nom n={name} /> · GÉN {ovrValue}
         </span>
         <span className="flex items-center gap-1.5 text-[12.5px] text-foreground/50">
           <span className="size-2 rounded-full bg-foreground/30" /> Ligue · GÉN {avgOvr}
@@ -709,7 +710,7 @@ export function MilestonesModule({ milestones }: { milestones: Analyse["mileston
             <Avatar name={m.name} size={28} />
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-[14px] font-semibold">{m.name}</span>
+                <span className="truncate text-[14px] font-semibold"><Nom n={m.name} /></span>
                 <span className="mono-label text-foreground/40 tabular-nums">
                   {m.crossed ? `${m.current} ${m.label}` : `${m.current}/${m.target} ${m.label}`}
                 </span>
@@ -744,7 +745,7 @@ export function FidelesModule({ fideles }: { fideles: Analyse["fideles"] }) {
       <div className="mt-4 flex flex-col gap-2.5">
         {fideles.rows.map((r) => (
           <div key={r.name} className="flex items-center gap-2.5">
-            <span className="w-[72px] truncate text-[13px] font-semibold">{r.name}</span>
+            <span className="w-[72px] truncate text-[13px] font-semibold"><Nom n={r.name} /></span>
             <div className="flex flex-1 justify-between gap-1">
               {r.cells.map((on, i) => (
                 <span
@@ -883,7 +884,7 @@ export function MouvementsModule({ mouvements }: { mouvements: Analyse["mouvemen
               <TrendingUp className="size-3.5" />
             </span>
             <Avatar name={m.name} size={26} />
-            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{m.name}</span>
+            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold"><Nom n={m.name} /></span>
             <span className="mono-label text-muted-foreground">
               {m.from}e → {m.to}e
             </span>
@@ -919,7 +920,7 @@ export function FormeModule({
             <div key={f.name} className="flex items-center gap-2.5">
               <Avatar name={f.name} size={26} />
               <p className="min-w-0 flex-1 text-[13px] text-muted-foreground">
-                <span className="font-semibold text-foreground">{f.name}</span> — {f.goals} buts
+                <span className="font-semibold text-foreground"><Nom n={f.name} /></span> — {f.goals} buts
                 sur ses {f.streak} dernières journées
               </p>
               <span className="flex gap-1">

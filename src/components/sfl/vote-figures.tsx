@@ -27,6 +27,7 @@ import {
 } from "@/lib/sfl/votes";
 import { cn } from "@/lib/utils";
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
+import { Nom } from "@/components/sfl/nom";
 
 export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
   const { saison, allPlayers } = useSeason();
@@ -98,7 +99,7 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
                           {p.name[0]}
                         </span>
                       )}
-                      <span className="max-w-[80px] truncate text-[12px] font-semibold">{p.name}</span>
+                      <span className="max-w-[80px] truncate text-[12px] font-semibold"><Nom n={p.name} /></span>
                       {choisi && (
                         <span className="absolute top-0 right-0 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
                           <Check className="size-3.5" />

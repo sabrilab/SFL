@@ -28,6 +28,7 @@ import {
   type Fil,
   type Profil,
 } from "@/lib/sfl/messages";
+import { Nom } from "@/components/sfl/nom";
 
 /** Initiales : deux lettres max, majuscules. */
 function initiales(nom: string) {
@@ -290,7 +291,7 @@ export function Messagerie() {
               <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/8 text-[10px] font-bold">
                 {initiales(p.name)}
               </span>
-              <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{p.name}</span>
+              <span className="min-w-0 flex-1 truncate text-[14px] font-semibold"><Nom n={p.name} /></span>
             </button>
           ))}
           {visibles.length === 0 && (

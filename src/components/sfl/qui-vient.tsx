@@ -11,6 +11,7 @@ import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import type { Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
+import { Nom } from "@/components/sfl/nom";
 
 function carteNeutre(name: string): Player {
   return {
@@ -51,7 +52,7 @@ export function QuiVient({
       {noms.map((nom) => (
         <div key={nom} className="flex shrink-0 flex-col items-center gap-1">
           <MiniCarte player={parNom.get(nom) ?? carteNeutre(nom)} size={size} />
-          <span className="max-w-[72px] truncate text-[11px] font-semibold">{nom}</span>
+          <span className="max-w-[72px] truncate text-[11px] font-semibold"><Nom n={nom} /></span>
         </div>
       ))}
       {Array.from({ length: Math.min(places, 10) }, (_, i) => (

@@ -33,11 +33,11 @@ import { useIsClient } from "@/hooks/use-is-client";
 import { SaisonArchiveProvider } from "@/components/sfl/season-provider";
 import { journeeJouee, saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
 import { PresencePanel } from "@/components/sfl/presence-panel";
-import { EmailNudge } from "@/components/sfl/auth/email-nudge";
 import { JourneeOpening } from "@/components/sfl/feed/journee-opening";
 import { CarteJournee } from "@/components/sfl/carte-journee";
 import { ALHonneur } from "@/components/sfl/a-l-honneur";
 import { cn } from "@/lib/utils";
+import { Nom } from "@/components/sfl/nom";
 
 // Les deux dimanches après celui de la convocation, lus côté client
 // (vides au rendu serveur, pour que l'hydratation concorde).
@@ -305,7 +305,7 @@ function Ligue() {
           <section className="glass rounded-[26px] p-[18px] ">
             <div className="flex items-center justify-between">
               <div>
-                <p className="mono-label text-foreground/40">{player.name}</p>
+                <p className="mono-label text-foreground/40"><Nom n={player.name} /></p>
                 <div className="mt-1 flex items-baseline gap-2">
                   <span className="text-[34px] leading-none font-extrabold tracking-tight">
                     {myRank}
@@ -375,7 +375,6 @@ function Ligue() {
         </>
       ) : (
         <>
-          <EmailNudge />
           {played.length > 0 && <div className="-mt-1 lg:hidden">{capsules(false)}</div>}
 
           {/* Sur ordinateur, au nombre d'or : le récap dans la grande colonne,

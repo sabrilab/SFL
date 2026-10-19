@@ -22,6 +22,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import dynamic from "next/dynamic";
 import { toPng } from "html-to-image";
 import { useBadgeRevision } from "@/hooks/use-badge-carte";
+import { useIdentitesRevision } from "@/hooks/use-identites";
 import { usePhotoRevision } from "@/hooks/use-player-photo";
 import { IMAGE_EVENT } from "@/lib/sfl/badges-3d/rendu";
 
@@ -279,7 +280,9 @@ export function Card3D(props: {
   // (attendreBadges) : la moindre image prête ailleurs ne relance plus tout.
   const revision = usePhotoRevision();
   const badges = useBadgeRevision();
-  return <Card3DInner key={`${props.cacheKey}~${revision}~${badges}`} {...props} />;
+  // Un nom ou un pseudo corrigé : la carte le porte, la capture repart.
+  const identites = useIdentitesRevision();
+  return <Card3DInner key={`${props.cacheKey}~${revision}~${badges}~${identites}`} {...props} />;
 }
 
 function Card3DInner({
