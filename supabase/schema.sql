@@ -563,12 +563,8 @@ create policy "messages: lecture"
     or destinataire = (select auth.uid())
   );
 
--- Écriture : sous son propre nom, jamais sous celui d'un autre.
-drop policy if exists "messages: j'écris pour moi" on public.messages;
-create policy "messages: j'écris pour moi"
-  on public.messages for insert
-  to authenticated
-  with check (auteur = (select auth.uid()) and (select public.est_membre()));
+-- Écriture : sous son propre nom, jamais sous celui d'un autre. La règle
+-- vit plus bas (Vestiaire), avec la sourdine que l'admin peut poser.
 
 -- Retrait : son propre message. L'admin peut retirer n'importe lequel du
 -- salon — la modération d'un lieu public lui revient.
@@ -589,6 +585,149 @@ exception
   when undefined_object then null;
 end;
 $$;
+
+-- ───────────────────────────── Vestiaire ─────────────────────────────
+-- Le salon de la ligue s'appelle désormais le Vestiaire (onglet Ligue). On
+-- s'y chambre : un message peut porter une PIÈCE, ce que le joueur partage
+-- en un geste (sa carte, une feuille de match, un classement). La pièce est
+-- un petit JSON que l'app sait dessiner ; le texte devient alors facultatif.
+--   · {"type":"carte","joueur":"Kader"}
+--   · {"type":"feuille","j":11}
+--   · {"type":"classement","id":"buts","top":[{"n":"Ilyes","v":20},…]}
+alter table public.messages add column if not exists piece jsonb;
+alter table public.messages drop constraint if exists messages_texte_check;
+alter table public.messages drop constraint if exists messages_texte_ou_piece;
+alter table public.messages add constraint messages_texte_ou_piece check (
+  char_length(texte) <= 2000
+  and (char_length(btrim(texte)) >= 1 or piece is not null)
+);
+alter table public.messages drop constraint if exists messages_piece_forme;
+alter table public.messages add constraint messages_piece_forme check (
+  piece is null
+  or (
+    jsonb_typeof(piece) = 'object'
+    and piece->>'type' in ('carte', 'feuille', 'classement')
+    and pg_column_size(piece) <= 4000
+  )
+);
+
+-- Les réactions : une par émoji et par joueur sur un message. On ne lit que
+-- les réactions des messages qu'on a le droit de lire (la sous-requête passe
+-- par la RLS de messages).
+create table if not exists public.message_reactions (
+  message_id  bigint not null references public.messages(id) on delete cascade,
+  user_id     uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  emoji       text not null check (emoji in ('😂', '🔥', '🐐', '🤡', '💀')),
+  created_at  timestamptz not null default now(),
+  primary key (message_id, user_id, emoji)
+);
+
+alter table public.message_reactions enable row level security;
+
+drop policy if exists "réactions: lecture" on public.message_reactions;
+create policy "réactions: lecture"
+  on public.message_reactions for select to authenticated
+  using (exists (select 1 from public.messages m where m.id = message_id));
+
+drop policy if exists "réactions: je réagis pour moi" on public.message_reactions;
+create policy "réactions: je réagis pour moi"
+  on public.message_reactions for insert to authenticated
+  with check (
+    user_id = (select auth.uid())
+    and (select public.est_membre())
+    and exists (select 1 from public.messages m where m.id = message_id)
+  );
+
+drop policy if exists "réactions: je retire la mienne" on public.message_reactions;
+create policy "réactions: je retire la mienne"
+  on public.message_reactions for delete to authenticated
+  using (user_id = (select auth.uid()));
+
+do $$
+begin
+  alter publication supabase_realtime add table public.message_reactions;
+exception
+  when duplicate_object then null;
+  when undefined_table then null;
+  when undefined_object then null;
+end;
+$$;
+
+-- La modération : l'admin retire n'importe quel message du Vestiaire (règle
+-- « je retire le mien » plus haut) et peut couper la parole à un joueur pour
+-- un temps. Un joueur coupé lit toujours, mais n'écrit plus au Vestiaire.
+create table if not exists public.vestiaire_sourdines (
+  user_id     uuid primary key references public.profiles(id) on delete cascade,
+  jusqu_au    timestamptz not null,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.vestiaire_sourdines enable row level security;
+
+drop policy if exists "sourdines: le joueur voit la sienne, l'admin tout" on public.vestiaire_sourdines;
+create policy "sourdines: le joueur voit la sienne, l'admin tout"
+  on public.vestiaire_sourdines for select to authenticated
+  using (user_id = (select auth.uid()) or (select public.is_league_admin()));
+
+drop policy if exists "sourdines: l'admin décide" on public.vestiaire_sourdines;
+create policy "sourdines: l'admin décide"
+  on public.vestiaire_sourdines for all to authenticated
+  using ((select public.is_league_admin()))
+  with check ((select public.is_league_admin()));
+
+create or replace function public.peut_parler_au_vestiaire()
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select not exists (
+    select 1 from public.vestiaire_sourdines s
+    where s.user_id = (select auth.uid()) and s.jusqu_au > now()
+  );
+$$;
+
+revoke execute on function public.peut_parler_au_vestiaire() from public, anon;
+grant execute on function public.peut_parler_au_vestiaire() to authenticated;
+
+drop policy if exists "messages: j'écris pour moi" on public.messages;
+create policy "messages: j'écris pour moi"
+  on public.messages for insert
+  to authenticated
+  with check (
+    auteur = (select auth.uid())
+    and (select public.est_membre())
+    and (canal <> 'sfl' or (select public.peut_parler_au_vestiaire()))
+  );
+
+-- Où en est chaque joueur avec le Vestiaire : jusqu'où il a lu (la pastille,
+-- d'un téléphone à l'autre), ce qu'il veut en notification, et quand on l'a
+-- notifié pour la dernière fois (une notification groupée par heure au plus).
+--   · notifs : 'tout' (cité, réactions, et le groupé), 'cite' (seulement
+--     quand on le cite ou réagit à son message), 'rien'.
+create table if not exists public.vestiaire_suivi (
+  user_id     uuid primary key default auth.uid() references public.profiles(id) on delete cascade,
+  lu_jusqua   timestamptz not null default now(),
+  notifs      text not null default 'tout' check (notifs in ('tout', 'cite', 'rien')),
+  notifie_le  timestamptz
+);
+
+alter table public.vestiaire_suivi enable row level security;
+
+drop policy if exists "suivi: le mien" on public.vestiaire_suivi;
+create policy "suivi: le mien"
+  on public.vestiaire_suivi for all to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
+-- notifie_le n'appartient qu'au serveur (clé secrète) : le joueur ne règle
+-- que sa lecture et ses notifications. Révoquer le droit de table AVANT de
+-- donner les colonnes, sinon le droit de table les annule.
+revoke insert, update on public.vestiaire_suivi from authenticated, anon;
+grant insert (user_id, lu_jusqua, notifs) on public.vestiaire_suivi to authenticated;
+-- user_id aussi : un upsert le réécrit (à l'identique, la RLS y veille).
+grant update (user_id, lu_jusqua, notifs) on public.vestiaire_suivi to authenticated;
 
 -- ────────────────────────────── Photos ───────────────────────────────
 -- Les photos de profil, partagées : celle qu'un joueur pose apparaît sur sa

@@ -100,7 +100,8 @@ export async function chargerTout(
       auteurId: r.auteur,
       auteur: nomDe.get(r.auteur) ?? "Quelqu'un",
       destinataireId: r.destinataire,
-      texte: r.texte,
+      // Un partage du Vestiaire (carte, feuille, classement) peut venir sans texte.
+      texte: r.texte || "a partagé quelque chose au Vestiaire",
       at: new Date(r.created_at).getTime(),
       mien: r.auteur === moi,
     }))

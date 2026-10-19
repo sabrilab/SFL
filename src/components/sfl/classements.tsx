@@ -21,6 +21,7 @@ import { RANKINGS, type RankingDef } from "@/lib/sfl/rankings";
 import { distinctions } from "@/lib/sfl/distinctions";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { Nom } from "@/components/sfl/nom";
+import { AuVestiaire } from "@/components/sfl/au-vestiaire";
 
 const DAUPHIN = FORMAT_CARTE.moyenne;
 const CHAMPION = FORMAT_CARTE.grande;
@@ -132,6 +133,10 @@ function Liste({ def, me }: { def: RankingDef; me: string }) {
   return (
     <div className="flex flex-col gap-5">
       <Podium def={def} top={ranked.slice(0, 3)} me={me} />
+      <AuVestiaire
+        className="self-center"
+        piece={{ type: "classement", id: def.id, top: ranked.slice(0, 3).map((p) => ({ n: p.name, v: p.value })) }}
+      />
 
       <div className="flex flex-col gap-1.5">
         {ranked.slice(3).map((p) => (
