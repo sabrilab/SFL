@@ -24,7 +24,6 @@ import { toPng } from "html-to-image";
 import { useBadgeRevision } from "@/hooks/use-badge-carte";
 import { useIdentitesRevision } from "@/hooks/use-identites";
 import { usePhotoRevision } from "@/hooks/use-player-photo";
-import { useStyleRevision } from "@/hooks/use-style-carte";
 import { IMAGE_EVENT } from "@/lib/sfl/badges-3d/rendu";
 
 const chargerCanvas = () => import("./card-3d-canvas");
@@ -283,9 +282,7 @@ export function Card3D(props: {
   const badges = useBadgeRevision();
   // Un nom ou un pseudo corrigé : la carte le porte, la capture repart.
   const identites = useIdentitesRevision();
-  // Un autre style de carte choisi dans Ma carte : même chose.
-  const style = useStyleRevision();
-  return <Card3DInner key={`${props.cacheKey}~${revision}~${badges}~${identites}~${style}`} {...props} />;
+  return <Card3DInner key={`${props.cacheKey}~${revision}~${badges}~${identites}`} {...props} />;
 }
 
 function Card3DInner({

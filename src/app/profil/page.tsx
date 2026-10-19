@@ -17,7 +17,6 @@ import { ChevronRight, Dumbbell, IdCard, Swords, Trophy } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Card3D } from "@/components/sfl/card-3d";
 import { PlayerCard } from "@/components/sfl/player-card";
-import { ChoixStyle } from "@/components/sfl/choix-style";
 import { BOOST_LABELS } from "@/components/sfl/boost-card";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { VitrineBadges } from "@/components/sfl/vitrine";
@@ -269,7 +268,6 @@ export default function Profil() {
         >
           Historique
         </Link>
-        <ChoixStyle player={player} className="flex-1" />
         <ChoixBadge player={player} />
       </div>
 
