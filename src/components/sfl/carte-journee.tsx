@@ -18,6 +18,7 @@ import { CarteDe, FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import type { Journee, MatchPlayerLine, MatchTeam } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
+import { AuVestiaire } from "@/components/sfl/au-vestiaire";
 
 const TEAM_COLORS: Record<string, string> = {
   Orange: "#F9CB9C",
@@ -229,14 +230,17 @@ export function CarteJournee({
         <Terrain a={match.teamA} b={match.teamB} />
       </div>
 
-      {onOuvrir && (
-        <button
-          onClick={onOuvrir}
-          className="mt-3 mb-4 mr-4 ml-4 block w-[calc(100%-2rem)] rounded-full bg-foreground py-3 text-center text-[14px] font-bold text-background transition-transform active:scale-[0.98]"
-        >
-          Ouvrir le récap
-        </button>
-      )}
+      <div className="mx-4 mt-3 mb-4 flex gap-2">
+        {onOuvrir && (
+          <button
+            onClick={onOuvrir}
+            className="flex-1 rounded-full bg-foreground py-3 text-center text-[14px] font-bold text-background transition-transform active:scale-[0.98]"
+          >
+            Ouvrir le récap
+          </button>
+        )}
+        <AuVestiaire piece={{ type: "feuille", j: journee.j }} className={onOuvrir ? "" : "flex-1"} />
+      </div>
     </section>
   );
 }

@@ -12,6 +12,8 @@ export interface Notif {
   texte: string;
   /** Page ouverte au toucher, dans l'app. */
   url: string;
+  /** Une notification de même étiquette remplace la précédente. */
+  tag?: string;
 }
 
 export const TITRE_MAX = 60;

@@ -20,6 +20,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CarteIcon, MapIcon, RechercheIcon, TropheeIcon } from "./nav-icons";
 import { ongletActif } from "@/lib/nav";
+import { useVestiaireNonLus } from "@/hooks/use-vestiaire-non-lus";
 
 const TABS = [
   { href: "/", Icon: MapIcon, label: "Map" },
@@ -36,6 +37,8 @@ export function BottomNav() {
   const recherche = pathname === "/recherche" || pathname.startsWith("/recherche/");
   const clair = surMap(pathname);
   const encre = clair ? "#0a0b0d" : "#ffffff";
+  // La pastille du Vestiaire, sur l'onglet Ligue : du nouveau dans la discussion.
+  const nonLus = useVestiaireNonLus();
 
   return (
     <div
@@ -65,7 +68,18 @@ export function BottomNav() {
               className="liquid-tabbar__onglet"
               style={{ color: encre }}
             >
-              <Icon plein={choisi} />
+              <span className="relative">
+                <Icon plein={choisi} />
+                {href === "/ligue" && nonLus > 0 && (
+                  <span
+                    aria-label={`${nonLus} nouveaux messages au Vestiaire`}
+                    className="absolute -top-1 -right-2.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full px-1 text-[10.5px] font-bold tabular-nums"
+                    style={{ background: encre, color: clair ? "#ffffff" : "#0a0b0d" }}
+                  >
+                    {nonLus > 9 ? "9+" : nonLus}
+                  </span>
+                )}
+              </span>
               <span className="liquid-tabbar__libelle" style={{ fontWeight: choisi ? 600 : 500 }}>
                 {label}
               </span>

@@ -11,7 +11,7 @@
 // renvoyait 404, ce 404 était mis en cache — et l'appareil restait bloqué sur
 // « Quelque chose a cassé » à chaque visite, indéfiniment.
 
-const CACHE_NAME = "sfl-cache-v5";
+const CACHE_NAME = "sfl-cache-v6";
 const OFFLINE_URL = "/offline";
 
 /** Une réponse digne d'être gardée : la nôtre, complète, et sans erreur. */
@@ -126,7 +126,7 @@ self.addEventListener("fetch", (event) => {
 
 // Les notifications (web push, voir lib/server/web-push.ts) : le message
 // arrive chiffré, le navigateur le déchiffre et nous le passe en JSON
-// { titre, texte, url }. Au toucher, on ramène l'app au premier plan sur la
+// { titre, texte, url, tag? }. Au toucher, on ramène l'app au premier plan sur la
 // bonne page, ou on l'ouvre.
 self.addEventListener("push", (event) => {
   let n = {};
@@ -139,6 +139,9 @@ self.addEventListener("push", (event) => {
       icon: "/icon-192.png",
       badge: "/icon-192.png",
       data: { url: typeof n.url === "string" && n.url.startsWith("/") ? n.url : "/" },
+      // Même étiquette (le Vestiaire) : la nouvelle remplace l'ancienne au
+      // lieu de s'empiler, et le téléphone sonne quand même.
+      ...(typeof n.tag === "string" ? { tag: n.tag, renotify: true } : {}),
     })
   );
 });
