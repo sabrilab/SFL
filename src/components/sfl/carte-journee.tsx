@@ -14,7 +14,7 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
-import { CarteDe, FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
+import { CarteDe, MiniCarte } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import type { Journee, MatchPlayerLine, MatchTeam } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
@@ -39,16 +39,25 @@ const PHI = (1 + Math.sqrt(5)) / 2;
 const onglet = (name: string) => ({ fond: couleur(name), encre: "#0A0A0A" });
 
 /**
+ * Les deux tailles du terrain, toutes deux en pastille (le visage, la note
+ * aux couleurs de l'équipe) : le meilleur de l'équipe n'est qu'un cran au-
+ * dessus des autres (×1,25), pas un autre format (Sabri, 19/10 : « mettre en
+ * avant, mais ne pas abuser »).
+ */
+const PASTILLE = 0.22; // 56 px
+const VEDETTE = 0.27; // 69 px, juste sous le palier de la réduite (70 px)
+
+/**
  * Un joueur sur la feuille : sa vraie carte Bola, son nom en entier, ses
- * buts et ses passes. Le meilleur de son équipe passe au format moyen (la
- * réduite) ; les autres gardent la pastille, la note aux couleurs de l'équipe.
+ * buts et ses passes. Le meilleur de son équipe, un peu plus grand, porte
+ * le filet de son équipe.
  */
 function Joueur({ ligne, equipe, delai, star }: { ligne: MatchPlayerLine; equipe: string; delai: number; star: boolean }) {
   const { allPlayers } = useSeason();
   const cle = ligne.name.trim().toLowerCase();
   const player = allPlayers.find((p) => p.name.toLowerCase() === cle);
   const decisif = ligne.buts > 0 || ligne.passes > 0;
-  const size = star ? FORMAT_CARTE.moyenne : FORMAT_CARTE.petite;
+  const size = star ? VEDETTE : PASTILLE;
   const largeur = 254 * size;
   const teinte = couleur(equipe);
   return (
@@ -68,11 +77,10 @@ function Joueur({ ligne, equipe, delai, star }: { ligne: MatchPlayerLine; equipe
           <CarteDe name={ligne.name} size={size} />
         )}
       </span>
-      {/* Le filet de l'équipe, sous les cartes que la note ne colore pas. */}
       {star && <span className="mt-[5px] h-[3px] rounded-full" style={{ width: largeur / PHI, background: teinte }} />}
       <span
         className="mt-[5px] max-w-full text-center leading-[1.1] font-bold break-words text-white/90"
-        style={{ fontSize: star ? 12 : 10 }}
+        style={{ fontSize: star ? 11.5 : 10 }}
       >
         {ligne.name}
       </span>
@@ -90,29 +98,53 @@ function Joueur({ ligne, equipe, delai, star }: { ligne: MatchPlayerLine; equipe
   );
 }
 
+/** La ligne d'un poste, du but vers l'avant : 0 gardien … 3 attaque. Sans poste connu : le milieu. */
+function ligneDuPoste(poste: string | undefined): number {
+  const p = (poste ?? "").split("/")[0].trim().toUpperCase();
+  if (p === "G" || p === "GB") return 0;
+  if (p === "MDC") return 1.5;
+  if (p.startsWith("D") || p === "LAT") return 1;
+  if (p === "MOC") return 2.5;
+  if (p.startsWith("M")) return 2;
+  if (p.startsWith("A") || p === "BU") return 3;
+  return 2;
+}
+
+/** Les joueurs de champ par ligne, défense → attaque, comme une compo de foot à cinq, six ou sept. */
+const SCHEMAS: Record<number, number[]> = { 1: [1], 2: [1, 1], 3: [2, 1], 4: [2, 1, 1], 5: [2, 2, 1], 6: [2, 3, 1], 7: [3, 3, 1] };
+
 /**
- * Une moitié de terrain : au fond, près du but, l'équipe en pastilles ;
- * devant, vers la ligne médiane, son meilleur joueur du jour, en plus grand
- * (deux s'ils sont à égalité).
+ * Une moitié de terrain, en vraie compo : le gardien près du but s'il y en
+ * a un, puis la défense, le milieu et l'attaque, chacun rangé selon son
+ * poste. Le meilleur du jour (buts et passes) est mis en avant, un seul.
  */
 function Moitie({ equipe, haut, delai }: { equipe: MatchTeam; haut: boolean; delai: number }) {
+  const { allPlayers } = useSeason();
+  const poste = (l: MatchPlayerLine) => allPlayers.find((p) => p.name.toLowerCase() === l.name.trim().toLowerCase())?.poste;
   const poids = (p: MatchPlayerLine) => p.buts * 2 + p.passes;
-  const ordre = [...equipe.players].sort((x, y) => poids(y) - poids(x));
-  const top = poids(ordre[0] ?? { name: "", buts: 0, passes: 0 });
-  const devant = top > 0 ? ordre.filter((p) => poids(p) === top).slice(0, 2) : [];
-  const fond = ordre.filter((p) => !devant.includes(p));
-  const rangee = (lignes: MatchPlayerLine[], d: number, star: boolean) =>
-    lignes.length > 0 && (
-      <div className="flex flex-wrap items-start justify-center gap-x-[5px] gap-y-[var(--fib-13)]">
-        {lignes.map((l, i) => (
-          <Joueur key={l.name} ligne={l} equipe={equipe.name} delai={d + i * 0.05} star={star} />
-        ))}
-      </div>
-    );
+  const meilleur = [...equipe.players].sort((x, y) => poids(y) - poids(x))[0];
+  const vedette = meilleur && poids(meilleur) > 0 ? meilleur : null;
+
+  const tries = [...equipe.players].sort((x, y) => ligneDuPoste(poste(x)) - ligneDuPoste(poste(y)));
+  const gardien = tries[0] && ligneDuPoste(poste(tries[0])) === 0 ? tries.shift()! : null;
+  const n = tries.length;
+  const schema = SCHEMAS[n] ?? [Math.ceil(n / 3), Math.ceil((n - Math.ceil(n / 3)) / 2), n - Math.ceil(n / 3) - Math.ceil((n - Math.ceil(n / 3)) / 2)];
+  const lignes: MatchPlayerLine[][] = gardien ? [[gardien]] : [];
+  let i = 0;
+  for (const k of schema) {
+    if (k > 0) lignes.push(tries.slice(i, i + k));
+    i += k;
+  }
+
   return (
-    <div className={cn("relative flex gap-[var(--fib-13)] px-[var(--fib-8)]", haut ? "flex-col pt-[var(--fib-34)] pb-[var(--fib-21)]" : "flex-col-reverse pt-[var(--fib-21)] pb-[var(--fib-34)]")}>
-      {rangee(fond, delai, false)}
-      {rangee(devant, delai + 0.1, true)}
+    <div className={cn("relative flex gap-[var(--fib-13)] px-[var(--fib-8)]", haut ? "flex-col pt-[var(--fib-21)] pb-[var(--fib-21)]" : "flex-col-reverse pt-[var(--fib-21)] pb-[var(--fib-21)]")}>
+      {lignes.map((ligne, r) => (
+        <div key={r} className="flex items-start justify-evenly">
+          {ligne.map((l, j) => (
+            <Joueur key={l.name} ligne={l} equipe={equipe.name} delai={delai + (r + j) * 0.05} star={l === vedette} />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
