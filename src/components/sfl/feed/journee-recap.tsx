@@ -499,7 +499,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                 <div key={`${c.player}-${c.type}`} className="flex flex-col items-center">
                   <Card3D
                     cacheKey={`feed-unlock-${lastJ.j}-${c.player}-${c.type}`}
-                    mode="rare"
+                    mode="simple"
                     size={0.42}
                     render={(s) => <BoostCard card={c} size={s} />}
                   />
@@ -524,7 +524,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
               leader && (
                 <Card3D
                   cacheKey={`feed-leader-${lastJ.j}-${leader.name}`}
-                  mode="rare"
+                  mode="simple"
                   size={0.44}
                   render={(s) => <RankingCard rankingId="pp" player={leader} size={s} />}
                 />
@@ -823,7 +823,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
             <div className="flex flex-col items-center gap-3">
               <Card3D
                 cacheKey={`feed-mvp-${lastJ.j}-${mvpCard.player}-${mvpCard.type}`}
-                mode="rare"
+                mode="simple"
                 size={0.92}
                 render={(s) => <BoostCard card={mvpCard} size={s} />}
               />

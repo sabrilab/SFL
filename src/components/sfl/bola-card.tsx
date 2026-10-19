@@ -366,10 +366,10 @@ export function BolaCard({
   // Le haut à droite du portrait : le numéro de maillot ; sinon le poste, en grand format seulement.
   const avecBadge = badge !== undefined;
   const marque = avecBadge ? null : numero != null ? String(numero) : complete ? position.toUpperCase() : null;
-  // Le badge, au nombre d'or lui aussi : le portrait ÷ φ⁵ (85), et
-  // autant ÷ φ jusqu'aux bords (52). En compacte, un cran au-dessus (÷ φ⁴,
-  // 137) pour rester lisible ; rien en réduite.
-  const coteBadge = PORTRAIT.c / PHI ** (complete ? 5 : 4);
+  // Le badge, au nombre d'or lui aussi : le portrait ÷ φ⁴ (137), et
+  // autant ÷ φ jusqu'aux bords (85) ; rien en réduite. La complète était à
+  // ÷ φ⁵ (85) : trop petit pour reconnaître son badge (Sabri, 19/10).
+  const coteBadge = PORTRAIT.c / PHI ** 4;
   const margeBadge = coteBadge / PHI;
   const largeurBadge = u(coteBadge);
   const badgeCoin = badge && !reduite ? badge : null;

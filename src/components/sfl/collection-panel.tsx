@@ -77,7 +77,7 @@ function CardModal({
             <div className={cn("transition-opacity", !has && "opacity-40 grayscale")}>
               <Card3D
                 cacheKey={card.id}
-                mode={card.kind === "simple" ? "simple" : "rare"}
+                mode={"simple"}
                 size={1.15}
                 render={(s) => <CollectionCardVisual card={card} size={s} />}
               />

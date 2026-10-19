@@ -146,7 +146,7 @@ export function NouvellesCartes() {
               >
                 <Card3D
                   cacheKey={`nouvelle-dos-${me}-${index}`}
-                  mode="rare"
+                  mode="simple"
                   size={0.9}
                   startFace="back"
                   interactive={false}
@@ -187,7 +187,7 @@ export function NouvellesCartes() {
               </motion.span>
               <Card3D
                 cacheKey={`nouvelle-face-${me}-${index}`}
-                mode="rare"
+                mode="simple"
                 size={0.95}
                 render={(s) => <BoostCard card={current} size={s} />}
               />
