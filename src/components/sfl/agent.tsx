@@ -54,6 +54,8 @@ import {
   type ImageCoach,
   type MessageAgent,
 } from "@/lib/sfl/agent";
+import { lireSchema, type SchemaCoach } from "@/lib/sfl/schemas-coach";
+import { SchemaVue } from "./schemas-coach";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
@@ -199,6 +201,7 @@ function Message({ m, dossier }: { m: MessageAgent; dossier: DossierJoueur }) {
           {m.texte}
         </p>
       )}
+      {m.schema && <SchemaVue schema={m.schema} />}
       {m.image && <ImageVue image={m.image} />}
       {m.cartes.map((c, i) => (
         <CarteVue key={i} carte={c} dossier={dossier} />
@@ -273,11 +276,11 @@ export function Agent() {
     (async () => {
       const { data } = await supabase()
         .from("agent_messages")
-        .select("id, role, texte, cartes, image, created_at")
+        .select("id, role, texte, cartes, image, schema, created_at")
         .order("created_at", { ascending: false })
         .limit(100);
       if (!vivant) return;
-      const lus = ((data ?? []) as { id: number; role: "joueur" | "coach"; texte: string; cartes: unknown; image: unknown; created_at: string }[])
+      const lus = ((data ?? []) as { id: number; role: "joueur" | "coach"; texte: string; cartes: unknown; image: unknown; schema?: unknown; created_at: string }[])
         .reverse()
         .map((r) => ({
           id: String(r.id),
@@ -285,6 +288,7 @@ export function Agent() {
           texte: r.texte,
           cartes: lireCartes(r.cartes),
           image: lireImage(r.image),
+          schema: lireSchema(r.schema),
           at: new Date(r.created_at).getTime(),
         }));
       setMessages(lus);
@@ -339,7 +343,7 @@ export function Agent() {
     setEnvoi(true);
     enBas.current = true;
     try {
-      let rep: { texte: string; cartes: CarteCoach[]; image: ImageCoach | null };
+      let rep: { texte: string; cartes: CarteCoach[]; image: ImageCoach | null; schema: SchemaCoach | null };
       if (demo) {
         await new Promise((r) => setTimeout(r, 1400));
         rep = reponseDemo(dossier);
@@ -356,15 +360,20 @@ export function Agent() {
             dossier,
             ouverture: ouv ?? undefined,
             raccourci,
-            historique: avant.slice(-HISTORIQUE_MAX).map(({ role, texte, cartes, image }) => ({ role, texte, cartes, image: image?.legende || undefined })),
+            historique: avant.slice(-HISTORIQUE_MAX).map(({ role, texte, cartes, image, schema }) => ({
+              role,
+              texte,
+              cartes,
+              image: image?.legende || (schema ? `schéma ${schema.type}${schema.legende ? ` : ${schema.legende}` : ""}` : undefined),
+            })),
           }),
         });
-        const d = (await r.json().catch(() => ({}))) as { texte?: string; cartes?: unknown; image?: unknown; error?: string };
+        const d = (await r.json().catch(() => ({}))) as { texte?: string; cartes?: unknown; image?: unknown; schema?: unknown; error?: string };
         if (!r.ok) throw new Error(d.error ?? "Le coach n'a pas pu répondre. Réessaie.");
-        rep = { texte: d.texte ?? "", cartes: lireCartes(d.cartes), image: lireImage(d.image) };
+        rep = { texte: d.texte ?? "", cartes: lireCartes(d.cartes), image: lireImage(d.image), schema: lireSchema(d.schema) };
       }
       if (navigator.vibrate) navigator.vibrate(8);
-      setMessages((ms) => [...ms, { id: `r-${Date.now()}`, role: "coach", texte: rep.texte, cartes: rep.cartes, image: rep.image, at: Date.now() }]);
+      setMessages((ms) => [...ms, { id: `r-${Date.now()}`, role: "coach", texte: rep.texte, cartes: rep.cartes, image: rep.image, schema: rep.schema, at: Date.now() }]);
     } catch (e) {
       // La question revient dans le champ, le fil reprend son état.
       setMessages(avant);
@@ -522,6 +531,11 @@ function conversationDemo(d: DossierJoueur): MessageAgent[] {
     m("d5", "joueur", "Par contre j'ai encore un peu mal à la cheville depuis dimanche.", 60 * 24),
     m("d6", "coach", "Aïe. Elle a gonflé ? Tu arrives à poser le pied et à marcher normalement ?", 60 * 24 + 1),
     m("d7", "joueur", "Un peu gonflé le soir, là je marche mais je la sens quand je tourne.", 60 * 24 + 3),
+    {
+      ...m("d7b", "coach", "Montre-moi : c'est plutôt là, sur l'extérieur ?", 60 * 24 + 3.5),
+      schema: { type: "corps", zones: [{ zone: "chevilles", cote: "droit" }], legende: "Cheville droite" },
+    },
+    m("d7c", "joueur", "Oui pile là.", 60 * 24 + 3.8),
     m(
       "d8",
       "coach",
@@ -541,10 +555,32 @@ function conversationDemo(d: DossierJoueur): MessageAgent[] {
         },
       ]
     ),
+    m("d9", "joueur", "Dimanche je joue devant, et je me fais tout le temps prendre par le défenseur.", 60 * 48),
+    {
+      ...m("d10", "coach", "Classique, et ça se règle vite. Au lieu de recevoir dos au but, tu feintes vers ton partenaire, puis tu pars dans son dos. Lui, il te la met dans la course.", 60 * 48 + 1),
+      schema: {
+        type: "terrain",
+        joueurs: [
+          { role: "moi", x: 58, y: 38 },
+          { role: "partenaire", x: 30, y: 62 },
+          { role: "partenaire", x: 75, y: 70 },
+          { role: "adversaire", x: 52, y: 30 },
+          { role: "adversaire", x: 30, y: 45 },
+          { role: "adversaire", x: 50, y: 4 },
+        ],
+        fleches: [
+          { type: "course", x1: 58, y1: 38, x2: 70, y2: 16 },
+          { type: "passe", x1: 30, y1: 62, x2: 68, y2: 18 },
+        ],
+        zone: { x: 70, y: 16, r: 11 },
+        ballon: { x: 30, y: 62 },
+        legende: "L'appel dans le dos du défenseur",
+      },
+    },
   ];
 }
 
-function reponseDemo(d: DossierJoueur): { texte: string; cartes: CarteCoach[]; image: ImageCoach | null } {
+function reponseDemo(d: DossierJoueur): { texte: string; cartes: CarteCoach[]; image: ImageCoach | null; schema: SchemaCoach | null } {
   const m = d.dernierMatch;
   return {
     texte: m
@@ -552,5 +588,6 @@ function reponseDemo(d: DossierJoueur): { texte: string; cartes: CarteCoach[]; i
       : "Raconte-moi, t'as joué quand pour la dernière fois ?",
     cartes: [],
     image: null,
+    schema: null,
   };
 }

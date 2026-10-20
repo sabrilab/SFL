@@ -41,6 +41,7 @@ import {
   type ImageCoach,
 } from "@/lib/sfl/agent";
 import { STAT_KEYS } from "@/lib/sfl/engine";
+import { COTES, ROLES_TERRAIN, TYPES_FLECHE, ZONES_CORPS, lireSchema, type SchemaCoach } from "@/lib/sfl/schemas-coach";
 
 export const maxDuration = 120;
 
@@ -72,17 +73,75 @@ Ce que tu fais avec lui :
 
 Les cartes, parfois : quand tu lui donnes quelque chose à suivre ou à garder (un programme de la semaine, une série d'exercices, un panier de courses, un débrief, un protocole de rééducation, un bilan), tu le mets dans une carte plutôt que dans le texte, et le texte reste une phrase ou deux autour. Pour une simple discussion, aucune carte. Une carte : un type (programme, exercice, debrief, panier, sante, bilan), un titre court, un sous-titre (« 3 séances · 45 min », « Total ≈ 38 € » ; vide sinon), une cible (la stat travaillée : VIT, TIR, PAS, DRI, DEF ou PHY ; vide sinon) et des lignes. Chaque ligne : label, detail (une phrase ; vide sinon), valeur (« 4 × 30 s », « 1 kg · 2,10 € », « 2×/jour » ; vide sinon). Une carte par réponse en général, deux au plus, huit lignes au plus.
 
-Les images, parfois : quand montrer vaut mieux qu'expliquer, tu fais faire une image. Une zone du corps (où ça fait mal, le ligament de la cheville, le muscle à étirer ou à renforcer), une posture ou un geste (la position de la fente, le pied d'appui sur une frappe), une zone du terrain (où se placer, où couvrir, l'appel à faire). Tu écris image.prompt en anglais : ce qu'il faut voir, précisément, et la zone à mettre en évidence ; pas de style, pas de couleurs, pas de texte dans l'image, c'est l'app qui s'en charge. image.legende, en français, dit en quelques mots ce qu'on voit. Une image au plus par réponse, et pas à chaque réponse : seulement quand elle aide vraiment. Sinon image.prompt et image.legende sont vides.
+Montrer, parfois : quand montrer vaut mieux qu'expliquer, l'app sait dessiner deux schémas elle-même, tout de suite et dans la charte Bola. Préfère-les toujours à une image.
+- Le corps (schema.type = "corps") : une silhouette de face et de dos où les zones choisies s'allument. schema.zones : chaque zone (tete, cou, epaules, pectoraux, biceps, triceps, avant-bras, abdos, obliques, trapezes, haut-du-dos, lombaires, fessiers, adducteurs, quadriceps, ischios, genoux, mollets, chevilles, pieds) et son côté (droit, gauche, ou les deux), le côté du joueur. Pour une douleur, le muscle à étirer ou à renforcer, ce que travaille un exercice.
+- Le terrain (schema.type = "terrain") : un five vu de dessus, en hauteur, le but adverse en haut. x de 0 (gauche) à 100 (droite), y de 0 (but adverse) à 100 (son but). schema.joueurs : moi (lui, une seule fois), partenaire, adversaire, chacun avec x et y. schema.fleches : course (son déplacement, son appel), passe ou tir, de (x1, y1) à (x2, y2). schema.zone : la zone à occuper ou à couvrir (x, y, rayon r de 6 à 25 ; r = 0 s'il n'y en a pas). schema.ballon : où est le ballon (montre = false s'il ne faut pas le dessiner). Cinq contre cinq au plus, gardiens compris.
+schema.legende, en français, dit en quelques mots ce qu'on voit. Sans schéma, schema.type est vide et les listes aussi.
+L'image, en dernier recours : seulement pour un geste ou une posture qu'aucun schéma ne montre (la position du corps sur une fente, le pied d'appui sur une frappe). Tu écris image.prompt en anglais : ce qu'il faut voir, précisément ; pas de style, pas de couleurs, pas de texte dans l'image, c'est l'app qui s'en charge. image.legende, en français, dit en quelques mots ce qu'on voit. Jamais un schéma et une image dans la même réponse ; au plus un des deux, et pas à chaque réponse : seulement quand ça aide vraiment. Sinon image.prompt et image.legende sont vides.
 
 Le sujet : à chaque réponse, sujet dit de quoi parle l'échange, en un mot de la liste (debrief : un match et comment il l'a vécu ; progression : faire monter une stat, exercices, programme ; tactique : placement, jeu collectif ; physique : forme, endurance, préparation ; nutrition : repas, courses, hydratation ; sante : douleur, blessure, rééducation ; recuperation : sommeil, récupération après match ; mental : confiance, motivation, stress ; ligue : classements, badges, objectifs, les autres joueurs ; autre). Il sert seulement à compter, sans rien garder de ce que vous vous dites.`;
 
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["texte", "cartes", "image", "sujet"],
+  required: ["texte", "cartes", "image", "schema", "sujet"],
   properties: {
     texte: { type: "string" },
     sujet: { type: "string", enum: [...SUJETS] },
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["type", "legende", "zones", "joueurs", "fleches", "zone", "ballon"],
+      properties: {
+        type: { type: "string", enum: ["", "corps", "terrain"] },
+        legende: { type: "string" },
+        zones: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["zone", "cote"],
+            properties: { zone: { type: "string", enum: [...ZONES_CORPS] }, cote: { type: "string", enum: [...COTES] } },
+          },
+        },
+        joueurs: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["role", "x", "y"],
+            properties: { role: { type: "string", enum: [...ROLES_TERRAIN] }, x: { type: "number" }, y: { type: "number" } },
+          },
+        },
+        fleches: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["type", "x1", "y1", "x2", "y2"],
+            properties: {
+              type: { type: "string", enum: [...TYPES_FLECHE] },
+              x1: { type: "number" },
+              y1: { type: "number" },
+              x2: { type: "number" },
+              y2: { type: "number" },
+            },
+          },
+        },
+        zone: {
+          type: "object",
+          additionalProperties: false,
+          required: ["x", "y", "r"],
+          properties: { x: { type: "number" }, y: { type: "number" }, r: { type: "number" } },
+        },
+        ballon: {
+          type: "object",
+          additionalProperties: false,
+          required: ["x", "y", "montre"],
+          properties: { x: { type: "number" }, y: { type: "number" }, montre: { type: "boolean" } },
+        },
+      },
+    },
     image: {
       type: "object",
       additionalProperties: false,
@@ -324,7 +383,7 @@ export async function POST(req: NextRequest) {
     const sortie = (await r.json()) as { stop_reason?: string; content?: { type: string; text?: string }[] };
     if (sortie.stop_reason === "refusal") return erreur("Le coach ne peut pas répondre à ça.", 422);
     const brut = sortie.content?.find((b) => b.type === "text")?.text ?? "";
-    let lu: { texte?: unknown; cartes?: unknown; image?: unknown; sujet?: unknown };
+    let lu: { texte?: unknown; cartes?: unknown; image?: unknown; schema?: unknown; sujet?: unknown };
     try {
       lu = JSON.parse(brut);
     } catch {
@@ -333,12 +392,15 @@ export async function POST(req: NextRequest) {
     }
     const texte = typeof lu.texte === "string" ? lu.texte.trim().slice(0, 4000) : "";
     const cartes = lireCartes(lu.cartes);
-    if (!texte && !cartes.length) return erreur("Le coach n'a pas pu répondre. Réessaie.", 502);
+    if (!texte && !cartes.length && !lireSchema(lu.schema)) return erreur("Le coach n'a pas pu répondre. Réessaie.", 502);
 
-    // L'image, si le coach en veut une et qu'il en reste pour aujourd'hui.
+    // Le schéma (corps ou terrain), dessiné par l'app : rien à générer.
+    const schema: SchemaCoach | null = lireSchema(lu.schema);
+
+    // L'image, si le coach en veut une (sans schéma) et qu'il en reste pour aujourd'hui.
     let image: ImageCoach | null = null;
     const demande = lu.image && typeof lu.image === "object" ? (lu.image as { prompt?: unknown; legende?: unknown }) : null;
-    if (demande && typeof demande.prompt === "string" && demande.prompt.trim()) {
+    if (!schema && demande && typeof demande.prompt === "string" && demande.prompt.trim()) {
       let reste = true;
       if (!sansTable) {
         const { count: faites } = await sb
@@ -353,7 +415,7 @@ export async function POST(req: NextRequest) {
     }
 
     // En base, l'image n'est gardée que par son chemin (jamais la data URL).
-    if (!sansTable) await sb.from("agent_messages").insert({ role: "coach", texte, cartes, image: image?.chemin ? image : null });
+    if (!sansTable) await sb.from("agent_messages").insert({ role: "coach", texte, cartes, image: image?.chemin ? image : null, schema });
     // Pour les stats de l'admin : le sujet de l'échange et ce qui a servi,
     // jamais le texte. Une erreur ici ne prive pas le joueur de sa réponse.
     if (!sansTable) {
@@ -364,10 +426,11 @@ export async function POST(req: NextRequest) {
         raccourci,
         cartes: cartes.map((c) => c.type),
         image: !!image,
+        schema: schema?.type ?? null,
       });
       if (statError) console.error("[agent] sujet", statError.code, statError.message);
     }
-    return NextResponse.json({ texte, cartes, image, garde: !sansTable });
+    return NextResponse.json({ texte, cartes, image, schema, garde: !sansTable });
   } catch (e) {
     console.error("[agent]", e);
     return erreur("Le coach n'a pas pu répondre. Réessaie.", 502);
