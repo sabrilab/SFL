@@ -7,7 +7,9 @@
 // (choisir-joueur.tsx) ; toucher une carte la retire, quand c'est permis.
 //
 // Les places se partagent en deux moitiés (Clairs devant, Foncés au fond),
-// remplies l'une après l'autre : l'organisateur en premier, devant.
+// remplies l'une après l'autre : l'organisateur en premier, devant. Une
+// équipe du mode Team (unCamp) occupe tout le terrain, en blanc, dans une
+// formation fixe (FORMATION) : le capitaine dans les buts, l'attaque au fond.
 
 import { useMemo } from "react";
 import { Plus } from "lucide-react";
@@ -29,6 +31,17 @@ const BLANC = { fond: "#f4f3ef", encre: "#0a0b0d" };
 const NOIR = { fond: "#0a0b0d", encre: "#f4f3ef" };
 const prenom = (nom: string) => nom.split(" ")[0];
 
+/** Une équipe seule (mode Team), sur tout le terrain : gardien, 2, 1, 2, 1 — en fractions (largeur, profondeur depuis le fond). */
+const FORMATION: [number, number][] = [
+  [0.5, 0.9],
+  [0.27, 0.74],
+  [0.73, 0.74],
+  [0.5, 0.56],
+  [0.22, 0.42],
+  [0.78, 0.42],
+  [0.5, 0.27],
+];
+
 export function TerrainPlaces({
   places,
   occupants,
@@ -36,6 +49,7 @@ export function TerrainPlaces({
   onPlus,
   onOccupant,
   hauteur = CADRE_H,
+  unCamp = false,
 }: {
   places: number;
   /** Dans l'ordre d'arrivée : l'organisateur d'abord. */
@@ -46,6 +60,8 @@ export function TerrainPlaces({
   onPlus?: () => void;
   onOccupant?: (o: Occupant) => void;
   hauteur?: number;
+  /** Une seule équipe (mode Team) : toutes les places devant, côté blanc. */
+  unCamp?: boolean;
 }) {
   const { allPlayers } = useSeason();
   const parNom = useMemo(() => new Map(allPlayers.map((p) => [p.name, p])), [allPlayers]);
@@ -63,15 +79,21 @@ export function TerrainPlaces({
     if (posesFond[i]) ordre.push(posesFond[i]);
   }
 
-  const cases = ordre
-    .map((pl, i) => {
-      const x = 50 + (pl.largeur - 50) * ecart(pl.profondeur, pl.chezMoi);
-      const y = (pl.chezMoi ? 1 : -1) * depuisMediane(pl.profondeur);
-      const u = (x / 100) * l;
-      const v = h / 2 + y;
-      return { i, occupant: occupants[i] ?? null, chezMoi: pl.chezMoi, u, v, ...projeter(u, v) };
-    })
-    .sort((a, b) => a.v - b.v);
+  const cases = (
+    unCamp
+      ? FORMATION.slice(0, places).map(([fx, fy], i) => {
+          const u = fx * l;
+          const v = fy * h;
+          return { i, occupant: occupants[i] ?? null, chezMoi: true, u, v, ...projeter(u, v) };
+        })
+      : ordre.map((pl, i) => {
+          const x = 50 + (pl.largeur - 50) * ecart(pl.profondeur, pl.chezMoi);
+          const y = (pl.chezMoi ? 1 : -1) * depuisMediane(pl.profondeur);
+          const u = (x / 100) * l;
+          const v = h / 2 + y;
+          return { i, occupant: occupants[i] ?? null, chezMoi: pl.chezMoi, u, v, ...projeter(u, v) };
+        })
+  ).sort((a, b) => a.v - b.v);
 
   const centre = projeter(l / 2, h / 2);
   const logo = { l: 46 * centre.k, h: projeter(l / 2, h / 2 + 23).y - projeter(l / 2, h / 2 - 23).y };
@@ -98,7 +120,7 @@ export function TerrainPlaces({
         }}
       />
       {cases.map(({ i, occupant, chezMoi, x, y, k }) => {
-        const onglet = chezMoi ? BLANC : NOIR;
+        const onglet = chezMoi || unCamp ? BLANC : NOIR;
         return (
           <div key={i} className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y }}>
             <div

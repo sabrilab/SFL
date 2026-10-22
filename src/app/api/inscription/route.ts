@@ -13,6 +13,11 @@
 // FERMÉ dans Supabase : personne ne peut créer de compte en contournant
 // cette route et ses contrôles.
 //
+// Venu par le lien d'une équipe (champ equipe = le jeton, mode Team) : le
+// capitaine qui a partagé le lien s'en porte garant. Le compte est validé
+// aussitôt et le joueur arrive invité dans l'équipe (il signe le Règlement
+// sur la page Team).
+//
 // GET ?pseudo=… dit seulement si un pseudo est libre (pour l'écran).
 
 import { NextRequest, NextResponse } from "next/server";
@@ -50,7 +55,7 @@ export async function POST(req: NextRequest) {
   const sb = serveur();
   if (!sb) return FERME;
 
-  const corps = (await req.json().catch(() => null)) as (Inscription & { site?: string }) | null;
+  const corps = (await req.json().catch(() => null)) as (Inscription & { site?: string; equipe?: string }) | null;
   if (!corps) return NextResponse.json({ error: "Formulaire illisible." }, { status: 400 });
   // Champ piège invisible : un humain ne le remplit jamais.
   if (corps.site) return NextResponse.json({ error: "Refusé." }, { status: 400 });
@@ -94,6 +99,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Le lien d'équipe, vérifié avant de créer quoi que ce soit.
+  let lien: { equipe_id: number; cree_par: string | null } | null = null;
+  if (corps.equipe) {
+    const { data } = await sb
+      .from("equipe_liens")
+      .select("equipe_id, cree_par")
+      .eq("jeton", String(corps.equipe))
+      .gt("expire_le", new Date().toISOString())
+      .maybeSingle();
+    if (!data) return NextResponse.json({ error: "Le lien de l'équipe n'est plus valable. Demande-en un nouveau." }, { status: 410 });
+    lien = data as { equipe_id: number; cree_par: string | null };
+  }
+
   const name = nomDeLigue(f.prenom, f.nom, pris.noms);
 
   // L'email de connexion reste technique (pseudo@sfl.local), comme pour tous
@@ -118,7 +136,7 @@ export async function POST(req: NextRequest) {
   // si la fiche ne passe pas : pas de compte à moitié créé.
   const { error: errProfil } = await sb
     .from("profiles")
-    .update({ contact_email: f.email, pseudo_change_le: new Date().toISOString() })
+    .update({ contact_email: f.email, pseudo_change_le: new Date().toISOString(), ...(lien ? { valide: true } : {}) })
     .eq("id", id);
   const { error: errFiche } = await sb.from("fiches").insert({
     player_id: id,
@@ -135,6 +153,14 @@ export async function POST(req: NextRequest) {
   if (errProfil || errFiche) {
     await sb.auth.admin.deleteUser(id).catch(() => {});
     return NextResponse.json({ error: "Création du compte impossible pour l'instant." }, { status: 500 });
+  }
+
+  if (lien) {
+    // L'équipe l'attend ; si l'invitation échoue, le compte reste valable.
+    await sb
+      .from("equipe_membres")
+      .insert({ equipe_id: lien.equipe_id, joueur: id, statut: "invite", invite_par: lien.cree_par })
+      .then(() => {}, () => {});
   }
 
   return NextResponse.json({ ok: true, pseudo: f.pseudo, name });

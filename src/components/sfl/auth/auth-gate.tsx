@@ -14,10 +14,10 @@ import { LoginScreen } from "./login-screen";
 import { EnAttente } from "./en-attente";
 
 /**
- * Pages ouvertes à tous : le lien d'accueil personnel envoyé par l'admin, et
- * la création de compte.
+ * Pages ouvertes à tous : le lien d'accueil personnel envoyé par l'admin, la
+ * création de compte et le lien d'invitation d'une équipe (mode Team).
  */
-const PUBLIC_ROUTES = ["/bienvenue", "/inscription"];
+const PUBLIC_ROUTES = ["/bienvenue", "/inscription", "/equipe/"];
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const isClient = useIsClient();

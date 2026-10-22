@@ -7,9 +7,11 @@
 //   · Près de toi — les joueurs de ta ville et des villes voisines (villes.ts) ;
 //   · Partenaires — ceux avec qui tu as déjà joué (la saison, les archives) ;
 //   · Tous — tout Bola, par ordre alphabétique.
-// Chaque joueur en petite carte ; le toucher l'invite.
+// Chaque joueur en petite carte ; le toucher l'invite. Le mode Team ajoute,
+// en tête, l'invitation par lien (un nouveau y crée son compte).
 
 import { useMemo, useState } from "react";
+import { Link2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
@@ -43,6 +45,7 @@ export function ChoisirJoueur({
   libres,
   moiNom,
   onChoisir,
+  onLien,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -53,6 +56,8 @@ export function ChoisirJoueur({
   libres: Set<string>;
   moiNom: string;
   onChoisir: (p: Profil) => void;
+  /** Inviter quelqu'un qui n'a pas encore de compte : un lien à partager. */
+  onLien?: () => void;
 }) {
   const { saison } = useSeason();
   const [q, setQ] = useState("");
@@ -122,6 +127,18 @@ export function ChoisirJoueur({
           <SheetTitle className="text-[24px] font-bold tracking-tight">Ajouter un joueur</SheetTitle>
         </SheetHeader>
         <div className="flex min-h-0 flex-1 flex-col gap-3 px-4">
+          {onLien && (
+            <button
+              type="button"
+              onClick={onLien}
+              className="flex items-center gap-3 rounded-[18px] bg-card px-3 py-3 text-left transition-transform active:scale-[0.98]"
+            >
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground text-background">
+                <Link2 className="size-5" strokeWidth={2.2} />
+              </span>
+              <span className="flex-1 text-[15px] font-semibold">Inviter par lien</span>
+            </button>
+          )}
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nom ou identifiant" autoCapitalize="none" autoCorrect="off" />
           {!recherche && onglets.length > 1 && (
             <div className="grid grid-flow-col gap-1 rounded-full bg-secondary p-1">
