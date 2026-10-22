@@ -862,6 +862,37 @@
 }
 
 /* Le nom du terrain sous le sticker du match. */
+/* Des matchs qui se chevauchent : un seul sticker reste, les autres s'y
+   rangent (une carte décalée derrière la vignette), et une pastille compte
+   ce qu'il range — « 2 matchs · 14 joueurs ». */
+.maplibregl-map .maplibregl-marker.stk-ancre--range {
+  visibility: hidden;
+  pointer-events: none;
+}
+.stk--groupe .stk__vignette::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 17px;
+  background: #d9dad5;
+  transform: translate(6px, -6px) rotate(6deg);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
+}
+.stk__groupe {
+  position: absolute;
+  top: calc(100% + 26px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #f4f5f2;
+  color: #0a0b0d;
+  font: 700 11px/1 var(--font-sans), system-ui, sans-serif;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+}
+
 .stk__nom {
   position: absolute;
   top: 100%;
