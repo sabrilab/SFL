@@ -150,11 +150,14 @@ export async function signIn(user: string, password: string): Promise<SignInResu
   const account = findAccount(user);
   let identifiant = account?.user ?? user.trim().replace(/^@+/, "").toLowerCase();
 
-  // 1 · Le serveur d'abord — 5 secondes maximum, sinon repli local.
+  // 1 · Le serveur d'abord — 12 secondes maximum, sinon repli local. Une
+  //     session locale ne lit plus rien de la ligue : mieux vaut attendre un
+  //     peu un réseau lent (5G, navigateur intégré de Snapchat ou d'Instagram)
+  //     que d'ouvrir une app vide.
   let refusServeur: Session["refus"];
   try {
     const essai = (id: string) =>
-      withTimeout(supabase().auth.signInWithPassword({ email: loginEmail(id), password }), 5000);
+      withTimeout(supabase().auth.signInWithPassword({ email: loginEmail(id), password }), 12000);
     let { data, error } = await essai(identifiant);
     // Un joueur qui a changé de pseudo garde son identifiant technique
     // d'origine : la base dit lequel correspond au pseudo tapé.
@@ -207,6 +210,8 @@ export async function signIn(user: string, password: string): Promise<SignInResu
       afterServerSignIn(data.user.id);
       return { ok: true, session };
     }
+    // Le serveur n'a pas répondu (réseau) : c'est une panne, pas un refus.
+    if (error && isAuthRetryableFetchError(error)) throw error;
     // Identifiants refusés par le serveur : en mode strict, on s'arrête là.
     if (ENFORCE_SERVER_AUTH) return { ok: false, reason: "bad-password" };
     refusServeur = "refuse";
@@ -225,13 +230,19 @@ export async function signIn(user: string, password: string): Promise<SignInResu
   try {
     local = localStorage.getItem(`${OVERRIDE_PREFIX}${account.user}`) !== null;
   } catch {}
-  // Ce mot de passe n'existe que sur cet appareil : une session locale ne
-  // lirait plus rien de la ligue (la base ne s'ouvre qu'aux connexions
-  // vérifiées) et n'écrirait rien non plus. On refuse, en disant pourquoi.
-  if (refusServeur === "refuse" && local) {
+  // Le serveur a répondu non : une session locale ne lirait plus rien de la
+  // ligue (la base ne s'ouvre qu'aux connexions vérifiées) et n'écrirait rien
+  // non plus. C'était le bandeau « Connexion non vérifiée » qui revenait après
+  // chaque « Me reconnecter » : un joueur qui a changé son mot de passe sur le
+  // serveur tape l'ancien, celui d'origine, que l'empreinte embarquée accepte
+  // encore. On refuse, en disant pourquoi.
+  if (refusServeur === "refuse") {
     const tape = await hashPassword(account.user, password);
-    if (tape === expectedHash(account)) return { ok: false, reason: "mot-de-passe-local" };
+    if (local && tape === expectedHash(account)) return { ok: false, reason: "mot-de-passe-local" };
+    return { ok: false, reason: "bad-password" };
   }
+  // Serveur injoignable : repli local, en attendant qu'il réponde (voir
+  // suivreSessionServeur, qui la revérifie dès que Supabase se connecte).
   return signInLocal(account, password, refusServeur);
 }
 
@@ -306,11 +317,32 @@ export async function refreshSession(): Promise<void> {
   }
 }
 
+/**
+ * Suit la connexion Supabase : une connexion qui aboutit après le délai de
+ * l'écran de connexion, un jeton rafraîchi ou perdu remettent la session à la
+ * vérité sans attendre la prochaine ouverture de l'app. Renvoie l'arrêt.
+ */
+export function suivreSessionServeur(): () => void {
+  const { data } = supabase().auth.onAuthStateChange((event) => {
+    if (event !== "SIGNED_IN" && event !== "TOKEN_REFRESHED" && event !== "SIGNED_OUT") return;
+    // Jamais d'appel Supabase dans ce rappel (il tient le verrou d'auth) :
+    // on attend le tour suivant.
+    setTimeout(() => void refreshSession(), 0);
+  });
+  return () => data.subscription.unsubscribe();
+}
+
 export function signOut() {
   localStorage.removeItem(SESSION_KEY);
   // Sans await : la session locale meurt tout de suite, le serveur suit.
+  // Portée « local » : seulement CET appareil. Par défaut Supabase ferme
+  // toutes les sessions du compte, partout : un joueur qui touchait « Me
+  // reconnecter » dans Snapchat déconnectait son app installée, qui
+  // affichait à son tour le bandeau « Connexion non vérifiée »… et ainsi de
+  // suite (journaux d'auth du 21/10 : /logout suivi de « Session not found »
+  // et « Refresh Token Not Found » sur l'autre appareil).
   supabase()
-    .auth.signOut()
+    .auth.signOut({ scope: "local" })
     .catch(() => {});
   emit();
 }
