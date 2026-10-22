@@ -21,7 +21,7 @@ import { notificationsBranchees } from "@/lib/sfl/notifications";
 const PAGES = [
   { url: "/profil", label: "Ma carte" },
   { url: "/map", label: "Map" },
-  { url: "/ligue", label: "Ligue" },
+  { url: "/ligue", label: "Actus" },
 ] as const;
 
 const BROUILLON: Notif = {
