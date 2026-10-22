@@ -14,12 +14,21 @@ const DEFAULT_PLAYER = "Smail";
 interface PlayerContextValue {
   me: string;
   setMe: (name: string) => void;
+  /**
+   * true = un joueur est connecté mais son nom n'est pas dans la saison
+   * chargée. AuthGate montre alors un écran d'attente : jamais la carte d'un
+   * autre à la place de la sienne.
+   */
+  inconnu: boolean;
 }
 
 const PlayerContext = createContext<PlayerContextValue>({
   me: DEFAULT_PLAYER,
   setMe: () => {},
+  inconnu: false,
 });
+
+const memeNom = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const isClient = useIsClient();
@@ -40,7 +49,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const stored = isClient ? localStorage.getItem(STORAGE_KEY) : null;
   const override = selected && selected.forSession === sessionName ? selected.name : null;
   const candidate = override ?? sessionName ?? stored ?? DEFAULT_PLAYER;
-  const me = players.some((p) => p.name === candidate) ? candidate : DEFAULT_PLAYER;
+  // Le nom de la saison fait foi (casse comprise) : « azzedine » est Azzedine.
+  const trouve = players.find((p) => memeNom(p.name, candidate))?.name;
+  // Connecté mais absent de la saison chargée : on ne retombe JAMAIS sur un
+  // autre joueur. Avant, c'était Smail par défaut — un joueur se connectait et
+  // ouvrait la carte de Smail (22/10). Le nom de session reste, AuthGate
+  // bloque l'app tant que la saison ne le connaît pas.
+  const inconnu = isClient && !!sessionName && !override && !trouve;
+  const me = trouve ?? (sessionName && !override ? sessionName : DEFAULT_PLAYER);
 
   // +2 Ballons à la première ouverture de l'app du jour — une fois connecté
   // seulement : sinon la récompense tombe sur l'écran de connexion, avant même
@@ -78,10 +94,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <PlayerContext.Provider value={{ me, setMe }}>
+    <PlayerContext.Provider value={{ me, setMe, inconnu }}>
       {children}
     </PlayerContext.Provider>
   );
+}
+
+/** Le joueur connecté est-il absent de la saison chargée ? (voir AuthGate) */
+export function useJoueurInconnu(): boolean {
+  return useContext(PlayerContext).inconnu;
 }
 
 export function useMyPlayer() {

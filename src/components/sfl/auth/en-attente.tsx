@@ -19,7 +19,7 @@ const STATS: Stats = { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 };
 /** Relecture de l'état de la demande. */
 const RYTHME = 30_000;
 
-export function EnAttente({ session }: { session: Session }) {
+export function EnAttente({ session, horsSaison = false }: { session: Session; horsSaison?: boolean }) {
   const perso = usePhotoPerso(session.name);
   const [verif, setVerif] = useState(false);
 
@@ -56,9 +56,13 @@ export function EnAttente({ session }: { session: Session }) {
       </div>
       <div className="mx-auto w-full max-w-[420px] pt-[34px]">
         <p className="mono-label text-foreground/40">En attente</p>
-        <h1 className="mt-[8px] text-[34px] leading-[1.05] font-extrabold tracking-tight">Tu es sur la liste.</h1>
+        <h1 className="mt-[8px] text-[34px] leading-[1.05] font-extrabold tracking-tight">
+          {horsSaison ? "Ta carte arrive." : "Tu es sur la liste."}
+        </h1>
         <p className="mt-[13px] text-[15px] leading-snug text-foreground/55">
-          La ligue valide ton entrée. Ta carte s&apos;ouvre dès que c&apos;est fait.
+          {horsSaison
+            ? "Ton compte est validé. Ta carte s'ouvre dès que la saison t'a ajouté."
+            : "La ligue valide ton entrée. Ta carte s'ouvre dès que c'est fait."}
         </p>
       </div>
       <div className="mx-auto mt-auto w-full max-w-[420px] pt-[34px]">

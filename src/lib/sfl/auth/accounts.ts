@@ -94,6 +94,6 @@ export const ACCOUNTS: Account[] = [
 ];
 
 export function findAccount(user: string): Account | undefined {
-  const needle = user.trim().toLowerCase();
+  const needle = user.trim().replace(/^@+/, "").toLowerCase();
   return ACCOUNTS.find((a) => a.user === needle);
 }
