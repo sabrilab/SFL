@@ -1,19 +1,37 @@
 "use client";
 
-// La fiche d'un match ouvert par un joueur : qui vient (en cartes), qui est
-// invité, les places libres, et le seul geste qui compte pour moi ici —
-// prendre une place, accepter, me retirer, ou annuler si c'est mon match.
+// La fiche d'un match ouvert par un joueur : le match sur son terrain
+// (terrain-places.tsx), qui vient, qui est invité (carte effacée), et un +
+// sur chaque place libre — l'organisateur y invite un joueur
+// (choisir-joueur.tsx), un autre y prend sa place si le match est public.
+// Puis le seul geste qui compte pour moi ici : accepter, me retirer, ou
+// annuler si c'est mon match.
 // Le coup d'envoi passé, l'organisateur tient la feuille (feuille-bola.tsx)
 // et tout le monde voit le score et le ou les MVP.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { QuiVient } from "@/components/sfl/qui-vient";
-import { accepter, annuler, direErreur, inscrits, placesLibres, quitter, rejoindre, type Partie } from "@/lib/sfl/matchs";
+import { TerrainPlaces } from "@/components/sfl/matchs/terrain-places";
+import { ChoisirJoueur } from "@/components/sfl/matchs/choisir-joueur";
+import {
+  accepter,
+  annuler,
+  direErreur,
+  inscrits,
+  inviter,
+  listerDispos,
+  listerProfils,
+  momentDeLHeure,
+  placesLibres,
+  quitter,
+  rejoindre,
+  type Partie,
+  type Profil,
+} from "@/lib/sfl/matchs";
 import { coupDEnvoiPasse, feuilleOuverte, mvpsDuMatch } from "@/lib/sfl/ligue-vierge";
 import { FeuilleBola } from "@/components/sfl/matchs/feuille-bola";
 import { cn } from "@/lib/utils";
-import { Nom } from "@/components/sfl/nom";
 
 export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: string | null; onChange: () => void }) {
   const [occupe, setOccupe] = useState(false);
@@ -28,6 +46,33 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
   const corrigeable = feuilleOuverte(partie.saisiLe);
   const presents = partie.joueurs.filter((j) => j.equipe === "clairs" || j.equipe === "fonces");
   const mvps = saisi ? mvpsDuMatch(presents) : [];
+
+  // L'organisateur invite depuis le terrain : la liste des joueurs, et ceux libres à cette heure-là.
+  const [choisir, setChoisir] = useState(false);
+  const [profils, setProfils] = useState<Profil[]>([]);
+  const [libresIds, setLibresIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!organise || joue) return;
+    let fini = false;
+    listerProfils()
+      .then((p) => !fini && setProfils(p))
+      .catch(() => {});
+    const moment = momentDeLHeure(partie.heure);
+    listerDispos(partie.jour, partie.jour)
+      .then((d) => !fini && setLibresIds(new Set(d.filter((x) => x.moment === moment).map((x) => x.playerId))))
+      .catch(() => {});
+    return () => {
+      fini = true;
+    };
+  }, [organise, joue, partie.jour, partie.heure]);
+  const orga = partie.joueurs.find((j) => j.id === partie.organisateurId);
+  const occupants = [
+    ...(orga ? [orga] : []),
+    ...venus.filter((j) => j !== orga),
+    ...attendus.filter((j) => j !== orga),
+  ].map((j) => ({ cle: j.id, nom: j.name, enAttente: j.statut === "invite" }));
+  const moiNom = moiLa?.name;
+  const prendrePlace = !joue && !moiLa && partie.visibilite === "public" && libres > 0 && !!moi;
 
   async function faire(action: () => Promise<void>, ok: string) {
     setOccupe(true);
@@ -56,18 +101,33 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
             <span className="text-muted-foreground">/{partie.places}</span>
           </p>
         </div>
-        <QuiVient className="mt-3" noms={venus.map((j) => j.name)} places={libres} />
-        {attendus.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <span className="mono-label mr-1 text-muted-foreground">Invités</span>
-            {attendus.map((j) => (
-              <span key={j.id} className="rounded-full bg-secondary px-2.5 py-1 text-[12.5px] font-medium">
-                <Nom n={j.name} />
-              </span>
-            ))}
-          </div>
-        )}
       </div>
+      <TerrainPlaces
+        places={partie.places}
+        occupants={occupants}
+        moi={moiNom}
+        hauteur={460}
+        onPlus={
+          joue || occupe
+            ? undefined
+            : organise
+              ? () => setChoisir(true)
+              : prendrePlace
+                ? () => void faire(() => rejoindre(partie.id), "Place prise, à toi de jouer.")
+                : undefined
+        }
+      />
+      {organise && !joue && (
+        <ChoisirJoueur
+          open={choisir}
+          onOpenChange={setChoisir}
+          profils={profils}
+          exclus={new Set(partie.joueurs.map((j) => j.id))}
+          libres={libresIds}
+          moiNom={moiNom ?? partie.organisateur}
+          onChoisir={(p) => void faire(() => inviter(partie.id, p.id), `${p.name} est invité.`)}
+        />
+      )}
 
       {saisi && (
         <div className="rounded-[26px] bg-card p-5">
