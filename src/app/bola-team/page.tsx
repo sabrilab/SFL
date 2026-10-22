@@ -22,7 +22,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { ChoixLigue } from "@/components/sfl/choix-ligue";
+import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
@@ -80,7 +80,7 @@ function LigneEquipe({ e, droite }: { e: Equipe; droite?: React.ReactNode }) {
   );
 }
 
-function Pilule({ children, onClick, plein = true, disabled }: { children: React.ReactNode; onClick: () => void; plein?: boolean; disabled?: boolean }) {
+function Pilule({ children, onClick, plein = true, ton, disabled }: { children: React.ReactNode; onClick: () => void; plein?: boolean; ton?: "bouton--vert" | "bouton--mauve" | "bouton--rouge"; disabled?: boolean }) {
   return (
     <button
       type="button"
@@ -88,7 +88,8 @@ function Pilule({ children, onClick, plein = true, disabled }: { children: React
       disabled={disabled}
       className={cn(
         "shrink-0 px-3.5 py-1.5 text-[13px] font-semibold disabled:opacity-50",
-        plein ? "bouton-principal" : "bouton-secondaire"
+        plein ? "bouton-principal" : "bouton-secondaire",
+        ton
       )}
     >
       {children}
@@ -229,7 +230,7 @@ export default function BolaTeamPage() {
   return (
     <div className="mx-auto flex w-full max-w-[470px] flex-col gap-7 px-5 pt-2 pb-8 sm:pt-6">
       <h1 className="sr-only">Team</h1>
-      <ChoixLigue actif="/bola-team" />
+      <EnteteLigue actif="/bola-team" />
 
       {invitations.length > 0 && (
         <section className="flex flex-col gap-2">
@@ -239,10 +240,10 @@ export default function BolaTeamPage() {
               e={e}
               droite={
                 <div className="flex gap-1.5">
-                  <Pilule plein={false} onClick={() => moi && void agir(() => retirerInvitation(e.id, moi), "Invitation refusée.")}>
+                  <Pilule plein={false} ton="bouton--rouge" onClick={() => moi && void agir(() => retirerInvitation(e.id, moi), "Invitation refusée.")}>
                     Refuser
                   </Pilule>
-                  <Pilule onClick={() => setASigner(e)}>Rejoindre</Pilule>
+                  <Pilule ton="bouton--vert" onClick={() => setASigner(e)}>Rejoindre</Pilule>
                 </div>
               }
             />
@@ -285,10 +286,10 @@ export default function BolaTeamPage() {
                 <p className="px-1 text-[14px] font-semibold">{quand(d)}</p>
                 {capitaine && (
                   <div className="grid grid-cols-2 gap-2">
-                    <Pilule plein={false} onClick={() => void agir(() => repondreDefi(d.id, "refuse"))}>
+                    <Pilule plein={false} ton="bouton--rouge" onClick={() => void agir(() => repondreDefi(d.id, "refuse"))}>
                       Refuser
                     </Pilule>
-                    <Pilule onClick={() => void agir(() => repondreDefi(d.id, "accepte"), "Défi accepté.")}>Accepter</Pilule>
+                    <Pilule ton="bouton--vert" onClick={() => void agir(() => repondreDefi(d.id, "accepte"), "Défi accepté.")}>Accepter</Pilule>
                   </div>
                 )}
               </div>
@@ -309,12 +310,12 @@ export default function BolaTeamPage() {
                     </span>
                     {d.statut === "propose" ? (
                       capitaine && d.de === mienne.id ? (
-                        <Pilule plein={false} onClick={() => void agir(() => repondreDefi(d.id, "annule"), "Défi retiré.")}>
+                        <Pilule plein={false} ton="bouton--rouge" onClick={() => void agir(() => repondreDefi(d.id, "annule"), "Défi retiré.")}>
                           Retirer
                         </Pilule>
                       ) : null
                     ) : capitaine ? (
-                      <Pilule plein={false} onClick={() => annulerMatch(d)}>
+                      <Pilule plein={false} ton="bouton--rouge" onClick={() => annulerMatch(d)}>
                         Annuler
                       </Pilule>
                     ) : (
@@ -327,7 +328,7 @@ export default function BolaTeamPage() {
           )}
         </section>
       ) : charge ? (
-        <Button onClick={() => setCreer(true)} className="h-12 rounded-full text-[15px] font-semibold">
+        <Button variant="vert" onClick={() => setCreer(true)} className="h-12 rounded-full text-[15px] font-semibold">
           Créer mon équipe
         </Button>
       ) : null}
@@ -340,18 +341,18 @@ export default function BolaTeamPage() {
               (d) => enCours(d) && ((d.de === mienne?.id && d.a === e.id) || (d.a === mienne?.id && d.de === e.id))
             );
             const peutDefier = !!mienne && capitaine && active(mienne) && active(e) && !dejaDefie;
-            return <LigneEquipe key={e.id} e={e} droite={peutDefier ? <Pilule onClick={() => setAdversaire(e)}>Défier</Pilule> : undefined} />;
+            return <LigneEquipe key={e.id} e={e} droite={peutDefier ? <Pilule ton="bouton--mauve" onClick={() => setAdversaire(e)}>Défier</Pilule> : undefined} />;
           })}
         </section>
       )}
 
       {mienne && (
         <div className="flex justify-center gap-2">
-          <button type="button" onClick={() => setQuitter("quitter")} className="bouton-discret px-4 py-2 text-[13px] font-semibold">
+          <button type="button" onClick={() => setQuitter("quitter")} className="bouton-discret bouton--rouge px-4 py-2 text-[13px] font-semibold">
             Quitter l&apos;équipe
           </button>
           {monRole === "capitaine" && (
-            <button type="button" onClick={() => setQuitter("dissoudre")} className="bouton-discret px-4 py-2 text-[13px] font-semibold">
+            <button type="button" onClick={() => setQuitter("dissoudre")} className="bouton-discret bouton--rouge px-4 py-2 text-[13px] font-semibold">
               Dissoudre
             </button>
           )}
@@ -389,7 +390,7 @@ export default function BolaTeamPage() {
               {joueur.statut === "invite" ? (
                 <Button
                   variant="secondary"
-                  className="h-12 rounded-full text-[15px] font-semibold"
+                  className="bouton--rouge h-12 rounded-full text-[15px] font-semibold"
                   onClick={() => {
                     setJoueur(null);
                     void agir(() => retirerInvitation(mienne.id, joueur.id), "Invitation retirée.");
@@ -402,7 +403,7 @@ export default function BolaTeamPage() {
                   {!joueur.departLe && (
                     <Button
                       variant="secondary"
-                      className="h-12 rounded-full text-[15px] font-semibold"
+                      className={cn(joueur.role === "vice" ? "bouton--rouge" : "bouton--or", "h-12 rounded-full text-[15px] font-semibold")}
                       onClick={() => {
                         setJoueur(null);
                         void agir(

@@ -17,7 +17,7 @@ import { carteNeutre } from "@/components/sfl/qui-vient";
 import { useSeason } from "@/components/sfl/season-provider";
 import { FeuilleBola } from "@/components/sfl/matchs/feuille-bola";
 import { Nom } from "@/components/sfl/nom";
-import { ChoixLigue } from "@/components/sfl/choix-ligue";
+import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { useSession } from "@/hooks/use-session";
 import { classementAVie, compterMatchs, coupDEnvoiPasse, feuilleOuverte, type Classe, type MatchCompte } from "@/lib/sfl/ligue-vierge";
 import { DEMO_LIGUE_VIERGE, demoFeuille, demoMatchs } from "@/lib/sfl/ligue-vierge-demo";
@@ -133,7 +133,7 @@ function MesFeuilles({ parties, onSaisie, apercu }: { parties: Partie[]; onSaisi
           key={p.id}
           type="button"
           onClick={() => setOuverte(p)}
-          className="flex items-center gap-3 rounded-[22px] bg-foreground px-4 py-3.5 text-left text-background"
+          className="bouton-principal bouton--vert flex items-center gap-3 rounded-[22px] px-4 py-3.5 text-left"
         >
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[15px] font-bold">{p.lieu}</span>
@@ -221,7 +221,7 @@ export default function LigueViergePage() {
     <div className="mx-auto flex w-full max-w-[470px] flex-col gap-6 px-5 pt-2 pb-8 sm:pt-6">
       <div className="flex flex-col gap-2.5">
         <h1 className="sr-only">Bola</h1>
-        <ChoixLigue actif="/ligue-vierge" />
+        <EnteteLigue actif="/ligue-vierge" />
         {vus && vus.length > 0 && (
           <span className="mono-label text-foreground/40">
             {vus.length} match{vus.length > 1 ? "s" : ""} · {classement.length} joueur{classement.length > 1 ? "s" : ""}

@@ -50,7 +50,7 @@ export function CreerCle() {
         <button
           type="button"
           onClick={creer}
-          className="bouton-principal py-[14px] text-[15px] font-bold"
+          className="bouton-principal bouton--vert py-[14px] text-[15px] font-bold"
         >
           Créer la clé
         </button>

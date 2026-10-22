@@ -139,7 +139,7 @@ export function MiseAJour() {
     <button
       type="button"
       onClick={() => void recharger(enAttente)}
-      className="liquid-tabbar fixed left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 px-4 text-sm font-semibold text-foreground animate-in fade-in slide-in-from-top-2 duration-300 motion-reduce:animate-none"
+      className="bouton-principal bouton--vert fixed left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 px-4 text-sm font-semibold animate-in fade-in slide-in-from-top-2 duration-300 motion-reduce:animate-none"
       style={{ top: "calc(env(safe-area-inset-top) + 10px)", height: 40 }}
     >
       <RefreshCw className="size-4" aria-hidden />

@@ -387,7 +387,7 @@ export function VitrineTrophees({ nom, enJeu = true }: { nom: string; enJeu?: bo
           Trophées
           {total > 0 && <span className="ml-2 font-mono text-[12px] font-bold text-white/45 tabular-nums">{total}</span>}
         </h2>
-        <button type="button" onClick={() => setOuvert("regles")} className="text-[13px] font-semibold text-white/70 underline-offset-4 active:underline">
+        <button type="button" onClick={() => setOuvert("regles")} className="bouton-discret bouton--or -mr-2 px-2 py-1 text-[13px] font-semibold">
           Comment les gagner
         </button>
       </div>

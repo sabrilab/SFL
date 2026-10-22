@@ -146,8 +146,8 @@ function Ligue() {
               key={jn.j}
               onClick={() => openJournee(jn.j)}
               className={cn(
-                "flex shrink-0 flex-col items-start gap-0.5 rounded-2xl px-3.5 py-2.5 text-left transition-transform active:scale-[0.96]",
-                active ? "bg-foreground" : "glass-soft"
+                "bouton--vert flex shrink-0 flex-col items-start gap-0.5 rounded-2xl px-3.5 py-2.5 text-left",
+                active ? "bouton-principal" : "bouton-secondaire"
               )}
             >
               <span className={cn("mono-label", active ? "text-background" : "text-primary")}>
@@ -204,8 +204,8 @@ function Ligue() {
             aria-selected={view === id}
             onClick={() => setView(id)}
             className={cn(
-              "flex-auto rounded-full px-[7px] py-2 text-[12.5px] whitespace-nowrap font-semibold transition-colors min-[400px]:px-2.5 min-[400px]:text-[13px] sm:px-4 sm:text-sm",
-              view === id ? "bg-foreground text-background" : "text-muted-foreground"
+              "flex-auto px-[7px] py-2 text-[12.5px] whitespace-nowrap font-semibold min-[400px]:px-2.5 min-[400px]:text-[13px] sm:px-4 sm:text-sm",
+              view === id ? "bouton-principal bouton--vert" : "bouton-discret text-muted-foreground"
             )}
           >
             {label}

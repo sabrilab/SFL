@@ -129,7 +129,7 @@ export function NouveauMotDePasse({ session }: { session: Session }) {
             type="submit"
             disabled={busy || !pret}
             className={cn(
-              "bouton-principal mt-1 flex items-center justify-center gap-2 py-4 text-[15px] font-bold",
+              "bouton-principal bouton--vert mt-1 flex items-center justify-center gap-2 py-4 text-[15px] font-bold",
               (busy || !pret) && "opacity-40"
             )}
           >
@@ -141,7 +141,7 @@ export function NouveauMotDePasse({ session }: { session: Session }) {
         <button
           type="button"
           onClick={signOut}
-          className="bouton-discret mt-5 w-full py-[8px] text-center text-[13px] font-semibold"
+          className="bouton-discret bouton--rouge mt-5 w-full py-[8px] text-center text-[13px] font-semibold"
         >
           Se déconnecter
         </button>

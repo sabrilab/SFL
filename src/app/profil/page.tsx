@@ -148,7 +148,7 @@ export default function Profil() {
       <div className="flex gap-[9px]">
         <Link
           href="/ligue?vue=matchs"
-          className="bouton-secondaire flex-1 py-[15px] text-center text-[15px] font-semibold"
+          className="bouton-secondaire bouton--or flex-1 py-[15px] text-center text-[15px] font-semibold"
         >
           Historique
         </Link>

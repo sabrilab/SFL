@@ -31,7 +31,7 @@ export function CarteOfficielle({ player, className }: { player: Player; classNa
         // la refaire n'est plus qu'un second geste, en verre fumé.
         className={cn(
           "flex items-center justify-center gap-2 py-[15px] text-[15px] font-bold",
-          aUnePhoto ? "bouton-secondaire" : "bouton-principal bouton--or",
+          aUnePhoto ? "bouton-secondaire bouton--or" : "bouton-principal bouton--or",
           className
         )}
       >

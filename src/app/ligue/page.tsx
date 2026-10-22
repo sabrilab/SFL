@@ -1,14 +1,14 @@
 "use client";
 
-// L'onglet Actus (ex-Ligue) : le fil d'actualité de la ligue, en
-// cinématiques (components/sfl/actus/fil.tsx). Les anciens liens restent bons :
+// L'onglet Actus (ex-Ligue) : la course et le fil des dimanches
+// (components/sfl/actus/course.tsx). Les anciens liens restent bons :
 //   · ?vue=classements (et /stats) ouvre les classements, ?vue=matchs les matchs ;
 //   · ?j=N (une feuille touchée au Vestiaire) ouvre le récap, /ligue/journee ;
 //   · ?vue=vestiaire renvoie au Vestiaire.
 
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FilActus } from "@/components/sfl/actus/fil";
+import { LaCourse } from "@/components/sfl/actus/course";
 import { LEAGUE_KEY } from "@/lib/nav";
 
 export default function ActusPage() {
@@ -35,5 +35,5 @@ function Actus() {
       if (localStorage.getItem(LEAGUE_KEY) && localStorage.getItem(LEAGUE_KEY) !== "SFL") localStorage.setItem(LEAGUE_KEY, "SFL");
     } catch {}
   }, []);
-  return <FilActus key={vue ?? ""} vueDepart={vue === "classements" || vue === "matchs" ? vue : "actus"} />;
+  return <LaCourse key={vue ?? ""} vueDepart={vue === "classements" || vue === "matchs" ? vue : "fil"} />;
 }

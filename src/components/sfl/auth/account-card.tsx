@@ -165,7 +165,7 @@ export function AccountCard() {
                 <button
                   type="submit"
                   disabled={emailBusy || !emailInput}
-                  className="bouton-principal shrink-0 px-4 py-2.5 text-[13px] font-bold disabled:opacity-40"
+                  className="bouton-principal bouton--vert shrink-0 px-4 py-2.5 text-[13px] font-bold disabled:opacity-40"
                 >
                   OK
                 </button>
@@ -177,7 +177,7 @@ export function AccountCard() {
                   <button
                     key={p}
                     onClick={() => linkProvider(p)}
-                    className="bouton-secondaire mono-label flex flex-1 items-center justify-center gap-1.5 py-2.5"
+                    className="bouton-secondaire bouton--vert mono-label flex flex-1 items-center justify-center gap-1.5 py-2.5"
                   >
                     <Link2 className="size-3" /> Lier {p === "google" ? "Google" : "Apple"}
                   </button>
@@ -210,7 +210,7 @@ export function AccountCard() {
                 type="submit"
                 disabled={busy || !current || !next}
                 className={cn(
-                  "bouton-principal flex-1 py-3 text-[14px] font-bold",
+                  "bouton-principal bouton--vert flex-1 py-3 text-[14px] font-bold",
                   (busy || !current || !next) && "opacity-40"
                 )}
               >

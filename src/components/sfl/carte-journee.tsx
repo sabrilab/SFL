@@ -269,8 +269,8 @@ export function CarteJournee({
               key={m.id}
               onClick={() => setIndex(i)}
               className={cn(
-                "mono-label shrink-0 rounded-full px-2.5 py-1 transition-colors",
-                i === index ? "bg-foreground text-background" : "glass-soft text-foreground/45"
+                "mono-label shrink-0 px-2.5 py-1",
+                i === index ? "bouton-principal" : "bouton-secondaire text-foreground/55"
               )}
             >
               M{i + 1} · {m.teamA.score}–{m.teamB.score}

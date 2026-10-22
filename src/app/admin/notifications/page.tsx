@@ -17,6 +17,7 @@ import { TEXTE_MAX, TITRE_MAX, type Notif } from "@/lib/sfl/push";
 import { ReglageNotifications } from "@/components/sfl/notifications/reglage-notifications";
 import { CreerCle } from "@/components/sfl/notifications/creer-cle";
 import { notificationsBranchees } from "@/lib/sfl/notifications";
+import { cn } from "@/lib/utils";
 
 const PAGES = [
   { url: "/profil", label: "Ma carte" },
@@ -129,10 +130,10 @@ export default function NotificationsAdmin() {
               key={p.url}
               type="button"
               onClick={() => setNotif({ ...notif, url: p.url })}
-              className={
-                "flex-1 rounded-xl py-2.5 text-[13px] font-semibold " +
-                (notif.url === p.url ? "bg-foreground/10 text-foreground" : "text-foreground/45")
-              }
+              className={cn(
+                "flex-1 rounded-xl py-2.5 text-[13px] font-semibold",
+                notif.url === p.url ? "bouton-principal" : "bouton-discret text-foreground/45"
+              )}
             >
               {p.label}
             </button>
@@ -166,7 +167,7 @@ export default function NotificationsAdmin() {
           type="button"
           disabled={!valide || busy !== null || !branchees}
           onClick={() => envoyer(true)}
-          className="bouton-secondaire flex items-center justify-center gap-2 py-[14px] text-[15px] font-bold disabled:opacity-40"
+          className="bouton-secondaire bouton--mauve flex items-center justify-center gap-2 py-[14px] text-[15px] font-bold disabled:opacity-40"
         >
           {busy === "essai" && <Loader2 className="size-4 animate-spin" />}
           M&apos;envoyer un essai
@@ -176,7 +177,7 @@ export default function NotificationsAdmin() {
             type="button"
             disabled={!valide || busy !== null || !branchees || !abonnes?.telephones}
             onClick={() => setConfirmer(true)}
-            className="bouton-principal py-[15px] text-[15px] font-bold disabled:opacity-40"
+            className="bouton-principal bouton--mauve py-[15px] text-[15px] font-bold disabled:opacity-40"
           >
             Envoyer à toute la ligue
           </button>

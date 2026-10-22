@@ -258,6 +258,7 @@ export default function CartePage() {
                     <Button
                       variant="secondary"
                       size="icon-sm"
+                      className="bouton--or"
                       aria-label={`Retirer un point en ${k}`}
                       disabled={alloc[k] === 0}
                       onClick={() => dec(k)}
@@ -267,6 +268,7 @@ export default function CartePage() {
                     <Button
                       variant="secondary"
                       size="icon-sm"
+                      className="bouton--or"
                       aria-label={`Ajouter un point en ${k}`}
                       disabled={remaining === 0}
                       onClick={() => inc(k)}

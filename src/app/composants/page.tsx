@@ -18,6 +18,15 @@ export const metadata: Metadata = {
   description: "Modules d'interface disponibles, installés via shadcn/ui.",
 };
 
+const TONS = [
+  { ton: "", geste: "Voir le classement" },
+  { ton: "bouton--vert", geste: "Je viens" },
+  { ton: "bouton--or", geste: "Créer ma carte" },
+  { ton: "bouton--mauve", geste: "Partager" },
+  { ton: "bouton--braise", geste: "Prendre une place" },
+  { ton: "bouton--rouge", geste: "Annuler" },
+];
+
 export default function ComponentsPage() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-10">
@@ -35,7 +44,7 @@ export default function ComponentsPage() {
           <CardTitle className="text-base">Boutons</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
-          {/* Les trois rangs (app/boutons.css) : le verre allumé, le verre
+          {/* Les trois rangs (app/boutons.css) : le verre de nuit allumé, le verre
               fumé, le texte seul. */}
           <div className="flex flex-col gap-3">
             <p className="mono-label text-muted-foreground">Rangs</p>
@@ -49,21 +58,25 @@ export default function ComponentsPage() {
               Plus tard
             </button>
           </div>
+          {/* Les six tons, un par famille de gestes, sur chaque rang. */}
           <div className="flex flex-col gap-3">
             <p className="mono-label text-muted-foreground">Tons</p>
             <div className="grid grid-cols-2 gap-3">
-              <button type="button" className="bouton-principal bouton--or flex h-12 items-center justify-center text-[15px] font-semibold">
-                Voir ma carte
-              </button>
-              <button type="button" className="bouton-principal bouton--braise flex h-12 items-center justify-center text-[15px] font-semibold">
-                Prendre une place
-              </button>
-              <button type="button" className="bouton-principal bouton--vert flex h-12 items-center justify-center text-[15px] font-semibold">
-                Je viens ✓
-              </button>
-              <button type="button" className="bouton-secondaire bouton--rouge flex h-12 items-center justify-center text-[15px] font-semibold">
-                Annuler le match
-              </button>
+              {TONS.map((t) => (
+                <button key={t.geste} type="button" className={`bouton-principal ${t.ton} flex h-12 items-center justify-center text-[15px] font-semibold`}>
+                  {t.geste}
+                </button>
+              ))}
+              {TONS.map((t) => (
+                <button key={t.geste} type="button" className={`bouton-secondaire ${t.ton} flex h-12 items-center justify-center text-[15px] font-semibold`}>
+                  {t.geste}
+                </button>
+              ))}
+              {TONS.map((t) => (
+                <button key={t.geste} type="button" className={`bouton-discret ${t.ton} flex h-11 items-center justify-center text-[14px] font-semibold`}>
+                  {t.geste}
+                </button>
+              ))}
             </div>
           </div>
           <div className="flex flex-col gap-3">
@@ -83,7 +96,7 @@ export default function ComponentsPage() {
           <div className="flex flex-col gap-3 rounded-[22px] bg-[#e9eae6] p-4">
             <p className="mono-label text-[#5c5d59]">Sur la Map</p>
             <div className="flex items-center gap-3">
-              <button type="button" className="bouton-encre flex h-11 items-center px-[18px] text-[15.5px] font-semibold">
+              <button type="button" className="bouton-encre bouton--vert flex h-11 items-center px-[18px] text-[15.5px] font-semibold">
                 Ouvrir un match
               </button>
               <button type="button" aria-label="Recherche" className="bouton-givre grid size-10 place-items-center">

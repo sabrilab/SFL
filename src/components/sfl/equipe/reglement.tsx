@@ -102,7 +102,7 @@ export function SignerReglement({
             <div className="flex flex-col gap-5 px-4">
               <ReglementListe />
               <CaseAcceptation coche={coche} onChange={setCoche} />
-              <Button disabled={!coche || envoi} onClick={signer} className="h-12 rounded-full text-[15px] font-semibold">
+              <Button variant="vert" disabled={!coche || envoi} onClick={signer} className="h-12 rounded-full text-[15px] font-semibold">
                 Signer et rejoindre {equipe.nom}
               </Button>
             </div>

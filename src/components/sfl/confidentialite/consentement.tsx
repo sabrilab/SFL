@@ -324,7 +324,7 @@ function Accord({
           type="button"
           onClick={continuer}
           disabled={!pret || envoi}
-          className="bouton-principal mt-[13px] flex w-full items-center justify-center gap-2 py-[16px] text-[15px] font-bold disabled:opacity-40"
+          className="bouton-principal bouton--vert mt-[13px] flex w-full items-center justify-center gap-2 py-[16px] text-[15px] font-bold disabled:opacity-40"
         >
           {envoi && <Loader2 className="size-4 animate-spin" />}
           Continuer
@@ -332,7 +332,7 @@ function Accord({
         <button
           type="button"
           onClick={signOut}
-          className="bouton-discret mt-[5px] block w-full py-[8px] text-center text-[13px] font-semibold"
+          className="bouton-discret bouton--rouge mt-[5px] block w-full py-[8px] text-center text-[13px] font-semibold"
         >
           Me déconnecter
         </button>

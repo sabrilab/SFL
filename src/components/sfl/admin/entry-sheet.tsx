@@ -203,7 +203,7 @@ export function EntrySheet({
                 <Button
                   variant="ghost"
                   onClick={onDelete}
-                  className="w-full text-destructive hover:text-destructive"
+                  className="bouton--rouge w-full"
                 >
                   <Trash2 className="mr-1.5 size-4" /> Retirer de la journée
                 </Button>
@@ -275,7 +275,7 @@ export function JourneeMetaSheet({
                 <Button
                   variant="ghost"
                   onClick={onDelete}
-                  className="w-full text-destructive hover:text-destructive"
+                  className="bouton--rouge w-full"
                 >
                   <Trash2 className="mr-1.5 size-4" /> Supprimer la journée
                 </Button>
@@ -410,7 +410,7 @@ export function PlayerSheet({
                 <Button
                   variant="ghost"
                   onClick={onDelete}
-                  className="w-full text-destructive hover:text-destructive"
+                  className="bouton--rouge w-full"
                 >
                   <Trash2 className="mr-1.5 size-4" /> Supprimer le joueur
                 </Button>
@@ -467,7 +467,7 @@ export function NewPlayerSheet({
             onKeyDown={(e) => e.key === "Enter" && submit()}
           />
           {taken && <p className="text-xs text-destructive">Ce joueur existe déjà.</p>}
-          <Button disabled={!valid} onClick={submit} className="font-semibold">
+          <Button variant="vert" disabled={!valid} onClick={submit} className="font-semibold">
             Créer la fiche
           </Button>
         </div>

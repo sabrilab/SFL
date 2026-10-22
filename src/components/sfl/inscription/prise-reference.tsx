@@ -165,7 +165,7 @@ export function PriseReference({
               <p className="mt-3 text-[14px] text-white/60">La caméra ne s&apos;ouvre pas ici.</p>
               <button
                 onClick={() => fichier.current?.click()}
-                className="bouton-principal mt-5 px-6 py-3 text-[14px] font-bold"
+                className="bouton-principal bouton--or mt-5 px-6 py-3 text-[14px] font-bold"
               >
                 Ouvrir l&apos;appareil photo
               </button>
@@ -200,8 +200,8 @@ export function PriseReference({
               key={r}
               onClick={() => setRetard(r)}
               className={cn(
-                "rounded-full px-2.5 py-1.5 text-[12px] font-bold tabular-nums",
-                retard === r ? "bg-white text-black" : "text-white/60"
+                "px-2.5 py-1.5 text-[12px] font-bold tabular-nums",
+                retard === r ? "bouton-principal" : "bouton-discret text-white/60"
               )}
             >
               {r === 0 ? "Direct" : `${r} s`}

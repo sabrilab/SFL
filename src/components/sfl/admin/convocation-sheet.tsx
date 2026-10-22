@@ -74,7 +74,7 @@ export function ConvocationSheet({
             l&apos;accueil de l&apos;app ; leurs confirmations pré-remplissent la journée.
             {terrains.length > 0 && " Un lieu qui porte le nom d'un terrain place le match sur la Map."}
           </p>
-          <Button disabled={!valid} onClick={() => valid && onCreate(info)} className="font-semibold">
+          <Button variant="vert" disabled={!valid} onClick={() => valid && onCreate(info)} className="font-semibold">
             <Send className="mr-1.5 size-4" /> Publier la convocation
           </Button>
         </div>

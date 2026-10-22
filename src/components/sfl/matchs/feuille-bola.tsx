@@ -180,8 +180,12 @@ export function FeuilleBola({
                       type="button"
                       onClick={() => changer(l.playerId, { equipe: o.id })}
                       className={cn(
-                        "rounded-full py-1.5 text-[13px] font-semibold transition-colors",
-                        l.equipe === o.id ? "bg-foreground text-background" : "text-muted-foreground"
+                        "py-1.5 text-[13px] font-semibold",
+                        l.equipe !== o.id
+                          ? "bouton-discret text-muted-foreground"
+                          : o.id === "absent"
+                            ? "bouton-secondaire bouton--rouge"
+                            : "bouton-principal"
                       )}
                     >
                       {o.libelle}
@@ -196,7 +200,7 @@ export function FeuilleBola({
             type="button"
             disabled={envoi || !coherent || presents < 2}
             onClick={valider}
-            className="bouton-principal flex h-12 items-center justify-center text-[15px] font-semibold disabled:opacity-40"
+            className="bouton-principal bouton--vert flex h-12 items-center justify-center text-[15px] font-semibold disabled:opacity-40"
           >
             {coherent ? `Valider · ${score.clairs} – ${score.fonces}` : "Plus de passes que de buts"}
           </button>

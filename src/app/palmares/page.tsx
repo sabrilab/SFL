@@ -152,8 +152,8 @@ function Legendes({ liste, onChoisir }: { liste: Legende[]; onChoisir: (nom: str
             aria-selected={c.id === cat}
             onClick={() => setCat(c.id)}
             className={cn(
-              "shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors",
-              c.id === cat ? "bg-foreground text-background" : "glass-soft text-foreground/60"
+              "bouton--or shrink-0 px-3.5 py-1.5 text-[13px] font-semibold",
+              c.id === cat ? "bouton-principal" : "bouton-secondaire text-foreground/60"
             )}
           >
             {c.label}
@@ -192,7 +192,7 @@ function Parcours({ nom, saisons, moi, onRevenir }: { nom: string; saisons: Sais
       <div className="flex items-center justify-between px-1">
         <h2 className="mono-label text-foreground/40">{moi ? "Ton parcours" : `Le parcours de ${nom}`}</h2>
         {!moi && (
-          <button onClick={onRevenir} className="flex items-center gap-1 text-[12px] font-semibold text-foreground/60">
+          <button onClick={onRevenir} className="bouton-discret bouton--or -mr-2 flex items-center gap-1 px-2.5 py-1 text-[12px] font-semibold">
             <ArrowLeft className="size-3.5" /> Le mien
           </button>
         )}

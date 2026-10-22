@@ -1,43 +1,31 @@
 "use client";
 
-// Le fil des Actus — l'onglet qui remplace la Ligue (Sabri, 22/10). En haut,
-// « League | Bola | Team » (choix-ligue.tsx), puis un seul sélecteur, comme
-// la Ligue d'avant, sans « Actus » puisqu'on y est : Classement, Match (Sabri, 22/10 : « faire un
-// mix des deux et un équilibre » ; les classements complets et les matchs
-// sont dans vues.tsx). Le fil, lui, se déroule en cinématiques
-// (cinematiques.tsx) : les dimanches joués, du plus récent au plus ancien
-// (la liste : lib/sfl/actus.ts), la prochaine journée glissée entre les
-// premières scènes, et à la fin la saison passée.
-// Pas d'en-tête de compte sur chaque scène (« moins Instagram ») : un
-// chapitre par dimanche (« J2 · 18 oct. »), puis ses scènes, chacune avec sa
-// légende et, à droite, la partager au Vestiaire. Toucher une scène la
-// rejoue ; toucher une carte l'ouvre en grand.
+// Les publications des Actus : une scène (cinematiques.tsx) et sa légende,
+// avec, à droite, la partager au Vestiaire. Pas d'en-tête de compte sur
+// chaque scène (« moins Instagram », Sabri, 22/10). L'onglet lui-même, la
+// course et les dimanches, est dans course.tsx ; il les pose en mode film
+// (ModeFil). Toucher une scène la rejoue ; toucher une carte l'ouvre en grand.
 
 import Link from "next/link";
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronRight, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMyPlayer } from "@/components/sfl/player-provider";
-import { SaisonArchiveProvider, useSeason } from "@/components/sfl/season-provider";
-import { PresencePanel } from "@/components/sfl/presence-panel";
+import { useSeason } from "@/components/sfl/season-provider";
 import { VoteFigures } from "@/components/sfl/vote-figures";
-import { BoutonRecherche } from "@/components/layout/bouton-recherche";
-import { BoutonStats } from "@/components/layout/bouton-stats";
-import { ChoixLigue } from "@/components/sfl/choix-ligue";
 import { useIdentites } from "@/hooks/use-identites";
 import { useIsClient } from "@/hooks/use-is-client";
-import { filDeSaison, buteursDe, type Actu } from "@/lib/sfl/actus";
+import { buteursDe, type Actu } from "@/lib/sfl/actus";
 import { voteOuvert } from "@/lib/sfl/convocation-temps";
 import { rankPlayers } from "@/lib/sfl/engine";
 import { isHidden } from "@/lib/sfl/hidden";
 import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
-import { journeeJouee, saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
+import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { TROPHEES, NOM_METAL, metal } from "@/lib/sfl/trophees";
 import { journeeAvecVote } from "@/lib/sfl/votes";
 import { preparerPiece, type PieceLigue } from "@/lib/sfl/vestiaire";
-import { ANTON, Ecran } from "./ecran";
+import { Ecran } from "./ecran";
 import { CineBadge, CineChiffre, CineCourse, CineDuo, CineEquipe, CineMontent, CineMvp, CinePodium, CinePresents, CineRecap, CineScore, CineSurface, CineToi, FORMAT_EQUIPE, FORMAT_MVP, FORMAT_SCORE } from "./cinematiques";
-import { VueClassements, VueMatchs } from "./vues";
 import { cn } from "@/lib/utils";
 
 const DEF = Object.fromEntries(TROPHEES.map((d) => [d.id, d]));
@@ -80,7 +68,100 @@ function Carrousel({ images, ratio }: { images: { duree: number; media: ReactNod
   );
 }
 
-function Publication({
+/**
+ * Comment une publication se pose dans le fil (les variantes du fil,
+ * fil-variantes.tsx) : « post », la scène puis sa légende (le fil de
+ * /ligue) ; « film », les scènes bord à bord avec une ligne de sous-titre ;
+ * « case », la scène en réduction dans une grille, qu'on ouvre en grand.
+ */
+export type Mode = "post" | "film" | "case";
+export const ModeFil = createContext<{ mode: Mode; ouvrir?: (n: ReactNode) => void; hauteur?: number }>({ mode: "post" });
+
+function Publication(props: Parameters<typeof PublicationPost>[0]) {
+  const { mode, ouvrir, hauteur } = useContext(ModeFil);
+  if (mode === "film") return <PublicationFilm {...props} />;
+  if (mode === "case") {
+    const { duree, media, ratio = 4 / 5, images, titre } = props;
+    return (
+      <article
+        className="actu-case flex shrink-0 cursor-pointer flex-col gap-1.5 break-inside-avoid"
+        style={hauteur ? { width: Math.min(hauteur * ratio, 300) } : undefined}
+        onClickCapture={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          ouvrir?.(
+            <ModeFil.Provider value={{ mode: "film" }}>
+              <PublicationFilm {...props} />
+            </ModeFil.Provider>
+          );
+        }}
+      >
+        <Reduit ratio={ratio}>
+          {images ? <Ecran duree={images[0].duree} ratio={ratio}>{images[0].media}</Ecran> : <Ecran duree={duree} ratio={ratio}>{media}</Ecran>}
+        </Reduit>
+        <p className="line-clamp-1 px-0.5 text-[12px] leading-tight font-semibold text-foreground/80">{titre}</p>
+      </article>
+    );
+  }
+  return <PublicationPost {...props} />;
+}
+
+/**
+ * Une scène en réduction : construite à la largeur d'un téléphone (390 px,
+ * celle pour laquelle les cinématiques sont réglées), puis ramenée à la
+ * largeur de sa case.
+ */
+export function Reduit({ ratio, children, base = 390 }: { ratio: number; children: ReactNode; base?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [l, setL] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const o = new ResizeObserver(([e]) => setL(e.contentRect.width));
+    o.observe(el);
+    return () => o.disconnect();
+  }, []);
+  const k = l / base;
+  return (
+    <div ref={ref} className="relative w-full overflow-hidden rounded-[14px]" style={{ height: l ? base / ratio * k : undefined, aspectRatio: l ? undefined : ratio }}>
+      {l > 0 && (
+        <div className="absolute top-0 left-0 origin-top-left" style={{ width: base, transform: `scale(${k})` }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Le film : la scène bord à bord, puis une ligne de sous-titre, sans marge. */
+function PublicationFilm({ j, date, saison, duree, media, ratio = 4 / 5, images, titre, partage, action }: Parameters<typeof PublicationPost>[0]) {
+  const router = useRouter();
+  return (
+    <article className="actu-film flex flex-col bg-black">
+      {images ? <Carrousel images={images} ratio={ratio} /> : <Ecran duree={duree} ratio={ratio}>{media}</Ecran>}
+      <div className={cn("flex min-h-10 items-center gap-2 pr-1.5 pl-4", images && "pt-5")}>
+        <span className="mono-label shrink-0 text-white/40">{[saison, j != null && `J${j}`, date].filter(Boolean).join(" · ")}</span>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-white/85">{titre}</span>
+        {action}
+        {partage && (
+          <button
+            type="button"
+            aria-label="Partager au Vestiaire"
+            onClick={() => {
+              preparerPiece({ type: "ligue", ...partage, lignes: partage.lignes.slice(0, 6) });
+              router.push("/vestiaire");
+            }}
+            className="grid size-8 shrink-0 place-items-center rounded-full text-white/55 transition-transform active:scale-90"
+          >
+            <MessageCircle className="size-[17px]" strokeWidth={1.8} />
+          </button>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function PublicationPost({
   duree,
   media,
   ratio = 4 / 5,
@@ -126,7 +207,7 @@ function Publication({
               preparerPiece({ type: "ligue", ...partage, lignes: partage.lignes.slice(0, 6) });
               router.push("/vestiaire");
             }}
-            className="-mt-1.5 grid size-9 shrink-0 place-items-center rounded-full text-foreground/60 transition-transform active:scale-90"
+            className="bouton-discret bouton--mauve -mt-1.5 grid size-9 shrink-0 place-items-center"
           >
             <MessageCircle className="size-[19px]" strokeWidth={1.8} />
           </button>
@@ -136,25 +217,9 @@ function Publication({
   );
 }
 
-/**
- * Le chapitre d'un dimanche : une seule fois par journée, au lieu d'un
- * en-tête sur chaque publication. Le numéro en grand, la date en petit.
- */
-function Chapitre({ j, date, saison }: { j: number; date: string; saison?: string }) {
-  return (
-    <div className="actu-chapitre flex items-end gap-3 px-5 pt-3">
-      <span className="text-[44px] leading-[0.8] tracking-tight" style={{ fontFamily: ANTON }}>
-        J{j}
-      </span>
-      <span className="mono-label pb-0.5 text-foreground/45">{[saison, date].filter(Boolean).join(" · ")}</span>
-      <span className="mb-1.5 h-px flex-1 bg-foreground/12" />
-    </div>
-  );
-}
-
 /* ------------------------------- Les genres ------------------------------- */
 
-function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saison?: string; enCours: boolean; onClassements: () => void }) {
+export function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saison?: string; enCours: boolean; onClassements: () => void }) {
   const id = useIdentites();
   const { me } = useMyPlayer();
   const { saison: s, players } = useSeason();
@@ -292,7 +357,7 @@ function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saiso
           texte={top.map((p) => `${p.rank}. ${id.nom(p.name)} ${p.pp} pts`).join(" · ")}
           partage={{ titre: "Le podium du Pépite d'Or", j: a.j, lignes: top.map((p) => ({ n: p.name, v: `${p.rank}e · ${p.pp} pts` })) }}
           action={
-            <button type="button" onClick={onClassements} className="-mt-1 flex shrink-0 items-center gap-0.5 rounded-full py-1.5 pl-2 text-[13.5px] font-semibold">
+            <button type="button" onClick={onClassements} className="bouton-discret bouton--or -mt-1 flex shrink-0 items-center gap-0.5 py-1.5 pr-1 pl-2.5 text-[13.5px] font-semibold">
               Classements <ChevronRight className="size-4" />
             </button>
           }
@@ -340,7 +405,7 @@ function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saiso
           texte={`${a.buts} ${pl(a.buts, "but", "buts")} · ${a.matchs} ${pl(a.matchs, "match", "matchs")} · ${joueurs} joueurs`}
           action={
             enCours ? (
-              <Link href={`/ligue/journee?j=${a.j}`} className="-mt-1 flex shrink-0 items-center gap-0.5 rounded-full py-1.5 pl-2 text-[13.5px] font-semibold">
+              <Link href={`/ligue/journee?j=${a.j}`} className="bouton-discret bouton--vert -mt-1 flex shrink-0 items-center gap-0.5 py-1.5 pr-1 pl-2.5 text-[13.5px] font-semibold">
                 Le récap <ChevronRight className="size-4" />
               </Link>
             ) : null
@@ -352,7 +417,7 @@ function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saiso
 }
 
 /** Ton dimanche : la première publication du fil, si tu as joué le dernier. */
-function TonDimanche({ j, date }: { j: number; date: string }) {
+export function TonDimanche({ j, date }: { j: number; date: string }) {
   const { player, me } = useMyPlayer();
   const { saison } = useSeason();
   const lignes = saison.entries.filter((e) => e.j === j && e.player === me);
@@ -383,75 +448,9 @@ function TonDimanche({ j, date }: { j: number; date: string }) {
   );
 }
 
-/* ------------------------------- Une saison ------------------------------- */
-
-function FilSaison({ enCours, onClassements, nom, apres }: { enCours: boolean; onClassements: () => void; nom?: string; apres?: ReactNode }) {
-  const { saison, journees } = useSeason();
-  const { me } = useMyPlayer();
-  const fil = useMemo(() => filDeSaison(saison, journees, me, enCours), [saison, journees, me, enCours]);
-  // Le fil se déroule par paquets : on ne construit que ce qu'on approche.
-  const [n, setN] = useState(8);
-  const fin = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = fin.current;
-    if (!el) return;
-    const o = new IntersectionObserver(([e]) => e.isIntersecting && setN((x) => x + 8), { rootMargin: "1200px 0px" });
-    o.observe(el);
-    return () => o.disconnect();
-  }, [fil.length, n]);
-  const dernier = fil[0];
-  return (
-    <>
-      {enCours && dernier && <Chapitre j={dernier.j} date={dernier.date} />}
-      {enCours && dernier && <TonDimanche j={dernier.j} date={dernier.date} />}
-      {fil.slice(0, n).map((a, i) => (
-        <Fragment key={a.id}>
-          {/* La prochaine journée, entre les premières publications : on y répond en passant. */}
-          {i === 2 && apres}
-          {(i === 0 ? !enCours : a.j !== fil[i - 1].j) && <Chapitre j={a.j} date={a.date} />}
-          <PublicationActu a={a} saison={nom} enCours={enCours} onClassements={onClassements} />
-        </Fragment>
-      ))}
-      {fil.length <= 2 && apres}
-      {n < fil.length && <div ref={fin} className="h-px" />}
-    </>
-  );
-}
-
-/** La saison passée, au bout du fil : montée seulement quand on y arrive. */
-function SaisonPassee({ onClassements }: { onClassements: () => void }) {
-  const { saison } = useSeason();
-  const archive = saison.archives?.[saison.archives.length - 1];
-  const s = useMemo(() => (archive ? saisonDepuisArchive(archive) : null), [archive]);
-  const [visible, setVisible] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || visible) return;
-    const o = new IntersectionObserver(([e]) => e.isIntersecting && setVisible(true), { rootMargin: "900px 0px" });
-    o.observe(el);
-    return () => o.disconnect();
-  }, [visible]);
-  if (!archive || !s) return null;
-  return (
-    <>
-      <div ref={ref} className="flex items-center gap-3 px-5 pt-2">
-        <span className="h-px flex-1 bg-foreground/10" />
-        <span className="mono-label text-foreground/40">{archive.nom}</span>
-        <span className="h-px flex-1 bg-foreground/10" />
-      </div>
-      {visible && (
-        <SaisonArchiveProvider saison={s}>
-          <FilSaison enCours={false} onClassements={onClassements} nom={archive.nom} />
-        </SaisonArchiveProvider>
-      )}
-    </>
-  );
-}
-
 /* ---------------------------------- Le fil ---------------------------------- */
 
-function VoteDuJour({ me }: { me: string }) {
+export function VoteDuJour({ me }: { me: string }) {
   const isClient = useIsClient();
   const { journees } = useSeason();
   if (!isClient) return null;
@@ -468,76 +467,5 @@ function VoteDuJour({ me }: { me: string }) {
         </section>
       ))}
     </>
-  );
-}
-
-type Vue = "actus" | "classements" | "matchs";
-// Pas de bouton « Actus » : on y est déjà (Sabri, 22/10). Toucher le bouton
-// actif ramène au fil.
-const VUES: [Vue, string][] = [
-  ["classements", "Classement"],
-  ["matchs", "Match"],
-];
-
-/**
- * L'onglet : « League | Bola | Team », puis deux boutons, Classement et Match,
- * comme la Ligue d'avant (Sabri, 22/10 : « faire un mix des deux et un équilibre ») : le fil
- * en cinématiques, les classements complets, les matchs.
- */
-export function FilActus({ vueDepart = "actus" }: { vueDepart?: Vue }) {
-  const { me } = useMyPlayer();
-  const [vue, setVue] = useState<Vue>(vueDepart);
-
-  return (
-    <div className="mx-auto flex w-full max-w-[470px] flex-col gap-6 pt-2 pb-8 sm:pt-6">
-      <div className="flex items-center justify-between px-5">
-        <h1 className="sr-only">Actus</h1>
-        <ChoixLigue actif="/ligue" />
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <BoutonStats className="size-10 sm:size-11" />
-          <BoutonRecherche className="size-10 sm:size-11" />
-        </div>
-      </div>
-      <div className="-mt-1 px-5">
-        <div className="flex gap-2" role="tablist" aria-label="Vue">
-          {VUES.map(([id, label]) => (
-            <button
-              key={id}
-              role="tab"
-              aria-selected={vue === id}
-              onClick={() => {
-                setVue(vue === id ? "actus" : id);
-                document.getElementById("app-scroll")?.scrollTo({ top: 0 });
-              }}
-              className={cn(
-                "flex-1 rounded-full px-3 py-2.5 text-[14px] font-semibold whitespace-nowrap transition-colors",
-                vue === id ? "bg-foreground text-background" : "glass text-foreground"
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-      {vue === "classements" ? (
-        <VueClassements vote={<VoteDuJour me={me} />} />
-      ) : vue === "matchs" ? (
-        <VueMatchs />
-      ) : (
-        <>
-          <VoteDuJour me={me} />
-          <FilSaison
-            enCours
-            onClassements={() => setVue("classements")}
-            apres={
-              <div className="px-4">
-                <PresencePanel compact />
-              </div>
-            }
-          />
-          <SaisonPassee onClassements={() => setVue("classements")} />
-        </>
-      )}
-    </div>
   );
 }

@@ -126,7 +126,7 @@ export function AccesJoueur({
                     () => {}
                   );
                 }}
-                className="bouton-principal flex items-center justify-center gap-1.5 py-2.5 text-[13.5px] font-bold"
+                className="bouton-principal bouton--mauve flex items-center justify-center gap-1.5 py-2.5 text-[13.5px] font-bold"
               >
                 {copie ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                 {copie ? "Copié" : "Copier pour l'envoyer"}
@@ -140,7 +140,7 @@ export function AccesJoueur({
                   <button
                     onClick={() => void provisoire()}
                     disabled={busy}
-                    className="bouton-secondaire flex items-center justify-center gap-1.5 py-2.5 text-[13.5px] font-semibold"
+                    className="bouton-secondaire bouton--vert flex items-center justify-center gap-1.5 py-2.5 text-[13.5px] font-semibold"
                   >
                     {busy ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
                     Lui donner un mot de passe provisoire

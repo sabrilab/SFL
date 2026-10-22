@@ -155,7 +155,7 @@ export function GuideInstallation() {
             <button
               type="button"
               onClick={fait}
-              className="bouton-discret w-full py-3 text-[14px] font-semibold"
+              className="bouton-discret bouton--vert w-full py-3 text-[14px] font-semibold"
             >
               C&apos;est fait
             </button>
@@ -163,7 +163,7 @@ export function GuideInstallation() {
           <button
             type="button"
             onClick={plusTard}
-            className="py-2 text-[12.5px] font-medium text-foreground/35 active:opacity-60"
+            className="bouton-discret px-4 py-2 text-[12.5px] font-medium"
           >
             {env.appHote ? `Rester dans ${env.appHote === "une app" ? "cette app" : env.appHote}` : "Plus tard"}
           </button>
@@ -224,7 +224,7 @@ function SortieApp({
       {lien && (
         <a
           href={lien}
-          className="bouton-principal mt-8 flex items-center justify-center py-4 text-[15px] font-bold"
+          className="bouton-principal bouton--vert mt-8 flex items-center justify-center py-4 text-[15px] font-bold"
         >
           Ouvrir dans {navigateur}
         </a>
@@ -336,7 +336,7 @@ function Installation({
         <button
           type="button"
           onClick={onInstaller}
-          className="bouton-principal mt-8 flex items-center justify-center py-4 text-[15px] font-bold"
+          className="bouton-principal bouton--vert mt-8 flex items-center justify-center py-4 text-[15px] font-bold"
         >
           Installer
         </button>

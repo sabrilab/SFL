@@ -131,7 +131,7 @@ function TaVille({ me, chercher = false }: { me: string; chercher?: boolean }) {
           aria-pressed={!mienne.cachee}
           className={cn(
             "grid size-10 shrink-0 place-items-center disabled:opacity-50",
-            mienne.cachee ? "bouton-secondaire text-muted-foreground" : "bouton-principal"
+            mienne.cachee ? "bouton-secondaire text-muted-foreground" : "bouton-principal bouton--mauve"
           )}
         >
           {mienne.cachee ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
@@ -182,7 +182,7 @@ export function CatalogueJoueurs({
           type="button"
           aria-pressed={!focus}
           onClick={() => onFocus(null)}
-          className={cn("flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-semibold", !focus ? "bg-foreground text-background" : "bg-secondary")}
+          className={cn("flex h-8 shrink-0 items-center gap-1.5 px-3.5 text-[13.5px] font-semibold", !focus ? "bouton-principal" : "bouton-secondaire")}
         >
           Toutes <span className="font-mono text-[11px] opacity-60">{total}</span>
         </button>
@@ -194,7 +194,7 @@ export function CatalogueJoueurs({
               type="button"
               aria-pressed={actif}
               onClick={() => onFocus([v.id])}
-              className={cn("flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-semibold", actif ? "bg-foreground text-background" : "bg-secondary")}
+              className={cn("flex h-8 shrink-0 items-center gap-1.5 px-3.5 text-[13.5px] font-semibold", actif ? "bouton-principal" : "bouton-secondaire")}
             >
               {v.ville}
               {ma && cleVille(ma.ville) === v.id && <span className="size-1.5 rounded-full bg-current" />}

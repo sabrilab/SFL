@@ -80,7 +80,7 @@ export function Defier({
               <Input type="time" value={heure} step={900} onChange={(e) => setHeure(e.target.value)} aria-label="L'heure" />
             </div>
             <Input value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Le terrain" maxLength={120} />
-            <Button disabled={!pret || envoi} onClick={envoyer} className="h-12 rounded-full text-[15px] font-semibold">
+            <Button variant="mauve" disabled={!pret || envoi} onClick={envoyer} className="h-12 rounded-full text-[15px] font-semibold">
               Envoyer le défi
             </Button>
           </div>

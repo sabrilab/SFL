@@ -133,7 +133,7 @@ export function PseudoCard() {
             type="submit"
             disabled={!pret || envoi}
             className={cn(
-              "bouton-principal flex shrink-0 items-center gap-1.5 px-4 py-2.5 text-[13px] font-bold",
+              "bouton-principal bouton--vert flex shrink-0 items-center gap-1.5 px-4 py-2.5 text-[13px] font-bold",
               (!pret || envoi) && "opacity-40"
             )}
           >
