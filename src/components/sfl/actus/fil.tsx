@@ -14,7 +14,7 @@
 // rejoue ; toucher une carte l'ouvre en grand.
 
 import Link from "next/link";
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronRight, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -80,7 +80,100 @@ function Carrousel({ images, ratio }: { images: { duree: number; media: ReactNod
   );
 }
 
-function Publication({
+/**
+ * Comment une publication se pose dans le fil (les variantes du fil,
+ * fil-variantes.tsx) : « post », la scène puis sa légende (le fil de
+ * /ligue) ; « film », les scènes bord à bord avec une ligne de sous-titre ;
+ * « case », la scène en réduction dans une grille, qu'on ouvre en grand.
+ */
+export type Mode = "post" | "film" | "case";
+export const ModeFil = createContext<{ mode: Mode; ouvrir?: (n: ReactNode) => void; hauteur?: number }>({ mode: "post" });
+
+function Publication(props: Parameters<typeof PublicationPost>[0]) {
+  const { mode, ouvrir, hauteur } = useContext(ModeFil);
+  if (mode === "film") return <PublicationFilm {...props} />;
+  if (mode === "case") {
+    const { duree, media, ratio = 4 / 5, images, titre } = props;
+    return (
+      <article
+        className="actu-case flex shrink-0 cursor-pointer flex-col gap-1.5 break-inside-avoid"
+        style={hauteur ? { width: Math.min(hauteur * ratio, 300) } : undefined}
+        onClickCapture={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          ouvrir?.(
+            <ModeFil.Provider value={{ mode: "film" }}>
+              <PublicationFilm {...props} />
+            </ModeFil.Provider>
+          );
+        }}
+      >
+        <Reduit ratio={ratio}>
+          {images ? <Ecran duree={images[0].duree} ratio={ratio}>{images[0].media}</Ecran> : <Ecran duree={duree} ratio={ratio}>{media}</Ecran>}
+        </Reduit>
+        <p className="line-clamp-1 px-0.5 text-[12px] leading-tight font-semibold text-foreground/80">{titre}</p>
+      </article>
+    );
+  }
+  return <PublicationPost {...props} />;
+}
+
+/**
+ * Une scène en réduction : construite à la largeur d'un téléphone (390 px,
+ * celle pour laquelle les cinématiques sont réglées), puis ramenée à la
+ * largeur de sa case.
+ */
+export function Reduit({ ratio, children, base = 390 }: { ratio: number; children: ReactNode; base?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [l, setL] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const o = new ResizeObserver(([e]) => setL(e.contentRect.width));
+    o.observe(el);
+    return () => o.disconnect();
+  }, []);
+  const k = l / base;
+  return (
+    <div ref={ref} className="relative w-full overflow-hidden rounded-[14px]" style={{ height: l ? base / ratio * k : undefined, aspectRatio: l ? undefined : ratio }}>
+      {l > 0 && (
+        <div className="absolute top-0 left-0 origin-top-left" style={{ width: base, transform: `scale(${k})` }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Le film : la scène bord à bord, puis une ligne de sous-titre, sans marge. */
+function PublicationFilm({ j, date, saison, duree, media, ratio = 4 / 5, images, titre, partage, action }: Parameters<typeof PublicationPost>[0]) {
+  const router = useRouter();
+  return (
+    <article className="actu-film flex flex-col bg-black">
+      {images ? <Carrousel images={images} ratio={ratio} /> : <Ecran duree={duree} ratio={ratio}>{media}</Ecran>}
+      <div className={cn("flex min-h-10 items-center gap-2 pr-1.5 pl-4", images && "pt-5")}>
+        <span className="mono-label shrink-0 text-white/40">{[saison, j != null && `J${j}`, date].filter(Boolean).join(" · ")}</span>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-white/85">{titre}</span>
+        {action}
+        {partage && (
+          <button
+            type="button"
+            aria-label="Partager au Vestiaire"
+            onClick={() => {
+              preparerPiece({ type: "ligue", ...partage, lignes: partage.lignes.slice(0, 6) });
+              router.push("/vestiaire");
+            }}
+            className="grid size-8 shrink-0 place-items-center rounded-full text-white/55 transition-transform active:scale-90"
+          >
+            <MessageCircle className="size-[17px]" strokeWidth={1.8} />
+          </button>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function PublicationPost({
   duree,
   media,
   ratio = 4 / 5,
@@ -154,7 +247,7 @@ function Chapitre({ j, date, saison }: { j: number; date: string; saison?: strin
 
 /* ------------------------------- Les genres ------------------------------- */
 
-function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saison?: string; enCours: boolean; onClassements: () => void }) {
+export function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saison?: string; enCours: boolean; onClassements: () => void }) {
   const id = useIdentites();
   const { me } = useMyPlayer();
   const { saison: s, players } = useSeason();
@@ -352,7 +445,7 @@ function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saiso
 }
 
 /** Ton dimanche : la première publication du fil, si tu as joué le dernier. */
-function TonDimanche({ j, date }: { j: number; date: string }) {
+export function TonDimanche({ j, date }: { j: number; date: string }) {
   const { player, me } = useMyPlayer();
   const { saison } = useSeason();
   const lignes = saison.entries.filter((e) => e.j === j && e.player === me);
@@ -451,7 +544,7 @@ function SaisonPassee({ onClassements }: { onClassements: () => void }) {
 
 /* ---------------------------------- Le fil ---------------------------------- */
 
-function VoteDuJour({ me }: { me: string }) {
+export function VoteDuJour({ me }: { me: string }) {
   const isClient = useIsClient();
   const { journees } = useSeason();
   if (!isClient) return null;
@@ -484,7 +577,14 @@ const VUES: [Vue, string][] = [
  * comme la Ligue d'avant (Sabri, 22/10 : « faire un mix des deux et un équilibre ») : le fil
  * en cinématiques, les classements complets, les matchs.
  */
-export function FilActus({ vueDepart = "actus" }: { vueDepart?: Vue }) {
+export function FilActus({
+  vueDepart = "actus",
+  variante,
+}: {
+  vueDepart?: Vue;
+  /** Un autre fil à la place de celui-ci (les variantes, /ligue/fil). */
+  variante?: (ouvrirClassements: () => void) => ReactNode;
+}) {
   const { me } = useMyPlayer();
   const [vue, setVue] = useState<Vue>(vueDepart);
 
@@ -524,6 +624,8 @@ export function FilActus({ vueDepart = "actus" }: { vueDepart?: Vue }) {
         <VueClassements vote={<VoteDuJour me={me} />} />
       ) : vue === "matchs" ? (
         <VueMatchs />
+      ) : variante ? (
+        variante(() => setVue("classements"))
       ) : (
         <>
           <VoteDuJour me={me} />
