@@ -1,20 +1,23 @@
 "use client";
 
-// Les deux fils de l'onglet Actus, côte à côte (Sabri, 22/10) : les Actus de
-// la SFL, la ligue du dimanche avec sa saison, et la Ligue vierge, qui compte
-// à vie les matchs Bola que les joueurs ouvrent eux-mêmes (app/ligue-vierge).
+// Les trois façons de jouer, côte à côte en tête de l'onglet Actus (Sabri,
+// 22/10, « en gros League et Team ») : League, le fil de la SFL, la ligue du
+// dimanche avec sa saison ; Bola, le classement à vie des matchs que les
+// joueurs ouvrent eux-mêmes (app/ligue-vierge, l'ancienne « Ligue vierge ») ;
+// Team, les matchs d'équipe (app/bola-team).
 
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 const LIGUES = [
-  { href: "/ligue", libelle: "Actus" },
-  { href: "/ligue-vierge", libelle: "Ligue vierge" },
+  { href: "/ligue", libelle: "League" },
+  { href: "/ligue-vierge", libelle: "Bola" },
+  { href: "/bola-team", libelle: "Team" },
 ] as const;
 
-export function ChoixLigue({ actif, className }: { actif: "/ligue" | "/ligue-vierge"; className?: string }) {
+export function ChoixLigue({ actif, className }: { actif: (typeof LIGUES)[number]["href"]; className?: string }) {
   return (
-    <nav aria-label="Actus ou Ligue vierge" className={cn("flex items-baseline gap-4", className)}>
+    <nav aria-label="League, Bola ou Team" className={cn("flex items-baseline gap-3.5", className)}>
       {LIGUES.map((l) => (
         <Link
           key={l.href}

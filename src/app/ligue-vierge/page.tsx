@@ -43,7 +43,7 @@ function Podium({ top, moi }: { top: Classe[]; moi: string | null }) {
       {marches.map(({ p, size }, i) =>
         p ? (
           <div key={p.id} className="flex min-w-0 flex-col items-center gap-1.5">
-            <Carte name={p.name} size={size} detail={`Ligue vierge · ${p.points} pts`} />
+            <Carte name={p.name} size={size} detail={`Bola · ${p.points} pts`} />
             <span
               className={cn(
                 "max-w-[120px] truncate font-semibold",
@@ -70,7 +70,7 @@ function Ligne({ c, moi }: { c: Classe; moi: string | null }) {
   return (
     <div className={cn("glass-soft flex items-center gap-3 rounded-[18px] px-3.5 py-2.5", c.id === moi && "bg-primary/10")}>
       <span className="w-7 text-[15px] font-bold text-foreground/40 tabular-nums">{c.rank}</span>
-      <Carte name={c.name} size={FORMAT_CARTE.petite} detail={`Ligue vierge · ${c.points} pts`} />
+      <Carte name={c.name} size={FORMAT_CARTE.petite} detail={`Bola · ${c.points} pts`} />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[15px] font-semibold"><Nom n={c.name} /></span>
         <span className="mono-label text-foreground/40">
@@ -220,7 +220,7 @@ export default function LigueViergePage() {
   return (
     <div className="mx-auto flex w-full max-w-[470px] flex-col gap-6 px-5 pt-2 pb-8 sm:pt-6">
       <div className="flex flex-col gap-2.5">
-        <h1 className="sr-only">Ligue vierge</h1>
+        <h1 className="sr-only">Bola</h1>
         <ChoixLigue actif="/ligue-vierge" />
         {vus && vus.length > 0 && (
           <span className="mono-label text-foreground/40">
@@ -233,7 +233,7 @@ export default function LigueViergePage() {
 
       {vus === null ? (
         actif ? null : (
-          <div className="glass-soft rounded-3xl px-6 py-10 text-center text-sm text-foreground/45">Connecte-toi pour voir la Ligue vierge.</div>
+          <div className="glass-soft rounded-3xl px-6 py-10 text-center text-sm text-foreground/45">Connecte-toi pour voir le classement Bola.</div>
         )
       ) : classement.length === 0 ? (
         <div className="glass-soft rounded-3xl px-6 py-10 text-center text-sm text-foreground/45">

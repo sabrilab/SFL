@@ -56,7 +56,7 @@ export interface EnTeteFeuille {
  * la photo (ou une silhouette grise sans photo), la note dans un onglet aux
  * couleurs de l'équipe.
  */
-function Pastille({
+export function Pastille({
   player,
   nom,
   cote,
@@ -151,10 +151,10 @@ interface Pose {
 }
 
 /** Le cadre du terrain, dans l'app comme dans l'image. */
-const CADRE_H = 540;
+export const CADRE_H = 540;
 
 /** Vertical : la profondeur (8 le but, 40 l'attaque) en px depuis la médiane du terrain couché. */
-const depuisMediane = (profondeur: number) =>
+export const depuisMediane = (profondeur: number) =>
   62 + ((40 - profondeur) / 32) * (TERRAIN.h / 2 - 98);
 
 /**
@@ -162,7 +162,7 @@ const depuisMediane = (profondeur: number) =>
  * chevaucheraient ; on les décale. Chez moi (devant), l'attaque se resserre ;
  * en face (au fond, donc plus petit), elle s'écarte.
  */
-const ecart = (profondeur: number, chezMoi: boolean) =>
+export const ecart = (profondeur: number, chezMoi: boolean) =>
   profondeur < 16
     ? 1
     : chezMoi

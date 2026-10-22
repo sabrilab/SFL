@@ -30,7 +30,7 @@ export const NAV_ITEMS: NavItem[] = [
 const SOUS_PAGES: Record<string, string[]> = {
   "/": ["/map"],
   "/profil": ["/carte", "/collection", "/duel", "/reglages", "/avatar"],
-  "/ligue": ["/palmares", "/saisons", "/stats", "/ligue-vierge"],
+  "/ligue": ["/palmares", "/saisons", "/stats", "/ligue-vierge", "/bola-team"],
 };
 
 /** L'onglet de la page courante, par son href ; null hors des onglets. */

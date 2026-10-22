@@ -3,20 +3,22 @@
 // Ouvrir un match — n'importe quel joueur, sans être admin.
 //
 // Quatre choix, dans l'ordre où on se les pose : match ou exhibition, public
-// ou privé, quand, où. Puis qui : on ajoute les joueurs par leur identifiant
-// (ou leur nom), et ceux qui ont dit être libres à ce moment-là sont proposés
-// en premier — c'est le matchmaking, à la main. Un match privé ne montre que
-// ceux qu'on a ajoutés ; un public affiche ses places restantes sur la Map.
+// ou privé, quand, où. Puis qui, sur le terrain même (terrain-places.tsx) :
+// chaque place libre est un +, qui ouvre la liste des joueurs (libres à ce
+// moment-là, près de toi, partenaires, tous : choisir-joueur.tsx) ; toucher
+// un invité le retire. Un match privé ne montre que ceux qu'on a ajoutés ;
+// un public affiche ses places restantes sur la Map.
 
 import { useEffect, useMemo, useState } from "react";
-import { Minus, Plus, X } from "lucide-react";
+import { Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TerrainPlaces } from "@/components/sfl/matchs/terrain-places";
+import { ChoisirJoueur } from "@/components/sfl/matchs/choisir-joueur";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   aujourdhuiIso,
-  chercherProfils,
   direErreur,
   listerDispos,
   listerProfils,
@@ -29,7 +31,6 @@ import {
 } from "@/lib/sfl/matchs";
 import type { Terrain } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
-import { Nom } from "@/components/sfl/nom";
 
 function Choix<T extends string>({
   valeur,
@@ -87,7 +88,7 @@ export function OuvrirMatch({
   const [lieuLibre, setLieuLibre] = useState("");
   const [places, setPlaces] = useState(10);
   const [invites, setInvites] = useState<Profil[]>([]);
-  const [q, setQ] = useState("");
+  const [choisir, setChoisir] = useState(false);
   const [profils, setProfils] = useState<Profil[]>([]);
   const [dispos, setDispos] = useState<Dispo[]>([]);
   const [envoi, setEnvoi] = useState(false);
@@ -115,7 +116,7 @@ export function OuvrirMatch({
     const ids = new Set(dispos.filter((d) => d.moment === moment && d.playerId !== moi).map((d) => d.playerId));
     return profils.filter((p) => ids.has(p.id));
   }, [dispos, moment, profils, moi]);
-  const trouves = chercherProfils(profils, q).filter((p) => p.id !== moi);
+  const moiNom = profils.find((p) => p.id === moi)?.name ?? "Toi";
 
   const terrain = terrains.find((t) => t.id === terrainId) ?? null;
   const lieu = terrain?.nom ?? lieuLibre.trim();
@@ -126,7 +127,6 @@ export function OuvrirMatch({
   function ajouter(p: Profil) {
     if (pris.has(p.id) || pleins) return;
     setInvites((l) => [...l, p]);
-    setQ("");
   }
 
   async function ouvrir() {
@@ -232,62 +232,27 @@ export function OuvrirMatch({
             </div>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <p className="mono-label text-muted-foreground">
-              {visibilite === "prive" ? "Qui joue" : "Qui tu invites"} · {invites.length + 1}/{places}
-            </p>
-            {invites.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {invites.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setInvites((l) => l.filter((x) => x.id !== p.id))}
-                    className="flex items-center gap-1 rounded-full bg-foreground py-1.5 pr-2 pl-3 text-[13px] font-semibold text-background"
-                  >
-                    {p.name} <X className="size-3.5 opacity-60" />
-                  </button>
-                ))}
-              </div>
-            )}
-            {!pleins && (
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Identifiant ou nom" autoCapitalize="none" autoCorrect="off" />
-            )}
-            {trouves.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {trouves.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    disabled={pris.has(p.id)}
-                    onClick={() => ajouter(p)}
-                    className="rounded-full border border-border/60 bg-card px-3 py-1.5 text-[13px] font-medium disabled:opacity-35"
-                  >
-                    {p.name} <span className="text-muted-foreground">{p.username}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {!pleins && libres.some((p) => !pris.has(p.id)) && (
-              <>
-                <p className="mono-label mt-1 text-muted-foreground">Libres à ce moment-là</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {libres
-                    .filter((p) => !pris.has(p.id))
-                    .map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => ajouter(p)}
-                        className="flex items-center gap-1 rounded-full border border-border/60 bg-card px-3 py-1.5 text-[13px] font-medium"
-                      >
-                        <Plus className="size-3" /> <Nom n={p.name} />
-                      </button>
-                    ))}
-                </div>
-              </>
-            )}
-          </div>
+          {/* Le terrain du match : moi devant, mes invités, et un + sur chaque place libre. */}
+          <TerrainPlaces
+            places={places}
+            moi={moiNom}
+            occupants={[
+              { cle: moi ?? "moi", nom: moiNom },
+              ...invites.map((p) => ({ cle: p.id, nom: p.name })),
+            ]}
+            hauteur={460}
+            onPlus={pleins ? undefined : () => setChoisir(true)}
+            onOccupant={(o) => o.cle !== (moi ?? "moi") && setInvites((l) => l.filter((x) => x.id !== o.cle))}
+          />
+          <ChoisirJoueur
+            open={choisir}
+            onOpenChange={setChoisir}
+            profils={profils}
+            exclus={new Set([...(moi ? [moi] : []), ...invites.map((p) => p.id)])}
+            libres={new Set(libres.map((p) => p.id))}
+            moiNom={moiNom}
+            onChoisir={ajouter}
+          />
 
           <Button disabled={!pret || envoi} onClick={ouvrir} className="h-12 rounded-full text-[15px] font-semibold">
             {visibilite === "public"
