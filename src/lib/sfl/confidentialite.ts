@@ -32,11 +32,13 @@ export const AGE_ACCORD_PARENT = 15;
 
 /**
  * Qui répond de la politique : le responsable du traitement au sens du RGPD.
- * À COMPLÉTER PAR SABRI : son nom complet et une adresse email de contact.
- * Tant que l'email manque, le texte renvoie au message privé dans l'app.
+ * Bola, et pas une personne (Sabri, 22/10/2026 : « Dis pas par Sabri mais
+ * Bola »). Quand Bola aura une adresse de contact, la mettre dans email ; le
+ * jour où Bola devient une société, son nom légal va dans nom. Tant que
+ * l'email manque, le texte renvoie au message privé à un administrateur.
  */
 export const RESPONSABLE: { nom: string; email: string | null } = {
-  nom: "Sabri",
+  nom: "Bola",
   email: null,
 };
 

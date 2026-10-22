@@ -10,8 +10,9 @@
 // texte change avec lui ; si le changement touche à ce que les joueurs ont
 // accepté, VERSION_POLITIQUE aussi (lib/sfl/confidentialite.ts).
 //
-// Ce n'est pas un avis juridique : Sabri complète son identité et son
-// contact (RESPONSABLE) et le fait relire s'il le souhaite.
+// Ce n'est pas un avis juridique. Le texte parle au nom de Bola, jamais d'une
+// personne (RESPONSABLE, lib/sfl/confidentialite.ts) ; à faire relire avant
+// une ouverture au public.
 //
 // Attention aux espaces : le compilateur de Next (SWC) mange l'espace en tête
 // d'un texte JSX qui suit une balise ou une expression quand ce texte court
@@ -62,13 +63,14 @@ function Fort({ children }: { children: React.ReactNode }) {
 
 const contact = RESPONSABLE.email ? (
   <>
-    écris à {RESPONSABLE.nom}{" "}en message privé dans l&apos;app, ou à{" "}
+    écris à{" "}
     <a href={`mailto:${RESPONSABLE.email}`} className="font-semibold text-foreground underline underline-offset-2">
       {RESPONSABLE.email}
     </a>
+    , ou à un administrateur en message privé dans l&apos;app
   </>
 ) : (
-  <>écris à {RESPONSABLE.nom} en message privé dans l&apos;app</>
+  <>écris à un administrateur en message privé dans l&apos;app</>
 );
 
 export function TextePolitique() {
@@ -86,9 +88,9 @@ export function TextePolitique() {
 
       <Section titre="Qui s'en occupe">
         <P>
-          Bola est créée par {RESPONSABLE.nom}, qui décide de ce que l&apos;app fait de tes données : c&apos;est lui
-          le responsable du traitement, au sens du RGPD. Les administrateurs de la ligue, Sabri et Ilyes, accèdent à
-          certaines d&apos;entre elles pour la faire tourner.
+          {RESPONSABLE.nom}{" "}décide de ce que l&apos;app fait de tes données : c&apos;est le responsable du
+          traitement, au sens du RGPD. Les administrateurs de la ligue accèdent à certaines d&apos;entre elles pour
+          la faire tourner.
         </P>
         <P>Pour une question ou une demande, {contact}.</P>
       </Section>
