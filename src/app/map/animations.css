@@ -10,9 +10,10 @@
 
    Les stickers sont refaits par Leaflet à chaque changement : on n'anime
    que des classes posées au bon moment (`stk--entre`, `stk--vient`,
-   `stk--part`), jamais la transformation de Leaflet. Le mouvement passe par
-   la propriété `scale` et `translate`, qui s'ajoutent au `transform` du
-   dessin (penché, agrandi quand il est choisi). */
+   `stk--part`, `stk__bulle--saute`), jamais la transformation de Leaflet.
+   Le mouvement passe par la propriété `scale` et `translate`, qui
+   s'ajoutent au `transform` du dessin (penché, agrandi quand il est
+   choisi). */
 
 @media (prefers-reduced-motion: no-preference) {
   /* ── Les joueurs : une pile qui arrive se pose ; une ville qui s'ouvre
@@ -45,6 +46,7 @@
     animation: stk-pastille 0.42s cubic-bezier(0.3, 1.5, 0.5, 1) calc(var(--delai, 0ms) + 0.3s) backwards;
   }
   .stk--entre .stk__badge,
+  .stk--entre .stk__bulle,
   .stk--entre .stk__etiquette {
     animation: stk-pastille 0.42s cubic-bezier(0.3, 1.5, 0.5, 1) calc(var(--delai, 0ms) + 0.42s) backwards;
   }
@@ -76,6 +78,16 @@
     animation:
       stk-pastille 0.42s cubic-bezier(0.3, 1.5, 0.5, 1) calc(var(--delai, 0ms) + 0.42s) both,
       stk-respire 2.6s ease-in-out calc(var(--delai, 0ms) + 1.4s) infinite;
+  }
+
+  /* ── Un message arrive dans la discussion d'un match : sa bulle saute,
+     comme une notification, et se pose. ── */
+  .stk__bulle--saute {
+    animation: bulle-saute 0.62s cubic-bezier(0.3, 1.6, 0.5, 1) backwards;
+  }
+  .stk__bulle:active {
+    scale: 0.88;
+    transition: scale 0.12s ease-out;
   }
 
   /* ── L'onde qui part du terrain touché. ── */
@@ -149,13 +161,9 @@
   }
 
   /* ── La discussion d'un match : l'écran glisse depuis la droite, comme
-     une conversation qu'on ouvre ; au-dessus de la carte du match, chaque
-     message qui arrive monte en pilule et se pose. ── */
+     une conversation qu'on ouvre. ── */
   .discussion-entre {
     animation: discussion-entre 0.34s cubic-bezier(0.2, 0.85, 0.25, 1) backwards;
-  }
-  .pilule-entre {
-    animation: pilule-entre 0.5s cubic-bezier(0.3, 1.45, 0.5, 1) calc(var(--i, 0) * 70ms) backwards;
   }
 
   /* ── Les cartes du carrousel : la choisie grandit avec un ressort. ── */
@@ -255,9 +263,10 @@
   0% { translate: 100% 0; }
   100% { translate: 0 0; }
 }
-@keyframes pilule-entre {
-  0% { opacity: 0; scale: 0.72; translate: 0 16px; }
-  100% { opacity: 1; scale: 1; translate: 0 0; }
+@keyframes bulle-saute {
+  0% { scale: 0.35; rotate: -14deg; }
+  55% { scale: 1.22; rotate: 4deg; }
+  100% { scale: 1; rotate: 0deg; }
 }
 
 @keyframes grp-entre {

@@ -12,8 +12,8 @@
 // braise pour chaque joueur qui manque. Les arrivées (« Kader a rejoint le
 // match ») sont des lignes du fil, gardées tant qu'elles disent vrai.
 //
-// S'ouvre depuis les pilules au-dessus de la carte du match, depuis la fiche
-// du match, ou depuis une notification (/?match=12&discussion).
+// S'ouvre depuis la bulle de messages du match sur la Map, depuis sa fiche,
+// ou depuis une notification (/?match=12&discussion).
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { ChevronLeft } from "lucide-react";

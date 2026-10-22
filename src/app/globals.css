@@ -527,6 +527,58 @@
   color: #0a0b0d;
   border-color: #0a0b0d;
 }
+/* La discussion du match (22/10, stade.ts, bulleHtml) : une bulle de BD au
+   coin du sticker, la queue vers le stade. Rouge des pastilles d'iOS avec
+   le nombre de messages pas lus ; blanche avec trois points quand tout est
+   lu. Le doigt l'attrape un peu au-delà de son dessin. */
+.stk__bulle {
+  position: absolute;
+  right: -17px;
+  top: -20px;
+  width: 31px;
+  height: 26px;
+  transform-origin: 12% 95%;
+}
+.stk__bulle::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+}
+.stk__bulle svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.stk__bulle path {
+  fill: #f4f5f2;
+  stroke: #f4f5f2;
+  stroke-width: 1.5px;
+  stroke-linejoin: round;
+}
+.stk__bulle--nouveau path {
+  fill: #ff3b30;
+}
+.stk__bulle-dedans {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 21.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2.5px;
+  color: #ffffff;
+  font: 900 11.5px/1 var(--font-sans), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.stk__bulle-dedans i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #0a0b0d;
+  opacity: 0.5;
+}
 .stk__etiquette {
   position: absolute;
   left: 45px;

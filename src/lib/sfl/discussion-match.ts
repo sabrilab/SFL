@@ -13,8 +13,9 @@
 //
 // Ici aussi :
 //   · ce que chacun a lu et veut en notification (table match_suivi) ;
-//   · ce que la Map en montre (chargerApercus) : les derniers messages, en
-//     pilules au-dessus de la carte du match, et combien ne sont pas lus ;
+//   · ce que la Map en montre (chargerApercus) : quels matchs ont une
+//     discussion, et combien de messages je n'y ai pas lus — la bulle au
+//     coin du sticker du match, le nombre sur sa carte ;
 //   · l'arrivée d'un joueur (annoncerArrivee) : la ligne « Kader a rejoint
 //     le match », posée quand il prend une place ou accepte l'invitation, et
 //     dont le serveur prévient les autres (/api/matchs/discussion).
@@ -28,7 +29,6 @@ import { aujourdhuiIso, listerParties } from "@/lib/sfl/matchs";
 import { DEMO_DISCUSSION, filDemo } from "@/lib/sfl/discussion-match-demo";
 import {
   chargerFil,
-  estPiece,
   notifier,
   poster,
   reagir,
@@ -221,45 +221,29 @@ export function arriveesVisibles<M extends { id: number; auteurId: string; piece
 
 /* ------------------------------ Les aperçus ------------------------------ */
 
-export interface ApercuMessage {
-  id: number;
-  auteurId: string;
-  texte: string;
-  piece: Piece | null;
-  at: number;
-  mien: boolean;
-}
-
 export interface ApercuDiscussion {
   matchId: number;
-  /** Les derniers messages, du plus ancien au plus récent (huit au plus). */
-  derniers: ApercuMessage[];
-  /** Ceux des autres que je n'ai pas lus, dix au plus. Un invité lit sans compter : 0. */
+  /** Les messages des autres que je n'ai pas lus, dix au plus. Un invité lit sans compter : 0. */
   nonLus: number;
-  /** Jusqu'où j'ai lu (ms). */
-  lu: number;
 }
 
-const DERNIERS = 8;
 /** Au-delà, la pastille dit « 9+ » : inutile de compter plus loin. */
 const NON_LUS_MAX = 10;
 
-interface Brut {
-  id: number;
-  auteur: string;
-  texte: string;
-  piece?: unknown;
-  created_at: string;
-}
-
-function apercu(matchId: number, statut: "invite" | "inscrit", messages: ApercuMessage[], lu: number): ApercuDiscussion {
-  const nonLus = statut === "inscrit" ? messages.filter((m) => !m.mien && m.at > lu).length : 0;
-  return { matchId, derniers: messages.slice(-DERNIERS), nonLus: Math.min(NON_LUS_MAX, nonLus), lu };
+function apercu(
+  matchId: number,
+  statut: "invite" | "inscrit",
+  messages: { auteur: string; at: number }[],
+  moi: string,
+  lu: number
+): ApercuDiscussion {
+  const nonLus = statut === "inscrit" ? messages.filter((m) => m.auteur !== moi && m.at > lu).length : 0;
+  return { matchId, nonLus: Math.min(NON_LUS_MAX, nonLus) };
 }
 
 /**
  * Les discussions de mes matchs à venir (j'en suis : organisateur, inscrit ou
- * invité) : par match, ses derniers messages et ce que je n'ai pas lu.
+ * invité) : par match qui a des messages, ce que je n'y ai pas lu.
  */
 export async function chargerApercus(moi: string): Promise<Map<number, ApercuDiscussion>> {
   const sb = supabase();
@@ -276,17 +260,16 @@ export async function chargerApercus(moi: string): Promise<Map<number, ApercuDis
   const luBase = new Map(((suivis ?? []) as { match_id: number; lu_jusqua: string }[]).map((s) => [s.match_id, t(s.lu_jusqua)]));
   const luDe = (id: number) => Math.max(luLocal(id), luBase.get(id) ?? 0);
 
-  // Un match à la fois : douze messages suffisent pour les pilules et pour
-  // compter jusqu'à dix non lus.
+  // Un match à la fois : ses derniers messages, assez pour compter jusqu'à dix non lus.
   const fils = await Promise.all(
     [...statuts.keys()].map(async (id) => {
       const r = await sb
         .from("messages")
-        .select("id, auteur, texte, piece, created_at")
+        .select("auteur, created_at")
         .eq("canal", "match")
         .eq("match_id", id)
         .order("created_at", { ascending: false })
-        .limit(DERNIERS + 4);
+        .limit(NON_LUS_MAX + 2);
       return { id, r };
     })
   );
@@ -294,17 +277,8 @@ export async function chargerApercus(moi: string): Promise<Map<number, ApercuDis
 
   const res = new Map<number, ApercuDiscussion>();
   for (const { id, r } of fils) {
-    const messages = ((r.data ?? []) as Brut[])
-      .map((b) => ({
-        id: b.id,
-        auteurId: b.auteur,
-        texte: b.texte,
-        piece: estPiece(b.piece) ? b.piece : null,
-        at: t(b.created_at),
-        mien: b.auteur === moi,
-      }))
-      .reverse();
-    if (messages.length > 0) res.set(id, apercu(id, statuts.get(id)!, messages, luDe(id)));
+    const messages = ((r.data ?? []) as { auteur: string; created_at: string }[]).map((b) => ({ auteur: b.auteur, at: t(b.created_at) }));
+    if (messages.length > 0) res.set(id, apercu(id, statuts.get(id)!, messages, moi, luDe(id)));
   }
   return res;
 }
@@ -320,8 +294,8 @@ async function apercusDemo(
   for (const p of parties) {
     const statut = statuts.get(p.id);
     if (!statut) continue;
-    const messages = filDemo(p, moi).map(({ id, auteurId, texte, piece, at, mien }) => ({ id, auteurId, texte, piece, at, mien }));
-    if (messages.length > 0) res.set(p.id, apercu(p.id, statut, messages, luDe(p.id)));
+    const messages = filDemo(p, moi).map((m) => ({ auteur: m.auteurId, at: m.at }));
+    if (messages.length > 0) res.set(p.id, apercu(p.id, statut, messages, moi, luDe(p.id)));
   }
   return res;
 }

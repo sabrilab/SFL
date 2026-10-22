@@ -1,9 +1,10 @@
 "use client";
 
-// Les discussions de mes matchs à venir : pour chaque match dont je suis, ses
-// derniers messages et ce que je n'ai pas lu (lib/sfl/discussion-match.ts,
-// chargerApercus). La Map en fait les pilules au-dessus de la carte du
-// match ; la barre d'onglets, sa pastille et celle de l'icône.
+// Les discussions de mes matchs à venir : pour chaque match dont je suis et
+// où l'on a écrit, ce que je n'ai pas lu (lib/sfl/discussion-match.ts,
+// chargerApercus). La Map en fait la bulle de messages au coin du sticker du
+// match et le nombre sur sa carte ; la barre d'onglets, sa pastille et celle
+// de l'icône.
 //
 // Un seul chargement et un seul abonnement temps réel pour tout l'écran,
 // quel que soit le nombre de composants qui lisent : l'état vit ici, ils s'y

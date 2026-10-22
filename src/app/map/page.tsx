@@ -15,12 +15,12 @@
 // (`saison.terrains`) ; l'admin donne l'adresse de chaque match juste sous la
 // carte.
 //
-// La discussion d'un match (22/10) : au-dessus de la carte du match choisi,
-// ses deux derniers messages en pilules (matchs/pilules-discussion.tsx) ; les
-// toucher, ou « Discussion du match » dans sa fiche, ou la notification
-// (/?match=12&discussion), ouvre la discussion plein écran
-// (matchs/discussion-match.tsx). Une carte de match qui a des messages pas
-// lus porte leur nombre.
+// La discussion d'un match (22/10) : sur le plan, une bulle de messages au
+// coin de son sticker, rouge avec ce que je n'ai pas lu (Sabri : « comme une
+// notification dans la bulle du match ») ; la carte du match porte le même
+// nombre. La bulle, « Discussion du match » dans sa fiche, ou la
+// notification (/?match=12&discussion) ouvre la discussion plein écran
+// (matchs/discussion-match.tsx).
 //
 // Les joueurs (22/10, « en poursuivant l'idée de remplacer Snapchat ») :
 // chacun dans sa ville, en piles qui s'ouvrent quand on s'approche
@@ -40,7 +40,6 @@ import { PresencePanel } from "@/components/sfl/presence-panel";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
 import { DiscussionMatch } from "@/components/sfl/matchs/discussion-match";
-import { HAUTEUR_PILULES, PilulesDiscussion } from "@/components/sfl/matchs/pilules-discussion";
 import { FeuilleDeMatch } from "@/components/sfl/matchs/feuille-de-match";
 import { feuilleDeConvocation, feuilleDeJournee } from "@/lib/sfl/feuille";
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
@@ -371,7 +370,7 @@ export default function MapPage() {
   // Les matchs ouverts par les joueurs : un public montre ses places libres,
   // un privé n'apparaît qu'à ceux qui en sont.
   const { parties, moi, actif: partiesActives, recharger } = useParties();
-  // La discussion de chacun de mes matchs : ses derniers messages, mes non lus.
+  // La discussion de chacun de mes matchs : ce que je n'y ai pas lu.
   const { apercus } = useDiscussionsMatch();
   const matchsTeam = useMatchsTeam();
   const matchs = useMemo<MatchMap[]>(() => {
@@ -518,10 +517,6 @@ export default function MapPage() {
     if (a.discussion) ouvrirDiscussion(a.cle);
     else choisirSticker(a.cle);
   }, [affiches, choisirSticker, ouvrirDiscussion]);
-  // Les pilules ont leur place dès qu'un de mes matchs a sa discussion : faire
-  // défiler les cartes ne fait pas sauter la Map.
-  const avecDiscussion = affiches.some((m) => m.partie && apercus.has(m.partie.id));
-  const apercuChoisi = choisi?.partie ? apercus.get(choisi.partie.id) : undefined;
   const invitations = useMemo(() => invitationsDe(parties, moi), [parties, moi]);
 
   // Le carrousel et le plan vont ensemble : faire glisser les cartes choisit
@@ -579,8 +574,9 @@ export default function MapPage() {
           etat: m.etat,
           nom: m.terrain!.nom,
           ligue: m.ligue,
+          discussion: m.partie && apercus.has(m.partie.id) ? { nonLus: apercus.get(m.partie.id)!.nonLus } : undefined,
         })),
-    [affiches, choisi]
+    [affiches, choisi, apercus]
   );
 
   // Toi : ta position, quand tu la donnes.
@@ -699,8 +695,9 @@ export default function MapPage() {
             toi={toi}
             choisi={choisi?.cle ?? null}
             onChoisir={choisirSticker}
+            onBulle={ouvrirDiscussion}
             villes={villes}
-            margeBas={replie ? 150 : 380 + (avecDiscussion ? HAUTEUR_PILULES + 12 : 0)}
+            margeBas={replie ? 150 : 380}
             onVille={ouvrirVille}
             onJoueur={setProfil}
             viser={viser}
@@ -853,14 +850,6 @@ export default function MapPage() {
             aria-hidden={replie}
           >
           <div data-traverse className="flex min-h-0 flex-col items-center gap-3 overflow-hidden">
-          {/* Au-dessus de la carte choisie : les deux derniers messages de sa discussion. */}
-          {avecDiscussion && (
-            <div data-traverse className="w-full shrink-0" style={{ height: HAUTEUR_PILULES }}>
-              {apercuChoisi && choisi?.partie && (
-                <PilulesDiscussion key={choisi.cle} apercu={apercuChoisi} partie={choisi.partie} onOuvrir={() => ouvrirDiscussion(choisi.cle)} />
-              )}
-            </div>
-          )}
           <div
             ref={carrousel}
             onScroll={suivreCarrousel}
@@ -1241,8 +1230,8 @@ function CarteMatch({
         </div>
       </button>
       {/* Des messages pas lus dans sa discussion : leur nombre, comme sur une
-          icône d'iPhone. Sur la choisie, les pilules le disent déjà. */}
-      {nonLus > 0 && !choisi && (
+          icône d'iPhone. */}
+      {nonLus > 0 && (
         <span
           aria-hidden
           className="pointer-events-none absolute -top-1.5 -right-1.5 z-10 flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-[12px] leading-none font-bold text-white tabular-nums"

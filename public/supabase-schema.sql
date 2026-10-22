@@ -2560,8 +2560,8 @@ update public.profiles set contact_email = null where contact_email is not null;
 -- Sabri, 22/10 : quand des joueurs rejoignent un match, ils se parlent entre
 -- eux (« Le match, il est où ? », « vous connaissez quelqu'un de dispo ? »),
 -- et chacun est prévenu sur son téléphone, d'un message comme d'une arrivée.
--- Sur la Map, les deux derniers messages flottent au-dessus de la carte du
--- match.
+-- Sur la Map, une bulle de messages au coin du sticker du match dit ce qu'on
+-- n'a pas lu.
 --
 -- La discussion d'un match ouvert par un joueur vit dans la table des
 -- messages, canal 'match' : elle hérite des réponses, des réactions, des
@@ -2617,7 +2617,7 @@ create policy "messages: le match à ceux du match"
   with check (canal <> 'match' or public.dans_le_match(match_id));
 
 -- Où en est chaque joueur avec la discussion d'un match : jusqu'où il a lu
--- (les pilules non lues de la Map), ce qu'il en veut sur son téléphone
+-- (la bulle et les pastilles de la Map), ce qu'il en veut sur son téléphone
 -- (comme au Vestiaire : 'tout', 'cite', 'rien'), s'il l'a sous les yeux
 -- (devant_le, redit toutes les 20 s par l'app : pas de notification à qui la
 -- lit), et quand le serveur l'a prévenu pour la dernière fois (notifie_le,
@@ -2648,3 +2648,20 @@ revoke all on public.match_suivi from anon, authenticated;
 grant select on public.match_suivi to authenticated;
 grant insert (user_id, match_id, lu_jusqua, notifs, devant_le) on public.match_suivi to authenticated;
 grant update (user_id, match_id, lu_jusqua, notifs, devant_le) on public.match_suivi to authenticated;
+
+-- ─────────────────────────── Rappel de la veille ───────────────────────────
+-- Sabri, 22/10 : la veille d'un match ouvert par un joueur, ceux qui jouent
+-- (l'organisateur, les inscrits) reçoivent un rappel sur leur téléphone
+-- (/api/matchs/rappel, que le cron de Vercel appelle chaque soir). Une ligne
+-- par match et par jour : le cron peut passer deux fois, personne ne reçoit
+-- deux rappels ; un match déplacé à un autre jour aura le sien. Au serveur
+-- seul.
+create table if not exists public.match_rappels (
+  match_id   bigint not null references public.matchs(id) on delete cascade,
+  jour       date not null,
+  envoye_le  timestamptz not null default now(),
+  primary key (match_id, jour)
+);
+
+alter table public.match_rappels enable row level security;
+revoke all on public.match_rappels from anon, authenticated;

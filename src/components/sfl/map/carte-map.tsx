@@ -28,6 +28,10 @@
 // classes sont dans app/map/animations.css ; « Réduire les animations »
 // coupe le vol et les ressorts.
 //
+// La discussion d'un match dont je suis (22/10) : une bulle de messages au
+// coin de son sticker (map/stade.ts), qui saute quand un message arrive ;
+// la toucher ouvre la discussion.
+//
 // Les joueurs (22/10, façon Snap Map) : chacun dans sa ville, sous les
 // matchs. De loin des piles, de près des tournesols de cartes (la
 // disposition est dans map/joueurs.ts), refaits à chaque fin de zoom.
@@ -133,6 +137,7 @@ export function CarteMap({
   toi,
   choisi,
   onChoisir,
+  onBulle,
   onPoint,
   fond = "plan",
   villes = [],
@@ -155,6 +160,8 @@ export function CarteMap({
   toi: ToiPlan | null;
   choisi: string | null;
   onChoisir: (id: string) => void;
+  /** Toucher la bulle de messages d'un match : sa discussion. */
+  onBulle?: (id: string) => void;
   /** Toucher un terrain libre (un match possible) ; sans elle, les terrains ne réagissent pas. */
   onPoint?: (id: string) => void;
   /** La place que prennent les surcouches du bas (moins quand le carrousel est replié). */
@@ -186,6 +193,9 @@ export function CarteMap({
   const volFini = useRef(Infinity);
   const cibleVol = useRef<maplibregl.LngLatBounds | null>(null);
   const choisirRef = useRef(onChoisir);
+  const bulleRef = useRef(onBulle);
+  // Les messages pas lus de chaque match, la dernière fois : la bulle saute quand il y en a plus.
+  const nonLusVus = useRef(new Map<string, number>());
   const pointRef = useRef(onPoint);
   const villeRef = useRef(onVille);
   const joueurRef = useRef(onJoueur);
@@ -197,11 +207,12 @@ export function CarteMap({
   const cadre = useRef<unknown[]>([]);
   useEffect(() => {
     choisirRef.current = onChoisir;
+    bulleRef.current = onBulle;
     pointRef.current = onPoint;
     villeRef.current = onVille;
     joueurRef.current = onJoueur;
     margeBasRef.current = margeBas;
-  }, [onChoisir, onPoint, onVille, onJoueur, margeBas]);
+  }, [onChoisir, onBulle, onPoint, onVille, onJoueur, margeBas]);
   const pointsActifs = !!onPoint;
 
   // La carte, une fois.
@@ -301,6 +312,12 @@ export function CarteMap({
       const est = s.id === choisi;
       const m = repere(map, s.lat, s.lng, stickerHtml(s, est, variante), { classe: "stk-ancre", z: est ? 3 + ordre.length : 3 + k });
       m.getElement().addEventListener("click", (e) => {
+        // Sa bulle de messages : droit à la discussion.
+        if (bulleRef.current && (e.target as HTMLElement).closest(".stk__bulle")) {
+          navigator.vibrate?.(6);
+          bulleRef.current(s.id);
+          return;
+        }
         // Un sticker qui en range d'autres : s'approcher pour les séparer ;
         // sa pastille de joueurs seuls ouvre leurs villes.
         const g = groupeDe.current.get(s.id);
@@ -322,6 +339,12 @@ export function CarteMap({
       poses.push(m);
       stickersVus.push({ s, el: m.getElement() });
       const el = m.getElement().querySelector<HTMLElement>(".stk");
+      // Un message de plus depuis la dernière fois : la bulle saute.
+      const nonLus = s.discussion?.nonLus ?? 0;
+      const avantNonLus = nonLusVus.current.get(s.id);
+      if (doux && avantNonLus !== undefined && nonLus > avantNonLus)
+        m.getElement().querySelector(".stk__bulle")?.classList.add("stk__bulle--saute");
+      nonLusVus.current.set(s.id, nonLus);
       if (!entrees.current.has(s.id)) entrees.current.set(s.id, Math.max(0, depuis) + rang++ * CADENCE);
       if (el && doux) {
         const retard = (entrees.current.get(s.id) ?? 0) - depuis + (origine.current == null ? VOL * 1000 - 250 : 0);
