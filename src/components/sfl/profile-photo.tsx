@@ -1,19 +1,19 @@
 "use client";
 
-// Photo de profil du joueur — pastille ronde avec badge appareil photo, comme
-// sur les réseaux sociaux. Choix d'une image depuis la galerie ou l'appareil
-// photo, recadrage carré automatique, recompression, puis stockage.
+// Photo de profil du joueur — pastille ronde, comme sur les réseaux sociaux.
 //
-// « Photo officielle » ouvre le studio (photo-studio.tsx) : la photo faite
-// là-bas repasse par le même recadrage avant de partir. Tant que le joueur
-// n'a pas posé de photo, c'est le grand bouton sous la pastille ; ensuite,
-// un simple lien à côté de Retirer et Recadrer.
+// Elle ne vient que du studio (photo-studio.tsx) : plus de choix dans la
+// pellicule (Sabri, 22/10/2026 : « Les utilisateurs ne doivent pas pouvoir
+// mettre de cartes de leurs pellicules »). Toucher la pastille ouvre le
+// studio, et la photo faite là-bas passe par le recadrage avant de partir.
+// Tant que le joueur n'a pas de photo, c'est le grand bouton sous la
+// pastille ; ensuite, un simple lien à côté de Retirer et Recadrer.
 //
 // La photo part à la ligue : elle remplit la carte du joueur chez tout le
 // monde (voir lib/sfl/photos).
 
-import { useRef, useState } from "react";
-import { Camera, Crop, Sparkles, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Crop, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { usePhotoPerso, usePlayerPhoto } from "@/hooks/use-player-photo";
@@ -27,7 +27,6 @@ import { useIdentites } from "@/hooks/use-identites";
 export function ProfilePhoto({ name }: { name: string }) {
   const src = usePlayerPhoto(name);
   const identite = useIdentites();
-  const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [broken, setBroken] = useState(false);
   const perso = usePhotoPerso(name);
@@ -35,12 +34,11 @@ export function ProfilePhoto({ name }: { name: string }) {
   const { allPlayers } = useSeason();
   const joueur = allPlayers.find((p) => p.name === name);
   const stats = joueur?.stats ?? { VIT: 60, TIR: 60, PAS: 60, DRI: 60, DEF: 60, PHY: 60 };
-  // L'image en cours de recadrage (le fichier choisi, ou la photo actuelle).
+  // L'image en cours de recadrage (la photo du studio, ou la photo actuelle).
   const [aRecadrer, setARecadrer] = useState<string | null>(null);
   const [studio, setStudio] = useState(false);
 
   function fermer() {
-    if (aRecadrer?.startsWith("blob:")) URL.revokeObjectURL(aRecadrer);
     setARecadrer(null);
   }
 
@@ -59,25 +57,14 @@ export function ProfilePhoto({ name }: { name: string }) {
     }
   }
 
-  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    // On réinitialise tout de suite : sans ça, rechoisir le même fichier
-    // ne déclenche pas de nouvel événement.
-    e.target.value = "";
-    if (!file) return;
-
-    // D'abord on la place : le visage là où on le veut, puis elle part.
-    setARecadrer(URL.createObjectURL(file));
-  }
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-4">
         <button
           type="button"
-          onClick={() => input.current?.click()}
+          onClick={() => setStudio(true)}
           disabled={busy}
-          aria-label="Changer ma photo de profil"
+          aria-label="Ma photo officielle"
           className="relative size-20 shrink-0 rounded-full transition-opacity active:opacity-70 disabled:opacity-50"
         >
           <span className="block size-20 overflow-hidden rounded-full bg-foreground/10 ring-1 ring-foreground/15">
@@ -97,7 +84,7 @@ export function ProfilePhoto({ name }: { name: string }) {
             )}
           </span>
           <span className="absolute right-0 bottom-0 flex size-7 items-center justify-center rounded-full bg-foreground text-background ring-2 ring-background">
-            <Camera className="size-3.5" />
+            <Sparkles className="size-3.5" />
           </span>
         </button>
   
@@ -105,7 +92,6 @@ export function ProfilePhoto({ name }: { name: string }) {
           <p className="text-[15px] font-semibold">Ma photo</p>
           <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
             Elle apparaît sur ta carte, chez tous les joueurs de la ligue.
-            Recadrée en carré automatiquement.
           </p>
           {hasCustom && (
             <Button
@@ -165,14 +151,6 @@ export function ProfilePhoto({ name }: { name: string }) {
         carte={{ name, affiche: identite.nom(name), username: identite.pseudo(name), position: joueur?.poste ?? "", overall: ovr(stats), stats }}
         onValider={valider}
         onFermer={fermer}
-      />
-
-      <input
-        ref={input}
-        type="file"
-        accept="image/*"
-        onChange={onPick}
-        className="hidden"
       />
     </div>
   );

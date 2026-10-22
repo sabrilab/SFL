@@ -4,9 +4,14 @@
 //
 // Avant, seul l'admin fabriquait les comptes et distribuait les accès. Ici le
 // joueur crée le sien, une question par écran, et voit sa carte se remplir à
-// chaque réponse : son nom, son pseudo, son poste, puis sa photo. Viennent
-// ensuite les quatre photos en pied imposées (face, droite, gauche, dos), le
-// personnage de référence des futurs skins, et le mot de passe.
+// chaque réponse : son nom, son pseudo, son poste. Viennent ensuite les quatre
+// photos en pied imposées (face, droite, gauche, dos), le personnage de
+// référence des futurs skins, et le mot de passe.
+//
+// Pas de photo de carte ici : elle ne vient que du studio (photo-studio.tsx,
+// Sabri, 22/10/2026 : pas de photo de pellicule sur les cartes), qui demande
+// un compte accepté. L'invitation de l'ouverture (invitation-carte.tsx) la
+// propose dès que l'admin a dit oui.
 //
 // Proportions : tout suit le nombre d'or. La carte occupe le petit segment de
 // l'écran (0,382), la question le grand (0,618) ; espacements 8 · 13 · 21 ·
@@ -19,13 +24,12 @@
 //
 // Page publique (hors de la porte de connexion, voir AuthGate).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ChevronLeft, Eye, EyeOff, Loader2, Minus, Plus, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BolaCard } from "@/components/sfl/bola-card";
-import { RecadrerPhoto } from "@/components/sfl/recadrer-photo";
 import { PriseReference } from "@/components/sfl/inscription/prise-reference";
 import { ovr, type Stats } from "@/lib/sfl/engine";
 import {
@@ -38,7 +42,6 @@ import {
   type Fournisseur,
 } from "@/lib/sfl/auth/session";
 import { BoutonsSociaux } from "@/components/sfl/auth/boutons-sociaux";
-import { setPhoto } from "@/lib/sfl/photos";
 import { envoyerReferences } from "@/lib/sfl/references";
 import { useSession } from "@/hooks/use-session";
 import {
@@ -57,7 +60,7 @@ import {
   type Inscription,
 } from "@/lib/sfl/inscription";
 
-const ETAPES = ["accueil", "identite", "contact", "naissance", "gabarit", "jeu", "photo", "angles", "secret", "fini"] as const;
+const ETAPES = ["accueil", "identite", "contact", "naissance", "gabarit", "jeu", "angles", "secret", "fini"] as const;
 type Etape = (typeof ETAPES)[number];
 
 /** Par Google ou Apple : ni email (le fournisseur le donne), ni mot de passe. */
@@ -220,8 +223,6 @@ export default function InscriptionPage() {
   const [confirmation, setConfirmation] = useState("");
   const [voir, setVoir] = useState(false);
   const [piege, setPiege] = useState("");
-  const [photo, setPhotoCarte] = useState<string | null>(null);
-  const [aRecadrer, setARecadrer] = useState<string | null>(null);
   const [refs, setRefs] = useState<Partial<Record<Angle, string>>>({});
   const [prise, setPrise] = useState<Angle | null>(null);
   const [pseudoEtat, setPseudoEtat] = useState<"?" | "libre" | "pris" | "verif">("?");
@@ -231,7 +232,6 @@ export default function InscriptionPage() {
   const [nomFinal, setNomFinal] = useState<string | null>(null);
   const [avertissement, setAvertissement] = useState<string | null>(null);
   const [aRenvoyer, setARenvoyer] = useState(false);
-  const fichierPhoto = useRef<HTMLInputElement>(null);
   // Revenu de Google ou Apple : le compte existe déjà, provisoire.
   const [sociale, setSociale] = useState<Fournisseur | null>(null);
   // Venu par le lien d'une équipe (mode Team, /equipe/[jeton]) : le compte
@@ -264,7 +264,7 @@ export default function InscriptionPage() {
       const b = JSON.parse(brut) as { f: Formulaire; etape: Etape };
       // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique d'un stockage externe au montage
       setF({ ...VIDE, ...b.f });
-      if (ETAPES.indexOf(b.etape) > 0 && ETAPES.indexOf(b.etape) <= ETAPES.indexOf("photo")) setEtape(b.etape);
+      if (ETAPES.indexOf(b.etape) > 0 && ETAPES.indexOf(b.etape) <= ETAPES.indexOf("jeu")) setEtape(b.etape);
     } catch {}
   }, []);
   useEffect(() => {
@@ -385,8 +385,6 @@ export default function InscriptionPage() {
         if (ans === null) return "Ta date de naissance.";
         if (ans < BORNES.ageMin || ans > 90) return "Vérifie ta date de naissance.";
         return null;
-      case "photo":
-        return photo ? null : "Ta photo de carte.";
       case "angles":
         return ANGLES.every((a) => refs[a.id]) ? null : "Les quatre photos.";
       case "secret":
@@ -438,10 +436,10 @@ export default function InscriptionPage() {
         return;
       }
       const nom = d.name;
-      // Connexion immédiate, puis la photo de carte et les quatre prises,
-      // envoyées sous sa propre session.
+      // Connexion immédiate, puis les quatre prises, envoyées sous sa
+      // propre session.
       const connexion = await signIn(pseudo, motDePasse);
-      if (connexion.ok) await envoyerPhotos(nom);
+      if (connexion.ok) await envoyerPhotos();
       else setAvertissement(`Ton compte est créé. Connecte-toi avec @${pseudo} pour entrer.`);
       try {
         sessionStorage.removeItem(BROUILLON);
@@ -493,7 +491,7 @@ export default function InscriptionPage() {
       // La session Supabase est déjà là : elle devient la session de ligue
       // (en attente), puis les photos partent sous elle.
       await bootstrapServerSession();
-      await envoyerPhotos(nom);
+      await envoyerPhotos();
       try {
         sessionStorage.removeItem(BROUILLON);
       } catch {}
@@ -521,20 +519,11 @@ export default function InscriptionPage() {
     router.replace("/");
   }
 
-  /** La photo de carte et les quatre prises, sous la session du joueur. */
-  async function envoyerPhotos(nom: string) {
-    let ok = true;
-    if (photo) ok = (await setPhoto(nom, photo)).partagee && ok;
-    ok = (await envoyerReferences(refs)).length === 0 && ok;
+  /** Les quatre prises, sous la session du joueur. */
+  async function envoyerPhotos() {
+    const ok = (await envoyerReferences(refs)).length === 0;
     setARenvoyer(!ok);
     setAvertissement(ok ? null : "Certaines photos ne sont pas parties.");
-  }
-
-  function choisirPhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setARecadrer(URL.createObjectURL(file));
   }
 
   /* ─────────────── Le contenu de chaque étape ─────────────── */
@@ -546,7 +535,6 @@ export default function InscriptionPage() {
     naissance: ["Ta date de naissance."],
     gabarit: ["Ton gabarit."],
     jeu: ["Ton jeu."],
-    photo: ["Ta photo de carte."],
     angles: ["Tes quatre angles.", "Même cadre pour toute la ligue : tes skins naîtront de ces quatre photos."],
     secret: ["Ton mot de passe."],
     fini: [`Bienvenue, ${nomCarte}.`],
@@ -694,29 +682,6 @@ export default function InscriptionPage() {
         </div>
       );
       break;
-    case "photo":
-      corps = (
-        <div className="flex flex-col gap-[13px]">
-          <button
-            type="button"
-            onClick={() => fichierPhoto.current?.click()}
-            className="flex items-center justify-center gap-2 rounded-full bg-foreground py-[17px] text-[15px] font-bold text-background active:scale-[0.98]"
-          >
-            {photo ? "Changer de photo" : "Choisir ma photo"}
-          </button>
-          {photo && (
-            <button
-              type="button"
-              onClick={() => setARecadrer(photo)}
-              className="glass-soft rounded-full py-[13px] text-[14px] font-semibold"
-            >
-              Recadrer
-            </button>
-          )}
-          <input ref={fichierPhoto} type="file" accept="image/*" onChange={choisirPhoto} className="hidden" />
-        </div>
-      );
-      break;
     case "angles":
       corps = (
         <div className="grid grid-cols-2 gap-[13px]">
@@ -818,7 +783,7 @@ export default function InscriptionPage() {
               disabled={envoi}
               onClick={async () => {
                 setEnvoi(true);
-                await envoyerPhotos(nomFinal);
+                await envoyerPhotos();
                 setEnvoi(false);
               }}
               className="glass-soft rounded-full py-[13px] text-[14px] font-semibold"
@@ -888,7 +853,7 @@ export default function InscriptionPage() {
                 className={cn(fini && "animate-in zoom-in-90 fade-in duration-700")}
                 style={{ filter: "drop-shadow(0 21px 34px rgba(0,0,0,.55))" }}
               >
-                <BolaCard {...carte} photo={photo} size={accueil || fini ? 1 : compacte ? 0.382 : 0.618} />
+                <BolaCard {...carte} size={accueil || fini ? 1 : compacte ? 0.382 : 0.618} />
               </div>
             </div>
           )}
@@ -969,21 +934,6 @@ export default function InscriptionPage() {
           }}
         />
       )}
-
-      <RecadrerPhoto
-        src={aRecadrer}
-        carte={carte}
-        onFermer={() => {
-          if (aRecadrer?.startsWith("blob:")) URL.revokeObjectURL(aRecadrer);
-          setARecadrer(null);
-        }}
-        onValider={(dataUrl) => {
-          if (aRecadrer?.startsWith("blob:")) URL.revokeObjectURL(aRecadrer);
-          setARecadrer(null);
-          setPhotoCarte(dataUrl);
-          setErreur(null);
-        }}
-      />
     </div>
   );
 }
