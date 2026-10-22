@@ -119,7 +119,7 @@ export function FeuilleBola({
         scoreFonces: score.fonces,
         lignes: lignes.map(({ playerId, equipe, buts, passes }) => ({ playerId, equipe, buts, passes })),
       });
-      toast.success("Feuille enregistrée, la Ligue vierge est à jour.");
+      toast.success("Feuille enregistrée, le classement Bola est à jour.");
       onSaisie();
       onOpenChange(false);
     } catch (e) {
