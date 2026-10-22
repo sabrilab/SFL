@@ -7,7 +7,9 @@
 // est posée par le joueur lui-même (profiles.ville, avec le centre de la
 // commune que donne le géocodeur, jamais un point à lui), et il peut se
 // rendre invisible (profiles.ville_cachee), comme le mode fantôme de la
-// Snap Map. Comme les identités (identites.ts), la liste est relue au
+// Snap Map. Le joueur qui n'a rien donné reçoit d'office la ville que devine
+// sa connexion (poserVilleDevinee, choix de Sabri du 22/10) ; il la corrige
+// ou la masque dans le catalogue. Comme les identités (identites.ts), la liste est relue au
 // lancement et au retour sur l'app, et gardée en cache.
 //
 // Aperçus Vercel et développement : la base n'a pas encore les colonnes, et
@@ -34,6 +36,8 @@ const hasWindow = () => typeof window !== "undefined" && !!window.localStorage;
 
 let liste: Record<string, Entree> | null = null;
 let revision = 0;
+/** La liste a-t-elle été relue de la base depuis le lancement ? */
+let lue = false;
 
 function lire(): Record<string, Entree> {
   if (liste) return liste;
@@ -123,6 +127,15 @@ export function maVille(nom: string): (VilleJoueur & { cachee: boolean }) | null
   return null;
 }
 
+/**
+ * Le joueur a-t-il déjà donné sa ville (même invisible) ? null tant que la
+ * base n'a pas été relue : on ne propose rien sur la foi d'un cache vide.
+ */
+export function villeDonnee(nom: string): boolean | null {
+  if (!lue) return null;
+  return !!lire()[nom];
+}
+
 let enCours: Promise<void> | null = null;
 
 /** Relit les villes de la ligue. */
@@ -134,6 +147,7 @@ export function rafraichirVilles(): Promise<void> {
       const { data, error } = await supabase().from("profiles").select("name, ville, ville_lat, ville_lng, ville_cachee").not("ville", "is", null);
       // Base pas encore migrée (aperçus), ou rien de lisible : on garde le cache.
       if (error || !data) return;
+      lue = true;
       const next: Record<string, Entree> = {};
       for (const p of data as Ligne[]) {
         if (!p.ville || p.ville_lat == null || p.ville_lng == null) continue;
@@ -172,4 +186,25 @@ export async function poserMaVille(nom: string, v: VilleJoueur | null, cachee: b
   } catch {
     return "Pas de réseau. Réessaie.";
   }
+}
+
+/**
+ * Le joueur connecté n'a pas encore de ville : on pose celle que devine sa
+ * connexion (/api/ville-devinee), une seule tentative par jour et par
+ * appareil quand rien n'est deviné. Il la corrige ou la masque ensuite.
+ */
+export async function poserVilleDevinee(nom: string): Promise<void> {
+  if (!hasWindow() || villeDonnee(nom) !== false) return;
+  const cle = `bola-ville-devinee-${nom}`;
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+  try {
+    if (window.localStorage.getItem(cle) === aujourdhui) return;
+    window.localStorage.setItem(cle, aujourdhui);
+  } catch {}
+  try {
+    const res = await fetch("/api/ville-devinee", { cache: "no-store" });
+    const d = (await res.json()) as { ville: VilleJoueur | null };
+    if (!d.ville || villeDonnee(nom) !== false) return;
+    await poserMaVille(nom, d.ville, false);
+  } catch {}
 }
