@@ -2,7 +2,7 @@
 
 // Le fil des Actus — l'onglet qui remplace la Ligue (Sabri, 22/10). En haut,
 // « League | Bola | Team » (choix-ligue.tsx), puis un seul sélecteur, comme
-// la Ligue d'avant : Actus, Classements, Matchs (Sabri, 22/10 : « faire un
+// la Ligue d'avant, sans « Actus » puisqu'on y est : Classement, Match (Sabri, 22/10 : « faire un
 // mix des deux et un équilibre » ; les classements complets et les matchs
 // sont dans vues.tsx). Le fil, lui, se déroule en cinématiques
 // (cinematiques.tsx) : les dimanches joués, du plus récent au plus ancien
@@ -472,15 +472,16 @@ function VoteDuJour({ me }: { me: string }) {
 }
 
 type Vue = "actus" | "classements" | "matchs";
+// Pas de bouton « Actus » : on y est déjà (Sabri, 22/10). Toucher le bouton
+// actif ramène au fil.
 const VUES: [Vue, string][] = [
-  ["actus", "Actus"],
-  ["classements", "Classements"],
-  ["matchs", "Matchs"],
+  ["classements", "Classement"],
+  ["matchs", "Match"],
 ];
 
 /**
- * L'onglet : « League | Bola | Team », puis un seul sélecteur, comme la Ligue
- * d'avant (Sabri, 22/10 : « faire un mix des deux et un équilibre ») : le fil
+ * L'onglet : « League | Bola | Team », puis deux boutons, Classement et Match,
+ * comme la Ligue d'avant (Sabri, 22/10 : « faire un mix des deux et un équilibre ») : le fil
  * en cinématiques, les classements complets, les matchs.
  */
 export function FilActus({ vueDepart = "actus" }: { vueDepart?: Vue }) {
@@ -498,19 +499,19 @@ export function FilActus({ vueDepart = "actus" }: { vueDepart?: Vue }) {
         </div>
       </div>
       <div className="-mt-1 px-5">
-        <div className="glass flex gap-1 rounded-full p-1" role="tablist" aria-label="Vue">
+        <div className="flex gap-2" role="tablist" aria-label="Vue">
           {VUES.map(([id, label]) => (
             <button
               key={id}
               role="tab"
               aria-selected={vue === id}
               onClick={() => {
-                setVue(id);
+                setVue(vue === id ? "actus" : id);
                 document.getElementById("app-scroll")?.scrollTo({ top: 0 });
               }}
               className={cn(
-                "flex-1 rounded-full px-2 py-2 text-[13px] font-semibold whitespace-nowrap transition-colors",
-                vue === id ? "bg-foreground text-background" : "text-muted-foreground"
+                "flex-1 rounded-full px-3 py-2.5 text-[14px] font-semibold whitespace-nowrap transition-colors",
+                vue === id ? "bg-foreground text-background" : "glass text-foreground"
               )}
             >
               {label}
