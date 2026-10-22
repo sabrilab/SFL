@@ -11,6 +11,7 @@
 //   · Sa courbe — journée après journée, toutes saisons à la suite : la note
 //     de sa carte (une marche par saison, un point pour chaque carte
 //     spéciale du jour) ou son rang au Pépite d'Or. On la parcourt du doigt.
+// Ma carte s'en sert aussi : « Mes cartes », et la courbe, ouverte sur le rang.
 // Noir et blanc : tout en `currentColor` et en opacités, sauf les cartes
 // spéciales et leurs ronds sur la courbe, dans leur couleur (or, rouge,
 // bleu : teinte-carte.ts, Sabri 22/10). Calcul dans
@@ -110,8 +111,10 @@ function useLargeur<T extends HTMLElement>() {
 
 type Mode = "note" | "rang";
 
-export function CourbeCarriere({ points }: { points: PointCourbe[] }) {
-  const [mode, setMode] = useState<Mode>("note");
+/** `depart` : la lecture montrée tant qu'on n'en a pas choisi une (Ma carte ouvre sur le rang). */
+export function CourbeCarriere({ points, depart = "note" }: { points: PointCourbe[]; depart?: Mode }) {
+  const [choisi, setMode] = useState<Mode | null>(null);
+  const mode = choisi ?? depart;
   const [ref, largeur] = useLargeur<HTMLDivElement>();
   const [actif, setActif] = useState<number | null>(null);
   const n = points.length;

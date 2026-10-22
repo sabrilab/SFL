@@ -63,8 +63,8 @@ function StatBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-/** Un chiffre de tête, sous le nom. */
-function Chiffre({ valeur, quoi }: { valeur: string | number; quoi: string }) {
+/** Un chiffre de tête, sous le nom (Ma carte s'en sert aussi). */
+export function Chiffre({ valeur, quoi }: { valeur: string | number; quoi: string }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center gap-[var(--fib-8)]">
       <span style={{ fontFamily: ANTON, fontSize: 34, lineHeight: 0.9 }} className="tabular-nums">
@@ -115,6 +115,8 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
         .sort((a, b) => a.j - b.j),
     [saison.entries, player.name]
   );
+  // Un dimanche peut compter plusieurs matchs : on compte les dimanches.
+  const dimanches = new Set(mine.map((e) => e.j)).size;
   const forme = mine
     .filter((e) => e.result)
     .slice(-5)
@@ -149,7 +151,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
         <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
           <Chiffre valeur={ordinal(rank)} quoi="Pépite d'Or" />
           <Chiffre valeur={ovr(player.stats)} quoi="Général" />
-          <Chiffre valeur={player.matchs} quoi={player.matchs > 1 ? "Dimanches" : "Dimanche"} />
+          <Chiffre valeur={dimanches} quoi={dimanches > 1 ? "Dimanches" : "Dimanche"} />
         </div>
         <p className="w-full text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
         {moi && (
