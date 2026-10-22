@@ -18,6 +18,7 @@
 import { ACCOUNTS, findAccount, type Account } from "./accounts";
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { loginEmail, supabase, SUPABASE_KEY, SUPABASE_URL } from "@/lib/supabase";
+import { accordConnu } from "@/lib/sfl/consentement";
 
 /**
  * false : Supabase d'abord, repli sur la vérification locale si indisponible.
@@ -207,7 +208,7 @@ export async function signIn(user: string, password: string): Promise<SignInResu
       try {
         localStorage.removeItem(`${OVERRIDE_PREFIX}${identifiant}`);
       } catch {}
-      afterServerSignIn(data.user.id);
+      afterServerSignIn(data.user.id, session.name);
       return { ok: true, session };
     }
     // Le serveur n'a pas répondu (réseau) : c'est une panne, pas un refus.
@@ -411,13 +412,16 @@ export function hasCustomPassword(user: string): boolean {
 /* ────────────────── Connexion Google / Apple (OAuth) ────────────────── */
 
 /**
- * Après une connexion serveur : journalise l'événement et capture l'email
- * réel du joueur (celui de son identité Google/Apple s'il en a lié une).
- * Fire-and-forget : jamais bloquant.
+ * Après une connexion serveur : journalise l'événement (une fois l'accord à
+ * la politique de confidentialité connu et donné, comme tout le journal
+ * d'usage) et capture l'email réel du joueur (celui de son identité
+ * Google/Apple s'il en a lié une). Fire-and-forget : jamais bloquant.
  */
-function afterServerSignIn(userId: string) {
+function afterServerSignIn(userId: string, nom: string) {
   const sb = supabase();
-  sb.from("activity").insert({ player_id: userId, kind: "login" }).then(undefined, () => {});
+  accordConnu(nom)
+    .then((ok) => (ok ? sb.from("activity").insert({ player_id: userId, kind: "login" }) : null))
+    .then(undefined, () => {});
   sb.auth
     .getUser()
     .then(async ({ data }) => {
@@ -468,7 +472,7 @@ export async function bootstrapServerSession(): Promise<boolean> {
       ...(valide ? {} : { enAttente: true }),
     };
     storeSession(session);
-    afterServerSignIn(user.id);
+    afterServerSignIn(user.id, session.name);
     return true;
   } catch {
     return false;

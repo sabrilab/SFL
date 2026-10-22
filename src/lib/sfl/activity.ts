@@ -3,15 +3,19 @@
 // Journal d'activité — ce qui alimente le tableau de bord admin : qui vient,
 // quand, combien de temps, et pour y faire quoi.
 //
-// Trois principes :
+// Quatre principes :
 //   · jamais bloquant — une écriture ratée n'a aucun effet sur l'app ;
 //   · rien hors session serveur — sans compte Supabase, on n'écrit pas ;
+//   · rien avant l'accord à la politique de confidentialité, qui le promet
+//     (lib/sfl/consentement.ts) — sur un nouveau téléphone, on attend que
+//     l'accord soit relu ;
 //   · une session d'usage = un identifiant tiré à l'ouverture de l'onglet.
 //     La durée d'une session se déduit de l'écart entre son premier et son
 //     dernier événement, d'où les battements réguliers (« heartbeat »).
 
 import { supabase } from "@/lib/supabase";
 import { getSession } from "@/lib/sfl/auth/session";
+import { accordConnu, accordDonne } from "@/lib/sfl/consentement";
 
 export type ActivityKind =
   | "login"
@@ -53,13 +57,8 @@ export function logActivity(kind: ActivityKind, options: LogOptions = {}) {
   try {
     const session = getSession();
     if (!session?.server) return;
-
-    // « open » : une seule fois par jour et par appareil.
-    if (kind === "open") {
-      const key = `sfl-activity-open-${new Date().toISOString().slice(0, 10)}`;
-      if (localStorage.getItem(key)) return;
-      localStorage.setItem(key, "1");
-    }
+    const nom = session.name;
+    if (accordDonne(nom) === false) return;
 
     const row = {
       kind,
@@ -69,12 +68,20 @@ export function logActivity(kind: ActivityKind, options: LogOptions = {}) {
     };
 
     const sb = supabase();
-    sb.auth
-      .getUser()
-      .then(({ data }) => {
-        const uid = data.user?.id;
-        if (!uid) return;
-        return sb.from("activity").insert({ player_id: uid, ...row });
+    accordConnu(nom)
+      .then((ok) => {
+        if (!ok) return;
+        // « open » : une seule fois par jour et par appareil.
+        if (kind === "open") {
+          const key = `sfl-activity-open-${new Date().toISOString().slice(0, 10)}`;
+          if (localStorage.getItem(key)) return;
+          localStorage.setItem(key, "1");
+        }
+        return sb.auth.getUser().then(({ data }) => {
+          const uid = data.user?.id;
+          if (!uid) return;
+          return sb.from("activity").insert({ player_id: uid, ...row });
+        });
       })
       .catch(() => {});
   } catch {

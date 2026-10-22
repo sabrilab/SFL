@@ -7,7 +7,8 @@
 // (`lib/sfl/retention.ts`) et affiche : conclusions, courbes de croissance,
 // rétention par cohorte, gestes qui font revenir, pays choisis pour la carte
 // (table photo_studio), joueurs à relancer. En
-// dessous, les sujets de Bola Agent (./agent.tsx), sans le contenu.
+// dessous, les sujets de Bola Agent (./agent.tsx), sans le contenu, puis les
+// accords à la politique de confidentialité (./confidentialite.tsx).
 // Rien n'est agrégé en base, donc rien à maintenir quand on ajoute un type
 // d'événement.
 //
@@ -20,6 +21,7 @@ import { useSession } from "@/hooks/use-session";
 import { isAdmin } from "@/lib/sfl/admin";
 import { supabase } from "@/lib/supabase";
 import { AgentStats } from "./agent";
+import { AccordsStats } from "./confidentialite";
 import { ActiviteVue, type DonneesActivite } from "./vue";
 
 /** Lignes rendues au plus par une requête au serveur (réglage Supabase). */
@@ -169,7 +171,12 @@ export default function ActivitePage() {
       loading={loading}
       onRefresh={load}
       error={error}
-      pied={(public_, admins) => <AgentStats public={public_} admins={admins} />}
+      pied={(public_, admins) => (
+        <>
+          <AgentStats public={public_} admins={admins} />
+          <AccordsStats public={public_} admins={admins} />
+        </>
+      )}
     />
   );
 }

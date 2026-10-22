@@ -13,12 +13,14 @@ import { bootstrapServerSession, inscriptionSocialeEnCours } from "@/lib/sfl/aut
 import { LoginScreen } from "./login-screen";
 import { EnAttente } from "./en-attente";
 import { useJoueurInconnu } from "@/components/sfl/player-provider";
+import { ConsentementObligatoire } from "@/components/sfl/confidentialite/consentement";
 
 /**
  * Pages ouvertes à tous : le lien d'accueil personnel envoyé par l'admin, la
- * création de compte et le lien d'invitation d'une équipe (mode Team).
+ * création de compte, le lien d'invitation d'une équipe (mode Team) et la
+ * politique de confidentialité.
  */
-const PUBLIC_ROUTES = ["/bienvenue", "/inscription", "/equipe/"];
+const PUBLIC_ROUTES = ["/bienvenue", "/inscription", "/equipe/", "/confidentialite"];
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const isClient = useIsClient();
@@ -64,11 +66,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       </div>
     );
   // Inscrit, pas encore accepté : sa carte et l'état de sa demande, rien
-  // d'autre (la base ne lui ouvre pas la ligue de toute façon).
+  // d'autre (la base ne lui ouvre pas la ligue de toute façon). La case de
+  // confidentialité passe avant, comme dans l'app.
   if (session.enAttente)
     return (
       <div className="h-full overflow-y-auto" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <EnAttente session={session} />
+        <ConsentementObligatoire />
       </div>
     );
   // Connecté, mais la saison chargée ne le connaît pas (pas encore ajouté à
@@ -78,6 +82,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="h-full overflow-y-auto" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <EnAttente session={session} horsSaison />
+        <ConsentementObligatoire />
       </div>
     );
   return <>{children}</>;
