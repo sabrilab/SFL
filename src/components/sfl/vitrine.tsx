@@ -167,9 +167,51 @@ export const NOM_TROPHEE: Record<ClassementId, string> = {
 export function Trophee({ id, rang, taille = 96, vivant = false }: { id: ClassementId; rang: number | null; taille?: number; vivant?: boolean }) {
   const m = rang ? METAL_RANG[rang] : null;
   const props = { objet: TROPHEE_SAISON[id], matiere: m ?? ("fantome" as const), taille, embleme: EMBLEMES_SAISON[id] };
+  if (vivant || !m) {
+    return (
+      <span className="relative block shrink-0" style={{ width: taille, height: taille }}>
+        {vivant ? <Objet3DVivant {...props} /> : <Objet3D {...props} />}
+      </span>
+    );
+  }
   return (
-    <span className="relative block shrink-0" style={{ width: taille, height: taille }}>
-      {vivant ? <Objet3DVivant {...props} /> : <Objet3D {...props} aura={!!m} />}
+    <Scintille taille={taille} decalage={ORDRE_TROPHEE.indexOf(id) * 0.9}>
+      <Objet3D {...props} aura />
+    </Scintille>
+  );
+}
+
+const ORDRE_TROPHEE: ClassementId[] = ["pepite", "buteur", "passeur", "mvp", "defenseur"];
+
+/** Les éclats d'une vitrine : trois petites étoiles à quatre branches qui scintillent tour à tour autour d'un trophée gagné. */
+const ECLATS: { x: number; y: number; t: number; d: number }[] = [
+  { x: 0.2, y: 0.18, t: 0.13, d: 0 },
+  { x: 0.78, y: 0.32, t: 0.1, d: 1.5 },
+  { x: 0.3, y: 0.58, t: 0.08, d: 3.1 },
+];
+
+function Scintille({ taille, decalage, children }: { taille: number; decalage: number; children: React.ReactNode }) {
+  return (
+    <span className="relative block" style={{ width: taille, height: taille, ["--decalage" as string]: `${-decalage}s` }}>
+      <span className="trophee-flotte absolute inset-0">{children}</span>
+      {ECLATS.map((e, i) => (
+        <svg
+          key={i}
+          aria-hidden
+          viewBox="0 0 20 20"
+          className="trophee-eclat pointer-events-none absolute"
+          style={{
+            left: taille * e.x,
+            top: taille * e.y,
+            width: taille * e.t,
+            height: taille * e.t,
+            animationDelay: `${e.d - decalage}s`,
+            filter: "drop-shadow(0 0 3px rgba(255,255,255,0.9))",
+          }}
+        >
+          <path d="M10 0 C10.8 7 13 9.2 20 10 C13 10.8 10.8 13 10 20 C9.2 13 7 10.8 0 10 C7 9.2 9.2 7 10 0 Z" fill="#fff" />
+        </svg>
+      ))}
     </span>
   );
 }
@@ -178,7 +220,13 @@ export function Trophee({ id, rang, taille = 96, vivant = false }: { id: Classem
 function TropheeObjet({ objet, taille, gagne = true }: { objet: Objet; taille: number; gagne?: boolean }) {
   return (
     <span className={cn("relative block shrink-0", !gagne && "opacity-70")} style={{ width: taille, height: taille }}>
-      <Objet3D objet={objet} matiere={gagne ? "or" : "fantome"} taille={taille} embleme={Crown} aura={gagne} />
+      {gagne ? (
+        <Scintille taille={taille} decalage={2.3}>
+          <Objet3D objet={objet} matiere="or" taille={taille} embleme={Crown} aura />
+        </Scintille>
+      ) : (
+        <Objet3D objet={objet} matiere="fantome" taille={taille} embleme={Crown} />
+      )}
     </span>
   );
 }

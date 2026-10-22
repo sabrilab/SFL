@@ -827,6 +827,18 @@ function monter(pieces: Piece[], echelle: number, bas: number): Piece[] {
   return pieces;
 }
 
+/**
+ * Le joyau du sommet, dans la DA des premiers badges : une pierre de verre
+ * irisé à facettes, et au cœur une pierre de métal (le métal du rang), qu'on
+ * voit à travers. Deux pièces : le cœur (corps) et l'écrin (verre).
+ */
+function joyau(cx: number, cy: number, r: number): Piece[] {
+  return [
+    { geo: pierre(cx, cy, r * 0.8), role: "corps" },
+    { geo: pierre(cx, cy, r * 1.02), role: "verre" },
+  ];
+}
+
 /** La pierre taillée : une boule à facettes, comme sur la planche. */
 function pierre(cx: number, cy: number, r: number): THREE.BufferGeometry {
   const g = new THREE.IcosahedronGeometry(r, 1).toNonIndexed();
@@ -907,7 +919,8 @@ function coupePepite(): Piece[] {
   aile.translate(0, 0, -0.06);
   return [
     ...socle("coupe-pepite"),
-    { geo: mergeGeometries([corps, pierre(0, 0.62, 0.17)].map(sansUv)), role: "corps" },
+    { geo: corps, role: "corps" },
+    ...joyau(0, 0.62, 0.17),
     { geo: mergeGeometries([aile, gravure(-0.03, -0.02, DEVANT, 0.055, 0.32, HAUT + 0.06)].map(sansUv)), role: "noir" },
   ];
 }
@@ -922,7 +935,8 @@ function coupeButeur(): Piece[] {
   aile.translate(0, 0, 0.05);
   return [
     ...socle("coupe-buteur"),
-    { geo: mergeGeometries([aile, pierre(-0.11, 0.6, 0.17)].map(sansUv)), role: "corps" },
+    { geo: aile, role: "corps" },
+    ...joyau(-0.11, 0.6, 0.17),
     { geo: noire, role: "noir" },
     { geo: gravure(-0.11, -0.05, DEVANT, 0.05, 0.4, HAUT + 0.06), role: "corps" },
   ];
@@ -946,7 +960,8 @@ function coupePasseur(): Piece[] {
   const tige = tour([[0, HAUT], [0.06, HAUT], [0.03, HAUT + 0.1], [0.025, 0.5], [0.05, 0.56], [0, 0.56]], 0.01, 48);
   return [
     ...socle("coupe-passeur"),
-    { geo: mergeGeometries([ruban(0), ruban(Math.PI), pierre(0, 0.66, 0.16)].map(sansUv)), role: "corps" },
+    { geo: mergeGeometries([ruban(0), ruban(Math.PI)].map(sansUv)), role: "corps" },
+    ...joyau(0, 0.66, 0.16),
     { geo: tige, role: "noir" },
   ];
 }
@@ -962,7 +977,8 @@ function coupeMvp(): Piece[] {
   berceau.translate(0, 0.6, 0);
   return [
     ...socle("coupe-mvp"),
-    { geo: mergeGeometries([droite, gauche, berceau, pierre(0, 0.6, 0.15)].map(sansUv)), role: "corps" },
+    { geo: mergeGeometries([droite, gauche, berceau].map(sansUv)), role: "corps" },
+    ...joyau(0, 0.6, 0.15),
     { geo: noire, role: "noir" },
     { geo: gravure(0, 0.0, DEVANT, 0.055, 0.38, HAUT + 0.06), role: "corps" },
   ];
@@ -982,7 +998,8 @@ function coupeDefenseur(): Piece[] {
   return [
     ...socle("coupe-defenseur"),
     { geo: cadre, role: "corps" },
-    { geo: mergeGeometries([noir, pierre(0, 0.76, 0.15)].map(sansUv)), role: "noir" },
+    { geo: noir, role: "noir" },
+    ...joyau(0, 0.76, 0.15),
     { geo: gravure(0, 0.05, DEVANT, 0.055, 0.5, HAUT + 0.06), role: "corps" },
   ];
 }

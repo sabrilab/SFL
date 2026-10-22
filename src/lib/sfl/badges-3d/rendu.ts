@@ -132,16 +132,16 @@ function verre(couleur: string, opacite: number, rugosite = 0.05) {
   });
 }
 
-/** Le noir des trophées (socles, lames) : un laqué profond, qui ne prend qu'un filet de lumière. */
+/**
+ * Le noir des trophées (socles, lames) : le chrome sombre et irisé des
+ * premiers badges (Sabri, 22/10 : « rester dans la DA de nos premiers
+ * badges »), un peu plus mat pour que le métal du rang reste ce qu'on voit
+ * d'abord. Les reflets bleu, violet et orange du studio filent sur ses arêtes.
+ */
 function noir() {
-  return new THREE.MeshPhysicalMaterial({
-    color: "#0b0b0d",
-    metalness: 0.2,
-    roughness: 0.32,
-    clearcoat: 1,
-    clearcoatRoughness: 0.12,
-    envMapIntensity: 0.35,
-  });
+  const m = chrome("#121318", 0.9, 0.3);
+  m.envMapIntensity = 0.6;
+  return m;
 }
 
 // Une carte d'environnement appartient à son moteur : les matières sont donc
