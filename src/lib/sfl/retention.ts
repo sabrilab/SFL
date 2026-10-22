@@ -189,7 +189,7 @@ export const PATH_FR: Record<string, string> = {
   "/map": "Map",
   "/ligue": "Ligue",
   "/profil": "Ma carte",
-  "/duel": "Arène",
+  "/duel": "Collection",
   "/collection": "Collection",
   "/discussions": "Discussions",
   "/boutique": "Boutique",

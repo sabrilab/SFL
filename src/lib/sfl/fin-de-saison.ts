@@ -94,3 +94,46 @@ export function podiumsDe(saison: Saison, id: ClassementId, noms?: Set<string>):
 export function ordinal(n: number): string {
   return n === 1 ? "1er" : `${n}e`;
 }
+
+/* ------------------------- Les trophées, saison par saison ------------------------- */
+
+// Ce que Ma carte met en vitrine (Sabri, 22/10, d'après la planche « Tous les
+// trophées & médailles ») : pour chaque saison close, les vrais trophées
+// gagnés — les podiums des cinq classements —, la médaille du Top 15 au
+// Pépite d'Or, et le trophée du joueur engagé, que reçoit tout joueur qui a
+// disputé plus d'un match dans la saison.
+
+/** Le rang le plus bas qui reçoit une médaille : les quinze premiers du Pépite d'Or. */
+export const TOP_MEDAILLE = 15;
+
+export interface TropheesDeSaison {
+  saison: string;
+  /** Les podiums de la saison, le Pépite d'Or d'abord, puis du 1er au 3e. */
+  podiums: { id: ClassementId; rang: number; valeur: number }[];
+  /** Son rang final au Pépite d'Or s'il est dans les quinze premiers. */
+  top: number | null;
+  /** Plus d'un match joué dans la saison. */
+  engage: boolean;
+}
+
+/** Les trophées d'un joueur, saison close par saison close, de la plus récente à la plus ancienne. */
+export function tropheesParSaison(saison: Saison, nom: string): TropheesDeSaison[] {
+  return [...(saison.archives ?? [])]
+    .sort((a, b) => b.numero - a.numero)
+    .map((a) => {
+      const players = deriveSeason(saisonDepuisArchive(a)).players;
+      const moi = players.find((p) => p.name === nom);
+      const podiums = CLASSEMENTS.flatMap((def) => {
+        const r = rang(players, nom, def.valeur);
+        return r && r.rang <= 3 ? [{ id: def.id, rang: r.rang, valeur: r.valeur }] : [];
+      }).sort((x, y) => Number(y.id === "pepite") - Number(x.id === "pepite") || x.rang - y.rang);
+      const pepite = rang(players, nom, (p) => p.pp);
+      return {
+        saison: a.nom,
+        podiums,
+        top: pepite && pepite.rang <= TOP_MEDAILLE ? pepite.rang : null,
+        engage: (moi?.matchs ?? 0) > 1,
+      };
+    })
+    .filter((s) => s.podiums.length || s.top || s.engage);
+}

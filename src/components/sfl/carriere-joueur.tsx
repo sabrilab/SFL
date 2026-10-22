@@ -28,13 +28,13 @@ const ANTON = "var(--font-anton), Anton, sans-serif";
 
 /* -------------------------------- Ses cartes ------------------------------- */
 
-export function CartesCarriere({ saisons }: { saisons: CartesDeSaison[] }) {
+export function CartesCarriere({ saisons, titre = "Ses cartes" }: { saisons: CartesDeSaison[]; titre?: string }) {
   const total = saisons.reduce((n, s) => n + 1 + s.speciales.length, 0);
   return (
     <section aria-labelledby="ses-cartes" className="flex flex-col gap-2.5">
       <div className="flex items-baseline justify-between px-1">
         <h3 id="ses-cartes" className="mono-label text-muted-foreground">
-          Ses cartes
+          {titre}
         </h3>
         <span className="font-mono text-[12px] font-bold text-foreground/45 tabular-nums">{total}</span>
       </div>

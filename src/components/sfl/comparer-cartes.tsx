@@ -4,18 +4,20 @@
 // comparer sa carte avec celle d'un autre joueur »). Ouvert depuis le profil
 // d'un joueur, toi à gauche, lui à droite :
 //   1. les deux cartes, au même format, et les deux notes en Anton ;
-//   2. les six stats face à face : deux barres qui partent du milieu, la plus
-//      haute en plein, l'autre en retrait ;
+//   2. les deux profils de jeu sur le même radar (profil-radar.tsx), le tien
+//      en pointillés (Sabri, 22/10 : « le radar du joueur dans la fonction de
+//      comparaison ») ;
 //   3. la saison de chacun : Pépite d'Or, buts, passes, MVP, dimanches ;
 //   4. le face-à-face, toutes saisons : ensemble, et l'un contre l'autre.
 // Noir et blanc, rien d'autre. Calcul du face-à-face dans lib/sfl/carriere.ts.
 
 import { useMemo } from "react";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
+import { RadarDuel } from "@/components/sfl/profil-radar";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useIdentites } from "@/hooks/use-identites";
 import { faceAFace } from "@/lib/sfl/carriere";
-import { ovr, STAT_KEYS, type Player } from "@/lib/sfl/engine";
+import { ovr, type Player } from "@/lib/sfl/engine";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
 import { cn } from "@/lib/utils";
 
@@ -42,9 +44,6 @@ export function ComparerCartes({ moi, lui, rangs }: { moi: Player; lui: Player; 
   const noteB = ovr(lui.stats);
   const ensemble = face.ensemble.victoires + face.ensemble.nuls + face.ensemble.defaites;
   const contre = face.contre.victoires + face.contre.nuls + face.contre.defaites;
-  const grand = Math.max(...STAT_KEYS.flatMap((k) => [moi.stats[k], lui.stats[k]]), 1);
-  const bas = Math.min(...STAT_KEYS.flatMap((k) => [moi.stats[k], lui.stats[k]])) - 5;
-  const part = (v: number) => `${Math.max(6, ((v - bas) / Math.max(1, grand - bas)) * 100)}%`;
 
   return (
     <div className="flex flex-col gap-[var(--fib-21)]">
@@ -64,26 +63,8 @@ export function ComparerCartes({ moi, lui, rangs }: { moi: Player; lui: Player; 
         ))}
       </div>
 
-      {/* 2. Les six stats, face à face depuis le milieu */}
-      <section className="flex flex-col gap-2.5">
-        {STAT_KEYS.map((k) => {
-          const a = moi.stats[k];
-          const b = lui.stats[k];
-          return (
-            <div key={k} className="grid grid-cols-[28px_1fr_32px_1fr_28px] items-center gap-2">
-              <span className={cn("text-left text-[14px] font-bold tabular-nums", a < b && "text-foreground/40")}>{a}</span>
-              <span className="flex h-1.5 justify-end overflow-hidden rounded-full bg-foreground/[0.07]">
-                <span className={cn("block h-full rounded-full", a >= b ? "bg-foreground" : "bg-foreground/30")} style={{ width: part(a) }} />
-              </span>
-              <span className="mono-label text-center text-foreground/45">{k}</span>
-              <span className="flex h-1.5 overflow-hidden rounded-full bg-foreground/[0.07]">
-                <span className={cn("block h-full rounded-full", b >= a ? "bg-foreground" : "bg-foreground/30")} style={{ width: part(b) }} />
-              </span>
-              <span className={cn("text-right text-[14px] font-bold tabular-nums", b < a && "text-foreground/40")}>{b}</span>
-            </div>
-          );
-        })}
-      </section>
+      {/* 2. Les deux profils de jeu, superposés */}
+      <RadarDuel toi={moi.stats} lui={lui.stats} nomLui={identite.nom(lui.name)} />
 
       {/* 3. La saison de chacun */}
       <section className="glass flex flex-col divide-y divide-white/8 rounded-[22px] px-4">

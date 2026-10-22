@@ -3,9 +3,8 @@
 // Collection — packs booster, catalogue de cartes numérotées (avec le vrai
 // visuel de chaque carte, filtrable) et achat à l'unité.
 //
-// Ce panneau vit désormais DANS l'Arène : tout le gameplay numérique (duels,
-// matchs, cartes) est réuni au même endroit. La page /collection ne fait plus
-// que rediriger vers l'onglet correspondant.
+// Ce panneau est toute la page /collection (l'Arène, qui l'abritait avec les
+// duels et les matchs, a été retirée le 22/10).
 
 import { useState } from "react";
 import { AnimatePresence } from "motion/react";

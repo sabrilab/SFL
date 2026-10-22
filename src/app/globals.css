@@ -1055,3 +1055,23 @@
   .studio-legende, .studio-revelation, .studio-revelation-flash { animation: none; }
   .studio-balayage, .studio-flash, .studio-revelation-flash { display: none; }
 }
+
+/* Les trophées de fin de saison (components/sfl/vitrine.tsx) : gagnés, ils
+   flottent à peine au-dessus de l'étagère et quelques éclats scintillent
+   autour, comme sous les spots d'une vitrine. Décalés d'un trophée à l'autre
+   (--decalage). Rien ne bouge avec « Réduire les animations ». */
+@keyframes trophee-flotte {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes trophee-eclat {
+  0%, 62%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+  72% { opacity: 1; transform: scale(1) rotate(45deg); }
+  84% { opacity: 0; transform: scale(0.5) rotate(90deg); }
+}
+.trophee-flotte { animation: trophee-flotte 5.4s ease-in-out infinite; animation-delay: var(--decalage, 0s); }
+.trophee-eclat { opacity: 0; animation: trophee-eclat 4.6s ease-in-out infinite; animation-delay: var(--decalage, 0s); }
+@media (prefers-reduced-motion: reduce) {
+  .trophee-flotte { animation: none; }
+  .trophee-eclat { animation: none; opacity: 0; }
+}

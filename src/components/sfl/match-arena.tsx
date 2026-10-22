@@ -100,7 +100,7 @@ export function MatchArena({ me }: { me: string }) {
         <Button
           size="sm"
           className="font-semibold"
-          render={<Link href="/duel?mode=collection">Ouvrir des packs</Link>}
+          render={<Link href="/collection">Ouvrir des packs</Link>}
         />
       </div>
     );

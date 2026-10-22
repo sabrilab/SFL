@@ -13,7 +13,7 @@ import { useMemo, useState } from "react";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useCardViewer } from "@/components/sfl/card-viewer";
 import { useSeason } from "@/components/sfl/season-provider";
-import { Ecusson, FeuilleBadge, Medaille } from "@/components/sfl/vitrine";
+import { FeuilleBadge, Medaille, Trophee } from "@/components/sfl/vitrine";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import type { Player } from "@/lib/sfl/engine";
 import { ficheJoueur } from "@/lib/sfl/fiche-joueur";
@@ -144,7 +144,7 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
                 onClick={() => setBadge({ famille: "saison", id: e.def.id })}
                 className="flex shrink-0 flex-col items-center gap-1 transition-transform active:scale-95 motion-reduce:transition-none"
               >
-                <Ecusson id={e.def.id} rang={e.meilleur!.rang} largeur={46} />
+                <Trophee id={e.def.id} rang={e.meilleur!.rang} taille={52} />
                 <span className="text-[10.5px] font-bold">{e.def.nom}</span>
                 <span className="font-mono text-[10px] text-muted-foreground">
                   {ordinal(e.meilleur!.rang)} · {e.meilleur!.saison}

@@ -8,8 +8,9 @@
 //   · Matchs → le terrain ;           · Victoires → le trophée ;
 //   · Pépite d'Or → la pépite ;       · MVP → l'étoile ;
 //   · Le Mur, Défenseur → le bouclier ; · Impact → l'éclair ;
-//   · Cage inviolée → la cage ;       · Série → la flamme ;
-//   · Ancienneté → le sablier.
+// Les trophées de fin de saison, eux, sont de vraies pièces de vitrine
+// (TROPHEE_SAISON, voir objets.ts) : Ma carte et le profil les montrent ; le
+// badge posé sur la carte garde son objet.
 // Le métal dit le niveau (bronze, argent, or ; rouge et or au dernier palier).
 // Un badge de fin de saison porte en plus son rang, gravé sur une pastille de
 // métal en bas à droite : c'est ce qui le distingue d'un palier.
@@ -38,9 +39,6 @@ export const OBJET_PALIER: Record<TropheeId, Objet> = {
   mvp: "etoile",
   mur: "bouclier",
   impact: "eclair",
-  cleanSheet: "cage",
-  serie: "flamme",
-  saisons: "sablier",
 };
 
 export const OBJET_SAISON: Record<ClassementId, Objet> = {
@@ -49,6 +47,15 @@ export const OBJET_SAISON: Record<ClassementId, Objet> = {
   passeur: "crampon",
   defenseur: "bouclier",
   mvp: "etoile",
+};
+
+/** Les vrais trophées de fin de saison (objets.ts), un par classement. */
+export const TROPHEE_SAISON: Record<ClassementId, Objet> = {
+  pepite: "coupe-pepite",
+  buteur: "coupe-buteur",
+  passeur: "coupe-passeur",
+  defenseur: "coupe-defenseur",
+  mvp: "coupe-mvp",
 };
 
 const RANG_METAL: Record<number, Metal> = { 1: "or", 2: "argent", 3: "bronze" };

@@ -56,7 +56,7 @@ const jusqua = (s: Saison, j: number): Saison => ({
 const memo = new WeakMap<Saison, Map<string, Honneur>>();
 
 /** Le plus rare d'abord : à palier égal, l'ordre de la vitrine. */
-const ORDRE: TropheeId[] = ["mvp", "buts", "passes", "mur", "impact", "cleanSheet", "victoires", "serie", "matchs", "saisons"];
+const ORDRE: TropheeId[] = ["mvp", "buts", "passes", "mur", "impact", "victoires", "matchs"];
 
 export function honneurDe(saison: Saison, j: number, moi?: string): Honneur {
   let parJ = memo.get(saison);
@@ -88,8 +88,7 @@ export function honneurDe(saison: Saison, j: number, moi?: string): Honneur {
     const v0 = new Map(vitrine(avant, nom).map((t) => [t.def.id, t.palier]));
     for (const t of v1) {
       if (t.palier > (v0.get(t.def.id) ?? 0)) decroches.push({ nom, id: t.def.id, palier: t.palier, valeur: t.valeur });
-      // Les saisons ne se gagnent pas un dimanche : pas de chasse là-dessus.
-      if (t.def.id !== "saisons" && t.cible != null && t.cible - t.valeur === 1) {
+      if (t.cible != null && t.cible - t.valeur === 1) {
         surface.push({ nom, id: t.def.id, reste: 1, palier: t.palier + 1 });
       }
     }
