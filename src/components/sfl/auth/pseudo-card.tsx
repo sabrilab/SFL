@@ -104,7 +104,7 @@ export function PseudoCard() {
             <button
               type="button"
               onClick={() => setOuvert(true)}
-              className="glass-soft mono-label rounded-full px-3.5 py-2 text-foreground/60"
+              className="bouton-secondaire mono-label px-3.5 py-2"
             >
               Changer
             </button>
@@ -133,7 +133,7 @@ export function PseudoCard() {
             type="submit"
             disabled={!pret || envoi}
             className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-full bg-foreground px-4 py-2.5 text-[13px] font-bold text-background",
+              "bouton-principal flex shrink-0 items-center gap-1.5 px-4 py-2.5 text-[13px] font-bold",
               (!pret || envoi) && "opacity-40"
             )}
           >
@@ -146,7 +146,7 @@ export function PseudoCard() {
               setOuvert(false);
               setSaisie("");
             }}
-            className="glass-soft shrink-0 rounded-full px-4 py-2.5 text-[13px] font-semibold text-foreground/60"
+            className="bouton-secondaire shrink-0 px-4 py-2.5 text-[13px] font-semibold"
           >
             Annuler
           </button>

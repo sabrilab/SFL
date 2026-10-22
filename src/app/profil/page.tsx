@@ -121,7 +121,7 @@ export default function Profil() {
         <Link
           href="/reglages"
           aria-label="Réglages"
-          className="glass-soft flex size-[38px] shrink-0 flex-col items-center justify-center gap-[2.5px] rounded-full"
+          className="bouton-secondaire flex size-[38px] shrink-0 flex-col items-center justify-center gap-[2.5px]"
         >
           {[0, 1, 2].map((i) => (
             <span key={i} className="size-[3.5px] rounded-full bg-foreground/60" />
@@ -148,7 +148,7 @@ export default function Profil() {
       <div className="flex gap-[9px]">
         <Link
           href="/ligue?vue=matchs"
-          className="glass-soft flex-1 rounded-full py-[15px] text-center text-[15px] font-semibold text-foreground/70"
+          className="bouton-secondaire flex-1 py-[15px] text-center text-[15px] font-semibold"
         >
           Historique
         </Link>

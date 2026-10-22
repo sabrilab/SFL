@@ -66,7 +66,7 @@ export function ChoixBadge({ player }: { player: Player }) {
         type="button"
         onClick={() => setOuvert(true)}
         aria-label={badge ? `Badge de ma carte : ${nomBadge(badge)}. Changer` : "Choisir le badge de ma carte"}
-        className="glass-soft flex size-[52px] shrink-0 items-center justify-center rounded-full"
+        className="bouton-secondaire flex size-[52px] shrink-0 items-center justify-center"
       >
         {badge ? <Mini badge={badge} taille={34} /> : <span className="size-[22px] rounded-full border-[1.5px] border-dashed border-foreground/45" />}
       </button>

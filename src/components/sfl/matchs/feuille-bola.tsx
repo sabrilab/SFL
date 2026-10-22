@@ -45,7 +45,7 @@ function Pas({ valeur, min = 0, onChange, label }: { valeur: number; min?: numbe
         aria-label={`${label} : un de moins`}
         disabled={valeur <= min}
         onClick={() => onChange(valeur - 1)}
-        className="grid size-8 place-items-center rounded-full bg-secondary disabled:opacity-30"
+        className="bouton-secondaire grid size-8 place-items-center disabled:opacity-30"
       >
         <Minus className="size-3.5" />
       </button>
@@ -55,7 +55,7 @@ function Pas({ valeur, min = 0, onChange, label }: { valeur: number; min?: numbe
         aria-label={`${label} : un de plus`}
         disabled={valeur >= 99}
         onClick={() => onChange(valeur + 1)}
-        className="grid size-8 place-items-center rounded-full bg-secondary"
+        className="bouton-secondaire grid size-8 place-items-center"
       >
         <Plus className="size-3.5" />
       </button>
@@ -196,7 +196,7 @@ export function FeuilleBola({
             type="button"
             disabled={envoi || !coherent || presents < 2}
             onClick={valider}
-            className="flex h-12 items-center justify-center rounded-full bg-foreground text-[15px] font-semibold text-background disabled:opacity-40"
+            className="bouton-principal flex h-12 items-center justify-center text-[15px] font-semibold disabled:opacity-40"
           >
             {coherent ? `Valider · ${score.clairs} – ${score.fonces}` : "Plus de passes que de buts"}
           </button>

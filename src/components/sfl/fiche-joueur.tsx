@@ -174,7 +174,7 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
       <button
         type="button"
         onClick={voirEnGrand}
-        className="mt-1 flex h-12 items-center justify-center rounded-full bg-foreground text-[15px] font-semibold text-background"
+        className="bouton-principal mt-1 flex h-12 items-center justify-center text-[15px] font-semibold"
       >
         Voir sa carte en grand
       </button>

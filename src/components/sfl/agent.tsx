@@ -446,7 +446,7 @@ export function Agent() {
                     key={d.label}
                     type="button"
                     onClick={() => void demander(d.question, d.id)}
-                    className="glass shrink-0 rounded-full px-3.5 py-2 text-[13.5px] font-semibold transition-transform active:scale-95"
+                    className="bouton-secondaire shrink-0 px-3.5 py-2 text-[13.5px] font-semibold"
                   >
                     {d.label}
                   </button>
@@ -485,7 +485,7 @@ export function Agent() {
                 onPointerDown={(e) => e.preventDefault()}
                 disabled={envoi || !texte.trim()}
                 aria-label="Envoyer"
-                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-95 disabled:opacity-25"
+                className="bouton-principal flex size-10 shrink-0 items-center justify-center disabled:opacity-25"
               >
                 <ArrowUp className="size-5" strokeWidth={2.75} />
               </button>

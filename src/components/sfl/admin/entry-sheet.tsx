@@ -57,7 +57,7 @@ export function Stepper({
         type="button"
         aria-label="Diminuer"
         onClick={() => onChange(Math.max(min, value - 1))}
-        className="flex size-9 items-center justify-center rounded-full bg-secondary text-foreground active:opacity-70"
+        className="bouton-secondaire flex size-9 items-center justify-center"
       >
         <Minus className="size-4" />
       </button>
@@ -66,7 +66,7 @@ export function Stepper({
         type="button"
         aria-label="Augmenter"
         onClick={() => onChange(value + 1)}
-        className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground active:opacity-70"
+        className="bouton-principal flex size-9 items-center justify-center"
       >
         <Plus className="size-4" />
       </button>

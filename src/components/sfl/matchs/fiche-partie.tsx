@@ -87,7 +87,7 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
     }
   }
 
-  const bouton = "flex h-12 items-center justify-center rounded-full text-[15px] font-semibold disabled:opacity-40";
+  const bouton = "flex h-12 items-center justify-center text-[15px] font-semibold disabled:opacity-40";
 
   return (
     <section className="flex flex-col gap-4">
@@ -149,7 +149,7 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
 
       {organise && joue && corrigeable && (
         <>
-          <button onClick={() => setFeuille(true)} className={cn(bouton, "bg-foreground text-background")}>
+          <button onClick={() => setFeuille(true)} className={cn(bouton, "bouton-principal")}>
             {saisi ? "Corriger la feuille" : "Feuille de match"}
           </button>
           {feuille && <FeuilleBola partie={partie} open={feuille} onOpenChange={setFeuille} onSaisie={onChange} />}
@@ -158,21 +158,22 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
 
       {!joue && moiLa?.statut === "invite" && (
         <div className="grid grid-cols-2 gap-2">
-          <button disabled={occupe} onClick={() => faire(() => accepter(partie.id), "C'est noté, tu joues.")} className={cn(bouton, "bg-foreground text-background")}>
+          <button disabled={occupe} onClick={() => faire(() => accepter(partie.id), "C'est noté, tu joues.")} className={cn(bouton, "bouton-principal")}>
             Je viens
           </button>
-          <button disabled={occupe} onClick={() => faire(() => quitter(partie.id), "Invitation déclinée.")} className={cn(bouton, "bg-secondary")}>
+          <button disabled={occupe} onClick={() => faire(() => quitter(partie.id), "Invitation déclinée.")} className={cn(bouton, "bouton-secondaire")}>
             Pas dispo
           </button>
         </div>
       )}
+      {/* Il manque des joueurs : la place à prendre s'allume en braise. */}
       {!joue && !moiLa && partie.visibilite === "public" && libres > 0 && (
-        <button disabled={occupe || !moi} onClick={() => faire(() => rejoindre(partie.id), "Place prise, à toi de jouer.")} className={cn(bouton, "bg-foreground text-background")}>
+        <button disabled={occupe || !moi} onClick={() => faire(() => rejoindre(partie.id), "Place prise, à toi de jouer.")} className={cn(bouton, "bouton-principal bouton--braise")}>
           Prendre une place
         </button>
       )}
       {!joue && moiLa?.statut === "inscrit" && !organise && (
-        <button disabled={occupe} onClick={() => faire(() => quitter(partie.id), "Tu as libéré ta place.")} className={cn(bouton, "bg-secondary")}>
+        <button disabled={occupe} onClick={() => faire(() => quitter(partie.id), "Tu as libéré ta place.")} className={cn(bouton, "bouton-secondaire")}>
           Me retirer
         </button>
       )}
@@ -182,7 +183,7 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
           onClick={() => {
             if (window.confirm("Annuler ce match pour tout le monde ?")) void faire(() => annuler(partie.id), "Match annulé.");
           }}
-          className={cn(bouton, "bg-secondary text-foreground/80")}
+          className={cn(bouton, "bouton-secondaire bouton--rouge")}
         >
           Annuler le match
         </button>

@@ -177,7 +177,7 @@ function Reglage({
             type="button"
             onClick={() => onChange(borne(valeur - pas))}
             aria-label={`${label} moins`}
-            className="grid size-[34px] place-items-center rounded-full bg-foreground/10"
+            className="bouton-secondaire grid size-[34px] place-items-center"
           >
             <Minus className="size-4" />
           </button>
@@ -189,7 +189,7 @@ function Reglage({
             type="button"
             onClick={() => onChange(borne(valeur + pas))}
             aria-label={`${label} plus`}
-            className="grid size-[34px] place-items-center rounded-full bg-foreground/10"
+            className="bouton-secondaire grid size-[34px] place-items-center"
           >
             <Plus className="size-4" />
           </button>
@@ -821,7 +821,7 @@ export default function InscriptionPage() {
                 await envoyerPhotos(nomFinal);
                 setEnvoi(false);
               }}
-              className="glass-soft rounded-full py-[13px] text-[14px] font-semibold"
+              className="bouton-secondaire py-[13px] text-[14px] font-semibold"
             >
               Renvoyer les photos
             </button>
@@ -851,7 +851,7 @@ export default function InscriptionPage() {
             type="button"
             onClick={() => aller(-1)}
             aria-label="Retour"
-            className="-ml-2 grid size-[34px] shrink-0 place-items-center rounded-full text-foreground/70"
+            className="bouton-discret -ml-2 grid size-[34px] shrink-0 place-items-center"
           >
             <ChevronLeft className="size-5" />
           </button>
@@ -928,7 +928,7 @@ export default function InscriptionPage() {
             else aller(1);
           }}
           className={cn(
-            "flex w-full items-center justify-center gap-2 rounded-full bg-foreground py-[17px] text-[15px] font-bold text-background transition-transform active:scale-[0.98]",
+            "bouton-principal flex w-full items-center justify-center gap-2 py-[17px] text-[15px] font-bold",
             (envoi || (accueil && ouvert === false)) && "opacity-40"
           )}
         >
@@ -943,12 +943,12 @@ export default function InscriptionPage() {
             <button
               type="button"
               onClick={() => void annulerSociale()}
-              className="mt-[13px] block w-full py-[8px] text-center text-[13px] font-semibold text-foreground/50"
+              className="bouton-discret mt-[13px] block w-full py-[8px] text-center text-[13px] font-semibold"
             >
               Annuler
             </button>
           ) : (
-            <Link href="/" className="mt-[13px] block py-[8px] text-center text-[13px] font-semibold text-foreground/50">
+            <Link href="/" className="bouton-discret mt-[13px] block py-[8px] text-center text-[13px] font-semibold">
               J&apos;ai déjà un compte
             </Link>
           ))}

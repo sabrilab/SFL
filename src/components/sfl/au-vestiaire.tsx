@@ -31,7 +31,7 @@ export function AuVestiaire({ piece, className }: { piece: Piece; className?: st
       type="button"
       onClick={partager}
       className={cn(
-        "glass-soft flex items-center justify-center gap-1.5 rounded-full px-4 py-3 text-[14px] font-semibold transition-transform active:scale-[0.98]",
+        "bouton-secondaire flex items-center justify-center gap-1.5 px-4 py-3 text-[14px] font-semibold",
         className
       )}
     >
@@ -49,7 +49,7 @@ export function AuVestiaireRond({ piece, className }: { piece: Piece; className?
       onClick={partager}
       aria-label="Partager au Vestiaire"
       className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm transition-transform active:scale-90",
+        "bouton-secondaire flex size-8 shrink-0 items-center justify-center",
         className
       )}
     >

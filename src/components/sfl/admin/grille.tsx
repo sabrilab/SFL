@@ -344,7 +344,7 @@ export function GrilleSaisie({ saison, commit }: Props) {
 
         <button
           onClick={() => ajouterLigne()}
-          className="flex h-9 items-center gap-1.5 rounded-full bg-foreground px-3.5 text-[13px] font-bold text-background"
+          className="bouton-principal flex h-9 items-center gap-1.5 px-3.5 text-[13px] font-bold"
         >
           <Plus className="size-3.5" /> Ligne
         </button>
@@ -357,7 +357,7 @@ export function GrilleSaisie({ saison, commit }: Props) {
           <button
             key={t}
             onClick={() => ajouterEquipe(t)}
-            className="glass-soft flex items-center gap-1 rounded-full px-2.5 py-1 text-[11.5px] font-semibold text-foreground/65"
+            className="bouton-secondaire flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-semibold"
           >
             <Users className="size-3" />
             {t}

@@ -86,7 +86,7 @@ export function ChangerJoueurSheet({
                           onChangerEquipe(t);
                           setQ("");
                         }}
-                        className="glass-soft flex items-center gap-2 rounded-full px-4 py-2.5 text-[14px] font-semibold transition-transform active:scale-95"
+                        className="bouton-secondaire flex items-center gap-2 px-4 py-2.5 text-[14px] font-semibold"
                       >
                         <span className="size-2.5 rounded-full" style={{ background: couleur(t) }} />
                         {t}

@@ -105,7 +105,7 @@ export function LoginScreen() {
             type="submit"
             disabled={busy || !user || !password}
             className={cn(
-              "mt-1 flex items-center justify-center gap-2 rounded-full bg-foreground py-4 text-[15px] font-bold text-background transition-transform active:scale-[0.98]",
+              "bouton-principal mt-1 flex items-center justify-center gap-2 py-4 text-[15px] font-bold",
               (busy || !user || !password) && "opacity-40"
             )}
           >
@@ -123,7 +123,7 @@ export function LoginScreen() {
 
         <Link
           href="/inscription"
-          className="glass-soft mt-6 flex items-center justify-center rounded-full py-3.5 text-[14px] font-bold"
+          className="bouton-secondaire mt-6 flex items-center justify-center py-3.5 text-[14px] font-bold"
         >
           Créer mon compte
         </Link>

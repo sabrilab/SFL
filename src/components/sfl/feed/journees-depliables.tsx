@@ -141,7 +141,7 @@ function Rubrique({
 
           <button
             onClick={onOuvrir}
-            className="mt-0.5 flex items-center justify-center gap-1.5 rounded-full bg-foreground py-2.5 text-[13.5px] font-bold text-background transition-transform active:scale-[0.98]"
+            className="bouton-principal mt-0.5 flex items-center justify-center gap-1.5 py-2.5 text-[13.5px] font-bold"
           >
             Ouvrir la journée <ArrowRight className="size-3.5" strokeWidth={2.75} />
           </button>

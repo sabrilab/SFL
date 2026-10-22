@@ -50,7 +50,7 @@ export function CreerCle() {
         <button
           type="button"
           onClick={creer}
-          className="rounded-full bg-foreground py-[14px] text-[15px] font-bold text-background"
+          className="bouton-principal py-[14px] text-[15px] font-bold"
         >
           Créer la clé
         </button>
@@ -60,7 +60,7 @@ export function CreerCle() {
           <button
             type="button"
             onClick={copier}
-            className="flex items-center justify-center gap-2 rounded-full bg-foreground py-[14px] text-[15px] font-bold text-background"
+            className="bouton-principal flex items-center justify-center gap-2 py-[14px] text-[15px] font-bold"
           >
             <Copy className="size-4" /> Copier
           </button>

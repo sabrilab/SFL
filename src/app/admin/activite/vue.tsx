@@ -348,7 +348,7 @@ export function ActiviteVue({
         <button
           onClick={onRefresh}
           disabled={loading}
-          className="glass-soft mono-label flex items-center gap-1.5 rounded-full px-3 py-1.5 text-foreground/60"
+          className="bouton-secondaire mono-label flex items-center gap-1.5 px-3 py-1.5"
         >
           {loading ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
           Actualiser
@@ -403,7 +403,7 @@ export function ActiviteVue({
             <button
               key={p.id}
               onClick={() => allerA(p.id)}
-              className="glass-soft shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold text-foreground/70"
+              className="bouton-secondaire shrink-0 px-3 py-1.5 text-[12px] font-semibold"
             >
               {p.label}
             </button>

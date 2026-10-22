@@ -240,7 +240,7 @@ export default function SetupPage() {
         <button
           onClick={verifier}
           disabled={checking}
-          className="glass-soft mono-label ml-auto flex items-center gap-1.5 rounded-full px-3 py-1.5 text-foreground/60"
+          className="bouton-secondaire mono-label ml-auto flex items-center gap-1.5 px-3 py-1.5"
         >
           {checking ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
           Vérifier
@@ -296,7 +296,7 @@ export default function SetupPage() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={copierSchema}
-            className="flex items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-[13px] font-bold text-background"
+            className="bouton-principal flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold"
           >
             <Copy className="size-3.5" /> Copier le script SQL
           </button>
@@ -304,7 +304,7 @@ export default function SetupPage() {
             href={`${DASHBOARD}/sql/new`}
             target="_blank"
             rel="noreferrer"
-            className="glass-soft flex items-center gap-1.5 rounded-full px-4 py-2.5 text-[13px] font-semibold text-foreground/70"
+            className="bouton-secondaire flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold"
           >
             Ouvrir l&apos;éditeur SQL <ExternalLink className="size-3.5" />
           </a>
@@ -321,7 +321,7 @@ export default function SetupPage() {
           onClick={toutInstaller}
           disabled={running}
           className={cn(
-            "flex items-center justify-center gap-2 rounded-full bg-foreground px-5 py-3.5 text-[15px] font-bold text-background",
+            "bouton-principal flex items-center justify-center gap-2 px-5 py-3.5 text-[15px] font-bold",
             running && "opacity-50"
           )}
         >

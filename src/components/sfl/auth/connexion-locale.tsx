@@ -35,7 +35,7 @@ export function ConnexionLocale() {
       <button
         type="button"
         onClick={() => signOut()}
-        className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#f4f5f2] px-3 py-1.5 text-[12px] font-semibold text-[#0a0b0d]"
+        className="bouton-principal flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold"
       >
         <RefreshCw className="size-3.5" strokeWidth={2.4} /> Me reconnecter
       </button>

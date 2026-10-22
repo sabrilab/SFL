@@ -175,7 +175,7 @@ export function AccountCard() {
                 <button
                   type="submit"
                   disabled={emailBusy || !emailInput}
-                  className="shrink-0 rounded-full bg-foreground px-4 py-2.5 text-[13px] font-bold text-background disabled:opacity-40"
+                  className="bouton-principal shrink-0 px-4 py-2.5 text-[13px] font-bold disabled:opacity-40"
                 >
                   OK
                 </button>
@@ -187,7 +187,7 @@ export function AccountCard() {
                   <button
                     key={p}
                     onClick={() => linkProvider(p)}
-                    className="glass-soft mono-label flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-foreground/60"
+                    className="bouton-secondaire mono-label flex flex-1 items-center justify-center gap-1.5 py-2.5"
                   >
                     <Link2 className="size-3" /> Lier {p === "google" ? "Google" : "Apple"}
                   </button>
@@ -220,7 +220,7 @@ export function AccountCard() {
                 type="submit"
                 disabled={busy || !current || !next}
                 className={cn(
-                  "flex-1 rounded-full bg-foreground py-3 text-[14px] font-bold text-background",
+                  "bouton-principal flex-1 py-3 text-[14px] font-bold",
                   (busy || !current || !next) && "opacity-40"
                 )}
               >
@@ -229,7 +229,7 @@ export function AccountCard() {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="glass-soft rounded-full px-5 py-3 text-[14px] font-semibold text-foreground/60"
+                className="bouton-secondaire px-5 py-3 text-[14px] font-semibold"
               >
                 Annuler
               </button>
@@ -239,7 +239,7 @@ export function AccountCard() {
           <div className="mt-3 flex gap-2">
             <button
               onClick={() => setOpen(true)}
-              className="glass-soft flex flex-1 items-center justify-center gap-2 rounded-full py-3 text-[14px] font-semibold"
+              className="bouton-secondaire flex flex-1 items-center justify-center gap-2 py-3 text-[14px] font-semibold"
             >
               <KeyRound className="size-4" />
               Changer mon mot de passe
@@ -250,7 +250,7 @@ export function AccountCard() {
                 toast.success("À dimanche 👋");
               }}
               aria-label="Se déconnecter"
-              className="glass-soft flex items-center justify-center rounded-full px-4 py-3 text-foreground/60"
+              className="bouton-secondaire bouton--rouge flex items-center justify-center px-4 py-3"
             >
               <LogOut className="size-4" />
             </button>

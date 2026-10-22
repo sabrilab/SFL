@@ -43,7 +43,7 @@ export function StatsAVenir({
           className={
             compact
               ? "mt-2 inline-flex items-center gap-1 text-[12.5px] font-semibold text-foreground/80"
-              : "mt-4 inline-flex items-center gap-1 rounded-full bg-secondary px-4 py-2 text-[13px] font-semibold"
+              : "bouton-secondaire mt-4 inline-flex items-center gap-1 px-4 py-2 text-[13px] font-semibold"
           }
         >
           Relire {archive.nom} <ChevronRight className="size-3.5" />

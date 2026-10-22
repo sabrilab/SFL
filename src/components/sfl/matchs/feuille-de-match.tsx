@@ -282,7 +282,7 @@ export function FeuilleDeMatch({
         type="button"
         disabled={!image.pret}
         onClick={image.partager}
-        className="flex h-12 items-center justify-center gap-2 rounded-full bg-foreground text-[15px] font-semibold text-background disabled:opacity-40"
+        className="bouton-principal flex h-12 items-center justify-center gap-2 text-[15px] font-semibold disabled:opacity-40"
       >
         <Share className="size-[18px]" />
         Partager la feuille
