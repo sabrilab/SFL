@@ -1,8 +1,8 @@
 "use client";
 
-// L'en-tête des façons de jouer (Sabri, 22/10) : trois sigles côte à côte,
-// SFL · Bola · Bola Team, le plein est la page où l'on est (il a gardé cet
-// en-tête avec « La course », l'onglet Actus) :
+// L'en-tête des façons de jouer (Sabri, 22/10) : le sigle de la page où
+// l'on est, qui déroule les deux autres (trois côte à côte, c'était « trop
+// complexe ») :
 //   · SFL — la ligue privée du dimanche, avec sa saison (/ligue) ;
 //   · Bola — la ligue globale, le classement à vie des matchs que les
 //     joueurs ouvrent eux-mêmes (/ligue-vierge) ; régions et mondial plus tard.
@@ -11,6 +11,8 @@
 // comme le texte par un masque : pleins quand on y est, effacés sinon.
 
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { cn } from "@/lib/utils";
 
@@ -22,8 +24,10 @@ const BADGES = [
 ] as const;
 
 /**
- * L'en-tête des trois onglets (Actus, Bola, Team) : les trois sigles, le
- * plein est la page où l'on est, et la loupe à droite.
+ * L'en-tête des trois onglets (Actus, Bola, Team). Trois logos côte à côte,
+ * dont Bola deux fois, c'était trop (Sabri, 22/10 : « trop complexe ») :
+ * seul le logo de la page où l'on est, en grand ; le toucher déroule les
+ * deux autres. La loupe à droite.
  */
 export function EnteteLigue({ actif, className }: { actif: Actif; className?: string }) {
   const liens = [
@@ -31,20 +35,54 @@ export function EnteteLigue({ actif, className }: { actif: Actif; className?: st
     { href: "/ligue-vierge", ligue: "bola" },
     { href: "/bola-team", ligue: "team" },
   ] as const;
+  const [ouvert, setOuvert] = useState(false);
+  const ici = liens.find((l) => l.href === actif) ?? liens[0];
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!ouvert) return;
+    const fermer = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOuvert(false);
+    };
+    document.addEventListener("pointerdown", fermer);
+    return () => document.removeEventListener("pointerdown", fermer);
+  }, [ouvert]);
   return (
     <div className={cn("flex items-center justify-between", className)}>
-      <nav aria-label="Ligue" className="flex items-center gap-4">
-        {liens.map((l) => (
-          <Link
-            key={l.href}
-            href={l.href}
-            aria-current={actif === l.href ? "page" : undefined}
-            className={cn("py-1.5 transition-colors", actif === l.href ? "text-foreground" : "text-foreground/30")}
+      <div ref={ref} className="relative">
+        <button
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={ouvert}
+          onClick={() => setOuvert((o) => !o)}
+          className="flex items-center gap-2 py-1.5 text-foreground"
+        >
+          <SigleLigue ligue={ici.ligue} hauteur={22} />
+          <ChevronDown className={cn("size-[18px] opacity-50 transition-transform", ouvert && "rotate-180")} />
+        </button>
+        {ouvert && (
+          <nav
+            role="menu"
+            aria-label="Ligue"
+            className="absolute top-full left-0 z-50 mt-2 flex min-w-[200px] flex-col rounded-[20px] border border-white/10 bg-popover/95 p-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.45)] backdrop-blur-xl"
           >
-            <SigleLigue ligue={l.ligue} hauteur={16} />
-          </Link>
-        ))}
-      </nav>
+            {liens.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                role="menuitem"
+                aria-current={actif === l.href ? "page" : undefined}
+                onClick={() => setOuvert(false)}
+                className={cn(
+                  "flex h-12 items-center rounded-[14px] px-3.5 transition-colors",
+                  actif === l.href ? "bg-white/[0.08] text-foreground" : "text-foreground/60"
+                )}
+              >
+                <SigleLigue ligue={l.ligue} hauteur={16} />
+              </Link>
+            ))}
+          </nav>
+        )}
+      </div>
       <BoutonRecherche className="size-10" />
     </div>
   );
