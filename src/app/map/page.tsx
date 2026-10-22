@@ -60,6 +60,7 @@ import type { JourneeMeta, Saison, Terrain } from "@/lib/sfl/saisie/types";
 import { ovr, rankPlayers } from "@/lib/sfl/engine";
 import { ProfilJoueur } from "@/components/sfl/profil-joueur";
 import { CatalogueJoueurs } from "@/components/sfl/map/catalogue-joueurs";
+import { CollectionPile } from "@/components/sfl/map/collection-pile";
 import { cleVille, type VillePlan } from "@/components/sfl/map/joueurs";
 import { villeOuLigue } from "@/lib/sfl/villes";
 import { photoPerso } from "@/lib/sfl/photos";
@@ -612,10 +613,11 @@ export default function MapPage() {
   const [focusVilles, setFocusVilles] = useState<string[] | null>(null);
   const [profil, setProfil] = useState<string | null>(null);
   const [viser, setViser] = useState<{ lat: number; lng: number; n: number } | null>(null);
-  const ouvrirVille = useCallback((ids: string[]) => {
-    setFocusVilles(ids);
-    setCatalogue(true);
-  }, []);
+  // Une pile touchée sur la Map : sa collection, la Map floutée derrière.
+  const [pile, setPile] = useState<string[] | null>(null);
+  const ouvrirVille = useCallback((ids: string[]) => setPile(ids), []);
+  const fermerPile = useCallback(() => setPile(null), []);
+  const villesPile = useMemo(() => (pile ? villes.filter((v) => pile.includes(v.id)) : []), [pile, villes]);
   const rangs = useMemo(() => new Map(rankPlayers(players).map((x) => [x.name, x.rank])), [players]);
   const profilJoueur = profil ? players.find((x) => x.name === profil) : undefined;
   const nomFocus = focusVilles?.length === 1 ? villes.find((v) => v.id === focusVilles[0])?.ville : null;
@@ -987,6 +989,17 @@ export default function MapPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <CollectionPile
+        villes={villesPile}
+        masquee={!!profil}
+        onFermer={fermerPile}
+        onJoueur={setProfil}
+        onVoir={(v) => {
+          setPile(null);
+          setViser((x) => ({ lat: v.lat, lng: v.lng, n: (x?.n ?? 0) + 1 }));
+        }}
+      />
 
       {/* ─── Le profil d'un joueur touché sur la Map ou dans le catalogue ─── */}
       <Sheet open={!!profilJoueur} onOpenChange={(o) => !o && setProfil(null)}>
