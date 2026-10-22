@@ -1,15 +1,17 @@
 /* ═══════════════════════ Les boutons de Bola ═══════════════════════
-   Du verre bombé, du grain, de la lumière (Sabri, 22/10 : « une belle
+   Du verre de nuit, éclairé par en dessous (Sabri, 22/10 : « une belle
    différenciation des boutons avec une espèce de bombage et un peu de
-   bruit, tout en restant dans l'ADN de Bola » ; puis : un grain moins
-   hasardeux, plus beau, qui se voie, et la couleur sur tous les boutons).
+   bruit, tout en restant dans l'ADN de Bola » ; puis la couleur sur tous
+   les boutons ; puis, planche « New tone test 26 » à l'appui : un verre
+   sombre où la lumière monte du bas, et un bruit bien moins visible).
 
-   Trois rangs, qu'on lit sans avoir à lire, comme une gamme de verres du
-   plus sombre au plus allumé :
-   · bouton-principal  — le verre allumé : la lumière monte du bas du
-                         verre, liserés clairs, halo. Le geste de l'écran ;
-   · bouton-secondaire — le verre fumé, teinté de son ton, liseré de la
-                         même couleur : on le voit au repos, il ne crie pas ;
+   Trois rangs, qu'on lit sans avoir à lire :
+   · bouton-principal  — le verre de nuit allumé : sombre en haut, la
+                         lumière de son ton monte du bas et s'enroule sur
+                         les bords, le biseau du haut la reprend, un halo
+                         la pose sur la page. Le geste de l'écran ;
+   · bouton-secondaire — le verre fumé, éteint, le liseré dans son ton : on
+                         le voit au repos, il ne crie pas ;
    · bouton-discret    — le texte seul, dans son ton ; le verre vient sous
                          le doigt.
    Sur un fond clair (la Map, ses stickers de papier) : bouton-encre, le
@@ -20,26 +22,26 @@
    · argent  (par défaut) regarder : voir, ouvrir, filtrer, revenir ;
    · bouton--vert   y aller : venir, rejoindre, valider, publier, créer ;
    · bouton--or     ta carrière : ta carte, tes photos, tes badges, le MVP ;
-   · bouton--mauve  les autres : le Vestiaire, partager, inviter, réagir ;
+   · bouton--mauve  les autres : le Vestiaire, partager, inviter, défier ;
    · bouton--braise il manque des joueurs (la braise reste au manque) ;
    · bouton--rouge  défaire : annuler, retirer, quitter, se déconnecter.
    Le ton se pose sur n'importe quel rang : il allume le verre du
-   principal, teinte le verre fumé du secondaire, colore le texte du
+   principal, borde le verre fumé du secondaire, colore le texte du
    discret. Une action qui défait reste en secondaire : elle ne brille
    jamais plus que celle qui fait.
 
-   Le grain : un bruit bleu (une tuile de 64 × 64), écrit ici même et rien
-   n'est téléchargé. Un bruit bleu répartit ses points sans amas ni trous :
-   un grain égal et fin, celui du verre sablé, là où un bruit ordinaire
-   faisait des taches au hasard. Il est fondu dans le verre (background-
-   blend-mode, pas de calque en plus) ; le reflet du haut le couvre un peu,
-   il se voit surtout en bas, où la lumière monte.
+   Le grain : un bruit bleu (une tuile de 64 × 64, écrite ici même : rien
+   n'est téléchargé), un point par pixel de l'écran (--grain-pas suit la
+   densité de l'écran), de faible amplitude autour du gris moyen. Fondu en
+   overlay, il ne se voit que dans la lumière, là où le verre passe du
+   sombre au clair, comme le dépoli de la planche ; sur le noir et sur le
+   blanc, il s'efface.
 
-   Accessibilité : texte à 4,5:1 au moins sur chaque verre, contour de
-   focus net au clavier, rien ne bouge avec « Réduire les animations »
-   (règle globale de globals.css), verre opaque avec « Réduire la
-   transparence », bords nets et sans grain avec « Augmenter le
-   contraste », bordures système en mode contraste forcé.
+   Accessibilité : texte à 4,5:1 au moins sur chaque verre (la lumière
+   reste sous les lettres), contour de focus net au clavier, rien ne bouge
+   avec « Réduire les animations » (règle globale de globals.css), verre
+   opaque avec « Réduire la transparence », bords nets et sans grain avec
+   « Augmenter le contraste », bordures système en mode contraste forcé.
 
    Tout est dans @layer components : les utilitaires Tailwind (taille,
    marges, position, arrondi, typo) gardent la main. Un bouton converti
@@ -47,15 +49,19 @@
    ton qui les donnent. */
 
 :root {
-  /* Le même bruit bleu, en trois dosages. Sur un verre allumé (overlay) :
-     ses points les plus sombres et les plus clairs, 15 % de chaque, isolés
-     et réguliers, sans jamais se toucher en vermicelles ; sur un verre
-     sombre, seulement ses points les plus clairs, comme du verre sablé
-     (screen) ; en ombre sur un verre blanc (soft-light). */
-  --grain-fondu: url("data:image/png;base64,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");
-  --grain-lumiere: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABABAMAAABYR2ztAAAAMFBMVEUAAAAREREiIiIzMzNERERVVVVmZmZ3d3eIiIiZmZmqqqq7u7vMzMzd3d3u7u7///97EBgKAAAAEHRSTlN4eHh4eHh4eHh4eHh4eHh4SbpsgQAABEdJREFUeNpF1b3K7QgVxvFfvrPztdPIMHJw0h0Zp0ilwxmRtIpFsFUk1jaBuQAzdxBBrXMcpg9eQZy5gbx3ED03sFXsLfYLrnLBgudZPOu/hFtS+AZRRcok1/5MMGv74JKDXpiPZLWmk7FqV7WSX3ONy8NLJTiXNsqpwkIi8a3bc7zFwoAH1om7AomhqwyyspsMs20eTdVAlYSZJre68zGw8aKz3bh3I2L64JRRSfxU94+VWqwrkJUOUym9+W1Me0kR5yKuOclr+qAMXuUVyBjTuy4r0QpucqPHl6XvfIRf+KRwUDElzh+Jas1Tm0JiB21fxMEVbhkpY+fzcEtzQ432N/rU7XXG6kFW4Qrv9ObLzVEb0jxa78ORiJYdJ7QTdCbaZ0dkx4db4s/RPu5VIM5K3iX2sGjPt7B1E10AhgLaiwxGt+TqnHIO50c3yGtzH9y7fHjMqpB1CqqhHmMjwfIf9Pzl6eDobbw62jTdgULpoLSNsUVcZd0gzCxykiAl0cWOsQ+q10h4ZLW7KrK5ETYyIQ1Fqp+/VxLRh5MgalQyN3fze3nPoRakhf1jNBkxLX27EKvbwfdZhEiPbVBmFlfZnYK4ynFlwtUvLdNJaxu1mPjGSWkJDU+doVGm4+j0lhBp6FfsdaozXwofnO691aY9fJ1rKGJsdskNiZ8/D+POxGG+k0UMaUw4FwikZKLVYzQEUeYwvxSC0qU372Pd1eQEBGsl4BO4TCpVICMQS+rccrE4R8alt7Y/kYYa1slWe17maO0LK3v0zGZu2Du0ZaT249qEIWo6S3KtL+46XPKULSjoXFVrZ3yGYzRv/RrBFGIuxVIsd3tomO08Enwo3JOlCWRy1/gtUVrlzo4pUKGN0UlULZTDCm7x2VpSscofnX7vYu+3Cd1X/ppiLVFmmOONMI3NLO10etBEIt0/kdY6osyG6HJgmA722sR61w6F3Nla/l0RW79Avw5Pw5Fe7gdaFdzsyCvk3KoUW4mpMMbt+N4U3NNQ5/ydJotQT6aoGvSsFYMlUrOw6/gKoYvaHxAqQwrJHt2YbI/e7mT+IUHUpLeaYpghaIYqhiSyDBThM4BJg36OHxN4+8rZ9V+xjS9k+MxVYunm5HDTMJ4wnrM3/Cl/IvRwlNRItYFxvTAKn8RPwrVvkQvFlW1+Jwr0m2XS1bHKSWb9NDK9gjRkn9sH9rl98vJKUKL9snHUeQpvDPhvtE0JbdMfnlDpoTunZcgL44b2Cu0EcS5RWt7GHiLoGr3DqjJmpiYgj1GGFk3hojVn5Cb2/MnkNx5S0S5MLGNeG97EBHWIVFSRWFSC6fkidPjbPTfHj3eIi0zoJeYWH+sh5pH5f20ojawFRI1lG/szjX2abFmV8Mh1zLveI0pfPQeF6rk/fRo1livUnrPZMTum0sjMZ9Inuac2khKrCBKG3HBJLzcn/o7C4xZ4Ly5cYU3JO+ZI8D/hJBeT/shdSwAAAABJRU5ErkJggg==");
-  --grain-ombre: url("data:image/png;base64,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");
-  --grain-encre: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABABAMAAABYR2ztAAAAMFBMVEUAAAAREREiIiIzMzNERERVVVVmZmZ3d3eIiIiZmZmqqqq7u7vMzMzd3d3u7u7///97EBgKAAAAEHRSTlNISEhISEhISEhISEhISEhIBwFMsAAABEdJREFUeNpF1b3K7QgVxvFfvrPztdPIMHJw0h0Zp0ilwxmRtIpFsFUk1jaBuQAzdxBBrXMcpg9eQZy5gbx3ED03sFXsLfYLrnLBgudZPOu/hFtS+AZRRcok1/5MMGv74JKDXpiPZLWmk7FqV7WSX3ONy8NLJTiXNsqpwkIi8a3bc7zFwoAH1om7AomhqwyyspsMs20eTdVAlYSZJre68zGw8aKz3bh3I2L64JRRSfxU94+VWqwrkJUOUym9+W1Me0kR5yKuOclr+qAMXuUVyBjTuy4r0QpucqPHl6XvfIRf+KRwUDElzh+Jas1Tm0JiB21fxMEVbhkpY+fzcEtzQ432N/rU7XXG6kFW4Qrv9ObLzVEb0jxa78ORiJYdJ7QTdCbaZ0dkx4db4s/RPu5VIM5K3iX2sGjPt7B1E10AhgLaiwxGt+TqnHIO50c3yGtzH9y7fHjMqpB1CqqhHmMjwfIf9Pzl6eDobbw62jTdgULpoLSNsUVcZd0gzCxykiAl0cWOsQ+q10h4ZLW7KrK5ETYyIQ1Fqp+/VxLRh5MgalQyN3fze3nPoRakhf1jNBkxLX27EKvbwfdZhEiPbVBmFlfZnYK4ynFlwtUvLdNJaxu1mPjGSWkJDU+doVGm4+j0lhBp6FfsdaozXwofnO691aY9fJ1rKGJsdskNiZ8/D+POxGG+k0UMaUw4FwikZKLVYzQEUeYwvxSC0qU372Pd1eQEBGsl4BO4TCpVICMQS+rccrE4R8alt7Y/kYYa1slWe17maO0LK3v0zGZu2Du0ZaT249qEIWo6S3KtL+46XPKULSjoXFVrZ3yGYzRv/RrBFGIuxVIsd3tomO08Enwo3JOlCWRy1/gtUVrlzo4pUKGN0UlULZTDCm7x2VpSscofnX7vYu+3Cd1X/ppiLVFmmOONMI3NLO10etBEIt0/kdY6osyG6HJgmA722sR61w6F3Nla/l0RW79Avw5Pw5Fe7gdaFdzsyCvk3KoUW4mpMMbt+N4U3NNQ5/ydJotQT6aoGvSsFYMlUrOw6/gKoYvaHxAqQwrJHt2YbI/e7mT+IUHUpLeaYpghaIYqhiSyDBThM4BJg36OHxN4+8rZ9V+xjS9k+MxVYunm5HDTMJ4wnrM3/Cl/IvRwlNRItYFxvTAKn8RPwrVvkQvFlW1+Jwr0m2XS1bHKSWb9NDK9gjRkn9sH9rl98vJKUKL9snHUeQpvDPhvtE0JbdMfnlDpoTunZcgL44b2Cu0EcS5RWt7GHiLoGr3DqjJmpiYgj1GGFk3hojVn5Cb2/MnkNx5S0S5MLGNeG97EBHWIVFSRWFSC6fkidPjbPTfHj3eIi0zoJeYWH+sh5pH5f20ojawFRI1lG/szjX2abFmV8Mh1zLveI0pfPQeF6rk/fRo1livUnrPZMTum0sjMZ9Inuac2khKrCBKG3HBJLzcn/o7C4xZ4Ly5cYU3JO+ZI8D/hJBeT/shdSwAAAABJRU5ErkJggg==");
+  --grain: url("data:image/png;base64,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");
+  /* Un point du bruit par pixel de l'écran. */
+  --grain-pas: 64px;
+}
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 2dppx) {
+  :root {
+    --grain-pas: 32px;
+  }
+}
+@media (-webkit-min-device-pixel-ratio: 3), (min-resolution: 3dppx) {
+  :root {
+    --grain-pas: 21.3333px;
+  }
 }
 
 @layer components {
@@ -64,16 +70,15 @@
   .bouton-discret,
   .bouton-encre,
   .bouton-givre {
-    /* Le ton par défaut, l'argent. */
-    --b-haut: #ffffff;
-    --b-milieu: #e7eaef;
-    --b-bas: #b8bdc6;
-    --b-encre: #0a0b0d;
-    --b-reflet: 0.62;
-    --b-lueur: 255 255 255;
-    --b-halo: 214 224 240;
-    --b-halo-pres: 0.5;
-    --b-halo-loin: 0.36;
+    /* Le ton par défaut, l'argent. Le verre (nuit, fond), sa lumière
+       (lueur), son cœur le plus chaud (feu), le texte allumé ; puis le ton
+       du verre fumé et du texte seul. */
+    --b-nuit: #121418;
+    --b-fond: #1d2026;
+    --b-lueur: 206 214 228;
+    --b-feu: 246 248 252;
+    --b-allume: #f6f7f4;
+    --b-halo: 0.62;
     --b-ton: 226 232 242;
     --b-texte: #f4f5f2;
     --b-discret: rgb(244 245 242 / 0.78);
@@ -95,114 +100,99 @@
 
   /* ── Les tons. Placés après le socle : ils l'emportent sur l'argent. ── */
   .bouton--or {
-    --b-haut: #fff1c2;
-    --b-milieu: #f0c45c;
-    --b-bas: #b5852a;
-    --b-encre: #221702;
-    --b-reflet: 0.55;
-    --b-lueur: 255 240 196;
-    --b-halo: 240 196 92;
+    --b-nuit: #161004;
+    --b-fond: #2b1f07;
+    --b-lueur: 240 196 92;
+    --b-feu: 255 238 196;
     --b-ton: 242 210 128;
     --b-texte: #f4d78c;
     --b-discret: #f4d78c;
     --b-sombre: #6b4a07;
   }
   .bouton--vert {
-    --b-haut: #e8f5e8;
-    --b-milieu: #abcfab;
-    --b-bas: #6c986d;
-    --b-encre: #0b170c;
-    --b-reflet: 0.55;
-    --b-lueur: 232 250 232;
-    --b-halo: 160 206 160;
+    --b-nuit: #0b150c;
+    --b-fond: #142717;
+    --b-lueur: 150 214 152;
+    --b-feu: 226 250 226;
     --b-ton: 178 218 178;
     --b-texte: #c2e2c2;
     --b-discret: #c2e2c2;
     --b-sombre: #2f4a30;
   }
   .bouton--mauve {
-    --b-haut: #fbe3ef;
-    --b-milieu: #e3b5ce;
-    --b-bas: #ad7493;
-    --b-encre: #2a0d1c;
-    --b-reflet: 0.55;
-    --b-lueur: 255 232 244;
-    --b-halo: 228 168 200;
+    --b-nuit: #170811;
+    --b-fond: #2b1121;
+    --b-lueur: 230 160 200;
+    --b-feu: 253 232 243;
     --b-ton: 232 186 210;
     --b-texte: #f0c6dc;
     --b-discret: #f0c6dc;
     --b-sombre: #5b2141;
   }
   .bouton--braise {
-    --b-haut: #ffd8bf;
-    --b-milieu: #ff9d63;
-    --b-bas: #df6127;
-    --b-encre: #170903;
-    --b-reflet: 0.5;
-    --b-lueur: 255 226 206;
-    --b-halo: 255 138 76;
+    --b-nuit: #1c0b04;
+    --b-fond: #351508;
+    --b-lueur: 255 138 76;
+    --b-feu: 255 216 190;
     --b-ton: 255 168 122;
     --b-texte: #ffb088;
     --b-discret: #ffb088;
     --b-sombre: #a8430f;
   }
   .bouton--rouge {
-    --b-haut: #f25a5f;
-    --b-milieu: #c6222b;
-    --b-bas: #7d0b13;
-    --b-encre: #fff6f5;
-    --b-reflet: 0.32;
-    --b-lueur: 255 176 170;
-    --b-halo: 236 62 66;
+    --b-nuit: #1c0608;
+    --b-fond: #340c11;
+    --b-lueur: 240 86 90;
+    --b-feu: 255 200 196;
     --b-ton: 255 128 128;
     --b-texte: #ff989a;
     --b-discret: #ff989a;
     --b-sombre: #a3141c;
   }
 
-  /* ── Principal : le verre allumé. La lumière monte du bas du verre (comme
-     dans un verre bombé éclairé par en dessous), le reflet du haut et les
-     deux liserés lui donnent son volume ; le halo est dans son ton. ── */
+  /* ── Principal : le verre de nuit allumé. De haut en bas : le biseau qui
+     prend la lumière, le grain, la lumière qui monte du bas (un cœur au
+     milieu, une bande sur toute la largeur), le verre sombre ; les ombres
+     intérieures enroulent la lumière sur les bords, le halo la pose sur la
+     page. Elle s'arrête sous les lettres. ── */
   .bouton-principal {
-    color: var(--b-encre);
-    background-color: var(--b-milieu);
+    color: var(--b-allume);
+    background-color: var(--b-nuit);
     background-image:
-      radial-gradient(85% 55% at 50% -12%, rgb(255 255 255 / var(--b-reflet)), rgb(255 255 255 / 0) 70%),
-      var(--grain-fondu),
-      radial-gradient(58% 75% at 50% 122%, rgb(var(--b-lueur) / 0.95), rgb(var(--b-lueur) / 0) 72%),
-      linear-gradient(180deg, var(--b-haut) 0%, var(--b-milieu) 55%, var(--b-bas) 100%);
-    background-size: 100% 100%, 64px 64px, 100% 100%, 100% 100%;
-    background-blend-mode: normal, overlay, normal, normal;
+      linear-gradient(180deg, rgb(var(--b-lueur) / 0.12) 0%, rgb(var(--b-lueur) / 0) 40%),
+      var(--grain),
+      radial-gradient(78% 105% at 50% 136%, rgb(var(--b-feu) / 0.95) 0%, rgb(var(--b-lueur) / 0.8) 26%, rgb(var(--b-lueur) / 0.28) 52%, rgb(var(--b-lueur) / 0) 74%),
+      linear-gradient(0deg, rgb(var(--b-lueur) / 0.5) 0%, rgb(var(--b-lueur) / 0.16) 24%, rgb(var(--b-lueur) / 0) 48%),
+      linear-gradient(180deg, var(--b-fond) 0%, var(--b-nuit) 30%, var(--b-nuit) 55%, var(--b-fond) 100%);
+    background-size: 100% 100%, var(--grain-pas) var(--grain-pas), 100% 100%, 100% 100%, 100% 100%;
+    background-blend-mode: normal, overlay, normal, normal, normal;
     box-shadow:
-      inset 0 0 0 1px rgb(255 255 255 / 0.26),
-      inset 1.5px 1.5px 1px -0.5px rgb(255 255 255 / 0.85),
-      inset -1.5px -1.5px 1px -0.5px rgb(var(--b-lueur) / 0.9),
-      inset 0 -8px 12px -8px rgb(var(--b-lueur) / 0.8),
-      0 0 0 0.5px rgb(var(--b-halo) / 0.7),
-      0 0 12px rgb(var(--b-halo) / var(--b-halo-pres)),
-      0 7px 26px -2px rgb(var(--b-halo) / var(--b-halo-loin)),
+      inset 0 0 7px 0 rgb(var(--b-lueur) / 0.22),
+      inset 0 2.5px 3px -1.5px rgb(var(--b-lueur) / 0.75),
+      inset 0 -2px 2px -1px rgb(var(--b-feu) / 0.9),
+      inset 0 -12px 16px -10px rgb(var(--b-lueur) / 0.7),
+      0 10px 22px -10px rgb(var(--b-lueur) / var(--b-halo)),
+      0 2px 10px -3px rgb(var(--b-lueur) / 0.22),
       0 12px 22px -12px rgb(0 0 0 / 0.8);
+    text-shadow: 0 1px 1px rgb(0 0 0 / 0.35);
   }
 
-  /* ── Secondaire : le verre fumé, teinté de son ton ; le liseré et la
-     lumière du bas sont de la même couleur. ── */
+  /* ── Secondaire : le verre fumé, éteint ; le liseré et un reste de
+     lumière en bas sont dans son ton. ── */
   .bouton-secondaire {
     color: var(--b-texte);
-    background-color: transparent;
+    background-color: rgb(22 24 28 / 0.9);
     background-image:
-      radial-gradient(100% 70% at 50% -20%, rgb(255 255 255 / 0.14), rgb(255 255 255 / 0) 70%),
-      var(--grain-lumiere),
-      radial-gradient(60% 75% at 50% 122%, rgb(var(--b-ton) / 0.36), rgb(var(--b-ton) / 0) 70%),
-      linear-gradient(180deg, rgb(var(--b-ton) / 0.13), rgb(var(--b-ton) / 0.05) 60%, rgb(var(--b-ton) / 0.1)),
-      linear-gradient(180deg, rgb(46 49 56 / 0.86) 0%, rgb(25 27 31 / 0.88) 55%, rgb(19 20 24 / 0.9) 100%);
-    background-size: 100% 100%, 64px 64px, 100% 100%, 100% 100%, 100% 100%;
-    background-blend-mode: normal, screen, normal, normal, normal;
+      linear-gradient(180deg, rgb(255 255 255 / 0.07) 0%, rgb(255 255 255 / 0) 42%),
+      var(--grain),
+      radial-gradient(64% 70% at 50% 122%, rgb(var(--b-ton) / 0.2), rgb(var(--b-ton) / 0) 74%),
+      linear-gradient(180deg, rgb(var(--b-ton) / 0.07), rgb(var(--b-ton) / 0.03) 60%, rgb(var(--b-ton) / 0.06));
+    background-size: 100% 100%, var(--grain-pas) var(--grain-pas), 100% 100%, 100% 100%;
+    background-blend-mode: normal, overlay, normal, normal;
     box-shadow:
-      inset 0 0 0 1px rgb(var(--b-ton) / 0.3),
-      inset 1.5px 1.5px 1px -0.5px rgb(var(--b-ton) / 0.8),
-      inset -1.5px -1.5px 1px -0.5px rgb(var(--b-ton) / 0.45),
-      inset 0 -8px 12px -8px rgb(var(--b-ton) / 0.4),
-      0 0 16px -5px rgb(var(--b-ton) / 0.3),
+      inset 0 0 0 1px rgb(var(--b-ton) / 0.16),
+      inset 0 1.5px 1px -0.5px rgb(var(--b-ton) / 0.42),
+      inset 0 -1.5px 1px -0.5px rgb(var(--b-ton) / 0.3),
       0 8px 18px -10px rgb(0 0 0 / 0.85);
   }
 
@@ -214,7 +204,7 @@
   .bouton-discret:active:not(:disabled) {
     background: rgb(var(--b-ton) / 0.1);
     box-shadow:
-      inset 1.5px 1.5px 1px -0.5px rgb(var(--b-ton) / 0.35),
+      inset 0 1.5px 1px -0.5px rgb(var(--b-ton) / 0.35),
       inset 0 0 0 1px rgb(var(--b-ton) / 0.1);
   }
 
@@ -223,17 +213,16 @@
     color: var(--b-texte);
     background-color: #16181c;
     background-image:
-      radial-gradient(120% 100% at 50% -32%, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0) 58%),
-      var(--grain-encre),
-      radial-gradient(60% 75% at 50% 122%, rgb(var(--b-ton) / 0.3), rgb(var(--b-ton) / 0) 70%),
-      linear-gradient(180deg, #33363d 0%, #16181c 52%, #060708 100%);
-    background-size: 100% 100%, 64px 64px, 100% 100%, 100% 100%;
-    background-blend-mode: normal, screen, normal, normal;
+      linear-gradient(180deg, rgb(255 255 255 / 0.16) 0%, rgb(255 255 255 / 0) 45%),
+      var(--grain),
+      radial-gradient(64% 78% at 50% 122%, rgb(var(--b-ton) / 0.32), rgb(var(--b-ton) / 0) 74%),
+      linear-gradient(180deg, #2a2d33 0%, #16181c 52%, #0b0c0e 100%);
+    background-size: 100% 100%, var(--grain-pas) var(--grain-pas), 100% 100%, 100% 100%;
+    background-blend-mode: normal, overlay, normal, normal;
     box-shadow:
-      inset 1.5px 1.5px 1px -0.5px rgb(255 255 255 / 0.6),
-      inset -1.5px -1.5px 1px -0.5px rgb(var(--b-ton) / 0.35),
+      inset 0 1.5px 1px -0.5px rgb(255 255 255 / 0.5),
+      inset 0 -1.5px 1px -0.5px rgb(var(--b-ton) / 0.4),
       inset 0 0 0 0.6px rgb(var(--b-ton) / 0.16),
-      inset 0 -10px 14px -10px rgb(var(--b-ton) / 0.3),
       0 1px 2px rgb(0 0 0 / 0.25),
       0 10px 20px -10px rgb(0 0 0 / 0.6);
   }
@@ -241,12 +230,7 @@
   .bouton-givre {
     color: var(--b-sombre);
     background-color: rgb(246 246 243 / 0.9);
-    background-image:
-      radial-gradient(120% 100% at 50% -32%, rgb(255 255 255 / 1), rgb(255 255 255 / 0) 60%),
-      var(--grain-ombre),
-      linear-gradient(180deg, rgb(255 255 255 / 0.95) 0%, rgb(246 246 243 / 0.9) 55%, rgb(226 227 223 / 0.92) 100%);
-    background-size: 100% 100%, 64px 64px, 100% 100%;
-    background-blend-mode: normal, soft-light, normal;
+    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.95) 0%, rgb(246 246 243 / 0.9) 55%, rgb(226 227 223 / 0.92) 100%);
     -webkit-backdrop-filter: blur(12px) saturate(1.5);
     backdrop-filter: blur(12px) saturate(1.5);
     box-shadow:
@@ -263,9 +247,8 @@
     transition-duration: 0.08s;
   }
   .bouton-principal:active:not(:disabled) {
-    --b-halo-pres: 0.65;
-    --b-halo-loin: 0.48;
-    filter: brightness(1.05);
+    --b-halo: 0.82;
+    filter: brightness(1.12);
   }
   .bouton-secondaire:active:not(:disabled),
   .bouton-encre:active:not(:disabled) {
@@ -276,7 +259,7 @@
   }
   @media (hover: hover) and (pointer: fine) {
     .bouton-principal:hover:not(:disabled) {
-      filter: brightness(1.04);
+      filter: brightness(1.08);
     }
     .bouton-secondaire:hover:not(:disabled),
     .bouton-encre:hover:not(:disabled) {
@@ -287,7 +270,7 @@
     }
   }
 
-  /* ── Éteint : plus de halo, plus de relief, le texte reste lisible. ── */
+  /* ── Éteint : plus de halo, la lumière baisse, le texte reste lisible. ── */
   :is(.bouton-principal, .bouton-secondaire, .bouton-discret, .bouton-encre, .bouton-givre):is(:disabled, [aria-disabled="true"]) {
     cursor: default;
     opacity: 0.42;
@@ -295,8 +278,8 @@
   .bouton-principal:is(:disabled, [aria-disabled="true"]) {
     filter: saturate(0.4);
     box-shadow:
-      inset 0 0 0 1px rgb(255 255 255 / 0.2),
-      inset 1.5px 1.5px 1px -0.5px rgb(255 255 255 / 0.6);
+      inset 0 0 7px 0 rgb(var(--b-lueur) / 0.16),
+      inset 0 2.5px 3px -1.5px rgb(var(--b-lueur) / 0.5);
   }
 
   /* ── Le focus au clavier : un anneau net, à 3 px du verre. ── */
@@ -309,20 +292,9 @@
     outline-offset: 3px;
   }
 
-  /* Thème clair (prêt, pas encore servi : l'app est en sombre) : le
-     principal argent y devient le verre noir, le secondaire le verre
-     dépoli, le texte des tons passe à leur version sombre. */
-  :root:not(.dark) .bouton-principal:not([class*="bouton--"]) {
-    --b-haut: #33363d;
-    --b-milieu: #16181c;
-    --b-bas: #060708;
-    --b-encre: #f4f5f2;
-    --b-reflet: 0.3;
-    --b-lueur: 120 126 138;
-    --b-halo: 10 11 13;
-    --b-halo-pres: 0.12;
-    --b-halo-loin: 0.1;
-  }
+  /* Thème clair (prêt, pas encore servi : l'app est en sombre) : le verre
+     de nuit garde sa lumière, le secondaire devient le verre dépoli, le
+     texte des tons passe à leur version sombre. */
   :root:not(.dark) .bouton-secondaire {
     color: var(--b-sombre);
     background-color: #ffffff;
@@ -353,13 +325,10 @@
 /* Augmenter le contraste : bords nets, plus de grain ni de halo flou. */
 @media (prefers-contrast: more) {
   :root {
-    --grain-fondu: none;
-    --grain-lumiere: none;
-    --grain-ombre: none;
-    --grain-encre: none;
+    --grain: none;
   }
   .bouton-principal {
-    box-shadow: 0 0 0 2px rgb(var(--b-halo) / 0.9);
+    box-shadow: 0 0 0 2px rgb(var(--b-lueur) / 0.9);
   }
   .bouton-secondaire {
     box-shadow: inset 0 0 0 1.5px rgb(var(--b-ton) / 0.8);
