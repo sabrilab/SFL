@@ -77,7 +77,7 @@ export function PilulesDiscussion({
             )}
             style={{ ["--i" as string]: i }}
           >
-            <CarteDe name={nom || "?"} size={0.112} inerte className="overflow-hidden rounded-full" />
+            <CarteDe name={nom || "?"} size={0.112} inerte />
             <span className="min-w-0 flex-1 truncate text-[13.5px] leading-none tracking-[-0.1px]">
               <span className="font-bold">{m.mien ? "Toi" : nom ? <Nom n={nom} /> : "Quelqu'un"}</span>{" "}
               {m.piece?.type === "rejoint" ? (
