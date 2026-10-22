@@ -110,16 +110,21 @@ export function photoRevision(): number {
 let enCours: Promise<void> | null = null;
 
 /**
- * Relit la liste des photos de la ligue. Lisible par tous, connecté ou non :
- * les photos sont publiques comme les portraits livrés avec l'app.
+ * Relit la liste des photos de la ligue. Depuis le 22/10/2026, seuls les
+ * membres la lisent (un joueur en attente n'y voit que la sienne ; sans
+ * compte, rien) : les fichiers, eux, restent publics par leur adresse. Sans
+ * session, ou si la liste revient vide (jeton refusé, la base ne montre
+ * rien), le cache reste tel quel : aucune carte ne perd sa photo.
  */
 export function rafraichirPhotos(): Promise<void> {
   if (!hasWindow()) return Promise.resolve();
   oublierAnciennes();
   enCours ??= (async () => {
     try {
+      const { data: auth } = await supabase().auth.getSession();
+      if (!auth.session) return;
       const { data, error } = await supabase().storage.from(BUCKET).list("", { limit: 1000 });
-      if (error || !data) return;
+      if (error || !data?.length) return;
       const next: Record<string, string> = {};
       for (const f of data) {
         const nom = nomDeCle(f.name);

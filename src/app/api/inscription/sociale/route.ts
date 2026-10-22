@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { appelant, dejaPris, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { idsParEmail } from "@/lib/sfl/contacts";
 import {
   capitaliser,
   erreurInscription,
@@ -43,13 +44,10 @@ type Corps = Partial<Omit<Inscription, "motDePasse">> & { action?: string; site?
 async function emailDeMembre(sb: SupabaseClient, user: User): Promise<boolean> {
   const email = user.email?.toLowerCase();
   if (!email) return false;
-  const { data } = await sb
-    .from("profiles")
-    .select("id")
-    .eq("contact_email", email)
-    .eq("pseudo_a_choisir", false)
-    .neq("id", user.id)
-    .limit(1);
+  // Les emails sont rangés à part (table contacts).
+  const ids = (await idsParEmail(sb, email).catch(() => [] as string[])).filter((id) => id !== user.id);
+  if (!ids.length) return false;
+  const { data } = await sb.from("profiles").select("id").in("id", ids).eq("pseudo_a_choisir", false).limit(1);
   return !!data && data.length > 0;
 }
 

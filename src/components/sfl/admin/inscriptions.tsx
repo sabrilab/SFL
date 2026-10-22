@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { emailsDeContact } from "@/lib/sfl/contacts";
 import { jetonServeur } from "@/lib/sfl/auth/session";
 import { usePhotoPerso } from "@/hooks/use-player-photo";
 import { addRoster, newRosterPlayer, rosterHasName } from "@/lib/sfl/saisie/mutations";
@@ -147,7 +148,7 @@ export function Inscriptions({
     const sb = supabase();
     const { data, error } = await sb
       .from("profiles")
-      .select("id, name, username, contact_email, created_at")
+      .select("id, name, username, created_at")
       .eq("valide", false)
       // Passé par Google ou Apple sans finir : pas encore une demande.
       .eq("pseudo_a_choisir", false)
@@ -159,8 +160,14 @@ export function Inscriptions({
       ? await sb.from("fiches").select("*").in("player_id", ids)
       : { data: [] as Record<string, unknown>[] };
     const parId = new Map((fiches ?? []).map((f) => [f.player_id as string, f]));
+    // Les emails sont rangés à part (table contacts) : l'admin les lit tous.
+    const emails = ids.length ? await emailsDeContact(sb).catch(() => new Map<string, string>()) : new Map<string, string>();
     setDemandes(
-      data.map((p) => ({ ...(p as Omit<Demande, "fiche">), fiche: (parId.get(p.id as string) as Demande["fiche"]) ?? null }))
+      data.map((p) => ({
+        ...(p as Omit<Demande, "fiche" | "contact_email">),
+        contact_email: emails.get(p.id as string) ?? null,
+        fiche: (parId.get(p.id as string) as Demande["fiche"]) ?? null,
+      }))
     );
     const { data: membres } = await sb
       .from("profiles")

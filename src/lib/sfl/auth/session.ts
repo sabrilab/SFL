@@ -19,6 +19,7 @@ import { ACCOUNTS, findAccount, type Account } from "./accounts";
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { loginEmail, supabase, SUPABASE_KEY, SUPABASE_URL } from "@/lib/supabase";
 import { accordConnu } from "@/lib/sfl/consentement";
+import { emailDe } from "@/lib/sfl/contacts";
 
 /**
  * false : Supabase d'abord, repli sur la vérification locale si indisponible.
@@ -430,11 +431,11 @@ function afterServerSignIn(userId: string, nom: string) {
         (i) => i.provider !== "email" && i.identity_data?.email
       )?.identity_data?.email as string | undefined;
       if (!oauthEmail) return;
-      await sb
-        .from("profiles")
-        .update({ contact_email: oauthEmail })
-        .eq("id", userId)
-        .is("contact_email", null);
+      // Seulement s'il n'en a pas encore donné un. L'email est rangé à part
+      // (table contacts) : on y regarde, puis on l'écrit par profiles, que la
+      // base range aussitôt.
+      if (await emailDe(sb, userId)) return;
+      await sb.from("profiles").update({ contact_email: oauthEmail }).eq("id", userId);
     })
     .catch(() => {});
 }
@@ -505,12 +506,7 @@ export async function getContactEmail(): Promise<string | null> {
     const { data: auth } = await supabase().auth.getUser();
     const uid = auth.user?.id;
     if (!uid) return null;
-    const { data } = await supabase()
-      .from("profiles")
-      .select("contact_email")
-      .eq("id", uid)
-      .maybeSingle();
-    return (data?.contact_email as string | null) ?? null;
+    return await emailDe(supabase(), uid);
   } catch {
     return null;
   }

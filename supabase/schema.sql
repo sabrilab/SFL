@@ -189,7 +189,9 @@ create policy "profiles: mise à jour de soi"
 
 -- Email de contact du joueur — collecté après la première connexion, ou
 -- automatiquement quand il lie Google/Apple (colonne ajoutée plus haut, avec
--- le pseudo). C'est LA table des emails.
+-- le pseudo). Depuis le 22/10/2026, la colonne n'est plus qu'un passage : ce
+-- qu'on y écrit part aussitôt dans public.contacts (en fin de script), que
+-- seuls le joueur et l'admin lisent, et la colonne reste vide.
 
 -- La règle du pseudo, appliquée à TOUTE modification (joueur, route serveur
 -- ou admin en SQL) : un format propre, et un changement tous les 30 jours.
@@ -858,7 +860,11 @@ $$;
 -- sont servies par le CDN, comme les portraits de public/players), un fichier
 -- par joueur : <nom du joueur en hexadécimal UTF-8>.jpg — l'hexadécimal évite
 -- les accents et les espaces que les clés Storage refusent.
---   · tout le monde liste le bucket (c'est ainsi que l'app sait qui a une photo) ;
+--   · les membres listent le bucket (c'est ainsi que l'app sait qui a une
+--     photo) ; un compte en attente n'y voit que la sienne, et sans compte on
+--     ne liste rien (22/10/2026 : la liste donnait à n'importe qui les noms et
+--     les visages de toute la ligue). Les fichiers restent publics par leur
+--     adresse, pour s'afficher partout ;
 --   · chacun ne pose, remplace ou retire QUE la sienne ;
 --   · l'admin peut corriger celle de n'importe qui.
 -- Chaque bloc rattrape ses erreurs : un projet où Storage refuserait ces
@@ -899,8 +905,17 @@ begin
   drop policy if exists "photos: lecture ligue" on storage.objects;
   create policy "photos: lecture ligue"
     on storage.objects for select
-    to anon, authenticated
-    using (bucket_id = 'photos');
+    to authenticated
+    using (
+      bucket_id = 'photos'
+      and (
+        (select public.est_membre())
+        or (select public.is_league_admin())
+        or lower(public.photo_joueur(name)) = (
+          select lower(p.name) from public.profiles p where p.id = (select auth.uid())
+        )
+      )
+    );
 
   drop policy if exists "photos: je pose la mienne" on storage.objects;
   create policy "photos: je pose la mienne"
@@ -961,7 +976,7 @@ $$;
 -- Ce que le joueur donne en créant son compte et que la ligue n'affiche pas :
 -- identité civile, naissance, gabarit. PRIVÉ — le joueur et l'admin seuls la
 -- lisent (le prénom affiché vit dans profiles.name, l'email dans
--- profiles.contact_email). Le gabarit sert aux maillots et, plus tard, au
+-- public.contacts). Le gabarit sert aux maillots et, plus tard, au
 -- personnage de référence des skins.
 create table if not exists public.fiches (
   player_id   uuid primary key references public.profiles(id) on delete cascade,
@@ -2463,3 +2478,75 @@ grant insert (version, hors_app, parent, ou) on public.consentements to authenti
 -- plus ancien part chaque lundi (/api/convocation/cron) et à chaque
 -- migration du schéma.
 delete from public.activity where created_at < now() - interval '13 months';
+
+-- ──────────────── Emails de contact : à part de profiles ────────────────
+-- profiles est lu par toute la ligue (noms, pseudos, villes) : l'email de
+-- contact y était lisible par n'importe quel membre qui interrogeait l'API,
+-- même si l'app ne le montrait qu'à l'admin. Il vit désormais ici, lu par le
+-- joueur lui-même et par l'admin, et par personne d'autre (22/10/2026).
+--
+-- Rien ne change pour ceux qui l'écrivent : la création de compte, les
+-- routes serveur et l'app écrivent toujours profiles.contact_email, et le
+-- trigger email_a_part le range ici en laissant la colonne vide. La lecture
+-- passe par lib/sfl/contacts.ts. Un email par joueur (le dernier donné) ; la
+-- règle « un email = un joueur » reste celle des routes d'inscription.
+-- La clé vise auth.users : le trigger passe AVANT l'insertion du profil.
+create table if not exists public.contacts (
+  user_id  uuid primary key references auth.users(id) on delete cascade,
+  email    text not null check (email = lower(btrim(email)) and email <> ''),
+  maj_le   timestamptz not null default now()
+);
+create index if not exists contacts_email on public.contacts (email);
+
+alter table public.contacts enable row level security;
+
+drop policy if exists "contacts: je lis le mien" on public.contacts;
+create policy "contacts: je lis le mien"
+  on public.contacts for select to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists "contacts: l'admin lit tout" on public.contacts;
+create policy "contacts: l'admin lit tout"
+  on public.contacts for select to authenticated
+  using ((select public.is_league_admin()));
+
+-- Lecture seule pour l'app : l'écriture passe par profiles (trigger).
+revoke all on public.contacts from anon, authenticated;
+grant select on public.contacts to authenticated;
+
+create or replace function public.email_a_part()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.contact_email is not null then
+    if btrim(new.contact_email) <> '' then
+      insert into public.contacts (user_id, email)
+      values (new.id, lower(btrim(new.contact_email)))
+      on conflict (user_id) do update set email = excluded.email, maj_le = now();
+    end if;
+    new.contact_email := null;
+  end if;
+  return new;
+end;
+$$;
+
+revoke execute on function public.email_a_part() from public, anon, authenticated;
+
+drop trigger if exists profiles_email_a_part on public.profiles;
+create trigger profiles_email_a_part
+  before insert or update of contact_email on public.profiles
+  for each row execute function public.email_a_part();
+
+-- Les emails déjà donnés passent dans contacts, et la colonne se vide (une
+-- seule fois : ensuite elle reste vide).
+insert into public.contacts (user_id, email)
+select p.id, lower(btrim(p.contact_email))
+from public.profiles p
+where p.contact_email is not null
+  and btrim(p.contact_email) <> ''
+  and exists (select 1 from auth.users u where u.id = p.id)
+on conflict (user_id) do update set email = excluded.email, maj_le = now();
+update public.profiles set contact_email = null where contact_email is not null;

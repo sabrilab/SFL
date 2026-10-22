@@ -22,6 +22,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { dejaPris, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { idsParEmail } from "@/lib/sfl/contacts";
 import {
   capitaliser,
   erreurInscription,
@@ -84,14 +85,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ce pseudo est déjà pris.", champ: "pseudo" }, { status: 409 });
   }
 
-  // Un email = un joueur.
-  const { data: memeEmail } = await sb
-    .from("profiles")
-    .select("id")
-    .eq("contact_email", f.email)
-    // Un passage par Google/Apple laissé en plan ne bloque pas l'email.
-    .eq("pseudo_a_choisir", false)
-    .limit(1);
+  // Un email = un joueur (les emails sont rangés à part : table contacts).
+  const memes = await idsParEmail(sb, f.email).catch(() => [] as string[]);
+  const { data: memeEmail } = memes.length
+    ? await sb
+        .from("profiles")
+        .select("id")
+        .in("id", memes)
+        // Un passage par Google/Apple laissé en plan ne bloque pas l'email.
+        .eq("pseudo_a_choisir", false)
+        .limit(1)
+    : { data: [] };
   if (memeEmail && memeEmail.length > 0) {
     return NextResponse.json(
       { error: "Un compte existe déjà avec cet email. Connecte-toi, ou demande à l'admin.", champ: "email" },
@@ -125,7 +129,8 @@ export async function POST(req: NextRequest) {
 
   // L'email de connexion reste technique (pseudo@sfl.local), comme pour tous
   // les comptes de la ligue : on se connecte avec son pseudo. L'email réel
-  // va dans profiles.contact_email.
+  // s'écrit dans profiles.contact_email, que la base range aussitôt à part
+  // (table contacts, lue par le joueur et l'admin seuls).
   const { data: cree, error: errCreation } = await sb.auth.admin.createUser({
     email: `${f.pseudo}@sfl.local`,
     password: f.motDePasse,
