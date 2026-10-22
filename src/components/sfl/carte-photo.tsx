@@ -15,12 +15,19 @@
 //   · pastille (< 70)       : un carré, le visage, la note dans un onglet
 //                             (aux couleurs de l'équipe sur les terrains).
 //
+// Les cartes à titre (`distinction`, Sabri 22/10) : la photo est sertie
+// dans un cadre de métal à leur couleur, or (MVP), rouge (Impact) ou bleu
+// (Défensive), de 1/φ⁶ de la largeur ; le voile du bas et l'onglet de la
+// note prennent la même teinte (teinte-carte.ts).
+//
 // Toujours le repère 1024 × 1656 (1 × φ) et les mêmes calques que la
 // classique (`data-card-part` body / player / stats).
 
 import { Badge3D } from "@/components/sfl/badge-3d";
 import { palierCarte } from "@/components/sfl/bola-card";
+import { TEINTES } from "@/components/sfl/teinte-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
+import type { BoostType } from "@/lib/sfl/engine";
 
 const W = 1024;
 const H = 1656;
@@ -28,6 +35,7 @@ const PHI = (1 + Math.sqrt(5)) / 2;
 const P = W / PHI ** 5; // 92, la marge
 const BADGE = 942 / PHI ** 4; // 137, comme la classique
 const BADGE_M = BADGE / PHI; // 85
+const CADRE = W / PHI ** 6; // 57, le serti des cartes à titre
 const SANS = "var(--font-inter), Inter, system-ui, sans-serif";
 const MONO = "var(--font-jbmono), ui-monospace, monospace";
 const NOIR = "#08090b";
@@ -84,6 +92,7 @@ export function CartePhoto({
   onglet,
   badge,
   vertical = false,
+  distinction,
 }: {
   name: string;
   affiche?: string;
@@ -95,11 +104,14 @@ export function CartePhoto({
   badge?: BadgeCarte | null;
   /** Debout même en tout petit : la réduite au lieu de la pastille (les terrains). */
   vertical?: boolean;
+  /** Une carte à titre : MVP (or), Impact (rouge), Défensive (bleu). */
+  distinction?: BoostType;
 }) {
   const largeur = 254 * size;
   const u = (n: number) => n * size * (254 / W);
   const p0 = palierCarte(largeur);
   const palier = vertical && p0 === "pastille" ? "reduite" : p0;
+  const teinte = distinction ? TEINTES[distinction] : null;
 
   if (palier === "pastille") {
     return (
@@ -111,11 +123,20 @@ export function CartePhoto({
           height: largeur,
           borderRadius: "24%",
           overflow: "hidden",
-          background: "#2a2b2f",
+          background: teinte?.cadre ?? "#2a2b2f",
           boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12), 0 2px 6px rgba(0,0,0,0.28)",
         }}
       >
-        <div data-card-part="player" style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+        <div
+          data-card-part="player"
+          style={{
+            position: "absolute",
+            inset: teinte ? Math.max(2, largeur * 0.07) : 0,
+            borderRadius: teinte ? "20%" : undefined,
+            overflow: "hidden",
+            background: "#2a2b2f",
+          }}
+        >
           <Photo photo={photo} nom={name} taille={largeur * 1.6} />
         </div>
         <div
@@ -129,8 +150,8 @@ export function CartePhoto({
             padding: "0 7%",
             boxSizing: "border-box",
             borderTopLeftRadius: largeur * 0.12,
-            background: onglet?.fond ?? NOIR,
-            color: onglet?.encre ?? BLANC,
+            background: onglet?.fond ?? teinte?.onglet.fond ?? NOIR,
+            color: onglet?.encre ?? teinte?.onglet.encre ?? BLANC,
             boxShadow: onglet ? `inset 1px 1px 0 ${onglet.encre}33` : undefined,
             display: "flex",
             alignItems: "center",
@@ -176,20 +197,30 @@ export function CartePhoto({
         height: u(H),
         borderRadius: u(61),
         overflow: "hidden",
-        background: "#2a2b2f",
+        background: teinte?.cadre ?? "#2a2b2f",
         boxShadow: `inset 0 0 0 ${u(3)}px rgba(255,255,255,0.1), 0 10px 28px rgba(0,0,0,0.45)`,
         fontFamily: SANS,
         textAlign: "left",
       }}
     >
-      <div data-card-part="player" style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+      <div
+        data-card-part="player"
+        style={{
+          position: "absolute",
+          inset: teinte ? u(CADRE) : 0,
+          borderRadius: teinte ? u(61 - CADRE / 2) : undefined,
+          overflow: "hidden",
+          background: "#2a2b2f",
+          boxShadow: teinte ? `0 0 0 ${u(4)}px rgba(0,0,0,0.18)` : undefined,
+        }}
+      >
         <Photo photo={photo} nom={name} taille={u(W)} />
-        {/* Un voile léger, seulement sous la section d'or. */}
+        {/* Un voile léger, seulement sous la section d'or (dans la couleur, pour une carte à titre). */}
         <div
           style={{
             position: "absolute",
             inset: 0,
-            background: `linear-gradient(180deg, rgba(0,0,0,0) ${100 / PHI}%, rgba(0,0,0,0.5) 100%)`,
+            background: `linear-gradient(180deg, rgba(0,0,0,0) ${100 / PHI}%, ${teinte?.voile ?? "rgba(0,0,0,0.5)"} 100%)`,
           }}
         />
         {badge && !reduite && (

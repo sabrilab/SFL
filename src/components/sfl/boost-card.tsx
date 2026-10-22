@@ -1,8 +1,10 @@
 // Cartes à titre — MVP / Impact / Défensive et n°1 de classement. Depuis le
-// 19/10 (Sabri : « ce sont toutes les mêmes cartes »), elles ne gardent plus
-// de design à part : elles montrent la carte actuelle du joueur (PlayerCard,
-// la carte Bola), la même partout. Le titre reste dit à côté de la carte par
-// l'écran qui l'affiche. Les anciennes cartes éditoriales (editorial-card)
+// 19/10 (Sabri : « ce sont toutes les mêmes cartes »), elles montrent la
+// carte actuelle du joueur (PlayerCard, la carte Bola), la même partout.
+// Depuis le 22/10, la carte MVP est en or, la carte Impact en rouge et la
+// Défensive en bleu (teinte-carte.ts) ; la carte de n°1 de classement reste
+// la carte de saison. Le titre reste dit à côté de la carte par l'écran qui
+// l'affiche. Les anciennes cartes éditoriales (editorial-card)
 // ne servent plus qu'à la page de travail /design-cartes.
 
 "use client";
@@ -51,7 +53,7 @@ export function BoostCard({ card, size = 1 }: { card: BoostCardData; size?: numb
     impact: 0,
     def: 0,
   }));
-  return <PlayerCard player={player} size={size} />;
+  return <PlayerCard player={player} size={size} distinction={card.type} />;
 }
 
 export function RankingCard({

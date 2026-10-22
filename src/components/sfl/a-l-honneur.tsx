@@ -447,7 +447,7 @@ function HommeDuDimanche({ j, m, p, moi }: { j: number; m: Mvp; p: Player; moi: 
           <Manipulable pose={0}>
             <div className="honneur-flotte relative flex" style={{ transformStyle: "preserve-3d" }}>
               <Ombre largeur={largeur} />
-              <MiniCarte player={p} size={GRANDE} detail={`MVP · J${j}`} />
+              <MiniCarte player={p} size={GRANDE} detail={`MVP · J${j}`} distinction="mvp" />
             </div>
           </Manipulable>
         </div>
@@ -483,7 +483,7 @@ function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player 
           {deux.map((m) => (
             <Manipulable key={m.nom} pose={0}>
               <Ombre largeur={W(MOYENNE)} />
-              <MiniCarte player={m.p} size={MOYENNE} detail={`MVP · J${j}`} />
+              <MiniCarte player={m.p} size={MOYENNE} detail={`MVP · J${j}`} distinction="mvp" />
             </Manipulable>
           ))}
         </div>
