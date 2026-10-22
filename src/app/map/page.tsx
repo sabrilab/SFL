@@ -24,7 +24,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { CalendarDays, ChartSpline, Crosshair, Layers, LocateFixed, MapPin, Navigation, Plus, Search, Settings2, Star, Trash2, Users } from "lucide-react";
+import { CalendarDays, ChartSpline, ChevronDown, ChevronUp, Crosshair, Layers, LocateFixed, MapPin, Navigation, Plus, Search, Settings2, Star, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -453,6 +453,26 @@ export default function MapPage() {
     const calme = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.setTimeout(() => setFiche(true), calme ? 0 : 320);
   }, []);
+  // Le carrousel replié (Sabri, 22/10 : « il faut pouvoir le rendre invisible
+  // pour qu'on puisse juste admirer la map »), gardé d'une visite à l'autre.
+  const [replie, setReplie] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      try {
+        if (window.localStorage.getItem("bola-map-replie") === "1") setReplie(true);
+      } catch {}
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, []);
+  const basculerCarrousel = () => {
+    navigator.vibrate?.(5);
+    setReplie((r) => {
+      try {
+        window.localStorage.setItem("bola-map-replie", r ? "0" : "1");
+      } catch {}
+      return !r;
+    });
+  };
   // Le match choisi : celui qu'on a touché s'il est encore là, sinon la une.
   const choisi = affiches.find((m) => m.cle === choix) ?? une;
 
@@ -646,6 +666,7 @@ export default function MapPage() {
             choisi={choisi?.cle ?? null}
             onChoisir={choisirSticker}
             villes={villes}
+            margeBas={replie ? 150 : 380}
             onVille={ouvrirVille}
             onJoueur={setProfil}
             viser={viser}
@@ -765,6 +786,17 @@ export default function MapPage() {
                 {partiesActives ? "Journée" : "Ouvrir un match"}
               </Link>
             )}
+            {affiches.length > 0 && (
+              <button
+                type="button"
+                onClick={basculerCarrousel}
+                aria-label={replie ? "Montrer les matchs" : "Cacher les matchs"}
+                aria-expanded={!replie}
+                className="bouton-givre map-monte map-touche absolute left-4 grid size-11 place-items-center"
+              >
+                {replie ? <ChevronUp className="size-[18px]" strokeWidth={2.4} /> : <ChevronDown className="size-[18px]" strokeWidth={2.4} />}
+              </button>
+            )}
             <button
               type="button"
               onClick={localiser}
@@ -776,7 +808,12 @@ export default function MapPage() {
           </div>
 
           {/* Le carrousel : une carte par match, celle du centre est la choisie.
-              Toucher la choisie ouvre sa fiche. */}
+              Toucher la choisie ouvre sa fiche. Replié, il descend et s'efface. */}
+          <div
+            className={cn("grid w-full transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none", replie ? "pointer-events-none grid-rows-[0fr] opacity-0" : "grid-rows-[1fr]")}
+            aria-hidden={replie}
+          >
+          <div className="flex min-h-0 flex-col items-center gap-3 overflow-hidden">
           <div
             ref={carrousel}
             onScroll={suivreCarrousel}
@@ -841,6 +878,8 @@ export default function MapPage() {
               )}
             </div>
           )}
+          </div>
+          </div>
         </div>
       </section>
 

@@ -36,7 +36,19 @@ import maplibregl, { type LngLatBoundsLike, type Map as PlanMap, type Marker, ty
 import "maplibre-gl/dist/maplibre-gl.css";
 import { SPLASH_FINI } from "@/components/sfl/app-splash";
 import { pointHtml, stickerHtml, toiHtml, type StickerPlan, type VarianteStade } from "./stade";
-import { centreHtml, disposer, joueurHtml, OUVERTE_MAX, pileHtml, ZOOM_OUVERTURE, type VillePlan } from "./joueurs";
+import {
+  centreHtml,
+  disposer,
+  FUSION_PILE,
+  groupeHtml,
+  grouperMatchs,
+  joueurHtml,
+  OUVERTE_MAX,
+  pileHtml,
+  R_STICKER,
+  ZOOM_OUVERTURE,
+  type VillePlan,
+} from "./joueurs";
 import { FONDU, LIBELLES, styleSnap } from "./style-snap";
 
 export interface PointPlan {
@@ -123,6 +135,7 @@ export function CarteMap({
   onVille,
   onJoueur,
   viser,
+  margeBas = MARGE_BAS,
   className,
 }: {
   fond?: FondCarte;
@@ -140,12 +153,22 @@ export function CarteMap({
   onChoisir: (id: string) => void;
   /** Toucher un terrain libre (un match possible) ; sans elle, les terrains ne réagissent pas. */
   onPoint?: (id: string) => void;
+  /** La place que prennent les surcouches du bas (moins quand le carrousel est replié). */
+  margeBas?: number;
   className?: string;
 }) {
   const conteneur = useRef<HTMLDivElement>(null);
   const carte = useRef<PlanMap | null>(null);
   const reperes = useRef<Marker[]>([]);
   const joueursReperes = useRef<Marker[]>([]);
+  // Les stickers posés, et le groupe que chacun mène quand des matchs se
+  // chevauchent (ses ids, et les villes de joueurs rangées dessous).
+  const stickersPoses = useRef<{ s: StickerPlan; el: HTMLElement }[]>([]);
+  const groupeDe = useRef(new Map<string, { ids: string[]; villes: string[] }>());
+  const choisiRef = useRef(choisi);
+  // Tout recomposer (regroupements et joueurs) : à chaque fin de zoom, et quand la liste change.
+  const recomposer = useRef<() => void>(() => {});
+  const margeBasRef = useRef(margeBas);
   // L'entrée de chaque sticker, en ms après `origine` (la fin du premier
   // vol). Les stickers sont refaits à chaque changement : on repose la
   // classe d'entrée, avec le retard qui reste, tant qu'elle n'est pas finie.
@@ -173,7 +196,8 @@ export function CarteMap({
     pointRef.current = onPoint;
     villeRef.current = onVille;
     joueurRef.current = onJoueur;
-  }, [onChoisir, onPoint, onVille, onJoueur]);
+    margeBasRef.current = margeBas;
+  }, [onChoisir, onPoint, onVille, onJoueur, margeBas]);
   const pointsActifs = !!onPoint;
 
   // La carte, une fois.
@@ -253,14 +277,31 @@ export function CarteMap({
     let rang = 0;
     const avant = dernierChoisi.current;
     const ordre = [...stickers].sort((a, b) => b.lat - a.lat);
+    const stickersVus: { s: StickerPlan; el: HTMLElement }[] = [];
     ordre.forEach((s, k) => {
       const est = s.id === choisi;
       const m = repere(map, s.lat, s.lng, stickerHtml(s, est, variante), { classe: "stk-ancre", z: est ? 3 + ordre.length : 3 + k });
-      m.getElement().addEventListener("click", () => {
+      m.getElement().addEventListener("click", (e) => {
+        // Un sticker qui en range d'autres : s'approcher pour les séparer ;
+        // sa pastille de joueurs seuls ouvre leurs villes.
+        const g = groupeDe.current.get(s.id);
+        if (g && (g.ids.length > 1 || (g.villes.length && (e.target as HTMLElement).closest(".stk__groupe")))) {
+          navigator.vibrate?.(6);
+          if (g.ids.length === 1 || map.getZoom() >= map.getMaxZoom() - 0.5) {
+            if (g.villes.length) villeRef.current?.(g.villes);
+            else choisirRef.current(s.id);
+            return;
+          }
+          const dans = stickers.filter((x) => g.ids.includes(x.id));
+          const b = dans.reduce((x, v) => x.extend([v.lng, v.lat]), new maplibregl.LngLatBounds([s.lng, s.lat], [s.lng, s.lat]));
+          cadrer(map, b, marges(map, MARGE_HAUT, margeBasRef.current, 90), Math.max(map.getZoom() + 2, ZOOM_OUVERTURE), doux ? 0.9 : 0);
+          return;
+        }
         onde(s.lat, s.lng);
         choisirRef.current(s.id);
       });
       poses.push(m);
+      stickersVus.push({ s, el: m.getElement() });
       const el = m.getElement().querySelector<HTMLElement>(".stk");
       if (!entrees.current.has(s.id)) entrees.current.set(s.id, Math.max(0, depuis) + rang++ * CADENCE);
       if (el && doux) {
@@ -280,6 +321,9 @@ export function CarteMap({
       poses.push(m);
     }
     reperes.current = poses;
+    stickersPoses.current = stickersVus;
+    choisiRef.current = choisi;
+    recomposer.current();
 
     // L'onde : trois anneaux qui partent du terrain touché, et un petit coup
     // sous le doigt là où le téléphone sait le faire.
@@ -302,7 +346,7 @@ export function CarteMap({
       if (!s) return;
       const h = map.getContainer().clientHeight;
       const ici = map.project([s.lng, s.lat]);
-      const cible = { x: map.getContainer().clientWidth / 2, y: (MARGE_HAUT + Math.max(MARGE_HAUT, h - MARGE_BAS)) / 2 + 40 };
+      const cible = { x: map.getContainer().clientWidth / 2, y: (MARGE_HAUT + Math.max(MARGE_HAUT, h - margeBasRef.current)) / 2 + 40 };
       const ecart: [number, number] = [ici.x - cible.x, ici.y - cible.y];
       if (Math.abs(ecart[0]) + Math.abs(ecart[1]) > 24) map.panBy(ecart, { duration: doux ? 700 : 0 });
       return;
@@ -330,7 +374,7 @@ export function CarteMap({
         if (carte.current !== map || !cibleVol.current) return;
         origine.current = performance.now() + VOL * 1000 - 250;
         volFini.current = performance.now() + VOL * 1000;
-        cadrer(map, cibleVol.current, marges(map, MARGE_HAUT, MARGE_BAS), ZOOM_CADRE, VOL);
+        cadrer(map, cibleVol.current, marges(map, MARGE_HAUT, margeBasRef.current), ZOOM_CADRE, VOL);
       };
       // Sous l'écran de chargement, le vol attend qu'il se lève (les
       // stickers, eux, sont en pause dans leur CSS jusque-là).
@@ -338,7 +382,7 @@ export function CarteMap({
       else window.addEventListener(SPLASH_FINI, voler, { once: true });
     } else {
       aVole.current = true;
-      cadrer(map, boite(), marges(map, MARGE_HAUT, MARGE_BAS), ZOOM_CADRE, doux ? 0.8 : 0);
+      cadrer(map, boite(), marges(map, MARGE_HAUT, margeBasRef.current), ZOOM_CADRE, doux ? 0.8 : 0);
     }
   }, [stickers, points, toi, choisi, fond, pointsActifs]);
 
@@ -355,14 +399,34 @@ export function CarteMap({
     };
     const dessiner = () => {
       vider();
-      if (!villes.length) return;
+      // Les matchs qui se chevauchent d'abord : un sticker reste, les autres s'y rangent.
+      const ecran = stickersPoses.current.map(({ s }) => ({ id: s.id, ...map.project([s.lng, s.lat]) }));
+      const groupes = grouperMatchs(ecran, choisiRef.current);
+      const absorbees = new Map<string, { villes: string[]; joueurs: number }>();
       const zoom = map.getZoom();
-      const dispo = disposer(villes, zoom, (lat, lng) => map.project([lng, lat]));
+      const dispo = villes.length
+        ? disposer(
+            villes,
+            zoom,
+            (lat, lng) => map.project([lng, lat]),
+            groupes.map((g) => ({ x: g.x, y: g.y - 40, r: R_STICKER }))
+          )
+        : [];
       const avant = ouvertes.current;
       const maintenant = new Set<string>();
       const poses: Marker[] = [];
       for (const d of dispo) {
         if (d.genre === "pile") {
+          // Une pile sous un sticker s'y range : la pastille du sticker la compte.
+          const p = map.project([d.lng, d.lat]);
+          const sous = groupes.find((g) => Math.hypot(g.x - p.x, g.y - 40 - p.y) < FUSION_PILE);
+          if (sous) {
+            const a = absorbees.get(sous.tete) ?? { villes: [], joueurs: 0 };
+            a.villes.push(...d.villes.map((v) => v.id));
+            a.joueurs += d.joueurs.length;
+            absorbees.set(sous.tete, a);
+            continue;
+          }
           const m = repere(map, d.lat, d.lng, pileHtml(d), { classe: "jr-ancre" });
           poses.push(m);
           if (doux && (avant.has(d.id) || !vues.has(d.id))) m.getElement().querySelector(".grp")?.classList.add("grp--entre");
@@ -371,7 +435,7 @@ export function CarteMap({
             navigator.vibrate?.(6);
             if (d.villes.length > 1) {
               const b = d.villes.reduce((x, v) => x.extend([v.lng, v.lat]), new maplibregl.LngLatBounds([d.lng, d.lat], [d.lng, d.lat]));
-              cadrer(map, b, marges(map, 90, MARGE_BAS - 120, 90), Math.max(zoom + 2, ZOOM_OUVERTURE), doux ? 0.9 : 0);
+              cadrer(map, b, marges(map, 90, margeBasRef.current - 120, 90), Math.max(zoom + 2, ZOOM_OUVERTURE), doux ? 0.9 : 0);
             } else if (zoom >= map.getMaxZoom() - 0.5) {
               villeRef.current?.(d.villes.map((v) => v.id));
             } else {
@@ -408,11 +472,29 @@ export function CarteMap({
       }
       joueursReperes.current = poses;
       ouvertes.current = maintenant;
+
+      // Les stickers : les rangés s'effacent, la tête porte la pastille.
+      const tetes = new Map(groupes.map((g) => [g.tete, g]));
+      const rangeDans = new Set(groupes.flatMap((g) => g.ids.filter((id) => id !== g.tete)));
+      groupeDe.current.clear();
+      for (const { s, el } of stickersPoses.current) {
+        el.classList.toggle("stk-ancre--range", rangeDans.has(s.id));
+        el.querySelector(".stk__groupe")?.remove();
+        const g = tetes.get(s.id);
+        const a = absorbees.get(s.id);
+        const html = g ? groupeHtml(g.ids.length, a?.joueurs ?? 0) : "";
+        el.querySelector(".stk")?.classList.toggle("stk--groupe", !!g && g.ids.length > 1);
+        if (!g || !html) continue;
+        el.querySelector(".stk")?.insertAdjacentHTML("beforeend", html);
+        groupeDe.current.set(s.id, { ids: g.ids, villes: a?.villes ?? [] });
+      }
     };
+    recomposer.current = dessiner;
     dessiner();
     map.on("zoomend", dessiner);
     return () => {
       map.off("zoomend", dessiner);
+      recomposer.current = () => {};
       vider();
     };
   }, [villes]);

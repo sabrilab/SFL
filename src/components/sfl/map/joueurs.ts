@@ -78,7 +78,13 @@ export type Disposition =
  * pixels). Les villes les plus peuplées passent d'abord : elles gardent leur
  * place, les petites voisines se fondent en elles.
  */
-export function disposer(villes: VillePlan[], zoom: number, ecran: (lat: number, lng: number) => { x: number; y: number }): Disposition[] {
+export function disposer(
+  villes: VillePlan[],
+  zoom: number,
+  ecran: (lat: number, lng: number) => { x: number; y: number },
+  /** Ce qu'un tournesol ne doit pas recouvrir (les stickers des matchs). */
+  obstacles: { x: number; y: number; r: number }[] = []
+): Disposition[] {
   const ordre = [...villes].sort((a, b) => b.joueurs.length - a.joueurs.length || a.ville.localeCompare(b.ville));
   const groupes: { tete: VillePlan; villes: VillePlan[]; x: number; y: number }[] = [];
   for (const v of ordre) {
@@ -96,7 +102,9 @@ export function disposer(villes: VillePlan[], zoom: number, ecran: (lat: number,
     groupes.forEach((g, i) => {
       if (g.villes.length > 1) return;
       const r = rayonOuvert(g.tete.joueurs.length);
-      const libre = groupes.every((h, k) => k === i || Math.hypot(h.x - g.x, h.y - g.y) >= r + rayons[k]);
+      const libre =
+        groupes.every((h, k) => k === i || Math.hypot(h.x - g.x, h.y - g.y) >= r + rayons[k]) &&
+        obstacles.every((o) => Math.hypot(o.x - g.x, o.y - g.y) >= r + o.r);
       if (libre) {
         ouverte[i] = true;
         rayons[i] = r;
@@ -163,4 +171,46 @@ export function joueurHtml(j: JoueurPlan, i: number, sort: boolean): string {
   <span class="jc jr__carte">${visage(j)}<span class="jr__note">${j.note}</span></span>
   <span class="jr__nom">${echapper(j.affiche)}</span>
 </div>`;
+}
+
+/* ───────────────────────────── Le regroupement ───────────────────────────── */
+
+/** Deux stickers plus proches que ça à l'écran n'en font qu'un. */
+const FUSION_MATCHS = 112;
+/** Une pile de joueurs sous un sticker s'y range. */
+export const FUSION_PILE = 100;
+/** La place d'un sticker pour un tournesol : sa vignette et son nom. */
+export const R_STICKER = 56;
+
+export interface GroupeMatchs {
+  /** Le sticker qui reste à l'écran : le choisi, sinon le premier venu. */
+  tete: string;
+  ids: string[];
+  x: number;
+  y: number;
+}
+
+/**
+ * Les matchs qui se chevauchent à l'écran (Sabri, 22/10 : « s'il y a des
+ * choses qui doivent se chevaucher, elles fusionnent ») : un seul sticker
+ * reste, les autres s'y rangent. Le choisi est toujours une tête.
+ */
+export function grouperMatchs(points: { id: string; x: number; y: number }[], choisi: string | null): GroupeMatchs[] {
+  const ordre = [...points].sort((a, b) => Number(b.id === choisi) - Number(a.id === choisi));
+  const groupes: GroupeMatchs[] = [];
+  for (const p of ordre) {
+    const proche = groupes.find((g) => Math.hypot(g.x - p.x, g.y - p.y) < FUSION_MATCHS);
+    if (proche) proche.ids.push(p.id);
+    else groupes.push({ tete: p.id, ids: [p.id], x: p.x, y: p.y });
+  }
+  return groupes;
+}
+
+/** La pastille sous un sticker qui en range d'autres : « 2 matchs · 14 joueurs ». */
+export function groupeHtml(matchs: number, joueurs: number): string {
+  const morceaux = [
+    ...(matchs > 1 ? [`${matchs} matchs`] : []),
+    ...(joueurs > 0 ? [`${joueurs} joueur${joueurs > 1 ? "s" : ""}`] : []),
+  ];
+  return morceaux.length ? `<span class="stk__groupe">${morceaux.join(" · ")}</span>` : "";
 }
