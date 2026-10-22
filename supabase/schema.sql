@@ -1251,6 +1251,117 @@ create trigger match_joueurs_capacite before insert on public.match_joueurs
 grant select, insert, update, delete on public.matchs to authenticated;
 grant select, insert, update, delete on public.match_joueurs to authenticated;
 
+-- ─────────────────── Mode Bola : le résultat et la Ligue vierge ───────────────────
+-- Trois façons de jouer (Sabri, 22/10) : les matchs Bola, que n'importe quel
+-- joueur ouvre hors de la SFL ; les matchs d'équipe (mode Team, à venir) ;
+-- les journées de la ligue (le document saison, à part). Un match ouvert par
+-- un joueur est un match Bola : l'organisateur en saisit le résultat (deux
+-- équipes, Clairs et Foncés, les buts et les passes de chacun), et la Ligue
+-- vierge les compte tous, à vie, jamais remise à zéro (règles officielles,
+-- docs/gameplay/03-mode-bola.md). Le MVP n'est jamais voté : l'app le tire
+-- des stats (lib/sfl/ligue-vierge.ts).
+alter table public.matchs add column if not exists mode text not null default 'bola';
+do $$
+begin
+  alter table public.matchs add constraint matchs_mode_check check (mode in ('bola', 'team'));
+exception when duplicate_object then null;
+end;
+$$;
+alter table public.matchs add column if not exists score_clairs int check (score_clairs between 0 and 99);
+alter table public.matchs add column if not exists score_fonces int check (score_fonces between 0 and 99);
+alter table public.matchs add column if not exists saisi_le timestamptz;
+
+-- equipe : null tant que rien n'est saisi, puis clairs, fonces ou absent.
+alter table public.match_joueurs add column if not exists equipe text check (equipe in ('clairs', 'fonces', 'absent'));
+alter table public.match_joueurs add column if not exists buts int not null default 0 check (buts between 0 and 99);
+alter table public.match_joueurs add column if not exists passes int not null default 0 check (passes between 0 and 99);
+
+-- Un joueur accepte son invitation (sa ligne), mais seul l'organisateur (ou
+-- l'admin) écrit les stats ; et une feuille ne se corrige plus 24 h après sa
+-- première saisie.
+create or replace function public.match_feuille_gardee()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  saisi timestamptz;
+begin
+  if public.is_league_admin() then
+    return new;
+  end if;
+  if tg_table_name = 'match_joueurs' then
+    if (new.equipe, new.buts, new.passes) is distinct from (old.equipe, old.buts, old.passes) then
+      if not public.organise_match(new.match_id) then
+        raise exception 'feuille réservée à l''organisateur' using errcode = '42501';
+      end if;
+      select saisi_le into saisi from public.matchs where id = new.match_id;
+      if saisi is not null and saisi < now() - interval '24 hours' then
+        raise exception 'feuille close' using errcode = 'P0001';
+      end if;
+    end if;
+  else
+    if (new.score_clairs, new.score_fonces) is distinct from (old.score_clairs, old.score_fonces)
+       and old.saisi_le is not null and old.saisi_le < now() - interval '24 hours' then
+      raise exception 'feuille close' using errcode = 'P0001';
+    end if;
+    -- La première saisie date la feuille (l'heure du serveur) ; une
+    -- correction ne la repousse pas.
+    if old.saisi_le is not null then
+      new.saisi_le := old.saisi_le;
+    elsif new.score_clairs is not null and new.score_fonces is not null then
+      new.saisi_le := now();
+    else
+      new.saisi_le := null;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+revoke execute on function public.match_feuille_gardee() from public, anon, authenticated;
+
+drop trigger if exists match_joueurs_feuille on public.match_joueurs;
+create trigger match_joueurs_feuille before update on public.match_joueurs
+  for each row execute function public.match_feuille_gardee();
+
+drop trigger if exists matchs_feuille on public.matchs;
+create trigger matchs_feuille before update on public.matchs
+  for each row execute function public.match_feuille_gardee();
+
+-- La Ligue vierge lit tous les matchs Bola joués, privés compris : seulement
+-- le jour, l'heure et qui a fait quoi — ni le lieu, ni les invités.
+create or replace function public.ligue_vierge()
+returns jsonb
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', m.id,
+           'jour', m.jour,
+           'heure', m.heure,
+           'genre', m.genre,
+           'scoreClairs', m.score_clairs,
+           'scoreFonces', m.score_fonces,
+           'joueurs', (
+             select coalesce(jsonb_agg(jsonb_build_object(
+                      'id', j.player_id, 'name', p.name, 'equipe', j.equipe, 'buts', j.buts, 'passes', j.passes)), '[]'::jsonb)
+               from public.match_joueurs j
+               join public.profiles p on p.id = j.player_id
+              where j.match_id = m.id and j.equipe in ('clairs', 'fonces')
+           )
+         ) order by m.jour, m.heure, m.id), '[]'::jsonb)
+    from public.matchs m
+   where m.mode = 'bola' and m.saisi_le is not null
+     and m.score_clairs is not null and m.score_fonces is not null;
+$$;
+
+revoke execute on function public.ligue_vierge() from public, anon;
+grant execute on function public.ligue_vierge() to authenticated;
+
 -- ─────────────────────────── Disponibilités ──────────────────────────
 -- Chaque joueur dit quand il peut jouer : un jour, un moment. La ligue s'en
 -- sert pour composer des matchs et inviter (matchmaking), et chacun voit,

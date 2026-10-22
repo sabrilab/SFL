@@ -4,7 +4,8 @@
 // réseau social : on fait défiler, chaque publication est une image animée
 // (une cinématique, cinematiques.tsx) avec, dessous, deux lignes qui disent
 // le fait. Pas de sélecteur, pas de vue à choisir :
-//   · en haut, les classements en ronds de stories (stories.tsx) et le Wall
+//   · en haut, « Actus | Ligue vierge » (choix-ligue.tsx) ; puis les
+//     classements en ronds de stories (stories.tsx) et le Wall
 //     of Fame au bout ;
 //   · la prochaine journée (sa présence se donne ici) et le vote du jour ;
 //   · puis les dimanches joués, du plus récent au plus ancien (la liste :
@@ -24,6 +25,7 @@ import { PresencePanel } from "@/components/sfl/presence-panel";
 import { VoteFigures } from "@/components/sfl/vote-figures";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { BoutonStats } from "@/components/layout/bouton-stats";
+import { ChoixLigue } from "@/components/sfl/choix-ligue";
 import { useIdentites } from "@/hooks/use-identites";
 import { useIsClient } from "@/hooks/use-is-client";
 import { filDeSaison, buteursDe, type Actu } from "@/lib/sfl/actus";
@@ -394,7 +396,8 @@ export function FilActus({ classementsOuverts = false }: { classementsOuverts?: 
   return (
     <div className="mx-auto flex w-full max-w-[470px] flex-col gap-7 pt-2 pb-8 sm:pt-6">
       <div className="flex items-center justify-between px-5">
-        <h1 className="text-[34px] leading-none font-bold tracking-tight">Actus</h1>
+        <h1 className="sr-only">Actus</h1>
+        <ChoixLigue actif="/ligue" />
         <div className="flex items-center gap-1.5 sm:gap-2">
           <BoutonStats className="size-10 sm:size-11" />
           <BoutonRecherche className="size-10 sm:size-11" />
