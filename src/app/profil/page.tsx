@@ -6,11 +6,12 @@
 // plus envie, qu'on comprenne mieux les choses et que ce soit mieux rangé »,
 // comme le profil d'un joueur ouvert depuis la Recherche (profil-joueur.tsx),
 // dont elle reprend l'ordre de lecture, du plus fort au plus fin :
-//   1. moi : ma carte en grand, mon nom en Anton, trois chiffres de tête (mon
-//      rang au Pépite d'Or, ma note, mes dimanches), puis la phrase qui me
-//      résume (fiche-joueur.ts, la même que sur mon profil). Le nom se
-//      corrige en le touchant (identite.tsx). Dessous, ma photo (la toucher
-//      ouvre « Ma photo »), la carte officielle et le badge de ma carte ;
+//   1. moi : ma carte en grand, mon nom dans le lettrage de la Map, trois
+//      chiffres de tête en Anton (mon rang au Pépite d'Or, ma note, mes
+//      dimanches), puis la phrase qui me résume (fiche-joueur.ts, la même que
+//      sur mon profil). Le nom se corrige en le touchant (identite.tsx).
+//      Dessous, ma photo (la toucher ouvre « Ma photo »), la carte officielle
+//      et le badge de ma carte ;
 //   2. ma saison : mon dernier dimanche en grand, mes points forts, mes
 //      autres dimanches (ma-saison.tsx) ;
 //   3. mon évolution : mon rang au Pépite d'Or ou la note de ma carte,
@@ -55,8 +56,6 @@ import { isHidden } from "@/lib/sfl/hidden";
 import { POSTES } from "@/lib/sfl/inscription";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { BoutonStats } from "@/components/layout/bouton-stats";
-
-const ANTON = "var(--font-anton), Anton, sans-serif";
 
 /* ------------------------------ Petits blocs ------------------------------ */
 
@@ -163,7 +162,7 @@ export default function Profil() {
             aria-label={`${identite.nom(player.name)}, ${identite.pseudo(player.name)}. Modifier mon nom et mon pseudo`}
             className="relative flex w-full flex-col items-center gap-[var(--fib-8)] text-center"
           >
-            <span style={{ fontFamily: ANTON }} className="text-[44px] leading-[0.92] tracking-[0.3px] break-words uppercase">
+            <span className="titre-lettrage text-[34px] leading-[0.95] break-words">
               {identite.nom(player.name)}
             </span>
             <span className="font-mono text-[12px] text-foreground/45">

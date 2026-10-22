@@ -117,10 +117,7 @@ export function LaUne({
           <span className="mono-label text-foreground/35">Édition du dimanche</span>
           <span className="mono-label text-foreground/35">{date}</span>
         </div>
-        <h2
-          className="text-center leading-[0.86] font-black tracking-[-0.02em] uppercase"
-          style={{ fontFamily: "var(--font-anton)", fontSize: 40 }}
-        >
+        <h2 className="titre-lettrage text-center text-[30px] leading-[0.9]">
           La Gazette
         </h2>
         <p className="mono-label mt-1.5 text-center text-foreground/40">
@@ -133,10 +130,7 @@ export function LaUne({
 
       {/* La manchette */}
       <div className="px-5 pb-4">
-        <h3
-          className="leading-[0.94] font-black tracking-[-0.015em] uppercase"
-          style={{ fontFamily: "var(--font-anton)", fontSize: 30 }}
-        >
+        <h3 className="titre-lettrage text-[23px] leading-[0.98]">
           {titre}
         </h3>
         <p className="mt-2 text-[13.5px] leading-[1.5] text-foreground/55">{chapeau}</p>
