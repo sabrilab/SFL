@@ -10,7 +10,9 @@
 //      rang au Pépite d'Or, ma note, mes dimanches), puis la phrase qui me
 //      résume (fiche-joueur.ts, la même que sur mon profil). Le nom se
 //      corrige en le touchant (identite.tsx). Dessous, ma photo (la toucher
-//      ouvre « Ma photo »), la carte officielle et le badge de ma carte ;
+//      ouvre « Ma photo »), la carte officielle tant qu'elle n'est pas faite
+//      (carte-officielle.tsx ; ensuite, on la refait depuis « Ma photo ») et
+//      le badge de ma carte ;
 //   2. ma saison : mon dernier dimanche en grand, mes points forts, mes
 //      autres dimanches (ma-saison.tsx) ;
 //   3. mon évolution : mon rang au Pépite d'Or ou la note de ma carte,
@@ -176,8 +178,10 @@ export default function Profil() {
             <Chiffre valeur={joues} quoi={joues > 1 ? "Dimanches" : "Dimanche"} />
           </div>
           <p className="w-full text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
-          {/* Ma photo, ma carte officielle (photo au maillot Bola), le badge de ma carte. */}
-          <div className="flex w-full items-center gap-[9px]">
+          {/* Ma photo, ma carte officielle (photo au maillot Bola) tant
+              qu'elle n'est pas faite, le badge de ma carte. Sans elle, les
+              deux ronds se centrent. */}
+          <div className="flex w-full items-center justify-center gap-[9px]">
             <button
               type="button"
               onClick={() => setPhotoOuverte(true)}
