@@ -149,7 +149,7 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
 
       {organise && joue && corrigeable && (
         <>
-          <button onClick={() => setFeuille(true)} className={cn(bouton, "bouton-principal")}>
+          <button onClick={() => setFeuille(true)} className={cn(bouton, "bouton-principal bouton--vert")}>
             {saisi ? "Corriger la feuille" : "Feuille de match"}
           </button>
           {feuille && <FeuilleBola partie={partie} open={feuille} onOpenChange={setFeuille} onSaisie={onChange} />}
@@ -158,10 +158,10 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
 
       {!joue && moiLa?.statut === "invite" && (
         <div className="grid grid-cols-2 gap-2">
-          <button disabled={occupe} onClick={() => faire(() => accepter(partie.id), "C'est noté, tu joues.")} className={cn(bouton, "bouton-principal")}>
+          <button disabled={occupe} onClick={() => faire(() => accepter(partie.id), "C'est noté, tu joues.")} className={cn(bouton, "bouton-principal bouton--vert")}>
             Je viens
           </button>
-          <button disabled={occupe} onClick={() => faire(() => quitter(partie.id), "Invitation déclinée.")} className={cn(bouton, "bouton-secondaire")}>
+          <button disabled={occupe} onClick={() => faire(() => quitter(partie.id), "Invitation déclinée.")} className={cn(bouton, "bouton-secondaire bouton--rouge")}>
             Pas dispo
           </button>
         </div>
@@ -173,7 +173,7 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
         </button>
       )}
       {!joue && moiLa?.statut === "inscrit" && !organise && (
-        <button disabled={occupe} onClick={() => faire(() => quitter(partie.id), "Tu as libéré ta place.")} className={cn(bouton, "bouton-secondaire")}>
+        <button disabled={occupe} onClick={() => faire(() => quitter(partie.id), "Tu as libéré ta place.")} className={cn(bouton, "bouton-secondaire bouton--rouge")}>
           Me retirer
         </button>
       )}

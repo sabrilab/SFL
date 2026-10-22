@@ -148,8 +148,8 @@ export function ChoisirJoueur({
                   type="button"
                   onClick={() => setChoix(id)}
                   className={cn(
-                    "rounded-full py-2 text-[13.5px] font-semibold transition-colors",
-                    onglet === id ? "bg-foreground text-background" : "text-muted-foreground"
+                    "py-2 text-[13.5px] font-semibold",
+                    onglet === id ? "bouton-principal" : "bouton-discret text-muted-foreground"
                   )}
                 >
                   {libelle}

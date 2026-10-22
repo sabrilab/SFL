@@ -237,7 +237,7 @@ export function Messagerie() {
             type="submit"
             disabled={!texte.trim()}
             aria-label="Envoyer"
-            className="bouton-principal flex size-10 shrink-0 items-center justify-center disabled:opacity-30"
+            className="bouton-principal bouton--mauve flex size-10 shrink-0 items-center justify-center disabled:opacity-30"
           >
             <Send className="size-4" strokeWidth={2.5} />
           </button>
@@ -312,7 +312,7 @@ export function Messagerie() {
         <h2 className="text-[16px] font-bold tracking-tight">Discussions</h2>
         <button
           onClick={() => setChoix(true)}
-          className="bouton-principal flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-bold"
+          className="bouton-principal bouton--mauve flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-bold"
         >
           <Plus className="size-3.5" strokeWidth={3} /> Nouveau
         </button>

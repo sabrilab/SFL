@@ -4,18 +4,21 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 // Les rangs de bouton de Bola (app/boutons.css) : `default` est le principal,
-// le verre allumé ; `secondary` et `outline`, le verre fumé ; `ghost`, le
-// discret. Les tons (`or`, `braise`, `vert`, `rouge`) allument le verre dans
-// une couleur de la DA ; `destructive` reste un secondaire au texte rouge.
+// le verre allumé (argent) ; `secondary` et `outline`, le verre fumé ;
+// `ghost`, le discret. Les tons (`vert`, `or`, `mauve`, `braise`, `rouge`)
+// allument le verre dans une couleur de la DA ; `destructive` reste un
+// secondaire rouge. Un secondaire ou un discret prend son ton par la classe :
+// <Button variant="secondary" className="bouton--vert">.
 const buttonVariants = cva(
   "group/button inline-flex shrink-0 items-center justify-center rounded-full text-sm font-semibold whitespace-nowrap select-none disabled:pointer-events-none aria-invalid:ring-3 aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default: "bouton-principal",
-        or: "bouton-principal bouton--or",
-        braise: "bouton-principal bouton--braise",
         vert: "bouton-principal bouton--vert",
+        or: "bouton-principal bouton--or",
+        mauve: "bouton-principal bouton--mauve",
+        braise: "bouton-principal bouton--braise",
         rouge: "bouton-principal bouton--rouge",
         outline: "bouton-secondaire",
         secondary: "bouton-secondaire",

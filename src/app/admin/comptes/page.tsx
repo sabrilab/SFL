@@ -77,7 +77,7 @@ function Fenetre({ c }: { c: Compte }) {
           aria-label={`Copier les accès de ${c.name}`}
           className={cn(
             "flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-[11.5px] font-bold",
-            copied ? "bouton-principal bouton--vert" : "bouton-secondaire"
+            copied ? "bouton-principal bouton--vert" : "bouton-secondaire bouton--mauve"
           )}
         >
           {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
@@ -256,7 +256,7 @@ export default function ComptesPage() {
           <button
             onClick={() => void inscrireManquants()}
             disabled={!!inscription && !inscription.erreur}
-            className="bouton-principal mt-2.5 w-full py-2.5 text-[13.5px] font-bold disabled:opacity-50"
+            className="bouton-principal bouton--vert mt-2.5 w-full py-2.5 text-[13.5px] font-bold disabled:opacity-50"
           >
             {inscription && !inscription.erreur
               ? `Inscription… ${inscription.faits}/${inscription.total}`

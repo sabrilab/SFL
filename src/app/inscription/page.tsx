@@ -136,8 +136,8 @@ function Puces<T extends string>({
             onChange(o.id);
           }}
           className={cn(
-            "flex min-h-[55px] flex-col items-center justify-center rounded-[13px] px-[8px] py-[8px] transition-all active:scale-[0.97]",
-            valeur === o.id ? "bg-foreground text-background" : "glass-soft text-foreground/70"
+            "bouton--or flex min-h-[55px] flex-col items-center justify-center rounded-[13px] px-[8px] py-[8px]",
+            valeur === o.id ? "bouton-principal" : "bouton-secondaire text-foreground/70"
           )}
         >
           <span className="text-[15px] font-extrabold tracking-tight">{o.label}</span>
@@ -180,7 +180,7 @@ function Reglage({
             type="button"
             onClick={() => onChange(borne(valeur - pas))}
             aria-label={`${label} moins`}
-            className="bouton-secondaire grid size-[34px] place-items-center"
+            className="bouton-secondaire bouton--or grid size-[34px] place-items-center"
           >
             <Minus className="size-4" />
           </button>
@@ -192,7 +192,7 @@ function Reglage({
             type="button"
             onClick={() => onChange(borne(valeur + pas))}
             aria-label={`${label} plus`}
-            className="bouton-secondaire grid size-[34px] place-items-center"
+            className="bouton-secondaire bouton--or grid size-[34px] place-items-center"
           >
             <Plus className="size-4" />
           </button>
@@ -786,7 +786,7 @@ export default function InscriptionPage() {
                 await envoyerPhotos();
                 setEnvoi(false);
               }}
-              className="bouton-secondaire py-[13px] text-[14px] font-semibold"
+              className="bouton-secondaire bouton--or py-[13px] text-[14px] font-semibold"
             >
               Renvoyer les photos
             </button>
@@ -893,7 +893,7 @@ export default function InscriptionPage() {
             else aller(1);
           }}
           className={cn(
-            "bouton-principal flex w-full items-center justify-center gap-2 py-[17px] text-[15px] font-bold",
+            "bouton-principal bouton--vert flex w-full items-center justify-center gap-2 py-[17px] text-[15px] font-bold",
             (envoi || (accueil && ouvert === false)) && "opacity-40"
           )}
         >

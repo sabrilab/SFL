@@ -133,7 +133,7 @@ function MesFeuilles({ parties, onSaisie, apercu }: { parties: Partie[]; onSaisi
           key={p.id}
           type="button"
           onClick={() => setOuverte(p)}
-          className="flex items-center gap-3 rounded-[22px] bg-foreground px-4 py-3.5 text-left text-background"
+          className="bouton-principal bouton--vert flex items-center gap-3 rounded-[22px] px-4 py-3.5 text-left"
         >
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[15px] font-bold">{p.lieu}</span>

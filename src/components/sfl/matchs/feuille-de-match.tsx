@@ -246,10 +246,10 @@ export function FeuilleDeMatch({
                 type="button"
                 onClick={() => setChoix(i)}
                 className={cn(
-                  "h-[30px] rounded-full px-3 text-[12.5px] font-semibold",
+                  "h-[30px] px-3 text-[12.5px] font-semibold",
                   i === choix
-                    ? "bg-foreground text-background"
-                    : "text-foreground",
+                    ? "bouton-principal"
+                    : "bouton-discret",
                 )}
               >
                 {x.label}
@@ -282,7 +282,7 @@ export function FeuilleDeMatch({
         type="button"
         disabled={!image.pret}
         onClick={image.partager}
-        className="bouton-principal flex h-12 items-center justify-center gap-2 text-[15px] font-semibold disabled:opacity-40"
+        className="bouton-principal bouton--mauve flex h-12 items-center justify-center gap-2 text-[15px] font-semibold disabled:opacity-40"
       >
         <Share className="size-[18px]" />
         Partager la feuille

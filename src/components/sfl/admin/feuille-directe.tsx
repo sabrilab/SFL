@@ -185,8 +185,8 @@ export function FeuilleDirecte({ saison, commit }: Props) {
               key={t}
               onClick={() => setTeam(t)}
               className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-[13px] font-semibold transition-colors",
-                teamActive === t ? "bg-foreground text-background" : "text-foreground/45"
+                "flex flex-1 items-center justify-center gap-1.5 py-2 text-[13px] font-semibold",
+                teamActive === t ? "bouton-principal" : "bouton-discret text-foreground/45"
               )}
             >
               <span
@@ -262,10 +262,10 @@ export function FeuilleDirecte({ saison, commit }: Props) {
                           )
                         }
                         className={cn(
-                          "rounded-full px-2.5 py-1 text-[11.5px] font-bold transition-colors",
+                          "px-2.5 py-1 text-[11.5px] font-bold",
                           on
-                            ? "bg-primary text-primary-foreground"
-                            : "glass-soft text-foreground/40"
+                            ? "bouton-principal bouton--or"
+                            : "bouton-secondaire bouton--or text-foreground/45"
                         )}
                       >
                         {h.label}

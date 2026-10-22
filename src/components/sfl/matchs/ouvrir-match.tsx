@@ -49,8 +49,8 @@ function Choix<T extends string>({
           type="button"
           onClick={() => onChange(o.id)}
           className={cn(
-            "rounded-full py-2 text-[14px] font-semibold transition-colors",
-            valeur === o.id ? "bg-foreground text-background" : "text-muted-foreground"
+            "py-2 text-[14px] font-semibold",
+            valeur === o.id ? "bouton-principal" : "bouton-discret text-muted-foreground"
           )}
         >
           {o.libelle}
@@ -195,8 +195,8 @@ export function OuvrirMatch({
                     type="button"
                     onClick={() => setTerrainId(t.id === terrainId ? null : t.id)}
                     className={cn(
-                      "rounded-full border px-3 py-1.5 text-[13px] font-semibold",
-                      t.id === terrainId ? "border-foreground bg-foreground text-background" : "border-border/60 bg-card"
+                      "px-3 py-1.5 text-[13px] font-semibold",
+                      t.id === terrainId ? "bouton-principal" : "bouton-secondaire"
                     )}
                   >
                     {t.nom}
@@ -254,7 +254,7 @@ export function OuvrirMatch({
             onChoisir={ajouter}
           />
 
-          <Button disabled={!pret || envoi} onClick={ouvrir} className="h-12 rounded-full text-[15px] font-semibold">
+          <Button variant="vert" disabled={!pret || envoi} onClick={ouvrir} className="h-12 rounded-full text-[15px] font-semibold">
             {visibilite === "public"
               ? `Ouvrir · ${places - invites.length - 1} place${places - invites.length - 1 > 1 ? "s" : ""} sur la Map`
               : "Ouvrir le match privé"}

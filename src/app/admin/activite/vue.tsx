@@ -361,8 +361,8 @@ export function ActiviteVue({
             key={p.id}
             onClick={() => setPublic(p.id)}
             className={cn(
-              "flex-1 rounded-full py-1.5 text-[13px] font-semibold transition-colors",
-              public_ === p.id ? "bg-foreground text-background" : "text-foreground/45"
+              "flex-1 py-1.5 text-[13px] font-semibold",
+              public_ === p.id ? "bouton-principal bouton--mauve" : "bouton-discret text-foreground/45"
             )}
           >
             {p.label}
@@ -385,8 +385,8 @@ export function ActiviteVue({
             key={p.id}
             onClick={() => setPeriode(p.id)}
             className={cn(
-              "flex-1 rounded-full py-1.5 text-[13px] font-semibold transition-colors",
-              periode === p.id ? "bg-foreground text-background" : "text-foreground/45"
+              "flex-1 py-1.5 text-[13px] font-semibold",
+              periode === p.id ? "bouton-principal" : "bouton-discret text-foreground/45"
             )}
           >
             {p.label}
@@ -448,8 +448,8 @@ export function ActiviteVue({
                   key={m.id}
                   onClick={() => setMetrique(m.id)}
                   className={cn(
-                    "shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors",
-                    metrique === m.id ? "bg-foreground text-background" : "glass-soft text-foreground/55"
+                    "shrink-0 px-3 py-1.5 text-[12px] font-semibold",
+                    metrique === m.id ? "bouton-principal" : "bouton-secondaire text-foreground/55"
                   )}
                 >
                   {m.court}

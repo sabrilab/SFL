@@ -72,7 +72,7 @@ export default function LienEquipePage() {
                   type="button"
                   disabled={envoi}
                   onClick={rejoindre}
-                  className="bouton-principal py-4 text-[15px] font-bold disabled:opacity-60"
+                  className="bouton-principal bouton--vert py-4 text-[15px] font-bold disabled:opacity-60"
                 >
                   Rejoindre {info.nom}
                 </button>
@@ -80,7 +80,7 @@ export default function LienEquipePage() {
                 <>
                   <Link
                     href={`/inscription?equipe=${encodeURIComponent(jeton)}`}
-                    className="bouton-principal py-4 text-[15px] font-bold"
+                    className="bouton-principal bouton--vert py-4 text-[15px] font-bold"
                   >
                     Créer mon compte
                   </Link>

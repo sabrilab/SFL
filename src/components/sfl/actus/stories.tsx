@@ -209,7 +209,7 @@ export function Stories({ depart, j, onFermer, moi }: { depart: number; j: numbe
               e.stopPropagation();
               onFermer();
             }}
-            className="grid size-10 place-items-center rounded-full bg-white/10"
+            className="bouton-secondaire grid size-10 place-items-center"
           >
             <X className="size-5" />
           </button>

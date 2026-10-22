@@ -69,7 +69,7 @@ function LigneEquipe({ e, droite }: { e: Equipe; droite?: React.ReactNode }) {
   );
 }
 
-function Pilule({ children, onClick, plein = true, disabled }: { children: React.ReactNode; onClick: () => void; plein?: boolean; disabled?: boolean }) {
+function Pilule({ children, onClick, plein = true, ton, disabled }: { children: React.ReactNode; onClick: () => void; plein?: boolean; ton?: "bouton--vert" | "bouton--rouge"; disabled?: boolean }) {
   return (
     <button
       type="button"
@@ -77,7 +77,8 @@ function Pilule({ children, onClick, plein = true, disabled }: { children: React
       disabled={disabled}
       className={cn(
         "shrink-0 px-3.5 py-1.5 text-[13px] font-semibold disabled:opacity-50",
-        plein ? "bouton-principal" : "bouton-secondaire"
+        plein ? "bouton-principal" : "bouton-secondaire",
+        ton
       )}
     >
       {children}
@@ -214,7 +215,7 @@ export default function BolaTeamPage() {
       {invitations.length > 0 && (
         <section className="flex flex-col gap-2">
           {invitations.map((e) => (
-            <LigneEquipe key={e.id} e={e} droite={<Pilule onClick={() => setASigner(e)}>Rejoindre</Pilule>} />
+            <LigneEquipe key={e.id} e={e} droite={<Pilule ton="bouton--vert" onClick={() => setASigner(e)}>Rejoindre</Pilule>} />
           ))}
         </section>
       )}
@@ -253,10 +254,10 @@ export default function BolaTeamPage() {
                 <p className="px-1 text-[14px] font-semibold">{quand(d)}</p>
                 {capitaine && (
                   <div className="grid grid-cols-2 gap-2">
-                    <Pilule plein={false} onClick={() => void agir(() => repondreDefi(d.id, "refuse"))}>
+                    <Pilule plein={false} ton="bouton--rouge" onClick={() => void agir(() => repondreDefi(d.id, "refuse"))}>
                       Refuser
                     </Pilule>
-                    <Pilule onClick={() => void agir(() => repondreDefi(d.id, "accepte"), "Défi accepté.")}>Accepter</Pilule>
+                    <Pilule ton="bouton--vert" onClick={() => void agir(() => repondreDefi(d.id, "accepte"), "Défi accepté.")}>Accepter</Pilule>
                   </div>
                 )}
               </div>
@@ -277,7 +278,7 @@ export default function BolaTeamPage() {
                     </span>
                     {d.statut === "propose" ? (
                       capitaine ? (
-                        <Pilule plein={false} onClick={() => void agir(() => repondreDefi(d.id, "annule"))}>
+                        <Pilule plein={false} ton="bouton--rouge" onClick={() => void agir(() => repondreDefi(d.id, "annule"))}>
                           Annuler
                         </Pilule>
                       ) : null
@@ -291,7 +292,7 @@ export default function BolaTeamPage() {
           )}
         </section>
       ) : (
-        <Button onClick={() => setCreer(true)} className="h-12 rounded-full text-[15px] font-semibold">
+        <Button variant="vert" onClick={() => setCreer(true)} className="h-12 rounded-full text-[15px] font-semibold">
           Créer mon équipe
         </Button>
       )}
@@ -302,13 +303,13 @@ export default function BolaTeamPage() {
           {autres.map((e) => {
             const dejaDefie = monde.defis.some((d) => (d.de === mienne?.id && d.a === e.id) || (d.a === mienne?.id && d.de === e.id));
             const peutDefier = !!mienne && capitaine && active(mienne) && active(e) && !dejaDefie;
-            return <LigneEquipe key={e.id} e={e} droite={peutDefier ? <Pilule onClick={() => setAdversaire(e)}>Défier</Pilule> : undefined} />;
+            return <LigneEquipe key={e.id} e={e} droite={peutDefier ? <Pilule ton="bouton--vert" onClick={() => setAdversaire(e)}>Défier</Pilule> : undefined} />;
           })}
         </section>
       )}
 
       {mienne && (
-        <button type="button" onClick={() => setQuitter(true)} className="bouton-discret self-center px-4 py-2 text-[13px] font-semibold">
+        <button type="button" onClick={() => setQuitter(true)} className="bouton-discret bouton--rouge self-center px-4 py-2 text-[13px] font-semibold">
           Quitter l&apos;équipe
         </button>
       )}

@@ -68,7 +68,7 @@ export function SignerReglement({
             </SheetHeader>
             <div className="flex flex-col gap-5 px-4">
               <ReglementListe />
-              <Button disabled={envoi} onClick={signer} className="h-12 rounded-full text-[15px] font-semibold">
+              <Button variant="vert" disabled={envoi} onClick={signer} className="h-12 rounded-full text-[15px] font-semibold">
                 Je signe et je rejoins
               </Button>
             </div>

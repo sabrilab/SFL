@@ -173,8 +173,8 @@ function VocalVue({ piece, mien }: { piece: PieceVocal; mien: boolean }) {
         disabled={!src}
         aria-label={lecture ? "Pause" : "Écouter"}
         className={cn(
-          "flex size-9 shrink-0 items-center justify-center rounded-full transition-transform active:scale-90 disabled:opacity-40",
-          mien ? "bg-background text-foreground" : "bg-foreground text-background"
+          "flex size-9 shrink-0 items-center justify-center disabled:opacity-40",
+          mien ? "bouton-encre bouton--mauve" : "bouton-principal bouton--mauve"
         )}
       >
         {lecture ? <Pause className="size-4" fill="currentColor" /> : <Play className="ml-0.5 size-4" fill="currentColor" />}
@@ -658,7 +658,7 @@ function ReglageNotifs({ mode, onMode, onFermer }: { mode: ModeNotifs; onMode: (
             setEtat(e);
             if (e === "actives") toast.success("Notifications activées");
           }}
-          className="bouton-principal mt-1 w-full py-2.5 text-[13px] font-bold"
+          className="bouton-principal bouton--mauve mt-1 w-full py-2.5 text-[13px] font-bold"
         >
           Activer sur ce téléphone
         </button>
@@ -828,8 +828,8 @@ function Bulle({
                   type="button"
                   onClick={() => onReagir(e)}
                   className={cn(
-                    "flex h-6 items-center gap-1 rounded-full border px-1.5 text-[12px] font-bold tabular-nums",
-                    mienne ? "border-foreground bg-foreground text-background" : "border-white/10 bg-background"
+                    "flex h-6 items-center gap-1 px-1.5 text-[12px] font-bold tabular-nums",
+                    mienne ? "bouton-secondaire bouton--mauve" : "bouton-secondaire"
                   )}
                 >
                   <span className="text-[13px] leading-none">{e}</span>
@@ -849,8 +849,8 @@ function Bulle({
                   type="button"
                   onClick={() => onReagir(e)}
                   className={cn(
-                    "flex size-9 items-center justify-center rounded-full text-[20px] transition-transform active:scale-90",
-                    moi && m.reactions[e]?.includes(moi) && "bg-white/15"
+                    "flex size-9 items-center justify-center text-[20px]",
+                    moi && m.reactions[e]?.includes(moi) ? "bouton-secondaire bouton--mauve" : "bouton-discret"
                   )}
                 >
                   {e}
@@ -879,7 +879,7 @@ function Bulle({
             type="button"
             onClick={onRepondre}
             aria-label="Répondre"
-            className="flex size-7 items-center justify-center rounded-full text-foreground/35 active:bg-white/10"
+            className="bouton-discret bouton--mauve flex size-7 items-center justify-center opacity-55"
           >
             <Reply className="size-[15px]" />
           </button>
@@ -888,7 +888,7 @@ function Bulle({
             onClick={onToucher}
             aria-label="Réagir"
             aria-expanded={ouvert}
-            className={cn("flex size-7 items-center justify-center rounded-full active:bg-white/10", ouvert ? "text-foreground" : "text-foreground/35")}
+            className={cn("bouton-discret bouton--mauve flex size-7 items-center justify-center", !ouvert && "opacity-55")}
           >
             <SmilePlus className="size-[15px]" />
           </button>
@@ -1243,7 +1243,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
             onClick={() => setReglage((v) => !v)}
             aria-label="Notifications du Vestiaire"
             aria-expanded={reglage}
-            className="bouton-secondaire flex size-11 items-center justify-center"
+            className="bouton-secondaire bouton--mauve flex size-11 items-center justify-center"
           >
             {mode === "rien" ? <BellOff className="size-[18px]" /> : <Bell className="size-[18px]" />}
           </button>
@@ -1352,7 +1352,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                     setTexte((t) => t.replace(/@([\p{L}0-9_.-]*)$/u, `@${p.pseudo} `));
                     champ.current?.focus();
                   }}
-                  className="bouton-secondaire flex shrink-0 items-center gap-2 py-1 pr-3.5 pl-1"
+                  className="bouton-secondaire bouton--mauve flex shrink-0 items-center gap-2 py-1 pr-3.5 pl-1"
                 >
                   <CarteDe name={p.name} size={FORMAT_CARTE.petite * 0.62} inerte />
                   <span className="text-[13px] font-semibold">@{p.pseudo}</span>
@@ -1439,7 +1439,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                 type="button"
                 onClick={() => void envoyerVocal()}
                 aria-label="Envoyer le vocal"
-                className="bouton-principal flex size-10 shrink-0 items-center justify-center"
+                className="bouton-principal bouton--mauve flex size-10 shrink-0 items-center justify-center"
               >
                 <ArrowUp className="size-5" strokeWidth={2.75} />
               </button>
@@ -1457,7 +1457,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                 onClick={() => setChoix((v) => !v)}
                 aria-label="Partager une carte, une feuille, un classement"
                 aria-expanded={choix}
-                className={cn("flex size-10 shrink-0 items-center justify-center", choix ? "bouton-principal" : "bouton-secondaire")}
+                className={cn("bouton--mauve flex size-10 shrink-0 items-center justify-center", choix ? "bouton-principal" : "bouton-secondaire")}
               >
                 <Plus className="size-5" strokeWidth={2.5} />
               </button>
@@ -1500,7 +1500,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                   onClick={() => choixPhoto.current?.click()}
                   disabled={envoi}
                   aria-label="Envoyer une photo ou une vidéo"
-                  className="bouton-discret flex size-10 shrink-0 items-center justify-center text-foreground disabled:opacity-25"
+                  className="bouton-discret bouton--mauve flex size-10 shrink-0 items-center justify-center disabled:opacity-25"
                 >
                   <Camera className="size-5" strokeWidth={2.25} />
                 </button>
@@ -1511,7 +1511,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                   onClick={() => void micro.commencer()}
                   disabled={envoi}
                   aria-label="Enregistrer un vocal"
-                  className="bouton-secondaire flex size-10 shrink-0 items-center justify-center disabled:opacity-25"
+                  className="bouton-secondaire bouton--mauve flex size-10 shrink-0 items-center justify-center disabled:opacity-25"
                 >
                   <Mic className="size-5" strokeWidth={2.25} />
                 </button>
@@ -1522,7 +1522,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                   onPointerDown={(e) => e.preventDefault()}
                   disabled={envoi || (!texte.trim() && !piece)}
                   aria-label="Envoyer"
-                  className="bouton-principal flex size-10 shrink-0 items-center justify-center disabled:opacity-25"
+                  className="bouton-principal bouton--mauve flex size-10 shrink-0 items-center justify-center disabled:opacity-25"
                 >
                   <ArrowUp className="size-5" strokeWidth={2.75} />
                 </button>

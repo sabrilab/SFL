@@ -430,7 +430,7 @@ export function AdminDashboard() {
                   </p>
                 )}
               </div>
-              <Button size="sm" onClick={() => setConvocOpen(true)} className="shrink-0 rounded-full">
+              <Button size="sm" variant="vert" onClick={() => setConvocOpen(true)} className="shrink-0 rounded-full">
                 Nouvelle
               </Button>
             </div>
@@ -440,9 +440,9 @@ export function AdminDashboard() {
                 <div className="mb-3 flex flex-wrap gap-1.5">
                   {(
                     [
-                      ["present", convocGroups.present, "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"],
-                      ["absent", convocGroups.absent, "bg-destructive/10 text-destructive"],
-                      ["sans", convocGroups.sans, "bg-secondary text-muted-foreground"],
+                      ["present", convocGroups.present, "bouton--vert"],
+                      ["absent", convocGroups.absent, "bouton--rouge"],
+                      ["sans", convocGroups.sans, "text-muted-foreground"],
                     ] as const
                   ).map(([key, list, cls]) =>
                     list.map((name) => (
@@ -451,7 +451,7 @@ export function AdminDashboard() {
                         type="button"
                         onClick={() => cycleReponse(name)}
                         title="Toucher pour basculer présent / absent / sans réponse"
-                        className={cn("rounded-full px-2.5 py-1 text-[12px] font-semibold transition-colors", cls)}
+                        className={cn("bouton-secondaire px-2.5 py-1 text-[12px] font-semibold", cls)}
                       >
                         {key === "present" ? "✓ " : key === "absent" ? "✗ " : ""}
                         {name}
@@ -475,6 +475,7 @@ export function AdminDashboard() {
                     </Button>
                     <Button
                       size="sm"
+                      variant="vert"
                       disabled={convocGroups.present.length < 2}
                       onClick={() => {
                         setJourneePrefill(convocGroups.present);
@@ -555,7 +556,7 @@ export function AdminDashboard() {
             </div>
           </div>
 
-          <Button variant="ghost" size="sm" onClick={() => { persist(saisieStore.reset()); setHistory([]); setFuture([]); }} className="self-start text-muted-foreground">
+          <Button variant="ghost" size="sm" onClick={() => { persist(saisieStore.reset()); setHistory([]); setFuture([]); }} className="bouton--rouge self-start">
             <RotateCcw className="mr-1.5 size-4" /> Réinitialiser les données de démo
           </Button>
         </TabsContent>
@@ -580,8 +581,8 @@ export function AdminDashboard() {
                 key={mode}
                 onClick={() => setFeuilleMode(mode)}
                 className={cn(
-                  "flex-1 rounded-full py-2 text-[13px] font-semibold transition-colors",
-                  feuilleMode === mode ? "bg-foreground text-background" : "text-foreground/45"
+                  "flex-1 py-2 text-[13px] font-semibold",
+                  feuilleMode === mode ? "bouton-principal" : "bouton-discret text-foreground/45"
                 )}
               >
                 {label}
@@ -593,7 +594,7 @@ export function AdminDashboard() {
             <FeuilleDirecte saison={saison} commit={commit} />
           ) : (
           <>
-          <Button onClick={() => setNewJourneeOpen(true)} className="rounded-full">
+          <Button variant="vert" onClick={() => setNewJourneeOpen(true)} className="rounded-full">
             <CalendarPlus className="mr-1.5 size-4" /> Nouvelle journée
           </Button>
 
@@ -659,7 +660,7 @@ export function AdminDashboard() {
                   </div>
                 ))}
 
-                <Button variant="ghost" size="sm" onClick={() => setAddToJ(meta.j)} className="self-start text-muted-foreground">
+                <Button variant="ghost" size="sm" onClick={() => setAddToJ(meta.j)} className="bouton--vert self-start">
                   <UserPlus className="mr-1.5 size-4" /> Ajouter un joueur
                 </Button>
               </div>
@@ -682,7 +683,7 @@ export function AdminDashboard() {
             <p className="text-[13px] text-muted-foreground">
               {rosterViews.length} joueurs — touche une fiche pour éditer poste, statut et stats.
             </p>
-            <Button size="sm" onClick={() => setNewPlayerOpen(true)} className="rounded-full">
+            <Button size="sm" variant="vert" onClick={() => setNewPlayerOpen(true)} className="rounded-full">
               <UserPlus className="mr-1.5 size-4" /> Ajouter
             </Button>
           </div>

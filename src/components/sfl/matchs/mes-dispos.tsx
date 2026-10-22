@@ -106,8 +106,8 @@ export function MesDispos({
                       aria-label={`${nomJour(j)} ${m.libelle}${n ? `, ${n} autres libres` : ""}`}
                       onClick={() => basculer(j, m.id)}
                       className={cn(
-                        "h-11 rounded-2xl text-[13px] font-semibold tabular-nums transition-colors",
-                        a ? "bg-foreground text-background" : "border border-border bg-card text-muted-foreground"
+                        "h-11 rounded-2xl text-[13px] font-semibold tabular-nums",
+                        a ? "bouton-principal bouton--vert" : "bouton-secondaire text-muted-foreground"
                       )}
                     >
                       {n > 0 ? `+${n}` : ""}
@@ -127,7 +127,7 @@ export function MesDispos({
               <button
                 type="button"
                 onClick={() => onOuvrir(e.jour, HEURE[e.moment.id])}
-                className="bouton-principal mt-3 flex h-11 w-full items-center justify-center text-[14px] font-semibold"
+                className="bouton-principal bouton--vert mt-3 flex h-11 w-full items-center justify-center text-[14px] font-semibold"
               >
                 Ouvrir un match
               </button>

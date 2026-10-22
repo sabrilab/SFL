@@ -97,7 +97,7 @@ export function ProfilePhoto({ name }: { name: string }) {
             <Button
               variant="ghost"
               size="sm"
-              className="mt-1.5 -ml-2 h-7 gap-1.5 px-2 text-[12px] text-muted-foreground"
+              className="bouton--or mt-1.5 -ml-2 h-7 gap-1.5 px-2 text-[12px]"
               onClick={() => setStudio(true)}
             >
               <Sparkles className="size-3.5" /> Photo officielle
@@ -107,7 +107,7 @@ export function ProfilePhoto({ name }: { name: string }) {
             <Button
               variant="ghost"
               size="sm"
-              className="mt-1.5 h-7 gap-1.5 px-2 text-[12px] text-muted-foreground"
+              className="bouton--rouge mt-1.5 h-7 gap-1.5 px-2 text-[12px]"
               onClick={async () => {
                 await removePhoto(name);
                 setBroken(false);
@@ -121,7 +121,7 @@ export function ProfilePhoto({ name }: { name: string }) {
             <Button
               variant="ghost"
               size="sm"
-              className="mt-1.5 h-7 gap-1.5 px-2 text-[12px] text-muted-foreground"
+              className="bouton--or mt-1.5 h-7 gap-1.5 px-2 text-[12px]"
               onClick={() => setARecadrer(perso)}
             >
               <Crop className="size-3.5" /> Recadrer
@@ -132,7 +132,7 @@ export function ProfilePhoto({ name }: { name: string }) {
 
       {/* Pas encore de photo : la photo officielle passe devant. */}
       {!hasCustom && (
-        <Button className="h-12 gap-2 rounded-full text-[15px] font-semibold" onClick={() => setStudio(true)}>
+        <Button variant="or" className="h-12 gap-2 rounded-full text-[15px] font-semibold" onClick={() => setStudio(true)}>
           <Sparkles className="size-4" /> Créer ma photo officielle
         </Button>
       )}

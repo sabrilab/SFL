@@ -236,7 +236,7 @@ export function PhotoStudio({
                           aria-label="Retirer cette photo"
                           disabled={!!enCours}
                           onClick={() => setSelfies((l) => l.filter((_, j) => j !== i))}
-                          className="absolute top-1.5 right-1.5 grid size-7 place-items-center rounded-full bg-black/60 text-white"
+                          className="bouton-secondaire bouton--rouge absolute top-1.5 right-1.5 grid size-7 place-items-center"
                         >
                           <X className="size-3.5" />
                         </button>
@@ -277,7 +277,7 @@ export function PhotoStudio({
                         type="button"
                         aria-label="Reprendre cette photo"
                         onClick={() => setSelfies((l) => l.filter((_, j) => j !== i))}
-                        className="absolute top-0.5 right-0.5 grid size-5 place-items-center rounded-full bg-black/60 text-white"
+                        className="bouton-secondaire bouton--rouge absolute top-0.5 right-0.5 grid size-5 place-items-center"
                       >
                         <X className="size-3" />
                       </button>
@@ -290,7 +290,7 @@ export function PhotoStudio({
                 {!sansCamera && (
                   <Button
                     variant="secondary"
-                    className="h-12 flex-1 gap-2 rounded-full text-[14px]"
+                    className="bouton--or h-12 flex-1 gap-2 rounded-full text-[14px]"
                     onClick={() => input.current?.click()}
                     disabled={selfies.length >= SELFIES_MAX}
                   >
@@ -298,6 +298,7 @@ export function PhotoStudio({
                   </Button>
                 )}
                 <Button
+                  variant="or"
                   className="h-12 flex-1 rounded-full text-[15px] font-semibold"
                   disabled={selfies.length === 0}
                   onClick={() => setEtape("maillot")}
@@ -337,8 +338,8 @@ export function PhotoStudio({
                     disabled={!!enCours}
                     onClick={() => setColoris(c.id)}
                     className={cn(
-                      "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-[13px] font-semibold transition-colors",
-                      coloris === c.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                      "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-[13px] font-semibold",
+                      coloris === c.id ? "bouton-principal bouton--or" : "bouton-discret text-muted-foreground"
                     )}
                   >
                     <span
@@ -354,6 +355,7 @@ export function PhotoStudio({
               </div>
 
               <Button
+                variant="or"
                 className="h-12 rounded-full text-[15px] font-semibold"
                 disabled={selfies.length === 0 || !!enCours}
                 onClick={faireStudio}
@@ -362,7 +364,7 @@ export function PhotoStudio({
               </Button>
               <Button
                 variant="ghost"
-                className="h-10 rounded-full text-[13px] text-muted-foreground"
+                className="bouton--or h-10 rounded-full text-[13px]"
                 disabled={!!enCours}
                 onClick={() => setEtape("visage")}
               >
@@ -460,13 +462,14 @@ export function PhotoStudio({
               <div className="flex gap-2.5">
                 <Button
                   variant="secondary"
-                  className="h-12 flex-1 gap-2 rounded-full text-[15px]"
+                  className="bouton--or h-12 flex-1 gap-2 rounded-full text-[15px]"
                   disabled={!!enCours}
                   onClick={reinitialiser}
                 >
                   <RotateCcw className="size-4" /> Refaire
                 </Button>
                 <Button
+                  variant="or"
                   className="h-12 flex-1 rounded-full text-[15px] font-semibold"
                   disabled={!affichee || !!enCours}
                   onClick={() => affichee && onChoisir(affichee)}

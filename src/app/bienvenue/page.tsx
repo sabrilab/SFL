@@ -115,7 +115,7 @@ function Bienvenue() {
 
       <Link
         href="/"
-        className="bouton-principal mt-5 block py-4 text-center text-[15px] font-bold"
+        className="bouton-principal bouton--vert mt-5 block py-4 text-center text-[15px] font-bold"
       >
         Entrer dans la ligue
       </Link>

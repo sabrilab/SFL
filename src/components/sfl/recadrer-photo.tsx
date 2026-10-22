@@ -239,6 +239,7 @@ export function RecadrerPhoto({
               Annuler
             </Button>
             <Button
+              variant="or"
               className="h-12 flex-1 rounded-full text-[15px] font-semibold"
               disabled={!image}
               onClick={() => {

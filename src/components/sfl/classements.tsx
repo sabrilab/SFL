@@ -144,8 +144,8 @@ export function Classements({ me }: { me: string }) {
             aria-selected={id === r.id}
             onClick={() => setId(r.id)}
             className={cn(
-              "shrink-0 rounded-full px-4 py-2 text-[13px] font-semibold whitespace-nowrap transition-colors",
-              id === r.id ? "bg-foreground text-background" : "glass-soft text-foreground/60"
+              "shrink-0 px-4 py-2 text-[13px] font-semibold whitespace-nowrap",
+              id === r.id ? "bouton-principal" : "bouton-secondaire text-foreground/60"
             )}
           >
             {r.label}

@@ -321,7 +321,7 @@ export default function SetupPage() {
           onClick={toutInstaller}
           disabled={running}
           className={cn(
-            "bouton-principal flex items-center justify-center gap-2 px-5 py-3.5 text-[15px] font-bold",
+            "bouton-principal bouton--vert flex items-center justify-center gap-2 px-5 py-3.5 text-[15px] font-bold",
             running && "opacity-50"
           )}
         >

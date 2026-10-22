@@ -115,12 +115,12 @@ export function Requalification({
                       <span className="text-[9px] font-bold tracking-wider text-muted-foreground">{nom}</span>
                       <div className="flex items-center gap-0.5">
                         <button type="button" aria-label={`${nom} −1`} onClick={() => poser(i, r, k, base[k] - 1)}
-                          className="grid size-6 place-items-center rounded-full active:bg-background">
+                          className="bouton-discret grid size-6 place-items-center">
                           <Minus className="size-3" />
                         </button>
                         <span className="w-6 text-center text-[13px] font-bold tabular-nums">{base[k]}</span>
                         <button type="button" aria-label={`${nom} +1`} onClick={() => poser(i, r, k, base[k] + 1)}
-                          className="grid size-6 place-items-center rounded-full active:bg-background">
+                          className="bouton-discret grid size-6 place-items-center">
                           <Plus className="size-3" />
                         </button>
                       </div>
@@ -137,7 +137,7 @@ export function Requalification({
             <Button
               variant="ghost"
               size="sm"
-              className="rounded-full text-[12px]"
+              className="bouton--rouge rounded-full text-[12px]"
               onClick={() => {
                 // Remise à 75 partout : le point de départ neutre d'une saison.
                 let next = saison;

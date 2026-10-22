@@ -76,7 +76,7 @@ export function CreerEquipe({
                   type="button"
                   aria-label={f === "noir" ? "Écusson noir" : "Écusson blanc"}
                   onClick={() => setFond(f)}
-                  className={cn("grid size-9 place-items-center rounded-full transition-colors", fond === f && "bg-foreground/15")}
+                  className={cn("grid size-9 place-items-center", fond === f ? "bouton-secondaire" : "bouton-discret")}
                 >
                   <span className={cn("size-5 rounded-full border-2", f === "noir" ? "border-white bg-black" : "border-black bg-white")} />
                 </button>
@@ -84,7 +84,7 @@ export function CreerEquipe({
             </div>
           </div>
           <ReglementListe />
-          <Button disabled={!pret || envoi} onClick={creer} className="h-12 rounded-full text-[15px] font-semibold">
+          <Button variant="vert" disabled={!pret || envoi} onClick={creer} className="h-12 rounded-full text-[15px] font-semibold">
             Signer et créer
           </Button>
         </div>

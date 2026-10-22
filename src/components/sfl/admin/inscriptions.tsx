@@ -83,7 +83,7 @@ function Ligne({
           </span>
           <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", ouvert && "rotate-180")} />
         </button>
-        <Button size="sm" className="rounded-full" disabled={occupe} onClick={onAccepter}>
+        <Button size="sm" variant="vert" className="rounded-full" disabled={occupe} onClick={onAccepter}>
           {occupe ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="mr-1 size-3.5" />}
           Accepter
         </Button>
@@ -258,14 +258,14 @@ export function Inscriptions({
                 type="button"
                 disabled={occupe === "suppression"}
                 onClick={() => void supprimer(horsSaisonComptes)}
-                className="bouton-secondaire px-3.5 py-1.5 text-[12.5px] font-semibold disabled:opacity-50"
+                className="bouton-secondaire bouton--rouge px-3.5 py-1.5 text-[12.5px] font-semibold disabled:opacity-50"
               >
                 Tout supprimer
               </button>
               <button
                 type="button"
                 onClick={() => ajouter(horsSaison)}
-                className="bouton-principal px-3.5 py-1.5 text-[12.5px] font-bold"
+                className="bouton-principal bouton--vert px-3.5 py-1.5 text-[12.5px] font-bold"
               >
                 Tout ajouter
               </button>
@@ -280,14 +280,14 @@ export function Inscriptions({
                 type="button"
                 disabled={occupe === "suppression"}
                 onClick={() => void supprimer([m])}
-                className="px-3 py-1.5 text-[12.5px] font-semibold text-muted-foreground disabled:opacity-50"
+                className="bouton-discret bouton--rouge px-3 py-1.5 text-[12.5px] font-semibold disabled:opacity-50"
               >
                 Supprimer
               </button>
               <button
                 type="button"
                 onClick={() => ajouter([m.name])}
-                className="bouton-secondaire px-3 py-1.5 text-[12.5px] font-semibold"
+                className="bouton-secondaire bouton--vert px-3 py-1.5 text-[12.5px] font-semibold"
               >
                 Ajouter
               </button>

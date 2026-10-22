@@ -99,6 +99,7 @@ export function MatchArena({ me }: { me: string }) {
         </p>
         <Button
           size="sm"
+          variant="or"
           className="font-semibold"
           render={<Link href="/collection">Ouvrir des packs</Link>}
         />
@@ -166,7 +167,7 @@ export function MatchArena({ me }: { me: string }) {
       </section>
 
       {/* Lancer le match */}
-      <Button size="lg" disabled={!ready || playing} onClick={launch} className="w-full font-semibold">
+      <Button size="lg" variant="vert" disabled={!ready || playing} onClick={launch} className="w-full font-semibold">
         <Play /> {ready ? "Lancer le match" : `Choisis encore ${DECK_SIZE - deckIds.length} carte${DECK_SIZE - deckIds.length > 1 ? "s" : ""}`}
       </Button>
 

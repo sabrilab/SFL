@@ -153,7 +153,7 @@ export function EquipesDimanche() {
           onClick={generer}
           className={cn(
             "flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-bold",
-            affichées ? "bouton-secondaire" : "bouton-principal"
+            affichées ? "bouton-secondaire bouton--vert" : "bouton-principal bouton--vert"
           )}
         >
           <RefreshCw className="size-3.5" /> {affichées ? "Regénérer" : "Générer les équipes"}
@@ -162,7 +162,7 @@ export function EquipesDimanche() {
           <button
             onClick={valider}
             disabled={saving}
-            className="bouton-principal flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-bold disabled:opacity-50"
+            className="bouton-principal bouton--vert flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-bold disabled:opacity-50"
           >
             <Send className="size-3.5" /> Valider — envoi vendredi 19h
           </button>

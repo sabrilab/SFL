@@ -60,13 +60,13 @@ export function Saisons({
           <Button
             variant="outline"
             size="sm"
-            className="rounded-full"
+            className="bouton--rouge rounded-full"
             onClick={() => onCommit(restaurerSaison(saison), `Clôture annulée — retour à la saison ${numero - 1}`)}
           >
             <RotateCcw className="mr-1.5 size-3.5" /> Annuler la clôture
           </Button>
         ) : (
-          <Button size="sm" className="rounded-full" disabled={vierge} onClick={() => { setNom(`Saison ${numero}`); setOuvert(true); }}>
+          <Button size="sm" variant="vert" className="rounded-full" disabled={vierge} onClick={() => { setNom(`Saison ${numero}`); setOuvert(true); }}>
             <Archive className="mr-1.5 size-3.5" /> Clôturer la saison
           </Button>
         )}
@@ -123,6 +123,7 @@ export function Saisons({
           <DialogFooter className="gap-2">
             <Button variant="ghost" className="rounded-full" onClick={() => setOuvert(false)}>Pas maintenant</Button>
             <Button
+              variant="vert"
               className="rounded-full"
               onClick={() => {
                 onCommit(cloturerSaison(saison, nom), `Clôture de la saison ${numero}`);

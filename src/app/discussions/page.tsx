@@ -127,19 +127,13 @@ export default function Discussions() {
               <div className="flex gap-2 px-3 pb-3">
                 <button
                   onClick={() => answer("present")}
-                  className={cn(
-                    "bouton-principal flex-1 py-2.5 text-center text-[13px] font-bold",
-                    presence.mine === "present" && "bouton--vert"
-                  )}
+                  className="bouton-principal bouton--vert flex-1 py-2.5 text-center text-[13px] font-bold"
                 >
                   {presence.mine === "present" ? "Je viens ✓" : "Je viens"}
                 </button>
                 <button
                   onClick={() => answer("absent")}
-                  className={cn(
-                    "bouton-secondaire flex-1 py-2.5 text-center text-[13px] font-semibold",
-                    presence.mine === "absent" && "bouton--rouge"
-                  )}
+                  className="bouton-secondaire bouton--rouge flex-1 py-2.5 text-center text-[13px] font-semibold"
                 >
                   {presence.mine === "absent" ? "Pas dispo ✓" : "Pas dispo"}
                 </button>

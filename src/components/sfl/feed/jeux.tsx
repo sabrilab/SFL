@@ -101,12 +101,12 @@ export function PronosticModule({
               onClick={() => choose(p.name)}
               disabled={!!pick || !!resolvedMvp}
               className={cn(
-                "flex items-center gap-2 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-transform active:scale-95",
+                "flex items-center gap-2 px-3.5 py-2 text-[13px] font-semibold",
                 isAnswer
-                  ? "bg-primary text-primary-foreground"
+                  ? "bouton-principal bouton--vert"
                   : active
-                    ? "bg-foreground text-background"
-                    : "glass-soft text-foreground/70"
+                    ? "bouton-principal bouton--or"
+                    : "bouton-secondaire bouton--or"
               )}
             >
               {p.name}
@@ -258,14 +258,14 @@ export function QuizModule({
                       onClick={() => answer(i, o)}
                       disabled={!!chosen}
                       className={cn(
-                        "rounded-full px-3.5 py-2 text-[13px] font-semibold transition-transform active:scale-95",
+                        "px-3.5 py-2 text-[13px] font-semibold",
                         chosen
                           ? isGood
-                            ? "bg-primary text-primary-foreground"
+                            ? "bouton-principal bouton--vert"
                             : isChosen
-                              ? "bg-foreground/15 text-foreground/50 line-through"
-                              : "glass-soft text-foreground/35"
-                          : "glass-soft text-foreground/70"
+                              ? "bouton-secondaire bouton--rouge line-through"
+                              : "bouton-secondaire text-foreground/35"
+                          : "bouton-secondaire"
                       )}
                     >
                       {o}
