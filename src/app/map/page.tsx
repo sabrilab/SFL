@@ -63,13 +63,14 @@ import { CatalogueJoueurs } from "@/components/sfl/map/catalogue-joueurs";
 import { CollectionPile } from "@/components/sfl/map/collection-pile";
 import { cleVille, type VillePlan } from "@/components/sfl/map/joueurs";
 import { villeOuLigue } from "@/lib/sfl/villes";
-import { photoPerso } from "@/lib/sfl/photos";
+import { photoMiniature, photoPerso } from "@/lib/sfl/photos";
 import { nomAffiche } from "@/lib/sfl/identites";
 import { useVillesRevision } from "@/hooks/use-villes";
 import { usePhotoRevision } from "@/hooks/use-player-photo";
 import { useIdentitesRevision } from "@/hooks/use-identites";
 import { cn } from "@/lib/utils";
-import { COULEUR_LIGUE, heureCourte, itineraires, photoSatellite, stadeSvg, type EtatSticker, type LigueMatch, type Moment, type StickerPlan } from "@/components/sfl/map/stade";
+import { COULEUR_LIGUE, heureCourte, itineraires, stadeSvg, type EtatSticker, type LigueMatch, type Moment, type StickerPlan } from "@/components/sfl/map/stade";
+import { VueSatellite } from "@/components/sfl/map/vue-satellite";
 import { SigleLigue } from "@/components/sfl/choix-ligue";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { useMatchsTeam, type MatchTeam } from "@/hooks/use-matchs-team";
@@ -592,7 +593,9 @@ export default function MapPage() {
       if (!v) continue;
       const id = cleVille(v.ville);
       const g = parVille.get(id) ?? { id, ville: v.ville, lat: v.lat, lng: v.lng, joueurs: [] };
-      g.joueurs.push({ name: pl.name, affiche: nomAffiche(pl.name), note: ovr(pl.stats), photo: photoPerso(pl.name) });
+      // Sur le plan, les cartes font 22 à 36 px : la photo en vignette.
+      const photo = photoPerso(pl.name);
+      g.joueurs.push({ name: pl.name, affiche: nomAffiche(pl.name), note: ovr(pl.stats), photo: photo && photoMiniature(photo), secours: photo });
       parVille.set(id, g);
     }
     for (const g of parVille.values()) g.joueurs.sort((a, b) => b.note - a.note || a.affiche.localeCompare(b.affiche));
@@ -702,7 +705,7 @@ export default function MapPage() {
             d'onglets le 19/10), la bascule plan / satellite et, pour
             l'admin, les stats (Activité & rétention, 22/10) et le réglage des
             matchs — le lettrage garde sa place. */}
-        <div className="absolute right-4 z-[510] flex flex-col items-end gap-2" style={{ top: haut }}>
+        <div data-traverse className="absolute right-4 z-[510] flex flex-col items-end gap-2" style={{ top: haut }}>
           <Link
             href="/recherche"
             aria-label="Recherche"
@@ -763,10 +766,14 @@ export default function MapPage() {
           )}
         </div>
 
-        {/* En bas : les boutons, les cartes des matchs, les pastilles */}
-        <div className="absolute inset-x-0 z-[510] flex flex-col items-center gap-3" style={{ bottom: bas }}>
+        {/* En bas : les boutons, les cartes des matchs, les pastilles. Leurs
+            rangées sont transparentes et prennent toute la largeur : marquées
+            `data-traverse` (comme la colonne des boutons), elles laissent la
+            molette, le pincement et le glisser de la souris au plan, sur
+            ordinateur (map/gestes-ordinateur.ts). */}
+        <div data-traverse className="absolute inset-x-0 z-[510] flex flex-col items-center gap-3" style={{ bottom: bas }}>
           <Invitations invitations={invitations} onOuvrir={(p) => choisirSticker(`m${p.id}`)} />
-          <div className="flex w-full items-center justify-center gap-2 px-4">
+          <div data-traverse className="flex w-full items-center justify-center gap-2 px-4">
             {/* Tout joueur ouvre un match ; l'admin garde en plus la journée de ligue. */}
             {partiesActives && (
               <button
@@ -812,13 +819,15 @@ export default function MapPage() {
           {/* Le carrousel : une carte par match, celle du centre est la choisie.
               Toucher la choisie ouvre sa fiche. Replié, il descend et s'efface. */}
           <div
+            data-traverse
             className={cn("grid w-full transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none", replie ? "pointer-events-none grid-rows-[0fr] opacity-0" : "grid-rows-[1fr]")}
             aria-hidden={replie}
           >
-          <div className="flex min-h-0 flex-col items-center gap-3 overflow-hidden">
+          <div data-traverse className="flex min-h-0 flex-col items-center gap-3 overflow-hidden">
           <div
             ref={carrousel}
             onScroll={suivreCarrousel}
+            data-traverse
             className="flex w-full snap-x snap-mandatory items-end gap-3 overflow-x-auto pr-[max(1rem,calc(50%-103px))] pb-3 [scrollbar-width:none]"
             style={{ paddingLeft: `max(1rem, calc(50% - ${affiches[0]?.joue ? LARGEUR_JOUE / 2 + 5 : 103}px))` }}
           >
@@ -837,7 +846,7 @@ export default function MapPage() {
           </div>
 
           {choisi && (
-            <div className="flex max-w-full items-center gap-2 px-4">
+            <div data-traverse className="flex max-w-full items-center gap-2 px-4">
               {choisi.terrain ? (
                 <>
                   <button
@@ -1106,12 +1115,13 @@ function CarteMatch({
         >
           {m.terrain ? (
             // La vue aérienne du vrai terrain, comme dans l'app iPhone.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={photoSatellite(m.terrain.lat, m.terrain.lng, 392, 280, 0.0009)}
-              alt=""
-              loading="lazy"
-              className={cn("absolute inset-0 h-full w-full object-cover", joue ? "grayscale" : complet && "saturate-[0.35]")}
+            <VueSatellite
+              lat={m.terrain.lat}
+              lng={m.terrain.lng}
+              demi={0.0009}
+              rapport={196 / 140}
+              hauteur={h}
+              className={cn("absolute inset-0 h-full w-full", joue ? "grayscale" : complet && "saturate-[0.35]")}
             />
           ) : (
             <div
@@ -1212,8 +1222,15 @@ function Itineraire({ terrain, ios }: { terrain: Terrain; ios: boolean }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="relative h-[200px] overflow-hidden rounded-[22px] border border-border bg-secondary">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photoSatellite(terrain.lat, terrain.lng, 800, 400, 0.0011)} alt={`Vue satellite de ${terrain.nom}`} className="h-full w-full object-cover" />
+        <VueSatellite
+          lat={terrain.lat}
+          lng={terrain.lng}
+          demi={0.0011}
+          rapport={2}
+          hauteur={200}
+          titre={`Vue satellite de ${terrain.nom}`}
+          className="h-full w-full"
+        />
         {/* L'épingle sur le terrain : la photo est centrée sur lui. */}
         <span className="ajuster-pin pointer-events-none" style={{ left: "50%", top: "50%", cursor: "default" }} aria-hidden />
         <span className="absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
