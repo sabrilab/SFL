@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "@/hooks/use-session";
 import { isAdmin } from "@/lib/sfl/admin";
+import { emailsDeContact } from "@/lib/sfl/contacts";
 import { supabase } from "@/lib/supabase";
 import { AgentStats } from "./agent";
 import { AccordsStats } from "./confidentialite";
@@ -78,10 +79,12 @@ export default function ActivitePage() {
           if (!data || data.length < PAGE) return lignes;
         }
       };
-      const [actData, prof, studioBrut] = await Promise.all([
+      const [actData, prof, studioBrut, emails] = await Promise.all([
         lireTout(),
-        sb.from("profiles").select("id, name, contact_email, created_at, is_admin"),
+        sb.from("profiles").select("id, name, created_at, is_admin"),
         lireStudio(),
+        // Rangés à part (table contacts) : l'admin les lit tous.
+        emailsDeContact(sb).catch(() => new Map<string, string>()),
       ]);
       if (prof.error) throw new Error(prof.error.message);
 
@@ -105,13 +108,12 @@ export default function ActivitePage() {
       type ProfilBrut = {
         id: string;
         name: string;
-        contact_email: string | null;
         created_at: string | null;
         is_admin: boolean | null;
       };
       const profiles = ((prof.data ?? []) as ProfilBrut[]).map((p) => ({
         name: p.name,
-        contact_email: p.contact_email,
+        contact_email: emails.get(p.id) ?? null,
         created_at: p.created_at ? new Date(p.created_at).getTime() : null,
         // Le rôle en base, ou la liste en dur de l'app (Sabri, Ilyes).
         admin: !!p.is_admin || isAdmin(p.name),

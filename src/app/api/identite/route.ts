@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { appelant, dejaPris, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { emailDe } from "@/lib/sfl/contacts";
 import { capitaliser, emailValide, erreurPseudo, nettoyerNom, nomDeLigue, normaliserPseudo } from "@/lib/sfl/inscription";
 import { separerNom } from "@/lib/sfl/identites-regles";
 
@@ -34,11 +35,16 @@ type Profil = {
 };
 
 async function lire(sb: SupabaseClient, id: string) {
-  const [{ data: p }, { data: f }] = await Promise.all([
-    sb.from("profiles").select("name, username, pseudo_change_le, contact_email, nom_affiche, identite_le").eq("id", id).maybeSingle(),
+  // L'email est rangé à part (table contacts, lib/sfl/contacts.ts).
+  const [{ data: p }, { data: f }, email] = await Promise.all([
+    sb.from("profiles").select("name, username, pseudo_change_le, nom_affiche, identite_le").eq("id", id).maybeSingle(),
     sb.from("fiches").select("prenom, nom").eq("player_id", id).maybeSingle(),
+    emailDe(sb, id).catch(() => null),
   ]);
-  return { profil: p as Profil | null, fiche: f as { prenom: string; nom: string } | null };
+  return {
+    profil: p ? ({ ...p, contact_email: email } as Profil) : null,
+    fiche: f as { prenom: string; nom: string } | null,
+  };
 }
 
 export async function GET(req: NextRequest) {

@@ -144,8 +144,8 @@ export function TextePolitique() {
               <>
                 La photo obtenue, ton visage au maillot Bola retouché par l&apos;IA, est enregistrée chez nous et
                 apparaît sur ta carte dans toute l&apos;app : Map, Actus, classements, feuilles de match, Vestiaire,
-                profil. Elle est rangée dans un espace public : <Fort>elle se voit sans compte</Fort>, pour qui la
-                cherche.
+                profil. Elle est rangée dans un espace public : <Fort>elle se voit sans compte</Fort>, par qui a son
+                adresse ; la liste des photos, elle, est réservée aux membres de la ligue.
               </>,
               <>
                 Les joueurs peuvent partager des visuels de la ligue hors de l&apos;app (une feuille de match en story,
