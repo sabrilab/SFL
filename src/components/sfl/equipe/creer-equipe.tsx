@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
-import { ReglementListe } from "@/components/sfl/equipe/reglement";
-import { creerEquipe, direErreurEquipe, initialesDe, type Fond } from "@/lib/sfl/equipes";
+import { CaseAcceptation, ReglementListe } from "@/components/sfl/equipe/reglement";
+import { confirmationSignature, creerEquipe, direErreurEquipe, initialesDe, type Fond } from "@/lib/sfl/equipes";
 import { cn } from "@/lib/utils";
 
 export function CreerEquipe({
@@ -29,6 +29,7 @@ export function CreerEquipe({
   const [initiales, setInitiales] = useState<string | null>(null);
   const [fond, setFond] = useState<Fond>("noir");
   const [envoi, setEnvoi] = useState(false);
+  const [coche, setCoche] = useState(false);
   const ini = (initiales ?? initialesDe(nom)).slice(0, 3);
   const pret = nom.trim().length >= 3 && /^[A-Z0-9]{1,3}$/.test(ini);
 
@@ -41,6 +42,7 @@ export function CreerEquipe({
     try {
       await creerEquipe(nom, ini, fond);
       navigator.vibrate?.([12, 60, 24]);
+      toast.success(confirmationSignature(nom.trim()));
       onOpenChange(false);
       onCree();
     } catch (e) {
@@ -84,8 +86,9 @@ export function CreerEquipe({
             </div>
           </div>
           <ReglementListe />
-          <Button variant="vert" disabled={!pret || envoi} onClick={creer} className="h-12 rounded-full text-[15px] font-semibold">
-            Signer et créer
+          <CaseAcceptation coche={coche} onChange={setCoche} />
+          <Button variant="vert" disabled={!pret || !coche || envoi} onClick={creer} className="h-12 rounded-full text-[15px] font-semibold">
+            Signer et créer l&apos;équipe
           </Button>
         </div>
       </SheetContent>

@@ -8,24 +8,38 @@
 // moment-là, près de toi, partenaires, tous : choisir-joueur.tsx) ; toucher
 // un invité le retire. Un match privé ne montre que ceux qu'on a ajoutés ;
 // un public affiche ses places restantes sur la Map.
+//
+// La même feuille modifie un match déjà ouvert (partie) : son organisateur
+// en change le genre, la visibilité, le jour, l'heure, le lieu et le nombre
+// de places ; les joueurs se gèrent sur la fiche du match (fiche-partie.tsx).
+// La feuille reste dans son cadre (feuille-cadree.tsx) : seul le milieu
+// défile, le bouton reste en bas.
+//
+// En haut, la ligue où l'on organise (Sabri, 22/10) : un match ouvert ici
+// compte en Bola ; un admin passe à la SFL (ses journées, réglées depuis la
+// fiche des matchs) ; Team mène aux défis entre équipes (page Team).
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TerrainPlaces } from "@/components/sfl/matchs/terrain-places";
 import { ChoisirJoueur } from "@/components/sfl/matchs/choisir-joueur";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { FeuilleCadree } from "@/components/sfl/feuille-cadree";
+import { SigleLigue } from "@/components/sfl/choix-ligue";
 import {
   aujourdhuiIso,
   direErreur,
   listerDispos,
   listerProfils,
+  modifierPartie,
   momentDeLHeure,
   ouvrirPartie,
   type Dispo,
   type Genre,
+  type Partie,
   type Profil,
   type Visibilite,
 } from "@/lib/sfl/matchs";
@@ -60,6 +74,26 @@ function Choix<T extends string>({
   );
 }
 
+/** La ligue où l'on organise : Bola ici, SFL pour un admin, Team ailleurs. */
+function LigueOrganisee({ onSfl }: { onSfl?: () => void }) {
+  const pastille = "flex h-10 items-center justify-center";
+  return (
+    <div className={cn("grid gap-1 rounded-full bg-secondary p-1", onSfl ? "grid-cols-3" : "grid-cols-2")} aria-label="La ligue">
+      <span aria-current="true" className={cn(pastille, "bouton-principal cursor-default")}>
+        <SigleLigue ligue="bola" hauteur={13} />
+      </span>
+      {onSfl && (
+        <button type="button" onClick={onSfl} className={cn(pastille, "bouton-discret text-muted-foreground")}>
+          <SigleLigue ligue="sfl" hauteur={13} />
+        </button>
+      )}
+      <Link href="/bola-team" className={cn(pastille, "bouton-discret text-muted-foreground")}>
+        <SigleLigue ligue="team" hauteur={13} />
+      </Link>
+    </div>
+  );
+}
+
 export function OuvrirMatch({
   open,
   onOpenChange,
@@ -69,6 +103,8 @@ export function OuvrirMatch({
   heureInitial,
   moi,
   onOuvert,
+  partie,
+  onSfl,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -79,14 +115,23 @@ export function OuvrirMatch({
   heureInitial?: string;
   moi: string | null;
   onOuvert: (id: number) => void;
+  /** Un match déjà ouvert, que son organisateur modifie. */
+  partie?: Partie;
+  /** Un admin : passer aux journées de la SFL. */
+  onSfl?: () => void;
 }) {
-  const [genre, setGenre] = useState<Genre>("match");
-  const [visibilite, setVisibilite] = useState<Visibilite>("public");
-  const [jour, setJour] = useState(() => jourInitial ?? aujourdhuiIso());
-  const [heure, setHeure] = useState(heureInitial ?? "19:00");
-  const [terrainId, setTerrainId] = useState<number | null>(terrainInitial?.id ?? terrains.find((t) => t.defaut)?.id ?? null);
-  const [lieuLibre, setLieuLibre] = useState("");
-  const [places, setPlaces] = useState(10);
+  const [genre, setGenre] = useState<Genre>(partie?.genre ?? "match");
+  const [visibilite, setVisibilite] = useState<Visibilite>(partie?.visibilite ?? "public");
+  const [jour, setJour] = useState(() => partie?.jour ?? jourInitial ?? aujourdhuiIso());
+  // En base, « 20h00 » ; dans le champ, « 20:00 ».
+  const [heure, setHeure] = useState(partie ? partie.heure.replace("h", ":").padStart(5, "0") : (heureInitial ?? "19:00"));
+  const terrainDuMatch = partie ? (terrains.find((t) => t.nom === partie.lieu) ?? null) : null;
+  const [terrainId, setTerrainId] = useState<number | null>(
+    partie ? (terrainDuMatch?.id ?? null) : (terrainInitial?.id ?? terrains.find((t) => t.defaut)?.id ?? null)
+  );
+  const modif = !!partie;
+  const [lieuLibre, setLieuLibre] = useState(partie && !terrainDuMatch ? partie.lieu : "");
+  const [places, setPlaces] = useState(partie?.places ?? 10);
   const [invites, setInvites] = useState<Profil[]>([]);
   const [choisir, setChoisir] = useState(false);
   const [profils, setProfils] = useState<Profil[]>([]);
@@ -94,9 +139,9 @@ export function OuvrirMatch({
   const [envoi, setEnvoi] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || modif) return;
     listerProfils().then(setProfils).catch(() => setProfils([]));
-  }, [open]);
+  }, [open, modif]);
 
   // Ceux qui ont dit être libres ce jour-là, à ce moment-là.
   const moment = momentDeLHeure(heure);
@@ -120,9 +165,11 @@ export function OuvrirMatch({
 
   const terrain = terrains.find((t) => t.id === terrainId) ?? null;
   const lieu = terrain?.nom ?? lieuLibre.trim();
-  // L'organisateur compte pour une place.
+  // L'organisateur compte pour une place ; un match ouvert garde au moins ses joueurs.
   const pleins = invites.length + 1 >= places;
-  const pret = !!jour && !!heure && !!lieu && jour >= aujourdhuiIso() && (visibilite === "public" || invites.length > 0);
+  const minimum = Math.max(2, partie ? partie.joueurs.length : invites.length + 1);
+  const pret =
+    !!jour && !!heure && !!lieu && jour >= aujourdhuiIso() && (partie || visibilite === "public" || invites.length > 0);
 
   function ajouter(p: Profil) {
     if (pris.has(p.id) || pleins) return;
@@ -132,6 +179,26 @@ export function OuvrirMatch({
   async function ouvrir() {
     setEnvoi(true);
     try {
+      if (partie) {
+        // Un lieu inchangé garde son adresse et sa place sur la Map.
+        const memeLieu = !terrain && lieu === partie.lieu;
+        await modifierPartie(partie, {
+          genre,
+          visibilite,
+          jour,
+          heure: heure.replace(":", "h"),
+          lieu,
+          adresse: terrain ? (terrain.adresse ?? null) : memeLieu ? partie.adresse : null,
+          lat: terrain ? (terrain.lat ?? null) : memeLieu ? partie.lat : null,
+          lng: terrain ? (terrain.lng ?? null) : memeLieu ? partie.lng : null,
+          places,
+        });
+        navigator.vibrate?.(12);
+        toast.success("Match modifié.");
+        onOuvert(partie.id);
+        onOpenChange(false);
+        return;
+      }
       const id = await ouvrirPartie({
         genre,
         visibilite,
@@ -155,112 +222,123 @@ export function OuvrirMatch({
     }
   }
 
+  const bouton = (
+    <Button variant="vert" disabled={!pret || envoi} onClick={ouvrir} className="h-12 w-full rounded-full text-[15px] font-semibold">
+      {partie
+        ? "Enregistrer"
+        : visibilite === "public"
+          ? `Ouvrir · ${places - invites.length - 1} place${places - invites.length - 1 > 1 ? "s" : ""} sur la Map`
+          : "Ouvrir le match privé"}
+    </Button>
+  );
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
-        <SheetHeader className="px-5 pt-5 pb-0">
-          <SheetTitle className="text-[26px] font-bold tracking-tight">Ouvrir un match</SheetTitle>
-        </SheetHeader>
+    <FeuilleCadree
+      open={open}
+      onOpenChange={onOpenChange}
+      titre={partie ? "Modifier le match" : "Ouvrir un match"}
+      surtitre={partie ? <SigleLigue ligue="bola" hauteur={11} className="text-foreground" /> : undefined}
+      pied={bouton}
+    >
+      <div className="flex flex-col gap-5">
+        {!partie && <LigueOrganisee onSfl={onSfl} />}
+        <Choix
+          valeur={genre}
+          onChange={setGenre}
+          options={[
+            { id: "match", libelle: "Match" },
+            { id: "exhibition", libelle: "Exhibition" },
+          ]}
+        />
+        <Choix
+          valeur={visibilite}
+          onChange={setVisibilite}
+          options={[
+            { id: "public", libelle: "Public" },
+            { id: "prive", libelle: "Privé" },
+          ]}
+        />
 
-        <div className="flex flex-col gap-5 px-4">
-          <Choix
-            valeur={genre}
-            onChange={setGenre}
-            options={[
-              { id: "match", libelle: "Match" },
-              { id: "exhibition", libelle: "Exhibition" },
-            ]}
-          />
-          <Choix
-            valeur={visibilite}
-            onChange={setVisibilite}
-            options={[
-              { id: "public", libelle: "Public" },
-              { id: "prive", libelle: "Privé" },
-            ]}
-          />
-
-          <div className="grid grid-cols-2 gap-2">
-            <Input type="date" value={jour} min={aujourdhuiIso()} onChange={(e) => setJour(e.target.value)} aria-label="Le jour" />
-            <Input type="time" value={heure} step={900} onChange={(e) => setHeure(e.target.value)} aria-label="L'heure" />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <p className="mono-label text-muted-foreground">Où</p>
-            {terrains.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {terrains.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setTerrainId(t.id === terrainId ? null : t.id)}
-                    className={cn(
-                      "px-3 py-1.5 text-[13px] font-semibold",
-                      t.id === terrainId ? "bouton-principal" : "bouton-secondaire"
-                    )}
-                  >
-                    {t.nom}
-                  </button>
-                ))}
-              </div>
-            )}
-            {terrainId == null && (
-              <Input value={lieuLibre} onChange={(e) => setLieuLibre(e.target.value)} placeholder="Le terrain" maxLength={120} />
-            )}
-          </div>
-
-          <div className="flex items-center justify-between">
-            <p className="mono-label text-muted-foreground">Joueurs</p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                aria-label="Une place de moins"
-                onClick={() => setPlaces((n) => Math.max(Math.max(2, invites.length + 1), n - 1))}
-                className="bouton-secondaire grid size-9 place-items-center"
-              >
-                <Minus className="size-4" />
-              </button>
-              <span className="w-8 text-center text-lg font-bold tabular-nums">{places}</span>
-              <button
-                type="button"
-                aria-label="Une place de plus"
-                onClick={() => setPlaces((n) => Math.min(22, n + 1))}
-                className="bouton-secondaire grid size-9 place-items-center"
-              >
-                <Plus className="size-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Le terrain du match : moi devant, mes invités, et un + sur chaque place libre. */}
-          <TerrainPlaces
-            places={places}
-            moi={moiNom}
-            occupants={[
-              { cle: moi ?? "moi", nom: moiNom },
-              ...invites.map((p) => ({ cle: p.id, nom: p.name })),
-            ]}
-            hauteur={460}
-            onPlus={pleins ? undefined : () => setChoisir(true)}
-            onOccupant={(o) => o.cle !== (moi ?? "moi") && setInvites((l) => l.filter((x) => x.id !== o.cle))}
-          />
-          <ChoisirJoueur
-            open={choisir}
-            onOpenChange={setChoisir}
-            profils={profils}
-            exclus={new Set([...(moi ? [moi] : []), ...invites.map((p) => p.id)])}
-            libres={new Set(libres.map((p) => p.id))}
-            moiNom={moiNom}
-            onChoisir={ajouter}
-          />
-
-          <Button variant="vert" disabled={!pret || envoi} onClick={ouvrir} className="h-12 rounded-full text-[15px] font-semibold">
-            {visibilite === "public"
-              ? `Ouvrir · ${places - invites.length - 1} place${places - invites.length - 1 > 1 ? "s" : ""} sur la Map`
-              : "Ouvrir le match privé"}
-          </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Input type="date" value={jour} min={aujourdhuiIso()} onChange={(e) => setJour(e.target.value)} aria-label="Le jour" />
+          <Input type="time" value={heure} step={900} onChange={(e) => setHeure(e.target.value)} aria-label="L'heure" />
         </div>
-      </SheetContent>
-    </Sheet>
+
+        <div className="flex flex-col gap-2">
+          <p className="mono-label text-muted-foreground">Où</p>
+          {terrains.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {terrains.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTerrainId(t.id === terrainId ? null : t.id)}
+                  className={cn(
+                    "px-3 py-1.5 text-[13px] font-semibold",
+                    t.id === terrainId ? "bouton-principal" : "bouton-secondaire"
+                  )}
+                >
+                  {t.nom}
+                </button>
+              ))}
+            </div>
+          )}
+          {terrainId == null && (
+            <Input value={lieuLibre} onChange={(e) => setLieuLibre(e.target.value)} placeholder="Le terrain" maxLength={120} />
+          )}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <p className="mono-label text-muted-foreground">Joueurs</p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="Une place de moins"
+              disabled={places <= minimum}
+              onClick={() => setPlaces((n) => Math.max(minimum, n - 1))}
+              className="bouton-secondaire grid size-9 place-items-center disabled:opacity-40"
+            >
+              <Minus className="size-4" />
+            </button>
+            <span className="w-8 text-center text-lg font-bold tabular-nums">{places}</span>
+            <button
+              type="button"
+              aria-label="Une place de plus"
+              disabled={places >= 22}
+              onClick={() => setPlaces((n) => Math.min(22, n + 1))}
+              className="bouton-secondaire grid size-9 place-items-center disabled:opacity-40"
+            >
+              <Plus className="size-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Le terrain du match : moi devant, mes invités, et un + sur chaque place libre. */}
+        {!partie && (
+          <>
+            <TerrainPlaces
+              places={places}
+              moi={moiNom}
+              occupants={[
+                { cle: moi ?? "moi", nom: moiNom },
+                ...invites.map((p) => ({ cle: p.id, nom: p.name })),
+              ]}
+              hauteur={420}
+              onPlus={pleins ? undefined : () => setChoisir(true)}
+              onOccupant={(o) => o.cle !== (moi ?? "moi") && setInvites((l) => l.filter((x) => x.id !== o.cle))}
+            />
+            <ChoisirJoueur
+              open={choisir}
+              onOpenChange={setChoisir}
+              profils={profils}
+              exclus={new Set([...(moi ? [moi] : []), ...invites.map((p) => p.id)])}
+              libres={new Set(libres.map((p) => p.id))}
+              moiNom={moiNom}
+              onChoisir={ajouter}
+            />
+          </>
+        )}
+      </div>
+    </FeuilleCadree>
   );
 }

@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { X } from "lucide-react";
 import { toast } from "sonner";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { useSession } from "@/hooks/use-session";
@@ -58,6 +59,15 @@ export default function LienEquipePage() {
   if (info === undefined) return null;
   return (
     <div className="fixed inset-0 z-[60] flex flex-col justify-center overflow-y-auto bg-background" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      {/* On peut toujours partir : vers la Team si l'on est connecté, sinon l'accueil. */}
+      <Link
+        href={session?.server ? "/bola-team" : "/"}
+        aria-label="Fermer"
+        className="bouton-secondaire fixed right-4 grid size-10 place-items-center"
+        style={{ top: "calc(env(safe-area-inset-top, 0px) + 12px)" }}
+      >
+        <X className="size-[18px]" />
+      </Link>
       <div className="mx-auto flex w-full max-w-sm flex-col items-center px-6 py-12 text-center">
         {info ? (
           <>

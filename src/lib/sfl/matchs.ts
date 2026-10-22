@@ -267,8 +267,66 @@ export async function ouvrirPartie(n: NouvellePartie): Promise<number> {
     const { error: e } = await sb.from("match_joueurs").insert(l);
     if (e) throw e;
   }
+  if (n.invites.length > 0) notifierMatch(id, "invitation");
   return id;
 }
+
+/** Ce que l'organisateur change après coup : quand, où, combien, pour qui. */
+export interface ReglagesPartie {
+  genre: Genre;
+  visibilite: Visibilite;
+  jour: string;
+  heure: string;
+  lieu: string;
+  adresse: string | null;
+  lat: number | null;
+  lng: number | null;
+  places: number;
+}
+
+/** L'organisateur modifie son match ; les joueurs qui en sont sont prévenus si le rendez-vous change. */
+export async function modifierPartie(p: Partie, r: ReglagesPartie): Promise<void> {
+  if (r.places < p.joueurs.length) throw new Error("Moins de places que de joueurs déjà dans le match.");
+  const { error } = await supabase()
+    .from("matchs")
+    .update({ ...r, lieu: r.lieu.trim() })
+    .eq("id", p.id);
+  if (error) throw error;
+  const rendezVous = p.jour !== r.jour || p.heure !== r.heure || p.lieu !== r.lieu.trim();
+  if (rendezVous && p.joueurs.length > 1) notifierMatch(p.id, "modifie");
+}
+
+/** L'organisateur retire un joueur (ou une invitation) de son match. */
+export async function retirerJoueur(id: number, playerId: string): Promise<void> {
+  const { error } = await supabase().from("match_joueurs").delete().eq("match_id", id).eq("player_id", playerId);
+  if (error) throw error;
+}
+
+/**
+ * Prévenir les joueurs d'un match (/api/matchs/notifier) : les invités pas
+ * encore prévenus, ou tout le monde quand le rendez-vous change. Une
+ * notification perdue ne bloque jamais le geste.
+ */
+async function appelNotifier(corps: { id: number; type: "invitation" | "modifie" | "annule" }): Promise<Response | null> {
+  try {
+    const { data } = await supabase().auth.getSession();
+    const jeton = data.session?.access_token;
+    if (!jeton) return null;
+    return await fetch("/api/matchs/notifier", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${jeton}` },
+      body: JSON.stringify(corps),
+      keepalive: true,
+    });
+  } catch {
+    return null;
+  }
+}
+
+export function notifierMatch(id: number, type: "invitation" | "modifie"): void {
+  void appelNotifier({ id, type });
+}
+
 
 /** Prendre une place libre d'un match public. */
 export async function rejoindre(id: number): Promise<void> {
@@ -298,10 +356,13 @@ export async function quitter(id: number): Promise<void> {
 export async function inviter(id: number, playerId: string): Promise<void> {
   const { error } = await supabase().from("match_joueurs").insert({ match_id: id, player_id: playerId, statut: "invite" });
   if (error) throw error;
+  notifierMatch(id, "invitation");
 }
 
-/** L'organisateur annule son match. */
+/** L'organisateur annule son match : le serveur prévient les joueurs puis l'efface ; sans lui, on l'efface d'ici. */
 export async function annuler(id: number): Promise<void> {
+  const r = await appelNotifier({ id, type: "annule" });
+  if (r?.ok && ((await r.json().catch(() => ({}))) as { annule?: boolean }).annule) return;
   const { error } = await supabase().from("matchs").delete().eq("id", id);
   if (error) throw error;
 }
@@ -375,5 +436,6 @@ export function direErreur(e: unknown): string {
   if (/feuille close/i.test(msg)) return "La feuille est close : 24 h sont passées.";
   if (/feuille réservée/i.test(msg)) return "Seul l'organisateur tient la feuille.";
   if (/row-level security|42501/i.test(msg)) return "Ce match ne t'est pas ouvert.";
+  if (/places_check|check constraint/i.test(msg)) return "Entre 2 et 22 places.";
   return msg || "Impossible pour l'instant. Réessaie dans un instant.";
 }
