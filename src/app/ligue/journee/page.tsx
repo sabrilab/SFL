@@ -28,6 +28,7 @@ import { CarteJournee } from "@/components/sfl/carte-journee";
 import { ALHonneur } from "@/components/sfl/a-l-honneur";
 import { cn } from "@/lib/utils";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
+import { BoutonStats } from "@/components/layout/bouton-stats";
 
 // Les deux dimanches après celui de la convocation, lus côté client
 // (vides au rendu serveur, pour que l'hydratation concorde).
@@ -211,6 +212,7 @@ function Ligue() {
           </button>
         ))}
       </div>
+        <BoutonStats className="size-10 sm:size-11" />
         <BoutonRecherche className="size-10 sm:size-11" />
       </div>
 

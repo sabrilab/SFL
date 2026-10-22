@@ -23,6 +23,7 @@ import { SaisonArchiveProvider, useSeason } from "@/components/sfl/season-provid
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { VoteFigures } from "@/components/sfl/vote-figures";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
+import { BoutonStats } from "@/components/layout/bouton-stats";
 import { useIdentites } from "@/hooks/use-identites";
 import { useIsClient } from "@/hooks/use-is-client";
 import { filDeSaison, buteursDe, type Actu } from "@/lib/sfl/actus";
@@ -394,7 +395,10 @@ export function FilActus({ classementsOuverts = false }: { classementsOuverts?: 
     <div className="mx-auto flex w-full max-w-[470px] flex-col gap-7 pt-2 pb-8 sm:pt-6">
       <div className="flex items-center justify-between px-5">
         <h1 className="text-[34px] leading-none font-bold tracking-tight">Actus</h1>
-        <BoutonRecherche className="size-10 sm:size-11" />
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <BoutonStats className="size-10 sm:size-11" />
+          <BoutonRecherche className="size-10 sm:size-11" />
+        </div>
       </div>
       <div className="-mt-2 px-5">
         <RondsClassements j={dernierJ} moi={me} />
