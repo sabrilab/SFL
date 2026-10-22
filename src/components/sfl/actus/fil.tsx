@@ -10,15 +10,16 @@
 //   · la prochaine journée (sa présence se donne ici) et le vote du jour ;
 //   · puis les dimanches joués, du plus récent au plus ancien (la liste :
 //     lib/sfl/actus.ts), et à la fin la saison passée.
-// Sous chaque image : la partager au Vestiaire, et pour le récap, l'ouvrir
-// en entier (/ligue/journee). Toucher une image la rejoue ; toucher une
-// carte l'ouvre en grand.
+// Pas d'en-tête de compte sur chaque publication (Sabri, 22/10 : « moins
+// Instagram ») : un chapitre par dimanche (« J2 · 18 oct. »), puis les
+// images de ce dimanche, chacune avec sa légende et, à droite, la partager
+// au Vestiaire (et pour le récap, l'ouvrir en entier, /ligue/journee).
+// Toucher une image la rejoue ; toucher une carte l'ouvre en grand.
 
 import Link from "next/link";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronRight, MessageCircle, RotateCcw } from "lucide-react";
+import { ChevronRight, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { SaisonArchiveProvider, useSeason } from "@/components/sfl/season-provider";
 import { PresencePanel } from "@/components/sfl/presence-panel";
@@ -37,21 +38,56 @@ import { journeeJouee, saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
 import { TROPHEES, NOM_METAL, metal } from "@/lib/sfl/trophees";
 import { journeeAvecVote } from "@/lib/sfl/votes";
 import { preparerPiece, type PieceLigue } from "@/lib/sfl/vestiaire";
-import { Ecran } from "./ecran";
-import { CineBadge, CineCourse, CineDuo, CineEquipe, CineMontent, CineMvp, CinePodium, CineRecap, CineScore, CineSurface, CineToi } from "./cinematiques";
+import { ANTON, Ecran } from "./ecran";
+import { CineBadge, CineChiffre, CineCourse, CineDuo, CineEquipe, CineMontent, CineMvp, CinePodium, CinePresents, CineRecap, CineScore, CineSurface, CineToi, FORMAT_EQUIPE, FORMAT_MVP, FORMAT_SCORE } from "./cinematiques";
 import { RondsClassements, Stories } from "./stories";
+import { cn } from "@/lib/utils";
 
 const DEF = Object.fromEntries(TROPHEES.map((d) => [d.id, d]));
 const pl = (n: number, un: string, plusieurs: string) => (n > 1 ? plusieurs : un);
 
 /* ------------------------------ Une publication ------------------------------ */
 
+/**
+ * Le carrousel : plusieurs images côte à côte, aimantées ; chacune joue sa
+ * scène quand elle arrive. Le compteur en haut à droite, les points dessous.
+ */
+function Carrousel({ images, ratio }: { images: { duree: number; media: ReactNode }[]; ratio: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [i, setI] = useState(0);
+  return (
+    <div className="relative">
+      <div
+        ref={ref}
+        className="actu-carrousel flex overflow-x-auto overscroll-x-contain"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          setI(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
+        }}
+      >
+        {images.map((im, k) => (
+          <div key={k} className="w-full shrink-0">
+            <Ecran duree={im.duree} ratio={ratio}>{im.media}</Ecran>
+          </div>
+        ))}
+      </div>
+      <span className="pointer-events-none absolute top-3 right-3 z-20 rounded-full bg-black/60 px-2.5 py-1 text-[12px] font-semibold text-white tabular-nums backdrop-blur-sm">
+        {i + 1}/{images.length}
+      </span>
+      <div className="pointer-events-none absolute inset-x-0 -bottom-[22px] flex justify-center gap-1.5">
+        {images.map((_, k) => (
+          <span key={k} className={cn("size-1.5 rounded-full transition-colors", k === i ? "bg-foreground" : "bg-foreground/25")} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Publication({
-  j,
-  date,
-  saison,
   duree,
   media,
+  ratio = 4 / 5,
+  images,
   titre,
   texte,
   partage,
@@ -61,31 +97,30 @@ function Publication({
   date?: string;
   saison?: string;
   duree: number;
-  media: ReactNode;
+  media?: ReactNode;
+  /** Le format de l'image : 4:5 par défaut, 9:16 en grand, 16:9, carré. */
+  ratio?: number;
+  /** Plusieurs images : un carrousel. */
+  images?: { duree: number; media: ReactNode }[];
   titre: ReactNode;
   texte?: ReactNode;
   partage?: Omit<PieceLigue, "type">;
   action?: ReactNode;
 }) {
   const router = useRouter();
-  const [rejoue, setRejoue] = useState(0);
+  // Pas d'en-tête ni de rangée de boutons (Sabri, 22/10 : « moins Instagram ») :
+  // l'image, puis sa légende ; on rejoue d'un toucher sur l'image.
   return (
-    <article className="flex flex-col">
-      <header className="flex items-center gap-2.5 px-4 pb-2.5">
-        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-white">
-          <Image src="/bola/symbole-noir.svg" alt="" width={20} height={20} />
-        </span>
-        <span className="min-w-0 flex-1 leading-tight">
-          <span className="block text-[14px] font-semibold">Sunday Five League</span>
-          <span className="block text-[12px] text-foreground/45">
-            {[saison, j != null && `J${j}`, date].filter(Boolean).join(" · ")}
-          </span>
-        </span>
-      </header>
+    <article className="actu-publication flex flex-col">
       <div className="sm:overflow-hidden sm:rounded-[22px]">
-        <Ecran key={rejoue} duree={duree}>{media}</Ecran>
+        {images ? <Carrousel images={images} ratio={ratio} /> : <Ecran duree={duree} ratio={ratio}>{media}</Ecran>}
       </div>
-      <div className="flex items-center gap-1 px-2.5 pt-1.5">
+      <div className={cn("flex items-start gap-2 pr-1.5 pl-4", images ? "pt-6" : "pt-2.5")}>
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] leading-snug font-semibold">{titre}</p>
+          {texte && <p className="mt-0.5 line-clamp-2 text-[13.5px] leading-snug text-foreground/55">{texte}</p>}
+        </div>
+        {action}
         {partage && (
           <button
             type="button"
@@ -94,22 +129,29 @@ function Publication({
               preparerPiece({ type: "ligue", ...partage, lignes: partage.lignes.slice(0, 6) });
               router.push("/vestiaire");
             }}
-            className="grid size-10 place-items-center rounded-full transition-transform active:scale-90"
+            className="-mt-1.5 grid size-9 shrink-0 place-items-center rounded-full text-foreground/60 transition-transform active:scale-90"
           >
-            <MessageCircle className="size-[23px]" strokeWidth={1.8} />
+            <MessageCircle className="size-[19px]" strokeWidth={1.8} />
           </button>
         )}
-        <button type="button" aria-label="Revoir" onClick={() => setRejoue((n) => n + 1)} className="grid size-10 place-items-center rounded-full transition-transform active:scale-90">
-          <RotateCcw className="size-[21px]" strokeWidth={1.8} />
-        </button>
-        <span className="flex-1" />
-        {action}
-      </div>
-      <div className="px-4 pt-0.5">
-        <p className="text-[15px] leading-snug font-semibold">{titre}</p>
-        {texte && <p className="mt-0.5 text-[14px] leading-snug text-foreground/60">{texte}</p>}
       </div>
     </article>
+  );
+}
+
+/**
+ * Le chapitre d'un dimanche : une seule fois par journée, au lieu d'un
+ * en-tête sur chaque publication. Le numéro en grand, la date en petit.
+ */
+function Chapitre({ j, date, saison }: { j: number; date: string; saison?: string }) {
+  return (
+    <div className="actu-chapitre flex items-end gap-3 px-5 pt-3">
+      <span className="text-[44px] leading-[0.8] tracking-tight" style={{ fontFamily: ANTON }}>
+        J{j}
+      </span>
+      <span className="mono-label pb-0.5 text-foreground/45">{[saison, date].filter(Boolean).join(" · ")}</span>
+      <span className="mb-1.5 h-px flex-1 bg-foreground/12" />
+    </div>
   );
 }
 
@@ -128,7 +170,8 @@ function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saiso
       return (
         <Publication
           {...commun}
-          duree={a.variante % 2 ? 2.4 : 3.8}
+          duree={a.variante % 3 === 0 ? 4.2 : a.variante % 2 ? 2.4 : 3.8}
+          ratio={FORMAT_SCORE[a.variante % 3]}
           media={<CineScore match={a.match} j={a.j} variante={a.variante} />}
           titre={`${teamA.name} ${teamA.score} – ${teamB.score} ${teamB.name}`}
           texte={[label, buteurs.length ? `Buts : ${buteurs.join(", ")}` : null].filter(Boolean).join(" · ")}
@@ -142,7 +185,8 @@ function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saiso
       return (
         <Publication
           {...commun}
-          duree={3.2}
+          duree={a.variante % 4 === 0 ? 4.2 : 3.2}
+          ratio={FORMAT_MVP[a.variante % 4]}
           media={<CineMvp mvp={m} j={a.j} variante={a.variante} />}
           titre={`${id.nom(m.nom)}, l'homme du dimanche`}
           texte={chiffres}
@@ -165,12 +209,51 @@ function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saiso
         />
       );
     }
+    case "badges": {
+      const titres = a.ds.map((d) => {
+        const def = DEF[d.id];
+        return { d, def, mt: metal(d.palier)! };
+      });
+      return (
+        <Publication
+          {...commun}
+          duree={2.8}
+          images={a.ds.map((d, k) => ({ duree: 2.8, media: <CineBadge d={d} j={a.j} variante={k} /> }))}
+          titre={`${a.ds.length} badges décrochés à la J${a.j}`}
+          texte={titres.map(({ d, def, mt }) => `${id.nom(d.nom)} · ${def.nom} ${NOM_METAL[mt].toLowerCase()}`).join(" · ")}
+          partage={{ titre: "Ils ont décroché", j: a.j, lignes: titres.map(({ d, def, mt }) => ({ n: d.nom, v: `${def.nom} · ${NOM_METAL[mt]}` })) }}
+        />
+      );
+    }
+    case "chiffre":
+      return (
+        <Publication
+          {...commun}
+          duree={3}
+          ratio={1}
+          media={<CineChiffre nom={a.nom} n={a.n} quoi={a.quoi} j={a.j} />}
+          titre={`${a.n} ${a.quoi === "buts" ? pl(a.n, "but", "buts") : pl(a.n, "passe", "passes")} pour ${id.nom(a.nom)} à la J${a.j}`}
+          texte="Personne n'a fait mieux ce dimanche"
+          partage={{ titre: `${a.n} ${a.quoi} en un dimanche`, j: a.j, lignes: [{ n: a.nom, v: `${a.n} ${a.quoi}` }] }}
+        />
+      );
+    case "presents":
+      return (
+        <Publication
+          {...commun}
+          duree={3.2}
+          media={<CinePresents noms={a.noms} j={a.j} />}
+          titre={`Ils étaient ${a.noms.length} à la J${a.j}`}
+          texte={a.noms.map((n) => id.nom(n)).join(", ")}
+        />
+      );
     case "equipe":
       return (
         <Publication
           {...commun}
           duree={2.6}
-          media={<CineEquipe equipe={a.equipe} j={a.j} />}
+          ratio={FORMAT_EQUIPE[a.variante % 2]}
+          media={<CineEquipe equipe={a.equipe} j={a.j} variante={a.variante} />}
           titre={`L'équipe type de la J${a.j}`}
           texte={a.equipe.map((e) => id.nom(e.nom)).join(", ")}
           partage={{ titre: "L'équipe type", j: a.j, lignes: a.equipe.map((e) => ({ n: e.nom, v: `+${e.pp} pts` })) }}
@@ -181,6 +264,7 @@ function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saiso
         <Publication
           {...commun}
           duree={3}
+          ratio={1}
           media={<CineDuo duo={a.duo} j={a.j} />}
           titre={`${id.nom(a.duo.passeur)} → ${id.nom(a.duo.buteur)}, ${a.duo.n} fois`}
           texte="La même passe, le même buteur"
@@ -211,7 +295,7 @@ function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saiso
           texte={top.map((p) => `${p.rank}. ${id.nom(p.name)} ${p.pp} pts`).join(" · ")}
           partage={{ titre: "Le podium du Pépite d'Or", j: a.j, lignes: top.map((p) => ({ n: p.name, v: `${p.rank}e · ${p.pp} pts` })) }}
           action={
-            <button type="button" onClick={onClassements} className="flex items-center gap-0.5 rounded-full px-3 py-2 text-[13.5px] font-semibold">
+            <button type="button" onClick={onClassements} className="-mt-1 flex shrink-0 items-center gap-0.5 rounded-full py-1.5 pl-2 text-[13.5px] font-semibold">
               Classements <ChevronRight className="size-4" />
             </button>
           }
@@ -240,6 +324,7 @@ function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saiso
         <Publication
           {...commun}
           duree={3}
+          ratio={1}
           media={<CineSurface surface={a.surface} j={a.j} />}
           titre="À un pas du prochain badge"
           texte={a.surface.slice(0, 3).map((x) => id.nom(x.nom)).join(", ")}
@@ -252,12 +337,13 @@ function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saiso
         <Publication
           {...commun}
           duree={2.8}
+          ratio={1}
           media={<CineRecap j={a.j} date={a.date} buts={a.buts} matchs={a.matchs} joueurs={joueurs} />}
           titre={`La J${a.j} en entier`}
           texte={`${a.buts} ${pl(a.buts, "but", "buts")} · ${a.matchs} ${pl(a.matchs, "match", "matchs")} · ${joueurs} joueurs`}
           action={
             enCours ? (
-              <Link href={`/ligue/journee?j=${a.j}`} className="flex items-center gap-0.5 rounded-full px-3 py-2 text-[13.5px] font-semibold">
+              <Link href={`/ligue/journee?j=${a.j}`} className="-mt-1 flex shrink-0 items-center gap-0.5 rounded-full py-1.5 pl-2 text-[13.5px] font-semibold">
                 Le récap <ChevronRight className="size-4" />
               </Link>
             ) : null
@@ -290,8 +376,9 @@ function TonDimanche({ j, date }: { j: number; date: string }) {
     <Publication
       j={j}
       date={date}
-      duree={3.2}
-      media={<CineToi p={player} j={j} buts={buts} passes={passes} pp={pp} delta={delta} />}
+      duree={3.6}
+      ratio={9 / 16}
+      media={<CineToi p={player} j={j} buts={buts} passes={passes} pp={pp} delta={delta} reel />}
       titre="Ton dimanche"
       texte={[buts > 0 && `${buts} ${pl(buts, "but", "buts")}`, passes > 0 && `${passes} ${pl(passes, "passe", "passes")}`, `+${pp} pts`, delta > 0 ? `▲ ${delta} au Pépite d'Or` : delta < 0 ? `▼ ${-delta} au Pépite d'Or` : null].filter(Boolean).join(" · ")}
       partage={{ titre: "Mon dimanche", j, lignes: [{ n: me, v: `${buts} buts · ${passes} passes · +${pp} pts` }] }}
@@ -318,11 +405,13 @@ function FilSaison({ enCours, onClassements, nom, apres }: { enCours: boolean; o
   const dernier = fil[0];
   return (
     <>
+      {enCours && dernier && <Chapitre j={dernier.j} date={dernier.date} />}
       {enCours && dernier && <TonDimanche j={dernier.j} date={dernier.date} />}
       {fil.slice(0, n).map((a, i) => (
         <Fragment key={a.id}>
           {/* La prochaine journée, entre les premières publications : on y répond en passant. */}
           {i === 2 && apres}
+          {(i === 0 ? !enCours : a.j !== fil[i - 1].j) && <Chapitre j={a.j} date={a.date} />}
           <PublicationActu a={a} saison={nom} enCours={enCours} onClassements={onClassements} />
         </Fragment>
       ))}
