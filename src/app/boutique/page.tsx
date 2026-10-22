@@ -110,7 +110,7 @@ function GuichetBallons({
             ))}
           </div>
           <Link
-            href="/duel?mode=collection"
+            href="/collection"
             className="glass-soft mt-3.5 block rounded-full py-2.5 text-center text-[13.5px] font-semibold text-foreground/70"
           >
             Voir le catalogue de cartes

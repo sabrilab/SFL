@@ -19,9 +19,9 @@
 //      spéciales débloquées), et sa courbe : la note de sa carte ou son rang
 //      au Pépite d'Or, journée après journée (carriere.ts) ;
 //   6. son parcours, saison après saison (palmares.ts, comme le Wall of Fame) ;
-//   7. son profil de jeu, sa forme et ses dimanches.
-// Sous son nom, « Comparer avec ma carte » ouvre les deux cartes face à face
-// (comparer-cartes.tsx).
+//   7. sa forme et ses dimanches.
+// Sous son nom, son profil de jeu : le radar de ses six notes (profil-radar.tsx).
+// Il a pris la place de « Comparer avec ma carte » le 22/10 (Sabri).
 // Une section sans rien à montrer ne s'affiche pas. Rien n'est stocké : tout
 // vient de la saison déjà en mémoire.
 
@@ -29,17 +29,15 @@ import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { Card3D } from "@/components/sfl/card-3d";
 import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur";
-import { ComparerCartes } from "@/components/sfl/comparer-cartes";
-import { useMyPlayer } from "@/components/sfl/player-provider";
+import { ProfilRadar } from "@/components/sfl/profil-radar";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
-import { Ecusson, FeuilleBadge, Medaille } from "@/components/sfl/vitrine";
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { FeuilleBadge, Medaille, NOM_TROPHEE, Trophee } from "@/components/sfl/vitrine";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useGrandEcran } from "@/hooks/use-media-query";
 import { useIdentites } from "@/hooks/use-identites";
 import { cartesDeCarriere, courbeDeCarriere } from "@/lib/sfl/carriere";
-import { ovr, rankPlayers, STAT_KEYS, type Player } from "@/lib/sfl/engine";
-import { isHidden } from "@/lib/sfl/hidden";
+import { ovr, type Player } from "@/lib/sfl/engine";
 import { ficheJoueur } from "@/lib/sfl/fiche-joueur";
 import { finsDeSaison, ordinal, type ClassementId } from "@/lib/sfl/fin-de-saison";
 import { POSTES } from "@/lib/sfl/inscription";
@@ -50,18 +48,6 @@ import { cn } from "@/lib/utils";
 const ANTON = "var(--font-anton), Anton, sans-serif";
 
 type Choix = { famille: "palier"; id: TropheeId } | { famille: "saison"; id: ClassementId } | null;
-
-function StatBar({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <span className="mono-label w-8 shrink-0 text-foreground/40">{label}</span>
-      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/8">
-        <span className="block h-full rounded-full bg-foreground/80" style={{ width: `${Math.min(100, value)}%` }} />
-      </span>
-      <span className="w-7 shrink-0 text-right text-[13px] font-bold tabular-nums">{value}</span>
-    </div>
-  );
-}
 
 /** Un chiffre de tête, sous le nom. */
 function Chiffre({ valeur, quoi }: { valeur: string | number; quoi: string }) {
@@ -80,14 +66,6 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
   const grand = useGrandEcran();
   const identite = useIdentites();
   const [choix, setChoix] = useState<Choix>(null);
-  const [compare, setCompare] = useState(false);
-  const { me } = useMyPlayer();
-  const moi = me && me !== player.name ? allPlayers.find((p) => p.name === me) : undefined;
-  // Les rangs de la comparaison : le classement public, plus soi-même s'on est masqué.
-  const rangs = useMemo(
-    () => new Map(rankPlayers(allPlayers.filter((p) => p.matchs > 0 && (!isHidden(p.name) || p.name === me))).map((p) => [p.name, p.rank])),
-    [allPlayers, me]
-  );
   const cartes = useMemo(() => cartesDeCarriere(saison, player.name), [saison, player.name]);
   const courbe = useMemo(() => courbeDeCarriere(saison, player.name), [saison, player.name]);
 
@@ -152,15 +130,9 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
           <Chiffre valeur={player.matchs} quoi={player.matchs > 1 ? "Dimanches" : "Dimanche"} />
         </div>
         <p className="w-full text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
-        {moi && (
-          <button
-            type="button"
-            onClick={() => setCompare(true)}
-            className="flex h-12 w-full items-center justify-center rounded-full bg-foreground text-[15px] font-semibold text-background transition-transform active:scale-[0.98] motion-reduce:transition-none"
-          >
-            Comparer avec ma carte
-          </button>
-        )}
+        <div className="w-full">
+          <ProfilRadar stats={player.stats} overall={ovr(player.stats)} />
+        </div>
       </div>
 
       <div className="flex min-w-0 flex-col gap-[var(--fib-21)]">
@@ -186,9 +158,9 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
                     onClick={() => setChoix({ famille: "saison", id: e.def.id })}
                     className="flex items-center gap-[var(--fib-13)] text-left transition-transform active:scale-[0.98] motion-reduce:transition-none"
                   >
-                    <Ecusson id={e.def.id} rang={e.meilleur!.rang} largeur={68} />
+                    <Trophee id={e.def.id} rang={e.meilleur!.rang} taille={84} />
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="text-[17px] font-extrabold">{e.def.nom}</span>
+                      <span className="text-[17px] font-extrabold">{NOM_TROPHEE[e.def.id]}</span>
                       <span className="font-mono text-[11px] text-white/55">
                         {e.podiums.map((p) => `${ordinal(p.rang)} · ${p.saison}`).join("  ·  ")}
                       </span>
@@ -285,14 +257,6 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
           </section>
         )}
 
-        {/* 7. Son jeu */}
-        <section className="glass flex flex-col gap-2.5 rounded-[26px] px-[18px] py-[17px]">
-          <p className="mono-label text-foreground/40">Profil de jeu</p>
-          {STAT_KEYS.map((k) => (
-            <StatBar key={k} label={k} value={player.stats[k]} />
-          ))}
-        </section>
-
         {forme.length > 0 && (
           <div className="glass-soft flex items-center justify-between rounded-[20px] px-4 py-3">
             <span className="mono-label text-foreground/40">Forme · 5 derniers</span>
@@ -347,13 +311,6 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
         </SheetContent>
       </Sheet>
 
-      <Sheet open={compare} onOpenChange={setCompare}>
-        <SheetContent side="bottom" className="mx-auto max-h-[92vh] w-full overflow-y-auto rounded-t-[28px] px-5 pt-6 pb-8 sm:max-w-md">
-          <SheetTitle className="sr-only">Comparer avec ma carte</SheetTitle>
-          <SheetDescription className="sr-only">Ta carte et celle de {identite.nom(player.name)}, face à face.</SheetDescription>
-          {compare && moi && <ComparerCartes moi={moi} lui={player} rangs={rangs} />}
-        </SheetContent>
-      </Sheet>
     </motion.div>
   );
 }

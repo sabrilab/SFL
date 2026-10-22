@@ -24,9 +24,16 @@ export type Objet =
   | "eclair"
   | "terrain"
   | "flamme"
-  | "sablier";
+  | "sablier"
+  | "coupe-pepite"
+  | "coupe-buteur"
+  | "coupe-passeur"
+  | "coupe-defenseur"
+  | "coupe-mvp"
+  | "coupe-engage"
+  | "coupe-but";
 
-export type Role = "corps" | "verre" | "sombre";
+export type Role = "corps" | "verre" | "sombre" | "noir";
 export interface Piece {
   geo: THREE.BufferGeometry;
   role: Role;
@@ -216,6 +223,13 @@ export const POSE: Record<Objet, [number, number, number]> = {
   terrain: [0.8, -0.5, 0],
   flamme: [0.16, -0.55, 0],
   sablier: [0.22, 0.4, 0.12],
+  "coupe-pepite": [0.08, -0.38, 0],
+  "coupe-buteur": [0.08, -0.38, 0],
+  "coupe-passeur": [0.08, -0.38, 0],
+  "coupe-defenseur": [0.08, -0.38, 0],
+  "coupe-mvp": [0.08, -0.38, 0],
+  "coupe-engage": [0.08, -0.38, 0],
+  "coupe-but": [0.08, -0.38, 0],
 };
 
 /** La direction, dans le repère de l'objet, qui fait face à la caméra une fois posé. */
@@ -743,6 +757,274 @@ function sablier(): Piece[] {
   ];
 }
 
+
+/* ------------------------ Les trophées de fin de saison ------------------------ */
+
+// Les trophées d'une fin de saison ne sont pas des badges (Sabri, 22/10 : « il
+// ne faut pas que ce soit des icônes comme les trophées de palier, il faut
+// que ce soit de vrais trophées designés »). Ils suivent la planche « Tous les
+// trophées & médailles » qu'il a envoyée le même soir : un socle noir en
+// tronc de pyramide, une plaque de métal devant, et dessus une lame haute et
+// asymétrique, gravée du rond central d'un terrain, qui porte une pierre
+// taillée à facettes :
+//   · Pépite d'Or → la lame de métal, une aile noire derrière, la pierre au sommet ;
+//   · Buteur      → une aile de métal qui s'élance en courbe, une lame noire ;
+//   · Passeur     → deux rubans de métal enroulés autour d'une tige ;
+//   · MVP         → une lame noire entre deux ailes de métal en V ;
+//   · Défensive   → un écu allongé, noir cerclé de métal, la pierre sombre ;
+//   · Joueur engagé → une simple stèle noire, un filet de métal sur le côté.
+// Le métal (or, argent, bronze) passe par la matière, comme pour les badges ;
+// le noir reste noir. Hauteur de y = -1 (sous le socle) à environ 1.
+
+/** Une lame plate et gonflée sur ses bords, dans le plan xy, centrée en z (sans recentrer x et y). */
+function lame(shape: THREE.Shape, epaisseur: number, gonfle: number): THREE.BufferGeometry {
+  const g = new THREE.ExtrudeGeometry(shape, {
+    depth: epaisseur,
+    bevelEnabled: true,
+    bevelThickness: gonfle,
+    bevelSize: gonfle * 0.85,
+    bevelSegments: 8,
+    curveSegments: 32,
+  });
+  g.translate(0, 0, -epaisseur / 2);
+  const m = lisser(g);
+  const pos = m.getAttribute("position");
+  const nor = m.getAttribute("normal");
+  const z = epaisseur / 2 + gonfle;
+  for (let i = 0; i < pos.count; i++) {
+    const pz = pos.getZ(i);
+    if (Math.abs(Math.abs(pz) - z) < 1e-4) nor.setXYZ(i, 0, 0, Math.sign(pz));
+  }
+  nor.needsUpdate = true;
+  return m;
+}
+
+/** Un contour fait de courbes : moveTo puis une suite de [x, y] ou de beziers [c1x, c1y, c2x, c2y, x, y]. */
+function contour(depart: [number, number], pas: number[][]): THREE.Shape {
+  const s = new THREE.Shape();
+  s.moveTo(...depart);
+  for (const p of pas) {
+    if (p.length === 2) s.lineTo(p[0], p[1]);
+    else s.bezierCurveTo(p[0], p[1], p[2], p[3], p[4], p[5]);
+  }
+  s.closePath();
+  return s;
+}
+
+/** Remet des pièces à l'échelle et les pose : le bas de leur boîte à y = bas, centrées en x et z. */
+function monter(pieces: Piece[], echelle: number, bas: number): Piece[] {
+  const box = new THREE.Box3();
+  for (const p of pieces) {
+    p.geo.computeBoundingBox();
+    box.union(p.geo.boundingBox!);
+  }
+  const c = box.getCenter(new THREE.Vector3());
+  for (const p of pieces) {
+    p.geo.translate(-c.x, -box.min.y, -c.z);
+    p.geo.scale(echelle, echelle, echelle);
+    p.geo.translate(0, bas, 0);
+  }
+  return pieces;
+}
+
+/** La pierre taillée : une boule à facettes, comme sur la planche. */
+function pierre(cx: number, cy: number, r: number): THREE.BufferGeometry {
+  const g = new THREE.IcosahedronGeometry(r, 1).toNonIndexed();
+  g.rotateY(0.3);
+  g.rotateX(0.2);
+  g.translate(cx, cy, 0);
+  g.deleteAttribute("uv");
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Le rond central et la ligne médiane, gravés en fils sur la face d'une lame (z = devant). */
+function gravure(cx: number, cy: number, z: number, rayon: number, haut: number, bas: number): THREE.BufferGeometry {
+  const e = rayon * 0.07;
+  const rond = new THREE.TorusGeometry(rayon, e, 8, 48);
+  rond.translate(cx, cy, z);
+  const ligne = (y0: number, y1: number) => {
+    const c = new THREE.CapsuleGeometry(e, Math.max(0.001, y1 - y0), 3, 8);
+    c.translate(cx, (y0 + y1) / 2, z);
+    return c;
+  };
+  const point = new THREE.SphereGeometry(e * 1.6, 10, 8);
+  point.translate(cx, cy, z);
+  return mergeGeometries([rond, ligne(cy + rayon, haut), ligne(bas, cy - rayon), point].map(sansUv));
+}
+
+/**
+ * Le socle : un tronc de pyramide noir à quatre pans, une marche fine dessus,
+ * et la plaque de métal sur le pan de face (le symbole BOLA y est gravé).
+ * Le dessus du socle est à y = HAUT.
+ */
+const HAUT = -0.48;
+function socle(objet: Objet, large = 0.84): Piece[] {
+  // Le pan de face regarde l'objectif : le tour est tourné pour qu'un pan, et
+  // non une arête, lui fasse face.
+  const d = face(objet);
+  d.y = 0;
+  d.normalize();
+  const angle = Math.atan2(d.x, d.z) - Math.PI / 4;
+  const R = 0.62 * large; // rayon au coin, en bas
+  const r = 0.5 * large; // en haut
+  const pied = -1;
+  const pyramide = new THREE.LatheGeometry(
+    [[0, pied], [R, pied], [r, HAUT - 0.05], [r * 0.92, HAUT - 0.05], [r * 0.92, HAUT], [0, HAUT]].map(([x, y]) => new THREE.Vector2(x, y)),
+    4
+  ).toNonIndexed();
+  pyramide.rotateY(angle);
+  pyramide.deleteAttribute("uv");
+  pyramide.computeVertexNormals();
+  // La plaque, sur le pan de face, penchée comme lui.
+  const c = Math.cos(Math.PI / 4);
+  const yp = pied + (HAUT - 0.05 - pied) * 0.48;
+  const t = (yp - pied) / (HAUT - 0.05 - pied);
+  const ap = (R + (r - R) * t) * c; // l'apothème : la distance du pan au centre
+  const demi = ap * 0.62;
+  const plaque = coussin(arrondi([[-demi, -0.11], [demi, -0.11], [demi, 0.11], [-demi, 0.11]], 0.02), 0.006, 0.012);
+  const normale = d.clone().setY(((R - r) * c) / (HAUT - 0.05 - pied)).normalize();
+  poser(plaque, d.clone().multiplyScalar(ap + 0.008).setY(yp), normale);
+  const marque = poser(symbole(0.045, 0.014), d.clone().multiplyScalar(ap + 0.024).setY(yp + 0.03), normale);
+  return [
+    { geo: pyramide, role: "noir" },
+    { geo: sansUv(plaque), role: "corps" },
+    { geo: sansUv(marque), role: "noir" },
+  ];
+}
+
+const EP = 0.05; // l'épaisseur des lames
+const GO = 0.025; // leur bord gonflé
+const DEVANT = EP / 2 + GO;
+
+function coupePepite(): Piece[] {
+  const corps = lame(
+    contour([-0.2, HAUT], [[0.13, HAUT], [0.1, -0.1, 0.09, 0.25, 0.2, 0.5], [0.06, 0.38, -0.07, 0.38, -0.2, 0.47], [-0.1, 0.2, -0.24, -0.15, -0.2, HAUT]]),
+    EP,
+    GO
+  );
+  const aile = lame(contour([0.03, HAUT], [[0.27, HAUT], [0.3, 0.1, 0.27, 0.6, 0.34, 1.0], [0.25, 0.86], [0.2, 0.4, 0.12, -0.1, 0.03, HAUT]]), EP * 0.8, GO);
+  aile.translate(0, 0, -0.06);
+  return [
+    ...socle("coupe-pepite"),
+    { geo: mergeGeometries([corps, pierre(0, 0.62, 0.17)].map(sansUv)), role: "corps" },
+    { geo: mergeGeometries([aile, gravure(-0.03, -0.02, DEVANT, 0.055, 0.32, HAUT + 0.06)].map(sansUv)), role: "noir" },
+  ];
+}
+
+function coupeButeur(): Piece[] {
+  const noire = lame(contour([-0.24, HAUT], [[0.02, HAUT], [-0.02, 0.43], [-0.2, 0.43], [-0.22, 0.0]]), EP, GO);
+  const aile = lame(
+    contour([-0.1, HAUT], [[0.16, HAUT], [0.3, -0.05, 0.26, 0.55, 0.44, 0.98], [0.3, 0.86], [0.18, 0.5, 0.1, 0.05, -0.1, HAUT]]),
+    EP * 0.8,
+    GO
+  );
+  aile.translate(0, 0, 0.05);
+  return [
+    ...socle("coupe-buteur"),
+    { geo: mergeGeometries([aile, pierre(-0.11, 0.6, 0.17)].map(sansUv)), role: "corps" },
+    { geo: noire, role: "noir" },
+    { geo: gravure(-0.11, -0.05, DEVANT, 0.05, 0.4, HAUT + 0.06), role: "corps" },
+  ];
+}
+
+function coupePasseur(): Piece[] {
+  // Deux rubans enroulés l'un dans l'autre, de la base jusque sous la pierre.
+  const ruban = (phase: number) => {
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= 80; i++) {
+      const t = i / 80;
+      const y = HAUT + 0.02 + t * (0.92 - HAUT);
+      const r = 0.2 * Math.sin(Math.PI * Math.min(1, t * 1.08)) + 0.03;
+      const a = phase + t * Math.PI * 2.2;
+      pts.push(new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r));
+    }
+    const g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 160, 0.03, 10);
+    g.scale(1, 1, 0.75);
+    return g;
+  };
+  const tige = tour([[0, HAUT], [0.06, HAUT], [0.03, HAUT + 0.1], [0.025, 0.5], [0.05, 0.56], [0, 0.56]], 0.01, 48);
+  return [
+    ...socle("coupe-passeur"),
+    { geo: mergeGeometries([ruban(0), ruban(Math.PI), pierre(0, 0.66, 0.16)].map(sansUv)), role: "corps" },
+    { geo: tige, role: "noir" },
+  ];
+}
+
+function coupeMvp(): Piece[] {
+  const noire = lame(contour([-0.2, HAUT], [[0.2, HAUT], [0.14, 0.44], [0, 0.4], [-0.14, 0.44]]), EP, GO);
+  const droite = lame(contour([0.06, HAUT], [[0.24, HAUT], [0.3, 0.3, 0.3, 0.7, 0.4, 0.98], [0.3, 0.9], [0.22, 0.5, 0.18, 0.1, 0.06, HAUT]]), EP * 0.7, GO);
+  const gauche = lame(contour([-0.18, -0.1], [[-0.1, -0.1], [-0.14, 0.4, -0.2, 0.62, -0.3, 0.9], [-0.33, 0.86], [-0.24, 0.5, -0.2, 0.2, -0.18, -0.1]]), EP * 0.7, GO);
+  droite.translate(0, 0, 0.05);
+  gauche.translate(0, 0, 0.05);
+  const berceau = new THREE.TorusGeometry(0.15, 0.022, 10, 48, Math.PI);
+  berceau.rotateZ(Math.PI);
+  berceau.translate(0, 0.6, 0);
+  return [
+    ...socle("coupe-mvp"),
+    { geo: mergeGeometries([droite, gauche, berceau, pierre(0, 0.6, 0.15)].map(sansUv)), role: "corps" },
+    { geo: noire, role: "noir" },
+    { geo: gravure(0, 0.0, DEVANT, 0.055, 0.38, HAUT + 0.06), role: "corps" },
+  ];
+}
+
+function coupeDefenseur(): Piece[] {
+  const ecu = (k: number) =>
+    contour([-0.23 * k, 0.5], [
+      [-0.06 * k, 0.56], [0, 0.6], [0.06 * k, 0.56], [0.23 * k, 0.5],
+      [0.24 * k, 0.1, 0.16 * k, -0.2, 0.09 * k, HAUT],
+      [-0.09 * k, HAUT],
+      [-0.16 * k, -0.2, -0.24 * k, 0.1, -0.23 * k, 0.5],
+    ]);
+  const noir = lame(ecu(1), EP, GO);
+  const cadre = lame(ecu(1.14), EP * 0.6, GO);
+  cadre.translate(0, 0, -0.04);
+  return [
+    ...socle("coupe-defenseur"),
+    { geo: cadre, role: "corps" },
+    { geo: mergeGeometries([noir, pierre(0, 0.76, 0.15)].map(sansUv)), role: "noir" },
+    { geo: gravure(0, 0.05, DEVANT, 0.055, 0.5, HAUT + 0.06), role: "corps" },
+  ];
+}
+
+function coupeEngage(): Piece[] {
+  const stele = lame(contour([-0.26, HAUT], [[0.2, HAUT], [0.2, 0.92], [-0.26, 0.74]]), EP * 1.4, GO);
+  const filet = lame(contour([0.14, HAUT], [[0.26, HAUT], [0.32, 1.0], [0.2, 0.86]]), EP, GO);
+  filet.translate(0, 0, 0.04);
+  return [
+    ...socle("coupe-engage"),
+    { geo: filet, role: "corps" },
+    { geo: stele, role: "noir" },
+    { geo: gravure(-0.03, 0.12, DEVANT + 0.01, 0.06, 0.6, HAUT + 0.06), role: "corps" },
+  ];
+}
+/** But d'exception : une lame noire, un filet de cage gravé dessus, une aile de métal et le ballon au sommet. */
+function coupeBut(): Piece[] {
+  const noire = lame(contour([-0.2, HAUT], [[0.24, HAUT], [0.26, 0.92], [0.12, 0.98], [-0.04, 0.5], [-0.2, 0.36]]), EP, GO);
+  const aile = lame(contour([-0.26, HAUT], [[-0.16, HAUT], [-0.1, 0.05, 0.05, 0.4, 0.26, 0.62], [0.24, 0.68], [0.0, 0.5, -0.2, 0.2, -0.26, HAUT]]), EP * 0.7, GO);
+  aile.translate(0, 0, 0.05);
+  // Le filet : des fils croisés sur la face, sous l'aile.
+  const fils: THREE.BufferGeometry[] = [];
+  const fil = (ax: number, ay: number, bx: number, by: number) => {
+    const a = new THREE.Vector3(ax, ay, DEVANT);
+    const b = new THREE.Vector3(bx, by, DEVANT);
+    const g = new THREE.CapsuleGeometry(0.006, a.distanceTo(b), 2, 6);
+    g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize()));
+    g.translate((ax + bx) / 2, (ay + by) / 2, DEVANT);
+    fils.push(g);
+  };
+  for (let i = 0; i < 6; i++) fil(-0.12 + i * 0.06, HAUT + 0.08, -0.12 + i * 0.06 + 0.06, 0.3);
+  for (let i = 0; i < 6; i++) fil(-0.14, HAUT + 0.12 + i * 0.12, 0.2, HAUT + 0.2 + i * 0.12);
+  const ballon = monter(FABRIQUES.ballon(), 0.13, 0.62);
+  for (const p of ballon) p.geo.translate(0.14, 0, 0.02);
+  return [
+    ...socle("coupe-but"),
+    { geo: noire, role: "noir" },
+    { geo: mergeGeometries([aile, ...fils].map(sansUv)), role: "corps" },
+    ...ballon,
+  ];
+}
+
 const FABRIQUES: Record<Objet, () => Piece[]> = {
   ballon,
   crampon,
@@ -755,6 +1037,13 @@ const FABRIQUES: Record<Objet, () => Piece[]> = {
   terrain,
   flamme,
   sablier,
+  "coupe-pepite": coupePepite,
+  "coupe-buteur": coupeButeur,
+  "coupe-passeur": coupePasseur,
+  "coupe-defenseur": coupeDefenseur,
+  "coupe-mvp": coupeMvp,
+  "coupe-engage": coupeEngage,
+  "coupe-but": coupeBut,
 };
 
 const cache = new Map<Objet, Piece[]>();

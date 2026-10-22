@@ -132,6 +132,18 @@ function verre(couleur: string, opacite: number, rugosite = 0.05) {
   });
 }
 
+/** Le noir des trophées (socles, lames) : un laqué profond, qui ne prend qu'un filet de lumière. */
+function noir() {
+  return new THREE.MeshPhysicalMaterial({
+    color: "#0b0b0d",
+    metalness: 0.2,
+    roughness: 0.32,
+    clearcoat: 1,
+    clearcoatRoughness: 0.12,
+    envMapIntensity: 0.35,
+  });
+}
+
 // Une carte d'environnement appartient à son moteur : les matières sont donc
 // rangées par environnement.
 const matieres = new WeakMap<THREE.Texture, Map<Matiere, Record<Role, THREE.MeshPhysicalMaterial>>>();
@@ -145,7 +157,7 @@ function matieresDe(m: Matiere, env: THREE.Texture): Record<Role, THREE.MeshPhys
   let r = parEnv.get(m);
   if (!r) {
     if (m === "fantome") {
-      r = { corps: verre("#dfe3ea", 0.42, 0.32), verre: verre("#dfe3ea", 0.22, 0.32), sombre: verre("#9aa0a8", 0.4, 0.32) };
+      r = { corps: verre("#dfe3ea", 0.42, 0.32), verre: verre("#dfe3ea", 0.22, 0.32), sombre: verre("#9aa0a8", 0.4, 0.32), noir: verre("#8a9098", 0.36, 0.32) };
     } else {
       const corps = chrome(CORPS[m], m === "argent" ? 0.6 : 0.3);
       r = {
@@ -153,6 +165,7 @@ function matieresDe(m: Matiere, env: THREE.Texture): Record<Role, THREE.MeshPhys
         verre: verre(m === "legende" ? "#ffb4a8" : "#ffffff", 0.34),
         // Au rouge et or, les pièces sombres passent à l'or.
         sombre: m === "legende" ? chrome(CORPS.or, 0.3) : chrome("#1b1d24", 1, 0.2),
+        noir: noir(),
       };
     }
     for (const mat of Object.values(r)) mat.envMap = env;
