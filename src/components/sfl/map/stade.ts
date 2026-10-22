@@ -33,6 +33,17 @@ export const FOND_MOMENT: Record<Moment, [string, string, string]> = {
   semaine: ["#3A3E44", "#24272B", "#14171B"],
 };
 
+/** La ligue d'un match, qui donne sa couleur au stade (Sabri, 22/10 : « même
+ *  Team, ça doit donner lieu à des couleurs de stades différentes ») :
+ *  la SFL au vert du dimanche, Bola au gris de la marque, Team au bleu nuit. */
+export type LigueMatch = "sfl" | "bola" | "team";
+
+export const COULEUR_LIGUE: Record<LigueMatch, { fond: [string, string, string]; herbe: [string, string] }> = {
+  sfl: { fond: ["#3A5A3A", "#243A24", "#111C11"], herbe: ["#5E8C52", "#527D47"] },
+  bola: { fond: ["#45474B", "#2A2C2F", "#151619"], herbe: ["#6E7073", "#626467"] },
+  team: { fond: ["#2E3F66", "#1A2647", "#0A1226"], herbe: ["#4F7A86", "#456D79"] },
+};
+
 const ENCRE = "#0A0B0D";
 const BLANC = "#F4F5F2";
 
@@ -40,28 +51,32 @@ const f = (n: number) => Number(n.toFixed(2));
 
 export function stadeSvg(
   moment: Moment,
-  opts: { fantome?: boolean; fond?: boolean; variante?: VarianteStade } = {},
+  opts: { fantome?: boolean; fond?: boolean; variante?: VarianteStade; ligue?: LigueMatch } = {},
 ): string {
   const fantome = !!opts.fantome;
   const fond = opts.fond !== false;
   const v = opts.variante ?? VARIANTE_STADE;
   const fini = v !== "origine";
-  const id = `bola-${moment}-${v}`;
+  const ligue = opts.ligue ? COULEUR_LIGUE[opts.ligue] : null;
+  const id = `bola-${moment}-${v}${opts.ligue ? `-${opts.ligue}` : ""}`;
   const out: string[] = [];
   const push = (s: string) => out.push(s);
 
-  // Les couleurs de la variante.
+  // Les couleurs de la variante ; la ligue, quand elle est dite, peint le
+  // fond (sauf le marbre, sur la photo satellite) et la pelouse.
   const [c0, c1, c2] =
-    v === "marbre"
-      ? ["#FBFBF9", "#EEEEEA", "#DCDDD8"]
-      : v === "mono"
-        ? ["#45474B", "#2A2C2F", "#151619"]
-        : v === "nuit"
-          ? ["#1A1F27", "#0D1015", "#05070A"]
-          : FOND_MOMENT[moment];
+    ligue && v !== "marbre"
+      ? ligue.fond
+      : v === "marbre"
+        ? ["#FBFBF9", "#EEEEEA", "#DCDDD8"]
+        : v === "mono"
+          ? ["#45474B", "#2A2C2F", "#151619"]
+          : v === "nuit"
+            ? ["#1A1F27", "#0D1015", "#05070A"]
+            : FOND_MOMENT[moment];
   const socle = v === "marbre" ? ["#E4E5E0", "#C9CAC4"] : ["#2B2F35", "#16191D"];
   const tranche = v === "marbre" ? "#AFB0AA" : "#050607";
-  const herbe = v === "mono" ? ["#6E7073", "#626467"] : v === "nuit" ? ["#5E8C52", "#527D47"] : ["#4F6F48", "#45633F"];
+  const herbe = ligue ? ligue.herbe : v === "mono" ? ["#6E7073", "#626467"] : v === "nuit" ? ["#5E8C52", "#527D47"] : ["#4F6F48", "#45633F"];
   const hPilier = v === "proche" ? 12 : 11;
 
   push(`<svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">`);
@@ -187,6 +202,8 @@ export type EtatSticker =
   | { genre: "inscrits"; n: number }
   | { genre: "dedans" }
   | { genre: "complet" }
+  /** Un match d'équipe (Team) : les deux sigles, « SF – LC ». */
+  | { genre: "equipe"; texte: string }
   | { genre: "joue" };
 
 export interface StickerPlan {
@@ -198,6 +215,7 @@ export interface StickerPlan {
   heure: string;
   etat: EtatSticker;
   nom: string;
+  ligue?: LigueMatch;
 }
 
 /** Le HTML d'un sticker de match pour Leaflet (le CSS est dans globals.css). */
@@ -217,10 +235,12 @@ export function stickerHtml(s: StickerPlan, choisi: boolean, variante?: Variante
         ? `<span class="stk__etiquette stk__etiquette--inscrits">${s.etat.n ? `${s.etat.n} participant${s.etat.n > 1 ? "s" : ""}` : "ouvert"}</span>`
         : s.etat.genre === "dedans"
           ? `<span class="stk__etiquette stk__etiquette--dedans">tu y es</span>`
-          : `<span class="stk__etiquette stk__etiquette--complet">${s.etat.genre === "joue" ? "joué" : "complet"}</span>`;
-  return `<div class="stk${choisi ? " stk--choisi" : ""}${s.etat.genre === "complet" || s.etat.genre === "joue" ? " stk--complet" : ""}" style="--penche:${penche(s.id)}deg">
+          : s.etat.genre === "equipe"
+            ? `<span class="stk__etiquette stk__etiquette--inscrits">${echapper(s.etat.texte)}</span>`
+            : `<span class="stk__etiquette stk__etiquette--complet">${s.etat.genre === "joue" ? "joué" : "complet"}</span>`;
+  return `<div class="stk${s.ligue ? ` stk--${s.ligue}` : ""}${choisi ? " stk--choisi" : ""}${s.etat.genre === "complet" || s.etat.genre === "joue" ? " stk--complet" : ""}" style="--penche:${penche(s.id)}deg">
   <div class="stk__vignette">
-    <div class="stk__stade">${stadeSvg(s.moment, { variante })}</div>
+    <div class="stk__stade">${stadeSvg(s.moment, { variante, ligue: s.ligue })}</div>
     <span class="stk__cal"><span class="stk__cal-jour">${echapper(s.jourCourt)}</span><span class="stk__cal-heure">${echapper(heureCourte(s.heure))}</span></span>
     ${choisi ? etiquette : badge}
   </div>

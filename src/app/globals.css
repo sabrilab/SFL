@@ -436,6 +436,13 @@
   overflow: hidden;
   background: #14171b;
 }
+/* La ligue du match : le bandeau du jour prend sa couleur (stade.ts, COULEUR_LIGUE). */
+.stk--sfl .stk__cal-jour {
+  background: #243a24;
+}
+.stk--team .stk__cal-jour {
+  background: #1a2647;
+}
 .stk--complet .stk__stade {
   filter: saturate(0);
   opacity: 0.8;

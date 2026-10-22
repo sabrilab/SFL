@@ -68,7 +68,10 @@ import { useVillesRevision } from "@/hooks/use-villes";
 import { usePhotoRevision } from "@/hooks/use-player-photo";
 import { useIdentitesRevision } from "@/hooks/use-identites";
 import { cn } from "@/lib/utils";
-import { FOND_MOMENT, heureCourte, itineraires, photoSatellite, stadeSvg, type EtatSticker, type Moment, type StickerPlan } from "@/components/sfl/map/stade";
+import { COULEUR_LIGUE, heureCourte, itineraires, photoSatellite, stadeSvg, type EtatSticker, type LigueMatch, type Moment, type StickerPlan } from "@/components/sfl/map/stade";
+import { SigleLigue } from "@/components/sfl/choix-ligue";
+import { Ecusson } from "@/components/sfl/equipe/ecusson";
+import { useMatchsTeam, type MatchTeam } from "@/hooks/use-matchs-team";
 import type { FondCarte, PointPlan, ToiPlan } from "@/components/sfl/map/carte-map";
 import "./animations.css";
 
@@ -216,6 +219,11 @@ interface MatchMap {
   convoquee?: boolean;
   /** Un match ouvert par un joueur (pas une journée de ligue). */
   partie?: Partie;
+  /** Un match d'équipe : un défi accepté du mode Team. */
+  team?: MatchTeam;
+  /** Sa ligue, qui donne sa couleur au stade : la journée est SFL, le match
+   *  ouvert par un joueur est Bola, le défi entre deux équipes est Team. */
+  ligue: LigueMatch;
 }
 
 /** « 13h00 », « 13:30 » → 13 ; 13 à défaut. */
@@ -313,6 +321,7 @@ export default function MapPage() {
         etatTexte: texte,
         joue,
         convoquee,
+        ligue: "sfl",
       };
     };
 
@@ -341,6 +350,7 @@ export default function MapPage() {
         dedans,
         etat,
         etatTexte: texte,
+        ligue: "sfl",
       },
       ...recente,
     ];
@@ -349,6 +359,7 @@ export default function MapPage() {
   // Les matchs ouverts par les joueurs : un public montre ses places libres,
   // un privé n'apparaît qu'à ceux qui en sont.
   const { parties, moi, actif: partiesActives, recharger } = useParties();
+  const matchsTeam = useMatchsTeam();
   const matchs = useMemo<MatchMap[]>(() => {
     const ouverts = parties.map((x): MatchMap => {
       const venus = inscrits(x).map((j) => j.name);
@@ -379,10 +390,34 @@ export default function MapPage() {
         etat,
         etatTexte: texte,
         partie: x,
+        ligue: "bola",
       };
     });
-    return [...ligue, ...ouverts];
-  }, [ligue, parties, moi, aujourdhui]);
+    // Les matchs d'équipe : sur le terrain dont ils portent le nom, s'il est
+    // connu de la Map ; sinon dans le carrousel seulement.
+    const nomTerrain = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const equipes = matchsTeam.map((t): MatchMap => {
+      const dateLabel = libelleJour(t.defi.jour);
+      const dedans = [t.de, t.a].some((e) => e.membres.some((x) => x.id === moi && x.statut === "membre"));
+      const terrain = terrains.find((x) => nomTerrain(x.nom) === nomTerrain(t.defi.lieu)) ?? null;
+      return {
+        cle: `t${t.defi.id}`,
+        j: null,
+        quand: quand(dateLabel, null, aujourdhui),
+        dateLabel,
+        heure: t.defi.heure.slice(0, 5).replace(":", "h"),
+        terrain,
+        presents: [],
+        effectif: 0,
+        dedans,
+        etat: dedans ? { genre: "dedans" } : { genre: "equipe", texte: `${t.de.initiales} – ${t.a.initiales}` },
+        etatTexte: dedans ? "Tu y es" : `${t.de.initiales} – ${t.a.initiales}`,
+        team: t,
+        ligue: "team",
+      };
+    });
+    return [...ligue, ...ouverts, ...equipes];
+  }, [ligue, parties, moi, aujourdhui, matchsTeam, terrains]);
 
   // Sur la carte, dans l'ordre du temps : le dernier match joué à gauche, en
   // petit, puis ce qui arrive, du plus proche au plus loin. Le match « à la
@@ -492,6 +527,7 @@ export default function MapPage() {
           heure: m.heure,
           etat: m.etat,
           nom: m.terrain!.nom,
+          ligue: m.ligue,
         })),
     [affiches, choisi]
   );
@@ -812,16 +848,23 @@ export default function MapPage() {
       <Sheet open={fiche} onOpenChange={setFiche}>
         <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
           <SheetHeader className="px-5 pt-5 pb-0">
-            <p className="mono-label text-muted-foreground">
-              {choisi?.partie ? `Ouvert par ${choisi.partie.organisateur}` : `${choisi?.j != null ? `J${choisi.j} · ` : ""}Sunday Five League`}
+            <p className="mono-label flex items-center gap-2 text-muted-foreground">
+              {choisi && !ficheAdmin && <SigleLigue ligue={choisi.ligue} hauteur={11} className="text-foreground" />}
+              <span className="min-w-0 truncate">
+                {choisi?.partie
+                  ? `Ouvert par ${choisi.partie.organisateur}`
+                  : choisi?.team
+                    ? "Match d'équipe"
+                    : `${choisi?.j != null ? `J${choisi.j} · ` : ""}Sunday Five League`}
+              </span>
             </p>
             <SheetTitle className="text-[26px] font-bold tracking-tight">
-              {ficheAdmin ? "Les matchs" : (choisi?.terrain?.nom ?? choisi?.partie?.lieu ?? (choisi?.j != null ? `Journée ${choisi.j}` : "Le match"))}
+              {ficheAdmin ? "Les matchs" : (choisi?.terrain?.nom ?? choisi?.partie?.lieu ?? choisi?.team?.defi.lieu ?? (choisi?.j != null ? `Journée ${choisi.j}` : "Le match"))}
             </SheetTitle>
             {!ficheAdmin && choisi && (
               <p className="text-[14px] text-muted-foreground">
                 {choisi.joue ? `Le match du ${dateLongue(choisi.dateLabel, aujourdhui)} · joué` : choisi.quand.titre} · {choisi.heure}
-                {choisi.terrain ? ` · ${choisi.terrain.adresse}` : " · lieu à venir"}
+                {choisi.terrain ? ` · ${choisi.terrain.adresse}` : choisi.team ? "" : " · lieu à venir"}
               </p>
             )}
           </SheetHeader>
@@ -837,6 +880,8 @@ export default function MapPage() {
                 {/* Une journée : ses joueurs. La convocation : on y répond, comme avant. */}
                 {choisi?.partie ? (
                   <FichePartie partie={choisi.partie} moi={moi} terrains={terrains} onChange={recharger} />
+                ) : choisi?.team ? (
+                  <FicheTeam t={choisi.team} />
                 ) : choisi?.j != null && !choisi.convoquee ? (
                   // Les équipes faites, la feuille de match dit déjà qui vient.
                   feuille.length === 0 && <Presents m={choisi} />
@@ -863,7 +908,7 @@ export default function MapPage() {
                     Voir le récap de la journée
                   </Link>
                 )}
-                {admin && !choisi?.partie && (
+                {admin && !choisi?.partie && !choisi?.team && (
                   <button
                     type="button"
                     onClick={() => setFicheAdmin(true)}
@@ -924,6 +969,15 @@ export default function MapPage() {
           jourInitial={ouvrir.jour}
           heureInitial={ouvrir.heure}
           moi={moi}
+          onSfl={
+            admin
+              ? () => {
+                  setOuvrir(null);
+                  setFicheAdmin(true);
+                  setFiche(true);
+                }
+              : undefined
+          }
           onOuvert={(id) => {
             recharger();
             setChoix(`m${id}`);
@@ -972,7 +1026,7 @@ function CarteMatch({
   loin: string | null;
   onToucher: () => void;
 }) {
-  const [c0, c1, c2] = FOND_MOMENT[m.quand.moment];
+  const [c0, c1, c2] = COULEUR_LIGUE[m.ligue].fond;
   const complet = m.etat.genre === "complet";
   const inscrits = m.etat.genre === "inscrits";
   const joue = !!m.joue;
@@ -1010,7 +1064,7 @@ function CarteMatch({
           ) : (
             <div
               className={cn("absolute top-1/2 left-1/2 size-[118px] -translate-x-1/2 -translate-y-[calc(50%+14px)]", (complet || joue) && "saturate-0")}
-              dangerouslySetInnerHTML={{ __html: stadeSvg(m.quand.moment, { fond: false }) }}
+              dangerouslySetInnerHTML={{ __html: stadeSvg(m.quand.moment, { fond: false, ligue: m.ligue }) }}
             />
           )}
           <div
@@ -1031,11 +1085,17 @@ function CarteMatch({
             >
               {titre}
             </p>
-            <p className={cn("mt-1 truncate font-mono font-bold text-white/70 uppercase", joue ? "text-[8.5px] tracking-[0.8px]" : "text-[9.5px] tracking-[1px]")}>
-              {heureCourte(m.heure)} ·{" "}
-              {m.partie
-                ? `${m.partie.genre === "exhibition" ? "Exhibition" : m.partie.visibilite === "prive" ? "Privé" : "Public"} · ${m.partie.organisateur}`
-                : `${m.j != null ? `J${m.j} · ` : ""}Sunday Five`}
+            <p className={cn("mt-1 flex items-center gap-1.5 font-mono font-bold text-white/70 uppercase", joue ? "text-[8.5px] tracking-[0.8px]" : "text-[9.5px] tracking-[1px]")}>
+              {/* La ligue du match, par son sigle (SFL, Bola, Team). */}
+              <SigleLigue ligue={m.ligue} hauteur={joue ? 8 : 9.5} className="text-white/90" />
+              <span className="min-w-0 truncate">
+                {heureCourte(m.heure)} ·{" "}
+                {m.partie
+                  ? `${m.partie.genre === "exhibition" ? "Exhibition" : m.partie.visibilite === "prive" ? "Privé" : "Public"} · ${m.partie.organisateur}`
+                  : m.team
+                    ? `${m.team.de.nom} – ${m.team.a.nom}`
+                    : `${m.j != null ? `J${m.j} · ` : ""}Sunday Five`}
+              </span>
             </p>
             {inscrits && (
               <p className="mt-1.5 flex items-baseline gap-1.5 text-white">
@@ -1163,6 +1223,30 @@ function Jeton({ texte, ton, petit }: { texte: string; ton: EtatSticker["genre"]
     <span className={cn("truncate rounded-full font-medium", petit ? "px-2 py-[3px] text-[10px]" : "px-2.5 py-[4.5px] text-[11px]")} style={style}>
       {texte}
     </span>
+  );
+}
+
+/** La fiche d'un match d'équipe : les deux écussons face à face, leurs
+ *  effectifs, et le chemin vers la page Team, où il se gère. */
+function FicheTeam({ t }: { t: MatchTeam }) {
+  const cote = (e: MatchTeam["de"]) => (
+    <div className="flex min-w-0 flex-1 flex-col items-center gap-2 text-center">
+      <Ecusson initiales={e.initiales} fond={e.fond} taille={72} />
+      <p className="w-full truncate text-[15px] font-bold tracking-tight">{e.nom}</p>
+      <p className="mono-label text-muted-foreground">{e.membres.filter((x) => x.statut === "membre").length} joueurs</p>
+    </div>
+  );
+  return (
+    <>
+      <div className="flex items-start gap-3 rounded-[22px] bg-white/[0.04] px-3 py-5">
+        {cote(t.de)}
+        <span className="mt-6 text-[22px] font-black text-muted-foreground">–</span>
+        {cote(t.a)}
+      </div>
+      <Link href="/bola-team" className="bouton-secondaire flex h-12 items-center justify-center text-[15px] font-semibold">
+        Voir la Team
+      </Link>
+    </>
   );
 }
 

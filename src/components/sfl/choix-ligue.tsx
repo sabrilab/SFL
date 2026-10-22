@@ -61,3 +61,23 @@ export function ChoixLigue({ actif, className }: { actif: Actif; className?: str
     </nav>
   );
 }
+
+/** Le sigle de la ligue d'un match (Map, fiche, ouverture d'un match) : le
+ *  logo SFL ou Bola, ou TEAM en lettres, à la couleur du texte. */
+export function SigleLigue({ ligue, hauteur = 12, className }: { ligue: "sfl" | "bola" | "team"; hauteur?: number; className?: string }) {
+  if (ligue === "team")
+    return (
+      <span className={cn("font-black tracking-[0.06em] uppercase", className)} style={{ fontSize: hauteur * 0.92, lineHeight: `${hauteur}px` }}>
+        Team
+      </span>
+    );
+  const b = BADGES[ligue === "sfl" ? 0 : 1];
+  return (
+    <span
+      role="img"
+      aria-label={b.libelle}
+      className={cn("inline-block shrink-0 bg-current align-middle", className)}
+      style={{ height: hauteur, width: (b.l / 18) * hauteur, mask: `url(${b.src}) center / contain no-repeat`, WebkitMask: `url(${b.src}) center / contain no-repeat` }}
+    />
+  );
+}

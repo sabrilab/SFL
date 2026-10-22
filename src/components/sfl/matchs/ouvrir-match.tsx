@@ -14,8 +14,13 @@
 // de places ; les joueurs se gèrent sur la fiche du match (fiche-partie.tsx).
 // La feuille reste dans son cadre (feuille-cadree.tsx) : seul le milieu
 // défile, le bouton reste en bas.
+//
+// En haut, la ligue où l'on organise (Sabri, 22/10) : un match ouvert ici
+// compte en Bola ; un admin passe à la SFL (ses journées, réglées depuis la
+// fiche des matchs) ; Team mène aux défis entre équipes (page Team).
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -23,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { TerrainPlaces } from "@/components/sfl/matchs/terrain-places";
 import { ChoisirJoueur } from "@/components/sfl/matchs/choisir-joueur";
 import { FeuilleCadree } from "@/components/sfl/feuille-cadree";
+import { SigleLigue } from "@/components/sfl/choix-ligue";
 import {
   aujourdhuiIso,
   direErreur,
@@ -68,6 +74,26 @@ function Choix<T extends string>({
   );
 }
 
+/** La ligue où l'on organise : Bola ici, SFL pour un admin, Team ailleurs. */
+function LigueOrganisee({ onSfl }: { onSfl?: () => void }) {
+  const pastille = "flex h-10 items-center justify-center rounded-full transition-colors";
+  return (
+    <div className={cn("grid gap-1 rounded-full bg-secondary p-1", onSfl ? "grid-cols-3" : "grid-cols-2")} aria-label="La ligue">
+      <span aria-current="true" className={cn(pastille, "bg-foreground text-background")}>
+        <SigleLigue ligue="bola" hauteur={13} />
+      </span>
+      {onSfl && (
+        <button type="button" onClick={onSfl} className={cn(pastille, "text-muted-foreground")}>
+          <SigleLigue ligue="sfl" hauteur={13} />
+        </button>
+      )}
+      <Link href="/bola-team" className={cn(pastille, "text-muted-foreground")}>
+        <SigleLigue ligue="team" hauteur={13} />
+      </Link>
+    </div>
+  );
+}
+
 export function OuvrirMatch({
   open,
   onOpenChange,
@@ -78,6 +104,7 @@ export function OuvrirMatch({
   moi,
   onOuvert,
   partie,
+  onSfl,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -90,6 +117,8 @@ export function OuvrirMatch({
   onOuvert: (id: number) => void;
   /** Un match déjà ouvert, que son organisateur modifie. */
   partie?: Partie;
+  /** Un admin : passer aux journées de la SFL. */
+  onSfl?: () => void;
 }) {
   const [genre, setGenre] = useState<Genre>(partie?.genre ?? "match");
   const [visibilite, setVisibilite] = useState<Visibilite>(partie?.visibilite ?? "public");
@@ -204,8 +233,15 @@ export function OuvrirMatch({
   );
 
   return (
-    <FeuilleCadree open={open} onOpenChange={onOpenChange} titre={partie ? "Modifier le match" : "Ouvrir un match"} pied={bouton}>
+    <FeuilleCadree
+      open={open}
+      onOpenChange={onOpenChange}
+      titre={partie ? "Modifier le match" : "Ouvrir un match"}
+      surtitre={partie ? <SigleLigue ligue="bola" hauteur={11} className="text-foreground" /> : undefined}
+      pied={bouton}
+    >
       <div className="flex flex-col gap-5">
+        {!partie && <LigueOrganisee onSfl={onSfl} />}
         <Choix
           valeur={genre}
           onChange={setGenre}
