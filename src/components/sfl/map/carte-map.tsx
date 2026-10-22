@@ -7,7 +7,10 @@
 // relief) : des tuiles vectorielles d'OpenStreetMap, sans clé, dessinées en
 // pastel ; en s'approchant, les bâtiments se lèvent et le plan s'incline
 // (PENTE), comme la Snap Map. Ni boutons de zoom ni rotation : on pince, et
-// deux doigts qui glissent inclinent le plan. Dessus, à la manière de la
+// deux doigts qui glissent inclinent le plan. Sur un ordinateur (22/10,
+// map/gestes-ordinateur.ts), le pavé tactile déplace le plan, le pincement et
+// la molette zooment, et le plan s'incline de lui-même en s'approchant (rien
+// ne l'incline à la main). Dessus, à la manière de la
 // carte de « Jouer » de l'app iOS : le sticker mini-stade du match (vignette
 // à bord blanc, pastille calendrier, badge braise du manque), les autres
 // terrains en simples points, et « toi », ta carte en miniature, quand tu as
@@ -49,6 +52,7 @@ import {
   ZOOM_OUVERTURE,
   type VillePlan,
 } from "./joueurs";
+import { gestesOrdinateur } from "./gestes-ordinateur";
 import { FONDU, LIBELLES, styleSnap } from "./style-snap";
 
 export interface PointPlan {
@@ -82,7 +86,7 @@ const CADENCE = 110;
 
 /** L'inclinaison du plan : à plat de loin, penché sur la ville, comme la Snap Map. */
 function pente(zoom: number): number {
-  return Math.round(Math.min(1, Math.max(0, (zoom - 9) / 4)) * 45);
+  return Math.min(1, Math.max(0, (zoom - 9) / 4)) * 45;
 }
 
 const calme = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -203,6 +207,8 @@ export function CarteMap({
   // La carte, une fois.
   useEffect(() => {
     if (!conteneur.current || carte.current) return;
+    // Un ordinateur : ni doigts ni écran tactile.
+    const ordinateur = navigator.maxTouchPoints === 0;
     const map = new maplibregl.Map({
       container: conteneur.current,
       style: styleSnap(),
@@ -224,11 +230,24 @@ export function CarteMap({
       // L'attribution reste repliée en un petit « i » : elle s'ouvre au toucher.
       map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
     });
+    // Au doigt, deux doigts inclinent le plan ; sur un ordinateur, il suit le zoom.
+    const debrancher = gestesOrdinateur(map, ordinateur ? pente : null);
+    // Une vignette qui ne vient pas (l'optimiseur d'images au bout de son
+    // forfait) : la photo entière, gardée dans `data-secours` (map/joueurs.ts).
+    const secours = (e: Event) => {
+      const img = e.target;
+      if (!(img instanceof HTMLImageElement) || !img.dataset.secours) return;
+      img.src = img.dataset.secours;
+      delete img.dataset.secours;
+    };
+    map.getContainer().addEventListener("error", secours, true);
     carte.current = map;
     // Captures en développement : viser une ville à la main.
     if (process.env.NODE_ENV === "development") (window as unknown as { __bolaMap?: PlanMap }).__bolaMap = map;
     const entreesAuMontage = entrees.current;
     return () => {
+      debrancher();
+      map.getContainer().removeEventListener("error", secours, true);
       map.remove();
       carte.current = null;
       reperes.current = [];
@@ -335,7 +354,11 @@ export function CarteMap({
       window.setTimeout(() => r.remove(), 1150);
     }
 
-    const deps = [stickers, points, toi, choisi];
+    // Le cadrage suit où sont les stickers, pas leur liste : la page la refait
+    // à chaque rendu (l'horloge de la convocation en lance un par minute), et
+    // le plan revenait alors sur les matchs en plein zoom (22/10).
+    const lieux = stickers.map((s) => `${s.lat},${s.lng}`).sort().join(";");
+    const deps = [lieux, points, toi, choisi];
     if (deps.every((d, i) => d === cadre.current[i])) return;
     // Seul le choix a changé : le plan glisse pour poser le choisi au centre
     // de ce qui reste visible, sans changer de zoom.

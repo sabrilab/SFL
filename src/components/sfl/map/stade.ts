@@ -19,6 +19,8 @@
 // dans la fiche du match), marbre sur la vue satellite, sombre. `VARIANTE_STADE`
 // est celle par défaut ; les autres restent pour comparer.
 
+import { SATELLITE } from "./style-snap";
+
 export type Moment = "jour" | "weekend" | "semaine";
 export type VarianteStade = "origine" | "fini" | "proche" | "nuit" | "marbre" | "mono";
 export const VARIANTES_STADE: VarianteStade[] = ["origine", "fini", "proche", "nuit", "marbre", "mono"];
@@ -265,15 +267,58 @@ export function pointHtml(nom: string, variante?: VarianteStade): string {
   return `<div class="ter"><div class="ter__vignette"><div class="ter__stade">${stadeSvg("semaine", { variante })}</div></div><span class="ter__queue"></span><span class="ter__nom">${echapper(nom)}</span></div>`;
 }
 
+const TUILE = 256;
+
+/** Un point en pixels du monde de Mercator, au zoom `z` (tuiles de 256). */
+function mercator(lat: number, lng: number, z: number): { x: number; y: number } {
+  const n = TUILE * 2 ** z;
+  const phi = (lat * Math.PI) / 180;
+  return { x: ((lng + 180) / 360) * n, y: ((1 - Math.log(Math.tan(phi) + 1 / Math.cos(phi)) / Math.PI) / 2) * n };
+}
+
+export interface MosaiqueSatellite {
+  /** Ce qu'on montre, en pixels de tuiles depuis la première tuile : le viewBox d'un SVG. */
+  boite: [number, number, number, number];
+  /** Les tuiles à poser, à leur place dans ce repère. */
+  tuiles: { x: number; y: number; url: string }[];
+}
+
 /**
- * La photo satellite centrée sur un point (Esri World Imagery, sans clé) :
- * une image de `l` × `h` pixels qui couvre ~`demi` degrés de latitude de part
- * et d'autre. C'est la « vue aérienne du vrai terrain » de l'app iPhone.
+ * La photo satellite centrée sur un point (Esri World Imagery, sans clé),
+ * faite des tuiles de la vue satellite du plan : ~`demi` degrés de latitude
+ * de part et d'autre, `rapport` = largeur / hauteur. C'est la « vue aérienne
+ * du vrai terrain » de l'app iPhone. Le zoom est le premier qui donne au
+ * moins 1,5 pixel de tuile par pixel affiché sur `hauteur` px : aussi net que
+ * l'ancienne image calculée par Esri, en 4 à 9 tuiles.
+ *
+ * Avant le 22/10, c'était une seule image demandée au service « export »
+ * d'Esri, qui la calculait à chaque fois (~2 s) et en interdisait le cache
+ * (max-age=0) : le carrousel de la Map attendait ses photos à chaque
+ * ouverture. Les tuiles sortent d'un CDN en ~150 ms et restent un jour dans
+ * le cache du téléphone.
  */
-export function photoSatellite(lat: number, lng: number, l = 600, h = 450, demi = 0.0012): string {
-  const dl = (demi / Math.cos((lat * Math.PI) / 180)) * (l / h);
-  const bbox = [lng - dl, lat - demi, lng + dl, lat + demi].map((n) => n.toFixed(6)).join(",");
-  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bbox}&bboxSR=4326&imageSR=3857&size=${l},${h}&format=jpg&f=image`;
+export function mosaiqueSatellite(
+  lat: number,
+  lng: number,
+  { demi, rapport, hauteur }: { demi: number; rapport: number; hauteur: number }
+): MosaiqueSatellite {
+  const haut = (z: number) => mercator(lat - demi, lng, z).y - mercator(lat + demi, lng, z).y;
+  let z = 10;
+  while (z < 18 && haut(z) < 1.5 * hauteur) z++;
+  const c = mercator(lat, lng, z);
+  const h = haut(z);
+  const w = h * rapport;
+  const [gauche, dessus] = [c.x - w / 2, c.y - h / 2];
+  const [tx0, ty0] = [Math.floor(gauche / TUILE), Math.floor(dessus / TUILE)];
+  const tuiles: MosaiqueSatellite["tuiles"] = [];
+  for (let ty = ty0; ty <= Math.floor((dessus + h) / TUILE); ty++)
+    for (let tx = tx0; tx <= Math.floor((gauche + w) / TUILE); tx++)
+      tuiles.push({
+        x: (tx - tx0) * TUILE,
+        y: (ty - ty0) * TUILE,
+        url: SATELLITE.replace("{z}", String(z)).replace("{y}", String(ty)).replace("{x}", String(tx)),
+      });
+  return { boite: [gauche - tx0 * TUILE, dessus - ty0 * TUILE, w, h], tuiles };
 }
 
 /** Les trois façons d'y aller : Plans (Apple), Google Maps, Waze. */

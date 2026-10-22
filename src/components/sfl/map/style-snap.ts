@@ -108,12 +108,17 @@ export function styleSnap(): StyleSpecification {
         url: "https://tiles.openfreemap.org/planet",
         attribution: '<a href="https://openfreemap.org">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       },
+      // Les tuiles d'altitude s'arrêtent au zoom 11 et sont agrandies au-delà
+      // (22/10) : un ombrage un peu plus doux dans les montagnes, le même sur
+      // la métropole, et un tiers de moins à charger à l'ouverture (1,7 Mo
+      // devenus 1,2 sur un téléphone, 3,1 devenus 1,9 sur un ordinateur ;
+      // elles allaient jusqu'au zoom 13, chacune de 50 à 150 Ko).
       relief: {
         type: "raster-dem",
         tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
         encoding: "terrarium",
         tileSize: 256,
-        maxzoom: 13,
+        maxzoom: 11,
       },
       satellite: {
         type: "raster",

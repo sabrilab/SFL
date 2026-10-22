@@ -401,6 +401,23 @@
   border: 0;
   overflow: visible;
 }
+/* Sur ordinateur, les rangées transparentes posées sur le plan le laissent
+   saisir (map/gestes-ordinateur.ts) : la main du plan, pas la flèche. Ce
+   qu'elles portent (cartes, boutons) garde son curseur. */
+@media (hover: hover) and (pointer: fine) {
+  [data-traverse] {
+    cursor: grab;
+  }
+  [data-traverse]:active {
+    cursor: grabbing;
+  }
+  [data-traverse] > :not([data-traverse]) {
+    cursor: auto;
+  }
+  [data-traverse] > a[href] {
+    cursor: pointer;
+  }
+}
 
 /* Le sticker du match : 71 de large, la pointe de la queue sur le terrain. */
 .stk {
