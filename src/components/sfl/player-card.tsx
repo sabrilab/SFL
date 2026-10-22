@@ -12,6 +12,8 @@
 // En dessous du grand format (palier « complète », < 170 px : la Ligue, les
 // terrains, les listes), c'est la carte photo (carte-photo.tsx) : la photo
 // resserrée sur le visage, la note et le nom en bas (Sabri, 19/10).
+// Avec `distinction`, c'est une carte à titre : la même carte, en or (MVP),
+// en rouge (Impact) ou en bleu (Défensive) (Sabri, 22/10, teinte-carte.ts).
 
 "use client";
 
@@ -19,7 +21,7 @@ import { BolaCard, palierCarte } from "./bola-card";
 import { CartePhoto } from "./carte-photo";
 import { useBadgeCarte } from "@/hooks/use-badge-carte";
 import { usePhotoPerso } from "@/hooks/use-player-photo";
-import { ovr, type Player, type StatKey } from "@/lib/sfl/engine";
+import { ovr, type BoostType, type Player, type StatKey } from "@/lib/sfl/engine";
 import { useIdentites } from "@/hooks/use-identites";
 
 export type CardMode = "simple" | "rare";
@@ -32,6 +34,7 @@ export function PlayerCard({
   affiche,
   pseudo,
   vertical,
+  distinction,
 }: {
   player: Player;
   /** Aperçu : le nom et le pseudo en cours de saisie (identite.tsx). */
@@ -45,6 +48,8 @@ export function PlayerCard({
   onglet?: { fond: string; encre: string };
   /** En petit, la carte reste debout (les terrains) au lieu de la pastille. */
   vertical?: boolean;
+  /** Une carte à titre : MVP (or), Impact (rouge), Défensive (bleu). */
+  distinction?: BoostType;
 }) {
   const stats = player.stats;
   const photo = usePhotoPerso(player.name);
@@ -62,11 +67,12 @@ export function PlayerCard({
         onglet={onglet}
         badge={badge}
         vertical={vertical}
+        distinction={distinction}
       />
     );
   return (
     <BolaCard
-      edition="base"
+      edition={distinction ?? "base"}
       name={player.name}
       affiche={affiche ?? identite.nom(player.name)}
       username={pseudo ?? identite.pseudo(player.name)}
