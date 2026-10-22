@@ -1,20 +1,17 @@
 "use client";
 
-// Le fil des Actus — l'onglet qui remplace la Ligue (Sabri, 22/10). Comme un
-// réseau social : on fait défiler, chaque publication est une image animée
-// (une cinématique, cinematiques.tsx) avec, dessous, deux lignes qui disent
-// le fait. Pas de sélecteur, pas de vue à choisir :
-//   · en haut, « Actus | Ligue vierge » (choix-ligue.tsx) ; puis les
-//     classements en ronds de stories (stories.tsx) et le Wall
-//     of Fame au bout ;
-//   · la prochaine journée (sa présence se donne ici) et le vote du jour ;
-//   · puis les dimanches joués, du plus récent au plus ancien (la liste :
-//     lib/sfl/actus.ts), et à la fin la saison passée.
-// Pas d'en-tête de compte sur chaque publication (Sabri, 22/10 : « moins
-// Instagram ») : un chapitre par dimanche (« J2 · 18 oct. »), puis les
-// images de ce dimanche, chacune avec sa légende et, à droite, la partager
-// au Vestiaire (et pour le récap, l'ouvrir en entier, /ligue/journee).
-// Toucher une image la rejoue ; toucher une carte l'ouvre en grand.
+// Le fil des Actus — l'onglet qui remplace la Ligue (Sabri, 22/10). En haut,
+// « League | Bola | Team » (choix-ligue.tsx), puis un seul sélecteur, comme
+// la Ligue d'avant : Actus, Classements, Matchs (Sabri, 22/10 : « faire un
+// mix des deux et un équilibre » ; les classements complets et les matchs
+// sont dans vues.tsx). Le fil, lui, se déroule en cinématiques
+// (cinematiques.tsx) : les dimanches joués, du plus récent au plus ancien
+// (la liste : lib/sfl/actus.ts), la prochaine journée glissée entre les
+// premières scènes, et à la fin la saison passée.
+// Pas d'en-tête de compte sur chaque scène (« moins Instagram ») : un
+// chapitre par dimanche (« J2 · 18 oct. »), puis ses scènes, chacune avec sa
+// légende et, à droite, la partager au Vestiaire. Toucher une scène la
+// rejoue ; toucher une carte l'ouvre en grand.
 
 import Link from "next/link";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -40,7 +37,7 @@ import { journeeAvecVote } from "@/lib/sfl/votes";
 import { preparerPiece, type PieceLigue } from "@/lib/sfl/vestiaire";
 import { ANTON, Ecran } from "./ecran";
 import { CineBadge, CineChiffre, CineCourse, CineDuo, CineEquipe, CineMontent, CineMvp, CinePodium, CinePresents, CineRecap, CineScore, CineSurface, CineToi, FORMAT_EQUIPE, FORMAT_MVP, FORMAT_SCORE } from "./cinematiques";
-import { RondsClassements, Stories } from "./stories";
+import { VueClassements, VueMatchs } from "./vues";
 import { cn } from "@/lib/utils";
 
 const DEF = Object.fromEntries(TROPHEES.map((d) => [d.id, d]));
@@ -474,16 +471,24 @@ function VoteDuJour({ me }: { me: string }) {
   );
 }
 
-export function FilActus({ classementsOuverts = false }: { classementsOuverts?: boolean }) {
-  const { saison } = useSeason();
+type Vue = "actus" | "classements" | "matchs";
+const VUES: [Vue, string][] = [
+  ["actus", "Actus"],
+  ["classements", "Classements"],
+  ["matchs", "Matchs"],
+];
+
+/**
+ * L'onglet : « League | Bola | Team », puis un seul sélecteur, comme la Ligue
+ * d'avant (Sabri, 22/10 : « faire un mix des deux et un équilibre ») : le fil
+ * en cinématiques, les classements complets, les matchs.
+ */
+export function FilActus({ vueDepart = "actus" }: { vueDepart?: Vue }) {
   const { me } = useMyPlayer();
-  const [stories, setStories] = useState<number | null>(classementsOuverts ? 0 : null);
-  const jouees = saison.journees.map((m) => m.j).filter((j) => journeeJouee(saison, j));
-  const dernierJ = jouees.length ? Math.max(...jouees) : 0;
-  const ouvrirClassements = () => setStories(0);
+  const [vue, setVue] = useState<Vue>(vueDepart);
 
   return (
-    <div className="mx-auto flex w-full max-w-[470px] flex-col gap-7 pt-2 pb-8 sm:pt-6">
+    <div className="mx-auto flex w-full max-w-[470px] flex-col gap-6 pt-2 pb-8 sm:pt-6">
       <div className="flex items-center justify-between px-5">
         <h1 className="sr-only">Actus</h1>
         <ChoixLigue actif="/ligue" />
@@ -492,22 +497,46 @@ export function FilActus({ classementsOuverts = false }: { classementsOuverts?: 
           <BoutonRecherche className="size-10 sm:size-11" />
         </div>
       </div>
-      <div className="-mt-2 px-5">
-        <RondsClassements j={dernierJ} moi={me} />
+      <div className="-mt-1 px-5">
+        <div className="glass flex gap-1 rounded-full p-1" role="tablist" aria-label="Vue">
+          {VUES.map(([id, label]) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={vue === id}
+              onClick={() => {
+                setVue(id);
+                document.getElementById("app-scroll")?.scrollTo({ top: 0 });
+              }}
+              className={cn(
+                "flex-1 rounded-full px-2 py-2 text-[13px] font-semibold whitespace-nowrap transition-colors",
+                vue === id ? "bg-foreground text-background" : "text-muted-foreground"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
-      <VoteDuJour me={me} />
-      <FilSaison
-        enCours
-        onClassements={ouvrirClassements}
-        apres={
-          <div className="px-4">
-            <PresencePanel compact />
-          </div>
-        }
-      />
-      <SaisonPassee onClassements={ouvrirClassements} />
-      {stories !== null && <Stories depart={stories} j={dernierJ} moi={me} onFermer={() => setStories(null)} />}
+      {vue === "classements" ? (
+        <VueClassements vote={<VoteDuJour me={me} />} />
+      ) : vue === "matchs" ? (
+        <VueMatchs />
+      ) : (
+        <>
+          <VoteDuJour me={me} />
+          <FilSaison
+            enCours
+            onClassements={() => setVue("classements")}
+            apres={
+              <div className="px-4">
+                <PresencePanel compact />
+              </div>
+            }
+          />
+          <SaisonPassee onClassements={() => setVue("classements")} />
+        </>
+      )}
     </div>
   );
 }
-
