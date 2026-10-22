@@ -94,16 +94,23 @@ function hache(s: string): number {
   return h;
 }
 
-function villeDemo(nom: string): VilleJoueur {
-  const total = COMMUNES_DEMO.reduce((s, c) => s + c[3], 0);
+function tirer(nom: string, communes: [string, number, number, number][]): VilleJoueur {
+  const total = communes.reduce((s, c) => s + c[3], 0);
   let r = hache(nom) % total;
-  for (const [ville, lat, lng, poids] of COMMUNES_DEMO) {
+  for (const [ville, lat, lng, poids] of communes) {
     if (r < poids) return { ville, lat, lng };
     r -= poids;
   }
-  const [ville, lat, lng] = COMMUNES_DEMO[0];
+  const [ville, lat, lng] = communes[0];
   return { ville, lat, lng };
 }
+
+function villeDemo(nom: string): VilleJoueur {
+  return tirer(nom, COMMUNES_DEMO);
+}
+
+/** La métropole seule : les communes autour des terrains, sans les venus de loin. */
+const COMMUNES_METROPOLE = COMMUNES_DEMO.filter(([v]) => v !== "Paris" && v !== "Valenciennes");
 
 /* ─────────────────────────────── Lecture ─────────────────────────────── */
 
@@ -120,21 +127,17 @@ export function villeDe(nom: string): VilleJoueur | null {
 }
 
 /**
- * La ville de la ligue : ses terrains sont tout autour de Lille (Marcq,
- * Croix, Roubaix, Tourcoing, Lezennes…). Qui n'a pas donné la sienne y est.
- */
-export const VILLE_LIGUE: VilleJoueur = { ville: "Lille", lat: 50.6329, lng: 3.0586 };
-
-/**
  * La ville d'un joueur de la ligue sur la Map : la sienne s'il l'a donnée
- * (null s'il s'est rendu invisible), sinon celle de la ligue (Sabri, 22/10 :
- * « ils ne voient personne » — 4 joueurs sur 98 avaient une ville).
+ * (null s'il s'est rendu invisible), sinon une commune de la métropole
+ * tirée de son nom, toujours la même (Sabri, 22/10 : « une localisation
+ * différente pour chacun, pour déjà les éparpiller »). Elle s'efface dès
+ * qu'il pose la sienne (la notification « Mets ta ville » l'y invite).
  */
 export function villeOuLigue(nom: string): VilleJoueur | null {
   const e = lire()[nom];
   if (e) return e.c ? null : { ville: e.v, lat: e.a, lng: e.o };
   if (DEMO_VILLES && !villesReelles()) return villeDemo(nom);
-  return VILLE_LIGUE;
+  return tirer(nom, COMMUNES_METROPOLE);
 }
 
 /** La ville que le joueur s'est donnée, même invisible (pour sa propre fiche). */
