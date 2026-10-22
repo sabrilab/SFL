@@ -15,6 +15,23 @@
    dessin (penché, agrandi quand il est choisi). */
 
 @media (prefers-reduced-motion: no-preference) {
+  /* ── Les joueurs : une pile qui arrive se pose ; une ville qui s'ouvre
+     lâche ses cartes du centre, une à une, chacune à sa place du tournesol. ── */
+  .grp--entre {
+    animation: grp-entre 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) backwards;
+  }
+  .jr--sort {
+    animation: jr-sort 0.62s cubic-bezier(0.25, 1.35, 0.45, 1) calc(var(--i, 0) * 22ms) backwards;
+  }
+  .vil--entre {
+    animation: grp-entre 0.42s cubic-bezier(0.3, 1.6, 0.5, 1) backwards;
+  }
+  .grp:active,
+  .jr:active {
+    scale: 0.9;
+    transition: scale 0.12s ease-out;
+  }
+
   /* Derrière l'écran de chargement, rien ne part : tout attend qu'il se lève. */
   html:not([data-splash="fini"]) :is(.stk--entre, .stk--entre *, .lettrage-entre, .compte-entre, .map-bord, .map-monte, .toi--entre) {
     animation-play-state: paused;
@@ -231,4 +248,21 @@
 @keyframes fondu {
   0% { opacity: 0; }
   100% { opacity: 1; }
+}
+
+@keyframes grp-entre {
+  from {
+    scale: 0.4;
+    opacity: 0;
+  }
+}
+@keyframes jr-sort {
+  from {
+    translate: calc(var(--dx) * -1) calc(var(--dy) * -1);
+    scale: 0.35;
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
 }

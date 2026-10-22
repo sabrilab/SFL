@@ -18,12 +18,19 @@
 // poser au centre, au-dessus du carrousel. Changer de fond fait monter le
 // nouveau en fondu sur l'ancien. Les classes sont dans app/map/animations.css ;
 // « Réduire les animations » coupe le vol et les ressorts.
+//
+// Les joueurs (22/10, façon Snap Map) : chacun dans sa ville, sur un calque à
+// part, sous les matchs. De loin des piles, de près des tournesols de cartes
+// (la disposition est dans map/joueurs.ts), refaits à chaque fin de zoom.
+// Toucher une pile approche la ville ; toucher le nom d'une ville ouverte ou
+// une carte, la page ouvre le catalogue ou le profil.
 
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { SPLASH_FINI } from "@/components/sfl/app-splash";
 import { pointHtml, stickerHtml, toiHtml, type StickerPlan, type VarianteStade } from "./stade";
+import { centreHtml, disposer, joueurHtml, OUVERTE_MAX, pileHtml, ZOOM_OUVERTURE, type VillePlan } from "./joueurs";
 
 export interface PointPlan {
   id: string;
@@ -67,9 +74,20 @@ export function CarteMap({
   onChoisir,
   onPoint,
   fond = "plan",
+  villes = [],
+  onVille,
+  onJoueur,
+  viser,
   className,
 }: {
   fond?: FondCarte;
+  /** Les joueurs, ville par ville. */
+  villes?: VillePlan[];
+  /** Toucher le nom d'une ville ouverte (ou une pile tout au bout du zoom) : ses dossiers. */
+  onVille?: (ids: string[]) => void;
+  onJoueur?: (name: string) => void;
+  /** Aller voir une ville choisie ailleurs (le catalogue) ; `n` change à chaque demande. */
+  viser?: { lat: number; lng: number; n: number } | null;
   stickers: StickerPlan[];
   points: PointPlan[];
   toi: ToiPlan | null;
@@ -98,13 +116,20 @@ export function CarteMap({
   const cibleVol = useRef<L.LatLngBounds | null>(null);
   const choisirRef = useRef(onChoisir);
   const pointRef = useRef(onPoint);
+  const villeRef = useRef(onVille);
+  const joueurRef = useRef(onJoueur);
+  const joueursCalque = useRef<L.LayerGroup | null>(null);
+  // Les villes déjà ouvertes : seules celles qui s'ouvrent lâchent leurs cartes.
+  const ouvertes = useRef(new Set<string>());
   // Ce qui a été cadré la dernière fois : changer de fond redessine les
   // stades sans recadrer.
   const cadre = useRef<unknown[]>([]);
   useEffect(() => {
     choisirRef.current = onChoisir;
     pointRef.current = onPoint;
-  }, [onChoisir, onPoint]);
+    villeRef.current = onVille;
+    joueurRef.current = onJoueur;
+  }, [onChoisir, onPoint, onVille, onJoueur]);
   const pointsActifs = !!onPoint;
 
   // La carte, une fois.
@@ -114,7 +139,12 @@ export function CarteMap({
     map.attributionControl.setPrefix(false);
     map.setView(FRANCE, 5);
     carte.current = map;
+    // Captures en développement : viser une ville à la main.
+    if (process.env.NODE_ENV === "development") (window as unknown as { __bolaMap?: L.Map }).__bolaMap = map;
     tuiles.current = L.layerGroup().addTo(map);
+    // Les joueurs sous les matchs : un match ne disparaît jamais sous une pile.
+    map.createPane("joueurs").style.zIndex = "590";
+    joueursCalque.current = L.layerGroup().addTo(map);
     calque.current = L.layerGroup().addTo(map);
     effets.current = L.layerGroup().addTo(map);
     const entreesAuMontage = entrees.current;
@@ -122,6 +152,7 @@ export function CarteMap({
       map.remove();
       carte.current = null;
       calque.current = null;
+      joueursCalque.current = null;
       tuiles.current = null;
       effets.current = null;
       cadre.current = [];
@@ -150,6 +181,7 @@ export function CarteMap({
       L.tileLayer(LIBELLES, { maxZoom: ZOOM_MAX.plan, pane: "shadowPane", className: entre }).addTo(groupe);
     }
     map.setMaxZoom(ZOOM_MAX[fond]);
+    map.getContainer().classList.toggle("fond-satellite", fond === "satellite");
     if (!anciens.length) return;
     const t = window.setTimeout(() => anciens.forEach((l) => groupe.removeLayer(l)), entre ? 650 : 0);
     return () => {
@@ -274,6 +306,85 @@ export function CarteMap({
       map.fitBounds(L.latLngBounds(tous), { ...pad, animate: doux });
     }
   }, [stickers, points, toi, choisi, fond, pointsActifs]);
+
+  // Les joueurs : refaits à chaque fin de zoom (la place de chaque ville à
+  // l'écran change), et à chaque changement de la liste.
+  useEffect(() => {
+    const map = carte.current;
+    const groupe = joueursCalque.current;
+    if (!map || !groupe) return;
+    const doux = !calme();
+    const vues = new Set<string>();
+    const dessiner = () => {
+      groupe.clearLayers();
+      if (!villes.length) return;
+      const zoom = map.getZoom();
+      const dispo = disposer(villes, zoom, (lat, lng) => map.latLngToLayerPoint([lat, lng]));
+      const avant = ouvertes.current;
+      const maintenant = new Set<string>();
+      for (const d of dispo) {
+        if (d.genre === "pile") {
+          const icone = L.divIcon({ className: "jr-ancre", iconSize: [0, 0], iconAnchor: [0, 0], html: pileHtml(d) });
+          const m = L.marker([d.lat, d.lng], { icon: icone, pane: "joueurs", keyboard: false }).addTo(groupe);
+          if (doux && (avant.has(d.id) || !vues.has(d.id))) m.getElement()?.querySelector(".grp")?.classList.add("grp--entre");
+          vues.add(d.id);
+          m.on("click", () => {
+            navigator.vibrate?.(6);
+            if (d.villes.length > 1) {
+              map.flyToBounds(L.latLngBounds(d.villes.map((v) => [v.lat, v.lng] as L.LatLngTuple)), {
+                padding: [90, 90],
+                paddingBottomRight: [90, MARGE_BAS - 120],
+                maxZoom: Math.max(zoom + 2, ZOOM_OUVERTURE),
+                duration: doux ? 0.9 : 0,
+              });
+            } else if (zoom >= map.getMaxZoom()) {
+              villeRef.current?.(d.villes.map((v) => v.id));
+            } else {
+              map.flyTo([d.lat, d.lng], Math.min(map.getMaxZoom(), Math.max(zoom + 2, ZOOM_OUVERTURE + 1)), { duration: doux ? 0.9 : 0 });
+            }
+          });
+          continue;
+        }
+        maintenant.add(d.id);
+        const sort = doux && !avant.has(d.id);
+        const html =
+          d.joueurs.slice(0, OUVERTE_MAX).map((j, i) => joueurHtml(j, i, sort)).join("") + centreHtml(d.ville, d.joueurs.length);
+        const icone = L.divIcon({ className: "jr-ancre", iconSize: [0, 0], iconAnchor: [0, 0], html });
+        const m = L.marker([d.lat, d.lng], { icon: icone, pane: "joueurs", keyboard: false }).addTo(groupe);
+        const el = m.getElement();
+        if (sort) el?.querySelector(".vil")?.classList.add("vil--entre");
+        // Un seul marqueur pour la ville : on lit ce que le doigt a touché.
+        m.on("click", (e) => {
+          const cible = e.originalEvent.target as HTMLElement;
+          const carteJ = cible.closest<HTMLElement>(".jr");
+          if (carteJ) {
+            const i = el ? [...el.querySelectorAll(".jr")].indexOf(carteJ) : -1;
+            const j = d.joueurs[i];
+            if (j) {
+              navigator.vibrate?.(5);
+              joueurRef.current?.(j.name);
+            }
+          } else if (cible.closest(".vil")) {
+            navigator.vibrate?.(5);
+            villeRef.current?.([d.id]);
+          }
+        });
+      }
+      ouvertes.current = maintenant;
+    };
+    dessiner();
+    map.on("zoomend", dessiner);
+    return () => {
+      map.off("zoomend", dessiner);
+    };
+  }, [villes]);
+
+  // Aller voir une ville choisie dans le catalogue : assez près pour qu'elle s'ouvre.
+  useEffect(() => {
+    const map = carte.current;
+    if (!map || !viser) return;
+    map.flyTo([viser.lat, viser.lng], Math.max(map.getZoom(), ZOOM_OUVERTURE + 1), { duration: calme() ? 0 : 1 });
+  }, [viser]);
 
   return <div ref={conteneur} className={className} role="region" aria-label="La Map des matchs" />;
 }

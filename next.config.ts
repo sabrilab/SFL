@@ -7,8 +7,13 @@ import type { NextConfig } from "next";
 const BOLA_VERSION =
   process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA ?? String(Date.now());
 
+// Où tourne ce build : « production » seulement pour la prod Vercel. Les
+// aperçus et le développement montrent des données de démonstration là où
+// la ligue n'en a pas encore (les villes des joueurs, lib/sfl/villes.ts).
+const BOLA_ENV = process.env.VERCEL_ENV ?? "development";
+
 const nextConfig: NextConfig = {
-  env: { NEXT_PUBLIC_BOLA_VERSION: BOLA_VERSION },
+  env: { NEXT_PUBLIC_BOLA_VERSION: BOLA_VERSION, NEXT_PUBLIC_BOLA_ENV: BOLA_ENV },
   async headers() {
     return [
       {
