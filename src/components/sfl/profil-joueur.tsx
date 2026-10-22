@@ -5,8 +5,9 @@
 // mis en avant »).
 //
 // Ordre de lecture, du plus fort au plus fin :
-//   1. lui : sa carte en grand, son nom en Anton, et trois chiffres de tête
-//      (son rang au Pépite d'Or, sa note, ses dimanches) ;
+//   1. lui : sa carte en grand, son nom dans le lettrage de la Map, et trois
+//      chiffres de tête en Anton (son rang au Pépite d'Or, sa note, ses
+//      dimanches) ;
 //   2. une phrase qui le résume (fiche-joueur.ts, la même que sur la feuille
 //      de match) ;
 //   3. ses trophées, sur un panneau noir mat sans décor : d'abord les
@@ -141,7 +142,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
           render={(s) => <PlayerCard player={player} size={s} />}
         />
         <div className="flex w-full flex-col items-center gap-[var(--fib-8)] text-center">
-          <h2 style={{ fontFamily: ANTON }} className="text-[44px] leading-[0.92] tracking-[0.3px] break-words uppercase">
+          <h2 className="titre-lettrage text-[34px] leading-[0.95] break-words">
             {identite.nom(player.name)}
           </h2>
           <p className="font-mono text-[12px] text-foreground/45">
