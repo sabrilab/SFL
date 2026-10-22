@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { jetonServeur } from "@/lib/sfl/auth/session";
 import { usePhotoPerso } from "@/hooks/use-player-photo";
 import { addRoster, newRosterPlayer, rosterHasName } from "@/lib/sfl/saisie/mutations";
 import type { Saison } from "@/lib/sfl/saisie/types";
@@ -140,7 +141,7 @@ export function Inscriptions({
   // Membres acceptés que la saison ne connaît pas : leur ajout à l'effectif
   // s'est perdu (publication écrasée par un appareil en retard, envoi raté).
   // Sans ligne dans l'effectif, l'app n'a pas de carte à leur montrer.
-  const [absents, setAbsents] = useState<string[]>([]);
+  const [absents, setAbsents] = useState<{ id: string; name: string }[]>([]);
 
   const charger = useCallback(async () => {
     const sb = supabase();
@@ -163,13 +164,46 @@ export function Inscriptions({
     );
     const { data: membres } = await sb
       .from("profiles")
-      .select("name")
+      .select("id, name")
       .eq("valide", true)
       .eq("is_admin", false)
       .eq("pseudo_a_choisir", false);
-    setAbsents(((membres ?? []) as { name: string | null }[]).map((m) => m.name ?? "").filter(Boolean));
+    setAbsents(((membres ?? []) as { id: string; name: string | null }[]).flatMap((m) => (m.name ? [{ id: m.id, name: m.name }] : [])));
   }, []);
-  const horsSaison = absents.filter((n) => !rosterHasName(saison, n)).sort((a, b) => a.localeCompare(b, "fr"));
+  const horsSaisonComptes = absents
+    .filter((m) => !rosterHasName(saison, m.name))
+    .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  const horsSaison = horsSaisonComptes.map((m) => m.name);
+
+  // Membres que la saison n'a pas gardés : leur compte part pour de bon
+  // (connexion, profil, activité), après une confirmation qui les nomme.
+  async function supprimer(comptes: { id: string; name: string }[]) {
+    const noms = comptes.map((c) => c.name).join(", ");
+    if (!window.confirm(`Supprimer définitivement : ${noms} ?`)) return;
+    const jeton = await jetonServeur();
+    if (!jeton) {
+      toast.error("Reconnecte-toi pour supprimer.");
+      return;
+    }
+    setOccupe("suppression");
+    try {
+      const r = await fetch("/api/comptes/supprimer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jeton}` },
+        body: JSON.stringify({ ids: comptes.map((c) => c.id) }),
+      });
+      const d = (await r.json().catch(() => ({}))) as { supprimes?: string[]; error?: string };
+      if (!r.ok) {
+        toast.error(d.error ?? "Suppression impossible pour l'instant.");
+        return;
+      }
+      const partis = new Set(d.supprimes ?? []);
+      setAbsents((l) => l.filter((m) => !partis.has(m.id)));
+      toast.success(partis.size > 1 ? `${partis.size} comptes supprimés.` : "Compte supprimé.");
+    } finally {
+      setOccupe(null);
+    }
+  }
 
   function ajouter(noms: string[]) {
     const next = noms.reduce((acc, n) => (rosterHasName(acc, n) ? acc : addRoster(acc, newRosterPlayer(n))), saison);
@@ -219,25 +253,45 @@ export function Inscriptions({
             </p>
           </div>
           {horsSaison.length > 1 && (
-            <button
-              type="button"
-              onClick={() => ajouter(horsSaison)}
-              className="bouton-principal shrink-0 px-3.5 py-1.5 text-[12.5px] font-bold"
-            >
-              Tout ajouter
-            </button>
+            <div className="flex shrink-0 gap-1.5">
+              <button
+                type="button"
+                disabled={occupe === "suppression"}
+                onClick={() => void supprimer(horsSaisonComptes)}
+                className="bouton-secondaire px-3.5 py-1.5 text-[12.5px] font-semibold disabled:opacity-50"
+              >
+                Tout supprimer
+              </button>
+              <button
+                type="button"
+                onClick={() => ajouter(horsSaison)}
+                className="bouton-principal px-3.5 py-1.5 text-[12.5px] font-bold"
+              >
+                Tout ajouter
+              </button>
+            </div>
           )}
         </div>
-        {horsSaison.map((n) => (
-          <div key={n} className="flex items-center justify-between gap-3 border-t border-border/60 px-4 py-2.5">
-            <span className="text-[14.5px] font-semibold">{n}</span>
-            <button
-              type="button"
-              onClick={() => ajouter([n])}
-              className="bouton-secondaire px-3 py-1.5 text-[12.5px] font-semibold"
-            >
-              Ajouter
-            </button>
+        {horsSaisonComptes.map((m) => (
+          <div key={m.id} className="flex items-center justify-between gap-3 border-t border-border/60 px-4 py-2.5">
+            <span className="text-[14.5px] font-semibold">{m.name}</span>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                disabled={occupe === "suppression"}
+                onClick={() => void supprimer([m])}
+                className="px-3 py-1.5 text-[12.5px] font-semibold text-muted-foreground disabled:opacity-50"
+              >
+                Supprimer
+              </button>
+              <button
+                type="button"
+                onClick={() => ajouter([m.name])}
+                className="bouton-secondaire px-3 py-1.5 text-[12.5px] font-semibold"
+              >
+                Ajouter
+              </button>
+            </div>
           </div>
         ))}
       </div>
