@@ -15,7 +15,9 @@
 //     Je passe) ; ce qui se joue dimanche (les places à un ou deux points),
 //     ton rival et ce qu'il te faut pour le passer ; puis chaque dimanche joué,
 //     du plus récent : son terrain avec les cartes des joueurs (CarteJournee),
-//     et ses scènes en motion design (Sabri, 22/10 : « des améliorations 10/10 »).
+//     et ses rubriques. Chaque rubrique est un terrain avec ses petites cartes
+//     près du but, qui s'anime au défilement, sans carrousel (pelouse.tsx ;
+//     Sabri, 22/10 : « que tout se fasse en scroll et qu'il y ait plus de vie »).
 // Les modules « toi » : lib/sfl/actus-toi.ts et cine-toi.tsx.
 
 import { useRouter } from "next/navigation";
@@ -37,42 +39,15 @@ import { enjeux, voisins } from "@/lib/sfl/actus-toi";
 import { rankByMetric } from "@/lib/sfl/engine";
 import { RANKINGS } from "@/lib/sfl/rankings";
 import { cn } from "@/lib/utils";
-import { ANTON, Ecran } from "./ecran";
-import { CineBesoin, CineEnjeux, CineRival } from "./cine-toi";
-import { ModeFil, PublicationActu, TonDimanche, VoteDuJour } from "./fil";
+import { ANTON } from "./ecran";
+import { VoteDuJour } from "./fil";
+import { RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
 import { VueClassements, VueMatchs } from "./vues";
 
 export type Vue = "fil" | "classements" | "matchs";
 
 /** Les scènes d'un dimanche qui font bouger la course. */
 const SCENES: Actu["type"][] = ["mvp", "chiffre", "duo", "montent", "badge", "badges", "equipe"];
-
-function Plan({
-  ratio = 4 / 5,
-  duree,
-  titre,
-  children,
-  className,
-}: {
-  ratio?: number;
-  duree: number;
-  titre?: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <figure className={cn("flex flex-col", className)}>
-      <Ecran duree={duree} ratio={ratio}>
-        {children}
-      </Ecran>
-      {titre && (
-        <figcaption className="bg-black px-4 py-2.5 text-[13.5px] font-semibold">
-          {titre}
-        </figcaption>
-      )}
-    </figure>
-  );
-}
 
 function Rubrique({
   id,
@@ -326,30 +301,12 @@ export function LaCourse({ vueDepart = "fil" }: { vueDepart?: Vue }) {
       </header>
       <EnDirect ouvrir={(j) => router.push(`/ligue/journee?j=${j}`)} />
       <VoteDuJour me={me} />
-      {dernier > 0 && (
-        <div className="flex flex-col">
-          <ModeFil.Provider value={{ mode: "film" }}>
-            <TonDimanche j={dernier} date={journees.find((x) => x.j === dernier)?.date ?? ""} />
-          </ModeFil.Provider>
-        </div>
-      )}
+      {dernier > 0 && <RubriqueToi j={dernier} date={journees.find((x) => x.j === dernier)?.date ?? ""} />}
       <Convocation />
-      <div className="flex flex-col">
-        {duels.length > 0 && (
-          <Plan ratio={4 / 5} duree={2.4} titre="Dimanche, ça peut basculer">
-            <CineEnjeux liste={duels} moi={me} />
-          </Plan>
-        )}
-        {v && (
-          <Plan ratio={4 / 5} duree={2.6} titre={v.devant ? `Ton rival : ${v.devant.name}` : "Personne devant toi"}>
-            <CineRival v={v} />
-          </Plan>
-        )}
-        {v?.devant && (
-          <Plan ratio={4 / 5} duree={2.4} titre={`Ce qu'il te faut pour passer ${v.devant.name}`}>
-            <CineBesoin v={v} />
-          </Plan>
-        )}
+      <div className="flex flex-col gap-1">
+        {duels.length > 0 && <RubriqueEnjeux liste={duels} moi={me} />}
+        {v && <RubriqueRival v={v} />}
+        {v?.devant && <RubriqueBesoin v={v} />}
       </div>
       {dimanches.map((d) => (
         <Rubrique key={d.j} titre={`J${d.j}`} plus={<span className="mono-label text-foreground/45">{d.journee?.date}</span>}>
@@ -358,12 +315,10 @@ export function LaCourse({ vueDepart = "fil" }: { vueDepart?: Vue }) {
               <CarteJournee journee={d.journee} onOuvrir={() => router.push(`/ligue/journee?j=${d.j}`)} />
             </div>
           )}
-          <div className="flex flex-col">
-            <ModeFil.Provider value={{ mode: "film" }}>
-              {d.scenes.map((a) => (
-                <PublicationActu key={a.id} a={a} enCours onClassements={() => aller("classements")} />
-              ))}
-            </ModeFil.Provider>
+          <div className="flex flex-col gap-1">
+            {d.scenes.map((a) => (
+              <RubriqueActu key={a.id} a={a} />
+            ))}
           </div>
         </Rubrique>
       ))}
