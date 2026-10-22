@@ -63,12 +63,16 @@ export function ChoixLigue({ actif, className }: { actif: Actif; className?: str
 }
 
 /** Le sigle de la ligue d'un match (Map, fiche, ouverture d'un match) : le
- *  logo SFL ou Bola, ou TEAM en lettres, à la couleur du texte. */
+ *  logo SFL ou Bola, à la couleur du texte ; Team, c'est « Bola Team » : le
+ *  logo Bola suivi de TEAM (Sabri, 22/10). */
 export function SigleLigue({ ligue, hauteur = 12, className }: { ligue: "sfl" | "bola" | "team"; hauteur?: number; className?: string }) {
   if (ligue === "team")
     return (
-      <span className={cn("font-black tracking-[0.06em] uppercase", className)} style={{ fontSize: hauteur * 0.92, lineHeight: `${hauteur}px` }}>
-        Team
+      <span role="img" aria-label="Bola Team" className={cn("inline-flex shrink-0 items-center", className)} style={{ gap: hauteur * 0.3 }}>
+        <SigleLigue ligue="bola" hauteur={hauteur} />
+        <span aria-hidden className="font-sans font-black tracking-[0.04em] uppercase italic" style={{ fontSize: hauteur * 0.95, lineHeight: `${hauteur}px` }}>
+          Team
+        </span>
       </span>
     );
   const b = BADGES[ligue === "sfl" ? 0 : 1];
