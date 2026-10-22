@@ -5,14 +5,15 @@
 // appareil (posée hors ligne, ou avant le partage) part à la ligue. Même
 // chose pour le badge choisi pour la carte (lib/sfl/badges-choisis), et pour
 // les noms et pseudos confirmés (lib/sfl/identites), et pour la ville de
-// chacun sur la Map (lib/sfl/villes).
+// chacun sur la Map (lib/sfl/villes), posée d'office d'après la connexion
+// tant que le joueur n'en a pas donné.
 
 import { useEffect } from "react";
 import { useSession } from "@/hooks/use-session";
 import { envoyerBadgeEnAttente, rafraichirBadges } from "@/lib/sfl/badges-choisis";
 import { rafraichirIdentites } from "@/lib/sfl/identites";
 import { envoyerPhotosEnAttente, rafraichirPhotos } from "@/lib/sfl/photos";
-import { rafraichirVilles } from "@/lib/sfl/villes";
+import { poserVilleDevinee, rafraichirVilles } from "@/lib/sfl/villes";
 
 export function PhotosSync() {
   const session = useSession();
@@ -38,6 +39,8 @@ export function PhotosSync() {
     if (!nom) return;
     void envoyerPhotosEnAttente(nom);
     void envoyerBadgeEnAttente(nom);
+    // Pas encore de ville sur la Map : celle que devine la connexion.
+    void rafraichirVilles().then(() => poserVilleDevinee(nom));
   }, [nom]);
 
   return null;
