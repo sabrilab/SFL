@@ -20,7 +20,9 @@
 //   4. mes badges : le prochain à viser, les trophées de fin de saison et
 //      les paliers (vitrine.tsx) ;
 //   5. mes cartes, saison par saison, avec les cartes spéciales gagnées ;
-//   6. les raccourcis.
+//   6. les raccourcis ;
+//   7. « Se déconnecter », tout en bas, comme dans toute app
+//      (bouton-deconnexion.tsx ; Sabri, le 22/10 : « plus accessible »).
 // « Historique » est parti : chaque dimanche de Ma saison ouvre son récap. Le
 // rappel « Glisse pour tourner » aussi, comme sur le profil. Les réglages
 // (« ⋯ ») sont en haut, à côté de la loupe.
@@ -57,6 +59,7 @@ import { isHidden } from "@/lib/sfl/hidden";
 import { POSTES } from "@/lib/sfl/inscription";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { BoutonStats } from "@/components/layout/bouton-stats";
+import { BoutonDeconnexion } from "@/components/sfl/auth/bouton-deconnexion";
 
 /* ------------------------------ Petits blocs ------------------------------ */
 
@@ -260,6 +263,9 @@ export default function Profil() {
               </div>
             </Locked>
           </section>
+
+          {/* 7. Se déconnecter */}
+          <BoutonDeconnexion className="w-full" />
         </div>
       </div>
 
