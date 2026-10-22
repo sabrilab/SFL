@@ -2,9 +2,8 @@
 
 // L'onglet Actus (ex-Ligue) : le fil d'actualité de la ligue, en
 // cinématiques (components/sfl/actus/fil.tsx). Les anciens liens restent bons :
-//   · ?vue=classements (et /stats) ouvre les classements en stories ;
-//   · ?vue=matchs et ?j=N (une feuille touchée au Vestiaire) ouvrent le récap,
-//     /ligue/journee ;
+//   · ?vue=classements (et /stats) ouvre les classements, ?vue=matchs les matchs ;
+//   · ?j=N (une feuille touchée au Vestiaire) ouvre le récap, /ligue/journee ;
 //   · ?vue=vestiaire renvoie au Vestiaire.
 
 import { Suspense, useEffect } from "react";
@@ -28,7 +27,6 @@ function Actus() {
   const j = params.get("j");
   useEffect(() => {
     if (vue === "vestiaire") router.replace("/vestiaire");
-    else if (vue === "matchs") router.replace("/ligue/journee?vue=matchs");
     else if (j) router.replace(`/ligue/journee?j=${encodeURIComponent(j)}`);
   }, [vue, j, router]);
   // Une seule ligue, la SFL : un ancien choix d'une autre ligue est effacé.
@@ -37,5 +35,5 @@ function Actus() {
       if (localStorage.getItem(LEAGUE_KEY) && localStorage.getItem(LEAGUE_KEY) !== "SFL") localStorage.setItem(LEAGUE_KEY, "SFL");
     } catch {}
   }, []);
-  return <FilActus classementsOuverts={vue === "classements"} />;
+  return <FilActus key={vue ?? ""} vueDepart={vue === "classements" || vue === "matchs" ? vue : "actus"} />;
 }
