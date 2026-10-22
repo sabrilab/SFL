@@ -33,7 +33,10 @@ export type Actu =
   | { type: "score"; id: string; j: number; date: string; match: JourneeMatch; variante: number }
   | { type: "mvp"; id: string; j: number; date: string; mvp: Honneur["mvp"][number]; variante: number }
   | { type: "badge"; id: string; j: number; date: string; d: Decroche; variante: number }
-  | { type: "equipe"; id: string; j: number; date: string; equipe: Honneur["equipeType"] }
+  | { type: "badges"; id: string; j: number; date: string; ds: Decroche[] }
+  | { type: "equipe"; id: string; j: number; date: string; equipe: Honneur["equipeType"]; variante: number }
+  | { type: "chiffre"; id: string; j: number; date: string; nom: string; n: number; quoi: "buts" | "passes" }
+  | { type: "presents"; id: string; j: number; date: string; noms: string[] }
   | { type: "duo"; id: string; j: number; date: string; duo: NonNullable<Honneur["duo"]> }
   | { type: "montent"; id: string; j: number; date: string; montent: Honneur["montent"] }
   | { type: "podium"; id: string; j: number; date: string }
@@ -61,6 +64,7 @@ export function filDeSaison(saison: Saison, journees: Journee[], moi?: string, e
   let mvpVu = 0;
   let scoreVu = 0;
   let badgeVu = 0;
+  let equipeVu = 0;
   jours.forEach((j, rang) => {
     const meta = journees.find((x) => x.j === j);
     const date = meta?.date ?? saison.journees.find((x) => x.j === j)?.date ?? "";
@@ -81,7 +85,7 @@ export function filDeSaison(saison: Saison, journees: Journee[], moi?: string, e
       .map((mvp) => ({ type: "mvp", id: `${cle}-mvp-${mvp.nom}`, j, date, mvp, variante: mvpVu++ }));
     const badges: Actu[] = h.decroches
       .filter((d) => BADGES_DU_FIL.has(d.id))
-      .slice(0, 4)
+      .slice(0, 6)
       .map((d) => ({ type: "badge", id: `${cle}-badge-${d.nom}-${d.id}`, j, date, d, variante: badgeVu++ }));
 
     // Le premier score ouvre le dimanche, son homme du match le suit ; les
@@ -94,13 +98,39 @@ export function filDeSaison(saison: Saison, journees: Journee[], moi?: string, e
     }
     fil.push(...tete);
 
-    if (h.equipeType.length >= 3) fil.push({ type: "equipe", id: `${cle}-equipe`, j, date, equipe: h.equipeType });
-    if (badges[0]) fil.push(badges[0]);
+    // Le chiffre du dimanche : le plus de buts d'un seul joueur (ou de passes,
+    // si personne n'a fait mieux en passes qu'en buts), en typo géante.
+    const lignes = saison.entries.filter((e) => e.j === j && !e.extraTime && !isHidden(e.player));
+    const parJoueur = new Map<string, { buts: number; passes: number }>();
+    for (const e of lignes) {
+      const x = parJoueur.get(e.player) ?? { buts: 0, passes: 0 };
+      x.buts += e.buts;
+      x.passes += e.passes;
+      parJoueur.set(e.player, x);
+    }
+    const [butMax] = [...parJoueur].sort((a, b) => b[1].buts - a[1].buts);
+    const [passeMax] = [...parJoueur].sort((a, b) => b[1].passes - a[1].passes);
+    const chiffre: Actu | null =
+      passeMax && butMax && passeMax[1].passes > butMax[1].buts
+        ? { type: "chiffre", id: `${cle}-chiffre`, j, date, nom: passeMax[0], n: passeMax[1].passes, quoi: "passes" }
+        : butMax && butMax[1].buts >= 2
+          ? { type: "chiffre", id: `${cle}-chiffre`, j, date, nom: butMax[0], n: butMax[1].buts, quoi: "buts" }
+          : null;
+    const presents = [...new Set(lignes.filter((e) => e.statut === "Présent").map((e) => e.player))];
+
+    // Les badges d'un dimanche : un seul, il a sa publication ; plusieurs, un carrousel.
+    const unBadge = badges.length === 1 ? badges[0] : null;
+    const carrousel: Actu | null =
+      badges.length > 1 ? { type: "badges", id: `${cle}-badges`, j, date, ds: badges.map((b) => (b as { d: Decroche }).d) } : null;
+
+    if (chiffre) fil.push(chiffre);
+    if (h.equipeType.length >= 3) fil.push({ type: "equipe", id: `${cle}-equipe`, j, date, equipe: h.equipeType, variante: equipeVu++ });
+    if (unBadge) fil.push(unBadge);
+    if (carrousel) fil.push(carrousel);
     if (h.duo) fil.push({ type: "duo", id: `${cle}-duo`, j, date, duo: h.duo });
-    if (badges[1]) fil.push(badges[1]);
     if (h.montent.length > 0) fil.push({ type: "montent", id: `${cle}-montent`, j, date, montent: h.montent });
     if (dernier) fil.push({ type: "podium", id: `${cle}-podium`, j, date });
-    fil.push(...badges.slice(2));
+    if (presents.length >= 6) fil.push({ type: "presents", id: `${cle}-presents`, j, date, noms: presents });
     if (dernier) fil.push({ type: "course", id: `${cle}-course`, j, date });
     const surface = h.surface.filter((x) => BADGES_DU_FIL.has(x.id));
     if (dernier && surface.length > 0) fil.push({ type: "surface", id: `${cle}-surface`, j, date, surface: surface.slice(0, 5) });

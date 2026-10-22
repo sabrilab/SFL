@@ -164,11 +164,64 @@
 .a-rayons { animation-name: a-rayons; animation-timing-function: cubic-bezier(0.2, 0.6, 0.3, 1) !important; }
 @keyframes a-rayons { from { opacity: 0; transform: rotate(-70deg) scale(0.6); } }
 
+/* L'éclair d'ouverture d'un reel : blanc, puis plus rien. */
+.a-eclair { animation-name: a-eclair; opacity: 0; }
+@keyframes a-eclair { from { opacity: 0.85; } }
+
+/* Le bandeau d'info qui défile une fois, de droite à gauche, et s'arrête au début. */
+.a-ticker { animation-name: a-ticker; animation-timing-function: linear !important; }
+@keyframes a-ticker { from { transform: translateX(100%); } }
+
+/*
+ * Au défilement (là où le navigateur sait lier une animation au défilement) :
+ * le nom d'un reel glisse un peu plus lentement que la page, et la grande carte
+ * s'incline à peine en entrant et en sortant, à plat au milieu de l'écran.
+ */
+@supports (animation-timeline: view()) {
+  .defile-parallaxe {
+    animation: defile-parallaxe linear both;
+    animation-timeline: view();
+  }
+  .defile-incline {
+    animation: defile-incline linear both;
+    animation-timeline: view();
+  }
+  .actu-ecran:not([data-joue]) .actu-scene :is(.defile-parallaxe, .defile-incline) {
+    animation-play-state: running !important;
+  }
+}
+@keyframes defile-parallaxe {
+  from { transform: translateY(46px); }
+  to { transform: translateY(-46px); }
+}
+@keyframes defile-incline {
+  from { transform: perspective(1000px) rotateX(14deg) scale(0.96); }
+  45%, 55% { transform: perspective(1000px) rotateX(0deg) scale(1); }
+  to { transform: perspective(1000px) rotateX(-14deg) scale(0.96); }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .defile-parallaxe,
+  .defile-incline {
+    animation: none !important;
+  }
   .actu-scene :is([class^="a-"], [class*=" a-"]),
   .actu-barre {
     animation: none !important;
   }
+}
+
+/* Le carrousel : les images glissent l'une après l'autre, aimantées. */
+.actu-carrousel {
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.actu-carrousel::-webkit-scrollbar {
+  display: none;
+}
+.actu-carrousel > * {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 
 /* Les stories des classements : la barre de chaque classement se remplit. */

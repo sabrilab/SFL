@@ -59,14 +59,14 @@ export function Ecran({
       ([e]) => {
         if (e.isIntersecting) setMonte(true);
       },
-      { rootMargin: "600px 0px" }
+      { rootMargin: "1000px 0px" }
     );
     const vue = new IntersectionObserver(
       ([e]) => {
         if (e.isIntersecting && !visible) setTour((n) => n + 1);
         visible = e.isIntersecting;
       },
-      { threshold: 0.6 }
+      { threshold: 0.45 }
     );
     proche.observe(el);
     vue.observe(el);
