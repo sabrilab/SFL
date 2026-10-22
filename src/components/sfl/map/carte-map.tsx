@@ -431,17 +431,10 @@ export function CarteMap({
           poses.push(m);
           if (doux && (avant.has(d.id) || !vues.has(d.id))) m.getElement().querySelector(".grp")?.classList.add("grp--entre");
           vues.add(d.id);
+          // Toucher une pile l'ouvre en collection : les cartes de ses joueurs.
           m.getElement().addEventListener("click", () => {
             navigator.vibrate?.(6);
-            if (d.villes.length > 1) {
-              const b = d.villes.reduce((x, v) => x.extend([v.lng, v.lat]), new maplibregl.LngLatBounds([d.lng, d.lat], [d.lng, d.lat]));
-              cadrer(map, b, marges(map, 90, margeBasRef.current - 120, 90), Math.max(zoom + 2, ZOOM_OUVERTURE), doux ? 0.9 : 0);
-            } else if (zoom >= map.getMaxZoom() - 0.5) {
-              villeRef.current?.(d.villes.map((v) => v.id));
-            } else {
-              const z = Math.min(map.getMaxZoom(), Math.max(zoom + 2, ZOOM_OUVERTURE + 1));
-              map.flyTo({ center: [d.lng, d.lat], zoom: z, pitch: pente(z), duration: doux ? 900 : 0 });
-            }
+            villeRef.current?.(d.villes.map((v) => v.id));
           });
           continue;
         }
