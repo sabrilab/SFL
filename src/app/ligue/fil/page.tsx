@@ -1,51 +1,54 @@
 "use client";
 
-// Le fil des Actus en variantes (components/sfl/actus/fil-variantes.tsx) :
-// ?v=1..5, gardé dans l'adresse pour qu'un lien montre la même chose. Page
-// d'essai : rien ne mène ici depuis l'app.
+// Les concepts de l'onglet Actus (components/sfl/actus/concepts.tsx), à
+// comparer avec l'onglet tel qu'il est en ligne : ?c=a..d, gardé dans
+// l'adresse pour qu'un lien montre la même chose. Page d'essai : rien ne mène
+// ici depuis l'app.
 
 import { Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FilActus } from "@/components/sfl/actus/fil";
-import { FilVariante, VARIANTES_FIL } from "@/components/sfl/actus/fil-variantes";
+import { Concept, CONCEPTS, type ConceptId } from "@/components/sfl/actus/concepts";
 import { cn } from "@/lib/utils";
 
-export default function FilVariantesPage() {
+export default function ConceptsPage() {
   // useSearchParams impose une frontière Suspense côté App Router.
   return (
     <Suspense fallback={null}>
-      <Variantes />
+      <Concepts />
     </Suspense>
   );
 }
 
-function Variantes() {
+const CHOIX = [{ id: "actuel", nom: "En ligne" }, ...CONCEPTS] as const;
+
+function Concepts() {
   const params = useSearchParams();
   const router = useRouter();
   const chemin = usePathname();
-  const v = Math.min(VARIANTES_FIL.length, Math.max(1, Number(params.get("v")) || 1));
+  const c = CHOIX.find((x) => x.id === params.get("c"))?.id ?? "a";
   return (
     <div className="flex flex-col gap-3 pt-2">
       <div className="mx-auto flex w-full max-w-[470px] gap-1.5 overflow-x-auto px-5 [scrollbar-width:none]">
-        {VARIANTES_FIL.map((nom, i) => (
+        {CHOIX.map((x) => (
           <button
-            key={nom}
+            key={x.id}
             type="button"
-            aria-pressed={v === i + 1}
+            aria-pressed={c === x.id}
             onClick={() => {
-              router.replace(`${chemin}?v=${i + 1}`, { scroll: false });
+              router.replace(`${chemin}?c=${x.id}`, { scroll: false });
               document.getElementById("app-scroll")?.scrollTo({ top: 0 });
             }}
             className={cn(
               "shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap transition-colors",
-              v === i + 1 ? "bg-foreground text-background" : "glass text-foreground"
+              c === x.id ? "bg-foreground text-background" : "glass text-foreground"
             )}
           >
-            V{i + 1} · {nom}
+            {x.id === "actuel" ? x.nom : `${x.id.toUpperCase()} · ${x.nom}`}
           </button>
         ))}
       </div>
-      <FilActus key={v} variante={v === 1 ? undefined : (ouvrirClassements) => <FilVariante v={v} onClassements={ouvrirClassements} />} />
+      {c === "actuel" ? <FilActus /> : <Concept key={c} id={c as ConceptId} />}
     </div>
   );
 }

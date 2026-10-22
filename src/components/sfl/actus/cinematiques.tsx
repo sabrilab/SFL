@@ -38,8 +38,8 @@ import { ANTON, Compte, Lettres, Rouleau, t } from "./ecran";
 const PHI = (1 + Math.sqrt(5)) / 2;
 /** Les formats de carte, en fraction de 254 px : le très grand, puis la hiérarchie φ. */
 export const TAILLE = { geante: 0.85, grande: 0.5, moyenne: 0.5 / PHI, petite: 0.5 / (PHI * PHI) } as const;
-const L = (s: number) => 254 * s;
-const H = (s: number) => 254 * s * PHI;
+export const L = (s: number) => 254 * s;
+export const H = (s: number) => 254 * s * PHI;
 
 export const TEINTE_EQUIPE: Record<string, string> = {
   Orange: "#F9CB9C",
@@ -53,16 +53,16 @@ export const TEINTE_EQUIPE: Record<string, string> = {
 };
 const teinte = (n: string) => TEINTE_EQUIPE[n] ?? "#B9B9B9";
 
-const LUEUR: Record<Metal, string> = { bronze: "#d39a6a", argent: "#dfe3ea", or: "#f4cd6a", legende: "#ef5a4c" };
-const DEF = Object.fromEntries(TROPHEES.map((d) => [d.id, d]));
+export const LUEUR: Record<Metal, string> = { bronze: "#d39a6a", argent: "#dfe3ea", or: "#f4cd6a", legende: "#ef5a4c" };
+export const DEF = Object.fromEntries(TROPHEES.map((d) => [d.id, d]));
 
 /** Le joueur d'un nom, dans la saison lue (en cours ou archivée). */
-function useJoueurs() {
+export function useJoueurs() {
   const { players, allPlayers } = useSeason();
   return (nom: string): Player | undefined => players.find((p) => p.name === nom) ?? allPlayers.find((p) => p.name === nom);
 }
 
-function Carte({ p, size, detail, className, style }: { p: Player; size: number; detail?: string; className?: string; style?: CSSProperties }) {
+export function Carte({ p, size, detail, className, style }: { p: Player; size: number; detail?: string; className?: string; style?: CSSProperties }) {
   return (
     <div className={cn("relative", className)} style={{ width: L(size), height: H(size), ...style }}>
       <MiniCarte player={p} size={size} detail={detail} />
@@ -71,7 +71,7 @@ function Carte({ p, size, detail, className, style }: { p: Player; size: number;
 }
 
 /** Le reflet qui traverse une carte, une fois. */
-function Reflet({ a, largeur, hauteur }: { a: number; largeur: number; hauteur: number }) {
+export function Reflet({ a, largeur, hauteur }: { a: number; largeur: number; hauteur: number }) {
   return (
     <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden" style={{ width: largeur, height: hauteur, borderRadius: largeur * 0.06 }}>
       <span
@@ -93,7 +93,7 @@ function Ombre({ largeur, a = 0 }: { largeur: number; a?: number }) {
   );
 }
 
-function Etiquette({ children, a, className }: { children: ReactNode; a: number; className?: string }) {
+export function Etiquette({ children, a, className }: { children: ReactNode; a: number; className?: string }) {
   return (
     <span className={cn("a-fondu mono-label absolute text-[9.5px] text-white/50", className)} style={t(a, 0.6)}>
       {children}
@@ -102,7 +102,7 @@ function Etiquette({ children, a, className }: { children: ReactNode; a: number;
 }
 
 /** Le grand chiffre d'une scène, en Anton. */
-function Gros({ children, taille, className, style }: { children: ReactNode; taille: number; className?: string; style?: CSSProperties }) {
+export function Gros({ children, taille, className, style }: { children: ReactNode; taille: number; className?: string; style?: CSSProperties }) {
   return (
     <span className={cn("block leading-[0.85] tabular-nums", className)} style={{ fontFamily: ANTON, fontSize: taille, ...style }}>
       {children}
@@ -110,7 +110,7 @@ function Gros({ children, taille, className, style }: { children: ReactNode; tai
   );
 }
 
-const pl = (n: number, un: string, plusieurs: string) => (n > 1 ? plusieurs : un);
+export const pl = (n: number, un: string, plusieurs: string) => (n > 1 ? plusieurs : un);
 
 /* ============================ L'homme du dimanche ============================ */
 
@@ -850,7 +850,7 @@ export function CineSurface({ surface, j }: { surface: Surface[]; j: number }) {
   );
 }
 
-function NomDe({ n }: { n: string }) {
+export function NomDe({ n }: { n: string }) {
   return <>{useIdentites().nom(n)}</>;
 }
 
