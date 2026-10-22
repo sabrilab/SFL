@@ -160,7 +160,10 @@ export async function POST(req: NextRequest) {
     return erreur("Tu as fait assez de photos pour aujourd'hui. Reviens demain.", 429);
   }
   // Noté AVANT l'appel : deux demandes simultanées comptent toutes les deux.
-  const { error: noteError } = await sb.from("photo_studio").insert({ filtre });
+  // Le pays du drapeau est gardé pour la page Activité de l'admin.
+  const { error: noteError } = await sb
+    .from("photo_studio")
+    .insert({ filtre, pays: filtre === "drapeau" && estPays(corps.pays) ? corps.pays : null });
   if (noteError) return erreur("Photo officielle indisponible pour l'instant.", 503);
 
   try {

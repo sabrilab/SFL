@@ -25,7 +25,8 @@ import { rewardConvocationReply } from "@/lib/sfl/ballons";
 import { NEXT_MATCH } from "@/lib/sfl/data";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/sfl/activity";
-import { publicOnly } from "@/lib/sfl/hidden";
+import { isHidden, publicOnly } from "@/lib/sfl/hidden";
+import { avecLaFeuille, joueursDeLaFeuille, jourMois, journeeDuJour } from "@/lib/sfl/presence-feuille";
 
 interface ServerConvocation {
   id: number;
@@ -262,9 +263,24 @@ export function usePresence(): PresenceView {
 
   /* -------------------------------- La vue -------------------------------- */
 
+  // Les joueurs que l'admin a posés sur la feuille de ce dimanche viennent :
+  // ils comptent avec ceux qui ont dit « Je viens » (lib/sfl/presence-feuille).
+  const dateConv = serverActive && server ? server.convocation.date_label : (localConv?.date ?? NEXT_MATCH.date);
+  const feuille = joueursDeLaFeuille(saison, journeeDuJour(saison, dateConv));
+  const surLaFeuille = feuille.includes(player.name);
+
   if (serverActive && server) {
     const names = publicOnly(saison.roster).map((r) => ({ name: r.name, actif: r.profil === "Actif" }));
     const rep = server.reponses;
+    const reponses = avecLaFeuille(
+      {
+        presents: names.filter((n) => rep[n.name] === "present").map((n) => n.name),
+        absents: names.filter((n) => rep[n.name] === "absent").map((n) => n.name),
+        sansReponse: names.filter((n) => !rep[n.name] && n.actif).map((n) => n.name),
+      },
+      feuille,
+      isHidden
+    );
     return {
       shared: true,
       journee: numeroDuDimanche(saison, server.convocation.date_label),
@@ -272,10 +288,8 @@ export function usePresence(): PresenceView {
       heure: server.convocation.heure,
       lieu: server.convocation.lieu,
       effectif: server.convocation.effectif,
-      mine: rep[player.name] ?? null,
-      presents: names.filter((n) => rep[n.name] === "present").map((n) => n.name),
-      absents: names.filter((n) => rep[n.name] === "absent").map((n) => n.name),
-      sansReponse: names.filter((n) => !rep[n.name] && n.actif).map((n) => n.name),
+      mine: surLaFeuille ? "present" : (rep[player.name] ?? null),
+      ...reponses,
       reponsesOuvertes: ouvert,
       equipesVisibles: revele,
       teams: server.convocation.teams ?? null,
@@ -285,6 +299,11 @@ export function usePresence(): PresenceView {
     };
   }
 
+  const reponsesLocales = avecLaFeuille(
+    { presents: local.presents, absents: local.absents, sansReponse: local.sansReponse },
+    feuille,
+    isHidden
+  );
   return {
     shared: false,
     journee: NEXT_MATCH.journee,
@@ -292,10 +311,8 @@ export function usePresence(): PresenceView {
     heure: localConv?.heure ?? NEXT_MATCH.heure,
     lieu: localConv?.lieu ?? NEXT_MATCH.lieu,
     effectif: 10,
-    mine: localConv ? ((localConv.reponses[player.name] as Reponse | undefined) ?? null) : null,
-    presents: local.presents,
-    absents: local.absents,
-    sansReponse: local.sansReponse,
+    mine: surLaFeuille ? "present" : localConv ? ((localConv.reponses[player.name] as Reponse | undefined) ?? null) : null,
+    ...reponsesLocales,
     reponsesOuvertes: ouvert,
     equipesVisibles: revele,
     teams: localConv?.teams ?? null,
@@ -304,16 +321,6 @@ export function usePresence(): PresenceView {
     publish: serverActive && session?.admin ? publish : null,
     saveTeams: session?.admin ? saveTeams : null,
   };
-}
-
-/** « 18 octobre », « 18 oct. » → « 18 oct » : de quoi comparer deux dates écrites autrement. */
-function jourMois(label: string): string | null {
-  const m = label
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .match(/(\d{1,2})\s*([a-z]{3})/);
-  return m ? `${Number(m[1])} ${m[2]}` : null;
 }
 
 /**

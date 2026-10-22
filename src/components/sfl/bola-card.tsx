@@ -26,8 +26,9 @@
 //   - pastille  (< 70)     : un carré, le visage et la note dans un onglet
 //                            (classements, plan, listes).
 //
-// Trois éditions : base (papier blanc), rare (argent, repères pleins) et mvp
-// (encre inversée, papier noir). Le numéro de maillot s'affiche en haut à
+// Les éditions : base (papier blanc), rare (argent, repères pleins), et les
+// trois cartes à titre en couleur (Sabri, 22/10) : mvp (papier or), impact
+// (papier rouge) et def (papier bleu), teintes de teinte-carte.ts. Le numéro de maillot s'affiche en haut à
 // droite du portrait quand le joueur en a un ; sinon, sur la carte complète,
 // son poste prend la place.
 //
@@ -42,10 +43,11 @@
 // au-dessus du portrait.
 
 import { Badge3D } from "@/components/sfl/badge-3d";
+import { TEINTES } from "@/components/sfl/teinte-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
 
-export type BolaEdition = "base" | "rare" | "mvp";
+export type BolaEdition = "base" | "rare" | "mvp" | "impact" | "def";
 type Palier = "complete" | "compacte" | "reduite" | "pastille";
 
 const W = 1024;
@@ -86,6 +88,10 @@ const PALETTES: Record<
     coins: number;
     etiquette: { fond: string; bord: string; texte: string };
     symbole: string;
+    /** Papier sombre : voile et ombres du texte en sombre. */
+    sombre: boolean;
+    /** Le texte de l'étiquette d'édition. */
+    nom: string;
   }
 > = {
   base: {
@@ -99,6 +105,8 @@ const PALETTES: Record<
     coins: 0.6,
     etiquette: { fond: "transparent", bord: "rgba(8,9,11,0.55)", texte: "rgba(8,9,11,0.75)" },
     symbole: "/bola/symbole-noir.svg",
+    sombre: false,
+    nom: "base",
   },
   rare: {
     encre: "8,9,11",
@@ -111,18 +119,52 @@ const PALETTES: Record<
     coins: 1,
     etiquette: { fond: "#08090b", bord: "#08090b", texte: "#f4f5f2" },
     symbole: "/bola/symbole-noir.svg",
+    sombre: false,
+    nom: "rare",
   },
+  // Or : le papier métal, l'encre noire.
   mvp: {
-    encre: "244,245,242",
-    papier: "linear-gradient(160deg, #2a2b2f 0%, #141518 60%, #08090b 100%)",
-    fond: "#1c1d20",
-    lueur: "rgba(255,255,255,0.12)",
-    rayures: 0.06,
-    micro: 0.05,
-    reflet: 0.12,
+    encre: "28,20,4",
+    papier: TEINTES.mvp.cadre,
+    fond: "#f1dfa6",
+    lueur: "rgba(255,248,220,0.95)",
+    rayures: 0.07,
+    micro: 0.07,
+    reflet: 0.6,
     coins: 1,
-    etiquette: { fond: "#f4f5f2", bord: "#f4f5f2", texte: "#08090b" },
+    etiquette: { fond: "#1c1404", bord: "#1c1404", texte: "#f2d687" },
+    symbole: "/bola/symbole-noir.svg",
+    sombre: false,
+    nom: "MVP",
+  },
+  // Rouge et bleu : le papier en couleur, l'encre blanche.
+  impact: {
+    encre: "255,247,246",
+    papier: TEINTES.impact.cadre,
+    fond: "#b3161e",
+    lueur: "rgba(255,140,140,0.35)",
+    rayures: 0.07,
+    micro: 0.07,
+    reflet: 0.28,
+    coins: 1,
+    etiquette: { fond: "#fff7f6", bord: "#fff7f6", texte: "#9a0f16" },
     symbole: "/bola/symbole-blanc.svg",
+    sombre: true,
+    nom: "IMPACT",
+  },
+  def: {
+    encre: "244,248,255",
+    papier: TEINTES.def.cadre,
+    fond: "#1a4cb5",
+    lueur: "rgba(150,190,255,0.35)",
+    rayures: 0.07,
+    micro: 0.07,
+    reflet: 0.28,
+    coins: 1,
+    etiquette: { fond: "#f4f8ff", bord: "#f4f8ff", texte: "#123c96" },
+    symbole: "/bola/symbole-blanc.svg",
+    sombre: true,
+    nom: "DÉFENSIVE",
   },
 };
 
@@ -315,7 +357,7 @@ export function BolaCard({
             boxSizing: "border-box",
             borderTopLeftRadius: largeur * 0.12,
             background: onglet?.fond ?? encre(1),
-            color: onglet?.encre ?? (edition === "mvp" ? "#08090b" : "#f4f5f2"),
+            color: onglet?.encre ?? (p.sombre ? "#08090b" : "#f4f5f2"),
             // Un onglet clair sur le papier clair : un filet le détache.
             boxShadow: onglet ? `inset 1px 1px 0 ${onglet.encre}33` : undefined,
             display: "flex",
@@ -464,7 +506,7 @@ export function BolaCard({
                 position: "absolute",
                 inset: 0,
                 background:
-                  edition === "mvp"
+                  p.sombre
                     ? "linear-gradient(180deg, rgba(8,9,11,0.5) 0%, rgba(8,9,11,0) 24%)"
                     : "linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 20%)",
               }}
@@ -481,7 +523,7 @@ export function BolaCard({
                 lineHeight: 1,
                 letterSpacing: u(-2),
                 color: encre(1),
-                textShadow: photo ? `0 0 ${u(18)}px ${edition === "mvp" ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)"}` : undefined,
+                textShadow: photo ? `0 0 ${u(18)}px ${p.sombre ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)"}` : undefined,
               }}
             >
               {marque}
@@ -516,7 +558,7 @@ export function BolaCard({
                     lineHeight: 1,
                     letterSpacing: u(1),
                     color: encre(1),
-                    textShadow: photo ? `0 0 ${u(18)}px ${edition === "mvp" ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)"}` : undefined,
+                    textShadow: photo ? `0 0 ${u(18)}px ${p.sombre ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)"}` : undefined,
                   }}
                 >
                   {position.toUpperCase()}
@@ -540,7 +582,7 @@ export function BolaCard({
                   color: p.etiquette.texte,
                 }}
               >
-                {edition}
+                {p.nom}
               </div>
               )}
               {/* La puce argent */}

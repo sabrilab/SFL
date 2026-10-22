@@ -97,6 +97,17 @@ export function TropheeIcon({ plein }: SymboleProps) {
   );
 }
 
+/** Les Actus (play.rectangle.on.rectangle) : une image du fil et sa lecture, une autre derrière. */
+export function ActusIcon({ plein }: SymboleProps) {
+  return (
+    <svg {...symbole} fill="none">
+      <path d="M6.2 4.2h11.6" />
+      <rect x="3.4" y="7.2" width="17.2" height="12.6" rx="3" fill={plein ? "currentColor" : "none"} />
+      <path d="M10.4 10.6v5.8l4.9-2.9z" fill={plein ? "var(--tabbar-trou)" : "currentColor"} stroke={plein ? "var(--tabbar-trou)" : "currentColor"} strokeWidth={1.2} />
+    </svg>
+  );
+}
+
 export function RechercheIcon({ plein }: SymboleProps) {
   return (
     <svg {...symbole} width={24} height={24} fill="none" strokeWidth={plein ? 2.4 : 1.9}>

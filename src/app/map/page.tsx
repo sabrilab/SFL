@@ -14,11 +14,17 @@
 // présence sous la carte. Les terrains vivent dans la saison
 // (`saison.terrains`) ; l'admin donne l'adresse de chaque match juste sous la
 // carte.
+//
+// Les joueurs (22/10, « en poursuivant l'idée de remplacer Snapchat ») :
+// chacun dans sa ville, en piles qui s'ouvrent quand on s'approche
+// (map/joueurs.ts), et le catalogue des joueurs par ville dans une fiche
+// (map/catalogue-joueurs.tsx), ouverte par le bouton aux visages en haut à
+// droite ou en touchant le nom d'une ville. Toucher une carte ouvre le profil.
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { CalendarDays, Crosshair, Layers, LocateFixed, MapPin, Navigation, Plus, Search, Settings2, Star, Trash2 } from "lucide-react";
+import { CalendarDays, ChartSpline, Crosshair, Layers, LocateFixed, MapPin, Navigation, Plus, Search, Settings2, Star, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +55,16 @@ import {
   updateJournee,
 } from "@/lib/sfl/saisie/mutations";
 import type { JourneeMeta, Saison, Terrain } from "@/lib/sfl/saisie/types";
-import { ovr } from "@/lib/sfl/engine";
+import { ovr, rankPlayers } from "@/lib/sfl/engine";
+import { ProfilJoueur } from "@/components/sfl/profil-joueur";
+import { CatalogueJoueurs } from "@/components/sfl/map/catalogue-joueurs";
+import { cleVille, type VillePlan } from "@/components/sfl/map/joueurs";
+import { villeDe } from "@/lib/sfl/villes";
+import { photoPerso } from "@/lib/sfl/photos";
+import { nomAffiche } from "@/lib/sfl/identites";
+import { useVillesRevision } from "@/hooks/use-villes";
+import { usePhotoRevision } from "@/hooks/use-player-photo";
+import { useIdentitesRevision } from "@/hooks/use-identites";
 import { cn } from "@/lib/utils";
 import { FOND_MOMENT, heureCourte, itineraires, photoSatellite, stadeSvg, type EtatSticker, type Moment, type StickerPlan } from "@/components/sfl/map/stade";
 import type { FondCarte, PointPlan, ToiPlan } from "@/components/sfl/map/carte-map";
@@ -245,11 +260,11 @@ function etatDe(dedans: boolean, manque: number): { etat: EtatSticker; texte: st
 }
 
 export default function MapPage() {
-  const { saison, journees } = useSeason();
+  const { saison, journees, players } = useSeason();
   const session = useSession();
   const admin = !!session?.admin;
   const p = usePresence();
-  const { player } = useMyPlayer();
+  const { player, me } = useMyPlayer();
   const aujourdhui = useAujourdhui();
   const heure = useHeure();
 
@@ -485,6 +500,38 @@ export default function MapPage() {
 
   const ios = useEstIos();
 
+  // Les joueurs, ville par ville, du mieux noté au moins bien noté.
+  const revVilles = useVillesRevision();
+  const revPhotos = usePhotoRevision();
+  const revNoms = useIdentitesRevision();
+  const villes = useMemo<VillePlan[]>(() => {
+    if (revVilles < 0) return [];
+    void revPhotos;
+    void revNoms;
+    const parVille = new Map<string, VillePlan>();
+    for (const pl of players) {
+      const v = villeDe(pl.name);
+      if (!v) continue;
+      const id = cleVille(v.ville);
+      const g = parVille.get(id) ?? { id, ville: v.ville, lat: v.lat, lng: v.lng, joueurs: [] };
+      g.joueurs.push({ name: pl.name, affiche: nomAffiche(pl.name), note: ovr(pl.stats), photo: photoPerso(pl.name) });
+      parVille.set(id, g);
+    }
+    for (const g of parVille.values()) g.joueurs.sort((a, b) => b.note - a.note || a.affiche.localeCompare(b.affiche));
+    return [...parVille.values()];
+  }, [players, revVilles, revPhotos, revNoms]);
+  const [catalogue, setCatalogue] = useState(false);
+  const [focusVilles, setFocusVilles] = useState<string[] | null>(null);
+  const [profil, setProfil] = useState<string | null>(null);
+  const [viser, setViser] = useState<{ lat: number; lng: number; n: number } | null>(null);
+  const ouvrirVille = useCallback((ids: string[]) => {
+    setFocusVilles(ids);
+    setCatalogue(true);
+  }, []);
+  const rangs = useMemo(() => new Map(rankPlayers(players).map((x) => [x.name, x.rank])), [players]);
+  const profilJoueur = profil ? players.find((x) => x.name === profil) : undefined;
+  const nomFocus = focusVilles?.length === 1 ? villes.find((v) => v.id === focusVilles[0])?.ville : null;
+
   // La feuille de match du choisi : les équipes de sa journée, sinon celles
   // de la convocation une fois révélées (vendredi 19h ; l'admin, toujours).
   const feuille = useMemo(() => {
@@ -523,7 +570,19 @@ export default function MapPage() {
       {/* ─── Le plan, tout l'écran ─── */}
       <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] [--sous-entete:0.75rem] lg:[--sous-entete:1.25rem]">
         <div className="absolute inset-0">
-          <CarteMap fond={fond} stickers={stickers} points={AUCUN_POINT} toi={toi} choisi={choisi?.cle ?? null} onChoisir={choisirSticker} className="h-full w-full" />
+          <CarteMap
+            fond={fond}
+            stickers={stickers}
+            points={AUCUN_POINT}
+            toi={toi}
+            choisi={choisi?.cle ?? null}
+            onChoisir={choisirSticker}
+            villes={villes}
+            onVille={ouvrirVille}
+            onJoueur={setProfil}
+            viser={viser}
+            className="h-full w-full"
+          />
         </div>
         {/* Voile en haut : la barre d'état et le lettrage restent lisibles.
             Tout ce qui est posé sur le plan passe au-dessus des calques de
@@ -550,7 +609,8 @@ export default function MapPage() {
 
         {/* En haut à droite : la loupe (la Recherche, montée de la barre
             d'onglets le 19/10), la bascule plan / satellite et, pour
-            l'admin, le réglage des matchs — le lettrage garde sa place. */}
+            l'admin, les stats (Activité & rétention, 22/10) et le réglage des
+            matchs — le lettrage garde sa place. */}
         <div className="absolute right-4 z-[510] flex flex-col items-end gap-2" style={{ top: haut }}>
           <Link
             href="/recherche"
@@ -560,6 +620,30 @@ export default function MapPage() {
           >
             <Search className="size-[18px]" strokeWidth={2.2} />
           </Link>
+          {admin && (
+            <Link
+              href="/admin/activite"
+              aria-label="Activité et rétention"
+              className="map-bord map-touche grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
+              style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
+            >
+              <ChartSpline className="size-[18px]" strokeWidth={2.2} />
+            </Link>
+          )}
+          {(villes.length > 0 || !!me) && (
+            <button
+              type="button"
+              onClick={() => {
+                setFocusVilles(null);
+                setCatalogue(true);
+              }}
+              aria-label="Les joueurs, ville par ville"
+              className="map-bord map-touche grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
+              style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
+            >
+              <Users className="size-[18px]" strokeWidth={2.2} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setFond((f) => (f === "plan" ? "satellite" : "plan"))}
@@ -771,6 +855,41 @@ export default function MapPage() {
               </>
             )}
           </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ─── Les joueurs, ville par ville ─── */}
+      <Sheet open={catalogue} onOpenChange={setCatalogue}>
+        <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
+          <SheetHeader className="px-5 pt-5 pb-0">
+            <p className="mono-label text-muted-foreground">
+              {villes.reduce((s, v) => s + v.joueurs.length, 0)} joueurs · {villes.length} ville{villes.length > 1 ? "s" : ""}
+            </p>
+            <SheetTitle className="text-[26px] font-bold tracking-tight">{nomFocus ?? "Les joueurs"}</SheetTitle>
+          </SheetHeader>
+          <div className="px-4">
+            <CatalogueJoueurs
+              villes={villes}
+              focus={focusVilles}
+              onFocus={setFocusVilles}
+              me={me}
+              onJoueur={setProfil}
+              onVoir={(v) => {
+                setCatalogue(false);
+                setViser((x) => ({ lat: v.lat, lng: v.lng, n: (x?.n ?? 0) + 1 }));
+              }}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ─── Le profil d'un joueur touché sur la Map ou dans le catalogue ─── */}
+      <Sheet open={!!profilJoueur} onOpenChange={(o) => !o && setProfil(null)}>
+        <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
+          <SheetHeader className="sr-only">
+            <SheetTitle>{profilJoueur ? nomAffiche(profilJoueur.name) : "Profil"}</SheetTitle>
+          </SheetHeader>
+          <div className="px-4 pt-5">{profilJoueur && <ProfilJoueur key={profilJoueur.name} player={profilJoueur} rank={rangs.get(profilJoueur.name) ?? players.length} />}</div>
         </SheetContent>
       </Sheet>
 

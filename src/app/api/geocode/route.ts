@@ -9,6 +9,9 @@
 // Les adresses d'abord, les lieux nommés ensuite, sans doublon. Côté serveur
 // pour borner chaque source à quelques secondes et ne jamais exposer de
 // détail au navigateur.
+//
+// `type=commune` (la ville d'un joueur, lib/sfl/villes) : les communes
+// seules, leur centre et leur département, sans adresse ni lieu.
 
 import { NextRequest, NextResponse } from "next/server";
 
@@ -28,7 +31,7 @@ export interface LieuGeocode {
 interface Ban {
   features?: {
     geometry: { coordinates: [number, number] };
-    properties: { label: string; city?: string; type?: string; name?: string };
+    properties: { label: string; city?: string; type?: string; name?: string; postcode?: string; context?: string };
   }[];
 }
 
@@ -66,6 +69,21 @@ export async function GET(req: NextRequest) {
   const lat = req.nextUrl.searchParams.get("lat");
   const lon = req.nextUrl.searchParams.get("lon");
   const pres = lat && lon ? `&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}` : "";
+
+  if (req.nextUrl.searchParams.get("type") === "commune") {
+    const communes = await lire<Ban>(`https://data.geopf.fr/geocodage/search?q=${encodeURIComponent(q)}&limit=6&autocomplete=1&type=municipality${pres}`);
+    if (!communes) return NextResponse.json({ resultats: [] as LieuGeocode[], erreur: "Le service des communes ne répond pas. Réessaie dans un instant." }, { status: 502 });
+    const resultats: LieuGeocode[] = (communes.features ?? [])
+      .map((f) => ({
+        lng: f.geometry.coordinates[0],
+        lat: f.geometry.coordinates[1],
+        commune: f.properties.city ?? f.properties.name ?? f.properties.label,
+        libelle: [f.properties.city ?? f.properties.label, f.properties.context?.split(",")[1]?.trim()].filter(Boolean).join(" · "),
+        genre: "adresse" as const,
+      }))
+      .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng));
+    return NextResponse.json({ resultats });
+  }
 
   const [ban, photon] = await Promise.all([
     lire<Ban>(`https://data.geopf.fr/geocodage/search?q=${encodeURIComponent(q)}&limit=5&autocomplete=1${pres}`),

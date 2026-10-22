@@ -252,6 +252,19 @@ grant execute on function public.identifiant_de_connexion(text) to anon, authent
 alter table public.profiles add column if not exists badge text
   check (badge is null or badge ~ '^(auto|aucun|s:[a-z]+|p:[a-zA-Z]+)$');
 
+-- La ville du joueur sur la Map (lib/sfl/villes.ts, 22/10) : le nom de sa
+-- commune et son CENTRE, tel que le donne le géocodeur — jamais sa position.
+-- ville_cachee : il reste dans la ligue mais disparaît de la Map (le mode
+-- fantôme de la Snap Map). Lu par toute la ligue, posé par le joueur seul
+-- (grant plus bas, RLS « mise à jour de soi »).
+alter table public.profiles add column if not exists ville text
+  check (ville is null or char_length(btrim(ville)) between 1 and 80);
+alter table public.profiles add column if not exists ville_lat double precision
+  check (ville_lat is null or ville_lat between -90 and 90);
+alter table public.profiles add column if not exists ville_lng double precision
+  check (ville_lng is null or ville_lng between -180 and 180);
+alter table public.profiles add column if not exists ville_cachee boolean not null default false;
+
 -- ──────────────────────────── Activité ───────────────────────────────
 -- Journal d'usage : connexions, ouvertures quotidiennes, réponses de
 -- présence. Alimente le tableau de bord admin (qui vient, quand, rétention).
@@ -496,6 +509,7 @@ revoke update (username) on public.profiles from authenticated;
 grant update (name) on public.profiles to authenticated;
 grant update (contact_email) on public.profiles to authenticated;
 grant update (badge) on public.profiles to authenticated;
+grant update (ville, ville_lat, ville_lng, ville_cachee) on public.profiles to authenticated;
 grant insert, select on public.activity to authenticated;
 grant insert, update, delete on public.presence to authenticated;
 grant insert, update, select on public.compositions to authenticated;
@@ -1304,6 +1318,10 @@ create table if not exists public.photo_studio (
   created_at  timestamptz not null default now()
 );
 create index if not exists photo_studio_user_date on public.photo_studio (user_id, created_at desc);
+-- Le pays du filtre drapeau (son code, lib/sfl/photo-studio.ts), depuis le
+-- 22/10 : la page Activité de l'admin montre la part de chaque pays choisi.
+-- Les lignes plus anciennes n'en ont pas.
+alter table public.photo_studio add column if not exists pays text;
 
 alter table public.photo_studio enable row level security;
 
@@ -1311,6 +1329,12 @@ drop policy if exists "photo_studio: je lis les miennes" on public.photo_studio;
 create policy "photo_studio: je lis les miennes"
   on public.photo_studio for select to authenticated
   using (user_id = (select auth.uid()));
+
+-- L'admin lit tout : les pays choisis, dans Activité.
+drop policy if exists "photo_studio: l'admin lit tout" on public.photo_studio;
+create policy "photo_studio: l'admin lit tout"
+  on public.photo_studio for select to authenticated
+  using ((select public.is_league_admin()));
 
 drop policy if exists "photo_studio: je note la mienne" on public.photo_studio;
 create policy "photo_studio: je note la mienne"

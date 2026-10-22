@@ -390,7 +390,8 @@
 .leaflet-container .leaflet-marker-icon.stk-ancre,
 .leaflet-container .leaflet-marker-icon.pt,
 .leaflet-container .leaflet-marker-icon.ter-ancre,
-.leaflet-container .leaflet-marker-icon.toi-ancre {
+.leaflet-container .leaflet-marker-icon.toi-ancre,
+.leaflet-container .leaflet-marker-icon.jr-ancre {
   background: none;
   border: 0;
   overflow: visible;
@@ -596,6 +597,178 @@
   border-radius: 50%;
   border: 1.5px solid rgba(10, 11, 13, 0.22);
   box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.12);
+}
+
+/* Les joueurs dans leur ville (map/joueurs.ts) : la même carte partout,
+   photo pleine au format 1 × φ, bord blanc, comme les petites cartes de la
+   Ligue. Noir et blanc : la braise reste au « il manque N ». */
+.jc {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: linear-gradient(160deg, #2a2f36, #14171b 60%, #0b0d10);
+  border: 2px solid #f4f5f2;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+.jc img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 32%;
+  transform: scale(1.22);
+  transform-origin: 50% 30%;
+  pointer-events: none;
+  user-select: none;
+}
+.jc__initiale {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 900 15px/1 var(--font-sans), system-ui, sans-serif;
+  color: rgba(244, 245, 242, 0.28);
+}
+
+/* La pile d'une ville : trois cartes en éventail, la pointe au centre de la
+   ville. Grande, moyenne, petite : 36, 36/√φ, 36/φ de large. */
+.grp {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translate(-50%, -62%);
+  cursor: pointer;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.22));
+  --w: 28px;
+}
+.grp--grande { --w: 36px; }
+.grp--petite { --w: 22px; }
+.grp__pile {
+  position: relative;
+  width: calc(var(--w) * 1.75);
+  height: calc(var(--w) * 1.618 + 4px);
+}
+.grp__carte {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: var(--w);
+  height: calc(var(--w) * 1.618);
+  margin-left: calc(var(--w) / -2);
+  transform: translate(var(--x), var(--y)) rotate(var(--r));
+  transform-origin: 50% 100%;
+  border-radius: calc(var(--w) * 0.16);
+}
+.grp__compte {
+  position: absolute;
+  right: -3px;
+  top: -7px;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #0a0b0d;
+  color: #f4f5f2;
+  border: 1.5px solid #f4f5f2;
+  font: 900 11px/1 var(--font-sans), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.3px;
+}
+.grp__ville,
+.vil {
+  margin-top: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #f4f5f2;
+  color: #0a0b0d;
+  white-space: nowrap;
+  font: 800 10.5px/1 var(--font-sans), system-ui, sans-serif;
+  letter-spacing: -0.2px;
+  box-shadow: 0 1.5px 3px rgba(0, 0, 0, 0.18);
+}
+.grp__plus,
+.vil__reste {
+  font: 700 9px/1 ui-monospace, "SF Mono", var(--font-jbmono), monospace;
+  color: #8f908b;
+}
+
+/* Une ville ouverte : son nom au centre, les cartes en tournesol autour. */
+.vil {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: 0;
+  height: 20px;
+  padding: 0 8px;
+  transform: translate(-50%, -50%) rotate(-3deg);
+  background: #0a0b0d;
+  color: #f4f5f2;
+  border: 1.5px solid #f4f5f2;
+  font: 900 italic 10.5px/1 var(--font-sans), system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: -0.3px;
+  cursor: pointer;
+}
+.vil__compte {
+  font: 700 9.5px/1 ui-monospace, "SF Mono", var(--font-jbmono), monospace;
+  font-style: normal;
+  color: rgba(244, 245, 242, 0.6);
+}
+.jr {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translate(calc(var(--dx) - 50%), calc(var(--dy) - 50%));
+  cursor: pointer;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.22));
+}
+.jr__carte {
+  width: 30px;
+  height: 48.5px;
+}
+.jr__note {
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  transform: translateX(-50%);
+  min-width: 18px;
+  height: 12px;
+  padding: 0 3px;
+  border-radius: 4px 4px 0 0;
+  background: #f4f5f2;
+  color: #0a0b0d;
+  font: 900 9px/12px var(--font-sans), system-ui, sans-serif;
+  text-align: center;
+  letter-spacing: -0.3px;
+}
+.jr__nom {
+  margin-top: 2px;
+  max-width: 54px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 700 9px/1.1 var(--font-sans), system-ui, sans-serif;
+  color: #0a0b0d;
+  text-shadow: 0 0 2px #f4f5f2, 0 0 4px #f4f5f2, 0 0 6px #f4f5f2;
+}
+.leaflet-container.fond-satellite .jr__nom {
+  color: #f4f5f2;
+  text-shadow: 0 0 2px #0a0b0d, 0 0 4px #0a0b0d;
 }
 
 /* Le lettrage découpé façon sticker : encre, cerné de blanc, ombre portée. */
