@@ -131,9 +131,9 @@
     --b-halo-loin: 0.18;
   }
   .bouton-principal.bouton--rouge {
-    --b-haut: #ff7d82;
-    --b-milieu: #d4252e;
-    --b-bas: #8f0d16;
+    --b-haut: #f0575d;
+    --b-milieu: #c41f28;
+    --b-bas: #7f0b13;
     --b-encre: #fff6f5;
     --b-reflet: 0.42;
     --b-halo: 232 54 62;
