@@ -23,6 +23,7 @@ import { usePathname } from "next/navigation";
 import { ActusIcon, CarteIcon, MapIcon, VestiaireIcon } from "./nav-icons";
 import { ongletActif } from "@/lib/nav";
 import { useVestiaireNonLus } from "@/hooks/use-vestiaire-non-lus";
+import { useInvitationsMatch } from "@/hooks/use-invitations";
 
 const TABS = [
   { href: "/", Icon: MapIcon, label: "Map" },
@@ -42,6 +43,8 @@ export function BottomNav() {
   const encre = clair ? "#0a0b0d" : "#ffffff";
   // Du nouveau dans la discussion : le nombre, sur la bulle.
   const nonLus = useVestiaireNonLus();
+  // Une invitation à un match sans réponse : le nombre, sur l'onglet Map.
+  const invitations = useInvitationsMatch();
 
   return (
     <div
@@ -71,7 +74,10 @@ export function BottomNav() {
               className="liquid-tabbar__onglet"
               style={{ color: encre }}
             >
-              <Icon plein={choisi} />
+              <span className="relative flex">
+                <Icon plein={choisi} />
+                {href === "/" && invitations > 0 && <Pastille n={invitations} clair={clair} />}
+              </span>
               <span className="liquid-tabbar__libelle" style={{ fontWeight: choisi ? 600 : 500 }}>
                 {label}
               </span>
@@ -91,20 +97,24 @@ export function BottomNav() {
       >
         <span className="relative">
           <VestiaireIcon plein={vestiaire} />
-          {nonLus > 0 && !vestiaire && (
-            <span
-              aria-hidden
-              className="absolute -top-2 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] text-[11.5px] leading-none font-bold tabular-nums text-white"
-              // Le rouge des pastilles d'iOS, cerclé du fond pour se détacher
-              // du verre (seule couleur de la barre : c'est une alerte).
-              style={{ background: "#FF3B30", boxShadow: `0 0 0 2px ${clair ? "#ffffff" : "#0a0b0d"}` }}
-            >
-              {nonLus > 9 ? "9+" : nonLus}
-            </span>
-          )}
+          {nonLus > 0 && !vestiaire && <Pastille n={nonLus} clair={clair} />}
         </span>
       </Link>
     </div>
+  );
+}
+
+/** Le rouge des pastilles d'iOS, cerclé du fond pour se détacher du verre
+ *  (seule couleur de la barre : c'est une alerte). */
+function Pastille({ n, clair }: { n: number; clair: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className="absolute -top-2 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] text-[11.5px] leading-none font-bold tabular-nums text-white"
+      style={{ background: "#FF3B30", boxShadow: `0 0 0 2px ${clair ? "#ffffff" : "#0a0b0d"}` }}
+    >
+      {n > 9 ? "9+" : n}
+    </span>
   );
 }
 

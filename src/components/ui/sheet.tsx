@@ -58,25 +58,108 @@ function SheetContent({
         )}
         {...props}
       >
-        {children}
+        {/* La croix ne part jamais avec le défilement (collée en haut de la
+            feuille), et une feuille du bas se ferme aussi en la tirant vers
+            le bas par sa poignée — Sabri, 22/10 : des fenêtres qu'on
+            n'arrivait plus à fermer. */}
         {showCloseButton && (
-          <SheetPrimitive.Close
-            data-slot="sheet-close"
-            render={
-              <Button
-                variant="ghost"
-                className="absolute top-3 right-3"
-                size="icon-sm"
+          <div className="pointer-events-none sticky top-0 z-30 -mb-[4.5rem] flex h-14 shrink-0 items-start justify-end px-3 pt-3">
+            {side === "bottom" && <Poignee />}
+            <SheetPrimitive.Close
+              data-slot="sheet-close"
+              render={
+                <Button
+                  variant="ghost"
+                  className="pointer-events-auto rounded-full bg-popover/80 backdrop-blur-sm"
+                  size="icon-sm"
+                />
+              }
+            >
+              <XIcon
               />
-            }
-          >
-            <XIcon
-            />
-            <span className="sr-only">Close</span>
-          </SheetPrimitive.Close>
+              <span className="sr-only">Fermer</span>
+            </SheetPrimitive.Close>
+          </div>
         )}
+        {children}
       </SheetPrimitive.Popup>
     </SheetPortal>
+  )
+}
+
+/** La poignée d'une feuille du bas : la tirer vers le bas fait suivre la
+ *  feuille au doigt, et au-delà de 90 px (ou d'un geste vif) la ferme. Au
+ *  doigt (touch, la page ne doit pas défiler) comme à la souris. */
+function Poignee() {
+  const ref = React.useRef<HTMLDivElement>(null)
+  React.useEffect(() => {
+    const el = ref.current
+    const f = el?.closest<HTMLElement>('[data-slot="sheet-content"]')
+    if (!el || !f) return
+    let y0: number | null = null
+    let t0 = 0
+    const debut = (y: number, t: number) => {
+      y0 = y
+      t0 = t
+    }
+    const suivre = (y: number) => {
+      if (y0 == null) return
+      f.style.transition = "none"
+      f.style.translate = `0 ${Math.max(0, y - y0)}px`
+    }
+    const fin = (y: number | null, t: number) => {
+      const dy = y0 != null && y != null ? y - y0 : 0
+      const vif = dy > 30 && dy / Math.max(1, t - t0) > 0.6
+      y0 = null
+      f.style.transition = ""
+      f.style.translate = ""
+      if (dy > 90 || vif) f.querySelector<HTMLElement>('[data-slot="sheet-close"]')?.click()
+    }
+    let dernierY: number | null = null
+    const tStart = (e: TouchEvent) => {
+      dernierY = e.touches[0].clientY
+      debut(dernierY, e.timeStamp)
+    }
+    const tMove = (e: TouchEvent) => {
+      if (y0 == null) return
+      e.preventDefault()
+      dernierY = e.touches[0].clientY
+      suivre(dernierY)
+    }
+    const tEnd = (e: TouchEvent) => fin(dernierY, e.timeStamp)
+    const pDown = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse") return
+      debut(e.clientY, e.timeStamp)
+      const pMove = (m: PointerEvent) => suivre(m.clientY)
+      const pUp = (u: PointerEvent) => {
+        window.removeEventListener("pointermove", pMove)
+        window.removeEventListener("pointerup", pUp)
+        fin(u.clientY, u.timeStamp)
+      }
+      window.addEventListener("pointermove", pMove)
+      window.addEventListener("pointerup", pUp)
+    }
+    el.addEventListener("touchstart", tStart, { passive: true })
+    el.addEventListener("touchmove", tMove, { passive: false })
+    el.addEventListener("touchend", tEnd)
+    el.addEventListener("touchcancel", tEnd)
+    el.addEventListener("pointerdown", pDown)
+    return () => {
+      el.removeEventListener("touchstart", tStart)
+      el.removeEventListener("touchmove", tMove)
+      el.removeEventListener("touchend", tEnd)
+      el.removeEventListener("touchcancel", tEnd)
+      el.removeEventListener("pointerdown", pDown)
+    }
+  }, [])
+  return (
+    <div
+      ref={ref}
+      aria-hidden
+      className="pointer-events-auto absolute inset-x-16 top-0 flex h-9 touch-none justify-center pt-2"
+    >
+      <span className="h-[5px] w-10 rounded-full bg-foreground/25" />
+    </div>
   )
 }
 
