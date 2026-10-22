@@ -12,6 +12,7 @@ import { useSession } from "@/hooks/use-session";
 import { bootstrapServerSession, inscriptionSocialeEnCours } from "@/lib/sfl/auth/session";
 import { LoginScreen } from "./login-screen";
 import { EnAttente } from "./en-attente";
+import { useJoueurInconnu } from "@/components/sfl/player-provider";
 
 /**
  * Pages ouvertes à tous : le lien d'accueil personnel envoyé par l'admin, et
@@ -22,6 +23,7 @@ const PUBLIC_ROUTES = ["/bienvenue", "/inscription"];
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const isClient = useIsClient();
   const session = useSession();
+  const inconnu = useJoueurInconnu();
   const pathname = usePathname();
   const router = useRouter();
   const [bootstrapped, setBootstrapped] = useState(false);
@@ -67,6 +69,15 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="h-full overflow-y-auto" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <EnAttente session={session} />
+      </div>
+    );
+  // Connecté, mais la saison chargée ne le connaît pas (pas encore ajouté à
+  // l'effectif, ou copie locale en retard) : sa carte arrive, pas celle d'un
+  // autre.
+  if (inconnu)
+    return (
+      <div className="h-full overflow-y-auto" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        <EnAttente session={session} horsSaison />
       </div>
     );
   return <>{children}</>;
