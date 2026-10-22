@@ -4,20 +4,21 @@
 // 22/10, « en gros League et Team ») : League, le fil de la SFL, la ligue du
 // dimanche avec sa saison ; Bola, le classement à vie des matchs que les
 // joueurs ouvrent eux-mêmes (app/ligue-vierge, l'ancienne « Ligue vierge ») ;
-// Team, les matchs d'équipe (app/bola-team).
+// Team, les matchs d'équipe (app/bola-team). La SFL n'est pas écrite : c'est
+// son badge (public/bola/sfl.svg, le logo de Sabri), teinté comme le texte.
 
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 const LIGUES = [
-  { href: "/ligue", libelle: "League" },
+  { href: "/ligue", libelle: "SFL", badge: "/bola/sfl.svg" },
   { href: "/ligue-vierge", libelle: "Bola" },
   { href: "/bola-team", libelle: "Team" },
 ] as const;
 
 export function ChoixLigue({ actif, className }: { actif: (typeof LIGUES)[number]["href"]; className?: string }) {
   return (
-    <nav aria-label="League, Bola ou Team" className={cn("flex items-baseline gap-3.5", className)}>
+    <nav aria-label="SFL, Bola ou Team" className={cn("flex items-center gap-3.5", className)}>
       {LIGUES.map((l) => (
         <Link
           key={l.href}
@@ -28,7 +29,16 @@ export function ChoixLigue({ actif, className }: { actif: (typeof LIGUES)[number
             actif === l.href ? "text-foreground" : "text-foreground/30"
           )}
         >
-          {l.libelle}
+          {"badge" in l ? (
+            <span
+              role="img"
+              aria-label={l.libelle}
+              className="block h-[21px] w-[83px] bg-current"
+              style={{ mask: `url(${l.badge}) center / contain no-repeat`, WebkitMask: `url(${l.badge}) center / contain no-repeat` }}
+            />
+          ) : (
+            l.libelle
+          )}
         </Link>
       ))}
     </nav>
