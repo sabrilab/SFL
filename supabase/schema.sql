@@ -1865,7 +1865,7 @@ begin
   end if;
   insert into public.equipe_membres (equipe_id, joueur, statut, invite_par)
   values (e, equipe_inviter.joueur, 'invite', (select auth.uid()))
-  on conflict (equipe_id, joueur) do nothing;
+  on conflict on constraint equipe_membres_pkey do nothing;
 end;
 $$;
 
@@ -2031,7 +2031,7 @@ begin
   end if;
   insert into public.equipe_membres (equipe_id, joueur, statut, invite_par)
   values (l.equipe_id, moi, 'invite', l.cree_par)
-  on conflict (equipe_id, joueur) do nothing;
+  on conflict on constraint equipe_membres_pkey do nothing;
   return l.equipe_id;
 end;
 $$;
