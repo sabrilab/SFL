@@ -20,6 +20,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { isAdmin } from "@/lib/sfl/admin";
 import { AccountCard } from "@/components/sfl/auth/account-card";
 import { ReglageNotifications } from "@/components/sfl/notifications/reglage-notifications";
+import { ReglageConfidentialite } from "@/components/sfl/confidentialite/reglage";
 
 const THEME_OPTIONS = [
   { value: "light", label: "Clair", icon: Sun },
@@ -51,6 +52,11 @@ export default function ReglagesPage() {
       <section>
         <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Notifications</h2>
         <ReglageNotifications />
+      </section>
+
+      <section>
+        <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Confidentialité</h2>
+        <ReglageConfidentialite />
       </section>
 
       <section>

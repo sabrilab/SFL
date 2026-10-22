@@ -2414,3 +2414,52 @@ exception
   when undefined_object then null;
 end;
 $$;
+
+-- ─────────────────── Confidentialité : les accords ───────────────────
+-- L'accord de chaque joueur à la politique de confidentialité (22/10/2026) :
+-- la case de l'ouverture et celle de l'inscription
+-- (components/sfl/confidentialite). Une ligne par accord : la version
+-- acceptée (sa date, VERSION_POLITIQUE dans lib/sfl/confidentialite.ts),
+-- l'usage de sa carte hors de l'app, l'accord d'un parent avant 15 ans, et
+-- où il a coché. La date est celle de la base : le joueur n'écrit que ces
+-- quatre colonnes, jamais user_id ni created_at. Rien ne se réécrit ni ne
+-- s'efface (ni update ni delete) : la dernière ligne fait foi, les autres
+-- gardent l'historique, pour pouvoir le prouver. Le joueur lit les siennes,
+-- l'admin toutes (Activité). /api/photo-studio et /api/agent la lisent avant
+-- d'envoyer un visage ou une question à un prestataire.
+create table if not exists public.consentements (
+  id          bigint generated always as identity primary key,
+  user_id     uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  version     text not null check (version ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'),
+  hors_app    boolean not null default false,
+  parent      boolean not null default false,
+  ou          text not null default 'ouverture' check (ou in ('ouverture', 'inscription', 'reglages')),
+  created_at  timestamptz not null default now()
+);
+create index if not exists consentements_user_date on public.consentements (user_id, created_at desc);
+
+alter table public.consentements enable row level security;
+
+drop policy if exists "consentements: je lis les miens" on public.consentements;
+create policy "consentements: je lis les miens"
+  on public.consentements for select to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists "consentements: l'admin lit tout" on public.consentements;
+create policy "consentements: l'admin lit tout"
+  on public.consentements for select to authenticated
+  using ((select public.is_league_admin()));
+
+drop policy if exists "consentements: je donne le mien" on public.consentements;
+create policy "consentements: je donne le mien"
+  on public.consentements for insert to authenticated
+  with check (user_id = (select auth.uid()));
+
+revoke all on public.consentements from anon, authenticated;
+grant select on public.consentements to authenticated;
+grant insert (version, hors_app, parent, ou) on public.consentements to authenticated;
+
+-- Le journal d'usage ne garde que 13 mois, comme la politique le dit : le
+-- plus ancien part chaque lundi (/api/convocation/cron) et à chaque
+-- migration du schéma.
+delete from public.activity where created_at < now() - interval '13 months';

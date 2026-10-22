@@ -17,9 +17,11 @@
 //
 // Il passe devant tout, écran de chargement et connexion compris : mieux
 // vaut sortir de Snapchat avant de créer son compte que de devoir se
-// reconnecter après.
+// reconnecter après. Sauf sur la politique de confidentialité : un lien
+// vers elle (pour un parent, par exemple) s'ouvre sur le texte.
 
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Check, Copy, Ellipsis, EllipsisVertical, Share, SquarePlus } from "lucide-react";
 import { useIsClient } from "@/hooks/use-is-client";
@@ -53,6 +55,7 @@ type Etape = { icone?: React.ReactNode; texte: React.ReactNode };
 
 export function GuideInstallation() {
   const isClient = useIsClient();
+  const pathname = usePathname();
   const [invite, setInvite] = useState<BeforeInstallPromptEvent | null>(null);
   const [ferme, setFerme] = useState(false);
   const [copie, setCopie] = useState(false);
@@ -74,7 +77,7 @@ export function GuideInstallation() {
     };
   }, []);
 
-  if (!isClient || ferme) return null;
+  if (!isClient || ferme || pathname?.startsWith("/confidentialite")) return null;
   const env = lireEnvironnement();
   if (env.systeme === "autre" || env.installee) return null;
   if (lire(() => sessionStorage, CLE_PLUS_TARD)) return null;
