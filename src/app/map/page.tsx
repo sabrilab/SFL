@@ -15,6 +15,13 @@
 // (`saison.terrains`) ; l'admin donne l'adresse de chaque match juste sous la
 // carte.
 //
+// La discussion d'un match (22/10) : au-dessus de la carte du match choisi,
+// ses deux derniers messages en pilules (matchs/pilules-discussion.tsx) ; les
+// toucher, ou « Discussion du match » dans sa fiche, ou la notification
+// (/?match=12&discussion), ouvre la discussion plein écran
+// (matchs/discussion-match.tsx). Une carte de match qui a des messages pas
+// lus porte leur nombre.
+//
 // Les joueurs (22/10, « en poursuivant l'idée de remplacer Snapchat ») :
 // chacun dans sa ville, en piles qui s'ouvrent quand on s'approche
 // (map/joueurs.ts), et le catalogue des joueurs par ville dans une fiche
@@ -32,12 +39,15 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
+import { DiscussionMatch } from "@/components/sfl/matchs/discussion-match";
+import { HAUTEUR_PILULES, PilulesDiscussion } from "@/components/sfl/matchs/pilules-discussion";
 import { FeuilleDeMatch } from "@/components/sfl/matchs/feuille-de-match";
 import { feuilleDeConvocation, feuilleDeJournee } from "@/lib/sfl/feuille";
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
 import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
 import { Invitations, invitationsDe } from "@/components/sfl/matchs/invitations";
 import { useParties } from "@/hooks/use-parties";
+import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
 import { inscrits, libelleJour, placesLibres, type Partie } from "@/lib/sfl/matchs";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
@@ -361,6 +371,8 @@ export default function MapPage() {
   // Les matchs ouverts par les joueurs : un public montre ses places libres,
   // un privé n'apparaît qu'à ceux qui en sont.
   const { parties, moi, actif: partiesActives, recharger } = useParties();
+  // La discussion de chacun de mes matchs : ses derniers messages, mes non lus.
+  const { apercus } = useDiscussionsMatch();
   const matchsTeam = useMatchsTeam();
   const matchs = useMemo<MatchMap[]>(() => {
     const ouverts = parties.map((x): MatchMap => {
@@ -478,21 +490,38 @@ export default function MapPage() {
   // Le match choisi : celui qu'on a touché s'il est encore là, sinon la une.
   const choisi = affiches.find((m) => m.cle === choix) ?? une;
 
+  // La discussion d'un match, plein écran par-dessus la Map.
+  const [discussion, setDiscussion] = useState<number | null>(null);
+  const fermerDiscussion = useCallback(() => setDiscussion(null), []);
+  const ouvrirDiscussion = useCallback((cle: string) => {
+    setChoix(cle);
+    setFiche(false);
+    setDiscussion(Number(cle.slice(1)));
+  }, []);
+  const partieDiscussion = discussion == null ? undefined : parties.find((x) => x.id === discussion);
+
   // Un match à montrer dès qu'il est là : celui qu'on vient d'ouvrir, ou
-  // celui d'une notification (/?match=12). Sa fiche s'ouvre, on y gère tout.
-  const aMontrer = useRef<string | null>(null);
+  // celui d'une notification (/?match=12). Sa fiche s'ouvre, on y gère tout ;
+  // la notification d'un message (/?match=12&discussion) ouvre sa discussion.
+  const aMontrer = useRef<{ cle: string; discussion: boolean } | null>(null);
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("match");
+    const q = new URLSearchParams(window.location.search);
+    const id = q.get("match");
     if (!id || !/^\d+$/.test(id)) return;
-    aMontrer.current = `m${id}`;
+    aMontrer.current = { cle: `m${id}`, discussion: q.has("discussion") };
     window.history.replaceState(null, "", window.location.pathname);
   }, []);
   useEffect(() => {
-    const cle = aMontrer.current;
-    if (!cle || !affiches.some((m) => m.cle === cle)) return;
+    const a = aMontrer.current;
+    if (!a || !affiches.some((m) => m.cle === a.cle)) return;
     aMontrer.current = null;
-    choisirSticker(cle);
-  }, [affiches, choisirSticker]);
+    if (a.discussion) ouvrirDiscussion(a.cle);
+    else choisirSticker(a.cle);
+  }, [affiches, choisirSticker, ouvrirDiscussion]);
+  // Les pilules ont leur place dès qu'un de mes matchs a sa discussion : faire
+  // défiler les cartes ne fait pas sauter la Map.
+  const avecDiscussion = affiches.some((m) => m.partie && apercus.has(m.partie.id));
+  const apercuChoisi = choisi?.partie ? apercus.get(choisi.partie.id) : undefined;
   const invitations = useMemo(() => invitationsDe(parties, moi), [parties, moi]);
 
   // Le carrousel et le plan vont ensemble : faire glisser les cartes choisit
@@ -671,7 +700,7 @@ export default function MapPage() {
             choisi={choisi?.cle ?? null}
             onChoisir={choisirSticker}
             villes={villes}
-            margeBas={replie ? 150 : 380}
+            margeBas={replie ? 150 : 380 + (avecDiscussion ? HAUTEUR_PILULES + 12 : 0)}
             onVille={ouvrirVille}
             onJoueur={setProfil}
             viser={viser}
@@ -824,6 +853,14 @@ export default function MapPage() {
             aria-hidden={replie}
           >
           <div data-traverse className="flex min-h-0 flex-col items-center gap-3 overflow-hidden">
+          {/* Au-dessus de la carte choisie : les deux derniers messages de sa discussion. */}
+          {avecDiscussion && (
+            <div data-traverse className="w-full shrink-0" style={{ height: HAUTEUR_PILULES }}>
+              {apercuChoisi && choisi?.partie && (
+                <PilulesDiscussion key={choisi.cle} apercu={apercuChoisi} partie={choisi.partie} onOuvrir={() => ouvrirDiscussion(choisi.cle)} />
+              )}
+            </div>
+          )}
           <div
             ref={carrousel}
             onScroll={suivreCarrousel}
@@ -839,6 +876,7 @@ export default function MapPage() {
                   une={m.cle === une?.cle && !m.joue}
                   dans={m.joue ? null : ecartJours(m.dateLabel, aujourdhui)}
                   loin={toi && m.terrain ? `à ${distanceLisible(toi, m.terrain)}` : null}
+                  nonLus={m.partie ? (apercus.get(m.partie.id)?.nonLus ?? 0) : 0}
                   onToucher={() => (m.cle !== choisi?.cle ? setChoix(m.cle) : ouvrirFiche())}
                 />
               </div>
@@ -929,7 +967,14 @@ export default function MapPage() {
                 {choisi?.terrain && <Itineraire terrain={choisi.terrain} ios={ios} />}
                 {/* Une journée : ses joueurs. La convocation : on y répond, comme avant. */}
                 {choisi?.partie ? (
-                  <FichePartie partie={choisi.partie} moi={moi} terrains={terrains} onChange={recharger} />
+                  <FichePartie
+                    partie={choisi.partie}
+                    moi={moi}
+                    terrains={terrains}
+                    onChange={recharger}
+                    nonLus={apercus.get(choisi.partie.id)?.nonLus ?? 0}
+                    onDiscussion={() => ouvrirDiscussion(choisi.cle)}
+                  />
                 ) : choisi?.team ? (
                   <FicheTeam t={choisi.team} />
                 ) : choisi?.j != null && !choisi.convoquee ? (
@@ -1042,7 +1087,7 @@ export default function MapPage() {
           onOuvert={(id) => {
             recharger();
             setChoix(`m${id}`);
-            aMontrer.current = `m${id}`;
+            aMontrer.current = { cle: `m${id}`, discussion: false };
           }}
         />
       )}
@@ -1055,6 +1100,9 @@ export default function MapPage() {
           setOuvrir((o) => ({ terrain: null, jour, heure: h, n: (o?.n ?? 0) + 1 }));
         }}
       />
+
+      {/* ─── La discussion d'un match, par-dessus tout (barre d'onglets comprise) ─── */}
+      {partieDiscussion && <DiscussionMatch key={partieDiscussion.id} partie={partieDiscussion} moi={moi} onFermer={fermerDiscussion} />}
     </>
   );
 }
@@ -1076,6 +1124,7 @@ function CarteMatch({
   une,
   dans,
   loin,
+  nonLus = 0,
   onToucher,
 }: {
   m: MatchMap;
@@ -1085,6 +1134,8 @@ function CarteMatch({
   /** Les jours avant le match (null : joué ou date illisible). */
   dans: number | null;
   loin: string | null;
+  /** Les messages de sa discussion que je n'ai pas lus. */
+  nonLus?: number;
   onToucher: () => void;
 }) {
   const [c0, c1, c2] = COULEUR_LIGUE[m.ligue].fond;
@@ -1106,7 +1157,7 @@ function CarteMatch({
         onClick={onToucher}
         className={cn("block p-[5px] text-left", joue ? "rounded-[20px] shadow-[0_5px_9px_rgba(0,0,0,0.18)]" : "rounded-[24px] shadow-[0_8px_12px_rgba(0,0,0,0.22)]")}
         style={{ background: BLANC }}
-        aria-label={`${titre} ${m.heure}${m.terrain ? `, ${m.terrain.nom}` : ""}, ${m.etatTexte}`}
+        aria-label={`${titre} ${m.heure}${m.terrain ? `, ${m.terrain.nom}` : ""}, ${m.etatTexte}${nonLus ? `, ${nonLus} message${nonLus > 1 ? "s" : ""} pas lu${nonLus > 1 ? "s" : ""}` : ""}`}
         aria-pressed={choisi}
       >
         <div
@@ -1189,6 +1240,17 @@ function CarteMatch({
           </div>
         </div>
       </button>
+      {/* Des messages pas lus dans sa discussion : leur nombre, comme sur une
+          icône d'iPhone. Sur la choisie, les pilules le disent déjà. */}
+      {nonLus > 0 && !choisi && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -top-1.5 -right-1.5 z-10 flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-[12px] leading-none font-bold text-white tabular-nums"
+          style={{ background: "#FF3B30", boxShadow: `0 0 0 2px ${BLANC}, 0 2px 4px rgba(0,0,0,0.25)` }}
+        >
+          {nonLus > 9 ? "9+" : nonLus}
+        </span>
+      )}
       {!joue && m.presents.length > 0 && (
         <div className="pointer-events-none absolute -bottom-3 left-1/2 flex -translate-x-1/2 items-center" aria-hidden>
           {m.presents.slice(0, 3).map((nom, i) => (

@@ -622,13 +622,18 @@ alter table public.messages add constraint messages_texte_ou_piece check (
   char_length(texte) <= 2000
   and (char_length(btrim(texte)) >= 1 or piece is not null)
 );
+-- 'rejoint' (22/10) n'existe que dans la discussion d'un match (plus bas) :
+-- c'est la ligne « Kader a rejoint le match ». Ajoutée ICI, pas plus bas : ce
+-- contrôle est reposé à chaque migration, et il doit déjà accepter les
+-- lignes 'rejoint' en base quand il l'est.
 alter table public.messages drop constraint if exists messages_piece_forme;
 alter table public.messages add constraint messages_piece_forme check (
   piece is null
   or (
     jsonb_typeof(piece) = 'object'
-    and piece->>'type' in ('carte', 'feuille', 'classement', 'vocal', 'photo', 'video', 'ligue')
+    and piece->>'type' in ('carte', 'feuille', 'classement', 'vocal', 'photo', 'video', 'ligue', 'rejoint')
     and pg_column_size(piece) <= 4000
+    and (piece->>'type' <> 'rejoint' or canal = 'match')
   )
 );
 
@@ -2550,3 +2555,96 @@ where p.contact_email is not null
   and exists (select 1 from auth.users u where u.id = p.id)
 on conflict (user_id) do update set email = excluded.email, maj_le = now();
 update public.profiles set contact_email = null where contact_email is not null;
+
+-- ─────────────────────────── Discussion de match ───────────────────────────
+-- Sabri, 22/10 : quand des joueurs rejoignent un match, ils se parlent entre
+-- eux (« Le match, il est où ? », « vous connaissez quelqu'un de dispo ? »),
+-- et chacun est prévenu sur son téléphone, d'un message comme d'une arrivée.
+-- Sur la Map, les deux derniers messages flottent au-dessus de la carte du
+-- match.
+--
+-- La discussion d'un match ouvert par un joueur vit dans la table des
+-- messages, canal 'match' : elle hérite des réponses, des réactions, des
+-- vocaux, des photos et du temps réel du Vestiaire. La lisent et y écrivent
+-- ceux du match, et eux seuls : l'organisateur, les inscrits et les invités
+-- (pas encore décidés, ils voient ce qui se dit). Ni le reste de la ligue,
+-- ni l'admin : comme un message privé. Qui quitte le match perd la
+-- discussion ; le match annulé l'emporte avec lui.
+alter table public.messages add column if not exists match_id bigint references public.matchs(id) on delete cascade;
+create index if not exists messages_match_idx
+  on public.messages (match_id, created_at desc) where canal = 'match';
+
+alter table public.messages drop constraint if exists messages_canal_check;
+alter table public.messages add constraint messages_canal_check check (canal in ('sfl', 'dm', 'match'));
+alter table public.messages drop constraint if exists messages_destinataire_coherent;
+alter table public.messages add constraint messages_destinataire_coherent check (
+  (canal = 'sfl' and destinataire is null and match_id is null)
+  or (canal = 'dm' and destinataire is not null and destinataire <> auteur and match_id is null)
+  or (canal = 'match' and destinataire is null and match_id is not null)
+);
+
+-- Qui est du match : l'organisateur, et chaque joueur de sa liste (inscrit
+-- ou invité). Un compte validé seulement, comme au Vestiaire.
+create or replace function public.dans_le_match(m bigint)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select public.est_membre()
+     and (
+       exists (select 1 from public.matchs x where x.id = m and x.organisateur = (select auth.uid()))
+       or exists (select 1 from public.match_joueurs j where j.match_id = m and j.player_id = (select auth.uid()))
+     );
+$$;
+
+revoke execute on function public.dans_le_match(bigint) from public, anon;
+grant execute on function public.dans_le_match(bigint) to authenticated;
+
+-- Lire : une règle de plus, à côté de celle du salon et des privés.
+drop policy if exists "messages: la discussion du match" on public.messages;
+create policy "messages: la discussion du match"
+  on public.messages for select to authenticated
+  using (canal = 'match' and public.dans_le_match(match_id));
+
+-- Écrire : la règle commune (« j'écris pour moi ») laisse passer tout canal
+-- autre que le salon ; celle-ci, restrictive, ferme le match à qui n'en est
+-- pas. Les réactions suivent d'elles-mêmes (on ne réagit qu'à ce qu'on lit).
+drop policy if exists "messages: le match à ceux du match" on public.messages;
+create policy "messages: le match à ceux du match"
+  on public.messages as restrictive for insert to authenticated
+  with check (canal <> 'match' or public.dans_le_match(match_id));
+
+-- Où en est chaque joueur avec la discussion d'un match : jusqu'où il a lu
+-- (les pilules non lues de la Map), ce qu'il en veut sur son téléphone
+-- (comme au Vestiaire : 'tout', 'cite', 'rien'), s'il l'a sous les yeux
+-- (devant_le, redit toutes les 20 s par l'app : pas de notification à qui la
+-- lit), et quand le serveur l'a prévenu pour la dernière fois (notifie_le,
+-- au serveur seul).
+create table if not exists public.match_suivi (
+  user_id     uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  match_id    bigint not null references public.matchs(id) on delete cascade,
+  lu_jusqua   timestamptz not null default now(),
+  notifs      text not null default 'tout' check (notifs in ('tout', 'cite', 'rien')),
+  devant_le   timestamptz,
+  notifie_le  timestamptz,
+  primary key (user_id, match_id)
+);
+
+create index if not exists match_suivi_match_idx on public.match_suivi (match_id);
+
+alter table public.match_suivi enable row level security;
+
+drop policy if exists "suivi du match: le mien" on public.match_suivi;
+create policy "suivi du match: le mien"
+  on public.match_suivi for all to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()) and public.dans_le_match(match_id));
+
+-- notifie_le n'appartient qu'au serveur. Révoquer le droit de table AVANT de
+-- donner les colonnes, sinon le droit de table les annule.
+revoke all on public.match_suivi from anon, authenticated;
+grant select on public.match_suivi to authenticated;
+grant insert (user_id, match_id, lu_jusqua, notifs, devant_le) on public.match_suivi to authenticated;
+grant update (user_id, match_id, lu_jusqua, notifs, devant_le) on public.match_suivi to authenticated;

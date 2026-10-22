@@ -2,8 +2,10 @@
 
 // La pastille du Vestiaire : combien de messages des autres depuis ma
 // dernière lecture. Recomptée à l'ouverture, au retour dans l'app, à chaque
-// message (temps réel) et dès que le Vestiaire est lu. Le même nombre va sur
-// l'icône de l'app installée (pastille rouge de l'écran d'accueil, iOS 16.4+).
+// message (temps réel) et dès que le Vestiaire est lu. Ce nombre, plus les
+// non lus des discussions de mes matchs, va sur l'icône de l'app installée
+// (pastille rouge de l'écran d'accueil, iOS 16.4+ : pastilleIcone, posée
+// par la barre d'onglets).
 
 import { useEffect, useState } from "react";
 import { useSession } from "@/hooks/use-session";
@@ -20,9 +22,7 @@ export function useVestiaireNonLus(): number {
     const compter = () => {
       if (document.visibilityState !== "visible") return;
       void compterNonLus().then((x) => {
-        if (!vivant) return;
-        setN(x);
-        pastilleIcone(x);
+        if (vivant) setN(x);
       });
     };
     compter();
@@ -40,7 +40,8 @@ export function useVestiaireNonLus(): number {
   return actif ? n : 0;
 }
 
-function pastilleIcone(n: number) {
+/** La pastille de l'icône de l'app : le même compte que les notifications (lib/sfl/non-lus.server.ts). */
+export function pastilleIcone(n: number) {
   try {
     const nav = navigator as Navigator & {
       setAppBadge?: (n?: number) => Promise<void>;

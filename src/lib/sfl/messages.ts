@@ -88,6 +88,8 @@ export async function chargerTout(
   const { data, error } = await supabase()
     .from("messages")
     .select("id, canal, auteur, destinataire, texte, created_at")
+    // Les discussions de match (canal 'match') vivent ailleurs : lib/sfl/discussion-match.ts.
+    .in("canal", ["sfl", "dm"])
     .order("created_at", { ascending: false })
     .limit(limite);
   if (error) return { ok: false, raison: expliquer(error.message) };

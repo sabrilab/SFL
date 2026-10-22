@@ -148,6 +148,16 @@
     rotate: 180deg;
   }
 
+  /* ── La discussion d'un match : l'écran glisse depuis la droite, comme
+     une conversation qu'on ouvre ; au-dessus de la carte du match, chaque
+     message qui arrive monte en pilule et se pose. ── */
+  .discussion-entre {
+    animation: discussion-entre 0.34s cubic-bezier(0.2, 0.85, 0.25, 1) backwards;
+  }
+  .pilule-entre {
+    animation: pilule-entre 0.5s cubic-bezier(0.3, 1.45, 0.5, 1) calc(var(--i, 0) * 70ms) backwards;
+  }
+
   /* ── Les cartes du carrousel : la choisie grandit avec un ressort. ── */
   .carte-match {
     transition:
@@ -239,6 +249,15 @@
 @keyframes map-monte {
   0% { opacity: 0; translate: 0 70px; scale: 0.92; }
   100% { opacity: 1; translate: 0 0; scale: 1; }
+}
+
+@keyframes discussion-entre {
+  0% { translate: 100% 0; }
+  100% { translate: 0 0; }
+}
+@keyframes pilule-entre {
+  0% { opacity: 0; scale: 0.72; translate: 0 16px; }
+  100% { opacity: 1; scale: 1; translate: 0 0; }
 }
 
 @keyframes grp-entre {
