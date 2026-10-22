@@ -1251,6 +1251,10 @@ create trigger match_joueurs_capacite before insert on public.match_joueurs
 grant select, insert, update, delete on public.matchs to authenticated;
 grant select, insert, update, delete on public.match_joueurs to authenticated;
 
+-- Une invitation n'est poussée qu'une fois sur le téléphone de l'invité
+-- (/api/matchs/notifier) : l'heure de l'envoi, null tant qu'il n'est pas prévenu.
+alter table public.match_joueurs add column if not exists notifie_le timestamptz;
+
 -- ─────────────────── Mode Bola : le résultat et la Ligue vierge ───────────────────
 -- Trois façons de jouer (Sabri, 22/10) : les matchs Bola, que n'importe quel
 -- joueur ouvre hors de la SFL ; les matchs d'équipe (mode Team, à venir) ;

@@ -34,7 +34,7 @@ import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { TitreDiscussion } from "@/components/sfl/titre-discussion";
-import { useVueVisible } from "@/components/sfl/vestiaire";
+import { useVueVisible } from "@/hooks/use-vue-visible";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { useSession } from "@/hooks/use-session";
 import {

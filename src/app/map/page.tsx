@@ -36,6 +36,7 @@ import { FeuilleDeMatch } from "@/components/sfl/matchs/feuille-de-match";
 import { feuilleDeConvocation, feuilleDeJournee } from "@/lib/sfl/feuille";
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
 import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
+import { Invitations, invitationsDe } from "@/components/sfl/matchs/invitations";
 import { useParties } from "@/hooks/use-parties";
 import { inscrits, libelleJour, placesLibres, type Partie } from "@/lib/sfl/matchs";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -420,6 +421,23 @@ export default function MapPage() {
   // Le match choisi : celui qu'on a touché s'il est encore là, sinon la une.
   const choisi = affiches.find((m) => m.cle === choix) ?? une;
 
+  // Un match à montrer dès qu'il est là : celui qu'on vient d'ouvrir, ou
+  // celui d'une notification (/?match=12). Sa fiche s'ouvre, on y gère tout.
+  const aMontrer = useRef<string | null>(null);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("match");
+    if (!id || !/^\d+$/.test(id)) return;
+    aMontrer.current = `m${id}`;
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+  useEffect(() => {
+    const cle = aMontrer.current;
+    if (!cle || !affiches.some((m) => m.cle === cle)) return;
+    aMontrer.current = null;
+    choisirSticker(cle);
+  }, [affiches, choisirSticker]);
+  const invitations = useMemo(() => invitationsDe(parties, moi), [parties, moi]);
+
   // Le carrousel et le plan vont ensemble : faire glisser les cartes choisit
   // celle qui s'arrête au centre (le plan suit), et choisir sur le plan amène
   // sa carte au centre.
@@ -694,6 +712,7 @@ export default function MapPage() {
 
         {/* En bas : les boutons, les cartes des matchs, les pastilles */}
         <div className="absolute inset-x-0 z-[510] flex flex-col items-center gap-3" style={{ bottom: bas }}>
+          <Invitations invitations={invitations} onOuvrir={(p) => choisirSticker(`m${p.id}`)} />
           <div className="flex w-full items-center justify-center gap-2 px-4">
             {/* Tout joueur ouvre un match ; l'admin garde en plus la journée de ligue. */}
             {partiesActives && (
@@ -830,7 +849,7 @@ export default function MapPage() {
                 {choisi?.terrain && <Itineraire terrain={choisi.terrain} ios={ios} />}
                 {/* Une journée : ses joueurs. La convocation : on y répond, comme avant. */}
                 {choisi?.partie ? (
-                  <FichePartie partie={choisi.partie} moi={moi} onChange={recharger} />
+                  <FichePartie partie={choisi.partie} moi={moi} terrains={terrains} onChange={recharger} />
                 ) : choisi?.j != null && !choisi.convoquee ? (
                   // Les équipes faites, la feuille de match dit déjà qui vient.
                   feuille.length === 0 && <Presents m={choisi} />
@@ -921,6 +940,7 @@ export default function MapPage() {
           onOuvert={(id) => {
             recharger();
             setChoix(`m${id}`);
+            aMontrer.current = `m${id}`;
           }}
         />
       )}

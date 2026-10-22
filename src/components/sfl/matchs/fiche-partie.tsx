@@ -6,6 +6,10 @@
 // (choisir-joueur.tsx), un autre y prend sa place si le match est public.
 // Puis le seul geste qui compte pour moi ici : accepter, me retirer, ou
 // annuler si c'est mon match.
+// L'organisateur garde la main jusqu'au coup d'envoi (Sabri, 22/10) : il
+// retire un joueur en touchant sa carte, et « Modifier » rouvre la feuille
+// du match (ouvrir-match.tsx) pour en changer le jour, l'heure, le lieu ou
+// les places.
 // Le coup d'envoi passé, l'organisateur tient la feuille (feuille-bola.tsx)
 // et tout le monde voit le score et le ou les MVP.
 
@@ -14,6 +18,8 @@ import { toast } from "sonner";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { TerrainPlaces } from "@/components/sfl/matchs/terrain-places";
 import { ChoisirJoueur } from "@/components/sfl/matchs/choisir-joueur";
+import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
+import type { Terrain } from "@/lib/sfl/saisie/types";
 import {
   accepter,
   annuler,
@@ -26,6 +32,7 @@ import {
   placesLibres,
   quitter,
   rejoindre,
+  retirerJoueur,
   type Partie,
   type Profil,
 } from "@/lib/sfl/matchs";
@@ -33,7 +40,18 @@ import { coupDEnvoiPasse, feuilleOuverte, mvpsDuMatch } from "@/lib/sfl/ligue-vi
 import { FeuilleBola } from "@/components/sfl/matchs/feuille-bola";
 import { cn } from "@/lib/utils";
 
-export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: string | null; onChange: () => void }) {
+export function FichePartie({
+  partie,
+  moi,
+  terrains,
+  onChange,
+}: {
+  partie: Partie;
+  moi: string | null;
+  terrains: Terrain[];
+  onChange: () => void;
+}) {
+  const [modifier, setModifier] = useState(0);
   const [occupe, setOccupe] = useState(false);
   const venus = inscrits(partie);
   const attendus = partie.joueurs.filter((j) => j.statut === "invite");
@@ -107,6 +125,15 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
         occupants={occupants}
         moi={moiNom}
         hauteur={460}
+        onOccupant={
+          organise && !joue && !occupe
+            ? (o) => {
+                if (o.cle === partie.organisateurId) return;
+                if (window.confirm(`Retirer ${o.nom.split(" ")[0]} du match ?`))
+                  void faire(() => retirerJoueur(partie.id, o.cle), `${o.nom.split(" ")[0]} n'est plus dans le match.`);
+              }
+            : undefined
+        }
         onPlus={
           joue || occupe
             ? undefined
@@ -176,7 +203,23 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
           Me retirer
         </button>
       )}
-      {organise && !saisi && (
+      {organise && !joue && (
+        <div className="grid grid-cols-2 gap-2">
+          <button disabled={occupe} onClick={() => setModifier((n) => n + 1)} className={cn(bouton, "bg-foreground text-background")}>
+            Modifier
+          </button>
+          <button
+            disabled={occupe}
+            onClick={() => {
+              if (window.confirm("Annuler ce match pour tout le monde ?")) void faire(() => annuler(partie.id), "Match annulé.");
+            }}
+            className={cn(bouton, "bg-secondary text-foreground/80")}
+          >
+            Annuler le match
+          </button>
+        </div>
+      )}
+      {organise && joue && !saisi && (
         <button
           disabled={occupe}
           onClick={() => {
@@ -186,6 +229,18 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
         >
           Annuler le match
         </button>
+      )}
+      {modifier > 0 && (
+        <OuvrirMatch
+          key={modifier}
+          open
+          onOpenChange={(o) => !o && setModifier(0)}
+          terrains={terrains}
+          terrainInitial={null}
+          moi={moi}
+          partie={partie}
+          onOuvert={onChange}
+        />
       )}
     </section>
   );
