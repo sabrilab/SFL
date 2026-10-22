@@ -63,8 +63,8 @@ function Choix<T extends string>({
           type="button"
           onClick={() => onChange(o.id)}
           className={cn(
-            "rounded-full py-2 text-[14px] font-semibold transition-colors",
-            valeur === o.id ? "bg-foreground text-background" : "text-muted-foreground"
+            "py-2 text-[14px] font-semibold",
+            valeur === o.id ? "bouton-principal" : "bouton-discret text-muted-foreground"
           )}
         >
           {o.libelle}
@@ -76,18 +76,18 @@ function Choix<T extends string>({
 
 /** La ligue où l'on organise : Bola ici, SFL pour un admin, Team ailleurs. */
 function LigueOrganisee({ onSfl }: { onSfl?: () => void }) {
-  const pastille = "flex h-10 items-center justify-center rounded-full transition-colors";
+  const pastille = "flex h-10 items-center justify-center";
   return (
     <div className={cn("grid gap-1 rounded-full bg-secondary p-1", onSfl ? "grid-cols-3" : "grid-cols-2")} aria-label="La ligue">
-      <span aria-current="true" className={cn(pastille, "bg-foreground text-background")}>
+      <span aria-current="true" className={cn(pastille, "bouton-principal cursor-default")}>
         <SigleLigue ligue="bola" hauteur={13} />
       </span>
       {onSfl && (
-        <button type="button" onClick={onSfl} className={cn(pastille, "text-muted-foreground")}>
+        <button type="button" onClick={onSfl} className={cn(pastille, "bouton-discret text-muted-foreground")}>
           <SigleLigue ligue="sfl" hauteur={13} />
         </button>
       )}
-      <Link href="/bola-team" className={cn(pastille, "text-muted-foreground")}>
+      <Link href="/bola-team" className={cn(pastille, "bouton-discret text-muted-foreground")}>
         <SigleLigue ligue="team" hauteur={13} />
       </Link>
     </div>
@@ -223,7 +223,7 @@ export function OuvrirMatch({
   }
 
   const bouton = (
-    <Button disabled={!pret || envoi} onClick={ouvrir} className="h-12 w-full rounded-full text-[15px] font-semibold">
+    <Button variant="vert" disabled={!pret || envoi} onClick={ouvrir} className="h-12 w-full rounded-full text-[15px] font-semibold">
       {partie
         ? "Enregistrer"
         : visibilite === "public"
@@ -274,8 +274,8 @@ export function OuvrirMatch({
                   type="button"
                   onClick={() => setTerrainId(t.id === terrainId ? null : t.id)}
                   className={cn(
-                    "rounded-full border px-3 py-1.5 text-[13px] font-semibold",
-                    t.id === terrainId ? "border-foreground bg-foreground text-background" : "border-border/60 bg-card"
+                    "px-3 py-1.5 text-[13px] font-semibold",
+                    t.id === terrainId ? "bouton-principal" : "bouton-secondaire"
                   )}
                 >
                   {t.nom}

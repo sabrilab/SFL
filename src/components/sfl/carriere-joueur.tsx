@@ -188,8 +188,8 @@ export function CourbeCarriere({ points }: { points: PointCourbe[] }) {
               aria-selected={mode === m}
               onClick={() => setMode(m)}
               className={cn(
-                "rounded-full px-3 py-1 text-[12px] font-semibold transition-colors",
-                mode === m ? "bg-foreground text-background" : "text-foreground/55"
+                "px-3 py-1 text-[12px] font-semibold",
+                mode === m ? "bouton-principal" : "bouton-discret text-foreground/55"
               )}
             >
               {m === "note" ? "Note" : "Pépite d'Or"}

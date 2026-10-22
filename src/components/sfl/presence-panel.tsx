@@ -90,8 +90,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
             <button
               onClick={() => answer("present")}
               className={cn(
-                "bouton-principal flex-1 py-3.5 text-[15px] font-bold",
-                p.mine === "present" && "bouton--vert"
+                "bouton-principal bouton--vert flex-1 py-3.5 text-[15px] font-bold"
               )}
             >
               {p.mine === "present" ? "Je viens ✓" : "Je viens"}
@@ -99,8 +98,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
             <button
               onClick={() => answer("absent")}
               className={cn(
-                "bouton-secondaire flex-1 py-3.5 text-[15px] font-semibold",
-                p.mine === "absent" && "bouton--rouge"
+                "bouton-secondaire bouton--rouge flex-1 py-3.5 text-[15px] font-semibold"
               )}
             >
               {p.mine === "absent" ? "Pas dispo ✓" : "Pas dispo"}
@@ -164,7 +162,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
       {admin && p.publish && (
         <button
           onClick={publish}
-          className="bouton-secondaire mt-3 w-full py-3 text-[13px] font-semibold"
+          className="bouton-secondaire bouton--vert mt-3 w-full py-3 text-[13px] font-semibold"
         >
           Publier la convocation J{p.journee} pour toute la ligue
         </button>
@@ -178,7 +176,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
             {p.sansReponse.length > 0 && (
               <button
                 onClick={copyRelances}
-                className="bouton-secondaire mono-label flex items-center gap-1.5 px-2.5 py-1"
+                className="bouton-secondaire bouton--mauve mono-label flex items-center gap-1.5 px-2.5 py-1"
               >
                 <Copy className="size-3" /> Relance
               </button>

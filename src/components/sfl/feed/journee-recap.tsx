@@ -116,8 +116,8 @@ function ReactionRow({ id, className }: { id: string; className?: string }) {
             key={emoji}
             onClick={() => toggle(emoji)}
             className={cn(
-              "glass flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold transition-transform active:scale-95",
-              active && "text-primary shadow-[inset_0_0_0_1.5px_var(--primary)]"
+              "flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-semibold",
+              active ? "bouton-secondaire bouton--mauve" : "bouton-secondaire"
             )}
           >
             <span className="text-[15px] leading-none">{emoji}</span>
@@ -127,7 +127,7 @@ function ReactionRow({ id, className }: { id: string; className?: string }) {
       })}
       <button
         onClick={() => toggle("👏")}
-        className="glass flex items-center justify-center rounded-full px-3 py-1.5 text-[13px] font-semibold text-muted-foreground"
+        className="bouton-secondaire bouton--mauve flex items-center justify-center px-3 py-1.5 text-[13px] font-semibold"
       >
         +
       </button>

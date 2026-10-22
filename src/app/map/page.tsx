@@ -725,7 +725,7 @@ export default function MapPage() {
                 setCatalogue(true);
               }}
               aria-label="Les joueurs, ville par ville"
-              className="bouton-givre map-bord map-touche grid size-10 place-items-center"
+              className="bouton-givre bouton--mauve map-bord map-touche grid size-10 place-items-center"
             >
               <Users className="size-[18px]" strokeWidth={2.2} />
             </button>
@@ -744,7 +744,7 @@ export default function MapPage() {
               type="button"
               onClick={() => setDispos(true)}
               aria-label="Mes dispos"
-              className="bouton-givre map-bord map-touche grid size-10 place-items-center"
+              className="bouton-givre bouton--vert map-bord map-touche grid size-10 place-items-center"
             >
               <CalendarDays className="size-[18px]" strokeWidth={2.2} />
             </button>
@@ -770,9 +770,9 @@ export default function MapPage() {
               <button
                 type="button"
                 onClick={() => setOuvrir((o) => ({ terrain: choisi?.partie ? null : (choisi?.terrain ?? null), n: (o?.n ?? 0) + 1 }))}
-                className="bouton-encre map-monte map-touche flex h-11 items-center gap-2 pr-[18px] pl-2 text-[15.5px] font-semibold"
+                className="bouton-encre bouton--vert map-monte map-touche flex h-11 items-center gap-2 pr-[18px] pl-2 text-[15.5px] font-semibold"
               >
-                <span className="grid size-7 place-items-center rounded-full" style={{ background: CLAIR, color: ENCRE }}>
+                <span className="grid size-7 place-items-center rounded-full" style={{ background: "var(--b-texte)", color: ENCRE }}>
                   <Plus className="size-[13px]" strokeWidth={3} />
                 </span>
                 Ouvrir un match
@@ -781,7 +781,7 @@ export default function MapPage() {
             {admin && (
               <Link
                 href="/admin"
-                className={cn("map-monte map-touche flex h-11 items-center gap-2 px-[18px] text-[15.5px] font-semibold", partiesActives ? "bouton-givre" : "bouton-encre")}
+                className={cn("map-monte map-touche flex h-11 items-center gap-2 px-[18px] text-[15.5px] font-semibold", partiesActives ? "bouton-givre" : "bouton-encre bouton--vert")}
               >
                 {partiesActives ? "Journée" : "Ouvrir un match"}
               </Link>
@@ -850,7 +850,7 @@ export default function MapPage() {
                     href={urlItineraire(choisi.terrain, ios)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bouton-givre flex h-[30px] shrink-0 items-center gap-[5px] px-3 text-[12.5px] font-semibold"
+                    className="bouton-givre bouton--vert flex h-[30px] shrink-0 items-center gap-[5px] px-3 text-[12.5px] font-semibold"
                   >
                     <Navigation className="size-[11px]" strokeWidth={2.6} /> Y aller
                   </a>
@@ -1211,7 +1211,7 @@ function Itineraire({ terrain, ios }: { terrain: Terrain; ios: boolean }) {
         href={ordre[0].url}
         target="_blank"
         rel="noopener noreferrer"
-        className="bouton-principal flex h-12 items-center justify-center gap-2 text-[15px] font-semibold"
+        className="bouton-principal bouton--vert flex h-12 items-center justify-center gap-2 text-[15px] font-semibold"
       >
         <Navigation className="size-4" /> Itinéraire avec {ordre[0].libelle}
       </a>
@@ -1222,7 +1222,7 @@ function Itineraire({ terrain, ios }: { terrain: Terrain; ios: boolean }) {
             href={l.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="bouton-secondaire flex h-11 items-center justify-center text-[14px] font-semibold"
+            className="bouton-secondaire bouton--vert flex h-11 items-center justify-center text-[14px] font-semibold"
           >
             {l.libelle}
           </a>
@@ -1434,6 +1434,7 @@ function ChercheAdresse({
           setLieux([]);
           setChoisi(null);
         }}
+        variant="vert"
         className="font-semibold"
       >
         <MapPin className="size-4" /> {bouton}

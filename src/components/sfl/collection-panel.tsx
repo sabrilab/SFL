@@ -96,7 +96,7 @@ function CardModal({
               </span>
               {!has && (
                 <>
-                  <Button size="sm" className="mt-1 font-semibold" onClick={() => onBuy(card)}>
+                  <Button size="sm" variant="or" className="mt-1 font-semibold" onClick={() => onBuy(card)}>
                     Acheter · {card.price} ⚽
                   </Button>
                   <span className="text-[11px] text-foreground/35">
@@ -188,6 +188,7 @@ export function CollectionPanel({ me }: { me: string }) {
         </p>
         <Button
           size="lg"
+          variant="or"
           onClick={handleOpenPack}
           disabled={!isClient || balance < PACK_COST}
           className="w-full max-w-xs font-semibold"
@@ -238,8 +239,8 @@ export function CollectionPanel({ me }: { me: string }) {
             key={f.id}
             onClick={() => setFilter(f.id)}
             className={cn(
-              "shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors",
-              filter === f.id ? "bg-foreground text-background" : "glass-soft text-foreground/60"
+              "shrink-0 px-3.5 py-1.5 text-[13px] font-semibold whitespace-nowrap",
+              filter === f.id ? "bouton-principal" : "bouton-secondaire text-foreground/60"
             )}
           >
             {f.label}
@@ -248,8 +249,8 @@ export function CollectionPanel({ me }: { me: string }) {
         <button
           onClick={() => setOwnedOnly((v) => !v)}
           className={cn(
-            "shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors",
-            ownedOnly ? "bg-primary text-primary-foreground" : "glass-soft text-foreground/60"
+            "shrink-0 px-3.5 py-1.5 text-[13px] font-semibold whitespace-nowrap",
+            ownedOnly ? "bouton-principal bouton--or" : "bouton-secondaire bouton--or"
           )}
         >
           Possédées

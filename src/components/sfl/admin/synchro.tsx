@@ -158,7 +158,7 @@ export function Synchro({ saison }: { saison: Saison }) {
         <button
           onClick={publier}
           disabled={occupe || !!empeche}
-          className="bouton-principal flex flex-1 items-center justify-center gap-2 py-3 text-[14px] font-bold disabled:opacity-40"
+          className="bouton-principal bouton--vert flex flex-1 items-center justify-center gap-2 py-3 text-[14px] font-bold disabled:opacity-40"
         >
           <CloudUpload className="size-4" strokeWidth={2.5} />
           {etat.phase === "envoi" ? "Publication…" : "Publier pour toute la ligue"}
@@ -197,7 +197,7 @@ export function Synchro({ saison }: { saison: Saison }) {
           </p>
           <button
             onClick={publier}
-            className="bouton-secondaire mono-label mt-2 px-3 py-1.5"
+            className="bouton-secondaire bouton--vert mono-label mt-2 px-3 py-1.5"
           >
             Réessayer
           </button>
@@ -264,7 +264,7 @@ export function ReinitialiserSaison() {
       }}
       className={cn(
         "mono-label px-3 py-1.5",
-        confirme ? "bouton-principal bouton--rouge" : "bouton-secondaire text-foreground/45"
+        confirme ? "bouton-principal bouton--rouge" : "bouton-secondaire bouton--rouge"
       )}
     >
       {confirme ? "Confirmer — tes saisies seront perdues" : "Repartir des données livrées"}

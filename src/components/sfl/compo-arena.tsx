@@ -217,8 +217,7 @@ export function CompoArena({ me }: { me: string }) {
         onClick={deposer}
         disabled={!complets}
         className={cn(
-          "bouton-principal flex items-center justify-center gap-2 py-3.5 text-[15px] font-bold disabled:opacity-35",
-          deposee && complets && "bouton--vert"
+          "bouton-principal bouton--vert flex items-center justify-center gap-2 py-3.5 text-[15px] font-bold disabled:opacity-35"
         )}
       >
         {deposee && complets ? (

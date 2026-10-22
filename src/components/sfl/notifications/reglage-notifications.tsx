@@ -61,7 +61,7 @@ export function ReglageNotifications() {
           type="button"
           onClick={activer}
           disabled={busy}
-          className="bouton-principal shrink-0 px-4 py-2 text-[13px] font-bold disabled:opacity-40"
+          className="bouton-principal bouton--mauve shrink-0 px-4 py-2 text-[13px] font-bold disabled:opacity-40"
         >
           Activer
         </button>

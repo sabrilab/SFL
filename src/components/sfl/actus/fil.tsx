@@ -126,7 +126,7 @@ function Publication({
               preparerPiece({ type: "ligue", ...partage, lignes: partage.lignes.slice(0, 6) });
               router.push("/vestiaire");
             }}
-            className="-mt-1.5 grid size-9 shrink-0 place-items-center rounded-full text-foreground/60 transition-transform active:scale-90"
+            className="bouton-discret bouton--mauve -mt-1.5 grid size-9 shrink-0 place-items-center"
           >
             <MessageCircle className="size-[19px]" strokeWidth={1.8} />
           </button>
@@ -292,7 +292,7 @@ function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saiso
           texte={top.map((p) => `${p.rank}. ${id.nom(p.name)} ${p.pp} pts`).join(" · ")}
           partage={{ titre: "Le podium du Pépite d'Or", j: a.j, lignes: top.map((p) => ({ n: p.name, v: `${p.rank}e · ${p.pp} pts` })) }}
           action={
-            <button type="button" onClick={onClassements} className="-mt-1 flex shrink-0 items-center gap-0.5 rounded-full py-1.5 pl-2 text-[13.5px] font-semibold">
+            <button type="button" onClick={onClassements} className="bouton-discret bouton--or -mt-1 flex shrink-0 items-center gap-0.5 py-1.5 pr-1 pl-2.5 text-[13.5px] font-semibold">
               Classements <ChevronRight className="size-4" />
             </button>
           }
@@ -340,7 +340,7 @@ function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu; saiso
           texte={`${a.buts} ${pl(a.buts, "but", "buts")} · ${a.matchs} ${pl(a.matchs, "match", "matchs")} · ${joueurs} joueurs`}
           action={
             enCours ? (
-              <Link href={`/ligue/journee?j=${a.j}`} className="-mt-1 flex shrink-0 items-center gap-0.5 rounded-full py-1.5 pl-2 text-[13.5px] font-semibold">
+              <Link href={`/ligue/journee?j=${a.j}`} className="bouton-discret bouton--vert -mt-1 flex shrink-0 items-center gap-0.5 py-1.5 pr-1 pl-2.5 text-[13.5px] font-semibold">
                 Le récap <ChevronRight className="size-4" />
               </Link>
             ) : null
@@ -510,8 +510,9 @@ export function FilActus({ vueDepart = "actus" }: { vueDepart?: Vue }) {
                 document.getElementById("app-scroll")?.scrollTo({ top: 0 });
               }}
               className={cn(
-                "flex-1 rounded-full px-3 py-2.5 text-[14px] font-semibold whitespace-nowrap transition-colors",
-                vue === id ? "bg-foreground text-background" : "glass text-foreground"
+                "flex-1 px-3 py-2.5 text-[14px] font-semibold whitespace-nowrap",
+                vue === id ? "bouton-principal" : "bouton-secondaire",
+                id === "classements" ? "bouton--or" : "bouton--vert"
               )}
             >
               {label}

@@ -72,13 +72,10 @@ export default function ReglagesPage() {
                 key={value}
                 onClick={() => setTheme(value)}
                 className={cn(
-                  "relative flex flex-1 flex-col items-center gap-1.5 rounded-xl py-3 text-xs font-semibold transition-colors",
-                  active ? "text-foreground" : "text-foreground/45 hover:text-foreground"
+                  "flex flex-1 flex-col items-center gap-1.5 rounded-xl py-3 text-xs font-semibold",
+                  active ? "bouton-principal" : "bouton-discret text-foreground/45"
                 )}
               >
-                {active && (
-                  <span className="absolute inset-0 rounded-xl bg-foreground/10 ring-1 ring-foreground/10" />
-                )}
                 <Icon className="relative size-5" />
                 <span className="relative">{label}</span>
               </button>

@@ -219,7 +219,7 @@ export function PackOpening({
                 </motion.div>
               ))}
             </div>
-            <Button size="lg" onClick={onDone} className="w-full max-w-xs font-semibold">
+            <Button size="lg" variant="or" onClick={onDone} className="w-full max-w-xs font-semibold">
               Ajouter à ma collection
             </Button>
             <span className="text-xs text-white/50">Pack ouvert · −{PACK_COST} ⚽</span>
