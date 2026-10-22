@@ -192,7 +192,7 @@ function Ligue() {
           ordinateur, le titre de la page à gauche (comme Ma carte), et le
           sélecteur ramené à sa juste largeur au lieu de traverser l'écran. */}
       <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-[var(--fib-13)]">
-      <Link href="/ligue" aria-label="Actus" className="glass flex size-10 shrink-0 items-center justify-center rounded-full sm:size-11 lg:hidden">
+      <Link href="/ligue" aria-label="Actus" className="bouton-secondaire flex size-10 shrink-0 items-center justify-center sm:size-11 lg:hidden">
         <ChevronLeft className="size-5" />
       </Link>
       <h1 className="hidden text-[34px] font-bold tracking-tight lg:mr-auto lg:block">Le récap</h1>

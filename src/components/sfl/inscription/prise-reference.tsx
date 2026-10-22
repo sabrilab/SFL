@@ -143,7 +143,7 @@ export function PriseReference({
           </p>
           <p className="text-[21px] leading-tight font-extrabold tracking-tight">{info.label}</p>
         </div>
-        <button onClick={onFermer} aria-label="Fermer" className="grid size-10 place-items-center rounded-full bg-white/10">
+        <button onClick={onFermer} aria-label="Fermer" className="bouton-secondaire grid size-10 place-items-center">
           <X className="size-5" />
         </button>
       </div>
@@ -165,7 +165,7 @@ export function PriseReference({
               <p className="mt-3 text-[14px] text-white/60">La caméra ne s&apos;ouvre pas ici.</p>
               <button
                 onClick={() => fichier.current?.click()}
-                className="mt-5 rounded-full bg-white px-6 py-3 text-[14px] font-bold text-black"
+                className="bouton-principal mt-5 px-6 py-3 text-[14px] font-bold"
               >
                 Ouvrir l&apos;appareil photo
               </button>
@@ -223,7 +223,7 @@ export function PriseReference({
         <button
           onClick={() => setFace((f) => (f === "user" ? "environment" : "user"))}
           aria-label="Changer de caméra"
-          className="grid size-11 place-items-center rounded-full bg-white/10"
+          className="bouton-secondaire grid size-11 place-items-center"
           disabled={indispo}
         >
           {indispo ? <RefreshCw className="size-5 opacity-30" /> : <SwitchCamera className="size-5" />}

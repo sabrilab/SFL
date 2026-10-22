@@ -134,7 +134,7 @@ function FicheJournee({ journee }: { journee: Journee }) {
 
       <Link
         href="/ligue"
-        className="block rounded-full bg-foreground py-4 text-center text-[15px] font-bold text-background transition-transform active:scale-[0.98]"
+        className="bouton-principal block py-4 text-center text-[15px] font-bold"
       >
         Ouvrir le récap dans la Ligue
       </Link>
@@ -193,7 +193,7 @@ export default function RecherchePage() {
       {fiche ? (
         <button
           onClick={close}
-          className="glass-soft flex w-fit items-center gap-2 rounded-full py-2 pr-4 pl-3 text-[13px] font-semibold text-foreground/60"
+          className="bouton-secondaire flex w-fit items-center gap-2 py-2 pr-4 pl-3 text-[13px] font-semibold"
         >
           <ArrowLeft className="size-4" /> Recherche
         </button>
@@ -239,7 +239,7 @@ export default function RecherchePage() {
                     <button
                       key={j.j}
                       onClick={() => setOpenJournee(j.j)}
-                      className="glass-soft flex items-center gap-2 rounded-full py-2 pr-4 pl-3 text-[13px] font-semibold transition-transform active:scale-95"
+                      className="bouton-secondaire flex items-center gap-2 py-2 pr-4 pl-3 text-[13px] font-semibold"
                     >
                       <CalendarDays className="size-3.5 text-foreground/35" />J{j.j}
                     </button>

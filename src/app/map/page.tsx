@@ -629,8 +629,7 @@ export default function MapPage() {
           <Link
             href="/recherche"
             aria-label="Recherche"
-            className="map-bord map-touche grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
-            style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
+            className="bouton-givre map-bord map-touche grid size-10 place-items-center"
           >
             <Search className="size-[18px]" strokeWidth={2.2} />
           </Link>
@@ -638,8 +637,7 @@ export default function MapPage() {
             <Link
               href="/admin/activite"
               aria-label="Activité et rétention"
-              className="map-bord map-touche grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
-              style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
+              className="bouton-givre map-bord map-touche grid size-10 place-items-center"
             >
               <ChartSpline className="size-[18px]" strokeWidth={2.2} />
             </Link>
@@ -652,8 +650,7 @@ export default function MapPage() {
                 setCatalogue(true);
               }}
               aria-label="Les joueurs, ville par ville"
-              className="map-bord map-touche grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
-              style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
+              className="bouton-givre map-bord map-touche grid size-10 place-items-center"
             >
               <Users className="size-[18px]" strokeWidth={2.2} />
             </button>
@@ -663,8 +660,7 @@ export default function MapPage() {
             onClick={() => setFond((f) => (f === "plan" ? "satellite" : "plan"))}
             aria-label={fond === "plan" ? "Voir la photo satellite" : "Revenir au plan"}
             aria-pressed={fond === "satellite"}
-            className="map-bord map-touche map-calques grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
-            style={fond === "satellite" ? { background: ENCRE, color: CLAIR, borderColor: "rgba(255,255,255,0.2)" } : { background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
+            className={cn("map-bord map-touche map-calques grid size-10 place-items-center", fond === "satellite" ? "bouton-encre" : "bouton-givre")}
           >
             <Layers className="size-[18px]" strokeWidth={2.2} />
           </button>
@@ -673,8 +669,7 @@ export default function MapPage() {
               type="button"
               onClick={() => setDispos(true)}
               aria-label="Mes dispos"
-              className="map-bord map-touche grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
-              style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
+              className="bouton-givre map-bord map-touche grid size-10 place-items-center"
             >
               <CalendarDays className="size-[18px]" strokeWidth={2.2} />
             </button>
@@ -684,8 +679,7 @@ export default function MapPage() {
               type="button"
               onClick={() => ouvrirFiche(true)}
               aria-label="Régler les matchs et les terrains"
-              className="map-bord map-touche grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
-              style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
+              className="bouton-givre map-bord map-touche grid size-10 place-items-center"
             >
               <Settings2 className="size-[18px]" strokeWidth={2.2} />
             </button>
@@ -700,8 +694,7 @@ export default function MapPage() {
               <button
                 type="button"
                 onClick={() => setOuvrir((o) => ({ terrain: choisi?.partie ? null : (choisi?.terrain ?? null), n: (o?.n ?? 0) + 1 }))}
-                className="map-monte map-touche flex h-11 items-center gap-2 rounded-full pr-[18px] pl-2 text-[15.5px] font-semibold shadow-[0_6px_10px_rgba(0,0,0,0.22)]"
-                style={{ background: ENCRE, color: CLAIR }}
+                className="bouton-encre map-monte map-touche flex h-11 items-center gap-2 pr-[18px] pl-2 text-[15.5px] font-semibold"
               >
                 <span className="grid size-7 place-items-center rounded-full" style={{ background: CLAIR, color: ENCRE }}>
                   <Plus className="size-[13px]" strokeWidth={3} />
@@ -712,8 +705,7 @@ export default function MapPage() {
             {admin && (
               <Link
                 href="/admin"
-                className="map-monte map-touche flex h-11 items-center gap-2 rounded-full px-[18px] text-[15.5px] font-semibold shadow-[0_6px_10px_rgba(0,0,0,0.22)]"
-                style={partiesActives ? { background: BLANC, color: ENCRE } : { background: ENCRE, color: CLAIR }}
+                className={cn("map-monte map-touche flex h-11 items-center gap-2 px-[18px] text-[15.5px] font-semibold", partiesActives ? "bouton-givre" : "bouton-encre")}
               >
                 {partiesActives ? "Journée" : "Ouvrir un match"}
               </Link>
@@ -722,8 +714,7 @@ export default function MapPage() {
               type="button"
               onClick={localiser}
               aria-label={toi ? "Revenir sur toi" : "Activer la localisation"}
-              className="map-monte map-touche absolute right-4 grid size-11 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
-              style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
+              className="bouton-givre map-monte map-touche absolute right-4 grid size-11 place-items-center"
             >
               <LocateFixed className={cn("size-4", cherchePosition && "animate-pulse")} strokeWidth={2.4} />
             </button>
@@ -758,8 +749,7 @@ export default function MapPage() {
                   <button
                     type="button"
                     onClick={() => ouvrirFiche()}
-                    className="flex h-[30px] min-w-0 items-center gap-[7px] rounded-full px-3.5 shadow-[0_3px_6px_rgba(0,0,0,0.14)]"
-                    style={{ background: BLANC, color: ENCRE }}
+                    className="bouton-givre flex h-[30px] min-w-0 items-center gap-[7px] px-3.5"
                   >
                     <span className="size-1.5 shrink-0 rounded-full" style={{ background: ENCRE }} />
                     <span className="truncate text-[13px] font-semibold tracking-[-0.2px]">{choisi.terrain.nom}</span>
@@ -768,8 +758,7 @@ export default function MapPage() {
                     href={urlItineraire(choisi.terrain, ios)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex h-[30px] shrink-0 items-center gap-[5px] rounded-full px-3 text-[12.5px] font-semibold shadow-[0_3px_6px_rgba(0,0,0,0.14)]"
-                    style={{ background: BLANC, color: ENCRE }}
+                    className="bouton-givre flex h-[30px] shrink-0 items-center gap-[5px] px-3 text-[12.5px] font-semibold"
                   >
                     <Navigation className="size-[11px]" strokeWidth={2.6} /> Y aller
                   </a>
@@ -778,8 +767,7 @@ export default function MapPage() {
                 <button
                   type="button"
                   onClick={() => ouvrirFiche()}
-                  className="flex h-[30px] items-center rounded-full px-3.5 text-[13px] font-semibold shadow-[0_3px_6px_rgba(0,0,0,0.14)]"
-                  style={{ background: BLANC, color: ENCRE }}
+                  className="bouton-givre flex h-[30px] items-center px-3.5 text-[13px] font-semibold"
                 >
                   {choisi.partie.lieu}
                 </button>
@@ -787,8 +775,7 @@ export default function MapPage() {
                 <button
                   type="button"
                   onClick={() => ouvrirFiche(true)}
-                  className="flex h-[30px] items-center gap-[7px] rounded-full px-3.5 text-[13px] font-semibold shadow-[0_3px_6px_rgba(0,0,0,0.14)]"
-                  style={{ background: BRAISE, color: ENCRE }}
+                  className="bouton-principal bouton--braise flex h-[30px] items-center gap-[7px] px-3.5 text-[13px] font-semibold"
                 >
                   <MapPin className="size-3.5" strokeWidth={2.4} /> Donner l&apos;adresse du match
                 </button>
@@ -852,7 +839,7 @@ export default function MapPage() {
                 {choisi?.joue && (
                   <Link
                     href="/ligue"
-                    className="flex h-12 items-center justify-center gap-2 rounded-full bg-foreground text-[15px] font-semibold text-background"
+                    className="bouton-principal flex h-12 items-center justify-center gap-2 text-[15px] font-semibold"
                   >
                     Voir le récap de la journée
                   </Link>
@@ -861,7 +848,7 @@ export default function MapPage() {
                   <button
                     type="button"
                     onClick={() => setFicheAdmin(true)}
-                    className="flex h-11 items-center justify-center gap-2 rounded-full bg-secondary text-[14px] font-semibold"
+                    className="bouton-secondaire flex h-11 items-center justify-center gap-2 text-[14px] font-semibold"
                   >
                     <Settings2 className="size-4" /> Date, heure et adresse des matchs
                   </button>
@@ -1105,7 +1092,7 @@ function Itineraire({ terrain, ios }: { terrain: Terrain; ios: boolean }) {
         href={ordre[0].url}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex h-12 items-center justify-center gap-2 rounded-full bg-primary text-[15px] font-semibold text-primary-foreground"
+        className="bouton-principal flex h-12 items-center justify-center gap-2 text-[15px] font-semibold"
       >
         <Navigation className="size-4" /> Itinéraire avec {ordre[0].libelle}
       </a>
@@ -1116,7 +1103,7 @@ function Itineraire({ terrain, ios }: { terrain: Terrain; ios: boolean }) {
             href={l.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex h-11 items-center justify-center rounded-full bg-secondary text-[14px] font-semibold"
+            className="bouton-secondaire flex h-11 items-center justify-center text-[14px] font-semibold"
           >
             {l.libelle}
           </a>
@@ -1464,7 +1451,7 @@ function Terrains({
                   type="button"
                   aria-label={`${t.nom} par défaut`}
                   onClick={() => onSauver(definirTerrainParDefaut(saison, t.id), `${t.nom} devient le terrain par défaut.`)}
-                  className="grid size-8 place-items-center rounded-full bg-secondary text-muted-foreground"
+                  className="bouton-secondaire grid size-8 place-items-center"
                 >
                   <Star className="size-4" />
                 </button>
@@ -1474,7 +1461,7 @@ function Terrains({
                 aria-label={`Ajuster ${t.nom} sur la photo satellite`}
                 aria-pressed={ajuste === t.id}
                 onClick={() => setAjuste((x) => (x === t.id ? null : t.id))}
-                className={cn("grid size-8 place-items-center rounded-full", ajuste === t.id ? "bg-foreground text-background" : "bg-secondary text-muted-foreground")}
+                className={cn("grid size-8 place-items-center", ajuste === t.id ? "bouton-principal" : "bouton-secondaire")}
               >
                 <Crosshair className="size-4" />
               </button>
@@ -1482,7 +1469,7 @@ function Terrains({
                 type="button"
                 aria-label={`Retirer ${t.nom}`}
                 onClick={() => onSauver(retirerTerrain(saison, t.id), `${t.nom} retiré de la Map.`)}
-                className="grid size-8 place-items-center rounded-full bg-secondary text-muted-foreground"
+                className="bouton-secondaire bouton--rouge grid size-8 place-items-center"
               >
                 <Trash2 className="size-4" />
               </button>

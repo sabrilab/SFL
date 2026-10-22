@@ -86,11 +86,12 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
       {p.reponsesOuvertes ? (
         <>
           <div className="mt-4 flex gap-2">
+            {/* Je viens : le verre allumé ; une fois dit, il passe au vert. */}
             <button
               onClick={() => answer("present")}
               className={cn(
-                "flex-1 rounded-full py-3.5 text-[15px] font-bold transition-transform active:scale-[0.98]",
-                p.mine === "present" ? "bg-primary text-primary-foreground" : "bg-foreground text-background"
+                "bouton-principal flex-1 py-3.5 text-[15px] font-bold",
+                p.mine === "present" && "bouton--vert"
               )}
             >
               {p.mine === "present" ? "Je viens ✓" : "Je viens"}
@@ -98,8 +99,8 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
             <button
               onClick={() => answer("absent")}
               className={cn(
-                "flex-1 rounded-full py-3.5 text-[15px] font-semibold transition-transform active:scale-[0.98]",
-                p.mine === "absent" ? "bg-[#FF6B5E]/20 text-[#FF6B5E]" : "glass-soft text-foreground/70"
+                "bouton-secondaire flex-1 py-3.5 text-[15px] font-semibold",
+                p.mine === "absent" && "bouton--rouge"
               )}
             >
               {p.mine === "absent" ? "Pas dispo ✓" : "Pas dispo"}
@@ -163,7 +164,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
       {admin && p.publish && (
         <button
           onClick={publish}
-          className="glass-soft mt-3 w-full rounded-full py-3 text-[13px] font-semibold text-foreground/70"
+          className="bouton-secondaire mt-3 w-full py-3 text-[13px] font-semibold"
         >
           Publier la convocation J{p.journee} pour toute la ligue
         </button>
@@ -177,7 +178,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
             {p.sansReponse.length > 0 && (
               <button
                 onClick={copyRelances}
-                className="glass-soft mono-label flex items-center gap-1.5 rounded-full px-2.5 py-1 text-foreground/60"
+                className="bouton-secondaire mono-label flex items-center gap-1.5 px-2.5 py-1"
               >
                 <Copy className="size-3" /> Relance
               </button>

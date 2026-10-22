@@ -612,7 +612,7 @@ export function AdminDashboard() {
                   type="button"
                   aria-label="Réglages de la journée"
                   onClick={() => setMetaJ(meta.j)}
-                  className="flex size-8 items-center justify-center rounded-full text-muted-foreground active:bg-secondary"
+                  className="bouton-discret flex size-8 items-center justify-center"
                 >
                   <Pencil className="size-4" />
                 </button>

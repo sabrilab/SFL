@@ -128,10 +128,8 @@ export default function Discussions() {
                 <button
                   onClick={() => answer("present")}
                   className={cn(
-                    "flex-1 rounded-full py-2.5 text-center text-[13px] font-bold transition-transform active:scale-[0.98]",
-                    presence.mine === "present"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-foreground text-background"
+                    "bouton-principal flex-1 py-2.5 text-center text-[13px] font-bold",
+                    presence.mine === "present" && "bouton--vert"
                   )}
                 >
                   {presence.mine === "present" ? "Je viens ✓" : "Je viens"}
@@ -139,10 +137,8 @@ export default function Discussions() {
                 <button
                   onClick={() => answer("absent")}
                   className={cn(
-                    "flex-1 rounded-full py-2.5 text-center text-[13px] font-semibold transition-transform active:scale-[0.98]",
-                    presence.mine === "absent"
-                      ? "bg-[#FF6B5E]/20 text-[#FF6B5E]"
-                      : "glass-soft text-foreground/70"
+                    "bouton-secondaire flex-1 py-2.5 text-center text-[13px] font-semibold",
+                    presence.mine === "absent" && "bouton--rouge"
                   )}
                 >
                   {presence.mine === "absent" ? "Pas dispo ✓" : "Pas dispo"}

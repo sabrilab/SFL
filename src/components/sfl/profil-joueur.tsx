@@ -156,7 +156,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
           <button
             type="button"
             onClick={() => setCompare(true)}
-            className="flex h-12 w-full items-center justify-center rounded-full bg-foreground text-[15px] font-semibold text-background transition-transform active:scale-[0.98] motion-reduce:transition-none"
+            className="bouton-principal flex h-12 w-full items-center justify-center text-[15px] font-semibold"
           >
             Comparer avec ma carte
           </button>

@@ -257,7 +257,7 @@ export function FormulaireIdentite({ onFini }: { onFini?: () => void }) {
       <button
         type="submit"
         disabled={!pret || envoi}
-        className="flex w-full items-center justify-center gap-2 rounded-full bg-white py-[15px] text-[15px] font-bold text-black transition-opacity active:opacity-80 disabled:opacity-40"
+        className="bouton-principal flex w-full items-center justify-center gap-2 py-[15px] text-[15px] font-bold disabled:opacity-40"
       >
         {envoi && <Loader2 className="size-4 animate-spin" />}
         C&apos;est moi

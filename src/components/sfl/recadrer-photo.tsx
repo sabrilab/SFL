@@ -208,7 +208,7 @@ export function RecadrerPhoto({
           </div>
 
           <div className="flex items-center gap-3">
-            <button type="button" onClick={() => zoomer(pos.zoom / 1.2)} aria-label="Dézoomer" className="grid size-9 place-items-center rounded-full bg-secondary">
+            <button type="button" onClick={() => zoomer(pos.zoom / 1.2)} aria-label="Dézoomer" className="bouton-secondaire grid size-9 place-items-center">
               <Minus className="size-4" />
             </button>
             <input
@@ -221,7 +221,7 @@ export function RecadrerPhoto({
               aria-label="Zoom"
               className="flex-1 accent-foreground"
             />
-            <button type="button" onClick={() => zoomer(pos.zoom * 1.2)} aria-label="Zoomer" className="grid size-9 place-items-center rounded-full bg-secondary">
+            <button type="button" onClick={() => zoomer(pos.zoom * 1.2)} aria-label="Zoomer" className="bouton-secondaire grid size-9 place-items-center">
               <Plus className="size-4" />
             </button>
           </div>

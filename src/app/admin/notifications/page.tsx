@@ -166,7 +166,7 @@ export default function NotificationsAdmin() {
           type="button"
           disabled={!valide || busy !== null || !branchees}
           onClick={() => envoyer(true)}
-          className="glass flex items-center justify-center gap-2 rounded-full py-[14px] text-[15px] font-bold disabled:opacity-40"
+          className="bouton-secondaire flex items-center justify-center gap-2 py-[14px] text-[15px] font-bold disabled:opacity-40"
         >
           {busy === "essai" && <Loader2 className="size-4 animate-spin" />}
           M&apos;envoyer un essai
@@ -176,7 +176,7 @@ export default function NotificationsAdmin() {
             type="button"
             disabled={!valide || busy !== null || !branchees || !abonnes?.telephones}
             onClick={() => setConfirmer(true)}
-            className="rounded-full bg-foreground py-[15px] text-[15px] font-bold text-background disabled:opacity-40"
+            className="bouton-principal py-[15px] text-[15px] font-bold disabled:opacity-40"
           >
             Envoyer à toute la ligue
           </button>
@@ -185,7 +185,7 @@ export default function NotificationsAdmin() {
             type="button"
             disabled={busy !== null}
             onClick={() => envoyer(false)}
-            className="flex items-center justify-center gap-2 rounded-full bg-[#FF8A4C] py-[15px] text-[15px] font-bold text-black disabled:opacity-40"
+            className="bouton-principal bouton--braise flex items-center justify-center gap-2 py-[15px] text-[15px] font-bold disabled:opacity-40"
           >
             {busy === "tous" && <Loader2 className="size-4 animate-spin" />}
             Confirmer l&apos;envoi à {abonnes?.telephones} téléphone{(abonnes?.telephones ?? 0) > 1 ? "s" : ""}

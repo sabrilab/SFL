@@ -308,7 +308,7 @@ export function CarteJournee({
         {onOuvrir && (
           <button
             onClick={onOuvrir}
-            className="flex-1 rounded-full bg-foreground py-3 text-center text-[14px] font-bold text-background transition-transform active:scale-[0.98]"
+            className="bouton-principal flex-1 py-3 text-center text-[14px] font-bold"
           >
             Ouvrir le récap
           </button>

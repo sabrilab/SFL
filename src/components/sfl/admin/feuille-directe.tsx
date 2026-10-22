@@ -67,7 +67,7 @@ function Stepper({
           onClick={() => onSet(Math.max(0, value - 1))}
           aria-label={`${label} moins`}
           disabled={value === 0}
-          className="flex size-7 shrink-0 items-center justify-center rounded-full text-foreground/45 transition-colors active:bg-white/10 disabled:opacity-25"
+          className="bouton-discret flex size-7 shrink-0 items-center justify-center disabled:opacity-25"
         >
           <Minus className="size-3.5" />
         </button>
@@ -82,7 +82,7 @@ function Stepper({
         <button
           onClick={() => onSet(Math.min(99, value + 1))}
           aria-label={`${label} plus`}
-          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-90"
+          className="bouton-principal flex size-7 shrink-0 items-center justify-center"
         >
           <Plus className="size-3.5" />
         </button>

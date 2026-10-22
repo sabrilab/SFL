@@ -76,8 +76,8 @@ function Pilule({ children, onClick, plein = true, disabled }: { children: React
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-transform active:scale-95 disabled:opacity-50",
-        plein ? "bg-foreground text-background" : "bg-secondary text-foreground"
+        "shrink-0 px-3.5 py-1.5 text-[13px] font-semibold disabled:opacity-50",
+        plein ? "bouton-principal" : "bouton-secondaire"
       )}
     >
       {children}
@@ -308,7 +308,7 @@ export default function BolaTeamPage() {
       )}
 
       {mienne && (
-        <button type="button" onClick={() => setQuitter(true)} className="self-center py-2 text-[13px] font-semibold text-muted-foreground">
+        <button type="button" onClick={() => setQuitter(true)} className="bouton-discret self-center px-4 py-2 text-[13px] font-semibold">
           Quitter l&apos;équipe
         </button>
       )}

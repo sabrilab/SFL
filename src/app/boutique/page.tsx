@@ -111,7 +111,7 @@ function GuichetBallons({
           </div>
           <Link
             href="/collection"
-            className="glass-soft mt-3.5 block rounded-full py-2.5 text-center text-[13.5px] font-semibold text-foreground/70"
+            className="bouton-secondaire mt-3.5 block py-2.5 text-center text-[13.5px] font-semibold"
           >
             Voir le catalogue de cartes
           </Link>
@@ -149,7 +149,7 @@ export default function Boutique() {
         </span>
         <button
           onClick={() => setGuichet(true)}
-          className="flex shrink-0 items-center gap-1.5 rounded-full bg-foreground px-3.5 py-2 text-[13px] font-bold whitespace-nowrap text-background transition-transform active:scale-95"
+          className="bouton-principal flex shrink-0 items-center gap-1.5 px-3.5 py-2 text-[13px] font-bold whitespace-nowrap"
         >
           <Plus className="size-3.5" strokeWidth={3} />
           {/* Le libellé entier ne tient pas à côté d'un solde à cinq chiffres sur

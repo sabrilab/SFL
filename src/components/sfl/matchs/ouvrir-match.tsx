@@ -216,7 +216,7 @@ export function OuvrirMatch({
                 type="button"
                 aria-label="Une place de moins"
                 onClick={() => setPlaces((n) => Math.max(Math.max(2, invites.length + 1), n - 1))}
-                className="grid size-9 place-items-center rounded-full bg-secondary"
+                className="bouton-secondaire grid size-9 place-items-center"
               >
                 <Minus className="size-4" />
               </button>
@@ -225,7 +225,7 @@ export function OuvrirMatch({
                 type="button"
                 aria-label="Une place de plus"
                 onClick={() => setPlaces((n) => Math.min(22, n + 1))}
-                className="grid size-9 place-items-center rounded-full bg-secondary"
+                className="bouton-secondaire grid size-9 place-items-center"
               >
                 <Plus className="size-4" />
               </button>

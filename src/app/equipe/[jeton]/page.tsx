@@ -72,7 +72,7 @@ export default function LienEquipePage() {
                   type="button"
                   disabled={envoi}
                   onClick={rejoindre}
-                  className="rounded-full bg-foreground py-4 text-[15px] font-bold text-background transition-transform active:scale-[0.98] disabled:opacity-60"
+                  className="bouton-principal py-4 text-[15px] font-bold disabled:opacity-60"
                 >
                   Rejoindre {info.nom}
                 </button>
@@ -80,11 +80,11 @@ export default function LienEquipePage() {
                 <>
                   <Link
                     href={`/inscription?equipe=${encodeURIComponent(jeton)}`}
-                    className="rounded-full bg-foreground py-4 text-[15px] font-bold text-background transition-transform active:scale-[0.98]"
+                    className="bouton-principal py-4 text-[15px] font-bold"
                   >
                     Créer mon compte
                   </Link>
-                  <Link href="/bola-team" onClick={garder} className="rounded-full py-3.5 text-[14px] font-semibold text-muted-foreground">
+                  <Link href="/bola-team" onClick={garder} className="bouton-discret py-3.5 text-[14px] font-semibold">
                     J&apos;ai déjà un compte
                   </Link>
                 </>
@@ -94,7 +94,7 @@ export default function LienEquipePage() {
         ) : (
           <>
             <h1 className="text-[26px] font-bold tracking-tight">Lien expiré</h1>
-            <Link href="/" className="mt-6 rounded-full bg-foreground px-6 py-3.5 text-[15px] font-bold text-background">
+            <Link href="/" className="bouton-principal mt-6 px-6 py-3.5 text-[15px] font-bold">
               Ouvrir Bola
             </Link>
           </>

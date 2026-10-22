@@ -158,7 +158,7 @@ export function Synchro({ saison }: { saison: Saison }) {
         <button
           onClick={publier}
           disabled={occupe || !!empeche}
-          className="flex flex-1 items-center justify-center gap-2 rounded-full bg-foreground py-3 text-[14px] font-bold text-background transition-transform active:scale-[0.98] disabled:opacity-40"
+          className="bouton-principal flex flex-1 items-center justify-center gap-2 py-3 text-[14px] font-bold disabled:opacity-40"
         >
           <CloudUpload className="size-4" strokeWidth={2.5} />
           {etat.phase === "envoi" ? "Publication…" : "Publier pour toute la ligue"}
@@ -166,7 +166,7 @@ export function Synchro({ saison }: { saison: Saison }) {
         <button
           onClick={reprendre}
           disabled={occupe || !session?.server}
-          className="glass-soft flex items-center justify-center gap-2 rounded-full px-4 py-3 text-[13.5px] font-semibold text-foreground/70 transition-transform active:scale-[0.98] disabled:opacity-40"
+          className="bouton-secondaire flex items-center justify-center gap-2 px-4 py-3 text-[13.5px] font-semibold disabled:opacity-40"
         >
           <RotateCcw className="size-4" />
           {etat.phase === "reprise" ? "Reprise…" : "Reprendre la base"}
@@ -197,7 +197,7 @@ export function Synchro({ saison }: { saison: Saison }) {
           </p>
           <button
             onClick={publier}
-            className="mono-label mt-2 rounded-full bg-white/8 px-3 py-1.5 text-foreground/70"
+            className="bouton-secondaire mono-label mt-2 px-3 py-1.5"
           >
             Réessayer
           </button>
@@ -212,7 +212,7 @@ export function Synchro({ saison }: { saison: Saison }) {
           setExamen(false);
         }}
         disabled={examen}
-        className="mono-label mt-3 flex items-center gap-1.5 rounded-full bg-white/6 px-3 py-1.5 text-foreground/60 disabled:opacity-40"
+        className="bouton-secondaire mono-label mt-3 flex items-center gap-1.5 px-3 py-1.5 disabled:opacity-40"
       >
         <Stethoscope className="size-3.5" />
         {examen ? "Examen…" : "Pourquoi ça ne se publie pas ?"}
@@ -263,8 +263,8 @@ export function ReinitialiserSaison() {
         setConfirme(false);
       }}
       className={cn(
-        "mono-label rounded-full px-3 py-1.5",
-        confirme ? "bg-red-500/20 text-red-300" : "glass-soft text-foreground/45"
+        "mono-label px-3 py-1.5",
+        confirme ? "bouton-principal bouton--rouge" : "bouton-secondaire text-foreground/45"
       )}
     >
       {confirme ? "Confirmer — tes saisies seront perdues" : "Repartir des données livrées"}

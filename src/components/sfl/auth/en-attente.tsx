@@ -69,7 +69,7 @@ export function EnAttente({ session, horsSaison = false }: { session: Session; h
         <button
           type="button"
           onClick={verifier}
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-foreground py-[17px] text-[15px] font-bold text-background active:scale-[0.98]"
+          className="bouton-principal flex w-full items-center justify-center gap-2 py-[17px] text-[15px] font-bold"
         >
           {verif && <Loader2 className="size-4 animate-spin" />}
           Vérifier
@@ -77,7 +77,7 @@ export function EnAttente({ session, horsSaison = false }: { session: Session; h
         <button
           type="button"
           onClick={signOut}
-          className="mt-[13px] w-full py-[8px] text-center text-[13px] font-semibold text-foreground/45"
+          className="bouton-discret mt-[13px] w-full py-[8px] text-center text-[13px] font-semibold"
         >
           Se déconnecter
         </button>

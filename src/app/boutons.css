@@ -1,0 +1,369 @@
+/* ═══════════════════════ Les boutons de Bola ═══════════════════════
+   Du verre bombé, du grain, de la lumière (Sabri, 22/10 : « une belle
+   différenciation des boutons avec une espèce de bombage et un peu de
+   bruit, tout en restant dans l'ADN de Bola »). Trois rangs, qu'on lit
+   sans avoir à lire :
+   · bouton-principal  — le verre s'allume : blanc perle, halo, grain. Le
+                         geste de l'écran, un seul le plus souvent ;
+   · bouton-secondaire — verre fumé bombé, liseré argent : on le voit au
+                         repos, il ne crie pas ;
+   · bouton-discret    — le texte seul, le verre n'apparaît qu'au toucher.
+   Sur un fond clair (la Map, ses stickers de papier) : bouton-encre, le
+   principal en verre noir, et bouton-givre, le secondaire en verre dépoli.
+
+   Les tons restent dans la DA, chacun pour une raison :
+   · bouton--or     ce qu'on gagne : sa carte, un badge, le MVP ;
+   · bouton--braise il manque des joueurs (la braise reste au manque) ;
+   · bouton--vert   c'est fait, confirmé (« Je viens ✓ ») ;
+   · bouton--rouge  on défait : annuler, retirer, se déconnecter.
+   Sur un principal, le ton colore le verre et son halo ; sur un secondaire
+   ou un discret, seulement le texte et le liseré : une action qui défait ne
+   brille jamais plus que celle qui fait.
+
+   Le grain est une texture SVG (feTurbulence) écrite ici même, rien n'est
+   téléchargé ; il est posé sur le verre, sous le texte (::after, z-index -1
+   dans le bouton isolé). Accessibilité : texte à 4,5:1 au moins sur chaque
+   verre, contour de focus net au clavier, rien ne bouge avec « Réduire les
+   animations » (règle globale de globals.css), verre opaque avec « Réduire
+   la transparence », bords nets et sans grain avec « Augmenter le
+   contraste », bordures système en mode contraste forcé.
+
+   Tout est dans @layer components : les utilitaires Tailwind (taille,
+   marges, position, arrondi, typo) gardent la main. Un bouton converti
+   perd donc ses bg-*, text-* de couleur et shadow-* : c'est le rang qui
+   les donne. */
+
+:root {
+  /* Le grain : des points blancs (verre sombre) ou noirs (verre clair). */
+  --grain-clair: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 5.5 0 0 0 -2.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  --grain-sombre: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 5.5 0 0 0 -2.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+@layer components {
+  .bouton-principal,
+  .bouton-secondaire,
+  .bouton-discret,
+  .bouton-encre,
+  .bouton-givre {
+    position: relative;
+    isolation: isolate;
+    border-radius: 999px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      scale 0.18s cubic-bezier(0.3, 1.5, 0.5, 1),
+      box-shadow 0.3s ease,
+      filter 0.3s ease,
+      background-color 0.25s ease,
+      color 0.25s ease,
+      opacity 0.2s ease;
+  }
+
+  /* Le grain, sur le verre et sous le texte. */
+  .bouton-principal::after,
+  .bouton-secondaire::after,
+  .bouton-encre::after,
+  .bouton-givre::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background-image: var(--b-grain-img);
+    background-size: 160px 160px;
+    opacity: var(--b-grain);
+    pointer-events: none;
+  }
+
+  /* ── Principal : le verre allumé. Le ton change les quatre couleurs. ── */
+  .bouton-principal {
+    --b-haut: #ffffff;
+    --b-milieu: #f0f0ed;
+    --b-bas: #cdcec9;
+    --b-encre: #0a0b0d;
+    --b-reflet: 0.95;
+    --b-halo: 255 255 255;
+    --b-halo-pres: 0.3;
+    --b-halo-loin: 0.13;
+    --b-grain: 0.15;
+    --b-grain-img: var(--grain-sombre);
+    color: var(--b-encre);
+    background:
+      radial-gradient(125% 100% at 50% -22%, rgb(255 255 255 / var(--b-reflet)), rgb(255 255 255 / 0) 58%),
+      linear-gradient(180deg, var(--b-haut) 0%, var(--b-milieu) 48%, var(--b-bas) 100%);
+    box-shadow:
+      inset 0 1px 0.5px rgb(255 255 255 / 0.9),
+      inset 0 -1.5px 1px rgb(10 11 13 / 0.2),
+      inset 0 -7px 12px -7px rgb(10 11 13 / 0.22),
+      0 0 0 1px rgb(var(--b-halo) / 0.3),
+      0 0 15px rgb(var(--b-halo) / var(--b-halo-pres)),
+      0 6px 30px -4px rgb(var(--b-halo) / var(--b-halo-loin)),
+      0 10px 22px -12px rgb(0 0 0 / 0.75);
+  }
+  .bouton-principal.bouton--or {
+    --b-haut: #fff4cc;
+    --b-milieu: #eec767;
+    --b-bas: #b8892b;
+    --b-encre: #221702;
+    --b-reflet: 0.7;
+    --b-halo: 236 192 92;
+    --b-halo-pres: 0.42;
+    --b-halo-loin: 0.2;
+  }
+  .bouton-principal.bouton--braise {
+    --b-haut: #ffd5ba;
+    --b-milieu: #ff9b62;
+    --b-bas: #e5652a;
+    --b-encre: #140803;
+    --b-reflet: 0.65;
+    --b-halo: 255 138 76;
+    --b-halo-pres: 0.45;
+    --b-halo-loin: 0.22;
+  }
+  .bouton-principal.bouton--vert {
+    --b-haut: #e6f3e6;
+    --b-milieu: #b6d5b6;
+    --b-bas: #7ea47f;
+    --b-encre: #0b170c;
+    --b-reflet: 0.7;
+    --b-halo: 169 203 169;
+    --b-halo-pres: 0.4;
+    --b-halo-loin: 0.18;
+  }
+  .bouton-principal.bouton--rouge {
+    --b-haut: #f0575d;
+    --b-milieu: #c41f28;
+    --b-bas: #7f0b13;
+    --b-encre: #fff6f5;
+    --b-reflet: 0.42;
+    --b-halo: 232 54 62;
+    --b-halo-pres: 0.42;
+    --b-halo-loin: 0.2;
+    --b-grain-img: var(--grain-clair);
+    --b-grain: 0.14;
+  }
+
+  /* ── Secondaire : le verre fumé, bombé, liseré d'argent. ── */
+  .bouton-secondaire {
+    --b-liseret: 255 255 255;
+    --b-grain: 0.22;
+    --b-grain-img: var(--grain-clair);
+    color: #f4f5f2;
+    background:
+      radial-gradient(120% 100% at 50% -32%, rgb(255 255 255 / 0.18), rgb(255 255 255 / 0) 60%),
+      linear-gradient(180deg, rgb(64 67 74 / 0.8) 0%, rgb(36 38 43 / 0.8) 52%, rgb(23 25 29 / 0.86) 100%);
+    /* Le liseré comme celui de la barre d'onglets : plus vif en haut à
+       gauche, d'où vient la lumière ; un reflet en bas à droite ; le bas du
+       verre s'éclaire de l'intérieur, comme un verre bombé. */
+    box-shadow:
+      inset 1.2px 1.2px 0.5px -0.5px rgb(var(--b-liseret) / 0.55),
+      inset -1px -1px 0.5px -0.5px rgb(var(--b-liseret) / 0.2),
+      inset 0 0 0 0.6px rgb(var(--b-liseret) / 0.14),
+      inset 0 -10px 14px -10px rgb(var(--b-liseret) / 0.2),
+      0 1px 1px rgb(0 0 0 / 0.4),
+      0 8px 18px -10px rgb(0 0 0 / 0.85);
+  }
+  .bouton-secondaire.bouton--or {
+    --b-liseret: 242 214 135;
+    color: #f2d687;
+  }
+  .bouton-secondaire.bouton--braise {
+    --b-liseret: 255 164 118;
+    color: #ffa476;
+  }
+  .bouton-secondaire.bouton--vert {
+    --b-liseret: 185 217 185;
+    color: #bddcbd;
+  }
+  .bouton-secondaire.bouton--rouge {
+    --b-liseret: 255 125 130;
+    color: #ff8a8e;
+  }
+
+  /* ── Discret : le texte seul ; le verre vient sous le doigt. ── */
+  .bouton-discret {
+    color: rgb(244 245 242 / 0.72);
+    background: transparent;
+  }
+  .bouton-discret.bouton--or {
+    color: #f2d687;
+  }
+  .bouton-discret.bouton--braise {
+    color: #ffa476;
+  }
+  .bouton-discret.bouton--vert {
+    color: #bddcbd;
+  }
+  .bouton-discret.bouton--rouge {
+    color: #ff8a8e;
+  }
+  .bouton-discret:active:not(:disabled) {
+    background: rgb(255 255 255 / 0.08);
+    box-shadow:
+      inset 0 1px 0.5px rgb(255 255 255 / 0.2),
+      inset 0 0 0 1px rgb(255 255 255 / 0.07);
+  }
+
+  /* ── Sur un fond clair : le verre noir (principal)… ── */
+  .bouton-encre {
+    --b-grain: 0.2;
+    --b-grain-img: var(--grain-clair);
+    color: #f4f5f2;
+    background:
+      radial-gradient(120% 100% at 50% -32%, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0) 58%),
+      linear-gradient(180deg, #33363d 0%, #16181c 52%, #060708 100%);
+    box-shadow:
+      inset 1.2px 1.2px 0.5px -0.5px rgb(255 255 255 / 0.6),
+      inset -1px -1px 0.5px -0.5px rgb(255 255 255 / 0.2),
+      inset 0 0 0 0.6px rgb(255 255 255 / 0.1),
+      inset 0 -10px 14px -10px rgb(255 255 255 / 0.24),
+      0 1px 2px rgb(0 0 0 / 0.25),
+      0 10px 20px -10px rgb(0 0 0 / 0.6);
+  }
+  /* … et le verre dépoli blanc (secondaire). */
+  .bouton-givre {
+    --b-grain: 0.12;
+    --b-grain-img: var(--grain-sombre);
+    color: #0a0b0d;
+    background:
+      radial-gradient(120% 100% at 50% -32%, rgb(255 255 255 / 1), rgb(255 255 255 / 0) 60%),
+      linear-gradient(180deg, rgb(255 255 255 / 0.95) 0%, rgb(246 246 243 / 0.9) 55%, rgb(226 227 223 / 0.92) 100%);
+    -webkit-backdrop-filter: blur(12px) saturate(1.5);
+    backdrop-filter: blur(12px) saturate(1.5);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 1),
+      inset 0 -1.5px 1px rgb(10 11 13 / 0.1),
+      inset 0 -7px 10px -8px rgb(10 11 13 / 0.12),
+      0 0 0 0.5px rgb(10 11 13 / 0.16),
+      0 4px 10px -2px rgb(0 0 0 / 0.2);
+  }
+
+  /* ── Le toucher : le verre s'enfonce, la lumière monte. ── */
+  :is(.bouton-principal, .bouton-secondaire, .bouton-discret, .bouton-encre, .bouton-givre):active:not(:disabled) {
+    scale: 0.97;
+    transition-duration: 0.08s;
+  }
+  .bouton-principal:active:not(:disabled) {
+    --b-halo-pres: 0.55;
+    --b-halo-loin: 0.3;
+    filter: brightness(1.05);
+  }
+  .bouton-secondaire:active:not(:disabled),
+  .bouton-encre:active:not(:disabled) {
+    filter: brightness(1.25);
+  }
+  .bouton-givre:active:not(:disabled) {
+    filter: brightness(0.96);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .bouton-principal:hover:not(:disabled) {
+      filter: brightness(1.04);
+    }
+    .bouton-secondaire:hover:not(:disabled),
+    .bouton-encre:hover:not(:disabled) {
+      filter: brightness(1.15);
+    }
+    .bouton-discret:hover:not(:disabled) {
+      background: rgb(255 255 255 / 0.05);
+    }
+  }
+
+  /* ── Éteint : plus de halo, plus de relief, le texte reste lisible. ── */
+  :is(.bouton-principal, .bouton-secondaire, .bouton-discret, .bouton-encre, .bouton-givre):is(:disabled, [aria-disabled="true"]) {
+    cursor: default;
+    opacity: 0.42;
+  }
+  .bouton-principal:is(:disabled, [aria-disabled="true"]) {
+    filter: saturate(0.4);
+    box-shadow:
+      inset 0 1px 0.5px rgb(255 255 255 / 0.7),
+      inset 0 -1.5px 1px rgb(10 11 13 / 0.14);
+  }
+
+  /* ── Le focus au clavier : un anneau net, à 3 px du verre. ── */
+  :is(.bouton-principal, .bouton-secondaire, .bouton-discret):focus-visible {
+    outline: 2px solid #f4f5f2;
+    outline-offset: 3px;
+  }
+  :is(.bouton-encre, .bouton-givre):focus-visible {
+    outline: 2px solid #0a0b0d;
+    outline-offset: 3px;
+  }
+
+  /* Thème clair (prêt, pas encore servi : l'app est en sombre) : le
+     principal y devient le verre noir, le secondaire le verre dépoli. */
+  :root:not(.dark) .bouton-principal:not([class*="bouton--"]) {
+    --b-haut: #33363d;
+    --b-milieu: #16181c;
+    --b-bas: #060708;
+    --b-encre: #f4f5f2;
+    --b-reflet: 0.3;
+    --b-halo: 10 11 13;
+    --b-halo-pres: 0.12;
+    --b-halo-loin: 0.1;
+    --b-grain-img: var(--grain-clair);
+  }
+  :root:not(.dark) .bouton-secondaire {
+    color: #0a0b0d;
+    background: linear-gradient(180deg, #ffffff, #e9eae6);
+    box-shadow:
+      inset 0 1px 0 #ffffff,
+      inset 0 -1.5px 1px rgb(10 11 13 / 0.1),
+      0 0 0 0.5px rgb(10 11 13 / 0.16),
+      0 4px 10px -4px rgb(0 0 0 / 0.2);
+    --b-grain-img: var(--grain-sombre);
+  }
+  :root:not(.dark) .bouton-discret:not([class*="bouton--"]) {
+    color: rgb(10 11 13 / 0.7);
+  }
+}
+
+/* Réduire la transparence : du verre opaque, le même dessin. */
+@media (prefers-reduced-transparency: reduce) {
+  .bouton-secondaire {
+    background: linear-gradient(180deg, #3d4047 0%, #23252a 52%, #17191c 100%);
+  }
+  .bouton-givre {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: linear-gradient(180deg, #ffffff 0%, #ecece9 100%);
+  }
+}
+
+/* Augmenter le contraste : bords nets, plus de grain ni de halo flou. */
+@media (prefers-contrast: more) {
+  .bouton-principal::after,
+  .bouton-secondaire::after,
+  .bouton-encre::after,
+  .bouton-givre::after {
+    display: none;
+  }
+  .bouton-principal {
+    box-shadow: 0 0 0 2px rgb(var(--b-halo) / 0.9);
+  }
+  .bouton-secondaire {
+    box-shadow: inset 0 0 0 1.5px rgb(var(--b-liseret) / 0.8);
+  }
+  .bouton-discret {
+    color: #f4f5f2;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
+/* Contraste forcé (Windows) : les couleurs du système, une bordure. */
+@media (forced-colors: active) {
+  .bouton-principal,
+  .bouton-secondaire,
+  .bouton-discret,
+  .bouton-encre,
+  .bouton-givre {
+    border: 1px solid ButtonText;
+  }
+  .bouton-principal::after,
+  .bouton-secondaire::after,
+  .bouton-encre::after,
+  .bouton-givre::after {
+    display: none;
+  }
+}

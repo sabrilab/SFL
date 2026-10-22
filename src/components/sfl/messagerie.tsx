@@ -156,7 +156,7 @@ export function Messagerie() {
           <button
             onClick={() => setOuvert(null)}
             aria-label="Retour aux discussions"
-            className="glass-soft flex size-8 shrink-0 items-center justify-center rounded-full"
+            className="bouton-secondaire flex size-8 shrink-0 items-center justify-center"
           >
             <ArrowLeft className="size-4" />
           </button>
@@ -237,7 +237,7 @@ export function Messagerie() {
             type="submit"
             disabled={!texte.trim()}
             aria-label="Envoyer"
-            className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-95 disabled:opacity-30"
+            className="bouton-principal flex size-10 shrink-0 items-center justify-center disabled:opacity-30"
           >
             <Send className="size-4" strokeWidth={2.5} />
           </button>
@@ -262,7 +262,7 @@ export function Messagerie() {
               setRecherche("");
             }}
             aria-label="Retour"
-            className="glass-soft flex size-8 shrink-0 items-center justify-center rounded-full"
+            className="bouton-secondaire flex size-8 shrink-0 items-center justify-center"
           >
             <ArrowLeft className="size-4" />
           </button>
@@ -312,7 +312,7 @@ export function Messagerie() {
         <h2 className="text-[16px] font-bold tracking-tight">Discussions</h2>
         <button
           onClick={() => setChoix(true)}
-          className="flex items-center gap-1.5 rounded-full bg-foreground px-3 py-1.5 text-[12.5px] font-bold text-background"
+          className="bouton-principal flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-bold"
         >
           <Plus className="size-3.5" strokeWidth={3} /> Nouveau
         </button>
@@ -327,7 +327,7 @@ export function Messagerie() {
           {erreur.includes("Installation Supabase") && (
             <Link
               href="/admin/setup"
-              className="glass-soft mt-2.5 block rounded-full py-2 text-center text-[13px] font-semibold text-foreground/75"
+              className="bouton-secondaire mt-2.5 block py-2 text-center text-[13px] font-semibold"
             >
               Ouvrir l&apos;installation
             </Link>
