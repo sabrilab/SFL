@@ -267,7 +267,7 @@ export function usePresence(): PresenceView {
   // ils comptent avec ceux qui ont dit « Je viens » (lib/sfl/presence-feuille).
   const dateConv = serverActive && server ? server.convocation.date_label : (localConv?.date ?? NEXT_MATCH.date);
   const feuille = joueursDeLaFeuille(saison, journeeDuJour(saison, dateConv));
-  const surLaFeuille = feuille.includes(player.name);
+  const surLaFeuille = feuille.noms.includes(player.name);
 
   if (serverActive && server) {
     const names = publicOnly(saison.roster).map((r) => ({ name: r.name, actif: r.profil === "Actif" }));

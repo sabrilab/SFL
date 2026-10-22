@@ -41,6 +41,7 @@ import { inscrits, libelleJour, placesLibres, type Partie } from "@/lib/sfl/matc
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
 import { usePresence } from "@/hooks/use-presence";
+import { joueursDeLaFeuille } from "@/lib/sfl/presence-feuille";
 import { useSession } from "@/hooks/use-session";
 import { saisieStore } from "@/lib/sfl/saisie/store";
 import {
@@ -286,7 +287,8 @@ export default function MapPage() {
     const ecartConvocation = ecartJours(p.jour.replace(/^\S+\s+/, ""), aujourdhui);
     const versMatch = (m: (typeof saison.journees)[number], joue: boolean): MatchMap => {
       const lignes = saison.entries.filter((e) => e.j === m.j);
-      const presents = lignes.filter((e) => e.statut === "Présent").map((e) => e.player);
+      // Les équipes faites, un joueur resté sans équipe ne compte pas.
+      const presents = joueursDeLaFeuille(saison, m.j).noms;
       const effectif = Math.max(EFFECTIF, lignes.length);
       const dedans = presents.includes(player.name);
       const e = ecartJours(m.date, aujourdhui);

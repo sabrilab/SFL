@@ -28,14 +28,27 @@ export function journeeDuJour(saison: Pick<Saison, "journees">, dateLabel: strin
   return saison.journees.find((m) => jourMois(m.date) === cle)?.j ?? null;
 }
 
-/** Les joueurs posés sur la feuille d'une journée, dans l'ordre de la feuille. */
-export function joueursDeLaFeuille(saison: Pick<Saison, "entries">, j: number | null): string[] {
-  if (j == null) return [];
+export interface Feuille {
+  /** Les joueurs qui comptent, dans l'ordre de la feuille. */
+  noms: string[];
+  /** Vrai dès que l'admin a mis au moins un joueur dans une équipe. */
+  equipes: boolean;
+}
+
+/**
+ * Les joueurs posés sur la feuille d'une journée. Tant qu'aucune équipe n'est
+ * faite, tous comptent ; dès qu'il y a des équipes, seuls ceux qui en ont une
+ * sont des participants — un joueur resté sans équipe ne joue pas.
+ */
+export function joueursDeLaFeuille(saison: Pick<Saison, "entries">, j: number | null): Feuille {
+  if (j == null) return { noms: [], equipes: false };
+  const lignes = saison.entries.filter((e) => e.j === j && e.statut === "Présent");
+  const equipes = lignes.some((e) => !!e.team);
   const noms: string[] = [];
-  for (const e of saison.entries) {
-    if (e.j === j && e.statut === "Présent" && !noms.includes(e.player)) noms.push(e.player);
+  for (const e of lignes) {
+    if ((!equipes || e.team) && !noms.includes(e.player)) noms.push(e.player);
   }
-  return noms;
+  return { noms, equipes };
 }
 
 export interface Reponses {
@@ -47,16 +60,19 @@ export interface Reponses {
 /**
  * Les réponses à la convocation, complétées par la feuille : ceux qui ont dit
  * « Je viens » d'abord, puis ceux que l'admin a ajoutés. Un joueur de la
- * feuille quitte « Absents » et « Sans réponse ».
+ * feuille quitte « Absents » et « Sans réponse ». Une fois les équipes
+ * faites, la feuille seule fait foi : qui n'a pas d'équipe ne participe pas,
+ * même s'il avait dit « Je viens ».
  */
-export function avecLaFeuille<T extends Reponses>(r: T, feuille: string[], masque: (nom: string) => boolean): T {
-  const ajoutes = feuille.filter((n) => !masque(n) && !r.presents.includes(n));
-  if (!ajoutes.length) return r;
-  const dessus = new Set(ajoutes);
+export function avecLaFeuille<T extends Reponses>(r: T, feuille: Feuille, masque: (nom: string) => boolean): T {
+  const sur = new Set(feuille.noms.filter((n) => !masque(n)));
+  const gardes = feuille.equipes ? r.presents.filter((n) => sur.has(n)) : r.presents;
+  const ajoutes = [...sur].filter((n) => !gardes.includes(n));
+  if (!ajoutes.length && gardes.length === r.presents.length) return r;
   return {
     ...r,
-    presents: [...r.presents, ...ajoutes],
-    absents: r.absents.filter((n) => !dessus.has(n)),
-    sansReponse: r.sansReponse.filter((n) => !dessus.has(n)),
+    presents: [...gardes, ...ajoutes],
+    absents: r.absents.filter((n) => !sur.has(n)),
+    sansReponse: r.sansReponse.filter((n) => !sur.has(n)),
   };
 }
