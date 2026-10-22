@@ -1,36 +1,43 @@
 "use client";
 
-// La Map — le plan clair et ce qu'on pose dessus.
+// La Map — le plan et ce qu'on pose dessus.
 //
-// Leaflet sur un fond clair et sobre (le « Light Gray » d'Esri, fond puis
-// libellés), sans clé, sans boutons de zoom : on pince, comme dans l'app. Dessus, à la
-// manière de la carte de « Jouer » de l'app iOS : le sticker mini-stade du
-// match (vignette à bord blanc, pastille calendrier, badge braise du manque),
-// les autres terrains en simples points, et « toi », ta carte en miniature,
-// quand tu as donné ta position. Le composant ne connaît ni la saison ni la
+// MapLibre sur notre propre plan (map/style-snap.ts, le 22/10 : Sabri la
+// voulait « plus mignonne, plus accueillante », à la Snapchat, avec du
+// relief) : des tuiles vectorielles d'OpenStreetMap, sans clé, dessinées en
+// pastel ; en s'approchant, les bâtiments se lèvent et le plan s'incline
+// (PENTE), comme la Snap Map. Ni boutons de zoom ni rotation : on pince, et
+// deux doigts qui glissent inclinent le plan. Dessus, à la manière de la
+// carte de « Jouer » de l'app iOS : le sticker mini-stade du match (vignette
+// à bord blanc, pastille calendrier, badge braise du manque), les autres
+// terrains en simples points, et « toi », ta carte en miniature, quand tu as
+// donné ta position. Ce sont des éléments HTML (les marqueurs de MapLibre),
+// toujours debout face à l'écran. Le composant ne connaît ni la saison ni la
 // convocation : il reçoit des repères et les pose. Jamais rendu côté serveur
-// (import dynamique dans app/map/page.tsx) : Leaflet a besoin de `window`.
+// (import dynamique dans app/map/page.tsx) : MapLibre a besoin de `window`.
 //
 // Le mouvement (17/10, Sabri veut une Map « plus animée ») : au premier
 // cadrage, le plan vole de la France jusqu'aux matchs ; les stickers tombent
 // ensuite un à un, du nord au sud. Toucher un sticker l'agrandit avec un
 // ressort, lâche une onde sur le terrain et fait glisser le plan pour le
-// poser au centre, au-dessus du carrousel. Changer de fond fait monter le
-// nouveau en fondu sur l'ancien. Les classes sont dans app/map/animations.css ;
-// « Réduire les animations » coupe le vol et les ressorts.
+// poser au centre, au-dessus du carrousel. Changer de fond fait monter la
+// photo satellite en fondu sur le plan (une couche du même style). Les
+// classes sont dans app/map/animations.css ; « Réduire les animations »
+// coupe le vol et les ressorts.
 //
-// Les joueurs (22/10, façon Snap Map) : chacun dans sa ville, sur un calque à
-// part, sous les matchs. De loin des piles, de près des tournesols de cartes
-// (la disposition est dans map/joueurs.ts), refaits à chaque fin de zoom.
+// Les joueurs (22/10, façon Snap Map) : chacun dans sa ville, sous les
+// matchs. De loin des piles, de près des tournesols de cartes (la
+// disposition est dans map/joueurs.ts), refaits à chaque fin de zoom.
 // Toucher une pile approche la ville ; toucher le nom d'une ville ouverte ou
 // une carte, la page ouvre le catalogue ou le profil.
 
 import { useEffect, useRef } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import maplibregl, { type LngLatBoundsLike, type Map as PlanMap, type Marker, type PaddingOptions } from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { SPLASH_FINI } from "@/components/sfl/app-splash";
 import { pointHtml, stickerHtml, toiHtml, type StickerPlan, type VarianteStade } from "./stade";
 import { centreHtml, disposer, joueurHtml, OUVERTE_MAX, pileHtml, ZOOM_OUVERTURE, type VillePlan } from "./joueurs";
+import { FONDU, LIBELLES, styleSnap } from "./style-snap";
 
 export interface PointPlan {
   id: string;
@@ -46,17 +53,14 @@ export interface ToiPlan {
   teinte: string;
 }
 
-const FOND = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}";
-const LIBELLES = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
-/** La vue satellite d'Esri, sans clé : on y voit le terrain lui-même. */
-export const SATELLITE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-const ATTRIBUTION = 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, Maxar, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
-/** Le « Light Gray » s'arrête au niveau 16 ; le satellite descend au terrain. */
-const ZOOM_MAX = { plan: 16, satellite: 18 } as const;
-
 export type FondCarte = "plan" | "satellite";
 /** Le centre quand rien n'est posé : la France entière. */
-const FRANCE: L.LatLngTuple = [46.6, 2.4];
+const FRANCE: [number, number] = [2.4, 46.6];
+const ZOOM_FRANCE = 4;
+/** Le zoom le plus proche (la photo satellite s'arrête là). */
+const ZOOM_MAX = 17.5;
+/** Le cadrage des matchs ne descend pas plus près que la rue. */
+const ZOOM_CADRE = 14;
 /** La place des surcouches : lettrage en haut, carrousel en bas. */
 const MARGE_HAUT = 140;
 const MARGE_BAS = 380;
@@ -64,7 +68,48 @@ const MARGE_BAS = 380;
 const VOL = 1.5;
 const CADENCE = 110;
 
+/** L'inclinaison du plan : à plat de loin, penché sur la ville, comme la Snap Map. */
+function pente(zoom: number): number {
+  return Math.round(Math.min(1, Math.max(0, (zoom - 9) / 4)) * 45);
+}
+
 const calme = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** Un repère HTML posé sur le plan, ancré par son coin (les dessins se placent eux-mêmes). */
+function repere(
+  map: PlanMap,
+  lat: number,
+  lng: number,
+  html: string,
+  { classe, z = 0, actif = true, taille, ancre }: { classe: string; z?: number; actif?: boolean; taille?: [number, number]; ancre?: [number, number] }
+): Marker {
+  const el = document.createElement("div");
+  el.className = classe;
+  el.innerHTML = html;
+  el.style.width = `${taille?.[0] ?? 0}px`;
+  el.style.height = `${taille?.[1] ?? 0}px`;
+  el.style.zIndex = String(z);
+  if (!actif) el.style.pointerEvents = "none";
+  return new maplibregl.Marker({ element: el, anchor: "top-left", offset: ancre ? [-ancre[0], -ancre[1]] : [0, 0] }).setLngLat([lng, lat]).addTo(map);
+}
+
+/** Les marges des surcouches, sans jamais dépasser l'écran (MapLibre refuse un cadre impossible). */
+function marges(map: PlanMap, haut: number, bas: number, cote = 40): PaddingOptions {
+  const h = map.getContainer().clientHeight;
+  const w = map.getContainer().clientWidth;
+  const b = Math.max(0, Math.min(bas, h - haut - 80));
+  return { top: Math.min(haut, h / 3), bottom: b, left: Math.min(cote, w / 4), right: Math.min(cote, w / 4) };
+}
+
+/** Voler (ou sauter, en mouvement réduit) sur une boîte, le plan incliné selon le zoom atteint. */
+function cadrer(map: PlanMap, boite: LngLatBoundsLike, padding: PaddingOptions, maxZoom: number, duree: number) {
+  const cam = map.cameraForBounds(boite, { padding, maxZoom });
+  if (!cam) return;
+  const zoom = Math.min(maxZoom, cam.zoom ?? map.getZoom());
+  const vise = { center: cam.center, zoom, pitch: pente(zoom), bearing: 0 };
+  if (duree > 0) map.flyTo({ ...vise, duration: duree * 1000, essential: false });
+  else map.jumpTo(vise);
+}
 
 export function CarteMap({
   stickers,
@@ -98,12 +143,11 @@ export function CarteMap({
   className?: string;
 }) {
   const conteneur = useRef<HTMLDivElement>(null);
-  const carte = useRef<L.Map | null>(null);
-  const calque = useRef<L.LayerGroup | null>(null);
-  const tuiles = useRef<L.LayerGroup | null>(null);
-  const effets = useRef<L.LayerGroup | null>(null);
+  const carte = useRef<PlanMap | null>(null);
+  const reperes = useRef<Marker[]>([]);
+  const joueursReperes = useRef<Marker[]>([]);
   // L'entrée de chaque sticker, en ms après `origine` (la fin du premier
-  // vol). Leaflet refait les stickers à chaque changement : on repose la
+  // vol). Les stickers sont refaits à chaque changement : on repose la
   // classe d'entrée, avec le retard qui reste, tant qu'elle n'est pas finie.
   const entrees = useRef(new Map<string, number>());
   const origine = useRef<number | null>(null);
@@ -113,12 +157,12 @@ export function CarteMap({
   // dernier cadrage demandé d'ici là.
   const aVole = useRef(false);
   const volFini = useRef(Infinity);
-  const cibleVol = useRef<L.LatLngBounds | null>(null);
+  const cibleVol = useRef<maplibregl.LngLatBounds | null>(null);
   const choisirRef = useRef(onChoisir);
   const pointRef = useRef(onPoint);
   const villeRef = useRef(onVille);
   const joueurRef = useRef(onJoueur);
-  const joueursCalque = useRef<L.LayerGroup | null>(null);
+  const fondRef = useRef(fond);
   // Les villes déjà ouvertes : seules celles qui s'ouvrent lâchent leurs cartes.
   const ouvertes = useRef(new Set<string>());
   // Ce qui a été cadré la dernière fois : changer de fond redessine les
@@ -135,26 +179,36 @@ export function CarteMap({
   // La carte, une fois.
   useEffect(() => {
     if (!conteneur.current || carte.current) return;
-    const map = L.map(conteneur.current, { zoomControl: false, attributionControl: true });
-    map.attributionControl.setPrefix(false);
-    map.setView(FRANCE, 5);
+    const map = new maplibregl.Map({
+      container: conteneur.current,
+      style: styleSnap(),
+      center: FRANCE,
+      zoom: ZOOM_FRANCE,
+      maxZoom: ZOOM_MAX,
+      maxPitch: 60,
+      attributionControl: false,
+      dragRotate: false,
+      // Un téléphone à 3× dessine trois fois plus pour un œil qui n'y voit pas mieux.
+      pixelRatio: Math.min(2, window.devicePixelRatio || 1),
+      fadeDuration: 180,
+    });
+    map.touchZoomRotate.disableRotation();
+    map.keyboard.disableRotation();
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
+    map.on("load", () => {
+      appliquerFond(map, fondRef.current, false);
+      // L'attribution reste repliée en un petit « i » : elle s'ouvre au toucher.
+      map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
+    });
     carte.current = map;
     // Captures en développement : viser une ville à la main.
-    if (process.env.NODE_ENV === "development") (window as unknown as { __bolaMap?: L.Map }).__bolaMap = map;
-    tuiles.current = L.layerGroup().addTo(map);
-    // Les joueurs sous les matchs : un match ne disparaît jamais sous une pile.
-    map.createPane("joueurs").style.zIndex = "590";
-    joueursCalque.current = L.layerGroup().addTo(map);
-    calque.current = L.layerGroup().addTo(map);
-    effets.current = L.layerGroup().addTo(map);
+    if (process.env.NODE_ENV === "development") (window as unknown as { __bolaMap?: PlanMap }).__bolaMap = map;
     const entreesAuMontage = entrees.current;
     return () => {
       map.remove();
       carte.current = null;
-      calque.current = null;
-      joueursCalque.current = null;
-      tuiles.current = null;
-      effets.current = null;
+      reperes.current = [];
+      joueursReperes.current = [];
       cadre.current = [];
       entreesAuMontage.clear();
       origine.current = null;
@@ -166,43 +220,29 @@ export function CarteMap({
     };
   }, []);
 
-  // Le fond : le plan clair, ou la vue satellite.
+  // Le fond : le plan, ou la vue satellite qui monte en fondu dessus.
   useEffect(() => {
+    fondRef.current = fond;
     const map = carte.current;
-    const groupe = tuiles.current;
-    if (!map || !groupe) return;
-    // L'ancien fond reste dessous le temps que le nouveau monte en fondu.
-    const anciens = groupe.getLayers();
-    const entre = calme() ? "" : "fond-entre";
-    if (fond === "satellite") {
-      L.tileLayer(SATELLITE, { attribution: ATTRIBUTION, maxZoom: ZOOM_MAX.satellite, className: entre }).addTo(groupe);
-    } else {
-      L.tileLayer(FOND, { attribution: ATTRIBUTION, maxZoom: ZOOM_MAX.plan, className: entre }).addTo(groupe);
-      L.tileLayer(LIBELLES, { maxZoom: ZOOM_MAX.plan, pane: "shadowPane", className: entre }).addTo(groupe);
-    }
-    map.setMaxZoom(ZOOM_MAX[fond]);
+    if (!map) return;
     map.getContainer().classList.toggle("fond-satellite", fond === "satellite");
-    if (!anciens.length) return;
-    const t = window.setTimeout(() => anciens.forEach((l) => groupe.removeLayer(l)), entre ? 650 : 0);
-    return () => {
-      window.clearTimeout(t);
-      anciens.forEach((l) => groupe.removeLayer(l));
-    };
+    if (!map.isStyleLoaded()) return;
+    return appliquerFond(map, fond, !calme());
   }, [fond]);
 
   // Tout ce qui est posé, à chaque changement de la liste (la page la mémorise).
   useEffect(() => {
     const map = carte.current;
-    const groupe = calque.current;
-    if (!map || !groupe) return;
-    groupe.clearLayers();
+    if (!map) return;
+    reperes.current.forEach((m) => m.remove());
+    const poses: Marker[] = [];
     // Noir et blanc sur le plan clair, marbre sur le satellite sombre.
     const variante: VarianteStade = fond === "satellite" ? "marbre" : "mono";
 
     for (const p of points) {
-      const icone = L.divIcon({ className: "ter-ancre", iconSize: [0, 0], iconAnchor: [0, 0], html: pointHtml(p.nom, variante) });
-      const m = L.marker([p.lat, p.lng], { icon: icone, keyboard: false, interactive: pointsActifs }).addTo(groupe);
-      if (pointsActifs) m.on("click", () => pointRef.current?.(p.id));
+      const m = repere(map, p.lat, p.lng, pointHtml(p.nom, variante), { classe: "ter-ancre", z: 1, actif: pointsActifs });
+      if (pointsActifs) m.getElement().addEventListener("click", () => pointRef.current?.(p.id));
+      poses.push(m);
     }
     // Du nord au sud : le sud passe devant.
     const doux = !calme();
@@ -212,20 +252,16 @@ export function CarteMap({
     const depuis = origine.current == null ? 0 : maintenant - origine.current;
     let rang = 0;
     const avant = dernierChoisi.current;
-    for (const s of [...stickers].sort((a, b) => b.lat - a.lat)) {
+    const ordre = [...stickers].sort((a, b) => b.lat - a.lat);
+    ordre.forEach((s, k) => {
       const est = s.id === choisi;
-      const icone = L.divIcon({
-        className: "stk-ancre",
-        iconSize: [0, 0],
-        iconAnchor: [0, 0],
-        html: stickerHtml(s, est, variante),
-      });
-      const m = L.marker([s.lat, s.lng], { icon: icone, keyboard: false, zIndexOffset: est ? 1000 : 0 }).addTo(groupe);
-      m.on("click", () => {
+      const m = repere(map, s.lat, s.lng, stickerHtml(s, est, variante), { classe: "stk-ancre", z: est ? 3 + ordre.length : 3 + k });
+      m.getElement().addEventListener("click", () => {
         onde(s.lat, s.lng);
         choisirRef.current(s.id);
       });
-      const el = m.getElement()?.querySelector<HTMLElement>(".stk");
+      poses.push(m);
+      const el = m.getElement().querySelector<HTMLElement>(".stk");
       if (!entrees.current.has(s.id)) entrees.current.set(s.id, Math.max(0, depuis) + rang++ * CADENCE);
       if (el && doux) {
         const retard = (entrees.current.get(s.id) ?? 0) - depuis + (origine.current == null ? VOL * 1000 - 250 : 0);
@@ -235,25 +271,24 @@ export function CarteMap({
         } else if (est && avant !== s.id) el.classList.add("stk--vient");
         else if (!est && avant === s.id) el.classList.add("stk--part");
       }
-    }
+    });
     dernierChoisi.current = choisi;
     if (toi) {
-      const icone = L.divIcon({ className: "toi-ancre", iconSize: [44, 59], iconAnchor: [22, 52], html: toiHtml(toi.note, toi.teinte) });
-      const m = L.marker([toi.lat, toi.lng], { icon: icone, keyboard: false, interactive: false }).addTo(groupe);
-      if (!toiVu.current && doux) m.getElement()?.querySelector(".toi")?.classList.add("toi--entre");
+      const m = repere(map, toi.lat, toi.lng, toiHtml(toi.note, toi.teinte), { classe: "toi-ancre", z: 2, actif: false, taille: [44, 59], ancre: [22, 52] });
+      if (!toiVu.current && doux) m.getElement().querySelector(".toi")?.classList.add("toi--entre");
       toiVu.current = true;
+      poses.push(m);
     }
+    reperes.current = poses;
 
     // L'onde : trois anneaux qui partent du terrain touché, et un petit coup
     // sous le doigt là où le téléphone sait le faire.
     function onde(lat: number, lng: number) {
       navigator.vibrate?.(8);
-      if (!doux || !effets.current) return;
+      if (!doux || !map) return;
       const clair = fond === "satellite" ? " onde--clair" : "";
-      const icone = L.divIcon({ className: "stk-ancre", iconSize: [0, 0], iconAnchor: [0, 0], html: `<span class="onde${clair}"></span>`.repeat(3) });
-      const fx = effets.current;
-      const r = L.marker([lat, lng], { icon: icone, keyboard: false, interactive: false }).addTo(fx);
-      window.setTimeout(() => fx.removeLayer(r), 1150);
+      const r = repere(map, lat, lng, `<span class="onde${clair}"></span>`.repeat(3), { classe: "stk-ancre", z: 2, actif: false });
+      window.setTimeout(() => r.remove(), 1150);
     }
 
     const deps = [stickers, points, toi, choisi];
@@ -265,37 +300,37 @@ export function CarteMap({
     if (seulLeChoix) {
       const s = stickers.find((x) => x.id === choisi);
       if (!s) return;
-      const taille = map.getSize();
-      const ici = map.latLngToContainerPoint([s.lat, s.lng]);
-      const cible = L.point(taille.x / 2, (MARGE_HAUT + Math.max(MARGE_HAUT, taille.y - MARGE_BAS)) / 2 + 40);
-      const ecart = ici.subtract(cible);
-      if (Math.abs(ecart.x) + Math.abs(ecart.y) > 24) map.panBy(ecart, { animate: doux, duration: 0.7, easeLinearity: 0.12 });
+      const h = map.getContainer().clientHeight;
+      const ici = map.project([s.lng, s.lat]);
+      const cible = { x: map.getContainer().clientWidth / 2, y: (MARGE_HAUT + Math.max(MARGE_HAUT, h - MARGE_BAS)) / 2 + 40 };
+      const ecart: [number, number] = [ici.x - cible.x, ici.y - cible.y];
+      if (Math.abs(ecart[0]) + Math.abs(ecart[1]) > 24) map.panBy(ecart, { duration: doux ? 700 : 0 });
       return;
     }
 
-    const tous: L.LatLngTuple[] = [
-      ...stickers.map((s) => [s.lat, s.lng] as L.LatLngTuple),
-      ...points.map((p) => [p.lat, p.lng] as L.LatLngTuple),
-      ...(toi ? [[toi.lat, toi.lng] as L.LatLngTuple] : []),
+    const tous: [number, number][] = [
+      ...stickers.map((s) => [s.lng, s.lat] as [number, number]),
+      ...points.map((p) => [p.lng, p.lat] as [number, number]),
+      ...(toi ? [[toi.lng, toi.lat] as [number, number]] : []),
     ];
+    const boite = () => tous.reduce((b, p) => b.extend(p), new maplibregl.LngLatBounds(tous[0], tous[0]));
     // Le sticker choisi mérite l'écran : on cadre large autour de lui, les
     // surcouches (lettrage en haut, carrousel en bas) prennent leur place.
-    const pad: L.FitBoundsOptions = { paddingTopLeft: [40, MARGE_HAUT], paddingBottomRight: [40, MARGE_BAS], maxZoom: 15 };
-    // Un seul point compris : la boîte est réduite à lui, le zoom plafonne à 15
+    // Un seul point compris : la boîte est réduite à lui, le zoom plafonne
     // et le point se pose au-dessus des cartes du bas, pas derrière.
     // La première fois, on vole de la France jusqu'aux matchs.
-    if (!tous.length) map.setView(FRANCE, 5);
+    if (!tous.length) map.jumpTo({ center: FRANCE, zoom: ZOOM_FRANCE, pitch: 0 });
     else if (aVole.current && maintenant < volFini.current) {
       // Le vol attend ou vole déjà : il visera ce nouveau cadrage.
-      cibleVol.current = L.latLngBounds(tous);
+      cibleVol.current = boite();
     } else if (!aVole.current && doux) {
       aVole.current = true;
-      cibleVol.current = L.latLngBounds(tous);
+      cibleVol.current = boite();
       const voler = () => {
         if (carte.current !== map || !cibleVol.current) return;
         origine.current = performance.now() + VOL * 1000 - 250;
         volFini.current = performance.now() + VOL * 1000;
-        map.flyToBounds(cibleVol.current, { ...pad, duration: VOL, easeLinearity: 0.2 });
+        cadrer(map, cibleVol.current, marges(map, MARGE_HAUT, MARGE_BAS), ZOOM_CADRE, VOL);
       };
       // Sous l'écran de chargement, le vol attend qu'il se lève (les
       // stickers, eux, sont en pause dans leur CSS jusque-là).
@@ -303,7 +338,7 @@ export function CarteMap({
       else window.addEventListener(SPLASH_FINI, voler, { once: true });
     } else {
       aVole.current = true;
-      map.fitBounds(L.latLngBounds(tous), { ...pad, animate: doux });
+      cadrer(map, boite(), marges(map, MARGE_HAUT, MARGE_BAS), ZOOM_CADRE, doux ? 0.8 : 0);
     }
   }, [stickers, points, toi, choisi, fond, pointsActifs]);
 
@@ -311,36 +346,37 @@ export function CarteMap({
   // l'écran change), et à chaque changement de la liste.
   useEffect(() => {
     const map = carte.current;
-    const groupe = joueursCalque.current;
-    if (!map || !groupe) return;
+    if (!map) return;
     const doux = !calme();
     const vues = new Set<string>();
+    const vider = () => {
+      joueursReperes.current.forEach((m) => m.remove());
+      joueursReperes.current = [];
+    };
     const dessiner = () => {
-      groupe.clearLayers();
+      vider();
       if (!villes.length) return;
       const zoom = map.getZoom();
-      const dispo = disposer(villes, zoom, (lat, lng) => map.latLngToLayerPoint([lat, lng]));
+      const dispo = disposer(villes, zoom, (lat, lng) => map.project([lng, lat]));
       const avant = ouvertes.current;
       const maintenant = new Set<string>();
+      const poses: Marker[] = [];
       for (const d of dispo) {
         if (d.genre === "pile") {
-          const icone = L.divIcon({ className: "jr-ancre", iconSize: [0, 0], iconAnchor: [0, 0], html: pileHtml(d) });
-          const m = L.marker([d.lat, d.lng], { icon: icone, pane: "joueurs", keyboard: false }).addTo(groupe);
-          if (doux && (avant.has(d.id) || !vues.has(d.id))) m.getElement()?.querySelector(".grp")?.classList.add("grp--entre");
+          const m = repere(map, d.lat, d.lng, pileHtml(d), { classe: "jr-ancre" });
+          poses.push(m);
+          if (doux && (avant.has(d.id) || !vues.has(d.id))) m.getElement().querySelector(".grp")?.classList.add("grp--entre");
           vues.add(d.id);
-          m.on("click", () => {
+          m.getElement().addEventListener("click", () => {
             navigator.vibrate?.(6);
             if (d.villes.length > 1) {
-              map.flyToBounds(L.latLngBounds(d.villes.map((v) => [v.lat, v.lng] as L.LatLngTuple)), {
-                padding: [90, 90],
-                paddingBottomRight: [90, MARGE_BAS - 120],
-                maxZoom: Math.max(zoom + 2, ZOOM_OUVERTURE),
-                duration: doux ? 0.9 : 0,
-              });
-            } else if (zoom >= map.getMaxZoom()) {
+              const b = d.villes.reduce((x, v) => x.extend([v.lng, v.lat]), new maplibregl.LngLatBounds([d.lng, d.lat], [d.lng, d.lat]));
+              cadrer(map, b, marges(map, 90, MARGE_BAS - 120, 90), Math.max(zoom + 2, ZOOM_OUVERTURE), doux ? 0.9 : 0);
+            } else if (zoom >= map.getMaxZoom() - 0.5) {
               villeRef.current?.(d.villes.map((v) => v.id));
             } else {
-              map.flyTo([d.lat, d.lng], Math.min(map.getMaxZoom(), Math.max(zoom + 2, ZOOM_OUVERTURE + 1)), { duration: doux ? 0.9 : 0 });
+              const z = Math.min(map.getMaxZoom(), Math.max(zoom + 2, ZOOM_OUVERTURE + 1));
+              map.flyTo({ center: [d.lng, d.lat], zoom: z, pitch: pente(z), duration: doux ? 900 : 0 });
             }
           });
           continue;
@@ -349,16 +385,16 @@ export function CarteMap({
         const sort = doux && !avant.has(d.id);
         const html =
           d.joueurs.slice(0, OUVERTE_MAX).map((j, i) => joueurHtml(j, i, sort)).join("") + centreHtml(d.ville, d.joueurs.length);
-        const icone = L.divIcon({ className: "jr-ancre", iconSize: [0, 0], iconAnchor: [0, 0], html });
-        const m = L.marker([d.lat, d.lng], { icon: icone, pane: "joueurs", keyboard: false }).addTo(groupe);
+        const m = repere(map, d.lat, d.lng, html, { classe: "jr-ancre" });
+        poses.push(m);
         const el = m.getElement();
-        if (sort) el?.querySelector(".vil")?.classList.add("vil--entre");
-        // Un seul marqueur pour la ville : on lit ce que le doigt a touché.
-        m.on("click", (e) => {
-          const cible = e.originalEvent.target as HTMLElement;
+        if (sort) el.querySelector(".vil")?.classList.add("vil--entre");
+        // Un seul repère pour la ville : on lit ce que le doigt a touché.
+        el.addEventListener("click", (e) => {
+          const cible = e.target as HTMLElement;
           const carteJ = cible.closest<HTMLElement>(".jr");
           if (carteJ) {
-            const i = el ? [...el.querySelectorAll(".jr")].indexOf(carteJ) : -1;
+            const i = [...el.querySelectorAll(".jr")].indexOf(carteJ);
             const j = d.joueurs[i];
             if (j) {
               navigator.vibrate?.(5);
@@ -370,12 +406,14 @@ export function CarteMap({
           }
         });
       }
+      joueursReperes.current = poses;
       ouvertes.current = maintenant;
     };
     dessiner();
     map.on("zoomend", dessiner);
     return () => {
       map.off("zoomend", dessiner);
+      vider();
     };
   }, [villes]);
 
@@ -383,8 +421,34 @@ export function CarteMap({
   useEffect(() => {
     const map = carte.current;
     if (!map || !viser) return;
-    map.flyTo([viser.lat, viser.lng], Math.max(map.getZoom(), ZOOM_OUVERTURE + 1), { duration: calme() ? 0 : 1 });
+    const z = Math.max(map.getZoom(), ZOOM_OUVERTURE + 1);
+    map.flyTo({ center: [viser.lng, viser.lat], zoom: z, pitch: pente(z), duration: calme() ? 0 : 1000 });
   }, [viser]);
 
   return <div ref={conteneur} className={className} role="region" aria-label="La Map des matchs" />;
+}
+
+/**
+ * Le plan ou la photo : la couche satellite monte (ou s'efface) en fondu,
+ * les volumes s'effacent sous la photo et les libellés passent en blanc.
+ * Renvoie de quoi annuler la fin du fondu.
+ */
+function appliquerFond(map: PlanMap, fond: FondCarte, doux: boolean): (() => void) | undefined {
+  const sat = fond === "satellite";
+  const duree = doux ? FONDU : 0;
+  map.setPaintProperty("satellite", "raster-opacity-transition", { duration: duree, delay: 0 });
+  for (const id of LIBELLES) {
+    map.setPaintProperty(id, "text-color", sat ? "#f4f5f2" : id === "noms-rues" ? "#6d6a64" : id === "noms-eau" ? "#3d8fbf" : "#6b6d72");
+    map.setPaintProperty(id, "text-halo-color", sat ? "rgba(10, 11, 13, 0.85)" : "#ffffff");
+  }
+  if (sat) {
+    map.setLayoutProperty("satellite", "visibility", "visible");
+    map.setPaintProperty("satellite", "raster-opacity", 1);
+    const t = window.setTimeout(() => map.setLayoutProperty("volumes", "visibility", "none"), duree);
+    return () => window.clearTimeout(t);
+  }
+  map.setLayoutProperty("volumes", "visibility", "visible");
+  map.setPaintProperty("satellite", "raster-opacity", 0);
+  const t = window.setTimeout(() => map.setLayoutProperty("satellite", "visibility", "none"), duree);
+  return () => window.clearTimeout(t);
 }

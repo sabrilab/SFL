@@ -163,11 +163,6 @@
     scale: 0.96;
     transition-duration: 0.1s;
   }
-
-  /* ── Le fond qui change : le nouveau fond monte en fondu sur l'ancien. ── */
-  .fond-entre {
-    animation: fondu 0.5s ease-out backwards;
-  }
 }
 
 /* La carte du carrousel, au repos : la choisie en avant. */
@@ -244,10 +239,6 @@
 @keyframes map-monte {
   0% { opacity: 0; translate: 0 70px; scale: 0.92; }
   100% { opacity: 1; translate: 0 0; scale: 1; }
-}
-@keyframes fondu {
-  0% { opacity: 0; }
-  100% { opacity: 1; }
 }
 
 @keyframes grp-entre {

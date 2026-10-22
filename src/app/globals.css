@@ -379,19 +379,22 @@
   background: #e9eae6;
   font-family: var(--font-sans), system-ui, sans-serif;
 }
-.leaflet-container .leaflet-control-attribution {
+.maplibregl-map {
+  background: #f3f0e8;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+.maplibregl-map .maplibregl-ctrl-attrib {
   background: rgba(244, 245, 242, 0.75);
   color: #8f908b;
   font-size: 9px;
 }
-.leaflet-container .leaflet-control-attribution a {
+.maplibregl-map .maplibregl-ctrl-attrib a {
   color: #5c5d59;
 }
-.leaflet-container .leaflet-marker-icon.stk-ancre,
-.leaflet-container .leaflet-marker-icon.pt,
-.leaflet-container .leaflet-marker-icon.ter-ancre,
-.leaflet-container .leaflet-marker-icon.toi-ancre,
-.leaflet-container .leaflet-marker-icon.jr-ancre {
+.maplibregl-map .maplibregl-marker.stk-ancre,
+.maplibregl-map .maplibregl-marker.ter-ancre,
+.maplibregl-map .maplibregl-marker.toi-ancre,
+.maplibregl-map .maplibregl-marker.jr-ancre {
   background: none;
   border: 0;
   overflow: visible;
@@ -766,7 +769,7 @@
   color: #0a0b0d;
   text-shadow: 0 0 2px #f4f5f2, 0 0 4px #f4f5f2, 0 0 6px #f4f5f2;
 }
-.leaflet-container.fond-satellite .jr__nom {
+.maplibregl-map.fond-satellite .jr__nom {
   color: #f4f5f2;
   text-shadow: 0 0 2px #0a0b0d, 0 0 4px #0a0b0d;
 }

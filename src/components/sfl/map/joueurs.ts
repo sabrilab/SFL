@@ -11,7 +11,7 @@
 //     à l'angle d'or (137,5°), le mieux noté au plus près. Au-delà de
 //     OUVERTE_MAX, un « +N » sur le nom : le reste est dans le catalogue.
 //
-// Ce fichier ne connaît pas Leaflet : il reçoit des points à l'écran et rend
+// Ce fichier ne connaît pas MapLibre : il reçoit des points à l'écran et rend
 // des dispositions et du HTML (le dessin est dans globals.css, le mouvement
 // dans app/map/animations.css).
 
@@ -43,8 +43,8 @@ export const OUVERTE_MAX = 21;
 const FUSION = 96;
 /** Le rayon qu'occupe une pile fermée (cartes, pastille et nom). */
 const R_PILE = 52;
-/** Une ville ne s'ouvre qu'à partir de ce zoom (le quartier). */
-export const ZOOM_OUVERTURE = 12;
+/** Une ville ne s'ouvre qu'à partir de ce zoom (le quartier ; zoom de MapLibre). */
+export const ZOOM_OUVERTURE = 11;
 
 /** Le dossier d'une ville : « Villeneuve-d'Ascq » → « villeneuve-d-ascq ». */
 export function cleVille(v: string): string {
