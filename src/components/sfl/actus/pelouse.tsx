@@ -357,7 +357,7 @@ export function Scene({
         <span className="pel-titre mono-label text-[10px] text-white/50" style={{ ["--d" as string]: 0 }}>
           {sur}
         </span>
-        <h3 className="pel-titre text-[30px] leading-[0.95] tracking-tight uppercase" style={{ fontFamily: ANTON, ["--d" as string]: 0.06 }}>
+        <h3 className="pel-titre titre-lettrage text-[24px] leading-[0.95]" style={{ ["--d" as string]: 0.06 }}>
           {titre}
         </h3>
       </header>

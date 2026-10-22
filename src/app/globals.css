@@ -9,8 +9,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* Typographie de l'app BOLA : une sans neutre (Inter) pour tout ce qui se
-     lit, une monospace en capitales pour ce qui s'étiquette. */
+  /* Typographie de l'app BOLA, celle de la Map : Inter pour tout ce qui se
+     lit, et au plus gras pour les titres en capitales (.titre-lettrage) ;
+     JetBrains Mono en capitales pour ce qui s'étiquette (.mono-label).
+     Anton ne sert plus qu'aux chiffres. */
   --font-sans: var(--font-inter);
   --font-mono: var(--font-jbmono);
   --font-heading: var(--font-sans);
@@ -259,14 +261,32 @@
 .orbs > i:nth-child(2) { top: 330px; right: -110px; width: 280px; height: 280px; filter: blur(24px); animation-duration: 21s; animation-direction: reverse; background: radial-gradient(circle, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 70%); }
 .orbs > i:nth-child(3) { bottom: -80px; left: 30px; width: 320px; height: 260px; filter: blur(30px); animation-duration: 25s; background: radial-gradient(circle, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 70%); }
 
-/* Micro-label — comme les étiquettes de l'app BOLA : monospace (SF Mono sur
-   iPhone, JetBrains Mono ailleurs), capitales espacées, en gras. */
+/* Micro-label — l'étiquette de la Map (« 3 MATCHS OUVERTS ») : JetBrains
+   Mono partout, iPhone compris, capitales espacées, en gras. Avant le 22/10,
+   l'iPhone prenait SF Mono, plus sèche que l'étiquette de la Map (Sabri :
+   « uniformise le tout »). */
 .mono-label {
-  font-family: ui-monospace, "SF Mono", var(--font-jbmono), monospace;
+  font-family: var(--font-jbmono), ui-monospace, monospace;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+/* Titre en lettrage — les lettres de la Map (le nom de la commune, « TU Y
+   ES », « DIMANCHE » sur les cartes des matchs) sans le découpage du
+   sticker : Inter au plus gras, en capitales, serré. Les titres des Actus,
+   du récap et du profil d'un joueur l'ont pris à Anton (22/10), qui ne garde
+   que les chiffres. Plus large qu'Anton : à taille égale, compter un quart
+   de moins. Dans la couche des composants, pour qu'un tracking-* le
+   desserre sur les petites tailles. */
+@layer components {
+  .titre-lettrage {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    text-transform: uppercase;
+  }
 }
 
 /* ─────────────────────── Le gabarit de page ────────────────────────
@@ -489,7 +509,7 @@
   height: 11px;
   background: #0a0b0d;
   color: #f4f5f2;
-  font: 700 7px/11px ui-monospace, "SF Mono", var(--font-jbmono), monospace;
+  font: 700 7px/11px var(--font-jbmono), ui-monospace, monospace;
   letter-spacing: 0.4px;
   text-align: center;
   text-transform: uppercase;
@@ -728,7 +748,7 @@
 }
 .grp__plus,
 .vil__reste {
-  font: 700 9px/1 ui-monospace, "SF Mono", var(--font-jbmono), monospace;
+  font: 700 9px/1 var(--font-jbmono), ui-monospace, monospace;
   color: #8f908b;
 }
 
@@ -750,7 +770,7 @@
   cursor: pointer;
 }
 .vil__compte {
-  font: 700 9.5px/1 ui-monospace, "SF Mono", var(--font-jbmono), monospace;
+  font: 700 9.5px/1 var(--font-jbmono), ui-monospace, monospace;
   font-style: normal;
   color: rgba(244, 245, 242, 0.6);
 }
@@ -1007,7 +1027,7 @@
   transition-duration: 0.12s;
 }
 .liquid-tabbar__libelle {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
   font-size: 10px;
   line-height: 12px;
   letter-spacing: 0.1px;

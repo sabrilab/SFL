@@ -230,8 +230,8 @@ function Joueur({ p, size, moi, detail, chiffre, dessus }: { p: Player; size: nu
         <MiniCarte player={p} size={size} detail={detail} />
       </div>
       <span
-        className={cn("mt-[var(--fib-8)] w-full text-center leading-[1.05] break-words uppercase", moi ? "text-primary" : "text-white")}
-        style={{ fontFamily: ANTON, fontSize: size >= MOYENNE ? 17 : 13, letterSpacing: "0.02em" }}
+        className={cn("titre-lettrage mt-[var(--fib-8)] w-full text-center leading-[1.05] tracking-[-0.02em] break-words", moi ? "text-primary" : "text-white")}
+        style={{ fontSize: size >= MOYENNE ? 13 : 10.5 }}
       >
         {p.name}
       </span>
@@ -459,8 +459,7 @@ function HommeDuDimanche({ j, m, p, moi }: { j: number; m: Mvp; p: Player; moi: 
           <Chiffre n={`+${m.pp}`} label="pts" taille={34} couleur="rgba(255,255,255,0.55)" />
         </div>
         <span
-          className={cn("absolute right-5 bottom-[var(--fib-13)] max-w-[40%] leading-none break-words text-right uppercase", m.nom === moi ? "text-primary" : "text-white")}
-          style={{ fontFamily: ANTON, fontSize: 21, letterSpacing: "0.01em" }}
+          className={cn("titre-lettrage absolute right-5 bottom-[var(--fib-13)] max-w-[40%] text-[16px] leading-none break-words text-right", m.nom === moi ? "text-primary" : "text-white")}
         >
           {m.nom}
         </span>
@@ -490,7 +489,7 @@ function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player 
         <div className="absolute inset-x-0 bottom-[var(--fib-13)] flex justify-center gap-[var(--fib-34)]">
           {deux.map((m) => (
             <div key={m.nom} className="flex flex-col items-center" style={{ width: W(MOYENNE) }}>
-              <span className={cn("max-w-full text-center leading-none break-words uppercase", m.nom === moi ? "text-primary" : "text-white")} style={{ fontFamily: ANTON, fontSize: 17 }}>
+              <span className={cn("titre-lettrage max-w-full text-center text-[13px] leading-none tracking-[-0.02em] break-words", m.nom === moi ? "text-primary" : "text-white")}>
                 {m.nom}
               </span>
               <span className="mono-label text-[9px] text-white/45 tabular-nums">
@@ -608,7 +607,7 @@ function Duo({ j, duo, passeur, buteur, moi }: { j: number; duo: { passeur: stri
             { nom: duo.buteur, label: unite("buts", duo.n) },
           ].map((x) => (
             <div key={x.nom} className="flex flex-col items-center" style={{ width: W(MOYENNE) }}>
-              <span className={cn("max-w-full text-center leading-none break-words uppercase", x.nom === moi ? "text-primary" : "text-white")} style={{ fontFamily: ANTON, fontSize: 17 }}>
+              <span className={cn("titre-lettrage max-w-full text-center text-[13px] leading-none tracking-[-0.02em] break-words", x.nom === moi ? "text-primary" : "text-white")}>
                 {x.nom}
               </span>
               <span className="mono-label text-[9px] text-white/45">{x.label}</span>
