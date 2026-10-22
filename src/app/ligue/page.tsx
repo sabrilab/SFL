@@ -42,6 +42,7 @@ import { ALHonneur } from "@/components/sfl/a-l-honneur";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
+import { BoutonStats } from "@/components/layout/bouton-stats";
 
 // Les deux dimanches après celui de la convocation, lus côté client
 // (vides au rendu serveur, pour que l'hydratation concorde).
@@ -276,6 +277,7 @@ function Ligue() {
           <Crown className="size-4" />
           <span className="hidden sm:inline">Wall of Fame</span>
         </Link>
+        <BoutonStats className="size-10 sm:size-11" />
         <BoutonRecherche className="size-10 sm:size-11" />
       </div>
 

@@ -18,7 +18,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { CalendarDays, Crosshair, Layers, LocateFixed, MapPin, Navigation, Plus, Search, Settings2, Star, Trash2 } from "lucide-react";
+import { CalendarDays, ChartSpline, Crosshair, Layers, LocateFixed, MapPin, Navigation, Plus, Search, Settings2, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -550,7 +550,8 @@ export default function MapPage() {
 
         {/* En haut à droite : la loupe (la Recherche, montée de la barre
             d'onglets le 19/10), la bascule plan / satellite et, pour
-            l'admin, le réglage des matchs — le lettrage garde sa place. */}
+            l'admin, les stats (Activité & rétention, 22/10) et le réglage des
+            matchs — le lettrage garde sa place. */}
         <div className="absolute right-4 z-[510] flex flex-col items-end gap-2" style={{ top: haut }}>
           <Link
             href="/recherche"
@@ -560,6 +561,16 @@ export default function MapPage() {
           >
             <Search className="size-[18px]" strokeWidth={2.2} />
           </Link>
+          {admin && (
+            <Link
+              href="/admin/activite"
+              aria-label="Activité et rétention"
+              className="map-bord map-touche grid size-10 place-items-center rounded-full border shadow-[0_3px_8px_rgba(0,0,0,0.16)]"
+              style={{ background: BLANC, color: ENCRE, borderColor: "rgba(10,11,13,0.1)" }}
+            >
+              <ChartSpline className="size-[18px]" strokeWidth={2.2} />
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => setFond((f) => (f === "plan" ? "satellite" : "plan"))}

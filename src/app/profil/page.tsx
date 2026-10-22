@@ -31,6 +31,7 @@ import { FormulaireIdentite } from "@/components/sfl/identite";
 import { useIdentites } from "@/hooks/use-identites";
 import { ovr, rankPlayers, STAT_KEYS, type Player } from "@/lib/sfl/engine";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
+import { BoutonStats } from "@/components/layout/bouton-stats";
 
 /* ------------------------- Radar « PROFIL DE JEU » ------------------------ */
 // Géométrie reprise du design : hexagone pointe en haut, centre (110,110),
@@ -200,7 +201,10 @@ export default function Profil() {
     <div className="shell py-4 sm:py-8 lg:pt-[var(--fib-55)]">
       <div className="mb-[18px] flex items-center justify-between gap-3 lg:mb-[var(--fib-34)]">
         <h1 className="text-[30px] font-bold tracking-tight lg:text-[34px]">Ma carte</h1>
-        <BoutonRecherche />
+        <div className="flex items-center gap-2">
+          <BoutonStats />
+          <BoutonRecherche />
+        </div>
       </div>
       {/* Deux colonnes dès qu'il y a la place, dans le rapport 1 : φ
           (grille-or, globals.css) : l'identité et la carte à gauche, les

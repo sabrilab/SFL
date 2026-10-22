@@ -1304,6 +1304,10 @@ create table if not exists public.photo_studio (
   created_at  timestamptz not null default now()
 );
 create index if not exists photo_studio_user_date on public.photo_studio (user_id, created_at desc);
+-- Le pays du filtre drapeau (son code, lib/sfl/photo-studio.ts), depuis le
+-- 22/10 : la page Activité de l'admin montre la part de chaque pays choisi.
+-- Les lignes plus anciennes n'en ont pas.
+alter table public.photo_studio add column if not exists pays text;
 
 alter table public.photo_studio enable row level security;
 
@@ -1311,6 +1315,12 @@ drop policy if exists "photo_studio: je lis les miennes" on public.photo_studio;
 create policy "photo_studio: je lis les miennes"
   on public.photo_studio for select to authenticated
   using (user_id = (select auth.uid()));
+
+-- L'admin lit tout : les pays choisis, dans Activité.
+drop policy if exists "photo_studio: l'admin lit tout" on public.photo_studio;
+create policy "photo_studio: l'admin lit tout"
+  on public.photo_studio for select to authenticated
+  using ((select public.is_league_admin()));
 
 drop policy if exists "photo_studio: je note la mienne" on public.photo_studio;
 create policy "photo_studio: je note la mienne"
