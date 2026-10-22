@@ -17,6 +17,11 @@
 // l'écran (0,382), la question le grand (0,618) ; espacements 8 · 13 · 21 ·
 // 34 · 55, titres en 34 px, texte en 13 et 21.
 //
+// La politique de confidentialité s'accepte à l'étape qui crée le compte :
+// les cases sont sous le pouce, au-dessus du bouton (consentement.tsx), le
+// texte entier s'ouvre sans quitter la page. L'accord est enregistré sous la
+// session du joueur AVANT que ses quatre photos ne partent.
+//
 // Le compte naît en attente (voir lib/sfl/inscription.ts) : la fin du parcours
 // le dit, et l'app montre l'écran d'attente jusqu'à l'accord de l'admin.
 // Sauf venu par le lien d'une équipe (?equipe=jeton, mode Team) : le
@@ -43,6 +48,9 @@ import {
 } from "@/lib/sfl/auth/session";
 import { BoutonsSociaux } from "@/components/sfl/auth/boutons-sociaux";
 import { envoyerReferences } from "@/lib/sfl/references";
+import { CaseAccord, LecturePolitique, PHRASE_PARENT, PhraseAccord } from "@/components/sfl/confidentialite/consentement";
+import { AGE_ACCORD_PARENT } from "@/lib/sfl/confidentialite";
+import { donnerAccord } from "@/lib/sfl/consentement";
 import { useSession } from "@/hooks/use-session";
 import {
   ANGLES,
@@ -232,6 +240,12 @@ export default function InscriptionPage() {
   const [nomFinal, setNomFinal] = useState<string | null>(null);
   const [avertissement, setAvertissement] = useState<string | null>(null);
   const [aRenvoyer, setARenvoyer] = useState(false);
+  // La politique de confidentialité : la case obligatoire, celle d'un parent
+  // avant 15 ans, la carte hors de l'app (facultative), et sa lecture.
+  const [accord, setAccord] = useState(false);
+  const [accordParent, setAccordParent] = useState(false);
+  const [horsApp, setHorsApp] = useState(false);
+  const [lecture, setLecture] = useState(false);
   // Revenu de Google ou Apple : le compte existe déjà, provisoire.
   const [sociale, setSociale] = useState<Fournisseur | null>(null);
   // Venu par le lien d'une équipe (mode Team, /equipe/[jeton]) : le compte
@@ -396,6 +410,17 @@ export default function InscriptionPage() {
     }
   }
 
+  const mineur = ans !== null && ans < AGE_ACCORD_PARENT;
+  /** Les cases de la politique, à l'étape qui crée le compte. */
+  function bloquantAccord(): string | null {
+    if (!accord) return "Coche la case de la politique de confidentialité.";
+    if (mineur && !accordParent) return "L'accord d'un de tes parents.";
+    return null;
+  }
+  /** L'accord, sous la session qui vient de naître ; il attend la prochaine ouverture s'il ne peut pas partir. */
+  const enregistrerAccord = (nom: string) =>
+    donnerAccord(nom, { horsApp, parent: mineur && accordParent, ou: "inscription" });
+
   function aller(sens: 1 | -1) {
     const i = etapes.indexOf(etape);
     if (sens === 1) {
@@ -413,7 +438,7 @@ export default function InscriptionPage() {
   }
 
   async function creer() {
-    const b = bloquant("secret");
+    const b = bloquant("secret") ?? bloquantAccord();
     if (b) {
       setErreur(b);
       return;
@@ -439,6 +464,7 @@ export default function InscriptionPage() {
       // Connexion immédiate, puis les quatre prises, envoyées sous sa
       // propre session.
       const connexion = await signIn(pseudo, motDePasse);
+      await enregistrerAccord(nom);
       if (connexion.ok) await envoyerPhotos();
       else setAvertissement(`Ton compte est créé. Connecte-toi avec @${pseudo} pour entrer.`);
       try {
@@ -456,7 +482,7 @@ export default function InscriptionPage() {
 
   /** Par Google ou Apple : la route pose le nom, le pseudo et la fiche. */
   async function finirSociale() {
-    const b = bloquant(derniere);
+    const b = bloquant(derniere) ?? bloquantAccord();
     if (b) {
       setErreur(b);
       return;
@@ -491,6 +517,7 @@ export default function InscriptionPage() {
       // La session Supabase est déjà là : elle devient la session de ligue
       // (en attente), puis les photos partent sous elle.
       await bootstrapServerSession();
+      await enregistrerAccord(nom);
       await envoyerPhotos();
       try {
         sessionStorage.removeItem(BROUILLON);
@@ -884,9 +911,30 @@ export default function InscriptionPage() {
         className="relative z-10 mx-auto w-full max-w-[420px] px-[21px] pt-[13px]"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 21px)" }}
       >
+        {etape === derniere && (
+          <div className="mb-[8px]">
+            <CaseAccord
+              coche={accord}
+              onChange={(v) => {
+                setAccord(v);
+                setErreur(null);
+              }}
+            >
+              <PhraseAccord onLire={() => setLecture(true)} />
+            </CaseAccord>
+            {mineur && (
+              <CaseAccord coche={accordParent} onChange={setAccordParent}>
+                {PHRASE_PARENT}
+              </CaseAccord>
+            )}
+            <CaseAccord coche={horsApp} onChange={setHorsApp} note="Facultatif">
+              Bola peut aussi montrer ma carte dans ses vidéos et ses posts, hors de l&apos;app.
+            </CaseAccord>
+          </div>
+        )}
         <button
           type="button"
-          disabled={envoi || (accueil && ouvert === false)}
+          disabled={envoi || (accueil && ouvert === false) || (etape === derniere && !!bloquantAccord())}
           onClick={() => {
             if (fini) router.replace(equipe ? "/bola-team" : "/");
             else if (etape === derniere) void (sociale ? finirSociale() : creer());
@@ -894,7 +942,7 @@ export default function InscriptionPage() {
           }}
           className={cn(
             "bouton-principal flex w-full items-center justify-center gap-2 py-[17px] text-[15px] font-bold",
-            (envoi || (accueil && ouvert === false)) && "opacity-40"
+            (envoi || (accueil && ouvert === false) || (etape === derniere && !!bloquantAccord())) && "opacity-40"
           )}
         >
           {envoi && <Loader2 className="size-4 animate-spin" />}
@@ -918,6 +966,12 @@ export default function InscriptionPage() {
             </Link>
           ))}
       </div>
+
+      {lecture && (
+        <div className="fixed inset-0 z-[70] flex flex-col bg-background" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+          <LecturePolitique onRetour={() => setLecture(false)} />
+        </div>
+      )}
 
       {prise && (
         <PriseReference

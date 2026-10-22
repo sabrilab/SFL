@@ -24,6 +24,10 @@
 // conversation, pas un problème difficile. ANTHROPIC_MODEL le change.
 // Si l'image ne se fait pas (fal en panne, plus de crédit), la réponse part
 // quand même, sans elle.
+//
+// Confidentialité (22/10/2026) : rien ne part chez Anthropic sans l'accord du
+// joueur à la politique en vigueur (lib/sfl/confidentialite.server.ts), et
+// fal ne garde pas les images du coach dans son historique (X-Fal-Store-IO: 0).
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -42,6 +46,7 @@ import {
 } from "@/lib/sfl/agent";
 import { STAT_KEYS } from "@/lib/sfl/engine";
 import { COTES, ROLES_TERRAIN, TYPES_FLECHE, ZONES_CORPS, lireSchema, type SchemaCoach } from "@/lib/sfl/schemas-coach";
+import { SANS_ACCORD, accordEnregistre } from "@/lib/sfl/confidentialite.server";
 
 export const maxDuration = 120;
 
@@ -213,7 +218,8 @@ async function faireImage(
   try {
     const r = await fetch(`https://fal.run/${MODELE_IMAGE}`, {
       method: "POST",
-      headers: { Authorization: `Key ${cle}`, "Content-Type": "application/json" },
+      // Rien de gardé dans l'historique de fal (voir /api/photo-studio).
+      headers: { Authorization: `Key ${cle}`, "Content-Type": "application/json", "X-Fal-Store-IO": "0" },
       body: JSON.stringify({ prompt: promptImage(sujet.slice(0, 1500)), num_images: 1, aspect_ratio: "1:1", output_format: "jpeg", sync_mode: true }),
     });
     if (!r.ok) {
@@ -325,6 +331,8 @@ export async function POST(req: NextRequest) {
   if (authError || !auth.user) return erreur("Session invalide.", 401);
   const { data: profil } = await sb.from("profiles").select("valide").eq("id", auth.user.id).maybeSingle();
   if (!profil?.valide) return erreur("Ton compte attend d'être accepté.", 403);
+  // Ses questions et son dossier partent chez Anthropic : pas sans son accord.
+  if (!(await accordEnregistre(sb, auth.user.id))) return erreur(SANS_ACCORD, 403);
 
   // Le crédit : LIMITE_AGENT_JOUR questions sur 24 h glissantes.
   const depuis = new Date(Date.now() - 24 * 3600 * 1000).toISOString();

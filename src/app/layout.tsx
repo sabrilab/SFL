@@ -22,6 +22,7 @@ import { PhotosSync } from "@/components/sfl/photos-sync";
 import { IdentiteObligatoire } from "@/components/sfl/identite";
 import { NouveauxBadges } from "@/components/sfl/vitrine";
 import { InvitationCarte } from "@/components/sfl/invitation-carte";
+import { ApresAccord, ConsentementObligatoire } from "@/components/sfl/confidentialite/consentement";
 
 // Typographie de l'app BOLA : une sans neutre pour tout ce qui se lit (Inter,
 // celle du site), et une monospace pour les étiquettes en capitales — SF Mono
@@ -103,12 +104,17 @@ export default function RootLayout({
                 <AuthGate>
                 <AppSplash />
                 <ActivityTracker />
-                <NouvellesCartes />
                 <ConnexionLocale />
                 <PhotosSync />
-                <NouveauxBadges />
-                <InvitationCarte />
-                <IdentiteObligatoire />
+                {/* La case de confidentialité passe avant tout ce qui s'ouvre
+                    de soi-même : cérémonies, invitations, identité. */}
+                <ConsentementObligatoire />
+                <ApresAccord>
+                  <NouvellesCartes />
+                  <NouveauxBadges />
+                  <InvitationCarte />
+                  <IdentiteObligatoire />
+                </ApresAccord>
                 {/* Orbes lumineux du design de référence, derrière tout le contenu */}
                 <div className="orbs" aria-hidden>
                   <i /><i /><i />

@@ -132,6 +132,12 @@ export function LoginScreen() {
           Mot de passe oublié ? Demande à Ilyes de te le redonner — il a la liste des
           comptes. Pense à le changer une fois connecté, dans Réglages.
         </p>
+        <Link
+          href="/confidentialite"
+          className="mt-4 inline-block text-[12.5px] font-semibold text-foreground/45 underline underline-offset-2"
+        >
+          Politique de confidentialité
+        </Link>
       </div>
     </div>
   );

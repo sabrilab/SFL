@@ -14,6 +14,11 @@
 //
 // Le crédit fal est celui de Sabri : chaque appel est noté dans la table
 // photo_studio, et un joueur s'arrête à LIMITE_JOUR générations sur 24 h.
+//
+// Confidentialité (22/10/2026) : pas de selfie chez fal sans l'accord du
+// joueur à la politique en vigueur (lib/sfl/confidentialite.server.ts), et
+// fal est prié de ne garder ni les selfies ni la photo dans son historique de
+// requêtes (en-tête X-Fal-Store-IO: 0) ; Bola ne les garde pas non plus.
 // Les prompts viennent des essais du 17/10/2026 (/mnt/project-files/avatars).
 //
 // Deux modèles : la photo de studio passe par Seedream 5 Pro (choisi par Sabri
@@ -23,6 +28,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { SANS_ACCORD, accordEnregistre } from "@/lib/sfl/confidentialite.server";
 import {
   LIMITE_JOUR,
   SELFIES_MAX,
@@ -147,6 +153,7 @@ export async function POST(req: NextRequest) {
     .eq("id", auth.user.id)
     .maybeSingle();
   if (!profil?.valide) return erreur("Ton compte attend d'être accepté.", 403);
+  if (!(await accordEnregistre(sb, auth.user.id))) return erreur(SANS_ACCORD, 403);
 
   // Le crédit : LIMITE_JOUR générations sur 24 h glissantes.
   const depuis = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -171,7 +178,9 @@ export async function POST(req: NextRequest) {
     const seedream = filtre === "studio";
     const r = await fetch(`https://fal.run/${seedream ? MODELE_STUDIO : MODELE}`, {
       method: "POST",
-      headers: { Authorization: `Key ${cle}`, "Content-Type": "application/json" },
+      // X-Fal-Store-IO: 0 : fal ne garde ni les selfies ni la photo dans
+      // l'historique des requêtes (la politique de confidentialité le promet).
+      headers: { Authorization: `Key ${cle}`, "Content-Type": "application/json", "X-Fal-Store-IO": "0" },
       body: JSON.stringify({
         prompt,
         image_urls: images,
