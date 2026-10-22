@@ -619,7 +619,7 @@ export default function MapPage() {
           >
             <Search className="size-[18px]" strokeWidth={2.2} />
           </Link>
-          {villes.length > 0 && (
+          {(villes.length > 0 || !!me) && (
             <button
               type="button"
               onClick={() => {
