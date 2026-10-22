@@ -1,34 +1,33 @@
 "use client";
 
-// Session du joueur connecté — vérification Supabase d'abord, repli local.
+// Session du joueur connecté — vérifiée par Supabase, et par lui seul.
 //
-// Depuis le branchement de Supabase, le mot de passe est vérifié PAR LE SERVEUR
-// (supabase.auth.signInWithPassword) : c'est lui qui fait foi, et le changement
-// de mot de passe est global, pas lié à un appareil.
+// Le mot de passe est vérifié PAR LE SERVEUR (supabase.auth.signInWithPassword) :
+// c'est lui qui fait foi, et le changement de mot de passe est global, pas lié
+// à un appareil.
 //
-// Le repli local (empreintes SHA-256 embarquées, voir accounts.ts) reste actif
-// tant que les comptes ne sont pas tous créés côté serveur : il permet à toute
-// la ligue de se connecter pendant la transition. Une fois l'installation
-// terminée (page /admin/setup), passer ENFORCE_SERVER_AUTH à true pour que le
-// serveur devienne l'unique juge.
+// Il y avait un repli local : les empreintes SHA-256 des mots de passe
+// d'origine, embarquées dans l'app, ouvraient une session quand le serveur ne
+// répondait pas. Ces empreintes partaient dans le code que reçoit chaque
+// navigateur, et le dépôt public contenait les mots de passe eux-mêmes : le
+// repli a disparu le 22/10/2026, avec les empreintes. Serveur injoignable =
+// connexion impossible, on le dit et on réessaie.
 //
-// L'interface (signIn / signOut / getSession / changePassword) ne bouge pas :
-// le reste de l'app ignore d'où vient la vérification.
+// Chaque compte né d'un mot de passe d'origine ou provisoire doit en choisir
+// un à lui (table mot_de_passe_a_changer) : la session le porte
+// (motDePasseAChanger) et AuthGate retient le joueur sur l'écran « Nouveau
+// mot de passe » tant que c'est à faire.
 
-import { ACCOUNTS, findAccount, type Account } from "./accounts";
+import { ACCOUNTS, findAccount } from "./accounts";
 import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { loginEmail, supabase, SUPABASE_KEY, SUPABASE_URL } from "@/lib/supabase";
 import { accordConnu } from "@/lib/sfl/consentement";
 import { emailDe } from "@/lib/sfl/contacts";
-
-/**
- * false : Supabase d'abord, repli sur la vérification locale si indisponible.
- * true  : Supabase uniquement (à activer une fois les 71 comptes créés).
- */
-const ENFORCE_SERVER_AUTH = false;
+import { BORNES } from "@/lib/sfl/inscription";
 
 const SESSION_KEY = "sfl-session";
-const OVERRIDE_PREFIX = "sfl-pwd-"; // mot de passe changé par le joueur (mode local)
+/** Ancien stockage des mots de passe changés sur l'appareil (repli local, retiré). */
+const OVERRIDE_PREFIX = "sfl-pwd-";
 export const SESSION_EVENT = "sfl-session";
 
 export interface Session {
@@ -36,14 +35,14 @@ export interface Session {
   name: string;
   admin: boolean;
   since: number;
-  /** true = vérifié par le serveur Supabase, false = repli local. */
+  /**
+   * true = vérifié par le serveur Supabase. false = session d'un ancien repli
+   * local (il n'en naît plus) ou jeton perdu : rien de la ligue ne s'ouvre.
+   */
   server?: boolean;
   /**
-   * Pourquoi le serveur n'a pas pris la connexion (repli local seulement) :
-   * « mot-de-passe-local » — le mot de passe tapé n'existe que sur cet
-   * appareil (changé ici quand la session était locale) ; « refuse » — le
-   * serveur ne reconnaît pas ce mot de passe ; « injoignable » — pas de
-   * réponse du serveur.
+   * Pourquoi le serveur n'avait pas pris la connexion (anciennes sessions
+   * locales seulement) : « mot-de-passe-local », « refuse », « injoignable ».
    */
   refus?: "mot-de-passe-local" | "refuse" | "injoignable";
   /**
@@ -52,6 +51,12 @@ export interface Session {
    * montre sa carte et l'écran d'attente à la place de l'app.
    */
   enAttente?: boolean;
+  /**
+   * Le compte doit choisir son mot de passe avant d'entrer : « origine » —
+   * celui que la ligue distribuait, devenu public ; « provisoire » — donné par
+   * l'admin à la création du compte ou après un oubli.
+   */
+  motDePasseAChanger?: "origine" | "provisoire";
 }
 
 function emit() {
@@ -63,22 +68,6 @@ function storeSession(session: Session) {
   // Le reste de l'app lit encore `sfl-me` : on garde les deux alignés.
   localStorage.setItem("sfl-me", session.name);
   emit();
-}
-
-/** SHA-256 hexadécimal — même formule que le générateur de comptes. */
-export async function hashPassword(user: string, password: string): Promise<string> {
-  const data = new TextEncoder().encode(`sfl:${user}:${password}`);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/** Empreinte locale attendue : celle choisie par le joueur, sinon la défaut. */
-function expectedHash(account: Account): string {
-  try {
-    return localStorage.getItem(`${OVERRIDE_PREFIX}${account.user}`) ?? account.hash;
-  } catch {
-    return account.hash;
-  }
 }
 
 /**
@@ -100,14 +89,41 @@ async function estValide(uid: string): Promise<boolean> {
   }
 }
 
+/**
+ * Le compte doit-il choisir son mot de passe ? Comme estValide, une erreur
+ * de lecture (table pas encore migrée, réseau) répond « non » : elle ne doit
+ * jamais enfermer un membre hors de l'app.
+ */
+async function motDePasseAChanger(uid: string): Promise<Session["motDePasseAChanger"]> {
+  try {
+    const r = await withTimeout(
+      Promise.resolve(
+        supabase().from("mot_de_passe_a_changer").select("motif").eq("user_id", uid).maybeSingle()
+      ),
+      5000
+    );
+    if (r.error || !r.data) return undefined;
+    return (r.data as { motif?: string }).motif === "provisoire" ? "provisoire" : "origine";
+  } catch {
+    return undefined;
+  }
+}
+
+/** La session, avec l'état du mot de passe tel que la base le dit. */
+function avecMotDePasse(session: Session, motif: Session["motDePasseAChanger"]): Session {
+  const { motDePasseAChanger: _avant, ...reste } = session;
+  void _avant;
+  return motif ? { ...reste, motDePasseAChanger: motif } : reste;
+}
+
 export type SignInResult =
   | { ok: true; session: Session }
-  | { ok: false; reason: "unknown-user" | "bad-password" | "unavailable" | "mot-de-passe-local" };
+  | { ok: false; reason: "bad-password" | "unavailable" };
 
 /**
  * Borne une promesse dans le temps. Un projet Supabase en pause peut laisser
  * la requête pendre : sans ce garde-fou, l'écran de connexion resterait à
- * tourner indéfiniment au lieu de basculer sur la vérification locale.
+ * tourner indéfiniment.
  */
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -125,38 +141,16 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-async function signInLocal(
-  account: Account,
-  password: string,
-  refus?: Session["refus"]
-): Promise<SignInResult> {
-  if (typeof crypto === "undefined" || !crypto.subtle) return { ok: false, reason: "unavailable" };
-  const hash = await hashPassword(account.user, password);
-  if (hash !== expectedHash(account)) return { ok: false, reason: "bad-password" };
-  const session: Session = {
-    user: account.user,
-    name: account.name,
-    admin: !!account.admin,
-    since: Date.now(),
-    server: false,
-    ...(refus ? { refus } : {}),
-  };
-  storeSession(session);
-  return { ok: true, session };
-}
-
 export async function signIn(user: string, password: string): Promise<SignInResult> {
   // La table embarquée est figée à la compilation : un joueur ajouté à
-  // l'effectif en cours de saison n'y figure pas. Elle sert donc de REPLI,
-  // plus de portail — le serveur, lui, connaît tout le monde.
+  // l'effectif en cours de saison n'y figure pas. Elle ne sert qu'à retrouver
+  // un identifiant et un nom canoniques — le serveur, lui, connaît tout le
+  // monde.
   const account = findAccount(user);
   let identifiant = account?.user ?? user.trim().replace(/^@+/, "").toLowerCase();
 
-  // 1 · Le serveur d'abord — 12 secondes maximum, sinon repli local. Une
-  //     session locale ne lit plus rien de la ligue : mieux vaut attendre un
-  //     peu un réseau lent (5G, navigateur intégré de Snapchat ou d'Instagram)
-  //     que d'ouvrir une app vide.
-  let refusServeur: Session["refus"];
+  // 12 secondes maximum : mieux vaut attendre un peu un réseau lent (5G,
+  // navigateur intégré de Snapchat ou d'Instagram) que d'abandonner.
   try {
     const essai = (id: string) =>
       withTimeout(supabase().auth.signInWithPassword({ email: loginEmail(id), password }), 12000);
@@ -190,6 +184,7 @@ export async function signIn(user: string, password: string): Promise<SignInResu
         .catch(() => null);
       if (profile) admin = !!profile.is_admin;
       const valide = await estValide(data.user.id);
+      const motif = await motDePasseAChanger(data.user.id);
       const session: Session = {
         user: identifiant,
         // Le nom CANONIQUE vient du compte embarqué quand il existe : un
@@ -201,11 +196,11 @@ export async function signIn(user: string, password: string): Promise<SignInResu
         since: Date.now(),
         server: true,
         ...(valide ? {} : { enAttente: true }),
+        ...(motif ? { motDePasseAChanger: motif } : {}),
       };
       storeSession(session);
-      // Le serveur fait foi : un mot de passe changé autrefois sur cet
-      // appareil seulement (en session locale) ne doit plus ouvrir de
-      // session locale qui contredit le serveur.
+      // Restes de l'ancien repli local : un mot de passe changé autrefois sur
+      // cet appareil seulement. Le serveur fait foi, on les efface.
       try {
         localStorage.removeItem(`${OVERRIDE_PREFIX}${identifiant}`);
       } catch {}
@@ -213,39 +208,12 @@ export async function signIn(user: string, password: string): Promise<SignInResu
       return { ok: true, session };
     }
     // Le serveur n'a pas répondu (réseau) : c'est une panne, pas un refus.
-    if (error && isAuthRetryableFetchError(error)) throw error;
-    // Identifiants refusés par le serveur : en mode strict, on s'arrête là.
-    if (ENFORCE_SERVER_AUTH) return { ok: false, reason: "bad-password" };
-    refusServeur = "refuse";
-  } catch {
-    // Réseau ou projet en pause : on tente le repli local.
-    if (ENFORCE_SERVER_AUTH) return { ok: false, reason: "unavailable" };
-    refusServeur = "injoignable";
-  }
-
-  // 2 · Repli local — impossible sans empreinte embarquée : un compte créé
-  //     en cours de saison n'existe que sur le serveur.
-  if (!account) return { ok: false, reason: "unknown-user" };
-  // Le serveur a refusé un mot de passe que cet appareil connaît parce qu'il
-  // y a été changé : on le dit, pour que la personne sache quoi faire.
-  let local = false;
-  try {
-    local = localStorage.getItem(`${OVERRIDE_PREFIX}${account.user}`) !== null;
-  } catch {}
-  // Le serveur a répondu non : une session locale ne lirait plus rien de la
-  // ligue (la base ne s'ouvre qu'aux connexions vérifiées) et n'écrirait rien
-  // non plus. C'était le bandeau « Connexion non vérifiée » qui revenait après
-  // chaque « Me reconnecter » : un joueur qui a changé son mot de passe sur le
-  // serveur tape l'ancien, celui d'origine, que l'empreinte embarquée accepte
-  // encore. On refuse, en disant pourquoi.
-  if (refusServeur === "refuse") {
-    const tape = await hashPassword(account.user, password);
-    if (local && tape === expectedHash(account)) return { ok: false, reason: "mot-de-passe-local" };
+    if (error && isAuthRetryableFetchError(error)) return { ok: false, reason: "unavailable" };
     return { ok: false, reason: "bad-password" };
+  } catch {
+    // Réseau coupé ou projet en pause.
+    return { ok: false, reason: "unavailable" };
   }
-  // Serveur injoignable : repli local, en attendant qu'il réponde (voir
-  // suivreSessionServeur, qui la revérifie dès que Supabase se connecte).
-  return signInLocal(account, password, refusServeur);
 }
 
 /**
@@ -253,7 +221,10 @@ export async function signIn(user: string, password: string): Promise<SignInResu
  * l'app et à chaque retour au premier plan. Le rôle admin vit dans la table
  * profiles : quand il change en base (migration, promotion), les sessions
  * déjà ouvertes doivent le voir sans que personne n'ait à se déconnecter.
- * Corrige aussi un nom de session hérité d'un ancien profil mal formé.
+ * Même chose pour le mot de passe à changer : une session ouverte depuis des
+ * semaines passe sur l'écran « Nouveau mot de passe » à la prochaine
+ * ouverture. Corrige aussi un nom de session hérité d'un ancien profil mal
+ * formé.
  *
  * Elle répare aussi une session marquée « non vérifiée » à tort : si le
  * jeton Supabase du même joueur est toujours là et valide, la session
@@ -301,7 +272,13 @@ export async function refreshSession(): Promise<void> {
       void _refus;
       void _avant;
       const attente = !(await estValide(user.id));
-      storeSession({ ...reste, admin: !!profile.is_admin, server: true, ...(attente ? { enAttente: true } : {}) });
+      const motif = await motDePasseAChanger(user.id);
+      storeSession(
+        avecMotDePasse(
+          { ...reste, admin: !!profile.is_admin, server: true, ...(attente ? { enAttente: true } : {}) },
+          motif
+        )
+      );
       return;
     }
 
@@ -311,10 +288,16 @@ export async function refreshSession(): Promise<void> {
     // formé (profil pas lu à la connexion, réseau lent → identifiant brut).
     const nom = account?.name ?? profile.name ?? session.name;
     const enAttente = !(await estValide(user.id));
-    if (session.admin !== admin || session.name !== nom || !!session.enAttente !== enAttente) {
+    const motif = await motDePasseAChanger(user.id);
+    if (
+      session.admin !== admin ||
+      session.name !== nom ||
+      !!session.enAttente !== enAttente ||
+      session.motDePasseAChanger !== motif
+    ) {
       const { enAttente: _avant, ...reste } = session;
       void _avant;
-      storeSession({ ...reste, admin, name: nom, ...(enAttente ? { enAttente: true } : {}) });
+      storeSession(avecMotDePasse({ ...reste, admin, name: nom, ...(enAttente ? { enAttente: true } : {}) }, motif));
     }
   } catch {
     // Hors ligne : la session actuelle reste ce qu'elle est.
@@ -365,48 +348,102 @@ export function getSession(): Session | null {
   }
 }
 
-/** Change le mot de passe — sur le serveur si la session vient de lui. */
-export async function changePassword(
-  user: string,
-  current: string,
-  next: string
-): Promise<{ ok: true } | { ok: false; reason: "bad-password" | "too-short" | "unavailable" }> {
-  const account = findAccount(user);
-  if (!account) return { ok: false, reason: "bad-password" };
-  if (next.trim().length < 6) return { ok: false, reason: "too-short" };
+export type RefusMotDePasse =
+  /** Le mot de passe actuel tapé n'est pas le bon. */
+  | "bad-password"
+  /** Trop court (BORNES.motDePasse, comme à l'inscription). */
+  | "too-short"
+  /** L'identifiant ou le nom lui-même, ou refusé par Supabase comme trop faible. */
+  | "weak"
+  /** Le même que l'actuel : Supabase le refuse (et l'actuel doit changer). */
+  | "same-password"
+  /** Supabase veut d'abord le mot de passe actuel (session trop ancienne). */
+  | "reauth"
+  | "unavailable";
 
-  const session = getSession();
-  if (session?.server) {
-    try {
-      // Revalide l'actuel avant de changer (updateUser ne le vérifie pas).
-      const { error: reauth } = await supabase().auth.signInWithPassword({
-        email: loginEmail(account.user),
-        password: current,
-      });
-      if (reauth) return { ok: false, reason: "bad-password" };
-      const { error } = await supabase().auth.updateUser({ password: next });
-      if (error) return { ok: false, reason: "unavailable" };
-      return { ok: true };
-    } catch {
-      return { ok: false, reason: "unavailable" };
-    }
-  }
+export type ResultatMotDePasse = { ok: true } | { ok: false; reason: RefusMotDePasse };
 
-  // Hors connexion vérifiée, on ne change plus le mot de passe : un mot de
-  // passe changé sur l'appareil seulement est celui que le serveur refuse
-  // ensuite, et la personne se retrouve coupée de la ligue sans le savoir.
+/** Les règles que l'app vérifie d'elle-même, avant tout appel. */
+function refusLocal(next: string, session: Session): RefusMotDePasse | null {
+  if (next.length < BORNES.motDePasse) return "too-short";
+  const n = next.trim().toLowerCase();
+  if (n === session.user.toLowerCase() || n === session.name.toLowerCase()) return "weak";
+  return null;
+}
+
+/** L'adresse de connexion du compte ouvert (pas forcément celle de l'identifiant tapé). */
+async function emailDuCompte(): Promise<string | null> {
+  const { data } = await supabase().auth.getUser();
+  return data.user?.email ?? null;
+}
+
+/** Revalide le mot de passe actuel : signInWithPassword ouvre une session fraîche. */
+async function verifierActuel(current: string): Promise<RefusMotDePasse | null> {
+  const email = await emailDuCompte();
+  if (!email) return "unavailable";
+  const { error } = await supabase().auth.signInWithPassword({ email, password: current });
+  if (!error) return null;
+  return isAuthRetryableFetchError(error) ? "unavailable" : "bad-password";
+}
+
+/**
+ * Pose le nouveau mot de passe. Supabase refuse lui-même celui qui est
+ * identique à l'actuel, et ferme les sessions du compte sur les autres
+ * appareils (celle-ci reste ouverte).
+ */
+async function poser(next: string): Promise<ResultatMotDePasse> {
+  const { error } = await supabase().auth.updateUser({ password: next });
+  if (!error) return { ok: true };
+  const code = (error as { code?: string }).code;
+  if (code === "same_password") return { ok: false, reason: "same-password" };
+  if (code === "weak_password") return { ok: false, reason: "weak" };
+  if (code === "reauthentication_needed") return { ok: false, reason: "reauth" };
   return { ok: false, reason: "unavailable" };
 }
 
-/** Le joueur a-t-il déjà changé son mot de passe par défaut ? (mode local) */
-export function hasCustomPassword(user: string): boolean {
+/** Change le mot de passe depuis les réglages : l'actuel est redemandé. */
+export async function changePassword(current: string, next: string): Promise<ResultatMotDePasse> {
   const session = getSession();
-  // Sur le serveur, on ne peut pas le savoir : on ne harcèle pas l'utilisateur.
-  if (session?.server) return true;
+  // Hors connexion vérifiée, rien ne se change : la base ne connaît que le
+  // mot de passe du serveur.
+  if (!session?.server) return { ok: false, reason: "unavailable" };
+  const local = refusLocal(next, session);
+  if (local) return { ok: false, reason: local };
   try {
-    return localStorage.getItem(`${OVERRIDE_PREFIX}${user}`) !== null;
+    const actuel = await verifierActuel(current);
+    if (actuel) return { ok: false, reason: actuel };
+    return await poser(next);
   } catch {
-    return false;
+    return { ok: false, reason: "unavailable" };
+  }
+}
+
+/**
+ * Le mot de passe que le joueur choisit quand il le DOIT (mot de passe
+ * d'origine ou provisoire). La session ouverte prouve qui il est : l'actuel
+ * n'est demandé que si Supabase l'exige (« reauth »), et alors `current`
+ * le porte. La base efface d'elle-même la ligne mot_de_passe_a_changer dès
+ * que le mot de passe a vraiment changé ; la session suit, et l'app s'ouvre.
+ */
+export async function choisirMotDePasse(next: string, current?: string): Promise<ResultatMotDePasse> {
+  const session = getSession();
+  if (!session?.server) return { ok: false, reason: "unavailable" };
+  const local = refusLocal(next, session);
+  if (local) return { ok: false, reason: local };
+  try {
+    if (current) {
+      const actuel = await verifierActuel(current);
+      if (actuel) return { ok: false, reason: actuel };
+    }
+    const r = await poser(next);
+    if (!r.ok) return r;
+    const { data } = await supabase().auth.getUser();
+    const motif = data.user ? await motDePasseAChanger(data.user.id) : undefined;
+    const apres = getSession();
+    if (apres) storeSession(avecMotDePasse(apres, motif));
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: "unavailable" };
   }
 }
 
@@ -464,6 +501,7 @@ export async function bootstrapServerSession(): Promise<boolean> {
 
     const account = ACCOUNTS.find((a) => a.name === profile.name);
     const valide = await estValide(user.id);
+    const motif = await motDePasseAChanger(user.id);
     const session: Session = {
       user: account?.user ?? (profile.username as string | null)?.replace(/^@/, "") ?? profile.name.toLowerCase(),
       name: profile.name,
@@ -471,6 +509,7 @@ export async function bootstrapServerSession(): Promise<boolean> {
       since: Date.now(),
       server: true,
       ...(valide ? {} : { enAttente: true }),
+      ...(motif ? { motDePasseAChanger: motif } : {}),
     };
     storeSession(session);
     afterServerSignIn(user.id, session.name);

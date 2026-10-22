@@ -2550,3 +2550,101 @@ where p.contact_email is not null
   and exists (select 1 from auth.users u where u.id = p.id)
 on conflict (user_id) do update set email = excluded.email, maj_le = now();
 update public.profiles set contact_email = null where contact_email is not null;
+
+-- ─────────────── Mots de passe à changer (sécurité, 22/10/2026) ───────────────
+-- Les mots de passe d'origine, ceux que l'admin distribuait, ont été lisibles
+-- par tout le monde : le dépôt du code était public et les contenait. Chaque
+-- compte créé par l'admin doit donc en choisir un nouveau, une fois. Une
+-- ligne ici = un compte qui doit le faire : l'app le retient sur l'écran
+-- « Nouveau mot de passe » tant que la ligne existe.
+--
+-- La ligne disparaît d'elle-même quand le mot de passe change vraiment
+-- (trigger sur auth.users) : personne ne peut l'effacer autrement. Les routes
+-- admin en posent une à chaque mot de passe provisoire (compte créé, mot de
+-- passe réinitialisé) : le provisoire ne sert qu'à entrer une fois.
+create table if not exists public.mot_de_passe_a_changer (
+  user_id  uuid primary key references auth.users(id) on delete cascade,
+  motif    text not null default 'origine' check (motif in ('origine', 'provisoire')),
+  depuis   timestamptz not null default now()
+);
+
+alter table public.mot_de_passe_a_changer enable row level security;
+
+drop policy if exists "mot_de_passe_a_changer: je lis le mien" on public.mot_de_passe_a_changer;
+create policy "mot_de_passe_a_changer: je lis le mien"
+  on public.mot_de_passe_a_changer for select to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists "mot_de_passe_a_changer: l'admin lit tout" on public.mot_de_passe_a_changer;
+create policy "mot_de_passe_a_changer: l'admin lit tout"
+  on public.mot_de_passe_a_changer for select to authenticated
+  using ((select public.is_league_admin()));
+
+-- Lecture seule pour l'app : la ligne naît par les routes admin (clé
+-- secrète) et meurt par le trigger.
+revoke all on public.mot_de_passe_a_changer from anon, authenticated;
+grant select on public.mot_de_passe_a_changer to authenticated;
+
+create or replace function public.mot_de_passe_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from public.mot_de_passe_a_changer where user_id = new.id;
+  return new;
+exception when others then
+  -- Jamais au prix d'un changement de mot de passe refusé.
+  return new;
+end;
+$$;
+
+revoke execute on function public.mot_de_passe_change() from public, anon, authenticated;
+
+drop trigger if exists on_auth_password_changed on auth.users;
+create trigger on_auth_password_changed
+  after update of encrypted_password on auth.users
+  for each row
+  when (old.encrypted_password is distinct from new.encrypted_password)
+  execute function public.mot_de_passe_change();
+
+-- Les étapes qui ne se jouent qu'une fois, quelle que soit la migration qui
+-- les porte : le schéma est rejoué à chaque changement, elles non.
+create table if not exists public.etapes_uniques (
+  etape    text primary key,
+  faite_le timestamptz not null default now()
+);
+alter table public.etapes_uniques enable row level security;
+revoke all on public.etapes_uniques from anon, authenticated;
+
+-- Une fois : tous les comptes nés d'un mot de passe d'origine, c'est-à-dire
+-- tous sauf les inscriptions libres (le joueur y choisit le sien) et les
+-- comptes Google ou Apple (sans mot de passe).
+do $$
+begin
+  if not exists (select 1 from public.etapes_uniques where etape = 'mots-de-passe-origine-2026-10') then
+    insert into public.mot_de_passe_a_changer (user_id, motif)
+    select u.id, 'origine'
+    from auth.users u
+    where coalesce(u.raw_user_meta_data ->> 'inscription', '') <> 'libre'
+      and coalesce(u.raw_app_meta_data ->> 'provider', 'email') = 'email'
+      and coalesce(u.encrypted_password, '') <> ''
+    on conflict (user_id) do nothing;
+    insert into public.etapes_uniques (etape) values ('mots-de-passe-origine-2026-10');
+  end if;
+end;
+$$;
+
+-- Le registre des migrations (créé par lib/server/migrate.ts) restait
+-- ouvert à l'API publique, sans règle : n'importe qui pouvait y écrire, et
+-- faire sauter une migration en y inscrivant son empreinte d'avance. Fermé :
+-- seule la migration elle-même, propriétaire de la base, y touche.
+do $$
+begin
+  if to_regclass('public.schema_migrations') is not null then
+    alter table public.schema_migrations enable row level security;
+    revoke all on public.schema_migrations from anon, authenticated;
+  end if;
+end;
+$$;

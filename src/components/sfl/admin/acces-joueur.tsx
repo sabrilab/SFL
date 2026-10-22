@@ -6,18 +6,38 @@
 // table des comptes est figée à la compilation, et lui n'y était pas. Il
 // fallait relancer un générateur puis redéployer — autant dire jamais.
 //
-// Désormais l'ajout fabrique ses accès et crée son compte dans la foulée,
-// et cet écran les montre une fois, prêts à être copiés et envoyés.
+// Désormais l'ajout crée son compte dans la foulée, avec un mot de passe
+// PROVISOIRE tiré au hasard, que cet écran montre une fois, prêt à être
+// copié et envoyé. Le joueur en choisit un à lui en se connectant. S'il avait
+// déjà un compte, son mot de passe ne se lit nulle part : un bouton lui en
+// donne un provisoire.
 
 import { useEffect, useState } from "react";
-import { Check, Copy, KeyRound, AlertTriangle } from "lucide-react";
+import { Check, Copy, KeyRound, AlertTriangle, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { supabase } from "@/lib/supabase";
+import { jetonServeur } from "@/lib/sfl/auth/session";
 
 interface Acces {
   user: string;
-  password: string;
+  password?: string;
   deja?: boolean;
+}
+
+async function appel(route: string, name: string): Promise<Acces & { error?: string }> {
+  const jeton = await jetonServeur();
+  if (!jeton) {
+    return {
+      user: "",
+      error:
+        "Ta session n'est pas vérifiée par le serveur : impossible de créer un compte. Déconnecte-toi puis reconnecte-toi.",
+    };
+  }
+  const r = await fetch(route, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${jeton}` },
+    body: JSON.stringify({ name }),
+  });
+  return (await r.json()) as Acces & { error?: string };
 }
 
 export function AccesJoueur({
@@ -31,6 +51,7 @@ export function AccesJoueur({
   const [acces, setAcces] = useState<Acces | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [copie, setCopie] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!nom) return;
@@ -40,30 +61,10 @@ export function AccesJoueur({
     // à zéro sans que l'effet ait à le faire.
     (async () => {
       try {
-        const { data } = await supabase().auth.getSession();
-        const accessToken = data.session?.access_token ?? null;
-        if (!accessToken) {
-          if (!annule)
-            setErreur(
-              "Ta session n'est pas vérifiée par le serveur : impossible de créer un compte. Déconnecte-toi puis reconnecte-toi."
-            );
-          return;
-        }
-        const r = await fetch("/api/comptes/creer", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ accessToken, name: nom }),
-        });
-        const j = (await r.json()) as Acces & { error?: string };
+        const j = await appel("/api/comptes/creer", nom);
         if (annule) return;
-        if (j.error) {
-          setErreur(j.error);
-          // Même en cas d'échec de création, les accès sont connus : ils se
-          // déduisent du nom. Autant les montrer.
-          if (j.user && j.password) setAcces({ user: j.user, password: j.password });
-        } else {
-          setAcces(j);
-        }
+        if (j.error) setErreur(j.error);
+        else setAcces(j);
       } catch {
         if (!annule) setErreur("Serveur injoignable.");
       }
@@ -74,7 +75,23 @@ export function AccesJoueur({
     };
   }, [nom]);
 
-  const texte = acces ? `${nom}\nIdentifiant : ${acces.user}\nMot de passe : ${acces.password}` : "";
+  async function provisoire() {
+    if (!nom) return;
+    setBusy(true);
+    setErreur(null);
+    try {
+      const j = await appel("/api/comptes/reinitialiser", nom);
+      if (j.error) setErreur(j.error);
+      else setAcces({ user: j.user, password: j.password });
+    } catch {
+      setErreur("Serveur injoignable.");
+    }
+    setBusy(false);
+  }
+
+  const texte = acces?.password
+    ? `${nom}\nIdentifiant : ${acces.user}\nMot de passe provisoire : ${acces.password}`
+    : "";
 
   return (
     <Dialog open={!!nom} onOpenChange={(o) => !o && onClose()}>
@@ -94,27 +111,42 @@ export function AccesJoueur({
                 <span className="mono-label text-foreground/35">Identifiant</span>
                 <span className="font-mono text-[15px] font-bold">{acces.user}</span>
               </div>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="mono-label text-foreground/35">Mot de passe</span>
-                <span className="font-mono text-[15px] font-bold">{acces.password}</span>
-              </div>
+              {acces.password && (
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="mono-label text-foreground/35">Provisoire</span>
+                  <span className="font-mono text-[15px] font-bold">{acces.password}</span>
+                </div>
+              )}
             </div>
-            <button
-              onClick={() => {
-                void navigator.clipboard?.writeText(texte).then(
-                  () => setCopie(true),
-                  () => {}
-                );
-              }}
-              className="bouton-principal flex items-center justify-center gap-1.5 py-2.5 text-[13.5px] font-bold"
-            >
-              {copie ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-              {copie ? "Copié" : "Copier pour l'envoyer"}
-            </button>
-            {acces.deja && (
-              <p className="text-[12.5px] leading-snug text-foreground/45">
-                Ce joueur avait déjà un compte — voici ses accès, inchangés.
-              </p>
+            {acces.password ? (
+              <button
+                onClick={() => {
+                  void navigator.clipboard?.writeText(texte).then(
+                    () => setCopie(true),
+                    () => {}
+                  );
+                }}
+                className="bouton-principal flex items-center justify-center gap-1.5 py-2.5 text-[13.5px] font-bold"
+              >
+                {copie ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                {copie ? "Copié" : "Copier pour l'envoyer"}
+              </button>
+            ) : (
+              acces.deja && (
+                <>
+                  <p className="text-[12.5px] leading-snug text-foreground/45">
+                    Ce joueur avait déjà un compte. Son mot de passe n&apos;est connu que de lui.
+                  </p>
+                  <button
+                    onClick={() => void provisoire()}
+                    disabled={busy}
+                    className="bouton-secondaire flex items-center justify-center gap-1.5 py-2.5 text-[13.5px] font-semibold"
+                  >
+                    {busy ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
+                    Lui donner un mot de passe provisoire
+                  </button>
+                </>
+              )
             )}
           </>
         )}
@@ -126,10 +158,12 @@ export function AccesJoueur({
           </p>
         )}
 
-        <p className="text-[11.5px] leading-relaxed text-foreground/30">
-          Ce mot de passe est un mot de passe d&apos;ouverture, pas un secret. Demande-lui de le
-          changer à sa première connexion, dans Réglages.
-        </p>
+        {acces?.password && (
+          <p className="text-[11.5px] leading-relaxed text-foreground/30">
+            Il ne s&apos;affiche qu&apos;ici : envoie-le en privé. À sa première connexion, le joueur
+            en choisit un à lui.
+          </p>
+        )}
       </DialogContent>
     </Dialog>
   );

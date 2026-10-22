@@ -1,7 +1,7 @@
 "use client";
 
 // Bloc « Mon compte » des réglages : qui est connecté, changement du mot de
-// passe par défaut, déconnexion.
+// passe, déconnexion.
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -10,27 +10,25 @@ import {
   changePassword,
   fournisseursActifs,
   getContactEmail,
-  hasCustomPassword,
   saveContactEmail,
   signOut,
   type Fournisseur,
+  type RefusMotDePasse,
 } from "@/lib/sfl/auth/session";
+import { BORNES } from "@/lib/sfl/inscription";
 import { supabase } from "@/lib/supabase";
 import { useSession } from "@/hooks/use-session";
-import { useIsClient } from "@/hooks/use-is-client";
 import { useIdentites } from "@/hooks/use-identites";
 import { cn } from "@/lib/utils";
 import { PseudoCard } from "./pseudo-card";
 
 export function AccountCard() {
   const session = useSession();
-  const isClient = useIsClient();
   const identite = useIdentites();
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [busy, setBusy] = useState(false);
-  const [tick, setTick] = useState(0);
   const [email, setEmail] = useState<string | null>(null);
   const [emailInput, setEmailInput] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
@@ -98,31 +96,30 @@ export function AccountCard() {
   }
 
   if (!session) return null;
-  void tick;
-  const custom = isClient && hasCustomPassword(session.user);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!session || busy) return;
     setBusy(true);
-    const res = await changePassword(session.user, current, next);
+    const res = await changePassword(current, next);
     setBusy(false);
     if (res.ok) {
       toast.success("Mot de passe modifié");
       setOpen(false);
       setCurrent("");
       setNext("");
-      setTick((t) => t + 1);
     } else {
-      toast.error(
-        res.reason === "too-short"
-          ? "Six caractères minimum."
-          : res.reason === "unavailable"
-            ? session.server
-              ? "Serveur injoignable — réessaie dans un instant."
-              : "Reconnecte-toi d'abord avec ton mot de passe d'origine : le mot de passe ne se change qu'avec une connexion vérifiée."
-            : "Mot de passe actuel incorrect."
-      );
+      const messages: Record<RefusMotDePasse, string> = {
+        "too-short": `${BORNES.motDePasse} caractères minimum.`,
+        weak: "Trop facile à deviner. Choisis-en un autre.",
+        "same-password": "C'est déjà ton mot de passe.",
+        "bad-password": "Mot de passe actuel incorrect.",
+        reauth: "Reconnecte-toi, puis réessaie.",
+        unavailable: session.server
+          ? "Serveur injoignable — réessaie dans un instant."
+          : "Reconnecte-toi d'abord : le mot de passe ne se change qu'avec une connexion vérifiée.",
+      };
+      toast.error(messages[res.reason]);
     }
   }
 
@@ -145,13 +142,6 @@ export function AccountCard() {
         </div>
 
         {serverSession && <PseudoCard />}
-
-        {isClient && !custom && (
-          <p className="mt-3 rounded-2xl bg-primary/10 px-3.5 py-2.5 text-[12.5px] leading-snug text-primary">
-            Tu utilises encore le mot de passe donné par l&apos;admin. Change-le : il est
-            écrit en clair sur sa liste.
-          </p>
-        )}
 
         {/* Email de contact — la clé de la future connexion Google/Apple */}
         {serverSession && (
@@ -210,7 +200,7 @@ export function AccountCard() {
             <input
               type="password"
               autoComplete="new-password"
-              placeholder="Nouveau mot de passe (6 caractères min.)"
+              placeholder={`Nouveau mot de passe (${BORNES.motDePasse} caractères min.)`}
               value={next}
               onChange={(e) => setNext(e.target.value)}
               className="glass-soft rounded-full px-4 py-3 text-[14px] font-medium outline-none placeholder:text-foreground/30"
