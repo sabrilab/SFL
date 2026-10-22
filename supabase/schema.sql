@@ -2165,5 +2165,6 @@ grant select on public.consentements to authenticated;
 grant insert (version, hors_app, parent, ou) on public.consentements to authenticated;
 
 -- Le journal d'usage ne garde que 13 mois, comme la politique le dit : le
--- plus ancien part à chaque migration du schéma.
+-- plus ancien part chaque lundi (/api/convocation/cron) et à chaque
+-- migration du schéma.
 delete from public.activity where created_at < now() - interval '13 months';

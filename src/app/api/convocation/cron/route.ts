@@ -8,6 +8,9 @@
 //      passé) et en crée une neuve pour le prochain dimanche — même heure,
 //      même lieu, même effectif que la précédente, journée suivante.
 //
+// Au passage, elle vide le journal d'usage de ce qui a plus de 13 mois, comme
+// le promet la politique de confidentialité (même sans nouvelle semaine).
+//
 // L'expiration du vendredi minuit et la révélation des équipes du vendredi
 // 19h n'ont PAS besoin du serveur : elles sont jugées à l'affichage par
 // lib/sfl/convocation-temps.ts, à l'heure de Paris. Le seul travail qui doit
@@ -65,6 +68,11 @@ export async function GET(req: NextRequest) {
     }
 
     try {
+      // Le journal d'usage : 13 mois au plus (politique de confidentialité).
+      await client
+        .query("delete from public.activity where created_at < now() - interval '13 months'")
+        .catch((e) => console.error("[cron] journal d'usage :", e instanceof Error ? e.message : e));
+
       const { rows } = await client.query<DerniereConvocation>(
         `select id, journee, heure, lieu, effectif, date_label, statut
            from public.convocations
