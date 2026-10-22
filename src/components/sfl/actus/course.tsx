@@ -4,7 +4,7 @@
 // très bien, la course », et il garde les terrains et les cartes d'avant les
 // Actus). Pourquoi la course : le journal d'activité montre que les joueurs
 // viennent surtout se situer (Ma carte est la page où ils restent le plus).
-//   · l'en-tête : SFL · Bola · Bola Team en sigles, la loupe, puis le
+//   · l'en-tête : SFL · Bola · Bola Team en sigles et la loupe (EnteteLigue), puis le
 //     classement en cartes qu'on fait défiler, centré sur toi, par catégorie
 //     (Pépite d'Or, Buteurs, Passeurs, MVP) ; « Tout » ouvre les classements
 //     complets, « Match » les journées (vues.tsx) ;
@@ -13,14 +13,12 @@
 //     cartes des joueurs (CarteJournee), et ses scènes en motion design.
 // Les modules « toi » : lib/sfl/actus-toi.ts et cine-toi.tsx.
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft } from "lucide-react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
-import { BoutonRecherche } from "@/components/layout/bouton-recherche";
-import { SigleLigue } from "@/components/sfl/choix-ligue";
+import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { CarteJournee } from "@/components/sfl/carte-journee";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
@@ -63,41 +61,6 @@ function Plan({
         </figcaption>
       )}
     </figure>
-  );
-}
-
-/** SFL · Bola · Team, en sigles : le plein est la ligue où l'on est. */
-function Sigles({
-  taille = 14,
-  className,
-}: {
-  taille?: number;
-  className?: string;
-}) {
-  const liens = [
-    { href: "/ligue", ligue: "sfl" as const, on: true },
-    { href: "/ligue-vierge", ligue: "bola" as const, on: false },
-    { href: "/bola-team", ligue: "team" as const, on: false },
-  ];
-  return (
-    <nav
-      aria-label="Ligue"
-      className={cn("flex items-center gap-4", className)}
-    >
-      {liens.map((l) => (
-        <Link
-          key={l.href}
-          href={l.href}
-          aria-current={l.on ? "page" : undefined}
-          className={cn(
-            "py-1.5 transition-colors",
-            l.on ? "text-foreground" : "text-foreground/30",
-          )}
-        >
-          <SigleLigue ligue={l.ligue} hauteur={taille} />
-        </Link>
-      ))}
-    </nav>
   );
 }
 
@@ -242,11 +205,8 @@ export function LaCourse({ vueDepart = "fil" }: { vueDepart?: Vue }) {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-4">
-        <div className="flex items-center justify-between px-5">
-          <h1 className="sr-only">Actus</h1>
-          <Sigles taille={16} />
-          <BoutonRecherche className="size-10" />
-        </div>
+        <h1 className="sr-only">Actus</h1>
+        <EnteteLigue actif="/ligue" className="px-5" />
         <Ticker moi={me} onTout={() => aller("classements")} />
         <div className="px-5">
           <button type="button" onClick={() => aller("matchs")} className="glass w-full rounded-full py-2.5 text-[14px] font-semibold">

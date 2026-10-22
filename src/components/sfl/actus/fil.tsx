@@ -1,43 +1,31 @@
 "use client";
 
-// Le fil des Actus — l'onglet qui remplace la Ligue (Sabri, 22/10). En haut,
-// « League | Bola | Team » (choix-ligue.tsx), puis un seul sélecteur, comme
-// la Ligue d'avant, sans « Actus » puisqu'on y est : Classement, Match (Sabri, 22/10 : « faire un
-// mix des deux et un équilibre » ; les classements complets et les matchs
-// sont dans vues.tsx). Le fil, lui, se déroule en cinématiques
-// (cinematiques.tsx) : les dimanches joués, du plus récent au plus ancien
-// (la liste : lib/sfl/actus.ts), la prochaine journée glissée entre les
-// premières scènes, et à la fin la saison passée.
-// Pas d'en-tête de compte sur chaque scène (« moins Instagram ») : un
-// chapitre par dimanche (« J2 · 18 oct. »), puis ses scènes, chacune avec sa
-// légende et, à droite, la partager au Vestiaire. Toucher une scène la
-// rejoue ; toucher une carte l'ouvre en grand.
+// Les publications des Actus : une scène (cinematiques.tsx) et sa légende,
+// avec, à droite, la partager au Vestiaire. Pas d'en-tête de compte sur
+// chaque scène (« moins Instagram », Sabri, 22/10). L'onglet lui-même, la
+// course et les dimanches, est dans course.tsx ; il les pose en mode film
+// (ModeFil). Toucher une scène la rejoue ; toucher une carte l'ouvre en grand.
 
 import Link from "next/link";
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronRight, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMyPlayer } from "@/components/sfl/player-provider";
-import { SaisonArchiveProvider, useSeason } from "@/components/sfl/season-provider";
-import { PresencePanel } from "@/components/sfl/presence-panel";
+import { useSeason } from "@/components/sfl/season-provider";
 import { VoteFigures } from "@/components/sfl/vote-figures";
-import { BoutonRecherche } from "@/components/layout/bouton-recherche";
-import { BoutonStats } from "@/components/layout/bouton-stats";
-import { ChoixLigue } from "@/components/sfl/choix-ligue";
 import { useIdentites } from "@/hooks/use-identites";
 import { useIsClient } from "@/hooks/use-is-client";
-import { filDeSaison, buteursDe, type Actu } from "@/lib/sfl/actus";
+import { buteursDe, type Actu } from "@/lib/sfl/actus";
 import { voteOuvert } from "@/lib/sfl/convocation-temps";
 import { rankPlayers } from "@/lib/sfl/engine";
 import { isHidden } from "@/lib/sfl/hidden";
 import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
-import { journeeJouee, saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
+import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { TROPHEES, NOM_METAL, metal } from "@/lib/sfl/trophees";
 import { journeeAvecVote } from "@/lib/sfl/votes";
 import { preparerPiece, type PieceLigue } from "@/lib/sfl/vestiaire";
-import { ANTON, Ecran } from "./ecran";
+import { Ecran } from "./ecran";
 import { CineBadge, CineChiffre, CineCourse, CineDuo, CineEquipe, CineMontent, CineMvp, CinePodium, CinePresents, CineRecap, CineScore, CineSurface, CineToi, FORMAT_EQUIPE, FORMAT_MVP, FORMAT_SCORE } from "./cinematiques";
-import { VueClassements, VueMatchs } from "./vues";
 import { cn } from "@/lib/utils";
 
 const DEF = Object.fromEntries(TROPHEES.map((d) => [d.id, d]));
@@ -226,22 +214,6 @@ function PublicationPost({
         )}
       </div>
     </article>
-  );
-}
-
-/**
- * Le chapitre d'un dimanche : une seule fois par journée, au lieu d'un
- * en-tête sur chaque publication. Le numéro en grand, la date en petit.
- */
-function Chapitre({ j, date, saison }: { j: number; date: string; saison?: string }) {
-  return (
-    <div className="actu-chapitre flex items-end gap-3 px-5 pt-3">
-      <span className="text-[44px] leading-[0.8] tracking-tight" style={{ fontFamily: ANTON }}>
-        J{j}
-      </span>
-      <span className="mono-label pb-0.5 text-foreground/45">{[saison, date].filter(Boolean).join(" · ")}</span>
-      <span className="mb-1.5 h-px flex-1 bg-foreground/12" />
-    </div>
   );
 }
 
@@ -476,72 +448,6 @@ export function TonDimanche({ j, date }: { j: number; date: string }) {
   );
 }
 
-/* ------------------------------- Une saison ------------------------------- */
-
-function FilSaison({ enCours, onClassements, nom, apres }: { enCours: boolean; onClassements: () => void; nom?: string; apres?: ReactNode }) {
-  const { saison, journees } = useSeason();
-  const { me } = useMyPlayer();
-  const fil = useMemo(() => filDeSaison(saison, journees, me, enCours), [saison, journees, me, enCours]);
-  // Le fil se déroule par paquets : on ne construit que ce qu'on approche.
-  const [n, setN] = useState(8);
-  const fin = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = fin.current;
-    if (!el) return;
-    const o = new IntersectionObserver(([e]) => e.isIntersecting && setN((x) => x + 8), { rootMargin: "1200px 0px" });
-    o.observe(el);
-    return () => o.disconnect();
-  }, [fil.length, n]);
-  const dernier = fil[0];
-  return (
-    <>
-      {enCours && dernier && <Chapitre j={dernier.j} date={dernier.date} />}
-      {enCours && dernier && <TonDimanche j={dernier.j} date={dernier.date} />}
-      {fil.slice(0, n).map((a, i) => (
-        <Fragment key={a.id}>
-          {/* La prochaine journée, entre les premières publications : on y répond en passant. */}
-          {i === 2 && apres}
-          {(i === 0 ? !enCours : a.j !== fil[i - 1].j) && <Chapitre j={a.j} date={a.date} />}
-          <PublicationActu a={a} saison={nom} enCours={enCours} onClassements={onClassements} />
-        </Fragment>
-      ))}
-      {fil.length <= 2 && apres}
-      {n < fil.length && <div ref={fin} className="h-px" />}
-    </>
-  );
-}
-
-/** La saison passée, au bout du fil : montée seulement quand on y arrive. */
-function SaisonPassee({ onClassements }: { onClassements: () => void }) {
-  const { saison } = useSeason();
-  const archive = saison.archives?.[saison.archives.length - 1];
-  const s = useMemo(() => (archive ? saisonDepuisArchive(archive) : null), [archive]);
-  const [visible, setVisible] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || visible) return;
-    const o = new IntersectionObserver(([e]) => e.isIntersecting && setVisible(true), { rootMargin: "900px 0px" });
-    o.observe(el);
-    return () => o.disconnect();
-  }, [visible]);
-  if (!archive || !s) return null;
-  return (
-    <>
-      <div ref={ref} className="flex items-center gap-3 px-5 pt-2">
-        <span className="h-px flex-1 bg-foreground/10" />
-        <span className="mono-label text-foreground/40">{archive.nom}</span>
-        <span className="h-px flex-1 bg-foreground/10" />
-      </div>
-      {visible && (
-        <SaisonArchiveProvider saison={s}>
-          <FilSaison enCours={false} onClassements={onClassements} nom={archive.nom} />
-        </SaisonArchiveProvider>
-      )}
-    </>
-  );
-}
-
 /* ---------------------------------- Le fil ---------------------------------- */
 
 export function VoteDuJour({ me }: { me: string }) {
@@ -561,86 +467,5 @@ export function VoteDuJour({ me }: { me: string }) {
         </section>
       ))}
     </>
-  );
-}
-
-type Vue = "actus" | "classements" | "matchs";
-// Pas de bouton « Actus » : on y est déjà (Sabri, 22/10). Toucher le bouton
-// actif ramène au fil.
-const VUES: [Vue, string][] = [
-  ["classements", "Classement"],
-  ["matchs", "Match"],
-];
-
-/**
- * L'onglet : « League | Bola | Team », puis deux boutons, Classement et Match,
- * comme la Ligue d'avant (Sabri, 22/10 : « faire un mix des deux et un équilibre ») : le fil
- * en cinématiques, les classements complets, les matchs.
- */
-export function FilActus({
-  vueDepart = "actus",
-  variante,
-}: {
-  vueDepart?: Vue;
-  /** Un autre fil à la place de celui-ci (les variantes, /ligue/fil). */
-  variante?: (ouvrirClassements: () => void) => ReactNode;
-}) {
-  const { me } = useMyPlayer();
-  const [vue, setVue] = useState<Vue>(vueDepart);
-
-  return (
-    <div className="mx-auto flex w-full max-w-[470px] flex-col gap-6 pt-2 pb-8 sm:pt-6">
-      <div className="flex items-center justify-between px-5">
-        <h1 className="sr-only">Actus</h1>
-        <ChoixLigue actif="/ligue" />
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <BoutonStats className="size-10 sm:size-11" />
-          <BoutonRecherche className="size-10 sm:size-11" />
-        </div>
-      </div>
-      <div className="-mt-1 px-5">
-        <div className="flex gap-2" role="tablist" aria-label="Vue">
-          {VUES.map(([id, label]) => (
-            <button
-              key={id}
-              role="tab"
-              aria-selected={vue === id}
-              onClick={() => {
-                setVue(vue === id ? "actus" : id);
-                document.getElementById("app-scroll")?.scrollTo({ top: 0 });
-              }}
-              className={cn(
-                "flex-1 px-3 py-2.5 text-[14px] font-semibold whitespace-nowrap",
-                vue === id ? "bouton-principal" : "bouton-secondaire",
-                id === "classements" ? "bouton--or" : "bouton--vert"
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-      {vue === "classements" ? (
-        <VueClassements vote={<VoteDuJour me={me} />} />
-      ) : vue === "matchs" ? (
-        <VueMatchs />
-      ) : variante ? (
-        variante(() => setVue("classements"))
-      ) : (
-        <>
-          <VoteDuJour me={me} />
-          <FilSaison
-            enCours
-            onClassements={() => setVue("classements")}
-            apres={
-              <div className="px-4">
-                <PresencePanel compact />
-              </div>
-            }
-          />
-          <SaisonPassee onClassements={() => setVue("classements")} />
-        </>
-      )}
-    </div>
   );
 }

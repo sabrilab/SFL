@@ -17,7 +17,7 @@ import { carteNeutre } from "@/components/sfl/qui-vient";
 import { useSeason } from "@/components/sfl/season-provider";
 import { FeuilleBola } from "@/components/sfl/matchs/feuille-bola";
 import { Nom } from "@/components/sfl/nom";
-import { ChoixLigue } from "@/components/sfl/choix-ligue";
+import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { useSession } from "@/hooks/use-session";
 import { classementAVie, compterMatchs, coupDEnvoiPasse, feuilleOuverte, type Classe, type MatchCompte } from "@/lib/sfl/ligue-vierge";
 import { DEMO_LIGUE_VIERGE, demoFeuille, demoMatchs } from "@/lib/sfl/ligue-vierge-demo";
@@ -221,7 +221,7 @@ export default function LigueViergePage() {
     <div className="mx-auto flex w-full max-w-[470px] flex-col gap-6 px-5 pt-2 pb-8 sm:pt-6">
       <div className="flex flex-col gap-2.5">
         <h1 className="sr-only">Bola</h1>
-        <ChoixLigue actif="/ligue-vierge" />
+        <EnteteLigue actif="/ligue-vierge" />
         {vus && vus.length > 0 && (
           <span className="mono-label text-foreground/40">
             {vus.length} match{vus.length > 1 ? "s" : ""} · {classement.length} joueur{classement.length > 1 ? "s" : ""}

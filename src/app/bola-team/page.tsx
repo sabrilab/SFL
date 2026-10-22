@@ -22,7 +22,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { ChoixLigue } from "@/components/sfl/choix-ligue";
+import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
@@ -230,7 +230,7 @@ export default function BolaTeamPage() {
   return (
     <div className="mx-auto flex w-full max-w-[470px] flex-col gap-7 px-5 pt-2 pb-8 sm:pt-6">
       <h1 className="sr-only">Team</h1>
-      <ChoixLigue actif="/bola-team" />
+      <EnteteLigue actif="/bola-team" />
 
       {invitations.length > 0 && (
         <section className="flex flex-col gap-2">
