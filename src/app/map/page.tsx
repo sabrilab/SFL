@@ -60,7 +60,7 @@ import { ovr, rankPlayers } from "@/lib/sfl/engine";
 import { ProfilJoueur } from "@/components/sfl/profil-joueur";
 import { CatalogueJoueurs } from "@/components/sfl/map/catalogue-joueurs";
 import { cleVille, type VillePlan } from "@/components/sfl/map/joueurs";
-import { villeDe } from "@/lib/sfl/villes";
+import { villeOuLigue } from "@/lib/sfl/villes";
 import { photoPerso } from "@/lib/sfl/photos";
 import { nomAffiche } from "@/lib/sfl/identites";
 import { useVillesRevision } from "@/hooks/use-villes";
@@ -511,8 +511,9 @@ export default function MapPage() {
     void revPhotos;
     void revNoms;
     const parVille = new Map<string, VillePlan>();
+    // Qui n'a pas donné sa ville est dans celle de la ligue.
     for (const pl of players) {
-      const v = villeDe(pl.name);
+      const v = villeOuLigue(pl.name);
       if (!v) continue;
       const id = cleVille(v.ville);
       const g = parVille.get(id) ?? { id, ville: v.ville, lat: v.lat, lng: v.lng, joueurs: [] };

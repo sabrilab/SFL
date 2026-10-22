@@ -119,6 +119,24 @@ export function villeDe(nom: string): VilleJoueur | null {
   return DEMO_VILLES && !villesReelles() ? villeDemo(nom) : null;
 }
 
+/**
+ * La ville de la ligue : ses terrains sont tout autour de Lille (Marcq,
+ * Croix, Roubaix, Tourcoing, Lezennes…). Qui n'a pas donné la sienne y est.
+ */
+export const VILLE_LIGUE: VilleJoueur = { ville: "Lille", lat: 50.6329, lng: 3.0586 };
+
+/**
+ * La ville d'un joueur de la ligue sur la Map : la sienne s'il l'a donnée
+ * (null s'il s'est rendu invisible), sinon celle de la ligue (Sabri, 22/10 :
+ * « ils ne voient personne » — 4 joueurs sur 98 avaient une ville).
+ */
+export function villeOuLigue(nom: string): VilleJoueur | null {
+  const e = lire()[nom];
+  if (e) return e.c ? null : { ville: e.v, lat: e.a, lng: e.o };
+  if (DEMO_VILLES && !villesReelles()) return villeDemo(nom);
+  return VILLE_LIGUE;
+}
+
 /** La ville que le joueur s'est donnée, même invisible (pour sa propre fiche). */
 export function maVille(nom: string): (VilleJoueur & { cachee: boolean }) | null {
   const e = lire()[nom];
