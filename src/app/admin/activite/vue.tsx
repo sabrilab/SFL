@@ -3,22 +3,29 @@
 // Ce que la page Activité & rétention affiche, une fois le journal lu.
 //
 // L'ordre suit les questions qu'on se pose en arrivant :
-//   1. Ce qu'il faut retenir — les conclusions, calculées sur les vraies
-//      données (lib/sfl/retention.ts), chacune avec la chose à faire ;
-//   2. les chiffres de la période et leur évolution ;
-//   3. la croissance — une courbe qu'on parcourt du doigt, au choix de la
+//   1. les chiffres de la période et leur évolution ;
+//   2. la croissance — une courbe qu'on parcourt du doigt, au choix de la
 //      mesure, avec la période d'avant en pointillé ;
+//   3. ce qu'il faut retenir — les conclusions, calculées sur les vraies
+//      données (lib/sfl/retention.ts), chacune avec la chose à faire, en
+//      une rangée qu'on fait glisser et qu'on peut masquer ;
 //   4. qui est là aujourd'hui (nouveaux, fidèles, à risque, décrochés…) ;
 //   5. la rétention — combien reviennent, cohorte par cohorte ;
 //   6. ce qui fait revenir — les gestes de la première semaine ;
 //   7. quand la ligue ouvre l'app ;
-//   8. ce qu'ils y font, les joueurs à relancer, le détail par joueur.
+//   8. ce qu'ils y font, les pays choisis pour la carte, les joueurs à
+//      relancer, le détail par joueur.
+//
+// Sabri, le 22/10 : « les conseils que tu donnes, ils peuvent pas être
+// skipés. Ça veut dire qu'on voit pas directement les courbes ». Les
+// conseils passent donc sous la courbe, en une seule rangée, et une rangée de
+// raccourcis, collée en haut, mène à chaque partie.
 //
 // Les données arrivent toutes faites (`page.tsx` lit le journal) : cette vue
 // ne fait que les analyser et les montrer.
 
-import { useMemo, useState } from "react";
-import { ChevronDown, Lightbulb, Loader2, Mail, RefreshCw, TrendingDown, TrendingUp, TriangleAlert } from "lucide-react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import { ChevronDown, ChevronUp, Lightbulb, Loader2, Mail, RefreshCw, TrendingDown, TrendingUp, TriangleAlert } from "lucide-react";
 import {
   analyser,
   DAY,
@@ -35,12 +42,22 @@ import {
   type MetriqueId,
   type Profil,
 } from "@/lib/sfl/retention";
+import { emojiDrapeau, unPays } from "@/lib/sfl/photo-studio";
 import { cn } from "@/lib/utils";
 import { CarteHoraire, Cohortes, Comparaison, Courbe, encre } from "./graphiques";
+
+/** Une carte au drapeau faite au studio photo ; `pays` manque avant le 22/10. */
+export interface Drapeau {
+  name: string;
+  pays: string | null;
+  at: number;
+}
 
 export interface DonneesActivite {
   evenements: Evenement[];
   profiles: Profil[];
+  /** Les cartes au drapeau, ou null si la base ne garde pas encore le pays. */
+  drapeaux: Drapeau[] | null;
   /** Instant de la lecture — figé pour garder le rendu pur. */
   now: number;
 }
@@ -89,9 +106,9 @@ function relative(ts: number, now: number): string {
 
 /* ------------------------------- briques UI ------------------------------ */
 
-function Section({ titre, sous, children }: { titre: string; sous?: string; children: React.ReactNode }) {
+function Section({ id, titre, sous, children }: { id?: string; titre: string; sous?: string; children: React.ReactNode }) {
   return (
-    <section className="glass rounded-3xl p-5">
+    <section id={id ? `activite-${id}` : undefined} className="glass scroll-mt-16 rounded-3xl p-5">
       <h2 className="text-[17px] font-bold tracking-tight">{titre}</h2>
       {sous && <p className="mt-0.5 text-[12px] leading-snug text-foreground/45">{sous}</p>}
       <div className="mt-4">{children}</div>
@@ -145,30 +162,72 @@ function Barres({ lignes }: { lignes: { label: string; value: number }[] }) {
   );
 }
 
+/** Une conclusion, dans la rangée : le titre et la chose à faire ; le détail en touchant. */
 function CarteConclusion({ c }: { c: Conclusion }) {
+  const [ouvert, setOuvert] = useState(false);
   const Icone = c.ton === "bon" ? TrendingUp : c.ton === "alerte" ? TriangleAlert : Lightbulb;
   return (
-    <div className="glass-soft rounded-2xl p-3.5">
-      <div className="flex gap-3">
+    <button
+      onClick={() => setOuvert((o) => !o)}
+      aria-expanded={ouvert}
+      className="glass-soft flex w-[78%] max-w-[320px] shrink-0 snap-start flex-col rounded-2xl p-3.5 text-left"
+    >
+      <div className="flex items-start gap-2.5">
         <span
           className={cn(
-            "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full",
+            "flex size-6 shrink-0 items-center justify-center rounded-full",
             c.ton === "alerte" ? "bg-foreground text-background" : "bg-foreground/10"
           )}
         >
-          <Icone className="size-3.5" />
+          <Icone className="size-3" />
         </span>
-        <div className="min-w-0">
-          <p className="text-[14px] leading-snug font-bold">{c.titre}</p>
-          <p className="mt-1 text-[12.5px] leading-snug text-foreground/55">{c.detail}</p>
-          <p className="mt-2 text-[12.5px] leading-snug">
-            <span className="mono-label mr-1.5 text-[8.5px] text-foreground/45">À faire</span>
-            {c.action}
-          </p>
-        </div>
+        <p className="text-[13.5px] leading-snug font-bold">{c.titre}</p>
       </div>
-    </div>
+      {ouvert && <p className="mt-2 text-[12px] leading-snug text-foreground/55">{c.detail}</p>}
+      <p className={cn("mt-2 text-[12.5px] leading-snug", !ouvert && "line-clamp-3")}>
+        <span className="mono-label mr-1.5 text-[8.5px] text-foreground/45">À faire</span>
+        {c.action}
+      </p>
+    </button>
   );
+}
+
+/** Les conseils masqués ou non : un choix de l'appareil, gardé d'une visite à l'autre. */
+const CLE_CONSEILS = "sfl-activite-conseils";
+const EVT_CONSEILS = "sfl-activite-conseils";
+function lireMasques(): boolean {
+  try {
+    return localStorage.getItem(CLE_CONSEILS) === "masques";
+  } catch {
+    return false;
+  }
+}
+function ecrireMasques(v: boolean) {
+  try {
+    if (v) localStorage.setItem(CLE_CONSEILS, "masques");
+    else localStorage.removeItem(CLE_CONSEILS);
+  } catch {
+    // Stockage refusé : le choix ne vaut que pour cette visite.
+  }
+  window.dispatchEvent(new Event(EVT_CONSEILS));
+}
+function abonneConseils(f: () => void) {
+  window.addEventListener(EVT_CONSEILS, f);
+  return () => window.removeEventListener(EVT_CONSEILS, f);
+}
+
+/** Les raccourcis, dans l'ordre de la page. */
+const PARTIES = [
+  { id: "courbes", label: "Courbes" },
+  { id: "conseils", label: "Conseils" },
+  { id: "qui", label: "Qui est là" },
+  { id: "retention", label: "Rétention" },
+  { id: "quand", label: "Quand" },
+  { id: "pays", label: "Pays" },
+  { id: "joueurs", label: "Joueurs" },
+] as const;
+function allerA(id: string) {
+  document.getElementById(`activite-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 /* ---------------------------------- vue ---------------------------------- */
@@ -192,7 +251,7 @@ export function ActiviteVue({
   const [metrique, setMetrique] = useState<MetriqueId>("hebdo");
   const [tri, setTri] = useState<"recent" | "temps" | "actions">("recent");
   const [ouverte, setOuverte] = useState<FamilleId | null>(null);
-  const [toutes, setToutes] = useState(false);
+  const masques = useSyncExternalStore(abonneConseils, lireMasques, () => false);
 
   const jours = PERIODES.find((p) => p.id === periode)?.days ?? null;
   // Le journal et les comptes du public choisi, et la part des admins dans
@@ -207,12 +266,37 @@ export function ActiviteVue({
     const partAdmins = data.evenements.length
       ? data.evenements.filter((e) => admins.has(e.name)).length / data.evenements.length
       : 0;
-    return { evenements, profiles, admins: [...admins].sort(), ensembleAdmins: admins, partAdmins };
+    const drapeaux = data.drapeaux?.filter((d) => garde(d.name)) ?? null;
+    return { evenements, profiles, drapeaux, admins: [...admins].sort(), ensembleAdmins: admins, partAdmins };
   }, [data, public_]);
   const a = useMemo(
     () => (data && vu ? analyser(vu.evenements, vu.profiles, data.now, jours) : null),
     [data, vu, jours]
   );
+
+  /* ----------------------- les pays choisis pour la carte ---------------- */
+  // Le dernier drapeau de chaque joueur : un joueur qui en essaie trois ne
+  // compte qu'une fois, pour celui qu'il a gardé en dernier.
+  const pays = useMemo(() => {
+    if (!vu?.drapeaux) return null;
+    const dernier = new Map<string, string>();
+    let cartes = 0;
+    let sansPays = 0;
+    for (const d of [...vu.drapeaux].sort((x, y) => x.at - y.at)) {
+      if (!d.pays) {
+        sansPays++;
+        continue;
+      }
+      cartes++;
+      dernier.set(d.name, d.pays);
+    }
+    const compte = new Map<string, number>();
+    for (const p of dernier.values()) compte.set(p, (compte.get(p) ?? 0) + 1);
+    const lignes = [...compte.entries()]
+      .map(([id, n]) => ({ id, n, nom: unPays(id)?.nom ?? id.toUpperCase(), drapeau: emojiDrapeau(id) }))
+      .sort((x, y) => y.n - x.n || x.nom.localeCompare(y.nom, "fr"));
+    return { lignes, joueurs: dernier.size, cartes, sansPays };
+  }, [vu]);
 
   /* ------------------------------- la courbe ----------------------------- */
   const courbe = useMemo(() => {
@@ -313,6 +397,23 @@ export function ActiviteVue({
         ))}
       </div>
 
+      {a && (
+        <nav
+          aria-label="Parties de la page"
+          className="sticky top-0 z-20 -mx-4 -my-1 flex gap-1.5 overflow-x-auto bg-background/80 px-4 py-2 backdrop-blur-xl [scrollbar-width:none]"
+        >
+          {PARTIES.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => allerA(p.id)}
+              className="glass-soft shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold text-foreground/70"
+            >
+              {p.label}
+            </button>
+          ))}
+        </nav>
+      )}
+
       {error && (
         <p className="glass-soft rounded-2xl p-3.5 text-[12.5px] text-[#FF6B5E]">
           {error} — as-tu bien rejoué le script SQL (table activity) ?
@@ -327,28 +428,7 @@ export function ActiviteVue({
 
       {a && courbe && (
         <>
-          {/* 1. Ce qu'il faut retenir */}
-          <Section titre="Ce qu'il faut retenir" sous="Calculé sur les vraies données, à chaque ouverture de la page.">
-            <div className="flex flex-col gap-2.5">
-              {(toutes ? a.conclusions : a.conclusions.slice(0, 4)).map((c) => (
-                <CarteConclusion key={c.titre} c={c} />
-              ))}
-              {a.conclusions.length === 0 && (
-                <p className="text-[12.5px] text-foreground/45">Pas encore assez de données pour conclure.</p>
-              )}
-            </div>
-            {a.conclusions.length > 4 && (
-              <button
-                onClick={() => setToutes((t) => !t)}
-                className="mono-label mt-3 flex items-center gap-1 text-foreground/55"
-              >
-                {toutes ? "Moins" : `Les ${a.conclusions.length - 4} autres`}
-                <ChevronDown className={cn("size-3 transition-transform", toutes && "rotate-180")} />
-              </button>
-            )}
-          </Section>
-
-          {/* 2. Les chiffres de la période */}
+          {/* 1. Les chiffres de la période */}
           <div>
             <p className="mono-label mb-2 px-1 text-[9px] text-foreground/40">
               {libellePeriode}
@@ -362,8 +442,8 @@ export function ActiviteVue({
             </div>
           </div>
 
-          {/* 3. La croissance */}
-          <section className="glass rounded-3xl p-5">
+          {/* 2. La croissance */}
+          <section id="activite-courbes" className="glass scroll-mt-16 rounded-3xl p-5">
             <h2 className="text-[17px] font-bold tracking-tight">Croissance</h2>
             <div className="-mx-5 mt-3 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none]">
               {METRIQUES.map((m) => (
@@ -404,8 +484,40 @@ export function ActiviteVue({
             </div>
           </section>
 
+          {/* 3. Ce qu'il faut retenir : une rangée qu'on fait glisser, qu'on peut masquer */}
+          <section id="activite-conseils" className="scroll-mt-16">
+            <div className="mb-2.5 flex items-center justify-between px-1">
+              <h2 className="text-[16px] font-bold tracking-tight">
+                Ce qu&apos;il faut retenir
+                {a.conclusions.length > 0 && (
+                  <span className="ml-1.5 text-[13px] font-semibold text-foreground/40">{a.conclusions.length}</span>
+                )}
+              </h2>
+              {a.conclusions.length > 0 && (
+                <button
+                  onClick={() => ecrireMasques(!masques)}
+                  className="mono-label flex items-center gap-1 text-foreground/55"
+                >
+                  {masques ? "Afficher" : "Masquer"}
+                  {masques ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
+                </button>
+              )}
+            </div>
+            {a.conclusions.length === 0 ? (
+              <p className="px-1 text-[12.5px] text-foreground/45">Pas encore assez de données pour conclure.</p>
+            ) : (
+              !masques && (
+                <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 items-start gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+                  {a.conclusions.map((c) => (
+                    <CarteConclusion key={c.titre} c={c} />
+                  ))}
+                </div>
+              )
+            )}
+          </section>
+
           {/* 4. Qui est là */}
-          <Section titre="Qui est là aujourd'hui" sous={`${totalFamilles} comptes, rangés selon leur dernière venue.`}>
+          <Section id="qui" titre="Qui est là aujourd'hui" sous={`${totalFamilles} comptes, rangés selon leur dernière venue.`}>
             <div className="flex h-3 overflow-hidden rounded-full">
               {a.familles.map((f) =>
                 f.noms.length ? (
@@ -443,7 +555,7 @@ export function ActiviteVue({
           </Section>
 
           {/* 5. La rétention */}
-          <Section titre="Rétention" sous="Sur tout l'historique. Revenu après N jours : rouvert l'app N jours ou plus après sa première venue.">
+          <Section id="retention" titre="Rétention" sous="Sur tout l'historique. Revenu après N jours : rouvert l'app N jours ou plus après sa première venue.">
             <div className="flex flex-col gap-2.5">
               {a.retention
                 .filter((r) => r.eligibles > 0)
@@ -492,7 +604,7 @@ export function ActiviteVue({
           )}
 
           {/* 7. Quand */}
-          <Section titre="Quand la ligue ouvre l'app" sous={`Présences par jour et par heure, ${libellePeriode}.`}>
+          <Section id="quand" titre="Quand la ligue ouvre l'app" sous={`Présences par jour et par heure, ${libellePeriode}.`}>
             <CarteHoraire carte={a.carte} />
           </Section>
 
@@ -504,6 +616,44 @@ export function ActiviteVue({
             <Barres lignes={a.pages} />
           </Section>
 
+          {/* 8 bis. Les pays choisis pour la carte */}
+          <Section
+            id="pays"
+            titre="Pays choisis pour la carte"
+            sous={
+              pays && pays.joueurs > 0
+                ? `Le dernier drapeau de chaque joueur au studio photo · ${pays.joueurs} ${pays.joueurs > 1 ? "joueurs" : "joueur"}, ${pays.cartes} ${pays.cartes > 1 ? "cartes" : "carte"}.`
+                : "Le dernier drapeau de chaque joueur au studio photo."
+            }
+          >
+            {pays && pays.lignes.length > 0 ? (
+              <div className="flex flex-col gap-2.5">
+                {pays.lignes.map((l) => (
+                  <div key={l.id} className="flex items-center gap-3">
+                    <span className="w-[44%] shrink-0 truncate text-[12.5px] font-medium">
+                      <span className="mr-1.5">{l.drapeau}</span>
+                      {l.nom}
+                    </span>
+                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/8">
+                      <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${(l.n / pays.joueurs) * 100}%` }} />
+                    </span>
+                    <span className="w-10 shrink-0 text-right text-[12px] font-bold tabular-nums">{pct(l.n / pays.joueurs)}</span>
+                    <span className="w-6 shrink-0 text-right text-[10.5px] text-foreground/40 tabular-nums">{l.n}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[12.5px] text-foreground/40">
+                Aucun pays enregistré pour l&apos;instant : ils s&apos;enregistrent depuis le 22/10, à chaque carte au drapeau.
+              </p>
+            )}
+            {pays && pays.sansPays > 0 && (
+              <p className="mt-3 text-[11px] leading-snug text-foreground/40">
+                {pays.sansPays} {pays.sansPays > 1 ? "cartes au drapeau faites" : "carte au drapeau faite"} avant le 22/10, sans pays enregistré.
+              </p>
+            )}
+          </Section>
+
           {/* 9. À relancer */}
           {a.aRelancer.length > 0 && (
             <Section titre="À relancer" sous="Venus plusieurs jours, plus vus depuis une semaine ou plus.">
@@ -511,8 +661,8 @@ export function ActiviteVue({
                 {a.aRelancer.map((j) => (
                   <div key={j.name} className="flex items-center gap-3 border-b border-foreground/6 py-2.5 last:border-0">
                     <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold">{j.name}</span>
-                    <span className="mono-label text-[9px] text-foreground/40">{j.jours} j venus</span>
-                    <span className="mono-label w-[66px] text-right text-[9px] text-foreground/55">{relative(j.last, a.now)}</span>
+                    <span className="mono-label text-[9px] whitespace-nowrap text-foreground/40">{j.jours} j venus</span>
+                    <span className="mono-label text-right text-[9px] whitespace-nowrap text-foreground/55">{relative(j.last, a.now)}</span>
                     <Mail className={cn("size-3.5", j.email ? "text-foreground" : "text-foreground/15")} />
                   </div>
                 ))}
@@ -521,7 +671,7 @@ export function ActiviteVue({
           )}
 
           {/* 10. Par joueur */}
-          <section>
+          <section id="activite-joueurs" className="scroll-mt-16">
             <div className="mb-2.5 flex items-center justify-between px-1">
               <h2 className="text-[16px] font-bold tracking-tight">Par joueur</h2>
               <div className="glass-soft flex rounded-full p-0.5">
@@ -545,30 +695,19 @@ export function ActiviteVue({
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-2 px-3.5 pb-2">
-              <span className="mono-label flex-1 text-[9px] text-foreground/30">Joueur</span>
-              <span className="mono-label w-[62px] text-[9px] text-foreground/30">Vu</span>
-              <span className="mono-label w-[30px] text-center text-[9px] text-foreground/30">Ses.</span>
-              <span className="mono-label w-[52px] text-right text-[9px] text-foreground/30">Moy.</span>
-              <span className="mono-label w-[52px] text-right text-[9px] text-foreground/30">Total</span>
-              <span className="mono-label w-[22px] text-right text-[9px] text-foreground/30">@</span>
-            </div>
             <div className="glass-soft overflow-hidden rounded-[24px]">
               {joueursTries.map((p) => (
-                <div key={p.name} className="flex items-center gap-2 border-b border-foreground/5 px-3.5 py-3 last:border-0">
+                <div key={p.name} className="flex items-center gap-3 border-b border-foreground/5 px-3.5 py-3 last:border-0">
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-semibold">{p.name}</span>
-                    <span className="mono-label text-[8px] text-foreground/30">
-                      {p.jours} j actifs · {milliers(p.actions)} actions · arrivé le {jjmm(p.premier)}
+                    <span className="flex items-baseline justify-between gap-3">
+                      <span className="truncate text-[14px] font-semibold">{p.name}</span>
+                      <span className="shrink-0 text-[13px] font-bold tabular-nums">{duree(p.temps)}</span>
+                    </span>
+                    <span className="mt-0.5 block text-[11.5px] leading-snug text-foreground/45">
+                      Vu {relative(p.last, a.now)} · {p.sessions} {p.sessions > 1 ? "sessions" : "session"}, {duree(p.moyenne)} en moyenne · {p.jours} j actifs · {milliers(p.actions)} actions · arrivé le {jjmm(p.premier)}
                     </span>
                   </span>
-                  <span className="mono-label w-[62px] text-foreground/45">{relative(p.last, a.now)}</span>
-                  <span className="mono-label w-[30px] text-center text-foreground/45">{p.sessions}</span>
-                  <span className="mono-label w-[52px] text-right text-foreground/45">{duree(p.moyenne)}</span>
-                  <span className="w-[52px] text-right text-[11px] font-bold tabular-nums">{duree(p.temps)}</span>
-                  <span className="w-[22px] text-right">
-                    <Mail className={cn("ml-auto size-3.5", p.email ? "text-foreground" : "text-foreground/15")} />
-                  </span>
+                  <Mail className={cn("size-3.5 shrink-0", p.email ? "text-foreground" : "text-foreground/15")} />
                 </div>
               ))}
               {joueursTries.length === 0 && (

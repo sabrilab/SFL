@@ -5,7 +5,8 @@
 // Cette page lit le journal `activity` (réservé à l'admin par RLS) et la table
 // des profils, puis passe le tout à la vue (`vue.tsx`), qui analyse
 // (`lib/sfl/retention.ts`) et affiche : conclusions, courbes de croissance,
-// rétention par cohorte, gestes qui font revenir, joueurs à relancer. En
+// rétention par cohorte, gestes qui font revenir, pays choisis pour la carte
+// (table photo_studio), joueurs à relancer. En
 // dessous, les sujets de Bola Agent (./agent.tsx), sans le contenu.
 // Rien n'est agrégé en base, donc rien à maintenir quand on ajoute un type
 // d'événement.
@@ -59,9 +60,27 @@ export default function ActivitePage() {
         }
         return lignes;
       };
-      const [actData, prof] = await Promise.all([
+      // Les cartes au drapeau du studio photo, pour les pays choisis. La
+      // colonne `pays` n'existe qu'après la mise à jour de la base (22/10) :
+      // sans elle, la partie le dit au lieu de faire échouer la page.
+      const lireDrapeaux = async () => {
+        const lignes: { user_id: string; pays: string | null; created_at: string }[] = [];
+        for (let debut = 0; ; debut += PAGE) {
+          const { data, error } = await sb
+            .from("photo_studio")
+            .select("user_id, pays, created_at")
+            .eq("filtre", "drapeau")
+            .order("id")
+            .range(debut, debut + PAGE - 1);
+          if (error) return null;
+          lignes.push(...(data ?? []));
+          if (!data || data.length < PAGE) return lignes;
+        }
+      };
+      const [actData, prof, drap] = await Promise.all([
         lireTout(),
-        sb.from("profiles").select("name, contact_email, created_at, is_admin"),
+        sb.from("profiles").select("id, name, contact_email, created_at, is_admin"),
+        lireDrapeaux(),
       ]);
       if (prof.error) throw new Error(prof.error.message);
 
@@ -83,6 +102,7 @@ export default function ActivitePage() {
         };
       });
       type ProfilBrut = {
+        id: string;
         name: string;
         contact_email: string | null;
         created_at: string | null;
@@ -95,7 +115,11 @@ export default function ActivitePage() {
         // Le rôle en base, ou la liste en dur de l'app (Sabri, Ilyes).
         admin: !!p.is_admin || isAdmin(p.name),
       }));
-      setData({ evenements, profiles, now: Date.now() });
+      const noms = new Map(((prof.data ?? []) as ProfilBrut[]).map((p) => [p.id, p.name]));
+      const drapeaux =
+        drap?.map((d) => ({ name: noms.get(d.user_id) ?? "?", pays: d.pays, at: new Date(d.created_at).getTime() })) ??
+        null;
+      setData({ evenements, profiles, drapeaux, now: Date.now() });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Lecture impossible.");
     }
