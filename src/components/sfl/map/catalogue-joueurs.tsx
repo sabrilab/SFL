@@ -40,10 +40,10 @@ function Carte({ p, size, onJoueur }: { p: Player | undefined; size: number; onJ
 }
 
 /** Ta ville : la pastille qui la change, et l'œil qui te rend invisible. */
-function TaVille({ me }: { me: string }) {
+function TaVille({ me, chercher = false }: { me: string; chercher?: boolean }) {
   const [, rafraichir] = useState(0);
   const mienne = maVille(me);
-  const [cherche, setCherche] = useState(false);
+  const [cherche, setCherche] = useState(chercher);
   const [q, setQ] = useState("");
   const [trouvees, setTrouvees] = useState<Commune[]>([]);
   const [envoi, setEnvoi] = useState(false);
@@ -148,6 +148,7 @@ export function CatalogueJoueurs({
   onVoir,
   onJoueur,
   me,
+  chercherVille = false,
 }: {
   villes: VillePlan[];
   /** Les villes ouvertes (une pile peut en fondre plusieurs) ; null = toutes. */
@@ -156,6 +157,8 @@ export function CatalogueJoueurs({
   onVoir: (v: VillePlan) => void;
   onJoueur: (name: string) => void;
   me: string | null;
+  /** Ouvert par la notification « Mets ta ville » : la recherche de ta ville d'emblée. */
+  chercherVille?: boolean;
 }) {
   const { players } = useSeason();
   const parNom = useMemo(() => new Map(players.map((p) => [p.name, p])), [players]);
@@ -201,7 +204,7 @@ export function CatalogueJoueurs({
         })}
       </div>
 
-      {me && <TaVille me={me} />}
+      {me && <TaVille me={me} chercher={chercherVille} />}
 
       {une ? (
         <section className="flex flex-col items-center gap-4">

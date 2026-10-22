@@ -137,6 +137,10 @@ export function Inscriptions({
 }) {
   const [demandes, setDemandes] = useState<Demande[]>([]);
   const [occupe, setOccupe] = useState<string | null>(null);
+  // Membres acceptés que la saison ne connaît pas : leur ajout à l'effectif
+  // s'est perdu (publication écrasée par un appareil en retard, envoi raté).
+  // Sans ligne dans l'effectif, l'app n'a pas de carte à leur montrer.
+  const [absents, setAbsents] = useState<string[]>([]);
 
   const charger = useCallback(async () => {
     const sb = supabase();
@@ -157,7 +161,22 @@ export function Inscriptions({
     setDemandes(
       data.map((p) => ({ ...(p as Omit<Demande, "fiche">), fiche: (parId.get(p.id as string) as Demande["fiche"]) ?? null }))
     );
+    const { data: membres } = await sb
+      .from("profiles")
+      .select("name")
+      .eq("valide", true)
+      .eq("is_admin", false)
+      .eq("pseudo_a_choisir", false);
+    setAbsents(((membres ?? []) as { name: string | null }[]).map((m) => m.name ?? "").filter(Boolean));
   }, []);
+  const horsSaison = absents.filter((n) => !rosterHasName(saison, n)).sort((a, b) => a.localeCompare(b, "fr"));
+
+  function ajouter(noms: string[]) {
+    const next = noms.reduce((acc, n) => (rosterHasName(acc, n) ? acc : addRoster(acc, newRosterPlayer(n))), saison);
+    if (next === saison) return;
+    onCommit(next, noms.length > 1 ? `Effectif — ${noms.length} joueurs ajoutés` : `Effectif — ${noms[0]}`);
+    toast.success(noms.length > 1 ? `${noms.length} joueurs ajoutés à la saison.` : `${noms[0]} ajouté à la saison.`);
+  }
 
   useEffect(() => {
     if (!partage) return;
@@ -186,9 +205,44 @@ export function Inscriptions({
     }
   }
 
-  if (!partage || demandes.length === 0) return null;
+  if (!partage || (demandes.length === 0 && horsSaison.length === 0)) return null;
 
   return (
+    <>
+    {horsSaison.length > 0 && (
+      <div className="overflow-hidden rounded-3xl bg-card">
+        <div className="flex items-end justify-between gap-3 px-4 pt-3 pb-2">
+          <div>
+            <p className="mono-label text-[10px] text-muted-foreground">EFFECTIF</p>
+            <p className="text-[17px] font-extrabold tracking-tight">
+              {horsSaison.length} membre{horsSaison.length > 1 ? "s" : ""} sans carte dans la saison
+            </p>
+          </div>
+          {horsSaison.length > 1 && (
+            <button
+              type="button"
+              onClick={() => ajouter(horsSaison)}
+              className="shrink-0 rounded-full bg-foreground px-3.5 py-1.5 text-[12.5px] font-bold text-background"
+            >
+              Tout ajouter
+            </button>
+          )}
+        </div>
+        {horsSaison.map((n) => (
+          <div key={n} className="flex items-center justify-between gap-3 border-t border-border/60 px-4 py-2.5">
+            <span className="text-[14.5px] font-semibold">{n}</span>
+            <button
+              type="button"
+              onClick={() => ajouter([n])}
+              className="rounded-full bg-muted px-3 py-1.5 text-[12.5px] font-semibold"
+            >
+              Ajouter
+            </button>
+          </div>
+        ))}
+      </div>
+    )}
+    {demandes.length > 0 && (
     <div className="overflow-hidden rounded-3xl bg-card">
       <div className="px-4 pt-3 pb-1">
         <p className="mono-label text-[10px] text-muted-foreground">INSCRIPTIONS</p>
@@ -200,5 +254,7 @@ export function Inscriptions({
         <Ligne key={d.id} d={d} occupe={occupe === d.id} onAccepter={() => void accepter(d)} />
       ))}
     </div>
+    )}
+    </>
   );
 }

@@ -305,7 +305,9 @@ export async function refreshSession(): Promise<void> {
 
     if (!profile) return;
     const admin = !!profile.is_admin;
-    const nom = account?.name ?? session.name;
+    // profiles.name est le nom de saison : il corrige un nom de session mal
+    // formé (profil pas lu à la connexion, réseau lent → identifiant brut).
+    const nom = account?.name ?? profile.name ?? session.name;
     const enAttente = !(await estValide(user.id));
     if (session.admin !== admin || session.name !== nom || !!session.enAttente !== enAttente) {
       const { enAttente: _avant, ...reste } = session;

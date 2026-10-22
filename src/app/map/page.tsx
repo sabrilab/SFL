@@ -524,6 +524,17 @@ export default function MapPage() {
     return [...parVille.values()];
   }, [players, revVilles, revPhotos, revNoms]);
   const [catalogue, setCatalogue] = useState(false);
+  // La notification « Mets ta ville » ouvre /map?ville : le catalogue, la recherche de ta ville ouverte.
+  const [chercherVille, setChercherVille] = useState(false);
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has("ville")) return;
+    const t = window.setTimeout(() => {
+      window.history.replaceState(null, "", window.location.pathname);
+      setChercherVille(true);
+      setCatalogue(true);
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, []);
   const [focusVilles, setFocusVilles] = useState<string[] | null>(null);
   const [profil, setProfil] = useState<string | null>(null);
   const [viser, setViser] = useState<{ lat: number; lng: number; n: number } | null>(null);
@@ -863,6 +874,7 @@ export default function MapPage() {
               focus={focusVilles}
               onFocus={setFocusVilles}
               me={me}
+              chercherVille={chercherVille}
               onJoueur={setProfil}
               onVoir={(v) => {
                 setCatalogue(false);
