@@ -80,7 +80,7 @@ function LigneEquipe({ e, droite }: { e: Equipe; droite?: React.ReactNode }) {
   );
 }
 
-function Pilule({ children, onClick, plein = true, ton, disabled }: { children: React.ReactNode; onClick: () => void; plein?: boolean; ton?: "bouton--vert" | "bouton--rouge"; disabled?: boolean }) {
+function Pilule({ children, onClick, plein = true, ton, disabled }: { children: React.ReactNode; onClick: () => void; plein?: boolean; ton?: "bouton--vert" | "bouton--mauve" | "bouton--rouge"; disabled?: boolean }) {
   return (
     <button
       type="button"
@@ -341,7 +341,7 @@ export default function BolaTeamPage() {
               (d) => enCours(d) && ((d.de === mienne?.id && d.a === e.id) || (d.a === mienne?.id && d.de === e.id))
             );
             const peutDefier = !!mienne && capitaine && active(mienne) && active(e) && !dejaDefie;
-            return <LigneEquipe key={e.id} e={e} droite={peutDefier ? <Pilule ton="bouton--vert" onClick={() => setAdversaire(e)}>Défier</Pilule> : undefined} />;
+            return <LigneEquipe key={e.id} e={e} droite={peutDefier ? <Pilule ton="bouton--mauve" onClick={() => setAdversaire(e)}>Défier</Pilule> : undefined} />;
           })}
         </section>
       )}
