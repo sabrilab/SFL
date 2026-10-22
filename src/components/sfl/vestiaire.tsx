@@ -1577,7 +1577,7 @@ function messagesDemo(noms: string[], journees: Journee[]): MessageV[] {
     [n(3), "", { type: "vocal", chemin: "blob:demo", duree: 14.2 }, { "😂": ["a"] }, null],
     [n(4), "Tu le crois ça ?", { type: "ligue", titre: "L'équipe type", j: jn?.j, lignes: [0, 1, 2, 3, 4].map((k) => ({ n: n(k), v: `+${30 - k * 4} pts` })) }, { "🔥": ["a", "b"] }, null],
     [n(0), "", { type: "ligue", titre: "L'homme du dimanche", j: jn?.j, lignes: [{ n: n(0), v: "3 buts · 1 passe · +42 pts" }] }, { "🐐": ["a", "b", "c"] }, null],
-    [n(1), "La preuve", { type: "photo", chemin: "/players/Yacine.png", l: 1024, h: 1536 }, { "💀": ["a", "b"] }, null],
+    [n(1), "La preuve", { type: "photo", chemin: "/avatars/maillot-noir.png", l: 460, h: 480 }, { "💀": ["a", "b"] }, null],
     [n(2), "", { type: "video", chemin: "/videos/j8-bensou.webm", l: 1280, h: 720, duree: 17.2 }, { "🔥": ["a", "b", "c"] }, null],
     ["moi", "Dimanche on règle ça sur le terrain", null, {}, 6],
   ];
