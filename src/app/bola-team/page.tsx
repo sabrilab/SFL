@@ -13,10 +13,15 @@
 //   · les autres équipes, chacune avec « Défier » quand les deux sont à 5.
 // Un lien d'invitation ouvert avant de se connecter (/equipe/[jeton]) est
 // repris ici, une fois connecté.
+// Le capitaine touche un joueur de son terrain : nommer ou retirer le vice,
+// exclure (48 h de préavis) ; un invité : retirer l'invitation. Il peut
+// aussi dissoudre l'équipe. Une équipe en formation (moins de 5) n'apparaît
+// pas aux autres. Les règles (délais, limites) sont gardées par la base.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ChoixLigue } from "@/components/sfl/choix-ligue";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -31,12 +36,17 @@ import {
   MAX_EQUIPE,
   MIN_EQUIPE,
   active,
+  annulerSeraitForfait,
   direErreurEquipe,
+  dissoudreEquipe,
+  enCours,
+  exclureMembre,
   inviterEquipe,
   invites,
   lienEquipe,
   listerDefis,
   listerEquipes,
+  nommerVice,
   quitterEquipe,
   rejoindreParLien,
   repondreDefi,
@@ -45,6 +55,7 @@ import {
   urlDuLien,
   type Defi,
   type Equipe,
+  type Membre,
 } from "@/lib/sfl/equipes";
 import { DEMO_EQUIPES, demoEquipes } from "@/lib/sfl/equipes-demo";
 import { libelleJour, listerProfils, monId, type Profil } from "@/lib/sfl/matchs";
@@ -102,7 +113,8 @@ export default function BolaTeamPage() {
   const [aSigner, setASigner] = useState<Equipe | null>(null);
   const [adversaire, setAdversaire] = useState<Equipe | null>(null);
   const [choisir, setChoisir] = useState(false);
-  const [quitter, setQuitter] = useState(false);
+  const [quitter, setQuitter] = useState<null | "quitter" | "dissoudre">(null);
+  const [joueur, setJoueur] = useState<Membre | null>(null);
 
   useEffect(() => {
     if (!connecte) return;
@@ -158,7 +170,9 @@ export default function BolaTeamPage() {
   const monRole = mienne?.membres.find((m) => m.id === moi)?.role ?? null;
   const capitaine = monRole === "capitaine" || monRole === "vice";
   const invitations = monde.equipes.filter((e) => e.membres.some((m) => m.id === moi && m.statut === "invite"));
-  const autres = monde.equipes.filter((e) => e.id !== mienne?.id);
+  // Une équipe en formation (moins de 5) reste invisible aux autres (doc 04 §6).
+  const autres = monde.equipes.filter((e) => e.id !== mienne?.id && active(e));
+  const charge = apercu || equipes !== null;
   const nomDe = (id: number) => monde.equipes.find((e) => e.id === id);
 
   const agir = async (f: () => Promise<unknown>, ok?: string) => {
@@ -203,7 +217,13 @@ export default function BolaTeamPage() {
     : [];
   const recus = mienne ? monde.defis.filter((d) => d.a === mienne.id && d.statut === "propose") : [];
   const envoyes = mienne ? monde.defis.filter((d) => d.de === mienne.id && d.statut === "propose") : [];
-  const aJouer = mienne ? monde.defis.filter((d) => (d.a === mienne.id || d.de === mienne.id) && d.statut === "accepte") : [];
+  const aJouer = mienne ? monde.defis.filter((d) => (d.a === mienne.id || d.de === mienne.id) && d.statut === "accepte" && enCours(d)) : [];
+  // Annuler un match programmé : libre jusqu'à 48 h avant, forfait ensuite.
+  const annulerMatch = (d: Defi) => {
+    const forfait = annulerSeraitForfait(d);
+    if (window.confirm(forfait ? "À moins de 48 h, annuler, c'est déclarer forfait. On déclare forfait ?" : "Annuler ce match ?"))
+      void agir(() => repondreDefi(d.id, "annule"), forfait ? "Forfait déclaré." : "Match annulé.");
+  };
   const quand = (d: Defi) => `${libelleJour(d.jour)} · ${d.heure.slice(0, 5)} · ${d.lieu}`;
 
   return (
@@ -214,7 +234,18 @@ export default function BolaTeamPage() {
       {invitations.length > 0 && (
         <section className="flex flex-col gap-2">
           {invitations.map((e) => (
-            <LigneEquipe key={e.id} e={e} droite={<Pilule onClick={() => setASigner(e)}>Rejoindre</Pilule>} />
+            <LigneEquipe
+              key={e.id}
+              e={e}
+              droite={
+                <div className="flex gap-1.5">
+                  <Pilule plein={false} onClick={() => moi && void agir(() => retirerInvitation(e.id, moi), "Invitation refusée.")}>
+                    Refuser
+                  </Pilule>
+                  <Pilule onClick={() => setASigner(e)}>Rejoindre</Pilule>
+                </div>
+              }
+            />
           ))}
         </section>
       )}
@@ -239,7 +270,8 @@ export default function BolaTeamPage() {
             onOccupant={
               capitaine
                 ? (o) => {
-                    if (o.enAttente) void agir(() => retirerInvitation(mienne.id, o.cle));
+                    const m = mienne.membres.find((x) => x.id === o.cle);
+                    if (m && m.id !== moi) setJoueur(m);
                   }
                 : undefined
             }
@@ -276,11 +308,15 @@ export default function BolaTeamPage() {
                       <span className="truncate text-[12.5px] text-muted-foreground">{quand(d)}</span>
                     </span>
                     {d.statut === "propose" ? (
-                      capitaine ? (
-                        <Pilule plein={false} onClick={() => void agir(() => repondreDefi(d.id, "annule"))}>
-                          Annuler
+                      capitaine && d.de === mienne.id ? (
+                        <Pilule plein={false} onClick={() => void agir(() => repondreDefi(d.id, "annule"), "Défi retiré.")}>
+                          Retirer
                         </Pilule>
                       ) : null
+                    ) : capitaine ? (
+                      <Pilule plein={false} onClick={() => annulerMatch(d)}>
+                        Annuler
+                      </Pilule>
                     ) : (
                       <span className="mono-label text-foreground">À jouer</span>
                     )}
@@ -290,17 +326,19 @@ export default function BolaTeamPage() {
             </div>
           )}
         </section>
-      ) : (
+      ) : charge ? (
         <Button onClick={() => setCreer(true)} className="h-12 rounded-full text-[15px] font-semibold">
           Créer mon équipe
         </Button>
-      )}
+      ) : null}
 
       {autres.length > 0 && (
         <section className="flex flex-col gap-2">
           <h2 className="mono-label text-muted-foreground">Équipes</h2>
           {autres.map((e) => {
-            const dejaDefie = monde.defis.some((d) => (d.de === mienne?.id && d.a === e.id) || (d.a === mienne?.id && d.de === e.id));
+            const dejaDefie = monde.defis.some(
+              (d) => enCours(d) && ((d.de === mienne?.id && d.a === e.id) || (d.a === mienne?.id && d.de === e.id))
+            );
             const peutDefier = !!mienne && capitaine && active(mienne) && active(e) && !dejaDefie;
             return <LigneEquipe key={e.id} e={e} droite={peutDefier ? <Pilule onClick={() => setAdversaire(e)}>Défier</Pilule> : undefined} />;
           })}
@@ -308,9 +346,16 @@ export default function BolaTeamPage() {
       )}
 
       {mienne && (
-        <button type="button" onClick={() => setQuitter(true)} className="bouton-discret self-center px-4 py-2 text-[13px] font-semibold">
-          Quitter l&apos;équipe
-        </button>
+        <div className="flex justify-center gap-2">
+          <button type="button" onClick={() => setQuitter("quitter")} className="bouton-discret px-4 py-2 text-[13px] font-semibold">
+            Quitter l&apos;équipe
+          </button>
+          {monRole === "capitaine" && (
+            <button type="button" onClick={() => setQuitter("dissoudre")} className="bouton-discret px-4 py-2 text-[13px] font-semibold">
+              Dissoudre
+            </button>
+          )}
+        </div>
       )}
 
       <CreerEquipe open={creer} onOpenChange={setCreer} apercu={apercu} onCree={recharger} />
@@ -328,26 +373,93 @@ export default function BolaTeamPage() {
           onLien={partagerLien}
         />
       )}
-      {mienne && quitter && (
-        <div className="fixed inset-0 z-[70] flex items-end bg-black/50 p-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]" onClick={() => setQuitter(false)}>
-          <div className="mx-auto flex w-full max-w-[440px] flex-col gap-2 rounded-[26px] bg-card p-4" onClick={(e) => e.stopPropagation()}>
-            <p className="px-1 pb-1 text-center text-[15px] font-semibold">Quitter {mienne.nom} pour toujours ?</p>
-            <Button
-              variant="destructive"
-              className="h-12 rounded-full text-[15px] font-semibold"
-              onClick={() => {
-                setQuitter(false);
-                void agir(() => quitterEquipe(mienne.id));
-              }}
-            >
-              Quitter
-            </Button>
-            <Button variant="secondary" className="h-12 rounded-full text-[15px] font-semibold" onClick={() => setQuitter(false)}>
-              Rester
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* Un joueur de mon équipe, touché par le capitaine (ou le vice). */}
+      <Sheet open={!!joueur} onOpenChange={(o) => !o && setJoueur(null)}>
+        <SheetContent side="bottom" className="rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
+          <SheetHeader className="px-5 pt-5 pb-0">
+            <SheetTitle className="pr-10 text-[24px] font-bold tracking-tight">{joueur?.name}</SheetTitle>
+            {joueur?.departLe && (
+              <p className="text-[14px] text-muted-foreground">
+                Part {new Intl.DateTimeFormat("fr-FR", { weekday: "long", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).format(new Date(joueur.departLe))}
+              </p>
+            )}
+          </SheetHeader>
+          {mienne && joueur && (
+            <div className="flex flex-col gap-2 px-4">
+              {joueur.statut === "invite" ? (
+                <Button
+                  variant="secondary"
+                  className="h-12 rounded-full text-[15px] font-semibold"
+                  onClick={() => {
+                    setJoueur(null);
+                    void agir(() => retirerInvitation(mienne.id, joueur.id), "Invitation retirée.");
+                  }}
+                >
+                  Retirer l&apos;invitation
+                </Button>
+              ) : monRole === "capitaine" ? (
+                <>
+                  {!joueur.departLe && (
+                    <Button
+                      variant="secondary"
+                      className="h-12 rounded-full text-[15px] font-semibold"
+                      onClick={() => {
+                        setJoueur(null);
+                        void agir(
+                          () => nommerVice(mienne.id, joueur.role === "vice" ? null : joueur.id),
+                          joueur.role === "vice" ? "Plus de vice-capitaine." : `${joueur.name.split(" ")[0]} est vice-capitaine.`
+                        );
+                      }}
+                    >
+                      {joueur.role === "vice" ? "Retirer le brassard de vice" : "Nommer vice-capitaine"}
+                    </Button>
+                  )}
+                  <Button
+                    variant={joueur.departLe ? "secondary" : "destructive"}
+                    className="h-12 rounded-full text-[15px] font-semibold"
+                    onClick={() => {
+                      if (!joueur.departLe && !window.confirm(`Exclure ${joueur.name.split(" ")[0]} ? Départ dans 48 h, sans retour possible.`)) return;
+                      setJoueur(null);
+                      void agir(() => exclureMembre(mienne.id, joueur.id), joueur.departLe ? "Exclusion annulée." : "Exclusion dans 48 h.");
+                    }}
+                  >
+                    {joueur.departLe ? "Annuler l'exclusion" : "Exclure (48 h de préavis)"}
+                  </Button>
+                </>
+              ) : null}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Quitter (pour toujours) ou dissoudre (le capitaine). */}
+      <Sheet open={!!mienne && !!quitter} onOpenChange={(o) => !o && setQuitter(null)}>
+        <SheetContent side="bottom" className="rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
+          <SheetHeader className="px-5 pt-5 pb-0">
+            <SheetTitle className="pr-10 text-[22px] font-bold tracking-tight">
+              {quitter === "dissoudre" ? `Dissoudre ${mienne?.nom} ?` : `Quitter ${mienne?.nom} pour toujours ?`}
+            </SheetTitle>
+          </SheetHeader>
+          {mienne && (
+            <div className="flex flex-col gap-2 px-4">
+              <Button
+                variant="destructive"
+                className="h-12 rounded-full text-[15px] font-semibold"
+                onClick={() => {
+                  const quoi = quitter;
+                  setQuitter(null);
+                  void agir(() => (quoi === "dissoudre" ? dissoudreEquipe(mienne.id) : quitterEquipe(mienne.id)));
+                }}
+              >
+                {quitter === "dissoudre" ? "Dissoudre" : "Quitter"}
+              </Button>
+              <Button variant="secondary" className="h-12 rounded-full text-[15px] font-semibold" onClick={() => setQuitter(null)}>
+                Rester
+              </Button>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

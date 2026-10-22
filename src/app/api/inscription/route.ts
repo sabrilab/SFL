@@ -99,17 +99,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Le lien d'équipe, vérifié avant de créer quoi que ce soit.
-  let lien: { equipe_id: number; cree_par: string | null } | null = null;
+  // Le lien d'équipe, vérifié avant de créer quoi que ce soit : valable 72 h,
+  // l'équipe pas dissoute, une place libre, et jamais plus de comptes
+  // ouverts par ce lien que de places restantes (un lien qui fuit ne fait
+  // pas entrer n'importe qui dans la ligue).
+  type Lien = { jeton: string; equipe_id: number; cree_par: string | null; utilisations: number };
+  let lien: Lien | null = null;
   if (corps.equipe) {
+    const perime = NextResponse.json({ error: "Le lien de l'équipe n'est plus valable. Demande-en un nouveau." }, { status: 410 });
     const { data } = await sb
       .from("equipe_liens")
-      .select("equipe_id, cree_par")
+      .select("jeton, equipe_id, cree_par, utilisations, equipes!inner(dissoute_le)")
       .eq("jeton", String(corps.equipe))
       .gt("expire_le", new Date().toISOString())
+      .is("equipes.dissoute_le", null)
       .maybeSingle();
-    if (!data) return NextResponse.json({ error: "Le lien de l'équipe n'est plus valable. Demande-en un nouveau." }, { status: 410 });
-    lien = data as { equipe_id: number; cree_par: string | null };
+    if (!data) return perime;
+    lien = data as unknown as Lien;
+    const { count } = await sb.from("equipe_membres").select("joueur", { count: "exact", head: true }).eq("equipe_id", lien.equipe_id);
+    const places = 7 - (count ?? 0);
+    if (places <= 0 || lien.utilisations >= places) return perime;
   }
 
   const name = nomDeLigue(f.prenom, f.nom, pris.noms);
@@ -156,6 +165,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (lien) {
+    await sb.from("equipe_liens").update({ utilisations: lien.utilisations + 1 }).eq("jeton", lien.jeton);
     // L'équipe l'attend ; si l'invitation échoue, le compte reste valable.
     await sb
       .from("equipe_membres")

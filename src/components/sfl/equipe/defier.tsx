@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { defier, direErreurEquipe, type Equipe } from "@/lib/sfl/equipes";
-import { aujourdhuiIso } from "@/lib/sfl/matchs";
+import { prochainsJours } from "@/lib/sfl/matchs";
 
 export function Defier({
   mienne,
@@ -25,11 +25,16 @@ export function Defier({
   apercu?: boolean;
   onDefie: () => void;
 }) {
+  // Le créneau : entre 48 h et 21 jours d'ici (doc 05 §5.3) ; la base tranche à l'heure près.
+  const [bornes] = useState(() => {
+    const j = prochainsJours(22);
+    return { min: j[2], max: j[21] };
+  });
   const [jour, setJour] = useState("");
   const [heure, setHeure] = useState("20:00");
   const [lieu, setLieu] = useState("");
   const [envoi, setEnvoi] = useState(false);
-  const pret = !!jour && /^\d{2}:\d{2}$/.test(heure) && lieu.trim().length > 0;
+  const pret = !!jour && jour >= bornes.min && jour <= bornes.max && /^\d{2}:\d{2}$/.test(heure) && lieu.trim().length > 0;
 
   async function envoyer() {
     if (!mienne || !adversaire) return;
@@ -71,7 +76,7 @@ export function Defier({
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Input type="date" value={jour} min={aujourdhuiIso()} onChange={(e) => setJour(e.target.value)} aria-label="Le jour" />
+              <Input type="date" value={jour} min={bornes.min} max={bornes.max} onChange={(e) => setJour(e.target.value)} aria-label="Le jour" />
               <Input type="time" value={heure} step={900} onChange={(e) => setHeure(e.target.value)} aria-label="L'heure" />
             </div>
             <Input value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Le terrain" maxLength={120} />
