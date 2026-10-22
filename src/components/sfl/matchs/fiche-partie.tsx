@@ -3,11 +3,15 @@
 // La fiche d'un match ouvert par un joueur : qui vient (en cartes), qui est
 // invité, les places libres, et le seul geste qui compte pour moi ici —
 // prendre une place, accepter, me retirer, ou annuler si c'est mon match.
+// Le coup d'envoi passé, l'organisateur tient la feuille (feuille-bola.tsx)
+// et tout le monde voit le score et le ou les MVP.
 
 import { useState } from "react";
 import { toast } from "sonner";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { accepter, annuler, direErreur, inscrits, placesLibres, quitter, rejoindre, type Partie } from "@/lib/sfl/matchs";
+import { coupDEnvoiPasse, feuilleOuverte, mvpsDuMatch } from "@/lib/sfl/ligue-vierge";
+import { FeuilleBola } from "@/components/sfl/matchs/feuille-bola";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
 
@@ -18,6 +22,12 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
   const libres = placesLibres(partie);
   const moiLa = partie.joueurs.find((j) => j.id === moi) ?? null;
   const organise = partie.organisateurId === moi;
+  const [feuille, setFeuille] = useState(false);
+  const joue = coupDEnvoiPasse(partie.jour, partie.heure);
+  const saisi = partie.saisiLe != null && partie.scoreClairs != null && partie.scoreFonces != null;
+  const corrigeable = feuilleOuverte(partie.saisiLe);
+  const presents = partie.joueurs.filter((j) => j.equipe === "clairs" || j.equipe === "fonces");
+  const mvps = saisi ? mvpsDuMatch(presents) : [];
 
   async function faire(action: () => Promise<void>, ok: string) {
     setOccupe(true);
@@ -59,7 +69,34 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
         )}
       </div>
 
-      {moiLa?.statut === "invite" && (
+      {saisi && (
+        <div className="rounded-[26px] bg-card p-5">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
+            <span className="mono-label text-muted-foreground">Clairs</span>
+            <span className="text-[40px] leading-none font-extrabold tracking-tight tabular-nums">
+              {partie.scoreClairs} <span className="text-foreground/25">–</span> {partie.scoreFonces}
+            </span>
+            <span className="mono-label text-muted-foreground">Foncés</span>
+          </div>
+          {mvps.length > 0 && (
+            <div className="mt-4 flex flex-col items-center gap-2">
+              <span className="mono-label text-muted-foreground">{mvps.length > 1 ? "MVP ex æquo" : "MVP"}</span>
+              <QuiVient className="justify-center" noms={presents.filter((j) => mvps.includes(j.id)).map((j) => j.name)} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {organise && joue && corrigeable && (
+        <>
+          <button onClick={() => setFeuille(true)} className={cn(bouton, "bg-foreground text-background")}>
+            {saisi ? "Corriger la feuille" : "Feuille de match"}
+          </button>
+          {feuille && <FeuilleBola partie={partie} open={feuille} onOpenChange={setFeuille} onSaisie={onChange} />}
+        </>
+      )}
+
+      {!joue && moiLa?.statut === "invite" && (
         <div className="grid grid-cols-2 gap-2">
           <button disabled={occupe} onClick={() => faire(() => accepter(partie.id), "C'est noté, tu joues.")} className={cn(bouton, "bg-foreground text-background")}>
             Je viens
@@ -69,17 +106,17 @@ export function FichePartie({ partie, moi, onChange }: { partie: Partie; moi: st
           </button>
         </div>
       )}
-      {!moiLa && partie.visibilite === "public" && libres > 0 && (
+      {!joue && !moiLa && partie.visibilite === "public" && libres > 0 && (
         <button disabled={occupe || !moi} onClick={() => faire(() => rejoindre(partie.id), "Place prise, à toi de jouer.")} className={cn(bouton, "bg-foreground text-background")}>
           Prendre une place
         </button>
       )}
-      {moiLa?.statut === "inscrit" && !organise && (
+      {!joue && moiLa?.statut === "inscrit" && !organise && (
         <button disabled={occupe} onClick={() => faire(() => quitter(partie.id), "Tu as libéré ta place.")} className={cn(bouton, "bg-secondary")}>
           Me retirer
         </button>
       )}
-      {organise && (
+      {organise && !saisi && (
         <button
           disabled={occupe}
           onClick={() => {

@@ -12,10 +12,12 @@
 //
 // Tout vit en base (supabase/schema.sql : matchs, match_joueurs,
 // disponibilites) ; les règles RLS y gardent le privé privé et la capacité
-// d'un match. Ces matchs ne comptent pas au classement tant que l'admin ne
-// les reprend pas en journée de ligue.
+// d'un match. Ce sont des matchs Bola : ils ne touchent pas à la saison de
+// la SFL, mais leur feuille (saisie par l'organisateur après le coup
+// d'envoi) compte dans la Ligue vierge (lib/sfl/ligue-vierge.ts).
 
 import { supabase } from "@/lib/supabase";
+import type { MatchBola } from "@/lib/sfl/ligue-vierge";
 
 export type Visibilite = "public" | "prive";
 export type Genre = "match" | "exhibition";
@@ -27,10 +29,16 @@ export const MOMENTS: { id: Moment; libelle: string }[] = [
   { id: "soir", libelle: "Soir" },
 ];
 
+export type EquipeFeuille = "clairs" | "fonces" | "absent";
+
 export interface JoueurDuMatch {
   id: string;
   name: string;
   statut: "invite" | "inscrit";
+  /** Sur la feuille : null tant qu'elle n'est pas saisie. */
+  equipe: EquipeFeuille | null;
+  buts: number;
+  passes: number;
 }
 
 export interface Partie {
@@ -48,6 +56,10 @@ export interface Partie {
   lng: number | null;
   places: number;
   joueurs: JoueurDuMatch[];
+  scoreClairs: number | null;
+  scoreFonces: number | null;
+  /** La première saisie de la feuille ; corrigeable 24 h. */
+  saisiLe: string | null;
 }
 
 export interface Profil {
@@ -102,22 +114,25 @@ interface LigneMatch {
   lat: number | null;
   lng: number | null;
   places: number;
+  score_clairs: number | null;
+  score_fonces: number | null;
+  saisi_le: string | null;
   orga: Un<{ name: string }>;
-  match_joueurs: { player_id: string; statut: "invite" | "inscrit"; profiles: Un<{ name: string }> }[];
+  match_joueurs: {
+    player_id: string;
+    statut: "invite" | "inscrit";
+    equipe: EquipeFeuille | null;
+    buts: number;
+    passes: number;
+    profiles: Un<{ name: string }>;
+  }[];
 }
 
-/** Les matchs à venir que je peux voir (les privés seulement si j'en suis). */
-export async function listerParties(): Promise<Partie[]> {
-  const { data, error } = await supabase()
-    .from("matchs")
-    .select(
-      "id, organisateur, genre, visibilite, jour, heure, lieu, adresse, lat, lng, places, orga:profiles!matchs_organisateur_fkey ( name ), match_joueurs ( player_id, statut, profiles ( name ) )"
-    )
-    .gte("jour", aujourdhuiIso())
-    .order("jour")
-    .order("heure");
-  if (error) throw error;
-  return ((data ?? []) as unknown as LigneMatch[]).map((m) => ({
+const COLONNES =
+  "id, organisateur, genre, visibilite, jour, heure, lieu, adresse, lat, lng, places, score_clairs, score_fonces, saisi_le, orga:profiles!matchs_organisateur_fkey ( name ), match_joueurs ( player_id, statut, equipe, buts, passes, profiles ( name ) )";
+
+function versPartie(m: LigneMatch): Partie {
+  return {
     id: m.id,
     organisateurId: m.organisateur,
     organisateur: un(m.orga)?.name ?? "—",
@@ -130,8 +145,81 @@ export async function listerParties(): Promise<Partie[]> {
     lat: m.lat,
     lng: m.lng,
     places: m.places,
-    joueurs: m.match_joueurs.map((j) => ({ id: j.player_id, name: un(j.profiles)?.name ?? "—", statut: j.statut })),
-  }));
+    joueurs: m.match_joueurs.map((j) => ({
+      id: j.player_id,
+      name: un(j.profiles)?.name ?? "—",
+      statut: j.statut,
+      equipe: j.equipe,
+      buts: j.buts ?? 0,
+      passes: j.passes ?? 0,
+    })),
+    scoreClairs: m.score_clairs,
+    scoreFonces: m.score_fonces,
+    saisiLe: m.saisi_le,
+  };
+}
+
+/** Les matchs à venir que je peux voir (les privés seulement si j'en suis). */
+export async function listerParties(): Promise<Partie[]> {
+  const { data, error } = await supabase()
+    .from("matchs")
+    .select(COLONNES)
+    .gte("jour", aujourdhuiIso())
+    .order("jour")
+    .order("heure");
+  if (error) throw error;
+  return ((data ?? []) as unknown as LigneMatch[]).map(versPartie);
+}
+
+/** Mes matchs Bola des 7 derniers jours (organisés ou joués) : les feuilles à saisir, à corriger. */
+export async function listerMesDerniers(): Promise<Partie[]> {
+  const moi = await monId();
+  if (!moi) return [];
+  const [a, m, d] = aujourdhuiIso().split("-").map(Number);
+  const depuis = new Date(Date.UTC(a, m - 1, d - 7)).toISOString().slice(0, 10);
+  const { data, error } = await supabase()
+    .from("matchs")
+    .select(COLONNES)
+    .eq("mode", "bola")
+    .gte("jour", depuis)
+    .lte("jour", aujourdhuiIso())
+    .order("jour", { ascending: false })
+    .order("heure", { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as unknown as LigneMatch[])
+    .map(versPartie)
+    .filter((p) => p.organisateurId === moi || p.joueurs.some((j) => j.id === moi && j.statut === "inscrit"));
+}
+
+/** La feuille d'un match Bola : l'équipe, les buts et les passes de chacun, puis le score. */
+export interface Feuille {
+  scoreClairs: number;
+  scoreFonces: number;
+  lignes: { playerId: string; equipe: EquipeFeuille; buts: number; passes: number }[];
+}
+
+export async function saisirFeuille(id: number, f: Feuille): Promise<void> {
+  const sb = supabase();
+  // Les lignes d'abord : la règle de la base ferme la feuille 24 h après la
+  // première saisie du score, qui date tout le reste.
+  for (const l of f.lignes) {
+    const absent = l.equipe === "absent";
+    const { error } = await sb
+      .from("match_joueurs")
+      .update({ equipe: l.equipe, buts: absent ? 0 : l.buts, passes: absent ? 0 : l.passes })
+      .eq("match_id", id)
+      .eq("player_id", l.playerId);
+    if (error) throw error;
+  }
+  const { error } = await sb.from("matchs").update({ score_clairs: f.scoreClairs, score_fonces: f.scoreFonces }).eq("id", id);
+  if (error) throw error;
+}
+
+/** Tous les matchs Bola joués, pour la Ligue vierge (fonction ligue_vierge en base). */
+export async function lireLigueVierge(): Promise<MatchBola[]> {
+  const { data, error } = await supabase().rpc("ligue_vierge");
+  if (error) throw error;
+  return (data ?? []) as MatchBola[];
 }
 
 export interface NouvellePartie {
@@ -284,6 +372,8 @@ export function direErreur(e: unknown): string {
   const msg = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : "";
   if (/complet/i.test(msg)) return "Le match est complet.";
   if (/duplicate|already exists|23505/i.test(msg)) return "Ce joueur est déjà dans le match.";
+  if (/feuille close/i.test(msg)) return "La feuille est close : 24 h sont passées.";
+  if (/feuille réservée/i.test(msg)) return "Seul l'organisateur tient la feuille.";
   if (/row-level security|42501/i.test(msg)) return "Ce match ne t'est pas ouvert.";
   return msg || "Impossible pour l'instant. Réessaie dans un instant.";
 }

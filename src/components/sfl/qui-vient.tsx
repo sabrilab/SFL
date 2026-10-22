@@ -13,7 +13,7 @@ import type { Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
 
-function carteNeutre(name: string): Player {
+export function carteNeutre(name: string): Player {
   return {
     name,
     poste: "—",

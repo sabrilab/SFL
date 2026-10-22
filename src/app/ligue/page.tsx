@@ -8,6 +8,7 @@
 //                   le vote du jour quand il est ouvert ;
 //   · Matchs      : les journées jouées, une carte chacune.
 // Le Wall of Fame est au bout du sélecteur, toujours à portée, puis la loupe.
+// Au-dessus, la SFL ou la Ligue vierge (choix-ligue.tsx, app/ligue-vierge).
 // Le Vestiaire, qui a été une quatrième vue ici, a sa page depuis le 19/10
 // (/vestiaire, la bulle de la barre d'onglets) : ?vue=vestiaire y renvoie.
 // ?j=N ouvre la journée N (une feuille de match touchée au Vestiaire).
@@ -43,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { BoutonStats } from "@/components/layout/bouton-stats";
+import { ChoixLigue } from "@/components/sfl/choix-ligue";
 
 // Les deux dimanches après celui de la convocation, lus côté client
 // (vides au rendu serveur, pour que l'hydratation concorde).
@@ -248,11 +250,14 @@ function Ligue() {
         />
       )}
 
+      {/* La SFL ou la Ligue vierge (les matchs Bola, à vie). */}
+      <ChoixLigue actif="/ligue" className="-mb-2 lg:hidden" />
+
       {/* Un seul sélecteur, toujours là, et le Wall of Fame au bout. Sur
           ordinateur, le titre de la page à gauche (comme Ma carte), et le
           sélecteur ramené à sa juste largeur au lieu de traverser l'écran. */}
       <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-[var(--fib-13)]">
-      <h1 className="hidden text-[34px] font-bold tracking-tight lg:mr-auto lg:block">Ligue</h1>
+      <ChoixLigue actif="/ligue" className="hidden lg:mr-auto lg:flex [&_a]:text-[34px]" />
       <div className="glass flex flex-1 gap-1 rounded-full p-1 lg:w-[420px] lg:flex-none" role="tablist" aria-label="Vue de la ligue">
         {VUES.map(([id, label]) => (
           <button
