@@ -11,12 +11,15 @@
 //   · Sa courbe — journée après journée, toutes saisons à la suite : la note
 //     de sa carte (une marche par saison, un point pour chaque carte
 //     spéciale du jour) ou son rang au Pépite d'Or. On la parcourt du doigt.
-// Noir et blanc : tout en `currentColor` et en opacités. Calcul dans
+// Noir et blanc : tout en `currentColor` et en opacités, sauf les cartes
+// spéciales et leurs ronds sur la courbe, dans leur couleur (or, rouge,
+// bleu : teinte-carte.ts, Sabri 22/10). Calcul dans
 // lib/sfl/carriere.ts.
 
 import { useEffect, useRef, useState } from "react";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { BOOST_LABELS } from "@/components/sfl/boost-card";
+import { TEINTES } from "@/components/sfl/teinte-carte";
 import type { CartesDeSaison, PointCourbe } from "@/lib/sfl/carriere";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
 import { cn } from "@/lib/utils";
@@ -25,13 +28,13 @@ const ANTON = "var(--font-anton), Anton, sans-serif";
 
 /* -------------------------------- Ses cartes ------------------------------- */
 
-export function CartesCarriere({ saisons }: { saisons: CartesDeSaison[] }) {
+export function CartesCarriere({ saisons, titre = "Ses cartes" }: { saisons: CartesDeSaison[]; titre?: string }) {
   const total = saisons.reduce((n, s) => n + 1 + s.speciales.length, 0);
   return (
     <section aria-labelledby="ses-cartes" className="flex flex-col gap-2.5">
       <div className="flex items-baseline justify-between px-1">
         <h3 id="ses-cartes" className="mono-label text-muted-foreground">
-          Ses cartes
+          {titre}
         </h3>
         <span className="font-mono text-[12px] font-bold text-foreground/45 tabular-nums">{total}</span>
       </div>
@@ -72,6 +75,7 @@ export function CartesCarriere({ saisons }: { saisons: CartesDeSaison[] }) {
                       player={c.player}
                       size={FORMAT_CARTE.moyenne}
                       cle={`speciale-${s.numero}-${c.j}-${c.carte.type}-${c.player.name}`}
+                      distinction={c.carte.type}
                       detail={`${BOOST_LABELS[c.carte.type]} · ${c.carte.date}`}
                     />
                     <figcaption className="flex flex-col items-center leading-tight">
@@ -253,7 +257,7 @@ export function CourbeCarriere({ points }: { points: PointCourbe[] }) {
                 q.speciale ? (
                   <g key={k}>
                     <line x1={x(k)} x2={x(k)} y1={y(q.note)} y2={y(q.speciale.note)} stroke="currentColor" strokeOpacity={0.3} />
-                    <circle cx={x(k)} cy={y(q.speciale.note)} r={3.5} fill="var(--background)" stroke="currentColor" strokeWidth={1.5} />
+                    <circle cx={x(k)} cy={y(q.speciale.note)} r={3.5} fill="var(--background)" stroke={TEINTES[q.speciale.type].vive} strokeWidth={1.75} />
                   </g>
                 ) : null
               )}

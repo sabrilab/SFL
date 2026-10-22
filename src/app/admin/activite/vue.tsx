@@ -8,7 +8,8 @@
 //      mesure, avec la période d'avant en pointillé ;
 //   3. ce qu'il faut retenir — les conclusions, calculées sur les vraies
 //      données (lib/sfl/retention.ts), chacune avec la chose à faire, en
-//      une rangée qu'on fait glisser et qu'on peut masquer ;
+//      une rangée qu'on fait glisser et qu'on peut masquer ; puis les
+//      nouveaux venus à suivre de près (lib/sfl/suivi-joueur.ts) ;
 //   4. qui est là aujourd'hui (nouveaux, fidèles, à risque, décrochés…) ;
 //   5. la rétention — combien reviennent, cohorte par cohorte ;
 //   6. ce qui fait revenir — les gestes de la première semaine ;
@@ -21,11 +22,14 @@
 // conseils passent donc sous la courbe, en une seule rangée, et une rangée de
 // raccourcis, collée en haut, mène à chaque partie.
 //
+// Chaque nom (à suivre, à relancer, par joueur) ouvre la fiche du joueur
+// (./fiche.tsx), demandée le 22/10 pour comprendre un nouveau très engagé.
+//
 // Les données arrivent toutes faites (`page.tsx` lit le journal) : cette vue
 // ne fait que les analyser et les montrer.
 
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { ChevronDown, ChevronUp, Lightbulb, Loader2, Mail, RefreshCw, TrendingDown, TrendingUp, TriangleAlert } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, Lightbulb, Loader2, Mail, RefreshCw, TrendingDown, TrendingUp, TriangleAlert } from "lucide-react";
 import {
   analyser,
   DAY,
@@ -43,12 +47,15 @@ import {
   type Profil,
 } from "@/lib/sfl/retention";
 import { emojiDrapeau, unPays } from "@/lib/sfl/photo-studio";
+import { aSuivre } from "@/lib/sfl/suivi-joueur";
+import { FicheJoueur } from "./fiche";
 import { cn } from "@/lib/utils";
-import { CarteHoraire, Cohortes, Comparaison, Courbe, encre } from "./graphiques";
+import { Barres, CarteHoraire, Cohortes, Comparaison, Courbe, encre } from "./graphiques";
 
-/** Une carte au drapeau faite au studio photo ; `pays` manque avant le 22/10. */
-export interface Drapeau {
+/** Une photo du studio (studio, drapeau, manga) ; `pays`, celui du drapeau, manque avant le 22/10. */
+export interface PhotoStudio {
   name: string;
+  filtre: string;
   pays: string | null;
   at: number;
 }
@@ -56,8 +63,8 @@ export interface Drapeau {
 export interface DonneesActivite {
   evenements: Evenement[];
   profiles: Profil[];
-  /** Les cartes au drapeau, ou null si la base ne garde pas encore le pays. */
-  drapeaux: Drapeau[] | null;
+  /** Les photos du studio, ou null si la lecture a échoué. */
+  studio: PhotoStudio[] | null;
   /** Instant de la lecture — figé pour garder le rendu pur. */
   now: number;
 }
@@ -144,23 +151,6 @@ function Tuile({ label, valeur, c }: { label: string; valeur: string; c: Chiffre
   );
 }
 
-function Barres({ lignes }: { lignes: { label: string; value: number }[] }) {
-  const max = Math.max(1, ...lignes.map((l) => l.value));
-  if (lignes.length === 0) return <p className="text-[12.5px] text-foreground/40">Rien sur cette période.</p>;
-  return (
-    <div className="flex flex-col gap-2.5">
-      {lignes.map((l) => (
-        <div key={l.label} className="flex items-center gap-3">
-          <span className="w-[46%] shrink-0 truncate text-[12.5px] font-medium">{l.label}</span>
-          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/8">
-            <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${(l.value / max) * 100}%` }} />
-          </span>
-          <span className="w-[52px] shrink-0 text-right text-[12px] font-bold tabular-nums">{milliers(l.value)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 /** Une conclusion, dans la rangée : le titre et la chose à faire ; le détail en touchant. */
 function CarteConclusion({ c }: { c: Conclusion }) {
@@ -220,6 +210,7 @@ function abonneConseils(f: () => void) {
 const PARTIES = [
   { id: "courbes", label: "Courbes" },
   { id: "conseils", label: "Conseils" },
+  { id: "suivre", label: "À suivre" },
   { id: "qui", label: "Qui est là" },
   { id: "retention", label: "Rétention" },
   { id: "quand", label: "Quand" },
@@ -250,6 +241,7 @@ export function ActiviteVue({
   const [public_, setPublic] = useState<PublicId>("joueurs");
   const [metrique, setMetrique] = useState<MetriqueId>("hebdo");
   const [tri, setTri] = useState<"recent" | "temps" | "actions">("recent");
+  const [fiche, setFiche] = useState<string | null>(null);
   const [ouverte, setOuverte] = useState<FamilleId | null>(null);
   const masques = useSyncExternalStore(abonneConseils, lireMasques, () => false);
 
@@ -266,8 +258,9 @@ export function ActiviteVue({
     const partAdmins = data.evenements.length
       ? data.evenements.filter((e) => admins.has(e.name)).length / data.evenements.length
       : 0;
-    const drapeaux = data.drapeaux?.filter((d) => garde(d.name)) ?? null;
-    return { evenements, profiles, drapeaux, admins: [...admins].sort(), ensembleAdmins: admins, partAdmins };
+    const studio = data.studio?.filter((d) => garde(d.name)) ?? null;
+    const drapeaux = studio?.filter((d) => d.filtre === "drapeau") ?? null;
+    return { evenements, profiles, studio, drapeaux, admins: [...admins].sort(), ensembleAdmins: admins, partAdmins };
   }, [data, public_]);
   const a = useMemo(
     () => (data && vu ? analyser(vu.evenements, vu.profiles, data.now, jours) : null),
@@ -297,6 +290,10 @@ export function ActiviteVue({
       .sort((x, y) => y.n - x.n || x.nom.localeCompare(y.nom, "fr"));
     return { lignes, joueurs: dernier.size, cartes, sansPays };
   }, [vu]);
+
+  /* ------------------------------ à suivre de près ----------------------- */
+  const suivre = useMemo(() => (vu && data ? aSuivre(vu.evenements, data.now) : []), [vu, data]);
+  const emailDe = (name: string) => vu?.profiles.find((p) => p.name === name)?.contact_email ?? null;
 
   /* ------------------------------- la courbe ----------------------------- */
   const courbe = useMemo(() => {
@@ -402,7 +399,7 @@ export function ActiviteVue({
           aria-label="Parties de la page"
           className="sticky top-0 z-20 -mx-4 -my-1 flex gap-1.5 overflow-x-auto bg-background/80 px-4 py-2 backdrop-blur-xl [scrollbar-width:none]"
         >
-          {PARTIES.map((p) => (
+          {PARTIES.filter((p) => p.id !== "suivre" || suivre.length > 0).map((p) => (
             <button
               key={p.id}
               onClick={() => allerA(p.id)}
@@ -515,6 +512,33 @@ export function ActiviteVue({
               )
             )}
           </section>
+
+          {/* 3 bis. À suivre de près : les nouveaux venus très engagés */}
+          {suivre.length > 0 && (
+            <Section
+              id="suivre"
+              titre="À suivre de près"
+              sous="Arrivés depuis moins de 14 jours, bien plus présents que les autres dans leurs premières 24 h. Touche un nom pour sa fiche."
+            >
+              <div className="flex flex-col">
+                {suivre.map((j) => (
+                  <button
+                    key={j.name}
+                    onClick={() => setFiche(j.name)}
+                    className="flex items-center gap-3 border-b border-foreground/6 py-2.5 text-left last:border-0"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-semibold">{j.name}</span>
+                      <span className="block text-[11.5px] text-foreground/45">
+                        {duree(j.ms)} dans ses premières 24 h · {Math.round(j.fois)} fois la médiane · arrivé le {jjmm(j.premier)}
+                      </span>
+                    </span>
+                    <ChevronRight className="size-4 shrink-0 text-foreground/40" />
+                  </button>
+                ))}
+              </div>
+            </Section>
+          )}
 
           {/* 4. Qui est là */}
           <Section id="qui" titre="Qui est là aujourd'hui" sous={`${totalFamilles} comptes, rangés selon leur dernière venue.`}>
@@ -659,12 +683,16 @@ export function ActiviteVue({
             <Section titre="À relancer" sous="Venus plusieurs jours, plus vus depuis une semaine ou plus.">
               <div className="flex flex-col">
                 {a.aRelancer.map((j) => (
-                  <div key={j.name} className="flex items-center gap-3 border-b border-foreground/6 py-2.5 last:border-0">
+                  <button
+                    key={j.name}
+                    onClick={() => setFiche(j.name)}
+                    className="flex items-center gap-3 border-b border-foreground/6 py-2.5 text-left last:border-0"
+                  >
                     <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold">{j.name}</span>
                     <span className="mono-label text-[9px] whitespace-nowrap text-foreground/40">{j.jours} j venus</span>
                     <span className="mono-label text-right text-[9px] whitespace-nowrap text-foreground/55">{relative(j.last, a.now)}</span>
                     <Mail className={cn("size-3.5", j.email ? "text-foreground" : "text-foreground/15")} />
-                  </div>
+                  </button>
                 ))}
               </div>
             </Section>
@@ -697,7 +725,11 @@ export function ActiviteVue({
             </div>
             <div className="glass-soft overflow-hidden rounded-[24px]">
               {joueursTries.map((p) => (
-                <div key={p.name} className="flex items-center gap-3 border-b border-foreground/5 px-3.5 py-3 last:border-0">
+                <button
+                  key={p.name}
+                  onClick={() => setFiche(p.name)}
+                  className="flex w-full items-center gap-3 border-b border-foreground/5 px-3.5 py-3 text-left last:border-0"
+                >
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline justify-between gap-3">
                       <span className="truncate text-[14px] font-semibold">{p.name}</span>
@@ -708,7 +740,7 @@ export function ActiviteVue({
                     </span>
                   </span>
                   <Mail className={cn("size-3.5 shrink-0", p.email ? "text-foreground" : "text-foreground/15")} />
-                </div>
+                </button>
               ))}
               {joueursTries.length === 0 && (
                 <p className="px-4 py-8 text-center text-[13px] text-foreground/40">
@@ -749,6 +781,17 @@ export function ActiviteVue({
       )}
 
       {pied && vu && pied(public_, vu.ensembleAdmins)}
+
+      {fiche && vu && data && (
+        <FicheJoueur
+          name={fiche}
+          evenements={vu.evenements}
+          studio={vu.studio}
+          email={emailDe(fiche)}
+          now={data.now}
+          onClose={() => setFiche(null)}
+        />
+      )}
     </div>
   );
 }

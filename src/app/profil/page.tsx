@@ -3,21 +3,22 @@
 // Ma carte — l'identité du joueur, rien d'autre.
 //
 // Ordre de lecture : qui je suis → ma carte (la simple) → mes badges (le
-// prochain à viser, puis la fin de saison et les paliers, voir vitrine.tsx)
-// → mon profil de jeu (le radar hexagonal, point faible en bleu) → les
-// raccourcis. Les chiffres et la série sont dans les paliers ; la photo se
-// change en touchant l'avatar.
+// prochain à viser, puis les trophées de fin de saison et les paliers, voir
+// vitrine.tsx) → mes cartes, saison par saison, avec les cartes spéciales
+// gagnées (carriere-joueur.tsx) → les raccourcis. La photo se change en
+// touchant l'avatar.
 //
-// Tout le gameplay numérique (packs, catalogue, duels, matchs) a déménagé dans
-// l'Arène : le profil ne porte plus de grille Collection, seulement le lien.
+// Le 22/10 (Sabri) : le profil de jeu (le radar) part sur le profil d'un
+// joueur dans Recherche ; « Cartes de match » disparaît, les cartes gagnées
+// sont ici, dans « Mes cartes » ; l'Arène n'est plus que la Collection.
 
 import Link from "next/link";
-import { useState } from "react";
-import { ChevronRight, Dumbbell, IdCard, Swords, Trophy } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ChevronRight, Dumbbell, Layers, Trophy } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Card3D } from "@/components/sfl/card-3d";
 import { PlayerCard } from "@/components/sfl/player-card";
-import { BOOST_LABELS } from "@/components/sfl/boost-card";
+import { CartesCarriere } from "@/components/sfl/carriere-joueur";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { VitrineBadges } from "@/components/sfl/vitrine";
 import { ChoixBadge } from "@/components/sfl/choix-badge";
@@ -29,127 +30,10 @@ import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { useGrandEcran } from "@/hooks/use-media-query";
 import { FormulaireIdentite } from "@/components/sfl/identite";
 import { useIdentites } from "@/hooks/use-identites";
-import { ovr, rankPlayers, STAT_KEYS, type Player } from "@/lib/sfl/engine";
+import { cartesDeCarriere } from "@/lib/sfl/carriere";
+import { rankPlayers } from "@/lib/sfl/engine";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { BoutonStats } from "@/components/layout/bouton-stats";
-
-/* ------------------------- Radar « PROFIL DE JEU » ------------------------ */
-// Géométrie reprise du design : hexagone pointe en haut, centre (110,110),
-// rayon 84, anneaux à 100/75/50/25 %, rayon de valeur = R × note/100.
-// Polygone blanc, points blancs — sauf le point faible, en accent bleu.
-
-const RADAR_LABELS: [number, number, number, "middle" | "start" | "end"][] = [
-  [110, 10, 22, "middle"], // VIT
-  [194, 58, 72, "start"], // TIR
-  [194, 166, 180, "start"], // PAS
-  [110, 216, 228, "middle"], // DRI
-  [26, 166, 180, "end"], // DEF
-  [26, 58, 72, "end"], // PHY
-];
-
-const STAT_FR: Record<string, string> = {
-  VIT: "vitesse",
-  TIR: "tir",
-  PAS: "passe",
-  DRI: "dribble",
-  DEF: "défense",
-  PHY: "physique",
-};
-
-function ProfilRadar({ stats, overall }: { stats: Player["stats"]; overall: number }) {
-  const CX = 110;
-  const CY = 110;
-  const R = 84;
-  const angle = (i: number) => -Math.PI / 2 + (i * Math.PI) / 3;
-  const px = (i: number, r: number) => (CX + Math.cos(angle(i)) * r).toFixed(1);
-  const py = (i: number, r: number) => (CY + Math.sin(angle(i)) * r).toFixed(1);
-  const ring = (f: number) => STAT_KEYS.map((_, i) => `${px(i, R * f)},${py(i, R * f)}`).join(" ");
-  const value = (i: number) => (R * stats[STAT_KEYS[i]]) / 100;
-
-  const worst = STAT_KEYS.reduce((a, k) => (stats[k] < stats[a] ? k : a), STAT_KEYS[0]);
-  const best = STAT_KEYS.reduce((a, k) => (stats[k] > stats[a] ? k : a), STAT_KEYS[0]);
-
-  return (
-    <section className="glass flex flex-col items-center rounded-[28px] px-[18px] pt-6 pb-5">
-      <div className="flex w-full items-start justify-between">
-        <div>
-          <p className="mono-label text-foreground/40">Profil de jeu</p>
-          <p className="mt-[5px] text-[12.5px] text-foreground/45">Six critères, saison 2025</p>
-        </div>
-        <div className="text-right">
-          <div className="text-[30px] leading-none font-extrabold tracking-tight">{overall}</div>
-          <p className="mono-label mt-[5px] text-foreground/40">Général</p>
-        </div>
-      </div>
-
-      <svg viewBox="-12 -10 244 248" className="mt-2.5 w-full max-w-[258px] overflow-visible">
-        <polygon points={ring(1)} fill="rgba(255,255,255,0.035)" stroke="rgba(255,255,255,0.14)" strokeWidth="1" />
-        <polygon points={ring(0.75)} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-        <polygon points={ring(0.5)} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-        <polygon points={ring(0.25)} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-        <path
-          d={STAT_KEYS.map((_, i) => `M${CX},${CY} L${px(i, R)},${py(i, R)}`).join(" ")}
-          stroke="rgba(255,255,255,0.1)"
-          strokeWidth="1"
-        />
-        <polygon
-          points={STAT_KEYS.map((_, i) => `${px(i, value(i))},${py(i, value(i))}`).join(" ")}
-          fill="rgba(255,255,255,0.16)"
-          stroke="#fff"
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
-        {STAT_KEYS.map((k, i) => (
-          <circle
-            key={k}
-            cx={px(i, value(i))}
-            cy={py(i, value(i))}
-            r="3.4"
-            fill={k === worst ? "#6FA8FF" : "#fff"}
-          />
-        ))}
-        <g
-          style={{ fontFamily: "var(--font-jbmono)", fontSize: 9, letterSpacing: 1.4 }}
-          fill="rgba(255,255,255,0.45)"
-        >
-          {STAT_KEYS.map((k, i) => (
-            <text key={k} x={RADAR_LABELS[i][0]} y={RADAR_LABELS[i][1]} textAnchor={RADAR_LABELS[i][3]}>
-              {k}
-            </text>
-          ))}
-        </g>
-        <g style={{ fontSize: 13, fontWeight: 800 }} fill="#fff">
-          {STAT_KEYS.map((k, i) => (
-            <text
-              key={k}
-              x={RADAR_LABELS[i][0]}
-              y={RADAR_LABELS[i][2]}
-              textAnchor={RADAR_LABELS[i][3]}
-              fill={k === worst ? "#6FA8FF" : "#fff"}
-            >
-              {stats[k]}
-            </text>
-          ))}
-        </g>
-      </svg>
-
-      <div className="mt-3.5 flex w-full items-center justify-between border-t border-white/9 pt-3.5">
-        {/* Une carte parfaitement plate n'a pas de point faible : le dire, plutôt
-            que d'annoncer « −0 » sur un critère pris au hasard. */}
-        {stats[best] === stats[worst] ? (
-          <p className="text-[12.5px] text-foreground/45">Profil parfaitement équilibré</p>
-        ) : (
-          <>
-            <p className="text-[12.5px] text-foreground/45">Point faible : {STAT_FR[worst]}</p>
-            <p className="mono-label text-primary">
-              −{stats[best] - stats[worst]} VS {best}
-            </p>
-          </>
-        )}
-      </div>
-    </section>
-  );
-}
 
 /* ------------------------------ Petits blocs ------------------------------ */
 
@@ -180,22 +64,18 @@ function AvatarPhoto({ name }: { name: string }) {
 
 export default function Profil() {
   const { player } = useMyPlayer();
-  const { allPlayers, boostCards } = useSeason();
+  const { allPlayers, saison } = useSeason();
   // Sur sa propre fiche, on se classe parmi tout le monde — y compris les
   // joueurs masqués ailleurs dans l'app.
   const myRank =
     rankPlayers(allPlayers).find((p) => p.name === player.name)?.rank ?? allPlayers.length;
-  const myCards = boostCards.filter((c) => c.player === player.name);
-  // La carte affichée est la simple : les notes brutes du joueur.
-  const cardStats = player.stats;
+  // Mes cartes : celle de chaque saison et les cartes spéciales gagnées.
+  const mesCartes = useMemo(() => cartesDeCarriere(saison, player.name), [saison, player.name]);
   // La carte est le sujet de la page : elle profite de la place quand il y en a.
   const grand = useGrandEcran();
   const [photoOuverte, setPhotoOuverte] = useState(false);
   const [identiteOuverte, setIdentiteOuverte] = useState(false);
   const identite = useIdentites();
-
-  const nbTitres = myCards.length;
-  const dernierTitre = myCards[myCards.length - 1];
 
   return (
     <div className="shell py-4 sm:py-8 lg:pt-[var(--fib-55)]">
@@ -208,7 +88,7 @@ export default function Profil() {
       </div>
       {/* Deux colonnes dès qu'il y a la place, dans le rapport 1 : φ
           (grille-or, globals.css) : l'identité et la carte à gauche, les
-          badges, le profil de jeu et les raccourcis à droite. */}
+          badges, les trophées, mes cartes et les raccourcis à droite. */}
       <div className="grille-or grid grid-cols-1 gap-[18px] lg:gap-y-[var(--fib-21)]">
       {/* La colonne d'identité reste à l'écran pendant qu'on parcourt le
           reste : la carte est le sujet de la page. */}
@@ -283,21 +163,13 @@ export default function Profil() {
         <VitrineBadges nom={player.name} />
       </div>
 
-      {/* PROFIL DE JEU — le radar hexagonal du design */}
-      <ProfilRadar stats={cardStats} overall={ovr(cardStats)} />
+      {/* Mes cartes : la carte de chaque saison et les cartes spéciales gagnées */}
+      {mesCartes.length > 0 && <CartesCarriere saisons={mesCartes} titre="Mes cartes" />}
 
       {/* Navigation du profil */}
       <section className="flex flex-col gap-2.5">
         {(
           [
-            {
-              href: "/carte",
-              icon: IdCard,
-              label: "Cartes de match",
-              note: dernierTitre
-                ? `${nbTitres} titre${nbTitres > 1 ? "s" : ""} · dernier : ${BOOST_LABELS[dernierTitre.type]}`
-                : "Carte, boosts et évolution EvoDay",
-            },
             {
               href: "/palmares",
               icon: Trophy,
@@ -305,10 +177,10 @@ export default function Profil() {
               note: "Ton parcours, saison après saison",
             },
             {
-              href: "/duel",
-              icon: Swords,
-              label: "Arène",
-              note: "Duels, matchs et collection de cartes",
+              href: "/collection",
+              icon: Layers,
+              label: "Collection",
+              note: "Packs et catalogue de cartes",
             },
           ] as const
         ).map((l) => (

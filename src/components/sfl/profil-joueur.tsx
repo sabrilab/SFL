@@ -20,8 +20,8 @@
 //      au Pépite d'Or, journée après journée (carriere.ts) ;
 //   6. son parcours, saison après saison (palmares.ts, comme le Wall of Fame) ;
 //   7. son profil de jeu, sa forme et ses dimanches.
-// Sous son nom, « Comparer avec ma carte » ouvre les deux cartes face à face
-// (comparer-cartes.tsx).
+// Sous son nom, « Comparer avec ma carte » ouvre les deux cartes face à face,
+// avec le radar des deux profils de jeu superposés (comparer-cartes.tsx).
 // Une section sans rien à montrer ne s'affiche pas. Rien n'est stocké : tout
 // vient de la saison déjà en mémoire.
 
@@ -33,7 +33,7 @@ import { ComparerCartes } from "@/components/sfl/comparer-cartes";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
-import { Ecusson, FeuilleBadge, Medaille } from "@/components/sfl/vitrine";
+import { FeuilleBadge, Medaille, NOM_TROPHEE, Trophee } from "@/components/sfl/vitrine";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useGrandEcran } from "@/hooks/use-media-query";
 import { useIdentites } from "@/hooks/use-identites";
@@ -186,9 +186,9 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
                     onClick={() => setChoix({ famille: "saison", id: e.def.id })}
                     className="flex items-center gap-[var(--fib-13)] text-left transition-transform active:scale-[0.98] motion-reduce:transition-none"
                   >
-                    <Ecusson id={e.def.id} rang={e.meilleur!.rang} largeur={68} />
+                    <Trophee id={e.def.id} rang={e.meilleur!.rang} taille={84} />
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="text-[17px] font-extrabold">{e.def.nom}</span>
+                      <span className="text-[17px] font-extrabold">{NOM_TROPHEE[e.def.id]}</span>
                       <span className="font-mono text-[11px] text-white/55">
                         {e.podiums.map((p) => `${ordinal(p.rang)} · ${p.saison}`).join("  ·  ")}
                       </span>

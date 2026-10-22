@@ -7,7 +7,7 @@ import { PlayerCard } from "@/components/sfl/player-card";
 import { useCardViewer } from "@/components/sfl/card-viewer";
 import { prechaufferCarte } from "@/components/sfl/card-3d";
 import { useSeason } from "@/components/sfl/season-provider";
-import type { Player } from "@/lib/sfl/engine";
+import type { BoostType, Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 
 /**
@@ -31,6 +31,7 @@ export function MiniCarte({
   onglet,
   cle,
   vertical,
+  distinction,
 }: {
   player: Player;
   /** La largeur, en fraction de 254 px (voir FORMAT_CARTE). */
@@ -44,6 +45,8 @@ export function MiniCarte({
   cle?: string;
   /** En petit, la carte reste debout (les terrains). */
   vertical?: boolean;
+  /** Une carte à titre : MVP (or), Impact (rouge), Défensive (bleu). */
+  distinction?: BoostType;
 }) {
   const { open } = useCardViewer();
   return (
@@ -53,17 +56,17 @@ export function MiniCarte({
       onClick={(e) => {
         e.stopPropagation();
         open({
-          cacheKey: cle ?? `mini-${player.name}`,
+          cacheKey: cle ?? `mini-${player.name}${distinction ? `-${distinction}` : ""}`,
           mode: "simple",
           title: player.name,
           subtitle: detail,
-          render: (s) => <PlayerCard player={player} size={s} />,
+          render: (s) => <PlayerCard player={player} size={s} distinction={distinction} />,
         });
       }}
       aria-label={`Voir la carte de ${player.name}`}
       className={cn("shrink-0 transition-transform active:scale-95", className)}
     >
-      <PlayerCard player={player} size={size} onglet={onglet} vertical={vertical} />
+      <PlayerCard player={player} size={size} onglet={onglet} vertical={vertical} distinction={distinction} />
     </button>
   );
 }

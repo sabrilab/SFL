@@ -5,12 +5,9 @@ import {
   Award,
   CalendarCheck,
   Crown,
-  Flame,
   Forward,
   Goal,
-  Hourglass,
   Shield,
-  ShieldCheck,
   Trophy,
   Zap,
 } from "lucide-react";
@@ -25,9 +22,6 @@ export const EMBLEMES: Record<TropheeId, typeof Crown> = {
   mvp: Award,
   mur: Shield,
   impact: Zap,
-  cleanSheet: ShieldCheck,
-  serie: Flame,
-  saisons: Hourglass,
 };
 
 export const EMBLEMES_SAISON: Record<ClassementId, typeof Crown> = {

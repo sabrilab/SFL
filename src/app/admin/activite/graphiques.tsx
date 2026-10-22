@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Cohorte } from "@/lib/sfl/retention";
-import { jjmm, pct } from "@/lib/sfl/retention";
+import { jjmm, milliers, pct } from "@/lib/sfl/retention";
 import { cn } from "@/lib/utils";
 
 /** Fond au premier plan dosé : 0 → transparent, 1 → plein. */
@@ -382,6 +382,25 @@ export function Comparaison({
         {barre(sans, false)}
         <span className="w-9 shrink-0 text-right text-[11px] text-foreground/55 tabular-nums">{pct(sans)}</span>
       </div>
+    </div>
+  );
+}
+
+/** Des barres horizontales, une ligne par libellé. */
+export function Barres({ lignes }: { lignes: { label: string; value: number }[] }) {
+  const max = Math.max(1, ...lignes.map((l) => l.value));
+  if (lignes.length === 0) return <p className="text-[12.5px] text-foreground/40">Rien sur cette période.</p>;
+  return (
+    <div className="flex flex-col gap-2.5">
+      {lignes.map((l) => (
+        <div key={l.label} className="flex items-center gap-3">
+          <span className="w-[46%] shrink-0 truncate text-[12.5px] font-medium">{l.label}</span>
+          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/8">
+            <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${(l.value / max) * 100}%` }} />
+          </span>
+          <span className="w-[52px] shrink-0 text-right text-[12px] font-bold tabular-nums">{milliers(l.value)}</span>
+        </div>
+      ))}
     </div>
   );
 }

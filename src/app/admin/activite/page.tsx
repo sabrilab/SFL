@@ -60,16 +60,15 @@ export default function ActivitePage() {
         }
         return lignes;
       };
-      // Les cartes au drapeau du studio photo, pour les pays choisis. La
-      // colonne `pays` n'existe qu'après la mise à jour de la base (22/10) :
-      // sans elle, la partie le dit au lieu de faire échouer la page.
-      const lireDrapeaux = async () => {
-        const lignes: { user_id: string; pays: string | null; created_at: string }[] = [];
+      // Les photos du studio (studio, drapeau, manga) : les pays choisis, et
+      // ce que chaque joueur y a fait (sa fiche). Une lecture refusée ne fait
+      // pas échouer la page : ces parties le disent.
+      const lireStudio = async () => {
+        const lignes: { user_id: string; filtre: string; pays: string | null; created_at: string }[] = [];
         for (let debut = 0; ; debut += PAGE) {
           const { data, error } = await sb
             .from("photo_studio")
-            .select("user_id, pays, created_at")
-            .eq("filtre", "drapeau")
+            .select("user_id, filtre, pays, created_at")
             .order("id")
             .range(debut, debut + PAGE - 1);
           if (error) return null;
@@ -77,10 +76,10 @@ export default function ActivitePage() {
           if (!data || data.length < PAGE) return lignes;
         }
       };
-      const [actData, prof, drap] = await Promise.all([
+      const [actData, prof, studioBrut] = await Promise.all([
         lireTout(),
         sb.from("profiles").select("id, name, contact_email, created_at, is_admin"),
-        lireDrapeaux(),
+        lireStudio(),
       ]);
       if (prof.error) throw new Error(prof.error.message);
 
@@ -116,10 +115,14 @@ export default function ActivitePage() {
         admin: !!p.is_admin || isAdmin(p.name),
       }));
       const noms = new Map(((prof.data ?? []) as ProfilBrut[]).map((p) => [p.id, p.name]));
-      const drapeaux =
-        drap?.map((d) => ({ name: noms.get(d.user_id) ?? "?", pays: d.pays, at: new Date(d.created_at).getTime() })) ??
-        null;
-      setData({ evenements, profiles, drapeaux, now: Date.now() });
+      const studio =
+        studioBrut?.map((d) => ({
+          name: noms.get(d.user_id) ?? "?",
+          filtre: d.filtre,
+          pays: d.pays,
+          at: new Date(d.created_at).getTime(),
+        })) ?? null;
+      setData({ evenements, profiles, studio, now: Date.now() });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Lecture impossible.");
     }

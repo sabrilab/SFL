@@ -218,12 +218,12 @@ export default function LigueViergePage() {
   const derniers = vus ? [...vus].reverse().slice(0, 12) : [];
 
   return (
-    <div className="shell flex flex-col gap-6 py-2 sm:py-6 lg:gap-[var(--fib-34)] lg:pt-[var(--fib-55)]">
-      <div className="flex items-baseline gap-2">
+    <div className="mx-auto flex w-full max-w-[470px] flex-col gap-6 px-5 pt-2 pb-8 sm:pt-6">
+      <div className="flex flex-col gap-2.5">
         <h1 className="sr-only">Ligue vierge</h1>
-        <ChoixLigue actif="/ligue-vierge" className="lg:[&_a]:text-[34px]" />
+        <ChoixLigue actif="/ligue-vierge" />
         {vus && vus.length > 0 && (
-          <span className="mono-label ml-auto text-foreground/40">
+          <span className="mono-label text-foreground/40">
             {vus.length} match{vus.length > 1 ? "s" : ""} · {classement.length} joueur{classement.length > 1 ? "s" : ""}
           </span>
         )}
@@ -240,7 +240,7 @@ export default function LigueViergePage() {
           Aucun match Bola joué pour l&apos;instant.
         </div>
       ) : (
-        <div className="grille-or grid grid-cols-1 gap-6">
+        <div className="flex flex-col gap-8">
           <section className="flex flex-col gap-5">
             <Podium top={classement.slice(0, 3)} moi={moi} />
             <div className="flex flex-col gap-1.5">

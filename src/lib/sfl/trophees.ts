@@ -4,6 +4,11 @@
 // encore gagnée montre déjà le chemin jusqu'au bronze. Calculé à partir de la
 // saison, rien n'est stocké.
 //
+// Sept badges, sur deux lignes dans Ma carte (Sabri, 22/10) : buts, passes,
+// matchs, victoires, puis MVP, Le Mur, Impact. Ancienneté, série et cage
+// inviolée ont été retirées (la cage reviendra, réservée aux gardiens et aux
+// meilleurs défenseurs).
+//
 // Les classements de fin de saison (1er, 2e, 3e), plus rares, vivent à part :
 // voir fin-de-saison.ts.
 
@@ -17,10 +22,7 @@ export type TropheeId =
   | "mvp"
   | "mur"
   | "impact"
-  | "victoires"
-  | "cleanSheet"
-  | "serie"
-  | "saisons";
+  | "victoires";
 
 export interface DefTrophee {
   id: TropheeId;
@@ -41,9 +43,6 @@ export const TROPHEES: DefTrophee[] = [
   { id: "mvp", nom: "MVP du match", inscription: "meilleur joueur du match.", paliers: [1, 3, 5, 10], unite: ["fois", "fois"] },
   { id: "mur", nom: "Le Mur", inscription: "meilleur défenseur du match.", paliers: [1, 3, 5, 10], unite: ["fois", "fois"] },
   { id: "impact", nom: "Impact", inscription: "le joueur qui change le match.", paliers: [1, 3, 5, 10], unite: ["fois", "fois"] },
-  { id: "cleanSheet", nom: "Cage inviolée", inscription: "des matchs sans encaisser.", paliers: [3, 5, 10, 20], unite: ["match", "matchs"] },
-  { id: "serie", nom: "Série", inscription: "des dimanches d'affilée.", paliers: [3, 5, 8, 12], unite: ["dimanche", "dimanches"] },
-  { id: "saisons", nom: "Ancienneté", inscription: "des saisons jouées.", paliers: [1, 2, 3, 5], unite: ["saison", "saisons"] },
 ];
 
 /** Les quatre paliers, du plus courant au plus rare. */
@@ -110,11 +109,9 @@ function compter(s: Saison, nom: string, c: Compteurs, maintenant?: Date) {
     return !!meta && datePassee(meta.date, maintenant);
   };
   const lignes = s.entries.filter((e) => e.player === nom && !e.extraTime);
-  const jouees = [...new Set(s.entries.map((e) => e.j))].filter(passee).sort((a, b) => a - b);
   const presentes = new Set(lignes.filter((e) => e.statut === "Présent" && passee(e.j)).map((e) => e.j));
   if (!presentes.size) return;
 
-  c.saisons += 1;
   c.matchs += presentes.size;
   for (const e of lignes) {
     if (!presentes.has(e.j)) continue;
@@ -124,12 +121,6 @@ function compter(s: Saison, nom: string, c: Compteurs, maintenant?: Date) {
     if (e.mvp) c.mvp += 1;
     if (e.def) c.mur += 1;
     if (e.impact) c.impact += 1;
-    if (e.cleanSheet) c.cleanSheet += 1;
-  }
-  let suite = 0;
-  for (const j of jouees) {
-    suite = presentes.has(j) ? suite + 1 : 0;
-    c.serie = Math.max(c.serie, suite);
   }
 }
 
@@ -153,7 +144,7 @@ export function vitrine(saison: Saison, nom: string, maintenant?: Date): EtatTro
 export function prochain(etats: EtatTrophee[]): EtatTrophee | null {
   return (
     etats
-      .filter((e) => e.cible != null && e.def.id !== "saisons")
+      .filter((e) => e.cible != null)
       .sort((a, b) => b.progression - a.progression || a.cible! - a.valeur - (b.cible! - b.valeur))[0] ?? null
   );
 }

@@ -9,5 +9,5 @@ import { Vestiaire } from "@/components/sfl/vestiaire";
 
 export default function VestiairePage() {
   const router = useRouter();
-  return <Vestiaire onOuvrirJournee={(j) => router.push(`/ligue?j=${j}`)} />;
+  return <Vestiaire onOuvrirJournee={(j) => router.push(`/ligue/journee?j=${j}`)} />;
 }

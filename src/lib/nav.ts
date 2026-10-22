@@ -13,7 +13,7 @@ export interface NavItem {
 // 1. Map (à gauche) — les matchs de la ligue sur leur terrain ; pour l'instant,
 //    un seul, celui du dimanche
 // 2. Profil (au milieu) — la carte du joueur, sa collection, ses matchs
-// 3. Feed (à droite) — les nouvelles et les récaps de la ligue
+// 3. Actus (à droite) — le fil de la ligue, en cinématiques (ex-Ligue, 22/10)
 // Discussions et Boutique existent (/discussions, /boutique) mais ne sont pas
 // mises en avant : retirées de la navigation à la demande de la ligue.
 // Les anciennes routes (/stats, /carte, /collection, /duel, /reglages)
@@ -21,7 +21,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Map", icon: MapPin },
   { href: "/profil", label: "Ma carte", icon: CircleUserRound },
-  { href: "/ligue", label: "Ligue", icon: Newspaper },
+  { href: "/ligue", label: "Actus", icon: Newspaper },
 ];
 
 // Les pages imbriquées sous un onglet : on y entre depuis l'onglet, l'onglet
