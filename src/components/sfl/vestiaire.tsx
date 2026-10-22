@@ -320,7 +320,7 @@ function PhotoVue({ piece }: { piece: PiecePhoto }) {
               type="button"
               onClick={() => setGrand(false)}
               aria-label="Fermer"
-              className="glass absolute top-[max(env(safe-area-inset-top),14px)] right-4 flex size-10 items-center justify-center rounded-full"
+              className="bouton-secondaire absolute top-[max(env(safe-area-inset-top),14px)] right-4 flex size-10 items-center justify-center"
             >
               <X className="size-5" />
             </button>
@@ -380,7 +380,7 @@ function VideoVue({ piece }: { piece: PieceVideo }) {
               type="button"
               onClick={() => setGrand(false)}
               aria-label="Fermer"
-              className="glass absolute top-[max(env(safe-area-inset-top),14px)] right-4 flex size-10 items-center justify-center rounded-full"
+              className="bouton-secondaire absolute top-[max(env(safe-area-inset-top),14px)] right-4 flex size-10 items-center justify-center"
             >
               <X className="size-5" />
             </button>
@@ -566,7 +566,7 @@ function ChoixPiece({ onChoix, onPhoto, onFermer }: { onChoix: (p: Piece) => voi
         <span className="mono-label text-foreground/45">
           {etape === "menu" ? "Partager" : etape === "feuille" ? "Feuille de match" : "Classement"}
         </span>
-        <button type="button" onClick={onFermer} aria-label="Fermer" className="flex size-7 items-center justify-center rounded-full text-foreground/50">
+        <button type="button" onClick={onFermer} aria-label="Fermer" className="bouton-discret flex size-7 items-center justify-center">
           <X className="size-4" />
         </button>
       </div>
@@ -659,7 +659,7 @@ function ReglageNotifs({ mode, onMode, onFermer }: { mode: ModeNotifs; onMode: (
             setEtat(e);
             if (e === "actives") toast.success("Notifications activées");
           }}
-          className="mt-1 w-full rounded-full bg-foreground py-2.5 text-[13px] font-bold text-background"
+          className="bouton-principal mt-1 w-full py-2.5 text-[13px] font-bold"
         >
           Activer sur ce téléphone
         </button>
@@ -860,11 +860,11 @@ function Bulle({
             </div>
             {(m.mien || admin) && (
               <div className="flex gap-1.5">
-                <button type="button" onClick={onRetirer} className="glass-soft rounded-full px-3 py-1.5 text-[12.5px] font-semibold">
+                <button type="button" onClick={onRetirer} className="bouton-secondaire bouton--rouge px-3 py-1.5 text-[12.5px] font-semibold">
                   Retirer
                 </button>
                 {admin && !m.mien && (
-                  <button type="button" onClick={onCouper} className="glass-soft rounded-full px-3 py-1.5 text-[12.5px] font-semibold">
+                  <button type="button" onClick={onCouper} className="bouton-secondaire bouton--rouge px-3 py-1.5 text-[12.5px] font-semibold">
                     Couper la parole 24 h
                   </button>
                 )}
@@ -1244,7 +1244,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
             onClick={() => setReglage((v) => !v)}
             aria-label="Notifications du Vestiaire"
             aria-expanded={reglage}
-            className="glass flex size-11 items-center justify-center rounded-full"
+            className="bouton-secondaire flex size-11 items-center justify-center"
           >
             {mode === "rien" ? <BellOff className="size-[18px]" /> : <Bell className="size-[18px]" />}
           </button>
@@ -1353,7 +1353,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                     setTexte((t) => t.replace(/@([\p{L}0-9_.-]*)$/u, `@${p.pseudo} `));
                     champ.current?.focus();
                   }}
-                  className="glass flex shrink-0 items-center gap-2 rounded-full py-1 pr-3.5 pl-1"
+                  className="bouton-secondaire flex shrink-0 items-center gap-2 py-1 pr-3.5 pl-1"
                 >
                   <CarteDe name={p.name} size={FORMAT_CARTE.petite * 0.62} inerte />
                   <span className="text-[13px] font-semibold">@{p.pseudo}</span>
@@ -1371,7 +1371,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                 </span>
                 <span className="block truncate text-[13px] text-foreground/55">{apercu(reponse)}</span>
               </div>
-              <button type="button" onClick={() => setReponse(null)} aria-label="Ne plus répondre" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/10">
+              <button type="button" onClick={() => setReponse(null)} aria-label="Ne plus répondre" className="bouton-secondaire flex size-7 shrink-0 items-center justify-center">
                 <X className="size-3.5" />
               </button>
             </div>
@@ -1398,7 +1398,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                   setPiece(null);
                 }}
                 aria-label="Retirer"
-                className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/10"
+                className="bouton-secondaire flex size-7 shrink-0 items-center justify-center"
               >
                 <X className="size-3.5" />
               </button>
@@ -1410,7 +1410,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
               <div className="min-w-0 flex-1">
                 <PieceVue piece={piece} />
               </div>
-              <button type="button" onClick={() => setPiece(null)} aria-label="Retirer la pièce" className="m-2 flex size-7 shrink-0 items-center justify-center rounded-full bg-white/10">
+              <button type="button" onClick={() => setPiece(null)} aria-label="Retirer la pièce" className="bouton-secondaire m-2 flex size-7 shrink-0 items-center justify-center">
                 <X className="size-3.5" />
               </button>
             </div>
@@ -1427,7 +1427,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                 type="button"
                 onClick={micro.annuler}
                 aria-label="Annuler le vocal"
-                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/10"
+                className="bouton-secondaire bouton--rouge flex size-10 shrink-0 items-center justify-center"
               >
                 <X className="size-5" />
               </button>
@@ -1440,7 +1440,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                 type="button"
                 onClick={() => void envoyerVocal()}
                 aria-label="Envoyer le vocal"
-                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-95"
+                className="bouton-principal flex size-10 shrink-0 items-center justify-center"
               >
                 <ArrowUp className="size-5" strokeWidth={2.75} />
               </button>
@@ -1458,7 +1458,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                 onClick={() => setChoix((v) => !v)}
                 aria-label="Partager une carte, une feuille, un classement"
                 aria-expanded={choix}
-                className={cn("flex size-10 shrink-0 items-center justify-center rounded-full transition-colors", choix ? "bg-foreground text-background" : "bg-white/10")}
+                className={cn("flex size-10 shrink-0 items-center justify-center", choix ? "bouton-principal" : "bouton-secondaire")}
               >
                 <Plus className="size-5" strokeWidth={2.5} />
               </button>
@@ -1501,7 +1501,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                   onClick={() => choixPhoto.current?.click()}
                   disabled={envoi}
                   aria-label="Envoyer une photo ou une vidéo"
-                  className="flex size-10 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95 disabled:opacity-25"
+                  className="bouton-discret flex size-10 shrink-0 items-center justify-center text-foreground disabled:opacity-25"
                 >
                   <Camera className="size-5" strokeWidth={2.25} />
                 </button>
@@ -1512,7 +1512,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                   onClick={() => void micro.commencer()}
                   disabled={envoi}
                   aria-label="Enregistrer un vocal"
-                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/10 transition-transform active:scale-95 disabled:opacity-25"
+                  className="bouton-secondaire flex size-10 shrink-0 items-center justify-center disabled:opacity-25"
                 >
                   <Mic className="size-5" strokeWidth={2.25} />
                 </button>
@@ -1523,7 +1523,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
                   onPointerDown={(e) => e.preventDefault()}
                   disabled={envoi || (!texte.trim() && !piece)}
                   aria-label="Envoyer"
-                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-95 disabled:opacity-25"
+                  className="bouton-principal flex size-10 shrink-0 items-center justify-center disabled:opacity-25"
                 >
                   <ArrowUp className="size-5" strokeWidth={2.75} />
                 </button>
@@ -1554,7 +1554,7 @@ function messagesDemo(noms: string[], journees: Journee[]): MessageV[] {
     [n(3), "", { type: "vocal", chemin: "blob:demo", duree: 14.2 }, { "😂": ["a"] }, null],
     [n(4), "Tu le crois ça ?", { type: "ligue", titre: "L'équipe type", j: jn?.j, lignes: [0, 1, 2, 3, 4].map((k) => ({ n: n(k), v: `+${30 - k * 4} pts` })) }, { "🔥": ["a", "b"] }, null],
     [n(0), "", { type: "ligue", titre: "L'homme du dimanche", j: jn?.j, lignes: [{ n: n(0), v: "3 buts · 1 passe · +42 pts" }] }, { "🐐": ["a", "b", "c"] }, null],
-    [n(1), "La preuve", { type: "photo", chemin: "/players/Yacine.png", l: 1024, h: 1536 }, { "💀": ["a", "b"] }, null],
+    [n(1), "La preuve", { type: "photo", chemin: "/avatars/maillot-noir.png", l: 460, h: 480 }, { "💀": ["a", "b"] }, null],
     [n(2), "", { type: "video", chemin: "/videos/j8-bensou.webm", l: 1280, h: 720, duree: 17.2 }, { "🔥": ["a", "b", "c"] }, null],
     ["moi", "Dimanche on règle ça sur le terrain", null, {}, 6],
   ];

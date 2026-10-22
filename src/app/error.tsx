@@ -92,7 +92,7 @@ export default function Error({
                 () => {}
               );
             }}
-            className="mono-label flex items-center gap-1.5 rounded-full bg-white/6 px-2.5 py-1.5 text-foreground/55"
+            className="bouton-secondaire mono-label flex items-center gap-1.5 px-2.5 py-1.5"
           >
             {copie ? <Check className="size-3" /> : <Copy className="size-3" />}
             {copie ? "Copié" : "Copier"}

@@ -260,7 +260,7 @@ export function OuvrirMatch({
               aria-label="Une place de moins"
               disabled={places <= minimum}
               onClick={() => setPlaces((n) => Math.max(minimum, n - 1))}
-              className="grid size-9 place-items-center rounded-full bg-secondary disabled:opacity-40"
+              className="bouton-secondaire grid size-9 place-items-center disabled:opacity-40"
             >
               <Minus className="size-4" />
             </button>
@@ -270,7 +270,7 @@ export function OuvrirMatch({
               aria-label="Une place de plus"
               disabled={places >= 22}
               onClick={() => setPlaces((n) => Math.min(22, n + 1))}
-              className="grid size-9 place-items-center rounded-full bg-secondary disabled:opacity-40"
+              className="bouton-secondaire grid size-9 place-items-center disabled:opacity-40"
             >
               <Plus className="size-4" />
             </button>

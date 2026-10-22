@@ -32,15 +32,69 @@ export default function ComponentsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Boutons & badges</CardTitle>
+          <CardTitle className="text-base">Boutons</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap items-center gap-3">
-          <Button>Primaire</Button>
-          <Button variant="secondary">Secondaire</Button>
-          <Button variant="outline">Contour</Button>
-          <Button variant="ghost">Fantôme</Button>
-          <Badge>Nouveau</Badge>
-          <Badge variant="secondary">Beta</Badge>
+        <CardContent className="flex flex-col gap-6">
+          {/* Les trois rangs (app/boutons.css) : le verre allumé, le verre
+              fumé, le texte seul. */}
+          <div className="flex flex-col gap-3">
+            <p className="mono-label text-muted-foreground">Rangs</p>
+            <button type="button" className="bouton-principal flex h-12 items-center justify-center text-[15px] font-semibold">
+              Je viens
+            </button>
+            <button type="button" className="bouton-secondaire flex h-12 items-center justify-center text-[15px] font-semibold">
+              Pas dispo
+            </button>
+            <button type="button" className="bouton-discret flex h-11 items-center justify-center text-[14px] font-semibold">
+              Plus tard
+            </button>
+          </div>
+          <div className="flex flex-col gap-3">
+            <p className="mono-label text-muted-foreground">Tons</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button type="button" className="bouton-principal bouton--or flex h-12 items-center justify-center text-[15px] font-semibold">
+                Voir ma carte
+              </button>
+              <button type="button" className="bouton-principal bouton--braise flex h-12 items-center justify-center text-[15px] font-semibold">
+                Prendre une place
+              </button>
+              <button type="button" className="bouton-principal bouton--vert flex h-12 items-center justify-center text-[15px] font-semibold">
+                Je viens ✓
+              </button>
+              <button type="button" className="bouton-secondaire bouton--rouge flex h-12 items-center justify-center text-[15px] font-semibold">
+                Annuler le match
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-col gap-3">
+            <p className="mono-label text-muted-foreground">Ronds, éteint</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" aria-label="Envoyer" className="bouton-principal grid size-10 place-items-center">
+                ↑
+              </button>
+              <button type="button" aria-label="Fermer" className="bouton-secondaire grid size-10 place-items-center">
+                ✕
+              </button>
+              <Button>Composant</Button>
+              <Button variant="secondary">Secondaire</Button>
+              <Button disabled>Éteint</Button>
+            </div>
+          </div>
+          <div className="flex flex-col gap-3 rounded-[22px] bg-[#e9eae6] p-4">
+            <p className="mono-label text-[#5c5d59]">Sur la Map</p>
+            <div className="flex items-center gap-3">
+              <button type="button" className="bouton-encre flex h-11 items-center px-[18px] text-[15.5px] font-semibold">
+                Ouvrir un match
+              </button>
+              <button type="button" aria-label="Recherche" className="bouton-givre grid size-10 place-items-center">
+                ⌕
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Badge>Nouveau</Badge>
+            <Badge variant="secondary">Beta</Badge>
+          </div>
         </CardContent>
       </Card>
 

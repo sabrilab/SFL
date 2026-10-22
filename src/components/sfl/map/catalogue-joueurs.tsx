@@ -93,7 +93,7 @@ function TaVille({ me, chercher = false }: { me: string; chercher?: boolean }) {
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input ref={champ} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ta ville" className="h-10 rounded-full pl-9 text-[15px]" />
           </div>
-          <button type="button" onClick={() => setCherche(false)} aria-label="Fermer" className="grid size-10 place-items-center rounded-full bg-secondary">
+          <button type="button" onClick={() => setCherche(false)} aria-label="Fermer" className="bouton-secondaire grid size-10 place-items-center">
             <X className="size-4" />
           </button>
         </div>
@@ -130,8 +130,8 @@ function TaVille({ me, chercher = false }: { me: string; chercher?: boolean }) {
           aria-label={mienne.cachee ? "Apparaître sur la Map" : "Disparaître de la Map"}
           aria-pressed={!mienne.cachee}
           className={cn(
-            "grid size-10 shrink-0 place-items-center rounded-full transition-colors disabled:opacity-50",
-            mienne.cachee ? "bg-secondary text-muted-foreground" : "bg-foreground text-background"
+            "grid size-10 shrink-0 place-items-center disabled:opacity-50",
+            mienne.cachee ? "bouton-secondaire text-muted-foreground" : "bouton-principal"
           )}
         >
           {mienne.cachee ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
@@ -227,7 +227,7 @@ export function CatalogueJoueurs({
           <button
             type="button"
             onClick={() => onVoir(une)}
-            className="flex h-11 items-center gap-2 rounded-full bg-foreground px-5 text-[15px] font-semibold text-background active:opacity-80"
+            className="bouton-principal flex h-11 items-center gap-2 px-5 text-[15px] font-semibold"
           >
             <MapPin className="size-4" strokeWidth={2.4} /> Sur la Map
           </button>

@@ -7,28 +7,31 @@
 // carte, sur tous les téléphones. Un fichier par joueur, nommé d'après son
 // nom en hexadécimal (les clés Storage refusent accents et espaces).
 //
+// Depuis le 22/10/2026, cette photo ne vient que du studio IA
+// (photo-studio.tsx, puis recadrer-photo.tsx) : l'app n'offre plus aucun
+// choix dans la pellicule (Sabri : « Les utilisateurs ne doivent pas pouvoir
+// mettre de cartes de leurs pellicules »).
+//
 // Ce module tient trois couches, de la plus proche à la plus lointaine :
 //   · la photo LOCALE (localStorage, data URL) — posée sur cet appareil et
-//     pas encore envoyée (session non vérifiée, réseau absent) ;
+//     pas encore envoyée (session non vérifiée, réseau absent). La clé a
+//     changé le 22/10 : une photo restée en attente sous l'ancienne clé
+//     pouvait venir de la pellicule, elle est effacée sans partir ;
 //   · la liste DISTANTE — nom → URL publique versionnée, relue au lancement
 //     et au retour sur l'app, gardée en cache pour un affichage immédiat ;
-//   · le portrait livré dans public/players, en dernier recours.
-//
-// Les images sont recadrées en carré et recompressées avant envoi : une
-// photo brute d'iPhone pèse plusieurs mégaoctets.
+//   · le portrait livré dans public/players, en dernier recours (aucun n'y
+//     est plus livré : une carte sans photo du studio n'en montre pas).
 
 import { SUPABASE_URL, supabase } from "@/lib/supabase";
 
-const KEY_PREFIX = "sfl-photo-";
+const KEY_PREFIX = "sfl-studio-photo-";
+/** L'ancienne clé des photos en attente, du temps de la pellicule. */
+const ANCIEN_PREFIXE = "sfl-photo-";
 const CACHE_KEY = "sfl-photos-distantes";
 const BUCKET = "photos";
 
 /** Émis à chaque ajout ou suppression de photo, pour rafraîchir les cartes. */
 export const PHOTO_EVENT = "sfl-photo";
-
-/** Côté carré de l'image stockée, en pixels. */
-const OUTPUT_SIZE = 640;
-const JPEG_QUALITY = 0.84;
 
 function key(name: string) {
   return `${KEY_PREFIX}${name}`;
@@ -36,6 +39,17 @@ function key(name: string) {
 
 function hasWindow() {
   return typeof window !== "undefined" && !!window.localStorage;
+}
+
+/** Efface les photos en attente sous l'ancienne clé : elles ne partiront jamais. */
+function oublierAnciennes() {
+  try {
+    const ls = window.localStorage;
+    for (let i = ls.length - 1; i >= 0; i--) {
+      const k = ls.key(i);
+      if (k?.startsWith(ANCIEN_PREFIXE)) ls.removeItem(k);
+    }
+  } catch {}
 }
 
 /** La clé Storage d'un joueur : son nom en hexadécimal UTF-8. */
@@ -101,6 +115,7 @@ let enCours: Promise<void> | null = null;
  */
 export function rafraichirPhotos(): Promise<void> {
   if (!hasWindow()) return Promise.resolve();
+  oublierAnciennes();
   enCours ??= (async () => {
     try {
       const { data, error } = await supabase().storage.from(BUCKET).list("", { limit: 1000 });
@@ -236,41 +251,4 @@ export async function envoyerPhotosEnAttente(name: string): Promise<void> {
   try {
     await envoyer(name, locale);
   } catch {}
-}
-
-/**
- * Recadre un fichier image en carré centré, le réduit à OUTPUT_SIZE et le
- * recompresse en JPEG. Renvoie une data URL prête à être envoyée.
- */
-export function preparePhoto(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new window.Image();
-
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      // Recadrage centré sur le plus petit côté.
-      const side = Math.min(img.naturalWidth, img.naturalHeight);
-      const sx = (img.naturalWidth - side) / 2;
-      const sy = (img.naturalHeight - side) / 2;
-
-      const canvas = document.createElement("canvas");
-      canvas.width = OUTPUT_SIZE;
-      canvas.height = OUTPUT_SIZE;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("Canvas indisponible."));
-        return;
-      }
-      ctx.drawImage(img, sx, sy, side, side, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
-      resolve(canvas.toDataURL("image/jpeg", JPEG_QUALITY));
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Image illisible."));
-    };
-
-    img.src = url;
-  });
 }

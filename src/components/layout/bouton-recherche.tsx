@@ -13,7 +13,7 @@ export function BoutonRecherche({ className }: { className?: string }) {
     <Link
       href="/recherche"
       aria-label="Recherche"
-      className={cn("glass flex size-11 shrink-0 items-center justify-center rounded-full transition-transform active:scale-95", className)}
+      className={cn("bouton-secondaire flex size-11 shrink-0 items-center justify-center", className)}
     >
       <span className="scale-[0.82]">
         <RechercheIcon />

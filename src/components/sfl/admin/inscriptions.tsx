@@ -222,7 +222,7 @@ export function Inscriptions({
             <button
               type="button"
               onClick={() => ajouter(horsSaison)}
-              className="shrink-0 rounded-full bg-foreground px-3.5 py-1.5 text-[12.5px] font-bold text-background"
+              className="bouton-principal shrink-0 px-3.5 py-1.5 text-[12.5px] font-bold"
             >
               Tout ajouter
             </button>
@@ -234,7 +234,7 @@ export function Inscriptions({
             <button
               type="button"
               onClick={() => ajouter([n])}
-              className="rounded-full bg-muted px-3 py-1.5 text-[12.5px] font-semibold"
+              className="bouton-secondaire px-3 py-1.5 text-[12.5px] font-semibold"
             >
               Ajouter
             </button>

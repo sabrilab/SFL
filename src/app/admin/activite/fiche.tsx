@@ -80,7 +80,7 @@ export function FicheJoueur({
           <button
             onClick={onClose}
             aria-label="Revenir à Activité"
-            className="glass flex size-10 shrink-0 items-center justify-center rounded-full active:scale-95"
+            className="bouton-secondaire flex size-10 shrink-0 items-center justify-center"
           >
             <ChevronLeft className="size-5" />
           </button>

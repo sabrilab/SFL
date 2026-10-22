@@ -127,7 +127,7 @@ export function MesDispos({
               <button
                 type="button"
                 onClick={() => onOuvrir(e.jour, HEURE[e.moment.id])}
-                className="mt-3 flex h-11 w-full items-center justify-center rounded-full bg-foreground text-[14px] font-semibold text-background"
+                className="bouton-principal mt-3 flex h-11 w-full items-center justify-center text-[14px] font-semibold"
               >
                 Ouvrir un match
               </button>

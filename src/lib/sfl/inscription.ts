@@ -2,9 +2,10 @@
 // la route serveur qui crée le compte (/api/inscription).
 //
 // Jusqu'ici, seul l'admin fabriquait les comptes et distribuait les accès. Un
-// joueur peut désormais créer le sien : identité, gabarit, photo de carte et
-// les quatre photos en pied (face, droite, gauche, dos) qui serviront de
-// personnage de référence aux skins. Le compte naît EN ATTENTE : il se
+// joueur peut désormais créer le sien : identité, gabarit et les quatre
+// photos en pied (face, droite, gauche, dos) qui serviront de personnage de
+// référence aux skins — la photo de carte, elle, ne vient que du studio, une
+// fois le compte accepté (22/10/2026). Le compte naît EN ATTENTE : il se
 // connecte, voit sa carte, et l'admin l'accepte d'un geste (Admin → Vue
 // d'ensemble → Inscriptions), ce qui l'ajoute à l'effectif.
 //

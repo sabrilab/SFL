@@ -152,7 +152,7 @@ export function GuideInstallation() {
             <button
               type="button"
               onClick={fait}
-              className="w-full rounded-full py-3 text-[14px] font-semibold text-foreground/80 active:opacity-60"
+              className="bouton-discret w-full py-3 text-[14px] font-semibold"
             >
               C&apos;est fait
             </button>
@@ -221,7 +221,7 @@ function SortieApp({
       {lien && (
         <a
           href={lien}
-          className="mt-8 flex items-center justify-center rounded-full bg-foreground py-4 text-[15px] font-bold text-background active:scale-[0.98]"
+          className="bouton-principal mt-8 flex items-center justify-center py-4 text-[15px] font-bold"
         >
           Ouvrir dans {navigateur}
         </a>
@@ -233,7 +233,7 @@ function SortieApp({
       <button
         type="button"
         onClick={onCopier}
-        className="glass-soft mt-4 flex items-center justify-center gap-2 rounded-full py-3.5 text-[14px] font-semibold"
+        className="bouton-secondaire mt-4 flex items-center justify-center gap-2 py-3.5 text-[14px] font-semibold"
       >
         {copie ? <Check className="size-4" /> : <Copy className="size-4" />}
         {copie ? `Lien copié, colle-le dans ${navigateur}` : "Copier le lien"}
@@ -333,7 +333,7 @@ function Installation({
         <button
           type="button"
           onClick={onInstaller}
-          className="mt-8 flex items-center justify-center rounded-full bg-foreground py-4 text-[15px] font-bold text-background active:scale-[0.98]"
+          className="bouton-principal mt-8 flex items-center justify-center py-4 text-[15px] font-bold"
         >
           Installer
         </button>

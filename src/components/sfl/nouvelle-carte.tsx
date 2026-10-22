@@ -205,7 +205,7 @@ export function NouvellesCartes() {
 
         <button
           onClick={terminer}
-          className="absolute top-5 right-5 rounded-full bg-white/8 px-3.5 py-2 text-[12px] font-semibold text-white/55"
+          className="bouton-secondaire absolute top-5 right-5 px-3.5 py-2 text-[12px] font-semibold"
           style={{ marginTop: "env(safe-area-inset-top)" }}
         >
           Plus tard

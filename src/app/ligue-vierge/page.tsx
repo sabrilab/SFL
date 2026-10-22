@@ -252,7 +252,7 @@ export default function LigueViergePage() {
               <button
                 type="button"
                 onClick={() => setTout(true)}
-                className="glass-soft self-center rounded-full px-5 py-2.5 text-[13px] font-semibold text-foreground/70"
+                className="bouton-secondaire self-center px-5 py-2.5 text-[13px] font-semibold"
               >
                 Tout le classement · {classement.length}
               </button>

@@ -60,8 +60,8 @@ function Field({
         onClick={copy}
         aria-label={`Copier ${label}`}
         className={cn(
-          "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[12px] font-bold transition-colors",
-          copied ? "bg-primary text-primary-foreground" : "bg-foreground text-background"
+          "bouton-principal flex shrink-0 items-center gap-1.5 px-3 py-2 text-[12px] font-bold",
+          copied && "bouton--vert"
         )}
       >
         {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
@@ -87,7 +87,7 @@ function Bienvenue() {
         </p>
         <Link
           href="/"
-          className="mt-6 inline-block rounded-full bg-foreground px-6 py-3.5 text-[15px] font-bold text-background"
+          className="bouton-principal mt-6 inline-block px-6 py-3.5 text-[15px] font-bold"
         >
           Ouvrir l&apos;app
         </Link>
@@ -115,7 +115,7 @@ function Bienvenue() {
 
       <Link
         href="/"
-        className="mt-5 block rounded-full bg-foreground py-4 text-center text-[15px] font-bold text-background transition-transform active:scale-[0.98]"
+        className="bouton-principal mt-5 block py-4 text-center text-[15px] font-bold"
       >
         Entrer dans la ligue
       </Link>

@@ -186,12 +186,12 @@ export function InvitationCarte() {
                 type="button"
                 onClick={oui}
                 disabled={busy}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-white py-[15px] text-[15px] font-bold text-black transition-opacity active:opacity-80 disabled:opacity-50"
+                className="bouton-principal bouton--or flex w-full items-center justify-center gap-2 py-[15px] text-[15px] font-bold disabled:opacity-50"
               >
                 <Icone className="size-4" />
                 {texte.bouton}
               </button>
-              <button type="button" onClick={plusTard} className="px-6 py-3 text-[14px] font-semibold text-white/50">
+              <button type="button" onClick={plusTard} className="bouton-discret px-6 py-3 text-[14px] font-semibold">
                 Plus tard
               </button>
             </motion.div>
