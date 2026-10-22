@@ -1720,3 +1720,402 @@ create policy "agent_sujets: lecture admin"
 
 revoke all on public.agent_sujets from anon, authenticated;
 grant select, insert on public.agent_sujets to authenticated;
+
+-- ───────────────────────────── Mode Team ─────────────────────────────
+-- Les équipes (Sabri, 22/10 ; règles officielles : BOLA docs/gameplay/04 et
+-- 11). Une équipe de 5 à 7 joueurs, un capitaine, un écusson noir et blanc
+-- (ses initiales). Le capitaine invite des joueurs de Bola, ou partage un
+-- lien : un nouveau y crée vite son compte (/api/inscription) et arrive
+-- invité. Entrer, c'est signer le Règlement Team. Une équipe à 5 défie
+-- les autres ; la rencontre se joue ensuite (feuille et points : à venir).
+--
+-- Toute écriture passe par les fonctions ci-dessous (SECURITY DEFINER, les
+-- contrôles DANS la fonction) : les tables ne se lisent que pour la ligue.
+create table if not exists public.equipes (
+  id          bigint generated always as identity primary key,
+  nom         text not null check (char_length(btrim(nom)) between 3 and 20),
+  initiales   text not null check (initiales ~ '^[A-Z0-9]{1,3}$'),
+  fond        text not null default 'noir' check (fond in ('noir', 'blanc')),
+  ville       text,
+  capitaine   uuid not null references public.profiles(id),
+  created_at  timestamptz not null default now()
+);
+create unique index if not exists equipes_nom_unique on public.equipes (lower(btrim(nom)));
+
+create table if not exists public.equipe_membres (
+  equipe_id   bigint not null references public.equipes(id) on delete cascade,
+  joueur      uuid   not null references public.profiles(id) on delete cascade,
+  statut      text   not null default 'invite' check (statut in ('invite', 'membre')),
+  role        text   not null default 'membre' check (role in ('capitaine', 'vice', 'membre')),
+  invite_par  uuid   references public.profiles(id) on delete set null,
+  signe_le    timestamptz,
+  created_at  timestamptz not null default now(),
+  primary key (equipe_id, joueur)
+);
+-- Une seule équipe à la fois.
+create unique index if not exists equipe_membres_une_equipe on public.equipe_membres (joueur) where statut = 'membre';
+
+-- Qui a quitté une équipe n'y revient jamais (règle du fondateur).
+create table if not exists public.equipe_departs (
+  equipe_id  bigint not null references public.equipes(id) on delete cascade,
+  joueur     uuid   not null references public.profiles(id) on delete cascade,
+  parti_le   timestamptz not null default now(),
+  primary key (equipe_id, joueur)
+);
+
+-- Le lien d'invitation : un jeton par équipe, valable 7 jours.
+create table if not exists public.equipe_liens (
+  jeton      text primary key,
+  equipe_id  bigint not null references public.equipes(id) on delete cascade,
+  cree_par   uuid   references public.profiles(id) on delete set null,
+  expire_le  timestamptz not null default now() + interval '7 days'
+);
+
+-- Les défis entre équipes (le call-out) : proposé, puis accepté ou refusé.
+create table if not exists public.equipe_defis (
+  id          bigint generated always as identity primary key,
+  de          bigint not null references public.equipes(id) on delete cascade,
+  a           bigint not null references public.equipes(id) on delete cascade,
+  jour        date   not null,
+  heure       text   not null check (heure ~ '^[0-2][0-9]:[0-5][0-9]$'),
+  lieu        text   not null check (char_length(btrim(lieu)) between 1 and 120),
+  statut      text   not null default 'propose' check (statut in ('propose', 'accepte', 'refuse', 'annule')),
+  created_at  timestamptz not null default now(),
+  check (de <> a)
+);
+create index if not exists equipe_defis_de on public.equipe_defis (de);
+create index if not exists equipe_defis_a on public.equipe_defis (a);
+
+alter table public.equipes enable row level security;
+alter table public.equipe_membres enable row level security;
+alter table public.equipe_departs enable row level security;
+alter table public.equipe_liens enable row level security;
+alter table public.equipe_defis enable row level security;
+
+drop policy if exists "equipes: lecture" on public.equipes;
+create policy "equipes: lecture" on public.equipes for select to authenticated
+  using ((select public.est_membre()));
+drop policy if exists "equipe_membres: lecture" on public.equipe_membres;
+create policy "equipe_membres: lecture" on public.equipe_membres for select to authenticated
+  using ((select public.est_membre()) or joueur = (select auth.uid()));
+drop policy if exists "equipe_defis: lecture" on public.equipe_defis;
+create policy "equipe_defis: lecture" on public.equipe_defis for select to authenticated
+  using ((select public.est_membre()));
+
+revoke all on public.equipes, public.equipe_membres, public.equipe_departs, public.equipe_liens, public.equipe_defis from anon, authenticated;
+grant select on public.equipes, public.equipe_membres, public.equipe_defis to authenticated;
+
+-- Mon rôle dans une équipe (null : pas membre).
+create or replace function public.role_equipe(e bigint)
+returns text
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select m.role from public.equipe_membres m
+   where m.equipe_id = e and m.joueur = (select auth.uid()) and m.statut = 'membre';
+$$;
+
+create or replace function public.equipe_creer(nom text, initiales text, fond text)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  moi uuid := (select auth.uid());
+  e bigint;
+begin
+  if moi is null or not public.est_membre() then
+    raise exception 'Réservé aux joueurs.' using errcode = '42501';
+  end if;
+  if exists (select 1 from public.equipe_membres where joueur = moi and statut = 'membre') then
+    raise exception 'Tu as déjà une équipe.' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.equipes x where lower(btrim(x.nom)) = lower(btrim(equipe_creer.nom))) then
+    raise exception 'Ce nom est déjà pris.' using errcode = 'P0001';
+  end if;
+  insert into public.equipes (nom, initiales, fond, ville, capitaine)
+  values (btrim(equipe_creer.nom), upper(equipe_creer.initiales), equipe_creer.fond,
+          (select p.ville from public.profiles p where p.id = moi), moi)
+  returning id into e;
+  insert into public.equipe_membres (equipe_id, joueur, statut, role, signe_le)
+  values (e, moi, 'membre', 'capitaine', now());
+  return e;
+end;
+$$;
+
+-- Le capitaine (ou son vice) invite un joueur de Bola.
+create or replace function public.equipe_inviter(e bigint, joueur uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if coalesce(public.role_equipe(e), 'membre') = 'membre' then
+    raise exception 'Réservé au capitaine.' using errcode = '42501';
+  end if;
+  if (select count(*) from public.equipe_membres m where m.equipe_id = e and m.statut = 'membre') >= 7 then
+    raise exception 'L''équipe est au complet.' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.equipe_departs d where d.equipe_id = e and d.joueur = equipe_inviter.joueur) then
+    raise exception 'Ce joueur a quitté l''équipe : il n''y revient pas.' using errcode = 'P0001';
+  end if;
+  insert into public.equipe_membres (equipe_id, joueur, statut, invite_par)
+  values (e, equipe_inviter.joueur, 'invite', (select auth.uid()))
+  on conflict on constraint equipe_membres_pkey do nothing;
+end;
+$$;
+
+-- Retirer une invitation (le capitaine), ou la refuser (l'invité).
+create or replace function public.equipe_retirer_invitation(e bigint, joueur uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if joueur <> (select auth.uid()) and coalesce(public.role_equipe(e), 'membre') = 'membre' then
+    raise exception 'Réservé au capitaine.' using errcode = '42501';
+  end if;
+  delete from public.equipe_membres m
+   where m.equipe_id = e and m.joueur = equipe_retirer_invitation.joueur and m.statut = 'invite';
+end;
+$$;
+
+-- Accepter, c'est signer le Règlement Team.
+create or replace function public.equipe_signer(e bigint)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  moi uuid := (select auth.uid());
+begin
+  perform 1 from public.equipes x where x.id = e for update;
+  if not exists (select 1 from public.equipe_membres m where m.equipe_id = e and m.joueur = moi and m.statut = 'invite') then
+    raise exception 'Invitation introuvable.' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.equipe_membres m where m.joueur = moi and m.statut = 'membre') then
+    raise exception 'Tu as déjà une équipe.' using errcode = 'P0001';
+  end if;
+  if (select count(*) from public.equipe_membres m where m.equipe_id = e and m.statut = 'membre') >= 7 then
+    raise exception 'L''équipe est au complet.' using errcode = 'P0001';
+  end if;
+  update public.equipe_membres m set statut = 'membre', signe_le = now()
+   where m.equipe_id = e and m.joueur = moi;
+  -- À 7, les autres invitations tombent.
+  if (select count(*) from public.equipe_membres m where m.equipe_id = e and m.statut = 'membre') >= 7 then
+    delete from public.equipe_membres m where m.equipe_id = e and m.statut = 'invite';
+  end if;
+  -- Mes autres invitations n'ont plus lieu d'être.
+  delete from public.equipe_membres m where m.joueur = moi and m.statut = 'invite';
+end;
+$$;
+
+-- Quitter : pour toujours. Le brassard passe au vice, sinon au plus ancien ;
+-- le dernier qui part dissout l'équipe.
+create or replace function public.equipe_quitter(e bigint)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  moi uuid := (select auth.uid());
+  r text := public.role_equipe(e);
+  suivant uuid;
+begin
+  if r is null then
+    raise exception 'Tu n''es pas dans cette équipe.' using errcode = 'P0001';
+  end if;
+  delete from public.equipe_membres m where m.equipe_id = e and m.joueur = moi;
+  if not exists (select 1 from public.equipe_membres m where m.equipe_id = e and m.statut = 'membre') then
+    delete from public.equipes x where x.id = e;
+    return;
+  end if;
+  insert into public.equipe_departs (equipe_id, joueur) values (e, moi) on conflict do nothing;
+  if r = 'capitaine' then
+    select m.joueur into suivant from public.equipe_membres m
+     where m.equipe_id = e and m.statut = 'membre'
+     order by (m.role = 'vice') desc, m.signe_le asc limit 1;
+    update public.equipe_membres m set role = 'capitaine' where m.equipe_id = e and m.joueur = suivant;
+    update public.equipes x set capitaine = suivant where x.id = e;
+  end if;
+end;
+$$;
+
+-- Le capitaine nomme (ou retire) son vice-capitaine.
+create or replace function public.equipe_vice(e bigint, joueur uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if public.role_equipe(e) is distinct from 'capitaine' then
+    raise exception 'Réservé au capitaine.' using errcode = '42501';
+  end if;
+  update public.equipe_membres m set role = 'membre' where m.equipe_id = e and m.role = 'vice';
+  if joueur is not null then
+    update public.equipe_membres m set role = 'vice'
+     where m.equipe_id = e and m.joueur = equipe_vice.joueur and m.statut = 'membre' and m.role = 'membre';
+  end if;
+end;
+$$;
+
+-- Le lien d'invitation de l'équipe (le même tant qu'il est valable).
+create or replace function public.equipe_lien(e bigint)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  j text;
+begin
+  if coalesce(public.role_equipe(e), 'membre') = 'membre' then
+    raise exception 'Réservé au capitaine.' using errcode = '42501';
+  end if;
+  select l.jeton into j from public.equipe_liens l
+   where l.equipe_id = e and l.expire_le > now() + interval '1 day'
+   order by l.expire_le desc limit 1;
+  if j is null then
+    j := left(replace(gen_random_uuid()::text, '-', ''), 16);
+    insert into public.equipe_liens (jeton, equipe_id, cree_par) values (j, e, (select auth.uid()));
+  end if;
+  return j;
+end;
+$$;
+
+-- Ce que montre la page du lien, même sans compte.
+create or replace function public.equipe_lien_info(j text)
+returns jsonb
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select jsonb_build_object(
+    'id', x.id, 'nom', x.nom, 'initiales', x.initiales, 'fond', x.fond, 'ville', x.ville,
+    'membres', (select count(*) from public.equipe_membres m where m.equipe_id = x.id and m.statut = 'membre'),
+    'capitaine', (select coalesce(p.nom_affiche, p.name) from public.profiles p where p.id = x.capitaine)
+  )
+  from public.equipe_liens l join public.equipes x on x.id = l.equipe_id
+  where l.jeton = j and l.expire_le > now();
+$$;
+
+-- Un joueur connecté ouvre le lien : il devient invité (il signe ensuite).
+create or replace function public.equipe_par_lien(j text)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  moi uuid := (select auth.uid());
+  l record;
+begin
+  select * into l from public.equipe_liens x where x.jeton = j and x.expire_le > now();
+  if l is null then
+    raise exception 'Ce lien n''est plus valable.' using errcode = 'P0001';
+  end if;
+  if moi is null then
+    raise exception 'Connecte-toi.' using errcode = '42501';
+  end if;
+  if exists (select 1 from public.equipe_departs d where d.equipe_id = l.equipe_id and d.joueur = moi) then
+    raise exception 'Tu as quitté cette équipe : tu n''y reviens pas.' using errcode = 'P0001';
+  end if;
+  insert into public.equipe_membres (equipe_id, joueur, statut, invite_par)
+  values (l.equipe_id, moi, 'invite', l.cree_par)
+  on conflict on constraint equipe_membres_pkey do nothing;
+  return l.equipe_id;
+end;
+$$;
+
+-- Défier une équipe : les deux à 5 joueurs au moins.
+create or replace function public.equipe_defier(de bigint, a bigint, jour date, heure text, lieu text)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  d bigint;
+begin
+  if coalesce(public.role_equipe(de), 'membre') = 'membre' then
+    raise exception 'Réservé au capitaine.' using errcode = '42501';
+  end if;
+  if (select count(*) from public.equipe_membres m where m.equipe_id = de and m.statut = 'membre') < 5
+     or (select count(*) from public.equipe_membres m where m.equipe_id = a and m.statut = 'membre') < 5 then
+    raise exception 'Il faut 5 joueurs de chaque côté.' using errcode = 'P0001';
+  end if;
+  if jour < (now() at time zone 'Europe/Paris')::date then
+    raise exception 'Choisis un jour à venir.' using errcode = 'P0001';
+  end if;
+  insert into public.equipe_defis (de, a, jour, heure, lieu)
+  values (equipe_defier.de, equipe_defier.a, equipe_defier.jour, equipe_defier.heure, btrim(equipe_defier.lieu))
+  returning id into d;
+  return d;
+end;
+$$;
+
+-- Répondre (l'équipe défiée) ou annuler (l'une ou l'autre).
+create or replace function public.equipe_defi_statut(d bigint, statut text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  x record;
+begin
+  select * into x from public.equipe_defis f where f.id = d;
+  if x is null then
+    raise exception 'Défi introuvable.' using errcode = 'P0001';
+  end if;
+  if statut in ('accepte', 'refuse') then
+    if x.statut <> 'propose' or coalesce(public.role_equipe(x.a), 'membre') = 'membre' then
+      raise exception 'Réservé au capitaine défié.' using errcode = '42501';
+    end if;
+  elsif statut = 'annule' then
+    if coalesce(public.role_equipe(x.de), 'membre') = 'membre' and coalesce(public.role_equipe(x.a), 'membre') = 'membre' then
+      raise exception 'Réservé aux capitaines.' using errcode = '42501';
+    end if;
+  else
+    raise exception 'Statut inconnu.' using errcode = '22023';
+  end if;
+  update public.equipe_defis f set statut = equipe_defi_statut.statut where f.id = d;
+end;
+$$;
+
+revoke execute on function public.role_equipe(bigint), public.equipe_creer(text, text, text), public.equipe_inviter(bigint, uuid),
+  public.equipe_retirer_invitation(bigint, uuid), public.equipe_signer(bigint), public.equipe_quitter(bigint),
+  public.equipe_vice(bigint, uuid), public.equipe_lien(bigint), public.equipe_par_lien(text),
+  public.equipe_defier(bigint, bigint, date, text, text), public.equipe_defi_statut(bigint, text) from public, anon;
+grant execute on function public.role_equipe(bigint), public.equipe_creer(text, text, text), public.equipe_inviter(bigint, uuid),
+  public.equipe_retirer_invitation(bigint, uuid), public.equipe_signer(bigint), public.equipe_quitter(bigint),
+  public.equipe_vice(bigint, uuid), public.equipe_lien(bigint), public.equipe_par_lien(text),
+  public.equipe_defier(bigint, bigint, date, text, text), public.equipe_defi_statut(bigint, text) to authenticated;
+revoke execute on function public.equipe_lien_info(text) from public;
+grant execute on function public.equipe_lien_info(text) to anon, authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.equipe_membres;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
+do $$
+begin
+  alter publication supabase_realtime add table public.equipe_defis;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;

@@ -19,6 +19,8 @@
 //
 // Le compte naît en attente (voir lib/sfl/inscription.ts) : la fin du parcours
 // le dit, et l'app montre l'écran d'attente jusqu'à l'accord de l'admin.
+// Sauf venu par le lien d'une équipe (?equipe=jeton, mode Team) : le
+// capitaine s'en porte garant, le compte entre aussitôt et l'équipe l'attend.
 //
 // Page publique (hors de la porte de connexion, voir AuthGate).
 
@@ -232,8 +234,17 @@ export default function InscriptionPage() {
   const [aRenvoyer, setARenvoyer] = useState(false);
   // Revenu de Google ou Apple : le compte existe déjà, provisoire.
   const [sociale, setSociale] = useState<Fournisseur | null>(null);
+  // Venu par le lien d'une équipe (mode Team, /equipe/[jeton]) : le compte
+  // entre dans Bola sans attendre l'admin et l'équipe l'attend ; le parcours
+  // est plus court (pas les quatre photos en pied).
+  const [equipe, setEquipe] = useState<string | null>(null);
+  useEffect(() => {
+    const j = new URLSearchParams(window.location.search).get("equipe");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique de l'URL au montage
+    if (j) setEquipe(j);
+  }, []);
   const fini = etape === "fini";
-  const etapes: readonly Etape[] = sociale ? ETAPES_SOCIALES : ETAPES;
+  const etapes: readonly Etape[] = sociale ? ETAPES_SOCIALES : equipe ? ETAPES.filter((e) => e !== "angles") : ETAPES;
   /** Les étapes comptées par la barre de progression (ni l'accueil, ni la fin). */
   const parcours = etapes.slice(1, -1);
   /** L'étape qui crée le compte. */
@@ -241,8 +252,8 @@ export default function InscriptionPage() {
 
   // Un membre déjà connecté n'a rien à faire ici.
   useEffect(() => {
-    if (session && !session.enAttente && !fini) router.replace("/");
-  }, [session, fini, router]);
+    if (session && !session.enAttente && (!fini || equipe)) router.replace(equipe ? "/bola-team" : "/");
+  }, [session, fini, equipe, router]);
 
   // Brouillon : une page rechargée ne fait pas tout recommencer (le mot de
   // passe et les photos ne sont jamais gardés).
@@ -413,7 +424,7 @@ export default function InscriptionPage() {
       const r = await fetch("/api/inscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...f, pseudo, motDePasse, site: piege }),
+        body: JSON.stringify({ ...f, pseudo, motDePasse, site: piege, ...(equipe ? { equipe } : {}) }),
       });
       const d = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string; champ?: string; name?: string };
       if (!r.ok || !d.ok || !d.name) {
@@ -759,12 +770,12 @@ export default function InscriptionPage() {
     case "fini":
       corps = (
         <div className="flex flex-col gap-[13px]">
-          <div className="glass-soft rounded-[21px] px-[21px] py-[13px]">
+          {!equipe && <div className="glass-soft rounded-[21px] px-[21px] py-[13px]">
             <p className="mono-label text-foreground/40">En attente</p>
             <p className="mt-[8px] text-[15px] leading-snug font-semibold">
               La ligue valide ton entrée. Ta carte s&apos;ouvre dès que c&apos;est fait.
             </p>
-          </div>
+          </div>}
           {avertissement && <p className="px-[13px] text-[12.5px] text-[#FF6B5E]">{avertissement}</p>}
           {aRenvoyer && nomFinal && (
             <button
@@ -877,7 +888,7 @@ export default function InscriptionPage() {
           type="button"
           disabled={envoi || (accueil && ouvert === false)}
           onClick={() => {
-            if (fini) router.replace("/");
+            if (fini) router.replace(equipe ? "/bola-team" : "/");
             else if (etape === derniere) void (sociale ? finirSociale() : creer());
             else aller(1);
           }}
@@ -889,7 +900,7 @@ export default function InscriptionPage() {
           {envoi && <Loader2 className="size-4 animate-spin" />}
           {action}
         </button>
-        {accueil && !sociale && ouvert !== false && (
+        {accueil && !sociale && !equipe && ouvert !== false && (
           <BoutonsSociaux retour="/inscription" inscription enLigne onErreur={setErreur} className="mt-[8px]" />
         )}
         {accueil &&
