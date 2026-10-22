@@ -424,7 +424,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
               </div>
             </div>
             <Link
-              href="/ligue?vue=matchs"
+              href="/ligue/journee?vue=matchs"
               className="mt-4 block rounded-full bg-foreground py-3 text-center text-sm font-bold text-background"
             >
               Voir le résumé

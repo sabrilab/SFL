@@ -1,0 +1,184 @@
+/*
+ * Les cinématiques des Actus (components/sfl/actus). Tout est en CSS : une
+ * publication est une scène, ses éléments portent une classe a-* et deux
+ * variables, --t (le moment où ils entrent, en secondes) et --du (leur
+ * durée). Les images clés ne donnent que le départ (from) : l'arrivée est le
+ * style de l'élément lui-même, si bien qu'avec « Réduire les animations »,
+ * qui coupe tout, chaque scène s'affiche directement dans sa pose finale.
+ * Tant que la scène n'est pas à l'écran, tout attend (paused) ; à chaque
+ * entrée, la scène est remontée et rejoue, comme une vidéo du fil.
+ */
+
+.actu-ecran:not([data-joue]) .actu-scene,
+.actu-ecran:not([data-joue]) .actu-scene * {
+  animation-play-state: paused !important;
+}
+
+.actu-scene :is([class^="a-"], [class*=" a-"]) {
+  animation-delay: var(--t, 0s);
+  animation-duration: var(--du, 0.8s);
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.22, 0.9, 0.24, 1);
+}
+
+/* La scène est un conteneur : cqw et cqh y sont ses centièmes. */
+.actu-scene {
+  container-type: size;
+}
+
+/* La barre de lecture, en bas de l'image : elle dit que ça se regarde. */
+.actu-barre {
+  transform-origin: 0 50%;
+  animation: actu-lecture var(--duree, 5s) linear both;
+}
+@keyframes actu-lecture {
+  from { transform: scaleX(0); }
+}
+
+.a-fondu { animation-name: a-fondu; }
+@keyframes a-fondu { from { opacity: 0; } }
+
+.a-monte { animation-name: a-monte; }
+@keyframes a-monte { from { opacity: 0; transform: translateY(46px); filter: blur(8px); } }
+
+.a-descend { animation-name: a-descend; }
+@keyframes a-descend { from { opacity: 0; transform: translateY(-40px); filter: blur(6px); } }
+
+.a-glisse-g { animation-name: a-glisse-g; }
+@keyframes a-glisse-g { from { opacity: 0; transform: translateX(-120%); } }
+
+.a-glisse-d { animation-name: a-glisse-d; }
+@keyframes a-glisse-d { from { opacity: 0; transform: translateX(120%); } }
+
+/* La carte qui se retourne : de profil, elle pivote jusqu'à se mettre de face. */
+.a-flip { animation-name: a-flip; }
+@keyframes a-flip {
+  from { opacity: 0; transform: perspective(900px) translateY(60px) rotateY(-100deg) scale(0.86); }
+  45% { opacity: 1; }
+}
+
+/* Le tour complet : la carte fait un tour sur elle-même et se pose de face. */
+.a-tour { animation-name: a-tour; animation-timing-function: cubic-bezier(0.16, 0.84, 0.3, 1) !important; }
+@keyframes a-tour {
+  from { opacity: 0; transform: perspective(900px) rotateY(-540deg) scale(0.5); }
+  20% { opacity: 1; }
+}
+
+/* Le zoom arrière : on part collé à la carte, flou, et on recule. */
+.a-zoom { animation-name: a-zoom; }
+@keyframes a-zoom { from { opacity: 0; transform: scale(3.2); filter: blur(10px); } 30% { opacity: 1; } }
+
+/* L'impact : un chiffre, un mot, qui tombe de près et claque en place. */
+.a-claque { animation-name: a-claque; animation-timing-function: cubic-bezier(0.3, 1.4, 0.5, 1) !important; }
+@keyframes a-claque { from { opacity: 0; transform: scale(2.2); filter: blur(4px); } }
+
+.a-pop { animation-name: a-pop; animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1) !important; }
+@keyframes a-pop { from { opacity: 0; transform: scale(0); } }
+
+/* La chute avec rebond : un badge, une carte qui atterrit sur sa marche. */
+.a-tombe { animation-name: a-tombe; animation-timing-function: linear !important; }
+@keyframes a-tombe {
+  from { opacity: 0; transform: translateY(-260px) rotate(-14deg); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  12% { opacity: 1; }
+  62% { transform: translateY(0) rotate(0deg); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+  78% { transform: translateY(-22px) rotate(2deg); animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.5); }
+  90% { transform: translateY(0) rotate(0deg); }
+  95% { transform: translateY(-5px); }
+}
+
+/* La donne : chaque carte part du paquet (--dx, --dy, --r) jusqu'à sa place. */
+.a-donne { animation-name: a-donne; }
+@keyframes a-donne {
+  from { opacity: 0; transform: translate(var(--dx, 0), var(--dy, 0)) rotate(var(--r, 0deg)) scale(0.7); }
+  15% { opacity: 1; }
+}
+
+/* Les deux cartes qui se rentrent dedans, puis s'écartent. */
+.a-choc-g { animation-name: a-choc-g; }
+@keyframes a-choc-g {
+  from { opacity: 0; transform: translateX(-160%); }
+  45% { opacity: 1; transform: translateX(32%) rotate(4deg); }
+  60% { transform: translateX(26%) rotate(3deg); }
+}
+.a-choc-d { animation-name: a-choc-d; }
+@keyframes a-choc-d {
+  from { opacity: 0; transform: translateX(160%); }
+  45% { opacity: 1; transform: translateX(-32%) rotate(-4deg); }
+  60% { transform: translateX(-26%) rotate(-3deg); }
+}
+
+/* Le projecteur qui s'ouvre. */
+.a-cone { animation-name: a-cone; transform-origin: 50% 0; }
+@keyframes a-cone { from { opacity: 0; transform: scaleX(0.05); } }
+
+/* Les barres et les marches qui poussent. */
+.a-barre { animation-name: a-barre; transform-origin: 0 50%; }
+@keyframes a-barre { from { transform: scaleX(0); } }
+.a-hausse { animation-name: a-hausse; transform-origin: 50% 100%; }
+@keyframes a-hausse { from { transform: scaleY(0); } }
+
+/* Un trait qui se dessine (pathLength="1" sur le tracé). */
+.a-trace { animation-name: a-trace; stroke-dasharray: 1; }
+@keyframes a-trace { from { stroke-dashoffset: 1; } }
+
+/* L'anneau qui se remplit jusqu'à --plein (de 0 à 1). */
+.a-anneau { animation-name: a-anneau; stroke-dasharray: 1; stroke-dashoffset: calc(1 - var(--plein, 1)); }
+@keyframes a-anneau { from { stroke-dashoffset: 1; } }
+
+/* Le reflet qui traverse la carte : il part et disparaît, il ne reste rien. */
+.a-reflet { animation-name: a-reflet; opacity: 0; }
+@keyframes a-reflet {
+  from { opacity: 1; transform: translateX(-130%) skewX(-18deg); }
+  to { opacity: 1; transform: translateX(230%) skewX(-18deg); }
+}
+
+/* L'onde de choc : un anneau qui s'élargit et s'éteint. */
+.a-onde { animation-name: a-onde; opacity: 0; }
+@keyframes a-onde {
+  from { opacity: 0.9; transform: scale(0.2); }
+  to { opacity: 0; transform: scale(2.6); }
+}
+
+/* Les traînées de vitesse : passent et s'effacent. */
+.a-trainee { animation-name: a-trainee; opacity: 0; }
+@keyframes a-trainee {
+  from { opacity: 0; transform: translateX(110%) scaleX(0.4); }
+  30% { opacity: 0.8; }
+  to { opacity: 0; transform: translateX(-120%) scaleX(1.4); }
+}
+
+/* Le rouleau : la colonne de chiffres part de --de et s'arrête sur le sien. */
+.a-rouleau { animation-name: a-rouleau; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1) !important; }
+@keyframes a-rouleau { from { transform: translateY(calc(var(--de, 0) * -1em)); } }
+
+/* Le ballon, sur la trajectoire de la passe (--x1,--y1 → --x2,--y2, par --cx,--cy). */
+.a-ballon { animation-name: a-ballon; animation-timing-function: linear !important; }
+@keyframes a-ballon {
+  from { opacity: 0; transform: translate(var(--x1), var(--y1)) scale(0.6); }
+  8% { opacity: 1; }
+  50% { transform: translate(var(--cx), var(--cy)) scale(1.15); }
+  to { transform: translate(var(--x2), var(--y2)) scale(1); }
+}
+
+/* Les rayons, derrière un champion : une seule lente rotation, pas de boucle. */
+.a-rayons { animation-name: a-rayons; animation-timing-function: cubic-bezier(0.2, 0.6, 0.3, 1) !important; }
+@keyframes a-rayons { from { opacity: 0; transform: rotate(-70deg) scale(0.6); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .actu-scene :is([class^="a-"], [class*=" a-"]),
+  .actu-barre {
+    animation: none !important;
+  }
+}
+
+/* Les stories des classements : la barre de chaque classement se remplit. */
+.story-barre {
+  transform-origin: 0 50%;
+  animation: actu-lecture var(--duree, 7s) linear both;
+}
+.story-barre[data-pause] {
+  animation-play-state: paused;
+}
+.story-anneau {
+  background: conic-gradient(from 210deg, #ffffff, #8a8a8a, #ffffff, #5b5b5b, #ffffff);
+}

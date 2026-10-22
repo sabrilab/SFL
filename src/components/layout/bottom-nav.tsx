@@ -20,14 +20,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CarteIcon, MapIcon, TropheeIcon, VestiaireIcon } from "./nav-icons";
+import { ActusIcon, CarteIcon, MapIcon, VestiaireIcon } from "./nav-icons";
 import { ongletActif } from "@/lib/nav";
 import { useVestiaireNonLus } from "@/hooks/use-vestiaire-non-lus";
 
 const TABS = [
   { href: "/", Icon: MapIcon, label: "Map" },
   { href: "/profil", Icon: CarteIcon, label: "Ma carte" },
-  { href: "/ligue", Icon: TropheeIcon, label: "Ligue" },
+  { href: "/ligue", Icon: ActusIcon, label: "Actus" },
 ] as const;
 
 const surMap = (pathname: string) => pathname === "/" || pathname === "/map";
