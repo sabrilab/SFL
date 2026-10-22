@@ -4,7 +4,8 @@
 // 22/10, « en gros League et Team ») : League, le fil de la SFL, la ligue du
 // dimanche avec sa saison ; Bola, le classement à vie des matchs que les
 // joueurs ouvrent eux-mêmes (app/ligue-vierge, l'ancienne « Ligue vierge ») ;
-// Team, les matchs d'équipe (app/bola-team). La SFL n'est pas écrite : c'est
+// Team, les matchs d'équipe, viendra ici quand le mode
+// existera : pas d'onglet vers une page vide (Sabri, 22/10). La SFL n'est pas écrite : c'est
 // son badge (public/bola/sfl.svg, le logo de Sabri), teinté comme le texte.
 
 import Link from "next/link";
@@ -13,12 +14,11 @@ import { cn } from "@/lib/utils";
 const LIGUES = [
   { href: "/ligue", libelle: "SFL", badge: "/bola/sfl.svg" },
   { href: "/ligue-vierge", libelle: "Bola" },
-  { href: "/bola-team", libelle: "Team" },
 ] as const;
 
 export function ChoixLigue({ actif, className }: { actif: (typeof LIGUES)[number]["href"]; className?: string }) {
   return (
-    <nav aria-label="SFL, Bola ou Team" className={cn("flex items-center gap-3.5", className)}>
+    <nav aria-label="SFL ou Bola" className={cn("flex items-center gap-3.5", className)}>
       {LIGUES.map((l) => (
         <Link
           key={l.href}
