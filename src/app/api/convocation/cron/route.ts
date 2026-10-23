@@ -68,10 +68,20 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-      // Le journal d'usage : 13 mois au plus (politique de confidentialité).
+      // Le journal d'usage et le suivi des notifications : 13 mois au plus
+      // (politique de confidentialité). L'arrivée d'un téléphone toujours
+      // abonné reste : sans elle, la courbe des abonnés le perdrait.
       await client
         .query("delete from public.activity where created_at < now() - interval '13 months'")
         .catch((e) => console.error("[cron] journal d'usage :", e instanceof Error ? e.message : e));
+      await client
+        .query(
+          `delete from public.push_envois where envoyee_le < now() - interval '13 months';
+           delete from public.push_historique h
+            where h.le < now() - interval '13 months'
+              and not exists (select 1 from public.push_abonnements a where md5(a.endpoint) = h.appareil)`
+        )
+        .catch((e) => console.error("[cron] suivi des notifications :", e instanceof Error ? e.message : e));
 
       const { rows } = await client.query<DerniereConvocation>(
         `select id, journee, heure, lieu, effectif, date_label, statut

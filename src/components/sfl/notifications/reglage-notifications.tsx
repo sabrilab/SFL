@@ -29,7 +29,7 @@ export function ReglageNotifications() {
   async function activer() {
     setBusy(true);
     try {
-      const e = await activerNotifications();
+      const e = await activerNotifications("reglages");
       setEtat(e);
       if (e === "actives") toast.success("Notifications activées");
       else if (e === "refusees") toast.error("Refusées : change-le dans les réglages du téléphone.");

@@ -19,7 +19,9 @@
 import { DAY, debutJour, KIND_FR, PATH_FR, type Evenement } from "./retention";
 
 const TROU = 5 * 60 * 1000;
-const neutre = (k: string) => k === "heartbeat" || k === "close";
+// Pas des gestes : les signes de vie, et l'invitation aux notifications
+// (montrée, puis sa réponse), que la partie Notifications compte à part.
+const neutre = (k: string) => k === "heartbeat" || k === "close" || k === "notifs";
 const cleSession = (e: Evenement) => e.session ?? `legacy:${e.name}:${debutJour(e.at)}`;
 
 /** Le nom d'une page, en français. */

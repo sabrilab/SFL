@@ -8,10 +8,16 @@
 //
 // `essai: true` n'envoie qu'aux téléphones de l'admin lui-même : de quoi voir
 // la notification avant de l'envoyer à toute la ligue.
+//
+// Chaque annonce garde sa trace (motif « annonce », lib/server/push-envoi.ts)
+// pour la page Activité : écrite avec la clé secrète, la seule qui le peut ;
+// sans elle, l'annonce part quand même.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
+import { cleVapid } from "@/lib/server/web-push";
+import { prevenir, type Envoi } from "@/lib/server/push-envoi";
+import { serveur } from "@/lib/sfl/serveur-ligue.server";
 import { estNotif } from "@/lib/sfl/push";
 
 export const maxDuration = 60;
@@ -48,21 +54,14 @@ export async function POST(req: NextRequest) {
   const { data: profil } = await sb.from("profiles").select("is_admin").eq("id", auth.user.id).maybeSingle();
   if (!profil?.is_admin) return erreur("Réservé à l'admin.", 403);
 
-  let requete = sb.from("push_abonnements").select("endpoint, p256dh, auth");
+  let requete = sb.from("push_abonnements").select("user_id");
   if (corps.essai === true) requete = requete.eq("user_id", auth.user.id);
   const { data: abonnements, error } = await requete;
   if (error) return erreur("Abonnements illisibles.", 500);
 
-  const resultats = await Promise.all(
-    (abonnements as Abonnement[]).map(async (ab) => ({ ab, r: await envoyer(ab, notif, cle) }))
-  );
+  const joueurs = [...new Set((abonnements as { user_id: string }[]).map((a) => a.user_id))];
+  const envois = new Map(joueurs.map((uid): [string, Envoi] => [uid, { notif, motif: "annonce" }]));
+  const bilan = await prevenir(sb, cle, envois, serveur());
 
-  const morts = resultats.filter((x) => x.r === "mort").map((x) => x.ab.endpoint);
-  if (morts.length > 0) await sb.from("push_abonnements").delete().in("endpoint", morts);
-
-  return NextResponse.json({
-    envoyes: resultats.filter((x) => x.r === "envoye").length,
-    morts: morts.length,
-    echecs: resultats.filter((x) => x.r === "echec").length,
-  });
+  return NextResponse.json({ envoyes: bilan.telephones, morts: bilan.morts, echecs: bilan.echecs });
 }

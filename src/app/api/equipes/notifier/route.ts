@@ -10,16 +10,19 @@
 //     l'apprennent (« Adil a signé · 3 / 5 »), et toute l'équipe quand la
 //     cinquième signature la rend active. Une seule fois par signature.
 // Toucher une invitation ouvre la signature (/bola-team?invitation=id),
-// le reste la page Team.
+// le reste la page Team. Chaque notification part avec son motif
+// (equipe-invitation, equipe-relance, equipe-signature, equipe-active ;
+// lib/sfl/motifs-notif.ts), rattachée à l'équipe : la base reconnaît seule
+// la réponse à une invitation (push_effet_equipe, supabase/schema.sql).
 //
 // La route agit avec la clé secrète, donc elle ne croit pas l'appelant sur
 // parole : son rôle dans l'équipe et l'état de chaque ligne sont relus ici.
 
 import { NextRequest, NextResponse } from "next/server";
-import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
+import { cleVapid } from "@/lib/server/web-push";
+import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { finInvitation, quandTombe } from "@/lib/sfl/equipes-temps";
-import type { Notif } from "@/lib/sfl/push";
 
 export const maxDuration = 30;
 
@@ -75,7 +78,8 @@ export async function POST(req: NextRequest) {
     return (p?.nom_affiche ?? p?.name ?? "Ton capitaine").split(" ")[0];
   };
 
-  const envois = new Map<string, Notif>();
+  const ref = `equipe:${id}`;
+  const envois = new Map<string, Envoi>();
   /** Les lignes dont l'avertissement part : notifie_le, pour ne pas le redire. */
   let marquer: string[] = [];
 
@@ -99,10 +103,14 @@ export async function POST(req: NextRequest) {
     for (const l of cibles) {
       const qui = prenom(l.invite_par ?? moi.id);
       envois.set(l.joueur, {
-        titre: couper(`${qui} ${type === "relance" ? "t'attend" : "t'invite"} · ${equipe.nom}`, 60),
-        texte: couper(`Bola Team · ${effectif} · jusqu'à ${quandTombe(finInvitation(l.created_at), new Date(maintenant))}`, 180),
-        url: `/bola-team?invitation=${id}`,
-        tag: `equipe-invitation-${id}`,
+        notif: {
+          titre: couper(`${qui} ${type === "relance" ? "t'attend" : "t'invite"} · ${equipe.nom}`, 60),
+          texte: couper(`Bola Team · ${effectif} · jusqu'à ${quandTombe(finInvitation(l.created_at), new Date(maintenant))}`, 180),
+          url: `/bola-team?invitation=${id}`,
+          tag: `equipe-invitation-${id}`,
+        },
+        motif: type === "relance" ? "equipe-relance" : "equipe-invitation",
+        ref,
       });
     }
     marquer = cibles.map((l) => l.joueur);
@@ -119,20 +127,28 @@ export async function POST(req: NextRequest) {
       for (const l of membres)
         if (l.joueur !== moi.id)
           envois.set(l.joueur, {
-            titre: couper(`${equipe.nom} est active`, 60),
-            texte: `${qui} a signé le Règlement Team. ${ACTIVE} joueurs.`,
-            url: "/bola-team",
-            tag,
+            notif: {
+              titre: couper(`${equipe.nom} est active`, 60),
+              texte: `${qui} a signé le Règlement Team. ${ACTIVE} joueurs.`,
+              url: "/bola-team",
+              tag,
+            },
+            motif: "equipe-active",
+            ref,
           });
     } else {
       const n = membres.length;
       for (const l of membres)
         if (l.joueur !== moi.id && l.role !== "membre")
           envois.set(l.joueur, {
-            titre: couper(`${qui} a signé · ${equipe.nom}`, 60),
-            texte: n < ACTIVE ? `${n} / ${ACTIVE} · Il manque ${ACTIVE - n}` : `${n} / 7`,
-            url: "/bola-team",
-            tag,
+            notif: {
+              titre: couper(`${qui} a signé · ${equipe.nom}`, 60),
+              texte: n < ACTIVE ? `${n} / ${ACTIVE} · Il manque ${ACTIVE - n}` : `${n} / 7`,
+              url: "/bola-team",
+              tag,
+            },
+            motif: "equipe-signature",
+            ref,
           });
     }
     marquer = [moi.id];
@@ -149,19 +165,6 @@ export async function POST(req: NextRequest) {
   const cle = cleVapid();
   if (!cle || envois.size === 0) return NextResponse.json({ envoyes: 0, prevenus: envois.size });
 
-  const { data: abonnements } = await sb
-    .from("push_abonnements")
-    .select("endpoint, p256dh, auth, user_id")
-    .in("user_id", [...envois.keys()]);
-  const resultats = await Promise.all(
-    ((abonnements ?? []) as (Abonnement & { user_id: string })[]).map(async (ab) => ({
-      ab,
-      r: await envoyer(ab, envois.get(ab.user_id), cle),
-    }))
-  );
-  const morts = resultats.filter((x) => x.r === "mort").map((x) => x.ab.endpoint);
-  if (morts.length > 0) await sb.from("push_abonnements").delete().in("endpoint", morts);
-
-  const envoyes = new Set(resultats.filter((x) => x.r === "envoye").map((x) => x.ab.user_id)).size;
-  return NextResponse.json({ envoyes, prevenus: envois.size });
+  const { recus } = await prevenir(sb, cle, envois);
+  return NextResponse.json({ envoyes: recus.size, prevenus: envois.size });
 }
