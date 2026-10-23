@@ -7,7 +7,11 @@
 //   · quand : les deux semaines qui viennent en une rangée de jours, puis
 //     les heures, de demi-heure en demi-heure ; un toucher chacune, les
 //     heures déjà passées éteintes, et le choix redit en clair à droite ;
-//   · où : les terrains de la ligue, ou « Ailleurs », en toutes lettres ;
+//   · où : les terrains de la ligue, puis « Tous les terrains », qui ouvre
+//     ceux du Nord (choisir-terrain.tsx : Sabri, 23/10, « tous les terrains
+//     qui sont possibles sur tout le territoire du Nord ») en plan et en
+//     liste, du plus proche au plus loin ; le terrain choisi s'ajoute aux
+//     pastilles, sa photo dessous ; un lieu absent s'y écrit en toutes lettres ;
 //   · les joueurs : combien, public ou privé, et qui, sur le terrain même
 //     (terrain-places.tsx) : chaque place libre est un +, qui ouvre la liste
 //     des joueurs (libres à ce moment-là, près de toi, partenaires, tous :
@@ -32,12 +36,13 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { CalendarDays, Globe, Lock, Minus, Plus, type LucideIcon } from "lucide-react";
+import { CalendarDays, Globe, Lock, MapPinned, Minus, Plus, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { TerrainPlaces } from "@/components/sfl/matchs/terrain-places";
 import { ChoisirJoueur } from "@/components/sfl/matchs/choisir-joueur";
+import { ChoisirTerrain, TerrainRetenu, type LieuChoisi } from "@/components/sfl/matchs/choisir-terrain";
+import { useMyPlayer } from "@/components/sfl/player-provider";
 import { FeuilleCadree } from "@/components/sfl/feuille-cadree";
 import { SigleLigue } from "@/components/sfl/choix-ligue";
 import {
@@ -55,6 +60,7 @@ import {
   type Visibilite,
 } from "@/lib/sfl/matchs";
 import type { Terrain } from "@/lib/sfl/saisie/types";
+import { maVille } from "@/lib/sfl/villes";
 import { cn } from "@/lib/utils";
 
 const JOURS = ["Dim.", "Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam."];
@@ -170,6 +176,7 @@ export function OuvrirMatch({
   onOuvert,
   partie,
   onSfl,
+  ici,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -184,6 +191,8 @@ export function OuvrirMatch({
   partie?: Partie;
   /** Un admin : passer aux journées de la SFL. */
   onSfl?: () => void;
+  /** Ta position, si tu l'as donnée sur la Map : les terrains du Nord se rangent autour. */
+  ici?: { lat: number; lng: number } | null;
 }) {
   const aujourdhui = aujourdhuiIso();
   const heureLa = maintenant();
@@ -204,7 +213,13 @@ export function OuvrirMatch({
     partie ? (terrainDuMatch?.id ?? null) : (terrainInitial?.id ?? terrains.find((t) => t.defaut)?.id ?? null)
   );
   const modif = !!partie;
-  const [lieuLibre, setLieuLibre] = useState(partie && !terrainDuMatch ? partie.lieu : "");
+  // Hors des terrains de la ligue : un terrain du Nord, ou un lieu écrit en toutes lettres.
+  const [ailleurs, setAilleurs] = useState<LieuChoisi | null>(
+    partie && !terrainDuMatch && partie.lieu ? { lieu: partie.lieu, adresse: partie.adresse, lat: partie.lat, lng: partie.lng } : null
+  );
+  // La feuille des terrains repart de zéro à chaque ouverture (sa clé), autour du choix du moment.
+  const [terrainsNord, setTerrainsNord] = useState({ n: 0, open: false });
+  const { me } = useMyPlayer();
   const [places, setPlaces] = useState(partie?.places ?? 10);
   const [invites, setInvites] = useState<Profil[]>([]);
   const [choisir, setChoisir] = useState(false);
@@ -256,7 +271,12 @@ export function OuvrirMatch({
   }
 
   const terrain = terrains.find((t) => t.id === terrainId) ?? null;
-  const lieu = terrain?.nom ?? lieuLibre.trim();
+  const choix: LieuChoisi | null = terrain
+    ? { lieu: terrain.nom, adresse: terrain.adresse ?? null, lat: terrain.lat ?? null, lng: terrain.lng ?? null }
+    : ailleurs;
+  const lieu = choix?.lieu.trim() ?? "";
+  const ville = me ? maVille(me) : null;
+  const autour = ici ?? (ville ? { lat: ville.lat, lng: ville.lng } : null);
   // L'organisateur compte pour une place ; un match ouvert garde au moins ses joueurs.
   const pleins = invites.length + 1 >= places;
   const minimum = Math.max(2, partie ? partie.joueurs.length : invites.length + 1);
@@ -277,16 +297,15 @@ export function OuvrirMatch({
     setEnvoi(true);
     try {
       if (partie) {
-        // Un lieu inchangé garde son adresse et sa place sur la Map.
-        const memeLieu = !terrain && lieu === partie.lieu;
+        // Un lieu inchangé garde son adresse et sa place sur la Map (`ailleurs` part du match).
         await modifierPartie(partie, {
           visibilite,
           jour,
           heure: heure.replace(":", "h"),
           lieu,
-          adresse: terrain ? (terrain.adresse ?? null) : memeLieu ? partie.adresse : null,
-          lat: terrain ? (terrain.lat ?? null) : memeLieu ? partie.lat : null,
-          lng: terrain ? (terrain.lng ?? null) : memeLieu ? partie.lng : null,
+          adresse: choix?.adresse ?? null,
+          lat: choix?.lat ?? null,
+          lng: choix?.lng ?? null,
           places,
         });
         navigator.vibrate?.(12);
@@ -300,9 +319,9 @@ export function OuvrirMatch({
         jour,
         heure: heure.replace(":", "h"),
         lieu,
-        adresse: terrain?.adresse ?? null,
-        lat: terrain?.lat ?? null,
-        lng: terrain?.lng ?? null,
+        adresse: choix?.adresse ?? null,
+        lat: choix?.lat ?? null,
+        lng: choix?.lng ?? null,
         places,
         invites: invites.map((p) => p.id),
       });
@@ -405,8 +424,8 @@ export function OuvrirMatch({
         </Rubrique>
 
         <Rubrique titre="Où">
-          {terrains.length > 0 && (
-            <div role="radiogroup" aria-label="Le terrain" className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
+            <div role="radiogroup" aria-label="Le terrain" className="contents">
               {terrains.map((t) => (
                 <button
                   key={t.id}
@@ -419,26 +438,47 @@ export function OuvrirMatch({
                   {t.nom}
                 </button>
               ))}
-              <button
-                type="button"
-                role="radio"
-                aria-checked={terrainId == null}
-                onClick={() => setTerrainId(null)}
-                className={cn(pastille, "h-9 px-3.5 text-[14px]", terrainId == null ? "bouton-principal" : "bouton-secondaire")}
-              >
-                Ailleurs
-              </button>
+              {ailleurs && (
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={terrainId == null}
+                  onClick={() => setTerrainId(null)}
+                  className={cn(
+                    pastille,
+                    "h-9 max-w-full truncate px-3.5 text-[14px]",
+                    terrainId == null ? "bouton-principal" : "bouton-secondaire"
+                  )}
+                >
+                  {ailleurs.lieu}
+                </button>
+              )}
             </div>
+            <button
+              type="button"
+              onClick={() => setTerrainsNord((o) => ({ n: o.n + 1, open: true }))}
+              className={cn(pastille, "bouton-secondaire flex h-9 items-center gap-1.5 px-3.5 text-[14px]")}
+            >
+              <MapPinned className="size-4" strokeWidth={2.2} />
+              Tous les terrains
+            </button>
+          </div>
+          {terrainId == null && ailleurs?.terrain && (
+            <TerrainRetenu t={ailleurs.terrain} onToucher={() => setTerrainsNord((o) => ({ n: o.n + 1, open: true }))} />
           )}
-          {terrainId == null && (
-            <Input
-              value={lieuLibre}
-              onChange={(e) => setLieuLibre(e.target.value)}
-              placeholder="Le terrain"
-              maxLength={120}
-              className="h-11 rounded-full px-4 text-[16px]"
-            />
-          )}
+          <ChoisirTerrain
+            key={terrainsNord.n}
+            open={terrainsNord.open}
+            onOpenChange={(o) => setTerrainsNord((x) => ({ ...x, open: o }))}
+            ligue={terrains}
+            ici={autour}
+            actuel={terrain ? `ligue-${terrain.id}` : (ailleurs?.terrain?.id ?? null)}
+            onLigue={setTerrainId}
+            onLieu={(l) => {
+              setAilleurs(l);
+              setTerrainId(null);
+            }}
+          />
         </Rubrique>
 
         <Rubrique
