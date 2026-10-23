@@ -94,7 +94,7 @@ export async function repondreMission(d: Demande): Promise<void> {
 }
 
 /* ------------------------------ L'annonce ------------------------------ */
-// « Tes missions · J3 » part du serveur (/api/missions/annoncer), une fois la
+// « Missions Bola · J3 » part du serveur (/api/missions/annoncer), une fois la
 // feuille finie et une seule fois par joueur. L'app de chacun le sonne à
 // l'ouverture tant qu'une journée a des missions ouvertes (MissionsAnnonce) :
 // au plus toutes les 20 minutes par téléphone, et plus du tout pendant six

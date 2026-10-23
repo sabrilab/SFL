@@ -4,7 +4,8 @@
 // compteurs à part de la carte : le terrain fait la note et les points
 // Pépite ; l'app fait l'XP (lib/sfl/missions.ts) — 100 XP par dimanche joué,
 // la prime de chaque mission acceptée et réussie, 150 de plus pour trois sur
-// trois.
+// trois ; une mission acceptée puis ratée en reprend la moitié de sa prime
+// (en rouge dans le journal).
 //   · le Niveau XP, à vie : passer du niveau n au suivant coûte 100 × n ;
 //   · le passe de la saison : vingt paliers de 250 XP, remis à zéro à chaque
 //     saison, chacun avec sa récompense, qu'on fait défiler ;
@@ -80,7 +81,7 @@ export function NiveauXp({ saison }: { saison: number }) {
             <>
               <Barre part={b.versPalier / XP_PALIER} />
               <span className="mono-label text-[9px] text-foreground/45">
-                Palier {prochain} à {XP_PALIER - b.versPalier} XP
+                Palier {prochain} à {b.manquePalier} XP
               </span>
             </>
           )}
@@ -120,7 +121,7 @@ export function NiveauXp({ saison }: { saison: number }) {
       <div className="grid grid-cols-3 gap-2">
         <div className="flex flex-col gap-1.5 rounded-2xl bg-secondary px-3 pt-3 pb-2.5">
           <span className="text-[26px] leading-none font-black tracking-[-1px] italic tabular-nums">{b.reussies}</span>
-          <span className="text-[12px] font-semibold">{b.reussies > 1 ? "Missions réussies" : "Mission réussie"}</span>
+          <span className="text-[12px] font-semibold">{b.reussies > 1 ? "Missions accomplies" : "Mission accomplie"}</span>
         </div>
         <div className="flex flex-col gap-1.5 rounded-2xl bg-secondary px-3 pt-3 pb-2.5">
           <span className="flex h-[26px] items-center gap-1">
@@ -150,7 +151,9 @@ export function NiveauXp({ saison }: { saison: number }) {
                 {l.saison === saison ? `J${l.j}` : `S${l.saison} J${l.j}`}
               </span>
               <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{l.quoi}</span>
-              <span className="font-mono text-[13px] font-bold tabular-nums">+{l.xp}</span>
+              <span className={cn("font-mono text-[13px] font-bold tabular-nums", l.xp < 0 && "text-[#ff989a]")}>
+                {l.xp < 0 ? `−${-l.xp}` : `+${l.xp}`}
+              </span>
             </div>
           ))}
         </div>

@@ -19,6 +19,7 @@ import {
   journalXp,
   juger,
   reponseDe,
+  risqueDe,
   verdictFinal,
   XP_DIMANCHE,
   XP_PARFAIT,
@@ -126,7 +127,7 @@ export interface MesMissions {
   phase: Phase;
   /** Le rival a accepté son contrat contre toi : un duel des deux côtés. */
   enFace: boolean;
-  /** L'XP de ce dimanche, comme dans le journal : le dimanche joué, puis les missions acceptées et réussies. */
+  /** L'XP de ce dimanche, comme dans le journal : le dimanche joué, les primes des missions réussies, les risques des ratées. */
   xp: number;
   repondre: (creneau: Creneau, reponse: Reponse["reponse"]) => Promise<void>;
 }
@@ -162,7 +163,7 @@ export function useMissions(): MesMissions | null {
     const phase: Phase = t < d.coupEnvoi.getTime() ? "ouvert" : t < d.finDuJour.getTime() ? "en-jeu" : "fini";
     const lignes = (d.missions.get(joueur) ?? []).map((m) => {
       const v = juger(m, joueur, d, jugee, votes);
-      return { m, reponse: reponseDe(reponses, d, joueur, m), verdict: phase === "fini" ? verdictFinal(v) : v };
+      return { m, reponse: reponseDe(reponses, d, joueur, m), verdict: phase === "fini" ? verdictFinal(v, m) : v };
     });
     const contrat = lignes.find((l) => l.m.creneau === "contrat");
     const rival = contrat?.m.genre === "tiens-le" || contrat?.m.genre === "finis-devant" ? contrat.m.cibles[0] : null;
@@ -179,10 +180,12 @@ export function useMissions(): MesMissions | null {
           r.reponse === "acceptee" &&
           new Date(r.le).getTime() <= d.coupEnvoi.getTime()
       );
-    const gagnees = lignes.filter((l) => l.reponse?.reponse === "acceptee" && l.verdict.etat === "reussie");
+    const acceptees = lignes.filter((l) => l.reponse?.reponse === "acceptee");
+    const gagnees = acceptees.filter((l) => l.verdict.etat === "reussie");
     const xp =
       (d.joue && aJoue(jugee, d.j, joueur) ? XP_DIMANCHE : 0) +
-      gagnees.reduce((a, l) => a + l.m.xp, 0) +
+      gagnees.reduce((a, l) => a + l.m.xp, 0) -
+      acceptees.filter((l) => l.verdict.etat === "ratee").reduce((a, l) => a + risqueDe(l.m), 0) +
       (lignes.length === 3 && gagnees.length === 3 ? XP_PARFAIT : 0);
     const repondre = (creneau: Creneau, reponse: Reponse["reponse"]) => {
       const m = lignes.find((l) => l.m.creneau === creneau)?.m;

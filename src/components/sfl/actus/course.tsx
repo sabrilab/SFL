@@ -43,7 +43,7 @@ import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
 import { VoteDuJour } from "./fil";
 import { RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
-import { TesMissions } from "./missions";
+import { MissionsBola } from "./missions";
 import { VueClassements, VueMatchs } from "./vues";
 
 export type Vue = "fil" | "classements" | "matchs";
@@ -305,7 +305,7 @@ export function LaCourse({ vueDepart = "fil" }: { vueDepart?: Vue }) {
       <VoteDuJour me={me} />
       {dernier > 0 && <RubriqueToi j={dernier} date={journees.find((x) => x.j === dernier)?.date ?? ""} />}
       <Convocation />
-      <TesMissions />
+      <MissionsBola />
       <div className="flex flex-col gap-1">
         {duels.length > 0 && <RubriqueEnjeux liste={duels} moi={me} />}
         {v && <RubriqueRival v={v} />}

@@ -32,6 +32,10 @@
 // mesurée sur les dimanches des saisons 0 et 1. Jouer le dimanche rapporte
 // 100 XP, sans mission ; trois sur trois, 150 de plus.
 //
+// Les Missions Bola (Sabri, 23/10) : chaque mission a un rang, S, A ou B,
+// qui suit la prime ; et accepter engage : une mission acceptée puis ratée
+// coûte la moitié de sa prime. Passer ne coûte rien.
+//
 // Pur : ni React ni réseau. Les réponses et les votes arrivent en paramètres.
 
 import { computeJournees, computeStandings, entryPP } from "./saisie/engine";
@@ -65,6 +69,35 @@ export const PRIME: Record<Genre, number> = {
   "deux-passes": 120,
   record: 150,
   vote: 30,
+};
+
+/**
+ * Le risque d'une mission acceptée : ratée, elle coûte la moitié de sa prime
+ * (Sabri, 23/10 : « quand on perd des missions, on doit perdre aussi des
+ * XP », pour qu'accepter engage). Passée ou annulée, elle ne coûte rien.
+ */
+export const risqueDe = (m: Pick<Mission, "xp">) => Math.round(m.xp / 10) * 5;
+
+/**
+ * Le rang d'une mission, comme dans un battle royale (Sabri, 23/10 : « des
+ * missions de rang S, des missions de rang A/B, des plus difficiles, moins
+ * difficiles »). La prime suit la cote, le rang suit la prime : S, moins de
+ * deux chances sur cinq ; A, autour d'une sur deux ; B, ce qui ne dépend que
+ * de toi.
+ */
+export type Rang = "S" | "A" | "B";
+export const rangDe = (m: Pick<Mission, "xp">): Rang => (m.xp >= 130 ? "S" : m.xp >= 100 ? "A" : "B");
+
+/** Le nom de code de chaque mission, en tête de sa fiche de contrat. */
+export const NOM_DE_CODE: Record<Genre, string> = {
+  "tiens-le": "Verrou",
+  "finis-devant": "Duel",
+  "passe-devant": "Remontada",
+  "reste-en-tete": "Couronne",
+  gagnez: "Victoire",
+  "deux-passes": "Double caviar",
+  record: "Record",
+  vote: "Jury",
 };
 
 /** Jouer un dimanche, dans une équipe de la feuille. */
@@ -504,9 +537,13 @@ export function juger(
   }
 }
 
-/** Le verdict une fois la journée finie : ce qui est encore en jeu à minuit est raté. */
-export function verdictFinal(v: Verdict): Verdict {
-  return v.etat === "en-jeu" ? { etat: "ratee", detail: v.detail || "Pas fait" } : v;
+/**
+ * Le verdict une fois la journée finie. Le vote se ferme à minuit : pas voté,
+ * c'est raté. Le reste se lit sur la feuille : tant qu'il y manque une ligne,
+ * la mission attend, sans prime ni perte, et se juge dès que l'admin la remplit.
+ */
+export function verdictFinal(v: Verdict, m: Pick<Mission, "genre">): Verdict {
+  return v.etat === "en-jeu" && m.genre === "vote" ? { etat: "ratee", detail: v.detail || "Pas voté" } : v;
 }
 
 /** La réponse qui compte : donnée avant le coup d'envoi, et pour le même rival. */
@@ -539,9 +576,14 @@ export interface BilanXp {
   /** Dans le niveau en cours, et ce qu'il faut pour le suivant (100 × niveau). */
   dansLeNiveau: number;
   pourLeSuivant: number;
-  /** Le palier du passe atteint (0 à 20), et l'XP déjà faite vers le suivant. */
+  /**
+   * Le palier du passe atteint (0 à 20) : un palier atteint reste acquis, même
+   * si un contrat raté fait redescendre l'XP de la saison. Puis l'XP déjà faite
+   * vers le suivant, et celle qui lui manque encore.
+   */
   palier: number;
   versPalier: number;
+  manquePalier: number;
   /** Les missions réussies, à vie : les crans du cadre. */
   reussies: number;
   cran: number;
@@ -578,8 +620,9 @@ function saisonsDans(s: Saison): { numero: number; lue: SaisonLue; reference: (m
 /**
  * Le journal d'XP de chacun : les dimanches joués (toutes saisons), les
  * missions acceptées à temps, jugées sur la feuille une fois la journée
- * finie, et les félicitations. Rien n'est stocké : comme les classements,
- * tout se recalcule ; une félicitation retirée retire son XP.
+ * finie (la prime si elle est réussie, le risque si elle est ratée), et les
+ * félicitations. Rien n'est stocké : comme les classements, tout se
+ * recalcule ; une félicitation retirée retire son XP.
  */
 export function journalXp(
   s: Saison,
@@ -613,7 +656,9 @@ export function journalXp(
         let ok = 0;
         for (const mi of liste) {
           if (reponseDe(reponses, d, nom, mi)?.reponse !== "acceptee") continue;
-          const v = verdictFinal(juger(mi, nom, d, sa.lue, votes));
+          const v = verdictFinal(juger(mi, nom, d, sa.lue, votes), mi);
+          if (v.etat === "ratee")
+            de(nom).lignes.push({ saison: sa.numero, j, date: d.date, quoi: `${libelleCourt(mi)} ratée`, xp: -risqueDe(mi) });
           if (v.etat !== "reussie") continue;
           ok++;
           de(nom).lignes.push({ saison: sa.numero, j, date: d.date, quoi: libelleCourt(mi), xp: mi.xp });
@@ -677,17 +722,31 @@ export function bilanDe(
   saisonEnCours: number
 ): BilanXp {
   const x = journal.get(joueur) ?? { lignes: [], reussies: 0 };
-  const total = x.lignes.reduce((a, l) => a + l.xp, 0);
-  const saison = x.lignes.filter((l) => l.saison === saisonEnCours).reduce((a, l) => a + l.xp, 0);
+  // Les risques font baisser l'XP ; jamais sous zéro.
+  const total = Math.max(0, x.lignes.reduce((a, l) => a + l.xp, 0));
+  const saison = Math.max(0, x.lignes.filter((l) => l.saison === saisonEnCours).reduce((a, l) => a + l.xp, 0));
   const niveau = niveauDe(total);
+  // Le passe suit la saison dimanche par dimanche : le plus haut palier atteint reste.
+  const parJournee = new Map<number, number>();
+  for (const l of x.lignes)
+    if (l.saison === saisonEnCours) parJournee.set(l.j, (parJournee.get(l.j) ?? 0) + l.xp);
+  let cumul = 0;
+  let atteint = 0;
+  for (const j of [...parJournee.keys()].sort((a, b) => a - b)) {
+    cumul += parJournee.get(j) ?? 0;
+    atteint = Math.max(atteint, Math.floor(Math.max(0, cumul) / XP_PALIER));
+  }
+  const palier = Math.min(PALIERS_PASSE, atteint);
+  const fini = palier >= PALIERS_PASSE;
   return {
     total,
     saison,
     niveau,
     dansLeNiveau: total - debutNiveau(niveau),
     pourLeSuivant: 100 * niveau,
-    palier: Math.min(PALIERS_PASSE, Math.floor(saison / XP_PALIER)),
-    versPalier: saison >= PALIERS_PASSE * XP_PALIER ? XP_PALIER : saison % XP_PALIER,
+    palier,
+    versPalier: fini ? XP_PALIER : Math.max(0, Math.min(XP_PALIER, saison - palier * XP_PALIER)),
+    manquePalier: fini ? 0 : (palier + 1) * XP_PALIER - saison,
     reussies: x.reussies,
     cran: cranDe(x.reussies),
     lignes: [...x.lignes].sort((a, b) => b.saison - a.saison || b.j - a.j),
@@ -739,18 +798,9 @@ export function phrase(m: Mission, nom: (n: string) => string = (n) => n): strin
   }
 }
 
-/** Le nom court d'une mission, pour le journal d'XP. */
-export function libelleCourt(m: Mission): string {
-  return {
-    "finis-devant": "Contrat : finis devant",
-    "tiens-le": "Contrat : tiens-le",
-    "passe-devant": "Contrat : passe devant",
-    "reste-en-tete": "Contrat : reste en tête",
-    gagnez: "Défi : gagnez",
-    "deux-passes": "Défi : deux passes D",
-    record: "Défi : ton record",
-    vote: "Ligue : le vote",
-  }[m.genre];
+/** Le nom court d'une mission, pour le journal d'XP : « Mission Verrou ». */
+export function libelleCourt(m: Pick<Mission, "genre">): string {
+  return `Mission ${NOM_DE_CODE[m.genre]}`;
 }
 
 /* ------------------------------ Le passe ------------------------------ */

@@ -1,5 +1,5 @@
-// L'annonce des missions du dimanche — « Tes missions · J3 », une notification
-// par joueur de la feuille et par journée (lib/sfl/missions.ts).
+// L'annonce des Missions Bola du dimanche — « Missions Bola · J3 », une
+// notification par joueur de la feuille et par journée (lib/sfl/missions.ts).
 //
 // Quand : une fois la feuille FINIE. L'admin compose ses équipes en plusieurs
 // enregistrements, et un joueur prévenu à mi-chemin recevrait un rival qui
@@ -16,15 +16,17 @@
 // que deux appels simultanés ne préviennent personne deux fois. Un envoi qui
 // échoue partout libère la réservation : le prochain appel réessaie.
 //
-// Le texte : le contrat du joueur, puis l'heure limite. Toucher la
-// notification ouvre les Actus sur ses missions.
+// Le texte : le contrat du joueur, son rang, ce qu'il rapporte et ce qu'il
+// coûte raté, puis l'heure limite — « Contrat de rang S : tiens Abdel à 8
+// buts et passes D. +130 XP, −65 si tu échoues. Accepte avant dimanche
+// 13h00. » Toucher la notification ouvre les Actus sur ses missions.
 //
 // La route agit avec la clé secrète : elle exige une session de membre.
 
 import { NextRequest, NextResponse } from "next/server";
 import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
-import { dimancheEnCours, phrase } from "@/lib/sfl/missions";
+import { dimancheEnCours, phrase, rangDe, risqueDe, type Mission } from "@/lib/sfl/missions";
 import type { Notif } from "@/lib/sfl/push";
 import type { Saison } from "@/lib/sfl/saisie/types";
 
@@ -34,6 +36,12 @@ export const maxDuration = 30;
 const CALME = 15 * 60_000;
 
 const couper = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+/** « Contrat de rang S : tiens Abdel à 8 buts et passes D. +130 XP, −65 si tu échoues. » */
+function annonce(contrat: Mission, nom: (n: string) => string): string {
+  const objectif = phrase(contrat, nom);
+  return `Contrat de rang ${rangDe(contrat)}\u00a0: ${objectif.charAt(0).toLowerCase()}${objectif.slice(1)} +${contrat.xp} XP, −${risqueDe(contrat)} si tu échoues.`;
+}
 
 /** « dimanche 13h00 », ou « 13h00 » le jour même — à l'heure de Paris. */
 function limite(coupEnvoi: Date, heure: string, maintenant: Date): string {
@@ -104,8 +112,8 @@ export async function POST(req: NextRequest) {
     ((reserves ?? []) as { joueur: string }[]).map(async ({ joueur }) => {
       const contrat = d.missions.get(joueur)?.find((m) => m.creneau === "contrat");
       const notif: Notif = {
-        titre: `Tes missions · J${d.j}`,
-        texte: couper(`${contrat ? `${phrase(contrat, nom)} ` : ""}Accepte avant ${quand}.`, 180),
+        titre: `Missions Bola · J${d.j}`,
+        texte: couper(`${contrat ? `${annonce(contrat, nom)} ` : ""}Accepte avant ${quand}.`, 180),
         url: "/ligue#missions",
         tag: `missions-${d.saison}-${d.j}`,
       };
