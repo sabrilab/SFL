@@ -6,7 +6,9 @@
 // plus envie, qu'on comprenne mieux les choses et que ce soit mieux rangé »,
 // comme le profil d'un joueur ouvert depuis la Recherche (profil-joueur.tsx),
 // dont elle reprend l'ordre de lecture, du plus fort au plus fin :
-//   1. moi : ma carte en grand, mon nom dans le lettrage de la Map, trois
+//   1. moi : ma carte en grand, mon nom dans le lettrage de la Map, mes
+//      abonnés comme sur Instagram (mes abonnés et mes abonnements, « Kader,
+//      Anis et 32 autres te suivent » : suivre.tsx ; Sabri, 23/10), trois
 //      chiffres de tête en Anton (mon rang au Pépite d'Or, ma note, mes
 //      dimanches), puis la phrase qui me résume (fiche-joueur.ts, la même que
 //      sur mon profil). Le nom se corrige en le touchant (identite.tsx).
@@ -39,7 +41,9 @@ import { Card3D } from "@/components/sfl/card-3d";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur";
 import { MaSaison, type RangDuJour } from "@/components/sfl/ma-saison";
+import { NiveauXp } from "@/components/sfl/niveau-xp";
 import { Chiffre } from "@/components/sfl/profil-joueur";
+import { ReseauJoueur } from "@/components/sfl/suivre";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { VitrineBadges } from "@/components/sfl/vitrine";
 import { ChoixBadge } from "@/components/sfl/choix-badge";
@@ -51,6 +55,7 @@ import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { useGrandEcran } from "@/hooks/use-media-query";
 import { FormulaireIdentite } from "@/components/sfl/identite";
 import { useIdentites } from "@/hooks/use-identites";
+import { useXp } from "@/hooks/use-missions";
 import { cartesDeCarriere, courbeDeCarriere } from "@/lib/sfl/carriere";
 import { ovr, rankPlayers } from "@/lib/sfl/engine";
 import { dimanchesDe, ficheJoueur } from "@/lib/sfl/fiche-joueur";
@@ -123,6 +128,7 @@ export default function Profil() {
   const [identiteOuverte, setIdentiteOuverte] = useState(false);
   const identite = useIdentites();
   const poste = POSTES.find((p) => p.id === player.poste)?.label ?? player.poste;
+  const xp = useXp(player.name);
 
   return (
     <div className="shell py-4 sm:py-8 lg:pt-[var(--fib-55)]">
@@ -160,19 +166,23 @@ export default function Profil() {
               render={(s) => <PlayerCard player={player} size={s} />}
             />
           </div>
-          <button
-            type="button"
-            onClick={() => setIdentiteOuverte(true)}
-            aria-label={`${identite.nom(player.name)}, ${identite.pseudo(player.name)}. Modifier mon nom et mon pseudo`}
-            className="relative flex w-full flex-col items-center gap-[var(--fib-8)] text-center"
-          >
-            <span className="titre-lettrage text-[34px] leading-[0.95] break-words">
-              {identite.nom(player.name)}
-            </span>
-            <span className="font-mono text-[12px] text-foreground/45">
-              {identite.pseudo(player.name)} · {poste.toLowerCase()}
-            </span>
-          </button>
+          <div className="relative flex w-full flex-col items-center gap-[var(--fib-13)]">
+            <button
+              type="button"
+              onClick={() => setIdentiteOuverte(true)}
+              aria-label={`${identite.nom(player.name)}, ${identite.pseudo(player.name)}. Modifier mon nom et mon pseudo`}
+              className="flex w-full flex-col items-center gap-[var(--fib-8)] text-center"
+            >
+              <span className="titre-lettrage text-[34px] leading-[0.95] break-words">
+                {identite.nom(player.name)}
+              </span>
+              <span className="font-mono text-[12px] text-foreground/45">
+                {identite.pseudo(player.name)} · {poste.toLowerCase()}
+                {xp && ` · niveau XP ${xp.niveau}`}
+              </span>
+            </button>
+            <ReseauJoueur nom={player.name} />
+          </div>
           <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
             <Chiffre valeur={myRank != null && (joues > 0 || player.pp !== 0) ? ordinal(myRank) : "–"} quoi="Pépite d'Or" />
             <Chiffre valeur={ovr(player.stats)} quoi="Général" />
@@ -199,6 +209,9 @@ export default function Profil() {
         <div className="flex min-w-0 flex-col gap-[var(--fib-21)]">
           {/* 2. Ma saison : mon dernier dimanche, mes points forts, mes dimanches */}
           <MaSaison saison={`Saison ${saison.numero ?? 0}`} dimanches={dimanches} forts={fiche.forts} rangs={rangs} />
+
+          {/* 2 bis. Mon Niveau XP : le niveau à vie, le passe de la saison, mes missions */}
+          <NiveauXp saison={saison.numero ?? 0} />
 
           {/* 3. Mon évolution, journée après journée : d'abord mon rang, si
               j'en ai un cette saison */}

@@ -124,7 +124,14 @@ export function TextePolitique() {
             Tes stats (buts, passes, notes, MVP, cartes spéciales, badges, classements), tes réponses aux
             convocations, tes disponibilités, les matchs que tu ouvres ou rejoins, et les feuilles de match.
             C&apos;est le cœur de la ligue : les joueurs de la ligue les voient. Tes votes de fin de match restent
-            secrets dans l&apos;app, seul le résultat s&apos;affiche.
+            secrets dans l&apos;app, seul le résultat s&apos;affiche. Tes réponses aux missions du dimanche (acceptée
+            ou passée, et l&apos;heure) ne sont vues que par toi, sauf un contrat accepté des deux côtés, que la ligue
+            voit ; l&apos;XP qu&apos;elles rapportent se calcule depuis les feuilles de match.
+          </P>
+          <P>
+            Les joueurs que tu suis et ceux qui te suivent, et les félicitations que tu donnes ou reçois dans les
+            Actus : les joueurs de la ligue les voient aussi. Celui que tu suis ou que tu félicites en est prévenu
+            par une notification.
           </P>
         </Sous>
 
@@ -285,7 +292,7 @@ export function TextePolitique() {
             <>
               <Fort>Les joueurs de la ligue :</Fort> ta carte et ta photo, ton nom et ton pseudo, ta ville (sauf en
               mode fantôme), tes stats, tes présences, tes disponibilités, tes matchs publics, tes messages du
-              Vestiaire.
+              Vestiaire, qui tu suis et qui te suit, tes félicitations.
             </>,
             <>
               <Fort>Les administrateurs, en plus :</Fort>{" "}ton email, ta fiche, tes photos en pied, ton journal

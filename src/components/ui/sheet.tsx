@@ -89,8 +89,10 @@ function SheetContent({
 
 /** La poignée d'une feuille du bas : la tirer vers le bas fait suivre la
  *  feuille au doigt, et au-delà de 90 px (ou d'un geste vif) la ferme. Au
- *  doigt (touch, la page ne doit pas défiler) comme à la souris. */
-function Poignee() {
+ *  doigt (touch, la page ne doit pas défiler) comme à la souris. Une feuille
+ *  sans la croix par défaut la pose elle-même (`barre` : sa couleur, sur un
+ *  verre clair) ; elle referme par le premier [data-slot="sheet-close"]. */
+function Poignee({ barre = "bg-foreground/25" }: { barre?: string }) {
   const ref = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => {
     const el = ref.current
@@ -158,7 +160,7 @@ function Poignee() {
       aria-hidden
       className="pointer-events-auto absolute inset-x-16 top-0 flex h-9 touch-none justify-center pt-2"
     >
-      <span className="h-[5px] w-10 rounded-full bg-foreground/25" />
+      <span className={cn("h-[5px] w-10 rounded-full", barre)} />
     </div>
   )
 }
@@ -210,6 +212,7 @@ function SheetDescription({
 }
 
 export {
+  Poignee,
   Sheet,
   SheetTrigger,
   SheetClose,

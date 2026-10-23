@@ -5,9 +5,11 @@
 // mis en avant »).
 //
 // Ordre de lecture, du plus fort au plus fin :
-//   1. lui : sa carte en grand, son nom dans le lettrage de la Map, et trois
-//      chiffres de tête en Anton (son rang au Pépite d'Or, sa note, ses
-//      dimanches) ;
+//   1. lui : sa carte en grand, son nom dans le lettrage de la Map, ses
+//      abonnés comme sur Instagram (ses abonnés et ses abonnements, « Suivi
+//      par Kader, Anis et 3 autres que tu connais » : suivre.tsx), le bouton
+//      pour le suivre, et trois chiffres de tête en Anton (son rang au Pépite
+//      d'Or, sa note, ses dimanches) ;
 //   2. une phrase qui le résume (fiche-joueur.ts, la même que sur la feuille
 //      de match) ;
 //   3. ses trophées, sur un panneau noir mat sans décor : d'abord les
@@ -34,6 +36,7 @@ import { ComparerCartes } from "@/components/sfl/comparer-cartes";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
+import { BoutonSuivre, ReseauJoueur } from "@/components/sfl/suivre";
 import { FeuilleBadge, Medaille, NOM_TROPHEE, Trophee } from "@/components/sfl/vitrine";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useGrandEcran } from "@/hooks/use-media-query";
@@ -148,6 +151,8 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
           <p className="font-mono text-[12px] text-foreground/45">
             {identite.pseudo(player.name)} · {poste.toLowerCase()}
           </p>
+          <ReseauJoueur nom={player.name} className="mt-[var(--fib-8)]" />
+          <BoutonSuivre nom={player.name} className="mt-[var(--fib-8)]" />
         </div>
         <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
           <Chiffre valeur={ordinal(rank)} quoi="Pépite d'Or" />

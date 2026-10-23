@@ -44,6 +44,7 @@ import { QuiVient } from "@/components/sfl/qui-vient";
 import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
 import { DiscussionMatch, type OngletDiscussion } from "@/components/sfl/matchs/discussion-match";
 import { FeuilleDeMatch } from "@/components/sfl/matchs/feuille-de-match";
+import { DuelsDuJour } from "@/components/sfl/matchs/duels";
 import { feuilleDeConvocation, feuilleDeJournee } from "@/lib/sfl/feuille";
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
 import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
@@ -1006,6 +1007,7 @@ export default function MapPage() {
                     }}
                   />
                 )}
+                {choisi && feuille.length > 0 && <DuelsDuJour j={choisi.j} />}
                 {choisi?.joue && (
                   <Link
                     href="/ligue"

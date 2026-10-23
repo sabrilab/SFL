@@ -6,13 +6,16 @@
 // chose pour le badge choisi pour la carte (lib/sfl/badges-choisis), et pour
 // les noms et pseudos confirmés (lib/sfl/identites), et pour la ville de
 // chacun sur la Map (lib/sfl/villes), posée d'office d'après la connexion
-// tant que le joueur n'en a pas donné.
+// tant que le joueur n'en a pas donné. Et qui suit qui, et les félicitations
+// des Actus (lib/sfl/suivis, lib/sfl/felicitations).
 
 import { useEffect } from "react";
 import { useSession } from "@/hooks/use-session";
 import { envoyerBadgeEnAttente, rafraichirBadges } from "@/lib/sfl/badges-choisis";
 import { rafraichirIdentites } from "@/lib/sfl/identites";
+import { rafraichirFelicitations } from "@/lib/sfl/felicitations";
 import { envoyerPhotosEnAttente, rafraichirPhotos } from "@/lib/sfl/photos";
+import { rafraichirSuivis } from "@/lib/sfl/suivis";
 import { poserVilleDevinee, rafraichirVilles } from "@/lib/sfl/villes";
 
 export function PhotosSync() {
@@ -24,12 +27,16 @@ export function PhotosSync() {
     void rafraichirBadges();
     void rafraichirIdentites();
     void rafraichirVilles();
+    void rafraichirSuivis();
+    void rafraichirFelicitations();
     const auRetour = () => {
       if (document.visibilityState !== "visible") return;
       void rafraichirPhotos();
       void rafraichirBadges();
       void rafraichirIdentites();
       void rafraichirVilles();
+      void rafraichirSuivis();
+      void rafraichirFelicitations();
     };
     document.addEventListener("visibilitychange", auRetour);
     return () => document.removeEventListener("visibilitychange", auRetour);
