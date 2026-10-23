@@ -5,13 +5,12 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { LogOut, KeyRound, Link2, Mail } from "lucide-react";
+import { KeyRound, Link2, Mail } from "lucide-react";
 import {
   changePassword,
   fournisseursActifs,
   getContactEmail,
   saveContactEmail,
-  signOut,
   type Fournisseur,
   type RefusMotDePasse,
 } from "@/lib/sfl/auth/session";
@@ -21,6 +20,7 @@ import { useSession } from "@/hooks/use-session";
 import { useIdentites } from "@/hooks/use-identites";
 import { cn } from "@/lib/utils";
 import { PseudoCard } from "./pseudo-card";
+import { BoutonDeconnexion } from "./bouton-deconnexion";
 
 export function AccountCard() {
   const session = useSession();
@@ -226,24 +226,15 @@ export function AccountCard() {
             </div>
           </form>
         ) : (
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex flex-col gap-2">
             <button
               onClick={() => setOpen(true)}
-              className="bouton-secondaire flex flex-1 items-center justify-center gap-2 py-3 text-[14px] font-semibold"
+              className="bouton-secondaire flex items-center justify-center gap-2 py-3 text-[14px] font-semibold"
             >
               <KeyRound className="size-4" />
               Changer mon mot de passe
             </button>
-            <button
-              onClick={() => {
-                signOut();
-                toast.success("À dimanche 👋");
-              }}
-              aria-label="Se déconnecter"
-              className="bouton-secondaire bouton--rouge flex items-center justify-center px-4 py-3"
-            >
-              <LogOut className="size-4" />
-            </button>
+            <BoutonDeconnexion className="py-3 text-[14px]" />
           </div>
         )}
       </div>

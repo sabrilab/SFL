@@ -7,7 +7,10 @@
 // relief) : des tuiles vectorielles d'OpenStreetMap, sans clé, dessinées en
 // pastel ; en s'approchant, les bâtiments se lèvent et le plan s'incline
 // (PENTE), comme la Snap Map. Ni boutons de zoom ni rotation : on pince, et
-// deux doigts qui glissent inclinent le plan. Dessus, à la manière de la
+// deux doigts qui glissent inclinent le plan. Sur un ordinateur (22/10,
+// map/gestes-ordinateur.ts), le pavé tactile déplace le plan, le pincement et
+// la molette zooment, et le plan s'incline de lui-même en s'approchant (rien
+// ne l'incline à la main). Dessus, à la manière de la
 // carte de « Jouer » de l'app iOS : le sticker mini-stade du match (vignette
 // à bord blanc, pastille calendrier, badge braise du manque), les autres
 // terrains en simples points, et « toi », ta carte en miniature, quand tu as
@@ -24,6 +27,10 @@
 // photo satellite en fondu sur le plan (une couche du même style). Les
 // classes sont dans app/map/animations.css ; « Réduire les animations »
 // coupe le vol et les ressorts.
+//
+// La discussion d'un match dont je suis (22/10) : une bulle de messages au
+// coin de son sticker (map/stade.ts), qui saute quand un message arrive ;
+// la toucher ouvre la discussion.
 //
 // Les joueurs (22/10, façon Snap Map) : chacun dans sa ville, sous les
 // matchs. De loin des piles, de près des tournesols de cartes (la
@@ -49,6 +56,7 @@ import {
   ZOOM_OUVERTURE,
   type VillePlan,
 } from "./joueurs";
+import { gestesOrdinateur } from "./gestes-ordinateur";
 import { FONDU, LIBELLES, styleSnap } from "./style-snap";
 
 export interface PointPlan {
@@ -82,7 +90,7 @@ const CADENCE = 110;
 
 /** L'inclinaison du plan : à plat de loin, penché sur la ville, comme la Snap Map. */
 function pente(zoom: number): number {
-  return Math.round(Math.min(1, Math.max(0, (zoom - 9) / 4)) * 45);
+  return Math.min(1, Math.max(0, (zoom - 9) / 4)) * 45;
 }
 
 const calme = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -129,6 +137,7 @@ export function CarteMap({
   toi,
   choisi,
   onChoisir,
+  onBulle,
   onPoint,
   fond = "plan",
   villes = [],
@@ -151,6 +160,8 @@ export function CarteMap({
   toi: ToiPlan | null;
   choisi: string | null;
   onChoisir: (id: string) => void;
+  /** Toucher la bulle de messages d'un match : sa discussion. */
+  onBulle?: (id: string) => void;
   /** Toucher un terrain libre (un match possible) ; sans elle, les terrains ne réagissent pas. */
   onPoint?: (id: string) => void;
   /** La place que prennent les surcouches du bas (moins quand le carrousel est replié). */
@@ -182,6 +193,9 @@ export function CarteMap({
   const volFini = useRef(Infinity);
   const cibleVol = useRef<maplibregl.LngLatBounds | null>(null);
   const choisirRef = useRef(onChoisir);
+  const bulleRef = useRef(onBulle);
+  // Les messages pas lus de chaque match, la dernière fois : la bulle saute quand il y en a plus.
+  const nonLusVus = useRef(new Map<string, number>());
   const pointRef = useRef(onPoint);
   const villeRef = useRef(onVille);
   const joueurRef = useRef(onJoueur);
@@ -193,16 +207,19 @@ export function CarteMap({
   const cadre = useRef<unknown[]>([]);
   useEffect(() => {
     choisirRef.current = onChoisir;
+    bulleRef.current = onBulle;
     pointRef.current = onPoint;
     villeRef.current = onVille;
     joueurRef.current = onJoueur;
     margeBasRef.current = margeBas;
-  }, [onChoisir, onPoint, onVille, onJoueur, margeBas]);
+  }, [onChoisir, onBulle, onPoint, onVille, onJoueur, margeBas]);
   const pointsActifs = !!onPoint;
 
   // La carte, une fois.
   useEffect(() => {
     if (!conteneur.current || carte.current) return;
+    // Un ordinateur : ni doigts ni écran tactile.
+    const ordinateur = navigator.maxTouchPoints === 0;
     const map = new maplibregl.Map({
       container: conteneur.current,
       style: styleSnap(),
@@ -224,11 +241,24 @@ export function CarteMap({
       // L'attribution reste repliée en un petit « i » : elle s'ouvre au toucher.
       map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
     });
+    // Au doigt, deux doigts inclinent le plan ; sur un ordinateur, il suit le zoom.
+    const debrancher = gestesOrdinateur(map, ordinateur ? pente : null);
+    // Une vignette qui ne vient pas (l'optimiseur d'images au bout de son
+    // forfait) : la photo entière, gardée dans `data-secours` (map/joueurs.ts).
+    const secours = (e: Event) => {
+      const img = e.target;
+      if (!(img instanceof HTMLImageElement) || !img.dataset.secours) return;
+      img.src = img.dataset.secours;
+      delete img.dataset.secours;
+    };
+    map.getContainer().addEventListener("error", secours, true);
     carte.current = map;
     // Captures en développement : viser une ville à la main.
     if (process.env.NODE_ENV === "development") (window as unknown as { __bolaMap?: PlanMap }).__bolaMap = map;
     const entreesAuMontage = entrees.current;
     return () => {
+      debrancher();
+      map.getContainer().removeEventListener("error", secours, true);
       map.remove();
       carte.current = null;
       reperes.current = [];
@@ -282,6 +312,12 @@ export function CarteMap({
       const est = s.id === choisi;
       const m = repere(map, s.lat, s.lng, stickerHtml(s, est, variante), { classe: "stk-ancre", z: est ? 3 + ordre.length : 3 + k });
       m.getElement().addEventListener("click", (e) => {
+        // Sa bulle de messages : droit à la discussion.
+        if (bulleRef.current && (e.target as HTMLElement).closest(".stk__bulle")) {
+          navigator.vibrate?.(6);
+          bulleRef.current(s.id);
+          return;
+        }
         // Un sticker qui en range d'autres : s'approcher pour les séparer ;
         // sa pastille de joueurs seuls ouvre leurs villes.
         const g = groupeDe.current.get(s.id);
@@ -303,6 +339,12 @@ export function CarteMap({
       poses.push(m);
       stickersVus.push({ s, el: m.getElement() });
       const el = m.getElement().querySelector<HTMLElement>(".stk");
+      // Un message de plus depuis la dernière fois : la bulle saute.
+      const nonLus = s.discussion?.nonLus ?? 0;
+      const avantNonLus = nonLusVus.current.get(s.id);
+      if (doux && avantNonLus !== undefined && nonLus > avantNonLus)
+        m.getElement().querySelector(".stk__bulle")?.classList.add("stk__bulle--saute");
+      nonLusVus.current.set(s.id, nonLus);
       if (!entrees.current.has(s.id)) entrees.current.set(s.id, Math.max(0, depuis) + rang++ * CADENCE);
       if (el && doux) {
         const retard = (entrees.current.get(s.id) ?? 0) - depuis + (origine.current == null ? VOL * 1000 - 250 : 0);
@@ -335,7 +377,11 @@ export function CarteMap({
       window.setTimeout(() => r.remove(), 1150);
     }
 
-    const deps = [stickers, points, toi, choisi];
+    // Le cadrage suit où sont les stickers, pas leur liste : la page la refait
+    // à chaque rendu (l'horloge de la convocation en lance un par minute), et
+    // le plan revenait alors sur les matchs en plein zoom (22/10).
+    const lieux = stickers.map((s) => `${s.lat},${s.lng}`).sort().join(";");
+    const deps = [lieux, points, toi, choisi];
     if (deps.every((d, i) => d === cadre.current[i])) return;
     // Seul le choix a changé : le plan glisse pour poser le choisi au centre
     // de ce qui reste visible, sans changer de zoom.

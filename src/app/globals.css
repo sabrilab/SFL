@@ -9,8 +9,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* Typographie de l'app BOLA : une sans neutre (Inter) pour tout ce qui se
-     lit, une monospace en capitales pour ce qui s'étiquette. */
+  /* Typographie de l'app BOLA, celle de la Map : Inter pour tout ce qui se
+     lit, et au plus gras pour les titres en capitales (.titre-lettrage) ;
+     JetBrains Mono en capitales pour ce qui s'étiquette (.mono-label).
+     Anton ne sert plus qu'aux chiffres. */
   --font-sans: var(--font-inter);
   --font-mono: var(--font-jbmono);
   --font-heading: var(--font-sans);
@@ -259,14 +261,32 @@
 .orbs > i:nth-child(2) { top: 330px; right: -110px; width: 280px; height: 280px; filter: blur(24px); animation-duration: 21s; animation-direction: reverse; background: radial-gradient(circle, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 70%); }
 .orbs > i:nth-child(3) { bottom: -80px; left: 30px; width: 320px; height: 260px; filter: blur(30px); animation-duration: 25s; background: radial-gradient(circle, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 70%); }
 
-/* Micro-label — comme les étiquettes de l'app BOLA : monospace (SF Mono sur
-   iPhone, JetBrains Mono ailleurs), capitales espacées, en gras. */
+/* Micro-label — l'étiquette de la Map (« 3 MATCHS OUVERTS ») : JetBrains
+   Mono partout, iPhone compris, capitales espacées, en gras. Avant le 22/10,
+   l'iPhone prenait SF Mono, plus sèche que l'étiquette de la Map (Sabri :
+   « uniformise le tout »). */
 .mono-label {
-  font-family: ui-monospace, "SF Mono", var(--font-jbmono), monospace;
+  font-family: var(--font-jbmono), ui-monospace, monospace;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+/* Titre en lettrage — les lettres de la Map (le nom de la commune, « TU Y
+   ES », « DIMANCHE » sur les cartes des matchs) sans le découpage du
+   sticker : Inter au plus gras, en capitales, serré. Les titres des Actus,
+   du récap et du profil d'un joueur l'ont pris à Anton (22/10), qui ne garde
+   que les chiffres. Plus large qu'Anton : à taille égale, compter un quart
+   de moins. Dans la couche des composants, pour qu'un tracking-* le
+   desserre sur les petites tailles. */
+@layer components {
+  .titre-lettrage {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    text-transform: uppercase;
+  }
 }
 
 /* ─────────────────────── Le gabarit de page ────────────────────────
@@ -401,6 +421,23 @@
   border: 0;
   overflow: visible;
 }
+/* Sur ordinateur, les rangées transparentes posées sur le plan le laissent
+   saisir (map/gestes-ordinateur.ts) : la main du plan, pas la flèche. Ce
+   qu'elles portent (cartes, boutons) garde son curseur. */
+@media (hover: hover) and (pointer: fine) {
+  [data-traverse] {
+    cursor: grab;
+  }
+  [data-traverse]:active {
+    cursor: grabbing;
+  }
+  [data-traverse] > :not([data-traverse]) {
+    cursor: auto;
+  }
+  [data-traverse] > a[href] {
+    cursor: pointer;
+  }
+}
 
 /* Le sticker du match : 71 de large, la pointe de la queue sur le terrain. */
 .stk {
@@ -472,7 +509,7 @@
   height: 11px;
   background: #0a0b0d;
   color: #f4f5f2;
-  font: 700 7px/11px ui-monospace, "SF Mono", var(--font-jbmono), monospace;
+  font: 700 7px/11px var(--font-jbmono), ui-monospace, monospace;
   letter-spacing: 0.4px;
   text-align: center;
   text-transform: uppercase;
@@ -509,6 +546,58 @@
   background: #f4f5f2;
   color: #0a0b0d;
   border-color: #0a0b0d;
+}
+/* La discussion du match (22/10, stade.ts, bulleHtml) : une bulle de BD au
+   coin du sticker, la queue vers le stade. Rouge des pastilles d'iOS avec
+   le nombre de messages pas lus ; blanche avec trois points quand tout est
+   lu. Le doigt l'attrape un peu au-delà de son dessin. */
+.stk__bulle {
+  position: absolute;
+  right: -17px;
+  top: -20px;
+  width: 31px;
+  height: 26px;
+  transform-origin: 12% 95%;
+}
+.stk__bulle::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+}
+.stk__bulle svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.stk__bulle path {
+  fill: #f4f5f2;
+  stroke: #f4f5f2;
+  stroke-width: 1.5px;
+  stroke-linejoin: round;
+}
+.stk__bulle--nouveau path {
+  fill: #ff3b30;
+}
+.stk__bulle-dedans {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 21.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2.5px;
+  color: #ffffff;
+  font: 900 11.5px/1 var(--font-sans), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.stk__bulle-dedans i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #0a0b0d;
+  opacity: 0.5;
 }
 .stk__etiquette {
   position: absolute;
@@ -711,7 +800,7 @@
 }
 .grp__plus,
 .vil__reste {
-  font: 700 9px/1 ui-monospace, "SF Mono", var(--font-jbmono), monospace;
+  font: 700 9px/1 var(--font-jbmono), ui-monospace, monospace;
   color: #8f908b;
 }
 
@@ -733,7 +822,7 @@
   cursor: pointer;
 }
 .vil__compte {
-  font: 700 9.5px/1 ui-monospace, "SF Mono", var(--font-jbmono), monospace;
+  font: 700 9.5px/1 var(--font-jbmono), ui-monospace, monospace;
   font-style: normal;
   color: rgba(244, 245, 242, 0.6);
 }
@@ -990,7 +1079,7 @@
   transition-duration: 0.12s;
 }
 .liquid-tabbar__libelle {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
   font-size: 10px;
   line-height: 12px;
   letter-spacing: 0.1px;
@@ -1117,4 +1206,49 @@
 @media (prefers-reduced-motion: reduce) {
   .trophee-flotte { animation: none; }
   .trophee-eclat { animation: none; opacity: 0; }
+}
+
+/* La collection d'une pile, dans la pop-up du bas (collection-pile.tsx) : un
+   verre clair qui laisse voir la Map floutée ; les cartes montent à l'entrée. */
+.collection-fond {
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+.collection-fond[data-entree] {
+  opacity: 1;
+}
+.collection-verre {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.62), rgb(255 255 255 / 0.38)),
+    rgb(244 245 242 / 0.3);
+  border-top: 1px solid rgb(255 255 255 / 0.75);
+  box-shadow:
+    0 -12px 40px rgb(10 11 13 / 0.18),
+    inset 0 1px 0 rgb(255 255 255 / 0.9);
+  -webkit-backdrop-filter: blur(26px) saturate(1.6);
+  backdrop-filter: blur(26px) saturate(1.6);
+  translate: 0 40px;
+  transition: translate 0.45s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.collection-fond[data-entree] .collection-verre {
+  translate: 0 0;
+}
+.collection-carte {
+  translate: 0 28px;
+  -webkit-tap-highlight-color: transparent;
+  filter: drop-shadow(0 10px 16px rgb(10 11 13 / 0.2));
+  transition:
+    scale 0.32s cubic-bezier(0.2, 0.9, 0.3, 1),
+    opacity 0.32s ease,
+    translate 0.5s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.collection-fond[data-entree] .collection-carte {
+  translate: 0 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .collection-fond,
+  .collection-verre,
+  .collection-carte {
+    transition: none;
+  }
 }

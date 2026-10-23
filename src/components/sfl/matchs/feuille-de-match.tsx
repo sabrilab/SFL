@@ -580,8 +580,8 @@ function ImageFeuille({
         </div>
         <div
           style={{
-            font: "400 46px/1 var(--font-anton), Anton, sans-serif",
-            letterSpacing: 0.5,
+            font: "900 35px/1 var(--font-inter), Inter, system-ui, sans-serif",
+            letterSpacing: "-0.04em",
             textTransform: "uppercase",
           }}
         >

@@ -19,7 +19,10 @@ export interface JoueurPlan {
   name: string;
   affiche: string;
   note: number;
+  /** La photo à montrer : sa vignette (lib/sfl/photos, photoMiniature). */
   photo: string | null;
+  /** La photo entière, si la vignette ne vient pas (carte-map.tsx s'en charge). */
+  secours?: string | null;
 }
 
 export interface VillePlan {
@@ -125,9 +128,14 @@ export function disposer(
 const echapper = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
 
+// Pas de chargement paresseux : les vignettes pèsent quelques Ko, l'écran
+// d'accueil les a déjà préchargées (app-splash.tsx), et les repères sont
+// refaits à chaque fin de zoom — une image paresseuse y repasserait par une
+// carte vide.
 function visage(j: JoueurPlan): string {
+  const secours = j.secours && j.secours !== j.photo ? ` data-secours="${echapper(j.secours)}"` : "";
   return j.photo
-    ? `<img src="${echapper(j.photo)}" alt="" loading="lazy" decoding="async" draggable="false" />`
+    ? `<img src="${echapper(j.photo)}"${secours} alt="" decoding="async" draggable="false" />`
     : `<span class="jc__initiale">${echapper(j.affiche.slice(0, 1).toUpperCase())}</span>`;
 }
 

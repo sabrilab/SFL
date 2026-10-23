@@ -15,6 +15,13 @@
 // (`saison.terrains`) ; l'admin donne l'adresse de chaque match juste sous la
 // carte.
 //
+// La discussion d'un match (22/10) : sur le plan, une bulle de messages au
+// coin de son sticker, rouge avec ce que je n'ai pas lu (Sabri : « comme une
+// notification dans la bulle du match ») ; la carte du match porte le même
+// nombre. La bulle, « Discussion du match » dans sa fiche, ou la
+// notification (/?match=12&discussion) ouvre la discussion plein écran
+// (matchs/discussion-match.tsx).
+//
 // Les joueurs (22/10, « en poursuivant l'idée de remplacer Snapchat ») :
 // chacun dans sa ville, en piles qui s'ouvrent quand on s'approche
 // (map/joueurs.ts), et le catalogue des joueurs par ville dans une fiche
@@ -32,12 +39,14 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
+import { DiscussionMatch } from "@/components/sfl/matchs/discussion-match";
 import { FeuilleDeMatch } from "@/components/sfl/matchs/feuille-de-match";
 import { feuilleDeConvocation, feuilleDeJournee } from "@/lib/sfl/feuille";
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
 import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
 import { Invitations, invitationsDe } from "@/components/sfl/matchs/invitations";
 import { useParties } from "@/hooks/use-parties";
+import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
 import { inscrits, libelleJour, placesLibres, type Partie } from "@/lib/sfl/matchs";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
@@ -60,15 +69,17 @@ import type { JourneeMeta, Saison, Terrain } from "@/lib/sfl/saisie/types";
 import { ovr, rankPlayers } from "@/lib/sfl/engine";
 import { ProfilJoueur } from "@/components/sfl/profil-joueur";
 import { CatalogueJoueurs } from "@/components/sfl/map/catalogue-joueurs";
+import { CollectionPile } from "@/components/sfl/map/collection-pile";
 import { cleVille, type VillePlan } from "@/components/sfl/map/joueurs";
 import { villeOuLigue } from "@/lib/sfl/villes";
-import { photoPerso } from "@/lib/sfl/photos";
+import { photoMiniature, photoPerso } from "@/lib/sfl/photos";
 import { nomAffiche } from "@/lib/sfl/identites";
 import { useVillesRevision } from "@/hooks/use-villes";
 import { usePhotoRevision } from "@/hooks/use-player-photo";
 import { useIdentitesRevision } from "@/hooks/use-identites";
 import { cn } from "@/lib/utils";
-import { COULEUR_LIGUE, heureCourte, itineraires, photoSatellite, stadeSvg, type EtatSticker, type LigueMatch, type Moment, type StickerPlan } from "@/components/sfl/map/stade";
+import { COULEUR_LIGUE, heureCourte, itineraires, stadeSvg, type EtatSticker, type LigueMatch, type Moment, type StickerPlan } from "@/components/sfl/map/stade";
+import { VueSatellite } from "@/components/sfl/map/vue-satellite";
 import { SigleLigue } from "@/components/sfl/choix-ligue";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { useMatchsTeam, type MatchTeam } from "@/hooks/use-matchs-team";
@@ -359,6 +370,8 @@ export default function MapPage() {
   // Les matchs ouverts par les joueurs : un public montre ses places libres,
   // un privé n'apparaît qu'à ceux qui en sont.
   const { parties, moi, actif: partiesActives, recharger } = useParties();
+  // La discussion de chacun de mes matchs : ce que je n'y ai pas lu.
+  const { apercus } = useDiscussionsMatch();
   const matchsTeam = useMatchsTeam();
   const matchs = useMemo<MatchMap[]>(() => {
     const ouverts = parties.map((x): MatchMap => {
@@ -476,21 +489,34 @@ export default function MapPage() {
   // Le match choisi : celui qu'on a touché s'il est encore là, sinon la une.
   const choisi = affiches.find((m) => m.cle === choix) ?? une;
 
+  // La discussion d'un match, plein écran par-dessus la Map.
+  const [discussion, setDiscussion] = useState<number | null>(null);
+  const fermerDiscussion = useCallback(() => setDiscussion(null), []);
+  const ouvrirDiscussion = useCallback((cle: string) => {
+    setChoix(cle);
+    setFiche(false);
+    setDiscussion(Number(cle.slice(1)));
+  }, []);
+  const partieDiscussion = discussion == null ? undefined : parties.find((x) => x.id === discussion);
+
   // Un match à montrer dès qu'il est là : celui qu'on vient d'ouvrir, ou
-  // celui d'une notification (/?match=12). Sa fiche s'ouvre, on y gère tout.
-  const aMontrer = useRef<string | null>(null);
+  // celui d'une notification (/?match=12). Sa fiche s'ouvre, on y gère tout ;
+  // la notification d'un message (/?match=12&discussion) ouvre sa discussion.
+  const aMontrer = useRef<{ cle: string; discussion: boolean } | null>(null);
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("match");
+    const q = new URLSearchParams(window.location.search);
+    const id = q.get("match");
     if (!id || !/^\d+$/.test(id)) return;
-    aMontrer.current = `m${id}`;
+    aMontrer.current = { cle: `m${id}`, discussion: q.has("discussion") };
     window.history.replaceState(null, "", window.location.pathname);
   }, []);
   useEffect(() => {
-    const cle = aMontrer.current;
-    if (!cle || !affiches.some((m) => m.cle === cle)) return;
+    const a = aMontrer.current;
+    if (!a || !affiches.some((m) => m.cle === a.cle)) return;
     aMontrer.current = null;
-    choisirSticker(cle);
-  }, [affiches, choisirSticker]);
+    if (a.discussion) ouvrirDiscussion(a.cle);
+    else choisirSticker(a.cle);
+  }, [affiches, choisirSticker, ouvrirDiscussion]);
   const invitations = useMemo(() => invitationsDe(parties, moi), [parties, moi]);
 
   // Le carrousel et le plan vont ensemble : faire glisser les cartes choisit
@@ -548,8 +574,9 @@ export default function MapPage() {
           etat: m.etat,
           nom: m.terrain!.nom,
           ligue: m.ligue,
+          discussion: m.partie && apercus.has(m.partie.id) ? { nonLus: apercus.get(m.partie.id)!.nonLus } : undefined,
         })),
-    [affiches, choisi]
+    [affiches, choisi, apercus]
   );
 
   // Toi : ta position, quand tu la donnes.
@@ -591,7 +618,9 @@ export default function MapPage() {
       if (!v) continue;
       const id = cleVille(v.ville);
       const g = parVille.get(id) ?? { id, ville: v.ville, lat: v.lat, lng: v.lng, joueurs: [] };
-      g.joueurs.push({ name: pl.name, affiche: nomAffiche(pl.name), note: ovr(pl.stats), photo: photoPerso(pl.name) });
+      // Sur le plan, les cartes font 22 à 36 px : la photo en vignette.
+      const photo = photoPerso(pl.name);
+      g.joueurs.push({ name: pl.name, affiche: nomAffiche(pl.name), note: ovr(pl.stats), photo: photo && photoMiniature(photo), secours: photo });
       parVille.set(id, g);
     }
     for (const g of parVille.values()) g.joueurs.sort((a, b) => b.note - a.note || a.affiche.localeCompare(b.affiche));
@@ -612,10 +641,11 @@ export default function MapPage() {
   const [focusVilles, setFocusVilles] = useState<string[] | null>(null);
   const [profil, setProfil] = useState<string | null>(null);
   const [viser, setViser] = useState<{ lat: number; lng: number; n: number } | null>(null);
-  const ouvrirVille = useCallback((ids: string[]) => {
-    setFocusVilles(ids);
-    setCatalogue(true);
-  }, []);
+  // Une pile touchée sur la Map : sa collection, la Map floutée derrière.
+  const [pile, setPile] = useState<string[] | null>(null);
+  const ouvrirVille = useCallback((ids: string[]) => setPile(ids), []);
+  const fermerPile = useCallback(() => setPile(null), []);
+  const villesPile = useMemo(() => (pile ? villes.filter((v) => pile.includes(v.id)) : []), [pile, villes]);
   const rangs = useMemo(() => new Map(rankPlayers(players).map((x) => [x.name, x.rank])), [players]);
   const profilJoueur = profil ? players.find((x) => x.name === profil) : undefined;
   const nomFocus = focusVilles?.length === 1 ? villes.find((v) => v.id === focusVilles[0])?.ville : null;
@@ -665,6 +695,7 @@ export default function MapPage() {
             toi={toi}
             choisi={choisi?.cle ?? null}
             onChoisir={choisirSticker}
+            onBulle={ouvrirDiscussion}
             villes={villes}
             margeBas={replie ? 150 : 380}
             onVille={ouvrirVille}
@@ -700,7 +731,7 @@ export default function MapPage() {
             d'onglets le 19/10), la bascule plan / satellite et, pour
             l'admin, les stats (Activité & rétention, 22/10) et le réglage des
             matchs — le lettrage garde sa place. */}
-        <div className="absolute right-4 z-[510] flex flex-col items-end gap-2" style={{ top: haut }}>
+        <div data-traverse className="absolute right-4 z-[510] flex flex-col items-end gap-2" style={{ top: haut }}>
           <Link
             href="/recherche"
             aria-label="Recherche"
@@ -761,10 +792,14 @@ export default function MapPage() {
           )}
         </div>
 
-        {/* En bas : les boutons, les cartes des matchs, les pastilles */}
-        <div className="absolute inset-x-0 z-[510] flex flex-col items-center gap-3" style={{ bottom: bas }}>
+        {/* En bas : les boutons, les cartes des matchs, les pastilles. Leurs
+            rangées sont transparentes et prennent toute la largeur : marquées
+            `data-traverse` (comme la colonne des boutons), elles laissent la
+            molette, le pincement et le glisser de la souris au plan, sur
+            ordinateur (map/gestes-ordinateur.ts). */}
+        <div data-traverse className="absolute inset-x-0 z-[510] flex flex-col items-center gap-3" style={{ bottom: bas }}>
           <Invitations invitations={invitations} onOuvrir={(p) => choisirSticker(`m${p.id}`)} />
-          <div className="flex w-full items-center justify-center gap-2 px-4">
+          <div data-traverse className="flex w-full items-center justify-center gap-2 px-4">
             {/* Tout joueur ouvre un match ; l'admin garde en plus la journée de ligue. */}
             {partiesActives && (
               <button
@@ -810,13 +845,15 @@ export default function MapPage() {
           {/* Le carrousel : une carte par match, celle du centre est la choisie.
               Toucher la choisie ouvre sa fiche. Replié, il descend et s'efface. */}
           <div
+            data-traverse
             className={cn("grid w-full transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none", replie ? "pointer-events-none grid-rows-[0fr] opacity-0" : "grid-rows-[1fr]")}
             aria-hidden={replie}
           >
-          <div className="flex min-h-0 flex-col items-center gap-3 overflow-hidden">
+          <div data-traverse className="flex min-h-0 flex-col items-center gap-3 overflow-hidden">
           <div
             ref={carrousel}
             onScroll={suivreCarrousel}
+            data-traverse
             className="flex w-full snap-x snap-mandatory items-end gap-3 overflow-x-auto pr-[max(1rem,calc(50%-103px))] pb-3 [scrollbar-width:none]"
             style={{ paddingLeft: `max(1rem, calc(50% - ${affiches[0]?.joue ? LARGEUR_JOUE / 2 + 5 : 103}px))` }}
           >
@@ -828,6 +865,7 @@ export default function MapPage() {
                   une={m.cle === une?.cle && !m.joue}
                   dans={m.joue ? null : ecartJours(m.dateLabel, aujourdhui)}
                   loin={toi && m.terrain ? `à ${distanceLisible(toi, m.terrain)}` : null}
+                  nonLus={m.partie ? (apercus.get(m.partie.id)?.nonLus ?? 0) : 0}
                   onToucher={() => (m.cle !== choisi?.cle ? setChoix(m.cle) : ouvrirFiche())}
                 />
               </div>
@@ -835,7 +873,7 @@ export default function MapPage() {
           </div>
 
           {choisi && (
-            <div className="flex max-w-full items-center gap-2 px-4">
+            <div data-traverse className="flex max-w-full items-center gap-2 px-4">
               {choisi.terrain ? (
                 <>
                   <button
@@ -918,7 +956,14 @@ export default function MapPage() {
                 {choisi?.terrain && <Itineraire terrain={choisi.terrain} ios={ios} />}
                 {/* Une journée : ses joueurs. La convocation : on y répond, comme avant. */}
                 {choisi?.partie ? (
-                  <FichePartie partie={choisi.partie} moi={moi} terrains={terrains} onChange={recharger} />
+                  <FichePartie
+                    partie={choisi.partie}
+                    moi={moi}
+                    terrains={terrains}
+                    onChange={recharger}
+                    nonLus={apercus.get(choisi.partie.id)?.nonLus ?? 0}
+                    onDiscussion={() => ouvrirDiscussion(choisi.cle)}
+                  />
                 ) : choisi?.team ? (
                   <FicheTeam t={choisi.team} />
                 ) : choisi?.j != null && !choisi.convoquee ? (
@@ -988,6 +1033,17 @@ export default function MapPage() {
         </SheetContent>
       </Sheet>
 
+      <CollectionPile
+        villes={villesPile}
+        masquee={!!profil}
+        onFermer={fermerPile}
+        onJoueur={setProfil}
+        onVoir={(v) => {
+          setPile(null);
+          setViser((x) => ({ lat: v.lat, lng: v.lng, n: (x?.n ?? 0) + 1 }));
+        }}
+      />
+
       {/* ─── Le profil d'un joueur touché sur la Map ou dans le catalogue ─── */}
       <Sheet open={!!profilJoueur} onOpenChange={(o) => !o && setProfil(null)}>
         <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
@@ -1020,7 +1076,7 @@ export default function MapPage() {
           onOuvert={(id) => {
             recharger();
             setChoix(`m${id}`);
-            aMontrer.current = `m${id}`;
+            aMontrer.current = { cle: `m${id}`, discussion: false };
           }}
         />
       )}
@@ -1033,6 +1089,9 @@ export default function MapPage() {
           setOuvrir((o) => ({ terrain: null, jour, heure: h, n: (o?.n ?? 0) + 1 }));
         }}
       />
+
+      {/* ─── La discussion d'un match, par-dessus tout (barre d'onglets comprise) ─── */}
+      {partieDiscussion && <DiscussionMatch key={partieDiscussion.id} partie={partieDiscussion} moi={moi} onFermer={fermerDiscussion} />}
     </>
   );
 }
@@ -1054,6 +1113,7 @@ function CarteMatch({
   une,
   dans,
   loin,
+  nonLus = 0,
   onToucher,
 }: {
   m: MatchMap;
@@ -1063,6 +1123,8 @@ function CarteMatch({
   /** Les jours avant le match (null : joué ou date illisible). */
   dans: number | null;
   loin: string | null;
+  /** Les messages de sa discussion que je n'ai pas lus. */
+  nonLus?: number;
   onToucher: () => void;
 }) {
   const [c0, c1, c2] = COULEUR_LIGUE[m.ligue].fond;
@@ -1084,7 +1146,7 @@ function CarteMatch({
         onClick={onToucher}
         className={cn("block p-[5px] text-left", joue ? "rounded-[20px] shadow-[0_5px_9px_rgba(0,0,0,0.18)]" : "rounded-[24px] shadow-[0_8px_12px_rgba(0,0,0,0.22)]")}
         style={{ background: BLANC }}
-        aria-label={`${titre} ${m.heure}${m.terrain ? `, ${m.terrain.nom}` : ""}, ${m.etatTexte}`}
+        aria-label={`${titre} ${m.heure}${m.terrain ? `, ${m.terrain.nom}` : ""}, ${m.etatTexte}${nonLus ? `, ${nonLus} message${nonLus > 1 ? "s" : ""} pas lu${nonLus > 1 ? "s" : ""}` : ""}`}
         aria-pressed={choisi}
       >
         <div
@@ -1093,12 +1155,13 @@ function CarteMatch({
         >
           {m.terrain ? (
             // La vue aérienne du vrai terrain, comme dans l'app iPhone.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={photoSatellite(m.terrain.lat, m.terrain.lng, 392, 280, 0.0009)}
-              alt=""
-              loading="lazy"
-              className={cn("absolute inset-0 h-full w-full object-cover", joue ? "grayscale" : complet && "saturate-[0.35]")}
+            <VueSatellite
+              lat={m.terrain.lat}
+              lng={m.terrain.lng}
+              demi={0.0009}
+              rapport={196 / 140}
+              hauteur={h}
+              className={cn("absolute inset-0 h-full w-full", joue ? "grayscale" : complet && "saturate-[0.35]")}
             />
           ) : (
             <div
@@ -1166,6 +1229,17 @@ function CarteMatch({
           </div>
         </div>
       </button>
+      {/* Des messages pas lus dans sa discussion : leur nombre, comme sur une
+          icône d'iPhone. */}
+      {nonLus > 0 && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -top-1.5 -right-1.5 z-10 flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-[12px] leading-none font-bold text-white tabular-nums"
+          style={{ background: "#FF3B30", boxShadow: `0 0 0 2px ${BLANC}, 0 2px 4px rgba(0,0,0,0.25)` }}
+        >
+          {nonLus > 9 ? "9+" : nonLus}
+        </span>
+      )}
       {!joue && m.presents.length > 0 && (
         <div className="pointer-events-none absolute -bottom-3 left-1/2 flex -translate-x-1/2 items-center" aria-hidden>
           {m.presents.slice(0, 3).map((nom, i) => (
@@ -1199,8 +1273,15 @@ function Itineraire({ terrain, ios }: { terrain: Terrain; ios: boolean }) {
   return (
     <section className="flex flex-col gap-3">
       <div className="relative h-[200px] overflow-hidden rounded-[22px] border border-border bg-secondary">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photoSatellite(terrain.lat, terrain.lng, 800, 400, 0.0011)} alt={`Vue satellite de ${terrain.nom}`} className="h-full w-full object-cover" />
+        <VueSatellite
+          lat={terrain.lat}
+          lng={terrain.lng}
+          demi={0.0011}
+          rapport={2}
+          hauteur={200}
+          titre={`Vue satellite de ${terrain.nom}`}
+          className="h-full w-full"
+        />
         {/* L'épingle sur le terrain : la photo est centrée sur lui. */}
         <span className="ajuster-pin pointer-events-none" style={{ left: "50%", top: "50%", cursor: "default" }} aria-hidden />
         <span className="absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">

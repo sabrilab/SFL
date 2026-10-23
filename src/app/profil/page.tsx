@@ -1,12 +1,31 @@
 "use client";
 
-// Ma carte — l'identité du joueur, rien d'autre.
+// Ma carte — le joueur, sa saison, sa progression.
 //
-// Ordre de lecture : qui je suis → ma carte (la simple) → mes badges (le
-// prochain à viser, puis les trophées de fin de saison et les paliers, voir
-// vitrine.tsx) → mes cartes, saison par saison, avec les cartes spéciales
-// gagnées (carriere-joueur.tsx) → les raccourcis. La photo se change en
-// touchant l'avatar.
+// La deuxième page la plus vue de l'app. Sabri, le 22/10 : qu'elle « donne
+// plus envie, qu'on comprenne mieux les choses et que ce soit mieux rangé »,
+// comme le profil d'un joueur ouvert depuis la Recherche (profil-joueur.tsx),
+// dont elle reprend l'ordre de lecture, du plus fort au plus fin :
+//   1. moi : ma carte en grand, mon nom dans le lettrage de la Map, trois
+//      chiffres de tête en Anton (mon rang au Pépite d'Or, ma note, mes
+//      dimanches), puis la phrase qui me résume (fiche-joueur.ts, la même que
+//      sur mon profil). Le nom se corrige en le touchant (identite.tsx).
+//      Dessous, ma photo (la toucher ouvre « Ma photo »), la carte officielle
+//      tant qu'elle n'est pas faite (carte-officielle.tsx ; ensuite, on la
+//      refait depuis « Ma photo ») et le badge de ma carte ;
+//   2. ma saison : mon dernier dimanche en grand, mes points forts, mes
+//      autres dimanches (ma-saison.tsx) ;
+//   3. mon évolution : mon rang au Pépite d'Or ou la note de ma carte,
+//      journée après journée (carriere-joueur.tsx) ;
+//   4. mes badges : le prochain à viser, les trophées de fin de saison et
+//      les paliers (vitrine.tsx) ;
+//   5. mes cartes, saison par saison, avec les cartes spéciales gagnées ;
+//   6. les raccourcis ;
+//   7. « Se déconnecter », tout en bas, comme dans toute app
+//      (bouton-deconnexion.tsx ; Sabri, le 22/10 : « plus accessible »).
+// « Historique » est parti : chaque dimanche de Ma saison ouvre son récap. Le
+// rappel « Glisse pour tourner » aussi, comme sur le profil. Les réglages
+// (« ⋯ ») sont en haut, à côté de la loupe.
 //
 // Le 22/10 (Sabri) : le profil de jeu (le radar) part sur le profil d'un
 // joueur dans Recherche ; « Cartes de match » disparaît, les cartes gagnées
@@ -18,7 +37,9 @@ import { ChevronRight, Dumbbell, Layers, Trophy } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Card3D } from "@/components/sfl/card-3d";
 import { PlayerCard } from "@/components/sfl/player-card";
-import { CartesCarriere } from "@/components/sfl/carriere-joueur";
+import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur";
+import { MaSaison, type RangDuJour } from "@/components/sfl/ma-saison";
+import { Chiffre } from "@/components/sfl/profil-joueur";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { VitrineBadges } from "@/components/sfl/vitrine";
 import { ChoixBadge } from "@/components/sfl/choix-badge";
@@ -30,10 +51,15 @@ import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { useGrandEcran } from "@/hooks/use-media-query";
 import { FormulaireIdentite } from "@/components/sfl/identite";
 import { useIdentites } from "@/hooks/use-identites";
-import { cartesDeCarriere } from "@/lib/sfl/carriere";
-import { rankPlayers } from "@/lib/sfl/engine";
+import { cartesDeCarriere, courbeDeCarriere } from "@/lib/sfl/carriere";
+import { ovr, rankPlayers } from "@/lib/sfl/engine";
+import { dimanchesDe, ficheJoueur } from "@/lib/sfl/fiche-joueur";
+import { ordinal } from "@/lib/sfl/fin-de-saison";
+import { isHidden } from "@/lib/sfl/hidden";
+import { POSTES } from "@/lib/sfl/inscription";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { BoutonStats } from "@/components/layout/bouton-stats";
+import { BoutonDeconnexion } from "@/components/sfl/auth/bouton-deconnexion";
 
 /* ------------------------------ Petits blocs ------------------------------ */
 
@@ -41,7 +67,7 @@ function AvatarPhoto({ name }: { name: string }) {
   const src = usePlayerPhoto(name);
   const [broken, setBroken] = useState(false);
   return (
-    <span className="glass-soft flex size-[46px] shrink-0 items-center justify-center overflow-hidden rounded-full text-[14px] font-bold">
+    <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-foreground/10 text-[14px] font-bold">
       {broken ? (
         name[0]
       ) : (
@@ -65,159 +91,182 @@ function AvatarPhoto({ name }: { name: string }) {
 export default function Profil() {
   const { player } = useMyPlayer();
   const { allPlayers, saison } = useSeason();
-  // Sur sa propre fiche, on se classe parmi tout le monde — y compris les
-  // joueurs masqués ailleurs dans l'app.
-  const myRank =
-    rankPlayers(allPlayers).find((p) => p.name === player.name)?.rank ?? allPlayers.length;
+  // Mon rang : celui du classement de la Ligue (sans les joueurs masqués),
+  // où je figure toujours, même masqué.
+  const myRank = useMemo(
+    () =>
+      rankPlayers(allPlayers.filter((p) => !isHidden(p.name) || p.name === player.name)).find((p) => p.name === player.name)
+        ?.rank ?? null,
+    [allPlayers, player.name]
+  );
   // Mes cartes : celle de chaque saison et les cartes spéciales gagnées.
   const mesCartes = useMemo(() => cartesDeCarriere(saison, player.name), [saison, player.name]);
+  const fiche = useMemo(() => ficheJoueur(saison, player, allPlayers), [saison, player, allPlayers]);
+  const dimanches = useMemo(() => dimanchesDe(saison, player.name), [saison, player.name]);
+  const joues = dimanches.filter((d) => !d.horsMatch).length;
+  const courbe = useMemo(() => courbeDeCarriere(saison, player.name), [saison, player.name]);
+  // Ma place au Pépite d'Or après chaque journée de la saison, et les places
+  // gagnées ou perdues depuis la précédente : la courbe les a déjà.
+  const rangs = useMemo(() => {
+    const m = new Map<number, RangDuJour>();
+    let avant: number | null = null;
+    for (const p of courbe) {
+      if (p.saison !== (saison.numero ?? 0)) continue;
+      m.set(p.j, { rang: p.rang, ecart: avant != null && p.rang != null ? avant - p.rang : null });
+      avant = p.rang;
+    }
+    return m;
+  }, [courbe, saison.numero]);
   // La carte est le sujet de la page : elle profite de la place quand il y en a.
   const grand = useGrandEcran();
   const [photoOuverte, setPhotoOuverte] = useState(false);
   const [identiteOuverte, setIdentiteOuverte] = useState(false);
   const identite = useIdentites();
+  const poste = POSTES.find((p) => p.id === player.poste)?.label ?? player.poste;
 
   return (
     <div className="shell py-4 sm:py-8 lg:pt-[var(--fib-55)]">
-      <div className="mb-[18px] flex items-center justify-between gap-3 lg:mb-[var(--fib-34)]">
+      <div className="relative z-10 mb-[18px] flex items-center justify-between gap-3 lg:mb-[var(--fib-34)]">
         <h1 className="text-[30px] font-bold tracking-tight lg:text-[34px]">Ma carte</h1>
         <div className="flex items-center gap-2">
           <BoutonStats />
           <BoutonRecherche />
+          <Link
+            href="/reglages"
+            aria-label="Réglages"
+            className="bouton-secondaire flex size-11 shrink-0 items-center justify-center gap-[3px]"
+          >
+            {[0, 1, 2].map((i) => (
+              <span key={i} className="size-[4px] rounded-full bg-foreground/70" />
+            ))}
+          </Link>
         </div>
       </div>
       {/* Deux colonnes dès qu'il y a la place, dans le rapport 1 : φ
-          (grille-or, globals.css) : l'identité et la carte à gauche, les
-          badges, les trophées, mes cartes et les raccourcis à droite. */}
-      <div className="grille-or grid grid-cols-1 gap-[18px] lg:gap-y-[var(--fib-21)]">
-      {/* La colonne d'identité reste à l'écran pendant qu'on parcourt le
-          reste : la carte est le sujet de la page. */}
-      <div className="flex min-w-0 flex-col gap-[18px] colonne-fixe lg:gap-[var(--fib-21)]">
-
-      {/* Rangée d'identité : photo, nom, pseudo, menu réglages */}
-      <div className="flex items-center justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setPhotoOuverte(true)}
-            aria-label="Changer ma photo"
-            className="shrink-0 rounded-full"
-          >
-            <AvatarPhoto name={player.name} />
-          </button>
-          {/* Le nom et le pseudo se corrigent en les touchant (identite.tsx). */}
+          (grille-or, globals.css) : moi à gauche, ma saison et le reste à
+          droite. */}
+      <div className="grille-or grid grid-cols-1 gap-[var(--fib-21)]">
+        {/* 1. Moi. La colonne reste à l'écran pendant qu'on parcourt le
+            reste : la carte est le sujet de la page. */}
+        <div className="colonne-fixe flex min-w-0 flex-col items-center gap-[var(--fib-21)]">
+          {/* Le cadre de la 3D garde autour de la carte de quoi la tourner :
+              ses bords vides passent un peu sous le titre et sous mon nom,
+              qui restent au-dessus (relative) et se touchent normalement. */}
+          <div className="-mt-[var(--fib-21)] -mb-[var(--fib-34)]">
+            <Card3D
+              cacheKey={`profil-simple-${player.name}`}
+              mode="simple"
+              size={grand ? 1.15 : 1}
+              render={(s) => <PlayerCard player={player} size={s} />}
+            />
+          </div>
           <button
             type="button"
             onClick={() => setIdentiteOuverte(true)}
-            aria-label="Modifier mon nom et mon pseudo"
-            className="min-w-0 text-left"
+            aria-label={`${identite.nom(player.name)}, ${identite.pseudo(player.name)}. Modifier mon nom et mon pseudo`}
+            className="relative flex w-full flex-col items-center gap-[var(--fib-8)] text-center"
           >
-            <div className="truncate text-[19px] font-extrabold tracking-tight">{identite.nom(player.name)}</div>
-            <div className="mt-0.5 truncate text-[12.5px] text-foreground/42">
-              {`${identite.pseudo(player.name)} · ${player.poste} · ${myRank}e au Pépite d'Or`}
-            </div>
+            <span className="titre-lettrage text-[34px] leading-[0.95] break-words">
+              {identite.nom(player.name)}
+            </span>
+            <span className="font-mono text-[12px] text-foreground/45">
+              {identite.pseudo(player.name)} · {poste.toLowerCase()}
+            </span>
           </button>
-        </div>
-        <Link
-          href="/reglages"
-          aria-label="Réglages"
-          className="bouton-secondaire flex size-[38px] shrink-0 flex-col items-center justify-center gap-[2.5px]"
-        >
-          {[0, 1, 2].map((i) => (
-            <span key={i} className="size-[3.5px] rounded-full bg-foreground/60" />
-          ))}
-        </Link>
-      </div>
-
-      {/* Ma carte */}
-      <section className="flex flex-col items-center gap-3.5">
-        <Card3D
-          cacheKey={`profil-simple-${player.name}`}
-          mode="simple"
-          size={grand ? 1.15 : 0.88}
-          render={(s) => <PlayerCard player={player} size={s} />}
-        />
-        <p className="mono-label text-center text-[9px] tracking-[0.12em] text-foreground/30">
-          Glisse pour tourner · double-clic pour retourner
-        </p>
-      </section>
-
-      {/* L'appel principal, pleine largeur juste sous la carte : la carte
-          officielle (photo au maillot Bola). Puis l'historique et le badge. */}
-      <CarteOfficielle player={player} className="-mt-1 w-full" />
-      <div className="flex gap-[9px]">
-        <Link
-          href="/ligue?vue=matchs"
-          className="bouton-secondaire bouton--or flex-1 py-[15px] text-center text-[15px] font-semibold"
-        >
-          Historique
-        </Link>
-        <ChoixBadge player={player} />
-      </div>
-
-      </div>
-
-      <div className="flex min-w-0 flex-col gap-[18px] lg:gap-[var(--fib-21)]">
-      {/* Mes badges : le prochain, la fin de saison, les paliers */}
-      <div id="badges" className="scroll-mt-4">
-        <VitrineBadges nom={player.name} />
-      </div>
-
-      {/* Mes cartes : la carte de chaque saison et les cartes spéciales gagnées */}
-      {mesCartes.length > 0 && <CartesCarriere saisons={mesCartes} titre="Mes cartes" />}
-
-      {/* Navigation du profil */}
-      <section className="flex flex-col gap-2.5">
-        {(
-          [
-            {
-              href: "/palmares",
-              icon: Trophy,
-              label: "Wall of Fame",
-              note: "Ton parcours, saison après saison",
-            },
-            {
-              href: "/collection",
-              icon: Layers,
-              label: "Collection",
-              note: "Packs et catalogue de cartes",
-            },
-          ] as const
-        ).map((l) => (
-          <Link
-            key={l.href}
-            href={l.href}
-            className="glass-soft flex items-center gap-3.5 rounded-3xl p-4 transition-colors active:opacity-80"
-          >
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground/10">
-              <l.icon className="size-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold">{l.label}</span>
-              <span className="block text-[13px] text-muted-foreground">{l.note}</span>
-            </span>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-          </Link>
-        ))}
-
-        {/* Les épreuves — verrouillées : les défis filmés qui rempliront la
-            carte critère par critère arrivent avec la V2. */}
-        <Locked label="Bientôt">
-          <div className="glass-soft flex items-center gap-3.5 rounded-3xl p-4">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground/10">
-              <Dumbbell className="size-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold">Les épreuves</span>
-              <span className="block text-[13px] text-muted-foreground">
-                Jonglage, sprint… tes stats mesurées sur le terrain
-              </span>
-            </span>
-            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
+            <Chiffre valeur={myRank != null && (joues > 0 || player.pp !== 0) ? ordinal(myRank) : "–"} quoi="Pépite d'Or" />
+            <Chiffre valeur={ovr(player.stats)} quoi="Général" />
+            <Chiffre valeur={joues} quoi={joues > 1 ? "Dimanches" : "Dimanche"} />
           </div>
-        </Locked>
-      </section>
-      </div>
+          <p className="w-full text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
+          {/* Ma photo, ma carte officielle (photo au maillot Bola) tant
+              qu'elle n'est pas faite, le badge de ma carte. Sans elle, les
+              deux ronds se centrent. */}
+          <div className="flex w-full items-center justify-center gap-[9px]">
+            <button
+              type="button"
+              onClick={() => setPhotoOuverte(true)}
+              aria-label="Ma photo"
+              className="bouton-secondaire bouton--or flex size-[52px] shrink-0 items-center justify-center"
+            >
+              <AvatarPhoto name={player.name} />
+            </button>
+            <CarteOfficielle player={player} className="min-w-0 flex-1" />
+            <ChoixBadge player={player} />
+          </div>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-[var(--fib-21)]">
+          {/* 2. Ma saison : mon dernier dimanche, mes points forts, mes dimanches */}
+          <MaSaison saison={`Saison ${saison.numero ?? 0}`} dimanches={dimanches} forts={fiche.forts} rangs={rangs} />
+
+          {/* 3. Mon évolution, journée après journée : d'abord mon rang, si
+              j'en ai un cette saison */}
+          <CourbeCarriere points={courbe} depart={joues > 0 ? "rang" : "note"} />
+
+          {/* 4. Mes badges : le prochain, la fin de saison, les paliers */}
+          <div id="badges" className="scroll-mt-4">
+            <VitrineBadges nom={player.name} />
+          </div>
+
+          {/* 5. Mes cartes : la carte de chaque saison et les cartes spéciales gagnées */}
+          {mesCartes.length > 0 && <CartesCarriere saisons={mesCartes} titre="Mes cartes" />}
+
+          {/* 6. Les raccourcis */}
+          <section className="flex flex-col gap-2.5">
+            {(
+              [
+                {
+                  href: "/palmares",
+                  icon: Trophy,
+                  label: "Wall of Fame",
+                  note: "Ton parcours, saison après saison",
+                },
+                {
+                  href: "/collection",
+                  icon: Layers,
+                  label: "Collection",
+                  note: "Packs et catalogue de cartes",
+                },
+              ] as const
+            ).map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="glass-soft flex items-center gap-3.5 rounded-3xl p-4 transition-colors active:opacity-80"
+              >
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground/10">
+                  <l.icon className="size-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-semibold">{l.label}</span>
+                  <span className="block text-[13px] text-muted-foreground">{l.note}</span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </Link>
+            ))}
+
+            {/* Les épreuves — verrouillées : les défis filmés qui rempliront la
+                carte critère par critère arrivent avec la V2. */}
+            <Locked label="Bientôt">
+              <div className="glass-soft flex items-center gap-3.5 rounded-3xl p-4">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground/10">
+                  <Dumbbell className="size-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-semibold">Les épreuves</span>
+                  <span className="block text-[13px] text-muted-foreground">
+                    Jonglage, sprint… tes stats mesurées sur le terrain
+                  </span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </div>
+            </Locked>
+          </section>
+
+          {/* 7. Se déconnecter */}
+          <BoutonDeconnexion className="w-full" />
+        </div>
       </div>
 
       {/* Le prénom, le nom, le pseudo et l'email : on y entre en touchant le nom */}
@@ -228,7 +277,7 @@ export default function Profil() {
         </SheetContent>
       </Sheet>
 
-      {/* La photo de profil, à part : on y entre en touchant l'avatar */}
+      {/* La photo de profil, à part : on y entre en touchant la photo */}
       <Sheet open={photoOuverte} onOpenChange={setPhotoOuverte}>
         <SheetContent side="bottom" className="mx-auto w-full rounded-t-[28px] px-5 pt-6 pb-8 sm:max-w-md">
           <SheetTitle className="text-[19px] font-extrabold tracking-tight">Ma photo</SheetTitle>

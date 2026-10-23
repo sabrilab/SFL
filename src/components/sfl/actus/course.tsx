@@ -8,9 +8,16 @@
 //     classement en cartes qu'on fait défiler, centré sur toi, par catégorie
 //     (Pépite d'Or, Buteurs, Passeurs, MVP) ; « Tout » ouvre les classements
 //     complets, « Match » les journées (vues.tsx) ;
-//   · le fil : ce qui se joue dimanche (les places à un ou deux points), ton
-//     rival, puis chaque dimanche joué, du plus récent : son terrain avec les
-//     cartes des joueurs (CarteJournee), et ses scènes en motion design.
+//     Sous chaque carte, ▲ ou ▼ depuis la semaine passée, et à l'ouverture
+//     les cartes glissent de leur ancienne place à la nouvelle ;
+//   · le fil : le jour du match, la feuille en direct ; ton dimanche (ta
+//     carte, tes chiffres, tes places) ; la convocation (qui vient, Je viens /
+//     Je passe) ; ce qui se joue dimanche (les places à un ou deux points),
+//     ton rival et ce qu'il te faut pour le passer ; puis chaque dimanche joué,
+//     du plus récent : son terrain avec les cartes des joueurs (CarteJournee),
+//     et ses rubriques. Chaque rubrique est un terrain avec ses petites cartes
+//     près du but, qui s'anime au défilement, sans carrousel (pelouse.tsx ;
+//     Sabri, 22/10 : « que tout se fasse en scroll et qu'il y ait plus de vie »).
 // Les modules « toi » : lib/sfl/actus-toi.ts et cine-toi.tsx.
 
 import { useRouter } from "next/navigation";
@@ -21,48 +28,26 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { CarteJournee } from "@/components/sfl/carte-journee";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
+import { QuiVient } from "@/components/sfl/qui-vient";
+import { usePresence } from "@/hooks/use-presence";
+import { voteOuvert } from "@/lib/sfl/convocation-temps";
+import { computeStandings } from "@/lib/sfl/saisie/engine";
+import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { Nom } from "@/components/sfl/nom";
 import { filDeSaison, type Actu } from "@/lib/sfl/actus";
 import { enjeux, voisins } from "@/lib/sfl/actus-toi";
 import { rankByMetric } from "@/lib/sfl/engine";
 import { RANKINGS } from "@/lib/sfl/rankings";
 import { cn } from "@/lib/utils";
-import { ANTON, Ecran } from "./ecran";
-import { CineEnjeux, CineRival } from "./cine-toi";
-import { ModeFil, PublicationActu, VoteDuJour } from "./fil";
+import { ANTON } from "./ecran";
+import { VoteDuJour } from "./fil";
+import { RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
 import { VueClassements, VueMatchs } from "./vues";
 
 export type Vue = "fil" | "classements" | "matchs";
 
 /** Les scènes d'un dimanche qui font bouger la course. */
 const SCENES: Actu["type"][] = ["mvp", "chiffre", "duo", "montent", "badge", "badges", "equipe"];
-
-function Plan({
-  ratio = 4 / 5,
-  duree,
-  titre,
-  children,
-  className,
-}: {
-  ratio?: number;
-  duree: number;
-  titre?: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <figure className={cn("flex flex-col", className)}>
-      <Ecran duree={duree} ratio={ratio}>
-        {children}
-      </Ecran>
-      {titre && (
-        <figcaption className="bg-black px-4 py-2.5 text-[13.5px] font-semibold">
-          {titre}
-        </figcaption>
-      )}
-    </figure>
-  );
-}
 
 function Rubrique({
   id,
@@ -93,21 +78,40 @@ function Rubrique({
 
 const METRIQUES = ["pp", "buts", "passes", "mvp"] as const;
 
+/** L'écart d'une carte à l'autre dans la rangée, pour les faire glisser de leur ancienne place. */
+const PAS = 87;
+
 function Ticker({ moi, onTout }: { moi: string; onTout: () => void }) {
-  const { players } = useSeason();
+  const { players, saison } = useSeason();
   const [id, setId] = useState<(typeof METRIQUES)[number]>("pp");
   const def = RANKINGS.find((r) => r.id === id)!;
   const rang = rankByMetric(players, def.value).filter(
     (p) => def.showAll || p.value > 0,
   );
+  // Le classement d'avant le dernier dimanche joué : d'où chacun vient.
+  const avant = useMemo(() => {
+    const d = Math.max(0, ...saison.journees.map((m) => m.j).filter((j) => journeeJouee(saison, j)));
+    return d ? computeStandings({ ...saison, entries: saison.entries.filter((e) => e.j !== d) }) : null;
+  }, [saison]);
+  const noms = new Set(rang.map((p) => p.name));
+  const ancien = avant ? new Map(rankByMetric(avant.filter((p) => noms.has(p.name)), def.value).map((p, i) => [p.name, { rank: p.rank, i }])) : null;
+  // Les cartes partent de leur place de la semaine passée, puis glissent à la nouvelle.
+  const [pose, setPose] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    const calme = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const el = ref.current?.querySelector<HTMLElement>("[data-moi]");
     if (el && ref.current)
       ref.current.scrollTo({
         left: el.offsetLeft - ref.current.clientWidth / 2 + el.clientWidth / 2,
         behavior: "smooth",
       });
+    const a = setTimeout(() => setPose(false), 0);
+    const b = setTimeout(() => setPose(true), calme ? 0 : 500);
+    return () => {
+      clearTimeout(a);
+      clearTimeout(b);
+    };
   }, [id]);
   return (
     <div className="flex flex-col gap-3">
@@ -138,14 +142,20 @@ function Ticker({ moi, onTout }: { moi: string; onTout: () => void }) {
         ref={ref}
         className="flex items-end gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none]"
       >
-        {rang.map((p) => (
+        {rang.map((p, i) => {
+          const a = ancien?.get(p.name);
+          const delta = a ? a.rank - p.rank : 0;
+          return (
           <div
-            key={p.name}
+            key={`${id}-${p.name}`}
             data-moi={p.name === moi ? "" : undefined}
             className={cn(
               "flex shrink-0 flex-col items-center gap-1 rounded-2xl p-1.5",
               p.name === moi && "bg-foreground/10",
+              pose && "transition-transform duration-[1200ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]",
+              p.name === moi && "relative z-10",
             )}
+            style={{ transform: pose || !a ? undefined : `translateX(${(a.i - i) * PAS}px)` }}
           >
             <span
               className="text-[20px] leading-none"
@@ -166,10 +176,83 @@ function Ticker({ moi, onTout }: { moi: string; onTout: () => void }) {
             <span className="mono-label text-[10px] text-foreground/50 tabular-nums">
               {p.value} {def.unit}
             </span>
+            <span
+              className={cn(
+                "mono-label h-3 text-[10px] tabular-nums transition-opacity delay-700 duration-500",
+                delta > 0 ? "text-primary" : "text-foreground/40",
+                pose ? "opacity-100" : "opacity-0",
+              )}
+            >
+              {delta > 0 ? `▲ ${delta}` : delta < 0 ? `▼ ${-delta}` : ""}
+            </span>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
+  );
+}
+
+/** La convocation du prochain dimanche, dans le fil : qui vient, et ta réponse d'un geste. */
+function Convocation() {
+  const p = usePresence();
+  const repondre = (r: "present" | "absent") => p.answer(p.mine === r ? null : r);
+  return (
+    <section className="mx-4 flex flex-col gap-4 overflow-hidden rounded-[28px] bg-black p-5 text-white">
+      <div className="flex items-end gap-4">
+        <span className="text-[64px] leading-[0.8]" style={{ fontFamily: ANTON }}>
+          J{p.journee}
+        </span>
+        <span className="flex min-w-0 flex-col pb-0.5">
+          <span className="text-[16px] font-bold">{p.jour}</span>
+          <span className="truncate text-[12.5px] text-white/55">
+            {p.heure} · {p.lieu}
+          </span>
+        </span>
+      </div>
+      <div className="flex items-baseline justify-between">
+        <span className="mono-label text-white/50">
+          {p.presents.length} {p.presents.length > 1 ? "viennent" : "vient"}
+        </span>
+      </div>
+      {p.presents.length > 0 && <QuiVient noms={p.presents} size={FORMAT_CARTE.petite * 1.2} />}
+      <div className="grid grid-cols-2 gap-2">
+        {(["present", "absent"] as const).map((r) => (
+          <button
+            key={r}
+            type="button"
+            disabled={!p.reponsesOuvertes}
+            onClick={() => repondre(r)}
+            className={cn(
+              "rounded-full py-3 text-[14px] font-bold transition-colors disabled:opacity-40",
+              p.mine === r ? (r === "present" ? "bg-primary text-black" : "bg-white text-black") : "bg-white/10",
+            )}
+          >
+            {r === "present" ? "Je viens" : "Je passe"}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Le dimanche en direct : le jour du match, la feuille se remplit sous tes yeux (la base pousse chaque saisie). */
+function EnDirect({ ouvrir }: { ouvrir: (j: number) => void }) {
+  const { journees } = useSeason();
+  const [maintenant] = useState(() => new Date());
+  const live = journees.find((j) => (j.matches?.length ?? 0) > 0 && voteOuvert(j.date, maintenant));
+  if (!live) return null;
+  return (
+    <section className="flex flex-col gap-3 px-5">
+      <span className="flex items-center gap-2">
+        <span className="relative flex size-2.5">
+          <span className="absolute inset-0 animate-ping rounded-full bg-red-500 opacity-70 motion-reduce:animate-none" />
+          <span className="relative size-2.5 rounded-full bg-red-500" />
+        </span>
+        <span className="mono-label text-foreground/70">En direct · J{live.j}</span>
+      </span>
+      <CarteJournee journee={live} onOuvrir={() => ouvrir(live.j)} />
+    </section>
   );
 }
 
@@ -191,6 +274,8 @@ export function LaCourse({ vueDepart = "fil" }: { vueDepart?: Vue }) {
     const js = [...new Set(fil.map((a) => a.j))];
     return js.map((j) => ({ j, journee: journees.find((x) => x.j === j), scenes: fil.filter((a) => a.j === j && SCENES.includes(a.type)) }));
   }, [fil, journees]);
+
+  const dernier = dimanches[0]?.j ?? 0;
 
   if (vue !== "fil")
     return (
@@ -214,18 +299,14 @@ export function LaCourse({ vueDepart = "fil" }: { vueDepart?: Vue }) {
           </button>
         </div>
       </header>
+      <EnDirect ouvrir={(j) => router.push(`/ligue/journee?j=${j}`)} />
       <VoteDuJour me={me} />
-      <div className="flex flex-col">
-        {duels.length > 0 && (
-          <Plan ratio={4 / 5} duree={2.4} titre="Dimanche, ça peut basculer">
-            <CineEnjeux liste={duels} moi={me} />
-          </Plan>
-        )}
-        {v && (
-          <Plan ratio={4 / 5} duree={2.6} titre={v.devant ? `Ton rival : ${v.devant.name}` : "Personne devant toi"}>
-            <CineRival v={v} />
-          </Plan>
-        )}
+      {dernier > 0 && <RubriqueToi j={dernier} date={journees.find((x) => x.j === dernier)?.date ?? ""} />}
+      <Convocation />
+      <div className="flex flex-col gap-1">
+        {duels.length > 0 && <RubriqueEnjeux liste={duels} moi={me} />}
+        {v && <RubriqueRival v={v} />}
+        {v?.devant && <RubriqueBesoin v={v} />}
       </div>
       {dimanches.map((d) => (
         <Rubrique key={d.j} titre={`J${d.j}`} plus={<span className="mono-label text-foreground/45">{d.journee?.date}</span>}>
@@ -234,12 +315,10 @@ export function LaCourse({ vueDepart = "fil" }: { vueDepart?: Vue }) {
               <CarteJournee journee={d.journee} onOuvrir={() => router.push(`/ligue/journee?j=${d.j}`)} />
             </div>
           )}
-          <div className="flex flex-col">
-            <ModeFil.Provider value={{ mode: "film" }}>
-              {d.scenes.map((a) => (
-                <PublicationActu key={a.id} a={a} enCours onClassements={() => aller("classements")} />
-              ))}
-            </ModeFil.Provider>
+          <div className="flex flex-col gap-1">
+            {d.scenes.map((a) => (
+              <RubriqueActu key={a.id} a={a} />
+            ))}
           </div>
         </Rubrique>
       ))}

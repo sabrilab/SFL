@@ -21,6 +21,10 @@
 //     et au retour sur l'app, gardée en cache pour un affichage immédiat ;
 //   · le portrait livré dans public/players, en dernier recours (aucun n'y
 //     est plus livré : une carte sans photo du studio n'en montre pas).
+//
+// Là où la carte est minuscule (les piles et les tournesols de la Map, 22 à
+// 36 px de large), on montre la photo en vignette (photoMiniature) : la Map
+// en charge une quarantaine d'un coup, en entier c'était plusieurs Mo.
 
 import { SUPABASE_URL, supabase } from "@/lib/supabase";
 
@@ -170,6 +174,28 @@ export function photoPerso(name: string): string | null {
  */
 export function photoSrc(name: string): string {
   return photoPerso(name) ?? `/players/${name}.png`;
+}
+
+/** Toutes les photos partagées connues de cet appareil (la liste en cache). */
+export function photosPartagees(): string[] {
+  if (!hasWindow()) return [];
+  return Object.values(lireDistantes());
+}
+
+/** La largeur des vignettes de la Map : une carte de 36 px, grossie 1,22 fois, sur un écran 3×. */
+export const LARGEUR_VIGNETTE = 128;
+
+/**
+ * La même photo en petit, par l'optimiseur d'images de Vercel (WebP, mise
+ * en cache sur son CDN puis dans le téléphone) : quelques Ko au lieu des
+ * 90 à 200 Ko du fichier de 896 px. Seules les photos du bucket passent par
+ * là (next.config.ts, `images.remotePatterns`) ; une photo encore locale
+ * (data URL) est rendue telle quelle. `largeur` est l'une des tailles
+ * permises par Next (32, 48, 64, 96, 128, 256, 384, 640…).
+ */
+export function photoMiniature(url: string, largeur = LARGEUR_VIGNETTE): string {
+  if (!url.startsWith(`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/`)) return url;
+  return `/_next/image?url=${encodeURIComponent(url)}&w=${largeur}&q=75`;
 }
 
 // ───────────────────────────── Écriture ─────────────────────────────

@@ -24,9 +24,11 @@ import { NouveauxBadges } from "@/components/sfl/vitrine";
 import { InvitationCarte } from "@/components/sfl/invitation-carte";
 import { ApresAccord, ConsentementObligatoire } from "@/components/sfl/confidentialite/consentement";
 
-// Typographie de l'app BOLA : une sans neutre pour tout ce qui se lit (Inter,
-// celle du site), et une monospace pour les étiquettes en capitales — SF Mono
-// sur iPhone, JetBrains Mono partout ailleurs.
+// Typographie de l'app BOLA, celle de la Map (Sabri, 22/10 : « uniformise le
+// tout ») : Inter pour tout ce qui se lit (celle du site), au plus gras pour
+// les titres en capitales, et JetBrains Mono pour les étiquettes en
+// capitales, sur tous les appareils (globals.css, .titre-lettrage et
+// .mono-label).
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
@@ -38,7 +40,8 @@ const jbMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
-// Chiffres de l'arène de duel, seul usage restant d'une typo d'affiche.
+// Les chiffres : rangs, scores, notes. Les titres l'ont quittée le 22/10
+// pour le lettrage de la Map ; les cartes et les écussons gardent leurs lettres.
 const anton = Anton({
   weight: "400",
   variable: "--font-anton",

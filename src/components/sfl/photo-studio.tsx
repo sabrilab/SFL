@@ -14,9 +14,16 @@
 // Pendant qu'elles se font, le joueur regarde sa séance (attente-studio.tsx),
 // et la photo arrive dans un flash. Le pays du drapeau se cherche parmi tous
 // les pays du monde ; ceux de la ligue sont proposés d'abord.
+//
+// Trois photos par jour, studio et filtres confondus, remises à minuit
+// (Sabri, 23/10/2026). Trois points le disent sous « Créer ma photo » et sous
+// la photo, et chaque photo faite l'annonce, dès la première : ce qui reste,
+// et dans combien de temps le compte repart. Les photos faites restent dans
+// l'album du téléphone (lib/sfl/album-studio.ts) : le studio rouvre sur le
+// dernier visage fait, les autres en ronds dessous, pour choisir entre eux.
 
 import { useEffect, useRef, useState } from "react";
-import { ImageUp, Plus, RotateCcw, Search, X } from "lucide-react";
+import { ImageUp, Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -24,24 +31,23 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { CameraVisage } from "@/components/sfl/camera-visage";
 import { AttenteFiltre, AttenteStudio } from "@/components/sfl/attente-studio";
+import { garderPhoto, lireAlbum, tailler, type PhotoGardee } from "@/lib/sfl/album-studio";
 import {
   COLORIS,
   FILTRES,
+  LIMITE_JOUR,
   PAYS,
   SELFIES_MAX,
   SELFIE_COTE,
   chercherPays,
+  dansCombien,
   emojiDrapeau,
+  jourDeParis,
   unPays,
   type Coloris,
   type Filtre,
   type Pays,
 } from "@/lib/sfl/photo-studio";
-
-/** La clé d'une variante : le filtre, et le pays pour un drapeau. */
-function cle(filtre: Filtre, pays: Pays | null): string {
-  return filtre === "drapeau" ? `drapeau-${pays}` : filtre;
-}
 
 /** Un selfie réduit à SELFIE_COTE de côté et recompressé : moins à envoyer. */
 async function reduire(fichier: File): Promise<string> {
@@ -67,25 +73,88 @@ function seanceFiltre(f: Exclude<Filtre, "studio">, pays: Pays | null): string[]
   return ["On déplie le drapeau", p ? `${emojiDrapeau(p.id)}  ${p.nom}` : "Le drapeau", "Mise au point"];
 }
 
-async function demander(corps: Record<string, unknown>): Promise<string> {
+/** L'heure d'une photo faite (hors rendu). */
+const horloge = () => Date.now();
+
+/** Ce qui reste aujourd'hui, quand le compte repart, et quand on l'a su (ms). */
+type Credit = { restantes: number; fin: number; lu: number };
+
+/** Une photo refusée ou ratée : le message, et le crédit quand la route le donne. */
+class ErreurStudio extends Error {
+  credit: Credit | null;
+  constructor(message: string, credit: Credit | null) {
+    super(message);
+    this.credit = credit;
+  }
+}
+
+async function demander(corps: Record<string, unknown>): Promise<{ image: string; credit: Credit | null }> {
   const { data } = await supabase().auth.getSession();
   const accessToken = data.session?.access_token;
-  if (!accessToken) throw new Error("Reconnecte-toi pour créer ta photo.");
+  if (!accessToken) throw new ErreurStudio("Reconnecte-toi pour créer ta photo.", null);
   const r = await fetch("/api/photo-studio", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ accessToken, ...corps }),
   });
-  const sortie = (await r.json().catch(() => ({}))) as { image?: string; error?: string };
-  if (!r.ok || !sortie.image) throw new Error(sortie.error ?? "La photo n'a pas pu être faite.");
-  return sortie.image;
+  const sortie = (await r.json().catch(() => ({}))) as {
+    image?: string;
+    error?: string;
+    restantes?: number;
+    fin?: string;
+  };
+  const credit =
+    typeof sortie.restantes === "number" && sortie.fin
+      ? { restantes: sortie.restantes, fin: Date.parse(sortie.fin), lu: Date.now() }
+      : null;
+  if (!r.ok || !sortie.image) throw new ErreurStudio(sortie.error ?? "La photo n'a pas pu être faite.", credit);
+  return { image: sortie.image, credit };
+}
+
+/**
+ * Le crédit à l'ouverture : les photos du jour notées sur le serveur, ou à
+ * défaut celles de l'album (sans connexion vérifiée, le serveur ne dit rien).
+ */
+async function lireCredit(album: PhotoGardee[]): Promise<Credit> {
+  const lu = Date.now();
+  const { debut, fin } = jourDeParis(new Date(lu));
+  let faites = album.filter((p) => p.faite >= debut.getTime()).length;
+  try {
+    const { data } = await supabase().auth.getSession();
+    const id = data.session?.user.id;
+    if (id) {
+      // Filtré sur le joueur : un admin lit les lignes de tout le monde.
+      const { count } = await supabase()
+        .from("photo_studio")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", id)
+        .gte("created_at", debut.toISOString());
+      if (count != null) faites = Math.max(faites, count);
+    }
+  } catch {
+    // Hors ligne : le compte de l'album suffit.
+  }
+  return { restantes: Math.max(0, LIMITE_JOUR - faites), fin: fin.getTime(), lu };
+}
+
+/** À chaque photo faite, dès la première : ce qui reste, et quand le compte repart. */
+function annoncer(c: Credit) {
+  const repart = `De nouveau ${LIMITE_JOUR} dans ${dansCombien(c.fin - c.lu)}.`;
+  if (c.restantes > 0) {
+    toast(`Il te reste ${c.restantes} photo${c.restantes > 1 ? "s" : ""} aujourd'hui`, { description: repart });
+  } else {
+    toast("C'était ta dernière photo du jour", { description: `${repart} Tes photos restent ici.` });
+  }
 }
 
 export function PhotoStudio({
+  joueur,
   ouvert,
   onFermer,
   onChoisir,
 }: {
+  /** Le joueur (nom de saison) : son album sur ce téléphone. */
+  joueur: string;
   ouvert: boolean;
   onFermer: () => void;
   /** La photo retenue (data URL), à recadrer puis poser sur la carte. */
@@ -94,15 +163,22 @@ export function PhotoStudio({
   const input = useRef<HTMLInputElement>(null);
   const [selfies, setSelfies] = useState<string[]>([]);
   const [coloris, setColoris] = useState<Coloris>("blanc");
-  const [variantes, setVariantes] = useState<Record<string, string>>({});
+  // Les photos faites (visages et filtres), gardées sur le téléphone.
+  const [album, setAlbum] = useState<PhotoGardee[]>([]);
+  // Le visage choisi dans l'album (son id) : les filtres partent de lui.
+  const [choixVisage, setChoixVisage] = useState<string | null>(null);
+  const [credit, setCredit] = useState<Credit | null>(null);
+  // L'album relu pour cette ouverture : d'ici là, la caméra attend (elle
+  // s'allumerait pour rien quand le studio rouvre sur les photos gardées).
+  const [albumLu, setAlbumLu] = useState(false);
   const [filtre, setFiltre] = useState<Filtre>("studio");
   const [pays, setPays] = useState<Pays | null>(null);
   const [enCours, setEnCours] = useState<Filtre | null>(null);
-  const [etape, setEtape] = useState<"visage" | "maillot">("visage");
+  const [etape, setEtape] = useState<"visage" | "maillot" | "photo">("visage");
   // Pas de caméra (refusée ou absente) : on passe par la galerie.
   const [sansCamera, setSansCamera] = useState(false);
   const [recherche, setRecherche] = useState("");
-  // La variante qui vient d'arriver : elle sort du flash, une fois.
+  // La photo qui vient d'arriver (son id) : elle sort du flash, une fois.
   const [revelee, setRevelee] = useState<string | null>(null);
 
   useEffect(() => {
@@ -111,22 +187,69 @@ export function PhotoStudio({
     return () => window.clearTimeout(id);
   }, [revelee]);
 
-  function reveler(k: string) {
-    setRevelee(k);
+  // À l'ouverture : l'album du téléphone, puis le crédit du jour. S'il y a
+  // déjà un visage, le studio rouvre dessus.
+  useEffect(() => {
+    if (!ouvert) return;
+    let annule = false;
+    void (async () => {
+      const lu = await lireAlbum(joueur);
+      if (annule) return;
+      setAlbum((a) =>
+        tailler([...a.filter((x) => x.joueur === joueur), ...lu.filter((p) => !a.some((x) => x.id === p.id))])
+      );
+      if (lu.some((p) => p.source === null)) setEtape((e) => (e === "visage" ? "photo" : e));
+      setAlbumLu(true);
+      const c = await lireCredit(lu);
+      if (!annule) setCredit(c);
+    })();
+    return () => {
+      annule = true;
+    };
+  }, [ouvert, joueur]);
+
+  function reveler(id: string) {
+    setRevelee(id);
     navigator.vibrate?.([14, 70, 14]);
   }
 
-  const studio = variantes.studio;
-  const affichee = filtre === "drapeau" && !pays ? undefined : variantes[cle(filtre, pays)];
+  // Le visage montré : celui qu'il a choisi, sinon le dernier fait.
+  const visages = album.filter((p) => p.source === null);
+  const visage = visages.find((v) => v.id === choixVisage) ?? visages[0];
+  const epuise = credit?.restantes === 0;
 
-  function reinitialiser() {
+  /** La photo d'un filtre pour ce visage (le visage lui-même pour Neutre). */
+  function trouver(f: Filtre, p: Pays | null): PhotoGardee | undefined {
+    if (!visage) return undefined;
+    if (f === "studio") return visage;
+    return album.find((x) => x.source === visage.id && x.filtre === f && (f !== "drapeau" || x.pays === p));
+  }
+  const affichee = filtre === "drapeau" && !pays ? undefined : trouver(filtre, pays);
+
+  /** Une photo faite rejoint l'album, à l'écran et sur le téléphone. */
+  function garder(photo: PhotoGardee) {
+    setAlbum((a) => tailler([photo, ...a]));
+    void garderPhoto(photo);
+  }
+
+  /** Le crédit qu'a rendu la route, annoncé. */
+  function compter(c: Credit | null) {
+    if (!c) return;
+    setCredit(c);
+    annoncer(c);
+  }
+
+  /** Un nouveau visage : on repart des selfies, l'album reste. */
+  function nouvellePhoto() {
     setSelfies([]);
     setEtape("visage");
-    setVariantes({});
     setFiltre("studio");
-    setPays(null);
-    setEnCours(null);
     setRecherche("");
+  }
+
+  function choisirVisage(id: string) {
+    setChoixVisage(id);
+    setFiltre("studio");
   }
 
   async function ajouter(e: React.ChangeEvent<HTMLInputElement>) {
@@ -148,14 +271,27 @@ export function PhotoStudio({
   }
 
   async function faireStudio() {
+    if (epuise) return;
     setEnCours("studio");
     try {
-      const image = await demander({ filtre: "studio", selfies, coloris });
-      // Nouvelle photo de studio : les filtres faits sur l'ancienne ne valent plus.
-      setVariantes({ studio: image });
+      const { image, credit: c } = await demander({ filtre: "studio", selfies, coloris });
+      const photo: PhotoGardee = {
+        id: crypto.randomUUID(),
+        joueur,
+        filtre: "studio",
+        pays: null,
+        source: null,
+        image,
+        faite: horloge(),
+      };
+      garder(photo);
+      setChoixVisage(photo.id);
       setFiltre("studio");
-      reveler("studio");
+      setEtape("photo");
+      reveler(photo.id);
+      compter(c);
     } catch (err) {
+      if (err instanceof ErreurStudio && err.credit) setCredit(err.credit);
       toast.error(err instanceof Error ? err.message : "La photo n'a pas pu être faite.");
     } finally {
       setEnCours(null);
@@ -163,14 +299,32 @@ export function PhotoStudio({
   }
 
   async function generer(f: Exclude<Filtre, "studio">, p: Pays | null) {
-    const k = cle(f, p);
-    if (variantes[k] || !studio || enCours) return;
+    if (!visage || trouver(f, p) || enCours) return;
+    if (epuise) {
+      toast.error("Plus de photo aujourd'hui", {
+        description: credit ? `De nouveau ${LIMITE_JOUR} dans ${dansCombien(credit.fin - horloge())}.` : undefined,
+      });
+      if (f !== "drapeau") setFiltre("studio");
+      return;
+    }
+    const source = visage;
     setEnCours(f);
     try {
-      const image = await demander({ filtre: f, source: studio, pays: p ?? undefined });
-      setVariantes((v) => ({ ...v, [k]: image }));
-      reveler(k);
+      const { image, credit: c } = await demander({ filtre: f, source: source.image, pays: p ?? undefined });
+      const photo: PhotoGardee = {
+        id: crypto.randomUUID(),
+        joueur,
+        filtre: f,
+        pays: f === "drapeau" ? p : null,
+        source: source.id,
+        image,
+        faite: horloge(),
+      };
+      garder(photo);
+      reveler(photo.id);
+      compter(c);
     } catch (err) {
+      if (err instanceof ErreurStudio && err.credit) setCredit(err.credit);
       toast.error(err instanceof Error ? err.message : "Le filtre n'a pas pu être appliqué.");
       if (f !== "drapeau") setFiltre("studio");
     } finally {
@@ -185,7 +339,8 @@ export function PhotoStudio({
   }
 
   function choisirPays(p: Pays) {
-    setPays(p);
+    // Plus de photo aujourd'hui : un pays jamais fait ne remplace pas celui affiché.
+    if (!(epuise && !trouver("drapeau", p))) setPays(p);
     void generer("drapeau", p);
   }
 
@@ -193,7 +348,9 @@ export function PhotoStudio({
     <Sheet
       open={ouvert}
       onOpenChange={(o) => {
-        if (!o && !enCours) onFermer();
+        if (o || enCours) return;
+        setAlbumLu(false);
+        onFermer();
       }}
     >
       <SheetContent
@@ -208,7 +365,7 @@ export function PhotoStudio({
           {/* Où on en est : Visage, Maillot, Photo */}
           <ol className="flex gap-1.5" aria-label="Étapes">
             {ETAPES.map((nom, i) => {
-              const actuelle = studio || enCours === "studio" ? 2 : etape === "maillot" ? 1 : 0;
+              const actuelle = etape === "photo" || enCours === "studio" ? 2 : etape === "maillot" ? 1 : 0;
               return (
                 <li key={nom} className="flex flex-1 flex-col gap-1.5" aria-current={i === actuelle ? "step" : undefined}>
                   <span className={cn("h-1 rounded-full", i <= actuelle ? "bg-foreground" : "bg-foreground/15")} />
@@ -220,8 +377,11 @@ export function PhotoStudio({
             })}
           </ol>
 
-          {!studio && etape === "visage" ? (
+          {etape === "visage" && !albumLu ? (
+            <div className="mx-auto aspect-[3/4] w-full max-w-[340px] rounded-[26px] bg-secondary/40" />
+          ) : etape === "visage" ? (
             <>
+              {epuise && <Compteur credit={credit} />}
               {sansCamera ? (
                 // Sans caméra : les photos du visage, depuis la galerie.
                 <div className="grid grid-cols-3 gap-2.5">
@@ -306,8 +466,17 @@ export function PhotoStudio({
                   Continuer
                 </Button>
               </div>
+              {visages.length > 0 && (
+                <Button
+                  variant="ghost"
+                  className="bouton--or h-10 rounded-full text-[13px]"
+                  onClick={() => setEtape("photo")}
+                >
+                  Revenir à mes photos
+                </Button>
+              )}
             </>
-          ) : !studio && enCours === "studio" ? (
+          ) : enCours === "studio" ? (
             <>
               {/* La séance : la photo arrivera exactement à cette place. */}
               <AttenteStudio visage={selfies[0]} />
@@ -315,7 +484,7 @@ export function PhotoStudio({
                 Moins d&apos;une minute. Garde l&apos;app ouverte.
               </p>
             </>
-          ) : !studio ? (
+          ) : etape === "maillot" || !visage ? (
             <>
               {/* Les visages retenus, en rappel */}
               <div className="flex justify-center gap-2">
@@ -357,11 +526,12 @@ export function PhotoStudio({
               <Button
                 variant="or"
                 className="h-12 rounded-full text-[15px] font-semibold"
-                disabled={selfies.length === 0 || !!enCours}
+                disabled={selfies.length === 0 || !!enCours || epuise}
                 onClick={faireStudio}
               >
                 Créer ma photo
               </Button>
+              <Compteur credit={credit} />
               <Button
                 variant="ghost"
                 className="bouton--or h-10 rounded-full text-[13px]"
@@ -378,55 +548,87 @@ export function PhotoStudio({
                 {affichee && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    key={cle(filtre, pays)}
-                    src={affichee}
+                    key={affichee.id}
+                    src={affichee.image}
                     alt="Ma photo officielle"
-                    className={cn("size-full object-cover", revelee === cle(filtre, pays) && "studio-revelation")}
+                    className={cn("size-full object-cover", revelee === affichee.id && "studio-revelation")}
                   />
                 )}
-                {affichee && revelee === cle(filtre, pays) && (
+                {affichee && revelee === affichee.id && (
                   <div aria-hidden className="studio-revelation-flash pointer-events-none absolute inset-0 bg-white" />
                 )}
-                {!affichee && studio && (
+                {!affichee && (
                   // Le fond attend : la photo neutre, voilée, sous le choix du pays.
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={studio} alt="" className="size-full object-cover opacity-35" />
+                  <img src={visage.image} alt="" className="size-full object-cover opacity-35" />
                 )}
-                {enCours && enCours !== "studio" && <AttenteFiltre legendes={seanceFiltre(enCours, pays)} />}
+                {enCours && <AttenteFiltre legendes={seanceFiltre(enCours, pays)} />}
               </div>
 
+              {/* Ses visages, le dernier fait d'abord : il choisit entre eux */}
+              {visages.length > 1 && (
+                <div className="-mx-5 overflow-x-auto px-5 [scrollbar-width:none]">
+                  <div className="mx-auto flex w-max gap-2.5 p-1" role="radiogroup" aria-label="Mes visages">
+                    {visages.map((v, i) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={v.id === visage.id}
+                        aria-label={`Visage ${visages.length - i}`}
+                        disabled={!!enCours}
+                        onClick={() => choisirVisage(v.id)}
+                        className={cn(
+                          "size-12 shrink-0 overflow-hidden rounded-full bg-secondary ring-2 ring-offset-2 ring-offset-background transition-all",
+                          v.id === visage.id ? "ring-foreground" : "ring-transparent opacity-60"
+                        )}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={v.image} alt="" className="size-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Filtre">
-                {FILTRES.map((f) => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={filtre === f.id}
-                    disabled={!!enCours}
-                    onClick={() => choisirFiltre(f.id)}
-                    className="flex flex-col items-center gap-1.5"
-                  >
-                    <span
-                      className={cn(
-                        "block aspect-square w-full overflow-hidden rounded-[14px] bg-secondary ring-2 transition-all",
-                        filtre === f.id ? "ring-foreground" : "ring-transparent"
-                      )}
+                {FILTRES.map((f) => {
+                  const faite = trouver(f.id, pays);
+                  // Plus de photo aujourd'hui : un filtre jamais fait sur ce visage attend demain.
+                  const bloque =
+                    epuise && f.id !== "studio" && !album.some((x) => x.source === visage.id && x.filtre === f.id);
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={filtre === f.id}
+                      disabled={!!enCours || bloque}
+                      onClick={() => choisirFiltre(f.id)}
+                      className={cn("flex flex-col items-center gap-1.5", bloque && "opacity-40")}
                     >
-                      {variantes[cle(f.id, pays)] && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={variantes[cle(f.id, pays)]} alt="" className="size-full object-cover" />
-                      )}
-                    </span>
-                    <span
-                      className={cn(
-                        "text-[12px] font-semibold",
-                        filtre === f.id ? "text-foreground" : "text-muted-foreground"
-                      )}
-                    >
-                      {f.label}
-                    </span>
-                  </button>
-                ))}
+                      <span
+                        className={cn(
+                          "block aspect-square w-full overflow-hidden rounded-[14px] bg-secondary ring-2 transition-all",
+                          filtre === f.id ? "ring-foreground" : "ring-transparent"
+                        )}
+                      >
+                        {faite && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={faite.image} alt="" className="size-full object-cover" />
+                        )}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-[12px] font-semibold",
+                          filtre === f.id ? "text-foreground" : "text-muted-foreground"
+                        )}
+                      >
+                        {f.label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Drapeau : le pays, cherché parmi tous, ou pris dans la rangée de la ligue */}
@@ -459,20 +661,22 @@ export function PhotoStudio({
                 </div>
               )}
 
+              <Compteur credit={credit} />
+
               <div className="flex gap-2.5">
                 <Button
                   variant="secondary"
                   className="bouton--or h-12 flex-1 gap-2 rounded-full text-[15px]"
-                  disabled={!!enCours}
-                  onClick={reinitialiser}
+                  disabled={!!enCours || epuise}
+                  onClick={nouvellePhoto}
                 >
-                  <RotateCcw className="size-4" /> Refaire
+                  <Plus className="size-4" /> Nouvelle photo
                 </Button>
                 <Button
                   variant="or"
                   className="h-12 flex-1 rounded-full text-[15px] font-semibold"
                   disabled={!affichee || !!enCours}
-                  onClick={() => affichee && onChoisir(affichee)}
+                  onClick={() => affichee && onChoisir(affichee.image)}
                 >
                   Sur ma carte
                 </Button>
@@ -484,6 +688,35 @@ export function PhotoStudio({
         <input ref={input} type="file" accept="image/*" multiple onChange={ajouter} className="hidden" />
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** Les photos qui restent aujourd'hui (trois points), et dans combien de temps le compte repart. */
+function Compteur({ credit }: { credit: Credit | null }) {
+  // L'heure, relue toutes les 30 s : l'attente affichée descend.
+  const [maintenant, setMaintenant] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setMaintenant(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+  if (!credit) return null;
+  const n = credit.restantes;
+  return (
+    <div className="flex flex-col items-center gap-1 text-center text-[12.5px] text-muted-foreground">
+      <p className="flex items-center gap-2">
+        <span className="flex shrink-0 gap-1" aria-hidden>
+          {Array.from({ length: LIMITE_JOUR }, (_, i) => (
+            <span key={i} className={cn("size-1.5 rounded-full", i < n ? "bg-foreground" : "bg-foreground/20")} />
+          ))}
+        </span>
+        {n > 0 ? `Encore ${n} photo${n > 1 ? "s" : ""} aujourd'hui` : "Plus de photo aujourd'hui"}
+      </p>
+      {n < LIMITE_JOUR && (
+        <p>
+          De nouveau {LIMITE_JOUR} dans {dansCombien(credit.fin - Math.max(maintenant, credit.lu))}
+        </p>
+      )}
+    </div>
   );
 }
 

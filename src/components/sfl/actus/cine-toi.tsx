@@ -99,3 +99,45 @@ export function CineEnjeux({ liste, moi }: { liste: Enjeu[]; moi: string }) {
     </>
   );
 }
+
+/**
+ * Ce qu'il te faut dimanche : l'écart avec celui de devant, traduit en match.
+ * Le barème (saisie/engine.ts) : une victoire vaut 2, un but ou une passe 1.
+ */
+export function CineBesoin({ v }: { v: Voisins }) {
+  const joueur = useJoueurs();
+  const lui = v.devant ? joueur(v.devant.name) : null;
+  if (!v.devant || !lui) return null;
+  const besoin = v.devant.pp - v.moi.pp + 1;
+  const victoire = besoin >= 2;
+  const reste = victoire ? besoin - 2 : besoin;
+  const morceaux = [victoire && { n: "V", l: "une victoire", pts: 2 }, ...Array.from({ length: Math.min(reste, 4) }, () => ({ n: "+1", l: "un but ou une passe", pts: 1 }))].filter(Boolean) as { n: string; l: string; pts: number }[];
+  return (
+    <>
+      <Etiquette a={0.1} className="top-[6%] left-[6%]">Ce qu&apos;il te faut dimanche</Etiquette>
+      <div className="absolute inset-x-[6%] top-[15%] flex items-center gap-4">
+        <div className="a-glisse-g shrink-0" style={t(0.2, 0.7)}>
+          <Carte p={lui} size={TAILLE.petite * 1.4} detail={`${v.devant.rank}e · ${v.devant.pp} pts`} />
+        </div>
+        <span className="a-fondu text-[15px] leading-snug font-semibold" style={t(0.5)}>
+          {besoin} {pl(besoin, "point", "points")} de plus que <NomDe n={lui.name} />, et tu passes devant.
+        </span>
+      </div>
+      <div className="absolute inset-x-[6%] bottom-[10%] flex items-end justify-center gap-3">
+        {morceaux.map((m, i) => (
+          <span key={i} className="a-pop flex flex-col items-center gap-2" style={t(1 + i * 0.25, 0.5)}>
+            <span className={cn("grid place-items-center rounded-2xl", m.n === "V" ? "size-[78px] bg-white text-black" : "size-[58px] bg-white/12")}>
+              <Gros taille={m.n === "V" ? 44 : 30}>{m.n}</Gros>
+            </span>
+            <span className="mono-label max-w-[90px] text-center text-[8.5px] text-white/55">{m.l}</span>
+          </span>
+        ))}
+        {reste > 4 && (
+          <span className="a-fondu mono-label pb-6 text-[10px] text-white/55" style={t(2.2)}>
+            et {reste - 4} de plus
+          </span>
+        )}
+      </div>
+    </>
+  );
+}

@@ -5,11 +5,17 @@
 //
 // Les badges de la fiche viennent d'ailleurs (trophees.ts, fin-de-saison.ts) :
 // ce sont ceux de Ma carte.
+//
+// Ma carte y lit aussi ses dimanches (dimanchesDe) : chaque dimanche de la
+// saison où il a joué ou pris des points sans jouer (un bonus d'extra time,
+// une absence injustifiée), ce qu'il y a fait et ce qu'il lui a rapporté.
+// Mis bout à bout, ses dimanches font son total au Pépite d'Or.
 
 import type { Player } from "./engine";
 import { ordinal } from "./fin-de-saison";
+import { entryPP } from "./saisie/engine";
 import { journeeJouee } from "./saisie/mutations";
-import type { MatchEntry, Saison } from "./saisie/types";
+import type { MatchEntry, PlayerStatutSaisie, Saison } from "./saisie/types";
 
 export interface PointFort {
   /** « 14 », « 9/9 ». */
@@ -60,6 +66,15 @@ const MESURES: Mesure[] = [
   { id: "pp", valeur: (p) => p.pp, quoi: () => "pts Pépite", rang: (r) => `${ordinal(r)} au Pépite d'Or`, premier: "En tête du Pépite d'Or.", podium: "Sur le podium du Pépite d'Or." },
 ];
 
+const majuscule = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Ses buts et ses passes d'un dimanche, en mots : « doublé et 1 passe », null s'il n'y en a pas. */
+export function actionsDuJour(buts: number, passes: number): string | null {
+  const b = buts >= 4 ? `${buts} buts` : buts === 3 ? "triplé" : buts === 2 ? "doublé" : buts === 1 ? "1 but" : null;
+  const actions = [b, passes ? pluriel(passes, "passe", "passes") : null].filter(Boolean) as string[];
+  return actions.length ? actions.join(" et ") : null;
+}
+
 /** Ce que le joueur a fait un dimanche, en une ligne, et ce que ça pèse. */
 function faitDuJour(e: MatchEntry): { quoi: string; poids: number } | null {
   const parts: string[] = [];
@@ -74,14 +89,10 @@ function faitDuJour(e: MatchEntry): { quoi: string; poids: number } | null {
     parts.push("Impact du match");
     poids += 3;
   }
-  const buts = e.buts >= 4 ? `${e.buts} buts` : e.buts === 3 ? "triplé" : e.buts === 2 ? "doublé" : e.buts === 1 ? "1 but" : null;
   if (e.buts >= 2) poids += e.buts >= 3 ? 5 : 3;
   if (e.passes >= 2) poids += 2;
-  const actions = [buts, e.passes ? pluriel(e.passes, "passe", "passes") : null].filter(Boolean) as string[];
-  if (actions.length) {
-    const texte = actions.join(" et ");
-    parts.push(parts.length ? texte : texte.charAt(0).toUpperCase() + texte.slice(1));
-  }
+  const texte = actionsDuJour(e.buts, e.passes);
+  if (texte) parts.push(parts.length ? texte : majuscule(texte));
   if (!poids && e.result === "Victoire" && e.cleanSheet) {
     parts.push("Victoire sans encaisser");
     poids += 2;
@@ -150,4 +161,97 @@ export function ficheJoueur(saison: Saison, moi: Player, players: Player[]): Fic
     .map((f) => ({ quand: `J${f.j}`, quoi: f.quoi }));
 
   return { synthese, forts, faits: retenus };
+}
+
+/* ------------------------------ Ses dimanches ------------------------------ */
+//
+// Un dimanche peut compter plusieurs matchs (une ligne par match sur la
+// feuille) : ses buts, ses passes et ses titres s'additionnent, ses résultats
+// se suivent. Les points du jour comptent aussi le bonus d'extra time. Un
+// dimanche sans match n'est là que s'il a changé ses points.
+
+export type Resultat = "V" | "N" | "D";
+export type TitreDuJour = "mvp" | "def" | "impact";
+
+export interface Dimanche {
+  j: number;
+  /** « 19 oct. ». */
+  date: string;
+  /** null s'il a joué ; sinon ce qui lui a valu ses points sans jouer : « Bonus extra time », « Absence injustifiée »… */
+  horsMatch: string | null;
+  /** Ses matchs du jour, dans l'ordre de la feuille (ceux dont le résultat est saisi). */
+  resultats: Resultat[];
+  buts: number;
+  passes: number;
+  /** Ses titres du jour : MVP, Le Mur, Impact. */
+  titres: TitreDuJour[];
+  /** Ses points Pépite du jour, bonus compris (en moins pour une absence injustifiée). */
+  points: number;
+}
+
+const LETTRE: Record<NonNullable<MatchEntry["result"]>, Resultat> = { Victoire: "V", Nul: "N", Défaite: "D" };
+
+const HORS_MATCH: Record<Exclude<PlayerStatutSaisie, "Présent">, string> = {
+  "Absent justifié": "Absence justifiée",
+  "Absence injustifiée": "Absence injustifiée",
+  Blessure: "Blessé",
+  Suspendu: "Suspendu",
+};
+
+/** Ses dimanches de la saison en cours, le plus récent d'abord. */
+export function dimanchesDe(saison: Saison, nom: string): Dimanche[] {
+  const dates = new Map(saison.journees.map((m) => [m.j, m.date]));
+  const parJour = new Map<number, MatchEntry[]>();
+  for (const e of saison.entries) {
+    if (e.player === nom) parJour.set(e.j, [...(parJour.get(e.j) ?? []), e]);
+  }
+  const out: Dimanche[] = [];
+  for (const [j, lignes] of parJour) {
+    const matchs = lignes.filter((e) => !e.extraTime && e.statut === "Présent");
+    const points = lignes.reduce((n, e) => n + (e.extraTime ? (e.pepiteBonus ?? 0) : entryPP(e)), 0);
+    if ((!matchs.length && !points) || !journeeJouee(saison, j)) continue;
+    const absence = lignes.find((e) => !e.extraTime && e.statut !== "Présent");
+    out.push({
+      j,
+      date: dates.get(j) ?? "",
+      horsMatch: matchs.length ? null : absence ? HORS_MATCH[absence.statut as keyof typeof HORS_MATCH] : "Bonus extra time",
+      resultats: matchs.flatMap((e) => (e.result ? [LETTRE[e.result]] : [])),
+      buts: matchs.reduce((n, e) => n + e.buts, 0),
+      passes: matchs.reduce((n, e) => n + e.passes, 0),
+      titres: (["mvp", "def", "impact"] as const).filter((t) => matchs.some((e) => e[t])),
+      points,
+    });
+  }
+  return out.sort((a, b) => b.j - a.j);
+}
+
+const NOM_RESULTAT: Record<Resultat, [string, string]> = {
+  V: ["victoire", "victoires"],
+  N: ["nul", "nuls"],
+  D: ["défaite", "défaites"],
+};
+
+/** Ses titres du jour, comme on les dit : MVP, Le Mur, Impact. */
+export const NOM_TITRE: Record<TitreDuJour, string> = { mvp: "MVP", def: "Le Mur", impact: "Impact" };
+
+const listeEt = (mots: string[]) => (mots.length > 1 ? `${mots.slice(0, -1).join(", ")} et ${mots[mots.length - 1]}` : mots[0] ?? "");
+
+/** Le résultat du jour : « victoire », ou « 2 victoires et 1 défaite » sur plusieurs matchs ; null sans résultat saisi. */
+export function resultatDuJour(d: Dimanche): string | null {
+  if (!d.resultats.length) return null;
+  if (d.resultats.length === 1) return NOM_RESULTAT[d.resultats[0]][0];
+  return listeEt(
+    (["V", "N", "D"] as const).flatMap((r) => {
+      const n = d.resultats.filter((x) => x === r).length;
+      return n ? [pluriel(n, ...NOM_RESULTAT[r])] : [];
+    })
+  );
+}
+
+/** Le dimanche en une phrase : « Victoire, doublé et 1 passe. MVP du match. » */
+export function phraseDuJour(d: Dimanche): string {
+  if (d.horsMatch) return `${d.horsMatch}.`;
+  const faits = [resultatDuJour(d), actionsDuJour(d.buts, d.passes)].filter(Boolean).join(", ");
+  const titres = d.titres.length ? `${listeEt(d.titres.map((t) => NOM_TITRE[t]))} du match.` : "";
+  return [faits ? `${majuscule(faits)}.` : "", titres].filter(Boolean).join(" ") || "Présent.";
 }

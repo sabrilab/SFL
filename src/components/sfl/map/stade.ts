@@ -19,6 +19,8 @@
 // dans la fiche du match), marbre sur la vue satellite, sombre. `VARIANTE_STADE`
 // est celle par défaut ; les autres restent pour comparer.
 
+import { SATELLITE } from "./style-snap";
+
 export type Moment = "jour" | "weekend" | "semaine";
 export type VarianteStade = "origine" | "fini" | "proche" | "nuit" | "marbre" | "mono";
 export const VARIANTES_STADE: VarianteStade[] = ["origine", "fini", "proche", "nuit", "marbre", "mono"];
@@ -216,6 +218,8 @@ export interface StickerPlan {
   etat: EtatSticker;
   nom: string;
   ligue?: LigueMatch;
+  /** La discussion du match, quand j'en suis et qu'on y a écrit : ce que je n'y ai pas lu. */
+  discussion?: { nonLus: number };
 }
 
 /** Le HTML d'un sticker de match pour Leaflet (le CSS est dans globals.css). */
@@ -238,15 +242,30 @@ export function stickerHtml(s: StickerPlan, choisi: boolean, variante?: Variante
           : s.etat.genre === "equipe"
             ? `<span class="stk__etiquette stk__etiquette--inscrits">${echapper(s.etat.texte)}</span>`
             : `<span class="stk__etiquette stk__etiquette--complet">${s.etat.genre === "joue" ? "joué" : "complet"}</span>`;
+  // La bulle de la discussion prend la place du badge : qui la voit est du match.
+  const bulle = s.discussion ? bulleHtml(s.discussion.nonLus) : "";
   return `<div class="stk${s.ligue ? ` stk--${s.ligue}` : ""}${choisi ? " stk--choisi" : ""}${s.etat.genre === "complet" || s.etat.genre === "joue" ? " stk--complet" : ""}" style="--penche:${penche(s.id)}deg">
   <div class="stk__vignette">
     <div class="stk__stade">${stadeSvg(s.moment, { variante, ligue: s.ligue })}</div>
     <span class="stk__cal"><span class="stk__cal-jour">${echapper(s.jourCourt)}</span><span class="stk__cal-heure">${echapper(heureCourte(s.heure))}</span></span>
-    ${choisi ? etiquette : badge}
+    ${choisi ? etiquette : bulle ? "" : badge}
+    ${bulle}
   </div>
   <span class="stk__queue"></span>
   <span class="stk__nom">${echapper(s.nom)}</span>
 </div>`;
+}
+
+/**
+ * La discussion du match, au coin du sticker (Sabri, 22/10 : « comme une
+ * notification dans la bulle du match ») : une bulle de BD, rouge avec le
+ * nombre de messages que je n'ai pas lus, blanche avec trois points quand
+ * tout est lu. La toucher ouvre la discussion (map/carte-map.tsx).
+ */
+function bulleHtml(nonLus: number): string {
+  const nouveau = nonLus > 0;
+  const dire = nouveau ? `${nonLus} message${nonLus > 1 ? "s" : ""} pas lu${nonLus > 1 ? "s" : ""}` : "La discussion du match";
+  return `<span class="stk__bulle${nouveau ? " stk__bulle--nouveau" : ""}" role="button" aria-label="${dire}"><svg viewBox="0 0 30 25" aria-hidden="true"><path d="M10.5 1H19.5A9.5 9.5 0 0 1 19.5 20H10L4 24L5.05 18.28A9.5 9.5 0 0 1 10.5 1Z"/></svg><span class="stk__bulle-dedans">${nouveau ? (nonLus > 9 ? "9+" : nonLus) : "<i></i><i></i><i></i>"}</span></span>`;
 }
 
 const COCHE = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#EFEFEC" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg>`;
@@ -265,15 +284,58 @@ export function pointHtml(nom: string, variante?: VarianteStade): string {
   return `<div class="ter"><div class="ter__vignette"><div class="ter__stade">${stadeSvg("semaine", { variante })}</div></div><span class="ter__queue"></span><span class="ter__nom">${echapper(nom)}</span></div>`;
 }
 
+const TUILE = 256;
+
+/** Un point en pixels du monde de Mercator, au zoom `z` (tuiles de 256). */
+function mercator(lat: number, lng: number, z: number): { x: number; y: number } {
+  const n = TUILE * 2 ** z;
+  const phi = (lat * Math.PI) / 180;
+  return { x: ((lng + 180) / 360) * n, y: ((1 - Math.log(Math.tan(phi) + 1 / Math.cos(phi)) / Math.PI) / 2) * n };
+}
+
+export interface MosaiqueSatellite {
+  /** Ce qu'on montre, en pixels de tuiles depuis la première tuile : le viewBox d'un SVG. */
+  boite: [number, number, number, number];
+  /** Les tuiles à poser, à leur place dans ce repère. */
+  tuiles: { x: number; y: number; url: string }[];
+}
+
 /**
- * La photo satellite centrée sur un point (Esri World Imagery, sans clé) :
- * une image de `l` × `h` pixels qui couvre ~`demi` degrés de latitude de part
- * et d'autre. C'est la « vue aérienne du vrai terrain » de l'app iPhone.
+ * La photo satellite centrée sur un point (Esri World Imagery, sans clé),
+ * faite des tuiles de la vue satellite du plan : ~`demi` degrés de latitude
+ * de part et d'autre, `rapport` = largeur / hauteur. C'est la « vue aérienne
+ * du vrai terrain » de l'app iPhone. Le zoom est le premier qui donne au
+ * moins 1,5 pixel de tuile par pixel affiché sur `hauteur` px : aussi net que
+ * l'ancienne image calculée par Esri, en 4 à 9 tuiles.
+ *
+ * Avant le 22/10, c'était une seule image demandée au service « export »
+ * d'Esri, qui la calculait à chaque fois (~2 s) et en interdisait le cache
+ * (max-age=0) : le carrousel de la Map attendait ses photos à chaque
+ * ouverture. Les tuiles sortent d'un CDN en ~150 ms et restent un jour dans
+ * le cache du téléphone.
  */
-export function photoSatellite(lat: number, lng: number, l = 600, h = 450, demi = 0.0012): string {
-  const dl = (demi / Math.cos((lat * Math.PI) / 180)) * (l / h);
-  const bbox = [lng - dl, lat - demi, lng + dl, lat + demi].map((n) => n.toFixed(6)).join(",");
-  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bbox}&bboxSR=4326&imageSR=3857&size=${l},${h}&format=jpg&f=image`;
+export function mosaiqueSatellite(
+  lat: number,
+  lng: number,
+  { demi, rapport, hauteur }: { demi: number; rapport: number; hauteur: number }
+): MosaiqueSatellite {
+  const haut = (z: number) => mercator(lat - demi, lng, z).y - mercator(lat + demi, lng, z).y;
+  let z = 10;
+  while (z < 18 && haut(z) < 1.5 * hauteur) z++;
+  const c = mercator(lat, lng, z);
+  const h = haut(z);
+  const w = h * rapport;
+  const [gauche, dessus] = [c.x - w / 2, c.y - h / 2];
+  const [tx0, ty0] = [Math.floor(gauche / TUILE), Math.floor(dessus / TUILE)];
+  const tuiles: MosaiqueSatellite["tuiles"] = [];
+  for (let ty = ty0; ty <= Math.floor((dessus + h) / TUILE); ty++)
+    for (let tx = tx0; tx <= Math.floor((gauche + w) / TUILE); tx++)
+      tuiles.push({
+        x: (tx - tx0) * TUILE,
+        y: (ty - ty0) * TUILE,
+        url: SATELLITE.replace("{z}", String(z)).replace("{y}", String(ty)).replace("{x}", String(tx)),
+      });
+  return { boite: [gauche - tx0 * TUILE, dessus - ty0 * TUILE, w, h], tuiles };
 }
 
 /** Les trois façons d'y aller : Plans (Apple), Google Maps, Waze. */

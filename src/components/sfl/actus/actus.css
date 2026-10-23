@@ -235,3 +235,30 @@
 .story-anneau {
   background: conic-gradient(from 210deg, #ffffff, #8a8a8a, #ffffff, #5b5b5b, #ffffff);
 }
+
+/*
+ * Les terrains du fil (pelouse.tsx) : tout suit le défilement. La section
+ * porte --p, de 0 (elle entre par le bas) à 1 (elle est en place) ; chaque
+ * élément porte --d, le moment où il entre. On remonte : tout repart.
+ * « Réduire les animations » : --p vaut 1, tout est posé.
+ */
+.pel-entre {
+  --e: clamp(0, (var(--p, 1) - var(--d, 0)) * 5, 1);
+  opacity: var(--e);
+  transform: translateY(calc((1 - var(--e)) * 26px)) scale(calc(0.86 + var(--e) * 0.14));
+  transform-origin: 50% 100%;
+  will-change: transform, opacity;
+}
+.pel-fondu {
+  --e: clamp(0, (var(--p, 1) - var(--d, 0)) * 4, 1);
+  opacity: var(--e);
+}
+.pel-camera {
+  transform: translateY(calc((1 - var(--p, 1)) * 34px)) scale(calc(1.07 - var(--p, 1) * 0.07));
+  transform-origin: 50% 30%;
+}
+.pel-titre {
+  --e: clamp(0, (var(--p, 1) - var(--d, 0)) * 4, 1);
+  opacity: var(--e);
+  transform: translateX(calc((1 - var(--e)) * -18px));
+}

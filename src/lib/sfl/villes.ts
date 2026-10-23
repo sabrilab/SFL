@@ -12,6 +12,12 @@
 // ou la masque dans le catalogue. Comme les identités (identites.ts), la liste est relue au
 // lancement et au retour sur l'app, et gardée en cache.
 //
+// Une ville devinée n'est qu'une hypothèse : tant que le joueur n'a ni
+// choisi ni confirmé la sienne (profiles.ville_le), l'ouverture de l'app la
+// lui propose (maVilleAProposer, invitation-ville.tsx ; Sabri, 22/10 :
+// « propose à chaque joueur, à sa prochaine connexion, de renseigner sa
+// ville »).
+//
 // Aperçus Vercel et développement : la base n'a pas encore les colonnes, et
 // personne n'a encore donné sa ville. Pour que Sabri voie la Map habitée
 // avant de publier, les joueurs y reçoivent une ville de démonstration,
@@ -186,19 +192,29 @@ export function rafraichirVilles(): Promise<void> {
 
 /* ────────────────────────────── Écriture ────────────────────────────── */
 
+/** Choisie sur cet appareil, quand la base n'a pas encore ville_le (aperçus). */
+const choisieIci = (nom: string) => `bola-ville-choisie-${nom}`;
+
 /**
- * Le joueur connecté pose sa ville (ou se rend invisible). La ligne de la
- * base ne s'écrit que pour soi (RLS). Renvoie un message d'erreur, ou null.
+ * Écrit la ville du joueur connecté. `choisie` : c'est lui qui l'a choisie ou
+ * confirmée (profiles.ville_le), et non sa connexion qui l'a devinée.
  */
-export async function poserMaVille(nom: string, v: VilleJoueur | null, cachee: boolean): Promise<string | null> {
+async function enregistrer(nom: string, v: VilleJoueur | null, cachee: boolean, choisie: boolean): Promise<string | null> {
   try {
     const { data: u } = await supabase().auth.getUser();
     if (!u.user) return "Connecte-toi d'abord.";
-    const { error } = await supabase()
-      .from("profiles")
-      .update({ ville: v?.ville ?? null, ville_lat: v?.lat ?? null, ville_lng: v?.lng ?? null, ville_cachee: cachee })
-      .eq("id", u.user.id);
+    const ligne = { ville: v?.ville ?? null, ville_lat: v?.lat ?? null, ville_lng: v?.lng ?? null, ville_cachee: cachee };
+    const maj = (champs: object) => supabase().from("profiles").update(champs).eq("id", u.user.id);
+    let { error } = await maj(choisie ? { ...ligne, ville_le: new Date().toISOString() } : ligne);
+    // Base pas encore migrée (aperçus) : la ville s'écrit sans sa date, qui
+    // reste sur cet appareil.
+    if (error && choisie && /ville_le/.test(error.message ?? "")) ({ error } = await maj(ligne));
     if (error) return DEMO_VILLES ? "La ville s'enregistrera une fois la Map des joueurs en ligne." : "La ville ne s'est pas enregistrée. Réessaie.";
+    if (choisie) {
+      try {
+        window.localStorage.setItem(choisieIci(nom), "1");
+      } catch {}
+    }
     const l = { ...lire() };
     if (v) l[nom] = { v: v.ville, a: v.lat, o: v.lng, ...(cachee ? { c: true } : {}) };
     else delete l[nom];
@@ -210,9 +226,61 @@ export async function poserMaVille(nom: string, v: VilleJoueur | null, cachee: b
 }
 
 /**
+ * Le joueur connecté pose sa ville (ou se rend invisible) : il l'a choisie.
+ * La ligne de la base ne s'écrit que pour soi (RLS). Renvoie un message
+ * d'erreur, ou null.
+ */
+export function poserMaVille(nom: string, v: VilleJoueur | null, cachee: boolean): Promise<string | null> {
+  return enregistrer(nom, v, cachee, true);
+}
+
+/**
+ * Faut-il proposer sa ville au joueur connecté, à l'ouverture
+ * (invitation-ville.tsx), et laquelle ? Oui tant qu'il ne l'a ni choisie ni
+ * confirmée lui-même (profiles.ville_le) et qu'il ne s'est pas rendu
+ * invisible. La ville proposée : celle qu'il a déjà sur la Map (devinée),
+ * sinon celle que sa connexion laisse deviner maintenant (rien n'est écrit),
+ * sinon aucune. null : on ne sait pas (pas de réseau, pas encore membre).
+ */
+export async function maVilleAProposer(nom: string): Promise<{ proposer: boolean; ville: VilleJoueur | null } | null> {
+  if (!hasWindow()) return null;
+  try {
+    type Ligne = { ville: string | null; ville_lat: number | null; ville_lng: number | null; ville_cachee: boolean | null; ville_le?: string | null };
+    let suivi = true;
+    let { data, error } = await supabase().from("profiles").select("ville, ville_lat, ville_lng, ville_cachee, ville_le").eq("name", nom).maybeSingle();
+    if (error) {
+      // Base pas encore migrée (aperçus) : ce que cet appareil sait.
+      suivi = false;
+      ({ data, error } = await supabase().from("profiles").select("ville, ville_lat, ville_lng, ville_cachee").eq("name", nom).maybeSingle());
+    }
+    if (error || !data) return null;
+    const p = data as Ligne;
+    let choisie = !!p.ville_le;
+    if (!suivi) {
+      try {
+        choisie = window.localStorage.getItem(choisieIci(nom)) !== null;
+      } catch {}
+    }
+    if (choisie || p.ville_cachee) return { proposer: false, ville: null };
+    if (p.ville && p.ville_lat != null && p.ville_lng != null) return { proposer: true, ville: { ville: p.ville, lat: p.ville_lat, lng: p.ville_lng } };
+    try {
+      const res = await fetch("/api/ville-devinee", { cache: "no-store" });
+      const d = (await res.json()) as { ville: VilleJoueur | null };
+      return { proposer: true, ville: d.ville };
+    } catch {
+      return { proposer: true, ville: null };
+    }
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Le joueur connecté n'a pas encore de ville : on pose celle que devine sa
  * connexion (/api/ville-devinee), une seule tentative par jour et par
- * appareil quand rien n'est deviné. Il la corrige ou la masque ensuite.
+ * appareil quand rien n'est deviné. Elle n'est pas « choisie » : l'ouverture
+ * la lui propose ensuite (maVilleAProposer), et il la corrige ou la masque
+ * aussi dans le catalogue.
  */
 export async function poserVilleDevinee(nom: string): Promise<void> {
   if (!hasWindow() || villeDonnee(nom) !== false) return;
@@ -226,6 +294,6 @@ export async function poserVilleDevinee(nom: string): Promise<void> {
     const res = await fetch("/api/ville-devinee", { cache: "no-store" });
     const d = (await res.json()) as { ville: VilleJoueur | null };
     if (!d.ville || villeDonnee(nom) !== false) return;
-    await poserMaVille(nom, d.ville, false);
+    await enregistrer(nom, d.ville, false, false);
   } catch {}
 }
