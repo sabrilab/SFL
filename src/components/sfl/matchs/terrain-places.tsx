@@ -10,6 +10,9 @@
 // remplies l'une après l'autre : l'organisateur en premier, devant. Une
 // équipe du mode Team (unCamp) occupe tout le terrain, en blanc, dans une
 // formation fixe (FORMATION) : le capitaine dans les buts, l'attaque au fond.
+// Un invité qui n'a pas encore répondu attend sur sa place, en pointillé, sa
+// carte voilée ; le mode Team ajoute à son prénom le temps qui reste avant
+// que l'invitation tombe (« Adil · 71 h »).
 
 import { useMemo } from "react";
 import { Plus } from "lucide-react";
@@ -23,8 +26,10 @@ import { cn } from "@/lib/utils";
 export interface Occupant {
   cle: string;
   nom: string;
-  /** Invité sans réponse : sa carte attend, un peu effacée. */
+  /** Invité sans réponse : sa carte attend, voilée, en pointillé. */
   enAttente?: boolean;
+  /** Le temps qui lui reste pour répondre (« 71 h »), à côté de son prénom. */
+  reste?: string;
 }
 
 const BLANC = { fond: "#f4f3ef", encre: "#0a0b0d" };
@@ -50,6 +55,7 @@ export function TerrainPlaces({
   onOccupant,
   hauteur = CADRE_H,
   unCamp = false,
+  toucher = "retirer",
 }: {
   places: number;
   /** Dans l'ordre d'arrivée : l'organisateur d'abord. */
@@ -62,6 +68,8 @@ export function TerrainPlaces({
   hauteur?: number;
   /** Une seule équipe (mode Team) : toutes les places devant, côté blanc. */
   unCamp?: boolean;
+  /** Ce que fait le toucher d'une carte : la retirer (un match), ou ouvrir sa fiche (le mode Team). */
+  toucher?: "retirer" | "voir";
 }) {
   const { allPlayers } = useSeason();
   const parNom = useMemo(() => new Map(allPlayers.map((p) => [p.name, p])), [allPlayers]);
@@ -133,25 +141,34 @@ export function TerrainPlaces({
                     type="button"
                     disabled={!onOccupant}
                     onClick={() => onOccupant?.(occupant)}
-                    aria-label={onOccupant ? `Retirer ${occupant.nom}` : occupant.nom}
+                    aria-label={
+                      !onOccupant
+                        ? occupant.nom
+                        : toucher === "voir"
+                          ? `${occupant.nom}${occupant.enAttente ? ", invité" : ""}`
+                          : `Retirer ${occupant.nom}`
+                    }
                     className={cn(
                       "flex rounded-[15px] transition-transform active:scale-95 disabled:active:scale-100",
                       occupant.nom === moi && "bg-white p-[3px]",
-                      occupant.enAttente && "opacity-45"
+                      occupant.enAttente && "border-[1.5px] border-dashed border-white/70 p-[2px]"
                     )}
                   >
-                    <span className={cn("flex rounded-[12px]", occupant.nom === moi && "bg-[#1b1d21] p-[2px]")}>
+                    <span className={cn("flex rounded-[12px]", occupant.nom === moi && "bg-[#1b1d21] p-[2px]", occupant.enAttente && "opacity-45")}>
                       <Pastille player={parNom.get(occupant.nom)} nom={occupant.nom} cote={42} onglet={onglet} />
                     </span>
                   </button>
                   <span
-                    className={cn(
-                      "whitespace-nowrap rounded-full px-[7px] py-[2px] text-[11px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]",
-                      occupant.enAttente && "opacity-60"
-                    )}
-                    style={{ background: onglet.fond, color: onglet.encre, fontWeight: occupant.nom === moi ? 800 : 600 }}
+                    className="whitespace-nowrap rounded-full px-[7px] py-[2px] text-[11px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
+                    style={{
+                      // Voilée mais opaque : les lignes du terrain ne passent pas au travers.
+                      background: occupant.enAttente ? `color-mix(in srgb, ${onglet.fond} 72%, #1b1d21)` : onglet.fond,
+                      color: onglet.encre,
+                      fontWeight: occupant.nom === moi ? 800 : 600,
+                    }}
                   >
                     {occupant.nom === moi ? "Toi" : prenom(occupant.nom)}
+                    {occupant.reste && <span className="font-medium tabular-nums opacity-60"> · {occupant.reste}</span>}
                   </span>
                 </>
               ) : (

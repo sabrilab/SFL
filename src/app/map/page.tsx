@@ -49,6 +49,8 @@ import { feuilleDeConvocation, feuilleDeJournee } from "@/lib/sfl/feuille";
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
 import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
 import { Invitations, invitationsDe } from "@/components/sfl/matchs/invitations";
+import { InvitationsEquipe } from "@/components/sfl/equipe/invitation-map";
+import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { useParties } from "@/hooks/use-parties";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
 import { inscrits, libelleJour, placesLibres, type Partie } from "@/lib/sfl/matchs";
@@ -541,6 +543,8 @@ export default function MapPage() {
     else choisirSticker(a.cle);
   }, [affiches, choisirSticker, ouvrirDiscussion, ouvrirEquipe]);
   const invitations = useMemo(() => invitationsDe(parties, moi), [parties, moi]);
+  // Les équipes du mode Team qui m'invitent : leur carte au-dessus de celles des matchs.
+  const invitationsEquipe = useMonEquipe().invitations;
 
   // Le carrousel et le plan vont ensemble : faire glisser les cartes choisit
   // celle qui s'arrête au centre (le plan suit), et choisir sur le plan amène
@@ -821,6 +825,7 @@ export default function MapPage() {
             molette, le pincement et le glisser de la souris au plan, sur
             ordinateur (map/gestes-ordinateur.ts). */}
         <div data-traverse className="absolute inset-x-0 z-[510] flex flex-col items-center gap-3" style={{ bottom: bas }}>
+          <InvitationsEquipe invitations={invitationsEquipe} moi={moi} />
           <Invitations invitations={invitations} onOuvrir={(p) => choisirSticker(`m${p.id}`)} />
           <div data-traverse className="flex w-full items-center justify-center gap-2 px-4">
             {/* Tout joueur ouvre un match ; l'admin garde en plus la journée de ligue. */}
