@@ -33,10 +33,14 @@
 // pas assez fluide : c'est bloqué ») : l'invité n'était prévenu nulle part,
 // une invitation ressemblait à un joueur déjà là, une invitation par
 // ouverture de la liste, et le seul geste sur un invité était de le retirer.
+//
+// Un terrain touché sur la Map (« Défier une équipe ici », /bola-team?terrain=id,
+// un terrain du Nord : lib/sfl/terrains-nord.ts) : il se pose au-dessus des
+// équipes à défier, sa photo et son adresse, et chaque défi part avec lui.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { MessageCircle, UserPlus } from "lucide-react";
+import { MessageCircle, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -48,6 +52,7 @@ import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { CreerEquipe } from "@/components/sfl/equipe/creer-equipe";
 import { SignerReglement } from "@/components/sfl/equipe/reglement";
 import { Defier } from "@/components/sfl/equipe/defier";
+import { TerrainRetenu } from "@/components/sfl/matchs/choisir-terrain";
 import { TerrainPlaces, type Occupant } from "@/components/sfl/matchs/terrain-places";
 import { ChoisirJoueur } from "@/components/sfl/matchs/choisir-joueur";
 import { useSession } from "@/hooks/use-session";
@@ -85,6 +90,7 @@ import {
   type Membre,
 } from "@/lib/sfl/equipes";
 import { finInvitation, quandTombe, resteAvant } from "@/lib/sfl/equipes-temps";
+import { avecLaLigue, lireTerrainsNord, terrainsNordLus, type CatalogueTerrains } from "@/lib/sfl/terrains-nord";
 import { DEMO_EQUIPES, demoEquipes } from "@/lib/sfl/equipes-demo";
 import { libelleJour, listerProfils, monId, type Profil } from "@/lib/sfl/matchs";
 import { supabase } from "@/lib/supabase";
@@ -181,7 +187,7 @@ export default function BolaTeamPage() {
   const session = useSession();
   const connecte = !!session?.server;
   const { me } = useMyPlayer();
-  const { allPlayers } = useSeason();
+  const { allPlayers, saison } = useSeason();
   const [equipes, setEquipes] = useState<Equipe[] | null>(null);
   const [defis, setDefis] = useState<Defi[]>([]);
   const [profils, setProfils] = useState<Profil[]>([]);
@@ -193,6 +199,10 @@ export default function BolaTeamPage() {
   const [creer, setCreer] = useState(false);
   const [aSigner, setASigner] = useState<Equipe | null>(null);
   const [adversaire, setAdversaire] = useState<Equipe | null>(null);
+  // La feuille du défi repart de zéro à chaque équipe défiée (sa clé), le terrain de la Map déjà écrit.
+  const [defiN, setDefiN] = useState(0);
+  const [terrainDefi, setTerrainDefi] = useState<string | null>(null);
+  const [recensement, setRecensement] = useState<CatalogueTerrains | null>(terrainsNordLus);
   const [choisir, setChoisir] = useState(false);
   const [indispos, setIndispos] = useState<Map<string, Indispo> | null>(null);
   const [joueur, setJoueur] = useState<Membre | null>(null);
@@ -205,19 +215,42 @@ export default function BolaTeamPage() {
   const nonLus = useMonEquipe().nonLus;
 
   // La notification ou la carte de la Map (?invitation=id), ou le lien d'une
-  // équipe après l'inscription (?lien=jeton) : repris une fois connecté.
+  // équipe après l'inscription (?lien=jeton) : repris une fois connecté. Le
+  // terrain de la Map (?terrain=id) est gardé de côté : l'adresse est déjà
+  // nettoyée quand l'effet repasse.
+  const terrainVenu = useRef<string | null>(null);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const id = q.get("invitation");
     const jeton = q.get("lien");
+    const terrain = q.get("terrain") ?? terrainVenu.current;
+    terrainVenu.current = terrain;
     if (id && /^\d+$/.test(id)) aOuvrir.current = Number(id);
     if (jeton) {
       try {
         localStorage.setItem(LIEN_EN_ATTENTE, jeton);
       } catch {}
     }
-    if (id || jeton) window.history.replaceState(null, "", window.location.pathname);
+    if (id || jeton || terrain) window.history.replaceState(null, "", window.location.pathname);
+    if (!terrain) return;
+    const t = window.setTimeout(() => setTerrainDefi(terrain), 0);
+    return () => window.clearTimeout(t);
   }, []);
+  // Le terrain venu de la Map : le recensement lu une fois, les terrains de la ligue à leur nom.
+  useEffect(() => {
+    if (!terrainDefi || recensement) return;
+    let fini = false;
+    lireTerrainsNord()
+      .then((c) => !fini && setRecensement(c))
+      .catch(() => {});
+    return () => {
+      fini = true;
+    };
+  }, [terrainDefi, recensement]);
+  const terrainDuDefi = useMemo(
+    () => (terrainDefi && recensement ? (avecLaLigue(recensement.terrains, saison.terrains ?? []).find((t) => t.id === terrainDefi) ?? null) : null),
+    [terrainDefi, recensement, saison.terrains]
+  );
 
   // Une fois connecté : mes joueurs, un lien ouvert avant de se connecter,
   // et le temps réel (un seul canal ; chaque changement relit les équipes).
@@ -574,13 +607,47 @@ export default function BolaTeamPage() {
 
       {autres.length > 0 && (
         <section className="flex flex-col gap-2">
+          {terrainDuDefi && !!mienne && capitaine && active(mienne) && (
+            <div className="mb-3 flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="mono-label text-muted-foreground">Le terrain du défi</h2>
+                <button
+                  type="button"
+                  onClick={() => setTerrainDefi(null)}
+                  aria-label="Défier ailleurs"
+                  className="bouton-discret grid size-8 place-items-center text-muted-foreground"
+                >
+                  <X className="size-4" strokeWidth={2.2} />
+                </button>
+              </div>
+              <TerrainRetenu t={terrainDuDefi} />
+            </div>
+          )}
           <h2 className="mono-label text-muted-foreground">Équipes</h2>
           {autres.map((e) => {
             const dejaDefie = monde.defis.some(
               (d) => enCours(d) && ((d.de === mienne?.id && d.a === e.id) || (d.a === mienne?.id && d.de === e.id))
             );
             const peutDefier = !!mienne && capitaine && active(mienne) && active(e) && !dejaDefie;
-            return <LigneEquipe key={e.id} e={e} droite={peutDefier ? <Pilule ton="bouton--mauve" onClick={() => setAdversaire(e)}>Défier</Pilule> : undefined} />;
+            return (
+              <LigneEquipe
+                key={e.id}
+                e={e}
+                droite={
+                  peutDefier ? (
+                    <Pilule
+                      ton="bouton--mauve"
+                      onClick={() => {
+                        setDefiN((n) => n + 1);
+                        setAdversaire(e);
+                      }}
+                    >
+                      Défier
+                    </Pilule>
+                  ) : undefined
+                }
+              />
+            );
           })}
         </section>
       )}
@@ -640,7 +707,15 @@ export default function BolaTeamPage() {
           signalerEquipe();
         }}
       />
-      <Defier mienne={mienne} adversaire={adversaire} onOpenChange={(o) => !o && setAdversaire(null)} apercu={apercu} onDefie={recharger} />
+      <Defier
+        key={defiN}
+        mienne={mienne}
+        adversaire={adversaire}
+        terrain={terrainDuDefi}
+        onOpenChange={(o) => !o && setAdversaire(null)}
+        apercu={apercu}
+        onDefie={recharger}
+      />
       {mienne && (
         <ChoisirJoueur
           open={choisir}

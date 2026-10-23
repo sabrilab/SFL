@@ -284,6 +284,60 @@ export function pointHtml(nom: string, variante?: VarianteStade): string {
   return `<div class="ter"><div class="ter__vignette"><div class="ter__stade">${stadeSvg("semaine", { variante })}</div></div><span class="ter__queue"></span><span class="ter__nom">${echapper(nom)}</span></div>`;
 }
 
+/** Le ton des terrains où l'on peut ouvrir un match : le gris du plan, ou le bleu du ciel. */
+export type TeinteFantome = "gris" | "ciel";
+
+const TONS_FANTOME: Record<TeinteFantome, Record<"plan" | "satellite", { trait: string; op: number; fond: string }>> = {
+  gris: {
+    plan: { trait: "#0A0B0D", op: 0.5, fond: "rgba(244,245,242,0.66)" },
+    satellite: { trait: "#F4F5F2", op: 0.9, fond: "rgba(10,11,13,0.42)" },
+  },
+  ciel: {
+    plan: { trait: "#1E8FFF", op: 0.85, fond: "rgba(226,241,255,0.75)" },
+    satellite: { trait: "#9AD4FF", op: 0.95, fond: "rgba(8,30,56,0.5)" },
+  },
+};
+
+/** Le trait d'un terrain possible : ses points, de loin, sont de la même encre. */
+export function couleurFantome(teinte: TeinteFantome, fond: "plan" | "satellite"): string {
+  return TONS_FANTOME[teinte][fond].trait;
+}
+
+/**
+ * Un terrain où l'on peut ouvrir un match (Sabri, 23/10 : « en mode grisé,
+ * comme s'il fallait ouvrir le match ») : le sticker d'un match, mais vide —
+ * sa vignette en pointillé, translucide, sa queue, et dedans le stade au
+ * trait, ses vingt piliers en tirets, comme les places libres d'un terrain
+ * (matchs/terrain-places.tsx). Pour la Map (map/carte-map.tsx), qui en fait
+ * une image du plan : `px` est sa largeur en pixels d'image, le double de
+ * ses 44 px à l'écran.
+ */
+export function fantomeSvg(teinte: TeinteFantome, fond: "plan" | "satellite", px = 96): string {
+  const t = TONS_FANTOME[teinte][fond];
+  const trait = (op: number) => `stroke="${t.trait}" stroke-opacity="${f(op)}"`;
+  const out: string[] = [];
+  out.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 56" width="${px}" height="${f((px * 56) / 48)}">`);
+  out.push(`<rect x="2" y="2" width="44" height="44" rx="10.5" fill="${t.fond}" ${trait(t.op)} stroke-width="1.4" stroke-dasharray="3.2 2.4"/>`);
+  out.push(`<path d="M19.5 46.6 L24 52 L28.5 46.6" fill="none" ${trait(t.op)} stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>`);
+  // Le stade : le socle en pointillé, les piliers du fond, la pelouse et ses lignes, les piliers de devant.
+  const [cx, cy, k] = [24, 26.5, 1.12];
+  out.push(`<ellipse cx="${cx}" cy="${f(cy + 1.2 * k)}" rx="${f(17.5 * k)}" ry="${f(8.75 * k)}" fill="${t.trait}" fill-opacity="${f(t.op * 0.08)}" ${trait(t.op)} stroke-width="1" stroke-dasharray="2 1.6"/>`);
+  const piliers = Array.from({ length: 20 }, (_, i) => {
+    const a = ((i + 0.5) / 20) * 2 * Math.PI;
+    return { x: cx + 15.5 * k * Math.cos(a), y: cy + 7.75 * k * Math.sin(a), devant: Math.sin(a) > 0 };
+  });
+  const pilier = (c: (typeof piliers)[number]) =>
+    out.push(`<line x1="${f(c.x)}" y1="${f(c.y)}" x2="${f(c.x)}" y2="${f(c.y - 4.6 * k)}" ${trait(t.op * (c.devant ? 0.8 : 0.55))} stroke-width="1.2" stroke-linecap="round"/>`);
+  piliers.filter((c) => !c.devant).forEach(pilier);
+  const q = (a: number, b: number) => `${f(cx + a * 8.6 * k - b * 4.6 * k)},${f(cy - 0.5 * k + a * 4.3 * k + b * 2.3 * k)}`;
+  out.push(`<polygon points="${q(-1, -1)} ${q(1, -1)} ${q(1, 1)} ${q(-1, 1)}" fill="${t.trait}" fill-opacity="${f(t.op * 0.16)}" ${trait(t.op)} stroke-width="1" stroke-linejoin="round"/>`);
+  out.push(`<polyline points="${q(0, -1)} ${q(0, 1)}" fill="none" ${trait(t.op)} stroke-width=".85"/>`);
+  out.push(`<ellipse cx="${cx}" cy="${f(cy - 0.5 * k)}" rx="${f(2.1 * k)}" ry="${f(1.05 * k)}" fill="none" ${trait(t.op)} stroke-width=".85"/>`);
+  piliers.filter((c) => c.devant).forEach(pilier);
+  out.push(`</svg>`);
+  return out.join("");
+}
+
 const TUILE = 256;
 
 /** Un point en pixels du monde de Mercator, au zoom `z` (tuiles de 256). */

@@ -37,12 +37,22 @@
 // disposition est dans map/joueurs.ts), refaits à chaque fin de zoom.
 // Toucher une pile approche la ville ; toucher le nom d'une ville ouverte ou
 // une carte, la page ouvre le catalogue ou le profil.
+//
+// Les terrains où l'on peut ouvrir un match (23/10, Sabri : « en mode grisé,
+// comme s'il fallait ouvrir le match ») : tous ceux du Nord
+// (lib/sfl/terrains-nord.ts), sauf ceux qui ont déjà le leur. De loin des
+// points ; en s'approchant, des stickers vides (map/stade.ts, fantomeSvg) ;
+// tout près, leur nom. Ce sont des couches du plan, pas des éléments HTML :
+// cent cinquante terrains ne coûtent rien, restent sous les matchs, les
+// joueurs et toi, et s'effacent l'un devant l'autre quand ils se
+// chevauchent. Toucher un terrain lâche l'onde et le lève en mini-stade,
+// son nom à côté, au-dessus de la fiche que la page ouvre.
 
 import { useEffect, useRef } from "react";
 import maplibregl, { type LngLatBoundsLike, type Map as PlanMap, type Marker, type PaddingOptions } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { SPLASH_FINI } from "@/components/sfl/app-splash";
-import { pointHtml, stickerHtml, toiHtml, type StickerPlan, type VarianteStade } from "./stade";
+import { couleurFantome, fantomeSvg, pointHtml, stickerHtml, toiHtml, type StickerPlan, type TeinteFantome, type VarianteStade } from "./stade";
 import {
   centreHtml,
   disposer,
@@ -73,6 +83,16 @@ export interface ToiPlan {
   teinte: string;
 }
 
+/** Un terrain où l'on peut ouvrir un match. */
+export interface PossiblePlan {
+  id: string;
+  lat: number;
+  lng: number;
+  nom: string;
+  /** Qui passe devant quand deux se chevauchent : le plus petit (la ligue, puis les plus grands complexes). */
+  rang: number;
+}
+
 export type FondCarte = "plan" | "satellite";
 /** Le centre quand rien n'est posé : la France entière. */
 const FRANCE: [number, number] = [2.4, 46.6];
@@ -87,6 +107,14 @@ const MARGE_BAS = 380;
 /** Le premier vol, et l'écart entre deux stickers qui tombent. */
 const VOL = 1.5;
 const CADENCE = 110;
+/**
+ * Les terrains possibles : des points jusque-là, des stickers vides au-delà ;
+ * leur nom, de tout près (un zoom entier : le texte se calcule au zoom des
+ * tuiles, un nom réglé à 14,5 n'apparaissait qu'à 15).
+ */
+const ZOOM_FANTOMES = 11.5;
+const ZOOM_NOMS = 15;
+const COUCHES_POSSIBLES = ["possibles", "possibles-points"];
 
 /** L'inclinaison du plan : à plat de loin, penché sur la ville, comme la Snap Map. */
 function pente(zoom: number): number {
@@ -121,6 +149,103 @@ function marges(map: PlanMap, haut: number, bas: number, cote = 40): PaddingOpti
   return { top: Math.min(haut, h / 3), bottom: b, left: Math.min(cote, w / 4), right: Math.min(cote, w / 4) };
 }
 
+/** L'onde : trois anneaux qui partent du terrain touché, et un petit coup sous le doigt là où le téléphone sait le faire. */
+function onde(map: PlanMap, lat: number, lng: number, clair: boolean) {
+  navigator.vibrate?.(8);
+  if (calme()) return;
+  const r = repere(map, lat, lng, `<span class="onde${clair ? " onde--clair" : ""}"></span>`.repeat(3), { classe: "stk-ancre", z: 2, actif: false });
+  window.setTimeout(() => r.remove(), 1150);
+}
+
+function collectionPossibles(possibles: PossiblePlan[]): GeoJSON.FeatureCollection<GeoJSON.Point, { id: string; nom: string; rang: number }> {
+  return {
+    type: "FeatureCollection",
+    features: possibles.map((p) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+      properties: { id: p.id, nom: p.nom, rang: p.rang },
+    })),
+  };
+}
+
+function imageSvg(svg: string): Promise<HTMLImageElement> {
+  return new Promise((ok, ko) => {
+    const img = new Image();
+    img.onload = () => ok(img);
+    img.onerror = ko;
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  });
+}
+
+/**
+ * Les couches des terrains possibles, posées tout en haut du style (sous les
+ * repères HTML, toujours au-dessus) : les points, puis les stickers vides et
+ * leur nom. Les quatre images (gris ou ciel, plan ou satellite) d'abord.
+ */
+async function poserPossibles(map: PlanMap, donnees: () => PossiblePlan[], encore: () => boolean): Promise<boolean> {
+  const tons = (["gris", "ciel"] as const).flatMap((t) => (["plan", "satellite"] as const).map((f) => [t, f] as const));
+  const images = await Promise.all(tons.map(([t, f]) => imageSvg(fantomeSvg(t, f)).then((img) => [`fantome-${t}-${f}`, img] as const)));
+  if (!encore() || map.getSource("possibles")) return false;
+  for (const [nom, img] of images) if (!map.hasImage(nom)) map.addImage(nom, img, { pixelRatio: 2 });
+  map.addSource("possibles", { type: "geojson", data: collectionPossibles(donnees()) });
+  map.addLayer({
+    id: "possibles-points",
+    type: "circle",
+    source: "possibles",
+    minzoom: 7,
+    maxzoom: ZOOM_FANTOMES + 0.5,
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 2, ZOOM_FANTOMES, 3.4],
+      "circle-opacity": ["interpolate", ["linear"], ["zoom"], 7, 0, 8, 0.6, ZOOM_FANTOMES, 0.6, ZOOM_FANTOMES + 0.5, 0],
+      "circle-stroke-width": 1.2,
+      "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 7, 0, 8, 0.9, ZOOM_FANTOMES, 0.9, ZOOM_FANTOMES + 0.5, 0],
+    },
+  });
+  map.addLayer({
+    id: "possibles",
+    type: "symbol",
+    source: "possibles",
+    minzoom: ZOOM_FANTOMES,
+    layout: {
+      "icon-image": "fantome-gris-plan",
+      "icon-anchor": "bottom",
+      "icon-size": ["interpolate", ["linear"], ["zoom"], ZOOM_FANTOMES, 0.6, 13.5, 0.8, 16, 1],
+      // Deux terrains qui se chevauchent : le premier rang reste. Les noms
+      // des rues et des villes, eux, se posent par-dessus sans les chasser.
+      "icon-allow-overlap": false,
+      "icon-ignore-placement": true,
+      "icon-padding": 3,
+      "icon-pitch-alignment": "viewport",
+      "icon-rotation-alignment": "viewport",
+      "symbol-sort-key": ["get", "rang"],
+      "text-field": ["step", ["zoom"], "", ZOOM_NOMS, ["get", "nom"]],
+      "text-font": ["Noto Sans Bold"],
+      "text-size": 11,
+      "text-anchor": "top",
+      "text-offset": [0, 0.35],
+      "text-max-width": 9,
+      "text-optional": true,
+    },
+    paint: {
+      "icon-opacity": ["interpolate", ["linear"], ["zoom"], ZOOM_FANTOMES, 0, ZOOM_FANTOMES + 0.5, 1],
+      "text-halo-width": 1.4,
+    },
+  });
+  return true;
+}
+
+/** Le ton des terrains possibles, selon le fond (et le gris ou le ciel). */
+function teinterPossibles(map: PlanMap, fond: FondCarte, teinte: TeinteFantome) {
+  if (!map.getLayer("possibles")) return;
+  const sat = fond === "satellite";
+  const trait = couleurFantome(teinte, fond);
+  map.setLayoutProperty("possibles", "icon-image", `fantome-${teinte}-${fond}`);
+  map.setPaintProperty("possibles-points", "circle-color", trait);
+  map.setPaintProperty("possibles-points", "circle-stroke-color", sat ? "rgba(10, 11, 13, 0.7)" : "#ffffff");
+  map.setPaintProperty("possibles", "text-color", sat ? "#f4f5f2" : teinte === "ciel" ? "#1673d6" : "#55575c");
+  map.setPaintProperty("possibles", "text-halo-color", sat ? "rgba(10, 11, 13, 0.85)" : "#ffffff");
+}
+
 /** Voler (ou sauter, en mouvement réduit) sur une boîte, le plan incliné selon le zoom atteint. */
 function cadrer(map: PlanMap, boite: LngLatBoundsLike, padding: PaddingOptions, maxZoom: number, duree: number) {
   const cam = map.cameraForBounds(boite, { padding, maxZoom });
@@ -130,6 +255,8 @@ function cadrer(map: PlanMap, boite: LngLatBoundsLike, padding: PaddingOptions, 
   if (duree > 0) map.flyTo({ ...vise, duration: duree * 1000, essential: false });
   else map.jumpTo(vise);
 }
+
+const AUCUN_POSSIBLE: PossiblePlan[] = [];
 
 export function CarteMap({
   stickers,
@@ -145,9 +272,20 @@ export function CarteMap({
   onJoueur,
   viser,
   margeBas = MARGE_BAS,
+  possibles = AUCUN_POSSIBLE,
+  possibleChoisi = null,
+  onPossible,
+  teinteFantome = "gris",
   className,
 }: {
   fond?: FondCarte;
+  /** Les terrains où l'on peut ouvrir un match, sans ceux qui ont déjà le leur. */
+  possibles?: PossiblePlan[];
+  /** Le terrain possible touché, dont la page montre la fiche : il se lève en mini-stade. */
+  possibleChoisi?: string | null;
+  onPossible?: (id: string) => void;
+  /** Le gris du plan, ou le bleu du ciel. */
+  teinteFantome?: TeinteFantome;
   /** Les joueurs, ville par ville. */
   villes?: VillePlan[];
   /** Toucher le nom d'une ville ouverte (ou une pile tout au bout du zoom) : ses dossiers. */
@@ -205,14 +343,22 @@ export function CarteMap({
   // Ce qui a été cadré la dernière fois : changer de fond redessine les
   // stades sans recadrer.
   const cadre = useRef<unknown[]>([]);
+  // Les terrains possibles : leurs données et leur ton, lus quand leurs
+  // couches se posent ; celui qui est levé, et le filtre qui l'ôte des couches.
+  const possiblesRef = useRef(possibles);
+  const possibleRef = useRef(onPossible);
+  const teinteRef = useRef(teinteFantome);
+  const leve = useRef<Marker | null>(null);
+  const filtreLeve = useRef<maplibregl.FilterSpecification | null>(null);
   useEffect(() => {
     choisirRef.current = onChoisir;
     bulleRef.current = onBulle;
     pointRef.current = onPoint;
     villeRef.current = onVille;
     joueurRef.current = onJoueur;
+    possibleRef.current = onPossible;
     margeBasRef.current = margeBas;
-  }, [onChoisir, onBulle, onPoint, onVille, onJoueur, margeBas]);
+  }, [onChoisir, onBulle, onPoint, onVille, onJoueur, onPossible, margeBas]);
   const pointsActifs = !!onPoint;
 
   // La carte, une fois.
@@ -240,7 +386,46 @@ export function CarteMap({
       appliquerFond(map, fondRef.current, false);
       // L'attribution reste repliée en un petit « i » : elle s'ouvre au toucher.
       map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
+      poserPossibles(map, () => possiblesRef.current, () => carte.current === map)
+        .then((pose) => {
+          if (!pose) return;
+          teinterPossibles(map, fondRef.current, teinteRef.current);
+          for (const id of COUCHES_POSSIBLES) map.setFilter(id, filtreLeve.current);
+        })
+        .catch(() => {});
     });
+    // Toucher un terrain possible : le plus proche du doigt, dans un carré
+    // de 36 px (un point de loin est petit sous le doigt). Un sticker, une
+    // carte ou toi, posés dessus, gardent le toucher pour eux.
+    map.on("click", (e) => {
+      const toucher = possibleRef.current;
+      if (!toucher || !map.getLayer("possibles")) return;
+      const cible = e.originalEvent?.target;
+      if (cible instanceof Element && cible.closest(".maplibregl-marker")) return;
+      const r = 18;
+      const vus = map.queryRenderedFeatures(
+        [
+          [e.point.x - r, e.point.y - r],
+          [e.point.x + r, e.point.y + r],
+        ],
+        { layers: COUCHES_POSSIBLES }
+      );
+      let mieux: { id: string; lat: number; lng: number; d: number } | null = null;
+      for (const v of vus) {
+        const id = v.properties?.id;
+        if (typeof id !== "string" || v.geometry.type !== "Point") continue;
+        const [lng, lat] = v.geometry.coordinates;
+        const p = map.project([lng, lat]);
+        // Le sticker vide se dessine au-dessus de son point.
+        const d = Math.hypot(p.x - e.point.x, p.y - (v.layer.id === "possibles" ? 20 : 0) - e.point.y);
+        if (!mieux || d < mieux.d) mieux = { id, lat, lng, d };
+      }
+      if (!mieux) return;
+      onde(map, mieux.lat, mieux.lng, fondRef.current === "satellite");
+      toucher(mieux.id);
+    });
+    map.on("mouseenter", "possibles", () => possibleRef.current && (map.getCanvas().style.cursor = "pointer"));
+    map.on("mouseleave", "possibles", () => (map.getCanvas().style.cursor = ""));
     // Au doigt, deux doigts inclinent le plan ; sur un ordinateur, il suit le zoom.
     const debrancher = gestesOrdinateur(map, ordinateur ? pente : null);
     // Une vignette qui ne vient pas (l'optimiseur d'images au bout de son
@@ -271,6 +456,7 @@ export function CarteMap({
       aVole.current = false;
       volFini.current = Infinity;
       cibleVol.current = null;
+      leve.current = null;
     };
   }, []);
 
@@ -281,8 +467,41 @@ export function CarteMap({
     if (!map) return;
     map.getContainer().classList.toggle("fond-satellite", fond === "satellite");
     if (!map.isStyleLoaded()) return;
+    teinterPossibles(map, fond, teinteRef.current);
     return appliquerFond(map, fond, !calme());
   }, [fond]);
+
+  // Les terrains possibles : leurs données, puis leur ton.
+  useEffect(() => {
+    possiblesRef.current = possibles;
+    const source = carte.current?.getSource("possibles");
+    if (source && "setData" in source) (source as maplibregl.GeoJSONSource).setData(collectionPossibles(possibles));
+  }, [possibles]);
+  useEffect(() => {
+    teinteRef.current = teinteFantome;
+    const map = carte.current;
+    if (map) teinterPossibles(map, fondRef.current, teinteFantome);
+  }, [teinteFantome]);
+
+  // Le terrain possible touché se lève : le mini-stade et son nom, à sa
+  // place, et le plan glisse pour le poser au-dessus de la fiche qui monte.
+  useEffect(() => {
+    const map = carte.current;
+    if (!map) return;
+    leve.current?.remove();
+    leve.current = null;
+    const p = possibleChoisi ? possiblesRef.current.find((x) => x.id === possibleChoisi) : undefined;
+    filtreLeve.current = p ? ["!=", ["get", "id"], p.id] : null;
+    for (const id of COUCHES_POSSIBLES) if (map.getLayer(id)) map.setFilter(id, filtreLeve.current);
+    if (!p) return;
+    const variante: VarianteStade = fondRef.current === "satellite" ? "marbre" : "mono";
+    leve.current = repere(map, p.lat, p.lng, pointHtml(p.nom, variante), { classe: "ter-ancre", z: 2, actif: false });
+    const h = map.getContainer().clientHeight;
+    const ici = map.project([p.lng, p.lat]);
+    const cible = { x: map.getContainer().clientWidth / 2, y: Math.max(MARGE_HAUT + 50, h * 0.3) };
+    const ecart: [number, number] = [ici.x - cible.x, ici.y - cible.y];
+    if (Math.abs(ecart[0]) + Math.abs(ecart[1]) > 24) map.panBy(ecart, { duration: calme() ? 0 : 650 });
+  }, [possibleChoisi]);
 
   // Tout ce qui est posé, à chaque changement de la liste (la page la mémorise).
   useEffect(() => {
@@ -333,7 +552,7 @@ export function CarteMap({
           cadrer(map, b, marges(map, MARGE_HAUT, margeBasRef.current, 90), Math.max(map.getZoom() + 2, ZOOM_OUVERTURE), doux ? 0.9 : 0);
           return;
         }
-        onde(s.lat, s.lng);
+        onde(map, s.lat, s.lng, fond === "satellite");
         choisirRef.current(s.id);
       });
       poses.push(m);
@@ -366,16 +585,6 @@ export function CarteMap({
     stickersPoses.current = stickersVus;
     choisiRef.current = choisi;
     recomposer.current();
-
-    // L'onde : trois anneaux qui partent du terrain touché, et un petit coup
-    // sous le doigt là où le téléphone sait le faire.
-    function onde(lat: number, lng: number) {
-      navigator.vibrate?.(8);
-      if (!doux || !map) return;
-      const clair = fond === "satellite" ? " onde--clair" : "";
-      const r = repere(map, lat, lng, `<span class="onde${clair}"></span>`.repeat(3), { classe: "stk-ancre", z: 2, actif: false });
-      window.setTimeout(() => r.remove(), 1150);
-    }
 
     // Le cadrage suit où sont les stickers, pas leur liste : la page la refait
     // à chaque rendu (l'horloge de la convocation en lance un par minute), et
