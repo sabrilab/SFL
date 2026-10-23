@@ -497,7 +497,7 @@ export default function BolaTeamPage() {
                   onClick={() => setJoueur(m)}
                   className="flex items-center gap-2.5 rounded-[18px] bg-card py-1.5 pr-3.5 pl-1.5 text-[13.5px] font-semibold transition-transform active:scale-95"
                 >
-                  <span className="flex rounded-[14px] border-[1.5px] border-dashed border-white/60 p-px opacity-60">
+                  <span className="flex rounded-[14px] border-[1.5px] border-dashed border-contraste/60 p-px opacity-60">
                     <CarteDe name={m.name} size={FORMAT_CARTE.petite} inerte />
                   </span>
                   {prenom(m.name)}

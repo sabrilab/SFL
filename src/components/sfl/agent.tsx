@@ -81,7 +81,7 @@ const Fiche = memo(function Fiche({ dossier }: { dossier: DossierJoueur }) {
         {dossier.stats.map((s, i) => (
           <li key={s.id} className="flex items-center gap-2.5">
             <span className="w-[62px] shrink-0 text-[12.5px] font-semibold text-foreground/60">{s.nom}</span>
-            <span className="relative h-[5px] min-w-0 flex-1 overflow-hidden rounded-full bg-white/[0.08]">
+            <span className="relative h-[5px] min-w-0 flex-1 overflow-hidden rounded-full bg-contraste/[0.08]">
               <span
                 className="absolute inset-y-0 left-0 rounded-full bg-foreground"
                 // La plus basse en dernier, et plus pâle à mesure qu'on descend.
@@ -110,16 +110,16 @@ function CarteVue({ carte, dossier }: { carte: CarteCoach; dossier: DossierJoueu
           {carte.sousTitre && <span className="mt-1 block text-[13px] text-foreground/55">{carte.sousTitre}</span>}
         </div>
         {cible && (
-          <span className="flex shrink-0 items-baseline gap-1 rounded-full border border-white/15 px-2.5 py-1">
+          <span className="flex shrink-0 items-baseline gap-1 rounded-full border border-contraste/15 px-2.5 py-1">
             <span className="text-[11.5px] font-semibold text-foreground/60">{NOMS_STATS[cible.id]}</span>
             <span className="text-[13px] font-bold tabular-nums">{cible.valeur}</span>
           </span>
         )}
       </div>
       {carte.lignes.length > 0 && (
-        <ol className="border-t border-white/[0.07]">
+        <ol className="border-t border-contraste/[0.07]">
           {carte.lignes.map((l, i) => (
-            <li key={i} className="flex items-start gap-3 border-b border-white/[0.07] px-4 py-2.5 last:border-b-0">
+            <li key={i} className="flex items-start gap-3 border-b border-contraste/[0.07] px-4 py-2.5 last:border-b-0">
               {numerotee && <span className="w-4 shrink-0 pt-px text-[13px] font-bold text-foreground/35 tabular-nums">{i + 1}</span>}
               <span className="min-w-0 flex-1">
                 <span className="block text-[14.5px] leading-snug font-semibold">{l.label}</span>
@@ -170,7 +170,7 @@ function ImageVue({ image }: { image: ImageCoach }) {
         type="button"
         onClick={() => src && setGrand(true)}
         aria-label={image.legende || "Agrandir l'image"}
-        className="block aspect-square w-full overflow-hidden rounded-[22px] bg-white/[0.06]"
+        className="block aspect-square w-full overflow-hidden rounded-[22px] bg-contraste/[0.06]"
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- lien signé ou data URL */}
         {src && <img src={src} alt={image.legende} className="size-full object-cover" />}
@@ -186,7 +186,7 @@ function ImageVue({ image }: { image: ImageCoach }) {
             type="button"
             onClick={() => setGrand(false)}
             aria-label="Fermer"
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4"
+            className="dark fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- lien signé ou data URL */}
             <img src={src} alt={image.legende} className="max-h-full max-w-full rounded-[22px]" />

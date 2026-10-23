@@ -330,26 +330,30 @@ function TerrainVu({
   const logo = { l: 46 * centre.k, h: projeter(l / 2, h / 2 + 23).y - projeter(l / 2, h / 2 - 23).y };
   return (
     <div
-      className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
+      className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#ffffff_0%,#e6e8e3_70%)] dark:bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
       style={{ height: CADRE_H }}
     >
       <SolTerrain ombres={places} />
-      {/* Le logo couché au rond central ; en <img>, que html-to-image sait embarquer. */}
-      {/* eslint-disable-next-line @next/next/no-img-element -- photographié par html-to-image */}
-      <img
-        src="/bola/symbole-blanc.svg"
-        alt=""
-        aria-hidden
-        className="absolute"
-        style={{
-          left: `calc(50% - ${logo.l / 2}px)`,
-          top: centre.y - logo.l / 2,
-          width: logo.l,
-          height: logo.l,
-          transform: `scaleY(${logo.h / logo.l})`,
-          opacity: 0.85,
-        }}
-      />
+      {/* Le logo couché au rond central ; en <img>, que html-to-image sait
+          embarquer. Blanc sur la nuit, noir sur le papier du mode clair. */}
+      {["/bola/symbole-blanc.svg", "/bola/symbole-noir.svg"].map((src, i) => (
+        // eslint-disable-next-line @next/next/no-img-element -- photographié par html-to-image
+        <img
+          key={src}
+          src={src}
+          alt=""
+          aria-hidden
+          className={cn("absolute", i === 0 ? "hidden dark:block" : "dark:hidden")}
+          style={{
+            left: `calc(50% - ${logo.l / 2}px)`,
+            top: centre.y - logo.l / 2,
+            width: logo.l,
+            height: logo.l,
+            transform: `scaleY(${logo.h / logo.l})`,
+            opacity: 0.85,
+          }}
+        />
+      ))}
       {places.map(({ p, x, y, k }) => {
         const player = parNom.get(p.nom);
         return (
@@ -366,8 +370,8 @@ function TerrainVu({
               }}
             >
               {/* Ma carte, cerclée d'un vrai cadre. */}
-              <div className={cn("flex rounded-[15px]", p.nom === moi && "bg-white p-[3px]")}>
-                <div className={cn("flex rounded-[12px]", p.nom === moi && "bg-[#1b1d21] p-[2px]")}>
+              <div className={cn("flex rounded-[15px]", p.nom === moi && "bg-[#0a0b0d] p-[3px] dark:bg-white")}>
+                <div className={cn("flex rounded-[12px]", p.nom === moi && "bg-white p-[2px] dark:bg-[#1b1d21]")}>
                   <Pastille
                     player={player}
                     nom={p.nom}
@@ -536,7 +540,9 @@ function ImageFeuille({
   const { terrain: t, basEstA } = sujet;
   const [bas, haut] = basEstA ? [t.a, t.b] : [t.b, t.a];
   return (
+    // Noire dans les deux modes : la classe dark garde au terrain sa nuit.
     <div
+      className="dark"
       style={{
         width: LARGEUR,
         height: HAUTEUR,

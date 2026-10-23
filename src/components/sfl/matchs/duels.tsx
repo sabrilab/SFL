@@ -47,7 +47,7 @@ export function DuelsDuJour({ j }: { j: number | null | undefined }) {
         {duels.map((d, i) => (
           <div
             key={`${d.noirs}-${d.blancs}`}
-            className={cn("flex flex-col gap-2 px-4 py-3", i > 0 && "border-t border-white/8")}
+            className={cn("flex flex-col gap-2 px-4 py-3", i > 0 && "border-t border-contraste/8")}
           >
             <div className="flex items-center gap-2">
               <Cote nom={d.noirs} onglet={NOIRS} />

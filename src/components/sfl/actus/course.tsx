@@ -73,7 +73,7 @@ const SCENES: Actu["type"][] = ["mvp", "chiffre", "duo", "montent", "badge", "ba
 function Dimanche({ j, journee, scenes, ouvrir }: { j: number; journee?: Journee; scenes: Actu[]; ouvrir: () => void }) {
   const [terrain, terrainCollant] = useCollant();
   return (
-    <section className="flex scroll-mt-4 flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-x-[var(--fib-21)] md:gap-y-[var(--fib-21)] md:border-t md:border-white/[0.08] md:pt-[var(--fib-34)] xl:grid-cols-3">
+    <section className="flex scroll-mt-4 flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-x-[var(--fib-21)] md:gap-y-[var(--fib-21)] md:border-t md:border-contraste/[0.08] md:pt-[var(--fib-34)] xl:grid-cols-3">
       <div className="flex items-end justify-between px-5 md:col-span-full md:justify-start md:gap-4 md:px-0">
         <h2
           className="text-[22px] leading-none tracking-tight md:text-[34px]"
@@ -276,20 +276,25 @@ function Convocation({ className }: { className?: string }) {
   const p = usePresence();
   const repondre = (r: "present" | "absent") => p.answer(p.mine === r ? null : r);
   return (
-    <section className={cn("mx-4 flex flex-col gap-4 overflow-hidden rounded-[28px] bg-black p-5 text-white md:mx-0 md:rounded-3xl", className)}>
+    <section
+      className={cn(
+        "mx-4 flex flex-col gap-4 overflow-hidden rounded-[28px] bg-white p-5 text-foreground shadow-[0_14px_34px_-18px_rgba(20,12,4,0.35)] ring-1 ring-foreground/[0.05] md:mx-0 md:rounded-3xl dark:bg-black dark:text-white dark:shadow-none dark:ring-0",
+        className,
+      )}
+    >
       <div className="flex items-end gap-4">
         <span className="text-[64px] leading-[0.8]" style={{ fontFamily: ANTON }}>
           J{p.journee}
         </span>
         <span className="flex min-w-0 flex-col pb-0.5">
           <span className="text-[16px] font-bold">{p.jour}</span>
-          <span className="truncate text-[12.5px] text-white/55">
+          <span className="truncate text-[12.5px] text-foreground/55 dark:text-white/55">
             {p.heure} · {p.lieu}
           </span>
         </span>
       </div>
       <div className="flex items-baseline justify-between">
-        <span className="mono-label text-white/50">
+        <span className="mono-label text-foreground/50 dark:text-white/50">
           {p.presents.length} {p.presents.length > 1 ? "viennent" : "vient"}
         </span>
       </div>
@@ -303,7 +308,11 @@ function Convocation({ className }: { className?: string }) {
             onClick={() => repondre(r)}
             className={cn(
               "rounded-full py-3 text-[14px] font-bold transition-colors disabled:opacity-40",
-              p.mine === r ? (r === "present" ? "bg-primary text-black" : "bg-white text-black") : "bg-white/10",
+              p.mine === r
+                ? r === "present"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-foreground text-background"
+                : "bg-foreground/[0.07] dark:bg-white/10",
             )}
           >
             {r === "present" ? "Je viens" : "Je passe"}

@@ -116,7 +116,7 @@ export function Synchro({ saison }: { saison: Saison }) {
         <span
           className={cn(
             "mono-label shrink-0 rounded-full px-2.5 py-1",
-            partage ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"
+            partage ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-amber-500/15 text-amber-700 dark:text-amber-400"
           )}
         >
           {partage ? "Partagé" : "Local"}
@@ -131,7 +131,7 @@ export function Synchro({ saison }: { saison: Saison }) {
           deux cas. */}
       {envoi && !envoi.ok && (
         <div className="mt-2.5 rounded-2xl border border-red-500/25 bg-red-500/8 px-3 py-2.5">
-          <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-red-300">
+          <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-red-600 dark:text-red-300">
             <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
             <span>
               <b className="font-semibold">Ta dernière sauvegarde n&apos;est pas partie en base.</b>{" "}
@@ -141,14 +141,14 @@ export function Synchro({ saison }: { saison: Saison }) {
         </div>
       )}
       {!envoi && enAttente && (
-        <p className="mt-1.5 flex items-start gap-1.5 text-[12.5px] leading-snug text-amber-400">
+        <p className="mt-1.5 flex items-start gap-1.5 text-[12.5px] leading-snug text-amber-700 dark:text-amber-400">
           <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
           Des saisies ne sont pas encore publiées. Elles partiront d&apos;elles-mêmes dès que ta
           session serveur sera rétablie.
         </p>
       )}
       {envoi?.ok && (
-        <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] text-emerald-400">
+        <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] text-emerald-700 dark:text-emerald-400">
           <Check className="size-3.5 shrink-0" />
           Dernière sauvegarde publiée à {quand(envoi.at)}.
         </p>
@@ -174,14 +174,14 @@ export function Synchro({ saison }: { saison: Saison }) {
       </div>
 
       {empeche && (
-        <p className="mt-2.5 flex items-start gap-1.5 text-[12.5px] leading-snug text-amber-400/90">
+        <p className="mt-2.5 flex items-start gap-1.5 text-[12.5px] leading-snug text-amber-700/90 dark:text-amber-400/90">
           <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
           {empeche}
         </p>
       )}
 
       {etat.phase === "ok" && (
-        <p className="mt-2.5 flex items-start gap-1.5 text-[12.5px] leading-snug text-emerald-400">
+        <p className="mt-2.5 flex items-start gap-1.5 text-[12.5px] leading-snug text-emerald-700 dark:text-emerald-400">
           <Check className="mt-[2px] size-3.5 shrink-0" />
           {etat.message}
         </p>
@@ -189,7 +189,7 @@ export function Synchro({ saison }: { saison: Saison }) {
 
       {etat.phase === "erreur" && (
         <div className="mt-2.5 rounded-2xl border border-red-500/25 bg-red-500/8 px-3 py-2.5">
-          <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-red-300">
+          <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-red-600 dark:text-red-300">
             <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
             <span>
               <b className="font-semibold">Publication impossible.</b> {etat.message}
@@ -219,13 +219,13 @@ export function Synchro({ saison }: { saison: Saison }) {
       </button>
 
       {etapes && (
-        <div className="mt-2.5 flex flex-col gap-1.5 rounded-2xl bg-white/4 px-3 py-2.5">
+        <div className="mt-2.5 flex flex-col gap-1.5 rounded-2xl bg-contraste/4 px-3 py-2.5">
           {etapes.map((e) => (
             <div key={e.titre} className="flex items-start gap-2">
               <span
                 className={cn(
                   "mt-[3px] flex size-3.5 shrink-0 items-center justify-center rounded-full text-[9px] font-black",
-                  e.ok ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+                  e.ok ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400" : "bg-red-500/20 text-red-600 dark:text-red-400"
                 )}
               >
                 {e.ok ? "✓" : "✕"}
@@ -239,7 +239,7 @@ export function Synchro({ saison }: { saison: Saison }) {
         </div>
       )}
 
-      <p className="mt-3 border-t border-white/8 pt-2.5 text-[11.5px] leading-relaxed text-foreground/30">
+      <p className="mt-3 border-t border-contraste/8 pt-2.5 text-[11.5px] leading-relaxed text-foreground/30">
         « Reprendre la base » remplace la saison de cet appareil par celle que voit la ligue.
         À utiliser quand une saisie a dérapé — puis corrige et republie.
       </p>

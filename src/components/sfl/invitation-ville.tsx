@@ -95,7 +95,7 @@ export function InvitationVille({
       role="dialog"
       aria-modal="true"
       aria-labelledby={titre}
-      className="fixed inset-0 z-[55] overflow-y-auto overscroll-contain bg-black/92 backdrop-blur-sm"
+      className="dark fixed inset-0 z-[55] overflow-y-auto overscroll-contain bg-black/92 text-foreground backdrop-blur-sm"
       style={{
         paddingTop: "env(safe-area-inset-top)",
         paddingBottom: "env(safe-area-inset-bottom)",

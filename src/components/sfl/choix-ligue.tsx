@@ -67,7 +67,7 @@ export function EnteteLigue({ actif, className }: { actif: Actif; className?: st
           <nav
             role="menu"
             aria-label="Ligue"
-            className="absolute top-full left-0 z-50 mt-2 flex min-w-[200px] flex-col rounded-[20px] border border-white/10 bg-popover/95 p-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+            className="absolute top-full left-0 z-50 mt-2 flex min-w-[200px] flex-col rounded-[20px] border border-foreground/10 bg-popover/95 p-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.45)] backdrop-blur-xl"
           >
             {liens.map((l) => (
               <Link
@@ -78,7 +78,7 @@ export function EnteteLigue({ actif, className }: { actif: Actif; className?: st
                 onClick={() => setOuvert(false)}
                 className={cn(
                   "flex h-12 items-center rounded-[14px] px-3.5 transition-colors",
-                  actif === l.href ? "bg-white/[0.08] text-foreground" : "text-foreground/60"
+                  actif === l.href ? "bg-foreground/[0.08] text-foreground" : "text-foreground/60"
                 )}
               >
                 <SigleLigue ligue={l.ligue} hauteur={16} />

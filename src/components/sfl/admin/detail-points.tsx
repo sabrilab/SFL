@@ -117,7 +117,7 @@ export function DetailPoints({ saison }: { saison: Saison }) {
 
       {detail && joueur && (
         <div className="mt-4">
-          <div className="flex items-baseline justify-between gap-3 border-b border-white/10 pb-2.5">
+          <div className="flex items-baseline justify-between gap-3 border-b border-contraste/10 pb-2.5">
             <span className="text-[15px] font-bold tracking-tight">{joueur}</span>
             <span className="flex items-baseline gap-1.5">
               <span className="text-[22px] font-extrabold tabular-nums">{detail.total}</span>
@@ -126,7 +126,7 @@ export function DetailPoints({ saison }: { saison: Saison }) {
           </div>
 
           {detail.absentes.length > 0 && (
-            <p className="mt-2.5 flex items-start gap-1.5 rounded-2xl bg-amber-500/10 px-3 py-2 text-[12.5px] leading-snug text-amber-300">
+            <p className="mt-2.5 flex items-start gap-1.5 rounded-2xl bg-amber-500/10 px-3 py-2 text-[12.5px] leading-snug text-amber-700 dark:text-amber-300">
               <AlertCircle className="mt-[2px] size-3.5 shrink-0" />
               <span>
                 Aucune ligne en {detail.absentes.map((j) => `J${j}`).join(", ")}.{" "}
@@ -146,7 +146,7 @@ export function DetailPoints({ saison }: { saison: Saison }) {
                 <div
                   key={r.j}
                   className={cn(
-                    "flex gap-3 border-b border-white/6 py-2.5 last:border-0",
+                    "flex gap-3 border-b border-contraste/6 py-2.5 last:border-0",
                     vide && "opacity-45"
                   )}
                 >
@@ -155,7 +155,7 @@ export function DetailPoints({ saison }: { saison: Saison }) {
                   </span>
                   <span className="min-w-0 flex-1">
                     {vide ? (
-                      <span className="text-[13px] text-amber-300/80">aucune ligne</span>
+                      <span className="text-[13px] text-amber-700/80 dark:text-amber-300/80">aucune ligne</span>
                     ) : (
                       r.lignes.map((l, i) => (
                         <span key={i} className="block text-[12.5px] leading-snug text-foreground/60">

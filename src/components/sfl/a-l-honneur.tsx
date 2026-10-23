@@ -7,9 +7,9 @@
 // rien ne l'explique ; puis « de vraies scènes 3D, avec de la perspective, la
 // carte sur le côté, un peu de data ».
 //
-// Chaque section est une petite scène sur un plateau sombre (sol qui fuit
-// vers l'horizon, projecteur, pelouse en perspective), comme la carte, qui ne
-// suit pas le thème de l'app. Les cartes, elles, sont toujours de face, à
+// Chaque section est une petite scène sur un plateau (sol qui fuit vers
+// l'horizon, projecteur, pelouse en perspective) : un studio noir en mode
+// sombre, un studio blanc en mode clair (globals.css, --studio-*). Les cartes, elles, sont toujours de face, à
 // leur vrai rapport 1 × φ : jamais tournées au repos, jamais écrasées ni
 // coupées (Sabri, 18/10 : « ne déforme pas la carte »).
 //   · l'homme du dimanche : la grande carte sous un projecteur, les chiffres
@@ -62,7 +62,7 @@ const unite = (id: TropheeId, n: number) => (n > 1 ? DEF[id].unite[1] : DEF[id].
 /** Un plateau : fond de studio, projecteur, sol quadrillé qui fuit vers l'horizon. */
 function Scene({
   hauteur,
-  lumiere = "rgba(255,255,255,0.16)",
+  lumiere = "var(--studio-lumiere)",
   horizon = 0.62,
   sol = true,
   className,
@@ -81,12 +81,13 @@ function Scene({
 }) {
   return (
     <div
-      className={cn("relative isolate overflow-hidden rounded-[26px] text-white", className)}
+      className={cn("relative isolate overflow-hidden rounded-[26px] text-contraste", className)}
       style={{
         height: hauteur,
         perspective: 900,
         perspectiveOrigin: `50% ${Math.round(horizon * 100) - 22}%`,
-        background: `radial-gradient(120% 70% at 50% 0%, ${lumiere} 0%, transparent 60%), linear-gradient(180deg, #17181d 0%, #0b0c0f 62%, #050506 100%)`,
+        background: `radial-gradient(120% 70% at 50% 0%, ${lumiere} 0%, transparent 60%), var(--studio-fond)`,
+        boxShadow: "var(--studio-cadre)",
         ...style,
       }}
     >
@@ -101,7 +102,7 @@ function Scene({
             height: 700,
             transformOrigin: "50% 0%",
             transform: "rotateX(84deg)",
-            background: `radial-gradient(40% 30% at 50% 6%, ${lumiere} 0%, transparent 100%), repeating-linear-gradient(90deg, rgba(255,255,255,0.07) 0 1px, transparent 1px 44px), repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 44px)`,
+            background: `radial-gradient(40% 30% at 50% 6%, ${lumiere} 0%, transparent 100%), repeating-linear-gradient(90deg, var(--studio-grille-1) 0 1px, transparent 1px 44px), repeating-linear-gradient(0deg, var(--studio-grille-2) 0 1px, transparent 1px 44px)`,
             maskImage: "linear-gradient(180deg, #000 0%, transparent 70%)",
             WebkitMaskImage: "linear-gradient(180deg, #000 0%, transparent 70%)",
           }}
@@ -117,9 +118,9 @@ function Scene({
 function Titre({ children, j, partage }: { children: string; j?: number; partage?: PieceLigue["lignes"] }) {
   return (
     <>
-      <h2 className="absolute top-[var(--fib-13)] left-[var(--fib-21)] z-10 text-[15px] font-bold tracking-tight text-white/90">
+      <h2 className="absolute top-[var(--fib-13)] left-[var(--fib-21)] z-10 text-[15px] font-bold tracking-tight text-contraste/90">
         {children}
-        {j != null && <span className="text-white/40"> · J{j}</span>}
+        {j != null && <span className="text-contraste/40"> · J{j}</span>}
       </h2>
       {partage && partage.length > 0 && (
         <AuVestiaireRond
@@ -138,7 +139,7 @@ function Chiffre({ n, label, taille = 55, couleur }: { n: ReactNode; label: stri
       <span style={{ fontFamily: ANTON, fontSize: taille, lineHeight: 0.9, color: couleur }} className="tabular-nums">
         {n}
       </span>
-      <span className="mono-label mt-1 text-[9px] text-white/45">{label}</span>
+      <span className="mono-label mt-1 text-[9px] text-contraste/45">{label}</span>
     </div>
   );
 }
@@ -153,7 +154,7 @@ function Ombre({ largeur }: { largeur: number }) {
         bottom: -largeur * 0.06,
         width: largeur * 1.2,
         height: largeur * 0.16,
-        background: "radial-gradient(closest-side, rgba(0,0,0,0.75), transparent)",
+        background: "radial-gradient(closest-side, var(--studio-ombre), transparent)",
       }}
     />
   );
@@ -189,19 +190,25 @@ function Pelouse({ surface = false, haut = "72%" }: { surface?: boolean; haut?: 
     return { d: `M ${x(0, v0)} ${v0 * 100} L ${x(1, v0)} ${v0 * 100} L ${x(1, v1)} ${v1 * 100} L ${x(0, v1)} ${v1 * 100} Z`, clair: i % 2 === 0 };
   });
   return (
-    <svg aria-hidden viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-x-0 bottom-0 w-full" style={{ height: haut }}>
+    <svg
+      aria-hidden
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      className="pointer-events-none absolute inset-x-0 bottom-0 w-full"
+      style={{ height: haut, maskImage: "var(--studio-pelouse-masque)", WebkitMaskImage: "var(--studio-pelouse-masque)" }}
+    >
       <defs>
         <linearGradient id="pelouse-fondu" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#0b0c0f" stopOpacity="1" />
+          <stop offset="0" style={{ stopColor: "var(--studio-fondu-haut)", stopOpacity: "var(--studio-fondu-haut-a)" }} />
           <stop offset="0.3" stopColor="#0b0c0f" stopOpacity="0" />
           <stop offset="0.85" stopColor="#050506" stopOpacity="0" />
-          <stop offset="1" stopColor="#050506" stopOpacity="0.9" />
+          <stop offset="1" style={{ stopColor: "var(--studio-fondu-bas)", stopOpacity: "var(--studio-fondu-bas-a)" }} />
         </linearGradient>
       </defs>
       {bandes.map((b, i) => (
-        <path key={i} d={b.d} fill={b.clair ? "#1a3a22" : "#163220"} />
+        <path key={i} d={b.d} style={{ fill: b.clair ? "var(--studio-herbe-1)" : "var(--studio-herbe-2)" }} />
       ))}
-      <g fill="none" stroke="rgba(255,255,255,0.42)" strokeWidth="1.2" vectorEffect="non-scaling-stroke">
+      <g fill="none" strokeWidth="1.2" vectorEffect="non-scaling-stroke" style={{ stroke: "var(--studio-craie)" }}>
         <path d={cadre(0.02, 0.02, 0.98, 1.2)} vectorEffect="non-scaling-stroke" />
         {surface ? (
           <>
@@ -230,12 +237,12 @@ function Joueur({ p, size, moi, detail, chiffre, dessus }: { p: Player; size: nu
         <MiniCarte player={p} size={size} detail={detail} />
       </div>
       <span
-        className={cn("titre-lettrage mt-[var(--fib-8)] w-full text-center leading-[1.05] tracking-[-0.02em] break-words", moi ? "text-primary" : "text-white")}
+        className={cn("titre-lettrage mt-[var(--fib-8)] w-full text-center leading-[1.05] tracking-[-0.02em] break-words", moi ? "text-primary" : "text-contraste")}
         style={{ fontSize: size >= MOYENNE ? 13 : 10.5 }}
       >
         {p.name}
       </span>
-      {chiffre && <span className="mono-label mt-0.5 text-[9px] text-white/55 tabular-nums">{chiffre}</span>}
+      {chiffre && <span className="mono-label mt-0.5 text-[9px] text-contraste/55 tabular-nums">{chiffre}</span>}
     </div>
   );
 }
@@ -439,7 +446,7 @@ function HommeDuDimanche({ j, m, p, moi }: { j: number; m: Mvp; p: Player; moi: 
             left: 0,
             width: largeur + 60,
             height: "100%",
-            background: "linear-gradient(180deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0) 85%)",
+            background: "linear-gradient(180deg, var(--studio-cone) 0%, transparent 85%)",
             clipPath: "polygon(38% 0, 62% 0, 100% 100%, 0 100%)",
           }}
         />
@@ -453,13 +460,13 @@ function HommeDuDimanche({ j, m, p, moi }: { j: number; m: Mvp; p: Player; moi: 
         </div>
         {/* Les chiffres du jour. */}
         <div className="absolute flex flex-col items-end gap-[var(--fib-13)]" style={{ right: 20, top: 52 }}>
-          <span className="mono-label text-[9px] text-[#ffc75a]">MVP</span>
+          <span className="mono-label text-[9px] text-[#9a6b12] dark:text-[#ffc75a]">MVP</span>
           {m.buts > 0 && <Chiffre n={m.buts} label={unite("buts", m.buts)} />}
           {m.passes > 0 && <Chiffre n={m.passes} label={unite("passes", m.passes)} taille={m.buts ? 34 : 55} />}
-          <Chiffre n={`+${m.pp}`} label="pts" taille={34} couleur="rgba(255,255,255,0.55)" />
+          <Chiffre n={`+${m.pp}`} label="pts" taille={34} couleur="rgb(var(--contraste-rgb) / 0.55)" />
         </div>
         <span
-          className={cn("titre-lettrage absolute right-5 bottom-[var(--fib-13)] max-w-[40%] text-[16px] leading-none break-words text-right", m.nom === moi ? "text-primary" : "text-white")}
+          className={cn("titre-lettrage absolute right-5 bottom-[var(--fib-13)] max-w-[40%] text-[16px] leading-none break-words text-right", m.nom === moi ? "text-primary" : "text-contraste")}
         >
           {m.nom}
         </span>
@@ -489,10 +496,10 @@ function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player 
         <div className="absolute inset-x-0 bottom-[var(--fib-13)] flex justify-center gap-[var(--fib-34)]">
           {deux.map((m) => (
             <div key={m.nom} className="flex flex-col items-center" style={{ width: W(MOYENNE) }}>
-              <span className={cn("titre-lettrage max-w-full text-center text-[13px] leading-none tracking-[-0.02em] break-words", m.nom === moi ? "text-primary" : "text-white")}>
+              <span className={cn("titre-lettrage max-w-full text-center text-[13px] leading-none tracking-[-0.02em] break-words", m.nom === moi ? "text-primary" : "text-contraste")}>
                 {m.nom}
               </span>
-              <span className="mono-label text-[9px] text-white/45 tabular-nums">
+              <span className="mono-label text-[9px] text-contraste/45 tabular-nums">
                 {[m.buts && `${m.buts} ${unite("buts", m.buts)}`, m.passes && `${m.passes} ${unite("passes", m.passes)}`, `+${m.pp} pts`].filter(Boolean).join(" · ")}
               </span>
             </div>
@@ -507,6 +514,7 @@ function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player 
  * Un badge tombé ce dimanche. Noir mat, sans décor (Sabri, 18/10 : la
  * vitrine voûtée ne lui plaisait pas) : la carte à gauche, le badge et son
  * chiffre à droite. Noir et blanc strict, seul le badge garde son métal.
+ * Blanc mat en mode clair, comme le studio (globals.css, .vitrine-mate).
  */
 function Vitrine({ d, p }: { d: { nom: string; id: TropheeId; palier: number }; p: Player }) {
   const def = DEF[d.id];
@@ -517,7 +525,7 @@ function Vitrine({ d, p }: { d: { nom: string; id: TropheeId; palier: number }; 
   const badge = largeur / PHI;
   return (
     <div
-      className="relative flex shrink-0 snap-start gap-[var(--fib-21)] rounded-[21px] border border-white/[0.08] bg-[#0a0a0b] p-[var(--fib-21)] text-white"
+      className="vitrine-mate relative flex shrink-0 snap-start gap-[var(--fib-21)] rounded-[21px] p-[var(--fib-21)]"
       style={{ height: hauteur + 42 }}
     >
       <Manipulable pose={0}>
@@ -527,12 +535,12 @@ function Vitrine({ d, p }: { d: { nom: string; id: TropheeId; palier: number }; 
         <span className="honneur-flotte pointer-events-none block self-center">
           <Badge3D badge={{ famille: "palier", id: d.id, palier: d.palier }} largeur={badge} />
         </span>
-        <div className="flex flex-col border-t border-white/10 pt-[var(--fib-13)]">
+        <div className="flex flex-col border-t border-contraste/10 pt-[var(--fib-13)]">
           <span style={{ fontFamily: ANTON, fontSize: 55, lineHeight: 0.85 }} className="tabular-nums">
             {seuil}
           </span>
-          <span className="mono-label mt-[var(--fib-8)] text-[9px] text-white/55">{unite(d.id, seuil)}</span>
-          <span className="mono-label text-[9px] text-white/30">{NOM_METAL[m]}</span>
+          <span className="mono-label mt-[var(--fib-8)] text-[9px] text-contraste/55">{unite(d.id, seuil)}</span>
+          <span className="mono-label text-[9px] text-contraste/30">{NOM_METAL[m]}</span>
         </div>
       </div>
     </div>
@@ -554,7 +562,7 @@ function EquipeType({ j, equipe, moi }: { j: number; equipe: { nom: string; pp: 
   );
   return (
     <section>
-      <Scene sol={false} lumiere="rgba(160,255,190,0.10)">
+      <Scene sol={false} lumiere="var(--studio-lumiere-verte)">
         <Pelouse haut="86%" />
         <Titre j={j} partage={[...equipe].sort((a, b) => b.pp - a.pp).map((e) => ({ n: e.nom, v: `+${e.pp} pts` }))}>
           L&apos;équipe type
@@ -587,7 +595,7 @@ function Duo({ j, duo, passeur, buteur, moi }: { j: number; duo: { passeur: stri
         >
           Le duo
         </Titre>
-        <svg aria-hidden viewBox="0 0 100 40" preserveAspectRatio="none" className="pointer-events-none absolute inset-x-[18%] top-[50px] h-[70px] text-white/50">
+        <svg aria-hidden viewBox="0 0 100 40" preserveAspectRatio="none" className="pointer-events-none absolute inset-x-[18%] top-[50px] h-[70px] text-contraste/50">
           <path d="M 4 38 Q 50 -14 96 38" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />
         </svg>
         <span className="absolute top-[46px] left-1/2 -translate-x-1/2 tabular-nums" style={{ fontFamily: ANTON, fontSize: 34, lineHeight: 1 }}>
@@ -607,10 +615,10 @@ function Duo({ j, duo, passeur, buteur, moi }: { j: number; duo: { passeur: stri
             { nom: duo.buteur, label: unite("buts", duo.n) },
           ].map((x) => (
             <div key={x.nom} className="flex flex-col items-center" style={{ width: W(MOYENNE) }}>
-              <span className={cn("titre-lettrage max-w-full text-center text-[13px] leading-none tracking-[-0.02em] break-words", x.nom === moi ? "text-primary" : "text-white")}>
+              <span className={cn("titre-lettrage max-w-full text-center text-[13px] leading-none tracking-[-0.02em] break-words", x.nom === moi ? "text-primary" : "text-contraste")}>
                 {x.nom}
               </span>
-              <span className="mono-label text-[9px] text-white/45">{x.label}</span>
+              <span className="mono-label text-[9px] text-contraste/45">{x.label}</span>
             </div>
           ))}
         </div>
@@ -642,13 +650,13 @@ function IlsMontent({ montent, moi }: { montent: { nom: string; gain: number; ra
                 <div className="relative w-full">
                   <div
                     className="flex w-full flex-col items-center justify-start pt-1.5"
-                    style={{ height: haut, background: "linear-gradient(180deg, #2a2c33 0%, #101115 100%)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22)" }}
+                    style={{ height: haut, background: "var(--studio-marche)", boxShadow: "var(--studio-marche-reflet)" }}
                   >
                     <span className="text-primary tabular-nums" style={{ fontFamily: ANTON, fontSize: 21, lineHeight: 1 }}>
                       ▲{m.gain}
                     </span>
-                    <span className={cn("mt-0.5 max-w-full px-1 text-center text-[10px] leading-tight font-semibold break-words", m.nom === moi ? "text-primary" : "text-white/75")}>{m.nom}</span>
-                    <span className="mono-label text-[8.5px] text-white/40 tabular-nums">{m.rang}e</span>
+                    <span className={cn("mt-0.5 max-w-full px-1 text-center text-[10px] leading-tight font-semibold break-words", m.nom === moi ? "text-primary" : "text-contraste/75")}>{m.nom}</span>
+                    <span className="mono-label text-[8.5px] text-contraste/40 tabular-nums">{m.rang}e</span>
                   </div>
                 </div>
               </div>
@@ -664,7 +672,7 @@ function IlsMontent({ montent, moi }: { montent: { nom: string; gain: number; ra
 function Surface({ surface, moi }: { surface: { nom: string; id: TropheeId; reste: number; p: Player }[]; moi: string }) {
   return (
     <section>
-      <Scene sol={false} lumiere="rgba(160,255,190,0.08)">
+      <Scene sol={false} lumiere="var(--studio-lumiere-surface)">
         <Pelouse surface />
         <Titre partage={surface.map((s) => ({ n: s.nom, v: `${DEF[s.id].nom} dans ${s.reste} ${unite(s.id, s.reste)}` }))}>
           Dans la surface
@@ -672,10 +680,12 @@ function Surface({ surface, moi }: { surface: { nom: string; id: TropheeId; rest
         {/* Le but, au fond de la surface. */}
         <div
           aria-hidden
-          className="absolute left-1/2 h-[34px] w-[89px] -translate-x-1/2 rounded-t-[2px] border-[2.5px] border-b-0 border-white/85"
+          className="absolute left-1/2 h-[34px] w-[89px] -translate-x-1/2 rounded-t-[2px] border-[2.5px] border-b-0"
           style={{
             top: 52,
-            background: "repeating-linear-gradient(90deg, rgba(255,255,255,0.16) 0 1px, transparent 1px 6px), repeating-linear-gradient(0deg, rgba(255,255,255,0.16) 0 1px, transparent 1px 6px)",
+            borderColor: "var(--studio-but)",
+            filter: "var(--studio-but-cerne)",
+            background: "repeating-linear-gradient(90deg, var(--studio-filet) 0 1px, transparent 1px 6px), repeating-linear-gradient(0deg, var(--studio-filet) 0 1px, transparent 1px 6px)",
           }}
         />
         <div className="relative flex items-end justify-center gap-[var(--fib-13)] px-[var(--fib-13)] pt-[118px] pb-[var(--fib-21)]">

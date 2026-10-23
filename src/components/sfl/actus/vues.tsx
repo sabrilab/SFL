@@ -94,10 +94,10 @@ export function VueClassements({ vote }: { vote?: React.ReactNode }) {
                       className="flex h-[30px] flex-1 items-center justify-center rounded-[9px]"
                       style={
                         r === "V"
-                          ? { background: "var(--primary)", color: "#0A0B0E" }
+                          ? { background: "var(--primary)", color: "var(--primary-foreground)" }
                           : r === "N"
-                            ? { background: "rgba(255,255,255,0.14)", color: "#fff" }
-                            : { background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.45)" }
+                            ? { background: "rgb(var(--foreground-rgb) / 0.14)", color: "var(--foreground)" }
+                            : { background: "rgb(var(--foreground-rgb) / 0.06)", color: "rgb(var(--foreground-rgb) / 0.45)" }
                       }
                     >
                       <span className="mono-label">{r}</span>

@@ -1397,7 +1397,7 @@ function FicheTeam({ t }: { t: MatchTeam }) {
   );
   return (
     <>
-      <div className="flex items-start gap-3 rounded-[22px] bg-white/[0.04] px-3 py-5">
+      <div className="flex items-start gap-3 rounded-[22px] bg-contraste/[0.04] px-3 py-5">
         {cote(t.de)}
         <span className="mt-6 text-[22px] font-black text-muted-foreground">–</span>
         {cote(t.a)}
