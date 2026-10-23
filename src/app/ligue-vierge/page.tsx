@@ -94,7 +94,7 @@ function MatchJoue({ m }: { m: MatchCompte }) {
         <span className="mono-label text-foreground/40">
           {libelleJour(m.jour)} · {m.heure}
         </span>
-        {!m.valide && <span className="mono-label text-foreground/40">{m.genre === "exhibition" ? "Exhibition" : "Amical"}</span>}
+        {!m.valide && <span className="mono-label text-foreground/40">Amical</span>}
       </div>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
         <span className="mono-label text-muted-foreground">Clairs</span>

@@ -22,7 +22,6 @@ import { supabase } from "@/lib/supabase";
 import type { MatchBola } from "@/lib/sfl/ligue-vierge";
 
 export type Visibilite = "public" | "prive";
-export type Genre = "match" | "exhibition";
 export type Moment = "matin" | "apres-midi" | "soir";
 
 export const MOMENTS: { id: Moment; libelle: string }[] = [
@@ -47,7 +46,6 @@ export interface Partie {
   id: number;
   organisateurId: string;
   organisateur: string;
-  genre: Genre;
   visibilite: Visibilite;
   /** ISO, « 2026-10-20 ». */
   jour: string;
@@ -107,7 +105,6 @@ const un = <T,>(v: Un<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
 interface LigneMatch {
   id: number;
   organisateur: string;
-  genre: Genre;
   visibilite: Visibilite;
   jour: string;
   heure: string;
@@ -131,14 +128,13 @@ interface LigneMatch {
 }
 
 const COLONNES =
-  "id, organisateur, genre, visibilite, jour, heure, lieu, adresse, lat, lng, places, score_clairs, score_fonces, saisi_le, orga:profiles!matchs_organisateur_fkey ( name ), match_joueurs ( player_id, statut, equipe, buts, passes, profiles ( name ) )";
+  "id, organisateur, visibilite, jour, heure, lieu, adresse, lat, lng, places, score_clairs, score_fonces, saisi_le, orga:profiles!matchs_organisateur_fkey ( name ), match_joueurs ( player_id, statut, equipe, buts, passes, profiles ( name ) )";
 
 function versPartie(m: LigneMatch): Partie {
   return {
     id: m.id,
     organisateurId: m.organisateur,
     organisateur: un(m.orga)?.name ?? "—",
-    genre: m.genre,
     visibilite: m.visibilite,
     jour: m.jour,
     heure: m.heure,
@@ -225,7 +221,6 @@ export async function lireLigueVierge(): Promise<MatchBola[]> {
 }
 
 export interface NouvellePartie {
-  genre: Genre;
   visibilite: Visibilite;
   jour: string;
   heure: string;
@@ -246,7 +241,6 @@ export async function ouvrirPartie(n: NouvellePartie): Promise<number> {
   const { data, error } = await sb
     .from("matchs")
     .insert({
-      genre: n.genre,
       visibilite: n.visibilite,
       jour: n.jour,
       heure: n.heure,
@@ -275,7 +269,6 @@ export async function ouvrirPartie(n: NouvellePartie): Promise<number> {
 
 /** Ce que l'organisateur change après coup : quand, où, combien, pour qui. */
 export interface ReglagesPartie {
-  genre: Genre;
   visibilite: Visibilite;
   jour: string;
   heure: string;

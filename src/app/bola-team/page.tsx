@@ -482,7 +482,6 @@ export default function BolaTeamPage() {
             unCamp
             moi={moiNom}
             occupants={occupants}
-            toucher="voir"
             onPlus={peutInviter ? ouvrirChoix : undefined}
             onOccupant={(o) => {
               const m = mienne.membres.find((x) => x.id === o.cle);

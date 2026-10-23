@@ -1230,7 +1230,7 @@ function CarteMatch({
               <span className="min-w-0 truncate">
                 {heureCourte(m.heure)} ·{" "}
                 {m.partie
-                  ? `${m.partie.genre === "exhibition" ? "Exhibition" : m.partie.visibilite === "prive" ? "Privé" : "Public"} · ${m.partie.organisateur}`
+                  ? `${m.partie.visibilite === "prive" ? "Privé" : "Public"} · ${m.partie.organisateur}`
                   : m.team
                     ? `${m.team.de.nom} – ${m.team.a.nom}`
                     : `${m.j != null ? `J${m.j} · ` : ""}Sunday Five`}
