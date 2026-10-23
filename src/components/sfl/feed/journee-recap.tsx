@@ -77,6 +77,7 @@ import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
 import { LISERE_CAMP, PastilleMaillot, PointMaillot } from "@/components/sfl/point-maillot";
 import { MAILLOTS, campDuJour, numeroDu, vainqueurDu } from "@/lib/sfl/maillots";
+import { Visages } from "@/components/sfl/suivre";
 
 /* ----------------------------- Réactions ------------------------------ */
 // Réactions locales à l'appareil (le multi-joueurs attend les comptes) :
@@ -155,6 +156,13 @@ function ModuleTitle({ label, title, partage }: { label?: string; title: string;
 function Avatar({ name }: { name: string; size?: number }) {
   return <CarteDe name={name} />;
 }
+
+/**
+ * La pastille « Bientôt », à cheval sur le bord du haut : elle ne couvre
+ * jamais le texte de ce qui arrive (Sabri, 23/10 : pas de superpositions
+ * incohérentes).
+ */
+const BIENTOT_DESSUS = "-top-3 right-3";
 
 /* ------------------------------- Le récap ------------------------------- */
 
@@ -346,11 +354,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
       <Reveal>
         <div className="glass-soft flex items-center justify-between gap-3 rounded-full px-3.5 py-2.5">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex -space-x-1.5">
-              {participants.slice(0, 4).map((n) => (
-                <Avatar key={n} name={n} size={24} />
-              ))}
-            </div>
+            <Visages noms={participants.slice(0, 4)} />
             <span className="truncate text-[12.5px] text-foreground/60">
               {participants.slice(0, 2).join(", ")} et {participants.length - 2} autres ont joué
             </span>
@@ -491,7 +495,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                   Le score du jour, prêt à partir en story — le pont entre la
                   ligue et vos réseaux.
                 </p>
-                <Locked label="Bientôt">
+                <Locked label="Bientôt" chipClassName={BIENTOT_DESSUS}>
                   <div className="rounded-full bg-foreground py-3 text-center text-sm font-bold text-background">
                     Partager en story
                   </div>
@@ -909,7 +913,8 @@ function JourneeRecapComplet({ j }: { j: number }) {
               <ReactionRow id={`j${lastJ.j}-moment`} />
               <Locked
                 label="Bientôt"
-                className="w-full"
+                className="mt-1 w-full"
+                chipClassName={BIENTOT_DESSUS}
                 note="Les commentaires ouvriront avec les comptes joueurs."
               >
                 <div className="rounded-3xl bg-card p-4">
@@ -998,7 +1003,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
       <Reveal>
         <section>
           <ModuleTitle label="Filmés par le vestiaire" title="Les clips de la journée" />
-          <Locked label="Bientôt" note="Les vidéos du dimanche arrivent avec l'upload et l'identification des joueurs.">
+          <Locked label="Bientôt" chipClassName={BIENTOT_DESSUS} note="Les vidéos du dimanche arrivent avec l'upload et l'identification des joueurs.">
             <div className="flex gap-2.5">
               {["La reprise de la 88e", "Le double contact", "L'arrêt du siècle"].map((t) => (
                 <div
@@ -1033,7 +1038,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
               Le duo qui a fait la journée
             </h2>
             <div className="mt-3 flex items-center gap-3">
-              <div className="flex -space-x-2">
+              <div className="flex shrink-0 gap-1.5">
                 {duo.best.map((e) => (
                   <Avatar key={e.player} name={e.player} size={34} />
                 ))}
@@ -1087,7 +1092,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
       <Reveal>
         <section>
           <ModuleTitle title="Le but du match" />
-          <Locked label="Bientôt">
+          <Locked label="Bientôt" chipClassName={BIENTOT_DESSUS}>
             <div
               className="relative w-full overflow-hidden rounded-3xl bg-card"
               style={{ aspectRatio: "16/10" }}
@@ -1156,7 +1161,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
       <Reveal>
         <section>
           <ModuleTitle title="Le vestiaire" />
-          <Locked label="Bientôt" note="Le chat de la ligue ouvre avec les comptes joueurs.">
+          <Locked label="Bientôt" chipClassName={BIENTOT_DESSUS} note="Le chat de la ligue ouvre avec les comptes joueurs.">
             <div className="glass rounded-3xl p-4">
               <div className="flex items-center gap-2.5">
                 <Avatar name="Ilyes" size={26} />

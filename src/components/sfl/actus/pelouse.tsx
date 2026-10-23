@@ -19,6 +19,19 @@
 // te faut, puis pour chaque dimanche joué l'homme du dimanche, le chiffre, le
 // duo, ceux qui montent, les badges décrochés et l'équipe type. Sous chacune
 // de celles-là, Bravo félicite ses joueurs (bravo.tsx).
+//
+// Rien ne se chevauche (Sabri, 23/10 : « des balles qui vont sur la tête des
+// joueurs […] pas de superpositions qui seraient incohérentes »). Une carte
+// ne se tient jamais devant le but quand il y a des ballons au fond du filet :
+// elle se pose à côté. Ailleurs, celle qui se tient au milieu du but le cache
+// en entier (une moyenne : le meilleur du rang), pour que les poteaux ne
+// l'encadrent pas, et aucune carte n'a le but juste au-dessus de la tête. Les
+// rangs de cartes sont assez loin l'un de l'autre
+// pour que la carte de devant ne cache pas le nom de celle de derrière. Une
+// pastille posée au-dessus d'une carte (« ▲ 3 », un badge) se pose au-dessus
+// de son nom compris, et le cadre la compte (Place.coiffe). Le ballon qui
+// file passe derrière ceux qui sont devant lui, et ses trajets évitent les
+// noms.
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { MessageCircle } from "lucide-react";
@@ -98,9 +111,14 @@ export interface Place {
   sous?: string;
   /** Sur le coin haut de la carte, en pastille : quand le nom n'a plus la place à côté de lui. */
   badge?: string;
+  /** La place qu'occupe, au-dessus de la carte, ce qui s'y pose (en px à l'échelle 1) : le cadre la compte. */
+  coiffe?: number;
 }
 
+/** La hauteur d'une carte debout et de son nom, à l'échelle 1. */
 const hauteur = (taille: number) => 254 * taille * PHI + 26;
+/** La hauteur (Bulle `haut`) du milieu d'une pastille de hauteur h posée au-dessus d'une carte et de son nom. */
+const dessus = (taille: number, h: number) => hauteur(taille) + 4 + h / 2;
 
 function Debout({ p }: { p: Place }) {
   const joueur = useJoueurs()(p.nom);
@@ -112,7 +130,9 @@ function Debout({ p }: { p: Place }) {
     <div className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y, zIndex: Math.round(p.v) }}>
       <div className="absolute bottom-0 left-0" style={{ transformOrigin: "50% 100%", transform: `translateX(-50%) scale(${k})` }}>
         <div className="pel-entre flex flex-col items-center" style={{ ["--d" as string]: p.d ?? 0.2 }}>
-          <div className="relative">
+          {/* En flex : un bouton (MiniCarte) seul dans un bloc garde sous lui
+              la place d'une ligne de texte, qui éloignait la carte de son nom. */}
+          <div className="relative flex">
             <MiniCarte player={joueur} size={taille} vertical />
             {p.badge && (
               <span className="absolute top-0 right-0 translate-x-[45%] -translate-y-[35%] rounded-full bg-white px-[5px] py-[1.5px] font-mono text-[9.5px] leading-[1.2] font-bold whitespace-nowrap text-black tabular-nums shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
@@ -135,11 +155,31 @@ function Debout({ p }: { p: Place }) {
   );
 }
 
-/** Ce qui flotte au-dessus du terrain en (u, v), à la hauteur w : un chiffre, un badge. */
-export function Bulle({ u, v, w = 0, d = 0.4, children, className }: { u: number; v: number; w?: number; d?: number; children: ReactNode; className?: string }) {
+/**
+ * Ce qui flotte au-dessus du terrain en (u, v), à la hauteur w : un chiffre,
+ * un badge. `haut` le relève encore de tant de px à l'échelle de l'endroit,
+ * comme une carte : au-dessus de la carte qui s'y tient (`dessus`).
+ */
+export function Bulle({
+  u,
+  v,
+  w = 0,
+  haut = 0,
+  d = 0.4,
+  children,
+  className,
+}: {
+  u: number;
+  v: number;
+  w?: number;
+  haut?: number;
+  d?: number;
+  children: ReactNode;
+  className?: string;
+}) {
   const { x, y, k } = projeter(u, v, w, VUE);
   return (
-    <div className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y, zIndex: 600 }}>
+    <div className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y - haut * k, zIndex: 600 }}>
       <div className="absolute top-0 left-0" style={{ transform: `translate(-50%, -50%) scale(${Math.max(0.85, k)})` }}>
         <div className={cn("pel-entre", className)} style={{ ["--d" as string]: d }}>
           {children}
@@ -197,7 +237,11 @@ function Filet({ n, d = 0.55 }: { n: number; d?: number }) {
   );
 }
 
-/** Le ballon qui suit un trajet sur le terrain au défilement, de p = de à p = a. */
+/**
+ * Le ballon qui suit un trajet sur le terrain au défilement, de p = de à p = a.
+ * Il passe derrière ceux qui sont devant lui : sa profondeur est celle d'une
+ * carte posée au même endroit (Debout, zIndex = v).
+ */
 function Ballon({ trajet, de, a }: { trajet: [number, number][]; de: number; a: number }) {
   const ref = useRef<HTMLSpanElement>(null);
   useAvancee((p) => {
@@ -212,6 +256,7 @@ function Ballon({ trajet, de, a }: { trajet: [number, number][]; de: number; a: 
     const w = Math.sin(f * Math.PI) * 10 + 3;
     const { x, y, k } = projeter(u, v, w, VUE);
     el.style.transform = `translate(${x - 5 * k}px, ${y - 5 * k}px) scale(${k})`;
+    el.style.zIndex = String(Math.round(v));
     el.style.opacity = p < de - 0.02 ? "0" : "1";
   });
   return (
@@ -219,7 +264,7 @@ function Ballon({ trajet, de, a }: { trajet: [number, number][]; de: number; a: 
       ref={ref}
       aria-hidden
       className="absolute top-0 left-1/2 block size-[10px] rounded-full bg-white shadow-[inset_-2px_-2px_0_rgba(0,0,0,0.25),0_4px_8px_rgba(0,0,0,0.4)]"
-      style={{ zIndex: 650, transformOrigin: "0 0" }}
+      style={{ zIndex: Math.round(trajet[0][1]), transformOrigin: "0 0" }}
     />
   );
 }
@@ -369,13 +414,13 @@ export function Scene({
     };
   }, []);
 
-  // Le cadre épouse ce qu'il montre : du haut de la carte la plus haute (ou
-  // de la barre du but) jusqu'à `jusqua`.
+  // Le cadre épouse ce qu'il montre : du haut de la carte la plus haute (et
+  // de ce qui s'y pose), ou de la barre du but, jusqu'à `jusqua`.
   const projetees = places.map((p) => ({ ...p, ...projeter(p.u, p.v, 0, VUE) }));
   const haut = Math.min(
     projeter(MILIEU, LIGNE, BARRE + 6, VUE).y,
     projeter(0, 0, 0, VUE).y,
-    ...projetees.map((p) => p.y - hauteur(p.taille ?? T.petite) * p.k),
+    ...projetees.map((p) => p.y - (hauteur(p.taille ?? T.petite) + (p.coiffe ?? 0)) * p.k),
   );
   const bas = projeter(MILIEU, jusqua, 0, VUE).y;
   const naturelle = bas - haut + MARGE * 2;
@@ -448,12 +493,36 @@ export function Scene({
 /** Le moment d'entrée de la i-ième carte. */
 export const tour = (i: number, de = 0.18, pas = 0.07) => de + i * pas;
 
+/**
+ * La place de l'homme du jour : à gauche du but, pas devant, pour que ses
+ * buts restent visibles au fond du filet.
+ */
+const A_COTE_DU_BUT = { u: 66, v: 100 } as const;
+
+/** Ses chiffres : ses buts au fond du filet et comptés près du but, ses passes à droite, ses points devant. */
+function SesChiffres({ buts, passes, pp }: { buts: number; passes: number; pp: number }) {
+  return (
+    <>
+      <Filet n={buts} />
+      <Bulle u={206} v={46} w={30} d={0.3}>
+        <Pastille n={<Compte n={buts} d={0.3} />} quoi={pl(buts, "but", "buts")} />
+      </Bulle>
+      <Bulle u={232} v={132} w={22} d={0.38}>
+        <Pastille n={<Compte n={passes} d={0.38} />} quoi={pl(passes, "passe", "passes")} />
+      </Bulle>
+      <Bulle u={166} v={200} d={0.5}>
+        <Pastille clair n={<>+<Compte n={pp} d={0.5} /></>} quoi="points" />
+      </Bulle>
+    </>
+  );
+}
+
 /** Des cartes en rang, de gauche à droite, centrées sur le milieu. */
 function rang(noms: string[], v: number, ecart: number, taille: number, d0: number, moi?: string): Place[] {
   return noms.map((nom, i) => ({ nom, u: MILIEU + (i - (noms.length - 1) / 2) * ecart, v, taille, d: tour(i, d0), moi: nom === moi }));
 }
 
-/** Ton dimanche : ta carte au point de penalty, tes buts au fond du filet, tes chiffres autour. */
+/** Ton dimanche : ta carte à côté du but, tes buts au fond du filet, tes chiffres autour. */
 export function RubriqueToi({ j, date, className }: { j: number; date: string; className?: string }) {
   const { player, me } = useMyPlayer();
   const { saison } = useSeason();
@@ -476,28 +545,24 @@ export function RubriqueToi({ j, date, className }: { j: number; date: string; c
       className={className}
       sur={`J${j} · ${date}`}
       titre="Ton dimanche"
-      places={[{ nom: me, u: MILIEU, v: 100, taille: T.vedette, d: 0.15, moi: true }]}
+      places={[{ nom: me, ...A_COTE_DU_BUT, taille: T.vedette, d: 0.15, moi: true }]}
+      jusqua={225}
       texte={delta > 0 ? `▲ ${delta} au Pépite d'Or` : delta < 0 ? `▼ ${-delta} au Pépite d'Or` : "Même place au Pépite d'Or"}
       partage={{ titre: "Mon dimanche", j, lignes: [{ n: me, v: `${buts} buts · ${passes} passes · +${pp} pts` }] }}
     >
-      <Filet n={buts} />
-      <Bulle u={44} v={110} w={34} d={0.3}>
-        <Pastille n={<Compte n={buts} d={0.3} />} quoi={pl(buts, "but", "buts")} />
-      </Bulle>
-      <Bulle u={226} v={110} w={34} d={0.38}>
-        <Pastille n={<Compte n={passes} d={0.38} />} quoi={pl(passes, "passe", "passes")} />
-      </Bulle>
-      <Bulle u={MILIEU} v={176} w={0} d={0.5}>
-        <Pastille clair n={<>+<Compte n={pp} d={0.5} /></>} quoi="points" />
-      </Bulle>
+      <SesChiffres buts={buts} passes={passes} pp={pp} />
     </Scene>
   );
 }
 
-/** Ce qui se joue dimanche : chaque duel de points, deux cartes face à face, l'écart entre elles. */
+/**
+ * Ce qui se joue dimanche : chaque duel de points, deux cartes face à face,
+ * l'écart entre elles. Un duel par rang, les rangs assez loin l'un de l'autre
+ * pour que les cartes de devant ne cachent pas les noms du rang du fond.
+ */
 export function RubriqueEnjeux({ liste, moi }: { liste: Enjeu[]; moi: string }) {
   const duels = liste.slice(0, 3);
-  const vs = [52, 150, 248];
+  const vs = [45, 180, 315];
   return (
     <Scene
       sur="Le Pépite d'Or"
@@ -510,7 +575,7 @@ export function RubriqueEnjeux({ liste, moi }: { liste: Enjeu[]; moi: string }) 
       texte={duels.map((d) => `${d.haut.rank}e et ${d.bas.rank}e à ${d.ecart} ${pl(d.ecart, "pt", "pts")}`).join(" · ")}
     >
       {duels.map((d, i) => (
-        <Bulle key={i} u={MILIEU + (i % 2) * 12} v={vs[i]} w={22} d={0.35 + i * 0.12}>
+        <Bulle key={i} u={MILIEU + (i % 2) * 12} v={vs[i] + 22} d={0.35 + i * 0.12}>
           <Pastille petit n={d.ecart} quoi={pl(d.ecart, "point", "points")} clair={d.haut.name === moi || d.bas.name === moi} />
         </Bulle>
       ))}
@@ -518,27 +583,30 @@ export function RubriqueEnjeux({ liste, moi }: { liste: Enjeu[]; moi: string }) 
   );
 }
 
-/** Ton rival : lui devant le but, toi face à lui, l'écart entre vous ; celui qui te suit, derrière. */
+/** Ton rival : lui devant le but, toi face à lui, l'écart posé entre vous ; celui qui te suit, derrière. */
 export function RubriqueRival({ v }: { v: Voisins }) {
   const id = useIdentites();
   const ecart = v.devant ? v.devant.pp - v.moi.pp : 0;
-  const places: Place[] = [{ nom: v.moi.name, u: v.devant ? 178 : MILIEU, v: 165, taille: T.moyenne, d: 0.15, moi: true, sous: `${v.moi.rank}e` }];
+  // Toi assez loin du but pour qu'il ne te tombe pas sur la tête ; seul en tête, loin devant un but vide.
+  const places: Place[] = [
+    { nom: v.moi.name, u: v.devant ? 190 : MILIEU, v: v.devant ? 172 : 215, taille: T.moyenne, d: 0.15, moi: true, sous: `${v.moi.rank}e` },
+  ];
   if (v.devant) places.push({ nom: v.devant.name, u: 92, v: 52, taille: T.moyenne, d: 0.25, sous: `${v.devant.rank}e` });
-  if (v.derriere) places.push({ nom: v.derriere.name, u: 70, v: 250, taille: T.petite, d: 0.4, sous: `${v.derriere.rank}e` });
+  if (v.derriere) places.push({ nom: v.derriere.name, u: 50, v: 262, taille: T.petite, d: 0.4, sous: `${v.derriere.rank}e` });
   return (
     <Scene
       sur={`Toi · ${v.moi.rank}e au Pépite d'Or`}
       titre={v.devant ? `Ton rival : ${id.nom(v.devant.name)}` : "Personne devant toi"}
       places={places}
-      jusqua={v.derriere ? 275 : 225}
+      jusqua={v.derriere ? 287 : 225}
       texte={v.derriere ? `${id.nom(v.derriere.name)} est à ${v.moi.pp - v.derriere.pp} derrière toi` : undefined}
     >
       {v.devant ? (
-        <Bulle u={222} v={30} w={34} d={0.45}>
+        <Bulle u={98} v={100} d={0.45}>
           <Pastille clair n={<Compte n={ecart} d={0.45} />} quoi={`${pl(ecart, "pt", "pts")} d'écart`} />
         </Bulle>
       ) : (
-        <Bulle u={MILIEU + 70} v={150} w={30} d={0.4}>
+        <Bulle u={222} v={170} w={30} d={0.4}>
           <Pastille clair n="1er" quoi="Pépite d'Or" />
         </Bulle>
       )}
@@ -549,8 +617,9 @@ export function RubriqueRival({ v }: { v: Voisins }) {
 /**
  * Ce qu'il te faut dimanche : l'écart avec celui de devant, traduit en match
  * (une victoire vaut 2, un but ou une passe 1, saisie/engine.ts). Lui dans le
- * but, toi au point de penalty, et ce qu'il te faut posé entre vous ; le
- * ballon file au fond quand tu descends.
+ * but, toi devant, et ce qu'il te faut posé devant toi : la victoire, puis
+ * les buts ou passes qui restent, en une pastille. Le ballon file au fond
+ * quand tu descends, dans le coin que le gardien ne couvre pas.
  */
 export function RubriqueBesoin({ v }: { v: Voisins }) {
   const id = useIdentites();
@@ -558,22 +627,24 @@ export function RubriqueBesoin({ v }: { v: Voisins }) {
   const besoin = v.devant.pp - v.moi.pp + 1;
   const victoire = besoin >= 2;
   const reste = victoire ? besoin - 2 : besoin;
-  const max = victoire ? 2 : 3;
-  const morceaux = [...(victoire ? [{ n: "V", l: "gagner" }] : []), ...Array.from({ length: Math.min(reste, max) }, () => ({ n: "+1", l: "but/passe" }))];
+  const morceaux = [
+    ...(victoire ? [{ n: "V", l: "gagner" }] : []),
+    ...(reste > 0 ? [{ n: `+${reste}`, l: pl(reste, "but/passe", "buts/passes") }] : []),
+  ];
+  const us = morceaux.length > 1 ? [170, 246] : [196];
   return (
     <Scene
       sur={`${besoin} ${pl(besoin, "point", "points")} pour passer devant`}
       titre={`Ce qu'il te faut pour passer ${id.nom(v.devant.name)}`}
       places={[
-        { nom: v.devant.name, u: MILIEU, v: 26, taille: T.petite, d: 0.15 },
-        { nom: v.moi.name, u: 62, v: 190, taille: T.moyenne, d: 0.2, moi: true },
+        { nom: v.devant.name, u: MILIEU - 28, v: 46, taille: T.petite, d: 0.15 },
+        { nom: v.moi.name, u: 54, v: 200, taille: T.moyenne, d: 0.2, moi: true },
       ]}
-      jusqua={235}
-      texte={reste > max ? `Et ${reste - max} de plus` : undefined}
+      jusqua={225}
     >
-      <Ballon trajet={[[74, 186], [120, 110], [MILIEU + 10, LIGNE - 5]]} de={0.55} a={0.95} />
+      <Ballon trajet={[[94, 196], [138, 110], [MILIEU + 18, LIGNE - 4]]} de={0.55} a={0.95} />
       {morceaux.map((m, i) => (
-        <Bulle key={i} u={186 + (i - (morceaux.length - 1) / 2) * 62} v={165} w={4} d={0.3 + i * 0.07}>
+        <Bulle key={m.n} u={us[i]} v={150} d={0.3 + i * 0.07}>
           <Pastille petit n={m.n} quoi={m.l} clair={m.n === "V"} />
         </Bulle>
       ))}
@@ -596,20 +667,11 @@ export function RubriqueActu({ a }: { a: Actu }) {
           {...bravo}
           sur={sur("l'homme du dimanche")}
           titre={id.nom(m.nom)}
-          places={[{ nom: m.nom, u: MILIEU, v: 100, taille: T.vedette, d: 0.15 }]}
-          jusqua={215}
+          places={[{ nom: m.nom, ...A_COTE_DU_BUT, taille: T.vedette, d: 0.15 }]}
+          jusqua={225}
           partage={{ titre: "L'homme du dimanche", j: a.j, lignes: [{ n: m.nom, v: `${m.buts} buts · ${m.passes} passes · +${m.pp} pts` }] }}
         >
-          <Filet n={m.buts} />
-          <Bulle u={44} v={110} w={34} d={0.3}>
-            <Pastille n={<Compte n={m.buts} d={0.3} />} quoi={pl(m.buts, "but", "buts")} />
-          </Bulle>
-          <Bulle u={226} v={110} w={34} d={0.38}>
-            <Pastille n={<Compte n={m.passes} d={0.38} />} quoi={pl(m.passes, "passe", "passes")} />
-          </Bulle>
-          <Bulle u={MILIEU} v={176} w={0} d={0.5}>
-            <Pastille clair n={<>+<Compte n={m.pp} d={0.5} /></>} quoi="points" />
-          </Bulle>
+          <SesChiffres buts={m.buts} passes={m.passes} pp={m.pp} />
         </Scene>
       );
     }
@@ -620,12 +682,12 @@ export function RubriqueActu({ a }: { a: Actu }) {
           {...bravo}
           sur={sur("personne n'a fait mieux")}
           titre={`${a.n} ${quoi} pour ${id.nom(a.nom)}`}
-          places={[{ nom: a.nom, u: MILIEU - 40, v: 105, taille: T.vedette, d: 0.15 }]}
+          places={[{ nom: a.nom, u: A_COTE_DU_BUT.u, v: 105, taille: T.vedette, d: 0.15 }]}
           jusqua={200}
           partage={{ titre: `${a.n} ${a.quoi} en un dimanche`, j: a.j, lignes: [{ n: a.nom, v: `${a.n} ${a.quoi}` }] }}
         >
           {a.quoi === "buts" && <Filet n={a.n} d={0.4} />}
-          <Bulle u={MILIEU + 72} v={100} w={40} d={0.3}>
+          <Bulle u={212} v={100} w={40} d={0.3}>
             <span className="block text-[84px] leading-[0.85] drop-shadow-[0_10px_24px_rgba(0,0,0,0.5)]" style={{ fontFamily: ANTON }}>
               <Compte n={a.n} d={0.3} />
             </span>
@@ -634,45 +696,52 @@ export function RubriqueActu({ a }: { a: Actu }) {
       );
     }
     case "duo": {
+      // Le passeur à gauche, le buteur à droite du but (pas devant : le filet
+      // reste visible). La passe part devant le nom du passeur, arrive à
+      // gauche de celui du buteur, et le tir file au fond.
       const passe: [number, number] = [52, 150];
-      const tir: [number, number] = [172, 72];
+      const tir: [number, number] = [204, 66];
+      const trajet: [number, number][] = [[82, 166], [122, 130], [170, 80], [MILIEU + 4, LIGNE - 5]];
       return (
         <Scene
           {...bravo}
           sur={sur("le duo")}
           titre={`${id.nom(a.duo.passeur)} → ${id.nom(a.duo.buteur)}`}
           places={[
-            { nom: a.duo.passeur, u: passe[0], v: passe[1], taille: T.moyenne, d: 0.15, sous: "passeur" },
-            { nom: a.duo.buteur, u: tir[0], v: tir[1], taille: T.moyenne, d: 0.25, sous: "buteur" },
+            { nom: a.duo.passeur, u: passe[0], v: passe[1], taille: T.moyenne, d: 0.15 },
+            { nom: a.duo.buteur, u: tir[0], v: tir[1], taille: T.moyenne, d: 0.25 },
           ]}
           jusqua={205}
           texte="La même passe, le même buteur"
           partage={{ titre: "Le duo", j: a.j, lignes: [{ n: a.duo.passeur, v: "passeur" }, { n: a.duo.buteur, v: `buteur · ×${a.duo.n}` }] }}
         >
-          <Craie points={[[passe[0] + 14, passe[1] - 4], [110, 128], [tir[0] - 16, tir[1] + 6]]} />
-          <Craie points={[[tir[0] - 10, tir[1] - 6], [MILIEU + 4, LIGNE - 4]]} d={0.5} />
+          <Craie points={trajet.slice(0, 3)} />
+          <Craie points={[trajet[2], [MILIEU + 4, LIGNE - 4]]} d={0.5} />
           <Filet n={a.duo.n} d={0.85} />
-          <Ballon trajet={[[passe[0] + 14, passe[1] - 4], [110, 128], [tir[0] - 16, tir[1] + 6], [MILIEU + 4, LIGNE - 5]]} de={0.4} a={0.9} />
-          <Bulle u={98} v={96} w={30} d={0.45}>
+          <Ballon trajet={trajet} de={0.4} a={0.9} />
+          <Bulle u={196} v={176} d={0.45}>
             <Pastille clair n={<>×<Compte n={a.duo.n} d={0.45} /></>} quoi="ensemble" />
           </Bulle>
         </Scene>
       );
     }
     case "montent": {
+      // Le gain au-dessus de chaque carte, nom compris ; le quatrième assez
+      // près de l'œil pour que son gain ne touche pas le nom du premier.
       const liste = a.montent.slice(0, 4);
-      const poses: [number, number][] = [[MILIEU, 60], [70, 140], [200, 140], [MILIEU, 215]];
+      const poses: [number, number][] = [[MILIEU, 52], [62, 140], [208, 140], [MILIEU, 232]];
+      const taille = (i: number) => (i === 0 ? T.moyenne : T.petite);
       return (
         <Scene
           {...bravo}
           sur={sur("au Pépite d'Or")}
           titre={liste.length > 1 ? "Ils montent" : `${id.nom(liste[0].nom)} monte`}
-          places={liste.map((m, i) => ({ nom: m.nom, u: poses[i][0], v: poses[i][1], taille: i === 0 ? T.moyenne : T.petite, d: tour(i), sous: `${m.rang}e` }))}
-          jusqua={liste.length > 3 ? 250 : liste.length > 1 ? 180 : 120}
+          places={liste.map((m, i) => ({ nom: m.nom, u: poses[i][0], v: poses[i][1], taille: taille(i), d: tour(i), sous: `${m.rang}e`, coiffe: 4 + 26 }))}
+          jusqua={liste.length > 3 ? 262 : liste.length > 1 ? 185 : 120}
           partage={{ titre: "Ils montent", j: a.j, lignes: a.montent.map((x) => ({ n: x.nom, v: `▲ ${x.gain} · ${x.rang}e` })) }}
         >
           {liste.map((m, i) => (
-            <Bulle key={m.nom} u={poses[i][0]} v={poses[i][1]} w={(254 * (i === 0 ? T.moyenne : T.petite) * PHI) / VUE.sin + 12} d={0.32 + i * 0.07}>
+            <Bulle key={m.nom} u={poses[i][0]} v={poses[i][1]} haut={dessus(taille(i), 26)} d={0.32 + i * 0.07}>
               <span className="whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-[15px] font-black text-black tabular-nums shadow-[0_6px_16px_rgba(0,0,0,0.4)]">
                 ▲ {m.gain}
               </span>
@@ -683,10 +752,26 @@ export function RubriqueActu({ a }: { a: Actu }) {
     }
     case "badge":
     case "badges": {
-      const ds = a.type === "badge" ? [a.d] : a.ds.slice(0, 6);
+      // Un badge : en grand, à droite de la carte. Plusieurs : chacun au-dessus
+      // de sa carte, nom compris, le plus haut palier d'abord ; au milieu du
+      // rang du fond, il se tient en moyenne (il cache le but en entier). En
+      // deux rangs au-delà de quatre, celui de devant assez près pour que ses
+      // badges passent sous les noms du fond.
+      const ds = a.type === "badge" ? [a.d] : [...a.ds.slice(0, 6)].sort((x, y) => y.palier - x.palier);
       const un = ds.length === 1;
       const lignes = ds.length > 4 ? [ds.slice(0, Math.ceil(ds.length / 2)), ds.slice(Math.ceil(ds.length / 2))] : [ds];
-      const places = lignes.flatMap((l, r) => rang(l.map((d) => d.nom), 70 + r * 135, l.length > 3 ? 62 : l.length > 2 ? 80 : 104, un ? T.vedette : T.petite, 0.15 + r * 0.2));
+      const vs = lignes.length > 1 ? [40, 240] : [70];
+      const poses = un
+        ? [{ d: ds[0], p: { nom: ds[0].nom, u: MILIEU, v: 70, taille: T.vedette, d: 0.15 } as Place }]
+        : lignes.flatMap((l, r) => {
+            const milieu = r === 0 && l.length === 3;
+            const ordre = milieu ? [l[1], l[0], l[2]] : l;
+            return rang(ordre.map((d) => d.nom), vs[r], l.length > 3 ? 70 : l.length > 2 ? 86 : 104, T.petite, 0.15 + r * 0.2).map((p, i) => ({
+              d: ordre[i],
+              p: { ...p, taille: milieu && i === 1 ? T.moyenne : T.petite, coiffe: 4 + 40 },
+            }));
+          });
+      const places = poses.map((x) => x.p);
       const premier = DEF[ds[0].id];
       const titre = un ? `${id.nom(ds[0].nom)} décroche ${premier.nom} ${NOM_METAL[metal(ds[0].palier)!].toLowerCase()}` : `${ds.length} badges décrochés`;
       return (
@@ -695,38 +780,43 @@ export function RubriqueActu({ a }: { a: Actu }) {
           sur={sur("ils ont décroché")}
           titre={titre}
           places={places}
-          jusqua={lignes.length > 1 ? 240 : 125}
+          jusqua={lignes.length > 1 ? 270 : 125}
           texte={un ? undefined : ds.map((d) => `${id.nom(d.nom)} · ${DEF[d.id].nom} ${NOM_METAL[metal(d.palier)!].toLowerCase()}`).join(" · ")}
           partage={{ titre: "Ils ont décroché", j: a.j, lignes: ds.map((d) => ({ n: d.nom, v: `${DEF[d.id].nom} · ${NOM_METAL[metal(d.palier)!]}` })) }}
         >
-          {ds.map((d, i) => {
-            const p = places[i];
-            // Au-dessus de la carte : sa hauteur à l'écran, ramenée en hauteur de terrain.
-            const w = (254 * p.taille! * PHI) / VUE.sin + 14;
-            return (
-              <Bulle key={d.nom + d.id} u={p.u + (un ? 62 : 0)} v={p.v} w={un ? 70 : w} d={(p.d ?? 0.2) + 0.2}>
-                <Badge3D badge={{ famille: "palier", id: d.id, palier: d.palier }} largeur={un ? 92 : 40} />
+          {poses.map(({ d, p }) =>
+            un ? (
+              <Bulle key={d.nom + d.id} u={p.u + 96} v={p.v} w={64} d={(p.d ?? 0.2) + 0.2}>
+                <Badge3D badge={{ famille: "palier", id: d.id, palier: d.palier }} largeur={92} />
               </Bulle>
-            );
-          })}
+            ) : (
+              <Bulle key={d.nom + d.id} u={p.u} v={p.v} haut={dessus(p.taille ?? T.petite, 40)} d={(p.d ?? 0.2) + 0.2}>
+                <Badge3D badge={{ famille: "palier", id: d.id, palier: d.palier }} largeur={40} />
+              </Bulle>
+            ),
+          )}
         </Scene>
       );
     }
     case "equipe": {
+      // Deux rangs, le second assez près de l'œil pour que ses cartes passent
+      // sous les noms du premier : aucune carte ne cache un nom. Le meilleur du
+      // jour au milieu du fond, en moyenne : il cache le but en entier.
       const noms = a.equipe.slice(0, 7).map((e) => e.nom);
-      const schema = ({ 3: [1, 2], 4: [2, 2], 5: [2, 1, 2], 6: [3, 3], 7: [3, 1, 3] } as Record<number, number[]>)[noms.length] ?? [noms.length];
-      const places = schema.flatMap((n, r) => {
-        const debut = schema.slice(0, r).reduce((t, x) => t + x, 0);
-        const l = noms.slice(debut, debut + n);
-        return rang(l, 55 + r * 95, n > 2 ? 82 : 110, T.petite, 0.15 + r * 0.15);
-      });
+      const schema = ({ 3: [1, 2], 4: [1, 3], 5: [3, 2], 6: [3, 3], 7: [3, 4] } as Record<number, number[]>)[noms.length] ?? [noms.length];
+      const fond = schema[0] === 3 ? [noms[1], noms[0], noms[2]] : noms.slice(0, schema[0]);
+      const devant = noms.slice(schema[0]);
+      const places = [
+        ...rang(fond, 45, 90, T.petite, 0.15).map((p) => (p.nom === noms[0] ? { ...p, taille: T.moyenne } : p)),
+        ...rang(devant, 190, devant.length > 3 ? 74 : devant.length > 2 ? 90 : 120, T.petite, 0.3),
+      ];
       return (
         <Scene
           {...bravo}
           sur={sur("les meilleurs du jour")}
           titre="L'équipe type"
           places={places}
-          jusqua={45 + schema.length * 95}
+          jusqua={235}
           partage={{ titre: "L'équipe type", j: a.j, lignes: a.equipe.map((e) => ({ n: e.nom, v: `+${e.pp} pts` })) }}
         />
       );

@@ -53,16 +53,25 @@ import { ANTON } from "./ecran";
 import { pl } from "./cinematiques";
 import { Bulle, MILIEU, Pastille, Scene, T, tour, type Place } from "./pelouse";
 
-/** Les rangs, du but vers l'avant : la D1 sur la ligne de but, puis la D2, la D3. */
-const RANGS: Record<Division, number> = { 1: 26, 2: 150, 3: 272 };
+/**
+ * Les rangs, du but vers l'avant : la D1, puis la D2, la D3. La D1 se tient
+ * devant le but, pas sur sa ligne : il reste entier au-dessus de ses cartes,
+ * au lieu de dépasser entre ses prénoms. Chaque rang assez loin de celui de
+ * derrière pour que ses cartes ne touchent pas les prénoms du rang du fond.
+ */
+const RANGS: Record<Division, number> = { 1: 161, 2: 277, 3: 385 };
 /** Ceux du bilan, un peu plus espacés : les points débordent du coin haut de chaque carte. */
-const RANGS_BILAN: Record<Division, number> = { 1: 26, 2: 164, 3: 300 };
+const RANGS_BILAN: Record<Division, number> = { 1: 168, 2: 290, 3: 403 };
 /** Trois cartes par rang, à droite de l'étiquette. */
 const PAR_RANG = 3;
 const ECART = 60;
 const CENTRE = MILIEU + 37;
-/** L'étiquette : au bord gauche, à mi-hauteur des cartes, loin des prénoms. */
-const ETIQUETTE = { u: 34, w: 80 } as const;
+/**
+ * L'étiquette : au bord gauche, à mi-hauteur des cartes, loin des prénoms.
+ * Celle de la D3, la plus près de l'œil, rentre un peu vers le milieu pour ne
+ * pas sortir du cadre d'un téléphone.
+ */
+const ETIQUETTE = { u: { 1: 34, 2: 34, 3: 45 } as Record<Division, number>, w: 92 } as const;
 /** Sur grand écran, le terrain et ses règles dessous ne font qu'une carte. */
 const CADRE = "scroll-mt-4 md:overflow-hidden md:rounded-3xl";
 
@@ -113,28 +122,33 @@ function cartesDuBilan(etat: EtatDivisions, bilan: BilanDivisions, division: Div
 /** Une règle de la J4 : un chiffre en grand, ce qu'il veut dire dessous. */
 function Regle({ n, quoi }: { n: string; quoi: string }) {
   return (
-    <div className="flex flex-col gap-1 rounded-2xl bg-white/[0.06] px-3 pt-2.5 pb-3">
+    <div className="flex flex-col gap-1 rounded-2xl bg-foreground/[0.06] px-3 pt-2.5 pb-3 dark:bg-white/[0.06]">
       <span className="text-[28px] leading-none" style={{ fontFamily: ANTON }}>
         {n}
       </span>
-      <span className="text-[12px] leading-tight font-semibold text-white/65">{quoi}</span>
+      <span className="text-[12px] leading-tight font-semibold text-foreground/65 dark:text-white/65">{quoi}</span>
     </div>
   );
 }
 
-/** Ce qui change dès la J4, sous le terrain ; une fois la J4 jouée, ce qui se joue chaque dimanche. */
+/**
+ * Ce qui change dès la J4, sous le terrain ; une fois la J4 jouée, ce qui se
+ * joue chaque dimanche. Sur le fond du bas du terrain (pelouse.tsx, Scene),
+ * en clair comme en sombre : le terrain et ses règles ne font qu'une carte.
+ */
 function DesLaJ4({ chaqueDimanche = false }: { chaqueDimanche?: boolean }) {
   const { montee, descente, depuis, taille } = REGLES_DIVISIONS;
   return (
-    <div className="flex flex-col gap-3 bg-[#0c0d0f] px-5 pt-1 pb-6 text-white">
-      <span className="mono-label text-[10px] text-white/50">{chaqueDimanche ? "Chaque dimanche" : `Dès la J${depuis}`}</span>
-      <div className={cn("grid gap-2", chaqueDimanche ? "grid-cols-3" : "grid-cols-2 md:grid-cols-4")}>
+    <div className="flex flex-col gap-3 bg-[#e8eae5] px-5 pt-1 pb-6 text-foreground dark:bg-[#0c0d0f] dark:text-white">
+      <span className="mono-label text-[10px] text-foreground/50 dark:text-white/50">{chaqueDimanche ? "Chaque dimanche" : `Dès la J${depuis}`}</span>
+      {/* Deux par ligne même sur ordinateur : la rubrique y tient dans une colonne d'Actus, quatre y serraient le texte. */}
+      <div className={cn("grid gap-2", chaqueDimanche ? "grid-cols-3" : "grid-cols-2")}>
         {!chaqueDimanche && <Regle n={String(taille)} quoi="joueurs par division, les meilleurs en D1" />}
         <Regle n={`${montee} pts`} quoi="ou plus sur la journée : tu montes" />
         <Regle n={`${descente} pts`} quoi="ou moins : tu descends" />
         <Regle n="MVP" quoi="Impact et Défensive élus à chaque journée" />
       </div>
-      <p className="text-[13px] leading-snug text-white/70">
+      <p className="text-[13px] leading-snug text-foreground/70 dark:text-white/70">
         Tu joues dans ta division. Les équipes se font toutes seules, au niveau de chacun.
       </p>
     </div>
@@ -190,7 +204,7 @@ export function RubriqueDivisions({ className }: { className?: string }) {
         sur={coupee ? `Après la J${J_DECOUPAGE}` : edition === "jour" ? `J${J_DECOUPAGE} · aujourd'hui` : `J${J_DECOUPAGE} · ${j3?.date ?? "dimanche"}`}
         titre={coupee ? `Trois divisions pour la J${REGLES_DIVISIONS.depuis}` : "Dernier dimanche sans divisions"}
         places={places}
-        jusqua={305}
+        jusqua={418}
         texte={texte}
         partage={{
           titre: coupee ? `Les divisions de la J${REGLES_DIVISIONS.depuis}` : "Si on coupait ce soir",
@@ -202,7 +216,7 @@ export function RubriqueDivisions({ className }: { className?: string }) {
         }}
       >
         {DIVISIONS.map((division, r) => (
-          <Bulle key={division} u={ETIQUETTE.u} v={RANGS[division]} w={ETIQUETTE.w} d={0.1 + r * 0.16}>
+          <Bulle key={division} u={ETIQUETTE.u[division]} v={RANGS[division]} w={ETIQUETTE.w} d={0.1 + r * 0.16}>
             <Pastille
               petit
               n={nomDivision(division)}
@@ -255,7 +269,7 @@ function Bilan({
         sur={`J${bilan.j} · ${jour?.date ?? "dimanche"}`}
         titre={`Les divisions après la J${bilan.j}`}
         places={places}
-        jusqua={333}
+        jusqua={436}
         texte={phraseBilan(etat, bilan, me) ?? mouvements}
         partage={{
           titre: `Les divisions après la J${bilan.j}`,
@@ -268,7 +282,7 @@ function Bilan({
         }}
       >
         {DIVISIONS.map((division, r) => (
-          <Bulle key={division} u={ETIQUETTE.u} v={RANGS_BILAN[division]} w={ETIQUETTE.w} d={0.1 + r * 0.16}>
+          <Bulle key={division} u={ETIQUETTE.u[division]} v={RANGS_BILAN[division]} w={ETIQUETTE.w} d={0.1 + r * 0.16}>
             <Pastille petit n={nomDivision(division)} quoi={quiDans(division, taille(division))} clair={ma === division} />
           </Bulle>
         ))}

@@ -125,8 +125,12 @@ function useProches(): (noms: string[]) => { ordre: string[]; connus: string[] }
   }, [s, me, ensemble, points]);
 }
 
-/** Les petites cartes de « Suivi par », la première devant. */
-function Visages({ noms, clair }: { noms: string[]; clair: boolean }) {
+/**
+ * Les petites cartes de « Suivi par », la première devant : chacune ne cache
+ * que le côté gauche de la suivante, jamais sa note (aussi la barre de
+ * présence du récap de la journée).
+ */
+export function Visages({ noms, clair = false }: { noms: string[]; clair?: boolean }) {
   return (
     <span aria-hidden className="flex shrink-0 items-center">
       {noms.map((n, i) => (

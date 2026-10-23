@@ -933,9 +933,10 @@ export function FormeModule({
       <h2 className="mt-1 text-xl font-bold tracking-tight">
         {forme[0].name} marque depuis {forme[0].streak} journées
       </h2>
-      <div className={cn("mt-3", card && "flex items-center gap-4")}>
+      {/* La carte au-dessus de la liste : à côté, elle ne laissait aux phrases qu'un mot par ligne. */}
+      <div className={cn("mt-3", card && "flex flex-col items-center gap-4")}>
         {card && <div className="shrink-0">{card}</div>}
-        <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+        <div className="flex w-full min-w-0 flex-col gap-2.5">
           {forme.map((f) => (
             <div key={f.name} className="flex items-center gap-2.5">
               <Avatar name={f.name} size={26} />

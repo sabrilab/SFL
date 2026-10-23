@@ -7,6 +7,9 @@
 // titres. On change de mode par les onglets mono ; les joueurs sont posés sur
 // la pelouse selon leur poste, la pastille sous chaque nom change de sens
 // selon l'onglet. En pied, les trois chiffres de la journée.
+// Rien ne se chevauche (Sabri, 23/10) : trois joueurs au plus par rangée, et
+// d'une rangée à la suivante, de quoi poser une carte, son nom et sa pastille
+// sans que la carte de devant ne cache la pastille de derrière.
 
 import { useState } from "react";
 import { ovr, type Player } from "@/lib/sfl/engine";
@@ -36,6 +39,13 @@ const MODES: [Mode, string][] = [
 function Avatar({ name }: { name: string; size?: number }) {
   return <CarteDe name={name} />;
 }
+
+/** Un joueur posé (sa carte, son nom, sa pastille) et l'écart d'une rangée à la suivante, en px. */
+const BLOC = 90;
+const RANGEE = BLOC + 8;
+const HAUT = 26;
+/** La place en largeur (en %) des joueurs d'une rangée, selon leur nombre. */
+const LARGEURS: Record<number, number[]> = { 1: [50], 2: [30, 70], 3: [18, 50, 82] };
 
 /** Rang vertical sur le demi-terrain, selon le poste. */
 function pitchRow(poste: string) {
@@ -97,12 +107,18 @@ export function PitchSynthese({
     }
   })();
 
-  // Placement par poste (rangées), puis répartition horizontale.
-  const rows: { name: string; badge: string; hot?: boolean }[][] = [[], [], []];
+  // Placement par poste (l'attaque près du rond central, le gardien devant
+  // sa surface), puis répartition horizontale : une rangée de plus de trois
+  // se dédouble, une rangée vide disparaît.
+  const parPoste: { name: string; badge: string; hot?: boolean }[][] = [[], [], []];
   for (const pl of picked) {
     const p = byName.get(pl.name);
-    rows[p ? pitchRow(p.poste) : 0].push(pl);
+    parPoste[p ? pitchRow(p.poste) : 0].push(pl);
   }
+  const rows = parPoste.flatMap((r) => {
+    if (r.length > 3) return [r.slice(0, Math.ceil(r.length / 2)), r.slice(Math.ceil(r.length / 2))];
+    return r.length ? [r] : [];
+  });
 
   return (
     <section className="glass overflow-hidden rounded-3xl">
@@ -129,7 +145,7 @@ export function PitchSynthese({
       <div
         className="relative mx-4 rounded-2xl border border-primary/20"
         style={{
-          height: 250,
+          height: Math.max(250, HAUT + (rows.length - 1) * RANGEE + BLOC + 14),
           background:
             "radial-gradient(120% 90% at 50% 0%, rgba(111,168,255,0.14), transparent 60%), linear-gradient(180deg, rgba(111,168,255,0.05), transparent)",
         }}
@@ -147,8 +163,8 @@ export function PitchSynthese({
               key={`${mode}-${pl.name}`}
               className="absolute flex -translate-x-1/2 flex-col items-center gap-1"
               style={{
-                top: 26 + ri * 74,
-                left: `${(100 / (rowPlayers.length + 1)) * (i + 1)}%`,
+                top: HAUT + ri * RANGEE,
+                left: `${LARGEURS[rowPlayers.length][i]}%`,
               }}
             >
               <Avatar name={pl.name} size={pl.hot ? 38 : 34} />
