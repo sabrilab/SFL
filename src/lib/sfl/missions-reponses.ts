@@ -8,9 +8,11 @@
 // celle du téléphone ; on lit les siennes, et les contrats acceptés des deux
 // côtés (la RLS ne montre personne comme cible sans qu'il l'ait voulu).
 //
-// L'aperçu (NEXT_PUBLIC_BOLA_ENV ≠ production) montre les missions d'un autre
-// joueur quand on n'est pas sur la feuille : ses réponses restent sur le
-// téléphone, elles ne partent jamais en base au nom de quelqu'un d'autre.
+// Dans un aperçu (NEXT_PUBLIC_BOLA_ENV ≠ production), toutes les réponses
+// restent sur le téléphone : la base de la ligue n'y est pas migrée, et un
+// essai ne doit jamais compter pour de vrai. Quand on n'est pas sur la
+// feuille, l'aperçu montre les missions d'un autre joueur ; elles ne partent
+// pas non plus en base à son nom.
 
 import { supabase } from "@/lib/supabase";
 import type { Creneau, Reponse } from "./missions";
@@ -67,13 +69,10 @@ export interface Demande {
   cible: string | null;
 }
 
-/**
- * Accepter ou passer une mission. `apercu` : les missions d'un autre joueur,
- * montrées dans un aperçu — la réponse reste sur ce téléphone.
- */
-export async function repondreMission(d: Demande, apercu = false): Promise<void> {
+/** Accepter ou passer une mission. Dans un aperçu, la réponse reste sur ce téléphone. */
+export async function repondreMission(d: Demande): Promise<void> {
   let le = new Date().toISOString();
-  if (apercu && APERCU_MISSIONS) {
+  if (APERCU_MISSIONS) {
     try {
       localStorage.setItem(CLE_APERCU, JSON.stringify([...lireApercu().filter((a) => !memeMission(a, d)), { ...d, le }]));
     } catch {

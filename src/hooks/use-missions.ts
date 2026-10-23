@@ -186,17 +186,14 @@ export function useMissions(): MesMissions | null {
       (lignes.length === 3 && gagnees.length === 3 ? XP_PARFAIT : 0);
     const repondre = (creneau: Creneau, reponse: Reponse["reponse"]) => {
       const m = lignes.find((l) => l.m.creneau === creneau)?.m;
-      return repondreMission(
-        {
-          saison: d.saison,
-          j: d.j,
-          mission: creneau,
-          joueur,
-          reponse,
-          cible: creneau === "contrat" ? (m?.cibles[0] ?? null) : null,
-        },
-        apercu
-      );
+      return repondreMission({
+        saison: d.saison,
+        j: d.j,
+        mission: creneau,
+        joueur,
+        reponse,
+        cible: creneau === "contrat" ? (m?.cibles[0] ?? null) : null,
+      });
     };
     return { d, joueur, apercu, lignes, phase, enFace, xp, repondre };
   }, [d, me, maintenant, jugee, votes, reponses]);
