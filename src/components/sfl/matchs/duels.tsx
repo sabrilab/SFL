@@ -2,8 +2,8 @@
 
 // Les duels du dimanche, sous la feuille de match (fiche du match, Map) :
 // les contrats acceptés des deux côtés (lib/sfl/missions.ts). Un contrat
-// accepté d'un seul côté reste entre son auteur et l'app : la base ne le
-// montre à personne d'autre, et il n'apparaît pas ici.
+// signé d'un seul côté n'apparaît pas ici ; toute la ligue le voit dans les
+// Actus (Contrats en jeu, actus/contrats-en-jeu.tsx).
 
 import { CarteDe, FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";

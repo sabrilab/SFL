@@ -356,3 +356,78 @@
     transform: scale(1.9) rotate(-12deg);
   }
 }
+
+/*
+ * Les Contrats en jeu (contrats-en-jeu.tsx) : les mêmes fiches, en affiches
+ * qu'on fait défiler, pour toute la ligue. Rien n'y bouge à l'arrivée : une
+ * ligue entière de viseurs qui se verrouilleraient ensemble ferait trop. Le
+ * viseur est posé verrouillé, les tampons sont déjà encrés.
+ */
+.fiche--affiche {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  width: 160px;
+  border-radius: 18px;
+  scroll-snap-align: start;
+}
+.fiche--affiche-duel {
+  width: 256px;
+}
+.fiche--affiche .fiche__bandeau {
+  gap: 8px;
+  height: 26px;
+  padding: 0 10px;
+}
+.fiche--affiche .fiche__viseur--verrou,
+.fiche--affiche .tampon,
+.fiche--engages .tampon {
+  animation: none;
+}
+.fiche--affiche .viseur__balayage {
+  display: none;
+}
+
+/* Plusieurs cibles : combien d'autres, au coin de la carte. */
+.affiche__plus {
+  position: absolute;
+  right: -11px;
+  bottom: -9px;
+  padding: 3px 6px 2px;
+  border-radius: 4px;
+  background: #060607;
+  color: var(--r-texte);
+  box-shadow: inset 0 0 0 1px rgb(var(--r-lueur) / 0.5);
+}
+
+/* Le tampon en petit : les affiches et les équipes du défi. */
+.tampon--petit {
+  gap: 6px;
+  padding: 4px 8px 3px;
+  border-width: 1.5px;
+  outline-offset: 1.5px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  transform: rotate(-4deg);
+}
+
+/* Les engagés du défi et de la ligue : leur carte ; après le verdict, cerclée (accomplie), éteinte (ratée) ou pâlie (annulée). */
+.engage {
+  position: relative;
+  display: inline-flex;
+  border-radius: 12px;
+}
+.engage--reussie {
+  box-shadow:
+    0 0 0 2px rgb(var(--r-lueur)),
+    0 0 12px rgb(var(--r-lueur) / 0.5);
+}
+.engage--ratee {
+  box-shadow: 0 0 0 2px #ff9b9d;
+}
+.engage--ratee > * {
+  filter: grayscale(1) brightness(0.62);
+}
+.engage--annulee {
+  opacity: 0.45;
+}

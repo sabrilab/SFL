@@ -1652,9 +1652,10 @@ $$;
 --   · on répond pour soi seulement, par repondre_mission() : la base pose le
 --     nom (mon_nom) et l'heure (now()), jamais le téléphone. L'app ne retient
 --     qu'une réponse donnée avant le coup d'envoi, qu'elle lit dans la saison ;
---   · chacun lit ses réponses ; la ligue ne voit un contrat que s'il est
---     accepté des deux côtés (le rival a accepté le sien en face) : personne
---     n'est montré comme cible sans l'avoir voulu.
+--   · chacun lit ses réponses ; la ligue voit toutes les missions acceptées
+--     (Sabri, 23/10 : « montrer tous les contrats qui sont acceptés, les
+--     missions qui sont en jeu », les Contrats en jeu des Actus). Un « passer »
+--     reste à celui qui l'a donné.
 create table if not exists public.missions_reponses (
   saison     integer not null,
   j          integer not null,
@@ -1671,34 +1672,18 @@ create table if not exists public.missions_reponses (
 
 alter table public.missions_reponses enable row level security;
 
--- Le contrat d'en face : le rival a accepté le sien contre ce joueur.
-create or replace function public.duel_accepte(p_saison integer, p_j integer, p_joueur text, p_cible text)
-returns boolean
-language sql
-security definer
-set search_path = ''
-stable
-as $$
-  select exists (
-    select 1 from public.missions_reponses r
-    where r.saison = p_saison and r.j = p_j and r.mission = 'contrat'
-      and r.joueur = p_cible and r.cible = p_joueur and r.reponse = 'acceptee'
-  );
-$$;
-
-revoke execute on function public.duel_accepte(integer, integer, text, text) from public, anon;
-grant execute on function public.duel_accepte(integer, integer, text, text) to authenticated;
-
+-- Jusqu'au 23/10, la ligue ne voyait un contrat qu'accepté des deux côtés
+-- (duel_accepte) : cette règle et sa fonction s'en vont.
 drop policy if exists "missions_reponses: les miennes, et les duels des deux côtés" on public.missions_reponses;
-create policy "missions_reponses: les miennes, et les duels des deux côtés"
+drop function if exists public.duel_accepte(integer, integer, text, text);
+
+drop policy if exists "missions_reponses: les miennes, et les acceptées" on public.missions_reponses;
+create policy "missions_reponses: les miennes, et les acceptées"
   on public.missions_reponses for select
   to authenticated
   using (
     (select public.est_membre())
-    and (
-      joueur_id = (select auth.uid())
-      or (mission = 'contrat' and reponse = 'acceptee' and public.duel_accepte(saison, j, joueur, cible))
-    )
+    and (joueur_id = (select auth.uid()) or reponse = 'acceptee')
   );
 
 revoke all on public.missions_reponses from anon, authenticated;

@@ -462,7 +462,8 @@ export function dimancheEnCours(s: Saison, maintenant: Date): DimancheMissions |
 /* ------------------------------- Le verdict ------------------------------- */
 
 const pl = (n: number, un: string, plusieurs: string) => `${n} ${n > 1 || n === 0 ? plusieurs : un}`;
-const prenom = (n: string) => n.split(" ")[0];
+/** Le prénom, comme les fiches le disent : « Passe devant Abdel ». */
+export const prenom = (n: string) => n.split(" ")[0];
 
 /**
  * Le verdict d'une mission, sur la feuille telle qu'elle est. Tant que la
@@ -555,6 +556,56 @@ export function reponseDe(reponses: Reponse[], d: DimancheMissions, joueur: stri
   if (new Date(r.le).getTime() > d.coupEnvoi.getTime()) return null;
   if (m.creneau === "contrat" && r.cible && r.cible !== (m.cibles[0] ?? null)) return null;
   return r;
+}
+
+/* ---------------------------- Les contrats en jeu ---------------------------- */
+// Sabri, 23/10 : « montrer tous les contrats qui sont acceptés, les missions
+// qui sont en jeu » (Actus). La base montre à toute la ligue les missions
+// acceptées, jamais un « passer ».
+
+/** Une mission acceptée, vue de la ligue : qui l'a signée, et où elle en est. */
+export interface Engagement {
+  joueur: string;
+  m: Mission;
+  reponse: Reponse;
+  verdict: Verdict;
+}
+
+/**
+ * Toutes les missions acceptées de la journée (la réponse qui compte, reponseDe),
+ * avec leur verdict sur la feuille telle qu'elle est ; définitif une fois la
+ * journée finie.
+ */
+export function engagementsDe(
+  d: DimancheMissions,
+  reponses: Reponse[],
+  s: SaisonLue,
+  votes: VoteLeger[],
+  fini: boolean
+): Engagement[] {
+  const liste: Engagement[] = [];
+  for (const [joueur, missions] of d.missions) {
+    for (const m of missions) {
+      const reponse = reponseDe(reponses, d, joueur, m);
+      if (reponse?.reponse !== "acceptee") continue;
+      const v = juger(m, joueur, d, s, votes);
+      liste.push({ joueur, m, reponse, verdict: fini ? verdictFinal(v, m) : v });
+    }
+  }
+  return liste;
+}
+
+/** Ceux qui ont signé un contrat contre ce joueur : son rival d'abord, puis ceux qui veulent le passer. */
+export function signesContre(d: DimancheMissions, reponses: Reponse[], joueur: string): string[] {
+  const qui: string[] = [];
+  for (const [chasseur, missions] of d.missions) {
+    const c = missions.find((m) => m.creneau === "contrat");
+    if (chasseur === joueur || !c?.cibles.includes(joueur)) continue;
+    if (reponseDe(reponses, d, chasseur, c)?.reponse === "acceptee") qui.push(chasseur);
+  }
+  const rival = d.duels.find((x) => x.noirs === joueur || x.blancs === joueur);
+  const r = rival ? (rival.noirs === joueur ? rival.blancs : rival.noirs) : null;
+  return qui.sort((a, b) => Number(b === r) - Number(a === r));
 }
 
 /* --------------------------------- L'XP --------------------------------- */
