@@ -25,6 +25,8 @@ import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { pseudosCites } from "@/lib/sfl/pseudos-cites";
 import { joueursDePiece } from "@/lib/sfl/pieces-joueurs";
+import { resumeMessage as resume } from "@/lib/sfl/resume-message";
+import { nonLus } from "@/lib/sfl/non-lus.server";
 import type { Notif } from "@/lib/sfl/push";
 
 export const maxDuration = 30;
@@ -45,24 +47,6 @@ interface Suivi {
 }
 
 const couper = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
-
-/** Ce que la notification dit d'un message à pièce sans texte. */
-function resume(texte: string, piece: unknown): string {
-  if (texte.trim()) return texte.trim();
-  const type = (piece as { type?: string } | null)?.type;
-  if (type === "vocal") return "🎤 Message vocal";
-  if (type === "photo") return "📷 Photo";
-  if (type === "video") return "🎬 Vidéo";
-  if (type === "ligue") {
-    const p = piece as { titre?: unknown; j?: unknown };
-    return `a partagé « ${String(p.titre ?? "la Ligue")}${typeof p.j === "number" ? ` · J${p.j}` : ""} »`;
-  }
-  return type === "carte"
-    ? "a partagé une carte"
-    : type === "feuille"
-      ? "a partagé une feuille de match"
-      : "a partagé un classement";
-}
 
 export async function POST(req: NextRequest) {
   const sb = serveur();
@@ -191,19 +175,12 @@ export async function POST(req: NextRequest) {
 
   if (envois.size === 0) return NextResponse.json({ envoyes: 0 });
 
-  // Le nombre de non lus de chacun, pour la pastille de l'icône (même compte
-  // que la pastille de la barre : lib/sfl/vestiaire.ts, compterNonLus).
-  const depuis = new Date(maintenant - 3 * 24 * HEURE).toISOString();
-  const { data: recents } = await sb
-    .from("messages")
-    .select("auteur, created_at")
-    .eq("canal", "sfl")
-    .gt("created_at", depuis);
+  // Le nombre de non lus de chacun, pour la pastille de l'icône : le
+  // Vestiaire et les discussions de ses matchs, le compte de la barre
+  // d'onglets (lib/sfl/non-lus.server.ts).
+  const comptes = await nonLus(sb, [...envois.keys()], maintenant);
   for (const [uid, notif] of envois) {
-    const lu = new Date(suivis.get(uid)?.lu_jusqua ?? depuis).getTime();
-    const n = ((recents ?? []) as { auteur: string; created_at: string }[]).filter(
-      (m) => m.auteur !== uid && new Date(m.created_at).getTime() > lu
-    ).length;
+    const n = comptes.get(uid) ?? 0;
     if (n > 0) envois.set(uid, { ...notif, pastille: n });
   }
 

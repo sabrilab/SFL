@@ -15,6 +15,8 @@
 // d'un match. Ce sont des matchs Bola : ils ne touchent pas à la saison de
 // la SFL, mais leur feuille (saisie par l'organisateur après le coup
 // d'envoi) compte dans la Ligue vierge (lib/sfl/ligue-vierge.ts).
+// Chaque match a sa discussion, entre ceux qui en sont
+// (lib/sfl/discussion-match.ts) : y entrer l'y annonce.
 
 import { supabase } from "@/lib/supabase";
 import type { MatchBola } from "@/lib/sfl/ligue-vierge";
@@ -328,12 +330,21 @@ export function notifierMatch(id: number, type: "invitation" | "modifie"): void 
 }
 
 
+/**
+ * Mon arrivée dans la discussion du match (« … a rejoint le match ») : les
+ * autres en sont prévenus. Chargée à la demande, sans attendre ni échouer.
+ */
+function annoncer(id: number): void {
+  void import("@/lib/sfl/discussion-match").then((d) => d.annoncerArrivee(id)).catch(() => {});
+}
+
 /** Prendre une place libre d'un match public. */
 export async function rejoindre(id: number): Promise<void> {
   const moi = await monId();
   if (!moi) throw new Error("Connecte-toi pour rejoindre un match.");
   const { error } = await supabase().from("match_joueurs").insert({ match_id: id, player_id: moi, statut: "inscrit" });
   if (error) throw error;
+  annoncer(id);
 }
 
 /** Accepter une invitation. */
@@ -342,6 +353,7 @@ export async function accepter(id: number): Promise<void> {
   if (!moi) return;
   const { error } = await supabase().from("match_joueurs").update({ statut: "inscrit" }).eq("match_id", id).eq("player_id", moi);
   if (error) throw error;
+  annoncer(id);
 }
 
 /** Se retirer d'un match (ou refuser l'invitation). */

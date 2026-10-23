@@ -6,9 +6,12 @@
 // l'onglet choisi une lentille de verre plus claire qui glisse d'un onglet à
 // l'autre avec un ressort. Le symbole choisi est plein, les autres au trait.
 // À droite, détachée, la pastille ronde du Vestiaire (la discussion de la
-// ligue), avec le nombre de messages pas encore lus. La Recherche, qui était
-// là, est montée en haut des écrans (BoutonRecherche, à la demande de Sabri
-// le 19/10) : le Vestiaire, où l'on revient sans cesse, reste sous le pouce.
+// ligue), avec le nombre de messages pas encore lus. L'onglet Map compte mes
+// invitations sans réponse et les messages pas lus des discussions de mes
+// matchs (22/10) ; l'icône de l'app, ces messages-là et ceux du Vestiaire.
+// La Recherche, qui était là, est montée en haut des écrans
+// (BoutonRecherche, à la demande de Sabri le 19/10) : le Vestiaire, où l'on
+// revient sans cesse, reste sous le pouce.
 //
 // Sur ordinateur, la même capsule, posée en bas au centre. Pendant qu'on
 // écrit au Vestiaire (le clavier ouvert), la barre s'efface : data-clavier
@@ -18,12 +21,14 @@
 // ailleurs, l'app est sombre : verre fumé, encre blanche — exactement le
 // `toolbarColorScheme` de l'onglet Jouer dans l'app.
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ActusIcon, CarteIcon, MapIcon, VestiaireIcon } from "./nav-icons";
 import { ongletActif } from "@/lib/nav";
-import { useVestiaireNonLus } from "@/hooks/use-vestiaire-non-lus";
+import { pastilleIcone, useVestiaireNonLus } from "@/hooks/use-vestiaire-non-lus";
 import { useInvitationsMatch } from "@/hooks/use-invitations";
+import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
 
 const TABS = [
   { href: "/", Icon: MapIcon, label: "Map" },
@@ -43,8 +48,13 @@ export function BottomNav() {
   const encre = clair ? "#0a0b0d" : "#ffffff";
   // Du nouveau dans la discussion : le nombre, sur la bulle.
   const nonLus = useVestiaireNonLus();
-  // Une invitation à un match sans réponse : le nombre, sur l'onglet Map.
+  // Une invitation à un match sans réponse, un message pas lu dans la
+  // discussion d'un de mes matchs : le nombre, sur l'onglet Map.
   const invitations = useInvitationsMatch();
+  const discussions = useDiscussionsMatch().nonLus;
+  const surOngletMap = invitations + discussions;
+  // L'icône de l'app : tous les messages pas lus, comme les notifications.
+  useEffect(() => pastilleIcone(nonLus + discussions), [nonLus, discussions]);
 
   return (
     <div
@@ -76,7 +86,7 @@ export function BottomNav() {
             >
               <span className="relative flex">
                 <Icon plein={choisi} />
-                {href === "/" && invitations > 0 && <Pastille n={invitations} clair={clair} />}
+                {href === "/" && surOngletMap > 0 && <Pastille n={surOngletMap} clair={clair} />}
               </span>
               <span className="liquid-tabbar__libelle" style={{ fontWeight: choisi ? 600 : 500 }}>
                 {label}
