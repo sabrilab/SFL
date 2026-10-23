@@ -8,7 +8,9 @@
 //   · rayons : la gloire du MVP, des pointes qui partent du portrait ;
 //   · ondes : l'onde de choc d'Impact, des cercles de plus en plus espacés ;
 //   · alvéoles : la cotte de mailles de la Défensive, en hexagones ;
-//   · étoiles : le ciel de la finition nuit, tiré de la graine du joueur.
+//   · étoiles : le ciel de la finition nuit, tiré de la graine du joueur ;
+//     les étincelles seulement au dos (sur la face, elles tombaient sur le
+//     texte).
 // Et la rosace guillochée du dos (RosaceBola), comme sur un billet.
 
 import { useId } from "react";
@@ -64,12 +66,15 @@ export function MotifCarte({
   motif,
   graine = 1,
   centre,
+  eclats = true,
 }: {
   motif: Motif & { clair: string; fonce: string };
   /** Les étoiles : le ciel propre à chaque joueur. */
   graine?: number;
   /** Le centre des rayons et des ondes, s'il change (le dos : la rosace). */
   centre?: { cx: number; cy: number };
+  /** Les étincelles du ciel (le dos) ; sur la face, seulement les points. */
+  eclats?: boolean;
 }) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");
   const style: React.CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%" };
@@ -133,13 +138,13 @@ export function MotifCarte({
     const t = rnd();
     points.push({ x: rnd() * W, y: rnd() * H, r: 1.4 + t * t * t * 4.2, a: 0.25 + rnd() * 0.75 });
   }
-  const eclats = Array.from({ length: 5 }, () => etincelle(70 + rnd() * (W - 140), 70 + rnd() * (H - 140), 14 + rnd() * 16)).join("");
+  const etincelles = Array.from({ length: 5 }, () => etincelle(70 + rnd() * (W - 140), 70 + rnd() * (H - 140), 14 + rnd() * 16)).join("");
   return (
     <svg aria-hidden viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={style}>
       {points.map((p, i) => (
         <circle key={i} cx={f(p.x)} cy={f(p.y)} r={f(p.r)} fill={p.r > 3.4 ? motif.clair : motif.fonce} opacity={f(p.a)} />
       ))}
-      <path d={eclats} fill={motif.clair} />
+      {eclats && <path d={etincelles} fill={motif.clair} />}
     </svg>
   );
 }

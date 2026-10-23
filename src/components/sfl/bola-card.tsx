@@ -436,7 +436,7 @@ export function BolaCard({
       }}
     >
       {/* La matière : le motif gravé ton sur ton (or, rouge, cobalt, nuit) */}
-      {p.motif && <MotifCarte motif={p.motif} graine={seed} />}
+      {p.motif && <MotifCarte motif={p.motif} graine={seed} eclats={false} />}
       {/* Le papier : microtexte gravé et lignes de scan */}
       <div
         aria-hidden
