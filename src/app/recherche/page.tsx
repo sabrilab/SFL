@@ -9,8 +9,11 @@
 //
 // Tout est dérivé de la saison déjà en mémoire : la recherche ne charge rien,
 // elle filtre. Les résultats s'ouvrent sur place, sans changer de page.
+// ?joueur=Nom ouvre directement un profil (la carte en grand, la
+// notification « … te suit »).
 
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, CalendarDays, Search, X } from "lucide-react";
@@ -145,10 +148,32 @@ function FicheJournee({ journee }: { journee: Journee }) {
 /* --------------------------------- page ---------------------------------- */
 
 export default function RecherchePage() {
+  // useSearchParams impose une frontière Suspense côté App Router.
+  return (
+    <Suspense fallback={null}>
+      <Recherche />
+    </Suspense>
+  );
+}
+
+function Recherche() {
   const { players, journees } = useSeason();
+  const demande = useSearchParams().get("joueur");
   const [q, setQ] = useState("");
-  const [openPlayer, setOpenPlayer] = useState<string | null>(null);
+  const [openPlayer, setOpenPlayer] = useState<string | null>(demande);
   const [openJournee, setOpenJournee] = useState<number | null>(null);
+  // Un autre profil demandé alors que la page est déjà ouverte.
+  const [vu, setVu] = useState(demande);
+  if (demande !== vu) {
+    setVu(demande);
+    if (demande) {
+      setOpenPlayer(demande);
+      setOpenJournee(null);
+    }
+  }
+  useEffect(() => {
+    if (demande) document.getElementById("app-scroll")?.scrollTo({ top: 0 });
+  }, [demande]);
 
   const ranked = useMemo(() => rankPlayers(players), [players]);
   const rankOf = useMemo(

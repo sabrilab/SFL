@@ -14,6 +14,7 @@
 import { useState } from "react";
 import { ChevronDown, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SigleLigue } from "@/components/sfl/choix-ligue";
 import type { Journee } from "@/lib/sfl/engine";
 import { Nom } from "@/components/sfl/nom";
 
@@ -170,7 +171,7 @@ export function JourneesDepliables({
       {/* La pastille SFL — elle nomme ce qu'on regarde. */}
       <div className="flex items-center gap-3 px-1">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/15">
-          <span className="mono-label text-[10px] text-primary">SFL</span>
+          <SigleLigue ligue="sfl" hauteur={10} className="text-primary" />
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-[16px] font-bold tracking-tight">Sunday Five League</h2>

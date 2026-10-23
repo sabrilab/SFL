@@ -5,8 +5,10 @@
 // Cette page lit le journal `activity` (réservé à l'admin par RLS) et la table
 // des profils, puis passe le tout à la vue (`vue.tsx`), qui analyse
 // (`lib/sfl/retention.ts`) et affiche : conclusions, courbes de croissance,
-// rétention par cohorte, gestes qui font revenir, pays choisis pour la carte
-// (table photo_studio), joueurs à relancer. En
+// rétention par cohorte, gestes qui font revenir, notifications (qui les a
+// activées, ce que chaque motif fait faire : ./notifications.tsx, qui lit ses
+// propres tables), pays choisis pour la carte (table photo_studio), joueurs à
+// relancer. En
 // dessous, les sujets de Bola Agent (./agent.tsx), sans le contenu, puis les
 // accords à la politique de confidentialité (./confidentialite.tsx).
 // Rien n'est agrégé en base, donc rien à maintenir quand on ajoute un type

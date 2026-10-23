@@ -1,7 +1,8 @@
 "use client";
 
 // La fiche d'un joueur, ouverte en touchant sa carte sur la feuille de match :
-// sa carte, son nom et son équipe du jour, une phrase qui le résume, ses trois
+// sa carte, son nom et son équipe du jour, de quoi le suivre, ses abonnés
+// comme sur Instagram (suivre.tsx), une phrase qui le résume, ses trois
 // points forts, ses faits marquants, puis ses badges, les plus rares d'abord
 // (les écussons et médailles de Ma carte ; toucher un badge ouvre son détail,
 // avec qui d'autre l'a). « Voir sa carte en grand » ouvre la carte en 3D,
@@ -13,6 +14,7 @@ import { useMemo, useState } from "react";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useCardViewer } from "@/components/sfl/card-viewer";
 import { useSeason } from "@/components/sfl/season-provider";
+import { BoutonSuivre, ReseauJoueur } from "@/components/sfl/suivre";
 import { FeuilleBadge, Medaille, Trophee } from "@/components/sfl/vitrine";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import type { Player } from "@/lib/sfl/engine";
@@ -77,6 +79,7 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
       cacheKey: `mini-${player.name}`,
       mode: "simple",
       title: identite.nom(player.name),
+      joueur: player.name,
       render: (s) => <PlayerCard player={player} size={s} />,
     });
   }
@@ -105,8 +108,11 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
             {identite.pseudo(player.name)}
             {poste && ` · ${poste.toLowerCase()}`}
           </SheetDescription>
+          <BoutonSuivre nom={player.name} petit className="mt-1 self-start" />
         </div>
       </div>
+
+      <ReseauJoueur nom={player.name} centre={false} />
 
       <p className="text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
 

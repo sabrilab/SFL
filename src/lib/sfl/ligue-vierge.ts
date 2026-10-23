@@ -39,6 +39,7 @@ export interface MatchBola {
   /** ISO, « 2026-10-22 ». */
   jour: string;
   heure: string;
+  /** Plus aucune exhibition ne s'ouvre depuis le 23/10 (la base met « match ») ; restent d'éventuelles anciennes lignes. */
   genre: "match" | "exhibition";
   scoreClairs: number;
   scoreFonces: number;

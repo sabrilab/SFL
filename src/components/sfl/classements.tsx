@@ -3,7 +3,8 @@
 // Tous les classements de la saison, sur une seule vue : la Ligue les montre
 // directement (onglet Classements), sans page intermédiaire.
 //
-// Un sélecteur de classement (Pépite d'Or, Buteurs, Passeurs…), puis le
+// Un sélecteur de classement (Pépite d'Or, Buteurs, Passeurs… : une rangée
+// qui défile sur téléphone, toutes les pastilles sur grand écran), puis le
 // podium en cartes de tailles différentes — le n°1 avec sa carte actuelle,
 // φ fois plus grande que celles de ses dauphins — et la suite en lignes,
 // chacune avec sa carte en vignette. Toucher une carte l'ouvre en grand.
@@ -133,7 +134,7 @@ export function Classements({ me }: { me: string }) {
   return (
     <section className="flex flex-col gap-4">
       <div
-        className="-mx-5 flex gap-2 overflow-x-auto overscroll-x-contain px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="-mx-5 flex gap-2 overflow-x-auto overscroll-x-contain px-5 pb-1 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden"
         role="tablist"
         aria-label="Classement"
       >

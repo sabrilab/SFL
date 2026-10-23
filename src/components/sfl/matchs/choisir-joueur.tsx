@@ -2,11 +2,15 @@
 
 // Ajouter un joueur à une place du terrain (terrain-places.tsx) : une liste
 // qui s'ouvre sur le + touché. En haut, la recherche par nom ou identifiant ;
-// dessous, trois façons de trouver quelqu'un :
+// dessous, cinq façons de trouver quelqu'un :
+//   · Suivis  — ceux que tu suis (suivis.ts), en premier (Sabri, 22/10 :
+//     « qu'on puisse ajouter les gens qu'on suit, qu'on puisse les voir en
+//     priorité ») ;
 //   · Libres  — ceux qui ont dit être libres à ce moment-là (leurs dispos) ;
 //   · Près de toi — les joueurs de ta ville et des villes voisines (villes.ts) ;
 //   · Partenaires — ceux avec qui tu as déjà joué (la saison, les archives) ;
 //   · Tous — tout Bola, par ordre alphabétique.
+// Dans chaque liste et dans la recherche, ceux que tu suis passent devant.
 // Chaque joueur en petite carte ; le toucher l'invite. Le mode Team ajoute,
 // en tête, l'invitation par lien (un nouveau y crée son compte).
 
@@ -17,11 +21,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import { Nom } from "@/components/sfl/nom";
+import { useSuivis } from "@/hooks/use-suivis";
 import { chercherProfils, type Profil } from "@/lib/sfl/matchs";
+import { partenaires } from "@/lib/sfl/partenaires";
 import { maVille, villeDe } from "@/lib/sfl/villes";
 import { cn } from "@/lib/utils";
 
-type Onglet = "libres" | "pres" | "partenaires" | "tous";
+type Onglet = "suivis" | "libres" | "pres" | "partenaires" | "tous";
 
 /** Distance entre deux points, en km (haversine). */
 function km(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
@@ -60,10 +66,26 @@ export function ChoisirJoueur({
   onLien?: () => void;
 }) {
   const { saison } = useSeason();
+  const suivis = useSuivis();
   const [q, setQ] = useState("");
   const candidats = useMemo(() => profils.filter((p) => !exclus.has(p.id)), [profils, exclus]);
 
   const listes = useMemo(() => {
+    // Ceux que je suis passent devant, l'ordre de chaque liste gardé entre eux.
+    const devant = (l: Ligne[]) => [
+      ...l.filter((x) => suivis.suit(moiNom, x.profil.name)),
+      ...l.filter((x) => !suivis.suit(moiNom, x.profil.name)),
+    ];
+    const ensemble = partenaires(saison, moiNom);
+
+    const suivisL: Ligne[] = candidats
+      .filter((p) => suivis.suit(moiNom, p.name))
+      .sort((a, b) => (ensemble.get(b.name) ?? 0) - (ensemble.get(a.name) ?? 0) || a.name.localeCompare(b.name, "fr"))
+      .map((profil) => ({
+        profil,
+        detail: suivis.suit(profil.name, moiNom) ? "Vous vous suivez" : (villeDe(profil.name)?.ville ?? profil.username),
+      }));
+
     const libresL: Ligne[] = candidats.filter((p) => libres.has(p.id)).map((profil) => ({ profil, detail: "Libre à ce moment-là" }));
 
     const ici = maVille(moiNom);
@@ -78,17 +100,6 @@ export function ChoisirJoueur({
           .map(({ profil, v, d }) => ({ profil, detail: d < 1 ? v.ville : `${v.ville} · ${Math.round(d)} km` }))
       : [];
 
-    // Les journées où chacun était présent, saison en cours et archives.
-    const entrees = [
-      ...saison.entries.map((e) => ({ ...e, s: saison.numero ?? 0 })),
-      ...(saison.archives ?? []).flatMap((a) => a.entries.map((e) => ({ ...e, s: a.numero }))),
-    ].filter((e) => e.statut === "Présent");
-    const mesJours = new Set(entrees.filter((e) => e.player === moiNom).map((e) => `${e.s}-${e.j}`));
-    const ensemble = new Map<string, number>();
-    for (const e of entrees) {
-      if (e.player === moiNom || !mesJours.has(`${e.s}-${e.j}`)) continue;
-      ensemble.set(e.player, (ensemble.get(e.player) ?? 0) + 1);
-    }
     const partenairesL: Ligne[] = candidats
       .filter((p) => ensemble.has(p.name))
       .sort((a, b) => (ensemble.get(b.name) ?? 0) - (ensemble.get(a.name) ?? 0))
@@ -101,11 +112,12 @@ export function ChoisirJoueur({
       .sort((a, b) => a.name.localeCompare(b.name, "fr"))
       .map((profil) => ({ profil, detail: villeDe(profil.name)?.ville ?? profil.username }));
 
-    return { libres: libresL, pres: presL, partenaires: partenairesL, tous: tousL };
-  }, [candidats, libres, moiNom, saison]);
+    return { suivis: suivisL, libres: devant(libresL), pres: devant(presL), partenaires: devant(partenairesL), tous: devant(tousL) };
+  }, [candidats, libres, moiNom, saison, suivis]);
 
   const onglets = (
     [
+      ["suivis", "Suivis"],
       ["libres", "Libres"],
       ["pres", "Près de toi"],
       ["partenaires", "Partenaires"],
@@ -116,13 +128,16 @@ export function ChoisirJoueur({
   const onglet: Onglet | null = onglets.some(([id]) => id === choix) ? choix : (onglets[0]?.[0] ?? null);
 
   const recherche = q.trim()
-    ? chercherProfils(candidats, q).map((profil) => ({ profil, detail: profil.username }))
+    ? chercherProfils(
+        [...candidats].sort((a, b) => Number(suivis.suit(moiNom, b.name)) - Number(suivis.suit(moiNom, a.name))),
+        q
+      ).map((profil) => ({ profil, detail: profil.username }))
     : null;
   const lignes: Ligne[] = recherche ?? (onglet ? listes[onglet] : []);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[80dvh] rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
+      <SheetContent side="bottom" className="data-[side=bottom]:h-[80dvh] rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
         <SheetHeader className="px-5 pt-5 pb-0">
           <SheetTitle className="text-[24px] font-bold tracking-tight">Ajouter un joueur</SheetTitle>
         </SheetHeader>
@@ -141,14 +156,14 @@ export function ChoisirJoueur({
           )}
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nom ou identifiant" autoCapitalize="none" autoCorrect="off" />
           {!recherche && onglets.length > 1 && (
-            <div className="grid grid-flow-col gap-1 rounded-full bg-secondary p-1">
+            <div className="flex gap-1 overflow-x-auto rounded-full bg-secondary p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {onglets.map(([id, libelle]) => (
                 <button
                   key={id}
                   type="button"
                   onClick={() => setChoix(id)}
                   className={cn(
-                    "py-2 text-[13.5px] font-semibold",
+                    "flex-1 px-3 py-2 text-[13.5px] font-semibold whitespace-nowrap",
                     onglet === id ? "bouton-principal" : "bouton-discret text-muted-foreground"
                   )}
                 >

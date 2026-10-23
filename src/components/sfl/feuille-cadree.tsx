@@ -45,9 +45,11 @@ export function FeuilleCadree({
           maxHeight: vue.hauteur > 0 ? Math.round(vue.hauteur * (clavier ? 0.98 : 0.92)) : "92dvh",
         }}
       >
-        <SheetHeader className="shrink-0 px-5 pt-5 pb-3">
+        {/* Le titre sous la poignée, sans la toucher : la croix du coin remonte
+            la feuille de 16 px (sheet.tsx). Sabri, 23/10. */}
+        <SheetHeader className="shrink-0 px-5 pt-8 pb-3">
           {surtitre && <p className="mono-label pr-10 text-muted-foreground">{surtitre}</p>}
-          <SheetTitle className="pr-10 text-[26px] font-bold tracking-tight">{titre}</SheetTitle>
+          <SheetTitle className="pr-10 text-[26px] leading-[1.15] font-bold tracking-tight">{titre}</SheetTitle>
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 [contain:paint]">{children}</div>
         {pied && (

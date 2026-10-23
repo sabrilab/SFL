@@ -94,7 +94,7 @@ function MatchJoue({ m }: { m: MatchCompte }) {
         <span className="mono-label text-foreground/40">
           {libelleJour(m.jour)} · {m.heure}
         </span>
-        {!m.valide && <span className="mono-label text-foreground/40">{m.genre === "exhibition" ? "Exhibition" : "Amical"}</span>}
+        {!m.valide && <span className="mono-label text-foreground/40">Amical</span>}
       </div>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
         <span className="mono-label text-muted-foreground">Clairs</span>
@@ -137,7 +137,7 @@ function MesFeuilles({ parties, onSaisie, apercu }: { parties: Partie[]; onSaisi
         >
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[15px] font-bold">{p.lieu}</span>
-            <span className="mono-label text-background/60">
+            <span className="mono-label bouton-sous">
               {libelleJour(p.jour)} · {p.heure}
             </span>
           </span>

@@ -19,6 +19,7 @@ import { ActivityTracker } from "@/components/sfl/activity-tracker";
 import { NouvellesCartes } from "@/components/sfl/nouvelle-carte";
 import { ConnexionLocale } from "@/components/sfl/auth/connexion-locale";
 import { PhotosSync } from "@/components/sfl/photos-sync";
+import { MissionsAnnonce } from "@/components/sfl/missions-annonce";
 import { IdentiteObligatoire } from "@/components/sfl/identite";
 import { NouveauxBadges } from "@/components/sfl/vitrine";
 import { InvitationCarte } from "@/components/sfl/invitation-carte";
@@ -109,6 +110,7 @@ export default function RootLayout({
                 <ActivityTracker />
                 <ConnexionLocale />
                 <PhotosSync />
+                <MissionsAnnonce />
                 {/* La case de confidentialité passe avant tout ce qui s'ouvre
                     de soi-même : cérémonies, invitations, identité. */}
                 <ConsentementObligatoire />
