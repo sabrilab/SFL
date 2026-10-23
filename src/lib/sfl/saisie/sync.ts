@@ -9,7 +9,13 @@
 //     version distante à la sienne et adopte la plus récente ;
 //   · ARBITRER: un document bâti sur un seed plus ancien que celui embarqué
 //     dans l'app est refusé — après un déploiement qui corrige les données,
-//     le premier passage d'un admin re-pousse le seed corrigé.
+//     le premier passage d'un admin re-pousse le seed corrigé ;
+//   · NE PAS ÉCRASER : depuis le 22/10/2026, l'admin publie par la fonction
+//     publier_saison en disant sur quelle version il a travaillé. Si un
+//     autre admin a publié entre-temps, rien n'est écrit : il reprend la base
+//     ou écrase en connaissance de cause. Avant, la dernière sauvegarde
+//     gagnait, et un appareil resté sur une vieille copie effaçait les
+//     journées saisies ailleurs (la J11 de la saison 0, le 17/10).
 //
 // Tout est silencieux et non bloquant : sans session serveur, l'app reste
 // exactement ce qu'elle était (stockage local seul).
@@ -97,8 +103,15 @@ export async function pullSaison(): Promise<boolean> {
   }
 }
 
-/** Issue d'une synchronisation — le motif sert à l'afficher tel quel. */
-export type Resultat = { ok: true } | { ok: false; raison: string };
+/**
+ * Issue d'une synchronisation — le motif sert à l'afficher tel quel.
+ * `conflit` : la base a changé depuis la version sur laquelle cet appareil a
+ * travaillé ; l'admin choisit entre reprendre la base et écraser.
+ */
+export type Resultat = { ok: true } | { ok: false; raison: string; conflit?: true };
+
+const CONFLIT =
+  "Un autre admin a publié depuis ta dernière synchro. Reprends la base pour repartir de sa version, ou écrase-la avec la tienne.";
 
 /** Date de la dernière publication réussie, pour l'afficher à l'admin. */
 const PUBLIE_KEY = "sfl-saison-publiee-le";
@@ -137,44 +150,84 @@ export function blocage(): string | null {
 /**
  * Pousse la saison en base — admin en session serveur uniquement, refus
  * silencieux sinon (c'est ce qui permet à saisieStore.save de l'appeler sans
- * réfléchir). Écriture document entier : la dernière sauvegarde gagne.
+ * réfléchir). Écriture document entier, mais jamais par-dessus une version
+ * plus neuve que celle d'où part cet appareil, sauf `forcer`.
+ *
+ * Une publication à la fois : chaque sauvegarde publie, et deux envois partis
+ * ensemble se gêneraient (le second, bâti sur la même version que le premier,
+ * passerait pour un conflit). Chacun attend le précédent, puis repart de la
+ * version que celui-ci a laissée.
  *
  * Renvoie le MOTIF de l'échec : « ça n'a pas marché » sans dire pourquoi
  * laisse l'admin sans rien à faire, et c'est exactement la situation où il a
  * besoin d'agir.
  */
-export async function publierSaison(saison: Saison): Promise<Resultat> {
+export function publierSaison(saison: Saison, { forcer = false } = {}): Promise<Resultat> {
+  const tour = fileDePublication.then(() => publierMaintenant(saison, forcer));
+  fileDePublication = tour.catch(() => {});
+  return tour;
+}
+
+let fileDePublication: Promise<unknown> = Promise.resolve();
+
+async function publierMaintenant(saison: Saison, forcer: boolean): Promise<Resultat> {
   const empeche = blocage();
   if (empeche) return { ok: false, raison: empeche };
   try {
-    const version = Date.now();
-    const { error } = await supabase().from("saison").upsert(
-      {
-        id: 1,
-        data: saison,
-        version,
-        seed: CURRENT_SEED_VERSION,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "id" }
-    );
-    if (error) {
-      const manque = /relation .*saison.* does not exist|schema cache/i.test(error.message);
-      return {
-        ok: false,
-        raison: manque
-          ? "La table « saison » n'existe pas encore en base. Passe une fois par Réglages → Installation Supabase."
-          : error.message,
-      };
-    }
-    // Se souvenir de sa propre version : l'écho temps réel ne re-adoptera pas
-    // ce qu'on vient d'écrire.
-    localStorage.setItem(VERSION_KEY, String(version));
-    localStorage.setItem(PUBLIE_KEY, String(version));
+    const { data, error } = await supabase().rpc("publier_saison", {
+      p_data: saison,
+      p_seed: CURRENT_SEED_VERSION,
+      p_base: localVersion(),
+      p_forcer: forcer,
+    });
+    // La base n'a pas encore la fonction (un aperçu avant la migration) :
+    // l'ancien envoi.
+    if (error?.code === "PGRST202") return ecrireDocument(saison);
+    if (error) return { ok: false, raison: motif(error.message) };
+    const r = data as { ok: boolean; version: number };
+    if (!r.ok) return { ok: false, raison: CONFLIT, conflit: true };
+    retenir(r.version);
     return { ok: true };
   } catch (e) {
     return { ok: false, raison: e instanceof Error ? e.message : "Base injoignable." };
   }
+}
+
+/** L'écriture d'avant publier_saison : le document entier, la dernière gagne. */
+async function ecrireDocument(saison: Saison): Promise<Resultat> {
+  const version = Math.max(Date.now(), localVersion() + 1);
+  const { error } = await supabase().from("saison").upsert(
+    {
+      id: 1,
+      data: saison,
+      version,
+      seed: CURRENT_SEED_VERSION,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "id" }
+  );
+  if (error) return { ok: false, raison: motif(error.message) };
+  retenir(version);
+  return { ok: true };
+}
+
+function motif(message: string): string {
+  return /relation .*saison.* does not exist|schema cache/i.test(message)
+    ? "La table « saison » n'existe pas encore en base. Passe une fois par Réglages → Installation Supabase."
+    : message;
+}
+
+/**
+ * Se souvenir de sa propre version : l'écho temps réel ne re-adoptera pas ce
+ * qu'on vient d'écrire, et la publication suivante partira d'elle. Plus rien
+ * n'attend de partir : l'échec d'un envoi précédent est réparé.
+ */
+function retenir(version: number) {
+  localStorage.setItem(VERSION_KEY, String(version));
+  localStorage.setItem(PUBLIE_KEY, String(version));
+  marquerAPublier(false);
+  dernier = { at: Date.now(), ok: true };
+  signalerEnvoi();
 }
 
 /* --------------------- Mémoire du dernier envoi auto --------------------- */
@@ -191,6 +244,7 @@ export interface EnvoiAuto {
   at: number;
   ok: boolean;
   raison?: string;
+  conflit?: boolean;
 }
 
 let dernier: EnvoiAuto | null = null;
@@ -200,16 +254,24 @@ export function dernierEnvoiAuto(): EnvoiAuto | null {
 }
 
 /** Envoi automatique — appelé par saisieStore.save à chaque sauvegarde. */
-export async function pushSaison(saison: Saison): Promise<boolean> {
-  const r = await publierSaison(saison);
-  dernier = { at: Date.now(), ok: r.ok, ...(r.ok ? {} : { raison: r.raison }) };
+export async function pushSaison(saison: Saison, { forcer = false } = {}): Promise<boolean> {
+  const r = await publierSaison(saison, { forcer });
+  dernier = {
+    at: Date.now(),
+    ok: r.ok,
+    ...(r.ok ? {} : { raison: r.raison, ...(r.conflit ? { conflit: true } : {}) }),
+  };
   marquerAPublier(!r.ok);
+  signalerEnvoi();
+  return r.ok;
+}
+
+function signalerEnvoi() {
   try {
     window.dispatchEvent(new Event(SYNC_EVENT));
   } catch {
     /* hors navigateur */
   }
-  return r.ok;
 }
 
 /**
@@ -347,6 +409,10 @@ export async function reprendreDeLaBase(): Promise<Resultat> {
     const doc = data as { data: Saison; version: number; seed: number };
     adoptSaison(doc.data);
     localStorage.setItem(VERSION_KEY, String(doc.version));
+    // Plus rien n'attend de partir : ce qui restait ici a été remplacé.
+    marquerAPublier(false);
+    dernier = null;
+    signalerEnvoi();
     window.dispatchEvent(new Event(SAISIE_EVENT));
     return { ok: true };
   } catch (e) {
@@ -359,6 +425,7 @@ export async function reprendreDeLaBase(): Promise<Resultat> {
  * uniquement. Si la table est vide (installation neuve) ou bâtie sur un seed
  * plus ancien que celui de l'app (déploiement correctif), la copie locale de
  * l'admin part en base sans qu'il ait rien à presser : ouvrir l'app suffit.
+ * C'est la seule publication forcée d'office : le seed livré fait foi.
  */
 export async function ensureRemoteSaison(): Promise<void> {
   const session = getSession();
@@ -373,7 +440,7 @@ export async function ensureRemoteSaison(): Promise<void> {
     const doc = data as { version: number; seed: number } | null;
     if (!doc || doc.seed < CURRENT_SEED_VERSION) {
       const { saisieStore } = await import("./store");
-      await pushSaison(saisieStore.load());
+      await pushSaison(saisieStore.load(), { forcer: true });
     }
   } catch {
     // Base injoignable : le prochain passage réessaiera.

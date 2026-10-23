@@ -33,7 +33,11 @@ import { quantite, vitrine } from "./trophees";
 import { journeeJouee } from "./saisie/mutations";
 import type { Saison } from "./saisie/types";
 
-/** Questions au coach par joueur sur 24 h glissantes (le crédit est celui de Sabri). */
+/**
+ * Questions au coach par joueur sur 24 h glissantes (le crédit est celui de
+ * Sabri). Recopiée dans la base (credit_du_jour, supabase/schema.sql) : les
+ * changer ensemble.
+ */
 export const LIMITE_AGENT_JOUR = 30;
 /** Images que le coach fait faire par joueur sur 24 h glissantes. */
 export const LIMITE_IMAGES_JOUR = 8;
