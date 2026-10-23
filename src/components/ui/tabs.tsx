@@ -53,8 +53,8 @@ function TabsList({
   )
 }
 
-// Un onglet est un segment de verre : l'actif est un bouton principal, les
-// autres des discrets (app/boutons.css).
+// Un onglet est un segment : l'actif est un bouton principal, les autres des
+// discrets (app/boutons.css).
 function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
   return (
     <TabsPrimitive.Tab

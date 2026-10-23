@@ -137,7 +137,7 @@ function MesFeuilles({ parties, onSaisie, apercu }: { parties: Partie[]; onSaisi
         >
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[15px] font-bold">{p.lieu}</span>
-            <span className="mono-label text-background/60">
+            <span className="mono-label bouton-sous">
               {libelleJour(p.jour)} · {p.heure}
             </span>
           </span>

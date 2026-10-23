@@ -1,21 +1,27 @@
 /* ═══════════════════════ Les boutons de Bola ═══════════════════════
-   Du verre de nuit, éclairé par en dessous (Sabri, 22/10 : « une belle
-   différenciation des boutons avec une espèce de bombage et un peu de
-   bruit, tout en restant dans l'ADN de Bola » ; puis la couleur sur tous
-   les boutons ; puis, planche « New tone test 26 » à l'appui : un verre
-   sombre où la lumière monte du bas, et un bruit bien moins visible).
+   Plus calmes (Sabri, 23/10, trois planches à l'appui : « pour les
+   boutons actuels, ça fait un peu too much »). Ses références : des
+   pilules de nacre au relief doux ; une carte sombre et mate où la seule
+   couleur est une barre qui luit, à côté d'une pilule cerclée d'un trait
+   fin ; des pilules sombres où la couleur n'est qu'un anneau et sa lueur.
+   Le verre de nuit d'avant (22/10) allumait chaque bouton de sa couleur,
+   avec un halo et un grain : ici, plus de grain ni de halo coloré, et la
+   couleur ne remplit plus le bouton, elle n'en est que l'accent.
+
+   Deux allures à l'essai, le temps que Sabri choisisse (aperçu seulement :
+   ?boutons=nacre ou ?boutons=mat dans l'adresse, retenu sur l'appareil) :
+   · nacre (par défaut) — le principal est une pilule de nacre, le texte
+     sombre dans son ton, une trace de sa couleur en bas ;
+   · mat — le principal est une pilule sombre et mate, au liseré clair ;
+     son ton n'est qu'une lumière douce au bas du bouton.
 
    Trois rangs, qu'on lit sans avoir à lire :
-   · bouton-principal  — le verre de nuit allumé : sombre en haut, la
-                         lumière de son ton monte du bas et s'enroule sur
-                         les bords, le biseau du haut la reprend, un halo
-                         la pose sur la page. Le geste de l'écran ;
-   · bouton-secondaire — le verre fumé, éteint, le liseré dans son ton : on
-                         le voit au repos, il ne crie pas ;
-   · bouton-discret    — le texte seul, dans son ton ; le verre vient sous
-                         le doigt.
-   Sur un fond clair (la Map, ses stickers de papier) : bouton-encre, le
-   verre noir, et bouton-givre, le verre dépoli blanc.
+   · bouton-principal  — le geste de l'écran (nacre, ou mat) ;
+   · bouton-secondaire — la pilule cerclée d'un trait fin, le texte dans
+                         son ton : on la voit, elle ne crie pas ;
+   · bouton-discret    — le texte seul, dans son ton.
+   Sur un fond clair (la Map, ses stickers de papier) : bouton-encre, la
+   pilule sombre et mate, et bouton-givre, la nacre posée sur le plan.
 
    Six tons, un par famille de gestes, pris dans la charte (le vert, le
    mauve et la braise) et dans les métaux des cartes (l'argent, l'or) :
@@ -25,44 +31,21 @@
    · bouton--mauve  les autres : le Vestiaire, partager, inviter, défier ;
    · bouton--braise il manque des joueurs (la braise reste au manque) ;
    · bouton--rouge  défaire : annuler, retirer, quitter, se déconnecter.
-   Le ton se pose sur n'importe quel rang : il allume le verre du
-   principal, borde le verre fumé du secondaire, colore le texte du
-   discret. Une action qui défait reste en secondaire : elle ne brille
-   jamais plus que celle qui fait.
+   Le ton se pose sur n'importe quel rang : il teinte le texte et le bas du
+   principal, le trait et le texte du secondaire, le texte du discret. Une
+   action qui défait reste en secondaire : elle ne brille jamais plus que
+   celle qui fait.
 
-   Le grain : un bruit bleu (une tuile de 64 × 64, écrite ici même : rien
-   n'est téléchargé), un point par pixel de l'écran (--grain-pas suit la
-   densité de l'écran), de faible amplitude autour du gris moyen. Fondu en
-   overlay, il ne se voit que dans la lumière, là où le verre passe du
-   sombre au clair, comme le dépoli de la planche ; sur le noir et sur le
-   blanc, il s'efface.
-
-   Accessibilité : texte à 4,5:1 au moins sur chaque verre (la lumière
-   reste sous les lettres), contour de focus net au clavier, rien ne bouge
-   avec « Réduire les animations » (règle globale de globals.css), verre
-   opaque avec « Réduire la transparence », bords nets et sans grain avec
-   « Augmenter le contraste », bordures système en mode contraste forcé.
+   Accessibilité : texte à 4,5:1 au moins sur chaque pilule, contour de
+   focus net au clavier, rien ne bouge avec « Réduire les animations »
+   (règle globale de globals.css), nacre opaque avec « Réduire la
+   transparence », traits renforcés avec « Augmenter le contraste »,
+   bordures système en mode contraste forcé.
 
    Tout est dans @layer components : les utilitaires Tailwind (taille,
    marges, position, arrondi, typo) gardent la main. Un bouton converti
    perd donc ses bg-*, text-* de couleur et shadow-* : c'est le rang et le
    ton qui les donnent. */
-
-:root {
-  --grain: url("data:image/png;base64,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");
-  /* Un point du bruit par pixel de l'écran. */
-  --grain-pas: 64px;
-}
-@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 2dppx) {
-  :root {
-    --grain-pas: 32px;
-  }
-}
-@media (-webkit-min-device-pixel-ratio: 3), (min-resolution: 3dppx) {
-  :root {
-    --grain-pas: 21.3333px;
-  }
-}
 
 @layer components {
   .bouton-principal,
@@ -70,219 +53,210 @@
   .bouton-discret,
   .bouton-encre,
   .bouton-givre {
-    /* Le ton par défaut, l'argent. Le verre (nuit, fond), sa lumière
-       (lueur), son cœur le plus chaud (feu), le texte allumé ; puis le ton
-       du verre fumé et du texte seul. */
-    --b-nuit: #121418;
-    --b-fond: #1d2026;
-    --b-lueur: 206 214 228;
-    --b-feu: 246 248 252;
-    --b-allume: #f6f7f4;
-    --b-halo: 0.62;
-    --b-ton: 226 232 242;
-    --b-texte: #f4f5f2;
-    --b-discret: rgb(244 245 242 / 0.78);
-    --b-sombre: #0a0b0d;
+    /* Le ton par défaut, l'argent : sa couleur (ton), le texte sur le sombre
+       (texte, discret), le texte sur la nacre (sombre) ; la trace du ton en
+       bas de la nacre (lumiere), la lumière et le liseré du mat (mat,
+       mat-trait), le trait du secondaire (trait). */
+    --b-ton: 222 227 236;
+    --b-texte: #f1f2ef;
+    --b-discret: rgb(241 242 239 / 0.74);
+    --b-sombre: #121316;
+    --b-lumiere: 0;
+    --b-mat: 0.1;
+    --b-mat-trait: 0.16;
+    --b-trait: 0.16;
     position: relative;
     isolation: isolate;
     border-radius: 999px;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    background-repeat: repeat;
     transition:
       scale 0.18s cubic-bezier(0.3, 1.5, 0.5, 1),
-      box-shadow 0.3s ease,
-      filter 0.3s ease,
+      box-shadow 0.25s ease,
+      filter 0.25s ease,
       background-color 0.25s ease,
       color 0.25s ease,
       opacity 0.2s ease;
   }
 
   /* ── Les tons. Placés après le socle : ils l'emportent sur l'argent. ── */
-  .bouton--or {
-    --b-nuit: #161004;
-    --b-fond: #2b1f07;
-    --b-lueur: 240 196 92;
-    --b-feu: 255 238 196;
-    --b-ton: 242 210 128;
-    --b-texte: #f4d78c;
-    --b-discret: #f4d78c;
-    --b-sombre: #6b4a07;
-  }
   .bouton--vert {
-    --b-nuit: #0b150c;
-    --b-fond: #142717;
-    --b-lueur: 150 214 152;
-    --b-feu: 226 250 226;
-    --b-ton: 178 218 178;
-    --b-texte: #c2e2c2;
-    --b-discret: #c2e2c2;
-    --b-sombre: #2f4a30;
+    --b-ton: 132 214 140;
+    --b-texte: #bfe2bf;
+    --b-discret: #bfe2bf;
+    --b-sombre: #24452a;
+  }
+  .bouton--or {
+    --b-ton: 240 196 92;
+    --b-texte: #f0d38a;
+    --b-discret: #f0d38a;
+    --b-sombre: #5a3f06;
   }
   .bouton--mauve {
-    --b-nuit: #170811;
-    --b-fond: #2b1121;
-    --b-lueur: 230 160 200;
-    --b-feu: 253 232 243;
-    --b-ton: 232 186 210;
-    --b-texte: #f0c6dc;
-    --b-discret: #f0c6dc;
+    --b-ton: 228 150 198;
+    --b-texte: #efc3da;
+    --b-discret: #efc3da;
     --b-sombre: #5b2141;
   }
   .bouton--braise {
-    --b-nuit: #1c0b04;
-    --b-fond: #351508;
-    --b-lueur: 255 138 76;
-    --b-feu: 255 216 190;
-    --b-ton: 255 168 122;
+    --b-ton: 255 138 76;
     --b-texte: #ffb088;
     --b-discret: #ffb088;
-    --b-sombre: #a8430f;
+    --b-sombre: #8a3509;
   }
   .bouton--rouge {
-    --b-nuit: #1c0608;
-    --b-fond: #340c11;
-    --b-lueur: 240 86 90;
-    --b-feu: 255 200 196;
-    --b-ton: 255 128 128;
-    --b-texte: #ff989a;
-    --b-discret: #ff989a;
-    --b-sombre: #a3141c;
+    --b-ton: 242 92 96;
+    --b-texte: #ff9b9d;
+    --b-discret: #ff9b9d;
+    --b-sombre: #8f1219;
+  }
+  :is(.bouton--vert, .bouton--or, .bouton--mauve, .bouton--braise, .bouton--rouge) {
+    --b-lumiere: 0.32;
+    --b-mat: 0.44;
+    --b-mat-trait: 0.6;
+    --b-trait: 0.26;
   }
 
-  /* ── Principal : le verre de nuit allumé. De haut en bas : le biseau qui
-     prend la lumière, le grain, la lumière qui monte du bas (un cœur au
-     milieu, une bande sur toute la largeur), le verre sombre ; les ombres
-     intérieures enroulent la lumière sur les bords, le halo la pose sur la
-     page. Elle s'arrête sous les lettres. ── */
+  /* ── Principal, nacre : une pilule claire au relief doux (le blanc en
+     haut, l'ombre propre en bas), posée sur la page par une ombre ; son ton
+     colore le texte et laisse une trace en bas. ── */
   .bouton-principal {
-    color: var(--b-allume);
-    background-color: var(--b-nuit);
+    color: var(--b-sombre);
+    background-color: #ebe7e2;
     background-image:
-      linear-gradient(180deg, rgb(var(--b-lueur) / 0.12) 0%, rgb(var(--b-lueur) / 0) 40%),
-      var(--grain),
-      radial-gradient(78% 105% at 50% 136%, rgb(var(--b-feu) / 0.95) 0%, rgb(var(--b-lueur) / 0.8) 26%, rgb(var(--b-lueur) / 0.28) 52%, rgb(var(--b-lueur) / 0) 74%),
-      linear-gradient(0deg, rgb(var(--b-lueur) / 0.5) 0%, rgb(var(--b-lueur) / 0.16) 24%, rgb(var(--b-lueur) / 0) 48%),
-      linear-gradient(180deg, var(--b-fond) 0%, var(--b-nuit) 30%, var(--b-nuit) 55%, var(--b-fond) 100%);
-    background-size: 100% 100%, var(--grain-pas) var(--grain-pas), 100% 100%, 100% 100%, 100% 100%;
-    background-blend-mode: normal, overlay, normal, normal, normal;
+      radial-gradient(64% 90% at 50% 132%, rgb(var(--b-ton) / var(--b-lumiere)) 0%, rgb(var(--b-ton) / 0) 70%),
+      linear-gradient(180deg, #fbfaf7 0%, #efebe6 55%, #e1ddd7 100%);
     box-shadow:
-      inset 0 0 7px 0 rgb(var(--b-lueur) / 0.22),
-      inset 0 2.5px 3px -1.5px rgb(var(--b-lueur) / 0.75),
-      inset 0 -2px 2px -1px rgb(var(--b-feu) / 0.9),
-      inset 0 -12px 16px -10px rgb(var(--b-lueur) / 0.7),
-      0 10px 22px -10px rgb(var(--b-lueur) / var(--b-halo)),
-      0 2px 10px -3px rgb(var(--b-lueur) / 0.22),
-      0 12px 22px -12px rgb(0 0 0 / 0.8);
-    text-shadow: 0 1px 1px rgb(0 0 0 / 0.35);
+      inset 0 1px 0 #ffffff,
+      inset 0 -1px 0 rgb(0 0 0 / 0.1),
+      0 1px 1px rgb(0 0 0 / 0.5),
+      0 12px 24px -12px rgb(0 0 0 / 0.95);
   }
 
-  /* ── Secondaire : le verre fumé, éteint ; le liseré et un reste de
-     lumière en bas sont dans son ton. ── */
+  /* ── Principal, mat : une pilule sombre et mate, le liseré clair en haut ;
+     son ton n'est qu'une lumière douce en bas et l'icône. ── */
+  :root[data-boutons="mat"] .bouton-principal {
+    color: #f6f6f4;
+    background-color: #222327;
+    background-image:
+      radial-gradient(60% 110% at 50% 140%, rgb(var(--b-ton) / var(--b-mat)) 0%, rgb(var(--b-ton) / 0) 72%),
+      linear-gradient(180deg, #303238 0%, #24252a 52%, #1c1d20 100%);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.13),
+      inset 0 0 0 1px rgb(255 255 255 / 0.06),
+      inset 0 -1px 0 rgb(var(--b-ton) / var(--b-mat-trait)),
+      0 1px 1px rgb(0 0 0 / 0.45),
+      0 14px 26px -14px rgb(0 0 0 / 0.95);
+  }
+  :root[data-boutons="mat"] .bouton-principal svg {
+    color: rgb(var(--b-ton));
+  }
+
+  /* Un détail sous le libellé d'un principal (une date, un compte) : le
+     texte du bouton, en retrait. */
+  .bouton-principal {
+    --b-sous: rgb(18 19 22 / 0.62);
+  }
+  :root[data-boutons="mat"] .bouton-principal {
+    --b-sous: rgb(246 246 244 / 0.6);
+  }
+  .bouton-sous {
+    color: var(--b-sous);
+  }
+
+  /* ── Secondaire : la pilule cerclée d'un trait fin, à peine teintée. ── */
   .bouton-secondaire {
     color: var(--b-texte);
-    background-color: rgb(22 24 28 / 0.9);
-    background-image:
-      linear-gradient(180deg, rgb(255 255 255 / 0.07) 0%, rgb(255 255 255 / 0) 42%),
-      var(--grain),
-      radial-gradient(64% 70% at 50% 122%, rgb(var(--b-ton) / 0.2), rgb(var(--b-ton) / 0) 74%),
-      linear-gradient(180deg, rgb(var(--b-ton) / 0.07), rgb(var(--b-ton) / 0.03) 60%, rgb(var(--b-ton) / 0.06));
-    background-size: 100% 100%, var(--grain-pas) var(--grain-pas), 100% 100%, 100% 100%;
-    background-blend-mode: normal, overlay, normal, normal;
-    box-shadow:
-      inset 0 0 0 1px rgb(var(--b-ton) / 0.16),
-      inset 0 1.5px 1px -0.5px rgb(var(--b-ton) / 0.42),
-      inset 0 -1.5px 1px -0.5px rgb(var(--b-ton) / 0.3),
-      0 8px 18px -10px rgb(0 0 0 / 0.85);
+    background-color: rgb(255 255 255 / 0.03);
+    box-shadow: inset 0 0 0 1px rgb(var(--b-ton) / var(--b-trait));
   }
 
-  /* ── Discret : le texte seul, dans son ton ; le verre vient sous le doigt. ── */
+  /* ── Discret : le texte seul, dans son ton ; un fond vient sous le doigt. ── */
   .bouton-discret {
     color: var(--b-discret);
     background: transparent;
   }
   .bouton-discret:active:not(:disabled) {
     background: rgb(var(--b-ton) / 0.1);
-    box-shadow:
-      inset 0 1.5px 1px -0.5px rgb(var(--b-ton) / 0.35),
-      inset 0 0 0 1px rgb(var(--b-ton) / 0.1);
   }
 
-  /* ── Sur un fond clair : le verre noir… ── */
+  /* ── Sur un fond clair : la pilule sombre et mate… ── */
   .bouton-encre {
-    color: var(--b-texte);
-    background-color: #16181c;
+    color: #f6f6f4;
+    background-color: #222327;
     background-image:
-      linear-gradient(180deg, rgb(255 255 255 / 0.16) 0%, rgb(255 255 255 / 0) 45%),
-      var(--grain),
-      radial-gradient(64% 78% at 50% 122%, rgb(var(--b-ton) / 0.32), rgb(var(--b-ton) / 0) 74%),
-      linear-gradient(180deg, #2a2d33 0%, #16181c 52%, #0b0c0e 100%);
-    background-size: 100% 100%, var(--grain-pas) var(--grain-pas), 100% 100%, 100% 100%;
-    background-blend-mode: normal, overlay, normal, normal;
+      radial-gradient(60% 110% at 50% 140%, rgb(var(--b-ton) / var(--b-mat)) 0%, rgb(var(--b-ton) / 0) 72%),
+      linear-gradient(180deg, #34363c 0%, #24252a 52%, #1a1b1e 100%);
     box-shadow:
-      inset 0 1.5px 1px -0.5px rgb(255 255 255 / 0.5),
-      inset 0 -1.5px 1px -0.5px rgb(var(--b-ton) / 0.4),
-      inset 0 0 0 0.6px rgb(var(--b-ton) / 0.16),
-      0 1px 2px rgb(0 0 0 / 0.25),
-      0 10px 20px -10px rgb(0 0 0 / 0.6);
+      inset 0 1px 0 rgb(255 255 255 / 0.16),
+      inset 0 -1px 0 rgb(var(--b-ton) / var(--b-mat-trait)),
+      0 1px 2px rgb(0 0 0 / 0.2),
+      0 10px 18px -10px rgb(0 0 0 / 0.5);
   }
-  /* … et le verre dépoli blanc, où le ton colore le texte. */
+  /* … et la nacre posée sur le plan, où le ton colore le texte. */
   .bouton-givre {
     color: var(--b-sombre);
-    background-color: rgb(246 246 243 / 0.9);
-    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.95) 0%, rgb(246 246 243 / 0.9) 55%, rgb(226 227 223 / 0.92) 100%);
-    -webkit-backdrop-filter: blur(12px) saturate(1.5);
-    backdrop-filter: blur(12px) saturate(1.5);
+    background-color: rgb(244 241 237 / 0.92);
+    background-image: linear-gradient(180deg, rgb(251 250 247 / 0.96) 0%, rgb(236 232 227 / 0.94) 100%);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    backdrop-filter: blur(12px) saturate(1.4);
     box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 1),
-      inset 0 -1.5px 1px rgb(10 11 13 / 0.1),
-      inset 0 -7px 10px -8px rgb(10 11 13 / 0.12),
-      0 0 0 0.5px rgb(10 11 13 / 0.16),
-      0 4px 10px -2px rgb(0 0 0 / 0.2);
+      inset 0 1px 0 #ffffff,
+      inset 0 -1px 0 rgb(0 0 0 / 0.06),
+      0 0 0 0.5px rgb(0 0 0 / 0.08),
+      0 1px 2px rgb(0 0 0 / 0.08),
+      0 10px 20px -10px rgb(70 60 50 / 0.45);
   }
 
-  /* ── Le toucher : le verre s'enfonce, la lumière monte. ── */
+  /* ── Le toucher : la pilule s'enfonce. ── */
   :is(.bouton-principal, .bouton-secondaire, .bouton-discret, .bouton-encre, .bouton-givre):active:not(:disabled) {
     scale: 0.97;
     transition-duration: 0.08s;
   }
-  .bouton-principal:active:not(:disabled) {
-    --b-halo: 0.82;
-    filter: brightness(1.12);
+  :root:not([data-boutons="mat"]) .bouton-principal:active:not(:disabled) {
+    background-image:
+      radial-gradient(64% 90% at 50% 132%, rgb(var(--b-ton) / var(--b-lumiere)) 0%, rgb(var(--b-ton) / 0) 70%),
+      linear-gradient(180deg, #e4e0da 0%, #ebe7e2 60%, #f1eee9 100%);
+    box-shadow:
+      inset 0 2px 5px rgb(0 0 0 / 0.18),
+      inset 0 -1px 0 rgb(255 255 255 / 0.6),
+      0 1px 1px rgb(0 0 0 / 0.5),
+      0 6px 14px -8px rgb(0 0 0 / 0.9);
   }
-  .bouton-secondaire:active:not(:disabled),
+  :root[data-boutons="mat"] .bouton-principal:active:not(:disabled),
   .bouton-encre:active:not(:disabled) {
-    filter: brightness(1.25);
+    filter: brightness(1.15);
+  }
+  .bouton-secondaire:active:not(:disabled) {
+    background-color: rgb(var(--b-ton) / 0.1);
   }
   .bouton-givre:active:not(:disabled) {
     filter: brightness(0.96);
   }
   @media (hover: hover) and (pointer: fine) {
-    .bouton-principal:hover:not(:disabled) {
-      filter: brightness(1.08);
+    .bouton-principal:hover:not(:disabled),
+    .bouton-givre:hover:not(:disabled) {
+      filter: brightness(0.97);
     }
-    .bouton-secondaire:hover:not(:disabled),
+    :root[data-boutons="mat"] .bouton-principal:hover:not(:disabled),
     .bouton-encre:hover:not(:disabled) {
-      filter: brightness(1.15);
+      filter: brightness(1.1);
+    }
+    .bouton-secondaire:hover:not(:disabled) {
+      background-color: rgb(var(--b-ton) / 0.07);
     }
     .bouton-discret:hover:not(:disabled) {
       background: rgb(var(--b-ton) / 0.06);
     }
   }
 
-  /* ── Éteint : plus de halo, la lumière baisse, le texte reste lisible. ── */
+  /* ── Éteint : la pilule pâlit, le texte reste lisible. ── */
   :is(.bouton-principal, .bouton-secondaire, .bouton-discret, .bouton-encre, .bouton-givre):is(:disabled, [aria-disabled="true"]) {
     cursor: default;
     opacity: 0.42;
   }
-  .bouton-principal:is(:disabled, [aria-disabled="true"]) {
-    filter: saturate(0.4);
-    box-shadow:
-      inset 0 0 7px 0 rgb(var(--b-lueur) / 0.16),
-      inset 0 2.5px 3px -1.5px rgb(var(--b-lueur) / 0.5);
-  }
 
-  /* ── Le focus au clavier : un anneau net, à 3 px du verre. ── */
+  /* ── Le focus au clavier : un anneau net, à 3 px de la pilule. ── */
   :is(.bouton-principal, .bouton-secondaire, .bouton-discret):focus-visible {
     outline: 2px solid #f4f5f2;
     outline-offset: 3px;
@@ -292,46 +266,37 @@
     outline-offset: 3px;
   }
 
-  /* Thème clair (prêt, pas encore servi : l'app est en sombre) : le verre
-     de nuit garde sa lumière, le secondaire devient le verre dépoli, le
-     texte des tons passe à leur version sombre. */
+  /* Thème clair (prêt, pas encore servi : l'app est en sombre) : le trait
+     et le texte des tons passent à leur version sombre. */
   :root:not(.dark) .bouton-secondaire {
     color: var(--b-sombre);
-    background-color: #ffffff;
-    background-image: linear-gradient(180deg, #ffffff, #e9eae6);
-    box-shadow:
-      inset 0 1px 0 #ffffff,
-      inset 0 -1.5px 1px rgb(10 11 13 / 0.1),
-      0 0 0 0.5px rgb(10 11 13 / 0.16),
-      0 4px 10px -4px rgb(0 0 0 / 0.2);
+    background-color: rgb(0 0 0 / 0.02);
+    box-shadow: inset 0 0 0 1px rgb(10 11 13 / 0.16);
   }
   :root:not(.dark) .bouton-discret {
     color: var(--b-sombre);
   }
 }
 
-/* Réduire la transparence : du verre opaque, le même dessin. */
+/* Réduire la transparence : la nacre de la Map devient opaque. */
 @media (prefers-reduced-transparency: reduce) {
-  .bouton-secondaire {
-    background-color: #1a1c20;
-  }
   .bouton-givre {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
-    background-color: #f2f2ef;
+    background-color: #f2efeb;
   }
 }
 
-/* Augmenter le contraste : bords nets, plus de grain ni de halo flou. */
+/* Augmenter le contraste : des traits nets autour de chaque pilule. */
 @media (prefers-contrast: more) {
-  :root {
-    --grain: none;
-  }
   .bouton-principal {
-    box-shadow: 0 0 0 2px rgb(var(--b-lueur) / 0.9);
+    box-shadow: 0 0 0 1.5px #ffffff;
+  }
+  :root[data-boutons="mat"] .bouton-principal {
+    box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.8);
   }
   .bouton-secondaire {
-    box-shadow: inset 0 0 0 1.5px rgb(var(--b-ton) / 0.8);
+    box-shadow: inset 0 0 0 1.5px rgb(var(--b-ton) / 0.85);
   }
   .bouton-discret {
     text-decoration: underline;

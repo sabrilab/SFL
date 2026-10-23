@@ -96,6 +96,14 @@ export default function RootLayout({
           cadre" toute l'appli (header, tab bar) au lieu de rester contenu
           dans une simple liste qui rebondit sur elle-même. */}
       <body className="h-dvh overflow-hidden overscroll-none touch-manipulation">
+        {/* Essai des boutons, le temps que Sabri choisisse : ?boutons=mat ou
+            ?boutons=nacre dans l'adresse, retenu sur l'appareil (boutons.css). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'try{var b=new URLSearchParams(location.search).get("boutons");if(b)localStorage.setItem("bola-boutons",b);b=localStorage.getItem("bola-boutons");if(b)document.documentElement.dataset.boutons=b}catch(e){}',
+          }}
+        />
         {/* Version sombre uniquement pour l'instant (décision admin) : le
             thème clair du design existe mais n'est pas encore porté partout,
             on force le sombre plutôt que d'exposer un clair à moitié fait. */}

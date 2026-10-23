@@ -150,13 +150,13 @@ function Ligue() {
                 active ? "bouton-principal" : "bouton-secondaire"
               )}
             >
-              <span className={cn("mono-label", active ? "text-background" : "text-primary")}>
+              <span className={cn("mono-label", !active && "text-primary")}>
                 J{jn.j}
               </span>
               <span
                 className={cn(
                   "text-[12.5px] font-semibold whitespace-nowrap",
-                  active ? "text-background" : "text-foreground/70"
+                  !active && "text-foreground/70"
                 )}
               >
                 {jn.date}
@@ -164,7 +164,7 @@ function Ligue() {
               <span
                 className={cn(
                   "mono-label text-[8px]",
-                  active ? "text-background/60" : "text-foreground/30"
+                  active ? "bouton-sous" : "text-foreground/30"
                 )}
               >
                 {buts} buts
