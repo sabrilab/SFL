@@ -41,7 +41,13 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSession } from "@/hooks/use-session";
 import { identiteConfirmee, rafraichirIdentites } from "@/lib/sfl/identites";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
-import { activerNotifications, etatNotifications, rafraichirAbonnement } from "@/lib/sfl/notifications";
+import {
+  activerNotifications,
+  etatNotifications,
+  noterEtatNotifs,
+  noterNotifs,
+  rafraichirAbonnement,
+} from "@/lib/sfl/notifications";
 import { maVille, maVilleAProposer, type VilleJoueur } from "@/lib/sfl/villes";
 
 type Invitation = "ville" | "carte" | "notifs";
@@ -109,7 +115,9 @@ export function InvitationCarte() {
         rafraichirPhotos(),
         rafraichirIdentites(),
       ]);
-      if (annule || identiteConfirmee(nom) === false) return;
+      if (annule) return;
+      noterEtatNotifs(etat, nom);
+      if (identiteConfirmee(nom) === false) return;
       if (ville?.proposer) {
         setProposee(ville.ville);
         setVisible("ville");
@@ -122,6 +130,12 @@ export function InvitationCarte() {
     };
   }, [nom, forcee]);
 
+  // L'invitation aux notifications, montrée : le journal d'usage le note,
+  // puis la réponse (lib/sfl/notifications.ts, page Activité de l'admin).
+  useEffect(() => {
+    if (visible === "notifs" && !forcee) noterNotifs("proposee", "ouverture");
+  }, [visible, forcee]);
+
   if (!nom) return null;
 
   function plusTard() {
@@ -129,6 +143,7 @@ export function InvitationCarte() {
     try {
       localStorage.setItem(PLUS_TARD(visible, nom!), String(Date.now()));
     } catch {}
+    if (visible === "notifs") noterNotifs("plus-tard", "ouverture");
     setVisible(null);
   }
 
@@ -140,7 +155,7 @@ export function InvitationCarte() {
     }
     setBusy(true);
     try {
-      const etat = await activerNotifications();
+      const etat = await activerNotifications("ouverture");
       if (etat === "actives") toast.success("Notifications activées");
       else if (etat === "refusees") toast.error("Refusées : change-le dans les réglages du téléphone.");
     } catch {

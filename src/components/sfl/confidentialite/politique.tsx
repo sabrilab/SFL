@@ -5,7 +5,8 @@
 // Il décrit l'app telle qu'elle est le 22/10/2026, relevée dans le code :
 // supabase/schema.sql pour ce qui est gardé et qui le lit, les routes
 // /api/photo-studio, /api/agent, /api/ville-devinee et /api/geocode pour ce
-// qui part chez un prestataire, lib/sfl/activity.ts pour le journal d'usage.
+// qui part chez un prestataire, lib/sfl/activity.ts pour le journal d'usage,
+// lib/server/push-envoi.ts pour le suivi des notifications (23/10).
 // Quand l'un de ces endroits change ce qu'il garde ou à qui il l'envoie, ce
 // texte change avec lui ; si le changement touche à ce que les joueurs ont
 // accepté, VERSION_POLITIQUE aussi (lib/sfl/confidentialite.ts).
@@ -224,6 +225,13 @@ export function TextePolitique() {
             On garde aussi tes réglages, où tu en es dans le Vestiaire, et le fait qu&apos;il soit ouvert à
             l&apos;écran, pour ne pas te notifier pendant que tu le lis.
           </P>
+          <P>
+            Pour savoir lesquelles servent, chaque notification envoyée est notée avec son motif (une réponse au
+            Vestiaire, le rappel d&apos;un match…), jamais avec son texte : si elle est arrivée, si tu l&apos;as
+            touchée, et si tu as fait ce qu&apos;elle proposait (écrire, réagir, répondre à une invitation). L&apos;app
+            note aussi ta réponse quand elle te propose de les activer, et chaque jour si elles sont activées sur ton
+            téléphone. Seuls les administrateurs voient ce suivi (Activité et rétention).
+          </P>
         </Sous>
 
         <Sous titre="Bola Agent, le coach">
@@ -281,7 +289,7 @@ export function TextePolitique() {
             </>,
             <>
               <Fort>Les administrateurs, en plus :</Fort>{" "}ton email, ta fiche, tes photos en pied, ton journal
-              d&apos;usage, les statistiques du coach.
+              d&apos;usage, le suivi de tes notifications, les statistiques du coach.
             </>,
             <>
               <Fort>Toi seul :</Fort> ta conversation avec le coach. <Fort>Toi et ton correspondant :</Fort> vos
@@ -354,8 +362,8 @@ export function TextePolitique() {
             </>,
             <>
               <Fort>Notre intérêt légitime</Fort>{" "}à faire tourner et améliorer la bêta sans abus (article 6.1.f) : le
-              journal d&apos;usage, les limites par jour, la modération du Vestiaire, la ville devinée pour la Map. Tu
-              peux t&apos;y opposer (voir « Tes droits »).
+              journal d&apos;usage, le suivi des notifications, les limites par jour, la modération du Vestiaire, la
+              ville devinée pour la Map. Tu peux t&apos;y opposer (voir « Tes droits »).
             </>,
           ]}
         />
@@ -375,7 +383,7 @@ export function TextePolitique() {
             </>,
             <>Tes selfies : jamais gardés par Bola.</>,
             <>Ta photo de carte : jusqu&apos;à ce que tu la retires, ou que ton compte soit supprimé.</>,
-            <>Le journal d&apos;usage : 13 mois au plus.</>,
+            <>Le journal d&apos;usage et le suivi des notifications : 13 mois au plus.</>,
             <>Ton accord (la case cochée, sa date, sa version) : tant que ton compte existe, pour pouvoir le prouver.</>,
             <>
               Quand ton compte est supprimé, tout cela est effacé sous 30 jours. Les feuilles des matchs déjà joués
@@ -400,7 +408,7 @@ export function TextePolitique() {
             </>,
             <>
               <Fort>Pour le reste</Fort>{" "}(une copie de tes données, la suppression de ton compte, la fin du journal
-              d&apos;usage) : {contact}. Réponse sous un mois.
+              d&apos;usage ou du suivi de tes notifications) : {contact}. Réponse sous un mois.
             </>,
             <>
               Si tu penses que tes droits ne sont pas respectés, tu peux saisir la CNIL, sur{" "}

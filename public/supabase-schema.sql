@@ -307,7 +307,8 @@ alter table public.activity add constraint activity_kind_check
     'pack',       -- ouverture d'un pack
     'achat',      -- achat d'une carte
     'recherche',  -- une recherche lancée
-    'compo'       -- une composition 5v5 déposée dans l'Arène
+    'compo',      -- une composition 5v5 déposée dans l'Arène
+    'notifs'      -- l'invitation aux notifications montrée, et la réponse
   ));
 
 create index if not exists activity_player_created_idx
@@ -1518,6 +1519,299 @@ drop policy if exists "push: j'efface le mien, l'admin les morts" on public.push
 create policy "push: j'efface le mien, l'admin les morts"
   on public.push_abonnements for delete to authenticated
   using (user_id = (select auth.uid()) or public.is_league_admin());
+
+-- ─────────────── Notifications : ce qu'elles deviennent ───────────────
+-- Sabri, 23/10 : « mets dans les analytics les gens qui répondent à la
+-- notification, c'est-à-dire combien ont activé la notification et ce à
+-- quoi ils ont répondu suite à un motif ». Admin → Activité & rétention →
+-- Notifications (src/app/admin/activite/notifications.tsx) lit :
+--   · push_envois : une ligne par notification et par joueur. Son motif
+--     (lib/sfl/motifs-notif.ts), son heure, si un téléphone l'a reçue et si
+--     le joueur l'a touchée (le service worker le dit à /api/push/suivi),
+--     et s'il a fait ce qu'elle attendait (les triggers push_effet_*, plus
+--     bas). Jamais son texte ;
+--   · push_historique : chaque téléphone qui s'abonne ou s'en va, pour la
+--     courbe des joueurs joignables (push_abonnements ne garde que le
+--     présent) ;
+--   · activity, kind 'notifs' : l'invitation de l'ouverture montrée, et ce
+--     que le joueur en fait (activées, refusées, plus tard).
+-- Le serveur seul écrit ici (clé secrète, triggers), l'admin seul lit. On
+-- garde 13 mois, comme le journal d'usage.
+create table if not exists public.push_envois (
+  id          uuid primary key,
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  motif       text not null,
+  -- Ce à quoi elle se rattache (« match:12 », « equipe:3 ») : le geste
+  -- attendu doit avoir lieu là.
+  ref         text,
+  -- Ses téléphones, et ceux dont le service de push l'a prise : null tant
+  -- que l'envoi n'est pas fini, 0 si elle n'est partie nulle part.
+  appareils   smallint not null default 0,
+  acceptes    smallint,
+  envoyee_le  timestamptz not null default now(),
+  recue_le    timestamptz,
+  ouverte_le  timestamptz,
+  -- Le geste attendu, une fois fait : 'message', 'reaction', 'accepte' ou
+  -- 'refuse' (une invitation).
+  effet       text,
+  effet_le    timestamptz
+);
+create index if not exists push_envois_envoyee on public.push_envois (envoyee_le desc);
+create index if not exists push_envois_en_attente
+  on public.push_envois (user_id, envoyee_le desc) where effet_le is null;
+
+alter table public.push_envois enable row level security;
+
+drop policy if exists "push_envois: l'admin lit" on public.push_envois;
+create policy "push_envois: l'admin lit"
+  on public.push_envois for select to authenticated
+  using ((select public.is_league_admin()));
+
+revoke all on public.push_envois from anon, authenticated;
+grant select on public.push_envois to authenticated;
+
+create table if not exists public.push_historique (
+  id         bigint generated always as identity primary key,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  -- Le téléphone, sans son adresse : l'empreinte de son abonnement.
+  appareil   text not null,
+  -- Qui achemine : apple (iPhone, Mac), google (Android, Chrome), mozilla,
+  -- microsoft, autre.
+  service    text not null,
+  evenement  text not null check (evenement in ('ajout', 'retrait')),
+  le         timestamptz not null default now()
+);
+create index if not exists push_historique_le on public.push_historique (le);
+create index if not exists push_historique_appareil on public.push_historique (appareil);
+
+alter table public.push_historique enable row level security;
+
+drop policy if exists "push_historique: l'admin lit" on public.push_historique;
+create policy "push_historique: l'admin lit"
+  on public.push_historique for select to authenticated
+  using ((select public.is_league_admin()));
+
+revoke all on public.push_historique from anon, authenticated;
+grant select on public.push_historique to authenticated;
+
+create or replace function public.push_service(endpoint text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case
+    when endpoint like 'https://web.push.apple.com/%' then 'apple'
+    when endpoint like 'https://fcm.googleapis.com/%' or endpoint like 'https://android.googleapis.com/%' then 'google'
+    when endpoint like '%mozilla.com/%' or endpoint like '%mozaws.net/%' then 'mozilla'
+    when endpoint like '%.notify.windows.com/%' then 'microsoft'
+    else 'autre'
+  end;
+$$;
+
+revoke execute on function public.push_service(text) from public, anon, authenticated;
+
+-- Chaque abonnement qui arrive, part, ou change de joueur (un autre s'est
+-- connecté sur le téléphone). L'abonnement redonné à chaque ouverture ne
+-- change rien. Un compte supprimé n'écrit plus rien : son historique part
+-- avec lui. Le suivi n'empêche jamais un abonnement.
+create or replace function public.push_historiser()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    if tg_op = 'DELETE' or (tg_op = 'UPDATE' and old.user_id is distinct from new.user_id) then
+      if exists (select 1 from auth.users u where u.id = old.user_id) then
+        insert into public.push_historique (user_id, appareil, service, evenement)
+        values (old.user_id, md5(old.endpoint), public.push_service(old.endpoint), 'retrait');
+      end if;
+    end if;
+    if tg_op = 'INSERT' or (tg_op = 'UPDATE' and old.user_id is distinct from new.user_id) then
+      insert into public.push_historique (user_id, appareil, service, evenement)
+      values (new.user_id, md5(new.endpoint), public.push_service(new.endpoint), 'ajout');
+    end if;
+  exception when others then
+    raise warning 'push_historiser : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_historiser() from public, anon, authenticated;
+
+drop trigger if exists push_abonnements_historique on public.push_abonnements;
+create trigger push_abonnements_historique
+  after insert or update or delete on public.push_abonnements
+  for each row execute function public.push_historiser();
+
+-- Les téléphones abonnés avant le suivi : leur arrivée, à la date de leur
+-- abonnement (une seule fois).
+insert into public.push_historique (user_id, appareil, service, evenement, le)
+select a.user_id, md5(a.endpoint), public.push_service(a.endpoint), 'ajout', a.created_at
+from public.push_abonnements a
+where not exists (select 1 from public.push_historique h where h.appareil = md5(a.endpoint));
+
+-- Le geste qu'une notification attendait. Il revient à UNE notification du
+-- joueur qui l'attend encore, du bon motif et au bon endroit : celle qu'il a
+-- touchée dans l'heure d'abord, sinon la plus récente partie depuis moins de
+-- `fenetre`. Un geste ne compte qu'une fois : cinq notifications du
+-- Vestiaire suivies d'un seul message, c'est une sur cinq.
+create or replace function public.push_effet(qui uuid, motifs text[], cle text, geste text, fenetre interval)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cible uuid;
+begin
+  if qui is null then
+    return;
+  end if;
+  select e.id into cible
+    from public.push_envois e
+   where e.user_id = qui
+     and e.motif = any (motifs)
+     and (cle is null or e.ref = cle)
+     and e.effet_le is null
+     and coalesce(e.acceptes, 1) > 0
+     and (e.ouverte_le > now() - interval '1 hour' or e.envoyee_le > now() - fenetre)
+   order by (e.ouverte_le > now() - interval '1 hour') desc nulls last, e.envoyee_le desc
+   limit 1;
+  if cible is not null then
+    update public.push_envois set effet = geste, effet_le = now() where id = cible;
+  end if;
+end;
+$$;
+
+revoke execute on function public.push_effet(uuid, text[], text, text, interval) from public, anon, authenticated;
+
+-- Écrire ou réagir dans une discussion : ce qu'attendent ses notifications.
+-- Au Vestiaire, toutes celles du Vestiaire ; dans un match ou une équipe,
+-- celles de CE match ou de CETTE équipe (le rappel de la veille et le
+-- nouveau rendez-vous compris : y répondre, c'est y avoir donné suite).
+create or replace function public.push_effet_discussion(qui uuid, canal text, match bigint, equipe bigint, geste text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if canal = 'sfl' then
+    perform public.push_effet(qui,
+      array['vestiaire-message', 'vestiaire-reponse', 'vestiaire-cite', 'vestiaire-en-avant', 'vestiaire-reaction'],
+      null, geste, interval '2 hours');
+  elsif canal = 'match' and match is not null then
+    perform public.push_effet(qui,
+      array['match-message', 'match-reponse', 'match-cite', 'match-reaction', 'match-arrivee', 'match-veille', 'match-modifie'],
+      'match:' || match, geste, interval '2 hours');
+  elsif canal = 'equipe' and equipe is not null then
+    perform public.push_effet(qui,
+      array['equipe-message', 'equipe-reponse', 'equipe-cite', 'equipe-reaction'],
+      'equipe:' || equipe, geste, interval '2 hours');
+  end if;
+end;
+$$;
+
+revoke execute on function public.push_effet_discussion(uuid, text, bigint, bigint, text) from public, anon, authenticated;
+
+-- Un message (la ligne « … a rejoint le match » n'en est pas un : c'est
+-- l'invitation acceptée, comptée plus bas), puis une réaction. Le suivi
+-- n'empêche jamais d'écrire.
+create or replace function public.push_effet_message()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    if coalesce(new.piece ->> 'type', '') <> 'rejoint' then
+      perform public.push_effet_discussion(new.auteur, new.canal, new.match_id, new.equipe_id, 'message');
+    end if;
+  exception when others then
+    raise warning 'push_effet_message : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_effet_message() from public, anon, authenticated;
+
+drop trigger if exists messages_push_effet on public.messages;
+create trigger messages_push_effet
+  after insert on public.messages
+  for each row execute function public.push_effet_message();
+
+create or replace function public.push_effet_reaction()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  m record;
+begin
+  begin
+    select canal, match_id, equipe_id into m from public.messages where id = new.message_id;
+    if found then
+      perform public.push_effet_discussion(new.user_id, m.canal, m.match_id, m.equipe_id, 'reaction');
+    end if;
+  exception when others then
+    raise warning 'push_effet_reaction : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_effet_reaction() from public, anon, authenticated;
+
+drop trigger if exists message_reactions_push_effet on public.message_reactions;
+create trigger message_reactions_push_effet
+  after insert on public.message_reactions
+  for each row execute function public.push_effet_reaction();
+
+-- La réponse à une invitation : l'invité accepte (sa ligne passe à
+-- 'inscrit'), ou la retire lui-même (refus). Ce que l'organisateur retire,
+-- ou un match annulé, n'est pas une réponse.
+create or replace function public.push_effet_invitation()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    if tg_op = 'UPDATE' then
+      if old.statut = 'invite' and new.statut = 'inscrit' then
+        perform public.push_effet(new.player_id, array['match-invitation'], 'match:' || new.match_id, 'accepte', interval '14 days');
+      end if;
+    elsif old.statut = 'invite' and old.player_id = (select auth.uid()) then
+      perform public.push_effet(old.player_id, array['match-invitation'], 'match:' || old.match_id, 'refuse', interval '14 days');
+    end if;
+  exception when others then
+    raise warning 'push_effet_invitation : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_effet_invitation() from public, anon, authenticated;
+
+drop trigger if exists match_joueurs_push_effet on public.match_joueurs;
+create trigger match_joueurs_push_effet
+  after update of statut or delete on public.match_joueurs
+  for each row execute function public.push_effet_invitation();
+
+-- 13 mois au plus (aussi chaque lundi, /api/convocation/cron) ; l'arrivée
+-- d'un téléphone toujours abonné reste, sans elle la courbe le perdrait.
+delete from public.push_envois where envoyee_le < now() - interval '13 months';
+delete from public.push_historique h
+ where h.le < now() - interval '13 months'
+   and not exists (select 1 from public.push_abonnements a where md5(a.endpoint) = h.appareil);
 
 -- ───────────────────────── Rôle admin ────────────────────────────────
 -- Remise d'aplomb des comptes admin — rejouée à chaque migration, donc à

@@ -7,7 +7,14 @@
 //
 // Sur iPhone, Safari ne les propose qu'à une app ouverte depuis l'écran
 // d'accueil (iOS 16.4 et plus) : dans Safari même, PushManager n'existe pas.
+//
+// Ce que le joueur répond à la demande va au journal d'usage (kind
+// 'notifs') : activées, refusées ou laissées, et d'où (l'invitation de
+// l'ouverture, les Réglages, le Vestiaire), et l'état de son téléphone une
+// fois par jour. La page Activité en tire combien les activent quand on le
+// leur propose, et pourquoi les autres ne les ont pas.
 
+import { logActivity } from "@/lib/sfl/activity";
 import { lireEnvironnement } from "@/lib/pwa/environnement";
 import { supabase } from "@/lib/supabase";
 
@@ -81,11 +88,44 @@ async function enregistrer(abo: PushSubscription): Promise<boolean> {
   return !error;
 }
 
+/** Où le joueur a vu la demande : l'invitation de l'ouverture, les Réglages, le Vestiaire. */
+export type OuNotifs = "ouverture" | "reglages" | "vestiaire";
+
+/** Le journal de la demande : proposée, puis activées, refusées, laissées ou plus tard. */
+export function noterNotifs(geste: "proposee" | EtatNotifications | "plus-tard", ou: OuNotifs) {
+  logActivity("notifs", { meta: { geste, ou } });
+}
+
+/**
+ * L'état des notifications sur ce téléphone, noté à l'ouverture une fois par
+ * jour (et quand il change) : la page Activité en tire pourquoi un joueur
+ * n'est pas joignable (Bola pas installée sur iPhone, refusées…).
+ */
+export function noterEtatNotifs(etat: EtatNotifications, nom: string) {
+  try {
+    const cle = `sfl-notifs-etat-${nom}-${new Date().toISOString().slice(0, 10)}`;
+    if (localStorage.getItem(cle) === etat) return;
+    localStorage.setItem(cle, etat);
+  } catch {
+    // Stockage refusé : noté à chaque ouverture, sans mal.
+  }
+  logActivity("notifs", { meta: { geste: "etat", etat } });
+}
+
 /**
  * Demande la permission puis abonne ce téléphone. À appeler sur un geste du
  * joueur (un toucher) : iOS refuse la demande autrement.
  */
-export async function activerNotifications(): Promise<EtatNotifications> {
+export async function activerNotifications(ou: OuNotifs): Promise<EtatNotifications> {
+  const etat = await demander().catch((e: unknown) => {
+    noterNotifs("inactives", ou);
+    throw e;
+  });
+  noterNotifs(etat, ou);
+  return etat;
+}
+
+async function demander(): Promise<EtatNotifications> {
   if (!pushPossible()) return etatNotifications();
   const permission = await Notification.requestPermission();
   if (permission !== "granted") return permission === "denied" ? "refusees" : "inactives";

@@ -658,7 +658,7 @@ function ReglageNotifs({ mode, onMode, onFermer }: { mode: ModeNotifs; onMode: (
         <button
           type="button"
           onClick={async () => {
-            const e = await activerNotifications().catch(() => "inactives" as const);
+            const e = await activerNotifications("vestiaire").catch(() => "inactives" as const);
             setEtat(e);
             if (e === "actives") toast.success("Notifications activées");
           }}

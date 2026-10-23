@@ -17,9 +17,9 @@
 // jamais en pleine nuit ni deux fois.
 
 import { NextRequest, NextResponse } from "next/server";
-import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
+import { cleVapid } from "@/lib/server/web-push";
+import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { serveur } from "@/lib/sfl/serveur-ligue.server";
-import type { Notif } from "@/lib/sfl/push";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -98,33 +98,26 @@ export async function GET(req: NextRequest) {
       return (p?.nom_affiche ?? p?.name ?? "").split(" ")[0];
     };
 
-    const envois = new Map<string, Notif>();
+    const envois = new Map<string, Envoi>();
     for (const uid of jouent) {
       if (!tous.some((p) => p.id === uid && p.valide)) continue;
       const autres = jouent.filter((x) => x !== uid).map(prenom).filter(Boolean);
       envois.set(uid, {
-        titre: couper(`Demain ${match.heure} · ${match.lieu}`, 60),
-        texte: couper(`${avecQui(autres)} · ${manque > 0 ? `Il manque ${manque}` : "Complet"}`, 180),
-        url: `/?match=${match.id}`,
-        tag: `match-${match.id}-veille`,
+        motif: "match-veille",
+        ref: `match:${match.id}`,
+        notif: {
+          titre: couper(`Demain ${match.heure} · ${match.lieu}`, 60),
+          texte: couper(`${avecQui(autres)} · ${manque > 0 ? `Il manque ${manque}` : "Complet"}`, 180),
+          url: `/?match=${match.id}`,
+          tag: `match-${match.id}-veille`,
+        },
       });
     }
     if (envois.size === 0) continue;
 
-    const { data: abonnements } = await sb
-      .from("push_abonnements")
-      .select("endpoint, p256dh, auth, user_id")
-      .in("user_id", [...envois.keys()]);
-    const resultats = await Promise.all(
-      ((abonnements ?? []) as (Abonnement & { user_id: string })[]).map(async (ab) => ({
-        ab,
-        r: await envoyer(ab, envois.get(ab.user_id), cle),
-      }))
-    );
-    const finis = resultats.filter((x) => x.r === "mort").map((x) => x.ab.endpoint);
-    if (finis.length > 0) await sb.from("push_abonnements").delete().in("endpoint", finis);
-    envoyes += new Set(resultats.filter((x) => x.r === "envoye").map((x) => x.ab.user_id)).size;
-    morts += finis.length;
+    const bilan = await prevenir(sb, cle, envois);
+    envoyes += bilan.recus.size;
+    morts += bilan.morts;
   }
 
   return NextResponse.json({ status: "ok", demain, matchs: rappeles, envoyes, morts });
