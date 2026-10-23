@@ -134,7 +134,7 @@ export function Affiche({ e, lg, vise }: { e: Engagement; lg: Ligue; vise?: stri
   return (
     <article
       aria-label={`Contrat ${code}, rang ${rang}, signé par ${identite.nom(e.joueur)}`}
-      className={cn("fiche fiche--affiche", `fiche--${rang}`, etatFiche(e, lg))}
+      className={cn("fiche fiche--affiche dark", `fiche--${rang}`, etatFiche(e, lg))}
     >
       <div className="fiche__bandeau">
         <span className="fiche__etiquette">Rang {rang}</span>
@@ -211,7 +211,7 @@ export function AfficheDuel({ f, lg }: { f: FaceAFace; lg: Ligue }) {
   return (
     <article
       aria-label={`Face-à-face : ${identite.nom(f.duel.noirs)} contre ${identite.nom(f.duel.blancs)}`}
-      className={cn("fiche fiche--affiche fiche--affiche-duel", `fiche--${rang}`)}
+      className={cn("fiche fiche--affiche fiche--affiche-duel dark", `fiche--${rang}`)}
     >
       <div className="fiche__bandeau">
         <span className="fiche__etiquette">Face-à-face</span>
@@ -256,7 +256,7 @@ function Engages({ titre, liste, lg }: { titre: string; liste: Engagement[]; lg:
   const reussies = tranches.filter((e) => e.verdict.etat === "reussie").length;
   const ratees = tranches.filter((e) => e.verdict.etat === "ratee").length;
   return (
-    <article aria-label={`${titre} : ${NOM_DE_CODE[m.genre]}`} className={cn("fiche fiche--engages mx-4 md:mx-0", `fiche--${rang}`)}>
+    <article aria-label={`${titre} : ${NOM_DE_CODE[m.genre]}`} className={cn("fiche fiche--engages dark mx-4 md:mx-0", `fiche--${rang}`)}>
       <div className="fiche__bandeau">
         <span className="fiche__etiquette">{titre}</span>
         <span className="fiche__type mono-label text-white/75">{pl(liste.length, "engagé", "engagés")}</span>

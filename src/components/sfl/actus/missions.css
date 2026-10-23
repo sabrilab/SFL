@@ -93,6 +93,11 @@
 .fiche__ton {
   color: var(--r-texte);
 }
+/* Au jour, hors des fiches (noires dans les deux modes), le ton du rang se lit
+   dans sa teinte sombre : le rang de Ma carte, sur le verre clair. */
+.fiche__ton:not(.dark *) {
+  color: var(--r-sombre);
+}
 
 /* Le bandeau du haut : la bande rayée des caisses et des zones, ses étiquettes au pochoir. */
 .fiche__bandeau {
