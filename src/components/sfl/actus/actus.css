@@ -262,3 +262,25 @@
   opacity: var(--e);
   transform: translateX(calc((1 - var(--e)) * -18px));
 }
+
+/*
+ * Bravo (bravo.tsx) : le « +10 XP » monte du bouton et s'efface ; la main
+ * applaudit d'un coup. « Réduire les animations » : rien ne monte.
+ */
+.bravo-xp {
+  transform: translateX(-50%);
+  opacity: 0;
+  animation: bravo-xp 1.3s cubic-bezier(0.22, 0.9, 0.24, 1) both;
+}
+@keyframes bravo-xp {
+  0% { opacity: 0; transform: translate(-50%, 8px) scale(0.9); }
+  18% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -26px) scale(1); }
+}
+.bravo-clap {
+  animation: bravo-clap 0.42s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+@keyframes bravo-clap {
+  from { transform: scale(1.5) rotate(-12deg); }
+}

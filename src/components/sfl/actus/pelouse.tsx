@@ -17,7 +17,8 @@
 //
 // Les rubriques : ton dimanche, ce qui se joue dimanche, ton rival, ce qu'il
 // te faut, puis pour chaque dimanche joué l'homme du dimanche, le chiffre, le
-// duo, ceux qui montent, les badges décrochés et l'équipe type.
+// duo, ceux qui montent, les badges décrochés et l'équipe type. Sous chacune
+// de celles-là, Bravo félicite ses joueurs (bravo.tsx).
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { MessageCircle } from "lucide-react";
@@ -31,6 +32,7 @@ import { useIdentites } from "@/hooks/use-identites";
 import type { Actu } from "@/lib/sfl/actus";
 import type { Enjeu, Voisins } from "@/lib/sfl/actus-toi";
 import { rankPlayers } from "@/lib/sfl/engine";
+import { exploitsDe } from "@/lib/sfl/exploits";
 import { isHidden } from "@/lib/sfl/hidden";
 import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
@@ -39,6 +41,7 @@ import { metal, NOM_METAL, TROPHEES } from "@/lib/sfl/trophees";
 import { preparerPiece, type PieceLigue } from "@/lib/sfl/vestiaire";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
+import { Bravo } from "./bravo";
 import { pl, useJoueurs } from "./cinematiques";
 import "./actus.css";
 
@@ -267,6 +270,7 @@ export function Scene({
   texte,
   partage,
   action,
+  exploits,
   children,
 }: {
   /** La petite ligne au-dessus du titre (« J2 · l'homme du dimanche »). */
@@ -278,6 +282,8 @@ export function Scene({
   texte?: ReactNode;
   partage?: Omit<PieceLigue, "type">;
   action?: ReactNode;
+  /** Les clés des exploits de la rubrique : la notification d'une félicitation y ramène (/ligue?exploit=…). */
+  exploits?: string[];
   children?: ReactNode;
 }) {
   const router = useRouter();
@@ -350,6 +356,7 @@ export function Scene({
   return (
     <section
       ref={ref}
+      data-exploits={exploits?.join("|")}
       className="relative flex flex-col overflow-hidden bg-[radial-gradient(120%_70%_at_50%_30%,#1d2024_0%,#0c0d0f_75%)] text-white"
       style={{ ["--p" as string]: 0 } as CSSProperties}
     >
@@ -539,15 +546,19 @@ export function RubriqueBesoin({ v }: { v: Voisins }) {
   );
 }
 
-/** Les rubriques d'un dimanche joué, posées sur le terrain. */
+/** Les rubriques d'un dimanche joué, posées sur le terrain. Bravo félicite leurs joueurs. */
 export function RubriqueActu({ a }: { a: Actu }) {
   const id = useIdentites();
+  const { saison } = useSeason();
   const sur = (quoi: string) => `J${a.j} · ${quoi}`;
+  const liste = exploitsDe(a, saison.numero ?? 0, id.nom);
+  const bravo = { action: <Bravo exploits={liste} />, exploits: liste.map((e) => e.cle) };
   switch (a.type) {
     case "mvp": {
       const m = a.mvp;
       return (
         <Scene
+          {...bravo}
           sur={sur("l'homme du dimanche")}
           titre={id.nom(m.nom)}
           places={[{ nom: m.nom, u: MILIEU, v: 100, taille: T.vedette, d: 0.15 }]}
@@ -571,6 +582,7 @@ export function RubriqueActu({ a }: { a: Actu }) {
       const quoi = a.quoi === "buts" ? pl(a.n, "but", "buts") : pl(a.n, "passe", "passes");
       return (
         <Scene
+          {...bravo}
           sur={sur("personne n'a fait mieux")}
           titre={`${a.n} ${quoi} pour ${id.nom(a.nom)}`}
           places={[{ nom: a.nom, u: MILIEU - 40, v: 105, taille: T.vedette, d: 0.15 }]}
@@ -591,6 +603,7 @@ export function RubriqueActu({ a }: { a: Actu }) {
       const tir: [number, number] = [172, 72];
       return (
         <Scene
+          {...bravo}
           sur={sur("le duo")}
           titre={`${id.nom(a.duo.passeur)} → ${id.nom(a.duo.buteur)}`}
           places={[
@@ -616,6 +629,7 @@ export function RubriqueActu({ a }: { a: Actu }) {
       const poses: [number, number][] = [[MILIEU, 60], [70, 140], [200, 140], [MILIEU, 215]];
       return (
         <Scene
+          {...bravo}
           sur={sur("au Pépite d'Or")}
           titre={liste.length > 1 ? "Ils montent" : `${id.nom(liste[0].nom)} monte`}
           places={liste.map((m, i) => ({ nom: m.nom, u: poses[i][0], v: poses[i][1], taille: i === 0 ? T.moyenne : T.petite, d: tour(i), sous: `${m.rang}e` }))}
@@ -642,6 +656,7 @@ export function RubriqueActu({ a }: { a: Actu }) {
       const titre = un ? `${id.nom(ds[0].nom)} décroche ${premier.nom} ${NOM_METAL[metal(ds[0].palier)!].toLowerCase()}` : `${ds.length} badges décrochés`;
       return (
         <Scene
+          {...bravo}
           sur={sur("ils ont décroché")}
           titre={titre}
           places={places}
@@ -672,6 +687,7 @@ export function RubriqueActu({ a }: { a: Actu }) {
       });
       return (
         <Scene
+          {...bravo}
           sur={sur("les meilleurs du jour")}
           titre="L'équipe type"
           places={places}
