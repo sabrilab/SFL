@@ -29,3 +29,12 @@ export function Ecusson({ initiales, fond, taille = 48, className }: { initiales
     </svg>
   );
 }
+
+/** La place d'une équipe qu'on n'a pas encore : le blason en pointillé. */
+export function EcussonVide({ taille = 48, className }: { taille?: number; className?: string }) {
+  return (
+    <svg viewBox="0 0 100 106" width={taille} height={taille * 1.06} className={className} aria-hidden>
+      <path d={BLASON} fill="none" stroke="currentColor" strokeWidth={2.5} strokeDasharray="7 6" strokeLinejoin="round" />
+    </svg>
+  );
+}

@@ -44,8 +44,8 @@ export default function ComponentsPage() {
           <CardTitle className="text-base">Boutons</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
-          {/* Les trois rangs (app/boutons.css) : le verre de nuit allumé, le verre
-              fumé, le texte seul. */}
+          {/* Les trois rangs (app/boutons.css) : la nacre, la pilule cerclée,
+              le texte seul. */}
           <div className="flex flex-col gap-3">
             <p className="mono-label text-muted-foreground">Rangs</p>
             <button type="button" className="bouton-principal flex h-12 items-center justify-center text-[15px] font-semibold">
