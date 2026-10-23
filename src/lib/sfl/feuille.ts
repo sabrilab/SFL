@@ -1,4 +1,4 @@
-// La feuille de match : qui joue avec qui, et contre qui, terrain par terrain.
+// La feuille de match : qui joue avec qui, et contre qui, match par match.
 //
 // C'était l'image qu'on s'envoyait sur Snap avant l'app. Elle se lit
 // maintenant dans la fiche du match (Map) et se partage en image.
@@ -12,6 +12,8 @@
 // Sur la feuille, chaque match se joue les Noirs contre les Blancs (décision
 // de Sabri, 17/10) : la couleur du jour de l'admin (Orange, Bleu…) n'y paraît
 // pas ; la première équipe de chaque paire prend le noir, la seconde le blanc.
+// Depuis le 23/10, les équipes s'appellent ainsi dès leur création (« Noirs
+// 2 », saisie/equipes.ts) et les matchs « Match 1 », « Match 2 ».
 //
 // Ici, rien que des calculs : les terrains, et où poser chaque joueur sur son
 // demi-terrain.
@@ -31,30 +33,34 @@ export interface TerrainFeuille {
   label: string;
   a: EquipeFeuille;
   b: EquipeFeuille;
+  /** Son coup d'envoi, son lieu et son terrain sur place, quand la journée les connaît (lib/sfl/matchs-du-jour). */
+  heure?: string;
+  ou?: string | null;
+  terrain?: string | null;
 }
 
 const noirs = (joueurs: string[]): EquipeFeuille => ({ nom: "Noirs", couleur: "#0A0B0D", encre: "#F4F5F2", joueurs });
 const blancs = (joueurs: string[]): EquipeFeuille => ({ nom: "Blancs", couleur: "#F4F3EF", encre: "#0A0B0D", joueurs });
 
-/** Les terrains d'une journée de ligue ; vide tant que les équipes ne sont pas faites. */
+/** Les matchs d'une journée de ligue ; vide tant que les équipes ne sont pas faites. */
 export function feuilleDeJournee(journee: Journee | undefined): TerrainFeuille[] {
   if (!journee?.matches?.length) return [];
   const plusieurs = journee.matches.length > 1;
   return journee.matches.map((m, i) => ({
-    label: plusieurs ? `Terrain ${i + 1}` : "Le match",
+    label: plusieurs ? `Match ${i + 1}` : "Le match",
     a: noirs(m.teamA.players.map((p) => p.name)),
     b: blancs(m.teamB.players.map((p) => p.name)),
   }));
 }
 
-/** Les terrains de la convocation : ses équipes appariées deux à deux. */
+/** Les matchs de la convocation : ses équipes appariées deux à deux. */
 export function feuilleDeConvocation(teams: ConvocationTeam[] | null): TerrainFeuille[] {
   const pleines = (teams ?? []).filter((t) => t.players.length > 0);
   const out: TerrainFeuille[] = [];
   const plusieurs = pleines.length > 3;
   for (let i = 0; i + 1 < pleines.length; i += 2) {
     out.push({
-      label: plusieurs ? `Terrain ${i / 2 + 1}` : "Le match",
+      label: plusieurs ? `Match ${i / 2 + 1}` : "Le match",
       a: noirs(pleines[i].players),
       b: blancs(pleines[i + 1].players),
     });
@@ -62,7 +68,7 @@ export function feuilleDeConvocation(teams: ConvocationTeam[] | null): TerrainFe
   return out;
 }
 
-/** Le terrain où je joue, sinon le premier. */
+/** Le match où je joue, sinon le premier. */
 export function monTerrain(terrains: TerrainFeuille[], moi: string): number {
   const i = terrains.findIndex((t) => t.a.joueurs.includes(moi) || t.b.joueurs.includes(moi));
   return Math.max(0, i);

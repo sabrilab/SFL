@@ -27,7 +27,8 @@
 //      (bouton-deconnexion.tsx ; Sabri, le 22/10 : « plus accessible »).
 // « Historique » est parti : chaque dimanche de Ma saison ouvre son récap. Le
 // rappel « Glisse pour tourner » aussi, comme sur le profil. Les réglages
-// (« ⋯ ») sont en haut, à côté de la loupe.
+// (« ⋯ ») sont en haut, à côté de la loupe et du rond qui passe l'app en
+// clair ou en sombre (bouton-theme.tsx, 23/10).
 //
 // Le 22/10 (Sabri) : le profil de jeu (le radar) part sur le profil d'un
 // joueur dans Recherche ; « Cartes de match » disparaît, les cartes gagnées
@@ -52,7 +53,10 @@ import { Locked } from "@/components/sfl/locked";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
-import { useGrandEcran } from "@/hooks/use-media-query";
+import { useGrandEcran, useTresGrandEcran } from "@/hooks/use-media-query";
+import { RACINE_PHI } from "@/hooks/use-format-carte";
+import { useDivision } from "@/hooks/use-division";
+import { nomDivision } from "@/lib/sfl/divisions";
 import { FormulaireIdentite } from "@/components/sfl/identite";
 import { useIdentites } from "@/hooks/use-identites";
 import { useRangXp, useXp } from "@/hooks/use-missions";
@@ -64,6 +68,7 @@ import { isHidden } from "@/lib/sfl/hidden";
 import { POSTES } from "@/lib/sfl/inscription";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { BoutonStats } from "@/components/layout/bouton-stats";
+import { BoutonTheme } from "@/components/layout/bouton-theme";
 import { BoutonDeconnexion } from "@/components/sfl/auth/bouton-deconnexion";
 
 /* ------------------------------ Petits blocs ------------------------------ */
@@ -96,6 +101,7 @@ function AvatarPhoto({ name }: { name: string }) {
 export default function Profil() {
   const { player } = useMyPlayer();
   const { allPlayers, saison } = useSeason();
+  const division = useDivision(player.name);
   // Mon rang : celui du classement de la Ligue (sans les joueurs masqués),
   // où je figure toujours, même masqué.
   const myRank = useMemo(
@@ -122,8 +128,10 @@ export default function Profil() {
     }
     return m;
   }, [courbe, saison.numero]);
-  // La carte est le sujet de la page : elle profite de la place quand il y en a.
+  // La carte est le sujet de la page : elle profite de la place quand il y en
+  // a, et d'un cran de plus (√φ) sur les très grands écrans.
   const grand = useGrandEcran();
+  const tresGrand = useTresGrandEcran();
   const [photoOuverte, setPhotoOuverte] = useState(false);
   const [identiteOuverte, setIdentiteOuverte] = useState(false);
   const identite = useIdentites();
@@ -138,6 +146,7 @@ export default function Profil() {
         <div className="flex items-center gap-2">
           <BoutonStats />
           <BoutonRecherche />
+          <BoutonTheme />
           <Link
             href="/reglages"
             aria-label="Réglages"
@@ -163,7 +172,7 @@ export default function Profil() {
             <Card3D
               cacheKey={`profil-simple-${player.name}`}
               mode="simple"
-              size={grand ? 1.15 : 1}
+              size={tresGrand ? 1.15 * RACINE_PHI : grand ? 1.15 : 1}
               render={(s) => <PlayerCard player={player} size={s} />}
             />
           </div>
@@ -187,6 +196,7 @@ export default function Profil() {
           </div>
           <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
             <Chiffre valeur={myRank != null && (joues > 0 || player.pp !== 0) ? ordinal(myRank) : "–"} quoi="Pépite d'Or" />
+            {division && <Chiffre valeur={nomDivision(division)} quoi="Division" />}
             <Chiffre valeur={ovr(player.stats)} quoi="Général" />
             <Chiffre valeur={joues} quoi={joues > 1 ? "Dimanches" : "Dimanche"} />
           </div>

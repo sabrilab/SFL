@@ -76,7 +76,7 @@ export function IdentiteObligatoire() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[60] overflow-y-auto overscroll-contain bg-black/94 backdrop-blur-sm"
+          className="dark fixed inset-0 z-[60] overflow-y-auto overscroll-contain bg-black/94 text-foreground backdrop-blur-sm"
           style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}
         >
           <div className="mx-auto flex min-h-full w-full max-w-[380px] flex-col items-center justify-center px-6 py-8">
@@ -174,7 +174,7 @@ export function FormulaireIdentite({ onFini }: { onFini?: () => void }) {
 
   const ligne = "glass-soft flex items-center rounded-2xl px-4";
   const entree =
-    "min-w-0 flex-1 bg-transparent py-[13px] text-[15px] font-medium text-white outline-none placeholder:text-white/30";
+    "min-w-0 flex-1 bg-transparent py-[13px] text-[15px] font-medium text-foreground outline-none placeholder:text-foreground/30";
 
   return (
     <form onSubmit={valider} className="flex w-full flex-col items-center gap-6">
@@ -186,7 +186,7 @@ export function FormulaireIdentite({ onFini }: { onFini?: () => void }) {
         <PlayerCard player={player} size={0.7} affiche={prenom || " "} pseudo={pseudo ? `@${pseudo}` : ""} />
       </motion.div>
 
-      <h2 className="text-center text-[24px] leading-tight font-extrabold tracking-tight text-white">C&apos;est bien toi ?</h2>
+      <h2 className="text-center text-[24px] leading-tight font-extrabold tracking-tight">C&apos;est bien toi ?</h2>
 
       <div className="flex w-full flex-col gap-2">
         <div className="grid grid-cols-2 gap-2">
@@ -215,7 +215,7 @@ export function FormulaireIdentite({ onFini }: { onFini?: () => void }) {
         </div>
 
         <label className={cn(ligne, champ === "pseudo" && "ring-1 ring-[#FF6B5E]")}>
-          <span className="text-[15px] font-bold text-white/30">@</span>
+          <span className="text-[15px] font-bold text-foreground/30">@</span>
           <input
             value={saisie.pseudo}
             onChange={(e) => setSaisie({ ...saisie, pseudo: normaliserPseudo(e.target.value) })}
@@ -226,14 +226,14 @@ export function FormulaireIdentite({ onFini }: { onFini?: () => void }) {
             maxLength={20}
             placeholder="pseudo"
             aria-label="Pseudo"
-            className={cn(entree, bloque && "text-white/50")}
+            className={cn(entree, bloque && "text-foreground/50")}
           />
           {bloque ? (
-            <span className="mono-label shrink-0 text-white/35">Jusqu&apos;au {jour(etat.prochain!)}</span>
+            <span className="mono-label shrink-0 text-foreground/35">Jusqu&apos;au {jour(etat.prochain!)}</span>
           ) : pseudoChange && libre === true ? (
-            <Check className="size-4 shrink-0 text-white/55" />
+            <Check className="size-4 shrink-0 text-foreground/55" />
           ) : pseudoChange && libre === false ? (
-            <span className="mono-label shrink-0 text-[#FF6B5E]">Pris</span>
+            <span className="mono-label shrink-0 text-[#c8352b] dark:text-[#FF6B5E]">Pris</span>
           ) : null}
         </label>
 

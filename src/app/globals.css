@@ -20,6 +20,7 @@
   --color-vert: var(--vert);
   --color-braise: var(--braise);
   --color-mauve: var(--mauve);
+  --color-contraste: var(--contraste);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -59,8 +60,12 @@
 }
 
 /* Thème clair — la charte BOLA sur papier : Blanc Craie, encre Noir Nuit,
-   le gris béton pour ce qui s'efface. Le site tourne en sombre (voir
-   layout.tsx) ; ce clair reste prêt, dans la même famille de couleurs. */
+   le gris béton pour ce qui s'efface. Depuis le 23/10, chaque joueur choisit
+   (Sabri : « un mode clair et un mode sombre, qu'on peut accéder
+   facilement ») : le rond en haut de Ma carte (bouton-theme.tsx), ou Clair,
+   Sombre et Auto dans les réglages. Le sombre reste le thème par défaut
+   (layout.tsx). Les cartes des joueurs, les écussons, la Map et ses
+   stickers ne changent pas d'un mode à l'autre : ce sont des objets. */
 :root {
   --background: #f4f5f2;
   --foreground: #08090b;
@@ -98,11 +103,20 @@
   --vert: #3f5e40;
   --braise: #ff8a4c;
   --mauve: #5b2141;
+  /* Le plein contraste du mode : l'encre sur le papier du clair, le blanc pur
+     sur le noir (et non le Blanc Craie de --foreground). Pour le texte et les
+     traits des scènes qui étaient blancs : text-contraste/45 garde au sombre
+     exactement son blanc à 45 %. */
+  --contraste: #08090b;
 }
 
 /* Thème sombre — l'app BOLA (DA/Theme.swift) : noir profond, neutres purs,
    le bouton plein en clair sur encre. Une seule couleur chaude, la braise,
-   réservée au manque ; le vert et le mauve restent ceux des cartes. */
+   réservée au manque ; le vert et le mauve restent ceux des cartes.
+   Un objet qui reste sombre dans les deux modes (la vitrine des trophées,
+   une cérémonie, une image du fil) porte lui-même la classe dark : dedans,
+   les couleurs, les variantes dark: et les boutons restent ceux du sombre
+   (les règles du clair s'écrivent X:not(.dark *)). */
 .dark {
   --background: #08090b;
   --foreground: #f4f5f2;
@@ -140,6 +154,7 @@
   --vert: #a9cba9;
   --braise: #ff8a4c;
   --mauve: #e0b3cb;
+  --contraste: #ffffff;
 }
 
 @layer base {
@@ -180,7 +195,13 @@
     background: linear-gradient(168deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.016));
     border: 1px solid rgba(255, 255, 255, 0.075);
   }
-  :root:not(.dark) .glass {
+  /* En clair : une feuille posée sur le papier, à peine plus blanche. */
+  .glass-soft:not(.dark *) {
+    background: linear-gradient(168deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.5));
+    border-color: rgba(10, 11, 13, 0.06);
+    box-shadow: 0 1px 2px rgba(20, 12, 4, 0.04);
+  }
+  .glass:not(.dark *) {
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.35)),
       color-mix(in oklab, var(--background) 40%, transparent);
@@ -210,7 +231,7 @@
       0 1px 1px rgba(0, 0, 0, 0.3),
       0 5px 12px -6px rgba(0, 0, 0, 0.55);
   }
-  :root:not(.dark) .pill-emboss {
+  .pill-emboss:not(.dark *) {
     background: linear-gradient(
       180deg,
       rgba(255, 255, 255, 0.95),
@@ -287,6 +308,140 @@
     letter-spacing: -0.04em;
     text-transform: uppercase;
   }
+}
+
+/* Le gazon des terrains de la Ligue et des Actus (sol-terrain.tsx, « vert »)
+   et le but des Actus (actus/pelouse.tsx). La nuit : un vert translucide sur
+   le noir, le filet et les poteaux blancs. Le jour, en mode clair : un gazon
+   plein au soleil (translucide sur le papier, il deviendrait pâle), le filet
+   à l'encre et les poteaux blancs cernés d'une ombre, pour se détacher du
+   papier. */
+:root {
+  --gazon-haut: #2c8a49;
+  --gazon-haut-a: 0.92;
+  --gazon-bas: #46ad63;
+  --gazon-bas-a: 0.96;
+  --gazon-bord: #1c6634;
+  --gazon-bord-a: 0.9;
+  --but-voile: rgb(10 11 13 / 0.05);
+  --but-fond: rgb(10 11 13 / 0.035);
+  --but-filet: rgb(10 11 13 / 0.24);
+  --but-cerne: rgb(10 11 13 / 0.3);
+}
+.dark {
+  --gazon-haut: #1e7a3e;
+  --gazon-haut-a: 0.62;
+  --gazon-bas: #36a157;
+  --gazon-bas-a: 0.72;
+  --gazon-bord: #0f3d1f;
+  --gazon-bord-a: 0.8;
+  --but-voile: rgb(255 255 255 / 0.08);
+  --but-fond: rgb(255 255 255 / 0.06);
+  --but-filet: rgb(255 255 255 / 0.28);
+  --but-cerne: transparent;
+}
+
+/* La nuit des feuilles de match (sol-terrain.tsx, « nuit » : la fiche d'un
+   match sur la Map, ses places) : un terrain noir tracé à la craie. Le jour,
+   en mode clair : le même terrain sur le papier, tracé à l'encre. L'image
+   qu'on partage reste noire (classe dark). */
+:root {
+  --nuit-haut: #f2f3f0;
+  --nuit-bas: #e4e6e1;
+  --nuit-bord: #c8cbc4;
+  --nuit-bande: rgb(8 9 11 / 0.025);
+  --nuit-craie: rgb(8 9 11 / 0.34);
+}
+.dark {
+  --nuit-haut: #17191d;
+  --nuit-bas: #24272c;
+  --nuit-bord: #08090b;
+  --nuit-bande: rgba(255, 255, 255, 0.04);
+  --nuit-craie: rgba(255, 255, 255, 0.55);
+}
+
+/* Le studio de la Journée (a-l-honneur.tsx) : les plateaux où les cartes
+   posent sous un projecteur. La nuit : un studio noir, le projecteur blanc,
+   le sol quadrillé à la craie, la pelouse dans l'ombre. Le jour, en mode
+   clair : un studio blanc, le projecteur en halo, le quadrillage et les
+   ombres à l'encre, la pelouse au soleil comme celle des Actus, qui s'efface
+   par un masque (une couleur peinte par-dessus ne raccorderait pas le halo).
+   Le texte suit --contraste. */
+:root {
+  --studio-fond: linear-gradient(180deg, #e3e5e0 0%, #eef0ec 62%, #f8f9f7 100%);
+  --studio-cadre: inset 0 0 0 1px rgb(8 9 11 / 0.05);
+  --studio-lumiere: rgb(255 255 255 / 0.95);
+  --studio-lumiere-verte: rgb(255 255 255 / 0.85);
+  --studio-lumiere-surface: rgb(255 255 255 / 0.8);
+  --studio-grille-1: rgb(8 9 11 / 0.08);
+  --studio-grille-2: rgb(8 9 11 / 0.06);
+  --studio-cone: rgb(255 255 255 / 0.7);
+  --studio-ombre: rgb(8 9 11 / 0.32);
+  --studio-herbe-1: #3d9856;
+  --studio-herbe-2: #358c4c;
+  --studio-craie: rgb(255 255 255 / 0.72);
+  --studio-fondu-haut: #0b0c0f;
+  --studio-fondu-haut-a: 0;
+  --studio-fondu-bas: #050506;
+  --studio-fondu-bas-a: 0;
+  --studio-pelouse-masque: linear-gradient(180deg, transparent 0%, #000 34%, #000 86%, rgb(0 0 0 / 0.25) 100%);
+  --studio-marche: linear-gradient(180deg, #ffffff 0%, #e4e6e1 100%);
+  --studio-marche-reflet: inset 0 1px 0 #ffffff, 0 1px 3px rgb(8 9 11 / 0.12);
+  --studio-but: rgb(255 255 255 / 0.95);
+  --studio-filet: rgb(8 9 11 / 0.14);
+  --studio-but-cerne: drop-shadow(0 0 0.75px rgb(8 9 11 / 0.65));
+}
+.dark {
+  --studio-fond: linear-gradient(180deg, #17181d 0%, #0b0c0f 62%, #050506 100%);
+  --studio-cadre: none;
+  --studio-lumiere: rgba(255, 255, 255, 0.16);
+  --studio-lumiere-verte: rgba(160, 255, 190, 0.1);
+  --studio-lumiere-surface: rgba(160, 255, 190, 0.08);
+  --studio-grille-1: rgba(255, 255, 255, 0.07);
+  --studio-grille-2: rgba(255, 255, 255, 0.05);
+  --studio-cone: rgba(255, 255, 255, 0.13);
+  --studio-ombre: rgba(0, 0, 0, 0.75);
+  --studio-herbe-1: #1a3a22;
+  --studio-herbe-2: #163220;
+  --studio-craie: rgba(255, 255, 255, 0.42);
+  --studio-fondu-haut: #0b0c0f;
+  --studio-fondu-haut-a: 1;
+  --studio-fondu-bas: #050506;
+  --studio-fondu-bas-a: 0.9;
+  --studio-pelouse-masque: none;
+  --studio-marche: linear-gradient(180deg, #2a2c33 0%, #101115 100%);
+  --studio-marche-reflet: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  --studio-but: rgba(255, 255, 255, 0.85);
+  --studio-filet: rgba(255, 255, 255, 0.16);
+  --studio-but-cerne: none;
+}
+
+/* Le panneau mat des vitrines (les trophées de Ma carte et du profil, les
+   badges décrochés de la Journée) : noir mat en sombre, comme la planche de
+   Sabri ; blanc mat en clair, comme le studio. Les éclats qui scintillent
+   autour d'un trophée gagné : blancs sur le noir, dorés sur le blanc, où le
+   blanc disparaîtrait. */
+@layer components {
+  .vitrine-mate {
+    border: 1px solid rgb(8 9 11 / 0.07);
+    background: #ffffff;
+    color: #08090b;
+    box-shadow: 0 1px 2px rgb(8 9 11 / 0.04), 0 10px 28px -16px rgb(8 9 11 / 0.18);
+  }
+  .dark .vitrine-mate {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: #0a0a0b;
+    color: #ffffff;
+    box-shadow: none;
+  }
+}
+:root {
+  --eclat: #e2b13c;
+  --eclat-halo: drop-shadow(0 0 2px rgb(226 177 60 / 0.55));
+}
+.dark {
+  --eclat: #ffffff;
+  --eclat-halo: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9));
 }
 
 /* ─────────────────────── Le gabarit de page ────────────────────────
@@ -391,6 +546,56 @@
   width: 100%;
   margin-inline: auto;
   max-width: 760px;
+}
+
+/* Le gabarit de la Ligue sur tablette et ordinateur. Bola et Team partagent
+   l'en-tête des Actus (EnteteLigue) : ils prennent la même largeur que les
+   Actus (.actus-gabarit, actus.css, dont ces paliers sont recopiés), et
+   passer d'une ligue à l'autre ne fait pas sauter l'en-tête. 1000 px dès
+   768, 1320 px dès 1280. Hors des calques : l'emporte sur la colonne de
+   téléphone de la page (max-w-[470px], px-5). Sous 768 px, rien. */
+@media (min-width: 768px) {
+  .gabarit-ligue {
+    width: 100%;
+    max-width: 1000px;
+    margin-inline: auto;
+    padding-inline: 24px;
+  }
+}
+@media (min-width: 1024px) {
+  .gabarit-ligue {
+    padding-inline: 32px;
+  }
+}
+@media (min-width: 1280px) {
+  .gabarit-ligue {
+    max-width: 1320px;
+    padding-inline: 40px;
+  }
+}
+
+/* Sur grand écran, les terrains et leurs cartes prennent un cran de plus :
+   √φ (×1,272), la moitié d'un pas d'or (Sabri, 23/10 : « quand il y a de la
+   place à l'écran […] les terrains un peu en plus grand, avec les cartes un
+   peu en plus grand »). La hiérarchie des cartes, φ d'un format au suivant,
+   ne bouge pas. Un terrain dessiné en pixels (terrain-places.tsx) grandit
+   d'un bloc, cadre compris : .terrain-grand. Les cartes seules :
+   useFormatCarte (hooks/use-format-carte.ts), le même facteur. */
+:root {
+  --racine-phi: 1.272;
+}
+@media (min-width: 1024px) {
+  .terrain-grand {
+    zoom: var(--racine-phi);
+  }
+}
+/* Dans le panneau de droite (une fiche de la Map), la place ne vient qu'à
+   1280 px : avant, il est à sa largeur minimale (400 px), juste celle d'un
+   terrain de téléphone. */
+@media (min-width: 1280px) {
+  .terrain-grand-panneau {
+    zoom: var(--racine-phi);
+  }
 }
 
 /* ─────────────────────── La Map : le plan clair et ses stickers ───────────────────────
@@ -1135,6 +1340,44 @@
   .liquid-tabbar[data-clair] {
     --tabbar-verre: rgba(250, 250, 252, 0.97);
   }
+}
+
+/* Le rond du mode clair et du mode sombre (layout/bouton-theme.tsx) : un
+   demi-tour à chaque bascule, depuis la pose d'avant. Une animation et non
+   une transition : next-themes coupe les transitions pendant le changement. */
+@keyframes theme-demi-tour {
+  from { rotate: -180deg; }
+}
+.theme-demi-tour { animation: theme-demi-tour 0.55s cubic-bezier(0.32, 1.35, 0.42, 1); }
+
+/* Sous la barre d'état (bottom-nav.tsx, VoileEtat) : un voile à la couleur
+   du fond, pour que ce qui défile ne passe pas sous l'heure et la batterie.
+   En clair, dans l'app installée, iOS écrit toujours l'heure et la batterie
+   en blanc (black-translucent, que l'iPhone lit à l'ouverture de l'app et ne
+   relit plus) : le voile devient une ombre d'encre qui les garde lisibles,
+   comme celle du haut de la Map (data-installee : pwa/couleur-theme.tsx).
+   Dans Safari, la barre d'état est à Safari : rien à faire. */
+.voile-etat {
+  height: calc(env(safe-area-inset-top, 0px) + 14px);
+  background: linear-gradient(
+    to bottom,
+    var(--background),
+    color-mix(in oklab, var(--background) 85%, transparent) 50%,
+    transparent
+  );
+}
+:root[data-installee] .voile-etat:not(.dark *) {
+  /* Au-dessus des pages plein écran (le Vestiaire, z-35) et des cérémonies :
+     l'heure reste blanche partout. */
+  z-index: 70;
+  height: calc(env(safe-area-inset-top, 0px) + 30px);
+  background: linear-gradient(
+    to bottom,
+    rgb(8 9 11 / 0.58),
+    rgb(8 9 11 / 0.4) 42%,
+    rgb(8 9 11 / 0.12) 76%,
+    transparent
+  );
 }
 
 /* À l'honneur (components/sfl/a-l-honneur.tsx) : la carte de l'homme du

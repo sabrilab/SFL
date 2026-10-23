@@ -41,6 +41,7 @@
 import { computeJournees, computeStandings, entryPP } from "./saisie/engine";
 import { journeeJouee } from "./saisie/mutations";
 import { isHidden } from "./hidden";
+import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { ovr, type Player } from "./engine";
 import type { MatchEntry, Saison, SaisonArchivee } from "./saisie/types";
 import type { Finition, Signe, Traitement } from "@/components/sfl/finitions-carte";
@@ -136,7 +137,7 @@ export interface Mission {
 }
 
 export interface Duel {
-  /** Le terrain, compté de 0. */
+  /** Son match, compté de 0 (0 pour le Match 1). */
   terrain: number;
   label: string;
   noirs: string;
@@ -268,7 +269,7 @@ function anneeProche(jour: number, mois: number, reference: Date): number {
   );
 }
 
-/** L'heure du coup d'envoi d'une journée : la sienne, sinon celle de la convocation du même jour. */
+/** L'heure de la journée : la sienne, sinon celle de la convocation du même jour (ses matchs peuvent avoir la leur). */
 function heureDe(s: SaisonLue, j: number): string {
   const meta = s.journees.find((m) => m.j === j);
   if (meta?.heure) return meta.heure;
@@ -343,7 +344,11 @@ export function missionsDeJournee(
   if (!meta || !journee?.matches?.length) return null;
 
   const jm = jourMois(meta.date);
-  const heure = heureDe(s, j);
+  // Des matchs à des heures différentes : les contrats ferment au premier
+  // coup d'envoi pour tout le monde (« passe devant » se joue sur tous les
+  // matchs ; à 15h, on connaîtrait déjà le match de 13h).
+  const heureJournee = heureDe(s, j);
+  const heure = premierCoupDEnvoi(matchsDeJournee(journee, [], { heure: heureJournee, lieu: null }), heureJournee);
   const [h, min] = lireHeure(heure);
   const annee = jm ? anneeProche(jm.jour, jm.mois, reference) : 2026;
   const coupEnvoi = jm ? dateDeParis(annee, jm.mois, jm.jour, h, min) : new Date(0);
@@ -368,14 +373,14 @@ export function missionsDeJournee(
     record.set(e.player, Math.max(record.get(e.player) ?? -Infinity, entryPP(e)));
   }
 
-  // Les duels, terrain par terrain, du haut vers le bas.
+  // Les duels, match par match, du haut vers le bas.
   const duels: Duel[] = [];
   const camps = new Map<string, Camp>();
   const rival = new Map<string, string>();
   journee.matches.forEach((m, t) => {
     const noirs = m.teamA.players.map((p) => p.name).filter((n) => !isHidden(n));
     const blancs = m.teamB.players.map((p) => p.name).filter((n) => !isHidden(n));
-    const label = journee.matches!.length > 1 ? `Terrain ${t + 1}` : "Le match";
+    const label = journee.matches!.length > 1 ? `Match ${t + 1}` : "Le match";
     noirs.forEach((n) => camps.set(n, { terrain: t, label, equipe: "noirs" }));
     blancs.forEach((n) => camps.set(n, { terrain: t, label, equipe: "blancs" }));
     const tous = [...noirs, ...blancs].sort((a, b) => pp(b) - pp(a) || note(b) - note(a) || a.localeCompare(b));

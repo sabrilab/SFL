@@ -39,7 +39,7 @@ function Pill({ ok, label }: { ok: boolean | null; label: string }) {
           ? "glass-soft text-foreground/40"
           : ok
             ? "bg-primary/15 text-primary"
-            : "bg-[#FF6B5E]/12 text-[#FF6B5E]"
+            : "bg-[#FF6B5E]/12 text-[#c8352b] dark:text-[#FF6B5E]"
       )}
     >
       {label}
@@ -132,7 +132,7 @@ export default function SetupPage() {
       </section>
 
       {db === "error" && dbMessage && (
-        <p className="glass-soft rounded-2xl p-3.5 font-mono text-[11px] leading-relaxed break-all text-[#FF6B5E]">
+        <p className="glass-soft rounded-2xl p-3.5 font-mono text-[11px] leading-relaxed break-all text-[#c8352b] dark:text-[#FF6B5E]">
           Migration : {dbMessage}
         </p>
       )}

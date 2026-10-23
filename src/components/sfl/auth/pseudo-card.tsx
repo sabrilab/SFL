@@ -93,7 +93,7 @@ export function PseudoCard() {
   }
 
   return (
-    <div className="mt-3 border-t border-white/8 pt-3">
+    <div className="mt-3 border-t border-contraste/8 pt-3">
       <div className="flex items-center gap-2">
         <AtSign className="size-3.5 shrink-0 text-primary" />
         <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{etat.pseudo}</span>
@@ -127,7 +127,7 @@ export function PseudoCard() {
               className="min-w-0 flex-1 bg-transparent py-2.5 text-[13.5px] font-medium outline-none placeholder:text-foreground/30"
             />
             {libre === true && <Check className="size-3.5 shrink-0 text-foreground/55" />}
-            {libre === false && <span className="mono-label shrink-0 text-[#FF6B5E]">Pris</span>}
+            {libre === false && <span className="mono-label shrink-0 text-[#c8352b] dark:text-[#FF6B5E]">Pris</span>}
           </span>
           <button
             type="submit"

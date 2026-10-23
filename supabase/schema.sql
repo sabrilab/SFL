@@ -59,6 +59,20 @@ alter table public.profiles add column if not exists identite_le timestamptz;
 create unique index if not exists profiles_nom_affiche_unique
   on public.profiles (lower(nom_affiche)) where nom_affiche is not null;
 
+-- Deux noms de saison qui ne diffèrent que par les majuscules ne cohabitent
+-- pas : la photo de carte et les votes retrouvent un joueur par son nom, sans
+-- tenir compte de la casse, et un compte nommé « abdel » touchait à la photo
+-- d'« Abdel » (22/10/2026). Si un tel doublon existait déjà, l'index attend
+-- qu'on le règle, sans faire échouer la migration.
+do $$
+begin
+  create unique index if not exists profiles_name_casse_unique on public.profiles (lower(name));
+exception
+  when unique_violation then
+    raise warning 'profiles : deux noms ne diffèrent que par la casse, index non créé (%)', sqlerrm;
+end;
+$$;
+
 -- À l'inscription, le profil est créé par trigger depuis les métadonnées
 -- d'identité (nom, pseudo). is_admin est FORCÉ à false : les métadonnées sont
 -- modifiables par l'utilisateur, elles ne portent jamais d'autorisation.
@@ -179,7 +193,8 @@ create policy "profiles: lecture ligue"
   using ((select public.est_membre()) or id = (select auth.uid()));
 
 -- Chacun ne modifie que sa fiche. L'auto-promotion admin est déjà impossible :
--- le grant de colonnes (plus bas) ne permet de modifier que name et username.
+-- le grant de colonnes (plus bas) ne laisse modifier que l'email de contact,
+-- le badge et la ville. Ni le nom ni le pseudo : ils passent par le serveur.
 drop policy if exists "profiles: mise à jour de soi" on public.profiles;
 create policy "profiles: mise à jour de soi"
   on public.profiles for update
@@ -372,6 +387,78 @@ create policy "saison: écriture admin"
   using ((select public.is_league_admin()))
   with check ((select public.is_league_admin()));
 
+-- Publier sans écraser plus neuf (22/10/2026). Chaque publication remplace
+-- le document entier : un appareil admin resté sur une vieille copie
+-- effaçait donc les journées saisies ailleurs depuis (la J11 de la saison 0,
+-- perdue le 17/10). L'app publie désormais par publier_saison, en disant sur
+-- quelle version elle a travaillé (p_base) : si la base a changé depuis,
+-- rien n'est écrit et elle reçoit la version actuelle, pour reprendre la
+-- base ou écraser en connaissance de cause (p_forcer). La version vient de
+-- l'horloge du serveur, toujours croissante : un téléphone à l'heure fausse
+-- ne fait plus passer sa publication pour plus ancienne qu'elle n'est.
+create or replace function public.publier_saison(
+  p_data jsonb,
+  p_seed int,
+  p_base bigint,
+  p_forcer boolean default false
+)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  courante bigint;
+  nouvelle bigint;
+begin
+  if not public.is_league_admin() then
+    raise exception 'Réservé à l''admin.' using errcode = '42501';
+  end if;
+  select s.version into courante from public.saison s where s.id = 1 for update;
+  if found and not p_forcer and courante is distinct from p_base then
+    return jsonb_build_object('ok', false, 'version', courante);
+  end if;
+  nouvelle := greatest((extract(epoch from clock_timestamp()) * 1000)::bigint, coalesce(courante, 0) + 1);
+  perform set_config('sfl.publication_saison', 'oui', true);
+  insert into public.saison (id, data, version, seed, updated_at)
+  values (1, p_data, nouvelle, p_seed, now())
+  on conflict (id) do update
+    set data = excluded.data,
+        version = excluded.version,
+        seed = excluded.seed,
+        updated_at = excluded.updated_at;
+  perform set_config('sfl.publication_saison', '', true);
+  return jsonb_build_object('ok', true, 'version', nouvelle);
+end;
+$$;
+
+revoke execute on function public.publier_saison(jsonb, int, bigint, boolean) from public, anon;
+grant execute on function public.publier_saison(jsonb, int, bigint, boolean) to authenticated;
+
+-- L'app n'écrit plus la table directement : une version d'avant ce
+-- correctif, restée en cache sur un téléphone, est refusée et doit se mettre
+-- à jour. Le serveur (clé secrète) et l'éditeur SQL restent libres.
+create or replace function public.saison_par_publication()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if current_user = 'authenticated'
+     and coalesce(current_setting('sfl.publication_saison', true), '') <> 'oui' then
+    raise exception 'Mets l''app à jour (ferme-la puis rouvre-la) avant de publier la saison.'
+      using errcode = 'P0001', hint = 'saison-app-a-jour';
+  end if;
+  return new;
+end;
+$$;
+
+revoke execute on function public.saison_par_publication() from public, anon, authenticated;
+
+drop trigger if exists saison_par_publication on public.saison;
+create trigger saison_par_publication before insert or update on public.saison
+  for each row execute function public.saison_par_publication();
+
 -- ─────────────────────────── Compositions ────────────────────────────
 -- Les compositions 5v5 déposées dans l'Arène : une par joueur et par
 -- dimanche (la nouvelle remplace l'ancienne). Elles serviront à générer les
@@ -522,7 +609,10 @@ revoke insert, update, delete, truncate on public.profiles from anon, authentica
 -- aussi les pseudos réservés aux comptes prévus ; la règle des 30 jours, elle,
 -- est dans la base (garde_pseudo).
 revoke update (username) on public.profiles from authenticated;
-grant update (name) on public.profiles to authenticated;
+-- Le nom de saison non plus : c'est la clé du joueur partout (journées,
+-- photos, votes), aucun écran ne le change, et un compte qui se renommait
+-- pouvait prendre la place d'un joueur de l'effectif sans compte (22/10/2026).
+revoke update (name) on public.profiles from authenticated;
 grant update (contact_email) on public.profiles to authenticated;
 grant update (badge) on public.profiles to authenticated;
 grant update (habillage) on public.profiles to authenticated;
@@ -885,7 +975,9 @@ $$;
 --     ne liste rien (22/10/2026 : la liste donnait à n'importe qui les noms et
 --     les visages de toute la ligue). Les fichiers restent publics par leur
 --     adresse, pour s'afficher partout ;
---   · chacun ne pose, remplace ou retire QUE la sienne ;
+--   · un membre accepté ne pose, remplace ou retire QUE la sienne (un
+--     compte en attente n'en pose aucune : n'importe qui peut s'inscrire,
+--     et la photo de carte se voit partout) ;
 --   · l'admin peut corriger celle de n'importe qui.
 -- Chaque bloc rattrape ses erreurs : un projet où Storage refuserait ces
 -- règles ne doit pas faire échouer le reste de la migration.
@@ -944,8 +1036,11 @@ begin
     with check (
       bucket_id = 'photos'
       and (
-        lower(public.photo_joueur(name)) = (
-          select lower(p.name) from public.profiles p where p.id = (select auth.uid())
+        (
+          (select public.est_membre())
+          and lower(public.photo_joueur(name)) = (
+            select lower(p.name) from public.profiles p where p.id = (select auth.uid())
+          )
         )
         or (select public.is_league_admin())
       )
@@ -958,8 +1053,11 @@ begin
     using (
       bucket_id = 'photos'
       and (
-        lower(public.photo_joueur(name)) = (
-          select lower(p.name) from public.profiles p where p.id = (select auth.uid())
+        (
+          (select public.est_membre())
+          and lower(public.photo_joueur(name)) = (
+            select lower(p.name) from public.profiles p where p.id = (select auth.uid())
+          )
         )
         or (select public.is_league_admin())
       )
@@ -967,8 +1065,11 @@ begin
     with check (
       bucket_id = 'photos'
       and (
-        lower(public.photo_joueur(name)) = (
-          select lower(p.name) from public.profiles p where p.id = (select auth.uid())
+        (
+          (select public.est_membre())
+          and lower(public.photo_joueur(name)) = (
+            select lower(p.name) from public.profiles p where p.id = (select auth.uid())
+          )
         )
         or (select public.is_league_admin())
       )
@@ -981,8 +1082,11 @@ begin
     using (
       bucket_id = 'photos'
       and (
-        lower(public.photo_joueur(name)) = (
-          select lower(p.name) from public.profiles p where p.id = (select auth.uid())
+        (
+          (select public.est_membre())
+          and lower(public.photo_joueur(name)) = (
+            select lower(p.name) from public.profiles p where p.id = (select auth.uid())
+          )
         )
         or (select public.is_league_admin())
       )
@@ -1109,6 +1213,9 @@ $$;
 --     personne d'autre ne le voit ni n'y entre ;
 --   · public : il invite qui il veut, et les places restantes s'affichent
 --     sur la Map ; n'importe qui de la ligue peut prendre une place libre.
+-- « La ligue » : les membres acceptés. Un compte en attente (n'importe qui
+-- peut s'inscrire) n'ouvre aucun match, ne voit pas les matchs publics et
+-- n'y entre pas (22/10/2026 : il voyait le lieu, l'heure et les joueurs).
 -- Ces matchs vivent à côté de la saison (document admin) : ils ne touchent
 -- pas aux classements tant que l'admin ne les reprend pas en journée.
 create table if not exists public.matchs (
@@ -1169,7 +1276,7 @@ as $$
     select 1 from public.matchs x
      where x.id = m
        and (
-         x.visibilite = 'public'
+         (x.visibilite = 'public' and public.est_membre())
          or x.organisateur = (select auth.uid())
          or exists (
            select 1 from public.match_joueurs j
@@ -1192,7 +1299,7 @@ create policy "matchs: lecture"
   -- relire dans la même requête (insert … returning), avant que la fonction
   -- puisse le voir.
   using (
-    visibilite = 'public'
+    (visibilite = 'public' and (select public.est_membre()))
     or organisateur = (select auth.uid())
     or (select public.voit_match(id))
   );
@@ -1201,7 +1308,7 @@ drop policy if exists "matchs: j'ouvre le mien" on public.matchs;
 create policy "matchs: j'ouvre le mien"
   on public.matchs for insert
   to authenticated
-  with check (organisateur = (select auth.uid()));
+  with check (organisateur = (select auth.uid()) and (select public.est_membre()));
 
 drop policy if exists "matchs: je modifie le mien" on public.matchs;
 create policy "matchs: je modifie le mien"
@@ -1222,9 +1329,10 @@ create policy "match_joueurs: lecture"
   to authenticated
   using ((select public.voit_match(match_id)));
 
--- L'organisateur invite (et inscrit) qui il veut ; un joueur ne prend
+-- L'organisateur invite (et inscrit) qui il veut ; un membre ne prend
 -- lui-même qu'une place d'un match public. La capacité est gardée par le
--- trigger plus bas, pas par la règle.
+-- trigger plus bas, pas par la règle ; ce qu'il apporte en entrant (rien :
+-- ni équipe ni stats), par match_entree_gardee.
 drop policy if exists "match_joueurs: on entre" on public.match_joueurs;
 create policy "match_joueurs: on entre"
   on public.match_joueurs for insert
@@ -1234,6 +1342,7 @@ create policy "match_joueurs: on entre"
     or (
       player_id = (select auth.uid())
       and statut = 'inscrit'
+      and (select public.est_membre())
       and exists (select 1 from public.matchs x where x.id = match_id and x.visibilite = 'public')
     )
   );
@@ -1246,7 +1355,8 @@ create policy "match_joueurs: j'accepte"
   using (player_id = (select auth.uid()) or (select public.organise_match(match_id)))
   with check (player_id = (select auth.uid()) or (select public.organise_match(match_id)));
 
--- On se retire soi-même ; l'organisateur retire n'importe qui de son match.
+-- On se retire soi-même (avant la feuille : match_sortie_gardee, plus bas) ;
+-- l'organisateur retire n'importe qui de son match.
 drop policy if exists "match_joueurs: on sort" on public.match_joueurs;
 create policy "match_joueurs: on sort"
   on public.match_joueurs for delete
@@ -1316,8 +1426,8 @@ alter table public.match_joueurs add column if not exists buts int not null defa
 alter table public.match_joueurs add column if not exists passes int not null default 0 check (passes between 0 and 99);
 
 -- Un joueur accepte son invitation (sa ligne), mais seul l'organisateur (ou
--- l'admin) écrit les stats ; et une feuille ne se corrige plus 24 h après sa
--- première saisie.
+-- l'admin) écrit les stats ; une ligne ne change jamais de match ni de
+-- joueur ; et une feuille ne se corrige plus 24 h après sa première saisie.
 create or replace function public.match_feuille_gardee()
 returns trigger
 language plpgsql
@@ -1331,6 +1441,11 @@ begin
     return new;
   end if;
   if tg_table_name = 'match_joueurs' then
+    -- On emportait sa ligne, stats comprises, dans un autre match : plein,
+    -- déjà joué, où personne ne l'avait invité (22/10/2026).
+    if (new.match_id, new.player_id) is distinct from (old.match_id, old.player_id) then
+      raise exception 'ligne de feuille figée' using errcode = '42501';
+    end if;
     if (new.equipe, new.buts, new.passes) is distinct from (old.equipe, old.buts, old.passes) then
       if not public.organise_match(new.match_id) then
         raise exception 'feuille réservée à l''organisateur' using errcode = '42501';
@@ -1369,8 +1484,69 @@ drop trigger if exists matchs_feuille on public.matchs;
 create trigger matchs_feuille before update on public.matchs
   for each row execute function public.match_feuille_gardee();
 
+-- Qui prend lui-même une place n'apporte ni équipe ni stats : c'est
+-- l'organisateur qui les écrit (match_feuille_gardee, juste au-dessus). Et il
+-- n'entre pas dans un match dont la feuille est faite : on s'ajoutait à un
+-- match déjà joué, avec les buts qu'on voulait, et la Ligue vierge les
+-- comptait à vie (22/10/2026).
+create or replace function public.match_entree_gardee()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  -- Le serveur (clé secrète), l'admin et l'organisateur passent.
+  if (select auth.uid()) is null or public.is_league_admin() or public.organise_match(new.match_id) then
+    return new;
+  end if;
+  if new.equipe is not null or new.buts <> 0 or new.passes <> 0 then
+    raise exception 'feuille réservée à l''organisateur' using errcode = '42501';
+  end if;
+  if exists (select 1 from public.matchs x where x.id = new.match_id and x.saisi_le is not null) then
+    raise exception 'match déjà joué' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$$;
+
+revoke execute on function public.match_entree_gardee() from public, anon, authenticated;
+
+drop trigger if exists match_joueurs_entree on public.match_joueurs;
+create trigger match_joueurs_entree before insert on public.match_joueurs
+  for each row execute function public.match_entree_gardee();
+
+-- On se retire d'un match tant que sa feuille n'est pas faite ; ensuite,
+-- seul l'organisateur (ou l'admin) en retire quelqu'un. On effaçait sa ligne
+-- d'un match perdu, et la Ligue vierge oubliait la défaite (22/10/2026).
+-- Le match annulé emporte ses lignes sans passer par ici : il n'est déjà
+-- plus là quand elles partent.
+create or replace function public.match_sortie_gardee()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) is null or public.is_league_admin() or public.organise_match(old.match_id) then
+    return old;
+  end if;
+  if exists (select 1 from public.matchs x where x.id = old.match_id and x.saisi_le is not null) then
+    raise exception 'match déjà joué' using errcode = 'P0001';
+  end if;
+  return old;
+end;
+$$;
+
+revoke execute on function public.match_sortie_gardee() from public, anon, authenticated;
+
+drop trigger if exists match_joueurs_sortie on public.match_joueurs;
+create trigger match_joueurs_sortie before delete on public.match_joueurs
+  for each row execute function public.match_sortie_gardee();
+
 -- La Ligue vierge lit tous les matchs Bola joués, privés compris : seulement
--- le jour, l'heure et qui a fait quoi — ni le lieu, ni les invités.
+-- le jour, l'heure et qui a fait quoi — ni le lieu, ni les invités. Pour les
+-- membres seulement : un compte en attente reçoit une liste vide.
 create or replace function public.ligue_vierge()
 returns jsonb
 language sql
@@ -1394,7 +1570,8 @@ as $$
            )
          ) order by m.jour, m.heure, m.id), '[]'::jsonb)
     from public.matchs m
-   where m.mode = 'bola' and m.saisi_le is not null
+   where public.est_membre()
+     and m.mode = 'bola' and m.saisi_le is not null
      and m.score_clairs is not null and m.score_fonces is not null;
 $$;
 
@@ -1404,7 +1581,8 @@ grant execute on function public.ligue_vierge() to authenticated;
 -- ─────────────────────────── Disponibilités ──────────────────────────
 -- Chaque joueur dit quand il peut jouer : un jour, un moment. La ligue s'en
 -- sert pour composer des matchs et inviter (matchmaking), et chacun voit,
--- en ouvrant l'app, qui est libre en même temps que lui.
+-- en ouvrant l'app, qui est libre en même temps que lui. La ligue seulement :
+-- un compte en attente ne lit que les siennes et n'en pose pas (22/10/2026).
 create table if not exists public.disponibilites (
   player_id  uuid not null references public.profiles(id) on delete cascade,
   jour       date not null,
@@ -1421,13 +1599,13 @@ drop policy if exists "disponibilites: lecture ligue" on public.disponibilites;
 create policy "disponibilites: lecture ligue"
   on public.disponibilites for select
   to authenticated
-  using (true);
+  using ((select public.est_membre()) or player_id = (select auth.uid()));
 
 drop policy if exists "disponibilites: je dis les miennes" on public.disponibilites;
 create policy "disponibilites: je dis les miennes"
   on public.disponibilites for insert
   to authenticated
-  with check (player_id = (select auth.uid()));
+  with check (player_id = (select auth.uid()) and (select public.est_membre()));
 
 drop policy if exists "disponibilites: je retire les miennes" on public.disponibilites;
 create policy "disponibilites: je retire les miennes"
@@ -1822,6 +2000,31 @@ delete from public.push_historique h
  where h.le < now() - interval '13 months'
    and not exists (select 1 from public.push_abonnements a where md5(a.endpoint) = h.appareil);
 
+-- Un abonnement ne désigne qu'un vrai service de notifications (Apple,
+-- Google, Mozilla, Microsoft) : le serveur appelle cette adresse à chaque
+-- envoi, et une adresse quelconque faisait de lui un relais vers n'importe
+-- quel site (22/10/2026). La même liste est recopiée côté serveur
+-- (lib/server/web-push.ts, SERVICES_PUSH) : les changer ensemble. Les
+-- abonnements déjà là sont vérifiés à part, sans faire échouer la migration.
+do $$
+begin
+  alter table public.push_abonnements add constraint push_abonnements_service_connu check (
+    endpoint ~ '^https://(fcm\.googleapis\.com|android\.googleapis\.com|updates\.push\.services\.mozilla\.com|web\.push\.apple\.com|[a-z0-9-]+\.push\.apple\.com|[a-z0-9.-]+\.notify\.windows\.com)/'
+  ) not valid;
+exception
+  when duplicate_object then null;
+end;
+$$;
+
+do $$
+begin
+  alter table public.push_abonnements validate constraint push_abonnements_service_connu;
+exception
+  when check_violation then
+    raise warning 'push : des abonnements anciens visent un service inconnu (%)', sqlerrm;
+end;
+$$;
+
 -- ───────────────────────── Rôle admin ────────────────────────────────
 -- Remise d'aplomb des comptes admin — rejouée à chaque migration, donc à
 -- chaque déploiement qui touche ce fichier. Elle répare TOUS les états de
@@ -2128,6 +2331,65 @@ drop policy if exists "agent: j'efface la mienne" on public.agent_messages;
 
 revoke all on public.agent_messages from anon, authenticated;
 grant select, insert on public.agent_messages to authenticated;
+
+-- ───────────────── Les crédits de l'IA payante, comptés ici ─────────────────
+-- fal (le studio photo) et Anthropic (le coach) sont payés par Sabri. Les
+-- routes comptaient les demandes du jour, puis les notaient : dix demandes
+-- envoyées d'un coup passaient toutes avant d'être comptées (22/10/2026). La
+-- base compte donc elle-même, sous un verrou par joueur, dans le geste qui
+-- note la demande : au-delà du crédit, la ligne est refusée (indice
+-- « credit-du-jour ») et la route répond « reviens demain », sans appeler.
+-- Les crédits recopient LIMITE_JOUR (lib/sfl/photo-studio.ts : 3 photos par
+-- jour, remises à minuit heure de Paris, comme jourDeParis()) et
+-- LIMITE_AGENT_JOUR (lib/sfl/agent.ts : 30 questions sur 24 h) : les changer
+-- ensemble. Les images du coach restent comptées par la route : une par
+-- question au plus, donc bornées par le crédit de questions.
+create or replace function public.credit_du_jour()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  credit int;
+  faites int;
+begin
+  if tg_table_name = 'photo_studio' then
+    credit := 3;
+  elsif tg_table_name = 'agent_messages' and new.role = 'joueur' then
+    credit := 30;
+  else
+    return new;
+  end if;
+  -- Jusqu'à la fin de la transaction : la demande suivante du même joueur
+  -- attend celle-ci, puis la compte.
+  perform pg_advisory_xact_lock(hashtextextended('credit:' || tg_table_name || ':' || new.user_id::text, 0));
+  if tg_table_name = 'photo_studio' then
+    -- Depuis minuit, heure de Paris (juste aussi les nuits de changement
+    -- d'heure : minuit n'y tombe jamais dans le trou ni dans le doublon).
+    select count(*) into faites from public.photo_studio
+     where user_id = new.user_id
+       and created_at >= (date_trunc('day', now() at time zone 'Europe/Paris') at time zone 'Europe/Paris');
+  else
+    select count(*) into faites from public.agent_messages
+     where user_id = new.user_id and role = 'joueur' and created_at > now() - interval '24 hours';
+  end if;
+  if faites >= credit then
+    raise exception 'Crédit du jour épuisé.' using errcode = 'P0001', hint = 'credit-du-jour';
+  end if;
+  return new;
+end;
+$$;
+
+revoke execute on function public.credit_du_jour() from public, anon, authenticated;
+
+drop trigger if exists photo_studio_credit on public.photo_studio;
+create trigger photo_studio_credit before insert on public.photo_studio
+  for each row execute function public.credit_du_jour();
+
+drop trigger if exists agent_messages_credit on public.agent_messages;
+create trigger agent_messages_credit before insert on public.agent_messages
+  for each row execute function public.credit_du_jour();
 
 -- Les images du coach : bucket PRIVÉ « agent », <uuid du joueur>/<horodatage>.jpg.
 -- La route /api/agent les y pose avec les droits du joueur ; lui seul les voit.
@@ -3312,6 +3574,20 @@ create table if not exists public.match_rappels (
 
 alter table public.match_rappels enable row level security;
 revoke all on public.match_rappels from anon, authenticated;
+
+-- Les annonces de la ligue déjà envoyées par notification : une fois par
+-- annonce et par joueur (« divisions-s1-j3 », /api/divisions/annoncer). Fermée
+-- aux téléphones : seule la route serveur, avec la clé secrète, la lit et
+-- l'écrit.
+create table if not exists public.annonces_envois (
+  annonce   text not null,
+  joueur    text not null,
+  envoye_le timestamptz not null default now(),
+  primary key (annonce, joueur)
+);
+
+alter table public.annonces_envois enable row level security;
+revoke all on public.annonces_envois from anon, authenticated;
 
 -- ─────────────────────────── Discussion d'équipe ───────────────────────────
 -- Sabri, 22/10 : « dans la discussion, […] discuter soit avec son match,

@@ -49,7 +49,7 @@ const DEF = Object.fromEntries(TROPHEES.map((d) => [d.id, d]));
 
 /** Le terrain des rubriques : celui des terrains de la Ligue, un peu plus couché, le but au fond. */
 const VUE = vue(270, 500, 40);
-const MILIEU = VUE.l / 2;
+export const MILIEU = VUE.l / 2;
 /** La ligne de but du fond, et le but de five : 4,5 m sur 1,6 m environ à cette échelle. */
 const LIGNE = 11;
 const POTEAUX = [MILIEU - 24, MILIEU + 24] as const;
@@ -65,7 +65,7 @@ const ECHELLE_MAX = 449 / BASE;
 const MARGE = 12;
 const PHI = (1 + Math.sqrt(5)) / 2;
 /** Les tailles des cartes debout (fraction de 254 px, comme FORMAT_CARTE). */
-const T = { vedette: 0.27, moyenne: 0.21, petite: 0.16 } as const;
+export const T = { vedette: 0.27, moyenne: 0.21, petite: 0.16 } as const;
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
@@ -96,6 +96,8 @@ export interface Place {
   moi?: boolean;
   /** Sous le nom, les chiffres du jour. */
   sous?: string;
+  /** Sur le coin haut de la carte, en pastille : quand le nom n'a plus la place à côté de lui. */
+  badge?: string;
 }
 
 const hauteur = (taille: number) => 254 * taille * PHI + 26;
@@ -110,7 +112,14 @@ function Debout({ p }: { p: Place }) {
     <div className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y, zIndex: Math.round(p.v) }}>
       <div className="absolute bottom-0 left-0" style={{ transformOrigin: "50% 100%", transform: `translateX(-50%) scale(${k})` }}>
         <div className="pel-entre flex flex-col items-center" style={{ ["--d" as string]: p.d ?? 0.2 }}>
-          <MiniCarte player={joueur} size={taille} vertical />
+          <div className="relative">
+            <MiniCarte player={joueur} size={taille} vertical />
+            {p.badge && (
+              <span className="absolute top-0 right-0 translate-x-[45%] -translate-y-[35%] rounded-full bg-white px-[5px] py-[1.5px] font-mono text-[9.5px] leading-[1.2] font-bold whitespace-nowrap text-black tabular-nums shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
+                {p.badge}
+              </span>
+            )}
+          </div>
           <span
             className={cn(
               "mt-[4px] flex items-center gap-[5px] rounded-full px-[8px] py-[2px] text-[11px] leading-[1.25] font-bold whitespace-nowrap",
@@ -127,7 +136,7 @@ function Debout({ p }: { p: Place }) {
 }
 
 /** Ce qui flotte au-dessus du terrain en (u, v), à la hauteur w : un chiffre, un badge. */
-function Bulle({ u, v, w = 0, d = 0.4, children, className }: { u: number; v: number; w?: number; d?: number; children: ReactNode; className?: string }) {
+export function Bulle({ u, v, w = 0, d = 0.4, children, className }: { u: number; v: number; w?: number; d?: number; children: ReactNode; className?: string }) {
   const { x, y, k } = projeter(u, v, w, VUE);
   return (
     <div className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y, zIndex: 600 }}>
@@ -141,7 +150,7 @@ function Bulle({ u, v, w = 0, d = 0.4, children, className }: { u: number; v: nu
 }
 
 /** Un chiffre en pastille : le nombre en Anton, ce qu'il compte dessous. */
-function Pastille({ n, quoi, clair = false, petit = false }: { n: ReactNode; quoi: string; clair?: boolean; petit?: boolean }) {
+export function Pastille({ n, quoi, clair = false, petit = false }: { n: ReactNode; quoi: string; clair?: boolean; petit?: boolean }) {
   return (
     <span
       className={cn(
@@ -215,7 +224,9 @@ function Ballon({ trajet, de, a }: { trajet: [number, number][]; de: number; a: 
   );
 }
 
-/** Le but du fond : les poteaux, la barre et le filet, en perspective. */
+/** Le but du fond : les poteaux, la barre et le filet, en perspective. Le
+ *  filet et le cerne des poteaux suivent le mode (globals.css, --but-*) : sur
+ *  le papier du mode clair, le blanc seul disparaîtrait. */
 function But() {
   const [g, dr] = POTEAUX;
   const fond = LIGNE - 9;
@@ -225,10 +236,10 @@ function But() {
       <svg x="50%" overflow="visible">
         <path
           d={trace([[g, LIGNE, BARRE], [g, fond, BARRE - 4], [dr, fond, BARRE - 4], [dr, LIGNE, BARRE]], true, VUE)}
-          fill="rgba(255,255,255,0.08)"
+          style={{ fill: "var(--but-voile)" }}
         />
-        <path d={trace([[g, fond, 0], [g, fond, BARRE - 4], [dr, fond, BARRE - 4], [dr, fond, 0]], true, VUE)} fill="rgba(255,255,255,0.06)" />
-        <g stroke="rgba(255,255,255,0.28)" strokeWidth={0.7} fill="none">
+        <path d={trace([[g, fond, 0], [g, fond, BARRE - 4], [dr, fond, BARRE - 4], [dr, fond, 0]], true, VUE)} style={{ fill: "var(--but-fond)" }} />
+        <g strokeWidth={0.7} fill="none" style={{ stroke: "var(--but-filet)" }}>
           {mailles.map((u) => (
             <path key={u} d={trace([[u, fond, 0], [u, fond, BARRE - 4], [u, LIGNE, BARRE]], false, VUE)} />
           ))}
@@ -238,6 +249,13 @@ function But() {
           <path d={trace([[g, LIGNE, 0], [g, fond, 0], [g, fond, BARRE - 4]], false, VUE)} />
           <path d={trace([[dr, LIGNE, 0], [dr, fond, 0], [dr, fond, BARRE - 4]], false, VUE)} />
         </g>
+        <path
+          d={trace([[g, LIGNE, 0], [g, LIGNE, BARRE], [dr, LIGNE, BARRE], [dr, LIGNE, 0]], false, VUE)}
+          fill="none"
+          strokeWidth={4.2}
+          strokeLinejoin="round"
+          style={{ stroke: "var(--but-cerne)" }}
+        />
         <path
           d={trace([[g, LIGNE, 0], [g, LIGNE, BARRE], [dr, LIGNE, BARRE], [dr, LIGNE, 0]], false, VUE)}
           fill="none"
@@ -368,13 +386,13 @@ export function Scene({
       ref={ref}
       data-exploits={exploits?.join("|")}
       className={cn(
-        "relative flex flex-col overflow-hidden bg-[radial-gradient(120%_70%_at_50%_30%,#1d2024_0%,#0c0d0f_75%)] text-white md:rounded-3xl",
+        "relative flex flex-col overflow-hidden bg-[radial-gradient(120%_70%_at_50%_30%,#ffffff_0%,#e8eae5_75%)] text-foreground md:rounded-3xl dark:bg-[radial-gradient(120%_70%_at_50%_30%,#1d2024_0%,#0c0d0f_75%)] dark:text-white",
         className,
       )}
       style={{ ["--p" as string]: 0 } as CSSProperties}
     >
       <header className="relative z-10 flex flex-col gap-1 px-5 pt-5">
-        <span className="pel-titre mono-label text-[10px] text-white/50" style={{ ["--d" as string]: 0 }}>
+        <span className="pel-titre mono-label text-[10px] text-foreground/50 dark:text-white/50" style={{ ["--d" as string]: 0 }}>
           {sur}
         </span>
         <h3 className="pel-titre titre-lettrage text-[24px] leading-[0.95]" style={{ ["--d" as string]: 0.06 }}>
@@ -404,7 +422,7 @@ export function Scene({
       </div>
       {(texte || partage || action) && (
         <div className="flex min-h-11 items-center gap-2 pr-1.5 pb-2 pl-5">
-          <span className="min-w-0 flex-1 text-[13px] leading-snug text-white/70">{texte}</span>
+          <span className="min-w-0 flex-1 text-[13px] leading-snug text-foreground/70 dark:text-white/70">{texte}</span>
           {action}
           {partage && (
             <button
@@ -414,7 +432,7 @@ export function Scene({
                 preparerPiece({ type: "ligue", ...partage, lignes: partage.lignes.slice(0, 6) });
                 router.push("/vestiaire");
               }}
-              className="grid size-9 shrink-0 place-items-center rounded-full text-white/60 transition-transform active:scale-90"
+              className="grid size-9 shrink-0 place-items-center rounded-full text-foreground/60 transition-transform active:scale-90 dark:text-white/60"
             >
               <MessageCircle className="size-[18px]" strokeWidth={1.8} />
             </button>
@@ -428,7 +446,7 @@ export function Scene({
 /* ------------------------------ Les rubriques ------------------------------ */
 
 /** Le moment d'entrée de la i-ième carte. */
-const tour = (i: number, de = 0.18, pas = 0.07) => de + i * pas;
+export const tour = (i: number, de = 0.18, pas = 0.07) => de + i * pas;
 
 /** Des cartes en rang, de gauche à droite, centrées sur le milieu. */
 function rang(noms: string[], v: number, ecart: number, taille: number, d0: number, moi?: string): Place[] {

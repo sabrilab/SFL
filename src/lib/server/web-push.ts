@@ -29,6 +29,20 @@ export interface CleVapid {
   sujet: string;
 }
 
+/**
+ * Les services de notifications connus (Apple, Google, Mozilla, Microsoft).
+ * Un abonnement ne peut viser qu'eux : le serveur appelle son adresse à
+ * chaque envoi, et une adresse quelconque ferait de lui un relais. La base
+ * garde la même liste (supabase/schema.sql, push_abonnements_service_connu) :
+ * les changer ensemble.
+ */
+const SERVICES_PUSH =
+  /^https:\/\/(fcm\.googleapis\.com|android\.googleapis\.com|updates\.push\.services\.mozilla\.com|web\.push\.apple\.com|[a-z0-9-]+\.push\.apple\.com|[a-z0-9.-]+\.notify\.windows\.com)\//;
+
+export function serviceConnu(endpoint: string): boolean {
+  return SERVICES_PUSH.test(endpoint);
+}
+
 const b64 = (b: Buffer) => b.toString("base64url");
 const deB64 = (s: string) => Buffer.from(s, "base64url");
 
@@ -107,6 +121,9 @@ export type Resultat = "envoye" | "mort" | "echec";
 
 /** Envoie à un téléphone. « mort » : l'abonnement n'existe plus, à effacer. */
 export async function envoyer(ab: Abonnement, message: unknown, cle: CleVapid): Promise<Resultat> {
+  // Une adresse hors des services connus n'est jamais appelée : l'abonnement
+  // est compté mort, et l'appelant l'efface.
+  if (!serviceConnu(ab.endpoint)) return "mort";
   try {
     const r = await fetch(ab.endpoint, {
       method: "POST",

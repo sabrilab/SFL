@@ -164,7 +164,7 @@ export function Stories({ depart, j, onFermer, moi }: { depart: number; j: numbe
     <div
       role="dialog"
       aria-label={`Classement ${def.label}`}
-      className="fixed inset-0 z-[60] bg-black text-white"
+      className="dark fixed inset-0 z-[60] bg-black text-white"
       onPointerDown={() => {
         long.current = false;
         appui.current = window.setTimeout(() => {

@@ -21,6 +21,10 @@
 // (hooks/use-ecran-clavier.ts), le fil tenu au plus récent même quand une
 // image ou un schéma finit de se dessiner (hooks/use-fil-au-bas.ts).
 //
+// Sur ordinateur (dès 1024 px), comme le Vestiaire : la colonne prend la
+// mesure du récap (760 px au lieu de 640), les images et les schémas du
+// coach un pas d'or de plus (420 px), la carte de la fiche un cran de plus.
+//
 // Tant que la clé du modèle n'est pas posée dans Vercel (/api/agent répond
 // { pret: false }), la fiche reste et la barre d'écriture cède la place à une
 // ligne : « Bola Agent arrive bientôt. »
@@ -33,7 +37,8 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "rea
 import { createPortal } from "react-dom";
 import { ArrowUp } from "lucide-react";
 import { toast } from "sonner";
-import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
+import { CarteDe } from "@/components/sfl/mini-carte";
+import { useFormatCarte } from "@/hooks/use-format-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { TitreDiscussion } from "@/components/sfl/titre-discussion";
@@ -74,14 +79,15 @@ const tactile = () => window.matchMedia("(pointer: coarse)").matches;
 /** La carte du joueur et ses six stats, de la plus haute à la plus basse. */
 const Fiche = memo(function Fiche({ dossier }: { dossier: DossierJoueur }) {
   const n = dossier.stats.length;
+  const format = useFormatCarte();
   return (
     <div className="mb-5 flex items-center gap-4 pt-1">
-      <CarteDe name={dossier.nom} size={FORMAT_CARTE.moyenne} inerte />
+      <CarteDe name={dossier.nom} size={format.moyenne} inerte />
       <ol className="flex min-w-0 flex-1 flex-col gap-[7px]">
         {dossier.stats.map((s, i) => (
           <li key={s.id} className="flex items-center gap-2.5">
             <span className="w-[62px] shrink-0 text-[12.5px] font-semibold text-foreground/60">{s.nom}</span>
-            <span className="relative h-[5px] min-w-0 flex-1 overflow-hidden rounded-full bg-white/[0.08]">
+            <span className="relative h-[5px] min-w-0 flex-1 overflow-hidden rounded-full bg-contraste/[0.08]">
               <span
                 className="absolute inset-y-0 left-0 rounded-full bg-foreground"
                 // La plus basse en dernier, et plus pâle à mesure qu'on descend.
@@ -110,16 +116,16 @@ function CarteVue({ carte, dossier }: { carte: CarteCoach; dossier: DossierJoueu
           {carte.sousTitre && <span className="mt-1 block text-[13px] text-foreground/55">{carte.sousTitre}</span>}
         </div>
         {cible && (
-          <span className="flex shrink-0 items-baseline gap-1 rounded-full border border-white/15 px-2.5 py-1">
+          <span className="flex shrink-0 items-baseline gap-1 rounded-full border border-contraste/15 px-2.5 py-1">
             <span className="text-[11.5px] font-semibold text-foreground/60">{NOMS_STATS[cible.id]}</span>
             <span className="text-[13px] font-bold tabular-nums">{cible.valeur}</span>
           </span>
         )}
       </div>
       {carte.lignes.length > 0 && (
-        <ol className="border-t border-white/[0.07]">
+        <ol className="border-t border-contraste/[0.07]">
           {carte.lignes.map((l, i) => (
-            <li key={i} className="flex items-start gap-3 border-b border-white/[0.07] px-4 py-2.5 last:border-b-0">
+            <li key={i} className="flex items-start gap-3 border-b border-contraste/[0.07] px-4 py-2.5 last:border-b-0">
               {numerotee && <span className="w-4 shrink-0 pt-px text-[13px] font-bold text-foreground/35 tabular-nums">{i + 1}</span>}
               <span className="min-w-0 flex-1">
                 <span className="block text-[14.5px] leading-snug font-semibold">{l.label}</span>
@@ -165,12 +171,12 @@ function ImageVue({ image }: { image: ImageCoach }) {
   }, [image.chemin, image.url]);
   const src = image.url ?? signe;
   return (
-    <figure className="w-[min(300px,74vw)]">
+    <figure className="w-[min(300px,74vw)] lg:w-[420px]">
       <button
         type="button"
         onClick={() => src && setGrand(true)}
         aria-label={image.legende || "Agrandir l'image"}
-        className="block aspect-square w-full overflow-hidden rounded-[22px] bg-white/[0.06]"
+        className="block aspect-square w-full overflow-hidden rounded-[22px] bg-contraste/[0.06]"
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- lien signé ou data URL */}
         {src && <img src={src} alt={image.legende} className="size-full object-cover" />}
@@ -186,7 +192,7 @@ function ImageVue({ image }: { image: ImageCoach }) {
             type="button"
             onClick={() => setGrand(false)}
             aria-label="Fermer"
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4"
+            className="dark fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- lien signé ou data URL */}
             <img src={src} alt={image.legende} className="max-h-full max-w-full rounded-[22px]" />
@@ -404,13 +410,13 @@ export function Agent() {
       className="ecran-discussion fixed inset-x-0 top-0 z-[35] flex flex-col bg-background"
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
-      <header className="relative mx-auto flex w-full max-w-[640px] shrink-0 items-center justify-between gap-3 px-5 pt-3 pb-2">
+      <header className="relative mx-auto flex w-full max-w-[640px] shrink-0 items-center justify-between gap-3 px-5 pt-3 pb-2 lg:max-w-[760px]">
         <TitreDiscussion actif="/agent" />
         <BoutonRecherche />
       </header>
 
       <div ref={fil} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div ref={contenu} className="mx-auto flex min-h-full w-full max-w-[640px] flex-col px-5 pb-3">
+        <div ref={contenu} className="mx-auto flex min-h-full w-full max-w-[640px] flex-col px-5 pb-3 lg:max-w-[760px]">
           {/* La fiche et la conversation arrivent ensemble, déjà au plus
               récent : posée seule, la fiche était chassée vers le haut. */}
           {charge && (
@@ -429,7 +435,7 @@ export function Agent() {
       </div>
 
       {/* La barre d'écriture : au-dessus des onglets, ou du clavier. */}
-      <div className="mx-auto w-full max-w-[640px] shrink-0 px-3 pt-2" style={{ paddingBottom: "var(--pied-ecriture)" }}>
+      <div className="mx-auto w-full max-w-[640px] shrink-0 px-3 pt-2 lg:max-w-[760px]" style={{ paddingBottom: "var(--pied-ecriture)" }}>
         {!peutEcrire ? (
           pret !== null && (
             <p className="glass rounded-full px-4 py-3 text-center text-[13.5px] font-semibold text-foreground/55">

@@ -18,11 +18,15 @@
 //
 // Sécurité : si CRON_SECRET est posé dans Vercel, l'appel doit le porter
 // (en-tête Authorization) — c'est ce que fait le cron Vercel de lui-même.
+// Sans secret, la route ne travaille que le lundi matin, heure de Paris, là
+// où passe le cron : appelée par n'importe qui un dimanche, elle clôturait la
+// convocation du jour même et ouvrait déjà la semaine suivante (22/10/2026).
+// Le lundi matin, elle ne fait rien de plus que ce que le cron ferait.
 
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "pg";
 import { candidateUrls, normalizeDbUrl } from "@/lib/server/migrate";
-import { labelDateFr, prochainDimanche } from "@/lib/sfl/convocation-temps";
+import { instantParis, labelDateFr, prochainDimanche } from "@/lib/sfl/convocation-temps";
 
 export const dynamic = "force-dynamic";
 
@@ -36,13 +40,21 @@ interface DerniereConvocation {
   statut: string;
 }
 
+/** Le lundi de 5 h à 14 h, heure de Paris : la fenêtre du cron (7 h UTC, à l'heure près). */
+function fenetreDuCron(date: Date): boolean {
+  const { jourIso, heure } = instantParis(date);
+  return jourIso === 1 && heure >= 5 && heure < 14;
+}
+
 export async function GET(req: NextRequest) {
   // Le cron Vercel présente le secret ; un appel anonyme est refusé si le
-  // secret existe. Sans secret configuré, la route reste inoffensive : elle
-  // est idempotente et ne fait qu'ouvrir la semaine.
+  // secret existe. Sans secret configuré, seulement dans la fenêtre du cron.
   const secret = process.env.CRON_SECRET;
   if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
+  }
+  if (!secret && !fenetreDuCron(new Date())) {
+    return NextResponse.json({ error: "Seulement le lundi matin." }, { status: 403 });
   }
 
   const candidates = candidateUrls();

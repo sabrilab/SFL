@@ -25,15 +25,16 @@
 import { useMemo, useRef, useState } from "react";
 import { Copy, Plus, Trash2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { entryPP } from "@/lib/sfl/saisie/engine";
+import { computeJournees, entryPP } from "@/lib/sfl/saisie/engine";
 import {
   addEntry,
   deleteEntryAt,
   duplicateEntryAt,
   newEntry,
   updateEntryAt,
-  TEAM_PRESETS,
 } from "@/lib/sfl/saisie/mutations";
+import { choixDEquipe } from "@/lib/sfl/saisie/equipes";
+import { PointMaillot } from "@/components/sfl/point-maillot";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
 /* ------------------------------- colonnes -------------------------------- */
@@ -61,16 +62,9 @@ const STATUTS = [
 
 const COLS: Col[] = [
   { id: "player", label: "Joueur", type: "player", width: 132 },
-  {
-    id: "team",
-    label: "Équipe",
-    type: "enum",
-    width: 84,
-    options: [
-      { value: "", label: "—" },
-      ...TEAM_PRESETS.map((t) => ({ value: t, label: t })),
-    ],
-  },
+  // Ses options dépendent de la journée : ses Noirs et ses Blancs, match par
+  // match, et un match de plus (saisie/equipes.ts) ; posées par la grille.
+  { id: "team", label: "Équipe", type: "enum", width: 84 },
   {
     id: "statut",
     label: "Statut",
@@ -128,7 +122,7 @@ const TOTAL_WIDTH = COLS.reduce((a, c) => a + c.width, 0) + 46;
 // Volets figés : le joueur reste visible à gauche, les PP à droite, pendant
 // qu'on fait défiler les colonnes du milieu. C'est le « figer les volets » du
 // tableur, sans avoir à le demander.
-const FIGE = "sticky z-10 bg-[#131313]";
+const FIGE = "sticky z-10 bg-[#f1f2ef] dark:bg-[#131313]";
 const GAUCHE_NUM = { left: 0 } as const;
 const GAUCHE_JOUEUR = { left: 30 } as const;
 // Les PP se figent juste à gauche de la colonne d'actions, elle-même figée :
@@ -217,7 +211,7 @@ function Enum({
       className={cn(cellBase, "cursor-pointer appearance-none font-medium")}
     >
       {options.map((o) => (
-        <option key={o.value} value={o.value} className="bg-[#141414] text-white">
+        <option key={o.value} value={o.value} className="bg-white text-[#08090b] dark:bg-[#141414] dark:text-white">
           {o.label}
         </option>
       ))}
@@ -253,6 +247,20 @@ export function GrilleSaisie({ saison, commit }: Props) {
       .filter((x) => !needle || x.e.player.toLowerCase().includes(needle));
   }, [saison.entries, j, q]);
 
+  // Les équipes qu'une ligne peut prendre : celles de la journée, match par
+  // match, puis les Noirs et les Blancs d'un match de plus.
+  const choix = useMemo(() => {
+    const noms = [...new Set(saison.entries.filter((e) => e.j === j && e.team).map((e) => e.team as string))];
+    return choixDEquipe(
+      computeJournees(saison).find((x) => x.j === j),
+      noms
+    );
+  }, [saison, j]);
+  const optionsEquipe = useMemo(
+    () => [{ value: "", label: "—" }, ...choix.map((t) => ({ value: t.nom, label: t.court }))],
+    [choix]
+  );
+
   // Les totaux d'équipe du bas de feuille, comme les lignes TOTAL du classeur.
   const equipes = useMemo(() => {
     const map = new Map<string, { buts: number; passes: number; joueurs: number }>();
@@ -264,8 +272,11 @@ export function GrilleSaisie({ saison, commit }: Props) {
       cur.joueurs += e.extraTime ? 0 : 1;
       map.set(e.team, cur);
     }
-    return [...map.entries()];
-  }, [rows]);
+    // Dans l'ordre des matchs : les Noirs, puis les Blancs.
+    return choix
+      .filter((t) => map.has(t.nom))
+      .map((t) => ({ ...t, ...map.get(t.nom)! }));
+  }, [rows, choix]);
 
   const ppTotal = rows.reduce((s, x) => s + entryPP(x.e), 0);
 
@@ -314,7 +325,7 @@ export function GrilleSaisie({ saison, commit }: Props) {
     const deja = new Set(rows.map((x) => x.e.player));
     const libres = rosterNames.filter((n) => !deja.has(n)).slice(0, 6);
     for (const name of libres) next = addEntry(next, newEntry(j, name, team));
-    commit(next, `Équipe ${team} ajoutée`);
+    commit(next, `${choix.find((t) => t.nom === team)?.libelle ?? team} ajoutés`);
   }
 
   const meta = saison.journees.find((m) => m.j === j);
@@ -329,7 +340,7 @@ export function GrilleSaisie({ saison, commit }: Props) {
           className="glass-soft h-9 cursor-pointer rounded-full px-3.5 text-[13px] font-bold outline-none"
         >
           {journees.map((m) => (
-            <option key={m.j} value={m.j} className="bg-[#141414] text-white">
+            <option key={m.j} value={m.j} className="bg-white text-[#08090b] dark:bg-[#141414] dark:text-white">
               Journée {m.j} · {m.date}
             </option>
           ))}
@@ -353,14 +364,15 @@ export function GrilleSaisie({ saison, commit }: Props) {
       {/* Poser une équipe entière */}
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="mono-label text-foreground/30">Ajouter une équipe</span>
-        {TEAM_PRESETS.map((t) => (
+        {choix.map((t) => (
           <button
-            key={t}
-            onClick={() => ajouterEquipe(t)}
+            key={t.nom}
+            onClick={() => ajouterEquipe(t.nom)}
             className="bouton-secondaire bouton--vert flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-semibold"
           >
             <Users className="size-3" />
-            {t}
+            {t.camp && <PointMaillot camp={t.camp} className="size-2" />}
+            {t.libelle}
           </button>
         ))}
       </div>
@@ -370,7 +382,7 @@ export function GrilleSaisie({ saison, commit }: Props) {
         <div className="overflow-x-auto overscroll-x-contain">
           <div style={{ minWidth: TOTAL_WIDTH }} ref={grid} onKeyDown={onGridKeyDown}>
             {/* En-tête */}
-            <div className="flex items-center border-b border-white/10 bg-[#141414] py-2 pr-1.5">
+            <div className="flex items-center border-b border-contraste/10 bg-[#eceee9] py-2 pr-1.5 dark:bg-[#141414]">
               <span
                 className={cn(FIGE, "mono-label w-[30px] shrink-0 text-center text-foreground/25")}
                 style={GAUCHE_NUM}
@@ -386,8 +398,8 @@ export function GrilleSaisie({ saison, commit }: Props) {
                     className={cn(
                       "mono-label shrink-0 px-1.5 text-foreground/35",
                       fige && FIGE,
-                      c.id === "player" && "border-r border-white/8",
-                      c.id === "pp" && "border-l border-white/8 text-center text-primary"
+                      c.id === "player" && "border-r border-contraste/8",
+                      c.id === "pp" && "border-l border-contraste/8 text-center text-primary"
                     )}
                     style={{
                       width: c.width,
@@ -409,8 +421,8 @@ export function GrilleSaisie({ saison, commit }: Props) {
                 <div
                   key={row.index}
                   className={cn(
-                    "flex items-center border-b border-white/5 py-[3px] pr-1.5 last:border-0",
-                    e.extraTime && "bg-white/[0.02]",
+                    "flex items-center border-b border-contraste/5 py-[3px] pr-1.5 last:border-0",
+                    e.extraTime && "bg-contraste/[0.02]",
                     e.statut !== "Présent" && !e.extraTime && "opacity-55"
                   )}
                 >
@@ -435,7 +447,7 @@ export function GrilleSaisie({ saison, commit }: Props) {
                           style={{ ...w, ...DROITE_PP }}
                           className={cn(
                             FIGE,
-                            "shrink-0 border-l border-white/8 px-1.5 text-center text-[12px] font-extrabold tabular-nums"
+                            "shrink-0 border-l border-contraste/8 px-1.5 text-center text-[12px] font-extrabold tabular-nums"
                           )}
                         >
                           {pp}
@@ -448,7 +460,7 @@ export function GrilleSaisie({ saison, commit }: Props) {
                         <span
                           key={c.id}
                           style={{ ...w, ...GAUCHE_JOUEUR }}
-                          className={cn(FIGE, "shrink-0 border-r border-white/8 px-0.5")}
+                          className={cn(FIGE, "shrink-0 border-r border-contraste/8 px-0.5")}
                         >
                           <Enum
                             {...nav}
@@ -474,7 +486,7 @@ export function GrilleSaisie({ saison, commit }: Props) {
                           <Enum
                             {...nav}
                             value={raw}
-                            options={c.options!}
+                            options={c.id === "team" ? optionsEquipe : c.options!}
                             onSet={(v) => {
                               const p =
                                 c.id === "team"
@@ -541,7 +553,7 @@ export function GrilleSaisie({ saison, commit }: Props) {
                     <button
                       onClick={() => commit(deleteEntryAt(saison, row.index), `Ligne supprimée — ${e.player}`)}
                       title="Supprimer"
-                      className="text-foreground/20 transition-colors hover:text-[#FF6B5E]"
+                      className="text-foreground/20 transition-colors hover:text-[#c8352b] dark:hover:text-[#FF6B5E]"
                     >
                       <Trash2 className="size-3" />
                     </button>
@@ -562,12 +574,15 @@ export function GrilleSaisie({ saison, commit }: Props) {
 
       {/* Les totaux — les lignes TOTAL du classeur, mais toujours justes */}
       <div className="flex flex-wrap items-center gap-2">
-        {equipes.map(([name, t]) => (
+        {equipes.map((t) => (
           <span
-            key={name}
+            key={t.nom}
             className="glass-soft flex items-baseline gap-1.5 rounded-full px-3 py-1.5 text-[12px]"
           >
-            <strong className="font-bold">{name}</strong>
+            <strong className="flex items-center gap-1.5 self-center font-bold">
+              {t.camp && <PointMaillot camp={t.camp} className="size-2" />}
+              {t.libelle}
+            </strong>
             <span className="tabular-nums text-foreground/45">
               {t.buts} but{t.buts > 1 ? "s" : ""} · {t.passes} passe{t.passes > 1 ? "s" : ""} ·{" "}
               {t.joueurs} joueur{t.joueurs > 1 ? "s" : ""}
@@ -594,7 +609,7 @@ export function GrilleSaisie({ saison, commit }: Props) {
             ] as const
           ).map(([k, v]) => (
             <div key={k} className="flex items-baseline gap-2">
-              <kbd className="shrink-0 rounded-md border border-white/12 bg-white/6 px-1.5 py-0.5 font-mono text-[10.5px] text-foreground/70">
+              <kbd className="shrink-0 rounded-md border border-contraste/12 bg-contraste/6 px-1.5 py-0.5 font-mono text-[10.5px] text-foreground/70">
                 {k}
               </kbd>
               <span className="min-w-0">{v}</span>
@@ -602,7 +617,7 @@ export function GrilleSaisie({ saison, commit }: Props) {
           ))}
         </div>
         {meta && (
-          <p className="mt-2.5 border-t border-white/8 pt-2.5 text-[12px] text-foreground/40">
+          <p className="mt-2.5 border-t border-contraste/8 pt-2.5 text-[12px] text-foreground/40">
             Journée {meta.j} du {meta.date}. Une ligne <strong>Xtratime</strong> n&apos;ouvre ni
             présence ni match : seuls sa mention et son bonus comptent. Chaque paire
             d&apos;arrêts et chaque paire d&apos;interceptions vaut 1 point Pépite.

@@ -11,25 +11,19 @@
 // posé par l'admin : chaque PAIRE d'arrêts vaut 1 point Pépite, chaque paire
 // d'interceptions aussi — le gardien et le défenseur ne repartent plus les
 // mains vides d'un match sans but.
+//
+// Chaque match se joue les Noirs contre les Blancs (saisie/equipes.ts) : un
+// jour à plusieurs matchs, on choisit le match, puis le camp qu'on suit.
 
 import { useMemo, useState } from "react";
 import { ChevronDown, Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { entryPP } from "@/lib/sfl/saisie/engine";
+import { computeJournees, entryPP } from "@/lib/sfl/saisie/engine";
 import { ChangerJoueurSheet } from "@/components/sfl/admin/changer-joueur-sheet";
-import { changerEquipeAt, remplacerJoueurAt, TEAM_PRESETS, updateEntryAt } from "@/lib/sfl/saisie/mutations";
+import { PointMaillot } from "@/components/sfl/point-maillot";
+import { changerEquipeAt, remplacerJoueurAt, updateEntryAt } from "@/lib/sfl/saisie/mutations";
+import { equipesDuJour } from "@/lib/sfl/saisie/equipes";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
-
-const TEAM_COLORS: Record<string, string> = {
-  Orange: "#F9CB9C",
-  Bleu: "#C9DAF8",
-  Vert: "#D9EAD3",
-  Jaune: "#FFF2CC",
-  Rouge: "#F4CCCC",
-  Gris: "#CCCCCC",
-  "Équipe A": "#F9CB9C",
-  "Équipe B": "#C9DAF8",
-};
 
 /** Les quatre compteurs du direct. */
 const COMPTEURS = [
@@ -108,32 +102,29 @@ export function FeuilleDirecte({ saison, commit }: Props) {
     [saison.entries, j]
   );
 
-  // Les équipes de la journée, dans leur ordre d'apparition.
+  // Les équipes de la journée, match par match : les Noirs, puis les Blancs
+  // (le moteur les apparie) ; puis celles qui n'ont personne en face.
+  const journee = useMemo(() => computeJournees(saison).find((x) => x.j === j), [saison, j]);
   const equipes = useMemo(() => {
-    const order: string[] = [];
-    for (const { e } of rows) if (e.team && !order.includes(e.team)) order.push(e.team);
-    // Ordre fixe des couleurs : un joueur qui change d'équipe ne déplace pas les onglets.
-    const rang = (t: string) => {
-      const i = (TEAM_PRESETS as readonly string[]).indexOf(t);
-      return i < 0 ? TEAM_PRESETS.length : i;
-    };
-    return order.sort((x, y) => rang(x) - rang(y));
-  }, [rows]);
+    const noms: string[] = [];
+    for (const { e } of rows) if (e.team && !noms.includes(e.team)) noms.push(e.team);
+    return equipesDuJour(journee, noms);
+  }, [journee, rows]);
+  const nbMatchs = journee?.matches?.length ?? 0;
 
   const [team, setTeam] = useState<string | null>(null);
-  const teamActive = team && equipes.includes(team) ? team : (equipes[0] ?? null);
+  const active = equipes.find((x) => x.nom === team) ?? equipes[0] ?? null;
+  const teamActive = active?.nom ?? null;
+  // Les onglets : les deux camps du match choisi ; un jour à un seul match, toutes les équipes.
+  const onglets = nbMatchs > 1 && active?.match != null ? equipes.filter((x) => x.match === active.match) : equipes;
 
   const visibles = rows.filter((x) => (teamActive ? x.e.team === teamActive : !x.e.team));
 
-  const scores = useMemo(
-    () =>
-      equipes.map((t) => ({
-        name: t,
-        buts: rows
-          .filter((x) => x.e.team === t)
-          .reduce((s, x) => s + x.e.buts + (x.e.teamScoreBonus ?? 0), 0),
-      })),
-    [equipes, rows]
+  const butsDe = (t: string) =>
+    rows.filter((x) => x.e.team === t).reduce((s, x) => s + x.e.buts + (x.e.teamScoreBonus ?? 0), 0);
+  // Le tableau d'affichage du match choisi.
+  const scores = (active?.match != null ? equipes.filter((x) => x.match === active.match) : active ? [active] : []).map(
+    (x) => ({ ...x, buts: butsDe(x.nom) })
   );
 
   function set(index: number, patch: Partial<MatchEntry>, label: string) {
@@ -154,7 +145,7 @@ export function FeuilleDirecte({ saison, commit }: Props) {
           className="glass-soft h-9 cursor-pointer rounded-full px-3.5 text-[13px] font-bold outline-none"
         >
           {journees.map((m) => (
-            <option key={m.j} value={m.j} className="bg-[#141414] text-white">
+            <option key={m.j} value={m.j} className="bg-white text-[#08090b] dark:bg-[#141414] dark:text-white">
               Journée {m.j} · {m.date}
             </option>
           ))}
@@ -163,37 +154,68 @@ export function FeuilleDirecte({ saison, commit }: Props) {
           {scores.length === 0 ? (
             <span className="text-[12.5px] text-foreground/40">Pas encore d&apos;équipes</span>
           ) : (
-            scores.map((s, i) => (
-              <span key={s.name} className="flex items-center gap-2">
-                {i > 0 && <span className="text-foreground/25">—</span>}
-                <span
-                  className="size-2 rounded-full"
-                  style={{ background: TEAM_COLORS[s.name] ?? "#ddd" }}
-                />
-                <span className="text-[17px] font-extrabold tabular-nums">{s.buts}</span>
-              </span>
-            ))
+            <>
+              {nbMatchs > 1 && active?.match != null && (
+                <span className="mono-label text-foreground/40">Match {active.match}</span>
+              )}
+              {scores.map((x, i) => (
+                <span key={x.nom} className="flex items-center gap-2">
+                  {i > 0 && <span className="text-foreground/25">—</span>}
+                  {x.camp && <PointMaillot camp={x.camp} />}
+                  <span className="text-[17px] font-extrabold tabular-nums">{x.buts}</span>
+                </span>
+              ))}
+            </>
           )}
         </div>
       </div>
 
-      {/* L'équipe qu'on suit */}
-      {equipes.length > 1 && (
-        <div className="glass flex w-full rounded-full p-1">
-          {equipes.map((t) => (
+      {/* Le match qu'on suit, un jour à plusieurs matchs */}
+      {nbMatchs > 1 && (
+        <div className="flex flex-wrap gap-1.5">
+          {Array.from({ length: nbMatchs }, (_, i) => i + 1).map((n) => (
             <button
-              key={t}
-              onClick={() => setTeam(t)}
+              key={n}
+              onClick={() => setTeam(equipes.find((x) => x.match === n)?.nom ?? null)}
               className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 py-2 text-[13px] font-semibold",
-                teamActive === t ? "bouton-principal" : "bouton-discret text-foreground/45"
+                "px-3.5 py-1.5 text-[13px] font-semibold",
+                active?.match === n ? "bouton-principal" : "bouton-secondaire text-foreground/45"
               )}
             >
-              <span
-                className="size-2 rounded-full"
-                style={{ background: TEAM_COLORS[t] ?? "#ddd" }}
-              />
-              {t}
+              Match {n}
+            </button>
+          ))}
+          {equipes
+            .filter((x) => x.match == null)
+            .map((x) => (
+              <button
+                key={x.nom}
+                onClick={() => setTeam(x.nom)}
+                className={cn(
+                  "px-3.5 py-1.5 text-[13px] font-semibold",
+                  teamActive === x.nom ? "bouton-principal" : "bouton-secondaire text-foreground/45"
+                )}
+              >
+                {x.libelle}
+              </button>
+            ))}
+        </div>
+      )}
+
+      {/* Le camp qu'on suit */}
+      {onglets.length > 1 && (
+        <div className="glass flex w-full rounded-full p-1">
+          {onglets.map((x) => (
+            <button
+              key={x.nom}
+              onClick={() => setTeam(x.nom)}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-1.5 py-2 text-[13px] font-semibold",
+                teamActive === x.nom ? "bouton-principal" : "bouton-discret text-foreground/45"
+              )}
+            >
+              {x.camp && <PointMaillot camp={x.camp} />}
+              {nbMatchs > 1 ? (x.camp ?? x.libelle) : x.libelle}
             </button>
           ))}
         </div>
@@ -283,7 +305,6 @@ export function FeuilleDirecte({ saison, commit }: Props) {
         saison={saison}
         ligne={ligneChoisie}
         equipes={equipes}
-        couleur={(t) => TEAM_COLORS[t] ?? "#ddd"}
         onOpenChange={(o) => !o && setChoix(null)}
         onRemplacer={(nom) => {
           if (choix == null || !ligneChoisie) return;
@@ -292,7 +313,10 @@ export function FeuilleDirecte({ saison, commit }: Props) {
         }}
         onChangerEquipe={(t) => {
           if (choix == null || !ligneChoisie) return;
-          commit(changerEquipeAt(saison, choix, t), `${ligneChoisie.player} → ${t}`);
+          commit(
+            changerEquipeAt(saison, choix, t),
+            `${ligneChoisie.player} → ${equipes.find((x) => x.nom === t)?.libelle ?? t}`
+          );
           setChoix(null);
         }}
       />

@@ -10,15 +10,24 @@
 // d'envoi passé, encore corrigeables), le podium en cartes (le n°1 φ fois
 // plus grand que ses dauphins), la suite du classement en pastilles, puis
 // les derniers matchs avec leur score et leurs MVP.
+//
+// Sur tablette et ordinateur (dès 768 px), la largeur des Actus
+// (.gabarit-ligue) et deux colonnes au nombre d'or : le classement dans la
+// grande, qui reste à l'écran s'il y tient (useCollant), les derniers matchs
+// dans la petite ; dès 1024 px, les cartes prennent un cran de plus
+// (useFormatCarte) ; dès 1280 px, la suite du classement sur deux colonnes.
+// Sous 768 px, rien ne bouge.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
+import { MiniCarte } from "@/components/sfl/mini-carte";
 import { carteNeutre } from "@/components/sfl/qui-vient";
 import { useSeason } from "@/components/sfl/season-provider";
 import { FeuilleBola } from "@/components/sfl/matchs/feuille-bola";
 import { Nom } from "@/components/sfl/nom";
 import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { useSession } from "@/hooks/use-session";
+import { useCollant } from "@/hooks/use-collant";
+import { useFormatCarte } from "@/hooks/use-format-carte";
 import { classementAVie, compterMatchs, coupDEnvoiPasse, feuilleOuverte, type Classe, type MatchCompte } from "@/lib/sfl/ligue-vierge";
 import { DEMO_LIGUE_VIERGE, demoFeuille, demoMatchs } from "@/lib/sfl/ligue-vierge-demo";
 import { aujourdhuiIso, libelleJour, listerMesDerniers, lireLigueVierge, monId, type Partie } from "@/lib/sfl/matchs";
@@ -33,13 +42,14 @@ function Carte({ name, size, detail }: { name: string; size: number; detail?: st
 }
 
 function Podium({ top, moi }: { top: Classe[]; moi: string | null }) {
+  const format = useFormatCarte();
   const marches = [
-    { p: top[1] ?? null, size: FORMAT_CARTE.moyenne },
-    { p: top[0] ?? null, size: FORMAT_CARTE.grande },
-    { p: top[2] ?? null, size: FORMAT_CARTE.moyenne },
+    { p: top[1] ?? null, size: format.moyenne },
+    { p: top[0] ?? null, size: format.grande },
+    { p: top[2] ?? null, size: format.moyenne },
   ];
   return (
-    <div className="flex items-end justify-center gap-3 sm:gap-5">
+    <div className="flex items-end justify-center gap-3 sm:gap-5 lg:gap-[var(--fib-34)]">
       {marches.map(({ p, size }, i) =>
         p ? (
           <div key={p.id} className="flex min-w-0 flex-col items-center gap-1.5">
@@ -67,10 +77,11 @@ function Podium({ top, moi }: { top: Classe[]; moi: string | null }) {
 }
 
 function Ligne({ c, moi }: { c: Classe; moi: string | null }) {
+  const format = useFormatCarte();
   return (
-    <div className={cn("glass-soft flex items-center gap-3 rounded-[18px] px-3.5 py-2.5", c.id === moi && "bg-primary/10")}>
+    <div className={cn("glass-soft flex items-center gap-3 rounded-[18px] px-3.5 py-2.5 xl:mb-1.5 xl:break-inside-avoid", c.id === moi && "bg-primary/10")}>
       <span className="w-7 text-[15px] font-bold text-foreground/40 tabular-nums">{c.rank}</span>
-      <Carte name={c.name} size={FORMAT_CARTE.petite} detail={`Bola · ${c.points} pts`} />
+      <Carte name={c.name} size={format.petite} detail={`Bola · ${c.points} pts`} />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[15px] font-semibold"><Nom n={c.name} /></span>
         <span className="mono-label text-foreground/40">
@@ -87,6 +98,7 @@ function Ligne({ c, moi }: { c: Classe; moi: string | null }) {
 }
 
 function MatchJoue({ m }: { m: MatchCompte }) {
+  const format = useFormatCarte();
   const mvps = m.joueurs.filter((j) => j.mvp);
   return (
     <article className="glass flex flex-col gap-4 rounded-[26px] p-[18px]">
@@ -109,7 +121,7 @@ function MatchJoue({ m }: { m: MatchCompte }) {
           <div className="flex flex-wrap justify-center gap-3">
             {mvps.map((j) => (
               <div key={j.id} className="flex flex-col items-center gap-1">
-                <Carte name={j.name} size={FORMAT_CARTE.moyenne} detail={`MVP · ${j.buts} but${j.buts > 1 ? "s" : ""}, ${j.passes} passe${j.passes > 1 ? "s" : ""}`} />
+                <Carte name={j.name} size={format.moyenne} detail={`MVP · ${j.buts} but${j.buts > 1 ? "s" : ""}, ${j.passes} passe${j.passes > 1 ? "s" : ""}`} />
                 <span className="text-[12.5px] font-semibold"><Nom n={j.name} /></span>
                 <span className="mono-label text-foreground/40">
                   {j.buts} B · {j.passes} P
@@ -127,7 +139,7 @@ function MesFeuilles({ parties, onSaisie, apercu }: { parties: Partie[]; onSaisi
   const [ouverte, setOuverte] = useState<Partie | null>(null);
   if (parties.length === 0) return null;
   return (
-    <section className="flex flex-col gap-2">
+    <section className="flex flex-col gap-2 md:grid md:grid-cols-2 md:gap-[var(--fib-13)] xl:grid-cols-3">
       {parties.map((p) => (
         <button
           key={p.id}
@@ -216,9 +228,10 @@ export default function LigueViergePage() {
   const demo = apercu ? demoFeuille(noms, aujourdhuiIso(), moi ?? "moi") : null;
   const feuilles = demo && aTenir.length === 0 ? [demo] : aTenir;
   const derniers = vus ? [...vus].reverse().slice(0, 12) : [];
+  const [colonne, colonneCollante] = useCollant();
 
   return (
-    <div className="mx-auto flex w-full max-w-[470px] flex-col gap-6 px-5 pt-2 pb-8 sm:pt-6">
+    <div className="gabarit-ligue mx-auto flex w-full max-w-[470px] flex-col gap-6 px-5 pt-2 pb-8 sm:pt-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
       <div className="flex flex-col gap-2.5">
         <h1 className="sr-only">Bola</h1>
         <EnteteLigue actif="/ligue-vierge" />
@@ -240,10 +253,13 @@ export default function LigueViergePage() {
           Aucun match Bola joué pour l&apos;instant.
         </div>
       ) : (
-        <div className="flex flex-col gap-8">
-          <section className="flex flex-col gap-5">
+        <div className="flex flex-col gap-8 md:grid md:grid-cols-[minmax(0,1.618fr)_minmax(0,1fr)] md:items-start md:gap-[var(--fib-34)] min-[1440px]:gap-[var(--fib-55)]">
+          <section
+            ref={colonne}
+            className={cn("flex flex-col gap-5 md:min-w-0 md:gap-[var(--fib-21)]", colonneCollante && "md:sticky md:top-[var(--fib-21)]")}
+          >
             <Podium top={classement.slice(0, 3)} moi={moi} />
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 xl:block xl:columns-2 xl:gap-[var(--fib-13)]">
               {classement.slice(3, tout ? undefined : 10).map((c) => (
                 <Ligne key={c.id} c={c} moi={moi} />
               ))}
@@ -258,7 +274,7 @@ export default function LigueViergePage() {
               </button>
             )}
           </section>
-          <section className="flex flex-col gap-3">
+          <section className="flex flex-col gap-3 md:min-w-0">
             <h2 className="px-1 text-[17px] font-bold tracking-tight">Derniers matchs</h2>
             {derniers.map((m) => (
               <MatchJoue key={m.id} m={m} />

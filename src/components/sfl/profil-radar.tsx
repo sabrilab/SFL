@@ -11,7 +11,8 @@ import { STAT_KEYS, type Player } from "@/lib/sfl/engine";
 /* ------------------------- Radar « PROFIL DE JEU » ------------------------ */
 // Géométrie reprise du design : hexagone pointe en haut, centre (110,110),
 // rayon 84, anneaux à 100/75/50/25 %, rayon de valeur = R × note/100.
-// Polygone blanc, points blancs — sauf le point faible, en accent bleu.
+// Polygone blanc, points blancs — sauf le point faible, en accent bleu. Le
+// blanc est celui du mode (currentColor sur text-contraste) : l'encre en clair.
 
 const RADAR_LABELS: [number, number, number, "middle" | "start" | "end"][] = [
   [110, 10, 22, "middle"], // VIT
@@ -57,20 +58,22 @@ export function ProfilRadar({ stats, overall }: { stats: Player["stats"]; overal
         </div>
       </div>
 
-      <svg viewBox="-12 -10 244 248" className="mt-2.5 w-full max-w-[258px] overflow-visible">
-        <polygon points={ring(1)} fill="rgba(255,255,255,0.035)" stroke="rgba(255,255,255,0.14)" strokeWidth="1" />
-        <polygon points={ring(0.75)} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-        <polygon points={ring(0.5)} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-        <polygon points={ring(0.25)} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+      <svg viewBox="-12 -10 244 248" className="mt-2.5 w-full max-w-[258px] overflow-visible text-contraste">
+        <polygon points={ring(1)} fill="currentColor" fillOpacity={0.035} stroke="currentColor" strokeOpacity={0.14} strokeWidth="1" />
+        <polygon points={ring(0.75)} fill="none" stroke="currentColor" strokeOpacity={0.1} strokeWidth="1" />
+        <polygon points={ring(0.5)} fill="none" stroke="currentColor" strokeOpacity={0.1} strokeWidth="1" />
+        <polygon points={ring(0.25)} fill="none" stroke="currentColor" strokeOpacity={0.08} strokeWidth="1" />
         <path
           d={STAT_KEYS.map((_, i) => `M${CX},${CY} L${px(i, R)},${py(i, R)}`).join(" ")}
-          stroke="rgba(255,255,255,0.1)"
+          stroke="currentColor"
+          strokeOpacity={0.1}
           strokeWidth="1"
         />
         <polygon
           points={STAT_KEYS.map((_, i) => `${px(i, value(i))},${py(i, value(i))}`).join(" ")}
-          fill="rgba(255,255,255,0.16)"
-          stroke="#fff"
+          fill="currentColor"
+          fillOpacity={0.16}
+          stroke="currentColor"
           strokeWidth="2"
           strokeLinejoin="round"
         />
@@ -80,12 +83,13 @@ export function ProfilRadar({ stats, overall }: { stats: Player["stats"]; overal
             cx={px(i, value(i))}
             cy={py(i, value(i))}
             r="3.4"
-            fill={k === worst ? "#6FA8FF" : "#fff"}
+            fill={k === worst ? "#6FA8FF" : "currentColor"}
           />
         ))}
         <g
           style={{ fontFamily: "var(--font-jbmono)", fontSize: 9, letterSpacing: 1.4 }}
-          fill="rgba(255,255,255,0.45)"
+          fill="currentColor"
+          fillOpacity={0.45}
         >
           {STAT_KEYS.map((k, i) => (
             <text key={k} x={RADAR_LABELS[i][0]} y={RADAR_LABELS[i][1]} textAnchor={RADAR_LABELS[i][3]}>
@@ -93,14 +97,14 @@ export function ProfilRadar({ stats, overall }: { stats: Player["stats"]; overal
             </text>
           ))}
         </g>
-        <g style={{ fontSize: 13, fontWeight: 800 }} fill="#fff">
+        <g style={{ fontSize: 13, fontWeight: 800 }} fill="currentColor">
           {STAT_KEYS.map((k, i) => (
             <text
               key={k}
               x={RADAR_LABELS[i][0]}
               y={RADAR_LABELS[i][2]}
               textAnchor={RADAR_LABELS[i][3]}
-              fill={k === worst ? "#6FA8FF" : "#fff"}
+              fill={k === worst ? "#6FA8FF" : "currentColor"}
             >
               {stats[k]}
             </text>
@@ -108,7 +112,7 @@ export function ProfilRadar({ stats, overall }: { stats: Player["stats"]; overal
         </g>
       </svg>
 
-      <div className="mt-3.5 flex w-full items-center justify-between border-t border-white/9 pt-3.5">
+      <div className="mt-3.5 flex w-full items-center justify-between border-t border-contraste/9 pt-3.5">
         {/* Une carte parfaitement plate n'a pas de point faible : le dire, plutôt
             que d'annoncer « −0 » sur un critère pris au hasard. */}
         {stats[best] === stats[worst] ? (
@@ -144,15 +148,15 @@ export function RadarDuel({ toi, lui, nomLui }: { toi: Player["stats"]; lui: Pla
   return (
     <section className="glass flex flex-col items-center rounded-[28px] px-[18px] pt-5 pb-4">
       <p className="mono-label w-full text-foreground/40">Profil de jeu</p>
-      <svg viewBox="-12 -10 244 248" className="mt-2 w-full max-w-[258px] overflow-visible">
-        <polygon points={ring(1)} fill="rgba(255,255,255,0.035)" stroke="rgba(255,255,255,0.14)" strokeWidth="1" />
-        <polygon points={ring(0.75)} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-        <polygon points={ring(0.5)} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-        <polygon points={ring(0.25)} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-        <path d={STAT_KEYS.map((_, i) => `M${CX},${CY} L${px(i, R)},${py(i, R)}`).join(" ")} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-        <polygon points={poly(lui)} fill="rgba(255,255,255,0.16)" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
-        <polygon points={poly(toi)} fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="1.6" strokeDasharray="4 3" strokeLinejoin="round" />
-        <g style={{ fontFamily: "var(--font-jbmono)", fontSize: 9, letterSpacing: 1.4 }} fill="rgba(255,255,255,0.45)">
+      <svg viewBox="-12 -10 244 248" className="mt-2 w-full max-w-[258px] overflow-visible text-contraste">
+        <polygon points={ring(1)} fill="currentColor" fillOpacity={0.035} stroke="currentColor" strokeOpacity={0.14} strokeWidth="1" />
+        <polygon points={ring(0.75)} fill="none" stroke="currentColor" strokeOpacity={0.1} strokeWidth="1" />
+        <polygon points={ring(0.5)} fill="none" stroke="currentColor" strokeOpacity={0.1} strokeWidth="1" />
+        <polygon points={ring(0.25)} fill="none" stroke="currentColor" strokeOpacity={0.08} strokeWidth="1" />
+        <path d={STAT_KEYS.map((_, i) => `M${CX},${CY} L${px(i, R)},${py(i, R)}`).join(" ")} stroke="currentColor" strokeOpacity={0.1} strokeWidth="1" />
+        <polygon points={poly(lui)} fill="currentColor" fillOpacity={0.16} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+        <polygon points={poly(toi)} fill="none" stroke="currentColor" strokeOpacity={0.75} strokeWidth="1.6" strokeDasharray="4 3" strokeLinejoin="round" />
+        <g style={{ fontFamily: "var(--font-jbmono)", fontSize: 9, letterSpacing: 1.4 }} fill="currentColor" fillOpacity={0.45}>
           {STAT_KEYS.map((k, i) => (
             <text key={k} x={RADAR_LABELS[i][0]} y={RADAR_LABELS[i][1]} textAnchor={RADAR_LABELS[i][3]}>
               {k}
@@ -162,9 +166,9 @@ export function RadarDuel({ toi, lui, nomLui }: { toi: Player["stats"]; lui: Pla
         <g style={{ fontSize: 12, fontWeight: 800 }}>
           {STAT_KEYS.map((k, i) => (
             <text key={k} x={RADAR_LABELS[i][0]} y={RADAR_LABELS[i][2]} textAnchor={RADAR_LABELS[i][3]}>
-              <tspan fill={toi[k] >= lui[k] ? "#fff" : "rgba(255,255,255,0.4)"}>{toi[k]}</tspan>
-              <tspan fill="rgba(255,255,255,0.3)"> · </tspan>
-              <tspan fill={lui[k] >= toi[k] ? "#fff" : "rgba(255,255,255,0.4)"}>{lui[k]}</tspan>
+              <tspan fill="currentColor" fillOpacity={toi[k] >= lui[k] ? 1 : 0.4}>{toi[k]}</tspan>
+              <tspan fill="currentColor" fillOpacity={0.3}> · </tspan>
+              <tspan fill="currentColor" fillOpacity={lui[k] >= toi[k] ? 1 : 0.4}>{lui[k]}</tspan>
             </text>
           ))}
         </g>
@@ -175,7 +179,7 @@ export function RadarDuel({ toi, lui, nomLui }: { toi: Player["stats"]; lui: Pla
           Toi
         </span>
         <span className="flex items-center gap-1.5">
-          <svg width="18" height="4" aria-hidden><line x1="0" y1="2" x2="18" y2="2" stroke="#fff" strokeWidth="2" /></svg>
+          <svg width="18" height="4" aria-hidden className="text-contraste"><line x1="0" y1="2" x2="18" y2="2" stroke="currentColor" strokeWidth="2" /></svg>
           {nomLui}
         </span>
       </div>

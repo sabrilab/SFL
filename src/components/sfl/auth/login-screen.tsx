@@ -94,7 +94,7 @@ export function LoginScreen() {
           </label>
 
           {error && (
-            <p className="px-1 text-[12.5px] font-medium text-[#FF6B5E]">{error}</p>
+            <p className="px-1 text-[12.5px] font-medium text-[#c8352b] dark:text-[#FF6B5E]">{error}</p>
           )}
 
           <button
@@ -111,9 +111,9 @@ export function LoginScreen() {
         </form>
 
         <div className="mt-5 flex items-center gap-3">
-          <span className="h-px flex-1 bg-white/8" />
+          <span className="h-px flex-1 bg-contraste/8" />
           <span className="mono-label text-foreground/30">ou</span>
-          <span className="h-px flex-1 bg-white/8" />
+          <span className="h-px flex-1 bg-contraste/8" />
         </div>
         <BoutonsSociaux retour="/inscription" onErreur={setError} className="mt-4" />
 

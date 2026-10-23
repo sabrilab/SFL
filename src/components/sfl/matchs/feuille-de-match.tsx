@@ -7,9 +7,11 @@
 // la 3D CSS, que Safari aplatissait et que l'image ne savait pas photographier.
 // Chaque joueur est posé à son poste avec sa carte en pastille, la note aux
 // couleurs de son équipe (noire chez les Noirs, blanche chez les Blancs). Mon
-// équipe joue en bas, devant ; ma carte est cerclée. Plusieurs terrains le
+// équipe joue en bas, devant ; ma carte est cerclée. Plusieurs matchs le
 // même jour : on passe de l'un à l'autre, la fiche s'ouvre sur le mien.
-// Toucher une carte ouvre la fiche du joueur (fiche-joueur.tsx).
+// Toucher une carte ouvre la fiche du joueur (fiche-joueur.tsx). Quand les
+// matchs ne se jouent pas tous à la même heure ou au même endroit, ou que
+// l'admin a dit sur quel terrain (Sabri, 23/10), chacun le porte dans un coin.
 //
 // « Partager la feuille » en fait une image au format story (1080 × 1920,
 // noir, logo BOLA) : le terrain qu'on regarde, dessiné comme dans l'app et
@@ -45,8 +47,10 @@ import { Nom } from "@/components/sfl/nom";
 export interface EnTeteFeuille {
   /** « J8 · Sunday Five League ». */
   surtitre: string;
-  /** « Dimanche 19 octobre · 13h00 ». */
-  quand: string;
+  /** « Dimanche 19 octobre ». */
+  jour: string;
+  /** « 13h00 » : celle d'un match qui n'a pas la sienne. */
+  heure: string;
   /** « Urban Soccer, Lille Sud » ; null tant que le lieu n'est pas posé. */
   ou: string | null;
 }
@@ -231,6 +235,11 @@ export function FeuilleDeMatch({
   if (!t) return null;
   const [bas, haut] = basEstA ? [t.a, t.b] : [t.b, t.a];
   const poses = poser(t, basEstA);
+  // Des matchs à des heures ou des lieux différents : chacun dit les siens,
+  // et le terrain qu'il occupe sur place quand l'admin l'a donné.
+  const heures = new Set(terrains.map((x) => x.heure)).size > 1;
+  const lieux = new Set(terrains.map((x) => x.ou)).size > 1;
+  const horaire = [heures && t.heure, lieux && t.ou, t.terrain].filter(Boolean).join(" · ");
 
   return (
     <section className="flex flex-col gap-3">
@@ -265,6 +274,7 @@ export function FeuilleDeMatch({
         bas={bas}
         moi={moi}
         parNom={parNom}
+        horaire={horaire}
         onChoisir={(p, player) =>
           setFiche({
             player,
@@ -308,6 +318,7 @@ function TerrainVu({
   bas,
   moi,
   parNom,
+  horaire,
   onChoisir,
 }: {
   poses: Pose[];
@@ -316,6 +327,8 @@ function TerrainVu({
   /** Ma carte, cerclée et nommée « Toi » ; absent dans l'image. */
   moi?: string;
   parNom: Map<string, Player>;
+  /** « 14h30 · Croix · Terrain 3 » : l'heure et le lieu de ce match quand ils diffèrent des autres, son terrain sur place ; absent dans l'image. */
+  horaire?: string;
   onChoisir?: (p: Pose, player: Player) => void;
 }) {
   const { l, h } = TERRAIN;
@@ -330,26 +343,30 @@ function TerrainVu({
   const logo = { l: 46 * centre.k, h: projeter(l / 2, h / 2 + 23).y - projeter(l / 2, h / 2 - 23).y };
   return (
     <div
-      className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
+      className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#ffffff_0%,#e6e8e3_70%)] dark:bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
       style={{ height: CADRE_H }}
     >
       <SolTerrain ombres={places} />
-      {/* Le logo couché au rond central ; en <img>, que html-to-image sait embarquer. */}
-      {/* eslint-disable-next-line @next/next/no-img-element -- photographié par html-to-image */}
-      <img
-        src="/bola/symbole-blanc.svg"
-        alt=""
-        aria-hidden
-        className="absolute"
-        style={{
-          left: `calc(50% - ${logo.l / 2}px)`,
-          top: centre.y - logo.l / 2,
-          width: logo.l,
-          height: logo.l,
-          transform: `scaleY(${logo.h / logo.l})`,
-          opacity: 0.85,
-        }}
-      />
+      {/* Le logo couché au rond central ; en <img>, que html-to-image sait
+          embarquer. Blanc sur la nuit, noir sur le papier du mode clair. */}
+      {["/bola/symbole-blanc.svg", "/bola/symbole-noir.svg"].map((src, i) => (
+        // eslint-disable-next-line @next/next/no-img-element -- photographié par html-to-image
+        <img
+          key={src}
+          src={src}
+          alt=""
+          aria-hidden
+          className={cn("absolute", i === 0 ? "hidden dark:block" : "dark:hidden")}
+          style={{
+            left: `calc(50% - ${logo.l / 2}px)`,
+            top: centre.y - logo.l / 2,
+            width: logo.l,
+            height: logo.l,
+            transform: `scaleY(${logo.h / logo.l})`,
+            opacity: 0.85,
+          }}
+        />
+      ))}
       {places.map(({ p, x, y, k }) => {
         const player = parNom.get(p.nom);
         return (
@@ -366,8 +383,8 @@ function TerrainVu({
               }}
             >
               {/* Ma carte, cerclée d'un vrai cadre. */}
-              <div className={cn("flex rounded-[15px]", p.nom === moi && "bg-white p-[3px]")}>
-                <div className={cn("flex rounded-[12px]", p.nom === moi && "bg-[#1b1d21] p-[2px]")}>
+              <div className={cn("flex rounded-[15px]", p.nom === moi && "bg-[#0a0b0d] p-[3px] dark:bg-white")}>
+                <div className={cn("flex rounded-[12px]", p.nom === moi && "bg-white p-[2px] dark:bg-[#1b1d21]")}>
                   <Pastille
                     player={player}
                     nom={p.nom}
@@ -393,6 +410,11 @@ function TerrainVu({
       })}
       <NomEquipe nom={haut.nom} couleur={haut.couleur} className="left-[18px] top-4" />
       <NomEquipe nom={bas.nom} couleur={bas.couleur} className="bottom-[70px] left-[18px]" />
+      {horaire && (
+        <span className="absolute top-3.5 right-3.5 max-w-[55%] truncate rounded-full bg-black/55 px-2.5 py-1 text-[11.5px] font-semibold text-white backdrop-blur">
+          {horaire}
+        </span>
+      )}
     </div>
   );
 }
@@ -432,7 +454,7 @@ const ZOOM = 1.3;
 interface SujetImage {
   terrain: TerrainFeuille;
   basEstA: boolean;
-  /** « Terrain 2 » quand il y en a plusieurs. */
+  /** « Match 2 » quand il y en a plusieurs. */
   label: string | null;
 }
 
@@ -536,7 +558,9 @@ function ImageFeuille({
   const { terrain: t, basEstA } = sujet;
   const [bas, haut] = basEstA ? [t.a, t.b] : [t.b, t.a];
   return (
+    // Noire dans les deux modes : la classe dark garde au terrain sa nuit.
     <div
+      className="dark"
       style={{
         width: LARGEUR,
         height: HAUTEUR,
@@ -589,10 +613,11 @@ function ImageFeuille({
         </div>
         <div style={{ fontSize: 16, fontWeight: 600 }}>
           {sujet.label && <span>{sujet.label} · </span>}
-          {entete.quand}
-          {entete.ou && (
-            <span style={{ fontWeight: 500, color: GRIS }}> · {entete.ou}</span>
+          {entete.jour} · {t.heure ?? entete.heure}
+          {(t.ou ?? entete.ou) && (
+            <span style={{ fontWeight: 500, color: GRIS }}> · {t.ou ?? entete.ou}</span>
           )}
+          {t.terrain && <span style={{ fontWeight: 500, color: GRIS }}> · {t.terrain}</span>}
         </div>
       </div>
 

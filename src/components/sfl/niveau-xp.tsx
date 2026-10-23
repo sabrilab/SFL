@@ -246,13 +246,13 @@ export function NiveauXp({ saison, player }: { saison: number; player: Player })
           {b.lignes.slice(0, 4).map((l, i) => (
             <div
               key={`${l.saison}-${l.j}-${l.quoi}`}
-              className={cn("flex items-center gap-3 px-4 py-3", i > 0 && "border-t border-white/8")}
+              className={cn("flex items-center gap-3 px-4 py-3", i > 0 && "border-t border-contraste/8")}
             >
               <span className="w-[44px] shrink-0 font-mono text-[11px] text-foreground/45">
                 {l.saison === saison ? `J${l.j}` : `S${l.saison} J${l.j}`}
               </span>
               <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{l.quoi}</span>
-              <span className={cn("font-mono text-[13px] font-bold tabular-nums", l.xp < 0 && "text-[#ff9b9d]")}>
+              <span className={cn("font-mono text-[13px] font-bold tabular-nums", l.xp < 0 && "text-[#c8352b] dark:text-[#ff9b9d]")}>
                 {l.xp < 0 ? `−${-l.xp}` : `+${l.xp}`}
               </span>
             </div>

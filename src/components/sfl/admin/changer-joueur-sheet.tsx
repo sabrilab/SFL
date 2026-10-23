@@ -10,14 +10,15 @@
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
+import { PointMaillot } from "@/components/sfl/point-maillot";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import type { EquipeDuJour } from "@/lib/sfl/saisie/equipes";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
 export function ChangerJoueurSheet({
   saison,
   ligne,
   equipes,
-  couleur,
   onOpenChange,
   onRemplacer,
   onChangerEquipe,
@@ -25,9 +26,8 @@ export function ChangerJoueurSheet({
   saison: Saison;
   /** La ligne touchée ; null = panneau fermé. */
   ligne: MatchEntry | null;
-  /** Les équipes de la journée. */
-  equipes: string[];
-  couleur: (team: string) => string;
+  /** Les équipes de la journée, match par match (saisie/equipes.ts). */
+  equipes: EquipeDuJour[];
   onOpenChange: (open: boolean) => void;
   onRemplacer: (nom: string) => void;
   onChangerEquipe: (team: string) => void;
@@ -48,7 +48,8 @@ export function ChangerJoueurSheet({
       .sort((a, b) => a.localeCompare(b, "fr"));
   }, [saison.entries, saison.roster, ligne, q]);
 
-  const autres = ligne ? equipes.filter((t) => t !== ligne.team) : [];
+  const autres = ligne ? equipes.filter((t) => t.nom !== ligne.team) : [];
+  const sienne = ligne ? equipes.find((t) => t.nom === ligne.team) : undefined;
 
   return (
     <Sheet
@@ -67,8 +68,8 @@ export function ChangerJoueurSheet({
                 <SheetTitle className="truncate text-xl">{ligne.player}</SheetTitle>
                 {ligne.team && (
                   <span className="mt-1 flex items-center gap-1.5 text-[13px] text-foreground/45">
-                    <span className="size-2 rounded-full" style={{ background: couleur(ligne.team) }} />
-                    {ligne.team}
+                    {sienne?.camp && <PointMaillot camp={sienne.camp} />}
+                    {sienne?.libelle ?? ligne.team}
                   </span>
                 )}
               </div>
@@ -81,15 +82,15 @@ export function ChangerJoueurSheet({
                   <div className="flex flex-wrap gap-2">
                     {autres.map((t) => (
                       <button
-                        key={t}
+                        key={t.nom}
                         onClick={() => {
-                          onChangerEquipe(t);
+                          onChangerEquipe(t.nom);
                           setQ("");
                         }}
                         className="bouton-secondaire flex items-center gap-2 px-4 py-2.5 text-[14px] font-semibold"
                       >
-                        <span className="size-2.5 rounded-full" style={{ background: couleur(t) }} />
-                        {t}
+                        {t.camp && <PointMaillot camp={t.camp} />}
+                        {t.libelle}
                       </button>
                     ))}
                   </div>
@@ -118,7 +119,7 @@ export function ChangerJoueurSheet({
                             onRemplacer(n);
                             setQ("");
                           }}
-                          className="flex w-full items-center gap-3 rounded-2xl px-1 py-1.5 text-left transition-colors active:bg-white/8"
+                          className="flex w-full items-center gap-3 rounded-2xl px-1 py-1.5 text-left transition-colors active:bg-contraste/8"
                         >
                           <CarteDe name={n} size={FORMAT_CARTE.petite} inerte />
                           <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{n}</span>
