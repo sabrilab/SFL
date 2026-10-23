@@ -21,8 +21,11 @@
 // x' = x + (100 − y) × 0,4 ; les arcs deviennent des courbes de Bézier, que le
 // cisaillement garde exactes.
 //
-//   npx tsx tools/sigle-sfl.ts            écrit public/bola/sfl.svg
-//   npx tsx tools/sigle-sfl.ts <fichier>  l'écrit ailleurs (le maillot du site)
+//   npx tsx tools/sigle-sfl.ts                    écrit public/bola/sfl.svg
+//   npx tsx tools/sigle-sfl.ts <fichier>          l'écrit ailleurs
+//   npx tsx tools/sigle-sfl.ts --serre <fichier>  cadré au plus près des lettres,
+//     sans les marges du logo BOLA : le badge du maillot (bola-site,
+//     public/sponsoring/sfl.svg), qui pose le sigle dans sa propre pastille.
 
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -139,7 +142,7 @@ function contour(pts: Sommet[]): { depart: Pt; segs: Segment[] } {
 
 const cisaille = ([x, y]: Pt): Pt => [x + (100 - y) * P.k, y];
 
-export function sigleSfl(couleur = "#08090B"): string {
+export function sigleSfl(couleur = "#08090B", serre = false): string {
   const contours = glyphes().map(contour);
   const tous = contours.flatMap((c) => [c.depart, ...c.segs.flatMap((s) => ("L" in s ? [s.L] : s.C))]).map(cisaille);
   const x0 = Math.min(...tous.map((p) => p[0]));
@@ -169,8 +172,11 @@ export function sigleSfl(couleur = "#08090B"): string {
       return `${s}Z`;
     })
     .join("");
+  const cadre = serre
+    ? `${MARGE} ${+(BASE - CAP).toFixed(2)} ${+((x1 - x0) * sc).toFixed(2)} ${+CAP.toFixed(2)}`
+    : `0 0 ${largeur} ${HAUT}`;
   return [
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largeur} ${HAUT}" role="img" aria-label="SFL">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${cadre}" role="img" aria-label="SFL">`,
     `<!-- Le sigle SFL (Sunday Five League), redessiné le 23/10/2026 d'après le logo d'origine, à la graisse et à l'angle de BOLA. Généré par tools/sigle-sfl.ts : ne pas éditer à la main. -->`,
     `<path fill="${couleur}" d="${d}"/>`,
     `</svg>`,
@@ -179,7 +185,9 @@ export function sigleSfl(couleur = "#08090B"): string {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const sortie = process.argv[2] ?? join(import.meta.dirname, "..", "public", "bola", "sfl.svg");
-  writeFileSync(sortie, sigleSfl());
-  console.log(`sigle SFL écrit dans ${sortie}`);
+  const args = process.argv.slice(2);
+  const serre = args.includes("--serre");
+  const sortie = args.find((a) => a !== "--serre") ?? join(import.meta.dirname, "..", "public", "bola", "sfl.svg");
+  writeFileSync(sortie, sigleSfl("#08090B", serre));
+  console.log(`sigle SFL${serre ? " (serré)" : ""} écrit dans ${sortie}`);
 }

@@ -14,9 +14,9 @@
 import { useState } from "react";
 import { ChevronDown, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SigleLigue } from "@/components/sfl/choix-ligue";
 import type { Journee } from "@/lib/sfl/engine";
 import { Nom } from "@/components/sfl/nom";
-import { SigleLigue } from "@/components/sfl/choix-ligue";
 
 /** « Orange 7 — 5 Bleu », ou le nombre de matchs si la journée en a plusieurs. */
 function resume(j: Journee): string {
