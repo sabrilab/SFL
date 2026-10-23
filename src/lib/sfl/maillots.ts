@@ -8,7 +8,10 @@
 //
 // La couleur du jour que choisit l'admin (Orange, Bleu…) reste le nom
 // interne des équipes : la saisie et ses écrans la gardent, les calculs s'en
-// servent comme clé. Elle ne se montre plus ailleurs.
+// servent comme clé. Elle ne se montre plus ailleurs. Un jour à plusieurs
+// matchs, ils se distinguent par leur numéro, « Match 1 », « Match 2 »
+// (Sabri, 23/10 : plus aucune couleur ; « Terrain » désigne le terrain réel
+// sur place, voir lib/sfl/matchs-du-jour.ts).
 
 import type { Journee, JourneeMatch, MatchTeam } from "@/lib/sfl/engine";
 
@@ -46,8 +49,8 @@ export interface CampDuJour {
   camp: Camp;
   maillot: Maillot;
   match: JourneeMatch;
-  /** « Terrain 2 » un jour à plusieurs terrains, sinon null. */
-  terrain: string | null;
+  /** « Match 2 » un jour à plusieurs matchs, sinon null. */
+  numero: string | null;
 }
 
 /** Où jouait une équipe (son nom interne) ce jour-là ; null si elle n'a pas joué. */
@@ -58,26 +61,26 @@ export function campDuJour(journee: Journee | undefined, equipe: string | null |
   if (i < 0) return null;
   const match = matches[i];
   const camp = campDansLeMatch(match, equipe);
-  return { camp, maillot: MAILLOTS[camp], match, terrain: matches.length > 1 ? `Terrain ${i + 1}` : null };
+  return { camp, maillot: MAILLOTS[camp], match, numero: matches.length > 1 ? `Match ${i + 1}` : null };
 }
 
-/** Le terrain d'un match quand la journée en a plusieurs (« Terrain 2 »), sinon null. */
-export function terrainDu(journee: Journee | undefined, match: JourneeMatch): string | null {
+/** Le numéro d'un match quand la journée en a plusieurs (« Match 2 »), sinon null. */
+export function numeroDu(journee: Journee | undefined, match: JourneeMatch): string | null {
   const matches = journee?.matches ?? [];
   if (matches.length < 2) return null;
   const i = matches.findIndex((m) => m.id === match.id);
-  return i < 0 ? null : `Terrain ${i + 1}`;
+  return i < 0 ? null : `Match ${i + 1}`;
 }
 
 /**
  * Le nom d'une équipe tel que les joueurs le lisent : « Noirs », ou
- * « Noirs · Terrain 2 » quand on le demande un jour à plusieurs terrains.
+ * « Noirs · Match 2 » quand on le demande un jour à plusieurs matchs.
  * Une équipe absente des matchs garde son nom.
  */
-export function nomDuCamp(journee: Journee | undefined, equipe: string, avecTerrain = false): string {
+export function nomDuCamp(journee: Journee | undefined, equipe: string, avecNumero = false): string {
   const c = campDuJour(journee, equipe);
   if (!c) return equipe;
-  return avecTerrain && c.terrain ? `${c.maillot.nom} · ${c.terrain}` : c.maillot.nom;
+  return avecNumero && c.numero ? `${c.maillot.nom} · ${c.numero}` : c.maillot.nom;
 }
 
 /** Le vainqueur d'un match, en clair : « les Noirs », « les Blancs », ou null s'il est nul. */

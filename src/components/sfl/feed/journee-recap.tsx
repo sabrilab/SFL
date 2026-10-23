@@ -76,7 +76,7 @@ import { cn } from "@/lib/utils";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
 import { LISERE_CAMP, PastilleCamp, PointCamp } from "@/components/sfl/camp";
-import { MAILLOTS, campDuJour, terrainDu, vainqueurDu } from "@/lib/sfl/maillots";
+import { MAILLOTS, campDuJour, numeroDu, vainqueurDu } from "@/lib/sfl/maillots";
 
 /* ----------------------------- Réactions ------------------------------ */
 // Réactions locales à l'appareil (le multi-joueurs attend les comptes) :
@@ -413,7 +413,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
         <Reveal delay={0.1}>
           <section className="glass rounded-3xl p-5">
             <p className="mono-label text-primary">
-              Le match de la journée · {terrainDu(lastJ, big) ? `${terrainDu(lastJ, big)} · ` : ""}Final
+              Le match de la journée · {numeroDu(lastJ, big) ? `${numeroDu(lastJ, big)} · ` : ""}Final
             </p>
             <div className="mt-3 flex items-center justify-between gap-3">
               <div className="flex min-w-0 flex-1 justify-center">
@@ -557,7 +557,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
             {matches.map((m: JourneeMatch) => (
               <div key={m.id}>
                 <p className="mono-label flex items-center gap-1.5 text-muted-foreground">
-                  {terrainDu(lastJ, m) && <span className="mr-1">{terrainDu(lastJ, m)}</span>}
+                  {numeroDu(lastJ, m) && <span className="mr-1">{numeroDu(lastJ, m)}</span>}
                   <PointCamp maillot={MAILLOTS.noirs} /> Noirs {m.teamA.score} – {m.teamB.score} Blancs{" "}
                   <PointCamp maillot={MAILLOTS.blancs} />
                 </p>
@@ -631,8 +631,8 @@ function JourneeRecapComplet({ j }: { j: number }) {
             <div className="flex flex-col gap-2">
               {others.map((m) => (
                 <div key={m.id} className="rounded-2xl bg-card px-4 py-3">
-                  {terrainDu(lastJ, m) && (
-                    <p className="mono-label mb-2 text-foreground/40">{terrainDu(lastJ, m)}</p>
+                  {numeroDu(lastJ, m) && (
+                    <p className="mono-label mb-2 text-foreground/40">{numeroDu(lastJ, m)}</p>
                   )}
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 flex-1">
@@ -1025,7 +1025,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
             <p className="mono-label text-primary">
               {(() => {
                 const c = campDuJour(lastJ, duo.team);
-                return c ? `Chez ${c.maillot.les}${c.terrain ? ` · ${c.terrain}` : ""}` : `Équipe ${duo.team}`;
+                return c ? `Chez ${c.maillot.les}${c.numero ? ` · ${c.numero}` : ""}` : `Équipe ${duo.team}`;
               })()}
             </p>
             <h2 className="mt-1 text-xl font-bold tracking-tight">
