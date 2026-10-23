@@ -110,7 +110,7 @@ export default function Discussions() {
                 <div className="truncate text-[15px] font-semibold">{presence.rendezVous.lieu}</div>
                 <div className="mt-[3px] text-[12.5px] text-foreground/42">
                   {[presence.rendezVous.match, presence.rendezVous.terrain, presence.rendezVous.heure].filter(Boolean).join(" · ")} ·{" "}
-                  {presence.presents.length}/{presence.effectif} inscrits
+                  {presence.presents.length} inscrit{presence.presents.length > 1 ? "s" : ""}
                 </div>
               </div>
               {presence.mine && (
