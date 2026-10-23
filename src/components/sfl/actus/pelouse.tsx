@@ -56,6 +56,12 @@ const POTEAUX = [MILIEU - 24, MILIEU + 24] as const;
 const BARRE = 20;
 /** La largeur du dessin avant mise à l'échelle de l'écran. */
 const BASE = 330;
+/**
+ * L'échelle la plus grande : celle d'un téléphone de 449 px. Au-delà
+ * (tablette, ordinateur, téléphone tenu en largeur), le terrain garde cette
+ * taille et se centre ; les cartes ne grandissent plus avec l'écran.
+ */
+const ECHELLE_MAX = 449 / BASE;
 const MARGE = 12;
 const PHI = (1 + Math.sqrt(5)) / 2;
 /** Les tailles des cartes debout (fraction de 254 px, comme FORMAT_CARTE). */
@@ -209,7 +215,9 @@ function Ballon({ trajet, de, a }: { trajet: [number, number][]; de: number; a: 
   );
 }
 
-/** Le but du fond : les poteaux, la barre et le filet, en perspective. */
+/** Le but du fond : les poteaux, la barre et le filet, en perspective. Le
+ *  filet et le cerne des poteaux suivent le mode (globals.css, --but-*) : sur
+ *  le papier du mode clair, le blanc seul disparaîtrait. */
 function But() {
   const [g, dr] = POTEAUX;
   const fond = LIGNE - 9;
@@ -219,10 +227,10 @@ function But() {
       <svg x="50%" overflow="visible">
         <path
           d={trace([[g, LIGNE, BARRE], [g, fond, BARRE - 4], [dr, fond, BARRE - 4], [dr, LIGNE, BARRE]], true, VUE)}
-          fill="rgba(255,255,255,0.08)"
+          style={{ fill: "var(--but-voile)" }}
         />
-        <path d={trace([[g, fond, 0], [g, fond, BARRE - 4], [dr, fond, BARRE - 4], [dr, fond, 0]], true, VUE)} fill="rgba(255,255,255,0.06)" />
-        <g stroke="rgba(255,255,255,0.28)" strokeWidth={0.7} fill="none">
+        <path d={trace([[g, fond, 0], [g, fond, BARRE - 4], [dr, fond, BARRE - 4], [dr, fond, 0]], true, VUE)} style={{ fill: "var(--but-fond)" }} />
+        <g strokeWidth={0.7} fill="none" style={{ stroke: "var(--but-filet)" }}>
           {mailles.map((u) => (
             <path key={u} d={trace([[u, fond, 0], [u, fond, BARRE - 4], [u, LIGNE, BARRE]], false, VUE)} />
           ))}
@@ -232,6 +240,13 @@ function But() {
           <path d={trace([[g, LIGNE, 0], [g, fond, 0], [g, fond, BARRE - 4]], false, VUE)} />
           <path d={trace([[dr, LIGNE, 0], [dr, fond, 0], [dr, fond, BARRE - 4]], false, VUE)} />
         </g>
+        <path
+          d={trace([[g, LIGNE, 0], [g, LIGNE, BARRE], [dr, LIGNE, BARRE], [dr, LIGNE, 0]], false, VUE)}
+          fill="none"
+          strokeWidth={4.2}
+          strokeLinejoin="round"
+          style={{ stroke: "var(--but-cerne)" }}
+        />
         <path
           d={trace([[g, LIGNE, 0], [g, LIGNE, BARRE], [dr, LIGNE, BARRE], [dr, LIGNE, 0]], false, VUE)}
           fill="none"
@@ -260,7 +275,9 @@ function Craie({ points, d = 0.35 }: { points: [number, number][]; d?: number })
 /**
  * Une rubrique : son titre, le terrain avec ses cartes, sa ligne de légende.
  * Le terrain est dessiné pour une largeur de 330 px, puis mis à la largeur
- * de l'écran ; on n'en montre que la moitié du fond, jusqu'à `jusqua`.
+ * de l'écran (jusqu'à ECHELLE_MAX) ; on n'en montre que la moitié du fond,
+ * jusqu'à `jusqua`. Dans la grille des grands écrans, une rubrique s'étire à
+ * la hauteur de sa voisine : le surplus va entre le titre et le terrain.
  */
 export function Scene({
   sur,
@@ -271,6 +288,7 @@ export function Scene({
   partage,
   action,
   exploits,
+  className,
   children,
 }: {
   /** La petite ligne au-dessus du titre (« J2 · l'homme du dimanche »). */
@@ -284,6 +302,7 @@ export function Scene({
   action?: ReactNode;
   /** Les clés des exploits de la rubrique : la notification d'une félicitation y ramène (/ligue?exploit=…). */
   exploits?: string[];
+  className?: string;
   children?: ReactNode;
 }) {
   const router = useRouter();
@@ -351,27 +370,33 @@ export function Scene({
   );
   const bas = projeter(MILIEU, jusqua, 0, VUE).y;
   const naturelle = bas - haut + MARGE * 2;
-  const s = largeur / BASE;
+  const s = Math.min(largeur / BASE, ECHELLE_MAX);
 
   return (
     <section
       ref={ref}
       data-exploits={exploits?.join("|")}
-      className="relative flex flex-col overflow-hidden bg-[radial-gradient(120%_70%_at_50%_30%,#1d2024_0%,#0c0d0f_75%)] text-white"
+      className={cn(
+        "relative flex flex-col overflow-hidden bg-[radial-gradient(120%_70%_at_50%_30%,#ffffff_0%,#e8eae5_75%)] text-foreground md:rounded-3xl dark:bg-[radial-gradient(120%_70%_at_50%_30%,#1d2024_0%,#0c0d0f_75%)] dark:text-white",
+        className,
+      )}
       style={{ ["--p" as string]: 0 } as CSSProperties}
     >
       <header className="relative z-10 flex flex-col gap-1 px-5 pt-5">
-        <span className="pel-titre mono-label text-[10px] text-white/50" style={{ ["--d" as string]: 0 }}>
+        <span className="pel-titre mono-label text-[10px] text-foreground/50 dark:text-white/50" style={{ ["--d" as string]: 0 }}>
           {sur}
         </span>
         <h3 className="pel-titre titre-lettrage text-[24px] leading-[0.95]" style={{ ["--d" as string]: 0.06 }}>
           {titre}
         </h3>
       </header>
-      <div ref={cadre} className="relative w-full" style={{ height: largeur ? naturelle * s : naturelle }}>
+      <div ref={cadre} className="relative mt-auto w-full" style={{ height: largeur ? naturelle * s : naturelle }}>
         {largeur > 0 && (
           <Avancee.Provider value={ctx}>
-            <div className="absolute top-0 left-0 origin-top-left" style={{ width: BASE, height: naturelle, transform: `scale(${s})` }}>
+            <div
+              className="absolute top-0 origin-top-left"
+              style={{ left: Math.max(0, Math.round((largeur - BASE * s) / 2)), width: BASE, height: naturelle, transform: `scale(${s})` }}
+            >
               <div className="pel-camera absolute inset-0">
                 <div className="absolute inset-x-0" style={{ top: MARGE - haut, height: bas + MARGE }}>
                   <SolTerrain ombres={projetees} rayon={26} vue={VUE} gazon="vert" />
@@ -388,7 +413,7 @@ export function Scene({
       </div>
       {(texte || partage || action) && (
         <div className="flex min-h-11 items-center gap-2 pr-1.5 pb-2 pl-5">
-          <span className="min-w-0 flex-1 text-[13px] leading-snug text-white/70">{texte}</span>
+          <span className="min-w-0 flex-1 text-[13px] leading-snug text-foreground/70 dark:text-white/70">{texte}</span>
           {action}
           {partage && (
             <button
@@ -398,7 +423,7 @@ export function Scene({
                 preparerPiece({ type: "ligue", ...partage, lignes: partage.lignes.slice(0, 6) });
                 router.push("/vestiaire");
               }}
-              className="grid size-9 shrink-0 place-items-center rounded-full text-white/60 transition-transform active:scale-90"
+              className="grid size-9 shrink-0 place-items-center rounded-full text-foreground/60 transition-transform active:scale-90 dark:text-white/60"
             >
               <MessageCircle className="size-[18px]" strokeWidth={1.8} />
             </button>
@@ -420,7 +445,7 @@ function rang(noms: string[], v: number, ecart: number, taille: number, d0: numb
 }
 
 /** Ton dimanche : ta carte au point de penalty, tes buts au fond du filet, tes chiffres autour. */
-export function RubriqueToi({ j, date }: { j: number; date: string }) {
+export function RubriqueToi({ j, date, className }: { j: number; date: string; className?: string }) {
   const { player, me } = useMyPlayer();
   const { saison } = useSeason();
   const lignes = saison.entries.filter((e) => e.j === j && e.player === me);
@@ -439,6 +464,7 @@ export function RubriqueToi({ j, date }: { j: number; date: string }) {
   const pp = lignes.reduce((t, e) => t + entryPP(e), 0);
   return (
     <Scene
+      className={className}
       sur={`J${j} · ${date}`}
       titre="Ton dimanche"
       places={[{ nom: me, u: MILIEU, v: 100, taille: T.vedette, d: 0.15, moi: true }]}

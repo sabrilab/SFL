@@ -51,6 +51,7 @@ import {
   deleteRosterAt,
   newEntry,
   newRosterPlayer,
+  reglerMatchDuJour,
   respondConvocation,
   rosterHasName,
   updateEntryAt,
@@ -58,6 +59,8 @@ import {
   updateRosterAt,
 } from "@/lib/sfl/saisie/mutations";
 import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
+import { choixDEquipe, equipesDuJour } from "@/lib/sfl/saisie/equipes";
+import { PointMaillot } from "@/components/sfl/point-maillot";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
 import { Synchro } from "@/components/sfl/admin/synchro";
 import { DetailPoints } from "@/components/sfl/admin/detail-points";
@@ -70,16 +73,6 @@ import { chercherJoueurs } from "@/lib/sfl/recherche-joueur";
 import { useSession } from "@/hooks/use-session";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
-const TEAM_COLORS: Record<string, string> = {
-  Orange: "#F9CB9C",
-  Bleu: "#C9DAF8",
-  Vert: "#D9EAD3",
-  Jaune: "#FFF2CC",
-  Rouge: "#F4CCCC",
-  Gris: "#CCCCCC",
-  "Équipe A": "#F9CB9C",
-  "Équipe B": "#C9DAF8",
-};
 
 const HONORS: [key: "mvp" | "impact" | "def", label: string, cls: string][] = [
   ["mvp", "M", "bg-gradient-to-b from-[#FFF3C6] via-[#F4C542] to-[#8A5A12] text-[#3a2703]"],
@@ -223,9 +216,12 @@ export function AdminDashboard() {
     };
   }, [derived, saison]);
 
-  // Journées (desc) avec leurs lignes groupées par équipe, index conservé.
+  // Journées (desc) avec leurs lignes groupées par équipe, index conservé :
+  // match par match, les Noirs puis les Blancs (saisie/equipes.ts), et les
+  // lignes sans équipe à la fin.
   const journeeViews = useMemo(() => {
     const withIndex = saison.entries.map((e, i) => ({ e, i }));
+    const derivees = new Map(derived.journees.map((x) => [x.j, x]));
     return [...saison.journees]
       .sort((a, b) => b.j - a.j)
       .map((meta) => {
@@ -240,14 +236,21 @@ export function AdminDashboard() {
           }
           groups.get(t)!.push(x);
         }
-        const teams = order.map((name) => {
-          const items = groups.get(name)!;
+        const nommees = equipesDuJour(
+          derivees.get(meta.j),
+          order.filter((t): t is string => t != null)
+        );
+        const teams = [
+          ...nommees.map((x) => ({ name: x.nom as string | null, libelle: x.libelle, camp: x.camp })),
+          ...(groups.has(null) ? [{ name: null, libelle: "Sans équipe", camp: null }] : []),
+        ].map((t) => {
+          const items = groups.get(t.name)!;
           const score = items.reduce((s, x) => s + x.e.buts + (x.e.teamScoreBonus ?? 0), 0);
-          return { name, items, score };
+          return { ...t, items, score };
         });
         return { meta, teams, players: new Set(rows.map((x) => x.e.player)) };
       });
-  }, [saison]);
+  }, [saison, derived]);
 
   const rosterNames = useMemo(
     () => [...saison.roster.map((r) => r.name)].sort((a, b) => a.localeCompare(b)),
@@ -288,7 +291,25 @@ export function AdminDashboard() {
   );
 
   const editEntry = editIndex != null ? saison.entries[editIndex] ?? null : null;
+  // Les équipes qu'on peut donner à la ligne ouverte : celles de sa journée, puis un match de plus.
+  const equipesLigne = useMemo(() => {
+    if (!editEntry) return [];
+    const noms = [...new Set(saison.entries.filter((e) => e.j === editEntry.j && e.team).map((e) => e.team as string))];
+    return choixDEquipe(derived.journees.find((x) => x.j === editEntry.j), noms);
+  }, [editEntry, saison.entries, derived]);
   const metaEntry = metaJ != null ? saison.journees.find((m) => m.j === metaJ) ?? null : null;
+  // Ses matchs, chacun avec son heure, son lieu et son terrain quand il a les siens.
+  const metaDuJour = useMemo(
+    () =>
+      (derived.journees.find((x) => x.j === metaJ)?.matches ?? []).map((m) => ({
+        label: m.label,
+        joueurs: `${m.teamA.players.length} contre ${m.teamB.players.length}`,
+        heure: m.heure,
+        lieuId: m.lieuId,
+        terrain: m.terrain,
+      })),
+    [derived, metaJ]
+  );
   const playerEntry = playerIndex != null ? saison.roster[playerIndex] ?? null : null;
 
   // Convocation ouverte + réponses groupées.
@@ -341,7 +362,7 @@ export function AdminDashboard() {
           </div>
           <Badge
             variant="secondary"
-            className={cn("rounded-full", partage && "bg-emerald-500/15 text-emerald-400")}
+            className={cn("rounded-full", partage && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400")}
           >
             {partage ? "Partagé" : "Local"}
           </Badge>
@@ -385,12 +406,12 @@ export function AdminDashboard() {
             <Stat label="Buts" value={totals.buts} />
             <Stat label="Passes D." value={totals.passes} />
             <Stat label="PP distribués" value={totals.pp} />
-            <Stat label="Alertes" value={totals.alertes} tone={totals.alertes ? "text-amber-500" : "text-emerald-500"} />
+            <Stat label="Alertes" value={totals.alertes} tone={totals.alertes ? "text-amber-700 dark:text-amber-500" : "text-emerald-700 dark:text-emerald-500"} />
           </div>
 
           <div className="rounded-3xl bg-card p-4">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-              <AlertTriangle className="size-4 text-amber-500" /> Contrôles de cohérence
+              <AlertTriangle className="size-4 text-amber-700 dark:text-amber-500" /> Contrôles de cohérence
             </div>
             {derived.alerts.length === 0 ? (
               <p className="text-[13px] text-muted-foreground">Aucune anomalie détectée — saisie propre ✓</p>
@@ -624,10 +645,8 @@ export function AdminDashboard() {
                   <div key={team.name ?? "flat"} className="rounded-2xl bg-secondary/40 p-3">
                     <div className="mb-1.5 flex items-center justify-between gap-2">
                       <span className="flex items-center gap-1.5 text-sm font-bold">
-                        {team.name && (
-                          <span className="size-2.5 rounded-full ring-1 ring-black/10" style={{ background: TEAM_COLORS[team.name] ?? "#ddd" }} />
-                        )}
-                        {team.name ?? "Sans équipe"}
+                        {team.camp && <PointMaillot camp={team.camp} />}
+                        {team.libelle}
                       </span>
                       {team.name && <span className="text-base font-bold tabular-nums">{team.score}</span>}
                     </div>
@@ -733,6 +752,7 @@ export function AdminDashboard() {
       {/* ===================== SHEETS ===================== */}
       <EntrySheet
         entry={editEntry}
+        equipes={equipesLigne}
         mvpAuto={editEntry ? mvpAutomatique(saison, editEntry.j) : false}
         onOpenChange={(o) => !o && setEditIndex(null)}
         onPatch={(patch) => editIndex != null && commit(updateEntryAt(saison, editIndex, patch), "Édition ligne")}
@@ -754,6 +774,8 @@ export function AdminDashboard() {
       <JourneeMetaSheet
         terrains={saison.terrains ?? []}
         meta={metaEntry}
+        duJour={metaDuJour}
+        onMatch={(n, reglage) => metaJ != null && commit(reglerMatchDuJour(saison, metaJ, n, reglage), `Match ${n + 1} de la journée`)}
         onOpenChange={(o) => !o && setMetaJ(null)}
         onPatch={(patch) => metaJ != null && commit(updateJournee(saison, metaJ, patch), "Édition journée")}
         onDelete={() => {
@@ -805,8 +827,15 @@ export function AdminDashboard() {
         }}
         roster={journeeRoster}
         initialChecked={journeePrefill}
-        onCreate={(teams) => {
-          const { saison: s, j } = addJourneeWithTeams(saison, teams);
+        lieux={saison.terrains ?? []}
+        onCreate={(teams, reglages) => {
+          const cree = addJourneeWithTeams(saison, teams);
+          const { j } = cree;
+          // Chaque match à son heure, son terrain et son lieu, quand l'admin les a donnés.
+          const s = reglages.reduce(
+            (acc, r, n) => (r.heure?.trim() || r.terrain?.trim() || r.lieuId != null ? reglerMatchDuJour(acc, j, n, r) : acc),
+            cree.saison
+          );
           commit(s, `Nouvelle journée ${j}`);
           setNewJourneeOpen(false);
           setJourneePrefill([]);

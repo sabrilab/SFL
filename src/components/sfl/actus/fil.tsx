@@ -138,7 +138,7 @@ export function Reduit({ ratio, children, base = 390 }: { ratio: number; childre
 function PublicationFilm({ j, date, saison, duree, media, ratio = 4 / 5, images, titre, partage, action }: Parameters<typeof PublicationPost>[0]) {
   const router = useRouter();
   return (
-    <article className="actu-film flex flex-col bg-black">
+    <article className="actu-film dark flex flex-col bg-black">
       {images ? <Carrousel images={images} ratio={ratio} /> : <Ecran duree={duree} ratio={ratio}>{media}</Ecran>}
       <div className={cn("flex min-h-10 items-center gap-2 pr-1.5 pl-4", images && "pt-5")}>
         <span className="mono-label shrink-0 text-white/40">{[saison, j != null && `J${j}`, date].filter(Boolean).join(" · ")}</span>
@@ -228,7 +228,7 @@ export function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu
   switch (a.type) {
     case "score": {
       const { teamA, teamB, label } = a.match;
-      const titre = `${MAILLOTS.noirs.nom} ${teamA.score} – ${teamB.score} ${MAILLOTS.blancs.nom}`;
+      const titre = `${MAILLOTS.Noirs.nom} ${teamA.score} – ${teamB.score} ${MAILLOTS.Blancs.nom}`;
       const { a: ba, b: bb } = buteursDe(a.match);
       const buteurs = [...ba, ...bb].map((b) => `${id.nom(b.nom)}${b.buts > 1 ? ` (${b.buts})` : ""}`);
       return (
@@ -461,7 +461,7 @@ export function VoteDuJour({ me }: { me: string }) {
   return (
     <>
       {ouvertes.map((j) => (
-        <section key={j.j} className="glass mx-4 flex flex-col gap-3 rounded-[26px] p-[18px]">
+        <section key={j.j} className="glass mx-4 flex flex-col gap-3 rounded-[26px] p-[18px] md:mx-0">
           <h2 className="text-[17px] font-bold tracking-tight">
             Vote du jour <span className="text-foreground/40">· J{j.j}</span>
           </h2>

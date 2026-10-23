@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# scripts de capture locaux (identifiants : jamais dans le dépôt)
+verify-*.mjs

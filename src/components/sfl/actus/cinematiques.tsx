@@ -27,7 +27,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { Badge3D } from "@/components/sfl/badge-3d";
-import { LISERE_CAMP, PastilleCamp } from "@/components/sfl/camp";
+import { LISERE_CAMP, PastilleMaillot } from "@/components/sfl/point-maillot";
 import { MiniCarte } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useIdentites } from "@/hooks/use-identites";
@@ -50,7 +50,7 @@ export const H = (s: number) => 254 * s * PHI;
  * lueur blanche côté Blancs, une ombre plus noire que le fond côté Noirs.
  */
 const voile = (m: Maillot, force: number) =>
-  m === MAILLOTS.blancs ? `rgba(244,243,239,${force})` : `rgba(0,0,0,${Math.min(1, force * 3)})`;
+  m === MAILLOTS.Blancs ? `rgba(244,243,239,${force})` : `rgba(0,0,0,${Math.min(1, force * 3)})`;
 
 export const LUEUR: Record<Metal, string> = { bronze: "#d39a6a", argent: "#dfe3ea", or: "#f4cd6a", legende: "#ef5a4c" };
 export const DEF = Object.fromEntries(TROPHEES.map((d) => [d.id, d]));
@@ -334,15 +334,15 @@ function ScoreTele({ match, j }: { match: JourneeMatch; j: number }) {
   );
   return (
     <>
-      <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(60% 80% at 15% 100%, ${voile(MAILLOTS.noirs, 0.13)}, transparent 70%), radial-gradient(60% 80% at 85% 100%, ${voile(MAILLOTS.blancs, 0.13)}, transparent 70%)` }} />
+      <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(60% 80% at 15% 100%, ${voile(MAILLOTS.Noirs, 0.13)}, transparent 70%), radial-gradient(60% 80% at 85% 100%, ${voile(MAILLOTS.Blancs, 0.13)}, transparent 70%)` }} />
       <div aria-hidden className="absolute inset-x-0 bottom-0 h-1/2 opacity-60" style={{ background: "repeating-linear-gradient(90deg, rgba(110,190,110,0.12) 0 30px, rgba(110,190,110,0.06) 30px 60px)", maskImage: "linear-gradient(180deg, transparent, #000)", WebkitMaskImage: "linear-gradient(180deg, transparent, #000)" }} />
       <Etiquette a={0.1} className="top-[9%] left-[5%]">SFL · J{j} · {match.label}</Etiquette>
       <span className="a-pop absolute top-[7%] right-[5%] rounded-[5px] bg-white px-2 py-0.5 text-[11px] font-bold text-black" style={t(1.6, 0.4)}>FIN</span>
       <div className="absolute inset-x-[5%] top-[32%] h-[30%] overflow-hidden rounded-[10px] bg-black/70 backdrop-blur-md">
         <div className="relative flex h-full items-stretch">
-          {cote(match.teamA, MAILLOTS.noirs, false)}
+          {cote(match.teamA, MAILLOTS.Noirs, false)}
           <span className="a-fondu w-px self-stretch bg-white/15" style={t(0.6)} />
-          {cote(match.teamB, MAILLOTS.blancs, true)}
+          {cote(match.teamB, MAILLOTS.Blancs, true)}
           <span aria-hidden className="a-reflet absolute inset-y-0 left-0 w-1/3" style={{ ...t(1.4, 1.2), background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)" }} />
         </div>
       </div>
@@ -365,8 +365,8 @@ function ScoreTableau({ match, j }: { match: JourneeMatch; j: number }) {
   const joueur = useJoueurs();
   const { a, b } = buteursDe(match);
   const cotes = [
-    { t: match.teamA, m: MAILLOTS.noirs, buteurs: a },
-    { t: match.teamB, m: MAILLOTS.blancs, buteurs: b },
+    { t: match.teamA, m: MAILLOTS.Noirs, buteurs: a },
+    { t: match.teamB, m: MAILLOTS.Blancs, buteurs: b },
   ];
   const gagnant = match.teamA.score === match.teamB.score ? null : match.teamA.score > match.teamB.score ? 0 : 1;
   return (
@@ -383,7 +383,7 @@ function ScoreTableau({ match, j }: { match: JourneeMatch; j: number }) {
       <Etiquette a={0.4} className="top-[5%] left-1/2 -translate-x-1/2">J{j} · {match.label}</Etiquette>
       {cotes.map((c, i) => (
         <div key={c.t.id} className="absolute top-[13%] flex w-1/2 flex-col items-center gap-3" style={{ left: i === 0 ? 0 : "50%" }}>
-          <PastilleCamp maillot={c.m} className="a-fondu text-[13px]" style={t(0.6)} />
+          <PastilleMaillot camp={c.m.nom} className="a-fondu text-[13px]" style={t(0.6)} />
           <Rouleau n={c.t.score} a={0.8 + i * 0.25} du={1.5} className={gagnant === null || gagnant === i ? "text-white" : "text-white/45"} style={{ fontFamily: ANTON, fontSize: 104 }} />
           <div className="mt-1 flex max-w-[92%] flex-wrap justify-center gap-x-2 gap-y-2.5">
             {c.buteurs.slice(0, 6).map((bt, k) => {
@@ -425,37 +425,37 @@ function ScoreChoc({ match, j }: { match: JourneeMatch; j: number }) {
   const pa = meilleur(match.teamA);
   const pb = meilleur(match.teamB);
   const s = TAILLE.grande;
-  const gagnant = match.teamA.score === match.teamB.score ? null : match.teamA.score > match.teamB.score ? MAILLOTS.noirs : MAILLOTS.blancs;
+  const gagnant = match.teamA.score === match.teamB.score ? null : match.teamA.score > match.teamB.score ? MAILLOTS.Noirs : MAILLOTS.Blancs;
   return (
     <>
-      <div aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(105deg, ${voile(MAILLOTS.noirs, 0.15)} 0%, transparent 45%, transparent 55%, ${voile(MAILLOTS.blancs, 0.15)} 100%)` }} />
+      <div aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(105deg, ${voile(MAILLOTS.Noirs, 0.15)} 0%, transparent 45%, transparent 55%, ${voile(MAILLOTS.Blancs, 0.15)} 100%)` }} />
       <span aria-hidden className="a-onde absolute top-[42%] left-1/2 size-40 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/70" style={t(0.62, 0.9)} />
       <span aria-hidden className="a-onde absolute top-[42%] left-1/2 size-40 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/40" style={t(0.78, 1.1)} />
       <div className="absolute top-[14%] left-[5%]">
         {pa && (
           <div className="a-choc-g" style={t(0, 1.2)}>
-            <Carte p={pa} size={s} detail={`J${j} · ${MAILLOTS.noirs.nom}`} />
+            <Carte p={pa} size={s} detail={`J${j} · ${MAILLOTS.Noirs.nom}`} />
           </div>
         )}
       </div>
       <div className="absolute top-[14%] right-[5%]">
         {pb && (
           <div className="a-choc-d" style={t(0, 1.2)}>
-            <Carte p={pb} size={s} detail={`J${j} · ${MAILLOTS.blancs.nom}`} />
+            <Carte p={pb} size={s} detail={`J${j} · ${MAILLOTS.Blancs.nom}`} />
           </div>
         )}
       </div>
       <div className="absolute inset-x-0 top-[62%] flex items-center justify-center gap-4 leading-none" style={{ fontFamily: ANTON }}>
-        <span className="a-claque text-[76px]" style={{ ...t(0.9, 0.5), color: MAILLOTS.noirs.fond, WebkitTextStroke: `2px ${MAILLOTS.noirs.encre}` }}>{match.teamA.score}</span>
+        <span className="a-claque text-[76px]" style={{ ...t(0.9, 0.5), color: MAILLOTS.Noirs.fond, WebkitTextStroke: `2px ${MAILLOTS.Noirs.encre}` }}>{match.teamA.score}</span>
         <span className="a-fondu text-[40px] text-white/40" style={t(1.1)}>–</span>
-        <span className="a-claque text-[76px]" style={{ ...t(1.05, 0.5), color: MAILLOTS.blancs.fond }}>{match.teamB.score}</span>
+        <span className="a-claque text-[76px]" style={{ ...t(1.05, 0.5), color: MAILLOTS.Blancs.fond }}>{match.teamB.score}</span>
       </div>
       <div className="absolute inset-x-[6%] bottom-[7%] flex items-end justify-between gap-2">
-        <PastilleCamp maillot={MAILLOTS.noirs} className="a-glisse-g" style={t(1.5, 0.6)} />
+        <PastilleMaillot camp="Noirs" className="a-glisse-g" style={t(1.5, 0.6)} />
         <span className="a-fondu mono-label pb-1 text-[9.5px] text-white/45" style={t(1.8)}>
           {gagnant ? `Victoire ${gagnant.des}` : "Match nul"} · J{j}
         </span>
-        <PastilleCamp maillot={MAILLOTS.blancs} className="a-glisse-d" style={t(1.5, 0.6)} />
+        <PastilleMaillot camp="Blancs" className="a-glisse-d" style={t(1.5, 0.6)} />
       </div>
     </>
   );

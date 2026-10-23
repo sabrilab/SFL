@@ -16,10 +16,24 @@ export interface Notif {
   tag?: string;
   /** Messages non lus : le nombre à poser sur l'icône de l'app. */
   pastille?: number;
+  /**
+   * Sa trace (push_envois, posée par lib/server/push-envoi.ts) : le
+   * téléphone la redonne à /api/push/suivi quand la notification arrive et
+   * quand on la touche.
+   */
+  id?: string;
 }
 
 export const TITRE_MAX = 60;
 export const TEXTE_MAX = 180;
+
+/**
+ * Un lien de l'app : un chemin qui commence par une seule barre. « //site »
+ * ou « /\site » mèneraient hors de l'app, sur le site de n'importe qui.
+ */
+export function estLienDeLApp(url: string): boolean {
+  return /^\/(?![/\\])/.test(url);
+}
 
 export function estNotif(v: unknown): v is Notif {
   if (!v || typeof v !== "object") return false;
@@ -32,6 +46,6 @@ export function estNotif(v: unknown): v is Notif {
     n.texte.trim().length > 0 &&
     n.texte.length <= TEXTE_MAX &&
     typeof n.url === "string" &&
-    n.url.startsWith("/")
+    estLienDeLApp(n.url)
   );
 }

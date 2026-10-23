@@ -28,7 +28,7 @@ import type { MatchEntry, MatchEvent, Saison } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
 import { CarteDe } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
-import { PointCamp } from "@/components/sfl/camp";
+import { PointMaillot } from "@/components/sfl/point-maillot";
 import { MAILLOTS } from "@/lib/sfl/maillots";
 
 /* ============================== Types ============================== */
@@ -148,7 +148,7 @@ export function useAnalysePlus(
         const before = timeline[bestRun.start - 1];
         const after = timeline[bestRun.start + bestRun.len - 1];
         tournant = {
-          les: (bestRun.team === big.teamA.name ? MAILLOTS.noirs : MAILLOTS.blancs).les,
+          les: (bestRun.team === big.teamA.name ? MAILLOTS.Noirs : MAILLOTS.Blancs).les,
           from: before ? `${before.scoreA}–${before.scoreB}` : "0–0",
           to: `${after.scoreA}–${after.scoreB}`,
           runs: bestRun.len,
@@ -557,16 +557,16 @@ export function TimelineModule({ timeline }: { timeline: AnalysePlus["timeline"]
       <p className="mono-label text-primary">Minute par minute</p>
       <h2 className="mt-1 text-xl font-bold tracking-tight">Comment le match s&apos;est joué</h2>
       <div className="relative mt-4 pl-[86px]">
-        <span className="absolute top-1 bottom-1 left-[62px] w-px bg-white/10" />
+        <span className="absolute top-1 bottom-1 left-[62px] w-px bg-contraste/10" />
         <div className="flex flex-col gap-3.5">
           {timeline.map((e, i) => {
-            const maillot = e.noirs ? MAILLOTS.noirs : MAILLOTS.blancs;
+            const maillot = e.noirs ? MAILLOTS.Noirs : MAILLOTS.Blancs;
             return (
               <div key={i} className="relative">
                 <span className="mono-label absolute top-0.5 -left-[86px] w-[34px] text-right text-foreground/40">
                   {e.minute}′
                 </span>
-                <PointCamp maillot={maillot} className="absolute top-1 -left-[28px]" />
+                <PointMaillot camp={maillot.nom} className="absolute top-1 -left-[28px]" />
                 <span className="mono-label absolute top-0.5 -left-[40px] hidden">·</span>
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="min-w-0 truncate text-[14px] font-semibold">
@@ -602,7 +602,7 @@ export function TournantModule({ tournant }: { tournant: AnalysePlus["tournant"]
         <span className="text-[22px] font-extrabold tracking-tight tabular-nums text-foreground/40">
           {tournant.from}
         </span>
-        <span className="h-px flex-1 bg-gradient-to-r from-white/10 to-primary" />
+        <span className="h-px flex-1 bg-gradient-to-r from-contraste/10 to-primary" />
         <span className="text-[22px] font-extrabold tracking-tight tabular-nums text-primary">
           {tournant.to}
         </span>
@@ -751,13 +751,9 @@ export function MonDimancheModule({
   if (!mine) return null;
   const delta = mine.rankFrom ? mine.rankFrom - mine.rankTo : 0;
   return (
-    <section
-      className="glass rounded-3xl p-5"
-      style={{
-        background:
-          "radial-gradient(120% 80% at 100% 0%, rgba(111,168,255,0.14), transparent 55%), linear-gradient(168deg, rgba(255,255,255,0.09), rgba(255,255,255,0.028))",
-      }}
-    >
+    // Le verre de la page, teinté de bleu en haut à droite : le voile blanc
+    // du sombre, le verre clair (globals.css, .glass) du mode clair.
+    <section className="glass rounded-3xl p-5 [background:radial-gradient(120%_80%_at_100%_0%,rgba(111,168,255,0.14),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.65),rgba(255,255,255,0.35)),color-mix(in_oklab,var(--background)_40%,transparent)] dark:[background:radial-gradient(120%_80%_at_100%_0%,rgba(111,168,255,0.14),transparent_55%),linear-gradient(168deg,rgba(255,255,255,0.09),rgba(255,255,255,0.028))]">
       <p className="mono-label text-primary">Ton dimanche</p>
       {mine.played ? (
         <>

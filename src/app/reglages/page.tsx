@@ -5,7 +5,7 @@ import { useTheme } from "next-themes";
 import {
   Moon,
   Sun,
-  Monitor,
+  SunMoon,
   ShieldCheck,
   ChevronRight,
   Settings,
@@ -14,7 +14,6 @@ import {
   Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Locked } from "@/components/sfl/locked";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { isAdmin } from "@/lib/sfl/admin";
@@ -22,16 +21,19 @@ import { AccountCard } from "@/components/sfl/auth/account-card";
 import { ReglageNotifications } from "@/components/sfl/notifications/reglage-notifications";
 import { ReglageConfidentialite } from "@/components/sfl/confidentialite/reglage";
 
+// Le mode de l'app : clair, sombre, ou Auto, qui suit le réglage du
+// téléphone (le mot d'iOS). Le sombre reste le défaut. Le même choix se fait
+// d'un toucher en haut de Ma carte (bouton-theme.tsx), entre clair et sombre.
 const THEME_OPTIONS = [
   { value: "light", label: "Clair", icon: Sun },
   { value: "dark", label: "Sombre", icon: Moon },
-  { value: "system", label: "Système", icon: Monitor },
+  { value: "system", label: "Auto", icon: SunMoon },
 ] as const;
 
 export default function ReglagesPage() {
   const { theme, setTheme } = useTheme();
   const isClient = useIsClient();
-  const current = isClient ? (theme ?? "system") : "system";
+  const current = isClient ? (theme ?? "dark") : null;
   const { me } = useMyPlayer();
   const admin = isClient && isAdmin(me);
 
@@ -50,26 +52,16 @@ export default function ReglagesPage() {
       <AccountCard />
 
       <section>
-        <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Notifications</h2>
-        <ReglageNotifications />
-      </section>
-
-      <section>
-        <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Confidentialité</h2>
-        <ReglageConfidentialite />
-      </section>
-
-      <section>
         <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Apparence</h2>
-        {/* Sombre uniquement pour l'instant : le clair sera réactivé quand
-            toutes les pages seront portées sur le design. */}
-        <Locked label="Bientôt" note="La version claire arrive — l'app reste en sombre pour l'instant.">
-        <div className="glass flex rounded-2xl p-1">
+        <div role="radiogroup" aria-label="Apparence" className="glass flex rounded-2xl p-1">
           {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
             const active = current === value;
             return (
               <button
                 key={value}
+                type="button"
+                role="radio"
+                aria-checked={active}
                 onClick={() => setTheme(value)}
                 className={cn(
                   "flex flex-1 flex-col items-center gap-1.5 rounded-xl py-3 text-xs font-semibold",
@@ -82,7 +74,16 @@ export default function ReglagesPage() {
             );
           })}
         </div>
-        </Locked>
+      </section>
+
+      <section>
+        <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Notifications</h2>
+        <ReglageNotifications />
+      </section>
+
+      <section>
+        <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Confidentialité</h2>
+        <ReglageConfidentialite />
       </section>
 
       {/* Section « Profil » (accès à l'avatar 3D) masquée volontairement,
@@ -132,7 +133,7 @@ export default function ReglagesPage() {
             <span className="flex-1">
               <span className="block text-[15px] font-semibold">Installation Supabase</span>
               <span className="block text-[12px] text-foreground/45">
-                Comptes, tables et présence partagée — guide pas à pas
+                Les tables de la base, mises à jour à chaque mise en ligne
               </span>
             </span>
             <ChevronRight className="size-4 text-foreground/45" />

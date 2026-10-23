@@ -21,25 +21,39 @@
 //     Sabri, 22/10 : « que tout se fasse en scroll et qu'il y ait plus de vie »).
 // Les modules « toi » : lib/sfl/actus-toi.ts et cine-toi.tsx.
 // ?exploit=… (la notification d'une félicitation) descend jusqu'à sa rubrique.
+//
+// Sur tablette et ordinateur (dès 768 px ; Sabri, 23/10 : « rends-le
+// responsive pour le desktop […] et réadapte toutes les dispositions »), le
+// fil devient une grille, deux colonnes puis trois dès 1280 px (.actus-gabarit,
+// actus.css). À gauche, ce qui se joue : le direct, le vote, la convocation et
+// tes missions ; à droite, tes rubriques côte à côte. Puis chaque dimanche :
+// son terrain à gauche, qui reste à l'écran pendant qu'on parcourt ses
+// rubriques à droite. La course garde sa rangée, avec deux flèches pour la
+// souris. Tout est en classes md: / xl: : sous 768 px, le téléphone garde son
+// fil tel quel (sur téléphone, l'ordre des blocs de la semaine vient des
+// classes order-*).
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronLeft } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { CarteJournee } from "@/components/sfl/carte-journee";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { QuiVient } from "@/components/sfl/qui-vient";
+import { useCollant } from "@/hooks/use-collant";
 import { usePresence } from "@/hooks/use-presence";
 import { voteOuvert } from "@/lib/sfl/convocation-temps";
 import { computeStandings } from "@/lib/sfl/saisie/engine";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { Nom } from "@/components/sfl/nom";
 import { filDeSaison, type Actu } from "@/lib/sfl/actus";
+import type { Journee } from "@/lib/sfl/engine";
 import { enjeux, voisins } from "@/lib/sfl/actus-toi";
 import { rankByMetric } from "@/lib/sfl/engine";
 import { RANKINGS } from "@/lib/sfl/rankings";
+import { ligneDuRendezVous } from "@/lib/sfl/matchs-du-jour";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
 import { VoteDuJour } from "./fil";
@@ -52,29 +66,39 @@ export type Vue = "fil" | "classements" | "matchs";
 /** Les scènes d'un dimanche qui font bouger la course. */
 const SCENES: Actu["type"][] = ["mvp", "chiffre", "duo", "montent", "badge", "badges", "equipe"];
 
-function Rubrique({
-  id,
-  titre,
-  children,
-  plus,
-}: {
-  id?: string;
-  titre: string;
-  children: ReactNode;
-  plus?: ReactNode;
-}) {
+/**
+ * Un dimanche joué : son titre (J8 · 9 août), son terrain, ses rubriques.
+ * Sur grand écran, le terrain à gauche, qui reste à l'écran tant qu'il y
+ * tient, et les rubriques à droite, une colonne puis deux dès 1280 px.
+ */
+function Dimanche({ j, journee, scenes, ouvrir }: { j: number; journee?: Journee; scenes: Actu[]; ouvrir: () => void }) {
+  const [terrain, terrainCollant] = useCollant();
   return (
-    <section id={id} className="flex scroll-mt-4 flex-col gap-3">
-      <div className="flex items-end justify-between px-5">
+    <section className="flex scroll-mt-4 flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-x-[var(--fib-21)] md:gap-y-[var(--fib-21)] md:border-t md:border-contraste/[0.08] md:pt-[var(--fib-34)] xl:grid-cols-3">
+      <div className="flex items-end justify-between px-5 md:col-span-full md:justify-start md:gap-4 md:px-0">
         <h2
-          className="text-[22px] leading-none tracking-tight"
+          className="text-[22px] leading-none tracking-tight md:text-[34px]"
           style={{ fontFamily: ANTON }}
         >
-          {titre}
+          {`J${j}`}
         </h2>
-        {plus}
+        <span className="mono-label text-foreground/45">{journee?.date}</span>
       </div>
-      {children}
+      {journee && (
+        <div ref={terrain} className={cn("px-5 md:px-0", terrainCollant && "md:sticky md:top-[var(--fib-21)]")}>
+          <CarteJournee journee={journee} onOuvrir={ouvrir} />
+        </div>
+      )}
+      <div
+        className={cn(
+          "flex flex-col gap-1 md:grid md:gap-[var(--fib-21)] xl:col-span-2 xl:grid-cols-2",
+          !journee && "md:col-span-full md:grid-cols-2 xl:grid-cols-3",
+        )}
+      >
+        {scenes.map((a) => (
+          <RubriqueActu key={a.id} a={a} />
+        ))}
+      </div>
     </section>
   );
 }
@@ -84,7 +108,7 @@ const METRIQUES = ["pp", "buts", "passes", "mvp"] as const;
 /** L'écart d'une carte à l'autre dans la rangée, pour les faire glisser de leur ancienne place. */
 const PAS = 87;
 
-function Ticker({ moi, onTout }: { moi: string; onTout: () => void }) {
+function Ticker({ moi, onTout, onMatch }: { moi: string; onTout: () => void; onMatch: () => void }) {
   const { players, saison } = useSeason();
   const [id, setId] = useState<(typeof METRIQUES)[number]>("pp");
   const def = RANKINGS.find((r) => r.id === id)!;
@@ -116,9 +140,36 @@ function Ticker({ moi, onTout }: { moi: string; onTout: () => void }) {
       clearTimeout(b);
     };
   }, [id]);
+  // À la souris, on ne glisse pas la rangée du doigt : deux flèches la font
+  // défiler, chacune effacée quand ce côté est au bout.
+  const [bouts, setBouts] = useState({ debut: true, fin: true });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // Un nouvel état seulement quand un bout change : pas de rendu à chaque pas du défilement.
+    const mesurer = () => {
+      const debut = el.scrollLeft <= 4;
+      const fin = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
+      setBouts((b) => (b.debut === debut && b.fin === fin ? b : { debut, fin }));
+    };
+    const o = new ResizeObserver(mesurer);
+    o.observe(el);
+    el.addEventListener("scroll", mesurer, { passive: true });
+    return () => {
+      o.disconnect();
+      el.removeEventListener("scroll", mesurer);
+    };
+    // Remesuré à chaque classement : la rangée change de longueur sans changer de taille.
+  }, [id, rang.length]);
+  const defiler = (sens: 1 | -1) => {
+    const el = ref.current;
+    if (!el) return;
+    const calme = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollBy({ left: sens * el.clientWidth * 0.8, behavior: calme ? "auto" : "smooth" });
+  };
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-1 px-5">
+      <div className="flex items-center gap-1 px-5 md:px-0">
         {METRIQUES.map((m) => (
           <button
             key={m}
@@ -133,17 +184,41 @@ function Ticker({ moi, onTout }: { moi: string; onTout: () => void }) {
             {RANKINGS.find((r) => r.id === m)!.label}
           </button>
         ))}
+        {/* Sur grand écran, « Match » rejoint la ligne des classements. */}
+        <button
+          type="button"
+          onClick={onMatch}
+          className="glass hidden rounded-full px-5 py-1.5 text-[13px] font-semibold md:ml-auto md:inline-flex"
+        >
+          Match
+        </button>
         <button
           type="button"
           onClick={onTout}
-          className="mono-label ml-auto text-foreground/50"
+          className="mono-label ml-auto text-foreground/50 md:ml-5"
         >
           Tout ›
         </button>
       </div>
+      <div className="md:relative">
+      {(["debut", "fin"] as const).map((bout) => (
+        <button
+          key={bout}
+          type="button"
+          aria-label={bout === "debut" ? "Défiler vers la gauche" : "Défiler vers la droite"}
+          onClick={() => defiler(bout === "debut" ? -1 : 1)}
+          className={cn(
+            "glass absolute top-1/2 z-20 hidden size-10 -translate-y-1/2 place-items-center rounded-full transition-opacity duration-300 pointer-fine:md:grid",
+            bout === "debut" ? "left-0" : "right-0",
+            bouts[bout] && "pointer-events-none opacity-0",
+          )}
+        >
+          {bout === "debut" ? <ChevronLeft className="size-5" /> : <ChevronRight className="size-5" />}
+        </button>
+      ))}
       <div
         ref={ref}
-        className="flex items-end gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none]"
+        className="flex items-end gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none] md:px-14 md:[mask-image:linear-gradient(90deg,transparent,#000_56px,#000_calc(100%-56px),transparent)]"
       >
         {rang.map((p, i) => {
           const a = ancien?.get(p.name);
@@ -192,29 +267,35 @@ function Ticker({ moi, onTout }: { moi: string; onTout: () => void }) {
           );
         })}
       </div>
+      </div>
     </div>
   );
 }
 
 /** La convocation du prochain dimanche, dans le fil : qui vient, et ta réponse d'un geste. */
-function Convocation() {
+function Convocation({ className }: { className?: string }) {
   const p = usePresence();
   const repondre = (r: "present" | "absent") => p.answer(p.mine === r ? null : r);
   return (
-    <section className="mx-4 flex flex-col gap-4 overflow-hidden rounded-[28px] bg-black p-5 text-white">
+    <section
+      className={cn(
+        "mx-4 flex flex-col gap-4 overflow-hidden rounded-[28px] bg-white p-5 text-foreground shadow-[0_14px_34px_-18px_rgba(20,12,4,0.35)] ring-1 ring-foreground/[0.05] md:mx-0 md:rounded-3xl dark:bg-black dark:text-white dark:shadow-none dark:ring-0",
+        className,
+      )}
+    >
       <div className="flex items-end gap-4">
         <span className="text-[64px] leading-[0.8]" style={{ fontFamily: ANTON }}>
           J{p.journee}
         </span>
         <span className="flex min-w-0 flex-col pb-0.5">
           <span className="text-[16px] font-bold">{p.jour}</span>
-          <span className="truncate text-[12.5px] text-white/55">
-            {p.heure} · {p.lieu}
+          <span className="truncate text-[12.5px] text-foreground/55 dark:text-white/55">
+            {ligneDuRendezVous(p.rendezVous)}
           </span>
         </span>
       </div>
       <div className="flex items-baseline justify-between">
-        <span className="mono-label text-white/50">
+        <span className="mono-label text-foreground/50 dark:text-white/50">
           {p.presents.length} {p.presents.length > 1 ? "viennent" : "vient"}
         </span>
       </div>
@@ -228,7 +309,11 @@ function Convocation() {
             onClick={() => repondre(r)}
             className={cn(
               "rounded-full py-3 text-[14px] font-bold transition-colors disabled:opacity-40",
-              p.mine === r ? (r === "present" ? "bg-primary text-black" : "bg-white text-black") : "bg-white/10",
+              p.mine === r
+                ? r === "present"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-foreground text-background"
+                : "bg-foreground/[0.07] dark:bg-white/10",
             )}
           >
             {r === "present" ? "Je viens" : "Je passe"}
@@ -246,7 +331,7 @@ function EnDirect({ ouvrir }: { ouvrir: (j: number) => void }) {
   const live = journees.find((j) => (j.matches?.length ?? 0) > 0 && voteOuvert(j.date, maintenant));
   if (!live) return null;
   return (
-    <section className="flex flex-col gap-3 px-5">
+    <section className="flex flex-col gap-3 px-5 md:px-0">
       <span className="flex items-center gap-2">
         <span className="relative flex size-2.5">
           <span className="absolute inset-0 animate-ping rounded-full bg-red-500 opacity-70 motion-reduce:animate-none" />
@@ -288,11 +373,12 @@ export function LaCourse({ vueDepart = "fil", exploit }: { vueDepart?: Vue; expl
   }, [fil, journees]);
 
   const dernier = dimanches[0]?.j ?? 0;
+  const [semaine, semaineCollante] = useCollant();
 
   if (vue !== "fil")
     return (
-      <div className="flex flex-col gap-5">
-        <button type="button" onClick={() => aller("fil")} className="flex items-center gap-1 px-4 text-[15px] font-semibold text-foreground/70">
+      <div className="actus-gabarit flex flex-col gap-5 md:gap-[var(--fib-21)] md:pt-4 lg:pt-[var(--fib-34)]">
+        <button type="button" onClick={() => aller("fil")} className="flex items-center gap-1 px-4 text-[15px] font-semibold text-foreground/70 md:self-start md:px-0">
           <ChevronLeft className="size-5" /> Actus
         </button>
         {vue === "classements" ? <VueClassements vote={<VoteDuJour me={me} />} /> : <VueMatchs />}
@@ -300,40 +386,44 @@ export function LaCourse({ vueDepart = "fil", exploit }: { vueDepart?: Vue; expl
     );
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-4">
+    <div className="actus-gabarit flex flex-col gap-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
+      <header className="flex flex-col gap-4 md:gap-[var(--fib-21)]">
         <h1 className="sr-only">Actus</h1>
-        <EnteteLigue actif="/ligue" className="px-5" />
-        <Ticker moi={me} onTout={() => aller("classements")} />
-        <div className="px-5">
+        <EnteteLigue actif="/ligue" className="px-5 md:px-0" />
+        <Ticker moi={me} onTout={() => aller("classements")} onMatch={() => aller("matchs")} />
+        <div className="px-5 md:hidden">
           <button type="button" onClick={() => aller("matchs")} className="glass w-full rounded-full py-2.5 text-[14px] font-semibold">
             Match
           </button>
         </div>
       </header>
-      <EnDirect ouvrir={(j) => router.push(`/ligue/journee?j=${j}`)} />
-      <VoteDuJour me={me} />
-      {dernier > 0 && <RubriqueToi j={dernier} date={journees.find((x) => x.j === dernier)?.date ?? ""} />}
-      <Convocation />
-      <MissionsBola />
-      <div className="flex flex-col gap-1">
-        {duels.length > 0 && <RubriqueEnjeux liste={duels} moi={me} />}
-        {v && <RubriqueRival v={v} />}
-        {v?.devant && <RubriqueBesoin v={v} />}
+      {/* La semaine. Sur téléphone, un seul fil (l'ordre vient des order-*) :
+          le direct, le vote, ton dimanche, la convocation, tes missions, puis
+          ce qui se joue. Sur grand écran, deux colonnes : à gauche ce qui se
+          joue (direct, vote, convocation, missions), à droite tes rubriques. */}
+      <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3">
+        <div
+          ref={semaine}
+          className={cn("contents md:flex md:flex-col md:gap-[var(--fib-21)]", semaineCollante && "md:sticky md:top-[var(--fib-21)]")}
+        >
+          <EnDirect ouvrir={(j) => router.push(`/ligue/journee?j=${j}`)} />
+          <VoteDuJour me={me} />
+          <Convocation className="order-2 md:order-none" />
+          <MissionsBola className="order-2 md:order-none" />
+        </div>
+        <div className="contents md:grid md:gap-[var(--fib-21)] xl:col-span-2 xl:grid-cols-2">
+          {dernier > 0 && (
+            <RubriqueToi className="order-1 md:order-none" j={dernier} date={journees.find((x) => x.j === dernier)?.date ?? ""} />
+          )}
+          <div className="order-3 flex flex-col gap-1 md:order-none md:contents">
+            {duels.length > 0 && <RubriqueEnjeux liste={duels} moi={me} />}
+            {v && <RubriqueRival v={v} />}
+            {v?.devant && <RubriqueBesoin v={v} />}
+          </div>
+        </div>
       </div>
       {dimanches.map((d) => (
-        <Rubrique key={d.j} titre={`J${d.j}`} plus={<span className="mono-label text-foreground/45">{d.journee?.date}</span>}>
-          {d.journee && (
-            <div className="px-5">
-              <CarteJournee journee={d.journee} onOuvrir={() => router.push(`/ligue/journee?j=${d.j}`)} />
-            </div>
-          )}
-          <div className="flex flex-col gap-1">
-            {d.scenes.map((a) => (
-              <RubriqueActu key={a.id} a={a} />
-            ))}
-          </div>
-        </Rubrique>
+        <Dimanche key={d.j} j={d.j} journee={d.journee} scenes={d.scenes} ouvrir={() => router.push(`/ligue/journee?j=${d.j}`)} />
       ))}
     </div>
   );

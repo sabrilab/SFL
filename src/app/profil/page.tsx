@@ -6,7 +6,9 @@
 // plus envie, qu'on comprenne mieux les choses et que ce soit mieux rangé »,
 // comme le profil d'un joueur ouvert depuis la Recherche (profil-joueur.tsx),
 // dont elle reprend l'ordre de lecture, du plus fort au plus fin :
-//   1. moi : ma carte en grand, mon nom dans le lettrage de la Map, trois
+//   1. moi : ma carte en grand, mon nom dans le lettrage de la Map, mes
+//      abonnés comme sur Instagram (mes abonnés et mes abonnements, « Kader,
+//      Anis et 32 autres te suivent » : suivre.tsx ; Sabri, 23/10), trois
 //      chiffres de tête en Anton (mon rang au Pépite d'Or, ma note, mes
 //      dimanches), puis la phrase qui me résume (fiche-joueur.ts, la même que
 //      sur mon profil). Le nom se corrige en le touchant (identite.tsx).
@@ -25,7 +27,8 @@
 //      (bouton-deconnexion.tsx ; Sabri, le 22/10 : « plus accessible »).
 // « Historique » est parti : chaque dimanche de Ma saison ouvre son récap. Le
 // rappel « Glisse pour tourner » aussi, comme sur le profil. Les réglages
-// (« ⋯ ») sont en haut, à côté de la loupe.
+// (« ⋯ ») sont en haut, à côté de la loupe et du rond qui passe l'app en
+// clair ou en sombre (bouton-theme.tsx, 23/10).
 //
 // Le 22/10 (Sabri) : le profil de jeu (le radar) part sur le profil d'un
 // joueur dans Recherche ; « Cartes de match » disparaît, les cartes gagnées
@@ -41,6 +44,7 @@ import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur
 import { MaSaison, type RangDuJour } from "@/components/sfl/ma-saison";
 import { NiveauXp } from "@/components/sfl/niveau-xp";
 import { Chiffre } from "@/components/sfl/profil-joueur";
+import { ReseauJoueur } from "@/components/sfl/suivre";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { VitrineBadges } from "@/components/sfl/vitrine";
 import { ChoixBadge } from "@/components/sfl/choix-badge";
@@ -61,6 +65,7 @@ import { isHidden } from "@/lib/sfl/hidden";
 import { POSTES } from "@/lib/sfl/inscription";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { BoutonStats } from "@/components/layout/bouton-stats";
+import { BoutonTheme } from "@/components/layout/bouton-theme";
 import { BoutonDeconnexion } from "@/components/sfl/auth/bouton-deconnexion";
 
 /* ------------------------------ Petits blocs ------------------------------ */
@@ -134,6 +139,7 @@ export default function Profil() {
         <div className="flex items-center gap-2">
           <BoutonStats />
           <BoutonRecherche />
+          <BoutonTheme />
           <Link
             href="/reglages"
             aria-label="Réglages"
@@ -163,20 +169,23 @@ export default function Profil() {
               render={(s) => <PlayerCard player={player} size={s} />}
             />
           </div>
-          <button
-            type="button"
-            onClick={() => setIdentiteOuverte(true)}
-            aria-label={`${identite.nom(player.name)}, ${identite.pseudo(player.name)}. Modifier mon nom et mon pseudo`}
-            className="relative flex w-full flex-col items-center gap-[var(--fib-8)] text-center"
-          >
-            <span className="titre-lettrage text-[34px] leading-[0.95] break-words">
-              {identite.nom(player.name)}
-            </span>
-            <span className="font-mono text-[12px] text-foreground/45">
-              {identite.pseudo(player.name)} · {poste.toLowerCase()}
-              {xp && ` · niveau XP ${xp.niveau}`}
-            </span>
-          </button>
+          <div className="relative flex w-full flex-col items-center gap-[var(--fib-13)]">
+            <button
+              type="button"
+              onClick={() => setIdentiteOuverte(true)}
+              aria-label={`${identite.nom(player.name)}, ${identite.pseudo(player.name)}. Modifier mon nom et mon pseudo`}
+              className="flex w-full flex-col items-center gap-[var(--fib-8)] text-center"
+            >
+              <span className="titre-lettrage text-[34px] leading-[0.95] break-words">
+                {identite.nom(player.name)}
+              </span>
+              <span className="font-mono text-[12px] text-foreground/45">
+                {identite.pseudo(player.name)} · {poste.toLowerCase()}
+                {xp && ` · niveau XP ${xp.niveau}`}
+              </span>
+            </button>
+            <ReseauJoueur nom={player.name} />
+          </div>
           <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
             <Chiffre valeur={myRank != null && (joues > 0 || player.pp !== 0) ? ordinal(myRank) : "–"} quoi="Pépite d'Or" />
             <Chiffre valeur={ovr(player.stats)} quoi="Général" />

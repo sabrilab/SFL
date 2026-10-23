@@ -13,6 +13,8 @@
 //   4. qui est là aujourd'hui (nouveaux, fidèles, à risque, décrochés…) ;
 //   5. la rétention — combien reviennent, cohorte par cohorte ;
 //   6. ce qui fait revenir — les gestes de la première semaine ;
+//   6 bis. les notifications — qui les a activées, et ce que chaque motif
+//      leur fait faire (./notifications.tsx, demandé le 23/10) ;
 //   7. quand la ligue ouvre l'app ;
 //   8. ce qu'ils y font, les pays choisis pour la carte, les joueurs à
 //      relancer, le détail par joueur.
@@ -49,6 +51,7 @@ import {
 import { emojiDrapeau, unPays } from "@/lib/sfl/photo-studio";
 import { aSuivre } from "@/lib/sfl/suivi-joueur";
 import { FicheJoueur } from "./fiche";
+import { NotifsStats } from "./notifications";
 import { cn } from "@/lib/utils";
 import { Barres, CarteHoraire, Cohortes, Comparaison, Courbe, encre } from "./graphiques";
 
@@ -213,6 +216,7 @@ const PARTIES = [
   { id: "suivre", label: "À suivre" },
   { id: "qui", label: "Qui est là" },
   { id: "retention", label: "Rétention" },
+  { id: "notifs", label: "Notifs" },
   { id: "quand", label: "Quand" },
   { id: "pays", label: "Pays" },
   { id: "joueurs", label: "Joueurs" },
@@ -290,6 +294,10 @@ export function ActiviteVue({
       .sort((x, y) => y.n - x.n || x.nom.localeCompare(y.nom, "fr"));
     return { lignes, joueurs: dernier.size, cartes, sansPays };
   }, [vu]);
+
+  /* ---------------------------- les notifications ------------------------ */
+  // Les joueurs venus sur la période : ceux qu'il faudrait pouvoir prévenir.
+  const actifs = useMemo(() => a?.joueurs.map((j) => j.name) ?? [], [a]);
 
   /* ------------------------------ à suivre de près ----------------------- */
   const suivre = useMemo(() => (vu && data ? aSuivre(vu.evenements, data.now) : []), [vu, data]);
@@ -412,7 +420,7 @@ export function ActiviteVue({
       )}
 
       {error && (
-        <p className="glass-soft rounded-2xl p-3.5 text-[12.5px] text-[#FF6B5E]">
+        <p className="glass-soft rounded-2xl p-3.5 text-[12.5px] text-[#c8352b] dark:text-[#FF6B5E]">
           {error} — as-tu bien rejoué le script SQL (table activity) ?
         </p>
       )}
@@ -625,6 +633,19 @@ export function ActiviteVue({
                 ))}
               </div>
             </Section>
+          )}
+
+          {/* 6 bis. Les notifications */}
+          {vu && data && (
+            <NotifsStats
+              key={data.now}
+              public={public_}
+              admins={vu.ensembleAdmins}
+              jours={jours}
+              actifs={actifs}
+              now={data.now}
+              onJoueur={setFiche}
+            />
           )}
 
           {/* 7. Quand */}

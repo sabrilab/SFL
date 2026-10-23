@@ -15,19 +15,23 @@
 // Chacun règle les siennes (vestiaire_suivi.notifs) : 'tout', 'cite'
 // (cité, mis en avant, réponses et réactions seulement) ou 'rien'.
 //
+// Les membres acceptés seulement : un compte en attente ne lit pas le
+// Vestiaire (la base le lui cache), il n'en reçoit donc rien non plus. Avant
+// le 22/10/2026, il recevait chaque message, avec sa phrase.
+//
 // La route agit avec la clé secrète (lire les abonnements de tout le monde),
 // donc elle ne croit pas l'appelant sur parole : le message ou la réaction
 // doit exister, être à lui, et être récent. Rejouer l'appel ne renvoie le
 // message à tous qu'une fois par RAFALE et ne vise que ses cités.
 
 import { NextRequest, NextResponse } from "next/server";
-import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
+import { cleVapid } from "@/lib/server/web-push";
+import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { pseudosCites } from "@/lib/sfl/pseudos-cites";
 import { joueursDePiece } from "@/lib/sfl/pieces-joueurs";
 import { resumeMessage as resume } from "@/lib/sfl/resume-message";
 import { nonLus } from "@/lib/sfl/non-lus.server";
-import type { Notif } from "@/lib/sfl/push";
 
 export const maxDuration = 30;
 
@@ -67,8 +71,15 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (!msg || msg.canal !== "sfl") return NextResponse.json({ error: "Message inconnu." }, { status: 404 });
 
-  const { data: profils } = await sb.from("profiles").select("id, name, username, nom_affiche");
-  const tous = (profils ?? []) as { id: string; name: string; username: string; nom_affiche: string | null }[];
+  const { data: profils } = await sb.from("profiles").select("id, name, username, nom_affiche, valide");
+  const tous = (profils ?? []) as {
+    id: string;
+    name: string;
+    username: string;
+    nom_affiche: string | null;
+    valide: boolean;
+  }[];
+  const membres = new Set(tous.filter((p) => p.valide).map((p) => p.id));
   const nomDe = (uid: string) => {
     const p = tous.find((x) => x.id === uid);
     return (p?.nom_affiche ?? p?.name ?? "Quelqu'un").split(" ")[0];
@@ -84,8 +95,9 @@ export async function POST(req: NextRequest) {
     return !!d && maintenant - new Date(d).getTime() < DEVANT;
   };
 
-  // Qui reçoit quoi : un seul message par joueur, le plus précis gagne.
-  const envois = new Map<string, Notif>();
+  // Qui reçoit quoi : un seul message par joueur, le plus précis gagne, et
+  // son motif pour la page Activité (lib/sfl/motifs-notif.ts).
+  const envois = new Map<string, Envoi>();
   /** Ceux qui reçoivent la notification « un message de plus ». */
   let courants: string[] = [];
 
@@ -101,10 +113,13 @@ export async function POST(req: NextRequest) {
     const recente = reaction && maintenant - new Date(reaction.created_at).getTime() < 5 * 60_000;
     if (recente && msg.auteur !== moi.id && modeDe(msg.auteur) !== "rien" && !devant(msg.auteur)) {
       envois.set(msg.auteur, {
-        titre: "Vestiaire",
-        texte: couper(`${nomDe(moi.id)} a réagi ${emoji} à « ${resume(msg.texte, msg.piece)} »`, 180),
-        url: URL_VESTIAIRE,
-        tag: "vestiaire-reaction",
+        motif: "vestiaire-reaction",
+        notif: {
+          titre: "Vestiaire",
+          texte: couper(`${nomDe(moi.id)} a réagi ${emoji} à « ${resume(msg.texte, msg.piece)} »`, 180),
+          url: URL_VESTIAIRE,
+          tag: "vestiaire-reaction",
+        },
       });
     }
   } else {
@@ -120,10 +135,13 @@ export async function POST(req: NextRequest) {
       const cible = (original as { auteur: string } | null)?.auteur;
       if (cible && cible !== moi.id && modeDe(cible) !== "rien" && !devant(cible))
         envois.set(cible, {
-          titre: `${auteur} t'a répondu au Vestiaire`,
-          texte: couper(phrase, 180),
-          url: URL_VESTIAIRE,
-          tag: `vestiaire-reponse-${msg.id}`,
+          motif: "vestiaire-reponse",
+          notif: {
+            titre: `${auteur} t'a répondu au Vestiaire`,
+            texte: couper(phrase, 180),
+            url: URL_VESTIAIRE,
+            tag: `vestiaire-reponse-${msg.id}`,
+          },
         });
     }
 
@@ -133,10 +151,13 @@ export async function POST(req: NextRequest) {
       const pseudo = p.username.replace(/^@/, "").toLowerCase();
       if (p.id === moi.id || envois.has(p.id) || !cites.has(pseudo) || modeDe(p.id) === "rien" || devant(p.id)) continue;
       envois.set(p.id, {
-        titre: `${auteur} t'a cité au Vestiaire`,
-        texte: couper(phrase, 180),
-        url: URL_VESTIAIRE,
-        tag: `vestiaire-cite-${msg.id}`,
+        motif: "vestiaire-cite",
+        notif: {
+          titre: `${auteur} t'a cité au Vestiaire`,
+          texte: couper(phrase, 180),
+          url: URL_VESTIAIRE,
+          tag: `vestiaire-cite-${msg.id}`,
+        },
       });
     }
 
@@ -149,10 +170,13 @@ export async function POST(req: NextRequest) {
       for (const p of tous) {
         if (p.id === moi.id || envois.has(p.id) || !enAvant.has(p.name) || modeDe(p.id) === "rien" || devant(p.id)) continue;
         envois.set(p.id, {
-          titre: `${auteur} t'a mis en avant au Vestiaire`,
-          texte: couper(texte, 180),
-          url: URL_VESTIAIRE,
-          tag: `vestiaire-cite-${msg.id}`,
+          motif: "vestiaire-en-avant",
+          notif: {
+            titre: `${auteur} t'a mis en avant au Vestiaire`,
+            texte: couper(texte, 180),
+            url: URL_VESTIAIRE,
+            tag: `vestiaire-cite-${msg.id}`,
+          },
         });
       }
     }
@@ -166,40 +190,27 @@ export async function POST(req: NextRequest) {
     });
     for (const uid of courants)
       envois.set(uid, {
-        titre: `${auteur} · Vestiaire`,
-        texte: couper(phrase, 180),
-        url: URL_VESTIAIRE,
-        tag: "vestiaire",
+        motif: "vestiaire-message",
+        notif: { titre: `${auteur} · Vestiaire`, texte: couper(phrase, 180), url: URL_VESTIAIRE, tag: "vestiaire" },
       });
   }
 
+  for (const uid of envois.keys()) if (!membres.has(uid)) envois.delete(uid);
+  courants = courants.filter((uid) => membres.has(uid));
   if (envois.size === 0) return NextResponse.json({ envoyes: 0 });
 
   // Le nombre de non lus de chacun, pour la pastille de l'icône : le
   // Vestiaire et les discussions de ses matchs, le compte de la barre
   // d'onglets (lib/sfl/non-lus.server.ts).
   const comptes = await nonLus(sb, [...envois.keys()], maintenant);
-  for (const [uid, notif] of envois) {
+  for (const [uid, e] of envois) {
     const n = comptes.get(uid) ?? 0;
-    if (n > 0) envois.set(uid, { ...notif, pastille: n });
+    if (n > 0) envois.set(uid, { ...e, notif: { ...e.notif, pastille: n } });
   }
 
-  const { data: abonnements } = await sb
-    .from("push_abonnements")
-    .select("endpoint, p256dh, auth, user_id")
-    .in("user_id", [...envois.keys()]);
-  const resultats = await Promise.all(
-    ((abonnements ?? []) as (Abonnement & { user_id: string })[]).map(async (ab) => ({
-      ab,
-      r: await envoyer(ab, envois.get(ab.user_id), cle),
-    }))
-  );
-
-  const morts = resultats.filter((x) => x.r === "mort").map((x) => x.ab.endpoint);
-  if (morts.length > 0) await sb.from("push_abonnements").delete().in("endpoint", morts);
+  const { recus, morts } = await prevenir(sb, cle, envois);
 
   // L'heure de la dernière notification, pour ceux qui l'ont vraiment reçue.
-  const recus = new Set(resultats.filter((x) => x.r === "envoye").map((x) => x.ab.user_id));
   courants = courants.filter((uid) => recus.has(uid));
   if (courants.length > 0) {
     const quand = new Date(maintenant).toISOString();
@@ -220,5 +231,5 @@ export async function POST(req: NextRequest) {
       );
   }
 
-  return NextResponse.json({ envoyes: recus.size, morts: morts.length });
+  return NextResponse.json({ envoyes: recus.size, morts });
 }

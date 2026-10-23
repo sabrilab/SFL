@@ -213,7 +213,7 @@ export function CollectionPanel({ me }: { me: string }) {
             key={label}
             className={cn(
               "flex items-center justify-between px-5 py-3",
-              i < 2 && "border-b border-white/8"
+              i < 2 && "border-b border-contraste/8"
             )}
           >
             <span className="font-medium">{label}</span>

@@ -8,10 +8,14 @@
 //     les classements (classements.tsx), le Wall of Fame ;
 //   · Matchs : les journées jouées, une carte chacune ; la toucher ouvre son
 //     récap (/ligue/journee?j=N).
+// Sur grand écran (dès 768 px) : les Classements au nombre d'or, ma synthèse
+// à gauche (qui reste à l'écran) et tous les classements à droite ; les
+// Matchs en grille, deux terrains de front, trois dès 1280 px.
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Crown } from "lucide-react";
+import { useCollant } from "@/hooks/use-collant";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { rankPlayers } from "@/lib/sfl/engine";
@@ -47,18 +51,17 @@ export function VueClassements({ vote }: { vote?: React.ReactNode }) {
     .slice(-5)
     .map((e) => (e.result === "Victoire" ? "V" : e.result === "Nul" ? "N" : "D"));
   const nb = (r: string) => myForm.filter((x) => x === r).length;
+  const [colonne, colonneCollante] = useCollant();
 
   return (
-    <div className="flex flex-col gap-6 px-5">
-      {vote}
-      {played.length === 0 ? (
-        <>
+    <div className="flex flex-col gap-6 px-5 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.618fr)] md:items-start md:gap-[var(--fib-34)] md:px-0 min-[1440px]:gap-[var(--fib-55)]">
+      {/* La petite colonne sur grand écran : le vote, ma synthèse, le Wall of Fame. */}
+      <div ref={colonne} className={cn("flex min-w-0 flex-col gap-6", colonneCollante && "md:sticky md:top-[var(--fib-21)]")}>
+        {vote}
+        {played.length === 0 ? (
           <StatsAVenir numero={saison.numero ?? 0} quoi="classement" archive={saison.archives?.[saison.archives.length - 1]} />
-          <IlsSeDemarquent />
-        </>
-      ) : (
-        <>
-          {/* Ma synthèse : rang, points, forme sur 5 matchs. */}
+        ) : (
+          /* Ma synthèse : rang, points, forme sur 5 matchs. */
           <section className="glass rounded-[26px] p-[18px]">
             <div className="flex items-center justify-between">
               <div>
@@ -91,10 +94,10 @@ export function VueClassements({ vote }: { vote?: React.ReactNode }) {
                       className="flex h-[30px] flex-1 items-center justify-center rounded-[9px]"
                       style={
                         r === "V"
-                          ? { background: "var(--primary)", color: "#0A0B0E" }
+                          ? { background: "var(--primary)", color: "var(--primary-foreground)" }
                           : r === "N"
-                            ? { background: "rgba(255,255,255,0.14)", color: "#fff" }
-                            : { background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.45)" }
+                            ? { background: "rgb(var(--foreground-rgb) / 0.14)", color: "var(--foreground)" }
+                            : { background: "rgb(var(--foreground-rgb) / 0.06)", color: "rgb(var(--foreground-rgb) / 0.45)" }
                       }
                     >
                       <span className="mono-label">{r}</span>
@@ -108,20 +111,27 @@ export function VueClassements({ vote }: { vote?: React.ReactNode }) {
               </>
             )}
           </section>
-          <Classements me={me} />
-        </>
-      )}
-      <Link href="/palmares" className="glass flex items-center gap-3.5 rounded-3xl px-4 py-3.5">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground/10">
-          <Crown className="size-5" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[15px] font-bold tracking-tight">Wall of Fame</span>
-          <span className="block truncate text-[12.5px] text-muted-foreground">Champions, légendes, ton parcours</span>
-        </span>
-        <ChevronRight className="size-4 text-muted-foreground" />
-      </Link>
+        )}
+        <WallOfFame className="hidden md:flex" />
+      </div>
+      {played.length === 0 ? <IlsSeDemarquent /> : <Classements me={me} />}
+      <WallOfFame className="md:hidden" />
     </div>
+  );
+}
+
+function WallOfFame({ className }: { className?: string }) {
+  return (
+    <Link href="/palmares" className={cn("glass flex items-center gap-3.5 rounded-3xl px-4 py-3.5", className)}>
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground/10">
+        <Crown className="size-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-bold tracking-tight">Wall of Fame</span>
+        <span className="block truncate text-[12.5px] text-muted-foreground">Champions, légendes, ton parcours</span>
+      </span>
+      <ChevronRight className="size-4 text-muted-foreground" />
+    </Link>
   );
 }
 
@@ -129,7 +139,7 @@ export function VueMatchs() {
   const router = useRouter();
   const played = useJouees();
   return (
-    <div className="flex flex-col gap-3.5 px-5">
+    <div className="flex flex-col gap-3.5 px-5 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] md:px-0 xl:grid-cols-3">
       {[...played].reverse().map((jn) => (
         <CarteJournee key={jn.j} journee={jn} onOuvrir={() => router.push(`/ligue/journee?j=${jn.j}`)} />
       ))}

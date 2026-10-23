@@ -22,7 +22,7 @@ import { CarteDe, MiniCarte } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import type { Journee, MatchPlayerLine, MatchTeam } from "@/lib/sfl/engine";
 import { MAILLOTS } from "@/lib/sfl/maillots";
-import { PastilleCamp } from "@/components/sfl/camp";
+import { PastilleMaillot } from "@/components/sfl/point-maillot";
 import { cn } from "@/lib/utils";
 import { projeter, vue } from "@/lib/sfl/terrain-vu";
 import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
@@ -126,8 +126,8 @@ function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
   // Les Noirs (la première équipe du match) au fond, les Blancs devant.
   const places = (
     [
-      [a, -1, MAILLOTS.noirs],
-      [b, 1, MAILLOTS.blancs],
+      [a, -1, MAILLOTS.Noirs],
+      [b, 1, MAILLOTS.Blancs],
     ] as const
   )
     .flatMap(([eq, sens, maillot]) => {
@@ -152,7 +152,7 @@ function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
+      className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#ffffff_0%,#e6e8e3_70%)] dark:bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
       style={{ height: bas - haut + MARGE * 2 }}
     >
       <div className="absolute inset-x-0" style={{ top: decalage, height: bas + MARGE }}>
@@ -272,13 +272,13 @@ export function CarteJournee({
       {/* Le tableau d'affichage : les Noirs à gauche (au fond du terrain), les Blancs à droite (devant). */}
       <div className="flex items-center justify-between gap-3 px-4 pb-2.5">
         <span className="flex min-w-0 flex-1">
-          <PastilleCamp maillot={MAILLOTS.noirs} className="text-[13px]" />
+          <PastilleMaillot camp="Noirs" className="text-[13px]" />
         </span>
         <span className="shrink-0 text-[22px] leading-none font-extrabold tracking-tight tabular-nums">
           {match.teamA.score}<span className="mx-1 text-foreground/25">–</span>{match.teamB.score}
         </span>
         <span className="flex min-w-0 flex-1 justify-end">
-          <PastilleCamp maillot={MAILLOTS.blancs} className="text-[13px]" />
+          <PastilleMaillot camp="Blancs" className="text-[13px]" />
         </span>
       </div>
 

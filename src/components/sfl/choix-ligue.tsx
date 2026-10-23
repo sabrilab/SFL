@@ -8,7 +8,9 @@
 //     joueurs ouvrent eux-mêmes (/ligue-vierge) ; régions et mondial plus tard.
 //   · Bola Team — les équipes et leurs défis (/bola-team).
 // Les badges sont les logos (public/bola/sfl.svg, logo-blanc.svg), teintés
-// comme le texte par un masque : pleins quand on y est, effacés sinon.
+// comme le texte par un masque : pleins quand on y est, effacés sinon. Le
+// sigle SFL (tools/sigle-sfl.ts, 23/10) a les métriques du logo BOLA : à
+// hauteur égale, les lettres de SFL, BOLA et BOLA TEAM ont la même taille.
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -19,9 +21,11 @@ import { cn } from "@/lib/utils";
 type Actif = "/ligue" | "/ligue-vierge" | "/bola-team";
 
 const BADGES = [
-  { href: "/ligue", libelle: "SFL", src: "/bola/sfl.svg", l: 70 },
+  { href: "/ligue", libelle: "SFL", src: "/bola/sfl.svg", l: 54.4 },
   { href: "/ligue-vierge", libelle: "Bola", src: "/bola/logo-blanc.svg", l: 74 },
 ] as const;
+// l : la largeur pour 18 px de haut. BOLA (1000 × 237) tient dans 74, donc à
+// 97,4 % de sa hauteur ; SFL (735 × 237) y est réduit d'autant : 54,4.
 
 /**
  * L'en-tête des trois onglets (Actus, Bola, Team). Trois logos côte à côte,
@@ -63,7 +67,7 @@ export function EnteteLigue({ actif, className }: { actif: Actif; className?: st
           <nav
             role="menu"
             aria-label="Ligue"
-            className="absolute top-full left-0 z-50 mt-2 flex min-w-[200px] flex-col rounded-[20px] border border-white/10 bg-popover/95 p-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+            className="absolute top-full left-0 z-50 mt-2 flex min-w-[200px] flex-col rounded-[20px] border border-foreground/10 bg-popover/95 p-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.45)] backdrop-blur-xl"
           >
             {liens.map((l) => (
               <Link
@@ -74,7 +78,7 @@ export function EnteteLigue({ actif, className }: { actif: Actif; className?: st
                 onClick={() => setOuvert(false)}
                 className={cn(
                   "flex h-12 items-center rounded-[14px] px-3.5 transition-colors",
-                  actif === l.href ? "bg-white/[0.08] text-foreground" : "text-foreground/60"
+                  actif === l.href ? "bg-foreground/[0.08] text-foreground" : "text-foreground/60"
                 )}
               >
                 <SigleLigue ligue={l.ligue} hauteur={16} />

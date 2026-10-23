@@ -30,8 +30,7 @@ import {
 } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
-import { PastilleCamp } from "@/components/sfl/camp";
-import { MAILLOTS } from "@/lib/sfl/maillots";
+import { PastilleMaillot } from "@/components/sfl/point-maillot";
 
 /* ------------------------------- outillage ------------------------------- */
 
@@ -103,7 +102,7 @@ function FicheJournee({ journee }: { journee: Journee }) {
       ) : (
         matches.map((m) => (
           <section key={m.id} className="glass overflow-hidden rounded-[26px]">
-            <div className="flex items-center justify-between border-b border-white/8 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-contraste/8 px-4 py-3">
               <span className="mono-label text-foreground/40">{m.label}</span>
               <span className="text-[19px] font-extrabold tracking-tight tabular-nums">
                 {m.teamA.score} – {m.teamB.score}
@@ -113,9 +112,9 @@ function FicheJournee({ journee }: { journee: Journee }) {
               {[m.teamA, m.teamB].map((team, ti) => (
                 <div
                   key={team.id}
-                  className={cn("px-4 py-3.5", ti === 0 && "border-r border-white/8")}
+                  className={cn("px-4 py-3.5", ti === 0 && "border-r border-contraste/8")}
                 >
-                  <PastilleCamp maillot={ti === 0 ? MAILLOTS.noirs : MAILLOTS.blancs} className="mb-2.5" />
+                  <PastilleMaillot camp={ti === 0 ? "Noirs" : "Blancs"} className="mb-2.5" />
                   <div className="flex flex-col gap-1.5">
                     {team.players.map((p) => (
                       <div key={p.name} className="flex items-baseline gap-1.5 text-[12.5px]">

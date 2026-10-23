@@ -12,12 +12,8 @@ import { BoutonsSociaux } from "./boutons-sociaux";
 import { cn } from "@/lib/utils";
 
 const MESSAGES: Record<string, string> = {
-  "unknown-user": "Cet identifiant n'existe pas dans la ligue.",
-  "bad-password": "Mot de passe incorrect.",
-  "mot-de-passe-local":
-    "Ce mot de passe a été changé sur cet appareil seulement : la ligue ne le connaît pas. Utilise ton mot de passe d'origine, celui donné par l'admin.",
-  unavailable:
-    "Connexion impossible depuis cette adresse. Ouvre l'app en https (ou en localhost).",
+  "bad-password": "Identifiant ou mot de passe incorrect.",
+  unavailable: "Pas de réponse du serveur. Vérifie ta connexion et réessaie.",
 };
 
 export function LoginScreen() {
@@ -98,7 +94,7 @@ export function LoginScreen() {
           </label>
 
           {error && (
-            <p className="px-1 text-[12.5px] font-medium text-[#FF6B5E]">{error}</p>
+            <p className="px-1 text-[12.5px] font-medium text-[#c8352b] dark:text-[#FF6B5E]">{error}</p>
           )}
 
           <button
@@ -115,9 +111,9 @@ export function LoginScreen() {
         </form>
 
         <div className="mt-5 flex items-center gap-3">
-          <span className="h-px flex-1 bg-white/8" />
+          <span className="h-px flex-1 bg-contraste/8" />
           <span className="mono-label text-foreground/30">ou</span>
-          <span className="h-px flex-1 bg-white/8" />
+          <span className="h-px flex-1 bg-contraste/8" />
         </div>
         <BoutonsSociaux retour="/inscription" onErreur={setError} className="mt-4" />
 
@@ -129,8 +125,7 @@ export function LoginScreen() {
         </Link>
 
         <p className="mt-6 text-[12.5px] leading-snug text-foreground/35">
-          Mot de passe oublié ? Demande à Ilyes de te le redonner — il a la liste des
-          comptes. Pense à le changer une fois connecté, dans Réglages.
+          Mot de passe oublié ? Un admin de la ligue peut t&apos;en donner un provisoire.
         </p>
         <Link
           href="/confidentialite"

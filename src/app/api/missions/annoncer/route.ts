@@ -23,13 +23,17 @@
 // buts et passes D. +130 XP, −65 si tu échoues. Accepte avant dimanche
 // 13h00. » Toucher la notification ouvre les Actus sur ses missions.
 //
+// Elle est suivie comme les autres (lib/server/push-envoi.ts, motif
+// « missions ») : la base reconnaît seule le joueur qui répond ensuite à ses
+// missions (trigger missions_reponses_push_effet).
+//
 // La route agit avec la clé secrète : elle exige une session de membre.
 
 import { NextRequest, NextResponse } from "next/server";
-import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
+import { prevenir, type Envoi } from "@/lib/server/push-envoi";
+import { cleVapid } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { dimancheEnCours, phrase, rangDe, risqueDe, type Mission } from "@/lib/sfl/missions";
-import type { Notif } from "@/lib/sfl/push";
 import type { Saison } from "@/lib/sfl/saisie/types";
 
 export const maxDuration = 30;
@@ -91,15 +95,9 @@ export async function POST(req: NextRequest) {
   const idDe = new Map(lignes.filter((p) => noms.includes(p.name)).map((p) => [p.name, p.id]));
   const ids = [...idDe.values()];
   if (!ids.length) return NextResponse.json({ envoyes: 0, fini: true });
-  const { data: abonnements } = await sb
-    .from("push_abonnements")
-    .select("endpoint, p256dh, auth, user_id")
-    .in("user_id", ids);
-  const parJoueur = new Map<string, Abonnement[]>();
-  for (const ab of (abonnements ?? []) as (Abonnement & { user_id: string })[]) {
-    parJoueur.set(ab.user_id, [...(parJoueur.get(ab.user_id) ?? []), ab]);
-  }
-  const abonnes = noms.filter((n) => parJoueur.has(idDe.get(n) ?? ""));
+  const { data: abonnements } = await sb.from("push_abonnements").select("user_id").in("user_id", ids);
+  const joignables = new Set(((abonnements ?? []) as { user_id: string }[]).map((ab) => ab.user_id));
+  const abonnes = noms.filter((n) => joignables.has(idDe.get(n) ?? ""));
   if (!abonnes.length) return NextResponse.json({ envoyes: 0, fini: true });
 
   // La réservation : seuls ceux qu'on vient d'inscrire sont prévenus par cet appel.
@@ -115,29 +113,25 @@ export async function POST(req: NextRequest) {
 
   const quand = limite(d.coupEnvoi, d.heure, maintenant);
   const nom = (n: string) => affiches.get(n) ?? n;
-  let envoyes = 0;
-  const morts: string[] = [];
-  const rates: string[] = [];
-  await Promise.all(
-    ((reserves ?? []) as { joueur: string }[]).map(async ({ joueur }) => {
-      const contrat = d.missions.get(joueur)?.find((m) => m.creneau === "contrat");
-      const notif: Notif = {
+  const inscrits = ((reserves ?? []) as { joueur: string }[]).map((x) => x.joueur);
+  const envois = new Map<string, Envoi>();
+  for (const joueur of inscrits) {
+    const contrat = d.missions.get(joueur)?.find((m) => m.creneau === "contrat");
+    envois.set(idDe.get(joueur)!, {
+      notif: {
         titre: `Missions Bola · J${d.j}`,
         texte: couper(`${contrat ? `${annonce(contrat, nom)} ` : ""}Accepte avant ${quand}.`, 180),
         url: "/ligue#missions",
         tag: `missions-${d.saison}-${d.j}`,
-      };
-      const resultats = await Promise.all(
-        (parJoueur.get(idDe.get(joueur) ?? "") ?? []).map((ab) => envoyer(ab, notif, cle).then((r) => ({ ab, r })))
-      );
-      morts.push(...resultats.filter((x) => x.r === "mort").map((x) => x.ab.endpoint));
-      if (resultats.some((x) => x.r === "envoye")) envoyes++;
-      else rates.push(joueur);
-    })
-  );
-  if (morts.length > 0) await sb.from("push_abonnements").delete().in("endpoint", morts);
+      },
+      motif: "missions",
+      ref: `missions:${d.saison}:${d.j}`,
+    });
+  }
+  const { recus } = await prevenir(sb, cle, envois);
+  const rates = inscrits.filter((joueur) => !recus.has(idDe.get(joueur)!));
   if (rates.length > 0)
     await sb.from("missions_envois").delete().eq("saison", d.saison).eq("j", d.j).in("joueur", rates);
 
-  return NextResponse.json({ envoyes, fini: rates.length === 0 });
+  return NextResponse.json({ envoyes: recus.size, fini: rates.length === 0 });
 }

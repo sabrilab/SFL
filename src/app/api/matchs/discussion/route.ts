@@ -23,13 +23,13 @@
 // et il doit être du match.
 
 import { NextRequest, NextResponse } from "next/server";
-import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
+import { cleVapid } from "@/lib/server/web-push";
+import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { nonLus } from "@/lib/sfl/non-lus.server";
 import { pseudosCites } from "@/lib/sfl/pseudos-cites";
 import { resumeMessage as resume } from "@/lib/sfl/resume-message";
 import { jourLong } from "@/lib/sfl/jour-long";
-import type { Notif } from "@/lib/sfl/push";
 
 export const maxDuration = 30;
 
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
 
   const { data: match } = await sb
     .from("matchs")
-    .select("id, organisateur, genre, jour, heure, lieu, places")
+    .select("id, organisateur, jour, heure, lieu, places")
     .eq("id", msg.match_id)
     .maybeSingle();
   if (!match) return NextResponse.json({ error: "Match inconnu." }, { status: 404 });
@@ -107,12 +107,14 @@ export async function POST(req: NextRequest) {
   const joignable = (uid: string) =>
     uid !== moi.id && tous.some((p) => p.id === uid && p.valide) && modeDe(uid) !== "rien" && !devant(uid);
 
-  const nomDuMatch = `${match.genre === "exhibition" ? "Exhibition" : "Match"} à ${match.lieu}`;
+  const nomDuMatch = `Match à ${match.lieu}`;
   const url = `/?match=${match.id}&discussion`;
   const tag = `match-${match.id}`;
+  const ref = `match:${match.id}`;
 
-  // Qui reçoit quoi : un seul message par joueur, le plus précis gagne.
-  const envois = new Map<string, Notif>();
+  // Qui reçoit quoi : un seul message par joueur, le plus précis gagne, et
+  // son motif pour la page Activité (lib/sfl/motifs-notif.ts).
+  const envois = new Map<string, Envoi>();
   /** Ceux qui reçoivent la notification « un message de plus ». */
   let courants: string[] = [];
 
@@ -128,10 +130,14 @@ export async function POST(req: NextRequest) {
     const recente = reaction && maintenant - new Date(reaction.created_at).getTime() < FRAIS;
     if (recente && joignable(msg.auteur))
       envois.set(msg.auteur, {
-        titre: couper(nomDuMatch, 60),
-        texte: couper(`${prenom(moi.id)} a réagi ${emoji} à « ${resume(msg.texte, msg.piece)} »`, 180),
-        url,
-        tag: `${tag}-reaction`,
+        motif: "match-reaction",
+        ref,
+        notif: {
+          titre: couper(nomDuMatch, 60),
+          texte: couper(`${prenom(moi.id)} a réagi ${emoji} à « ${resume(msg.texte, msg.piece)} »`, 180),
+          url,
+          tag: `${tag}-reaction`,
+        },
       });
   } else {
     if (msg.auteur !== moi.id || maintenant - new Date(msg.created_at).getTime() > FRAIS)
@@ -156,10 +162,14 @@ export async function POST(req: NextRequest) {
         for (const uid of jouent) {
           if (!joignable(uid)) continue;
           envois.set(uid, {
-            titre: couper(`${auteur} a rejoint ${uid === match.organisateur ? "ton" : "le"} match`, 60),
-            texte: couper(rdv, 180),
-            url,
-            tag: `${tag}-arrivee`,
+            motif: "match-arrivee",
+            ref,
+            notif: {
+              titre: couper(`${auteur} a rejoint ${uid === match.organisateur ? "ton" : "le"} match`, 60),
+              texte: couper(rdv, 180),
+              url,
+              tag: `${tag}-arrivee`,
+            },
           });
         }
       }
@@ -173,10 +183,9 @@ export async function POST(req: NextRequest) {
         const cible = (original as { auteur: string } | null)?.auteur;
         if (cible && membres.has(cible) && joignable(cible))
           envois.set(cible, {
-            titre: couper(`${auteur} t'a répondu · ${nomDuMatch}`, 60),
-            texte: phrase,
-            url,
-            tag: `${tag}-reponse-${msg.id}`,
+            motif: "match-reponse",
+            ref,
+            notif: { titre: couper(`${auteur} t'a répondu · ${nomDuMatch}`, 60), texte: phrase, url, tag: `${tag}-reponse-${msg.id}` },
           });
       }
 
@@ -185,10 +194,9 @@ export async function POST(req: NextRequest) {
       for (const p of tous) {
         if (envois.has(p.id) || !cites.has(p.username.replace(/^@/, "").toLowerCase()) || !joignable(p.id)) continue;
         envois.set(p.id, {
-          titre: couper(`${auteur} t'a cité · ${nomDuMatch}`, 60),
-          texte: phrase,
-          url,
-          tag: `${tag}-cite-${msg.id}`,
+          motif: "match-cite",
+          ref,
+          notif: { titre: couper(`${auteur} t'a cité · ${nomDuMatch}`, 60), texte: phrase, url, tag: `${tag}-cite-${msg.id}` },
         });
       }
 
@@ -199,7 +207,11 @@ export async function POST(req: NextRequest) {
         return !dernier || maintenant - new Date(dernier).getTime() >= RAFALE;
       });
       for (const uid of courants)
-        envois.set(uid, { titre: couper(`${auteur} · ${nomDuMatch}`, 60), texte: phrase, url, tag: `${tag}-discussion` });
+        envois.set(uid, {
+          motif: "match-message",
+          ref,
+          notif: { titre: couper(`${auteur} · ${nomDuMatch}`, 60), texte: phrase, url, tag: `${tag}-discussion` },
+        });
     }
   }
 
@@ -208,27 +220,14 @@ export async function POST(req: NextRequest) {
   // Le nombre de non lus de chacun, pour la pastille de l'icône : le
   // Vestiaire et les discussions de ses matchs (lib/sfl/non-lus.server.ts).
   const comptes = await nonLus(sb, [...envois.keys()], maintenant);
-  for (const [uid, notif] of envois) {
+  for (const [uid, e] of envois) {
     const n = comptes.get(uid) ?? 0;
-    if (n > 0) envois.set(uid, { ...notif, pastille: n });
+    if (n > 0) envois.set(uid, { ...e, notif: { ...e.notif, pastille: n } });
   }
 
-  const { data: abonnements } = await sb
-    .from("push_abonnements")
-    .select("endpoint, p256dh, auth, user_id")
-    .in("user_id", [...envois.keys()]);
-  const resultats = await Promise.all(
-    ((abonnements ?? []) as (Abonnement & { user_id: string })[]).map(async (ab) => ({
-      ab,
-      r: await envoyer(ab, envois.get(ab.user_id), cle),
-    }))
-  );
-
-  const morts = resultats.filter((x) => x.r === "mort").map((x) => x.ab.endpoint);
-  if (morts.length > 0) await sb.from("push_abonnements").delete().in("endpoint", morts);
+  const { recus, morts } = await prevenir(sb, cle, envois);
 
   // L'heure du dernier message notifié, pour ceux qui l'ont vraiment reçu.
-  const recus = new Set(resultats.filter((x) => x.r === "envoye").map((x) => x.ab.user_id));
   courants = courants.filter((uid) => recus.has(uid));
   if (courants.length > 0) {
     const quand = new Date(maintenant).toISOString();
@@ -246,5 +245,5 @@ export async function POST(req: NextRequest) {
       );
   }
 
-  return NextResponse.json({ envoyes: recus.size, morts: morts.length });
+  return NextResponse.json({ envoyes: recus.size, morts });
 }

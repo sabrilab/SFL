@@ -138,7 +138,7 @@ export function Messagerie() {
     return (
       <div className="glass rounded-3xl p-4">
         <h2 className="text-[16px] font-bold tracking-tight">Discussions</h2>
-        <p className="mt-2 flex items-start gap-1.5 text-[13px] leading-snug text-amber-400">
+        <p className="mt-2 flex items-start gap-1.5 text-[13px] leading-snug text-amber-700 dark:text-amber-400">
           <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
           {empeche}
         </p>
@@ -152,7 +152,7 @@ export function Messagerie() {
     const salonOuvert = filOuvert.cle === SALON;
     return (
       <div className="glass flex flex-col overflow-hidden rounded-3xl">
-        <div className="flex items-center gap-2.5 border-b border-white/8 px-3.5 py-2.5">
+        <div className="flex items-center gap-2.5 border-b border-contraste/8 px-3.5 py-2.5">
           <button
             onClick={() => setOuvert(null)}
             aria-label="Retour aux discussions"
@@ -163,7 +163,7 @@ export function Messagerie() {
           <span
             className={cn(
               "flex size-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
-              salonOuvert ? "bg-primary/20 text-primary" : "bg-white/8"
+              salonOuvert ? "bg-primary/20 text-primary" : "bg-contraste/8"
             )}
           >
             {salonOuvert ? <Hash className="size-4" /> : initiales(filOuvert.titre)}
@@ -200,7 +200,7 @@ export function Messagerie() {
                 <span
                   className={cn(
                     "max-w-[80%] rounded-2xl px-3.5 py-2 text-[14px] leading-snug break-words",
-                    m.mien ? "bg-primary text-primary-foreground" : "bg-white/8"
+                    m.mien ? "bg-primary text-primary-foreground" : "bg-contraste/8"
                   )}
                 >
                   {m.texte}
@@ -213,7 +213,7 @@ export function Messagerie() {
         </div>
 
         {erreur && (
-          <p className="flex items-start gap-1.5 border-t border-white/8 px-3.5 py-2 text-[12.5px] leading-snug text-red-300">
+          <p className="flex items-start gap-1.5 border-t border-contraste/8 px-3.5 py-2 text-[12.5px] leading-snug text-red-600 dark:text-red-300">
             <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
             {erreur}
           </p>
@@ -224,7 +224,7 @@ export function Messagerie() {
             e.preventDefault();
             void soumettre();
           }}
-          className="flex items-center gap-2 border-t border-white/8 px-3 py-2.5"
+          className="flex items-center gap-2 border-t border-contraste/8 px-3 py-2.5"
         >
           <input
             value={texte}
@@ -286,9 +286,9 @@ export function Messagerie() {
                 setRecherche("");
                 setOuvert(p.id);
               }}
-              className="flex items-center gap-2.5 border-b border-white/6 py-2.5 text-left last:border-0"
+              className="flex items-center gap-2.5 border-b border-contraste/6 py-2.5 text-left last:border-0"
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/8 text-[10px] font-bold">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-contraste/8 text-[10px] font-bold">
                 {initiales(p.name)}
               </span>
               <span className="min-w-0 flex-1 truncate text-[14px] font-semibold"><Nom n={p.name} /></span>
@@ -320,7 +320,7 @@ export function Messagerie() {
 
       {erreur && (
         <div className="rounded-2xl border border-amber-500/25 bg-amber-500/8 px-3.5 py-3">
-          <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-amber-300">
+          <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-amber-700 dark:text-amber-300">
             <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
             {erreur}
           </p>
@@ -349,7 +349,7 @@ export function Messagerie() {
             <span
               className={cn(
                 "flex size-10 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
-                estSalon ? "bg-primary/20 text-primary" : "bg-white/8"
+                estSalon ? "bg-primary/20 text-primary" : "bg-contraste/8"
               )}
             >
               {estSalon ? <Hash className="size-4" /> : initiales(f.titre)}

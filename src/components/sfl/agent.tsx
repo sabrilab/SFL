@@ -17,24 +17,28 @@
 //
 // Comme le Vestiaire : un écran de discussion à la hauteur de ce qui est
 // visible (le clavier d'iPhone recouvre la page), la barre d'écriture en bas,
-// les onglets effacés pendant qu'on écrit.
+// les onglets et les départs effacés pendant qu'on écrit
+// (hooks/use-ecran-clavier.ts), le fil tenu au plus récent même quand une
+// image ou un schéma finit de se dessiner (hooks/use-fil-au-bas.ts).
 //
 // Tant que la clé du modèle n'est pas posée dans Vercel (/api/agent répond
 // { pret: false }), la fiche reste et la barre d'écriture cède la place à une
 // ligne : « Bola Agent arrive bientôt. »
 //
-// Données : la table agent_messages (la conversation, privée). En
-// développement seulement, ?demo=agent montre une conversation d'essai, sans
-// base ni modèle, pour juger le rendu.
+// Données : la table agent_messages (la conversation, privée). Hors
+// production (développement et aperçus Vercel), ?demo=agent montre une
+// conversation d'essai, sans base ni modèle, pour juger le rendu.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ArrowUp } from "lucide-react";
 import { toast } from "sonner";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { TitreDiscussion } from "@/components/sfl/titre-discussion";
-import { useVueVisible } from "@/hooks/use-vue-visible";
+import { useEcranClavier } from "@/hooks/use-ecran-clavier";
+import { useFilAuBas } from "@/hooks/use-fil-au-bas";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { useSession } from "@/hooks/use-session";
 import {
@@ -59,14 +63,16 @@ import { SchemaVue } from "./schemas-coach";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
-const DEMO = process.env.NODE_ENV !== "production";
+const DEMO = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
 /** L'heure d'un envoi (hors rendu). */
 const horloge = () => Date.now();
+/** Un écran tactile : Entrée y va à la ligne au lieu d'envoyer. */
+const tactile = () => window.matchMedia("(pointer: coarse)").matches;
 
 /* --------------------------------- La fiche ------------------------------- */
 
 /** La carte du joueur et ses six stats, de la plus haute à la plus basse. */
-function Fiche({ dossier }: { dossier: DossierJoueur }) {
+const Fiche = memo(function Fiche({ dossier }: { dossier: DossierJoueur }) {
   const n = dossier.stats.length;
   return (
     <div className="mb-5 flex items-center gap-4 pt-1">
@@ -75,7 +81,7 @@ function Fiche({ dossier }: { dossier: DossierJoueur }) {
         {dossier.stats.map((s, i) => (
           <li key={s.id} className="flex items-center gap-2.5">
             <span className="w-[62px] shrink-0 text-[12.5px] font-semibold text-foreground/60">{s.nom}</span>
-            <span className="relative h-[5px] min-w-0 flex-1 overflow-hidden rounded-full bg-white/[0.08]">
+            <span className="relative h-[5px] min-w-0 flex-1 overflow-hidden rounded-full bg-contraste/[0.08]">
               <span
                 className="absolute inset-y-0 left-0 rounded-full bg-foreground"
                 // La plus basse en dernier, et plus pâle à mesure qu'on descend.
@@ -88,7 +94,7 @@ function Fiche({ dossier }: { dossier: DossierJoueur }) {
       </ol>
     </div>
   );
-}
+});
 
 /* --------------------------------- Les cartes ----------------------------- */
 
@@ -104,16 +110,16 @@ function CarteVue({ carte, dossier }: { carte: CarteCoach; dossier: DossierJoueu
           {carte.sousTitre && <span className="mt-1 block text-[13px] text-foreground/55">{carte.sousTitre}</span>}
         </div>
         {cible && (
-          <span className="flex shrink-0 items-baseline gap-1 rounded-full border border-white/15 px-2.5 py-1">
+          <span className="flex shrink-0 items-baseline gap-1 rounded-full border border-contraste/15 px-2.5 py-1">
             <span className="text-[11.5px] font-semibold text-foreground/60">{NOMS_STATS[cible.id]}</span>
             <span className="text-[13px] font-bold tabular-nums">{cible.valeur}</span>
           </span>
         )}
       </div>
       {carte.lignes.length > 0 && (
-        <ol className="border-t border-white/[0.07]">
+        <ol className="border-t border-contraste/[0.07]">
           {carte.lignes.map((l, i) => (
-            <li key={i} className="flex items-start gap-3 border-b border-white/[0.07] px-4 py-2.5 last:border-b-0">
+            <li key={i} className="flex items-start gap-3 border-b border-contraste/[0.07] px-4 py-2.5 last:border-b-0">
               {numerotee && <span className="w-4 shrink-0 pt-px text-[13px] font-bold text-foreground/35 tabular-nums">{i + 1}</span>}
               <span className="min-w-0 flex-1">
                 <span className="block text-[14.5px] leading-snug font-semibold">{l.label}</span>
@@ -164,33 +170,40 @@ function ImageVue({ image }: { image: ImageCoach }) {
         type="button"
         onClick={() => src && setGrand(true)}
         aria-label={image.legende || "Agrandir l'image"}
-        className="block aspect-square w-full overflow-hidden rounded-[22px] bg-white/[0.06]"
+        className="block aspect-square w-full overflow-hidden rounded-[22px] bg-contraste/[0.06]"
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- lien signé ou data URL */}
         {src && <img src={src} alt={image.legende} className="size-full object-cover" />}
       </button>
       {image.legende && <figcaption className="mt-1.5 px-1 text-[12.5px] leading-snug text-foreground/50">{image.legende}</figcaption>}
-      {grand && src && (
-        <button
-          type="button"
-          onClick={() => setGrand(false)}
-          aria-label="Fermer"
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element -- lien signé ou data URL */}
-          <img src={src} alt={image.legende} className="max-h-full max-w-full rounded-[22px]" />
-        </button>
-      )}
+      {/* Posée sur la page même : dans l'écran de discussion (décalé quand le
+          clavier est là), elle ne couvrait pas tout l'écran et les onglets
+          passaient dessus. */}
+      {grand &&
+        src &&
+        createPortal(
+          <button
+            type="button"
+            onClick={() => setGrand(false)}
+            aria-label="Fermer"
+            className="dark fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- lien signé ou data URL */}
+            <img src={src} alt={image.legende} className="max-h-full max-w-full rounded-[22px]" />
+          </button>,
+          document.body
+        )}
     </figure>
   );
 }
 
 /* --------------------------------- Le fil --------------------------------- */
 
-function Message({ m, dossier }: { m: MessageAgent; dossier: DossierJoueur }) {
+/** Un message : redessiné seulement s'il change (pas à chaque lettre tapée). */
+const Message = memo(function Message({ m, dossier }: { m: MessageAgent; dossier: DossierJoueur }) {
   const mien = m.role === "joueur";
   return (
-    <div className={cn("mb-3 flex flex-col gap-2", mien ? "items-end" : "items-start")}>
+    <div id={`a-${m.id}`} data-ancre="" className={cn("mb-3 flex flex-col gap-2", mien ? "items-end" : "items-start")}>
       {m.texte && (
         <p
           className={cn(
@@ -208,7 +221,7 @@ function Message({ m, dossier }: { m: MessageAgent; dossier: DossierJoueur }) {
       ))}
     </div>
   );
-}
+});
 
 function Reflechit() {
   return (
@@ -238,12 +251,9 @@ export function Agent() {
   const [charge, setCharge] = useState(false);
   const [texte, setTexte] = useState("");
   const [envoi, setEnvoi] = useState(false);
-  const fil = useRef<HTMLDivElement>(null);
+  const ecran = useEcranClavier();
   const champ = useRef<HTMLTextAreaElement>(null);
-  const enBas = useRef(true);
-  const vue = useVueVisible();
-  const [ecrit, setEcrit] = useState(false);
-  const clavier = ecrit && vue.tactile;
+  const { fil, contenu, onScroll, tenir, allerEnBas } = useFilAuBas();
   const connecte = demo || !!session?.server;
 
   // La clé est-elle posée ?
@@ -311,22 +321,12 @@ export function Agent() {
     return messages.some((x) => x.at >= depuis) ? null : questionDebrief(m);
   }, [charge, dossier, messages]);
 
-  // Rester au plus récent.
+  // Le fil en place à chaque changement : au plus récent, ou sur le message
+  // qu'on lit (le clavier, les images et les schémas qui se dessinent :
+  // useFilAuBas les suit seul).
   useLayoutEffect(() => {
-    const f = fil.current;
-    if (!charge || !f) return;
-    if (enBas.current) f.scrollTop = f.scrollHeight;
-  }, [charge, messages.length, envoi, vue.hauteur]);
-
-  // Les onglets s'effacent pendant qu'on écrit (bottom-nav.tsx).
-  useEffect(() => {
-    const html = document.documentElement;
-    if (clavier) html.dataset.clavier = "";
-    else delete html.dataset.clavier;
-    return () => {
-      delete html.dataset.clavier;
-    };
-  }, [clavier]);
+    if (charge) tenir();
+  }, [charge, messages, envoi, ouverture, tenir]);
 
   async function demander(question: string, raccourci?: Raccourci) {
     const q = question.trim();
@@ -341,7 +341,7 @@ export function Agent() {
     setMessages((ms) => [...ms, ...ajout]);
     setTexte("");
     setEnvoi(true);
-    enBas.current = true;
+    allerEnBas();
     try {
       let rep: { texte: string; cartes: CarteCoach[]; image: ImageCoach | null; schema: SchemaCoach | null };
       if (demo) {
@@ -394,43 +394,42 @@ export function Agent() {
   const peutEcrire = connecte && pret === true;
 
   return (
+    // Tout l'écran ; clavier ouvert, la partie visible (globals.css,
+    // .ecran-discussion). Rien d'autre que le fil n'y fait glisser la page
+    // (pwa/viewport-lock.tsx).
     <section
-      className="fixed inset-x-0 top-0 z-[35] flex flex-col bg-background"
-      style={{
-        height: vue.hauteur ? `${vue.hauteur}px` : "100dvh",
-        transform: vue.haut ? `translateY(${vue.haut}px)` : undefined,
-        paddingTop: "env(safe-area-inset-top)",
-      }}
+      ref={ecran}
+      data-ecran-fixe=""
+      data-onglets=""
+      className="ecran-discussion fixed inset-x-0 top-0 z-[35] flex flex-col bg-background"
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       <header className="relative mx-auto flex w-full max-w-[640px] shrink-0 items-center justify-between gap-3 px-5 pt-3 pb-2">
         <TitreDiscussion actif="/agent" />
         <BoutonRecherche />
       </header>
 
-      <div
-        ref={fil}
-        onScroll={(e) => {
-          const f = e.currentTarget;
-          enBas.current = f.scrollHeight - f.scrollTop - f.clientHeight < 80;
-        }}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
-      >
-        <div className="mx-auto flex min-h-full w-full max-w-[640px] flex-col px-5 pb-3">
-          <Fiche dossier={dossier} />
-          <div className="mt-auto">
-            {messages.map((m) => (
-              <Message key={m.id} m={m} dossier={dossier} />
-            ))}
-            {ouverture && !envoi && <Message m={{ id: "ouverture", role: "coach", texte: ouverture, cartes: [], at: 0 }} dossier={dossier} />}
-            {envoi && <Reflechit />}
-          </div>
+      <div ref={fil} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div ref={contenu} className="mx-auto flex min-h-full w-full max-w-[640px] flex-col px-5 pb-3">
+          {/* La fiche et la conversation arrivent ensemble, déjà au plus
+              récent : posée seule, la fiche était chassée vers le haut. */}
+          {charge && (
+            <>
+              <Fiche dossier={dossier} />
+              <div className="mt-auto">
+                {messages.map((m) => (
+                  <Message key={m.id} m={m} dossier={dossier} />
+                ))}
+                {ouverture && !envoi && <Message m={{ id: "ouverture", role: "coach", texte: ouverture, cartes: [], at: 0 }} dossier={dossier} />}
+                {envoi && <Reflechit />}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      <div
-        className="mx-auto w-full max-w-[640px] shrink-0 px-3 pt-2"
-        style={{ paddingBottom: clavier ? "8px" : "calc(max(calc(env(safe-area-inset-bottom) - 4px), 14px) + 62px + 10px)" }}
-      >
+      {/* La barre d'écriture : au-dessus des onglets, ou du clavier. */}
+      <div className="mx-auto w-full max-w-[640px] shrink-0 px-3 pt-2" style={{ paddingBottom: "var(--pied-ecriture)" }}>
         {!peutEcrire ? (
           pret !== null && (
             <p className="glass rounded-full px-4 py-3 text-center text-[13.5px] font-semibold text-foreground/55">
@@ -439,8 +438,9 @@ export function Agent() {
           )
         ) : (
           <>
-            {!texte.trim() && !envoi && !clavier && (
-              <div className="-mx-3 mb-2 flex gap-1.5 overflow-x-auto px-3 [scrollbar-width:none]">
+            {/* Les départs : effacés pendant qu'on écrit (globals.css, .hors-clavier). */}
+            {!texte.trim() && !envoi && (
+              <div className="hors-clavier -mx-3 mb-2 flex gap-1.5 overflow-x-auto px-3 [scrollbar-width:none]">
                 {departs.map((d) => (
                   <button
                     key={d.label}
@@ -464,13 +464,9 @@ export function Agent() {
                 ref={champ}
                 value={texte}
                 onChange={(e) => setTexte(e.target.value)}
-                onFocus={() => setEcrit(true)}
-                onBlur={() => {
-                  setEcrit(false);
-                  if (vue.tactile) window.scrollTo(0, 0);
-                }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !vue.tactile) {
+                  // Entrée envoie sur ordinateur ; au téléphone, elle va à la ligne.
+                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !tactile()) {
                     e.preventDefault();
                     void demander(texte);
                   }
@@ -499,7 +495,7 @@ export function Agent() {
 
 /* ---------------------------------- Démo -------------------------------- */
 
-// Développement seulement (?demo=agent) : une conversation d'essai sur le vrai
+// Hors production (?demo=agent) : une conversation d'essai sur le vrai
 // dossier du joueur, pour juger la mise en page des cartes sans modèle.
 function conversationDemo(d: DossierJoueur): MessageAgent[] {
   const t0 = Date.now() - 26 * 3600_000;

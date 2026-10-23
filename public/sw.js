@@ -11,7 +11,7 @@
 // renvoyait 404, ce 404 était mis en cache — et l'appareil restait bloqué sur
 // « Quelque chose a cassé » à chaque visite, indéfiniment.
 
-const CACHE_NAME = "sfl-cache-v6";
+const CACHE_NAME = "sfl-cache-v7";
 const OFFLINE_URL = "/offline";
 
 /** Une réponse digne d'être gardée : la nôtre, complète, et sans erreur. */
@@ -126,8 +126,23 @@ self.addEventListener("fetch", (event) => {
 
 // Les notifications (web push, voir lib/server/web-push.ts) : le message
 // arrive chiffré, le navigateur le déchiffre et nous le passe en JSON
-// { titre, texte, url, tag?, pastille? }. Au toucher, on ramène l'app au premier plan sur la
+// { titre, texte, url, tag?, pastille?, id? }. Au toucher, on ramène l'app au premier plan sur la
 // bonne page, ou on l'ouvre.
+//
+// `id` est la trace de la notification (push_envois) : on dit au serveur
+// qu'elle est arrivée, puis qu'elle a été touchée (/api/push/suivi), pour la
+// page Activité de l'admin. Ce signal part après l'affichage et ne le
+// retarde jamais ; perdu, il ne coûte rien.
+function signaler(id, quoi) {
+  if (typeof id !== "string") return Promise.resolve();
+  return fetch("/api/push/suivi", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, quoi }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
 self.addEventListener("push", (event) => {
   let n = {};
   try {
@@ -140,27 +155,37 @@ self.addEventListener("push", (event) => {
       ? self.navigator.setAppBadge(Math.min(n.pastille, 99)).catch(() => {})
       : Promise.resolve();
   event.waitUntil(
-    pastille.then(() => self.registration.showNotification(n.titre || "Bola", {
-      body: n.texte || "",
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
-      data: { url: typeof n.url === "string" && n.url.startsWith("/") ? n.url : "/" },
-      // Même étiquette (le Vestiaire) : la nouvelle remplace l'ancienne au
-      // lieu de s'empiler, et le téléphone sonne quand même.
-      ...(typeof n.tag === "string" ? { tag: n.tag, renotify: true } : {}),
-    }))
+    pastille
+      .then(() => self.registration.showNotification(n.titre || "Bola", {
+        body: n.texte || "",
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        data: {
+          url: typeof n.url === "string" && n.url.startsWith("/") ? n.url : "/",
+          id: typeof n.id === "string" ? n.id : null,
+        },
+        // Même étiquette (le Vestiaire) : la nouvelle remplace l'ancienne au
+        // lieu de s'empiler, et le téléphone sonne quand même.
+        ...(typeof n.tag === "string" ? { tag: n.tag, renotify: true } : {}),
+      }))
+      .then(() => signaler(n.id, "recue"))
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  // Seulement une page de l'app : un lien qui mènerait ailleurs ouvre l'accueil.
+  const cible = new URL(event.notification.data?.url || "/", self.location.origin);
+  const url = cible.origin === self.location.origin ? cible.href : new URL("/", self.location.origin).href;
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((fenetres) => {
-      for (const f of fenetres) {
-        if ("focus" in f) return f.navigate(url).then((g) => (g || f).focus());
-      }
-      return self.clients.openWindow(url);
-    })
+    Promise.all([
+      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((fenetres) => {
+        for (const f of fenetres) {
+          if ("focus" in f) return f.navigate(url).then((g) => (g || f).focus());
+        }
+        return self.clients.openWindow(url);
+      }),
+      signaler(event.notification.data?.id, "ouverte"),
+    ])
   );
 });

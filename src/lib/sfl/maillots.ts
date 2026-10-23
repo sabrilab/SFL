@@ -6,20 +6,22 @@
 // de match, on voie qui est noir et qui est blanc ») : le terrain des Actus
 // et de la Ligue, le récap de la journée, le fil, le Vestiaire, la recherche.
 //
-// La couleur du jour que choisit l'admin (Orange, Bleu…) reste le nom
-// interne des équipes : la saisie et ses écrans la gardent, les calculs s'en
-// servent comme clé. Elle ne se montre plus ailleurs. Un jour à plusieurs
-// matchs, ils se distinguent par leur numéro, « Match 1 », « Match 2 »
-// (Sabri, 23/10 : plus aucune couleur ; « Terrain » désigne le terrain réel
-// sur place, voir lib/sfl/matchs-du-jour.ts).
+// Le nom interne d'une équipe reste la clé de la saisie et des calculs :
+// « Noirs 2 », « Blancs 2 » depuis le 23/10 (saisie/equipes.ts, qui tient
+// aussi la couleur de chaque camp), une couleur (Orange, Bleu…) dans les
+// journées d'avant, qui ne se montre plus. Un jour à plusieurs matchs, ils se
+// distinguent par leur numéro, « Match 1 », « Match 2 » (Sabri, 23/10 : plus
+// aucune couleur ; « Terrain » désigne le terrain réel sur place, voir
+// lib/sfl/matchs-du-jour.ts). Ici, ce que les écrans des joueurs en disent.
 
 import type { Journee, JourneeMatch, MatchTeam } from "@/lib/sfl/engine";
+import { MAILLOT, type Camp } from "@/lib/sfl/saisie/equipes";
 
-export type Camp = "noirs" | "blancs";
+export type { Camp };
 
 export interface Maillot {
-  /** « Noirs », « Blancs ». */
-  nom: string;
+  /** « Noirs », « Blancs » : le camp. */
+  nom: Camp;
   /** « les Noirs », pour une phrase. */
   les: string;
   /** « des Noirs » (« 40 % des buts des Noirs »). */
@@ -30,14 +32,14 @@ export interface Maillot {
 }
 
 export const MAILLOTS: Record<Camp, Maillot> = {
-  noirs: { nom: "Noirs", les: "les Noirs", des: "des Noirs", fond: "#0A0B0D", encre: "#F4F5F2" },
-  blancs: { nom: "Blancs", les: "les Blancs", des: "des Blancs", fond: "#F4F3EF", encre: "#0A0B0D" },
+  Noirs: { nom: "Noirs", les: "les Noirs", des: "des Noirs", fond: MAILLOT.Noirs, encre: "#F4F5F2" },
+  Blancs: { nom: "Blancs", les: "les Blancs", des: "des Blancs", fond: MAILLOT.Blancs, encre: MAILLOT.Noirs },
 };
 
 /** Le camp d'une équipe dans son match : la première de la paire joue en noir. */
 export function campDansLeMatch(match: JourneeMatch, equipe: MatchTeam | string): Camp {
   const nom = typeof equipe === "string" ? equipe : equipe.name;
-  return match.teamA.name === nom ? "noirs" : "blancs";
+  return match.teamA.name === nom ? "Noirs" : "Blancs";
 }
 
 /** Le maillot d'une équipe dans son match. */
@@ -86,5 +88,5 @@ export function nomDuCamp(journee: Journee | undefined, equipe: string, avecNume
 /** Le vainqueur d'un match, en clair : « les Noirs », « les Blancs », ou null s'il est nul. */
 export function vainqueurDu(match: JourneeMatch): Maillot | null {
   if (match.teamA.score === match.teamB.score) return null;
-  return MAILLOTS[match.teamA.score > match.teamB.score ? "noirs" : "blancs"];
+  return MAILLOTS[match.teamA.score > match.teamB.score ? "Noirs" : "Blancs"];
 }

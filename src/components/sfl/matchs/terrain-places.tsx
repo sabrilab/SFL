@@ -1,30 +1,40 @@
 "use client";
 
-// Le terrain d'un match ouvert par un joueur (Sabri, 22/10) : le même terrain
-// que la feuille de match (feuille-de-match.tsx, en perspective), mais avec
-// les places du match. Chaque joueur sur sa place, en pastille ; chaque place
-// libre est un « + » posé sur le terrain. Toucher un + ajoute un joueur
-// (choisir-joueur.tsx) ; toucher une carte la retire, quand c'est permis.
+// Le terrain d'un match ouvert par un joueur (Sabri, 22/10) : le terrain en
+// perspective de la feuille de match (feuille-de-match.tsx), avec les places
+// du match. Chaque joueur sur sa place, en pastille ; chaque place libre est
+// un « + » posé sur le terrain. Toucher un + ajoute un joueur
+// (choisir-joueur.tsx) ; toucher une carte la retire, quand c'est permis (une
+// petite croix le dit, `retirable`).
 //
 // Les places se partagent en deux moitiés (Clairs devant, Foncés au fond),
-// remplies l'une après l'autre : l'organisateur en premier, devant. Une
-// équipe du mode Team (unCamp) occupe tout le terrain, en blanc, dans une
+// remplies l'une après l'autre : l'organisateur en premier, devant. Où poser
+// chaque carte pour qu'aucune n'en touche une autre, ni le logo du rond
+// central, quel que soit le nombre de places : lib/sfl/places-terrain.ts
+// (Sabri, 23/10 : les + se chevauchaient). Le cadre épouse ce qu'il montre.
+//
+// Une équipe du mode Team (unCamp) occupe tout le terrain, en blanc, dans une
 // formation fixe (FORMATION) : le capitaine dans les buts, l'attaque au fond.
+// Un invité qui n'a pas encore répondu attend sur sa place, en pointillé, sa
+// carte voilée ; le mode Team ajoute à son prénom le temps qui reste avant
+// que l'invitation tombe (« Adil · 71 h »).
 
 import { useMemo } from "react";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { useSeason } from "@/components/sfl/season-provider";
-import { CADRE_H, Pastille, depuisMediane, ecart } from "@/components/sfl/matchs/feuille-de-match";
+import { CADRE_H, Pastille } from "@/components/sfl/matchs/feuille-de-match";
 import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
-import { placesSurDemiTerrain } from "@/lib/sfl/feuille";
-import { projeter, TERRAIN } from "@/lib/sfl/terrain-vu";
+import { placerTerrain, VUE_PLACES } from "@/lib/sfl/places-terrain";
+import { projeter, TERRAIN, vue as vueDe, type Vue } from "@/lib/sfl/terrain-vu";
 import { cn } from "@/lib/utils";
 
 export interface Occupant {
   cle: string;
   nom: string;
-  /** Invité sans réponse : sa carte attend, un peu effacée. */
+  /** Invité sans réponse : sa carte attend, voilée, en pointillé. */
   enAttente?: boolean;
+  /** Le temps qui lui reste pour répondre (« 71 h »), à côté de son prénom. */
+  reste?: string;
 }
 
 const BLANC = { fond: "#f4f3ef", encre: "#0a0b0d" };
@@ -42,12 +52,18 @@ const FORMATION: [number, number][] = [
   [0.5, 0.27],
 ];
 
+/** La vue de la feuille de match, pour le mode Team. */
+const VUE_EQUIPE = vueDe();
+/** L'air autour du terrain et des cartes, dans le cadre. */
+const MARGE = 12;
+
 export function TerrainPlaces({
   places,
   occupants,
   moi,
   onPlus,
   onOccupant,
+  retirable = false,
   hauteur = CADRE_H,
   unCamp = false,
 }: {
@@ -59,119 +75,135 @@ export function TerrainPlaces({
   /** Toucher une place libre ; sans, les + ne se touchent pas. */
   onPlus?: () => void;
   onOccupant?: (o: Occupant) => void;
+  /** Toucher une carte (autre que la mienne) la retire : une petite croix le montre. */
+  retirable?: boolean;
+  /** La hauteur du cadre, pour le mode Team ; deux équipes : le cadre épouse ce qu'il montre. */
   hauteur?: number;
   /** Une seule équipe (mode Team) : toutes les places devant, côté blanc. */
   unCamp?: boolean;
 }) {
   const { allPlayers } = useSeason();
   const parNom = useMemo(() => new Map(allPlayers.map((p) => [p.name, p])), [allPlayers]);
-  const { l, h } = TERRAIN;
 
-  // Les places : la moitié devant (Clairs) pour les places impaires, le fond pour les paires.
-  const devant = Math.ceil(places / 2);
-  const fond = places - devant;
-  const posesDevant = placesSurDemiTerrain(devant).map((p) => ({ ...p, chezMoi: true }));
-  const posesFond = placesSurDemiTerrain(fond).map((p) => ({ ...p, chezMoi: false }));
-  // L'ordre de remplissage alterne devant et fond, en commençant devant par le gardien.
-  const ordre: typeof posesDevant = [];
-  for (let i = 0; i < Math.max(devant, fond); i++) {
-    if (posesDevant[i]) ordre.push(posesDevant[i]);
-    if (posesFond[i]) ordre.push(posesFond[i]);
-  }
+  const { cases, vu, cadre, decalage } = useMemo(() => {
+    if (unCamp) {
+      const { l, h } = TERRAIN;
+      const cases = FORMATION.slice(0, places).map(([fx, fy], i) => {
+        const u = fx * l;
+        const v = fy * h;
+        return { i, chezMoi: true, u, v, etiquette: 112, ...projeter(u, v, 0, VUE_EQUIPE) };
+      });
+      return { cases, vu: VUE_EQUIPE, cadre: hauteur, decalage: 0 };
+    }
+    const d = placerTerrain(places);
+    return { cases: d.places, vu: VUE_PLACES as Vue, cadre: d.bas - d.haut + MARGE * 2, decalage: MARGE - d.haut };
+  }, [places, unCamp, hauteur]);
 
-  const cases = (
-    unCamp
-      ? FORMATION.slice(0, places).map(([fx, fy], i) => {
-          const u = fx * l;
-          const v = fy * h;
-          return { i, occupant: occupants[i] ?? null, chezMoi: true, u, v, ...projeter(u, v) };
-        })
-      : ordre.map((pl, i) => {
-          const x = 50 + (pl.largeur - 50) * ecart(pl.profondeur, pl.chezMoi);
-          const y = (pl.chezMoi ? 1 : -1) * depuisMediane(pl.profondeur);
-          const u = (x / 100) * l;
-          const v = h / 2 + y;
-          return { i, occupant: occupants[i] ?? null, chezMoi: pl.chezMoi, u, v, ...projeter(u, v) };
-        })
-  ).sort((a, b) => a.v - b.v);
-
-  const centre = projeter(l / 2, h / 2);
-  const logo = { l: 46 * centre.k, h: projeter(l / 2, h / 2 + 23).y - projeter(l / 2, h / 2 - 23).y };
+  const { l, h } = vu;
+  const centre = projeter(l / 2, h / 2, 0, vu);
+  const logo = { l: 46 * centre.k, h: projeter(l / 2, h / 2 + 23, 0, vu).y - projeter(l / 2, h / 2 - 23, 0, vu).y };
+  const posees = cases.map((c) => ({ ...c, occupant: occupants[c.i] ?? null })).sort((a, b) => a.v - b.v);
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
-      style={{ height: hauteur }}
+      // --voile : la couleur du sol sous les joueurs, où se fond l'étiquette d'un invité.
+      className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#ffffff_0%,#e6e8e3_70%)] [--voile:#e9ebe6] dark:bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)] dark:[--voile:#1b1d21]"
+      style={{ height: cadre }}
     >
-      <SolTerrain ombres={cases.filter((c) => c.occupant)} />
-      {/* eslint-disable-next-line @next/next/no-img-element -- le même logo que la feuille */}
-      <img
-        src="/bola/symbole-blanc.svg"
-        alt=""
-        aria-hidden
-        className="absolute"
-        style={{
-          left: `calc(50% - ${logo.l / 2}px)`,
-          top: centre.y - logo.l / 2,
-          width: logo.l,
-          height: logo.l,
-          transform: `scaleY(${logo.h / logo.l})`,
-          opacity: 0.85,
-        }}
-      />
-      {cases.map(({ i, occupant, chezMoi, x, y, k }) => {
-        const onglet = chezMoi || unCamp ? BLANC : NOIR;
-        return (
-          <div key={i} className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y }}>
-            <div
-              className="absolute bottom-0 left-0 flex flex-col items-center gap-1"
-              style={{ transformOrigin: "50% 100%", transform: `translateX(-50%) scale(${k})` }}
-            >
-              {occupant ? (
-                <>
-                  <button
-                    type="button"
-                    disabled={!onOccupant}
-                    onClick={() => onOccupant?.(occupant)}
-                    aria-label={onOccupant ? `Retirer ${occupant.nom}` : occupant.nom}
-                    className={cn(
-                      "flex rounded-[15px] transition-transform active:scale-95 disabled:active:scale-100",
-                      occupant.nom === moi && "bg-white p-[3px]",
-                      occupant.enAttente && "opacity-45"
-                    )}
-                  >
-                    <span className={cn("flex rounded-[12px]", occupant.nom === moi && "bg-[#1b1d21] p-[2px]")}>
-                      <Pastille player={parNom.get(occupant.nom)} nom={occupant.nom} cote={42} onglet={onglet} />
+      <div className="absolute inset-x-0 top-0 bottom-0" style={{ transform: `translateY(${decalage}px)` }}>
+        <SolTerrain ombres={posees.filter((c) => c.occupant)} vue={vu} />
+        {/* Le même logo que la feuille : blanc sur la nuit, noir sur le papier. */}
+        {["/bola/symbole-blanc.svg", "/bola/symbole-noir.svg"].map((src, i) => (
+          // eslint-disable-next-line @next/next/no-img-element -- le même logo que la feuille
+          <img
+            key={src}
+            src={src}
+            alt=""
+            aria-hidden
+            className={cn("absolute", i === 0 ? "hidden dark:block" : "dark:hidden")}
+            style={{
+              left: `calc(50% - ${logo.l / 2}px)`,
+              top: centre.y - logo.l / 2,
+              width: logo.l,
+              height: logo.l,
+              transform: `scaleY(${logo.h / logo.l})`,
+              opacity: 0.85,
+            }}
+          />
+        ))}
+        {posees.map(({ i, occupant, chezMoi, x, y, k, etiquette }) => {
+          const onglet = chezMoi || unCamp ? BLANC : NOIR;
+          const cestMoi = !!occupant && occupant.nom === moi;
+          return (
+            <div key={i} className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y }}>
+              <div
+                className="absolute bottom-0 left-0 flex flex-col items-center gap-1"
+                style={{ transformOrigin: "50% 100%", transform: `translateX(-50%) scale(${k})` }}
+              >
+                {occupant ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={!onOccupant}
+                      onClick={() => onOccupant?.(occupant)}
+                      aria-label={
+                        onOccupant && retirable && !cestMoi ? `Retirer ${occupant.nom}` : `${occupant.nom}${occupant.enAttente ? ", invité" : ""}`
+                      }
+                      className={cn(
+                        "relative flex rounded-[15px] transition-transform active:scale-95 disabled:active:scale-100",
+                        cestMoi && "bg-[#0a0b0d] p-[3px] dark:bg-white",
+                        occupant.enAttente && "border-[1.5px] border-dashed border-contraste/70 p-[2px]"
+                      )}
+                    >
+                      <span className={cn("flex rounded-[12px]", cestMoi && "bg-white p-[2px] dark:bg-[#1b1d21]", occupant.enAttente && "opacity-45")}>
+                        <Pastille player={parNom.get(occupant.nom)} nom={occupant.nom} cote={42} onglet={onglet} />
+                      </span>
+                      {retirable && onOccupant && !cestMoi && (
+                        <span
+                          aria-hidden
+                          className="absolute -top-1 -right-1 grid size-4 place-items-center rounded-full bg-[#0a0b0d] text-white shadow-[0_0_0_1.5px_rgba(255,255,255,0.3)]"
+                        >
+                          <X className="size-[10px]" strokeWidth={3.2} />
+                        </span>
+                      )}
+                    </button>
+                    <span
+                      className={cn(
+                        "truncate rounded-full py-[2px] leading-[15px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]",
+                        // Quatre ou cinq par rang : l'étiquette se resserre pour garder le prénom.
+                        etiquette < 64 ? "px-[4px] text-[10px]" : "px-[7px] text-[11px]"
+                      )}
+                      style={{
+                        // Voilée mais opaque : les lignes du terrain ne passent pas au travers.
+                        background: occupant.enAttente ? `color-mix(in srgb, ${onglet.fond} 72%, var(--voile))` : onglet.fond,
+                        color: onglet.encre,
+                        fontWeight: cestMoi ? 800 : 600,
+                        maxWidth: etiquette,
+                      }}
+                    >
+                      {cestMoi ? "Toi" : prenom(occupant.nom)}
+                      {occupant.reste && <span className="font-medium tabular-nums opacity-60"> · {occupant.reste}</span>}
                     </span>
-                  </button>
-                  <span
-                    className={cn(
-                      "whitespace-nowrap rounded-full px-[7px] py-[2px] text-[11px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]",
-                      occupant.enAttente && "opacity-60"
-                    )}
-                    style={{ background: onglet.fond, color: onglet.encre, fontWeight: occupant.nom === moi ? 800 : 600 }}
-                  >
-                    {occupant.nom === moi ? "Toi" : prenom(occupant.nom)}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    disabled={!onPlus}
-                    onClick={onPlus}
-                    aria-label="Ajouter un joueur"
-                    className="grid size-[42px] place-items-center rounded-[10px] border-[1.5px] border-dashed border-white/45 bg-white/[0.06] text-white/80 transition-transform active:scale-95 disabled:opacity-50"
-                  >
-                    <Plus className="size-5" strokeWidth={2.4} />
-                  </button>
-                  <span className="h-[19px]" aria-hidden />
-                </>
-              )}
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      disabled={!onPlus}
+                      onClick={onPlus}
+                      aria-label="Ajouter un joueur"
+                      className="grid size-[42px] place-items-center rounded-[10px] border-[1.5px] border-dashed border-contraste/45 bg-contraste/[0.06] text-contraste/80 transition-transform active:scale-95 disabled:opacity-50"
+                    >
+                      <Plus className="size-5" strokeWidth={2.4} />
+                    </button>
+                    <span className="h-[19px]" aria-hidden />
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

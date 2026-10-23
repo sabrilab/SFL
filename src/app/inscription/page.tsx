@@ -257,6 +257,8 @@ export default function InscriptionPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique de l'URL au montage
     if (j) setEquipe(j);
   }, []);
+  // Le compte ouvert, la page Team ouvre aussitôt la signature de l'équipe.
+  const apres = equipe ? `/bola-team?lien=${encodeURIComponent(equipe)}` : "/";
   const fini = etape === "fini";
   const etapes: readonly Etape[] = sociale ? ETAPES_SOCIALES : equipe ? ETAPES.filter((e) => e !== "angles") : ETAPES;
   /** Les étapes comptées par la barre de progression (ni l'accueil, ni la fin). */
@@ -266,8 +268,8 @@ export default function InscriptionPage() {
 
   // Un membre déjà connecté n'a rien à faire ici.
   useEffect(() => {
-    if (session && !session.enAttente && (!fini || equipe)) router.replace(equipe ? "/bola-team" : "/");
-  }, [session, fini, equipe, router]);
+    if (session && !session.enAttente && (!fini || equipe)) router.replace(apres);
+  }, [session, fini, equipe, apres, router]);
 
   // Brouillon : une page rechargée ne fait pas tout recommencer (le mot de
   // passe et les photos ne sont jamais gardés).
@@ -608,7 +610,7 @@ export default function InscriptionPage() {
             label="Pseudo"
             note={
               pseudoEtat === "pris" ? (
-                <span className="text-[#FF6B5E]">Déjà pris.</span>
+                <span className="text-[#c8352b] dark:text-[#FF6B5E]">Déjà pris.</span>
               ) : pseudoEtat === "libre" ? (
                 <span className="text-foreground/55">
                   <Check className="mr-1 inline size-3.5" />
@@ -803,7 +805,7 @@ export default function InscriptionPage() {
               La ligue valide ton entrée. Ta carte s&apos;ouvre dès que c&apos;est fait.
             </p>
           </div>}
-          {avertissement && <p className="px-[13px] text-[12.5px] text-[#FF6B5E]">{avertissement}</p>}
+          {avertissement && <p className="px-[13px] text-[12.5px] text-[#c8352b] dark:text-[#FF6B5E]">{avertissement}</p>}
           {aRenvoyer && nomFinal && (
             <button
               type="button"
@@ -900,7 +902,7 @@ export default function InscriptionPage() {
                 Les inscriptions ouvrent bientôt. En attendant, l&apos;admin te donne ton accès.
               </p>
             )}
-            {erreur && <p className="mt-[13px] px-[13px] text-[12.5px] font-medium text-[#FF6B5E]">{erreur}</p>}
+            {erreur && <p className="mt-[13px] px-[13px] text-[12.5px] font-medium text-[#c8352b] dark:text-[#FF6B5E]">{erreur}</p>}
             <div className="min-h-[34px] flex-1" />
           </div>
         </div>
@@ -936,7 +938,7 @@ export default function InscriptionPage() {
           type="button"
           disabled={envoi || (accueil && ouvert === false) || (etape === derniere && !!bloquantAccord())}
           onClick={() => {
-            if (fini) router.replace(equipe ? "/bola-team" : "/");
+            if (fini) router.replace(apres);
             else if (etape === derniere) void (sociale ? finirSociale() : creer());
             else aller(1);
           }}

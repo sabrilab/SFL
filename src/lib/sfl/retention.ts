@@ -299,7 +299,9 @@ export function evolution(c: Chiffre): number | null {
 /** Au-delà de cet écart entre deux événements, l'app n'était plus au premier plan. */
 const TROU = 5 * 60 * 1000;
 
-const neutre = (k: string) => k === "heartbeat" || k === "close";
+// Pas des gestes : les signes de vie, et l'invitation aux notifications
+// (montrée, puis sa réponse), que la partie Notifications compte à part.
+const neutre = (k: string) => k === "heartbeat" || k === "close" || k === "notifs";
 
 /* -------------------------------- analyse -------------------------------- */
 

@@ -14,10 +14,10 @@
 import { useState } from "react";
 import { ChevronDown, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SigleLigue } from "@/components/sfl/choix-ligue";
 import type { Journee } from "@/lib/sfl/engine";
 import { Nom } from "@/components/sfl/nom";
-import { PointCamp } from "@/components/sfl/camp";
-import { MAILLOTS } from "@/lib/sfl/maillots";
+import { PointMaillot } from "@/components/sfl/point-maillot";
 
 /**
  * « Noirs 7 — 5 Blancs » (chaque match se joue les Noirs contre les Blancs,
@@ -52,7 +52,7 @@ function Rubrique({
   const buts = butsDe(journee);
 
   return (
-    <div className={cn("glass overflow-hidden rounded-[20px]", ouverte && "bg-white/[0.055]")}>
+    <div className={cn("glass overflow-hidden rounded-[20px]", ouverte && "bg-contraste/[0.055]")}>
       <button
         onClick={onBascule}
         aria-expanded={ouverte}
@@ -80,7 +80,7 @@ function Rubrique({
       </button>
 
       {ouverte && (
-        <div className="flex flex-col gap-2.5 border-t border-white/8 px-3.5 pt-3 pb-3.5">
+        <div className="flex flex-col gap-2.5 border-t border-contraste/8 px-3.5 pt-3 pb-3.5">
           {/* Les matchs du jour, score en gros */}
           {matches.map((m) => {
             const aGagne = m.teamA.score > m.teamB.score;
@@ -97,7 +97,7 @@ function Rubrique({
                       aGagne ? "text-foreground" : "text-foreground/45"
                     )}
                   >
-                    <PointCamp maillot={MAILLOTS.noirs} /> Noirs
+                    <PointMaillot camp="Noirs" /> Noirs
                   </span>
                   <span className="shrink-0 text-[16px] font-extrabold tabular-nums">
                     {m.teamA.score} — {m.teamB.score}
@@ -108,7 +108,7 @@ function Rubrique({
                       bGagne ? "text-foreground" : "text-foreground/45"
                     )}
                   >
-                    Blancs <PointCamp maillot={MAILLOTS.blancs} />
+                    Blancs <PointMaillot camp="Blancs" />
                   </span>
                 </div>
               </div>
@@ -178,7 +178,7 @@ export function JourneesDepliables({
       {/* La pastille SFL — elle nomme ce qu'on regarde. */}
       <div className="flex items-center gap-3 px-1">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/15">
-          <span className="mono-label text-[10px] text-primary">SFL</span>
+          <SigleLigue ligue="sfl" hauteur={10} className="text-primary" />
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-[16px] font-bold tracking-tight">Sunday Five League</h2>

@@ -75,7 +75,7 @@ import type { Piece } from "@/lib/sfl/vestiaire";
 import { cn } from "@/lib/utils";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
-import { LISERE_CAMP, PastilleCamp, PointCamp } from "@/components/sfl/camp";
+import { LISERE_CAMP, PastilleMaillot, PointMaillot } from "@/components/sfl/point-maillot";
 import { MAILLOTS, campDuJour, numeroDu, vainqueurDu } from "@/lib/sfl/maillots";
 
 /* ----------------------------- Réactions ------------------------------ */
@@ -417,13 +417,13 @@ function JourneeRecapComplet({ j }: { j: number }) {
             </p>
             <div className="mt-3 flex items-center justify-between gap-3">
               <div className="flex min-w-0 flex-1 justify-center">
-                <PastilleCamp maillot={MAILLOTS.noirs} className="text-[15px]" />
+                <PastilleMaillot camp="Noirs" className="text-[15px]" />
               </div>
               <div className="shrink-0 text-[44px] leading-none font-bold tracking-tight tabular-nums">
                 {big.teamA.score}–{big.teamB.score}
               </div>
               <div className="flex min-w-0 flex-1 justify-center">
-                <PastilleCamp maillot={MAILLOTS.blancs} className="text-[15px]" />
+                <PastilleMaillot camp="Blancs" className="text-[15px]" />
               </div>
             </div>
             <Link
@@ -464,8 +464,9 @@ function JourneeRecapComplet({ j }: { j: number }) {
           <section>
             <ModuleTitle label="Story 9:16 · générée auto" title="Le visuel de la journée" />
             <div className="flex items-stretch gap-4">
+              {/* L'image de la story : nuit dans les deux modes (classe dark). */}
               <div
-                className="relative w-[46%] shrink-0 overflow-hidden rounded-3xl bg-gradient-to-b from-[#1a2030] to-[#070707] p-4"
+                className="dark relative w-[46%] shrink-0 overflow-hidden rounded-3xl bg-gradient-to-b from-[#1a2030] to-[#070707] p-4 text-foreground"
                 style={{ aspectRatio: "9/16" }}
               >
                 <p className="mono-label text-primary">SFL · J{lastJ.j}</p>
@@ -475,9 +476,9 @@ function JourneeRecapComplet({ j }: { j: number }) {
                   {big.teamB.score}
                 </div>
                 <p className="mt-4 text-[15px] leading-snug font-bold">
-                  {vainqueurDu(big) === MAILLOTS.noirs
+                  {vainqueurDu(big) === MAILLOTS.Noirs
                     ? "Les Noirs font tomber les Blancs"
-                    : vainqueurDu(big) === MAILLOTS.blancs
+                    : vainqueurDu(big) === MAILLOTS.Blancs
                       ? "Les Blancs font tomber les Noirs"
                       : "Noirs et Blancs dos à dos"}
                 </p>
@@ -558,15 +559,15 @@ function JourneeRecapComplet({ j }: { j: number }) {
               <div key={m.id}>
                 <p className="mono-label flex items-center gap-1.5 text-muted-foreground">
                   {numeroDu(lastJ, m) && <span className="mr-1">{numeroDu(lastJ, m)}</span>}
-                  <PointCamp maillot={MAILLOTS.noirs} /> Noirs {m.teamA.score} – {m.teamB.score} Blancs{" "}
-                  <PointCamp maillot={MAILLOTS.blancs} />
+                  <PointMaillot camp="Noirs" /> Noirs {m.teamA.score} – {m.teamB.score} Blancs{" "}
+                  <PointMaillot camp="Blancs" />
                 </p>
                 {/* Les décisifs, camp par camp : les Noirs sur une ligne, les Blancs sur l'autre, chacun sur la couleur de son maillot */}
                 <div className="mt-2 grid grid-cols-[auto_1fr] items-start gap-x-2.5 gap-y-1.5">
                   {(
                     [
-                      [m.teamA, MAILLOTS.noirs],
-                      [m.teamB, MAILLOTS.blancs],
+                      [m.teamA, MAILLOTS.Noirs],
+                      [m.teamB, MAILLOTS.Blancs],
                     ] as const
                   ).map(([equipe, maillot]) => {
                     const decisifs = equipe.players
@@ -576,7 +577,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                     return (
                       <Fragment key={maillot.nom}>
                         <span className="mono-label flex items-center gap-1.5 pt-[7px] text-muted-foreground">
-                          <PointCamp maillot={maillot} />
+                          <PointMaillot camp={maillot.nom} />
                           {maillot.nom}
                         </span>
                         <div className="flex flex-wrap gap-1.5">
@@ -636,13 +637,13 @@ function JourneeRecapComplet({ j }: { j: number }) {
                   )}
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 flex-1">
-                      <PastilleCamp maillot={MAILLOTS.noirs} />
+                      <PastilleMaillot camp="Noirs" />
                     </span>
                     <span className="shrink-0 text-[15px] font-bold tabular-nums">
                       {m.teamA.score}–{m.teamB.score}
                     </span>
                     <span className="flex min-w-0 flex-1 justify-end">
-                      <PastilleCamp maillot={MAILLOTS.blancs} />
+                      <PastilleMaillot camp="Blancs" />
                     </span>
                   </div>
                 </div>

@@ -56,7 +56,13 @@ import { isHidden } from "@/lib/sfl/hidden";
 import { identiteConfirmee, rafraichirIdentites } from "@/lib/sfl/identites";
 import { partenaires } from "@/lib/sfl/partenaires";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
-import { activerNotifications, etatNotifications, rafraichirAbonnement } from "@/lib/sfl/notifications";
+import {
+  activerNotifications,
+  etatNotifications,
+  noterEtatNotifs,
+  noterNotifs,
+  rafraichirAbonnement,
+} from "@/lib/sfl/notifications";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import { enDemo as enDemoSuivis, liensDeLaBase, liensDemo, rafraichirSuivis, suivisLus, suivre } from "@/lib/sfl/suivis";
 import { maVille, maVilleAProposer, type VilleJoueur } from "@/lib/sfl/villes";
@@ -163,7 +169,9 @@ export function InvitationCarte() {
         rafraichirIdentites(),
         rafraichirSuivis(),
       ]);
-      if (annule || identiteConfirmee(nom) === false) return;
+      if (annule) return;
+      noterEtatNotifs(etat, nom);
+      if (identiteConfirmee(nom) === false) return;
       if (ville?.proposer) {
         setProposee(ville.ville);
         setVisible("ville");
@@ -185,6 +193,12 @@ export function InvitationCarte() {
     };
   }, [nom, forcee]);
 
+  // L'invitation aux notifications, montrée : le journal d'usage le note,
+  // puis la réponse (lib/sfl/notifications.ts, page Activité de l'admin).
+  useEffect(() => {
+    if (visible === "notifs" && !forcee) noterNotifs("proposee", "ouverture");
+  }, [visible, forcee]);
+
   if (!nom) return null;
 
   function plusTard() {
@@ -192,6 +206,7 @@ export function InvitationCarte() {
     try {
       localStorage.setItem(PLUS_TARD(visible, nom!), String(Date.now()));
     } catch {}
+    if (visible === "notifs") noterNotifs("plus-tard", "ouverture");
     setVisible(null);
   }
 
@@ -211,7 +226,7 @@ export function InvitationCarte() {
     }
     setBusy(true);
     try {
-      const etat = await activerNotifications();
+      const etat = await activerNotifications("ouverture");
       if (etat === "actives") toast.success("Notifications activées");
       else if (etat === "refusees") toast.error("Refusées : change-le dans les réglages du téléphone.");
     } catch {
@@ -238,7 +253,7 @@ export function InvitationCarte() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[55] flex flex-col items-center justify-center gap-6 bg-black/92 px-6 backdrop-blur-sm"
+            className="dark fixed inset-0 z-[55] flex flex-col items-center justify-center gap-6 bg-black/92 px-6 text-foreground backdrop-blur-sm"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
             {visible === "suivre" ? (

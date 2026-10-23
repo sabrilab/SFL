@@ -28,7 +28,7 @@ import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
 import { CarteDe } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
-import { PointCamp } from "@/components/sfl/camp";
+import { PointMaillot } from "@/components/sfl/point-maillot";
 import { MAILLOTS, campDuJour, type Camp } from "@/lib/sfl/maillots";
 
 /* ------------------------------ Calculs ------------------------------ */
@@ -291,8 +291,8 @@ export function useAnalyse(
     for (const j of journees)
       for (const m of j.matches ?? [])
         for (const [t, camp] of [
-          [m.teamA, MAILLOTS.noirs],
-          [m.teamB, MAILLOTS.blancs],
+          [m.teamA, MAILLOTS.Noirs],
+          [m.teamB, MAILLOTS.Blancs],
         ] as const)
           if (!teamRecord || t.score > teamRecord.score)
             teamRecord = { team: camp.nom, score: t.score, j: j.j };
@@ -337,8 +337,8 @@ export function useAnalyse(
     const teamOf = new Map<string, { des: string; les: string; score: number; conceded: number }>();
     matches.forEach((m, i) => {
       const ou = matches.length > 1 ? ` du terrain ${i + 1}` : "";
-      teamOf.set(m.teamA.name, { des: MAILLOTS.noirs.des + ou, les: MAILLOTS.noirs.les + ou, score: m.teamA.score, conceded: m.teamB.score });
-      teamOf.set(m.teamB.name, { des: MAILLOTS.blancs.des + ou, les: MAILLOTS.blancs.les + ou, score: m.teamB.score, conceded: m.teamA.score });
+      teamOf.set(m.teamA.name, { des: MAILLOTS.Noirs.des + ou, les: MAILLOTS.Noirs.les + ou, score: m.teamA.score, conceded: m.teamB.score });
+      teamOf.set(m.teamB.name, { des: MAILLOTS.Blancs.des + ou, les: MAILLOTS.Blancs.les + ou, score: m.teamB.score, conceded: m.teamA.score });
     });
     const losers = new Set(
       matches.flatMap((m) =>
@@ -497,7 +497,9 @@ export function RaceModule({ race }: { race: Analyse["race"] }) {
   const x = (i: number) => PX + (i * (W - 2 * PX)) / Math.max(1, race.js.length - 1);
   const y = (v: number) => H - PY - (v / max) * (H - 2 * PY);
   const line = (serie: number[]) => serie.map((v, i) => `${x(i)},${y(v)}`).join(" ");
-  const STROKES = ["var(--primary)", "rgba(255,255,255,0.55)", "rgba(255,255,255,0.28)"];
+  // Le leader à l'encre du mode, les deux suivants en plus pâle (--contraste :
+  // blanc pur en sombre, encre en clair).
+  const STROKES = ["var(--primary)", "rgb(var(--contraste-rgb) / 0.55)", "rgb(var(--contraste-rgb) / 0.28)"];
   return (
     <section className="glass rounded-3xl p-5">
       <p className="mono-label text-primary">Depuis la J{race.js[0]}</p>
@@ -510,7 +512,7 @@ export function RaceModule({ race }: { race: Analyse["race"] }) {
             x2={W - PX}
             y1={y(max * f)}
             y2={y(max * f)}
-            stroke="rgba(255,255,255,0.07)"
+            style={{ stroke: "rgb(var(--contraste-rgb) / 0.07)" }}
             strokeWidth="1"
           />
         ))}
@@ -527,7 +529,7 @@ export function RaceModule({ race }: { race: Analyse["race"] }) {
               key={i}
               points={line(serie)}
               fill="none"
-              stroke={STROKES[i]}
+              style={{ stroke: STROKES[i] }}
               strokeWidth={i === 0 ? 2.5 : 1.5}
               strokeLinejoin="round"
               strokeLinecap="round"
@@ -540,7 +542,7 @@ export function RaceModule({ race }: { race: Analyse["race"] }) {
             cx={x(serie.length - 1)}
             cy={y(serie[serie.length - 1])}
             r={i === 0 ? 4 : 3}
-            fill={STROKES[i]}
+            style={{ fill: STROKES[i] }}
           />
         ))}
       </svg>
@@ -596,7 +598,7 @@ export function PulseModule({ pulse }: { pulse: Analyse["pulse"] }) {
                 className="w-full rounded-t-md"
                 style={{
                   height: `${Math.max(6, (p.buts / max) * 68)}px`,
-                  background: active ? "var(--primary)" : "rgba(255,255,255,0.14)",
+                  background: active ? "var(--primary)" : "rgb(var(--contraste-rgb) / 0.14)",
                   boxShadow: active ? "0 0 16px rgba(111,168,255,0.45)" : undefined,
                 }}
               />
@@ -654,7 +656,7 @@ export function RadarModule({
       <h2 className="mt-1 text-xl font-bold tracking-tight"><Nom n={name} />, au scanner</h2>
       <svg viewBox="0 0 260 224" className="mx-auto mt-2 w-full max-w-[300px]" aria-hidden>
         {[0.33, 0.66, 1].map((f) => (
-          <polygon key={f} points={ring(f)} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+          <polygon key={f} points={ring(f)} fill="none" style={{ stroke: "rgb(var(--contraste-rgb) / 0.08)" }} strokeWidth="1" />
         ))}
         {STAT_KEYS.map((_, i) => (
           <line
@@ -663,11 +665,11 @@ export function RadarModule({
             y1={CY}
             x2={CX + Math.cos(angle(i)) * R}
             y2={CY + Math.sin(angle(i)) * R}
-            stroke="rgba(255,255,255,0.08)"
+            style={{ stroke: "rgb(var(--contraste-rgb) / 0.08)" }}
             strokeWidth="1"
           />
         ))}
-        <polygon points={poly(avg)} fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.2" />
+        <polygon points={poly(avg)} style={{ fill: "rgb(var(--contraste-rgb) / 0.07)", stroke: "rgb(var(--contraste-rgb) / 0.3)" }} strokeWidth="1.2" />
         <polygon points={poly(stats)} fill="rgba(111,168,255,0.22)" stroke="var(--primary)" strokeWidth="2" strokeLinejoin="round" />
         {STAT_KEYS.map((k, i) => {
           const lx = CX + Math.cos(angle(i)) * (R + 22);
@@ -677,12 +679,11 @@ export function RadarModule({
               <tspan
                 x={lx}
                 dy="-2"
-                style={{ fontFamily: "var(--font-jbmono)", fontSize: 9, letterSpacing: 2 }}
-                fill="rgba(255,255,255,0.4)"
+                style={{ fontFamily: "var(--font-jbmono)", fontSize: 9, letterSpacing: 2, fill: "rgb(var(--contraste-rgb) / 0.4)" }}
               >
                 {k}
               </tspan>
-              <tspan x={lx} dy="12" style={{ fontSize: 12, fontWeight: 700 }} fill="#fff">
+              <tspan x={lx} dy="12" style={{ fontSize: 12, fontWeight: 700, fill: "var(--contraste)" }}>
                 {stats[k]}
               </tspan>
             </text>
@@ -769,8 +770,8 @@ export function FidelesModule({ fideles }: { fideles: Analyse["fideles"] }) {
                     background: on
                       ? i === lastIdx
                         ? "var(--primary)"
-                        : "rgba(255,255,255,0.8)"
-                      : "rgba(255,255,255,0.1)",
+                        : "rgb(var(--contraste-rgb) / 0.8)"
+                      : "rgb(var(--contraste-rgb) / 0.1)",
                     boxShadow: on && i === lastIdx ? "0 0 8px rgba(111,168,255,0.6)" : undefined,
                   }}
                 />
@@ -809,14 +810,14 @@ export function CouleursModule({ couleurs }: { couleurs: Analyse["couleurs"] }) 
         <h2 className="mt-0.5 text-xl font-bold tracking-tight">
           {egalite
             ? "Noirs et Blancs, coude à coude"
-            : `${leader.camp === "noirs" ? "Les Noirs" : "Les Blancs"}, patrons des couleurs`}
+            : `${leader.camp === "Noirs" ? "Les Noirs" : "Les Blancs"}, patrons des couleurs`}
         </h2>
       </div>
       <div className="glass-soft flex flex-col gap-3 rounded-3xl p-4">
         {couleurs.map((c) => (
           <div key={c.camp} className="flex items-center gap-3">
             <span className="flex w-[72px] items-center gap-1.5 text-[13px] font-semibold">
-              <PointCamp maillot={MAILLOTS[c.camp]} />
+              <PointMaillot camp={c.camp} />
               {MAILLOTS[c.camp].nom}
             </span>
             <div className="flex h-2 flex-1 gap-[3px] overflow-hidden">

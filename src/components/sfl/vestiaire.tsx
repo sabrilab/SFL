@@ -21,9 +21,14 @@
 // au milieu (seul à défiler, le plus récent en bas), la barre d'écriture
 // toujours en bas, même quand le fil est vide. Clavier fermé, elle se pose
 // au-dessus des onglets ; clavier ouvert, les onglets s'effacent et elle
-// monte juste au-dessus du clavier. L'écran suit la partie visible de la
-// page (visualViewport) : sur iPhone, en PWA, le clavier ne la redimensionne
-// pas, il la recouvre.
+// monte juste au-dessus du clavier (hooks/use-ecran-clavier.ts : sur
+// iPhone, le clavier recouvre la page sans la redimensionner). Le fil reste
+// au plus récent, ou sur le message qu'on lit (hooks/use-fil-au-bas.ts).
+//
+// Depuis le 23/10 (Sabri : « des composants qui se figent et qui changent de
+// place ») : mon message s'affiche dès que je l'envoie, en retrait le temps
+// que la base le prenne ; taper une lettre ne redessine plus toutes les
+// bulles ; une seule relecture du fil à la fois, la suivante après elle.
 //
 // Depuis le 22/10, le même écran sert à la discussion de chaque match ouvert
 // par un joueur (matchs/discussion-match.tsx) : Discussion, plus bas, reçoit
@@ -31,10 +36,11 @@
 // (la modération et la barre d'onglets restent au Vestiaire, lieu public ;
 // l'arrivée d'un joueur est une ligne du fil, pas une bulle).
 //
-// Données : lib/sfl/vestiaire.ts. En développement seulement, ?demo=vestiaire
-// remplit le fil de messages d'essai, sans base, pour juger le rendu.
+// Données : lib/sfl/vestiaire.ts. Hors production (développement et aperçus
+// Vercel), ?demo=vestiaire remplit le fil de messages d'essai, sans base,
+// pour juger le rendu.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowUp, Bell, BellOff, Camera, Check, Mic, Pause, Play, Plus, Reply, SmilePlus, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -42,8 +48,7 @@ import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { Nom } from "@/components/sfl/nom";
-import { PointCamp } from "@/components/sfl/camp";
-import { MAILLOTS } from "@/lib/sfl/maillots";
+import { PointMaillot } from "@/components/sfl/point-maillot";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { TitreDiscussion } from "@/components/sfl/titre-discussion";
 import { useSession } from "@/hooks/use-session";
@@ -52,7 +57,8 @@ import { rankByMetric, type Journee } from "@/lib/sfl/engine";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { activerNotifications, etatNotifications, type EtatNotifications } from "@/lib/sfl/notifications";
 import { supabase } from "@/lib/supabase";
-import { useVueVisible } from "@/hooks/use-vue-visible";
+import { useEcranClavier } from "@/hooks/use-ecran-clavier";
+import { useFilAuBas } from "@/hooks/use-fil-au-bas";
 import {
   EMOJIS,
   EVT_PIECE,
@@ -299,7 +305,7 @@ function PhotoVue({ piece }: { piece: PiecePhoto }) {
           if (src) setGrand(true);
         }}
         aria-label="Voir la photo"
-        className="block w-[min(260px,64vw)] overflow-hidden rounded-[20px] bg-white/8"
+        className="block w-[min(260px,64vw)] overflow-hidden rounded-[20px] bg-contraste/8"
         style={{ aspectRatio: ratio }}
       >
         {src && (
@@ -315,7 +321,7 @@ function PhotoVue({ piece }: { piece: PiecePhoto }) {
             role="dialog"
             aria-label="Photo"
             onClick={() => setGrand(false)}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black"
+            className="dark fixed inset-0 z-[60] flex items-center justify-center bg-black"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- lien signé */}
             <img src={src} alt="" className="max-h-full max-w-full object-contain" />
@@ -360,7 +366,7 @@ function VideoVue({ piece }: { piece: PieceVideo }) {
           if (src) setGrand(true);
         }}
         aria-label="Lire la vidéo"
-        className="relative block w-[min(260px,64vw)] overflow-hidden rounded-[20px] bg-white/8"
+        className="relative block w-[min(260px,64vw)] overflow-hidden rounded-[20px] bg-contraste/8"
         style={{ aspectRatio: ratio }}
       >
         {/* #t=0.1 : Safari montre alors la première image au lieu d'un cadre noir. */}
@@ -377,7 +383,7 @@ function VideoVue({ piece }: { piece: PieceVideo }) {
       {grand &&
         src &&
         createPortal(
-          <div role="dialog" aria-label="Vidéo" className="fixed inset-0 z-[60] flex items-center justify-center bg-black">
+          <div role="dialog" aria-label="Vidéo" className="dark fixed inset-0 z-[60] flex items-center justify-center bg-black">
             <video src={src} controls autoPlay playsInline className="max-h-full max-w-full" />
             <button
               type="button"
@@ -489,7 +495,7 @@ function LigueVue({ piece, onOuvrirJournee }: { piece: PieceLigue; onOuvrirJourn
       {chiffres.length > 0 && (
         <span className="grid grid-cols-2 gap-2">
           {chiffres.map((l) => (
-            <span key={l.l} className="flex flex-col rounded-2xl bg-white/[0.06] px-3 py-2.5">
+            <span key={l.l} className="flex flex-col rounded-2xl bg-contraste/[0.06] px-3 py-2.5">
               <span className="text-[22px] leading-none font-bold tabular-nums">{l.v}</span>
               <span className="mono-label mt-1 text-foreground/45">{l.l}</span>
             </span>
@@ -526,7 +532,7 @@ function FeuilleVue({ journee, onOuvrir }: { journee: Journee; onOuvrir?: () => 
           <div key={m.id} className="flex items-center justify-between gap-2 text-[13.5px] font-semibold">
             <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
               {matches.length > 1 && <span className="mono-label mr-0.5 text-foreground/35">T{i + 1}</span>}
-              <PointCamp maillot={MAILLOTS.noirs} /> Noirs
+              <PointMaillot camp="Noirs" /> Noirs
             </span>
             <span className="shrink-0 text-[17px] font-extrabold tabular-nums">
               {m.teamA.score}
@@ -534,7 +540,7 @@ function FeuilleVue({ journee, onOuvrir }: { journee: Journee; onOuvrir?: () => 
               {m.teamB.score}
             </span>
             <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5 truncate">
-              Blancs <PointCamp maillot={MAILLOTS.blancs} />
+              Blancs <PointMaillot camp="Blancs" />
             </span>
           </div>
         ))}
@@ -568,7 +574,7 @@ function ChoixPiece({ onChoix, onPhoto, onFermer }: { onChoix: (p: Piece) => voi
     [journees, saison]
   );
 
-  const ligne = "flex w-full items-center justify-between gap-3 rounded-2xl px-3.5 py-3 text-left text-[14.5px] font-semibold active:bg-white/8";
+  const ligne = "flex w-full items-center justify-between gap-3 rounded-2xl px-3.5 py-3 text-left text-[14.5px] font-semibold active:bg-contraste/8";
 
   return (
     <div className="glass mb-2 overflow-hidden rounded-3xl p-1.5">
@@ -580,7 +586,7 @@ function ChoixPiece({ onChoix, onPhoto, onFermer }: { onChoix: (p: Piece) => voi
           <X className="size-4" />
         </button>
       </div>
-      <div className="max-h-[42dvh] overflow-y-auto">
+      <div className="choix-ecriture max-h-[42dvh] overflow-y-auto">
         {etape === "menu" && (
           <>
             <button type="button" className={ligne} onClick={onPhoto}>
@@ -655,7 +661,7 @@ function ReglageNotifs({ mode, onMode, onFermer }: { mode: ModeNotifs; onMode: (
             onMode(m);
             onFermer();
           }}
-          className="flex w-full items-center justify-between rounded-2xl px-3.5 py-2.5 text-left text-[14px] font-semibold active:bg-white/8"
+          className="flex w-full items-center justify-between rounded-2xl px-3.5 py-2.5 text-left text-[14px] font-semibold active:bg-contraste/8"
         >
           {label}
           {mode === m && <Check className="size-4" />}
@@ -665,7 +671,7 @@ function ReglageNotifs({ mode, onMode, onFermer }: { mode: ModeNotifs; onMode: (
         <button
           type="button"
           onClick={async () => {
-            const e = await activerNotifications().catch(() => "inactives" as const);
+            const e = await activerNotifications("vestiaire").catch(() => "inactives" as const);
             setEtat(e);
             if (e === "actives") toast.success("Notifications activées");
           }}
@@ -680,7 +686,18 @@ function ReglageNotifs({ mode, onMode, onFermer }: { mode: ModeNotifs; onMode: (
 
 /* -------------------------------- Message ------------------------------- */
 
-function Bulle({
+/** Les gestes sur un message. Les mêmes d'un rendu à l'autre : taper une
+ *  lettre dans la barre d'écriture ne redessine pas les bulles du fil. */
+interface ActionsBulle {
+  toucher: (id: number) => void;
+  reagir: (m: MessageV, e: Emoji) => void;
+  retirer: (m: MessageV) => void;
+  couper: (m: MessageV) => void;
+  repondre: (m: MessageV) => void;
+  allerA: (id: number) => void;
+}
+
+const Bulle = memo(function Bulle({
   m,
   cite,
   surligne,
@@ -688,12 +705,8 @@ function Bulle({
   ouvert,
   moi,
   admin,
-  onToucher,
-  onReagir,
-  onRetirer,
-  onCouper,
-  onRepondre,
-  onAllerA,
+  attente = false,
+  actions,
   onOuvrirJournee,
 }: {
   m: MessageV;
@@ -706,16 +719,16 @@ function Bulle({
   ouvert: boolean;
   moi: string | null;
   admin: boolean;
-  onToucher: () => void;
-  onReagir: (e: Emoji) => void;
-  onRetirer: () => void;
-  onCouper: () => void;
-  onRepondre: () => void;
-  onAllerA: (id: number) => void;
+  /** Mon message parti, que la base n'a pas encore pris : en retrait, sans gestes. */
+  attente?: boolean;
+  actions: ActionsBulle;
   onOuvrirJournee?: (j: number) => void;
 }) {
   const pastille = 254 * FORMAT_CARTE.petite;
   const reactions = EMOJIS.filter((e) => (m.reactions[e]?.length ?? 0) > 0);
+  const onToucher = () => !attente && actions.toucher(m.id);
+  const onRepondre = () => !attente && actions.repondre(m);
+  const onReagir = (e: Emoji) => actions.reagir(m, e);
 
   // Glisser la bulle vers la droite : répondre, comme dans WhatsApp.
   const depart = useRef<{ x: number; y: number; horizontal: boolean | null } | null>(null);
@@ -748,20 +761,23 @@ function Bulle({
   return (
     <div
       id={`m-${m.id}`}
+      data-ancre=""
+      aria-busy={attente || undefined}
       {...touche}
       onTouchCancel={touche.onTouchEnd}
       className={cn(
-        "relative flex touch-pan-y items-end gap-2 rounded-3xl transition-colors duration-700",
+        "relative flex touch-pan-y items-end gap-2 rounded-3xl transition-[background-color,opacity] duration-700",
         m.mien ? "flex-row-reverse" : "flex-row",
         suite ? "mt-1" : "mt-[var(--fib-13)]",
-        surligne && "bg-white/[0.07]"
+        surligne && "bg-contraste/[0.07]",
+        attente && "opacity-60"
       )}
       style={{ transform: tire ? `translateX(${tire}px)` : undefined, transition: tire ? "none" : "transform 0.25s ease" }}
     >
       {tire > 0 && (
         <span
           aria-hidden
-          className="absolute top-1/2 -left-10 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/10"
+          className="absolute top-1/2 -left-10 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-contraste/10"
           style={{ opacity: Math.min(1, tire / SEUIL) }}
         >
           <Reply className="size-4" />
@@ -796,9 +812,9 @@ function Bulle({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onAllerA(cite.id);
+                actions.allerA(cite.id);
               }}
-              className="max-w-full rounded-2xl border-l-[3px] border-foreground/45 bg-white/[0.06] py-1.5 pr-3 pl-2.5 text-left"
+              className="max-w-full rounded-2xl border-l-[3px] border-foreground/45 bg-contraste/[0.06] py-1.5 pr-3 pl-2.5 text-left"
             >
               <span className="block text-[11.5px] font-bold text-foreground/65">
                 {cite.mien ? "Toi" : cite.auteur ? <Nom n={cite.auteur} /> : "Quelqu'un"}
@@ -870,11 +886,11 @@ function Bulle({
             </div>
             {(m.mien || admin) && (
               <div className="flex gap-1.5">
-                <button type="button" onClick={onRetirer} className="bouton-secondaire bouton--rouge px-3 py-1.5 text-[12.5px] font-semibold">
+                <button type="button" onClick={() => actions.retirer(m)} className="bouton-secondaire bouton--rouge px-3 py-1.5 text-[12.5px] font-semibold">
                   Retirer
                 </button>
                 {admin && !m.mien && (
-                  <button type="button" onClick={onCouper} className="bouton-secondaire bouton--rouge px-3 py-1.5 text-[12.5px] font-semibold">
+                  <button type="button" onClick={() => actions.couper(m)} className="bouton-secondaire bouton--rouge px-3 py-1.5 text-[12.5px] font-semibold">
                     Couper la parole 24 h
                   </button>
                 )}
@@ -884,7 +900,7 @@ function Bulle({
         )}
 
         {/* L'heure, et sous chaque bulle les deux gestes : répondre, réagir. */}
-        <div className={cn("mt-0.5 flex items-center gap-0.5", m.mien ? "flex-row-reverse" : "flex-row")}>
+        <div className={cn("mt-0.5 flex items-center gap-0.5", m.mien ? "flex-row-reverse" : "flex-row", attente && "pointer-events-none")}>
           <span className="px-1 text-[10.5px] font-medium text-foreground/30 tabular-nums">{quand(m.at)}</span>
           <button
             type="button"
@@ -907,14 +923,14 @@ function Bulle({
       </div>
     </div>
   );
-}
+});
 
 /* ------------------------------- Arrivée -------------------------------- */
 
 /** « Kader a rejoint le match » : une ligne au milieu du fil, sa carte en pastille. */
-function LigneArrivee({ m }: { m: MessageV }) {
+const LigneArrivee = memo(function LigneArrivee({ m }: { m: MessageV }) {
   return (
-    <div id={`m-${m.id}`} className="mt-[var(--fib-13)] flex items-center justify-center gap-2 px-6 text-center">
+    <div id={`m-${m.id}`} data-ancre="" className="mt-[var(--fib-13)] flex items-center justify-center gap-2 px-6 text-center">
       <CarteDe name={m.auteur || "?"} size={FORMAT_CARTE.petite * 0.62} inerte />
       <span className="text-[13px] font-semibold text-foreground/55">
         {m.mien ? "Tu as rejoint le match" : m.auteur ? <><Nom n={m.auteur} /> a rejoint le match</> : "Quelqu'un a rejoint le match"}
@@ -922,11 +938,12 @@ function LigneArrivee({ m }: { m: MessageV }) {
       <span className="text-[10.5px] font-medium text-foreground/30 tabular-nums">{quand(m.at)}</span>
     </div>
   );
-}
+});
 
 /* ------------------------------ Vestiaire ------------------------------- */
 
-const DEMO = process.env.NODE_ENV !== "production";
+// Aussi sur les aperçus Vercel : ?demo=vestiaire se juge sur un téléphone sans écrire en base.
+const DEMO = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
 
 export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) => void }) {
   const { players, journees } = useSeason();
@@ -953,6 +970,43 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
 }
 
 /* ------------------------------ Discussion ------------------------------ */
+
+/** L'heure d'un envoi (hors rendu). */
+const horloge = () => Date.now();
+/** Un écran tactile : Entrée y va à la ligne au lieu d'envoyer. */
+const tactile = () => window.matchMedia("(pointer: coarse)").matches;
+
+/** Le même message, tel que la base le rend à nouveau ? */
+function pareil(a: MessageV, b: MessageV): boolean {
+  return (
+    a.texte === b.texte &&
+    a.at === b.at &&
+    a.auteur === b.auteur &&
+    a.auteurId === b.auteurId &&
+    a.mien === b.mien &&
+    a.reponseA === b.reponseA &&
+    JSON.stringify(a.piece) === JSON.stringify(b.piece) &&
+    JSON.stringify(a.reactions) === JSON.stringify(b.reactions)
+  );
+}
+
+/** Le fil relu, où chaque message inchangé reste l'objet déjà affiché : sa bulle ne se redessine pas. */
+function garderLesMemes(avant: MessageV[], apres: MessageV[]): MessageV[] {
+  if (avant.length === 0) return apres;
+  const deja = new Map(avant.map((m) => [m.id, m]));
+  return apres.map((m) => {
+    const a = deja.get(m.id);
+    return a && pareil(a, m) ? a : m;
+  });
+}
+
+/** Mon message parti : à l'écran tout de suite, avant que la base ne le rende. */
+interface Parti {
+  cle: number;
+  m: MessageV;
+  /** La base l'a pris : il porte son vrai numéro, la relecture le remplacera. */
+  pris: boolean;
+}
 
 /**
  * Un écran de discussion : le Vestiaire, ou la discussion d'un match
@@ -1007,6 +1061,9 @@ export function Discussion({
   const [moi, setMoi] = useState<string | null>(null);
   const [profils, setProfils] = useState<ProfilV[]>([]);
   const [messages, setMessages] = useState<MessageV[]>([]);
+  const [partis, setPartis] = useState<Parti[]>([]);
+  /** Mes messages envoyés d'ici : leur bulle garde la clé de l'envoi, rendue par la base (pas de remontage, pas d'éclair sur une photo). */
+  const [cles, setCles] = useState<ReadonlyMap<number, string>>(() => new Map());
   const [prete, setPrete] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [texte, setTexte] = useState("");
@@ -1022,16 +1079,16 @@ export function Discussion({
   const [reglage, setReglage] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const [sourdine, setSourdine] = useState<number | null>(null);
-  const fil = useRef<HTMLDivElement>(null);
+  const ecran = useEcranClavier();
   const champ = useRef<HTMLTextAreaElement>(null);
   const choixPhoto = useRef<HTMLInputElement>(null);
   /** La photo ou la vidéo choisie, en attente d'envoi (la pièce porte son lien local). */
   const photoLocale = useRef<{ url: string; blob: Blob } | null>(null);
-  /** Le fil est-il tenu au plus récent ? (faux dès qu'on remonte lire.) */
-  const enBas = useRef(true);
-  const vue = useVueVisible();
-  const [ecrit, setEcrit] = useState(false);
-  const clavier = ecrit && vue.tactile;
+  /** Mes messages partent un à un, dans l'ordre où je les ai écrits. */
+  const fileEnvoi = useRef<Promise<unknown>>(Promise.resolve());
+  /** Une relecture du fil à la fois ; une autre demandée entre-temps la suit. */
+  const relecture = useRef({ enCours: false, encore: false });
+  const { fil, contenu, onScroll, noter, tenir, allerEnBas, montrer } = useFilAuBas();
 
   // Un fil d'essai (démo, ou secours des aperçus) : tout reste sur l'écran.
   const [secoursActif, setSecoursActif] = useState(false);
@@ -1039,17 +1096,44 @@ export function Discussion({
   const empeche = essai ? null : blocageVestiaire(salon.ou);
   const admin = moderation && !!session?.admin;
 
+  // Le fil relu par la base prend sa place ; mes messages qu'elle rend
+  // quittent l'attente dans le même rendu (ni trou, ni doublon).
+  const poser = useCallback(
+    (ms: MessageV[]) => {
+      noter();
+      setMessages((avant) => garderLesMemes(avant, ms));
+      setPartis((l) => (l.some((x) => x.pris) ? l.filter((x) => !x.pris || !ms.some((m) => m.id === x.m.id)) : l));
+    },
+    [noter]
+  );
+
+  // Une rafale (un message, des réactions, le mien) : une relecture à la
+  // fois, une seule après elle. Deux relectures croisées pouvaient revenir
+  // dans le désordre et faire disparaître puis réapparaître un message.
   const recharger = useCallback(
     async (uid: string, liste: ProfilV[]) => {
-      const r = await salon.charger(uid, liste);
-      if (!r.ok) setErreur(r.raison);
-      else {
-        setErreur(null);
-        setMessages(r.messages);
+      const etat = relecture.current;
+      if (etat.enCours) {
+        etat.encore = true;
+        return;
       }
-      setPrete(true);
+      etat.enCours = true;
+      try {
+        do {
+          etat.encore = false;
+          const r = await salon.charger(uid, liste);
+          if (!r.ok) setErreur(r.raison);
+          else {
+            setErreur(null);
+            poser(r.messages);
+          }
+          setPrete(true);
+        } while (etat.encore);
+      } finally {
+        etat.enCours = false;
+      }
     },
-    [salon]
+    [salon, poser]
   );
 
   // Premier chargement, temps réel, et lecture.
@@ -1100,7 +1184,7 @@ export function Discussion({
         return;
       }
       if (!r.ok) setErreur(r.raison);
-      else setMessages(r.messages);
+      else poser(r.messages);
       setPrete(true);
       stop = salon.ecouter(() => void recharger(uid, liste));
     })();
@@ -1108,7 +1192,7 @@ export function Discussion({
       vivant = false;
       stop();
     };
-  }, [session?.server, recharger, demo, salon, moderation, secours]);
+  }, [session?.server, recharger, poser, demo, salon, moderation, secours]);
 
   // La discussion ouverte devant moi : tout ce qui arrive est lu.
   const dernier = messages[messages.length - 1]?.at ?? 0;
@@ -1137,24 +1221,12 @@ export function Discussion({
     };
   }, [demo, session?.server, salon]);
 
-  // Rester au plus récent : à l'ouverture, quand un message arrive (si on ne
-  // lit pas plus haut), quand c'est le mien, et quand le clavier pousse.
-  const dernierMien = messages[messages.length - 1]?.mien ?? false;
+  // Le fil en place à chaque changement : au plus récent, ou sur le message
+  // qu'on lit (le clavier, la barre d'écriture et les photos qui chargent :
+  // useFilAuBas les suit seul).
   useLayoutEffect(() => {
-    const f = fil.current;
-    if (!prete || !f) return;
-    if (enBas.current || dernierMien) f.scrollTop = f.scrollHeight;
-  }, [prete, messages.length, dernierMien, vue.hauteur, piece, choix, reponse]);
-
-  // Les onglets s'effacent pendant qu'on écrit (bottom-nav.tsx).
-  useEffect(() => {
-    const html = document.documentElement;
-    if (clavier) html.dataset.clavier = "";
-    else delete html.dataset.clavier;
-    return () => {
-      delete html.dataset.clavier;
-    };
-  }, [clavier]);
+    if (prete) tenir();
+  }, [prete, messages, partis, tenir]);
 
   // Une pièce préparée ailleurs (« Au Vestiaire » d'un classement, d'une
   // feuille de match) attend dans la barre d'écriture.
@@ -1184,6 +1256,8 @@ export function Discussion({
     if (envoi || (!texte.trim() && !p)) return;
     // Une photo ou une vidéo choisie part d'abord dans le stockage, puis avec le message.
     const locale = photoLocale.current;
+    /** La pièce telle que la barre la montre (une photo : son lien local), pour l'y remettre si rien ne part. */
+    const choisie = vocal ? null : piece;
     if (!vocal && !essai && (p?.type === "photo" || p?.type === "video") && locale && p.chemin === locale.url) {
       setEnvoi(true);
       const deposee =
@@ -1197,38 +1271,43 @@ export function Discussion({
     }
     const corps = vocal ? "" : texte;
     const rep = reponse;
-    if (essai) {
-      setMessages((ms) => [
-        ...ms,
-        { id: Date.now(), auteurId: moi ?? "moi", auteur: "", texte: corps.trim(), piece: p, at: Date.now(), mien: true, reponseA: rep?.id ?? null, reactions: {} },
-      ]);
-      if (!vocal) {
-        setTexte("");
-        setPiece(null);
-      }
-      setReponse(null);
-      return;
-    }
-    setEnvoi(true);
     if (!vocal) {
       setTexte("");
       setPiece(null);
     }
     setReponse(null);
-    const r = await salon.poster(corps, p, rep?.id ?? null);
-    setEnvoi(false);
+    allerEnBas();
+    const at = horloge();
+    const mien: MessageV = { id: -at, auteurId: moi ?? "moi", auteur: "", texte: corps.trim(), piece: p, at, mien: true, reponseA: rep?.id ?? null, reactions: {} };
+    if (essai) {
+      setMessages((ms) => [...ms, { ...mien, id: at }]);
+      return;
+    }
+    // Mon message est à l'écran tout de suite, en retrait le temps que la
+    // base le prenne : la barre ne se fige plus le temps de l'envoi, et le
+    // fil ne saute plus quand il arrive. Il part après les précédents.
+    setPartis((l) => [...l, { cle: at, m: mien, pris: false }]);
+    const tache = fileEnvoi.current.then(() => salon.poster(corps, p, rep?.id ?? null));
+    fileEnvoi.current = tache.catch(() => undefined);
+    const r = await tache.catch(() => ({ ok: false as const, raison: "Message pas envoyé. Réessaie." }));
     if (!r.ok) {
+      setPartis((l) => l.filter((x) => x.cle !== at));
+      // Ce qui n'est pas parti revient dans la barre, si rien d'autre n'y a été écrit.
       if (!vocal) {
-        setTexte(corps);
-        setPiece(p);
+        setTexte((t) => t || corps);
+        setPiece((x) => x ?? choisie);
       }
-      setReponse(rep);
+      setReponse((x) => x ?? rep);
       toast.error(r.raison);
       return;
     }
     if (navigator.vibrate) navigator.vibrate(8);
-    if (p?.type === "photo" || p?.type === "video") oublierPhoto();
-    if (moi) await recharger(moi, profils);
+    // Partie : la bulle lit la photo en ligne, le lien local ne sert plus (sauf si une autre a été choisie depuis).
+    if (!vocal && locale && photoLocale.current === locale && p !== choisie) oublierPhoto();
+    const id = r.id;
+    if (id != null) setCles((c) => new Map(c).set(id, `p${at}`));
+    setPartis((l) => (id == null ? l.filter((x) => x.cle !== at) : l.map((x) => (x.cle === at ? { ...x, m: { ...x.m, id }, pris: true } : x))));
+    if (moi) void recharger(moi, profils);
   }
 
   /** Une photo ou une vidéo choisie dans la photothèque, ou prise à l'instant. */
@@ -1292,7 +1371,7 @@ export function Discussion({
   function allerA(id: number) {
     const el = document.getElementById(`m-${id}`);
     if (!el) return;
-    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    montrer(el);
     setSurligne(id);
     window.setTimeout(() => setSurligne((x) => (x === id ? null : x)), 1400);
   }
@@ -1345,8 +1424,38 @@ export function Discussion({
     if (!essai && !(await salon.reglerNotifs(m))) toast.error("Réglage pas enregistré.");
   }
 
+  // Les gestes des bulles : les mêmes à chaque rendu (une bulle ne se
+  // redessine que si son message change), qui appellent ceux du dernier.
+  const gestes = useRef<ActionsBulle | null>(null);
+  useLayoutEffect(() => {
+    gestes.current = {
+      toucher: (id) => setOuvert((o) => (o === id ? null : id)),
+      reagir: (m, e) => void basculerReaction(m, e),
+      retirer: (m) => void retirer(m),
+      couper: (m) => void couper(m),
+      repondre: repondreA,
+      allerA,
+    };
+  });
+  const actions = useMemo<ActionsBulle>(
+    () => ({
+      toucher: (id) => gestes.current?.toucher(id),
+      reagir: (m, e) => gestes.current?.reagir(m, e),
+      retirer: (m) => gestes.current?.retirer(m),
+      couper: (m) => gestes.current?.couper(m),
+      repondre: (m) => gestes.current?.repondre(m),
+      allerA: (id) => gestes.current?.allerA(id),
+    }),
+    []
+  );
+
   const parId = new Map(messages.map((m) => [m.id, m]));
   const affiches = filtre ? filtre(messages) : messages;
+  // Au bout du fil, mes messages en route ; une fois rendus par la base, c'est elle qui les montre.
+  const lignes = [
+    ...affiches.map((m) => ({ cle: cles.get(m.id) ?? String(m.id), m, attente: false })),
+    ...partis.filter((x) => !(x.pris && parId.has(x.m.id))).map((x) => ({ cle: `p${x.cle}`, m: x.m, attente: !x.pris })),
+  ];
 
   const enTete = (
     <header className="relative mx-auto w-full max-w-[640px] shrink-0 px-5 pt-3 pb-2">
@@ -1373,27 +1482,22 @@ export function Discussion({
   );
 
   return (
-    // Tout l'écran, à la hauteur de ce qui est visible : clavier ouvert, la
-    // barre d'écriture est juste au-dessus de lui.
+    // Tout l'écran ; clavier ouvert, la partie visible, la barre d'écriture
+    // juste au-dessus du clavier (hooks/use-ecran-clavier.ts, globals.css).
+    // data-ecran-fixe : rien d'autre que le fil n'y fait glisser la page
+    // (pwa/viewport-lock.tsx).
     <section
-      className={cn("fixed inset-x-0 top-0 flex flex-col bg-background", onglets ? "z-[35]" : "z-[60]", className)}
-      style={{
-        height: vue.hauteur ? `${vue.hauteur}px` : "100dvh",
-        transform: vue.haut ? `translateY(${vue.haut}px)` : undefined,
-        paddingTop: "env(safe-area-inset-top)",
-      }}
+      ref={ecran}
+      data-ecran-fixe=""
+      data-onglets={onglets ? "" : undefined}
+      className={cn("ecran-discussion fixed inset-x-0 top-0 flex flex-col bg-background", onglets ? "z-[35]" : "z-[60]", className)}
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       {enTete}
 
-      <div
-        ref={fil}
-        onScroll={(e) => {
-          const f = e.currentTarget;
-          enBas.current = f.scrollHeight - f.scrollTop - f.clientHeight < 80;
-        }}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
-      >
+      <div ref={fil} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div
+          ref={contenu}
           className="mx-auto flex min-h-full w-full max-w-[640px] flex-col justify-end px-5 pb-3"
           onClick={(e) => e.target === e.currentTarget && setOuvert(null)}
         >
@@ -1404,35 +1508,33 @@ export function Discussion({
             </p>
           )}
           {erreur && !empeche && (
-            <p className="mb-auto flex items-start gap-1.5 rounded-2xl border border-white/10 px-3.5 py-3 text-[13px] leading-snug text-foreground/70">
+            <p className="mb-auto flex items-start gap-1.5 rounded-2xl border border-contraste/10 px-3.5 py-3 text-[13px] leading-snug text-foreground/70">
               <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
               {erreur}
             </p>
           )}
-          {!empeche && tete}
-          {!empeche && prete && messages.length === 0 && !erreur && vide && (
+          {/* La tête du fil (les cartes du match) arrive avec les messages :
+              posée seule, elle sautait en haut quand ils arrivaient. */}
+          {!empeche && prete && tete}
+          {!empeche && prete && lignes.length === 0 && !erreur && vide && (
             <p className="my-auto text-center text-[15px] font-semibold text-foreground/35">{vide}</p>
           )}
-          {affiches.map((m, i) => {
-            if (m.piece?.type === "rejoint") return <LigneArrivee key={m.id} m={m} />;
-            const avant = affiches[i - 1];
+          {lignes.map(({ cle, m, attente }, i) => {
+            if (m.piece?.type === "rejoint") return <LigneArrivee key={cle} m={m} />;
+            const avant = lignes[i - 1]?.m;
             const suite = !!avant && avant.piece?.type !== "rejoint" && avant.auteurId === m.auteurId && m.at - avant.at < 5 * 60_000;
             return (
               <Bulle
-                key={m.id}
+                key={cle}
                 m={m}
                 cite={m.reponseA ? parId.get(m.reponseA) : undefined}
                 surligne={surligne === m.id}
-                onRepondre={() => repondreA(m)}
-                onAllerA={allerA}
                 suite={suite}
                 ouvert={ouvert === m.id}
                 moi={moi}
                 admin={admin}
-                onToucher={() => setOuvert((o) => (o === m.id ? null : m.id))}
-                onReagir={(e) => void basculerReaction(m, e)}
-                onRetirer={() => void retirer(m)}
-                onCouper={() => void couper(m)}
+                attente={attente}
+                actions={actions}
                 onOuvrirJournee={onOuvrirJournee}
               />
             );
@@ -1442,16 +1544,7 @@ export function Discussion({
 
       {/* La barre d'écriture : au-dessus des onglets, ou du clavier. */}
       {!empeche && (
-        <div
-          className="mx-auto w-full max-w-[640px] shrink-0 px-3 pt-2"
-          style={{
-            paddingBottom: clavier
-              ? "8px"
-              : onglets
-                ? "calc(max(calc(env(safe-area-inset-bottom) - 4px), 14px) + 62px + 10px)"
-                : "max(calc(env(safe-area-inset-bottom) - 4px), 14px)",
-          }}
-        >
+        <div className="mx-auto w-full max-w-[640px] shrink-0 px-3 pt-2" style={{ paddingBottom: "var(--pied-ecriture)" }}>
           {choix && (
             <ChoixPiece
               onFermer={() => setChoix(false)}
@@ -1529,7 +1622,7 @@ export function Discussion({
           )}
 
           {piece && piece.type !== "photo" && piece.type !== "video" && (
-            <div className="glass mb-2 flex max-h-[38dvh] items-start gap-2 overflow-y-auto rounded-3xl">
+            <div className="attente-ecriture glass mb-2 flex max-h-[38dvh] items-start gap-2 overflow-y-auto rounded-3xl">
               <div className="min-w-0 flex-1">
                 <PieceVue piece={piece} />
               </div>
@@ -1589,15 +1682,9 @@ export function Discussion({
                 ref={champ}
                 value={texte}
                 onChange={(e) => setTexte(e.target.value)}
-                onFocus={() => setEcrit(true)}
-                onBlur={() => {
-                  setEcrit(false);
-                  // iOS laisse parfois la page décalée après le clavier.
-                  if (vue.tactile) window.scrollTo(0, 0);
-                }}
                 onKeyDown={(e) => {
                   // Entrée envoie sur ordinateur ; au téléphone, elle va à la ligne.
-                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !vue.tactile) {
+                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !tactile()) {
                     e.preventDefault();
                     void envoyer();
                   }
@@ -1662,7 +1749,7 @@ export function Discussion({
 
 /* ---------------------------------- Démo -------------------------------- */
 
-// Développement seulement (?demo=vestiaire) : un fil d'essai avec les vrais
+// Hors production (?demo=vestiaire) : un fil d'essai avec les vrais
 // noms de la saison, pour juger le rendu sans écrire en base.
 function messagesDemo(noms: string[], journees: Journee[]): MessageV[] {
   const n = (i: number) => noms[i % Math.max(1, noms.length)] ?? "Ilyes";

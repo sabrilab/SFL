@@ -445,7 +445,7 @@ function Fiche({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions;
   const code = NOM_DE_CODE[l.m.genre];
   const camp = mm.d.camps.get(mm.joueur);
   const type =
-    l.m.creneau === "contrat" && camp?.label.startsWith("Terrain") ? `${TYPE.contrat} · ${camp.label}` : TYPE[l.m.creneau];
+    l.m.creneau === "contrat" && camp?.label.startsWith("Match") ? `${TYPE.contrat} · ${camp.label}` : TYPE[l.m.creneau];
   const acceptee = l.reponse?.reponse === "acceptee";
   const apres = mm.phase !== "ouvert";
   const rival = l.m.creneau === "contrat" && mm.enFace ? l.m.cibles[0] : null;
@@ -453,7 +453,9 @@ function Fiche({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions;
     <article
       aria-label={`Mission ${code}, rang ${rang}`}
       className={cn(
-        "fiche mx-4",
+        // Noire dans les deux modes, comme une carte : la classe dark garde au
+        // mode sombre ce qu'elle contient (boutons, textes).
+        "fiche dark mx-4 md:mx-0",
         `fiche--${rang}`,
         apres && acceptee && l.verdict.etat === "reussie" && "fiche--reussie",
         apres && acceptee && l.verdict.etat === "ratee" && "fiche--ratee",
@@ -490,7 +492,7 @@ function Fiche({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions;
   );
 }
 
-export function MissionsBola() {
+export function MissionsBola({ className }: { className?: string }) {
   const mm = useMissions();
   const identite = useIdentites();
   const [attente, setAttente] = useState(false);
@@ -515,8 +517,8 @@ export function MissionsBola() {
   };
 
   return (
-    <section ref={ref} id="missions" aria-labelledby="titre-missions" className="flex scroll-mt-4 flex-col gap-4">
-      <div className="flex flex-col gap-1.5 px-5">
+    <section ref={ref} id="missions" aria-labelledby="titre-missions" className={cn("flex scroll-mt-4 flex-col gap-4", className)}>
+      <div className="flex flex-col gap-1.5 px-5 md:px-0">
         <div className="flex items-baseline justify-between gap-3">
           <span className="mono-label truncate text-foreground/45">
             J{d.j} · {d.date}
@@ -535,11 +537,11 @@ export function MissionsBola() {
 
       {/* Le bonus des trois ; puis, une fois la feuille remplie, l'XP du dimanche. */}
       {(phase === "ouvert" || d.joue) && (
-        <div className="flex items-baseline justify-between gap-3 px-5">
+        <div className="flex items-baseline justify-between gap-3 px-5 md:px-0">
           <span className="mono-label text-foreground/45">
             {phase === "ouvert" ? "Les trois accomplies" : phase === "en-jeu" ? "À minuit" : "Ton dimanche"}
           </span>
-          <span className={cn("mono-label", phase !== "ouvert" && xp < 0 ? "text-[#ff9b9d]" : "text-foreground/70")}>
+          <span className={cn("mono-label", phase !== "ouvert" && xp < 0 ? "text-[#c8352b] dark:text-[#ff9b9d]" : "text-foreground/70")}>
             {phase === "ouvert" ? `+${XP_PARFAIT} XP de bonus` : `${signe(xp)} XP`}
           </span>
         </div>

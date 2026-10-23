@@ -106,7 +106,8 @@ export async function POST(req: NextRequest) {
   // Le lien d'équipe, vérifié avant de créer quoi que ce soit : valable 72 h,
   // l'équipe pas dissoute, une place libre, et jamais plus de comptes
   // ouverts par ce lien que de places restantes (un lien qui fuit ne fait
-  // pas entrer n'importe qui dans la ligue).
+  // pas entrer n'importe qui dans la ligue). Comme pour une invitation, seuls
+  // les membres prennent une place (equipe_inviter, supabase/schema.sql).
   type Lien = { jeton: string; equipe_id: number; cree_par: string | null; utilisations: number };
   let lien: Lien | null = null;
   if (corps.equipe) {
@@ -120,7 +121,11 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
     if (!data) return perime;
     lien = data as unknown as Lien;
-    const { count } = await sb.from("equipe_membres").select("joueur", { count: "exact", head: true }).eq("equipe_id", lien.equipe_id);
+    const { count } = await sb
+      .from("equipe_membres")
+      .select("joueur", { count: "exact", head: true })
+      .eq("equipe_id", lien.equipe_id)
+      .eq("statut", "membre");
     const places = 7 - (count ?? 0);
     if (places <= 0 || lien.utilisations >= places) return perime;
   }
