@@ -59,7 +59,7 @@ import { useDivision } from "@/hooks/use-division";
 import { nomDivision } from "@/lib/sfl/divisions";
 import { FormulaireIdentite } from "@/components/sfl/identite";
 import { useIdentites } from "@/hooks/use-identites";
-import { useXp } from "@/hooks/use-missions";
+import { useRangXp, useXp } from "@/hooks/use-missions";
 import { cartesDeCarriere, courbeDeCarriere } from "@/lib/sfl/carriere";
 import { ovr, rankPlayers } from "@/lib/sfl/engine";
 import { dimanchesDe, ficheJoueur } from "@/lib/sfl/fiche-joueur";
@@ -137,6 +137,7 @@ export default function Profil() {
   const identite = useIdentites();
   const poste = POSTES.find((p) => p.id === player.poste)?.label ?? player.poste;
   const xp = useXp(player.name);
+  const rangXp = useRangXp(player.name);
 
   return (
     <div className="shell py-4 sm:py-8 lg:pt-[var(--fib-55)]">
@@ -188,6 +189,7 @@ export default function Profil() {
               <span className="font-mono text-[12px] text-foreground/45">
                 {identite.pseudo(player.name)} · {poste.toLowerCase()}
                 {xp && ` · niveau XP ${xp.niveau}`}
+                {rangXp && ` · rang ${rangXp.rang}`}
               </span>
             </button>
             <ReseauJoueur nom={player.name} />
@@ -221,7 +223,7 @@ export default function Profil() {
           <MaSaison saison={`Saison ${saison.numero ?? 0}`} dimanches={dimanches} forts={fiche.forts} rangs={rangs} />
 
           {/* 2 bis. Mon Niveau XP : le niveau à vie, le passe de la saison, mes missions */}
-          <NiveauXp saison={saison.numero ?? 0} />
+          <NiveauXp saison={saison.numero ?? 0} player={player} />
 
           {/* 3. Mon évolution, journée après journée : d'abord mon rang, si
               j'en ai un cette saison */}

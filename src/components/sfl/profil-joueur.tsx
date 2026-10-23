@@ -44,6 +44,7 @@ import { RACINE_PHI } from "@/hooks/use-format-carte";
 import { useDivision } from "@/hooks/use-division";
 import { nomDivision } from "@/lib/sfl/divisions";
 import { useIdentites } from "@/hooks/use-identites";
+import { useRangXp, useXp } from "@/hooks/use-missions";
 import { cartesDeCarriere, courbeDeCarriere } from "@/lib/sfl/carriere";
 import { ovr, rankPlayers, STAT_KEYS, type Player } from "@/lib/sfl/engine";
 import { isHidden } from "@/lib/sfl/hidden";
@@ -133,6 +134,8 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
   const dates = new Map(journees.map((j) => [j.j, j.date]));
   const poste = POSTES.find((p) => p.id === player.poste)?.label ?? player.poste;
   const trophees = ecussons.reduce((n, e) => n + e.podiums.length, 0) + medailles.length;
+  const xp = useXp(player.name);
+  const rangXp = useRangXp(player.name);
 
   return (
     <motion.div
@@ -155,6 +158,8 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
           </h2>
           <p className="font-mono text-[12px] text-foreground/45">
             {identite.pseudo(player.name)} · {poste.toLowerCase()}
+            {xp && ` · niveau XP ${xp.niveau}`}
+            {rangXp && ` · rang ${rangXp.rang}`}
           </p>
           <ReseauJoueur nom={player.name} className="mt-[var(--fib-8)]" />
           <BoutonSuivre nom={player.name} className="mt-[var(--fib-8)]" />

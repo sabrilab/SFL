@@ -1,0 +1,126 @@
+/*
+ * Le filtre Contrats de la Map (map/contrats-map.ts, map/joueurs.ts) : la
+ * carte d'une cible sous un viseur, aux couleurs du rang de son contrat
+ * (--r-lueur, posé par fiche--S, fiche--A ou fiche--B : actus/missions.css),
+ * sa prime à la place de sa note. Le viseur des affiches (missions.css), en
+ * petit : quatre coins qui se referment sur la carte.
+ *   · verrou : le contrat est signé ; pendant le match, le viseur bat ;
+ *   · accompli : un contrat sur lui a réussi, la lueur s'allume ;
+ *   · rate : tous ratés, la carte s'éteint sous un viseur rouge ;
+ *   · eteint : tous annulés, le viseur pâlit.
+ * Rien ne bat avec « Réduire les animations » (règle globale de globals.css).
+ * Pendant le filtre, les stickers des matchs s'effacent (matchsEnRetrait,
+ * map/carte-map.tsx) : les cibles ne se rangent plus sous eux.
+ */
+
+/* MapLibre pose l'opacité de chaque repère en ligne : il faut !important. */
+.carte--matchs-en-retrait .maplibregl-marker.stk-ancre {
+  opacity: 0 !important;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.3s ease-out,
+    visibility 0s linear 0.3s;
+}
+.maplibregl-marker.stk-ancre {
+  transition:
+    opacity 0.3s ease-out,
+    visibility 0s;
+}
+
+.jr__viseur,
+.grp__viseur {
+  position: absolute;
+  pointer-events: none;
+  color: rgb(var(--r-lueur));
+  filter: drop-shadow(0 0 3px rgb(var(--r-lueur) / 0.85)) drop-shadow(0 1px 1px rgb(0 0 0 / 0.35));
+}
+/* Autour de la carte d'une ville ouverte (30 × 48,5 px, en haut de .jr). */
+.jr__viseur {
+  left: -6px;
+  top: -6px;
+  width: 42px;
+  height: 60.5px;
+}
+/* Autour de la carte de devant d'une pile (au centre de .grp__pile). */
+.grp__viseur {
+  left: 50%;
+  top: -6px;
+  width: calc(var(--w) + 12px);
+  height: calc(var(--w) * 1.618 + 12px);
+  margin-left: calc((var(--w) + 12px) / -2);
+}
+.cible__coin {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 0 solid currentColor;
+}
+.cible__coin--hg {
+  top: 0;
+  left: 0;
+  border-top-width: 2px;
+  border-left-width: 2px;
+  border-top-left-radius: 6px;
+}
+.cible__coin--hd {
+  top: 0;
+  right: 0;
+  border-top-width: 2px;
+  border-right-width: 2px;
+  border-top-right-radius: 6px;
+}
+.cible__coin--bg {
+  bottom: 0;
+  left: 0;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+  border-bottom-left-radius: 6px;
+}
+.cible__coin--bd {
+  right: 0;
+  bottom: 0;
+  border-right-width: 2px;
+  border-bottom-width: 2px;
+  border-bottom-right-radius: 6px;
+}
+
+/* Le nom descend sous les coins du bas du viseur. */
+.jr.cible .jr__nom {
+  margin-top: 9px;
+}
+
+/* La prime, à la place de la note, dans le ton du rang. */
+.jr__note.cible__prime {
+  min-width: 22px;
+  background: rgb(var(--r-feu));
+  color: #0a0b0d;
+}
+
+.cible--direct .jr__viseur,
+.grp__viseur.cible--direct {
+  animation: cible-bat 1.6s ease-in-out infinite;
+}
+@keyframes cible-bat {
+  50% {
+    opacity: 0.55;
+    transform: scale(1.1);
+  }
+}
+.cible--accompli .jr__viseur,
+.grp__viseur.cible--accompli {
+  filter: drop-shadow(0 0 6px rgb(var(--r-lueur))) drop-shadow(0 0 2px rgb(var(--r-feu)));
+}
+.cible--rate .jr__viseur,
+.grp__viseur.cible--rate {
+  color: #ff9b9d;
+  filter: drop-shadow(0 0 3px rgb(255 155 157 / 0.6));
+}
+.cible--rate .jr__carte img {
+  filter: grayscale(1) brightness(0.62);
+}
+.cible--eteint .jr__viseur,
+.grp__viseur.cible--eteint {
+  color: rgb(255 255 255 / 0.4);
+  filter: none;
+}

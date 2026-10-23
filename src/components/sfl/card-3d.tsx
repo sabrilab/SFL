@@ -32,6 +32,7 @@ import { toPng } from "html-to-image";
 import { DosCarte } from "@/components/sfl/dos-carte";
 import { MATIERES, type HabillageCarte, type NomMatiere } from "@/components/sfl/finitions-carte";
 import { useBadgeRevision } from "@/hooks/use-badge-carte";
+import { useHabillageRevision } from "@/hooks/use-habillage";
 import { useIdentitesRevision } from "@/hooks/use-identites";
 import { usePhotoRevision } from "@/hooks/use-player-photo";
 import { IMAGE_EVENT } from "@/lib/sfl/badges-3d/rendu";
@@ -327,7 +328,9 @@ export function Card3D(props: {
   const badges = useBadgeRevision();
   // Un nom ou un pseudo corrigé : la carte le porte, la capture repart.
   const identites = useIdentitesRevision();
-  return <Card3DInner key={`${props.cacheKey}~${revision}~${badges}~${identites}`} {...props} />;
+  // Une finition choisie, un palier, un cran ou un rang gagné (use-habillage.ts).
+  const habillages = useHabillageRevision();
+  return <Card3DInner key={`${props.cacheKey}~${revision}~${badges}~${identites}~${habillages}`} {...props} />;
 }
 
 function Card3DInner({

@@ -1,12 +1,17 @@
 "use client";
 
 // Les missions du dimanche côté écrans (lib/sfl/missions.ts) : le dimanche en
-// cours, mes trois missions avec ma réponse et leur verdict, les duels
+// cours, mes trois missions avec ma réponse et leur verdict, les missions
+// acceptées de toute la ligue (les Contrats en jeu des Actus), les duels
 // acceptés des deux côtés, et mon XP. Les réponses se chargent une fois et
 // suivent la base en temps réel, quel que soit le nombre d'écrans qui les
 // lisent.
+//
+// L'XP de toute la ligue se calcule une seule fois pour l'app
+// (XpLigueProvider, xp-ligue.tsx) : mon XP, celui d'un profil et le rang de
+// chacun (B, A, S) le lisent sans recalculer, autant de cartes qu'il y ait.
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useFelicitations } from "@/hooks/use-felicitations";
@@ -16,11 +21,17 @@ import { useVotes } from "@/hooks/use-votes";
 import {
   aJoue,
   bilanDe,
+  classementNiveau,
+  cranDe,
   dimancheEnCours,
+  engagementsDe,
   journalXp,
   juger,
+  palierMaxDe,
+  rangsDesJoueurs,
   reponseDe,
   risqueDe,
+  signesContre,
   verdictFinal,
   XP_DIMANCHE,
   XP_PARFAIT,
@@ -28,7 +39,10 @@ import {
   type Creneau,
   type DimancheMissions,
   type Duel,
+  type Engagement,
+  type LigneXp,
   type Mission,
+  type RangJoueur,
   type Reponse,
   type Verdict,
 } from "@/lib/sfl/missions";
@@ -37,6 +51,7 @@ import {
   chargerReponses,
   MISSIONS_EVENT,
   repondreMission,
+  reponsesDemo,
   reponsesEnMemoire,
 } from "@/lib/sfl/missions-reponses";
 import { appliquerVotes } from "@/lib/sfl/votes";
@@ -108,6 +123,31 @@ function useSaisonJugee(maintenant: Date) {
   return { saison, jugee, votes };
 }
 
+/** Avant le coup d'envoi, jusqu'à minuit, puis fini. */
+function phaseDe(d: DimancheMissions, maintenant: Date): Phase {
+  const t = maintenant.getTime();
+  return t < d.coupEnvoi.getTime() ? "ouvert" : t < d.finDuJour.getTime() ? "en-jeu" : "fini";
+}
+
+/** Celui dont l'écran montre les missions : moi si je suis sur la feuille ; dans un aperçu, sinon, un joueur de la feuille. */
+function vuPar(d: DimancheMissions, me: string): string | null {
+  if (d.missions.has(me)) return me;
+  return APERCU_MISSIONS ? joueurApercu(d) : null;
+}
+
+/**
+ * Les réponses telles que les écrans de la ligue les lisent : celles de la
+ * base et, dans un aperçu, la ligue simulée autour de celui qu'on regarde.
+ * Jamais pour l'XP.
+ */
+function avecDemo(reponses: Reponse[], d: DimancheMissions, sauf: string | null): Reponse[] {
+  const demo = reponsesDemo(d, sauf);
+  if (!demo.length) return reponses;
+  const meme = (a: Reponse, b: Reponse) =>
+    a.saison === b.saison && a.j === b.j && a.mission === b.mission && a.joueur === b.joueur;
+  return [...reponses, ...demo.filter((x) => !reponses.some((r) => meme(r, x)))];
+}
+
 export interface LigneMission {
   m: Mission;
   /** La réponse retenue : donnée avant le coup d'envoi, pour le même rival. */
@@ -126,8 +166,8 @@ export interface MesMissions {
   lignes: LigneMission[];
   /** Avant le coup d'envoi, jusqu'à minuit, puis fini. */
   phase: Phase;
-  /** Le rival a accepté son contrat contre toi : un duel des deux côtés. */
-  enFace: boolean;
+  /** Ceux qui ont signé un contrat contre toi, ton rival d'abord. */
+  contreMoi: string[];
   /** L'XP de ce dimanche, comme dans le journal : le dimanche joué, les primes des missions réussies, les risques des ratées. */
   xp: number;
   repondre: (creneau: Creneau, reponse: Reponse["reponse"]) => Promise<void>;
@@ -158,29 +198,14 @@ export function useMissions(): MesMissions | null {
   return useMemo(() => {
     if (!d) return null;
     const apercu = !d.missions.has(me) && APERCU_MISSIONS;
-    const joueur = apercu ? joueurApercu(d) : d.missions.has(me) ? me : null;
+    const joueur = vuPar(d, me);
     if (!joueur) return null;
-    const t = maintenant.getTime();
-    const phase: Phase = t < d.coupEnvoi.getTime() ? "ouvert" : t < d.finDuJour.getTime() ? "en-jeu" : "fini";
+    const phase = phaseDe(d, maintenant);
     const lignes = (d.missions.get(joueur) ?? []).map((m) => {
       const v = juger(m, joueur, d, jugee, votes);
       return { m, reponse: reponseDe(reponses, d, joueur, m), verdict: phase === "fini" ? verdictFinal(v, m) : v };
     });
-    const contrat = lignes.find((l) => l.m.creneau === "contrat");
-    const rival = contrat?.m.genre === "tiens-le" || contrat?.m.genre === "finis-devant" ? contrat.m.cibles[0] : null;
-    const enFace =
-      !!rival &&
-      contrat?.reponse?.reponse === "acceptee" &&
-      reponses.some(
-        (r) =>
-          r.saison === d.saison &&
-          r.j === d.j &&
-          r.mission === "contrat" &&
-          r.joueur === rival &&
-          r.cible === joueur &&
-          r.reponse === "acceptee" &&
-          new Date(r.le).getTime() <= d.coupEnvoi.getTime()
-      );
+    const contreMoi = signesContre(d, avecDemo(reponses, d, joueur), joueur);
     const acceptees = lignes.filter((l) => l.reponse?.reponse === "acceptee");
     const gagnees = acceptees.filter((l) => l.verdict.etat === "reussie");
     const xp =
@@ -199,13 +224,74 @@ export function useMissions(): MesMissions | null {
         cible: creneau === "contrat" ? (m?.cibles[0] ?? null) : null,
       });
     };
-    return { d, joueur, apercu, lignes, phase, enFace, xp, repondre };
+    return { d, joueur, apercu, lignes, phase, contreMoi, xp, repondre };
+  }, [d, me, maintenant, jugee, votes, reponses]);
+}
+
+/** Un duel où les deux rivaux ont signé l'un contre l'autre. */
+export interface FaceAFace {
+  duel: Duel;
+  noirs: Engagement;
+  blancs: Engagement;
+}
+
+export interface MissionsDeLaLigue {
+  d: DimancheMissions;
+  phase: Phase;
+  /** Celui que l'écran appelle « toi » (null pour qui n'est pas sur la feuille). */
+  moi: string | null;
+  /** Les duels signés des deux côtés, les plus grosses primes d'abord. */
+  faceAFace: FaceAFace[];
+  /** Les autres contrats signés, du rang S au rang B. */
+  contrats: Engagement[];
+  /** Le défi du dimanche et la ligue, signés. */
+  defis: Engagement[];
+  ligue: Engagement[];
+  /** Toutes les missions signées. */
+  total: number;
+}
+
+/** Les missions acceptées de toute la ligue, pour le dimanche en cours : les Contrats en jeu des Actus. */
+export function useMissionsDeLaLigue(): MissionsDeLaLigue | null {
+  const isClient = useIsClient();
+  const { me } = useMyPlayer();
+  const maintenant = useMaintenant();
+  const reponses = useReponses();
+  const { saison, jugee, votes } = useSaisonJugee(maintenant);
+
+  const d = useMemo(() => (isClient ? dimancheEnCours(saison, maintenant) : null), [isClient, saison, maintenant]);
+
+  return useMemo(() => {
+    if (!d) return null;
+    const phase = phaseDe(d, maintenant);
+    const moi = vuPar(d, me);
+    const tout = engagementsDe(d, avecDemo(reponses, d, moi), jugee, votes, phase === "fini");
+    const contratDe = new Map(tout.filter((e) => e.m.creneau === "contrat").map((e) => [e.joueur, e]));
+    const faceAFace: FaceAFace[] = [];
+    for (const duel of d.duels) {
+      const noirs = contratDe.get(duel.noirs);
+      const blancs = contratDe.get(duel.blancs);
+      if (noirs?.m.cibles[0] !== duel.blancs || blancs?.m.cibles[0] !== duel.noirs) continue;
+      faceAFace.push({ duel, noirs, blancs });
+      contratDe.delete(duel.noirs);
+      contratDe.delete(duel.blancs);
+    }
+    const avant = (n: string) => d.avant.get(n) ?? 0;
+    faceAFace.sort((a, b) => b.noirs.m.xp + b.blancs.m.xp - (a.noirs.m.xp + a.blancs.m.xp) || a.duel.terrain - b.duel.terrain);
+    const contrats = [...contratDe.values()].sort(
+      (a, b) => b.m.xp - a.m.xp || avant(b.joueur) - avant(a.joueur) || a.joueur.localeCompare(b.joueur)
+    );
+    const parPoints = (a: Engagement, b: Engagement) => avant(b.joueur) - avant(a.joueur) || a.joueur.localeCompare(b.joueur);
+    const defis = tout.filter((e) => e.m.creneau === "defi").sort(parPoints);
+    const ligue = tout.filter((e) => e.m.creneau === "ligue").sort(parPoints);
+    return { d, phase, moi, faceAFace, contrats, defis, ligue, total: tout.length };
   }, [d, me, maintenant, jugee, votes, reponses]);
 }
 
 /** Les duels d'une journée acceptés des deux côtés, avant le coup d'envoi. */
 export function useDuelsAcceptes(j: number | null | undefined): Duel[] {
   const isClient = useIsClient();
+  const { me } = useMyPlayer();
   const maintenant = useMaintenant();
   const reponses = useReponses();
   const { saison } = useSeason();
@@ -213,8 +299,9 @@ export function useDuelsAcceptes(j: number | null | undefined): Duel[] {
     if (!isClient || j == null) return [];
     const d = dimancheEnCours(saison, maintenant);
     if (!d || d.j !== j) return [];
+    const vues = avecDemo(reponses, d, vuPar(d, me));
     const accepte = (joueur: string, cible: string) =>
-      reponses.some(
+      vues.some(
         (r) =>
           r.saison === d.saison &&
           r.j === d.j &&
@@ -225,24 +312,69 @@ export function useDuelsAcceptes(j: number | null | undefined): Duel[] {
           new Date(r.le).getTime() <= d.coupEnvoi.getTime()
       );
     return d.duels.filter((x) => accepte(x.noirs, x.blancs) && accepte(x.blancs, x.noirs));
-  }, [isClient, j, saison, maintenant, reponses]);
+  }, [isClient, j, me, saison, maintenant, reponses]);
+}
+
+/** L'XP de toute la ligue, calculé une fois pour l'app (XpLigueProvider). */
+export interface XpLigue {
+  journal: Map<string, { lignes: LigneXp[]; reussies: number }>;
+  /** Le numéro de la saison en cours, celle du passe. */
+  saison: number;
+  /** Le rang de chaque joueur classé : S, A ou B selon sa place dans l'XP à vie. */
+  rangs: Map<string, RangJoueur>;
+  /**
+   * Ce que l'XP pose sur les cartes, joueur par joueur, en JSON : [nom, rang,
+   * plus haut palier débloqué, cran du cadre][]. Une chaîne, qui ne change
+   * que quand l'un d'eux change : les cartes la lisent (CartesXpContext,
+   * use-habillage.ts) sans se redessiner à chaque minute de l'horloge.
+   */
+  surLesCartes: string;
+}
+
+export const XpLigueContext = createContext<XpLigue | null>(null);
+
+/**
+ * Le calcul, pour XpLigueProvider seulement : le journal de chacun (les
+ * dimanches joués, les missions jugées, les félicitations, toutes saisons),
+ * puis les rangs. Les félicitations reçues et données y comptent (lib/sfl/
+ * felicitations.ts), relues au lancement et au retour sur l'app.
+ */
+export function useXpLigueCalcule(): XpLigue | null {
+  const isClient = useIsClient();
+  const maintenant = useMaintenant();
+  const reponses = useReponses();
+  const { allPlayers } = useSeason();
+  const { toutes: felicitations } = useFelicitations();
+  const { saison, jugee, votes } = useSaisonJugee(maintenant);
+  return useMemo(() => {
+    if (!isClient) return null;
+    const journal = journalXp(jugee, reponses, votes, maintenant, felicitations);
+    const rangs = rangsDesJoueurs(classementNiveau(journal, allPlayers));
+    const surLesCartes = JSON.stringify(
+      [...journal].map(([nom, x]) => [nom, rangs.get(nom)?.rang ?? null, palierMaxDe(journal, nom), cranDe(x.reussies)])
+    );
+    return { journal, saison: saison.numero ?? 0, rangs, surLesCartes };
+  }, [isClient, jugee, reponses, votes, maintenant, felicitations, saison.numero, allPlayers]);
+}
+
+/** L'XP de la ligue, tel que l'app l'a calculé (null avant le premier rendu côté client). */
+export function useXpLigue(): XpLigue | null {
+  return useContext(XpLigueContext);
 }
 
 /**
- * Mon XP : le niveau à vie et le passe de la saison (masqués compris : chacun
- * voit le sien). Les félicitations reçues et données y comptent (lib/sfl/
- * felicitations.ts), relues au lancement et au retour sur l'app.
+ * Mon XP (ou celui de `nom`) : le niveau à vie et le passe de la saison
+ * (masqués compris : chacun voit le sien).
  */
 export function useXp(nom?: string): BilanXp | null {
-  const isClient = useIsClient();
   const { me } = useMyPlayer();
-  const maintenant = useMaintenant();
-  const reponses = useReponses();
-  const { toutes: felicitations } = useFelicitations();
-  const { saison, jugee, votes } = useSaisonJugee(maintenant);
+  const lg = useXpLigue();
   const qui = nom ?? me;
-  return useMemo(() => {
-    if (!isClient || !qui) return null;
-    return bilanDe(journalXp(jugee, reponses, votes, maintenant, felicitations), qui, saison.numero ?? 0);
-  }, [isClient, qui, jugee, reponses, votes, maintenant, felicitations, saison.numero]);
+  return useMemo(() => (lg && qui ? bilanDe(lg.journal, qui, lg.saison) : null), [lg, qui]);
+}
+
+/** Le rang d'un joueur (B, A, S) ; null pour un joueur masqué ou inconnu. */
+export function useRangXp(nom: string | null | undefined): RangJoueur | null {
+  const lg = useXpLigue();
+  return (nom && lg?.rangs.get(nom)) || null;
 }

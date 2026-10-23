@@ -5,17 +5,19 @@
 //
 // En base (supabase/schema.sql, table missions_reponses) : on n'écrit que par
 // repondre_mission(), qui pose le nom (mon_nom) et l'heure du serveur, jamais
-// celle du téléphone ; on lit les siennes, et les contrats acceptés des deux
-// côtés (la RLS ne montre personne comme cible sans qu'il l'ait voulu).
+// celle du téléphone ; on lit les siennes, et toutes les missions acceptées
+// de la ligue (les Contrats en jeu des Actus). Un « passer » reste à celui
+// qui l'a donné.
 //
 // Dans un aperçu (NEXT_PUBLIC_BOLA_ENV ≠ production), toutes les réponses
 // restent sur le téléphone : la base de la ligue n'y est pas migrée, et un
 // essai ne doit jamais compter pour de vrai. Quand on n'est pas sur la
 // feuille, l'aperçu montre les missions d'un autre joueur ; elles ne partent
-// pas non plus en base à son nom.
+// pas non plus en base à son nom. Le reste de la ligue y est simulé
+// (reponsesDemo), pour voir les contrats en jeu : jamais dans l'XP.
 
 import { supabase } from "@/lib/supabase";
-import type { Creneau, Reponse } from "./missions";
+import type { Creneau, DimancheMissions, Reponse } from "./missions";
 
 export const MISSIONS_EVENT = "sfl-missions";
 export const APERCU_MISSIONS = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
@@ -91,6 +93,49 @@ export async function repondreMission(d: Demande): Promise<void> {
   }
   cache = [...cache.filter((x) => !memeMission(x, d)), { ...d, le }];
   emit();
+}
+
+/* --------------------------- La ligue d'un aperçu --------------------------- */
+
+/** Un tirage fixe dans [0, 1), le même pour le même texte (FNV-1a). */
+function tirage(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967296;
+}
+
+/** La part de la feuille qui accepte chaque mission, dans la ligue simulée. */
+const PART_DEMO: Record<Creneau, number> = { contrat: 0.55, defi: 0.6, ligue: 0.45 };
+
+/**
+ * La ligue simulée d'un aperçu : à peu près un joueur de la feuille sur deux
+ * accepte chacune de ses missions, toujours les mêmes d'une ouverture à
+ * l'autre. Rien hors d'un aperçu ; rien pour `sauf`, dont les réponses sont
+ * celles qu'on donne soi-même sur ce téléphone.
+ */
+export function reponsesDemo(d: DimancheMissions, sauf: string | null): Reponse[] {
+  if (!APERCU_MISSIONS) return [];
+  const liste: Reponse[] = [];
+  for (const [joueur, missions] of d.missions) {
+    if (joueur === sauf) continue;
+    for (const m of missions) {
+      const t = tirage(`${d.saison}·${d.j}·${joueur}·${m.creneau}`);
+      if (t >= PART_DEMO[m.creneau]) continue;
+      liste.push({
+        saison: d.saison,
+        j: d.j,
+        mission: m.creneau,
+        joueur,
+        reponse: "acceptee",
+        cible: m.creneau === "contrat" ? (m.cibles[0] ?? null) : null,
+        le: new Date(d.coupEnvoi.getTime() - (2 + t * 40) * 3600_000).toISOString(),
+      });
+    }
+  }
+  return liste;
 }
 
 /* ------------------------------ L'annonce ------------------------------ */

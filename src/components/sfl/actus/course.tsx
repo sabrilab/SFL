@@ -15,8 +15,9 @@
 //     dimanche) ; ton dimanche (ta carte, tes chiffres, tes places) ; la
 //     convocation (qui vient, Je viens / Je passe ; « Dernier dimanche sans
 //     divisions » sur celle de la J3, ta division dès la J4) ; tes missions,
-//     dès que la feuille est faite (missions.tsx) ; ce qui se joue dimanche
-//     (les places à un ou deux points), ton rival et ce qu'il te faut pour le
+//     dès que la feuille est faite (missions.tsx), puis les contrats en jeu
+//     de toute la ligue (contrats-en-jeu.tsx) ; ce qui se joue dimanche (les
+//     places à un ou deux points), ton rival et ce qu'il te faut pour le
 //     passer ; puis chaque dimanche joué,
 //     du plus récent : son terrain avec les cartes des joueurs (CarteJournee),
 //     et ses rubriques. Chaque rubrique est un terrain avec ses petites cartes
@@ -29,12 +30,13 @@
 // responsive pour le desktop […] et réadapte toutes les dispositions »), le
 // fil devient une grille, deux colonnes puis trois dès 1280 px (.actus-gabarit,
 // actus.css). À gauche, ce qui se joue : le direct, le vote, la convocation et
-// tes missions ; à droite, tes rubriques côte à côte. Puis chaque dimanche :
-// son terrain à gauche, qui reste à l'écran pendant qu'on parcourt ses
-// rubriques à droite. La course garde sa rangée, avec deux flèches pour la
-// souris. Tout est en classes md: / xl: : sous 768 px, le téléphone garde son
-// fil tel quel (sur téléphone, l'ordre des blocs de la semaine vient des
-// classes order-*).
+// tes missions ; à droite, tes rubriques côte à côte ; dessous, les contrats
+// en jeu de toute la ligue, sur toute la largeur. Puis chaque dimanche : son
+// terrain à gauche, qui reste à l'écran pendant qu'on parcourt ses rubriques
+// à droite. La course garde sa rangée, avec deux flèches pour la souris (les
+// contrats en jeu aussi). Tout est en classes md: / xl: : sous 768 px, le
+// téléphone garde son fil tel quel (sur téléphone, l'ordre des blocs de la
+// semaine vient des classes order-*).
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -63,8 +65,10 @@ import { ligneDuRendezVous } from "@/lib/sfl/matchs-du-jour";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
 import { RubriqueDivisions } from "./divisions";
+import { RubriqueOutsider } from "./outsider";
 import { VoteDuJour } from "./fil";
 import { RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
+import { ContratsEnJeu } from "./contrats-en-jeu";
 import { MissionsBola } from "./missions";
 import { VueClassements, VueMatchs } from "./vues";
 
@@ -414,10 +418,11 @@ export function LaCourse({ vueDepart = "fil", exploit }: { vueDepart?: Vue; expl
         </div>
       </header>
       {/* La semaine. Sur téléphone, un seul fil (l'ordre vient des order-*) :
-          le direct, le vote, les divisions, ton dimanche, la convocation, tes
-          missions, puis ce qui se joue. Sur grand écran, deux colonnes : à
-          gauche ce qui se joue (direct, vote, convocation, missions), à droite
-          les divisions et tes rubriques. */}
+          le direct, le vote, les divisions, l'outsider, ton dimanche, la
+          convocation, tes missions, les contrats en jeu, puis ce qui se joue.
+          Sur grand écran, deux colonnes : à gauche ce qui se joue (direct,
+          vote, convocation, missions), à droite les divisions, l'outsider et
+          tes rubriques ; dessous, les contrats en jeu sur toute la largeur. */}
       <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3">
         <div
           ref={semaine}
@@ -430,6 +435,7 @@ export function LaCourse({ vueDepart = "fil", exploit }: { vueDepart?: Vue; expl
         </div>
         <div className="contents md:grid md:gap-[var(--fib-21)] xl:col-span-2 xl:grid-cols-2">
           <RubriqueDivisions className="order-1 md:order-none" />
+          <RubriqueOutsider className="order-1 md:order-none" />
           {dernier > 0 && (
             <RubriqueToi className="order-1 md:order-none" j={dernier} date={journees.find((x) => x.j === dernier)?.date ?? ""} />
           )}
@@ -439,6 +445,7 @@ export function LaCourse({ vueDepart = "fil", exploit }: { vueDepart?: Vue; expl
             {v?.devant && <RubriqueBesoin v={v} />}
           </div>
         </div>
+        <ContratsEnJeu className="order-2 md:order-none md:col-span-full" />
       </div>
       {dimanches.map((d) => (
         <Dimanche key={d.j} j={d.j} journee={d.journee} scenes={d.scenes} ouvrir={() => router.push(`/ligue/journee?j=${d.j}`)} />

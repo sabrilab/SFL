@@ -22,8 +22,9 @@
 // à mesure que la feuille se remplit et devient définitif à minuit. L'XP va
 // au Niveau XP et au passe de la saison (Ma carte), jamais aux points Pépite.
 //
-// Le rival ne voit ton contrat que s'il a accepté le sien en face (la base ne
-// le lui montre pas avant) : la fiche le dit alors, « Abdel a signé contre toi ».
+// Toute la ligue voit les missions acceptées, sous les fiches (Contrats en
+// jeu, contrats-en-jeu.tsx) : dès que quelqu'un signe un contrat contre toi,
+// ta fiche le dit, « Abdel a signé contre toi », que tu aies signé ou non.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -36,6 +37,7 @@ import { rankPlayers } from "@/lib/sfl/engine";
 import {
   NOM_DE_CODE,
   phrase,
+  prenom,
   rangDe,
   risqueDe,
   XP_PARFAIT,
@@ -51,11 +53,11 @@ const TYPE: Record<Creneau, string> = { contrat: "Contrat", defi: "Défi du dima
 /** Les crans allumés à côté du rang : de la plus dure à la plus facile. */
 const CRANS_DU_RANG: Record<Rang, number> = { S: 3, A: 2, B: 1 };
 /** Les onglets de la feuille de match (lib/sfl/feuille.ts). */
-const NOIRS = { fond: "#0A0B0D", encre: "#F4F5F2" };
-const BLANCS = { fond: "#F4F3EF", encre: "#0A0B0D" };
+export const NOIRS = { fond: "#0A0B0D", encre: "#F4F5F2" };
+export const BLANCS = { fond: "#F4F3EF", encre: "#0A0B0D" };
 
 type Repondre = (c: Creneau, r: Reponse["reponse"]) => void;
-type EtatViseur = "libre" | "verrou" | "rate" | "eteint";
+export type EtatViseur = "libre" | "verrou" | "rate" | "eteint";
 
 const rangTexte = (n: number) => (n === 1 ? "1er" : `${n}e`);
 const pts = (n: number) => `${n} pt${Math.abs(n) > 1 ? "s" : ""}`;
@@ -80,7 +82,7 @@ function useClassement() {
   }, [players, allPlayers]);
 }
 
-function Carte({ nom, size, onglet }: { nom: string; size: number; onglet?: { fond: string; encre: string } }) {
+export function Carte({ nom, size, onglet }: { nom: string; size: number; onglet?: { fond: string; encre: string } }) {
   const { allPlayers } = useSeason();
   const p = allPlayers.find((x) => x.name === nom);
   return p ? <MiniCarte player={p} size={size} onglet={onglet} /> : <CarteDe name={nom} size={size} />;
@@ -107,7 +109,7 @@ function CompteARebours({ fin }: { fin: Date }) {
   );
 }
 
-function Pouls({ bat }: { bat: boolean }) {
+export function Pouls({ bat }: { bat: boolean }) {
   return (
     <span className="relative flex size-2">
       {bat && (
@@ -132,7 +134,8 @@ function Moment({ mm }: { mm: MesMissions }) {
   );
 }
 
-function Insigne({ rang }: { rang: Rang }) {
+/** L'insigne du rang, aux couleurs que pose fiche--{rang} sur un parent. */
+export function Insigne({ rang }: { rang: Rang }) {
   return (
     <span className="fiche__insigne" aria-hidden>
       <span className="fiche__hexa" />
@@ -156,7 +159,7 @@ function Difficulte({ rang }: { rang: Rang }) {
 }
 
 /** Le viseur posé sur une carte ; il rejoue son verrouillage à chaque changement d'état. */
-function Viseur({ etat, petit }: { etat: EtatViseur; petit?: boolean }) {
+export function Viseur({ etat, petit }: { etat: EtatViseur; petit?: boolean }) {
   return (
     <span key={etat} className={cn("fiche__viseur", `fiche__viseur--${etat}`, petit && "fiche__viseur--petit")} aria-hidden>
       {etat === "verrou" && <span className="viseur__balayage" />}
@@ -178,7 +181,8 @@ function etatViseur(l: LigneMission, phase: Phase): EtatViseur {
   return l.verdict.etat === "annulee" ? "eteint" : "verrou";
 }
 
-function Champ({ label, grand, children }: { label: string; grand?: boolean; children: React.ReactNode }) {
+/** Un champ de fiche : son libellé en petit, la valeur dessous ; en grand, au lettrage des titres. Aussi l'outsider (outsider.tsx). */
+export function Champ({ label, grand, children }: { label: string; grand?: boolean; children: React.ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <dt className="mono-label text-white/45">{label}</dt>
@@ -335,8 +339,16 @@ function Champs({ l, mm }: { l: LigneMission; mm: MesMissions }) {
   );
 }
 
-function Tampon({ ton, children }: { ton?: "rouge" | "gris"; children: React.ReactNode }) {
-  return <span className={cn("tampon", ton && `tampon--${ton}`)}>{children}</span>;
+export function Tampon({ ton, petit, children }: { ton?: "rouge" | "gris"; petit?: boolean; children: React.ReactNode }) {
+  return <span className={cn("tampon", ton && `tampon--${ton}`, petit && "tampon--petit")}>{children}</span>;
+}
+
+/** « Abdel a signé contre toi », « Abdel et Ryad ont signé… », « Abdel et 2 autres ont signé… ». */
+function signatures(qui: string[], nom: (n: string) => string): string {
+  const p = (n: string) => prenom(nom(n));
+  if (qui.length === 1) return `${p(qui[0])} a signé contre toi`;
+  if (qui.length === 2) return `${p(qui[0])} et ${p(qui[1])} ont signé contre toi`;
+  return `${p(qui[0])} et ${qui.length - 1} autres ont signé contre toi`;
 }
 
 /** Accepter ou passer jusqu'au coup d'envoi ; ensuite, ce qui est en jeu, puis le tampon du verdict. */
@@ -448,7 +460,7 @@ function Fiche({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions;
     l.m.creneau === "contrat" && camp?.label.startsWith("Match") ? `${TYPE.contrat} · ${camp.label}` : TYPE[l.m.creneau];
   const acceptee = l.reponse?.reponse === "acceptee";
   const apres = mm.phase !== "ouvert";
-  const rival = l.m.creneau === "contrat" && mm.enFace ? l.m.cibles[0] : null;
+  const contre = l.m.creneau === "contrat" ? mm.contreMoi : [];
   return (
     <article
       aria-label={`Mission ${code}, rang ${rang}`}
@@ -476,11 +488,7 @@ function Fiche({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions;
         </div>
         {l.m.creneau === "contrat" && <Cible l={l} mm={mm} />}
         {(l.m.genre === "gagnez" || l.m.genre === "deux-passes") && <Escouade mm={mm} />}
-        {rival && (
-          <span className="fiche__duel mono-label">
-            {identite.nom(rival).split(" ")[0]} a signé contre toi
-          </span>
-        )}
+        {contre.length > 0 && <span className="fiche__duel mono-label">{signatures(contre, identite.nom)}</span>}
         <div className="flex flex-col gap-1.5">
           <span className="mono-label text-white/45">Objectif</span>
           <p className="text-[20px] leading-[1.15] font-bold tracking-[-0.3px]">{phrase(l.m, identite.nom)}</p>

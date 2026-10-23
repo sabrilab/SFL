@@ -55,6 +55,13 @@
   --r-texte: #efc3da;
   --r-sombre: #5b2141;
 }
+/* Le ton B redit pour un parent qui n'est pas une fiche (l'insigne du rang du joueur, la carte). */
+.fiche--B {
+  --r-lueur: 222 227 236;
+  --r-feu: 246 248 252;
+  --r-texte: #e6ebf3;
+  --r-sombre: #3d434d;
+}
 /* Accomplie : le cadre s'allume. Ratée : il vire au rouge. Passée, expirée, annulée : elle s'éteint. */
 .fiche--reussie {
   box-shadow:
@@ -85,6 +92,11 @@
 
 .fiche__ton {
   color: var(--r-texte);
+}
+/* Au jour, hors des fiches (noires dans les deux modes), le ton du rang se lit
+   dans sa teinte sombre : le rang de Ma carte, sur le verre clair. */
+.fiche__ton:not(.dark *) {
+  color: var(--r-sombre);
 }
 
 /* Le bandeau du haut : la bande rayée des caisses et des zones, ses étiquettes au pochoir. */
@@ -365,4 +377,177 @@
     opacity: 0;
     transform: scale(1.9) rotate(-12deg);
   }
+}
+
+/*
+ * Les Contrats en jeu (contrats-en-jeu.tsx) : les mêmes fiches, en affiches
+ * qu'on fait défiler, pour toute la ligue. Rien n'y bouge à l'arrivée : une
+ * ligue entière de viseurs qui se verrouilleraient ensemble ferait trop. Le
+ * viseur est posé verrouillé, les tampons sont déjà encrés.
+ */
+.fiche--affiche {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  width: 160px;
+  border-radius: 18px;
+  scroll-snap-align: start;
+}
+.fiche--affiche-duel {
+  width: 256px;
+}
+.fiche--affiche .fiche__bandeau {
+  gap: 8px;
+  height: 26px;
+  padding: 0 10px;
+}
+.fiche--affiche .fiche__viseur--verrou,
+.fiche--affiche .tampon,
+.fiche--engages .tampon {
+  animation: none;
+}
+.fiche--affiche .viseur__balayage {
+  display: none;
+}
+
+/* Plusieurs cibles : combien d'autres, au coin de la carte. */
+.affiche__plus {
+  position: absolute;
+  right: -11px;
+  bottom: -9px;
+  padding: 3px 6px 2px;
+  border-radius: 4px;
+  background: #060607;
+  color: var(--r-texte);
+  box-shadow: inset 0 0 0 1px rgb(var(--r-lueur) / 0.5);
+}
+
+/* Le tampon en petit : les affiches et les équipes du défi. */
+.tampon--petit {
+  gap: 6px;
+  padding: 4px 8px 3px;
+  border-width: 1.5px;
+  outline-offset: 1.5px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  transform: rotate(-4deg);
+}
+
+/* Les engagés du défi et de la ligue : leur carte ; après le verdict, cerclée (accomplie), éteinte (ratée) ou pâlie (annulée). */
+.engage {
+  position: relative;
+  display: inline-flex;
+  border-radius: 12px;
+}
+.engage--reussie {
+  box-shadow:
+    0 0 0 2px rgb(var(--r-lueur)),
+    0 0 12px rgb(var(--r-lueur) / 0.5);
+}
+.engage--ratee {
+  box-shadow: 0 0 0 2px #ff9b9d;
+}
+.engage--ratee > * {
+  filter: grayscale(1) brightness(0.62);
+}
+.engage--annulee {
+  opacity: 0.45;
+}
+
+/*
+ * L'outsider (outsider.tsx) : la fiche du rang B de la D1, à l'argent du
+ * rang. Sa carte en grand dans un halo. Sa quête se lit comme un journal de quête : une case hexagonale par étape,
+ * pleine une fois l'étape passée (cerclée de rouge si elle tombe), et la
+ * barre de l'XP vers le rang A, rayée là où ses missions signées la
+ * mèneraient. Comme les Contrats en jeu, rien n'y bouge à l'arrivée : les
+ * tampons sont déjà encrés.
+ */
+.outsider__heros {
+  position: relative;
+}
+.outsider__heros::before {
+  content: "";
+  position: absolute;
+  inset: -36px -44px;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgb(var(--r-lueur) / 0.2), rgb(var(--r-lueur) / 0));
+  pointer-events: none;
+}
+.fiche--outsider .tampon {
+  animation: none;
+}
+.quete {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+}
+.quete > li {
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+  min-height: 50px;
+  padding: 11px 0;
+  border-bottom: 1px solid rgb(255 255 255 / 0.1);
+}
+/* La dernière étape n'a pas de trait : celui de la rangée qui suit (les autres rangs B) le fait. */
+.quete > li:last-child {
+  border-bottom: 0;
+}
+.quete__quoi {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.quete__case {
+  position: relative;
+  flex-shrink: 0;
+  width: 14px;
+  height: 16px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: rgb(var(--r-lueur) / 0.55);
+}
+.quete__case::after {
+  content: "";
+  position: absolute;
+  inset: 1.5px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: #060607;
+}
+.quete__case--faite {
+  background: rgb(var(--r-lueur));
+}
+.quete__case--faite::after {
+  display: none;
+}
+.quete__case--ratee {
+  background: #ff9b9d;
+}
+/* La barre et sa ligne, alignées sur le libellé de l'étape (case de 14 px, puis 10 px). */
+.quete__barre {
+  position: relative;
+  flex-basis: calc(100% - 24px);
+  height: 4px;
+  margin-left: 24px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.1);
+}
+.quete__barre + .mono-label {
+  flex-basis: calc(100% - 24px);
+  margin-left: 24px;
+}
+.quete__acquis {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  border-radius: 2px;
+  background: rgb(var(--r-lueur));
+  box-shadow: 0 0 8px rgb(var(--r-lueur) / 0.6);
+}
+.quete__possible {
+  position: absolute;
+  inset-block: 0;
+  background: repeating-linear-gradient(-45deg, rgb(var(--r-lueur) / 0.6) 0 3px, rgb(var(--r-lueur) / 0.14) 3px 6px);
 }

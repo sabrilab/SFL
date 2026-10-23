@@ -44,6 +44,7 @@ import { isHidden } from "./hidden";
 import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { ovr, type Player } from "./engine";
 import type { MatchEntry, Saison, SaisonArchivee } from "./saisie/types";
+import type { Finition, Signe, Traitement } from "@/components/sfl/finitions-carte";
 
 /* ------------------------------- Le barème ------------------------------- */
 
@@ -467,7 +468,8 @@ export function dimancheEnCours(s: Saison, maintenant: Date): DimancheMissions |
 /* ------------------------------- Le verdict ------------------------------- */
 
 const pl = (n: number, un: string, plusieurs: string) => `${n} ${n > 1 || n === 0 ? plusieurs : un}`;
-const prenom = (n: string) => n.split(" ")[0];
+/** Le prénom, comme les fiches le disent : « Passe devant Abdel ». */
+export const prenom = (n: string) => n.split(" ")[0];
 
 /**
  * Le verdict d'une mission, sur la feuille telle qu'elle est. Tant que la
@@ -560,6 +562,56 @@ export function reponseDe(reponses: Reponse[], d: DimancheMissions, joueur: stri
   if (new Date(r.le).getTime() > d.coupEnvoi.getTime()) return null;
   if (m.creneau === "contrat" && r.cible && r.cible !== (m.cibles[0] ?? null)) return null;
   return r;
+}
+
+/* ---------------------------- Les contrats en jeu ---------------------------- */
+// Sabri, 23/10 : « montrer tous les contrats qui sont acceptés, les missions
+// qui sont en jeu » (Actus). La base montre à toute la ligue les missions
+// acceptées, jamais un « passer ».
+
+/** Une mission acceptée, vue de la ligue : qui l'a signée, et où elle en est. */
+export interface Engagement {
+  joueur: string;
+  m: Mission;
+  reponse: Reponse;
+  verdict: Verdict;
+}
+
+/**
+ * Toutes les missions acceptées de la journée (la réponse qui compte, reponseDe),
+ * avec leur verdict sur la feuille telle qu'elle est ; définitif une fois la
+ * journée finie.
+ */
+export function engagementsDe(
+  d: DimancheMissions,
+  reponses: Reponse[],
+  s: SaisonLue,
+  votes: VoteLeger[],
+  fini: boolean
+): Engagement[] {
+  const liste: Engagement[] = [];
+  for (const [joueur, missions] of d.missions) {
+    for (const m of missions) {
+      const reponse = reponseDe(reponses, d, joueur, m);
+      if (reponse?.reponse !== "acceptee") continue;
+      const v = juger(m, joueur, d, s, votes);
+      liste.push({ joueur, m, reponse, verdict: fini ? verdictFinal(v, m) : v });
+    }
+  }
+  return liste;
+}
+
+/** Ceux qui ont signé un contrat contre ce joueur : son rival d'abord, puis ceux qui veulent le passer. */
+export function signesContre(d: DimancheMissions, reponses: Reponse[], joueur: string): string[] {
+  const qui: string[] = [];
+  for (const [chasseur, missions] of d.missions) {
+    const c = missions.find((m) => m.creneau === "contrat");
+    if (chasseur === joueur || !c?.cibles.includes(joueur)) continue;
+    if (reponseDe(reponses, d, chasseur, c)?.reponse === "acceptee") qui.push(chasseur);
+  }
+  const rival = d.duels.find((x) => x.noirs === joueur || x.blancs === joueur);
+  const r = rival ? (rival.noirs === joueur ? rival.blancs : rival.noirs) : null;
+  return qui.sort((a, b) => Number(b === r) - Number(a === r));
 }
 
 /* --------------------------------- L'XP --------------------------------- */
@@ -777,6 +829,52 @@ export function classementNiveau(
   });
 }
 
+/* --------------------------- Le rang des joueurs --------------------------- */
+// Sabri, 23/10 : « grâce à leur niveau d'XP, on attribue aux joueurs un
+// rang : rang A, B, tout ça, jusqu'au rang S, le rang S étant la difficulté
+// vraiment ultime ». Les rangs des missions (B, A, S), donnés par la place au
+// classement du niveau, l'XP à vie : les 10 % de tête de ceux qui ont de
+// l'XP sont S, les 25 % suivants A, tous les autres B. Une place plutôt
+// qu'un seuil : l'XP de chacun monte chaque dimanche, le rang S doit rester
+// rare. Des ex aequo ont le même rang.
+
+/** La part de la ligue, depuis le haut du classement du niveau, qui atteint chaque rang. */
+export const PART_DU_RANG: Record<Exclude<Rang, "B">, number> = { S: 0.1, A: 0.35 };
+
+export interface RangJoueur {
+  rang: Rang;
+  /** La place au classement du niveau (ex aequo à la même place). */
+  place: number;
+  xp: number;
+  /** Les joueurs qui ont de l'XP : ceux entre qui les places se jouent. */
+  sur: number;
+  /** Le rang du dessus et la dernière place qui l'ouvre ; null au rang S. */
+  suivant: { rang: Rang; place: number } | null;
+}
+
+/** Le rang de chaque joueur du classement du niveau (classementNiveau). */
+export function rangsDesJoueurs(classement: { name: string; xp: number; rank: number }[]): Map<string, RangJoueur> {
+  const sur = classement.filter((c) => c.xp > 0).length;
+  const borne = (part: number) => Math.max(1, Math.ceil(part * sur));
+  const placeS = borne(PART_DU_RANG.S);
+  const placeA = borne(PART_DU_RANG.A);
+  const out = new Map<string, RangJoueur>();
+  for (const c of classement) {
+    const rang: Rang = c.xp <= 0 ? "B" : c.rank <= placeS ? "S" : c.rank <= placeA ? "A" : "B";
+    const suivant = rang === "S" ? null : rang === "A" ? { rang: "S" as const, place: placeS } : { rang: "A" as const, place: placeA };
+    out.set(c.name, { rang, place: c.rank, xp: c.xp, sur, suivant });
+  }
+  return out;
+}
+
+/** Le plus haut palier du passe atteint, toutes saisons confondues : ce qu'il a débloqué pour de bon. */
+export function palierMaxDe(journal: Map<string, { lignes: LigneXp[]; reussies: number }>, joueur: string): number {
+  const saisons = new Set((journal.get(joueur)?.lignes ?? []).map((l) => l.saison));
+  let max = 0;
+  for (const s of saisons) max = Math.max(max, bilanDe(journal, joueur, s).palier);
+  return max;
+}
+
 /* ------------------------------ Les libellés ------------------------------ */
 
 /** La mission en une phrase, à la deuxième personne : « Finis devant Abdel. » */
@@ -809,6 +907,14 @@ export function libelleCourt(m: Pick<Mission, "genre">): string {
 }
 
 /* ------------------------------ Le passe ------------------------------ */
+// Sabri, 23/10 : « faut que tu me dises ce que je peux faire visuellement,
+// parce que là, ça fait moche quand c'est affiché. Faut qu'on puisse montrer
+// des choses », avec « des changements de code au niveau de la carte ou des
+// signes distinctifs ». Les paliers de la carte et de la photo posent donc
+// quelque chose sur la carte (`habille`, dessiné par finitions-carte.ts,
+// sans IA) : un signe, d'office une fois débloqué ; une finition ou un
+// traitement de la photo, que le joueur choisit de porter. Un palier atteint
+// une saison reste débloqué pour de bon (palierMaxDe).
 
 export type Famille = "contrats" | "photo" | "carte" | "vrai";
 
@@ -816,31 +922,43 @@ export interface Palier {
   n: number;
   recompense: string;
   famille: Famille;
+  /** Ce que le palier pose sur la carte, s'il l'habille (finitions-carte.ts). */
+  habille?: { finition?: Finition; traitement?: Traitement; signe?: Signe };
 }
 
-/** Les vingt paliers du passe de saison : chaque récompense sert à quelque chose. */
+/** Les vingt paliers du passe de saison : chaque récompense sert à quelque chose, la moitié se voit sur la carte. */
 export const PASSE: Palier[] = [
-  { n: 1, recompense: "Joker", famille: "contrats" },
-  { n: 2, recompense: "Filtre studio argentique", famille: "photo" },
-  { n: 3, recompense: "Le dossier du rival", famille: "contrats" },
-  { n: 4, recompense: "Finition nuit", famille: "carte" },
-  { n: 5, recompense: "Séance studio offerte", famille: "photo" },
+  { n: 1, recompense: "Liseré argent", famille: "carte", habille: { signe: "lisere-argent" } },
+  { n: 2, recompense: "Joker", famille: "contrats" },
+  { n: 3, recompense: "Photo argentique", famille: "photo", habille: { traitement: "argentique" } },
+  { n: 4, recompense: "Finition nuit", famille: "carte", habille: { finition: "nuit" } },
+  { n: 5, recompense: "Sceau à tes initiales", famille: "carte", habille: { signe: "sceau" } },
   { n: 6, recompense: "Double ou rien", famille: "contrats" },
-  { n: 7, recompense: "Joker", famille: "contrats" },
-  { n: 8, recompense: "Filtre studio marbre", famille: "photo" },
+  { n: 7, recompense: "Photo gravure", famille: "photo", habille: { traitement: "gravure" } },
+  { n: 8, recompense: "Puce dorée", famille: "carte", habille: { signe: "puce-or" } },
   { n: 9, recompense: "Assurance", famille: "contrats" },
-  { n: 10, recompense: "Finition chrome", famille: "carte" },
-  { n: 11, recompense: "Dossier du rival, 3 dimanches", famille: "contrats" },
-  { n: 12, recompense: "Séance studio offerte", famille: "photo" },
-  { n: 13, recompense: "Choisir ton rival", famille: "contrats" },
-  { n: 14, recompense: "Double ou rien", famille: "contrats" },
-  { n: 15, recompense: "Filtre studio gravure", famille: "photo" },
-  { n: 16, recompense: "Finition animée", famille: "carte" },
+  { n: 10, recompense: "Finition chrome", famille: "carte", habille: { finition: "chrome" } },
+  { n: 11, recompense: "Le dossier du rival", famille: "contrats" },
+  { n: 12, recompense: "Ton nom gravé", famille: "carte", habille: { signe: "nom-grave" } },
+  { n: 13, recompense: "Photo marbre", famille: "photo", habille: { traitement: "marbre" } },
+  { n: 14, recompense: "Choisir ton rival", famille: "contrats" },
+  { n: 15, recompense: "Liseré or", famille: "carte", habille: { signe: "lisere-or" } },
+  { n: 16, recompense: "Finition animée", famille: "carte", habille: { finition: "animee" } },
   { n: 17, recompense: "Joker", famille: "contrats" },
   { n: 18, recompense: "Séance studio offerte", famille: "photo" },
   { n: 19, recompense: "Chaussettes Bola", famille: "vrai" },
   { n: 20, recompense: "Carte de saison imprimée", famille: "vrai" },
 ];
+
+/** Ce qu'un palier du passe a débloqué sur la carte, dans l'ordre des paliers. */
+export function debloquesDe(palier: number): { finitions: Finition[]; traitements: Traitement[]; signes: Signe[] } {
+  const ouverts = PASSE.filter((p) => p.n <= palier);
+  return {
+    finitions: ouverts.flatMap((p) => (p.habille?.finition ? [p.habille.finition] : [])),
+    traitements: ouverts.flatMap((p) => (p.habille?.traitement ? [p.habille.traitement] : [])),
+    signes: ouverts.flatMap((p) => (p.habille?.signe ? [p.habille.signe] : [])),
+  };
+}
 
 export const FAMILLES: Record<Famille, string> = {
   contrats: "tes contrats",
