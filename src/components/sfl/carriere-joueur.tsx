@@ -12,15 +12,19 @@
 //     de sa carte (une marche par saison, un point pour chaque carte
 //     spéciale du jour) ou son rang au Pépite d'Or. On la parcourt du doigt.
 // Ma carte s'en sert aussi : « Mes cartes », et la courbe, ouverte sur le rang.
+// Dès la tablette (768 px), où une rangée qui défile se manie mal à la souris,
+// les cartes spéciales passent à la ligne à droite de la carte de la saison ;
+// dès 1024 px, toutes prennent un cran de plus (useFormatCarte).
 // Noir et blanc : tout en `currentColor` et en opacités, sauf les cartes
 // spéciales et leurs ronds sur la courbe, dans leur couleur (or, rouge,
 // bleu : teinte-carte.ts, Sabri 22/10). Calcul dans
 // lib/sfl/carriere.ts.
 
 import { useEffect, useRef, useState } from "react";
-import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
+import { MiniCarte } from "@/components/sfl/mini-carte";
 import { BOOST_LABELS } from "@/components/sfl/boost-card";
 import { TEINTES } from "@/components/sfl/teinte-carte";
+import { useFormatCarte } from "@/hooks/use-format-carte";
 import type { CartesDeSaison, PointCourbe } from "@/lib/sfl/carriere";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
 import { cn } from "@/lib/utils";
@@ -31,6 +35,7 @@ const ANTON = "var(--font-anton), Anton, sans-serif";
 
 export function CartesCarriere({ saisons, titre = "Ses cartes" }: { saisons: CartesDeSaison[]; titre?: string }) {
   const total = saisons.reduce((n, s) => n + 1 + s.speciales.length, 0);
+  const format = useFormatCarte();
   return (
     <section aria-labelledby="ses-cartes" className="flex flex-col gap-2.5">
       <div className="flex items-baseline justify-between px-1">
@@ -61,30 +66,33 @@ export function CartesCarriere({ saisons, titre = "Ses cartes" }: { saisons: Car
                   </span>
                 </span>
               </div>
-              <div className="flex items-end gap-[var(--fib-13)] overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+              <div className="flex items-end gap-[var(--fib-13)] overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:overflow-visible">
                 <figure className="flex shrink-0 flex-col items-center">
                   <MiniCarte
                     player={s.player}
-                    size={FORMAT_CARTE.grande}
+                    size={format.grande}
                     cle={`saison-${s.numero}-${s.player.name}`}
                     detail={`${s.nom} · ${s.note}`}
                   />
                 </figure>
-                {s.speciales.map((c) => (
-                  <figure key={c.carte.type + c.j} className="flex shrink-0 flex-col items-center gap-1.5">
-                    <MiniCarte
-                      player={c.player}
-                      size={FORMAT_CARTE.moyenne}
-                      cle={`speciale-${s.numero}-${c.j}-${c.carte.type}-${c.player.name}`}
-                      distinction={c.carte.type}
-                      detail={`${BOOST_LABELS[c.carte.type]} · ${c.carte.date}`}
-                    />
-                    <figcaption className="flex flex-col items-center leading-tight">
-                      <span className="text-[11px] font-bold">{BOOST_LABELS[c.carte.type]}</span>
-                      <span className="font-mono text-[10px] text-foreground/45">J{c.j}</span>
-                    </figcaption>
-                  </figure>
-                ))}
+                {/* Sur téléphone, sans boîte : les cartes spéciales suivent dans la rangée. */}
+                <div className="contents md:flex md:min-w-0 md:flex-1 md:flex-wrap md:items-end md:gap-[var(--fib-13)]">
+                  {s.speciales.map((c) => (
+                    <figure key={c.carte.type + c.j} className="flex shrink-0 flex-col items-center gap-1.5">
+                      <MiniCarte
+                        player={c.player}
+                        size={format.moyenne}
+                        cle={`speciale-${s.numero}-${c.j}-${c.carte.type}-${c.player.name}`}
+                        distinction={c.carte.type}
+                        detail={`${BOOST_LABELS[c.carte.type]} · ${c.carte.date}`}
+                      />
+                      <figcaption className="flex flex-col items-center leading-tight">
+                        <span className="text-[11px] font-bold">{BOOST_LABELS[c.carte.type]}</span>
+                        <span className="font-mono text-[10px] text-foreground/45">J{c.j}</span>
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
               </div>
             </div>
           );

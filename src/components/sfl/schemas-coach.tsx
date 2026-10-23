@@ -132,7 +132,7 @@ function TerrainVue({ s }: { s: SchemaTerrain }) {
 export function SchemaVue({ schema }: { schema: SchemaCoach }) {
   const legende = schema.legende || (schema.type === "corps" ? legendeCorps(schema) : "");
   return (
-    <figure className="w-[min(320px,80vw)]">
+    <figure className="w-[min(320px,80vw)] lg:w-[420px]">
       <div className="glass-soft overflow-hidden rounded-[22px]">
         {schema.type === "corps" ? <CorpsVue s={schema} /> : <TerrainVue s={schema} />}
       </div>
