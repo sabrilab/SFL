@@ -376,10 +376,11 @@ export function phraseAnnonce(
 
 /**
  * La place dans sa division (« à la 26e des 30 places ») entre dans le texte
- * de la notification quand Sabri l'a validé mot pour mot ; d'ici là, elle
- * garde le texte qu'il a validé le 23/10.
+ * de la notification, comme dans l'app : avec des divisions de 30, tous les
+ * classés tombent en D1 avant la J3, et la place leur dit ce qu'ils risquent.
+ * Sabri l'a choisie le 23/10 ; false rend le texte de son premier accord.
  */
-export const PLACE_DANS_LA_NOTIFICATION = false;
+export const PLACE_DANS_LA_NOTIFICATION = true;
 
 /** La notification de l'annonce, pour un joueur (titre ≤ 60 signes, texte ≤ 180, lib/sfl/push.ts). */
 export function notificationAnnonce(saison: Saison, d: Decoupage, nom: string, edition: EditionAnnonce): { titre: string; texte: string } {
