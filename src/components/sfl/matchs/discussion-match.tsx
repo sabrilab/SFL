@@ -24,8 +24,17 @@
 // S'ouvre depuis la bulle de messages du match sur la Map, depuis sa fiche,
 // depuis la page Team, ou depuis une notification (/?match=12&discussion,
 // /?discussion=equipe).
+//
+// L'écran est posé sur <body>, hors de la page (Sabri, 23/10 : « la barre de
+// dialogue, elle est cachée ») : sur iPhone, la page défile dans un conteneur
+// (#app-scroll, layout.tsx) dont WebKit fait une seule couche, sous la barre
+// d'onglets ; l'écran restait dessous, et sa barre d'écriture juste derrière
+// les onglets. Sur <body>, il passe au-dessus d'eux (z 45, onglets 40), sous
+// les feuilles (z 50) : la carte d'un joueur touchée dans le fil s'ouvre
+// par-dessus.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Discussion } from "@/components/sfl/vestiaire";
@@ -46,6 +55,23 @@ import { cn } from "@/lib/utils";
 const BRAISE = "#FF8A4C";
 /** Au-delà, les places vides ne disent rien de plus que le nombre. */
 const PLACES_MAX = 12;
+/** La largeur d'une petite carte, arrondie au-dessus (les places vides l'ont pleine). */
+const COTE = Math.ceil(254 * FORMAT_CARTE.petite);
+/** L'écart entre deux cartes (gap-2). */
+const ECART = 8;
+
+/**
+ * Les cartes en tête du fil, en rangées égales de six au plus : dix places
+ * font cinq et cinq (avant : sept, puis trois seules dessous).
+ */
+function Rangees({ n, label, children }: { n: number; label: string; children: React.ReactNode }) {
+  const par = n <= 0 ? 1 : Math.ceil(n / Math.ceil(n / 6));
+  return (
+    <div aria-label={label} className="mx-auto flex flex-wrap justify-center gap-2" style={{ maxWidth: par * COTE + (par - 1) * ECART }}>
+      {children}
+    </div>
+  );
+}
 
 export type OngletDiscussion = "match" | "equipe";
 
@@ -90,9 +116,15 @@ export function DiscussionMatch({
   );
   const className = bascule ? undefined : "discussion-entre";
 
-  if (surMatch) return <FilDuMatch key={`m${partie.id}`} partie={partie} moi={moi} onglets={onglets} onFermer={onFermer} className={className} />;
-  if (equipe) return <FilDeLEquipe key={`e${equipe.id}`} equipe={equipe} moi={moi} onglets={onglets} onFermer={onFermer} className={className} />;
-  return <SansEquipe charge={charge} onglets={onglets} onFermer={onFermer} className={className} />;
+  const ecran = surMatch ? (
+    <FilDuMatch key={`m${partie.id}`} partie={partie} moi={moi} onglets={onglets} onFermer={onFermer} className={className} />
+  ) : equipe ? (
+    <FilDeLEquipe key={`e${equipe.id}`} equipe={equipe} moi={moi} onglets={onglets} onFermer={onFermer} className={className} />
+  ) : (
+    <SansEquipe charge={charge} onglets={onglets} onFermer={onFermer} className={className} />
+  );
+  // Ouverte d'un geste, jamais au premier rendu du serveur.
+  return typeof document === "undefined" ? null : createPortal(ecran, document.body);
 }
 
 /* ------------------------------- En-tête -------------------------------- */
@@ -206,14 +238,14 @@ function FilDuMatch({
   const orga = partie.joueurs.find((j) => j.id === partie.organisateurId);
   const jouent = [...(orga ? [orga] : []), ...partie.joueurs.filter((j) => j.statut === "inscrit" && j !== orga)];
   const invites = partie.joueurs.filter((j) => j.statut === "invite" && j !== orga);
-  const cote = Math.round(254 * FORMAT_CARTE.petite);
+  const places = Math.min(manque, PLACES_MAX);
 
   return (
     <Discussion
       salon={salon}
       className={className}
       libelleNotifs="Notifications de la discussion du match"
-      vide=""
+      vide="Personne n'a encore écrit."
       secours={DEMO_DISCUSSION ? filEssai : undefined}
       filtre={filtre}
       titre={<EnTete onglets={onglets} onFermer={onFermer} />}
@@ -224,23 +256,25 @@ function FilDuMatch({
         </SousTitre>
       }
       tete={
-        <div className="flex flex-wrap justify-center gap-2 pt-5 pb-1" aria-label="Les joueurs du match">
-          {jouent.map((j) => (
-            <CarteDe key={j.id} name={j.name} size={FORMAT_CARTE.petite} />
-          ))}
-          {invites.map((j) => (
-            <span key={j.id} className="opacity-40">
-              <CarteDe name={j.name} size={FORMAT_CARTE.petite} />
-            </span>
-          ))}
-          {Array.from({ length: Math.min(manque, PLACES_MAX) }, (_, i) => (
-            <span
-              key={`vide-${i}`}
-              aria-hidden
-              className="shrink-0 border-[1.5px] border-dashed"
-              style={{ width: cote, height: cote, borderRadius: cote * 0.24, borderColor: `${BRAISE}99`, background: `${BRAISE}14` }}
-            />
-          ))}
+        <div className="pt-5 pb-1">
+          <Rangees n={jouent.length + invites.length + places} label="Les joueurs du match">
+            {jouent.map((j) => (
+              <CarteDe key={j.id} name={j.name} size={FORMAT_CARTE.petite} />
+            ))}
+            {invites.map((j) => (
+              <span key={j.id} className="opacity-40">
+                <CarteDe name={j.name} size={FORMAT_CARTE.petite} />
+              </span>
+            ))}
+            {Array.from({ length: places }, (_, i) => (
+              <span
+                key={`vide-${i}`}
+                aria-hidden
+                className="shrink-0 border-[1.5px] border-dashed"
+                style={{ width: COTE, height: COTE, borderRadius: COTE * 0.24, borderColor: `${BRAISE}99`, background: `${BRAISE}14` }}
+              />
+            ))}
+          </Rangees>
         </div>
       }
     />
@@ -277,18 +311,18 @@ function FilDeLEquipe({
       salon={salon}
       className={className}
       libelleNotifs="Notifications de la discussion de l'équipe"
-      vide=""
+      vide="Personne n'a encore écrit."
       secours={DEMO_DISCUSSION_EQUIPE ? filEssai : undefined}
       titre={<EnTete onglets={onglets} onFermer={onFermer} />}
       sousTitre={<SousTitre>{[equipe.nom, equipe.ville].filter(Boolean).join(" · ")}</SousTitre>}
       tete={
-        <div className="flex flex-col items-center gap-3 pt-5 pb-1" aria-label="Les joueurs de l'équipe">
+        <div className="flex flex-col items-center gap-3 pt-5 pb-1">
           <Ecusson initiales={equipe.initiales} fond={equipe.fond} taille={44} />
-          <div className="flex flex-wrap justify-center gap-2">
+          <Rangees n={signataires(equipe).length} label="Les joueurs de l'équipe">
             {signataires(equipe).map((m) => (
               <CarteDe key={m.id} name={m.name} size={FORMAT_CARTE.petite} />
             ))}
-          </div>
+          </Rangees>
         </div>
       }
     />
@@ -310,7 +344,7 @@ function SansEquipe({
   return (
     <section
       data-ecran-fixe=""
-      className={cn("fixed inset-x-0 top-0 z-[60] flex h-dvh flex-col bg-background", className)}
+      className={cn("fixed inset-x-0 top-0 z-[45] flex h-dvh flex-col bg-background", className)}
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       <header className="mx-auto flex w-full max-w-[640px] shrink-0 items-center gap-3 px-5 pt-3 pb-2">
