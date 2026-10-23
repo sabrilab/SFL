@@ -2,8 +2,9 @@
 // Vercel, jamais en production) : tant que la base n'a pas les tables du
 // suivi, la partie Notifications d'Admin → Activité montre une ligue inventée
 // (vingt-deux prénoms, cinq semaines de Vestiaire, trois matchs entre
-// joueurs, une équipe, deux annonces), pour juger de la page remplie. Tirée
-// d'une graine fixe : la même à chaque visite. Rien n'est écrit.
+// joueurs, une équipe, deux dimanches de missions, des bravos, des abonnés,
+// deux annonces), pour juger de la page remplie. Tirée d'une graine fixe :
+// la même à chaque visite. Rien n'est écrit.
 
 import type { MotifNotif } from "@/lib/sfl/motifs-notif";
 import { DAY, debutJour } from "@/lib/sfl/retention";
@@ -30,6 +31,10 @@ const TOUCHE: Partial<Record<MotifNotif, number>> = {
   "match-modifie": 0.5,
   "equipe-message": 0.36,
   "equipe-reponse": 0.6,
+  missions: 0.6,
+  felicitation: 0.66,
+  suivi: 0.5,
+  "suivi-retour": 0.4,
   annonce: 0.42,
 };
 
@@ -46,6 +51,7 @@ const SUITE: Partial<Record<MotifNotif, number>> = {
   "match-modifie": 0.3,
   "equipe-message": 0.3,
   "equipe-reponse": 0.5,
+  suivi: 0.45,
 };
 
 /** mulberry32 : un tirage reproductible. */
@@ -119,11 +125,11 @@ export function notifsDemo(now: number): { donnees: DonneesNotifs; actifs: strin
     // Un délai médian de sept minutes, parfois des heures.
     const ouverte = touchee ? Math.min(now, t + Math.round(-Math.log(1 - r()) * 10 * 60_000)) : null;
     let effet: string | null = null;
-    if (prise && motif === "match-invitation") {
+    if (prise && (motif === "match-invitation" || motif === "missions")) {
       const x = r();
       effet = x < (touchee ? 0.6 : 0.08) ? "accepte" : x < (touchee ? 0.75 : 0.1) ? "refuse" : null;
     } else if (prise && SUITE[motif] !== undefined && r() < (touchee ? SUITE[motif]! : 0.04)) {
-      effet = r() < 0.7 ? "message" : "reaction";
+      effet = motif === "suivi" ? "suivi" : r() < 0.7 ? "message" : "reaction";
     }
     envois.push({
       nom,
@@ -170,6 +176,14 @@ export function notifsDemo(now: number): { donnees: DonneesNotifs; actifs: strin
   }
   // Deux annonces à toute la ligue.
   for (const jour of [5, 27]) for (const p of PRENOMS) prevenir(p, "annonce", a(jour, 18));
+  // La ligue : les missions le vendredi d'avant chaque dimanche, les bravos
+  // le lendemain, et des abonnés de temps en temps.
+  for (const dimanche of [22, 29]) {
+    for (const p of actifs.slice(0, 16)) prevenir(p, "missions", a(dimanche - 2, 18));
+    for (let k = 0; k < 9; k++) prevenir(choisir(actifs), "felicitation", a(dimanche + 1, 12 + Math.floor(r() * 9)));
+  }
+  for (let j = 16; j <= 34; j++)
+    if (r() < 0.7) prevenir(choisir(actifs), r() < 0.3 ? "suivi-retour" : "suivi", a(j, 11 + Math.floor(r() * 11)));
 
   /* ------------------- l'invitation de l'ouverture, les états -------------- */
   const gestes: GesteNotifs[] = [];

@@ -1,8 +1,9 @@
 // Prévenir des joueurs sur leur téléphone, et garder la trace de chaque
 // notification (push_envois) : toutes les routes qui préviennent passent par
 // ici (le Vestiaire, les matchs, les équipes, le rappel de la veille, les
-// annonces de l'admin). La page Activité & rétention en tire, motif par
-// motif, ce que les joueurs en font (Sabri, 23/10).
+// missions du dimanche, les félicitations, les abonnés, les annonces de
+// l'admin). La page Activité & rétention en tire, motif par motif, ce que
+// les joueurs en font (Sabri, 23/10).
 //
 // Pour chaque joueur qui a au moins un téléphone abonné :
 //   1. sa trace est posée AVANT l'envoi, avec un identifiant tiré au hasard

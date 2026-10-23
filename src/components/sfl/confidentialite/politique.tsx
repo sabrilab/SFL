@@ -235,9 +235,10 @@ export function TextePolitique() {
           <P>
             Pour savoir lesquelles servent, chaque notification envoyée est notée avec son motif (une réponse au
             Vestiaire, le rappel d&apos;un match…), jamais avec son texte : si elle est arrivée, si tu l&apos;as
-            touchée, et si tu as fait ce qu&apos;elle proposait (écrire, réagir, répondre à une invitation). L&apos;app
-            note aussi ta réponse quand elle te propose de les activer, et chaque jour si elles sont activées sur ton
-            téléphone. Seuls les administrateurs voient ce suivi (Activité et rétention).
+            touchée, et si tu as fait ce qu&apos;elle proposait (écrire, réagir, répondre à une invitation ou à tes
+            missions, suivre en retour). L&apos;app note aussi ta réponse quand elle te propose de les activer, et
+            chaque jour si elles sont activées sur ton téléphone. Seuls les administrateurs voient ce suivi (Activité
+            et rétention).
           </P>
         </Sous>
 

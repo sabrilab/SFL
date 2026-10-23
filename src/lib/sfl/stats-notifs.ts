@@ -36,7 +36,7 @@ export interface EnvoiLu {
   envoyee: number;
   recue: number | null;
   ouverte: number | null;
-  /** Le geste attendu, une fois fait : message, reaction, accepte, refuse. */
+  /** Le geste attendu, une fois fait : message, reaction, accepte, refuse, suivi. */
   effet: string | null;
 }
 
@@ -83,7 +83,7 @@ export interface Taux {
   /** Celles qui attendaient un geste, et celles qui l'ont eu. */
   attendues: number;
   suivies: number;
-  /** Les invitations à un match : acceptées, refusées. */
+  /** Les réponses attendues (invitation à un match, missions) : oui, non. */
   oui: number;
   non: number;
   /** Délai médian entre l'envoi et le toucher (ms). */

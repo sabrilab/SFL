@@ -1552,7 +1552,7 @@ create table if not exists public.push_envois (
   recue_le    timestamptz,
   ouverte_le  timestamptz,
   -- Le geste attendu, une fois fait : 'message', 'reaction', 'accepte' ou
-  -- 'refuse' (une invitation).
+  -- 'refuse' (une invitation, les missions), 'suivi' (suivi en retour).
   effet       text,
   effet_le    timestamptz
 );
@@ -2040,6 +2040,45 @@ exception
   when undefined_object then null;
 end;
 $$;
+
+-- Répondre à ses missions : ce qu'attend la notification « Missions Bola ·
+-- J3 » (/api/missions/annoncer, motif 'missions', rattachée à la journée ;
+-- push_effet plus haut). Une mission acceptée en fait un oui ('accepte'),
+-- même après en avoir passé une autre ; passer sans rien accepter, un non
+-- ('refuse'). Le suivi n'empêche jamais de répondre.
+create or replace function public.push_effet_missions()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_ref text := 'missions:' || new.saison || ':' || new.j;
+begin
+  begin
+    if new.reponse = 'acceptee' then
+      update public.push_envois e
+         set effet = 'accepte'
+       where e.user_id = new.joueur_id and e.motif = 'missions' and e.ref = v_ref and e.effet = 'refuse';
+      if not found then
+        perform public.push_effet(new.joueur_id, array['missions'], v_ref, 'accepte', interval '7 days');
+      end if;
+    else
+      perform public.push_effet(new.joueur_id, array['missions'], v_ref, 'refuse', interval '7 days');
+    end if;
+  exception when others then
+    raise warning 'push_effet_missions : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_effet_missions() from public, anon, authenticated;
+
+drop trigger if exists missions_reponses_push_effet on public.missions_reponses;
+create trigger missions_reponses_push_effet
+  after insert or update of reponse on public.missions_reponses
+  for each row execute function public.push_effet_missions();
 
 -- Les missions déjà annoncées par notification (/api/missions/annoncer) :
 -- une fois par joueur et par journée. Fermée aux téléphones : seule la route
@@ -3214,6 +3253,32 @@ create policy "suivis: j'arrête de suivre"
 revoke all on public.suivis from anon, authenticated;
 grant select, delete on public.suivis to authenticated;
 grant insert (suivi) on public.suivis to authenticated;
+
+-- Suivre en retour : ce qu'attend la notification « Kader te suit · Suivre
+-- en retour » (/api/suivis, motif 'suivi', rattachée au suiveur ;
+-- push_effet plus haut). Le suivi n'empêche jamais de suivre.
+create or replace function public.push_effet_suivi()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    perform public.push_effet(new.suiveur, array['suivi'], 'joueur:' || new.suivi, 'suivi', interval '7 days');
+  exception when others then
+    raise warning 'push_effet_suivi : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_effet_suivi() from public, anon, authenticated;
+
+drop trigger if exists suivis_push_effet on public.suivis;
+create trigger suivis_push_effet
+  after insert on public.suivis
+  for each row execute function public.push_effet_suivi();
 
 -- Les félicitations : un joueur en félicite un autre pour un exploit des
 -- Actus (l'homme du dimanche, le chiffre, le duo, ils montent, un badge

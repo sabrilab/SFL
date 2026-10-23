@@ -26,6 +26,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Lightbulb, Loader2, TrendingUp, TriangleAlert } from "lucide-react";
+import { estMotif, REPONSES_NOTIF } from "@/lib/sfl/motifs-notif";
 import { jjmm, milliers, pct } from "@/lib/sfl/retention";
 import {
   analyserNotifs,
@@ -33,6 +34,7 @@ import {
   part,
   type DonneesNotifs,
   type EnvoiLu,
+  type FamilleNotifs,
   type GesteNotifs,
   type LigneMotif,
   type MouvementLu,
@@ -264,7 +266,11 @@ function Barre({ t, epaisse }: { t: Taux; epaisse?: boolean }) {
   );
 }
 
+/** « 12 acceptées · 3 refusées », pour les motifs qui attendent un oui ou un non. */
+const reponsesDe = (m: LigneMotif) => (estMotif(m.motif) ? (REPONSES_NOTIF[m.motif]?.(m.oui, m.non) ?? null) : null);
+
 function Motif({ m }: { m: LigneMotif }) {
+  const reponses = reponsesDe(m);
   return (
     <div className="py-2 pl-3">
       <div className="flex items-baseline gap-2">
@@ -272,20 +278,22 @@ function Motif({ m }: { m: LigneMotif }) {
         <Colonnes t={m} />
       </div>
       <Barre t={m} />
-      {m.motif === "match-invitation" && (
-        <p className="mt-1 text-[10.5px] text-foreground/45 tabular-nums">
-          {m.oui} {m.oui > 1 ? "acceptées" : "acceptée"} · {m.non} {m.non > 1 ? "refusées" : "refusée"}
-        </p>
-      )}
+      {reponses && <p className="mt-1 text-[10.5px] text-foreground/45 tabular-nums">{reponses}</p>}
     </div>
   );
+}
+
+/** Une famille d'un seul motif : la ligne de la famille suffit, le motif se dit dessous. */
+function seulMotif(f: FamilleNotifs): string | null {
+  const [m] = f.motifs;
+  return [m.label !== f.label ? m.label : null, reponsesDe(m)].filter(Boolean).join(" · ") || null;
 }
 
 /** Ce que veulent dire les mots de la partie, et ce qu'elle ne compte pas. */
 function note(t: Taux): string {
   return [
     "Touchée : ouverte depuis la notification.",
-    "Suivie d'effet : le joueur a fait ce qu'elle attendait (écrire ou réagir dans la discussion dans les 2 h, répondre à une invitation dans les 14 jours) ; un geste ne compte qu'une fois, pour la notification touchée juste avant, sinon la plus récente.",
+    "Suivie d'effet : le joueur a fait ce qu'elle attendait (écrire ou réagir dans la discussion dans les 2 h, répondre à une invitation dans les 14 jours, à ses missions ou suivre en retour dans les 7 jours) ; un geste ne compte qu'une fois, pour la notification touchée juste avant, sinon la plus récente.",
     "Au Vestiaire, une notification remplace la précédente encore affichée : d'une rafale, une seule reste à toucher.",
     t.envoyees > 0 ? `Arrivées sur le téléphone : ${pct(part(t.arrivees, t.envoyees))}.` : null,
     t.echouees > 0 ? `${milliers(t.echouees)} prises par aucun téléphone, hors des taux.` : null,
@@ -493,8 +501,8 @@ export function NotifsStats({
                     </div>
                     <Barre t={f} epaisse />
                     {f.motifs.length > 1 && f.motifs.map((m) => <Motif key={m.motif} m={m} />)}
-                    {f.motifs.length === 1 && f.motifs[0].label !== f.label && (
-                      <p className="mt-1 text-[11px] text-foreground/45">{f.motifs[0].label}</p>
+                    {f.motifs.length === 1 && seulMotif(f) && (
+                      <p className="mt-1 text-[11px] text-foreground/45 tabular-nums">{seulMotif(f)}</p>
                     )}
                   </div>
                 ))}

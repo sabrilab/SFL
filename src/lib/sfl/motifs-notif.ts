@@ -58,11 +58,11 @@ export const MOTIFS_NOTIF = {
   "equipe-cite": { famille: "equipe", label: "On le cite (@pseudo)", effet: A_L_EQUIPE },
   "equipe-reaction": { famille: "equipe", label: "Une réaction reçue", effet: A_L_EQUIPE },
 
-  // Prêts pour les missions du dimanche, les félicitations et les abonnés :
-  // leurs routes n'ont qu'à les donner.
-  missions: { famille: "ligue", label: "Tes missions du dimanche", effet: null },
+  missions: { famille: "ligue", label: "Missions Bola", effet: "a répondu à ses missions" },
   felicitation: { famille: "ligue", label: "On le félicite", effet: null },
-  suivi: { famille: "ligue", label: "Un joueur le suit", effet: null },
+  suivi: { famille: "ligue", label: "Un joueur le suit", effet: "l'a suivi en retour" },
+  // Déjà suivi par lui : il n'y a rien à faire en retour.
+  "suivi-retour": { famille: "ligue", label: "On le suit en retour", effet: null },
 
   annonce: { famille: "annonce", label: "Annonce à toute la ligue", effet: null },
 } as const satisfies Record<string, DefMotif>;
@@ -76,10 +76,13 @@ export function defMotif(m: string): DefMotif {
   return estMotif(m) ? MOTIFS_NOTIF[m] : { famille: "annonce", label: m, effet: null };
 }
 
-/** Les gestes posés sur une notification (push_envois.effet), en clair. */
-export const GESTES_EFFET: Record<string, string> = {
-  message: "a écrit",
-  reaction: "a réagi",
-  accepte: "a accepté",
-  refuse: "a refusé",
+/**
+ * Les motifs qui attendent un oui ou un non (push_envois.effet : accepte,
+ * refuse), dits en clair. Les missions : une seule acceptée fait un oui ;
+ * passer sans rien accepter, un non.
+ */
+export const REPONSES_NOTIF: Partial<Record<MotifNotif, (oui: number, non: number) => string>> = {
+  "match-invitation": (oui, non) =>
+    `${oui} ${oui > 1 ? "acceptées" : "acceptée"} · ${non} ${non > 1 ? "refusées" : "refusée"}`,
+  missions: (oui, non) => `${oui} ${oui > 1 ? "ont accepté" : "a accepté"} · ${non} ${non > 1 ? "ont passé" : "a passé"}`,
 };
