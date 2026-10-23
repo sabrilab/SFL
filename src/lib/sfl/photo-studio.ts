@@ -28,8 +28,58 @@ export type Coloris = (typeof COLORIS)[number]["id"];
 
 /** Selfies envoyés pour une photo de studio. */
 export const SELFIES_MAX = 3;
-/** Générations par joueur sur 24 h glissantes (studio et filtres confondus). */
-export const LIMITE_JOUR = 12;
+/**
+ * Photos par joueur et par jour, studio et filtres confondus, remises à
+ * minuit, heure de Paris (Sabri, 23/10/2026 : « Elle limite à 3 générations
+ * d'images de cartes par jour », le joueur averti dès la première de ce qui
+ * lui reste et du temps qu'il faut attendre). Avant : 12 sur 24 h glissantes.
+ */
+export const LIMITE_JOUR = 3;
+
+const HEURE_DE_PARIS = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Europe/Paris",
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "numeric",
+  second: "numeric",
+  hourCycle: "h23",
+});
+
+/** L'heure qu'il est à Paris à l'instant t (ms), écrite comme une heure UTC. */
+function murDeParis(t: number): number {
+  const p: Record<string, number> = {};
+  for (const x of HEURE_DE_PARIS.formatToParts(new Date(t))) if (x.type !== "literal") p[x.type] = Number(x.value);
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+}
+
+/** L'instant où il est minuit à Paris le jour a/m/j (j peut déborder sur le mois suivant). */
+function minuitDeParis(a: number, m: number, j: number): number {
+  const mur = Date.UTC(a, m - 1, j);
+  // Le décalage sur UTC (1 h l'hiver, 2 h l'été) est celui de minuit même :
+  // lu deux fois, il tombe juste les nuits de changement d'heure.
+  let t = mur - (murDeParis(mur) - mur);
+  t = mur - (murDeParis(t) - t);
+  return t;
+}
+
+/** Le jour de Paris où tombe `maintenant` : son minuit et celui du lendemain. */
+export function jourDeParis(maintenant: Date = new Date()): { debut: Date; fin: Date } {
+  const mur = new Date(murDeParis(maintenant.getTime()));
+  const [a, m, j] = [mur.getUTCFullYear(), mur.getUTCMonth() + 1, mur.getUTCDate()];
+  return { debut: new Date(minuitDeParis(a, m, j)), fin: new Date(minuitDeParis(a, m, j + 1)) };
+}
+
+/** Une attente en clair : « 42 min », « 5 h », « 5 h 07 » (espaces insécables : elle ne se coupe pas). */
+export function dansCombien(ms: number): string {
+  const min = Math.max(1, Math.ceil(ms / 60_000));
+  if (min < 60) return `${min}\u00a0min`;
+  const reste = min % 60;
+  const h = `${Math.floor(min / 60)}\u00a0h`;
+  return reste ? `${h}\u00a0${String(reste).padStart(2, "0")}` : h;
+}
+
 /** Côté maximal d'un selfie envoyé, en pixels (le modèle n'a pas besoin de plus). */
 export const SELFIE_COTE = 1024;
 

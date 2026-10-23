@@ -152,7 +152,7 @@ export function TextePolitique() {
                 par exemple) : ta carte peut y figurer.
               </>,
               <>
-                Chaque photo faite est notée (le filtre, la date), pour s&apos;en tenir à 12 par jour ; avec le filtre
+                Chaque photo faite est notée (le filtre, la date), pour s&apos;en tenir à 3 par jour ; avec le filtre
                 Drapeau, le pays choisi aussi, pour compter les pays de la ligue.
               </>,
               <>
@@ -264,8 +264,9 @@ export function TextePolitique() {
         <Sous titre="Sur ton téléphone">
           <P>
             L&apos;app y garde ta session, tes réglages et des copies (photos, noms, villes) pour s&apos;ouvrir vite,
-            et un identifiant de séance pour le journal d&apos;usage. Aucun cookie publicitaire, aucun traceur
-            d&apos;une autre entreprise.
+            un identifiant de séance pour le journal d&apos;usage, et les photos que tu fais au studio, pour choisir
+            entre elles : seule celle que tu poses sur ta carte part chez nous. Aucun cookie publicitaire, aucun
+            traceur d&apos;une autre entreprise.
           </P>
         </Sous>
       </Section>

@@ -138,6 +138,7 @@ export function ProfilePhoto({ name }: { name: string }) {
       )}
 
       <PhotoStudio
+        joueur={name}
         ouvert={studio}
         onFermer={() => setStudio(false)}
         onChoisir={(dataUrl) => {

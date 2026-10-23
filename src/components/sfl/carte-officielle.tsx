@@ -71,6 +71,7 @@ export function FluxCarteOfficielle({
   return (
     <>
       <PhotoStudio
+        joueur={player.name}
         ouvert={ouvert}
         onFermer={onFermer}
         onChoisir={(dataUrl) => {
