@@ -20,7 +20,10 @@
 // notification dans la bulle du match ») ; la carte du match porte le même
 // nombre. La bulle, « Discussion du match » dans sa fiche, ou la
 // notification (/?match=12&discussion) ouvre la discussion plein écran
-// (matchs/discussion-match.tsx).
+// (matchs/discussion-match.tsx), avec un onglet Équipe à côté : la
+// discussion de mon équipe du mode Team. Sa notification, et son bouton sur
+// la page Team (/?discussion=equipe), l'ouvrent sur cet onglet, mon
+// prochain match sous l'onglet Match.
 //
 // Les joueurs (22/10, « en poursuivant l'idée de remplacer Snapchat ») :
 // chacun dans sa ville, en piles qui s'ouvrent quand on s'approche
@@ -39,7 +42,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
-import { DiscussionMatch } from "@/components/sfl/matchs/discussion-match";
+import { DiscussionMatch, type OngletDiscussion } from "@/components/sfl/matchs/discussion-match";
 import { FeuilleDeMatch } from "@/components/sfl/matchs/feuille-de-match";
 import { feuilleDeConvocation, feuilleDeJournee } from "@/lib/sfl/feuille";
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
@@ -489,34 +492,53 @@ export default function MapPage() {
   // Le match choisi : celui qu'on a touché s'il est encore là, sinon la une.
   const choisi = affiches.find((m) => m.cle === choix) ?? une;
 
-  // La discussion d'un match, plein écran par-dessus la Map.
-  const [discussion, setDiscussion] = useState<number | null>(null);
+  // La discussion d'un match, plein écran par-dessus la Map ; ou celle de
+  // mon équipe (match: null), mon prochain match sous l'onglet Match.
+  const [discussion, setDiscussion] = useState<{ match: number | null; onglet: OngletDiscussion } | null>(null);
   const fermerDiscussion = useCallback(() => setDiscussion(null), []);
   const ouvrirDiscussion = useCallback((cle: string) => {
     setChoix(cle);
     setFiche(false);
-    setDiscussion(Number(cle.slice(1)));
+    setDiscussion({ match: Number(cle.slice(1)), onglet: "match" });
   }, []);
-  const partieDiscussion = discussion == null ? undefined : parties.find((x) => x.id === discussion);
+  const ouvrirEquipe = useCallback(() => setDiscussion({ match: null, onglet: "equipe" }), []);
+  const partieDiscussion =
+    discussion == null
+      ? undefined
+      : discussion.match != null
+        ? parties.find((x) => x.id === discussion.match)
+        : parties.find((x) => !!moi && (x.organisateurId === moi || x.joueurs.some((j) => j.id === moi)));
 
   // Un match à montrer dès qu'il est là : celui qu'on vient d'ouvrir, ou
   // celui d'une notification (/?match=12). Sa fiche s'ouvre, on y gère tout ;
-  // la notification d'un message (/?match=12&discussion) ouvre sa discussion.
+  // la notification d'un message (/?match=12&discussion) ouvre sa discussion,
+  // celle d'un message de mon équipe (/?discussion=equipe), son onglet.
   const aMontrer = useRef<{ cle: string; discussion: boolean } | null>(null);
+  const equipeAMontrer = useRef(false);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
+    if (q.get("discussion") === "equipe") {
+      equipeAMontrer.current = true;
+      window.history.replaceState(null, "", window.location.pathname);
+      return;
+    }
     const id = q.get("match");
     if (!id || !/^\d+$/.test(id)) return;
     aMontrer.current = { cle: `m${id}`, discussion: q.has("discussion") };
     window.history.replaceState(null, "", window.location.pathname);
   }, []);
   useEffect(() => {
+    if (equipeAMontrer.current) {
+      equipeAMontrer.current = false;
+      ouvrirEquipe();
+      return;
+    }
     const a = aMontrer.current;
     if (!a || !affiches.some((m) => m.cle === a.cle)) return;
     aMontrer.current = null;
     if (a.discussion) ouvrirDiscussion(a.cle);
     else choisirSticker(a.cle);
-  }, [affiches, choisirSticker, ouvrirDiscussion]);
+  }, [affiches, choisirSticker, ouvrirDiscussion, ouvrirEquipe]);
   const invitations = useMemo(() => invitationsDe(parties, moi), [parties, moi]);
 
   // Le carrousel et le plan vont ensemble : faire glisser les cartes choisit
@@ -1091,7 +1113,15 @@ export default function MapPage() {
       />
 
       {/* ─── La discussion d'un match, par-dessus tout (barre d'onglets comprise) ─── */}
-      {partieDiscussion && <DiscussionMatch key={partieDiscussion.id} partie={partieDiscussion} moi={moi} onFermer={fermerDiscussion} />}
+      {discussion && (partieDiscussion || discussion.onglet === "equipe") && (
+        <DiscussionMatch
+          key={discussion.match ?? "equipe"}
+          partie={partieDiscussion ?? null}
+          moi={moi}
+          ongletInitial={discussion.onglet}
+          onFermer={fermerDiscussion}
+        />
+      )}
     </>
   );
 }
