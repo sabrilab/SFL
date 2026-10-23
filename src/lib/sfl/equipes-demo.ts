@@ -23,7 +23,12 @@ export function demoEquipes(noms: string[], moi: string): { equipes: Equipe[]; d
   });
 
   const mienne = equipe(1, "Sunday Five", "SF", "noir", "Lille", [moi, ...pris(0, 4)]);
-  mienne.membres.push(m(autres[4] ?? "Invité", "membre", "invite"));
+  // Un invité depuis cinq heures : il lui en reste 67 pour signer.
+  mienne.membres.push({
+    ...m(autres[4] ?? "Invité", "membre", "invite"),
+    depuis: new Date(Date.now() - 5 * 3600_000).toISOString(),
+    invitePar: `demo-${moi}`,
+  });
   const [a, j, d] = aujourdhuiIso().split("-").map(Number);
   const dans = (n: number) => new Date(Date.UTC(a, j - 1, d + n)).toISOString().slice(0, 10);
   return {
