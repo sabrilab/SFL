@@ -6,17 +6,13 @@
    fin ; des pilules sombres où la couleur n'est qu'un anneau et sa lueur.
    Le verre de nuit d'avant (22/10) allumait chaque bouton de sa couleur,
    avec un halo et un grain : ici, plus de grain ni de halo coloré, et la
-   couleur ne remplit plus le bouton, elle n'en est que l'accent.
-
-   Deux allures à l'essai, le temps que Sabri choisisse (aperçu seulement :
-   ?boutons=nacre ou ?boutons=mat dans l'adresse, retenu sur l'appareil) :
-   · nacre (par défaut) — le principal est une pilule de nacre, le texte
-     sombre dans son ton, une trace de sa couleur en bas ;
-   · mat — le principal est une pilule sombre et mate, au liseré clair ;
-     son ton n'est qu'une lumière douce au bas du bouton.
+   couleur ne remplit plus le bouton, elle n'en est que l'accent. Entre la
+   nacre et une pilule sombre et mate, essayées toutes deux dans l'app,
+   Sabri a choisi la nacre (23/10).
 
    Trois rangs, qu'on lit sans avoir à lire :
-   · bouton-principal  — le geste de l'écran (nacre, ou mat) ;
+   · bouton-principal  — le geste de l'écran : la pilule de nacre, le texte
+                         sombre dans son ton, une trace de sa couleur en bas ;
    · bouton-secondaire — la pilule cerclée d'un trait fin, le texte dans
                          son ton : on la voit, elle ne crie pas ;
    · bouton-discret    — le texte seul, dans son ton.
@@ -55,7 +51,7 @@
   .bouton-givre {
     /* Le ton par défaut, l'argent : sa couleur (ton), le texte sur le sombre
        (texte, discret), le texte sur la nacre (sombre) ; la trace du ton en
-       bas de la nacre (lumiere), la lumière et le liseré du mat (mat,
+       bas de la nacre (lumiere), la lumière et le liseré de l'encre (mat,
        mat-trait), le trait du secondaire (trait). */
     --b-ton: 222 227 236;
     --b-texte: #f1f2ef;
@@ -133,35 +129,10 @@
       0 12px 24px -12px rgb(0 0 0 / 0.95);
   }
 
-  /* ── Principal, mat : une pilule sombre et mate, le liseré clair en haut ;
-     son ton n'est qu'une lumière douce en bas et l'icône. ── */
-  :root[data-boutons="mat"] .bouton-principal {
-    color: #f6f6f4;
-    background-color: #222327;
-    background-image:
-      radial-gradient(60% 110% at 50% 140%, rgb(var(--b-ton) / var(--b-mat)) 0%, rgb(var(--b-ton) / 0) 72%),
-      linear-gradient(180deg, #303238 0%, #24252a 52%, #1c1d20 100%);
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.13),
-      inset 0 0 0 1px rgb(255 255 255 / 0.06),
-      inset 0 -1px 0 rgb(var(--b-ton) / var(--b-mat-trait)),
-      0 1px 1px rgb(0 0 0 / 0.45),
-      0 14px 26px -14px rgb(0 0 0 / 0.95);
-  }
-  :root[data-boutons="mat"] .bouton-principal svg {
-    color: rgb(var(--b-ton));
-  }
-
   /* Un détail sous le libellé d'un principal (une date, un compte) : le
-     texte du bouton, en retrait. */
-  .bouton-principal {
-    --b-sous: rgb(18 19 22 / 0.62);
-  }
-  :root[data-boutons="mat"] .bouton-principal {
-    --b-sous: rgb(246 246 244 / 0.6);
-  }
+     texte sombre de la nacre, en retrait. */
   .bouton-sous {
-    color: var(--b-sous);
+    color: rgb(18 19 22 / 0.62);
   }
 
   /* ── Secondaire : la pilule cerclée d'un trait fin, à peine teintée. ── */
@@ -213,7 +184,7 @@
     scale: 0.97;
     transition-duration: 0.08s;
   }
-  :root:not([data-boutons="mat"]) .bouton-principal:active:not(:disabled) {
+  .bouton-principal:active:not(:disabled) {
     background-image:
       radial-gradient(64% 90% at 50% 132%, rgb(var(--b-ton) / var(--b-lumiere)) 0%, rgb(var(--b-ton) / 0) 70%),
       linear-gradient(180deg, #e4e0da 0%, #ebe7e2 60%, #f1eee9 100%);
@@ -223,7 +194,6 @@
       0 1px 1px rgb(0 0 0 / 0.5),
       0 6px 14px -8px rgb(0 0 0 / 0.9);
   }
-  :root[data-boutons="mat"] .bouton-principal:active:not(:disabled),
   .bouton-encre:active:not(:disabled) {
     filter: brightness(1.15);
   }
@@ -238,7 +208,6 @@
     .bouton-givre:hover:not(:disabled) {
       filter: brightness(0.97);
     }
-    :root[data-boutons="mat"] .bouton-principal:hover:not(:disabled),
     .bouton-encre:hover:not(:disabled) {
       filter: brightness(1.1);
     }
@@ -291,9 +260,6 @@
 @media (prefers-contrast: more) {
   .bouton-principal {
     box-shadow: 0 0 0 1.5px #ffffff;
-  }
-  :root[data-boutons="mat"] .bouton-principal {
-    box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.8);
   }
   .bouton-secondaire {
     box-shadow: inset 0 0 0 1.5px rgb(var(--b-ton) / 0.85);
