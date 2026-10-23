@@ -17,7 +17,7 @@
 
 .fiche {
   /* B, l'argent : le ton par défaut. */
-  --r-lueur: 206 214 228;
+  --r-lueur: 222 227 236;
   --r-feu: 246 248 252;
   --r-texte: #e6ebf3;
   --r-sombre: #3d434d;
@@ -46,13 +46,13 @@
 .fiche--S {
   --r-lueur: 240 196 92;
   --r-feu: 255 238 196;
-  --r-texte: #f4d78c;
-  --r-sombre: #6b4a07;
+  --r-texte: #f0d38a;
+  --r-sombre: #5a3f06;
 }
 .fiche--A {
-  --r-lueur: 230 160 200;
+  --r-lueur: 228 150 198;
   --r-feu: 253 232 243;
-  --r-texte: #f0c6dc;
+  --r-texte: #efc3da;
   --r-sombre: #5b2141;
 }
 /* Accomplie : le cadre s'allume. Ratée : il vire au rouge. Passée, expirée, annulée : elle s'éteint. */
@@ -65,8 +65,8 @@
 }
 .fiche--ratee {
   box-shadow:
-    inset 0 0 0 1px rgb(255 152 154 / 0.55),
-    0 24px 44px -28px rgb(255 152 154 / 0.45),
+    inset 0 0 0 1px rgb(255 155 157 / 0.55),
+    0 24px 44px -28px rgb(255 155 157 / 0.45),
     0 14px 28px -18px rgb(0 0 0 / 0.9);
 }
 .fiche--eteinte {
@@ -175,8 +175,8 @@
   animation: fiche-verrou 0.6s cubic-bezier(0.2, 0.9, 0.25, 1) 0.1s both;
 }
 .fiche__viseur--rate {
-  color: #ff989a;
-  filter: drop-shadow(0 0 4px rgb(255 152 154 / 0.55));
+  color: #ff9b9d;
+  filter: drop-shadow(0 0 4px rgb(255 155 157 / 0.55));
 }
 .fiche__viseur--eteint {
   color: rgb(255 255 255 / 0.16);
@@ -345,7 +345,7 @@
   animation: tampon-pose 0.32s cubic-bezier(0.2, 1.5, 0.4, 1) both;
 }
 .tampon--rouge {
-  --t-encre: #ff989a;
+  --t-encre: #ff9b9d;
 }
 .tampon--gris {
   --t-encre: rgb(244 245 242 / 0.45);

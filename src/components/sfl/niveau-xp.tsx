@@ -151,7 +151,7 @@ export function NiveauXp({ saison }: { saison: number }) {
                 {l.saison === saison ? `J${l.j}` : `S${l.saison} J${l.j}`}
               </span>
               <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{l.quoi}</span>
-              <span className={cn("font-mono text-[13px] font-bold tabular-nums", l.xp < 0 && "text-[#ff989a]")}>
+              <span className={cn("font-mono text-[13px] font-bold tabular-nums", l.xp < 0 && "text-[#ff9b9d]")}>
                 {l.xp < 0 ? `−${-l.xp}` : `+${l.xp}`}
               </span>
             </div>

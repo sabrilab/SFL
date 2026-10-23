@@ -318,7 +318,7 @@ function Champs({ l, mm }: { l: LigneMission; mm: MesMissions }) {
       </div>
       <div>
         <span className="mono-label text-white/45">Risque</span>
-        <span className="flex items-baseline gap-1 text-[#ff989a]">
+        <span className="flex items-baseline gap-1 text-[#ff9b9d]">
           <span className={chiffre} style={{ fontFamily: ANTON }}>
             −{risqueDe(l.m)}
           </span>
@@ -539,7 +539,7 @@ export function MissionsBola() {
           <span className="mono-label text-foreground/45">
             {phase === "ouvert" ? "Les trois accomplies" : phase === "en-jeu" ? "À minuit" : "Ton dimanche"}
           </span>
-          <span className={cn("mono-label", phase !== "ouvert" && xp < 0 ? "text-[#ff989a]" : "text-foreground/70")}>
+          <span className={cn("mono-label", phase !== "ouvert" && xp < 0 ? "text-[#ff9b9d]" : "text-foreground/70")}>
             {phase === "ouvert" ? `+${XP_PARFAIT} XP de bonus` : `${signe(xp)} XP`}
           </span>
         </div>
