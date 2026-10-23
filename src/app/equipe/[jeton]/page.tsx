@@ -3,8 +3,8 @@
 // Le lien d'invitation d'une équipe (mode Team, lib/sfl/equipes.ts) : ce que
 // le capitaine partage. Page publique (hors de la porte de connexion, voir
 // AuthGate) : l'écusson, le nom, l'effectif, puis
-//   · un joueur connecté : « Rejoindre », il arrive invité et signe le
-//     Règlement sur la page Team ;
+//   · un joueur connecté : « Rejoindre », il arrive invité et la page Team
+//     ouvre aussitôt la signature du Règlement ;
 //   · un nouveau : « Créer mon compte », l'inscription courte, qui le fait
 //     entrer dans Bola sans attendre et l'amène invité dans l'équipe ;
 //   · un joueur qui a déjà un compte mais n'est pas connecté : le lien est
@@ -48,8 +48,8 @@ export default function LienEquipePage() {
   async function rejoindre() {
     setEnvoi(true);
     try {
-      await rejoindreParLien(jeton);
-      router.replace("/bola-team");
+      const id = await rejoindreParLien(jeton);
+      router.replace(`/bola-team?invitation=${id}`);
     } catch (e) {
       toast.error(direErreurEquipe(e));
       setEnvoi(false);

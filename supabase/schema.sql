@@ -2312,6 +2312,10 @@ $$;
 alter table public.equipe_membres add column if not exists reglement_version text;
 -- Exclusion programmée par le capitaine (préavis de 48 h).
 alter table public.equipe_membres add column if not exists depart_le timestamptz;
+-- Le dernier avertissement envoyé sur le téléphone pour cette ligne
+-- (/api/equipes/notifier) : l'invitation ou sa relance, puis la signature.
+-- Il garde de prévenir deux fois.
+alter table public.equipe_membres add column if not exists notifie_le timestamptz;
 alter table public.equipe_liens alter column expire_le set default now() + interval '72 hours';
 alter table public.equipe_liens add column if not exists utilisations int not null default 0;
 alter table public.equipe_defis add column if not exists forfait_de bigint references public.equipes(id) on delete set null;
@@ -2475,8 +2479,16 @@ begin
 end;
 $$;
 
--- Le capitaine (ou son vice) invite un joueur de Bola : 72 h pour signer,
--- jamais plus de 7 entre membres et invités.
+-- Le capitaine (ou son vice) invite un joueur de Bola : 72 h pour signer.
+-- C'est l'effectif qui borne (7 membres, doc 13 §1.4 I1), pas les
+-- invitations : on peut inviter plus de joueurs qu'il ne reste de places,
+-- les premiers qui signent entrent, et à 7 les autres invitations tombent
+-- (equipe_signer). Jusqu'au 23/10, membres et invités comptaient ensemble :
+-- trois invités muets suffisaient à bloquer l'équipe 72 h. Six invitations
+-- en attente au plus, la borne haute de la création (team_invitations_creation).
+-- Inviter quelqu'un de déjà invité ne fait rien. L'invité doit pouvoir
+-- signer : un compte validé, sans équipe, jamais parti de celle-ci, et
+-- sorti de sa carence avant que l'invitation tombe.
 create or replace function public.equipe_inviter(e bigint, joueur uuid)
 returns void
 language plpgsql
@@ -2492,8 +2504,14 @@ begin
   if coalesce(public.role_equipe(e), 'membre') = 'membre' then
     raise exception 'Réservé au capitaine.' using errcode = '42501';
   end if;
-  if (select count(*) from public.equipe_membres m where m.equipe_id = e) >= 7 then
+  if public.equipe_effectif(e) >= 7 then
     raise exception 'L''équipe est au complet.' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.equipe_membres m where m.equipe_id = e and m.joueur = equipe_inviter.joueur) then
+    return;
+  end if;
+  if not exists (select 1 from public.profiles p where p.id = equipe_inviter.joueur and p.valide) then
+    raise exception 'Son compte n''est pas encore validé.' using errcode = 'P0001';
   end if;
   if exists (select 1 from public.equipe_departs d where d.equipe_id = e and d.joueur = equipe_inviter.joueur) then
     raise exception 'Ce joueur a quitté l''équipe : il n''y revient pas.' using errcode = 'P0001';
@@ -2501,10 +2519,44 @@ begin
   if exists (select 1 from public.equipe_membres m where m.joueur = equipe_inviter.joueur and m.statut = 'membre') then
     raise exception 'Ce joueur a déjà une équipe.' using errcode = 'P0001';
   end if;
+  if exists (select 1 from public.equipe_departs d
+              where d.joueur = equipe_inviter.joueur and d.parti_le > now() - interval '14 days' + interval '72 hours') then
+    raise exception 'Ce joueur vient de quitter son équipe : 14 jours avant une autre.' using errcode = 'P0001';
+  end if;
+  if (select count(*) from public.equipe_membres m where m.equipe_id = e and m.statut = 'invite') >= 6 then
+    raise exception '6 invitations en attente au plus.' using errcode = 'P0001';
+  end if;
   insert into public.equipe_membres (equipe_id, joueur, statut, invite_par)
   values (e, equipe_inviter.joueur, 'invite', (select auth.uid()))
   on conflict on constraint equipe_membres_pkey do nothing;
 end;
+$$;
+
+-- Ceux que le capitaine ne peut pas inviter, et pourquoi : la liste des
+-- joueurs le dit sur leur ligne, au lieu d'une erreur après coup.
+-- 'parti' : a quitté cette équipe ; 'equipe' : en a déjà une ; 'carence' :
+-- vient de quitter la sienne (14 jours, et l'invitation tomberait avant) ;
+-- 'attente' : compte pas encore validé. Réservé au capitaine et au vice.
+create or replace function public.equipe_indisponibles(e bigint)
+returns table (joueur uuid, raison text)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select t.id, t.raison from (
+    select p.id,
+      case
+        when exists (select 1 from public.equipe_departs d where d.equipe_id = e and d.joueur = p.id) then 'parti'
+        when exists (select 1 from public.equipe_membres m where m.joueur = p.id and m.statut = 'membre' and m.equipe_id <> e) then 'equipe'
+        when exists (select 1 from public.equipe_departs d
+                      where d.joueur = p.id and d.parti_le > now() - interval '14 days' + interval '72 hours') then 'carence'
+        when not p.valide then 'attente'
+      end as raison
+    from public.profiles p
+    where coalesce(public.role_equipe(e), 'membre') <> 'membre'
+  ) t
+  where t.raison is not null;
 $$;
 
 -- Retirer une invitation (le capitaine), ou la refuser (l'invité).
@@ -2735,7 +2787,8 @@ begin
   if exists (select 1 from public.equipe_membres m where m.joueur = moi and m.statut = 'membre') then
     raise exception 'Tu as déjà une équipe.' using errcode = 'P0001';
   end if;
-  if (select count(*) from public.equipe_membres m where m.equipe_id = l.equipe_id) >= 7 then
+  -- Comme pour une invitation : seuls les membres comptent (equipe_inviter).
+  if public.equipe_effectif(l.equipe_id) >= 7 then
     raise exception 'L''équipe est au complet.' using errcode = 'P0001';
   end if;
   insert into public.equipe_membres (equipe_id, joueur, statut, invite_par)
@@ -2867,12 +2920,12 @@ revoke execute on function public.role_equipe(bigint), public.equipe_creer(text,
   public.equipe_retirer_invitation(bigint, uuid), public.equipe_signer(bigint), public.equipe_quitter(bigint),
   public.equipe_vice(bigint, uuid), public.equipe_lien(bigint), public.equipe_par_lien(text),
   public.equipe_defier(bigint, bigint, date, text, text), public.equipe_defi_statut(bigint, text),
-  public.equipe_exclure(bigint, uuid), public.equipe_dissoudre(bigint) from public, anon;
+  public.equipe_exclure(bigint, uuid), public.equipe_dissoudre(bigint), public.equipe_indisponibles(bigint) from public, anon;
 grant execute on function public.role_equipe(bigint), public.equipe_creer(text, text, text), public.equipe_inviter(bigint, uuid),
   public.equipe_retirer_invitation(bigint, uuid), public.equipe_signer(bigint), public.equipe_quitter(bigint),
   public.equipe_vice(bigint, uuid), public.equipe_lien(bigint), public.equipe_par_lien(text),
   public.equipe_defier(bigint, bigint, date, text, text), public.equipe_defi_statut(bigint, text),
-  public.equipe_exclure(bigint, uuid), public.equipe_dissoudre(bigint) to authenticated;
+  public.equipe_exclure(bigint, uuid), public.equipe_dissoudre(bigint), public.equipe_indisponibles(bigint) to authenticated;
 revoke execute on function public.equipe_lien_info(text) from public;
 grant execute on function public.equipe_lien_info(text) to anon, authenticated;
 
@@ -2892,6 +2945,43 @@ exception
   when undefined_object then null;
 end;
 $$;
+
+-- La réponse à une invitation d'équipe : ce qu'attendent « Ilyes t'invite
+-- · FC BENSOU » et sa relance (/api/equipes/notifier, motifs
+-- 'equipe-invitation' et 'equipe-relance', rattachées à l'équipe ;
+-- push_effet plus haut). Signer le Règlement en fait un oui (sa ligne passe
+-- à 'membre') ; la refuser lui-même, ou signer ailleurs (equipe_signer
+-- efface alors ses autres invitations, à son nom), un non. Ce que le
+-- capitaine retire, ou une invitation tombée après 72 h, n'est pas une
+-- réponse. Le suivi n'empêche jamais de signer.
+create or replace function public.push_effet_equipe()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    if tg_op = 'UPDATE' then
+      if old.statut = 'invite' and new.statut = 'membre' then
+        perform public.push_effet(new.joueur, array['equipe-invitation', 'equipe-relance'], 'equipe:' || new.equipe_id, 'accepte', interval '72 hours');
+      end if;
+    elsif old.statut = 'invite' and old.joueur = (select auth.uid()) then
+      perform public.push_effet(old.joueur, array['equipe-invitation', 'equipe-relance'], 'equipe:' || old.equipe_id, 'refuse', interval '72 hours');
+    end if;
+  exception when others then
+    raise warning 'push_effet_equipe : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_effet_equipe() from public, anon, authenticated;
+
+drop trigger if exists equipe_membres_push_effet on public.equipe_membres;
+create trigger equipe_membres_push_effet
+  after update of statut or delete on public.equipe_membres
+  for each row execute function public.push_effet_equipe();
 
 -- ─────────────────── Confidentialité : les accords ───────────────────
 -- L'accord de chaque joueur à la politique de confidentialité (22/10/2026) :
