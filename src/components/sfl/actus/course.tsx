@@ -65,6 +65,7 @@ import { ligneDuRendezVous } from "@/lib/sfl/matchs-du-jour";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
 import { RubriqueDivisions } from "./divisions";
+import { RubriqueOutsider } from "./outsider";
 import { VoteDuJour } from "./fil";
 import { RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
 import { ContratsEnJeu } from "./contrats-en-jeu";
@@ -417,11 +418,11 @@ export function LaCourse({ vueDepart = "fil", exploit }: { vueDepart?: Vue; expl
         </div>
       </header>
       {/* La semaine. Sur téléphone, un seul fil (l'ordre vient des order-*) :
-          le direct, le vote, les divisions, ton dimanche, la convocation, tes
-          missions, les contrats en jeu, puis ce qui se joue. Sur grand écran,
-          deux colonnes : à gauche ce qui se joue (direct, vote, convocation,
-          missions), à droite les divisions et tes rubriques ; dessous, les
-          contrats en jeu sur toute la largeur. */}
+          le direct, le vote, les divisions, l'outsider, ton dimanche, la
+          convocation, tes missions, les contrats en jeu, puis ce qui se joue.
+          Sur grand écran, deux colonnes : à gauche ce qui se joue (direct,
+          vote, convocation, missions), à droite les divisions, l'outsider et
+          tes rubriques ; dessous, les contrats en jeu sur toute la largeur. */}
       <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3">
         <div
           ref={semaine}
@@ -434,6 +435,7 @@ export function LaCourse({ vueDepart = "fil", exploit }: { vueDepart?: Vue; expl
         </div>
         <div className="contents md:grid md:gap-[var(--fib-21)] xl:col-span-2 xl:grid-cols-2">
           <RubriqueDivisions className="order-1 md:order-none" />
+          <RubriqueOutsider className="order-1 md:order-none" />
           {dernier > 0 && (
             <RubriqueToi className="order-1 md:order-none" j={dernier} date={journees.find((x) => x.j === dernier)?.date ?? ""} />
           )}

@@ -181,7 +181,8 @@ function etatViseur(l: LigneMission, phase: Phase): EtatViseur {
   return l.verdict.etat === "annulee" ? "eteint" : "verrou";
 }
 
-function Champ({ label, grand, children }: { label: string; grand?: boolean; children: React.ReactNode }) {
+/** Un champ de fiche : son libellé en petit, la valeur dessous ; en grand, au lettrage des titres. Aussi l'outsider (outsider.tsx). */
+export function Champ({ label, grand, children }: { label: string; grand?: boolean; children: React.ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <dt className="mono-label text-white/45">{label}</dt>

@@ -453,3 +453,105 @@
 .engage--annulee {
   opacity: 0.45;
 }
+
+/*
+ * L'outsider (outsider.tsx) : la fiche du rang B de la D1, à l'argent du
+ * rang. Sa carte en grand dans un halo, l'insigne du rang posé sur son coin.
+ * Sa quête se lit comme un journal de quête : une case hexagonale par étape,
+ * pleine une fois l'étape passée (cerclée de rouge si elle tombe), et la
+ * barre de l'XP vers le rang A, rayée là où ses missions signées la
+ * mèneraient. Comme les Contrats en jeu, rien n'y bouge à l'arrivée : les
+ * tampons sont déjà encrés.
+ */
+.outsider__heros {
+  position: relative;
+}
+.outsider__heros::before {
+  content: "";
+  position: absolute;
+  inset: -36px -44px;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgb(var(--r-lueur) / 0.2), rgb(var(--r-lueur) / 0));
+  pointer-events: none;
+}
+.outsider__insigne {
+  position: absolute;
+  top: -14px;
+  right: -17px;
+  transform: scale(0.62);
+  transform-origin: 100% 0;
+}
+.fiche--outsider .tampon {
+  animation: none;
+}
+.quete {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+}
+.quete > li {
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+  min-height: 50px;
+  padding: 11px 0;
+  border-bottom: 1px solid rgb(255 255 255 / 0.1);
+}
+.quete__quoi {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.quete__case {
+  position: relative;
+  flex-shrink: 0;
+  width: 14px;
+  height: 16px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: rgb(var(--r-lueur) / 0.55);
+}
+.quete__case::after {
+  content: "";
+  position: absolute;
+  inset: 1.5px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: #060607;
+}
+.quete__case--faite {
+  background: rgb(var(--r-lueur));
+}
+.quete__case--faite::after {
+  display: none;
+}
+.quete__case--ratee {
+  background: #ff9b9d;
+}
+/* La barre et sa ligne, alignées sur le libellé de l'étape (case de 14 px, puis 10 px). */
+.quete__barre {
+  position: relative;
+  flex-basis: calc(100% - 24px);
+  height: 4px;
+  margin-left: 24px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.1);
+}
+.quete__barre + .mono-label {
+  flex-basis: calc(100% - 24px);
+  margin-left: 24px;
+}
+.quete__acquis {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  border-radius: 2px;
+  background: rgb(var(--r-lueur));
+  box-shadow: 0 0 8px rgb(var(--r-lueur) / 0.6);
+}
+.quete__possible {
+  position: absolute;
+  inset-block: 0;
+  background: repeating-linear-gradient(-45deg, rgb(var(--r-lueur) / 0.6) 0 3px, rgb(var(--r-lueur) / 0.14) 3px 6px);
+}
