@@ -459,7 +459,7 @@ export function VoteDuJour({ me }: { me: string }) {
   return (
     <>
       {ouvertes.map((j) => (
-        <section key={j.j} className="glass mx-4 flex flex-col gap-3 rounded-[26px] p-[18px]">
+        <section key={j.j} className="glass mx-4 flex flex-col gap-3 rounded-[26px] p-[18px] md:mx-0">
           <h2 className="text-[17px] font-bold tracking-tight">
             Vote du jour <span className="text-foreground/40">· J{j.j}</span>
           </h2>

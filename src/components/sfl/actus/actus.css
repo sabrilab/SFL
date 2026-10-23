@@ -284,3 +284,30 @@
 @keyframes bravo-clap {
   from { transform: scale(1.5) rotate(-12deg); }
 }
+
+/*
+ * Le gabarit des Actus sur tablette et ordinateur (course.tsx) : la page
+ * devient une grille de terrains, deux colonnes dès 768 px, trois dès
+ * 1280 px. Mêmes paliers que .shell (globals.css), mais élargi à 1320 px dès
+ * 1280 : trois terrains côte à côte y gardent la taille qu'ils ont sur un
+ * téléphone. Sous 768 px, rien : le téléphone garde son fil tel quel.
+ */
+@media (min-width: 768px) {
+  .actus-gabarit {
+    width: 100%;
+    max-width: 1000px;
+    margin-inline: auto;
+    padding-inline: 24px;
+  }
+}
+@media (min-width: 1024px) {
+  .actus-gabarit {
+    padding-inline: 32px;
+  }
+}
+@media (min-width: 1280px) {
+  .actus-gabarit {
+    max-width: 1320px;
+    padding-inline: 40px;
+  }
+}
