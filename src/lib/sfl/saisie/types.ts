@@ -61,6 +61,36 @@ export interface JourneeMeta {
    * qui gardent leurs MVP tels qu'ils ont été désignés.
    */
   mvpAuto?: boolean;
+  /**
+   * Les matchs de la journée, Match 1 d'abord : qui s'y affronte, et l'heure,
+   * le lieu et le terrain de chacun quand ce ne sont pas ceux de la journée.
+   * Absent : les équipes s'apparient d'elles-mêmes (saisie/engine.ts), à
+   * l'heure et au lieu de la journée.
+   */
+  matchsDuJour?: MatchDuJour[];
+}
+
+/**
+ * Un match d'une journée (« Match 2 »), Noirs contre Blancs. Sabri, 23/10 :
+ * « Dans une journée, il faudrait que je puisse changer l'heure de chaque
+ * terrain. Et également l'endroit. » Puis : « Noir contre blanc, juste
+ * match 1 et match 2, c'est ça qui les diffère. Même le terrain qu'ils vont
+ * occuper […], et l'heure à laquelle ils vont jouer, et même l'endroit. »
+ *
+ * Les deux équipes y sont écrites en toutes lettres : l'appariement ne
+ * dépend plus de l'ordre des lignes, qu'un absent en tête de feuille ou un
+ * changement d'équipe en direct suffisait à rebattre — et l'heure d'un
+ * match serait partie avec.
+ */
+export interface MatchDuJour {
+  /** Les deux équipes (noms des lignes de saisie) : les Noirs, puis les Blancs. */
+  equipes: [string, string];
+  /** Son coup d'envoi, « 14h30 » ; absent : celui de la journée. */
+  heure?: string;
+  /** Son lieu, l'adresse sur la Map (un id de saison.terrains) ; absent : celui de la journée. */
+  lieuId?: number;
+  /** Le terrain qu'il occupe sur place, « Terrain 3 » ou « 3 ». */
+  terrain?: string;
 }
 
 // Événement minuté d'un match — alimente la timeline et la détection du

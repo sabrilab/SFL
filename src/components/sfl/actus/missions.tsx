@@ -445,7 +445,7 @@ function Fiche({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions;
   const code = NOM_DE_CODE[l.m.genre];
   const camp = mm.d.camps.get(mm.joueur);
   const type =
-    l.m.creneau === "contrat" && camp?.label.startsWith("Terrain") ? `${TYPE.contrat} · ${camp.label}` : TYPE[l.m.creneau];
+    l.m.creneau === "contrat" && camp?.label.startsWith("Match") ? `${TYPE.contrat} · ${camp.label}` : TYPE[l.m.creneau];
   const acceptee = l.reponse?.reponse === "acceptee";
   const apres = mm.phase !== "ouvert";
   const rival = l.m.creneau === "contrat" && mm.enFace ? l.m.cibles[0] : null;

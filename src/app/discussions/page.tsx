@@ -18,6 +18,8 @@ import { usePresence } from "@/hooks/use-presence";
 import { useSession } from "@/hooks/use-session";
 import { NEXT_MATCH } from "@/lib/sfl/data";
 import { activeConvocation } from "@/lib/sfl/saisie/mutations";
+import { equipesDeConvocation } from "@/lib/sfl/saisie/equipes";
+import { PointMaillot } from "@/components/sfl/point-maillot";
 import { cn } from "@/lib/utils";
 
 export default function Discussions() {
@@ -105,9 +107,10 @@ export default function Discussions() {
               </div>
               <span className="h-10 w-px bg-white/10" />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[15px] font-semibold">{presence.lieu}</div>
+                <div className="truncate text-[15px] font-semibold">{presence.rendezVous.lieu}</div>
                 <div className="mt-[3px] text-[12.5px] text-foreground/42">
-                  {presence.heure} · {presence.presents.length}/{presence.effectif} inscrits
+                  {[presence.rendezVous.match, presence.rendezVous.terrain, presence.rendezVous.heure].filter(Boolean).join(" · ")} ·{" "}
+                  {presence.presents.length}/{presence.effectif} inscrits
                 </div>
               </div>
               {presence.mine && (
@@ -157,21 +160,22 @@ export default function Discussions() {
             <div className="border-t border-white/8 px-4 py-3.5">
               <p className="mono-label text-primary">Les équipes de dimanche</p>
               <div className="mt-2.5 flex flex-col gap-2.5">
-                {presence.teams.map((t) => {
-                  const mine = t.players.includes(player.name);
+                {equipesDeConvocation(presence.teams).map((t) => {
+                  const mine = t.joueurs.includes(player.name);
                   return (
-                    <div key={t.name}>
+                    <div key={t.nom}>
                       <p
                         className={cn(
-                          "text-[12.5px] font-bold",
+                          "flex items-center gap-1.5 text-[12.5px] font-bold",
                           mine ? "text-primary" : "text-foreground/70"
                         )}
                       >
-                        {t.name}
+                        {t.camp && <PointMaillot camp={t.camp} />}
+                        {t.libelle}
                         {mine && " · ton équipe"}
                       </p>
                       <p className="mt-0.5 text-[12.5px] leading-snug text-foreground/45">
-                        {t.players.join(" · ")}
+                        {t.joueurs.join(" · ")}
                       </p>
                     </div>
                   );
