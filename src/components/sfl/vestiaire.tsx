@@ -955,6 +955,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
 export function Discussion({
   salon,
   titre,
+  sousTitre,
   aDroite,
   libelleNotifs,
   vide,
@@ -971,6 +972,8 @@ export function Discussion({
   salon: Salon;
   /** À gauche de l'en-tête : le titre de l'écran. */
   titre: React.ReactNode;
+  /** Sous la ligne du titre, de toute sa largeur (le match : où, quand, ce qu'il manque). */
+  sousTitre?: React.ReactNode;
   /** À droite, après la cloche des notifications. */
   aDroite?: React.ReactNode;
   libelleNotifs: string;
@@ -1339,22 +1342,25 @@ export function Discussion({
   const affiches = filtre ? filtre(messages) : messages;
 
   const enTete = (
-    <header className="relative mx-auto flex w-full max-w-[640px] shrink-0 items-center justify-between gap-3 px-5 pt-3 pb-2">
-      {titre}
-      {!empeche && (
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setReglage((v) => !v)}
-            aria-label={libelleNotifs}
-            aria-expanded={reglage}
-            className="bouton-secondaire bouton--mauve flex size-11 items-center justify-center"
-          >
-            {mode === "rien" ? <BellOff className="size-[18px]" /> : <Bell className="size-[18px]" />}
-          </button>
-          {aDroite}
-        </div>
-      )}
+    <header className="relative mx-auto w-full max-w-[640px] shrink-0 px-5 pt-3 pb-2">
+      <div className="flex items-center justify-between gap-3">
+        {titre}
+        {!empeche && (
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setReglage((v) => !v)}
+              aria-label={libelleNotifs}
+              aria-expanded={reglage}
+              className="bouton-secondaire bouton--mauve flex size-11 items-center justify-center"
+            >
+              {mode === "rien" ? <BellOff className="size-[18px]" /> : <Bell className="size-[18px]" />}
+            </button>
+            {aDroite}
+          </div>
+        )}
+      </div>
+      {sousTitre}
       {reglage && <ReglageNotifs mode={mode} onMode={changerMode} onFermer={() => setReglage(false)} />}
     </header>
   );

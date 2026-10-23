@@ -13,7 +13,11 @@
 //   · { filtre: "manga", source: dataURL } : la photo de studio redessinée.
 //
 // Le crédit fal est celui de Sabri : chaque appel est noté dans la table
-// photo_studio, et un joueur s'arrête à LIMITE_JOUR générations sur 24 h.
+// photo_studio, et un joueur a LIMITE_JOUR photos par jour, studio et filtres
+// confondus, remises à minuit, heure de Paris. Chaque réponse dit ce qui lui
+// reste (restantes) et quand le compte repart (fin) : le studio l'affiche dès
+// la première photo. Une photo ratée chez fal reste comptée : on la note
+// avant l'appel, et personne ne peut effacer ses lignes.
 //
 // Confidentialité (22/10/2026) : pas de selfie chez fal sans l'accord du
 // joueur à la politique en vigueur (lib/sfl/confidentialite.server.ts), et
@@ -32,9 +36,11 @@ import { SANS_ACCORD, accordEnregistre } from "@/lib/sfl/confidentialite.server"
 import {
   LIMITE_JOUR,
   SELFIES_MAX,
+  dansCombien,
   estColoris,
   estFiltre,
   estPays,
+  jourDeParis,
   unPays,
   type Coloris,
 } from "@/lib/sfl/photo-studio";
@@ -84,8 +90,11 @@ function estImage(v: unknown): v is string {
   );
 }
 
-function erreur(message: string, status: number) {
-  return NextResponse.json({ error: message }, { status });
+/** Ce qui reste au joueur aujourd'hui, et quand le compte repart (ISO). */
+type Credit = { restantes: number; fin: string };
+
+function erreur(message: string, status: number, credit?: Credit) {
+  return NextResponse.json({ error: message, ...credit }, { status });
 }
 
 /** L'image rendue par fal, en data URL (fal peut rendre une data URL ou un lien). */
@@ -155,17 +164,24 @@ export async function POST(req: NextRequest) {
   if (!profil?.valide) return erreur("Ton compte attend d'être accepté.", 403);
   if (!(await accordEnregistre(sb, auth.user.id))) return erreur(SANS_ACCORD, 403);
 
-  // Le crédit : LIMITE_JOUR générations sur 24 h glissantes.
-  const depuis = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  // Le crédit : LIMITE_JOUR photos depuis minuit, heure de Paris.
+  const { debut, fin } = jourDeParis();
   const { count, error: compteError } = await sb
     .from("photo_studio")
     .select("id", { count: "exact", head: true })
     .eq("user_id", auth.user.id)
-    .gte("created_at", depuis);
+    .gte("created_at", debut.toISOString());
   if (compteError) return erreur("Photo officielle indisponible pour l'instant.", 503);
-  if ((count ?? 0) >= LIMITE_JOUR) {
-    return erreur("Tu as fait assez de photos pour aujourd'hui. Reviens demain.", 429);
+  const faites = count ?? 0;
+  if (faites >= LIMITE_JOUR) {
+    return erreur(
+      `Tes ${LIMITE_JOUR} photos du jour sont faites. De nouveau ${LIMITE_JOUR} dans ${dansCombien(fin.getTime() - Date.now())}.`,
+      429,
+      { restantes: 0, fin: fin.toISOString() }
+    );
   }
+  // Celle-ci comprise.
+  const credit: Credit = { restantes: LIMITE_JOUR - faites - 1, fin: fin.toISOString() };
   // Noté AVANT l'appel : deux demandes simultanées comptent toutes les deux.
   // Le pays du drapeau est gardé pour la page Activité de l'admin.
   const { error: noteError } = await sb
@@ -192,14 +208,14 @@ export async function POST(req: NextRequest) {
     });
     if (!r.ok) {
       console.error("[photo-studio] fal", r.status, (await r.text()).slice(0, 500));
-      return erreur("La photo n'a pas pu être faite. Réessaie.", 502);
+      return erreur("La photo n'a pas pu être faite. Réessaie.", 502, credit);
     }
     const sortie = (await r.json()) as { images?: { url?: string }[] };
     const url = sortie.images?.[0]?.url;
-    if (!url) return erreur("La photo n'a pas pu être faite. Réessaie.", 502);
-    return NextResponse.json({ image: await enDataUrl(url), filtre });
+    if (!url) return erreur("La photo n'a pas pu être faite. Réessaie.", 502, credit);
+    return NextResponse.json({ image: await enDataUrl(url), filtre, ...credit });
   } catch (e) {
     console.error("[photo-studio]", e);
-    return erreur("La photo n'a pas pu être faite. Réessaie.", 502);
+    return erreur("La photo n'a pas pu être faite. Réessaie.", 502, credit);
   }
 }

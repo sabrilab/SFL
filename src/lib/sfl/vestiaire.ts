@@ -170,8 +170,8 @@ interface Brut {
   created_at: string;
 }
 
-/** Où vit une discussion : le Vestiaire, ou la discussion d'un match. */
-export type Canal = { canal: "sfl" } | { canal: "match"; matchId: number };
+/** Où vit une discussion : le Vestiaire, la discussion d'un match, ou celle d'une équipe. */
+export type Canal = { canal: "sfl" } | { canal: "match"; matchId: number } | { canal: "equipe"; equipeId: number };
 const VESTIAIRE: Canal = { canal: "sfl" };
 
 export function expliquer(message: string, ou: Canal = VESTIAIRE): string {
@@ -181,6 +181,12 @@ export function expliquer(message: string, ou: Canal = VESTIAIRE): string {
     // Avant la migration (les aperçus), la colonne match_id n'existe pas.
     if (/match_id/.test(message)) return "La discussion des matchs arrive bientôt.";
     if (/row-level security|violates/i.test(message)) return "Tu n'es plus dans ce match.";
+    return "La discussion ne répond pas. Réessaie dans un instant.";
+  }
+  if (ou.canal === "equipe") {
+    // Avant la migration (les aperçus), la colonne equipe_id n'existe pas.
+    if (/equipe_id/.test(message)) return "La discussion des équipes arrive bientôt.";
+    if (/row-level security|violates/i.test(message)) return "Tu n'es plus dans cette équipe.";
     return "La discussion ne répond pas. Réessaie dans un instant.";
   }
   if (/row-level security|violates/i.test(message)) return "L'admin t'a coupé la parole pour l'instant.";
@@ -203,7 +209,8 @@ export async function chargerFil(
   // on relit sans elle plutôt que de laisser le Vestiaire vide.
   const lire = (colonnes: string) => {
     const q = sb.from("messages").select(colonnes).eq("canal", ou.canal);
-    return (ou.canal === "match" ? q.eq("match_id", ou.matchId) : q).order("created_at", { ascending: false }).limit(limite);
+    const ici = ou.canal === "match" ? q.eq("match_id", ou.matchId) : ou.canal === "equipe" ? q.eq("equipe_id", ou.equipeId) : q;
+    return ici.order("created_at", { ascending: false }).limit(limite);
   };
   let r = await lire("id, auteur, texte, piece, reponse_a, created_at");
   if (r.error && /reponse_a/.test(r.error.message)) r = await lire("id, auteur, texte, piece, created_at");
@@ -251,7 +258,7 @@ export type Resultat = { ok: true } | { ok: false; raison: string };
 /** Pourquoi écrire est impossible — null si ça l'est. */
 export function blocageVestiaire(ou: Canal = VESTIAIRE): string | null {
   const session = getSession();
-  const ici = ou.canal === "match" ? "aux joueurs du match" : "au Vestiaire";
+  const ici = ou.canal === "match" ? "aux joueurs du match" : ou.canal === "equipe" ? "à ton équipe" : "au Vestiaire";
   if (!session) return `Connecte-toi pour parler ${ici}.`;
   if (!session.server) return `Déconnecte-toi puis reconnecte-toi pour écrire ${ici}.`;
   return null;
@@ -259,8 +266,9 @@ export function blocageVestiaire(ou: Canal = VESTIAIRE): string | null {
 
 export type CorpsNotif = { type: "message"; id: number } | { type: "reaction"; id: number; emoji: Emoji };
 
-/** La route qui prévient pour une discussion : celle du Vestiaire, ou celle des matchs. */
-const routeDe = (ou: Canal) => (ou.canal === "match" ? "/api/matchs/discussion" : "/api/vestiaire/notifier");
+/** La route qui prévient pour une discussion : celle du Vestiaire, des matchs ou des équipes. */
+const routeDe = (ou: Canal) =>
+  ou.canal === "match" ? "/api/matchs/discussion" : ou.canal === "equipe" ? "/api/equipes/discussion" : "/api/vestiaire/notifier";
 
 /** Demande au serveur de prévenir qui doit l'être. Sans attendre ni échouer. */
 export function notifier(corps: CorpsNotif, ou: Canal = VESTIAIRE) {
@@ -299,6 +307,7 @@ export async function poster(ou: Canal, texte: string, piece: Piece | null, repo
     if (!uid) return { ok: false, raison: expliquer("jwt", ou) };
     const ligne: Record<string, unknown> = { canal: ou.canal, auteur: uid, destinataire: null, texte: propre };
     if (ou.canal === "match") ligne.match_id = ou.matchId;
+    if (ou.canal === "equipe") ligne.equipe_id = ou.equipeId;
     if (piece) ligne.piece = piece;
     if (reponseA) ligne.reponse_a = reponseA;
     const { data, error } = await sb.from("messages").insert(ligne).select("id").single();
