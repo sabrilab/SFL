@@ -266,6 +266,11 @@ alter table public.profiles add column if not exists ville_lat double precision
 alter table public.profiles add column if not exists ville_lng double precision
   check (ville_lng is null or ville_lng between -180 and 180);
 alter table public.profiles add column if not exists ville_cachee boolean not null default false;
+-- ville_le : quand le joueur a choisi ou confirmé sa ville lui-même (null =
+-- jamais : celle qu'il a, s'il en a une, a été devinée par sa connexion).
+-- Tant qu'elle est vide, l'ouverture de l'app lui propose de la donner
+-- (invitation-carte.tsx, Sabri, 22/10).
+alter table public.profiles add column if not exists ville_le timestamptz;
 
 -- ──────────────────────────── Activité ───────────────────────────────
 -- Journal d'usage : connexions, ouvertures quotidiennes, réponses de
@@ -511,7 +516,7 @@ revoke update (username) on public.profiles from authenticated;
 grant update (name) on public.profiles to authenticated;
 grant update (contact_email) on public.profiles to authenticated;
 grant update (badge) on public.profiles to authenticated;
-grant update (ville, ville_lat, ville_lng, ville_cachee) on public.profiles to authenticated;
+grant update (ville, ville_lat, ville_lng, ville_cachee, ville_le) on public.profiles to authenticated;
 grant insert, select on public.activity to authenticated;
 grant insert, update, delete on public.presence to authenticated;
 grant insert, update, select on public.compositions to authenticated;

@@ -1,9 +1,15 @@
 "use client";
 
-// Les invitations de l'ouverture : les notifications, puis la carte
-// officielle. Une seule par ouverture, jamais les deux.
+// Les invitations de l'ouverture : la ville, les notifications, puis la
+// carte officielle. Une seule par ouverture, jamais deux.
 //
-// 1. Les notifications, d'abord (Sabri, 19/10 : « quand quelqu'un
+// 1. La ville, d'abord (Sabri, 22/10 : « propose à chaque joueur, à sa
+//    prochaine connexion, de renseigner sa ville pour qu'on puisse le mettre
+//    sur la map »). Tant que le joueur ne l'a ni choisie ni confirmée
+//    lui-même (lib/sfl/villes, maVilleAProposer), « D'où tu viens ? » lui
+//    montre celle que sa connexion a devinée, ou la lui fait chercher
+//    (invitation-ville.tsx).
+// 2. Les notifications (Sabri, 19/10 : « quand quelqu'un
 //    télécharge l'application, fais-lui autoriser les notifs directement »).
 //    Dès la première ouverture où ce téléphone peut en recevoir sans les
 //    avoir ni activées ni refusées — l'app installée sur l'écran d'accueil,
@@ -11,7 +17,7 @@
 //    (lib/sfl/notifications). Le bouton est indispensable : iOS ne demande
 //    la permission qu'après un toucher. Un iPhone dans Safari ne peut pas :
 //    le guide d'installation s'en charge d'abord.
-// 2. La carte officielle. Tant que le joueur connecté n'a pas de photo à lui
+// 3. La carte officielle. Tant que le joueur connecté n'a pas de photo à lui
 //    sur sa carte, sa carte actuelle arrive, et un bouton ouvre directement
 //    le parcours (carte-officielle.tsx). On ne décide qu'après avoir relu la
 //    liste des photos de la ligue : un cache vide sur un nouvel appareil ne
@@ -29,23 +35,24 @@ import { Bell, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Card3D } from "@/components/sfl/card-3d";
 import { FluxCarteOfficielle } from "@/components/sfl/carte-officielle";
+import { InvitationVille } from "@/components/sfl/invitation-ville";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSession } from "@/hooks/use-session";
 import { identiteConfirmee, rafraichirIdentites } from "@/lib/sfl/identites";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
 import { activerNotifications, etatNotifications, rafraichirAbonnement } from "@/lib/sfl/notifications";
+import { maVille, maVilleAProposer, type VilleJoueur } from "@/lib/sfl/villes";
 
-type Invitation = "carte" | "notifs";
+type Invitation = "ville" | "carte" | "notifs";
 
-const PLUS_TARD = (quoi: Invitation, nom: string) =>
-  quoi === "carte" ? `sfl-invitation-carte-${nom}` : `sfl-invitation-notifs-${nom}`;
+const PLUS_TARD = (quoi: Invitation, nom: string) => `sfl-invitation-${quoi}-${nom}`;
 /** Silence après « Plus tard ». */
 const PAUSE_MS = 2 * 24 * 3600 * 1000;
 /** Après le splash, et après la cérémonie des nouvelles cartes si elle passe. */
 const DELAI_MS = 2600;
 
-const TEXTES: Record<Invitation, { titre: string; ligne: string; bouton: string }> = {
+const TEXTES: Record<Exclude<Invitation, "ville">, { titre: string; ligne: string; bouton: string }> = {
   carte: {
     titre: "Ta carte officielle",
     ligne: "Ton visage, le maillot Bola. Elle apparaît sur ta carte, chez tout le monde.",
@@ -67,11 +74,11 @@ function enPause(quoi: Invitation, nom: string): boolean {
   }
 }
 
-/** En dev, `?invitation` ou `?invitation=notifs` la montre sans compte vérifié (captures). */
+/** En dev, `?invitation`, `?invitation=notifs` ou `?invitation=ville` la montre sans compte vérifié (captures). */
 function apercu(): Invitation | null {
   if (process.env.NODE_ENV === "production" || typeof window === "undefined") return null;
   const v = new URLSearchParams(window.location.search).get("invitation");
-  return v === null ? null : v === "notifs" ? "notifs" : "carte";
+  return v === null ? null : v === "notifs" || v === "ville" ? v : "carte";
 }
 
 export function InvitationCarte() {
@@ -81,6 +88,8 @@ export function InvitationCarte() {
   const nom = forcee || (session?.server && session.name === player.name) ? player.name : null;
 
   const [visible, setVisible] = useState<Invitation | null>(null);
+  /** La ville que « D'où tu viens ? » propose d'emblée. */
+  const [proposee, setProposee] = useState<VilleJoueur | null>(null);
   const [flux, setFlux] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -90,16 +99,21 @@ export function InvitationCarte() {
     let annule = false;
     const timer = setTimeout(async () => {
       if (forcee) {
+        if (forcee === "ville") setProposee(maVille(nom));
         setVisible(forcee);
         return;
       }
-      const [etat] = await Promise.all([
+      const [etat, ville] = await Promise.all([
         etatNotifications().catch(() => "indisponible" as const),
+        enPause("ville", nom) ? null : maVilleAProposer(nom),
         rafraichirPhotos(),
         rafraichirIdentites(),
       ]);
       if (annule || identiteConfirmee(nom) === false) return;
-      if (etat === "inactives" && !enPause("notifs", nom)) setVisible("notifs");
+      if (ville?.proposer) {
+        setProposee(ville.ville);
+        setVisible("ville");
+      } else if (etat === "inactives" && !enPause("notifs", nom)) setVisible("notifs");
       else if (photoPerso(nom) === null && !enPause("carte", nom)) setVisible("carte");
     }, DELAI_MS);
     return () => {
@@ -137,12 +151,15 @@ export function InvitationCarte() {
     }
   }
 
-  const texte = visible ? TEXTES[visible] : null;
+  const texte = visible && visible !== "ville" ? TEXTES[visible] : null;
   const Icone = visible === "notifs" ? Bell : Sparkles;
 
   return (
     <>
       <AnimatePresence>
+        {visible === "ville" && (
+          <InvitationVille key="ville" player={player} proposee={proposee} onFini={() => setVisible(null)} onPlusTard={plusTard} />
+        )}
         {texte && (
           <motion.div
             key="invitation"

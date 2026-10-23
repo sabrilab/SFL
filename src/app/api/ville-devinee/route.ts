@@ -5,9 +5,11 @@
 // Vercel pose sur chaque requête la ville de l'adresse IP (en-tête
 // x-vercel-ip-city) : juste en wifi, souvent fausse sur le réseau mobile
 // (la sortie de l'opérateur). Rien n'est donc écrit ici : la route renvoie
-// la commune, centrée par la Base Adresse Nationale, et c'est le joueur qui
-// la confirme d'un tap (map/ville-proposee.tsx). Hors de France, ou si la
-// ville est inconnue : rien. L'adresse IP n'est ni gardée ni renvoyée.
+// la commune, centrée par la Base Adresse Nationale. L'app la pose sur la
+// Map en attendant (lib/sfl/villes, poserVilleDevinee), et l'ouverture la
+// propose au joueur, qui la confirme d'un toucher ou en choisit une autre
+// (invitation-ville.tsx). Hors de France, ou si la ville est inconnue :
+// rien. L'adresse IP n'est ni gardée ni renvoyée.
 
 import { NextRequest, NextResponse } from "next/server";
 
