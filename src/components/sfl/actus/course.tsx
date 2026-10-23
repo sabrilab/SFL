@@ -12,8 +12,9 @@
 //     les cartes glissent de leur ancienne place à la nouvelle ;
 //   · le fil : le jour du match, la feuille en direct ; ton dimanche (ta
 //     carte, tes chiffres, tes places) ; la convocation (qui vient, Je viens /
-//     Je passe) ; ce qui se joue dimanche (les places à un ou deux points),
-//     ton rival et ce qu'il te faut pour le passer ; puis chaque dimanche joué,
+//     Je passe) ; tes missions, dès que la feuille est faite (missions.tsx) ;
+//     ce qui se joue dimanche (les places à un ou deux points), ton rival et
+//     ce qu'il te faut pour le passer ; puis chaque dimanche joué,
 //     du plus récent : son terrain avec les cartes des joueurs (CarteJournee),
 //     et ses rubriques. Chaque rubrique est un terrain avec ses petites cartes
 //     près du but, qui s'anime au défilement, sans carrousel (pelouse.tsx ;
@@ -42,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
 import { VoteDuJour } from "./fil";
 import { RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
+import { TesMissions } from "./missions";
 import { VueClassements, VueMatchs } from "./vues";
 
 export type Vue = "fil" | "classements" | "matchs";
@@ -303,6 +305,7 @@ export function LaCourse({ vueDepart = "fil" }: { vueDepart?: Vue }) {
       <VoteDuJour me={me} />
       {dernier > 0 && <RubriqueToi j={dernier} date={journees.find((x) => x.j === dernier)?.date ?? ""} />}
       <Convocation />
+      <TesMissions />
       <div className="flex flex-col gap-1">
         {duels.length > 0 && <RubriqueEnjeux liste={duels} moi={me} />}
         {v && <RubriqueRival v={v} />}

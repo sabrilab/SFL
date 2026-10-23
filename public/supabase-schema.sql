@@ -1641,6 +1641,126 @@ exception
 end;
 $$;
 
+-- ─────────────────────── Missions du dimanche ───────────────────────
+-- Sabri, 22/10 : des missions tirées de la feuille de match, que chacun
+-- accepte ou passe (lib/sfl/missions.ts). Trois par joueur et par journée :
+-- le contrat contre son rival, le défi du dimanche, la ligue (le vote). Elles
+-- ne donnent jamais de point Pépite, seulement de l'XP, que l'app recalcule
+-- depuis la feuille : ici, on ne garde que les réponses.
+--
+-- Règles :
+--   · on répond pour soi seulement, par repondre_mission() : la base pose le
+--     nom (mon_nom) et l'heure (now()), jamais le téléphone. L'app ne retient
+--     qu'une réponse donnée avant le coup d'envoi, qu'elle lit dans la saison ;
+--   · chacun lit ses réponses ; la ligue ne voit un contrat que s'il est
+--     accepté des deux côtés (le rival a accepté le sien en face) : personne
+--     n'est montré comme cible sans l'avoir voulu.
+create table if not exists public.missions_reponses (
+  saison     integer not null,
+  j          integer not null,
+  mission    text    not null check (mission in ('contrat', 'defi', 'ligue')),
+  -- Le nom de joueur de la saison, la clé utilisée partout dans l'app.
+  joueur     text    not null,
+  reponse    text    not null check (reponse in ('acceptee', 'passee')),
+  -- Le rival du contrat au moment de répondre : si la feuille change, la réponse tombe.
+  cible      text,
+  joueur_id  uuid    not null references public.profiles(id) on delete cascade,
+  le         timestamptz not null default now(),
+  primary key (saison, j, mission, joueur)
+);
+
+alter table public.missions_reponses enable row level security;
+
+-- Le contrat d'en face : le rival a accepté le sien contre ce joueur.
+create or replace function public.duel_accepte(p_saison integer, p_j integer, p_joueur text, p_cible text)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select exists (
+    select 1 from public.missions_reponses r
+    where r.saison = p_saison and r.j = p_j and r.mission = 'contrat'
+      and r.joueur = p_cible and r.cible = p_joueur and r.reponse = 'acceptee'
+  );
+$$;
+
+revoke execute on function public.duel_accepte(integer, integer, text, text) from public, anon;
+grant execute on function public.duel_accepte(integer, integer, text, text) to authenticated;
+
+drop policy if exists "missions_reponses: les miennes, et les duels des deux côtés" on public.missions_reponses;
+create policy "missions_reponses: les miennes, et les duels des deux côtés"
+  on public.missions_reponses for select
+  to authenticated
+  using (
+    (select public.est_membre())
+    and (
+      joueur_id = (select auth.uid())
+      or (mission = 'contrat' and reponse = 'acceptee' and public.duel_accepte(saison, j, joueur, cible))
+    )
+  );
+
+revoke all on public.missions_reponses from anon, authenticated;
+grant select on public.missions_reponses to authenticated;
+
+-- Répondre à une mission : la seule porte d'écriture. Renvoie l'heure posée.
+create or replace function public.repondre_mission(
+  p_saison integer,
+  p_j integer,
+  p_mission text,
+  p_reponse text,
+  p_cible text default null
+)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_nom text := public.mon_nom();
+  v_le  timestamptz := now();
+begin
+  if not public.est_membre() or v_nom is null then
+    raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
+  end if;
+  if p_mission not in ('contrat', 'defi', 'ligue') or p_reponse not in ('acceptee', 'passee') then
+    raise exception 'Réponse inconnue.' using errcode = '22023';
+  end if;
+  insert into public.missions_reponses (saison, j, mission, joueur, reponse, cible, joueur_id, le)
+  values (p_saison, p_j, p_mission, v_nom, p_reponse, nullif(btrim(p_cible), ''), (select auth.uid()), v_le)
+  on conflict (saison, j, mission, joueur) do update
+    set reponse = excluded.reponse, cible = excluded.cible, joueur_id = excluded.joueur_id, le = excluded.le;
+  return v_le;
+end;
+$$;
+
+revoke execute on function public.repondre_mission(integer, integer, text, text, text) from public, anon;
+grant execute on function public.repondre_mission(integer, integer, text, text, text) to authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.missions_reponses;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
+
+-- Les missions déjà annoncées par notification (/api/missions/annoncer) :
+-- une fois par joueur et par journée. Fermée aux téléphones : seule la route
+-- serveur, avec la clé secrète, la lit et l'écrit.
+create table if not exists public.missions_envois (
+  saison    integer not null,
+  j         integer not null,
+  joueur    text    not null,
+  envoye_le timestamptz not null default now(),
+  primary key (saison, j, joueur)
+);
+
+alter table public.missions_envois enable row level security;
+revoke all on public.missions_envois from anon, authenticated;
+
 -- ─────────────────────────── Bola Agent ───────────────────────────
 -- La conversation d'un joueur avec son coach (/agent, route /api/agent) :
 -- ses questions et les réponses du coach, avec leurs cartes (programme,

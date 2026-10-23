@@ -39,6 +39,7 @@ import { Card3D } from "@/components/sfl/card-3d";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur";
 import { MaSaison, type RangDuJour } from "@/components/sfl/ma-saison";
+import { NiveauXp } from "@/components/sfl/niveau-xp";
 import { Chiffre } from "@/components/sfl/profil-joueur";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { VitrineBadges } from "@/components/sfl/vitrine";
@@ -51,6 +52,7 @@ import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { useGrandEcran } from "@/hooks/use-media-query";
 import { FormulaireIdentite } from "@/components/sfl/identite";
 import { useIdentites } from "@/hooks/use-identites";
+import { useXp } from "@/hooks/use-missions";
 import { cartesDeCarriere, courbeDeCarriere } from "@/lib/sfl/carriere";
 import { ovr, rankPlayers } from "@/lib/sfl/engine";
 import { dimanchesDe, ficheJoueur } from "@/lib/sfl/fiche-joueur";
@@ -123,6 +125,7 @@ export default function Profil() {
   const [identiteOuverte, setIdentiteOuverte] = useState(false);
   const identite = useIdentites();
   const poste = POSTES.find((p) => p.id === player.poste)?.label ?? player.poste;
+  const xp = useXp(player.name);
 
   return (
     <div className="shell py-4 sm:py-8 lg:pt-[var(--fib-55)]">
@@ -171,6 +174,7 @@ export default function Profil() {
             </span>
             <span className="font-mono text-[12px] text-foreground/45">
               {identite.pseudo(player.name)} · {poste.toLowerCase()}
+              {xp && ` · niveau XP ${xp.niveau}`}
             </span>
           </button>
           <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
@@ -199,6 +203,9 @@ export default function Profil() {
         <div className="flex min-w-0 flex-col gap-[var(--fib-21)]">
           {/* 2. Ma saison : mon dernier dimanche, mes points forts, mes dimanches */}
           <MaSaison saison={`Saison ${saison.numero ?? 0}`} dimanches={dimanches} forts={fiche.forts} rangs={rangs} />
+
+          {/* 2 bis. Mon Niveau XP : le niveau à vie, le passe de la saison, mes missions */}
+          <NiveauXp saison={saison.numero ?? 0} />
 
           {/* 3. Mon évolution, journée après journée : d'abord mon rang, si
               j'en ai un cette saison */}
