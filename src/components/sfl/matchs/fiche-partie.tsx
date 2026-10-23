@@ -140,30 +140,33 @@ export function FichePartie({
           )}
         </button>
       )}
-      <TerrainPlaces
-        places={partie.places}
-        occupants={occupants}
-        moi={moiNom}
-        retirable={organise && !joue}
-        onOccupant={
-          organise && !joue && !occupe
-            ? (o) => {
-                if (o.cle === partie.organisateurId) return;
-                if (window.confirm(`Retirer ${o.nom.split(" ")[0]} du match ?`))
-                  void faire(() => retirerJoueur(partie.id, o.cle), `${o.nom.split(" ")[0]} n'est plus dans le match.`);
-              }
-            : undefined
-        }
-        onPlus={
-          joue || occupe
-            ? undefined
-            : organise
-              ? () => setChoisir(true)
-              : prendrePlace
-                ? () => void faire(() => rejoindre(partie.id), "Place prise, à toi de jouer.")
-                : undefined
-        }
-      />
+      {/* Un cran plus grand dans le panneau de droite, sur grand écran (globals.css). */}
+      <div className="terrain-grand-panneau">
+        <TerrainPlaces
+          places={partie.places}
+          occupants={occupants}
+          moi={moiNom}
+          retirable={organise && !joue}
+          onOccupant={
+            organise && !joue && !occupe
+              ? (o) => {
+                  if (o.cle === partie.organisateurId) return;
+                  if (window.confirm(`Retirer ${o.nom.split(" ")[0]} du match ?`))
+                    void faire(() => retirerJoueur(partie.id, o.cle), `${o.nom.split(" ")[0]} n'est plus dans le match.`);
+                }
+              : undefined
+          }
+          onPlus={
+            joue || occupe
+              ? undefined
+              : organise
+                ? () => setChoisir(true)
+                : prendrePlace
+                  ? () => void faire(() => rejoindre(partie.id), "Place prise, à toi de jouer.")
+                  : undefined
+          }
+        />
+      </div>
       {organise && !joue && (
         <ChoisirJoueur
           open={choisir}

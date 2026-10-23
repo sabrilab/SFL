@@ -36,6 +36,12 @@
 // (la modération et la barre d'onglets restent au Vestiaire, lieu public ;
 // l'arrivée d'un joueur est une ligne du fil, pas une bulle).
 //
+// Sur ordinateur (dès 1024 px ; Sabri, 23/10 : « toutes les sections de
+// l'app » sur desktop), la discussion reste une colonne, car une ligne trop
+// longue ne se lit plus, mais elle prend la mesure du récap (760 px au lieu
+// de 640) ; les photos et vidéos un pas d'or de plus (420 px au lieu de 260),
+// les cartes des pièces un cran de plus (useFormatCarte).
+//
 // Données : lib/sfl/vestiaire.ts. Hors production (développement et aperçus
 // Vercel), ?demo=vestiaire remplit le fil de messages d'essai, sans base,
 // pour juger le rendu.
@@ -45,6 +51,7 @@ import { AlertTriangle, ArrowUp, Bell, BellOff, Camera, Check, Mic, Pause, Play,
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
+import { useFormatCarte } from "@/hooks/use-format-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { Nom } from "@/components/sfl/nom";
@@ -304,7 +311,7 @@ function PhotoVue({ piece }: { piece: PiecePhoto }) {
           if (src) setGrand(true);
         }}
         aria-label="Voir la photo"
-        className="block w-[min(260px,64vw)] overflow-hidden rounded-[20px] bg-contraste/8"
+        className="block w-[min(260px,64vw)] overflow-hidden rounded-[20px] bg-contraste/8 lg:w-[420px]"
         style={{ aspectRatio: ratio }}
       >
         {src && (
@@ -365,7 +372,7 @@ function VideoVue({ piece }: { piece: PieceVideo }) {
           if (src) setGrand(true);
         }}
         aria-label="Lire la vidéo"
-        className="relative block w-[min(260px,64vw)] overflow-hidden rounded-[20px] bg-contraste/8"
+        className="relative block w-[min(260px,64vw)] overflow-hidden rounded-[20px] bg-contraste/8 lg:w-[420px]"
         style={{ aspectRatio: ratio }}
       >
         {/* #t=0.1 : Safari montre alors la première image au lieu d'un cadre noir. */}
@@ -403,6 +410,7 @@ function VideoVue({ piece }: { piece: PieceVideo }) {
 
 function PieceVue({ piece, onOuvrirJournee, mien = false }: { piece: Piece; onOuvrirJournee?: (j: number) => void; mien?: boolean }) {
   const { journees } = useSeason();
+  const format = useFormatCarte();
 
   // L'arrivée d'un joueur n'est pas une pièce à dessiner : le fil en fait une ligne (LigneArrivee).
   if (piece.type === "rejoint") return null;
@@ -414,7 +422,7 @@ function PieceVue({ piece, onOuvrirJournee, mien = false }: { piece: Piece; onOu
   if (piece.type === "carte") {
     return (
       <div className="flex justify-center px-1 pt-1 pb-3">
-        <CarteDe name={piece.joueur} size={FORMAT_CARTE.grande} detail="Partagée au Vestiaire" />
+        <CarteDe name={piece.joueur} size={format.grande} detail="Partagée au Vestiaire" />
       </div>
     );
   }
@@ -427,7 +435,7 @@ function PieceVue({ piece, onOuvrirJournee, mien = false }: { piece: Piece; onOu
         {piece.top.map((l, i) => (
           <div key={l.n} className="flex items-center gap-2.5">
             <span className="w-4 text-[13px] font-bold text-foreground/40 tabular-nums">{i + 1}</span>
-            <CarteDe name={l.n} size={FORMAT_CARTE.petite} />
+            <CarteDe name={l.n} size={format.petite} />
             <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">
               <Nom n={l.n} />
             </span>
@@ -452,6 +460,7 @@ function PieceVue({ piece, onOuvrirJournee, mien = false }: { piece: Piece; onOu
  * sur des lignes, comme un podium. Toucher ouvre la journée dans la Ligue.
  */
 function LigueVue({ piece, onOuvrirJournee }: { piece: PieceLigue; onOuvrirJournee?: (j: number) => void }) {
+  const format = useFormatCarte();
   const joueurs = piece.lignes.filter((l) => l.n);
   const chiffres = piece.lignes.filter((l) => !l.n);
   const ouvrir = piece.j != null && onOuvrirJournee ? () => onOuvrirJournee(piece.j!) : undefined;
@@ -467,14 +476,14 @@ function LigueVue({ piece, onOuvrirJournee }: { piece: PieceLigue; onOuvrirJourn
       </span>
       {joueurs.length === 1 ? (
         <span className="flex flex-col items-center gap-1.5 pt-1">
-          <CarteDe name={joueurs[0].n!} size={FORMAT_CARTE.grande} detail={piece.titre} inerte />
+          <CarteDe name={joueurs[0].n!} size={format.grande} detail={piece.titre} inerte />
           <span className="text-center text-[13px] font-semibold text-foreground/70">{joueurs[0].v}</span>
         </span>
       ) : joueurs.length === 2 ? (
         <span className="flex justify-center gap-4 pt-1">
           {joueurs.map((l) => (
             <span key={l.n} className="flex flex-col items-center gap-1.5">
-              <CarteDe name={l.n!} size={FORMAT_CARTE.moyenne} detail={piece.titre} inerte />
+              <CarteDe name={l.n!} size={format.moyenne} detail={piece.titre} inerte />
               <span className="max-w-[110px] text-center text-[12.5px] leading-tight font-semibold text-foreground/70">{l.v}</span>
             </span>
           ))}
@@ -483,7 +492,7 @@ function LigueVue({ piece, onOuvrirJournee }: { piece: PieceLigue; onOuvrirJourn
         joueurs.map((l, i) => (
           <span key={l.n} className="flex items-center gap-2.5">
             <span className="w-4 text-[13px] font-bold text-foreground/40 tabular-nums">{i + 1}</span>
-            <CarteDe name={l.n!} size={FORMAT_CARTE.petite} inerte />
+            <CarteDe name={l.n!} size={format.petite} inerte />
             <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">
               <Nom n={l.n!} />
             </span>
@@ -507,6 +516,7 @@ function LigueVue({ piece, onOuvrirJournee }: { piece: PieceLigue; onOuvrirJourn
 
 /** Une feuille de match en résumé : les scores, puis les décisifs en cartes. */
 function FeuilleVue({ journee, onOuvrir }: { journee: Journee; onOuvrir?: () => void }) {
+  const format = useFormatCarte();
   const matches = journee.matches ?? [];
   const decisifs = matches
     .flatMap((m) => [...m.teamA.players, ...m.teamB.players])
@@ -543,7 +553,7 @@ function FeuilleVue({ journee, onOuvrir }: { journee: Journee; onOuvrir?: () => 
         <div className="mt-3 flex gap-3">
           {decisifs.map((l) => (
             <span key={l.name} className="flex min-w-0 flex-col items-center gap-1">
-              <CarteDe name={l.name} size={FORMAT_CARTE.petite} inerte />
+              <CarteDe name={l.name} size={format.petite} inerte />
               <span className="mono-label text-[9px] text-foreground/55 tabular-nums">
                 {l.buts > 0 && `${l.buts}B`}
                 {l.buts > 0 && l.passes > 0 && " "}
@@ -1452,7 +1462,7 @@ export function Discussion({
   ];
 
   const enTete = (
-    <header className="relative mx-auto w-full max-w-[640px] shrink-0 px-5 pt-3 pb-2">
+    <header className="relative mx-auto w-full max-w-[640px] shrink-0 px-5 pt-3 pb-2 lg:max-w-[760px]">
       <div className="flex items-center justify-between gap-3">
         {titre}
         {!empeche && (
@@ -1492,7 +1502,7 @@ export function Discussion({
       <div ref={fil} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div
           ref={contenu}
-          className="mx-auto flex min-h-full w-full max-w-[640px] flex-col justify-end px-5 pb-3"
+          className="mx-auto flex min-h-full w-full max-w-[640px] flex-col justify-end px-5 pb-3 lg:max-w-[760px]"
           onClick={(e) => e.target === e.currentTarget && setOuvert(null)}
         >
           {empeche && (
@@ -1538,7 +1548,7 @@ export function Discussion({
 
       {/* La barre d'écriture : au-dessus des onglets, ou du clavier. */}
       {!empeche && (
-        <div className="mx-auto w-full max-w-[640px] shrink-0 px-3 pt-2" style={{ paddingBottom: "var(--pied-ecriture)" }}>
+        <div className="mx-auto w-full max-w-[640px] shrink-0 px-3 pt-2 lg:max-w-[760px]" style={{ paddingBottom: "var(--pied-ecriture)" }}>
           {choix && (
             <ChoixPiece
               onFermer={() => setChoix(false)}

@@ -53,7 +53,8 @@ import { Locked } from "@/components/sfl/locked";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
-import { useGrandEcran } from "@/hooks/use-media-query";
+import { useGrandEcran, useTresGrandEcran } from "@/hooks/use-media-query";
+import { RACINE_PHI } from "@/hooks/use-format-carte";
 import { FormulaireIdentite } from "@/components/sfl/identite";
 import { useIdentites } from "@/hooks/use-identites";
 import { useXp } from "@/hooks/use-missions";
@@ -124,8 +125,10 @@ export default function Profil() {
     }
     return m;
   }, [courbe, saison.numero]);
-  // La carte est le sujet de la page : elle profite de la place quand il y en a.
+  // La carte est le sujet de la page : elle profite de la place quand il y en
+  // a, et d'un cran de plus (√φ) sur les très grands écrans.
   const grand = useGrandEcran();
+  const tresGrand = useTresGrandEcran();
   const [photoOuverte, setPhotoOuverte] = useState(false);
   const [identiteOuverte, setIdentiteOuverte] = useState(false);
   const identite = useIdentites();
@@ -165,7 +168,7 @@ export default function Profil() {
             <Card3D
               cacheKey={`profil-simple-${player.name}`}
               mode="simple"
-              size={grand ? 1.15 : 1}
+              size={tresGrand ? 1.15 * RACINE_PHI : grand ? 1.15 : 1}
               render={(s) => <PlayerCard player={player} size={s} />}
             />
           </div>

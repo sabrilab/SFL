@@ -33,6 +33,13 @@
 // pas assez fluide : c'est bloqué ») : l'invité n'était prévenu nulle part,
 // une invitation ressemblait à un joueur déjà là, une invitation par
 // ouverture de la liste, et le seul geste sur un invité était de le retirer.
+//
+// Sur tablette et ordinateur (dès 768 px ; Sabri, 23/10 : « comme tu l'as
+// fait pour l'onglet Actus »), la largeur des Actus (.gabarit-ligue) et deux
+// colonnes au nombre d'or : à gauche, la grande, mon équipe et son terrain,
+// qui prend un cran de plus dès 1024 px (.terrain-grand) ; à droite, ses
+// défis et les autres équipes. Sous 768 px, rien ne bouge (les copies pour
+// grand écran sont masquées, les enveloppes en display: contents).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -423,13 +430,64 @@ export default function BolaTeamPage() {
   };
   const quand = (d: Defi) => `${libelleJour(d.jour)} · ${d.heure.slice(0, 5)} · ${d.lieu}`;
 
+  // Les autres équipes et « Quitter » : sous l'équipe sur téléphone, dans la
+  // petite colonne, à côté du terrain, sur grand écran (une copie chacun).
+  const lesAutres = (className?: string) =>
+    autres.length > 0 && (
+      <section className={cn("flex flex-col gap-2", className)}>
+        <h2 className="mono-label text-muted-foreground">Équipes</h2>
+        {autres.map((e) => {
+          const dejaDefie = monde.defis.some(
+            (d) => enCours(d) && ((d.de === mienne?.id && d.a === e.id) || (d.a === mienne?.id && d.de === e.id))
+          );
+          const peutDefier = !!mienne && capitaine && active(mienne) && active(e) && !dejaDefie;
+          return <LigneEquipe key={e.id} e={e} droite={peutDefier ? <Pilule ton="bouton--mauve" onClick={() => setAdversaire(e)}>Défier</Pilule> : undefined} />;
+        })}
+      </section>
+    );
+  const partir = (className?: string) =>
+    mienne && (
+      <div className={cn("flex justify-center gap-2", className)}>
+        <button
+          type="button"
+          onClick={() =>
+            setConfirmer({
+              titre: `Quitter ${mienne.nom} pour toujours ?`,
+              oui: "Quitter",
+              non: "Rester",
+              action: () => void agir(() => quitterEquipe(mienne.id)),
+            })
+          }
+          className="bouton-discret bouton--rouge px-4 py-2 text-[13px] font-semibold"
+        >
+          Quitter l&apos;équipe
+        </button>
+        {monRole === "capitaine" && (
+          <button
+            type="button"
+            onClick={() =>
+              setConfirmer({
+                titre: `Dissoudre ${mienne.nom} ?`,
+                oui: "Dissoudre",
+                non: "Garder l'équipe",
+                action: () => void agir(() => dissoudreEquipe(mienne.id)),
+              })
+            }
+            className="bouton-discret bouton--rouge px-4 py-2 text-[13px] font-semibold"
+          >
+            Dissoudre
+          </button>
+        )}
+      </div>
+    );
+
   return (
-    <div className="mx-auto flex w-full max-w-[470px] flex-col gap-7 px-5 pt-2 pb-8 sm:pt-6">
+    <div className="gabarit-ligue mx-auto flex w-full max-w-[470px] flex-col gap-7 px-5 pt-2 pb-8 sm:pt-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
       <h1 className="sr-only">Team</h1>
       <EnteteLigue actif="/bola-team" />
 
       {invitations.length > 0 && (
-        <section className="flex flex-col gap-2.5">
+        <section className="flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:gap-[var(--fib-13)]">
           {invitations.map((e) => (
             <InvitationRecue
               key={e.id}
@@ -443,11 +501,13 @@ export default function BolaTeamPage() {
       )}
 
       {mienne ? (
-        <section className="flex flex-col gap-4">
+        <section className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1.618fr)_minmax(0,1fr)] md:items-start md:gap-[var(--fib-34)] min-[1440px]:gap-[var(--fib-55)]">
+          {/* La grande colonne : l'équipe, sa discussion, son terrain. */}
+          <div className="contents md:flex md:min-w-0 md:flex-col md:gap-[var(--fib-21)]">
           <div className="flex items-center gap-4">
             <Ecusson initiales={mienne.initiales} fond={mienne.fond} taille={76} />
             <div className="flex min-w-0 flex-col gap-1.5">
-              <h2 className="truncate text-[28px] leading-none font-bold tracking-tight">{mienne.nom}</h2>
+              <h2 className="truncate text-[28px] leading-none font-bold tracking-tight md:text-[34px]">{mienne.nom}</h2>
               <span className="mono-label text-muted-foreground">{etatEquipe(mienne)}</span>
               {!active(mienne) && (
                 <span className="mono-label text-braise">Il manque {MIN_EQUIPE - signes.length}</span>
@@ -477,17 +537,19 @@ export default function BolaTeamPage() {
               )}
             </Link>
           )}
-          <TerrainPlaces
-            places={MAX_EQUIPE}
-            unCamp
-            moi={moiNom}
-            occupants={occupants}
-            onPlus={peutInviter ? ouvrirChoix : undefined}
-            onOccupant={(o) => {
-              const m = mienne.membres.find((x) => x.id === o.cle);
-              if (m && m.id !== moi) setJoueur(m);
-            }}
-          />
+          <div className="terrain-grand">
+            <TerrainPlaces
+              places={MAX_EQUIPE}
+              unCamp
+              moi={moiNom}
+              occupants={occupants}
+              onPlus={peutInviter ? ouvrirChoix : undefined}
+              onOccupant={(o) => {
+                const m = mienne.membres.find((x) => x.id === o.cle);
+                if (m && m.id !== moi) setJoueur(m);
+              }}
+            />
+          </div>
           {deborde.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {deborde.map((m) => (
@@ -512,7 +574,10 @@ export default function BolaTeamPage() {
               Inviter des joueurs
             </Button>
           )}
+          </div>
 
+          {/* La petite colonne : les défis, puis les autres équipes. */}
+          <div className="contents md:flex md:min-w-0 md:flex-col md:gap-[var(--fib-21)]">
           {recus.map((d) => {
             const e = nomDe(d.de);
             return e ? (
@@ -561,64 +626,23 @@ export default function BolaTeamPage() {
               })}
             </div>
           )}
+          {lesAutres("hidden md:flex")}
+          {partir("hidden md:mt-[var(--fib-13)] md:flex")}
+          </div>
         </section>
       ) : charge ? (
         <Button
           variant={invitations.length > 0 ? "secondary" : "vert"}
           onClick={() => setCreer(true)}
-          className={cn("h-12 rounded-full text-[15px] font-semibold", invitations.length > 0 && "bouton--vert")}
+          className={cn("h-12 rounded-full text-[15px] font-semibold md:w-[320px] md:self-center", invitations.length > 0 && "bouton--vert")}
         >
           Créer mon équipe
         </Button>
       ) : null}
 
-      {autres.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h2 className="mono-label text-muted-foreground">Équipes</h2>
-          {autres.map((e) => {
-            const dejaDefie = monde.defis.some(
-              (d) => enCours(d) && ((d.de === mienne?.id && d.a === e.id) || (d.a === mienne?.id && d.de === e.id))
-            );
-            const peutDefier = !!mienne && capitaine && active(mienne) && active(e) && !dejaDefie;
-            return <LigneEquipe key={e.id} e={e} droite={peutDefier ? <Pilule ton="bouton--mauve" onClick={() => setAdversaire(e)}>Défier</Pilule> : undefined} />;
-          })}
-        </section>
-      )}
+      {lesAutres(mienne ? "md:hidden" : "md:grid md:grid-cols-2 md:gap-[var(--fib-13)] xl:grid-cols-3 md:[&>h2]:col-span-full")}
 
-      {mienne && (
-        <div className="flex justify-center gap-2">
-          <button
-            type="button"
-            onClick={() =>
-              setConfirmer({
-                titre: `Quitter ${mienne.nom} pour toujours ?`,
-                oui: "Quitter",
-                non: "Rester",
-                action: () => void agir(() => quitterEquipe(mienne.id)),
-              })
-            }
-            className="bouton-discret bouton--rouge px-4 py-2 text-[13px] font-semibold"
-          >
-            Quitter l&apos;équipe
-          </button>
-          {monRole === "capitaine" && (
-            <button
-              type="button"
-              onClick={() =>
-                setConfirmer({
-                  titre: `Dissoudre ${mienne.nom} ?`,
-                  oui: "Dissoudre",
-                  non: "Garder l'équipe",
-                  action: () => void agir(() => dissoudreEquipe(mienne.id)),
-                })
-              }
-              className="bouton-discret bouton--rouge px-4 py-2 text-[13px] font-semibold"
-            >
-              Dissoudre
-            </button>
-          )}
-        </div>
-      )}
+      {partir("md:hidden")}
 
       <CreerEquipe
         open={creer}

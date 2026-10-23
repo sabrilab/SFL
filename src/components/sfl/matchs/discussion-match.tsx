@@ -24,15 +24,20 @@
 // S'ouvre depuis la bulle de messages du match sur la Map, depuis sa fiche,
 // depuis la page Team, ou depuis une notification (/?match=12&discussion,
 // /?discussion=equipe).
+//
+// Sur ordinateur (dès 1024 px), la colonne du Vestiaire (760 px) et les
+// cartes de tête un cran plus grandes (useFormatCarte), places en braise
+// comprises. Sur téléphone et tablette, rien ne bouge.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Discussion } from "@/components/sfl/vestiaire";
-import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
+import { CarteDe } from "@/components/sfl/mini-carte";
 import { Ecusson, EcussonVide } from "@/components/sfl/equipe/ecusson";
 import { buttonVariants } from "@/components/ui/button";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
+import { useFormatCarte } from "@/hooks/use-format-carte";
 import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { arriveesVisibles, salonDuMatch } from "@/lib/sfl/discussion-match";
 import { DEMO_DISCUSSION, filDemo } from "@/lib/sfl/discussion-match-demo";
@@ -206,7 +211,8 @@ function FilDuMatch({
   const orga = partie.joueurs.find((j) => j.id === partie.organisateurId);
   const jouent = [...(orga ? [orga] : []), ...partie.joueurs.filter((j) => j.statut === "inscrit" && j !== orga)];
   const invites = partie.joueurs.filter((j) => j.statut === "invite" && j !== orga);
-  const cote = Math.round(254 * FORMAT_CARTE.petite);
+  const format = useFormatCarte();
+  const cote = Math.round(254 * format.petite);
 
   return (
     <Discussion
@@ -226,11 +232,11 @@ function FilDuMatch({
       tete={
         <div className="flex flex-wrap justify-center gap-2 pt-5 pb-1" aria-label="Les joueurs du match">
           {jouent.map((j) => (
-            <CarteDe key={j.id} name={j.name} size={FORMAT_CARTE.petite} />
+            <CarteDe key={j.id} name={j.name} size={format.petite} />
           ))}
           {invites.map((j) => (
             <span key={j.id} className="opacity-40">
-              <CarteDe name={j.name} size={FORMAT_CARTE.petite} />
+              <CarteDe name={j.name} size={format.petite} />
             </span>
           ))}
           {Array.from({ length: Math.min(manque, PLACES_MAX) }, (_, i) => (
@@ -271,6 +277,7 @@ function FilDeLEquipe({
     equipeCourante.current = equipe;
   }, [equipe]);
   const filEssai = useCallback(() => filDemoEquipe(equipeCourante.current, moi), [moi]);
+  const format = useFormatCarte();
 
   return (
     <Discussion
@@ -286,7 +293,7 @@ function FilDeLEquipe({
           <Ecusson initiales={equipe.initiales} fond={equipe.fond} taille={44} />
           <div className="flex flex-wrap justify-center gap-2">
             {signataires(equipe).map((m) => (
-              <CarteDe key={m.id} name={m.name} size={FORMAT_CARTE.petite} />
+              <CarteDe key={m.id} name={m.name} size={format.petite} />
             ))}
           </div>
         </div>
@@ -313,7 +320,7 @@ function SansEquipe({
       className={cn("fixed inset-x-0 top-0 z-[60] flex h-dvh flex-col bg-background", className)}
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
-      <header className="mx-auto flex w-full max-w-[640px] shrink-0 items-center gap-3 px-5 pt-3 pb-2">
+      <header className="mx-auto flex w-full max-w-[640px] shrink-0 items-center gap-3 px-5 pt-3 pb-2 lg:max-w-[760px]">
         <EnTete onglets={onglets} onFermer={onFermer} />
       </header>
       {charge && (

@@ -548,6 +548,56 @@
   max-width: 760px;
 }
 
+/* Le gabarit de la Ligue sur tablette et ordinateur. Bola et Team partagent
+   l'en-tête des Actus (EnteteLigue) : ils prennent la même largeur que les
+   Actus (.actus-gabarit, actus.css, dont ces paliers sont recopiés), et
+   passer d'une ligue à l'autre ne fait pas sauter l'en-tête. 1000 px dès
+   768, 1320 px dès 1280. Hors des calques : l'emporte sur la colonne de
+   téléphone de la page (max-w-[470px], px-5). Sous 768 px, rien. */
+@media (min-width: 768px) {
+  .gabarit-ligue {
+    width: 100%;
+    max-width: 1000px;
+    margin-inline: auto;
+    padding-inline: 24px;
+  }
+}
+@media (min-width: 1024px) {
+  .gabarit-ligue {
+    padding-inline: 32px;
+  }
+}
+@media (min-width: 1280px) {
+  .gabarit-ligue {
+    max-width: 1320px;
+    padding-inline: 40px;
+  }
+}
+
+/* Sur grand écran, les terrains et leurs cartes prennent un cran de plus :
+   √φ (×1,272), la moitié d'un pas d'or (Sabri, 23/10 : « quand il y a de la
+   place à l'écran […] les terrains un peu en plus grand, avec les cartes un
+   peu en plus grand »). La hiérarchie des cartes, φ d'un format au suivant,
+   ne bouge pas. Un terrain dessiné en pixels (terrain-places.tsx) grandit
+   d'un bloc, cadre compris : .terrain-grand. Les cartes seules :
+   useFormatCarte (hooks/use-format-carte.ts), le même facteur. */
+:root {
+  --racine-phi: 1.272;
+}
+@media (min-width: 1024px) {
+  .terrain-grand {
+    zoom: var(--racine-phi);
+  }
+}
+/* Dans le panneau de droite (une fiche de la Map), la place ne vient qu'à
+   1280 px : avant, il est à sa largeur minimale (400 px), juste celle d'un
+   terrain de téléphone. */
+@media (min-width: 1280px) {
+  .terrain-grand-panneau {
+    zoom: var(--racine-phi);
+  }
+}
+
 /* ─────────────────────── La Map : le plan clair et ses stickers ───────────────────────
    Repris de la carte de « Jouer » de l'app iOS : des objets de papier blanc
    posés sur un plan clair — le sticker mini-stade, sa pastille calendrier,
