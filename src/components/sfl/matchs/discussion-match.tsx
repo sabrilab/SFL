@@ -5,31 +5,188 @@
 // qui connaît quelqu'un de dispo — et chacun en est prévenu sur son
 // téléphone (/api/matchs/discussion).
 //
+// Deux onglets en titre, Match et Équipe (Sabri, 22/10 : « discuter soit
+// avec son match, soit son équipe »), comme Vestiaire et Agent : l'ouvert
+// en blanc, l'autre en gris avec ses messages pas lus en rouge ; on passe de
+// l'un à l'autre en le touchant. L'équipe, c'est celle du mode Team dont je
+// suis membre (lib/sfl/discussion-equipe.ts) ; sans équipe, l'onglet mène à
+// la page Team pour en créer une.
+//
 // C'est l'écran du Vestiaire (components/sfl/vestiaire.tsx, Discussion) :
-// mêmes bulles, réponses, réactions, vocaux, photos. En haut, le match — où,
-// quand, ce qu'il manque — et le retour à la Map ; en tête du fil, les
-// cartes de ceux qui jouent, celles des invités en retrait, et une place en
-// braise pour chaque joueur qui manque. Les arrivées (« Kader a rejoint le
-// match ») sont des lignes du fil, gardées tant qu'elles disent vrai.
+// mêmes bulles, réponses, réactions, vocaux, photos. Sous les onglets, le
+// match — où, quand, ce qu'il manque — ou le nom de l'équipe, et le retour à
+// la Map. En tête du fil du match, les cartes de ceux qui jouent, celles des
+// invités en retrait, et une place en braise pour chaque joueur qui manque ;
+// en tête de celui de l'équipe, son écusson et les cartes de ses membres.
+// Les arrivées (« Kader a rejoint le match ») sont des lignes du fil, gardées
+// tant qu'elles disent vrai.
 //
 // S'ouvre depuis la bulle de messages du match sur la Map, depuis sa fiche,
-// ou depuis une notification (/?match=12&discussion).
+// depuis la page Team, ou depuis une notification (/?match=12&discussion,
+// /?discussion=equipe).
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Discussion } from "@/components/sfl/vestiaire";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
+import { Ecusson, EcussonVide } from "@/components/sfl/equipe/ecusson";
+import { buttonVariants } from "@/components/ui/button";
+import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
+import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { arriveesVisibles, salonDuMatch } from "@/lib/sfl/discussion-match";
 import { DEMO_DISCUSSION, filDemo } from "@/lib/sfl/discussion-match-demo";
+import { DEMO_DISCUSSION_EQUIPE, filDemoEquipe, salonDeLEquipe } from "@/lib/sfl/discussion-equipe";
+import { signataires, type Equipe } from "@/lib/sfl/equipes";
 import { aujourdhuiIso, placesLibres, type Partie } from "@/lib/sfl/matchs";
 import { jourCourt } from "@/lib/sfl/jour-long";
 import type { MessageV } from "@/lib/sfl/vestiaire";
+import { cn } from "@/lib/utils";
 
 const BRAISE = "#FF8A4C";
 /** Au-delà, les places vides ne disent rien de plus que le nombre. */
 const PLACES_MAX = 12;
 
-export function DiscussionMatch({ partie, moi, onFermer }: { partie: Partie; moi: string | null; onFermer: () => void }) {
+export type OngletDiscussion = "match" | "equipe";
+
+export function DiscussionMatch({
+  partie,
+  moi,
+  ongletInitial = "match",
+  onFermer,
+}: {
+  /** Le match ; sans lui (une notification de l'équipe, rien à venir), l'équipe seule. */
+  partie: Partie | null;
+  moi: string | null;
+  ongletInitial?: OngletDiscussion;
+  onFermer: () => void;
+}) {
+  const { equipe, nonLus: nonLusEquipe, charge } = useMonEquipe();
+  const { apercus } = useDiscussionsMatch();
+  const [onglet, setOnglet] = useState<OngletDiscussion>(partie ? ongletInitial : "equipe");
+  // L'écran glisse depuis la droite à l'ouverture ; passer d'un onglet à l'autre ne le refait pas.
+  const [bascule, setBascule] = useState(false);
+  const changer = useCallback((o: OngletDiscussion) => {
+    navigator.vibrate?.(6);
+    setOnglet(o);
+    setBascule(true);
+  }, []);
+
+  // Échap ferme, sur ordinateur.
+  useEffect(() => {
+    const touche = (e: KeyboardEvent) => e.key === "Escape" && onFermer();
+    window.addEventListener("keydown", touche);
+    return () => window.removeEventListener("keydown", touche);
+  }, [onFermer]);
+
+  const surMatch = onglet === "match" && !!partie;
+  const onglets = (
+    <Onglets
+      ouvert={surMatch ? "match" : "equipe"}
+      avecMatch={!!partie}
+      nonLus={{ match: partie ? (apercus.get(partie.id)?.nonLus ?? 0) : 0, equipe: nonLusEquipe }}
+      onOnglet={changer}
+    />
+  );
+  const className = bascule ? undefined : "discussion-entre";
+
+  if (surMatch) return <FilDuMatch key={`m${partie.id}`} partie={partie} moi={moi} onglets={onglets} onFermer={onFermer} className={className} />;
+  if (equipe) return <FilDeLEquipe key={`e${equipe.id}`} equipe={equipe} moi={moi} onglets={onglets} onFermer={onFermer} className={className} />;
+  return <SansEquipe charge={charge} onglets={onglets} onFermer={onFermer} className={className} />;
+}
+
+/* ------------------------------- En-tête -------------------------------- */
+
+/** Match et Équipe, en grands titres : l'ouvert en blanc, l'autre en gris, ses non lus en rouge. */
+function Onglets({
+  ouvert,
+  avecMatch,
+  nonLus,
+  onOnglet,
+}: {
+  ouvert: OngletDiscussion;
+  avecMatch: boolean;
+  nonLus: Record<OngletDiscussion, number>;
+  onOnglet: (o: OngletDiscussion) => void;
+}) {
+  const liste: { id: OngletDiscussion; label: string }[] = [
+    ...(avecMatch ? [{ id: "match" as const, label: "Match" }] : []),
+    { id: "equipe", label: "Équipe" },
+  ];
+  const taille = "text-[clamp(24px,7vw,28px)] leading-tight font-bold tracking-tight";
+  return (
+    <nav aria-label="Discussion" className="flex min-w-0 items-baseline gap-3.5">
+      {liste.map(({ id, label }) =>
+        id === ouvert ? (
+          <h1 key={id} className={taille}>
+            {label}
+          </h1>
+        ) : (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onOnglet(id)}
+            aria-label={nonLus[id] > 0 ? `${label}, ${nonLus[id]} message${nonLus[id] > 1 ? "s" : ""} pas lu${nonLus[id] > 1 ? "s" : ""}` : label}
+            className={cn("relative text-foreground/25 transition-colors active:text-foreground/45", taille)}
+          >
+            {label}
+            {nonLus[id] > 0 && (
+              <span
+                aria-hidden
+                className="absolute -top-1 -right-3.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-[5px] text-[11px] leading-none font-bold tracking-normal text-white tabular-nums"
+                style={{ background: "#FF3B30", boxShadow: "0 0 0 2px var(--background)" }}
+              >
+                {nonLus[id] > 9 ? "9+" : nonLus[id]}
+              </span>
+            )}
+          </button>
+        )
+      )}
+    </nav>
+  );
+}
+
+/** Le retour à la Map, puis les onglets. */
+function EnTete({ onglets, onFermer }: { onglets: React.ReactNode; onFermer: () => void }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <button
+        type="button"
+        onClick={onFermer}
+        aria-label="Revenir à la Map"
+        className="bouton-secondaire flex size-11 shrink-0 items-center justify-center"
+      >
+        <ChevronLeft className="size-5" strokeWidth={2.4} />
+      </button>
+      <div className="min-w-0">{onglets}</div>
+    </div>
+  );
+}
+
+/**
+ * Sous les onglets, ce qui est ouvert : de toute la largeur de l'en-tête,
+ * cloche comprise, pour que « Il manque 7 » ne soit jamais coupé ; aligné
+ * sur les onglets, après le retour (44 px) et son écart (12 px).
+ */
+function SousTitre({ children }: { children: React.ReactNode }) {
+  return <p className="mt-1 truncate pl-14 text-[12.5px] font-semibold text-foreground/50">{children}</p>;
+}
+
+/* --------------------------------- Match -------------------------------- */
+
+function FilDuMatch({
+  partie,
+  moi,
+  onglets,
+  onFermer,
+  className,
+}: {
+  partie: Partie;
+  moi: string | null;
+  onglets: React.ReactNode;
+  onFermer: () => void;
+  className?: string;
+}) {
   const salon = useMemo(() => salonDuMatch(partie.id), [partie.id]);
   const manque = placesLibres(partie);
 
@@ -45,13 +202,6 @@ export function DiscussionMatch({ partie, moi, onFermer }: { partie: Partie; moi
   }, [partie]);
   const filEssai = useCallback(() => filDemo(partieCourante.current, moi), [moi]);
 
-  // Échap ferme, sur ordinateur.
-  useEffect(() => {
-    const touche = (e: KeyboardEvent) => e.key === "Escape" && onFermer();
-    window.addEventListener("keydown", touche);
-    return () => window.removeEventListener("keydown", touche);
-  }, [onFermer]);
-
   // Qui joue : l'organisateur d'abord, puis les inscrits ; les invités après, en retrait.
   const orga = partie.joueurs.find((j) => j.id === partie.organisateurId);
   const jouent = [...(orga ? [orga] : []), ...partie.joueurs.filter((j) => j.statut === "inscrit" && j !== orga)];
@@ -61,29 +211,17 @@ export function DiscussionMatch({ partie, moi, onFermer }: { partie: Partie; moi
   return (
     <Discussion
       salon={salon}
-      className="discussion-entre"
+      className={className}
       libelleNotifs="Notifications de la discussion du match"
       vide=""
       secours={DEMO_DISCUSSION ? filEssai : undefined}
       filtre={filtre}
-      titre={
-        <div className="flex min-w-0 items-center gap-3">
-          <button
-            type="button"
-            onClick={onFermer}
-            aria-label="Revenir à la Map"
-            className="bouton-secondaire flex size-11 shrink-0 items-center justify-center"
-          >
-            <ChevronLeft className="size-5" strokeWidth={2.4} />
-          </button>
-          <div className="min-w-0">
-            <h1 className="truncate text-[21px] leading-tight font-bold tracking-tight">{partie.lieu}</h1>
-            <p className="mt-0.5 truncate text-[12.5px] font-semibold text-foreground/50">
-              {jourCourt(partie.jour, aujourdhuiIso())} · {partie.heure} ·{" "}
-              {manque > 0 ? <span style={{ color: BRAISE }}>Il manque {manque}</span> : "Complet"}
-            </p>
-          </div>
-        </div>
+      titre={<EnTete onglets={onglets} onFermer={onFermer} />}
+      sousTitre={
+        <SousTitre>
+          {partie.lieu} · {jourCourt(partie.jour, aujourdhuiIso())} · {partie.heure} ·{" "}
+          {manque > 0 ? <span style={{ color: BRAISE }}>Il manque {manque}</span> : "Complet"}
+        </SousTitre>
       }
       tete={
         <div className="flex flex-wrap justify-center gap-2 pt-5 pb-1" aria-label="Les joueurs du match">
@@ -106,5 +244,85 @@ export function DiscussionMatch({ partie, moi, onFermer }: { partie: Partie; moi
         </div>
       }
     />
+  );
+}
+
+/* -------------------------------- Équipe -------------------------------- */
+
+function FilDeLEquipe({
+  equipe,
+  moi,
+  onglets,
+  onFermer,
+  className,
+}: {
+  equipe: Equipe;
+  moi: string | null;
+  onglets: React.ReactNode;
+  onFermer: () => void;
+  className?: string;
+}) {
+  const salon = useMemo(() => salonDeLEquipe(equipe.id), [equipe.id]);
+
+  // Aperçus et développement : la base n'a pas encore la discussion des
+  // équipes, un fil d'essai tiré de ses membres la remplace.
+  const equipeCourante = useRef(equipe);
+  useEffect(() => {
+    equipeCourante.current = equipe;
+  }, [equipe]);
+  const filEssai = useCallback(() => filDemoEquipe(equipeCourante.current, moi), [moi]);
+
+  return (
+    <Discussion
+      salon={salon}
+      className={className}
+      libelleNotifs="Notifications de la discussion de l'équipe"
+      vide=""
+      secours={DEMO_DISCUSSION_EQUIPE ? filEssai : undefined}
+      titre={<EnTete onglets={onglets} onFermer={onFermer} />}
+      sousTitre={<SousTitre>{[equipe.nom, equipe.ville].filter(Boolean).join(" · ")}</SousTitre>}
+      tete={
+        <div className="flex flex-col items-center gap-3 pt-5 pb-1" aria-label="Les joueurs de l'équipe">
+          <Ecusson initiales={equipe.initiales} fond={equipe.fond} taille={44} />
+          <div className="flex flex-wrap justify-center gap-2">
+            {signataires(equipe).map((m) => (
+              <CarteDe key={m.id} name={m.name} size={FORMAT_CARTE.petite} />
+            ))}
+          </div>
+        </div>
+      }
+    />
+  );
+}
+
+/** Pas encore d'équipe : sa place en pointillé, et de quoi en créer une. */
+function SansEquipe({
+  charge,
+  onglets,
+  onFermer,
+  className,
+}: {
+  charge: boolean;
+  onglets: React.ReactNode;
+  onFermer: () => void;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cn("fixed inset-x-0 top-0 z-[60] flex h-dvh flex-col bg-background", className)}
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
+    >
+      <header className="mx-auto flex w-full max-w-[640px] shrink-0 items-center gap-3 px-5 pt-3 pb-2">
+        <EnTete onglets={onglets} onFermer={onFermer} />
+      </header>
+      {charge && (
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8 pb-[14vh]">
+          <EcussonVide taille={84} className="text-foreground/25" />
+          <Link href="/bola-team" className={cn(buttonVariants({ variant: "vert" }), "h-12 rounded-full px-6 text-[15px] font-semibold")}>
+            Créer mon équipe
+          </Link>
+        </div>
+      )}
+    </section>
   );
 }

@@ -8,7 +8,8 @@
 // À droite, détachée, la pastille ronde du Vestiaire (la discussion de la
 // ligue), avec le nombre de messages pas encore lus. L'onglet Map compte mes
 // invitations sans réponse et les messages pas lus des discussions de mes
-// matchs (22/10) ; l'icône de l'app, ces messages-là et ceux du Vestiaire.
+// matchs (22/10) ; l'icône de l'app, ces messages-là, ceux du Vestiaire et
+// ceux de la discussion de mon équipe.
 // La Recherche, qui était là, est montée en haut des écrans
 // (BoutonRecherche, à la demande de Sabri le 19/10) : le Vestiaire, où l'on
 // revient sans cesse, reste sous le pouce.
@@ -29,6 +30,7 @@ import { ongletActif } from "@/lib/nav";
 import { pastilleIcone, useVestiaireNonLus } from "@/hooks/use-vestiaire-non-lus";
 import { useInvitationsMatch } from "@/hooks/use-invitations";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
+import { useMonEquipe } from "@/hooks/use-mon-equipe";
 
 const TABS = [
   { href: "/", Icon: MapIcon, label: "Map" },
@@ -53,8 +55,9 @@ export function BottomNav() {
   const invitations = useInvitationsMatch();
   const discussions = useDiscussionsMatch().nonLus;
   const surOngletMap = invitations + discussions;
+  const equipe = useMonEquipe().nonLus;
   // L'icône de l'app : tous les messages pas lus, comme les notifications.
-  useEffect(() => pastilleIcone(nonLus + discussions), [nonLus, discussions]);
+  useEffect(() => pastilleIcone(nonLus + discussions + equipe), [nonLus, discussions, equipe]);
 
   return (
     <div
