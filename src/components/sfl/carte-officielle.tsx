@@ -3,9 +3,12 @@
 // « Créer ma carte officielle » : l'appel principal de Ma carte. Il ouvre la
 // photo officielle (photo-studio.tsx : visage à l'appareil photo, maillot,
 // filtres), puis le recadrage habituel, et la photo part sur la carte chez
-// tout le monde (lib/sfl/photos). Une fois une photo posée, le même bouton
-// sert à la refaire. Le parcours seul (FluxCarteOfficielle) sert aussi à
-// l'invitation de l'ouverture (invitation-carte.tsx).
+// tout le monde (lib/sfl/photos). Une fois la carte faite, le bouton quitte
+// Ma carte (Sabri, 22/10 : il « ne doit plus être présent sur ma carte une
+// fois l'action effectuée ») : on la refait depuis « Ma photo »
+// (profile-photo.tsx), en touchant sa photo. Le parcours seul
+// (FluxCarteOfficielle) sert aussi à l'invitation de l'ouverture
+// (invitation-carte.tsx).
 
 import { useState } from "react";
 import { Sparkles } from "lucide-react";
@@ -21,22 +24,20 @@ import { cn } from "@/lib/utils";
 export function CarteOfficielle({ player, className }: { player: Player; className?: string }) {
   const [studio, setStudio] = useState(false);
   const aUnePhoto = usePhotoPerso(player.name) !== null;
+  // La photo posée, le parcours est déjà refermé (le recadrage se ferme avant
+  // l'envoi) : le bouton peut partir sans rien couper.
+  if (aUnePhoto) return null;
 
   return (
     <>
       <button
         type="button"
         onClick={() => setStudio(true)}
-        // Pas encore de photo : l'or, c'est la carte à gagner. Une fois faite,
-        // la refaire n'est plus qu'un second geste, en verre fumé.
-        className={cn(
-          "flex items-center justify-center gap-2 py-[15px] text-[15px] font-bold",
-          aUnePhoto ? "bouton-secondaire bouton--or" : "bouton-principal bouton--or",
-          className
-        )}
+        // L'or : c'est la carte à gagner.
+        className={cn("bouton-principal bouton--or flex items-center justify-center gap-2 py-[15px] text-[15px] font-bold", className)}
       >
         <Sparkles className="size-4" />
-        {aUnePhoto ? "Refaire ma carte officielle" : "Créer ma carte officielle"}
+        Créer ma carte officielle
       </button>
       <FluxCarteOfficielle player={player} ouvert={studio} onFermer={() => setStudio(false)} />
     </>
