@@ -39,8 +39,13 @@ import { cn } from "@/lib/utils";
 export const pluriel = (n: number, un: string, plusieurs: string) => (n > 1 ? plusieurs : un);
 
 const PHI = (1 + Math.sqrt(5)) / 2;
-/** Les visages de « Suivi par » : la pastille, un cran sous la petite (30 px). */
-const VISAGE = FORMAT_CARTE.petite / PHI;
+/**
+ * Les visages de « Suivi par » : la pastille, un cran sous la petite (30 px).
+ * Lu au rendu, pas au chargement : mini-carte → card-viewer → suivre →
+ * mini-carte est un cycle, et selon l'ordre des imports FORMAT_CARTE n'est
+ * pas encore défini quand ce module se charge.
+ */
+const visage = () => FORMAT_CARTE.petite / PHI;
 
 type Onglet = "abonnes" | "abonnements";
 
@@ -132,7 +137,7 @@ function Visages({ noms, clair }: { noms: string[]; clair: boolean }) {
           className={cn("relative flex rounded-[24%] ring-2", clair ? "ring-[#f2f1ee]" : "ring-background", i > 0 && "-ml-[11px]")}
           style={{ zIndex: noms.length - i }}
         >
-          <CarteDe name={n} size={VISAGE} inerte />
+          <CarteDe name={n} size={visage()} inerte />
         </span>
       ))}
     </span>

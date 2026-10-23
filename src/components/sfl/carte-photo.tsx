@@ -15,18 +15,20 @@
 //   · pastille (< 70)       : un carré, le visage, la note dans un onglet
 //                             (aux couleurs de l'équipe sur les terrains).
 //
-// Les cartes à titre (`distinction`, Sabri 22/10) : la photo est sertie
-// dans un cadre de métal à leur couleur, or (MVP), rouge (Impact) ou bleu
-// (Défensive), de 1/φ⁶ de la largeur ; le voile du bas et l'onglet de la
-// note prennent la même teinte (teinte-carte.ts).
+// Les cartes à titre (`distinction`, Sabri 22/10) et les finitions de la
+// passe (`habillage`, 23/10) : la photo est sertie dans un cadre de leur
+// matière (finitions-carte.ts : l'or du MVP, le rouge d'Impact, le cobalt
+// de la Défensive, la nuit, le chrome, la nacre), de 1/φ⁶ de la largeur,
+// avec un liseré de lumière ; le voile du bas et l'onglet de la note
+// prennent la même teinte. La carte de saison sans finition reste sans
+// cadre : la photo bord à bord. Coins de 92 (÷ φ⁵), comme la classique.
 //
 // Toujours le repère 1024 × 1656 (1 × φ) et les mêmes calques que la
 // classique (`data-card-part` body / player / stats).
 
 import { Badge3D } from "@/components/sfl/badge-3d";
 import { palierCarte } from "@/components/sfl/bola-card";
-import type { HabillageCarte } from "@/components/sfl/finitions-carte";
-import { TEINTES } from "@/components/sfl/teinte-carte";
+import { MATIERES, RAYON_CARTE, type HabillageCarte } from "@/components/sfl/finitions-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import type { BoostType } from "@/lib/sfl/engine";
 
@@ -115,7 +117,8 @@ export function CartePhoto({
   const u = (n: number) => n * size * (254 / W);
   const p0 = palierCarte(largeur);
   const palier = vertical && p0 === "pastille" ? "reduite" : p0;
-  const teinte = distinction ? TEINTES[distinction] : null;
+  // Le serti : la matière d'une carte à titre, ou de la finition portée.
+  const teinte = distinction ? MATIERES[distinction] : habillage?.finition ? MATIERES[habillage.finition] : null;
 
   if (palier === "pastille") {
     return (
@@ -128,7 +131,9 @@ export function CartePhoto({
           borderRadius: "24%",
           overflow: "hidden",
           background: teinte?.cadre ?? "#2a2b2f",
-          boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12), 0 2px 6px rgba(0,0,0,0.28)",
+          boxShadow: teinte
+            ? `inset 0 0 0 1px ${teinte.rebord.ombre}, inset 1px 1px 0 ${teinte.rebord.lumiere}, 0 2px 6px rgba(0,0,0,0.28)`
+            : "inset 0 0 0 1px rgba(255,255,255,0.12), 0 2px 6px rgba(0,0,0,0.28)",
         }}
       >
         <div
@@ -139,6 +144,7 @@ export function CartePhoto({
             borderRadius: teinte ? "20%" : undefined,
             overflow: "hidden",
             background: "#2a2b2f",
+            boxShadow: teinte ? `0 0 0 1px ${teinte.rebord.lumiere}` : undefined,
           }}
         >
           <Photo photo={photo} nom={name} taille={largeur * 1.6} />
@@ -199,10 +205,16 @@ export function CartePhoto({
         position: "relative",
         width: u(W),
         height: u(H),
-        borderRadius: u(61),
+        borderRadius: u(RAYON_CARTE),
         overflow: "hidden",
         background: teinte?.cadre ?? "#2a2b2f",
-        boxShadow: `inset 0 0 0 ${u(3)}px rgba(255,255,255,0.1), 0 10px 28px rgba(0,0,0,0.45)`,
+        boxShadow: teinte
+          ? [
+              `inset 0 0 0 ${u(3)}px ${teinte.rebord.ombre}`,
+              `inset ${u(5)}px ${u(6)}px ${u(4)}px -${u(2)}px ${teinte.rebord.lumiere}`,
+              "0 10px 28px rgba(0,0,0,0.45)",
+            ].join(", ")
+          : `inset 0 0 0 ${u(3)}px rgba(255,255,255,0.1), 0 10px 28px rgba(0,0,0,0.45)`,
         fontFamily: SANS,
         textAlign: "left",
       }}
@@ -212,10 +224,11 @@ export function CartePhoto({
         style={{
           position: "absolute",
           inset: teinte ? u(CADRE) : 0,
-          borderRadius: teinte ? u(61 - CADRE / 2) : undefined,
+          borderRadius: teinte ? u(RAYON_CARTE - CADRE) : undefined,
           overflow: "hidden",
           background: "#2a2b2f",
-          boxShadow: teinte ? `0 0 0 ${u(4)}px rgba(0,0,0,0.18)` : undefined,
+          // Le liseré de lumière du serti, puis une ombre fine sous la photo.
+          boxShadow: teinte ? `0 0 0 ${u(4)}px ${teinte.rebord.lumiere}, 0 ${u(4)}px ${u(10)}px ${u(4)}px rgba(0,0,0,0.28)` : undefined,
         }}
       >
         <Photo photo={photo} nom={name} taille={u(W)} />
