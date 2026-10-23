@@ -652,7 +652,7 @@ export function PairesModule({ paires }: { paires: AnalysePlus["paires"] }) {
       <div className="flex flex-col gap-2">
         {paires.map((p) => (
           <div key={`${p.a}-${p.b}`} className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3">
-            <span className="flex -space-x-2">
+            <span className="flex shrink-0 gap-1.5">
               <Avatar name={p.a} size={28} />
               <Avatar name={p.b} size={28} />
             </span>

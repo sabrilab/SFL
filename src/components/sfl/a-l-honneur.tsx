@@ -29,8 +29,11 @@
 // Les cartes en vedette (homme du dimanche, badges décrochés, duo) se font
 // tourner au doigt, avec un peu d'élan, puis reviennent à leur pose (Sabri,
 // 18/10 : « rendre certaines cartes un peu manipulables »).
+// Une rangée de cartes trop large pour la scène (l'équipe type, les marches
+// de « Ils montent », sur un téléphone) rapetisse toutes ses cartes d'autant
+// plutôt que d'en couper une au bord (Sabri, 23/10).
 
-import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { AuVestiaireRond } from "@/components/sfl/au-vestiaire";
 import { Badge3D, Objet3D, OBJET_PALIER } from "@/components/sfl/badge-3d";
 import { EMBLEMES } from "@/components/sfl/emblemes";
@@ -169,6 +172,27 @@ function Rangee({ children }: { children: ReactNode }) {
   );
 }
 
+/** La largeur d'un élément, suivie (0 avant la première mesure). */
+function useLargeur(): [RefObject<HTMLDivElement | null>, number] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [largeur, setLargeur] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const o = new ResizeObserver(([e]) => setLargeur(e.contentRect.width));
+    o.observe(el);
+    return () => o.disconnect();
+  }, []);
+  return [ref, largeur];
+}
+
+/**
+ * Ce qu'il faut réduire les cartes d'une rangée (leurs largeurs cumulées,
+ * plus ce qui ne rapetisse pas : marges et écarts) pour qu'elle tienne dans
+ * la largeur mesurée ; 1 tant qu'elle tient, ou avant la mesure.
+ */
+const ajuster = (largeur: number, cartes: number, reste: number) => (largeur > 0 ? Math.min(1, (largeur - reste) / cartes) : 1);
+
 /* ------------------------------- La pelouse ------------------------------ */
 
 /**
@@ -227,14 +251,18 @@ function Pelouse({ surface = false, haut = "72%" }: { surface?: boolean; haut?: 
   );
 }
 
-/** Un joueur posé sur la pelouse : sa carte de face, son ombre, son nom en entier. */
-function Joueur({ p, size, moi, detail, chiffre, dessus }: { p: Player; size: number; moi: boolean; detail: string; chiffre?: string; dessus?: ReactNode }) {
+/**
+ * Un joueur posé sur la pelouse : sa carte de face, son ombre, son nom en
+ * entier. `marge` : ce que son nom peut déborder de la carte ; `echelle` : la
+ * réduction de sa rangée (le nom garde sa taille).
+ */
+function Joueur({ p, size, moi, detail, chiffre, dessus, marge = 21, echelle = 1 }: { p: Player; size: number; moi: boolean; detail: string; chiffre?: string; dessus?: ReactNode; marge?: number; echelle?: number }) {
   return (
-    <div className="flex flex-col items-center" style={{ width: W(size) + 21 }}>
+    <div className="flex flex-col items-center" style={{ width: W(size * echelle) + marge }}>
       {dessus}
       <div className={cn("relative flex rounded-[6px]", moi && "ring-2 ring-primary ring-offset-2 ring-offset-transparent")}>
-        <Ombre largeur={W(size)} />
-        <MiniCarte player={p} size={size} detail={detail} />
+        <Ombre largeur={W(size * echelle)} />
+        <MiniCarte player={p} size={size * echelle} detail={detail} />
       </div>
       <span
         className={cn("titre-lettrage mt-[var(--fib-8)] w-full text-center leading-[1.05] tracking-[-0.02em] break-words", moi ? "text-primary" : "text-contraste")}
@@ -553,12 +581,16 @@ function Vitrine({ d, p }: { d: { nom: string; id: TropheeId; palier: number }; 
  * en petites. Toutes de face, rien n'est coupé.
  */
 function EquipeType({ j, equipe, moi }: { j: number; equipe: { nom: string; pp: number; p: Player }[]; moi: string }) {
+  const [cadre, largeur] = useLargeur();
   const meilleur = equipe.reduce((a, b) => (b.pp > a.pp ? b : a));
   const autres = equipe.filter((e) => e !== meilleur);
   const fond = autres.slice(0, 2);
   const [gauche, droite] = autres.slice(2);
-  const joueur = (e: { nom: string; pp: number; p: Player }, size: number) => (
-    <Joueur key={e.nom} p={e.p} size={size} moi={e.nom === moi} detail={`Équipe type · J${j} · ${e.pp} pts`} chiffre={`+${e.pp} pts`} />
+  // Devant, les trois cartes tiennent côte à côte : chaque nom sous sa carte
+  // (4 px de marge), et toutes rapetissent si la scène est plus étroite.
+  const echelle = ajuster(largeur, 2 * W(PETITE) + W(MOYENNE), 3 * 4 + 2 * 8);
+  const joueur = (e: { nom: string; pp: number; p: Player }, size: number, marge?: number) => (
+    <Joueur key={e.nom} p={e.p} size={size} moi={e.nom === moi} detail={`Équipe type · J${j} · ${e.pp} pts`} chiffre={`+${e.pp} pts`} marge={marge} echelle={marge ? echelle : 1} />
   );
   return (
     <section>
@@ -567,12 +599,12 @@ function EquipeType({ j, equipe, moi }: { j: number; equipe: { nom: string; pp: 
         <Titre j={j} partage={[...equipe].sort((a, b) => b.pp - a.pp).map((e) => ({ n: e.nom, v: `+${e.pp} pts` }))}>
           L&apos;équipe type
         </Titre>
-        <div className="relative flex flex-col items-center gap-[var(--fib-13)] px-[var(--fib-13)] pt-[var(--fib-55)] pb-[var(--fib-21)]">
+        <div ref={cadre} className="relative flex flex-col items-center gap-[var(--fib-13)] px-1 pt-[var(--fib-55)] pb-[var(--fib-21)]">
           <div className="flex justify-center gap-[var(--fib-55)]">{fond.map((e) => joueur(e, PETITE))}</div>
           <div className="flex items-end justify-center gap-[var(--fib-8)]">
-            {gauche && joueur(gauche, PETITE)}
-            {joueur(meilleur, MOYENNE)}
-            {droite && joueur(droite, PETITE)}
+            {gauche && joueur(gauche, PETITE, 4)}
+            {joueur(meilleur, MOYENNE, 4)}
+            {droite && joueur(droite, PETITE, 4)}
           </div>
         </div>
       </Scene>
@@ -629,15 +661,19 @@ function Duo({ j, duo, passeur, buteur, moi }: { j: number; duo: { passeur: stri
 
 /** Ils montent : chacun sur sa marche, d'autant plus haute que la remontée est belle. */
 function IlsMontent({ montent, moi }: { montent: { nom: string; gain: number; rang: number; p: Player }[]; moi: string }) {
+  const [cadre, largeurScene] = useLargeur();
   // Les marches montent de gauche à droite : la plus belle remontée au sommet.
   const marches = [...montent].reverse();
   const max = Math.max(...montent.map((m) => m.gain));
-  const largeur = W(PETITE);
+  // Toutes les marches tiennent dans la scène, avec 4 px de chaque côté.
+  const echelle = ajuster(largeurScene, montent.length * W(PETITE), montent.length * 4 + (montent.length - 1) * 8 + 8);
+  const largeur = W(PETITE * echelle);
   return (
     <section>
-      <Scene hauteur={H(PETITE) + 160} horizon={0.84}>
+      <Scene hauteur={H(PETITE * echelle) + 160} horizon={0.84}>
         <Titre partage={montent.map((m) => ({ n: m.nom, v: `▲ ${m.gain} · ${m.rang}e` }))}>Ils montent</Titre>
         <div
+          ref={cadre}
           className="absolute inset-x-0 flex items-end justify-center gap-[var(--fib-8)]"
           style={{ bottom: 22 }}
         >
@@ -645,7 +681,7 @@ function IlsMontent({ montent, moi }: { montent: { nom: string; gain: number; ra
             const haut = 55 + (m.gain / max) * 34;
             return (
               <div key={m.nom} className="flex flex-col items-center" style={{ width: largeur + 4, transformStyle: "preserve-3d" }}>
-                <MiniCarte player={m.p} size={PETITE} detail={`${m.rang}e · ▲ ${m.gain}`} />
+                <MiniCarte player={m.p} size={PETITE * echelle} detail={`${m.rang}e · ▲ ${m.gain}`} />
                 {/* La marche, où le gain est gravé. */}
                 <div className="relative w-full">
                   <div

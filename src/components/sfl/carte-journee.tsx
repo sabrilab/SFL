@@ -26,18 +26,10 @@ import type { Journee, MatchPlayerLine, MatchTeam } from "@/lib/sfl/engine";
 import { MAILLOTS } from "@/lib/sfl/maillots";
 import { PastilleMaillot } from "@/components/sfl/point-maillot";
 import { cn } from "@/lib/utils";
-import { projeter, vue } from "@/lib/sfl/terrain-vu";
+import { projeter } from "@/lib/sfl/terrain-vu";
+import { placerJournee, VUE_JOURNEE as VUE } from "@/lib/sfl/places-journee";
 import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
 import { AuVestiaire } from "@/components/sfl/au-vestiaire";
-
-/**
- * Les deux tailles du terrain, toutes deux en carte debout (la photo, la
- * note dans l'onglet de l'équipe) : le meilleur de l'équipe n'est qu'un cran
- * au-dessus des autres (×1,15), pas un autre format (Sabri, 19/10 : « mettre
- * en avant, mais ne pas abuser » ; « on préfère le format vertical »).
- */
-const PASTILLE = 50 / 254; // 50 × 81 px à l'échelle 1
-const VEDETTE = 58 / 254; // 58 × 94 px
 
 /** La ligne d'un poste, du but vers l'avant : 0 gardien … 3 attaque. Sans poste connu : le milieu. */
 function ligneDuPoste(poste: string | undefined): number {
@@ -51,105 +43,72 @@ function ligneDuPoste(poste: string | undefined): number {
   return 2;
 }
 
-/**
- * Les joueurs de champ par ligne, défense → attaque, comme une compo de foot
- * à cinq, six ou sept. Deux lignes qui se suivent n'ont jamais le même
- * nombre de joueurs : chaque carte tombe dans l'intervalle de la ligne de
- * devant et ne cache personne.
- */
-const SCHEMAS: Record<number, number[]> = { 1: [1], 2: [2], 3: [2, 1], 4: [1, 2, 1], 5: [2, 1, 2], 6: [3, 2, 1], 7: [2, 3, 2] };
-/** La place en largeur (en %) des joueurs d'une ligne, selon leur nombre. */
-const LARGEURS: Record<number, number[]> = { 1: [50], 2: [27, 73], 3: [17, 50, 83] };
-
-/**
- * La compo d'une équipe : le gardien près du but s'il y en a un, puis la
- * défense, le milieu et l'attaque, chacun rangé selon son poste. Chaque
- * joueur reçoit sa profondeur (8 le but, 40 la médiane, comme la feuille de
- * match) et sa place en largeur (en %).
- */
-function compo(equipe: MatchTeam, poste: (l: MatchPlayerLine) => string | undefined) {
-  const tries = [...equipe.players].sort((x, y) => ligneDuPoste(poste(x)) - ligneDuPoste(poste(y)));
-  const gardien = tries[0] && ligneDuPoste(poste(tries[0])) === 0 ? tries.shift()! : null;
-  const n = tries.length;
-  const tiers = Math.ceil(n / 3);
-  const schema = SCHEMAS[n] ?? [tiers, Math.ceil((n - tiers) / 2), n - tiers - Math.ceil((n - tiers) / 2)];
-  const lignes: MatchPlayerLine[][] = [];
-  let i = 0;
-  for (const k of schema) {
-    if (k > 0) lignes.push(tries.slice(i, i + k));
-    i += k;
-  }
-  const out: { ligne: MatchPlayerLine; profondeur: number; largeur: number }[] = [];
-  if (gardien) out.push({ ligne: gardien, profondeur: 5, largeur: 50 });
-  const debut = gardien ? 22 : 10;
-  lignes.forEach((rang, r) => {
-    const profondeur = lignes.length === 1 ? 32 : debut + ((40 - debut) * r) / (lignes.length - 1);
-    rang.forEach((ligne, j) => {
-      const largeur = LARGEURS[rang.length]?.[j] ?? 12 + (j * 76) / (rang.length - 1);
-      out.push({ ligne, profondeur, largeur });
-    });
-  });
-  return out;
-}
-
-/**
- * Le point de vue des terrains de la Ligue : plus court que celui de la
- * feuille de match (500 px au lieu de 540) et moins couché (38° au lieu de
- * 56°), pour que les rangs de cartes debout s'étagent au lieu de s'empiler
- * (Sabri, 19/10 : « le terrain est un peu trop grand »).
- */
-const VUE = vue(270, 500, 38);
-
-/** La profondeur (8 le but, 40 la médiane) en px depuis la médiane du terrain couché. */
-const depuisMediane = (profondeur: number) => 74 + ((40 - profondeur) / 32) * (VUE.h / 2 - 104);
-
-/** Le haut d'une carte debout et de son nom, à l'échelle 1 : la carte (1 × φ) et l'étiquette. */
-const hauteurCarte = (size: number) => 254 * size * PHI + 24;
 /** La marge autour du terrain et des cartes, dans le cadre. */
 const MARGE = 14;
-const PHI = (1 + Math.sqrt(5)) / 2;
+
+/** Ses buts et ses passes du jour, comme l'étiquette les écrit (« 2B 1P »). */
+const chiffres = (l: MatchPlayerLine) => [l.buts > 0 && `${l.buts}B`, l.passes > 0 && `${l.passes}P`].filter(Boolean).join(" ");
+
+/**
+ * La largeur d'une étiquette entière, à l'échelle 1 : le prénom en Inter
+ * 10,5 px (gras pour le meilleur), les chiffres en JetBrains Mono 9 px, les
+ * marges. Comptée un peu large, lettre par lettre (mesuré dans Chrome le
+ * 23/10 : jamais en dessous du vrai) : places-journee.ts s'en sert pour
+ * laisser un prénom long prendre la place que ses voisins n'utilisent pas.
+ */
+function largeurEtiquette(prenom: string, stats: string, gras: boolean): number {
+  const em = (c: string) =>
+    /[iljIîï.'’]/.test(c) ? 0.3 : /[frt1 ]/.test(c) ? 0.4 : /[mwMW]/.test(c) ? 1 : /[A-ZÀ-Þ]/.test(c) ? 0.76 : 0.63;
+  const nom = [...prenom].reduce((s, c) => s + em(c), 0) * 10.5 * (gras ? 1.04 : 1);
+  return 14 + nom + (stats ? 5 + stats.length * 5.4 : 0) + 2;
+}
 
 /**
  * Le terrain du match en légère perspective, comme la feuille de match de la
  * Map (lib/sfl/terrain-vu.ts) : le terrain couché avec son ombre sous chaque
- * carte, les cartes debout, plus petites au fond. Une équipe par moitié,
- * chacune en vraie compo ; le meilleur du jour de chaque équipe (buts et
- * passes), un seul, à peine plus grand, son nom en gras.
+ * carte, les cartes debout, plus petites au fond. Une équipe par moitié, son
+ * gardien au but s'il en a un, puis deux rangs rangés selon les postes, la
+ * défense et l'attaque, posés par places-journee.ts pour qu'aucune carte ne
+ * cache la carte ou le prénom d'une autre. Le meilleur du jour de chaque
+ * équipe (buts et passes), un seul, à peine plus grand, son nom en gras.
  */
 function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
   const { allPlayers } = useSeason();
   const trouver = (l: MatchPlayerLine) => allPlayers.find((p) => p.name.toLowerCase() === l.name.trim().toLowerCase());
   const poids = (p: MatchPlayerLine) => p.buts * 2 + p.passes;
-  const vedette = (eq: MatchTeam) => {
-    const m = [...eq.players].sort((x, y) => poids(y) - poids(x))[0];
-    return m && poids(m) > 0 ? m : null;
+  // Chaque équipe du but vers l'avant : le gardien d'abord, s'il est déclaré à ce poste.
+  const ranger = (eq: MatchTeam) => {
+    const tries = [...eq.players].sort((x, y) => ligneDuPoste(trouver(x)?.poste) - ligneDuPoste(trouver(y)?.poste));
+    const meilleur = [...tries].sort((x, y) => poids(y) - poids(x))[0];
+    const vedette = meilleur && poids(meilleur) > 0 ? tries.indexOf(meilleur) : -1;
+    return {
+      tries,
+      nombre: tries.length,
+      gardien: !!tries[0] && ligneDuPoste(trouver(tries[0])?.poste) === 0,
+      vedette,
+      etiquettes: tries.map((l, i) => largeurEtiquette(l.name.split(" ")[0], chiffres(l), i === vedette)),
+    };
   };
-  const { l, h } = VUE;
+  const equipes = [ranger(a), ranger(b)] as const;
   // Les Noirs (la première équipe du match) au fond, les Blancs devant.
-  const places = (
-    [
-      [a, -1, MAILLOTS.Noirs],
-      [b, 1, MAILLOTS.Blancs],
-    ] as const
-  )
-    .flatMap(([eq, sens, maillot]) => {
-      const star = vedette(eq);
-      return compo(eq, (x) => trouver(x)?.poste).map(({ ligne, profondeur, largeur }) => {
-        const u = (largeur / 100) * l;
-        const v = h / 2 + sens * depuisMediane(profondeur);
-        return { ligne, maillot, star: ligne === star, u, v, ...projeter(u, v, 0, VUE) };
-      });
-    })
+  const maillots = [MAILLOTS.Noirs, MAILLOTS.Blancs] as const;
+  const disposition = placerJournee(equipes[0], equipes[1]);
+  // Du fond vers l'avant : celle de devant passe par-dessus celle de derrière.
+  const places = disposition.places
+    .map((p) => ({
+      ...p,
+      ligne: equipes[p.equipe].tries[p.i],
+      maillot: maillots[p.equipe],
+      star: p.i === equipes[p.equipe].vedette,
+      voulue: equipes[p.equipe].etiquettes[p.i],
+    }))
     .sort((x, y) => x.v - y.v);
+  const { l, h } = VUE;
   const centre = projeter(l / 2, h / 2, 0, VUE);
   const logo = { l: 46 * centre.k, h: projeter(l / 2, h / 2 + 23, 0, VUE).y - projeter(l / 2, h / 2 - 23, 0, VUE).y };
   // Le cadre épouse ce qu'il montre : du haut de la carte la plus haute
   // (ou du bord du fond) jusqu'à l'épaisseur du bord avant.
-  const haut = Math.min(
-    projeter(0, 0, 0, VUE).y,
-    ...places.map(({ y, k, star }) => y - hauteurCarte(star ? VEDETTE : PASTILLE) * k),
-  );
-  const bas = projeter(l / 2, h, -14, VUE).y;
+  const { haut, bas } = disposition;
   const decalage = MARGE - haut;
 
   return (
@@ -174,9 +133,10 @@ function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
             opacity: 0.85,
           }}
         />
-        {places.map(({ ligne, maillot, star, x, y, k }) => {
+        {places.map(({ ligne, maillot, star, x, y, k, taille, etiquette, voulue }) => {
           const player = trouver(ligne);
-          const size = star ? VEDETTE : PASTILLE;
+          // Une étiquette qui ne tient pas entière se resserre un peu (lettres et marges), comme sur iPhone, avant que le prénom s'abrège.
+          const serre = Math.min(1, Math.max(0.86, etiquette / voulue));
           return (
             <div key={ligne.name} className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y }}>
               <div
@@ -186,26 +146,22 @@ function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
                 {player ? (
                   <MiniCarte
                     player={player}
-                    size={size}
+                    size={taille}
                     onglet={{ fond: maillot.fond, encre: maillot.encre }}
                     maillot={maillot.nom}
                     vertical
                     detail={ligne.buts || ligne.passes ? `${ligne.buts} B · ${ligne.passes} P` : undefined}
                   />
                 ) : (
-                  <CarteDe name={ligne.name} size={size} />
+                  <CarteDe name={ligne.name} size={taille} />
                 )}
                 <span
-                  className="mt-[4px] flex items-center gap-[5px] whitespace-nowrap rounded-full px-[7px] py-[2px] text-[10.5px] leading-[1.2] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
-                  style={{ background: maillot.fond, color: maillot.encre, fontWeight: star ? 800 : 600 }}
+                  className="mt-[4px] flex items-center gap-[0.48em] whitespace-nowrap rounded-full px-[0.667em] py-[2px] leading-[12.6px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
+                  style={{ background: maillot.fond, color: maillot.encre, fontWeight: star ? 800 : 600, maxWidth: etiquette, fontSize: 10.5 * serre }}
                 >
-                  {ligne.name.split(" ")[0]}
-                  {(ligne.buts > 0 || ligne.passes > 0) && (
-                    <span className="font-mono text-[9px] font-semibold opacity-60 tabular-nums">
-                      {ligne.buts > 0 && `${ligne.buts}B`}
-                      {ligne.buts > 0 && ligne.passes > 0 && " "}
-                      {ligne.passes > 0 && `${ligne.passes}P`}
-                    </span>
+                  <span className="min-w-0 truncate">{ligne.name.split(" ")[0]}</span>
+                  {chiffres(ligne) && (
+                    <span className="shrink-0 font-mono text-[0.857em] font-semibold opacity-60 tabular-nums">{chiffres(ligne)}</span>
                   )}
                 </span>
               </div>
