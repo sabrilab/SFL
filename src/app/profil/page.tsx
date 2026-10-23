@@ -54,6 +54,8 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { useGrandEcran } from "@/hooks/use-media-query";
+import { useDivision } from "@/hooks/use-division";
+import { nomDivision } from "@/lib/sfl/divisions";
 import { FormulaireIdentite } from "@/components/sfl/identite";
 import { useIdentites } from "@/hooks/use-identites";
 import { useXp } from "@/hooks/use-missions";
@@ -98,6 +100,7 @@ function AvatarPhoto({ name }: { name: string }) {
 export default function Profil() {
   const { player } = useMyPlayer();
   const { allPlayers, saison } = useSeason();
+  const division = useDivision(player.name);
   // Mon rang : celui du classement de la Ligue (sans les joueurs masqués),
   // où je figure toujours, même masqué.
   const myRank = useMemo(
@@ -188,6 +191,7 @@ export default function Profil() {
           </div>
           <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
             <Chiffre valeur={myRank != null && (joues > 0 || player.pp !== 0) ? ordinal(myRank) : "–"} quoi="Pépite d'Or" />
+            {division && <Chiffre valeur={nomDivision(division)} quoi="Division" />}
             <Chiffre valeur={ovr(player.stats)} quoi="Général" />
             <Chiffre valeur={joues} quoi={joues > 1 ? "Dimanches" : "Dimanche"} />
           </div>

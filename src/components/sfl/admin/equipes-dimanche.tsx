@@ -13,8 +13,11 @@
 //
 // Depuis le 23/10, chaque match se joue les Noirs contre les Blancs : les
 // équipes générées s'appellent « Noirs 1 », « Blancs 1 »… (saisie/equipes.ts).
+//
+// Dès la J4, la ligue joue en divisions : les équipes se font toutes seules,
+// et ce composeur laisse la place à leur vue (equipes-divisions.tsx).
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { RefreshCw, Send, Users } from "lucide-react";
 import { Locked } from "@/components/sfl/locked";
@@ -23,17 +26,22 @@ import { usePresence } from "@/hooks/use-presence";
 import { generateBalancedTeams, type BalancedTeam } from "@/lib/sfl/saisie/mutations";
 import { equipesDeConvocation } from "@/lib/sfl/saisie/equipes";
 import { ovr, rareStats } from "@/lib/sfl/engine";
+import { divisionsDeLaJournee } from "@/lib/sfl/equipes-division";
+import type { ConvocationTeam } from "@/lib/sfl/saisie/types";
 import { PointMaillot } from "@/components/sfl/point-maillot";
+import { EquipesParDivision } from "./equipes-divisions";
 import { cn } from "@/lib/utils";
 
-export function EquipesDimanche() {
+export function EquipesDimanche({ onPoser }: { onPoser?: (j: number, teams: ConvocationTeam[], date: string) => void }) {
   const presence = usePresence();
-  const { allPlayers } = useSeason();
+  const { saison, allPlayers } = useSeason();
   const [draft, setDraft] = useState<BalancedTeam[] | null>(null);
   const [saving, setSaving] = useState(false);
+  const etat = useMemo(() => divisionsDeLaJournee(saison, presence.journee), [saison, presence.journee]);
 
   // Réservé à l'admin — le hook ne donne saveTeams qu'à lui.
   if (!presence.saveTeams) return null;
+  if (etat) return <EquipesParDivision presence={presence} etat={etat} onPoser={onPoser} />;
 
   const confirmés = presence.presents;
   // Un match jusqu'à 12 confirmés, deux au-delà.

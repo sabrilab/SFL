@@ -67,6 +67,8 @@ export const MOTIFS_NOTIF = {
   suivi: { famille: "ligue", label: "Un joueur le suit", effet: "l'a suivi en retour" },
   // Déjà suivi par lui : il n'y a rien à faire en retour.
   "suivi-retour": { famille: "ligue", label: "On le suit en retour", effet: null },
+  // La veille de la J3 : où il tomberait si on coupait ce soir (lib/sfl/divisions.ts).
+  divisions: { famille: "ligue", label: "L'annonce des divisions", effet: null },
 
   annonce: { famille: "annonce", label: "Annonce à toute la ligue", effet: null },
 } as const satisfies Record<string, DefMotif>;
