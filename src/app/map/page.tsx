@@ -30,6 +30,11 @@
 // (map/joueurs.ts), et le catalogue des joueurs par ville dans une fiche
 // (map/catalogue-joueurs.tsx), ouverte par le bouton aux visages en haut à
 // droite ou en touchant le nom d'une ville. Toucher une carte ouvre le profil.
+//
+// Les contrats en direct (23/10) : le bouton au viseur ne laisse sur la Map
+// que les cibles des contrats signés du dimanche, sous leur viseur, leur prime
+// à la place de la note (map/contrats-map.ts). Toucher une cible ouvre les
+// affiches des contrats sur elle (map/contrats-sur.tsx).
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -76,7 +81,10 @@ import { ovr, rankPlayers } from "@/lib/sfl/engine";
 import { ProfilJoueur } from "@/components/sfl/profil-joueur";
 import { CatalogueJoueurs } from "@/components/sfl/map/catalogue-joueurs";
 import { CollectionPile } from "@/components/sfl/map/collection-pile";
-import { cleVille, type VillePlan } from "@/components/sfl/map/joueurs";
+import { ciblesDuDimanche, contratsSignes, foyerDesCibles, villesDesCibles } from "@/components/sfl/map/contrats-map";
+import { ContratsSur } from "@/components/sfl/map/contrats-sur";
+import { cleVille, type ContratPlan, type VillePlan } from "@/components/sfl/map/joueurs";
+import { useMissionsDeLaLigue } from "@/hooks/use-missions";
 import { villeOuLigue } from "@/lib/sfl/villes";
 import { photoMiniature, photoPerso } from "@/lib/sfl/photos";
 import { nomAffiche } from "@/lib/sfl/identites";
@@ -92,6 +100,7 @@ import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { useMatchsTeam, type MatchTeam } from "@/hooks/use-matchs-team";
 import type { FondCarte, PointPlan, ToiPlan } from "@/components/sfl/map/carte-map";
 import "./animations.css";
+import "@/components/sfl/map/contrats-map.css";
 
 /** Les terrains enregistrés ne s'affichent plus sur le plan : seuls les matchs. */
 const AUCUN_POINT: PointPlan[] = [];
@@ -654,6 +663,26 @@ export default function MapPage() {
     for (const g of parVille.values()) g.joueurs.sort((a, b) => b.note - a.note || a.affiche.localeCompare(b.affiche));
     return [...parVille.values()];
   }, [players, revVilles, revPhotos, revNoms]);
+  // Le filtre Contrats : seules les cibles du dimanche, chacune avec son
+  // contrat. L'horloge des missions recalcule tout chaque minute : les cibles
+  // passent par une chaîne, pour que le plan ne redessine ses joueurs que
+  // quand un contrat change.
+  const missions = useMissionsDeLaLigue();
+  const [contrats, setContrats] = useState(false);
+  const ciblesCle = useMemo(() => JSON.stringify(missions ? [...ciblesDuDimanche(missions)] : []), [missions]);
+  const cibles = useMemo(() => new Map(JSON.parse(ciblesCle) as [string, ContratPlan][]), [ciblesCle]);
+  const enContrats = contrats && cibles.size > 0;
+  const villesVues = useMemo(() => (enContrats ? villesDesCibles(villes, cibles) : villes), [enContrats, villes, cibles]);
+  // Allumer le filtre cadre le plan sur le foyer des cibles ; l'éteindre le ramène sur les matchs.
+  const [cadrage, setCadrage] = useState<{ lieux: { lat: number; lng: number }[]; n: number } | null>(null);
+  const basculerContrats = () => {
+    navigator.vibrate?.(6);
+    const allume = !contrats;
+    setContrats(allume);
+    setCadrage((x) =>
+      allume ? { lieux: foyerDesCibles(villesDesCibles(villes, cibles)).map((v) => ({ lat: v.lat, lng: v.lng })), n: (x?.n ?? 0) + 1 } : null
+    );
+  };
   const [catalogue, setCatalogue] = useState(false);
   // La notification « Mets ta ville » ouvre /map?ville : le catalogue, la recherche de ta ville ouverte.
   const [chercherVille, setChercherVille] = useState(false);
@@ -673,7 +702,13 @@ export default function MapPage() {
   const [pile, setPile] = useState<string[] | null>(null);
   const ouvrirVille = useCallback((ids: string[]) => setPile(ids), []);
   const fermerPile = useCallback(() => setPile(null), []);
-  const villesPile = useMemo(() => (pile ? villes.filter((v) => pile.includes(v.id)) : []), [pile, villes]);
+  const villesPile = useMemo(() => (pile ? villesVues.filter((v) => pile.includes(v.id)) : []), [pile, villesVues]);
+  // Une cible touchée avec le filtre Contrats : les contrats sur elle ; sinon le profil.
+  const [cible, setCible] = useState<string | null>(null);
+  const toucherJoueur = useCallback(
+    (nom: string) => (enContrats && cibles.has(nom) ? setCible(nom) : setProfil(nom)),
+    [enContrats, cibles]
+  );
   const rangs = useMemo(() => new Map(rankPlayers(players).map((x) => [x.name, x.rank])), [players]);
   const profilJoueur = profil ? players.find((x) => x.name === profil) : undefined;
   const nomFocus = focusVilles?.length === 1 ? villes.find((v) => v.id === focusVilles[0])?.ville : null;
@@ -689,7 +724,12 @@ export default function MapPage() {
 
   const commune = choisi?.terrain?.commune ?? terrains.find((t) => t.commune)?.commune ?? "SFL";
   const n = affiches.filter((m) => !m.joue).length;
-  const compte = n ? `${n} MATCH${n > 1 ? "S" : ""} OUVERT${n > 1 ? "S" : ""}` : "MATCH JOUÉ";
+  const signes = missions ? contratsSignes(missions).length : 0;
+  const compte = enContrats
+    ? `${signes} CONTRAT${signes > 1 ? "S" : ""} EN JEU`
+    : n
+      ? `${n} MATCH${n > 1 ? "S" : ""} OUVERT${n > 1 ? "S" : ""}`
+      : "MATCH JOUÉ";
 
   function sauver(next: Saison, message: string) {
     saisieStore.save(next);
@@ -724,11 +764,13 @@ export default function MapPage() {
             choisi={choisi?.cle ?? null}
             onChoisir={choisirSticker}
             onBulle={ouvrirDiscussion}
-            villes={villes}
-            margeBas={replie ? 150 : 380}
+            villes={villesVues}
+            margeBas={replie || enContrats ? 150 : 380}
             onVille={ouvrirVille}
-            onJoueur={setProfil}
+            onJoueur={toucherJoueur}
             viser={viser}
+            cadrerSur={cadrage}
+            matchsEnRetrait={enContrats}
             className="h-full w-full"
           />
         </div>
@@ -787,6 +829,17 @@ export default function MapPage() {
               className="bouton-givre bouton--mauve map-bord map-touche grid size-10 place-items-center"
             >
               <Users className="size-[18px]" strokeWidth={2.2} />
+            </button>
+          )}
+          {cibles.size > 0 && (
+            <button
+              type="button"
+              onClick={basculerContrats}
+              aria-label={contrats ? "Revoir tous les joueurs" : "Voir les contrats en jeu"}
+              aria-pressed={contrats}
+              className={cn("map-bord map-touche grid size-10 place-items-center", contrats ? "bouton-encre" : "bouton-givre")}
+            >
+              <Crosshair className="size-[18px]" strokeWidth={2.2} />
             </button>
           )}
           <button
@@ -850,7 +903,7 @@ export default function MapPage() {
                 {partiesActives ? "Journée" : "Ouvrir un match"}
               </Link>
             )}
-            {affiches.length > 0 && (
+            {affiches.length > 0 && !enContrats && (
               <button
                 type="button"
                 onClick={basculerCarrousel}
@@ -875,8 +928,8 @@ export default function MapPage() {
               Toucher la choisie ouvre sa fiche. Replié, il descend et s'efface. */}
           <div
             data-traverse
-            className={cn("grid w-full transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none", replie ? "pointer-events-none grid-rows-[0fr] opacity-0" : "grid-rows-[1fr]")}
-            aria-hidden={replie}
+            className={cn("grid w-full transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none", replie || enContrats ? "pointer-events-none grid-rows-[0fr] opacity-0" : "grid-rows-[1fr]")}
+            aria-hidden={replie || enContrats}
           >
           <div data-traverse className="flex min-h-0 flex-col items-center gap-3 overflow-hidden">
           <div
@@ -1065,12 +1118,23 @@ export default function MapPage() {
 
       <CollectionPile
         villes={villesPile}
-        masquee={!!profil}
+        masquee={!!profil || !!cible}
         onFermer={fermerPile}
-        onJoueur={setProfil}
+        onJoueur={toucherJoueur}
         onVoir={(v) => {
           setPile(null);
           setViser((x) => ({ lat: v.lat, lng: v.lng, n: (x?.n ?? 0) + 1 }));
+        }}
+      />
+
+      {/* ─── Les contrats sur une cible, avec le filtre Contrats ─── */}
+      <ContratsSur
+        nom={cible}
+        lg={missions}
+        onFermer={() => setCible(null)}
+        onProfil={(nom) => {
+          setCible(null);
+          setProfil(nom);
         }}
       />
 

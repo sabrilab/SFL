@@ -144,6 +144,8 @@ export function CarteMap({
   onVille,
   onJoueur,
   viser,
+  cadrerSur,
+  matchsEnRetrait = false,
   margeBas = MARGE_BAS,
   className,
 }: {
@@ -155,6 +157,10 @@ export function CarteMap({
   onJoueur?: (name: string) => void;
   /** Aller voir une ville choisie ailleurs (le catalogue) ; `n` change à chaque demande. */
   viser?: { lat: number; lng: number; n: number } | null;
+  /** Cadrer sur des lieux choisis ailleurs (le filtre Contrats : ses cibles) ; `n` change à chaque demande, `null` revient sur les matchs. */
+  cadrerSur?: { lieux: { lat: number; lng: number }[]; n: number } | null;
+  /** Les matchs s'effacent du plan (le filtre Contrats) : les joueurs ne se rangent plus sous leurs stickers. */
+  matchsEnRetrait?: boolean;
   stickers: StickerPlan[];
   points: PointPlan[];
   toi: ToiPlan | null;
@@ -205,6 +211,10 @@ export function CarteMap({
   // Ce qui a été cadré la dernière fois : changer de fond redessine les
   // stades sans recadrer.
   const cadre = useRef<unknown[]>([]);
+  // Le dernier cadrage des matchs : on y revient après avoir cadré ailleurs (cadrerSur).
+  const maison = useRef<maplibregl.LngLatBounds | null>(null);
+  const ailleurs = useRef(false);
+  const retraitRef = useRef(matchsEnRetrait);
   useEffect(() => {
     choisirRef.current = onChoisir;
     bulleRef.current = onBulle;
@@ -212,7 +222,8 @@ export function CarteMap({
     villeRef.current = onVille;
     joueurRef.current = onJoueur;
     margeBasRef.current = margeBas;
-  }, [onChoisir, onBulle, onPoint, onVille, onJoueur, margeBas]);
+    retraitRef.current = matchsEnRetrait;
+  }, [onChoisir, onBulle, onPoint, onVille, onJoueur, margeBas, matchsEnRetrait]);
   const pointsActifs = !!onPoint;
 
   // La carte, une fois.
@@ -403,7 +414,7 @@ export function CarteMap({
       ...points.map((p) => [p.lng, p.lat] as [number, number]),
       ...(toi ? [[toi.lng, toi.lat] as [number, number]] : []),
     ];
-    const boite = () => tous.reduce((b, p) => b.extend(p), new maplibregl.LngLatBounds(tous[0], tous[0]));
+    const boite = () => (maison.current = tous.reduce((b, p) => b.extend(p), new maplibregl.LngLatBounds(tous[0], tous[0])));
     // Le sticker choisi mérite l'écran : on cadre large autour de lui, les
     // surcouches (lettrage en haut, carrousel en bas) prennent leur place.
     // Un seul point compris : la boîte est réduite à lui, le zoom plafonne
@@ -446,7 +457,8 @@ export function CarteMap({
     const dessiner = () => {
       vider();
       // Les matchs qui se chevauchent d'abord : un sticker reste, les autres s'y rangent.
-      const ecran = stickersPoses.current.map(({ s }) => ({ id: s.id, ...map.project([s.lng, s.lat]) }));
+      // Effacés (matchsEnRetrait), ils ne gardent plus de joueurs sous eux.
+      const ecran = retraitRef.current ? [] : stickersPoses.current.map(({ s }) => ({ id: s.id, ...map.project([s.lng, s.lat]) }));
       const groupes = grouperMatchs(ecran, choisiRef.current);
       const absorbees = new Map<string, { villes: string[]; joueurs: number }>();
       const zoom = map.getZoom();
@@ -545,6 +557,30 @@ export function CarteMap({
     const z = Math.max(map.getZoom(), ZOOM_OUVERTURE + 1);
     map.flyTo({ center: [viser.lng, viser.lat], zoom: z, pitch: pente(z), duration: calme() ? 0 : 1000 });
   }, [viser]);
+
+  // Les matchs s'effacent ou reviennent : les joueurs se redisposent sans eux.
+  useEffect(() => {
+    conteneur.current?.classList.toggle("carte--matchs-en-retrait", matchsEnRetrait);
+    recomposer.current();
+  }, [matchsEnRetrait]);
+
+  // Cadrer sur des lieux que la page demande (les cibles des contrats), puis
+  // revenir sur les matchs. Une seule ville : assez près pour qu'elle s'ouvre.
+  useEffect(() => {
+    const map = carte.current;
+    if (!map) return;
+    const duree = calme() ? 0 : 0.9;
+    const marge = marges(map, MARGE_HAUT, margeBasRef.current, 60);
+    if (!cadrerSur?.lieux.length) {
+      if (ailleurs.current && maison.current) cadrer(map, maison.current, marge, ZOOM_CADRE, duree);
+      ailleurs.current = false;
+      return;
+    }
+    ailleurs.current = true;
+    const [a, ...autres] = cadrerSur.lieux;
+    const b = autres.reduce((x, p) => x.extend([p.lng, p.lat]), new maplibregl.LngLatBounds([a.lng, a.lat], [a.lng, a.lat]));
+    cadrer(map, b, marge, ZOOM_OUVERTURE + 1, duree);
+  }, [cadrerSur]);
 
   return <div ref={conteneur} className={className} role="region" aria-label="La Map des matchs" />;
 }

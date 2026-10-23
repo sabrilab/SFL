@@ -11,9 +11,26 @@
 //     à l'angle d'or (137,5°), le mieux noté au plus près. Au-delà de
 //     OUVERTE_MAX, un « +N » sur le nom : le reste est dans le catalogue.
 //
+// Avec le filtre Contrats (map/contrats-map.ts, 23/10), seules les cibles du
+// dimanche restent, chacune sous un viseur à la couleur du rang de son
+// contrat, sa prime à la place de sa note (le dessin du viseur est dans
+// map/contrats-map.css).
+//
 // Ce fichier ne connaît pas MapLibre : il reçoit des points à l'écran et rend
 // des dispositions et du HTML (le dessin est dans globals.css, le mouvement
 // dans app/map/animations.css).
+
+/** Les contrats signés contre un joueur, tels que la Map les montre (map/contrats-map.ts). */
+export interface ContratPlan {
+  /** Le plus haut rang des contrats sur lui : la couleur du viseur. */
+  rang: "S" | "A" | "B";
+  /** Ce que rapportent, ensemble, les contrats sur lui. */
+  prime: number;
+  /** verrou : en jeu ; accompli : un contrat sur lui a réussi ; rate : tous ratés ; eteint : tous annulés. */
+  etat: "verrou" | "accompli" | "rate" | "eteint";
+  /** Le match se joue : le viseur bat. */
+  direct: boolean;
+}
 
 export interface JoueurPlan {
   name: string;
@@ -23,6 +40,8 @@ export interface JoueurPlan {
   photo: string | null;
   /** La photo entière, si la vignette ne vient pas (carte-map.tsx s'en charge). */
   secours?: string | null;
+  /** Le filtre Contrats : ce qu'il y a sur sa tête. */
+  contrat?: ContratPlan;
 }
 
 export interface VillePlan {
@@ -139,6 +158,22 @@ function visage(j: JoueurPlan): string {
     : `<span class="jc__initiale">${echapper(j.affiche.slice(0, 1).toUpperCase())}</span>`;
 }
 
+const ORDRE_RANG = { S: 0, A: 1, B: 2 } as const;
+
+/** Une cible passe devant les autres, la plus haute d'abord, puis la plus grosse prime. */
+function avantCible(a: JoueurPlan, b: JoueurPlan): number {
+  if (!a.contrat || !b.contrat) return Number(!!b.contrat) - Number(!!a.contrat);
+  return ORDRE_RANG[a.contrat.rang] - ORDRE_RANG[b.contrat.rang] || b.contrat.prime - a.contrat.prime;
+}
+
+/** Les classes d'une cible : la couleur de son rang (fiche--S, actus/missions.css) et l'état de ses contrats. */
+function classesCible(c: ContratPlan): string {
+  return ` cible fiche--${c.rang} cible--${c.etat}${c.direct ? " cible--direct" : ""}`;
+}
+
+/** Les quatre coins du viseur. */
+const VISEUR = `<i class="cible__coin cible__coin--hg"></i><i class="cible__coin cible__coin--hd"></i><i class="cible__coin cible__coin--bg"></i><i class="cible__coin cible__coin--bd"></i>`;
+
 /** La taille de la pile suit le nombre d'or : grande, moyenne, petite. */
 function taillePile(n: number): "grande" | "moyenne" | "petite" {
   return n >= 13 ? "grande" : n >= 5 ? "moyenne" : "petite";
@@ -146,8 +181,10 @@ function taillePile(n: number): "grande" | "moyenne" | "petite" {
 
 /** Une pile fermée : trois cartes en éventail, le compte, la ville. */
 export function pileHtml(d: Extract<Disposition, { genre: "pile" }>): string {
-  // Devant : ceux qui ont une photo, du mieux noté au moins bien noté.
-  const devant = [...d.joueurs].sort((a, b) => Number(!!b.photo) - Number(!!a.photo) || b.note - a.note).slice(0, 3);
+  // Devant : les cibles (filtre Contrats), puis ceux qui ont une photo, du mieux noté au moins bien noté.
+  const devant = [...d.joueurs]
+    .sort((a, b) => avantCible(a, b) || Number(!!b.photo) - Number(!!a.photo) || b.note - a.note)
+    .slice(0, 3);
   const eventail = [
     ["-11deg", "-9px", "2px"],
     ["10deg", "9px", "2px"],
@@ -160,8 +197,11 @@ export function pileHtml(d: Extract<Disposition, { genre: "pile" }>): string {
     .map(({ j, pose }) => `<span class="jc grp__carte" style="--r:${pose[0]};--x:${pose[1]};--y:${pose[2]}">${visage(j)}</span>`)
     .join("");
   const autres = d.villes.length > 1 ? `<span class="grp__plus">+${d.villes.length - 1}</span>` : "";
+  // La cible de devant, sous son viseur.
+  const c = devant[0]?.contrat;
+  const viseur = c ? `<span class="grp__viseur${classesCible(c)}">${VISEUR}</span>` : "";
   return `<div class="grp grp--${taillePile(d.joueurs.length)}" data-pile="${echapper(d.id)}">
-  <div class="grp__pile">${cartes}<span class="grp__compte">${d.joueurs.length}</span></div>
+  <div class="grp__pile">${cartes}${viseur}<span class="grp__compte">${d.joueurs.length}</span></div>
   <span class="grp__ville">${echapper(d.ville)}${autres}</span>
 </div>`;
 }
@@ -172,11 +212,13 @@ export function centreHtml(ville: string, n: number): string {
   return `<div class="vil"><span class="vil__nom">${echapper(ville)}</span><span class="vil__compte">${n}</span>${reste}</div>`;
 }
 
-/** Une carte d'une ville ouverte, à sa place dans le tournesol. */
+/** Une carte d'une ville ouverte, à sa place dans le tournesol. Une cible : sous son viseur, sa prime à la place de sa note. */
 export function joueurHtml(j: JoueurPlan, i: number, sort: boolean): string {
   const p = tournesol(i);
-  return `<div class="jr${sort ? " jr--sort" : ""}" style="--dx:${p.x}px;--dy:${p.y}px;--i:${i}">
-  <span class="jc jr__carte">${visage(j)}<span class="jr__note">${j.note}</span></span>
+  const c = j.contrat;
+  const bas = c ? `<span class="jr__note cible__prime">+${c.prime}</span>` : `<span class="jr__note">${j.note}</span>`;
+  return `<div class="jr${sort ? " jr--sort" : ""}${c ? classesCible(c) : ""}" style="--dx:${p.x}px;--dy:${p.y}px;--i:${i}">
+  <span class="jc jr__carte">${visage(j)}${bas}</span>${c ? `<span class="jr__viseur">${VISEUR}</span>` : ""}
   <span class="jr__nom">${echapper(j.affiche)}</span>
 </div>`;
 }

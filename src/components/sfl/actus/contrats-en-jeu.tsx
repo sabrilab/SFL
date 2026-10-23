@@ -120,13 +120,14 @@ function Resultat({ e, lg, court }: { e: Engagement; lg: Ligue; court?: boolean 
   );
 }
 
-/** Un contrat signé : la cible sous le viseur, l'objectif, celui qui a signé, ce qu'il rapporte. */
-function Affiche({ e, lg }: { e: Engagement; lg: Ligue }) {
+/** Un contrat signé : la cible sous le viseur, l'objectif, celui qui a signé, ce qu'il rapporte. Aussi sur la Map (map/contrats-sur.tsx). */
+/** `vise` : la cible à mettre sous le viseur quand le contrat en vise plusieurs (la Map, map/contrats-sur.tsx). */
+export function Affiche({ e, lg, vise }: { e: Engagement; lg: Ligue; vise?: string }) {
   const identite = useIdentites();
   const rang = rangDe(e.m);
   const code = NOM_DE_CODE[e.m.genre];
   const tete = e.m.genre === "reste-en-tete";
-  const cible = tete ? e.joueur : (e.m.cibles[0] ?? e.joueur);
+  const cible = tete ? e.joueur : vise && e.m.cibles.includes(vise) ? vise : (e.m.cibles[0] ?? e.joueur);
   const autres = tete ? 0 : e.m.cibles.length - 1;
   // Le coin d'une affiche est étroit : seulement « Sur toi ». Le sien se lit à « Signé par Toi ».
   const coin = lg.moi && e.joueur !== lg.moi && e.m.cibles.includes(lg.moi) ? "Sur toi" : null;
@@ -202,7 +203,7 @@ function Cote({ e, lg, couleurs }: { e: Engagement; lg: Ligue; couleurs: { fond:
 }
 
 /** Deux rivaux qui ont signé l'un contre l'autre. */
-function AfficheDuel({ f, lg }: { f: FaceAFace; lg: Ligue }) {
+export function AfficheDuel({ f, lg }: { f: FaceAFace; lg: Ligue }) {
   const identite = useIdentites();
   const rang = meilleur(rangDe(f.noirs.m), rangDe(f.blancs.m));
   const lui = lg.moi === f.duel.noirs || lg.moi === f.duel.blancs;
