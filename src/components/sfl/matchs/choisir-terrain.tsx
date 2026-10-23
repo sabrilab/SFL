@@ -34,10 +34,10 @@ import {
   avecLaLigue,
   chercherTerrains,
   distanceLisible,
-  formatsLisibles,
   km,
   lieuDuTerrain,
   lireTerrainsNord,
+  surPlace,
   terrainsNordLus,
   type CatalogueTerrains,
   type TerrainPropose,
@@ -70,11 +70,6 @@ const calme = () => typeof window !== "undefined" && window.matchMedia("(prefers
 /** « 23/10/2026 » */
 const dateCourte = (iso: string) => iso.split("-").reverse().join("/");
 
-/** Ce qu'il y a sur place : « À 8 · À 5 ×4 · ÉCLAIRÉ · ACCÈS LIBRE ». */
-function surPlace(t: TerrainPropose): string {
-  return [...formatsLisibles(t.formats), t.eclaire && "éclairé", t.libre && "accès libre"].filter(Boolean).join(" · ");
-}
-
 /** La photo satellite d'un terrain, chargée quand sa ligne approche de l'écran. */
 function Vignette({ t, racine, className }: { t: TerrainPropose; racine?: RefObject<HTMLElement | null>; className?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -100,21 +95,24 @@ function Vignette({ t, racine, className }: { t: TerrainPropose; racine?: RefObj
   );
 }
 
-/** Le terrain retenu, sous les choix de la feuille : sa photo, son adresse, ce qu'il y a sur place. */
-export function TerrainRetenu({ t, onToucher }: { t: TerrainPropose; onToucher: () => void }) {
+/** Le terrain retenu, sous les choix de la feuille : sa photo, son adresse, ce qu'il y a sur place. Sans `onToucher`, il ne fait que se montrer. */
+export function TerrainRetenu({ t, onToucher }: { t: TerrainPropose; onToucher?: () => void }) {
   const detail = surPlace(t);
-  return (
-    <button
-      type="button"
-      onClick={onToucher}
-      className="flex items-center gap-3 rounded-[18px] bg-card p-2 pr-3 text-left transition-transform active:scale-[0.98]"
-    >
+  const contenu = (
+    <>
       <Vignette t={t} className="size-14 rounded-[13px]" />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="truncate text-[15px] leading-tight font-semibold">{t.nom}</span>
         <span className="truncate text-[12.5px] leading-tight text-muted-foreground">{t.adresse || t.commune}</span>
         {detail && <span className="mono-label truncate text-muted-foreground/80">{detail}</span>}
       </span>
+    </>
+  );
+  const forme = "flex items-center gap-3 rounded-[18px] bg-card p-2 pr-3 text-left";
+  if (!onToucher) return <div className={forme}>{contenu}</div>;
+  return (
+    <button type="button" onClick={onToucher} className={cn(forme, "transition-transform active:scale-[0.98]")}>
+      {contenu}
     </button>
   );
 }

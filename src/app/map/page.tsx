@@ -30,6 +30,16 @@
 // (map/joueurs.ts), et le catalogue des joueurs par ville dans une fiche
 // (map/catalogue-joueurs.tsx), ouverte par le bouton aux visages en haut à
 // droite ou en touchant le nom d'une ville. Toucher une carte ouvre le profil.
+//
+// Les terrains où l'on peut jouer (23/10, Sabri : « en mode grisé, comme
+// s'il fallait ouvrir le match […] pour que chacun puisse ouvrir un match
+// Bola ou Bola Team ») : tous ceux du Nord (lib/sfl/terrains-nord.ts), en
+// stickers vides sous les matchs ; un terrain qui a son match n'a plus le
+// sien. En toucher un ouvre sa fiche : sa photo, ce qu'il y a sur place, et
+// « Ouvrir un match ici » (la feuille d'ouverture, le terrain déjà choisi)
+// ou, pour le capitaine d'une équipe active, « Défier une équipe ici » (la
+// page Team, le défi posé sur ce terrain). Un défi accepté s'y pose ensuite,
+// à son nom.
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -94,7 +104,20 @@ import { cleVille, type VillePlan } from "@/components/sfl/map/joueurs";
 import { villeOuLigue } from "@/lib/sfl/villes";
 import { photoMiniature, photoPerso } from "@/lib/sfl/photos";
 import { nomAffiche } from "@/lib/sfl/identites";
-import { communeDeLAdresse } from "@/lib/sfl/terrains-nord";
+import {
+  avecLaLigue,
+  communeDeLAdresse,
+  km,
+  lieuDuTerrain,
+  lireTerrainsNord,
+  sansAccents,
+  surPlace,
+  terrainsNordLus,
+  type CatalogueTerrains,
+  type TerrainPropose,
+} from "@/lib/sfl/terrains-nord";
+import { active } from "@/lib/sfl/equipes";
+import type { LieuChoisi } from "@/components/sfl/matchs/choisir-terrain";
 import { useVillesRevision } from "@/hooks/use-villes";
 import { usePhotoRevision } from "@/hooks/use-player-photo";
 import { useIdentitesRevision } from "@/hooks/use-identites";
@@ -104,11 +127,19 @@ import { VueSatellite } from "@/components/sfl/map/vue-satellite";
 import { SigleLigue } from "@/components/sfl/choix-ligue";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { useMatchsTeam, type MatchTeam } from "@/hooks/use-matchs-team";
-import type { FondCarte, PointPlan, ToiPlan } from "@/components/sfl/map/carte-map";
+import type { FondCarte, PointPlan, PossiblePlan, ToiPlan } from "@/components/sfl/map/carte-map";
+import type { TeinteFantome } from "@/components/sfl/map/stade";
 import "./animations.css";
 
 /** Les terrains enregistrés ne s'affichent plus sur le plan : seuls les matchs. */
 const AUCUN_POINT: PointPlan[] = [];
+/** Un terrain qui a son match n'a plus son sticker vide : à moins de 200 m, c'est le même. */
+const MEME_TERRAIN_KM = 0.2;
+/** « 23/10/2026 » */
+const dateCourte = (iso: string) => iso.split("-").reverse().join("/");
+/** Le gris ou le ciel des terrains possibles (dans un aperçu, /map?fantome=ciel montre l'autre). */
+const teinteFantome = (): TeinteFantome =>
+  process.env.NEXT_PUBLIC_BOLA_ENV !== "production" && new URLSearchParams(window.location.search).get("fantome") === "ciel" ? "ciel" : "gris";
 
 const CarteMap = dynamic(() => import("@/components/sfl/map/carte-map").then((m) => m.CarteMap), {
   ssr: false,
@@ -165,6 +196,7 @@ const heureParis = () => Number(new Intl.DateTimeFormat("fr-FR", { timeZone: "Eu
 const useHeure = () => useSyncExternalStore(rienAEcouter, heureParis, () => -1);
 const useEstIos = () =>
   useSyncExternalStore(rienAEcouter, () => /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent), () => false);
+const useTeinteFantome = () => useSyncExternalStore(rienAEcouter, teinteFantome, (): TeinteFantome => "gris");
 
 const MOIS = ["jan", "fev", "mar", "avr", "mai", "juin", "juil", "aou", "sep", "oct", "nov", "dec"];
 const JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
@@ -331,6 +363,29 @@ export default function MapPage() {
     },
     [saison, journees, terrains, p.heure, p.lieu]
   );
+  // Les terrains du Nord (le recensement) : lus une fois, gardés en mémoire.
+  const [recensement, setRecensement] = useState<CatalogueTerrains | null>(terrainsNordLus);
+  useEffect(() => {
+    if (recensement) return;
+    let fini = false;
+    lireTerrainsNord()
+      .then((c) => !fini && setRecensement(c))
+      .catch(() => {});
+    return () => {
+      fini = true;
+    };
+  }, [recensement]);
+  // Tous les terrains où l'on peut jouer : ceux de la ligue à leur nom, puis le recensement.
+  const proposables = useMemo(() => (recensement ? avecLaLigue(recensement.terrains, terrains) : []), [recensement, terrains]);
+  // Un défi d'équipe se pose sur le terrain recensé qui porte son nom (celui que la fiche du terrain lui donne).
+  const recensesParNom = useMemo(() => {
+    const m = new Map<string, Terrain>();
+    (recensement?.terrains ?? []).forEach((t, i) => {
+      const nom = lieuDuTerrain(t);
+      m.set(sansAccents(nom), { id: -(1_000_000 + i), nom, adresse: t.adresse, lat: t.lat, lng: t.lng, commune: t.commune });
+    });
+    return m;
+  }, [recensement]);
 
   // Les journées à venir, chacune sur son terrain ; sinon la convocation du
   // dimanche. Une journée est passée quand elle est jouée (résultat saisi) ou
@@ -467,13 +522,13 @@ export default function MapPage() {
         ligue: "bola",
       };
     });
-    // Les matchs d'équipe : sur le terrain dont ils portent le nom, s'il est
-    // connu de la Map ; sinon dans le carrousel seulement.
-    const nomTerrain = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    // Les matchs d'équipe : sur le terrain dont ils portent le nom, de la
+    // ligue ou du recensement ; sinon dans le carrousel seulement.
     const equipes = matchsTeam.map((t): MatchMap => {
       const dateLabel = libelleJour(t.defi.jour);
       const dedans = [t.de, t.a].some((e) => e.membres.some((x) => x.id === moi && x.statut === "membre"));
-      const terrain = terrains.find((x) => nomTerrain(x.nom) === nomTerrain(t.defi.lieu)) ?? null;
+      const lieu = sansAccents(t.defi.lieu);
+      const terrain = terrains.find((x) => sansAccents(x.nom) === lieu) ?? recensesParNom.get(lieu) ?? null;
       return {
         cle: `t${t.defi.id}`,
         j: null,
@@ -491,7 +546,7 @@ export default function MapPage() {
       };
     });
     return [...ligue, ...ouverts, ...equipes];
-  }, [ligue, parties, moi, aujourdhui, matchsTeam, terrains]);
+  }, [ligue, parties, moi, aujourdhui, matchsTeam, terrains, recensesParNom]);
 
   // Sur la carte, dans l'ordre du temps : le dernier match joué à gauche, en
   // petit, puis ce qui arrive, du plus proche au plus loin. Le match « à la
@@ -515,8 +570,51 @@ export default function MapPage() {
     return mien ?? prochain ?? affiches[0];
   }, [affiches, aujourdhui]);
 
-  // Ouvrir un match : n'importe quel joueur, d'un bouton ou d'un terrain libre.
-  const [ouvrir, setOuvrir] = useState<{ terrain: Terrain | null; jour?: string; heure?: string; n: number } | null>(null);
+  // Les terrains possibles, en stickers vides : tous, sauf ceux qui ont déjà
+  // leur match. Comparés par leurs lieux : la liste des matchs est refaite à
+  // chaque rendu, le plan ne se redessine que si un match change de terrain.
+  const pris = useMemo(
+    () =>
+      affiches
+        .flatMap((m) => (m.terrain ? [`${m.terrain.lat},${m.terrain.lng}`] : []))
+        .sort()
+        .join(";"),
+    [affiches]
+  );
+  const possibles = useMemo<PossiblePlan[]>(() => {
+    const occupes = pris ? pris.split(";").map((x) => ({ lat: Number(x.split(",")[0]), lng: Number(x.split(",")[1]) })) : [];
+    return proposables
+      .filter((t) => !occupes.some((o) => km(o, t) < MEME_TERRAIN_KM))
+      .map((t) => ({
+        id: t.id,
+        lat: t.lat,
+        lng: t.lng,
+        nom: lieuDuTerrain(t),
+        // La ligue d'abord, puis les complexes les plus grands, éclairés avant les autres.
+        rang: t.ligue != null ? 0 : 10 - Math.min(9, t.formats.length) + (t.eclaire ? 0 : 0.5),
+      }));
+  }, [proposables, pris]);
+  // Le terrain possible touché : il se lève sur le plan, puis sa fiche monte
+  // (un instant après, qu'on voie l'onde partir). La fiche garde le terrain
+  // le temps de redescendre.
+  const [libre, setLibre] = useState<TerrainPropose | null>(null);
+  const [leve, setLeve] = useState<string | null>(null);
+  const [ficheLibre, setFicheLibre] = useState(false);
+  const toucherPossible = useCallback(
+    (id: string) => {
+      const t = proposables.find((x) => x.id === id);
+      if (!t) return;
+      setLibre(t);
+      setLeve(t.id);
+      const calme = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.setTimeout(() => setFicheLibre(true), calme ? 0 : 320);
+    },
+    [proposables]
+  );
+  const tonFantomes = useTeinteFantome();
+
+  // Ouvrir un match : n'importe quel joueur, d'un bouton, d'un moment libre ou d'un terrain possible.
+  const [ouvrir, setOuvrir] = useState<{ terrain: Terrain | null; lieu?: LieuChoisi; jour?: string; heure?: string; n: number } | null>(null);
   const [dispos, setDispos] = useState(false);
 
   const [fiche, setFiche] = useState(false);
@@ -604,7 +702,17 @@ export default function MapPage() {
   }, [affiches, choisirSticker, ouvrirDiscussion, ouvrirEquipe]);
   const invitations = useMemo(() => invitationsDe(parties, moi), [parties, moi]);
   // Les équipes du mode Team qui m'invitent : leur carte au-dessus de celles des matchs.
-  const invitationsEquipe = useMonEquipe().invitations;
+  const { equipe: monEquipe, invitations: invitationsEquipe } = useMonEquipe();
+  // Défier depuis un terrain : le capitaine ou le vice d'une équipe active ;
+  // sans équipe, la monter ; un simple membre laisse le défi à son capitaine.
+  const roleEquipe = monEquipe?.membres.find((x) => x.id === moi && x.statut === "membre")?.role;
+  const defiDepuisTerrain: "defier" | "monter" | null = !partiesActives
+    ? null
+    : !monEquipe
+      ? "monter"
+      : active(monEquipe) && (roleEquipe === "capitaine" || roleEquipe === "vice")
+        ? "defier"
+        : null;
 
   // Le carrousel et le plan vont ensemble : faire glisser les cartes choisit
   // celle qui s'arrête au centre (le plan suit), et choisir sur le plan amène
@@ -797,6 +905,10 @@ export default function MapPage() {
             onVille={ouvrirVille}
             onJoueur={setProfil}
             viser={viser}
+            possibles={possibles}
+            possibleChoisi={leve}
+            onPossible={toucherPossible}
+            teinteFantome={tonFantomes}
             className="h-full w-full"
           />
         </div>
@@ -1153,6 +1265,45 @@ export default function MapPage() {
         </SheetContent>
       </Sheet>
 
+      {/* ─── Un terrain possible : sa fiche, et les deux façons d'y jouer ─── */}
+      <Sheet
+        open={ficheLibre}
+        onOpenChange={(o) => {
+          setFicheLibre(o);
+          if (!o) setLeve(null);
+        }}
+      >
+        <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
+          <SheetHeader className="px-5 pt-5 pb-0">
+            <p className="mono-label flex items-center gap-2 text-muted-foreground">
+              {libre?.ligue != null && <SigleLigue ligue="sfl" hauteur={11} className="text-foreground" />}
+              <span className="min-w-0 truncate">{[libre?.commune, libre && toi ? `à ${distanceLisible(toi, libre)}` : null].filter(Boolean).join(" · ")}</span>
+            </p>
+            <SheetTitle className="text-[26px] leading-tight font-bold tracking-tight">{libre?.nom}</SheetTitle>
+            {libre && surPlace(libre) && <p className="mono-label text-muted-foreground">{surPlace(libre)}</p>}
+          </SheetHeader>
+          {libre && (
+            <FicheLibre
+              t={libre}
+              ios={ios}
+              defi={defiDepuisTerrain}
+              ouvrir={partiesActives}
+              source={recensement ? `${recensement.source} · ${recensement.licence} · ${dateCourte(recensement.date)}` : null}
+              onOuvrir={() => {
+                setFicheLibre(false);
+                setLeve(null);
+                const ligue = libre.ligue != null ? (terrains.find((x) => x.id === libre.ligue) ?? null) : null;
+                setOuvrir((o) => ({
+                  terrain: ligue,
+                  lieu: ligue ? undefined : { lieu: lieuDuTerrain(libre), adresse: libre.adresse, lat: libre.lat, lng: libre.lng, terrain: libre },
+                  n: (o?.n ?? 0) + 1,
+                }));
+              }}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
+
       {ouvrir && (
         <OuvrirMatch
           key={ouvrir.n}
@@ -1160,6 +1311,7 @@ export default function MapPage() {
           onOpenChange={(o) => !o && setOuvrir(null)}
           terrains={terrains}
           terrainInitial={ouvrir.terrain}
+          lieuInitial={ouvrir.lieu}
           jourInitial={ouvrir.jour}
           heureInitial={ouvrir.heure}
           moi={moi}
@@ -1369,6 +1521,66 @@ function CarteMatch({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * La fiche d'un terrain possible : sa photo, le chemin pour y aller, et les
+ * deux façons d'y jouer — un match Bola ouvert à tous, ou le défi d'une
+ * équipe (Team, que seul un capitaine lance ; sans équipe, on la monte).
+ */
+function FicheLibre({
+  t,
+  ios,
+  defi,
+  ouvrir,
+  source,
+  onOuvrir,
+}: {
+  t: TerrainPropose;
+  ios: boolean;
+  defi: "defier" | "monter" | null;
+  /** Ouvrir un match demande d'être connecté (le bouton de la Map aussi). */
+  ouvrir: boolean;
+  /** Le recensement, cité sous la fiche (Licence Ouverte). */
+  source: string | null;
+  onOuvrir: () => void;
+}) {
+  const lien = itineraires(t.lat, t.lng, t.nom)[ios ? 0 : 1];
+  return (
+    <div className="flex flex-col gap-3 px-4">
+      <div className="relative h-[180px] overflow-hidden rounded-[22px] border border-border bg-secondary">
+        <VueSatellite lat={t.lat} lng={t.lng} demi={0.0011} rapport={2} hauteur={180} titre={`Vue satellite de ${t.nom}`} className="h-full w-full" />
+        <span className="ajuster-pin pointer-events-none" style={{ left: "50%", top: "50%", cursor: "default" }} aria-hidden />
+        <span className="absolute bottom-2 left-2 max-w-[calc(100%-6.5rem)] truncate rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
+          {t.adresse || t.commune}
+        </span>
+        <a
+          href={lien.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute right-2 bottom-2 flex h-[26px] items-center gap-[5px] rounded-full bg-black/55 px-2.5 text-[11.5px] font-semibold text-white backdrop-blur"
+        >
+          <Navigation className="size-[10px]" strokeWidth={2.6} /> Y aller
+        </a>
+      </div>
+      {ouvrir && (
+        <Button variant="vert" onClick={onOuvrir} className="h-12 w-full gap-2.5 rounded-full text-[15px] font-semibold">
+          <SigleLigue ligue="bola" hauteur={12} />
+          Ouvrir un match ici
+        </Button>
+      )}
+      {defi && (
+        <Link
+          href={defi === "defier" ? `/bola-team?terrain=${encodeURIComponent(t.id)}` : "/bola-team"}
+          className="bouton-secondaire bouton--mauve flex h-12 items-center justify-center gap-2.5 text-[15px] font-semibold"
+        >
+          <SigleLigue ligue="team" hauteur={12} />
+          {defi === "defier" ? "Défier une équipe ici" : "Monter mon équipe"}
+        </Link>
+      )}
+      {source && <p className="px-2 pt-1 text-center text-[11px] leading-snug text-muted-foreground/70">{source}</p>}
     </div>
   );
 }
