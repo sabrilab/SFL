@@ -20,6 +20,7 @@ import { saisieStore } from "@/lib/sfl/saisie/store";
 import { SAISIE_EVENT } from "@/components/sfl/season-provider";
 import type { ConvocationTeam } from "@/lib/sfl/saisie/types";
 import { assurerConvocationOuverte } from "@/lib/sfl/convocation-auto";
+import { ajusterEquipes } from "@/lib/sfl/divisions-equipes";
 import { equipesVisibles, reponsesOuvertes } from "@/lib/sfl/convocation-temps";
 import { rewardConvocationReply } from "@/lib/sfl/ballons";
 import { NEXT_MATCH } from "@/lib/sfl/data";
@@ -27,6 +28,8 @@ import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/sfl/activity";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
 import { avecLaFeuille, joueursDeLaFeuille, jourMois, journeeDuJour } from "@/lib/sfl/presence-feuille";
+import { terrainDeJournee } from "@/lib/sfl/saisie/mutations";
+import { matchsDeJournee, rendezVousDe, type RendezVous } from "@/lib/sfl/matchs-du-jour";
 
 interface ServerConvocation {
   id: number;
@@ -55,6 +58,14 @@ export interface PresenceView {
   heure: string;
   lieu: string;
   effectif: number;
+  /**
+   * Où et à quelle heure je joue ce dimanche : l'heure, le lieu et le
+   * terrain de mon match dès que l'admin a fait les équipes, sinon le
+   * premier coup d'envoi et le lieu de la journée ; sans journée ouverte,
+   * ceux de la convocation. `heure` et `lieu` restent ceux de la
+   * convocation, pour tous.
+   */
+  rendezVous: RendezVous;
   mine: Reponse | null;
   presents: string[];
   absents: string[];
@@ -73,7 +84,7 @@ export interface PresenceView {
 }
 
 export function usePresence(): PresenceView {
-  const { saison } = useSeason();
+  const { saison, journees } = useSeason();
   const { player } = useMyPlayer();
   const session = useSession();
   const serverActive = !!session?.server;
@@ -195,6 +206,8 @@ export function usePresence(): PresenceView {
               .delete()
               .eq("convocation_id", server.convocation.id)
               .eq("player_id", uid);
+            // Les équipes par division déjà faites : il en sort (lib/sfl/divisions-equipes).
+            if (!error) void ajusterEquipes("reponse", server.convocation.heure);
             return !error;
           }
           const { error } = await sb.from("presence").upsert(
@@ -204,6 +217,7 @@ export function usePresence(): PresenceView {
           if (!error) {
             logActivity("presence");
             recompense();
+            void ajusterEquipes("reponse", server.convocation.heure);
           }
           return !error;
         } catch {
@@ -266,8 +280,19 @@ export function usePresence(): PresenceView {
   // Les joueurs que l'admin a posés sur la feuille de ce dimanche viennent :
   // ils comptent avec ceux qui ont dit « Je viens » (lib/sfl/presence-feuille).
   const dateConv = serverActive && server ? server.convocation.date_label : (localConv?.date ?? NEXT_MATCH.date);
-  const feuille = joueursDeLaFeuille(saison, journeeDuJour(saison, dateConv));
+  const jDuJour = journeeDuJour(saison, dateConv);
+  const feuille = joueursDeLaFeuille(saison, jDuJour);
   const surLaFeuille = feuille.noms.includes(player.name);
+
+  // L'heure, le lieu et le terrain de mon match, quand la journée de ce
+  // dimanche est ouverte (lib/sfl/matchs-du-jour) ; sinon ceux de la convocation.
+  const rendezVousDuDimanche = (heure: string, lieu: string): RendezVous => {
+    const meta = saison.journees.find((m) => m.j === jDuJour);
+    if (!meta) return { heure, lieu, match: null, terrain: null };
+    const repli = { heure: meta.heure || heure, lieu: terrainDeJournee(saison, meta, lieu) };
+    const matchs = matchsDeJournee(journees.find((x) => x.j === jDuJour), saison.terrains ?? [], repli);
+    return rendezVousDe(matchs, player.name, repli, lieu);
+  };
 
   if (serverActive && server) {
     const names = publicOnly(saison.roster).map((r) => ({ name: r.name, actif: r.profil === "Actif" }));
@@ -288,6 +313,7 @@ export function usePresence(): PresenceView {
       heure: server.convocation.heure,
       lieu: server.convocation.lieu,
       effectif: server.convocation.effectif,
+      rendezVous: rendezVousDuDimanche(server.convocation.heure, server.convocation.lieu),
       mine: surLaFeuille ? "present" : (rep[player.name] ?? null),
       ...reponses,
       reponsesOuvertes: ouvert,
@@ -311,6 +337,7 @@ export function usePresence(): PresenceView {
     heure: localConv?.heure ?? NEXT_MATCH.heure,
     lieu: localConv?.lieu ?? NEXT_MATCH.lieu,
     effectif: 10,
+    rendezVous: rendezVousDuDimanche(localConv?.heure ?? NEXT_MATCH.heure, localConv?.lieu ?? NEXT_MATCH.lieu),
     mine: surLaFeuille ? "present" : localConv ? ((localConv.reponses[player.name] as Reponse | undefined) ?? null) : null,
     ...reponsesLocales,
     reponsesOuvertes: ouvert,

@@ -49,7 +49,7 @@ const DEF = Object.fromEntries(TROPHEES.map((d) => [d.id, d]));
 
 /** Le terrain des rubriques : celui des terrains de la Ligue, un peu plus couché, le but au fond. */
 const VUE = vue(270, 500, 40);
-const MILIEU = VUE.l / 2;
+export const MILIEU = VUE.l / 2;
 /** La ligne de but du fond, et le but de five : 4,5 m sur 1,6 m environ à cette échelle. */
 const LIGNE = 11;
 const POTEAUX = [MILIEU - 24, MILIEU + 24] as const;
@@ -65,7 +65,7 @@ const ECHELLE_MAX = 449 / BASE;
 const MARGE = 12;
 const PHI = (1 + Math.sqrt(5)) / 2;
 /** Les tailles des cartes debout (fraction de 254 px, comme FORMAT_CARTE). */
-const T = { vedette: 0.27, moyenne: 0.21, petite: 0.16 } as const;
+export const T = { vedette: 0.27, moyenne: 0.21, petite: 0.16 } as const;
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
@@ -96,6 +96,8 @@ export interface Place {
   moi?: boolean;
   /** Sous le nom, les chiffres du jour. */
   sous?: string;
+  /** Sur le coin haut de la carte, en pastille : quand le nom n'a plus la place à côté de lui. */
+  badge?: string;
 }
 
 const hauteur = (taille: number) => 254 * taille * PHI + 26;
@@ -110,7 +112,14 @@ function Debout({ p }: { p: Place }) {
     <div className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y, zIndex: Math.round(p.v) }}>
       <div className="absolute bottom-0 left-0" style={{ transformOrigin: "50% 100%", transform: `translateX(-50%) scale(${k})` }}>
         <div className="pel-entre flex flex-col items-center" style={{ ["--d" as string]: p.d ?? 0.2 }}>
-          <MiniCarte player={joueur} size={taille} vertical />
+          <div className="relative">
+            <MiniCarte player={joueur} size={taille} vertical />
+            {p.badge && (
+              <span className="absolute top-0 right-0 translate-x-[45%] -translate-y-[35%] rounded-full bg-white px-[5px] py-[1.5px] font-mono text-[9.5px] leading-[1.2] font-bold whitespace-nowrap text-black tabular-nums shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
+                {p.badge}
+              </span>
+            )}
+          </div>
           <span
             className={cn(
               "mt-[4px] flex items-center gap-[5px] rounded-full px-[8px] py-[2px] text-[11px] leading-[1.25] font-bold whitespace-nowrap",
@@ -127,7 +136,7 @@ function Debout({ p }: { p: Place }) {
 }
 
 /** Ce qui flotte au-dessus du terrain en (u, v), à la hauteur w : un chiffre, un badge. */
-function Bulle({ u, v, w = 0, d = 0.4, children, className }: { u: number; v: number; w?: number; d?: number; children: ReactNode; className?: string }) {
+export function Bulle({ u, v, w = 0, d = 0.4, children, className }: { u: number; v: number; w?: number; d?: number; children: ReactNode; className?: string }) {
   const { x, y, k } = projeter(u, v, w, VUE);
   return (
     <div className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y, zIndex: 600 }}>
@@ -141,7 +150,7 @@ function Bulle({ u, v, w = 0, d = 0.4, children, className }: { u: number; v: nu
 }
 
 /** Un chiffre en pastille : le nombre en Anton, ce qu'il compte dessous. */
-function Pastille({ n, quoi, clair = false, petit = false }: { n: ReactNode; quoi: string; clair?: boolean; petit?: boolean }) {
+export function Pastille({ n, quoi, clair = false, petit = false }: { n: ReactNode; quoi: string; clair?: boolean; petit?: boolean }) {
   return (
     <span
       className={cn(
@@ -437,7 +446,7 @@ export function Scene({
 /* ------------------------------ Les rubriques ------------------------------ */
 
 /** Le moment d'entrée de la i-ième carte. */
-const tour = (i: number, de = 0.18, pas = 0.07) => de + i * pas;
+export const tour = (i: number, de = 0.18, pas = 0.07) => de + i * pas;
 
 /** Des cartes en rang, de gauche à droite, centrées sur le milieu. */
 function rang(noms: string[], v: number, ecart: number, taille: number, d0: number, moi?: string): Place[] {

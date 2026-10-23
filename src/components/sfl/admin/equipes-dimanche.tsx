@@ -10,37 +10,41 @@
 // vendredi soir, sans envoyer quoi que ce soit à la main.
 //
 // « Selon l'avis des joueurs » attend les compositions d'Arène : verrouillé.
+//
+// Depuis le 23/10, chaque match se joue les Noirs contre les Blancs : les
+// équipes générées s'appellent « Noirs 1 », « Blancs 1 »… (saisie/equipes.ts).
+//
+// Dès la J4, la ligue joue en divisions : les équipes se font toutes seules,
+// et ce composeur laisse la place à leur vue (equipes-divisions.tsx).
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { RefreshCw, Send, Users } from "lucide-react";
 import { Locked } from "@/components/sfl/locked";
 import { useSeason } from "@/components/sfl/season-provider";
 import { usePresence } from "@/hooks/use-presence";
 import { generateBalancedTeams, type BalancedTeam } from "@/lib/sfl/saisie/mutations";
+import { equipesDeConvocation } from "@/lib/sfl/saisie/equipes";
 import { ovr, rareStats } from "@/lib/sfl/engine";
+import { divisionsDeLaJournee } from "@/lib/sfl/equipes-division";
+import type { ConvocationTeam } from "@/lib/sfl/saisie/types";
+import { PointMaillot } from "@/components/sfl/point-maillot";
+import { EquipesParDivision } from "./equipes-divisions";
 import { cn } from "@/lib/utils";
 
-const TEAM_TINTS: Record<string, string> = {
-  Orange: "#F9CB9C",
-  Bleu: "#8FB6F5",
-  Vert: "#9FD49B",
-  Jaune: "#F2DC8B",
-  Rouge: "#F09A96",
-  Gris: "#C9C9C9",
-};
-
-export function EquipesDimanche() {
+export function EquipesDimanche({ onPoser }: { onPoser?: (j: number, teams: ConvocationTeam[], date: string) => void }) {
   const presence = usePresence();
-  const { allPlayers } = useSeason();
+  const { saison, allPlayers } = useSeason();
   const [draft, setDraft] = useState<BalancedTeam[] | null>(null);
   const [saving, setSaving] = useState(false);
+  const etat = useMemo(() => divisionsDeLaJournee(saison, presence.journee), [saison, presence.journee]);
 
   // Réservé à l'admin — le hook ne donne saveTeams qu'à lui.
   if (!presence.saveTeams) return null;
+  if (etat) return <EquipesParDivision presence={presence} etat={etat} onPoser={onPoser} />;
 
   const confirmés = presence.presents;
-  // Deux équipes jusqu'à 12 confirmés, quatre au-delà (deux terrains).
+  // Un match jusqu'à 12 confirmés, deux au-delà.
   const nbEquipes = confirmés.length > 12 ? 4 : 2;
 
   const ovrOf = (name: string) => {
@@ -89,7 +93,7 @@ export function EquipesDimanche() {
           <Users className="size-4 text-primary" /> Les équipes de dimanche
         </span>
         <span className="mono-label text-foreground/40">
-          {confirmés.length} confirmé{confirmés.length > 1 ? "s" : ""} → {nbEquipes} équipes
+          {confirmés.length} confirmé{confirmés.length > 1 ? "s" : ""} → {nbEquipes / 2} match{nbEquipes > 2 ? "s" : ""}
         </span>
       </div>
       <p className="text-[12.5px] leading-snug text-muted-foreground">
@@ -102,20 +106,17 @@ export function EquipesDimanche() {
       {/* L'état en base : ce qui partira vendredi */}
       {validées && validées.length > 0 && !affichées && (
         <div className="mt-3 flex flex-col gap-2">
-          {validées.map((t) => (
-            <div key={t.name} className="rounded-2xl bg-secondary/40 p-3">
+          {equipesDeConvocation(validées).map((t) => (
+            <div key={t.nom} className="rounded-2xl bg-secondary/40 p-3">
               <div className="mb-1 flex items-center justify-between">
                 <span className="flex items-center gap-1.5 text-[13px] font-bold">
-                  <span
-                    className="size-2.5 rounded-full ring-1 ring-black/10"
-                    style={{ background: TEAM_TINTS[t.name] ?? "#ddd" }}
-                  />
-                  {t.name}
+                  {t.camp && <PointMaillot camp={t.camp} />}
+                  {t.libelle}
                 </span>
-                <span className="mono-label text-foreground/40">{t.players.length} joueur{t.players.length > 1 ? "s" : ""}</span>
+                <span className="mono-label text-foreground/40">{t.joueurs.length} joueur{t.joueurs.length > 1 ? "s" : ""}</span>
               </div>
               <p className="text-[12.5px] leading-snug text-foreground/55">
-                {t.players.join(" · ")}
+                {t.joueurs.join(" · ")}
               </p>
             </div>
           ))}
@@ -128,20 +129,19 @@ export function EquipesDimanche() {
       {/* Le brouillon en cours */}
       {affichées && (
         <div className="mt-3 flex flex-col gap-2">
-          {affichées.map((t) => (
-            <div key={t.name} className="rounded-2xl bg-secondary/40 p-3">
+          {equipesDeConvocation(affichées.map((t) => ({ name: t.name, players: t.players.map((p) => p.name) }))).map((t) => (
+            <div key={t.nom} className="rounded-2xl bg-secondary/40 p-3">
               <div className="mb-1 flex items-center justify-between">
                 <span className="flex items-center gap-1.5 text-[13px] font-bold">
-                  <span
-                    className="size-2.5 rounded-full ring-1 ring-black/10"
-                    style={{ background: TEAM_TINTS[t.name] ?? "#ddd" }}
-                  />
-                  {t.name}
+                  {t.camp && <PointMaillot camp={t.camp} />}
+                  {t.libelle}
                 </span>
-                <span className="mono-label text-foreground/40">OVR {t.totalOvr}</span>
+                <span className="mono-label text-foreground/40">
+                  OVR {affichées.find((x) => x.name === t.nom)?.totalOvr}
+                </span>
               </div>
               <p className="text-[12.5px] leading-snug text-foreground/55">
-                {t.players.map((p) => p.name).join(" · ")}
+                {t.joueurs.join(" · ")}
               </p>
             </div>
           ))}

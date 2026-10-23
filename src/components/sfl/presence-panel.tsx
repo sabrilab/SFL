@@ -9,17 +9,29 @@
 // Toute la donnée vient de usePresence : partagée (Supabase, temps réel)
 // quand la base est branchée, locale sinon. L'écran ne fait pas la différence.
 
+import { useMemo } from "react";
 import { Check, Copy, Radio, X } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "@/hooks/use-session";
 import { usePresence } from "@/hooks/use-presence";
+import { ligneDuRendezVous } from "@/lib/sfl/matchs-du-jour";
+import { equipesDeConvocation } from "@/lib/sfl/saisie/equipes";
+import { PointMaillot } from "@/components/sfl/point-maillot";
 import { QuiVient } from "@/components/sfl/qui-vient";
+import { useSeason } from "@/components/sfl/season-provider";
+import { divisionsDeLaJournee, terrainsDesEquipes } from "@/lib/sfl/equipes-division";
 import { cn } from "@/lib/utils";
 
 export function PresencePanel({ compact = false }: { compact?: boolean }) {
   const session = useSession();
   const admin = !!session?.admin;
   const p = usePresence();
+  const { saison } = useSeason();
+  // Dès la J4, chaque équipe dit sa division : « Noirs · Match 2 · D1 ».
+  const divisionDe = useMemo(() => {
+    const etat = p.teams?.length ? divisionsDeLaJournee(saison, p.journee) : null;
+    return new Map(etat && p.teams ? terrainsDesEquipes(p.teams, etat).flatMap(({ divisions, equipes }) => equipes.map((e) => [e.name, divisions] as const)) : []);
+  }, [saison, p.journee, p.teams]);
 
   async function answer(value: "present" | "absent") {
     const next = p.mine === value ? null : value;
@@ -63,7 +75,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
           <p className="mono-label text-primary">J{p.journee} · Ma présence</p>
           <h2 className="mt-1 text-xl font-bold tracking-tight">{p.jour}</h2>
           <p className="mt-1 text-[13px] text-foreground/45">
-            {p.heure} · {p.lieu}
+            {ligneDuRendezVous(p.rendezVous)}
           </p>
         </div>
         {p.mine && (
@@ -130,10 +142,14 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
         <div className="mt-4 border-t border-contraste/8 pt-3.5">
           <p className="mono-label text-primary">Les équipes de dimanche</p>
           <div className="mt-2 flex flex-col gap-3">
-            {p.teams.map((t) => (
-              <div key={t.name}>
-                <p className="mb-1.5 text-[12.5px] font-bold text-foreground/85">{t.name}</p>
-                <QuiVient noms={t.players} />
+            {equipesDeConvocation(p.teams).map((t) => (
+              <div key={t.nom}>
+                <p className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-bold text-foreground/85">
+                  {t.camp && <PointMaillot camp={t.camp} />}
+                  {t.libelle}
+                  {divisionDe.get(t.nom) && <span className="font-normal text-foreground/45">· {divisionDe.get(t.nom)}</span>}
+                </p>
+                <QuiVient noms={t.joueurs} />
               </div>
             ))}
           </div>

@@ -25,15 +25,16 @@
 import { useMemo, useRef, useState } from "react";
 import { Copy, Plus, Trash2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { entryPP } from "@/lib/sfl/saisie/engine";
+import { computeJournees, entryPP } from "@/lib/sfl/saisie/engine";
 import {
   addEntry,
   deleteEntryAt,
   duplicateEntryAt,
   newEntry,
   updateEntryAt,
-  TEAM_PRESETS,
 } from "@/lib/sfl/saisie/mutations";
+import { choixDEquipe } from "@/lib/sfl/saisie/equipes";
+import { PointMaillot } from "@/components/sfl/point-maillot";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
 /* ------------------------------- colonnes -------------------------------- */
@@ -61,16 +62,9 @@ const STATUTS = [
 
 const COLS: Col[] = [
   { id: "player", label: "Joueur", type: "player", width: 132 },
-  {
-    id: "team",
-    label: "Équipe",
-    type: "enum",
-    width: 84,
-    options: [
-      { value: "", label: "—" },
-      ...TEAM_PRESETS.map((t) => ({ value: t, label: t })),
-    ],
-  },
+  // Ses options dépendent de la journée : ses Noirs et ses Blancs, match par
+  // match, et un match de plus (saisie/equipes.ts) ; posées par la grille.
+  { id: "team", label: "Équipe", type: "enum", width: 84 },
   {
     id: "statut",
     label: "Statut",
@@ -253,6 +247,20 @@ export function GrilleSaisie({ saison, commit }: Props) {
       .filter((x) => !needle || x.e.player.toLowerCase().includes(needle));
   }, [saison.entries, j, q]);
 
+  // Les équipes qu'une ligne peut prendre : celles de la journée, match par
+  // match, puis les Noirs et les Blancs d'un match de plus.
+  const choix = useMemo(() => {
+    const noms = [...new Set(saison.entries.filter((e) => e.j === j && e.team).map((e) => e.team as string))];
+    return choixDEquipe(
+      computeJournees(saison).find((x) => x.j === j),
+      noms
+    );
+  }, [saison, j]);
+  const optionsEquipe = useMemo(
+    () => [{ value: "", label: "—" }, ...choix.map((t) => ({ value: t.nom, label: t.court }))],
+    [choix]
+  );
+
   // Les totaux d'équipe du bas de feuille, comme les lignes TOTAL du classeur.
   const equipes = useMemo(() => {
     const map = new Map<string, { buts: number; passes: number; joueurs: number }>();
@@ -264,8 +272,11 @@ export function GrilleSaisie({ saison, commit }: Props) {
       cur.joueurs += e.extraTime ? 0 : 1;
       map.set(e.team, cur);
     }
-    return [...map.entries()];
-  }, [rows]);
+    // Dans l'ordre des matchs : les Noirs, puis les Blancs.
+    return choix
+      .filter((t) => map.has(t.nom))
+      .map((t) => ({ ...t, ...map.get(t.nom)! }));
+  }, [rows, choix]);
 
   const ppTotal = rows.reduce((s, x) => s + entryPP(x.e), 0);
 
@@ -314,7 +325,7 @@ export function GrilleSaisie({ saison, commit }: Props) {
     const deja = new Set(rows.map((x) => x.e.player));
     const libres = rosterNames.filter((n) => !deja.has(n)).slice(0, 6);
     for (const name of libres) next = addEntry(next, newEntry(j, name, team));
-    commit(next, `Équipe ${team} ajoutée`);
+    commit(next, `${choix.find((t) => t.nom === team)?.libelle ?? team} ajoutés`);
   }
 
   const meta = saison.journees.find((m) => m.j === j);
@@ -353,14 +364,15 @@ export function GrilleSaisie({ saison, commit }: Props) {
       {/* Poser une équipe entière */}
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="mono-label text-foreground/30">Ajouter une équipe</span>
-        {TEAM_PRESETS.map((t) => (
+        {choix.map((t) => (
           <button
-            key={t}
-            onClick={() => ajouterEquipe(t)}
+            key={t.nom}
+            onClick={() => ajouterEquipe(t.nom)}
             className="bouton-secondaire bouton--vert flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-semibold"
           >
             <Users className="size-3" />
-            {t}
+            {t.camp && <PointMaillot camp={t.camp} className="size-2" />}
+            {t.libelle}
           </button>
         ))}
       </div>
@@ -474,7 +486,7 @@ export function GrilleSaisie({ saison, commit }: Props) {
                           <Enum
                             {...nav}
                             value={raw}
-                            options={c.options!}
+                            options={c.id === "team" ? optionsEquipe : c.options!}
                             onSet={(v) => {
                               const p =
                                 c.id === "team"
@@ -562,12 +574,15 @@ export function GrilleSaisie({ saison, commit }: Props) {
 
       {/* Les totaux — les lignes TOTAL du classeur, mais toujours justes */}
       <div className="flex flex-wrap items-center gap-2">
-        {equipes.map(([name, t]) => (
+        {equipes.map((t) => (
           <span
-            key={name}
+            key={t.nom}
             className="glass-soft flex items-baseline gap-1.5 rounded-full px-3 py-1.5 text-[12px]"
           >
-            <strong className="font-bold">{name}</strong>
+            <strong className="flex items-center gap-1.5 self-center font-bold">
+              {t.camp && <PointMaillot camp={t.camp} className="size-2" />}
+              {t.libelle}
+            </strong>
             <span className="tabular-nums text-foreground/45">
               {t.buts} but{t.buts > 1 ? "s" : ""} · {t.passes} passe{t.passes > 1 ? "s" : ""} ·{" "}
               {t.joueurs} joueur{t.joueurs > 1 ? "s" : ""}

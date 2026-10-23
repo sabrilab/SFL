@@ -33,6 +33,8 @@ export const SELFIES_MAX = 3;
  * minuit, heure de Paris (Sabri, 23/10/2026 : « Elle limite à 3 générations
  * d'images de cartes par jour », le joueur averti dès la première de ce qui
  * lui reste et du temps qu'il faut attendre). Avant : 12 sur 24 h glissantes.
+ * Recopiée dans la base, qui compte elle aussi depuis minuit de Paris
+ * (credit_du_jour, supabase/schema.sql) : les changer ensemble.
  */
 export const LIMITE_JOUR = 3;
 
