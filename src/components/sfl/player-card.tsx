@@ -14,6 +14,8 @@
 // resserrée sur le visage, la note et le nom en bas (Sabri, 19/10).
 // Avec `distinction`, c'est une carte à titre : la même carte, en or (MVP),
 // en rouge (Impact) ou en bleu (Défensive) (Sabri, 22/10, teinte-carte.ts).
+// Avec `maillot`, le joueur porte le maillot de son camp dans ce match : la
+// photo est repeinte par le code (Sabri, 23/10, lib/sfl/maillot-des-photos).
 
 "use client";
 
@@ -21,6 +23,8 @@ import { BolaCard, palierCarte } from "./bola-card";
 import { CartePhoto } from "./carte-photo";
 import { useBadgeCarte } from "@/hooks/use-badge-carte";
 import { usePhotoPerso } from "@/hooks/use-player-photo";
+import { usePhotoAuMaillot } from "@/hooks/use-photo-au-maillot";
+import type { Camp } from "@/lib/sfl/maillots";
 import { ovr, type BoostType, type Player, type StatKey } from "@/lib/sfl/engine";
 import { useIdentites } from "@/hooks/use-identites";
 
@@ -35,6 +39,7 @@ export function PlayerCard({
   pseudo,
   vertical,
   distinction,
+  maillot,
 }: {
   player: Player;
   /** Aperçu : le nom et le pseudo en cours de saisie (identite.tsx). */
@@ -50,9 +55,11 @@ export function PlayerCard({
   vertical?: boolean;
   /** Une carte à titre : MVP (or), Impact (rouge), Défensive (bleu). */
   distinction?: BoostType;
+  /** Le camp du joueur dans un match : sa photo porte ce maillot-là. */
+  maillot?: Camp;
 }) {
   const stats = player.stats;
-  const photo = usePhotoPerso(player.name);
+  const photo = usePhotoAuMaillot(usePhotoPerso(player.name), maillot);
   const badge = useBadgeCarte(player.name);
   const identite = useIdentites();
   if (palierCarte(254 * size) !== "complete")

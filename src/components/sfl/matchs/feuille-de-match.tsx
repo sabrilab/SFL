@@ -9,6 +9,8 @@
 // couleurs de son équipe (noire chez les Noirs, blanche chez les Blancs). Mon
 // équipe joue en bas, devant ; ma carte est cerclée. Plusieurs matchs le
 // même jour : on passe de l'un à l'autre, la fiche s'ouvre sur le mien.
+// Chaque joueur y porte le maillot de son camp, sa photo repeinte par le
+// code (lib/sfl/maillot-des-photos.ts), dans l'app comme dans l'image.
 // Toucher une carte ouvre la fiche du joueur (fiche-joueur.tsx). Quand les
 // matchs ne se jouent pas tous à la même heure ou au même endroit, ou que
 // l'admin a dit sur quel terrain (Sabri, 23/10), chacun le porte dans un coin.
@@ -32,6 +34,7 @@ import {
   type EquipeDuJour,
 } from "@/components/sfl/fiche-joueur";
 import { usePhotoPerso } from "@/hooks/use-player-photo";
+import { usePhotoAuMaillot, useVersionMaillots } from "@/hooks/use-photo-au-maillot";
 import { useSeason } from "@/components/sfl/season-provider";
 import {
   placesSurDemiTerrain,
@@ -39,6 +42,7 @@ import {
   type TerrainFeuille,
 } from "@/lib/sfl/feuille";
 import { ovr, type Player } from "@/lib/sfl/engine";
+import type { Camp } from "@/lib/sfl/maillots";
 import { cn } from "@/lib/utils";
 import { projeter, TERRAIN } from "@/lib/sfl/terrain-vu";
 import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
@@ -65,6 +69,7 @@ export function Pastille({
   nom,
   cote,
   onglet,
+  maillot,
   onChoisir,
 }: {
   player: Player | undefined;
@@ -72,10 +77,12 @@ export function Pastille({
   cote: number;
   /** La note aux couleurs de l'équipe. */
   onglet: { fond: string; encre: string };
+  /** Le camp du joueur : sa photo porte ce maillot-là. */
+  maillot?: Camp;
   /** Toucher la carte ouvre la fiche du joueur ; absent dans l'image. */
   onChoisir?: (p: Player) => void;
 }) {
-  const photo = usePhotoPerso(nom);
+  const photo = usePhotoAuMaillot(usePhotoPerso(nom), maillot);
   const r = cote * 0.24;
   const carte = (
     <div
@@ -98,7 +105,13 @@ export function Pastille({
       >
         {photo ? (
           // eslint-disable-next-line @next/next/no-img-element -- photographié aussi par html-to-image
-          <img src={photo} alt="" className="size-full object-cover" />
+          <img
+            src={photo}
+            alt=""
+            // Chargée comme html-to-image la relit : l'image partagée la trouve en cache.
+            crossOrigin={photo.startsWith("data:") ? undefined : "anonymous"}
+            className="size-full object-cover"
+          />
         ) : (
           <svg aria-hidden viewBox="0 0 40 40" className="size-full">
             <circle cx="20" cy="16" r="7.5" fill="#b4b3ae" />
@@ -146,6 +159,7 @@ export function Pastille({
 interface Pose {
   nom: string;
   equipe: string;
+  camp: Camp;
   couleur: string;
   encre: string;
   /** En % de la largeur du terrain. */
@@ -191,6 +205,7 @@ function poser(t: TerrainFeuille, basEstA: boolean): Pose[] {
       out.push({
         nom,
         equipe: eq.nom,
+        camp: eq.camp,
         couleur: eq.couleur,
         encre: eq.encre,
         x: 50 + (largeur - 50) * ecart(profondeur, chezMoi),
@@ -280,6 +295,7 @@ export function FeuilleDeMatch({
             player,
             equipe: {
               nom: p.equipe,
+              camp: p.camp,
               couleur: p.couleur,
               encre: p.encre,
               terrain: terrains.length > 1 ? t.label : null,
@@ -390,6 +406,7 @@ function TerrainVu({
                     nom={p.nom}
                     cote={42}
                     onglet={{ fond: p.couleur, encre: p.encre }}
+                    maillot={p.camp}
                     onChoisir={onChoisir && ((pl) => onChoisir(p, pl))}
                   />
                 </div>
@@ -468,7 +485,9 @@ function useImage(
   parNom: Map<string, Player>,
 ) {
   const ref = useRef<HTMLDivElement>(null);
-  const cle = JSON.stringify([sujet, entete]);
+  // Une photo repeinte au maillot qui arrive : l'image se reprend, avec elle.
+  const maillots = useVersionMaillots();
+  const cle = JSON.stringify([sujet, entete, maillots]);
   // L'image tient à la feuille qu'elle montre : une autre feuille, et elle est périmée.
   const [pris, setPris] = useState<{ cle: string; fichier: File } | null>(null);
   const fichier = pris?.cle === cle ? pris.fichier : null;
@@ -483,7 +502,9 @@ function useImage(
         await document.fonts?.ready;
         const blob = await toBlob(noeud, {
           pixelRatio: 2,
-          cacheBust: true,
+          // Les photos changent d'adresse avec elles (?v=…) ; une photo
+          // repeinte (blob:) ne se relit pas si on lui ajoute un paramètre.
+          includeQueryParams: true,
           width: LARGEUR,
           height: HAUTEUR,
         });

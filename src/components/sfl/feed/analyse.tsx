@@ -5,11 +5,15 @@
 // Tout est calculé en comparant la saison AVANT la journée (classement
 // recalculé sans ses lignes) et APRÈS : mouvements au classement, course au
 // Pépite d'Or (en barres et en courbes depuis J1), pouls des buts, séries de
-// buteurs, paliers franchis ou en approche, assiduité, bilan des équipes de
-// couleur, records de la saison, absents marquants, et une réserve de
+// buteurs, paliers franchis ou en approche, assiduité, bilan des Noirs et
+// des Blancs, records de la saison, absents marquants, et une réserve de
 // « stats qui piquent » injectée dans le bento des chiffres. Chaque module
 // ne s'affiche que si la journée a réellement produit la donnée — le récap
 // varie donc d'une semaine à l'autre.
+//
+// Les équipes se disent Noirs et Blancs, comme sur la feuille de match
+// (lib/sfl/maillots.ts) ; la couleur du jour de l'admin (Orange, Bleu…)
+// reste la clé des calculs.
 
 import { useMemo, type ReactNode } from "react";
 import { TrendingUp } from "lucide-react";
@@ -24,6 +28,8 @@ import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
 import { CarteDe } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
+import { PointMaillot } from "@/components/sfl/point-maillot";
+import { MAILLOTS, campDuJour, type Camp } from "@/lib/sfl/maillots";
 
 /* ------------------------------ Calculs ------------------------------ */
 
@@ -56,8 +62,8 @@ export interface Analyse {
   }[];
   /** Grille de présence des plus assidus sur toutes les journées. */
   fideles: { js: number[]; rows: { name: string; cells: boolean[]; count: number }[] };
-  /** Bilan V/N/D des équipes de couleur sur la saison. */
-  couleurs: { team: string; v: number; n: number; d: number; total: number }[];
+  /** Bilan V/N/D des Noirs et des Blancs sur la saison. */
+  couleurs: { camp: Camp; v: number; n: number; d: number; total: number }[];
   /** Records individuels et collectifs de la saison. */
   records: { label: string; value: string; sub: string; fresh: boolean }[];
 }
@@ -242,25 +248,27 @@ export function useAnalyse(
         }),
     };
 
-    /* Le bilan des couleurs : V/N/D par équipe sur la saison */
-    const teamRes = new Map<string, { v: number; n: number; d: number }>();
+    /* Le bilan des couleurs : V/N/D des Noirs et des Blancs sur la saison */
+    const parJ = new Map(journees.map((x) => [x.j, x]));
+    const teamRes = new Map<Camp, { v: number; n: number; d: number }>();
     const seenTeamJ = new Set<string>();
     for (const e of saison.entries) {
       if (e.statut !== "Présent" || e.extraTime || !e.team || !e.result) continue;
       const key = `${e.j}|${e.team}`;
       if (seenTeamJ.has(key)) continue;
       seenTeamJ.add(key);
-      const t = teamRes.get(e.team) ?? { v: 0, n: 0, d: 0 };
+      const camp = campDuJour(parJ.get(e.j), e.team)?.camp;
+      if (!camp) continue;
+      const t = teamRes.get(camp) ?? { v: 0, n: 0, d: 0 };
       if (e.result === "Victoire") t.v += 1;
       else if (e.result === "Nul") t.n += 1;
       else t.d += 1;
-      teamRes.set(e.team, t);
+      teamRes.set(camp, t);
     }
     const couleurs = [...teamRes.entries()]
-      .map(([team, r]) => ({ team, ...r, total: r.v + r.n + r.d }))
+      .map(([camp, r]) => ({ camp, ...r, total: r.v + r.n + r.d }))
       .filter((t) => t.total >= 2)
-      .sort((a, b) => b.v / b.total - a.v / a.total || b.total - a.total)
-      .slice(0, 6);
+      .sort((a, b) => b.v / b.total - a.v / a.total || b.total - a.total);
 
     /* Les records de la saison — perfs sur une seule journée */
     const perPlayerJ = new Map<
@@ -282,9 +290,12 @@ export function useAnalyse(
     let teamRecord: { team: string; score: number; j: number } | null = null;
     for (const j of journees)
       for (const m of j.matches ?? [])
-        for (const t of [m.teamA, m.teamB])
+        for (const [t, camp] of [
+          [m.teamA, MAILLOTS.Noirs],
+          [m.teamB, MAILLOTS.Blancs],
+        ] as const)
           if (!teamRecord || t.score > teamRecord.score)
-            teamRecord = { team: t.name, score: t.score, j: j.j };
+            teamRecord = { team: camp.nom, score: t.score, j: j.j };
     const rBut = best("buts");
     const rPas = best("passes");
     const rPP = best("pp");
@@ -321,11 +332,14 @@ export function useAnalyse(
     /* Stats qui piquent — la réserve, dans l'ordre d'intérêt */
     const insolites: Insolite[] = [];
     const matches = lastJ.matches ?? [];
-    const teamOf = new Map<string, { name: string; score: number; conceded: number }>();
-    for (const m of matches) {
-      teamOf.set(m.teamA.name, { name: m.teamA.name, score: m.teamA.score, conceded: m.teamB.score });
-      teamOf.set(m.teamB.name, { name: m.teamB.name, score: m.teamB.score, conceded: m.teamA.score });
-    }
+    // Chaque équipe du jour, par son nom interne : son maillot (« des Noirs »,
+    // « les Blancs du terrain 2 » un jour à plusieurs terrains) et son score.
+    const teamOf = new Map<string, { des: string; les: string; score: number; conceded: number }>();
+    matches.forEach((m, i) => {
+      const ou = matches.length > 1 ? ` du terrain ${i + 1}` : "";
+      teamOf.set(m.teamA.name, { des: MAILLOTS.Noirs.des + ou, les: MAILLOTS.Noirs.les + ou, score: m.teamA.score, conceded: m.teamB.score });
+      teamOf.set(m.teamB.name, { des: MAILLOTS.Blancs.des + ou, les: MAILLOTS.Blancs.les + ou, score: m.teamB.score, conceded: m.teamA.score });
+    });
     const losers = new Set(
       matches.flatMap((m) =>
         m.teamA.score > m.teamB.score ? [m.teamB.name] : m.teamA.score < m.teamB.score ? [m.teamA.name] : []
@@ -336,7 +350,7 @@ export function useAnalyse(
     const share = jEntries
       .map((e) => {
         const t = e.team ? teamOf.get(e.team) : undefined;
-        return t && t.score > 0 ? { e, pct: Math.round((e.buts / t.score) * 100), team: t.name } : null;
+        return t && t.score > 0 ? { e, pct: Math.round((e.buts / t.score) * 100), des: t.des } : null;
       })
       .filter((x): x is NonNullable<typeof x> => !!x && x.pct >= 40)
       .sort((a, b) => b.pct - a.pct)[0];
@@ -344,7 +358,7 @@ export function useAnalyse(
       insolites.push({
         label: "Il porte son équipe",
         value: `${share.pct}%`,
-        sub: `des buts du ${share.team} par ${share.e.player}`,
+        sub: `des buts ${share.des} par ${share.e.player}`,
       });
 
     // Le meilleur perdant : la grosse perf dans la défaite.
@@ -400,7 +414,7 @@ export function useAnalyse(
       insolites.push({
         label: "Le mur du jour",
         value: `${bestDef.conceded}`,
-        sub: `but${bestDef.conceded > 1 ? "s" : ""} encaissé${bestDef.conceded > 1 ? "s" : ""} par le ${bestDef.name}`,
+        sub: `but${bestDef.conceded > 1 ? "s" : ""} encaissé${bestDef.conceded > 1 ? "s" : ""} par ${bestDef.les}`,
       });
 
     return {
@@ -784,23 +798,28 @@ export function FidelesModule({ fideles }: { fideles: Analyse["fideles"] }) {
   );
 }
 
-/** Le bilan des couleurs — V/N/D des équipes sur la saison. */
+/** Le bilan des couleurs — V/N/D des Noirs et des Blancs sur la saison. */
 export function CouleursModule({ couleurs }: { couleurs: Analyse["couleurs"] }) {
   if (couleurs.length < 2) return null;
-  const leader = couleurs[0];
+  const [leader, second] = couleurs;
+  const egalite = leader.v / leader.total === second.v / second.total;
   return (
     <section>
       <div className="mb-3 px-1">
         <p className="mono-label text-primary">Depuis le début de saison</p>
         <h2 className="mt-0.5 text-xl font-bold tracking-tight">
-          {/^[AEIOUY]/i.test(leader.team) ? `L'${leader.team}` : `Le ${leader.team}`}, patron des
-          couleurs
+          {egalite
+            ? "Noirs et Blancs, coude à coude"
+            : `${leader.camp === "Noirs" ? "Les Noirs" : "Les Blancs"}, patrons des couleurs`}
         </h2>
       </div>
       <div className="glass-soft flex flex-col gap-3 rounded-3xl p-4">
         {couleurs.map((c) => (
-          <div key={c.team} className="flex items-center gap-3">
-            <span className="w-[64px] truncate text-[13px] font-semibold">{c.team}</span>
+          <div key={c.camp} className="flex items-center gap-3">
+            <span className="flex w-[72px] items-center gap-1.5 text-[13px] font-semibold">
+              <PointMaillot camp={c.camp} />
+              {MAILLOTS[c.camp].nom}
+            </span>
             <div className="flex h-2 flex-1 gap-[3px] overflow-hidden">
               {c.v > 0 && (
                 <span
