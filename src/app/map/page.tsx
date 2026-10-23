@@ -80,6 +80,7 @@ import { cleVille, type VillePlan } from "@/components/sfl/map/joueurs";
 import { villeOuLigue } from "@/lib/sfl/villes";
 import { photoMiniature, photoPerso } from "@/lib/sfl/photos";
 import { nomAffiche } from "@/lib/sfl/identites";
+import { communeDeLAdresse } from "@/lib/sfl/terrains-nord";
 import { useVillesRevision } from "@/hooks/use-villes";
 import { usePhotoRevision } from "@/hooks/use-player-photo";
 import { useIdentitesRevision } from "@/hooks/use-identites";
@@ -401,7 +402,7 @@ export default function MapPage() {
         heure: x.heure,
         terrain:
           x.lat != null && x.lng != null
-            ? { id: -x.id, nom: x.lieu, adresse: x.adresse ?? "", lat: x.lat, lng: x.lng }
+            ? { id: -x.id, nom: x.lieu, adresse: x.adresse ?? "", lat: x.lat, lng: x.lng, commune: communeDeLAdresse(x.adresse) }
             : null,
         presents: venus,
         effectif: x.places,
@@ -1093,6 +1094,7 @@ export default function MapPage() {
           jourInitial={ouvrir.jour}
           heureInitial={ouvrir.heure}
           moi={moi}
+          ici={toi}
           onSfl={
             admin
               ? () => {
