@@ -20,11 +20,12 @@
 // demi-terrain.
 
 import type { Journee } from "@/lib/sfl/engine";
-import { MAILLOTS } from "@/lib/sfl/maillots";
+import { MAILLOTS, type Camp } from "@/lib/sfl/maillots";
 import type { ConvocationTeam } from "@/lib/sfl/saisie/types";
 
 export interface EquipeFeuille {
   nom: string;
+  camp: Camp;
   /** Le fond de l'équipe (pastille du nom, point), et l'encre posée dessus. */
   couleur: string;
   encre: string;
@@ -42,8 +43,8 @@ export interface TerrainFeuille {
 }
 
 const { Noirs: NOIRS, Blancs: BLANCS } = MAILLOTS;
-const noirs = (joueurs: string[]): EquipeFeuille => ({ nom: NOIRS.nom, couleur: NOIRS.fond, encre: NOIRS.encre, joueurs });
-const blancs = (joueurs: string[]): EquipeFeuille => ({ nom: BLANCS.nom, couleur: BLANCS.fond, encre: BLANCS.encre, joueurs });
+const noirs = (joueurs: string[]): EquipeFeuille => ({ nom: NOIRS.nom, camp: "Noirs", couleur: NOIRS.fond, encre: NOIRS.encre, joueurs });
+const blancs = (joueurs: string[]): EquipeFeuille => ({ nom: BLANCS.nom, camp: "Blancs", couleur: BLANCS.fond, encre: BLANCS.encre, joueurs });
 
 /** Les matchs d'une journée de ligue ; vide tant que les équipes ne sont pas faites. */
 export function feuilleDeJournee(journee: Journee | undefined): TerrainFeuille[] {

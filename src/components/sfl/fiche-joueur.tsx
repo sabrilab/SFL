@@ -6,7 +6,7 @@
 // points forts, ses faits marquants, puis ses badges, les plus rares d'abord
 // (les écussons et médailles de Ma carte ; toucher un badge ouvre son détail,
 // avec qui d'autre l'a). « Voir sa carte en grand » ouvre la carte en 3D,
-// comme partout ailleurs.
+// comme partout ailleurs. Sa carte porte le maillot de son camp du jour.
 //
 // Le calcul est dans lib/sfl/fiche-joueur.ts.
 
@@ -18,6 +18,7 @@ import { BoutonSuivre, ReseauJoueur } from "@/components/sfl/suivre";
 import { FeuilleBadge, Medaille, Trophee } from "@/components/sfl/vitrine";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import type { Player } from "@/lib/sfl/engine";
+import type { Camp } from "@/lib/sfl/maillots";
 import { ficheJoueur } from "@/lib/sfl/fiche-joueur";
 import { finsDeSaison, ordinal, type ClassementId } from "@/lib/sfl/fin-de-saison";
 import { POSTES } from "@/lib/sfl/inscription";
@@ -27,9 +28,11 @@ import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 
 export interface EquipeDuJour {
   nom: string;
+  /** Le camp du jour : la carte en porte le maillot. */
+  camp?: Camp;
   couleur: string;
   encre: string;
-  /** « Terrain 1 », ou null s'il n'y a qu'un match. */
+  /** « Match 1 », ou null s'il n'y a qu'un match. */
   terrain: string | null;
 }
 
@@ -76,11 +79,11 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
   function voirEnGrand() {
     onClose();
     open({
-      cacheKey: `mini-${player.name}`,
+      cacheKey: `mini-${player.name}${equipe?.camp ? `-${equipe.camp}` : ""}`,
       mode: "simple",
       title: identite.nom(player.name),
       joueur: player.name,
-      render: (s) => <PlayerCard player={player} size={s} />,
+      render: (s) => <PlayerCard player={player} size={s} maillot={equipe?.camp} />,
     });
   }
 
@@ -88,7 +91,7 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
     <div className="flex flex-col gap-5">
       <div className="flex items-end gap-4">
         <button type="button" onClick={voirEnGrand} aria-label={`Voir la carte de ${identite.nom(player.name)} en grand`} className="shrink-0 transition-transform active:scale-95">
-          <PlayerCard player={player} size={FORMAT_CARTE.grande} />
+          <PlayerCard player={player} size={FORMAT_CARTE.grande} maillot={equipe?.camp} />
         </button>
         <div className="flex min-w-0 flex-col gap-2 pb-1">
           {equipe && (

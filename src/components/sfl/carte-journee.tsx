@@ -15,7 +15,9 @@
 // Chaque match se lit Noirs contre Blancs, comme la feuille de match de la
 // Map (lib/sfl/maillots.ts) : le tableau d'affichage le dit, et chaque carte
 // porte la note et le nom aux couleurs de son maillot (Sabri, 23/10). La
-// couleur du jour de l'admin (Orange, Bleu…) ne s'y montre plus.
+// couleur du jour de l'admin (Orange, Bleu…) ne s'y montre plus. Chaque
+// joueur y porte aussi le maillot de son camp, sa photo repeinte par le code
+// (lib/sfl/maillot-des-photos.ts).
 
 import { useState } from "react";
 import { CarteDe, MiniCarte } from "@/components/sfl/mini-carte";
@@ -182,7 +184,14 @@ function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
                 style={{ transformOrigin: "50% 100%", transform: `translateX(-50%) scale(${k})` }}
               >
                 {player ? (
-                  <MiniCarte player={player} size={size} onglet={{ fond: maillot.fond, encre: maillot.encre }} vertical detail={ligne.buts || ligne.passes ? `${ligne.buts} B · ${ligne.passes} P` : undefined} />
+                  <MiniCarte
+                    player={player}
+                    size={size}
+                    onglet={{ fond: maillot.fond, encre: maillot.encre }}
+                    maillot={maillot.nom}
+                    vertical
+                    detail={ligne.buts || ligne.passes ? `${ligne.buts} B · ${ligne.passes} P` : undefined}
+                  />
                 ) : (
                   <CarteDe name={ligne.name} size={size} />
                 )}
