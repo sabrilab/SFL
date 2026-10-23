@@ -7,9 +7,10 @@
 // l'autre avec un ressort. Le symbole choisi est plein, les autres au trait.
 // À droite, détachée, la pastille ronde du Vestiaire (la discussion de la
 // ligue), avec le nombre de messages pas encore lus. L'onglet Map compte mes
-// invitations sans réponse et les messages pas lus des discussions de mes
-// matchs (22/10) ; l'icône de l'app, ces messages-là, ceux du Vestiaire et
-// ceux de la discussion de mon équipe.
+// invitations sans réponse (à un match, et depuis le 23/10 à une équipe du
+// mode Team) et les messages pas lus des discussions de mes matchs (22/10) ;
+// l'icône de l'app, ces messages-là, ceux du Vestiaire et ceux de la
+// discussion de mon équipe.
 // La Recherche, qui était là, est montée en haut des écrans
 // (BoutonRecherche, à la demande de Sabri le 19/10) : le Vestiaire, où l'on
 // revient sans cesse, reste sous le pouce.
@@ -52,12 +53,12 @@ export function BottomNav() {
   const encre = clair ? "#0a0b0d" : "#ffffff";
   // Du nouveau dans la discussion : le nombre, sur la bulle.
   const nonLus = useVestiaireNonLus();
-  // Une invitation à un match sans réponse, un message pas lu dans la
-  // discussion d'un de mes matchs : le nombre, sur l'onglet Map.
+  // Une invitation sans réponse (un match, une équipe), un message pas lu
+  // dans la discussion d'un de mes matchs : le nombre, sur l'onglet Map.
   const invitations = useInvitationsMatch();
   const discussions = useDiscussionsMatch().nonLus;
-  const surOngletMap = invitations + discussions;
-  const equipe = useMonEquipe().nonLus;
+  const { nonLus: equipe, invitations: invitationsEquipe } = useMonEquipe();
+  const surOngletMap = invitations + invitationsEquipe.length + discussions;
   // L'icône de l'app : tous les messages pas lus, comme les notifications.
   useEffect(() => pastilleIcone(nonLus + discussions + equipe), [nonLus, discussions, equipe]);
 

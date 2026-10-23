@@ -293,7 +293,7 @@ function seulMotif(f: FamilleNotifs): string | null {
 function note(t: Taux): string {
   return [
     "Touchée : ouverte depuis la notification.",
-    "Suivie d'effet : le joueur a fait ce qu'elle attendait (écrire ou réagir dans la discussion dans les 2 h, répondre à une invitation dans les 14 jours, à ses missions ou suivre en retour dans les 7 jours) ; un geste ne compte qu'une fois, pour la notification touchée juste avant, sinon la plus récente.",
+    "Suivie d'effet : le joueur a fait ce qu'elle attendait (écrire ou réagir dans la discussion dans les 2 h, répondre à une invitation dans les 14 jours, 72 h pour une équipe, à ses missions ou suivre en retour dans les 7 jours) ; un geste ne compte qu'une fois, pour la notification touchée juste avant, sinon la plus récente.",
     "Au Vestiaire, une notification remplace la précédente encore affichée : d'une rafale, une seule reste à toucher.",
     t.envoyees > 0 ? `Arrivées sur le téléphone : ${pct(part(t.arrivees, t.envoyees))}.` : null,
     t.echouees > 0 ? `${milliers(t.echouees)} prises par aucun téléphone, hors des taux.` : null,

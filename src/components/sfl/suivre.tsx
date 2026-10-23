@@ -40,10 +40,9 @@ export const pluriel = (n: number, un: string, plusieurs: string) => (n > 1 ? pl
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 /** Les visages de « Suivi par » : la pastille, un cran sous la petite (30 px).
- *  Une fonction, pas une constante : mini-carte → card-viewer → suivre →
- *  mini-carte est une boucle d'imports ; quand mini-carte est chargé le
- *  premier, FORMAT_CARTE n'existe pas encore au moment où ce fichier
- *  s'évalue (Ma carte plantait en dev). */
+ *  Lu au rendu, pas au chargement : mini-carte → card-viewer → suivre →
+ *  mini-carte font un cycle, et FORMAT_CARTE n'existe pas encore quand ce
+ *  module se charge par ce chemin (la Map ne démarrait plus en dev). */
 const visage = () => FORMAT_CARTE.petite / PHI;
 
 type Onglet = "abonnes" | "abonnements";
