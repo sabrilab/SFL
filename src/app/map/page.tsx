@@ -55,6 +55,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
 import { usePresence } from "@/hooks/use-presence";
 import { joueursDeLaFeuille } from "@/lib/sfl/presence-feuille";
+import { annonceEnCours, J_DECOUPAGE } from "@/lib/sfl/divisions";
 import { useSession } from "@/hooks/use-session";
 import { saisieStore } from "@/lib/sfl/saisie/store";
 import {
@@ -291,6 +292,8 @@ export default function MapPage() {
   const { player, me } = useMyPlayer();
   const aujourdhui = useAujourdhui();
   const heure = useHeure();
+  // La J3, dernier dimanche avant les divisions (lib/sfl/divisions.ts) : sa fiche le dit.
+  const sansDivisions = !!aujourdhui && annonceEnCours(saison, new Date(`${aujourdhui}T12:00:00Z`));
 
   const terrains = useMemo(() => saison.terrains ?? [], [saison.terrains]);
 
@@ -954,7 +957,7 @@ export default function MapPage() {
                   ? `Ouvert par ${choisi.partie.organisateur}`
                   : choisi?.team
                     ? "Match d'équipe"
-                    : `${choisi?.j != null ? `J${choisi.j} · ` : ""}Sunday Five League`}
+                    : `${choisi?.j != null ? `J${choisi.j} · ` : ""}${choisi?.j === J_DECOUPAGE && sansDivisions ? "Dernier dimanche sans divisions" : "Sunday Five League"}`}
               </span>
             </p>
             <SheetTitle className="text-[26px] font-bold tracking-tight">

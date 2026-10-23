@@ -10,9 +10,10 @@
 //     complets, « Match » les journées (vues.tsx) ;
 //     Sous chaque carte, ▲ ou ▼ depuis la semaine passée, et à l'ouverture
 //     les cartes glissent de leur ancienne place à la nouvelle ;
-//   · le fil : le jour du match, la feuille en direct ; ton dimanche (ta
-//     carte, tes chiffres, tes places) ; la convocation (qui vient, Je viens /
-//     Je passe) ; ce qui se joue dimanche (les places à un ou deux points),
+//   · le fil : le jour du match, la feuille en direct ; jusqu'à la J4,
+//     l'annonce des divisions (divisions.tsx) ; ton dimanche (ta carte, tes
+//     chiffres, tes places) ; la convocation (qui vient, Je viens / Je
+//     passe ; « Dernier dimanche sans divisions » sur celle de la J3) ; ce qui se joue dimanche (les places à un ou deux points),
 //     ton rival et ce qu'il te faut pour le passer ; puis chaque dimanche joué,
 //     du plus récent : son terrain avec les cartes des joueurs (CarteJournee),
 //     et ses rubriques. Chaque rubrique est un terrain avec ses petites cartes
@@ -31,6 +32,7 @@ import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { usePresence } from "@/hooks/use-presence";
 import { voteOuvert } from "@/lib/sfl/convocation-temps";
+import { annonceEnCours, J_DECOUPAGE } from "@/lib/sfl/divisions";
 import { computeStandings } from "@/lib/sfl/saisie/engine";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { Nom } from "@/components/sfl/nom";
@@ -40,6 +42,7 @@ import { rankByMetric } from "@/lib/sfl/engine";
 import { RANKINGS } from "@/lib/sfl/rankings";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
+import { RubriqueDivisions } from "./divisions";
 import { VoteDuJour } from "./fil";
 import { RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
 import { VueClassements, VueMatchs } from "./vues";
@@ -196,6 +199,9 @@ function Ticker({ moi, onTout }: { moi: string; onTout: () => void }) {
 /** La convocation du prochain dimanche, dans le fil : qui vient, et ta réponse d'un geste. */
 function Convocation() {
   const p = usePresence();
+  const { saison } = useSeason();
+  const [maintenant] = useState(() => new Date());
+  const derniere = p.journee === J_DECOUPAGE && annonceEnCours(saison, maintenant);
   const repondre = (r: "present" | "absent") => p.answer(p.mine === r ? null : r);
   return (
     <section className="mx-4 flex flex-col gap-4 overflow-hidden rounded-[28px] bg-black p-5 text-white">
@@ -204,6 +210,7 @@ function Convocation() {
           J{p.journee}
         </span>
         <span className="flex min-w-0 flex-col pb-0.5">
+          {derniere && <span className="mono-label mb-1 text-[10px] text-white/60">Dernier dimanche sans divisions</span>}
           <span className="text-[16px] font-bold">{p.jour}</span>
           <span className="truncate text-[12.5px] text-white/55">
             {p.heure} · {p.lieu}
@@ -301,6 +308,7 @@ export function LaCourse({ vueDepart = "fil" }: { vueDepart?: Vue }) {
       </header>
       <EnDirect ouvrir={(j) => router.push(`/ligue/journee?j=${j}`)} />
       <VoteDuJour me={me} />
+      <RubriqueDivisions />
       {dernier > 0 && <RubriqueToi j={dernier} date={journees.find((x) => x.j === dernier)?.date ?? ""} />}
       <Convocation />
       <div className="flex flex-col gap-1">

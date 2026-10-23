@@ -1,8 +1,14 @@
 "use client";
 
-// Les invitations de l'ouverture : la ville, les notifications, puis la
-// carte officielle. Une seule par ouverture, jamais deux.
+// Les invitations de l'ouverture : l'annonce des divisions, la ville, les
+// notifications, puis la carte officielle. Une seule par ouverture, jamais
+// deux.
 //
+// 0. L'annonce des divisions, jusqu'au soir de la J3 (annonce-divisions.tsx) :
+//    une fois dans la semaine, une fois le dimanche même. Pendant la fenêtre
+//    de sa notification (la veille dès 18 h, le dimanche matin), l'ouverture
+//    sonne aussi le serveur, qui l'envoie une fois à chaque joueur
+//    (lib/sfl/divisions-annonce.ts).
 // 1. La ville, d'abord (Sabri, 22/10 : « propose à chaque joueur, à sa
 //    prochaine connexion, de renseigner sa ville pour qu'on puisse le mettre
 //    sur la map »). Tant que le joueur ne l'a ni choisie ni confirmée
@@ -29,22 +35,26 @@
 // « Plus tard » fait taire chaque invitation deux jours, sur cet appareil.
 // À chaque ouverture, un téléphone déjà abonné redonne son abonnement.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Bell, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { AnnonceDivisions } from "@/components/sfl/annonce-divisions";
 import { Card3D } from "@/components/sfl/card-3d";
 import { FluxCarteOfficielle } from "@/components/sfl/carte-officielle";
 import { InvitationVille } from "@/components/sfl/invitation-ville";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
+import { useSeason } from "@/components/sfl/season-provider";
 import { useSession } from "@/hooks/use-session";
+import { editionAnnonce, fenetreNotification, type EditionAnnonce } from "@/lib/sfl/divisions";
+import { annonceVue, annoncerDivisions, noterAnnonceVue } from "@/lib/sfl/divisions-annonce";
 import { identiteConfirmee, rafraichirIdentites } from "@/lib/sfl/identites";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
 import { activerNotifications, etatNotifications, rafraichirAbonnement } from "@/lib/sfl/notifications";
 import { maVille, maVilleAProposer, type VilleJoueur } from "@/lib/sfl/villes";
 
-type Invitation = "ville" | "carte" | "notifs";
+type Invitation = "divisions" | "ville" | "carte" | "notifs";
 
 const PLUS_TARD = (quoi: Invitation, nom: string) => `sfl-invitation-${quoi}-${nom}`;
 /** Silence après « Plus tard ». */
@@ -52,7 +62,7 @@ const PAUSE_MS = 2 * 24 * 3600 * 1000;
 /** Après le splash, et après la cérémonie des nouvelles cartes si elle passe. */
 const DELAI_MS = 2600;
 
-const TEXTES: Record<Exclude<Invitation, "ville">, { titre: string; ligne: string; bouton: string }> = {
+const TEXTES: Record<Exclude<Invitation, "ville" | "divisions">, { titre: string; ligne: string; bouton: string }> = {
   carte: {
     titre: "Ta carte officielle",
     ligne: "Ton visage, le maillot Bola. Elle apparaît sur ta carte, chez tout le monde.",
@@ -74,22 +84,29 @@ function enPause(quoi: Invitation, nom: string): boolean {
   }
 }
 
-/** En dev, `?invitation`, `?invitation=notifs` ou `?invitation=ville` la montre sans compte vérifié (captures). */
+/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville` ou `?invitation=divisions` la montre sans compte vérifié (captures). */
 function apercu(): Invitation | null {
   if (process.env.NODE_ENV === "production" || typeof window === "undefined") return null;
   const v = new URLSearchParams(window.location.search).get("invitation");
-  return v === null ? null : v === "notifs" || v === "ville" ? v : "carte";
+  return v === null ? null : v === "notifs" || v === "ville" || v === "divisions" ? v : "carte";
 }
 
 export function InvitationCarte() {
   const session = useSession();
   const { player } = useMyPlayer();
+  const { saison } = useSeason();
+  // La saison du moment où le minuteur tombe : elle arrive souvent après le montage.
+  const saisonRef = useRef(saison);
+  useEffect(() => {
+    saisonRef.current = saison;
+  });
   const [forcee] = useState(apercu);
   const nom = forcee || (session?.server && session.name === player.name) ? player.name : null;
 
   const [visible, setVisible] = useState<Invitation | null>(null);
   /** La ville que « D'où tu viens ? » propose d'emblée. */
   const [proposee, setProposee] = useState<VilleJoueur | null>(null);
+  const [edition, setEdition] = useState<EditionAnnonce>("avant");
   const [flux, setFlux] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -98,11 +115,14 @@ export function InvitationCarte() {
     void rafraichirAbonnement().catch(() => {});
     let annule = false;
     const timer = setTimeout(async () => {
+      const maintenant = new Date();
       if (forcee) {
         if (forcee === "ville") setProposee(maVille(nom));
+        if (forcee === "divisions") setEdition(editionAnnonce(saisonRef.current, maintenant) ?? "avant");
         setVisible(forcee);
         return;
       }
+      if (fenetreNotification(saisonRef.current, maintenant)) void annoncerDivisions();
       const [etat, ville] = await Promise.all([
         etatNotifications().catch(() => "indisponible" as const),
         enPause("ville", nom) ? null : maVilleAProposer(nom),
@@ -110,7 +130,11 @@ export function InvitationCarte() {
         rafraichirIdentites(),
       ]);
       if (annule || identiteConfirmee(nom) === false) return;
-      if (ville?.proposer) {
+      const annonce = editionAnnonce(saisonRef.current, maintenant);
+      if (annonce && !annonceVue(annonce, nom)) {
+        setEdition(annonce);
+        setVisible("divisions");
+      } else if (ville?.proposer) {
         setProposee(ville.ville);
         setVisible("ville");
       } else if (etat === "inactives" && !enPause("notifs", nom)) setVisible("notifs");
@@ -151,12 +175,18 @@ export function InvitationCarte() {
     }
   }
 
-  const texte = visible && visible !== "ville" ? TEXTES[visible] : null;
+  function annonceFermee() {
+    noterAnnonceVue(edition, nom!);
+    setVisible(null);
+  }
+
+  const texte = visible && visible !== "ville" && visible !== "divisions" ? TEXTES[visible] : null;
   const Icone = visible === "notifs" ? Bell : Sparkles;
 
   return (
     <>
       <AnimatePresence>
+        {visible === "divisions" && <AnnonceDivisions key="divisions" player={player} edition={edition} onFermer={annonceFermee} />}
         {visible === "ville" && (
           <InvitationVille key="ville" player={player} proposee={proposee} onFini={() => setVisible(null)} onPlusTard={plusTard} />
         )}

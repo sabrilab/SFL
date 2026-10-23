@@ -2678,6 +2678,20 @@ create table if not exists public.match_rappels (
 alter table public.match_rappels enable row level security;
 revoke all on public.match_rappels from anon, authenticated;
 
+-- Les annonces de la ligue déjà envoyées par notification : une fois par
+-- annonce et par joueur (« divisions-s1-j3 », /api/divisions/annoncer). Fermée
+-- aux téléphones : seule la route serveur, avec la clé secrète, la lit et
+-- l'écrit.
+create table if not exists public.annonces_envois (
+  annonce   text not null,
+  joueur    text not null,
+  envoye_le timestamptz not null default now(),
+  primary key (annonce, joueur)
+);
+
+alter table public.annonces_envois enable row level security;
+revoke all on public.annonces_envois from anon, authenticated;
+
 -- ─────────────────────────── Discussion d'équipe ───────────────────────────
 -- Sabri, 22/10 : « dans la discussion, […] discuter soit avec son match,
 -- soit son équipe ». L'écran de discussion a deux onglets, Match et Équipe ;
