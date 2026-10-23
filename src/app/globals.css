@@ -1252,3 +1252,36 @@
     transition: none;
   }
 }
+
+/* Les écrans de discussion (vestiaire.tsx, agent.tsx) : toute la hauteur de
+   l'écran ; clavier ouvert, celle de la partie visible, décalée comme elle
+   (hooks/use-ecran-clavier.ts pose data-clavier, --vue-h et --vue-haut). Le
+   bas de la barre d'écriture suit dans la même image : au-dessus des onglets
+   s'il y en a, du bord de l'écran sinon, juste au-dessus du clavier quand il
+   est là. */
+.ecran-discussion {
+  height: 100vh;
+  height: 100dvh;
+  --pied-ecriture: max(calc(env(safe-area-inset-bottom) - 4px), 14px);
+}
+.ecran-discussion[data-onglets] {
+  --pied-ecriture: calc(max(calc(env(safe-area-inset-bottom) - 4px), 14px) + 62px + 10px);
+}
+.ecran-discussion[data-clavier] {
+  height: var(--vue-h, 100dvh);
+  transform: translateY(var(--vue-haut, 0px));
+  --pied-ecriture: 8px;
+}
+/* Clavier ouvert, ce qui ne sert qu'au repos s'efface (les départs du coach). */
+.ecran-discussion[data-clavier] .hors-clavier {
+  display: none;
+}
+/* Ce qui attend dans la barre d'écriture (une carte, un classement, le choix
+   d'une pièce) ne prend jamais plus d'un tiers de la partie visible : sur un
+   petit téléphone, clavier ouvert, le champ finissait sous le clavier. */
+.ecran-discussion[data-clavier] .attente-ecriture {
+  max-height: calc(var(--vue-h) * 0.3);
+}
+.ecran-discussion[data-clavier] .choix-ecriture {
+  max-height: calc(var(--vue-h) * 0.4);
+}

@@ -17,7 +17,7 @@
 // touche qui ouvre le clavier de l'iPhone (un focus donné après coup ne
 // l'ouvre pas). Pendant la recherche, la carte se replie et le champ monte
 // en haut de l'écran, avec les communes dessous. Le voile suit la partie
-// visible de la page (useVueVisible, comme le Vestiaire) : en PWA, le
+// visible de la page (useVueVisible) : en PWA, le
 // clavier de l'iPhone recouvre la page sans la redimensionner.
 
 import { useId, useRef, useState } from "react";
