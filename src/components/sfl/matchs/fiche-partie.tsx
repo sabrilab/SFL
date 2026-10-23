@@ -12,8 +12,11 @@
 // les places.
 // Le coup d'envoi passé, l'organisateur tient la feuille (feuille-bola.tsx)
 // et tout le monde voit le score et le ou les MVP.
+// Ceux du match (organisateur, inscrits, invités) ont en haut la porte de sa
+// discussion (22/10, matchs/discussion-match.tsx), avec ce qu'ils n'ont pas lu.
 
 import { useEffect, useState } from "react";
+import { MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { TerrainPlaces } from "@/components/sfl/matchs/terrain-places";
@@ -45,11 +48,17 @@ export function FichePartie({
   moi,
   terrains,
   onChange,
+  nonLus = 0,
+  onDiscussion,
 }: {
   partie: Partie;
   moi: string | null;
   terrains: Terrain[];
   onChange: () => void;
+  /** Les messages de la discussion que je n'ai pas lus. */
+  nonLus?: number;
+  /** Ouvre la discussion du match (pour ceux qui en sont). */
+  onDiscussion?: () => void;
 }) {
   const [modifier, setModifier] = useState(0);
   const [occupe, setOccupe] = useState(false);
@@ -120,6 +129,17 @@ export function FichePartie({
           </p>
         </div>
       </div>
+      {onDiscussion && (moiLa || organise) && (
+        <button type="button" onClick={onDiscussion} className={cn(bouton, "bouton-secondaire bouton--mauve gap-2.5")}>
+          <MessageCircle className="size-[18px]" strokeWidth={2.2} />
+          Discussion du match
+          {nonLus > 0 && (
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] text-[11.5px] leading-none font-bold text-white tabular-nums" style={{ background: "#FF3B30" }}>
+              {nonLus > 9 ? "9+" : nonLus}
+            </span>
+          )}
+        </button>
+      )}
       <TerrainPlaces
         places={partie.places}
         occupants={occupants}

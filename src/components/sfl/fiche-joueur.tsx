@@ -97,7 +97,8 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
               {equipe.terrain ? `${equipe.nom} · ${equipe.terrain}` : equipe.nom}
             </span>
           )}
-          <SheetTitle className="font-[family-name:var(--font-anton)] text-[38px] leading-[0.95] font-normal tracking-[0.3px] break-words uppercase">
+          {/* font-black : le font-medium de SheetTitle passerait devant le lettrage. */}
+          <SheetTitle className="titre-lettrage text-[29px] leading-[0.95] font-black break-words">
             {identite.nom(player.name)}
           </SheetTitle>
           <SheetDescription className="font-mono text-[12px] text-muted-foreground">

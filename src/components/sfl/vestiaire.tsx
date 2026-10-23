@@ -25,6 +25,12 @@
 // page (visualViewport) : sur iPhone, en PWA, le clavier ne la redimensionne
 // pas, il la recouvre.
 //
+// Depuis le 22/10, le même écran sert à la discussion de chaque match ouvert
+// par un joueur (matchs/discussion-match.tsx) : Discussion, plus bas, reçoit
+// son salon (lib/sfl/vestiaire.ts, Salon), son titre et ce qui le distingue
+// (la modération et la barre d'onglets restent au Vestiaire, lieu public ;
+// l'arrivée d'un joueur est une ligne du fil, pas une bulle).
+//
 // Données : lib/sfl/vestiaire.ts. En développement seulement, ?demo=vestiaire
 // remplit le fil de messages d'essai, sans base, pour juger le rendu.
 
@@ -48,26 +54,19 @@ import { useVueVisible } from "@/hooks/use-vue-visible";
 import {
   EMOJIS,
   EVT_PIECE,
+  SALON_VESTIAIRE,
   blocageVestiaire,
   chargerProfilsV,
-  chargerVestiaire,
   couperLaParole,
   deposerPhoto,
   deposerVideo,
   deposerVocal,
-  direDevant,
-  ecouterVestiaire,
   formatVocal,
   lienPhoto,
   lienVocal,
-  lireSuivi,
-  marquerVestiaireLu,
-  posterAuVestiaire,
   preparerPhoto,
   preparerVideo,
   prendrePiece,
-  reagir,
-  reglerNotifsVestiaire,
   retirerMessage,
   type Emoji,
   type MessageV,
@@ -78,6 +77,7 @@ import {
   type PieceVideo,
   type PieceVocal,
   type ProfilV,
+  type Salon,
   VOCAL_MAX_S,
 } from "@/lib/sfl/vestiaire";
 import { cn } from "@/lib/utils";
@@ -102,6 +102,7 @@ function apercu(m: MessageV): string {
   if (m.texte.trim()) return m.texte.trim();
   if (m.piece?.type === "ligue") return m.piece.titre;
   const t = m.piece?.type;
+  if (t === "rejoint") return "a rejoint le match";
   return t === "vocal" ? "🎤 Message vocal" : t === "photo" ? "📷 Photo" : t === "video" ? "🎬 Vidéo" : t === "carte" ? "Une carte" : t === "feuille" ? "Une feuille de match" : "Un classement";
 }
 
@@ -396,6 +397,8 @@ function VideoVue({ piece }: { piece: PieceVideo }) {
 function PieceVue({ piece, onOuvrirJournee, mien = false }: { piece: Piece; onOuvrirJournee?: (j: number) => void; mien?: boolean }) {
   const { journees } = useSeason();
 
+  // L'arrivée d'un joueur n'est pas une pièce à dessiner : le fil en fait une ligne (LigneArrivee).
+  if (piece.type === "rejoint") return null;
   if (piece.type === "vocal") return <VocalVue piece={piece} mien={mien} />;
   if (piece.type === "photo") return <PhotoVue piece={piece} />;
   if (piece.type === "video") return <VideoVue piece={piece} />;
@@ -899,13 +902,98 @@ function Bulle({
   );
 }
 
-/* ------------------------------- Vestiaire ------------------------------ */
+/* ------------------------------- Arrivée -------------------------------- */
+
+/** « Kader a rejoint le match » : une ligne au milieu du fil, sa carte en pastille. */
+function LigneArrivee({ m }: { m: MessageV }) {
+  return (
+    <div id={`m-${m.id}`} className="mt-[var(--fib-13)] flex items-center justify-center gap-2 px-6 text-center">
+      <CarteDe name={m.auteur || "?"} size={FORMAT_CARTE.petite * 0.62} inerte />
+      <span className="text-[13px] font-semibold text-foreground/55">
+        {m.mien ? "Tu as rejoint le match" : m.auteur ? <><Nom n={m.auteur} /> a rejoint le match</> : "Quelqu'un a rejoint le match"}
+      </span>
+      <span className="text-[10.5px] font-medium text-foreground/30 tabular-nums">{quand(m.at)}</span>
+    </div>
+  );
+}
+
+/* ------------------------------ Vestiaire ------------------------------- */
 
 const DEMO = process.env.NODE_ENV !== "production";
 
 export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) => void }) {
-  const session = useSession();
   const { players, journees } = useSeason();
+  // ?demo=vestiaire : un fil d'essai ; ?demo=vestiaire-vide : le fil vide.
+  const demoVal = useMemo(() => (DEMO && typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("demo") : null), []);
+  const demo = useMemo(
+    () => (demoVal === "vestiaire" ? messagesDemo(players.map((p) => p.name), journees) : demoVal === "vestiaire-vide" ? [] : null),
+    [demoVal, players, journees]
+  );
+  return (
+    <Discussion
+      salon={SALON_VESTIAIRE}
+      titre={<TitreDiscussion actif="/vestiaire" />}
+      aDroite={<BoutonRecherche />}
+      libelleNotifs="Notifications du Vestiaire"
+      vide="Le Vestiaire est vide."
+      onglets
+      moderation
+      pieces
+      demo={demo}
+      onOuvrirJournee={onOuvrirJournee}
+    />
+  );
+}
+
+/* ------------------------------ Discussion ------------------------------ */
+
+/**
+ * Un écran de discussion : le Vestiaire, ou la discussion d'un match
+ * (matchs/discussion-match.tsx). Ce qui les distingue arrive par les
+ * propriétés ; le fil, les bulles, la barre d'écriture sont les mêmes.
+ */
+export function Discussion({
+  salon,
+  titre,
+  aDroite,
+  libelleNotifs,
+  vide,
+  onglets = false,
+  moderation = false,
+  pieces = false,
+  demo = null,
+  secours,
+  tete,
+  filtre,
+  onOuvrirJournee,
+  className,
+}: {
+  salon: Salon;
+  /** À gauche de l'en-tête : le titre de l'écran. */
+  titre: React.ReactNode;
+  /** À droite, après la cloche des notifications. */
+  aDroite?: React.ReactNode;
+  libelleNotifs: string;
+  /** Ce que dit le fil vide (rien si vide). */
+  vide: string;
+  /** La barre d'onglets reste dessous (le Vestiaire) ; sinon l'écran la recouvre. */
+  onglets?: boolean;
+  /** L'admin modère : il retire n'importe quel message et coupe la parole (le Vestiaire, lieu public). */
+  moderation?: boolean;
+  /** Prend la pièce préparée ailleurs (« Au Vestiaire » d'un classement, d'une feuille). */
+  pieces?: boolean;
+  /** Un fil d'essai, sans base : rien n'est lu ni écrit. */
+  demo?: MessageV[] | null;
+  /** Si la base n'a pas encore cette discussion (les aperçus) : le fil d'essai à montrer. */
+  secours?: () => MessageV[];
+  /** En tête du fil, avant le premier message. */
+  tete?: React.ReactNode;
+  /** Ce qu'on montre du fil (les arrivées encore vraies, pour un match). */
+  filtre?: (ms: MessageV[]) => MessageV[];
+  onOuvrirJournee?: (j: number) => void;
+  className?: string;
+}) {
+  const session = useSession();
   const [moi, setMoi] = useState<string | null>(null);
   const [profils, setProfils] = useState<ProfilV[]>([]);
   const [messages, setMessages] = useState<MessageV[]>([]);
@@ -935,28 +1023,31 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
   const [ecrit, setEcrit] = useState(false);
   const clavier = ecrit && vue.tactile;
 
-  // ?demo=vestiaire : un fil d'essai ; ?demo=vestiaire-vide : le fil vide.
-  const demoVal = useMemo(() => (DEMO && typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("demo") : null), []);
-  const demo = demoVal === "vestiaire" || demoVal === "vestiaire-vide";
-  const empeche = demo ? null : blocageVestiaire();
-  const admin = !!session?.admin;
+  // Un fil d'essai (démo, ou secours des aperçus) : tout reste sur l'écran.
+  const [secoursActif, setSecoursActif] = useState(false);
+  const essai = demo !== null || secoursActif;
+  const empeche = essai ? null : blocageVestiaire(salon.ou);
+  const admin = moderation && !!session?.admin;
 
-  const recharger = useCallback(async (uid: string, liste: ProfilV[]) => {
-    const r = await chargerVestiaire(uid, liste);
-    if (!r.ok) setErreur(r.raison);
-    else {
-      setErreur(null);
-      setMessages(r.messages);
-    }
-    setPrete(true);
-  }, []);
+  const recharger = useCallback(
+    async (uid: string, liste: ProfilV[]) => {
+      const r = await salon.charger(uid, liste);
+      if (!r.ok) setErreur(r.raison);
+      else {
+        setErreur(null);
+        setMessages(r.messages);
+      }
+      setPrete(true);
+    },
+    [salon]
+  );
 
   // Premier chargement, temps réel, et lecture.
   useEffect(() => {
     if (demo) {
       Promise.resolve().then(() => {
         setMoi("moi");
-        setMessages(demoVal === "vestiaire-vide" ? [] : messagesDemo(players.map((p) => p.name), journees));
+        setMessages(demo);
         setPrete(true);
       });
       return;
@@ -980,30 +1071,41 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
       }
       const [liste, suivi, sd] = await Promise.all([
         chargerProfilsV(),
-        lireSuivi(),
-        sb.from("vestiaire_sourdines").select("jusqu_au").eq("user_id", uid).maybeSingle(),
+        salon.lireSuivi(),
+        moderation
+          ? sb.from("vestiaire_sourdines").select("jusqu_au").eq("user_id", uid).maybeSingle()
+          : Promise.resolve({ data: null }),
       ]);
       if (!vivant) return;
       setProfils(liste);
       setMode(suivi.notifs);
       const fin = sd.data ? new Date((sd.data as { jusqu_au: string }).jusqu_au).getTime() : 0;
       setSourdine(fin > Date.now() ? fin : null);
-      await recharger(uid, liste);
+      const r = await salon.charger(uid, liste);
       if (!vivant) return;
-      stop = ecouterVestiaire(() => void recharger(uid, liste));
+      if (!r.ok && secours) {
+        setSecoursActif(true);
+        setMessages(secours());
+        setPrete(true);
+        return;
+      }
+      if (!r.ok) setErreur(r.raison);
+      else setMessages(r.messages);
+      setPrete(true);
+      stop = salon.ecouter(() => void recharger(uid, liste));
     })();
     return () => {
       vivant = false;
       stop();
     };
-  }, [session?.server, recharger, demo, demoVal, players, journees]);
+  }, [session?.server, recharger, demo, salon, moderation, secours]);
 
-  // Le Vestiaire ouvert devant moi : tout ce qui arrive est lu.
+  // La discussion ouverte devant moi : tout ce qui arrive est lu.
   const dernier = messages[messages.length - 1]?.at ?? 0;
   useEffect(() => {
     if (demo || !prete || !session?.server) return;
-    void marquerVestiaireLu(Math.max(Date.now(), dernier));
-  }, [dernier, prete, demo, session?.server]);
+    void salon.marquerLu(Math.max(Date.now(), dernier));
+  }, [dernier, prete, demo, session?.server, salon]);
 
   // Sous mes yeux : pas de notification tant que je regarde. Redit toutes
   // les 20 s quand l'écran est visible, effacé dès qu'il ne l'est plus.
@@ -1013,17 +1115,17 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
     const suivre = () => {
       window.clearInterval(minuteur);
       const visible = document.visibilityState === "visible";
-      void direDevant(visible);
-      if (visible) minuteur = window.setInterval(() => void direDevant(true), 20_000);
+      void salon.direDevant(visible);
+      if (visible) minuteur = window.setInterval(() => void salon.direDevant(true), 20_000);
     };
     suivre();
     document.addEventListener("visibilitychange", suivre);
     return () => {
       window.clearInterval(minuteur);
       document.removeEventListener("visibilitychange", suivre);
-      void direDevant(false);
+      void salon.direDevant(false);
     };
-  }, [demo, session?.server]);
+  }, [demo, session?.server, salon]);
 
   // Rester au plus récent : à l'ouverture, quand un message arrive (si on ne
   // lit pas plus haut), quand c'est le mien, et quand le clavier pousse.
@@ -1047,6 +1149,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
   // Une pièce préparée ailleurs (« Au Vestiaire » d'un classement, d'une
   // feuille de match) attend dans la barre d'écriture.
   useEffect(() => {
+    if (!pieces) return;
     const prendre = () => {
       const p = prendrePiece();
       if (p) {
@@ -1057,7 +1160,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
     prendre();
     window.addEventListener(EVT_PIECE, prendre);
     return () => window.removeEventListener(EVT_PIECE, prendre);
-  }, []);
+  }, [pieces]);
 
   // @pseudo : les joueurs qui commencent par ce qui est tapé.
   const enCours = /(?:^|\s)@([\p{L}0-9_.-]*)$/u.exec(texte)?.[1]?.toLowerCase();
@@ -1071,7 +1174,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
     if (envoi || (!texte.trim() && !p)) return;
     // Une photo ou une vidéo choisie part d'abord dans le stockage, puis avec le message.
     const locale = photoLocale.current;
-    if (!vocal && !demo && (p?.type === "photo" || p?.type === "video") && locale && p.chemin === locale.url) {
+    if (!vocal && !essai && (p?.type === "photo" || p?.type === "video") && locale && p.chemin === locale.url) {
       setEnvoi(true);
       const deposee =
         p.type === "photo" ? await deposerPhoto(locale.blob, p.l, p.h) : await deposerVideo(locale.blob, p.l, p.h, p.duree);
@@ -1084,10 +1187,10 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
     }
     const corps = vocal ? "" : texte;
     const rep = reponse;
-    if (demo) {
+    if (essai) {
       setMessages((ms) => [
         ...ms,
-        { id: Date.now(), auteurId: "moi", auteur: "", texte: corps.trim(), piece: p, at: Date.now(), mien: true, reponseA: rep?.id ?? null, reactions: {} },
+        { id: Date.now(), auteurId: moi ?? "moi", auteur: "", texte: corps.trim(), piece: p, at: Date.now(), mien: true, reponseA: rep?.id ?? null, reactions: {} },
       ]);
       if (!vocal) {
         setTexte("");
@@ -1102,7 +1205,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
       setPiece(null);
     }
     setReponse(null);
-    const r = await posterAuVestiaire(corps, p, rep?.id ?? null);
+    const r = await salon.poster(corps, p, rep?.id ?? null);
     setEnvoi(false);
     if (!r.ok) {
       if (!vocal) {
@@ -1148,7 +1251,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
 
   function oublierPhoto() {
     // En démo, la bulle envoyée garde le lien local : on ne le libère pas.
-    if (photoLocale.current && !demo) URL.revokeObjectURL(photoLocale.current.url);
+    if (photoLocale.current && !essai) URL.revokeObjectURL(photoLocale.current.url);
     photoLocale.current = null;
   }
 
@@ -1156,7 +1259,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
   async function envoyerVocal() {
     const fin = await micro.terminer();
     if (!fin) return;
-    if (demo) {
+    if (essai) {
       void envoyer({ type: "vocal", chemin: URL.createObjectURL(fin.blob), duree: Math.round(fin.duree * 10) / 10 });
       return;
     }
@@ -1201,8 +1304,8 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
       )
     );
     setOuvert(null);
-    if (demo) return;
-    const ok = await reagir(m.id, e, !deja);
+    if (essai) return;
+    const ok = await salon.reagir(m.id, e, !deja);
     if (!ok && moi) {
       toast.error("Réaction pas enregistrée.");
       await recharger(moi, profils);
@@ -1211,7 +1314,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
 
   async function retirer(m: MessageV) {
     setOuvert(null);
-    if (demo) {
+    if (essai) {
       setMessages((ms) => ms.filter((x) => x.id !== m.id));
       return;
     }
@@ -1221,7 +1324,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
 
   async function couper(m: MessageV) {
     setOuvert(null);
-    if (demo) return;
+    if (essai || !moderation) return;
     const ok = await couperLaParole(m.auteurId, 24);
     if (ok) toast.success("Parole coupée pour 24 h");
     else toast.error("Impossible pour l'instant.");
@@ -1229,26 +1332,27 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
 
   async function changerMode(m: ModeNotifs) {
     setMode(m);
-    if (!demo && !(await reglerNotifsVestiaire(m))) toast.error("Réglage pas enregistré.");
+    if (!essai && !(await salon.reglerNotifs(m))) toast.error("Réglage pas enregistré.");
   }
 
   const parId = new Map(messages.map((m) => [m.id, m]));
+  const affiches = filtre ? filtre(messages) : messages;
 
   const enTete = (
     <header className="relative mx-auto flex w-full max-w-[640px] shrink-0 items-center justify-between gap-3 px-5 pt-3 pb-2">
-      <TitreDiscussion actif="/vestiaire" />
+      {titre}
       {!empeche && (
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => setReglage((v) => !v)}
-            aria-label="Notifications du Vestiaire"
+            aria-label={libelleNotifs}
             aria-expanded={reglage}
             className="bouton-secondaire bouton--mauve flex size-11 items-center justify-center"
           >
             {mode === "rien" ? <BellOff className="size-[18px]" /> : <Bell className="size-[18px]" />}
           </button>
-          <BoutonRecherche />
+          {aDroite}
         </div>
       )}
       {reglage && <ReglageNotifs mode={mode} onMode={changerMode} onFermer={() => setReglage(false)} />}
@@ -1259,7 +1363,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
     // Tout l'écran, à la hauteur de ce qui est visible : clavier ouvert, la
     // barre d'écriture est juste au-dessus de lui.
     <section
-      className="fixed inset-x-0 top-0 z-[35] flex flex-col bg-background"
+      className={cn("fixed inset-x-0 top-0 flex flex-col bg-background", onglets ? "z-[35]" : "z-[60]", className)}
       style={{
         height: vue.hauteur ? `${vue.hauteur}px` : "100dvh",
         transform: vue.haut ? `translateY(${vue.haut}px)` : undefined,
@@ -1292,12 +1396,14 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
               {erreur}
             </p>
           )}
-          {!empeche && prete && messages.length === 0 && !erreur && (
-            <p className="my-auto text-center text-[15px] font-semibold text-foreground/35">Le Vestiaire est vide.</p>
+          {!empeche && tete}
+          {!empeche && prete && messages.length === 0 && !erreur && vide && (
+            <p className="my-auto text-center text-[15px] font-semibold text-foreground/35">{vide}</p>
           )}
-          {messages.map((m, i) => {
-            const avant = messages[i - 1];
-            const suite = !!avant && avant.auteurId === m.auteurId && m.at - avant.at < 5 * 60_000;
+          {affiches.map((m, i) => {
+            if (m.piece?.type === "rejoint") return <LigneArrivee key={m.id} m={m} />;
+            const avant = affiches[i - 1];
+            const suite = !!avant && avant.piece?.type !== "rejoint" && avant.auteurId === m.auteurId && m.at - avant.at < 5 * 60_000;
             return (
               <Bulle
                 key={m.id}
@@ -1326,7 +1432,11 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
         <div
           className="mx-auto w-full max-w-[640px] shrink-0 px-3 pt-2"
           style={{
-            paddingBottom: clavier ? "8px" : "calc(max(calc(env(safe-area-inset-bottom) - 4px), 14px) + 62px + 10px)",
+            paddingBottom: clavier
+              ? "8px"
+              : onglets
+                ? "calc(max(calc(env(safe-area-inset-bottom) - 4px), 14px) + 62px + 10px)"
+                : "max(calc(env(safe-area-inset-bottom) - 4px), 14px)",
           }}
         >
           {choix && (

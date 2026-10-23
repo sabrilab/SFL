@@ -17,6 +17,10 @@
 //
 // Ce que chacun a lu vit en base (vestiaire_suivi) pour que la pastille suive
 // le joueur d'un téléphone à l'autre ; localStorage ne sert que de repli.
+//
+// Depuis le 22/10, l'écran du Vestiaire sert aussi à la discussion de chaque
+// match ouvert par un joueur (lib/sfl/discussion-match.ts) : il ne connaît
+// qu'un SALON (plus bas), que le Vestiaire et chaque match remplissent.
 
 import { supabase } from "@/lib/supabase";
 import { getSession } from "@/lib/sfl/auth/session";
@@ -76,13 +80,22 @@ export interface PieceLigue {
   lignes: { n?: string; l?: string; v: string }[];
 }
 export const LIGNES_MAX = 6;
-export type Piece = PieceCarte | PieceFeuille | PieceClassement | PieceVocal | PiecePhoto | PieceVideo | PieceLigue;
+/**
+ * L'arrivée d'un joueur dans un match (22/10), dans la discussion du match
+ * seulement : « Kader a rejoint le match ». L'app la pose quand il prend sa
+ * place ou accepte l'invitation ; elle ne dit rien d'autre que son auteur.
+ */
+export interface PieceRejoint {
+  type: "rejoint";
+}
+export type Piece = PieceCarte | PieceFeuille | PieceClassement | PieceVocal | PiecePhoto | PieceVideo | PieceLigue | PieceRejoint;
 
 export function estPiece(v: unknown): v is Piece {
   if (!v || typeof v !== "object") return false;
   const p = v as Record<string, unknown>;
   if (p.type === "carte") return typeof p.joueur === "string" && p.joueur.length > 0;
   if (p.type === "feuille") return typeof p.j === "number";
+  if (p.type === "rejoint") return true;
   if (p.type === "classement")
     return typeof p.id === "string" && Array.isArray(p.top) && p.top.length <= 3;
   if (p.type === "vocal") return typeof p.chemin === "string" && typeof p.duree === "number";
@@ -157,14 +170,30 @@ interface Brut {
   created_at: string;
 }
 
-function expliquer(message: string): string {
+/** Où vit une discussion : le Vestiaire, ou la discussion d'un match. */
+export type Canal = { canal: "sfl" } | { canal: "match"; matchId: number };
+const VESTIAIRE: Canal = { canal: "sfl" };
+
+export function expliquer(message: string, ou: Canal = VESTIAIRE): string {
   if (/jwt|token|not authenticated|auth session/i.test(message))
     return "Ta session a expiré. Déconnecte-toi puis reconnecte-toi.";
+  if (ou.canal === "match") {
+    // Avant la migration (les aperçus), la colonne match_id n'existe pas.
+    if (/match_id/.test(message)) return "La discussion des matchs arrive bientôt.";
+    if (/row-level security|violates/i.test(message)) return "Tu n'es plus dans ce match.";
+    return "La discussion ne répond pas. Réessaie dans un instant.";
+  }
   if (/row-level security|violates/i.test(message)) return "L'admin t'a coupé la parole pour l'instant.";
   return "Le Vestiaire ne répond pas. Réessaie dans un instant.";
 }
 
-export async function chargerVestiaire(
+export function chargerVestiaire(moi: string, profils: ProfilV[], limite = 200) {
+  return chargerFil(VESTIAIRE, moi, profils, limite);
+}
+
+/** Les derniers messages d'une discussion, du plus ancien au plus récent, avec leurs réactions. */
+export async function chargerFil(
+  ou: Canal,
   moi: string,
   profils: ProfilV[],
   limite = 200
@@ -172,12 +201,14 @@ export async function chargerVestiaire(
   const sb = supabase();
   // Avant la migration (les aperçus), la colonne piece n'existe pas encore :
   // on relit sans elle plutôt que de laisser le Vestiaire vide.
-  const lire = (colonnes: string) =>
-    sb.from("messages").select(colonnes).eq("canal", "sfl").order("created_at", { ascending: false }).limit(limite);
+  const lire = (colonnes: string) => {
+    const q = sb.from("messages").select(colonnes).eq("canal", ou.canal);
+    return (ou.canal === "match" ? q.eq("match_id", ou.matchId) : q).order("created_at", { ascending: false }).limit(limite);
+  };
   let r = await lire("id, auteur, texte, piece, reponse_a, created_at");
   if (r.error && /reponse_a/.test(r.error.message)) r = await lire("id, auteur, texte, piece, created_at");
   if (r.error && /piece/.test(r.error.message)) r = await lire("id, auteur, texte, created_at");
-  if (r.error) return { ok: false, raison: expliquer(r.error.message) };
+  if (r.error) return { ok: false, raison: expliquer(r.error.message, ou) };
   const bruts = (r.data ?? []) as unknown as Brut[];
 
   const reactions = new Map<number, Partial<Record<Emoji, string[]>>>();
@@ -218,21 +249,27 @@ export async function chargerVestiaire(
 export type Resultat = { ok: true } | { ok: false; raison: string };
 
 /** Pourquoi écrire est impossible — null si ça l'est. */
-export function blocageVestiaire(): string | null {
+export function blocageVestiaire(ou: Canal = VESTIAIRE): string | null {
   const session = getSession();
-  if (!session) return "Connecte-toi pour parler au Vestiaire.";
-  if (!session.server) return "Déconnecte-toi puis reconnecte-toi pour écrire au Vestiaire.";
+  const ici = ou.canal === "match" ? "aux joueurs du match" : "au Vestiaire";
+  if (!session) return `Connecte-toi pour parler ${ici}.`;
+  if (!session.server) return `Déconnecte-toi puis reconnecte-toi pour écrire ${ici}.`;
   return null;
 }
 
+export type CorpsNotif = { type: "message"; id: number } | { type: "reaction"; id: number; emoji: Emoji };
+
+/** La route qui prévient pour une discussion : celle du Vestiaire, ou celle des matchs. */
+const routeDe = (ou: Canal) => (ou.canal === "match" ? "/api/matchs/discussion" : "/api/vestiaire/notifier");
+
 /** Demande au serveur de prévenir qui doit l'être. Sans attendre ni échouer. */
-function notifier(corps: { type: "message"; id: number } | { type: "reaction"; id: number; emoji: Emoji }) {
+export function notifier(corps: CorpsNotif, ou: Canal = VESTIAIRE) {
   void (async () => {
     try {
       const { data } = await supabase().auth.getSession();
       const jeton = data.session?.access_token;
       if (!jeton) return;
-      await fetch("/api/vestiaire/notifier", {
+      await fetch(routeDe(ou), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${jeton}` },
         body: JSON.stringify(corps),
@@ -244,26 +281,32 @@ function notifier(corps: { type: "message"; id: number } | { type: "reaction"; i
   })();
 }
 
-export async function posterAuVestiaire(texte: string, piece: Piece | null, reponseA: number | null = null): Promise<Resultat> {
+export function posterAuVestiaire(texte: string, piece: Piece | null, reponseA: number | null = null): Promise<Resultat> {
+  return poster(VESTIAIRE, texte, piece, reponseA);
+}
+
+/** Écrit dans une discussion, puis demande au serveur de prévenir. */
+export async function poster(ou: Canal, texte: string, piece: Piece | null, reponseA: number | null = null): Promise<Resultat> {
   const propre = texte.trim();
   if (!propre && !piece) return { ok: false, raison: "Message vide." };
   if (propre.length > 2000) return { ok: false, raison: "Message trop long." };
-  const empeche = blocageVestiaire();
+  const empeche = blocageVestiaire(ou);
   if (empeche) return { ok: false, raison: empeche };
   try {
     const sb = supabase();
     const { data: auth } = await sb.auth.getUser();
     const uid = auth.user?.id;
-    if (!uid) return { ok: false, raison: expliquer("jwt") };
-    const ligne: Record<string, unknown> = { canal: "sfl", auteur: uid, destinataire: null, texte: propre };
+    if (!uid) return { ok: false, raison: expliquer("jwt", ou) };
+    const ligne: Record<string, unknown> = { canal: ou.canal, auteur: uid, destinataire: null, texte: propre };
+    if (ou.canal === "match") ligne.match_id = ou.matchId;
     if (piece) ligne.piece = piece;
     if (reponseA) ligne.reponse_a = reponseA;
     const { data, error } = await sb.from("messages").insert(ligne).select("id").single();
-    if (error) return { ok: false, raison: expliquer(error.message) };
-    notifier({ type: "message", id: (data as { id: number }).id });
+    if (error) return { ok: false, raison: expliquer(error.message, ou) };
+    notifier({ type: "message", id: (data as { id: number }).id }, ou);
     return { ok: true };
   } catch {
-    return { ok: false, raison: expliquer("") };
+    return { ok: false, raison: expliquer("", ou) };
   }
 }
 
@@ -413,13 +456,13 @@ export async function deposerVideo(fichier: Blob, l: number, h: number, duree: n
   return { type: "video", chemin, l, h, duree };
 }
 
-/** Pose ou retire ma réaction. */
-export async function reagir(id: number, emoji: Emoji, poser: boolean): Promise<boolean> {
+/** Pose ou retire ma réaction (au Vestiaire, ou dans la discussion `ou`). */
+export async function reagir(id: number, emoji: Emoji, poser: boolean, ou: Canal = VESTIAIRE): Promise<boolean> {
   const sb = supabase();
   if (poser) {
     const { error } = await sb.from("message_reactions").insert({ message_id: id, emoji });
     if (error) return false;
-    notifier({ type: "reaction", id, emoji });
+    notifier({ type: "reaction", id, emoji }, ou);
     return true;
   }
   const { data: auth } = await sb.auth.getUser();
@@ -535,6 +578,38 @@ export async function compterNonLus(): Promise<number> {
 }
 
 export const EVT_LU = "sfl-vestiaire-lu";
+
+/* -------------------------------- Le salon ------------------------------- */
+
+/**
+ * Une discussion, telle que l'écran la voit (components/sfl/vestiaire.tsx) :
+ * le Vestiaire de toute la ligue, ou la discussion d'un match
+ * (lib/sfl/discussion-match.ts, salonDuMatch). Lire, écrire, réagir, suivre
+ * le temps réel, et ce que le joueur a lu et veut en notification.
+ */
+export interface Salon {
+  ou: Canal;
+  charger(moi: string, profils: ProfilV[]): Promise<{ ok: true; messages: MessageV[] } | { ok: false; raison: string }>;
+  poster(texte: string, piece: Piece | null, reponseA: number | null): Promise<Resultat>;
+  reagir(id: number, emoji: Emoji, poser: boolean): Promise<boolean>;
+  ecouter(onChange: () => void): () => void;
+  lireSuivi(): Promise<{ lu: number; notifs: ModeNotifs }>;
+  marquerLu(at?: number): Promise<void>;
+  direDevant(devant: boolean): Promise<void>;
+  reglerNotifs(mode: ModeNotifs): Promise<boolean>;
+}
+
+export const SALON_VESTIAIRE: Salon = {
+  ou: VESTIAIRE,
+  charger: (moi, profils) => chargerVestiaire(moi, profils),
+  poster: (texte, piece, reponseA) => posterAuVestiaire(texte, piece, reponseA),
+  reagir: (id, emoji, poser) => reagir(id, emoji, poser),
+  ecouter: (onChange) => ecouterVestiaire(onChange),
+  lireSuivi: () => lireSuivi(),
+  marquerLu: (at) => marquerVestiaireLu(at),
+  direDevant: (devant) => direDevant(devant),
+  reglerNotifs: (mode) => reglerNotifsVestiaire(mode),
+};
 
 /* ------------------------------ Temps réel ------------------------------ */
 

@@ -6,11 +6,13 @@
 // plus envie, qu'on comprenne mieux les choses et que ce soit mieux rangé »,
 // comme le profil d'un joueur ouvert depuis la Recherche (profil-joueur.tsx),
 // dont elle reprend l'ordre de lecture, du plus fort au plus fin :
-//   1. moi : ma carte en grand, mon nom en Anton, trois chiffres de tête (mon
-//      rang au Pépite d'Or, ma note, mes dimanches), puis la phrase qui me
-//      résume (fiche-joueur.ts, la même que sur mon profil). Le nom se
-//      corrige en le touchant (identite.tsx). Dessous, ma photo (la toucher
-//      ouvre « Ma photo »), la carte officielle et le badge de ma carte ;
+//   1. moi : ma carte en grand, mon nom dans le lettrage de la Map, trois
+//      chiffres de tête en Anton (mon rang au Pépite d'Or, ma note, mes
+//      dimanches), puis la phrase qui me résume (fiche-joueur.ts, la même que
+//      sur mon profil). Le nom se corrige en le touchant (identite.tsx).
+//      Dessous, ma photo (la toucher ouvre « Ma photo »), la carte officielle
+//      tant qu'elle n'est pas faite (carte-officielle.tsx ; ensuite, on la
+//      refait depuis « Ma photo ») et le badge de ma carte ;
 //   2. ma saison : mon dernier dimanche en grand, mes points forts, mes
 //      autres dimanches (ma-saison.tsx) ;
 //   3. mon évolution : mon rang au Pépite d'Or ou la note de ma carte,
@@ -18,7 +20,9 @@
 //   4. mes badges : le prochain à viser, les trophées de fin de saison et
 //      les paliers (vitrine.tsx) ;
 //   5. mes cartes, saison par saison, avec les cartes spéciales gagnées ;
-//   6. les raccourcis.
+//   6. les raccourcis ;
+//   7. « Se déconnecter », tout en bas, comme dans toute app
+//      (bouton-deconnexion.tsx ; Sabri, le 22/10 : « plus accessible »).
 // « Historique » est parti : chaque dimanche de Ma saison ouvre son récap. Le
 // rappel « Glisse pour tourner » aussi, comme sur le profil. Les réglages
 // (« ⋯ ») sont en haut, à côté de la loupe.
@@ -55,8 +59,7 @@ import { isHidden } from "@/lib/sfl/hidden";
 import { POSTES } from "@/lib/sfl/inscription";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { BoutonStats } from "@/components/layout/bouton-stats";
-
-const ANTON = "var(--font-anton), Anton, sans-serif";
+import { BoutonDeconnexion } from "@/components/sfl/auth/bouton-deconnexion";
 
 /* ------------------------------ Petits blocs ------------------------------ */
 
@@ -163,7 +166,7 @@ export default function Profil() {
             aria-label={`${identite.nom(player.name)}, ${identite.pseudo(player.name)}. Modifier mon nom et mon pseudo`}
             className="relative flex w-full flex-col items-center gap-[var(--fib-8)] text-center"
           >
-            <span style={{ fontFamily: ANTON }} className="text-[44px] leading-[0.92] tracking-[0.3px] break-words uppercase">
+            <span className="titre-lettrage text-[34px] leading-[0.95] break-words">
               {identite.nom(player.name)}
             </span>
             <span className="font-mono text-[12px] text-foreground/45">
@@ -176,8 +179,10 @@ export default function Profil() {
             <Chiffre valeur={joues} quoi={joues > 1 ? "Dimanches" : "Dimanche"} />
           </div>
           <p className="w-full text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
-          {/* Ma photo, ma carte officielle (photo au maillot Bola), le badge de ma carte. */}
-          <div className="flex w-full items-center gap-[9px]">
+          {/* Ma photo, ma carte officielle (photo au maillot Bola) tant
+              qu'elle n'est pas faite, le badge de ma carte. Sans elle, les
+              deux ronds se centrent. */}
+          <div className="flex w-full items-center justify-center gap-[9px]">
             <button
               type="button"
               onClick={() => setPhotoOuverte(true)}
@@ -258,6 +263,9 @@ export default function Profil() {
               </div>
             </Locked>
           </section>
+
+          {/* 7. Se déconnecter */}
+          <BoutonDeconnexion className="w-full" />
         </div>
       </div>
 

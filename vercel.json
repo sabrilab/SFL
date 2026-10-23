@@ -3,6 +3,10 @@
     {
       "path": "/api/convocation/cron",
       "schedule": "0 7 * * 1"
+    },
+    {
+      "path": "/api/matchs/rappel",
+      "schedule": "0 17 * * *"
     }
   ]
 }
