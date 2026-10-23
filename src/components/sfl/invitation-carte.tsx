@@ -9,7 +9,9 @@
 //    une fois dans la semaine, une fois le dimanche même. Pendant la fenêtre
 //    de sa notification (la veille dès 18 h, le dimanche matin), l'ouverture
 //    sonne aussi le serveur, qui l'envoie une fois à chaque joueur
-//    (lib/sfl/divisions-annonce.ts).
+//    (lib/sfl/divisions-annonce.ts). Dès la J4, le samedi soir et le
+//    dimanche, elle sonne de même la notification de l'outsider
+//    (lib/sfl/outsider-annonce.ts).
 // 1. La ville, d'abord (Sabri, 22/10 : « propose à chaque joueur, à sa
 //    prochaine connexion, de renseigner sa ville pour qu'on puisse le mettre
 //    sur la map »). Tant que le joueur ne l'a ni choisie ni confirmée
@@ -64,6 +66,8 @@ import { ajusterEquipes } from "@/lib/sfl/divisions-equipes";
 import { rankPlayers, type Player } from "@/lib/sfl/engine";
 import { isHidden } from "@/lib/sfl/hidden";
 import { identiteConfirmee, rafraichirIdentites } from "@/lib/sfl/identites";
+import { annoncerOutsider } from "@/lib/sfl/outsider-annonce";
+import { dimancheAAnnoncer, peutEtreLaVeille } from "@/lib/sfl/outsiders";
 import { partenaires } from "@/lib/sfl/partenaires";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
 import {
@@ -176,6 +180,7 @@ export function InvitationCarte() {
         return;
       }
       if (fenetreNotification(ligue.current.saison, maintenant)) void annoncerDivisions();
+      if (dimancheAAnnoncer(ligue.current.saison) !== null && peutEtreLaVeille(maintenant)) void annoncerOutsider();
       // Le week-end des équipes par division : elles se tiennent à jour.
       void ajusterEquipes("ouverture");
       const [etat, ville] = await Promise.all([

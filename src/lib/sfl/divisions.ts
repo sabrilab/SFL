@@ -241,7 +241,7 @@ export function phraseBilan(etat: EtatDivisions, bilan: BilanDivisions, nom: str
 // l'ouverture, la convocation, et une notification la veille.
 
 /** Le jour, l'heure (en minutes) et l'année qu'il est à Paris. */
-function aParis(d: Date): { annee: number; mois: number; jour: number; minutes: number } {
+export function aParis(d: Date): { annee: number; mois: number; jour: number; minutes: number } {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Paris",
     year: "numeric",

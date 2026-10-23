@@ -20,14 +20,36 @@
 //
 // Rien n'est stocké : comme les divisions, tout se relit dans les feuilles et
 // dans le journal de l'XP (chaque ligne porte sa saison et sa journée).
+//
+// La veille du dimanche, toute la ligue apprend dont c'est la journée, par
+// notification (notificationOutsider, /api/outsider/annoncer).
 
+import { jourMoisDuLibelle } from "./convocation-temps";
 import { rankPlayers, type Player } from "./engine";
-import { apresLaJournee, etatDivisions, REGLES_DIVISIONS, type EtatDivisions } from "./divisions";
+import {
+  aParis,
+  apresLaJournee,
+  etatDivisions,
+  FENETRE_NOTIFICATION,
+  REGLES_DIVISIONS,
+  type EtatDivisions,
+} from "./divisions";
 import { isHidden } from "./hidden";
-import { classementNiveau, rangsDesJoueurs, type LigneXp, type RangJoueur } from "./missions";
-import { computeStandings, entryPP } from "./saisie/engine";
+import { heureMin } from "./ligue-vierge";
+import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
+import {
+  classementNiveau,
+  journalXp,
+  rangsDesJoueurs,
+  type FelicitationXp,
+  type LigneXp,
+  type RangJoueur,
+  type Reponse,
+} from "./missions";
+import { computeJournees, computeStandings, deriveSeason, entryPP } from "./saisie/engine";
 import { journeeJouee } from "./saisie/mutations";
 import { numeroSaison, type Saison } from "./saisie/types";
+import { appliquerVotes, type VoteFigure } from "./votes";
 
 type Journal = Map<string, { lignes: LigneXp[]; reussies: number }>;
 
@@ -177,4 +199,97 @@ export function arcOutsider(saison: Saison, journal: Journal, joueurs: Player[],
   const precedent = j - 1 >= REGLES_DIVISIONS.depuis ? chapitreDe(saison, journal, joueurs, j - 1) : null;
   if (!outsiders.length && !precedent) return null;
   return { arc, j, outsiders, chapitre: chapitreDe(saison, journal, joueurs, j, outsiders), precedent };
+}
+
+/* ─────────────────────── La notification du samedi ─────────────────────── */
+// La veille de chaque dimanche qui a son outsider, dès 18 h (Paris), comme
+// l'annonce des divisions : « J4 · La journée de Miken ». Le prénom revient
+// dans le texte au lieu d'un « il » : la notification ne suppose jamais le
+// genre de personne.
+
+/** Le texte que Sabri a retenu : le récit, ou les chiffres. */
+export const TEXTE_NOTIFICATION: "recit" | "chiffres" = "recit";
+
+/** Le dimanche dont l'outsider s'annonce : celui d'après la dernière journée jouée, dans l'arc. */
+export function dimancheAAnnoncer(saison: Saison): number | null {
+  if (numeroSaison(saison) !== REGLES_DIVISIONS.saison) return null;
+  const j = Math.max(0, ...saison.journees.map((m) => m.j).filter((x) => journeeJouee(saison, x))) + 1;
+  return j >= REGLES_DIVISIONS.depuis ? j : null;
+}
+
+/**
+ * L'outsider du dimanche `j`, calculé comme les Actus le calculent
+ * (SeasonProvider, hooks/use-missions.ts), depuis ce que la base garde : les
+ * réponses aux missions, les votes de la saison, les félicitations. null si
+ * ce dimanche n'en a pas.
+ */
+export function outsiderDuDimanche(
+  saison: Saison,
+  j: number,
+  base: { reponses: Reponse[]; votes: VoteFigure[]; felicitations: FelicitationXp[] },
+  maintenant: Date
+): Outsider | null {
+  const brut = deriveSeason(saison);
+  const vote = appliquerVotes(saison, brut.journees, base.votes, maintenant);
+  const derivee = vote === saison ? brut : deriveSeason(vote);
+  const jugee = appliquerVotes(saison, derivee.journees, base.votes, maintenant);
+  const journal = journalXp(jugee, base.reponses, base.votes, maintenant, base.felicitations);
+  return arcOutsider(saison, journal, derivee.players, j)?.chapitre?.outsider ?? null;
+}
+
+/** Un samedi soir ou un dimanche, à Paris : l'app ne sonne la route qu'alors (le serveur juge du reste). */
+export function peutEtreLaVeille(maintenant: Date): boolean {
+  const ici = aParis(maintenant);
+  const jour = new Date(Date.UTC(ici.annee, ici.mois - 1, ici.jour)).getUTCDay();
+  return (jour === 6 && ici.minutes >= FENETRE_NOTIFICATION.veille) || (jour === 0 && ici.minutes >= FENETRE_NOTIFICATION.matin);
+}
+
+/**
+ * Quand part la notification du dimanche `j` : la veille dès 18 h, le jour
+ * même de 9 h au coup d'envoi (Paris). La date est celle de la journée, sinon
+ * celle de la convocation ouverte ; null hors de la fenêtre.
+ */
+export function fenetreOutsider(
+  saison: Saison,
+  j: number,
+  maintenant: Date,
+  convocation?: { date_label?: string | null; heure?: string | null } | null
+): "veille" | "jour" | null {
+  const meta = saison.journees.find((m) => m.j === j);
+  const jm = jourMoisDuLibelle(meta?.date ?? convocation?.date_label ?? "");
+  if (!jm) return null;
+  const ici = aParis(maintenant);
+  const veille = new Date(Date.UTC(ici.annee, jm.mois - 1, jm.jour - 1));
+  if (ici.mois === veille.getUTCMonth() + 1 && ici.jour === veille.getUTCDate())
+    return ici.minutes >= FENETRE_NOTIFICATION.veille ? "veille" : null;
+  if (ici.mois !== jm.mois || ici.jour !== jm.jour) return null;
+  const heure = meta?.heure ?? convocation?.heure ?? "13h00";
+  const journee = computeJournees(saison).find((x) => x.j === j);
+  const coupEnvoi = premierCoupDEnvoi(matchsDeJournee(journee, [], { heure, lieu: null }), heure);
+  return ici.minutes >= FENETRE_NOTIFICATION.matin && ici.minutes < heureMin(coupEnvoi) ? "jour" : null;
+}
+
+/**
+ * La notification, pour un joueur de la ligue : « J4 · La journée de Miken »,
+ * « Personne ne l'attendait en D1. Demain, Miken joue son rang A. » ; pour
+ * l'outsider : « J4 · Ta journée », « Personne ne t'attendait en D1. Demain,
+ * tu joues ton rang A. » Le dimanche matin, « Aujourd'hui ». `qui` est le
+ * prénom de l'outsider, tel que la ligue le lit.
+ */
+export function notificationOutsider(
+  o: Outsider,
+  j: number,
+  pour: string,
+  qui: string,
+  moment: "veille" | "jour",
+  texte: typeof TEXTE_NOTIFICATION = TEXTE_NOTIFICATION
+): { titre: string; texte: string } {
+  const toi = pour === o.nom;
+  const quand = moment === "veille" ? "Demain" : "Aujourd'hui";
+  const debut =
+    texte === "recit"
+      ? `Personne ne ${toi ? "t'" : "l'"}attendait en D1.`
+      : `Rang B, ${o.placeD1 === 1 ? "en tête" : `${o.placeD1}e`} de la D1.`;
+  const quete = `${quand}, ${toi ? "tu joues ton" : `${qui} joue son`} rang A${texte === "chiffres" ? " sans tomber en D2" : ""}.`;
+  return { titre: toi ? `J${j} · Ta journée` : `J${j} · La journée de ${qui}`, texte: `${debut} ${quete}` };
 }

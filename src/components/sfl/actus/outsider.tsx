@@ -22,8 +22,10 @@
 // donne. À minuit, le chapitre se ferme (le rang A se juge avec l'XP des
 // missions, comptée à minuit) et le suivant s'ouvre sur l'outsider du
 // dimanche d'après : le même tant qu'il tient, rang B et en D1.
+// La veille, la notification « J4 · La journée de Miken »
+// (/api/outsider/annoncer) ouvre la rubrique : /ligue#outsider.
 
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { MessageCircle } from "lucide-react";
 import { ciblesDe, contratsSignes } from "@/components/sfl/map/contrats-map";
@@ -238,6 +240,12 @@ export function RubriqueOutsider({ className }: { className?: string }) {
   );
   const j = dimancheDeLOutsider(lg, derniere);
   const arc = useMemo(() => (xp ? arcOutsider(saison, xp.journal, allPlayers, j) : null), [xp, saison, allPlayers, j]);
+  const ref = useRef<HTMLElement>(null);
+  const present = !!arc;
+  // La notification du samedi mène à /ligue#outsider.
+  useEffect(() => {
+    if (present && window.location.hash === "#outsider") ref.current?.scrollIntoView({ block: "start" });
+  }, [present]);
   if (!arc) return null;
 
   const c = arc.chapitre;
@@ -276,7 +284,7 @@ export function RubriqueOutsider({ className }: { className?: string }) {
   };
 
   return (
-    <section id="outsider" aria-labelledby="titre-outsider" className={cn("flex scroll-mt-4 flex-col gap-4", className)}>
+    <section id="outsider" ref={ref} aria-labelledby="titre-outsider" className={cn("flex scroll-mt-4 flex-col gap-4", className)}>
       <div className="flex flex-col gap-1.5 px-5 md:px-0">
         <div className="flex items-baseline justify-between gap-3">
           <span className="mono-label truncate text-foreground/45">
