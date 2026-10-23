@@ -123,7 +123,7 @@ export function NouveauMotDePasse({ session }: { session: Session }) {
             </span>
           </label>
 
-          {error && <p className="px-1 text-[12.5px] font-medium text-[#FF6B5E]">{error}</p>}
+          {error && <p className="px-1 text-[12.5px] font-medium text-[#c8352b] dark:text-[#FF6B5E]">{error}</p>}
 
           <button
             type="submit"

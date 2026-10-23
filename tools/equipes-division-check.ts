@@ -48,7 +48,8 @@ assert.deepEqual(
 );
 // Moins de huit en tout : un seul terrain.
 assert.deepEqual(repartirSurTerrains(joueurs.slice(0, 3).concat(joueurs.slice(20, 23))).map((t) => t.length), [6]);
-assert.deepEqual(nomsDEquipes(10).slice(6), ["Équipe A", "Équipe B", "Équipe C", "Équipe D"]);
+assert.deepEqual(nomsDEquipes(4), ["Noirs 1", "Blancs 1", "Noirs 2", "Blancs 2"]);
+assert.deepEqual(nomsDEquipes(10).slice(6), ["Noirs 4", "Blancs 4", "Noirs 5", "Blancs 5"]);
 
 // Une saison : dix joueurs, deux journées jouées. Ana et Bilal ont toujours
 // joué ensemble ; Chris et Dina se sont toujours affrontés.
@@ -126,17 +127,26 @@ assert.equal(etat4.phase, "divisions");
 assert.equal(divisionsDeLaJournee(coupee, 3), null, "la J3 se joue sans divisions");
 assert.equal(divisionsDeLaJournee({ ...coupee, numero: 2 }, 4), null, "une autre saison");
 
-// En divisions : les dix classés en trois tiers, trois terrains impossibles à
-// dix ; la D1 et la D3, trop courtes, rejoignent la D2 : un seul terrain.
+// En divisions : les dix classés tiennent dans les 30 places de la D1 : un
+// seul terrain, un seul match, les Noirs contre les Blancs.
 const c4 = composer(coupee, NOMS, etat4);
 assert.equal(c4.terrains.length, 1);
-assert.deepEqual(terrainsDesEquipes(c4.teams, etat4).map((x) => x.label), ["D1–D2–D3"]);
-// Deux terrains de la même division se numérotent.
-const enD3 = [...etat4.actuelle].filter(([, d]) => d === 3).map(([n]) => n);
-const d3 = (n: string) => ({ name: n, players: enD3.slice(0, 2) });
+assert.deepEqual(c4.teams.map((x) => x.name), ["Noirs 1", "Blancs 1"]);
+assert.deepEqual(terrainsDesEquipes(c4.teams, etat4).map((x) => x.label), ["Match 1 · D1"]);
+// Une division sur deux terrains joue deux matchs ; une division courte avec sa voisine se dit à deux.
+const enD1 = [...etat4.actuelle].filter(([, d]) => d === 1).map(([n]) => n);
+const d1 = (n: string) => ({ name: n, players: enD1.slice(0, 2) });
 assert.deepEqual(
-  terrainsDesEquipes([d3("Orange"), d3("Bleu"), d3("Vert"), d3("Jaune")], etat4).map((x) => x.label),
-  ["D3 · Terrain 1", "D3 · Terrain 2"]
+  terrainsDesEquipes([d1("Noirs 1"), d1("Blancs 1"), d1("Noirs 2"), d1("Blancs 2")], etat4).map((x) => [x.n, x.divisions, x.label]),
+  [
+    [1, "D1", "Match 1 · D1"],
+    [2, "D1", "Match 2 · D1"],
+  ]
+);
+assert.deepEqual(
+  terrainsDesEquipes([{ name: "Noirs 1", players: ["Ana", "Inconnu"] }, { name: "Blancs 1", players: [] }], etat4).map((x) => x.divisions),
+  ["D1–D3"],
+  "qui n'a jamais joué est en D3"
 );
 
 // Les équipes posées sur la feuille : une ligne gardée (et ses chiffres), une
@@ -152,7 +162,15 @@ assert.equal(lignes4.find((e) => e.player === "Kenza")?.team, null, "sur la feui
 const match = computeJournees(posee).find((x) => x.j === 4)!.matches![0];
 assert.deepEqual([match.teamA.name, match.teamB.name], [c4.teams[0].name, c4.teams[1].name]);
 const neuve = poserEquipes(coupee, 4, c4.teams, "1 nov.");
-assert.deepEqual(neuve.journees.at(-1), { j: 4, date: "1 nov.", sflTime: true, mvpAuto: true });
+assert.deepEqual(neuve.journees.at(-1), { j: 4, date: "1 nov.", sflTime: true, mvpAuto: true, matchsDuJour: [{ equipes: ["Noirs 1", "Blancs 1"] }] });
+// Un match garde l'heure, le lieu et le terrain que l'admin lui avait donnés.
+const reglee: Saison = {
+  ...feuille,
+  journees: feuille.journees.map((m) => (m.j === 4 ? { ...m, matchsDuJour: [{ equipes: ["Orange", "Bleu"], heure: "14h30", lieuId: 2, terrain: "Terrain 3" }] } : m)),
+};
+assert.deepEqual(poserEquipes(reglee, 4, c4.teams).journees.find((m) => m.j === 4)?.matchsDuJour, [
+  { equipes: ["Noirs 1", "Blancs 1"], heure: "14h30", lieuId: 2, terrain: "Terrain 3" },
+]);
 
 console.log("équipes par division : terrains, équilibre, mélange, gardiens, réponses tardives, calendrier, feuille, tout est bon");
 

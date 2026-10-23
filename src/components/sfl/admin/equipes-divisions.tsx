@@ -18,17 +18,10 @@ import { useSeason } from "@/components/sfl/season-provider";
 import type { PresenceView } from "@/hooks/use-presence";
 import type { EtatDivisions } from "@/lib/sfl/divisions";
 import { composer, HEURE_DES_EQUIPES, terrainsDesEquipes } from "@/lib/sfl/equipes-division";
+import { PointMaillot } from "@/components/sfl/point-maillot";
 import { joueursDeLaFeuille } from "@/lib/sfl/presence-feuille";
+import { lireEquipe } from "@/lib/sfl/saisie/equipes";
 import type { ConvocationTeam } from "@/lib/sfl/saisie/types";
-
-const TEAM_TINTS: Record<string, string> = {
-  Orange: "#F9CB9C",
-  Bleu: "#8FB6F5",
-  Vert: "#9FD49B",
-  Jaune: "#F2DC8B",
-  Rouge: "#F09A96",
-  Gris: "#C9C9C9",
-};
 
 export function EquipesParDivision({
   presence,
@@ -87,12 +80,13 @@ export function EquipesParDivision({
             {equipes.map((t) => {
               const notes = t.players.map(note).filter((x): x is number => x != null);
               const moyenne = notes.length ? Math.round(notes.reduce((s, x) => s + x, 0) / notes.length) : null;
+              const camp = lireEquipe(t.name)?.camp;
               return (
                 <div key={t.name} className="py-1">
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1.5 text-[13px] font-bold">
-                      <span className="size-2.5 rounded-full ring-1 ring-black/10" style={{ background: TEAM_TINTS[t.name] ?? "#ddd" }} />
-                      {t.name}
+                      {camp && <PointMaillot camp={camp} />}
+                      {camp ?? t.name}
                     </span>
                     {moyenne != null && <span className="mono-label text-foreground/40">OVR {moyenne}</span>}
                   </div>

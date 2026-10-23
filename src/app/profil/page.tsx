@@ -27,7 +27,8 @@
 //      (bouton-deconnexion.tsx ; Sabri, le 22/10 : « plus accessible »).
 // « Historique » est parti : chaque dimanche de Ma saison ouvre son récap. Le
 // rappel « Glisse pour tourner » aussi, comme sur le profil. Les réglages
-// (« ⋯ ») sont en haut, à côté de la loupe.
+// (« ⋯ ») sont en haut, à côté de la loupe et du rond qui passe l'app en
+// clair ou en sombre (bouton-theme.tsx, 23/10).
 //
 // Le 22/10 (Sabri) : le profil de jeu (le radar) part sur le profil d'un
 // joueur dans Recherche ; « Cartes de match » disparaît, les cartes gagnées
@@ -66,6 +67,7 @@ import { isHidden } from "@/lib/sfl/hidden";
 import { POSTES } from "@/lib/sfl/inscription";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { BoutonStats } from "@/components/layout/bouton-stats";
+import { BoutonTheme } from "@/components/layout/bouton-theme";
 import { BoutonDeconnexion } from "@/components/sfl/auth/bouton-deconnexion";
 
 /* ------------------------------ Petits blocs ------------------------------ */
@@ -140,6 +142,7 @@ export default function Profil() {
         <div className="flex items-center gap-2">
           <BoutonStats />
           <BoutonRecherche />
+          <BoutonTheme />
           <Link
             href="/reglages"
             aria-label="Réglages"

@@ -11,6 +11,7 @@ import { useIsClient } from "@/hooks/use-is-client";
 import { useSession } from "@/hooks/use-session";
 import { bootstrapServerSession, inscriptionSocialeEnCours } from "@/lib/sfl/auth/session";
 import { LoginScreen } from "./login-screen";
+import { VoileEtat } from "@/components/layout/bottom-nav";
 import { EnAttente } from "./en-attente";
 import { NouveauMotDePasse } from "./nouveau-mot-de-passe";
 import { useJoueurInconnu } from "@/components/sfl/player-provider";
@@ -64,6 +65,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
         <LoginScreen />
+        <VoileEtat partout />
       </div>
     );
   // Un compte né d'un mot de passe d'origine (devenu public) ou provisoire :
@@ -72,6 +74,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="h-full overflow-y-auto" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <NouveauMotDePasse session={session} />
+        <VoileEtat partout />
       </div>
     );
   // Inscrit, pas encore accepté : sa carte et l'état de sa demande, rien
@@ -82,6 +85,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       <div className="h-full overflow-y-auto" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <EnAttente session={session} />
         <ConsentementObligatoire />
+        <VoileEtat partout />
       </div>
     );
   // Connecté, mais la saison chargée ne le connaît pas (pas encore ajouté à
@@ -92,6 +96,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       <div className="h-full overflow-y-auto" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <EnAttente session={session} horsSaison />
         <ConsentementObligatoire />
+        <VoileEtat partout />
       </div>
     );
   return <>{children}</>;

@@ -137,7 +137,7 @@ export function Reduit({ ratio, children, base = 390 }: { ratio: number; childre
 function PublicationFilm({ j, date, saison, duree, media, ratio = 4 / 5, images, titre, partage, action }: Parameters<typeof PublicationPost>[0]) {
   const router = useRouter();
   return (
-    <article className="actu-film flex flex-col bg-black">
+    <article className="actu-film dark flex flex-col bg-black">
       {images ? <Carrousel images={images} ratio={ratio} /> : <Ecran duree={duree} ratio={ratio}>{media}</Ecran>}
       <div className={cn("flex min-h-10 items-center gap-2 pr-1.5 pl-4", images && "pt-5")}>
         <span className="mono-label shrink-0 text-white/40">{[saison, j != null && `J${j}`, date].filter(Boolean).join(" · ")}</span>

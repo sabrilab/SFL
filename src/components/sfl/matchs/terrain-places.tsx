@@ -106,26 +106,31 @@ export function TerrainPlaces({
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
+      // --voile : la couleur du sol sous les joueurs, où se fond l'étiquette d'un invité.
+      className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#ffffff_0%,#e6e8e3_70%)] [--voile:#e9ebe6] dark:bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)] dark:[--voile:#1b1d21]"
       style={{ height: cadre }}
     >
       <div className="absolute inset-x-0 top-0 bottom-0" style={{ transform: `translateY(${decalage}px)` }}>
         <SolTerrain ombres={posees.filter((c) => c.occupant)} vue={vu} />
-        {/* eslint-disable-next-line @next/next/no-img-element -- le même logo que la feuille */}
-        <img
-          src="/bola/symbole-blanc.svg"
-          alt=""
-          aria-hidden
-          className="absolute"
-          style={{
-            left: `calc(50% - ${logo.l / 2}px)`,
-            top: centre.y - logo.l / 2,
-            width: logo.l,
-            height: logo.l,
-            transform: `scaleY(${logo.h / logo.l})`,
-            opacity: 0.85,
-          }}
-        />
+        {/* Le même logo que la feuille : blanc sur la nuit, noir sur le papier. */}
+        {["/bola/symbole-blanc.svg", "/bola/symbole-noir.svg"].map((src, i) => (
+          // eslint-disable-next-line @next/next/no-img-element -- le même logo que la feuille
+          <img
+            key={src}
+            src={src}
+            alt=""
+            aria-hidden
+            className={cn("absolute", i === 0 ? "hidden dark:block" : "dark:hidden")}
+            style={{
+              left: `calc(50% - ${logo.l / 2}px)`,
+              top: centre.y - logo.l / 2,
+              width: logo.l,
+              height: logo.l,
+              transform: `scaleY(${logo.h / logo.l})`,
+              opacity: 0.85,
+            }}
+          />
+        ))}
         {posees.map(({ i, occupant, chezMoi, x, y, k, etiquette }) => {
           const onglet = chezMoi || unCamp ? BLANC : NOIR;
           const cestMoi = !!occupant && occupant.nom === moi;
@@ -146,11 +151,11 @@ export function TerrainPlaces({
                       }
                       className={cn(
                         "relative flex rounded-[15px] transition-transform active:scale-95 disabled:active:scale-100",
-                        cestMoi && "bg-white p-[3px]",
-                        occupant.enAttente && "border-[1.5px] border-dashed border-white/70 p-[2px]"
+                        cestMoi && "bg-[#0a0b0d] p-[3px] dark:bg-white",
+                        occupant.enAttente && "border-[1.5px] border-dashed border-contraste/70 p-[2px]"
                       )}
                     >
-                      <span className={cn("flex rounded-[12px]", cestMoi && "bg-[#1b1d21] p-[2px]", occupant.enAttente && "opacity-45")}>
+                      <span className={cn("flex rounded-[12px]", cestMoi && "bg-white p-[2px] dark:bg-[#1b1d21]", occupant.enAttente && "opacity-45")}>
                         <Pastille player={parNom.get(occupant.nom)} nom={occupant.nom} cote={42} onglet={onglet} />
                       </span>
                       {retirable && onOccupant && !cestMoi && (
@@ -170,7 +175,7 @@ export function TerrainPlaces({
                       )}
                       style={{
                         // Voilée mais opaque : les lignes du terrain ne passent pas au travers.
-                        background: occupant.enAttente ? `color-mix(in srgb, ${onglet.fond} 72%, #1b1d21)` : onglet.fond,
+                        background: occupant.enAttente ? `color-mix(in srgb, ${onglet.fond} 72%, var(--voile))` : onglet.fond,
                         color: onglet.encre,
                         fontWeight: cestMoi ? 800 : 600,
                         maxWidth: etiquette,
@@ -187,7 +192,7 @@ export function TerrainPlaces({
                       disabled={!onPlus}
                       onClick={onPlus}
                       aria-label="Ajouter un joueur"
-                      className="grid size-[42px] place-items-center rounded-[10px] border-[1.5px] border-dashed border-white/45 bg-white/[0.06] text-white/80 transition-transform active:scale-95 disabled:opacity-50"
+                      className="grid size-[42px] place-items-center rounded-[10px] border-[1.5px] border-dashed border-contraste/45 bg-contraste/[0.06] text-contraste/80 transition-transform active:scale-95 disabled:opacity-50"
                     >
                       <Plus className="size-5" strokeWidth={2.4} />
                     </button>

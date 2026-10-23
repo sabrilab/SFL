@@ -133,7 +133,7 @@ export function PriseReference({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col bg-black text-white" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+    <div className="dark fixed inset-0 z-[80] flex flex-col bg-black text-white" style={{ paddingTop: "env(safe-area-inset-top)" }}>
       {/* En-tête : l'angle demandé */}
       <div className="flex items-center gap-3 px-5 pt-3 pb-2">
         <Cadran angle={angle} />

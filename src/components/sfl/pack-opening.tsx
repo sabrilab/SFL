@@ -115,7 +115,7 @@ export function PackOpening({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[60] flex flex-col items-center justify-center overflow-hidden bg-black/92 px-6 backdrop-blur-sm"
+      className="dark fixed inset-0 z-[60] flex flex-col items-center justify-center overflow-hidden bg-black/92 px-6 text-foreground backdrop-blur-sm"
     >
       <AnimatePresence mode="wait">
         {phase === "pack" && (

@@ -4,16 +4,17 @@
 // dernier jour sans division. Battez-vous pour qu'au terme de ce dimanche-là,
 // on découpe la ligue en trois divisions »).
 //
-// Jusqu'au soir de la J3 : la ligue coupée en trois si on coupait ce soir,
-// sur le terrain des rubriques (pelouse.tsx). La D1 au fond, près du but, la
-// D3 devant : plus on est près du but, plus on est haut. Puis ce qui change
-// dès la J4 : la plage de points qui fait monter ou descendre, le MVP,
-// l'Impact et la Défensive élus à chaque journée, les équipes faites par
-// division. La J3 jouée, les mêmes rangs donnent les divisions de la J4,
-// jusqu'à ce qu'elle se joue.
+// Jusqu'au soir de la J3 : la ligue coupée en divisions de 30 joueurs si on
+// coupait ce soir, sur le terrain des rubriques (pelouse.tsx). La D1 au fond,
+// près du but, la D3 devant : plus on est près du but, plus on est haut. Puis
+// ce qui change dès la J4 : 30 joueurs par division, la plage de points qui
+// fait monter ou descendre, le MVP, l'Impact et la Défensive élus à chaque
+// journée, les équipes faites par division. La J3 jouée, les mêmes rangs
+// donnent les divisions de la J4, jusqu'à ce qu'elle se joue.
 //
-// Chaque rang montre trois cartes, son étiquette à gauche (la division, son
-// nombre de joueurs). Le tien : toi et les deux qui te précèdent. Au-dessus
+// Chaque rang montre trois cartes, son étiquette à gauche : la division, et
+// pendant l'annonce ses places (« 30 places », « les autres »), ensuite son
+// nombre de joueurs. Le tien : toi et les deux qui te précèdent. Au-dessus
 // de toi, les derniers de la division (ceux qu'il faut passer) ; en dessous,
 // les premiers (ceux qui te chassent). Qui n'est pas classé voit les premiers
 // de chaque division.
@@ -64,6 +65,12 @@ const CENTRE = MILIEU + 37;
 const ETIQUETTE = { u: 34, w: 80 } as const;
 /** Sur grand écran, le terrain et ses règles dessous ne font qu'une carte. */
 const CADRE = "scroll-mt-4 md:overflow-hidden md:rounded-3xl";
+
+/** Les places d'une division : 30 pour la D1 et la D2, la D3 prend les autres. */
+const placesDe = (division: Division) => (division < 3 ? `${REGLES_DIVISIONS.taille} places` : "les autres");
+
+/** Sous une division : ses joueurs ; vide, ses places. */
+const quiDans = (division: Division, n: number) => (n > 0 ? `${n} ${pl(n, "joueur", "joueurs")}` : placesDe(division));
 
 /** Les cartes d'un rang, selon la place de celui qui regarde. */
 function cartesDuRang(d: Decoupage, division: Division, moi: PlaceDecoupage | undefined): PlaceDecoupage[] {
@@ -117,11 +124,12 @@ function Regle({ n, quoi }: { n: string; quoi: string }) {
 
 /** Ce qui change dès la J4, sous le terrain ; une fois la J4 jouée, ce qui se joue chaque dimanche. */
 function DesLaJ4({ chaqueDimanche = false }: { chaqueDimanche?: boolean }) {
-  const { montee, descente, depuis } = REGLES_DIVISIONS;
+  const { montee, descente, depuis, taille } = REGLES_DIVISIONS;
   return (
     <div className="flex flex-col gap-3 bg-[#0c0d0f] px-5 pt-1 pb-6 text-white">
       <span className="mono-label text-[10px] text-white/50">{chaqueDimanche ? "Chaque dimanche" : `Dès la J${depuis}`}</span>
-      <div className="grid grid-cols-3 gap-2">
+      <div className={cn("grid gap-2", chaqueDimanche ? "grid-cols-3" : "grid-cols-2 md:grid-cols-4")}>
+        {!chaqueDimanche && <Regle n={String(taille)} quoi="joueurs par division, les meilleurs en D1" />}
         <Regle n={`${montee} pts`} quoi="ou plus sur la journée : tu montes" />
         <Regle n={`${descente} pts`} quoi="ou moins : tu descends" />
         <Regle n="MVP" quoi="Impact et Défensive élus à chaque journée" />
@@ -189,7 +197,7 @@ export function RubriqueDivisions({ className }: { className?: string }) {
           j: J_DECOUPAGE,
           lignes: [
             ...(moi ? [{ n: me, v: nomDivision(moi.division) }] : []),
-            ...DIVISIONS.map((x) => ({ l: nomDivision(x), v: `${d.divisions[x].length} ${pl(d.divisions[x].length, "joueur", "joueurs")}` })),
+            ...DIVISIONS.map((x) => ({ l: nomDivision(x), v: quiDans(x, d.divisions[x].length) })),
           ],
         }}
       >
@@ -198,7 +206,7 @@ export function RubriqueDivisions({ className }: { className?: string }) {
             <Pastille
               petit
               n={nomDivision(division)}
-              quoi={`${d.divisions[division].length} ${pl(d.divisions[division].length, "joueur", "joueurs")}`}
+              quoi={coupee ? quiDans(division, d.divisions[division].length) : placesDe(division)}
               clair={moi?.division === division}
             />
           </Bulle>
@@ -255,13 +263,13 @@ function Bilan({
           lignes: [
             ...(ma ? [{ n: me, v: nomDivision(ma) }] : []),
             { l: "Mouvements", v: mouvements },
-            ...DIVISIONS.map((x) => ({ l: nomDivision(x), v: `${taille(x)} ${pl(taille(x), "joueur", "joueurs")}` })),
+            ...DIVISIONS.map((x) => ({ l: nomDivision(x), v: quiDans(x, taille(x)) })),
           ],
         }}
       >
         {DIVISIONS.map((division, r) => (
           <Bulle key={division} u={ETIQUETTE.u} v={RANGS_BILAN[division]} w={ETIQUETTE.w} d={0.1 + r * 0.16}>
-            <Pastille petit n={nomDivision(division)} quoi={`${taille(division)} ${pl(taille(division), "joueur", "joueurs")}`} clair={ma === division} />
+            <Pastille petit n={nomDivision(division)} quoi={quiDans(division, taille(division))} clair={ma === division} />
           </Bulle>
         ))}
       </Scene>

@@ -1,6 +1,7 @@
 // Vérifie les divisions de la ligue (lib/sfl/divisions.ts) sur une saison
-// fabriquée : le découpage en tiers, les écarts, la plage de points, les
-// montées et descentes, le calendrier de l'annonce et ses phrases.
+// fabriquée : le découpage en divisions de 30, les écarts et les places, la
+// plage de points, les montées et descentes, le calendrier de l'annonce et
+// ses phrases.
 //   npx tsx tools/divisions-check.ts
 // Avec une saison réelle (le document de la table saison, en JSON),
 // imprime en plus son découpage et la notification de chaque joueur :
@@ -23,6 +24,7 @@ import {
   notificationAnnonce,
   phraseAnnonce,
   phraseBilan,
+  REGLES_DIVISIONS,
   taDivision,
 } from "../src/lib/sfl/divisions";
 import type { MatchEntry, Saison } from "../src/lib/sfl/saisie/types";
@@ -40,37 +42,67 @@ const inscrit = (j: number, player: string): MatchEntry => ({ ...pts(j, player, 
 const NOMS = ["Ana", "Bilal", "Chris", "Dina", "Eli", "Fodé", "Gaby", "Hugo", "Inès"];
 // J1 + J2 : 20, 18, 15, 15, 12, 10, 8, 5, 3 points.
 const TOTAUX = [20, 18, 15, 15, 12, 10, 8, 5, 3];
-const base: Saison = {
+// Le reste de la ligue, pour remplir les places : 27 devant (50 à 24 points),
+// 27 entre Fodé et Gaby (9 points chacun).
+const HAUTS = Array.from({ length: 27 }, (_, i) => `Haut ${i + 1}`);
+const MILIEUX = Array.from({ length: 27 }, (_, i) => `Milieu ${i + 1}`);
+const deuxJournees = (n: string, total: number) => [pts(1, n, Math.ceil(total / 2)), pts(2, n, Math.floor(total / 2))];
+const saisonDe = (autres: [string, number][]): Saison => ({
   numero: 1,
   journees: [
     { j: 1, date: "11 oct.", sflTime: true },
     { j: 2, date: "18 oct.", sflTime: true },
     { j: 3, date: "25 oct.", sflTime: true, mvpAuto: true },
   ],
-  roster: [...NOMS, "Jade", "Sabri"].map((name) => ({ name, poste: null, profil: "Actif", base: null })),
+  roster: [...autres.map(([n]) => n), ...NOMS, "Jade", "Sabri"].map((name) => ({ name, poste: null, profil: "Actif", base: null })),
   entries: [
-    ...NOMS.flatMap((n, i) => [pts(1, n, Math.ceil(TOTAUX[i] / 2)), pts(2, n, Math.floor(TOTAUX[i] / 2))]),
+    ...autres.flatMap(([n, total]) => deuxJournees(n, total)),
+    ...NOMS.flatMap((n, i) => deuxJournees(n, TOTAUX[i])),
     // La feuille de la J3, pas encore jouée : Jade y vient pour la première fois.
     ...[...NOMS, "Jade"].map((n) => inscrit(3, n)),
   ],
   convocations: [],
-};
+});
+const base = saisonDe([...HAUTS.map((n, i): [string, number] => [n, 50 - i]), ...MILIEUX.map((n): [string, number] => [n, 9])]);
+const nommes = (liste: { nom: string }[]) => liste.map((p) => p.nom).filter((n) => !/^(Haut|Milieu) /.test(n));
 
-// Le découpage : neuf classés, trois par tiers ; Chris et Dina, à égalité à la limite, montent ensemble.
+// Le découpage, 30 places par division : les 27 premiers, puis Ana, Bilal, et
+// Chris et Dina, ex æquo à la 30e place, qui entrent tous les deux en D1 ; la
+// D2 reprend après eux, la D3 prend les autres.
+assert.equal(REGLES_DIVISIONS.taille, 30);
 const d = decouper(base);
-assert.equal(d.classes, 9, "la feuille non jouée de la J3 ne classe personne");
-assert.deepEqual(d.divisions[1].map((p) => p.nom), ["Ana", "Bilal", "Chris", "Dina"]);
-assert.deepEqual(d.divisions[2].map((p) => p.nom), ["Eli", "Fodé"]);
-assert.deepEqual(d.divisions[3].map((p) => p.nom), ["Gaby", "Hugo", "Inès"]);
+assert.equal(d.classes, 63, "la feuille non jouée de la J3 ne classe personne");
+assert.deepEqual([d.divisions[1].length, d.divisions[2].length, d.divisions[3].length], [31, 29, 3]);
+assert.deepEqual(nommes(d.divisions[1]), ["Ana", "Bilal", "Chris", "Dina"]);
+assert.deepEqual(nommes(d.divisions[2]), ["Eli", "Fodé"]);
+assert.deepEqual(nommes(d.divisions[3]), ["Gaby", "Hugo", "Inès"]);
 assert.equal(d.parNom.get("Jade"), undefined);
 
 assert.deepEqual(ecartsDecoupage(d, "Eli"), { monter: 3, avance: 4 });
 assert.deepEqual(ecartsDecoupage(d, "Ana"), { monter: null, avance: 8 });
-assert.deepEqual(ecartsDecoupage(d, "Gaby"), { monter: 2, avance: null });
+assert.deepEqual(ecartsDecoupage(d, "Gaby"), { monter: 1, avance: null });
 assert.equal(taDivision(d, "Eli"), "tu serais en D2, à 3 pts de la D1 et 4 pts devant la D3");
 assert.equal(taDivision(d, "Dina"), "tu serais en D1, 3 pts devant la D2");
-assert.equal(taDivision(d, "Gaby"), "tu serais en D3, à 2 pts de la D2");
+assert.equal(taDivision(d, "Gaby"), "tu serais en D3, à 1 pt de la D2");
 assert.equal(taDivision(d, "Jade"), null);
+
+// Personne sous sa division : sa place à la place de l'écart. Les neuf seuls
+// tiennent dans la D1 ; avec les 27 premiers, la D2 commence après Dina.
+const seuls = decouper(saisonDe([]));
+assert.deepEqual([seuls.divisions[1].length, seuls.divisions[2].length], [9, 0]);
+assert.equal(taDivision(seuls, "Ana"), "tu serais en D1, à la 1re des 30 places");
+assert.equal(taDivision(seuls, "Dina"), "tu serais en D1, à la 3e des 30 places", "ex æquo, même place");
+assert.equal(taDivision(seuls, "Inès"), "tu serais en D1, à la 9e des 30 places");
+assert.equal(taDivision(seuls, "Inès", { place: false }), "tu serais en D1");
+const sansD3 = decouper(saisonDe(HAUTS.map((n, i): [string, number] => [n, 50 - i])));
+assert.equal(taDivision(sansD3, "Eli"), "tu serais en D2, à 3 pts de la D1 et à la 1re des 30 places");
+assert.equal(taDivision(sansD3, "Inès"), "tu serais en D2, à 12 pts de la D1 et à la 5e des 30 places");
+assert.equal(
+  notificationAnnonce(saisonDe([]), seuls, "Inès", "avant").texte,
+  "Après la J3, la ligue se coupe en trois. Si on coupait ce soir, tu serais en D1.",
+  "la notification garde le texte validé"
+);
+assert.equal(phraseAnnonce(saisonDe([]), seuls, "Inès", "avant"), "Si on coupait ce soir, tu serais en D1, à la 9e des 30 places");
 
 // Les phrases de l'annonce : la semaine, puis le dimanche ; qui n'est pas classé.
 assert.equal(phraseAnnonce(base, d, "Fodé", "avant"), "Si on coupait ce soir, tu serais en D2, à 5 pts de la D1 et 2 pts devant la D3");
@@ -121,10 +153,12 @@ assert.equal(annonceEnCours(apresJ3, t("2026-10-26T08:00:00Z")), false);
 assert.equal(decoupageAnnonce(apresJ3, t("2026-10-26T08:00:00Z")), true);
 const e3 = etatDivisions(apresJ3)!;
 assert.equal(e3.phase, "divisions");
-// 24, 19, 18, 24, 21, 12, 12, 6, 15 et Jade 2 : dix classés, tiers de 4.
-assert.deepEqual(e3.decoupage.divisions[1].map((p) => p.nom), ["Ana", "Dina", "Eli", "Bilal"]);
-assert.deepEqual(e3.decoupage.divisions[2].map((p) => p.nom), ["Chris", "Inès", "Fodé", "Gaby"]);
-assert.deepEqual(e3.decoupage.divisions[3].map((p) => p.nom), ["Hugo", "Jade"]);
+// 24, 19, 18, 24, 21, 12, 12, 6, 15 et Jade 2 : derrière les 26 premiers,
+// Haut 27, Ana et Dina à 24, puis Eli, 30e ; Bilal passe en D2.
+assert.deepEqual([e3.decoupage.divisions[1].length, e3.decoupage.divisions[2].length, e3.decoupage.divisions[3].length], [30, 32, 2]);
+assert.deepEqual(nommes(e3.decoupage.divisions[1]), ["Ana", "Dina", "Eli"]);
+assert.deepEqual(nommes(e3.decoupage.divisions[2]), ["Bilal", "Chris", "Inès", "Fodé", "Gaby"]);
+assert.deepEqual(nommes(e3.decoupage.divisions[3]), ["Hugo", "Jade"]);
 
 const apresJ4: Saison = {
   ...apresJ3,
@@ -137,14 +171,14 @@ const apresJ4: Saison = {
     absent(4, "Gaby", "Absent justifié"), // garde la D2
     absent(4, "Hugo", "Absence injustifiée"), // déjà en D3 : y reste
     pts(4, "Jade", 10), // D3 → D2
-    absent(4, "Bilal", "Absence injustifiée"), // D1 → D2
+    absent(4, "Bilal", "Absence injustifiée"), // D2 → D3
   ],
 };
 assert.equal(decoupageAnnonce(apresJ4, t("2026-11-02T08:00:00Z")), false);
 const e4 = etatDivisions(apresJ4)!;
 assert.equal(e4.journees.length, 1);
 const vers = Object.fromEntries(e4.journees[0].mouvements.map((m) => [m.nom, `${m.de}→${m.vers}`]));
-assert.deepEqual(vers, { Ana: "1→2", Bilal: "1→2", Chris: "2→1", Fodé: "2→2", Hugo: "3→3", Jade: "3→2" });
+assert.deepEqual(vers, { Ana: "1→2", Bilal: "2→3", Chris: "2→1", Fodé: "2→2", Hugo: "3→3", Jade: "3→2" });
 assert.equal(e4.actuelle.get("Gaby"), 2, "un absent excusé garde sa division");
 assert.equal(e4.actuelle.get("Dina"), 1, "qui n'a pas joué garde sa division");
 assert.equal(etatDivisions({ ...base, numero: 0 }), null);

@@ -374,7 +374,7 @@ export function NotifsStats({
       {lecture.etat === "absent" && (
         <p className="mt-3 text-[12.5px] text-foreground/55">Le suivi des notifications arrive avec la prochaine mise en ligne.</p>
       )}
-      {lecture.etat === "erreur" && <p className="mt-3 text-[12.5px] text-[#FF6B5E]">{lecture.message}</p>}
+      {lecture.etat === "erreur" && <p className="mt-3 text-[12.5px] text-[#c8352b] dark:text-[#FF6B5E]">{lecture.message}</p>}
 
       {a && (
         <div className="mt-4 flex flex-col gap-6">

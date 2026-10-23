@@ -3,7 +3,9 @@
 // Les lignes sont identifiées par leur index dans `entries` — l'UI passe cet
 // index. Le store persiste le résultat.
 
-import { numeroSaison, type SaisonArchivee, type Terrain } from "./types";
+import { computeJournees } from "./engine";
+import { equipesDuMatch } from "./equipes";
+import { numeroSaison, type MatchDuJour, type SaisonArchivee, type Terrain } from "./types";
 import type {
   Convocation,
   ConvocationReponse,
@@ -13,16 +15,11 @@ import type {
   ConvocationTeam,
 } from "./types";
 
-export const TEAM_PRESETS = [
-  "Orange",
-  "Bleu",
-  "Vert",
-  "Jaune",
-  "Rouge",
-  "Gris",
-  "Équipe A",
-  "Équipe B",
-] as const;
+/**
+ * Les équipes qu'on compose, match par match : « Noirs 1 » contre « Blancs 1 »,
+ * puis le Match 2… Plus de couleurs depuis le 23/10 (saisie/equipes.ts).
+ */
+export const TEAM_PRESETS: readonly string[] = [1, 2, 3, 4].flatMap(equipesDuMatch);
 
 export function updateEntryAt(
   saison: Saison,
@@ -245,13 +242,15 @@ export function libelleCourt(dateLabel: string): string {
 
 /**
  * Pose sur la feuille de la journée `j` les équipes de la convocation
- * (composées par division, lib/sfl/equipes-division.ts), dans leur ordre : la
- * saisie apparie les équipes dans l'ordre où elles apparaissent, si bien que
- * la première paire reste le Terrain 1. Un joueur déjà sur la feuille garde
- * sa ligne (et ce qui y est noté) et prend son équipe ; les autres y entrent.
- * Qui est sur la feuille sans être dans les équipes y reste, sans équipe. La
- * journée n'existe pas encore : elle naît, datée du dimanche de la
- * convocation, et reprend de la précédente le SFL Time et le terrain.
+ * (composées par division, lib/sfl/equipes-division.ts), dans leur ordre :
+ * chaque paire devient un match de la journée (JourneeMeta.matchsDuJour),
+ * les Noirs puis les Blancs, si bien que la D1 joue le Match 1. Un match
+ * garde l'heure, le lieu et le terrain que l'admin lui avait déjà donnés.
+ * Un joueur déjà sur la feuille garde sa ligne (et ce qui y est noté) et
+ * prend son équipe ; les autres y entrent. Qui est sur la feuille sans être
+ * dans les équipes y reste, sans équipe. La journée n'existe pas encore :
+ * elle naît, datée du dimanche de la convocation, et reprend de la
+ * précédente le SFL Time et le terrain.
  */
 export function poserEquipes(saison: Saison, j: number, teams: ConvocationTeam[], date?: string): Saison {
   let s = saison;
@@ -284,7 +283,21 @@ export function poserEquipes(saison: Saison, j: number, teams: ConvocationTeam[]
     }
   }
   const reste = lignes.filter((e) => !prises.has(e)).map((e) => ({ ...e, team: null }));
-  return { ...s, entries: [...s.entries.filter((e) => e.j !== j), ...posees, ...reste] };
+  const avant = s.journees.find((m) => m.j === j)?.matchsDuJour ?? [];
+  const matchsDuJour = Array.from({ length: Math.floor(teams.length / 2) }, (_, n): MatchDuJour => {
+    const { heure, lieuId, terrain } = avant[n] ?? {};
+    return {
+      equipes: [teams[n * 2].name, teams[n * 2 + 1].name],
+      ...(heure ? { heure } : {}),
+      ...(lieuId != null ? { lieuId } : {}),
+      ...(terrain ? { terrain } : {}),
+    };
+  });
+  return {
+    ...s,
+    journees: s.journees.map((m) => (m.j === j ? { ...m, matchsDuJour } : m)),
+    entries: [...s.entries.filter((e) => e.j !== j), ...posees, ...reste],
+  };
 }
 
 /* ----------------------------- Convocations ----------------------------- */
@@ -483,6 +496,49 @@ export function placerJourneeSurNouveauTerrain(
   const avec = ajouterTerrain(saison, t);
   const id = (avec.terrains ?? []).reduce((m, x) => Math.max(m, x.id), 0);
   return updateJournee(avec, j, { terrainId: id });
+}
+
+/**
+ * Donne à un match de la journée (0 pour le Match 1) son heure, son lieu ou
+ * son terrain ; `undefined` ou un texte vide lui rendent ceux de la journée.
+ * Les matchs du moment sont écrits en toutes lettres au passage, chacun avec
+ * ses deux équipes : l'appariement ne bouge plus, et l'heure reste avec son
+ * match. Le texte est gardé tel que tapé : l'admin le règle touche par
+ * touche, et l'espace de « Terrain 3 » ne doit pas tomber en route.
+ */
+export function reglerMatchDuJour(
+  saison: Saison,
+  j: number,
+  n: number,
+  reglage: { heure?: string; lieuId?: number; terrain?: string }
+): Saison {
+  const matches = computeJournees(saison).find((x) => x.j === j)?.matches ?? [];
+  if (!matches[n]) return saison;
+  const plein = (texte: string | undefined) => (texte?.trim() ? texte : undefined);
+  const matchsDuJour = matches.map((m, i): MatchDuJour => {
+    const r = i === n ? { heure: m.heure, lieuId: m.lieuId, terrain: m.terrain, ...reglage } : m;
+    const heure = plein(r.heure);
+    const terrain = plein(r.terrain);
+    return {
+      equipes: [m.teamA.name, m.teamB.name],
+      ...(heure ? { heure } : {}),
+      ...(r.lieuId != null ? { lieuId: r.lieuId } : {}),
+      ...(terrain ? { terrain } : {}),
+    };
+  });
+  return { ...saison, journees: saison.journees.map((m) => (m.j === j ? { ...m, matchsDuJour } : m)) };
+}
+
+/** Envoie un match de la journée sur un nouveau lieu, créé depuis son adresse. */
+export function placerMatchDuJourSurNouveauLieu(
+  saison: Saison,
+  j: number,
+  n: number,
+  t: Omit<Terrain, "id" | "defaut">
+): Saison {
+  const avec = ajouterTerrain(saison, t);
+  const id = (avec.terrains ?? []).reduce((m, x) => Math.max(m, x.id), 0);
+  return reglerMatchDuJour(avec, j, n, { lieuId: id });
 }
 
 /** Une journée est jouée quand ses actions sont saisies : un résultat, un but ou une passe. */

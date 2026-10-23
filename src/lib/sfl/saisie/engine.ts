@@ -21,7 +21,8 @@ import {
   type PlayerStatus,
   type Stats,
 } from "../engine";
-import type { MatchEntry, RosterEntry, Saison, SaisieAlert } from "./types";
+import { equipesDuMatch, lireEquipe } from "./equipes";
+import type { MatchDuJour, MatchEntry, RosterEntry, Saison, SaisieAlert } from "./types";
 
 /* ------------------------------- Barème ------------------------------- */
 
@@ -238,19 +239,52 @@ export function computeJournees(saison: Saison): Journee[] {
           }
           groups.get(t)!.push(e);
         }
+        // Les matchs écrits par l'admin passent d'abord, dans leur ordre, avec
+        // leur heure, leur lieu et leur terrain (JourneeMeta.matchsDuJour) ;
+        // un match dont une équipe n'a plus personne tombe. Puis les équipes
+        // d'avant le 23/10 (Orange, Bleu…), deux à deux dans leur ordre
+        // d'apparition ; puis les Noirs et les Blancs d'un même match
+        // (« Noirs 2 » contre « Blancs 2 », saisie/equipes.ts), par numéro.
+        const paires: { a: string; b: string; reglage?: MatchDuJour }[] = [];
+        const prises = new Set<string>();
+        const prendre = (a: string, b: string, reglage?: MatchDuJour) => {
+          prises.add(a);
+          prises.add(b);
+          paires.push({ a, b, reglage });
+        };
+        for (const m of meta.matchsDuJour ?? []) {
+          const [a, b] = m.equipes;
+          if (a === b || !groups.has(a) || !groups.has(b) || prises.has(a) || prises.has(b)) continue;
+          prendre(a, b, m);
+        }
+        const numerotes: { noirs: string; blancs: string; n: number }[] = [];
+        for (const t of order) {
+          const lu = lireEquipe(t);
+          if (lu?.camp !== "Noirs" || prises.has(t)) continue;
+          const [, blancs] = equipesDuMatch(lu.n);
+          if (groups.has(blancs) && !prises.has(blancs)) numerotes.push({ noirs: t, blancs, n: lu.n });
+        }
+        numerotes.sort((x, y) => x.n - y.n);
+        const appariees = new Set(numerotes.flatMap((x) => [x.noirs, x.blancs]));
+        const reste = order.filter((t) => !prises.has(t) && !appariees.has(t));
+        for (let i = 0; i + 1 < reste.length; i += 2) prendre(reste[i], reste[i + 1]);
+        for (const x of numerotes) prendre(x.noirs, x.blancs);
+
         const matches: JourneeMatch[] = [];
-        // Plusieurs matchs le même jour se jouent côte à côte : chacun porte
-        // le nom de son terrain (« Terrain 1 », « Terrain 2 »…).
-        const plusieurs = order.length > 3;
-        for (let i = 0; i + 1 < order.length; i += 2) {
-          const mi = i / 2 + 1;
+        // Plusieurs matchs le même jour : « Match 1 », « Match 2 »… C'est ce
+        // qui les distingue, avec leur heure, leur lieu et leur terrain.
+        paires.forEach(({ a, b, reglage }, i) => {
+          const mi = i + 1;
           matches.push({
             id: `j${meta.j}-m${mi}`,
-            label: plusieurs ? `Terrain ${mi}` : `Match ${mi}`,
-            teamA: buildTeam(meta.j, mi, order[i], groups.get(order[i])!),
-            teamB: buildTeam(meta.j, mi, order[i + 1], groups.get(order[i + 1])!),
+            label: `Match ${mi}`,
+            teamA: buildTeam(meta.j, mi, a, groups.get(a)!),
+            teamB: buildTeam(meta.j, mi, b, groups.get(b)!),
+            ...(reglage?.heure ? { heure: reglage.heure } : {}),
+            ...(reglage?.lieuId != null ? { lieuId: reglage.lieuId } : {}),
+            ...(reglage?.terrain?.trim() ? { terrain: reglage.terrain } : {}),
           });
-        }
+        });
         return { j: meta.j, date: meta.date, sflTime: meta.sflTime, matches, faits, ...(meta.mvpAuto ? { mvpAuto: true } : {}) };
       }
 

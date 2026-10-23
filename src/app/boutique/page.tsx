@@ -89,7 +89,7 @@ function GuichetBallons({
         </Locked>
 
         {/* Ce que les Ballons achètent — informatif, pas en vitrine */}
-        <div className="mt-1 border-t border-white/8 pt-3.5">
+        <div className="mt-1 border-t border-contraste/8 pt-3.5">
           <p className="mono-label text-foreground/35">Ce qu&apos;ils achètent</p>
           <div className="mt-2.5 flex flex-col gap-1.5">
             {(
@@ -198,10 +198,10 @@ export default function Boutique() {
                 style={{
                   minHeight: 210,
                   background:
-                    "repeating-linear-gradient(115deg, rgba(255,255,255,0.06) 0 9px, rgba(255,255,255,0.012) 9px 18px), radial-gradient(120% 90% at 70% 15%, rgba(255,255,255,0.07), rgba(0,0,0,0) 60%)",
+                    "repeating-linear-gradient(115deg, rgb(var(--contraste-rgb) / 0.06) 0 9px, rgb(var(--contraste-rgb) / 0.012) 9px 18px), radial-gradient(120% 90% at 70% 15%, rgb(var(--contraste-rgb) / 0.07), rgba(0,0,0,0) 60%)",
                 }}
               >
-                <span className="mono-label absolute top-3.5 left-3.5 rounded-full border border-white/16 bg-white/10 px-[11px] py-[5px] text-foreground/80">
+                <span className="mono-label absolute top-3.5 left-3.5 rounded-full border border-contraste/16 bg-contraste/10 px-[11px] py-[5px] text-foreground/80">
                   Nouveau · Domicile 25/26
                 </span>
                 <span className="mono-label absolute right-3.5 bottom-3.5 text-foreground/35">
@@ -238,7 +238,7 @@ export default function Boutique() {
                     style={{
                       height: 112,
                       background:
-                        "repeating-linear-gradient(115deg, rgba(255,255,255,0.06) 0 9px, rgba(255,255,255,0.012) 9px 18px), rgba(255,255,255,0.02)",
+                        "repeating-linear-gradient(115deg, rgb(var(--contraste-rgb) / 0.06) 0 9px, rgb(var(--contraste-rgb) / 0.012) 9px 18px), rgb(var(--contraste-rgb) / 0.02)",
                     }}
                   >
                     <span className="mono-label absolute top-2.5 left-2.5 text-foreground/40">
@@ -264,14 +264,14 @@ export default function Boutique() {
             <div className="glass rounded-3xl p-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-[16px] font-bold tracking-tight">Drop de la semaine</h2>
-                <span className="mono-label text-[#FF6B5E]">Fin dans 2 j</span>
+                <span className="mono-label text-[#c8352b] dark:text-[#FF6B5E]">Fin dans 2 j</span>
               </div>
               <div className="mt-3 flex gap-[11px]">
                 <span
-                  className="size-24 shrink-0 rounded-[18px] border border-white/8"
+                  className="size-24 shrink-0 rounded-[18px] border border-contraste/8"
                   style={{
                     background:
-                      "repeating-linear-gradient(115deg, rgba(255,255,255,0.06) 0 9px, rgba(255,255,255,0.012) 9px 18px), rgba(255,255,255,0.03)",
+                      "repeating-linear-gradient(115deg, rgb(var(--contraste-rgb) / 0.06) 0 9px, rgb(var(--contraste-rgb) / 0.012) 9px 18px), rgb(var(--contraste-rgb) / 0.03)",
                   }}
                 />
                 <div className="min-w-0 flex-1">

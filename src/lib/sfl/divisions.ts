@@ -5,10 +5,12 @@
 // Le calendrier, saison 1 :
 //   · jusqu'à la J3, une seule ligue. L'app annonce les divisions et montre à
 //     chacun où il tomberait si on coupait ce soir (la projection) ;
-//   · la J3 jouée, le Pépite d'Or de la saison coupe la ligue en trois tiers,
-//     comme le bonus de tiers des EvoDays (engine.ts, tierBonus) : D1, D2,
-//     D3. À égalité de points, même division ; qui n'a pas encore joué de la
-//     saison entre en D3, la division ouverte ;
+//   · la J3 jouée, le Pépite d'Or de la saison coupe la ligue en divisions
+//     de 30 joueurs (Sabri, 23/10 : « Il faut faire des divisions de 30
+//     joueurs ») : les 30 premiers en D1, les 30 suivants en D2, les autres
+//     en D3. À égalité de points, même division : les ex æquo de la 30e
+//     place entrent tous en D1. Qui n'a pas encore joué de la saison entre
+//     en D3, la division ouverte ;
 //   · dès la J4, chaque dimanche joué fait bouger : les points Pépite de la
 //     journée (saisie/engine.ts, entryPP) font monter (MONTEE ou plus),
 //     rester, ou descendre (DESCENTE ou moins), d'une division à la fois. Un
@@ -32,7 +34,8 @@ import { rankPlayers, type RankedPlayer } from "./engine";
 import { isHidden } from "./hidden";
 import { jourMoisDuLibelle, voteOuvert } from "./convocation-temps";
 import { heureMin } from "./ligue-vierge";
-import { computeStandings, entryPP } from "./saisie/engine";
+import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
+import { computeJournees, computeStandings, entryPP } from "./saisie/engine";
 import { journeeJouee } from "./saisie/mutations";
 import { numeroSaison, type Saison } from "./saisie/types";
 
@@ -42,6 +45,8 @@ export const DIVISIONS: readonly Division[] = [1, 2, 3];
 export const REGLES_DIVISIONS = {
   /** La saison où naissent les divisions. */
   saison: 1,
+  /** Les places de la D1 et de la D2 au découpage ; la D3 prend les autres. */
+  taille: 30,
   /** La première journée jouée en divisions ; celle d'avant fait le découpage. */
   depuis: 4,
   /** Les points de la journée qui font monter d'une division. */
@@ -70,12 +75,12 @@ export interface Decoupage {
 }
 
 /**
- * Le Pépite d'Or coupé en trois tiers, sur les journées jouées jusqu'à
- * `jusqua` (toutes si absent). Une journée pas encore jouée ne compte pas :
- * sa feuille donne déjà le point de présence à chacun de ses joueurs, et des
- * nouveaux à 1 point feraient basculer les tiers avant d'avoir touché un
- * ballon. Seuls comptent ceux qui ont joué un match de la saison ; les
- * joueurs masqués restent hors de la liste publique.
+ * Le Pépite d'Or coupé en divisions de REGLES_DIVISIONS.taille joueurs, sur
+ * les journées jouées jusqu'à `jusqua` (toutes si absent). Une journée pas
+ * encore jouée ne compte pas : sa feuille donne déjà le point de présence à
+ * chacun de ses joueurs, et des nouveaux à 1 point feraient bouger les
+ * places avant d'avoir touché un ballon. Seuls comptent ceux qui ont joué un
+ * match de la saison ; les joueurs masqués restent hors de la liste publique.
  */
 export function decouper(saison: Saison, jusqua?: number): Decoupage {
   const jouees = new Set(saison.journees.map((m) => m.j).filter((j) => journeeJouee(saison, j)));
@@ -83,11 +88,12 @@ export function decouper(saison: Saison, jusqua?: number): Decoupage {
   const classes: RankedPlayer[] = rankPlayers(
     computeStandings({ ...saison, entries }).filter((p) => p.matchs > 0 && !isHidden(p.name))
   );
-  const tiers = Math.ceil(classes.length / 3);
+  const { taille } = REGLES_DIVISIONS;
   const divisions: Record<Division, PlaceDecoupage[]> = { 1: [], 2: [], 3: [] };
   const parNom = new Map<string, PlaceDecoupage>();
   for (const p of classes) {
-    const division: Division = p.rank <= tiers ? 1 : p.rank <= tiers * 2 ? 2 : 3;
+    // Le rang des ex æquo est le même (rankPlayers) : à la 30e place, tous entrent.
+    const division: Division = p.rank <= taille ? 1 : p.rank <= taille * 2 ? 2 : 3;
     const place = { nom: p.name, division, rang: p.rank, pp: p.pp };
     divisions[division].push(place);
     parNom.set(p.name, place);
@@ -255,9 +261,14 @@ function jourDuDecoupage(saison: Saison) {
   return j3 ? jourMoisDuLibelle(j3.date) : null;
 }
 
-/** Le coup d'envoi de la J3 : le sien, sinon celui de la convocation, sinon 13 h. */
+/**
+ * Le coup d'envoi de la J3 : celui de son premier match (matchs-du-jour.ts),
+ * sinon l'heure de la journée, sinon celle de la convocation, sinon 13 h.
+ */
 function coupDEnvoiDuDecoupage(saison: Saison, convocation?: string | null): string {
-  return saison.journees.find((m) => m.j === J_DECOUPAGE)?.heure ?? convocation ?? "13h00";
+  const heure = saison.journees.find((m) => m.j === J_DECOUPAGE)?.heure ?? convocation ?? "13h00";
+  const journee = computeJournees(saison).find((x) => x.j === J_DECOUPAGE);
+  return premierCoupDEnvoi(matchsDeJournee(journee, [], { heure, lieu: null }), heure);
 }
 
 /**
@@ -309,11 +320,16 @@ export function fenetreNotification(saison: Saison, maintenant: Date, heureConvo
 
 const pts = (n: number) => `${n} ${n > 1 ? "pts" : "pt"}`;
 
+/** « 1re », « 26e » : le rang d'une place. */
+const ordinal = (n: number) => (n === 1 ? "1re" : `${n}e`);
+
 /**
  * Où tombe un joueur au découpage, en toutes lettres : « tu serais en D2, à
- * 3 pts de la D1 et 1 pt devant la D3 ». null pour qui n'est pas classé.
+ * 3 pts de la D1 et 1 pt devant la D3 ». Tant que personne n'est classé sous
+ * sa division, sa place la remplace (`place`, par défaut) : « tu serais en
+ * D1, à la 26e des 30 places ». null pour qui n'est pas classé.
  */
-export function taDivision(d: Decoupage, nom: string): string | null {
+export function taDivision(d: Decoupage, nom: string, { place: avecPlace = true }: { place?: boolean } = {}): string | null {
   const place = d.parNom.get(nom);
   if (!place) return null;
   const { monter, avance } = ecartsDecoupage(d, nom);
@@ -321,6 +337,11 @@ export function taDivision(d: Decoupage, nom: string): string | null {
     monter != null ? `à ${pts(monter)} de la ${nomDivision((place.division - 1) as Division)}` : null,
     avance != null ? `${pts(avance)} devant la ${nomDivision((place.division + 1) as Division)}` : null,
   ].filter(Boolean);
+  if (avecPlace && avance == null && place.division < 3) {
+    // Le rang dans sa division, compté depuis son premier : la D2 commence après la 30e place.
+    const premier = d.divisions[place.division][0].rang;
+    ecarts.push(`à la ${ordinal(place.rang - premier + 1)} des ${REGLES_DIVISIONS.taille} places`);
+  }
   return `tu serais en ${nomDivision(place.division)}${ecarts.length ? `, ${ecarts.join(" et ")}` : ""}`;
 }
 
@@ -338,18 +359,33 @@ export function enteteAnnonce(edition: EditionAnnonce): string {
  * Ce que l'annonce dit à un joueur, sans point final : où il tomberait si on
  * coupait maintenant, ou ce qui le placera. null pour un joueur masqué.
  */
-export function phraseAnnonce(saison: Saison, d: Decoupage, nom: string, edition: EditionAnnonce): string | null {
+export function phraseAnnonce(
+  saison: Saison,
+  d: Decoupage,
+  nom: string,
+  edition: EditionAnnonce,
+  options: { place?: boolean } = {}
+): string | null {
   if (isHidden(nom)) return null;
-  const ta = taDivision(d, nom);
+  const ta = taDivision(d, nom, options);
   if (ta) return `${edition === "jour" ? "Pour l'instant" : "Si on coupait ce soir"}, ${ta}`;
   if (saison.entries.some((e) => e.j === J_DECOUPAGE && e.player === nom))
     return `Tes points ${edition === "jour" ? "d'aujourd'hui" : "de dimanche"} te placent`;
   return `Sans match cette saison, tu commences en ${nomDivision(3)}`;
 }
 
+/**
+ * La place dans sa division (« à la 26e des 30 places ») entre dans le texte
+ * de la notification quand Sabri l'a validé mot pour mot ; d'ici là, elle
+ * garde le texte qu'il a validé le 23/10.
+ */
+export const PLACE_DANS_LA_NOTIFICATION = false;
+
 /** La notification de l'annonce, pour un joueur (titre ≤ 60 signes, texte ≤ 180, lib/sfl/push.ts). */
 export function notificationAnnonce(saison: Saison, d: Decoupage, nom: string, edition: EditionAnnonce): { titre: string; texte: string } {
-  const phrase = phraseAnnonce(saison, d, nom, edition) ?? `Dès la J${REGLES_DIVISIONS.depuis}, chacun joue dans sa division`;
+  const phrase =
+    phraseAnnonce(saison, d, nom, edition, { place: PLACE_DANS_LA_NOTIFICATION }) ??
+    `Dès la J${REGLES_DIVISIONS.depuis}, chacun joue dans sa division`;
   return {
     titre: `J${J_DECOUPAGE} · Dernier dimanche sans divisions`,
     texte: `${enteteAnnonce(edition)}. ${phrase}.`,

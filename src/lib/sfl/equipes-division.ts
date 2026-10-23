@@ -4,8 +4,9 @@
 // le joueur. Comme ça, c'est plus l'admin qui doit sélectionner »).
 //
 // Entrée : la saison et ceux qui viennent. Sortie : les équipes de la
-// convocation, deux par terrain, dans l'ordre des terrains : feuille.ts et la
-// saisie les apparient deux à deux, la première en noir.
+// convocation, un match par terrain, les Noirs puis les Blancs (« Noirs 1 »
+// contre « Blancs 1 », saisie/equipes.ts), dans l'ordre des terrains : la D1
+// joue le Match 1. feuille.ts et la saisie les apparient deux à deux.
 //
 //   1. Les terrains. Chaque division joue sur le sien (divisions.ts), la D1
 //      sur le premier. Une division de moins de 8 joueurs rejoint sa voisine
@@ -43,7 +44,8 @@ import { isHidden } from "./hidden";
 import { heureMin } from "./ligue-vierge";
 import { journeeDuJour } from "./presence-feuille";
 import { computeJournees, computeStandings, entryPP } from "./saisie/engine";
-import { journeeJouee, saisonDepuisArchive, TEAM_PRESETS } from "./saisie/mutations";
+import { equipesDuMatch } from "./saisie/equipes";
+import { journeeJouee, saisonDepuisArchive } from "./saisie/mutations";
 import type { ConvocationTeam, Saison } from "./saisie/types";
 
 export const REGLES_EQUIPES = {
@@ -233,12 +235,11 @@ const LIGNE: [RegExp, number][] = [
   [/^A/, 3],
 ];
 
-/** Les noms des équipes, deux par terrain, dans l'ordre des couleurs de la saisie. */
+/** Les noms des équipes, deux par terrain : « Noirs 1 », « Blancs 1 », « Noirs 2 »… */
 export function nomsDEquipes(n: number): string[] {
-  const noms: string[] = TEAM_PRESETS.slice(0, n);
-  // « Équipe A » et « Équipe B » sont les deux derniers préréglages : la suite continue à C.
-  for (let i = noms.length; i < n; i++) noms.push(`Équipe ${String.fromCharCode(67 + i - TEAM_PRESETS.length)}`);
-  return noms;
+  return Array.from({ length: Math.ceil(n / 2) }, (_, t) => equipesDuMatch(t + 1))
+    .flat()
+    .slice(0, n);
 }
 
 interface Partage {
@@ -394,22 +395,22 @@ export function completer(saison: Saison, teams: ConvocationTeam[], venus: strin
 /* ------------------------------- Les étiquettes ------------------------------- */
 
 /**
- * Les équipes deux par deux, avec le nom de leur terrain, d'après les
- * divisions de leurs joueurs : « D1 », « D3 · Terrain 2 » (une division sur
- * deux terrains), « D1–D2 » (une division trop courte avec sa voisine).
+ * Les équipes deux par deux, match par match, avec les divisions de leurs
+ * joueurs : « D1 », « D1–D2 » (une division trop courte avec sa voisine).
+ * Une division sur deux terrains joue deux matchs : « Match 1 · D1 »,
+ * « Match 2 · D1 ».
  */
-export function terrainsDesEquipes(teams: ConvocationTeam[], etat: EtatDivisions): { label: string; equipes: readonly [ConvocationTeam, ConvocationTeam] }[] {
+export function terrainsDesEquipes(
+  teams: ConvocationTeam[],
+  etat: EtatDivisions
+): { n: number; divisions: string; label: string; equipes: readonly [ConvocationTeam, ConvocationTeam] }[] {
   const paires = Array.from({ length: Math.floor(teams.length / 2) }, (_, i) => [teams[i * 2], teams[i * 2 + 1]] as const);
-  const noms = paires.map(([a, b]) =>
-    [...new Set([...a.players, ...b.players].map((nom) => divisionDe(etat, nom)))]
+  return paires.map((equipes, i) => {
+    const divisions = [...new Set([...equipes[0].players, ...equipes[1].players].map((nom) => divisionDe(etat, nom)))]
       .sort((x, y) => x - y)
       .map(nomDivision)
-      .join("–")
-  );
-  return paires.map((equipes, i) => {
-    const memes = noms.filter((n) => n === noms[i]).length;
-    const rang = noms.slice(0, i + 1).filter((n) => n === noms[i]).length;
-    return { label: memes > 1 ? `${noms[i]} · Terrain ${rang}` : noms[i], equipes };
+      .join("–");
+    return { n: i + 1, divisions, label: `Match ${i + 1} · ${divisions}`, equipes };
   });
 }
 

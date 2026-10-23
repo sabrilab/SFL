@@ -183,7 +183,7 @@ export function AgentStats({
       <p className="mt-0.5 text-[12px] leading-snug text-foreground/45">
         30 derniers jours, admins exclus. Seul le sujet de chaque échange est compté, jamais ce qui s&apos;y dit.
       </p>
-      {erreur && <p className="mt-3 text-[12.5px] text-[#FF6B5E]">{erreur}</p>}
+      {erreur && <p className="mt-3 text-[12.5px] text-[#c8352b] dark:text-[#FF6B5E]">{erreur}</p>}
       {a && (
         <div className="mt-4 flex flex-col gap-5">
           <div className="grid grid-cols-3 gap-2">

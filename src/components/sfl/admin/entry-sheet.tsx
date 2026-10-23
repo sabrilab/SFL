@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { TEAM_PRESETS } from "@/lib/sfl/saisie/mutations";
+import type { EquipeDuJour } from "@/lib/sfl/saisie/equipes";
 import type {
   MatchEntry,
   MatchResult,
@@ -104,12 +104,15 @@ function Toggle({
 /** Édition complète d'une ligne de match (une bottom-sheet). */
 export function EntrySheet({
   entry,
+  equipes = [],
   mvpAuto = false,
   onOpenChange,
   onPatch,
   onDelete,
 }: {
   entry: MatchEntry | null;
+  /** Les équipes de sa journée, match par match, et celles d'un match de plus (saisie/equipes.ts). */
+  equipes?: EquipeDuJour[];
   /** Journée Bola : le MVP se calcule sur les stats, il ne se coche pas. */
   mvpAuto?: boolean;
   onOpenChange: (open: boolean) => void;
@@ -134,8 +137,8 @@ export function EntrySheet({
                   <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NONE}>Aucune (à plat)</SelectItem>
-                    {TEAM_PRESETS.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    {equipes.map((t) => (
+                      <SelectItem key={t.nom} value={t.nom}>{t.libelle}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -216,23 +219,37 @@ export function EntrySheet({
   );
 }
 
-/** Réglages d'une journée : date, heure, terrain (la Map), SFL Time, suppression. */
+/**
+ * Réglages d'une journée : date, heure, lieu (la Map), SFL Time,
+ * suppression ; et, match par match, le terrain qu'il occupe sur place, son
+ * heure et son lieu quand ils ne sont pas ceux de la journée.
+ */
 export function JourneeMetaSheet({
   meta,
   onOpenChange,
   onPatch,
   onDelete,
   terrains = [],
+  duJour = [],
+  onMatch,
 }: {
   meta: { j: number; date: string; sflTime: boolean; heure?: string; terrainId?: number } | null;
   onOpenChange: (open: boolean) => void;
   onPatch: (patch: { date?: string; sflTime?: boolean; heure?: string; terrainId?: number | undefined }) => void;
   onDelete: () => void;
   terrains?: { id: number; nom: string; defaut?: boolean }[];
+  /** Les matchs de la journée, Match 1 d'abord ; `joueurs` : « 5 contre 5 ». */
+  duJour?: { label: string; joueurs: string; heure?: string; lieuId?: number; terrain?: string }[];
+  /** Règle le match n (0 pour le Match 1) ; vide, il reprend ceux de la journée. */
+  onMatch?: (n: number, reglage: { heure?: string; lieuId?: number; terrain?: string }) => void;
 }) {
+  const lieuDuJour = meta
+    ? terrains.find((t) => t.id === meta.terrainId) ?? terrains.find((t) => t.defaut)
+    : undefined;
+  const plusieurs = duJour.length > 1 && !!onMatch;
   return (
     <Sheet open={!!meta} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-3xl">
+      <SheetContent side="bottom" className="max-h-[88vh] overflow-y-auto rounded-t-3xl">
         {meta && (
           <>
             <SheetHeader className="px-1">
@@ -255,7 +272,7 @@ export function JourneeMetaSheet({
                 />
               </Row>
               {terrains.length > 0 && (
-                <Row label="Terrain">
+                <Row label="Lieu">
                   <select
                     value={meta.terrainId ?? ""}
                     onChange={(e) => onPatch({ terrainId: e.target.value ? Number(e.target.value) : undefined })}
@@ -269,6 +286,60 @@ export function JourneeMetaSheet({
                     ))}
                   </select>
                 </Row>
+              )}
+              {duJour.length === 1 && onMatch && (
+                <Row label="Terrain">
+                  <Input
+                    value={duJour[0].terrain ?? ""}
+                    placeholder="Terrain 1"
+                    onChange={(e) => onMatch(0, { terrain: e.target.value })}
+                    className="w-40"
+                  />
+                </Row>
+              )}
+              {plusieurs && (
+                <div className="flex flex-col gap-3 py-3">
+                  <span className="mono-label text-muted-foreground">Chaque match</span>
+                  {duJour.map((t, n) => (
+                    <div key={t.label} className="flex flex-col gap-1.5">
+                      <p className="flex items-baseline justify-between gap-3">
+                        <span className="text-[15px] font-medium">{t.label}</span>
+                        <span className="truncate text-xs text-muted-foreground">{t.joueurs}</span>
+                      </p>
+                      <div className="grid grid-cols-[4.75rem_5.5rem_minmax(0,1fr)] gap-2">
+                        <Input
+                          value={t.heure ?? ""}
+                          placeholder={meta.heure || "13h00"}
+                          aria-label={`Heure du ${t.label}`}
+                          onChange={(e) => onMatch!(n, { heure: e.target.value })}
+                        />
+                        <Input
+                          value={t.terrain ?? ""}
+                          placeholder="Terrain"
+                          aria-label={`Terrain du ${t.label}`}
+                          onChange={(e) => onMatch!(n, { terrain: e.target.value })}
+                        />
+                        {terrains.length > 0 && (
+                          <select
+                            value={t.lieuId ?? ""}
+                            aria-label={`Lieu du ${t.label}`}
+                            onChange={(e) => onMatch!(n, { lieuId: e.target.value ? Number(e.target.value) : undefined })}
+                            className="h-9 min-w-0 rounded-md border border-input bg-transparent px-2 text-sm"
+                          >
+                            <option value="">{lieuDuJour?.nom ?? "Lieu de la journée"}</option>
+                            {terrains
+                              .filter((x) => x.id !== lieuDuJour?.id)
+                              .map((x) => (
+                                <option key={x.id} value={x.id}>
+                                  {x.nom}
+                                </option>
+                              ))}
+                          </select>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
               <Toggle label="SFL Time" checked={meta.sflTime} onChange={(v) => onPatch({ sflTime: v })} />
               <div className="pt-3">
