@@ -2,6 +2,9 @@
 
 // Défier une équipe (le call-out) : face à face des deux écussons, puis
 // quand et où. L'équipe défiée accepte ou refuse depuis sa page Team.
+// Venu d'un terrain de la Map, le défi part avec lui : sa photo à la place
+// du lieu à écrire, son nom pour lieu (celui où la Map posera le match) ; le
+// toucher rend la main pour écrire un autre lieu.
 
 import { useState } from "react";
 import { toast } from "sonner";
@@ -11,16 +14,21 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { defier, direErreurEquipe, type Equipe } from "@/lib/sfl/equipes";
 import { prochainsJours } from "@/lib/sfl/matchs";
+import { TerrainRetenu } from "@/components/sfl/matchs/choisir-terrain";
+import { lieuDuTerrain, type TerrainPropose } from "@/lib/sfl/terrains-nord";
 
 export function Defier({
   mienne,
   adversaire,
+  terrain,
   onOpenChange,
   apercu,
   onDefie,
 }: {
   mienne: Equipe | null;
   adversaire: Equipe | null;
+  /** Le terrain touché sur la Map : le défi s'y joue, sauf à écrire un autre lieu. */
+  terrain?: TerrainPropose | null;
   onOpenChange: (o: boolean) => void;
   apercu?: boolean;
   onDefie: () => void;
@@ -32,7 +40,9 @@ export function Defier({
   });
   const [jour, setJour] = useState("");
   const [heure, setHeure] = useState("20:00");
-  const [lieu, setLieu] = useState("");
+  const [lieu, setLieu] = useState(() => (terrain ? lieuDuTerrain(terrain) : ""));
+  const [ailleurs, setAilleurs] = useState(false);
+  const surLeTerrain = !!terrain && !ailleurs;
   const [envoi, setEnvoi] = useState(false);
   const pret = !!jour && jour >= bornes.min && jour <= bornes.max && /^\d{2}:\d{2}$/.test(heure) && lieu.trim().length > 0;
 
@@ -79,7 +89,17 @@ export function Defier({
               <Input type="date" value={jour} min={bornes.min} max={bornes.max} onChange={(e) => setJour(e.target.value)} aria-label="Le jour" />
               <Input type="time" value={heure} step={900} onChange={(e) => setHeure(e.target.value)} aria-label="L'heure" />
             </div>
-            <Input value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Le terrain" maxLength={120} />
+            {surLeTerrain ? (
+              <TerrainRetenu
+                t={terrain}
+                onToucher={() => {
+                  setAilleurs(true);
+                  setLieu("");
+                }}
+              />
+            ) : (
+              <Input value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Le terrain" maxLength={120} autoFocus={!!terrain} />
+            )}
             <Button variant="mauve" disabled={!pret || envoi} onClick={envoyer} className="h-12 rounded-full text-[15px] font-semibold">
               Envoyer le défi
             </Button>

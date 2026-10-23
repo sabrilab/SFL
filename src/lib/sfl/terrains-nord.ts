@@ -141,6 +141,11 @@ export function formatsLisibles(formats: number[]): string[] {
   return [...n.entries()].sort((a, b) => b[0] - a[0]).map(([f, k]) => (k > 1 ? `à ${f} ×${k}` : `à ${f}`));
 }
 
+/** Ce qu'il y a sur place : « à 8 · à 5 ×4 · éclairé · accès libre » (en capitales sous `.mono-label`). */
+export function surPlace(t: Pick<TerrainNord, "formats" | "eclaire" | "libre">): string {
+  return [...formatsLisibles(t.formats), t.eclaire && "éclairé", t.libre && "accès libre"].filter(Boolean).join(" · ");
+}
+
 /** Un nom qui ne dit pas où l'on est (« Complexe sportif », « Stade municipal »). */
 const GENERIQUE = /^(complexe|stade|stades|terrain|espace|plaine|parc des sports)( (sportif|sportive|municipal|synthétique|de football|de proximité|multisports|des sports))*$/i;
 

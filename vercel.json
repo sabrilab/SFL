@@ -7,6 +7,10 @@
     {
       "path": "/api/matchs/rappel",
       "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/divisions/equipes",
+      "schedule": "0 17 * * 5"
     }
   ]
 }

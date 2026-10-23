@@ -1040,7 +1040,7 @@ export function Discussion({
   libelleNotifs: string;
   /** Ce que dit le fil vide (rien si vide). */
   vide: string;
-  /** La barre d'onglets reste dessous (le Vestiaire) ; sinon l'écran la recouvre. */
+  /** La barre d'onglets reste dessous (le Vestiaire) ; sinon l'écran la recouvre, posé sur <body> (matchs/discussion-match.tsx). */
   onglets?: boolean;
   /** L'admin modère : il retire n'importe quel message et coupe la parole (le Vestiaire, lieu public). */
   moderation?: boolean;
@@ -1490,7 +1490,10 @@ export function Discussion({
       ref={ecran}
       data-ecran-fixe=""
       data-onglets={onglets ? "" : undefined}
-      className={cn("ecran-discussion fixed inset-x-0 top-0 flex flex-col bg-background", onglets ? "z-[35]" : "z-[60]", className)}
+      // Sans onglets (un match, une équipe, posés sur <body>) : au-dessus de la
+      // barre d'onglets (z 40), sous les feuilles (z 50), dont la carte d'un
+      // joueur touchée dans le fil.
+      className={cn("ecran-discussion fixed inset-x-0 top-0 flex flex-col bg-background", onglets ? "z-[35]" : "z-[45]", className)}
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       {enTete}

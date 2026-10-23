@@ -49,8 +49,10 @@ import {
   deleteEntryAt,
   deleteJournee,
   deleteRosterAt,
+  libelleCourt,
   newEntry,
   newRosterPlayer,
+  poserEquipes,
   reglerMatchDuJour,
   respondConvocation,
   rosterHasName,
@@ -513,7 +515,9 @@ export function AdminDashboard() {
           </div>
 
           {/* Les équipes de dimanche — générées depuis les « oui » */}
-          <EquipesDimanche />
+          <EquipesDimanche
+            onPoser={(j, teams, date) => commit(poserEquipes(saison, j, teams, libelleCourt(date)), `Équipes de la J${j} sur la feuille`)}
+          />
 
           {/* Historique / annulation */}
           <div className="rounded-3xl bg-card p-4">
