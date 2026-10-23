@@ -19,16 +19,10 @@ import { PlayerCard } from "@/components/sfl/player-card";
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import { cleVille, type VillePlan } from "@/components/sfl/map/joueurs";
+import { useCommunes } from "@/hooks/use-communes";
 import { maVille, poserMaVille, type VilleJoueur } from "@/lib/sfl/villes";
 import type { Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
-
-interface Commune {
-  lat: number;
-  lng: number;
-  libelle: string;
-  commune?: string;
-}
 
 function Carte({ p, size, onJoueur }: { p: Player | undefined; size: number; onJoueur: (n: string) => void }) {
   if (!p) return null;
@@ -45,7 +39,7 @@ function TaVille({ me, chercher = false }: { me: string; chercher?: boolean }) {
   const mienne = maVille(me);
   const [cherche, setCherche] = useState(chercher);
   const [q, setQ] = useState("");
-  const [trouvees, setTrouvees] = useState<Commune[]>([]);
+  const trouvees = useCommunes(q);
   const [envoi, setEnvoi] = useState(false);
   const champ = useRef<HTMLInputElement>(null);
 
@@ -53,22 +47,6 @@ function TaVille({ me, chercher = false }: { me: string; chercher?: boolean }) {
     if (!cherche) return;
     champ.current?.focus();
   }, [cherche]);
-
-  useEffect(() => {
-    if (q.trim().length < 3) return;
-    const ctl = new AbortController();
-    const t = window.setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/geocode?type=commune&q=${encodeURIComponent(q.trim())}`, { signal: ctl.signal });
-        const d = (await res.json()) as { resultats?: Commune[] };
-        setTrouvees(d.resultats ?? []);
-      } catch {}
-    }, 220);
-    return () => {
-      ctl.abort();
-      window.clearTimeout(t);
-    };
-  }, [q]);
 
   async function poser(v: VilleJoueur | null, cachee: boolean) {
     setEnvoi(true);
@@ -81,7 +59,6 @@ function TaVille({ me, chercher = false }: { me: string; chercher?: boolean }) {
     navigator.vibrate?.(8);
     setCherche(false);
     setQ("");
-    setTrouvees([]);
     rafraichir((n) => n + 1);
   }
 
@@ -97,18 +74,17 @@ function TaVille({ me, chercher = false }: { me: string; chercher?: boolean }) {
             <X className="size-4" />
           </button>
         </div>
-        {q.trim().length >= 3 &&
-          trouvees.map((c) => (
-            <button
-              key={`${c.libelle}${c.lat}`}
-              type="button"
-              disabled={envoi}
-              onClick={() => poser({ ville: c.commune ?? c.libelle, lat: c.lat, lng: c.lng }, mienne?.cachee ?? false)}
-              className="flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-[15px] font-semibold active:bg-secondary disabled:opacity-50"
-            >
-              <MapPin className="size-4 text-muted-foreground" /> {c.libelle}
-            </button>
-          ))}
+        {trouvees.map((c) => (
+          <button
+            key={`${c.libelle}${c.lat}`}
+            type="button"
+            disabled={envoi}
+            onClick={() => poser({ ville: c.commune ?? c.libelle, lat: c.lat, lng: c.lng }, mienne?.cachee ?? false)}
+            className="flex items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-[15px] font-semibold active:bg-secondary disabled:opacity-50"
+          >
+            <MapPin className="size-4 text-muted-foreground" /> {c.libelle}
+          </button>
+        ))}
       </div>
     );
 
