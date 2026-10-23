@@ -2699,13 +2699,20 @@ alter table public.messages add column if not exists match_id bigint references 
 create index if not exists messages_match_idx
   on public.messages (match_id, created_at desc) where canal = 'match';
 
+-- La discussion d'une équipe du mode Team (plus bas, « Discussion d'équipe »)
+-- vit à côté : canal 'equipe', avec son équipe. Ses contrôles sont posés ICI,
+-- avec ceux du match : ils sont reposés à chaque migration, et doivent déjà
+-- accepter les lignes d'équipe en base quand ils le sont.
+alter table public.messages add column if not exists equipe_id bigint references public.equipes(id) on delete cascade;
+
 alter table public.messages drop constraint if exists messages_canal_check;
-alter table public.messages add constraint messages_canal_check check (canal in ('sfl', 'dm', 'match'));
+alter table public.messages add constraint messages_canal_check check (canal in ('sfl', 'dm', 'match', 'equipe'));
 alter table public.messages drop constraint if exists messages_destinataire_coherent;
 alter table public.messages add constraint messages_destinataire_coherent check (
-  (canal = 'sfl' and destinataire is null and match_id is null)
-  or (canal = 'dm' and destinataire is not null and destinataire <> auteur and match_id is null)
-  or (canal = 'match' and destinataire is null and match_id is not null)
+  (canal = 'sfl' and destinataire is null and match_id is null and equipe_id is null)
+  or (canal = 'dm' and destinataire is not null and destinataire <> auteur and match_id is null and equipe_id is null)
+  or (canal = 'match' and destinataire is null and match_id is not null and equipe_id is null)
+  or (canal = 'equipe' and destinataire is null and equipe_id is not null and match_id is null)
 );
 
 -- Qui est du match : l'organisateur, et chaque joueur de sa liste (inscrit
@@ -2790,3 +2797,80 @@ create table if not exists public.match_rappels (
 
 alter table public.match_rappels enable row level security;
 revoke all on public.match_rappels from anon, authenticated;
+
+-- ─────────────────────────── Discussion d'équipe ───────────────────────────
+-- Sabri, 22/10 : « dans la discussion, […] discuter soit avec son match,
+-- soit son équipe ». L'écran de discussion a deux onglets, Match et Équipe ;
+-- l'équipe, c'est celle du mode Team dont je suis membre (une seule à la
+-- fois). Un fil par équipe, dans la table des messages, canal 'equipe'
+-- (colonne et contrôles posés avec ceux du match, plus haut) : les mêmes
+-- bulles, réponses, réactions, vocaux et photos.
+--
+-- La lisent et y écrivent ses membres, ceux qui ont signé le Règlement, et
+-- eux seuls : ni les invités qui n'ont pas encore signé, ni le reste de la
+-- ligue, ni l'admin. Qui quitte l'équipe perd la discussion ; l'équipe
+-- dissoute n'en a plus ; supprimée, elle l'emporte.
+create index if not exists messages_equipe_idx
+  on public.messages (equipe_id, created_at desc) where canal = 'equipe';
+
+create or replace function public.dans_l_equipe(e bigint)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select public.est_membre()
+     and exists (
+       select 1
+       from public.equipe_membres m
+       join public.equipes q on q.id = m.equipe_id
+       where m.equipe_id = e
+         and m.joueur = (select auth.uid())
+         and m.statut = 'membre'
+         and q.dissoute_le is null
+     );
+$$;
+
+revoke execute on function public.dans_l_equipe(bigint) from public, anon;
+grant execute on function public.dans_l_equipe(bigint) to authenticated;
+
+drop policy if exists "messages: la discussion de l'équipe" on public.messages;
+create policy "messages: la discussion de l'équipe"
+  on public.messages for select to authenticated
+  using (canal = 'equipe' and public.dans_l_equipe(equipe_id));
+
+drop policy if exists "messages: l'équipe à ses membres" on public.messages;
+create policy "messages: l'équipe à ses membres"
+  on public.messages as restrictive for insert to authenticated
+  with check (canal <> 'equipe' or public.dans_l_equipe(equipe_id));
+
+-- Où en est chaque membre avec la discussion de son équipe : comme pour un
+-- match (match_suivi, plus haut) — jusqu'où il a lu, ce qu'il en veut sur
+-- son téléphone, s'il l'a sous les yeux, et quand le serveur l'a prévenu
+-- pour la dernière fois (notifie_le, au serveur seul).
+create table if not exists public.equipe_suivi (
+  user_id     uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  equipe_id   bigint not null references public.equipes(id) on delete cascade,
+  lu_jusqua   timestamptz not null default now(),
+  notifs      text not null default 'tout' check (notifs in ('tout', 'cite', 'rien')),
+  devant_le   timestamptz,
+  notifie_le  timestamptz,
+  primary key (user_id, equipe_id)
+);
+
+create index if not exists equipe_suivi_equipe_idx on public.equipe_suivi (equipe_id);
+
+alter table public.equipe_suivi enable row level security;
+
+drop policy if exists "suivi de l'équipe: le mien" on public.equipe_suivi;
+create policy "suivi de l'équipe: le mien"
+  on public.equipe_suivi for all to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()) and public.dans_l_equipe(equipe_id));
+
+-- notifie_le n'appartient qu'au serveur : le droit de table d'abord retiré.
+revoke all on public.equipe_suivi from anon, authenticated;
+grant select on public.equipe_suivi to authenticated;
+grant insert (user_id, equipe_id, lu_jusqua, notifs, devant_le) on public.equipe_suivi to authenticated;
+grant update (user_id, equipe_id, lu_jusqua, notifs, devant_le) on public.equipe_suivi to authenticated;

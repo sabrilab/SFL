@@ -135,6 +135,23 @@ interface LigneEquipe {
 
 const MEMBRES = "joueur, statut, role, created_at, depart_le, p:profiles!equipe_membres_joueur_fkey(name)";
 
+const versEquipe = (r: LigneEquipe): Equipe => ({
+  id: r.id,
+  nom: r.nom,
+  initiales: r.initiales,
+  fond: r.fond,
+  ville: r.ville,
+  capitaine: r.capitaine,
+  membres: r.equipe_membres.map((m) => ({
+    id: m.joueur,
+    name: un(m.p)?.name ?? "?",
+    statut: m.statut,
+    role: m.role,
+    depuis: m.created_at,
+    departLe: m.depart_le ?? null,
+  })),
+});
+
 /** Les équipes vivantes (une équipe dissoute garde son historique, mais ne s'affiche plus). */
 export async function listerEquipes(): Promise<Equipe[]> {
   const { data, error } = await supabase()
@@ -143,22 +160,28 @@ export async function listerEquipes(): Promise<Equipe[]> {
     .is("dissoute_le", null)
     .order("created_at");
   if (error) throw error;
-  return ((data ?? []) as unknown as LigneEquipe[]).map((r) => ({
-    id: r.id,
-    nom: r.nom,
-    initiales: r.initiales,
-    fond: r.fond,
-    ville: r.ville,
-    capitaine: r.capitaine,
-    membres: r.equipe_membres.map((m) => ({
-      id: m.joueur,
-      name: un(m.p)?.name ?? "?",
-      statut: m.statut,
-      role: m.role,
-      depuis: m.created_at,
-      departLe: m.depart_le ?? null,
-    })),
-  }));
+  return ((data ?? []) as unknown as LigneEquipe[]).map(versEquipe);
+}
+
+/** L'équipe dont je suis membre (une seule à la fois), ou null. */
+export async function monEquipe(moi: string): Promise<Equipe | null> {
+  const sb = supabase();
+  const { data: place, error } = await sb
+    .from("equipe_membres")
+    .select("equipe_id")
+    .eq("joueur", moi)
+    .eq("statut", "membre")
+    .maybeSingle();
+  if (error) throw error;
+  if (!place) return null;
+  const { data, error: e2 } = await sb
+    .from("equipes")
+    .select(`id, nom, initiales, fond, ville, capitaine, equipe_membres(${MEMBRES})`)
+    .eq("id", (place as { equipe_id: number }).equipe_id)
+    .is("dissoute_le", null)
+    .maybeSingle();
+  if (e2) throw e2;
+  return data ? versEquipe(data as unknown as LigneEquipe) : null;
 }
 
 /** Les défis en jeu (un défi sans réponse depuis 48 h, ou à moins de 36 h du match, a expiré). */
