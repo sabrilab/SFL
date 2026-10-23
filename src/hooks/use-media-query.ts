@@ -34,6 +34,7 @@ export const useGrandEcran = () => useMediaQuery("(min-width: 1024px)");
 /**
  * Le palier où la carte 3D d'un profil prend un cran de plus (√φ) : assez
  * large pour sa colonne (.shell à 1200 px), assez haut pour que la colonne
- * qui la porte tienne encore à l'écran (.colonne-fixe, globals.css).
+ * qui la porte tienne à l'écran dès l'ouverture, au-dessus de la barre
+ * d'onglets (.colonne-fixe, globals.css). Un grand moniteur, pas un portable.
  */
-export const useTresGrandEcran = () => useMediaQuery("(min-width: 1440px) and (min-height: 980px)");
+export const useTresGrandEcran = () => useMediaQuery("(min-width: 1440px) and (min-height: 1200px)");
