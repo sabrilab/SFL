@@ -199,7 +199,7 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
     onglet: { fond: "#e2b955", encre: "#241803" },
     vive: "#d4a73a",
     tranche: { couleur: "#c99a3c", metal: 0.55, rugosite: 0.32 },
-    holo: { force: 0.85, teinte: [1, 0.86, 0.5] },
+    holo: { force: 0.5, teinte: [1, 0.86, 0.5] },
   },
   // Impact : le rouge laqué, l'encre blanche, les ondes autour de la note.
   impact: {
@@ -228,7 +228,7 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
     onglet: { fond: "#d8212a", encre: "#fff7f6" },
     vive: "#e0262e",
     tranche: { couleur: "#b3141f", metal: 0.4, rugosite: 0.3 },
-    holo: { force: 0.8, teinte: [1, 0.55, 0.5] },
+    holo: { force: 0.5, teinte: [1, 0.55, 0.5] },
   },
   // Défensive : le bleu de cobalt, l'encre blanche, les alvéoles.
   def: {
@@ -257,7 +257,7 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
     onglet: { fond: "#2462d9", encre: "#f4f8ff" },
     vive: "#2a6ae6",
     tranche: { couleur: "#1c4cb4", metal: 0.4, rugosite: 0.3 },
-    holo: { force: 0.8, teinte: [0.55, 0.75, 1] },
+    holo: { force: 0.5, teinte: [0.55, 0.75, 1] },
   },
   // Nuit : le ciel de nuit, l'encre d'argent, les étoiles.
   nuit: {
@@ -285,7 +285,7 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
     onglet: { fond: "#0d111c", encre: "#e8ecf4" },
     vive: "#8fa2d6",
     tranche: { couleur: "#1b2130", metal: 0.3, rugosite: 0.4 },
-    holo: { force: 0.55, teinte: [0.72, 0.8, 1] },
+    holo: { force: 0.45, teinte: [0.72, 0.8, 1] },
   },
   // Chrome : un miroir, des reflets francs, l'encre noire.
   chrome: {
@@ -312,7 +312,7 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
     onglet: { fond: "#e9ecef", encre: "#0a0b0d" },
     vive: "#c8cdd3",
     tranche: { couleur: "#c3c8ce", metal: 0.85, rugosite: 0.18 },
-    holo: { force: 1.1, teinte: [0.92, 0.95, 1] },
+    holo: { force: 0.7, teinte: [0.92, 0.95, 1] },
   },
   // Animée : la nacre irisée, et la lumière qui passe d'elle-même.
   animee: {
@@ -339,7 +339,7 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
     onglet: { fond: "#f4f0ff", encre: "#08090b" },
     vive: "#b9a8f0",
     tranche: { couleur: "#e7e2f2", metal: 0.2, rugosite: 0.35 },
-    holo: { force: 1.2, teinte: null },
+    holo: { force: 0.8, teinte: null },
     anime: true,
   },
 };
@@ -366,6 +366,43 @@ export function serieDe(nom: string): { serie: string; numero: string } {
   return { serie: `bola-fr-${String(seed % 1000000).padStart(6, "0")}`, numero: `n° ${(seed % 900) + 100} / ∞` };
 }
 
+/** Les métaux des signes (liserés, crans, puce) : un dégradé qui accroche la lumière, du haut à gauche au bas à droite. */
+export const METAUX = {
+  argent: ["#ffffff", "#c9ccd2", "#8a9099", "#eef0f3", "#a3a8b0"],
+  or: ["#fff4cc", "#e7c46a", "#a8761f", "#f6dc92", "#b98a2c"],
+} as const;
+export type Metal = keyof typeof METAUX;
+
+/** La puce dorée (signe « puce-or »). */
+export const PUCE_OR = "linear-gradient(135deg, #fff2c6, #d1a03a 45%, #f3dc98 70%, #9c6f1e)";
+
+/**
+ * Les couleurs des rangs, recopiées de actus/missions.css (.fiche--S, --A,
+ * --B : la lueur, le feu, le sombre) : l'insigne de la carte est celui des
+ * fiches de mission. S l'or, A le mauve, B l'argent.
+ */
+export const RANGS: Record<RangCarte, { lueur: string; feu: string; sombre: string }> = {
+  S: { lueur: "240,196,92", feu: "255,238,196", sombre: "#5a3f06" },
+  A: { lueur: "228,150,198", feu: "253,232,243", sombre: "#5b2141" },
+  B: { lueur: "222,227,236", feu: "246,248,252", sombre: "#3d434d" },
+};
+
+/** Le liseré porté : l'or remplace l'argent. */
+export function lisereDe(habillage?: HabillageCarte): Metal | null {
+  const s = habillage?.signes ?? [];
+  return s.includes("lisere-or") ? "or" : s.includes("lisere-argent") ? "argent" : null;
+}
+
+/** Les initiales du sceau : la première lettre des deux premiers mots du nom. */
+export function initiales(nom: string): string {
+  return nom
+    .trim()
+    .split(/[\s-]+/)
+    .slice(0, 2)
+    .map((m) => m.slice(0, 1).toUpperCase())
+    .join("");
+}
+
 /** Le microtexte « Matrix » de la carte officielle : toujours le même pour un joueur. */
 export function microtexte(seed: number, n: number): string {
   const jeu = "0123456789bolaBOLA·/";
@@ -378,6 +415,25 @@ export function microtexte(seed: number, n: number): string {
     s += jeu[(x >>> 0) % jeu.length];
   }
   return s;
+}
+
+/**
+ * Le microtexte, son nom gravé dedans (signe « nom-grave ») : des morceaux
+ * de microtexte, et le nom glissé tous les ~70 signes, à trouver de près.
+ */
+export function microtexteGrave(seed: number, n: number, nom: string): { texte: string; nom: boolean }[] {
+  const brut = microtexte(seed, n);
+  const mot = `·${nom.toUpperCase().replace(/\s+/g, "·")}·`;
+  const out: { texte: string; nom: boolean }[] = [];
+  let i = 0;
+  let k = 0;
+  while (i < brut.length) {
+    const pas = 52 + ((seed >>> (k % 24)) % 37);
+    out.push({ texte: brut.slice(i, i + pas), nom: false }, { texte: mot, nom: true });
+    i += pas;
+    k++;
+  }
+  return out;
 }
 
 // Le logo Bola (public/bola/logo-noir.svg, repère 1000 × 237) : le symbole,

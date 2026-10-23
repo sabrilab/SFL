@@ -23,12 +23,18 @@
 // prennent la même teinte. La carte de saison sans finition reste sans
 // cadre : la photo bord à bord. Coins de 92 (÷ φ⁵), comme la classique.
 //
+// L'habillage se voit aussi en petit : la photo traitée (argentique,
+// gravure, marbre), le liseré d'argent ou d'or (le filet autour de la photo
+// sertie, ou le long du bord), et l'insigne du rang en haut à gauche de la
+// compacte. Le reste (crans, sceau, puce, nom gravé) est pour la classique.
+//
 // Toujours le repère 1024 × 1656 (1 × φ) et les mêmes calques que la
 // classique (`data-card-part` body / player / stats).
 
 import { Badge3D } from "@/components/sfl/badge-3d";
 import { palierCarte } from "@/components/sfl/bola-card";
-import { MATIERES, RAYON_CARTE, type HabillageCarte } from "@/components/sfl/finitions-carte";
+import { lisereDe, MATIERES, METAUX, RAYON_CARTE, type HabillageCarte, type Traitement } from "@/components/sfl/finitions-carte";
+import { filtrePhoto, InsigneRang, VoileTraitement } from "@/components/sfl/habillage-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import type { BoostType } from "@/lib/sfl/engine";
 
@@ -46,7 +52,19 @@ const BLANC = "#f5f5f3";
 /** Rapprocher : la photo grossie, ancrée au-dessus des yeux. */
 const ZOOM = { transform: "scale(1.28)", transformOrigin: "50% 30%" } as const;
 
-function Photo({ photo, nom, taille }: { photo?: string | null; nom: string; taille: number }) {
+function Photo({
+  photo,
+  nom,
+  taille,
+  traitement,
+  u,
+}: {
+  photo?: string | null;
+  nom: string;
+  taille: number;
+  traitement?: Traitement;
+  u: (n: number) => number;
+}) {
   if (!photo)
     return (
       <div
@@ -67,21 +85,25 @@ function Photo({ photo, nom, taille }: { photo?: string | null; nom: string; tai
       </div>
     );
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={photo}
-      alt=""
-      crossOrigin={photo.startsWith("data:") ? undefined : "anonymous"}
-      style={{
-        position: "absolute",
-        inset: 0,
-        width: "100%",
-        height: "100%",
-        objectFit: "cover",
-        objectPosition: "50% 38%",
-        ...ZOOM,
-      }}
-    />
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={photo}
+        alt=""
+        crossOrigin={photo.startsWith("data:") ? undefined : "anonymous"}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          objectPosition: "50% 38%",
+          filter: filtrePhoto(traitement),
+          ...ZOOM,
+        }}
+      />
+      <VoileTraitement traitement={traitement} u={u} />
+    </>
   );
 }
 
@@ -119,6 +141,10 @@ export function CartePhoto({
   const palier = vertical && p0 === "pastille" ? "reduite" : p0;
   // Le serti : la matière d'une carte à titre, ou de la finition portée.
   const teinte = distinction ? MATIERES[distinction] : habillage?.finition ? MATIERES[habillage.finition] : null;
+  // Le liseré porté : le filet autour de la photo, dans son métal (au moins 1 px).
+  const lisere = lisereDe(habillage);
+  const filet = lisere ? METAUX[lisere][1] : null;
+  const traitement = habillage?.traitement;
 
   if (palier === "pastille") {
     return (
@@ -143,11 +169,12 @@ export function CartePhoto({
             inset: teinte ? Math.max(2, largeur * 0.07) : 0,
             borderRadius: teinte ? "20%" : undefined,
             overflow: "hidden",
+            isolation: "isolate",
             background: "#2a2b2f",
-            boxShadow: teinte ? `0 0 0 1px ${teinte.rebord.lumiere}` : undefined,
+            boxShadow: teinte ? `0 0 0 1px ${filet ?? teinte.rebord.lumiere}` : undefined,
           }}
         >
-          <Photo photo={photo} nom={name} taille={largeur * 1.6} />
+          <Photo photo={photo} nom={name} taille={largeur * 1.6} traitement={traitement} u={u} />
         </div>
         <div
           data-card-part="stats"
@@ -226,12 +253,15 @@ export function CartePhoto({
           inset: teinte ? u(CADRE) : 0,
           borderRadius: teinte ? u(RAYON_CARTE - CADRE) : undefined,
           overflow: "hidden",
+          isolation: "isolate",
           background: "#2a2b2f",
-          // Le liseré de lumière du serti, puis une ombre fine sous la photo.
-          boxShadow: teinte ? `0 0 0 ${u(4)}px ${teinte.rebord.lumiere}, 0 ${u(4)}px ${u(10)}px ${u(4)}px rgba(0,0,0,0.28)` : undefined,
+          // Le liseré de lumière du serti (de métal, s'il est porté), puis une ombre fine sous la photo.
+          boxShadow: teinte
+            ? `0 0 0 ${filet ? Math.max(1, u(7)) : u(4)}px ${filet ?? teinte.rebord.lumiere}, 0 ${u(4)}px ${u(10)}px ${u(4)}px rgba(0,0,0,0.28)`
+            : undefined,
         }}
       >
-        <Photo photo={photo} nom={name} taille={u(W)} />
+        <Photo photo={photo} nom={name} taille={u(W)} traitement={traitement} u={u} />
         {/* Un voile léger, seulement sous la section d'or (dans la couleur, pour une carte à titre). */}
         <div
           style={{
@@ -248,6 +278,23 @@ export function CartePhoto({
       </div>
 
       <div data-card-part="stats" style={{ position: "absolute", inset: 0 }}>
+        {/* Sans serti, le liseré court le long du bord. */}
+        {filet && !teinte && (
+          <div
+            style={{
+              position: "absolute",
+              inset: u(26),
+              borderRadius: u(RAYON_CARTE - 26),
+              border: `${Math.max(1, u(7))}px solid ${filet}`,
+              boxShadow: `0 ${u(3)}px ${u(6)}px rgba(0,0,0,0.25)`,
+            }}
+          />
+        )}
+        {habillage?.rang && !reduite && (
+          <span style={{ position: "absolute", left: u(BADGE_M), top: u(BADGE_M), display: "flex" }}>
+            <InsigneRang rang={habillage.rang} hauteur={u(BADGE * 1.05)} />
+          </span>
+        )}
         {reduite && onglet ? (
           // Sur un terrain : la note dans l'onglet aux couleurs de l'équipe, comme la pastille.
           <div

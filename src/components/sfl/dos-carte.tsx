@@ -14,22 +14,34 @@
 // billet, puis le logotype. En bas, comme sur la face, le filet pointillé et
 // le numéro de série de la carte.
 //
+// L'habillage du joueur s'y retrouve : son nom gravé dans le microtexte, le
+// liseré d'argent ou d'or et ses coins par cran, en cadre intérieur, à la
+// même distance du bord que celui du portrait sur la face.
+//
 // Repère 1024 × 1656, comme la face : card-3d.tsx le photographie pour le
 // dos de la 3D (data-card-part="body").
 
 import {
   graine,
+  lisereDe,
   LOGO_BOLA,
   microtexte,
+  microtexteGrave,
   RAYON_CARTE,
   serieDe,
+  type HabillageCarte,
   type Matiere,
 } from "@/components/sfl/finitions-carte";
+import { Crans, Lisere, type Boite } from "@/components/sfl/habillage-carte";
 import { MotifCarte, RosaceBola } from "@/components/sfl/motif-carte";
 
 const W = 1024;
 const H = 1656;
 const M = 41;
+const PHI = (1 + Math.sqrt(5)) / 2;
+const SERIE_X = RAYON_CARTE / PHI; // la série rentrée, comme sur la face
+// Le cadre intérieur (liseré, crans) : à 29 du bord, comme celui du portrait.
+const CADRE: Boite = { x: 29, y: 29, w: W - 58, h: H - 58, r: RAYON_CARTE - 29 };
 const MONO = "var(--font-jbmono), ui-monospace, monospace";
 
 // La rosace et la lune, puis le logotype, centrés sur la hauteur.
@@ -40,12 +52,25 @@ const LOGOTYPE = { cy: 1222, h: 104 };
 const BOITE_SYMBOLE = { x: 17, y: 103.485, c: 112.373 };
 const BOITE_LOGOTYPE = { x: 150.41, y: 32.445, l: 783.3, h: 183.7 };
 
-export function DosCarte({ matiere: p, nom, size = 1 }: { matiere: Matiere; nom: string; size?: number }) {
+export function DosCarte({
+  matiere: p,
+  nom,
+  size = 1,
+  habillage,
+}: {
+  matiere: Matiere;
+  nom: string;
+  size?: number;
+  habillage?: HabillageCarte;
+}) {
   const u = (n: number) => n * size * (254 / W);
   const encre = (a: number) => `rgba(${p.encre},${a})`;
   const seed = graine(nom);
   const { serie, numero } = serieDe(nom);
   const sLune = LUNE / BOITE_SYMBOLE.c;
+  const lisere = lisereDe(habillage);
+  const cran = habillage?.cran ?? 0;
+  const nomGrave = !!nom && !!habillage?.signes?.includes("nom-grave");
   const sLogo = LOGOTYPE.h / BOITE_LOGOTYPE.h;
 
   return (
@@ -82,7 +107,17 @@ export function DosCarte({ matiere: p, nom, size = 1 }: { matiere: Matiere; nom:
           wordBreak: "break-all",
         }}
       >
-        {microtexte(seed ^ 0x5f3759df, 2600)}
+        {nomGrave
+          ? microtexteGrave(seed ^ 0x5f3759df, 2600, nom).map((m, i) =>
+              m.nom ? (
+                <span key={i} style={{ color: encre(Math.min(0.4, p.micro * 2.6)), fontWeight: 700 }}>
+                  {m.texte}
+                </span>
+              ) : (
+                m.texte
+              )
+            )
+          : microtexte(seed ^ 0x5f3759df, 2600)}
       </div>
       <div
         aria-hidden
@@ -92,14 +127,34 @@ export function DosCarte({ matiere: p, nom, size = 1 }: { matiere: Matiere; nom:
           background: `repeating-linear-gradient(0deg, ${encre(0.022)} 0 ${u(3)}px, transparent ${u(3)}px ${u(9)}px)`,
         }}
       />
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: `linear-gradient(245deg, transparent 30%, rgba(255,255,255,${p.reflet}) 45%, transparent 60%)`,
-        }}
-      />
+      {/* Le reflet, en miroir de la face ; sur la finition animée, la lumière qui passe. */}
+      {p.anime ? (
+        <div
+          aria-hidden
+          className="carte-lumiere"
+          data-card-part="lumiere"
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: "-60%",
+            width: "220%",
+            background: `linear-gradient(105deg, transparent 38%, rgba(255,255,255,${p.reflet}) 47%, rgba(214,236,255,0.5) 50%, rgba(255,214,236,0.4) 53%, transparent 62%)`,
+          }}
+        />
+      ) : (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: `linear-gradient(245deg, transparent 30%, rgba(255,255,255,${p.reflet}) 45%, transparent 60%)`,
+          }}
+        />
+      )}
+
+      {lisere && <Lisere metal={lisere} boite={CADRE} />}
+      {cran > 0 && <Crans cran={cran} metal={lisere ?? "argent"} boite={CADRE} />}
 
       {/* Bola : la lune dans sa rosace, puis le logotype */}
       <svg
@@ -139,8 +194,8 @@ export function DosCarte({ matiere: p, nom, size = 1 }: { matiere: Matiere; nom:
       <div
         style={{
           position: "absolute",
-          left: u(M),
-          right: u(M),
+          left: u(SERIE_X),
+          right: u(SERIE_X),
           top: u(1621),
           display: "flex",
           justifyContent: "space-between",

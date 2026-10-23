@@ -46,7 +46,14 @@
 //
 // La ligne de série, en bas : le numéro de la carte, puis le sigle SFL de la
 // ligue (sfl.svg), à la place de « lot s1 ». « Sunday Five League » n'est
-// plus écrit sur la carte (Sabri, 23/10).
+// plus écrit sur la carte (Sabri, 23/10). Elle est rentrée de 92 ÷ φ aux
+// deux bouts, pour rester loin des coins arrondis.
+//
+// L'habillage (habillage-carte.tsx, ce que le joueur porte de la passe) : la
+// photo traitée (argentique, gravure, marbre), le liseré d'argent ou d'or
+// autour du portrait et ses coins un par cran, le sceau sur la photo, la
+// puce dorée, son nom gravé dans le microtexte, l'insigne de son rang après
+// l'étiquette. `data-habillage` le redit au dos de la 3D.
 //
 // Mêmes calques que la carte éditoriale (`data-card-part` body / player /
 // stats) : la 3D de card-3d.tsx mesure la carte et la prend telle quelle,
@@ -57,13 +64,18 @@
 import { Badge3D } from "@/components/sfl/badge-3d";
 import {
   graine,
+  lisereDe,
   matiereDe,
   microtexte,
+  microtexteGrave,
+  PUCE_OR,
   RAYON_CARTE,
   RAYON_PORTRAIT,
   serieDe,
   type HabillageCarte,
+  type Traitement,
 } from "@/components/sfl/finitions-carte";
+import { Crans, filtrePhoto, InsigneRang, Lisere, Sceau, VoileTraitement, type Boite } from "@/components/sfl/habillage-carte";
 import { MotifCarte } from "@/components/sfl/motif-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
@@ -87,6 +99,15 @@ const COL_X = M + NOTE_C; // 622, colonne de droite (361 de large)
 const NOM_H = 220; // 361 ÷ φ
 const FILET = BANDE + NOTE_C; // 1605
 const SERIE = 1621;
+const SERIE_X = RAYON_CARTE / PHI; // 57 : la série rentrée, loin des coins
+// Le cadre du portrait (liseré, crans) : 12 autour, concentrique.
+const CADRE: Boite = {
+  x: PORTRAIT.x - 12,
+  y: PORTRAIT.y - 12,
+  w: PORTRAIT.c + 24,
+  h: PORTRAIT.c + 24,
+  r: RAYON_PORTRAIT + 12,
+};
 
 /** Le palier d'une carte selon sa largeur à l'écran. */
 export function palierCarte(largeurPx: number): Palier {
@@ -127,6 +148,8 @@ function Portrait({
   lueur,
   pas,
   cote,
+  traitement,
+  u,
 }: {
   photo?: string | null;
   nom: string;
@@ -139,6 +162,9 @@ function Portrait({
   pas: number;
   /** Le côté du portrait, en px à l'écran. */
   cote: number;
+  /** Le traitement de la photo (habillage), et l'échelle de la carte. */
+  traitement?: Traitement;
+  u: (n: number) => number;
 }) {
   return (
     <>
@@ -171,6 +197,7 @@ function Portrait({
             objectPosition: "50% 38%",
             transform: resserre ? "scale(1.24)" : undefined,
             transformOrigin: "50% 36%",
+            filter: filtrePhoto(traitement),
           }}
         />
       ) : (
@@ -189,6 +216,7 @@ function Portrait({
           {nom.slice(0, 1).toUpperCase()}
         </div>
       )}
+      {photo && <VoileTraitement traitement={traitement} u={u} />}
     </>
   );
 }
@@ -263,6 +291,7 @@ export function BolaCard({
             inset: "7%",
             borderRadius: "20%",
             overflow: "hidden",
+            isolation: "isolate",
             background: p.fond,
           }}
         >
@@ -275,6 +304,8 @@ export function BolaCard({
             lueur={p.lueur}
             pas={Math.max(2, largeur / 18)}
             cote={largeur * 0.86}
+            traitement={habillage?.traitement}
+            u={u}
           />
         </div>
         <div
@@ -359,7 +390,15 @@ export function BolaCard({
     lueur: p.lueur,
     pas: u(34),
     cote: u(PORTRAIT.c),
+    traitement: habillage?.traitement,
+    u,
   };
+  // L'habillage porté (habillage-carte.tsx).
+  const signes = habillage?.signes ?? [];
+  const lisere = lisereDe(habillage);
+  const cran = habillage?.cran ?? 0;
+  const sceau = complete && signes.includes("sceau");
+  const nomGrave = complete && signes.includes("nom-grave");
   const tailleMarque = numero != null ? (complete ? 164 : compacte ? 225 : 287) : 80;
   const halo = p.sombre ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)";
 
@@ -377,6 +416,7 @@ export function BolaCard({
       data-card-part="body"
       data-matiere={p.nom}
       data-nom={name}
+      data-habillage={habillage ? JSON.stringify(habillage) : undefined}
       style={{
         position: "relative",
         width: u(W),
@@ -409,7 +449,17 @@ export function BolaCard({
           wordBreak: "break-all",
         }}
       >
-        {microtexte(seed, 2600)}
+        {nomGrave
+          ? microtexteGrave(seed, 2600, name).map((m, i) =>
+              m.nom ? (
+                <span key={i} style={{ color: encre(Math.min(0.4, p.micro * 2.6)), fontWeight: 700 }}>
+                  {m.texte}
+                </span>
+              ) : (
+                m.texte
+              )
+            )
+          : microtexte(seed, 2600)}
       </div>
       <div
         aria-hidden
@@ -424,6 +474,7 @@ export function BolaCard({
         <div
           aria-hidden
           className="carte-lumiere"
+          data-card-part="lumiere"
           style={{
             position: "absolute",
             top: 0,
@@ -444,6 +495,10 @@ export function BolaCard({
         />
       )}
 
+      {/* Le cadre du portrait que le joueur a gagné : le liseré, puis ses coins un par cran */}
+      {complete && lisere && <Lisere metal={lisere} boite={CADRE} />}
+      {complete && cran > 0 && <Crans cran={cran} metal={lisere ?? "argent"} boite={CADRE} />}
+
       {/* Le portrait : photo carrée, repères, symbole, étiquette, numéro, puce */}
       <div data-card-part="player" style={{ position: "absolute", inset: 0 }}>
         <div
@@ -455,6 +510,7 @@ export function BolaCard({
             height: u(PORTRAIT.c),
             borderRadius: u(RAYON_PORTRAIT),
             overflow: "hidden",
+            isolation: "isolate",
             background: p.fond,
             // Le serti : un filet d'encre dedans, un liseré de lumière autour.
             boxShadow: `inset 0 0 0 ${u(2)}px ${encre(0.16)}, 0 0 0 ${u(2)}px ${p.rebord.lumiere}`,
@@ -501,7 +557,7 @@ export function BolaCard({
               {coin({ left: u(31), top: u(31) }, 0)}
               {coin({ right: u(31), top: u(31) }, 90)}
               {coin({ right: u(31), bottom: u(31) }, 180)}
-              {coin({ left: u(31), bottom: u(31) }, 270)}
+              {!sceau && coin({ left: u(31), bottom: u(31) }, 270)}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={p.symbole}
@@ -509,44 +565,52 @@ export function BolaCard({
                 style={{ position: "absolute", left: u(61), top: u(61), width: u(51), height: u(51) }}
               />
               {/* Le poste, à la place de l'étiquette, quand le coin droit est au badge */}
-              {posteEnHaut ? (
-                <div
-                  style={{
-                    position: "absolute",
-                    left: u(133),
-                    top: u(56),
-                    fontFamily: ANTON,
-                    fontSize: u(62),
-                    lineHeight: 1,
-                    letterSpacing: u(1),
-                    color: encre(1),
-                    textShadow: photo ? `0 0 ${u(18)}px ${halo}` : undefined,
-                  }}
-                >
-                  {position.toUpperCase()}
-                </div>
-              ) : (
-                /* L'étiquette d'édition : base, ou le titre de la carte */
-                <div
-                  style={{
-                    position: "absolute",
-                    left: u(133),
-                    top: u(61),
-                    height: u(51),
-                    padding: `0 ${u(18)}px`,
-                    boxSizing: "border-box",
-                    borderRadius: u(10),
-                    display: "flex",
-                    alignItems: "center",
-                    background: p.etiquette.fond,
-                    border: `${u(2)}px solid ${p.etiquette.bord}`,
-                    ...mono(26, 2.5, 1, 700),
-                    color: p.etiquette.texte,
-                  }}
-                >
-                  {p.titre}
-                </div>
-              )}
+              {/* Après le symbole : le poste (à côté d'un badge) ou l'étiquette d'édition, puis le rang */}
+              <div
+                style={{
+                  position: "absolute",
+                  left: u(133),
+                  top: u(56),
+                  height: u(62),
+                  display: "flex",
+                  alignItems: "center",
+                  gap: u(18),
+                }}
+              >
+                {posteEnHaut ? (
+                  <div
+                    style={{
+                      fontFamily: ANTON,
+                      fontSize: u(62),
+                      lineHeight: 1,
+                      letterSpacing: u(1),
+                      color: encre(1),
+                      textShadow: photo ? `0 0 ${u(18)}px ${halo}` : undefined,
+                    }}
+                  >
+                    {position.toUpperCase()}
+                  </div>
+                ) : (
+                  /* L'étiquette d'édition : base, ou le titre de la carte */
+                  <div
+                    style={{
+                      height: u(51),
+                      padding: `0 ${u(18)}px`,
+                      boxSizing: "border-box",
+                      borderRadius: u(10),
+                      display: "flex",
+                      alignItems: "center",
+                      background: p.etiquette.fond,
+                      border: `${u(2)}px solid ${p.etiquette.bord}`,
+                      ...mono(26, 2.5, 1, 700),
+                      color: p.etiquette.texte,
+                    }}
+                  >
+                    {p.titre}
+                  </div>
+                )}
+                {habillage?.rang && <InsigneRang rang={habillage.rang} hauteur={u(82)} />}
+              </div>
               {/* La puce, dans le métal de la carte */}
               <div
                 style={{
@@ -556,7 +620,7 @@ export function BolaCard({
                   width: u(87),
                   height: u(67),
                   borderRadius: u(14),
-                  background: p.puce,
+                  background: signes.includes("puce-or") ? PUCE_OR : p.puce,
                   boxShadow: `inset 0 0 0 ${u(2)}px rgba(8,9,11,0.22)`,
                 }}
               >
@@ -564,6 +628,12 @@ export function BolaCard({
                 <div style={{ position: "absolute", top: "50%", left: u(8), right: u(8), height: u(2), background: "rgba(8,9,11,0.22)" }} />
               </div>
             </>
+          )}
+          {/* Le sceau, tamponné sur le bas de la photo */}
+          {sceau && (
+            <span style={{ position: "absolute", left: u(55), top: u(695) }}>
+              <Sceau nom={affiche ?? name} encre={p.encre} papier={p.sombre ? "rgba(8,9,11,0.28)" : "rgba(255,255,255,0.4)"} cote={u(190)} />
+            </span>
           )}
         </div>
       </div>
@@ -686,8 +756,8 @@ export function BolaCard({
             <div
               style={{
                 position: "absolute",
-                left: u(M),
-                right: u(M),
+                left: u(SERIE_X),
+                right: u(SERIE_X),
                 top: u(SERIE),
                 display: "flex",
                 alignItems: "center",
