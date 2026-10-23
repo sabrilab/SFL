@@ -45,7 +45,7 @@ import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
 import { DiscussionMatch, type OngletDiscussion } from "@/components/sfl/matchs/discussion-match";
 import { FeuilleDeMatch } from "@/components/sfl/matchs/feuille-de-match";
 import { DuelsDuJour } from "@/components/sfl/matchs/duels";
-import { feuilleDeConvocation, feuilleDeJournee } from "@/lib/sfl/feuille";
+import { feuilleDeConvocation, feuilleDeJournee, type TerrainFeuille } from "@/lib/sfl/feuille";
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
 import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
 import { Invitations, invitationsDe } from "@/components/sfl/matchs/invitations";
@@ -66,6 +66,8 @@ import {
   deplacerTerrain,
   journeeJouee,
   placerJourneeSurNouveauTerrain,
+  placerMatchDuJourSurNouveauLieu,
+  reglerMatchDuJour,
   retirerTerrain,
   terrainDeJournee,
   terrainDuMatch,
@@ -73,6 +75,16 @@ import {
 } from "@/lib/sfl/saisie/mutations";
 import type { JourneeMeta, Saison, Terrain } from "@/lib/sfl/saisie/types";
 import { ovr, rankPlayers } from "@/lib/sfl/engine";
+import {
+  dernierCoupDEnvoi,
+  matchDuJoueur,
+  matchsDeJournee,
+  matchsParLieu,
+  nomDuTerrain,
+  premierCoupDEnvoi,
+  type MatchResolu,
+  type Repli,
+} from "@/lib/sfl/matchs-du-jour";
 import { ProfilJoueur } from "@/components/sfl/profil-joueur";
 import { CatalogueJoueurs } from "@/components/sfl/map/catalogue-joueurs";
 import { CollectionPile } from "@/components/sfl/map/collection-pile";
@@ -242,6 +254,8 @@ interface MatchMap {
   /** Sa ligue, qui donne sa couleur au stade : la journée est SFL, le match
    *  ouvert par un joueur est Bola, le défi entre deux équipes est Team. */
   ligue: LigueMatch;
+  /** Une journée jouée en plusieurs lieux : ses matchs dans celui-ci (0 = Match 1). */
+  matchsIci?: number[];
 }
 
 /** « 13h00 », « 13:30 » → 13 ; 13 à défaut. */
@@ -297,57 +311,85 @@ export default function MapPage() {
   const heure = useHeure();
 
   const terrains = useMemo(() => saison.terrains ?? [], [saison.terrains]);
+  // L'heure et le lieu d'une journée, et ses matchs chacun aux siens.
+  const matchsDe = useCallback(
+    (m: JourneeMeta) => {
+      const repli: Repli = { heure: m.heure || p.heure, lieu: terrainDeJournee(saison, m, p.lieu) };
+      return { repli, matchs: matchsDeJournee(journees.find((x) => x.j === m.j), terrains, repli) };
+    },
+    [saison, journees, terrains, p.heure, p.lieu]
+  );
 
   // Les journées à venir, chacune sur son terrain ; sinon la convocation du
   // dimanche. Une journée est passée quand elle est jouée (résultat saisi) ou
   // quand sa date est derrière nous — le jour même, deux heures après le coup
-  // d'envoi. La dernière passée (de moins d'une semaine) reste sur la Map,
-  // « jouée », avec ses joueurs et le chemin vers le récap.
+  // d'envoi de son dernier match. La dernière passée (de moins d'une
+  // semaine) reste sur la Map, « jouée », avec ses joueurs et le chemin vers
+  // le récap.
+  //
+  // Ses matchs peuvent avoir chacun leur heure et leur lieu (Sabri, 23/10 ;
+  // lib/sfl/matchs-du-jour) : une journée jouée en deux lieux pose un
+  // sticker sur chacun, avec ses matchs et leurs joueurs. L'heure affichée
+  // est celle de mon match, sinon le premier coup d'envoi du lieu.
   const ligue = useMemo<MatchMap[]>(() => {
-    const passee = (m: (typeof saison.journees)[number]) => {
+    const passee = (m: JourneeMeta) => {
       if (journeeJouee(saison, m.j)) return true;
       const e = ecartJours(m.date, aujourdhui);
       if (e == null) return false;
       if (e < 0) return true;
-      return e === 0 && heure >= 0 && heure >= heureDe(m.heure || p.heure) + 2;
+      const { repli, matchs: tous } = matchsDe(m);
+      return e === 0 && heure >= 0 && heure >= heureDe(dernierCoupDEnvoi(tous, repli.heure)) + 2;
     };
     const ecartConvocation = ecartJours(p.jour.replace(/^\S+\s+/, ""), aujourdhui);
-    const versMatch = (m: (typeof saison.journees)[number], joue: boolean): MatchMap => {
+    const versMatchs = (m: JourneeMeta, joue: boolean): MatchMap[] => {
       const lignes = saison.entries.filter((e) => e.j === m.j);
       // Les équipes faites, un joueur resté sans équipe ne compte pas.
       const presents = joueursDeLaFeuille(saison, m.j).noms;
       const effectif = Math.max(EFFECTIF, lignes.length);
-      const dedans = presents.includes(player.name);
       const e = ecartJours(m.date, aujourdhui);
       const convoquee = !joue && e != null && e === ecartConvocation;
-      const { etat, texte } = joue
-        ? { etat: { genre: "joue" } as EtatSticker, texte: dedans ? "Joué · tu y étais" : "Joué" }
-        : convoquee
-          ? etatLigue(p.mine === "present", p.presents.length)
-          : etatLigue(dedans, presents.length);
-      return {
-        cle: `j${m.j}`,
-        j: m.j,
-        quand: joue ? { titre: m.date, jourCourt: m.date.toUpperCase().slice(0, 7), moment: "weekend" } : quand(m.date, null, aujourdhui),
-        dateLabel: m.date,
-        heure: m.heure || p.heure,
-        terrain: terrainDeJournee(saison, m, p.lieu),
-        presents: convoquee ? p.presents : presents,
-        effectif: convoquee ? p.effectif : effectif,
-        dedans: convoquee ? p.mine === "present" : dedans,
-        etat,
-        etatTexte: texte,
-        joue,
-        convoquee,
-        ligue: "sfl",
-      };
+      const { repli, matchs: tous } = matchsDe(m);
+      const lieux = matchsParLieu(tous);
+      // Un seul lieu (ou la journée jouée, qui reste une seule carte) : un
+      // seul match sur la Map, comme avant.
+      const separe = lieux.length > 1 && !joue;
+      const groupes = separe ? lieux : [{ lieu: lieux.length === 1 ? lieux[0].lieu : repli.lieu, matchs: tous }];
+      return groupes.map((g, i): MatchMap => {
+        const noms = new Set(g.matchs.flatMap((t) => [...t.noirs, ...t.blancs]));
+        const ici = separe ? presents.filter((n) => noms.has(n)) : presents;
+        const dedans = ici.includes(player.name);
+        // La convocation du dimanche : on y répond pour toute la journée.
+        const commeConvocation = convoquee && !separe;
+        const { etat, texte } = joue
+          ? { etat: { genre: "joue" } as EtatSticker, texte: dedans ? "Joué · tu y étais" : "Joué" }
+          : commeConvocation
+            ? etatLigue(p.mine === "present", p.presents.length)
+            : etatLigue(dedans, ici.length);
+        return {
+          cle: i === 0 ? `j${m.j}` : `j${m.j}-${g.lieu?.id ?? i}`,
+          j: m.j,
+          quand: joue ? { titre: m.date, jourCourt: m.date.toUpperCase().slice(0, 7), moment: "weekend" } : quand(m.date, null, aujourdhui),
+          dateLabel: m.date,
+          heure: matchDuJoueur(g.matchs, player.name)?.heure ?? premierCoupDEnvoi(g.matchs, repli.heure),
+          terrain: g.lieu,
+          presents: commeConvocation ? p.presents : ici,
+          effectif: commeConvocation ? p.effectif : effectif,
+          dedans: commeConvocation ? p.mine === "present" : dedans,
+          etat,
+          etatTexte: texte,
+          joue,
+          convoquee,
+          ligue: "sfl",
+          ...(separe ? { matchsIci: g.matchs.map((t) => t.n) } : {}),
+        };
+      });
     };
 
     const parDate = [...saison.journees].sort((a, b) => a.j - b.j);
-    const aVenir = parDate.filter((m) => !passee(m)).map((m) => versMatch(m, false));
+    const aVenir = parDate.filter((m) => !passee(m)).flatMap((m) => versMatchs(m, false));
     const derniere = parDate.filter(passee).at(-1);
     const eDerniere = derniere ? ecartJours(derniere.date, aujourdhui) : null;
-    const recente = derniere && (eDerniere == null || eDerniere >= -6) ? [versMatch(derniere, true)] : [];
+    const recente = derniere && (eDerniere == null || eDerniere >= -6) ? versMatchs(derniere, true) : [];
 
     if (aVenir.length) return [...aVenir, ...recente];
     // Pas de journée à venir : la convocation du dimanche, si elle n'est pas
@@ -372,7 +414,7 @@ export default function MapPage() {
       },
       ...recente,
     ];
-  }, [saison, player.name, aujourdhui, heure, p.heure, p.lieu, p.jour, p.mine, p.effectif, p.presents]);
+  }, [saison, matchsDe, player.name, aujourdhui, heure, p.heure, p.lieu, p.jour, p.mine, p.effectif, p.presents]);
 
   // Les matchs ouverts par les joueurs : un public montre ses places libres,
   // un privé n'apparaît qu'à ceux qui en sont.
@@ -445,17 +487,20 @@ export default function MapPage() {
   // qu'il lui manque. Le jour même, après le coup de sifflet, le match joué
   // garde la une jusqu'à minuit (on y cherche le récap) ; dès le lendemain,
   // la une passe au suivant. Les terrains enregistrés n'y sont plus — on ne
-  // noie pas le match.
+  // noie pas le match. Une journée jouée en plusieurs lieux pose une carte
+  // par lieu : chacun ouvre la Map sur la sienne, celle de son match.
   const affiches = useMemo(() => {
     const ordre = (m: MatchMap) => (ecartJours(m.dateLabel, aujourdhui) ?? 99) * 24 + heureDe(m.heure);
-    const aVenir = matchs.filter((m) => !m.joue).sort((a, b) => ordre(a) - ordre(b));
+    const aVenir = matchs.filter((m) => !m.joue).sort((a, b) => ordre(a) - ordre(b) || Number(b.dedans) - Number(a.dedans));
     const joue = matchs.filter((m) => m.joue).at(-1);
     return joue ? [joue, ...aVenir] : aVenir;
   }, [matchs, aujourdhui]);
   const une = useMemo(() => {
     const joue = affiches.find((m) => m.joue);
     if (joue && ecartJours(joue.dateLabel, aujourdhui) === 0) return joue;
-    return affiches.find((m) => !m.joue) ?? affiches[0];
+    const prochain = affiches.find((m) => !m.joue);
+    const mien = prochain?.j != null ? affiches.find((m) => !m.joue && m.j === prochain.j && m.dedans) : undefined;
+    return mien ?? prochain ?? affiches[0];
   }, [affiches, aujourdhui]);
 
   // Ouvrir un match : n'importe quel joueur, d'un bouton ou d'un terrain libre.
@@ -678,14 +723,23 @@ export default function MapPage() {
   const profilJoueur = profil ? players.find((x) => x.name === profil) : undefined;
   const nomFocus = focusVilles?.length === 1 ? villes.find((v) => v.id === focusVilles[0])?.ville : null;
 
-  // La feuille de match du choisi : les équipes de sa journée, sinon celles
-  // de la convocation une fois révélées (vendredi 19h ; l'admin, toujours).
-  const feuille = useMemo(() => {
+  // La feuille de match du choisi : les équipes de sa journée, chaque match
+  // à son heure, à son lieu et sur son terrain (seulement ceux d'ici quand la
+  // journée se joue en plusieurs lieux), sinon celles de la convocation une
+  // fois révélées (vendredi 19h ; l'admin, toujours).
+  const feuille = useMemo<TerrainFeuille[]>(() => {
     if (!choisi || choisi.partie) return [];
-    const deJournee = choisi.j != null ? feuilleDeJournee(journees.find((x) => x.j === choisi.j)) : [];
+    const meta = choisi.j != null ? saison.journees.find((x) => x.j === choisi.j) : undefined;
+    const horaires = meta ? matchsDe(meta).matchs : [];
+    const deJournee = feuilleDeJournee(journees.find((x) => x.j === choisi.j))
+      .map((t, i) => {
+        const h = horaires[i];
+        return h ? { ...t, heure: h.heure, ou: h.lieu?.nom ?? null, terrain: h.terrain } : t;
+      })
+      .filter((_, i) => !choisi.matchsIci || choisi.matchsIci.includes(i));
     if (deJournee.length || (choisi.j != null && !choisi.convoquee)) return deJournee;
     return p.equipesVisibles || admin ? feuilleDeConvocation(p.teams) : [];
-  }, [choisi, journees, p.equipesVisibles, p.teams, admin]);
+  }, [choisi, saison.journees, journees, matchsDe, p.equipesVisibles, p.teams, admin]);
 
   const commune = choisi?.terrain?.commune ?? terrains.find((t) => t.commune)?.commune ?? "SFL";
   const n = affiches.filter((m) => !m.joue).length;
@@ -977,7 +1031,7 @@ export default function MapPage() {
           <div className="flex flex-col gap-5 px-4">
             {ficheAdmin ? (
               <>
-                <OuSeJouent saison={saison} matchs={ligue} terrains={terrains} onSauver={sauver} />
+                <OuSeJouent saison={saison} matchs={ligue} terrains={terrains} matchsDe={matchsDe} onSauver={sauver} />
                 <Terrains saison={saison} terrains={terrains} onSauver={sauver} />
               </>
             ) : (
@@ -1008,12 +1062,13 @@ export default function MapPage() {
                     moi={player.name}
                     entete={{
                       surtitre: `${choisi.j != null ? `J${choisi.j} · ` : ""}Sunday Five League`,
-                      quand: `${dateComplete(choisi.dateLabel, aujourdhui)} · ${choisi.heure}`,
+                      jour: dateComplete(choisi.dateLabel, aujourdhui),
+                      heure: choisi.heure,
                       ou: choisi.terrain ? choisi.terrain.nom : null,
                     }}
                   />
                 )}
-                {choisi && feuille.length > 0 && <DuelsDuJour j={choisi.j} />}
+                {choisi && feuille.length > 0 && <DuelsDuJour j={choisi.j} matchs={choisi.matchsIci} />}
                 {choisi?.joue && (
                   <Link
                     href="/ligue"
@@ -1563,21 +1618,32 @@ function ChercheAdresse({
   );
 }
 
-/** Où se joue chaque match ouvert : son terrain, son heure, sa date. */
+/**
+ * Où se joue chaque match ouvert : son terrain, son heure, sa date ; et quand
+ * la journée a plusieurs terrains, l'heure et le lieu de chacun (Sabri,
+ * 23/10). Un terrain laissé vide suit la journée.
+ */
 function OuSeJouent({
   saison,
   matchs,
   terrains,
+  matchsDe,
   onSauver,
 }: {
   saison: Saison;
   matchs: MatchMap[];
   terrains: Terrain[];
+  /** L'heure et le lieu d'une journée, et ses matchs chacun aux siens. */
+  matchsDe: (m: JourneeMeta) => { repli: Repli; matchs: MatchResolu[] };
   onSauver: (next: Saison, message: string) => void;
 }) {
   const [nouvelle, setNouvelle] = useState<number | "convocation" | null>(null);
-  const journees = matchs.filter((m) => m.j != null);
+  // « 3-1 » : le Match 2 de la J3 attend sa nouvelle adresse.
+  const [nouveauLieu, setNouveauLieu] = useState<string | null>(null);
+  // Une journée jouée en plusieurs lieux a un match par lieu : une seule ligne ici.
+  const journees = matchs.filter((m, i) => m.j != null && matchs.findIndex((x) => x.j === m.j) === i);
   const meta = (j: number) => saison.journees.find((x) => x.j === j) as JourneeMeta;
+  const { journees: derivees } = useSeason();
 
   return (
     <section id="ou-se-joue" className="scroll-mt-4 overflow-hidden rounded-[26px] bg-card">
@@ -1608,6 +1674,8 @@ function OuSeJouent({
           {journees.map((m) => {
             const j = m.j!;
             const mj = meta(j);
+            const { repli, matchs: duJour } = matchsDe(mj);
+            const matches = derivees.find((x) => x.j === j)?.matches ?? [];
             return (
               <li key={m.cle} className="flex flex-col gap-3 border-t border-border/60 px-5 py-4">
                 <div className="flex items-baseline justify-between gap-3">
@@ -1615,10 +1683,10 @@ function OuSeJouent({
                     J{j} · {m.quand.titre}
                   </p>
                   <span className={cn("mono-label", m.terrain ? "text-muted-foreground" : "text-braise")}>
-                    {m.terrain ? (mj.terrainId != null ? "sur la map" : "terrain par défaut") : "sans adresse"}
+                    {m.terrain ? (mj.terrainId != null ? "sur la map" : "lieu par défaut") : "sans adresse"}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className={cn("grid gap-2", duJour.length === 1 ? "grid-cols-3" : "grid-cols-2")}>
                   <label className="flex flex-col gap-1">
                     <span className="text-[12px] text-muted-foreground">Date</span>
                     <Input
@@ -1631,22 +1699,42 @@ function OuSeJouent({
                   <label className="flex flex-col gap-1">
                     <span className="text-[12px] text-muted-foreground">Heure</span>
                     <Input
-                      key={`h${j}-${mj.heure ?? m.heure}`}
-                      defaultValue={mj.heure ?? m.heure}
+                      key={`h${j}-${mj.heure ?? repli.heure}`}
+                      defaultValue={mj.heure ?? repli.heure}
                       placeholder="13h00"
-                      onBlur={(e) => e.target.value.trim() && e.target.value !== (mj.heure ?? m.heure) && onSauver(updateJournee(saison, j, { heure: e.target.value.trim() }), `J${j} à ${e.target.value.trim()}.`)}
+                      onBlur={(e) => e.target.value.trim() && e.target.value !== (mj.heure ?? repli.heure) && onSauver(updateJournee(saison, j, { heure: e.target.value.trim() }), `J${j} à ${e.target.value.trim()}.`)}
                     />
                   </label>
+                  {/* Un seul match : son terrain sur place se règle ici. */}
+                  {duJour.length === 1 && matches[0] && (
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[12px] text-muted-foreground">Terrain</span>
+                      <Input
+                        key={`t${j}-${matches[0].terrain ?? ""}`}
+                        defaultValue={matches[0].terrain ?? ""}
+                        placeholder="—"
+                        onBlur={(e) => {
+                          const v = e.target.value.trim();
+                          if (v === (matches[0].terrain ?? "").trim()) return;
+                          const nom = nomDuTerrain(v);
+                          onSauver(
+                            reglerMatchDuJour(saison, j, 0, { terrain: v || undefined }),
+                            nom ? `J${j} sur le ${nom}.` : `J${j} : terrain retiré.`
+                          );
+                        }}
+                      />
+                    </label>
+                  )}
                 </div>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[12px] text-muted-foreground">Terrain</span>
+                  <span className="text-[12px] text-muted-foreground">Lieu</span>
                   <select
                     value={nouvelle === j ? "nouveau" : (mj.terrainId ?? "")}
                     onChange={(e) => {
                       const v = e.target.value;
                       if (v === "nouveau") return setNouvelle(j);
                       setNouvelle(null);
-                      onSauver(updateJournee(saison, j, { terrainId: v ? Number(v) : undefined }), `J${j} : terrain enregistré.`);
+                      onSauver(updateJournee(saison, j, { terrainId: v ? Number(v) : undefined }), `J${j} : lieu enregistré.`);
                     }}
                     className="h-10 rounded-xl border border-input bg-transparent px-3 text-[14px]"
                   >
@@ -1671,6 +1759,98 @@ function OuSeJouent({
                       setNouvelle(null);
                     }}
                   />
+                )}
+
+                {/* Plusieurs matchs : l'heure, le lieu et le terrain de chacun. Vide, il suit la journée. */}
+                {duJour.length > 1 && (
+                  <div className="flex flex-col gap-3 rounded-2xl bg-secondary/60 p-3">
+                    <p className="mono-label text-muted-foreground">Chaque match</p>
+                    {duJour.map((t) => {
+                      const match = matches[t.n];
+                      if (!match) return null;
+                      const cle = `${j}-${t.n}`;
+                      const sienne = match.heure ?? "";
+                      const sonTerrain = match.terrain ?? "";
+                      return (
+                        <div key={cle} className="flex flex-col gap-1.5">
+                          <p className="flex min-w-0 items-baseline gap-2 text-[13.5px]">
+                            <span className="shrink-0 font-bold">{t.label}</span>
+                            <span className="truncate text-muted-foreground">
+                              {t.noirs.length} contre {t.blancs.length}
+                            </span>
+                          </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Input
+                              key={`h${cle}-${sienne}`}
+                              defaultValue={sienne}
+                              placeholder={repli.heure}
+                              aria-label={`Heure du ${t.label}`}
+                              onBlur={(e) => {
+                                const v = e.target.value.trim();
+                                if (v === sienne.trim()) return;
+                                onSauver(
+                                  reglerMatchDuJour(saison, j, t.n, { heure: v || undefined }),
+                                  v ? `J${j} · ${t.label} à ${v}.` : `J${j} · ${t.label} à l'heure de la journée.`
+                                );
+                              }}
+                            />
+                            <Input
+                              key={`t${cle}-${sonTerrain}`}
+                              defaultValue={sonTerrain}
+                              placeholder="Terrain"
+                              aria-label={`Terrain du ${t.label}`}
+                              onBlur={(e) => {
+                                const v = e.target.value.trim();
+                                if (v === sonTerrain.trim()) return;
+                                const nom = nomDuTerrain(v);
+                                onSauver(
+                                  reglerMatchDuJour(saison, j, t.n, { terrain: v || undefined }),
+                                  nom ? `J${j} · ${t.label} sur le ${nom}.` : `J${j} · ${t.label} : terrain retiré.`
+                                );
+                              }}
+                            />
+                          </div>
+                          <select
+                            aria-label={`Lieu du ${t.label}`}
+                            value={nouveauLieu === cle ? "nouveau" : (match.lieuId ?? "")}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              if (v === "nouveau") return setNouveauLieu(cle);
+                              setNouveauLieu(null);
+                              const lieu = terrains.find((x) => x.id === Number(v));
+                              onSauver(
+                                reglerMatchDuJour(saison, j, t.n, { lieuId: lieu?.id }),
+                                lieu ? `J${j} · ${t.label} au ${lieu.nom}.` : `J${j} · ${t.label} au lieu de la journée.`
+                              );
+                            }}
+                            className="h-10 min-w-0 rounded-xl border border-input bg-transparent px-3 text-[14px]"
+                          >
+                            <option value="">{repli.lieu ? repli.lieu.nom : "Lieu de la journée"}</option>
+                            {terrains
+                              .filter((x) => x.id !== repli.lieu?.id)
+                              .map((x) => (
+                                <option key={x.id} value={x.id}>
+                                  {x.nom}
+                                </option>
+                              ))}
+                            <option value="nouveau">+ Nouvelle adresse…</option>
+                          </select>
+                          {nouveauLieu === cle && (
+                            <ChercheAdresse
+                              bouton={`Placer le ${t.label} sur la Map`}
+                              onPlacer={(nom, adresse, l) => {
+                                onSauver(
+                                  placerMatchDuJourSurNouveauLieu(saison, j, t.n, { nom, adresse, lat: l.lat, lng: l.lng, commune: l.commune }),
+                                  `J${j} · ${t.label} au ${nom}.`
+                                );
+                                setNouveauLieu(null);
+                              }}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </li>
             );

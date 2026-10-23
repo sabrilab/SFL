@@ -53,6 +53,7 @@ import type { Journee } from "@/lib/sfl/engine";
 import { enjeux, voisins } from "@/lib/sfl/actus-toi";
 import { rankByMetric } from "@/lib/sfl/engine";
 import { RANKINGS } from "@/lib/sfl/rankings";
+import { ligneDuRendezVous } from "@/lib/sfl/matchs-du-jour";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
 import { VoteDuJour } from "./fil";
@@ -289,7 +290,7 @@ function Convocation({ className }: { className?: string }) {
         <span className="flex min-w-0 flex-col pb-0.5">
           <span className="text-[16px] font-bold">{p.jour}</span>
           <span className="truncate text-[12.5px] text-foreground/55 dark:text-white/55">
-            {p.heure} · {p.lieu}
+            {ligneDuRendezVous(p.rendezVous)}
           </span>
         </span>
       </div>
