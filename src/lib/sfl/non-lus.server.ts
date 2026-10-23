@@ -1,13 +1,15 @@
 // Les messages pas encore lus de chaque joueur, pour la pastille rouge de
 // l'icône de l'app (le nombre que porte la notification : public/sw.js) :
-// ceux du Vestiaire, et ceux des discussions de ses matchs à venir, là où il
-// joue (organisateur ou inscrit ; un invité lit sans compter).
+// ceux du Vestiaire, ceux des discussions de ses matchs à venir, là où il
+// joue (organisateur ou inscrit ; un invité lit sans compter), et ceux de la
+// discussion de son équipe (mode Team).
 //
-// Le même compte que l'app (hooks/use-vestiaire-non-lus.ts et
-// hooks/use-discussions-match.ts, additionnés par la barre d'onglets), aux
-// bornes près : trois jours au plus pour le Vestiaire, dix messages au plus
-// par match. Partagé par les deux routes qui préviennent,
-// /api/vestiaire/notifier et /api/matchs/discussion.
+// Le même compte que l'app (hooks/use-vestiaire-non-lus.ts,
+// hooks/use-discussions-match.ts et hooks/use-mon-equipe.ts, additionnés par
+// la barre d'onglets), aux bornes près : trois jours au plus pour le
+// Vestiaire, dix messages au plus par match et pour l'équipe. Partagé par
+// les routes qui préviennent : /api/vestiaire/notifier,
+// /api/matchs/discussion et /api/equipes/discussion.
 //
 // SERVEUR UNIQUEMENT : il lit les messages de tout le monde (clé secrète).
 
@@ -26,6 +28,7 @@ export async function nonLus(sb: SupabaseClient, uids: string[], maintenant = Da
   const n = new Map(uids.map((u) => [u, 0]));
   if (uids.length === 0) return n;
   const t = (iso: string) => new Date(iso).getTime();
+  await nonLusEquipes(sb, uids, n, t);
 
   // Le Vestiaire : ce que les autres ont écrit depuis ma dernière lecture,
   // trois jours au plus (qui ne l'a jamais ouvert voit ces trois jours-là).
@@ -37,7 +40,7 @@ export async function nonLus(sb: SupabaseClient, uids: string[], maintenant = Da
   const luV = new Map(((lus ?? []) as { user_id: string; lu_jusqua: string }[]).map((s) => [s.user_id, t(s.lu_jusqua)]));
   for (const uid of uids) {
     const lu = luV.get(uid) ?? 0;
-    n.set(uid, ((recents ?? []) as Ecrit[]).filter((m) => m.auteur !== uid && t(m.created_at) > lu).length);
+    n.set(uid, (n.get(uid) ?? 0) + ((recents ?? []) as Ecrit[]).filter((m) => m.auteur !== uid && t(m.created_at) > lu).length);
   }
 
   // Les matchs à venir où il joue : ce que les autres y ont écrit depuis sa
@@ -75,4 +78,42 @@ export async function nonLus(sb: SupabaseClient, uids: string[], maintenant = Da
     n.set(l.player_id, (n.get(l.player_id) ?? 0) + Math.min(NON_LUS_MAX_PAR_MATCH, k));
   }
   return n;
+}
+
+/**
+ * La discussion de son équipe : ce que les autres membres y ont écrit depuis
+ * sa dernière lecture, et depuis qu'il en est (pas l'histoire d'avant lui).
+ * Ajouté au compte `n`. Avant la migration (equipe_id absent), rien.
+ */
+async function nonLusEquipes(sb: SupabaseClient, uids: string[], n: Map<string, number>, t: (iso: string) => number) {
+  const { data: places, error } = await sb
+    .from("equipe_membres")
+    .select("equipe_id, joueur, created_at, equipes!inner(dissoute_le)")
+    .in("joueur", uids)
+    .eq("statut", "membre")
+    .is("equipes.dissoute_le", null);
+  const lignes = (places ?? []) as { equipe_id: number; joueur: string; created_at: string }[];
+  const ids = [...new Set(lignes.map((l) => l.equipe_id))];
+  if (error || ids.length === 0) return;
+  const [{ data: suivis }, { data: fils, error: e2 }] = await Promise.all([
+    sb.from("equipe_suivi").select("user_id, equipe_id, lu_jusqua").in("user_id", uids).in("equipe_id", ids),
+    sb
+      .from("messages")
+      .select("equipe_id, auteur, created_at")
+      .eq("canal", "equipe")
+      .in("equipe_id", ids)
+      .order("created_at", { ascending: false })
+      .limit(1000),
+  ]);
+  if (e2) return;
+  const lu = new Map(
+    ((suivis ?? []) as { user_id: string; equipe_id: number; lu_jusqua: string }[]).map((s) => [`${s.user_id}:${s.equipe_id}`, t(s.lu_jusqua)])
+  );
+  for (const l of lignes) {
+    const depuis = Math.max(lu.get(`${l.joueur}:${l.equipe_id}`) ?? 0, t(l.created_at));
+    const k = ((fils ?? []) as (Ecrit & { equipe_id: number })[]).filter(
+      (m) => m.equipe_id === l.equipe_id && m.auteur !== l.joueur && t(m.created_at) > depuis
+    ).length;
+    n.set(l.joueur, (n.get(l.joueur) ?? 0) + Math.min(NON_LUS_MAX_PAR_MATCH, k));
+  }
 }

@@ -5,7 +5,9 @@
 //
 // De haut en bas :
 //   · les équipes qui m'invitent : les rejoindre, c'est signer le Règlement ;
-//   · mon équipe : son écusson, puis le terrain (terrain-places.tsx) avec
+//   · mon équipe : son écusson, « Discussion de l'équipe » (l'onglet Équipe
+//     de l'écran de discussion, matchs/discussion-match.tsx, avec ce que je
+//     n'y ai pas lu), puis le terrain (terrain-places.tsx) avec
 //     ses joueurs à leur place et un + sur chaque place libre jusqu'à 7. Le
 //     + ouvre la liste des joueurs de Bola, et l'invitation par lien pour
 //     un nouveau. Puis ses défis : reçus, envoyés, à jouer ;
@@ -19,6 +21,8 @@
 // pas aux autres. Les règles (délais, limites) sont gardées par la base.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -32,6 +36,7 @@ import { Defier } from "@/components/sfl/equipe/defier";
 import { TerrainPlaces } from "@/components/sfl/matchs/terrain-places";
 import { ChoisirJoueur } from "@/components/sfl/matchs/choisir-joueur";
 import { useSession } from "@/hooks/use-session";
+import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import {
   MAX_EQUIPE,
   MIN_EQUIPE,
@@ -116,6 +121,8 @@ export default function BolaTeamPage() {
   const [choisir, setChoisir] = useState(false);
   const [quitter, setQuitter] = useState<null | "quitter" | "dissoudre">(null);
   const [joueur, setJoueur] = useState<Membre | null>(null);
+  // Ce que je n'ai pas lu dans la discussion de mon équipe.
+  const nonLus = useMonEquipe().nonLus;
 
   useEffect(() => {
     if (!connecte) return;
@@ -262,6 +269,23 @@ export default function BolaTeamPage() {
               </span>
             </div>
           </div>
+          {!apercu && (
+            <Link
+              href="/?discussion=equipe"
+              className="bouton-secondaire bouton--mauve flex h-12 items-center justify-center gap-2.5 text-[15px] font-semibold"
+            >
+              <MessageCircle className="size-[18px]" strokeWidth={2.2} />
+              Discussion de l&apos;équipe
+              {nonLus > 0 && (
+                <span
+                  className="flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] text-[11.5px] leading-none font-bold text-white tabular-nums"
+                  style={{ background: "#FF3B30" }}
+                >
+                  {nonLus > 9 ? "9+" : nonLus}
+                </span>
+              )}
+            </Link>
+          )}
           <TerrainPlaces
             places={MAX_EQUIPE}
             unCamp
