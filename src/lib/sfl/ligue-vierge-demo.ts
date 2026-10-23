@@ -53,7 +53,6 @@ export function demoFeuille(noms: string[], aujourdhui: string, moi: string): Pa
     id: -100,
     organisateurId: moi,
     organisateur: noms[0],
-    genre: "match",
     visibilite: "public",
     jour: aujourdhui,
     heure: "00h00",

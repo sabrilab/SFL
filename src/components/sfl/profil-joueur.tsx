@@ -5,10 +5,11 @@
 // mis en avant »).
 //
 // Ordre de lecture, du plus fort au plus fin :
-//   1. lui : sa carte en grand, son nom dans le lettrage de la Map, le
-//      bouton pour le suivre (suivre.tsx), et quatre chiffres de tête en
-//      Anton (son rang au Pépite d'Or, sa note, ses dimanches, ses abonnés :
-//      les toucher ouvre qui le suit et qui il suit) ;
+//   1. lui : sa carte en grand, son nom dans le lettrage de la Map, ses
+//      abonnés comme sur Instagram (ses abonnés et ses abonnements, « Suivi
+//      par Kader, Anis et 3 autres que tu connais » : suivre.tsx), le bouton
+//      pour le suivre, et trois chiffres de tête en Anton (son rang au Pépite
+//      d'Or, sa note, ses dimanches) ;
 //   2. une phrase qui le résume (fiche-joueur.ts, la même que sur la feuille
 //      de match) ;
 //   3. ses trophées, sur un panneau noir mat sans décor : d'abord les
@@ -35,7 +36,7 @@ import { ComparerCartes } from "@/components/sfl/comparer-cartes";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
-import { Abonnes, BoutonSuivre } from "@/components/sfl/suivre";
+import { BoutonSuivre, ReseauJoueur } from "@/components/sfl/suivre";
 import { FeuilleBadge, Medaille, NOM_TROPHEE, Trophee } from "@/components/sfl/vitrine";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useGrandEcran } from "@/hooks/use-media-query";
@@ -150,15 +151,13 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
           <p className="font-mono text-[12px] text-foreground/45">
             {identite.pseudo(player.name)} · {poste.toLowerCase()}
           </p>
+          <ReseauJoueur nom={player.name} className="mt-[var(--fib-8)]" />
           <BoutonSuivre nom={player.name} className="mt-[var(--fib-8)]" />
         </div>
         <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
           <Chiffre valeur={ordinal(rank)} quoi="Pépite d'Or" />
           <Chiffre valeur={ovr(player.stats)} quoi="Général" />
           <Chiffre valeur={dimanches} quoi={dimanches > 1 ? "Dimanches" : "Dimanche"} />
-          <Abonnes nom={player.name} className="flex min-w-0 flex-1">
-            {(n) => <Chiffre valeur={n} quoi={n > 1 ? "Abonnés" : "Abonné"} />}
-          </Abonnes>
         </div>
         <p className="w-full text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
         {moi && (
