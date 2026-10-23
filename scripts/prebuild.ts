@@ -1,9 +1,12 @@
 // Prébuild — exécuté avant chaque `npm run build` (donc à chaque déploiement
 // Vercel) :
-//   1. copie le schéma vers public/ (bouton « Copier le SQL » de la page
-//      d'installation) ;
-//   2. régénère le module serveur qui embarque le SQL (pour /api/migrate) ;
-//   3. applique le schéma à la base s'il a changé (migration automatique).
+//   1. régénère le module serveur qui embarque le SQL (pour /api/migrate,
+//      réservée à l'admin) ;
+//   2. applique le schéma à la base s'il a changé (migration automatique).
+//
+// Le schéma n'est plus copié dans public/ : il s'y lisait par tout le monde,
+// règles de sécurité comprises. Le copier-coller de la page d'installation le
+// demande à /api/migrate, avec la session de l'admin.
 //
 // L'étape 0, elle, ARRÊTE le build : un joueur présent dans l'effectif mais
 // absent de la table des comptes ne peut pas se connecter du tout, et rien
@@ -15,26 +18,18 @@
 // réseau, elle se contente de le dire et laisse le déploiement continuer —
 // la page d'installation garde le copier-coller en repli.
 
-import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { migrateSchema } from "../src/lib/server/migrate";
 import { ACCOUNTS } from "../src/lib/sfl/auth/accounts";
-import { SEED_ACCOUNTS } from "../src/lib/sfl/auth/seed.server";
 import { SEED_ROSTER } from "../src/lib/sfl/saisie/seed";
 
 // 0 · Personne ne reste à la porte.
 {
   const comptes = new Set(ACCOUNTS.map((a) => a.name));
-  const motsDePasse = new Set(SEED_ACCOUNTS.map((a) => a.name));
   const sansCompte = SEED_ROSTER.filter((r) => !comptes.has(r.name)).map((r) => r.name);
-  const sansMotDePasse = ACCOUNTS.filter((a) => !motsDePasse.has(a.name)).map((a) => a.name);
 
-  if (sansCompte.length > 0 || sansMotDePasse.length > 0) {
-    if (sansCompte.length > 0) {
-      console.error(`[comptes] Dans l'effectif mais sans compte : ${sansCompte.join(", ")}`);
-    }
-    if (sansMotDePasse.length > 0) {
-      console.error(`[comptes] Compte sans mot de passe serveur : ${sansMotDePasse.join(", ")}`);
-    }
+  if (sansCompte.length > 0) {
+    console.error(`[comptes] Dans l'effectif mais sans compte : ${sansCompte.join(", ")}`);
     console.error("[comptes] Régénère la table : npx tsx tools/generate-accounts.ts");
     process.exit(1);
   }
@@ -43,22 +38,19 @@ import { SEED_ROSTER } from "../src/lib/sfl/saisie/seed";
 
 const sql = readFileSync("supabase/schema.sql", "utf8");
 
-// 1 · Copie publique (fallback copier-coller).
-copyFileSync("supabase/schema.sql", "public/supabase-schema.sql");
-
-// 2 · Module serveur — le SQL embarqué pour la route /api/migrate.
+// 1 · Module serveur — le SQL embarqué pour la route /api/migrate.
 writeFileSync(
   "src/lib/sfl/db/schema-sql.server.ts",
   [
     "// GÉNÉRÉ par scripts/prebuild.ts depuis supabase/schema.sql — ne pas modifier.",
-    "// SERVEUR UNIQUEMENT : importé par app/api/migrate/route.ts.",
+    "// SERVEUR UNIQUEMENT : importé par app/api/migrate/route.ts (admin seul).",
     "",
     `export const SCHEMA_SQL = ${JSON.stringify(sql)};`,
     "",
   ].join("\n")
 );
 
-// 3 · Migration automatique.
+// 2 · Migration automatique.
 migrateSchema(sql)
   .then((r) => {
     const label = {

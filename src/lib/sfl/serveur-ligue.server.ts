@@ -29,6 +29,12 @@ export async function appelant(sb: SupabaseClient, req: Request): Promise<User |
   return error ? null : data.user;
 }
 
+/** Admin de la ligue ? Lu dans profiles, jamais dans le jeton ni ses métadonnées. */
+export async function estAdmin(sb: SupabaseClient, id: string): Promise<boolean> {
+  const { data } = await sb.from("profiles").select("is_admin").eq("id", id).maybeSingle();
+  return !!(data as { is_admin?: boolean } | null)?.is_admin;
+}
+
 /** Pseudos qu'aucun joueur ne peut prendre : la ligue et ses services. */
 const RESERVES = ["admin", "sfl", "bola", "ligue", "support"];
 

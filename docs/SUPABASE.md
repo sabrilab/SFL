@@ -10,38 +10,48 @@
   donc à la base de la ligue. `NEXT_PUBLIC_SFL_LECTURE_SEULE=1` (dans
   `.env.local`) coupe la publication — la lecture et le temps réel restent —
   et l'admin voit le motif à la place du bouton « Publier ».
-- **Connexion** : `signIn` vérifie d'abord côté serveur
-  (`auth.signInWithPassword`), et retombe sur la vérification locale tant que
-  les comptes serveur n'existent pas (`ENFORCE_SERVER_AUTH = false` dans
-  `src/lib/sfl/auth/session.ts` — à passer à true une fois l'installation
-  terminée).
+- **Connexion** : `signIn` vérifie côté serveur (`auth.signInWithPassword`),
+  et seulement là. Le repli local (empreintes des mots de passe d'origine
+  embarquées dans l'app) a disparu le 22/10/2026 : voir « Mots de passe ».
 - **Présence** : `src/hooks/use-presence.ts` — partagée et temps réel quand une
   convocation est publiée en base, locale sinon. Le panneau affiche « En
   direct » quand la liste est commune.
-- **Schéma** : `supabase/schema.sql` (copié dans `public/supabase-schema.sql`
-  au build pour le bouton « Copier » de la page d'installation).
-- **Installation guidée** : `/admin/setup` (lien dans Réglages → zone admin).
+- **Schéma** : `supabase/schema.sql`. Il n'est plus copié dans `public/` :
+  le bouton « Copier » de la page d'installation le demande à `/api/migrate`,
+  avec la session de l'admin.
+- **Installation** : `/admin/setup` (Réglages → zone admin) ne fait plus que
+  vérifier la base et la mettre à jour. L'installation d'origine (création
+  des comptes avec leurs mots de passe d'origine, `/api/setup`) a disparu le
+  22/10/2026 : la route n'avait aucun contrôle d'accès.
 
-## Ce que l'admin fait, une seule fois (page /admin/setup)
+## Mots de passe (depuis le 22/10/2026)
 
-1. Restore project + désactiver « Confirm email »
-2. Coller le script SQL dans l'éditeur → Run
-3. Coller le tableau de docs/COMPTES.md → « Créer les comptes »
-4. Rejouer la dernière ligne SQL (rôle admin)
-5. Se reconnecter, publier la convocation depuis le panneau Ma présence
-6. Désactiver « Allow new users to sign up »
-
-## Ensuite (moi)
-
-- Passer `ENFORCE_SERVER_AUTH` à true (le serveur devient l'unique juge).
-- Étapes suivantes : photos de profil (Storage), saison complète, chat.
+- **Aucun mot de passe dans le dépôt ni dans l'app.** `docs/COMPTES.md`, la
+  graine serveur et les empreintes de `accounts.ts` ont disparu : le dépôt
+  était public et les contenait. Ils restent lisibles dans l'historique git :
+  c'est pourquoi chaque compte né d'un mot de passe d'origine doit en
+  choisir un nouveau.
+- **Table `mot_de_passe_a_changer`** : une ligne = un compte qui doit choisir
+  son mot de passe. L'app le retient sur l'écran « Choisis le tien » tant
+  qu'elle existe ; elle disparaît d'elle-même quand le mot de passe change
+  (trigger `on_auth_password_changed` sur `auth.users`). Remplie une fois par
+  la migration (tous les comptes sauf les inscriptions libres), puis par les
+  routes admin.
+- **Mot de passe provisoire** : `/api/comptes/creer` (compte neuf) et
+  `/api/comptes/reinitialiser` (mot de passe perdu) en tirent un au hasard,
+  le rendent une fois à l'admin et marquent le compte « à changer ». Poser
+  un mot de passe ferme les sessions ouvertes du compte.
+- **Admin → Les accès** montre les identifiants et qui doit encore choisir
+  son mot de passe, jamais un mot de passe.
 
 ## Sécurité
 
 - Jamais la clé `service_role` dans l'app ni dans la conversation.
 - `is_admin` ne vient jamais des métadonnées utilisateur (modifiables) :
   posé en SQL, colonne protégée par grant de colonnes.
-- Inscriptions ouvertes UNIQUEMENT le temps de l'étape 3, refermées en 6.
+- « Allow new users to sign up » : FERMÉ dans Supabase. Toutes les créations
+  de compte passent par les routes serveur à clé secrète (`/api/inscription`,
+  `/api/inscription/sociale`, `/api/comptes/creer`).
 
 ## Google / Apple (connexion sans mot de passe)
 
@@ -78,11 +88,14 @@ emails collectés.
 
 Le schéma s'applique tout seul, à deux moments :
 - **à chaque déploiement** (scripts/prebuild.ts, avant le build Vercel) ;
-- **à l'ouverture de la page /admin/setup** (route /api/migrate).
+- **à l'ouverture de la page /admin/setup** (route /api/migrate, admin seul).
 
-Dans les deux cas : empreinte SHA-256 du script mémorisée dans
-`schema_migrations` — si le schéma n'a pas changé, rien n'est exécuté. La
-route ne peut appliquer QUE le schéma figé au build, jamais du SQL arbitraire.
+Dans les deux cas : empreinte du script, signée par la chaîne de connexion
+(HMAC-SHA-256), mémorisée dans `schema_migrations` — si le schéma n'a pas
+changé, rien n'est exécuté. Le registre est fermé à l'API publique (RLS, aucun
+droit pour anon ni authenticated) : personne ne peut y inscrire d'avance
+l'empreinte d'une migration pour la faire sauter. La route ne peut appliquer
+QUE le schéma figé au build, jamais du SQL arbitraire.
 
 ### Activer (une seule fois)
 
