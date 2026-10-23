@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
 
   const { data: match } = await sb
     .from("matchs")
-    .select("id, organisateur, genre, jour, heure, lieu, places")
+    .select("id, organisateur, jour, heure, lieu, places")
     .eq("id", msg.match_id)
     .maybeSingle();
   if (!match) return NextResponse.json({ error: "Match inconnu." }, { status: 404 });
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
   const joignable = (uid: string) =>
     uid !== moi.id && tous.some((p) => p.id === uid && p.valide) && modeDe(uid) !== "rien" && !devant(uid);
 
-  const nomDuMatch = `${match.genre === "exhibition" ? "Exhibition" : "Match"} à ${match.lieu}`;
+  const nomDuMatch = `Match à ${match.lieu}`;
   const url = `/?match=${match.id}&discussion`;
   const tag = `match-${match.id}`;
   const ref = `match:${match.id}`;

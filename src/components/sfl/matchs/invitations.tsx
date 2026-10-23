@@ -44,7 +44,7 @@ export function Invitations({ invitations, onOuvrir }: { invitations: Partie[]; 
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-[15px] font-bold tracking-[-0.2px]">
-            {orga.split(" ")[0]} t&apos;invite{p.genre === "exhibition" ? " · Exhibition" : ""}
+            {orga.split(" ")[0]} t&apos;invite
           </span>
           <span className="truncate text-[13px] font-medium opacity-60">
             {jourCourt(p.jour, aujourdhuiIso())} · {p.heure} · {p.lieu}
