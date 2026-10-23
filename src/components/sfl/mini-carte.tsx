@@ -1,7 +1,8 @@
 "use client";
 
 // La carte d'un joueur en vignette, pour les classements : sa vraie carte
-// Bola (photo comprise), en petit. La toucher l'ouvre en grand, en 3D.
+// Bola (photo comprise), en petit. La toucher l'ouvre en grand, en 3D, avec
+// ses abonnés et de quoi le suivre (card-viewer.tsx).
 
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useCardViewer } from "@/components/sfl/card-viewer";
@@ -60,6 +61,7 @@ export function MiniCarte({
           mode: "simple",
           title: player.name,
           subtitle: detail,
+          joueur: player.name,
           render: (s) => <PlayerCard player={player} size={s} distinction={distinction} />,
         });
       }}

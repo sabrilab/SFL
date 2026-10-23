@@ -19,6 +19,7 @@
 //     près du but, qui s'anime au défilement, sans carrousel (pelouse.tsx ;
 //     Sabri, 22/10 : « que tout se fasse en scroll et qu'il y ait plus de vie »).
 // Les modules « toi » : lib/sfl/actus-toi.ts et cine-toi.tsx.
+// ?exploit=… (la notification d'une félicitation) descend jusqu'à sa rubrique.
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -256,11 +257,20 @@ function EnDirect({ ouvrir }: { ouvrir: (j: number) => void }) {
   );
 }
 
-export function LaCourse({ vueDepart = "fil" }: { vueDepart?: Vue }) {
+export function LaCourse({ vueDepart = "fil", exploit }: { vueDepart?: Vue; exploit?: string | null }) {
   const { saison, journees } = useSeason();
   const { me } = useMyPlayer();
   const router = useRouter();
   const [vue, setVue] = useState<Vue>(vueDepart);
+  // La rubrique d'un exploit, une fois les terrains mesurés.
+  useEffect(() => {
+    if (!exploit) return;
+    const t = setTimeout(() => {
+      const el = [...document.querySelectorAll<HTMLElement>("[data-exploits]")].find((x) => x.dataset.exploits?.split("|").includes(exploit));
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 450);
+    return () => clearTimeout(t);
+  }, [exploit]);
   const aller = (v: Vue) => {
     setVue(v);
     document.getElementById("app-scroll")?.scrollTo({ top: 0 });

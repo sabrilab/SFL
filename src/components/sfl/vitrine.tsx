@@ -667,6 +667,7 @@ function Detenteur({ nom, m, detail }: { nom: string; m: Metal; detail: string }
             mode: "simple",
             title: nom,
             subtitle: detail,
+            joueur: nom,
             render: (s) => <PlayerCard player={p} size={s} />,
           })
         }

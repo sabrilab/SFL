@@ -2754,3 +2754,104 @@ revoke all on public.equipe_suivi from anon, authenticated;
 grant select on public.equipe_suivi to authenticated;
 grant insert (user_id, equipe_id, lu_jusqua, notifs, devant_le) on public.equipe_suivi to authenticated;
 grant update (user_id, equipe_id, lu_jusqua, notifs, devant_le) on public.equipe_suivi to authenticated;
+
+-- ─────────────────── Suivre des joueurs, les féliciter ───────────────────
+-- Demandé par Sabri le 22/10/2026 : voir combien de joueurs en suivent un
+-- autre en touchant sa carte, le suivre d'un geste, retrouver ceux qu'on suit
+-- en premier quand on ajoute des joueurs à un match, et féliciter un joueur
+-- pour un exploit des Actus, ce qui le prévient sur son téléphone et lui
+-- donne de l'XP (lib/sfl/suivis.ts, lib/sfl/felicitations.ts).
+--
+-- Les suivis : une ligne par joueur suivi. Toute la ligue les lit (le nombre
+-- d'abonnés est public, comme qui suit qui) ; chacun ne suit et n'arrête de
+-- suivre que pour lui, un compte validé seulement. Arrêter de suivre efface
+-- la ligne. Le joueur n'écrit que la colonne suivi : le suiveur, c'est lui
+-- (auth.uid()), la date, celle de la base.
+create table if not exists public.suivis (
+  suiveur     uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  suivi       uuid not null references public.profiles(id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  primary key (suiveur, suivi),
+  constraint suivis_pas_soi check (suiveur <> suivi)
+);
+create index if not exists suivis_suivi on public.suivis (suivi);
+
+alter table public.suivis enable row level security;
+
+drop policy if exists "suivis: la ligue lit" on public.suivis;
+create policy "suivis: la ligue lit"
+  on public.suivis for select to authenticated
+  using ((select public.est_membre()) or suiveur = (select auth.uid()));
+
+drop policy if exists "suivis: je suis pour moi" on public.suivis;
+create policy "suivis: je suis pour moi"
+  on public.suivis for insert to authenticated
+  with check (
+    suiveur = (select auth.uid())
+    and (select public.est_membre())
+    and exists (select 1 from public.profiles p where p.id = suivi and p.valide)
+  );
+
+drop policy if exists "suivis: j'arrête de suivre" on public.suivis;
+create policy "suivis: j'arrête de suivre"
+  on public.suivis for delete to authenticated
+  using (suiveur = (select auth.uid()));
+
+revoke all on public.suivis from anon, authenticated;
+grant select, delete on public.suivis to authenticated;
+grant insert (suivi) on public.suivis to authenticated;
+
+-- Les félicitations : un joueur en félicite un autre pour un exploit des
+-- Actus (l'homme du dimanche, le chiffre, le duo, ils montent, un badge
+-- décroché, l'équipe type). L'exploit est la clé que l'app tire de la saison
+-- (« 0-2-mvp-Kader » : saison, journée, famille, nom de saison du joueur,
+-- lib/sfl/exploits.ts). Une félicitation par joueur et par exploit, jamais à
+-- soi-même. Toute la ligue les lit (combien, et qui) ; chacun retire les
+-- siennes.
+--
+-- Elles donnent de l'XP (lib/sfl/missions.ts, calculé à la lecture : une
+-- félicitation retirée retire son XP). C'est pourquoi l'app ne les écrit
+-- pas elle-même : la route /api/felicitations vérifie sur la saison que
+-- l'exploit existe et qu'il est bien à ce joueur, puis l'enregistre avec la
+-- clé secrète. Aucun exploit inventé ne passe.
+create table if not exists public.felicitations (
+  id          bigint generated always as identity primary key,
+  de          uuid not null references public.profiles(id) on delete cascade,
+  a           uuid not null references public.profiles(id) on delete cascade,
+  exploit     text not null check (char_length(exploit) <= 120),
+  saison      integer not null check (saison between 0 and 999),
+  j           integer not null check (j between 1 and 999),
+  famille     text not null check (famille in ('mvp', 'chiffre', 'duo', 'montent', 'badge', 'equipe')),
+  created_at  timestamptz not null default now(),
+  constraint felicitations_pas_soi check (de <> a),
+  constraint felicitations_une_fois unique (de, a, exploit),
+  constraint felicitations_cle check (exploit like saison::text || '-' || j::text || '-' || famille || '-_%')
+);
+create index if not exists felicitations_a on public.felicitations (a, exploit);
+
+alter table public.felicitations enable row level security;
+
+drop policy if exists "felicitations: la ligue lit" on public.felicitations;
+create policy "felicitations: la ligue lit"
+  on public.felicitations for select to authenticated
+  using ((select public.est_membre()) or de = (select auth.uid()) or a = (select auth.uid()));
+
+drop policy if exists "felicitations: je retire la mienne" on public.felicitations;
+create policy "felicitations: je retire la mienne"
+  on public.felicitations for delete to authenticated
+  using (de = (select auth.uid()));
+
+revoke all on public.felicitations from anon, authenticated;
+grant select, delete on public.felicitations to authenticated;
+
+-- Les notifications déjà parties, par clé : « X te suit » ne part qu'une fois
+-- par paire, et « X t'a félicité » qu'une fois par exploit et par joueur,
+-- même si l'on arrête de suivre (ou retire sa félicitation) puis qu'on
+-- recommence. Seules les routes serveur (clé secrète) la lisent et l'écrivent.
+create table if not exists public.push_envoyes (
+  cle  text primary key check (char_length(cle) <= 300),
+  le   timestamptz not null default now()
+);
+
+alter table public.push_envoyes enable row level security;
+revoke all on public.push_envoyes from anon, authenticated;
