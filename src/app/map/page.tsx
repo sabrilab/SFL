@@ -49,6 +49,8 @@ import { feuilleDeConvocation, feuilleDeJournee, type TerrainFeuille } from "@/l
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
 import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
 import { Invitations, invitationsDe } from "@/components/sfl/matchs/invitations";
+import { InvitationsEquipe } from "@/components/sfl/equipe/invitation-map";
+import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { useParties } from "@/hooks/use-parties";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
 import { inscrits, libelleJour, placesLibres, type Partie } from "@/lib/sfl/matchs";
@@ -90,6 +92,7 @@ import { cleVille, type VillePlan } from "@/components/sfl/map/joueurs";
 import { villeOuLigue } from "@/lib/sfl/villes";
 import { photoMiniature, photoPerso } from "@/lib/sfl/photos";
 import { nomAffiche } from "@/lib/sfl/identites";
+import { communeDeLAdresse } from "@/lib/sfl/terrains-nord";
 import { useVillesRevision } from "@/hooks/use-villes";
 import { usePhotoRevision } from "@/hooks/use-player-photo";
 import { useIdentitesRevision } from "@/hooks/use-identites";
@@ -441,7 +444,7 @@ export default function MapPage() {
         heure: x.heure,
         terrain:
           x.lat != null && x.lng != null
-            ? { id: -x.id, nom: x.lieu, adresse: x.adresse ?? "", lat: x.lat, lng: x.lng }
+            ? { id: -x.id, nom: x.lieu, adresse: x.adresse ?? "", lat: x.lat, lng: x.lng, commune: communeDeLAdresse(x.adresse) }
             : null,
         presents: venus,
         effectif: x.places,
@@ -586,6 +589,8 @@ export default function MapPage() {
     else choisirSticker(a.cle);
   }, [affiches, choisirSticker, ouvrirDiscussion, ouvrirEquipe]);
   const invitations = useMemo(() => invitationsDe(parties, moi), [parties, moi]);
+  // Les équipes du mode Team qui m'invitent : leur carte au-dessus de celles des matchs.
+  const invitationsEquipe = useMonEquipe().invitations;
 
   // Le carrousel et le plan vont ensemble : faire glisser les cartes choisit
   // celle qui s'arrête au centre (le plan suit), et choisir sur le plan amène
@@ -875,6 +880,7 @@ export default function MapPage() {
             molette, le pincement et le glisser de la souris au plan, sur
             ordinateur (map/gestes-ordinateur.ts). */}
         <div data-traverse className="absolute inset-x-0 z-[510] flex flex-col items-center gap-3" style={{ bottom: bas }}>
+          <InvitationsEquipe invitations={invitationsEquipe} moi={moi} />
           <Invitations invitations={invitations} onOuvrir={(p) => choisirSticker(`m${p.id}`)} />
           <div data-traverse className="flex w-full items-center justify-center gap-2 px-4">
             {/* Tout joueur ouvre un match ; l'admin garde en plus la journée de ligue. */}
@@ -1143,6 +1149,7 @@ export default function MapPage() {
           jourInitial={ouvrir.jour}
           heureInitial={ouvrir.heure}
           moi={moi}
+          ici={toi}
           onSfl={
             admin
               ? () => {

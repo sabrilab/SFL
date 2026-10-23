@@ -11,11 +11,16 @@
 // La route agit avec la clé secrète, donc elle ne croit pas l'appelant sur
 // parole : le suivi doit exister dans la base, être le sien, et avoir moins
 // de cinq minutes.
+//
+// Elle est suivie comme les autres (lib/server/push-envoi.ts) : motif
+// « suivi », dont le geste attendu est de suivre en retour (la base le
+// reconnaît, trigger suivis_push_effet), ou « suivi-retour » quand ils se
+// suivent déjà et qu'il n'y a rien à faire.
 
 import { NextRequest, NextResponse } from "next/server";
-import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
+import { prevenir, type Envoi } from "@/lib/server/push-envoi";
+import { cleVapid } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
-import type { Notif } from "@/lib/sfl/push";
 
 export const maxDuration = 30;
 
@@ -86,26 +91,21 @@ export async function POST(req: NextRequest) {
   const pseudo = `@${lui.username.replace(/^@/, "")}`;
   const leSuivent = new Set(((retour ?? []) as { suiveur: string }[]).map((r) => r.suiveur));
 
-  const envois = new Map<string, Notif>();
+  const envois = new Map<string, Envoi>();
   for (const uid of cibles) {
     const autres = Math.max(0, ((recents ?? []) as { suivi: string }[]).filter((r) => r.suivi === uid).length - 1);
     envois.set(uid, {
-      titre: couper(autres > 0 ? `${prenom} et ${autres} ${autres > 1 ? "autres" : "autre"} te suivent` : `${prenom} te suit`, 60),
-      texte: couper(`${pseudo} · ${leSuivent.has(uid) ? "Vous vous suivez" : "Suivre en retour"}`, 180),
-      url: `/recherche?joueur=${encodeURIComponent(lui.name)}`,
-      tag: "suivi",
+      notif: {
+        titre: couper(autres > 0 ? `${prenom} et ${autres} ${autres > 1 ? "autres" : "autre"} te suivent` : `${prenom} te suit`, 60),
+        texte: couper(`${pseudo} · ${leSuivent.has(uid) ? "Vous vous suivez" : "Suivre en retour"}`, 180),
+        url: `/recherche?joueur=${encodeURIComponent(lui.name)}`,
+        tag: "suivi",
+      },
+      motif: leSuivent.has(uid) ? "suivi-retour" : "suivi",
+      ref: `joueur:${moi.id}`,
     });
   }
 
-  const { data: abonnements } = await sb.from("push_abonnements").select("endpoint, p256dh, auth, user_id").in("user_id", cibles);
-  const resultats = await Promise.all(
-    ((abonnements ?? []) as (Abonnement & { user_id: string })[]).map(async (ab) => ({
-      ab,
-      r: await envoyer(ab, envois.get(ab.user_id), cle),
-    }))
-  );
-  const morts = resultats.filter((x) => x.r === "mort").map((x) => x.ab.endpoint);
-  if (morts.length > 0) await sb.from("push_abonnements").delete().in("endpoint", morts);
-
-  return NextResponse.json({ envoyes: new Set(resultats.filter((x) => x.r === "envoye").map((x) => x.ab.user_id)).size });
+  const { recus } = await prevenir(sb, cle, envois);
+  return NextResponse.json({ envoyes: recus.size });
 }

@@ -309,6 +309,7 @@ function SansEquipe({
 }) {
   return (
     <section
+      data-ecran-fixe=""
       className={cn("fixed inset-x-0 top-0 z-[60] flex h-dvh flex-col bg-background", className)}
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >

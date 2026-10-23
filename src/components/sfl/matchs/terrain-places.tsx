@@ -15,6 +15,9 @@
 //
 // Une équipe du mode Team (unCamp) occupe tout le terrain, en blanc, dans une
 // formation fixe (FORMATION) : le capitaine dans les buts, l'attaque au fond.
+// Un invité qui n'a pas encore répondu attend sur sa place, en pointillé, sa
+// carte voilée ; le mode Team ajoute à son prénom le temps qui reste avant
+// que l'invitation tombe (« Adil · 71 h »).
 
 import { useMemo } from "react";
 import { Plus, X } from "lucide-react";
@@ -28,8 +31,10 @@ import { cn } from "@/lib/utils";
 export interface Occupant {
   cle: string;
   nom: string;
-  /** Invité sans réponse : sa carte attend, un peu effacée. */
+  /** Invité sans réponse : sa carte attend, voilée, en pointillé. */
   enAttente?: boolean;
+  /** Le temps qui lui reste pour répondre (« 71 h »), à côté de son prénom. */
+  reste?: string;
 }
 
 const BLANC = { fond: "#f4f3ef", encre: "#0a0b0d" };
@@ -86,7 +91,7 @@ export function TerrainPlaces({
       const cases = FORMATION.slice(0, places).map(([fx, fy], i) => {
         const u = fx * l;
         const v = fy * h;
-        return { i, chezMoi: true, u, v, etiquette: 88, ...projeter(u, v, 0, VUE_EQUIPE) };
+        return { i, chezMoi: true, u, v, etiquette: 112, ...projeter(u, v, 0, VUE_EQUIPE) };
       });
       return { cases, vu: VUE_EQUIPE, cadre: hauteur, decalage: 0 };
     }
@@ -136,14 +141,16 @@ export function TerrainPlaces({
                       type="button"
                       disabled={!onOccupant}
                       onClick={() => onOccupant?.(occupant)}
-                      aria-label={onOccupant ? (retirable && !cestMoi ? `Retirer ${occupant.nom}` : occupant.nom) : occupant.nom}
+                      aria-label={
+                        onOccupant && retirable && !cestMoi ? `Retirer ${occupant.nom}` : `${occupant.nom}${occupant.enAttente ? ", invité" : ""}`
+                      }
                       className={cn(
                         "relative flex rounded-[15px] transition-transform active:scale-95 disabled:active:scale-100",
                         cestMoi && "bg-white p-[3px]",
-                        occupant.enAttente && "opacity-45"
+                        occupant.enAttente && "border-[1.5px] border-dashed border-white/70 p-[2px]"
                       )}
                     >
-                      <span className={cn("flex rounded-[12px]", cestMoi && "bg-[#1b1d21] p-[2px]")}>
+                      <span className={cn("flex rounded-[12px]", cestMoi && "bg-[#1b1d21] p-[2px]", occupant.enAttente && "opacity-45")}>
                         <Pastille player={parNom.get(occupant.nom)} nom={occupant.nom} cote={42} onglet={onglet} />
                       </span>
                       {retirable && onOccupant && !cestMoi && (
@@ -159,12 +166,18 @@ export function TerrainPlaces({
                       className={cn(
                         "truncate rounded-full py-[2px] leading-[15px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]",
                         // Quatre ou cinq par rang : l'étiquette se resserre pour garder le prénom.
-                        etiquette < 64 ? "px-[4px] text-[10px]" : "px-[7px] text-[11px]",
-                        occupant.enAttente && "opacity-60"
+                        etiquette < 64 ? "px-[4px] text-[10px]" : "px-[7px] text-[11px]"
                       )}
-                      style={{ background: onglet.fond, color: onglet.encre, fontWeight: cestMoi ? 800 : 600, maxWidth: etiquette }}
+                      style={{
+                        // Voilée mais opaque : les lignes du terrain ne passent pas au travers.
+                        background: occupant.enAttente ? `color-mix(in srgb, ${onglet.fond} 72%, #1b1d21)` : onglet.fond,
+                        color: onglet.encre,
+                        fontWeight: cestMoi ? 800 : 600,
+                        maxWidth: etiquette,
+                      }}
                     >
                       {cestMoi ? "Toi" : prenom(occupant.nom)}
+                      {occupant.reste && <span className="font-medium tabular-nums opacity-60"> · {occupant.reste}</span>}
                     </span>
                   </>
                 ) : (

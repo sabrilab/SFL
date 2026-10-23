@@ -4,28 +4,41 @@
 // (lib/sfl/discussion-equipe.ts). L'écran de discussion en fait son onglet
 // Équipe et le nombre posé à côté ; la page Team, le nombre sur son bouton
 // de discussion ; la barre d'onglets, la pastille de l'icône.
+// Aussi les équipes qui m'invitent (passe du 23/10) : la carte posée sur la
+// Map (equipe/invitation-map.tsx) et la pastille de l'onglet Map.
 //
 // Un seul chargement et un seul abonnement temps réel pour tout l'écran,
 // comme les discussions des matchs (hooks/use-discussions-match.ts).
 // Recompté à l'ouverture, au retour dans l'app, à chaque message d'une
-// équipe, quand j'entre dans une équipe ou en sors, et dès que la discussion
-// est lue.
+// équipe, quand j'entre dans une équipe ou en sors, quand on m'invite ou que
+// mon invitation tombe, dès que la discussion est lue, et après un geste de
+// la page Team (signalerEquipe).
 
 import { useSyncExternalStore } from "react";
 import { useSession } from "@/hooks/use-session";
 import { EVT_LU_EQUIPE, ecouterMonEquipe, nonLusEquipe } from "@/lib/sfl/discussion-equipe";
-import { monEquipe, type Equipe } from "@/lib/sfl/equipes";
+import { mesInvitations, monEquipe, type Equipe } from "@/lib/sfl/equipes";
 import { monId } from "@/lib/sfl/matchs";
 
 export interface MonEquipe {
   equipe: Equipe | null;
+  /** Les équipes qui m'invitent, invitation encore valable. */
+  invitations: Equipe[];
   /** Les messages de sa discussion que je n'ai pas lus, dix au plus. */
   nonLus: number;
   /** Faux tant que le premier chargement n'est pas revenu. */
   charge: boolean;
 }
 
-const VIDE: MonEquipe = { equipe: null, nonLus: 0, charge: false };
+const VIDE: MonEquipe = { equipe: null, invitations: [], nonLus: 0, charge: false };
+
+/** Émis par la page Team après un geste (signer, refuser) : on relit tout de suite. */
+const EVT_EQUIPE = "sfl-mon-equipe";
+
+export function signalerEquipe(): void {
+  window.dispatchEvent(new Event(EVT_EQUIPE));
+}
+
 let etat = VIDE;
 const abonnes = new Set<() => void>();
 let arreter: (() => void) | null = null;
@@ -52,9 +65,11 @@ function lancer(): () => void {
     enCours = true;
     try {
       const moi = await monId();
-      const equipe = moi ? await monEquipe(moi) : null;
+      const [equipe, invitations]: [Equipe | null, Equipe[]] = moi
+        ? await Promise.all([monEquipe(moi), mesInvitations(moi).catch(() => etat.invitations)])
+        : [null, []];
       const nonLus = moi && equipe ? await nonLusEquipe(equipe, moi) : 0;
-      if (vivant) publier({ equipe, nonLus, charge: true });
+      if (vivant) publier({ equipe, invitations, nonLus, charge: true });
       if (vivant && moi && !tempsReel) {
         tempsReel = true;
         stopTempsReel = ecouterMonEquipe(moi, () => void charger());
@@ -74,11 +89,13 @@ function lancer(): () => void {
 
   recompter();
   window.addEventListener(EVT_LU_EQUIPE, recompter);
+  window.addEventListener(EVT_EQUIPE, recompter);
   document.addEventListener("visibilitychange", recompter);
   return () => {
     vivant = false;
     stopTempsReel();
     window.removeEventListener(EVT_LU_EQUIPE, recompter);
+    window.removeEventListener(EVT_EQUIPE, recompter);
     document.removeEventListener("visibilitychange", recompter);
     etat = VIDE;
   };
