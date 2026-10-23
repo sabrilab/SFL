@@ -461,8 +461,9 @@ function JourneeRecapComplet({ j }: { j: number }) {
           <section>
             <ModuleTitle label="Story 9:16 · générée auto" title="Le visuel de la journée" />
             <div className="flex items-stretch gap-4">
+              {/* L'image de la story : nuit dans les deux modes (classe dark). */}
               <div
-                className="relative w-[46%] shrink-0 overflow-hidden rounded-3xl bg-gradient-to-b from-[#1a2030] to-[#070707] p-4"
+                className="dark relative w-[46%] shrink-0 overflow-hidden rounded-3xl bg-gradient-to-b from-[#1a2030] to-[#070707] p-4 text-foreground"
                 style={{ aspectRatio: "9/16" }}
               >
                 <p className="mono-label text-primary">SFL · J{lastJ.j}</p>

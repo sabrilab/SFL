@@ -114,13 +114,13 @@ export function MatchArena({ me }: { me: string }) {
       {/* Le portefeuille bleu — la monnaie qui ne s'achète pas */}
       <div className="glass flex items-center justify-between gap-3 rounded-[20px] px-4 py-3">
         <div className="min-w-0">
-          <p className="mono-label text-[#6FA8FF]">Ballons bleus</p>
+          <p className="mono-label text-[#2f6fd6] dark:text-[#6FA8FF]">Ballons bleus</p>
           <p className="mt-1 text-[12.5px] leading-snug text-foreground/45">
             +{MATCH_WIN_BLUE} par match gagné · {victoires} victoire{victoires > 1 ? "s" : ""}.
             Ils débloqueront l&apos;échange de cartes entre joueurs.
           </p>
         </div>
-        <span className="shrink-0 text-[26px] leading-none font-extrabold tracking-tight tabular-nums text-[#6FA8FF]">
+        <span className="shrink-0 text-[26px] leading-none font-extrabold tracking-tight tabular-nums text-[#2f6fd6] dark:text-[#6FA8FF]">
           {bleus} <span className="text-[15px]">🔵</span>
         </span>
       </div>
@@ -131,7 +131,7 @@ export function MatchArena({ me }: { me: string }) {
       >
         <div className="glass-soft flex items-center justify-between rounded-[18px] px-4 py-3">
           <span className="text-[13.5px] font-semibold">Duel direct contre un ami</span>
-          <span className="mono-label text-[#6FA8FF]">+{DUEL_DIRECT_BLUE} 🔵</span>
+          <span className="mono-label text-[#2f6fd6] dark:text-[#6FA8FF]">+{DUEL_DIRECT_BLUE} 🔵</span>
         </div>
       </Locked>
 

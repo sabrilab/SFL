@@ -27,6 +27,14 @@ export interface Notif {
 export const TITRE_MAX = 60;
 export const TEXTE_MAX = 180;
 
+/**
+ * Un lien de l'app : un chemin qui commence par une seule barre. « //site »
+ * ou « /\site » mèneraient hors de l'app, sur le site de n'importe qui.
+ */
+export function estLienDeLApp(url: string): boolean {
+  return /^\/(?![/\\])/.test(url);
+}
+
 export function estNotif(v: unknown): v is Notif {
   if (!v || typeof v !== "object") return false;
   const n = v as Record<string, unknown>;
@@ -38,6 +46,6 @@ export function estNotif(v: unknown): v is Notif {
     n.texte.trim().length > 0 &&
     n.texte.length <= TEXTE_MAX &&
     typeof n.url === "string" &&
-    n.url.startsWith("/")
+    estLienDeLApp(n.url)
   );
 }

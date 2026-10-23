@@ -10,11 +10,19 @@
 //
 // Le tirage équilibré reste là, mais à sa place : un coup de main pour les
 // joueurs qu'on n'a pas encore placés, jamais un passage obligé.
+//
+// Depuis le 23/10, chaque match se joue les Noirs contre les Blancs (Sabri :
+// « On oublie les couleurs […]. Noir contre blanc, juste match 1 et match 2,
+// c'est ça qui les diffère ») : on compose les Noirs et les Blancs de chaque
+// match, et chacun peut recevoir ici son heure, son terrain et son lieu
+// (vides : ceux de la journée).
 
 import { Fragment, useMemo, useState } from "react";
 import { Dices, Users, Eraser } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { PointMaillot } from "@/components/sfl/point-maillot";
 import { cn } from "@/lib/utils";
 import {
   generateBalancedTeams,
@@ -22,15 +30,14 @@ import {
   type BalancedPlayer,
   type BalancedTeam,
 } from "@/lib/sfl/saisie/mutations";
+import { lireEquipe } from "@/lib/sfl/saisie/equipes";
 
-const TEAM_COLORS: Record<string, string> = {
-  Orange: "#F9CB9C",
-  Bleu: "#C9DAF8",
-  Vert: "#D9EAD3",
-  Jaune: "#FFF2CC",
-  Rouge: "#F4CCCC",
-  Gris: "#CCCCCC",
-};
+/** L'heure, le terrain et le lieu d'un match ; vides, ceux de la journée. */
+export interface ReglageMatch {
+  heure?: string;
+  terrain?: string;
+  lieuId?: number;
+}
 
 /** Le vestiaire : les joueurs retenus qu'on n'a pas encore placés. */
 const A_PLACER = "—";
@@ -40,6 +47,7 @@ export function NewJourneeSheet({
   onOpenChange,
   roster,
   initialChecked = [],
+  lieux = [],
   onCreate,
 }: {
   open: boolean;
@@ -48,7 +56,10 @@ export function NewJourneeSheet({
   roster: { name: string; ovr: number; actif: boolean }[];
   /** Pré-cochés à l'ouverture (ex. confirmés de la convocation). */
   initialChecked?: string[];
-  onCreate: (teams: BalancedTeam[]) => void;
+  /** Les lieux de la ligue (saison.terrains). */
+  lieux?: { id: number; nom: string }[];
+  /** Les équipes, Noirs puis Blancs match par match, et le réglage de chaque match. */
+  onCreate: (teams: BalancedTeam[], reglages: ReglageMatch[]) => void;
 }) {
   const [teamCount, setTeamCount] = useState(2);
   // joueur → équipe (ou A_PLACER). Absent de la table = pas retenu.
@@ -56,6 +67,14 @@ export function NewJourneeSheet({
     Object.fromEntries(initialChecked.map((n) => [n, A_PLACER]))
   );
   const [pinceau, setPinceau] = useState<string>(TEAM_PRESETS[0]);
+  // Match par match (0 pour le Match 1) : son heure, son terrain, son lieu.
+  const [reglages, setReglages] = useState<ReglageMatch[]>([]);
+  const regler = (i: number, r: ReglageMatch) =>
+    setReglages((prev) => {
+      const next = [...prev];
+      next[i] = { ...next[i], ...r };
+      return next;
+    });
 
   const equipes = useMemo(() => TEAM_PRESETS.slice(0, teamCount), [teamCount]);
   const ovrDe = useMemo(() => new Map(roster.map((r) => [r.name, r.ovr])), [roster]);
@@ -108,6 +127,7 @@ export function NewJourneeSheet({
     setAffectation(Object.fromEntries(initialChecked.map((n) => [n, A_PLACER])));
     setTeamCount(2);
     setPinceau(TEAM_PRESETS[0]);
+    setReglages([]);
   }
 
   const equipesGarnies = equipes.filter((e) => (parEquipe.get(e)?.length ?? 0) > 0);
@@ -133,7 +153,7 @@ export function NewJourneeSheet({
         totalOvr: joueurs.reduce((s, p) => s + p.ovr, 0),
       };
     });
-    onCreate(teams);
+    onCreate(teams, Array.from({ length: teamCount / 2 }, (_, i) => reglages[i] ?? {}));
   }
 
   return (
@@ -150,9 +170,9 @@ export function NewJourneeSheet({
         </SheetHeader>
 
         <div className="flex flex-col gap-4 px-1 pb-8">
-          {/* Combien d'équipes */}
+          {/* Combien de matchs */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold">Terrains</span>
+            <span className="text-sm font-semibold">Matchs</span>
             <div className="flex gap-1">
               {[2, 4, 6].map((n) => (
                 <button
@@ -202,13 +222,14 @@ export function NewJourneeSheet({
                       membres.reduce((s, m) => s + (ovrDe.get(m) ?? 75), 0) / membres.length
                     )
                   : 0;
-                // Un match par terrain : les équipes vont deux par deux.
-                const terrain = eq !== A_PLACER && i % 2 === 0 && teamCount > 2 ? i / 2 + 1 : null;
+                // Les Noirs et les Blancs de chaque match, deux par deux.
+                const lu = eq === A_PLACER ? null : lireEquipe(eq);
+                const match = eq !== A_PLACER && i % 2 === 0 && teamCount > 2 ? i / 2 + 1 : null;
                 return (
                   <Fragment key={eq}>
-                  {terrain != null && (
+                  {match != null && (
                     <span className={cn("mono-label w-full text-muted-foreground", i > 0 && "mt-1")}>
-                      Terrain {terrain}
+                      Match {match}
                     </span>
                   )}
                   {eq === A_PLACER && teamCount > 2 && <span className="mt-1 w-full" />}
@@ -222,13 +243,8 @@ export function NewJourneeSheet({
                         : "bouton-secondaire text-muted-foreground"
                     )}
                   >
-                    {eq !== A_PLACER && (
-                      <span
-                        className="size-2.5 rounded-full ring-1 ring-black/20"
-                        style={{ background: TEAM_COLORS[eq] ?? "#ddd" }}
-                      />
-                    )}
-                    {eq === A_PLACER ? "Vestiaire" : eq}
+                    {lu && <PointMaillot camp={lu.camp} />}
+                    {eq === A_PLACER ? "Vestiaire" : (lu?.camp ?? eq)}
                     <span className="tabular-nums opacity-70">{n}</span>
                     {moyenne > 0 && eq !== A_PLACER && (
                       <span className="text-[10px] opacity-55 tabular-nums">Ø{moyenne}</span>
@@ -271,6 +287,7 @@ export function NewJourneeSheet({
                 const eq = affectation[r.name];
                 const place = eq !== undefined && eq !== A_PLACER;
                 const auVestiaire = eq === A_PLACER;
+                const lu = place ? lireEquipe(eq) : null;
                 return (
                   <button
                     key={r.name}
@@ -288,14 +305,17 @@ export function NewJourneeSheet({
                     )}
                   >
                     <span className="flex min-w-0 items-center gap-1.5">
-                      <span
-                        className={cn(
-                          "size-2.5 shrink-0 rounded-full ring-1",
-                          place ? "ring-black/20" : "ring-border"
-                        )}
-                        style={place ? { background: TEAM_COLORS[eq] ?? "#ddd" } : undefined}
-                      />
+                      {lu ? (
+                        <PointMaillot camp={lu.camp} />
+                      ) : (
+                        <span className="size-2.5 shrink-0 rounded-full ring-1 ring-border" />
+                      )}
                       <span className="truncate">{r.name}</span>
+                      {lu && teamCount > 2 && (
+                        <span className="shrink-0 text-[10px] font-semibold text-muted-foreground tabular-nums">
+                          M{lu.n}
+                        </span>
+                      )}
                     </span>
                     <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
                       {r.ovr}
@@ -304,6 +324,46 @@ export function NewJourneeSheet({
                 );
               })}
             </div>
+          </div>
+
+          {/* Chaque match : son heure, son terrain sur place, son lieu. */}
+          <div className="flex flex-col gap-2.5">
+            <span className="text-sm font-semibold">{teamCount > 2 ? "Les matchs" : "Le match"}</span>
+            {Array.from({ length: teamCount / 2 }, (_, i) => {
+              const r = reglages[i] ?? {};
+              return (
+                <div key={i} className="flex flex-col gap-1.5">
+                  {teamCount > 2 && <span className="mono-label text-muted-foreground">Match {i + 1}</span>}
+                  <div className="grid grid-cols-[4.75rem_5.5rem_minmax(0,1fr)] gap-2">
+                    <Input
+                      value={r.heure ?? ""}
+                      placeholder="Heure"
+                      aria-label={`Heure du Match ${i + 1}`}
+                      onChange={(e) => regler(i, { heure: e.target.value })}
+                    />
+                    <Input
+                      value={r.terrain ?? ""}
+                      placeholder="Terrain"
+                      aria-label={`Terrain du Match ${i + 1}`}
+                      onChange={(e) => regler(i, { terrain: e.target.value })}
+                    />
+                    <select
+                      value={r.lieuId ?? ""}
+                      aria-label={`Lieu du Match ${i + 1}`}
+                      onChange={(e) => regler(i, { lieuId: e.target.value ? Number(e.target.value) : undefined })}
+                      className="h-9 min-w-0 rounded-md border border-input bg-transparent px-2 text-sm"
+                    >
+                      <option value="">Lieu de la journée</option>
+                      {lieux.map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.nom}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {blocage && <p className="text-center text-xs text-muted-foreground">{blocage}</p>}

@@ -19,7 +19,7 @@ export type FamilleNotif = "vestiaire" | "match" | "equipe" | "ligue" | "annonce
 export const FAMILLES_NOTIF: { id: FamilleNotif; label: string }[] = [
   { id: "vestiaire", label: "Vestiaire" },
   { id: "match", label: "Matchs entre joueurs" },
-  { id: "equipe", label: "Discussion d'équipe" },
+  { id: "equipe", label: "Bola Team" },
   { id: "ligue", label: "Ligue" },
   { id: "annonce", label: "Annonces de l'admin" },
 ];
@@ -53,6 +53,10 @@ export const MOTIFS_NOTIF = {
   "match-modifie": { famille: "match", label: "Nouveau rendez-vous", effet: AU_MATCH },
   "match-annule": { famille: "match", label: "Match annulé", effet: null },
 
+  "equipe-invitation": { famille: "equipe", label: "Invitation à signer", effet: "a répondu à l'invitation" },
+  "equipe-relance": { famille: "equipe", label: "Le capitaine relance", effet: "a répondu à l'invitation" },
+  "equipe-signature": { famille: "equipe", label: "Un joueur a signé", effet: null },
+  "equipe-active": { famille: "equipe", label: "L'équipe est active", effet: null },
   "equipe-message": { famille: "equipe", label: "Un nouveau message", effet: A_L_EQUIPE },
   "equipe-reponse": { famille: "equipe", label: "On lui répond", effet: A_L_EQUIPE },
   "equipe-cite": { famille: "equipe", label: "On le cite (@pseudo)", effet: A_L_EQUIPE },
@@ -63,6 +67,8 @@ export const MOTIFS_NOTIF = {
   suivi: { famille: "ligue", label: "Un joueur le suit", effet: "l'a suivi en retour" },
   // Déjà suivi par lui : il n'y a rien à faire en retour.
   "suivi-retour": { famille: "ligue", label: "On le suit en retour", effet: null },
+  // La veille de la J3 : où il tomberait si on coupait ce soir (lib/sfl/divisions.ts).
+  divisions: { famille: "ligue", label: "L'annonce des divisions", effet: null },
 
   annonce: { famille: "annonce", label: "Annonce à toute la ligue", effet: null },
 } as const satisfies Record<string, DefMotif>;
@@ -76,13 +82,19 @@ export function defMotif(m: string): DefMotif {
   return estMotif(m) ? MOTIFS_NOTIF[m] : { famille: "annonce", label: m, effet: null };
 }
 
+function invitations(oui: number, non: number): string {
+  return `${oui} ${oui > 1 ? "acceptées" : "acceptée"} · ${non} ${non > 1 ? "refusées" : "refusée"}`;
+}
+
 /**
  * Les motifs qui attendent un oui ou un non (push_envois.effet : accepte,
- * refuse), dits en clair. Les missions : une seule acceptée fait un oui ;
- * passer sans rien accepter, un non.
+ * refuse), dits en clair. Une invitation d'équipe : signer fait un oui ;
+ * la refuser, ou signer ailleurs, un non. Les missions : une seule acceptée
+ * fait un oui ; passer sans rien accepter, un non.
  */
 export const REPONSES_NOTIF: Partial<Record<MotifNotif, (oui: number, non: number) => string>> = {
-  "match-invitation": (oui, non) =>
-    `${oui} ${oui > 1 ? "acceptées" : "acceptée"} · ${non} ${non > 1 ? "refusées" : "refusée"}`,
+  "match-invitation": invitations,
+  "equipe-invitation": invitations,
+  "equipe-relance": invitations,
   missions: (oui, non) => `${oui} ${oui > 1 ? "ont accepté" : "a accepté"} · ${non} ${non > 1 ? "ont passé" : "a passé"}`,
 };

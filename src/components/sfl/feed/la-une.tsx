@@ -81,8 +81,8 @@ function Filet({ epais = false }: { epais?: boolean }) {
       style={{
         height: epais ? 3 : 1,
         background: epais
-          ? "linear-gradient(90deg, rgba(255,255,255,0.55), rgba(255,255,255,0.18))"
-          : "rgba(255,255,255,0.14)",
+          ? "linear-gradient(90deg, rgb(var(--contraste-rgb) / 0.55), rgb(var(--contraste-rgb) / 0.18))"
+          : "rgb(var(--contraste-rgb) / 0.14)",
       }}
     />
   );
@@ -182,8 +182,8 @@ export function LaUne({
             <div
               key={l.player}
               className={cn(
-                "flex items-baseline gap-2 border-b border-white/6 py-[7px] text-[12.5px]",
-                i === 0 && "border-b-white/14"
+                "flex items-baseline gap-2 border-b border-contraste/6 py-[7px] text-[12.5px]",
+                i === 0 && "border-b-contraste/14"
               )}
             >
               <span

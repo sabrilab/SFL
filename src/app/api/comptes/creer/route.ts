@@ -5,57 +5,37 @@
 // aucun moyen de se connecter. Cette route lui fabrique ses accès et crée son
 // compte Supabase, pour que l'admin n'ait rien à faire d'autre que l'ajouter.
 //
-// Le mot de passe est DÉDUIT du nom, par le même algorithme que le générateur
-// (derive.server.ts) : il ne dépend d'aucun stockage, et régénérer la table un
-// jour ne cassera pas un accès déjà distribué.
+// Le mot de passe est PROVISOIRE et tiré au hasard (derive.server.ts) : la
+// route le rend une seule fois, à l'admin qui le transmet, et la base oblige
+// le joueur à en choisir un à lui dès sa connexion (mot_de_passe_a_changer).
+// Jusqu'au 22/10/2026 il se déduisait du nom, par l'algorithme que le dépôt
+// public montrait à tout le monde.
 //
-// Sécurité : aucune clé secrète. La route agit avec la clé publishable, comme
-// n'importe quel navigateur, et n'accepte que l'appelant qui prouve être admin
-// en présentant son jeton de session Supabase.
+// La création passe par la clé secrète (lib/sfl/serveur-ligue.server.ts),
+// comme l'inscription autonome : « Allow new users to sign up » peut rester
+// fermé dans Supabase. L'appelant prouve qu'il est admin par son jeton de
+// session (« Authorization: Bearer … »).
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { identifiantPour, motDePassePour } from "@/lib/sfl/auth/derive.server";
-import { username } from "@/lib/sfl/usernames";
-
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://tpfusliksgxcvfrodchk.supabase.co";
-const SUPABASE_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  "sb_publishable_oZ4YpiQZFgtnu2jTz-mrtw_Dt133w86";
+import { identifiantPour, motDePasseProvisoire } from "@/lib/sfl/auth/derive.server";
+import { appelant, estAdmin, serveur } from "@/lib/sfl/serveur-ligue.server";
 
 const email = (user: string) => `${user}@sfl.local`;
 
 export async function POST(req: NextRequest) {
-  const { accessToken, name } = (await req.json().catch(() => ({}))) as {
-    accessToken?: string;
-    name?: string;
-  };
-  if (!accessToken) return NextResponse.json({ error: "Session serveur requise." }, { status: 401 });
-  if (!name?.trim()) return NextResponse.json({ error: "Nom manquant." }, { status: 400 });
+  const sb = serveur();
+  if (!sb) return NextResponse.json({ error: "Fermé sur cet environnement." }, { status: 503 });
+  const moi = await appelant(sb, req);
+  if (!moi) return NextResponse.json({ error: "Session serveur requise." }, { status: 401 });
+  if (!(await estAdmin(sb, moi.id))) return NextResponse.json({ error: "Réservé à l'admin." }, { status: 403 });
 
+  const { name } = (await req.json().catch(() => ({}))) as { name?: string };
+  if (!name?.trim()) return NextResponse.json({ error: "Nom manquant." }, { status: 400 });
   const joueur = name.trim();
 
-  // 1 · L'appelant est-il admin ? Le jeton parle pour lui, RLS s'applique.
-  const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${accessToken}` } },
-  });
-  const { data: auth, error: authError } = await sb.auth.getUser(accessToken);
-  if (authError || !auth.user) {
-    return NextResponse.json({ error: "Session invalide." }, { status: 401 });
-  }
-  const { data: profile } = await sb
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", auth.user.id)
-    .maybeSingle();
-  if (!profile?.is_admin) {
-    return NextResponse.json({ error: "Réservé à l'admin." }, { status: 403 });
-  }
-
-  // 2 · Ce joueur a-t-il déjà un compte ? Le mot de passe étant déduit du nom,
-  //     on peut le lui redonner sans rien créer.
+  // 1 · Ce joueur a-t-il déjà un compte ? Son mot de passe ne se redonne
+  //     plus (personne ne le connaît) : l'admin peut lui en donner un
+  //     provisoire, depuis Les accès.
   const { data: existant } = await sb
     .from("profiles")
     .select("username")
@@ -63,46 +43,38 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (existant) {
     const user = (existant as { username: string }).username.replace(/^@/, "");
-    return NextResponse.json({ user, password: motDePassePour(joueur), deja: true });
+    return NextResponse.json({ user, deja: true });
   }
 
-  // 3 · Un identifiant libre : deux joueurs ne peuvent pas partager le leur.
+  // 2 · Un identifiant libre : deux joueurs ne peuvent pas partager le leur.
   const { data: tous } = await sb.from("profiles").select("username");
   const pris = new Set(
     ((tous ?? []) as { username: string }[]).map((p) => p.username.replace(/^@/, ""))
   );
   const user = identifiantPour(joueur, pris);
-  const password = motDePassePour(joueur);
+  const password = motDePasseProvisoire();
 
-  // 4 · Création du compte. La session de l'admin n'est pas touchée : ce
-  //     client-ci ne persiste rien.
-  const neuf = createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data: inscrit, error } = await neuf.auth.signUp({
+  // 3 · Création du compte. Le profil naît du trigger (handle_new_user), en
+  //     attente comme tout compte neuf : c'est l'admin qui le crée, il est
+  //     accepté d'office, et son mot de passe est à changer.
+  const { data: cree, error } = await sb.auth.admin.createUser({
     email: email(user),
     password,
-    options: { data: { name: joueur, username: username(joueur) } },
+    email_confirm: true,
+    user_metadata: { name: joueur, username: `@${user}` },
   });
-
-  // Tout compte naît en attente (inscription autonome) ; celui-ci, c'est
-  // l'admin qui le crée : il est accepté d'office.
-  if (!error && inscrit.user) {
-    await sb.rpc("valider_inscription", { joueur: inscrit.user.id });
+  if (error || !cree.user) {
+    return NextResponse.json({ error: error?.message ?? "Création impossible." }, { status: 400 });
   }
-
-  if (error) {
-    const ferme = /signup|not allowed|disabled/i.test(error.message);
-    return NextResponse.json(
-      {
-        error: ferme
-          ? "Les inscriptions sont fermées sur Supabase. Ouvre-les le temps de l'ajout (Authentication → Sign In / Providers → Allow new users to sign up), puis referme-les."
-          : error.message,
-        user,
-        password,
-      },
-      { status: 400 }
-    );
+  const id = cree.user.id;
+  const { error: errValide } = await sb.from("profiles").update({ valide: true }).eq("id", id);
+  const { error: errAChanger } = await sb
+    .from("mot_de_passe_a_changer")
+    .upsert({ user_id: id, motif: "provisoire", depuis: new Date().toISOString() });
+  if (errValide || errAChanger) {
+    // Un compte à moitié posé ne doit pas rester : on l'efface, l'admin réessaie.
+    await sb.auth.admin.deleteUser(id).catch(() => {});
+    return NextResponse.json({ error: "Création interrompue. Réessaie." }, { status: 500 });
   }
 
   return NextResponse.json({ user, password });

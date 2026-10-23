@@ -348,9 +348,12 @@ export async function POST(req: NextRequest) {
   if ((count ?? 0) >= LIMITE_AGENT_JOUR) return erreur("On a assez parlé pour aujourd'hui. Reviens demain.", 429);
   // Notée AVANT l'appel : deux questions simultanées comptent toutes les deux.
   const ouverture = typeof corps.ouverture === "string" ? corps.ouverture.trim().slice(0, 300) : "";
+  // La base refuse la question qui dépasse le crédit (credit_du_jour) : des
+  // questions envoyées en même temps ne passent plus toutes.
   if (!sansTable) {
     const lignes = [...(ouverture ? [{ role: "coach", texte: ouverture }] : []), { role: "joueur", texte: question }];
     const { error } = await sb.from("agent_messages").insert(lignes);
+    if (error?.hint === "credit-du-jour") return erreur("On a assez parlé pour aujourd'hui. Reviens demain.", 429);
     if (error) return erreur("Bola Agent indisponible pour l'instant.", 503);
   }
 

@@ -12,10 +12,18 @@
 // créneau d'un défi entre +48 h et +21 jours, réponse sous 48 h, forfait à
 // moins de 48 h) sont gardés par la base ; l'app les montre.
 //
+// Inviter (passe du 23/10, « c'est bloqué ») : le capitaine choisit
+// plusieurs joueurs d'un coup, l'app dit d'avance qui ne peut pas venir
+// (indisponibles), et chaque invité est prévenu sur son téléphone
+// (notifierEquipe), sur la Map et par la pastille de l'onglet
+// (mesInvitations). Comme le veut la règle, seuls les membres prennent une
+// place : on peut inviter plus de joueurs qu'il ne reste de places.
+//
 // Tout vit en base (supabase/schema.sql, « Mode Team ») ; chaque écriture
 // passe par une fonction de la base qui en vérifie les règles.
 
 import { supabase } from "@/lib/supabase";
+import { finInvitation } from "@/lib/sfl/equipes-temps";
 
 export type Fond = "noir" | "blanc";
 export type Role = "capitaine" | "vice" | "membre";
@@ -30,6 +38,10 @@ export interface Membre {
   role: Role;
   /** Invité : quand ; son invitation tombe 72 h après. */
   depuis?: string;
+  /** Invité : par qui (le capitaine ou le vice). */
+  invitePar?: string | null;
+  /** Membre : quand il a signé le Règlement. */
+  signeLe?: string | null;
   /** Exclu par le capitaine : son départ, 48 h après. */
   departLe?: string | null;
 }
@@ -86,14 +98,38 @@ export function signataires(e: Equipe): Membre[] {
   return e.membres.filter((m) => m.statut === "membre").sort((a, b) => rang[a.role] - rang[b.role]);
 }
 
+/** Les invitations encore valables (72 h), de la plus ancienne à la plus récente. */
 export function invites(e: Equipe): Membre[] {
-  const limite = Date.now() - 72 * 3600_000;
-  return e.membres.filter((m) => m.statut === "invite" && (!m.depuis || new Date(m.depuis).getTime() > limite));
+  const maintenant = Date.now();
+  return e.membres
+    .filter((m) => m.statut === "invite" && (!m.depuis || finInvitation(m.depuis).getTime() > maintenant))
+    .sort((a, b) => (a.depuis ?? "").localeCompare(b.depuis ?? ""));
+}
+
+/** Six invitations en attente au plus (la base le garde, equipe_inviter). */
+export const INVITATIONS_MAX = 6;
+
+/** Combien de joueurs le capitaine peut encore inviter. */
+export function invitationsPossibles(e: Equipe): number {
+  if (signataires(e).length >= MAX_EQUIPE) return 0;
+  return Math.max(0, INVITATIONS_MAX - invites(e).length);
+}
+
+/** Qui a invité ce joueur : son prénom, sinon celui du capitaine. */
+export function inviteur(e: Equipe, m: Membre): string {
+  const par = e.membres.find((x) => x.id === m.invitePar) ?? e.membres.find((x) => x.role === "capitaine");
+  return (par?.name ?? "").split(" ")[0];
 }
 
 /** Une équipe joue (et se défie) à 5 signataires. */
 export function active(e: Equipe): boolean {
   return signataires(e).length >= MIN_EQUIPE;
+}
+
+/** « Roubaix · En formation · 2 / 5 », puis « Roubaix · Active · 6 / 7 » : vers 5, puis vers 7. */
+export function etatEquipe(e: Equipe): string {
+  const n = signataires(e).length;
+  return [e.ville, active(e) ? "Active" : "En formation", `${n} / ${active(e) ? MAX_EQUIPE : MIN_EQUIPE}`].filter(Boolean).join(" · ");
 }
 
 /** « Sunday Five » → « SF » ; « Racing » → « RAC ». */
@@ -128,12 +164,14 @@ interface LigneEquipe {
     statut: Membre["statut"];
     role: Role;
     created_at: string;
+    invite_par?: string | null;
+    signe_le?: string | null;
     depart_le?: string | null;
     p: Un<{ name: string }>;
   }[];
 }
 
-const MEMBRES = "joueur, statut, role, created_at, depart_le, p:profiles!equipe_membres_joueur_fkey(name)";
+const MEMBRES = "joueur, statut, role, created_at, invite_par, signe_le, depart_le, p:profiles!equipe_membres_joueur_fkey(name)";
 
 const versEquipe = (r: LigneEquipe): Equipe => ({
   id: r.id,
@@ -148,6 +186,8 @@ const versEquipe = (r: LigneEquipe): Equipe => ({
     statut: m.statut,
     role: m.role,
     depuis: m.created_at,
+    invitePar: m.invite_par ?? null,
+    signeLe: m.signe_le ?? null,
     departLe: m.depart_le ?? null,
   })),
 });
@@ -184,6 +224,32 @@ export async function monEquipe(moi: string): Promise<Equipe | null> {
   return data ? versEquipe(data as unknown as LigneEquipe) : null;
 }
 
+/**
+ * Les équipes qui m'invitent, invitation encore valable : la carte de la
+ * Map, la pastille de l'onglet, la page Team. Une seule lecture quand il n'y
+ * en a pas.
+ */
+export async function mesInvitations(moi: string): Promise<Equipe[]> {
+  const sb = supabase();
+  const { data: lignes, error } = await sb
+    .from("equipe_membres")
+    .select("equipe_id")
+    .eq("joueur", moi)
+    .eq("statut", "invite")
+    .gt("created_at", new Date(Date.now() - 72 * 3600_000).toISOString());
+  if (error) throw error;
+  const ids = ((lignes ?? []) as { equipe_id: number }[]).map((l) => l.equipe_id);
+  if (ids.length === 0) return [];
+  const { data, error: e2 } = await sb
+    .from("equipes")
+    .select(`id, nom, initiales, fond, ville, capitaine, equipe_membres(${MEMBRES})`)
+    .in("id", ids)
+    .is("dissoute_le", null)
+    .order("created_at");
+  if (e2) throw e2;
+  return ((data ?? []) as unknown as LigneEquipe[]).map(versEquipe);
+}
+
 /** Les défis en jeu (un défi sans réponse depuis 48 h, ou à moins de 36 h du match, a expiré). */
 export async function listerDefis(): Promise<Defi[]> {
   const { data, error } = await supabase()
@@ -210,8 +276,78 @@ async function rpc<T = void>(fn: string, args: Record<string, unknown>): Promise
 
 export const creerEquipe = (nom: string, initiales: string, fond: Fond) => rpc<number>("equipe_creer", { nom: nom.trim(), initiales, fond });
 export const inviterEquipe = (e: number, joueur: string) => rpc("equipe_inviter", { e, joueur });
+
+/**
+ * Inviter plusieurs joueurs d'un coup : chacun à son tour (la base garde les
+ * règles de chacun), puis une notification à tous les nouveaux invités.
+ */
+export async function inviterJoueurs(
+  e: number,
+  joueurs: { id: string; name: string }[]
+): Promise<{ invites: string[]; refus: { name: string; raison: string }[] }> {
+  const invites: string[] = [];
+  const refus: { name: string; raison: string }[] = [];
+  for (const j of joueurs) {
+    try {
+      await inviterEquipe(e, j.id);
+      invites.push(j.name);
+    } catch (err) {
+      refus.push({ name: j.name, raison: direErreurEquipe(err) });
+    }
+  }
+  if (invites.length > 0) void notifierEquipe(e, "invitation");
+  return { invites, refus };
+}
+
+/** Pourquoi un joueur ne peut pas être invité (equipe_indisponibles, dans la base). */
+export type Indispo = "parti" | "equipe" | "carence" | "attente";
+
+/** Ce que la liste des joueurs en dit, sur sa ligne. */
+export const RAISON_INDISPO: Record<Indispo, string> = {
+  parti: "A quitté l'équipe",
+  equipe: "A déjà une équipe",
+  carence: "Vient de quitter son équipe",
+  attente: "Compte en attente",
+};
+
+/** Ceux que mon équipe ne peut pas inviter, et pourquoi (capitaine et vice). */
+export async function indisponibles(e: number): Promise<Map<string, Indispo>> {
+  const { data, error } = await supabase().rpc("equipe_indisponibles", { e });
+  if (error) throw error;
+  return new Map(((data ?? []) as { joueur: string; raison: Indispo }[]).map((r) => [r.joueur, r.raison]));
+}
+
+/**
+ * Prévenir sur le téléphone (/api/equipes/notifier) : les joueurs tout juste
+ * invités, un invité qu'on relance, ou le capitaine quand je viens de signer.
+ * Une notification perdue ne bloque jamais le geste : null si l'appel échoue.
+ */
+export async function notifierEquipe(
+  e: number,
+  type: "invitation" | "relance" | "signature",
+  joueur?: string
+): Promise<{ envoyes?: number; tropTot?: boolean } | null> {
+  try {
+    const { data } = await supabase().auth.getSession();
+    const jeton = data.session?.access_token;
+    if (!jeton) return null;
+    const r = await fetch("/api/equipes/notifier", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${jeton}` },
+      body: JSON.stringify({ equipe: e, type, joueur }),
+      keepalive: true,
+    });
+    return r.ok ? ((await r.json()) as { envoyes?: number; tropTot?: boolean }) : null;
+  } catch {
+    return null;
+  }
+}
 export const retirerInvitation = (e: number, joueur: string) => rpc("equipe_retirer_invitation", { e, joueur });
-export const signerReglement = (e: number) => rpc("equipe_signer", { e });
+/** Signer, puis le dire au capitaine (et à l'équipe, à la cinquième signature). */
+export async function signerReglement(e: number): Promise<void> {
+  await rpc("equipe_signer", { e });
+  void notifierEquipe(e, "signature");
+}
 export const quitterEquipe = (e: number) => rpc("equipe_quitter", { e });
 export const nommerVice = (e: number, joueur: string | null) => rpc("equipe_vice", { e, joueur });
 /** Exclure avec 48 h de préavis ; refaire annule l'exclusion. */

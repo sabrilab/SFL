@@ -58,6 +58,12 @@ export interface JourneeMatch {
   label: string;
   teamA: MatchTeam;
   teamB: MatchTeam;
+  /** Son coup d'envoi, quand ce match a le sien (JourneeMeta.matchsDuJour). */
+  heure?: string;
+  /** Son lieu (un id de saison.terrains), quand ce match a le sien. */
+  lieuId?: number;
+  /** Le terrain qu'il occupe sur place, quand l'admin l'a donné. */
+  terrain?: string;
 }
 
 export interface Journee {

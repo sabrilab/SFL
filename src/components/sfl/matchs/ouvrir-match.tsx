@@ -32,7 +32,9 @@
 // En haut, la ligue où l'on organise (Sabri, 22/10), en onglets et non plus
 // en boutons à choisir comme les autres : un match ouvert ici compte en
 // Bola ; un admin passe à la SFL (ses journées, réglées depuis la fiche des
-// matchs) ; Team mène aux défis entre équipes (page Team).
+// matchs) ; Team mène aux défis entre équipes (page Team), avec le terrain
+// choisi. Touché sur la Map, un terrain du Nord ouvre la feuille déjà posée
+// sur lui (lieuInitial).
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -144,11 +146,11 @@ function Rubrique({ titre, droite, children }: { titre: string; droite?: ReactNo
   );
 }
 
-/** La ligue où l'on organise, en onglets : Bola ici, SFL pour un admin, Team ailleurs. */
-function LigueOrganisee({ onSfl }: { onSfl?: () => void }) {
+/** La ligue où l'on organise, en onglets : Bola ici, SFL pour un admin, Team ailleurs (le terrain choisi le suit). */
+function LigueOrganisee({ onSfl, terrain }: { onSfl?: () => void; terrain?: string | null }) {
   const onglet = "flex h-11 items-center px-0.5";
   return (
-    <nav aria-label="La ligue" className="-mt-1 flex gap-6 border-b border-white/[0.08]">
+    <nav aria-label="La ligue" className="-mt-1 flex gap-6 border-b border-contraste/[0.08]">
       <span aria-current="true" className={cn(onglet, "relative text-foreground")}>
         <SigleLigue ligue="bola" hauteur={14} />
         <span aria-hidden className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-foreground" />
@@ -158,7 +160,7 @@ function LigueOrganisee({ onSfl }: { onSfl?: () => void }) {
           <SigleLigue ligue="sfl" hauteur={14} />
         </button>
       )}
-      <Link href="/bola-team" className={cn(onglet, "text-foreground/35 active:text-foreground/60")}>
+      <Link href={terrain ? `/bola-team?terrain=${encodeURIComponent(terrain)}` : "/bola-team"} className={cn(onglet, "text-foreground/35 active:text-foreground/60")}>
         <SigleLigue ligue="team" hauteur={14} />
       </Link>
     </nav>
@@ -170,6 +172,7 @@ export function OuvrirMatch({
   onOpenChange,
   terrains,
   terrainInitial,
+  lieuInitial,
   jourInitial,
   heureInitial,
   moi,
@@ -182,6 +185,8 @@ export function OuvrirMatch({
   onOpenChange: (o: boolean) => void;
   terrains: Terrain[];
   terrainInitial: Terrain | null;
+  /** Venu d'un terrain du Nord touché sur la Map : le lieu déjà choisi. */
+  lieuInitial?: LieuChoisi;
   /** Venu de « Mes dispos » : le jour et l'heure du moment choisi. */
   jourInitial?: string;
   heureInitial?: string;
@@ -210,12 +215,16 @@ export function OuvrirMatch({
   );
   const terrainDuMatch = partie ? (terrains.find((t) => t.nom === partie.lieu) ?? null) : null;
   const [terrainId, setTerrainId] = useState<number | null>(
-    partie ? (terrainDuMatch?.id ?? null) : (terrainInitial?.id ?? terrains.find((t) => t.defaut)?.id ?? null)
+    partie ? (terrainDuMatch?.id ?? null) : lieuInitial ? null : (terrainInitial?.id ?? terrains.find((t) => t.defaut)?.id ?? null)
   );
   const modif = !!partie;
   // Hors des terrains de la ligue : un terrain du Nord, ou un lieu écrit en toutes lettres.
   const [ailleurs, setAilleurs] = useState<LieuChoisi | null>(
-    partie && !terrainDuMatch && partie.lieu ? { lieu: partie.lieu, adresse: partie.adresse, lat: partie.lat, lng: partie.lng } : null
+    partie
+      ? !terrainDuMatch && partie.lieu
+        ? { lieu: partie.lieu, adresse: partie.adresse, lat: partie.lat, lng: partie.lng }
+        : null
+      : (lieuInitial ?? null)
   );
   // La feuille des terrains repart de zéro à chaque ouverture (sa clé), autour du choix du moment.
   const [terrainsNord, setTerrainsNord] = useState({ n: 0, open: false });
@@ -357,7 +366,7 @@ export function OuvrirMatch({
       pied={bouton}
     >
       <div className="flex flex-col gap-6">
-        {!partie && <LigueOrganisee onSfl={onSfl} />}
+        {!partie && <LigueOrganisee onSfl={onSfl} terrain={terrain ? `ligue-${terrain.id}` : (ailleurs?.terrain?.id ?? null)} />}
 
         <Rubrique
           titre="Quand"

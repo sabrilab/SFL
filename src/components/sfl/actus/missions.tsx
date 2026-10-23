@@ -445,7 +445,7 @@ function Fiche({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions;
   const code = NOM_DE_CODE[l.m.genre];
   const camp = mm.d.camps.get(mm.joueur);
   const type =
-    l.m.creneau === "contrat" && camp?.label.startsWith("Terrain") ? `${TYPE.contrat} · ${camp.label}` : TYPE[l.m.creneau];
+    l.m.creneau === "contrat" && camp?.label.startsWith("Match") ? `${TYPE.contrat} · ${camp.label}` : TYPE[l.m.creneau];
   const acceptee = l.reponse?.reponse === "acceptee";
   const apres = mm.phase !== "ouvert";
   const rival = l.m.creneau === "contrat" && mm.enFace ? l.m.cibles[0] : null;
@@ -453,7 +453,9 @@ function Fiche({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions;
     <article
       aria-label={`Mission ${code}, rang ${rang}`}
       className={cn(
-        "fiche mx-4 md:mx-0",
+        // Noire dans les deux modes, comme une carte : la classe dark garde au
+        // mode sombre ce qu'elle contient (boutons, textes).
+        "fiche dark mx-4 md:mx-0",
         `fiche--${rang}`,
         apres && acceptee && l.verdict.etat === "reussie" && "fiche--reussie",
         apres && acceptee && l.verdict.etat === "ratee" && "fiche--ratee",
@@ -539,7 +541,7 @@ export function MissionsBola({ className }: { className?: string }) {
           <span className="mono-label text-foreground/45">
             {phase === "ouvert" ? "Les trois accomplies" : phase === "en-jeu" ? "À minuit" : "Ton dimanche"}
           </span>
-          <span className={cn("mono-label", phase !== "ouvert" && xp < 0 ? "text-[#ff9b9d]" : "text-foreground/70")}>
+          <span className={cn("mono-label", phase !== "ouvert" && xp < 0 ? "text-[#c8352b] dark:text-[#ff9b9d]" : "text-foreground/70")}>
             {phase === "ouvert" ? `+${XP_PARFAIT} XP de bonus` : `${signe(xp)} XP`}
           </span>
         </div>

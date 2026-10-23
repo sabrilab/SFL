@@ -18,6 +18,8 @@
 // reste (restantes) et quand le compte repart (fin) : le studio l'affiche dès
 // la première photo. Une photo ratée chez fal reste comptée : on la note
 // avant l'appel, et personne ne peut effacer ses lignes.
+// La base tient le compte elle-même (credit_du_jour, supabase/schema.sql) :
+// des demandes envoyées en même temps ne passent plus toutes.
 //
 // Confidentialité (22/10/2026) : pas de selfie chez fal sans l'accord du
 // joueur à la politique en vigueur (lib/sfl/confidentialite.server.ts), et
@@ -182,11 +184,19 @@ export async function POST(req: NextRequest) {
   }
   // Celle-ci comprise.
   const credit: Credit = { restantes: LIMITE_JOUR - faites - 1, fin: fin.toISOString() };
-  // Noté AVANT l'appel : deux demandes simultanées comptent toutes les deux.
+  // Noté AVANT l'appel : deux demandes simultanées comptent toutes les deux,
+  // et la base refuse celle qui dépasse le crédit (indice « credit-du-jour »).
   // Le pays du drapeau est gardé pour la page Activité de l'admin.
   const { error: noteError } = await sb
     .from("photo_studio")
     .insert({ filtre, pays: filtre === "drapeau" && estPays(corps.pays) ? corps.pays : null });
+  if (noteError?.hint === "credit-du-jour") {
+    return erreur(
+      `Tes ${LIMITE_JOUR} photos du jour sont faites. De nouveau ${LIMITE_JOUR} dans ${dansCombien(fin.getTime() - Date.now())}.`,
+      429,
+      { restantes: 0, fin: fin.toISOString() }
+    );
+  }
   if (noteError) return erreur("Photo officielle indisponible pour l'instant.", 503);
 
   try {

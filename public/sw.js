@@ -174,7 +174,9 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  // Seulement une page de l'app : un lien qui mènerait ailleurs ouvre l'accueil.
+  const cible = new URL(event.notification.data?.url || "/", self.location.origin);
+  const url = cible.origin === self.location.origin ? cible.href : new URL("/", self.location.origin).href;
   event.waitUntil(
     Promise.all([
       self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((fenetres) => {

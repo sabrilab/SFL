@@ -33,8 +33,15 @@ function Cote({ nom, onglet, droite }: { nom: string; onglet: { fond: string; en
   );
 }
 
-export function DuelsDuJour({ j }: { j: number | null | undefined }) {
-  const duels = useDuelsAcceptes(j);
+export function DuelsDuJour({
+  j,
+  matchs,
+}: {
+  j: number | null | undefined;
+  /** Une journée en plusieurs lieux : ses matchs dans celui-ci (0 = Match 1). */
+  matchs?: number[];
+}) {
+  const duels = useDuelsAcceptes(j).filter((d) => !matchs || matchs.includes(d.terrain));
   if (!duels.length) return null;
   return (
     <section aria-labelledby="duels-du-jour" className="flex flex-col gap-2.5">
@@ -47,7 +54,7 @@ export function DuelsDuJour({ j }: { j: number | null | undefined }) {
         {duels.map((d, i) => (
           <div
             key={`${d.noirs}-${d.blancs}`}
-            className={cn("flex flex-col gap-2 px-4 py-3", i > 0 && "border-t border-white/8")}
+            className={cn("flex flex-col gap-2 px-4 py-3", i > 0 && "border-t border-contraste/8")}
           >
             <div className="flex items-center gap-2">
               <Cote nom={d.noirs} onglet={NOIRS} />

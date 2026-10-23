@@ -4,15 +4,30 @@
 // équipe, ou pour en créer une. C'est le seul texte de règles du mode Team.
 // L'écran de signature suit la « Formule d'acceptation » : le titre avec la
 // version, l'essentiel en 8 points, une case décochée par défaut, et un
-// bouton inactif tant qu'elle ne l'est pas.
+// bouton inactif tant qu'elle ne l'est pas. Au-dessus (passe du 23/10) : qui
+// m'invite, jusqu'à quand, et les cartes de ceux qui ont déjà signé — on
+// sait où l'on entre avant de signer.
 
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { Check } from "lucide-react";
-import { ACCEPTATION, REGLEMENT, VERSION_REGLEMENT, confirmationSignature, direErreurEquipe, signerReglement, type Equipe } from "@/lib/sfl/equipes";
+import {
+  ACCEPTATION,
+  REGLEMENT,
+  VERSION_REGLEMENT,
+  confirmationSignature,
+  direErreurEquipe,
+  etatEquipe,
+  inviteur,
+  signataires,
+  signerReglement,
+  type Equipe,
+} from "@/lib/sfl/equipes";
+import { finInvitation, quandTombe } from "@/lib/sfl/equipes-temps";
 import { cn } from "@/lib/utils";
 
 export function ReglementListe() {
@@ -60,17 +75,25 @@ export function CaseAcceptation({ coche, onChange }: { coche: boolean; onChange:
 /** Entrer dans l'équipe qui m'invite : signer le règlement. */
 export function SignerReglement({
   equipe,
+  moi,
   onOpenChange,
   apercu,
   onSigne,
 }: {
   equipe: Equipe | null;
+  /** Mon identifiant : mon invitation dit qui m'invite et jusqu'à quand. */
+  moi?: string | null;
   onOpenChange: (o: boolean) => void;
   apercu?: boolean;
   onSigne: () => void;
 }) {
   const [envoi, setEnvoi] = useState(false);
   const [coche, setCoche] = useState(false);
+  // La case repart décochée à chaque ouverture (Formule d'acceptation).
+  const fermer = (o: boolean) => {
+    if (!o) setCoche(false);
+    onOpenChange(o);
+  };
   async function signer() {
     if (!equipe) return;
     if (apercu) {
@@ -82,7 +105,7 @@ export function SignerReglement({
       await signerReglement(equipe.id);
       navigator.vibrate?.([12, 60, 24]);
       toast.success(confirmationSignature(equipe.nom));
-      onOpenChange(false);
+      fermer(false);
       onSigne();
     } catch (e) {
       toast.error(direErreurEquipe(e));
@@ -90,16 +113,40 @@ export function SignerReglement({
       setEnvoi(false);
     }
   }
+  const invitation = equipe?.membres.find((m) => m.id === moi && m.statut === "invite");
+  const deja = equipe ? signataires(equipe) : [];
   return (
-    <Sheet open={!!equipe} onOpenChange={onOpenChange}>
+    <Sheet open={!!equipe} onOpenChange={fermer}>
       <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
         {equipe && (
           <>
             <SheetHeader className="flex-row items-center gap-3 px-5 pt-5 pb-0">
               <Ecusson initiales={equipe.initiales} fond={equipe.fond} taille={44} />
-              <SheetTitle className="text-[24px] font-bold tracking-tight">{equipe.nom}</SheetTitle>
+              <span className="flex min-w-0 flex-col gap-0.5 pr-10">
+                <SheetTitle className="truncate text-[24px] font-bold tracking-tight">{equipe.nom}</SheetTitle>
+                {invitation && (
+                  <span className="truncate text-[13.5px] text-muted-foreground">
+                    {[`${inviteur(equipe, invitation)} t'invite`, invitation.depuis && `jusqu'à ${quandTombe(finInvitation(invitation.depuis))}`]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                )}
+              </span>
             </SheetHeader>
             <div className="flex flex-col gap-5 px-4">
+              {deja.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <p className="mono-label text-muted-foreground">{etatEquipe(equipe)}</p>
+                  <div className="flex flex-wrap gap-x-2 gap-y-2.5">
+                    {deja.map((m) => (
+                      <span key={m.id} className="flex w-[52px] flex-col items-center gap-1">
+                        <CarteDe name={m.name} size={FORMAT_CARTE.petite} />
+                        <span className="w-full truncate text-center text-[11.5px] font-medium">{m.name.split(" ")[0]}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               <ReglementListe />
               <CaseAcceptation coche={coche} onChange={setCoche} />
               <Button variant="vert" disabled={!coche || envoi} onClick={signer} className="h-12 rounded-full text-[15px] font-semibold">

@@ -40,6 +40,8 @@ import { BoutonSuivre, ReseauJoueur } from "@/components/sfl/suivre";
 import { FeuilleBadge, Medaille, NOM_TROPHEE, Trophee } from "@/components/sfl/vitrine";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useGrandEcran } from "@/hooks/use-media-query";
+import { useDivision } from "@/hooks/use-division";
+import { nomDivision } from "@/lib/sfl/divisions";
 import { useIdentites } from "@/hooks/use-identites";
 import { cartesDeCarriere, courbeDeCarriere } from "@/lib/sfl/carriere";
 import { ovr, rankPlayers, STAT_KEYS, type Player } from "@/lib/sfl/engine";
@@ -59,7 +61,7 @@ function StatBar({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center gap-2.5">
       <span className="mono-label w-8 shrink-0 text-foreground/40">{label}</span>
-      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/8">
+      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/8">
         <span className="block h-full rounded-full bg-foreground/80" style={{ width: `${Math.min(100, value)}%` }} />
       </span>
       <span className="w-7 shrink-0 text-right text-[13px] font-bold tabular-nums">{value}</span>
@@ -83,6 +85,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
   const { saison, journees, allPlayers } = useSeason();
   const grand = useGrandEcran();
   const identite = useIdentites();
+  const division = useDivision(player.name);
   const [choix, setChoix] = useState<Choix>(null);
   const [compare, setCompare] = useState(false);
   const { me } = useMyPlayer();
@@ -156,6 +159,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
         </div>
         <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
           <Chiffre valeur={ordinal(rank)} quoi="Pépite d'Or" />
+          {division && <Chiffre valeur={nomDivision(division)} quoi="Division" />}
           <Chiffre valeur={ovr(player.stats)} quoi="Général" />
           <Chiffre valeur={dimanches} quoi={dimanches > 1 ? "Dimanches" : "Dimanche"} />
         </div>
@@ -172,17 +176,18 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
       </div>
 
       <div className="flex min-w-0 flex-col gap-[var(--fib-21)]">
-        {/* 3. Ses trophées : noir mat, seul le métal sort du noir et blanc */}
+        {/* 3. Ses trophées : noir mat (blanc mat en mode clair, .vitrine-mate),
+            seul le métal sort du noir et blanc */}
         {trophees > 0 && (
           <section
             aria-labelledby="trophees"
-            className="flex flex-col gap-[var(--fib-21)] rounded-[21px] border border-white/[0.08] bg-[#0a0a0b] p-[var(--fib-21)] text-white"
+            className="vitrine-mate flex flex-col gap-[var(--fib-21)] rounded-[21px] p-[var(--fib-21)]"
           >
             <div className="flex items-baseline justify-between">
               <h3 id="trophees" className="text-[19px] font-extrabold tracking-tight">
                 Trophées
               </h3>
-              <span className="font-mono text-[12px] font-bold text-white/45 tabular-nums">{trophees}</span>
+              <span className="font-mono text-[12px] font-bold text-contraste/45 tabular-nums">{trophees}</span>
             </div>
 
             {ecussons.length > 0 && (
@@ -197,7 +202,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
                     <Trophee id={e.def.id} rang={e.meilleur!.rang} taille={84} />
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
                       <span className="text-[17px] font-extrabold">{NOM_TROPHEE[e.def.id]}</span>
-                      <span className="font-mono text-[11px] text-white/55">
+                      <span className="font-mono text-[11px] text-contraste/55">
                         {e.podiums.map((p) => `${ordinal(p.rang)} · ${p.saison}`).join("  ·  ")}
                       </span>
                     </span>
@@ -211,7 +216,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
               </div>
             )}
 
-            {ecussons.length > 0 && medailles.length > 0 && <span aria-hidden className="h-px w-full bg-white/10" />}
+            {ecussons.length > 0 && medailles.length > 0 && <span aria-hidden className="h-px w-full bg-contraste/10" />}
 
             {medailles.length > 0 && (
               <div className="grid grid-cols-4 gap-x-1 gap-y-[var(--fib-21)] sm:grid-cols-5">
@@ -225,7 +230,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
                     <Medaille e={e} diametre={52} />
                     <span className="w-full text-[12px] leading-tight font-bold">{e.def.nom}</span>
                     <span className="font-mono text-[12px] font-bold tabular-nums">{e.valeur}</span>
-                    <span className="text-[11px] font-semibold text-white/55">{NOM_METAL[metal(e.palier)!]}</span>
+                    <span className="text-[11px] font-semibold text-contraste/55">{NOM_METAL[metal(e.palier)!]}</span>
                   </button>
                 ))}
               </div>
@@ -270,7 +275,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
               {etapes.map((e, i) => (
                 <div
                   key={e.saison.numero}
-                  className={cn("flex items-center gap-[var(--fib-13)] px-4 py-3", i < etapes.length - 1 && "border-b border-white/8")}
+                  className={cn("flex items-center gap-[var(--fib-13)] px-4 py-3", i < etapes.length - 1 && "border-b border-foreground/8")}
                 >
                   <span style={{ fontFamily: ANTON, fontSize: 30, lineHeight: 0.9 }} className="w-[58px] shrink-0 tabular-nums">
                     {ordinal(e.rang)}
@@ -310,7 +315,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
                   key={i}
                   className={cn(
                     "flex size-6 items-center justify-center rounded-full text-[11px] font-bold",
-                    r === "V" ? "bg-primary text-primary-foreground" : r === "N" ? "bg-white/12 text-foreground/70" : "bg-white/6 text-foreground/35"
+                    r === "V" ? "bg-primary text-primary-foreground" : r === "N" ? "bg-foreground/12 text-foreground/70" : "bg-foreground/6 text-foreground/35"
                   )}
                 >
                   {r}
@@ -327,7 +332,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
               {mine.map((e, i) => (
                 <div
                   key={e.j}
-                  className={cn("flex items-center gap-3 px-4 py-2.5 text-[13px]", i < mine.length - 1 && "border-b border-white/8")}
+                  className={cn("flex items-center gap-3 px-4 py-2.5 text-[13px]", i < mine.length - 1 && "border-b border-foreground/8")}
                 >
                   <span className="mono-label w-7 shrink-0 text-foreground/40">J{e.j}</span>
                   <span className="min-w-0 flex-1 truncate text-foreground/45">{dates.get(e.j) ?? ""}</span>

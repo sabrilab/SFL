@@ -304,7 +304,7 @@ function PhotoVue({ piece }: { piece: PiecePhoto }) {
           if (src) setGrand(true);
         }}
         aria-label="Voir la photo"
-        className="block w-[min(260px,64vw)] overflow-hidden rounded-[20px] bg-white/8"
+        className="block w-[min(260px,64vw)] overflow-hidden rounded-[20px] bg-contraste/8"
         style={{ aspectRatio: ratio }}
       >
         {src && (
@@ -320,7 +320,7 @@ function PhotoVue({ piece }: { piece: PiecePhoto }) {
             role="dialog"
             aria-label="Photo"
             onClick={() => setGrand(false)}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black"
+            className="dark fixed inset-0 z-[60] flex items-center justify-center bg-black"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- lien signé */}
             <img src={src} alt="" className="max-h-full max-w-full object-contain" />
@@ -365,7 +365,7 @@ function VideoVue({ piece }: { piece: PieceVideo }) {
           if (src) setGrand(true);
         }}
         aria-label="Lire la vidéo"
-        className="relative block w-[min(260px,64vw)] overflow-hidden rounded-[20px] bg-white/8"
+        className="relative block w-[min(260px,64vw)] overflow-hidden rounded-[20px] bg-contraste/8"
         style={{ aspectRatio: ratio }}
       >
         {/* #t=0.1 : Safari montre alors la première image au lieu d'un cadre noir. */}
@@ -382,7 +382,7 @@ function VideoVue({ piece }: { piece: PieceVideo }) {
       {grand &&
         src &&
         createPortal(
-          <div role="dialog" aria-label="Vidéo" className="fixed inset-0 z-[60] flex items-center justify-center bg-black">
+          <div role="dialog" aria-label="Vidéo" className="dark fixed inset-0 z-[60] flex items-center justify-center bg-black">
             <video src={src} controls autoPlay playsInline className="max-h-full max-w-full" />
             <button
               type="button"
@@ -494,7 +494,7 @@ function LigueVue({ piece, onOuvrirJournee }: { piece: PieceLigue; onOuvrirJourn
       {chiffres.length > 0 && (
         <span className="grid grid-cols-2 gap-2">
           {chiffres.map((l) => (
-            <span key={l.l} className="flex flex-col rounded-2xl bg-white/[0.06] px-3 py-2.5">
+            <span key={l.l} className="flex flex-col rounded-2xl bg-contraste/[0.06] px-3 py-2.5">
               <span className="text-[22px] leading-none font-bold tabular-nums">{l.v}</span>
               <span className="mono-label mt-1 text-foreground/45">{l.l}</span>
             </span>
@@ -568,7 +568,7 @@ function ChoixPiece({ onChoix, onPhoto, onFermer }: { onChoix: (p: Piece) => voi
     [journees, saison]
   );
 
-  const ligne = "flex w-full items-center justify-between gap-3 rounded-2xl px-3.5 py-3 text-left text-[14.5px] font-semibold active:bg-white/8";
+  const ligne = "flex w-full items-center justify-between gap-3 rounded-2xl px-3.5 py-3 text-left text-[14.5px] font-semibold active:bg-contraste/8";
 
   return (
     <div className="glass mb-2 overflow-hidden rounded-3xl p-1.5">
@@ -655,7 +655,7 @@ function ReglageNotifs({ mode, onMode, onFermer }: { mode: ModeNotifs; onMode: (
             onMode(m);
             onFermer();
           }}
-          className="flex w-full items-center justify-between rounded-2xl px-3.5 py-2.5 text-left text-[14px] font-semibold active:bg-white/8"
+          className="flex w-full items-center justify-between rounded-2xl px-3.5 py-2.5 text-left text-[14px] font-semibold active:bg-contraste/8"
         >
           {label}
           {mode === m && <Check className="size-4" />}
@@ -763,7 +763,7 @@ const Bulle = memo(function Bulle({
         "relative flex touch-pan-y items-end gap-2 rounded-3xl transition-[background-color,opacity] duration-700",
         m.mien ? "flex-row-reverse" : "flex-row",
         suite ? "mt-1" : "mt-[var(--fib-13)]",
-        surligne && "bg-white/[0.07]",
+        surligne && "bg-contraste/[0.07]",
         attente && "opacity-60"
       )}
       style={{ transform: tire ? `translateX(${tire}px)` : undefined, transition: tire ? "none" : "transform 0.25s ease" }}
@@ -771,7 +771,7 @@ const Bulle = memo(function Bulle({
       {tire > 0 && (
         <span
           aria-hidden
-          className="absolute top-1/2 -left-10 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/10"
+          className="absolute top-1/2 -left-10 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-contraste/10"
           style={{ opacity: Math.min(1, tire / SEUIL) }}
         >
           <Reply className="size-4" />
@@ -808,7 +808,7 @@ const Bulle = memo(function Bulle({
                 e.stopPropagation();
                 actions.allerA(cite.id);
               }}
-              className="max-w-full rounded-2xl border-l-[3px] border-foreground/45 bg-white/[0.06] py-1.5 pr-3 pl-2.5 text-left"
+              className="max-w-full rounded-2xl border-l-[3px] border-foreground/45 bg-contraste/[0.06] py-1.5 pr-3 pl-2.5 text-left"
             >
               <span className="block text-[11.5px] font-bold text-foreground/65">
                 {cite.mien ? "Toi" : cite.auteur ? <Nom n={cite.auteur} /> : "Quelqu'un"}
@@ -1034,7 +1034,7 @@ export function Discussion({
   libelleNotifs: string;
   /** Ce que dit le fil vide (rien si vide). */
   vide: string;
-  /** La barre d'onglets reste dessous (le Vestiaire) ; sinon l'écran la recouvre. */
+  /** La barre d'onglets reste dessous (le Vestiaire) ; sinon l'écran la recouvre, posé sur <body> (matchs/discussion-match.tsx). */
   onglets?: boolean;
   /** L'admin modère : il retire n'importe quel message et coupe la parole (le Vestiaire, lieu public). */
   moderation?: boolean;
@@ -1484,7 +1484,10 @@ export function Discussion({
       ref={ecran}
       data-ecran-fixe=""
       data-onglets={onglets ? "" : undefined}
-      className={cn("ecran-discussion fixed inset-x-0 top-0 flex flex-col bg-background", onglets ? "z-[35]" : "z-[60]", className)}
+      // Sans onglets (un match, une équipe, posés sur <body>) : au-dessus de la
+      // barre d'onglets (z 40), sous les feuilles (z 50), dont la carte d'un
+      // joueur touchée dans le fil.
+      className={cn("ecran-discussion fixed inset-x-0 top-0 flex flex-col bg-background", onglets ? "z-[35]" : "z-[45]", className)}
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       {enTete}
@@ -1502,7 +1505,7 @@ export function Discussion({
             </p>
           )}
           {erreur && !empeche && (
-            <p className="mb-auto flex items-start gap-1.5 rounded-2xl border border-white/10 px-3.5 py-3 text-[13px] leading-snug text-foreground/70">
+            <p className="mb-auto flex items-start gap-1.5 rounded-2xl border border-contraste/10 px-3.5 py-3 text-[13px] leading-snug text-foreground/70">
               <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
               {erreur}
             </p>
