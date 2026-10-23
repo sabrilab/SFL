@@ -2,8 +2,13 @@
 //
 // Le schéma (supabase/schema.sql) est idempotent : on peut le rejouer sans
 // danger. Ce module l'applique quand il a changé, et seulement dans ce cas :
-// l'empreinte SHA-256 du script est mémorisée dans public.schema_migrations,
-// si elle est déjà là on ne touche à rien.
+// l'empreinte du script est mémorisée dans public.schema_migrations, si elle
+// est déjà là on ne touche à rien.
+//
+// L'empreinte est SIGNÉE par la chaîne de connexion (HMAC) : le script est
+// public, mais personne ne peut calculer d'avance l'empreinte qui fera
+// sauter une migration. Le registre est fermé à l'API publique à chaque
+// passage (RLS, aucun droit pour anon ni authenticated).
 //
 // La connexion vient des variables d'environnement de Vercel — jamais du
 // code, jamais du navigateur (pas de préfixe NEXT_PUBLIC). Deux sources :
@@ -11,7 +16,7 @@
 //   · les variables injectées par l'intégration Vercel × Supabase
 //     (POSTGRES_URL et déclinaisons) — reconnues automatiquement.
 
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { Client } from "pg";
 
 /**
@@ -55,8 +60,8 @@ export async function migrateSchema(sql: string, dbUrl?: string): Promise<Migrat
   const candidates = dbUrl ? [{ name: "explicite", url: dbUrl }] : candidateUrls();
   if (candidates.length === 0) return { status: "not-configured" };
 
-  const hash = createHash("sha256").update(sql).digest("hex");
   const connectErrors: string[] = [];
+  let hash: string | undefined;
 
   // Les URLs de l'intégration portent `sslmode=require` : avec le pilote pg,
   // ce paramètre PREND LE PAS sur l'option `ssl` du code (bug connu) et
@@ -81,12 +86,15 @@ export async function migrateSchema(sql: string, dbUrl?: string): Promise<Migrat
       continue;
     }
 
+    hash = createHmac("sha256", c.url).update(sql).digest("hex");
     try {
       await client.query(
         `create table if not exists public.schema_migrations (
            hash text primary key,
            applied_at timestamptz not null default now()
-         )`
+         );
+         alter table public.schema_migrations enable row level security;
+         revoke all on public.schema_migrations from anon, authenticated;`
       );
       const seen = await client.query("select 1 from public.schema_migrations where hash = $1", [
         hash,
