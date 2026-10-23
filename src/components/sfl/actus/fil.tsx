@@ -19,6 +19,7 @@ import { buteursDe, type Actu } from "@/lib/sfl/actus";
 import { voteOuvert } from "@/lib/sfl/convocation-temps";
 import { rankPlayers } from "@/lib/sfl/engine";
 import { isHidden } from "@/lib/sfl/hidden";
+import { MAILLOTS } from "@/lib/sfl/maillots";
 import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { TROPHEES, NOM_METAL, metal } from "@/lib/sfl/trophees";
@@ -227,6 +228,7 @@ export function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu
   switch (a.type) {
     case "score": {
       const { teamA, teamB, label } = a.match;
+      const titre = `${MAILLOTS.Noirs.nom} ${teamA.score} – ${teamB.score} ${MAILLOTS.Blancs.nom}`;
       const { a: ba, b: bb } = buteursDe(a.match);
       const buteurs = [...ba, ...bb].map((b) => `${id.nom(b.nom)}${b.buts > 1 ? ` (${b.buts})` : ""}`);
       return (
@@ -235,9 +237,9 @@ export function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu
           duree={a.variante % 3 === 0 ? 4.2 : a.variante % 2 ? 2.4 : 3.8}
           ratio={FORMAT_SCORE[a.variante % 3]}
           media={<CineScore match={a.match} j={a.j} variante={a.variante} />}
-          titre={`${teamA.name} ${teamA.score} – ${teamB.score} ${teamB.name}`}
+          titre={titre}
           texte={[label, buteurs.length ? `Buts : ${buteurs.join(", ")}` : null].filter(Boolean).join(" · ")}
-          partage={{ titre: `${teamA.name} ${teamA.score} – ${teamB.score} ${teamB.name}`, j: a.j, lignes: [...ba, ...bb].slice(0, 6).map((b) => ({ n: b.nom, v: `${b.buts} ${pl(b.buts, "but", "buts")}` })) }}
+          partage={{ titre, j: a.j, lignes: [...ba, ...bb].slice(0, 6).map((b) => ({ n: b.nom, v: `${b.buts} ${pl(b.buts, "but", "buts")}` })) }}
         />
       );
     }

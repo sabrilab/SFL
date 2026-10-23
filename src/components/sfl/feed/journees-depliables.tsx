@@ -17,14 +17,18 @@ import { cn } from "@/lib/utils";
 import { SigleLigue } from "@/components/sfl/choix-ligue";
 import type { Journee } from "@/lib/sfl/engine";
 import { Nom } from "@/components/sfl/nom";
+import { PointMaillot } from "@/components/sfl/point-maillot";
 
-/** « Orange 7 — 5 Bleu », ou le nombre de matchs si la journée en a plusieurs. */
+/**
+ * « Noirs 7 — 5 Blancs » (chaque match se joue les Noirs contre les Blancs,
+ * lib/sfl/maillots.ts), ou le nombre de matchs si la journée en a plusieurs.
+ */
 function resume(j: Journee): string {
   const matches = j.matches ?? [];
   if (matches.length === 0) return `${(j.lignes ?? []).length} joueurs`;
   if (matches.length === 1) {
     const m = matches[0];
-    return `${m.teamA.name} ${m.teamA.score} — ${m.teamB.score} ${m.teamB.name}`;
+    return `Noirs ${m.teamA.score} — ${m.teamB.score} Blancs`;
   }
   return `${matches.length} matchs`;
 }
@@ -83,25 +87,28 @@ function Rubrique({
             const bGagne = m.teamB.score > m.teamA.score;
             return (
               <div key={m.id} className="glass-soft rounded-2xl px-3.5 py-2.5">
+                {matches.length > 1 && (
+                  <p className="mono-label mb-1.5 text-foreground/35">{m.label}</p>
+                )}
                 <div className="flex items-center justify-between gap-3">
                   <span
                     className={cn(
-                      "min-w-0 flex-1 truncate text-[13.5px] font-semibold",
+                      "flex min-w-0 flex-1 items-center gap-1.5 truncate text-[13.5px] font-semibold",
                       aGagne ? "text-foreground" : "text-foreground/45"
                     )}
                   >
-                    {m.teamA.name}
+                    <PointMaillot camp="Noirs" /> Noirs
                   </span>
                   <span className="shrink-0 text-[16px] font-extrabold tabular-nums">
                     {m.teamA.score} — {m.teamB.score}
                   </span>
                   <span
                     className={cn(
-                      "min-w-0 flex-1 truncate text-right text-[13.5px] font-semibold",
+                      "flex min-w-0 flex-1 items-center justify-end gap-1.5 truncate text-right text-[13.5px] font-semibold",
                       bGagne ? "text-foreground" : "text-foreground/45"
                     )}
                   >
-                    {m.teamB.name}
+                    Blancs <PointMaillot camp="Blancs" />
                   </span>
                 </div>
               </div>

@@ -139,6 +139,12 @@ interface Question {
   q: string;
   options: string[];
   answer: string;
+  /**
+   * Ce qu'on lit sur un choix, quand ce n'est pas sa valeur : les équipes se
+   * gardent sous leur nom interne (la réponse déjà donnée reste juste) et se
+   * lisent Noirs ou Blancs, comme sur la feuille de match.
+   */
+  libelles?: Record<string, string>;
 }
 
 export function buildQuiz(journee: Journee, lines: { name: string; buts: number }[]): Question[] {
@@ -172,14 +178,11 @@ export function buildQuiz(journee: Journee, lines: { name: string; buts: number 
   if (big && big.teamA.score !== big.teamB.score) {
     const winner = big.teamA.score > big.teamB.score ? big.teamA.name : big.teamB.name;
     const loser = big.teamA.score > big.teamB.score ? big.teamB.name : big.teamA.name;
-    const third =
-      matches
-        .flatMap((m) => [m.teamA.name, m.teamB.name])
-        .find((n) => n !== winner && n !== loser) ?? "Match nul";
     qs.push({
       q: "Qui a gagné le match de la journée ?",
-      options: shuffle([winner, loser, third], journee.j + 2),
+      options: shuffle([winner, loser, "Match nul"], journee.j + 2),
       answer: winner,
+      libelles: { [big.teamA.name]: "Les Noirs", [big.teamB.name]: "Les Blancs" },
     });
   }
 
@@ -268,7 +271,7 @@ export function QuizModule({
                           : "bouton-secondaire"
                       )}
                     >
-                      {o}
+                      {q.libelles?.[o] ?? o}
                     </button>
                   );
                 })}

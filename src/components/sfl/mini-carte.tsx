@@ -2,13 +2,15 @@
 
 // La carte d'un joueur en vignette, pour les classements : sa vraie carte
 // Bola (photo comprise), en petit. La toucher l'ouvre en grand, en 3D, avec
-// ses abonnés et de quoi le suivre (card-viewer.tsx).
+// ses abonnés et de quoi le suivre (card-viewer.tsx). Sur un terrain, le
+// joueur y porte le maillot de son camp (`maillot`), en petit comme en grand.
 
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useCardViewer } from "@/components/sfl/card-viewer";
 import { prechaufferCarte } from "@/components/sfl/card-3d";
 import { useSeason } from "@/components/sfl/season-provider";
 import type { BoostType, Player } from "@/lib/sfl/engine";
+import type { Camp } from "@/lib/sfl/maillots";
 import { cn } from "@/lib/utils";
 
 /**
@@ -33,6 +35,7 @@ export function MiniCarte({
   cle,
   vertical,
   distinction,
+  maillot,
 }: {
   player: Player;
   /** La largeur, en fraction de 254 px (voir FORMAT_CARTE). */
@@ -48,6 +51,8 @@ export function MiniCarte({
   vertical?: boolean;
   /** Une carte à titre : MVP (or), Impact (rouge), Défensive (bleu). */
   distinction?: BoostType;
+  /** Le camp du joueur dans un match : sa photo porte ce maillot-là. */
+  maillot?: Camp;
 }) {
   const { open } = useCardViewer();
   return (
@@ -57,18 +62,25 @@ export function MiniCarte({
       onClick={(e) => {
         e.stopPropagation();
         open({
-          cacheKey: cle ?? `mini-${player.name}${distinction ? `-${distinction}` : ""}`,
+          cacheKey: cle ?? `mini-${player.name}${distinction ? `-${distinction}` : ""}${maillot ? `-${maillot}` : ""}`,
           mode: "simple",
           title: player.name,
           subtitle: detail,
           joueur: player.name,
-          render: (s) => <PlayerCard player={player} size={s} distinction={distinction} />,
+          render: (s) => <PlayerCard player={player} size={s} distinction={distinction} maillot={maillot} />,
         });
       }}
       aria-label={`Voir la carte de ${player.name}`}
       className={cn("shrink-0 transition-transform active:scale-95", className)}
     >
-      <PlayerCard player={player} size={size} onglet={onglet} vertical={vertical} distinction={distinction} />
+      <PlayerCard
+        player={player}
+        size={size}
+        onglet={onglet}
+        vertical={vertical}
+        distinction={distinction}
+        maillot={maillot}
+      />
     </button>
   );
 }

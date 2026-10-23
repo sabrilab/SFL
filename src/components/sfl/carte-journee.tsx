@@ -11,32 +11,24 @@
 //
 // C'est la vue « Matchs » de la Ligue : on parcourt la saison en regardant des
 // terrains, pas des tableaux. Toucher la carte ouvre le récap de la journée.
+//
+// Chaque match se lit Noirs contre Blancs, comme la feuille de match de la
+// Map (lib/sfl/maillots.ts) : le tableau d'affichage le dit, et chaque carte
+// porte la note et le nom aux couleurs de son maillot (Sabri, 23/10). La
+// couleur du jour de l'admin (Orange, Bleu…) ne s'y montre plus. Chaque
+// joueur y porte aussi le maillot de son camp, sa photo repeinte par le code
+// (lib/sfl/maillot-des-photos.ts).
 
 import { useState } from "react";
 import { CarteDe, MiniCarte } from "@/components/sfl/mini-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import type { Journee, MatchPlayerLine, MatchTeam } from "@/lib/sfl/engine";
+import { MAILLOTS } from "@/lib/sfl/maillots";
+import { PastilleMaillot } from "@/components/sfl/point-maillot";
 import { cn } from "@/lib/utils";
 import { projeter, vue } from "@/lib/sfl/terrain-vu";
 import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
 import { AuVestiaire } from "@/components/sfl/au-vestiaire";
-
-const TEAM_COLORS: Record<string, string> = {
-  Orange: "#F9CB9C",
-  Bleu: "#8FB6F5",
-  Vert: "#9FD49B",
-  Jaune: "#F2DC8B",
-  Rouge: "#F09A96",
-  Gris: "#C9C9C9",
-  "Équipe A": "#F9CB9C",
-  "Équipe B": "#8FB6F5",
-};
-
-const couleur = (name: string) => TEAM_COLORS[name] ?? "#B9B9B9";
-
-
-/** L'encre de la note sur la couleur d'une équipe : toutes sont claires. */
-const onglet = (name: string) => ({ fond: couleur(name), encre: "#0A0A0A" });
 
 /**
  * Les deux tailles du terrain, toutes deux en carte debout (la photo, la
@@ -133,18 +125,19 @@ function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
     return m && poids(m) > 0 ? m : null;
   };
   const { l, h } = VUE;
+  // Les Noirs (la première équipe du match) au fond, les Blancs devant.
   const places = (
     [
-      [a, -1],
-      [b, 1],
+      [a, -1, MAILLOTS.Noirs],
+      [b, 1, MAILLOTS.Blancs],
     ] as const
   )
-    .flatMap(([eq, sens]) => {
+    .flatMap(([eq, sens, maillot]) => {
       const star = vedette(eq);
       return compo(eq, (x) => trouver(x)?.poste).map(({ ligne, profondeur, largeur }) => {
         const u = (largeur / 100) * l;
         const v = h / 2 + sens * depuisMediane(profondeur);
-        return { ligne, equipe: eq.name, star: ligne === star, u, v, ...projeter(u, v, 0, VUE) };
+        return { ligne, maillot, star: ligne === star, u, v, ...projeter(u, v, 0, VUE) };
       });
     })
     .sort((x, y) => x.v - y.v);
@@ -181,10 +174,9 @@ function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
             opacity: 0.85,
           }}
         />
-        {places.map(({ ligne, equipe, star, x, y, k }) => {
+        {places.map(({ ligne, maillot, star, x, y, k }) => {
           const player = trouver(ligne);
           const size = star ? VEDETTE : PASTILLE;
-          const teinte = couleur(equipe);
           return (
             <div key={ligne.name} className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y }}>
               <div
@@ -192,13 +184,20 @@ function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
                 style={{ transformOrigin: "50% 100%", transform: `translateX(-50%) scale(${k})` }}
               >
                 {player ? (
-                  <MiniCarte player={player} size={size} onglet={onglet(equipe)} vertical detail={ligne.buts || ligne.passes ? `${ligne.buts} B · ${ligne.passes} P` : undefined} />
+                  <MiniCarte
+                    player={player}
+                    size={size}
+                    onglet={{ fond: maillot.fond, encre: maillot.encre }}
+                    maillot={maillot.nom}
+                    vertical
+                    detail={ligne.buts || ligne.passes ? `${ligne.buts} B · ${ligne.passes} P` : undefined}
+                  />
                 ) : (
                   <CarteDe name={ligne.name} size={size} />
                 )}
                 <span
                   className="mt-[4px] flex items-center gap-[5px] whitespace-nowrap rounded-full px-[7px] py-[2px] text-[10.5px] leading-[1.2] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
-                  style={{ background: teinte, color: "#0A0A0A", fontWeight: star ? 800 : 600 }}
+                  style={{ background: maillot.fond, color: maillot.encre, fontWeight: star ? 800 : 600 }}
                 >
                   {ligne.name.split(" ")[0]}
                   {(ligne.buts > 0 || ligne.passes > 0) && (
@@ -279,24 +278,16 @@ export function CarteJournee({
         </div>
       )}
 
-      {/* Le tableau d'affichage */}
+      {/* Le tableau d'affichage : les Noirs à gauche (au fond du terrain), les Blancs à droite (devant). */}
       <div className="flex items-center justify-between gap-3 px-4 pb-2.5">
-        <span className="flex min-w-0 flex-1 items-center gap-1.5">
-          <span
-            className="size-2.5 shrink-0 rounded-full"
-            style={{ background: couleur(match.teamA.name) }}
-          />
-          <span className="text-[13px] leading-tight font-bold break-words">{match.teamA.name}</span>
+        <span className="flex min-w-0 flex-1">
+          <PastilleMaillot camp="Noirs" className="text-[13px]" />
         </span>
         <span className="shrink-0 text-[22px] leading-none font-extrabold tracking-tight tabular-nums">
           {match.teamA.score}<span className="mx-1 text-foreground/25">–</span>{match.teamB.score}
         </span>
-        <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
-          <span className="text-right text-[13px] leading-tight font-bold break-words">{match.teamB.name}</span>
-          <span
-            className="size-2.5 shrink-0 rounded-full"
-            style={{ background: couleur(match.teamB.name) }}
-          />
+        <span className="flex min-w-0 flex-1 justify-end">
+          <PastilleMaillot camp="Blancs" className="text-[13px]" />
         </span>
       </div>
 
