@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
+import { useFelicitations } from "@/hooks/use-felicitations";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useSession } from "@/hooks/use-session";
 import { useVotes } from "@/hooks/use-votes";
@@ -227,16 +228,21 @@ export function useDuelsAcceptes(j: number | null | undefined): Duel[] {
   }, [isClient, j, saison, maintenant, reponses]);
 }
 
-/** Mon XP : le niveau à vie et le passe de la saison (masqués compris : chacun voit le sien). */
+/**
+ * Mon XP : le niveau à vie et le passe de la saison (masqués compris : chacun
+ * voit le sien). Les félicitations reçues et données y comptent (lib/sfl/
+ * felicitations.ts), relues au lancement et au retour sur l'app.
+ */
 export function useXp(nom?: string): BilanXp | null {
   const isClient = useIsClient();
   const { me } = useMyPlayer();
   const maintenant = useMaintenant();
   const reponses = useReponses();
+  const { toutes: felicitations } = useFelicitations();
   const { saison, jugee, votes } = useSaisonJugee(maintenant);
   const qui = nom ?? me;
   return useMemo(() => {
     if (!isClient || !qui) return null;
-    return bilanDe(journalXp(jugee, reponses, votes, maintenant), qui, saison.numero ?? 0);
-  }, [isClient, qui, jugee, reponses, votes, maintenant, saison.numero]);
+    return bilanDe(journalXp(jugee, reponses, votes, maintenant, felicitations), qui, saison.numero ?? 0);
+  }, [isClient, qui, jugee, reponses, votes, maintenant, felicitations, saison.numero]);
 }
