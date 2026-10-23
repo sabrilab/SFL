@@ -44,7 +44,7 @@ export function CartesCarriere({ saisons, titre = "Ses cartes" }: { saisons: Car
           const avant = saisons[i + 1];
           const ecart = avant ? s.note - avant.note : 0;
           return (
-            <div key={s.numero} className={cn("flex flex-col gap-[var(--fib-13)] py-[var(--fib-13)]", i > 0 && "border-t border-white/8")}>
+            <div key={s.numero} className={cn("flex flex-col gap-[var(--fib-13)] py-[var(--fib-13)]", i > 0 && "border-t border-foreground/8")}>
               <div className="flex items-baseline justify-between px-4">
                 <span className="text-[15px] font-semibold">
                   {s.nom}

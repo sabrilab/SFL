@@ -362,7 +362,7 @@ export function AdminDashboard() {
           </div>
           <Badge
             variant="secondary"
-            className={cn("rounded-full", partage && "bg-emerald-500/15 text-emerald-400")}
+            className={cn("rounded-full", partage && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400")}
           >
             {partage ? "Partagé" : "Local"}
           </Badge>
@@ -406,12 +406,12 @@ export function AdminDashboard() {
             <Stat label="Buts" value={totals.buts} />
             <Stat label="Passes D." value={totals.passes} />
             <Stat label="PP distribués" value={totals.pp} />
-            <Stat label="Alertes" value={totals.alertes} tone={totals.alertes ? "text-amber-500" : "text-emerald-500"} />
+            <Stat label="Alertes" value={totals.alertes} tone={totals.alertes ? "text-amber-700 dark:text-amber-500" : "text-emerald-700 dark:text-emerald-500"} />
           </div>
 
           <div className="rounded-3xl bg-card p-4">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-              <AlertTriangle className="size-4 text-amber-500" /> Contrôles de cohérence
+              <AlertTriangle className="size-4 text-amber-700 dark:text-amber-500" /> Contrôles de cohérence
             </div>
             {derived.alerts.length === 0 ? (
               <p className="text-[13px] text-muted-foreground">Aucune anomalie détectée — saisie propre ✓</p>

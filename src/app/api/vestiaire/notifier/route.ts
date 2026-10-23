@@ -15,6 +15,10 @@
 // Chacun règle les siennes (vestiaire_suivi.notifs) : 'tout', 'cite'
 // (cité, mis en avant, réponses et réactions seulement) ou 'rien'.
 //
+// Les membres acceptés seulement : un compte en attente ne lit pas le
+// Vestiaire (la base le lui cache), il n'en reçoit donc rien non plus. Avant
+// le 22/10/2026, il recevait chaque message, avec sa phrase.
+//
 // La route agit avec la clé secrète (lire les abonnements de tout le monde),
 // donc elle ne croit pas l'appelant sur parole : le message ou la réaction
 // doit exister, être à lui, et être récent. Rejouer l'appel ne renvoie le
@@ -67,8 +71,15 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (!msg || msg.canal !== "sfl") return NextResponse.json({ error: "Message inconnu." }, { status: 404 });
 
-  const { data: profils } = await sb.from("profiles").select("id, name, username, nom_affiche");
-  const tous = (profils ?? []) as { id: string; name: string; username: string; nom_affiche: string | null }[];
+  const { data: profils } = await sb.from("profiles").select("id, name, username, nom_affiche, valide");
+  const tous = (profils ?? []) as {
+    id: string;
+    name: string;
+    username: string;
+    nom_affiche: string | null;
+    valide: boolean;
+  }[];
+  const membres = new Set(tous.filter((p) => p.valide).map((p) => p.id));
   const nomDe = (uid: string) => {
     const p = tous.find((x) => x.id === uid);
     return (p?.nom_affiche ?? p?.name ?? "Quelqu'un").split(" ")[0];
@@ -184,6 +195,8 @@ export async function POST(req: NextRequest) {
       });
   }
 
+  for (const uid of envois.keys()) if (!membres.has(uid)) envois.delete(uid);
+  courants = courants.filter((uid) => membres.has(uid));
   if (envois.size === 0) return NextResponse.json({ envoyes: 0 });
 
   // Le nombre de non lus de chacun, pour la pastille de l'icône : le

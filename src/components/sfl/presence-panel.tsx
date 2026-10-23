@@ -112,7 +112,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
           </p>
         </>
       ) : (
-        <p className="mt-4 rounded-[14px] bg-white/5 px-3.5 py-3 text-[12.5px] leading-snug text-foreground/45">
+        <p className="mt-4 rounded-[14px] bg-contraste/5 px-3.5 py-3 text-[12.5px] leading-snug text-foreground/45">
           Les réponses sont closes depuis vendredi minuit.
           {p.mine === "present"
             ? " Tu es sur la liste — à dimanche ⚽"
@@ -130,7 +130,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
       </div>
 
       {p.equipesVisibles && p.teams && p.teams.length > 0 ? (
-        <div className="mt-4 border-t border-white/8 pt-3.5">
+        <div className="mt-4 border-t border-contraste/8 pt-3.5">
           <p className="mono-label text-primary">Les équipes de dimanche</p>
           <div className="mt-2 flex flex-col gap-3">
             {equipesDeConvocation(p.teams).map((t) => (
@@ -146,7 +146,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
         </div>
       ) : (
         p.presents.length > 0 && (
-          <div className="mt-4 border-t border-white/8 pt-3.5">
+          <div className="mt-4 border-t border-contraste/8 pt-3.5">
             <p className="mono-label mb-2 text-foreground/40">Qui vient</p>
             <QuiVient noms={p.presents} />
           </div>
@@ -176,7 +176,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
 
       {/* Vue admin : le tableau complet */}
       {admin && !compact && (
-        <div className="mt-5 border-t border-white/8 pt-4">
+        <div className="mt-5 border-t border-contraste/8 pt-4">
           <div className="flex items-center justify-between">
             <p className="mono-label text-primary">Vue admin · les réponses</p>
             {p.sansReponse.length > 0 && (

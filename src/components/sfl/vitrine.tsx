@@ -206,10 +206,10 @@ function Scintille({ taille, decalage, children }: { taille: number; decalage: n
             width: taille * e.t,
             height: taille * e.t,
             animationDelay: `${e.d - decalage}s`,
-            filter: "drop-shadow(0 0 3px rgba(255,255,255,0.9))",
+            filter: "var(--eclat-halo)",
           }}
         >
-          <path d="M10 0 C10.8 7 13 9.2 20 10 C13 10.8 10.8 13 10 20 C9.2 13 7 10.8 0 10 C7 9.2 9.2 7 10 0 Z" fill="#fff" />
+          <path d="M10 0 C10.8 7 13 9.2 20 10 C13 10.8 10.8 13 10 20 C9.2 13 7 10.8 0 10 C7 9.2 9.2 7 10 0 Z" style={{ fill: "var(--eclat)" }} />
         </svg>
       ))}
     </span>
@@ -275,10 +275,10 @@ function SurEtagere({ children, nom, detail, onOpen, label }: { children: React.
     <>
       <span className="relative flex h-[100px] w-full items-end justify-center pb-1.5">
         {children}
-        <span aria-hidden className="absolute inset-x-0 bottom-0 h-px bg-white/20" />
+        <span aria-hidden className="absolute inset-x-0 bottom-0 h-px bg-contraste/20" />
       </span>
       <span className="mt-1.5 w-full text-[12px] leading-tight font-bold">{nom}</span>
-      {detail && <span className="text-[11px] leading-tight text-white/60">{detail}</span>}
+      {detail && <span className="text-[11px] leading-tight text-contraste/60">{detail}</span>}
     </>
   );
   return onOpen ? (
@@ -301,7 +301,7 @@ function Etagere({ children }: { children: React.ReactNode }) {
 function SaisonEnVitrine({ s, onOpen }: { s: TropheesDeSaison; onOpen: (id: ClassementId) => void }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="mono-label text-[11px] text-white/55">{s.saison}</span>
+      <span className="mono-label text-[11px] text-contraste/55">{s.saison}</span>
       <Etagere>
         {s.podiums.map((p) => (
           <SurEtagere
@@ -366,8 +366,9 @@ function FeuilleTrophees() {
 }
 
 /**
- * La vitrine des trophées, sur un panneau noir mat comme la planche : saison
- * close par saison close, puis ce qui est en jeu dans la saison en cours.
+ * La vitrine des trophées, sur un panneau noir mat comme la planche (blanc
+ * mat en mode clair, globals.css, .vitrine-mate) : saison close par saison
+ * close, puis ce qui est en jeu dans la saison en cours.
  */
 export function VitrineTrophees({ nom, enJeu = true }: { nom: string; enJeu?: boolean }) {
   const { saison, allPlayers } = useSeason();
@@ -381,11 +382,11 @@ export function VitrineTrophees({ nom, enJeu = true }: { nom: string; enJeu?: bo
   if (!enJeu && !saisons.length) return null;
 
   return (
-    <section aria-labelledby="trophees-saison" className="flex flex-col gap-[18px] rounded-[26px] border border-white/[0.08] bg-[#0a0a0b] px-4 pt-[18px] pb-4 text-white">
+    <section aria-labelledby="trophees-saison" className="vitrine-mate flex flex-col gap-[18px] rounded-[26px] px-4 pt-[18px] pb-4">
       <div className="flex items-baseline justify-between">
         <h2 id="trophees-saison" className="text-[19px] font-extrabold tracking-tight">
           Trophées
-          {total > 0 && <span className="ml-2 font-mono text-[12px] font-bold text-white/45 tabular-nums">{total}</span>}
+          {total > 0 && <span className="ml-2 font-mono text-[12px] font-bold text-contraste/45 tabular-nums">{total}</span>}
         </h2>
         <button type="button" onClick={() => setOuvert("regles")} className="bouton-discret bouton--or -mr-2 px-2 py-1 text-[13px] font-semibold">
           Comment les gagner
@@ -398,7 +399,7 @@ export function VitrineTrophees({ nom, enJeu = true }: { nom: string; enJeu?: bo
 
       {enJeu && courants.length > 0 && (
         <div className="flex flex-col gap-2">
-          <span className="mono-label text-[11px] text-white/55">En jeu · ton rang du moment</span>
+          <span className="mono-label text-[11px] text-contraste/55">En jeu · ton rang du moment</span>
           <Etagere>
             {courants.map((e) => (
               <SurEtagere

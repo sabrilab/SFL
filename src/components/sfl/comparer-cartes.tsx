@@ -67,7 +67,7 @@ export function ComparerCartes({ moi, lui, rangs }: { moi: Player; lui: Player; 
       <RadarDuel toi={moi.stats} lui={lui.stats} nomLui={identite.nom(lui.name)} />
 
       {/* 3. La saison de chacun */}
-      <section className="glass flex flex-col divide-y divide-white/8 rounded-[22px] px-4">
+      <section className="glass flex flex-col divide-y divide-contraste/8 rounded-[22px] px-4">
         <Ligne a={rangs.get(moi.name) ?? 0} b={rangs.get(lui.name) ?? 0} quoi="Pépite d'Or" format={(v) => (v ? ordinal(v) : "–")} basGagne />
         <Ligne a={moi.pp} b={lui.pp} quoi="Points" />
         <Ligne a={moi.buts} b={lui.buts} quoi="Buts" />

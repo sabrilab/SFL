@@ -119,7 +119,7 @@ export function ChangerJoueurSheet({
                             onRemplacer(n);
                             setQ("");
                           }}
-                          className="flex w-full items-center gap-3 rounded-2xl px-1 py-1.5 text-left transition-colors active:bg-white/8"
+                          className="flex w-full items-center gap-3 rounded-2xl px-1 py-1.5 text-left transition-colors active:bg-contraste/8"
                         >
                           <CarteDe name={n} size={FORMAT_CARTE.petite} inerte />
                           <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{n}</span>

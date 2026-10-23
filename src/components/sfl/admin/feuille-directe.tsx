@@ -145,7 +145,7 @@ export function FeuilleDirecte({ saison, commit }: Props) {
           className="glass-soft h-9 cursor-pointer rounded-full px-3.5 text-[13px] font-bold outline-none"
         >
           {journees.map((m) => (
-            <option key={m.j} value={m.j} className="bg-[#141414] text-white">
+            <option key={m.j} value={m.j} className="bg-white text-[#08090b] dark:bg-[#141414] dark:text-white">
               Journée {m.j} · {m.date}
             </option>
           ))}

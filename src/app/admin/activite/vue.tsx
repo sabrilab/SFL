@@ -420,7 +420,7 @@ export function ActiviteVue({
       )}
 
       {error && (
-        <p className="glass-soft rounded-2xl p-3.5 text-[12.5px] text-[#FF6B5E]">
+        <p className="glass-soft rounded-2xl p-3.5 text-[12.5px] text-[#c8352b] dark:text-[#FF6B5E]">
           {error} — as-tu bien rejoué le script SQL (table activity) ?
         </p>
       )}

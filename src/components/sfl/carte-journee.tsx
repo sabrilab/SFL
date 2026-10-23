@@ -161,7 +161,7 @@ function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
+      className="relative w-full overflow-hidden rounded-[22px] bg-[radial-gradient(120%_80%_at_50%_0%,#ffffff_0%,#e6e8e3_70%)] dark:bg-[radial-gradient(120%_80%_at_50%_0%,#22252a_0%,#111214_70%)]"
       style={{ height: bas - haut + MARGE * 2 }}
     >
       <div className="absolute inset-x-0" style={{ top: decalage, height: bas + MARGE }}>

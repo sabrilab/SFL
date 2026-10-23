@@ -215,7 +215,9 @@ function Ballon({ trajet, de, a }: { trajet: [number, number][]; de: number; a: 
   );
 }
 
-/** Le but du fond : les poteaux, la barre et le filet, en perspective. */
+/** Le but du fond : les poteaux, la barre et le filet, en perspective. Le
+ *  filet et le cerne des poteaux suivent le mode (globals.css, --but-*) : sur
+ *  le papier du mode clair, le blanc seul disparaîtrait. */
 function But() {
   const [g, dr] = POTEAUX;
   const fond = LIGNE - 9;
@@ -225,10 +227,10 @@ function But() {
       <svg x="50%" overflow="visible">
         <path
           d={trace([[g, LIGNE, BARRE], [g, fond, BARRE - 4], [dr, fond, BARRE - 4], [dr, LIGNE, BARRE]], true, VUE)}
-          fill="rgba(255,255,255,0.08)"
+          style={{ fill: "var(--but-voile)" }}
         />
-        <path d={trace([[g, fond, 0], [g, fond, BARRE - 4], [dr, fond, BARRE - 4], [dr, fond, 0]], true, VUE)} fill="rgba(255,255,255,0.06)" />
-        <g stroke="rgba(255,255,255,0.28)" strokeWidth={0.7} fill="none">
+        <path d={trace([[g, fond, 0], [g, fond, BARRE - 4], [dr, fond, BARRE - 4], [dr, fond, 0]], true, VUE)} style={{ fill: "var(--but-fond)" }} />
+        <g strokeWidth={0.7} fill="none" style={{ stroke: "var(--but-filet)" }}>
           {mailles.map((u) => (
             <path key={u} d={trace([[u, fond, 0], [u, fond, BARRE - 4], [u, LIGNE, BARRE]], false, VUE)} />
           ))}
@@ -238,6 +240,13 @@ function But() {
           <path d={trace([[g, LIGNE, 0], [g, fond, 0], [g, fond, BARRE - 4]], false, VUE)} />
           <path d={trace([[dr, LIGNE, 0], [dr, fond, 0], [dr, fond, BARRE - 4]], false, VUE)} />
         </g>
+        <path
+          d={trace([[g, LIGNE, 0], [g, LIGNE, BARRE], [dr, LIGNE, BARRE], [dr, LIGNE, 0]], false, VUE)}
+          fill="none"
+          strokeWidth={4.2}
+          strokeLinejoin="round"
+          style={{ stroke: "var(--but-cerne)" }}
+        />
         <path
           d={trace([[g, LIGNE, 0], [g, LIGNE, BARRE], [dr, LIGNE, BARRE], [dr, LIGNE, 0]], false, VUE)}
           fill="none"
@@ -368,13 +377,13 @@ export function Scene({
       ref={ref}
       data-exploits={exploits?.join("|")}
       className={cn(
-        "relative flex flex-col overflow-hidden bg-[radial-gradient(120%_70%_at_50%_30%,#1d2024_0%,#0c0d0f_75%)] text-white md:rounded-3xl",
+        "relative flex flex-col overflow-hidden bg-[radial-gradient(120%_70%_at_50%_30%,#ffffff_0%,#e8eae5_75%)] text-foreground md:rounded-3xl dark:bg-[radial-gradient(120%_70%_at_50%_30%,#1d2024_0%,#0c0d0f_75%)] dark:text-white",
         className,
       )}
       style={{ ["--p" as string]: 0 } as CSSProperties}
     >
       <header className="relative z-10 flex flex-col gap-1 px-5 pt-5">
-        <span className="pel-titre mono-label text-[10px] text-white/50" style={{ ["--d" as string]: 0 }}>
+        <span className="pel-titre mono-label text-[10px] text-foreground/50 dark:text-white/50" style={{ ["--d" as string]: 0 }}>
           {sur}
         </span>
         <h3 className="pel-titre titre-lettrage text-[24px] leading-[0.95]" style={{ ["--d" as string]: 0.06 }}>
@@ -404,7 +413,7 @@ export function Scene({
       </div>
       {(texte || partage || action) && (
         <div className="flex min-h-11 items-center gap-2 pr-1.5 pb-2 pl-5">
-          <span className="min-w-0 flex-1 text-[13px] leading-snug text-white/70">{texte}</span>
+          <span className="min-w-0 flex-1 text-[13px] leading-snug text-foreground/70 dark:text-white/70">{texte}</span>
           {action}
           {partage && (
             <button
@@ -414,7 +423,7 @@ export function Scene({
                 preparerPiece({ type: "ligue", ...partage, lignes: partage.lignes.slice(0, 6) });
                 router.push("/vestiaire");
               }}
-              className="grid size-9 shrink-0 place-items-center rounded-full text-white/60 transition-transform active:scale-90"
+              className="grid size-9 shrink-0 place-items-center rounded-full text-foreground/60 transition-transform active:scale-90 dark:text-white/60"
             >
               <MessageCircle className="size-[18px]" strokeWidth={1.8} />
             </button>
