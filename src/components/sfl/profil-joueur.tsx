@@ -39,7 +39,8 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { BoutonSuivre, ReseauJoueur } from "@/components/sfl/suivre";
 import { FeuilleBadge, Medaille, NOM_TROPHEE, Trophee } from "@/components/sfl/vitrine";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import { useGrandEcran } from "@/hooks/use-media-query";
+import { useGrandEcran, useTresGrandEcran } from "@/hooks/use-media-query";
+import { RACINE_PHI } from "@/hooks/use-format-carte";
 import { useDivision } from "@/hooks/use-division";
 import { nomDivision } from "@/lib/sfl/divisions";
 import { useIdentites } from "@/hooks/use-identites";
@@ -84,6 +85,7 @@ export function Chiffre({ valeur, quoi }: { valeur: string | number; quoi: strin
 export function ProfilJoueur({ player, rank }: { player: Player; rank: number }) {
   const { saison, journees, allPlayers } = useSeason();
   const grand = useGrandEcran();
+  const tresGrand = useTresGrandEcran();
   const identite = useIdentites();
   const division = useDivision(player.name);
   const [choix, setChoix] = useState<Choix>(null);
@@ -144,7 +146,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
         <Card3D
           cacheKey={`recherche-${player.name}`}
           mode="simple"
-          size={grand ? 1.05 : 0.8}
+          size={tresGrand ? 1.05 * RACINE_PHI : grand ? 1.05 : 0.8}
           render={(s) => <PlayerCard player={player} size={s} />}
         />
         <div className="flex w-full flex-col items-center gap-[var(--fib-8)] text-center">

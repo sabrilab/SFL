@@ -32,16 +32,21 @@
 // les onglets. Sur <body>, il passe au-dessus d'eux (z 45, onglets 40), sous
 // les feuilles (z 50) : la carte d'un joueur touchée dans le fil s'ouvre
 // par-dessus.
+//
+// Sur ordinateur (dès 1024 px), la colonne du Vestiaire (760 px) et les
+// cartes de tête un cran plus grandes (useFormatCarte), places en braise
+// et rangées comprises. Sur téléphone et tablette, rien ne bouge.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Discussion } from "@/components/sfl/vestiaire";
-import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
+import { CarteDe } from "@/components/sfl/mini-carte";
 import { Ecusson, EcussonVide } from "@/components/sfl/equipe/ecusson";
 import { buttonVariants } from "@/components/ui/button";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
+import { useFormatCarte, type FormatsCarte } from "@/hooks/use-format-carte";
 import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { arriveesVisibles, salonDuMatch } from "@/lib/sfl/discussion-match";
 import { DEMO_DISCUSSION, filDemo } from "@/lib/sfl/discussion-match-demo";
@@ -56,18 +61,19 @@ const BRAISE = "#FF8A4C";
 /** Au-delà, les places vides ne disent rien de plus que le nombre. */
 const PLACES_MAX = 12;
 /** La largeur d'une petite carte, arrondie au-dessus (les places vides l'ont pleine). */
-const COTE = Math.ceil(254 * FORMAT_CARTE.petite);
+const cotePetite = (format: FormatsCarte) => Math.ceil(254 * format.petite);
 /** L'écart entre deux cartes (gap-2). */
 const ECART = 8;
 
 /**
  * Les cartes en tête du fil, en rangées égales de six au plus : dix places
- * font cinq et cinq (avant : sept, puis trois seules dessous).
+ * font cinq et cinq (avant : sept, puis trois seules dessous). `cote` : la
+ * largeur d'une carte, un cran plus grande sur ordinateur.
  */
-function Rangees({ n, label, children }: { n: number; label: string; children: React.ReactNode }) {
+function Rangees({ n, cote, label, children }: { n: number; cote: number; label: string; children: React.ReactNode }) {
   const par = n <= 0 ? 1 : Math.ceil(n / Math.ceil(n / 6));
   return (
-    <div aria-label={label} className="mx-auto flex flex-wrap justify-center gap-2" style={{ maxWidth: par * COTE + (par - 1) * ECART }}>
+    <div aria-label={label} className="mx-auto flex flex-wrap justify-center gap-2" style={{ maxWidth: par * cote + (par - 1) * ECART }}>
       {children}
     </div>
   );
@@ -238,6 +244,8 @@ function FilDuMatch({
   const orga = partie.joueurs.find((j) => j.id === partie.organisateurId);
   const jouent = [...(orga ? [orga] : []), ...partie.joueurs.filter((j) => j.statut === "inscrit" && j !== orga)];
   const invites = partie.joueurs.filter((j) => j.statut === "invite" && j !== orga);
+  const format = useFormatCarte();
+  const cote = cotePetite(format);
   const places = Math.min(manque, PLACES_MAX);
 
   return (
@@ -257,13 +265,13 @@ function FilDuMatch({
       }
       tete={
         <div className="pt-5 pb-1">
-          <Rangees n={jouent.length + invites.length + places} label="Les joueurs du match">
+          <Rangees n={jouent.length + invites.length + places} cote={cote} label="Les joueurs du match">
             {jouent.map((j) => (
-              <CarteDe key={j.id} name={j.name} size={FORMAT_CARTE.petite} />
+              <CarteDe key={j.id} name={j.name} size={format.petite} />
             ))}
             {invites.map((j) => (
               <span key={j.id} className="opacity-40">
-                <CarteDe name={j.name} size={FORMAT_CARTE.petite} />
+                <CarteDe name={j.name} size={format.petite} />
               </span>
             ))}
             {Array.from({ length: places }, (_, i) => (
@@ -271,7 +279,7 @@ function FilDuMatch({
                 key={`vide-${i}`}
                 aria-hidden
                 className="shrink-0 border-[1.5px] border-dashed"
-                style={{ width: COTE, height: COTE, borderRadius: COTE * 0.24, borderColor: `${BRAISE}99`, background: `${BRAISE}14` }}
+                style={{ width: cote, height: cote, borderRadius: cote * 0.24, borderColor: `${BRAISE}99`, background: `${BRAISE}14` }}
               />
             ))}
           </Rangees>
@@ -305,6 +313,7 @@ function FilDeLEquipe({
     equipeCourante.current = equipe;
   }, [equipe]);
   const filEssai = useCallback(() => filDemoEquipe(equipeCourante.current, moi), [moi]);
+  const format = useFormatCarte();
 
   return (
     <Discussion
@@ -318,9 +327,9 @@ function FilDeLEquipe({
       tete={
         <div className="flex flex-col items-center gap-3 pt-5 pb-1">
           <Ecusson initiales={equipe.initiales} fond={equipe.fond} taille={44} />
-          <Rangees n={signataires(equipe).length} label="Les joueurs de l'équipe">
+          <Rangees n={signataires(equipe).length} cote={cotePetite(format)} label="Les joueurs de l'équipe">
             {signataires(equipe).map((m) => (
-              <CarteDe key={m.id} name={m.name} size={FORMAT_CARTE.petite} />
+              <CarteDe key={m.id} name={m.name} size={format.petite} />
             ))}
           </Rangees>
         </div>
@@ -347,7 +356,7 @@ function SansEquipe({
       className={cn("fixed inset-x-0 top-0 z-[45] flex h-dvh flex-col bg-background", className)}
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
-      <header className="mx-auto flex w-full max-w-[640px] shrink-0 items-center gap-3 px-5 pt-3 pb-2">
+      <header className="mx-auto flex w-full max-w-[640px] shrink-0 items-center gap-3 px-5 pt-3 pb-2 lg:max-w-[760px]">
         <EnTete onglets={onglets} onFermer={onFermer} />
       </header>
       {charge && (
