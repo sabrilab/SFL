@@ -30,6 +30,7 @@ import {
 } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
+import { PastilleMaillot } from "@/components/sfl/point-maillot";
 
 /* ------------------------------- outillage ------------------------------- */
 
@@ -113,7 +114,7 @@ function FicheJournee({ journee }: { journee: Journee }) {
                   key={team.id}
                   className={cn("px-4 py-3.5", ti === 0 && "border-r border-contraste/8")}
                 >
-                  <p className="mono-label mb-2 text-foreground/45">{team.name}</p>
+                  <PastilleMaillot camp={ti === 0 ? "Noirs" : "Blancs"} className="mb-2.5" />
                   <div className="flex flex-col gap-1.5">
                     {team.players.map((p) => (
                       <div key={p.name} className="flex items-baseline gap-1.5 text-[12.5px]">

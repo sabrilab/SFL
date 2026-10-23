@@ -99,8 +99,8 @@ assert.equal(taDivision(sansD3, "Eli"), "tu serais en D2, à 3 pts de la D1 et �
 assert.equal(taDivision(sansD3, "Inès"), "tu serais en D2, à 12 pts de la D1 et à la 5e des 30 places");
 assert.equal(
   notificationAnnonce(saisonDe([]), seuls, "Inès", "avant").texte,
-  "Après la J3, la ligue se coupe en trois. Si on coupait ce soir, tu serais en D1.",
-  "la notification garde le texte validé"
+  "Après la J3, la ligue se coupe en trois. Si on coupait ce soir, tu serais en D1, à la 9e des 30 places.",
+  "la notification dit la place, comme l'app"
 );
 assert.equal(phraseAnnonce(saisonDe([]), seuls, "Inès", "avant"), "Si on coupait ce soir, tu serais en D1, à la 9e des 30 places");
 

@@ -55,6 +55,7 @@ import { useFormatCarte } from "@/hooks/use-format-carte";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { Nom } from "@/components/sfl/nom";
+import { PointMaillot } from "@/components/sfl/point-maillot";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { TitreDiscussion } from "@/components/sfl/titre-discussion";
 import { useSession } from "@/hooks/use-session";
@@ -537,15 +538,20 @@ function FeuilleVue({ journee, onOuvrir }: { journee: Journee; onOuvrir?: () => 
         Feuille de match · J{journee.j} · {journee.date}
       </p>
       <div className="mt-2 flex flex-col gap-1">
-        {matches.map((m) => (
+        {matches.map((m, i) => (
           <div key={m.id} className="flex items-center justify-between gap-2 text-[13.5px] font-semibold">
-            <span className="min-w-0 flex-1 truncate">{m.teamA.name}</span>
+            <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
+              {matches.length > 1 && <span className="mono-label mr-0.5 text-foreground/35">T{i + 1}</span>}
+              <PointMaillot camp="Noirs" /> Noirs
+            </span>
             <span className="shrink-0 text-[17px] font-extrabold tabular-nums">
               {m.teamA.score}
               <span className="mx-1 text-foreground/30">–</span>
               {m.teamB.score}
             </span>
-            <span className="min-w-0 flex-1 truncate text-right">{m.teamB.name}</span>
+            <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5 truncate">
+              Blancs <PointMaillot camp="Blancs" />
+            </span>
           </div>
         ))}
       </div>

@@ -12,7 +12,7 @@
 // écrans de l'archive du design.
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Check, Play } from "lucide-react";
 import { AuVestiaireRond } from "@/components/sfl/au-vestiaire";
 import { BoostCard, RankingCard } from "@/components/sfl/boost-card";
@@ -47,7 +47,6 @@ import {
   useAnalyse,
 } from "@/components/sfl/feed/analyse";
 import {
-  AffichesModule,
   AlternatifModule,
   BeteNoireModule,
   CinqModule,
@@ -76,6 +75,8 @@ import type { Piece } from "@/lib/sfl/vestiaire";
 import { cn } from "@/lib/utils";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
+import { LISERE_CAMP, PastilleMaillot, PointMaillot } from "@/components/sfl/point-maillot";
+import { MAILLOTS, campDuJour, numeroDu, vainqueurDu } from "@/lib/sfl/maillots";
 
 /* ----------------------------- Réactions ------------------------------ */
 // Réactions locales à l'appareil (le multi-joueurs attend les comptes) :
@@ -411,16 +412,18 @@ function JourneeRecapComplet({ j }: { j: number }) {
       {big && (
         <Reveal delay={0.1}>
           <section className="glass rounded-3xl p-5">
-            <p className="mono-label text-primary">Le match de la journée · Final</p>
+            <p className="mono-label text-primary">
+              Le match de la journée · {numeroDu(lastJ, big) ? `${numeroDu(lastJ, big)} · ` : ""}Final
+            </p>
             <div className="mt-3 flex items-center justify-between gap-3">
-              <div className="min-w-0 flex-1 text-center">
-                <div className="truncate text-lg font-bold">{big.teamA.name}</div>
+              <div className="flex min-w-0 flex-1 justify-center">
+                <PastilleMaillot camp="Noirs" className="text-[15px]" />
               </div>
               <div className="shrink-0 text-[44px] leading-none font-bold tracking-tight tabular-nums">
                 {big.teamA.score}–{big.teamB.score}
               </div>
-              <div className="min-w-0 flex-1 text-center">
-                <div className="truncate text-lg font-bold">{big.teamB.name}</div>
+              <div className="flex min-w-0 flex-1 justify-center">
+                <PastilleMaillot camp="Blancs" className="text-[15px]" />
               </div>
             </div>
             <Link
@@ -473,8 +476,11 @@ function JourneeRecapComplet({ j }: { j: number }) {
                   {big.teamB.score}
                 </div>
                 <p className="mt-4 text-[15px] leading-snug font-bold">
-                  {big.teamA.score > big.teamB.score ? big.teamA.name : big.teamB.name} fait
-                  tomber {big.teamA.score > big.teamB.score ? big.teamB.name : big.teamA.name}
+                  {vainqueurDu(big) === MAILLOTS.Noirs
+                    ? "Les Noirs font tomber les Blancs"
+                    : vainqueurDu(big) === MAILLOTS.Blancs
+                      ? "Les Blancs font tomber les Noirs"
+                      : "Noirs et Blancs dos à dos"}
                 </p>
                 <p className="absolute bottom-4 left-4 text-[11px] text-muted-foreground">
                   {lastJ.date} · {totalButs} buts
@@ -551,27 +557,45 @@ function JourneeRecapComplet({ j }: { j: number }) {
           <div className="flex flex-col gap-4">
             {matches.map((m: JourneeMatch) => (
               <div key={m.id}>
-                <p className="mono-label text-muted-foreground">
-                  {m.teamA.name} {m.teamA.score} – {m.teamB.score} {m.teamB.name}
+                <p className="mono-label flex items-center gap-1.5 text-muted-foreground">
+                  {numeroDu(lastJ, m) && <span className="mr-1">{numeroDu(lastJ, m)}</span>}
+                  <PointMaillot camp="Noirs" /> Noirs {m.teamA.score} – {m.teamB.score} Blancs{" "}
+                  <PointMaillot camp="Blancs" />
                 </p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {[...m.teamA.players, ...m.teamB.players]
-                    .filter((p) => p.buts > 0 || p.passes > 0)
-                    .sort((a, b) => b.buts - a.buts || b.passes - a.passes)
-                    .map((p) => (
-                      <span
-                        key={p.name}
-                        className="flex items-center gap-1.5 rounded-full bg-foreground/8 px-2.5 py-1 text-[12px] font-semibold"
-                      >
-                        {p.name}
-                        {p.buts > 0 && (
-                          <span className="mono-label text-primary">{p.buts}B</span>
-                        )}
-                        {p.passes > 0 && (
-                          <span className="mono-label text-muted-foreground">{p.passes}P</span>
-                        )}
-                      </span>
-                    ))}
+                {/* Les décisifs, camp par camp : les Noirs sur une ligne, les Blancs sur l'autre, chacun sur la couleur de son maillot */}
+                <div className="mt-2 grid grid-cols-[auto_1fr] items-start gap-x-2.5 gap-y-1.5">
+                  {(
+                    [
+                      [m.teamA, MAILLOTS.Noirs],
+                      [m.teamB, MAILLOTS.Blancs],
+                    ] as const
+                  ).map(([equipe, maillot]) => {
+                    const decisifs = equipe.players
+                      .filter((p) => p.buts > 0 || p.passes > 0)
+                      .sort((a, b) => b.buts - a.buts || b.passes - a.passes);
+                    if (!decisifs.length) return null;
+                    return (
+                      <Fragment key={maillot.nom}>
+                        <span className="mono-label flex items-center gap-1.5 pt-[7px] text-muted-foreground">
+                          <PointMaillot camp={maillot.nom} />
+                          {maillot.nom}
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {decisifs.map((p) => (
+                            <span
+                              key={p.name}
+                              className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold"
+                              style={{ background: maillot.fond, color: maillot.encre, boxShadow: LISERE_CAMP }}
+                            >
+                              {p.name}
+                              {p.buts > 0 && <span className="mono-label">{p.buts}B</span>}
+                              {p.passes > 0 && <span className="mono-label opacity-60">{p.passes}P</span>}
+                            </span>
+                          ))}
+                        </div>
+                      </Fragment>
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -607,15 +631,21 @@ function JourneeRecapComplet({ j }: { j: number }) {
             <ModuleTitle title="Ailleurs dans la ligue" />
             <div className="flex flex-col gap-2">
               {others.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center justify-between rounded-2xl bg-card px-4 py-3"
-                >
-                  <span className="text-[14px] font-semibold">{m.teamA.name}</span>
-                  <span className="text-[15px] font-bold tabular-nums">
-                    {m.teamA.score}–{m.teamB.score}
-                  </span>
-                  <span className="text-[14px] font-semibold">{m.teamB.name}</span>
+                <div key={m.id} className="rounded-2xl bg-card px-4 py-3">
+                  {numeroDu(lastJ, m) && (
+                    <p className="mono-label mb-2 text-foreground/40">{numeroDu(lastJ, m)}</p>
+                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 flex-1">
+                      <PastilleMaillot camp="Noirs" />
+                    </span>
+                    <span className="shrink-0 text-[15px] font-bold tabular-nums">
+                      {m.teamA.score}–{m.teamB.score}
+                    </span>
+                    <span className="flex min-w-0 flex-1 justify-end">
+                      <PastilleMaillot camp="Blancs" />
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -993,7 +1023,12 @@ function JourneeRecapComplet({ j }: { j: number }) {
       {duo && (
         <Reveal>
           <section className="glass rounded-3xl p-5">
-            <p className="mono-label text-primary">Équipe {duo.team}</p>
+            <p className="mono-label text-primary">
+              {(() => {
+                const c = campDuJour(lastJ, duo.team);
+                return c ? `Chez ${c.maillot.les}${c.numero ? ` · ${c.numero}` : ""}` : `Équipe ${duo.team}`;
+              })()}
+            </p>
             <h2 className="mt-1 text-xl font-bold tracking-tight">
               Le duo qui a fait la journée
             </h2>
@@ -1070,12 +1105,6 @@ function JourneeRecapComplet({ j }: { j: number }) {
           </Locked>
         </section>
       </Reveal>
-
-      {plus.affiches.length > 0 && (
-        <Reveal>
-          <AffichesModule affiches={plus.affiches} />
-        </Reveal>
-      )}
 
       {plus.cinq.length >= 3 && (
         <Reveal>
