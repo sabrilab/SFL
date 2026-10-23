@@ -52,6 +52,43 @@
 - « Allow new users to sign up » : FERMÉ dans Supabase. Toutes les créations
   de compte passent par les routes serveur à clé secrète (`/api/inscription`,
   `/api/inscription/sociale`, `/api/comptes/creer`).
+- **Nom de saison** (`profiles.name`) : la clé de tout (stats, photos,
+  classements). Le joueur ne peut plus le changer (droit de colonne retiré),
+  et deux noms ne peuvent plus différer par la casse seulement
+  (`profiles_name_casse_unique`). Seuls l'admin et les routes serveur le
+  posent.
+- **Photos de carte** : un membre n'écrit, ne remplace et n'efface que la
+  sienne (le nom du fichier est son nom de saison, sans tenir compte de la
+  casse) ; l'admin, toutes.
+- **Compte en attente** : en plus du Vestiaire et de la saison, il ne voit
+  ni les matchs ouverts, ni les dispos, ni la Ligue vierge ; il n'ouvre ni ne
+  rejoint de match, et ne reçoit aucune notification du Vestiaire.
+- **Feuille de match** : un joueur s'inscrit seul à un match, sans équipe ni
+  buts ni passes, et jamais dans un match déjà saisi
+  (`match_entree_gardee`) ; il ne s'en retire plus une fois la feuille faite
+  (`match_sortie_gardee`), et une ligne ne change jamais de match ni de
+  joueur (`match_feuille_gardee`). L'organisateur et l'admin remplissent la
+  feuille.
+- **Crédits de l'IA** : la base compte elle-même (`credit_du_jour`, verrou
+  par joueur) : 3 photos du studio par jour (remises à minuit, heure de
+  Paris) et 30 questions au coach sur 24 h. Des demandes envoyées ensemble
+  ne passent plus toutes. Les valeurs sont
+  recopiées de `LIMITE_JOUR` (`/api/photo-studio`) et `LIMITE_AGENT_JOUR`
+  (`/api/agent`) : les changer ensemble.
+- **Saison** : publiée seulement par `publier_saison(p_data, p_seed, p_base,
+  p_forcer)`. L'appareil dit de quelle version il part ; si un autre admin a
+  publié depuis, rien n'est écrit et la Synchro propose « Reprendre la base »
+  ou « Écraser avec la mienne » (confirmé). Une écriture directe de la table
+  par l'app est refusée (trigger `saison_par_publication`) : une app restée
+  en cache demande d'être mise à jour. L'éditeur SQL et la clé secrète
+  écrivent toujours librement.
+- **Notifications** : un abonnement ne vise qu'un service connu (Apple,
+  Google, Mozilla, Microsoft : contrainte `push_abonnements_service_connu`,
+  recopiée dans `lib/server/web-push.ts`), et une notification n'ouvre
+  qu'une page de l'app.
+- **Cron de convocation** : avec `CRON_SECRET` posé dans Vercel, seul le
+  cron l'appelle. Sans lui, la route ne travaille que le lundi de 5 h à 14 h
+  (heure de Paris), où elle ne fait rien de plus que le cron.
 
 ## Google / Apple (connexion sans mot de passe)
 

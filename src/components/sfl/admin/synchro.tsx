@@ -11,6 +11,10 @@
 // Les échecs sont affichés AVEC LEUR MOTIF, en toutes lettres. Un « échec de
 // synchronisation » sans cause laisse l'admin sans rien à faire, et c'est
 // justement le moment où il a besoin d'agir.
+//
+// Le conflit (22/10/2026) : un autre admin a publié depuis la version d'où
+// part cet appareil. Rien n'a été écrasé ; l'admin choisit entre reprendre la
+// base et écraser avec la sienne, ce second geste confirmé.
 
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { CloudUpload, RotateCcw, Check, AlertTriangle, Stethoscope } from "lucide-react";
@@ -37,7 +41,7 @@ type Etat =
   | { phase: "envoi" }
   | { phase: "reprise" }
   | { phase: "ok"; message: string }
-  | { phase: "erreur"; message: string };
+  | { phase: "erreur"; message: string; conflit?: boolean };
 
 /**
  * L'issue du dernier envoi automatique. C'est un état extérieur à React
@@ -69,6 +73,7 @@ export function Synchro({ saison }: { saison: Saison }) {
   const [etat, setEtat] = useState<Etat>({ phase: "repos" });
   const [etapes, setEtapes] = useState<Etape[] | null>(null);
   const [examen, setExamen] = useState(false);
+  const [ecraser, setEcraser] = useState(false);
   const envoi = useDernierEnvoi();
   // La marque survit au rechargement : elle dit qu'une saisie attend encore
   // son voyage vers la base, même si l'envoi raté date d'une autre session.
@@ -77,14 +82,15 @@ export function Synchro({ saison }: { saison: Saison }) {
   const derniere = quand(dernierePublication());
   const empeche = blocage();
 
-  async function publier() {
+  async function publier(forcer = false) {
+    setEcraser(false);
     setEtat({ phase: "envoi" });
-    const r = await publierSaison(saison);
+    const r = await publierSaison(saison, { forcer });
     if (r.ok) {
       setEtat({ phase: "ok", message: "Publiée. Toute la ligue est sur cette version." });
       toast.success("Saison publiée", { description: "Tout le monde voit la même chose." });
     } else {
-      setEtat({ phase: "erreur", message: r.raison });
+      setEtat({ phase: "erreur", message: r.raison, conflit: !!r.conflit });
     }
   }
 
@@ -101,6 +107,9 @@ export function Synchro({ saison }: { saison: Saison }) {
   }
 
   const occupe = etat.phase === "envoi" || etat.phase === "reprise";
+  // Un conflit, qu'il vienne du bouton ou de l'envoi automatique.
+  const conflit =
+    (etat.phase === "erreur" && !!etat.conflit) || (etat.phase === "repos" && !!envoi && !envoi.ok && !!envoi.conflit);
 
   return (
     <div className="glass rounded-3xl p-4">
@@ -129,7 +138,7 @@ export function Synchro({ saison }: { saison: Saison }) {
           dire et son échec était avalé : on enregistrait sa journée, la base
           ne la voyait jamais, et l'écran affichait la même chose dans les
           deux cas. */}
-      {envoi && !envoi.ok && (
+      {envoi && !envoi.ok && !conflit && (
         <div className="mt-2.5 rounded-2xl border border-red-500/25 bg-red-500/8 px-3 py-2.5">
           <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-red-300">
             <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
@@ -156,7 +165,7 @@ export function Synchro({ saison }: { saison: Saison }) {
 
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <button
-          onClick={publier}
+          onClick={() => void publier()}
           disabled={occupe || !!empeche}
           className="bouton-principal bouton--vert flex flex-1 items-center justify-center gap-2 py-3 text-[14px] font-bold disabled:opacity-40"
         >
@@ -187,7 +196,27 @@ export function Synchro({ saison }: { saison: Saison }) {
         </p>
       )}
 
-      {etat.phase === "erreur" && (
+      {conflit && (
+        <div className="mt-2.5 rounded-2xl border border-amber-500/25 bg-amber-500/8 px-3 py-2.5">
+          <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-amber-300">
+            <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
+            <span>
+              <b className="font-semibold">Rien n&apos;a été écrasé.</b>{" "}
+              {etat.phase === "erreur" ? etat.message : envoi?.raison}
+            </span>
+          </p>
+          {/* « Reprendre la base » est le bouton juste au-dessus. */}
+          <button
+            onClick={() => (ecraser ? void publier(true) : setEcraser(true))}
+            disabled={occupe}
+            className="bouton-secondaire bouton--rouge mono-label mt-2 px-3 py-1.5 disabled:opacity-40"
+          >
+            {ecraser ? "Confirmer : remplacer la base" : "Écraser avec la mienne"}
+          </button>
+        </div>
+      )}
+
+      {etat.phase === "erreur" && !etat.conflit && (
         <div className="mt-2.5 rounded-2xl border border-red-500/25 bg-red-500/8 px-3 py-2.5">
           <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-red-300">
             <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
@@ -196,7 +225,7 @@ export function Synchro({ saison }: { saison: Saison }) {
             </span>
           </p>
           <button
-            onClick={publier}
+            onClick={() => void publier()}
             className="bouton-secondaire bouton--vert mono-label mt-2 px-3 py-1.5"
           >
             Réessayer
