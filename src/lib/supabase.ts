@@ -32,17 +32,6 @@ export function supabase(): SupabaseClient {
   return client;
 }
 
-/**
- * Client jetable SANS persistance de session — pour les opérations qui se
- * connectent « en tant qu'un autre » sans écraser la session courante
- * (ex. la création des comptes depuis la page d'installation admin).
- */
-export function supabaseEphemeral(): SupabaseClient {
-  return createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
-
 /** Les identifiants de connexion sont des emails techniques : user@sfl.local */
 export function loginEmail(user: string): string {
   return `${user.trim().toLowerCase()}@sfl.local`;

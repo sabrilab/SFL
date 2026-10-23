@@ -1,34 +1,26 @@
-// Fabrique d'identifiants — SERVEUR UNIQUEMENT.
+// Fabrique d'identifiants et de mots de passe provisoires — SERVEUR UNIQUEMENT.
 //
-// Reprend mot pour mot l'algorithme de tools/generate-accounts.ts : un joueur
-// ajouté en cours de saison reçoit exactement le mot de passe que le
-// générateur lui donnerait si on le relançait. Les deux ne peuvent donc pas
-// diverger, et régénérer la table n'invalide jamais un accès déjà distribué.
+// L'identifiant se déduit du nom, comme dans tools/generate-accounts.ts : un
+// joueur ajouté en cours de saison reçoit celui que le générateur lui
+// donnerait.
 //
-// Ce module ne part JAMAIS dans le bundle du navigateur : le mot de passe se
-// déduit du nom, et le publier côté client reviendrait à publier les mots de
-// passe de toute la ligue.
+// Le mot de passe, lui, ne se déduit plus de rien. Jusqu'au 22/10/2026 il
+// sortait du nom (un mot parmi 24 et un nombre parmi 90), par le même
+// algorithme que le générateur : quiconque lisait le dépôt pouvait le
+// recalculer. Il est désormais tiré au hasard, montré une seule fois à
+// l'admin, et ne sert qu'à entrer : la base oblige le joueur à en choisir un
+// à lui dès sa connexion (table mot_de_passe_a_changer).
 
-import { createHash } from "node:crypto";
+import { randomInt } from "node:crypto";
 import { username } from "@/lib/sfl/usernames";
 
-/** Mots simples, sans accent ni ambiguïté à l'oral. */
-const MOTS = [
-  "ballon", "corner", "lucarne", "pivot", "tacle", "volee", "passe", "sprint",
-  "cage", "arret", "duel", "reprise", "louche", "praline", "roulette", "sombrero",
-  "pointu", "gardien", "buteur", "capitaine", "terrain", "sifflet", "maillot", "crampon",
-];
+/** Lettres et chiffres sans sosie à l'écrit ni à l'oral (pas de i, l, o, 0, 1). */
+const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 
-/** Générateur déterministe : même nom = même mot de passe à chaque exécution. */
-function seededInt(seed: string, max: number): number {
-  const h = createHash("sha256").update(seed).digest();
-  return ((h[0] << 16) | (h[1] << 8) | h[2]) % max;
-}
-
-export function motDePassePour(name: string): string {
-  const mot = MOTS[seededInt(`${name}|mot`, MOTS.length)];
-  const num = 10 + seededInt(`${name}|num`, 90);
-  return `${mot}${num}`;
+/** Mot de passe provisoire : trois blocs de quatre, tirés au hasard (≈ 2⁵⁹). */
+export function motDePasseProvisoire(): string {
+  const bloc = () => Array.from({ length: 4 }, () => ALPHABET[randomInt(ALPHABET.length)]).join("");
+  return `${bloc()}-${bloc()}-${bloc()}`;
 }
 
 /**
