@@ -9,8 +9,9 @@
 // mieux placé des rangs B de la D1 (lib/sfl/outsiders.ts), et la rubrique
 // porte son nom : « La journée de Miken ». Sa fiche est noire dans les deux
 // modes, comme les Missions Bola, à l'argent du rang B :
-//   · sa carte en grand, l'insigne du rang B au coin ; sa place à l'XP à vie
-//     et sa place en D1 : l'écart entre les deux fait l'histoire ;
+//   · sa carte en grand, dans un halo (elle porte l'insigne de son rang) ;
+//     sa place à l'XP à vie et sa place en D1 : l'écart entre les deux fait
+//     l'histoire ;
 //   · sa quête, en deux temps : tenir la D1 ce dimanche (sous 4 points, il
 //     redescend), et gagner son rang A (l'XP qui lui manque ; en rayé, celle
 //     des missions qu'il a signées pour le dimanche) ;
@@ -22,7 +23,7 @@
 // missions, comptée à minuit) et le suivant s'ouvre sur l'outsider du
 // dimanche d'après : le même tant qu'il tient, rang B et en D1.
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { MessageCircle } from "lucide-react";
 import { ciblesDe, contratsSignes } from "@/components/sfl/map/contrats-map";
@@ -35,11 +36,11 @@ import { useIdentites } from "@/hooks/use-identites";
 import { useMissionsDeLaLigue, useXpLigue, type MissionsDeLaLigue } from "@/hooks/use-missions";
 import { REGLES_DIVISIONS } from "@/lib/sfl/divisions";
 import { prenom } from "@/lib/sfl/missions";
-import { arcOutsider, POUR_RESTER_EN_D1, type Chapitre, type Outsider } from "@/lib/sfl/outsiders";
+import { arcOutsider, POUR_RESTER_EN_D1, type Chapitre } from "@/lib/sfl/outsiders";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { preparerPiece } from "@/lib/sfl/vestiaire";
 import { cn } from "@/lib/utils";
-import { BLANCS, Carte, Champ, Insigne, NOIRS, Pouls, Tampon } from "./missions";
+import { BLANCS, Carte, Champ, NOIRS, Pouls, Tampon } from "./missions";
 import "./missions.css";
 
 /** Les autres rangs B de la D1 montrés en petites cartes ; au-delà, leur nombre. */
@@ -83,12 +84,23 @@ function phraseDe(c: Chapitre, qui: string, toi: boolean): string {
   }
 }
 
-/** Le tampon d'un chapitre : tenu, tombé, accompli, absent. */
-function TamponDe({ c }: { c: Chapitre }) {
-  if (c.issue === "accomplie") return <Tampon petit>Accomplie</Tampon>;
-  if (c.issue === "chute") return <Tampon petit ton="rouge">Tombé</Tampon>;
-  if (c.issue === "absent") return <Tampon petit ton="gris">Absent</Tampon>;
-  return <Tampon petit>Tenu</Tampon>;
+/** Le tampon d'un chapitre : tenu, tombé, accompli, absent ; en grand, quand le chapitre a la fiche pour lui. */
+function TamponDe({ c, grand = false }: { c: Chapitre; grand?: boolean }) {
+  const petit = !grand;
+  if (c.issue === "accomplie") return <Tampon petit={petit}>{grand ? "Quête accomplie" : "Accomplie"}</Tampon>;
+  if (c.issue === "chute")
+    return (
+      <Tampon petit={petit} ton="rouge">
+        {grand ? "Tombé en D2" : "Tombé"}
+      </Tampon>
+    );
+  if (c.issue === "absent")
+    return (
+      <Tampon petit={petit} ton="gris">
+        Absent
+      </Tampon>
+    );
+  return <Tampon petit={petit}>Tenu</Tampon>;
 }
 
 /** Le chapitre d'avant : son outsider, ce que le dimanche a fait de lui. */
@@ -171,30 +183,34 @@ function Quete({ c, toi, enDirect, enJeu }: { c: Chapitre; toi: boolean; enDirec
   );
 }
 
-/** Lui en grand : sa carte, l'insigne du rang B au coin, ses deux places. */
-function Heros({ o, toi, onglet, partager }: { o: Outsider; toi: boolean; onglet?: { fond: string; encre: string }; partager: () => void }) {
+/** Lui en grand : sa carte (qui porte déjà l'insigne de son rang), son nom, puis ce que la fiche dit de lui. */
+function Heros({
+  nom,
+  toi,
+  onglet,
+  partager,
+  children,
+}: {
+  nom: string;
+  toi: boolean;
+  onglet?: { fond: string; encre: string };
+  partager: () => void;
+  children: ReactNode;
+}) {
   return (
     <div className="flex items-center gap-6">
-      <div className="outsider__heros ml-[3px] shrink-0">
-        <Carte nom={o.nom} size={FORMAT_CARTE.grande} onglet={onglet} />
-        <span className="outsider__insigne">
-          <Insigne rang="B" />
-        </span>
+      <div className="outsider__heros shrink-0">
+        <Carte nom={nom} size={FORMAT_CARTE.grande} onglet={onglet} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-4">
         <dl className="flex flex-col gap-4">
           <Champ label="L'outsider" grand>
-            {toi ? "Toi" : <Nom n={o.nom} />}
+            {toi ? "Toi" : <Nom n={nom} />}
           </Champ>
-          <Champ label="XP à vie">
-            <span className="fiche__ton">Rang B</span> · {rangTexte(o.placeXp)} sur {o.surXp}
-          </Champ>
-          <Champ label="Division 1">
-            {rangTexte(o.placeD1)} sur {o.surD1}
-          </Champ>
+          {children}
         </dl>
         <div className="flex items-center gap-1">
-          <BoutonSuivre nom={o.nom} petit />
+          <BoutonSuivre nom={nom} petit />
           <button
             type="button"
             aria-label="Partager au Vestiaire"
@@ -225,31 +241,36 @@ export function RubriqueOutsider({ className }: { className?: string }) {
   if (!arc) return null;
 
   const c = arc.chapitre;
-  const heros = c?.outsider.nom;
+  // Sans outsider pour ce dimanche (plus aucun rang B en D1), la fiche montre en grand le chapitre d'avant.
+  const vedette = c ?? arc.precedent!;
+  const heros = vedette.outsider.nom;
   const toi = heros === me;
+  const qui = prenom(id.nom(heros));
   // Ce dimanche dans les missions : son équipe, ses missions signées, les contrats sur lui.
-  const ceDimanche = lg && lg.d.j === j ? lg : null;
-  const camp = heros ? ceDimanche?.d.camps.get(heros) : undefined;
-  const signees = heros && ceDimanche ? [...contratsSignes(ceDimanche), ...ceDimanche.defis, ...ceDimanche.ligue].filter((e) => e.joueur === heros) : [];
-  const contre = heros && ceDimanche ? contratsSignes(ceDimanche).filter((e) => e.joueur !== heros && ciblesDe(e).includes(heros)).length : 0;
+  const ceDimanche = c && lg && lg.d.j === j ? lg : null;
+  const camp = ceDimanche?.d.camps.get(heros);
+  const signees = ceDimanche ? [...contratsSignes(ceDimanche), ...ceDimanche.defis, ...ceDimanche.ligue].filter((e) => e.joueur === heros) : [];
+  const contre = ceDimanche ? contratsSignes(ceDimanche).filter((e) => e.joueur !== heros && ciblesDe(e).includes(heros)).length : 0;
   const enDirect = !!ceDimanche && ceDimanche.phase === "en-jeu";
   // Toi d'abord parmi les autres rangs B de la D1.
   const autres = arc.outsiders.slice(1).sort((a, b) => Number(b.nom === me) - Number(a.nom === me));
   const montres = autres.slice(0, autres.length > DANS_LA_RANGEE ? DANS_LA_RANGEE - 1 : DANS_LA_RANGEE);
-  const date = saison.journees.find((m) => m.j === j)?.date;
-  const titre = c ? (toi ? "Ta journée" : `La journée de ${prenom(id.nom(c.outsider.nom))}`) : "L'outsider";
+  const date = saison.journees.find((m) => m.j === vedette.j)?.date;
+  const titre = c ? (toi ? "Ta journée" : `La journée de ${qui}`) : phraseDe(vedette, qui, toi);
+  const o = vedette.outsider;
 
   const partager = () => {
-    if (!c) return;
     preparerPiece({
       type: "ligue",
-      titre: `La journée de ${prenom(id.nom(c.outsider.nom))}`,
-      j,
-      lignes: [
-        { n: c.outsider.nom, v: `Rang B · ${rangTexte(c.outsider.placeD1)} de la D1` },
-        { l: "XP à vie", v: `${rangTexte(c.outsider.placeXp)} sur ${c.outsider.surXp}` },
-        { l: "Sa quête", v: `${POUR_RESTER_EN_D1} pts pour tenir la D1 · rang A à ${c.outsider.pourLeRangA} XP` },
-      ],
+      titre: c ? `La journée de ${qui}` : phraseDe(vedette, qui, false),
+      j: vedette.j,
+      lignes: c
+        ? [
+            { n: heros, v: `Rang B · ${rangTexte(o.placeD1)} de la D1` },
+            { l: "XP à vie", v: `${rangTexte(o.placeXp)} sur ${o.surXp}` },
+            { l: "Sa quête", v: `${POUR_RESTER_EN_D1} pts pour tenir la D1 · rang A à ${o.pourLeRangA} XP` },
+          ]
+        : [{ n: heros, v: `J${vedette.j} · ${pts(vedette.points)}` }],
     });
     router.push("/vestiaire");
   };
@@ -259,7 +280,7 @@ export function RubriqueOutsider({ className }: { className?: string }) {
       <div className="flex flex-col gap-1.5 px-5 md:px-0">
         <div className="flex items-baseline justify-between gap-3">
           <span className="mono-label truncate text-foreground/45">
-            Arc {arc.arc} · J{j}
+            Arc {arc.arc} · J{vedette.j}
             {date ? ` · ${date}` : ""}
           </span>
           <Moment lg={lg} j={j} />
@@ -269,19 +290,23 @@ export function RubriqueOutsider({ className }: { className?: string }) {
         </h2>
       </div>
 
-      <article
-        aria-label={c ? `L'outsider : ${id.nom(c.outsider.nom)}, rang B en D1` : "L'outsider"}
-        className="fiche fiche--B fiche--outsider dark mx-4 md:mx-0"
-      >
+      <article aria-label={`L'outsider : ${id.nom(heros)}`} className="fiche fiche--B fiche--outsider dark mx-4 md:mx-0">
         <div className="fiche__bandeau">
           <span className="fiche__etiquette">L&apos;outsider</span>
-          <span className="fiche__type mono-label text-white/75">Chapitre {chapitreDe(c ? j : (arc.precedent?.j ?? j))}</span>
+          <span className="fiche__type mono-label text-white/75">Chapitre {chapitreDe(vedette.j)}</span>
         </div>
         <div className="flex flex-col gap-5 px-[18px] pt-4 pb-5">
-          {arc.precedent && <Precedent c={arc.precedent} me={me} />}
-          {c && (
+          {c ? (
             <>
-              <Heros o={c.outsider} toi={toi} onglet={camp ? (camp.equipe === "noirs" ? NOIRS : BLANCS) : undefined} partager={partager} />
+              {arc.precedent && <Precedent c={arc.precedent} me={me} />}
+              <Heros nom={heros} toi={toi} onglet={camp ? (camp.equipe === "noirs" ? NOIRS : BLANCS) : undefined} partager={partager}>
+                <Champ label="XP à vie">
+                  <span className="fiche__ton">Rang B</span> · {rangTexte(o.placeXp)} sur {o.surXp}
+                </Champ>
+                <Champ label="Division 1">
+                  {rangTexte(o.placeD1)} sur {o.surD1}
+                </Champ>
+              </Heros>
               {contre > 0 && (
                 <span className="fiche__duel mono-label">
                   {pl(contre, "contrat signé", "contrats signés")} contre {toi ? "toi" : "lui"}
@@ -289,13 +314,31 @@ export function RubriqueOutsider({ className }: { className?: string }) {
               )}
               <Quete c={c} toi={toi} enDirect={enDirect} enJeu={signees.reduce((a, e) => a + e.m.xp, 0)} />
             </>
+          ) : (
+            <>
+              <Heros nom={heros} toi={toi} partager={partager}>
+                {vedette.issue === "accomplie" && vedette.rangApres ? (
+                  <Champ label="XP à vie">
+                    <span className={cn("fiche__ton", `fiche--${vedette.rangApres.rang}`)}>Rang {vedette.rangApres.rang}</span> ·{" "}
+                    {rangTexte(vedette.rangApres.place)} sur {vedette.rangApres.sur}
+                  </Champ>
+                ) : (
+                  <Champ label="Division">{vedette.issue === "chute" ? "D2" : "D1"}</Champ>
+                )}
+                <Champ label={`J${vedette.j}`}>{vedette.issue === "absent" ? "Absent" : pts(vedette.points)}</Champ>
+              </Heros>
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-4 border-t border-white/10 pt-5">
+                <TamponDe c={vedette} grand />
+                <span className="mono-label text-white/45">Plus aucun rang B en D1</span>
+              </div>
+            </>
           )}
           {autres.length > 0 && (
             <div className="flex flex-col gap-2.5 border-t border-white/10 pt-4">
               <span className="mono-label text-white/45">{pl(autres.length, "autre rang B", "autres rangs B")} en D1</span>
               <div className="flex items-center gap-1.5">
-                {montres.map((o) => (
-                  <Carte key={o.nom} nom={o.nom} size={FORMAT_CARTE.petite} />
+                {montres.map((x) => (
+                  <Carte key={x.nom} nom={x.nom} size={FORMAT_CARTE.petite} />
                 ))}
                 {autres.length > montres.length && (
                   <span className="mono-label pl-1.5 text-white/45">+{autres.length - montres.length}</span>

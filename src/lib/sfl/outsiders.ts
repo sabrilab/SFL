@@ -63,6 +63,8 @@ export interface Chapitre {
   issue: Issue;
   /** Ses points Pépite de la journée. */
   points: number;
+  /** Son rang à l'XP à vie une fois la journée jouée (null avant) : le rang A de la quête accomplie. */
+  rangApres: RangJoueur | null;
 }
 
 export interface ArcOutsider {
@@ -152,15 +154,14 @@ function chapitreDe(saison: Saison, journal: Journal, joueurs: Player[], j: numb
   const lignes = saison.entries.filter((e) => e.j === j && e.player === outsider.nom);
   const compte = lignes.some((e) => (e.statut === "Présent" && !e.extraTime) || e.statut === "Absence injustifiée");
   const points = lignes.reduce((a, e) => a + entryPP(e), 0);
+  const jouee = journeeJouee(saison, j);
+  const rangApres = jouee ? (rangsEtSeuil(journalAvant(journal, numeroSaison(saison), j + 1), joueurs).rangs.get(outsider.nom) ?? null) : null;
   let issue: Issue;
-  if (!journeeJouee(saison, j)) issue = "a-venir";
+  if (!jouee) issue = "a-venir";
   else if (!compte) issue = "absent";
   else if (apresLaJournee(1, points) > 1) issue = "chute";
-  else {
-    const apres = rangsEtSeuil(journalAvant(journal, numeroSaison(saison), j + 1), joueurs).rangs.get(outsider.nom);
-    issue = apres && apres.rang !== "B" ? "accomplie" : "tient";
-  }
-  return { j, outsider, issue, points };
+  else issue = rangApres && rangApres.rang !== "B" ? "accomplie" : "tient";
+  return { j, outsider, issue, points, rangApres };
 }
 
 /**

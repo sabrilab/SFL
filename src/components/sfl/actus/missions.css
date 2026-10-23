@@ -456,8 +456,7 @@
 
 /*
  * L'outsider (outsider.tsx) : la fiche du rang B de la D1, à l'argent du
- * rang. Sa carte en grand dans un halo, l'insigne du rang posé sur son coin.
- * Sa quête se lit comme un journal de quête : une case hexagonale par étape,
+ * rang. Sa carte en grand dans un halo. Sa quête se lit comme un journal de quête : une case hexagonale par étape,
  * pleine une fois l'étape passée (cerclée de rouge si elle tombe), et la
  * barre de l'XP vers le rang A, rayée là où ses missions signées la
  * mèneraient. Comme les Contrats en jeu, rien n'y bouge à l'arrivée : les
@@ -474,13 +473,6 @@
   background: radial-gradient(closest-side, rgb(var(--r-lueur) / 0.2), rgb(var(--r-lueur) / 0));
   pointer-events: none;
 }
-.outsider__insigne {
-  position: absolute;
-  top: -14px;
-  right: -17px;
-  transform: scale(0.62);
-  transform-origin: 100% 0;
-}
 .fiche--outsider .tampon {
   animation: none;
 }
@@ -496,6 +488,10 @@
   min-height: 50px;
   padding: 11px 0;
   border-bottom: 1px solid rgb(255 255 255 / 0.1);
+}
+/* La dernière étape n'a pas de trait : celui de la rangée qui suit (les autres rangs B) le fait. */
+.quete > li:last-child {
+  border-bottom: 0;
 }
 .quete__quoi {
   flex: 1;
