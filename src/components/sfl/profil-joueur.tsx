@@ -37,6 +37,8 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { FeuilleBadge, Medaille, NOM_TROPHEE, Trophee } from "@/components/sfl/vitrine";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useGrandEcran } from "@/hooks/use-media-query";
+import { useDivision } from "@/hooks/use-division";
+import { nomDivision } from "@/lib/sfl/divisions";
 import { useIdentites } from "@/hooks/use-identites";
 import { cartesDeCarriere, courbeDeCarriere } from "@/lib/sfl/carriere";
 import { ovr, rankPlayers, STAT_KEYS, type Player } from "@/lib/sfl/engine";
@@ -80,6 +82,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
   const { saison, journees, allPlayers } = useSeason();
   const grand = useGrandEcran();
   const identite = useIdentites();
+  const division = useDivision(player.name);
   const [choix, setChoix] = useState<Choix>(null);
   const [compare, setCompare] = useState(false);
   const { me } = useMyPlayer();
@@ -151,6 +154,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
         </div>
         <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
           <Chiffre valeur={ordinal(rank)} quoi="Pépite d'Or" />
+          {division && <Chiffre valeur={nomDivision(division)} quoi="Division" />}
           <Chiffre valeur={ovr(player.stats)} quoi="Général" />
           <Chiffre valeur={dimanches} quoi={dimanches > 1 ? "Dimanches" : "Dimanche"} />
         </div>

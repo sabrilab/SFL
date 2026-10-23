@@ -9,17 +9,26 @@
 // Toute la donnée vient de usePresence : partagée (Supabase, temps réel)
 // quand la base est branchée, locale sinon. L'écran ne fait pas la différence.
 
+import { useMemo } from "react";
 import { Check, Copy, Radio, X } from "lucide-react";
 import { toast } from "sonner";
 import { useSession } from "@/hooks/use-session";
 import { usePresence } from "@/hooks/use-presence";
 import { QuiVient } from "@/components/sfl/qui-vient";
+import { useSeason } from "@/components/sfl/season-provider";
+import { divisionsDeLaJournee, terrainsDesEquipes } from "@/lib/sfl/equipes-division";
 import { cn } from "@/lib/utils";
 
 export function PresencePanel({ compact = false }: { compact?: boolean }) {
   const session = useSession();
   const admin = !!session?.admin;
   const p = usePresence();
+  const { saison } = useSeason();
+  // Dès la J4, chaque équipe dit son terrain : « D1 », « D3 · Terrain 2 ».
+  const terrainDe = useMemo(() => {
+    const etat = p.teams?.length ? divisionsDeLaJournee(saison, p.journee) : null;
+    return new Map(etat && p.teams ? terrainsDesEquipes(p.teams, etat).flatMap(({ label, equipes }) => equipes.map((e) => [e.name, label] as const)) : []);
+  }, [saison, p.journee, p.teams]);
 
   async function answer(value: "present" | "absent") {
     const next = p.mine === value ? null : value;
@@ -132,7 +141,10 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
           <div className="mt-2 flex flex-col gap-3">
             {p.teams.map((t) => (
               <div key={t.name}>
-                <p className="mb-1.5 text-[12.5px] font-bold text-foreground/85">{t.name}</p>
+                <p className="mb-1.5 text-[12.5px] font-bold text-foreground/85">
+                  {t.name}
+                  {terrainDe.get(t.name) && <span className="font-normal text-foreground/45"> · {terrainDe.get(t.name)}</span>}
+                </p>
                 <QuiVient noms={t.players} />
               </div>
             ))}

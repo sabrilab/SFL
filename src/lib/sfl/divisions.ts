@@ -188,6 +188,47 @@ export function divisionDe(etat: EtatDivisions, nom: string): Division {
   return etat.actuelle.get(nom) ?? 3;
 }
 
+/** Ce que le dernier dimanche joué en divisions a fait de chacun. */
+export interface BilanDivisions {
+  j: number;
+  parNom: Map<string, Mouvement>;
+  montees: number;
+  descentes: number;
+}
+
+/** Le bilan du dernier dimanche joué en divisions ; null avant la J4 jouée. */
+export function dernierBilan(etat: EtatDivisions | null): BilanDivisions | null {
+  const derniere = etat?.journees.at(-1);
+  if (!derniere) return null;
+  return {
+    j: derniere.j,
+    parNom: new Map(derniere.mouvements.map((m) => [m.nom, m])),
+    montees: derniere.mouvements.filter((m) => m.vers < m.de).length,
+    descentes: derniere.mouvements.filter((m) => m.vers > m.de).length,
+  };
+}
+
+/** « 11 pts », « 1 pt », « −2 pts ». */
+export const enPoints = (n: number) => `${n < 0 ? "−" : ""}${Math.abs(n)} ${Math.abs(n) > 1 ? "pts" : "pt"}`;
+
+/**
+ * Ce que le dernier dimanche a fait d'un joueur, sans point final : « Tu
+ * montes en D1 avec 11 pts », « Tu restes en D2 avec 6 pts, 9 pts dimanche
+ * et tu montes ». null pour un joueur masqué ou sans division.
+ */
+export function phraseBilan(etat: EtatDivisions, bilan: BilanDivisions, nom: string): string | null {
+  if (isHidden(nom)) return null;
+  const m = bilan.parNom.get(nom);
+  if (!m) {
+    const d = etat.actuelle.get(nom);
+    return d ? `Tu restes en ${nomDivision(d)}` : null;
+  }
+  if (m.vers < m.de) return `Tu montes en ${nomDivision(m.vers)} avec ${enPoints(m.points)}`;
+  if (m.vers > m.de) return `Tu descends en ${nomDivision(m.vers)} avec ${enPoints(m.points)}`;
+  const reste = `Tu restes en ${nomDivision(m.vers)} avec ${enPoints(m.points)}`;
+  return m.vers > 1 ? `${reste}, ${REGLES_DIVISIONS.montee} pts dimanche et tu montes` : reste;
+}
+
 /* ------------------------------- L'annonce ------------------------------- */
 // Jusqu'au dimanche de la J3, l'app annonce les divisions (Sabri : « ça fait
 // des annonces jusqu'à dimanche ») : la rubrique des Actus, l'écran de

@@ -55,7 +55,8 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
 import { usePresence } from "@/hooks/use-presence";
 import { joueursDeLaFeuille } from "@/lib/sfl/presence-feuille";
-import { annonceEnCours, J_DECOUPAGE } from "@/lib/sfl/divisions";
+import { annonceEnCours, J_DECOUPAGE, nomDivision, REGLES_DIVISIONS } from "@/lib/sfl/divisions";
+import { useDivision } from "@/hooks/use-division";
 import { useSession } from "@/hooks/use-session";
 import { saisieStore } from "@/lib/sfl/saisie/store";
 import {
@@ -292,8 +293,16 @@ export default function MapPage() {
   const { player, me } = useMyPlayer();
   const aujourdhui = useAujourdhui();
   const heure = useHeure();
-  // La J3, dernier dimanche avant les divisions (lib/sfl/divisions.ts) : sa fiche le dit.
+  // La J3, dernier dimanche avant les divisions (lib/sfl/divisions.ts) : sa fiche le dit ;
+  // dès la J4, la fiche d'un dimanche à venir dit ta division.
   const sansDivisions = !!aujourdhui && annonceEnCours(saison, new Date(`${aujourdhui}T12:00:00Z`));
+  const maDivision = useDivision(me);
+  const surtitreDeLigue = (j: number | null | undefined) =>
+    j === J_DECOUPAGE && sansDivisions
+      ? "Dernier dimanche sans divisions"
+      : j != null && j >= REGLES_DIVISIONS.depuis && maDivision && !journeeJouee(saison, j)
+        ? `Tu joues en ${nomDivision(maDivision)}`
+        : "Sunday Five League";
 
   const terrains = useMemo(() => saison.terrains ?? [], [saison.terrains]);
 
@@ -494,6 +503,8 @@ export default function MapPage() {
   };
   // Le match choisi : celui qu'on a touché s'il est encore là, sinon la une.
   const choisi = affiches.find((m) => m.cle === choix) ?? une;
+  // La convocation d'un dimanche que la saison n'a pas encore : le numéro de sa journée.
+  const jDuChoisi = choisi?.j ?? (choisi?.cle === "convocation" && p.shared ? p.journee : null);
 
   // La discussion d'un match, plein écran par-dessus la Map ; ou celle de
   // mon équipe (match: null), mon prochain match sous l'onglet Match.
@@ -957,7 +968,7 @@ export default function MapPage() {
                   ? `Ouvert par ${choisi.partie.organisateur}`
                   : choisi?.team
                     ? "Match d'équipe"
-                    : `${choisi?.j != null ? `J${choisi.j} · ` : ""}${choisi?.j === J_DECOUPAGE && sansDivisions ? "Dernier dimanche sans divisions" : "Sunday Five League"}`}
+                    : `${jDuChoisi != null ? `J${jDuChoisi} · ` : ""}${surtitreDeLigue(jDuChoisi)}`}
               </span>
             </p>
             <SheetTitle className="text-[26px] font-bold tracking-tight">

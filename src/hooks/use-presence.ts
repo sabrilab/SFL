@@ -20,6 +20,7 @@ import { saisieStore } from "@/lib/sfl/saisie/store";
 import { SAISIE_EVENT } from "@/components/sfl/season-provider";
 import type { ConvocationTeam } from "@/lib/sfl/saisie/types";
 import { assurerConvocationOuverte } from "@/lib/sfl/convocation-auto";
+import { ajusterEquipes } from "@/lib/sfl/divisions-equipes";
 import { equipesVisibles, reponsesOuvertes } from "@/lib/sfl/convocation-temps";
 import { rewardConvocationReply } from "@/lib/sfl/ballons";
 import { NEXT_MATCH } from "@/lib/sfl/data";
@@ -195,6 +196,8 @@ export function usePresence(): PresenceView {
               .delete()
               .eq("convocation_id", server.convocation.id)
               .eq("player_id", uid);
+            // Les équipes par division déjà faites : il en sort (lib/sfl/divisions-equipes).
+            if (!error) void ajusterEquipes("reponse", server.convocation.heure);
             return !error;
           }
           const { error } = await sb.from("presence").upsert(
@@ -204,6 +207,7 @@ export function usePresence(): PresenceView {
           if (!error) {
             logActivity("presence");
             recompense();
+            void ajusterEquipes("reponse", server.convocation.heure);
           }
           return !error;
         } catch {

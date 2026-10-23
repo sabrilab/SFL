@@ -232,6 +232,61 @@ export function addJourneeWithTeams(
   return { saison: { ...withJournee, entries: [...withJournee.entries, ...entries] }, j };
 }
 
+/** « 1 novembre » → « 1 nov. » : le libellé d'une convocation, à la façon des journées. */
+export function libelleCourt(dateLabel: string): string {
+  const COURTS: Record<string, string> = {
+    janvier: "janv.", février: "févr.", mars: "mars", avril: "avr.", mai: "mai", juin: "juin",
+    juillet: "juil.", août: "août", septembre: "sept.", octobre: "oct.", novembre: "nov.", décembre: "déc.",
+  };
+  const m = dateLabel.trim().match(/^(\d{1,2})\s+(\p{L}+)/u);
+  const mois = m ? COURTS[m[2].toLowerCase()] : undefined;
+  return m && mois ? `${Number(m[1])} ${mois}` : dateLabel;
+}
+
+/**
+ * Pose sur la feuille de la journée `j` les équipes de la convocation
+ * (composées par division, lib/sfl/equipes-division.ts), dans leur ordre : la
+ * saisie apparie les équipes dans l'ordre où elles apparaissent, si bien que
+ * la première paire reste le Terrain 1. Un joueur déjà sur la feuille garde
+ * sa ligne (et ce qui y est noté) et prend son équipe ; les autres y entrent.
+ * Qui est sur la feuille sans être dans les équipes y reste, sans équipe. La
+ * journée n'existe pas encore : elle naît, datée du dimanche de la
+ * convocation, et reprend de la précédente le SFL Time et le terrain.
+ */
+export function poserEquipes(saison: Saison, j: number, teams: ConvocationTeam[], date?: string): Saison {
+  let s = saison;
+  if (!s.journees.some((m) => m.j === j)) {
+    const avant = [...s.journees].sort((a, b) => b.j - a.j)[0];
+    s = {
+      ...s,
+      journees: [
+        ...s.journees,
+        {
+          j,
+          date: date ?? shortToday(),
+          sflTime: avant?.sflTime ?? false,
+          mvpAuto: true,
+          ...(avant?.terrainId != null ? { terrainId: avant.terrainId } : {}),
+        },
+      ],
+    };
+  }
+  const lignes = s.entries.filter((e) => e.j === j);
+  // Une ligne neuve compte la victoire comme les autres lignes du jour, sinon comme la journée.
+  const sflTime = lignes[0]?.sflTime ?? s.journees.find((m) => m.j === j)?.sflTime ?? false;
+  const prises = new Set<MatchEntry>();
+  const posees: MatchEntry[] = [];
+  for (const t of teams) {
+    for (const nom of t.players) {
+      const ligne = lignes.find((e) => e.player === nom && !prises.has(e));
+      if (ligne) prises.add(ligne);
+      posees.push(ligne ? { ...ligne, team: t.name } : { ...newEntry(j, nom, t.name), sflTime });
+    }
+  }
+  const reste = lignes.filter((e) => !prises.has(e)).map((e) => ({ ...e, team: null }));
+  return { ...s, entries: [...s.entries.filter((e) => e.j !== j), ...posees, ...reste] };
+}
+
 /* ----------------------------- Convocations ----------------------------- */
 
 /** Convocation ouverte la plus récente (celle affichée aux joueurs). */

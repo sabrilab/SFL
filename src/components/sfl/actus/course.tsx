@@ -10,10 +10,11 @@
 //     complets, « Match » les journées (vues.tsx) ;
 //     Sous chaque carte, ▲ ou ▼ depuis la semaine passée, et à l'ouverture
 //     les cartes glissent de leur ancienne place à la nouvelle ;
-//   · le fil : le jour du match, la feuille en direct ; jusqu'à la J4,
-//     l'annonce des divisions (divisions.tsx) ; ton dimanche (ta carte, tes
-//     chiffres, tes places) ; la convocation (qui vient, Je viens / Je
-//     passe ; « Dernier dimanche sans divisions » sur celle de la J3) ; ce qui se joue dimanche (les places à un ou deux points),
+//   · le fil : le jour du match, la feuille en direct ; les divisions
+//     (divisions.tsx : leur annonce jusqu'à la J4, puis le bilan de chaque
+//     dimanche) ; ton dimanche (ta carte, tes chiffres, tes places) ; la
+//     convocation (qui vient, Je viens / Je passe ; « Dernier dimanche sans
+//     divisions » sur celle de la J3, ta division dès la J4) ; ce qui se joue dimanche (les places à un ou deux points),
 //     ton rival et ce qu'il te faut pour le passer ; puis chaque dimanche joué,
 //     du plus récent : son terrain avec les cartes des joueurs (CarteJournee),
 //     et ses rubriques. Chaque rubrique est un terrain avec ses petites cartes
@@ -32,7 +33,9 @@ import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { usePresence } from "@/hooks/use-presence";
 import { voteOuvert } from "@/lib/sfl/convocation-temps";
-import { annonceEnCours, J_DECOUPAGE } from "@/lib/sfl/divisions";
+import { annonceEnCours, J_DECOUPAGE, nomDivision } from "@/lib/sfl/divisions";
+import { divisionsDeLaJournee } from "@/lib/sfl/equipes-division";
+import { isHidden } from "@/lib/sfl/hidden";
 import { computeStandings } from "@/lib/sfl/saisie/engine";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { Nom } from "@/components/sfl/nom";
@@ -200,8 +203,12 @@ function Ticker({ moi, onTout }: { moi: string; onTout: () => void }) {
 function Convocation() {
   const p = usePresence();
   const { saison } = useSeason();
+  const { me } = useMyPlayer();
   const [maintenant] = useState(() => new Date());
   const derniere = p.journee === J_DECOUPAGE && annonceEnCours(saison, maintenant);
+  // Dès la J4, la division où l'on joue ce dimanche-là.
+  const etat = useMemo(() => divisionsDeLaJournee(saison, p.journee), [saison, p.journee]);
+  const division = etat && !isHidden(me) ? (etat.actuelle.get(me) ?? 3) : null;
   const repondre = (r: "present" | "absent") => p.answer(p.mine === r ? null : r);
   return (
     <section className="mx-4 flex flex-col gap-4 overflow-hidden rounded-[28px] bg-black p-5 text-white">
@@ -211,6 +218,7 @@ function Convocation() {
         </span>
         <span className="flex min-w-0 flex-col pb-0.5">
           {derniere && <span className="mono-label mb-1 text-[10px] text-white/60">Dernier dimanche sans divisions</span>}
+          {division && <span className="mono-label mb-1 text-[10px] text-white/60">Tu joues en {nomDivision(division)}</span>}
           <span className="text-[16px] font-bold">{p.jour}</span>
           <span className="truncate text-[12.5px] text-white/55">
             {p.heure} · {p.lieu}

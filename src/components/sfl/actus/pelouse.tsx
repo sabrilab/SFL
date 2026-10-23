@@ -87,6 +87,8 @@ export interface Place {
   moi?: boolean;
   /** Sous le nom, les chiffres du jour. */
   sous?: string;
+  /** Sur le coin haut de la carte, en pastille : quand le nom n'a plus la place à côté de lui. */
+  badge?: string;
 }
 
 const hauteur = (taille: number) => 254 * taille * PHI + 26;
@@ -101,7 +103,14 @@ function Debout({ p }: { p: Place }) {
     <div className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y, zIndex: Math.round(p.v) }}>
       <div className="absolute bottom-0 left-0" style={{ transformOrigin: "50% 100%", transform: `translateX(-50%) scale(${k})` }}>
         <div className="pel-entre flex flex-col items-center" style={{ ["--d" as string]: p.d ?? 0.2 }}>
-          <MiniCarte player={joueur} size={taille} vertical />
+          <div className="relative">
+            <MiniCarte player={joueur} size={taille} vertical />
+            {p.badge && (
+              <span className="absolute top-0 right-0 translate-x-[45%] -translate-y-[35%] rounded-full bg-white px-[5px] py-[1.5px] font-mono text-[9.5px] leading-[1.2] font-bold whitespace-nowrap text-black tabular-nums shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
+                {p.badge}
+              </span>
+            )}
+          </div>
           <span
             className={cn(
               "mt-[4px] flex items-center gap-[5px] rounded-full px-[8px] py-[2px] text-[11px] leading-[1.25] font-bold whitespace-nowrap",

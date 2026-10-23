@@ -18,22 +18,32 @@
 // les premiers (ceux qui te chassent). Qui n'est pas classé voit les premiers
 // de chaque division.
 //
-// Le découpage et ses phrases : lib/sfl/divisions.ts.
+// Puis, chaque dimanche joué en divisions, le bilan : les divisions du
+// dimanche suivant, et sur chaque rang ceux qui viennent d'y monter (↑) ou d'y
+// descendre (↓), leurs points de la journée en pastille sur la carte (le nom
+// n'a plus la place à trois par rang) ; toi d'abord dans le tien.
+//
+// Le découpage, le bilan et leurs phrases : lib/sfl/divisions.ts.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Ref } from "react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import {
   decoupageAnnonce,
   decouper,
+  dernierBilan,
   DIVISIONS,
   editionAnnonce,
+  etatDivisions,
   J_DECOUPAGE,
   nomDivision,
   phraseAnnonce,
+  phraseBilan,
   REGLES_DIVISIONS,
+  type BilanDivisions,
   type Decoupage,
   type Division,
+  type EtatDivisions,
   type PlaceDecoupage,
 } from "@/lib/sfl/divisions";
 import { isHidden } from "@/lib/sfl/hidden";
@@ -43,6 +53,8 @@ import { Bulle, MILIEU, Pastille, Scene, T, tour, type Place } from "./pelouse";
 
 /** Les rangs, du but vers l'avant : la D1 sur la ligne de but, puis la D2, la D3. */
 const RANGS: Record<Division, number> = { 1: 26, 2: 150, 3: 272 };
+/** Ceux du bilan, un peu plus espacés : les points débordent du coin haut de chaque carte. */
+const RANGS_BILAN: Record<Division, number> = { 1: 26, 2: 164, 3: 300 };
 /** Trois cartes par rang, à droite de l'étiquette. */
 const PAR_RANG = 3;
 const ECART = 60;
@@ -63,6 +75,31 @@ function cartesDuRang(d: Decoupage, division: Division, moi: PlaceDecoupage | un
   return division < moi.division ? liste.slice(-PAR_RANG) : liste.slice(0, PAR_RANG);
 }
 
+/**
+ * Les cartes d'un rang après un dimanche : toi d'abord dans ta division, puis
+ * ceux qui viennent d'y arriver, puis les meilleurs de la journée.
+ */
+function cartesDuBilan(etat: EtatDivisions, bilan: BilanDivisions, division: Division, moi: string): { nom: string; badge?: string }[] {
+  const ici = [...etat.actuelle].filter(([n, d]) => d === division && !isHidden(n)).map(([n]) => n);
+  const m = (n: string) => bilan.parNom.get(n);
+  const arrive = (n: string) => (m(n) && m(n)!.de !== m(n)!.vers ? 1 : 0);
+  return ici
+    .sort(
+      (a, b) =>
+        Number(b === moi) - Number(a === moi) ||
+        arrive(b) - arrive(a) ||
+        (m(b)?.points ?? -99) - (m(a)?.points ?? -99) ||
+        a.localeCompare(b, "fr")
+    )
+    .slice(0, PAR_RANG)
+    .map((nom) => {
+      const x = m(nom);
+      // Les points de la journée sur la carte, flèche en tête pour qui change de division.
+      const points = x ? (x.points < 0 ? `−${-x.points}` : String(x.points)) : null;
+      return { nom, badge: x ? `${x.vers < x.de ? "↑ " : x.vers > x.de ? "↓ " : ""}${points}` : undefined };
+    });
+}
+
 /** Une règle de la J4 : un chiffre en grand, ce qu'il veut dire dessous. */
 function Regle({ n, quoi }: { n: string; quoi: string }) {
   return (
@@ -75,12 +112,12 @@ function Regle({ n, quoi }: { n: string; quoi: string }) {
   );
 }
 
-/** Ce qui change dès la J4, sous le terrain. */
-function DesLaJ4() {
+/** Ce qui change dès la J4, sous le terrain ; une fois la J4 jouée, ce qui se joue chaque dimanche. */
+function DesLaJ4({ chaqueDimanche = false }: { chaqueDimanche?: boolean }) {
   const { montee, descente, depuis } = REGLES_DIVISIONS;
   return (
     <div className="flex flex-col gap-3 bg-[#0c0d0f] px-5 pt-1 pb-6 text-white">
-      <span className="mono-label text-[10px] text-white/50">Dès la J{depuis}</span>
+      <span className="mono-label text-[10px] text-white/50">{chaqueDimanche ? "Chaque dimanche" : `Dès la J${depuis}`}</span>
       <div className="grid grid-cols-3 gap-2">
         <Regle n={`${montee} pts`} quoi="ou plus sur la journée : tu montes" />
         <Regle n={`${descente} pts`} quoi="ou moins : tu descends" />
@@ -103,12 +140,16 @@ export function RubriqueDivisions() {
     () => (edition || coupee ? decouper(saison, coupee ? J_DECOUPAGE : undefined) : null),
     [saison, edition, coupee]
   );
+  // Après chaque dimanche joué en divisions : le bilan.
+  const etat = useMemo(() => (edition || coupee ? null : etatDivisions(saison)), [saison, edition, coupee]);
+  const bilan = useMemo(() => dernierBilan(etat), [etat]);
   const ref = useRef<HTMLDivElement>(null);
-  const present = !!d && d.classes > 0;
+  const present = (!!d && d.classes > 0) || !!bilan;
   // La notification et l'écran de l'ouverture mènent à /ligue#divisions.
   useEffect(() => {
     if (present && window.location.hash === "#divisions") ref.current?.scrollIntoView({ block: "start" });
   }, [present]);
+  if (etat && bilan) return <Bilan ref={ref} etat={etat} bilan={bilan} me={me} />;
   if (!d || !present) return null;
 
   const moi = isHidden(me) ? undefined : d.parNom.get(me);
@@ -160,6 +201,54 @@ export function RubriqueDivisions() {
         ))}
       </Scene>
       <DesLaJ4 />
+    </div>
+  );
+}
+
+/** Le bilan du dernier dimanche joué en divisions. */
+function Bilan({ ref, etat, bilan, me }: { ref: Ref<HTMLDivElement>; etat: EtatDivisions; bilan: BilanDivisions; me: string }) {
+  const { saison } = useSeason();
+  const taille = (x: Division) => [...etat.actuelle].filter(([n, d]) => d === x && !isHidden(n)).length;
+  const places: Place[] = DIVISIONS.flatMap((division, r) => {
+    const cartes = cartesDuBilan(etat, bilan, division, me);
+    return cartes.map((p, i) => ({
+      nom: p.nom,
+      u: CENTRE + (i - (cartes.length - 1) / 2) * ECART,
+      v: RANGS_BILAN[division],
+      taille: T.petite,
+      d: tour(i, 0.16 + r * 0.16, 0.05),
+      moi: p.nom === me,
+      badge: p.badge,
+    }));
+  });
+  const jour = saison.journees.find((m) => m.j === bilan.j);
+  const ma = isHidden(me) ? undefined : etat.actuelle.get(me);
+  const mouvements = `${bilan.montees} ${pl(bilan.montees, "monte", "montent")}, ${bilan.descentes} ${pl(bilan.descentes, "descend", "descendent")}`;
+  return (
+    <div id="divisions" ref={ref} className="scroll-mt-4">
+      <Scene
+        sur={`J${bilan.j} · ${jour?.date ?? "dimanche"}`}
+        titre={`Les divisions après la J${bilan.j}`}
+        places={places}
+        jusqua={333}
+        texte={phraseBilan(etat, bilan, me) ?? mouvements}
+        partage={{
+          titre: `Les divisions après la J${bilan.j}`,
+          j: bilan.j,
+          lignes: [
+            ...(ma ? [{ n: me, v: nomDivision(ma) }] : []),
+            { l: "Mouvements", v: mouvements },
+            ...DIVISIONS.map((x) => ({ l: nomDivision(x), v: `${taille(x)} ${pl(taille(x), "joueur", "joueurs")}` })),
+          ],
+        }}
+      >
+        {DIVISIONS.map((division, r) => (
+          <Bulle key={division} u={ETIQUETTE.u} v={RANGS_BILAN[division]} w={ETIQUETTE.w} d={0.1 + r * 0.16}>
+            <Pastille petit n={nomDivision(division)} quoi={`${taille(division)} ${pl(taille(division), "joueur", "joueurs")}`} clair={ma === division} />
+          </Bulle>
+        ))}
+      </Scene>
+      <DesLaJ4 chaqueDimanche />
     </div>
   );
 }

@@ -12,14 +12,17 @@ import {
   apresLaJournee,
   decoupageAnnonce,
   decouper,
+  dernierBilan,
   DIVISIONS,
   ecartsDecoupage,
   editionAnnonce,
+  enPoints,
   etatDivisions,
   fenetreNotification,
   nomDivision,
   notificationAnnonce,
   phraseAnnonce,
+  phraseBilan,
   taDivision,
 } from "../src/lib/sfl/divisions";
 import type { MatchEntry, Saison } from "../src/lib/sfl/saisie/types";
@@ -146,7 +149,20 @@ assert.equal(e4.actuelle.get("Gaby"), 2, "un absent excusé garde sa division");
 assert.equal(e4.actuelle.get("Dina"), 1, "qui n'a pas joué garde sa division");
 assert.equal(etatDivisions({ ...base, numero: 0 }), null);
 
-console.log("divisions : découpage, plage, montées, annonce et notification, tout est bon");
+// Le bilan du dimanche, joueur par joueur.
+assert.equal(dernierBilan(e3), null, "avant la J4 jouée, pas de bilan");
+const b4 = dernierBilan(e4)!;
+assert.deepEqual([b4.j, b4.montees, b4.descentes], [4, 2, 2]);
+assert.equal(phraseBilan(e4, b4, "Chris"), "Tu montes en D1 avec 9 pts");
+assert.equal(phraseBilan(e4, b4, "Ana"), "Tu descends en D2 avec 3 pts");
+assert.equal(phraseBilan(e4, b4, "Fodé"), "Tu restes en D2 avec 5 pts, 9 pts dimanche et tu montes");
+assert.equal(phraseBilan(e4, b4, "Hugo"), "Tu restes en D3 avec −2 pts, 9 pts dimanche et tu montes");
+assert.equal(phraseBilan(e4, b4, "Gaby"), "Tu restes en D2", "absent excusé");
+assert.equal(phraseBilan(e4, b4, "Sabri"), null);
+assert.equal(phraseBilan(e4, b4, "Personne"), null);
+assert.deepEqual([enPoints(1), enPoints(0), enPoints(-1), enPoints(12)], ["1 pt", "0 pt", "−1 pt", "12 pts"]);
+
+console.log("divisions : découpage, plage, montées, bilan, annonce et notification, tout est bon");
 
 // Une saison réelle : son découpage et la notification de chacun.
 const fichier = process.argv[2];

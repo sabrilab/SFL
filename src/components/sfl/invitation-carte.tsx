@@ -49,6 +49,7 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { useSession } from "@/hooks/use-session";
 import { editionAnnonce, fenetreNotification, type EditionAnnonce } from "@/lib/sfl/divisions";
 import { annonceVue, annoncerDivisions, noterAnnonceVue } from "@/lib/sfl/divisions-annonce";
+import { ajusterEquipes } from "@/lib/sfl/divisions-equipes";
 import { identiteConfirmee, rafraichirIdentites } from "@/lib/sfl/identites";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
 import { activerNotifications, etatNotifications, rafraichirAbonnement } from "@/lib/sfl/notifications";
@@ -123,6 +124,8 @@ export function InvitationCarte() {
         return;
       }
       if (fenetreNotification(saisonRef.current, maintenant)) void annoncerDivisions();
+      // Le week-end des équipes par division : elles se tiennent à jour.
+      void ajusterEquipes("ouverture");
       const [etat, ville] = await Promise.all([
         etatNotifications().catch(() => "indisponible" as const),
         enPause("ville", nom) ? null : maVilleAProposer(nom),
