@@ -23,6 +23,7 @@ import { useBadgeCarte } from "@/hooks/use-badge-carte";
 import { usePhotoPerso } from "@/hooks/use-player-photo";
 import { ovr, type BoostType, type Player, type StatKey } from "@/lib/sfl/engine";
 import { useIdentites } from "@/hooks/use-identites";
+import type { HabillageCarte } from "./finitions-carte";
 
 export type CardMode = "simple" | "rare";
 
@@ -35,6 +36,7 @@ export function PlayerCard({
   pseudo,
   vertical,
   distinction,
+  habillage,
 }: {
   player: Player;
   /** Aperçu : le nom et le pseudo en cours de saisie (identite.tsx). */
@@ -50,6 +52,8 @@ export function PlayerCard({
   vertical?: boolean;
   /** Une carte à titre : MVP (or), Impact (rouge), Défensive (bleu). */
   distinction?: BoostType;
+  /** Ce que la carte porte (finitions-carte.ts) ; gagne sur celui du joueur (l'essai dans la passe). */
+  habillage?: HabillageCarte;
 }) {
   const stats = player.stats;
   const photo = usePhotoPerso(player.name);
@@ -68,6 +72,7 @@ export function PlayerCard({
         badge={badge}
         vertical={vertical}
         distinction={distinction}
+        habillage={habillage}
       />
     );
   return (
@@ -84,6 +89,7 @@ export function PlayerCard({
       photo={photo}
       onglet={onglet}
       badge={badge}
+      habillage={habillage}
     />
   );
 }
