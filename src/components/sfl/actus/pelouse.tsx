@@ -130,7 +130,9 @@ function Debout({ p }: { p: Place }) {
     <div className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y, zIndex: Math.round(p.v) }}>
       <div className="absolute bottom-0 left-0" style={{ transformOrigin: "50% 100%", transform: `translateX(-50%) scale(${k})` }}>
         <div className="pel-entre flex flex-col items-center" style={{ ["--d" as string]: p.d ?? 0.2 }}>
-          <div className="relative">
+          {/* En flex : un bouton (MiniCarte) seul dans un bloc garde sous lui
+              la place d'une ligne de texte, qui éloignait la carte de son nom. */}
+          <div className="relative flex">
             <MiniCarte player={joueur} size={taille} vertical />
             {p.badge && (
               <span className="absolute top-0 right-0 translate-x-[45%] -translate-y-[35%] rounded-full bg-white px-[5px] py-[1.5px] font-mono text-[9.5px] leading-[1.2] font-bold whitespace-nowrap text-black tabular-nums shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
