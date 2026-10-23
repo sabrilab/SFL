@@ -13,6 +13,7 @@ import { ViewportLock } from "@/components/pwa/viewport-lock";
 import { PlayerProvider } from "@/components/sfl/player-provider";
 import { AuthGate } from "@/components/sfl/auth/auth-gate";
 import { SeasonProvider } from "@/components/sfl/season-provider";
+import { XpLigueProvider } from "@/components/sfl/xp-ligue";
 import { CardViewerProvider } from "@/components/sfl/card-viewer";
 import { AppSplash } from "@/components/sfl/app-splash";
 import { ActivityTracker } from "@/components/sfl/activity-tracker";
@@ -103,6 +104,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" forcedTheme="dark" disableTransitionOnChange>
           <SeasonProvider>
             <PlayerProvider>
+            <XpLigueProvider>
             <CardViewerProvider>
               <TooltipProvider delay={200}>
                 <AuthGate>
@@ -153,6 +155,7 @@ export default function RootLayout({
                 <Toaster position="top-center" />
               </TooltipProvider>
             </CardViewerProvider>
+            </XpLigueProvider>
             </PlayerProvider>
           </SeasonProvider>
         </ThemeProvider>

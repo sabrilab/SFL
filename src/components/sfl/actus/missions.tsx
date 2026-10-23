@@ -134,7 +134,8 @@ function Moment({ mm }: { mm: MesMissions }) {
   );
 }
 
-function Insigne({ rang }: { rang: Rang }) {
+/** L'insigne du rang, aux couleurs que pose fiche--{rang} sur un parent. */
+export function Insigne({ rang }: { rang: Rang }) {
   return (
     <span className="fiche__insigne" aria-hidden>
       <span className="fiche__hexa" />

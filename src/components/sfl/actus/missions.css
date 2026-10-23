@@ -55,6 +55,13 @@
   --r-texte: #efc3da;
   --r-sombre: #5b2141;
 }
+/* Le ton B redit pour un parent qui n'est pas une fiche (l'insigne du rang du joueur, la carte). */
+.fiche--B {
+  --r-lueur: 222 227 236;
+  --r-feu: 246 248 252;
+  --r-texte: #e6ebf3;
+  --r-sombre: #3d434d;
+}
 /* Accomplie : le cadre s'allume. Ratée : il vire au rouge. Passée, expirée, annulée : elle s'éteint. */
 .fiche--reussie {
   box-shadow:

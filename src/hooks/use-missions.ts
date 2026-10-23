@@ -6,8 +6,12 @@
 // acceptés des deux côtés, et mon XP. Les réponses se chargent une fois et
 // suivent la base en temps réel, quel que soit le nombre d'écrans qui les
 // lisent.
+//
+// L'XP de toute la ligue se calcule une seule fois pour l'app
+// (XpLigueProvider, xp-ligue.tsx) : mon XP, celui d'un profil et le rang de
+// chacun (B, A, S) le lisent sans recalculer, autant de cartes qu'il y ait.
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useFelicitations } from "@/hooks/use-felicitations";
@@ -17,10 +21,12 @@ import { useVotes } from "@/hooks/use-votes";
 import {
   aJoue,
   bilanDe,
+  classementNiveau,
   dimancheEnCours,
   engagementsDe,
   journalXp,
   juger,
+  rangsDesJoueurs,
   reponseDe,
   risqueDe,
   signesContre,
@@ -32,7 +38,9 @@ import {
   type DimancheMissions,
   type Duel,
   type Engagement,
+  type LigneXp,
   type Mission,
+  type RangJoueur,
   type Reponse,
   type Verdict,
 } from "@/lib/sfl/missions";
@@ -305,21 +313,55 @@ export function useDuelsAcceptes(j: number | null | undefined): Duel[] {
   }, [isClient, j, me, saison, maintenant, reponses]);
 }
 
+/** L'XP de toute la ligue, calculé une fois pour l'app (XpLigueProvider). */
+export interface XpLigue {
+  journal: Map<string, { lignes: LigneXp[]; reussies: number }>;
+  /** Le numéro de la saison en cours, celle du passe. */
+  saison: number;
+  /** Le rang de chaque joueur classé : S, A ou B selon sa place dans l'XP à vie. */
+  rangs: Map<string, RangJoueur>;
+}
+
+export const XpLigueContext = createContext<XpLigue | null>(null);
+
 /**
- * Mon XP : le niveau à vie et le passe de la saison (masqués compris : chacun
- * voit le sien). Les félicitations reçues et données y comptent (lib/sfl/
+ * Le calcul, pour XpLigueProvider seulement : le journal de chacun (les
+ * dimanches joués, les missions jugées, les félicitations, toutes saisons),
+ * puis les rangs. Les félicitations reçues et données y comptent (lib/sfl/
  * felicitations.ts), relues au lancement et au retour sur l'app.
  */
-export function useXp(nom?: string): BilanXp | null {
+export function useXpLigueCalcule(): XpLigue | null {
   const isClient = useIsClient();
-  const { me } = useMyPlayer();
   const maintenant = useMaintenant();
   const reponses = useReponses();
+  const { allPlayers } = useSeason();
   const { toutes: felicitations } = useFelicitations();
   const { saison, jugee, votes } = useSaisonJugee(maintenant);
-  const qui = nom ?? me;
   return useMemo(() => {
-    if (!isClient || !qui) return null;
-    return bilanDe(journalXp(jugee, reponses, votes, maintenant, felicitations), qui, saison.numero ?? 0);
-  }, [isClient, qui, jugee, reponses, votes, maintenant, felicitations, saison.numero]);
+    if (!isClient) return null;
+    const journal = journalXp(jugee, reponses, votes, maintenant, felicitations);
+    return { journal, saison: saison.numero ?? 0, rangs: rangsDesJoueurs(classementNiveau(journal, allPlayers)) };
+  }, [isClient, jugee, reponses, votes, maintenant, felicitations, saison.numero, allPlayers]);
+}
+
+/** L'XP de la ligue, tel que l'app l'a calculé (null avant le premier rendu côté client). */
+export function useXpLigue(): XpLigue | null {
+  return useContext(XpLigueContext);
+}
+
+/**
+ * Mon XP (ou celui de `nom`) : le niveau à vie et le passe de la saison
+ * (masqués compris : chacun voit le sien).
+ */
+export function useXp(nom?: string): BilanXp | null {
+  const { me } = useMyPlayer();
+  const lg = useXpLigue();
+  const qui = nom ?? me;
+  return useMemo(() => (lg && qui ? bilanDe(lg.journal, qui, lg.saison) : null), [lg, qui]);
+}
+
+/** Le rang d'un joueur (B, A, S) ; null pour un joueur masqué ou inconnu. */
+export function useRangXp(nom: string | null | undefined): RangJoueur | null {
+  const lg = useXpLigue();
+  return (nom && lg?.rangs.get(nom)) || null;
 }

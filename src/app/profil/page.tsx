@@ -55,7 +55,7 @@ import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { useGrandEcran } from "@/hooks/use-media-query";
 import { FormulaireIdentite } from "@/components/sfl/identite";
 import { useIdentites } from "@/hooks/use-identites";
-import { useXp } from "@/hooks/use-missions";
+import { useRangXp, useXp } from "@/hooks/use-missions";
 import { cartesDeCarriere, courbeDeCarriere } from "@/lib/sfl/carriere";
 import { ovr, rankPlayers } from "@/lib/sfl/engine";
 import { dimanchesDe, ficheJoueur } from "@/lib/sfl/fiche-joueur";
@@ -129,6 +129,7 @@ export default function Profil() {
   const identite = useIdentites();
   const poste = POSTES.find((p) => p.id === player.poste)?.label ?? player.poste;
   const xp = useXp(player.name);
+  const rangXp = useRangXp(player.name);
 
   return (
     <div className="shell py-4 sm:py-8 lg:pt-[var(--fib-55)]">
@@ -179,6 +180,7 @@ export default function Profil() {
               <span className="font-mono text-[12px] text-foreground/45">
                 {identite.pseudo(player.name)} · {poste.toLowerCase()}
                 {xp && ` · niveau XP ${xp.niveau}`}
+                {rangXp && ` · rang ${rangXp.rang}`}
               </span>
             </button>
             <ReseauJoueur nom={player.name} />

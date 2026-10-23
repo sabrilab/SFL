@@ -823,6 +823,52 @@ export function classementNiveau(
   });
 }
 
+/* --------------------------- Le rang des joueurs --------------------------- */
+// Sabri, 23/10 : « grâce à leur niveau d'XP, on attribue aux joueurs un
+// rang : rang A, B, tout ça, jusqu'au rang S, le rang S étant la difficulté
+// vraiment ultime ». Les rangs des missions (B, A, S), donnés par la place au
+// classement du niveau, l'XP à vie : les 10 % de tête de ceux qui ont de
+// l'XP sont S, les 25 % suivants A, tous les autres B. Une place plutôt
+// qu'un seuil : l'XP de chacun monte chaque dimanche, le rang S doit rester
+// rare. Des ex aequo ont le même rang.
+
+/** La part de la ligue, depuis le haut du classement du niveau, qui atteint chaque rang. */
+export const PART_DU_RANG: Record<Exclude<Rang, "B">, number> = { S: 0.1, A: 0.35 };
+
+export interface RangJoueur {
+  rang: Rang;
+  /** La place au classement du niveau (ex aequo à la même place). */
+  place: number;
+  xp: number;
+  /** Les joueurs qui ont de l'XP : ceux entre qui les places se jouent. */
+  sur: number;
+  /** Le rang du dessus et la dernière place qui l'ouvre ; null au rang S. */
+  suivant: { rang: Rang; place: number } | null;
+}
+
+/** Le rang de chaque joueur du classement du niveau (classementNiveau). */
+export function rangsDesJoueurs(classement: { name: string; xp: number; rank: number }[]): Map<string, RangJoueur> {
+  const sur = classement.filter((c) => c.xp > 0).length;
+  const borne = (part: number) => Math.max(1, Math.ceil(part * sur));
+  const placeS = borne(PART_DU_RANG.S);
+  const placeA = borne(PART_DU_RANG.A);
+  const out = new Map<string, RangJoueur>();
+  for (const c of classement) {
+    const rang: Rang = c.xp <= 0 ? "B" : c.rank <= placeS ? "S" : c.rank <= placeA ? "A" : "B";
+    const suivant = rang === "S" ? null : rang === "A" ? { rang: "S" as const, place: placeS } : { rang: "A" as const, place: placeA };
+    out.set(c.name, { rang, place: c.rank, xp: c.xp, sur, suivant });
+  }
+  return out;
+}
+
+/** Le plus haut palier du passe atteint, toutes saisons confondues : ce qu'il a débloqué pour de bon. */
+export function palierMaxDe(journal: Map<string, { lignes: LigneXp[]; reussies: number }>, joueur: string): number {
+  const saisons = new Set((journal.get(joueur)?.lignes ?? []).map((l) => l.saison));
+  let max = 0;
+  for (const s of saisons) max = Math.max(max, bilanDe(journal, joueur, s).palier);
+  return max;
+}
+
 /* ------------------------------ Les libellés ------------------------------ */
 
 /** La mission en une phrase, à la deuxième personne : « Finis devant Abdel. » */

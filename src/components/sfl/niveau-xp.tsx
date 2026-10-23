@@ -7,6 +7,8 @@
 // trois ; une mission acceptée puis ratée en reprend la moitié de sa prime
 // (en rouge dans le journal).
 //   · le Niveau XP, à vie : passer du niveau n au suivant coûte 100 × n ;
+//   · le rang, B, A ou S, d'après la place au classement de l'XP à vie
+//     (rangsDesJoueurs) : les 10 % de tête S, les 25 % suivants A ;
 //   · le passe de la saison : vingt paliers de 250 XP, remis à zéro à chaque
 //     saison, chacun avec sa récompense, qu'on fait défiler ;
 //   · les missions réussies, à vie, qui font les crans du cadre de la carte
@@ -18,9 +20,33 @@
 import { useEffect, useRef } from "react";
 import { Check } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
-import { useXp } from "@/hooks/use-missions";
-import { CRANS, FAMILLES, PALIERS_PASSE, PASSE, XP_PALIER } from "@/lib/sfl/missions";
+import { Insigne } from "@/components/sfl/actus/missions";
+import { useMyPlayer } from "@/components/sfl/player-provider";
+import { useRangXp, useXp } from "@/hooks/use-missions";
+import { CRANS, FAMILLES, PALIERS_PASSE, PASSE, XP_PALIER, type RangJoueur } from "@/lib/sfl/missions";
 import { cn } from "@/lib/utils";
+
+const eme = (n: number) => (n === 1 ? "1re" : `${n}e`);
+
+/** Mon rang, B, A ou S, d'après ma place au classement de l'XP à vie. */
+function RangXp({ r }: { r: RangJoueur }) {
+  return (
+    <div className={cn(`fiche--${r.rang}`, "glass flex items-center gap-4 rounded-[22px] px-4 py-3")}>
+      <Insigne rang={r.rang} />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="fiche__ton text-[15px] font-bold">Rang {r.rang}</span>
+        <span className="font-mono text-[12px] text-foreground/55 tabular-nums">
+          {r.xp > 0 ? `${eme(r.place)} sur ${r.sur} en XP à vie` : "Hors classement"}
+        </span>
+        {r.suivant && (
+          <span className="mono-label text-[9px] text-foreground/45">
+            Rang {r.suivant.rang} : {r.suivant.place === 1 ? "le premier" : `les ${r.suivant.place} premiers`}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function Barre({ part }: { part: number }) {
   return (
@@ -32,6 +58,8 @@ function Barre({ part }: { part: number }) {
 
 export function NiveauXp({ saison }: { saison: number }) {
   const b = useXp();
+  const { me } = useMyPlayer();
+  const rangXp = useRangXp(me);
   const rangee = useRef<HTMLDivElement>(null);
   const palier = b?.palier ?? 0;
   // Le passe s'ouvre sur le dernier palier atteint, pas sur le premier.
@@ -68,6 +96,8 @@ export function NiveauXp({ saison }: { saison: number }) {
           <Barre part={b.dansLeNiveau / b.pourLeSuivant} />
         </div>
       </div>
+
+      {rangXp && <RangXp r={rangXp} />}
 
       <div className="glass flex flex-col gap-3 overflow-hidden rounded-[22px] py-[var(--fib-13)]">
         <div className="flex flex-col gap-2 px-4">
