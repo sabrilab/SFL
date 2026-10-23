@@ -18,12 +18,15 @@
 // « réservé » dans annonces_envois avant l'envoi (insert … on conflict do
 // nothing), si bien que deux appels simultanés ne préviennent personne deux
 // fois. Un envoi qui échoue partout libère la réservation : le prochain appel
-// réessaie.
+// réessaie. Comme toute notification, elle part par prevenir
+// (lib/server/push-envoi.ts), motif « divisions » : Admin → Activité compte
+// qui l'a reçue et touchée.
 //
 // La route agit avec la clé secrète : elle exige une session de membre.
 
 import { NextRequest, NextResponse } from "next/server";
-import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
+import { prevenir, type Envoi } from "@/lib/server/push-envoi";
+import { cleVapid } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { decouper, editionAnnonce, fenetreNotification, J_DECOUPAGE, notificationAnnonce } from "@/lib/sfl/divisions";
 import { numeroSaison, type Saison } from "@/lib/sfl/saisie/types";
@@ -57,21 +60,18 @@ export async function POST(req: NextRequest) {
   const cle = cleVapid();
   if (!cle) return NextResponse.json({ envoyes: 0, fini: true });
 
-  // Les joueurs de la ligue et leurs abonnements.
+  // Les joueurs de la ligue qui ont un téléphone abonné.
   const { data: profils } = await sb.from("profiles").select("id, name").eq("valide", true);
   const joueurs = (profils ?? []) as { id: string; name: string }[];
   const { data: abonnements } = await sb
     .from("push_abonnements")
-    .select("endpoint, p256dh, auth, user_id")
+    .select("user_id")
     .in(
       "user_id",
       joueurs.map((p) => p.id)
     );
-  const parJoueur = new Map<string, Abonnement[]>();
-  for (const ab of (abonnements ?? []) as (Abonnement & { user_id: string })[]) {
-    parJoueur.set(ab.user_id, [...(parJoueur.get(ab.user_id) ?? []), ab]);
-  }
-  const idDe = new Map(joueurs.filter((p) => parJoueur.has(p.id)).map((p) => [p.name, p.id]));
+  const abonnes = new Set(((abonnements ?? []) as { user_id: string }[]).map((ab) => ab.user_id));
+  const idDe = new Map(joueurs.filter((p) => abonnes.has(p.id)).map((p) => [p.name, p.id]));
   if (!idDe.size) return NextResponse.json({ envoyes: 0, fini: true });
 
   // La réservation : seuls ceux qu'on vient d'inscrire sont prévenus par cet appel.
@@ -88,23 +88,17 @@ export async function POST(req: NextRequest) {
 
   const edition = editionAnnonce(saison, maintenant) ?? "avant";
   const d = decouper(saison);
-  let envoyes = 0;
-  const morts: string[] = [];
-  const rates: string[] = [];
-  await Promise.all(
-    ((reserves ?? []) as { joueur: string }[]).map(async ({ joueur }) => {
-      const { titre, texte } = notificationAnnonce(saison, d, joueur, edition);
-      const notif: Notif = { titre: couper(titre, 60), texte: couper(texte, 180), url: "/ligue#divisions", tag: annonce };
-      const resultats = await Promise.all(
-        (parJoueur.get(idDe.get(joueur) ?? "") ?? []).map((ab) => envoyer(ab, notif, cle).then((r) => ({ ab, r })))
-      );
-      morts.push(...resultats.filter((x) => x.r === "mort").map((x) => x.ab.endpoint));
-      if (resultats.some((x) => x.r === "envoye")) envoyes++;
-      else rates.push(joueur);
-    })
-  );
-  if (morts.length > 0) await sb.from("push_abonnements").delete().in("endpoint", morts);
+  const envois = new Map<string, Envoi>();
+  for (const { joueur } of (reserves ?? []) as { joueur: string }[]) {
+    const uid = idDe.get(joueur);
+    if (!uid) continue;
+    const { titre, texte } = notificationAnnonce(saison, d, joueur, edition);
+    const notif: Notif = { titre: couper(titre, 60), texte: couper(texte, 180), url: "/ligue#divisions", tag: annonce };
+    envois.set(uid, { notif, motif: "divisions", ref: annonce });
+  }
+  const { recus } = await prevenir(sb, cle, envois);
+  const rates = [...idDe].filter(([, uid]) => envois.has(uid) && !recus.has(uid)).map(([joueur]) => joueur);
   if (rates.length > 0) await sb.from("annonces_envois").delete().eq("annonce", annonce).in("joueur", rates);
 
-  return NextResponse.json({ envoyes, fini: rates.length === 0 });
+  return NextResponse.json({ envoyes: recus.size, fini: rates.length === 0 });
 }
