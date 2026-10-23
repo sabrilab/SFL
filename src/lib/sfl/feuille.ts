@@ -11,12 +11,14 @@
 //
 // Sur la feuille, chaque match se joue les Noirs contre les Blancs (décision
 // de Sabri, 17/10) : la couleur du jour de l'admin (Orange, Bleu…) n'y paraît
-// pas ; la première équipe de chaque paire prend le noir, la seconde le blanc.
+// pas ; la première équipe de chaque paire prend le noir, la seconde le blanc
+// (lib/sfl/maillots.ts, que suivent aussi les récaps).
 //
 // Ici, rien que des calculs : les terrains, et où poser chaque joueur sur son
 // demi-terrain.
 
 import type { Journee } from "@/lib/sfl/engine";
+import { MAILLOTS } from "@/lib/sfl/maillots";
 import type { ConvocationTeam } from "@/lib/sfl/saisie/types";
 
 export interface EquipeFeuille {
@@ -33,8 +35,9 @@ export interface TerrainFeuille {
   b: EquipeFeuille;
 }
 
-const noirs = (joueurs: string[]): EquipeFeuille => ({ nom: "Noirs", couleur: "#0A0B0D", encre: "#F4F5F2", joueurs });
-const blancs = (joueurs: string[]): EquipeFeuille => ({ nom: "Blancs", couleur: "#F4F3EF", encre: "#0A0B0D", joueurs });
+const { noirs: NOIRS, blancs: BLANCS } = MAILLOTS;
+const noirs = (joueurs: string[]): EquipeFeuille => ({ nom: NOIRS.nom, couleur: NOIRS.fond, encre: NOIRS.encre, joueurs });
+const blancs = (joueurs: string[]): EquipeFeuille => ({ nom: BLANCS.nom, couleur: BLANCS.fond, encre: BLANCS.encre, joueurs });
 
 /** Les terrains d'une journée de ligue ; vide tant que les équipes ne sont pas faites. */
 export function feuilleDeJournee(journee: Journee | undefined): TerrainFeuille[] {

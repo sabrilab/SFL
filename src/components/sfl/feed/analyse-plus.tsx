@@ -8,6 +8,11 @@
 //
 // Les modules minutés (timeline, tournant) attendent `saison.events` : tant que
 // le classeur ne porte pas les minutes des buts, ils restent masqués.
+//
+// Les équipes s'y disent Noirs et Blancs, comme sur la feuille de match
+// (lib/sfl/maillots.ts). « Les affiches » (qui domine qui entre les couleurs
+// du jour de l'admin) n'ont plus de sens quand chaque match est un Noirs
+// contre Blancs : le bilan des deux maillots est dans CouleursModule.
 
 import { useMemo } from "react";
 import {
@@ -23,14 +28,16 @@ import type { MatchEntry, MatchEvent, Saison } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
 import { CarteDe } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
+import { PointCamp } from "@/components/sfl/camp";
+import { MAILLOTS } from "@/lib/sfl/maillots";
 
 /* ============================== Types ============================== */
 
 export interface AnalysePlus {
-  /** 1 · buts minutés de la journée, s'ils existent. */
-  timeline: { minute: number; team: string; player: string; passeur?: string; scoreA: number; scoreB: number; teamA: string; teamB: string }[] | null;
-  /** 2 · le run décisif du match, déduit des minutes. */
-  tournant: { team: string; from: string; to: string; runs: number; window: string } | null;
+  /** 1 · buts minutés de la journée, s'ils existent ; noirs : le but est des Noirs (teamA). */
+  timeline: { minute: number; noirs: boolean; player: string; passeur?: string; scoreA: number; scoreB: number }[] | null;
+  /** 2 · le run décisif du match, déduit des minutes ; les : « les Noirs ». */
+  tournant: { les: string; from: string; to: string; runs: number; window: string } | null;
   /** 3 · les joueurs dont la présence change le résultat. */
   facteurX: { name: string; winRate: number; diff: number; matchs: number }[];
   /** 4 · les paires qui gagnent ensemble. */
@@ -64,8 +71,6 @@ export interface AnalysePlus {
   mercato: { name: string; value: number; delta: number }[];
   /** 13 · le cinq de la saison. */
   cinq: { name: string; pp: number; ovr: number; poste: string }[];
-  /** 14 · l'historique des affiches entre couleurs. */
-  affiches: { a: string; b: string; winsA: number; winsB: number; nuls: number; total: number }[];
   /** 15 · toutes les séries en cours. */
   series: { kind: string; name: string; count: number; unit: string }[];
   /** 16 · la météo de la ligue. */
@@ -116,13 +121,11 @@ export function useAnalysePlus(
         const home = e.team === big.teamA.name;
         acc.push({
           minute: e.minute,
-          team: e.team,
+          noirs: home,
           player: e.player,
           passeur: e.passeur,
           scoreA: (prev?.scoreA ?? 0) + (home ? 1 : 0),
           scoreB: (prev?.scoreB ?? 0) + (home ? 0 : 1),
-          teamA: big.teamA.name,
-          teamB: big.teamB.name,
         });
         return acc;
       }, []);
@@ -145,7 +148,7 @@ export function useAnalysePlus(
         const before = timeline[bestRun.start - 1];
         const after = timeline[bestRun.start + bestRun.len - 1];
         tournant = {
-          team: bestRun.team,
+          les: (bestRun.team === big.teamA.name ? MAILLOTS.noirs : MAILLOTS.blancs).les,
           from: before ? `${before.scoreA}–${before.scoreB}` : "0–0",
           to: `${after.scoreA}–${after.scoreB}`,
           runs: bestRun.len,
@@ -384,26 +387,6 @@ export function useAnalysePlus(
       .slice(0, 5)
       .map((p) => ({ name: p.name, pp: p.pp, ovr: ovr(p.stats), poste: POSTE_LABEL(p.poste) }));
 
-    /* --- 14 · Les affiches --------------------------------------- */
-    const h2h = new Map<string, { a: string; b: string; winsA: number; winsB: number; nuls: number }>();
-    for (const jn of journees)
-      for (const m of jn.matches ?? []) {
-        const [x, y] = [m.teamA.name, m.teamB.name].sort();
-        const k = `${x}|${y}`;
-        const cur = h2h.get(k) ?? { a: x, b: y, winsA: 0, winsB: 0, nuls: 0 };
-        const scoreX = m.teamA.name === x ? m.teamA.score : m.teamB.score;
-        const scoreY = m.teamA.name === x ? m.teamB.score : m.teamA.score;
-        if (scoreX > scoreY) cur.winsA += 1;
-        else if (scoreY > scoreX) cur.winsB += 1;
-        else cur.nuls += 1;
-        h2h.set(k, cur);
-      }
-    const affiches = [...h2h.values()]
-      .map((v) => ({ ...v, total: v.winsA + v.winsB + v.nuls }))
-      .filter((v) => v.total >= 2)
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 4);
-
     /* --- 15 · Le mur des séries ---------------------------------- */
     const streakOf = (pred: (e: MatchEntry) => boolean, name: string) => {
       let n = 0;
@@ -542,7 +525,6 @@ export function useAnalysePlus(
       evolution,
       mercato,
       cinq,
-      affiches,
       series,
       meteo,
       citation,
@@ -570,7 +552,6 @@ function Head({ label, title }: { label: string; title: string }) {
 /** 1 · La minute par minute. */
 export function TimelineModule({ timeline }: { timeline: AnalysePlus["timeline"] }) {
   if (!timeline || timeline.length === 0) return null;
-  const teamA = timeline[0].teamA;
   return (
     <section className="glass rounded-3xl p-5">
       <p className="mono-label text-primary">Minute par minute</p>
@@ -579,19 +560,13 @@ export function TimelineModule({ timeline }: { timeline: AnalysePlus["timeline"]
         <span className="absolute top-1 bottom-1 left-[62px] w-px bg-white/10" />
         <div className="flex flex-col gap-3.5">
           {timeline.map((e, i) => {
-            const home = e.team === teamA;
+            const maillot = e.noirs ? MAILLOTS.noirs : MAILLOTS.blancs;
             return (
               <div key={i} className="relative">
                 <span className="mono-label absolute top-0.5 -left-[86px] w-[34px] text-right text-foreground/40">
                   {e.minute}′
                 </span>
-                <span
-                  className="absolute top-1 -left-[28px] size-2.5 rounded-full"
-                  style={{
-                    background: home ? "var(--primary)" : "rgba(255,255,255,0.5)",
-                    boxShadow: home ? "0 0 8px rgba(111,168,255,0.6)" : undefined,
-                  }}
-                />
+                <PointCamp maillot={maillot} className="absolute top-1 -left-[28px]" />
                 <span className="mono-label absolute top-0.5 -left-[40px] hidden">·</span>
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="min-w-0 truncate text-[14px] font-semibold">
@@ -604,7 +579,7 @@ export function TimelineModule({ timeline }: { timeline: AnalysePlus["timeline"]
                     {e.scoreA}–{e.scoreB}
                   </span>
                 </div>
-                <span className="mono-label text-foreground/35">{e.team}</span>
+                <span className="mono-label text-foreground/35">{maillot.nom}</span>
               </div>
             );
           })}
@@ -621,7 +596,7 @@ export function TournantModule({ tournant }: { tournant: AnalysePlus["tournant"]
     <section className="glass rounded-3xl p-5">
       <p className="mono-label text-primary">Le tournant</p>
       <h2 className="mt-1 text-xl font-bold tracking-tight">
-        {tournant.runs} buts d&apos;affilée pour le {tournant.team}
+        {tournant.runs} buts d&apos;affilée pour {tournant.les}
       </h2>
       <div className="mt-4 flex items-center gap-3">
         <span className="text-[22px] font-extrabold tracking-tight tabular-nums text-foreground/40">
@@ -1067,41 +1042,6 @@ export function CinqModule({ cinq }: { cinq: AnalysePlus["cinq"] }) {
               {p.ovr}
             </span>
             <span className="mono-label text-foreground/40">{p.pp} PP</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/** 14 · Les affiches. */
-export function AffichesModule({ affiches }: { affiches: AnalysePlus["affiches"] }) {
-  if (affiches.length === 0) return null;
-  return (
-    <section className="glass rounded-3xl p-5">
-      <p className="mono-label text-primary">Les affiches</p>
-      <h2 className="mt-1 text-xl font-bold tracking-tight">Qui domine qui</h2>
-      <div className="mt-4 flex flex-col gap-3">
-        {affiches.map((a) => (
-          <div key={`${a.a}-${a.b}`} className="flex items-center gap-3">
-            <span className="w-[58px] shrink-0 truncate text-[13px] font-semibold">{a.a}</span>
-            <div className="flex h-2 flex-1 gap-[3px]">
-              {a.winsA > 0 && (
-                <span className="rounded-full bg-primary" style={{ flexGrow: a.winsA, flexBasis: 0 }} />
-              )}
-              {a.nuls > 0 && (
-                <span className="rounded-full bg-foreground/25" style={{ flexGrow: a.nuls, flexBasis: 0 }} />
-              )}
-              {a.winsB > 0 && (
-                <span className="rounded-full bg-foreground/10" style={{ flexGrow: a.winsB, flexBasis: 0 }} />
-              )}
-            </div>
-            <span className="w-[58px] shrink-0 truncate text-right text-[13px] font-semibold">
-              {a.b}
-            </span>
-            <span className="mono-label w-12 shrink-0 text-right text-foreground/40 tabular-nums">
-              {a.winsA}-{a.winsB}
-            </span>
           </div>
         ))}
       </div>
