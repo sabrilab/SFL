@@ -5,7 +5,9 @@
 // enregistrements, et un joueur prévenu à mi-chemin recevrait un rival qui
 // change dix minutes plus tard. La route n'annonce donc rien tant que la
 // saison a bougé depuis moins de CALME (saison.updated_at, posé à chaque
-// publication de l'admin), ni après le coup d'envoi.
+// publication de l'admin), ni après le coup d'envoi. Jamais la nuit non plus,
+// comme le rappel de la veille : de 22 h à 9 h à Paris, l'annonce attend le
+// matin (le premier téléphone ouvert après 9 h la sonne).
 //
 // Qui l'appelle : n'importe quel joueur de la ligue, sans le savoir — l'app
 // la sonne à l'ouverture tant qu'une journée a des missions ouvertes
@@ -34,6 +36,12 @@ export const maxDuration = 30;
 
 /** Le temps sans publication de l'admin après lequel la feuille est tenue pour finie. */
 const CALME = 15 * 60_000;
+/** La journée, à Paris : de 9 h à 22 h. */
+const JOUR = [9, 22] as const;
+
+/** L'heure qu'il est à Paris (0 à 23). */
+const heureParis = (d: Date) =>
+  Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Paris", hour: "2-digit", hourCycle: "h23" }).format(d));
 
 const couper = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
@@ -67,6 +75,8 @@ export async function POST(req: NextRequest) {
   if (!d || d.joue || maintenant.getTime() >= d.coupEnvoi.getTime()) return NextResponse.json({ envoyes: 0, fini: true });
   const publieLe = new Date((doc as { updated_at?: string }).updated_at ?? 0).getTime();
   if (maintenant.getTime() - publieLe < CALME) return NextResponse.json({ envoyes: 0, attente: true });
+  const heure = heureParis(maintenant);
+  if (heure < JOUR[0] || heure >= JOUR[1]) return NextResponse.json({ envoyes: 0, attente: true });
 
   const cle = cleVapid();
   if (!cle) return NextResponse.json({ envoyes: 0, fini: true });
