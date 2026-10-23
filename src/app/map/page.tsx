@@ -484,17 +484,20 @@ export default function MapPage() {
   // qu'il lui manque. Le jour même, après le coup de sifflet, le match joué
   // garde la une jusqu'à minuit (on y cherche le récap) ; dès le lendemain,
   // la une passe au suivant. Les terrains enregistrés n'y sont plus — on ne
-  // noie pas le match.
+  // noie pas le match. Une journée jouée en plusieurs lieux pose une carte
+  // par lieu : chacun ouvre la Map sur la sienne, celle de son match.
   const affiches = useMemo(() => {
     const ordre = (m: MatchMap) => (ecartJours(m.dateLabel, aujourdhui) ?? 99) * 24 + heureDe(m.heure);
-    const aVenir = matchs.filter((m) => !m.joue).sort((a, b) => ordre(a) - ordre(b));
+    const aVenir = matchs.filter((m) => !m.joue).sort((a, b) => ordre(a) - ordre(b) || Number(b.dedans) - Number(a.dedans));
     const joue = matchs.filter((m) => m.joue).at(-1);
     return joue ? [joue, ...aVenir] : aVenir;
   }, [matchs, aujourdhui]);
   const une = useMemo(() => {
     const joue = affiches.find((m) => m.joue);
     if (joue && ecartJours(joue.dateLabel, aujourdhui) === 0) return joue;
-    return affiches.find((m) => !m.joue) ?? affiches[0];
+    const prochain = affiches.find((m) => !m.joue);
+    const mien = prochain?.j != null ? affiches.find((m) => !m.joue && m.j === prochain.j && m.dedans) : undefined;
+    return mien ?? prochain ?? affiches[0];
   }, [affiches, aujourdhui]);
 
   // Ouvrir un match : n'importe quel joueur, d'un bouton ou d'un terrain libre.

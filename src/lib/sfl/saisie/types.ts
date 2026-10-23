@@ -112,7 +112,7 @@ export type ConvocationReponse = "present" | "absent";
 
 /** Une équipe composée pour dimanche — révélée aux joueurs vendredi 19h. */
 export interface ConvocationTeam {
-  name: string; // couleur ("Orange", "Bleu", …)
+  name: string; // « Noirs 1 », « Blancs 1 »… (avant le 23/10, une couleur : « Orange »)
   players: string[];
 }
 
