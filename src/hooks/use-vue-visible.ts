@@ -10,12 +10,12 @@ export function useVueVisible() {
   useEffect(() => {
     const vv = window.visualViewport;
     const tactile = window.matchMedia("(pointer: coarse)").matches;
-    const maj = () =>
-      setVue({
-        hauteur: vv ? Math.round(vv.height) : 0,
-        haut: vv ? Math.max(0, Math.round(vv.offsetTop)) : 0,
-        tactile,
-      });
+    const maj = () => {
+      const hauteur = vv ? Math.round(vv.height) : 0;
+      const haut = vv ? Math.max(0, Math.round(vv.offsetTop)) : 0;
+      // iOS envoie des rafales d'événements identiques : pas de rendu pour rien.
+      setVue((v) => (v.hauteur === hauteur && v.haut === haut && v.tactile === tactile ? v : { hauteur, haut, tactile }));
+    };
     maj();
     vv?.addEventListener("resize", maj);
     vv?.addEventListener("scroll", maj);

@@ -132,7 +132,7 @@ export default function ReglagesPage() {
             <span className="flex-1">
               <span className="block text-[15px] font-semibold">Installation Supabase</span>
               <span className="block text-[12px] text-foreground/45">
-                Comptes, tables et présence partagée — guide pas à pas
+                Les tables de la base, mises à jour à chaque mise en ligne
               </span>
             </span>
             <ChevronRight className="size-4 text-foreground/45" />

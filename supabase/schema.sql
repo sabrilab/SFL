@@ -307,7 +307,8 @@ alter table public.activity add constraint activity_kind_check
     'pack',       -- ouverture d'un pack
     'achat',      -- achat d'une carte
     'recherche',  -- une recherche lancée
-    'compo'       -- une composition 5v5 déposée dans l'Arène
+    'compo',      -- une composition 5v5 déposée dans l'Arène
+    'notifs'      -- l'invitation aux notifications montrée, et la réponse
   ));
 
 create index if not exists activity_player_created_idx
@@ -1519,6 +1520,299 @@ create policy "push: j'efface le mien, l'admin les morts"
   on public.push_abonnements for delete to authenticated
   using (user_id = (select auth.uid()) or public.is_league_admin());
 
+-- ─────────────── Notifications : ce qu'elles deviennent ───────────────
+-- Sabri, 23/10 : « mets dans les analytics les gens qui répondent à la
+-- notification, c'est-à-dire combien ont activé la notification et ce à
+-- quoi ils ont répondu suite à un motif ». Admin → Activité & rétention →
+-- Notifications (src/app/admin/activite/notifications.tsx) lit :
+--   · push_envois : une ligne par notification et par joueur. Son motif
+--     (lib/sfl/motifs-notif.ts), son heure, si un téléphone l'a reçue et si
+--     le joueur l'a touchée (le service worker le dit à /api/push/suivi),
+--     et s'il a fait ce qu'elle attendait (les triggers push_effet_*, plus
+--     bas). Jamais son texte ;
+--   · push_historique : chaque téléphone qui s'abonne ou s'en va, pour la
+--     courbe des joueurs joignables (push_abonnements ne garde que le
+--     présent) ;
+--   · activity, kind 'notifs' : l'invitation de l'ouverture montrée, et ce
+--     que le joueur en fait (activées, refusées, plus tard).
+-- Le serveur seul écrit ici (clé secrète, triggers), l'admin seul lit. On
+-- garde 13 mois, comme le journal d'usage.
+create table if not exists public.push_envois (
+  id          uuid primary key,
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  motif       text not null,
+  -- Ce à quoi elle se rattache (« match:12 », « equipe:3 ») : le geste
+  -- attendu doit avoir lieu là.
+  ref         text,
+  -- Ses téléphones, et ceux dont le service de push l'a prise : null tant
+  -- que l'envoi n'est pas fini, 0 si elle n'est partie nulle part.
+  appareils   smallint not null default 0,
+  acceptes    smallint,
+  envoyee_le  timestamptz not null default now(),
+  recue_le    timestamptz,
+  ouverte_le  timestamptz,
+  -- Le geste attendu, une fois fait : 'message', 'reaction', 'accepte' ou
+  -- 'refuse' (une invitation, les missions), 'suivi' (suivi en retour).
+  effet       text,
+  effet_le    timestamptz
+);
+create index if not exists push_envois_envoyee on public.push_envois (envoyee_le desc);
+create index if not exists push_envois_en_attente
+  on public.push_envois (user_id, envoyee_le desc) where effet_le is null;
+
+alter table public.push_envois enable row level security;
+
+drop policy if exists "push_envois: l'admin lit" on public.push_envois;
+create policy "push_envois: l'admin lit"
+  on public.push_envois for select to authenticated
+  using ((select public.is_league_admin()));
+
+revoke all on public.push_envois from anon, authenticated;
+grant select on public.push_envois to authenticated;
+
+create table if not exists public.push_historique (
+  id         bigint generated always as identity primary key,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  -- Le téléphone, sans son adresse : l'empreinte de son abonnement.
+  appareil   text not null,
+  -- Qui achemine : apple (iPhone, Mac), google (Android, Chrome), mozilla,
+  -- microsoft, autre.
+  service    text not null,
+  evenement  text not null check (evenement in ('ajout', 'retrait')),
+  le         timestamptz not null default now()
+);
+create index if not exists push_historique_le on public.push_historique (le);
+create index if not exists push_historique_appareil on public.push_historique (appareil);
+
+alter table public.push_historique enable row level security;
+
+drop policy if exists "push_historique: l'admin lit" on public.push_historique;
+create policy "push_historique: l'admin lit"
+  on public.push_historique for select to authenticated
+  using ((select public.is_league_admin()));
+
+revoke all on public.push_historique from anon, authenticated;
+grant select on public.push_historique to authenticated;
+
+create or replace function public.push_service(endpoint text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case
+    when endpoint like 'https://web.push.apple.com/%' then 'apple'
+    when endpoint like 'https://fcm.googleapis.com/%' or endpoint like 'https://android.googleapis.com/%' then 'google'
+    when endpoint like '%mozilla.com/%' or endpoint like '%mozaws.net/%' then 'mozilla'
+    when endpoint like '%.notify.windows.com/%' then 'microsoft'
+    else 'autre'
+  end;
+$$;
+
+revoke execute on function public.push_service(text) from public, anon, authenticated;
+
+-- Chaque abonnement qui arrive, part, ou change de joueur (un autre s'est
+-- connecté sur le téléphone). L'abonnement redonné à chaque ouverture ne
+-- change rien. Un compte supprimé n'écrit plus rien : son historique part
+-- avec lui. Le suivi n'empêche jamais un abonnement.
+create or replace function public.push_historiser()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    if tg_op = 'DELETE' or (tg_op = 'UPDATE' and old.user_id is distinct from new.user_id) then
+      if exists (select 1 from auth.users u where u.id = old.user_id) then
+        insert into public.push_historique (user_id, appareil, service, evenement)
+        values (old.user_id, md5(old.endpoint), public.push_service(old.endpoint), 'retrait');
+      end if;
+    end if;
+    if tg_op = 'INSERT' or (tg_op = 'UPDATE' and old.user_id is distinct from new.user_id) then
+      insert into public.push_historique (user_id, appareil, service, evenement)
+      values (new.user_id, md5(new.endpoint), public.push_service(new.endpoint), 'ajout');
+    end if;
+  exception when others then
+    raise warning 'push_historiser : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_historiser() from public, anon, authenticated;
+
+drop trigger if exists push_abonnements_historique on public.push_abonnements;
+create trigger push_abonnements_historique
+  after insert or update or delete on public.push_abonnements
+  for each row execute function public.push_historiser();
+
+-- Les téléphones abonnés avant le suivi : leur arrivée, à la date de leur
+-- abonnement (une seule fois).
+insert into public.push_historique (user_id, appareil, service, evenement, le)
+select a.user_id, md5(a.endpoint), public.push_service(a.endpoint), 'ajout', a.created_at
+from public.push_abonnements a
+where not exists (select 1 from public.push_historique h where h.appareil = md5(a.endpoint));
+
+-- Le geste qu'une notification attendait. Il revient à UNE notification du
+-- joueur qui l'attend encore, du bon motif et au bon endroit : celle qu'il a
+-- touchée dans l'heure d'abord, sinon la plus récente partie depuis moins de
+-- `fenetre`. Un geste ne compte qu'une fois : cinq notifications du
+-- Vestiaire suivies d'un seul message, c'est une sur cinq.
+create or replace function public.push_effet(qui uuid, motifs text[], cle text, geste text, fenetre interval)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cible uuid;
+begin
+  if qui is null then
+    return;
+  end if;
+  select e.id into cible
+    from public.push_envois e
+   where e.user_id = qui
+     and e.motif = any (motifs)
+     and (cle is null or e.ref = cle)
+     and e.effet_le is null
+     and coalesce(e.acceptes, 1) > 0
+     and (e.ouverte_le > now() - interval '1 hour' or e.envoyee_le > now() - fenetre)
+   order by (e.ouverte_le > now() - interval '1 hour') desc nulls last, e.envoyee_le desc
+   limit 1;
+  if cible is not null then
+    update public.push_envois set effet = geste, effet_le = now() where id = cible;
+  end if;
+end;
+$$;
+
+revoke execute on function public.push_effet(uuid, text[], text, text, interval) from public, anon, authenticated;
+
+-- Écrire ou réagir dans une discussion : ce qu'attendent ses notifications.
+-- Au Vestiaire, toutes celles du Vestiaire ; dans un match ou une équipe,
+-- celles de CE match ou de CETTE équipe (le rappel de la veille et le
+-- nouveau rendez-vous compris : y répondre, c'est y avoir donné suite).
+create or replace function public.push_effet_discussion(qui uuid, canal text, match bigint, equipe bigint, geste text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if canal = 'sfl' then
+    perform public.push_effet(qui,
+      array['vestiaire-message', 'vestiaire-reponse', 'vestiaire-cite', 'vestiaire-en-avant', 'vestiaire-reaction'],
+      null, geste, interval '2 hours');
+  elsif canal = 'match' and match is not null then
+    perform public.push_effet(qui,
+      array['match-message', 'match-reponse', 'match-cite', 'match-reaction', 'match-arrivee', 'match-veille', 'match-modifie'],
+      'match:' || match, geste, interval '2 hours');
+  elsif canal = 'equipe' and equipe is not null then
+    perform public.push_effet(qui,
+      array['equipe-message', 'equipe-reponse', 'equipe-cite', 'equipe-reaction'],
+      'equipe:' || equipe, geste, interval '2 hours');
+  end if;
+end;
+$$;
+
+revoke execute on function public.push_effet_discussion(uuid, text, bigint, bigint, text) from public, anon, authenticated;
+
+-- Un message (la ligne « … a rejoint le match » n'en est pas un : c'est
+-- l'invitation acceptée, comptée plus bas), puis une réaction. Le suivi
+-- n'empêche jamais d'écrire.
+create or replace function public.push_effet_message()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    if coalesce(new.piece ->> 'type', '') <> 'rejoint' then
+      perform public.push_effet_discussion(new.auteur, new.canal, new.match_id, new.equipe_id, 'message');
+    end if;
+  exception when others then
+    raise warning 'push_effet_message : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_effet_message() from public, anon, authenticated;
+
+drop trigger if exists messages_push_effet on public.messages;
+create trigger messages_push_effet
+  after insert on public.messages
+  for each row execute function public.push_effet_message();
+
+create or replace function public.push_effet_reaction()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  m record;
+begin
+  begin
+    select canal, match_id, equipe_id into m from public.messages where id = new.message_id;
+    if found then
+      perform public.push_effet_discussion(new.user_id, m.canal, m.match_id, m.equipe_id, 'reaction');
+    end if;
+  exception when others then
+    raise warning 'push_effet_reaction : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_effet_reaction() from public, anon, authenticated;
+
+drop trigger if exists message_reactions_push_effet on public.message_reactions;
+create trigger message_reactions_push_effet
+  after insert on public.message_reactions
+  for each row execute function public.push_effet_reaction();
+
+-- La réponse à une invitation : l'invité accepte (sa ligne passe à
+-- 'inscrit'), ou la retire lui-même (refus). Ce que l'organisateur retire,
+-- ou un match annulé, n'est pas une réponse.
+create or replace function public.push_effet_invitation()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    if tg_op = 'UPDATE' then
+      if old.statut = 'invite' and new.statut = 'inscrit' then
+        perform public.push_effet(new.player_id, array['match-invitation'], 'match:' || new.match_id, 'accepte', interval '14 days');
+      end if;
+    elsif old.statut = 'invite' and old.player_id = (select auth.uid()) then
+      perform public.push_effet(old.player_id, array['match-invitation'], 'match:' || old.match_id, 'refuse', interval '14 days');
+    end if;
+  exception when others then
+    raise warning 'push_effet_invitation : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_effet_invitation() from public, anon, authenticated;
+
+drop trigger if exists match_joueurs_push_effet on public.match_joueurs;
+create trigger match_joueurs_push_effet
+  after update of statut or delete on public.match_joueurs
+  for each row execute function public.push_effet_invitation();
+
+-- 13 mois au plus (aussi chaque lundi, /api/convocation/cron) ; l'arrivée
+-- d'un téléphone toujours abonné reste, sans elle la courbe le perdrait.
+delete from public.push_envois where envoyee_le < now() - interval '13 months';
+delete from public.push_historique h
+ where h.le < now() - interval '13 months'
+   and not exists (select 1 from public.push_abonnements a where md5(a.endpoint) = h.appareil);
+
 -- ───────────────────────── Rôle admin ────────────────────────────────
 -- Remise d'aplomb des comptes admin — rejouée à chaque migration, donc à
 -- chaque déploiement qui touche ce fichier. Elle répare TOUS les états de
@@ -1731,6 +2025,45 @@ exception
   when undefined_object then null;
 end;
 $$;
+
+-- Répondre à ses missions : ce qu'attend la notification « Missions Bola ·
+-- J3 » (/api/missions/annoncer, motif 'missions', rattachée à la journée ;
+-- push_effet plus haut). Une mission acceptée en fait un oui ('accepte'),
+-- même après en avoir passé une autre ; passer sans rien accepter, un non
+-- ('refuse'). Le suivi n'empêche jamais de répondre.
+create or replace function public.push_effet_missions()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_ref text := 'missions:' || new.saison || ':' || new.j;
+begin
+  begin
+    if new.reponse = 'acceptee' then
+      update public.push_envois e
+         set effet = 'accepte'
+       where e.user_id = new.joueur_id and e.motif = 'missions' and e.ref = v_ref and e.effet = 'refuse';
+      if not found then
+        perform public.push_effet(new.joueur_id, array['missions'], v_ref, 'accepte', interval '7 days');
+      end if;
+    else
+      perform public.push_effet(new.joueur_id, array['missions'], v_ref, 'refuse', interval '7 days');
+    end if;
+  exception when others then
+    raise warning 'push_effet_missions : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_effet_missions() from public, anon, authenticated;
+
+drop trigger if exists missions_reponses_push_effet on public.missions_reponses;
+create trigger missions_reponses_push_effet
+  after insert or update of reponse on public.missions_reponses
+  for each row execute function public.push_effet_missions();
 
 -- Les missions déjà annoncées par notification (/api/missions/annoncer) :
 -- une fois par joueur et par journée. Fermée aux téléphones : seule la route
@@ -1964,6 +2297,10 @@ $$;
 alter table public.equipe_membres add column if not exists reglement_version text;
 -- Exclusion programmée par le capitaine (préavis de 48 h).
 alter table public.equipe_membres add column if not exists depart_le timestamptz;
+-- Le dernier avertissement envoyé sur le téléphone pour cette ligne
+-- (/api/equipes/notifier) : l'invitation ou sa relance, puis la signature.
+-- Il garde de prévenir deux fois.
+alter table public.equipe_membres add column if not exists notifie_le timestamptz;
 alter table public.equipe_liens alter column expire_le set default now() + interval '72 hours';
 alter table public.equipe_liens add column if not exists utilisations int not null default 0;
 alter table public.equipe_defis add column if not exists forfait_de bigint references public.equipes(id) on delete set null;
@@ -2127,8 +2464,16 @@ begin
 end;
 $$;
 
--- Le capitaine (ou son vice) invite un joueur de Bola : 72 h pour signer,
--- jamais plus de 7 entre membres et invités.
+-- Le capitaine (ou son vice) invite un joueur de Bola : 72 h pour signer.
+-- C'est l'effectif qui borne (7 membres, doc 13 §1.4 I1), pas les
+-- invitations : on peut inviter plus de joueurs qu'il ne reste de places,
+-- les premiers qui signent entrent, et à 7 les autres invitations tombent
+-- (equipe_signer). Jusqu'au 23/10, membres et invités comptaient ensemble :
+-- trois invités muets suffisaient à bloquer l'équipe 72 h. Six invitations
+-- en attente au plus, la borne haute de la création (team_invitations_creation).
+-- Inviter quelqu'un de déjà invité ne fait rien. L'invité doit pouvoir
+-- signer : un compte validé, sans équipe, jamais parti de celle-ci, et
+-- sorti de sa carence avant que l'invitation tombe.
 create or replace function public.equipe_inviter(e bigint, joueur uuid)
 returns void
 language plpgsql
@@ -2144,8 +2489,14 @@ begin
   if coalesce(public.role_equipe(e), 'membre') = 'membre' then
     raise exception 'Réservé au capitaine.' using errcode = '42501';
   end if;
-  if (select count(*) from public.equipe_membres m where m.equipe_id = e) >= 7 then
+  if public.equipe_effectif(e) >= 7 then
     raise exception 'L''équipe est au complet.' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.equipe_membres m where m.equipe_id = e and m.joueur = equipe_inviter.joueur) then
+    return;
+  end if;
+  if not exists (select 1 from public.profiles p where p.id = equipe_inviter.joueur and p.valide) then
+    raise exception 'Son compte n''est pas encore validé.' using errcode = 'P0001';
   end if;
   if exists (select 1 from public.equipe_departs d where d.equipe_id = e and d.joueur = equipe_inviter.joueur) then
     raise exception 'Ce joueur a quitté l''équipe : il n''y revient pas.' using errcode = 'P0001';
@@ -2153,10 +2504,44 @@ begin
   if exists (select 1 from public.equipe_membres m where m.joueur = equipe_inviter.joueur and m.statut = 'membre') then
     raise exception 'Ce joueur a déjà une équipe.' using errcode = 'P0001';
   end if;
+  if exists (select 1 from public.equipe_departs d
+              where d.joueur = equipe_inviter.joueur and d.parti_le > now() - interval '14 days' + interval '72 hours') then
+    raise exception 'Ce joueur vient de quitter son équipe : 14 jours avant une autre.' using errcode = 'P0001';
+  end if;
+  if (select count(*) from public.equipe_membres m where m.equipe_id = e and m.statut = 'invite') >= 6 then
+    raise exception '6 invitations en attente au plus.' using errcode = 'P0001';
+  end if;
   insert into public.equipe_membres (equipe_id, joueur, statut, invite_par)
   values (e, equipe_inviter.joueur, 'invite', (select auth.uid()))
   on conflict on constraint equipe_membres_pkey do nothing;
 end;
+$$;
+
+-- Ceux que le capitaine ne peut pas inviter, et pourquoi : la liste des
+-- joueurs le dit sur leur ligne, au lieu d'une erreur après coup.
+-- 'parti' : a quitté cette équipe ; 'equipe' : en a déjà une ; 'carence' :
+-- vient de quitter la sienne (14 jours, et l'invitation tomberait avant) ;
+-- 'attente' : compte pas encore validé. Réservé au capitaine et au vice.
+create or replace function public.equipe_indisponibles(e bigint)
+returns table (joueur uuid, raison text)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select t.id, t.raison from (
+    select p.id,
+      case
+        when exists (select 1 from public.equipe_departs d where d.equipe_id = e and d.joueur = p.id) then 'parti'
+        when exists (select 1 from public.equipe_membres m where m.joueur = p.id and m.statut = 'membre' and m.equipe_id <> e) then 'equipe'
+        when exists (select 1 from public.equipe_departs d
+                      where d.joueur = p.id and d.parti_le > now() - interval '14 days' + interval '72 hours') then 'carence'
+        when not p.valide then 'attente'
+      end as raison
+    from public.profiles p
+    where coalesce(public.role_equipe(e), 'membre') <> 'membre'
+  ) t
+  where t.raison is not null;
 $$;
 
 -- Retirer une invitation (le capitaine), ou la refuser (l'invité).
@@ -2387,7 +2772,8 @@ begin
   if exists (select 1 from public.equipe_membres m where m.joueur = moi and m.statut = 'membre') then
     raise exception 'Tu as déjà une équipe.' using errcode = 'P0001';
   end if;
-  if (select count(*) from public.equipe_membres m where m.equipe_id = l.equipe_id) >= 7 then
+  -- Comme pour une invitation : seuls les membres comptent (equipe_inviter).
+  if public.equipe_effectif(l.equipe_id) >= 7 then
     raise exception 'L''équipe est au complet.' using errcode = 'P0001';
   end if;
   insert into public.equipe_membres (equipe_id, joueur, statut, invite_par)
@@ -2519,12 +2905,12 @@ revoke execute on function public.role_equipe(bigint), public.equipe_creer(text,
   public.equipe_retirer_invitation(bigint, uuid), public.equipe_signer(bigint), public.equipe_quitter(bigint),
   public.equipe_vice(bigint, uuid), public.equipe_lien(bigint), public.equipe_par_lien(text),
   public.equipe_defier(bigint, bigint, date, text, text), public.equipe_defi_statut(bigint, text),
-  public.equipe_exclure(bigint, uuid), public.equipe_dissoudre(bigint) from public, anon;
+  public.equipe_exclure(bigint, uuid), public.equipe_dissoudre(bigint), public.equipe_indisponibles(bigint) from public, anon;
 grant execute on function public.role_equipe(bigint), public.equipe_creer(text, text, text), public.equipe_inviter(bigint, uuid),
   public.equipe_retirer_invitation(bigint, uuid), public.equipe_signer(bigint), public.equipe_quitter(bigint),
   public.equipe_vice(bigint, uuid), public.equipe_lien(bigint), public.equipe_par_lien(text),
   public.equipe_defier(bigint, bigint, date, text, text), public.equipe_defi_statut(bigint, text),
-  public.equipe_exclure(bigint, uuid), public.equipe_dissoudre(bigint) to authenticated;
+  public.equipe_exclure(bigint, uuid), public.equipe_dissoudre(bigint), public.equipe_indisponibles(bigint) to authenticated;
 revoke execute on function public.equipe_lien_info(text) from public;
 grant execute on function public.equipe_lien_info(text) to anon, authenticated;
 
@@ -2544,6 +2930,43 @@ exception
   when undefined_object then null;
 end;
 $$;
+
+-- La réponse à une invitation d'équipe : ce qu'attendent « Ilyes t'invite
+-- · FC BENSOU » et sa relance (/api/equipes/notifier, motifs
+-- 'equipe-invitation' et 'equipe-relance', rattachées à l'équipe ;
+-- push_effet plus haut). Signer le Règlement en fait un oui (sa ligne passe
+-- à 'membre') ; la refuser lui-même, ou signer ailleurs (equipe_signer
+-- efface alors ses autres invitations, à son nom), un non. Ce que le
+-- capitaine retire, ou une invitation tombée après 72 h, n'est pas une
+-- réponse. Le suivi n'empêche jamais de signer.
+create or replace function public.push_effet_equipe()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    if tg_op = 'UPDATE' then
+      if old.statut = 'invite' and new.statut = 'membre' then
+        perform public.push_effet(new.joueur, array['equipe-invitation', 'equipe-relance'], 'equipe:' || new.equipe_id, 'accepte', interval '72 hours');
+      end if;
+    elsif old.statut = 'invite' and old.joueur = (select auth.uid()) then
+      perform public.push_effet(old.joueur, array['equipe-invitation', 'equipe-relance'], 'equipe:' || old.equipe_id, 'refuse', interval '72 hours');
+    end if;
+  exception when others then
+    raise warning 'push_effet_equipe : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_effet_equipe() from public, anon, authenticated;
+
+drop trigger if exists equipe_membres_push_effet on public.equipe_membres;
+create trigger equipe_membres_push_effet
+  after update of statut or delete on public.equipe_membres
+  for each row execute function public.push_effet_equipe();
 
 -- ─────────────────── Confidentialité : les accords ───────────────────
 -- L'accord de chaque joueur à la politique de confidentialité (22/10/2026) :
@@ -2665,6 +3088,104 @@ where p.contact_email is not null
   and exists (select 1 from auth.users u where u.id = p.id)
 on conflict (user_id) do update set email = excluded.email, maj_le = now();
 update public.profiles set contact_email = null where contact_email is not null;
+
+-- ─────────────── Mots de passe à changer (sécurité, 22/10/2026) ───────────────
+-- Les mots de passe d'origine, ceux que l'admin distribuait, ont été lisibles
+-- par tout le monde : le dépôt du code était public et les contenait. Chaque
+-- compte créé par l'admin doit donc en choisir un nouveau, une fois. Une
+-- ligne ici = un compte qui doit le faire : l'app le retient sur l'écran
+-- « Nouveau mot de passe » tant que la ligne existe.
+--
+-- La ligne disparaît d'elle-même quand le mot de passe change vraiment
+-- (trigger sur auth.users) : personne ne peut l'effacer autrement. Les routes
+-- admin en posent une à chaque mot de passe provisoire (compte créé, mot de
+-- passe réinitialisé) : le provisoire ne sert qu'à entrer une fois.
+create table if not exists public.mot_de_passe_a_changer (
+  user_id  uuid primary key references auth.users(id) on delete cascade,
+  motif    text not null default 'origine' check (motif in ('origine', 'provisoire')),
+  depuis   timestamptz not null default now()
+);
+
+alter table public.mot_de_passe_a_changer enable row level security;
+
+drop policy if exists "mot_de_passe_a_changer: je lis le mien" on public.mot_de_passe_a_changer;
+create policy "mot_de_passe_a_changer: je lis le mien"
+  on public.mot_de_passe_a_changer for select to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists "mot_de_passe_a_changer: l'admin lit tout" on public.mot_de_passe_a_changer;
+create policy "mot_de_passe_a_changer: l'admin lit tout"
+  on public.mot_de_passe_a_changer for select to authenticated
+  using ((select public.is_league_admin()));
+
+-- Lecture seule pour l'app : la ligne naît par les routes admin (clé
+-- secrète) et meurt par le trigger.
+revoke all on public.mot_de_passe_a_changer from anon, authenticated;
+grant select on public.mot_de_passe_a_changer to authenticated;
+
+create or replace function public.mot_de_passe_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from public.mot_de_passe_a_changer where user_id = new.id;
+  return new;
+exception when others then
+  -- Jamais au prix d'un changement de mot de passe refusé.
+  return new;
+end;
+$$;
+
+revoke execute on function public.mot_de_passe_change() from public, anon, authenticated;
+
+drop trigger if exists on_auth_password_changed on auth.users;
+create trigger on_auth_password_changed
+  after update of encrypted_password on auth.users
+  for each row
+  when (old.encrypted_password is distinct from new.encrypted_password)
+  execute function public.mot_de_passe_change();
+
+-- Les étapes qui ne se jouent qu'une fois, quelle que soit la migration qui
+-- les porte : le schéma est rejoué à chaque changement, elles non.
+create table if not exists public.etapes_uniques (
+  etape    text primary key,
+  faite_le timestamptz not null default now()
+);
+alter table public.etapes_uniques enable row level security;
+revoke all on public.etapes_uniques from anon, authenticated;
+
+-- Une fois : tous les comptes nés d'un mot de passe d'origine, c'est-à-dire
+-- tous sauf les inscriptions libres (le joueur y choisit le sien) et les
+-- comptes Google ou Apple (sans mot de passe).
+do $$
+begin
+  if not exists (select 1 from public.etapes_uniques where etape = 'mots-de-passe-origine-2026-10') then
+    insert into public.mot_de_passe_a_changer (user_id, motif)
+    select u.id, 'origine'
+    from auth.users u
+    where coalesce(u.raw_user_meta_data ->> 'inscription', '') <> 'libre'
+      and coalesce(u.raw_app_meta_data ->> 'provider', 'email') = 'email'
+      and coalesce(u.encrypted_password, '') <> ''
+    on conflict (user_id) do nothing;
+    insert into public.etapes_uniques (etape) values ('mots-de-passe-origine-2026-10');
+  end if;
+end;
+$$;
+
+-- Le registre des migrations (créé par lib/server/migrate.ts) restait
+-- ouvert à l'API publique, sans règle : n'importe qui pouvait y écrire, et
+-- faire sauter une migration en y inscrivant son empreinte d'avance. Fermé :
+-- seule la migration elle-même, propriétaire de la base, y touche.
+do $$
+begin
+  if to_regclass('public.schema_migrations') is not null then
+    alter table public.schema_migrations enable row level security;
+    revoke all on public.schema_migrations from anon, authenticated;
+  end if;
+end;
+$$;
 
 -- ─────────────────────────── Discussion de match ───────────────────────────
 -- Sabri, 22/10 : quand des joueurs rejoignent un match, ils se parlent entre
@@ -2905,6 +3426,32 @@ create policy "suivis: j'arrête de suivre"
 revoke all on public.suivis from anon, authenticated;
 grant select, delete on public.suivis to authenticated;
 grant insert (suivi) on public.suivis to authenticated;
+
+-- Suivre en retour : ce qu'attend la notification « Kader te suit · Suivre
+-- en retour » (/api/suivis, motif 'suivi', rattachée au suiveur ;
+-- push_effet plus haut). Le suivi n'empêche jamais de suivre.
+create or replace function public.push_effet_suivi()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    perform public.push_effet(new.suiveur, array['suivi'], 'joueur:' || new.suivi, 'suivi', interval '7 days');
+  exception when others then
+    raise warning 'push_effet_suivi : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_effet_suivi() from public, anon, authenticated;
+
+drop trigger if exists suivis_push_effet on public.suivis;
+create trigger suivis_push_effet
+  after insert on public.suivis
+  for each row execute function public.push_effet_suivi();
 
 -- Les félicitations : un joueur en félicite un autre pour un exploit des
 -- Actus (l'homme du dimanche, le chiffre, le duo, ils montent, un badge
