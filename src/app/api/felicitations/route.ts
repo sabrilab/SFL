@@ -12,14 +12,15 @@
 // du dimanche · J2 · +10 XP ». Les 10 XP ne s'annoncent que tant qu'ils
 // comptent : cinq félicitations au plus par exploit, dix par joueur et par
 // journée (les plafonds de lib/sfl/missions.ts). La toucher ouvre l'exploit
-// dans les Actus (/ligue?exploit=…).
+// dans les Actus (/ligue?exploit=…). Elle est suivie comme les autres
+// (lib/server/push-envoi.ts, motif « felicitation »).
 
 import { NextRequest, NextResponse } from "next/server";
-import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
+import { prevenir, type Envoi } from "@/lib/server/push-envoi";
+import { cleVapid } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { exploitsDeLaSaison, lireCle, type Exploit } from "@/lib/sfl/exploits";
 import type { Saison } from "@/lib/sfl/saisie/types";
-import type { Notif } from "@/lib/sfl/push";
 
 export const maxDuration = 30;
 
@@ -119,7 +120,7 @@ export async function POST(req: NextRequest) {
   const toutes = (recues ?? []) as Ligne[];
   const prenom = (lui.nom_affiche ?? lui.name).split(" ")[0];
 
-  const envois = new Map<string, Notif>();
+  const envois = new Map<string, Envoi>();
   for (const f of cibles) {
     const e = exploits.get(f.exploit)!;
     const duJour = toutes.filter((x) => x.a === f.a && x.saison === e.saison && x.j === e.j);
@@ -137,25 +138,17 @@ export async function POST(req: NextRequest) {
     const autres = duJour.filter((x) => x.exploit === f.exploit).length - 1;
     // Plusieurs exploits du même joueur dans l'appel : la dernière notification reste.
     envois.set(f.a, {
-      titre: couper(autres > 0 ? `${prenom} et ${autres} ${autres > 1 ? "autres" : "autre"} t'ont félicité` : `${prenom} t'a félicité`, 60),
-      texte: couper(`Pour ${e.quoi} · J${e.j}${compte ? ` · +${XP_RECUE} XP` : ""}`, 180),
-      url: `/ligue?exploit=${encodeURIComponent(e.cle)}`,
-      tag: `felicitation-${e.cle}`,
+      notif: {
+        titre: couper(autres > 0 ? `${prenom} et ${autres} ${autres > 1 ? "autres" : "autre"} t'ont félicité` : `${prenom} t'a félicité`, 60),
+        texte: couper(`Pour ${e.quoi} · J${e.j}${compte ? ` · +${XP_RECUE} XP` : ""}`, 180),
+        url: `/ligue?exploit=${encodeURIComponent(e.cle)}`,
+        tag: `felicitation-${e.cle}`,
+      },
+      motif: "felicitation",
+      ref: `exploit:${e.cle}`,
     });
   }
 
-  const { data: abonnements } = await sb
-    .from("push_abonnements")
-    .select("endpoint, p256dh, auth, user_id")
-    .in("user_id", [...envois.keys()]);
-  const resultats = await Promise.all(
-    ((abonnements ?? []) as (Abonnement & { user_id: string })[]).map(async (ab) => ({
-      ab,
-      r: await envoyer(ab, envois.get(ab.user_id), cle),
-    }))
-  );
-  const morts = resultats.filter((x) => x.r === "mort").map((x) => x.ab.endpoint);
-  if (morts.length > 0) await sb.from("push_abonnements").delete().in("endpoint", morts);
-
-  return NextResponse.json({ ok, envoyes: new Set(resultats.filter((x) => x.r === "envoye").map((x) => x.ab.user_id)).size });
+  const { recus } = await prevenir(sb, cle, envois);
+  return NextResponse.json({ ok, envoyes: recus.size });
 }

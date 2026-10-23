@@ -16,6 +16,12 @@ export interface Notif {
   tag?: string;
   /** Messages non lus : le nombre à poser sur l'icône de l'app. */
   pastille?: number;
+  /**
+   * Sa trace (push_envois, posée par lib/server/push-envoi.ts) : le
+   * téléphone la redonne à /api/push/suivi quand la notification arrive et
+   * quand on la touche.
+   */
+  id?: string;
 }
 
 export const TITRE_MAX = 60;

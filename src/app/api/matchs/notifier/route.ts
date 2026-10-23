@@ -14,7 +14,8 @@
 // l'organisateur du match.
 
 import { NextRequest, NextResponse } from "next/server";
-import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
+import { cleVapid } from "@/lib/server/web-push";
+import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { jourLong } from "@/lib/sfl/jour-long";
 import type { Notif } from "@/lib/sfl/push";
@@ -85,16 +86,10 @@ export async function POST(req: NextRequest) {
   const cle = cleVapid();
   let envoyes = 0;
   if (cle && cibles.length > 0) {
-    const { data: abonnements } = await sb
-      .from("push_abonnements")
-      .select("endpoint, p256dh, auth, user_id")
-      .in("user_id", cibles);
-    const resultats = await Promise.all(
-      ((abonnements ?? []) as (Abonnement & { user_id: string })[]).map((ab) => envoyer(ab, notif, cle).then((r) => ({ ab, r })))
-    );
-    envoyes = new Set(resultats.filter((x) => x.r === "envoye").map((x) => x.ab.user_id)).size;
-    const morts = resultats.filter((x) => x.r === "mort").map((x) => x.ab.endpoint);
-    if (morts.length > 0) await sb.from("push_abonnements").delete().in("endpoint", morts);
+    // Le motif, pour la page Activité : match-invitation, match-modifie ou match-annule.
+    const motif = type === "invitation" ? "match-invitation" : type === "modifie" ? "match-modifie" : "match-annule";
+    const envois = new Map(cibles.map((uid): [string, Envoi] => [uid, { notif, motif, ref: `match:${id}` }]));
+    envoyes = (await prevenir(sb, cle, envois)).recus.size;
   }
 
   return NextResponse.json({ envoyes, prevenus: cibles.length, annule: type === "annule" });
