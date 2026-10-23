@@ -254,6 +254,14 @@ grant execute on function public.identifiant_de_connexion(text) to anon, authent
 alter table public.profiles add column if not exists badge text
   check (badge is null or badge ~ '^(auto|aucun|s:[a-z]+|p:[a-zA-Z]+)$');
 
+-- Ce que le joueur porte sur sa carte depuis la passe (src/lib/sfl/
+-- habillages-choisis.ts) : « finition/traitement », chacun « auto » (le
+-- dernier débloqué), « - » (rien) ou l'id d'une récompense. Ce qui est
+-- débloqué se recalcule de l'XP : un choix pas débloqué ne s'affiche pas.
+-- Lu par toute la ligue, modifiable par le joueur seul (grant plus bas).
+alter table public.profiles add column if not exists habillage text
+  check (habillage is null or habillage ~ '^(auto|-|nuit|chrome|animee)/(auto|-|argentique|gravure|marbre)$');
+
 -- La ville du joueur sur la Map (lib/sfl/villes.ts, 22/10) : le nom de sa
 -- commune et son CENTRE, tel que le donne le géocodeur — jamais sa position.
 -- ville_cachee : il reste dans la ligue mais disparaît de la Map (le mode
@@ -517,6 +525,7 @@ revoke update (username) on public.profiles from authenticated;
 grant update (name) on public.profiles to authenticated;
 grant update (contact_email) on public.profiles to authenticated;
 grant update (badge) on public.profiles to authenticated;
+grant update (habillage) on public.profiles to authenticated;
 grant update (ville, ville_lat, ville_lng, ville_cachee, ville_le) on public.profiles to authenticated;
 grant insert, select on public.activity to authenticated;
 grant insert, update, delete on public.presence to authenticated;

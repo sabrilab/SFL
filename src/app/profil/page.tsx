@@ -213,7 +213,7 @@ export default function Profil() {
           <MaSaison saison={`Saison ${saison.numero ?? 0}`} dimanches={dimanches} forts={fiche.forts} rangs={rangs} />
 
           {/* 2 bis. Mon Niveau XP : le niveau à vie, le passe de la saison, mes missions */}
-          <NiveauXp saison={saison.numero ?? 0} />
+          <NiveauXp saison={saison.numero ?? 0} player={player} />
 
           {/* 3. Mon évolution, journée après journée : d'abord mon rang, si
               j'en ai un cette saison */}

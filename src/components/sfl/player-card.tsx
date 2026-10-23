@@ -22,6 +22,7 @@ import { CartePhoto } from "./carte-photo";
 import { useBadgeCarte } from "@/hooks/use-badge-carte";
 import { usePhotoPerso } from "@/hooks/use-player-photo";
 import { ovr, type BoostType, type Player, type StatKey } from "@/lib/sfl/engine";
+import { useHabillage } from "@/hooks/use-habillage";
 import { useIdentites } from "@/hooks/use-identites";
 import type { HabillageCarte } from "./finitions-carte";
 
@@ -58,6 +59,9 @@ export function PlayerCard({
   const stats = player.stats;
   const photo = usePhotoPerso(player.name);
   const badge = useBadgeCarte(player.name);
+  // Ce que le joueur porte (use-habillage.ts), sauf un essai passé en prop.
+  const porte = useHabillage(player.name);
+  const habille = habillage ?? porte;
   const identite = useIdentites();
   if (palierCarte(254 * size) !== "complete")
     return (
@@ -72,7 +76,7 @@ export function PlayerCard({
         badge={badge}
         vertical={vertical}
         distinction={distinction}
-        habillage={habillage}
+        habillage={habille}
       />
     );
   return (
@@ -89,7 +93,7 @@ export function PlayerCard({
       photo={photo}
       onglet={onglet}
       badge={badge}
-      habillage={habillage}
+      habillage={habille}
     />
   );
 }

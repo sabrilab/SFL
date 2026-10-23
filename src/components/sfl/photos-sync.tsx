@@ -3,7 +3,8 @@
 // Les photos de la ligue, tenues à jour : la liste est relue au lancement et
 // à chaque retour sur l'app, et la photo du joueur connecté restée sur cet
 // appareil (posée hors ligne, ou avant le partage) part à la ligue. Même
-// chose pour le badge choisi pour la carte (lib/sfl/badges-choisis), et pour
+// chose pour le badge choisi pour la carte (lib/sfl/badges-choisis), pour ce
+// qu'il porte sur sa carte depuis la passe (lib/sfl/habillages-choisis), et pour
 // les noms et pseudos confirmés (lib/sfl/identites), et pour la ville de
 // chacun sur la Map (lib/sfl/villes), posée d'office d'après la connexion
 // tant que le joueur n'en a pas donné. Et qui suit qui, et les félicitations
@@ -12,6 +13,7 @@
 import { useEffect } from "react";
 import { useSession } from "@/hooks/use-session";
 import { envoyerBadgeEnAttente, rafraichirBadges } from "@/lib/sfl/badges-choisis";
+import { envoyerHabillageEnAttente, rafraichirHabillages } from "@/lib/sfl/habillages-choisis";
 import { rafraichirIdentites } from "@/lib/sfl/identites";
 import { rafraichirFelicitations } from "@/lib/sfl/felicitations";
 import { envoyerPhotosEnAttente, rafraichirPhotos } from "@/lib/sfl/photos";
@@ -25,6 +27,7 @@ export function PhotosSync() {
   useEffect(() => {
     void rafraichirPhotos();
     void rafraichirBadges();
+    void rafraichirHabillages();
     void rafraichirIdentites();
     void rafraichirVilles();
     void rafraichirSuivis();
@@ -33,6 +36,7 @@ export function PhotosSync() {
       if (document.visibilityState !== "visible") return;
       void rafraichirPhotos();
       void rafraichirBadges();
+      void rafraichirHabillages();
       void rafraichirIdentites();
       void rafraichirVilles();
       void rafraichirSuivis();
@@ -46,6 +50,7 @@ export function PhotosSync() {
     if (!nom) return;
     void envoyerPhotosEnAttente(nom);
     void envoyerBadgeEnAttente(nom);
+    void envoyerHabillageEnAttente(nom);
     // Pas encore de ville sur la Map : celle que devine la connexion.
     void rafraichirVilles().then(() => poserVilleDevinee(nom));
   }, [nom]);

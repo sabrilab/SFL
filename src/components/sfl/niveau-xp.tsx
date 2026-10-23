@@ -10,20 +10,29 @@
 //   · le rang, B, A ou S, d'après la place au classement de l'XP à vie
 //     (rangsDesJoueurs) : les 10 % de tête S, les 25 % suivants A ;
 //   · le passe de la saison : vingt paliers de 250 XP, remis à zéro à chaque
-//     saison, chacun avec sa récompense, qu'on fait défiler ;
+//     saison, chacun avec sa récompense, qu'on fait défiler. On touche un
+//     palier pour essayer sa récompense sur sa propre carte, juste dessous ;
+//     un palier atteint une saison reste débloqué pour de bon. Une finition
+//     ou un traitement de la photo débloqué se porte ou se retire (profiles.
+//     habillage) ; un signe se pose d'office (use-habillage.ts) ;
 //   · les missions réussies, à vie, qui font les crans du cadre de la carte
 //     (3, 9, 18, 30) ;
 //   · les derniers gains, du plus récent.
 // « Niveau XP » et pas « Niveau » : dans les règles BOLA, le Niveau est déjà
 // celui de la carte, de 1 à 50.
 
-import { useEffect, useRef } from "react";
-import { Check } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Lock } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { Insigne } from "@/components/sfl/actus/missions";
-import { useMyPlayer } from "@/components/sfl/player-provider";
+import type { HabillageCarte } from "@/components/sfl/finitions-carte";
+import { PlayerCard } from "@/components/sfl/player-card";
+import { Button } from "@/components/ui/button";
+import { useChoixHabillage, useHabillage, usePalierMax } from "@/hooks/use-habillage";
 import { useRangXp, useXp } from "@/hooks/use-missions";
-import { CRANS, FAMILLES, PALIERS_PASSE, PASSE, XP_PALIER, type RangJoueur } from "@/lib/sfl/missions";
+import type { Player } from "@/lib/sfl/engine";
+import { choisirHabillage, type ChoixHabillage } from "@/lib/sfl/habillages-choisis";
+import { CRANS, FAMILLES, PALIERS_PASSE, PASSE, XP_PALIER, type Palier, type RangJoueur } from "@/lib/sfl/missions";
 import { cn } from "@/lib/utils";
 
 const eme = (n: number) => (n === 1 ? "1re" : `${n}e`);
@@ -48,6 +57,33 @@ function RangXp({ r }: { r: RangJoueur }) {
   );
 }
 
+/** Ma carte telle qu'elle serait avec la récompense du palier, en plus de ce que je porte. */
+function essai(porte: HabillageCarte, p: Palier): HabillageCarte {
+  const h = p.habille;
+  if (h?.finition) return { ...porte, finition: h.finition };
+  if (h?.traitement) return { ...porte, traitement: h.traitement };
+  if (h?.signe) return { ...porte, signes: [...new Set([...(porte.signes ?? []), h.signe])] };
+  return porte;
+}
+
+/** Porter ou retirer une récompense débloquée ; sinon, où elle en est. */
+function Porter({ p, ouvert, porte, choix, nom }: { p: Palier; ouvert: boolean; porte: HabillageCarte; choix: ChoixHabillage; nom: string }) {
+  const h = p.habille;
+  if (!ouvert) return <span className="mono-label text-[9px] text-foreground/45">Au palier {p.n}</span>;
+  if (h?.finition || h?.traitement) {
+    const portee = h.finition ? porte.finition === h.finition : porte.traitement === h.traitement;
+    const suivant: ChoixHabillage = h.finition
+      ? { ...choix, finition: portee ? "-" : h.finition }
+      : { ...choix, traitement: portee || !h.traitement ? "-" : h.traitement };
+    return (
+      <Button variant={portee ? "destructive" : "or"} onClick={() => void choisirHabillage(nom, suivant)}>
+        {portee ? "Retirer" : "Porter"}
+      </Button>
+    );
+  }
+  return <span className="mono-label text-[9px] text-foreground/45">{h?.signe ? "Sur ta carte" : "Débloqué"}</span>;
+}
+
 function Barre({ part }: { part: number }) {
   return (
     <div className="h-1.5 overflow-hidden rounded-full bg-foreground/10">
@@ -56,10 +92,13 @@ function Barre({ part }: { part: number }) {
   );
 }
 
-export function NiveauXp({ saison }: { saison: number }) {
-  const b = useXp();
-  const { me } = useMyPlayer();
-  const rangXp = useRangXp(me);
+export function NiveauXp({ saison, player }: { saison: number; player: Player }) {
+  const b = useXp(player.name);
+  const rangXp = useRangXp(player.name);
+  const palierMax = usePalierMax(player.name);
+  const porte = useHabillage(player.name);
+  const choix = useChoixHabillage(player.name);
+  const [choisi, setChoisi] = useState<number | null>(null);
   const rangee = useRef<HTMLDivElement>(null);
   const palier = b?.palier ?? 0;
   // Le passe s'ouvre sur le dernier palier atteint, pas sur le premier.
@@ -70,6 +109,8 @@ export function NiveauXp({ saison }: { saison: number }) {
   }, [palier]);
   if (!b) return null;
   const prochain = Math.min(PALIERS_PASSE, b.palier + 1);
+  // L'essai s'ouvre sur le prochain palier : ce que je peux gagner.
+  const vu = PASSE.find((p) => p.n === (choisi ?? prochain)) ?? PASSE[0];
   const crans = CRANS.filter((c) => b.reussies >= c).length;
   const versCran = CRANS.find((c) => b.reussies < c);
 
@@ -116,35 +157,65 @@ export function NiveauXp({ saison }: { saison: number }) {
             </>
           )}
         </div>
-        <div ref={rangee} className="flex snap-x scroll-px-4 gap-2 overflow-x-auto scroll-smooth px-4 pb-1 [scrollbar-width:none]">
+        <div ref={rangee} className="flex snap-x scroll-px-4 gap-2 overflow-x-auto scroll-smooth px-4 py-1 [scrollbar-width:none]">
           {PASSE.map((p) => {
             const atteint = p.n <= b.palier;
+            // Débloqué une saison d'avant : acquis, même si la saison en cours n'y est pas.
+            const acquis = !atteint && p.n <= palierMax;
             const suivant = p.n === prochain && !atteint;
             return (
-              <div
+              <button
                 key={p.n}
+                type="button"
+                aria-pressed={p.n === vu.n}
+                onClick={() => setChoisi(p.n)}
                 className={cn(
-                  "flex h-[112px] w-[96px] shrink-0 snap-start flex-col justify-between rounded-2xl p-2.5",
-                  atteint ? "bg-foreground text-background" : suivant ? "bg-secondary ring-1 ring-foreground/40" : "bg-secondary/60"
+                  "flex h-[112px] w-[96px] shrink-0 snap-start flex-col justify-between rounded-2xl p-2.5 text-left outline-offset-2",
+                  atteint
+                    ? "bg-foreground text-background"
+                    : acquis || suivant
+                      ? "bg-secondary ring-1 ring-foreground/40"
+                      : "bg-secondary/60",
+                  p.n === vu.n && "outline-2 outline-foreground"
                 )}
               >
                 <span className="flex items-center justify-between">
                   <span className="tabular-nums" style={{ fontFamily: ANTON, fontSize: 24, lineHeight: 0.9 }}>
                     {p.n}
                   </span>
-                  {atteint && <Check className="size-4" strokeWidth={3} />}
+                  {atteint || acquis ? (
+                    <Check className="size-4" strokeWidth={3} />
+                  ) : (
+                    <Lock className="size-3.5 text-foreground/35" strokeWidth={2.5} />
+                  )}
                 </span>
                 <span className="flex flex-col gap-1">
-                  <span className={cn("text-[12.5px] leading-[1.15] font-bold", !atteint && !suivant && "text-foreground/55")}>
+                  <span
+                    className={cn("text-[12.5px] leading-[1.15] font-bold", !atteint && !acquis && !suivant && "text-foreground/55")}
+                  >
                     {p.recompense}
                   </span>
                   <span className={cn("mono-label text-[8.5px]", atteint ? "text-background/55" : "text-foreground/40")}>
                     {FAMILLES[p.famille]}
                   </span>
                 </span>
-              </div>
+              </button>
             );
           })}
+        </div>
+
+        {/* L'essai : ma carte avec la récompense du palier touché. */}
+        <div className="flex items-center gap-4 border-t border-white/8 px-4 pt-[var(--fib-13)]">
+          <div className="shrink-0">
+            <PlayerCard player={player} size={0.7} habillage={essai(porte, vu)} />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
+            <span className="mono-label text-[9px] text-foreground/45">
+              Palier {vu.n} · {FAMILLES[vu.famille]}
+            </span>
+            <span className="text-[17px] leading-[1.15] font-bold">{vu.recompense}</span>
+            <Porter p={vu} ouvert={vu.n <= palierMax} porte={porte} choix={choix} nom={player.name} />
+          </div>
         </div>
       </div>
 

@@ -22,10 +22,12 @@ import {
   aJoue,
   bilanDe,
   classementNiveau,
+  cranDe,
   dimancheEnCours,
   engagementsDe,
   journalXp,
   juger,
+  palierMaxDe,
   rangsDesJoueurs,
   reponseDe,
   risqueDe,
@@ -320,6 +322,13 @@ export interface XpLigue {
   saison: number;
   /** Le rang de chaque joueur classé : S, A ou B selon sa place dans l'XP à vie. */
   rangs: Map<string, RangJoueur>;
+  /**
+   * Ce que l'XP pose sur les cartes, joueur par joueur, en JSON : [nom, rang,
+   * plus haut palier débloqué, cran du cadre][]. Une chaîne, qui ne change
+   * que quand l'un d'eux change : les cartes la lisent (CartesXpContext,
+   * use-habillage.ts) sans se redessiner à chaque minute de l'horloge.
+   */
+  surLesCartes: string;
 }
 
 export const XpLigueContext = createContext<XpLigue | null>(null);
@@ -340,7 +349,11 @@ export function useXpLigueCalcule(): XpLigue | null {
   return useMemo(() => {
     if (!isClient) return null;
     const journal = journalXp(jugee, reponses, votes, maintenant, felicitations);
-    return { journal, saison: saison.numero ?? 0, rangs: rangsDesJoueurs(classementNiveau(journal, allPlayers)) };
+    const rangs = rangsDesJoueurs(classementNiveau(journal, allPlayers));
+    const surLesCartes = JSON.stringify(
+      [...journal].map(([nom, x]) => [nom, rangs.get(nom)?.rang ?? null, palierMaxDe(journal, nom), cranDe(x.reussies)])
+    );
+    return { journal, saison: saison.numero ?? 0, rangs, surLesCartes };
   }, [isClient, jugee, reponses, votes, maintenant, felicitations, saison.numero, allPlayers]);
 }
 

@@ -43,6 +43,7 @@ import { journeeJouee } from "./saisie/mutations";
 import { isHidden } from "./hidden";
 import { ovr, type Player } from "./engine";
 import type { MatchEntry, Saison, SaisonArchivee } from "./saisie/types";
+import type { Finition, Signe, Traitement } from "@/components/sfl/finitions-carte";
 
 /* ------------------------------- Le barème ------------------------------- */
 
@@ -901,6 +902,14 @@ export function libelleCourt(m: Pick<Mission, "genre">): string {
 }
 
 /* ------------------------------ Le passe ------------------------------ */
+// Sabri, 23/10 : « faut que tu me dises ce que je peux faire visuellement,
+// parce que là, ça fait moche quand c'est affiché. Faut qu'on puisse montrer
+// des choses », avec « des changements de code au niveau de la carte ou des
+// signes distinctifs ». Les paliers de la carte et de la photo posent donc
+// quelque chose sur la carte (`habille`, dessiné par finitions-carte.ts,
+// sans IA) : un signe, d'office une fois débloqué ; une finition ou un
+// traitement de la photo, que le joueur choisit de porter. Un palier atteint
+// une saison reste débloqué pour de bon (palierMaxDe).
 
 export type Famille = "contrats" | "photo" | "carte" | "vrai";
 
@@ -908,31 +917,43 @@ export interface Palier {
   n: number;
   recompense: string;
   famille: Famille;
+  /** Ce que le palier pose sur la carte, s'il l'habille (finitions-carte.ts). */
+  habille?: { finition?: Finition; traitement?: Traitement; signe?: Signe };
 }
 
-/** Les vingt paliers du passe de saison : chaque récompense sert à quelque chose. */
+/** Les vingt paliers du passe de saison : chaque récompense sert à quelque chose, la moitié se voit sur la carte. */
 export const PASSE: Palier[] = [
-  { n: 1, recompense: "Joker", famille: "contrats" },
-  { n: 2, recompense: "Filtre studio argentique", famille: "photo" },
-  { n: 3, recompense: "Le dossier du rival", famille: "contrats" },
-  { n: 4, recompense: "Finition nuit", famille: "carte" },
-  { n: 5, recompense: "Séance studio offerte", famille: "photo" },
+  { n: 1, recompense: "Liseré argent", famille: "carte", habille: { signe: "lisere-argent" } },
+  { n: 2, recompense: "Joker", famille: "contrats" },
+  { n: 3, recompense: "Photo argentique", famille: "photo", habille: { traitement: "argentique" } },
+  { n: 4, recompense: "Finition nuit", famille: "carte", habille: { finition: "nuit" } },
+  { n: 5, recompense: "Sceau à tes initiales", famille: "carte", habille: { signe: "sceau" } },
   { n: 6, recompense: "Double ou rien", famille: "contrats" },
-  { n: 7, recompense: "Joker", famille: "contrats" },
-  { n: 8, recompense: "Filtre studio marbre", famille: "photo" },
+  { n: 7, recompense: "Photo gravure", famille: "photo", habille: { traitement: "gravure" } },
+  { n: 8, recompense: "Puce dorée", famille: "carte", habille: { signe: "puce-or" } },
   { n: 9, recompense: "Assurance", famille: "contrats" },
-  { n: 10, recompense: "Finition chrome", famille: "carte" },
-  { n: 11, recompense: "Dossier du rival, 3 dimanches", famille: "contrats" },
-  { n: 12, recompense: "Séance studio offerte", famille: "photo" },
-  { n: 13, recompense: "Choisir ton rival", famille: "contrats" },
-  { n: 14, recompense: "Double ou rien", famille: "contrats" },
-  { n: 15, recompense: "Filtre studio gravure", famille: "photo" },
-  { n: 16, recompense: "Finition animée", famille: "carte" },
+  { n: 10, recompense: "Finition chrome", famille: "carte", habille: { finition: "chrome" } },
+  { n: 11, recompense: "Le dossier du rival", famille: "contrats" },
+  { n: 12, recompense: "Ton nom gravé", famille: "carte", habille: { signe: "nom-grave" } },
+  { n: 13, recompense: "Photo marbre", famille: "photo", habille: { traitement: "marbre" } },
+  { n: 14, recompense: "Choisir ton rival", famille: "contrats" },
+  { n: 15, recompense: "Liseré or", famille: "carte", habille: { signe: "lisere-or" } },
+  { n: 16, recompense: "Finition animée", famille: "carte", habille: { finition: "animee" } },
   { n: 17, recompense: "Joker", famille: "contrats" },
   { n: 18, recompense: "Séance studio offerte", famille: "photo" },
   { n: 19, recompense: "Chaussettes Bola", famille: "vrai" },
   { n: 20, recompense: "Carte de saison imprimée", famille: "vrai" },
 ];
+
+/** Ce qu'un palier du passe a débloqué sur la carte, dans l'ordre des paliers. */
+export function debloquesDe(palier: number): { finitions: Finition[]; traitements: Traitement[]; signes: Signe[] } {
+  const ouverts = PASSE.filter((p) => p.n <= palier);
+  return {
+    finitions: ouverts.flatMap((p) => (p.habille?.finition ? [p.habille.finition] : [])),
+    traitements: ouverts.flatMap((p) => (p.habille?.traitement ? [p.habille.traitement] : [])),
+    signes: ouverts.flatMap((p) => (p.habille?.signe ? [p.habille.signe] : [])),
+  };
+}
 
 export const FAMILLES: Record<Famille, string> = {
   contrats: "tes contrats",
