@@ -25,6 +25,7 @@
 
 import { Badge3D } from "@/components/sfl/badge-3d";
 import { palierCarte } from "@/components/sfl/bola-card";
+import type { HabillageCarte } from "@/components/sfl/finitions-carte";
 import { TEINTES } from "@/components/sfl/teinte-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import type { BoostType } from "@/lib/sfl/engine";
@@ -93,6 +94,7 @@ export function CartePhoto({
   badge,
   vertical = false,
   distinction,
+  habillage,
 }: {
   name: string;
   affiche?: string;
@@ -106,6 +108,8 @@ export function CartePhoto({
   vertical?: boolean;
   /** Une carte à titre : MVP (or), Impact (rouge), Défensive (bleu). */
   distinction?: BoostType;
+  /** Ce que le joueur porte sur sa carte (finitions-carte.ts). */
+  habillage?: HabillageCarte;
 }) {
   const largeur = 254 * size;
   const u = (n: number) => n * size * (254 / W);

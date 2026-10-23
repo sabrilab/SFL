@@ -43,6 +43,7 @@
 // au-dessus du portrait.
 
 import { Badge3D } from "@/components/sfl/badge-3d";
+import type { HabillageCarte } from "@/components/sfl/finitions-carte";
 import { TEINTES } from "@/components/sfl/teinte-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
@@ -279,6 +280,7 @@ export function BolaCard({
   numero,
   onglet,
   badge,
+  habillage,
 }: {
   name: string;
   /** Le nom montré sur la carte, s'il diffère du nom de saison (voir lib/sfl/identites). */
@@ -298,6 +300,8 @@ export function BolaCard({
   onglet?: { fond: string; encre: string };
   /** Le badge du coin ; null = coin vide ; absent = l'ancienne mise en page (numéro ou poste). */
   badge?: BadgeCarte | null;
+  /** Ce que le joueur porte sur sa carte (finitions-carte.ts). */
+  habillage?: HabillageCarte;
 }) {
   // 254 px de large à taille 1, comme les autres cartes de l'app.
   const largeur = 254 * size;
