@@ -145,6 +145,8 @@ export function CartePhoto({
   const lisere = lisereDe(habillage);
   const filet = lisere ? METAUX[lisere][1] : null;
   const traitement = habillage?.traitement;
+  // Le bord de la photo : le cadre, si elle est sertie (le badge et l'insigne s'y alignent).
+  const bord = teinte ? CADRE : 0;
 
   if (palier === "pastille") {
     return (
@@ -270,8 +272,12 @@ export function CartePhoto({
             background: `linear-gradient(180deg, rgba(0,0,0,0) ${100 / PHI}%, ${teinte?.voile ?? "rgba(0,0,0,0.5)"} 100%)`,
           }}
         />
+        {/* Le badge à BADGE_M du bord de la photo, sertie ou non (sertie, le calque est rentré du cadre). */}
         {badge && !reduite && (
-          <span className="absolute" style={{ left: u(W - BADGE_M - BADGE * 1.2), top: u(BADGE_M) }}>
+          <span
+            className="absolute"
+            style={{ left: u(W - bord * 2 - BADGE_M - BADGE * 1.2), top: u(BADGE_M) }}
+          >
             <Badge3D badge={badge} largeur={u(BADGE * 1.2)} socle />
           </span>
         )}
@@ -291,7 +297,7 @@ export function CartePhoto({
           />
         )}
         {habillage?.rang && !reduite && (
-          <span style={{ position: "absolute", left: u(BADGE_M), top: u(BADGE_M), display: "flex" }}>
+          <span style={{ position: "absolute", left: u(BADGE_M + bord), top: u(BADGE_M + bord), display: "flex" }}>
             <InsigneRang rang={habillage.rang} hauteur={u(BADGE * 1.05)} />
           </span>
         )}
