@@ -4,7 +4,8 @@
 // (components/sfl/actus/course.tsx). Les anciens liens restent bons :
 //   · ?vue=classements (et /stats) ouvre les classements, ?vue=matchs les matchs ;
 //   · ?j=N (une feuille touchée au Vestiaire) ouvre le récap, /ligue/journee ;
-//   · ?vue=vestiaire renvoie au Vestiaire.
+//   · ?vue=vestiaire renvoie au Vestiaire ;
+//   · ?exploit=… (une félicitation reçue) descend jusqu'à sa rubrique.
 
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -35,5 +36,7 @@ function Actus() {
       if (localStorage.getItem(LEAGUE_KEY) && localStorage.getItem(LEAGUE_KEY) !== "SFL") localStorage.setItem(LEAGUE_KEY, "SFL");
     } catch {}
   }, []);
-  return <LaCourse key={vue ?? ""} vueDepart={vue === "classements" || vue === "matchs" ? vue : "fil"} />;
+  return (
+    <LaCourse key={vue ?? ""} vueDepart={vue === "classements" || vue === "matchs" ? vue : "fil"} exploit={params.get("exploit")} />
+  );
 }

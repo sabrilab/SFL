@@ -253,7 +253,8 @@ export async function chargerFil(
 
 /* ------------------------------- Écriture ------------------------------- */
 
-export type Resultat = { ok: true } | { ok: false; raison: string };
+/** `id` : le message tout juste posé (poster), pour le remettre à sa place dans le fil. */
+export type Resultat = { ok: true; id?: number } | { ok: false; raison: string };
 
 /** Pourquoi écrire est impossible — null si ça l'est. */
 export function blocageVestiaire(ou: Canal = VESTIAIRE): string | null {
@@ -302,8 +303,10 @@ export async function poster(ou: Canal, texte: string, piece: Piece | null, repo
   if (empeche) return { ok: false, raison: empeche };
   try {
     const sb = supabase();
-    const { data: auth } = await sb.auth.getUser();
-    const uid = auth.user?.id;
+    // La session gardée sur le téléphone suffit (la base vérifie le jeton à
+    // l'écriture) : pas d'aller-retour de plus avant que le message parte.
+    const { data: auth } = await sb.auth.getSession();
+    const uid = auth.session?.user.id;
     if (!uid) return { ok: false, raison: expliquer("jwt", ou) };
     const ligne: Record<string, unknown> = { canal: ou.canal, auteur: uid, destinataire: null, texte: propre };
     if (ou.canal === "match") ligne.match_id = ou.matchId;
@@ -312,8 +315,9 @@ export async function poster(ou: Canal, texte: string, piece: Piece | null, repo
     if (reponseA) ligne.reponse_a = reponseA;
     const { data, error } = await sb.from("messages").insert(ligne).select("id").single();
     if (error) return { ok: false, raison: expliquer(error.message, ou) };
-    notifier({ type: "message", id: (data as { id: number }).id }, ou);
-    return { ok: true };
+    const id = (data as { id: number }).id;
+    notifier({ type: "message", id }, ou);
+    return { ok: true, id };
   } catch {
     return { ok: false, raison: expliquer("", ou) };
   }
@@ -624,13 +628,17 @@ export const SALON_VESTIAIRE: Salon = {
 
 let seq = 0;
 
-/** Rappelle `onChange` à chaque message ou réaction. Renvoie l'arrêt. */
+/** Rappelle `onChange` à chaque message ou réaction du Vestiaire. Renvoie l'arrêt. */
 export function ecouterVestiaire(onChange: () => void): () => void {
   try {
     const sb = supabase();
     const canal = sb
       .channel(`sfl-vestiaire-${++seq}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, onChange)
+      // Les messages des matchs et des équipes ne font plus relire le Vestiaire.
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: "canal=eq.sfl" }, onChange)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages", filter: "canal=eq.sfl" }, onChange)
+      // Un retrait ne se filtre pas (la ligne n'est plus là) : on relit.
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "messages" }, onChange)
       .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, onChange)
       .subscribe();
     return () => {

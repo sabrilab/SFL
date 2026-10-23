@@ -88,6 +88,7 @@ export function IlsSeDemarquent({ className }: { className?: string }) {
       mode: "simple",
       title: p.name,
       subtitle: d.detail,
+      joueur: p.name,
       render: (s) => <PlayerCard player={p} size={s} />,
     });
 

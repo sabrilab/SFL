@@ -262,3 +262,52 @@
   opacity: var(--e);
   transform: translateX(calc((1 - var(--e)) * -18px));
 }
+
+/*
+ * Bravo (bravo.tsx) : le « +10 XP » monte du bouton et s'efface ; la main
+ * applaudit d'un coup. « Réduire les animations » : rien ne monte.
+ */
+.bravo-xp {
+  transform: translateX(-50%);
+  opacity: 0;
+  animation: bravo-xp 1.3s cubic-bezier(0.22, 0.9, 0.24, 1) both;
+}
+@keyframes bravo-xp {
+  0% { opacity: 0; transform: translate(-50%, 8px) scale(0.9); }
+  18% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -26px) scale(1); }
+}
+.bravo-clap {
+  animation: bravo-clap 0.42s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+@keyframes bravo-clap {
+  from { transform: scale(1.5) rotate(-12deg); }
+}
+
+/*
+ * Le gabarit des Actus sur tablette et ordinateur (course.tsx) : la page
+ * devient une grille de terrains, deux colonnes dès 768 px, trois dès
+ * 1280 px. Mêmes paliers que .shell (globals.css), mais élargi à 1320 px dès
+ * 1280 : trois terrains côte à côte y gardent la taille qu'ils ont sur un
+ * téléphone. Sous 768 px, rien : le téléphone garde son fil tel quel.
+ */
+@media (min-width: 768px) {
+  .actus-gabarit {
+    width: 100%;
+    max-width: 1000px;
+    margin-inline: auto;
+    padding-inline: 24px;
+  }
+}
+@media (min-width: 1024px) {
+  .actus-gabarit {
+    padding-inline: 32px;
+  }
+}
+@media (min-width: 1280px) {
+  .actus-gabarit {
+    max-width: 1320px;
+    padding-inline: 40px;
+  }
+}

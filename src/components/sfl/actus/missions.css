@@ -1,0 +1,358 @@
+/*
+ * Les fiches des Missions Bola (missions.tsx) : des fiches de contrat, façon
+ * espion et battle royale (Sabri, 23/10 : « des vraies fiches de contrats »,
+ * « un truc d'espion », « dans l'ambiance des battles royales »). Le rang
+ * fait la couleur, prise dans les tons des boutons (boutons.css) : S l'or,
+ * A le mauve, B l'argent. Elle allume le cadre, le bandeau rayé du haut,
+ * l'insigne, les crans de difficulté, le viseur sur la cible et les tampons.
+ *
+ * Hors couche, comme actus.css : rien ici ne se règle par un utilitaire
+ * Tailwind posé sur le même élément (la couleur du texte d'une fiche, la
+ * police d'un tampon).
+ *
+ * Rien ne bouge avec « Réduire les animations » (règle globale de
+ * globals.css) : chaque animation ne donne que son départ, et l'élément se
+ * pose directement dans son état final (le balayage du viseur, invisible).
+ */
+
+.fiche {
+  /* B, l'argent : le ton par défaut. */
+  --r-lueur: 222 227 236;
+  --r-feu: 246 248 252;
+  --r-texte: #e6ebf3;
+  --r-sombre: #3d434d;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 20px;
+  color: #f4f5f2;
+  background-color: #060607;
+  /* Une lueur du rang dans le coin de l'insigne, et une trame de carte d'état-major. */
+  background-image:
+    radial-gradient(85% 55% at 100% 0%, rgb(var(--r-lueur) / 0.17), rgb(var(--r-lueur) / 0) 72%),
+    linear-gradient(rgb(255 255 255 / 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.028) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    22px 22px,
+    22px 22px;
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--r-lueur) / 0.4),
+    inset 0 1px 0 rgb(var(--r-feu) / 0.22),
+    0 24px 44px -28px rgb(var(--r-lueur) / 0.6),
+    0 14px 28px -18px rgb(0 0 0 / 0.9);
+  transition: opacity 0.3s;
+}
+.fiche--S {
+  --r-lueur: 240 196 92;
+  --r-feu: 255 238 196;
+  --r-texte: #f0d38a;
+  --r-sombre: #5a3f06;
+}
+.fiche--A {
+  --r-lueur: 228 150 198;
+  --r-feu: 253 232 243;
+  --r-texte: #efc3da;
+  --r-sombre: #5b2141;
+}
+/* Accomplie : le cadre s'allume. Ratée : il vire au rouge. Passée, expirée, annulée : elle s'éteint. */
+.fiche--reussie {
+  box-shadow:
+    inset 0 0 0 1.5px rgb(var(--r-lueur) / 0.85),
+    inset 0 1px 0 rgb(var(--r-feu) / 0.4),
+    0 26px 52px -24px rgb(var(--r-lueur) / 0.85),
+    0 14px 28px -18px rgb(0 0 0 / 0.9);
+}
+.fiche--ratee {
+  box-shadow:
+    inset 0 0 0 1px rgb(255 155 157 / 0.55),
+    0 24px 44px -28px rgb(255 155 157 / 0.45),
+    0 14px 28px -18px rgb(0 0 0 / 0.9);
+}
+.fiche--eteinte {
+  opacity: 0.55;
+}
+
+.fiche__ton {
+  color: var(--r-texte);
+}
+
+/* Le bandeau du haut : la bande rayée des caisses et des zones, ses étiquettes au pochoir. */
+.fiche__bandeau {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 30px;
+  padding: 0 14px;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgb(var(--r-lueur) / 0.22) 0 5px,
+    rgb(var(--r-lueur) / 0) 5px 11px
+  );
+  border-bottom: 1px solid rgb(var(--r-lueur) / 0.32);
+}
+.fiche__etiquette {
+  padding: 3px 7px 2px;
+  border-radius: 3px;
+  background: #060607;
+  color: var(--r-texte);
+  font-family: var(--font-jbmono), ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.fiche__type {
+  padding: 3px 7px 2px;
+  border-radius: 3px;
+  background: #060607;
+  white-space: nowrap;
+}
+
+/* L'insigne du rang : un hexagone de métal, biseauté, la lettre gravée. */
+.fiche__insigne {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 54px;
+  height: 62px;
+  filter: drop-shadow(0 0 14px rgb(var(--r-lueur) / 0.45));
+}
+.fiche__hexa {
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: linear-gradient(165deg, rgb(var(--r-feu)) 0%, rgb(var(--r-lueur)) 48%, var(--r-sombre) 100%);
+}
+.fiche__hexa--coeur {
+  inset: 3px;
+  background: linear-gradient(165deg, rgb(var(--r-lueur)) 0%, rgb(var(--r-feu)) 52%, rgb(var(--r-lueur)) 100%);
+}
+.fiche__lettre {
+  position: relative;
+  padding-top: 3px;
+  font-family: var(--font-anton), Anton, sans-serif;
+  font-size: 34px;
+  line-height: 1;
+  color: #0a0b0d;
+}
+
+/* Les crans de difficulté, à côté du rang : trois pour S, deux pour A, un pour B. */
+.fiche__cran {
+  width: 4px;
+  border-radius: 1px;
+  background: rgb(255 255 255 / 0.14);
+}
+.fiche__cran--on {
+  background: rgb(var(--r-lueur));
+  box-shadow: 0 0 6px rgb(var(--r-lueur) / 0.6);
+}
+
+/*
+ * Le viseur sur la carte de la cible. Libre (gris) tant qu'on n'a pas
+ * accepté ; verrouillé ensuite, à la couleur du rang : il se resserre sur la
+ * carte, et un balayage la parcourt une fois. Rouge si la mission est ratée,
+ * éteint si elle n'est plus en jeu.
+ */
+.fiche__viseur {
+  --v-coin: 22px;
+  position: absolute;
+  inset: -7px;
+  color: rgb(255 255 255 / 0.36);
+  pointer-events: none;
+}
+.fiche__viseur--petit {
+  --v-coin: 15px;
+  inset: -5px;
+}
+.fiche__viseur--verrou {
+  color: rgb(var(--r-lueur));
+  filter: drop-shadow(0 0 4px rgb(var(--r-lueur) / 0.7));
+  animation: fiche-verrou 0.6s cubic-bezier(0.2, 0.9, 0.25, 1) 0.1s both;
+}
+.fiche__viseur--rate {
+  color: #ff9b9d;
+  filter: drop-shadow(0 0 4px rgb(255 155 157 / 0.55));
+}
+.fiche__viseur--eteint {
+  color: rgb(255 255 255 / 0.16);
+}
+@keyframes fiche-verrou {
+  from {
+    opacity: 0;
+    transform: scale(1.3) rotate(-14deg);
+  }
+}
+.viseur__coin {
+  position: absolute;
+  width: var(--v-coin);
+  height: var(--v-coin);
+  border: 0 solid currentColor;
+}
+.viseur__coin--hg {
+  top: 0;
+  left: 0;
+  border-top-width: 2px;
+  border-left-width: 2px;
+  border-top-left-radius: 12px;
+}
+.viseur__coin--hd {
+  top: 0;
+  right: 0;
+  border-top-width: 2px;
+  border-right-width: 2px;
+  border-top-right-radius: 12px;
+}
+.viseur__coin--bg {
+  bottom: 0;
+  left: 0;
+  border-bottom-width: 2px;
+  border-left-width: 2px;
+  border-bottom-left-radius: 12px;
+}
+.viseur__coin--bd {
+  right: 0;
+  bottom: 0;
+  border-right-width: 2px;
+  border-bottom-width: 2px;
+  border-bottom-right-radius: 12px;
+}
+/* Les quatre traits de la mire, au milieu de chaque côté, qui pointent vers la carte. */
+.viseur__trait {
+  position: absolute;
+  background: currentColor;
+}
+.viseur__trait--h,
+.viseur__trait--b {
+  left: 50%;
+  width: 2px;
+  height: 9px;
+  margin-left: -1px;
+}
+.viseur__trait--h {
+  top: -4px;
+}
+.viseur__trait--b {
+  bottom: -4px;
+}
+.viseur__trait--g,
+.viseur__trait--d {
+  top: 50%;
+  width: 9px;
+  height: 2px;
+  margin-top: -1px;
+}
+.viseur__trait--g {
+  left: -4px;
+}
+.viseur__trait--d {
+  right: -4px;
+}
+/* Le balayage du verrouillage, une fois, sur la carte. */
+.viseur__balayage {
+  position: absolute;
+  inset: 7px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+.fiche__viseur--petit .viseur__balayage {
+  inset: 5px;
+}
+.viseur__balayage::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  right: 0;
+  left: 0;
+  height: 40%;
+  background: linear-gradient(to bottom, rgb(var(--r-lueur) / 0), rgb(var(--r-lueur) / 0.3) 82%, rgb(var(--r-feu) / 0.95));
+  opacity: 0;
+  animation: viseur-balayage 1.05s cubic-bezier(0.45, 0, 0.25, 1) 0.35s both;
+}
+@keyframes viseur-balayage {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  85% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(350%);
+  }
+}
+
+/* La carte d'une cible manquée : éteinte, sous un viseur rouge. */
+.fiche__carte--ratee {
+  filter: grayscale(1) brightness(0.62);
+}
+
+/* Le duel : le rival a signé son contrat en face. */
+.fiche__duel {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--r-texte);
+  box-shadow: inset 0 0 0 1px rgb(var(--r-lueur) / 0.5);
+  background: rgb(var(--r-lueur) / 0.08);
+}
+
+/* Les champs du contrat : prime, risque, délai. */
+.fiche__champs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-block: 1px solid rgb(255 255 255 / 0.1);
+}
+.fiche__champs > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 0 12px;
+}
+.fiche__champs > div + div {
+  padding-left: 12px;
+  border-left: 1px solid rgb(255 255 255 / 0.1);
+}
+
+/* Les tampons : accepté, accompli, échec. Encrés de travers, posés d'un coup. */
+.tampon {
+  --t-encre: var(--r-texte);
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 5px;
+  border: 2px solid var(--t-encre);
+  border-radius: 6px;
+  outline: 1px solid var(--t-encre);
+  outline-offset: 2px;
+  color: var(--t-encre);
+  font-family: var(--font-jbmono), ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: rotate(-5deg);
+  opacity: 0.94;
+  animation: tampon-pose 0.32s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+.tampon--rouge {
+  --t-encre: #ff9b9d;
+}
+.tampon--gris {
+  --t-encre: rgb(244 245 242 / 0.45);
+}
+@keyframes tampon-pose {
+  from {
+    opacity: 0;
+    transform: scale(1.9) rotate(-12deg);
+  }
+}

@@ -121,7 +121,7 @@ export function FichePartie({
       <div className="rounded-[26px] bg-card p-5">
         <div className="flex items-baseline justify-between">
           <p className="mono-label text-muted-foreground">
-            {partie.genre === "exhibition" ? "Exhibition" : "Match"} · {partie.visibilite === "prive" ? "privé" : "public"} · par {partie.organisateur}
+            Match {partie.visibilite === "prive" ? "privé" : "public"} · par {partie.organisateur}
           </p>
           <p className="text-[22px] font-bold tabular-nums">
             {venus.length}
@@ -144,7 +144,7 @@ export function FichePartie({
         places={partie.places}
         occupants={occupants}
         moi={moiNom}
-        hauteur={460}
+        retirable={organise && !joue}
         onOccupant={
           organise && !joue && !occupe
             ? (o) => {

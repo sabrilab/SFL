@@ -14,7 +14,8 @@
 // l'organisateur du match.
 
 import { NextRequest, NextResponse } from "next/server";
-import { cleVapid, envoyer, type Abonnement } from "@/lib/server/web-push";
+import { cleVapid } from "@/lib/server/web-push";
+import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { jourLong } from "@/lib/sfl/jour-long";
 import type { Notif } from "@/lib/sfl/push";
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   const { data: match } = await sb
     .from("matchs")
-    .select("id, organisateur, genre, jour, heure, lieu")
+    .select("id, organisateur, jour, heure, lieu")
     .eq("id", id)
     .maybeSingle();
   if (!match) return NextResponse.json({ error: "Match inconnu." }, { status: 404 });
@@ -52,7 +53,6 @@ export async function POST(req: NextRequest) {
 
   const { data: orga } = await sb.from("profiles").select("name, nom_affiche").eq("id", moi.id).maybeSingle();
   const qui = ((orga as { nom_affiche?: string | null; name?: string } | null)?.nom_affiche ?? orga?.name ?? "Quelqu'un").split(" ")[0];
-  const quoi = match.genre === "exhibition" ? "Exhibition" : "Match";
   const rdv = couper(`${jourLong(match.jour)} · ${match.heure} · ${match.lieu}`, 180);
   const url = `/?match=${id}`;
   const tag = `match-${id}`;
@@ -72,13 +72,13 @@ export async function POST(req: NextRequest) {
       .map((j) => j.player_id);
     if (cibles.length > 0 && avecColonne)
       await sb.from("match_joueurs").update({ notifie_le: new Date().toISOString() }).eq("match_id", id).in("player_id", cibles);
-    notif = { titre: `${qui} t'invite · ${quoi}`, texte: rdv, url, tag };
+    notif = { titre: `${qui} t'invite · Match`, texte: rdv, url, tag };
   } else if (type === "modifie") {
     cibles = joueurs.map((j) => j.player_id);
-    notif = { titre: `${quoi} de ${qui} : nouveau rendez-vous`, texte: rdv, url, tag };
+    notif = { titre: `Match de ${qui} : nouveau rendez-vous`, texte: rdv, url, tag };
   } else {
     cibles = joueurs.map((j) => j.player_id);
-    notif = { titre: `${quoi} de ${qui} annulé`, texte: rdv, url: "/", tag };
+    notif = { titre: `Match de ${qui} annulé`, texte: rdv, url: "/", tag };
     const { error } = await sb.from("matchs").delete().eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -86,16 +86,10 @@ export async function POST(req: NextRequest) {
   const cle = cleVapid();
   let envoyes = 0;
   if (cle && cibles.length > 0) {
-    const { data: abonnements } = await sb
-      .from("push_abonnements")
-      .select("endpoint, p256dh, auth, user_id")
-      .in("user_id", cibles);
-    const resultats = await Promise.all(
-      ((abonnements ?? []) as (Abonnement & { user_id: string })[]).map((ab) => envoyer(ab, notif, cle).then((r) => ({ ab, r })))
-    );
-    envoyes = new Set(resultats.filter((x) => x.r === "envoye").map((x) => x.ab.user_id)).size;
-    const morts = resultats.filter((x) => x.r === "mort").map((x) => x.ab.endpoint);
-    if (morts.length > 0) await sb.from("push_abonnements").delete().in("endpoint", morts);
+    // Le motif, pour la page Activité : match-invitation, match-modifie ou match-annule.
+    const motif = type === "invitation" ? "match-invitation" : type === "modifie" ? "match-modifie" : "match-annule";
+    const envois = new Map(cibles.map((uid): [string, Envoi] => [uid, { notif, motif, ref: `match:${id}` }]));
+    envoyes = (await prevenir(sb, cle, envois)).recus.size;
   }
 
   return NextResponse.json({ envoyes, prevenus: cibles.length, annule: type === "annule" });

@@ -44,6 +44,7 @@ import { QuiVient } from "@/components/sfl/qui-vient";
 import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
 import { DiscussionMatch, type OngletDiscussion } from "@/components/sfl/matchs/discussion-match";
 import { FeuilleDeMatch } from "@/components/sfl/matchs/feuille-de-match";
+import { DuelsDuJour } from "@/components/sfl/matchs/duels";
 import { feuilleDeConvocation, feuilleDeJournee } from "@/lib/sfl/feuille";
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
 import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
@@ -1020,6 +1021,7 @@ export default function MapPage() {
                     }}
                   />
                 )}
+                {choisi && feuille.length > 0 && <DuelsDuJour j={choisi.j} />}
                 {choisi?.joue && (
                   <Link
                     href="/ligue"
@@ -1237,7 +1239,7 @@ function CarteMatch({
               <span className="min-w-0 truncate">
                 {heureCourte(m.heure)} ·{" "}
                 {m.partie
-                  ? `${m.partie.genre === "exhibition" ? "Exhibition" : m.partie.visibilite === "prive" ? "Privé" : "Public"} · ${m.partie.organisateur}`
+                  ? `${m.partie.visibilite === "prive" ? "Privé" : "Public"} · ${m.partie.organisateur}`
                   : m.team
                     ? `${m.team.de.nom} – ${m.team.a.nom}`
                     : `${m.j != null ? `J${m.j} · ` : ""}Sunday Five`}
