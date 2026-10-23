@@ -27,6 +27,7 @@ import { usePhotoAuMaillot } from "@/hooks/use-photo-au-maillot";
 import type { Camp } from "@/lib/sfl/maillots";
 import { ovr, type BoostType, type Player, type StatKey } from "@/lib/sfl/engine";
 import { useIdentites } from "@/hooks/use-identites";
+import type { HabillageCarte } from "./finitions-carte";
 
 export type CardMode = "simple" | "rare";
 
@@ -39,6 +40,7 @@ export function PlayerCard({
   pseudo,
   vertical,
   distinction,
+  habillage,
   maillot,
 }: {
   player: Player;
@@ -55,6 +57,8 @@ export function PlayerCard({
   vertical?: boolean;
   /** Une carte à titre : MVP (or), Impact (rouge), Défensive (bleu). */
   distinction?: BoostType;
+  /** Ce que la carte porte (finitions-carte.ts) ; gagne sur celui du joueur (l'essai dans la passe). */
+  habillage?: HabillageCarte;
   /** Le camp du joueur dans un match : sa photo porte ce maillot-là. */
   maillot?: Camp;
 }) {
@@ -75,6 +79,7 @@ export function PlayerCard({
         badge={badge}
         vertical={vertical}
         distinction={distinction}
+        habillage={habillage}
       />
     );
   return (
@@ -91,6 +96,7 @@ export function PlayerCard({
       photo={photo}
       onglet={onglet}
       badge={badge}
+      habillage={habillage}
     />
   );
 }

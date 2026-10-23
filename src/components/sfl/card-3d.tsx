@@ -17,10 +17,20 @@
 // navigateur — son URL est déjà versionnée (lib/sfl/photos), aucun besoin
 // de « cacheBust », qui re-téléchargeait polices et photo à chaque calque.
 // prechaufferCarte() lance tout ça dès qu'on pose le doigt sur une carte.
+//
+// Le dos (23/10, Sabri : « à l'arrière, on met Bola », de la même couleur
+// que l'avant) : la face dit sa matière et son joueur (data-matiere,
+// data-nom) ; on monte à côté d'elle, hors écran, le dos de la carte
+// (DosCarte), qu'on photographie aussi — la 3D le colle derrière, et prend
+// la tranche et le reflet de la même matière. La lumière qui passe sur la
+// finition animée (data-card-part="lumiere") n'est pas photographiée : la 3D
+// la fait passer elle-même.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { toPng } from "html-to-image";
+import { DosCarte } from "@/components/sfl/dos-carte";
+import { MATIERES, type HabillageCarte, type NomMatiere } from "@/components/sfl/finitions-carte";
 import { useBadgeRevision } from "@/hooks/use-badge-carte";
 import { useIdentitesRevision } from "@/hooks/use-identites";
 import { usePhotoRevision } from "@/hooks/use-player-photo";
@@ -159,8 +169,43 @@ interface CapturedLayers {
   background: string;
   playerLayer: string;
   stats: string;
+  /** Le dos (DosCarte), s'il a pu être photographié. */
+  dos?: string;
+  matiere: NomMatiere | null;
   width: number;
   height: number;
+}
+
+interface Dos {
+  matiere: NomMatiere;
+  nom: string;
+  habillage?: HabillageCarte;
+}
+
+/** La matière, le joueur et l'habillage que la face déclare (bola-card.tsx), pour son dos. */
+function dosDe(node: HTMLElement): Dos | null {
+  const corps = node.querySelector<HTMLElement>("[data-matiere]");
+  const matiere = corps?.dataset.matiere as NomMatiere | undefined;
+  if (!corps || !matiere || !(matiere in MATIERES)) return null;
+  let habillage: HabillageCarte | undefined;
+  try {
+    habillage = corps.dataset.habillage ? (JSON.parse(corps.dataset.habillage) as HabillageCarte) : undefined;
+  } catch {
+    habillage = undefined;
+  }
+  return { matiere, nom: corps.dataset.nom ?? "", habillage };
+}
+
+/** Attend qu'un nœud soit monté, quelques images au plus. */
+function attendreNoeud<T>(lire: () => T | null, images = 30): Promise<T | null> {
+  return new Promise((fin) => {
+    const essayer = (reste: number) => {
+      const n = lire();
+      if (n || reste <= 0) fin(n);
+      else requestAnimationFrame(() => essayer(reste - 1));
+    };
+    essayer(images);
+  });
 }
 
 // Capture le nœud une fois par calque : soit en excluant certaines parties
@@ -298,7 +343,7 @@ function Card3DInner({
   mode?: "simple" | "rare";
   /** Rend le contenu CardShell (PlayerCard/BoostCard) à la taille donnée. */
   render: (size: number) => ReactNode;
-  /** "back" démarre déjà retournée (dos SFL gravé) — pour les packs scellés. */
+  /** "back" démarre déjà retournée (le dos Bola) — pour les packs scellés. */
   startFace?: "front" | "back";
   /** false = décorative, ne répond pas au glissement (fans de pack). */
   interactive?: boolean;
@@ -314,6 +359,15 @@ function Card3DInner({
   const [source, setSource] = useState<{ width: number; height: number } | null>(null);
   /** La 3D a dessiné sa première image : l'aperçu plat peut s'effacer. */
   const [affichee, setAffichee] = useState(false);
+  /** Le dos à monter hors écran pour le photographier, lu sur la face. */
+  const [dos, setDos] = useState<Dos | null>(null);
+  const dosRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const node = captureRef.current;
+    if (!inView || !node) return;
+    setDos(dosDe(node));
+  }, [inView]);
 
   useLayoutEffect(() => {
     const node = captureRef.current;
@@ -342,7 +396,7 @@ function Card3DInner({
         const prets = await attendreBadges(node, 600);
         if (cancelled) return;
         const polices = await policesEnLigne(node);
-        const background = await captureLayer(node, { excludeParts: ["player", "stats"] }, polices);
+        const background = await captureLayer(node, { excludeParts: ["player", "stats", "lumiere"] }, polices);
         if (cancelled) return;
         // Sur WebKit, une capture à blanc du calque joueur d'abord : elle
         // lui fait décoder la photo, que la vraie capture trouve prête.
@@ -354,9 +408,26 @@ function Card3DInner({
         }
         const playerLayer = await captureLayer(node, { isolatePart: "player" }, polices);
         if (cancelled) return;
+        // Même chose pour le sigle SFL de la ligne de série (un masque CSS).
+        if (WEBKIT && node.querySelector('[data-card-part="stats"] [role="img"]')) {
+          await captureLayer(node, { isolatePart: "stats" }, polices);
+          if (cancelled) return;
+        }
         const stats = await captureLayer(node, { isolatePart: "stats" }, polices);
         if (cancelled) return;
-        setCaptured({ background, playerLayer, stats, width, height });
+        // Le dos, monté à côté de la face dès qu'elle a dit sa matière.
+        let dosUrl: string | undefined;
+        const dosNode = dosDe(node) ? await attendreNoeud(() => dosRef.current) : null;
+        if (cancelled) return;
+        if (dosNode) {
+          try {
+            dosUrl = await captureLayer(dosNode, { excludeParts: ["lumiere"] }, await policesEnLigne(dosNode));
+          } catch {
+            // le dos de repli (uni, à la couleur de la carte) le remplacera
+          }
+          if (cancelled) return;
+        }
+        setCaptured({ background, playerLayer, stats, dos: dosUrl, matiere: dosDe(node)?.matiere ?? null, width, height });
         if (!prets) void attendreBadges(node, Infinity).then(() => !cancelled && setEssai((n) => n + 1));
       } catch {
         // rasterisation indisponible — la carte plate ci-dessous reste
@@ -386,6 +457,11 @@ function Card3DInner({
           <div ref={captureRef} style={{ position: "absolute" }} aria-hidden>
             {render(1)}
           </div>
+          {dos && (
+            <div ref={dosRef} style={{ position: "absolute" }} aria-hidden>
+              <DosCarte matiere={MATIERES[dos.matiere]} nom={dos.nom} habillage={dos.habillage} />
+            </div>
+          )}
         </div>
       )}
 
@@ -416,6 +492,8 @@ function Card3DInner({
           background={captured.background}
           playerLayer={captured.playerLayer}
           stats={captured.stats}
+          dos={captured.dos}
+          matiere={captured.matiere}
           holo={mode === "rare"}
           mode={mode}
           startFace={startFace}
