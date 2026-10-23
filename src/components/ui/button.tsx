@@ -4,9 +4,9 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 // Les rangs de bouton de Bola (app/boutons.css) : `default` est le principal,
-// le verre de nuit éclairé par en dessous (argent) ; `secondary` et
-// `outline`, le verre fumé ; `ghost`, le discret. Les tons (`vert`, `or`,
-// `mauve`, `braise`, `rouge`) donnent sa couleur à la lumière ;
+// la pilule de nacre (argent) ; `secondary` et `outline`, la pilule cerclée
+// d'un trait fin ; `ghost`, le discret. Les tons (`vert`, `or`, `mauve`,
+// `braise`, `rouge`) en teintent le texte et l'accent ;
 // `destructive` reste un secondaire rouge. Un secondaire ou un discret prend son ton par la classe :
 // <Button variant="secondary" className="bouton--vert">.
 const buttonVariants = cva(

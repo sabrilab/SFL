@@ -150,7 +150,7 @@ function Puces<T extends string>({
         >
           <span className="text-[15px] font-extrabold tracking-tight">{o.label}</span>
           {o.detail && (
-            <span className={cn("mt-0.5 text-[10.5px] leading-tight", valeur === o.id ? "text-background/60" : "text-foreground/35")}>
+            <span className={cn("mt-0.5 text-[10.5px] leading-tight", valeur === o.id ? "bouton-sous" : "text-foreground/35")}>
               {o.detail}
             </span>
           )}
