@@ -120,7 +120,7 @@ export function AccesJoueur({
         )}
 
         {erreur && (
-          <p className="flex items-start gap-1.5 rounded-2xl border border-amber-500/25 bg-amber-500/8 px-3 py-2.5 text-[12.5px] leading-snug text-amber-300">
+          <p className="flex items-start gap-1.5 rounded-2xl border border-amber-500/25 bg-amber-500/8 px-3 py-2.5 text-[12.5px] leading-snug text-amber-700 dark:text-amber-300">
             <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
             {erreur}
           </p>

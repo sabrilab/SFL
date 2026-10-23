@@ -109,7 +109,7 @@ export function Bravo({ exploits }: { exploits: Exploit[] }) {
   return (
     <span className="relative flex shrink-0">
       {envol > 0 && xp && (
-        <span key={envol} aria-hidden className="bravo-xp pointer-events-none absolute bottom-full left-1/2 mb-1 font-mono text-[12px] font-bold whitespace-nowrap text-white">
+        <span key={envol} aria-hidden className="bravo-xp pointer-events-none absolute bottom-full left-1/2 mb-1 font-mono text-[12px] font-bold whitespace-nowrap text-foreground">
           +{XP_RECUE} XP
         </span>
       )}

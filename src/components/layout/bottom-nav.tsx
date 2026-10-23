@@ -19,7 +19,8 @@
 // sur <html>, posé par le Vestiaire.
 //
 // Sur la Map (plan clair), le verre devient clair et l'encre noire ;
-// ailleurs, l'app est sombre : verre fumé, encre blanche — exactement le
+// ailleurs, le verre suit le mode de l'app : fumé et encre blanche en
+// sombre, clair et encre noire en clair (23/10) — exactement le
 // `toolbarColorScheme` de l'onglet Jouer dans l'app.
 
 import { useEffect } from "react";
@@ -31,6 +32,7 @@ import { pastilleIcone, useVestiaireNonLus } from "@/hooks/use-vestiaire-non-lus
 import { useInvitationsMatch } from "@/hooks/use-invitations";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
 import { useMonEquipe } from "@/hooks/use-mon-equipe";
+import { useModeClair } from "@/hooks/use-mode-clair";
 
 const TABS = [
   { href: "/", Icon: MapIcon, label: "Map" },
@@ -46,7 +48,7 @@ export function BottomNav() {
   const actif = TABS.findIndex(({ href }) => href === onglet);
   // La bulle ouvre la discussion : le Vestiaire, et Bola Agent à côté.
   const vestiaire = pathname === "/vestiaire" || pathname === "/agent";
-  const clair = surMap(pathname);
+  const clair = useModeClair() || surMap(pathname);
   const encre = clair ? "#0a0b0d" : "#ffffff";
   // Du nouveau dans la discussion : le nombre, sur la bulle.
   const nonLus = useVestiaireNonLus();
@@ -131,17 +133,13 @@ function Pastille({ n, clair }: { n: number; clair: boolean }) {
   );
 }
 
-/** Sous la barre d'état : un voile à la couleur du fond, pour que le texte
- *  qui défile ne passe pas sous l'heure et la batterie (sur l'app installée,
- *  la barre d'état est transparente). Hors de la Map, qui a son propre voile. */
-export function VoileEtat() {
+/** Sous la barre d'état : un voile, pour que le texte qui défile ne passe
+ *  pas sous l'heure et la batterie (sur l'app installée, la barre d'état est
+ *  transparente). À la couleur du fond en sombre, une ombre d'encre en clair
+ *  (globals.css, .voile-etat). Hors de la Map, qui a son propre voile ;
+ *  partout pour les écrans d'avant l'app (la connexion s'ouvre sur « / »). */
+export function VoileEtat({ partout = false }: { partout?: boolean }) {
   const pathname = usePathname();
-  if (surMap(pathname)) return null;
-  return (
-    <div
-      aria-hidden
-      className="pointer-events-none fixed inset-x-0 top-0 z-30 bg-gradient-to-b from-background via-background/85 to-transparent"
-      style={{ height: "calc(env(safe-area-inset-top, 0px) + 14px)" }}
-    />
-  );
+  if (!partout && surMap(pathname)) return null;
+  return <div aria-hidden className="voile-etat pointer-events-none fixed inset-x-0 top-0 z-30" />;
 }

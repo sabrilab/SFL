@@ -142,7 +142,7 @@ function Rubrique({ titre, droite, children }: { titre: string; droite?: ReactNo
 function LigueOrganisee({ onSfl }: { onSfl?: () => void }) {
   const onglet = "flex h-11 items-center px-0.5";
   return (
-    <nav aria-label="La ligue" className="-mt-1 flex gap-6 border-b border-white/[0.08]">
+    <nav aria-label="La ligue" className="-mt-1 flex gap-6 border-b border-contraste/[0.08]">
       <span aria-current="true" className={cn(onglet, "relative text-foreground")}>
         <SigleLigue ligue="bola" hauteur={14} />
         <span aria-hidden className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-foreground" />

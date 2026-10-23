@@ -48,7 +48,7 @@ function Rubrique({
   const buts = butsDe(journee);
 
   return (
-    <div className={cn("glass overflow-hidden rounded-[20px]", ouverte && "bg-white/[0.055]")}>
+    <div className={cn("glass overflow-hidden rounded-[20px]", ouverte && "bg-contraste/[0.055]")}>
       <button
         onClick={onBascule}
         aria-expanded={ouverte}
@@ -76,7 +76,7 @@ function Rubrique({
       </button>
 
       {ouverte && (
-        <div className="flex flex-col gap-2.5 border-t border-white/8 px-3.5 pt-3 pb-3.5">
+        <div className="flex flex-col gap-2.5 border-t border-contraste/8 px-3.5 pt-3 pb-3.5">
           {/* Les matchs du jour, score en gros */}
           {matches.map((m) => {
             const aGagne = m.teamA.score > m.teamB.score;

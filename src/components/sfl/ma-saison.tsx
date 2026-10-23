@@ -56,7 +56,7 @@ function Pastille({ r }: { r: Resultat }) {
     <span
       className={cn(
         "flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
-        r === "V" ? "bg-primary text-primary-foreground" : r === "N" ? "bg-white/12 text-foreground/70" : "bg-white/6 text-foreground/40"
+        r === "V" ? "bg-primary text-primary-foreground" : r === "N" ? "bg-foreground/12 text-foreground/70" : "bg-foreground/6 text-foreground/40"
       )}
     >
       {r}
@@ -124,7 +124,7 @@ function LigneDimanche({ d, premiere }: { d: Dimanche; premiere: boolean }) {
     <Link
       href={`/ligue/journee?j=${d.j}`}
       aria-label={`J${d.j}, ${d.date} : ${phraseDuJour(d)} ${signe(d.points)} points Pépite. Voir le récap`}
-      className={cn("flex min-h-[60px] items-center gap-3 px-4 py-2.5 active:bg-foreground/[0.04]", !premiere && "border-t border-white/8")}
+      className={cn("flex min-h-[60px] items-center gap-3 px-4 py-2.5 active:bg-foreground/[0.04]", !premiere && "border-t border-foreground/8")}
     >
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className={cn("truncate text-[15px] font-semibold", d.horsMatch && "text-foreground/60")}>
@@ -200,7 +200,7 @@ export function MaSaison({
               type="button"
               onClick={() => setTout((t) => !t)}
               aria-expanded={tout}
-              className="border-t border-white/8 py-3.5 text-[13px] font-semibold text-foreground/70 active:bg-foreground/[0.04]"
+              className="border-t border-foreground/8 py-3.5 text-[13px] font-semibold text-foreground/70 active:bg-foreground/[0.04]"
             >
               {tout ? "Moins" : "Tous mes dimanches"}
             </button>

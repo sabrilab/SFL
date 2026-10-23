@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { BottomNav, VoileEtat } from "@/components/layout/bottom-nav";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { MiseAJour } from "@/components/pwa/mise-a-jour";
+import { CouleurTheme } from "@/components/pwa/couleur-theme";
 import { GuideInstallation } from "@/components/pwa/guide-installation";
 import { ViewportLock } from "@/components/pwa/viewport-lock";
 import { PlayerProvider } from "@/components/sfl/player-provider";
@@ -97,10 +98,12 @@ export default function RootLayout({
           cadre" toute l'appli (header, tab bar) au lieu de rester contenu
           dans une simple liste qui rebondit sur elle-même. */}
       <body className="h-dvh overflow-hidden overscroll-none touch-manipulation">
-        {/* Version sombre uniquement pour l'instant (décision admin) : le
-            thème clair du design existe mais n'est pas encore porté partout,
-            on force le sombre plutôt que d'exposer un clair à moitié fait. */}
-        <ThemeProvider attribute="class" forcedTheme="dark" disableTransitionOnChange>
+        {/* Clair, sombre ou Auto (qui suit le téléphone), au choix de chaque
+            joueur : le rond en haut de Ma carte, ou les réglages. Le sombre
+            reste le thème de qui n'a rien choisi. Le choix est gardé sur le
+            téléphone (bola-theme). */}
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem storageKey="bola-theme" disableTransitionOnChange>
+          <CouleurTheme />
           <SeasonProvider>
             <PlayerProvider>
             <CardViewerProvider>

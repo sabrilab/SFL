@@ -253,7 +253,7 @@ export function InvitationCarte() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[55] flex flex-col items-center justify-center gap-6 bg-black/92 px-6 backdrop-blur-sm"
+            className="dark fixed inset-0 z-[55] flex flex-col items-center justify-center gap-6 bg-black/92 px-6 text-foreground backdrop-blur-sm"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
             {visible === "suivre" ? (

@@ -48,7 +48,7 @@ function Fenetre({ c }: { c: Compte }) {
   return (
     <div className="glass overflow-hidden rounded-[18px]">
       {/* En-tête de la fenêtre : nom du joueur + icône copier */}
-      <div className="flex items-center gap-2.5 border-b border-white/8 px-3.5 py-2.5">
+      <div className="flex items-center gap-2.5 border-b border-contraste/8 px-3.5 py-2.5">
         <span className="flex shrink-0 gap-1.5">
           {["rgba(255,255,255,0.22)", "rgba(255,255,255,0.14)", "rgba(255,255,255,0.1)"].map(
             (bg) => (
@@ -62,7 +62,7 @@ function Fenetre({ c }: { c: Compte }) {
         {/* Distingue les joueurs arrivés après la liste d'origine : leurs
             accès viennent d'être fabriqués, ils n'ont encore rien reçu. */}
         {c.sansCompte ? (
-          <span className="mono-label shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-400">
+          <span className="mono-label shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-700 dark:text-amber-400">
             À inscrire
           </span>
         ) : (
@@ -230,7 +230,7 @@ export default function ComptesPage() {
 
       {error && (
         <div className="glass-soft rounded-2xl p-4">
-          <p className="text-[12.5px] leading-snug text-[#FF6B5E]">{error}</p>
+          <p className="text-[12.5px] leading-snug text-[#c8352b] dark:text-[#FF6B5E]">{error}</p>
           <button
             onClick={load}
             className="bouton-secondaire mono-label mt-3 px-3 py-1.5"
@@ -246,7 +246,7 @@ export default function ComptesPage() {
           serveur, la personne ne peut pas entrer. */}
       {manquants.length > 0 && (
         <div className="rounded-2xl border border-amber-500/25 bg-amber-500/8 px-3.5 py-3">
-          <p className="text-[13px] leading-snug text-amber-300">
+          <p className="text-[13px] leading-snug text-amber-700 dark:text-amber-300">
             <b className="font-semibold">
               {manquants.length} joueur{manquants.length > 1 ? "s" : ""} sans compte.
             </b>{" "}
@@ -263,7 +263,7 @@ export default function ComptesPage() {
               : `Créer les ${manquants.length} comptes manquants`}
           </button>
           {inscription?.erreur && (
-            <p className="mt-2 text-[12.5px] leading-snug text-red-300">
+            <p className="mt-2 text-[12.5px] leading-snug text-red-600 dark:text-red-300">
               Arrêté après {inscription.faits} sur {inscription.total} — {inscription.erreur}
             </p>
           )}

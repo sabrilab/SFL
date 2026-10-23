@@ -31,10 +31,13 @@ export function SolTerrain({
   /** Le point de vue (terrain-vu.ts) ; celui de la feuille de match par défaut. */
   vue?: Vue;
   /**
-   * Le gazon : « nuit » (la feuille de match) ou « vert », un vert translucide
+   * Le gazon : « nuit » (la feuille de match ; au jour, sur le papier, en
+   * mode clair : globals.css, --nuit-*) ou « vert », un vert translucide
    * qui s'efface en dégradé vers les bords du cadre (les terrains de la Ligue ;
    * Sabri, 19/10 : « bien vert, avec le petit dégradé en bord de carte, pas
-   * trop opaque »).
+   * trop opaque »). Le vert suit le mode de l'app (globals.css, --gazon-*) :
+   * translucide sur le noir, plein sur le papier du mode clair, où il
+   * deviendrait pâle.
    */
   gazon?: "nuit" | "vert";
 }) {
@@ -64,8 +67,17 @@ export function SolTerrain({
     >
       <defs>
         <linearGradient id={`${id}f`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={vert ? "#1e7a3e" : "#17191d"} stopOpacity={vert ? 0.62 : 1} />
-          <stop offset="1" stopColor={vert ? "#36a157" : "#24272c"} stopOpacity={vert ? 0.72 : 1} />
+          {vert ? (
+            <>
+              <stop offset="0" style={{ stopColor: "var(--gazon-haut)", stopOpacity: "var(--gazon-haut-a)" }} />
+              <stop offset="1" style={{ stopColor: "var(--gazon-bas)", stopOpacity: "var(--gazon-bas-a)" }} />
+            </>
+          ) : (
+            <>
+              <stop offset="0" style={{ stopColor: "var(--nuit-haut)" }} />
+              <stop offset="1" style={{ stopColor: "var(--nuit-bas)" }} />
+            </>
+          )}
         </linearGradient>
         <radialGradient id={`${id}o`}>
           <stop offset="0" stopColor="#000" stopOpacity="0.55" />
@@ -79,11 +91,10 @@ export function SolTerrain({
         {/* L'épaisseur du terrain, sous le bord avant. */}
         <path
           d={t([[4, h], [l - 4, h], [l - 4, h, -14], [4, h, -14]], true)}
-          fill={vert ? "#0f3d1f" : "#08090b"}
-          fillOpacity={vert ? 0.8 : 1}
+          style={vert ? { fill: "var(--gazon-bord)", fillOpacity: "var(--gazon-bord-a)" } : { fill: "var(--nuit-bord)" }}
         />
         <path d={t(rectArrondi(0, 0, l, h, 10), true)} fill={`url(#${id}f)`} />
-        <g clipPath={`url(#${id}c)`} fill={vert ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.04)"}>
+        <g clipPath={`url(#${id}c)`} fill={vert ? "rgba(255,255,255,0.07)" : undefined} style={vert ? undefined : { fill: "var(--nuit-bande)" }}>
           {Array.from({ length: Math.ceil(h / 100) }, (_, i) => (
             <path
               key={i}
@@ -93,7 +104,8 @@ export function SolTerrain({
         </g>
         <g
           fill="none"
-          stroke={vert ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.55)"}
+          stroke={vert ? "rgba(255,255,255,0.75)" : undefined}
+          style={vert ? undefined : { stroke: "var(--nuit-craie)" }}
           strokeWidth={1.7}
           strokeLinejoin="round"
         >

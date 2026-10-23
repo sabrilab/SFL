@@ -119,7 +119,7 @@ export function EquipesDimanche() {
               </p>
             </div>
           ))}
-          <p className="mono-label text-emerald-400">
+          <p className="mono-label text-emerald-700 dark:text-emerald-400">
             ✓ Prêtes — {presence.equipesVisibles ? "visibles par la ligue" : "révélées vendredi 19h"}
           </p>
         </div>

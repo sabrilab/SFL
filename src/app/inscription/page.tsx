@@ -608,7 +608,7 @@ export default function InscriptionPage() {
             label="Pseudo"
             note={
               pseudoEtat === "pris" ? (
-                <span className="text-[#FF6B5E]">Déjà pris.</span>
+                <span className="text-[#c8352b] dark:text-[#FF6B5E]">Déjà pris.</span>
               ) : pseudoEtat === "libre" ? (
                 <span className="text-foreground/55">
                   <Check className="mr-1 inline size-3.5" />
@@ -803,7 +803,7 @@ export default function InscriptionPage() {
               La ligue valide ton entrée. Ta carte s&apos;ouvre dès que c&apos;est fait.
             </p>
           </div>}
-          {avertissement && <p className="px-[13px] text-[12.5px] text-[#FF6B5E]">{avertissement}</p>}
+          {avertissement && <p className="px-[13px] text-[12.5px] text-[#c8352b] dark:text-[#FF6B5E]">{avertissement}</p>}
           {aRenvoyer && nomFinal && (
             <button
               type="button"
@@ -900,7 +900,7 @@ export default function InscriptionPage() {
                 Les inscriptions ouvrent bientôt. En attendant, l&apos;admin te donne ton accès.
               </p>
             )}
-            {erreur && <p className="mt-[13px] px-[13px] text-[12.5px] font-medium text-[#FF6B5E]">{erreur}</p>}
+            {erreur && <p className="mt-[13px] px-[13px] text-[12.5px] font-medium text-[#c8352b] dark:text-[#FF6B5E]">{erreur}</p>}
             <div className="min-h-[34px] flex-1" />
           </div>
         </div>

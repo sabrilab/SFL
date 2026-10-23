@@ -101,7 +101,7 @@ function FicheJournee({ journee }: { journee: Journee }) {
       ) : (
         matches.map((m) => (
           <section key={m.id} className="glass overflow-hidden rounded-[26px]">
-            <div className="flex items-center justify-between border-b border-white/8 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-contraste/8 px-4 py-3">
               <span className="mono-label text-foreground/40">{m.label}</span>
               <span className="text-[19px] font-extrabold tracking-tight tabular-nums">
                 {m.teamA.score} – {m.teamB.score}
@@ -111,7 +111,7 @@ function FicheJournee({ journee }: { journee: Journee }) {
               {[m.teamA, m.teamB].map((team, ti) => (
                 <div
                   key={team.id}
-                  className={cn("px-4 py-3.5", ti === 0 && "border-r border-white/8")}
+                  className={cn("px-4 py-3.5", ti === 0 && "border-r border-contraste/8")}
                 >
                   <p className="mono-label mb-2 text-foreground/45">{team.name}</p>
                   <div className="flex flex-col gap-1.5">

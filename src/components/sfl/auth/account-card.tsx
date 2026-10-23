@@ -155,7 +155,7 @@ export function AccountCard() {
 
         {/* Email de contact — la clé de la future connexion Google/Apple */}
         {serverSession && (
-          <div className="mt-3 border-t border-white/8 pt-3">
+          <div className="mt-3 border-t border-contraste/8 pt-3">
             {email ? (
               <p className="flex items-center gap-2 text-[13px] text-foreground/60">
                 <Mail className="size-3.5 shrink-0 text-primary" />

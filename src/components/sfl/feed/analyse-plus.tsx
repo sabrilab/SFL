@@ -576,7 +576,7 @@ export function TimelineModule({ timeline }: { timeline: AnalysePlus["timeline"]
       <p className="mono-label text-primary">Minute par minute</p>
       <h2 className="mt-1 text-xl font-bold tracking-tight">Comment le match s&apos;est joué</h2>
       <div className="relative mt-4 pl-[86px]">
-        <span className="absolute top-1 bottom-1 left-[62px] w-px bg-white/10" />
+        <span className="absolute top-1 bottom-1 left-[62px] w-px bg-contraste/10" />
         <div className="flex flex-col gap-3.5">
           {timeline.map((e, i) => {
             const home = e.team === teamA;
@@ -588,7 +588,7 @@ export function TimelineModule({ timeline }: { timeline: AnalysePlus["timeline"]
                 <span
                   className="absolute top-1 -left-[28px] size-2.5 rounded-full"
                   style={{
-                    background: home ? "var(--primary)" : "rgba(255,255,255,0.5)",
+                    background: home ? "var(--primary)" : "rgb(var(--contraste-rgb) / 0.5)",
                     boxShadow: home ? "0 0 8px rgba(111,168,255,0.6)" : undefined,
                   }}
                 />
@@ -627,7 +627,7 @@ export function TournantModule({ tournant }: { tournant: AnalysePlus["tournant"]
         <span className="text-[22px] font-extrabold tracking-tight tabular-nums text-foreground/40">
           {tournant.from}
         </span>
-        <span className="h-px flex-1 bg-gradient-to-r from-white/10 to-primary" />
+        <span className="h-px flex-1 bg-gradient-to-r from-contraste/10 to-primary" />
         <span className="text-[22px] font-extrabold tracking-tight tabular-nums text-primary">
           {tournant.to}
         </span>
@@ -776,13 +776,9 @@ export function MonDimancheModule({
   if (!mine) return null;
   const delta = mine.rankFrom ? mine.rankFrom - mine.rankTo : 0;
   return (
-    <section
-      className="glass rounded-3xl p-5"
-      style={{
-        background:
-          "radial-gradient(120% 80% at 100% 0%, rgba(111,168,255,0.14), transparent 55%), linear-gradient(168deg, rgba(255,255,255,0.09), rgba(255,255,255,0.028))",
-      }}
-    >
+    // Le verre de la page, teinté de bleu en haut à droite : le voile blanc
+    // du sombre, le verre clair (globals.css, .glass) du mode clair.
+    <section className="glass rounded-3xl p-5 [background:radial-gradient(120%_80%_at_100%_0%,rgba(111,168,255,0.14),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.65),rgba(255,255,255,0.35)),color-mix(in_oklab,var(--background)_40%,transparent)] dark:[background:radial-gradient(120%_80%_at_100%_0%,rgba(111,168,255,0.14),transparent_55%),linear-gradient(168deg,rgba(255,255,255,0.09),rgba(255,255,255,0.028))]">
       <p className="mono-label text-primary">Ton dimanche</p>
       {mine.played ? (
         <>

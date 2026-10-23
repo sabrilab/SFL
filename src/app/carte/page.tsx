@@ -176,7 +176,7 @@ export default function CartePage() {
               key={label}
               className={cn(
                 "flex items-center justify-between gap-3 px-5 py-3.5",
-                i < sources.length - 1 && "border-b border-white/8"
+                i < sources.length - 1 && "border-b border-contraste/8"
               )}
             >
               <span className="text-sm font-semibold">
@@ -186,7 +186,7 @@ export default function CartePage() {
               <span className={cn("text-right text-[13px] font-semibold", color)}>{detail}</span>
             </div>
           ))}
-          <p className="border-t border-white/8 bg-secondary/40 px-5 py-3 text-xs text-foreground/45">
+          <p className="border-t border-contraste/8 bg-secondary/40 px-5 py-3 text-xs text-foreground/45">
             Non-titré dans une catégorie ? Tu reçois des points{" "}
             <strong className="font-semibold text-foreground">au prorata</strong> de ton rang.
           </p>
@@ -231,7 +231,7 @@ export default function CartePage() {
             return (
               <div
                 key={k}
-                className="flex items-center gap-3 border-b border-white/8 py-2.5 last:border-0"
+                className="flex items-center gap-3 border-b border-contraste/8 py-2.5 last:border-0"
               >
                 <span className="w-9 text-[13px] font-semibold text-foreground/45">{k}</span>
                 <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
@@ -318,7 +318,7 @@ export default function CartePage() {
               key={action}
               className={cn(
                 "flex items-center justify-between px-5 py-3.5",
-                i < BAREME.length - 1 && "border-b border-white/8"
+                i < BAREME.length - 1 && "border-b border-contraste/8"
               )}
             >
               <span className="text-sm font-medium">{action}</span>
