@@ -27,13 +27,14 @@ import { useSeason } from "@/components/sfl/season-provider";
 import type { RangDuJour } from "@/components/sfl/ma-saison";
 import { useRangXp, useXp } from "@/hooks/use-missions";
 import { cartesDeCarriere, courbeDeCarriere, type PointCourbe } from "@/lib/sfl/carriere";
-import { dimanchesDe, ficheJoueur, phraseDuJour } from "@/lib/sfl/fiche-joueur";
+import { actionsDuJour, dimanchesDe, ficheJoueur, resultatDuJour } from "@/lib/sfl/fiche-joueur";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
 import { PALIERS_PASSE, PASSE_BOLA } from "@/lib/sfl/passe";
 import { metal, NOM_METAL, prochain, vitrine } from "@/lib/sfl/trophees";
 import { cn } from "@/lib/utils";
 
 const signe = (n: number) => (n < 0 ? `−${-n}` : `+${n}`);
+const majuscule = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Ce que Ma carte et ses pages lisent de ma saison : calculé au même endroit. */
 export function useMaCarte() {
@@ -149,7 +150,7 @@ export function RubriquesMaCarte() {
         <Rangee
           href="/profil/saison"
           nom="Ma saison"
-          phrase={phraseDuJour(dernier)}
+          phrase={dernier.horsMatch ?? majuscule([resultatDuJour(dernier), actionsDuJour(dernier.buts, dernier.passes)].filter(Boolean).join(", ") || "présent")}
           detail={`J${dernier.j} · ${joues} ${joues > 1 ? "dimanches" : "dimanche"}${rang?.ecart ? ` · ${rang.ecart > 0 ? "▲" : "▼"} ${Math.abs(rang.ecart)} ${Math.abs(rang.ecart) > 1 ? "places" : "place"}` : ""}`}
           premiere={premiere}
         >
@@ -268,10 +269,15 @@ export function RubriquesMaCarte() {
 
 /* ----------------------------- La page enfant ----------------------------- */
 
-/** Une rubrique en grand : le retour vers Ma carte, son nom, son contenu. */
+/**
+ * Une rubrique en grand : le retour vers Ma carte, son nom, son contenu. Le
+ * nom du bloc repris (« Ma saison », « Niveau XP ») redirait le titre : il ne
+ * reste que pour le lecteur d'écran, la ligne d'à côté (« Saison 1 · après
+ * J2 ») reste à sa place.
+ */
 export function PageRubrique({ titre, children }: { titre: string; children: React.ReactNode }) {
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col gap-[var(--fib-21)] px-5 py-4 sm:py-8 lg:max-w-2xl">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-[var(--fib-21)] px-5 py-4 sm:py-8 lg:max-w-2xl [&>section>div:first-child>h2.mono-label]:sr-only">
       <div className="flex items-center gap-3">
         <BoutonRetour />
         <h1 className="text-[30px] font-bold tracking-tight">{titre}</h1>
