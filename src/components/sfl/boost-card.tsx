@@ -53,7 +53,9 @@ export function BoostCard({ card, size = 1 }: { card: BoostCardData; size?: numb
     impact: 0,
     def: 0,
   }));
-  return <PlayerCard player={player} size={size} distinction={card.type} />;
+  // La journée du titre (« J5 · 19 juil. ») : le jour d'émission d'une carte d'époque.
+  const j = Number(/^J(\d+)/.exec(card.date)?.[1]) || undefined;
+  return <PlayerCard player={player} size={size} distinction={card.type} journee={j} />;
 }
 
 export function RankingCard({

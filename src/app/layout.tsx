@@ -24,10 +24,9 @@ import { NouvellesCartes } from "@/components/sfl/nouvelle-carte";
 import { ConnexionLocale } from "@/components/sfl/auth/connexion-locale";
 import { PhotosSync } from "@/components/sfl/photos-sync";
 import { MissionsAnnonce } from "@/components/sfl/missions-annonce";
-import { IdentiteObligatoire } from "@/components/sfl/identite";
 import { NouveauxBadges } from "@/components/sfl/vitrine";
 import { InvitationCarte } from "@/components/sfl/invitation-carte";
-import { ApresAccord, ConsentementObligatoire } from "@/components/sfl/confidentialite/consentement";
+import { Accueil, ApresAccueil } from "@/components/sfl/accueil/accueil";
 
 // Typographie de l'app BOLA, celle de la Map (Sabri, 22/10 : « uniformise le
 // tout ») : Inter pour tout ce qui se lit (celle du site), au plus gras pour
@@ -118,15 +117,16 @@ export default function RootLayout({
                 <ConnexionLocale />
                 <PhotosSync />
                 <MissionsAnnonce />
-                {/* La case de confidentialité passe avant tout ce qui s'ouvre
-                    de soi-même : cérémonies, invitations, identité. */}
-                <ConsentementObligatoire />
-                <ApresAccord>
+                {/* L'accueil de l'app passe avant tout ce qui s'ouvre de
+                    soi-même (cérémonies, badges, invitations) : à la première
+                    ouverture, tout ce qui manque au joueur, puis la visite.
+                    Hors de lui, la case de confidentialité garde la porte. */}
+                <Accueil />
+                <ApresAccueil>
                   <NouvellesCartes />
                   <NouveauxBadges />
                   <InvitationCarte />
-                  <IdentiteObligatoire />
-                </ApresAccord>
+                </ApresAccueil>
                 {/* Orbes lumineux du design de référence, derrière tout le contenu */}
                 <div className="orbs" aria-hidden>
                   <i /><i /><i />

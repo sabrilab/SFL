@@ -1681,6 +1681,40 @@
   }
 }
 
+/* La carte en grand (carte-en-grand.tsx) : une scène de nuit, éclairée juste
+   derrière la carte, qui s'allume pendant que la carte vient au centre et
+   s'éteint quand elle repart à sa place. La même en clair et en sombre : la
+   carte est un objet, la scène est sa vitrine. */
+.carte-en-grand {
+  transition: opacity 0.15s ease;
+}
+.carte-en-grand-fond {
+  background:
+    radial-gradient(44% 32% at 50% 50%, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0) 100%),
+    radial-gradient(150% 110% at 50% 42%, #16181d 0%, #090a0d 55%, #030304 100%);
+  animation: carte-en-grand-allume 0.3s ease-out backwards;
+  transition: opacity 0.28s ease;
+}
+.carte-en-grand-titre {
+  animation: carte-en-grand-allume 0.32s 0.12s ease-out backwards;
+  transition: opacity 0.2s ease;
+}
+.carte-en-grand[data-fermeture] .carte-en-grand-fond,
+.carte-en-grand[data-fermeture] .carte-en-grand-titre {
+  opacity: 0;
+}
+@keyframes carte-en-grand-allume {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .carte-en-grand-fond,
+  .carte-en-grand-titre {
+    animation: none;
+  }
+}
+
 /* Les écrans de discussion (vestiaire.tsx, agent.tsx) : toute la hauteur de
    l'écran ; clavier ouvert, celle de la partie visible, décalée comme elle
    (hooks/use-ecran-clavier.ts pose data-clavier, --vue-h et --vue-haut). Le

@@ -18,6 +18,12 @@
 // liseré d'argent ou d'or et ses coins par cran, en cadre intérieur, à la
 // même distance du bord que celui du portrait sur la face.
 //
+// Le dos d'une carte d'époque (la saison 0, Sabri 24/10) est de sa matière
+// lui aussi : le parchemin et ses coups de pinceau (en haut, loin du logo),
+// ou le fond de sa carte Boost, sa lumière, son cadre de métal et son filet.
+// Sous le logotype, sa saison (et son titre) ; dans la ligne de série, sa
+// date d'émission et son numéro, comme sur la face.
+//
 // Repère 1024 × 1656, comme la face : card-3d.tsx le photographie pour le
 // dos de la 3D (data-card-part="body").
 
@@ -33,7 +39,9 @@ import {
   type Matiere,
 } from "@/components/sfl/finitions-carte";
 import { Crans, Lisere, type Boite } from "@/components/sfl/habillage-carte";
+import { BordEpoque } from "@/components/sfl/marques-carte";
 import { MotifCarte, RosaceBola } from "@/components/sfl/motif-carte";
+import { ligneDEmission, type EmissionCarte } from "@/lib/sfl/epoques";
 
 const W = 1024;
 const H = 1656;
@@ -48,6 +56,8 @@ const MONO = "var(--font-jbmono), ui-monospace, monospace";
 const ROSACE = { cx: 512, cy: 738, r1: 236, r2: 318 };
 const LUNE = 300; // le diamètre du symbole
 const LOGOTYPE = { cy: 1222, h: 104 };
+// Les coups de pinceau de la saison 0 : en haut à gauche, loin de la lune et du logotype.
+const PINCEAU_DOS = { cx: 512, cy: 330 };
 // Les boîtes des tracés dans le repère du logo (1000 × 237).
 const BOITE_SYMBOLE = { x: 17, y: 103.485, c: 112.373 };
 const BOITE_LOGOTYPE = { x: 150.41, y: 32.445, l: 783.3, h: 183.7 };
@@ -56,17 +66,23 @@ export function DosCarte({
   matiere: p,
   nom,
   size = 1,
-  habillage,
+  habillage: habillageDemande,
+  emission,
 }: {
   matiere: Matiere;
   nom: string;
   size?: number;
   habillage?: HabillageCarte;
+  /** Une carte d'époque : sa date d'émission et son numéro (lib/sfl/epoques.ts). */
+  emission?: EmissionCarte | null;
 }) {
   const u = (n: number) => n * size * (254 / W);
   const encre = (a: number) => `rgba(${p.encre},${a})`;
   const seed = graine(nom);
-  const { serie, numero } = serieDe(nom);
+  const era = p.epoque;
+  const habillage = era ? undefined : habillageDemande;
+  const ligne = era ? ligneDEmission(emission ?? { saison: era.saison, le: null, n: null, sur: null }) : null;
+  const { serie, numero } = ligne ? { serie: ligne.date, numero: ligne.numero } : serieDe(nom);
   const sLune = LUNE / BOITE_SYMBOLE.c;
   const lisere = lisereDe(habillage);
   const cran = habillage?.cran ?? 0;
@@ -91,7 +107,9 @@ export function DosCarte({
         ].join(", "),
       }}
     >
-      {p.motif && <MotifCarte motif={p.motif} graine={seed} centre={{ cx: ROSACE.cx, cy: ROSACE.cy }} />}
+      {p.motif && (
+        <MotifCarte motif={p.motif} graine={seed} centre={p.motif.type === "pinceau" ? PINCEAU_DOS : { cx: ROSACE.cx, cy: ROSACE.cy }} />
+      )}
       <div
         aria-hidden
         style={{
@@ -153,6 +171,7 @@ export function DosCarte({
         />
       )}
 
+      {era && <BordEpoque epoque={era} />}
       {lisere && <Lisere metal={lisere} boite={CADRE} />}
       {cran > 0 && <Crans cran={cran} metal={lisere ?? "argent"} boite={CADRE} />}
 
@@ -180,6 +199,28 @@ export function DosCarte({
         />
       </svg>
 
+      {/* Une carte d'époque : sa saison (et son titre), sous le logotype */}
+      {era && (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: u(LOGOTYPE.cy + LOGOTYPE.h / 2 + 70),
+            textAlign: "center",
+            fontFamily: MONO,
+            fontSize: u(30),
+            letterSpacing: u(6),
+            fontWeight: 700,
+            lineHeight: 1,
+            textTransform: "uppercase",
+            color: era.libelle,
+          }}
+        >
+          {`saison ${era.saison}${era.embleme ? ` · ${p.titre}` : ""}`}
+        </div>
+      )}
+
       {/* Le filet pointillé et la série, comme sur la face */}
       <div
         style={{
@@ -188,7 +229,7 @@ export function DosCarte({
           right: u(M),
           top: u(1605),
           height: u(2),
-          backgroundImage: `repeating-linear-gradient(90deg, ${encre(0.4)} 0 ${u(10)}px, transparent ${u(10)}px ${u(20)}px)`,
+          backgroundImage: `repeating-linear-gradient(90deg, ${era ? `${era.libelle}99` : encre(0.4)} 0 ${u(10)}px, transparent ${u(10)}px ${u(20)}px)`,
         }}
       />
       <div
@@ -204,7 +245,7 @@ export function DosCarte({
           letterSpacing: u(0.5),
           fontWeight: 500,
           lineHeight: 1,
-          color: encre(0.75),
+          color: era ? era.libelle : encre(0.75),
         }}
       >
         <span>{serie}</span>

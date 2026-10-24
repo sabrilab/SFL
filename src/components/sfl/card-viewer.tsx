@@ -29,6 +29,9 @@
 // (la fiche d'un match, un profil, un trophée et ceux qui l'ont) y est posée
 // aussi, au lieu d'ouvrir une fenêtre de plus : le retour, à gauche du nom,
 // ramène à ce qu'on regardait.
+//
+// Toucher la carte elle-même l'ouvre en grand, en plein écran, pour bien la
+// manipuler (carte-en-grand.tsx ; Sabri, 24/10) ; la fiche attend dessous.
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
@@ -51,6 +54,7 @@ import { useGrandEcran } from "@/hooks/use-media-query";
 import { rankPlayers } from "@/lib/sfl/engine";
 import { isHidden } from "@/lib/sfl/hidden";
 import { Card3D, prechaufferCarte } from "./card-3d";
+import { Card3DEnGrand } from "./carte-en-grand";
 import { useMyPlayer } from "./player-provider";
 import { useSeason } from "./season-provider";
 import { BoutonSuivre, ReseauJoueur } from "./suivre";
@@ -147,14 +151,17 @@ function EcranCarte({ viewed }: { viewed: ViewedCard }) {
 
       {/* Le cadre de la 3D garde autour de la carte de quoi la
           tourner : ses bords vides passent sous le nom et les
-          abonnés, qui restent au-dessus (relative). */}
+          abonnés, qui restent au-dessus (relative). Un toucher sur
+          la carte l'ouvre en grand. */}
       <div className="-mt-[var(--fib-13)] -mb-[var(--fib-21)] flex shrink-0 justify-center">
-        <Card3D
+        <Card3DEnGrand
           cacheKey={`viewer-${viewed.cacheKey}`}
           mode={viewed.mode}
           size={grand ? 1 : 0.92}
           render={viewed.render}
           apercu
+          titre={viewed.joueur ? identite.nom(viewed.joueur) : viewed.title}
+          sousTitre={viewed.subtitle ?? (joueur ? identite.pseudo(joueur) : undefined)}
         />
       </div>
 

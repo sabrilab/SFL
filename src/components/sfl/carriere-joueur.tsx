@@ -12,6 +12,8 @@
 //     de sa carte (une marche par saison, un point pour chaque carte
 //     spéciale du jour) ou son rang au Pépite d'Or. On la parcourt du doigt.
 // Ma carte s'en sert aussi : « Mes cartes », et la courbe, ouverte sur le rang.
+// Les cartes d'une saison close qui a son édition d'époque (la saison 0)
+// sont dans les visuels de son temps (finitions-carte.ts, Sabri 24/10).
 // Dès la tablette (768 px), où une rangée qui défile se manie mal à la souris,
 // les cartes spéciales passent à la ligne à droite de la carte de la saison ;
 // dès 1024 px, toutes prennent un cran de plus (useFormatCarte).
@@ -73,6 +75,7 @@ export function CartesCarriere({ saisons, titre = "Ses cartes" }: { saisons: Car
                     size={format.grande}
                     cle={`saison-${s.numero}-${s.player.name}`}
                     detail={`${s.nom} · ${s.note}`}
+                    saison={s.enCours ? undefined : s.numero}
                   />
                 </figure>
                 {/* Sur téléphone, sans boîte : les cartes spéciales suivent dans la rangée. */}
@@ -85,6 +88,8 @@ export function CartesCarriere({ saisons, titre = "Ses cartes" }: { saisons: Car
                         cle={`speciale-${s.numero}-${c.j}-${c.carte.type}-${c.player.name}`}
                         distinction={c.carte.type}
                         detail={`${BOOST_LABELS[c.carte.type]} · ${c.carte.date}`}
+                        saison={s.enCours ? undefined : s.numero}
+                        journee={c.j}
                       />
                       <figcaption className="flex flex-col items-center leading-tight">
                         <span className="text-[11px] font-bold">{BOOST_LABELS[c.carte.type]}</span>

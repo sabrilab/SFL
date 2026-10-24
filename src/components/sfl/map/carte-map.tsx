@@ -59,6 +59,7 @@ import { useEffect, useRef } from "react";
 import maplibregl, { type LngLatBoundsLike, type Map as PlanMap, type Marker, type PaddingOptions } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { SPLASH_FINI } from "@/components/sfl/app-splash";
+import { quandAccueilLibre } from "@/lib/sfl/accueil";
 import {
   couleurFantome,
   dosHtml,
@@ -722,10 +723,12 @@ export function CarteMap({
         volFini.current = performance.now() + VOL * 1000;
         cadrer(map, cibleVol.current, marges(map, MARGE_HAUT, margeBasRef.current), ZOOM_CADRE, VOL);
       };
-      // Sous l'écran de chargement, le vol attend qu'il se lève (les
+      // Sous l'écran de chargement, puis sous l'accueil de l'app
+      // (components/sfl/accueil), le vol attend qu'ils se lèvent (les
       // stickers, eux, sont en pause dans leur CSS jusque-là).
-      if (document.documentElement.dataset.splash === "fini") voler();
-      else window.addEventListener(SPLASH_FINI, voler, { once: true });
+      const apresAccueil = () => void quandAccueilLibre(voler);
+      if (document.documentElement.dataset.splash === "fini") apresAccueil();
+      else window.addEventListener(SPLASH_FINI, apresAccueil, { once: true });
     } else {
       aVole.current = true;
       cadrer(map, boite(), marges(map, MARGE_HAUT, margeBasRef.current), ZOOM_CADRE, doux ? 0.8 : 0);

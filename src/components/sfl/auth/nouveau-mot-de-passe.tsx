@@ -8,6 +8,10 @@
 // d'entrer : la base tient la liste (mot_de_passe_a_changer) et efface la
 // ligne d'elle-même quand le mot de passe change vraiment.
 //
+// Depuis le 24/10, un membre de la ligue le choisit dans l'accueil de l'app
+// (components/sfl/accueil), en tête du parcours ; cet écran reste aux comptes
+// en attente et à ceux que la saison ne connaît pas encore (AuthGate).
+//
 // La session ouverte prouve qui est le joueur : l'actuel n'est pas redemandé,
 // sauf si Supabase l'exige (session trop ancienne) — le champ apparaît alors.
 // Même langage que l'écran de connexion : verre, micro-libellés, une seule
@@ -20,7 +24,8 @@ import { choisirMotDePasse, signOut, type RefusMotDePasse, type Session } from "
 import { BORNES } from "@/lib/sfl/inscription";
 import { cn } from "@/lib/utils";
 
-const MESSAGES: Record<RefusMotDePasse, string> = {
+/** Ce que l'écran dit de chaque refus (repris par l'accueil de l'app). */
+export const MESSAGES: Record<RefusMotDePasse, string> = {
   "too-short": `${BORNES.motDePasse} caractères au moins.`,
   weak: "Trop facile à deviner. Choisis-en un autre.",
   "same-password": "C'est celui que tu as déjà. Choisis-en un nouveau.",

@@ -15,9 +15,10 @@ import Link from "next/link";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Check, Play } from "lucide-react";
 import { AuVestiaireRond } from "@/components/sfl/au-vestiaire";
-import { BoostCard, RankingCard } from "@/components/sfl/boost-card";
+import { BOOST_LABELS, BoostCard, RankingCard } from "@/components/sfl/boost-card";
 import { PlayerCard } from "@/components/sfl/player-card";
-import { Card3D } from "@/components/sfl/card-3d";
+import { Card3DEnGrand } from "@/components/sfl/carte-en-grand";
+import { nomAffiche } from "@/lib/sfl/identites";
 import { Locked } from "@/components/sfl/locked";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
@@ -519,11 +520,13 @@ function JourneeRecapComplet({ j }: { j: number }) {
             <div className="flex justify-center gap-2.5">
               {unlocked.slice(0, 3).map((c) => (
                 <div key={`${c.player}-${c.type}`} className="flex flex-col items-center">
-                  <Card3D
+                  <Card3DEnGrand
                     cacheKey={`feed-unlock-${lastJ.j}-${c.player}-${c.type}`}
                     mode="simple"
                     size={0.42}
                     render={(s) => <BoostCard card={c} size={s} />}
+                    titre={nomAffiche(c.player)}
+                    sousTitre={`${BOOST_LABELS[c.type]} · J${lastJ.j}`}
                   />
                   {feat(c.player) && (
                     <p className="mono-label mt-2 text-center text-primary">{feat(c.player)}</p>
@@ -544,11 +547,13 @@ function JourneeRecapComplet({ j }: { j: number }) {
             course={analyse.course}
             card={
               leader && (
-                <Card3D
+                <Card3DEnGrand
                   cacheKey={`feed-leader-${lastJ.j}-${leader.name}`}
                   mode="simple"
                   size={0.44}
                   render={(s) => <RankingCard rankingId="pp" player={leader} size={s} />}
+                  titre={nomAffiche(leader.name)}
+                  sousTitre={`Pépite d'Or · J${lastJ.j}`}
                 />
               )
             }
@@ -807,18 +812,22 @@ function JourneeRecapComplet({ j }: { j: number }) {
               }}
             />
             <div className="mb-4 flex items-center justify-center gap-2.5">
-              <Card3D
+              <Card3DEnGrand
                 cacheKey={`feed-duel-${lastJ.j}-${duelA.name}`}
                 mode="simple"
                 size={FORMAT_CARTE.grande}
                 render={(s) => <PlayerCard player={duelA} size={s} />}
+                titre={nomAffiche(duelA.name)}
+                sousTitre={`Le duel · J${lastJ.j}`}
               />
               <span className="mono-label shrink-0 text-foreground/40">VS</span>
-              <Card3D
+              <Card3DEnGrand
                 cacheKey={`feed-duel-${lastJ.j}-${duelB.name}`}
                 mode="simple"
                 size={FORMAT_CARTE.grande}
                 render={(s) => <PlayerCard player={duelB} size={s} />}
+                titre={nomAffiche(duelB.name)}
+                sousTitre={`Le duel · J${lastJ.j}`}
               />
             </div>
             <div className="mb-3 flex items-center justify-between">
@@ -906,11 +915,13 @@ function JourneeRecapComplet({ j }: { j: number }) {
               }}
             />
             <div className="flex flex-col items-center gap-3">
-              <Card3D
+              <Card3DEnGrand
                 cacheKey={`feed-mvp-${lastJ.j}-${mvpCard.player}-${mvpCard.type}`}
                 mode="simple"
                 size={0.92}
                 render={(s) => <BoostCard card={mvpCard} size={s} />}
+                titre={nomAffiche(mvpCard.player)}
+                sousTitre={`${BOOST_LABELS[mvpCard.type]} · J${lastJ.j}`}
               />
               <ReactionRow id={`j${lastJ.j}-moment`} />
               <Locked
@@ -989,11 +1000,13 @@ function JourneeRecapComplet({ j }: { j: number }) {
             forme={analyse.forme}
             card={
               formePlayer && (
-                <Card3D
+                <Card3DEnGrand
                   cacheKey={`feed-forme-${lastJ.j}-${formePlayer.name}`}
                   mode="simple"
                   size={FORMAT_CARTE.grande}
                   render={(s) => <PlayerCard player={formePlayer} size={s} />}
+                  titre={nomAffiche(formePlayer.name)}
+                  sousTitre={`En forme · J${lastJ.j}`}
                 />
               )
             }
