@@ -1,16 +1,17 @@
 "use client";
 
-// Les deux autres vues de l'onglet, à côté du fil des Actus (Sabri, 22/10 :
+// Les deux autres onglets des Actus, à côté de la Pépite d'Or (Sabri, 22/10 :
 // « on peut pas avoir accès à tout le classement comme on avait avant […]
-// faire un mix des deux ») : les Classements et les Matchs, tels qu'ils
-// étaient dans la Ligue avant les Actus (app/ligue/page.tsx avant #71).
-//   · Classements : le vote du jour, ma synthèse (rang, points, forme), tous
+// faire un mix des deux » ; 24/10 : Buteurs, Passeurs, MVP « dans un bouton
+// Classement », et « juste à côté, l'onglet Match »), tels qu'ils étaient
+// dans la Ligue avant les Actus (app/ligue/page.tsx avant #71) :
+//   · Classement : le vote du jour, ma synthèse (rang, points, forme), tous
 //     les classements (classements.tsx) ;
-//   · Matchs : les journées jouées, une carte chacune ; la toucher ouvre son
+//   · Match : les journées jouées, une carte chacune ; la toucher ouvre son
 //     récap (/ligue/journee?j=N).
-// Les deux servent aussi une saison close (son époque, epoques.tsx) : ma
-// synthèse n'y paraît que si j'y ai joué. Le Wall of Fame, qui avait sa
-// carte ici, est dans la rangée des époques, au-dessus.
+// Les deux servent aussi une saison close (le choix de la saison,
+// epoques.tsx) : ma synthèse n'y paraît que si j'y ai joué. Le Wall of Fame,
+// qui avait sa carte ici, est dans le même choix.
 // Sur grand écran (dès 768 px) : les Classements au nombre d'or, ma synthèse
 // à gauche (qui reste à l'écran) et tous les classements à droite ; les
 // Matchs en grille, deux terrains de front, trois dès 1280 px.
@@ -34,8 +35,11 @@ function useJouees() {
   return journees.filter((j) => saison.entries.some((e) => e.j === j.j && (e.result || e.buts > 0 || e.passes > 0)));
 }
 
-/** `classement` : celui qui s'ouvre (un id de lib/sfl/rankings.ts, ?classement=… dans l'adresse). */
-export function VueClassements({ vote, classement }: { vote?: React.ReactNode; classement?: string | null }) {
+/**
+ * `classement` : celui qui s'ouvre (un id de lib/sfl/rankings.ts, ?classement=… dans l'adresse).
+ * `cle` : la clé 3D des cartes d'une saison close (classements.tsx).
+ */
+export function VueClassements({ vote, classement, cle }: { vote?: React.ReactNode; classement?: string | null; cle?: string }) {
   const { player, me } = useMyPlayer();
   const { players, saison, allPlayers } = useSeason();
   // Une saison close où je n'ai pas joué : pas de synthèse (ce serait celle d'un autre).
@@ -124,7 +128,7 @@ export function VueClassements({ vote, classement }: { vote?: React.ReactNode; c
           </section>
         ) : null}
       </div>
-      {played.length === 0 ? <IlsSeDemarquent /> : <Classements me={me} initial={classement} />}
+      {played.length === 0 ? <IlsSeDemarquent /> : <Classements me={me} initial={classement} cle={cle} />}
     </div>
   );
 }

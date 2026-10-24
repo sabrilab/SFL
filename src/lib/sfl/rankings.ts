@@ -23,3 +23,15 @@ export const RANKINGS: RankingDef[] = [
   { id: "presences", label: "Présences", unit: "m", desc: "Matchs joués cette saison", value: (p) => p.matchs, showAll: true },
   { id: "discipline", label: "Discipline", unit: "abs", desc: "Absences injustifiées et suspensions", value: (p) => p.absInj ?? 0 },
 ];
+
+/**
+ * Un classement à montrer : une définition de RANKINGS, ou une légende de
+ * carrière (le Wall of Fame, components/sfl/actus/wall-of-fame.tsx).
+ * `unites` accorde l'unité au nombre (« 1 titre », « 2 titres ») ; sans elle,
+ * l'unité reste telle quelle, comme dans les classements de la saison.
+ */
+export type Categorie = Pick<RankingDef, "id" | "label" | "unit" | "value" | "showAll"> & { unites?: [string, string] };
+
+export function unite(c: Categorie, n: number): string {
+  return c.unites ? c.unites[Math.abs(n) > 1 ? 1 : 0] : c.unit;
+}

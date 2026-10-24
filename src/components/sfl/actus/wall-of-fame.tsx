@@ -5,10 +5,10 @@
 // epoques.tsx). C'était une page à part, ouverte depuis Ma carte ; c'est
 // maintenant le temps le plus long de l'onglet, à côté de la saison en cours
 // et des saisons closes, avec les mêmes gestes :
+//   · la Pépite d'Or de toute la carrière : la rangée de cartes des Actus,
+//     centrée sur toi ; les autres légendes (buteurs, passeurs, MVP, titres,
+//     victoires, matchs) sont dans l'onglet Classement, à côté ;
 //   · trois chiffres : les saisons, les journées, les buts ;
-//   · les légendes : la rangée de cartes des Actus, centrée sur toi, mais
-//     sur toute la carrière (Pépite d'Or, buteurs, passeurs, MVP, titres,
-//     victoires, matchs) ;
 //   · les saisons, une carte chacune : le podium du Pépite d'Or en cartes
 //     joueurs (le champion φ fois plus grand que ses dauphins), le meilleur
 //     buteur, passeur et MVP ; la toucher ouvre la saison dans les Actus ;
@@ -27,7 +27,7 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { useCollant } from "@/hooks/use-collant";
 import type { Player } from "@/lib/sfl/engine";
 import { parcours, type Legende, type SaisonPalmares } from "@/lib/sfl/palmares";
-import type { RankingDef } from "@/lib/sfl/rankings";
+import type { Categorie } from "@/lib/sfl/rankings";
 import { vitrine } from "@/lib/sfl/trophees";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
@@ -37,21 +37,9 @@ const DAUPHIN = FORMAT_CARTE.petite;
 const CHAMPION = FORMAT_CARTE.moyenne;
 
 /**
- * Une catégorie de la rangée de cartes des Actus : un classement de la
- * saison (lib/sfl/rankings.ts) ou une légende de carrière. `unites` accorde
- * l'unité au nombre (« 1 titre », « 2 titres ») ; sans elle, l'unité reste
- * telle quelle, comme dans les classements de la saison.
- */
-export type Categorie = Pick<RankingDef, "id" | "label" | "unit" | "value" | "showAll"> & { unites?: [string, string] };
-
-export function unite(c: Categorie, n: number): string {
-  return c.unites ? c.unites[Math.abs(n) > 1 ? 1 : 0] : c.unit;
-}
-
-/**
- * Les légendes en catégories pour la rangée : chaque joueur avec sa dernière
- * carte, classé sur ses totaux de carrière. La Pépite d'Or d'abord, comme
- * dans la saison en cours.
+ * Les légendes en catégories (lib/sfl/rankings.ts) : chaque joueur avec sa
+ * dernière carte, classé sur ses totaux de carrière. La Pépite d'Or d'abord,
+ * seule dans la rangée de cartes ; toutes dans l'onglet Classement.
  */
 export function categoriesLegendes(liste: Legende[]): { categories: Categorie[]; joueurs: Player[] } {
   const parNom = new Map(liste.map((l) => [l.player.name, l]));

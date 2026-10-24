@@ -4,12 +4,20 @@
 // très bien, la course », et il garde les terrains et les cartes d'avant les
 // Actus). Pourquoi la course : le journal d'activité montre que les joueurs
 // viennent surtout se situer (Ma carte est la page où ils restent le plus).
-//   · l'en-tête : SFL · Bola · Bola Team en sigles et la loupe (EnteteLigue), puis le
-//     classement en cartes qu'on fait défiler, centré sur toi, par catégorie
-//     (Pépite d'Or, Buteurs, Passeurs, MVP) ; « Tout » ouvre les classements
-//     complets, « Match » les journées (vues.tsx) ;
-//     Sous chaque carte, ▲ ou ▼ depuis la semaine passée, et à l'ouverture
-//     les cartes glissent de leur ancienne place à la nouvelle ;
+//   · l'en-tête : le sigle SFL (qui déroule Bola et Bola Team), le choix de
+//     la saison et la loupe (EnteteLigue, epoques.tsx), puis trois onglets
+//     côte à côte (Sabri, 24/10 : moins de boutons, « le classement Pépite
+//     d'Or comme ça, juste à côté, un onglet Classement, juste à côté,
+//     l'onglet Match ») :
+//       Pépite d'Or — son classement en cartes qu'on fait défiler, centré
+//       sur toi, lui seul (plus de Buteurs, Passeurs, MVP ni « Tout » ici),
+//       puis le fil ci-dessous. Sous chaque carte, ▲ ou ▼ depuis la semaine
+//       passée, et à l'ouverture les cartes glissent de leur ancienne place
+//       à la nouvelle ;
+//       Classement — tous les classements (Buteurs, Passeurs, MVP… ; vues.tsx) ;
+//       Match — les journées jouées (vues.tsx).
+//     L'onglet est dans l'adresse (?vue=classements, ?vue=matchs ;
+//     page-actus.tsx), et l'en-tête ne bouge pas d'un onglet à l'autre ;
 //   · le fil : le jour du match, la feuille en direct ; les divisions
 //     (divisions.tsx : leur annonce jusqu'à la J4, puis le bilan de chaque
 //     dimanche) ; ton dimanche (ta carte, tes chiffres, tes places) ; la
@@ -28,13 +36,15 @@
 // #j2 (un dimanche touché dans Ma saison) jusqu'à ce dimanche.
 //
 // Le présent et le passé (Sabri, 24/10 : le Wall of Fame « dans la section
-// Actu », avec de quoi voir « le passé ou le présent ») : sous les sigles, la
-// rangée des époques (epoques.tsx) choisit la saison en cours, une saison
-// close ou le Wall of Fame. Une saison close se lit avec les mêmes gestes :
-// la rangée de cartes, figée sur son classement final, son palmarès, puis
-// chacun de ses dimanches. Le Wall of Fame met la rangée sur toute la
-// carrière, puis les saisons et ton parcours (wall-of-fame.tsx). Chaque
-// époque a son adresse (page-actus.tsx).
+// Actu », avec de quoi voir « le passé ou le présent ») : le bouton de la
+// saison, à côté de la loupe (epoques.tsx), déroule la saison en cours, les
+// saisons closes et le Wall of Fame. Une saison close se lit avec les mêmes
+// onglets : sa rangée de cartes, figée sur son classement final, son
+// palmarès, puis chacun de ses dimanches ; ses classements ; ses matchs. Le
+// Wall of Fame met la rangée sur la Pépite d'Or de toute la carrière, puis
+// les saisons et ton parcours ; son onglet Classement a toutes les légendes,
+// et il n'a pas d'onglet Match (wall-of-fame.tsx). Chaque époque a son
+// adresse (page-actus.tsx).
 //
 // Sur tablette et ordinateur (dès 768 px ; Sabri, 23/10 : « rends-le
 // responsive pour le desktop […] et réadapte toutes les dispositions »), le
@@ -43,10 +53,10 @@
 // tes missions ; à droite, tes rubriques côte à côte ; dessous, les contrats
 // en jeu de toute la ligue, sur toute la largeur. Puis chaque dimanche : son
 // terrain à gauche, qui reste à l'écran pendant qu'on parcourt ses rubriques
-// à droite. La course garde sa rangée, avec deux flèches pour la souris (les
-// contrats en jeu aussi). Tout est en classes md: / xl: : sous 768 px, le
-// téléphone garde son fil tel quel (sur téléphone, l'ordre des blocs de la
-// semaine vient des classes order-*).
+// à droite. Les onglets restent à gauche ; la course garde sa rangée, avec
+// deux flèches pour la souris (les contrats en jeu aussi). Tout est en
+// classes md: / xl: : sous 768 px, le téléphone garde son fil tel quel (sur
+// téléphone, l'ordre des blocs de la semaine vient des classes order-*).
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -55,6 +65,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { SaisonArchiveProvider, useSeason } from "@/components/sfl/season-provider";
 import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { CarteJournee } from "@/components/sfl/carte-journee";
+import { Classements } from "@/components/sfl/classements";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { useCollant } from "@/hooks/use-collant";
@@ -70,7 +81,7 @@ import { filDeSaison, type Actu } from "@/lib/sfl/actus";
 import type { Journee, Player } from "@/lib/sfl/engine";
 import { enjeux, voisins } from "@/lib/sfl/actus-toi";
 import { rankByMetric } from "@/lib/sfl/engine";
-import { RANKINGS } from "@/lib/sfl/rankings";
+import { RANKINGS, unite, type Categorie } from "@/lib/sfl/rankings";
 import { ligneDuRendezVous } from "@/lib/sfl/matchs-du-jour";
 import { legendes, saisonsPalmares, type SaisonPalmares } from "@/lib/sfl/palmares";
 import { cn } from "@/lib/utils";
@@ -82,10 +93,8 @@ import { RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueTo
 import { ContratsEnJeu } from "./contrats-en-jeu";
 import { MissionsBola } from "./missions";
 import { VueClassements, VueMatchs } from "./vues";
-import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque } from "./epoques";
-import { CarteSaison, categoriesLegendes, Compteurs, LeMur, unite, type Categorie } from "./wall-of-fame";
-
-export type Vue = "fil" | "classements" | "matchs";
+import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque, type Vue } from "./epoques";
+import { CarteSaison, categoriesLegendes, Compteurs, LeMur } from "./wall-of-fame";
 
 /** Les scènes d'un dimanche qui font bouger la course. */
 const SCENES: Actu["type"][] = ["mvp", "chiffre", "duo", "montent", "badge", "badges", "equipe"];
@@ -143,32 +152,28 @@ function useAncre(pret: boolean) {
   }, [pret]);
 }
 
-const METRIQUES = ["pp", "buts", "passes", "mvp"] as const;
-/** Les classements de la rangée dans une saison : Pépite d'Or, Buteurs, Passeurs, MVP. */
-const DE_LA_SAISON: Categorie[] = METRIQUES.map((m) => RANKINGS.find((r) => r.id === m)!);
+/** Le classement de la rangée de cartes : la Pépite d'Or de la saison. */
+const PEPITE: Categorie = RANKINGS.find((r) => r.id === "pp")!;
 
 /** L'écart d'une carte à l'autre dans la rangée, pour les faire glisser de leur ancienne place. */
 const PAS = 87;
 
 /**
- * La rangée de cartes : le classement d'une catégorie, centré sur toi. Par
- * défaut, les joueurs et les classements de la saison lue, avec ▲ ou ▼
- * depuis le dimanche d'avant. `figee` (une saison close, la carrière) : le
- * classement ne bouge plus. Sans `onTout` ni `onMatch`, pas de bouton.
+ * La rangée de cartes : la Pépite d'Or, centrée sur toi, et elle seule (les
+ * autres classements sont dans l'onglet Classement). Par défaut, les joueurs
+ * de la saison lue, avec ▲ ou ▼ depuis le dimanche d'avant. `figee` (une
+ * saison close, la carrière) : le classement ne bouge plus. Le Wall of Fame
+ * passe sa Pépite d'Or de carrière (`def`, `joueurs`).
  */
 function Ticker({
   moi,
-  onTout,
-  onMatch,
-  categories = DE_LA_SAISON,
+  def = PEPITE,
   joueurs,
   figee = false,
   cle,
 }: {
   moi: string;
-  onTout?: () => void;
-  onMatch?: () => void;
-  categories?: Categorie[];
+  def?: Categorie;
   /** Les joueurs classés ; par défaut, ceux de la saison. */
   joueurs?: Player[];
   figee?: boolean;
@@ -176,8 +181,6 @@ function Ticker({
   cle?: string;
 }) {
   const { players, saison } = useSeason();
-  const [id, setId] = useState(categories[0].id);
-  const def = categories.find((c) => c.id === id) ?? categories[0];
   const rang = rankByMetric(joueurs ?? players, def.value).filter(
     (p) => def.showAll || p.value > 0,
   );
@@ -189,7 +192,9 @@ function Ticker({
   }, [saison, figee]);
   const noms = new Set(rang.map((p) => p.name));
   const ancien = avant ? new Map(rankByMetric(avant.filter((p) => noms.has(p.name)), def.value).map((p, i) => [p.name, { rank: p.rank, i }])) : null;
-  // Les cartes partent de leur place de la semaine passée, puis glissent à la nouvelle.
+  // Les cartes partent de leur place de la semaine passée, puis glissent à la
+  // nouvelle : dès que la saison est là (elle peut arriver après la rangée).
+  const pret = rang.length > 0;
   const [pose, setPose] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -206,7 +211,7 @@ function Ticker({
       clearTimeout(a);
       clearTimeout(b);
     };
-  }, [id]);
+  }, [pret]);
   // À la souris, on ne glisse pas la rangée du doigt : deux flèches la font
   // défiler, chacune effacée quand ce côté est au bout.
   const [bouts, setBouts] = useState({ debut: true, fin: true });
@@ -226,8 +231,8 @@ function Ticker({
       o.disconnect();
       el.removeEventListener("scroll", mesurer);
     };
-    // Remesuré à chaque classement : la rangée change de longueur sans changer de taille.
-  }, [id, rang.length]);
+    // Remesuré quand la rangée change de longueur sans changer de taille.
+  }, [rang.length]);
   const defiler = (sens: 1 | -1) => {
     const el = ref.current;
     if (!el) return;
@@ -235,49 +240,7 @@ function Ticker({
     el.scrollBy({ left: sens * el.clientWidth * 0.8, behavior: calme ? "auto" : "smooth" });
   };
   return (
-    <div className="flex flex-col gap-3">
-      <div
-        className={cn(
-          "flex items-center gap-1 px-5 md:px-0",
-          // Plus de quatre classements (la carrière) : la ligne défile.
-          categories.length > DE_LA_SAISON.length && "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        )}
-      >
-        {categories.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            aria-pressed={id === c.id}
-            onClick={() => setId(c.id)}
-            className={cn(
-              "rounded-full px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap",
-              id === c.id ? "bg-foreground text-background" : "text-foreground/50",
-            )}
-          >
-            {c.label}
-          </button>
-        ))}
-        {/* Sur grand écran, « Match » rejoint la ligne des classements. */}
-        {onMatch && (
-          <button
-            type="button"
-            onClick={onMatch}
-            className="glass hidden rounded-full px-5 py-1.5 text-[13px] font-semibold md:ml-auto md:inline-flex"
-          >
-            Match
-          </button>
-        )}
-        {onTout && (
-          <button
-            type="button"
-            onClick={onTout}
-            className="mono-label ml-auto text-foreground/50 md:ml-5"
-          >
-            Tout ›
-          </button>
-        )}
-      </div>
-      <div className="md:relative">
+    <div className="md:relative">
       {(["debut", "fin"] as const).map((bout) => (
         <button
           key={bout}
@@ -302,7 +265,7 @@ function Ticker({
           const delta = a ? a.rank - p.rank : 0;
           return (
           <div
-            key={`${id}-${p.name}`}
+            key={p.name}
             data-moi={p.name === moi ? "" : undefined}
             className={cn(
               "flex shrink-0 flex-col items-center gap-1 rounded-2xl p-1.5",
@@ -344,7 +307,6 @@ function Ticker({
           </div>
           );
         })}
-      </div>
       </div>
     </div>
   );
@@ -432,75 +394,111 @@ function EnDirect({ ouvrir }: { ouvrir: (j: number) => void }) {
 }
 
 /**
- * Les classements ou les matchs d'une époque : le retour au fil, la rangée
- * des époques (changer de temps garde la vue : les classements de la saison
- * passée, puis ceux d'avant…), puis la vue elle-même.
+ * Les onglets d'une époque, côte à côte (Sabri, 24/10 : « le classement
+ * Pépite d'Or comme ça, juste à côté, un onglet Classement, juste à côté,
+ * l'onglet Match »).
  */
-function SousVue({
-  retour,
-  onRetour,
+const VUES: { id: Vue; label: string }[] = [
+  { id: "fil", label: "Pépite d'Or" },
+  { id: "classements", label: "Classement" },
+  { id: "matchs", label: "Match" },
+];
+
+/** Les pages de l'onglet, d'une époque à l'autre et d'un onglet à l'autre : l'en-tête reste à sa place. */
+const GABARIT = "actus-gabarit flex flex-col gap-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]";
+
+/**
+ * L'en-tête d'une époque, le même sous chaque onglet : le sigle de la ligue,
+ * le bouton de la saison et la loupe, puis les onglets. Sous la Pépite d'Or,
+ * sa rangée de cartes (`children`). Sans `vues`, pas d'onglets (une saison
+ * introuvable).
+ */
+function EnTete({
+  titre,
   epoque,
   epoques,
   vue,
+  onVue,
+  vues = VUES,
   children,
 }: {
-  retour: string;
-  onRetour: () => void;
+  titre: string;
   epoque: Epoque;
   epoques: ChoixDEpoque[];
   vue: Vue;
-  children: React.ReactNode;
+  onVue: (v: Vue) => void;
+  vues?: { id: Vue; label: string }[];
+  children?: React.ReactNode;
 }) {
   return (
-    <div className="actus-gabarit flex flex-col gap-5 md:gap-[var(--fib-21)] md:pt-4 lg:pt-[var(--fib-34)]">
-      <button type="button" onClick={onRetour} className="flex items-center gap-1 px-4 text-[15px] font-semibold text-foreground/70 md:self-start md:px-0">
-        <ChevronLeft className="size-5" /> {retour}
-      </button>
-      <ChoixEpoque epoque={epoque} epoques={epoques} vue={vue} className="mx-5 md:mx-0" />
+    <header className="flex flex-col gap-4 md:gap-[var(--fib-21)]">
+      <h1 className="sr-only">{titre}</h1>
+      <EnteteLigue actif="/ligue" className="px-5 md:px-0">
+        <ChoixEpoque epoque={epoque} epoques={epoques} vue={vue} />
+      </EnteteLigue>
+      {vues.length > 0 && (
+        <div role="tablist" aria-label="Vue" className="glass mx-5 flex gap-1 rounded-full p-1 md:mx-0 md:self-start">
+          {vues.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              role="tab"
+              aria-selected={vue === o.id}
+              onClick={() => onVue(o.id)}
+              className={cn(
+                "flex-1 px-4 py-2 text-[13px] font-semibold whitespace-nowrap md:flex-none md:px-6",
+                vue === o.id ? "bouton-principal" : "bouton-discret text-muted-foreground",
+              )}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
       {children}
-    </div>
+    </header>
   );
 }
 
 /**
  * L'onglet, à l'époque choisie (epoques.tsx) : la saison en cours (/ligue),
- * une saison close (/saisons/N) ou le Wall of Fame (/palmares). `classement` :
- * celui qu'ouvrent les classements (?classement=buts).
+ * une saison close (/saisons/N) ou le Wall of Fame (/palmares), sous
+ * l'onglet `vue` ; `onVue` en change (page-actus.tsx le garde dans
+ * l'adresse). `classement` : celui qu'ouvre l'onglet Classement
+ * (?classement=buts).
  */
 export function LaCourse({
   epoque = "present",
-  vueDepart = "fil",
+  vue = "fil",
+  onVue,
   classement,
   exploit,
 }: {
   epoque?: Epoque;
-  vueDepart?: Vue;
+  vue?: Vue;
+  onVue: (v: Vue) => void;
   classement?: string | null;
   exploit?: string | null;
 }) {
   const epoques = useEpoques();
-  if (epoque === "palmares") return <EpoqueWallOfFame epoques={epoques} />;
+  if (epoque === "palmares") return <EpoqueWallOfFame epoques={epoques} vue={vue} onVue={onVue} classement={classement} />;
   if (typeof epoque === "number")
-    return <EpoqueSaisonClose numero={epoque} epoques={epoques} vueDepart={vueDepart} classement={classement} />;
-  return <EpoqueEnCours epoques={epoques} vueDepart={vueDepart} classement={classement} exploit={exploit} />;
+    return <EpoqueSaisonClose numero={epoque} epoques={epoques} vue={vue} onVue={onVue} classement={classement} />;
+  return <EpoqueEnCours epoques={epoques} vue={vue} onVue={onVue} classement={classement} exploit={exploit} />;
+}
+
+interface PropsEpoque {
+  epoques: ChoixDEpoque[];
+  vue: Vue;
+  onVue: (v: Vue) => void;
+  classement?: string | null;
 }
 
 /** La saison en cours : la course, la semaine, puis chaque dimanche joué. */
-function EpoqueEnCours({
-  epoques,
-  vueDepart,
-  classement,
-  exploit,
-}: {
-  epoques: ChoixDEpoque[];
-  vueDepart: Vue;
-  classement?: string | null;
-  exploit?: string | null;
-}) {
+function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque & { exploit?: string | null }) {
   const { saison, journees } = useSeason();
   const { me } = useMyPlayer();
   const router = useRouter();
-  const [vue, setVue] = useState<Vue>(vueDepart);
   // La rubrique d'un exploit, une fois les terrains mesurés.
   useEffect(() => {
     if (!exploit) return;
@@ -510,10 +508,6 @@ function EpoqueEnCours({
     }, 450);
     return () => clearTimeout(t);
   }, [exploit]);
-  const aller = (v: Vue) => {
-    setVue(v);
-    document.getElementById("app-scroll")?.scrollTo({ top: 0 });
-  };
   const { fil, v, duels } = useMemo(
     () => ({ fil: filDeSaison(saison, journees, me, true), v: voisins(saison, me), duels: enjeux(saison) }),
     [saison, journees, me]
@@ -528,59 +522,52 @@ function EpoqueEnCours({
   const [semaine, semaineCollante] = useCollant();
   useAncre(vue === "fil" && dimanches.length > 0);
 
-  if (vue !== "fil")
-    return (
-      <SousVue retour="Actus" onRetour={() => aller("fil")} epoque="present" epoques={epoques} vue={vue}>
-        {vue === "classements" ? <VueClassements vote={<VoteDuJour me={me} />} classement={classement} /> : <VueMatchs />}
-      </SousVue>
-    );
-
   return (
-    <div className="actus-gabarit flex flex-col gap-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
-      <header className="flex flex-col gap-4 md:gap-[var(--fib-21)]">
-        <h1 className="sr-only">Actus</h1>
-        <EnteteLigue actif="/ligue" className="px-5 md:px-0" />
-        <ChoixEpoque epoque="present" epoques={epoques} className="mx-5 md:mx-0" />
-        <Ticker moi={me} onTout={() => aller("classements")} onMatch={() => aller("matchs")} />
-        <div className="px-5 md:hidden">
-          <button type="button" onClick={() => aller("matchs")} className="glass w-full rounded-full py-2.5 text-[14px] font-semibold">
-            Match
-          </button>
-        </div>
-      </header>
-      {/* La semaine. Sur téléphone, un seul fil (l'ordre vient des order-*) :
-          le direct, le vote, les divisions, l'outsider, ton dimanche, la
-          convocation, tes missions, les contrats en jeu, puis ce qui se joue.
-          Sur grand écran, deux colonnes : à gauche ce qui se joue (direct,
-          vote, convocation, missions), à droite les divisions, l'outsider et
-          tes rubriques ; dessous, les contrats en jeu sur toute la largeur. */}
-      <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3">
-        <div
-          ref={semaine}
-          className={cn("contents md:flex md:flex-col md:gap-[var(--fib-21)]", semaineCollante && "md:sticky md:top-[var(--fib-21)]")}
-        >
-          <EnDirect ouvrir={(j) => router.push(`/ligue/journee?j=${j}`)} />
-          <VoteDuJour me={me} />
-          <Convocation className="order-2 md:order-none" />
-          <MissionsBola className="order-2 md:order-none" />
-        </div>
-        <div className="contents md:grid md:gap-[var(--fib-21)] xl:col-span-2 xl:grid-cols-2">
-          <RubriqueDivisions className="order-1 md:order-none" />
-          <RubriqueOutsider className="order-1 md:order-none" />
-          {dernier > 0 && (
-            <RubriqueToi className="order-1 md:order-none" j={dernier} date={journees.find((x) => x.j === dernier)?.date ?? ""} />
-          )}
-          <div className="order-3 flex flex-col gap-1 md:order-none md:contents">
-            {duels.length > 0 && <RubriqueEnjeux liste={duels} moi={me} />}
-            {v && <RubriqueRival v={v} />}
-            {v?.devant && <RubriqueBesoin v={v} />}
+    <div className={GABARIT}>
+      <EnTete titre="Actus" epoque="present" epoques={epoques} vue={vue} onVue={onVue}>
+        {vue === "fil" && <Ticker moi={me} />}
+      </EnTete>
+      {vue === "classements" ? (
+        <VueClassements vote={<VoteDuJour me={me} />} classement={classement} />
+      ) : vue === "matchs" ? (
+        <VueMatchs />
+      ) : (
+        <>
+          {/* La semaine. Sur téléphone, un seul fil (l'ordre vient des order-*) :
+              le direct, le vote, les divisions, l'outsider, ton dimanche, la
+              convocation, tes missions, les contrats en jeu, puis ce qui se joue.
+              Sur grand écran, deux colonnes : à gauche ce qui se joue (direct,
+              vote, convocation, missions), à droite les divisions, l'outsider et
+              tes rubriques ; dessous, les contrats en jeu sur toute la largeur. */}
+          <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3">
+            <div
+              ref={semaine}
+              className={cn("contents md:flex md:flex-col md:gap-[var(--fib-21)]", semaineCollante && "md:sticky md:top-[var(--fib-21)]")}
+            >
+              <EnDirect ouvrir={(j) => router.push(`/ligue/journee?j=${j}`)} />
+              <VoteDuJour me={me} />
+              <Convocation className="order-2 md:order-none" />
+              <MissionsBola className="order-2 md:order-none" />
+            </div>
+            <div className="contents md:grid md:gap-[var(--fib-21)] xl:col-span-2 xl:grid-cols-2">
+              <RubriqueDivisions className="order-1 md:order-none" />
+              <RubriqueOutsider className="order-1 md:order-none" />
+              {dernier > 0 && (
+                <RubriqueToi className="order-1 md:order-none" j={dernier} date={journees.find((x) => x.j === dernier)?.date ?? ""} />
+              )}
+              <div className="order-3 flex flex-col gap-1 md:order-none md:contents">
+                {duels.length > 0 && <RubriqueEnjeux liste={duels} moi={me} />}
+                {v && <RubriqueRival v={v} />}
+                {v?.devant && <RubriqueBesoin v={v} />}
+              </div>
+            </div>
+            <ContratsEnJeu className="order-2 md:order-none md:col-span-full" />
           </div>
-        </div>
-        <ContratsEnJeu className="order-2 md:order-none md:col-span-full" />
-      </div>
-      {dimanches.map((d) => (
-        <Dimanche key={d.j} j={d.j} journee={d.journee} scenes={d.scenes} ouvrir={() => router.push(`/ligue/journee?j=${d.j}`)} />
-      ))}
+          {dimanches.map((d) => (
+            <Dimanche key={d.j} j={d.j} journee={d.journee} scenes={d.scenes} ouvrir={() => router.push(`/ligue/journee?j=${d.j}`)} />
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -589,20 +576,11 @@ function EpoqueEnCours({
  * Une saison close, relue dans son archive comme la saison en cours (tout ce
  * qui lit useSeason dessous voit l'archive) : son classement final en cartes,
  * qui ne bouge plus, son palmarès, puis chacun de ses dimanches avec son
- * terrain et ses rubriques, sans Bravo ni partage (useSaisonClose). Toucher
- * un terrain ouvre le récap de ce dimanche-là (/ligue/journee?saison=N&j=…).
+ * terrain et ses rubriques, sans Bravo ni partage (useSaisonClose) ; ses
+ * classements ; ses matchs. Toucher un terrain ouvre le récap de ce
+ * dimanche-là (/ligue/journee?saison=N&j=…).
  */
-function EpoqueSaisonClose({
-  numero,
-  epoques,
-  vueDepart,
-  classement,
-}: {
-  numero: number;
-  epoques: ChoixDEpoque[];
-  vueDepart: Vue;
-  classement?: string | null;
-}) {
+function EpoqueSaisonClose({ numero, epoques, vue, onVue, classement }: PropsEpoque & { numero: number }) {
   const { saison } = useSeason();
   const archive = saison.archives?.find((a) => a.numero === numero);
   const relue = useMemo(() => (archive ? saisonDepuisArchive(archive) : null), [archive]);
@@ -612,17 +590,14 @@ function EpoqueSaisonClose({
   );
   if (!archive || !relue)
     return (
-      <div className="actus-gabarit flex flex-col gap-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
-        <header className="flex flex-col gap-4 md:gap-[var(--fib-21)]">
-          <EnteteLigue actif="/ligue" className="px-5 md:px-0" />
-          <ChoixEpoque epoque={numero} epoques={epoques} className="mx-5 md:mx-0" />
-        </header>
+      <div className={GABARIT}>
+        <EnTete titre="Actus" epoque={numero} epoques={epoques} vue={vue} onVue={onVue} vues={[]} />
         <p className="px-5 text-[14px] text-muted-foreground md:px-0">Cette saison n&apos;est pas dans les archives.</p>
       </div>
     );
   return (
     <SaisonArchiveProvider saison={relue}>
-      <LectureSaison numero={numero} nom={archive.nom} epoques={epoques} palmares={palmares} vueDepart={vueDepart} classement={classement} />
+      <LectureSaison numero={numero} nom={archive.nom} epoques={epoques} palmares={palmares} vue={vue} onVue={onVue} classement={classement} />
     </SaisonArchiveProvider>
   );
 }
@@ -632,24 +607,13 @@ function LectureSaison({
   nom,
   epoques,
   palmares,
-  vueDepart,
+  vue,
+  onVue,
   classement,
-}: {
-  numero: number;
-  nom: string;
-  epoques: ChoixDEpoque[];
-  palmares: SaisonPalmares | null;
-  vueDepart: Vue;
-  classement?: string | null;
-}) {
+}: PropsEpoque & { numero: number; nom: string; palmares: SaisonPalmares | null }) {
   const { saison, journees } = useSeason();
   const { me } = useMyPlayer();
   const router = useRouter();
-  const [vue, setVue] = useState<Vue>(vueDepart);
-  const aller = (v: Vue) => {
-    setVue(v);
-    document.getElementById("app-scroll")?.scrollTo({ top: 0 });
-  };
   const recap = (j: number) => router.push(`/ligue/journee?saison=${numero}&j=${j}`);
   // Ses dimanches, du dernier au premier : le terrain, puis les scènes.
   const dimanches = useMemo(() => {
@@ -659,54 +623,54 @@ function LectureSaison({
   }, [saison, journees, me]);
   useAncre(vue === "fil" && dimanches.length > 0);
 
-  if (vue !== "fil")
-    return (
-      <SousVue retour={nom} onRetour={() => aller("fil")} epoque={numero} epoques={epoques} vue={vue}>
-        {vue === "classements" ? <VueClassements classement={classement} /> : <VueMatchs ouvrir={recap} />}
-      </SousVue>
-    );
-
   return (
-    <div className="actus-gabarit flex flex-col gap-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
-      <header className="flex flex-col gap-4 md:gap-[var(--fib-21)]">
-        <h1 className="sr-only">{nom}</h1>
-        <EnteteLigue actif="/ligue" className="px-5 md:px-0" />
-        <ChoixEpoque epoque={numero} epoques={epoques} className="mx-5 md:mx-0" />
-        <Ticker moi={me} figee cle={`saison-${numero}`} onTout={() => aller("classements")} onMatch={() => aller("matchs")} />
-        <div className="px-5 md:hidden">
-          <button type="button" onClick={() => aller("matchs")} className="glass w-full rounded-full py-2.5 text-[14px] font-semibold">
-            Match
-          </button>
-        </div>
-      </header>
-      {palmares && <CarteSaison s={palmares} titre="Le palmarès" lien={false} className="mx-5 md:mx-auto md:w-full md:max-w-[560px]" />}
-      {dimanches.map((d) => (
-        <Dimanche key={d.j} j={d.j} journee={d.journee} scenes={d.scenes} ouvrir={() => recap(d.j)} />
-      ))}
+    <div className={GABARIT}>
+      <EnTete titre={nom} epoque={numero} epoques={epoques} vue={vue} onVue={onVue}>
+        {vue === "fil" && <Ticker moi={me} figee cle={`saison-${numero}`} />}
+      </EnTete>
+      {vue === "classements" ? (
+        <VueClassements classement={classement} cle={`saison-${numero}`} />
+      ) : vue === "matchs" ? (
+        <VueMatchs ouvrir={recap} />
+      ) : (
+        <>
+          {palmares && <CarteSaison s={palmares} titre="Le palmarès" lien={false} className="mx-5 md:mx-auto md:w-full md:max-w-[560px]" />}
+          {dimanches.map((d) => (
+            <Dimanche key={d.j} j={d.j} journee={d.journee} scenes={d.scenes} ouvrir={() => recap(d.j)} />
+          ))}
+        </>
+      )}
     </div>
   );
 }
 
 /**
- * Le Wall of Fame : toutes les saisons. Ses chiffres, les légendes dans la
- * rangée de cartes (la carrière, centrée sur toi), puis les saisons et ton
- * parcours (wall-of-fame.tsx).
+ * Le Wall of Fame : toutes les saisons, sous deux onglets (pas de matchs) :
+ * la Pépite d'Or de la carrière en cartes, centrée sur toi, ses chiffres,
+ * puis les saisons et ton parcours ; Classement, toutes les légendes
+ * (wall-of-fame.tsx).
  */
-function EpoqueWallOfFame({ epoques }: { epoques: ChoixDEpoque[] }) {
+function EpoqueWallOfFame({ epoques, vue, onVue, classement }: PropsEpoque) {
   const { saison } = useSeason();
   const { me } = useMyPlayer();
   const saisons = useMemo(() => saisonsPalmares(saison), [saison]);
   const { categories, joueurs } = useMemo(() => categoriesLegendes(legendes(saisons)), [saisons]);
+  const ici = vue === "classements" ? vue : "fil";
   return (
-    <div className="actus-gabarit flex flex-col gap-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
-      <header className="flex flex-col gap-4 md:gap-[var(--fib-21)]">
-        <h1 className="sr-only">Wall of Fame</h1>
-        <EnteteLigue actif="/ligue" className="px-5 md:px-0" />
-        <ChoixEpoque epoque="palmares" epoques={epoques} className="mx-5 md:mx-0" />
-        <Compteurs saisons={saisons} className="mx-5 md:mx-0 md:max-w-[480px]" />
-        {joueurs.length > 0 && <Ticker moi={me} categories={categories} joueurs={joueurs} figee cle="carriere" />}
-      </header>
-      <LeMur saisons={saisons} moi={me} />
+    <div className={GABARIT}>
+      <EnTete titre="Wall of Fame" epoque="palmares" epoques={epoques} vue={ici} onVue={onVue} vues={VUES.filter((o) => o.id !== "matchs")}>
+        {ici === "fil" && joueurs.length > 0 && <Ticker moi={me} def={categories[0]} joueurs={joueurs} figee cle="carriere" />}
+      </EnTete>
+      {ici === "classements" ? (
+        <div className="px-5 md:px-0">
+          <Classements me={me} initial={classement} categories={categories} joueurs={joueurs} cle="carriere" />
+        </div>
+      ) : (
+        <>
+          <Compteurs saisons={saisons} className="mx-5 md:mx-0 md:max-w-[480px]" />
+          <LeMur saisons={saisons} moi={me} />
+        </>
+      )}
     </div>
   );
 }
