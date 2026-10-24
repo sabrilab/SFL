@@ -40,7 +40,7 @@ import { Badge3D } from "@/components/sfl/badge-3d";
 import { MiniCarte } from "@/components/sfl/mini-carte";
 import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
 import { useMyPlayer } from "@/components/sfl/player-provider";
-import { useSeason } from "@/components/sfl/season-provider";
+import { useSaisonClose, useSeason } from "@/components/sfl/season-provider";
 import { useIdentites } from "@/hooks/use-identites";
 import type { Actu } from "@/lib/sfl/actus";
 import type { Enjeu, Voisins } from "@/lib/sfl/actus-toi";
@@ -360,6 +360,10 @@ export function Scene({
   children?: ReactNode;
 }) {
   const router = useRouter();
+  // Une saison close se relit dans les Actus (epoques.tsx) : sans Bravo ni partage.
+  const relue = useSaisonClose();
+  const aPartager = relue ? undefined : partage;
+  const geste = relue ? undefined : action;
   const ref = useRef<HTMLElement>(null);
   const cadre = useRef<HTMLDivElement>(null);
   const [largeur, setLargeur] = useState(0);
@@ -429,7 +433,7 @@ export function Scene({
   return (
     <section
       ref={ref}
-      data-exploits={exploits?.join("|")}
+      data-exploits={relue ? undefined : exploits?.join("|")}
       className={cn(
         "relative flex flex-col overflow-hidden bg-[radial-gradient(120%_70%_at_50%_30%,#ffffff_0%,#e8eae5_75%)] text-foreground md:rounded-3xl dark:bg-[radial-gradient(120%_70%_at_50%_30%,#1d2024_0%,#0c0d0f_75%)] dark:text-white",
         className,
@@ -465,16 +469,16 @@ export function Scene({
           </Avancee.Provider>
         )}
       </div>
-      {(texte || partage || action) && (
+      {(texte || aPartager || geste) && (
         <div className="flex min-h-11 items-center gap-2 pr-1.5 pb-2 pl-5">
           <span className="min-w-0 flex-1 text-[13px] leading-snug text-foreground/70 dark:text-white/70">{texte}</span>
-          {action}
-          {partage && (
+          {geste}
+          {aPartager && (
             <button
               type="button"
               aria-label="Partager au Vestiaire"
               onClick={() => {
-                preparerPiece({ type: "ligue", ...partage, lignes: partage.lignes.slice(0, 6) });
+                preparerPiece({ type: "ligue", ...aPartager, lignes: aPartager.lignes.slice(0, 6) });
                 router.push("/vestiaire");
               }}
               className="grid size-9 shrink-0 place-items-center rounded-full text-foreground/60 transition-transform active:scale-90 dark:text-white/60"

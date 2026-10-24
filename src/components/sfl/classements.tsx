@@ -127,8 +127,12 @@ function Liste({ def, me }: { def: RankingDef; me: string }) {
   );
 }
 
-export function Classements({ me }: { me: string }) {
-  const [id, setId] = useState<string>("pp");
+/** `initial` : le classement qui s'ouvre (un id de RANKINGS ; « points » vaut la Pépite d'Or). */
+export function Classements({ me, initial }: { me: string; initial?: string | null }) {
+  const [id, setId] = useState<string>(() => {
+    const voulu = initial === "points" ? "pp" : initial;
+    return RANKINGS.some((r) => r.id === voulu) ? voulu! : "pp";
+  });
   const def = RANKINGS.find((r) => r.id === id) ?? RANKINGS[0];
 
   return (

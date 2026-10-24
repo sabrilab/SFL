@@ -21,7 +21,7 @@ import { Card3D } from "@/components/sfl/card-3d";
 import { Locked } from "@/components/sfl/locked";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useIsClient } from "@/hooks/use-is-client";
-import { useSeason } from "@/components/sfl/season-provider";
+import { useSaisonClose, useSeason } from "@/components/sfl/season-provider";
 import { StatsAVenir } from "@/components/sfl/feed/stats-a-venir";
 import {
   journeeParticipants,
@@ -195,6 +195,8 @@ export function JourneeRecap({ j }: { j: number }) {
 function JourneeRecapComplet({ j }: { j: number }) {
   const { player } = useMyPlayer();
   const { journees, boostCards, saison } = useSeason();
+  // Une saison close se relit sans ses jeux (quiz, pronostic), qui sont du présent.
+  const relue = useSaisonClose();
 
   // Barre de progression de lecture — le scroll vit dans #app-scroll.
   const [progress, setProgress] = useState(0);
@@ -431,7 +433,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
               </div>
             </div>
             <Link
-              href="/ligue/journee?vue=matchs"
+              href={relue ? `/ligue/journee?saison=${saison.numero ?? 0}&vue=matchs` : "/ligue/journee?vue=matchs"}
               className="bouton-principal mt-4 block py-3 text-center text-sm font-bold"
             >
               Voir le résumé
@@ -737,7 +739,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
         </Reveal>
       )}
 
-      {quiz.length > 0 && (
+      {!relue && quiz.length > 0 && (
         <Reveal>
           <QuizModule journee={lastJ.j} questions={quiz} me={player.name} />
         </Reveal>
@@ -1147,15 +1149,17 @@ function JourneeRecapComplet({ j }: { j: number }) {
         </Reveal>
       )}
 
-      <Reveal>
-        <PronosticModule
-          journee={pronoJ}
-          date={pronoDate}
-          candidates={pronoCandidates}
-          me={player.name}
-          resolvedMvp={pronoResolved}
-        />
-      </Reveal>
+      {!relue && (
+        <Reveal>
+          <PronosticModule
+            journee={pronoJ}
+            date={pronoDate}
+            candidates={pronoCandidates}
+            me={player.name}
+            resolvedMvp={pronoResolved}
+          />
+        </Reveal>
+      )}
 
       {/* 15 · Le vestiaire */}
       <Reveal>

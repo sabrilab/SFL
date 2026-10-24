@@ -24,7 +24,17 @@
 //     près du but, qui s'anime au défilement, sans carrousel (pelouse.tsx ;
 //     Sabri, 22/10 : « que tout se fasse en scroll et qu'il y ait plus de vie »).
 // Les modules « toi » : lib/sfl/actus-toi.ts et cine-toi.tsx.
-// ?exploit=… (la notification d'une félicitation) descend jusqu'à sa rubrique.
+// ?exploit=… (la notification d'une félicitation) descend jusqu'à sa rubrique,
+// #j2 (un dimanche touché dans Ma saison) jusqu'à ce dimanche.
+//
+// Le présent et le passé (Sabri, 24/10 : le Wall of Fame « dans la section
+// Actu », avec de quoi voir « le passé ou le présent ») : sous les sigles, la
+// rangée des époques (epoques.tsx) choisit la saison en cours, une saison
+// close ou le Wall of Fame. Une saison close se lit avec les mêmes gestes :
+// la rangée de cartes, figée sur son classement final, son palmarès, puis
+// chacun de ses dimanches. Le Wall of Fame met la rangée sur toute la
+// carrière, puis les saisons et ton parcours (wall-of-fame.tsx). Chaque
+// époque a son adresse (page-actus.tsx).
 //
 // Sur tablette et ordinateur (dès 768 px ; Sabri, 23/10 : « rends-le
 // responsive pour le desktop […] et réadapte toutes les dispositions »), le
@@ -42,7 +52,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
-import { useSeason } from "@/components/sfl/season-provider";
+import { SaisonArchiveProvider, useSeason } from "@/components/sfl/season-provider";
 import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { CarteJournee } from "@/components/sfl/carte-journee";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
@@ -54,14 +64,15 @@ import { annonceEnCours, J_DECOUPAGE, nomDivision } from "@/lib/sfl/divisions";
 import { divisionsDeLaJournee } from "@/lib/sfl/equipes-division";
 import { isHidden } from "@/lib/sfl/hidden";
 import { computeStandings } from "@/lib/sfl/saisie/engine";
-import { journeeJouee } from "@/lib/sfl/saisie/mutations";
+import { journeeJouee, saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
 import { Nom } from "@/components/sfl/nom";
 import { filDeSaison, type Actu } from "@/lib/sfl/actus";
-import type { Journee } from "@/lib/sfl/engine";
+import type { Journee, Player } from "@/lib/sfl/engine";
 import { enjeux, voisins } from "@/lib/sfl/actus-toi";
 import { rankByMetric } from "@/lib/sfl/engine";
 import { RANKINGS } from "@/lib/sfl/rankings";
 import { ligneDuRendezVous } from "@/lib/sfl/matchs-du-jour";
+import { legendes, saisonsPalmares, type SaisonPalmares } from "@/lib/sfl/palmares";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
 import { RubriqueDivisions } from "./divisions";
@@ -71,6 +82,8 @@ import { RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueTo
 import { ContratsEnJeu } from "./contrats-en-jeu";
 import { MissionsBola } from "./missions";
 import { VueClassements, VueMatchs } from "./vues";
+import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque } from "./epoques";
+import { CarteSaison, categoriesLegendes, Compteurs, LeMur, unite, type Categorie } from "./wall-of-fame";
 
 export type Vue = "fil" | "classements" | "matchs";
 
@@ -81,11 +94,12 @@ const SCENES: Actu["type"][] = ["mvp", "chiffre", "duo", "montent", "badge", "ba
  * Un dimanche joué : son titre (J8 · 9 août), son terrain, ses rubriques.
  * Sur grand écran, le terrain à gauche, qui reste à l'écran tant qu'il y
  * tient, et les rubriques à droite, une colonne puis deux dès 1280 px.
+ * Son ancre, #j8, y mène depuis Ma saison (useAncre).
  */
 function Dimanche({ j, journee, scenes, ouvrir }: { j: number; journee?: Journee; scenes: Actu[]; ouvrir: () => void }) {
   const [terrain, terrainCollant] = useCollant();
   return (
-    <section className="flex scroll-mt-4 flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-x-[var(--fib-21)] md:gap-y-[var(--fib-21)] md:border-t md:border-contraste/[0.08] md:pt-[var(--fib-34)] xl:grid-cols-3">
+    <section id={`j${j}`} className="flex scroll-mt-4 flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-x-[var(--fib-21)] md:gap-y-[var(--fib-21)] md:border-t md:border-contraste/[0.08] md:pt-[var(--fib-34)] xl:grid-cols-3">
       <div className="flex items-end justify-between px-5 md:col-span-full md:justify-start md:gap-4 md:px-0">
         <h2
           className="text-[22px] leading-none tracking-tight md:text-[34px]"
@@ -114,23 +128,65 @@ function Dimanche({ j, journee, scenes, ouvrir }: { j: number; journee?: Journee
   );
 }
 
+/**
+ * Une adresse en #j2 (un dimanche de Ma saison) : on descend jusqu'à ce
+ * dimanche, d'un coup, une fois les terrains mesurés ; une seule fois, pas à
+ * chaque mise à jour de la saison.
+ */
+function useAncre(pret: boolean) {
+  useEffect(() => {
+    if (!pret) return;
+    const id = window.location.hash.slice(1);
+    if (!/^j\d+$/.test(id)) return;
+    const t = setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: "start" }), 450);
+    return () => clearTimeout(t);
+  }, [pret]);
+}
+
 const METRIQUES = ["pp", "buts", "passes", "mvp"] as const;
+/** Les classements de la rangée dans une saison : Pépite d'Or, Buteurs, Passeurs, MVP. */
+const DE_LA_SAISON: Categorie[] = METRIQUES.map((m) => RANKINGS.find((r) => r.id === m)!);
 
 /** L'écart d'une carte à l'autre dans la rangée, pour les faire glisser de leur ancienne place. */
 const PAS = 87;
 
-function Ticker({ moi, onTout, onMatch }: { moi: string; onTout: () => void; onMatch: () => void }) {
+/**
+ * La rangée de cartes : le classement d'une catégorie, centré sur toi. Par
+ * défaut, les joueurs et les classements de la saison lue, avec ▲ ou ▼
+ * depuis le dimanche d'avant. `figee` (une saison close, la carrière) : le
+ * classement ne bouge plus. Sans `onTout` ni `onMatch`, pas de bouton.
+ */
+function Ticker({
+  moi,
+  onTout,
+  onMatch,
+  categories = DE_LA_SAISON,
+  joueurs,
+  figee = false,
+  cle,
+}: {
+  moi: string;
+  onTout?: () => void;
+  onMatch?: () => void;
+  categories?: Categorie[];
+  /** Les joueurs classés ; par défaut, ceux de la saison. */
+  joueurs?: Player[];
+  figee?: boolean;
+  /** La clé 3D de cartes qui ne sont pas les actuelles (une saison close, la carrière). */
+  cle?: string;
+}) {
   const { players, saison } = useSeason();
-  const [id, setId] = useState<(typeof METRIQUES)[number]>("pp");
-  const def = RANKINGS.find((r) => r.id === id)!;
-  const rang = rankByMetric(players, def.value).filter(
+  const [id, setId] = useState(categories[0].id);
+  const def = categories.find((c) => c.id === id) ?? categories[0];
+  const rang = rankByMetric(joueurs ?? players, def.value).filter(
     (p) => def.showAll || p.value > 0,
   );
   // Le classement d'avant le dernier dimanche joué : d'où chacun vient.
   const avant = useMemo(() => {
+    if (figee) return null;
     const d = Math.max(0, ...saison.journees.map((m) => m.j).filter((j) => journeeJouee(saison, j)));
     return d ? computeStandings({ ...saison, entries: saison.entries.filter((e) => e.j !== d) }) : null;
-  }, [saison]);
+  }, [saison, figee]);
   const noms = new Set(rang.map((p) => p.name));
   const ancien = avant ? new Map(rankByMetric(avant.filter((p) => noms.has(p.name)), def.value).map((p, i) => [p.name, { rank: p.rank, i }])) : null;
   // Les cartes partent de leur place de la semaine passée, puis glissent à la nouvelle.
@@ -180,36 +236,46 @@ function Ticker({ moi, onTout, onMatch }: { moi: string; onTout: () => void; onM
   };
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-1 px-5 md:px-0">
-        {METRIQUES.map((m) => (
+      <div
+        className={cn(
+          "flex items-center gap-1 px-5 md:px-0",
+          // Plus de quatre classements (la carrière) : la ligne défile.
+          categories.length > DE_LA_SAISON.length && "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        )}
+      >
+        {categories.map((c) => (
           <button
-            key={m}
+            key={c.id}
             type="button"
-            aria-pressed={id === m}
-            onClick={() => setId(m)}
+            aria-pressed={id === c.id}
+            onClick={() => setId(c.id)}
             className={cn(
               "rounded-full px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap",
-              id === m ? "bg-foreground text-background" : "text-foreground/50",
+              id === c.id ? "bg-foreground text-background" : "text-foreground/50",
             )}
           >
-            {RANKINGS.find((r) => r.id === m)!.label}
+            {c.label}
           </button>
         ))}
         {/* Sur grand écran, « Match » rejoint la ligne des classements. */}
-        <button
-          type="button"
-          onClick={onMatch}
-          className="glass hidden rounded-full px-5 py-1.5 text-[13px] font-semibold md:ml-auto md:inline-flex"
-        >
-          Match
-        </button>
-        <button
-          type="button"
-          onClick={onTout}
-          className="mono-label ml-auto text-foreground/50 md:ml-5"
-        >
-          Tout ›
-        </button>
+        {onMatch && (
+          <button
+            type="button"
+            onClick={onMatch}
+            className="glass hidden rounded-full px-5 py-1.5 text-[13px] font-semibold md:ml-auto md:inline-flex"
+          >
+            Match
+          </button>
+        )}
+        {onTout && (
+          <button
+            type="button"
+            onClick={onTout}
+            className="mono-label ml-auto text-foreground/50 md:ml-5"
+          >
+            Tout ›
+          </button>
+        )}
       </div>
       <div className="md:relative">
       {(["debut", "fin"] as const).map((bout) => (
@@ -257,13 +323,14 @@ function Ticker({ moi, onTout, onMatch }: { moi: string; onTout: () => void; onM
               size={
                 p.rank === 1 ? FORMAT_CARTE.moyenne : FORMAT_CARTE.petite * 1.3
               }
-              detail={`${p.rank}e · ${p.value} ${def.unit}`}
+              detail={`${p.rank}e · ${p.value} ${unite(def, p.value)}`}
+              cle={cle && `${cle}-${p.name}`}
             />
             <span className="max-w-[80px] truncate text-[11px] font-semibold">
               <Nom n={p.name} />
             </span>
             <span className="mono-label text-[10px] text-foreground/50 tabular-nums">
-              {p.value} {def.unit}
+              {p.value} {unite(def, p.value)}
             </span>
             <span
               className={cn(
@@ -364,7 +431,72 @@ function EnDirect({ ouvrir }: { ouvrir: (j: number) => void }) {
   );
 }
 
-export function LaCourse({ vueDepart = "fil", exploit }: { vueDepart?: Vue; exploit?: string | null }) {
+/**
+ * Les classements ou les matchs d'une époque : le retour au fil, la rangée
+ * des époques (changer de temps garde la vue : les classements de la saison
+ * passée, puis ceux d'avant…), puis la vue elle-même.
+ */
+function SousVue({
+  retour,
+  onRetour,
+  epoque,
+  epoques,
+  vue,
+  children,
+}: {
+  retour: string;
+  onRetour: () => void;
+  epoque: Epoque;
+  epoques: ChoixDEpoque[];
+  vue: Vue;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="actus-gabarit flex flex-col gap-5 md:gap-[var(--fib-21)] md:pt-4 lg:pt-[var(--fib-34)]">
+      <button type="button" onClick={onRetour} className="flex items-center gap-1 px-4 text-[15px] font-semibold text-foreground/70 md:self-start md:px-0">
+        <ChevronLeft className="size-5" /> {retour}
+      </button>
+      <ChoixEpoque epoque={epoque} epoques={epoques} vue={vue} className="mx-5 md:mx-0" />
+      {children}
+    </div>
+  );
+}
+
+/**
+ * L'onglet, à l'époque choisie (epoques.tsx) : la saison en cours (/ligue),
+ * une saison close (/saisons/N) ou le Wall of Fame (/palmares). `classement` :
+ * celui qu'ouvrent les classements (?classement=buts).
+ */
+export function LaCourse({
+  epoque = "present",
+  vueDepart = "fil",
+  classement,
+  exploit,
+}: {
+  epoque?: Epoque;
+  vueDepart?: Vue;
+  classement?: string | null;
+  exploit?: string | null;
+}) {
+  const epoques = useEpoques();
+  if (epoque === "palmares") return <EpoqueWallOfFame epoques={epoques} />;
+  if (typeof epoque === "number")
+    return <EpoqueSaisonClose numero={epoque} epoques={epoques} vueDepart={vueDepart} classement={classement} />;
+  return <EpoqueEnCours epoques={epoques} vueDepart={vueDepart} classement={classement} exploit={exploit} />;
+}
+
+/** La saison en cours : la course, la semaine, puis chaque dimanche joué. */
+function EpoqueEnCours({
+  epoques,
+  vueDepart,
+  classement,
+  exploit,
+}: {
+  epoques: ChoixDEpoque[];
+  vueDepart: Vue;
+  classement?: string | null;
+  exploit?: string | null;
+}) {
   const { saison, journees } = useSeason();
   const { me } = useMyPlayer();
   const router = useRouter();
@@ -394,15 +526,13 @@ export function LaCourse({ vueDepart = "fil", exploit }: { vueDepart?: Vue; expl
 
   const dernier = dimanches[0]?.j ?? 0;
   const [semaine, semaineCollante] = useCollant();
+  useAncre(vue === "fil" && dimanches.length > 0);
 
   if (vue !== "fil")
     return (
-      <div className="actus-gabarit flex flex-col gap-5 md:gap-[var(--fib-21)] md:pt-4 lg:pt-[var(--fib-34)]">
-        <button type="button" onClick={() => aller("fil")} className="flex items-center gap-1 px-4 text-[15px] font-semibold text-foreground/70 md:self-start md:px-0">
-          <ChevronLeft className="size-5" /> Actus
-        </button>
-        {vue === "classements" ? <VueClassements vote={<VoteDuJour me={me} />} /> : <VueMatchs />}
-      </div>
+      <SousVue retour="Actus" onRetour={() => aller("fil")} epoque="present" epoques={epoques} vue={vue}>
+        {vue === "classements" ? <VueClassements vote={<VoteDuJour me={me} />} classement={classement} /> : <VueMatchs />}
+      </SousVue>
     );
 
   return (
@@ -410,6 +540,7 @@ export function LaCourse({ vueDepart = "fil", exploit }: { vueDepart?: Vue; expl
       <header className="flex flex-col gap-4 md:gap-[var(--fib-21)]">
         <h1 className="sr-only">Actus</h1>
         <EnteteLigue actif="/ligue" className="px-5 md:px-0" />
+        <ChoixEpoque epoque="present" epoques={epoques} className="mx-5 md:mx-0" />
         <Ticker moi={me} onTout={() => aller("classements")} onMatch={() => aller("matchs")} />
         <div className="px-5 md:hidden">
           <button type="button" onClick={() => aller("matchs")} className="glass w-full rounded-full py-2.5 text-[14px] font-semibold">
@@ -450,6 +581,132 @@ export function LaCourse({ vueDepart = "fil", exploit }: { vueDepart?: Vue; expl
       {dimanches.map((d) => (
         <Dimanche key={d.j} j={d.j} journee={d.journee} scenes={d.scenes} ouvrir={() => router.push(`/ligue/journee?j=${d.j}`)} />
       ))}
+    </div>
+  );
+}
+
+/**
+ * Une saison close, relue dans son archive comme la saison en cours (tout ce
+ * qui lit useSeason dessous voit l'archive) : son classement final en cartes,
+ * qui ne bouge plus, son palmarès, puis chacun de ses dimanches avec son
+ * terrain et ses rubriques, sans Bravo ni partage (useSaisonClose). Toucher
+ * un terrain ouvre le récap de ce dimanche-là (/ligue/journee?saison=N&j=…).
+ */
+function EpoqueSaisonClose({
+  numero,
+  epoques,
+  vueDepart,
+  classement,
+}: {
+  numero: number;
+  epoques: ChoixDEpoque[];
+  vueDepart: Vue;
+  classement?: string | null;
+}) {
+  const { saison } = useSeason();
+  const archive = saison.archives?.find((a) => a.numero === numero);
+  const relue = useMemo(() => (archive ? saisonDepuisArchive(archive) : null), [archive]);
+  const palmares = useMemo(
+    () => (archive ? (saisonsPalmares(saison).find((s) => s.cloturee && s.numero === numero) ?? null) : null),
+    [saison, archive, numero],
+  );
+  if (!archive || !relue)
+    return (
+      <div className="actus-gabarit flex flex-col gap-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
+        <header className="flex flex-col gap-4 md:gap-[var(--fib-21)]">
+          <EnteteLigue actif="/ligue" className="px-5 md:px-0" />
+          <ChoixEpoque epoque={numero} epoques={epoques} className="mx-5 md:mx-0" />
+        </header>
+        <p className="px-5 text-[14px] text-muted-foreground md:px-0">Cette saison n&apos;est pas dans les archives.</p>
+      </div>
+    );
+  return (
+    <SaisonArchiveProvider saison={relue}>
+      <LectureSaison numero={numero} nom={archive.nom} epoques={epoques} palmares={palmares} vueDepart={vueDepart} classement={classement} />
+    </SaisonArchiveProvider>
+  );
+}
+
+function LectureSaison({
+  numero,
+  nom,
+  epoques,
+  palmares,
+  vueDepart,
+  classement,
+}: {
+  numero: number;
+  nom: string;
+  epoques: ChoixDEpoque[];
+  palmares: SaisonPalmares | null;
+  vueDepart: Vue;
+  classement?: string | null;
+}) {
+  const { saison, journees } = useSeason();
+  const { me } = useMyPlayer();
+  const router = useRouter();
+  const [vue, setVue] = useState<Vue>(vueDepart);
+  const aller = (v: Vue) => {
+    setVue(v);
+    document.getElementById("app-scroll")?.scrollTo({ top: 0 });
+  };
+  const recap = (j: number) => router.push(`/ligue/journee?saison=${numero}&j=${j}`);
+  // Ses dimanches, du dernier au premier : le terrain, puis les scènes.
+  const dimanches = useMemo(() => {
+    const fil = filDeSaison(saison, journees, me, false);
+    const js = [...new Set(fil.map((a) => a.j))];
+    return js.map((j) => ({ j, journee: journees.find((x) => x.j === j), scenes: fil.filter((a) => a.j === j && SCENES.includes(a.type)) }));
+  }, [saison, journees, me]);
+  useAncre(vue === "fil" && dimanches.length > 0);
+
+  if (vue !== "fil")
+    return (
+      <SousVue retour={nom} onRetour={() => aller("fil")} epoque={numero} epoques={epoques} vue={vue}>
+        {vue === "classements" ? <VueClassements classement={classement} /> : <VueMatchs ouvrir={recap} />}
+      </SousVue>
+    );
+
+  return (
+    <div className="actus-gabarit flex flex-col gap-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
+      <header className="flex flex-col gap-4 md:gap-[var(--fib-21)]">
+        <h1 className="sr-only">{nom}</h1>
+        <EnteteLigue actif="/ligue" className="px-5 md:px-0" />
+        <ChoixEpoque epoque={numero} epoques={epoques} className="mx-5 md:mx-0" />
+        <Ticker moi={me} figee cle={`saison-${numero}`} onTout={() => aller("classements")} onMatch={() => aller("matchs")} />
+        <div className="px-5 md:hidden">
+          <button type="button" onClick={() => aller("matchs")} className="glass w-full rounded-full py-2.5 text-[14px] font-semibold">
+            Match
+          </button>
+        </div>
+      </header>
+      {palmares && <CarteSaison s={palmares} titre="Le palmarès" lien={false} className="mx-5 md:mx-auto md:w-full md:max-w-[560px]" />}
+      {dimanches.map((d) => (
+        <Dimanche key={d.j} j={d.j} journee={d.journee} scenes={d.scenes} ouvrir={() => recap(d.j)} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Le Wall of Fame : toutes les saisons. Ses chiffres, les légendes dans la
+ * rangée de cartes (la carrière, centrée sur toi), puis les saisons et ton
+ * parcours (wall-of-fame.tsx).
+ */
+function EpoqueWallOfFame({ epoques }: { epoques: ChoixDEpoque[] }) {
+  const { saison } = useSeason();
+  const { me } = useMyPlayer();
+  const saisons = useMemo(() => saisonsPalmares(saison), [saison]);
+  const { categories, joueurs } = useMemo(() => categoriesLegendes(legendes(saisons)), [saisons]);
+  return (
+    <div className="actus-gabarit flex flex-col gap-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
+      <header className="flex flex-col gap-4 md:gap-[var(--fib-21)]">
+        <h1 className="sr-only">Wall of Fame</h1>
+        <EnteteLigue actif="/ligue" className="px-5 md:px-0" />
+        <ChoixEpoque epoque="palmares" epoques={epoques} className="mx-5 md:mx-0" />
+        <Compteurs saisons={saisons} className="mx-5 md:mx-0 md:max-w-[480px]" />
+        {joueurs.length > 0 && <Ticker moi={me} categories={categories} joueurs={joueurs} figee cle="carriere" />}
+      </header>
+      <LeMur saisons={saisons} moi={me} />
     </div>
   );
 }
