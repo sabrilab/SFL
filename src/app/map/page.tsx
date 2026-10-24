@@ -411,7 +411,7 @@ export default function MapPage() {
       ? "Dernier dimanche sans divisions"
       : j != null && j >= REGLES_DIVISIONS.depuis && maDivision && !journeeJouee(saison, j)
         ? `Tu joues en ${nomDivision(maDivision)}`
-        : "Sunday Five League";
+        : null; // le sigle SFL dit déjà la ligue : plus de « Sunday Five League »
 
   const terrains = useMemo(() => saison.terrains ?? [], [saison.terrains]);
   // L'heure et le lieu d'une journée, et ses matchs chacun aux siens.
@@ -1398,7 +1398,7 @@ export default function MapPage() {
                   ? `Ouvert par ${choisi.partie.organisateur}`
                   : choisi?.team
                     ? "Match d'équipe"
-                    : `${jDuChoisi != null ? `J${jDuChoisi} · ` : ""}${surtitreDeLigue(jDuChoisi)}`}
+                    : [jDuChoisi != null && `J${jDuChoisi}`, surtitreDeLigue(jDuChoisi)].filter(Boolean).join(" · ")}
               </span>
             </p>
             <SheetTitle className="text-[26px] font-bold tracking-tight">
@@ -1419,8 +1419,10 @@ export default function MapPage() {
               </>
             ) : (
               <>
-                {choisi?.terrain && <Itineraire terrain={choisi.terrain} ios={ios} />}
-                {/* Une journée : ses joueurs. La convocation : on y répond, comme avant. */}
+                {/* Les joueurs d'abord, la feuille de match tout de suite dessous
+                    (Sabri, 24/10 : plus de vue satellite en tête de la fiche) ;
+                    le chemin pour y aller vient après. Une journée : ses
+                    joueurs. La convocation : on y répond, comme avant. */}
                 {choisi?.partie ? (
                   <FichePartie
                     partie={choisi.partie}
@@ -1433,8 +1435,7 @@ export default function MapPage() {
                 ) : choisi?.team ? (
                   <FicheTeam t={choisi.team} />
                 ) : choisi?.j != null && !choisi.convoquee ? (
-                  // Les équipes faites, la feuille de match dit déjà qui vient.
-                  feuille.length === 0 && <Presents m={choisi} />
+                  <Presents m={choisi} />
                 ) : (
                   <PresencePanel />
                 )}
@@ -1452,6 +1453,7 @@ export default function MapPage() {
                   />
                 )}
                 {choisi && feuille.length > 0 && <DuelsDuJour j={choisi.j} matchs={choisi.matchsIci} />}
+                {choisi?.terrain && <Itineraire terrain={choisi.terrain} ios={ios} />}
                 {choisi?.joue && (
                   <Link
                     href="/ligue"
@@ -1946,29 +1948,13 @@ function FicheLibre({
   );
 }
 
-/** La photo satellite du terrain, et les trois façons d'y aller. */
+/** Les trois façons d'aller au terrain (l'adresse est déjà sous le titre de la fiche). */
 function Itineraire({ terrain, ios }: { terrain: Terrain; ios: boolean }) {
   const liens = itineraires(terrain.lat, terrain.lng, terrain.nom);
   // Sur iPhone, Plans d'abord ; ailleurs, Google Maps d'abord.
   const ordre = ios ? liens : [liens[1], liens[0], liens[2]];
   return (
     <section className="flex flex-col gap-3">
-      <div className="relative h-[200px] overflow-hidden rounded-[22px] border border-border bg-secondary">
-        <VueSatellite
-          lat={terrain.lat}
-          lng={terrain.lng}
-          demi={0.0011}
-          rapport={2}
-          hauteur={200}
-          titre={`Vue satellite de ${terrain.nom}`}
-          className="h-full w-full"
-        />
-        {/* L'épingle sur le terrain : la photo est centrée sur lui. */}
-        <span className="ajuster-pin pointer-events-none" style={{ left: "50%", top: "50%", cursor: "default" }} aria-hidden />
-        <span className="absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
-          {terrain.adresse || terrain.nom}
-        </span>
-      </div>
       <a
         href={ordre[0].url}
         target="_blank"
@@ -1994,16 +1980,14 @@ function Itineraire({ terrain, ios }: { terrain: Terrain; ios: boolean }) {
   );
 }
 
-/** Les joueurs d'une journée, tels que l'admin les a convoqués. */
+/** Les joueurs d'une journée, tels que l'admin les a convoqués : leur nombre,
+ *  jamais sur un plafond (une journée n'en a pas). */
 function Presents({ m }: { m: MatchMap }) {
   return (
     <section className="rounded-[26px] bg-card p-5">
       <div className="flex items-baseline justify-between">
         <p className="mono-label text-muted-foreground">{m.joue ? "Ils ont joué" : "Les joueurs"}</p>
-        <p className="text-[22px] font-bold tabular-nums">
-          {m.presents.length}
-          <span className="text-muted-foreground">/{m.effectif}</span>
-        </p>
+        <p className="text-[22px] font-bold tabular-nums">{m.presents.length}</p>
       </div>
       {m.presents.length ? (
         <QuiVient className="mt-3" noms={m.presents} />
