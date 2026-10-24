@@ -30,6 +30,10 @@ export type Poste = (typeof POSTES)[number]["id"];
 export const PIEDS = ["droit", "gauche", "les deux"] as const;
 export type Pied = (typeof PIEDS)[number];
 
+/** Demandé à l'accueil de l'app (components/sfl/accueil), pas à l'inscription. */
+export const SEXES = ["homme", "femme"] as const;
+export type Sexe = (typeof SEXES)[number];
+
 export const MAILLOTS = ["XS", "S", "M", "L", "XL", "XXL"] as const;
 export type Maillot = (typeof MAILLOTS)[number];
 

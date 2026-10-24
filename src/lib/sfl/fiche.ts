@@ -1,8 +1,8 @@
 "use client";
 
 // La fiche du joueur connecté, côté téléphone : ce que l'accueil lui demande
-// (components/sfl/accueil) en plus de son identité, sa date de naissance,
-// son gabarit, son pied fort et son poste.
+// (components/sfl/accueil) en plus de son identité, homme ou femme, sa date
+// de naissance, son gabarit, son pied fort et son poste.
 //
 // La table fiches (supabase/schema.sql) est privée : le joueur et l'admin
 // seuls la lisent, et le joueur pose et corrige la sienne lui-même (RLS),
@@ -11,11 +11,13 @@
 // « C'est bien toi ? ».
 
 import { supabase } from "@/lib/supabase";
-import type { Maillot, Pied, Poste } from "./inscription";
+import type { Maillot, Pied, Poste, Sexe } from "./inscription";
 
 export interface FicheJoueur {
   /** AAAA-MM-JJ. */
   naissance: string | null;
+  /** undefined : la base ne le garde pas encore (aperçus Vercel, avant la migration). */
+  sexe?: Sexe | null;
   taille_cm: number | null;
   poids_kg: number | null;
   pointure: number | null;
@@ -24,7 +26,8 @@ export interface FicheJoueur {
   poste: Poste | null;
 }
 
-const COLONNES = "naissance, taille_cm, poids_kg, pointure, maillot, pied, poste";
+const COLONNES = "naissance, sexe, taille_cm, poids_kg, pointure, maillot, pied, poste";
+const SANS_SEXE = COLONNES.replace("sexe, ", "");
 
 const nombre = (v: unknown) => (v == null || v === "" ? null : Number(v));
 
@@ -35,11 +38,15 @@ export async function lireMaFiche(): Promise<FicheJoueur | null> {
     const { data: auth } = await sb.auth.getSession();
     const uid = auth.session?.user.id;
     if (!uid) return null;
-    const { data, error } = await sb.from("fiches").select(COLONNES).eq("player_id", uid).maybeSingle();
+    let { data, error } = await sb.from("fiches").select(COLONNES).eq("player_id", uid).maybeSingle();
+    // Base pas encore migrée (aperçus Vercel) : le reste de la fiche, sans le sexe.
+    const sansSexe = !!error && /sexe/.test(error.message ?? "");
+    if (sansSexe) ({ data, error } = await sb.from("fiches").select(SANS_SEXE).eq("player_id", uid).maybeSingle());
     if (error) return null;
     const d = (data ?? {}) as Record<string, unknown>;
     return {
       naissance: (d.naissance as string | null | undefined) ?? null,
+      sexe: sansSexe ? undefined : ((d.sexe as Sexe | null | undefined) ?? null),
       taille_cm: nombre(d.taille_cm),
       poids_kg: nombre(d.poids_kg),
       pointure: nombre(d.pointure),

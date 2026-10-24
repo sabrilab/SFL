@@ -1132,6 +1132,10 @@ alter table public.fiches enable row level security;
 -- posés en confirmant leur identité depuis Ma carte : la naissance attend.
 alter table public.fiches alter column naissance drop not null;
 
+-- Homme ou femme (Sabri, 24/10) : demandé à l'accueil de l'app, juste après
+-- l'identité (components/sfl/accueil). Privé comme le reste de la fiche.
+alter table public.fiches add column if not exists sexe text check (sexe in ('homme', 'femme'));
+
 drop policy if exists "fiches: la mienne ou admin" on public.fiches;
 create policy "fiches: la mienne ou admin"
   on public.fiches for select

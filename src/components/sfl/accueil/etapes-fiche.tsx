@@ -1,11 +1,13 @@
 "use client";
 
-// La fiche, à l'accueil (accueil.tsx) : la date de naissance aux roues, le
-// gabarit aux règles, le pied fort aux semelles et le poste sur le terrain.
-// Ce que l'inscription demande déjà (lib/sfl/inscription.ts, mêmes bornes),
-// demandé ici aux joueurs que l'admin a créés, une seule fois : chaque écran
-// écrit sa part de la fiche (lib/sfl/fiche.ts) en passant au suivant. Une
-// écriture qui échoue ne bloque personne : l'accueil la redemandera.
+// La fiche, à l'accueil (accueil.tsx) : homme ou femme aux deux symboles, la
+// date de naissance aux roues, le gabarit aux règles, le pied fort aux
+// semelles et le poste sur le terrain. Ce que l'inscription demande déjà
+// (lib/sfl/inscription.ts, mêmes bornes), demandé ici aux joueurs que l'admin
+// a créés, une seule fois ; homme ou femme, que l'inscription ne demande pas,
+// à tous. Chaque écran écrit sa part de la fiche (lib/sfl/fiche.ts) en
+// passant au suivant. Une écriture qui échoue ne bloque personne : l'accueil
+// la redemandera.
 //
 // Sous 15 ans, la case d'un parent (confidentialite/consentement.tsx)
 // s'ajoute à la date de naissance quand l'accord a été donné sans elle.
@@ -22,13 +24,13 @@ import { AGE_ACCORD_PARENT } from "@/lib/sfl/confidentialite";
 import { donnerAccord } from "@/lib/sfl/consentement";
 import { poserMaFiche, type FicheJoueur } from "@/lib/sfl/fiche";
 import { separerNom } from "@/lib/sfl/identites-regles";
-import { age, BORNES, MAILLOTS, type Maillot, type Pied, type Poste } from "@/lib/sfl/inscription";
+import { age, BORNES, MAILLOTS, type Maillot, type Pied, type Poste, type Sexe } from "@/lib/sfl/inscription";
 import type { VilleJoueur } from "@/lib/sfl/villes";
 import { cn } from "@/lib/utils";
 import { BoutonPrincipal, Corps, Ligne, Titre, useContexteAccueil } from "./cadre";
 import { Regle } from "./regle";
 import { Roue } from "./roue";
-import { PiedFort, TerrainPostes } from "./terrain-postes";
+import { HommeOuFemme, PiedFort, TerrainPostes } from "./terrain-postes";
 
 /** Ce que le joueur a réglé, gardé d'un écran à l'autre (le retour le retrouve). */
 export interface Brouillon {
@@ -38,6 +40,7 @@ export interface Brouillon {
   annee: number;
   /** Une roue a tourné : la date n'est plus celle qu'on propose au départ. */
   naissanceVue: boolean;
+  sexe: Sexe | null;
   taille: number;
   poids: number;
   pointure: number;
@@ -73,6 +76,24 @@ function Suivant({ envoi, disabled, onClick }: { envoi: boolean; disabled?: bool
       {envoi && <Loader2 className="size-4 animate-spin" />}
       Continuer
     </BoutonPrincipal>
+  );
+}
+
+export function EtapeSexe({ b, maj, onFini }: { b: Brouillon; maj: (p: Partial<Brouillon>) => void; onFini: () => void }) {
+  const { envoi, enregistrer } = useEnregistrer();
+  async function continuer() {
+    if (!b.sexe) return;
+    navigator.vibrate?.(12);
+    await enregistrer({ sexe: b.sexe });
+    onFini();
+  }
+  return (
+    <Corps pied={<Suivant envoi={envoi} disabled={!b.sexe} onClick={continuer} />}>
+      <Titre>Homme ou femme ?</Titre>
+      <div className="mt-[34px]">
+        <HommeOuFemme valeur={b.sexe} onChange={(sexe) => maj({ sexe })} />
+      </div>
+    </Corps>
   );
 }
 

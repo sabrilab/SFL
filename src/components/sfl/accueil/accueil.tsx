@@ -17,9 +17,9 @@
 //   · la partie qu'on ne passe pas, des segments en haut comme les stories :
 //     son mot de passe à lui (d'origine ou provisoire, voir AuthGate),
 //     l'accord à la politique de confidentialité, « C'est bien toi ? » (nom,
-//     pseudo, email), sa date de naissance aux roues, son gabarit aux
-//     règles, son pied fort, son poste sur le terrain, sa ville sur la Map
-//     (ou le mode fantôme) et sa carte officielle au studio ;
+//     pseudo, email), homme ou femme, sa date de naissance aux roues, son
+//     gabarit aux règles, son pied fort, son poste sur le terrain, sa ville
+//     sur la Map (ou le mode fantôme) et sa carte officielle au studio ;
 //   · la révélation de sa carte, qu'il retourne d'un toucher ;
 //   · ce qu'on remet à plus tard : les notifications, les partenaires ;
 //   · la visite de l'app, qu'on passe (visite.tsx).
@@ -73,7 +73,7 @@ import { ContexteAccueil, Entete } from "./cadre";
 import { EtapeCarte, EtapeRevelation } from "./etape-carte";
 import { EtapeVille } from "./etape-ville";
 import { EtapeAccord, EtapeBonjour, EtapeIdentite, EtapeMotDePasse } from "./etapes-compte";
-import { EtapeGabarit, EtapeNaissance, EtapePied, EtapePoste, type Brouillon } from "./etapes-fiche";
+import { EtapeGabarit, EtapeNaissance, EtapePied, EtapePoste, EtapeSexe, type Brouillon } from "./etapes-fiche";
 import { EtapeNotifs, EtapeSuivre } from "./etapes-suite";
 import { Visite } from "./visite";
 import "./accueil.css";
@@ -83,6 +83,7 @@ type Etape =
   | "motdepasse"
   | "accord"
   | "identite"
+  | "sexe"
   | "naissance"
   | "gabarit"
   | "pied"
@@ -99,6 +100,7 @@ const ORDRE: Etape[] = [
   "motdepasse",
   "accord",
   "identite",
+  "sexe",
   "naissance",
   "gabarit",
   "pied",
@@ -112,10 +114,10 @@ const ORDRE: Etape[] = [
 ];
 
 /** La partie qu'on ne passe pas : les segments en haut. */
-const OBLIGATOIRES: Etape[] = ["motdepasse", "accord", "identite", "naissance", "gabarit", "pied", "poste", "ville", "carte"];
+const OBLIGATOIRES: Etape[] = ["motdepasse", "accord", "identite", "sexe", "naissance", "gabarit", "pied", "poste", "ville", "carte"];
 
 /** Les écrans où l'on peut revenir : rien n'y part pour de bon. */
-const ON_Y_REVIENT: Etape[] = ["identite", "naissance", "gabarit", "pied", "poste", "ville"];
+const ON_Y_REVIENT: Etape[] = ["identite", "sexe", "naissance", "gabarit", "pied", "poste", "ville"];
 
 /** Pas d'accueil sur les pages qui ont leur propre parcours, ou pas de compte. */
 const SANS_ACCUEIL = ["/confidentialite", "/inscription", "/bienvenue", "/equipe/"];
@@ -155,6 +157,7 @@ function brouillonDe(fiche: FicheJoueur | null, ville: VilleJoueur | null, poste
     mois: m || 1,
     annee: a || new Date().getFullYear() - 25,
     naissanceVue: !!fiche?.naissance,
+    sexe: fiche?.sexe ?? null,
     taille: fiche?.taille_cm ?? BORNES.taille.defaut,
     poids: Math.round(fiche?.poids_kg ?? BORNES.poids.defaut),
     pointure: fiche?.pointure ?? BORNES.pointure.defaut,
@@ -206,6 +209,8 @@ async function lirePlan(
   if (premiere && accordDonne(nomSession) === false) etapes.push("accord");
   if (identiteConfirmee(nom) === false) etapes.push("identite");
   if (fiche) {
+    // undefined : la base ne le garde pas encore, on ne le demande pas pour rien.
+    if (fiche.sexe === null) etapes.push("sexe");
     if (!fiche.naissance) etapes.push("naissance");
     if (fiche.taille_cm == null || fiche.poids_kg == null || fiche.pointure == null || !fiche.maillot) etapes.push("gabarit");
     if (!fiche.pied) etapes.push("pied");
@@ -385,6 +390,8 @@ export function Accueil() {
         return <EtapeAccord nom={nomSession ?? player.name} mineur={!!plan?.mineur} onFini={avancer} />;
       case "identite":
         return <EtapeIdentite onFini={avancer} />;
+      case "sexe":
+        return <EtapeSexe b={b} maj={maj} onFini={avancer} />;
       case "naissance":
         return <EtapeNaissance nom={nomSession ?? player.name} b={b} maj={maj} onFini={avancer} />;
       case "gabarit":

@@ -113,8 +113,8 @@ export function TextePolitique() {
                 L&apos;email sert à te joindre et à retrouver ton compte ; il n&apos;apparaît nulle part dans l&apos;app.
               </>,
               <>
-                À l&apos;inscription, ou à ta première ouverture de l&apos;app : ta date de naissance, ta taille, ton
-                poids, ta pointure, ta taille de maillot,
+                À l&apos;inscription, ou à ta première ouverture de l&apos;app : ta date de naissance, si tu es un
+                homme ou une femme, ta taille, ton poids, ta pointure, ta taille de maillot,
                 ton pied fort et ton poste. Cette fiche est privée, entre toi et les administrateurs. Elle sert à
                 vérifier ton âge, à préparer les maillots et, plus tard, ton personnage.
               </>,

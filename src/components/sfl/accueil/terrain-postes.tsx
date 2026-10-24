@@ -1,16 +1,18 @@
 "use client";
 
-// Le poste et le pied fort, à l'accueil (accueil.tsx).
+// Le poste, le pied fort et homme ou femme, à l'accueil (accueil.tsx).
 //
 // Le poste se touche sur un terrain : le terrain des feuilles de match
 // (matchs/sol-terrain.tsx, vu en perspective par lib/sfl/terrain-vu), le
 // jeu vers le haut, les neuf postes de l'effectif à leur place. Le pied fort
 // se touche sur deux semelles à crampons : l'une, l'autre, ou les deux.
+// Homme ou femme se touche sur deux jetons à symbole : blanc et plein une
+// fois choisi, de la même matière que les semelles.
 
 import { useId } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
-import { POSTES, type Pied, type Poste } from "@/lib/sfl/inscription";
+import { POSTES, SEXES, type Pied, type Poste, type Sexe } from "@/lib/sfl/inscription";
 import { projeter, vue } from "@/lib/sfl/terrain-vu";
 import { cn } from "@/lib/utils";
 
@@ -199,6 +201,71 @@ export function PiedFort({ valeur, onChange }: { valeur: Pied | null; onChange: 
           )}
         </AnimatePresence>
       </div>
+    </div>
+  );
+}
+
+/** Les deux symboles, tracés sur 120 × 120 : le rond, puis la flèche ou la croix. */
+const SYMBOLES: Record<Sexe, string> = {
+  homme: "M24 70a26 26 0 1 0 52 0a26 26 0 1 0 -52 0M68.4 51.6L96 24M74 24H96V46",
+  femme: "M34 42a26 26 0 1 0 52 0a26 26 0 1 0 -52 0M60 68V106M44 90H76",
+};
+
+export function HommeOuFemme({ valeur, onChange }: { valeur: Sexe | null; onChange: (s: Sexe) => void }) {
+  const reduit = useReducedMotion();
+  const id = useId().replace(/[^\w-]/g, "");
+  return (
+    <div className="flex items-start gap-[34px]">
+      {SEXES.map((s) => {
+        const pris = valeur === s;
+        return (
+          <motion.button
+            key={s}
+            type="button"
+            aria-pressed={pris}
+            onClick={() => {
+              if (pris) return;
+              navigator.vibrate?.(10);
+              onChange(s);
+            }}
+            initial={false}
+            animate={pris ? { scale: 1, y: 0, opacity: 1 } : { scale: 0.94, y: 6, opacity: 0.75 }}
+            whileTap={{ scale: 0.9 }}
+            transition={reduit ? { duration: 0 } : { type: "spring", stiffness: 380, damping: 16 }}
+            className="flex flex-col items-center gap-[13px] outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+          >
+            <svg viewBox="0 0 120 120" width={134} height={134} aria-hidden className="overflow-visible">
+              <defs>
+                <linearGradient id={`${id}-${s}`} x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stopColor="#ffffff" />
+                  <stop offset="1" stopColor="#c9ccd1" />
+                </linearGradient>
+              </defs>
+              <circle
+                cx={60}
+                cy={60}
+                r={58}
+                fill={pris ? `url(#${id}-${s})` : "rgba(255,255,255,0.05)"}
+                stroke={pris ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.32)"}
+                strokeWidth={1.4}
+                style={{ filter: pris ? "drop-shadow(0 10px 22px rgba(255,255,255,0.18))" : undefined }}
+              />
+              <path
+                d={SYMBOLES[s]}
+                transform="translate(60 60) scale(0.62) translate(-60 -60)"
+                fill="none"
+                stroke={pris ? "#1b1c20" : "rgba(255,255,255,0.45)"}
+                strokeWidth={9}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className={cn("mono-label transition-colors", pris ? "text-white" : "text-white/40")}>
+              {s === "homme" ? "Homme" : "Femme"}
+            </span>
+          </motion.button>
+        );
+      })}
     </div>
   );
 }
