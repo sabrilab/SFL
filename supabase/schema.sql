@@ -4849,7 +4849,13 @@ begin
     to authenticated
     using (
       bucket_id = 'videos'
-      and exists (select 1 from public.videos v where v.id = (storage.foldername(name))[1])
+      and (
+        exists (select 1 from public.videos v where v.id = (storage.foldername(name))[1])
+        -- L'admin lit aussi un fichier pas encore rattaché à une ligne : le
+        -- dépôt (upsert) en a besoin, sinon « new row violates row-level
+        -- security policy » au premier envoi (Sabri, 25/10).
+        or (select public.is_league_admin())
+      )
     );
 
   drop policy if exists "videos: l'admin pose" on storage.objects;
