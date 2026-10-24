@@ -505,6 +505,10 @@ export function BolaCard({
   const cartons = complete && signes.includes("cartons");
   const tailleMarque = !era && numero != null ? (complete ? 164 : compacte ? 225 : 287) : 80;
   const halo = p.sombre ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)";
+  // La gravure en creux : l'ombre en haut à gauche, la lumière en bas à droite.
+  const gravure = p.gravure
+    ? `drop-shadow(-${u(2)}px -${u(2)}px 0 ${p.gravure.ombre}) drop-shadow(${u(2)}px ${u(3)}px 0 ${p.gravure.lumiere})`
+    : null;
 
   // La note : dans son carré, centrée sur toute la largeur en réduite.
   const place = reduite
@@ -661,6 +665,7 @@ export function BolaCard({
                   : photo
                     ? `0 0 ${u(18)}px ${halo}`
                     : undefined,
+                ...(gravure && { filter: gravure }),
               }}
             >
               {marque}
@@ -687,7 +692,7 @@ export function BolaCard({
                 <img
                   src={p.symbole}
                   alt=""
-                  style={{ position: "absolute", left: u(61), top: u(61), width: u(51), height: u(51) }}
+                  style={{ position: "absolute", left: u(61), top: u(61), width: u(51), height: u(51), ...(gravure && { filter: gravure }) }}
                 />
               )}
               {/* Après le symbole : l'étiquette d'édition (base, ou le titre de la carte), puis le rang */}
@@ -782,7 +787,7 @@ export function BolaCard({
         </div>
       </div>
 
-      {/* Le texte, au premier plan */}
+      {/* Le texte, au premier plan (gravé en creux dans l'or de la pépite) */}
       <div
         data-card-part="stats"
         style={{
@@ -790,6 +795,7 @@ export function BolaCard({
           inset: 0,
           // Sur le verre, ce qu'il y a derrière peut être clair : un halo sombre garde l'encre blanche lisible.
           ...(p.transparente && { filter: `drop-shadow(0 0 ${u(5)}px rgba(0,0,0,0.38))` }),
+          ...(gravure && { filter: gravure }),
         }}
       >
         {/* La note, en italique avec sa frange */}

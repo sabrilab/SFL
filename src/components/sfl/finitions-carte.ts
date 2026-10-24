@@ -39,6 +39,10 @@
 //     tranche de l'autre côté), le guilloché de l'onyx gravé dedans comme un
 //     dépoli, l'encre blanche ; la note et le numéro taillés en biseau,
 //     creux, leur arête accrochant la lumière (chiffres: "biseau") ;
+//   · pépite et palestine (offertes à la carte d'Ilyes, Pépite d'Or de la
+//     saison 0, 24/10), dans skins-offerts.ts et motifs-offerts.tsx : l'or
+//     massif gravé en clous de Paris, le texte gravé en creux (gravure) ; le
+//     drapeau de la Palestine au dos (dos : le dos a son encre et son papier) ;
 //   · les skins du Passe Bola (lib/sfl/passe.ts, 24/10), dans
 //     skins-passe.ts et motifs-passe.tsx : givre, carbone, marbre, tes
 //     couleurs (le pays choisi, HabillageCarte.pays), néon, aurore, ki et
@@ -72,13 +76,14 @@ import {
   type FinitionPasse,
   type MotifPasse,
 } from "@/components/sfl/skins-passe";
+import { MATIERES_OFFERTES, type FinitionOfferte, type MotifOffert } from "@/components/sfl/skins-offerts";
 import { MATIERE_ARBITRE, MATIERES_ARBITRE, type FinitionArbitre, type MotifArbitre } from "@/components/sfl/skins-arbitre";
 
 /** L'édition d'une carte : la carte de saison, ou une carte à titre. */
 export type EditionCarte = "base" | "mvp" | "impact" | "def";
 
 /** Les finitions de la passe, ou offertes : elles habillent la carte de saison. */
-export type Finition = "nuit" | "chrome" | "animee" | "onyx" | "verre" | FinitionPasse;
+export type Finition = "nuit" | "chrome" | "animee" | "onyx" | "verre" | FinitionPasse | FinitionOfferte;
 
 /** Le traitement de la photo, sans IA. */
 export type Traitement = "argentique" | "gravure" | "marbre";
@@ -128,6 +133,7 @@ export type Motif =
   /** Les fines rayures de la tenue, sur la carte d'arbitre. */
   | { type: "tenue" }
   | MotifPasse
+  | MotifOffert
   | MotifArbitre;
 
 /**
@@ -203,6 +209,17 @@ export interface Matiere {
   chiffres?: "biseau";
   /** Une édition d'époque : ce qu'elle reprend de son temps. */
   epoque?: Epoque;
+  /**
+   * Le texte gravé en creux dans le métal (la pépite : « des gravures d'or
+   * sur de l'or ») : l'ombre en haut à gauche, la lumière en bas à droite.
+   */
+  gravure?: { ombre: string; lumiere: string };
+  /**
+   * Le dos, s'il n'a pas l'encre ou le papier de la face (la palestine : le
+   * drapeau au dos, la carte de saison devant). `logo: false` : le motif
+   * dessine lui-même la lune et le logotype.
+   */
+  dos?: Partial<Pick<Matiere, "encre" | "sombre" | "papier" | "micro" | "reflet" | "rebord">> & { logo?: false };
 }
 
 const PHI = (1 + Math.sqrt(5)) / 2;
@@ -674,6 +691,7 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
   // Les skins du Passe Bola (skins-passe.ts) ; « Tes couleurs » au pays par
   // défaut, celui du joueur passe par matiereDe.
   ...MATIERES_PASSE,
+  ...MATIERES_OFFERTES,
   ...MATIERES_ARBITRE,
   couleurs: matiereCouleurs(PAYS_PAR_DEFAUT),
 };
