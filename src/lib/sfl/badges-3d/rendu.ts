@@ -21,6 +21,13 @@
 // Le métal dit le niveau, comme avant : or, argent, bronze, et au dernier
 // palier le rouge et or (corps rouge, pièces sombres en or). « fantome » est
 // le badge pas encore gagné : tout en verre dépoli, sans couleur.
+//
+// La pierre de la Pépite d'Or a son propre studio, celui d'un joaillier
+// (24/10) : vue de profil, sa culasse ne reflète que ce qui est sous elle et
+// derrière, là où le studio des badges met un rose qui la teintait de rouge ;
+// une boîte à lumière de la teinte du métal y prend sa place, et la pierre
+// s'allume comme un diamant de couleur (jaune pour l'or, blanc pour
+// l'argent, cognac pour le bronze).
 
 import * as THREE from "three";
 import { piecesDe, POSE, type Objet, type Role } from "./objets";
@@ -38,8 +45,20 @@ const CORPS: Record<Metal, string> = {
 
 /* -------------------------------- Le studio ------------------------------- */
 
-/** La carte d'environnement : un fond noir et des panneaux de lumière colorée. */
-export function environnement(renderer: THREE.WebGLRenderer): THREE.Texture {
+/** La teinte de la boîte à lumière du joaillier, sous la pierre, selon le métal. */
+const JOAILLIER: Record<Metal, string> = { or: "#ffd98a", argent: "#e8f0ff", bronze: "#ffb27a", legende: "#ffc2b0" };
+
+/** Le studio d'un objet : celui des badges, ou celui du joaillier pour la pierre de la Pépite d'Or. */
+export function teinteStudio(objet: Objet, m: Matiere): string | undefined {
+  return objet === "pepite" && m !== "fantome" ? JOAILLIER[m] : undefined;
+}
+
+/**
+ * La carte d'environnement : un fond noir et des panneaux de lumière colorée.
+ * `joaillier` : la teinte de la boîte à lumière posée sous l'objet et
+ * derrière lui, à la place du rose (la pierre de la Pépite d'Or).
+ */
+export function environnement(renderer: THREE.WebGLRenderer, joaillier?: string): THREE.Texture {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#040406");
   // Des boîtes à lumière de studio : le centre franc, les bords qui tombent
@@ -76,7 +95,8 @@ export function environnement(renderer: THREE.WebGLRenderer): THREE.Texture {
   panneau("#3b6cff", 9, 3, 10, -6, 1, -5); // le bleu, à gauche, derrière
   panneau("#9b4dff", 7, 6, 3, 3, 6, -5); // le violet, en haut, derrière
   panneau("#ff7a3d", 9, 3, 8, 6, -2, -4); // l'orange, à droite, derrière
-  panneau("#ff4fa3", 4, 6, 3, -2, -7, -2); // un rose, sous l'objet
+  if (joaillier) panneau(joaillier, 4, 7, 4.2, 0, -6.5, -3.5); // sous la pierre, derrière : sa culasse s'allume
+  else panneau("#ff4fa3", 4, 6, 3, -2, -7, -2); // un rose, sous l'objet
   const pmrem = new THREE.PMREMGenerator(renderer);
   const tex = pmrem.fromScene(scene, 0.035).texture;
   pmrem.dispose();
@@ -211,8 +231,13 @@ export function eclat(): THREE.DirectionalLight {
 
 /* -------------------------------- Les images ------------------------------- */
 
-/** Le côté des images, en pixels : net jusqu'à ~100 px à l'écran sur un iPhone. */
+/**
+ * Le côté des images, en pixels : net jusqu'à ~100 px à l'écran sur un
+ * iPhone. Le trophée vedette de la vitrine en demande une plus grande
+ * (COTE_GRAND), qui reste nette à ~260 px.
+ */
 const COTE = 384;
+export const COTE_GRAND = 768;
 
 const IMAGE_EVENT = "sfl-badge-3d";
 export { IMAGE_EVENT };
@@ -220,7 +245,15 @@ export { IMAGE_EVENT };
 const images = new Map<string, string>();
 const aFaire = new Set<string>();
 let revision = 0;
-let moteur: { renderer: THREE.WebGLRenderer; env: THREE.Texture; scene: THREE.Scene; cam: THREE.PerspectiveCamera } | null = null;
+let moteur: {
+  renderer: THREE.WebGLRenderer;
+  env: THREE.Texture;
+  /** Les studios du joaillier, un par teinte, faits à la première pierre. */
+  joailliers: Map<string, THREE.Texture>;
+  cote: number;
+  scene: THREE.Scene;
+  cam: THREE.PerspectiveCamera;
+} | null = null;
 let impossible = false;
 let planifie = false;
 
@@ -235,7 +268,7 @@ function lancerMoteur() {
     const env = environnement(renderer);
     const scene = new THREE.Scene();
     scene.add(eclat());
-    moteur = { renderer, env, scene, cam: camera() };
+    moteur = { renderer, env, joailliers: new Map(), cote: COTE, scene, cam: camera() };
   } catch {
     impossible = true;
   }
@@ -245,8 +278,19 @@ function lancerMoteur() {
 function photographier(cle: string) {
   const m = lancerMoteur();
   if (!m) return;
-  const [objet, matiere] = cle.split(":") as [Objet, Matiere];
-  const g = construire(objet, matiere, m.env);
+  const [objet, matiere, taille] = cle.split(":") as [Objet, Matiere, string | undefined];
+  const cote = taille ? Number(taille) : COTE;
+  if (cote !== m.cote) {
+    m.renderer.setSize(cote, cote, false);
+    m.cote = cote;
+  }
+  const teinte = teinteStudio(objet, matiere);
+  let env = m.env;
+  if (teinte) {
+    env = m.joailliers.get(teinte) ?? environnement(m.renderer, teinte);
+    m.joailliers.set(teinte, env);
+  }
+  const g = construire(objet, matiere, env);
   m.scene.add(g);
   m.renderer.render(m.scene, m.cam);
   images.set(cle, m.renderer.domElement.toDataURL("image/png"));
@@ -283,12 +327,13 @@ function planifier() {
 }
 
 /**
- * L'image d'un objet dans une matière : une URL data: (PNG transparent), ou
- * null tant qu'elle n'est pas faite (elle est alors demandée, et IMAGE_EVENT
- * annoncera qu'elle est prête) ou si l'appareil n'a pas WebGL.
+ * L'image d'un objet dans une matière (`cote` : son côté en pixels) : une
+ * URL data: (PNG transparent), ou null tant qu'elle n'est pas faite (elle
+ * est alors demandée, et IMAGE_EVENT annoncera qu'elle est prête) ou si
+ * l'appareil n'a pas WebGL.
  */
-export function imageBadge(objet: Objet, m: Matiere): string | null {
-  const cle = `${objet}:${m}`;
+export function imageBadge(objet: Objet, m: Matiere, cote: number = COTE): string | null {
+  const cle = cote === COTE ? `${objet}:${m}` : `${objet}:${m}:${cote}`;
   const deja = images.get(cle);
   if (deja) return deja;
   if (typeof window === "undefined" || impossible) return null;

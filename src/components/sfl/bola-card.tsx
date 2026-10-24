@@ -40,11 +40,12 @@
 //
 // Avec `badge` (les cartes de la ligue, PlayerCard), le badge que le joueur a
 // choisi est dans la bande, au-dessus de la note et à gauche du nom : une
-// bulle qui le dit en toutes lettres, son insigne au bout (insigne-carte.tsx ;
-// Sabri, 24/10 : « essaie de le mettre juste au-dessus de la grande note […]
-// une espèce de bulle et, peut-être au bout, le badge »). Il était en haut à
-// droite du portrait depuis le 17/10, en 3D, et on ne le reconnaissait pas.
-// Les coins du portrait reprennent l'étiquette et le numéro (ou le poste).
+// bulle imprimée à l'encre de la carte qui le dit en toutes lettres, son
+// objet 3D au bout (insigne-carte.tsx ; Sabri, 24/10 : « essaie de le mettre
+// juste au-dessus de la grande note […] une espèce de bulle et, peut-être au
+// bout, le badge »). Il était en haut à droite du portrait depuis le 17/10,
+// dans un écusson, et on ne le reconnaissait pas. Les coins du portrait
+// reprennent l'étiquette et le numéro (ou le poste).
 //
 // La ligne de série, en bas : le numéro de la carte, puis le sigle SFL de la
 // ligue (sfl.svg), à la place de « lot s1 ». « Sunday Five League » n'est
@@ -102,7 +103,7 @@ const NOM_H = 220; // 361 ÷ φ
 const FILET = BANDE + NOTE_C; // 1605
 const SERIE = 1621;
 const SERIE_X = RAYON_CARTE / PHI; // 57 : la série rentrée, loin des coins
-// La bulle du badge : son insigne à la marge, entre le bas du portrait (983)
+// La bulle du badge : son objet à la marge, entre le bas du portrait (983)
 // et le haut des chiffres de la note (~1160) ; elle s'arrête avant la colonne du nom.
 const BULLE = { x: M, centre: 1078, fin: COL_X - 22 };
 // Le cadre du portrait (liseré, crans) : 12 autour, concentrique.
@@ -638,7 +639,7 @@ export function BolaCard({
         ))}
 
         {/* Le badge choisi : sa bulle, au-dessus de la note */}
-        {complete && badge && <BulleBadge badge={badge} u={u} x={BULLE.x} centre={BULLE.centre} fin={BULLE.fin} />}
+        {complete && badge && <BulleBadge badge={badge} u={u} x={BULLE.x} centre={BULLE.centre} fin={BULLE.fin} encre={p.encre} sombre={p.sombre} />}
 
         {/* Qui : le nom en Anton, puis le pseudo et le poste (ou le poste seul, en compacte) */}
         {!reduite && (

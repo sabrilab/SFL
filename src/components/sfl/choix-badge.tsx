@@ -4,13 +4,14 @@
 // posé en ce moment ; la feuille montre la carte elle-même en grand format,
 // avec la bulle du badge au-dessus de la note, qui change à chaque choix,
 // puis les choix : le meilleur (par défaut, suit les saisons), chaque badge
-// gagné, ou aucun. Le choix part à la ligue (badges-choisis.ts). Les badges
-// sont les insignes dessinés de la carte (insigne-carte.tsx).
+// gagné, ou aucun. Le choix part à la ligue (badges-choisis.ts). Chaque
+// badge est montré par son objet 3D, comme au bout de la bulle de la carte
+// (insigne-carte.tsx).
 
 import { useState } from "react";
 import { Check } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { InsigneCarte, nomInsigne } from "@/components/sfl/insigne-carte";
+import { nomInsigne, ObjetBadge } from "@/components/sfl/insigne-carte";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useBadgeCarte, useChoixBadge } from "@/hooks/use-badge-carte";
@@ -20,7 +21,7 @@ import type { Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 
 function Mini({ badge, taille }: { badge: BadgeCarte; taille: number }) {
-  return <InsigneCarte badge={badge} largeur={taille} />;
+  return <ObjetBadge badge={badge} largeur={taille} ombre />;
 }
 
 function Option({

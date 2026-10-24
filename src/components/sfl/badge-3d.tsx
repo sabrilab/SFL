@@ -10,8 +10,9 @@
 //   · Le Mur, Défenseur → le bouclier ; · Impact → l'éclair ;
 // Les trophées de fin de saison, eux, sont de vraies pièces de vitrine
 // (TROPHEE_SAISON, voir objets.ts) : Ma carte et le profil les montrent. Le
-// badge posé sur la carte n'est plus en 3D depuis le 24/10 : c'est un
-// insigne dessiné (insigne-carte.tsx), qu'on reconnaît même petit.
+// badge posé sur la carte est le même objet, au bout d'une bulle gravée à
+// l'encre de la carte (insigne-carte.tsx) ; la pierre de la Pépite d'Or y est
+// vue de profil, pour qu'on la reconnaisse même petite.
 // Le métal dit le niveau (bronze, argent, or ; rouge et or au dernier palier).
 // Un badge de fin de saison porte en plus son rang, gravé sur une pastille de
 // métal en bas à droite : c'est ce qui le distingue d'un palier.
@@ -26,7 +27,7 @@ import * as THREE from "three";
 import { EMBLEMES, EMBLEMES_SAISON } from "@/components/sfl/emblemes";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import type { Objet } from "@/lib/sfl/badges-3d/objets";
-import { camera, construire, eclat, environnement, IMAGE_EVENT, imageBadge, liberer, regler, sansTroisD, type Matiere } from "@/lib/sfl/badges-3d/rendu";
+import { camera, construire, eclat, environnement, IMAGE_EVENT, imageBadge, liberer, regler, sansTroisD, teinteStudio, type Matiere } from "@/lib/sfl/badges-3d/rendu";
 import { CLASSEMENTS, ordinal, type ClassementId } from "@/lib/sfl/fin-de-saison";
 import { metal, NOM_METAL, TROPHEES, type Metal, type TropheeId } from "@/lib/sfl/trophees";
 
@@ -114,11 +115,11 @@ function abonner(onChange: () => void) {
   return () => window.removeEventListener(IMAGE_EVENT, onChange);
 }
 
-/** L'image d'un objet dans une matière, demandée au moteur partagé et suivie jusqu'à ce qu'elle soit prête. */
-export function useImageBadge(objet: Objet, m: Matiere): string | null {
+/** L'image d'un objet dans une matière, demandée au moteur partagé et suivie jusqu'à ce qu'elle soit prête. `cote` : son côté en pixels (COTE_GRAND pour une grande vitrine). */
+export function useImageBadge(objet: Objet, m: Matiere, cote?: number): string | null {
   return useSyncExternalStore(
     abonner,
-    () => imageBadge(objet, m),
+    () => imageBadge(objet, m, cote),
     () => null
   );
 }
@@ -131,6 +132,7 @@ export function Objet3D({
   embleme: Embleme,
   ombre = true,
   aura = false,
+  cote,
 }: {
   objet: Objet;
   matiere: Matiere;
@@ -139,14 +141,16 @@ export function Objet3D({
   ombre?: boolean;
   /** Le halo du métal sous l'objet (la vitrine, les feuilles). */
   aura?: boolean;
+  /** Le côté de l'image en pixels, si l'objet est montré en grand (COTE_GRAND). */
+  cote?: number;
 }) {
-  const src = useImageBadge(objet, matiere);
+  const src = useImageBadge(objet, matiere, cote);
   if (aura) {
     return (
       <span className="relative block" style={{ width: taille, height: taille }}>
         <Aura matiere={matiere} taille={taille} />
         <span className="absolute inset-0">
-          <Objet3D objet={objet} matiere={matiere} taille={taille} embleme={Embleme} ombre={ombre} />
+          <Objet3D objet={objet} matiere={matiere} taille={taille} embleme={Embleme} ombre={ombre} cote={cote} />
         </span>
       </span>
     );
@@ -260,7 +264,7 @@ export function Objet3DVivant({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.5));
     renderer.setSize(taille, taille, false);
     regler(renderer);
-    const env = environnement(renderer);
+    const env = environnement(renderer, teinteStudio(objet, matiere));
     const scene = new THREE.Scene();
     scene.add(eclat());
     const cam = camera();

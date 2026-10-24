@@ -9,7 +9,7 @@
 // de papier ni de cadre : la photo remplit la carte, resserrée sur le
 // visage, et seul l'essentiel reste en bas, en blanc sur un voile léger qui
 // ne commence qu'à la section d'or (1/φ de la hauteur) :
-//   · compacte (100–170 px) : le poste, le nom, la note ; l'insigne du badge
+//   · compacte (100–170 px) : le poste, le nom, la note ; l'objet du badge
 //                             en haut à droite (insigne-carte.tsx, 24/10) ;
 //   · réduite  (70–100)     : la note seule (dans l'onglet de l'équipe sur
 //                             les terrains) ;
@@ -35,7 +35,7 @@
 import { palierCarte } from "@/components/sfl/bola-card";
 import { lisereDe, MATIERES, METAUX, RAYON_CARTE, type HabillageCarte, type Traitement } from "@/components/sfl/finitions-carte";
 import { filtrePhoto, InsigneRang, VoileTraitement } from "@/components/sfl/habillage-carte";
-import { InsigneCarte } from "@/components/sfl/insigne-carte";
+import { ObjetBadge } from "@/components/sfl/insigne-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import type { BoostType } from "@/lib/sfl/engine";
 
@@ -279,7 +279,7 @@ export function CartePhoto({
             className="absolute"
             style={{ left: u(W - bord * 2 - BADGE_M - BADGE * 1.2), top: u(BADGE_M) }}
           >
-            <InsigneCarte badge={badge} largeur={u(BADGE * 1.2)} />
+            <ObjetBadge badge={badge} largeur={u(BADGE * 1.2)} ombre />
           </span>
         )}
       </div>

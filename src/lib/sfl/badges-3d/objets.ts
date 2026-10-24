@@ -216,7 +216,7 @@ export const POSE: Record<Objet, [number, number, number]> = {
   crampon: [0.5, 0.42, 0.06],
   cage: [0.2, -0.5, 0],
   trophee: [0.16, 0.3, 0],
-  pepite: [0.42, 0.35, 0.08],
+  pepite: [0.18, 0.2, 0], // de profil, presque : la table, la couronne et la culasse, la silhouette du brillant
   etoile: [0.12, -0.32, 0.06],
   bouclier: [0.2, -0.5, 0],
   eclair: [0.18, -0.6, 0.12],
