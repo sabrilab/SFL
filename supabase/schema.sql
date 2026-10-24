@@ -3403,7 +3403,7 @@ begin
   if b is null or jsonb_typeof(b) <> 'object'
      or coalesce(b ->> 'forme', '') <> all (array['ecu', 'blason', 'rond', 'pointe', 'ovale'])
      or coalesce(b ->> 'motif', '') <> all (array['uni', 'parti', 'coupe', 'tranche', 'rayures', 'bande', 'echarpe', 'chevron', 'cercle'])
-     or coalesce(b ->> 'embleme', '') <> all (array['initiales', 'etoile', 'ballon', 'couronne', 'eclair', 'cheval', 'lion', 'aigle', 'loup', 'taureau', 'coq'])
+     or coalesce(b ->> 'embleme', '') <> all (array['initiales', 'etoile', 'ballon', 'couronne', 'eclair', 'lune', 'anneau', 'losange', 'chevrons', 'bandes', 'delta', 'hexagone', 'damier', 'cheval', 'lion', 'aigle', 'loup', 'taureau', 'coq'])
      or coalesce(jsonb_typeof(b -> 'couleurs'), '') <> 'array'
      or jsonb_array_length(b -> 'couleurs') <> 3
      or exists (select 1 from jsonb_array_elements(b -> 'couleurs') c

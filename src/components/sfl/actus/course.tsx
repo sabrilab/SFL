@@ -583,7 +583,7 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
                 {v?.devant && <RubriqueBesoin v={v} />}
               </div>
             </div>
-            <ContratsEnJeu className="order-2 md:order-none md:col-span-full" />
+            <ContratsEnJeu apercu className="order-2 md:order-none md:col-span-full" />
           </div>
           {dimanches.map((d) => (
             <Dimanche key={d.j} j={d.j} journee={d.journee} scenes={d.scenes} ouvrir={() => router.push(`/ligue/journee?j=${d.j}`)} />
