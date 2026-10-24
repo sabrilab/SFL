@@ -51,6 +51,7 @@ import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { projeter, trace, vue } from "@/lib/sfl/terrain-vu";
 import { metal, NOM_METAL, TROPHEES } from "@/lib/sfl/trophees";
+import { sources, type Couverture } from "@/lib/sfl/couvertures";
 import { preparerPiece, type PieceLigue } from "@/lib/sfl/vestiaire";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
@@ -95,6 +96,13 @@ function useAvancee(f: (p: number) => void) {
   });
   useEffect(() => abonner((p) => ref.current(p)), [abonner]);
 }
+
+/**
+ * La couverture de la rubrique, quand le dimanche lui en donne une (course.tsx,
+ * lib/sfl/couvertures.ts) : la photo remplace le gazon, le terrain n'est plus
+ * que ses lignes à la craie, les cartes et les chiffres restent les mêmes.
+ */
+export const CouvertureRubrique = createContext<Couverture | null>(null);
 
 /* ------------------------------ Les éléments ------------------------------ */
 
@@ -362,6 +370,7 @@ export function Scene({
   const router = useRouter();
   // Une saison close se relit dans les Actus (epoques.tsx) : sans Bravo ni partage.
   const relue = useSaisonClose();
+  const couverture = useContext(CouvertureRubrique);
   const aPartager = relue ? undefined : partage;
   const geste = relue ? undefined : action;
   const ref = useRef<HTMLElement>(null);
@@ -435,11 +444,15 @@ export function Scene({
       ref={ref}
       data-exploits={relue ? undefined : exploits?.join("|")}
       className={cn(
-        "relative flex flex-col overflow-hidden bg-[radial-gradient(120%_70%_at_50%_30%,#ffffff_0%,#e8eae5_75%)] text-foreground md:rounded-3xl dark:bg-[radial-gradient(120%_70%_at_50%_30%,#1d2024_0%,#0c0d0f_75%)] dark:text-white",
+        "relative flex flex-col overflow-hidden md:rounded-3xl",
+        couverture
+          ? "dark bg-black text-white"
+          : "bg-[radial-gradient(120%_70%_at_50%_30%,#ffffff_0%,#e8eae5_75%)] text-foreground dark:bg-[radial-gradient(120%_70%_at_50%_30%,#1d2024_0%,#0c0d0f_75%)] dark:text-white",
         className,
       )}
       style={{ ["--p" as string]: 0 } as CSSProperties}
     >
+      {couverture && <FondPhoto c={couverture} />}
       <header className="relative z-10 flex flex-col gap-1 px-5 pt-5">
         <span className="pel-titre mono-label text-[10px] text-foreground/50 dark:text-white/50" style={{ ["--d" as string]: 0 }}>
           {sur}
@@ -448,6 +461,8 @@ export function Scene({
           {titre}
         </h3>
       </header>
+      {/* La place de la photo, entre le titre et le terrain. */}
+      {couverture && <div className="h-[52vw] max-h-64 shrink-0 md:h-56" />}
       <div ref={cadre} className="relative mt-auto w-full" style={{ height: largeur ? naturelle * s : naturelle }}>
         {largeur > 0 && (
           <Avancee.Provider value={ctx}>
@@ -457,7 +472,7 @@ export function Scene({
             >
               <div className="pel-camera absolute inset-0">
                 <div className="absolute inset-x-0" style={{ top: MARGE - haut, height: bas + MARGE }}>
-                  <SolTerrain ombres={projetees} rayon={26} vue={VUE} gazon="vert" />
+                  <SolTerrain ombres={projetees} rayon={26} vue={VUE} gazon={couverture ? "craie" : "vert"} />
                   <But />
                   {children}
                   {places.map((p, i) => (
@@ -470,7 +485,7 @@ export function Scene({
         )}
       </div>
       {(texte || aPartager || geste) && (
-        <div className="flex min-h-11 items-center gap-2 pr-1.5 pb-2 pl-5">
+        <div className="relative flex min-h-11 items-center gap-2 pr-1.5 pb-2 pl-5">
           <span className="min-w-0 flex-1 text-[13px] leading-snug text-foreground/70 dark:text-white/70">{texte}</span>
           {geste}
           {aPartager && (
@@ -489,6 +504,36 @@ export function Scene({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * La photo d'une rubrique couverte : en haut, bord à bord, sous le titre ;
+ * elle se fond dans le noir là où les cartes se lèvent, pour que rien ne
+ * se lise sur elle que le titre. Elle glisse un peu moins vite que le
+ * défilement (--p) ; immobile avec « Réduire les animations ».
+ */
+function FondPhoto({ c }: { c: Couverture }) {
+  const { src, srcSet } = sources(c);
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 top-0 h-[72%] overflow-hidden"
+      style={{ maskImage: "linear-gradient(180deg, #000 36%, transparent 86%)", WebkitMaskImage: "linear-gradient(180deg, #000 36%, transparent 86%)" }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- une image fixe du moodboard, en srcset */}
+      <img
+        src={src}
+        srcSet={srcSet}
+        sizes="(min-width: 768px) 560px, 100vw"
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="pel-photo absolute inset-0 size-full object-cover"
+        style={{ objectPosition: c.point }}
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.7)_0%,rgba(0,0,0,0)_30%)]" />
+    </div>
   );
 }
 

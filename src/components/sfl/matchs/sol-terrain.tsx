@@ -37,11 +37,13 @@ export function SolTerrain({
    * Sabri, 19/10 : « bien vert, avec le petit dégradé en bord de carte, pas
    * trop opaque »). Le vert suit le mode de l'app (globals.css, --gazon-*) :
    * translucide sur le noir, plein sur le papier du mode clair, où il
-   * deviendrait pâle.
+   * deviendrait pâle. « craie » : les lignes seules, sans gazon, sur une
+   * photo (les couvertures des Actus, lib/sfl/couvertures.ts).
    */
-  gazon?: "nuit" | "vert";
+  gazon?: "nuit" | "vert" | "craie";
 }) {
-  const vert = gazon === "vert";
+  const craie = gazon === "craie";
+  const vert = gazon === "vert" || craie;
   const id = useId().replace(/:/g, "");
   const { l, h } = vue;
   const t = (points: [number, number, number?][], ferme = false) => trace(points, ferme, vue);
@@ -89,12 +91,14 @@ export function SolTerrain({
       </defs>
       <svg x="50%" overflow="visible">
         {/* L'épaisseur du terrain, sous le bord avant. */}
-        <path
-          d={t([[4, h], [l - 4, h], [l - 4, h, -14], [4, h, -14]], true)}
-          style={vert ? { fill: "var(--gazon-bord)", fillOpacity: "var(--gazon-bord-a)" } : { fill: "var(--nuit-bord)" }}
-        />
-        <path d={t(rectArrondi(0, 0, l, h, 10), true)} fill={`url(#${id}f)`} />
-        <g clipPath={`url(#${id}c)`} fill={vert ? "rgba(255,255,255,0.07)" : undefined} style={vert ? undefined : { fill: "var(--nuit-bande)" }}>
+        {!craie && (
+          <path
+            d={t([[4, h], [l - 4, h], [l - 4, h, -14], [4, h, -14]], true)}
+            style={vert ? { fill: "var(--gazon-bord)", fillOpacity: "var(--gazon-bord-a)" } : { fill: "var(--nuit-bord)" }}
+          />
+        )}
+        {!craie && <path d={t(rectArrondi(0, 0, l, h, 10), true)} fill={`url(#${id}f)`} />}
+        <g clipPath={`url(#${id}c)`} fill={craie ? "rgba(255,255,255,0.035)" : vert ? "rgba(255,255,255,0.07)" : undefined} style={vert ? undefined : { fill: "var(--nuit-bande)" }}>
           {Array.from({ length: Math.ceil(h / 100) }, (_, i) => (
             <path
               key={i}
@@ -104,7 +108,7 @@ export function SolTerrain({
         </g>
         <g
           fill="none"
-          stroke={vert ? "rgba(255,255,255,0.75)" : undefined}
+          stroke={craie ? "rgba(255,255,255,0.5)" : vert ? "rgba(255,255,255,0.75)" : undefined}
           style={vert ? undefined : { stroke: "var(--nuit-craie)" }}
           strokeWidth={1.7}
           strokeLinejoin="round"
