@@ -15,11 +15,12 @@
 //   · un accord donné hors ligne, sans session serveur, ou avant que la base
 //     ait la table (aperçus Vercel), reste « en attente » ici et part à la
 //     prochaine ouverture avec une session.
-// L'accord qui compte est celui de la version en vigueur (VERSION_POLITIQUE) :
-// quand elle change, la case revient.
+// Un nouvel accord porte la version en vigueur (VERSION_POLITIQUE) ; un accord
+// vaut tant que sa version n'est pas plus ancienne que VERSION_ACCEPTEE :
+// quand celle-ci monte, la case revient.
 
 import { supabase } from "@/lib/supabase";
-import { VERSION_POLITIQUE, ageDe } from "./confidentialite";
+import { VERSION_POLITIQUE, accordValable, ageDe } from "./confidentialite";
 
 const CACHE_KEY = "bola-accord";
 /** Émis quand un accord change ou revient du serveur. */
@@ -92,11 +93,12 @@ export function monAccord(nom: string): Accord | null {
 }
 
 /**
- * true : accord donné à la version en vigueur ; false : aucun, ou d'une
- * version plus ancienne ; null : on ne sait pas encore (relecture en cours).
+ * true : accord donné à une version qui vaut encore (accordValable) ; false :
+ * aucun, ou d'une version trop ancienne ; null : on ne sait pas encore
+ * (relecture en cours).
  */
 export function accordDonne(nom: string): boolean | null {
-  if (lire()[nom]?.version === VERSION_POLITIQUE) return true;
+  if (accordValable(lire()[nom]?.version)) return true;
   return relus.has(nom) ? false : null;
 }
 
