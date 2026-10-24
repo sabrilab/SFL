@@ -5,7 +5,8 @@
 // mis en avant »).
 //
 // Ordre de lecture, du plus fort au plus fin :
-//   1. lui : sa carte en grand, son nom dans le lettrage de la Map, ses
+//   1. lui : sa carte en grand (la toucher l'ouvre en plein écran, pour la
+//      manipuler : carte-en-grand.tsx, Sabri, 24/10), son nom dans le lettrage de la Map, ses
 //      abonnés comme sur Instagram (ses abonnés et ses abonnements, « Suivi
 //      par Kader, Anis et 3 autres que tu connais » : suivre.tsx), le bouton
 //      pour le suivre, et trois chiffres de tête en Anton (son rang au Pépite
@@ -30,7 +31,7 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { Card3D } from "@/components/sfl/card-3d";
+import { Card3DEnGrand } from "@/components/sfl/carte-en-grand";
 import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur";
 import { ComparerCartes } from "@/components/sfl/comparer-cartes";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -146,11 +147,13 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
     >
       {/* 1. Lui */}
       <div className="colonne-fixe flex min-w-0 flex-col items-center gap-[var(--fib-21)]">
-        <Card3D
+        <Card3DEnGrand
           cacheKey={`recherche-${player.name}`}
           mode="simple"
           size={tresGrand ? 1.05 * RACINE_PHI : grand ? 1.05 : 0.8}
           render={(s) => <PlayerCard player={player} size={s} />}
+          titre={identite.nom(player.name)}
+          sousTitre={identite.pseudo(player.name)}
         />
         <div className="flex w-full flex-col items-center gap-[var(--fib-8)] text-center">
           <h2 className="titre-lettrage text-[34px] leading-[0.95] break-words">

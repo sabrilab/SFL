@@ -166,7 +166,7 @@ const REMPLISSAGE_3D = 0.72;
 const TRANSPARENT_PX =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
-interface CapturedLayers {
+export interface CapturedLayers {
   background: string;
   playerLayer: string;
   stats: string;
@@ -216,7 +216,8 @@ function attendreNoeud<T>(lire: () => T | null, images = 30): Promise<T | null> 
 async function captureLayer(
   node: HTMLElement,
   opts: { isolatePart?: "player" | "stats"; excludeParts?: string[] },
-  fontEmbedCSS: string | undefined
+  fontEmbedCSS: string | undefined,
+  pixelRatio = 3
 ): Promise<string> {
   const transparentEls: HTMLElement[] = [];
   let isolateEl: HTMLElement | null = null;
@@ -237,7 +238,7 @@ async function captureLayer(
 
   try {
     return await toPng(node, {
-      pixelRatio: 3,
+      pixelRatio,
       fontEmbedCSS,
       // La photo change d'URL (?v=…) quand le joueur la change : sans ça,
       // le cache interne de html-to-image garderait l'ancienne.
@@ -319,6 +320,14 @@ export function Card3D(props: {
    * Pour la pop-up d'une carte qu'on vient de toucher.
    */
   apercu?: boolean;
+  /** La définition des calques photographiés, en largeurs de carte de taille 1 (254 px) : 3, davantage pour une carte vue en grand. */
+  definition?: number;
+  /**
+   * La scène qui montre les calques à la place du canvas d'ici : la carte en
+   * plein écran (carte-en-grand.tsx). Le cadre remplit alors son parent, sans
+   * squelette ni carte plate (la scène a la sienne).
+   */
+  scene?: (calques: CapturedLayers) => ReactNode;
 }) {
   // Une photo posée ou changée (chez soi ou par un autre joueur) : la capture
   // repart, sinon la 3D garderait l'ancienne image. Même chose pour le badge
@@ -340,6 +349,8 @@ function Card3DInner({
   startFace = "front",
   interactive = true,
   apercu = false,
+  definition = 3,
+  scene,
 }: {
   size?: number;
   /** Contrôle la couleur du bezel et l'intensité de l'effet holo. */
@@ -351,6 +362,8 @@ function Card3DInner({
   /** false = décorative, ne répond pas au glissement (fans de pack). */
   interactive?: boolean;
   apercu?: boolean;
+  definition?: number;
+  scene?: (calques: CapturedLayers) => ReactNode;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -365,6 +378,12 @@ function Card3DInner({
   /** Le dos à monter hors écran pour le photographier, lu sur la face. */
   const [dos, setDos] = useState<Dos | null>(null);
   const dosRef = useRef<HTMLDivElement>(null);
+  // En grand (scene), la face est photographiée à la taille de sa définition, en
+  // pixels CSS, plutôt qu'à la taille 1 grossie : html-to-image ramène chaque
+  // police à l'entier inférieur moins 0,1 (cloneCSSStyle). À la taille 1, le
+  // microtexte (5,95 px) y perdait 18 %, la ligne de série 14 % : en plein écran,
+  // les petits textes rétrécissaient quand la 3D remplaçait la carte plate.
+  const echelle = scene ? definition : 1;
 
   useLayoutEffect(() => {
     const node = captureRef.current;
@@ -399,24 +418,24 @@ function Card3DInner({
         const prets = await attendreBadges(node, 600);
         if (cancelled) return;
         const polices = await policesEnLigne(node);
-        const background = await captureLayer(node, { excludeParts: ["player", "stats", "lumiere"] }, polices);
+        const background = await captureLayer(node, { excludeParts: ["player", "stats", "lumiere"] }, polices, definition / echelle);
         if (cancelled) return;
         // Sur WebKit, une capture à blanc du calque joueur d'abord : elle
         // lui fait décoder la photo, que la vraie capture trouve prête.
         // (Avant, la carte se capturait deux fois par accident, ce qui le
         // masquait.)
         if (WEBKIT && node.querySelector('[data-card-part="player"] img')) {
-          await captureLayer(node, { isolatePart: "player" }, polices);
+          await captureLayer(node, { isolatePart: "player" }, polices, definition / echelle);
           if (cancelled) return;
         }
-        const playerLayer = await captureLayer(node, { isolatePart: "player" }, polices);
+        const playerLayer = await captureLayer(node, { isolatePart: "player" }, polices, definition / echelle);
         if (cancelled) return;
         // Même chose pour le sigle SFL de la ligne de série (un masque CSS).
         if (WEBKIT && node.querySelector('[data-card-part="stats"] [role="img"]')) {
-          await captureLayer(node, { isolatePart: "stats" }, polices);
+          await captureLayer(node, { isolatePart: "stats" }, polices, definition / echelle);
           if (cancelled) return;
         }
-        const stats = await captureLayer(node, { isolatePart: "stats" }, polices);
+        const stats = await captureLayer(node, { isolatePart: "stats" }, polices, definition / echelle);
         if (cancelled) return;
         // Le dos, monté à côté de la face dès qu'elle a dit sa matière.
         let dosUrl: string | undefined;
@@ -424,7 +443,7 @@ function Card3DInner({
         if (cancelled) return;
         if (dosNode) {
           try {
-            dosUrl = await captureLayer(dosNode, { excludeParts: ["lumiere"] }, await policesEnLigne(dosNode));
+            dosUrl = await captureLayer(dosNode, { excludeParts: ["lumiere"] }, await policesEnLigne(dosNode), definition);
           } catch {
             // le dos de repli (uni, à la couleur de la carte) le remplacera
           }
@@ -441,7 +460,7 @@ function Card3DInner({
     return () => {
       cancelled = true;
     };
-  }, [inView, essai]);
+  }, [inView, essai, definition, echelle]);
 
   // Dimensions estimées avant capture (base CardShell ~260×376 avec
   // bannière) pour que le skeleton occupe déjà la bonne place — la taille
@@ -451,14 +470,14 @@ function Card3DInner({
   const height = (dims ? dims.height : 376) * size;
 
   return (
-    <div ref={wrapperRef} style={{ position: "relative", width, height }}>
+    <div ref={wrapperRef} style={scene ? { position: "absolute", inset: 0 } : { position: "relative", width, height }}>
       {/* Source de capture — hors-écran (clip par un parent de taille nulle,
           jamais opacity:0 sur le nœud capturé lui-même, sinon l'image
           rasterisée hérite de cette opacité et ressort vide). */}
       {inView && (
         <div style={{ position: "absolute", top: 0, left: 0, width: 0, height: 0, overflow: "hidden" }}>
           <div ref={captureRef} style={{ position: "absolute" }} aria-hidden>
-            {render(1)}
+            {render(echelle)}
           </div>
           {dos && (
             <div ref={dosRef} style={{ position: "absolute" }} aria-hidden>
@@ -490,7 +509,9 @@ function Card3DInner({
         </div>
       )}
 
-      {captured ? (
+      {captured && scene ? (
+        scene(captured)
+      ) : captured ? (
         <CardCanvas
           background={captured.background}
           playerLayer={captured.playerLayer}
@@ -504,7 +525,7 @@ function Card3DInner({
           posee={apercu}
           onAffichee={() => setAffichee(true)}
         />
-      ) : apercu ? null : (
+      ) : apercu || scene ? null : (
         // Skeleton pendant la capture : jamais de carte 2D "flash" avant
         // le rendu 3D, juste un shimmer discret aux couleurs de la carte.
         <div

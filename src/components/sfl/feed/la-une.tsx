@@ -13,7 +13,7 @@
 
 import { motion } from "motion/react";
 import { BoostCard } from "@/components/sfl/boost-card";
-import { Card3D } from "@/components/sfl/card-3d";
+import { Card3DEnGrand } from "@/components/sfl/carte-en-grand";
 import type { BoostCardData } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
@@ -155,11 +155,13 @@ export function LaUne({
                 transition={{ duration: 0.45, delay: i * 0.08, ease: [0.22, 1, 0.36, 1] }}
                 className="flex shrink-0 flex-col items-center gap-2"
               >
-                <Card3D
+                <Card3DEnGrand
                   cacheKey={`une-${journee}-${c.type}-${c.player}`}
                   mode="simple"
                   size={0.52}
                   render={(s) => <BoostCard card={c} size={s} />}
+                  titre={nomAffiche(c.player)}
+                  sousTitre={`${TITRES[c.type] ?? c.type} · J${journee}`}
                 />
                 <figcaption className="max-w-[130px] text-center">
                   <span className="mono-label block text-primary">{TITRES[c.type] ?? c.type}</span>
