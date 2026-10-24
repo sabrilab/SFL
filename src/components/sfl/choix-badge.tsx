@@ -1,14 +1,17 @@
 "use client";
 
 // Choisir le badge de sa carte, depuis Ma carte. Le bouton montre le badge
-// posé en ce moment ; la feuille montre la carte elle-même, qui change à
-// chaque choix, puis les choix : le meilleur (par défaut, suit les saisons),
-// chaque badge gagné, ou aucun. Le choix part à la ligue (badges-choisis.ts).
+// posé en ce moment ; la feuille montre la carte elle-même en grand format,
+// avec la bulle du badge au-dessus de la note, qui change à chaque choix,
+// puis les choix : le meilleur (par défaut, suit les saisons), chaque badge
+// gagné, ou aucun. Le choix part à la ligue (badges-choisis.ts). Chaque
+// badge est montré par son objet 3D, comme au bout de la bulle de la carte
+// (insigne-carte.tsx).
 
 import { useState } from "react";
 import { Check } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Badge3D, nomBadge } from "@/components/sfl/badge-3d";
+import { nomInsigne, ObjetBadge } from "@/components/sfl/insigne-carte";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useBadgeCarte, useChoixBadge } from "@/hooks/use-badge-carte";
@@ -18,7 +21,7 @@ import type { Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 
 function Mini({ badge, taille }: { badge: BadgeCarte; taille: number }) {
-  return <Badge3D badge={badge} largeur={taille} socle />;
+  return <ObjetBadge badge={badge} largeur={taille} ombre />;
 }
 
 function Option({
@@ -65,7 +68,7 @@ export function ChoixBadge({ player }: { player: Player }) {
       <button
         type="button"
         onClick={() => setOuvert(true)}
-        aria-label={badge ? `Badge de ma carte : ${nomBadge(badge)}. Changer` : "Choisir le badge de ma carte"}
+        aria-label={badge ? `Badge de ma carte : ${nomInsigne(badge)}. Changer` : "Choisir le badge de ma carte"}
         className="bouton-secondaire bouton--or flex size-[52px] shrink-0 items-center justify-center"
       >
         {badge ? <Mini badge={badge} taille={34} /> : <span className="size-[22px] rounded-full border-[1.5px] border-dashed border-foreground/45" />}
@@ -75,14 +78,15 @@ export function ChoixBadge({ player }: { player: Player }) {
         <SheetContent side="bottom" className="mx-auto max-h-[90vh] w-full overflow-y-auto rounded-t-[28px] px-5 pt-6 pb-8 sm:max-w-md">
           <SheetTitle className="text-[19px] font-extrabold tracking-tight">Le badge de ma carte</SheetTitle>
           <div className="mt-4 flex justify-center">
-            <PlayerCard player={player} size={0.62} />
+            {/* Assez grande pour la carte complète, où vit la bulle (≥ 170 px). */}
+            <PlayerCard player={player} size={0.8} />
           </div>
           <div className="mt-5 flex flex-col gap-2">
-            <Option actif={actif === "auto"} onClick={() => choisir("auto")} label={meilleur ? `Le meilleur · ${nomBadge(meilleur)}` : "Le meilleur"}>
+            <Option actif={actif === "auto"} onClick={() => choisir("auto")} label={meilleur ? `Le meilleur · ${nomInsigne(meilleur)}` : "Le meilleur"}>
               {meilleur ? <Mini badge={meilleur} taille={44} /> : <span className="size-9 shrink-0" />}
             </Option>
             {gagnes.map((b) => (
-              <Option key={cleBadge(b)} actif={actif === cleBadge(b)} onClick={() => choisir(cleBadge(b))} label={nomBadge(b)}>
+              <Option key={cleBadge(b)} actif={actif === cleBadge(b)} onClick={() => choisir(cleBadge(b))} label={nomInsigne(b)}>
                 <Mini badge={b} taille={44} />
               </Option>
             ))}

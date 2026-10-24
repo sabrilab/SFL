@@ -33,7 +33,7 @@ export type Objet =
   | "coupe-engage"
   | "coupe-but";
 
-export type Role = "corps" | "verre" | "sombre" | "noir";
+export type Role = "corps" | "verre" | "sombre" | "noir" | "brut";
 export interface Piece {
   geo: THREE.BufferGeometry;
   role: Role;
@@ -216,7 +216,7 @@ export const POSE: Record<Objet, [number, number, number]> = {
   crampon: [0.5, 0.42, 0.06],
   cage: [0.2, -0.5, 0],
   trophee: [0.16, 0.3, 0],
-  pepite: [0.42, 0.35, 0.08],
+  pepite: [0.3, 0.35, 0.1], // presque de face, un peu d'en haut : ses lobes et ses creux
   etoile: [0.12, -0.32, 0.06],
   bouclier: [0.2, -0.5, 0],
   eclair: [0.18, -0.6, 0.12],
@@ -558,28 +558,105 @@ function trophee(): Piece[] {
 
 /* --------------------------------- Pépite --------------------------------- */
 
+/** Un bruit de valeurs en 3D, lissé, toujours le même (sans hasard) : le relief de la pépite. */
+function bruit(x: number, y: number, z: number): number {
+  const h = (i: number, j: number, k: number) => {
+    let n = (i * 374761393 + j * 668265263 + k * 2147483647) | 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+  };
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const f = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+  const u = f(x - xi), v = f(y - yi), w = f(z - zi);
+  const l = (a: number, b: number, t: number) => a + (b - a) * t;
+  const c = (dx: number, dy: number) => l(h(xi + dx, yi + dy, zi), h(xi + dx, yi + dy, zi + 1), w);
+  return l(l(c(0, 0), c(1, 0), u), l(c(0, 1), c(1, 1), u), v) * 2 - 1;
+}
+
+function fbm(x: number, y: number, z: number, octaves: number): number {
+  let s = 0, a = 0.5, f = 1;
+  for (let i = 0; i < octaves; i++) {
+    s += a * bruit(x * f + i * 17.3, y * f - i * 9.1, z * f + i * 4.7);
+    a *= 0.5;
+    f *= 2.03;
+  }
+  return s;
+}
+
+/** Les lobes de la pépite : centre et rayon de boules fondues ensemble. */
+const LOBES: [number, number, number, number][] = [
+  [0, 0, 0, 0.6],
+  [0.6, 0.22, 0.06, 0.42],
+  [0.98, -0.12, 0, 0.3],
+  [-0.56, 0.14, 0.05, 0.47],
+  [-0.98, -0.18, 0, 0.27],
+  [-0.22, -0.42, 0.06, 0.38],
+  [0.32, -0.38, -0.05, 0.34],
+  [0.14, 0.5, 0, 0.3],
+  [-0.42, 0.56, -0.05, 0.23],
+];
+
+/** La distance signée à la masse des lobes (union adoucie), et à la boule la plus proche (> 0 dans un creux). */
+function lobes(x: number, y: number, z: number): [number, number] {
+  const k = 0.09;
+  let res = 0;
+  let proche = Infinity;
+  for (const [cx, cy, cz, r] of LOBES) {
+    const d = Math.hypot(x - cx, y - cy, z - cz) - r;
+    proche = Math.min(proche, d);
+    res += Math.exp(-d / k);
+  }
+  return [-k * Math.log(res), proche];
+}
+
 /**
- * La pépite d'or : une pierre taillée en brillant, seize pans. La table fait
- * 1/φ du diamètre ; le symbole BOLA y est gravé, 1/φ de la table.
+ * La pépite d'or : une vraie pépite, pas une pierre taillée (Sabri, 24/10 :
+ * « c'est pas du diamant, c'est une pépite d'or qu'on doit modéliser »). Une
+ * masse de métal brut : des lobes ronds fondus ensemble, comme du métal
+ * coulé puis roulé par la rivière, une surface bosselée et grêlée ; les
+ * creux entre les lobes et les cavités sont plus sombres (une couleur par
+ * sommet, que la matière « brut » lit), les bosses usées accrochent la
+ * lumière.
  */
 function pepite(): Piece[] {
-  const t = 1 / PHI;
-  const profil = [
-    new THREE.Vector2(0, -0.95),
-    new THREE.Vector2(t, -0.36),
-    new THREE.Vector2(1, 0),
-    new THREE.Vector2(1, 0.08),
-    new THREE.Vector2(0.82, 0.28),
-    new THREE.Vector2(t, 0.42),
-    new THREE.Vector2(0, 0.42),
-  ];
-  const taille = new THREE.LatheGeometry(profil, 16).toNonIndexed();
-  taille.computeVertexNormals();
-  const marque = poser(symbole(t / PHI, 0.04), new THREE.Vector3(0, 0.415, 0), new THREE.Vector3(0, 1, 0));
-  return [
-    { geo: taille, role: "corps" },
-    { geo: marque, role: "sombre" },
-  ];
+  const g = mergeVertices(new THREE.IcosahedronGeometry(1, 40).deleteAttribute("normal").deleteAttribute("uv"), 1e-6);
+  const pos = g.getAttribute("position");
+  const d = new THREE.Vector3();
+  const ombre = new Float32Array(pos.count);
+  for (let i = 0; i < pos.count; i++) {
+    d.fromBufferAttribute(pos, i).normalize();
+    // Le long du rayon, la surface de la masse : par dichotomie.
+    let lo = 0;
+    let hi = 2.2;
+    for (let n = 0; n < 28; n++) {
+      const m = (lo + hi) / 2;
+      if (lobes(d.x * m, d.y * m, d.z * m)[0] < 0) lo = m;
+      else hi = m;
+    }
+    const x = d.x * lo, y = d.y * lo, z = d.z * lo;
+    const creux = Math.max(0, lobes(x, y, z)[1]);
+    // Le relief : des bosses douces, puis de petites cavités.
+    const bosse = 0.05 * fbm(x * 2.4, y * 2.4, z * 2.4, 3);
+    const cavite = Math.max(0, fbm(x * 4.6 + 7, y * 4.6, z * 4.6, 2) - 0.1);
+    const r = lo + bosse - 0.06 * cavite + 0.003 * bruit(x * 30, y * 30, z * 30);
+    pos.setXYZ(i, d.x * r, d.y * r, d.z * r * 0.66);
+    ombre[i] = Math.min(1, creux * 5 + cavite * 3 + Math.max(0, -bosse) * 6);
+  }
+  const teinte = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const k = 1 - 0.55 * ombre[i];
+    teinte.set([k, k * 0.96, k * 0.9], i * 3);
+  }
+  g.setAttribute("color", new THREE.BufferAttribute(teinte, 3));
+  g.computeVertexNormals();
+  g.computeBoundingBox();
+  const b = g.boundingBox!;
+  const c = b.getCenter(new THREE.Vector3());
+  const taille = b.getSize(new THREE.Vector3());
+  g.translate(-c.x, -c.y, -c.z);
+  const k = 1.9 / Math.max(taille.x, taille.y, taille.z);
+  g.scale(k, k, k);
+  return [{ geo: g, role: "brut" }];
 }
 
 /* ------------------------ Formes plates, gonflées ------------------------- */
