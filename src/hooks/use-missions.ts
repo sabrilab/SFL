@@ -104,7 +104,15 @@ function useReponses(): Reponse[] {
   const session = useSession();
   const depuisLaBase = !!session?.server;
   useEffect(() => suivre(depuisLaBase), [depuisLaBase]);
-  return useSyncExternalStore(abonner, reponsesEnMemoire, () => AUCUNE);
+  const reponses = useSyncExternalStore(abonner, reponsesEnMemoire, () => AUCUNE);
+  // Le compte vitrine (compte-vitrine.ts) répond, sur son écran, comme son
+  // modèle : ces réponses ne partent jamais en base.
+  const { vitrine } = useSeason();
+  return useMemo(() => {
+    if (!vitrine) return reponses;
+    const copies = reponses.filter((r) => r.joueur === vitrine.modele).map((r) => ({ ...r, joueur: vitrine.nom }));
+    return copies.length ? [...reponses.filter((r) => r.joueur !== vitrine.nom), ...copies] : reponses;
+  }, [reponses, vitrine]);
 }
 
 /** L'heure, à la minute : le coup d'envoi et minuit se voient sans recharger. */

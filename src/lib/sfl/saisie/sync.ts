@@ -24,6 +24,7 @@ import { supabase } from "@/lib/supabase";
 import { getSession } from "@/lib/sfl/auth/session";
 import { adoptSaison, CURRENT_SEED_VERSION } from "./store";
 import type { Saison } from "./types";
+import { sansVitrine } from "../compte-vitrine";
 
 // Même canal d'événement que SeasonProvider (littéral pour éviter le cycle
 // d'imports : season-provider importe store, qui importe ce module).
@@ -162,7 +163,9 @@ export function blocage(): string | null {
  * laisse l'admin sans rien à faire, et c'est exactement la situation où il a
  * besoin d'agir.
  */
-export function publierSaison(saison: Saison, { forcer = false } = {}): Promise<Resultat> {
+export function publierSaison(input: Saison, { forcer = false } = {}): Promise<Resultat> {
+  // Jamais les lignes du compte vitrine (compte-vitrine.ts) : elles ne vivent que sur son écran.
+  const saison = sansVitrine(input);
   const tour = fileDePublication.then(() => publierMaintenant(saison, forcer));
   fileDePublication = tour.catch(() => {});
   return tour;
