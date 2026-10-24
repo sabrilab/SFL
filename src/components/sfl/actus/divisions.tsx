@@ -7,11 +7,15 @@
 //
 // Le Pépite d'Or de la saison, du premier au dernier classé, coupé en trois
 // bandes : la D1 à l'or, la D2 à l'argent, la D3 au bronze (les métaux des
-// trophées, badge-3d.tsx). Chaque ligne : la place, la carte (petite), le
-// nom, les points ; la tienne se détache. Repliée, chaque division montre
-// ses trois premiers, toi, et sa dernière place, celle qu'on défend ; entre
-// les deux, combien on en saute, et « Tout le classement » déplie le reste.
-// Une D1 ou une D2 pas encore pleine compte ses places libres.
+// trophées, badge-3d.tsx). Chaque division compte ses places depuis 1 : le
+// premier de la D2 est 1er, pas 31e (Sabri, 24/10 : « chaque division a son
+// premier, son deuxième, son troisième, et c'est sa récompense à elle ») ;
+// ses trois premiers, son podium, portent leur place sur le métal de leur
+// division. Chaque ligne : la place, la carte (petite), le nom, les points ;
+// la tienne se détache. Repliée, chaque division montre son podium, toi, et
+// sa dernière place, celle qu'on défend ; entre les deux, combien on en
+// saute, et « Tout le classement » déplie le reste. Une D1 ou une D2 pas
+// encore pleine compte ses places libres.
 //
 // Trois temps, ceux du moteur (lib/sfl/divisions.ts) :
 //   · jusqu'au soir de la J3, l'annonce : « Dernier dimanche sans
@@ -46,6 +50,7 @@ import {
   nomDivision,
   phraseAnnonce,
   phraseBilan,
+  rangDansDivision,
   REGLES_DIVISIONS,
   type BilanDivisions,
   type Decoupage,
@@ -58,7 +63,7 @@ import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
 import { pl, useJoueurs } from "./cinematiques";
 
-/** Le haut de chaque division, toujours montré : ses trois premiers. */
+/** Le podium de chaque division, toujours montré : ses trois premiers. */
 const TETE = 3;
 /** Au bilan, ceux qui viennent d'arriver dans une division, montrés d'office (les mieux classés). */
 const ARRIVEES = 3;
@@ -93,11 +98,6 @@ const METAL: Record<Division, { poli: string; encre: string; voile: string }> = 
 
 /** « 1er », « 17e » : une place au classement. */
 const rangTexte = (n: number) => (n === 1 ? "1er" : `${n}e`);
-/** Les places d'une division, en chiffres : 1–30, 31–60, 61 et plus. */
-const bornes = (x: Division) => {
-  const { taille } = REGLES_DIVISIONS;
-  return x < 3 ? `${(x - 1) * taille + 1}–${x * taille}` : `${2 * taille + 1} et plus`;
-};
 /** Les places d'une division : 30 pour la D1 et la D2, la D3 prend les autres. */
 const placesDe = (x: Division) => (x < 3 ? `${REGLES_DIVISIONS.taille} places` : "les autres");
 /** Sous une division : ses joueurs ; vide, ses places. */
@@ -120,9 +120,9 @@ function libres(d: Decoupage, x: Division): number {
 type Ligne = { place: PlaceDecoupage } | { saut: number };
 
 /**
- * Une division repliée : ses trois premiers, sa dernière place et ceux qu'on
- * garde (toi, les arrivées), et entre eux combien on en saute. Un seul à
- * sauter se montre : un « ⋮ 1 autre » ne fait rien gagner.
+ * Une division repliée : son podium, ex æquo compris, sa dernière place et
+ * ceux qu'on garde (toi, les arrivées), et entre eux combien on en saute. Un
+ * seul à sauter se montre : un « ⋮ 1 autre » ne fait rien gagner.
  */
 function replier(liste: PlaceDecoupage[], garder: Set<string>): Ligne[] {
   const lignes: Ligne[] = [];
@@ -133,7 +133,8 @@ function replier(liste: PlaceDecoupage[], garder: Set<string>): Ligne[] {
     sautes = [];
   };
   liste.forEach((place, i) => {
-    if (i < TETE || i === liste.length - 1 || garder.has(place.nom)) {
+    // Sa place dans la division (rangDansDivision) : liste[0] est son premier.
+    if (place.rang - liste[0].rang < TETE || i === liste.length - 1 || garder.has(place.nom)) {
       vider();
       lignes.push({ place });
     } else sautes.push(place);
@@ -160,13 +161,34 @@ function SousLeNom({ bilan, nom }: { bilan: BilanDivisions; nom: string }) {
   );
 }
 
-/** Une ligne du classement : la place, la carte, le nom, les points. */
+/** La place dans la division : sur le métal de la division pour son podium, en chiffre pour les autres. */
+function Place({ x, rang }: { x: Division; rang: number }) {
+  if (rang > TETE)
+    return <span className="w-7 shrink-0 text-center text-[15px] font-bold text-foreground/40 tabular-nums dark:text-white/40">{rang}</span>;
+  return (
+    <span className="grid w-7 shrink-0 place-items-center">
+      <span
+        className="grid size-[26px] place-items-center rounded-full pt-px text-[15px] leading-none shadow-[0_1px_5px_rgba(0,0,0,0.22)]"
+        style={{ background: METAL[x].poli, color: METAL[x].encre, fontFamily: ANTON }}
+      >
+        {rang}
+      </span>
+    </span>
+  );
+}
+
+/** Une ligne du classement : la place dans la division, la carte, le nom, les points. */
 function LigneJoueur({
+  x,
+  rang,
   place,
   moi,
   bilan,
   ordre,
 }: {
+  x: Division;
+  /** Sa place dans la division (rangDansDivision). */
+  rang: number;
   place: PlaceDecoupage;
   moi: boolean;
   bilan: BilanDivisions | null;
@@ -186,8 +208,8 @@ function LigneJoueur({
         moi && "bg-white/80 shadow-[0_2px_10px_rgba(0,0,0,0.06)] dark:bg-white/[0.12] dark:shadow-none",
       )}
     >
-      <span className="w-7 shrink-0 text-right text-[15px] font-bold text-foreground/40 tabular-nums dark:text-white/40">{place.rang}</span>
-      <MiniCarte player={joueur} size={FORMAT_CARTE.petite} detail={`${rangTexte(place.rang)} au Pépite d'Or · ${enPoints(place.pp)}`} />
+      <Place x={x} rang={rang} />
+      <MiniCarte player={joueur} size={FORMAT_CARTE.petite} detail={`${rangTexte(rang)} de la ${nomDivision(x)} · ${enPoints(place.pp)}`} />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className={cn("truncate text-[15px]", moi ? "font-bold" : "font-semibold")}>
           <Nom n={place.nom} />
@@ -211,7 +233,7 @@ function Saut({ n, deplier }: { n: number; deplier: () => void }) {
         onClick={deplier}
         className="flex w-full items-center gap-3 rounded-[14px] px-2.5 py-1 text-left text-foreground/45 transition-colors active:bg-foreground/[0.05] dark:text-white/45 dark:active:bg-white/[0.06]"
       >
-        <span className="w-7 shrink-0 text-right text-[15px] leading-none font-bold">⋮</span>
+        <span className="w-7 shrink-0 text-center text-[15px] leading-none font-bold">⋮</span>
         <span className="mono-label text-[10px]">{`${n} ${pl(n, "autre", "autres")}`}</span>
       </button>
     </li>
@@ -247,7 +269,6 @@ function Bande({
           {nomDivision(x)}
         </span>
         <span className="text-[13px] font-semibold text-foreground/75 dark:text-white/75">{entete}</span>
-        <span className="mono-label ml-auto text-[10px] text-foreground/45 dark:text-white/45">{bornes(x)}</span>
       </div>
       {lignes.length > 0 && (
         <ol className="flex flex-col px-1">
@@ -255,7 +276,15 @@ function Bande({
             "saut" in l ? (
               <Saut key={`saut-${i}`} n={l.saut} deplier={deplier} />
             ) : (
-              <LigneJoueur key={l.place.nom} place={l.place} moi={l.place.nom === moi} bilan={bilan} ordre={i} />
+              <LigneJoueur
+                key={l.place.nom}
+                x={x}
+                rang={rangDansDivision(d, l.place)}
+                place={l.place}
+                moi={l.place.nom === moi}
+                bilan={bilan}
+                ordre={i}
+              />
             ),
           )}
         </ol>
