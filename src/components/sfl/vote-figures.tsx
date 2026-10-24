@@ -4,6 +4,8 @@
 // de son match. On touche la carte de celui qu'on choisit ; on peut changer
 // d'avis jusqu'à minuit. Les voix restent cachées tant que le vote est
 // ouvert — seul le nombre de votants s'affiche — pour ne pas suivre la foule.
+// Tant que la feuille de son match n'est pas remplie, le vote est là mais
+// grisé, sans rien de touchable (feuilleRemplie, lib/sfl/votes.ts).
 // Règles et décompte : lib/sfl/votes.ts.
 
 import { useState } from "react";
@@ -21,6 +23,7 @@ import {
   CATEGORIES_VOTE,
   LIBELLES_VOTE,
   decompterMatch,
+  feuilleRemplie,
   monVote,
   voter,
   type CategorieVote,
@@ -37,9 +40,11 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
   const numero = saison.numero ?? 0;
   const place = findPlayerMatch(journee, me);
   const carte = (nom: string) => allPlayers.find((p) => p.name === nom);
+  // Le vote attend la feuille de son match : avant, grisé.
+  const ouvert = !!place && feuilleRemplie(saison, journee.j, place.match);
 
   async function choisir(cat: CategorieVote, candidat: string) {
-    if (!place || envoi) return;
+    if (!place || !ouvert || envoi) return;
     setEnvoi(cat);
     try {
       await voter({ saison: numero, j: journee.j, categorie: cat, votant: me, candidat, match_id: place.match.id });
@@ -55,9 +60,16 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="rounded-2xl bg-primary/10 px-3.5 py-2.5 text-[12.5px] font-medium text-primary">
-        <span className="font-bold">Vote ouvert jusqu&apos;à minuit</span> · {REGLE_VOTE}
-      </p>
+      {place && !ouvert ? (
+        <p className="rounded-2xl bg-foreground/[0.06] px-3.5 py-2.5 text-[12.5px] font-medium text-foreground/55">
+          <span className="font-bold">Vote fermé</span>
+          {` · Il s'ouvre quand la feuille du ${place.match.label} est remplie, jusqu'à minuit.`}
+        </p>
+      ) : (
+        <p className="rounded-2xl bg-primary/10 px-3.5 py-2.5 text-[12.5px] font-medium text-primary">
+          <span className="font-bold">Vote ouvert jusqu&apos;à minuit</span> · {REGLE_VOTE}
+        </p>
+      )}
 
       {!place ? (
         <p className="px-1 text-[13px] text-muted-foreground">Le vote est réservé aux joueurs de la journée.</p>
@@ -68,11 +80,14 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
           const mien = monVote(votes, numero, journee.j, cat, me);
           const d = decompterMatch(votes, numero, journee.j, place.match, cat);
           return (
-            <section key={cat} className="flex flex-col gap-2.5">
+            <section
+              key={cat}
+              className={cn("flex flex-col gap-2.5", !ouvert && "pointer-events-none select-none opacity-40 grayscale")}
+            >
               <div className="flex items-baseline justify-between px-1">
                 <h3 className="text-[15px] font-bold tracking-tight">{LIBELLES_VOTE[cat]}</h3>
                 <span className="mono-label text-foreground/40 tabular-nums">
-                  {d.votants}/{d.inscrits} ont voté
+                  {ouvert ? `${d.votants}/${d.inscrits} ont voté` : "Pas encore ouvert"}
                 </span>
               </div>
               <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -83,7 +98,7 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
                     <button
                       key={p.name}
                       type="button"
-                      disabled={envoi !== null}
+                      disabled={!ouvert || envoi !== null}
                       onClick={() => choisir(cat, p.name)}
                       aria-pressed={choisi}
                       aria-label={`${LIBELLES_VOTE[cat]} : ${p.name}`}
