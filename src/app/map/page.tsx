@@ -80,6 +80,7 @@ import { FeuilleProfil } from "@/components/sfl/card-viewer";
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
+import { MeteoMatch } from "@/components/sfl/meteo-match";
 import { DiscussionMatch, type OngletDiscussion } from "@/components/sfl/matchs/discussion-match";
 import { FeuilleDeMatch } from "@/components/sfl/matchs/feuille-de-match";
 import { DuelsDuJour } from "@/components/sfl/matchs/duels";
@@ -91,7 +92,7 @@ import { InvitationsEquipe } from "@/components/sfl/equipe/invitation-map";
 import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { useParties } from "@/hooks/use-parties";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
-import { inscrits, libelleJour, listerDispos, momentDeLHeure, placesLibres, prochainsJours, type Dispo, type Partie } from "@/lib/sfl/matchs";
+import { DISPOS_AFFICHEES, inscrits, libelleJour, listerDispos, momentDeLHeure, placesLibres, prochainsJours, type Dispo, type Partie } from "@/lib/sfl/matchs";
 import { cleMoment, meilleurMoment, terrainPropose, type MomentPropose } from "@/lib/sfl/proposition";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
@@ -356,6 +357,15 @@ interface MatchMap {
 function heureDe(heure: string): number {
   const m = heure.match(/(\d{1,2})\s*[h:]/i);
   return m ? Number(m[1]) : 13;
+}
+
+/** Le jour d'un match, AAAA-MM-JJ : celui de la base pour un match ouvert ou un défi, sinon lu dans son libellé. */
+function dateIsoDuMatch(m: Pick<MatchMap, "partie" | "team" | "dateLabel">, aujourdhui: string): string | null {
+  const brut = m.partie?.jour ?? m.team?.defi.jour;
+  const iso = brut?.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  if (iso) return iso;
+  const d = lireDate(m.dateLabel, aujourdhui);
+  return d ? d.toISOString().slice(0, 10) : null;
 }
 
 /** Les jours entre aujourd'hui et une date (négatif : passée) ; null si illisible. */
@@ -882,7 +892,8 @@ export default function MapPage() {
   // de la semaine où le plus de joueurs sont libres, que rien n'occupe déjà,
   // sur le terrain libre le plus proche (de toi, de ta ville, sinon de la
   // ligue) et du format choisi. Les dispos se relisent quand Mes dispos se
-  // referme.
+  // referme. Tant qu'elles sont cachées (DISPOS_AFFICHEES), pas de moment :
+  // la carte propose seulement le terrain.
   const [disposSemaine, setDisposSemaine] = useState<Dispo[]>([]);
   useEffect(() => {
     if (!partiesActives || dispos) return;
@@ -1195,7 +1206,7 @@ export default function MapPage() {
                     },
                   ]
                 : []),
-              ...(partiesActives
+              ...(partiesActives && DISPOS_AFFICHEES
                 ? [{ id: "dispos", libelle: "Mes dispos", icone: <CalendarDays className="size-[18px]" strokeWidth={2.2} />, ton: "#24452a", onClick: () => setDispos(true) }]
                 : []),
             ]}
@@ -1415,6 +1426,18 @@ export default function MapPage() {
             )}
           </SheetHeader>
           <div className="flex flex-col gap-5 px-4">
+            {/* La météo au coup d'envoi, sur le terrain du match (Sabri, 24/10 :
+                « à telle heure, ce que ça prévoit ») : sous l'heure et l'adresse. */}
+            {!ficheAdmin && choisi && !choisi.joue && choisi.terrain && (
+              <MeteoMatch
+                key={choisi.cle}
+                lat={choisi.terrain.lat}
+                lng={choisi.terrain.lng}
+                date={dateIsoDuMatch(choisi, aujourdhui)}
+                heure={choisi.heure}
+                aujourdhui={aujourdhui}
+              />
+            )}
             {ficheAdmin ? (
               <>
                 <OuSeJouent saison={saison} matchs={ligue} terrains={terrains} matchsDe={matchsDe} onSauver={sauver} />
@@ -1620,15 +1643,17 @@ export default function MapPage() {
           }}
         />
       )}
-      <MesDispos
-        open={dispos}
-        onOpenChange={setDispos}
-        moi={moi}
-        onOuvrir={(jour, h) => {
-          setDispos(false);
-          setOuvrir((o) => ({ terrain: null, jour, heure: h, n: (o?.n ?? 0) + 1 }));
-        }}
-      />
+      {DISPOS_AFFICHEES && (
+        <MesDispos
+          open={dispos}
+          onOpenChange={setDispos}
+          moi={moi}
+          onOuvrir={(jour, h) => {
+            setDispos(false);
+            setOuvrir((o) => ({ terrain: null, jour, heure: h, n: (o?.n ?? 0) + 1 }));
+          }}
+        />
+      )}
 
       {/* ─── La discussion d'un match, par-dessus tout (barre d'onglets comprise) ─── */}
       {discussion && (partieDiscussion || discussion.onglet === "equipe") && (

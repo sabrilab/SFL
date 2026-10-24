@@ -1,0 +1,112 @@
+/* Les tuiles des rubriques de Ma carte (rubriques.tsx). Chacune porte son ton,
+   pris dans les familles des boutons (boutons.css) et des contrats : le vert du
+   terrain pour ma saison, le violet de la nuit pour l'XP, le mauve pour
+   l'évolution, l'or retenu de la carrière pour les badges, l'argent pour mes
+   cartes. Le ton ne fait qu'une lueur dans le verre, le filet, l'étiquette et
+   les coins de coupe, ceux de la carte (le vocabulaire de l'impression) :
+   jamais d'aplat. En clair, la même lueur sur le papier, l'étiquette dans la
+   teinte sombre du ton. */
+
+.tuile {
+  --t: 222 227 236;
+  --t-sombre: #3d434d;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 24px;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgb(var(--t) / 0.26), transparent 62%),
+    linear-gradient(168deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.55));
+  border: 1px solid rgb(var(--t) / 0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(20, 12, 4, 0.05),
+    0 10px 28px -18px rgb(var(--t) / 0.9);
+  transition: transform 160ms ease;
+}
+.dark .tuile {
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgb(var(--t) / 0.2), transparent 62%),
+    linear-gradient(168deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+  border-color: rgb(var(--t) / 0.22);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--t) / 0.22),
+    0 14px 34px -22px rgb(var(--t) / 0.7);
+}
+.tuile:active {
+  transform: scale(0.98);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tuile {
+    transition: none;
+  }
+  .tuile:active {
+    transform: none;
+  }
+}
+
+/* Les coins de coupe, comme aux quatre coins de la photo de la carte. */
+.tuile::before,
+.tuile::after {
+  content: "";
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  pointer-events: none;
+  border-color: rgb(var(--t) / 0.6);
+  border-style: solid;
+}
+.tuile::before {
+  top: 10px;
+  right: 10px;
+  border-width: 1.5px 1.5px 0 0;
+}
+.tuile::after {
+  bottom: 10px;
+  left: 10px;
+  border-width: 0 0 1.5px 1.5px;
+}
+
+.tuile__etiquette {
+  color: var(--t-sombre);
+}
+.dark .tuile__etiquette {
+  color: rgb(var(--t));
+}
+.tuile__trait {
+  background: rgb(var(--t) / 0.25);
+}
+.tuile__plein {
+  background: var(--t-sombre);
+}
+.dark .tuile__plein {
+  background: rgb(var(--t));
+  box-shadow: 0 0 10px rgb(var(--t) / 0.6);
+}
+.tuile__courbe {
+  color: var(--t-sombre);
+}
+.dark .tuile__courbe {
+  color: rgb(var(--t));
+}
+
+.tuile--saison {
+  --t: 132 214 140;
+  --t-sombre: #24652e;
+}
+.tuile--xp {
+  --t: 158 140 255;
+  --t-sombre: #3e2f9a;
+}
+.tuile--evolution {
+  --t: 228 150 198;
+  --t-sombre: #7a2b58;
+}
+.tuile--badges {
+  --t: 232 196 120;
+  --t-sombre: #6b4b0c;
+}
+.tuile--cartes {
+  --t: 214 220 230;
+  --t-sombre: #3d434d;
+}

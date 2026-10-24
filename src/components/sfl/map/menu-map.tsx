@@ -8,7 +8,8 @@
 //   · ce que la Map montre, en interrupteurs : les joueurs, les terrains
 //     libres et leur format (map/format-terrains.tsx), les contrats en jeu
 //     le dimanche, la vue satellite ;
-//   · les raccourcis : les joueurs ville par ville, mes dispos ;
+//   · les raccourcis : les joueurs ville par ville, mes dispos (cachées pour
+//     l'instant : DISPOS_AFFICHEES, lib/sfl/matchs.ts) ;
 //   · pour l'admin : l'activité, les matchs et terrains, la journée.
 // Un interrupteur laisse le menu ouvert (on en bascule plusieurs) ; un
 // raccourci le referme, comme un toucher à côté (qui ne touche rien d'autre

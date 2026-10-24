@@ -21,7 +21,7 @@
 //   · le fil : le jour du match, la feuille en direct ; les divisions
 //     (divisions.tsx : leur annonce jusqu'à la J4, puis le bilan de chaque
 //     dimanche) ; ton dimanche (ta carte, tes chiffres, tes places) ; la
-//     convocation (qui vient, Je viens / Je passe ; « Dernier dimanche sans
+//     convocation (la météo de ton match, meteo-match.tsx ; qui vient, Je viens / Je passe ; « Dernier dimanche sans
 //     divisions » sur celle de la J3, ta division dès la J4) ; tes missions,
 //     dès que la feuille est faite (missions.tsx), puis les contrats en jeu
 //     de toute la ligue (contrats-en-jeu.tsx) ; ce qui se joue dimanche (les
@@ -70,6 +70,8 @@ import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { useCollant } from "@/hooks/use-collant";
 import { usePresence } from "@/hooks/use-presence";
+import { MeteoMatch } from "@/components/sfl/meteo-match";
+import { dateIsoDuLibelle } from "@/lib/sfl/meteo";
 import { voteOuvert } from "@/lib/sfl/convocation-temps";
 import { annonceEnCours, J_DECOUPAGE, nomDivision } from "@/lib/sfl/divisions";
 import { divisionsDeLaJournee } from "@/lib/sfl/equipes-division";
@@ -93,6 +95,7 @@ import { RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueTo
 import { ContratsEnJeu } from "./contrats-en-jeu";
 import { MissionsBola } from "./missions";
 import { PronosBola } from "./pronos";
+import { VideosDuFil } from "./video";
 import { VueClassements, VueMatchs } from "./vues";
 import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque, type Vue } from "./epoques";
 import { CarteSaison, categoriesLegendes, Compteurs, LeMur } from "./wall-of-fame";
@@ -326,6 +329,10 @@ function Convocation({ className }: { className?: string }) {
   const etat = useMemo(() => divisionsDeLaJournee(saison, p.journee), [saison, p.journee]);
   const division = etat && !isHidden(me) ? (etat.actuelle.get(me) ?? 3) : null;
   const repondre = (r: "present" | "absent") => p.answer(p.mine === r ? null : r);
+  // La météo de mon match : son lieu (celui de la ligue qui porte ce nom, sinon le terrain habituel).
+  const [aujourdhui] = useState(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date()));
+  const terrains = saison.terrains ?? [];
+  const lieu = terrains.find((t) => t.nom === p.rendezVous.lieu) ?? terrains.find((t) => t.defaut) ?? terrains[0] ?? null;
   if (bola) return null;
   return (
     <section
@@ -347,6 +354,17 @@ function Convocation({ className }: { className?: string }) {
           </span>
         </span>
       </div>
+      {lieu && (
+        <MeteoMatch
+          taille="ligne"
+          lat={lieu.lat}
+          lng={lieu.lng}
+          date={dateIsoDuLibelle(p.jour, aujourdhui)}
+          heure={p.rendezVous.heure}
+          aujourdhui={aujourdhui}
+          className="border-t border-foreground/10 pt-3.5 dark:border-white/10"
+        />
+      )}
       <div className="flex items-baseline justify-between">
         <span className="mono-label text-foreground/50 dark:text-white/50">
           {p.presents.length} {p.presents.length > 1 ? "viennent" : "vient"}
@@ -538,9 +556,9 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
       ) : (
         <>
           {/* La semaine. Sur téléphone, un seul fil (l'ordre vient des order-*) :
-              le direct, le vote, les divisions, l'outsider, ton dimanche, la
+              la vidéo de Bola, le direct, le vote, les divisions, l'outsider, ton dimanche, la
               convocation, tes missions, tes pronos, les contrats en jeu, puis ce qui se joue.
-              Sur grand écran, deux colonnes : à gauche ce qui se joue (direct,
+              Sur grand écran, deux colonnes : à gauche ce qui se joue (vidéo, direct,
               vote, convocation, missions, pronos), à droite les divisions, l'outsider et
               tes rubriques ; dessous, les contrats en jeu sur toute la largeur. */}
           <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3">
@@ -548,6 +566,7 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
               ref={semaine}
               className={cn("contents md:flex md:flex-col md:gap-[var(--fib-21)]", semaineCollante && "md:sticky md:top-[var(--fib-21)]")}
             >
+              <VideosDuFil />
               <EnDirect ouvrir={(j) => router.push(`/ligue/journee?j=${j}`)} />
               <VoteDuJour me={me} />
               <Convocation className="order-2 md:order-none" />
@@ -566,7 +585,7 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
                 {v?.devant && <RubriqueBesoin v={v} />}
               </div>
             </div>
-            <ContratsEnJeu className="order-2 md:order-none md:col-span-full" />
+            <ContratsEnJeu apercu className="order-2 md:order-none md:col-span-full" />
           </div>
           {dimanches.map((d) => (
             <Dimanche key={d.j} j={d.j} journee={d.journee} scenes={d.scenes} ouvrir={() => router.push(`/ligue/journee?j=${d.j}`)} />

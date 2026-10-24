@@ -4757,6 +4757,378 @@ exception
 end;
 $$;
 
+-- ───────────────────────── Les vidéos de Bola ─────────────────────────
+-- Sabri, 24/10 : la vidéo de la journée (« L'Entrée », J3) « dans l'actu »,
+-- qu'on ne puisse ouvrir que dans l'app ; savoir combien l'ont vue ; y
+-- réagir, la commenter ; la partager par un lien (Snap) qui mène à l'app,
+-- où seuls ceux qui ont un compte la voient vraiment (lib/sfl/videos.ts).
+--
+--   · videos : une ligne par vidéo, posée par l'admin (Admin → Activité →
+--     Vidéos) ; publiee_le vide = brouillon, que l'admin seul voit ;
+--   · le fichier et son image d'attente dans le bucket PRIVÉ « videos »
+--     (<id>/video.mp4, <id>/affiche.jpg) : aucune adresse publique. Un
+--     joueur de Bola ne les lit que si la vidéo est publiée, par une
+--     adresse signée qui expire (deux heures) ; l'admin seul les pose ;
+--   · video_vues : qui l'a vue, combien de fois, jusqu'où (une ligne par
+--     joueur, par video_vue(), seulement après son accord à la politique) ;
+--   · video_reactions, video_commentaires : toute l'app les lit ; chacun
+--     pose et retire les siens, l'admin retire un commentaire ;
+--   · video_partages : chaque partage du lien (qui, quand) ;
+--   · video_liens : les ouvertures du lien hors de l'app, sans rien de
+--     personnel (un identifiant tiré au hasard sur le téléphone, comme pour
+--     le parrainage), et le code de celui qui l'a partagé.
+-- L'admin lit tout. Les ouvertures de liens partent après 13 mois.
+create table if not exists public.videos (
+  id          text primary key check (id ~ '^[a-z0-9][a-z0-9-]{1,39}$'),
+  titre       text not null check (char_length(titre) between 1 and 80),
+  legende     text check (char_length(legende) <= 200),
+  fichier     text not null check (char_length(fichier) <= 200),
+  affiche     text check (char_length(affiche) <= 200),
+  largeur     integer check (largeur between 1 and 8000),
+  hauteur     integer check (hauteur between 1 and 8000),
+  duree       numeric check (duree between 0 and 3600),
+  publiee_le  timestamptz,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.videos enable row level security;
+
+drop policy if exists "videos: publiées pour l'app, tout pour l'admin" on public.videos;
+create policy "videos: publiées pour l'app, tout pour l'admin"
+  on public.videos for select to authenticated
+  using (((select public.est_membre()) and publiee_le is not null and publiee_le <= now()) or (select public.is_league_admin()));
+
+drop policy if exists "videos: l'admin pose" on public.videos;
+create policy "videos: l'admin pose"
+  on public.videos for insert to authenticated
+  with check ((select public.is_league_admin()));
+
+drop policy if exists "videos: l'admin change" on public.videos;
+create policy "videos: l'admin change"
+  on public.videos for update to authenticated
+  using ((select public.is_league_admin()))
+  with check ((select public.is_league_admin()));
+
+drop policy if exists "videos: l'admin retire" on public.videos;
+create policy "videos: l'admin retire"
+  on public.videos for delete to authenticated
+  using ((select public.is_league_admin()));
+
+revoke all on public.videos from anon, authenticated;
+grant select, insert, update, delete on public.videos to authenticated;
+
+-- Le bucket : 50 Mo au plus par fichier (la limite du projet), vidéos et images d'attente.
+do $$
+begin
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('videos', 'videos', false, 52428800,
+          array['video/mp4', 'video/quicktime', 'video/webm', 'image/jpeg', 'image/webp'])
+  on conflict (id) do update
+    set public = false,
+        file_size_limit = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types;
+exception
+  when others then raise warning 'videos : bucket non créé (%)', sqlerrm;
+end;
+$$;
+
+do $$
+begin
+  -- La sous-requête passe par la RLS de videos : un brouillon ne se lit pas.
+  drop policy if exists "videos: l'app regarde les publiées" on storage.objects;
+  create policy "videos: l'app regarde les publiées"
+    on storage.objects for select
+    to authenticated
+    using (
+      bucket_id = 'videos'
+      and exists (select 1 from public.videos v where v.id = (storage.foldername(name))[1])
+    );
+
+  drop policy if exists "videos: l'admin pose" on storage.objects;
+  create policy "videos: l'admin pose"
+    on storage.objects for insert
+    to authenticated
+    with check (bucket_id = 'videos' and (select public.is_league_admin()));
+
+  drop policy if exists "videos: l'admin remplace" on storage.objects;
+  create policy "videos: l'admin remplace"
+    on storage.objects for update
+    to authenticated
+    using (bucket_id = 'videos' and (select public.is_league_admin()))
+    with check (bucket_id = 'videos' and (select public.is_league_admin()));
+
+  drop policy if exists "videos: l'admin retire" on storage.objects;
+  create policy "videos: l'admin retire"
+    on storage.objects for delete
+    to authenticated
+    using (bucket_id = 'videos' and (select public.is_league_admin()));
+exception
+  when others then raise warning 'videos : règles Storage non posées (%)', sqlerrm;
+end;
+$$;
+
+create table if not exists public.video_vues (
+  video     text not null references public.videos(id) on delete cascade,
+  joueur    uuid not null references public.profiles(id) on delete cascade,
+  premiere  timestamptz not null default now(),
+  derniere  timestamptz not null default now(),
+  fois      integer not null default 1 check (fois between 0 and 100000),
+  vu_s      numeric not null default 0 check (vu_s between 0 and 3600),
+  fini      boolean not null default false,
+  primary key (video, joueur)
+);
+-- Comme le journal d'usage : 13 mois au plus.
+delete from public.video_vues where derniere < now() - interval '13 months';
+
+alter table public.video_vues enable row level security;
+
+drop policy if exists "video_vues: les miennes, l'admin" on public.video_vues;
+create policy "video_vues: les miennes, l'admin"
+  on public.video_vues for select to authenticated
+  using (joueur = (select auth.uid()) or (select public.is_league_admin()));
+
+revoke all on public.video_vues from anon, authenticated;
+grant select on public.video_vues to authenticated;
+
+-- Je regarde : `p_debut` à chaque lecture lancée (une nouvelle fois compte
+-- s'il y a dix minutes de plus depuis la dernière), puis jusqu'où je suis
+-- allé, et si je l'ai vue jusqu'au bout. Une vidéo non publiée ne compte pas.
+create or replace function public.video_vue(v text, p_debut boolean, p_secondes numeric, p_fini boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  s numeric := least(greatest(coalesce(p_secondes, 0), 0), 3600);
+begin
+  if not public.est_membre() then
+    return;
+  end if;
+  if not exists (select 1 from public.videos x where x.id = v and x.publiee_le is not null and x.publiee_le <= now()) then
+    return;
+  end if;
+  insert into public.video_vues (video, joueur, vu_s, fini)
+  values (v, (select auth.uid()), s, coalesce(p_fini, false))
+  on conflict (video, joueur) do update
+    set fois = least(public.video_vues.fois
+                 + case when p_debut and public.video_vues.derniere < now() - interval '10 minutes' then 1 else 0 end, 100000),
+        vu_s = greatest(public.video_vues.vu_s, s),
+        fini = public.video_vues.fini or coalesce(p_fini, false),
+        derniere = now();
+end;
+$$;
+
+create table if not exists public.video_reactions (
+  video       text not null references public.videos(id) on delete cascade,
+  joueur      uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  emoji       text not null check (emoji in ('🔥', '🐐', '😮', '😂', '👏')),
+  created_at  timestamptz not null default now(),
+  primary key (video, joueur, emoji)
+);
+
+alter table public.video_reactions enable row level security;
+
+drop policy if exists "video_reactions: l'app lit" on public.video_reactions;
+create policy "video_reactions: l'app lit"
+  on public.video_reactions for select to authenticated
+  using (exists (select 1 from public.videos v where v.id = video));
+
+drop policy if exists "video_reactions: je réagis pour moi" on public.video_reactions;
+create policy "video_reactions: je réagis pour moi"
+  on public.video_reactions for insert to authenticated
+  with check (
+    joueur = (select auth.uid())
+    and (select public.est_membre())
+    and exists (select 1 from public.videos v where v.id = video)
+  );
+
+drop policy if exists "video_reactions: je retire la mienne" on public.video_reactions;
+create policy "video_reactions: je retire la mienne"
+  on public.video_reactions for delete to authenticated
+  using (joueur = (select auth.uid()));
+
+revoke all on public.video_reactions from anon, authenticated;
+grant select, delete on public.video_reactions to authenticated;
+grant insert (video, emoji) on public.video_reactions to authenticated;
+
+create table if not exists public.video_commentaires (
+  id          bigint generated always as identity primary key,
+  video       text not null references public.videos(id) on delete cascade,
+  joueur      uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  texte       text not null check (char_length(btrim(texte)) between 1 and 400),
+  created_at  timestamptz not null default now()
+);
+create index if not exists video_commentaires_video on public.video_commentaires (video, id);
+
+alter table public.video_commentaires enable row level security;
+
+drop policy if exists "video_commentaires: l'app lit" on public.video_commentaires;
+create policy "video_commentaires: l'app lit"
+  on public.video_commentaires for select to authenticated
+  using (exists (select 1 from public.videos v where v.id = video));
+
+-- Un joueur à qui l'admin a coupé la parole au Vestiaire ne commente pas non plus.
+drop policy if exists "video_commentaires: j'écris pour moi" on public.video_commentaires;
+create policy "video_commentaires: j'écris pour moi"
+  on public.video_commentaires for insert to authenticated
+  with check (
+    joueur = (select auth.uid())
+    and (select public.est_membre())
+    and (select public.peut_parler_au_vestiaire())
+    and exists (select 1 from public.videos v where v.id = video)
+  );
+
+drop policy if exists "video_commentaires: je retire le mien, l'admin aussi" on public.video_commentaires;
+create policy "video_commentaires: je retire le mien, l'admin aussi"
+  on public.video_commentaires for delete to authenticated
+  using (joueur = (select auth.uid()) or (select public.is_league_admin()));
+
+revoke all on public.video_commentaires from anon, authenticated;
+grant select, delete on public.video_commentaires to authenticated;
+grant insert (video, texte) on public.video_commentaires to authenticated;
+
+create table if not exists public.video_partages (
+  id      bigint generated always as identity primary key,
+  video   text not null references public.videos(id) on delete cascade,
+  joueur  uuid not null references public.profiles(id) on delete cascade,
+  le      timestamptz not null default now()
+);
+
+alter table public.video_partages enable row level security;
+
+drop policy if exists "video_partages: l'admin" on public.video_partages;
+create policy "video_partages: l'admin"
+  on public.video_partages for select to authenticated
+  using ((select public.is_league_admin()));
+
+revoke all on public.video_partages from anon, authenticated;
+grant select on public.video_partages to authenticated;
+
+-- J'ai partagé (ou copié) le lien d'une vidéo publiée.
+create or replace function public.video_partage(v text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.est_membre() then
+    return;
+  end if;
+  insert into public.video_partages (video, joueur)
+  select x.id, (select auth.uid()) from public.videos x
+   where x.id = v and x.publiee_le is not null and x.publiee_le <= now();
+end;
+$$;
+
+create table if not exists public.video_liens (
+  id          bigint generated always as identity primary key,
+  video       text not null references public.videos(id) on delete cascade,
+  visiteur    text not null check (visiteur ~ '^[0-9a-f-]{8,40}$'),
+  etape       text not null check (etape in ('ouvert', 'app')),
+  de          text check (de ~ '^[a-z0-9][a-z0-9._]{2,19}$'),
+  jour        date not null default ((now() at time zone 'Europe/Paris')::date),
+  created_at  timestamptz not null default now(),
+  constraint video_liens_une_fois unique (video, visiteur, etape)
+);
+delete from public.video_liens where created_at < now() - interval '13 months';
+
+alter table public.video_liens enable row level security;
+
+drop policy if exists "video_liens: l'admin" on public.video_liens;
+create policy "video_liens: l'admin"
+  on public.video_liens for select to authenticated
+  using ((select public.is_league_admin()));
+
+revoke all on public.video_liens from anon, authenticated;
+grant select on public.video_liens to authenticated;
+
+-- Le lien ouvert hors de l'app (« ouvert »), puis le pas vers l'app
+-- (« app » : se connecter ou créer son compte). Ouvert à tous, sans compte ;
+-- une vidéo inconnue ou pas publiée n'écrit rien.
+create or replace function public.video_lien_vu(v text, visiteur text, etape text, de text default null)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.video_liens (video, visiteur, etape, de)
+  select x.id, video_lien_vu.visiteur, video_lien_vu.etape, nullif(lower(btrim(video_lien_vu.de)), '')
+    from public.videos x
+   where x.id = v and x.publiee_le is not null and x.publiee_le <= now()
+  on conflict on constraint video_liens_une_fois do nothing;
+exception when check_violation then
+  return;
+end;
+$$;
+
+-- Ce que montre le lien hors de l'app : le titre, rien d'autre (ni image,
+-- ni fichier). null : vidéo inconnue ou pas publiée.
+create or replace function public.video_info(v text)
+returns jsonb
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select jsonb_build_object('id', x.id, 'titre', x.titre)
+    from public.videos x
+   where x.id = v and x.publiee_le is not null and x.publiee_le <= now();
+$$;
+
+revoke execute on function public.video_vue(text, boolean, numeric, boolean), public.video_partage(text),
+  public.video_lien_vu(text, text, text, text), public.video_info(text)
+  from public, anon;
+grant execute on function public.video_vue(text, boolean, numeric, boolean), public.video_partage(text)
+  to authenticated;
+grant execute on function public.video_lien_vu(text, text, text, text), public.video_info(text)
+  to anon, authenticated;
+
+-- La notification d'une nouvelle vidéo (motif « video », /api/videos/annoncer)
+-- attend qu'on la regarde, dans la semaine.
+create or replace function public.push_effet_video()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.push_effet(new.joueur, array['video'], 'video:' || new.video, 'a regardé la vidéo', interval '7 days');
+  return new;
+exception
+  when others then
+    raise warning 'push_effet_video : %', sqlerrm;
+    return new;
+end;
+$$;
+
+revoke execute on function public.push_effet_video() from public, anon, authenticated;
+
+drop trigger if exists push_effet_video on public.video_vues;
+create trigger push_effet_video
+  after insert on public.video_vues
+  for each row execute function public.push_effet_video();
+
+do $$
+begin
+  alter publication supabase_realtime add table public.video_reactions;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.video_commentaires;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
+
 -- ───────────────────────────── Les arbitres ─────────────────────────────
 -- Sabri, 24/10 : « un nouveau type d'utilisateur qui ne serait pas des
 -- joueurs, mais des arbitres, avec une carte d'arbitre […] et des stats

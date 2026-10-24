@@ -20,14 +20,14 @@
 //      « Personnaliser ma carte » (le skin, les signes et le badge, au choix :
 //      personnaliser-carte.tsx, 24/10), puis « Inviter », mon lien de
 //      parrainage (parrainage/page.tsx, 24/10) ;
-//   2. ma saison : mon dernier dimanche en grand, mes points forts, mes
-//      autres dimanches (ma-saison.tsx) ;
-//   3. mon évolution : mon rang au Pépite d'Or ou la note de ma carte,
-//      journée après journée (carriere-joueur.tsx) ;
-//   4. mes badges : le prochain à viser, les trophées de fin de saison et
-//      les paliers (vitrine.tsx) ;
-//   5. mes cartes, saison par saison, avec les cartes spéciales gagnées ;
-//   6. « Se déconnecter », tout en bas, comme dans toute app
+//   2. le reste, en résumé (Sabri, 24/10 : « plus agréable à parcourir » ;
+//      « si on veut approfondir dans une rubrique, on puisse y aller ») : une
+//      liste groupée comme les Réglages d'un iPhone, une rangée par rubrique,
+//      qui ouvre sa page enfant (ma-carte/rubriques.tsx) : ma saison
+//      (/profil/saison), mon Niveau XP et le Passe Bola (/profil/xp), mon
+//      évolution (/profil/evolution), mes badges et trophées
+//      (/profil/badges), mes cartes (/profil/cartes) ;
+//   3. « Se déconnecter », tout en bas, comme dans toute app
 //      (bouton-deconnexion.tsx ; Sabri, le 22/10 : « plus accessible »).
 // Le Wall of Fame est parti dans les Actus, où il est l'époque la plus
 // longue, et la Collection est masquée pour l'instant (Sabri, 24/10 ;
@@ -52,17 +52,14 @@ import { UserPlus } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Card3DEnGrand } from "@/components/sfl/carte-en-grand";
 import { PlayerCard } from "@/components/sfl/player-card";
-import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur";
-import { MaSaison, type RangDuJour } from "@/components/sfl/ma-saison";
-import { NiveauXp } from "@/components/sfl/niveau-xp";
 import { Chiffre } from "@/components/sfl/profil-joueur";
 import { ReseauJoueur } from "@/components/sfl/suivre";
 import { AppartenancesJoueur } from "@/components/sfl/badge-sfl";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
-import { VitrineBadges } from "@/components/sfl/vitrine";
 import { ChoixBadge } from "@/components/sfl/choix-badge";
 import { PersonnaliserCarte } from "@/components/sfl/personnaliser-carte";
 import { CarteOfficielle } from "@/components/sfl/carte-officielle";
+import { RubriquesMaCarte, useMaCarte } from "@/components/sfl/ma-carte/rubriques";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { ProfilArbitre } from "@/components/sfl/profil-arbitre";
 import { useArbitres } from "@/hooks/use-arbitres";
@@ -75,9 +72,7 @@ import { nomDivision } from "@/lib/sfl/divisions";
 import { FormulaireIdentite } from "@/components/sfl/identite";
 import { useIdentites } from "@/hooks/use-identites";
 import { useRangXp, useXp } from "@/hooks/use-missions";
-import { cartesDeCarriere, courbeDeCarriere } from "@/lib/sfl/carriere";
 import { ovr, rankPlayers } from "@/lib/sfl/engine";
-import { dimanchesDe, ficheJoueur } from "@/lib/sfl/fiche-joueur";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
 import { isHidden } from "@/lib/sfl/hidden";
 import { POSTES } from "@/lib/sfl/inscription";
@@ -123,7 +118,7 @@ export default function Profil() {
 
 function ProfilJoueurPage() {
   const { player } = useMyPlayer();
-  const { allPlayers, saison } = useSeason();
+  const { allPlayers } = useSeason();
   const division = useDivision(player.name);
   // Mon rang : celui du classement de la Ligue (sans les joueurs masqués),
   // où je figure toujours, même masqué.
@@ -133,24 +128,7 @@ function ProfilJoueurPage() {
         ?.rank ?? null,
     [allPlayers, player.name]
   );
-  // Mes cartes : celle de chaque saison et les cartes spéciales gagnées.
-  const mesCartes = useMemo(() => cartesDeCarriere(saison, player.name), [saison, player.name]);
-  const fiche = useMemo(() => ficheJoueur(saison, player, allPlayers), [saison, player, allPlayers]);
-  const dimanches = useMemo(() => dimanchesDe(saison, player.name), [saison, player.name]);
-  const joues = dimanches.filter((d) => !d.horsMatch).length;
-  const courbe = useMemo(() => courbeDeCarriere(saison, player.name), [saison, player.name]);
-  // Ma place au Pépite d'Or après chaque journée de la saison, et les places
-  // gagnées ou perdues depuis la précédente : la courbe les a déjà.
-  const rangs = useMemo(() => {
-    const m = new Map<number, RangDuJour>();
-    let avant: number | null = null;
-    for (const p of courbe) {
-      if (p.saison !== (saison.numero ?? 0)) continue;
-      m.set(p.j, { rang: p.rang, ecart: avant != null && p.rang != null ? avant - p.rang : null });
-      avant = p.rang;
-    }
-    return m;
-  }, [courbe, saison.numero]);
+  const { fiche, joues } = useMaCarte();
   // La carte est le sujet de la page : elle profite de la place quand il y en
   // a, et d'un cran de plus (√φ) sur les très grands écrans.
   const grand = useGrandEcran();
@@ -255,23 +233,10 @@ function ProfilJoueurPage() {
         </div>
 
         <div className="flex min-w-0 flex-col gap-[var(--fib-21)]">
-          {/* 2. Ma saison : mon dernier dimanche, mes points forts, mes dimanches */}
-          <MaSaison saison={`Saison ${saison.numero ?? 0}`} dimanches={dimanches} forts={fiche.forts} rangs={rangs} />
-
-          {/* 2 bis. Mon Niveau XP : le niveau à vie, le passe de la saison, mes missions */}
-          <NiveauXp saison={saison.numero ?? 0} player={player} />
-
-          {/* 3. Mon évolution, journée après journée : d'abord mon rang, si
-              j'en ai un cette saison */}
-          <CourbeCarriere points={courbe} depart={joues > 0 ? "rang" : "note"} />
-
-          {/* 4. Mes badges : le prochain, la fin de saison, les paliers */}
-          <div id="badges" className="scroll-mt-4">
-            <VitrineBadges nom={player.name} />
-          </div>
-
-          {/* 5. Mes cartes : la carte de chaque saison et les cartes spéciales gagnées */}
-          {mesCartes.length > 0 && <CartesCarriere saisons={mesCartes} titre="Mes cartes" />}
+          {/* 2. Le reste en résumé : une rangée par rubrique, qui ouvre sa page
+              (ma saison, mon Niveau XP, mon évolution, mes badges, mes cartes :
+              ma-carte/rubriques.tsx) */}
+          <RubriquesMaCarte />
 
           {/* 6. Se déconnecter */}
           <BoutonDeconnexion className="w-full" />

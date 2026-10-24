@@ -19,8 +19,13 @@
 // Sur ordinateur (course.tsx), le bloc prend toute la largeur sous la
 // semaine : la rangée y prend les deux flèches et le fondu de la course, le
 // défi et la ligue se posent côte à côte.
+// Sabri, 24/10 : « sur l'actu principale de tout le monde, tu laisses que
+// les rang S de visible en aperçu ». Dans les Actus (`apercu`), seuls les
+// contrats de rang S ; « Tout voir » ouvre la page enfant /ligue/contrats,
+// qui montre tout : face-à-face, rangs A et B, défi et ligue.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { useIdentites } from "@/hooks/use-identites";
@@ -384,11 +389,14 @@ function Rangee({ cles, children }: { cles: string; children: ReactNode }) {
   );
 }
 
-export function ContratsEnJeu({ className }: { className?: string }) {
+export function ContratsEnJeu({ className, apercu }: { className?: string; apercu?: boolean }) {
   const lg = useMissionsDeLaLigue();
   if (!lg || lg.total === 0) return null;
   const { d, faceAFace, contrats, defis, ligue } = lg;
   const signes = faceAFace.length * 2 + contrats.length;
+  const rangS = contrats.filter((e) => rangDe(e.m) === "S");
+  const duels = apercu ? [] : faceAFace;
+  const affiches = apercu ? rangS : contrats;
   return (
     <section aria-labelledby="titre-contrats-en-jeu" className={cn("flex flex-col gap-4", className)}>
       <div className="flex flex-col gap-1.5 px-5 md:px-0">
@@ -401,29 +409,45 @@ export function ContratsEnJeu({ className }: { className?: string }) {
         </h2>
       </div>
 
-      {signes > 0 && (
+      {(apercu || signes > 0) && (
         <div className="flex flex-col gap-1">
-          <span className="mono-label px-5 text-foreground/45 md:px-0">
-            {faceAFace.length > 0 && `${faceAFace.length} face-à-face · `}
-            {pl(signes, "contrat signé", "contrats signés")}
-          </span>
-          <Rangee cles={[...faceAFace.map((f) => `${f.duel.noirs}-${f.duel.blancs}`), ...contrats.map((e) => e.joueur)].join("|")}>
-            {faceAFace.map((f) => (
-              <AfficheDuel key={`${f.duel.noirs}-${f.duel.blancs}`} f={f} lg={lg} />
-            ))}
-            {contrats.map((e) => (
-              <Affiche key={e.joueur} e={e} lg={lg} />
-            ))}
-          </Rangee>
+          <div className="flex items-center justify-between gap-3 px-5 md:px-0">
+            <span className="mono-label truncate text-foreground/45">
+              {apercu
+                ? rangS.length > 0 && pl(rangS.length, "contrat rang S", "contrats rang S")
+                : (faceAFace.length > 0 ? `${faceAFace.length} face-à-face · ` : "") + pl(signes, "contrat signé", "contrats signés")}
+            </span>
+            {apercu && (
+              <Link
+                href="/ligue/contrats"
+                className="bouton-discret flex shrink-0 items-center gap-0.5 py-1.5 pr-1 pl-2.5 text-[13.5px] font-semibold"
+              >
+                Tout voir · {lg.total}
+                <ChevronRight className="size-4" />
+              </Link>
+            )}
+          </div>
+          {affiches.length + duels.length > 0 && (
+            <Rangee cles={[...duels.map((f) => `${f.duel.noirs}-${f.duel.blancs}`), ...affiches.map((e) => e.joueur)].join("|")}>
+              {duels.map((f) => (
+                <AfficheDuel key={`${f.duel.noirs}-${f.duel.blancs}`} f={f} lg={lg} />
+              ))}
+              {affiches.map((e) => (
+                <Affiche key={e.joueur} e={e} lg={lg} />
+              ))}
+            </Rangee>
+          )}
         </div>
       )}
 
-      <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3">
-        {[...new Set(defis.map((e) => e.m.genre))].map((g) => (
-          <Engages key={g} titre="Défi du dimanche" liste={defis.filter((e) => e.m.genre === g)} lg={lg} />
-        ))}
-        {ligue.length > 0 && <Engages titre="La ligue" liste={ligue} lg={lg} />}
-      </div>
+      {!apercu && (
+        <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3">
+          {[...new Set(defis.map((e) => e.m.genre))].map((g) => (
+            <Engages key={g} titre="Défi du dimanche" liste={defis.filter((e) => e.m.genre === g)} lg={lg} />
+          ))}
+          {ligue.length > 0 && <Engages titre="La ligue" liste={ligue} lg={lg} />}
+        </div>
+      )}
     </section>
   );
 }
