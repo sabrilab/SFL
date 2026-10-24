@@ -300,7 +300,7 @@ export async function inviterJoueurs(
 }
 
 /** Pourquoi un joueur ne peut pas être invité (equipe_indisponibles, dans la base). */
-export type Indispo = "parti" | "equipe" | "carence" | "attente";
+export type Indispo = "parti" | "equipe" | "carence" | "attente" | "team";
 
 /** Ce que la liste des joueurs en dit, sur sa ligne. */
 export const RAISON_INDISPO: Record<Indispo, string> = {
@@ -308,6 +308,9 @@ export const RAISON_INDISPO: Record<Indispo, string> = {
   equipe: "A déjà une équipe",
   carence: "Vient de quitter son équipe",
   attente: "Compte en attente",
+  // Joueur Bola venu sans le lien d'un joueur SFL (parrainage, 24/10) :
+  // seule une équipe dont un joueur SFL l'invite peut l'accueillir.
+  team: "Pas de Bola Team",
 };
 
 /** Ceux que mon équipe ne peut pas inviter, et pourquoi (capitaine et vice). */

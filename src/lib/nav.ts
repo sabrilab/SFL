@@ -29,7 +29,7 @@ export const NAV_ITEMS: NavItem[] = [
 // la barre et on ne savait plus où on était.
 const SOUS_PAGES: Record<string, string[]> = {
   "/": ["/map"],
-  "/profil": ["/carte", "/collection", "/duel", "/reglages", "/avatar"],
+  "/profil": ["/carte", "/collection", "/duel", "/reglages", "/avatar", "/parrainage"],
   "/ligue": ["/palmares", "/saisons", "/stats", "/ligue-vierge", "/bola-team"],
 };
 

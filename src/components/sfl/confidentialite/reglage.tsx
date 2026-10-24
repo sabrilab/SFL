@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { useSession } from "@/hooks/use-session";
 import { useAccord } from "@/hooks/use-accord";
-import { DATE_POLITIQUE, VERSION_POLITIQUE, dateAccord } from "@/lib/sfl/confidentialite";
+import { DATE_POLITIQUE, accordValable, dateAccord } from "@/lib/sfl/confidentialite";
 import { changerHorsApp } from "@/lib/sfl/consentement";
 
 export function ReglageConfidentialite() {
@@ -19,7 +19,7 @@ export function ReglageConfidentialite() {
   const nom = session?.name ?? null;
   const { accord } = useAccord(nom);
   const [envoi, setEnvoi] = useState(false);
-  const accepte = accord?.version === VERSION_POLITIQUE ? accord : null;
+  const accepte = accordValable(accord?.version) ? accord : null;
 
   async function changer(horsApp: boolean) {
     if (!nom || envoi) return;

@@ -15,13 +15,30 @@
 /**
  * La version en vigueur : la date du texte. La changer quand un changement
  * touche à ce que les joueurs ont accepté (un nouveau prestataire, un nouvel
- * usage de leur image) : l'app redemande alors l'accord à l'ouverture. Une
- * retouche de forme ne la change pas.
+ * usage de leur image) ; une retouche de forme ne la change pas. Le 24/10 : le
+ * parrainage (les joueurs invités voient les cartes, la page d'un lien peut
+ * montrer celle du parrain). C'est la version qu'enregistre un nouvel accord ;
+ * la case ne revient que si VERSION_ACCEPTEE monte aussi.
  */
-export const VERSION_POLITIQUE = "2026-10-22";
+export const VERSION_POLITIQUE = "2026-10-24";
+
+/**
+ * La plus ancienne version qui vaut encore accord : qui a accepté celle-ci ou
+ * une plus récente ne revoit pas la case à l'ouverture, et les routes serveur
+ * le laissent passer. Sabri, 24/10/2026 : ne pas redemander l'accord à chaque
+ * changement (« sinon ils vont recevoir que des trucs en mode accepter ») ; on
+ * regroupera les changements. Le jour où la case doit revenir, monter
+ * VERSION_ACCEPTEE à VERSION_POLITIQUE.
+ */
+export const VERSION_ACCEPTEE = "2026-10-22";
+
+/** Cet accord vaut-il encore ? Les versions sont des dates AAAA-MM-JJ, comparées comme textes. */
+export function accordValable(version: string | null | undefined): boolean {
+  return !!version && version >= VERSION_ACCEPTEE;
+}
 
 /** La même, telle qu'on l'écrit en tête du texte. */
-export const DATE_POLITIQUE = "22 octobre 2026";
+export const DATE_POLITIQUE = "24 octobre 2026";
 
 /**
  * Avant cet âge, l'accord d'un parent s'ajoute à celui du joueur (loi

@@ -105,6 +105,15 @@ export function useJoueurInconnu(): boolean {
   return useContext(PlayerContext).inconnu;
 }
 
+/**
+ * Le joueur connecté joue-t-il en Bola, hors de la SFL (venu par un
+ * parrain, season-provider.tsx) ? Ce qui n'appartient qu'à la saison SFL
+ * (convocation du dimanche, Vestiaire) ne s'affiche pas pour lui.
+ */
+export function useJoueurBola(): boolean {
+  return useSeason().bola !== null;
+}
+
 export function useMyPlayer() {
   const { me, setMe } = useContext(PlayerContext);
   const { allPlayers } = useSeason();

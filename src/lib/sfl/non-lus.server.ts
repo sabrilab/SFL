@@ -14,6 +14,7 @@
 // SERVEUR UNIQUEMENT : il lit les messages de tout le monde (clé secrète).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { idsSfl } from "./parrainage.server";
 
 const JOUR = 86_400_000;
 /** Par match : au-delà, la pastille de l'app dit déjà « 9+ ». */
@@ -32,13 +33,16 @@ export async function nonLus(sb: SupabaseClient, uids: string[], maintenant = Da
 
   // Le Vestiaire : ce que les autres ont écrit depuis ma dernière lecture,
   // trois jours au plus (qui ne l'a jamais ouvert voit ces trois jours-là).
+  // Pour la SFL seulement : un joueur Bola (venu par un parrain) ne le lit pas.
   const depuis = new Date(maintenant - 3 * JOUR).toISOString();
-  const [{ data: lus }, { data: recents }] = await Promise.all([
+  const [{ data: lus }, { data: recents }, sfl] = await Promise.all([
     sb.from("vestiaire_suivi").select("user_id, lu_jusqua").in("user_id", uids),
     sb.from("messages").select("auteur, created_at").eq("canal", "sfl").gt("created_at", depuis),
+    idsSfl(sb),
   ]);
   const luV = new Map(((lus ?? []) as { user_id: string; lu_jusqua: string }[]).map((s) => [s.user_id, t(s.lu_jusqua)]));
   for (const uid of uids) {
+    if (sfl && !sfl.has(uid)) continue;
     const lu = luV.get(uid) ?? 0;
     n.set(uid, (n.get(uid) ?? 0) + ((recents ?? []) as Ecrit[]).filter((m) => m.auteur !== uid && t(m.created_at) > lu).length);
   }

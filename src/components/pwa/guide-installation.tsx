@@ -80,6 +80,13 @@ export function GuideInstallation() {
   if (!isClient || ferme || pathname?.startsWith("/confidentialite")) return null;
   const env = lireEnvironnement();
   if (env.systeme === "autre" || env.installee) return null;
+  // Le lien d'un parrain, et l'inscription qui en vient : ouverte depuis
+  // l'écran d'accueil, Bola démarre sur « / », et sur iPhone avec un
+  // stockage à part : le code du parrain serait perdu. Le compte se crée
+  // d'abord ici, le guide revient ensuite sur l'app. Sortir d'une app
+  // (Snapchat…) reste proposé : l'adresse garde le code.
+  if (!env.appHote && (pathname?.startsWith("/p/") || (pathname?.startsWith("/inscription") && /[?&]parrain=/.test(window.location.search))))
+    return null;
   if (lire(() => sessionStorage, CLE_PLUS_TARD)) return null;
   // « C'est fait » ne vaut que dans un vrai navigateur : depuis Snapchat,
   // on n'a rien pu installer.
