@@ -1738,7 +1738,7 @@ function Jeton({ texte, ton, petit }: { texte: string; ton: EtatSticker["genre"]
 function FicheTeam({ t }: { t: MatchTeam }) {
   const cote = (e: MatchTeam["de"]) => (
     <div className="flex min-w-0 flex-1 flex-col items-center gap-2 text-center">
-      <Ecusson initiales={e.initiales} fond={e.fond} taille={72} />
+      <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={72} />
       <p className="w-full truncate text-[15px] font-bold tracking-tight">{e.nom}</p>
       <p className="mono-label text-muted-foreground">{e.membres.filter((x) => x.statut === "membre").length} joueurs</p>
     </div>

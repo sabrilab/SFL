@@ -17,9 +17,24 @@
 // dans la petite ; dès 1024 px, les cartes prennent un cran de plus
 // (useFormatCarte) ; dès 1280 px, la suite du classement sur deux colonnes.
 // Sous 768 px, rien ne bouge.
+//
+// Passe du 24/10 (Sabri : « le classement des buteurs, des passeurs, et un
+// semi-classement Pépite d'Or qui intègre les victoires, les nuls, les
+// défaites et la carte MVP sélectionnée automatiquement ») : trois
+// classements au-dessus du podium, Points (le barème de Bola, MVP compris),
+// Buteurs et Passeurs (classementBola) ; le podium porte l'or, l'argent et
+// le bronze. « Des divisions une fois qu'on a assez d'utilisateurs […] au
+// nombre de points » : dès que le classement des points remplit deux
+// divisions de 30, il se découpe en D1, D2… (divisionsBola), recoupées à
+// chaque match, sans règle de montée ni de descente ; chaque division compte
+// ses places à partir de 1. En aperçu, des divisions de 12 pour les voir. Et pour qui n'a pas d'équipe, la vitrine
+// de Bola Team en une ligne (equipe/vitrine-team.tsx).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MiniCarte } from "@/components/sfl/mini-carte";
+import { RangMetal } from "@/components/sfl/rang-metal";
+import { VitrineBola } from "@/components/sfl/equipe/vitrine-team";
+import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { carteNeutre } from "@/components/sfl/qui-vient";
 import { useSeason } from "@/components/sfl/season-provider";
 import { FeuilleBola } from "@/components/sfl/matchs/feuille-bola";
@@ -28,7 +43,18 @@ import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { useSession } from "@/hooks/use-session";
 import { useCollant } from "@/hooks/use-collant";
 import { useFormatCarte } from "@/hooks/use-format-carte";
-import { classementAVie, compterMatchs, coupDEnvoiPasse, feuilleOuverte, type Classe, type MatchCompte } from "@/lib/sfl/ligue-vierge";
+import {
+  DIVISIONS_BOLA,
+  classementAVie,
+  classementBola,
+  compterMatchs,
+  coupDEnvoiPasse,
+  divisionsBola,
+  feuilleOuverte,
+  type ClassementBola,
+  type LigneBolaClassee,
+  type MatchCompte,
+} from "@/lib/sfl/ligue-vierge";
 import { DEMO_LIGUE_VIERGE, demoFeuille, demoMatchs } from "@/lib/sfl/ligue-vierge-demo";
 import { aujourdhuiIso, libelleJour, listerMesDerniers, lireLigueVierge, monId, type Partie } from "@/lib/sfl/matchs";
 import { supabase } from "@/lib/supabase";
@@ -41,7 +67,13 @@ function Carte({ name, size, detail }: { name: string; size: number; detail?: st
   return <MiniCarte player={p} size={size} detail={detail} cle={`lv-${name}`} />;
 }
 
-function Podium({ top, moi }: { top: Classe[]; moi: string | null }) {
+const CLASSEMENTS: { id: ClassementBola; label: string; unite: string }[] = [
+  { id: "points", label: "Points", unite: "pts" },
+  { id: "buts", label: "Buteurs", unite: "buts" },
+  { id: "passes", label: "Passeurs", unite: "pd" },
+];
+
+function Podium({ top, moi, unite }: { top: LigneBolaClassee[]; moi: string | null; unite: string }) {
   const format = useFormatCarte();
   const marches = [
     { p: top[1] ?? null, size: format.moyenne },
@@ -53,19 +85,22 @@ function Podium({ top, moi }: { top: Classe[]; moi: string | null }) {
       {marches.map(({ p, size }, i) =>
         p ? (
           <div key={p.id} className="flex min-w-0 flex-col items-center gap-1.5">
-            <Carte name={p.name} size={size} detail={`Bola · ${p.points} pts`} />
+            <Carte name={p.name} size={size} detail={`Bola · ${p.valeur} ${unite}`} />
             <span
               className={cn(
-                "max-w-[120px] truncate font-semibold",
+                "flex max-w-[132px] items-center gap-1.5 font-semibold",
                 i === 1 ? "text-[15px]" : "text-[12.5px] text-foreground/70",
                 p.id === moi && "text-primary"
               )}
             >
-              <span className="text-foreground/40 tabular-nums">{p.rank}</span> <Nom n={p.name} />
+              <RangMetal rang={p.place} taille={i === 1 ? 22 : 19} className={i === 1 ? "text-[12px]" : "text-[10.5px]"} />
+              <span className="truncate">
+                <Nom n={p.name} />
+              </span>
             </span>
             <span className={cn("font-bold tabular-nums", i === 1 ? "text-[20px]" : "text-[15px]")}>
-              {p.points}
-              <span className="mono-label ml-1 text-foreground/40">pts</span>
+              {p.valeur}
+              <span className="mono-label ml-1 text-foreground/40">{unite}</span>
             </span>
           </div>
         ) : (
@@ -76,22 +111,26 @@ function Podium({ top, moi }: { top: Classe[]; moi: string | null }) {
   );
 }
 
-function Ligne({ c, moi }: { c: Classe; moi: string | null }) {
+function Ligne({ c, rang, moi, cle, unite }: { c: LigneBolaClassee; rang?: number; moi: string | null; cle: ClassementBola; unite: string }) {
   const format = useFormatCarte();
+  // Ce que la valeur ne dit pas : les matchs, et les MVP, les passes ou les buts.
+  const detail = [
+    `${c.matchs} match${c.matchs > 1 ? "s" : ""}`,
+    cle === "points" && c.mvp > 0 && `${c.mvp} MVP`,
+    cle === "buts" && c.passes > 0 && `${c.passes} pd`,
+    cle === "passes" && c.buts > 0 && `${c.buts} but${c.buts > 1 ? "s" : ""}`,
+  ].filter(Boolean);
   return (
     <div className={cn("glass-soft flex items-center gap-3 rounded-[18px] px-3.5 py-2.5 xl:mb-1.5 xl:break-inside-avoid", c.id === moi && "bg-primary/10")}>
-      <span className="w-7 text-[15px] font-bold text-foreground/40 tabular-nums">{c.rank}</span>
-      <Carte name={c.name} size={format.petite} detail={`Bola · ${c.points} pts`} />
+      <span className="w-7 text-[15px] font-bold text-foreground/40 tabular-nums">{rang ?? c.place}</span>
+      <Carte name={c.name} size={format.petite} detail={`Bola · ${c.valeur} ${unite}`} />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[15px] font-semibold"><Nom n={c.name} /></span>
-        <span className="mono-label text-foreground/40">
-          {c.matchs} match{c.matchs > 1 ? "s" : ""}
-          {c.mvp > 0 && ` · ${c.mvp} MVP`}
-        </span>
+        <span className="mono-label text-foreground/40">{detail.join(" · ")}</span>
       </span>
       <span className="w-16 text-right text-lg font-bold tracking-tight tabular-nums">
-        {c.points}
-        <span className="mono-label ml-1 text-foreground/40">pts</span>
+        {c.valeur}
+        <span className="mono-label ml-1 text-foreground/40">{unite}</span>
       </span>
     </div>
   );
@@ -180,7 +219,9 @@ export default function LigueViergePage() {
   const [moi, setMoi] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [tout, setTout] = useState(false);
+  const [cle, setCle] = useState<ClassementBola>("points");
   const recharger = useCallback(() => setTick((n) => n + 1), []);
+  const { equipe, charge: equipeLue } = useMonEquipe();
 
   useEffect(() => {
     if (!actif) return;
@@ -218,6 +259,13 @@ export default function LigueViergePage() {
     [apercu, noms, matchs]
   );
   const classement = useMemo(() => (vus ? classementAVie(vus) : []), [vus]);
+  const def = CLASSEMENTS.find((c) => c.id === cle) ?? CLASSEMENTS[0];
+  const lignes = useMemo(() => classementBola(classement, cle), [classement, cle]);
+  // Les divisions ne coupent que le classement des points ; en aperçu, des divisions de 12 pour les voir.
+  const divisions = useMemo(
+    () => (cle === "points" ? divisionsBola(lignes, apercu ? 12 : DIVISIONS_BOLA.taille) : []),
+    [cle, lignes, apercu]
+  );
   // Mes feuilles : j'organise, le coup d'envoi est passé, et la feuille reste ouverte (24 h après la saisie).
   const aTenir = mesParties.filter(
     (p) =>
@@ -258,23 +306,64 @@ export default function LigueViergePage() {
             ref={colonne}
             className={cn("flex flex-col gap-5 md:min-w-0 md:gap-[var(--fib-21)]", colonneCollante && "md:sticky md:top-[var(--fib-21)]")}
           >
-            <Podium top={classement.slice(0, 3)} moi={moi} />
-            <div className="flex flex-col gap-1.5 xl:block xl:columns-2 xl:gap-[var(--fib-13)]">
-              {classement.slice(3, tout ? undefined : 10).map((c) => (
-                <Ligne key={c.id} c={c} moi={moi} />
+            <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Classement">
+              {CLASSEMENTS.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={cle === c.id}
+                  onClick={() => setCle(c.id)}
+                  className={cn(
+                    "shrink-0 px-4 py-2 text-[13px] font-semibold whitespace-nowrap",
+                    cle === c.id ? "bouton-principal" : "bouton-secondaire text-foreground/60"
+                  )}
+                >
+                  {c.label}
+                </button>
               ))}
             </div>
-            {!tout && classement.length > 10 && (
-              <button
-                type="button"
-                onClick={() => setTout(true)}
-                className="bouton-secondaire self-center px-5 py-2.5 text-[13px] font-semibold"
-              >
-                Tout le classement · {classement.length}
-              </button>
+            {lignes.length === 0 ? (
+              <div className="glass-soft rounded-3xl px-6 py-10 text-center text-sm text-foreground/45">Personne pour l&apos;instant.</div>
+            ) : (
+              <>
+                {divisions.length > 0 && <span className="mono-label -mb-2 px-1 text-foreground/45">{divisions[0].nom}</span>}
+                <Podium top={lignes.slice(0, 3)} moi={moi} unite={def.unite} />
+                {(divisions.length > 0
+                  ? divisions.map((d) => ({ nom: d.nom, n: d.n, lignes: d.n === 1 ? d.lignes.slice(3) : d.lignes }))
+                  : [{ nom: "", n: 1, lignes: lignes.slice(3) }]
+                ).map((d) => {
+                  // Sans « Tout le classement » : le haut seulement, jusqu'à la 10e place.
+                  const debut = d.n === 1 ? 3 : lignes.indexOf(d.lignes[0]);
+                  const visibles = tout ? d.lignes : d.lignes.slice(0, Math.max(0, 10 - debut));
+                  if (visibles.length === 0) return null;
+                  // La place dans sa division : la D2 repart de 1.
+                  const decalage = d.n > 1 ? d.lignes[0].place - 1 : 0;
+                  return (
+                    <div key={d.n} className="flex flex-col gap-1.5">
+                      {d.nom && d.n > 1 && <span className="mono-label px-1 pt-2 text-foreground/45">{d.nom}</span>}
+                      <div className="flex flex-col gap-1.5 xl:block xl:columns-2 xl:gap-[var(--fib-13)]">
+                        {visibles.map((c) => (
+                          <Ligne key={c.id} c={c} rang={c.place - decalage} moi={moi} cle={cle} unite={def.unite} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+                {!tout && lignes.length > 10 && (
+                  <button
+                    type="button"
+                    onClick={() => setTout(true)}
+                    className="bouton-secondaire self-center px-5 py-2.5 text-[13px] font-semibold"
+                  >
+                    Tout le classement · {lignes.length}
+                  </button>
+                )}
+              </>
             )}
           </section>
           <section className="flex flex-col gap-3 md:min-w-0">
+            {!equipe && (equipeLue || apercu) && <VitrineBola />}
             <h2 className="px-1 text-[17px] font-bold tracking-tight">Derniers matchs</h2>
             {derniers.map((m) => (
               <MatchJoue key={m.id} m={m} />

@@ -35,7 +35,7 @@ export function InvitationsEquipe({ invitations, moi }: { invitations: Equipe[];
         style={{ background: BLANC, color: ENCRE }}
       >
         <span className="relative shrink-0">
-          <Ecusson initiales={e.initiales} fond={e.fond} taille={42} />
+          <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={42} />
           <span aria-hidden className="absolute -top-1 -right-1 size-3 rounded-full" style={{ background: "#FF3B30", boxShadow: `0 0 0 2px ${BLANC}` }} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col">

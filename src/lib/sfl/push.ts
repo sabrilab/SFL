@@ -17,6 +17,11 @@ export interface Notif {
   /** Messages non lus : le nombre à poser sur l'icône de l'app. */
   pastille?: number;
   /**
+   * Ses réponses, en boutons sous la notification (Android ; l'iPhone n'en
+   * montre pas et ouvre `url`) : chacune ouvre sa page de l'app.
+   */
+  actions?: { action: string; titre: string; url: string }[];
+  /**
    * Sa trace (push_envois, posée par lib/server/push-envoi.ts) : le
    * téléphone la redonne à /api/push/suivi quand la notification arrive et
    * quand on la touche.

@@ -11,7 +11,7 @@
 // renvoyait 404, ce 404 était mis en cache — et l'appareil restait bloqué sur
 // « Quelque chose a cassé » à chaque visite, indéfiniment.
 
-const CACHE_NAME = "sfl-cache-v7";
+const CACHE_NAME = "sfl-cache-v8";
 const OFFLINE_URL = "/offline";
 
 /** Une réponse digne d'être gardée : la nôtre, complète, et sans erreur. */
@@ -154,6 +154,13 @@ self.addEventListener("push", (event) => {
     typeof n.pastille === "number" && n.pastille > 0 && self.navigator.setAppBadge
       ? self.navigator.setAppBadge(Math.min(n.pastille, 99)).catch(() => {})
       : Promise.resolve();
+  // Ses réponses (une invitation d'équipe : Oui, Non), en boutons là où le
+  // téléphone sait les montrer ; chacune garde sa page de l'app.
+  const actions = Array.isArray(n.actions)
+    ? n.actions
+        .filter((a) => a && typeof a.action === "string" && typeof a.titre === "string" && typeof a.url === "string" && a.url.startsWith("/"))
+        .slice(0, 2)
+    : [];
   event.waitUntil(
     pastille
       .then(() => self.registration.showNotification(n.titre || "Bola", {
@@ -163,7 +170,9 @@ self.addEventListener("push", (event) => {
         data: {
           url: typeof n.url === "string" && n.url.startsWith("/") ? n.url : "/",
           id: typeof n.id === "string" ? n.id : null,
+          actions: Object.fromEntries(actions.map((a) => [a.action, a.url])),
         },
+        ...(actions.length > 0 ? { actions: actions.map((a) => ({ action: a.action, title: a.titre })) } : {}),
         // Même étiquette (le Vestiaire) : la nouvelle remplace l'ancienne au
         // lieu de s'empiler, et le téléphone sonne quand même.
         ...(typeof n.tag === "string" ? { tag: n.tag, renotify: true } : {}),
@@ -175,7 +184,9 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   // Seulement une page de l'app : un lien qui mènerait ailleurs ouvre l'accueil.
-  const cible = new URL(event.notification.data?.url || "/", self.location.origin);
+  // Un bouton touché (Oui, Non) ouvre la sienne.
+  const parAction = event.action && event.notification.data?.actions?.[event.action];
+  const cible = new URL(parAction || event.notification.data?.url || "/", self.location.origin);
   const url = cible.origin === self.location.origin ? cible.href : new URL("/", self.location.origin).href;
   event.waitUntil(
     Promise.all([
