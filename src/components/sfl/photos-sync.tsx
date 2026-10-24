@@ -8,7 +8,8 @@
 // les noms et pseudos confirmés (lib/sfl/identites), et pour la ville de
 // chacun sur la Map (lib/sfl/villes), posée d'office d'après la connexion
 // tant que le joueur n'en a pas donné. Et qui suit qui, et les félicitations
-// des Actus (lib/sfl/suivis, lib/sfl/felicitations).
+// des Actus (lib/sfl/suivis, lib/sfl/felicitations). Et les arbitres, leurs
+// matchs et leurs notes (lib/sfl/arbitres).
 
 import { useEffect } from "react";
 import { useSession } from "@/hooks/use-session";
@@ -18,6 +19,7 @@ import { rafraichirIdentites } from "@/lib/sfl/identites";
 import { rafraichirFelicitations } from "@/lib/sfl/felicitations";
 import { envoyerPhotosEnAttente, rafraichirPhotos } from "@/lib/sfl/photos";
 import { rafraichirSuivis } from "@/lib/sfl/suivis";
+import { rafraichirArbitres } from "@/lib/sfl/arbitres";
 import { poserVilleDevinee, rafraichirVilles } from "@/lib/sfl/villes";
 
 export function PhotosSync() {
@@ -32,6 +34,7 @@ export function PhotosSync() {
     void rafraichirVilles();
     void rafraichirSuivis();
     void rafraichirFelicitations();
+    void rafraichirArbitres();
     const auRetour = () => {
       if (document.visibilityState !== "visible") return;
       void rafraichirPhotos();
@@ -41,6 +44,7 @@ export function PhotosSync() {
       void rafraichirVilles();
       void rafraichirSuivis();
       void rafraichirFelicitations();
+      void rafraichirArbitres();
     };
     document.addEventListener("visibilitychange", auRetour);
     return () => document.removeEventListener("visibilitychange", auRetour);

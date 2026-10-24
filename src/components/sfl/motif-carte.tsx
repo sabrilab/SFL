@@ -22,7 +22,12 @@
 //     hachés vers les bords, des manques au milieu, des bouts qui
 //     s'effilent) : du SVG sans filtre, que la capture de la 3D prend sur
 //     iPhone, et un coup de pinceau propre à chaque carte ;
-//   · particules : les étincelles d'énergie des cartes Boost de la saison 0.
+//   · particules : les étincelles d'énergie des cartes Boost de la saison 0 ;
+//   · tenue : les fines rayures de la carte d'arbitre, comme le tissu d'une
+//     tenue d'arbitre, un fil sur trois plus marqué ;
+//   · bandes, damier, projecteurs : trois skins d'arbitre (skins-arbitre.ts),
+//     les larges bandes des tenues d'autrefois, le damier du drapeau de
+//     touche, les deux faisceaux des projecteurs d'un stade la nuit.
 // Et la rosace guillochée du dos (RosaceBola), comme sur un billet. Les
 // motifs des skins du Passe Bola sont dans motifs-passe.tsx.
 
@@ -264,6 +269,93 @@ export function MotifCarte({
             </g>
           ))}
         </g>
+      </svg>
+    );
+  }
+
+  if (motif.type === "tenue") {
+    // Un fil tous les 18, le troisième plus marqué : une tuile de 54 répétée.
+    const fils = (dx: number, fort: string, fin: string, l: number) => (
+      <>
+        {[0, 18, 36].map((x, i) => (
+          <rect key={x} x={x + dx} y={0} width={i === 0 ? l * 1.6 : l} height={H} fill={i === 0 ? fort : fin} />
+        ))}
+      </>
+    );
+    return (
+      <svg aria-hidden viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={style}>
+        <defs>
+          <pattern id={`ten-o-${id}`} width={54} height={H} patternUnits="userSpaceOnUse" x={W / 2 + 3} y={0}>
+            {fils(0, motif.fonce, motif.fonce, 2.4)}
+          </pattern>
+          <pattern id={`ten-c-${id}`} width={54} height={H} patternUnits="userSpaceOnUse" x={W / 2} y={0}>
+            {fils(0, motif.clair, motif.clair.replace(/[\d.]+\)$/, (a) => `${Number.parseFloat(a) * 0.55})`), 1.8)}
+          </pattern>
+        </defs>
+        <rect width={W} height={H} fill={`url(#ten-o-${id})`} />
+        <rect width={W} height={H} fill={`url(#ten-c-${id})`} />
+      </svg>
+    );
+  }
+
+  if (motif.type === "bandes") {
+    // Des bandes de 96, une sur deux plus sombre, bordées d'un fil clair : gravées, décalées de 3.
+    const pas = 96;
+    const n = Math.ceil(W / (pas * 2)) + 1;
+    return (
+      <svg aria-hidden viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={style}>
+        {Array.from({ length: n }, (_, i) => {
+          const x = i * pas * 2 - 40;
+          return (
+            <Fragment key={i}>
+              <rect x={x} y={0} width={pas} height={H} fill={motif.fonce} />
+              <rect x={x + pas - 3} y={0} width={3} height={H} fill={motif.clair} />
+            </Fragment>
+          );
+        })}
+      </svg>
+    );
+  }
+
+  if (motif.type === "damier") {
+    // Le damier du drapeau de touche, des cases de 64, gravé ton sur ton.
+    const c = 64;
+    return (
+      <svg aria-hidden viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={style}>
+        <defs>
+          <pattern id={`dam-${id}`} width={c * 2} height={c * 2} patternUnits="userSpaceOnUse" x={W / 2} y={0}>
+            <rect width={c} height={c} fill={motif.fonce} />
+            <rect x={c} y={c} width={c} height={c} fill={motif.fonce} />
+            <rect x={c} y={0} width={c} height={2} fill={motif.clair} />
+            <rect x={0} y={c} width={c} height={2} fill={motif.clair} />
+          </pattern>
+        </defs>
+        <rect width={W} height={H} fill={`url(#dam-${id})`} />
+      </svg>
+    );
+  }
+
+  if (motif.type === "projecteurs") {
+    // Deux faisceaux partis des coins du haut qui se croisent sur le portrait, et le halo de leurs lampes.
+    const faisceau = (x: number, vers: number) => `M${x - 26} -40L${x + 26} -40L${vers + 300} ${H}L${vers - 300} ${H}Z`;
+    return (
+      <svg aria-hidden viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={style}>
+        <defs>
+          <linearGradient id={`proj-${id}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={motif.clair} />
+            <stop offset="0.7" stopColor={motif.clair} stopOpacity={0.25} />
+            <stop offset="1" stopColor={motif.clair} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <path d={faisceau(90, 820)} fill={`url(#proj-${id})`} />
+        <path d={faisceau(W - 90, W - 820)} fill={`url(#proj-${id})`} />
+        {[90, W - 90].map((x) => (
+          <g key={x}>
+            <circle cx={x} cy={-6} r={90} fill={motif.clair} opacity={0.5} />
+            <circle cx={x} cy={-6} r={40} fill={motif.clair} />
+          </g>
+        ))}
+        <rect y={H - 260} width={W} height={260} fill={motif.fonce} opacity={0.6} />
       </svg>
     );
   }

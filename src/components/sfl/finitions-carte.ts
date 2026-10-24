@@ -65,6 +65,7 @@ import {
   type FinitionPasse,
   type MotifPasse,
 } from "@/components/sfl/skins-passe";
+import { MATIERE_ARBITRE, MATIERES_ARBITRE, type FinitionArbitre, type MotifArbitre } from "@/components/sfl/skins-arbitre";
 
 /** L'édition d'une carte : la carte de saison, ou une carte à titre. */
 export type EditionCarte = "base" | "mvp" | "impact" | "def";
@@ -78,7 +79,8 @@ export type Traitement = "argentique" | "gravure" | "marbre";
 /** Les signes distinctifs, à poser en plus. */
 // Sans or depuis le 24/10 (Sabri : l'or, le bleu et le rouge restent aux cartes à titre) : le liseré
 // or est devenu le double liseré platine, la puce dorée la puce noire.
-export type Signe = "lisere-argent" | "lisere-platine" | "sceau" | "puce-noire" | "nom-grave";
+// Le sifflet et les cartons ne sont qu'aux arbitres (passe-arbitre.ts).
+export type Signe = "lisere-argent" | "lisere-platine" | "sceau" | "puce-noire" | "nom-grave" | "sifflet" | "cartons";
 
 /** Le rang du joueur selon son XP, aux couleurs des rangs de mission. */
 export type RangCarte = "B" | "A" | "S";
@@ -103,7 +105,7 @@ export interface HabillageCarte {
 export type EditionEpoque = "s0" | "s0-mvp" | "s0-impact" | "s0-def";
 
 /** Les matières : les quatre éditions, les finitions, l'ancienne rare, et les éditions d'époque. */
-export type NomMatiere = EditionCarte | Finition | "rare" | EditionEpoque;
+export type NomMatiere = EditionCarte | Finition | "rare" | EditionEpoque | "arbitre" | FinitionArbitre;
 
 /** Le motif gravé d'une matière (motif-carte.tsx le dessine). */
 export type Motif =
@@ -116,7 +118,10 @@ export type Motif =
   | { type: "pinceau"; cx: number; cy: number; noir: string }
   /** Les particules des cartes Boost de la saison 0. */
   | { type: "particules" }
-  | MotifPasse;
+  /** Les fines rayures de la tenue, sur la carte d'arbitre. */
+  | { type: "tenue" }
+  | MotifPasse
+  | MotifArbitre;
 
 /**
  * Ce qu'une carte d'époque reprend des visuels de son temps, sur la
@@ -450,6 +455,10 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
     tranche: { couleur: "#15161a", metal: 0.85, rugosite: 0.2 },
     holo: { force: 0.38, teinte: [0.86, 0.9, 1] },
   },
+  // L'arbitre : le jaune fluo de sa chasuble (Sabri, 24/10 : « même sa carte
+  // principale à lui soit soit jaune, soit orange fluo »), dessiné dans
+  // skins-arbitre.ts avec ses skins.
+  arbitre: MATIERE_ARBITRE,
   // Saison 0, la carte de saison : la « Standard parchemin » du 12/07. Le
   // papier crème, ses coups de pinceau derrière la note et le nom.
   s0: {
@@ -616,6 +625,7 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
   // Les skins du Passe Bola (skins-passe.ts) ; « Tes couleurs » au pays par
   // défaut, celui du joueur passe par matiereDe.
   ...MATIERES_PASSE,
+  ...MATIERES_ARBITRE,
   couleurs: matiereCouleurs(PAYS_PAR_DEFAUT),
 };
 

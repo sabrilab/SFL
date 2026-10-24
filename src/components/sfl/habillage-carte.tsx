@@ -292,3 +292,43 @@ export function VoileTraitement({ traitement, u }: { traitement?: Traitement; u:
     );
   return null;
 }
+
+/**
+ * Le sifflet gravé (passe d'arbitre, palier 3) : la chambre ronde, l'embout et
+ * l'anneau du cordon, à l'encre de la carte, au coin haut droit du portrait.
+ */
+export function Sifflet({ encre, papier, largeur }: { encre: string; papier: string; largeur: number }) {
+  const ink = (a: number) => `rgba(${encre},${a})`;
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 220 140"
+      style={{ position: "absolute", width: largeur, height: (largeur * 140) / 220, transform: "rotate(-10deg)", pointerEvents: "none" }}
+    >
+      <circle cx={30} cy={34} r={18} fill="none" stroke={ink(0.75)} strokeWidth={7} />
+      <path d="M44 46L70 62" stroke={ink(0.75)} strokeWidth={6} strokeLinecap="round" />
+      {/* L'embout, puis la chambre */}
+      <path d="M100 52h100a10 10 0 0 1 10 10v14a10 10 0 0 1 -10 10h-100z" fill={papier} stroke={ink(0.9)} strokeWidth={7} strokeLinejoin="round" />
+      <circle cx={100} cy={84} r={44} fill={papier} stroke={ink(0.9)} strokeWidth={7} />
+      <circle cx={100} cy={84} r={26} fill="none" stroke={ink(0.45)} strokeWidth={3} />
+      <path d="M128 52v-10h28v10" fill="none" stroke={ink(0.9)} strokeWidth={6} strokeLinejoin="round" />
+      <path d="M146 66h48M146 74h48" stroke={ink(0.35)} strokeWidth={2.5} />
+    </svg>
+  );
+}
+
+/**
+ * Les cartons (passe d'arbitre, palier 8) : les deux cartons en éventail,
+ * l'un plein d'encre, l'autre en filet, au bas de la photo. Noir et blanc :
+ * ni jaune, ni rouge.
+ */
+export function Cartons({ encre, papier, cote }: { encre: string; papier: string; cote: number }) {
+  const ink = (a: number) => `rgba(${encre},${a})`;
+  return (
+    <svg aria-hidden viewBox="0 0 200 200" style={{ position: "absolute", width: cote, height: cote, pointerEvents: "none" }}>
+      <rect x={46} y={36} width={84} height={120} rx={10} fill={papier} stroke={ink(0.85)} strokeWidth={6} transform="rotate(-14 88 96)" />
+      <rect x={78} y={46} width={84} height={120} rx={10} fill={ink(0.85)} stroke={ink(0.95)} strokeWidth={4} transform="rotate(10 120 106)" />
+      <path d="M96 70h48" stroke={papier} strokeWidth={3} transform="rotate(10 120 106)" />
+    </svg>
+  );
+}

@@ -6,7 +6,7 @@
 // (événement "sfl-saisie" ou storage cross-onglet). Demain Supabase : seul le
 // store change, ce provider et ses consommateurs restent identiques.
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useIsClient } from "@/hooks/use-is-client";
 import { deriveSeason, type DerivedSeason } from "@/lib/sfl/saisie/engine";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
@@ -15,12 +15,18 @@ import type { Saison } from "@/lib/sfl/saisie/types";
 import type { Player } from "@/lib/sfl/engine";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
 import { appliquerVotes } from "@/lib/sfl/votes";
+import { amorcerDemo, ARBITRES_EVENT, arbitresRevision } from "@/lib/sfl/arbitres";
 import { useSuiviVotes, useVotes } from "@/hooks/use-votes";
 import { useSession } from "@/hooks/use-session";
 import type { Session } from "@/lib/sfl/auth/session";
 import { supabase } from "@/lib/supabase";
 
 export const SAISIE_EVENT = "sfl-saisie";
+
+function suivreArbitres(onChange: () => void) {
+  window.addEventListener(ARBITRES_EVENT, onChange);
+  return () => window.removeEventListener(ARBITRES_EVENT, onChange);
+}
 
 interface SeasonValue extends DerivedSeason {
   saison: Saison;
@@ -32,6 +38,8 @@ interface SeasonValue extends DerivedSeason {
   allPlayers: Player[];
   /** Le nom du joueur connecté s'il joue en Bola, hors de la SFL (voir joueurBola). */
   bola: string | null;
+  /** Change avec la liste des arbitres (masqués des listes) ; absent hors de la saison en cours. */
+  arbitres?: number;
 }
 
 const memeNom = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -146,6 +154,13 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   const nom = useMemo(() => nomBola(session, derived.players), [session, derived.players]);
   const poste = usePosteBola(nom);
   const bola = useMemo(() => joueurBola(nom, poste), [nom, poste]);
+  // Les arbitres (lib/sfl/arbitres) sont masqués comme des joueurs : la
+  // liste publique se refait quand la base les donne.
+  const arbitres = useSyncExternalStore(suivreArbitres, arbitresRevision, () => -1);
+  useEffect(
+    () => amorcerDemo(saison.numero ?? 0, derived.journees, new Set(saison.entries.filter((e) => e.result).map((e) => e.j))),
+    [saison.numero, saison.entries, derived.journees]
+  );
   // `players` est la liste PUBLIQUE : les joueurs masqués n'y sont pas, donc
   // aucun classement, aucune recherche, aucun duel ne peut les faire remonter.
   const value = useMemo<SeasonValue>(
@@ -156,8 +171,9 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
       allPlayers: bola ? [...derived.players, bola] : derived.players,
       bola: bola?.name ?? null,
       saison,
+      arbitres,
     }),
-    [derived, bola, saison]
+    [derived, bola, saison, arbitres]
   );
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;

@@ -68,6 +68,11 @@
 // la place de la puce, et sa date d'émission et son numéro dans la ligne de
 // série. Ni badge, ni habillage : elle est restée telle qu'elle a été émise.
 //
+// La carte d'un arbitre (`edition="arbitre"`, `arbitre` ; carte-arbitre.tsx,
+// Sabri 24/10) garde toute cette disposition, dans le jaune fluo de sa chasuble
+// (skins-arbitre.ts) ou le skin qu'il porte : sa satisfaction à la place de la note, ses chiffres
+// (matchs arbitrés, notes reçues…) à la place des six stats.
+//
 // Mêmes calques que la carte éditoriale (`data-card-part` body / player /
 // stats) : la 3D de card-3d.tsx mesure la carte et la prend telle quelle,
 // avec sa parallaxe — le portrait flotte au-dessus du papier, le texte
@@ -78,6 +83,7 @@ import { BulleBadge } from "@/components/sfl/insigne-carte";
 import {
   graine,
   lisereDe,
+  MATIERES,
   matiereDe,
   microtexte,
   microtexteGrave,
@@ -88,14 +94,29 @@ import {
   type HabillageCarte,
   type Traitement,
 } from "@/components/sfl/finitions-carte";
-import { Crans, filtrePhoto, InsigneRang, Lisere, Sceau, VoileTraitement, type Boite } from "@/components/sfl/habillage-carte";
+import { Cartons, Crans, filtrePhoto, InsigneRang, Lisere, Sceau, Sifflet, VoileTraitement, type Boite } from "@/components/sfl/habillage-carte";
+import { GRADES, type FinitionArbitre, type GradeArbitre } from "@/components/sfl/skins-arbitre";
 import { BordEpoque, EmblemeEpoque, LosangeBallon, SigleSfl, SigleSouligne } from "@/components/sfl/marques-carte";
 import { MotifCarte } from "@/components/sfl/motif-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
 import { ligneDEmission, type EmissionCarte } from "@/lib/sfl/epoques";
 
-export type BolaEdition = "base" | "rare" | "mvp" | "impact" | "def";
+export type BolaEdition = "base" | "rare" | "mvp" | "impact" | "def" | "arbitre";
+
+/**
+ * La carte d'un arbitre (carte-arbitre.tsx) : sa satisfaction à la place de
+ * la note de joueur, et ses chiffres à la place des six stats.
+ */
+export interface FaceArbitre {
+  /** La satisfaction, de 0 à 99 ; « – » tant qu'il n'a pas de note. */
+  note: string;
+  /** Ses chiffres, deux par rangée : [« mat », 12]. */
+  stats: [string, string | number][];
+  /** Le skin de tenue qu'il porte (skins-arbitre.ts), et son grade dans l'étiquette (passe-arbitre.ts). */
+  finition?: FinitionArbitre | null;
+  grade?: GradeArbitre | null;
+}
 type Palier = "complete" | "compacte" | "reduite" | "pastille";
 
 const W = 1024;
@@ -240,6 +261,7 @@ export function BolaCard({
   badge,
   habillage: habillageDemande,
   epoque,
+  arbitre,
 }: {
   name: string;
   /** Le nom montré sur la carte, s'il diffère du nom de saison (voir lib/sfl/identites). */
@@ -263,12 +285,16 @@ export function BolaCard({
   habillage?: HabillageCarte;
   /** Une carte d'une saison close qui a son édition d'époque : sa saison, sa date d'émission, son numéro. */
   epoque?: EmissionCarte | null;
+  /** La carte d'un arbitre : sa satisfaction et ses chiffres (avec l'édition « arbitre »). */
+  arbitre?: FaceArbitre;
 }) {
   // 254 px de large à taille 1, comme les autres cartes de l'app.
   const largeur = 254 * size;
   const u = (n: number) => n * size * (254 / W);
   const palier = palierCarte(largeur);
-  const p = matiereDe(edition, habillageDemande, epoque?.saison);
+  // L'arbitre a sa matière à lui (ou le skin de tenue qu'il porte), sans époque.
+  const p = edition === "arbitre" ? MATIERES[arbitre?.finition ?? "arbitre"] : matiereDe(edition, habillageDemande, epoque?.saison);
+  const note = arbitre ? arbitre.note : overall;
   // Une carte d'époque est restée telle qu'elle a été émise : sans habillage ni badge.
   const era = p.epoque;
   const habillage = era ? undefined : habillageDemande;
@@ -344,7 +370,7 @@ export function BolaCard({
             lineHeight: 1,
           }}
         >
-          {overall}
+          {note}
         </div>
       </div>
     );
@@ -382,15 +408,18 @@ export function BolaCard({
   // Le haut à droite du portrait : le numéro de maillot ; sinon le poste, en grand format seulement.
   // Une carte d'époque : le poste, ou rien sous l'emblème d'une carte Boost.
   // Le badge n'est plus dans le coin : il est dans sa bulle, sur la bande.
-  const marque = era
-    ? era.embleme || !complete
-      ? null
-      : position.toUpperCase()
-    : numero != null
-      ? String(numero)
-      : complete
-        ? position.toUpperCase()
-        : null;
+  // Un arbitre n'a ni numéro ni poste : son étiquette le dit déjà.
+  const marque = arbitre
+    ? null
+    : era
+      ? era.embleme || !complete
+        ? null
+        : position.toUpperCase()
+      : numero != null
+        ? String(numero)
+        : complete
+          ? position.toUpperCase()
+          : null;
   const portraitProps = {
     photo,
     nom: name,
@@ -412,11 +441,13 @@ export function BolaCard({
   const cran = habillage?.cran ?? 0;
   const sceau = complete && signes.includes("sceau");
   const nomGrave = complete && signes.includes("nom-grave");
+  const sifflet = complete && signes.includes("sifflet");
+  const cartons = complete && signes.includes("cartons");
   const tailleMarque = !era && numero != null ? (complete ? 164 : compacte ? 225 : 287) : 80;
   const halo = p.sombre ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)";
 
   // La note : dans son carré, centrée sur toute la largeur en réduite.
-  const note = reduite
+  const place = reduite
     ? { left: 0, top: 1065, width: W, align: "center" as const, fs: 512 }
     : { left: 26, top: complete ? 1101 : 1096, width: NOTE_C + 40, align: "left" as const, fs: complete ? 450 : 420 };
 
@@ -617,6 +648,23 @@ export function BolaCard({
                   {p.titre}
                 </div>
                 {habillage?.rang && <InsigneRang rang={habillage.rang} hauteur={u(82)} />}
+                {arbitre?.grade && (
+                  <div
+                    style={{
+                      height: u(51),
+                      padding: `0 ${u(16)}px`,
+                      boxSizing: "border-box",
+                      borderRadius: u(10),
+                      display: "flex",
+                      alignItems: "center",
+                      border: `${u(2)}px solid ${encre(0.7)}`,
+                      ...mono(26, 2.5, 1, 700),
+                      color: encre(0.92),
+                    }}
+                  >
+                    {GRADES[arbitre.grade]}
+                  </div>
+                )}
               </div>
               {era ? (
                 /* Le losange au ballon, qui pointait sous les cartes d'alors */
@@ -642,6 +690,17 @@ export function BolaCard({
                 </div>
               )}
             </>
+          )}
+          {/* Les signes d'arbitre : le sifflet au coin haut droit, les cartons au bas de la photo */}
+          {sifflet && (
+            <span style={{ position: "absolute", right: u(40), top: u(46), width: u(190), height: u(121) }}>
+              <Sifflet encre={p.encre} papier={p.sombre ? "rgba(8,9,11,0.35)" : "rgba(255,255,255,0.5)"} largeur={u(190)} />
+            </span>
+          )}
+          {cartons && (
+            <span style={{ position: "absolute", left: u(55), top: u(695) }}>
+              <Cartons encre={p.encre} papier={p.sombre ? "rgba(8,9,11,0.35)" : "rgba(255,255,255,0.5)"} cote={u(190)} />
+            </span>
           )}
           {/* Le sceau, tamponné sur le bas de la photo */}
           {sceau && (
@@ -671,21 +730,21 @@ export function BolaCard({
             key={i}
             style={{
               position: "absolute",
-              left: u(note.left + dx),
-              top: u(note.top),
-              width: u(note.width),
-              textAlign: note.align,
+              left: u(place.left + dx),
+              top: u(place.top),
+              width: u(place.width),
+              textAlign: place.align,
               fontFamily: SANS,
               fontWeight: 900,
               fontStyle: "italic",
-              fontSize: u(note.fs),
+              fontSize: u(place.fs),
               letterSpacing: u(-18),
               lineHeight: 1,
               // Une carte d'époque : la frange dans l'accent d'alors, comme un repérage décalé.
               color: era && a < 1 ? opaque(era.accent, a) : encre(a),
             }}
           >
-            {overall}
+            {note}
           </div>
         ))}
 
@@ -743,8 +802,8 @@ export function BolaCard({
                 columnGap: u(16),
               }}
             >
-              {STAT_KEYS.map((k) => {
-                const actif = highlightStats?.includes(k);
+              {(arbitre?.stats ?? STAT_KEYS.map((k) => [k, stats[k]] as const)).map(([k, valeur]) => {
+                const actif = highlightStats?.includes(k as StatKey);
                 return (
                   <div key={k} style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: u(12) }}>
                     {era ? (
@@ -767,7 +826,7 @@ export function BolaCard({
                         textUnderlineOffset: u(8),
                       }}
                     >
-                      {stats[k]}
+                      {valeur}
                     </span>
                   </div>
                 );
