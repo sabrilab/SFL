@@ -161,8 +161,18 @@ self.addEventListener("push", (event) => {
         .filter((a) => a && typeof a.action === "string" && typeof a.titre === "string" && typeof a.url === "string" && a.url.startsWith("/"))
         .slice(0, 2)
     : [];
+  // Même étiquette : l'ancienne s'efface d'abord. Le téléphone qui ne sait
+  // pas remplacer par l'étiquette seule (l'iPhone) garde ainsi une seule
+  // notification du Vestiaire, qui compte les messages (Sabri, 24/10).
+  const avant =
+    typeof n.tag === "string" && self.registration.getNotifications
+      ? self.registration
+          .getNotifications({ tag: n.tag })
+          .then((vieilles) => vieilles.forEach((v) => v.close()))
+          .catch(() => {})
+      : Promise.resolve();
   event.waitUntil(
-    pastille
+    Promise.all([pastille, avant])
       .then(() => self.registration.showNotification(n.titre || "Bola", {
         body: n.texte || "",
         icon: "/icon-192.png",

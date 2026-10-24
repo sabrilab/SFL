@@ -8,7 +8,9 @@
 //   · l'auteur d'un message qui reçoit une RÉACTION : tout de suite, et la
 //     suivante remplace la précédente sur son écran (même étiquette) ;
 //   · tous les autres : chaque message, comme Snap ou WhatsApp (Sabri,
-//     19/10 : la notification groupée à l'heure ne se voyait pas), sauf une
+//     19/10 : la notification groupée à l'heure ne se voyait pas), mais en
+//     une seule notification sur l'écran, qui compte ses non lus
+//     (« Vestiaire · 4 nouveaux messages », 24/10) ; sauf une
 //     réponse à un autre joueur, qui ne regarde qu'eux deux (Sabri, 24/10 :
 //     « c'est la personne concernée qui doit recevoir la notif »). Deux
 //     garde-fous seulement : rien à qui a le Vestiaire sous les yeux
@@ -27,6 +29,7 @@
 // message à tous qu'une fois par RAFALE et ne vise que ses cités.
 
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { cleVapid } from "@/lib/server/web-push";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
@@ -54,6 +57,36 @@ interface Suivi {
 }
 
 const couper = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+/**
+ * Les messages du Vestiaire que chacun n'a pas lus (des autres, depuis son
+ * lu_jusqua ; trois jours au plus, comme la pastille de qui ne l'a jamais
+ * ouvert).
+ */
+async function nonLusDuVestiaire(
+  sb: SupabaseClient,
+  qui: string[],
+  suivis: Map<string, Suivi>,
+  maintenant: number
+): Promise<Map<string, number>> {
+  const comptes = new Map<string, number>();
+  if (qui.length === 0) return comptes;
+  const depuis = maintenant - 3 * 24 * HEURE;
+  const { data } = await sb
+    .from("messages")
+    .select("auteur, created_at")
+    .eq("canal", "sfl")
+    .gt("created_at", new Date(depuis).toISOString());
+  const recents = ((data ?? []) as { auteur: string; created_at: string }[]).map((m) => ({
+    auteur: m.auteur,
+    le: new Date(m.created_at).getTime(),
+  }));
+  for (const uid of qui) {
+    const lu = Math.max(depuis, new Date(suivis.get(uid)?.lu_jusqua ?? 0).getTime());
+    comptes.set(uid, recents.filter((m) => m.auteur !== uid && m.le > lu).length);
+  }
+  return comptes;
+}
 
 export async function POST(req: NextRequest) {
   const sb = serveur();
@@ -200,11 +233,21 @@ export async function POST(req: NextRequest) {
       const dernier = suivis.get(uid)?.notifie_le;
       return !dernier || maintenant - new Date(dernier).getTime() >= RAFALE;
     });
-    for (const uid of courants)
+    // Une seule notification du Vestiaire sur son téléphone, qui compte ce
+    // qu'il n'a pas lu (Sabri, 24/10 : « chaque message pour tous […], mais
+    // une seule notification ») : même étiquette, la nouvelle remplace la
+    // précédente (public/sw.js), « Vestiaire · 4 nouveaux messages ».
+    const nonLusVestiaire = await nonLusDuVestiaire(sb, courants, suivis, maintenant);
+    for (const uid of courants) {
+      const n = Math.max(1, nonLusVestiaire.get(uid) ?? 0);
       envois.set(uid, {
         motif: "vestiaire-message",
-        notif: { titre: `${auteur} · Vestiaire`, texte: couper(phrase, 180), url: URL_VESTIAIRE, tag: "vestiaire" },
+        notif:
+          n > 1
+            ? { titre: `Vestiaire · ${n} nouveaux messages`, texte: couper(`${auteur} : ${phrase}`, 180), url: URL_VESTIAIRE, tag: "vestiaire" }
+            : { titre: `${auteur} · Vestiaire`, texte: couper(phrase, 180), url: URL_VESTIAIRE, tag: "vestiaire" },
       });
+    }
   }
 
   for (const uid of envois.keys()) if (!membres.has(uid)) envois.delete(uid);

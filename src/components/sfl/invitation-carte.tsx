@@ -72,6 +72,7 @@ import { useSuivis } from "@/hooks/use-suivis";
 import { idDe } from "@/lib/sfl/comptes";
 import { editionAnnonce, fenetreNotification, type EditionAnnonce } from "@/lib/sfl/divisions";
 import { annonceVue, annoncerDivisions, noterAnnonceVue } from "@/lib/sfl/divisions-annonce";
+import { annoncerLigue } from "@/lib/sfl/ligue-annonce";
 import { ajusterEquipes } from "@/lib/sfl/divisions-equipes";
 import { rankPlayers, type Player } from "@/lib/sfl/engine";
 import { isHidden } from "@/lib/sfl/hidden";
@@ -204,6 +205,8 @@ export function InvitationCarte() {
       }
       if (fenetreNotification(ligue.current.saison, maintenant)) void annoncerDivisions();
       if (dimancheAAnnoncer(ligue.current.saison) !== null && peutEtreLaVeille(maintenant)) void annoncerOutsider();
+      // La convocation du lundi, les résultats du dimanche : le serveur juge.
+      void annoncerLigue();
       // Le week-end des équipes par division : elles se tiennent à jour.
       void ajusterEquipes("ouverture");
       const [etat, ville] = await Promise.all([
