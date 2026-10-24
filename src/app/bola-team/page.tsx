@@ -733,7 +733,7 @@ export default function BolaTeamPage() {
 
   return (
     <div className="gabarit-ligue mx-auto flex w-full max-w-[470px] flex-col gap-7 px-5 pt-2 pb-8 sm:pt-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
-      <h1 className="sr-only">Team</h1>
+      <h1 className="sr-only">Bola, équipes</h1>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <EnteteLigue actif="/bola-team" className="md:flex-1" />
         <div className="glass flex gap-1 rounded-full p-1 md:w-[340px]" role="tablist" aria-label="Vue">
