@@ -22,12 +22,11 @@
 // palier le rouge et or (corps rouge, pièces sombres en or). « fantome » est
 // le badge pas encore gagné : tout en verre dépoli, sans couleur.
 //
-// La pierre de la Pépite d'Or a son propre studio, celui d'un joaillier
-// (24/10) : vue de profil, sa culasse ne reflète que ce qui est sous elle et
-// derrière, là où le studio des badges met un rose qui la teintait de rouge ;
-// une boîte à lumière de la teinte du métal y prend sa place, et la pierre
-// s'allume comme un diamant de couleur (jaune pour l'or, blanc pour
-// l'argent, cognac pour le bronze).
+// La Pépite d'Or a son propre studio (24/10) : une boîte à lumière de la
+// teinte du métal sous l'objet et derrière lui, là où le studio des badges
+// met un rose qui le teintait de rouge. La pépite est du métal brut (rôle
+// « brut ») : satiné, sans irisation, ses creux assombris par la couleur
+// de ses sommets.
 
 import * as THREE from "three";
 import { piecesDe, POSE, type Objet, type Role } from "./objets";
@@ -45,10 +44,10 @@ const CORPS: Record<Metal, string> = {
 
 /* -------------------------------- Le studio ------------------------------- */
 
-/** La teinte de la boîte à lumière du joaillier, sous la pierre, selon le métal. */
+/** La teinte de la boîte à lumière du joaillier, sous la pépite, selon le métal. */
 const JOAILLIER: Record<Metal, string> = { or: "#ffd98a", argent: "#e8f0ff", bronze: "#ffb27a", legende: "#ffc2b0" };
 
-/** Le studio d'un objet : celui des badges, ou celui du joaillier pour la pierre de la Pépite d'Or. */
+/** Le studio d'un objet : celui des badges, ou celui du joaillier pour la Pépite d'Or. */
 export function teinteStudio(objet: Objet, m: Matiere): string | undefined {
   return objet === "pepite" && m !== "fantome" ? JOAILLIER[m] : undefined;
 }
@@ -56,7 +55,7 @@ export function teinteStudio(objet: Objet, m: Matiere): string | undefined {
 /**
  * La carte d'environnement : un fond noir et des panneaux de lumière colorée.
  * `joaillier` : la teinte de la boîte à lumière posée sous l'objet et
- * derrière lui, à la place du rose (la pierre de la Pépite d'Or).
+ * derrière lui, à la place du rose (la Pépite d'Or).
  */
 export function environnement(renderer: THREE.WebGLRenderer, joaillier?: string): THREE.Texture {
   const scene = new THREE.Scene();
@@ -95,7 +94,7 @@ export function environnement(renderer: THREE.WebGLRenderer, joaillier?: string)
   panneau("#3b6cff", 9, 3, 10, -6, 1, -5); // le bleu, à gauche, derrière
   panneau("#9b4dff", 7, 6, 3, 3, 6, -5); // le violet, en haut, derrière
   panneau("#ff7a3d", 9, 3, 8, 6, -2, -4); // l'orange, à droite, derrière
-  if (joaillier) panneau(joaillier, 4, 7, 4.2, 0, -6.5, -3.5); // sous la pierre, derrière : sa culasse s'allume
+  if (joaillier) panneau(joaillier, 4, 7, 4.2, 0, -6.5, -3.5); // sous la pépite, derrière : son dessous s'allume
   else panneau("#ff4fa3", 4, 6, 3, -2, -7, -2); // un rose, sous l'objet
   const pmrem = new THREE.PMREMGenerator(renderer);
   const tex = pmrem.fromScene(scene, 0.035).texture;
@@ -168,6 +167,14 @@ function noir() {
   return m;
 }
 
+/** Le métal brut de la pépite : satiné, sans film ni vernis, ses creux plus sombres. */
+function brut(couleur: string) {
+  const m = chrome(couleur, 0, 0.3);
+  m.clearcoat = 0;
+  m.vertexColors = true;
+  return m;
+}
+
 // Une carte d'environnement appartient à son moteur : les matières sont donc
 // rangées par environnement.
 const matieres = new WeakMap<THREE.Texture, Map<Matiere, Record<Role, THREE.MeshPhysicalMaterial>>>();
@@ -181,7 +188,7 @@ function matieresDe(m: Matiere, env: THREE.Texture): Record<Role, THREE.MeshPhys
   let r = parEnv.get(m);
   if (!r) {
     if (m === "fantome") {
-      r = { corps: verre("#dfe3ea", 0.42, 0.32), verre: verre("#dfe3ea", 0.22, 0.32), sombre: verre("#9aa0a8", 0.4, 0.32), noir: verre("#8a9098", 0.36, 0.32) };
+      r = { corps: verre("#dfe3ea", 0.42, 0.32), verre: verre("#dfe3ea", 0.22, 0.32), sombre: verre("#9aa0a8", 0.4, 0.32), noir: verre("#8a9098", 0.36, 0.32), brut: verre("#dfe3ea", 0.42, 0.32) };
     } else {
       const corps = chrome(CORPS[m], m === "argent" ? 0.6 : 0.3);
       r = {
@@ -190,6 +197,7 @@ function matieresDe(m: Matiere, env: THREE.Texture): Record<Role, THREE.MeshPhys
         // Au rouge et or, les pièces sombres passent à l'or.
         sombre: m === "legende" ? chrome(CORPS.or, 0.3) : chrome("#1b1d24", 1, 0.2),
         noir: noir(),
+        brut: brut(CORPS[m]),
       };
     }
     for (const mat of Object.values(r)) mat.envMap = env;
@@ -252,7 +260,7 @@ let revision = 0;
 let moteur: {
   renderer: THREE.WebGLRenderer;
   env: THREE.Texture;
-  /** Les studios du joaillier, un par teinte, faits à la première pierre. */
+  /** Les studios du joaillier, un par teinte, faits à la première pépite. */
   joailliers: Map<string, THREE.Texture>;
   cote: number;
   scene: THREE.Scene;

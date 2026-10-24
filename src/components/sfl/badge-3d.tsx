@@ -10,9 +10,9 @@
 //   · Le Mur, Défenseur → le bouclier ; · Impact → l'éclair ;
 // Les trophées de fin de saison, eux, sont de vraies pièces de vitrine
 // (TROPHEE_SAISON, voir objets.ts) : Ma carte et le profil les montrent. Le
-// badge posé sur la carte est le même objet, au bout d'une bulle gravée à
-// l'encre de la carte (insigne-carte.tsx) ; la pierre de la Pépite d'Or y est
-// vue de profil, pour qu'on la reconnaisse même petite.
+// badge posé sur la carte est le même objet, au bout d'un bouton à l'encre
+// de la carte (insigne-carte.tsx) ; la Pépite d'Or est une vraie pépite de
+// métal brut, pas une pierre taillée.
 // Le métal dit le niveau (bronze, argent, or ; rouge et or au dernier palier).
 // Un badge de fin de saison porte en plus son rang, gravé sur une pastille de
 // métal en bas à droite : c'est ce qui le distingue d'un palier.

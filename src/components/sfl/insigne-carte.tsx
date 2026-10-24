@@ -46,14 +46,14 @@ import { metal, NOM_METAL, TROPHEES, type TropheeId } from "@/lib/sfl/trophees";
 
 /**
  * La place de chaque objet dans son image (mesurée le 24/10 : le ballon
- * occupe 0,67 du carré en hauteur, la pierre de profil 0,46, le crampon
+ * occupe 0,67 du carré en hauteur, la pépite 0,58, le crampon
  * couché 0,34, le terrain 0,49) : `e` agrandit l'image pour que les objets
  * aient tous à peu près la hauteur du ballon, sans qu'un objet couché
  * dépasse sa boîte en largeur ; `dy` recentre l'objet en hauteur (en
  * fraction de l'image, vers le haut).
  */
 const EMPRISE: Partial<Record<Objet, { e: number; dy?: number }>> = {
-  pepite: { e: 1.42 },
+  pepite: { e: 1.35 },
   crampon: { e: 1.45, dy: 0.05 },
   eclair: { e: 1.12 },
   terrain: { e: 1.2, dy: 0.025 },
@@ -157,7 +157,7 @@ const LETTRE: Lettre = {
   poids: 900,
   italique: false,
   pas: -0.03,
-  max: 37,
+  max: 35,
   hauteur: 0.9,
   chasse: table("79 67 75 72 61 58 75 75 29 60 76 57 96 77 78 66 79 67 67 69 72 79 108 79 78 69", "71 45 65 67 70 65 67 59 68 67"),
   blanc: 0.25,
@@ -177,11 +177,11 @@ function chasse(texte: string, l: Lettre): number {
 // Les cotes de la bulle, dans le repère de la carte (1024 × 1656).
 const R = 74; // la demi-boîte de l'objet : la bulle part de son centre
 const OBJET = 168; // la boîte de l'objet (avant son emprise)
-const H = 110; // la hauteur de la bulle
+const H = 84; // la hauteur du bouton (110 trop haut pour Sabri, 24/10) : l'objet, de 168, en déborde
 const AVANT = R + 24; // du bord gauche de la bulle au texte
 const APRES = 40;
-const DETAIL = 22;
-const ECART = 8; // entre le titre et le détail
+const DETAIL = 21;
+const ECART = 6; // entre le titre et le détail
 
 /**
  * La bulle de la grande carte : un bouton plein, à l'encre de la carte, les
@@ -239,7 +239,7 @@ export function BulleBadge({
           style={{
             position: "absolute",
             left: u(AVANT),
-            top: u(3),
+            top: u(2),
             bottom: 0,
             display: "flex",
             flexDirection: "column",
