@@ -26,6 +26,10 @@
 // le dit, et l'app montre l'écran d'attente jusqu'à l'accord de l'admin.
 // Sauf venu par le lien d'une équipe (?equipe=jeton, mode Team) : le
 // capitaine s'en porte garant, le compte entre aussitôt et l'équipe l'attend.
+// De même par le lien d'un joueur (?parrain=code, ou le code gardé 30 jours
+// par la page /p/code, ou tapé ici : lib/sfl/parrainage.ts) : le parrain
+// s'en porte garant et le compte entre aussitôt dans Bola. Ces deux parcours
+// sont plus courts (pas les quatre photos en pied).
 //
 // Page publique (hors de la porte de connexion, voir AuthGate).
 
@@ -53,6 +57,17 @@ import { AGE_ACCORD_PARENT } from "@/lib/sfl/confidentialite";
 import { donnerAccord } from "@/lib/sfl/consentement";
 import { useSession } from "@/hooks/use-session";
 import {
+  codeGarde,
+  codeValide,
+  garderCode,
+  lireParrain,
+  normaliserCode,
+  noterVisite,
+  oublierCode,
+  type Canal,
+  type Parrain,
+} from "@/lib/sfl/parrainage";
+import {
   ANGLES,
   BORNES,
   MAILLOTS,
@@ -70,9 +85,6 @@ import {
 
 const ETAPES = ["accueil", "identite", "contact", "naissance", "gabarit", "jeu", "angles", "secret", "fini"] as const;
 type Etape = (typeof ETAPES)[number];
-
-/** Par Google ou Apple : ni email (le fournisseur le donne), ni mot de passe. */
-const ETAPES_SOCIALES = ETAPES.filter((e) => e !== "secret");
 
 const NOM_FOURNISSEUR: Record<Fournisseur, string> = { google: "Google", apple: "Apple" };
 
@@ -252,24 +264,88 @@ export default function InscriptionPage() {
   // entre dans Bola sans attendre l'admin et l'équipe l'attend ; le parcours
   // est plus court (pas les quatre photos en pied).
   const [equipe, setEquipe] = useState<string | null>(null);
+  // Venu par le lien d'un joueur, ou avec son code : son parrain (parrainage).
+  const [parrain, setParrain] = useState<{ p: Parrain; canal: Canal } | null>(null);
+  const [codeOuvert, setCodeOuvert] = useState(false);
+  const [codeSaisi, setCodeSaisi] = useState("");
+  const [codeEtat, setCodeEtat] = useState<"?" | "verif" | "inconnu">("?");
+  // Le compte créé entre-t-il aussitôt (lien d'équipe ou parrain) ?
+  const [entre, setEntre] = useState(false);
   useEffect(() => {
-    const j = new URLSearchParams(window.location.search).get("equipe");
+    const q = new URLSearchParams(window.location.search);
+    const j = q.get("equipe");
     // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique de l'URL au montage
     if (j) setEquipe(j);
+    if (j) return;
+    const lien = normaliserCode(q.get("parrain") ?? "");
+    const garde = codeValide(lien) ? { code: lien, canal: "lien" as const } : codeGarde();
+    if (!garde) return;
+    let annule = false;
+    lireParrain(garde.code)
+      .then((p) => {
+        if (annule || !p) return;
+        garderCode(p.code, garde.canal);
+        setParrain({ p, canal: garde.canal });
+        // Un code tapé avant un détour par Google ou Apple se retrouve dans son champ.
+        if (garde.canal === "code") {
+          setCodeSaisi(p.code);
+          setCodeOuvert(true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      annule = true;
+    };
   }, []);
   // Le compte ouvert, la page Team ouvre aussitôt la signature de l'équipe.
   const apres = equipe ? `/bola-team?lien=${encodeURIComponent(equipe)}` : "/";
   const fini = etape === "fini";
-  const etapes: readonly Etape[] = sociale ? ETAPES_SOCIALES : equipe ? ETAPES.filter((e) => e !== "angles") : ETAPES;
+  // Par Google ou Apple : ni email (le fournisseur le donne), ni mot de passe.
+  // Venu par un lien (équipe, parrain) : pas les quatre photos en pied.
+  const court = !!equipe || !!parrain;
+  const etapes: readonly Etape[] = ETAPES.filter((e) => !(sociale && e === "secret") && !(court && e === "angles"));
   /** Les étapes comptées par la barre de progression (ni l'accueil, ni la fin). */
   const parcours = etapes.slice(1, -1);
   /** L'étape qui crée le compte. */
   const derniere = etapes[etapes.length - 2];
 
-  // Un membre déjà connecté n'a rien à faire ici.
+  // Un membre déjà connecté n'a rien à faire ici. Pas pendant la création :
+  // un compte qui entre aussitôt est connecté avant d'avoir fini.
   useEffect(() => {
-    if (session && !session.enAttente && (!fini || equipe)) router.replace(apres);
-  }, [session, fini, equipe, apres, router]);
+    if (session && !session.enAttente && !envoi && (!fini || equipe)) router.replace(apres);
+  }, [session, envoi, fini, equipe, apres, router]);
+
+  // Un code tapé : vérifié en tapant, comme le pseudo.
+  const codeNormalise = normaliserCode(codeSaisi);
+  useEffect(() => {
+    if (!codeOuvert || !codeValide(codeNormalise)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- réinitialise l'état d'une requête réseau
+      setCodeEtat("?");
+      return;
+    }
+    if (parrain?.p.code === codeNormalise) return;
+    setCodeEtat("verif");
+    let annule = false;
+    const t = setTimeout(() => {
+      lireParrain(codeNormalise)
+        .then((p) => {
+          if (annule) return;
+          if (p) {
+            garderCode(p.code, "code");
+            setParrain({ p, canal: "code" });
+            setCodeEtat("?");
+          } else {
+            setParrain(null);
+            setCodeEtat("inconnu");
+          }
+        })
+        .catch(() => !annule && setCodeEtat("?"));
+    }, 420);
+    return () => {
+      annule = true;
+      clearTimeout(t);
+    };
+  }, [codeOuvert, codeNormalise, parrain]);
 
   // Brouillon : une page rechargée ne fait pas tout recommencer (le mot de
   // passe et les photos ne sont jamais gardés).
@@ -323,6 +399,8 @@ export default function InscriptionPage() {
         return;
       }
       setSociale(fournisseur);
+      const garde = codeGarde();
+      if (garde) noterVisite(garde.code, "commence");
       setF((x) => ({
         ...x,
         prenom: x.prenom || d.prenom || "",
@@ -434,6 +512,7 @@ export default function InscriptionPage() {
       }
     }
     setErreur(null);
+    if (etape === "accueil" && sens === 1 && parrain) noterVisite(parrain.p.code, "commence");
     const suivante = etapes[Math.min(etapes.length - 1, Math.max(0, i + sens))];
     setEtape(suivante);
     document.getElementById("inscription-scroll")?.scrollTo({ top: 0 });
@@ -451,9 +530,21 @@ export default function InscriptionPage() {
       const r = await fetch("/api/inscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...f, pseudo, motDePasse, site: piege, ...(equipe ? { equipe } : {}) }),
+        body: JSON.stringify({
+          ...f,
+          pseudo,
+          motDePasse,
+          site: piege,
+          ...(equipe ? { equipe } : parrain ? { parrain: parrain.p.code, canal: parrain.canal } : {}),
+        }),
       });
-      const d = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string; champ?: string; name?: string };
+      const d = (await r.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        champ?: string;
+        name?: string;
+        entre?: boolean;
+      };
       if (!r.ok || !d.ok || !d.name) {
         setErreur(d.error ?? "Création impossible pour l'instant.");
         if (d.champ === "pseudo" || d.champ === "email") {
@@ -463,6 +554,8 @@ export default function InscriptionPage() {
         return;
       }
       const nom = d.name;
+      setEntre(!!d.entre);
+      if (d.entre && parrain) oublierCode();
       // Connexion immédiate, puis les quatre prises, envoyées sous sa
       // propre session.
       const connexion = await signIn(pseudo, motDePasse);
@@ -504,9 +597,21 @@ export default function InscriptionPage() {
       const r = await fetch("/api/inscription/sociale", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${jeton}` },
-        body: JSON.stringify({ action: "finir", ...fiche, pseudo, site: piege }),
+        body: JSON.stringify({
+          action: "finir",
+          ...fiche,
+          pseudo,
+          site: piege,
+          ...(parrain ? { parrain: parrain.p.code, canal: parrain.canal } : {}),
+        }),
       });
-      const d = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string; champ?: string; name?: string };
+      const d = (await r.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        champ?: string;
+        name?: string;
+        entre?: boolean;
+      };
       if (!r.ok || !d.ok || !d.name) {
         setErreur(d.error ?? "Création impossible pour l'instant.");
         if (d.champ === "pseudo") {
@@ -516,8 +621,10 @@ export default function InscriptionPage() {
         return;
       }
       const nom = d.name;
+      setEntre(!!d.entre);
+      if (d.entre && parrain) oublierCode();
       // La session Supabase est déjà là : elle devient la session de ligue
-      // (en attente), puis les photos partent sous elle.
+      // (en attente, sauf venu par un parrain), puis les photos partent sous elle.
       await bootstrapServerSession();
       await enregistrerAccord(nom);
       await envoyerPhotos();
@@ -578,6 +685,55 @@ export default function InscriptionPage() {
 
   let corps: React.ReactNode = null;
   switch (etape) {
+    case "accueil":
+      // Un code de parrain se tape ici (on peut l'avoir reçu de vive voix).
+      if (equipe || sociale || parrain?.canal === "lien") break;
+      corps = codeOuvert ? (
+        <Champ
+          label="Code"
+          note={
+            codeEtat === "inconnu" ? (
+              <span className="text-[#c8352b] dark:text-[#FF6B5E]">Code inconnu.</span>
+            ) : parrain ? (
+              <span className="text-foreground/55">
+                <Check className="mr-1 inline size-3.5" />
+                {parrain.p.affiche}
+              </span>
+            ) : null
+          }
+        >
+          <span className="flex items-center">
+            <input
+              autoFocus
+              value={codeSaisi}
+              onChange={(e) => {
+                setCodeSaisi(e.target.value);
+                if (parrain) {
+                  setParrain(null);
+                  oublierCode();
+                }
+                setErreur(null);
+              }}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={21}
+              placeholder="code"
+              className={SAISIE}
+            />
+            {codeEtat === "verif" && <Loader2 className="size-4 shrink-0 animate-spin text-foreground/30" />}
+          </span>
+        </Champ>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setCodeOuvert(true)}
+          className="bouton-discret -ml-[8px] px-[8px] py-[8px] text-[13px] font-semibold"
+        >
+          J&apos;ai un code
+        </button>
+      );
+      break;
     case "identite":
       corps = (
         <div className="flex flex-col gap-[13px]">
@@ -799,7 +955,7 @@ export default function InscriptionPage() {
     case "fini":
       corps = (
         <div className="flex flex-col gap-[13px]">
-          {!equipe && <div className="glass-soft rounded-[21px] px-[21px] py-[13px]">
+          {!entre && <div className="glass-soft rounded-[21px] px-[21px] py-[13px]">
             <p className="mono-label text-foreground/40">En attente</p>
             <p className="mt-[8px] text-[15px] leading-snug font-semibold">
               La ligue valide ton entrée. Ta carte s&apos;ouvre dès que c&apos;est fait.
@@ -889,7 +1045,13 @@ export default function InscriptionPage() {
 
           {/* Le grand segment (0,618) : la question */}
           <div className="flex flex-1 flex-col pt-[34px]">
-            {accueil && <p className="mono-label text-foreground/40">Bola · Sunday Five League</p>}
+            {accueil && (
+              <p className="mono-label text-foreground/40">
+                {parrain
+                  ? `Invité par ${parrain.p.affiche}${parrain.p.sfl ? " · Bola Team offert" : ""}`
+                  : "Bola · Sunday Five League"}
+              </p>
+            )}
             {/* La taille AVANT l'interligne : tailwind-merge retire un leading-*
                 placé avant un text-[…], qui peut porter le sien. */}
             <h1 className={cn("font-extrabold tracking-tight", accueil || fini ? "mt-[8px] text-[42px]" : "text-[34px]", "leading-[1.05]")}>

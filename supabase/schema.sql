@@ -3929,6 +3929,15 @@ create table if not exists public.parrainage_codes (
   actif       boolean not null default true,
   created_at  timestamptz not null default now()
 );
+-- La carte que montre son lien (poste et stats), posée par son app chaque
+-- fois qu'il ouvre « Inviter » (parrainage_ma_carte) : la page publique ne
+-- lit pas la saison. Montrée seulement s'il a accepté que sa carte sorte de
+-- l'app (parrain_info).
+alter table public.parrainage_codes add column if not exists carte jsonb;
+-- Combien de fois il a partagé son lien (ou l'a copié), et la dernière fois :
+-- le premier étage du tunnel de l'admin.
+alter table public.parrainage_codes add column if not exists partages int not null default 0;
+alter table public.parrainage_codes add column if not exists partage_le timestamptz;
 
 create table if not exists public.parrainages (
   filleul     uuid primary key references public.profiles(id) on delete cascade,
@@ -3955,6 +3964,10 @@ create table if not exists public.parrainage_visites (
   constraint parrainage_visites_une_fois unique (code, visiteur, etape)
 );
 create index if not exists parrainage_visites_jour on public.parrainage_visites (jour);
+-- Les liens ouverts ne se gardent que 13 mois, comme le journal d'usage
+-- (politique de confidentialité) : le plus ancien part chaque lundi
+-- (/api/convocation/cron) et à chaque migration du schéma.
+delete from public.parrainage_visites where created_at < now() - interval '13 months';
 
 alter table public.parrainage_codes enable row level security;
 alter table public.parrainages enable row level security;
@@ -4022,9 +4035,12 @@ begin
 end;
 $$;
 
--- Ce que montre la page d'un lien, même sans compte : le prénom de ligue du
--- parrain, son pseudo, s'il joue en SFL (Bola Team offert), et si sa carte
--- peut sortir de l'app (son dernier accord à la politique : hors_app).
+-- Ce que montre la page d'un lien, même sans compte : le nom du parrain (sa
+-- clé de ligue et le nom que l'app affiche), son pseudo, s'il joue en SFL
+-- (Bola Team offert) et, seulement si sa carte peut sortir de l'app (son
+-- dernier accord à la politique : hors_app), sa carte et la version de sa
+-- photo (le fichier du bucket « photos », nommé d'après son nom en
+-- hexadécimal ; null s'il n'en a pas).
 create or replace function public.parrain_info(c text)
 returns jsonb
 language sql
@@ -4035,13 +4051,62 @@ as $$
   select jsonb_build_object(
     'code', x.code,
     'nom', p.name,
+    'affiche', coalesce(p.nom_affiche, p.name),
     'pseudo', p.username,
     'sfl', public.joueur_sfl(p.id),
-    'carte', coalesce((select k.hors_app from public.consentements k
-                        where k.user_id = p.id order by k.created_at desc limit 1), false)
+    'carte', case when h.hors_app then x.carte end,
+    'photo', case when h.hors_app then (
+      select (extract(epoch from coalesce(o.updated_at, o.created_at)) * 1000)::bigint
+        from storage.objects o
+       where o.bucket_id = 'photos' and o.name = encode(convert_to(p.name, 'UTF8'), 'hex') || '.jpg'
+       limit 1
+    ) end
   )
-  from public.parrainage_codes x join public.profiles p on p.id = x.joueur
+  from public.parrainage_codes x
+  join public.profiles p on p.id = x.joueur
+  left join lateral (
+    select k.hors_app from public.consentements k
+     where k.user_id = p.id order by k.created_at desc limit 1
+  ) h on true
   where x.code = lower(btrim(c)) and x.actif and p.valide;
+$$;
+
+-- Ma carte, telle que mon app la montre, pour la page de mon lien. Seuls le
+-- poste et les six stats sont gardés ; la note se recalcule (moyenne arrondie
+-- au-dessus, comme ovr dans l'app).
+create or replace function public.parrainage_ma_carte(poste text, stats jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  k text;
+  v int;
+  propres jsonb := '{}'::jsonb;
+  somme int := 0;
+begin
+  if (select auth.uid()) is null or not public.est_membre() then
+    raise exception 'Réservé aux joueurs.' using errcode = '42501';
+  end if;
+  if poste is null or char_length(poste) > 4 or jsonb_typeof(stats) is distinct from 'object' then
+    raise exception 'Carte illisible.' using errcode = '22023';
+  end if;
+  foreach k in array array['VIT', 'TIR', 'PAS', 'DRI', 'DEF', 'PHY'] loop
+    if jsonb_typeof(stats -> k) is distinct from 'number' then
+      raise exception 'Carte illisible.' using errcode = '22023';
+    end if;
+    v := round((stats ->> k)::numeric);
+    if v < 1 or v > 99 then
+      raise exception 'Carte illisible.' using errcode = '22023';
+    end if;
+    propres := propres || jsonb_build_object(k, v);
+    somme := somme + v;
+  end loop;
+  update public.parrainage_codes x
+     set carte = jsonb_build_object('poste', poste, 'stats', propres, 'note', ceil(somme / 6.0)::int)
+   where x.joueur = (select auth.uid());
+end;
 $$;
 
 -- Le haut du tunnel : un lien ouvert, une inscription commencée. Une fois par
@@ -4063,6 +4128,18 @@ exception when check_violation then
 end;
 $$;
 
+-- J'ai partagé (ou copié) mon lien.
+create or replace function public.parrainage_partage()
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.parrainage_codes x
+     set partages = least(x.partages + 1, 100000), partage_le = now()
+   where x.joueur = (select auth.uid());
+$$;
+
 -- L'admin coupe un code (un lien qui fuit), ou le rallume.
 create or replace function public.parrainage_code_actif(c text, actif boolean)
 returns void
@@ -4078,7 +4155,45 @@ begin
 end;
 $$;
 
+-- Le bas du tunnel, pour l'admin (Activité → Parrainage) : chaque filleul a-t-il
+-- joué un match (inscrit à un match passé) et rejoint une équipe Bola Team ?
+-- Les matchs privés ne se lisent pas autrement. Vide pour tout autre compte.
+create or replace function public.parrainage_suivi()
+returns table (filleul uuid, a_joue boolean, en_equipe boolean)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select p.filleul,
+         exists (
+           select 1
+             from public.match_joueurs mj
+             join public.matchs m on m.id = mj.match_id
+            where mj.player_id = p.filleul and mj.statut = 'inscrit'
+              and m.jour <= (now() at time zone 'Europe/Paris')::date
+         ),
+         exists (select 1 from public.equipe_membres em where em.joueur = p.filleul and em.statut = 'membre')
+    from public.parrainages p
+   where (select public.is_league_admin());
+$$;
+
 revoke execute on function public.mon_code_parrain(), public.parrain_info(text), public.parrainage_vu(text, text, text),
-  public.parrainage_code_actif(text, boolean) from public, anon;
-grant execute on function public.mon_code_parrain(), public.parrainage_code_actif(text, boolean) to authenticated;
+  public.parrainage_code_actif(text, boolean), public.parrainage_ma_carte(text, jsonb), public.parrainage_partage(),
+  public.parrainage_suivi()
+  from public, anon;
+grant execute on function public.mon_code_parrain(), public.parrainage_code_actif(text, boolean),
+  public.parrainage_ma_carte(text, jsonb), public.parrainage_partage(), public.parrainage_suivi() to authenticated;
 grant execute on function public.parrain_info(text), public.parrainage_vu(text, text, text) to anon, authenticated;
+
+-- Le Vestiaire est le salon de la SFL : un joueur Bola (venu par un parrain,
+-- hors de la saison) ne le lit pas et n'y écrit pas. Ses messages privés et
+-- les discussions de ses matchs et de son équipe restent les siens. Deux
+-- règles restrictives, qui s'ajoutent à celles du salon (plus haut) : elles
+-- vivent ici parce que joueur_sfl n'existe qu'à partir du mode Team.
+drop policy if exists "messages: le Vestiaire, à la SFL" on public.messages;
+create policy "messages: le Vestiaire, à la SFL" on public.messages as restrictive for select to authenticated
+  using (canal <> 'sfl' or (select public.joueur_sfl((select auth.uid()))) or (select public.is_league_admin()));
+drop policy if exists "messages: écrire au Vestiaire, la SFL" on public.messages;
+create policy "messages: écrire au Vestiaire, la SFL" on public.messages as restrictive for insert to authenticated
+  with check (canal <> 'sfl' or (select public.joueur_sfl((select auth.uid()))) or (select public.is_league_admin()));

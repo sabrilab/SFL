@@ -41,7 +41,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMyPlayer } from "@/components/sfl/player-provider";
+import { useJoueurBola, useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { CarteJournee } from "@/components/sfl/carte-journee";
@@ -288,12 +288,15 @@ function Convocation({ className }: { className?: string }) {
   const p = usePresence();
   const { saison } = useSeason();
   const { me } = useMyPlayer();
+  // Un joueur Bola (hors de la saison) n'est pas convoqué.
+  const bola = useJoueurBola();
   const [maintenant] = useState(() => new Date());
   const derniere = p.journee === J_DECOUPAGE && annonceEnCours(saison, maintenant);
   // Dès la J4, la division où l'on joue ce dimanche-là.
   const etat = useMemo(() => divisionsDeLaJournee(saison, p.journee), [saison, p.journee]);
   const division = etat && !isHidden(me) ? (etat.actuelle.get(me) ?? 3) : null;
   const repondre = (r: "present" | "absent") => p.answer(p.mine === r ? null : r);
+  if (bola) return null;
   return (
     <section
       className={cn(

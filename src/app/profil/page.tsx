@@ -14,7 +14,8 @@
 //      sur mon profil). Le nom se corrige en le touchant (identite.tsx).
 //      Dessous, ma photo (la toucher ouvre « Ma photo »), la carte officielle
 //      tant qu'elle n'est pas faite (carte-officielle.tsx ; ensuite, on la
-//      refait depuis « Ma photo ») et le badge de ma carte ;
+//      refait depuis « Ma photo ») et le badge de ma carte ; enfin
+//      « Inviter », mon lien de parrainage (parrainage/page.tsx, 24/10) ;
 //   2. ma saison : mon dernier dimanche en grand, mes points forts, mes
 //      autres dimanches (ma-saison.tsx) ;
 //   3. mon évolution : mon rang au Pépite d'Or ou la note de ma carte,
@@ -36,7 +37,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ChevronRight, Dumbbell, Layers, Trophy } from "lucide-react";
+import { ChevronRight, Dumbbell, Layers, Trophy, UserPlus } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Card3D } from "@/components/sfl/card-3d";
 import { PlayerCard } from "@/components/sfl/player-card";
@@ -216,6 +217,14 @@ export default function Profil() {
             <CarteOfficielle player={player} className="min-w-0 flex-1" />
             <ChoixBadge player={player} />
           </div>
+          {/* Inviter : mon lien et mon code de parrainage (parrainage/page.tsx) */}
+          <Link
+            href="/parrainage"
+            className="bouton-secondaire bouton--mauve flex w-full items-center justify-center gap-2 py-3.5 text-[14px] font-semibold"
+          >
+            <UserPlus className="size-4" />
+            Inviter
+          </Link>
         </div>
 
         <div className="flex min-w-0 flex-col gap-[var(--fib-21)]">
