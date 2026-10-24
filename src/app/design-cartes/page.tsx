@@ -7,12 +7,14 @@
 // paliers (lib/sfl/passe.ts : givre, carbone, nuit, marbre, tes couleurs,
 // chrome, néon, aurore, ki, animée, onyx, météorite) et trois habillages
 // (signes, crans, rang), chacune de face et de dos, puis en petit (compacte,
-// réduite, pastille).
+// réduite, pastille). Puis l'édition d'époque de la saison 0 (sa carte de
+// saison et ses trois cartes Boost), quand l'appareil a l'archive de la
+// saison 0.
 // `?joueur=Nom` choisit le joueur ; par défaut, soi. `?trois=mvp` (ou base,
 // impact, def, givre, carbone, nuit, marbre, couleurs, couleurs-br, chrome,
-// neon, aurore, ki, animee, onyx, meteorite, h1, h2, h3) montre d'abord cette
-// carte en 3D, à tourner ; `&dos=1` la pose sur son dos. `?seul=h1,h2` ne
-// montre que ces cartes-là.
+// neon, aurore, ki, animee, onyx, meteorite, h1, h2, h3, s0, s0-mvp,
+// s0-impact, s0-def) montre d'abord cette carte en 3D, à tourner ; `&dos=1`
+// la pose sur son dos. `?seul=h1,h2` ne montre que ces cartes-là.
 
 import { Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
@@ -23,9 +25,10 @@ import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
+import { cartesDeCarriere } from "@/lib/sfl/carriere";
 import { rankPlayers } from "@/lib/sfl/engine";
 
-const LOOKS: { cle: string; titre: string; edition: EditionCarte; habillage?: HabillageCarte }[] = [
+const LOOKS: { cle: string; titre: string; edition: EditionCarte; habillage?: HabillageCarte; saison?: number }[] = [
   { cle: "base", titre: "Carte de saison", edition: "base" },
   { cle: "mvp", titre: "MVP", edition: "mvp" },
   { cle: "impact", titre: "Impact", edition: "impact" },
@@ -75,19 +78,34 @@ const LOOKS: { cle: string; titre: string; edition: EditionCarte; habillage?: Ha
       rang: "S",
     },
   },
+  { cle: "s0", titre: "Saison 0 · carte de saison (Standard parchemin, 12/07)", edition: "base", saison: 0 },
+  { cle: "s0-mvp", titre: "Saison 0 · MVP du match", edition: "mvp", saison: 0 },
+  { cle: "s0-impact", titre: "Saison 0 · Joueur Impact", edition: "impact", saison: 0 },
+  { cle: "s0-def", titre: "Saison 0 · Défensive", edition: "def", saison: 0 },
 ];
 
 function Atelier() {
-  const { players, allPlayers } = useSeason();
+  const { players, allPlayers, saison } = useSeason();
   const { me } = useMyPlayer();
   const params = useSearchParams();
   const demande = params.get("joueur");
-  const trois = LOOKS.find((l) => l.cle === params.get("trois"));
   const seul = params.get("seul")?.split(",");
   const classes = useMemo(() => rankPlayers(players), [players]);
   // Un joueur masqué (Sabri) se demande aussi : c'est une page de travail.
   const player =
     allPlayers.find((p) => p.name.toLowerCase() === (demande ?? me ?? "").toLowerCase()) ?? classes[0];
+  // Ses cartes d'une saison close : le joueur tel qu'il était alors, et la journée d'une carte à titre.
+  const carriere = useMemo(() => (player ? cartesDeCarriere(saison, player.name) : []), [saison, player]);
+  const version = (l: (typeof LOOKS)[number]) => {
+    if (l.saison == null) return player ? { player, journee: undefined } : null;
+    const s = carriere.find((c) => c.numero === l.saison && !c.enCours);
+    if (!s) return null;
+    if (l.edition === "base") return { player: s.player, journee: undefined };
+    const c = s.speciales.find((x) => x.carte.type === l.edition);
+    return c ? { player: c.player, journee: c.j } : null;
+  };
+  const looks = LOOKS.filter((l) => version(l));
+  const trois = looks.find((l) => l.cle === params.get("trois"));
   if (!player) return null;
   const taille = 0.68;
 
@@ -107,30 +125,34 @@ function Atelier() {
             apercu
             render={(s) => (
               <PlayerCard
-                player={player}
+                player={version(trois)!.player}
                 size={s}
                 distinction={trois.edition === "base" ? undefined : trois.edition}
                 habillage={trois.habillage}
+                saison={trois.saison}
+                journee={version(trois)!.journee}
               />
             )}
           />
         </section>
       )}
-      {LOOKS.filter((l) => !seul || seul.includes(l.cle)).map((l) => {
+      {looks.filter((l) => !seul || seul.includes(l.cle)).map((l) => {
         const distinction = l.edition === "base" ? undefined : l.edition;
         const habillage = l.habillage;
+        const { player: joueur, journee } = version(l)!;
+        const epoque = { saison: l.saison, journee };
         return (
           <section key={l.titre} className="flex flex-col gap-3">
             <h2 className="mono-label text-muted-foreground">{l.titre}</h2>
             <div className="flex flex-wrap items-start gap-3">
-              <PlayerCard player={player} size={taille} distinction={distinction} habillage={habillage} />
-              <DosCarte matiere={matiereDe(l.edition, habillage)} nom={player.name} size={taille} habillage={habillage} />
+              <PlayerCard player={joueur} size={taille} distinction={distinction} habillage={habillage} {...epoque} />
+              <DosCarte matiere={matiereDe(l.edition, habillage, l.saison)} nom={player.name} size={taille} habillage={habillage} />
             </div>
             <div className="flex items-end gap-3">
-              <PlayerCard player={player} size={FORMAT_CARTE.grande} distinction={distinction} habillage={habillage} />
-              <PlayerCard player={player} size={FORMAT_CARTE.moyenne} distinction={distinction} habillage={habillage} vertical />
-              <PlayerCard player={player} size={FORMAT_CARTE.moyenne} distinction={distinction} habillage={habillage} />
-              <PlayerCard player={player} size={FORMAT_CARTE.petite} distinction={distinction} habillage={habillage} />
+              <PlayerCard player={joueur} size={FORMAT_CARTE.grande} distinction={distinction} habillage={habillage} {...epoque} />
+              <PlayerCard player={joueur} size={FORMAT_CARTE.moyenne} distinction={distinction} habillage={habillage} vertical {...epoque} />
+              <PlayerCard player={joueur} size={FORMAT_CARTE.moyenne} distinction={distinction} habillage={habillage} {...epoque} />
+              <PlayerCard player={joueur} size={FORMAT_CARTE.petite} distinction={distinction} habillage={habillage} {...epoque} />
             </div>
           </section>
         );
