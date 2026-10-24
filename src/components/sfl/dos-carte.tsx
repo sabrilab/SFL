@@ -24,6 +24,10 @@
 // Sous le logotype, sa saison (et son titre) ; dans la ligne de série, sa
 // date d'émission et son numéro, comme sur la face.
 //
+// Le dos d'un skin offert peut avoir son encre et son papier (Matiere.dos) :
+// la palestine porte le drapeau au dos, la carte de saison devant, et son
+// motif dessine lui-même la lune et le logotype sur la bande blanche.
+//
 // Repère 1024 × 1656, comme la face : card-3d.tsx le photographie pour le
 // dos de la 3D (data-card-part="body").
 
@@ -63,7 +67,7 @@ const BOITE_SYMBOLE = { x: 17, y: 103.485, c: 112.373 };
 const BOITE_LOGOTYPE = { x: 150.41, y: 32.445, l: 783.3, h: 183.7 };
 
 export function DosCarte({
-  matiere: p,
+  matiere,
   nom,
   size = 1,
   habillage: habillageDemande,
@@ -77,6 +81,8 @@ export function DosCarte({
   emission?: EmissionCarte | null;
 }) {
   const u = (n: number) => n * size * (254 / W);
+  // Un dos qui n'a pas l'encre ou le papier de la face (la palestine : le drapeau).
+  const p: Matiere = matiere.dos ? { ...matiere, ...matiere.dos } : matiere;
   const encre = (a: number) => `rgba(${p.encre},${a})`;
   const seed = graine(nom);
   const era = p.epoque;
@@ -175,13 +181,20 @@ export function DosCarte({
       {lisere && <Lisere metal={lisere} boite={CADRE} />}
       {cran > 0 && <Crans cran={cran} metal={lisere ?? "argent"} boite={CADRE} />}
 
-      {/* Bola : la lune dans sa rosace, puis le logotype */}
+      {/* Bola : la lune dans sa rosace, puis le logotype (gravés en creux dans l'or de la pépite) ; le drapeau dessine les siens */}
+      {matiere.dos?.logo !== false && (
       <svg
         role="img"
         aria-label="Bola"
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          ...(p.gravure && { filter: `drop-shadow(-${u(2)}px -${u(2)}px 0 ${p.gravure.ombre}) drop-shadow(${u(2)}px ${u(3)}px 0 ${p.gravure.lumiere})` }),
+        }}
       >
         {/* Un disque de papier sous la lune : la rosace s'arrête net autour. */}
         <RosaceBola {...ROSACE} couleur={encre(0.2)} epaisseur={1.8} />
@@ -198,6 +211,7 @@ export function DosCarte({
           transform={`translate(${W / 2 - (BOITE_LOGOTYPE.x + BOITE_LOGOTYPE.l / 2) * sLogo} ${LOGOTYPE.cy - (BOITE_LOGOTYPE.y + BOITE_LOGOTYPE.h / 2) * sLogo}) scale(${sLogo})`}
         />
       </svg>
+      )}
 
       {/* Une carte d'époque : sa saison (et son titre), sous le logotype */}
       {era && (

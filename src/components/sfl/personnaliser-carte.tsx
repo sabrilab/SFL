@@ -30,6 +30,7 @@ import { badgesGagnes, cleBadge, type BadgeCarte } from "@/lib/sfl/badge-carte";
 import { choisirBadge } from "@/lib/sfl/badges-choisis";
 import type { Player } from "@/lib/sfl/engine";
 import { CLASSEMENTS } from "@/lib/sfl/fin-de-saison";
+import { SKINS_OFFERTS } from "@/lib/sfl/finitions-offertes";
 import { choisirHabillage } from "@/lib/sfl/habillages-choisis";
 import { PASSE_BOLA } from "@/lib/sfl/passe";
 import { NOM_METAL, TROPHEES, metal } from "@/lib/sfl/trophees";
@@ -195,9 +196,9 @@ export function PersonnaliserCarte({ player }: { player: Player }) {
                   actif={porte.finition === f}
                   onClick={() => porterSkin(f)}
                   vignette={vignette({ finition: f })}
-                  titre={f === "onyx" ? "Onyx" : f === "verre" ? "Verre" : f}
-                  quoi={f === "verre" ? "La plaque de verre vert, gravée et irisée." : "La carte noire guillochée."}
-                  comment="Offert"
+                  titre={SKINS_OFFERTS[f]?.titre ?? f}
+                  quoi={SKINS_OFFERTS[f]?.quoi}
+                  comment={SKINS_OFFERTS[f]?.comment ?? "Offert"}
                 />
               ))}
             </Rubrique>

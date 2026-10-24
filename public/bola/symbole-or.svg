@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="bola-symbole-or" xmlns="http://www.w3.org/2000/svg" version="1.1" role="img" aria-labelledby="titre" viewBox="0 0 512 512">
+  <title id="titre">BOLA</title>
+  <defs><linearGradient id="or" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff1c0"/><stop offset="0.42" stop-color="#e2b553"/><stop offset="0.7" stop-color="#f6d98a"/><stop offset="1" stop-color="#c48d28"/></linearGradient></defs>
+  <g>
+    <path id="symbole" d="M451.133,255.531c0-108.009-87.559-195.567-195.567-195.567S60,147.522,60,255.531s87.558,195.566,195.566,195.566c8.771,0,17.407-.577,25.872-1.696-57.091-9.652-100.572-59.334-100.572-119.17,0-66.753,54.113-120.867,120.866-120.867s120.867,54.114,120.867,120.867c0,12.206-1.81,23.99-5.175,35.098,21.275-31.301,33.707-69.097,33.707-109.797Z" fill="url(#or)" fill-rule="evenodd"/>
+  </g>
+</svg>
