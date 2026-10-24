@@ -6,7 +6,8 @@
 // plus envie, qu'on comprenne mieux les choses et que ce soit mieux rangé »,
 // comme le profil d'un joueur ouvert depuis la Recherche (profil-joueur.tsx),
 // dont elle reprend l'ordre de lecture, du plus fort au plus fin :
-//   1. moi : ma carte en grand, mon nom dans le lettrage de la Map, mes
+//   1. moi : ma carte en grand (la toucher l'ouvre en plein écran, pour la
+//      manipuler : carte-en-grand.tsx, Sabri, 24/10), mon nom dans le lettrage de la Map, mes
 //      abonnés comme sur Instagram (mes abonnés et mes abonnements, « Kader,
 //      Anis et 32 autres te suivent » : suivre.tsx ; Sabri, 23/10), trois
 //      chiffres de tête en Anton (mon rang au Pépite d'Or, ma note, mes
@@ -40,7 +41,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ChevronRight, Dumbbell } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Card3D } from "@/components/sfl/card-3d";
+import { Card3DEnGrand } from "@/components/sfl/carte-en-grand";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur";
 import { MaSaison, type RangDuJour } from "@/components/sfl/ma-saison";
@@ -171,11 +172,13 @@ export default function Profil() {
               ses bords vides passent un peu sous le titre et sous mon nom,
               qui restent au-dessus (relative) et se touchent normalement. */}
           <div className="-mt-[var(--fib-21)] -mb-[var(--fib-34)]">
-            <Card3D
+            <Card3DEnGrand
               cacheKey={`profil-simple-${player.name}`}
               mode="simple"
               size={tresGrand ? 1.15 * RACINE_PHI : grand ? 1.15 : 1}
               render={(s) => <PlayerCard player={player} size={s} />}
+              titre={identite.nom(player.name)}
+              sousTitre={identite.pseudo(player.name)}
             />
           </div>
           <div className="relative flex w-full flex-col items-center gap-[var(--fib-13)]">
