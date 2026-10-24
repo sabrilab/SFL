@@ -1762,6 +1762,12 @@ create table if not exists public.push_envois (
   effet       text,
   effet_le    timestamptz
 );
+-- Le joueur dont elle vient (24/10) : celui qui a écrit, réagi, invité,
+-- suivi ou félicité ; null quand c'est l'app (rappels, annonces de la ligue,
+-- missions). Admin → Activité en tire « Qui ramène du monde » : les joueurs
+-- dont un geste fait revenir les autres. Avant cette colonne, la page le
+-- déduit, quand elle le peut, du geste qui a déclenché la notification.
+alter table public.push_envois add column if not exists de uuid references public.profiles(id) on delete set null;
 create index if not exists push_envois_envoyee on public.push_envois (envoyee_le desc);
 create index if not exists push_envois_en_attente
   on public.push_envois (user_id, envoyee_le desc) where effet_le is null;
@@ -4216,3 +4222,28 @@ create policy "messages: le Vestiaire, à la SFL" on public.messages as restrict
 drop policy if exists "messages: écrire au Vestiaire, la SFL" on public.messages;
 create policy "messages: écrire au Vestiaire, la SFL" on public.messages as restrictive for insert to authenticated
   with check (canal <> 'sfl' or (select public.joueur_sfl((select auth.uid()))) or (select public.is_league_admin()));
+
+-- ─────────────── Mises en ligne : les repères de la croissance ───────────────
+-- Sabri, 24/10 : « quand on voit la croissance, voir rapidement les actions
+-- qui ont été faites à ce moment-là de la part de l'application ». Chaque
+-- build de production réussi pose ici sa version (scripts/postbuild.ts) :
+-- le commit, son titre (celui de sa PR) et l'heure. Admin → Activité les
+-- montre sous les courbes, avec l'historique d'avant cette table
+-- (lib/sfl/mises-en-ligne.ts). Rien de personnel ; l'admin seul lit, le
+-- build seul écrit (connexion directe à la base, hors API).
+create table if not exists public.mises_en_ligne (
+  sha    text primary key check (sha ~ '^[0-9a-f]{7,40}$'),
+  titre  text not null check (char_length(titre) between 1 and 300),
+  pr     integer,
+  le     timestamptz not null default now()
+);
+
+alter table public.mises_en_ligne enable row level security;
+
+drop policy if exists "mises_en_ligne: l'admin lit" on public.mises_en_ligne;
+create policy "mises_en_ligne: l'admin lit"
+  on public.mises_en_ligne for select to authenticated
+  using ((select public.is_league_admin()));
+
+revoke all on public.mises_en_ligne from anon, authenticated;
+grant select on public.mises_en_ligne to authenticated;

@@ -212,7 +212,7 @@ export async function POST(req: NextRequest) {
     if (n > 0) envois.set(uid, { ...e, notif: { ...e.notif, pastille: n } });
   }
 
-  const { recus, morts } = await prevenir(sb, cle, envois);
+  const { recus, morts } = await prevenir(sb, cle, envois, { de: moi.id });
 
   // L'heure de la dernière notification, pour ceux qui l'ont vraiment reçue.
   courants = courants.filter((uid) => recus.has(uid));

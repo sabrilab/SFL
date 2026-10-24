@@ -111,6 +111,8 @@ export async function POST(req: NextRequest) {
         },
         motif: type === "relance" ? "equipe-relance" : "equipe-invitation",
         ref,
+        // Celui que la notification nomme, qui n'est pas toujours le capitaine qui l'envoie.
+        de: l.invite_par ?? moi.id,
       });
     }
     marquer = cibles.map((l) => l.joueur);
@@ -165,6 +167,6 @@ export async function POST(req: NextRequest) {
   const cle = cleVapid();
   if (!cle || envois.size === 0) return NextResponse.json({ envoyes: 0, prevenus: envois.size });
 
-  const { recus } = await prevenir(sb, cle, envois);
+  const { recus } = await prevenir(sb, cle, envois, { de: moi.id });
   return NextResponse.json({ envoyes: recus.size, prevenus: envois.size });
 }
