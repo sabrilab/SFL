@@ -45,6 +45,8 @@ import {
   type Rang,
   type Reponse,
 } from "@/lib/sfl/missions";
+import { useDa } from "@/lib/sfl/da";
+import { InsigneDa, ViseurDa } from "@/components/sfl/da/insigne-da";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
 import "./missions.css";
@@ -136,6 +138,8 @@ function Moment({ mm }: { mm: MesMissions }) {
 
 /** L'insigne du rang, aux couleurs que pose fiche--{rang} sur un parent. */
 export function Insigne({ rang }: { rang: Rang }) {
+  const da = useDa();
+  if (da !== 0) return <InsigneDa rang={rang} da={da} />;
   return (
     <span className="fiche__insigne" aria-hidden>
       <span className="fiche__hexa" />
@@ -160,6 +164,8 @@ function Difficulte({ rang }: { rang: Rang }) {
 
 /** Le viseur posé sur une carte ; il rejoue son verrouillage à chaque changement d'état. */
 export function Viseur({ etat, petit }: { etat: EtatViseur; petit?: boolean }) {
+  const da = useDa();
+  if (da !== 0) return <ViseurDa etat={etat} petit={petit} da={da} />;
   return (
     <span key={etat} className={cn("fiche__viseur", `fiche__viseur--${etat}`, petit && "fiche__viseur--petit")} aria-hidden>
       {etat === "verrou" && <span className="viseur__balayage" />}
