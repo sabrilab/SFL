@@ -4,8 +4,9 @@
 // d'entrer dans l'app (Sabri, 22/10/2026 : « quand ils se connectent, ils ont
 // un truc à cocher rapidement, qui peuvent lire en profondeur aussi »).
 //
-// Tant que le joueur connecté n'a pas accepté la version en vigueur
-// (VERSION_POLITIQUE), l'app se voile au-dessus de tout le reste : l'essentiel
+// Tant que le joueur connecté n'a pas d'accord qui vaille encore (une version
+// au moins aussi récente que VERSION_ACCEPTEE), l'app se voile au-dessus de
+// tout le reste : l'essentiel
 // en cinq points, le texte entier à un toucher (politique.tsx), une case
 // obligatoire, une case facultative pour l'usage de sa carte hors de l'app
 // et, avant 15 ans, celle d'un parent. « Continuer » enregistre l'accord
