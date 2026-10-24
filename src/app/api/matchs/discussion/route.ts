@@ -9,8 +9,10 @@
 //     par joueur et par match en six heures : qui sort et revient ne
 //     réveille pas tout le monde deux fois ;
 //   · un MESSAGE : l'organisateur et les inscrits, chaque message, comme au
-//     Vestiaire. Un invité lit la discussion sans être encore du match : il
-//     n'est prévenu que si on lui répond ou qu'on le cite (@pseudo) ;
+//     Vestiaire, sauf une réponse : elle ne prévient que celui à qui l'on
+//     répond (Sabri, 24/10). Un invité lit la discussion sans être encore
+//     du match : il n'est prévenu que si on lui répond ou qu'on le cite
+//     (@pseudo) ;
 //   · une RÉACTION : l'auteur du message, tout de suite.
 // Rien à qui a la discussion sous les yeux (devant_le, redit toutes les 20 s
 // par l'app), pas deux messages au même joueur à moins de RAFALE d'écart
@@ -176,11 +178,14 @@ export async function POST(req: NextRequest) {
     } else {
       const phrase = couper(resume(msg.texte, msg.piece), 180);
 
-      // Celui à qui l'on répond.
+      // Celui à qui l'on répond : une réponse ne prévient que lui (et les
+      // cités), pas tous les autres (Sabri, 24/10, comme au Vestiaire).
+      let entreEux = false;
       const repondu = typeof msg.reponse_a === "number" ? msg.reponse_a : null;
       if (repondu) {
         const { data: original } = await sb.from("messages").select("auteur").eq("id", repondu).maybeSingle();
         const cible = (original as { auteur: string } | null)?.auteur;
+        entreEux = !!cible && cible !== moi.id;
         if (cible && membres.has(cible) && joignable(cible))
           envois.set(cible, {
             motif: "match-reponse",
@@ -202,7 +207,7 @@ export async function POST(req: NextRequest) {
 
       // Ceux qui jouent : ce message, sauf à qui vient d'en recevoir un.
       courants = [...jouent].filter((uid) => {
-        if (envois.has(uid) || !joignable(uid) || modeDe(uid) !== "tout") return false;
+        if (entreEux || envois.has(uid) || !joignable(uid) || modeDe(uid) !== "tout") return false;
         const dernier = suivis.get(uid)?.notifie_le;
         return !dernier || maintenant - new Date(dernier).getTime() >= RAFALE;
       });
