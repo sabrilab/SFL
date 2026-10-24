@@ -85,6 +85,8 @@ const PARENTS: [string, Parent][] = [
   ["/ligue/journee", { href: "/ligue", titre: "Actus" }],
   ["/ligue/contrats", { href: "/ligue", titre: "Actus" }],
   ["/discussions", { href: "/vestiaire", titre: "Vestiaire" }],
+  // La liste des messages privés (une conversation donne son parent elle-même : messages/conversation.tsx).
+  ["/messages", { href: "/vestiaire", titre: "Vestiaire" }],
   ["/recherche", { href: "/", titre: "Map" }],
 ];
 
@@ -113,6 +115,7 @@ const TITRES: [string, string][] = [
   ["/parrainage", "Inviter"],
   ["/recherche", "Recherche"],
   ["/vestiaire", "Vestiaire"],
+  ["/messages", "Messages"],
   ["/agent", "Bola Agent"],
   ["/admin/activite", "Activité"],
   ["/admin", "Admin"],

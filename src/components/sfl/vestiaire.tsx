@@ -57,6 +57,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { Nom } from "@/components/sfl/nom";
 import { PointMaillot } from "@/components/sfl/point-maillot";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
+import { BoutonMessages } from "@/components/sfl/messages/bouton-messages";
 import { TitreDiscussion } from "@/components/sfl/titre-discussion";
 import { useSession } from "@/hooks/use-session";
 import { RANKINGS } from "@/lib/sfl/rankings";
@@ -656,14 +657,24 @@ const MODES: [ModeNotifs, string][] = [
   ["rien", "Rien"],
 ];
 
-function ReglageNotifs({ mode, onMode, onFermer }: { mode: ModeNotifs; onMode: (m: ModeNotifs) => void; onFermer: () => void }) {
+function ReglageNotifs({
+  mode,
+  modes = MODES,
+  onMode,
+  onFermer,
+}: {
+  mode: ModeNotifs;
+  modes?: [ModeNotifs, string][];
+  onMode: (m: ModeNotifs) => void;
+  onFermer: () => void;
+}) {
   const [etat, setEtat] = useState<EtatNotifications | null>(null);
   useEffect(() => {
     void etatNotifications().then(setEtat);
   }, []);
   return (
     <div className="glass absolute top-[52px] right-0 z-20 w-[248px] rounded-3xl p-1.5 shadow-2xl">
-      {MODES.map(([m, label]) => (
+      {modes.map(([m, label]) => (
         <button
           key={m}
           type="button"
@@ -967,7 +978,12 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
     <Discussion
       salon={SALON_VESTIAIRE}
       titre={<TitreDiscussion actif="/vestiaire" />}
-      aDroite={<BoutonRecherche />}
+      aDroite={
+        <>
+          <BoutonMessages />
+          <BoutonRecherche />
+        </>
+      }
       libelleNotifs="Notifications du Vestiaire"
       vide="Le Vestiaire est vide."
       onglets
@@ -1029,6 +1045,7 @@ export function Discussion({
   sousTitre,
   aDroite,
   libelleNotifs,
+  modesNotifs,
   vide,
   onglets = false,
   moderation = false,
@@ -1048,6 +1065,8 @@ export function Discussion({
   /** À droite, après la cloche des notifications. */
   aDroite?: React.ReactNode;
   libelleNotifs: string;
+  /** Ce que la cloche propose (une conversation privée : Tout ou Rien, tout y est pour moi). */
+  modesNotifs?: [ModeNotifs, string][];
   /** Ce que dit le fil vide (rien si vide). */
   vide: string;
   /** La barre d'onglets reste dessous (le Vestiaire) ; sinon l'écran la recouvre, posé sur <body> (matchs/discussion-match.tsx). */
@@ -1487,7 +1506,7 @@ export function Discussion({
         )}
       </div>
       {sousTitre}
-      {reglage && <ReglageNotifs mode={mode} onMode={changerMode} onFermer={() => setReglage(false)} />}
+      {reglage && <ReglageNotifs mode={mode} modes={modesNotifs} onMode={changerMode} onFermer={() => setReglage(false)} />}
     </header>
   );
 

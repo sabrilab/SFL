@@ -236,7 +236,8 @@ export function TextePolitique() {
             Tes messages, tes réactions, tes vocaux (une minute au plus), tes photos et tes vidéos (30 secondes au
             plus). Au Vestiaire, les joueurs de la ligue les voient ; les administrateurs peuvent retirer un message
             et couper la parole un temps. Un message privé ne se lit qu&apos;entre vous deux : les administrateurs
-            ne le voient pas dans l&apos;app. Tu retires tes messages quand tu veux.
+            ne le voient pas dans l&apos;app. Tu retires tes messages quand tu veux, et tu peux bloquer un joueur :
+            il ne peut plus t&apos;écrire, sans savoir qu&apos;il est bloqué ; toi seul vois qui tu as bloqué.
           </P>
         </Sous>
 

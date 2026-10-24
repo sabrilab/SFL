@@ -58,6 +58,7 @@ import { Card3DEnGrand } from "./carte-en-grand";
 import { useMyPlayer } from "./player-provider";
 import { useSeason } from "./season-provider";
 import { BoutonSuivre, ReseauJoueur } from "./suivre";
+import { BoutonEcrire } from "./messages/bouton-ecrire";
 
 // Le profil complet d'un joueur, chargé au premier « Son profil ».
 const ProfilJoueur = dynamic(() => import("./profil-joueur").then((m) => m.ProfilJoueur), { ssr: false });
@@ -170,6 +171,7 @@ function EcranCarte({ viewed }: { viewed: ViewedCard }) {
           <ReseauJoueur nom={joueur} clair centre={false} className="relative px-5" />
           <footer className="flex gap-2.5 px-5 pt-[var(--fib-21)]">
             <BoutonSuivre nom={joueur} clair className="h-11 flex-1 text-[15px]" />
+            <BoutonEcrire nom={joueur} rond />
             {aUnProfil && (
               <button
                 type="button"

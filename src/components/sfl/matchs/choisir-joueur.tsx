@@ -65,6 +65,8 @@ export function ChoisirJoueur({
   onLien,
   plusieurs,
   indispos,
+  titre,
+  geste = "Inviter",
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -81,6 +83,9 @@ export function ChoisirJoueur({
   plusieurs?: { max: number; onInviter: (ps: Profil[]) => void };
   /** Ceux qui ne peuvent pas venir : identifiant → la raison, dite sur leur ligne. */
   indispos?: Map<string, string>;
+  /** Le titre de la liste, et le mot de chaque ligne (un message privé : « Écrire »). */
+  titre?: string;
+  geste?: string;
 }) {
   const { saison } = useSeason();
   const suivis = useSuivis();
@@ -174,7 +179,7 @@ export function ChoisirJoueur({
     <Sheet open={open} onOpenChange={fermer}>
       <SheetContent side="bottom" className="data-[side=bottom]:h-[80dvh] rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
         <SheetHeader className="px-5 pt-5 pb-0">
-          <SheetTitle className="text-[24px] font-bold tracking-tight">{plusieurs ? "Inviter des joueurs" : "Ajouter un joueur"}</SheetTitle>
+          <SheetTitle className="text-[24px] font-bold tracking-tight">{titre ?? (plusieurs ? "Inviter des joueurs" : "Ajouter un joueur")}</SheetTitle>
         </SheetHeader>
         <div className="flex min-h-0 flex-1 flex-col gap-3 px-4">
           {onLien && (
@@ -248,7 +253,7 @@ export function ChoisirJoueur({
                       {coche && <Check className="size-4" strokeWidth={3} />}
                     </span>
                   ) : (
-                    <span className="shrink-0 rounded-full bg-foreground px-3.5 py-1.5 text-[13px] font-semibold text-background">Inviter</span>
+                    <span className="shrink-0 rounded-full bg-foreground px-3.5 py-1.5 text-[13px] font-semibold text-background">{geste}</span>
                   )}
                 </button>
               );
