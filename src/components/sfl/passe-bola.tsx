@@ -8,10 +8,13 @@
 //     de l'XP vers elle, ou l'épreuve qui la retient ;
 //   · la piste : les vingt récompenses en vignettes, chacune sur la carte du
 //     joueur (le skin entier, un signe cadré de près), à la couleur de sa
-//     rareté (B l'argent, A le mauve, S l'or, les tons des contrats) ; les
-//     portes des épreuves avant les paliers 5, 10, 15 et 20. Elle s'ouvre sur
-//     le prochain palier ;
-//   · les épreuves de la saison, faites (et quel dimanche) ou à faire ;
+//     rareté (B l'argent, A le mauve, S l'or, les tons des contrats). Elle
+//     s'ouvre sur le prochain palier ;
+//   · les épreuves qui gardent les paliers 5, 10, 15 et 20 restent cachées
+//     (Sabri, 24/10 : « cache les épreuves dans ma carte ») : ni liste ni
+//     portes sur la piste. Une épreuve ne se montre que quand elle retient le
+//     prochain palier, en tête à la place de la barre ; l'aperçu d'un palier
+//     gardé dit seulement « + une épreuve » ;
 //   · toucher une vignette ouvre son aperçu : la carte en 3D qui la porte, ce
 //     que c'est, ce qu'il faut, combien de joueurs l'ont ; Porter ou Retirer
 //     un skin débloqué (profiles.habillage) ; « Tes couleurs » se porte avec
@@ -20,7 +23,7 @@
 // Un palier atteint une saison reste débloqué (usePalierMax) : « Acquis ».
 // Noire dans les deux modes, comme les fiches (la classe dark).
 
-import { Fragment, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Lock, Play, X } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { Champ, Insigne, Tampon, Viseur } from "@/components/sfl/actus/missions";
@@ -251,7 +254,7 @@ function ApercuPalier({ p, player, b, palierMax }: { p: PalierPasse; player: Pla
           </Champ>
           <Champ label="Il faut">
             <span className="tabular-nums">{xp(seuilPalier(p.n))}</span>
-            {e && <span className="fiche__ton block text-[12px]">+ épreuve {e.romain}</span>}
+            {e && <span className="fiche__ton block text-[12px]">+ une épreuve</span>}
           </Champ>
           <Champ label="Ils l'ont">
             <span className="tabular-nums">{ontLe(p.n)}</span>
@@ -330,7 +333,6 @@ export function PasseBola({ player, saison, b, rang }: { player: Player; saison:
   const { passe } = b;
   const fini = passe.palier >= PALIERS_PASSE;
   const prochain = PASSE_BOLA[Math.min(PALIERS_PASSE, passe.palier + 1) - 1];
-  const faites = new Set(passe.epreuves.filter((x) => x.j !== null).map((x) => x.e.numero));
   const p = PASSE_BOLA.find((x) => x.n === vu);
 
   // La piste s'ouvre sur le prochain palier, le précédent encore en vue.
@@ -404,56 +406,22 @@ export function PasseBola({ player, saison, b, rang }: { player: Player; saison:
 
       <div ref={piste} role="group" className="passe__piste" aria-label="Les vingt paliers">
         {PASSE_BOLA.map((x) => {
-          const e = epreuveDu(x.n);
           const etat = etatDe(x.n, passe.palier, palierMax);
           return (
-            <Fragment key={x.n}>
-              {e && (
-                <div
-                  role="img"
-                  aria-label={`Épreuve ${e.romain}, ${e.nom}${faites.has(e.numero) ? " : faite" : ""}`}
-                  className={cn("passe__porte", `fiche--${x.rang}`, faites.has(e.numero) && "passe__porte--faite")}
-                >
-                  <span className="passe__porte-case">
-                    <span>{e.romain}</span>
-                  </span>
-                  <span className="passe__porte-nom mono-label">{e.nom}</span>
-                </div>
-              )}
-              <Vignette
-                p={x}
-                etat={etat}
-                player={player}
-                porte={porte}
-                sous={sous(x.n, etat)}
-                onOuvrir={() => {
-                  setVu(x.n);
-                  setOuvert(true);
-                }}
-              />
-            </Fragment>
+            <Vignette
+              key={x.n}
+              p={x}
+              etat={etat}
+              player={player}
+              porte={porte}
+              sous={sous(x.n, etat)}
+              onOuvrir={() => {
+                setVu(x.n);
+                setOuvert(true);
+              }}
+            />
           );
         })}
-      </div>
-
-      <div className="flex flex-col border-t border-white/10 px-[18px] pt-3 pb-2">
-        <span className="mono-label text-white/45">Épreuves de la saison</span>
-        {passe.epreuves.map(({ e, j }) => (
-          <div key={e.numero} className={cn("flex items-center gap-3 py-2.5", `fiche--${PASSE_BOLA[e.palier - 1].rang}`)}>
-            <span className={cn("passe__porte-case", j !== null && "passe__porte-case--faite")}>
-              <span>{e.romain}</span>
-            </span>
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-[14px] leading-tight font-bold">{e.nom}</span>
-              <span className="text-[12.5px] leading-[1.3] text-white/60">{e.phrase}</span>
-            </div>
-            {j !== null ? (
-              <Tampon petit>J{j}</Tampon>
-            ) : (
-              <span className="mono-label shrink-0 text-white/45">Palier {e.palier}</span>
-            )}
-          </div>
-        ))}
       </div>
 
       <Sheet open={ouvert} onOpenChange={setOuvert}>
