@@ -29,7 +29,7 @@
 import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
-import { MATIERES, RAYON_CARTE, type NomMatiere } from "@/components/sfl/finitions-carte";
+import { RAYON_CARTE, type Matiere } from "@/components/sfl/finitions-carte";
 
 const MAX_TILT_X = 0.3; // rad, bascule verticale (clampée, revient à plat)
 const ROT_PER_PX = 0.011; // rad de rotation Y par pixel glissé (libre, 360°)
@@ -328,8 +328,8 @@ function useLayerTexture(url: string | null) {
 }
 
 /** Ce que la matière de la carte change en 3D ; sans matière, l'allure d'avant. */
-function allureDe(matiere: NomMatiere | null | undefined, mode: "simple" | "rare", holo: boolean) {
-  const m = matiere ? MATIERES[matiere] : null;
+function allureDe(matiere: Matiere | null | undefined, mode: "simple" | "rare", holo: boolean) {
+  const m = matiere ?? null;
   return {
     tranche: m?.tranche ?? { couleur: BEZEL_COLOR[mode], metal: 0.35, rugosite: 0.45 },
     holo: m ? m.holo.force : holo ? 1 : 0.3,
@@ -373,7 +373,7 @@ export function CardMesh({
   playerLayer: string;
   stats: string;
   dos?: string;
-  matiere?: NomMatiere | null;
+  matiere?: Matiere | null;
   mode: "simple" | "rare";
   holo: boolean;
   /** "back" démarre déjà retournée (le dos Bola) — pour les visuels de pack scellé. */
@@ -757,7 +757,7 @@ export function CardCanvas({
   /** Le dos (dos-carte.tsx photographié) ; à défaut, un dos uni de la couleur de la carte. */
   dos?: string;
   /** La matière de la carte (finitions-carte.ts) : la tranche, le reflet, la lueur. */
-  matiere?: NomMatiere | null;
+  matiere?: Matiere | null;
   holo: boolean;
   mode: "simple" | "rare";
   startFace?: "front" | "back";
