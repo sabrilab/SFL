@@ -980,8 +980,8 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
       titre={<TitreDiscussion actif="/vestiaire" />}
       aDroite={
         <>
-          <BoutonMessages />
-          <BoutonRecherche />
+          <BoutonMessages className="size-10" />
+          <BoutonRecherche className="size-10" />
         </>
       }
       libelleNotifs="Notifications du Vestiaire"
@@ -989,6 +989,7 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
       onglets
       moderation
       pieces
+      serre
       demo={demo}
       onOuvrirJournee={onOuvrirJournee}
     />
@@ -1048,6 +1049,7 @@ export function Discussion({
   modesNotifs,
   vide,
   onglets = false,
+  serre = false,
   moderation = false,
   pieces = false,
   demo = null,
@@ -1071,6 +1073,8 @@ export function Discussion({
   vide: string;
   /** La barre d'onglets reste dessous (le Vestiaire) ; sinon l'écran la recouvre, posé sur <body> (matchs/discussion-match.tsx). */
   onglets?: boolean;
+  /** Trois boutons en haut (le Vestiaire : la cloche, les messages, la loupe) : un cran plus petits, pour que le titre tienne. */
+  serre?: boolean;
   /** L'admin modère : il retire n'importe quel message et coupe la parole (le Vestiaire, lieu public). */
   moderation?: boolean;
   /** Prend la pièce préparée ailleurs (« Au Vestiaire » d'un classement, d'une feuille). */
@@ -1491,13 +1495,13 @@ export function Discussion({
       <div className="flex items-center justify-between gap-3">
         {titre}
         {!empeche && (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
               onClick={() => setReglage((v) => !v)}
               aria-label={libelleNotifs}
               aria-expanded={reglage}
-              className="bouton-secondaire bouton--mauve flex size-11 items-center justify-center"
+              className={cn("bouton-secondaire bouton--mauve flex items-center justify-center", serre ? "size-10" : "size-11")}
             >
               {mode === "rien" ? <BellOff className="size-[18px]" /> : <Bell className="size-[18px]" />}
             </button>
