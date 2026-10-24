@@ -4216,3 +4216,89 @@ create policy "messages: le Vestiaire, à la SFL" on public.messages as restrict
 drop policy if exists "messages: écrire au Vestiaire, la SFL" on public.messages;
 create policy "messages: écrire au Vestiaire, la SFL" on public.messages as restrictive for insert to authenticated
   with check (canal <> 'sfl' or (select public.joueur_sfl((select auth.uid()))) or (select public.is_league_admin()));
+
+-- ───────────────────────── Les pronos Bola ─────────────────────────
+-- Sabri, 24/10 : « que le joueur puisse pronostiquer des choses dans les
+-- matchs à venir ou les journées », « qui finira meilleur buteur, qui finira
+-- meilleure Pépite d'Or ». Un prono par joueur et par sujet (lib/sfl/pronos.ts) :
+--   · j > 0, la journée : 'match:0' (Noirs, nul ou Blancs), 'buteur',
+--     'pepite' (un nom de joueur) ;
+--   · j = 0, la saison : 'pepite', 'buteur', 'passeur'.
+-- On ne pose que pour soi, par pronostiquer() : la base met le nom (mon_nom)
+-- et l'heure (now()), jamais le téléphone. L'app ne retient qu'un prono posé
+-- avant le coup d'envoi, qu'elle lit dans la saison, et calcule l'XP ; rien
+-- d'autre n'est stocké. Toute la ligue lit tous les pronos : ce sont les parts
+-- (« 62 % pour les Noirs »).
+create table if not exists public.pronos (
+  saison     integer not null,
+  j          integer not null check (j >= 0),
+  sujet      text    not null check (sujet ~ '^(match:[0-9]{1,2}|buteur|pepite|passeur)$'),
+  joueur     text    not null,
+  choix      text    not null check (char_length(choix) between 1 and 80),
+  joueur_id  uuid    not null references public.profiles(id) on delete cascade,
+  le         timestamptz not null default now(),
+  primary key (saison, j, sujet, joueur)
+);
+
+alter table public.pronos enable row level security;
+
+drop policy if exists "pronos: la ligue lit tout" on public.pronos;
+create policy "pronos: la ligue lit tout"
+  on public.pronos for select
+  to authenticated
+  using ((select public.est_membre()));
+
+revoke all on public.pronos from anon, authenticated;
+grant select on public.pronos to authenticated;
+
+-- Poser un prono, ou le retirer (p_choix vide) : la seule porte d'écriture.
+-- Renvoie l'heure posée.
+create or replace function public.pronostiquer(
+  p_saison integer,
+  p_j integer,
+  p_sujet text,
+  p_choix text default null
+)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_nom text := public.mon_nom();
+  v_le  timestamptz := now();
+begin
+  if not public.est_membre() or v_nom is null then
+    raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
+  end if;
+  if p_j < 0 or p_sujet !~ '^(match:[0-9]{1,2}|buteur|pepite|passeur)$'
+     or (p_j = 0 and p_sujet not in ('pepite', 'buteur', 'passeur'))
+     or (p_j > 0 and p_sujet = 'passeur') then
+    raise exception 'Prono inconnu.' using errcode = '22023';
+  end if;
+  if nullif(btrim(p_choix), '') is null then
+    delete from public.pronos where saison = p_saison and j = p_j and sujet = p_sujet and joueur = v_nom;
+    return v_le;
+  end if;
+  if p_sujet like 'match:%' and p_choix not in ('noirs', 'nul', 'blancs') then
+    raise exception 'Prono inconnu.' using errcode = '22023';
+  end if;
+  insert into public.pronos (saison, j, sujet, joueur, choix, joueur_id, le)
+  values (p_saison, p_j, p_sujet, v_nom, btrim(p_choix), (select auth.uid()), v_le)
+  on conflict (saison, j, sujet, joueur) do update
+    set choix = excluded.choix, joueur_id = excluded.joueur_id, le = excluded.le;
+  return v_le;
+end;
+$$;
+
+revoke execute on function public.pronostiquer(integer, integer, text, text) from public, anon;
+grant execute on function public.pronostiquer(integer, integer, text, text) to authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.pronos;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;

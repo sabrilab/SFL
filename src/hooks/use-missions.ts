@@ -17,6 +17,7 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { useFelicitations } from "@/hooks/use-felicitations";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useSession } from "@/hooks/use-session";
+import { useListePronos } from "@/hooks/use-liste-pronos";
 import { useVotes } from "@/hooks/use-votes";
 import {
   aJoue,
@@ -54,6 +55,7 @@ import {
   reponsesDemo,
   reponsesEnMemoire,
 } from "@/lib/sfl/missions-reponses";
+import { ajouterPronos } from "@/lib/sfl/pronos";
 import { appliquerVotes } from "@/lib/sfl/votes";
 import { supabase } from "@/lib/supabase";
 
@@ -106,7 +108,7 @@ function useReponses(): Reponse[] {
 }
 
 /** L'heure, à la minute : le coup d'envoi et minuit se voient sans recharger. */
-function useMaintenant(): Date {
+export function useMaintenant(): Date {
   const [t, setT] = useState(() => Date.now());
   useEffect(() => {
     const id = window.setInterval(() => setT(Date.now()), 60_000);
@@ -116,7 +118,7 @@ function useMaintenant(): Date {
 }
 
 /** La saison telle qu'on la juge : les élus des votes fermés posés sur les lignes. */
-function useSaisonJugee(maintenant: Date) {
+export function useSaisonJugee(maintenant: Date) {
   const { saison, journees } = useSeason();
   const votes = useVotes();
   const jugee = useMemo(() => appliquerVotes(saison, journees, votes, maintenant), [saison, journees, votes, maintenant]);
@@ -337,7 +339,8 @@ export const XpLigueContext = createContext<XpLigue | null>(null);
  * Le calcul, pour XpLigueProvider seulement : le journal de chacun (les
  * dimanches joués, les missions jugées, les félicitations, toutes saisons),
  * puis les rangs. Les félicitations reçues et données y comptent (lib/sfl/
- * felicitations.ts), relues au lancement et au retour sur l'app.
+ * felicitations.ts), relues au lancement et au retour sur l'app, et les
+ * pronos justes (lib/sfl/pronos.ts).
  */
 export function useXpLigueCalcule(): XpLigue | null {
   const isClient = useIsClient();
@@ -345,16 +348,18 @@ export function useXpLigueCalcule(): XpLigue | null {
   const reponses = useReponses();
   const { allPlayers } = useSeason();
   const { toutes: felicitations } = useFelicitations();
+  const pronos = useListePronos();
   const { saison, jugee, votes } = useSaisonJugee(maintenant);
   return useMemo(() => {
     if (!isClient) return null;
     const journal = journalXp(jugee, reponses, votes, maintenant, felicitations);
+    ajouterPronos(journal, jugee, pronos, maintenant);
     const rangs = rangsDesJoueurs(classementNiveau(journal, allPlayers));
     const surLesCartes = JSON.stringify(
       [...journal].map(([nom, x]) => [nom, rangs.get(nom)?.rang ?? null, palierMaxDe(journal, nom), cranDe(x.reussies)])
     );
     return { journal, saison: saison.numero ?? 0, rangs, surLesCartes };
-  }, [isClient, jugee, reponses, votes, maintenant, felicitations, saison.numero, allPlayers]);
+  }, [isClient, jugee, reponses, votes, maintenant, felicitations, pronos, saison.numero, allPlayers]);
 }
 
 /** L'XP de la ligue, tel que l'app l'a calculé (null avant le premier rendu côté client). */
