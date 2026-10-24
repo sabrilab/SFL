@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
   const joueurs = [...new Set((abonnements as { user_id: string }[]).map((a) => a.user_id))];
   const envois = new Map(joueurs.map((uid): [string, Envoi] => [uid, { notif, motif: "annonce" }]));
-  const bilan = await prevenir(sb, cle, envois, serveur());
+  const bilan = await prevenir(sb, cle, envois, { traces: serveur(), de: auth.user.id });
 
   return NextResponse.json({ envoyes: bilan.telephones, morts: bilan.morts, echecs: bilan.echecs });
 }
