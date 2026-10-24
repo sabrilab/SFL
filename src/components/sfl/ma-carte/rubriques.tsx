@@ -282,7 +282,7 @@ export function RubriquesMaCarte() {
           {gagnes.length} / {paliers.length} paliers
         </span>
         {suivant && (
-          <span className="truncate font-mono text-[11px] text-foreground/45">
+          <span className="font-mono text-[11px] leading-snug text-foreground/45">
             prochain : {suivant.def.nom.toLowerCase()} {NOM_METAL[metal(suivant.palier + 1)!].toLowerCase()}
           </span>
         )}
