@@ -4775,7 +4775,13 @@ $$;
 --     équipes de ce match, recopiées au moment du choix ;
 --   · avis_arbitre : la note de 1 à 5 de chaque joueur du match. Chacun ne
 --     lit que la sienne ; la ligue et l'arbitre ne voient que les totaux
---     (avis_des_arbitrages), pour que la note reste franche.
+--     (avis_des_arbitrages), pour que la note reste franche. Les notes
+--     ferment le mardi à minuit qui suit le match (arbitrages.ferme_le) :
+--     les missions d'arbitre sont jugées dessus, et ne bougent plus ;
+--   · missions_arbitre : ses réponses à ses missions (missions-arbitre.ts),
+--     que l'on n'écrit que par repondre_mission_arbitre() ;
+--   · profiles.habillage_arbitre : ce qu'il porte sur sa carte, parmi ce que
+--     son passe d'arbitre lui a fait gagner (passe-arbitre.ts).
 alter table public.profiles add column if not exists arbitre boolean not null default false;
 
 create or replace function public.poser_arbitre(p_profil uuid, p_arbitre boolean)
@@ -4806,9 +4812,12 @@ create table if not exists public.arbitrages (
   n          integer not null check (n between 0 and 30),
   arbitre_id uuid    not null references public.profiles(id) on delete cascade,
   equipes    text[]  not null default '{}',
+  ferme_le   timestamptz,
   cree_le    timestamptz not null default now(),
   unique (saison, j, n)
 );
+
+alter table public.arbitrages add column if not exists ferme_le timestamptz;
 
 alter table public.arbitrages enable row level security;
 
@@ -4875,6 +4884,9 @@ begin
   if a.arbitre_id = (select auth.uid()) then
     raise exception 'L''arbitre ne se note pas.' using errcode = '42501';
   end if;
+  if a.ferme_le is not null and now() > a.ferme_le then
+    raise exception 'Seuls les joueurs du match notent son arbitre, jusqu''au mardi minuit.' using errcode = '42501';
+  end if;
   select coalesce((s.data ->> 'numero')::integer, 0) into v_num from public.saison s where s.id = 1;
   if v_num is distinct from a.saison or not exists (
     select 1
@@ -4919,6 +4931,69 @@ grant execute on function public.avis_des_arbitrages() to authenticated;
 
 revoke execute on function public.poser_arbitre(uuid, boolean) from public, anon;
 grant execute on function public.poser_arbitre(uuid, boolean) to authenticated;
+
+-- Ce que l'arbitre porte sur sa carte : « finition/signes/grade », « - »
+-- pour rien (passe-arbitre.ts). Il l'écrit lui-même, sur son profil.
+alter table public.profiles add column if not exists habillage_arbitre text;
+alter table public.profiles drop constraint if exists profiles_habillage_arbitre_check;
+alter table public.profiles add constraint profiles_habillage_arbitre_check
+  check (habillage_arbitre is null or habillage_arbitre ~ '^(-|craie|ardoise|raye|damier|nuit-de-match|chrono|argent|platine|filets)/(-|(lisere-argent|lisere-platine|puce-noire|nom-grave|sifflet|cartons)(\+(lisere-argent|lisere-platine|puce-noire|nom-grave|sifflet|cartons))*)/(-|ligue|national|elite|international)$');
+grant update (habillage_arbitre) on public.profiles to authenticated;
+
+-- Les missions d'arbitre (Sabri, 24/10 : « qu'ils puissent activer, accepter
+-- et refuser aussi des missions ») : trois par journée qu'il arbitre. L'app
+-- ne compte que la réponse donnée avant le coup d'envoi, à l'heure de la
+-- base (comme missions_reponses).
+create table if not exists public.missions_arbitre (
+  saison     integer not null,
+  j          integer not null check (j > 0),
+  mission    text    not null check (mission in ('sang-froid', 'tribune', 'unanime')),
+  arbitre_id uuid    not null references public.profiles(id) on delete cascade,
+  reponse    text    not null check (reponse in ('acceptee', 'passee')),
+  le         timestamptz not null default now(),
+  primary key (saison, j, mission, arbitre_id)
+);
+
+alter table public.missions_arbitre enable row level security;
+
+drop policy if exists "missions_arbitre: l'arbitre lit les siennes" on public.missions_arbitre;
+create policy "missions_arbitre: l'arbitre lit les siennes"
+  on public.missions_arbitre for select
+  to authenticated
+  using (arbitre_id = (select auth.uid()) or (select public.is_league_admin()));
+
+revoke all on public.missions_arbitre from anon, authenticated;
+grant select on public.missions_arbitre to authenticated;
+
+create or replace function public.repondre_mission_arbitre(p_saison integer, p_j integer, p_mission text, p_reponse text)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_le timestamptz := now();
+begin
+  if not exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.arbitre) then
+    raise exception 'Réservé aux arbitres.' using errcode = '42501';
+  end if;
+  if p_mission not in ('sang-froid', 'tribune', 'unanime') or p_reponse not in ('acceptee', 'passee') then
+    raise exception 'Réponse inconnue.' using errcode = '22023';
+  end if;
+  if not exists (
+    select 1 from public.arbitrages a where a.saison = p_saison and a.j = p_j and a.arbitre_id = (select auth.uid())
+  ) then
+    raise exception 'Réservé à l''arbitre de cette journée.' using errcode = '42501';
+  end if;
+  insert into public.missions_arbitre (saison, j, mission, arbitre_id, reponse, le)
+  values (p_saison, p_j, p_mission, (select auth.uid()), p_reponse, v_le)
+  on conflict (saison, j, mission, arbitre_id) do update set reponse = excluded.reponse, le = excluded.le;
+  return v_le;
+end;
+$$;
+
+revoke execute on function public.repondre_mission_arbitre(integer, integer, text, text) from public, anon;
+grant execute on function public.repondre_mission_arbitre(integer, integer, text, text) to authenticated;
 
 -- Une fois : Fabio, le premier arbitre de la ligue (Sabri, 24/10 : « Et tu
 -- peux le faire pour Fabio »). Ensuite, c'est l'admin qui décide (Admin →

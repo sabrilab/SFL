@@ -7,15 +7,20 @@
 //      en plein écran, comme celle d'un joueur), son nom, son pseudo ;
 //   2. trois chiffres : ses matchs arbitrés, sa satisfaction, ses notes ;
 //   3. sa photo (le studio, comme tout le monde : ProfilePhoto) ;
-//   4. ses matchs, du plus récent au plus ancien, chacun avec sa
+//   4. ses missions d'arbitre de la journée (arbitre-missions.tsx), et la
+//      ligne de son passe d'arbitre (arbitre-passe.tsx) : ses skins de
+//      tenue, ses signes et ses grades ;
+//   5. ses matchs, du plus récent au plus ancien, chacun avec sa
 //      satisfaction (ou « à venir », ou « pas encore noté ») ;
-//   5. « Se déconnecter ».
+//   6. « Se déconnecter ».
 
 import Link from "next/link";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Card3DEnGrand } from "@/components/sfl/carte-en-grand";
 import { CarteArbitre } from "@/components/sfl/carte-arbitre";
+import { MissionsArbitre } from "@/components/sfl/arbitre-missions";
+import { PasseArbitre } from "@/components/sfl/arbitre-passe";
 import { Chiffre } from "@/components/sfl/profil-joueur";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -62,7 +67,7 @@ export function ProfilArbitre({ nom }: { nom: string }) {
         <div className="colonne-fixe flex min-w-0 flex-col items-center gap-[var(--fib-21)]">
           <div className="-mt-[var(--fib-21)] -mb-[var(--fib-34)]">
             <Card3DEnGrand
-              cacheKey={`arbitre-${nom}-${s.satisfaction ?? "x"}-${s.matchs}-${s.avis}`}
+              cacheKey={`arbitre-${nom}-${s.satisfaction ?? "x"}-${s.matchs}-${s.avis}-${arbitres.habillages[nom] ?? ""}`}
               mode="simple"
               size={tresGrand ? 1.15 * RACINE_PHI : grand ? 1.15 : 1}
               render={(t) => <CarteArbitre nom={nom} size={t} />}
@@ -89,6 +94,8 @@ export function ProfilArbitre({ nom }: { nom: string }) {
         </div>
 
         <div className="flex min-w-0 flex-col gap-[var(--fib-21)]">
+          <MissionsArbitre nom={nom} />
+          <PasseArbitre nom={nom} saison={numero} />
           <section>
             <h2 className="mb-3 px-1 text-lg font-semibold tracking-tight">Mes matchs</h2>
             {s.liste.length === 0 ? (

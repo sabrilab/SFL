@@ -14,19 +14,24 @@
 //   · avis : les notes reçues ;
 //   · top : la part de 5 sur 5 ;
 //   · der : la satisfaction de son dernier match noté.
-// Ni badge, ni habillage : ce n'est pas une carte de joueur.
+// Ni badge, ni habillage de joueur : il porte ce qu'il a gagné dans son passe
+// d'arbitre (passe-arbitre.ts) et choisi, un skin de tenue, des signes, son
+// grade dans l'étiquette ; `porte` en essaie un autre (l'aperçu d'un palier).
 
 import { BolaCard } from "./bola-card";
 import { usePhotoPerso } from "@/hooks/use-player-photo";
 import { useIdentites } from "@/hooks/use-identites";
 import { useArbitres } from "@/hooks/use-arbitres";
+import type { ChoixArbitre } from "@/lib/sfl/passe-arbitre";
 
 const ou = (v: number | null, suffixe = "") => (v == null ? "–" : `${v}${suffixe}`);
 
-export function CarteArbitre({ nom, size = 1 }: { nom: string; size?: number }) {
+export function CarteArbitre({ nom, size = 1, porte }: { nom: string; size?: number; porte?: ChoixArbitre }) {
   const photo = usePhotoPerso(nom);
   const identite = useIdentites();
-  const s = useArbitres().stats(nom);
+  const a = useArbitres();
+  const s = a.stats(nom);
+  const c = porte ?? a.choix(nom);
   return (
     <BolaCard
       edition="arbitre"
@@ -38,7 +43,10 @@ export function CarteArbitre({ nom, size = 1 }: { nom: string; size?: number }) 
       stats={{ VIT: 0, TIR: 0, PAS: 0, DRI: 0, DEF: 0, PHY: 0 }}
       size={size}
       photo={photo}
+      habillage={{ signes: c.signes }}
       arbitre={{
+        finition: c.finition,
+        grade: c.grade,
         note: ou(s.satisfaction),
         stats: [
           ["mat", s.matchs],

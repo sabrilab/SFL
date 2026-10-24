@@ -18,7 +18,7 @@
 // retour sur l'app, et gardé en cache.
 //
 // Aperçus Vercel et développement : la base n'a pas les tables. Fabio y est
-// l'arbitre de démonstration, des deux premiers matchs de chaque journée,
+// l'arbitre de démonstration, du premier match de chaque journée,
 // avec des notes tirées de son nom (toujours les mêmes) ; ma note reste sur
 // l'appareil. Jamais en production.
 
@@ -26,6 +26,7 @@ import { supabase } from "@/lib/supabase";
 import { definirArbitres } from "./hidden";
 import { idDe, nomDeId, rafraichirComptes } from "./comptes";
 import type { Journee } from "./engine";
+import { satisfactionDe, type CreneauArbitre, type ReponseArbitre } from "./missions-arbitre";
 
 export const ARBITRES_EVENT = "sfl-arbitres";
 export const APERCU_ARBITRES = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
@@ -59,11 +60,17 @@ export interface EtatArbitres {
   avis: Record<number, Avis>;
   /** Mes notes, par arbitrage. */
   mesNotes: Record<number, number>;
+  /** Ce que chaque arbitre porte sur sa carte (profiles.habillage_arbitre, passe-arbitre.ts). */
+  habillages: Record<string, string>;
+  /** Mes réponses à mes missions d'arbitre (missions-arbitre.ts). */
+  reponses: ReponseArbitre[];
   /** La démonstration des aperçus. */
   demo: boolean;
 }
 
-const VIDE: EtatArbitres = { arbitres: [], arbitrages: [], avis: {}, mesNotes: {}, demo: false };
+const VIDE: EtatArbitres = { arbitres: [], arbitrages: [], avis: {}, mesNotes: {}, habillages: {}, reponses: [], demo: false };
+const CLE_APERCU_MISSIONS = "sfl-arbitres-apercu-missions";
+const CLE_APERCU_HABILLAGE = "sfl-arbitres-apercu-habillage";
 
 const hasWindow = () => typeof window !== "undefined" && !!window.localStorage;
 
@@ -79,7 +86,15 @@ function lire(): EtatArbitres {
       if (brut) etat = { ...VIDE, ...(JSON.parse(brut) as EtatArbitres) };
     } catch {}
   }
-  if (APERCU_ARBITRES) etat = { ...VIDE, arbitres: [ARBITRE_DEMO], mesNotes: lireApercu(), demo: true };
+  if (APERCU_ARBITRES)
+    etat = {
+      ...VIDE,
+      arbitres: [ARBITRE_DEMO],
+      mesNotes: lireApercu(),
+      habillages: lireJsonLocal<Record<string, string>>(CLE_APERCU_HABILLAGE, {}),
+      reponses: lireJsonLocal<ReponseArbitre[]>(CLE_APERCU_MISSIONS, []),
+      demo: true,
+    };
   definirArbitres(etat.arbitres);
   return etat;
 }
@@ -109,14 +124,23 @@ export function etatArbitres(): EtatArbitres {
 
 /* ─────────────────────────── La démonstration ─────────────────────────── */
 
-function lireApercu(): Record<number, number> {
-  if (!hasWindow()) return {};
+function lireJsonLocal<T>(cle: string, defaut: T): T {
+  if (!hasWindow()) return defaut;
   try {
-    return JSON.parse(window.localStorage.getItem(CLE_APERCU) ?? "{}") as Record<number, number>;
+    const brut = window.localStorage.getItem(cle);
+    return brut ? (JSON.parse(brut) as T) : defaut;
   } catch {
-    return {};
+    return defaut;
   }
 }
+
+function ecrireJsonLocal(cle: string, v: unknown) {
+  try {
+    window.localStorage.setItem(cle, JSON.stringify(v));
+  } catch {}
+}
+
+const lireApercu = () => lireJsonLocal<Record<number, number>>(CLE_APERCU, {});
 
 function hache(s: string): number {
   let h = 2166136261;
@@ -128,14 +152,25 @@ function hache(s: string): number {
 const idDemo = (saison: number, j: number, n: number) => saison * 100000 + j * 100 + n;
 
 /**
- * Les arbitrages de démonstration : Fabio sur les deux premiers matchs de
- * chaque journée qui a ses équipes, et ses notes, tirées de son nom.
+ * Les arbitrages de démonstration : Fabio sur le premier match de chaque
+ * journée qui a ses équipes, ses notes et ses réponses aux missions des
+ * journées jouées, tirées de son nom.
  */
-export function demoArbitrages(saison: number, journees: Pick<Journee, "j" | "matches">[]): Pick<EtatArbitres, "arbitrages" | "avis"> {
+export function demoArbitrages(
+  saison: number,
+  journees: Pick<Journee, "j" | "matches">[],
+  jouees: ReadonlySet<number> = new Set()
+): Pick<EtatArbitres, "arbitrages" | "avis" | "reponses"> {
   const arbitrages: Arbitrage[] = [];
   const avis: Record<number, Avis> = {};
+  const reponses: ReponseArbitre[] = [];
   for (const jr of journees) {
-    (jr.matches ?? []).slice(0, 2).forEach((m, n) => {
+    // Ses réponses des journées passées, tirées de son nom (la base garde l'heure : bien avant le match).
+    for (const mission of ["sang-froid", "tribune", "unanime"] as CreneauArbitre[]) {
+      if (jouees.has(jr.j) && hache(`${ARBITRE_DEMO}:${saison}:${jr.j}:${mission}`) % 4 !== 0)
+        reponses.push({ saison, j: jr.j, mission, reponse: "acceptee", le: REPONSE_TIREE });
+    }
+    (jr.matches ?? []).slice(0, 1).forEach((m, n) => {
       const id = idDemo(saison, jr.j, n);
       arbitrages.push({ id, saison, j: jr.j, n, arbitre: ARBITRE_DEMO, equipes: [m.teamA.name, m.teamB.name] });
       const h = hache(`${ARBITRE_DEMO}:${id}`);
@@ -146,25 +181,32 @@ export function demoArbitrages(saison: number, journees: Pick<Journee, "j" | "ma
       avis[id] = { avis: nb, total: cinq * 5 + quatre * 4 + reste * 3, cinq };
     });
   }
-  return { arbitrages, avis };
+  return { arbitrages, avis, reponses };
 }
 
-let amorcee = false;
+/** La saison sur laquelle la démonstration a été posée : une autre saison chargée la repose. */
+let amorcee = "";
+/** L'heure des réponses de démonstration tirées du nom : bien avant tout coup d'envoi. */
+const REPONSE_TIREE = "2000-01-01T00:00:00Z";
 
 /**
  * Pose la démonstration (aperçus) une fois les journées connues, avec mes
  * notes de l'appareil comptées dans les totaux.
  */
-export function amorcerDemo(saison: number, journees: Pick<Journee, "j" | "matches">[]): void {
+export function amorcerDemo(saison: number, journees: Pick<Journee, "j" | "matches">[], jouees: ReadonlySet<number>): void {
   const e = lire();
-  if (!e.demo || amorcee || journees.length === 0) return;
-  amorcee = true;
-  const { arbitrages, avis } = demoArbitrages(saison, journees);
+  const cle = `${saison}:${journees.map((jr) => `${jr.j}.${jr.matches?.length ?? 0}`).join(",")}:${[...jouees].join(",")}`;
+  if (!e.demo || amorcee === cle || journees.length === 0) return;
+  amorcee = cle;
+  const { arbitrages, avis, reponses } = demoArbitrages(saison, journees, jouees);
   for (const [id, note] of Object.entries(e.mesNotes)) {
     const t = avis[Number(id)];
     if (t) avis[Number(id)] = { avis: t.avis + 1, total: t.total + note, cinq: t.cinq + (note === 5 ? 1 : 0) };
   }
-  ecrire({ ...e, arbitrages, avis });
+  // Mes réponses de l'appareil l'emportent sur celles tirées du nom.
+  const miennes = e.reponses.filter((r) => r.le !== REPONSE_TIREE);
+  const tirees = reponses.filter((r) => !miennes.some((m) => m.saison === r.saison && m.j === r.j && m.mission === r.mission));
+  ecrire({ ...e, arbitrages, avis, reponses: [...tirees, ...miennes] });
 }
 
 /* ─────────────────────────────── Lecture ─────────────────────────────── */
@@ -182,14 +224,16 @@ export function rafraichirArbitres(): Promise<void> {
       const sb = supabase();
       const [, profils, arbitrages, totaux, miens] = await Promise.all([
         rafraichirComptes(),
-        sb.from("profiles").select("id, name").eq("arbitre", true),
+        sb.from("profiles").select("id, name, habillage_arbitre").eq("arbitre", true),
         sb.from("arbitrages").select("id, saison, j, n, arbitre_id, equipes"),
         sb.rpc("avis_des_arbitrages"),
         sb.from("avis_arbitre").select("arbitrage_id, note"),
       ]);
+      const reponses = await sb.from("missions_arbitre").select("saison, j, mission, reponse, le");
       // Base pas encore migrée, pas encore membre, hors ligne : on garde le cache.
       if (profils.error || arbitrages.error) return;
-      const parId = new Map((profils.data as { id: string; name: string }[]).map((p) => [p.id, p.name]));
+      const lignes = profils.data as { id: string; name: string; habillage_arbitre: string | null }[];
+      const parId = new Map(lignes.map((p) => [p.id, p.name]));
       const next: EtatArbitres = {
         arbitres: [...parId.values()],
         arbitrages: (arbitrages.data as { id: number; saison: number; j: number; n: number; arbitre_id: string; equipes: string[] }[])
@@ -209,6 +253,8 @@ export function rafraichirArbitres(): Promise<void> {
           ])
         ),
         mesNotes: Object.fromEntries(((miens.data ?? []) as { arbitrage_id: number; note: number }[]).map((m) => [m.arbitrage_id, m.note])),
+        habillages: Object.fromEntries(lignes.filter((p) => p.habillage_arbitre).map((p) => [p.name, p.habillage_arbitre!])),
+        reponses: (reponses.data ?? []) as ReponseArbitre[],
         demo: false,
       };
       if (JSON.stringify(next) !== JSON.stringify(lire())) ecrire(next);
@@ -294,7 +340,9 @@ export async function designerArbitre(
   j: number,
   n: number,
   equipes: string[],
-  arbitre: string | null
+  arbitre: string | null,
+  /** Le mardi minuit qui suit le match : les notes ferment (missions-arbitre.ts). */
+  fermeLe: Date | null = null
 ): Promise<string | null> {
   const avant = lire();
   const existant = avant.arbitrages.find((a) => a.saison === saison && a.j === j && a.n === n);
@@ -320,13 +368,69 @@ export async function designerArbitre(
     if (!id) return "Cet arbitre n'a pas de compte accepté.";
     const { data, error } = await sb
       .from("arbitrages")
-      .upsert({ saison, j, n, arbitre_id: id, equipes }, { onConflict: "saison,j,n" })
+      .upsert({ saison, j, n, arbitre_id: id, equipes, ferme_le: fermeLe?.toISOString() ?? null }, { onConflict: "saison,j,n" })
       .select("id")
       .single();
     if (error || !data) throw error ?? new Error("arbitrage");
     ecrire({ ...avant, arbitrages: [...reste, { id: (data as { id: number }).id, saison, j, n, arbitre, equipes }] });
     return null;
   } catch {
+    return "Pas enregistré. Réessaie.";
+  }
+}
+
+/**
+ * L'arbitre accepte ou passe une de ses missions : affiché tout de suite,
+ * écrit derrière ; la base garde l'heure (repondre_mission_arbitre).
+ */
+export async function repondreMissionArbitre(
+  saison: number,
+  j: number,
+  mission: CreneauArbitre,
+  reponse: ReponseArbitre["reponse"]
+): Promise<string | null> {
+  const avant = lire();
+  const r: ReponseArbitre = { saison, j, mission, reponse, le: new Date().toISOString() };
+  const reponses = [...avant.reponses.filter((x) => !(x.saison === saison && x.j === j && x.mission === mission)), r];
+  ecrire({ ...avant, reponses });
+  if (avant.demo) {
+    ecrireJsonLocal(CLE_APERCU_MISSIONS, reponses.filter((x) => x.le !== REPONSE_TIREE));
+    return null;
+  }
+  try {
+    const { data, error } = await supabase().rpc("repondre_mission_arbitre", {
+      p_saison: saison,
+      p_j: j,
+      p_mission: mission,
+      p_reponse: reponse,
+    });
+    if (error) throw error;
+    // L'heure de la base, pas celle du téléphone.
+    if (typeof data === "string") ecrire({ ...lire(), reponses: reponses.map((x) => (x === r ? { ...r, le: data } : x)) });
+    return null;
+  } catch (e) {
+    ecrire(avant);
+    const message = (e as { message?: string })?.message ?? "";
+    return /^(Trop tard|Réservé)/.test(message) ? message : "Pas enregistré. Réessaie.";
+  }
+}
+
+/** L'arbitre choisit ce qu'il porte sur sa carte (passe-arbitre.ts, « finition/signes/grade »). */
+export async function choisirHabillageArbitre(nom: string, brut: string): Promise<string | null> {
+  const avant = lire();
+  ecrire({ ...avant, habillages: { ...avant.habillages, [nom]: brut } });
+  if (avant.demo) {
+    ecrireJsonLocal(CLE_APERCU_HABILLAGE, { ...avant.habillages, [nom]: brut });
+    return null;
+  }
+  const id = idDe(nom);
+  try {
+    if (!id) throw new Error("compte");
+    const { error } = await supabase().from("profiles").update({ habillage_arbitre: brut }).eq("id", id);
+    if (error) throw error;
+    return null;
+  } catch {
+    ecrire(avant);
     return "Pas enregistré. Réessaie.";
   }
 }
@@ -348,9 +452,8 @@ export interface StatsArbitre {
   liste: (Arbitrage & { joue: boolean; totaux: Avis | null })[];
 }
 
-/** La satisfaction d'une moyenne sur 5 : ×20, plafonnée à 99 comme une note de carte. */
-export const satisfactionDe = (t: Avis | null | undefined): number | null =>
-  t && t.avis > 0 ? Math.min(99, Math.round((t.total / t.avis) * 20)) : null;
+/** La satisfaction d'une moyenne sur 5 (missions-arbitre.ts). */
+export { satisfactionDe };
 
 /**
  * Les chiffres de la carte d'un arbitre. `jouee(saison, j)` : la journée

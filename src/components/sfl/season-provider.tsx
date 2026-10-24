@@ -157,7 +157,10 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   // Les arbitres (lib/sfl/arbitres) sont masqués comme des joueurs : la
   // liste publique se refait quand la base les donne.
   const arbitres = useSyncExternalStore(suivreArbitres, arbitresRevision, () => -1);
-  useEffect(() => amorcerDemo(saison.numero ?? 0, derived.journees), [saison.numero, derived.journees]);
+  useEffect(
+    () => amorcerDemo(saison.numero ?? 0, derived.journees, new Set(saison.entries.filter((e) => e.result).map((e) => e.j))),
+    [saison.numero, saison.entries, derived.journees]
+  );
   // `players` est la liste PUBLIQUE : les joueurs masqués n'y sont pas, donc
   // aucun classement, aucune recherche, aucun duel ne peut les faire remonter.
   const value = useMemo<SeasonValue>(

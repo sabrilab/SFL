@@ -94,7 +94,8 @@ import {
   type HabillageCarte,
   type Traitement,
 } from "@/components/sfl/finitions-carte";
-import { Crans, filtrePhoto, InsigneRang, Lisere, Sceau, VoileTraitement, type Boite } from "@/components/sfl/habillage-carte";
+import { Cartons, Crans, filtrePhoto, InsigneRang, Lisere, Sceau, Sifflet, VoileTraitement, type Boite } from "@/components/sfl/habillage-carte";
+import { GRADES, type FinitionArbitre, type GradeArbitre } from "@/components/sfl/skins-arbitre";
 import { BordEpoque, EmblemeEpoque, LosangeBallon, SigleSfl, SigleSouligne } from "@/components/sfl/marques-carte";
 import { MotifCarte } from "@/components/sfl/motif-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
@@ -112,6 +113,9 @@ export interface FaceArbitre {
   note: string;
   /** Ses chiffres, deux par rangée : [« mat », 12]. */
   stats: [string, string | number][];
+  /** Le skin de tenue qu'il porte (skins-arbitre.ts), et son grade dans l'étiquette (passe-arbitre.ts). */
+  finition?: FinitionArbitre | null;
+  grade?: GradeArbitre | null;
 }
 type Palier = "complete" | "compacte" | "reduite" | "pastille";
 
@@ -288,8 +292,8 @@ export function BolaCard({
   const largeur = 254 * size;
   const u = (n: number) => n * size * (254 / W);
   const palier = palierCarte(largeur);
-  // L'arbitre a sa matière à lui, sans habillage ni époque.
-  const p = edition === "arbitre" ? MATIERES.arbitre : matiereDe(edition, habillageDemande, epoque?.saison);
+  // L'arbitre a sa matière à lui (ou le skin de tenue qu'il porte), sans époque.
+  const p = edition === "arbitre" ? MATIERES[arbitre?.finition ?? "arbitre"] : matiereDe(edition, habillageDemande, epoque?.saison);
   const note = arbitre ? arbitre.note : overall;
   // Une carte d'époque est restée telle qu'elle a été émise : sans habillage ni badge.
   const era = p.epoque;
@@ -437,6 +441,8 @@ export function BolaCard({
   const cran = habillage?.cran ?? 0;
   const sceau = complete && signes.includes("sceau");
   const nomGrave = complete && signes.includes("nom-grave");
+  const sifflet = complete && signes.includes("sifflet");
+  const cartons = complete && signes.includes("cartons");
   const tailleMarque = !era && numero != null ? (complete ? 164 : compacte ? 225 : 287) : 80;
   const halo = p.sombre ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)";
 
@@ -642,6 +648,23 @@ export function BolaCard({
                   {p.titre}
                 </div>
                 {habillage?.rang && <InsigneRang rang={habillage.rang} hauteur={u(82)} />}
+                {arbitre?.grade && (
+                  <div
+                    style={{
+                      height: u(51),
+                      padding: `0 ${u(16)}px`,
+                      boxSizing: "border-box",
+                      borderRadius: u(10),
+                      display: "flex",
+                      alignItems: "center",
+                      border: `${u(2)}px solid ${encre(0.7)}`,
+                      ...mono(26, 2.5, 1, 700),
+                      color: encre(0.92),
+                    }}
+                  >
+                    {GRADES[arbitre.grade]}
+                  </div>
+                )}
               </div>
               {era ? (
                 /* Le losange au ballon, qui pointait sous les cartes d'alors */
@@ -667,6 +690,17 @@ export function BolaCard({
                 </div>
               )}
             </>
+          )}
+          {/* Les signes d'arbitre : le sifflet au coin haut droit, les cartons au bas de la photo */}
+          {sifflet && (
+            <span style={{ position: "absolute", right: u(40), top: u(46), width: u(190), height: u(121) }}>
+              <Sifflet encre={p.encre} papier={p.sombre ? "rgba(8,9,11,0.35)" : "rgba(255,255,255,0.5)"} largeur={u(190)} />
+            </span>
+          )}
+          {cartons && (
+            <span style={{ position: "absolute", left: u(55), top: u(695) }}>
+              <Cartons encre={p.encre} papier={p.sombre ? "rgba(8,9,11,0.35)" : "rgba(255,255,255,0.5)"} cote={u(190)} />
+            </span>
           )}
           {/* Le sceau, tamponné sur le bas de la photo */}
           {sceau && (

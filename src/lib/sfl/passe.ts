@@ -92,13 +92,14 @@ export const EPREUVES: readonly Epreuve[] = [
 ];
 
 /** L'épreuve qui ouvre le palier n, s'il en a une. */
-export const epreuveDu = (n: number): Epreuve | undefined => EPREUVES.find((e) => e.palier === n);
+export const epreuveDu = (n: number, epreuves: readonly Epreuve[] = EPREUVES): Epreuve | undefined =>
+  epreuves.find((e) => e.palier === n);
 
 /** Le palier que paient `xp` points de la saison, les épreuves faites ouvrant leur porte. */
-export function palierPour(xp: number, faites: ReadonlySet<number>): number {
+export function palierPour(xp: number, faites: ReadonlySet<number>, epreuves: readonly Epreuve[] = EPREUVES): number {
   let p = 0;
   while (p < PALIERS_PASSE && xp >= seuilPalier(p + 1)) p++;
-  for (const e of EPREUVES) if (p >= e.palier && !faites.has(e.numero)) return e.palier - 1;
+  for (const e of epreuves) if (p >= e.palier && !faites.has(e.numero)) return e.palier - 1;
   return p;
 }
 
@@ -169,8 +170,11 @@ export interface BilanPasse {
   epreuves: EtatEpreuve[];
 }
 
-/** Le passe d'un joueur, tiré de ses lignes d'XP de la saison (dans n'importe quel ordre). */
-export function passeDe(lignes: readonly LigneXp[]): BilanPasse {
+/**
+ * Le passe d'un joueur, tiré de ses lignes d'XP de la saison (dans n'importe
+ * quel ordre). Le passe d'arbitre (passe-arbitre.ts) a ses épreuves à lui.
+ */
+export function passeDe(lignes: readonly LigneXp[], epreuves: readonly Epreuve[] = EPREUVES): BilanPasse {
   const parJournee = new Map<number, LigneXp[]>();
   for (const l of lignes) {
     const liste = parJournee.get(l.j);
@@ -184,16 +188,16 @@ export function passeDe(lignes: readonly LigneXp[]): BilanPasse {
   for (const j of [...parJournee.keys()].sort((a, b) => a - b)) {
     const du = parJournee.get(j) ?? [];
     cumul += du.reduce((a, l) => a + l.xp, 0);
-    for (const e of EPREUVES) if (!faites.has(e.numero) && du.some(e.faite)) faites.set(e.numero, j);
-    palier = Math.max(palier, palierPour(Math.max(0, cumul), new Set(faites.keys())));
+    for (const e of epreuves) if (!faites.has(e.numero) && du.some(e.faite)) faites.set(e.numero, j);
+    palier = Math.max(palier, palierPour(Math.max(0, cumul), new Set(faites.keys()), epreuves));
   }
   const xp = Math.max(0, lignes.reduce((a, l) => a + l.xp, 0));
-  const epreuves = EPREUVES.map((e) => ({ e, j: faites.get(e.numero) ?? null }));
+  const etats = epreuves.map((e) => ({ e, j: faites.get(e.numero) ?? null }));
   if (palier >= PALIERS_PASSE)
-    return { palier, xp, versPalier: 0, coutPalier: 0, manque: 0, bloquee: null, epreuves };
+    return { palier, xp, versPalier: 0, coutPalier: 0, manque: 0, bloquee: null, epreuves: etats };
   const suivant = palier + 1;
   const cout = coutPalier(suivant);
-  const porte = epreuveDu(suivant);
+  const porte = epreuveDu(suivant, epreuves);
   return {
     palier,
     xp,
@@ -201,7 +205,7 @@ export function passeDe(lignes: readonly LigneXp[]): BilanPasse {
     coutPalier: cout,
     manque: Math.max(0, seuilPalier(suivant) - xp),
     bloquee: porte && !faites.has(porte.numero) ? porte : null,
-    epreuves,
+    epreuves: etats,
   };
 }
 

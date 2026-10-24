@@ -15,6 +15,7 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { useArbitres } from "@/hooks/use-arbitres";
 import { useIdentites } from "@/hooks/use-identites";
 import { designerArbitre, poserArbitre } from "@/lib/sfl/arbitres";
+import { heuresDeJournee } from "@/lib/sfl/missions";
 
 export function ArbitresAdmin() {
   const { allPlayers, journees, saison } = useSeason();
@@ -109,7 +110,9 @@ export function ArbitresAdmin() {
                       aria-label={`Arbitre du match ${n + 1}, journée ${jr.j}`}
                       onChange={async (e) => {
                         setMessage(null);
-                        const err = await designerArbitre(numero, jr.j, n, equipes, e.target.value || null);
+                        // Les notes des joueurs ferment le mardi à minuit qui suit le match (missions-arbitre.ts).
+                        const fermeLe = heuresDeJournee(saison, jr.j, new Date())?.finDesNotes ?? null;
+                        const err = await designerArbitre(numero, jr.j, n, equipes, e.target.value || null, fermeLe);
                         if (err) setMessage(err);
                       }}
                       className="h-9 max-w-[45%] shrink-0 rounded-full bg-background px-3 text-[13px] font-medium"

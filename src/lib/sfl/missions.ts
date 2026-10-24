@@ -46,6 +46,7 @@ import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { ovr, type Player } from "./engine";
 import type { MatchEntry, Saison, SaisonArchivee } from "./saisie/types";
 import { passeDe, type BilanPasse } from "./passe";
+import type { CreneauArbitre } from "./missions-arbitre";
 
 /* ------------------------------- Le barème ------------------------------- */
 
@@ -207,7 +208,7 @@ export interface Verdict {
 }
 
 /** Une saison telle que le moteur la lit : celle en cours, ou une archive. */
-type SaisonLue = Pick<Saison, "journees" | "entries" | "roster"> & Partial<Pick<Saison, "convocations">>;
+export type SaisonLue = Pick<Saison, "journees" | "entries" | "roster"> & Partial<Pick<Saison, "convocations">>;
 
 /* --------------------------------- L'heure --------------------------------- */
 
@@ -330,6 +331,29 @@ export function defiDuDimanche(j: number): "gagnez" | "deux-passes" | "record" {
  * records. `reference` : l'instant qui fixe l'année des dates (maintenant pour
  * la saison en cours, la clôture pour une archive).
  */
+/**
+ * Les heures d'une journée qui a ses équipes : son premier coup d'envoi et
+ * minuit le soir du match, à Paris ; null sans équipes. Des matchs à des
+ * heures différentes : tout ferme au premier coup d'envoi (« passe devant »
+ * se joue sur tous les matchs ; à 15h, on connaîtrait déjà le match de 13h).
+ * Les missions d'arbitre s'en servent aussi (missions-arbitre.ts).
+ */
+export function heuresDeJournee(s: SaisonLue, j: number, reference: Date) {
+  const meta = s.journees.find((m) => m.j === j);
+  const journee = computeJournees(s as Saison).find((x) => x.j === j);
+  if (!meta || !journee?.matches?.length) return null;
+  const jm = jourMois(meta.date);
+  const heureJournee = heureDe(s, j);
+  const heure = premierCoupDEnvoi(matchsDeJournee(journee, [], { heure: heureJournee, lieu: null }), heureJournee);
+  const [h, min] = lireHeure(heure);
+  const annee = jm ? anneeProche(jm.jour, jm.mois, reference) : 2026;
+  const coupEnvoi = jm ? dateDeParis(annee, jm.mois, jm.jour, h, min) : new Date(0);
+  const finDuJour = jm ? dateDeParis(annee, jm.mois, jm.jour + 1) : new Date(0);
+  /** Le mardi à minuit : deux jours pour noter l'arbitre. */
+  const finDesNotes = jm ? dateDeParis(annee, jm.mois, jm.jour + 3) : new Date(0);
+  return { meta, journee, heure, coupEnvoi, finDuJour, finDesNotes };
+}
+
 export function missionsDeJournee(
   s: SaisonLue,
   numero: number,
@@ -337,20 +361,9 @@ export function missionsDeJournee(
   reference: Date,
   passe: MatchEntry[] = []
 ): DimancheMissions | null {
-  const meta = s.journees.find((m) => m.j === j);
-  const journee = computeJournees(s as Saison).find((x) => x.j === j);
-  if (!meta || !journee?.matches?.length) return null;
-
-  const jm = jourMois(meta.date);
-  // Des matchs à des heures différentes : les contrats ferment au premier
-  // coup d'envoi pour tout le monde (« passe devant » se joue sur tous les
-  // matchs ; à 15h, on connaîtrait déjà le match de 13h).
-  const heureJournee = heureDe(s, j);
-  const heure = premierCoupDEnvoi(matchsDeJournee(journee, [], { heure: heureJournee, lieu: null }), heureJournee);
-  const [h, min] = lireHeure(heure);
-  const annee = jm ? anneeProche(jm.jour, jm.mois, reference) : 2026;
-  const coupEnvoi = jm ? dateDeParis(annee, jm.mois, jm.jour, h, min) : new Date(0);
-  const finDuJour = jm ? dateDeParis(annee, jm.mois, jm.jour + 1) : new Date(0);
+  const heures = heuresDeJournee(s, j, reference);
+  if (!heures) return null;
+  const { meta, journee, heure, coupEnvoi, finDuJour } = heures;
 
   const avant = pointsAvant(s, j);
   const notes = new Map<string, number>(
@@ -375,7 +388,7 @@ export function missionsDeJournee(
   const duels: Duel[] = [];
   const camps = new Map<string, Camp>();
   const rival = new Map<string, string>();
-  journee.matches.forEach((m, t) => {
+  journee.matches!.forEach((m, t) => {
     const noirs = m.teamA.players.map((p) => p.name).filter((n) => !isHidden(n));
     const blancs = m.teamB.players.map((p) => p.name).filter((n) => !isHidden(n));
     const label = journee.matches!.length > 1 ? `Match ${t + 1}` : "Le match";
@@ -621,7 +634,7 @@ export interface LigneXp {
   quoi: string;
   xp: number;
   /** Une mission acceptée et jugée : son créneau, son rang, réussie ou non (les épreuves du passe, passe.ts). */
-  mission?: { creneau: Creneau; rang: Rang; reussie: boolean };
+  mission?: { creneau: Creneau | CreneauArbitre; rang: Rang; reussie: boolean };
   /** Les trois missions du même dimanche réussies. */
   parfait?: boolean;
 }
