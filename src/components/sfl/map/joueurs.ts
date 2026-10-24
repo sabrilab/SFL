@@ -6,15 +6,22 @@
 //     notés devant, ceux qui ont une photo d'abord), le compte dans une
 //     pastille, le nom de la ville dessous. Des villes trop proches à
 //     l'écran se fondent en une seule pile, celle de la plus peuplée ;
-//   · en s'approchant, quand la place le permet, la pile s'ouvre : les cartes
-//     sortent du centre et se posent en tournesol autour du nom de la ville,
-//     à l'angle d'or (137,5°), le mieux noté au plus près. Au-delà de
-//     OUVERTE_MAX, un « +N » sur le nom : le reste est dans le catalogue.
+//   · la pile reste un paquet fermé tant qu'on ne l'a pas touchée (Sabri,
+//     24/10 : « tu crées vraiment des paquets indivisibles tant qu'on n'a
+//     pas cliqué dessus. Jusqu'à ce qu'on zoome jusqu'au bout ») : des
+//     cartes éparpillées cachaient les matchs. La toucher ouvre sa
+//     collection (map/collection-pile.tsx) ;
+//   · tout au bout du zoom (ZOOM_OUVERTURE), quand la place le permet, elle
+//     s'ouvre : les cartes sortent du centre et se posent en tournesol autour
+//     du nom de la ville, à l'angle d'or (137,5°), le mieux noté au plus
+//     près. Au-delà de OUVERTE_MAX, un « +N » sur le nom : le reste est dans
+//     le catalogue.
 //
 // Avec le filtre Contrats (map/contrats-map.ts, 23/10), seules les cibles du
 // dimanche restent, chacune sous un viseur à la couleur du rang de son
 // contrat, sa prime à la place de sa note (le dessin du viseur est dans
-// map/contrats-map.css).
+// map/contrats-map.css). Les matchs s'effacent alors du plan : les villes
+// s'ouvrent dès le quartier (ZOOM_OUVERTURE_CONTRATS), comme avant le 24/10.
 //
 // Ce fichier ne connaît pas MapLibre : il reçoit des points à l'écran et rend
 // des dispositions et du HTML (le dessin est dans globals.css, le mouvement
@@ -65,8 +72,12 @@ export const OUVERTE_MAX = 21;
 const FUSION = 96;
 /** Le rayon qu'occupe une pile fermée (cartes, pastille et nom). */
 const R_PILE = 52;
-/** Une ville ne s'ouvre qu'à partir de ce zoom (le quartier ; zoom de MapLibre). */
-export const ZOOM_OUVERTURE = 11;
+/** Une ville ne s'ouvre qu'au bout du zoom (zoom de MapLibre ; le plus proche est 17,5). */
+export const ZOOM_OUVERTURE = 17;
+/** Avec le filtre Contrats, les matchs effacés, elle s'ouvre dès le quartier. */
+export const ZOOM_OUVERTURE_CONTRATS = 11;
+/** Le zoom où l'on va voir une ville : ses rues, sa pile. */
+export const ZOOM_VILLE = 12;
 
 /** Le dossier d'une ville : « Villeneuve-d'Ascq » → « villeneuve-d-ascq ». */
 export function cleVille(v: string): string {
@@ -105,7 +116,9 @@ export function disposer(
   zoom: number,
   ecran: (lat: number, lng: number) => { x: number; y: number },
   /** Ce qu'un tournesol ne doit pas recouvrir (les stickers des matchs). */
-  obstacles: { x: number; y: number; r: number }[] = []
+  obstacles: { x: number; y: number; r: number }[] = [],
+  /** Le zoom à partir duquel une ville peut s'ouvrir. */
+  zoomOuverture = ZOOM_OUVERTURE
 ): Disposition[] {
   const ordre = [...villes].sort((a, b) => b.joueurs.length - a.joueurs.length || a.ville.localeCompare(b.ville));
   const groupes: { tete: VillePlan; villes: VillePlan[]; x: number; y: number }[] = [];
@@ -120,7 +133,7 @@ export function disposer(
   // tournesol ne recouvre ni une pile voisine ni un autre tournesol.
   const rayons = groupes.map(() => R_PILE);
   const ouverte = groupes.map(() => false);
-  if (zoom >= ZOOM_OUVERTURE) {
+  if (zoom >= zoomOuverture) {
     groupes.forEach((g, i) => {
       if (g.villes.length > 1) return;
       const r = rayonOuvert(g.tete.joueurs.length);
@@ -226,15 +239,16 @@ export function joueurHtml(j: JoueurPlan, i: number, sort: boolean): string {
 /* ───────────────────────────── Le regroupement ───────────────────────────── */
 
 /** Deux stickers plus proches que ça à l'écran n'en font qu'un. */
-const FUSION_MATCHS = 112;
-/** Une pile de joueurs sous un sticker s'y range. */
+export const FUSION_MATCHS = 112;
+/** Une pile de joueurs sur un sticker ou sous ses noms s'y range (de côté, au-dessus, en dessous). */
 export const FUSION_PILE = 100;
 /** La place d'un sticker pour un tournesol : sa vignette et son nom. */
 export const R_STICKER = 56;
 
 export interface GroupeMatchs {
-  /** Le sticker qui reste à l'écran : le choisi, sinon le premier venu. */
+  /** Le sticker qui reste devant : le choisi, sinon le plus proche dans le temps. */
   tete: string;
+  /** Les matchs du paquet : la tête, puis les autres dans l'ordre du temps. */
   ids: string[];
   x: number;
   y: number;
@@ -242,11 +256,13 @@ export interface GroupeMatchs {
 
 /**
  * Les matchs qui se chevauchent à l'écran (Sabri, 22/10 : « s'il y a des
- * choses qui doivent se chevaucher, elles fusionnent ») : un seul sticker
- * reste, les autres s'y rangent. Le choisi est toujours une tête.
+ * choses qui doivent se chevaucher, elles fusionnent ») : un paquet, le
+ * premier devant, les autres rangés derrière lui. Le choisi est toujours une
+ * tête ; sinon, le match le plus proche dans le temps (`rang` : l'ordre des
+ * matchs, le joué en dernier).
  */
-export function grouperMatchs(points: { id: string; x: number; y: number }[], choisi: string | null): GroupeMatchs[] {
-  const ordre = [...points].sort((a, b) => Number(b.id === choisi) - Number(a.id === choisi));
+export function grouperMatchs(points: { id: string; x: number; y: number; rang: number }[], choisi: string | null): GroupeMatchs[] {
+  const ordre = [...points].sort((a, b) => Number(b.id === choisi) - Number(a.id === choisi) || a.rang - b.rang);
   const groupes: GroupeMatchs[] = [];
   for (const p of ordre) {
     const proche = groupes.find((g) => Math.hypot(g.x - p.x, g.y - p.y) < FUSION_MATCHS);
@@ -256,11 +272,24 @@ export function grouperMatchs(points: { id: string; x: number; y: number }[], ch
   return groupes;
 }
 
-/** La pastille sous un sticker qui en range d'autres : « 2 matchs · 14 joueurs ». */
-export function groupeHtml(matchs: number, joueurs: number): string {
-  const morceaux = [
-    ...(matchs > 1 ? [`${matchs} matchs`] : []),
-    ...(joueurs > 0 ? [`${joueurs} joueur${joueurs > 1 ? "s" : ""}`] : []),
+/**
+ * Les joueurs rangés sous un sticker (leur ville est au même endroit, à
+ * l'écran) : leur pile en petit, posée contre lui, et leur nombre — des
+ * cartes, qu'on ne les prenne pas pour des matchs. La toucher ouvre leur
+ * collection.
+ */
+export function joueursSousHtml(joueurs: JoueurPlan[]): string {
+  const devant = [...joueurs].sort((a, b) => Number(!!b.photo) - Number(!!a.photo) || b.note - a.note).slice(0, 3);
+  const poses = [
+    ["-13deg", "-6px"],
+    ["10deg", "6px"],
+    ["-2deg", "0px"],
   ];
-  return morceaux.length ? `<span class="stk__groupe">${morceaux.join(" · ")}</span>` : "";
+  const cartes = devant
+    .map((j, i) => ({ j, pose: poses[devant.length === 1 ? 2 : devant.length === 2 ? [2, 1][i] : [2, 0, 1][i]] }))
+    .reverse()
+    .map(({ j, pose }) => `<span class="jc stk__joueurs-carte" style="--r:${pose[0]};--x:${pose[1]}">${visage(j)}</span>`)
+    .join("");
+  const n = joueurs.length;
+  return `<span class="stk__joueurs" role="button" aria-label="${n} joueur${n > 1 ? "s" : ""} ici">${cartes}<span class="stk__joueurs-compte">${n}</span></span>`;
 }
