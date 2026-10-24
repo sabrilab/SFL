@@ -110,14 +110,11 @@ function installer() {
   // La première page de l'app : Next y a déjà mis son état ; sans le sien,
   // l'état reste tel quel (Next recharge une page dont l'état n'est pas le sien).
   if (h.state?.__NA && !marque()) remplacer.call(h, { ...h.state, bola: { i: 0, k: nouvelleCle() } satisfies Marque }, "");
-  // Une page rechargée (une mise à jour) retrouve sa place, le temps que la
-  // saison se charge.
+  // Une page rechargée (une mise à jour) retrouve sa place, le temps que
+  // l'app s'ouvre et que la saison se charge.
   const m = marque();
   const top = m ? places.get(m.k) : undefined;
-  if (top) {
-    silence = maintenant() + 3000;
-    restaurer(top, silence);
-  }
+  if (top) restaurer(top, maintenant() + 8000);
 
   window.addEventListener("popstate", () => {
     // La page d'avant (ou d'après) revient : sa place, notée avant que
@@ -126,10 +123,8 @@ function installer() {
     // Next, qui passe avant celle-ci : elle est alors déjà là.
     const m = marque();
     const top = (m && places.get(m.k)) ?? 0;
-    if (affichee === adresse()) {
-      silence = maintenant() + 1500;
-      restaurer(top, silence);
-    } else attendre(adresse(), top, 1500);
+    if (affichee === adresse()) restaurer(top, maintenant() + 2000);
+    else attendre(adresse(), top, 2000);
     prevenir();
   });
 
@@ -152,7 +147,7 @@ function attendre(url: string, top: number, duree: number) {
 /** Retrouver la place d'une racine, à la touche de son onglet. */
 export function retrouverOnglet(href: string) {
   if (!RACINES_MEMOIRE.includes(href)) return;
-  attendre(href, racines.get(href) ?? 0, 1500);
+  attendre(href, racines.get(href) ?? 0, 2000);
 }
 
 /** Remonter en haut de la page, à la touche de l'onglet où l'on est déjà. */
@@ -161,28 +156,55 @@ export function remonter() {
   defilant()?.scrollTo({ top: 0, behavior: reduit ? "auto" : "smooth" });
 }
 
+/** Arrête la pose en cours, quand une autre la remplace. */
+let arreter: (() => void) | null = null;
+
 /**
  * Pose la page attendue à sa place, image après image, le temps que son
- * contenu arrive (une liste qui se charge) ; un doigt posé arrête tout.
+ * contenu arrive (une liste qui se charge) ; un doigt posé, ou la page
+ * défilée par autre chose (la barre de défilement, le clavier), arrête tout.
+ * Jusqu'à `jusqua`, le navigateur ne la décale pas pour garder en vue ce qui
+ * s'ajoute plus haut (overflow-anchor) : la page, une fois remplie, est là
+ * où on l'avait laissée. #app-scroll est repris à chaque image : à
+ * l'ouverture de l'app, la porte de connexion peut le remplacer.
  */
 function restaurer(top: number, jusqua: number) {
-  const el = defilant();
-  if (!el) return void (silence = 0);
+  arreter?.();
+  silence = jusqua;
+  let el: HTMLElement | null = null;
+  let pose = false;
   let fini = false;
+  let dernier = -1;
   const finir = () => {
+    if (fini) return;
     fini = true;
     silence = 0;
-    el.removeEventListener("touchstart", finir);
-    el.removeEventListener("wheel", finir);
+    if (el) el.style.overflowAnchor = "";
+    window.removeEventListener("touchstart", finir, true);
+    window.removeEventListener("wheel", finir, true);
+    if (arreter === finir) arreter = null;
   };
-  el.addEventListener("touchstart", finir, { passive: true });
-  el.addEventListener("wheel", finir, { passive: true });
+  arreter = finir;
+  window.addEventListener("touchstart", finir, { passive: true, capture: true });
+  window.addEventListener("wheel", finir, { passive: true, capture: true });
+  setTimeout(finir, Math.max(0, jusqua - maintenant()));
   const pas = () => {
     if (fini) return;
-    const max = el.scrollHeight - el.clientHeight;
-    el.scrollTop = Math.min(top, max);
-    if (max >= top || maintenant() > jusqua) return finir();
-    requestAnimationFrame(pas);
+    const ici = defilant();
+    if (ici && ici !== el) {
+      if (el) el.style.overflowAnchor = "";
+      el = ici;
+      el.style.overflowAnchor = "none";
+      pose = false;
+      dernier = -1;
+    }
+    if (el && !pose) {
+      if (dernier >= 0 && Math.abs(el.scrollTop - dernier) > 1) return finir();
+      const max = el.scrollHeight - el.clientHeight;
+      el.scrollTop = dernier = Math.min(top, max);
+      pose = max >= top;
+    }
+    if (!pose && maintenant() < jusqua) requestAnimationFrame(pas);
   };
   pas();
 }
