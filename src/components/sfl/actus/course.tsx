@@ -91,7 +91,8 @@ import { ANTON } from "./ecran";
 import { RubriqueDivisions } from "./divisions";
 import { RubriqueOutsider } from "./outsider";
 import { VoteDuJour } from "./fil";
-import { RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
+import { CouvertureRubrique, RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
+import { couverturesDuDimanche, sources, type Couverture } from "@/lib/sfl/couvertures";
 import { ContratsEnJeu } from "./contrats-en-jeu";
 import { MissionsBola } from "./missions";
 import { PronosBola } from "./pronos";
@@ -104,24 +105,20 @@ import { CarteSaison, categoriesLegendes, Compteurs, LeMur } from "./wall-of-fam
 const SCENES: Actu["type"][] = ["mvp", "chiffre", "duo", "montent", "badge", "badges", "equipe"];
 
 /**
- * Un dimanche joué : son titre (J8 · 9 août), son terrain, ses rubriques.
- * Sur grand écran, le terrain à gauche, qui reste à l'écran tant qu'il y
- * tient, et les rubriques à droite, une colonne puis deux dès 1280 px.
- * Son ancre, #j8, y mène depuis Ma saison (useAncre).
+ * Un dimanche joué : sa couverture (une photo du moodboard, J8 et sa date,
+ * lib/sfl/couvertures.ts), son terrain, ses rubriques, dont une sur trois
+ * posée sur une photo plutôt que sur le gazon : le fil respire (Sabri,
+ * 24/10). Sur grand écran, la couverture en bandeau, le terrain à gauche,
+ * qui reste à l'écran tant qu'il y tient, et les rubriques à droite, une
+ * colonne puis deux dès 1280 px. Son ancre, #j8, y mène depuis Ma saison
+ * (useAncre).
  */
 function Dimanche({ j, journee, scenes, ouvrir }: { j: number; journee?: Journee; scenes: Actu[]; ouvrir: () => void }) {
   const [terrain, terrainCollant] = useCollant();
+  const { chapitre, rubriques } = useMemo(() => couverturesDuDimanche(j, scenes.map((a) => a.type)), [j, scenes]);
   return (
     <section id={`j${j}`} className="flex scroll-mt-4 flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-x-[var(--fib-21)] md:gap-y-[var(--fib-21)] md:border-t md:border-contraste/[0.08] md:pt-[var(--fib-34)] xl:grid-cols-3">
-      <div className="flex items-end justify-between px-5 md:col-span-full md:justify-start md:gap-4 md:px-0">
-        <h2
-          className="text-[22px] leading-none tracking-tight md:text-[34px]"
-          style={{ fontFamily: ANTON }}
-        >
-          {`J${j}`}
-        </h2>
-        <span className="mono-label text-foreground/45">{journee?.date}</span>
-      </div>
+      <CouvertureDimanche j={j} journee={journee} c={chapitre} />
       {journee && (
         <div ref={terrain} className={cn("px-5 md:px-0", terrainCollant && "md:sticky md:top-[var(--fib-21)]")}>
           <CarteJournee journee={journee} onOuvrir={ouvrir} />
@@ -133,11 +130,51 @@ function Dimanche({ j, journee, scenes, ouvrir }: { j: number; journee?: Journee
           !journee && "md:col-span-full md:grid-cols-2 xl:grid-cols-3",
         )}
       >
-        {scenes.map((a) => (
-          <RubriqueActu key={a.id} a={a} />
+        {scenes.map((a, i) => (
+          <CouvertureRubrique.Provider key={a.id} value={rubriques[i]}>
+            <RubriqueActu a={a} />
+          </CouvertureRubrique.Provider>
         ))}
       </div>
     </section>
+  );
+}
+
+/**
+ * La couverture d'un dimanche, bord à bord : la photo, et dessus, en bas,
+ * J8 en grand, sa date, ses matchs et ses buts. Rien d'autre : c'est la
+ * respiration entre deux dimanches. Toujours sur le noir de la photo, en
+ * mode clair aussi.
+ */
+function CouvertureDimanche({ j, journee, c }: { j: number; journee?: Journee; c: Couverture }) {
+  const { src, srcSet } = sources(c);
+  const matchs = journee?.matches ?? [];
+  const buts = matchs.reduce((s, m) => s + m.teamA.score + m.teamB.score, 0);
+  const ligne = matchs.length ? `${matchs.length} ${matchs.length > 1 ? "matchs" : "match"} · ${buts} ${buts > 1 ? "buts" : "but"}` : null;
+  return (
+    <header className="dark relative isolate mb-2 flex aspect-[4/5] max-h-[76svh] w-full flex-col justify-end overflow-hidden bg-black text-white md:col-span-full md:mb-0 md:aspect-[21/8] md:max-h-none md:rounded-3xl">
+      {/* eslint-disable-next-line @next/next/no-img-element -- une image fixe du moodboard, en srcset */}
+      <img
+        src={src}
+        srcSet={srcSet}
+        sizes="(min-width: 1280px) 1320px, 100vw"
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="absolute inset-0 -z-10 size-full object-cover"
+        style={{ objectPosition: c.point }}
+      />
+      <div aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0)_45%,rgba(0,0,0,0.85)_100%)]" />
+      <div className="flex items-end justify-between gap-4 px-5 pb-5 md:px-8 md:pb-7">
+        <h2 className="text-[88px] leading-[0.8] tracking-tight md:text-[120px]" style={{ fontFamily: ANTON }}>
+          {`J${j}`}
+        </h2>
+        <div className="flex flex-col items-end gap-1 pb-1 text-right">
+          <span className="mono-label text-white/70">{journee?.date}</span>
+          {ligne && <span className="mono-label text-white/45">{ligne}</span>}
+        </div>
+      </div>
+    </header>
   );
 }
 
