@@ -194,7 +194,8 @@ create policy "profiles: lecture ligue"
 
 -- Chacun ne modifie que sa fiche. L'auto-promotion admin est déjà impossible :
 -- le grant de colonnes (plus bas) ne laisse modifier que l'email de contact,
--- le badge et la ville. Ni le nom ni le pseudo : ils passent par le serveur.
+-- le badge, l'habillage, la ville et la date de l'accueil. Ni le nom ni le
+-- pseudo : ils passent par le serveur.
 drop policy if exists "profiles: mise à jour de soi" on public.profiles;
 create policy "profiles: mise à jour de soi"
   on public.profiles for update
@@ -294,6 +295,13 @@ alter table public.profiles add column if not exists ville_cachee boolean not nu
 -- Tant qu'elle est vide, l'ouverture de l'app lui propose de la donner
 -- (invitation-carte.tsx, Sabri, 22/10).
 alter table public.profiles add column if not exists ville_le timestamptz;
+
+-- L'accueil de l'app (components/sfl/accueil, Sabri, 24/10) : à la première
+-- ouverture, tout ce que l'app demande au joueur, puis la visite de l'app.
+-- accueil_le : quand il l'a fini (null = jamais : la visite l'attend à sa
+-- prochaine ouverture). Posé par le joueur seul (grant plus bas, RLS « mise
+-- à jour de soi »).
+alter table public.profiles add column if not exists accueil_le timestamptz;
 
 -- ──────────────────────────── Activité ───────────────────────────────
 -- Journal d'usage : connexions, ouvertures quotidiennes, réponses de
@@ -617,6 +625,7 @@ grant update (contact_email) on public.profiles to authenticated;
 grant update (badge) on public.profiles to authenticated;
 grant update (habillage) on public.profiles to authenticated;
 grant update (ville, ville_lat, ville_lng, ville_cachee, ville_le) on public.profiles to authenticated;
+grant update (accueil_le) on public.profiles to authenticated;
 grant insert, select on public.activity to authenticated;
 grant insert, update, delete on public.presence to authenticated;
 grant insert, update, select on public.compositions to authenticated;
@@ -1122,6 +1131,10 @@ alter table public.fiches enable row level security;
 -- Les joueurs inscrits avant les fiches n'y ont que leur prénom et leur nom,
 -- posés en confirmant leur identité depuis Ma carte : la naissance attend.
 alter table public.fiches alter column naissance drop not null;
+
+-- Homme ou femme (Sabri, 24/10) : demandé à l'accueil de l'app, juste après
+-- l'identité (components/sfl/accueil). Privé comme le reste de la fiche.
+alter table public.fiches add column if not exists sexe text check (sexe in ('homme', 'femme'));
 
 drop policy if exists "fiches: la mienne ou admin" on public.fiches;
 create policy "fiches: la mienne ou admin"
