@@ -34,11 +34,13 @@
 //     tourne ; palier 16 du Passe Bola ;
 //   · verre (offerte, la deuxième à la carte de Sabri, 24/10 : « transparente
 //     comme du verre, mais que tu gardes un peu les détails de motif […] et
-//     que tu trouves un truc stylé pour les chiffres ») : une plaque de verre
-//     fumé qui laisse voir ce qu'il y a derrière (la page, et en 3D la
+//     que tu trouves un truc stylé pour les chiffres », puis « encore plus
+//     vert, avec des petits reflets en bas, arc-en-ciel ») : une plaque de
+//     verre vert qui laisse voir ce qu'il y a derrière (la page, et en 3D la
 //     tranche de l'autre côté), le guilloché de l'onyx gravé dedans comme un
-//     dépoli, l'encre blanche ; la note et le numéro taillés en biseau,
-//     creux, leur arête accrochant la lumière (chiffres: "biseau") ;
+//     dépoli, l'irisation au bas, l'encre blanche ; la note et le numéro
+//     taillés en biseau, creux, leur arête accrochant la lumière (chiffres:
+//     "biseau") ;
 //   · les skins du Passe Bola (lib/sfl/passe.ts, 24/10), dans
 //     skins-passe.ts et motifs-passe.tsx : givre, carbone, marbre, tes
 //     couleurs (le pays choisi, HabillageCarte.pays), néon, aurore, ki et
@@ -199,6 +201,8 @@ export interface Matiere {
    * qu'il y a derrière, la 3D garde la transparence du papier et du dos.
    */
   transparente?: boolean;
+  /** L'irisation arc-en-ciel au bas de la carte, comme la lumière qui se décompose dans l'épaisseur du verre. */
+  irise?: boolean;
   /** La note et le numéro taillés en biseau : creux, une arête de lumière, une ombre portée. */
   chiffres?: "biseau";
   /** Une édition d'époque : ce qu'elle reprend de son temps. */
@@ -469,39 +473,43 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
     tranche: { couleur: "#15161a", metal: 0.85, rugosite: 0.2 },
     holo: { force: 0.38, teinte: [0.86, 0.9, 1] },
   },
-  // Verre : une plaque de verre fumé. Le teint laisse passer ce qu'il y a
-  // derrière (plus clair en haut, où la lumière entre), un reflet en deux
-  // bandes comme sur une vitre, le guilloché de l'onyx gravé en dépoli
-  // (clair) avec son ombre dans l'épaisseur, une tranche polie qui brille.
-  // Sans couleur : ni or, ni bleu, ni rouge.
+  // Verre : une plaque de verre vert, clair comme une bouteille au soleil
+  // (Sabri, 24/10 : « encore plus vert, avec des petits reflets en bas,
+  // arc-en-ciel. Vraiment pas noir, genre vert-vert »). Le teint vert laisse
+  // passer ce qu'il y a derrière et reste vert même sur une page noire, plus
+  // profond sur les bords comme l'épaisseur d'un verre ; un reflet en deux
+  // bandes, le guilloché de l'onyx gravé en dépoli, l'irisation arc-en-ciel
+  // au bas de la carte (irise), une tranche de verre vert polie.
   verre: {
     nom: "verre",
     titre: "verre",
-    encre: "242,244,247",
+    encre: "244,255,249",
     sombre: true,
     papier: [
-      "linear-gradient(118deg, rgba(255,255,255,0) 28%, rgba(255,255,255,0.13) 40%, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0) 60%)",
-      "radial-gradient(130% 70% at 20% 0%, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 55%)",
-      "linear-gradient(165deg, rgba(40,44,50,0.2) 0%, rgba(16,18,21,0.34) 58%, rgba(8,9,11,0.46) 100%)",
+      "linear-gradient(118deg, rgba(255,255,255,0) 28%, rgba(255,255,255,0.16) 40%, rgba(255,255,255,0.03) 45%, rgba(255,255,255,0.11) 50%, rgba(255,255,255,0) 60%)",
+      "radial-gradient(130% 70% at 20% 0%, rgba(214,255,232,0.2) 0%, rgba(214,255,232,0) 55%)",
+      "radial-gradient(75% 60% at 50% 45%, rgba(70,200,140,0) 40%, rgba(20,120,80,0.28) 100%)",
+      "linear-gradient(165deg, rgba(88,214,156,0.46) 0%, rgba(46,170,118,0.5) 55%, rgba(24,128,88,0.58) 100%)",
     ].join(", "),
-    motif: { type: "guilloche", clair: "rgba(255,255,255,0.17)", fonce: "rgba(0,0,0,0.2)" },
-    fond: "rgba(18,20,24,0.55)",
-    lueur: "rgba(255,255,255,0.1)",
+    motif: { type: "guilloche", clair: "rgba(226,255,240,0.22)", fonce: "rgba(0,52,32,0.22)" },
+    fond: "rgba(30,120,84,0.5)",
+    lueur: "rgba(200,255,226,0.14)",
     rayures: 0.05,
-    micro: 0.08,
-    reflet: 0.12,
-    coins: 0.8,
-    etiquette: { fond: "rgba(255,255,255,0.08)", bord: "rgba(242,244,247,0.6)", texte: "rgba(242,244,247,0.95)" },
+    micro: 0.09,
+    reflet: 0.16,
+    coins: 0.85,
+    etiquette: { fond: "rgba(226,255,240,0.12)", bord: "rgba(244,255,249,0.7)", texte: "rgba(244,255,249,0.96)" },
     symbole: "/bola/symbole-blanc.svg",
-    rebord: { lumiere: "rgba(255,255,255,0.6)", ombre: "rgba(0,0,0,0.55)" },
-    puce: "linear-gradient(135deg, rgba(255,255,255,0.7), rgba(255,255,255,0.12) 45%, rgba(255,255,255,0.5) 70%, rgba(255,255,255,0.08))",
-    cadre: "linear-gradient(152deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.14) 38%, rgba(255,255,255,0.42) 64%, rgba(255,255,255,0.1) 100%)",
-    voile: "rgba(6,7,9,0.72)",
-    onglet: { fond: "rgba(8,9,11,0.7)", encre: "#f2f4f7" },
-    vive: "#e4e8ec",
-    tranche: { couleur: "#9aa2aa", metal: 0.9, rugosite: 0.06 },
-    holo: { force: 0.38, teinte: [0.9, 0.94, 1] },
+    rebord: { lumiere: "rgba(226,255,240,0.75)", ombre: "rgba(0,60,36,0.5)" },
+    puce: "linear-gradient(135deg, rgba(236,255,246,0.8), rgba(120,220,170,0.25) 45%, rgba(236,255,246,0.6) 70%, rgba(80,190,140,0.2))",
+    cadre: "linear-gradient(152deg, rgba(200,255,226,0.75) 0%, rgba(70,190,135,0.35) 38%, rgba(190,255,220,0.6) 64%, rgba(40,150,100,0.3) 100%)",
+    voile: "rgba(8,60,40,0.62)",
+    onglet: { fond: "rgba(14,90,60,0.72)", encre: "#f4fff9" },
+    vive: "#9ff0c6",
+    tranche: { couleur: "#3fb784", metal: 0.75, rugosite: 0.05 },
+    holo: { force: 0.5, teinte: [0.82, 1, 0.9] },
     transparente: true,
+    irise: true,
     chiffres: "biseau",
   },
   // L'arbitre : le jaune fluo de sa chasuble (Sabri, 24/10 : « même sa carte

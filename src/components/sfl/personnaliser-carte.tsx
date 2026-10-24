@@ -196,7 +196,7 @@ export function PersonnaliserCarte({ player }: { player: Player }) {
                   onClick={() => porterSkin(f)}
                   vignette={vignette({ finition: f })}
                   titre={f === "onyx" ? "Onyx" : f === "verre" ? "Verre" : f}
-                  quoi={f === "verre" ? "La plaque de verre fumé, gravée." : "La carte noire guillochée."}
+                  quoi={f === "verre" ? "La plaque de verre vert, gravée et irisée." : "La carte noire guillochée."}
                   comment="Offert"
                 />
               ))}
