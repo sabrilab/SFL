@@ -13,7 +13,7 @@
 // s'ajoute à la date de naissance quand l'accord a été donné sans elle.
 
 import { useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, stagger, useAnimate, useReducedMotion } from "motion/react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { CaseAccord, PHRASE_PARENT } from "@/components/sfl/confidentialite/consentement";
@@ -70,9 +70,19 @@ function useEnregistrer() {
   return { envoi, enregistrer };
 }
 
-function Suivant({ envoi, disabled, onClick }: { envoi: boolean; disabled?: boolean; onClick: () => void }) {
+function Suivant({
+  envoi,
+  disabled,
+  eteint,
+  onClick,
+}: {
+  envoi: boolean;
+  disabled?: boolean;
+  eteint?: boolean;
+  onClick: () => void;
+}) {
   return (
-    <BoutonPrincipal onClick={onClick} disabled={envoi || disabled}>
+    <BoutonPrincipal onClick={onClick} disabled={envoi || disabled} eteint={eteint}>
       {envoi && <Loader2 className="size-4 animate-spin" />}
       Continuer
     </BoutonPrincipal>
@@ -192,74 +202,91 @@ export function EtapeNaissance({
   );
 }
 
+/** L'écart entre les règles et le maillot, du plus ample au plus serré (Corps, cadre.tsx). */
+const ECARTS_GABARIT = ["mt-[21px] gap-[21px]", "mt-[13px] gap-[13px]", "mt-[13px] gap-[13px]", "mt-[13px] gap-[8px]"];
+/** La règle de chaque niveau : le niveau 2 garde celle du 1, sans la ligne du dessous. */
+const REGLE_GABARIT = [0, 1, 1, 2];
+
 export function EtapeGabarit({ b, maj, onFini }: { b: Brouillon; maj: (p: Partial<Brouillon>) => void; onFini: () => void }) {
-  const { court } = useContexteAccueil();
+  const reduit = useReducedMotion();
   const { envoi, enregistrer } = useEnregistrer();
+  const [tailles, animer] = useAnimate<HTMLDivElement>();
   async function continuer() {
-    if (!b.maillot) return;
+    // Le maillot manque : on le montre, les tailles l'une après l'autre.
+    if (!b.maillot) {
+      navigator.vibrate?.([8, 60, 8]);
+      tailles.current?.scrollIntoView({ block: "nearest", behavior: reduit ? "auto" : "smooth" });
+      if (!reduit) animer("button", { scale: [1, 1.12, 1] }, { duration: 0.42, delay: stagger(0.05) });
+      return;
+    }
     navigator.vibrate?.(12);
     await enregistrer({ taille_cm: b.taille, poids_kg: b.poids, pointure: b.pointure, maillot: b.maillot });
     onFini();
   }
+  // Quatre façons de se dessiner : le corps garde la plus ample qui tient sans défiler.
   return (
-    <Corps pied={<Suivant envoi={envoi} disabled={!b.maillot} onClick={continuer} />}>
-      <Titre>Ton gabarit.</Titre>
-      <Ligne>Pour tes maillots et, bientôt, ton personnage.</Ligne>
-      <div className={cn("flex w-full flex-col", court ? "mt-[13px] gap-[13px]" : "mt-[21px] gap-[21px]")}>
-        <Regle
-          label="Taille"
-          unite="cm"
-          min={BORNES.taille.min}
-          max={BORNES.taille.max}
-          valeur={b.taille}
-          onChange={(v) => maj({ taille: v })}
-          compact={court}
-        />
-        <Regle
-          label="Poids"
-          unite="kg"
-          min={BORNES.poids.min}
-          max={BORNES.poids.max}
-          valeur={b.poids}
-          onChange={(v) => maj({ poids: v })}
-          compact={court}
-        />
-        <Regle
-          label="Pointure"
-          unite="EU"
-          min={BORNES.pointure.min}
-          max={BORNES.pointure.max}
-          pas={0.5}
-          majeur={5}
-          moyen={1}
-          valeur={b.pointure}
-          onChange={(v) => maj({ pointure: v })}
-          compact={court}
-        />
-        <div className="flex flex-col items-center gap-[8px]">
-          <span className="mono-label text-white/45">Maillot</span>
-          <div className="grid w-full grid-cols-6 gap-[5px]">
-            {MAILLOTS.map((m) => (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={b.maillot === m}
-                onClick={() => {
-                  navigator.vibrate?.(6);
-                  maj({ maillot: m });
-                }}
-                className={cn(
-                  "bouton--or grid place-items-center rounded-[13px] text-[14px] font-extrabold tracking-tight",
-                  court ? "h-[40px]" : "h-[44px]",
-                  b.maillot === m ? "bouton-principal" : "bouton-secondaire text-white/70"
-                )}
-              >
-                {m}
-              </button>
-            ))}
+    <Corps niveaux={4} pied={<Suivant envoi={envoi} eteint={!b.maillot} onClick={continuer} />}>
+      {(n) => (
+        <>
+          <Titre>Ton gabarit.</Titre>
+          {n < 2 && <Ligne>Pour tes maillots et, bientôt, ton personnage.</Ligne>}
+          <div className={cn("flex w-full flex-col", ECARTS_GABARIT[n])}>
+            <Regle
+              label="Taille"
+              unite="cm"
+              min={BORNES.taille.min}
+              max={BORNES.taille.max}
+              valeur={b.taille}
+              onChange={(v) => maj({ taille: v })}
+              niveau={REGLE_GABARIT[n]}
+            />
+            <Regle
+              label="Poids"
+              unite="kg"
+              min={BORNES.poids.min}
+              max={BORNES.poids.max}
+              valeur={b.poids}
+              onChange={(v) => maj({ poids: v })}
+              niveau={REGLE_GABARIT[n]}
+            />
+            <Regle
+              label="Pointure"
+              unite="EU"
+              min={BORNES.pointure.min}
+              max={BORNES.pointure.max}
+              pas={0.5}
+              majeur={5}
+              moyen={1}
+              valeur={b.pointure}
+              onChange={(v) => maj({ pointure: v })}
+              niveau={REGLE_GABARIT[n]}
+            />
+            <div className={cn("flex flex-col items-center", n < 3 ? "gap-[8px]" : "gap-[5px]")}>
+              <span className="mono-label text-white/45">Maillot</span>
+              <div ref={tailles} className="grid w-full grid-cols-6 gap-[5px]">
+                {MAILLOTS.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    aria-pressed={b.maillot === m}
+                    onClick={() => {
+                      navigator.vibrate?.(6);
+                      maj({ maillot: m });
+                    }}
+                    className={cn(
+                      "bouton--or grid place-items-center rounded-[13px] text-[14px] font-extrabold tracking-tight",
+                      n === 0 ? "h-[44px]" : n < 3 ? "h-[40px]" : "h-[36px]",
+                      b.maillot === m ? "bouton-principal" : "bouton-secondaire text-white/70"
+                    )}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </Corps>
   );
 }
