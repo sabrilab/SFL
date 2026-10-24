@@ -13,11 +13,12 @@
 //
 // Module pur, partagé par le serveur et la page admin.
 
-export type FamilleNotif = "vestiaire" | "match" | "equipe" | "ligue" | "annonce";
+export type FamilleNotif = "vestiaire" | "prive" | "match" | "equipe" | "ligue" | "annonce";
 
 /** Dans l'ordre de la page. */
 export const FAMILLES_NOTIF: { id: FamilleNotif; label: string }[] = [
   { id: "vestiaire", label: "Vestiaire" },
+  { id: "prive", label: "Messages privés" },
   { id: "match", label: "Matchs entre joueurs" },
   { id: "equipe", label: "Bola Team" },
   { id: "ligue", label: "Ligue" },
@@ -34,6 +35,7 @@ interface DefMotif {
 const AU_VESTIAIRE = "a écrit ou réagi au Vestiaire";
 const AU_MATCH = "a écrit ou réagi dans la discussion du match";
 const A_L_EQUIPE = "a écrit ou réagi dans la discussion de l'équipe";
+const EN_PRIVE = "a répondu ou réagi dans la conversation";
 
 /** Dans l'ordre de la page, famille par famille. */
 export const MOTIFS_NOTIF = {
@@ -42,6 +44,10 @@ export const MOTIFS_NOTIF = {
   "vestiaire-cite": { famille: "vestiaire", label: "On le cite (@pseudo)", effet: AU_VESTIAIRE },
   "vestiaire-en-avant": { famille: "vestiaire", label: "On le met en avant", effet: AU_VESTIAIRE },
   "vestiaire-reaction": { famille: "vestiaire", label: "Une réaction reçue", effet: AU_VESTIAIRE },
+
+  // Messages privés (24/10) : seul le destinataire est prévenu, ou l'auteur du message qui reçoit une réaction.
+  "prive-message": { famille: "prive", label: "Un message privé", effet: EN_PRIVE },
+  "prive-reaction": { famille: "prive", label: "Une réaction à son message", effet: EN_PRIVE },
 
   "match-invitation": { famille: "match", label: "Invitation à un match", effet: "a répondu à l'invitation" },
   "match-arrivee": { famille: "match", label: "Un joueur le rejoint", effet: AU_MATCH },
@@ -73,6 +79,10 @@ export const MOTIFS_NOTIF = {
   divisions: { famille: "ligue", label: "L'annonce des divisions", effet: null },
   // La veille de chaque dimanche de l'arc 1 : « J4 · La journée de Miken » (lib/sfl/outsiders.ts).
   outsider: { famille: "ligue", label: "La journée de l'outsider", effet: null },
+  // La convocation du dimanche, le lundi matin, à toute la ligue (lib/sfl/annonces-ligue.ts).
+  convocation: { famille: "ligue", label: "La convocation du dimanche", effet: "a répondu à la convocation" },
+  // Les résultats et les MVP d'une journée, une fois la feuille remplie (lib/sfl/annonces-ligue.ts).
+  resultats: { famille: "ligue", label: "Les résultats de la journée", effet: null },
   // Une nouvelle vidéo dans les Actus, lancée par l'admin (lib/sfl/videos.ts).
   video: { famille: "ligue", label: "Une nouvelle vidéo", effet: "a regardé la vidéo" },
 
