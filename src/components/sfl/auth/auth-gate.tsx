@@ -69,8 +69,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       </div>
     );
   // Un compte né d'un mot de passe d'origine (devenu public) ou provisoire :
-  // il choisit le sien avant tout le reste.
-  if (session.server && session.motDePasseAChanger)
+  // il choisit le sien avant tout le reste. Un membre de la saison le choisit
+  // dans l'accueil de l'app (components/sfl/accueil), qui s'ouvre dessus ;
+  // ici, les comptes en attente et ceux que la saison ne connaît pas encore.
+  if (session.server && session.motDePasseAChanger && (session.enAttente || inconnu))
     return (
       <div className="h-full overflow-y-auto" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <NouveauMotDePasse session={session} />

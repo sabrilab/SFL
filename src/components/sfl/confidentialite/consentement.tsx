@@ -15,6 +15,10 @@
 // Les invitations de l'ouverture (nouvelles cartes, badges, notifications,
 // photo, identité) attendent l'accord : ApresAccord ne les monte qu'après.
 //
+// Depuis le 24/10, l'accord d'un membre se donne dans l'accueil de l'app
+// (components/sfl/accueil), avec ces mêmes cases et ces cinq points (POINTS) ;
+// le voile reste aux comptes en attente et aux connexions non vérifiées.
+//
 // Pas de voile sur les pages qui ont leur propre case ou pas de compte :
 // l'inscription (la case est à sa dernière étape), le lien d'accueil et la
 // politique elle-même.
@@ -42,7 +46,8 @@ function apercu(): { mineur: boolean } | null {
   return v === null ? null : { mineur: v === "mineur" };
 }
 
-const POINTS = [
+/** L'essentiel de la politique, en cinq points (le voile, et l'accueil de l'app). */
+export const POINTS = [
   {
     icone: Camera,
     titre: "Ta photo de carte",

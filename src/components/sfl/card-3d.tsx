@@ -160,8 +160,12 @@ const WEBKIT =
   /AppleWebKit/.test(navigator.userAgent) &&
   !/Chrome|Chromium|Android/.test(navigator.userAgent);
 
-/** La part du canvas qu'occupe la carte 3D posée (FILL_RATIO de card-3d-canvas, recopié pour ne pas charger three ici). */
-const REMPLISSAGE_3D = 0.72;
+/**
+ * La part du canvas qu'occupe la carte 3D posée (FILL_RATIO de card-3d-canvas,
+ * recopié pour ne pas charger three ici). L'accueil s'en sert pour poser la
+ * 3D pile sur une carte plate (accueil/etape-carte.tsx).
+ */
+export const REMPLISSAGE_3D = 0.72;
 
 const TRANSPARENT_PX =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";

@@ -33,8 +33,10 @@
     transition: scale 0.12s ease-out;
   }
 
-  /* Derrière l'écran de chargement, rien ne part : tout attend qu'il se lève. */
-  html:not([data-splash="fini"]) :is(.stk--entre, .stk--entre *, .lettrage-entre, .compte-entre, .map-bord, .map-monte, .toi--entre) {
+  /* Derrière l'écran de chargement, puis derrière l'accueil de l'app
+     (components/sfl/accueil), rien ne part : tout attend qu'ils se lèvent. */
+  html:not([data-splash="fini"]) :is(.stk--entre, .stk--entre *, .lettrage-entre, .compte-entre, .map-bord, .map-monte, .toi--entre),
+  html:is([data-accueil="verif"], [data-accueil="ouvert"]) :is(.stk--entre, .stk--entre *, .lettrage-entre, .compte-entre, .map-bord, .map-monte, .toi--entre) {
     animation-play-state: paused;
   }
 
