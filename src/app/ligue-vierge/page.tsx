@@ -27,7 +27,8 @@
 // nombre de points » : dès que le classement des points remplit deux
 // divisions de 30, il se découpe en D1, D2… (divisionsBola), recoupées à
 // chaque match, sans règle de montée ni de descente ; chaque division compte
-// ses places à partir de 1. En aperçu, des divisions de 12 pour les voir. Et pour qui n'a pas d'équipe, la vitrine
+// ses places à partir de 1. En aperçu, des divisions de 12 pour les voir
+// (sur une préversion, ?apercu=1 force la démonstration). Et pour qui n'a pas d'équipe, la vitrine
 // de Bola Team en une ligne (equipe/vitrine-team.tsx).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -220,7 +221,15 @@ export default function LigueViergePage() {
   const [tick, setTick] = useState(0);
   const [tout, setTout] = useState(false);
   const [cle, setCle] = useState<ClassementBola>("points");
+  const [forceApercu, setForceApercu] = useState(false);
   const recharger = useCallback(() => setTick((n) => n + 1), []);
+
+  // Sur une préversion, ?apercu=1 montre la démonstration même s'il y a déjà de vrais matchs.
+  useEffect(() => {
+    if (!DEMO_LIGUE_VIERGE || !new URLSearchParams(window.location.search).has("apercu")) return;
+    const t = window.setTimeout(() => setForceApercu(true), 0);
+    return () => window.clearTimeout(t);
+  }, []);
   const { equipe, charge: equipeLue } = useMonEquipe();
 
   useEffect(() => {
@@ -253,7 +262,7 @@ export default function LigueViergePage() {
   // En aperçu, tant que rien n'est saisi : des matchs de démonstration.
   const { allPlayers } = useSeason();
   const noms = useMemo(() => allPlayers.filter((p) => p.matchs > 0).map((p) => p.name), [allPlayers]);
-  const apercu = DEMO_LIGUE_VIERGE && (matchs?.length ?? 0) === 0 && noms.length >= 10;
+  const apercu = DEMO_LIGUE_VIERGE && (forceApercu || (matchs?.length ?? 0) === 0) && noms.length >= 10;
   const vus = useMemo(
     () => (apercu ? compterMatchs(demoMatchs(noms, aujourdhuiIso())) : matchs),
     [apercu, noms, matchs]
