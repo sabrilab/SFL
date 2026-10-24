@@ -30,6 +30,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { toPng } from "html-to-image";
+import { ChargementBola } from "@/components/sfl/chargement-bola";
 import { DosCarte } from "@/components/sfl/dos-carte";
 import { matiereDuNom, type HabillageCarte, type Matiere } from "@/components/sfl/finitions-carte";
 import type { EmissionCarte } from "@/lib/sfl/epoques";
@@ -478,7 +479,7 @@ function Card3DInner({
   }, [inView, essai, definition, echelle]);
 
   // Dimensions estimées avant capture (base CardShell ~260×376 avec
-  // bannière) pour que le skeleton occupe déjà la bonne place — la taille
+  // bannière) pour que le chargement occupe déjà la bonne place — la taille
   // exacte prend le relais dès que la capture aboutit.
   const dims = captured ?? source;
   const width = (dims ? dims.width : 260) * size;
@@ -541,22 +542,12 @@ function Card3DInner({
           onAffichee={() => setAffichee(true)}
         />
       ) : apercu || scene ? null : (
-        // Skeleton pendant la capture : jamais de carte 2D "flash" avant
-        // le rendu 3D, juste un shimmer discret aux couleurs de la carte.
-        <div
-          aria-hidden
-          className="animate-pulse"
-          style={{
-            width,
-            height: height * 0.88,
-            borderRadius: 20 * size,
-            background:
-              mode === "rare"
-                ? "linear-gradient(160deg, #2a1f0d 0%, #171106 45%, #241a08 100%)"
-                : "linear-gradient(160deg, #3a342a 0%, #26221b 45%, #322c22 100%)",
-            boxShadow: "inset 0 0 0 1.5px rgba(242,206,123,.18)",
-          }}
-        />
+        // Pendant la capture : jamais de carte 2D "flash" avant le rendu 3D,
+        // la lune Bola qui se charge, à la place de la carte (24/10 : plus le
+        // rectangle brun qui pulsait).
+        <div style={{ width, height: height * 0.88, display: "grid", placeItems: "center" }}>
+          <ChargementBola taille={Math.round(52 * size)} />
+        </div>
       )}
     </div>
   );
