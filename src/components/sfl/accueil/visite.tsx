@@ -3,7 +3,8 @@
 // La visite de l'app, à la fin de l'accueil (accueil.tsx) : la partie qu'on
 // peut passer (Sabri, 24/10 : « une explication de l'app dedans, qui peut
 // être skip »). Quatre écrans, un par endroit de la barre d'onglets : la
-// Map, Ma carte, les Actus, le Vestiaire. Chacun montre ce qu'on y trouve
+// Map, Ma carte, les Actus, le Vestiaire (pas pour un joueur Bola, venu par
+// un parrain : sa barre n'a pas la bulle). Chacun montre ce qu'on y trouve
 // (sa carte à lui, le vrai podium du Pépite d'Or) et, en bas, à la place même
 // de la vraie barre, une copie de la barre d'onglets où la lentille glisse
 // d'un onglet à l'autre : quand l'accueil s'efface, la vraie est déjà là.
@@ -17,6 +18,7 @@ import { Sparkles } from "lucide-react";
 import { ActusIcon, CarteIcon, MapIcon, VestiaireIcon } from "@/components/layout/nav-icons";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { PlayerCard } from "@/components/sfl/player-card";
+import { useJoueurBola } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useIdentites } from "@/hooks/use-identites";
 import { rankPlayers, type Player } from "@/lib/sfl/engine";
@@ -41,12 +43,14 @@ const ONGLETS = [
 
 export function Visite({ player, onFini }: { player: Player; onFini: () => void }) {
   const reduit = useReducedMotion();
+  const bola = useJoueurBola();
+  const diapos = bola ? DIAPOS.slice(0, 3) : DIAPOS;
   const [i, setI] = useState(0);
   const [dir, setDir] = useState(1);
-  const derniere = i === DIAPOS.length - 1;
+  const derniere = i === diapos.length - 1;
 
   function aller(n: number) {
-    if (n < 0 || n >= DIAPOS.length) return;
+    if (n < 0 || n >= diapos.length) return;
     navigator.vibrate?.(6);
     setDir(n > i ? 1 : -1);
     setI(n);
@@ -94,8 +98,8 @@ export function Visite({ player, onFini }: { player: Player; onFini: () => void 
                 {i === 3 && <Bulles />}
               </div>
               <div className="mt-[21px] flex flex-col items-center">
-                <Titre>{DIAPOS[i].titre}</Titre>
-                <Ligne>{DIAPOS[i].ligne}</Ligne>
+                <Titre>{diapos[i].titre}</Titre>
+                <Ligne>{diapos[i].ligne}</Ligne>
               </div>
             </div>
           </motion.div>
@@ -105,7 +109,7 @@ export function Visite({ player, onFini }: { player: Player; onFini: () => void 
       <div className="mx-auto w-full max-w-[420px] shrink-0 px-[21px] pt-[8px] pb-[13px]">
         <BoutonPrincipal onClick={derniere ? onFini : () => aller(i + 1)}>{derniere ? "C'est parti" : "Suivant"}</BoutonPrincipal>
       </div>
-      <BarreOnglets onglet={i} onToucher={aller} />
+      <BarreOnglets onglet={i} onToucher={aller} bulle={!bola} />
     </div>
   );
 }
@@ -113,9 +117,9 @@ export function Visite({ player, onFini }: { player: Player; onFini: () => void 
 /**
  * La barre d'onglets, recopiée (layout/bottom-nav.tsx, mêmes classes) et
  * posée à la même place : l'onglet de l'écran en cours a la lentille, le
- * Vestiaire la sienne. Toucher un onglet y mène.
+ * Vestiaire la sienne, s'il a la bulle. Toucher un onglet y mène.
  */
-function BarreOnglets({ onglet, onToucher }: { onglet: number; onToucher: (n: number) => void }) {
+function BarreOnglets({ onglet, onToucher, bulle }: { onglet: number; onToucher: (n: number) => void; bulle: boolean }) {
   return (
     <div
       className="mx-auto flex shrink-0 items-center gap-2"
@@ -144,16 +148,18 @@ function BarreOnglets({ onglet, onToucher }: { onglet: number; onToucher: (n: nu
           </button>
         ))}
       </div>
-      <button
-        type="button"
-        onClick={() => onToucher(3)}
-        aria-label="Vestiaire"
-        aria-current={onglet === 3 ? "step" : undefined}
-        className="liquid-tabbar liquid-tabbar--rond text-white"
-        data-choisi={onglet === 3 ? "" : undefined}
-      >
-        <VestiaireIcon plein={onglet === 3} />
-      </button>
+      {bulle && (
+        <button
+          type="button"
+          onClick={() => onToucher(3)}
+          aria-label="Vestiaire"
+          aria-current={onglet === 3 ? "step" : undefined}
+          className="liquid-tabbar liquid-tabbar--rond text-white"
+          data-choisi={onglet === 3 ? "" : undefined}
+        >
+          <VestiaireIcon plein={onglet === 3} />
+        </button>
+      )}
     </div>
   );
 }
