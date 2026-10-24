@@ -299,7 +299,7 @@ function ListeSuivis({
   const noms = proches(listes[onglet]).ordre;
 
   return (
-    <Sheet open={ouvert} onOpenChange={(o) => !o && onFermer()}>
+    <Sheet open={ouvert} onOpenChange={(o) => !o && onFermer()} titre={onglet === "abonnes" ? "ses abonnés" : "ses abonnements"}>
       <SheetContent side="bottom" className="data-[side=bottom]:h-[80dvh] rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
         <div className="flex flex-col gap-1 px-5 pt-5">
           <SheetTitle className="titre-lettrage text-[24px] leading-[0.95] font-black">{id.nom(nom)}</SheetTitle>

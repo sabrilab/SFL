@@ -33,7 +33,7 @@ export interface MonEquipe {
 const VIDE: MonEquipe = { equipe: null, invitations: [], nonLus: 0, charge: false };
 
 /** Émis par la page Team après un geste (signer, refuser) : on relit tout de suite. */
-const EVT_EQUIPE = "sfl-mon-equipe";
+export const EVT_EQUIPE = "sfl-mon-equipe";
 
 export function signalerEquipe(): void {
   window.dispatchEvent(new Event(EVT_EQUIPE));

@@ -19,6 +19,10 @@
 // écrit au Vestiaire (le clavier ouvert), la barre s'efface : data-clavier
 // sur <html>, posé par le Vestiaire.
 //
+// Comme sur iOS, chaque onglet garde sa place : y revenir le retrouve là où
+// on l'avait laissé, et toucher l'onglet où l'on est déjà remonte en haut
+// (memoire-navigation.tsx). Depuis une page enfant, il ramène à sa racine.
+//
 // Sur la Map (plan clair), le verre devient clair et l'encre noire ;
 // ailleurs, le verre suit le mode de l'app : fumé et encre blanche en
 // sombre, clair et encre noire en clair (23/10) — exactement le
@@ -29,6 +33,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ActusIcon, CarteIcon, MapIcon, VestiaireIcon } from "./nav-icons";
 import { ongletActif } from "@/lib/nav";
+import { remonter, retrouverOnglet } from "./memoire-navigation";
 import { pastilleIcone, useVestiaireNonLus } from "@/hooks/use-vestiaire-non-lus";
 import { useJoueurBola } from "@/components/sfl/player-provider";
 import { useInvitationsMatch } from "@/hooks/use-invitations";
@@ -91,6 +96,12 @@ export function BottomNav() {
               key={href}
               href={href}
               aria-current={choisi ? "page" : undefined}
+              onClick={(e) => {
+                if (pathname === href && !window.location.search) {
+                  e.preventDefault();
+                  remonter();
+                } else retrouverOnglet(href);
+              }}
               className="liquid-tabbar__onglet"
               style={{ color: encre }}
             >

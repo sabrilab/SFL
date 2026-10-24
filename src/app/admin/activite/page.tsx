@@ -8,7 +8,9 @@
 // rétention par cohorte, gestes qui font revenir, notifications (qui les a
 // activées, ce que chaque motif fait faire : ./notifications.tsx, qui lit ses
 // propres tables), pays choisis pour la carte (table photo_studio), joueurs à
-// relancer. En
+// relancer. Sous les courbes, les repères de ce que l'app a fait chaque jour
+// (journées, matchs, notifications, mises en ligne), et « Qui ramène du
+// monde » : ./lectures.ts lit leurs tables (24/10). En
 // dessous, le parrainage vers 500 joueurs (./parrainage.tsx), les sujets de
 // Bola Agent (./agent.tsx), sans le contenu, puis les accords à la politique
 // de confidentialité (./confidentialite.tsx).
@@ -26,6 +28,7 @@ import { emailsDeContact } from "@/lib/sfl/contacts";
 import { supabase } from "@/lib/supabase";
 import { AgentStats } from "./agent";
 import { AccordsStats } from "./confidentialite";
+import { assemblerReperes, lireReperes } from "./lectures";
 import { ParrainageStats } from "./parrainage";
 import { ActiviteVue, type DonneesActivite } from "./vue";
 
@@ -83,12 +86,14 @@ export default function ActivitePage() {
           if (!data || data.length < PAGE) return lignes;
         }
       };
-      const [actData, prof, studioBrut, emails] = await Promise.all([
+      const [actData, prof, studioBrut, emails, reperesBrut] = await Promise.all([
         lireTout(),
         sb.from("profiles").select("id, name, created_at, is_admin"),
         lireStudio(),
         // Rangés à part (table contacts) : l'admin les lit tous.
         emailsDeContact(sb).catch(() => new Map<string, string>()),
+        // Les repères et « Qui ramène » : une lecture ratée les laisse vides.
+        lireReperes(sb).catch(() => null),
       ]);
       if (prof.error) throw new Error(prof.error.message);
 
@@ -130,7 +135,8 @@ export default function ActivitePage() {
           pays: d.pays,
           at: new Date(d.created_at).getTime(),
         })) ?? null;
-      setData({ evenements, profiles, studio, now: Date.now() });
+      const reperes = reperesBrut ? assemblerReperes(reperesBrut, noms) : null;
+      setData({ evenements, profiles, studio, reperes, now: Date.now() });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Lecture impossible.");
     }

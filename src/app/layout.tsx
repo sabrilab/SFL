@@ -5,7 +5,9 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { Suspense } from "react";
 import { BottomNav, VoileEtat } from "@/components/layout/bottom-nav";
+import { MemoireNavigation } from "@/components/layout/memoire-navigation";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { MiseAJour } from "@/components/pwa/mise-a-jour";
 import { CouleurTheme } from "@/components/pwa/couleur-theme";
@@ -148,6 +150,11 @@ export default function RootLayout({
                 >
                   <main className="flex-1 pt-3 pb-32">{children}</main>
                 </div>
+                {/* Après les pages : la place d'une page se pose après le
+                    défilement de Next vers le haut. */}
+                <Suspense fallback={null}>
+                  <MemoireNavigation />
+                </Suspense>
                 <VoileEtat />
                 <DaEssai />
                 <BottomNav />

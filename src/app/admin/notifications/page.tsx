@@ -18,6 +18,7 @@ import { ReglageNotifications } from "@/components/sfl/notifications/reglage-not
 import { CreerCle } from "@/components/sfl/notifications/creer-cle";
 import { notificationsBranchees } from "@/lib/sfl/notifications";
 import { cn } from "@/lib/utils";
+import { BoutonRetour } from "@/components/layout/bouton-retour";
 
 const PAGES = [
   { url: "/profil", label: "Ma carte" },
@@ -95,6 +96,7 @@ export default function NotificationsAdmin() {
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6 px-5 py-4 sm:py-8">
       <div className="flex items-center gap-2.5">
+        <BoutonRetour />
         <span className="glass flex size-11 items-center justify-center rounded-2xl">
           <Bell className="size-5" />
         </span>

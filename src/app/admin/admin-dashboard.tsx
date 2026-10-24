@@ -73,6 +73,7 @@ import { AccesJoueur } from "@/components/sfl/admin/acces-joueur";
 import { RechercheJoueur } from "@/components/sfl/admin/recherche-joueur";
 import { chercherJoueurs } from "@/lib/sfl/recherche-joueur";
 import { useSession } from "@/hooks/use-session";
+import { BoutonRetour } from "@/components/layout/bouton-retour";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
 
@@ -358,9 +359,12 @@ export function AdminDashboard() {
     <div className="shell flex flex-col gap-5 py-4 sm:py-8">
       <div>
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[13px] font-medium text-muted-foreground">Espace administrateur</p>
-            <h1 className="text-[30px] font-bold tracking-tight">Admin</h1>
+          <div className="flex items-center gap-3">
+            <BoutonRetour />
+            <div>
+              <p className="text-[13px] font-medium text-muted-foreground">Espace administrateur</p>
+              <h1 className="text-[30px] font-bold tracking-tight">Admin</h1>
+            </div>
           </div>
           <Badge
             variant="secondary"
