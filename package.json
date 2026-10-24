@@ -9,7 +9,8 @@
     "lint": "eslint",
     "saison:check": "tsx tools/saison-snapshot.ts",
     "saison:bless": "tsx tools/saison-snapshot.ts --bless",
-    "prebuild": "tsx scripts/prebuild.ts"
+    "prebuild": "tsx scripts/prebuild.ts",
+    "postbuild": "tsx scripts/postbuild.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
