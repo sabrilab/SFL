@@ -7,11 +7,17 @@
 //   · Courbe — la courbe de croissance : un trait, une aire, la période
 //     d'avant en pointillé, le creux grisé. On la parcourt du doigt (ou de
 //     la souris) : un repère suit, la bulle donne le jour et la valeur.
+//     Dessous, trois lignes de repères (24/10) : les matchs (une journée de
+//     la ligue, « J3 », tirée en pointillé jusqu'à la courbe ; un match
+//     ouvert par un joueur), les notifications (◆ à toute la ligue, · entre
+//     joueurs) et les mises en ligne (■) ; le jour touché se lit en entier
+//     sous la courbe (./reperes.tsx).
 //   · CarteHoraire — jours × heures, plus c'est foncé plus la ligue est là.
 //   · Cohortes — une ligne par semaine d'arrivée, la part encore là ensuite.
 //   · Comparaison — deux barres : ceux qui font un geste, et les autres.
 
 import { useEffect, useRef, useState } from "react";
+import type { Marques } from "@/lib/sfl/reperes";
 import type { Cohorte } from "@/lib/sfl/retention";
 import { jjmm, milliers, pct } from "@/lib/sfl/retention";
 import { cn } from "@/lib/utils";
@@ -29,7 +35,7 @@ function maxRond(v: number): number {
 }
 
 /** Largeur réelle d'un élément, suivie au redimensionnement. */
-function useLargeur<T extends HTMLElement>() {
+export function useLargeur<T extends HTMLElement>() {
   const ref = useRef<T>(null);
   const [w, setW] = useState(0);
   useEffect(() => {
@@ -44,29 +50,48 @@ function useLargeur<T extends HTMLElement>() {
 
 /* --------------------------------- courbe -------------------------------- */
 
+/** Les trois lignes de repères, dans l'ordre, et leur nom dans la marge. */
+const LIGNES_REPERES = ["MATCHS", "NOTIFS", "APP"] as const;
+const PAS_LIGNE = 12;
+
 export function Courbe({
   points,
   avant,
   format,
   creux,
   hauteur = 200,
+  marques,
+  actif: actifSuivi,
+  onActif,
 }: {
   points: { t: number; v: number }[];
   /** Même longueur que `points` : la valeur de la période d'avant, au même rang. */
   avant?: (number | null)[] | null;
   format: (v: number) => string;
   creux?: { de: number; a: number } | null;
+  /** La hauteur de la courbe, repères en plus. */
   hauteur?: number;
+  /** Même longueur que `points` : les repères du jour (lib/sfl/reperes.ts), en trois lignes sous la courbe. */
+  marques?: (Marques | null)[] | null;
+  /** Le jour choisi, quand la page le suit (son détail sous la courbe) ; sans `onActif`, la courbe le garde. */
+  actif?: number | null;
+  onActif?: (i: number | null) => void;
 }) {
   const [ref, largeur] = useLargeur<HTMLDivElement>();
-  const [actif, setActif] = useState<number | null>(null);
+  const [actifLocal, setActifLocal] = useState<number | null>(null);
+  const suivi = onActif !== undefined;
+  const actif = suivi ? (actifSuivi ?? null) : actifLocal;
+  const setActif = suivi ? onActif : setActifLocal;
   const n = points.length;
 
-  const gauche = 30;
+  const gauche = marques ? 42 : 30;
   const droite = 8;
   // En haut, la place de la bulle : elle ne couvre jamais la courbe.
   const haut = 44;
+  // Sous la courbe, les repères ; puis les dates.
+  const lignes = marques ? LIGNES_REPERES.length * PAS_LIGNE + 8 : 0;
   const bas = 22;
+  const total = hauteur + lignes;
   const w = Math.max(0, largeur - gauche - droite);
   const h = hauteur - haut - bas;
   const valeurs = [...points.map((p) => p.v), ...(avant ?? []).map((v) => v ?? 0)];
@@ -110,18 +135,27 @@ export function Courbe({
   }
 
   const graduations = [0, max / 2, max];
-  const reperes = n > 1 ? [0, Math.floor((n - 1) / 2), n - 1] : [0];
+  const dates = n > 1 ? [0, Math.floor((n - 1) / 2), n - 1] : [0];
+
+  // Les lignes de repères : le milieu de chacune, et la place d'un jour.
+  const yLigne = (k: number) => haut + h + 8 + k * PAS_LIGNE + PAS_LIGNE / 2;
+  const pas = n > 1 ? w / (n - 1) : w;
+  // « J3 » en toutes lettres quand les journées ont la place, un point sinon.
+  const journees = marques ? marques.flatMap((m, k) => (m?.terrain === 2 ? [k] : [])) : [];
+  const ecartJournees = Math.min(Infinity, ...journees.slice(1).map((k, j) => (k - journees[j]) * pas));
+  const journeesEcrites = ecartJournees >= 18;
 
   return (
-    <div ref={ref} className="relative select-none" style={{ height: hauteur, touchAction: "pan-y" }}>
+    <div ref={ref} className="relative select-none" style={{ height: total, touchAction: "pan-y" }}>
       {largeur > 0 && (
         <svg
           width={largeur}
-          height={hauteur}
+          height={total}
           className="block text-foreground"
           onPointerMove={(e) => choisir(e.clientX)}
           onPointerDown={(e) => choisir(e.clientX)}
-          onPointerLeave={(e) => e.pointerType === "mouse" && setActif(null)}
+          // À la souris, la courbe seule oublie le jour quand on la quitte ; suivi par la page, il reste.
+          onPointerLeave={(e) => e.pointerType === "mouse" && !suivi && setActif(null)}
         >
           <defs>
             <linearGradient id="aire-courbe" x1="0" x2="0" y1="0" y2="1">
@@ -176,6 +210,18 @@ export function Courbe({
               </text>
             </g>
           )}
+          {journees.map((k) => (
+            <line
+              key={`j${k}`}
+              x1={x(k)}
+              x2={x(k)}
+              y1={haut}
+              y2={yLigne(0) - 6}
+              stroke="currentColor"
+              strokeOpacity="0.16"
+              strokeDasharray="2 3"
+            />
+          ))}
           <path d={aire} fill="url(#aire-courbe)" />
           {avant && (
             <path
@@ -196,24 +242,89 @@ export function Courbe({
             strokeLinejoin="round"
             strokeLinecap="round"
           />
+          {marques && (
+            <g>
+              {LIGNES_REPERES.map((nom, k) => (
+                <text
+                  key={nom}
+                  x={gauche - 5}
+                  y={yLigne(k) + 2.5}
+                  textAnchor="end"
+                  fontSize="7"
+                  fontWeight="700"
+                  letterSpacing="0.06em"
+                  fill="currentColor"
+                  fillOpacity="0.38"
+                >
+                  {nom}
+                </text>
+              ))}
+              {marques.map((m, k) =>
+                m ? (
+                  <g key={k}>
+                    {m.terrain === 2 &&
+                      (journeesEcrites && m.journee ? (
+                        <text
+                          x={x(k)}
+                          y={yLigne(0) + 3}
+                          textAnchor="middle"
+                          fontSize="8.5"
+                          fontWeight="800"
+                          fill="currentColor"
+                        >
+                          {m.journee}
+                        </text>
+                      ) : (
+                        <circle cx={x(k)} cy={yLigne(0)} r="3" fill="currentColor" />
+                      ))}
+                    {m.terrain === 1 && (
+                      <circle cx={x(k)} cy={yLigne(0)} r="2.4" fill="none" stroke="currentColor" strokeOpacity="0.6" strokeWidth="1.2" />
+                    )}
+                    {m.notif === 2 && (
+                      <rect
+                        x={x(k) - 2.8}
+                        y={yLigne(1) - 2.8}
+                        width="5.6"
+                        height="5.6"
+                        transform={`rotate(45 ${x(k)} ${yLigne(1)})`}
+                        fill="currentColor"
+                      />
+                    )}
+                    {m.notif === 1 && <circle cx={x(k)} cy={yLigne(1)} r="1.7" fill="currentColor" fillOpacity="0.5" />}
+                    {m.appli > 0 && (
+                      <rect
+                        x={x(k) - 2.5}
+                        y={yLigne(2) - 2.5}
+                        width="5"
+                        height="5"
+                        rx="1"
+                        fill="currentColor"
+                        fillOpacity={m.appli >= 3 ? 0.95 : m.appli === 2 ? 0.7 : 0.45}
+                      />
+                    )}
+                  </g>
+                ) : null
+              )}
+            </g>
+          )}
           {point && (
             <g>
               <line
                 x1={x(i)}
                 x2={x(i)}
                 y1={haut}
-                y2={haut + h}
+                y2={marques ? haut + h + lignes : haut + h}
                 stroke="currentColor"
                 strokeOpacity="0.25"
               />
               <circle cx={x(i)} cy={y(point.v)} r="4.5" fill="var(--background)" stroke="currentColor" strokeWidth="2" />
             </g>
           )}
-          {reperes.map((k) => (
+          {dates.map((k) => (
             <text
               key={k}
               x={x(k)}
-              y={hauteur - 6}
+              y={total - 6}
               textAnchor={k === 0 ? "start" : k === n - 1 ? "end" : "middle"}
               fontSize="9"
               fill="currentColor"

@@ -13,7 +13,7 @@
 // où `joueurs` et `categories` sont les légendes de toute la carrière
 // (sans badges de saison ni partage au Vestiaire).
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { BadgesLigne } from "@/components/sfl/distinctions";
@@ -171,10 +171,22 @@ export function Classements({
       ).id,
   );
   const def = categories.find((r) => r.id === id) ?? categories[0];
+  // Ouvert sur un classement du bout de la rangée (un point fort de Ma saison,
+  // ?classement=def) : la rangée défile jusqu'à lui, pour qu'on le voie choisi.
+  const rangee = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const r = rangee.current;
+    const b = r?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!r || !b) return;
+    const rr = r.getBoundingClientRect();
+    const bb = b.getBoundingClientRect();
+    if (bb.right > rr.right || bb.left < rr.left) r.scrollLeft += bb.left - rr.left - (rr.width - bb.width) / 2;
+  }, []);
 
   return (
     <section className="flex flex-col gap-4">
       <div
+        ref={rangee}
         className="-mx-5 flex gap-2 overflow-x-auto overscroll-x-contain px-5 pb-1 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden"
         role="tablist"
         aria-label="Classement"

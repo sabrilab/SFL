@@ -36,7 +36,7 @@ export function FeuilleCadree({
   const clavier = dessous > 80;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange} titre={typeof titre === "string" ? titre : undefined}>
       <SheetContent
         side="bottom"
         className="flex flex-col gap-0 overflow-hidden rounded-t-[28px] p-0"

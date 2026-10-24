@@ -44,10 +44,36 @@
 // qui prend un cran de plus dès 1024 px (.terrain-grand) ; à droite, ses
 // défis et les autres équipes. Sous 768 px, rien ne bouge (les copies pour
 // grand écran sont masquées, les enveloppes en display: contents).
+//
+// Passe du 24/10 (Sabri : « un championnat comme la Ligue 1 », « un vrai
+// écusson d'équipe et de vraies couleurs », « contraints de répondre : oui
+// ou non ? », « un règlement déontologique […] qu'ils doivent signer ») :
+//   · deux vues sous l'en-tête, Mon équipe et Championnat (le tableau par
+//     division, les buteurs et les passeurs, les récompenses :
+//     equipe/championnat.tsx ; /bola-team?vue=championnat) ;
+//   · sous le nom de mon équipe, sa place au championnat (la toucher ouvre
+//     la vue) ; le capitaine (ou le vice) touche l'écusson pour le dessiner,
+//     avec le maillot (equipe/editeur-blason.tsx) ;
+//   · au capitaine et au vice, les feuilles de match à remplir, à confirmer
+//     ou à corriger (equipe/feuille-team.tsx ; la notification ouvre
+//     /bola-team?feuille=id) ; à qui avait signé la version 1, la Charte de
+//     déontologie à signer (?charte=1 l'ouvre) ;
+//   · les boutons Oui et Non de la notification d'invitation arrivent ici
+//     (?invitation=id&reponse=oui|non) : Non refuse, Oui ouvre la signature ;
+//   · sans accès à Bola Team (hooks/use-acces-team.ts), la vitrine du mode
+//     à la place de « Créer mon équipe » (equipe/vitrine-team.tsx).
+// Depuis le 24/10 au soir, chaque équipe a sa page (bola-team/[id]/page.tsx :
+// sa couverture, son effectif, son maillot, sa saison) : toucher le nom de
+// mon équipe, une autre équipe ou une ligne du championnat l'ouvre.
+// En aperçu seulement (jamais en production) : ?apercu=1 montre le monde de
+// démonstration même connecté, gardé sur l'appareil (la page des équipes, le
+// profil des joueurs et Ma carte le montrent aussi) jusqu'à ?apercu=0 ;
+// ?vitrine=1 la vitrine ; et le championnat de démonstration
+// (lib/sfl/equipes-demo.ts) tant que la vraie saison n'a aucun match validé.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { MessageCircle, UserPlus, X } from "lucide-react";
+import { ChevronRight, MessageCircle, Pencil, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -57,17 +83,26 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { CreerEquipe } from "@/components/sfl/equipe/creer-equipe";
-import { SignerReglement } from "@/components/sfl/equipe/reglement";
+import { SignerCharte, SignerReglement } from "@/components/sfl/equipe/reglement";
 import { Defier } from "@/components/sfl/equipe/defier";
+import { ChampionnatTeam } from "@/components/sfl/equipe/championnat";
+import { FeuilleTeam } from "@/components/sfl/equipe/feuille-team";
+import { FicheBlason } from "@/components/sfl/equipe/editeur-blason";
+import { VitrineTeam } from "@/components/sfl/equipe/vitrine-team";
 import { TerrainRetenu } from "@/components/sfl/matchs/choisir-terrain";
 import { TerrainPlaces, type Occupant } from "@/components/sfl/matchs/terrain-places";
 import { ChoisirJoueur } from "@/components/sfl/matchs/choisir-joueur";
 import { useSession } from "@/hooks/use-session";
+import { useAccesTeam } from "@/hooks/use-acces-team";
+import { useApercuTeam } from "@/hooks/use-equipes";
 import { signalerEquipe, useMonEquipe } from "@/hooks/use-mon-equipe";
+import { championnat, coupDEnvoiTeam, etatMatch, saisonEnCours, type EtatMatch, type MatchTeam } from "@/lib/sfl/championnat-team";
 import {
   MAX_EQUIPE,
   MIN_EQUIPE,
   RAISON_INDISPO,
+  VERSION_REGLEMENT,
+  aSignerLaCharte,
   active,
   annulerSeraitForfait,
   direErreurEquipe,
@@ -76,11 +111,13 @@ import {
   etatEquipe,
   exclureMembre,
   indisponibles,
+  initialesDe,
   invitationsPossibles,
   invites,
   inviterJoueurs,
   inviteur,
   lienEquipe,
+  lireChampionnat,
   listerDefis,
   listerEquipes,
   nommerVice,
@@ -93,12 +130,13 @@ import {
   urlDuLien,
   type Defi,
   type Equipe,
+  type EquipeTeam,
   type Indispo,
   type Membre,
 } from "@/lib/sfl/equipes";
 import { finInvitation, quandTombe, resteAvant } from "@/lib/sfl/equipes-temps";
 import { avecLaLigue, lireTerrainsNord, terrainsNordLus, type CatalogueTerrains } from "@/lib/sfl/terrains-nord";
-import { DEMO_EQUIPES, demoEquipes } from "@/lib/sfl/equipes-demo";
+import { DEMO_EQUIPES, demanderApercu, demoChampionnat, demoEquipes } from "@/lib/sfl/equipes-demo";
 import { libelleJour, listerProfils, monId, type Profil } from "@/lib/sfl/matchs";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -110,6 +148,12 @@ const de = (nom: string) => (/^[aeiouyàâäéèêëîïôöûü]/i.test(nom) ? 
 
 let seq = 0;
 
+/** « 1er », « 2e », « 3e »… */
+const rangFr = (n: number) => (n === 1 ? "1er" : `${n}e`);
+
+type Championnat = { equipes: EquipeTeam[]; matchs: MatchTeam[] };
+const SANS_CHAMPIONNAT: Championnat = { equipes: [], matchs: [] };
+
 /** Un geste qui défait, à confirmer dans une fiche (au lieu d'une alerte du navigateur). */
 interface AConfirmer {
   titre: string;
@@ -120,17 +164,20 @@ interface AConfirmer {
   action: () => void;
 }
 
+/** Une équipe : la toucher ouvre sa page (/bola-team/[id]) ; à droite, son geste (Défier). */
 function LigneEquipe({ e, droite }: { e: Equipe; droite?: React.ReactNode }) {
   const n = signataires(e).length;
   return (
     <div className="flex items-center gap-3 rounded-[20px] bg-card px-3 py-2.5">
-      <Ecusson initiales={e.initiales} fond={e.fond} taille={42} />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-[15.5px] font-semibold">{e.nom}</span>
-        <span className="truncate text-[12.5px] text-muted-foreground">
-          {[e.ville, `${n} / ${MAX_EQUIPE}`].filter(Boolean).join(" · ")}
+      <Link href={`/bola-team/${e.id}`} className="flex min-w-0 flex-1 items-center gap-3 transition-transform active:scale-[0.98]">
+        <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={42} />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-[15.5px] font-semibold">{e.nom}</span>
+          <span className="truncate text-[12.5px] text-muted-foreground">
+            {[e.ville, `${n} / ${MAX_EQUIPE}`].filter(Boolean).join(" · ")}
+          </span>
         </span>
-      </span>
+      </Link>
       {droite}
     </div>
   );
@@ -153,6 +200,44 @@ function Pilule({ children, onClick, plein = true, ton, disabled }: { children: 
   );
 }
 
+/** Une feuille de match à remplir, à confirmer ou à corriger (capitaine et vice). */
+function CarteFeuille({
+  m,
+  etat,
+  mienne,
+  adverse,
+  onOuvrir,
+}: {
+  m: MatchTeam;
+  etat: EtatMatch;
+  mienne: number;
+  adverse: Pick<Equipe, "nom" | "initiales" | "fond" | "blason">;
+  onOuvrir: () => void;
+}) {
+  // Ma feuille envoyée attend l'autre capitaine : on peut encore la corriger, elle ne presse plus.
+  const envoyee = etat.etat === "a-confirmer" && etat.par === mienne;
+  const action = etat.etat === "a-saisir" ? "Feuille de match" : etat.etat === "litige" ? "À corriger" : envoyee ? "Envoyée" : "À confirmer";
+  return (
+    <button
+      type="button"
+      onClick={onOuvrir}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-[22px] py-3 pr-4 pl-3 text-left transition-transform active:scale-[0.98]",
+        envoyee ? "bg-card" : "bouton-principal bouton--vert"
+      )}
+    >
+      <Ecusson initiales={adverse.initiales} fond={adverse.fond} blason={adverse.blason} taille={36} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] font-bold">{adverse.nom}</span>
+        <span className={cn("mono-label", envoyee ? "text-muted-foreground" : "bouton-sous")}>
+          {libelleJour(m.jour)} · {m.heure}
+        </span>
+      </span>
+      <span className={cn("shrink-0 text-[14px] font-semibold", envoyee && "text-muted-foreground")}>{action}</span>
+    </button>
+  );
+}
+
 /** Une équipe qui m'invite : qui, jusqu'à quand, ceux qui ont signé, et la réponse. */
 function InvitationRecue({ e, moi, onRefuser, onRejoindre }: { e: Equipe; moi: string | null; onRefuser: () => void; onRejoindre: () => void }) {
   const m = e.membres.find((x) => x.id === moi && x.statut === "invite");
@@ -160,7 +245,7 @@ function InvitationRecue({ e, moi, onRefuser, onRejoindre }: { e: Equipe; moi: s
   return (
     <div className="flex flex-col gap-3 rounded-[24px] bg-card p-3.5">
       <div className="flex items-center gap-3">
-        <Ecusson initiales={e.initiales} fond={e.fond} taille={50} />
+        <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={50} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-[18px] leading-tight font-bold tracking-tight">{e.nom}</span>
           {m && (
@@ -195,8 +280,15 @@ export default function BolaTeamPage() {
   const connecte = !!session?.server;
   const { me } = useMyPlayer();
   const { allPlayers, saison } = useSeason();
+  const acces = useAccesTeam();
   const [equipes, setEquipes] = useState<Equipe[] | null>(null);
   const [defis, setDefis] = useState<Defi[]>([]);
+  const [champ, setChamp] = useState<Championnat | null>(null);
+  const [vue, setVue] = useState<"equipe" | "championnat">("equipe");
+  // Aperçu seulement : le monde de démonstration même connecté (demandé une
+  // fois par appareil, ?apercu=1 ; ?apercu=0 revient à la base), la vitrine.
+  const forceApercu = useApercuTeam();
+  const [forceVitrine, setForceVitrine] = useState(false);
   const [profils, setProfils] = useState<Profil[]>([]);
   const [moiId, setMoiId] = useState<string | null>(null);
   const [indisponible, setIndisponible] = useState(false);
@@ -214,10 +306,18 @@ export default function BolaTeamPage() {
   const [indispos, setIndispos] = useState<Map<string, Indispo> | null>(null);
   const [joueur, setJoueur] = useState<Membre | null>(null);
   const [confirmer, setConfirmer] = useState<AConfirmer | null>(null);
+  const [feuille, setFeuille] = useState<number | null>(null);
+  const [blasonOuvert, setBlasonOuvert] = useState(false);
+  const [charte, setCharte] = useState(false);
   // Une invitation à ouvrir dès que les équipes sont là (notification, Map,
   // lien), et la liste des joueurs à ouvrir juste après la création.
   const aOuvrir = useRef<number | null>(null);
   const inviterApres = useRef(false);
+  // La réponse donnée sur la notification (Oui, Non), la feuille qu'elle
+  // ouvre, la Charte demandée par l'ouverture de l'app.
+  const reponse = useRef<"oui" | "non" | null>(null);
+  const feuilleVoulue = useRef<number | null>(null);
+  const charteVoulue = useRef(false);
   // Ce que je n'ai pas lu dans la discussion de mon équipe.
   const nonLus = useMonEquipe().nonLus;
 
@@ -226,21 +326,38 @@ export default function BolaTeamPage() {
   // terrain de la Map (?terrain=id) est gardé de côté : l'adresse est déjà
   // nettoyée quand l'effet repasse.
   const terrainVenu = useRef<string | null>(null);
+  const vueVenue = useRef<string | null>(null);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const id = q.get("invitation");
     const jeton = q.get("lien");
     const terrain = q.get("terrain") ?? terrainVenu.current;
     terrainVenu.current = terrain;
+    const v = q.get("vue") ?? vueVenue.current;
+    vueVenue.current = v;
+    const r = q.get("reponse");
+    const f = q.get("feuille");
     if (id && /^\d+$/.test(id)) aOuvrir.current = Number(id);
+    if (r === "oui" || r === "non") reponse.current = r;
+    if (f && /^\d+$/.test(f)) feuilleVoulue.current = Number(f);
+    if (q.has("charte")) charteVoulue.current = true;
     if (jeton) {
       try {
         localStorage.setItem(LIEN_EN_ATTENTE, jeton);
       } catch {}
     }
-    if (id || jeton || terrain) window.history.replaceState(null, "", window.location.pathname);
-    if (!terrain) return;
-    const t = window.setTimeout(() => setTerrainDefi(terrain), 0);
+    // Le monde de démonstration se garde sur l'appareil ; la vitrine reste
+    // dans l'adresse ; le reste ne sert qu'une fois.
+    if (DEMO_EQUIPES && q.has("apercu")) demanderApercu(q.get("apercu") !== "0");
+    const garde = new URLSearchParams();
+    if (DEMO_EQUIPES && q.has("vitrine")) garde.set("vitrine", "1");
+    if ([...q.keys()].some((k) => !garde.has(k)))
+      window.history.replaceState(null, "", window.location.pathname + (garde.toString() ? `?${garde}` : ""));
+    const t = window.setTimeout(() => {
+      if (terrain) setTerrainDefi(terrain);
+      if (v === "championnat") setVue("championnat");
+      if (garde.has("vitrine")) setForceVitrine(true);
+    }, 0);
     return () => window.clearTimeout(t);
   }, []);
   // Le terrain venu de la Map : le recensement lu une fois, les terrains de la ligue à leur nom.
@@ -287,6 +404,7 @@ export default function BolaTeamPage() {
         .channel(`team-${++seq}`)
         .on("postgres_changes", { event: "*", schema: "public", table: "equipe_membres" }, recharger)
         .on("postgres_changes", { event: "*", schema: "public", table: "equipe_defis" }, recharger)
+        .on("postgres_changes", { event: "*", schema: "public", table: "equipe_resultats" }, recharger)
         .subscribe();
     } catch {}
     return () => {
@@ -298,20 +416,47 @@ export default function BolaTeamPage() {
   useEffect(() => {
     if (!connecte) return;
     let fini = false;
-    Promise.all([listerEquipes(), listerDefis(), monId()])
-      .then(([e, d, id]) => {
+    Promise.all([listerEquipes(), listerDefis(), monId(), lireChampionnat().catch(() => null)])
+      .then(([e, d, id, c]) => {
         if (fini) return;
         setEquipes(e);
         setDefis(d);
+        setChamp(c);
         setMoiId(id);
         setIndisponible(false);
-        // L'invitation qu'on vient ouvrir : sa signature, tout de suite.
+        // L'invitation qu'on vient ouvrir : sa signature, tout de suite ; ou
+        // le Non donné sur la notification, qui la refuse.
         const voulue = aOuvrir.current;
         if (voulue != null && id) {
           aOuvrir.current = null;
+          const non = reponse.current === "non";
+          reponse.current = null;
           const x = e.find((q) => q.id === voulue);
-          if (x && invites(x).some((m) => m.id === id)) setASigner(x);
-          else if (!x?.membres.some((m) => m.id === id && m.statut === "membre")) toast("Cette invitation n'est plus valable.");
+          if (x && invites(x).some((m) => m.id === id)) {
+            if (non)
+              retirerInvitation(x.id, id).then(
+                () => {
+                  toast.success("Invitation refusée.");
+                  recharger();
+                  signalerEquipe();
+                },
+                (err) => toast.error(direErreurEquipe(err))
+              );
+            else setASigner(x);
+          } else if (!x?.membres.some((m) => m.id === id && m.statut === "membre")) toast("Cette invitation n'est plus valable.");
+        }
+        // La notification d'une feuille : la feuille, si je peux la remplir ; sinon le championnat.
+        const f = feuilleVoulue.current;
+        if (f != null && id) {
+          feuilleVoulue.current = null;
+          const mien = e.find((x) => x.membres.some((m) => m.id === id && m.statut === "membre" && m.role !== "membre"));
+          const match = c?.matchs.find((m) => m.id === f);
+          if (mien && match && (match.de === mien.id || match.a === mien.id)) setFeuille(f);
+          else setVue("championnat");
+        }
+        if (charteVoulue.current) {
+          charteVoulue.current = false;
+          setCharte(true);
         }
         // L'équipe vient d'être créée : on invite.
         const creee = id ? e.find((x) => x.membres.some((m) => m.id === id && m.statut === "membre" && m.role === "capitaine")) : null;
@@ -328,16 +473,17 @@ export default function BolaTeamPage() {
     return () => {
       fini = true;
     };
-  }, [connecte, tick]);
+  }, [connecte, tick, recharger]);
 
   // Aperçu (jamais en production) : la base n'a pas encore les équipes.
   const noms = useMemo(() => allPlayers.filter((p) => p.matchs > 0).map((p) => p.name), [allPlayers]);
-  const apercu = DEMO_EQUIPES && (indisponible || !connecte) && noms.length >= 12;
+  const apercu = DEMO_EQUIPES && (forceApercu || indisponible || !connecte) && noms.length >= 12;
   const monde = useMemo(
     () => (apercu ? demoEquipes(noms, me) : { equipes: equipes ?? [], defis }),
     [apercu, noms, me, equipes, defis]
   );
-  const moi = apercu ? `demo-${me}` : moiId;
+  // La vitrine en aperçu : personne n'est dans une équipe.
+  const moi = forceVitrine ? null : apercu ? `demo-${me}` : moiId;
   const moiNom = apercu ? me : (profils.find((p) => p.id === moiId)?.name ?? me);
 
   const mienne = monde.equipes.find((e) => e.membres.some((m) => m.id === moi && m.statut === "membre")) ?? null;
@@ -348,6 +494,45 @@ export default function BolaTeamPage() {
   const autres = monde.equipes.filter((e) => e.id !== mienne?.id && active(e));
   const charge = apercu || equipes !== null;
   const nomDe = (id: number) => monde.equipes.find((e) => e.id === id);
+  const sansAcces = forceVitrine || acces === false;
+  const moiMembre = mienne?.membres.find((m) => m.id === moi) ?? null;
+  const charteASigner = !!moiMembre && aSignerLaCharte(moiMembre);
+
+  // Le championnat. En aperçu, et sur une préversion tant que la vraie
+  // saison n'a aucun match validé : la démonstration, à son heure (le soir du
+  // 15 décembre). Mon équipe n'y est surlignée que dans le monde de démonstration.
+  const vraiVide = !champ || !champ.matchs.some((m) => etatMatch(m).etat === "valide");
+  const demoChamp = useMemo(
+    () => (DEMO_EQUIPES && (apercu || vraiVide) && noms.length >= 12 ? demoChampionnat(noms, me) : null),
+    [apercu, vraiVide, noms, me]
+  );
+  const vu = demoChamp ?? champ ?? SANS_CHAMPIONNAT;
+  const heureChamp = demoChamp?.maintenant;
+  const mienneChamp = demoChamp ? (apercu && mienne ? mienne.id : null) : (mienne?.id ?? null);
+  const classement = useMemo(() => {
+    const now = heureChamp ?? new Date();
+    return championnat(saisonEnCours(now), vu.equipes, vu.matchs, now);
+  }, [heureChamp, vu]);
+  const maPlace = (() => {
+    if (mienneChamp == null) return null;
+    const d = classement.divisions.find((x) => x.n === classement.divisionDe.get(mienneChamp));
+    const l = d?.lignes.find((x) => x.equipe === mienneChamp);
+    return d && l && l.j > 0 ? `${d.nom} · ${rangFr(l.rang)} · ${l.pts} pt${l.pts > 1 ? "s" : ""}` : null;
+  })();
+  // Mes feuilles : celles de mes vrais matchs (ou de la démonstration, en aperçu).
+  const miens = apercu && demoChamp ? demoChamp : (champ ?? SANS_CHAMPIONNAT);
+  const heureFeuilles = apercu && demoChamp ? demoChamp.maintenant : undefined;
+  const equipeDe = (id: number) => miens.equipes.find((e) => e.id === id) ?? monde.equipes.find((e) => e.id === id) ?? null;
+  const aRemplir =
+    mienne && capitaine
+      ? miens.matchs
+          .filter((m) => m.de === mienne.id || m.a === mienne.id)
+          .map((m) => ({ m, etat: etatMatch(m, heureFeuilles) }))
+          .filter(({ etat }) => etat.etat === "a-saisir" || etat.etat === "a-confirmer" || etat.etat === "litige")
+          .sort((x, y) => coupDEnvoiTeam(y.m).getTime() - coupDEnvoiTeam(x.m).getTime())
+      : [];
+  const matchFeuille = feuille != null ? (miens.matchs.find((m) => m.id === feuille) ?? null) : null;
+  const adverseFeuille = matchFeuille && mienne ? equipeDe(matchFeuille.de === mienne.id ? matchFeuille.a : matchFeuille.de) : null;
 
   const agir = async (f: () => Promise<unknown>, ok?: string) => {
     if (apercu) {
@@ -420,16 +605,14 @@ export default function BolaTeamPage() {
   // (les joueurs d'une autre équipe, avec son nom quand elle est active),
   // puis la base, qui sait le reste (un départ, une carence, un compte en
   // attente). Sans la base (un aperçu), la liste se contente du premier.
-  const raisons = useMemo(() => {
-    const r = new Map<string, string>();
-    if (!mienne) return r;
+  const raisons = new Map<string, string>();
+  if (mienne) {
     for (const e of monde.equipes) {
       if (e.id === mienne.id) continue;
-      for (const m of signataires(e)) r.set(m.id, active(e) ? `Chez ${e.nom}` : RAISON_INDISPO.equipe);
+      for (const m of signataires(e)) raisons.set(m.id, active(e) ? `Chez ${e.nom}` : RAISON_INDISPO.equipe);
     }
-    for (const [id, raison] of indispos ?? []) if (raison !== "equipe" || !r.has(id)) r.set(id, RAISON_INDISPO[raison]);
-    return r;
-  }, [mienne, monde.equipes, indispos]);
+    for (const [id, raison] of indispos ?? []) if (raison !== "equipe" || !raisons.has(id)) raisons.set(id, RAISON_INDISPO[raison]);
+  }
 
   const signes = mienne ? signataires(mienne) : [];
   const enAttente = mienne ? invites(mienne) : [];
@@ -551,9 +734,43 @@ export default function BolaTeamPage() {
   return (
     <div className="gabarit-ligue mx-auto flex w-full max-w-[470px] flex-col gap-7 px-5 pt-2 pb-8 sm:pt-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
       <h1 className="sr-only">Team</h1>
-      <EnteteLigue actif="/bola-team" />
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <EnteteLigue actif="/bola-team" className="md:flex-1" />
+        <div className="glass flex gap-1 rounded-full p-1 md:w-[340px]" role="tablist" aria-label="Vue">
+          {(
+            [
+              ["equipe", "Mon équipe"],
+              ["championnat", "Championnat"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={vue === id}
+              onClick={() => setVue(id)}
+              className={cn(
+                "flex-1 px-4 py-2 text-[13.5px] font-semibold whitespace-nowrap",
+                vue === id ? "bouton-principal bouton--vert" : "bouton-discret text-muted-foreground"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      {invitations.length > 0 && (
+      {vue === "championnat" && (
+        <ChampionnatTeam
+          equipes={vu.equipes}
+          matchs={vu.matchs}
+          mienne={mienneChamp}
+          maintenant={heureChamp}
+          pages={!demoChamp || (forceApercu && apercu)}
+        />
+      )}
+
+      {vue === "equipe" && invitations.length > 0 && (
         <section className="flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:gap-[var(--fib-13)]">
           {invitations.map((e) => (
             <InvitationRecue
@@ -567,20 +784,64 @@ export default function BolaTeamPage() {
         </section>
       )}
 
-      {mienne ? (
+      {vue !== "equipe" ? null : mienne ? (
         <section className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1.618fr)_minmax(0,1fr)] md:items-start md:gap-[var(--fib-34)] min-[1440px]:gap-[var(--fib-55)]">
           {/* La grande colonne : l'équipe, sa discussion, son terrain. */}
           <div className="contents md:flex md:min-w-0 md:flex-col md:gap-[var(--fib-21)]">
           <div className="flex items-center gap-4">
-            <Ecusson initiales={mienne.initiales} fond={mienne.fond} taille={76} />
+            {capitaine ? (
+              <button
+                type="button"
+                onClick={() => setBlasonOuvert(true)}
+                aria-label="Écusson et couleurs"
+                className="relative shrink-0 transition-transform active:scale-95"
+              >
+                <Ecusson initiales={mienne.initiales} fond={mienne.fond} blason={mienne.blason} taille={76} />
+                <span
+                  aria-hidden
+                  className="absolute -right-1 -bottom-0.5 grid size-7 place-items-center rounded-full bg-foreground text-background ring-[3px] ring-background"
+                >
+                  <Pencil className="size-3.5" strokeWidth={2.4} />
+                </span>
+              </button>
+            ) : (
+              <Ecusson initiales={mienne.initiales} fond={mienne.fond} blason={mienne.blason} taille={76} />
+            )}
             <div className="flex min-w-0 flex-col gap-1.5">
-              <h2 className="truncate text-[28px] leading-none font-bold tracking-tight md:text-[34px]">{mienne.nom}</h2>
+              <Link href={`/bola-team/${mienne.id}`} className="flex min-w-0 items-center gap-1 transition-opacity active:opacity-60">
+                <h2 className="truncate text-[28px] leading-none font-bold tracking-tight md:text-[34px]">{mienne.nom}</h2>
+                <ChevronRight className="size-5 shrink-0 text-foreground/35" strokeWidth={2.4} />
+              </Link>
               <span className="mono-label text-muted-foreground">{etatEquipe(mienne)}</span>
               {!active(mienne) && (
                 <span className="mono-label text-braise">Il manque {MIN_EQUIPE - signes.length}</span>
               )}
+              {maPlace && (
+                <button type="button" onClick={() => setVue("championnat")} className="mono-label self-start text-left text-foreground">
+                  {maPlace}
+                </button>
+              )}
             </div>
           </div>
+          {charteASigner && (
+            <button
+              type="button"
+              onClick={() => setCharte(true)}
+              className="bouton-principal bouton--vert flex w-full items-center gap-3 rounded-[22px] px-4 py-3.5 text-left transition-transform active:scale-[0.98]"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-bold">Charte de déontologie</span>
+                <span className="mono-label bouton-sous">Règlement Team · version {VERSION_REGLEMENT.slice(1)}</span>
+              </span>
+              <span className="shrink-0 text-[14px] font-semibold">Signer</span>
+            </button>
+          )}
+          {aRemplir.map(({ m, etat }) => {
+            const autre = equipeDe(m.de === mienne.id ? m.a : m.de);
+            return autre ? (
+              <CarteFeuille key={m.id} m={m} etat={etat} mienne={mienne.id} adverse={autre} onOuvrir={() => setFeuille(m.id)} />
+            ) : null;
+          })}
           {peutInviter && !active(mienne) && (
             <Button variant="mauve" onClick={ouvrirChoix} className="h-12 gap-2.5 rounded-full text-[15px] font-semibold">
               <UserPlus className="size-[18px]" strokeWidth={2.2} />
@@ -670,7 +931,7 @@ export default function BolaTeamPage() {
                 if (!e) return null;
                 return (
                   <div key={d.id} className="flex items-center gap-3 rounded-[20px] bg-card px-3 py-2.5">
-                    <Ecusson initiales={e.initiales} fond={e.fond} taille={36} />
+                    <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={36} />
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-[15px] font-semibold">{e.nom}</span>
                       <span className="truncate text-[12.5px] text-muted-foreground">{quand(d)}</span>
@@ -697,6 +958,8 @@ export default function BolaTeamPage() {
           {partir("hidden md:mt-[var(--fib-13)] md:flex")}
           </div>
         </section>
+      ) : sansAcces && invitations.length === 0 ? (
+        <VitrineTeam initiales={initialesDe(moiNom)} />
       ) : charge ? (
         <Button
           variant={invitations.length > 0 ? "secondary" : "vert"}
@@ -707,9 +970,9 @@ export default function BolaTeamPage() {
         </Button>
       ) : null}
 
-      {lesAutres(mienne ? "md:hidden" : "md:grid md:grid-cols-2 md:gap-[var(--fib-13)] xl:grid-cols-3 md:[&>h2]:col-span-full")}
+      {vue === "equipe" && lesAutres(mienne ? "md:hidden" : "md:grid md:grid-cols-2 md:gap-[var(--fib-13)] xl:grid-cols-3 md:[&>h2]:col-span-full")}
 
-      {partir("md:hidden")}
+      {vue === "equipe" && partir("md:hidden")}
 
       <CreerEquipe
         open={creer}
@@ -727,6 +990,38 @@ export default function BolaTeamPage() {
         onOpenChange={(o) => !o && setASigner(null)}
         apercu={apercu}
         onSigne={() => {
+          recharger();
+          signalerEquipe();
+        }}
+      />
+      <SignerCharte
+        equipe={mienne}
+        open={charte}
+        onOpenChange={setCharte}
+        apercu={apercu}
+        onSigne={() => {
+          recharger();
+          signalerEquipe();
+        }}
+      />
+      <FicheBlason
+        equipe={capitaine ? mienne : null}
+        open={blasonOuvert}
+        onOpenChange={setBlasonOuvert}
+        apercu={apercu}
+        onEnregistre={() => {
+          recharger();
+          signalerEquipe();
+        }}
+      />
+      <FeuilleTeam
+        match={matchFeuille}
+        mienne={mienne}
+        adverse={adverseFeuille}
+        onOpenChange={(o) => !o && setFeuille(null)}
+        apercu={apercu}
+        maintenant={heureFeuilles}
+        onSaisie={() => {
           recharger();
           signalerEquipe();
         }}

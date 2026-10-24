@@ -177,3 +177,69 @@ export function coupDEnvoiPasse(jour: string, heure: string, maintenant = new Da
 export function feuilleOuverte(saisiLe: string | null, maintenant = new Date()): boolean {
   return !saisiLe || maintenant.getTime() - new Date(saisiLe).getTime() < 24 * 3600 * 1000;
 }
+
+// ─────────────── Les classements de Bola, et ses divisions ───────────────
+// Sabri, 24/10 : « dans le classement Bola, c'est juste le classement des
+// buteurs, des passeurs, et on a un semi-classement Pépite d'Or qui intègre
+// les victoires, les nuls, les défaites et la carte MVP sélectionnée
+// automatiquement » : trois classements, Points (le barème plus haut),
+// Buteurs et Passeurs, tous à vie, sur les matchs classés.
+//
+// « On peut aussi faire des divisions une fois qu'on a assez
+// d'utilisateurs […] c'est pareil qu'à la SFL : c'est au nombre de points.
+// On peut très bien passer premier ou dixième » : les divisions de Bola ne
+// sont que des tranches du classement des points, recoupées à chaque match
+// (pas de règle de montée ni de descente). Des tranches de 30 comme la SFL,
+// dès que le classement en remplit deux ; la dernière reçoit tous les
+// autres. Un ex æquo à la dernière place d'une division y entre avec
+// celui qu'il égale (comme la SFL, lib/sfl/divisions.ts).
+
+export type ClassementBola = "points" | "buts" | "passes";
+
+export const DIVISIONS_BOLA = {
+  /** Joueurs par division, comme la SFL. */
+  taille: 30,
+} as const;
+
+export interface LigneBolaClassee extends Classe {
+  /** La valeur du classement (points, buts ou passes) et le rang qu'elle donne. */
+  valeur: number;
+  place: number;
+}
+
+/** Un classement à vie : points (le rang déjà calculé), buts ou passes (ex æquo au même rang ; personne à 0). */
+export function classementBola(classement: Classe[], cle: ClassementBola): LigneBolaClassee[] {
+  if (cle === "points") return classement.map((c) => ({ ...c, valeur: c.points, place: c.rank }));
+  const autre = cle === "buts" ? "passes" : "buts";
+  const t = classement
+    .filter((c) => c[cle] > 0)
+    .sort((a, b) => b[cle] - a[cle] || b[autre] - a[autre] || a.matchs - b.matchs || a.name.localeCompare(b.name, "fr"));
+  const out: LigneBolaClassee[] = [];
+  t.forEach((c, i) => {
+    const p = out[i - 1];
+    out.push({ ...c, valeur: c[cle], place: p && p.valeur === c[cle] ? p.place : i + 1 });
+  });
+  return out;
+}
+
+export interface DivisionBola {
+  n: number;
+  nom: string;
+  lignes: LigneBolaClassee[];
+}
+
+/** Les divisions du classement des points ; aucune tant qu'il n'en remplit pas deux. */
+export function divisionsBola(lignes: LigneBolaClassee[], taille: number = DIVISIONS_BOLA.taille): DivisionBola[] {
+  if (taille < 1 || lignes.length < taille * 2) return [];
+  const k = Math.floor(lignes.length / taille);
+  const out: DivisionBola[] = [];
+  let i = 0;
+  for (let n = 1; n <= k && i < lignes.length; n++) {
+    let fin = n === k ? lignes.length : Math.min(lignes.length, i + taille);
+    // L'ex æquo du dernier entre avec lui.
+    while (n < k && fin < lignes.length && lignes[fin].place === lignes[fin - 1].place) fin++;
+    out.push({ n, nom: `D${n}`, lignes: lignes.slice(i, fin) });
+    i = fin;
+  }
+  return out;
+}

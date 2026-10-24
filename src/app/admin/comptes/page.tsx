@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { useSession } from "@/hooks/use-session";
 import { jetonServeur } from "@/lib/sfl/auth/session";
 import { cn } from "@/lib/utils";
+import { BoutonRetour } from "@/components/layout/bouton-retour";
 
 interface Compte {
   name: string;
@@ -254,11 +255,14 @@ export default function ComptesPage() {
 
   return (
     <div className="shell flex flex-col gap-4 py-4 sm:py-8">
-      <div>
-        <h1 className="text-[30px] font-bold tracking-tight">Les accès</h1>
-        <p className="mt-1 text-[13px] text-foreground/42">
-          Une fenêtre par joueur · un mot de passe provisoire s&apos;il a perdu le sien
-        </p>
+      <div className="flex items-center gap-3">
+        <BoutonRetour />
+        <div>
+          <h1 className="text-[30px] font-bold tracking-tight">Les accès</h1>
+          <p className="mt-1 text-[13px] text-foreground/42">
+            Une fenêtre par joueur · un mot de passe provisoire s&apos;il a perdu le sien
+          </p>
+        </div>
       </div>
 
       {/* Recherche — pour ne pas dérouler les 71 à chaque fois */}

@@ -706,7 +706,7 @@ export function VitrineTrophees({ nom, enJeu = true }: { nom: string; enJeu?: bo
         </div>
       )}
 
-      <Sheet open={!!ouvert} onOpenChange={(o) => !o && setOuvert(null)}>
+      <Sheet open={!!ouvert} onOpenChange={(o) => !o && setOuvert(null)} titre={ouvert === "regles" ? "les trophées" : "ce trophée"}>
         <SheetContent side="bottom" className="mx-auto max-h-[90vh] w-full overflow-y-auto rounded-t-[28px] px-5 pt-6 pb-8 sm:max-w-md">
           {ouvert === "regles" && <FeuilleTrophees />}
           {detail && <FeuilleSaison e={detail} moi={nom} />}
@@ -773,7 +773,7 @@ export function VitrineBadges({ nom }: { nom: string }) {
         ))}
       </section>
 
-      <Sheet open={!!choix} onOpenChange={(o) => !o && setChoix(null)}>
+      <Sheet open={!!choix} onOpenChange={(o) => !o && setChoix(null)} titre="ce badge">
         <SheetContent side="bottom" className="mx-auto max-h-[90vh] w-full overflow-y-auto rounded-t-[28px] px-5 pt-6 pb-8 sm:max-w-md">
           {detailPalier && <FeuillePalier e={detailPalier} moi={nom} />}
         </SheetContent>

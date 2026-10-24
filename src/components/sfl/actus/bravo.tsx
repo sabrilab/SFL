@@ -56,7 +56,7 @@ export function Bravo({ exploits }: { exploits: Exploit[] }) {
           <span aria-hidden>👏</span>
           {qui.length}
         </button>
-        <Sheet open={liste} onOpenChange={setListe}>
+        <Sheet open={liste} onOpenChange={setListe} titre="les félicitations">
           <SheetContent side="bottom" className="mx-auto max-h-[80dvh] w-full rounded-t-[28px] px-4 pt-6 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] sm:max-w-md">
             <div className="flex flex-col gap-1 px-1">
               <SheetTitle className="titre-lettrage text-[24px] leading-[0.95] font-black">

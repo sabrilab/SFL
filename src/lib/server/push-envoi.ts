@@ -12,9 +12,12 @@
 //   2. la notification part sur tous ses téléphones ;
 //   3. la trace garde combien l'ont prise ; les abonnements que le service
 //      de push dit morts sont effacés, comme avant.
-// Rien de son texte n'est gardé : son motif (lib/sfl/motifs-notif.ts) et ce
-// à quoi elle se rattache suffisent à l'analyse. Le geste qu'elle attendait,
-// la base le reconnaît seule (triggers push_effet_*, supabase/schema.sql).
+// Rien de son texte n'est gardé : son motif (lib/sfl/motifs-notif.ts), ce à
+// quoi elle se rattache et le joueur dont elle vient (celui qui a écrit,
+// invité, suivi ou félicité ; personne quand c'est l'app) suffisent à
+// l'analyse. Le geste qu'elle attendait, la base le reconnaît seule
+// (triggers push_effet_*, supabase/schema.sql). Le joueur dont elle vient
+// nourrit « Qui ramène du monde » (Admin → Activité, demandé le 24/10).
 //
 // Une trace impossible à poser (base pas encore migrée, aperçus) n'empêche
 // jamais l'envoi : la notification part simplement sans identifiant.
@@ -32,6 +35,15 @@ export interface Envoi {
   motif: MotifNotif;
   /** Ce à quoi elle se rattache (« match:12 », « equipe:3 ») : le geste attendu doit avoir lieu là. */
   ref?: string | null;
+  /** Le joueur dont elle vient, quand ce n'est pas celui de l'envoi (une invitation lancée par le vice-capitaine). */
+  de?: string | null;
+}
+
+export interface Options {
+  /** Qui écrit les traces : `sb` par défaut ; null, personne (seule la clé secrète le peut, et elle manque). */
+  traces?: SupabaseClient | null;
+  /** Le joueur dont viennent ces notifications (son message, son invitation, son suivi…) ; rien quand c'est l'app. */
+  de?: string | null;
 }
 
 export interface Bilan {
@@ -46,15 +58,14 @@ export interface Bilan {
 
 /**
  * Une notification par joueur, sur tous ses téléphones, avec sa trace.
- * `sb` lit les abonnements et efface les morts ; `traces` écrit les traces
- * (par défaut `sb` ; null : aucune, quand seule la clé secrète le peut et
- * qu'elle manque).
+ * `sb` lit les abonnements et efface les morts ; `options.traces` écrit les
+ * traces, `options.de` dit de quel joueur elles viennent.
  */
 export async function prevenir(
   sb: SupabaseClient,
   cle: CleVapid,
   envois: Map<string, Envoi>,
-  traces: SupabaseClient | null = sb
+  { traces = sb, de = null }: Options = {}
 ): Promise<Bilan> {
   const recus = new Set<string>();
   const rien: Bilan = { recus, telephones: 0, echecs: 0, morts: 0 };
@@ -76,15 +87,21 @@ export async function prevenir(
   const ids = new Map([...parJoueur.keys()].map((uid) => [uid, randomUUID()]));
   let suivi = false;
   if (traces) {
-    const { error } = await traces.from("push_envois").insert(
+    const source = (uid: string) => envois.get(uid)!.de ?? de;
+    const lignes = (avecSource: boolean) =>
       [...parJoueur].map(([uid, abonnements]) => ({
         id: ids.get(uid),
         user_id: uid,
         motif: envois.get(uid)!.motif,
         ref: envois.get(uid)!.ref ?? null,
         appareils: abonnements.length,
-      }))
-    );
+        ...(avecSource ? { de: source(uid) } : {}),
+      }));
+    const avecSource = [...parJoueur.keys()].some((uid) => source(uid));
+    let { error } = await traces.from("push_envois").insert(lignes(avecSource));
+    // Avant la migration (un aperçu lit la base de production), la colonne
+    // de n'existe pas encore : la trace part sans elle.
+    if (error && avecSource) ({ error } = await traces.from("push_envois").insert(lignes(false)));
     suivi = !error;
   }
 

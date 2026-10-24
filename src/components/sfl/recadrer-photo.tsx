@@ -170,7 +170,8 @@ export function RecadrerPhoto({
   const dh = image ? image.naturalHeight * s : 0;
 
   return (
-    <Sheet open={!!src} onOpenChange={(o) => !o && onFermer()}>
+    // À part, comme le studio photo qui l'ouvre (ui/sheet.tsx).
+    <Sheet aPart open={!!src} onOpenChange={(o) => !o && onFermer()}>
       <SheetContent side="bottom" className="max-h-[94dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)]">
         <SheetHeader className="px-5 pt-5 pb-0">
           <SheetTitle className="text-[22px] font-bold tracking-tight">Placer ma photo</SheetTitle>
