@@ -278,22 +278,7 @@
   color: var(--r-texte);
 }
 
-/* Les portes des épreuves, entre deux vignettes : un trait, l'hexagone et son numéro, le nom au pochoir. */
-.passe__porte {
-  display: flex;
-  flex-shrink: 0;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  width: 28px;
-  padding-block: 4px;
-}
-.passe__porte::before,
-.passe__porte::after {
-  content: "";
-  flex: 1;
-  border-left: 1.5px dashed rgb(var(--r-lueur) / 0.45);
-}
+/* L'hexagone de l'épreuve qui retient le prochain palier (passe__bloque) : son numéro. */
 .passe__porte-case {
   position: relative;
   display: grid;
@@ -320,34 +305,6 @@
   font-size: 13px;
   line-height: 1;
 }
-.passe__porte--faite .passe__porte-case {
-  background: linear-gradient(165deg, rgb(var(--r-feu)), rgb(var(--r-lueur)) 55%, var(--r-sombre));
-  box-shadow: 0 0 12px rgb(var(--r-lueur) / 0.6);
-}
-.passe__porte--faite .passe__porte-case::after {
-  display: none;
-}
-.passe__porte--faite .passe__porte-case > span {
-  color: #0a0b0d;
-}
-.passe__porte-nom {
-  writing-mode: vertical-rl;
-  color: rgb(244 245 242 / 0.5);
-  transform: rotate(180deg);
-}
-
-/* L'épreuve faite, hors de la piste : l'hexagone plein. */
-.passe__porte-case--faite {
-  background: linear-gradient(165deg, rgb(var(--r-feu)), rgb(var(--r-lueur)) 55%, var(--r-sombre));
-  box-shadow: 0 0 12px rgb(var(--r-lueur) / 0.6);
-}
-.passe__porte-case--faite::after {
-  display: none;
-}
-.passe__porte-case--faite > span {
-  color: #0a0b0d;
-}
-
 /* Le palier qui attend son épreuve : l'XP est là, la porte est fermée. */
 .passe__bloque {
   display: flex;

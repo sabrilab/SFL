@@ -29,11 +29,20 @@
 // sertie, ou le long du bord), et l'insigne du rang en haut à gauche de la
 // compacte. Le reste (crans, sceau, puce, nom gravé) est pour la classique.
 //
+// Une carte d'époque (`epoque`, la saison 0, Sabri 24/10) est sertie dans
+// sa matière : le parchemin de la carte de saison, où passent les bouts de
+// ses coups de pinceau, ou le métal de sa carte Boost ; l'onglet de la note
+// est la barre orange du logo d'alors (ou le fond sombre de la carte
+// Boost), le poste dans l'accent d'alors, et en haut de la compacte, le
+// sigle SFL souligné, sur une étiquette de son papier (et l'emblème d'une
+// carte Boost à la place du badge).
+//
 // Toujours le repère 1024 × 1656 (1 × φ) et les mêmes calques que la
 // classique (`data-card-part` body / player / stats).
 
 import { palierCarte } from "@/components/sfl/bola-card";
 import {
+  graine,
   lisereDe,
   MATIERES,
   matiereDe,
@@ -44,8 +53,11 @@ import {
 } from "@/components/sfl/finitions-carte";
 import { filtrePhoto, InsigneRang, VoileTraitement } from "@/components/sfl/habillage-carte";
 import { ObjetBadge } from "@/components/sfl/insigne-carte";
+import { EmblemeEpoque, SigleSouligne } from "@/components/sfl/marques-carte";
+import { MotifCarte } from "@/components/sfl/motif-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import type { BoostType } from "@/lib/sfl/engine";
+import type { EmissionCarte } from "@/lib/sfl/epoques";
 
 const W = 1024;
 const H = 1656;
@@ -128,6 +140,7 @@ export function CartePhoto({
   vertical = false,
   distinction,
   habillage,
+  epoque,
 }: {
   name: string;
   affiche?: string;
@@ -143,13 +156,17 @@ export function CartePhoto({
   distinction?: BoostType;
   /** Ce que le joueur porte sur sa carte (finitions-carte.ts). */
   habillage?: HabillageCarte;
+  /** Une carte d'une saison close qui a son édition d'époque. */
+  epoque?: EmissionCarte | null;
 }) {
   const largeur = 254 * size;
   const u = (n: number) => n * size * (254 / W);
   const p0 = palierCarte(largeur);
   const palier = vertical && p0 === "pastille" ? "reduite" : p0;
-  // Le serti : la matière d'une carte à titre, ou de la finition portée.
-  const teinte = distinction ? MATIERES[distinction] : habillage?.finition ? matiereDe("base", habillage) : null;
+  // Le serti : la matière d'une carte d'époque, d'une carte à titre, ou de la finition portée.
+  const temps = epoque ? matiereDe(distinction ?? "base", undefined, epoque.saison) : null;
+  const era = temps?.epoque;
+  const teinte = era ? temps : distinction ? MATIERES[distinction] : habillage?.finition ? matiereDe("base", habillage) : null;
   // Le liseré porté : le filet autour de la photo, dans son métal (au moins 1 px).
   const lisere = lisereDe(habillage);
   const filet = lisere ? METAUX[lisere][1] : null;
@@ -173,6 +190,7 @@ export function CartePhoto({
             : "inset 0 0 0 1px rgba(255,255,255,0.12), 0 2px 6px rgba(0,0,0,0.28)",
         }}
       >
+        {era && teinte?.motif && <MotifCarte motif={teinte.motif} graine={graine(name)} centre={{ cx: 512, cy: 1150 }} />}
         <div
           data-card-part="player"
           style={{
@@ -257,6 +275,8 @@ export function CartePhoto({
         textAlign: "left",
       }}
     >
+      {/* Les bouts des coups de pinceau d'une carte de la saison 0, dans le serti */}
+      {era && teinte?.motif && <MotifCarte motif={teinte.motif} graine={graine(name)} />}
       <div
         data-card-part="player"
         style={{
@@ -282,7 +302,7 @@ export function CartePhoto({
           }}
         />
         {/* Le badge à BADGE_M du bord de la photo, sertie ou non (sertie, le calque est rentré du cadre). */}
-        {badge && !reduite && (
+        {badge && !era && !reduite && (
           <span
             className="absolute"
             style={{ left: u(W - bord * 2 - BADGE_M - BADGE * 1.2), top: u(BADGE_M) }}
@@ -305,10 +325,34 @@ export function CartePhoto({
             }}
           />
         )}
-        {habillage?.rang && !reduite && (
+        {habillage?.rang && !era && !reduite && (
           <span style={{ position: "absolute", left: u(BADGE_M + bord), top: u(BADGE_M + bord), display: "flex" }}>
             <InsigneRang rang={habillage.rang} hauteur={u(BADGE * 1.05)} />
           </span>
+        )}
+        {era && !reduite && (
+          <>
+            {/* Le sigle SFL souligné, sur une étiquette de son papier */}
+            <span
+              style={{
+                position: "absolute",
+                left: u(BADGE_M * 0.8 + bord),
+                top: u(BADGE_M * 0.8 + bord),
+                display: "flex",
+                padding: `${u(26)}px ${u(30)}px ${u(24)}px`,
+                borderRadius: u(30),
+                background: temps!.papier,
+                boxShadow: `0 ${u(4)}px ${u(14)}px rgba(0,0,0,0.3)`,
+              }}
+            >
+              <SigleSouligne hauteur={u(86)} epoque={era} />
+            </span>
+            {era.embleme && (
+              <span style={{ position: "absolute", right: u(BADGE_M + bord), top: u(BADGE_M + bord), display: "flex" }}>
+                <EmblemeEpoque cote={u(BADGE)} epoque={era} />
+              </span>
+            )}
+          </>
         )}
         {reduite && onglet ? (
           // Sur un terrain : la note dans l'onglet aux couleurs de l'équipe, comme la pastille.
@@ -358,7 +402,7 @@ export function CartePhoto({
                   fontSize: u(46),
                   letterSpacing: u(4),
                   lineHeight: 1,
-                  color: "rgba(255,255,255,0.75)",
+                  color: era ? teinte!.vive : "rgba(255,255,255,0.75)",
                   whiteSpace: "nowrap",
                   textShadow: ombre,
                   marginBottom: u(22),

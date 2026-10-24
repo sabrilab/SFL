@@ -17,6 +17,10 @@
 // en rouge (Impact) ou en bleu (Défensive) (Sabri, 22/10, teinte-carte.ts).
 // Avec `maillot`, le joueur porte le maillot de son camp dans ce match : la
 // photo est repeinte par le code (Sabri, 23/10, lib/sfl/maillot-des-photos).
+// La carte d'une saison close qui a son édition d'époque (la saison 0,
+// Sabri 24/10) se dessine dans les visuels de son temps, avec sa date
+// d'émission et son numéro (use-epoque-carte.ts) : sa saison vient de
+// `saison`, ou de l'archive qu'on relit. Ni badge ni habillage dessus.
 
 "use client";
 
@@ -27,6 +31,7 @@ import { usePhotoPerso } from "@/hooks/use-player-photo";
 import { usePhotoAuMaillot } from "@/hooks/use-photo-au-maillot";
 import type { Camp } from "@/lib/sfl/maillots";
 import { ovr, type BoostType, type Player, type StatKey } from "@/lib/sfl/engine";
+import { useEpoqueCarte } from "@/hooks/use-epoque-carte";
 import { useHabillage } from "@/hooks/use-habillage";
 import { useIdentites } from "@/hooks/use-identites";
 import type { HabillageCarte } from "./finitions-carte";
@@ -44,6 +49,8 @@ export function PlayerCard({
   distinction,
   habillage,
   maillot,
+  saison,
+  journee,
 }: {
   player: Player;
   /** Aperçu : le nom et le pseudo en cours de saisie (identite.tsx). */
@@ -63,13 +70,20 @@ export function PlayerCard({
   habillage?: HabillageCarte;
   /** Le camp du joueur dans un match : sa photo porte ce maillot-là. */
   maillot?: Camp;
+  /** La saison de la carte, quand ce n'est pas celle qu'on lit (une carte d'une saison close). */
+  saison?: number;
+  /** La journée d'une carte à titre : le jour de son émission. */
+  journee?: number;
 }) {
   const stats = player.stats;
   const photo = usePhotoAuMaillot(usePhotoPerso(player.name), maillot);
-  const badge = useBadgeCarte(player.name);
+  const epoque = useEpoqueCarte(player.name, saison, distinction, journee);
+  const badgeActuel = useBadgeCarte(player.name);
   // Ce que le joueur porte (use-habillage.ts), sauf un essai passé en prop.
   const porte = useHabillage(player.name);
-  const habille = habillage ?? porte;
+  // Une carte d'époque est restée telle qu'elle a été émise.
+  const badge = epoque ? undefined : badgeActuel;
+  const habille = epoque ? undefined : (habillage ?? porte);
   const identite = useIdentites();
   if (palierCarte(254 * size) !== "complete")
     return (
@@ -85,6 +99,7 @@ export function PlayerCard({
         vertical={vertical}
         distinction={distinction}
         habillage={habille}
+        epoque={epoque}
       />
     );
   return (
@@ -102,6 +117,7 @@ export function PlayerCard({
       onglet={onglet}
       badge={badge}
       habillage={habille}
+      epoque={epoque}
     />
   );
 }

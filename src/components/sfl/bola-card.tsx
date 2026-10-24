@@ -58,11 +58,21 @@
 // puce noire, son nom gravé dans le microtexte, l'insigne de son rang après
 // l'étiquette. `data-habillage` le redit au dos de la 3D.
 //
+// Une carte d'époque (`epoque`, la carte d'une saison close qui a son
+// édition d'époque, Sabri 24/10 ; finitions-carte.ts, lib/sfl/epoques.ts)
+// garde cette disposition dans les visuels de son temps : la saison 0, son
+// papier et ses coups de pinceau, ou sa carte Boost, son cadre de métal et
+// sa lumière ; le sigle SFL souligné de sa barre à la place du symbole, le
+// poste dans l'accent d'alors (ou l'emblème d'une carte Boost), la frange de
+// la note dans cet accent, les libellés en capitales, le losange au ballon à
+// la place de la puce, et sa date d'émission et son numéro dans la ligne de
+// série. Ni badge, ni habillage : elle est restée telle qu'elle a été émise.
+//
 // Mêmes calques que la carte éditoriale (`data-card-part` body / player /
 // stats) : la 3D de card-3d.tsx mesure la carte et la prend telle quelle,
 // avec sa parallaxe — le portrait flotte au-dessus du papier, le texte
 // au-dessus du portrait. `data-matiere` et `data-nom` lui disent quel dos
-// dessiner.
+// dessiner, `data-emission` ce qu'une carte d'époque y écrit.
 
 import { BulleBadge } from "@/components/sfl/insigne-carte";
 import {
@@ -79,9 +89,11 @@ import {
   type Traitement,
 } from "@/components/sfl/finitions-carte";
 import { Crans, filtrePhoto, InsigneRang, Lisere, Sceau, VoileTraitement, type Boite } from "@/components/sfl/habillage-carte";
+import { BordEpoque, EmblemeEpoque, LosangeBallon, SigleSfl, SigleSouligne } from "@/components/sfl/marques-carte";
 import { MotifCarte } from "@/components/sfl/motif-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
+import { ligneDEmission, type EmissionCarte } from "@/lib/sfl/epoques";
 
 export type BolaEdition = "base" | "rare" | "mvp" | "impact" | "def";
 type Palier = "complete" | "compacte" | "reduite" | "pastille";
@@ -123,23 +135,11 @@ export function palierCarte(largeurPx: number): Palier {
   return "complete";
 }
 
-/** Le sigle SFL, à la couleur de l'encre (le masque de SigleLigue, choix-ligue.tsx). */
-function SigleSfl({ hauteur, couleur }: { hauteur: number; couleur: string }) {
-  return (
-    <span
-      role="img"
-      aria-label="SFL"
-      style={{
-        display: "inline-block",
-        height: hauteur,
-        width: (hauteur * 735) / 237,
-        background: couleur,
-        mask: "url(/bola/sfl.svg) center / contain no-repeat",
-        WebkitMask: "url(/bola/sfl.svg) center / contain no-repeat",
-      }}
-    />
-  );
-}
+/** La hauteur du sigle SFL d'une carte d'époque, en haut à gauche du portrait. */
+const SIGLE_H = 46;
+
+/** Une couleur « #rrggbb » à l'opacité voulue. */
+const opaque = (hex: string, a: number) => `${hex}${Math.round(a * 255).toString(16).padStart(2, "0")}`;
 
 /** Le portrait : la photo du joueur, ou à défaut son initiale en filigrane sur les rayures. */
 function Portrait({
@@ -238,7 +238,8 @@ export function BolaCard({
   numero,
   onglet,
   badge,
-  habillage,
+  habillage: habillageDemande,
+  epoque,
 }: {
   name: string;
   /** Le nom montré sur la carte, s'il diffère du nom de saison (voir lib/sfl/identites). */
@@ -260,15 +261,21 @@ export function BolaCard({
   badge?: BadgeCarte | null;
   /** Ce que le joueur porte sur sa carte (finitions-carte.ts). */
   habillage?: HabillageCarte;
+  /** Une carte d'une saison close qui a son édition d'époque : sa saison, sa date d'émission, son numéro. */
+  epoque?: EmissionCarte | null;
 }) {
   // 254 px de large à taille 1, comme les autres cartes de l'app.
   const largeur = 254 * size;
   const u = (n: number) => n * size * (254 / W);
   const palier = palierCarte(largeur);
-  const p = matiereDe(edition, habillage);
+  const p = matiereDe(edition, habillageDemande, epoque?.saison);
+  // Une carte d'époque est restée telle qu'elle a été émise : sans habillage ni badge.
+  const era = p.epoque;
+  const habillage = era ? undefined : habillageDemande;
   const encre = (a: number) => `rgba(${p.encre},${a})`;
   const seed = graine(name);
   const { serie, numero: numeroSerie } = serieDe(name);
+  const emission = p.epoque ? ligneDEmission(epoque ?? { saison: p.epoque.saison, le: null, n: null, sur: null }) : null;
   const nomUp = (affiche ?? name).toUpperCase();
 
   // La pastille : un carré, le visage, la note dans un onglet.
@@ -373,7 +380,17 @@ export function BolaCard({
   );
 
   // Le haut à droite du portrait : le numéro de maillot ; sinon le poste, en grand format seulement.
-  const marque = numero != null ? String(numero) : complete ? position.toUpperCase() : null;
+  // Une carte d'époque : le poste, ou rien sous l'emblème d'une carte Boost.
+  // Le badge n'est plus dans le coin : il est dans sa bulle, sur la bande.
+  const marque = era
+    ? era.embleme || !complete
+      ? null
+      : position.toUpperCase()
+    : numero != null
+      ? String(numero)
+      : complete
+        ? position.toUpperCase()
+        : null;
   const portraitProps = {
     photo,
     nom: name,
@@ -395,7 +412,7 @@ export function BolaCard({
   const cran = habillage?.cran ?? 0;
   const sceau = complete && signes.includes("sceau");
   const nomGrave = complete && signes.includes("nom-grave");
-  const tailleMarque = numero != null ? (complete ? 164 : compacte ? 225 : 287) : 80;
+  const tailleMarque = !era && numero != null ? (complete ? 164 : compacte ? 225 : 287) : 80;
   const halo = p.sombre ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)";
 
   // La note : dans son carré, centrée sur toute la largeur en réduite.
@@ -413,6 +430,7 @@ export function BolaCard({
       data-matiere={p.nom}
       data-nom={name}
       data-habillage={habillage ? JSON.stringify(habillage) : undefined}
+      data-emission={era && epoque ? JSON.stringify(epoque) : undefined}
       style={{
         position: "relative",
         width: u(W),
@@ -491,6 +509,9 @@ export function BolaCard({
         />
       )}
 
+      {/* Le cadre de métal d'une carte d'époque, et le filet des cartes Boost */}
+      {era && <BordEpoque epoque={era} />}
+
       {/* Le cadre du portrait que le joueur a gagné : le liseré, puis ses coins un par cran */}
       {complete && lisere && <Lisere metal={lisere} boite={CADRE} />}
       {complete && cran > 0 && <Crans cran={cran} metal={lisere ?? "argent"} boite={CADRE} />}
@@ -536,12 +557,17 @@ export function BolaCard({
                 fontSize: u(tailleMarque),
                 lineHeight: 1,
                 letterSpacing: u(-2),
-                color: encre(1),
+                color: era?.accent ?? encre(1),
                 textShadow: photo ? `0 0 ${u(18)}px ${halo}` : undefined,
               }}
             >
               {marque}
             </div>
+          )}
+          {era?.embleme && complete && (
+            <span className="absolute flex" style={{ right: u(46), top: u(40) }}>
+              <EmblemeEpoque cote={u(124)} epoque={era} />
+            </span>
           )}
           {complete && (
             <>
@@ -549,17 +575,24 @@ export function BolaCard({
               {coin({ right: u(31), top: u(31) }, 90)}
               {coin({ right: u(31), bottom: u(31) }, 180)}
               {!sceau && coin({ left: u(31), bottom: u(31) }, 270)}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={p.symbole}
-                alt=""
-                style={{ position: "absolute", left: u(61), top: u(61), width: u(51), height: u(51) }}
-              />
+              {era ? (
+                // Le sigle SFL souligné de sa barre, comme le logo des cartes d'alors.
+                <span style={{ position: "absolute", left: u(61), top: u(56), display: "flex" }}>
+                  <SigleSouligne hauteur={u(SIGLE_H)} epoque={era} />
+                </span>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={p.symbole}
+                  alt=""
+                  style={{ position: "absolute", left: u(61), top: u(61), width: u(51), height: u(51) }}
+                />
+              )}
               {/* Après le symbole : l'étiquette d'édition (base, ou le titre de la carte), puis le rang */}
               <div
                 style={{
                   position: "absolute",
-                  left: u(133),
+                  left: u(era ? 61 + (SIGLE_H * 735) / 237 + 24 : 133),
                   top: u(56),
                   height: u(62),
                   display: "flex",
@@ -585,22 +618,29 @@ export function BolaCard({
                 </div>
                 {habillage?.rang && <InsigneRang rang={habillage.rang} hauteur={u(82)} />}
               </div>
-              {/* La puce, dans le métal de la carte */}
-              <div
-                style={{
-                  position: "absolute",
-                  right: u(56),
-                  bottom: u(61),
-                  width: u(87),
-                  height: u(67),
-                  borderRadius: u(14),
-                  background: puceNoire ? PUCE_NOIRE : p.puce,
-                  boxShadow: `inset 0 0 0 ${u(2)}px ${contacts}`,
-                }}
-              >
-                <div style={{ position: "absolute", left: "50%", top: u(8), bottom: u(8), width: u(2), background: contacts }} />
-                <div style={{ position: "absolute", top: "50%", left: u(8), right: u(8), height: u(2), background: contacts }} />
-              </div>
+              {era ? (
+                /* Le losange au ballon, qui pointait sous les cartes d'alors */
+                <span style={{ position: "absolute", right: u(48), bottom: u(46), display: "flex" }}>
+                  <LosangeBallon cote={u(104)} epoque={era} />
+                </span>
+              ) : (
+                /* La puce, dans le métal de la carte */
+                <div
+                  style={{
+                    position: "absolute",
+                    right: u(56),
+                    bottom: u(61),
+                    width: u(87),
+                    height: u(67),
+                    borderRadius: u(14),
+                    background: puceNoire ? PUCE_NOIRE : p.puce,
+                    boxShadow: `inset 0 0 0 ${u(2)}px ${contacts}`,
+                  }}
+                >
+                  <div style={{ position: "absolute", left: "50%", top: u(8), bottom: u(8), width: u(2), background: contacts }} />
+                  <div style={{ position: "absolute", top: "50%", left: u(8), right: u(8), height: u(2), background: contacts }} />
+                </div>
+              )}
             </>
           )}
           {/* Le sceau, tamponné sur le bas de la photo */}
@@ -615,11 +655,18 @@ export function BolaCard({
       {/* Le texte, au premier plan */}
       <div data-card-part="stats" style={{ position: "absolute", inset: 0 }}>
         {/* La note, en italique avec sa frange */}
-        {[
-          { dx: -5, a: 0.24 },
-          { dx: 5, a: 0.13 },
-          { dx: 0, a: 1 },
-        ].map(({ dx, a }, i) => (
+        {(era
+          ? [
+              { dx: -8, a: 0.42 },
+              { dx: 6, a: 0.2 },
+              { dx: 0, a: 1 },
+            ]
+          : [
+              { dx: -5, a: 0.24 },
+              { dx: 5, a: 0.13 },
+              { dx: 0, a: 1 },
+            ]
+        ).map(({ dx, a }, i) => (
           <div
             key={i}
             style={{
@@ -634,7 +681,8 @@ export function BolaCard({
               fontSize: u(note.fs),
               letterSpacing: u(-18),
               lineHeight: 1,
-              color: encre(a),
+              // Une carte d'époque : la frange dans l'accent d'alors, comme un repérage décalé.
+              color: era && a < 1 ? opaque(era.accent, a) : encre(a),
             }}
           >
             {overall}
@@ -642,7 +690,7 @@ export function BolaCard({
         ))}
 
         {/* Le badge choisi : sa bulle, au-dessus de la note */}
-        {complete && badge && <BulleBadge badge={badge} u={u} x={BULLE.x} centre={BULLE.centre} fin={BULLE.fin} encre={p.encre} sombre={p.sombre} />}
+        {complete && badge && !era && <BulleBadge badge={badge} u={u} x={BULLE.x} centre={BULLE.centre} fin={BULLE.fin} encre={p.encre} sombre={p.sombre} />}
 
         {/* Qui : le nom en Anton, puis le pseudo et le poste (ou le poste seul, en compacte) */}
         {!reduite && (
@@ -660,6 +708,7 @@ export function BolaCard({
                 letterSpacing: u(1),
                 whiteSpace: "nowrap",
                 overflow: "hidden",
+                color: era?.nom,
               }}
             >
               {nomUp}
@@ -671,6 +720,7 @@ export function BolaCard({
                 top: u(complete ? BANDE + 164 : BANDE + 333),
                 textAlign: "right",
                 ...(complete ? mono(27, 0, 0.8, 500) : mono(51, 1, 0.8, 700)),
+                ...(era && { color: era.libelle }),
               }}
             >
               {complete ? `${username ? `${username} · ` : ""}${position.toLowerCase()}` : position.toUpperCase()}
@@ -697,7 +747,12 @@ export function BolaCard({
                 const actif = highlightStats?.includes(k);
                 return (
                   <div key={k} style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: u(12) }}>
-                    <span style={mono(26, 1, 0.62, 500)}>{k.toLowerCase()}</span>
+                    {era ? (
+                      // Les libellés d'alors : en capitales, dans le brun (ou le métal) de l'édition.
+                      <span style={{ ...mono(23, 2.5, 1, 700), color: era.libelle }}>{k.toUpperCase()}</span>
+                    ) : (
+                      <span style={mono(26, 1, 0.62, 500)}>{k.toLowerCase()}</span>
+                    )}
                     <span
                       style={{
                         fontFamily: SANS,
@@ -727,7 +782,7 @@ export function BolaCard({
                 right: u(M),
                 top: u(FILET),
                 height: u(2),
-                backgroundImage: `repeating-linear-gradient(90deg, ${encre(0.4)} 0 ${u(10)}px, transparent ${u(10)}px ${u(20)}px)`,
+                backgroundImage: `repeating-linear-gradient(90deg, ${era ? opaque(era.libelle, 0.6) : encre(0.4)} 0 ${u(10)}px, transparent ${u(10)}px ${u(20)}px)`,
               }}
             />
             <div
@@ -740,11 +795,13 @@ export function BolaCard({
                 alignItems: "center",
                 justifyContent: "space-between",
                 ...mono(19, 0.5, 0.75, 500),
+                ...(era && { color: era.libelle }),
               }}
             >
-              <span>{serie}</span>
-              <span>{numeroSerie}</span>
-              <SigleSfl hauteur={u(17)} couleur={encre(0.75)} />
+              {/* Une carte d'époque : sa date d'émission et son numéro dans la saison */}
+              <span>{emission?.date ?? serie}</span>
+              <span>{emission ? emission.numero : numeroSerie}</span>
+              <SigleSfl hauteur={u(17)} couleur={era ? era.libelle : encre(0.75)} />
             </div>
           </>
         )}

@@ -37,6 +37,25 @@
 //     couleurs (le pays choisi, HabillageCarte.pays), néon, aurore, ki et
 //     météorite ; sans or, sans bleu, sans rouge, qui restent aux cartes à
 //     titre (Sabri, 24/10).
+//
+// Les éditions d'époque (Sabri, 24/10 : « récupérer, pour les joueurs de
+// la saison 0, les designs qu'on avait à ce moment-là […] un truc qui
+// respecte notre carte actuelle, mais qui fait penser à ça ») : une carte
+// d'une saison close garde la disposition d'aujourd'hui, dans les visuels
+// de son temps. La saison 0 (été 2026), d'après les visuels officiels du
+// 12/07 et les cartes Boost qui ont suivi :
+//   · la carte de saison, la « Standard parchemin » : le papier crème, trois
+//     coups de pinceau en diagonale (orange, noir, orange) derrière la note
+//     et le nom, le sigle SFL souligné d'orange, le poste en braise, les
+//     libellés en capitales brunes, un losange au ballon pour puce ;
+//   · les cartes à titre, les cartes Boost : MVP du match (l'or), Joueur
+//     Impact (la braise), Défensive (la glace) — le fond sombre, sa lumière
+//     (des rayons, une traînée, un halo), les particules, le cadre de métal
+//     et son filet, l'emblème (couronne, flamme, bouclier).
+// Elles ne portent ni la finition ni les signes d'aujourd'hui : une carte
+// d'époque est restée telle qu'elle a été émise (lib/sfl/epoques.ts, sa
+// date et son numéro, écrits dans sa ligne de série). Les cartes de la
+// saison en cours ne changent pas.
 // Toutes les cotes sont dans le repère de la carte (1024 × 1656).
 
 import {
@@ -80,8 +99,11 @@ export interface HabillageCarte {
   rang?: RangCarte;
 }
 
-/** Les matières : les quatre éditions, les finitions, et l'ancienne rare. */
-export type NomMatiere = EditionCarte | Finition | "rare";
+/** Les éditions d'époque : les cartes de la saison 0, dans ses visuels. */
+export type EditionEpoque = "s0" | "s0-mvp" | "s0-impact" | "s0-def";
+
+/** Les matières : les quatre éditions, les finitions, l'ancienne rare, et les éditions d'époque. */
+export type NomMatiere = EditionCarte | Finition | "rare" | EditionEpoque;
 
 /** Le motif gravé d'une matière (motif-carte.tsx le dessine). */
 export type Motif =
@@ -90,7 +112,37 @@ export type Motif =
   | { type: "alveoles"; cote: number }
   | { type: "etoiles" }
   | { type: "guilloche" }
+  /** Les coups de pinceau de la saison 0, centrés en (cx, cy) : orange (clair → foncé), noir, orange. */
+  | { type: "pinceau"; cx: number; cy: number; noir: string }
+  /** Les particules des cartes Boost de la saison 0. */
+  | { type: "particules" }
   | MotifPasse;
+
+/**
+ * Ce qu'une carte d'époque reprend des visuels de son temps, sur la
+ * disposition d'aujourd'hui (bola-card.tsx, carte-photo.tsx, dos-carte.tsx,
+ * marques-carte.tsx les dessinent).
+ */
+export interface Epoque {
+  saison: number;
+  /** Le sigle SFL du coin (à la place du symbole Bola), et la barre dessous. */
+  sigle: string;
+  barre: string;
+  /** L'accent d'alors : le poste, la frange de la note. */
+  accent: string;
+  /** Le nom. */
+  nom: string;
+  /** Les libellés en capitales (les stats), le pseudo, la série. */
+  libelle: string;
+  /** Le cadre de la carte : son métal (du haut à gauche au bas à droite), son épaisseur. */
+  bord: { couleurs: string[]; epaisseur: number };
+  /** Le filet intérieur des cartes Boost. */
+  filet?: string;
+  /** L'emblème du coin des cartes Boost. */
+  embleme?: "couronne" | "flamme" | "bouclier";
+  /** Le losange au ballon, à la place de la puce. */
+  losange: { fond: string; trait: string; ballon: string };
+}
 
 export interface Matiere {
   nom: NomMatiere;
@@ -130,6 +182,8 @@ export interface Matiere {
   holo: { force: number; teinte: [number, number, number] | null };
   /** La lumière passe d'elle-même sur la carte (finition animée). */
   anime?: boolean;
+  /** Une édition d'époque : ce qu'elle reprend de son temps. */
+  epoque?: Epoque;
 }
 
 const PHI = (1 + Math.sqrt(5)) / 2;
@@ -396,6 +450,169 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
     tranche: { couleur: "#15161a", metal: 0.85, rugosite: 0.2 },
     holo: { force: 0.38, teinte: [0.86, 0.9, 1] },
   },
+  // Saison 0, la carte de saison : la « Standard parchemin » du 12/07. Le
+  // papier crème, ses coups de pinceau derrière la note et le nom.
+  s0: {
+    nom: "s0",
+    titre: "saison 0",
+    encre: "24,19,16",
+    sombre: false,
+    papier: [
+      "radial-gradient(90% 55% at 50% 30%, rgba(255,251,240,0.5) 0%, rgba(255,251,240,0) 70%)",
+      "linear-gradient(170deg, #f1e6cb 0%, #eadbb8 55%, #e2cfa6 100%)",
+    ].join(", "),
+    motif: { type: "pinceau", cx: 512, cy: 1290, noir: "#181310", clair: "#c86428", fonce: "#9a4517" },
+    fond: "#f3e9d0",
+    lueur: "rgba(255,250,236,0.9)",
+    rayures: 0.05,
+    micro: 0.05,
+    reflet: 0.26,
+    coins: 0.55,
+    etiquette: { fond: "transparent", bord: "rgba(138,100,55,0.6)", texte: "#8a6437" },
+    symbole: "/bola/symbole-noir.svg",
+    rebord: { lumiere: "rgba(255,251,240,0.9)", ombre: "rgba(92,62,20,0.24)" },
+    puce: "linear-gradient(135deg, #f1e6cb, #c9b488 45%, #eadbb8 70%, #a8915f)",
+    cadre: "linear-gradient(160deg, #f4ead2 0%, #e6d5ae 55%, #d2bd8c 100%)",
+    voile: "rgba(40,26,10,0.74)",
+    onglet: { fond: "linear-gradient(90deg, #c05a1e, #7a340f)", encre: "#f6eedc" },
+    vive: "#f39a5c",
+    tranche: { couleur: "#e2cfa6", metal: 0.05, rugosite: 0.8 },
+    holo: { force: 0.18, teinte: [1, 0.86, 0.68] },
+    epoque: {
+      saison: 0,
+      sigle: "#181310",
+      barre: "linear-gradient(90deg, #c05a1e, #7a340f)",
+      accent: "#b4551f",
+      nom: "#181310",
+      libelle: "#8a6437",
+      bord: { couleurs: ["#dccb9f", "#c9b488", "#b49e6d"], epaisseur: 7 },
+      losange: { fond: "#e2cfa6", trait: "#b49e6d", ballon: "#181310" },
+    },
+  },
+  // Saison 0, les cartes Boost : le fond sombre et sa lumière, les
+  // particules, le cadre de métal et son filet, l'emblème. MVP du match : l'or.
+  "s0-mvp": {
+    nom: "s0-mvp",
+    titre: "MVP du match",
+    encre: "244,228,166",
+    sombre: true,
+    papier: [
+      "linear-gradient(180deg, rgba(6,4,2,0.45) 0%, rgba(6,4,2,0) 20%, rgba(6,4,2,0) 60%, rgba(6,4,2,0.7) 80%, rgba(6,4,2,0.9) 100%)",
+      "conic-gradient(from 210deg at 50% 31%, rgba(244,197,66,0.55), rgba(244,197,66,0) 40%, rgba(244,197,66,0.32) 60%, rgba(244,197,66,0) 82%)",
+      "radial-gradient(130% 110% at 50% 8%, #241a06 0%, #120c03 48%, #060402 100%)",
+    ].join(", "),
+    motif: { type: "particules", clair: "#f4c542", fonce: "rgba(244,197,66,0.45)" },
+    fond: "#1a1305",
+    lueur: "rgba(244,197,66,0.22)",
+    rayures: 0.05,
+    micro: 0.06,
+    reflet: 0.14,
+    coins: 0.8,
+    etiquette: { fond: "#0c0804", bord: "rgba(244,197,66,0.75)", texte: "#fcebb0" },
+    symbole: "/bola/symbole-blanc.svg",
+    rebord: { lumiere: "rgba(255,243,198,0.5)", ombre: "rgba(0,0,0,0.6)" },
+    puce: "linear-gradient(135deg, #fff3c6, #c9962e 45%, #fbe9a8 70%, #8a5a12)",
+    cadre: "linear-gradient(160deg, #fff3c6 0%, #f4c542 22%, #8a5a12 50%, #fbe9a8 75%, #c9962e 100%)",
+    voile: "rgba(18,12,3,0.86)",
+    onglet: { fond: "#0c0804", encre: "#f4c542" },
+    vive: "#f4c542",
+    tranche: { couleur: "#c9962e", metal: 0.6, rugosite: 0.3 },
+    holo: { force: 0.5, teinte: [1, 0.85, 0.45] },
+    epoque: {
+      saison: 0,
+      sigle: "#ffffff",
+      barre: "linear-gradient(90deg, #ffcf5c, #8a5a12)",
+      accent: "#f4c542",
+      nom: "#f4c542",
+      libelle: "#b98f32",
+      bord: { couleurs: ["#fff3c6", "#f4c542", "#8a5a12", "#fbe9a8", "#c9962e"], epaisseur: 14 },
+      filet: "rgba(244,197,66,0.34)",
+      embleme: "couronne",
+      losange: { fond: "#0c0804", trait: "#f4c542", ballon: "#f4c542" },
+    },
+  },
+  // Joueur Impact : la braise, et sa traînée de lumière en diagonale.
+  "s0-impact": {
+    nom: "s0-impact",
+    titre: "Joueur Impact",
+    encre: "252,233,221",
+    sombre: true,
+    papier: [
+      "linear-gradient(180deg, rgba(10,4,2,0.45) 0%, rgba(10,4,2,0) 20%, rgba(10,4,2,0) 60%, rgba(10,4,2,0.7) 80%, rgba(10,4,2,0.9) 100%)",
+      "linear-gradient(115deg, rgba(255,90,31,0) 25%, rgba(255,90,31,0.5) 45%, rgba(255,160,70,0.7) 55%, rgba(255,90,31,0.38) 65%, rgba(255,90,31,0) 82%)",
+      "radial-gradient(130% 110% at 50% 6%, #360c02 0%, #1a0601 50%, #0a0402 100%)",
+    ].join(", "),
+    motif: { type: "particules", clair: "#ff8a4a", fonce: "rgba(255,138,74,0.45)" },
+    fond: "#240802",
+    lueur: "rgba(255,138,74,0.22)",
+    rayures: 0.05,
+    micro: 0.06,
+    reflet: 0.14,
+    coins: 0.8,
+    etiquette: { fond: "#1a0601", bord: "rgba(255,122,63,0.75)", texte: "#fee3d2" },
+    symbole: "/bola/symbole-blanc.svg",
+    rebord: { lumiere: "rgba(255,184,138,0.5)", ombre: "rgba(0,0,0,0.6)" },
+    puce: "linear-gradient(135deg, #ffb88a, #b33e0e 45%, #ff8a4a 70%, #7a1e05)",
+    cadre: "linear-gradient(160deg, #ffb88a 0%, #ff5a1f 25%, #7a1e05 50%, #ff8a4a 75%, #b33e0e 100%)",
+    voile: "rgba(26,6,1,0.86)",
+    onglet: { fond: "#1a0601", encre: "#ff8a4a" },
+    vive: "#ff8a4a",
+    tranche: { couleur: "#b33e0e", metal: 0.5, rugosite: 0.3 },
+    holo: { force: 0.5, teinte: [1, 0.6, 0.4] },
+    epoque: {
+      saison: 0,
+      sigle: "#ffffff",
+      barre: "linear-gradient(90deg, #ff8a4a, #7a1e05)",
+      accent: "#ff8a4a",
+      nom: "#ff8a4a",
+      libelle: "#c77c4e",
+      bord: { couleurs: ["#ffb88a", "#ff5a1f", "#7a1e05", "#ff8a4a", "#b33e0e"], epaisseur: 14 },
+      filet: "rgba(255,122,63,0.34)",
+      embleme: "flamme",
+      losange: { fond: "#1a0601", trait: "#ff7a3f", ballon: "#ff8a4a" },
+    },
+  },
+  // Défensive : la glace, et son halo derrière le portrait.
+  "s0-def": {
+    nom: "s0-def",
+    titre: "Défensive",
+    encre: "226,244,255",
+    sombre: true,
+    papier: [
+      "linear-gradient(180deg, rgba(3,10,16,0.45) 0%, rgba(3,10,16,0) 20%, rgba(3,10,16,0) 60%, rgba(3,10,16,0.7) 80%, rgba(3,10,16,0.9) 100%)",
+      "radial-gradient(70% 50% at 50% 34%, rgba(80,190,255,0.5), rgba(80,190,255,0) 62%)",
+      "radial-gradient(130% 110% at 50% 14%, #0f2c42 0%, #081a28 50%, #04070f 100%)",
+    ].join(", "),
+    motif: { type: "particules", clair: "#7fd4ff", fonce: "rgba(127,212,255,0.45)" },
+    fond: "#0b2133",
+    lueur: "rgba(127,212,255,0.22)",
+    rayures: 0.05,
+    micro: 0.06,
+    reflet: 0.14,
+    coins: 0.8,
+    etiquette: { fond: "#081a28", bord: "rgba(127,212,255,0.75)", texte: "#e2f4ff" },
+    symbole: "/bola/symbole-blanc.svg",
+    rebord: { lumiere: "rgba(216,241,255,0.5)", ombre: "rgba(0,0,0,0.6)" },
+    puce: "linear-gradient(135deg, #d8f1ff, #2e6e99 45%, #a6e3ff 70%, #1c4e77)",
+    cadre: "linear-gradient(160deg, #d8f1ff 0%, #7fd4ff 25%, #1c4e77 50%, #a6e3ff 75%, #2e6e99 100%)",
+    voile: "rgba(8,26,40,0.86)",
+    onglet: { fond: "#081a28", encre: "#7fd4ff" },
+    vive: "#7fd4ff",
+    tranche: { couleur: "#2e6e99", metal: 0.5, rugosite: 0.3 },
+    holo: { force: 0.5, teinte: [0.6, 0.85, 1] },
+    epoque: {
+      saison: 0,
+      sigle: "#ffffff",
+      barre: "linear-gradient(90deg, #7fd4ff, #1c4e77)",
+      accent: "#7fd4ff",
+      nom: "#a6e3ff",
+      libelle: "#5b8fb5",
+      bord: { couleurs: ["#d8f1ff", "#7fd4ff", "#1c4e77", "#a6e3ff", "#2e6e99"], epaisseur: 14 },
+      filet: "rgba(127,212,255,0.34)",
+      embleme: "bouclier",
+      losange: { fond: "#081a28", trait: "#7fd4ff", ballon: "#7fd4ff" },
+    },
+  },
   // Les skins du Passe Bola (skins-passe.ts) ; « Tes couleurs » au pays par
   // défaut, celui du joueur passe par matiereDe.
   ...MATIERES_PASSE,
@@ -403,10 +620,26 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
 };
 
 /**
- * La matière d'une carte : son édition, sauf la carte de saison qui prend la
- * finition que le joueur porte.
+ * Les saisons closes qui ont leur édition d'époque : la matière de chacune
+ * de leurs éditions (Sabri, 24/10). La saison 0 seulement, pour l'instant.
  */
-export function matiereDe(edition: EditionCarte | "rare", habillage?: HabillageCarte): Matiere {
+const EDITIONS_D_EPOQUE: Partial<Record<number, Record<EditionCarte | "rare", EditionEpoque>>> = {
+  0: { base: "s0", rare: "s0", mvp: "s0-mvp", impact: "s0-impact", def: "s0-def" },
+};
+
+/** Les cartes de cette saison ont-elles leur édition d'époque ? */
+export function aSonEpoque(saison: number | null | undefined): saison is number {
+  return saison != null && EDITIONS_D_EPOQUE[saison] != null;
+}
+
+/**
+ * La matière d'une carte : son édition, sauf la carte de saison qui prend la
+ * finition que le joueur porte (« Tes couleurs » au pays de son habillage).
+ * Une carte d'une saison qui a son édition d'époque (`saison`) prend la
+ * matière de son temps, sans finition.
+ */
+export function matiereDe(edition: EditionCarte | "rare", habillage?: HabillageCarte, saison?: number | null): Matiere {
+  if (aSonEpoque(saison)) return MATIERES[EDITIONS_D_EPOQUE[saison]![edition]];
   if (edition === "base" && habillage?.finition)
     return habillage.finition === "couleurs" ? matiereCouleurs(habillage.pays) : MATIERES[habillage.finition];
   return MATIERES[edition];
