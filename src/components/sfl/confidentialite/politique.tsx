@@ -7,7 +7,10 @@
 // /api/photo-studio, /api/agent, /api/ville-devinee et /api/geocode pour ce
 // qui part chez un prestataire, lib/sfl/activity.ts pour le journal d'usage,
 // lib/server/push-envoi.ts pour le suivi des notifications (23/10),
-// lib/sfl/parrainage.ts pour le parrainage et les joueurs invités (24/10).
+// lib/sfl/parrainage.ts pour le parrainage et les joueurs invités (24/10),
+// /api/equipes/couverture pour la couverture des équipes de Bola Team (24/10
+// au soir ; son accord passe par le Règlement Team version 2, que chaque
+// joueur signe : la version de la politique n'a pas bougé).
 // Quand l'un de ces endroits change ce qu'il garde ou à qui il l'envoie, ce
 // texte change avec lui ; si le changement touche à ce que les joueurs ont
 // accepté, VERSION_POLITIQUE aussi, et VERSION_ACCEPTEE le jour où la case
@@ -163,6 +166,14 @@ export function TextePolitique() {
                 par exemple) : ta carte peut y figurer.
               </>,
               <>
+                En Bola Team, le capitaine (ou son vice) peut créer la couverture de la page de l&apos;équipe avec le
+                même studio : la photo de carte des joueurs qui ont signé le Règlement Team version 2 part chez
+                fal.ai avec le maillot et l&apos;écusson de l&apos;équipe. L&apos;image obtenue est rangée comme ta
+                photo, dans un espace public, et se voit sur la page de l&apos;équipe. Chaque couverture créée est
+                notée (l&apos;équipe, la date), pour s&apos;en tenir à 2 par jour. Si un joueur quitte l&apos;équipe,
+                la couverture est retirée.
+              </>,
+              <>
                 Chaque photo faite est notée (le filtre, la date), pour s&apos;en tenir à 3 par jour ; avec le filtre
                 Drapeau, le pays choisi aussi, pour compter les pays de la ligue.
               </>,
@@ -238,7 +249,8 @@ export function TextePolitique() {
           </P>
           <P>
             Pour savoir lesquelles servent, chaque notification envoyée est notée avec son motif (une réponse au
-            Vestiaire, le rappel d&apos;un match…), jamais avec son texte : si elle est arrivée, si tu l&apos;as
+            Vestiaire, le rappel d&apos;un match…) et le joueur dont elle vient quand un joueur l&apos;a déclenchée
+            (son message, son invitation, son suivi), jamais avec son texte : si elle est arrivée, si tu l&apos;as
             touchée, et si tu as fait ce qu&apos;elle proposait (écrire, réagir, répondre à une invitation ou à tes
             missions, suivre en retour). L&apos;app note aussi ta réponse quand elle te propose de les activer, et
             chaque jour si elles sont activées sur ton téléphone. Seuls les administrateurs voient ce suivi (Activité

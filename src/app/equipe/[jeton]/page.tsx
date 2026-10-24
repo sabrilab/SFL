@@ -71,7 +71,7 @@ export default function LienEquipePage() {
       <div className="mx-auto flex w-full max-w-sm flex-col items-center px-6 py-12 text-center">
         {info ? (
           <>
-            <Ecusson initiales={info.initiales} fond={info.fond} taille={132} />
+            <Ecusson initiales={info.initiales} fond={info.fond} blason={info.blason} taille={132} />
             <h1 className="mt-6 text-[34px] leading-none font-bold tracking-tight">{info.nom}</h1>
             <p className="mono-label mt-3 text-muted-foreground">
               {[info.ville, `${info.membres} / ${MAX_EQUIPE}`, info.capitaine && `Cap. ${info.capitaine}`].filter(Boolean).join(" · ")}

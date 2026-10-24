@@ -149,6 +149,6 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { recus } = await prevenir(sb, cle, envois);
+  const { recus } = await prevenir(sb, cle, envois, { de: moi.id });
   return NextResponse.json({ ok, envoyes: recus.size });
 }

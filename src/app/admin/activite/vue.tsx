@@ -5,14 +5,22 @@
 // L'ordre suit les questions qu'on se pose en arrivant :
 //   1. les chiffres de la période et leur évolution ;
 //   2. la croissance — une courbe qu'on parcourt du doigt, au choix de la
-//      mesure, avec la période d'avant en pointillé ;
+//      mesure, avec la période d'avant en pointillé ; dessous, ce que l'app
+//      a fait chaque jour (les journées et les matchs, les notifications,
+//      les mises en ligne : lib/sfl/reperes.ts), le détail du jour touché et
+//      les pics de la période (./reperes.tsx). Sabri, 24/10 : « voir
+//      rapidement les actions qui ont été faites à ce moment-là de la part
+//      de l'application, pour qu'on comprenne encore la relation entre les
+//      choses » ;
 //   3. ce qu'il faut retenir — les conclusions, calculées sur les vraies
 //      données (lib/sfl/retention.ts), chacune avec la chose à faire, en
 //      une rangée qu'on fait glisser et qu'on peut masquer ; puis les
 //      nouveaux venus à suivre de près (lib/sfl/suivi-joueur.ts) ;
 //   4. qui est là aujourd'hui (nouveaux, fidèles, à risque, décrochés…) ;
 //   5. la rétention — combien reviennent, cohorte par cohorte ;
-//   6. ce qui fait revenir — les gestes de la première semaine ;
+//   6. ce qui fait revenir — les gestes de la première semaine ; puis qui
+//      fait revenir : les joueurs dont un geste fait venir ou revenir les
+//      autres, en schéma (./rassembleurs.tsx, demandé le 24/10) ;
 //   6 bis. les notifications — qui les a activées, et ce que chaque motif
 //      leur fait faire (./notifications.tsx, demandé le 23/10) ;
 //   7. quand la ligue ouvre l'app ;
@@ -49,9 +57,24 @@ import {
   type Profil,
 } from "@/lib/sfl/retention";
 import { emojiDrapeau, unPays } from "@/lib/sfl/photo-studio";
+import { analyserLiens } from "@/lib/sfl/rassembleurs";
+import {
+  ecartDuJour,
+  marquesDuJour,
+  pics,
+  reperesJournees,
+  reperesMatchs,
+  reperesMisesEnLigne,
+  reperesNotifs,
+  reperesParJour,
+} from "@/lib/sfl/reperes";
 import { aSuivre } from "@/lib/sfl/suivi-joueur";
+import { useSeason } from "@/components/sfl/season-provider";
 import { FicheJoueur } from "./fiche";
+import type { DonneesReperes } from "./lectures";
 import { NotifsStats } from "./notifications";
+import { QuiRamene } from "./rassembleurs";
+import { CeJourLa, Pics } from "./reperes";
 import { cn } from "@/lib/utils";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { Barres, CarteHoraire, Cohortes, Comparaison, Courbe, encre } from "./graphiques";
@@ -69,6 +92,8 @@ export interface DonneesActivite {
   profiles: Profil[];
   /** Les photos du studio, ou null si la lecture a échoué. */
   studio: PhotoStudio[] | null;
+  /** Les repères sous les courbes et « Qui ramène du monde » (./lectures.ts), ou null si la lecture a échoué. */
+  reperes: DonneesReperes | null;
   /** Instant de la lecture — figé pour garder le rendu pur. */
   now: number;
 }
@@ -217,6 +242,7 @@ const PARTIES = [
   { id: "suivre", label: "À suivre" },
   { id: "qui", label: "Qui est là" },
   { id: "retention", label: "Rétention" },
+  { id: "ramene", label: "Qui ramène" },
   { id: "notifs", label: "Notifs" },
   { id: "quand", label: "Quand" },
   { id: "pays", label: "Pays" },
@@ -248,7 +274,10 @@ export function ActiviteVue({
   const [tri, setTri] = useState<"recent" | "temps" | "actions">("recent");
   const [fiche, setFiche] = useState<string | null>(null);
   const [ouverte, setOuverte] = useState<FamilleId | null>(null);
+  /** Le jour touché sur la courbe (minuit) ; null : aujourd'hui. */
+  const [jourChoisi, setJourChoisi] = useState<number | null>(null);
   const masques = useSyncExternalStore(abonneConseils, lireMasques, () => false);
+  const { saison } = useSeason();
 
   const jours = PERIODES.find((p) => p.id === periode)?.days ?? null;
   // Le journal et les comptes du public choisi, et la part des admins dans
@@ -265,7 +294,7 @@ export function ActiviteVue({
       : 0;
     const studio = data.studio?.filter((d) => garde(d.name)) ?? null;
     const drapeaux = studio?.filter((d) => d.filtre === "drapeau") ?? null;
-    return { evenements, profiles, studio, drapeaux, admins: [...admins].sort(), ensembleAdmins: admins, partAdmins };
+    return { evenements, profiles, studio, drapeaux, admins: [...admins].sort(), ensembleAdmins: admins, partAdmins, garde };
   }, [data, public_]);
   const a = useMemo(
     () => (data && vu ? analyser(vu.evenements, vu.profiles, data.now, jours) : null),
@@ -338,6 +367,62 @@ export function ActiviteVue({
 
   const format = (v: number) =>
     metrique === "minutes" ? (v >= 120 ? `${Math.round(v / 60)} h` : `${Math.round(v)} min`) : milliers(Math.round(v));
+
+  /* ------------------------------ les repères ---------------------------- */
+  // Ce que l'app a fait, jour par jour : les journées de la ligue (toutes les
+  // saisons), les matchs ouverts, les notifications, les mises en ligne.
+  const reperesDuJour = useMemo(() => {
+    if (!data || !vu) return null;
+    const r = data.reperes;
+    return reperesParJour([
+      ...reperesJournees(saison, data.now),
+      ...(r
+        ? [
+            ...reperesMatchs(r.matchs),
+            ...reperesNotifs(r.envois, vu.garde, vu.ensembleAdmins),
+            ...reperesMisesEnLigne(r.misesEnLigne),
+          ]
+        : []),
+    ]);
+  }, [data, vu, saison]);
+  const marques = useMemo(
+    () => (courbe && reperesDuJour ? courbe.points.map((p) => marquesDuJour(reperesDuJour.get(p.t))) : null),
+    [courbe, reperesDuJour]
+  );
+  // Le jour choisi sur la courbe, retrouvé par sa date : il survit au changement de mesure.
+  const iChoisi = courbe && jourChoisi !== null ? courbe.points.findIndex((p) => p.t === jourChoisi) : -1;
+  const iJour = iChoisi >= 0 ? iChoisi : (courbe?.points.length ?? 0) - 1;
+  const lesPics = useMemo(
+    () =>
+      a
+        ? pics(a.serie, a.debutPeriode, metrique).map((k) => ({
+            i: k - a.debutPeriode,
+            t: a.serie[k].t,
+            ecart: ecartDuJour(a.serie, k, metrique),
+          }))
+        : [],
+    [a, metrique]
+  );
+
+  /* ------------------------------ qui ramène ----------------------------- */
+  // Les venues de chaque joueur, toute l'histoire, triées : revenu ou pas après une notification.
+  const instants = useMemo(() => {
+    const m = new Map<string, number[]>();
+    for (const e of data?.evenements ?? []) {
+      const liste = m.get(e.name);
+      if (liste) liste.push(e.at);
+      else m.set(e.name, [e.at]);
+    }
+    for (const liste of m.values()) liste.sort((x, y) => x - y);
+    return m;
+  }, [data]);
+  const liens = useMemo(
+    () =>
+      a && vu && data?.reperes
+        ? analyserLiens({ envois: data.reperes.envois, instants, autres: data.reperes.liens, depuis: a.depuis, garde: vu.garde })
+        : null,
+    [a, vu, data, instants]
+  );
 
   const joueursTries = [...(a?.joueurs ?? [])].sort((x, y) =>
     tri === "temps" ? y.temps - x.temps : tri === "actions" ? y.actions - x.actions : y.last - x.last
@@ -476,7 +561,15 @@ export function ActiviteVue({
               <Delta c={courbe.c} />
             </div>
             <div className="mt-3">
-              <Courbe points={courbe.points} avant={courbe.avant} format={format} creux={a.creux} />
+              <Courbe
+                points={courbe.points}
+                avant={courbe.avant}
+                format={format}
+                creux={a.creux}
+                marques={marques}
+                actif={iChoisi >= 0 ? iChoisi : null}
+                onActif={(i) => setJourChoisi(i === null ? null : (courbe.points[i]?.t ?? null))}
+              />
             </div>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-foreground/45">
               <span className="flex items-center gap-1.5">
@@ -489,8 +582,22 @@ export function ActiviteVue({
                   {`les ${jours} jours d'avant`}
                 </span>
               )}
-              <span>Glisse le doigt sur la courbe pour lire un jour.</span>
+              <span>Touche un jour : ce que l&apos;app y a fait s&apos;affiche dessous.</span>
             </div>
+            {courbe.points[iJour] && (
+              <div className="mt-4 border-t border-foreground/8 pt-3.5">
+                <Pics pics={lesPics} actif={iJour} onChoisir={(i) => setJourChoisi(courbe.points[i]?.t ?? null)} />
+                <CeJourLa
+                  key={courbe.points[iJour].t}
+                  t={courbe.points[iJour].t}
+                  aujourdhui={iJour === courbe.points.length - 1}
+                  reperes={reperesDuJour?.get(courbe.points[iJour].t) ?? []}
+                  ecart={ecartDuJour(a.serie, a.debutPeriode + iJour, metrique)}
+                  metrique={metrique}
+                  format={format}
+                />
+              </div>
+            )}
           </section>
 
           {/* 3. Ce qu'il faut retenir : une rangée qu'on fait glisser, qu'on peut masquer */}
@@ -639,7 +746,19 @@ export function ActiviteVue({
             </Section>
           )}
 
-          {/* 6 bis. Les notifications */}
+          {/* 6 bis. Qui ramène du monde */}
+          {liens && data?.reperes && vu && (
+            <QuiRamene
+              analyse={liens}
+              tousLiens={data.reperes.liens}
+              deduites={data.reperes.deduites}
+              libellePeriode={libellePeriode}
+              admins={vu.ensembleAdmins}
+              onFiche={setFiche}
+            />
+          )}
+
+          {/* 6 ter. Les notifications */}
           {vu && data && (
             <NotifsStats
               key={data.now}
