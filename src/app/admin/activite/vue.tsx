@@ -247,6 +247,7 @@ const PARTIES = [
   { id: "quand", label: "Quand" },
   { id: "pays", label: "Pays" },
   { id: "joueurs", label: "Joueurs" },
+  { id: "videos", label: "Vidéos" },
 ] as const;
 function allerA(id: string) {
   document.getElementById(`activite-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });

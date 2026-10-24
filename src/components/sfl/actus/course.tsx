@@ -93,6 +93,7 @@ import { RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueTo
 import { ContratsEnJeu } from "./contrats-en-jeu";
 import { MissionsBola } from "./missions";
 import { PronosBola } from "./pronos";
+import { VideosDuFil } from "./video";
 import { VueClassements, VueMatchs } from "./vues";
 import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque, type Vue } from "./epoques";
 import { CarteSaison, categoriesLegendes, Compteurs, LeMur } from "./wall-of-fame";
@@ -538,9 +539,9 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
       ) : (
         <>
           {/* La semaine. Sur téléphone, un seul fil (l'ordre vient des order-*) :
-              le direct, le vote, les divisions, l'outsider, ton dimanche, la
+              la vidéo de Bola, le direct, le vote, les divisions, l'outsider, ton dimanche, la
               convocation, tes missions, tes pronos, les contrats en jeu, puis ce qui se joue.
-              Sur grand écran, deux colonnes : à gauche ce qui se joue (direct,
+              Sur grand écran, deux colonnes : à gauche ce qui se joue (vidéo, direct,
               vote, convocation, missions, pronos), à droite les divisions, l'outsider et
               tes rubriques ; dessous, les contrats en jeu sur toute la largeur. */}
           <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3">
@@ -548,6 +549,7 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
               ref={semaine}
               className={cn("contents md:flex md:flex-col md:gap-[var(--fib-21)]", semaineCollante && "md:sticky md:top-[var(--fib-21)]")}
             >
+              <VideosDuFil />
               <EnDirect ouvrir={(j) => router.push(`/ligue/journee?j=${j}`)} />
               <VoteDuJour me={me} />
               <Convocation className="order-2 md:order-none" />

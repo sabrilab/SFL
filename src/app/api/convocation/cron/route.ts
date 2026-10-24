@@ -99,6 +99,13 @@ export async function GET(req: NextRequest) {
       await client
         .query("delete from public.parrainage_visites where created_at < now() - interval '13 months'")
         .catch((e) => console.error("[cron] liens de parrainage ouverts :", e instanceof Error ? e.message : e));
+      // Les vidéos : qui les a vues, et les liens partagés ouverts (13 mois).
+      await client
+        .query(
+          `delete from public.video_vues where derniere < now() - interval '13 months';
+           delete from public.video_liens where created_at < now() - interval '13 months'`
+        )
+        .catch((e) => console.error("[cron] vidéos :", e instanceof Error ? e.message : e));
 
       const { rows } = await client.query<DerniereConvocation>(
         `select id, journee, heure, lieu, effectif, date_label, statut

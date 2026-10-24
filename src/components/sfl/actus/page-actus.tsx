@@ -12,12 +12,15 @@
 //   · #j2 (un dimanche touché dans Ma saison) descend jusqu'à ce dimanche ;
 //   · ?j=N (une feuille touchée au Vestiaire) ouvre le récap, /ligue/journee ;
 //   · ?vue=vestiaire renvoie au Vestiaire ;
-//   · ?exploit=… (une félicitation reçue) descend jusqu'à sa rubrique.
+//   · ?exploit=… (une félicitation reçue) descend jusqu'à sa rubrique ;
+//   · ?video=<id> (le lien d'une vidéo, sa notification) ouvre son lecteur
+//     (video.tsx) ; le fermer retire le paramètre.
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useCallback, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LEAGUE_KEY } from "@/lib/nav";
 import { LaCourse } from "./course";
+import { LecteurParLien } from "./video";
 import type { Epoque, Vue } from "./epoques";
 
 export function PageActus({ epoque }: { epoque: Epoque }) {
@@ -53,14 +56,24 @@ function Actus({ epoque }: { epoque: Epoque }) {
     if (v !== vue) window.history.replaceState(null, "", v === "fil" ? pathname : `${pathname}?vue=${v}`);
     document.getElementById("app-scroll")?.scrollTo({ top: 0 });
   };
+  const video = params.get("video");
+  const fermerVideo = useCallback(() => {
+    const p = new URLSearchParams(window.location.search);
+    p.delete("video");
+    const q = p.toString();
+    window.history.replaceState(null, "", q ? `${window.location.pathname}?${q}` : window.location.pathname);
+  }, []);
   return (
-    <LaCourse
-      key={`${epoque}|${classement ?? ""}`}
-      epoque={epoque}
-      vue={vue}
-      onVue={changerDeVue}
-      classement={classement}
-      exploit={params.get("exploit")}
-    />
+    <>
+      <LaCourse
+        key={`${epoque}|${classement ?? ""}`}
+        epoque={epoque}
+        vue={vue}
+        onVue={changerDeVue}
+        classement={classement}
+        exploit={params.get("exploit")}
+      />
+      {video && <LecteurParLien id={video} onFermer={fermerVideo} />}
+    </>
   );
 }
