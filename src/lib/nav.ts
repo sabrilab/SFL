@@ -68,6 +68,12 @@ const REGLAGES: Parent = { href: "/reglages", titre: "Réglages" };
 
 /** Les pages enfants, de la plus précise à la plus large (la première qui va l'emporte). */
 const PARENTS: [string, Parent][] = [
+  // Les rubriques de Ma carte, chacune en grand (ma-carte/rubriques.tsx).
+  ["/profil/saison", MA_CARTE],
+  ["/profil/xp", MA_CARTE],
+  ["/profil/evolution", MA_CARTE],
+  ["/profil/badges", MA_CARTE],
+  ["/profil/cartes", MA_CARTE],
   ["/reglages", MA_CARTE],
   ["/collection", MA_CARTE],
   ["/carte", MA_CARTE],
@@ -94,6 +100,11 @@ const TITRES: [string, string][] = [
   ["/bola-team", "Bola Team"],
   ["/palmares", "Wall of Fame"],
   ["/saisons", "Saison"],
+  ["/profil/saison", "Ma saison"],
+  ["/profil/xp", "Niveau XP"],
+  ["/profil/evolution", "Évolution"],
+  ["/profil/badges", "Badges"],
+  ["/profil/cartes", "Mes cartes"],
   ["/profil", "Ma carte"],
   ["/reglages", "Réglages"],
   ["/collection", "Collection"],
