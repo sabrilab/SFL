@@ -10,8 +10,11 @@ import { etatDivisions, type Division } from "@/lib/sfl/divisions";
 import { isHidden } from "@/lib/sfl/hidden";
 
 export function useDivision(nom: string | null | undefined): Division | null {
-  const { saison } = useSeason();
+  const { saison, vitrine } = useSeason();
   const etat = useMemo(() => etatDivisions(saison), [saison]);
-  if (!nom || isHidden(nom) || etat?.phase !== "divisions") return null;
+  if (!nom || etat?.phase !== "divisions") return null;
+  // Le compte vitrine (compte-vitrine.ts), masqué, se voit en D1 sur son écran.
+  if (vitrine && nom === vitrine.nom) return 1;
+  if (isHidden(nom)) return null;
   return etat.actuelle.get(nom) ?? 3;
 }

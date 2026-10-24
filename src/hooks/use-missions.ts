@@ -24,6 +24,7 @@ import {
   bilanDe,
   classementNiveau,
   cranDe,
+  CRANS,
   dimancheEnCours,
   engagementsDe,
   journalXp,
@@ -58,6 +59,7 @@ import {
 import { ajouterPronos } from "@/lib/sfl/pronos";
 import { appliquerVotes } from "@/lib/sfl/votes";
 import { supabase } from "@/lib/supabase";
+import type { Saison } from "@/lib/sfl/saisie/types";
 
 const AUCUNE: Reponse[] = [];
 let abonnes = 0;
@@ -104,15 +106,42 @@ function useReponses(): Reponse[] {
   const session = useSession();
   const depuisLaBase = !!session?.server;
   useEffect(() => suivre(depuisLaBase), [depuisLaBase]);
-  const reponses = useSyncExternalStore(abonner, reponsesEnMemoire, () => AUCUNE);
-  // Le compte vitrine (compte-vitrine.ts) répond, sur son écran, comme son
-  // modèle : ces réponses ne partent jamais en base.
-  const { vitrine } = useSeason();
-  return useMemo(() => {
-    if (!vitrine) return reponses;
-    const copies = reponses.filter((r) => r.joueur === vitrine.modele).map((r) => ({ ...r, joueur: vitrine.nom }));
-    return copies.length ? [...reponses.filter((r) => r.joueur !== vitrine.nom), ...copies] : reponses;
-  }, [reponses, vitrine]);
+  return useSyncExternalStore(abonner, reponsesEnMemoire, () => AUCUNE);
+}
+
+/** L'XP de saison que le compte vitrine reçoit en plus : de quoi passer le dernier palier du passe. */
+const XP_VITRINE = 3600;
+
+/**
+ * Le compte vitrine (compte-vitrine.ts) a tout, sur son seul écran : à chaque
+ * saison, les trois missions de rang S réussies et le trois sur trois de
+ * chaque dimanche joué (toutes les épreuves du passe, tous les crans),
+ * assez d'XP pour le dernier palier, et le rang S.
+ */
+function avecVitrineXp(lg: XpLigue, s: Saison, nom: string): XpLigue {
+  const lignes: LigneXp[] = [];
+  const saisons = [...(s.archives ?? []).map((a) => ({ numero: a.numero, lue: a })), { numero: s.numero ?? 0, lue: s }];
+  for (const { numero, lue } of saisons) {
+    const jouees = lue.journees.filter((m) => lue.entries.some((e) => e.j === m.j && e.result));
+    const dimanches = jouees.length ? jouees : lue.journees.slice(0, 1);
+    const part = Math.ceil(XP_VITRINE / Math.max(1, dimanches.length) / 4);
+    for (const m of dimanches) {
+      for (const creneau of ["contrat", "defi", "ligue"] as const)
+        lignes.push({ saison: numero, j: m.j, date: m.date, quoi: `${creneau === "defi" ? "Défi" : creneau === "ligue" ? "Ligue" : "Contrat"} · rang S`, xp: part, mission: { creneau, rang: "S", reussie: true } });
+      lignes.push({ saison: numero, j: m.j, date: m.date, quoi: "Trois sur trois", xp: part, parfait: true });
+    }
+  }
+  const avant = lg.journal.get(nom) ?? { lignes: [], reussies: 0 };
+  const journal = new Map(lg.journal);
+  journal.set(nom, { lignes: [...avant.lignes, ...lignes], reussies: Math.max(avant.reussies, CRANS[CRANS.length - 1]) });
+  const xp = journal.get(nom)!.lignes.reduce((a, l) => a + l.xp, 0);
+  const rangs = new Map(lg.rangs);
+  const sur = Math.max(1, ...[...lg.rangs.values()].map((r) => r.sur));
+  rangs.set(nom, { rang: "S", place: 1, xp, sur, suivant: null });
+  const surLesCartes = JSON.stringify(
+    [...journal].map(([n, x]) => [n, rangs.get(n)?.rang ?? null, palierMaxDe(journal, n), cranDe(x.reussies)])
+  );
+  return { ...lg, journal, rangs, surLesCartes };
 }
 
 /** L'heure, à la minute : le coup d'envoi et minuit se voient sans recharger. */
@@ -354,7 +383,7 @@ export function useXpLigueCalcule(): XpLigue | null {
   const isClient = useIsClient();
   const maintenant = useMaintenant();
   const reponses = useReponses();
-  const { allPlayers } = useSeason();
+  const { allPlayers, vitrine } = useSeason();
   const { toutes: felicitations } = useFelicitations();
   const pronos = useListePronos();
   const { saison, jugee, votes } = useSaisonJugee(maintenant);
@@ -366,8 +395,9 @@ export function useXpLigueCalcule(): XpLigue | null {
     const surLesCartes = JSON.stringify(
       [...journal].map(([nom, x]) => [nom, rangs.get(nom)?.rang ?? null, palierMaxDe(journal, nom), cranDe(x.reussies)])
     );
-    return { journal, saison: saison.numero ?? 0, rangs, surLesCartes };
-  }, [isClient, jugee, reponses, votes, maintenant, felicitations, pronos, saison.numero, allPlayers]);
+    const lg = { journal, saison: saison.numero ?? 0, rangs, surLesCartes };
+    return vitrine ? avecVitrineXp(lg, saison, vitrine.nom) : lg;
+  }, [isClient, jugee, reponses, votes, maintenant, felicitations, pronos, saison, allPlayers, vitrine]);
 }
 
 /** L'XP de la ligue, tel que l'app l'a calculé (null avant le premier rendu côté client). */
