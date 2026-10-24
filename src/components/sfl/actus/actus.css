@@ -257,6 +257,11 @@
   transform: translateY(calc((1 - var(--p, 1)) * 34px)) scale(calc(1.07 - var(--p, 1) * 0.07));
   transform-origin: 50% 30%;
 }
+/* La photo d'une rubrique couverte : elle s'approche à peine, moins vite que la caméra. */
+.pel-photo {
+  transform: translateY(calc((1 - var(--p, 1)) * -22px)) scale(calc(1.1 - var(--p, 1) * 0.04));
+  transform-origin: 50% 40%;
+}
 .pel-titre {
   --e: clamp(0, (var(--p, 1) - var(--d, 0)) * 4, 1);
   opacity: var(--e);
