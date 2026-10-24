@@ -125,7 +125,7 @@
   filter: none;
 }
 
-/* Les pièces des DA à l'essai (da/da.css) : rien sans elles. */
-.cible__da {
+/* L'orbite et la balle de la DA Lune (actus/lune.css). */
+.cible__lune {
   display: none;
 }

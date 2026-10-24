@@ -1,0 +1,255 @@
+/*
+ * La DA « Lune » des contrats, des missions et du passe (Sabri, 24/10 : « plus
+ * branding Bola », « on est mercenaires », choisie parmi quatre variantes) :
+ * le symbole Bola, « la troisième lune » de la bible de marque. Le mauve nuit,
+ * les arcs du nombre d'or qui dessinent le symbole, les phases au bandeau,
+ * l'orbite de la balle autour de la cible, un sceau rond en minuscules.
+ * Elle se pose par-dessus la DA d'origine (actus/missions.css,
+ * passe-bola.css, map/contrats-map.css) : chaque règle commence par
+ * :root:root, le poids qu'avait la variante à l'essai (:root[data-da]), pour
+ * passer devant elles sans les réécrire. Les couleurs du rang (--r-lueur,
+ * --r-feu, --r-texte, --r-sombre) restent celles de fiche--S, --A et --B ;
+ * les chiffres restent en Anton. L'insigne et le viseur : actus/lune.tsx.
+ * Les textures sont des SVG en ligne, posées en masque pour prendre la
+ * couleur du rang.
+ */
+
+.insigne-lune {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  color: var(--r-texte);
+}
+.insigne-lune > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.insigne-lune__lettre {
+  fill: rgb(var(--r-feu));
+  font-family: var(--font-anton), Anton, sans-serif;
+  font-size: 22px;
+}
+.insigne-lune__micro {
+  font-family: var(--font-jbmono), ui-monospace, monospace;
+  font-size: 6.2px;
+  font-weight: 700;
+}
+.viseur-lune > i {
+  position: absolute;
+  display: block;
+}
+.viseur-lune .viseur__balayage {
+  display: none;
+}
+
+
+
+:root:root .fiche,
+:root:root .xp__encadre,
+:root:root .passe__apercu,
+:root:root .passe__vignette {
+  border-radius: 22px;
+  background-color: #070609;
+  background-image:
+    radial-gradient(110% 60% at 100% 0%, rgb(45 5 27 / 0.95), rgb(45 5 27 / 0) 65%),
+    radial-gradient(60% 40% at 92% 6%, rgb(var(--r-lueur) / 0.16), rgb(var(--r-lueur) / 0) 70%);
+  background-size: 100% 100%;
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--r-lueur) / 0.28),
+    inset 0 1px 0 rgb(var(--r-feu) / 0.18),
+    0 22px 44px -26px rgb(var(--r-lueur) / 0.45);
+}
+:root:root .xp__encadre,
+:root:root .passe__vignette {
+  border-radius: 16px;
+}
+/* Les arcs du nombre d'or qui construisent le symbole, au coin de la lune. */
+:root:root .fiche::before,
+:root:root .passe__apercu::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: -1;
+  width: 300px;
+  height: 300px;
+  background: rgb(var(--r-feu) / 0.13);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cg fill='none' stroke='black' stroke-width='0.7'%3E%3Ccircle cx='300' cy='0' r='40.0'/%3E%3Ccircle cx='300' cy='0' r='64.72'/%3E%3Ccircle cx='300' cy='0' r='104.72'/%3E%3Ccircle cx='300' cy='0' r='169.44'/%3E%3Ccircle cx='300' cy='0' r='274.16'/%3E%3Ccircle cx='130.56' cy='104.72' r='104.72'/%3E%3Cline x1='0' y1='185.41' x2='300' y2='185.41' stroke-dasharray='2 5'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 300px 300px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cg fill='none' stroke='black' stroke-width='0.7'%3E%3Ccircle cx='300' cy='0' r='40.0'/%3E%3Ccircle cx='300' cy='0' r='64.72'/%3E%3Ccircle cx='300' cy='0' r='104.72'/%3E%3Ccircle cx='300' cy='0' r='169.44'/%3E%3Ccircle cx='300' cy='0' r='274.16'/%3E%3Ccircle cx='130.56' cy='104.72' r='104.72'/%3E%3Cline x1='0' y1='185.41' x2='300' y2='185.41' stroke-dasharray='2 5'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 300px 300px no-repeat;
+  pointer-events: none;
+}
+/* Le bandeau : l'horizon, et les phases au milieu. */
+:root:root .fiche__bandeau {
+  position: relative;
+  height: 34px;
+  padding: 0 18px;
+  background: none;
+  border-bottom: 0.5px solid rgb(var(--r-lueur) / 0.28);
+}
+:root:root .fiche__bandeau::before {
+  content: "";
+  order: 1;
+  flex: 0 1 128px;
+  min-width: 0;
+  height: 12px;
+  background: rgb(var(--r-lueur) / 0.55);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='12'%3E%3Cmask id='m0'%3E%3Ccircle cx='8' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='18.5' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='8' cy='6' r='4.6' mask='url(%23m0)'/%3E%3Ccircle cx='8' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3Cmask id='m1'%3E%3Ccircle cx='24' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='31.88' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='24' cy='6' r='4.6' mask='url(%23m1)'/%3E%3Ccircle cx='24' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3Cmask id='m2'%3E%3Ccircle cx='40' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='45.25' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='40' cy='6' r='4.6' mask='url(%23m2)'/%3E%3Ccircle cx='40' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3Cmask id='m3'%3E%3Ccircle cx='56' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='58.62' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='56' cy='6' r='4.6' mask='url(%23m3)'/%3E%3Ccircle cx='56' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3Cmask id='m4'%3E%3Ccircle cx='72' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='72.0' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='72' cy='6' r='4.6' mask='url(%23m4)'/%3E%3Ccircle cx='72' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3Cmask id='m5'%3E%3Ccircle cx='88' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='85.38' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='88' cy='6' r='4.6' mask='url(%23m5)'/%3E%3Ccircle cx='88' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3Cmask id='m6'%3E%3Ccircle cx='104' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='98.75' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='104' cy='6' r='4.6' mask='url(%23m6)'/%3E%3Ccircle cx='104' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3Cmask id='m7'%3E%3Ccircle cx='120' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='112.12' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='120' cy='6' r='4.6' mask='url(%23m7)'/%3E%3Ccircle cx='120' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3C/svg%3E") 50% 0 / 128px 12px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='12'%3E%3Cmask id='m0'%3E%3Ccircle cx='8' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='18.5' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='8' cy='6' r='4.6' mask='url(%23m0)'/%3E%3Ccircle cx='8' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3Cmask id='m1'%3E%3Ccircle cx='24' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='31.88' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='24' cy='6' r='4.6' mask='url(%23m1)'/%3E%3Ccircle cx='24' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3Cmask id='m2'%3E%3Ccircle cx='40' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='45.25' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='40' cy='6' r='4.6' mask='url(%23m2)'/%3E%3Ccircle cx='40' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3Cmask id='m3'%3E%3Ccircle cx='56' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='58.62' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='56' cy='6' r='4.6' mask='url(%23m3)'/%3E%3Ccircle cx='56' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3Cmask id='m4'%3E%3Ccircle cx='72' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='72.0' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='72' cy='6' r='4.6' mask='url(%23m4)'/%3E%3Ccircle cx='72' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3Cmask id='m5'%3E%3Ccircle cx='88' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='85.38' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='88' cy='6' r='4.6' mask='url(%23m5)'/%3E%3Ccircle cx='88' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3Cmask id='m6'%3E%3Ccircle cx='104' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='98.75' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='104' cy='6' r='4.6' mask='url(%23m6)'/%3E%3Ccircle cx='104' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3Cmask id='m7'%3E%3Ccircle cx='120' cy='6' r='4.6' fill='white'/%3E%3Ccircle cx='112.12' cy='6' r='4.6' fill='black'/%3E%3C/mask%3E%3Ccircle cx='120' cy='6' r='4.6' mask='url(%23m7)'/%3E%3Ccircle cx='120' cy='6' r='4.6' fill='none' stroke='black' stroke-width='0.6'/%3E%3C/svg%3E") 50% 0 / 128px 12px no-repeat;
+}
+:root:root .fiche--affiche .fiche__bandeau::before,
+:root:root .fiche--engages .fiche__bandeau::before {
+  display: none;
+}
+:root:root .fiche__type {
+  order: 2;
+}
+:root:root .fiche__etiquette,
+:root:root .fiche__type {
+  position: relative;
+  padding: 0;
+  background: none;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+}
+:root:root .fiche .mono-label,
+:root:root .xp__encadre .mono-label,
+:root:root .passe__apercu .mono-label {
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+}
+:root:root .fiche__cran {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50%;
+  background: none;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.3);
+}
+:root:root .fiche__cran--on {
+  background: rgb(var(--r-lueur));
+  box-shadow: 0 0 6px rgb(var(--r-lueur) / 0.7);
+}
+:root:root .insigne-lune {
+  width: 66px;
+  height: 66px;
+  filter: drop-shadow(0 0 14px rgb(var(--r-lueur) / 0.4));
+}
+:root:root .insigne-lune .insigne-lune__lettre {
+  fill: var(--r-texte);
+  font-size: 23px;
+}
+/* L'orbite : la balle posée sur l'orbite autour de la carte. */
+:root:root .viseur-lune {
+  inset: -9px;
+}
+:root:root .viseur-lune.fiche__viseur--petit {
+  inset: -6px;
+}
+.v-orbite {
+  inset: 0;
+  border: 1px solid currentColor;
+  border-radius: 20px;
+}
+.fiche__viseur--libre .v-orbite,
+.fiche__viseur--eteint .v-orbite {
+  border-style: dashed;
+}
+.fiche__viseur--petit .v-orbite {
+  border-radius: 14px;
+}
+.v-balle {
+  top: -6px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 70% 68%, #070609 0 40%, currentColor 43%);
+}
+.fiche__viseur--petit .v-balle {
+  top: -4.5px;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+}
+:root:root .fiche__champs {
+  border-block: 0.5px solid rgb(var(--r-lueur) / 0.25);
+}
+:root:root .fiche__champs > div + div {
+  border-left: 0.5px solid rgb(var(--r-lueur) / 0.18);
+}
+/* Le tampon : un sceau rond, en minuscules. */
+:root:root .tampon {
+  border-width: 1.5px;
+  border-radius: 999px;
+  outline-offset: 3px;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+  transform: rotate(-4deg);
+}
+:root:root .passe__rang,
+:root:root .passe__porte-case {
+  clip-path: none;
+  width: 21px;
+  height: 21px;
+  padding: 3px 0 0 5px;
+  border-radius: 50%;
+  color: var(--r-texte);
+  background:
+    radial-gradient(circle at 64% 60%, #070609 0 46%, transparent 48%),
+    linear-gradient(160deg, rgb(var(--r-feu)), rgb(var(--r-lueur)) 55%, var(--r-sombre));
+  font-size: 10px;
+}
+:root:root .passe__porte-case::after {
+  display: none;
+}
+:root:root .passe__barre {
+  height: 3px;
+  overflow: visible;
+  margin-block: 4px;
+}
+:root:root .passe__barre > span::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -5px;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 70% 68%, #070609 0 38%, rgb(var(--r-feu)) 42%);
+  box-shadow: 0 0 10px rgb(var(--r-lueur) / 0.9);
+}
+:root:root .quete__case,
+:root:root .quete__case::after {
+  clip-path: circle(50%);
+}
+/* Map : l'orbite et la balle. */
+:root:root .cible__coin {
+  display: none;
+}
+:root:root .cible__lune--a {
+  display: block;
+  position: absolute;
+  inset: 1px;
+  border: 1.5px solid currentColor;
+  border-radius: 9px;
+}
+:root:root .cible__lune--b {
+  display: block;
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 70% 68%, #070609 0 38%, currentColor 42%);
+}
+:root:root .jr__note.cible__prime {
+  border-radius: 999px;
+}
