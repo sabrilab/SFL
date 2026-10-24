@@ -169,6 +169,18 @@ export function useSeason(): SeasonValue {
   return value;
 }
 
+const SaisonCloseContext = createContext(false);
+
+/**
+ * Lit-on une saison close (SaisonArchiveProvider) ? Rien ne s'y partage au
+ * Vestiaire ni ne s'y félicite : le Vestiaire et les félicitations ne
+ * connaissent que la saison en cours (une feuille partagée y montrerait la
+ * journée du même numéro, mais de cette saison-ci).
+ */
+export function useSaisonClose(): boolean {
+  return useContext(SaisonCloseContext);
+}
+
 /**
  * Une saison close, servie comme la saison en cours : tout ce qui lit
  * `useSeason()` dessous (le récap éditorial d'une journée, par exemple) voit
@@ -186,5 +198,9 @@ export function SaisonArchiveProvider({ saison, children }: { saison: Saison; ch
       saison,
     };
   }, [saison]);
-  return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
+  return (
+    <SeasonContext.Provider value={value}>
+      <SaisonCloseContext.Provider value>{children}</SaisonCloseContext.Provider>
+    </SeasonContext.Provider>
+  );
 }

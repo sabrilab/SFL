@@ -4,10 +4,11 @@
 // les matières de la carte joueur (finitions-carte.ts), sur un vrai joueur et
 // avec les vrais composants : la carte de saison, les trois cartes à titre
 // (MVP, Impact, Défensive), les trois finitions de la passe (nuit, chrome,
-// animée) et trois habillages (signes, crans, rang, photo traitée), chacune
-// de face et de dos, puis en petit (compacte, réduite, pastille).
+// animée), l'offerte (onyx) et trois habillages (signes, crans, rang, photo
+// traitée), chacune de face et de dos, puis en petit (compacte, réduite,
+// pastille).
 // `?joueur=Nom` choisit le joueur ; par défaut, soi. `?trois=mvp` (ou base,
-// impact, def, nuit, chrome, animee, h1, h2, h3) montre d'abord cette carte
+// impact, def, nuit, chrome, animee, onyx, h1, h2, h3) montre d'abord cette carte
 // en 3D, à tourner ; `&dos=1` la pose sur son dos. `?seul=h1,h2` ne montre
 // que ces cartes-là.
 
@@ -30,6 +31,7 @@ const LOOKS: { cle: string; titre: string; edition: EditionCarte; habillage?: Ha
   { cle: "nuit", titre: "Finition nuit · palier 4", edition: "base", habillage: { finition: "nuit" } },
   { cle: "chrome", titre: "Finition chrome · palier 10", edition: "base", habillage: { finition: "chrome" } },
   { cle: "animee", titre: "Finition animée · palier 16", edition: "base", habillage: { finition: "animee" } },
+  { cle: "onyx", titre: "Finition onyx · offerte", edition: "base", habillage: { finition: "onyx" } },
   {
     cle: "h1",
     titre: "Habillage · liseré argent, photo argentique, 1 cran, rang B",

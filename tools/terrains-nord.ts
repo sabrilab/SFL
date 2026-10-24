@@ -11,7 +11,8 @@
 // Licence Ouverte 2.0), tous les terrains de football (et les terrains mixtes
 // ou « de soccer ») en gazon synthétique, à l'air libre, du département du
 // Nord (59). Un complexe fait une seule ligne, avec ses terrains et leur
-// format (à 5, à 8, à 11, d'après leurs dimensions).
+// format (à 3, à 5, à 7, à 8, à 11, d'après leur nom ou leurs dimensions :
+// format() ; c'est sur lui qu'on filtre dans l'app, Sabri, 24/10).
 //
 // Laissés de côté : les fives couverts (Urban Soccer…), les city-stades, les
 // terrains en herbe ; les terrains d'écoles, de lycées et d'universités, et
@@ -82,17 +83,43 @@ function retenu(e: Equipement): boolean {
 }
 
 /**
- * Le format d'un terrain, en joueurs par équipe : d'après sa longueur
- * (jusqu'à 50 m un five, jusqu'à 88 m un foot à 8, au-delà un grand
- * terrain), sinon d'après son nom ; 0 quand on ne sait pas.
+ * Un format écrit en toutes lettres dans le nom du terrain : « Foot à 5 »,
+ * « TERRAIN HERBE A 7 », « Terrain synthétique 7V7 », « 6 vs 6 ». Jamais
+ * dans des dimensions (« (105x65) ») ni un numéro (« Terrain N° 2 »).
+ */
+const ECRIT = /(?:^|[^a-zà-ÿ0-9])à ?(3|5|6|7|8|11)(?![0-9])|(?<![0-9])(3|5|6|7|8|11) ?(?:vs?|x|contre) ?(?:3|5|6|7|8|11)(?![0-9])/i;
+
+/**
+ * Le format d'un terrain, en joueurs par équipe : 3, 5, 7, 8 ou 11, ceux
+ * qu'on filtre dans l'app (Sabri, 24/10 : « 11 5 8 7 3 versus »).
+ *
+ * Le nom d'abord, quand il le dit (six contre six passe à 5). Sinon les
+ * dimensions : un mini-terrain de moins de 30 m (un mini-stade de 24 × 12)
+ * se joue à 3 ; un five, un futsal, un hat-trick (50 × 30 m au plus) à 5 ;
+ * un petit terrain ou un demi-terrain (65 × 45 m au plus) à 7 ; jusqu'à
+ * 88 m, à 8 ; au-delà, un grand terrain, à 11. Sans dimensions, d'autres
+ * mots du nom ; 0 quand on ne sait pas.
  */
 function format(e: Equipement): number {
-  const l = e.equip_long;
-  if (l != null && l > 0) return l <= 50 ? 5 : l < 88 ? 8 : 11;
+  const ecrit = (e.equip_nom ?? "").match(ECRIT);
+  if (ecrit) {
+    const n = Number(ecrit[1] ?? ecrit[2]);
+    return n === 6 ? 5 : n;
+  }
+  // La longueur est le plus grand côté, quel que soit l'ordre de saisie.
+  const [long, large] = [e.equip_long ?? 0, e.equip_larg ?? 0].sort((a, b) => b - a);
+  if (long > 0) {
+    // Sans largeur, celle d'un terrain ordinaire de cette longueur.
+    const l = large > 0 ? large : long * 0.6;
+    if (long < 30) return 3;
+    if (long <= 50 && l <= 30) return 5;
+    if (long <= 65 && l <= 45) return 7;
+    return long < 88 ? 8 : 11;
+  }
   const n = (e.equip_nom ?? "").toLowerCase();
-  if (/\bà ?5\b|five|futsal|hat.?tre?i?ck|mini|petit|[56] ?v(s)? ?[56]/.test(n)) return 5;
-  if (/\bà ?[78]\b|[78] ?v ?[78]|poussin/.test(n)) return 8;
-  if (/honneur|à ?11|grand/.test(n)) return 11;
+  if (/five|futsal|hat.?tre?i?ck|mini|petit/.test(n)) return 5;
+  if (/poussin/.test(n)) return 8;
+  if (/honneur|grand/.test(n)) return 11;
   return 0;
 }
 

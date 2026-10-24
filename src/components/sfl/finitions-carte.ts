@@ -26,14 +26,19 @@
 //   · Défensive, le bleu : des alvéoles, la cotte de mailles ;
 //   · nuit (passe, palier 4) : un ciel de nuit étoilé, l'encre d'argent ;
 //   · chrome (palier 10) : un miroir, des reflets francs ;
-//   · animée (palier 16) : la nacre irisée, et la lumière qui passe.
+//   · animée (palier 16) : la nacre irisée, et la lumière qui passe ;
+//   · onyx (offerte, finitions-offertes.ts ; la première, à la carte de
+//     Sabri, 24/10 : « une espèce de skin noir ultra stylé ») : la pierre
+//     noire polie, ses bandes ondulées gravées comme un guilloché, l'encre
+//     d'argent, une tranche de métal noir et un reflet d'argent quand on la
+//     tourne.
 // Toutes les cotes sont dans le repère de la carte (1024 × 1656).
 
 /** L'édition d'une carte : la carte de saison, ou une carte à titre. */
 export type EditionCarte = "base" | "mvp" | "impact" | "def";
 
-/** Les finitions de la passe : elles habillent la carte de saison. */
-export type Finition = "nuit" | "chrome" | "animee";
+/** Les finitions de la passe, ou offertes : elles habillent la carte de saison. */
+export type Finition = "nuit" | "chrome" | "animee" | "onyx";
 
 /** Le traitement de la photo, sans IA. */
 export type Traitement = "argentique" | "gravure" | "marbre";
@@ -58,7 +63,7 @@ export interface HabillageCarte {
   rang?: RangCarte;
 }
 
-/** Les matières : les quatre éditions, les trois finitions, et l'ancienne rare. */
+/** Les matières : les quatre éditions, les finitions, et l'ancienne rare. */
 export type NomMatiere = EditionCarte | Finition | "rare";
 
 /** Le motif gravé d'une matière (motif-carte.tsx le dessine). */
@@ -66,7 +71,8 @@ export type Motif =
   | { type: "rayons"; cx: number; cy: number; n: number }
   | { type: "ondes"; cx: number; cy: number }
   | { type: "alveoles"; cote: number }
-  | { type: "etoiles" };
+  | { type: "etoiles" }
+  | { type: "guilloche" };
 
 export interface Matiere {
   nom: NomMatiere;
@@ -341,6 +347,36 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
     tranche: { couleur: "#e7e2f2", metal: 0.2, rugosite: 0.35 },
     holo: { force: 0.8, teinte: null },
     anime: true,
+  },
+  // Onyx : la pierre noire polie et ses bandes en guilloché, l'encre
+  // d'argent, la tranche en métal noir, un reflet d'argent froid à peine
+  // irisé quand elle tourne (en plein arc-en-ciel, il teintait le visage).
+  onyx: {
+    nom: "onyx",
+    titre: "onyx",
+    encre: "236,237,240",
+    sombre: true,
+    papier: [
+      "linear-gradient(118deg, rgba(255,255,255,0) 34%, rgba(255,255,255,0.045) 44%, rgba(255,255,255,0) 54%)",
+      "radial-gradient(90% 55% at 50% 30%, #1b1c20 0%, #0c0c0f 55%, #050506 100%)",
+    ].join(", "),
+    motif: { type: "guilloche", clair: "rgba(255,255,255,0.085)", fonce: "rgba(0,0,0,0.55)" },
+    fond: "#0d0e11",
+    lueur: "rgba(255,255,255,0.06)",
+    rayures: 0.04,
+    micro: 0.06,
+    reflet: 0.1,
+    coins: 0.7,
+    etiquette: { fond: "#050506", bord: "rgba(236,237,240,0.45)", texte: "rgba(236,237,240,0.9)" },
+    symbole: "/bola/symbole-blanc.svg",
+    rebord: { lumiere: "rgba(255,255,255,0.32)", ombre: "rgba(0,0,0,0.75)" },
+    puce: "linear-gradient(135deg, #6a6e77, #17181b 45%, #9a9ea7 70%, #0b0c0e)",
+    cadre: "linear-gradient(152deg, #2b2c31 0%, #0d0d10 38%, #1c1d21 62%, #060607 100%)",
+    voile: "rgba(4,4,6,0.85)",
+    onglet: { fond: "#060607", encre: "#ecedf0" },
+    vive: "#c8cbd2",
+    tranche: { couleur: "#15161a", metal: 0.85, rugosite: 0.2 },
+    holo: { force: 0.38, teinte: [0.86, 0.9, 1] },
   },
 };
 

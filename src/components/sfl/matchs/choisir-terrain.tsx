@@ -7,13 +7,22 @@
 // le tri et ses raisons dans tools/terrains-nord.ts), et ceux de la ligue à
 // leur nom, en blanc sur le plan.
 //
-// En haut, la recherche (une ville, un stade) et le plan (plan-terrains.tsx) ;
-// dessous, la liste, du plus proche au plus loin : de ta position si tu la
-// donnes (le viseur), sinon de ta ville, sinon de l'hippodrome. Déplacer le
-// plan range la liste autour de ce qu'il montre ; toucher un point met son
-// terrain en tête. Chaque ligne : la photo satellite (chargée quand elle
-// approche de l'écran), la commune et la distance, les terrains par format,
-// éclairé, en accès libre. La toucher choisit le terrain.
+// En haut, la recherche (une ville, un stade), les formats et le plan
+// (plan-terrains.tsx) ; dessous, la liste, du plus proche au plus loin : de
+// ta position si tu la donnes (le viseur), sinon de ta ville, sinon de
+// l'hippodrome. Déplacer le plan range la liste autour de ce qu'il montre ;
+// toucher un point met son terrain en tête. Chaque ligne : la photo
+// satellite (chargée quand elle approche de l'écran), la commune et la
+// distance, les terrains par format, éclairé, en accès libre. La toucher
+// choisit le terrain.
+//
+// Les formats (Sabri, 24/10 : « on fait actuellement du foot à 5 […] qu'on
+// puisse filtrer facilement pour voir les terrains qui nous plaisent ») :
+// une rangée de pastilles, à 3, à 5, à 7, à 8, à 11. En toucher une ne garde
+// que les complexes qui ont un terrain à ce format, sur le plan comme dans la
+// liste ; la retoucher les rend tous. Le choix est celui de la Map (le même
+// partout, gardé par le téléphone : hooks/use-format-terrain.ts) ; si aucun
+// complexe de ce format n'est en vue, le plan s'ouvre jusqu'aux plus proches.
 //
 // Un lieu absent du recensement (un five couvert, un city-stade) s'écrit
 // dans la recherche : la dernière ligne le reprend tel quel, sans place sur
@@ -30,7 +39,10 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { SigleLigue } from "@/components/sfl/choix-ligue";
 import { VueSatellite } from "@/components/sfl/map/vue-satellite";
+import { PucesFormat } from "@/components/sfl/map/format-terrains";
+import { useFormatTerrain } from "@/hooks/use-format-terrain";
 import {
+  aFormat,
   avecLaLigue,
   chercherTerrains,
   distanceLisible,
@@ -146,12 +158,13 @@ export function ChoisirTerrain({
   // Un terrain du Nord déjà choisi s'ouvre en tête, le plan posé sur lui.
   const [focus, setFocus] = useState<string | null>(actuel && !actuel.startsWith("ligue-") ? actuel : null);
   const tous = useMemo(() => avecLaLigue(catalogue?.terrains ?? [], ligue), [catalogue, ligue]);
+  const format = useFormatTerrain();
   // Le point d'où la liste se range : le terrain déjà choisi, toi, l'hippodrome.
   const [origine, setOrigine] = useState<Point>(() => {
     const t = ligue.find((x) => `ligue-${x.id}` === actuel) ?? ligue.find((x) => x.defaut) ?? ligue[0];
     return (actuel && !actuel.startsWith("ligue-") ? terrainsNordLus()?.terrains.find((x) => x.id === actuel) : null) ?? iciConnu ?? t ?? LILLE;
   });
-  const [cadrage, setCadrage] = useState<{ n: number; sur: "centre" | "terrains" }>({ n: 0, sur: "centre" });
+  const [cadrage, setCadrage] = useState<{ n: number; sur: "centre" | "terrains" | "proches" }>({ n: 0, sur: "centre" });
   const liste = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -172,7 +185,7 @@ export function ChoisirTerrain({
     return () => clearTimeout(id);
   }, [q]);
 
-  const trouves = useMemo(() => chercherTerrains(tous, q), [tous, q]);
+  const trouves = useMemo(() => chercherTerrains(aFormat(tous, format), q), [tous, format, q]);
   const ranges = useMemo(
     () =>
       trouves
@@ -255,6 +268,15 @@ export function ChoisirTerrain({
               <LocateFixed className="size-5" strokeWidth={2.1} />
             </button>
           </div>
+
+          <PucesFormat
+            sur="feuille"
+            onChoix={() => {
+              setCadrage((c) => ({ n: c.n + 1, sur: "proches" }));
+              enHaut();
+            }}
+            className="shrink-0 gap-2"
+          />
 
           <div className="relative h-[min(34dvh,300px)] shrink-0 overflow-hidden rounded-[22px] border border-border bg-secondary">
             <PlanTerrains

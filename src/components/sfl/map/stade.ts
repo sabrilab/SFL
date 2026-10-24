@@ -208,6 +208,30 @@ export type EtatSticker =
   | { genre: "equipe"; texte: string }
   | { genre: "joue" };
 
+/**
+ * Ce qu'il reste à remplir dans un match ouvert par un joueur (Sabri, 24/10 :
+ * « rouges quand il manque vraiment beaucoup de joueurs, orange quand il
+ * manque presque pas de joueurs, et qu'on nous indique combien, et vert
+ * quand elles sont pleines. Parce que là, gris, on comprend pas : on dirait
+ * que le match est mort »). Le bord du sticker en prend la couleur, son badge
+ * dit combien il manque. Une journée de ligue n'a pas de plafond : elle n'en
+ * a jamais (ni rouge, ni orange, ni « il manque N »).
+ */
+export type Remplissage = "rouge" | "orange" | "vert";
+
+/** Le rouge des pastilles d'iOS assombri (le blanc s'y lit), la braise du manque, un vert de pelouse. */
+export const COULEUR_REMPLISSAGE: Record<Remplissage, string> = {
+  rouge: "#E5383B",
+  orange: "#FF8A4C",
+  vert: "#1FA055",
+};
+
+/** Presque plein : il manque au plus 30 % des places, 2 au moins (1 à 3 sur 10) ; au-delà, rouge. */
+export function remplissageDe(manque: number, places: number): Remplissage {
+  if (manque <= 0) return "vert";
+  return manque <= Math.max(2, Math.round(places * 0.3)) ? "orange" : "rouge";
+}
+
 export interface StickerPlan {
   id: string;
   lat: number;
@@ -218,11 +242,16 @@ export interface StickerPlan {
   etat: EtatSticker;
   nom: string;
   ligue?: LigueMatch;
+  /** Un match ouvert par un joueur, avec ses places : la couleur de son bord. */
+  remplissage?: Remplissage;
   /** La discussion du match, quand j'en suis et qu'on y a écrit : ce que je n'y ai pas lu. */
   discussion?: { nonLus: number };
 }
 
-/** Le HTML d'un sticker de match pour Leaflet (le CSS est dans globals.css). */
+/** Joué, ou complet sans couleur (un match privé) : le stade passe au gris. */
+const eteint = (s: StickerPlan) => s.etat.genre === "joue" || (s.etat.genre === "complet" && !s.remplissage);
+
+/** Le HTML d'un sticker de match pour MapLibre (le CSS est dans globals.css). */
 export function stickerHtml(s: StickerPlan, choisi: boolean, variante?: VarianteStade): string {
   const badge =
     s.etat.genre === "manque"
@@ -231,7 +260,9 @@ export function stickerHtml(s: StickerPlan, choisi: boolean, variante?: Variante
         ? `<span class="stk__badge stk__badge--inscrits">${s.etat.n}</span>`
         : s.etat.genre === "dedans"
           ? `<span class="stk__badge stk__badge--dedans">${COCHE}</span>`
-          : "";
+          : s.etat.genre === "complet" && s.remplissage === "vert"
+            ? `<span class="stk__badge stk__badge--plein">${COCHE}</span>`
+            : "";
   const etiquette =
     s.etat.genre === "manque"
       ? `<span class="stk__etiquette stk__etiquette--manque">il manque ${s.etat.n}</span>`
@@ -244,7 +275,8 @@ export function stickerHtml(s: StickerPlan, choisi: boolean, variante?: Variante
             : `<span class="stk__etiquette stk__etiquette--complet">${s.etat.genre === "joue" ? "joué" : "complet"}</span>`;
   // La bulle de la discussion prend la place du badge : qui la voit est du match.
   const bulle = s.discussion ? bulleHtml(s.discussion.nonLus) : "";
-  return `<div class="stk${s.ligue ? ` stk--${s.ligue}` : ""}${choisi ? " stk--choisi" : ""}${s.etat.genre === "complet" || s.etat.genre === "joue" ? " stk--complet" : ""}" style="--penche:${penche(s.id)}deg">
+  const classes = [s.ligue && `stk--${s.ligue}`, s.remplissage && `stk--${s.remplissage}`, choisi && "stk--choisi", eteint(s) && "stk--eteint"].filter(Boolean);
+  return `<div class="stk ${classes.join(" ")}" style="--penche:${penche(s.id)}deg">
   <div class="stk__vignette">
     <div class="stk__stade">${stadeSvg(s.moment, { variante, ligue: s.ligue })}</div>
     <span class="stk__cal"><span class="stk__cal-jour">${echapper(s.jourCourt)}</span><span class="stk__cal-heure">${echapper(heureCourte(s.heure))}</span></span>
@@ -254,6 +286,32 @@ export function stickerHtml(s: StickerPlan, choisi: boolean, variante?: Variante
   <span class="stk__queue"></span>
   <span class="stk__nom">${echapper(s.nom)}</span>
 </div>`;
+}
+
+/**
+ * Des matchs au même endroit à l'écran font un paquet (map/carte-map.tsx) :
+ * le premier devant, les suivants derrière lui, penchés, qui dépassent de
+ * chaque côté — leurs vraies vignettes, avec la couleur de leur ligue et de
+ * leur bord : qu'on voie, même de loin, qu'il y en a plusieurs et lesquels
+ * se remplissent. Deux au plus derrière ; le nombre, en noir, au coin.
+ */
+export function dosHtml(s: StickerPlan, rang: 1 | 2, variante?: VarianteStade): string {
+  const classes = [`stk__dos--${rang}`, s.remplissage && `stk__dos--${s.remplissage}`, eteint(s) && "stk__dos--eteint"].filter(Boolean);
+  return `<span class="stk__dos ${classes.join(" ")}" aria-hidden="true"><span class="stk__stade">${stadeSvg(s.moment, { variante, ligue: s.ligue })}</span></span>`;
+}
+
+/** Le nombre de matchs d'un paquet, au coin : le noir des piles de joueurs. */
+export function nombreHtml(n: number): string {
+  return `<span class="stk__nombre" aria-hidden="true">${n}</span>`;
+}
+
+/**
+ * Sous un paquet, ce qu'il range : au même endroit, le nom du terrain reste et
+ * « 2 matchs ici » s'ajoute dessous ; à plusieurs endroits, « 6 matchs » prend
+ * la place du nom (celui du premier ne dirait pas où sont les autres).
+ */
+export function paquetHtml(n: number, ici: boolean): string {
+  return `<span class="stk__paquet${ici ? "" : " stk__paquet--nom"}">${n} matchs${ici ? " ici" : ""}</span>`;
 }
 
 /**

@@ -99,6 +99,8 @@ export interface Legende {
   player: Player;
   saisons: number;
   matchs: number;
+  /** Les points Pépite d'Or de toutes ses saisons. */
+  points: number;
   buts: number;
   passes: number;
   mvp: number;
@@ -115,10 +117,11 @@ export function legendes(saisons: SaisonPalmares[]): Legende[] {
   // De la plus ancienne à la plus récente : la carte retenue est la dernière.
   for (const s of [...saisons].reverse()) {
     for (const p of s.classement) {
-      const l = out.get(p.name) ?? { player: p, saisons: 0, matchs: 0, buts: 0, passes: 0, mvp: 0, victoires: 0, titres: 0, podiums: 0 };
+      const l = out.get(p.name) ?? { player: p, saisons: 0, matchs: 0, points: 0, buts: 0, passes: 0, mvp: 0, victoires: 0, titres: 0, podiums: 0 };
       l.player = p;
       l.saisons += 1;
       l.matchs += p.matchs;
+      l.points += p.pp;
       l.buts += p.buts;
       l.passes += p.passes;
       l.mvp += p.mvp;
