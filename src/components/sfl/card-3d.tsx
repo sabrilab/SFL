@@ -20,7 +20,8 @@
 //
 // Le dos (23/10, Sabri : « à l'arrière, on met Bola », de la même couleur
 // que l'avant) : la face dit sa matière et son joueur (data-matiere,
-// data-nom) ; on monte à côté d'elle, hors écran, le dos de la carte
+// data-nom ; data-emission pour une carte d'époque, sa date et son numéro
+// au dos aussi) ; on monte à côté d'elle, hors écran, le dos de la carte
 // (DosCarte), qu'on photographie aussi — la 3D le colle derrière, et prend
 // la tranche et le reflet de la même matière. La lumière qui passe sur la
 // finition animée (data-card-part="lumiere") n'est pas photographiée : la 3D
@@ -31,6 +32,7 @@ import dynamic from "next/dynamic";
 import { toPng } from "html-to-image";
 import { DosCarte } from "@/components/sfl/dos-carte";
 import { MATIERES, type HabillageCarte, type NomMatiere } from "@/components/sfl/finitions-carte";
+import type { EmissionCarte } from "@/lib/sfl/epoques";
 import { useBadgeRevision } from "@/hooks/use-badge-carte";
 import { useHabillageRevision } from "@/hooks/use-habillage";
 import { useIdentitesRevision } from "@/hooks/use-identites";
@@ -185,20 +187,30 @@ interface Dos {
   matiere: NomMatiere;
   nom: string;
   habillage?: HabillageCarte;
+  /** Une carte d'époque : sa date d'émission et son numéro. */
+  emission?: EmissionCarte;
 }
 
-/** La matière, le joueur et l'habillage que la face déclare (bola-card.tsx), pour son dos. */
+/** Un attribut JSON de la face, ou undefined s'il manque ou ne se lit pas. */
+function lireJson<T>(texte: string | undefined): T | undefined {
+  try {
+    return texte ? (JSON.parse(texte) as T) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** La matière, le joueur, l'habillage et l'émission que la face déclare (bola-card.tsx), pour son dos. */
 function dosDe(node: HTMLElement): Dos | null {
   const corps = node.querySelector<HTMLElement>("[data-matiere]");
   const matiere = corps?.dataset.matiere as NomMatiere | undefined;
   if (!corps || !matiere || !(matiere in MATIERES)) return null;
-  let habillage: HabillageCarte | undefined;
-  try {
-    habillage = corps.dataset.habillage ? (JSON.parse(corps.dataset.habillage) as HabillageCarte) : undefined;
-  } catch {
-    habillage = undefined;
-  }
-  return { matiere, nom: corps.dataset.nom ?? "", habillage };
+  return {
+    matiere,
+    nom: corps.dataset.nom ?? "",
+    habillage: lireJson<HabillageCarte>(corps.dataset.habillage),
+    emission: lireJson<EmissionCarte>(corps.dataset.emission),
+  };
 }
 
 /** Attend qu'un nœud soit monté, quelques images au plus. */
@@ -485,7 +497,7 @@ function Card3DInner({
           </div>
           {dos && (
             <div ref={dosRef} style={{ position: "absolute" }} aria-hidden>
-              <DosCarte matiere={MATIERES[dos.matiere]} nom={dos.nom} habillage={dos.habillage} />
+              <DosCarte matiere={MATIERES[dos.matiere]} nom={dos.nom} habillage={dos.habillage} emission={dos.emission} />
             </div>
           )}
         </div>

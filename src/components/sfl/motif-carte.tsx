@@ -14,7 +14,15 @@
 //   · guilloché : les bandes de l'onyx, deux familles de vagues en
 //     opposition de phase et de longueurs d'onde voisines, qui
 //     s'entrelacent en chaînes puis se rejoignent (une moire, comme sur le
-//     revers d'un smoking).
+//     revers d'un smoking) ;
+//   · pinceau : les trois coups de pinceau de la carte de la saison 0
+//     (orange, noir, orange, à −32°, comme sur les visuels du 12/07). Alors
+//     un filtre de turbulence les effilochait ; ici, chaque coup est un
+//     faisceau de poils tirés de la graine du joueur (plus courts et plus
+//     hachés vers les bords, des manques au milieu, des bouts qui
+//     s'effilent) : du SVG sans filtre, que la capture de la 3D prend sur
+//     iPhone, et un coup de pinceau propre à chaque carte ;
+//   · particules : les étincelles d'énergie des cartes Boost de la saison 0.
 // Et la rosace guillochée du dos (RosaceBola), comme sur un billet.
 
 import { Fragment, useId } from "react";
@@ -85,6 +93,55 @@ function alea(seed: number) {
 function etincelle(x: number, y: number, r: number): string {
   const e = r * 0.16;
   return `M${f(x)} ${f(y - r)}Q${f(x + e)} ${f(y - e)} ${f(x + r)} ${f(y)}Q${f(x + e)} ${f(y + e)} ${f(x)} ${f(y + r)}Q${f(x - e)} ${f(y + e)} ${f(x - r)} ${f(y)}Q${f(x - e)} ${f(y - e)} ${f(x)} ${f(y - r)}Z`;
+}
+
+/**
+ * Les trois coups de la carte de la saison 0, dans leur repère (x le long du
+ * coup, y en travers, 0 au centre du motif) : leur bande, leur encre, leur
+ * force. Les cotes des visuels du 12/07 (rect 26, 12 et 18 dans une carte de
+ * 254 de large), × 1024 ÷ 254.
+ */
+const COUPS = [
+  { haut: -258, bas: -153, encre: "orange", force: 0.85 },
+  { haut: -121, bas: -73, encre: "noir", force: 0.85 },
+  { haut: -40, bas: 32, encre: "orange", force: 0.62 },
+] as const;
+const PINCEAU = { angle: -32, demi: 820 } as const;
+
+/**
+ * Un coup de pinceau en poils : chacun un trait effilé aux deux bouts, plus
+ * court et plus haché vers les bords du coup. Rendu par paliers d'opacité,
+ * un tracé chacun.
+ */
+function poils(haut: number, bas: number, rnd: () => number): string[] {
+  const paliers = ["", "", "", ""];
+  const epaisseur = bas - haut;
+  const n = Math.round(epaisseur / 2.4);
+  const pas = epaisseur / n;
+  for (let i = 0; i < n; i++) {
+    const v = (i + 0.5) / n;
+    const bord = Math.abs(v * 2 - 1); // 0 au milieu du coup, 1 sur ses bords
+    const y = haut + v * epaisseur + (rnd() - 0.5) * pas * 0.8;
+    // Les poils se recouvrent : le cœur du coup est plein, ses bords s'effilochent.
+    const t = pas * (1.2 + rnd() * (1.4 - bord));
+    // Les bouts : les poils du bord commencent plus tard et finissent plus tôt.
+    let x = -PINCEAU.demi + rnd() * 70 + bord ** 2 * rnd() * 520;
+    const fin = PINCEAU.demi - rnd() * 70 - bord ** 2 * rnd() * 620;
+    const force = (0.7 + rnd() * 0.3) * (1 - bord ** 2 * 0.45);
+    const palier = Math.min(3, Math.floor(force * 4));
+    // Des manques : nombreux vers les bords, rares et courts au cœur.
+    while (x < fin) {
+      const long = bord > 0.6 ? 60 + rnd() * 420 : 400 + rnd() * 1400;
+      const x1 = Math.min(fin, x + long);
+      if (x1 - x > 14) {
+        const pointe = Math.min(26, (x1 - x) / 3);
+        paliers[palier] +=
+          `M${f(x)} ${f(y)}L${f(x + pointe)} ${f(y - t / 2)}L${f(x1 - pointe)} ${f(y - t / 2)}L${f(x1)} ${f(y)}L${f(x1 - pointe)} ${f(y + t / 2)}L${f(x + pointe)} ${f(y + t / 2)}Z`;
+      }
+      x = x1 + (bord > 0.6 ? 12 + rnd() * 90 : 4 + rnd() * 26);
+    }
+  }
+  return paliers;
 }
 
 export function MotifCarte({
@@ -178,6 +235,45 @@ export function MotifCarte({
         ))}
         {familles.map((v) => (
           <rect key={`${v.cle}c`} width={W} height={H} fill={`url(#${v.cle}c)`} />
+        ))}
+      </svg>
+    );
+  }
+
+  if (motif.type === "pinceau") {
+    const { cx, cy } = centre ?? motif;
+    const rnd = alea(graine ^ 0x2f6b9c1d);
+    const opacites = [0.45, 0.65, 0.85, 1];
+    return (
+      <svg aria-hidden viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={style}>
+        <defs>
+          <linearGradient id={`pin-${id}`} gradientUnits="userSpaceOnUse" x1={-PINCEAU.demi} y1={0} x2={PINCEAU.demi} y2={0}>
+            <stop offset="0" stopColor={motif.clair} />
+            <stop offset="1" stopColor={motif.fonce} />
+          </linearGradient>
+        </defs>
+        <g transform={`translate(${cx} ${cy}) rotate(${PINCEAU.angle})`}>
+          {COUPS.map((c, i) => (
+            <g key={i} opacity={c.force} fill={c.encre === "noir" ? motif.noir : `url(#pin-${id})`}>
+              {poils(c.haut, c.bas, rnd).map((d, k) => (d ? <path key={k} d={d} opacity={opacites[k]} /> : null))}
+            </g>
+          ))}
+        </g>
+      </svg>
+    );
+  }
+
+  if (motif.type === "particules") {
+    // Les étincelles d'énergie : une vingtaine, de toutes tailles.
+    const rnd = alea(graine ^ 0x51ed270b);
+    const points = Array.from({ length: 22 }, () => {
+      const t = rnd();
+      return { x: 40 + rnd() * (W - 80), y: 40 + rnd() * (H - 80), r: 3 + t * t * 5, a: 0.45 + rnd() * 0.45 };
+    });
+    return (
+      <svg aria-hidden viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={style}>
+        {points.map((p, i) => (
+          <circle key={i} cx={f(p.x)} cy={f(p.y)} r={f(p.r)} fill={p.r > 5 ? motif.clair : motif.fonce} opacity={f(p.a)} />
         ))}
       </svg>
     );
