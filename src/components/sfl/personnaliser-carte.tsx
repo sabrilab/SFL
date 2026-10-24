@@ -226,7 +226,7 @@ export function PersonnaliserCarte({ player }: { player: Player }) {
                 <Ligne
                   actif={badgeActif === "auto"}
                   onClick={() => void choisirBadge(nom, "auto")}
-                  vignette={<span className="flex h-full items-center justify-center"><Badge3D badge={badges[0]} largeur={40} socle /></span>}
+                  vignette={<span className="flex h-full items-center justify-center"><Badge3D badge={badges[0]} largeur={40} /></span>}
                   titre="Le meilleur"
                   quoi={`${nomBadge(badges[0])}. Il change tout seul quand tu gagnes mieux.`}
                   comment="Par défaut"
@@ -237,7 +237,7 @@ export function PersonnaliserCarte({ player }: { player: Player }) {
                   key={cleBadge(b)}
                   actif={badgeActif === cleBadge(b)}
                   onClick={() => void choisirBadge(nom, cleBadge(b))}
-                  vignette={<span className="flex h-full items-center justify-center"><Badge3D badge={b} largeur={40} socle /></span>}
+                  vignette={<span className="flex h-full items-center justify-center"><Badge3D badge={b} largeur={40} /></span>}
                   titre={nomBadge(b)}
                   quoi={commentBadge(b).quoi}
                   comment={commentBadge(b).court}
