@@ -76,7 +76,7 @@ export async function pronostiquer(d: DemandeProno): Promise<void> {
       p_sujet: d.sujet,
       p_choix: d.choix,
     });
-    if (error) throw new Error("Prono refusé. Reconnecte-toi, puis réessaie.");
+    if (error) throw new Error("Choix refusé. Reconnecte-toi, puis réessaie.");
     if (typeof data === "string") le = data;
   }
   const reste = cache.filter((x) => !meme(x, d));

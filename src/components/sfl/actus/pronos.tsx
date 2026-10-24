@@ -1,6 +1,6 @@
 "use client";
 
-// Les pronos Bola, dans les Actus, juste sous les Missions Bola (lib/sfl/
+// Le Flair (les pronos Bola ; nom choisi par Sabri le 24/10), dans les Actus, juste sous les Missions Bola (lib/sfl/
 // pronos.ts). Sabri, 24/10 : « que le joueur puisse pronostiquer des choses
 // dans les matchs à venir ou les journées », « qui finira meilleur buteur,
 // qui finira meilleure Pépite d'Or ».
@@ -164,7 +164,7 @@ async function poser(mp: { poser: (s: string, c: string | null) => Promise<void>
   try {
     await mp.poser(sujet, choix);
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : "Prono refusé.");
+    toast.error(e instanceof Error ? e.message : "Choix refusé.");
   }
 }
 
@@ -365,7 +365,7 @@ export function PronosBola({ className }: { className?: string }) {
             ))}
         </div>
         <h2 id="titre-pronos" className="titre-lettrage text-[30px] leading-[0.95]">
-          Pronos
+          Le Flair
         </h2>
       </div>
       {mp && (

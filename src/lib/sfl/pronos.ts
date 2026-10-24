@@ -1,4 +1,5 @@
-// Les pronos Bola : deviner ce que le terrain va dire, avant qu'il le dise.
+// Le Flair (les pronos Bola ; Sabri, 24/10 : « faut pas que t'appelles ça
+// prono, faut trouver un truc plus stylé », il a choisi « Le Flair ») : deviner ce que le terrain va dire, avant qu'il le dise.
 //
 // Sabri, 24/10 : « que le joueur puisse pronostiquer des choses dans les
 // matchs à venir ou les journées, et que ça puisse lui donner des XP », « qui
@@ -268,7 +269,7 @@ export function lignesPronos(
       if (!b.justes) continue;
       out.push({
         joueur,
-        ligne: { saison: numero, j, date: p.date, quoi: `Pronos justes, ${b.justes} sur ${b.total}`, xp: Math.min(b.xp, PLAFOND_JOURNEE) },
+        ligne: { saison: numero, j, date: p.date, quoi: `Flair, ${b.justes} sur ${b.total}`, xp: Math.min(b.xp, PLAFOND_JOURNEE) },
       });
     }
   }
@@ -284,7 +285,7 @@ export function lignesPronos(
           saison: numero,
           j: derniere?.j ?? 0,
           date: derniere?.date ?? "",
-          quoi: `Prono de la saison : ${TITRE_SAISON[sujet] ?? sujet}`,
+          quoi: `Flair de la saison : ${TITRE_SAISON[sujet] ?? sujet}`,
           xp: primeAu(lue, numero, new Date(x.le), reference),
         },
       });
