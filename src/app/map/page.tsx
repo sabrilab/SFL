@@ -92,7 +92,7 @@ import { InvitationsEquipe } from "@/components/sfl/equipe/invitation-map";
 import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { useParties } from "@/hooks/use-parties";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
-import { inscrits, libelleJour, listerDispos, momentDeLHeure, placesLibres, prochainsJours, type Dispo, type Partie } from "@/lib/sfl/matchs";
+import { DISPOS_AFFICHEES, inscrits, libelleJour, listerDispos, momentDeLHeure, placesLibres, prochainsJours, type Dispo, type Partie } from "@/lib/sfl/matchs";
 import { cleMoment, meilleurMoment, terrainPropose, type MomentPropose } from "@/lib/sfl/proposition";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
@@ -892,7 +892,8 @@ export default function MapPage() {
   // de la semaine où le plus de joueurs sont libres, que rien n'occupe déjà,
   // sur le terrain libre le plus proche (de toi, de ta ville, sinon de la
   // ligue) et du format choisi. Les dispos se relisent quand Mes dispos se
-  // referme.
+  // referme. Tant qu'elles sont cachées (DISPOS_AFFICHEES), pas de moment :
+  // la carte propose seulement le terrain.
   const [disposSemaine, setDisposSemaine] = useState<Dispo[]>([]);
   useEffect(() => {
     if (!partiesActives || dispos) return;
@@ -1205,7 +1206,7 @@ export default function MapPage() {
                     },
                   ]
                 : []),
-              ...(partiesActives
+              ...(partiesActives && DISPOS_AFFICHEES
                 ? [{ id: "dispos", libelle: "Mes dispos", icone: <CalendarDays className="size-[18px]" strokeWidth={2.2} />, ton: "#24452a", onClick: () => setDispos(true) }]
                 : []),
             ]}
@@ -1642,15 +1643,17 @@ export default function MapPage() {
           }}
         />
       )}
-      <MesDispos
-        open={dispos}
-        onOpenChange={setDispos}
-        moi={moi}
-        onOuvrir={(jour, h) => {
-          setDispos(false);
-          setOuvrir((o) => ({ terrain: null, jour, heure: h, n: (o?.n ?? 0) + 1 }));
-        }}
-      />
+      {DISPOS_AFFICHEES && (
+        <MesDispos
+          open={dispos}
+          onOpenChange={setDispos}
+          moi={moi}
+          onOuvrir={(jour, h) => {
+            setDispos(false);
+            setOuvrir((o) => ({ terrain: null, jour, heure: h, n: (o?.n ?? 0) + 1 }));
+          }}
+        />
+      )}
 
       {/* ─── La discussion d'un match, par-dessus tout (barre d'onglets comprise) ─── */}
       {discussion && (partieDiscussion || discussion.onglet === "equipe") && (
