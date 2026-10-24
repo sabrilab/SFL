@@ -17,8 +17,10 @@
 //   · carbone (4) : la fibre tissée, gris anthracite ;
 //   · marbre (7) : le marbre blanc veiné des statues du site ;
 //   · tes couleurs (8) : le blanc de la carte de saison, et les bandes du
-//     drapeau le long des deux bords, comme les côtés d'un maillot ; le
-//     joueur choisit le pays (COULEURS_PAYS, les 24 pays du studio) ;
+//     drapeau le long des deux bords, comme les côtés d'un maillot : en gris
+//     d'encre sur la face et sur la petite carte, en couleurs au dos (presque
+//     tous les drapeaux ont du bleu, du rouge ou du jaune or) ; le joueur
+//     choisit le pays (COULEURS_PAYS, les 24 pays du studio) ;
 //   · néon (11) : sur le noir, un tube fuchsia qui suit le bord ;
 //   · aurore (12) : les rideaux verts et violets d'une aurore boréale ;
 //   · ki (14) : l'aura blanche qui monte, gravée comme des flammes, et les
@@ -39,7 +41,7 @@ export type MotifPasse =
   | { type: "givre" }
   | { type: "carbone" }
   | { type: "marbre" }
-  | { type: "couleurs"; bandes: string[]; trame: string }
+  | { type: "couleurs"; bandes: string[]; encre: string[]; trame: string }
   | { type: "neon" }
   | { type: "aurore" }
   | { type: "ki" }
@@ -278,9 +280,12 @@ export const MATIERES_PASSE: Record<Exclude<FinitionPasse, "couleurs">, Matiere>
 /* ------------------------------ Tes couleurs ------------------------------ */
 // Les bandes du drapeau, dans leur ordre, posées le long des deux bords sur
 // le blanc de la carte de saison : le drapeau habille la carte sans la
-// teindre (une carte toute bleue ou toute rouge se confondrait avec une
-// carte à titre). Les 24 pays mis en avant par le studio (photo-studio.ts,
-// PAYS).
+// teindre. Sur la face et sur la petite carte des classements, elles sont en
+// gris d'encre, chacune à la clarté de sa couleur (enEncre) : le bleu, le
+// rouge et le jaune or des drapeaux sont ceux des cartes à titre, et un cadre
+// bleu ou rouge en petite carte se lirait Défensive ou Impact. Leurs
+// couleurs sont au dos, quand on retourne la carte. Les 24 pays mis en avant
+// par le studio (photo-studio.ts, PAYS).
 
 export interface CouleursPays {
   nom: string;
@@ -320,6 +325,17 @@ export const PAYS_PAR_DEFAUT = "fr";
 
 export const estPaysCouleurs = (p: unknown): p is string => typeof p === "string" && p in COULEURS_PAYS;
 
+/** Une couleur en gris d'encre de même clarté (luminance relative), le blanc restant le blanc de la carte. */
+export function enEncre(hex: string): string {
+  const lin = (i: number) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const y = 0.2126 * lin(1) + 0.7152 * lin(3) + 0.0722 * lin(5);
+  const g = Math.round(255 * (y <= 0.0031308 ? 12.92 * y : 1.055 * y ** (1 / 2.4) - 0.055));
+  return `#${g.toString(16).padStart(2, "0").repeat(3)}`;
+}
+
 /** Le serti de la carte photo : les bandes du drapeau sur ses deux côtés (le serti fait 57 / 1024 de large), le blanc entre. */
 function sertiDrapeau(bandes: string[]): string {
   const l = 4.6 / bandes.length;
@@ -337,13 +353,14 @@ export function matiereCouleurs(pays?: string): Matiere {
   const deja = cache.get(id);
   if (deja) return deja;
   const c = COULEURS_PAYS[id];
+  const encre = c.bandes.map(enEncre);
   const m: Matiere = {
     nom: "couleurs",
     titre: c.nom.toLowerCase(),
     encre: "8,9,11",
     sombre: false,
     papier: "linear-gradient(160deg, #fcfcfa 0%, #f1f1ed 55%, #e9e9e4 100%)",
-    motif: { type: "couleurs", bandes: c.bandes, trame: "rgba(8,9,11,0.05)", clair: "rgba(255,255,255,0.9)", fonce: "rgba(8,9,11,0.32)" },
+    motif: { type: "couleurs", bandes: c.bandes, encre, trame: "rgba(8,9,11,0.05)", clair: "rgba(255,255,255,0.9)", fonce: "rgba(8,9,11,0.32)" },
     fond: "#ffffff",
     lueur: BLANC,
     rayures: 0.05,
@@ -354,7 +371,7 @@ export function matiereCouleurs(pays?: string): Matiere {
     symbole: "/bola/symbole-noir.svg",
     rebord: { lumiere: "rgba(255,255,255,0.9)", ombre: "rgba(8,9,11,0.14)" },
     puce: "linear-gradient(135deg, #f3f3f1, #b9bab5 45%, #e6e6e3 70%, #a7a8a3)",
-    cadre: sertiDrapeau(c.bandes),
+    cadre: sertiDrapeau(encre),
     voile: "rgba(0,0,0,0.5)",
     onglet: { fond: "#08090b", encre: "#f5f5f3" },
     vive: "#f5f5f3",

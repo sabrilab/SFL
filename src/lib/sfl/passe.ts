@@ -131,7 +131,7 @@ export const PASSE_BOLA: readonly PalierPasse[] = [
   { n: 5, nom: "Nuit", quoi: "Le ciel de nuit, l'encre d'argent.", rang: "A", genre: "skin", habille: { finition: "nuit" } },
   { n: 6, nom: "Puce noire", quoi: "La puce de ta carte en noir laqué, ses contacts d'argent.", rang: "B", genre: "signe", habille: { signe: "puce-noire" } },
   { n: 7, nom: "Marbre", quoi: "Le marbre blanc veiné des statues.", rang: "A", genre: "skin", habille: { finition: "marbre" } },
-  { n: 8, nom: "Tes couleurs", quoi: "Le drapeau de ton choix, le long des bords de ta carte.", rang: "A", genre: "skin", habille: { finition: "couleurs" } },
+  { n: 8, nom: "Tes couleurs", quoi: "Ton drapeau le long des bords : à l'encre sur la face, en couleurs au dos.", rang: "A", genre: "skin", habille: { finition: "couleurs" } },
   { n: 9, nom: "Ton nom gravé", quoi: "Ton nom caché dans la gravure fine.", rang: "B", genre: "signe", habille: { signe: "nom-grave" } },
   { n: 10, nom: "Chrome", quoi: "Le métal poli, des reflets francs.", rang: "A", genre: "skin", habille: { finition: "chrome" } },
   { n: 11, nom: "Néon", quoi: "Un tube de néon fuchsia qui suit le bord, sur le noir.", rang: "A", genre: "skin", habille: { finition: "neon" } },

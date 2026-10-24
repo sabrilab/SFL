@@ -14,7 +14,8 @@
 //   · marbre : quatre grandes veines à peu près parallèles, leurs ramures et
 //     leurs fils, chacune dans sa brume ;
 //   · tes couleurs : la maille d'un maillot, et les bandes du drapeau le long
-//     des deux bords, comme ses côtés ;
+//     des deux bords, comme ses côtés : en gris d'encre sur la face, en
+//     couleurs au dos ;
 //   · néon : un tube fuchsia qui suit le bord, ouvert en bas, ses attaches et
 //     ses électrodes ;
 //   · aurore : trois rideaux de rayons, vifs et verts en bas, qui pâlissent en
@@ -880,7 +881,7 @@ export function MotifPasseSvg({
 }: {
   motif: MotifPasse & Couleurs;
   graine?: number;
-  /** Le dos de la carte : le ki y pose la boule dans sa couronne d'aura. */
+  /** Le dos de la carte : le ki y pose la boule dans sa couronne d'aura, tes couleurs y prennent leurs couleurs. */
   dos?: boolean;
 }) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");
@@ -895,7 +896,7 @@ export function MotifPasseSvg({
       ) : motif.type === "marbre" ? (
         <Marbre m={m} seed={graine} />
       ) : motif.type === "couleurs" ? (
-        <Couleurs m={m} bandes={motif.bandes} trame={motif.trame} id={id} />
+        <Couleurs m={m} bandes={dos ? motif.bandes : motif.encre} trame={motif.trame} id={id} />
       ) : motif.type === "neon" ? (
         <Neon m={m} />
       ) : motif.type === "aurore" ? (
