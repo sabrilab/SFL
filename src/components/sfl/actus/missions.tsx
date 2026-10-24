@@ -45,11 +45,11 @@ import {
   type Rang,
   type Reponse,
 } from "@/lib/sfl/missions";
-import { useDa } from "@/lib/sfl/da";
-import { InsigneDa, ViseurDa } from "@/components/sfl/da/insigne-da";
+import { InsigneLune, ViseurLune } from "./lune";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
 import "./missions.css";
+import "./lune.css";
 
 const TYPE: Record<Creneau, string> = { contrat: "Contrat", defi: "Défi du dimanche", ligue: "La ligue" };
 /** Les crans allumés à côté du rang : de la plus dure à la plus facile. */
@@ -136,17 +136,9 @@ function Moment({ mm }: { mm: MesMissions }) {
   );
 }
 
-/** L'insigne du rang, aux couleurs que pose fiche--{rang} sur un parent. */
+/** L'insigne du rang, aux couleurs que pose fiche--{rang} sur un parent : le symbole Bola (lune.tsx). */
 export function Insigne({ rang }: { rang: Rang }) {
-  const da = useDa();
-  if (da !== 0) return <InsigneDa rang={rang} da={da} />;
-  return (
-    <span className="fiche__insigne" aria-hidden>
-      <span className="fiche__hexa" />
-      <span className="fiche__hexa fiche__hexa--coeur" />
-      <span className="fiche__lettre">{rang}</span>
-    </span>
-  );
+  return <InsigneLune rang={rang} />;
 }
 
 function Difficulte({ rang }: { rang: Rang }) {
@@ -162,23 +154,9 @@ function Difficulte({ rang }: { rang: Rang }) {
   );
 }
 
-/** Le viseur posé sur une carte ; il rejoue son verrouillage à chaque changement d'état. */
+/** Le viseur posé sur une carte, l'orbite de la balle (lune.tsx) ; il rejoue son verrouillage à chaque changement d'état. */
 export function Viseur({ etat, petit }: { etat: EtatViseur; petit?: boolean }) {
-  const da = useDa();
-  if (da !== 0) return <ViseurDa etat={etat} petit={petit} da={da} />;
-  return (
-    <span key={etat} className={cn("fiche__viseur", `fiche__viseur--${etat}`, petit && "fiche__viseur--petit")} aria-hidden>
-      {etat === "verrou" && <span className="viseur__balayage" />}
-      <span className="viseur__coin viseur__coin--hg" />
-      <span className="viseur__coin viseur__coin--hd" />
-      <span className="viseur__coin viseur__coin--bg" />
-      <span className="viseur__coin viseur__coin--bd" />
-      <span className="viseur__trait viseur__trait--h" />
-      <span className="viseur__trait viseur__trait--b" />
-      <span className="viseur__trait viseur__trait--g" />
-      <span className="viseur__trait viseur__trait--d" />
-    </span>
-  );
+  return <ViseurLune etat={etat} petit={petit} />;
 }
 
 function etatViseur(l: LigneMission, phase: Phase): EtatViseur {
