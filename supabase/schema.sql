@@ -5128,3 +5128,30 @@ exception
   when undefined_object then null;
 end;
 $$;
+
+-- La notification de la convocation du dimanche (motif « convocation »,
+-- /api/ligue/annoncer, rattachée à 'convocation:<id>') attend une réponse
+-- à cette convocation, Je viens ou Pas dispo, dans les six jours.
+create or replace function public.push_effet_presence()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.push_effet(new.player_id, array['convocation'], 'convocation:' || new.convocation_id,
+    'a répondu à la convocation', interval '6 days');
+  return new;
+exception
+  when others then
+    raise warning 'push_effet_presence : %', sqlerrm;
+    return new;
+end;
+$$;
+
+revoke execute on function public.push_effet_presence() from public, anon, authenticated;
+
+drop trigger if exists push_effet_presence on public.presence;
+create trigger push_effet_presence
+  after insert or update of reponse on public.presence
+  for each row execute function public.push_effet_presence();
