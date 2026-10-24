@@ -117,7 +117,7 @@ export function BoutonFormat({ comptes, className }: { comptes?: ReadonlyMap<num
         className={cn("map-bord map-touche relative grid size-10 place-items-center", format ? "bouton-encre" : "bouton-givre")}
       >
         {format ? (
-          <span key={format} className="format-entre font-mono text-[11px] font-bold tracking-tight">
+          <span key={format} className="format-entre text-[13px] font-bold tracking-tight whitespace-nowrap tabular-nums">
             à {format}
           </span>
         ) : (
