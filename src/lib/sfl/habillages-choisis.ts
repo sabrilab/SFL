@@ -45,6 +45,7 @@ const FINITIONS: readonly string[] = [
   "chrome",
   "animee",
   "onyx",
+  "verre",
   "givre",
   "carbone",
   "marbre",

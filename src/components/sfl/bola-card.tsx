@@ -245,6 +245,66 @@ function Portrait({
   );
 }
 
+/**
+ * La note taillée en biseau (matières à `chiffres: "biseau"`, le verre) : un
+ * chiffre creux dans la plaque. Son ombre tombe dans l'épaisseur (en bas à
+ * droite), une arête de lumière le borde en haut à gauche, et sa face est
+ * taillée en deux facettes : celle du haut prend la lumière, celle du bas
+ * reste dans le verre. Même place, même taille que la note ordinaire.
+ */
+function NoteBiseau({
+  note,
+  place,
+  u,
+  encre,
+}: {
+  note: number | string;
+  place: { left: number; top: number; width: number; align: "left" | "center"; fs: number };
+  u: (n: number) => number;
+  encre: (a: number) => string;
+}) {
+  const base = {
+    position: "absolute" as const,
+    top: u(place.top),
+    width: u(place.width),
+    textAlign: place.align,
+    fontFamily: SANS,
+    fontWeight: 900,
+    fontStyle: "italic" as const,
+    fontSize: u(place.fs),
+    letterSpacing: u(-18),
+    lineHeight: 1,
+  };
+  const couches = [
+    // L'ombre, dans l'épaisseur du verre.
+    { dx: 7, dy: 9, color: "rgba(0,0,0,0.24)", stroke: `${u(5)}px rgba(0,0,0,0.42)` },
+    // L'arête de lumière.
+    { dx: -3, dy: -3, color: "transparent", stroke: `${u(3)}px rgba(255,255,255,0.42)` },
+    // La face, et son contour.
+    { dx: 0, dy: 0, color: encre(0.08), stroke: `${u(3.5)}px ${encre(0.96)}` },
+  ];
+  return (
+    <>
+      {couches.map((c, i) => (
+        <div key={i} style={{ ...base, left: u(place.left + c.dx), marginTop: u(c.dy), color: c.color, WebkitTextStroke: c.stroke }}>
+          {note}
+        </div>
+      ))}
+      {/* La facette du haut, qui prend la lumière : la face, coupée en biais. */}
+      <div
+        style={{
+          ...base,
+          left: u(place.left),
+          color: encre(0.34),
+          clipPath: "polygon(0 0, 100% 0, 100% 34%, 0 60%)",
+        }}
+      >
+        {note}
+      </div>
+    </>
+  );
+}
+
 export function BolaCard({
   name,
   affiche,
@@ -474,8 +534,14 @@ export function BolaCard({
           `inset 0 0 0 ${u(2)}px ${encre(0.12)}`,
           `inset ${u(3)}px ${u(4)}px ${u(3)}px -${u(1)}px ${p.rebord.lumiere}`,
           `inset -${u(3)}px -${u(5)}px ${u(5)}px -${u(1)}px ${p.rebord.ombre}`,
+          // Le verre : son épaisseur, une arête claire tout autour et la lumière prise dans la masse.
+          ...(p.transparente
+            ? [`inset 0 0 0 ${u(7)}px rgba(255,255,255,0.07)`, `inset 0 0 ${u(46)}px rgba(255,255,255,0.09)`]
+            : []),
           "0 14px 38px rgba(0,0,0,0.5)",
         ].join(", "),
+        // Ce qu'il y a derrière le verre, un peu flou (la 3D, elle, le laisse net).
+        ...(p.transparente && { backdropFilter: `blur(${u(14)}px) saturate(1.2)`, WebkitBackdropFilter: `blur(${u(14)}px) saturate(1.2)` }),
         fontFamily: SANS,
         color: encre(1),
       }}
@@ -588,8 +654,13 @@ export function BolaCard({
                 fontSize: u(tailleMarque),
                 lineHeight: 1,
                 letterSpacing: u(-2),
-                color: era?.accent ?? encre(1),
-                textShadow: photo ? `0 0 ${u(18)}px ${halo}` : undefined,
+                color: era?.accent ?? (p.chiffres ? encre(0.14) : encre(1)),
+                ...(p.chiffres && { WebkitTextStroke: `${u(3)}px ${encre(0.95)}` }),
+                textShadow: p.chiffres
+                  ? `${u(3)}px ${u(4)}px 0 rgba(0,0,0,0.45), -${u(2)}px -${u(2)}px 0 rgba(255,255,255,0.35)`
+                  : photo
+                    ? `0 0 ${u(18)}px ${halo}`
+                    : undefined,
               }}
             >
               {marque}
@@ -712,9 +783,19 @@ export function BolaCard({
       </div>
 
       {/* Le texte, au premier plan */}
-      <div data-card-part="stats" style={{ position: "absolute", inset: 0 }}>
+      <div
+        data-card-part="stats"
+        style={{
+          position: "absolute",
+          inset: 0,
+          // Sur le verre, ce qu'il y a derrière peut être clair : un halo sombre garde l'encre blanche lisible.
+          ...(p.transparente && { filter: `drop-shadow(0 0 ${u(5)}px rgba(0,0,0,0.38))` }),
+        }}
+      >
         {/* La note, en italique avec sa frange */}
-        {(era
+        {p.chiffres === "biseau" && !era ? (
+          <NoteBiseau note={note} place={place} u={u} encre={encre} />
+        ) : ((era
           ? [
               { dx: -8, a: 0.42 },
               { dx: 6, a: 0.2 },
@@ -746,7 +827,7 @@ export function BolaCard({
           >
             {note}
           </div>
-        ))}
+        )))}
 
         {/* Le badge choisi : sa bulle, au-dessus de la note */}
         {complete && badge && !era && <BulleBadge badge={badge} u={u} x={BULLE.x} centre={BULLE.centre} fin={BULLE.fin} encre={p.encre} sombre={p.sombre} />}

@@ -55,6 +55,7 @@ const LOOKS: { cle: string; titre: string; edition: EditionCarte; habillage?: Ha
   { cle: "ki", titre: "Ki · palier 14", edition: "base", habillage: { finition: "ki" } },
   { cle: "animee", titre: "Animée · palier 15", edition: "base", habillage: { finition: "animee" } },
   { cle: "onyx", titre: "Onyx · palier 16 (offerte)", edition: "base", habillage: { finition: "onyx" } },
+  { cle: "verre", titre: "Verre (offerte)", edition: "base", habillage: { finition: "verre" } },
   { cle: "meteorite", titre: "Météorite · palier 17", edition: "base", habillage: { finition: "meteorite" } },
   {
     cle: "h1",
