@@ -58,7 +58,7 @@ export const REGLES_DIVISIONS = {
 /** La journée qui coupe la ligue : la dernière sans divisions. */
 export const J_DECOUPAGE = REGLES_DIVISIONS.depuis - 1;
 
-/** Une place au découpage : la division, et le rang au Pépite d'Or qui l'a donnée. */
+/** Une place au découpage : la division, et le rang au Pépite d'Or qui l'a donnée (à l'écran, sa place dans la division : rangDansDivision). */
 export interface PlaceDecoupage {
   nom: string;
   division: Division;
@@ -99,6 +99,16 @@ export function decouper(saison: Saison, jusqua?: number): Decoupage {
     parNom.set(p.name, place);
   }
   return { divisions, parNom, classes: classes.length };
+}
+
+/**
+ * La place d'un joueur dans sa division, comptée depuis son premier : le
+ * premier de la D2 est 1er, pas 31e (Sabri, 24/10 : « chaque division a son
+ * premier, son deuxième, son troisième »). Les ex æquo gardent leur place
+ * commune.
+ */
+export function rangDansDivision(d: Decoupage, place: PlaceDecoupage): number {
+  return place.rang - d.divisions[place.division][0].rang + 1;
 }
 
 /**
@@ -345,11 +355,8 @@ export function taDivision(d: Decoupage, nom: string, { place: avecPlace = true 
     monter != null ? `à ${pts(monter)} de la ${nomDivision((place.division - 1) as Division)}` : null,
     avance != null ? `${pts(avance)} devant la ${nomDivision((place.division + 1) as Division)}` : null,
   ].filter(Boolean);
-  if (avecPlace && avance == null && place.division < 3) {
-    // Le rang dans sa division, compté depuis son premier : la D2 commence après la 30e place.
-    const premier = d.divisions[place.division][0].rang;
-    ecarts.push(`à la ${ordinal(place.rang - premier + 1)} des ${REGLES_DIVISIONS.taille} places`);
-  }
+  if (avecPlace && avance == null && place.division < 3)
+    ecarts.push(`à la ${ordinal(rangDansDivision(d, place))} des ${REGLES_DIVISIONS.taille} places`);
   return `tu serais en ${nomDivision(place.division)}${ecarts.length ? `, ${ecarts.join(" et ")}` : ""}`;
 }
 
