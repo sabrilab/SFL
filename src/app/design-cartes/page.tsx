@@ -56,6 +56,8 @@ const LOOKS: { cle: string; titre: string; edition: EditionCarte; habillage?: Ha
   { cle: "animee", titre: "Animée · palier 15", edition: "base", habillage: { finition: "animee" } },
   { cle: "onyx", titre: "Onyx · palier 16 (offerte)", edition: "base", habillage: { finition: "onyx" } },
   { cle: "verre", titre: "Verre (offerte)", edition: "base", habillage: { finition: "verre" } },
+  { cle: "pepite", titre: "Pépite d'or (offerte, Ilyes)", edition: "base", habillage: { finition: "pepite" } },
+  { cle: "palestine", titre: "Palestine (offerte, Ilyes)", edition: "base", habillage: { finition: "palestine" } },
   { cle: "meteorite", titre: "Météorite · palier 17", edition: "base", habillage: { finition: "meteorite" } },
   {
     cle: "h1",
