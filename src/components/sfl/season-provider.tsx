@@ -7,6 +7,7 @@
 // store change, ce provider et ses consommateurs restent identiques.
 
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 import { useIsClient } from "@/hooks/use-is-client";
 import { deriveSeason, type DerivedSeason } from "@/lib/sfl/saisie/engine";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
@@ -20,6 +21,7 @@ import { useSuiviVotes, useVotes } from "@/hooks/use-votes";
 import { useSession } from "@/hooks/use-session";
 import type { Session } from "@/lib/sfl/auth/session";
 import { supabase } from "@/lib/supabase";
+import { avecVitrine, vitrineDe, type Vitrine } from "@/lib/sfl/compte-vitrine";
 
 export const SAISIE_EVENT = "sfl-saisie";
 
@@ -40,6 +42,8 @@ interface SeasonValue extends DerivedSeason {
   bola: string | null;
   /** Change avec la liste des arbitres (masqués des listes) ; absent hors de la saison en cours. */
   arbitres?: number;
+  /** Le compte vitrine connecté, et son modèle (compte-vitrine.ts) ; null sinon. */
+  vitrine?: Vitrine | null;
 }
 
 const memeNom = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -130,10 +134,21 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const session = useSession();
+  const chemin = usePathname();
+  // Le compte vitrine (compte-vitrine.ts) lit en plus les dimanches de son
+  // modèle, à son nom, sur son seul écran ; jamais dans l'espace admin.
+  const nomSession = session?.server ? session.name : null;
+  const horsAdmin = !chemin?.startsWith("/admin");
+  // Recalculée quand on entre ou sort de l'admin, pas à chaque page.
+  const vitrine = useMemo(
+    () => (isClient ? vitrineDe(nomSession, horsAdmin ? null : "/admin") : null),
+    [isClient, nomSession, horsAdmin]
+  );
   const saison = useMemo(() => {
     void version; // relit le store à chaque incrément de version (édition admin)
-    return isClient ? saisieStore.load() : seedSaison();
-  }, [isClient, version]);
+    return avecVitrine(isClient ? saisieStore.load() : seedSaison(), vitrine);
+  }, [isClient, version, vitrine]);
   // Les votes Impact / Défensive : leurs élus sont posés sur les lignes une
   // fois le vote fermé (minuit, heure de Paris). L'horloge avance toutes les
   // cinq minutes pour que la fermeture se voie sans recharger.
@@ -150,7 +165,6 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     const vote = appliquerVotes(saison, brut.journees, votes, new Date());
     return vote === saison ? brut : deriveSeason(vote);
   }, [saison, votes, horloge]);
-  const session = useSession();
   const nom = useMemo(() => nomBola(session, derived.players), [session, derived.players]);
   const poste = usePosteBola(nom);
   const bola = useMemo(() => joueurBola(nom, poste), [nom, poste]);
@@ -172,8 +186,9 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
       bola: bola?.name ?? null,
       saison,
       arbitres,
+      vitrine,
     }),
-    [derived, bola, saison, arbitres]
+    [derived, bola, saison, arbitres, vitrine]
   );
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;

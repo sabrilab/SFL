@@ -14,6 +14,7 @@
 
 import { journeeJouee, saisonDepuisArchive } from "./saisie/mutations";
 import type { Saison } from "./saisie/types";
+import { estVitrine } from "./compte-vitrine";
 
 export type TropheeId =
   | "matchs"
@@ -131,7 +132,8 @@ export function vitrine(saison: Saison, nom: string, maintenant?: Date): EtatTro
   compter(saison, nom, c, maintenant);
 
   return TROPHEES.map((def) => {
-    const valeur = c[def.id];
+    // Le compte vitrine a tout, au plus haut palier (compte-vitrine.ts).
+    const valeur = estVitrine(nom) ? Math.max(c[def.id], def.paliers[def.paliers.length - 1]) : c[def.id];
     const palier = def.paliers.filter((p) => valeur >= p).length;
     const cible = def.paliers[palier] ?? null;
     const base = palier ? def.paliers[palier - 1] : 0;

@@ -37,6 +37,8 @@ export interface MatchEntry {
   teamScoreBonus?: number; // buts d'équipe non attribués à un joueur (ex. but d'extra time)
   pepiteBonus?: number; // points Pépite manuels (ex. +1 pour un extra time)
   extraTime?: boolean; // n'ouvre ni présence ni match : seuls note/bonus s'appliquent
+  /** Recopiée pour le compte vitrine, sur son seul téléphone (compte-vitrine.ts) : jamais écrite. */
+  vitrine?: true;
 }
 
 // Fiche joueur (comme JOUEURS & RÈGLES) : base fixe de la carte + méta.
@@ -45,6 +47,8 @@ export interface RosterEntry {
   poste: string | null;
   profil: string; // "Actif" | "Blessure" | "En attente" | ...
   base: number[] | null; // [VIT, TIR, PAS, DRI, DEF, PHY] ; null = non évalué (→ 75)
+  /** Posée par le compte vitrine (compte-vitrine.ts) : la base d'avant, ou une fiche ajoutée. Jamais écrite. */
+  vitrine?: { base: number[] | null } | "ajout";
 }
 
 export interface JourneeMeta {

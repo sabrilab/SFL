@@ -7,6 +7,7 @@
 
 import { SEED_ENTRIES, SEED_JOURNEES, SEED_ROSTER } from "./seed";
 import { appliquerMvpAuto } from "./mvp";
+import { sansVitrine } from "../compte-vitrine";
 import type { Saison } from "./types";
 
 const STORAGE_KEY = "sfl-saisie-v1";
@@ -159,7 +160,8 @@ export function adoptSaison(saison: Saison) {
 export const saisieStore: SaisieStore = {
   load: () => localStorageStore.load(),
   save(input) {
-    const saison = appliquerMvpAuto(input);
+    // Les lignes du compte vitrine ne vivent que sur son écran (compte-vitrine.ts).
+    const saison = appliquerMvpAuto(sansVitrine(input));
     localStorageStore.save(saison);
     void import("./sync").then((m) => m.pushSaison(saison)).catch(() => {});
   },
