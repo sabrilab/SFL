@@ -16,9 +16,9 @@
 // Le récap lui-même vit dans feed/journee-recap.tsx.
 
 import Link from "next/link";
+import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
 import { useSeason } from "@/components/sfl/season-provider";
 import { labelDateFr, prochainDimanche } from "@/lib/sfl/convocation-temps";
 import { JourneeRecap } from "@/components/sfl/feed/journee-recap";
@@ -221,13 +221,13 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
           ordinateur, le titre de la page à gauche (comme Ma carte), et le
           sélecteur ramené à sa juste largeur au lieu de traverser l'écran. */}
       <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-[var(--fib-13)]">
-      <Link
-        href={saisonClose ? `/saisons/${saisonClose.numero}` : "/ligue"}
-        aria-label={saisonClose ? saisonClose.nom : "Actus"}
-        className="bouton-secondaire flex size-10 shrink-0 items-center justify-center sm:size-11"
-      >
-        <ChevronLeft className="size-5" />
-      </Link>
+      {/* Le retour commun : au dimanche des Actus d'où l'on vient, à sa place ;
+          arrivé de dehors, aux Actus (ou à la saison close). */}
+      <BoutonRetour
+        parent={saisonClose ? `/saisons/${saisonClose.numero}` : "/ligue"}
+        titre={saisonClose ? saisonClose.nom : "Actus"}
+        className="size-10 sm:size-11"
+      />
       <h1 className="hidden text-[34px] font-bold tracking-tight lg:mr-auto lg:block">Le récap</h1>
       <div className="glass flex flex-1 gap-1 rounded-full p-1 lg:w-[420px] lg:flex-none" role="tablist" aria-label="Vue du récap">
         {VUES.map(([id, label]) => (

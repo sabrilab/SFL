@@ -1452,9 +1452,10 @@ export default function MapPage() {
                   />
                 )}
                 {choisi && feuille.length > 0 && <DuelsDuJour j={choisi.j} matchs={choisi.matchsIci} />}
+                {/* Son dimanche dans les Actus, pas l'Actu du jour. */}
                 {choisi?.joue && (
                   <Link
-                    href="/ligue"
+                    href={choisi.j !== null ? `/ligue#j${choisi.j}` : "/ligue"}
                     className="bouton-principal flex h-12 items-center justify-center gap-2 text-[15px] font-semibold"
                   >
                     Voir le récap de la journée

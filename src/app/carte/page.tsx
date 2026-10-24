@@ -11,6 +11,7 @@ import { PlayerCard } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { useSeason } from "@/components/sfl/season-provider";
+import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { BAREME } from "@/lib/sfl/data";
 import {
   STAT_KEYS,
@@ -94,11 +95,14 @@ export default function CartePage() {
 
   return (
     <div className="shell flex flex-col gap-6 py-4 sm:py-8">
-      <div>
-        <h1 className="text-[30px] font-bold tracking-tight">Ma carte</h1>
-        <p className="mt-1 text-[13px] text-foreground/42">
-          Évolue chaque mois à l&apos;EvoDay
-        </p>
+      <div className="flex items-center gap-3">
+        <BoutonRetour />
+        <div>
+          <h1 className="text-[30px] font-bold tracking-tight">Ma carte</h1>
+          <p className="mt-1 text-[13px] text-foreground/42">
+            Évolue chaque mois à l&apos;EvoDay
+          </p>
+        </div>
       </div>
 
       {/* Carte principale */}

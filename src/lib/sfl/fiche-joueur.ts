@@ -24,6 +24,12 @@ export interface PointFort {
   quoi: string;
   /** « 1er buteur ». */
   rang: string;
+  /** Le classement qui le dit (un id de rankings.ts) : Ma saison y mène. */
+  classement: string;
+  /** Sa place dans ce classement ; null pour la présence, qui se dit en part des dimanches. */
+  place: number | null;
+  /** Le rang sans sa place : « buteur » (« 1er buteur »), ou le rang entier pour la présence. */
+  titre: string;
 }
 
 export interface FaitMarquant {
@@ -52,18 +58,19 @@ interface Mesure {
   id: "buts" | "passes" | "mvp" | "def" | "pp";
   valeur: (p: Player) => number;
   quoi: (n: number) => string;
-  rang: (r: number) => string;
+  /** « buteur » : le rang, après la place (« 1er buteur »). */
+  titre: string;
   /** « Le buteur de la ligue. » au 1er rang ; « Sur le podium des buteurs. » ensuite. */
   premier: string;
   podium: string;
 }
 
 const MESURES: Mesure[] = [
-  { id: "buts", valeur: (p) => p.buts, quoi: (n) => (n > 1 ? "buts" : "but"), rang: (r) => `${ordinal(r)} buteur`, premier: "Le buteur de la ligue.", podium: "Sur le podium des buteurs." },
-  { id: "passes", valeur: (p) => p.passes, quoi: (n) => (n > 1 ? "passes" : "passe"), rang: (r) => `${ordinal(r)} passeur`, premier: "Le passeur de la ligue.", podium: "Sur le podium des passeurs." },
-  { id: "mvp", valeur: (p) => p.mvp, quoi: () => "MVP", rang: (r) => `${ordinal(r)} en MVP`, premier: "Le MVP de la ligue.", podium: "Sur le podium des MVP." },
-  { id: "def", valeur: (p) => p.def, quoi: () => "fois le Mur", rang: (r) => `${ordinal(r)} défenseur`, premier: "Le mur de la ligue.", podium: "Sur le podium des défenseurs." },
-  { id: "pp", valeur: (p) => p.pp, quoi: () => "pts Pépite", rang: (r) => `${ordinal(r)} au Pépite d'Or`, premier: "En tête du Pépite d'Or.", podium: "Sur le podium du Pépite d'Or." },
+  { id: "buts", valeur: (p) => p.buts, quoi: (n) => (n > 1 ? "buts" : "but"), titre: "buteur", premier: "Le buteur de la ligue.", podium: "Sur le podium des buteurs." },
+  { id: "passes", valeur: (p) => p.passes, quoi: (n) => (n > 1 ? "passes" : "passe"), titre: "passeur", premier: "Le passeur de la ligue.", podium: "Sur le podium des passeurs." },
+  { id: "mvp", valeur: (p) => p.mvp, quoi: () => "MVP", titre: "en MVP", premier: "Le MVP de la ligue.", podium: "Sur le podium des MVP." },
+  { id: "def", valeur: (p) => p.def, quoi: () => "fois le Mur", titre: "défenseur", premier: "Le mur de la ligue.", podium: "Sur le podium des défenseurs." },
+  { id: "pp", valeur: (p) => p.pp, quoi: () => "pts Pépite", titre: "au Pépite d'Or", premier: "En tête du Pépite d'Or.", podium: "Sur le podium du Pépite d'Or." },
 ];
 
 const majuscule = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -117,12 +124,18 @@ export function ficheJoueur(saison: Saison, moi: Player, players: Player[]): Fic
     const r = rangDe(players, moi, m.valeur);
     if (r == null) continue;
     const v = m.valeur(moi);
-    candidats.push({ score: r, mesure: m, rang: r, fort: { chiffre: String(v), quoi: m.quoi(v), rang: m.rang(r) } });
+    candidats.push({
+      score: r,
+      mesure: m,
+      rang: r,
+      fort: { chiffre: String(v), quoi: m.quoi(v), rang: `${ordinal(r)} ${m.titre}`, classement: m.id, place: r, titre: m.titre },
+    });
   }
   const toujours = p === n && n >= 3;
+  const presence = toujours ? "toujours là" : `${Math.round((p / n) * 100)} % présent`;
   candidats.push({
     score: toujours ? 2.5 : 10 + (1 - p / n) * 10,
-    fort: { chiffre: `${p}/${n}`, quoi: n > 1 ? "dimanches" : "dimanche", rang: toujours ? "toujours là" : `${Math.round((p / n) * 100)} % présent` },
+    fort: { chiffre: `${p}/${n}`, quoi: n > 1 ? "dimanches" : "dimanche", rang: presence, classement: "presences", place: null, titre: presence },
   });
   candidats.sort((a, b) => a.score - b.score);
   const forts = candidats.slice(0, 3).map((c) => c.fort);

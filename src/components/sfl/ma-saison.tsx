@@ -11,15 +11,23 @@
 //   3. ses autres dimanches, une ligne chacun, les plus récents d'abord.
 // Un dimanche sans match n'y est que s'il lui a rapporté ou coûté des points
 // (un bonus d'extra time, une absence injustifiée) : ses dimanches mis bout à
-// bout font son total. Chaque dimanche ouvre son récap
-// (/ligue/journee?j=N). Noir et blanc : seuls
-// ses titres du jour portent la couleur de leur carte (or, rouge, bleu :
-// teinte-carte.ts). Calcul dans lib/sfl/fiche-joueur.ts (dimanchesDe).
+// bout font son total.
+//
+// Tout se touche (Sabri, 24/10 : « des boutons, des choses dessus où je peux
+// cliquer, et ça me ramène vers des classements ») : un dimanche ouvre ce
+// dimanche dans les Actus (/ligue#j2), pas l'ancien récap ; ses points et sa
+// place, le Pépite d'Or ; un point fort, son classement (?classement=buts),
+// sa place en pastille, pleine sur le podium. Le haut dit jusqu'où va la
+// saison lue : « Saison 1 · après J2 ».
+// Noir et blanc : seuls ses titres du jour portent la couleur de leur carte
+// (or, rouge, bleu : teinte-carte.ts). Calcul dans lib/sfl/fiche-joueur.ts
+// (dimanchesDe, ficheJoueur).
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Chiffre } from "@/components/sfl/profil-joueur";
+import { useSeason } from "@/components/sfl/season-provider";
 import { TEINTES } from "@/components/sfl/teinte-carte";
 import {
   actionsDuJour,
@@ -32,6 +40,7 @@ import {
   type TitreDuJour,
 } from "@/lib/sfl/fiche-joueur";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
+import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { cn } from "@/lib/utils";
 
 /** Sa place au Pépite d'Or après un dimanche, et ce qu'il a gagné (+) ou perdu (−) ce jour-là. */
@@ -42,6 +51,10 @@ const D_EMBLEE = 4;
 
 const majuscule = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const signe = (n: number) => (n < 0 ? `−${-n}` : `+${n}`);
+
+/** Un dimanche dans les Actus ; un classement de la saison. */
+const dimancheDansLesActus = (j: number) => `/ligue#j${j}`;
+const classement = (id: string) => `/ligue?vue=classements&classement=${id}`;
 
 /** La carte d'un titre du jour : MVP en or, Le Mur en bleu, Impact en rouge. */
 const TEINTE_TITRE: Record<TitreDuJour, string> = {
@@ -83,34 +96,77 @@ function Titres({ titres, taille = "petit" }: { titres: TitreDuJour[]; taille?: 
   );
 }
 
-/** Le dernier dimanche joué, en grand. */
+/**
+ * Le dernier dimanche joué, en grand. Deux touchers : le haut ouvre ce
+ * dimanche dans les Actus, les chiffres du bas le Pépite d'Or.
+ */
 function DernierDimanche({ d, rang }: { d: Dimanche; rang?: RangDuJour }) {
   const sansTitres = { ...d, titres: [] };
   const ecart = rang?.ecart ?? null;
   return (
-    <Link
-      href={`/ligue/journee?j=${d.j}`}
-      aria-label={`Dernier dimanche, J${d.j}, ${d.date} : ${phraseDuJour(d)} Voir le récap`}
-      className="glass flex flex-col gap-[var(--fib-13)] rounded-[22px] px-4 pt-[var(--fib-13)] pb-[var(--fib-13)] transition-transform active:scale-[0.99] motion-reduce:transition-none"
-    >
-      <span className="flex items-center justify-between gap-3">
-        <span className="mono-label text-muted-foreground">Dernier dimanche</span>
-        <span className="flex items-center gap-1 font-mono text-[11px] text-foreground/45">
-          J{d.j} · {d.date}
-          <ChevronRight className="size-3.5" aria-hidden />
+    <div className="glass flex flex-col rounded-[22px]">
+      <Link
+        href={dimancheDansLesActus(d.j)}
+        aria-label={`Dernier dimanche, J${d.j}, ${d.date} : ${phraseDuJour(d)} Voir ce dimanche dans les Actus`}
+        className="flex flex-col gap-[var(--fib-13)] rounded-t-[22px] px-4 pt-[var(--fib-13)] pb-[var(--fib-13)] active:bg-foreground/[0.04]"
+      >
+        <span className="flex items-center justify-between gap-3">
+          <span className="mono-label text-muted-foreground">Dernier dimanche</span>
+          <span className="flex items-center gap-1 font-mono text-[11px] text-foreground/45">
+            J{d.j} · {d.date}
+            <ChevronRight className="size-3.5" aria-hidden />
+          </span>
         </span>
-      </span>
-      <span className="flex flex-col gap-[var(--fib-8)]">
-        <span className="text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{phraseDuJour(sansTitres)}</span>
-        <Titres titres={d.titres} taille="grand" />
-      </span>
-      <span className="flex items-stretch divide-x divide-foreground/10 border-t border-foreground/10 pt-[var(--fib-13)]">
+        <span className="flex flex-col gap-[var(--fib-8)]">
+          <span className="text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{phraseDuJour(sansTitres)}</span>
+          <Titres titres={d.titres} taille="grand" />
+        </span>
+      </Link>
+      <Link
+        href={classement("pp")}
+        aria-label={`${signe(d.points)} points Pépite ce dimanche : voir le classement du Pépite d'Or`}
+        className="mx-4 flex items-stretch divide-x divide-foreground/10 border-t border-foreground/10 pt-[var(--fib-13)] pb-[var(--fib-13)] active:opacity-70"
+      >
         <Chiffre valeur={signe(d.points)} quoi={Math.abs(d.points) > 1 ? "Pts Pépite" : "Pt Pépite"} />
         {ecart != null ? (
           <Chiffre valeur={ecart > 0 ? `▲${ecart}` : ecart < 0 ? `▼${-ecart}` : "="} quoi={ecart === 0 ? "Même place" : "Au Pépite d'Or"} />
         ) : rang?.rang != null ? (
           <Chiffre valeur={ordinal(rang.rang)} quoi="Pépite d'Or" />
         ) : null}
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * Un point fort, en bouton : son chiffre, ce qu'il compte, sa place (pleine
+ * sur le podium) ; il ouvre son classement.
+ */
+function Fort({ f }: { f: PointFort }) {
+  const podium = f.place != null && f.place <= 3;
+  return (
+    <Link
+      href={classement(f.classement)}
+      aria-label={`${f.chiffre} ${f.quoi}, ${f.rang} : voir le classement`}
+      className="bouton-secondaire flex min-w-0 flex-col gap-1.5 rounded-2xl bg-secondary px-3 pt-3 pb-2.5"
+    >
+      <span className="flex items-start justify-between gap-1">
+        <span className="text-[26px] leading-none font-black tracking-[-1px] italic tabular-nums">{f.chiffre}</span>
+        <ChevronRight className="size-4 shrink-0 text-foreground/35" aria-hidden />
+      </span>
+      <span className="text-[12px] font-semibold">{f.quoi}</span>
+      <span className="font-mono text-[10.5px] leading-tight text-muted-foreground">
+        {f.place != null && (
+          <span
+            className={cn(
+              "mr-1 inline-block rounded-full px-1.5 py-px font-bold tabular-nums",
+              podium ? "bg-foreground text-background" : "text-foreground/80 ring-1 ring-foreground/20 ring-inset"
+            )}
+          >
+            {ordinal(f.place)}
+          </span>
+        )}
+        {f.titre}
       </span>
     </Link>
   );
@@ -122,8 +178,8 @@ function LigneDimanche({ d, premiere }: { d: Dimanche; premiere: boolean }) {
   const resultat = resultatDuJour(d);
   return (
     <Link
-      href={`/ligue/journee?j=${d.j}`}
-      aria-label={`J${d.j}, ${d.date} : ${phraseDuJour(d)} ${signe(d.points)} points Pépite. Voir le récap`}
+      href={dimancheDansLesActus(d.j)}
+      aria-label={`J${d.j}, ${d.date} : ${phraseDuJour(d)} ${signe(d.points)} points Pépite. Voir ce dimanche dans les Actus`}
       className={cn("flex min-h-[60px] items-center gap-3 px-4 py-2.5 active:bg-foreground/[0.04]", !premiere && "border-t border-foreground/8")}
     >
       <span className="flex min-w-0 flex-1 flex-col gap-1">
@@ -163,6 +219,9 @@ export function MaSaison({
   rangs: Map<number, RangDuJour>;
 }) {
   const [tout, setTout] = useState(false);
+  // Jusqu'où va la saison : son dernier dimanche joué, celui de tous les classements.
+  const { saison: s } = useSeason();
+  const apres = useMemo(() => Math.max(0, ...s.journees.map((m) => m.j).filter((j) => journeeJouee(s, j))), [s]);
   if (!dimanches.length) return null;
   const [dernier, ...autres] = dimanches;
   const montres = tout ? autres : autres.slice(0, D_EMBLEE);
@@ -173,7 +232,10 @@ export function MaSaison({
         <h2 id="ma-saison" className="mono-label text-muted-foreground">
           Ma saison
         </h2>
-        <span className="font-mono text-[12px] font-bold text-foreground/45">{saison}</span>
+        <span className="font-mono text-[12px] font-bold text-foreground/45">
+          {saison}
+          {apres > 0 && ` · après J${apres}`}
+        </span>
       </div>
 
       <DernierDimanche d={dernier} rang={rangs.get(dernier.j)} />
@@ -181,11 +243,7 @@ export function MaSaison({
       {forts.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {forts.map((f) => (
-            <div key={f.rang} className="flex flex-col gap-1.5 rounded-2xl bg-secondary px-3 pt-3 pb-2.5">
-              <span className="text-[26px] leading-none font-black tracking-[-1px] italic tabular-nums">{f.chiffre}</span>
-              <span className="text-[12px] font-semibold">{f.quoi}</span>
-              <span className="font-mono text-[10.5px] leading-tight text-muted-foreground">{f.rang}</span>
-            </div>
+            <Fort key={f.classement} f={f} />
           ))}
         </div>
       )}
