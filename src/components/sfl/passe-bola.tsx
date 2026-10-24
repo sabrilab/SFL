@@ -46,7 +46,7 @@ import "./passe-bola.css";
 
 const xp = (n: number) => `${n.toLocaleString("fr-FR")} XP`;
 
-const GENRE: Record<GenrePalier, string> = {
+export const GENRE: Record<GenrePalier, string> = {
   skin: "Skin",
   signe: "Signe",
   sequence: "Séquence 6 s",
@@ -60,7 +60,7 @@ interface Cadrage {
   zoom: number;
 }
 
-const CADRAGES: Partial<Record<number, Cadrage>> = {
+export const CADRAGES: Partial<Record<number, Cadrage>> = {
   1: { x: 150, y: 150, zoom: 2.3 }, // le liseré, au coin du portrait
   3: { x: 191, y: 831, zoom: 2.2 }, // le sceau
   6: { x: 883, y: 888, zoom: 2.8 }, // la puce
@@ -92,23 +92,23 @@ export function Mini({ player, habillage, cadrage, l, h }: { player: Player; hab
 }
 
 /** Ma carte telle qu'elle serait avec la récompense du palier, en plus de ce que je porte. */
-function essai(porte: HabillageCarte, p: PalierPasse, pays?: string): HabillageCarte {
+export function essai(porte: HabillageCarte, p: PalierPasse, pays?: string): HabillageCarte {
   const h = p.habille;
   if (h?.finition) return { ...porte, finition: h.finition as Finition, pays: h.finition === "couleurs" ? pays : undefined };
   if (h?.signe) return { ...porte, signes: [...new Set([...(porte.signes ?? []), h.signe])] };
   return porte;
 }
 
-type EtatPalier = "gagne" | "acquis" | "prochain" | "verrou";
+export type EtatPalier = "gagne" | "acquis" | "prochain" | "verrou";
 
-function etatDe(n: number, palier: number, palierMax: number): EtatPalier {
+export function etatDe(n: number, palier: number, palierMax: number): EtatPalier {
   if (n <= palier) return "gagne";
   if (n <= palierMax) return "acquis";
   return n === palier + 1 ? "prochain" : "verrou";
 }
 
 /** Combien de joueurs ont débloqué chaque palier (toutes saisons), sans les joueurs masqués. */
-function useOntLePalier(): (n: number) => number {
+export function useOntLePalier(): (n: number) => number {
   const cartes = useContext(CartesXpContext);
   return useMemo(() => {
     const paliers = [...(cartes?.parJoueur ?? new Map()).entries()].filter(([nom]) => !isHidden(nom)).map(([, x]) => x.palier);
