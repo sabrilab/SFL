@@ -410,6 +410,7 @@ function useBascule(popup: HTMLElement | null, devant: string, ids: string) {
   const etat = React.useRef<{ el: HTMLElement | null; id: string; top: number; hauteur: number }>({ el: null, id: "", top: 0, hauteur: 0 })
   const places = React.useRef(new Map<string, number>())
   const focus = React.useRef(new Map<string, HTMLElement>())
+  const anim = React.useRef<Animation | null>(null)
 
   React.useEffect(() => {
     if (!popup) return
@@ -435,6 +436,7 @@ function useBascule(popup: HTMLElement | null, devant: string, ids: string) {
       etat.current = { el: popup, id: devant, top: popup.scrollTop, hauteur: popup.getBoundingClientRect().height }
       places.current.clear()
       focus.current.clear()
+      anim.current = null
       return
     }
     if (e.id === devant) return
@@ -445,11 +447,16 @@ function useBascule(popup: HTMLElement | null, devant: string, ids: string) {
       if (actif instanceof HTMLElement && popup.contains(actif)) focus.current.set(e.id, actif)
     } else places.current.delete(e.id)
     const top = avance ? 0 : (places.current.get(devant) ?? 0)
+    // Un passage encore en cours (deux touchers rapides) : on repart de la
+    // hauteur où il en est, et l'on mesure la vraie, sans lui.
+    const depuis = anim.current?.playState === "running" ? popup.getBoundingClientRect().height : e.hauteur
+    anim.current?.cancel()
+    anim.current = null
     popup.scrollTo({ top })
     const hauteur = popup.getBoundingClientRect().height
     const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    if (!reduit && e.hauteur > 0 && Math.abs(hauteur - e.hauteur) > 2) {
-      popup.animate([{ height: `${e.hauteur}px` }, { height: `${hauteur}px` }], { duration: 320, easing: GLISSE })
+    if (!reduit && depuis > 0 && Math.abs(hauteur - depuis) > 2) {
+      anim.current = popup.animate([{ height: `${depuis}px` }, { height: `${hauteur}px` }], { duration: 320, easing: GLISSE })
     }
     const ecran = popup.querySelector<HTMLElement>(`[data-ecran="${CSS.escape(devant)}"]`)
     if (ecran) {
