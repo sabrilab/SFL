@@ -41,7 +41,16 @@
 
 import { Badge3D } from "@/components/sfl/badge-3d";
 import { palierCarte } from "@/components/sfl/bola-card";
-import { graine, lisereDe, MATIERES, matiereDe, METAUX, RAYON_CARTE, type HabillageCarte, type Traitement } from "@/components/sfl/finitions-carte";
+import {
+  graine,
+  lisereDe,
+  MATIERES,
+  matiereDe,
+  METAUX,
+  RAYON_CARTE,
+  type HabillageCarte,
+  type Traitement,
+} from "@/components/sfl/finitions-carte";
 import { filtrePhoto, InsigneRang, VoileTraitement } from "@/components/sfl/habillage-carte";
 import { EmblemeEpoque, SigleSouligne } from "@/components/sfl/marques-carte";
 import { MotifCarte } from "@/components/sfl/motif-carte";
@@ -156,7 +165,7 @@ export function CartePhoto({
   // Le serti : la matière d'une carte d'époque, d'une carte à titre, ou de la finition portée.
   const temps = epoque ? matiereDe(distinction ?? "base", undefined, epoque.saison) : null;
   const era = temps?.epoque;
-  const teinte = era ? temps : distinction ? MATIERES[distinction] : habillage?.finition ? MATIERES[habillage.finition] : null;
+  const teinte = era ? temps : distinction ? MATIERES[distinction] : habillage?.finition ? matiereDe("base", habillage) : null;
   // Le liseré porté : le filet autour de la photo, dans son métal (au moins 1 px).
   const lisere = lisereDe(habillage);
   const filet = lisere ? METAUX[lisere][1] : null;

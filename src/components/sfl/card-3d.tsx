@@ -31,7 +31,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import dynamic from "next/dynamic";
 import { toPng } from "html-to-image";
 import { DosCarte } from "@/components/sfl/dos-carte";
-import { MATIERES, type HabillageCarte, type NomMatiere } from "@/components/sfl/finitions-carte";
+import { matiereDuNom, type HabillageCarte, type Matiere } from "@/components/sfl/finitions-carte";
 import type { EmissionCarte } from "@/lib/sfl/epoques";
 import { useBadgeRevision } from "@/hooks/use-badge-carte";
 import { useHabillageRevision } from "@/hooks/use-habillage";
@@ -178,13 +178,13 @@ export interface CapturedLayers {
   stats: string;
   /** Le dos (DosCarte), s'il a pu être photographié. */
   dos?: string;
-  matiere: NomMatiere | null;
+  matiere: Matiere | null;
   width: number;
   height: number;
 }
 
 interface Dos {
-  matiere: NomMatiere;
+  matiere: Matiere;
   nom: string;
   habillage?: HabillageCarte;
   /** Une carte d'époque : sa date d'émission et son numéro. */
@@ -203,14 +203,13 @@ function lireJson<T>(texte: string | undefined): T | undefined {
 /** La matière, le joueur, l'habillage et l'émission que la face déclare (bola-card.tsx), pour son dos. */
 function dosDe(node: HTMLElement): Dos | null {
   const corps = node.querySelector<HTMLElement>("[data-matiere]");
-  const matiere = corps?.dataset.matiere as NomMatiere | undefined;
-  if (!corps || !matiere || !(matiere in MATIERES)) return null;
-  return {
-    matiere,
-    nom: corps.dataset.nom ?? "",
-    habillage: lireJson<HabillageCarte>(corps.dataset.habillage),
-    emission: lireJson<EmissionCarte>(corps.dataset.emission),
-  };
+  if (!corps?.dataset.matiere) return null;
+  const habillage = lireJson<HabillageCarte>(corps.dataset.habillage);
+  // « Tes couleurs » : la matière du pays que porte l'habillage.
+  const matiere = matiereDuNom(corps.dataset.matiere, habillage);
+  return matiere
+    ? { matiere, nom: corps.dataset.nom ?? "", habillage, emission: lireJson<EmissionCarte>(corps.dataset.emission) }
+    : null;
 }
 
 /** Attend qu'un nœud soit monté, quelques images au plus. */
@@ -497,7 +496,7 @@ function Card3DInner({
           </div>
           {dos && (
             <div ref={dosRef} style={{ position: "absolute" }} aria-hidden>
-              <DosCarte matiere={MATIERES[dos.matiere]} nom={dos.nom} habillage={dos.habillage} emission={dos.emission} />
+              <DosCarte matiere={dos.matiere} nom={dos.nom} habillage={dos.habillage} emission={dos.emission} />
             </div>
           )}
         </div>

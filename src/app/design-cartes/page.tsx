@@ -3,13 +3,16 @@
 // Atelier des cartes — page de travail, non reliée à la navigation. Toutes
 // les matières de la carte joueur (finitions-carte.ts), sur un vrai joueur et
 // avec les vrais composants : la carte de saison, les trois cartes à titre
-// (MVP, Impact, Défensive), les trois finitions de la passe (nuit, chrome,
-// animée), l'offerte (onyx) et trois habillages (signes, crans, rang, photo
-// traitée), chacune de face et de dos, puis en petit (compacte, réduite,
-// pastille). Puis l'édition d'époque de la saison 0 (sa carte de saison et
-// ses trois cartes Boost), quand l'appareil a l'archive de la saison 0.
+// (MVP, Impact, Défensive), les skins du Passe Bola dans l'ordre des
+// paliers (lib/sfl/passe.ts : givre, carbone, nuit, marbre, tes couleurs,
+// chrome, néon, aurore, ki, animée, onyx, météorite) et trois habillages
+// (signes, crans, rang), chacune de face et de dos, puis en petit (compacte,
+// réduite, pastille). Puis l'édition d'époque de la saison 0 (sa carte de
+// saison et ses trois cartes Boost), quand l'appareil a l'archive de la
+// saison 0.
 // `?joueur=Nom` choisit le joueur ; par défaut, soi. `?trois=mvp` (ou base,
-// impact, def, nuit, chrome, animee, onyx, h1, h2, h3, s0, s0-mvp,
+// impact, def, givre, carbone, nuit, marbre, couleurs, couleurs-br, chrome,
+// neon, aurore, ki, animee, onyx, meteorite, h1, h2, h3, s0, s0-mvp,
 // s0-impact, s0-def) montre d'abord cette carte en 3D, à tourner ; `&dos=1`
 // la pose sur son dos. `?seul=h1,h2` ne montre que ces cartes-là.
 
@@ -30,29 +33,47 @@ const LOOKS: { cle: string; titre: string; edition: EditionCarte; habillage?: Ha
   { cle: "mvp", titre: "MVP", edition: "mvp" },
   { cle: "impact", titre: "Impact", edition: "impact" },
   { cle: "def", titre: "Défensive", edition: "def" },
-  { cle: "nuit", titre: "Finition nuit · palier 4", edition: "base", habillage: { finition: "nuit" } },
-  { cle: "chrome", titre: "Finition chrome · palier 10", edition: "base", habillage: { finition: "chrome" } },
-  { cle: "animee", titre: "Finition animée · palier 16", edition: "base", habillage: { finition: "animee" } },
-  { cle: "onyx", titre: "Finition onyx · offerte", edition: "base", habillage: { finition: "onyx" } },
+  { cle: "givre", titre: "Givre · palier 2", edition: "base", habillage: { finition: "givre" } },
+  { cle: "carbone", titre: "Carbone · palier 4", edition: "base", habillage: { finition: "carbone" } },
+  { cle: "nuit", titre: "Nuit · palier 5", edition: "base", habillage: { finition: "nuit" } },
+  { cle: "marbre", titre: "Marbre · palier 7", edition: "base", habillage: { finition: "marbre" } },
+  {
+    cle: "couleurs",
+    titre: "Tes couleurs · palier 8 · Algérie",
+    edition: "base",
+    habillage: { finition: "couleurs", pays: "dz" },
+  },
+  {
+    cle: "couleurs-br",
+    titre: "Tes couleurs · palier 8 · Brésil",
+    edition: "base",
+    habillage: { finition: "couleurs", pays: "br" },
+  },
+  { cle: "chrome", titre: "Chrome · palier 10", edition: "base", habillage: { finition: "chrome" } },
+  { cle: "neon", titre: "Néon · palier 11", edition: "base", habillage: { finition: "neon" } },
+  { cle: "aurore", titre: "Aurore · palier 12", edition: "base", habillage: { finition: "aurore" } },
+  { cle: "ki", titre: "Ki · palier 14", edition: "base", habillage: { finition: "ki" } },
+  { cle: "animee", titre: "Animée · palier 15", edition: "base", habillage: { finition: "animee" } },
+  { cle: "onyx", titre: "Onyx · palier 16 (offerte)", edition: "base", habillage: { finition: "onyx" } },
+  { cle: "meteorite", titre: "Météorite · palier 17", edition: "base", habillage: { finition: "meteorite" } },
   {
     cle: "h1",
-    titre: "Habillage · liseré argent, photo argentique, 1 cran, rang B",
+    titre: "Habillage · liseré argent, 1 cran, rang B",
     edition: "base",
-    habillage: { signes: ["lisere-argent"], traitement: "argentique", cran: 1, rang: "B" },
+    habillage: { signes: ["lisere-argent"], cran: 1, rang: "B" },
   },
   {
     cle: "h2",
-    titre: "Habillage · nuit, sceau, gravure, 3 crans, rang A",
+    titre: "Habillage · nuit, sceau, 3 crans, rang A",
     edition: "base",
-    habillage: { finition: "nuit", signes: ["lisere-argent", "sceau"], traitement: "gravure", cran: 3, rang: "A" },
+    habillage: { finition: "nuit", signes: ["lisere-argent", "sceau"], cran: 3, rang: "A" },
   },
   {
     cle: "h3",
-    titre: "Habillage · MVP, liseré or, marbre, puce dorée, nom gravé, cadre complet, rang S",
+    titre: "Habillage · MVP, liseré platine, puce noire, nom gravé, cadre complet, rang S",
     edition: "mvp",
     habillage: {
-      signes: ["lisere-argent", "lisere-or", "sceau", "puce-or", "nom-grave"],
-      traitement: "marbre",
+      signes: ["lisere-argent", "lisere-platine", "sceau", "puce-noire", "nom-grave"],
       cran: 4,
       rang: "S",
     },
@@ -64,14 +85,15 @@ const LOOKS: { cle: string; titre: string; edition: EditionCarte; habillage?: Ha
 ];
 
 function Atelier() {
-  const { players, saison } = useSeason();
+  const { players, allPlayers, saison } = useSeason();
   const { me } = useMyPlayer();
   const params = useSearchParams();
   const demande = params.get("joueur");
   const seul = params.get("seul")?.split(",");
   const classes = useMemo(() => rankPlayers(players), [players]);
+  // Un joueur masqué (Sabri) se demande aussi : c'est une page de travail.
   const player =
-    players.find((p) => p.name.toLowerCase() === (demande ?? me ?? "").toLowerCase()) ?? classes[0];
+    allPlayers.find((p) => p.name.toLowerCase() === (demande ?? me ?? "").toLowerCase()) ?? classes[0];
   // Ses cartes d'une saison close : le joueur tel qu'il était alors, et la journée d'une carte à titre.
   const carriere = useMemo(() => (player ? cartesDeCarriere(saison, player.name) : []), [saison, player]);
   const version = (l: (typeof LOOKS)[number]) => {

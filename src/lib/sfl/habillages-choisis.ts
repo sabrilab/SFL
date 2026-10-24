@@ -5,8 +5,12 @@
 //
 // Le choix vit dans profiles.habillage (supabase/schema.sql), sous la forme
 // « finition/traitement » : « auto » (le dernier débloqué), « - » (rien) ou
-// l'id d'une récompense (nuit, chrome, animee, ou onyx l'offerte ;
-// argentique, gravure, marbre).
+// l'id d'une récompense (nuit, chrome, animee, onyx, et les skins du Passe
+// Bola : givre, carbone, marbre, neon, aurore, ki, meteorite, et « Tes
+// couleurs » avec son pays, couleurs:dz). Le traitement de la photo
+// (argentique, gravure, marbre) n'est plus dans la passe depuis le 24/10
+// (Sabri : « Tu peux tirer tout ce qui est carte argentique ») : il reste
+// lisible, la carte ne le porte plus.
 // Comme le badge (badges-choisis.ts), deux couches :
 //   · la liste DISTANTE — nom → choix, relue au lancement et au retour sur
 //     l'app, gardée en cache pour un affichage immédiat ;
@@ -17,6 +21,7 @@
 // pas.
 
 import type { Finition, Traitement } from "@/components/sfl/finitions-carte";
+import { estPaysCouleurs } from "@/components/sfl/skins-passe";
 import { supabase } from "@/lib/supabase";
 
 export type ChoixFinition = "auto" | "-" | Finition;
@@ -24,22 +29,42 @@ export type ChoixTraitement = "auto" | "-" | Traitement;
 
 export interface ChoixHabillage {
   finition: ChoixFinition;
+  /** « Tes couleurs » : le pays choisi. */
+  pays?: string;
   traitement: ChoixTraitement;
 }
 
-const FINITIONS: readonly string[] = ["auto", "-", "nuit", "chrome", "animee", "onyx"];
+const FINITIONS: readonly string[] = [
+  "auto",
+  "-",
+  "nuit",
+  "chrome",
+  "animee",
+  "onyx",
+  "givre",
+  "carbone",
+  "marbre",
+  "couleurs",
+  "neon",
+  "aurore",
+  "ki",
+  "meteorite",
+];
 const TRAITEMENTS: readonly string[] = ["auto", "-", "argentique", "gravure", "marbre"];
 
 /** Le choix tel qu'il est enregistré ; rien ou illisible = « auto » des deux côtés. */
 export function lireChoixHabillage(brut: string | null | undefined): ChoixHabillage {
   const [f, t] = (brut ?? "").split("/");
+  const [finition, pays] = (f ?? "").split(":");
   return {
-    finition: FINITIONS.includes(f) ? (f as ChoixFinition) : "auto",
+    finition: FINITIONS.includes(finition) ? (finition as ChoixFinition) : "auto",
+    pays: finition === "couleurs" && estPaysCouleurs(pays) ? pays : undefined,
     traitement: TRAITEMENTS.includes(t) ? (t as ChoixTraitement) : "auto",
   };
 }
 
-export const ecrireChoixHabillage = (c: ChoixHabillage) => `${c.finition}/${c.traitement}`;
+export const ecrireChoixHabillage = (c: ChoixHabillage) =>
+  `${c.finition === "couleurs" && c.pays ? `couleurs:${c.pays}` : c.finition}/${c.traitement}`;
 
 const CACHE_KEY = "sfl-habillages-choisis";
 const ATTENTE_KEY = "sfl-habillage-en-attente";

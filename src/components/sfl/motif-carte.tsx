@@ -23,10 +23,13 @@
 //     s'effilent) : du SVG sans filtre, que la capture de la 3D prend sur
 //     iPhone, et un coup de pinceau propre à chaque carte ;
 //   · particules : les étincelles d'énergie des cartes Boost de la saison 0.
-// Et la rosace guillochée du dos (RosaceBola), comme sur un billet.
+// Et la rosace guillochée du dos (RosaceBola), comme sur un billet. Les
+// motifs des skins du Passe Bola sont dans motifs-passe.tsx.
 
 import { Fragment, useId } from "react";
 import type { Motif } from "@/components/sfl/finitions-carte";
+import { MotifPasseSvg } from "@/components/sfl/motifs-passe";
+import { estMotifPasse } from "@/components/sfl/skins-passe";
 
 const W = 1024;
 const H = 1656;
@@ -160,6 +163,8 @@ export function MotifCarte({
 }) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");
   const style: React.CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%" };
+
+  if (estMotifPasse(motif)) return <MotifPasseSvg motif={motif} graine={graine} dos={!!centre} />;
 
   if (motif.type === "rayons") {
     const { cx, cy } = centre ?? motif;
