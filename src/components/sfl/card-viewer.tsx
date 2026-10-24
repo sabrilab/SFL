@@ -52,7 +52,7 @@ import {
 import { useIdentites } from "@/hooks/use-identites";
 import { useGrandEcran } from "@/hooks/use-media-query";
 import { rankPlayers } from "@/lib/sfl/engine";
-import { isHidden } from "@/lib/sfl/hidden";
+import { useProfilsOuverts } from "@/hooks/use-suivis";
 import { Card3D, prechaufferCarte } from "./card-3d";
 import { Card3DEnGrand } from "./carte-en-grand";
 import { useMyPlayer } from "./player-provider";
@@ -119,16 +119,18 @@ function FeuilleCarte({ viewed }: { viewed: ViewedCard }) {
 }
 
 function EcranCarte({ viewed }: { viewed: ViewedCard }) {
-  const { players } = useSeason();
+  const { allPlayers } = useSeason();
   const { me } = useMyPlayer();
   const identite = useIdentites();
   const grand = useGrandEcran();
   const fenetre = useFenetre();
   const retour = useRetourDEcran();
+  const profils = useProfilsOuverts();
 
-  // Un joueur masqué ne montre que sa carte ; un joueur d'une autre saison, pas de profil.
-  const joueur = viewed.joueur && !isHidden(viewed.joueur) ? viewed.joueur : null;
-  const aUnProfil = !!joueur && joueur !== me && players.some((p) => p.name === joueur);
+  // Un joueur masqué ne montre que sa carte, sauf à ceux qu'il suit et qui le
+  // suivent (useProfilsOuverts) ; un joueur d'une autre saison, pas de profil.
+  const joueur = viewed.joueur && profils.ouvert(viewed.joueur) ? viewed.joueur : null;
+  const aUnProfil = !!joueur && joueur !== me && allPlayers.some((p) => p.name === joueur);
 
   return (
     <>
@@ -205,9 +207,12 @@ function EcranCarte({ viewed }: { viewed: ViewedCard }) {
  */
 export function FeuilleProfil({ nom, onRetour }: { nom: string; onRetour?: () => void }) {
   const { players } = useSeason();
+  const { relies } = useProfilsOuverts();
   const identite = useIdentites();
-  const rangs = useMemo(() => new Map(rankPlayers(players).map((p) => [p.name, p.rank])), [players]);
-  const player = players.find((p) => p.name === nom);
+  // Un joueur masqué qu'on a le droit d'ouvrir se range parmi les autres, sur son seul profil.
+  const ouverts = useMemo(() => [...players, ...relies.filter((p) => p.name === nom)], [players, relies, nom]);
+  const rangs = useMemo(() => new Map(rankPlayers(ouverts).map((p) => [p.name, p.rank])), [ouverts]);
+  const player = ouverts.find((p) => p.name === nom);
   return (
     <SheetContent
       side="bottom"

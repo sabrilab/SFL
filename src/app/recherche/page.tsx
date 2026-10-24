@@ -20,6 +20,7 @@ import { CalendarDays, Search, X } from "lucide-react";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { ProfilJoueur } from "@/components/sfl/profil-joueur";
 import { useSeason } from "@/components/sfl/season-provider";
+import { useProfilsOuverts } from "@/hooks/use-suivis";
 import { CarteDe } from "@/components/sfl/mini-carte";
 import { logActivity } from "@/lib/sfl/activity";
 import { nomAffiche, pseudoAffiche } from "@/lib/sfl/identites";
@@ -178,7 +179,14 @@ function Recherche() {
     if (demande) document.getElementById("app-scroll")?.scrollTo({ top: 0 });
   }, [demande]);
 
-  const ranked = useMemo(() => rankPlayers(players), [players]);
+  // Un joueur masqué ne se trouve que pour ceux qu'il suit et qui le suivent
+  // (useProfilsOuverts), à la place qu'il aurait, sans déplacer les autres.
+  const { relies } = useProfilsOuverts();
+  const ranked = useMemo(() => {
+    const publics = rankPlayers(players);
+    const masques = relies.flatMap((r) => rankPlayers([...players, r]).filter((p) => p.name === r.name));
+    return [...publics, ...masques].sort((a, b) => a.rank - b.rank);
+  }, [players, relies]);
   const rankOf = useMemo(
     () => new Map(ranked.map((p) => [p.name, p.rank])),
     [ranked]
@@ -206,7 +214,7 @@ function Recherche() {
     return journees.filter((j) => fold(j.date).includes(needle)).slice(0, 6);
   }, [journees, needle, asJournee]);
 
-  const selectedPlayer = openPlayer ? players.find((p) => p.name === openPlayer) : undefined;
+  const selectedPlayer = openPlayer ? ranked.find((p) => p.name === openPlayer) : undefined;
   const selectedJournee =
     openJournee !== null ? journees.find((j) => j.j === openJournee) : undefined;
   const fiche = selectedPlayer || selectedJournee;

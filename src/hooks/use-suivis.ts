@@ -4,6 +4,8 @@ import { useMemo, useSyncExternalStore } from "react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { idDe } from "@/lib/sfl/comptes";
+import { isArbitre, isHidden } from "@/lib/sfl/hidden";
+import type { Player } from "@/lib/sfl/engine";
 import { enDemo, liensDeLaBase, liensDemo, SUIVIS_EVENT, suivisLus, suivisRevision, type Lien } from "@/lib/sfl/suivis";
 
 function subscribe(onChange: () => void) {
@@ -60,4 +62,26 @@ export function useSuivis(): Suivis {
       lue: demo || suivisLus(),
     };
   }, [rev, allPlayers, me]);
+}
+
+/**
+ * Les profils que j'ai le droit d'ouvrir. Un joueur masqué (Sabri, hidden.ts)
+ * reste hors des classements et des listes, mais son profil s'ouvre comme
+ * celui de n'importe qui pour ceux qui le suivent et ceux qu'il suit (Sabri,
+ * 24/10 : « Permet aux gens qui sont abonnés à moi et qui s'abonnent à eux
+ * de voir tout mon profil comme les autres »). Ils voient ses vraies données :
+ * la vitrine (compte-vitrine.ts) ne vit que sur son téléphone. Un arbitre
+ * garde sa page à lui.
+ */
+export function useProfilsOuverts(): { ouvert: (nom: string | null | undefined) => boolean; relies: Player[] } {
+  const s = useSuivis();
+  const { allPlayers } = useSeason();
+  const { me } = useMyPlayer();
+  return useMemo(() => {
+    const relie = (nom: string) => !!me && nom !== me && !isArbitre(nom) && (s.suit(me, nom) || s.suit(nom, me));
+    return {
+      ouvert: (nom) => !!nom && (!isHidden(nom) || nom === me || relie(nom)),
+      relies: allPlayers.filter((p) => isHidden(p.name) && relie(p.name)),
+    };
+  }, [s, allPlayers, me]);
 }
