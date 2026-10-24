@@ -23,7 +23,7 @@
 //     son papier, comme l'étiquette, le sceau ou le microtexte : un filet,
 //     puis une ligne de microtexte qui en fait le tour en répétant le nom du
 //     badge (« PÉPITE D'OR · 1ER · SAISON 0 · », à lire de près, comme sur
-//     un billet), le titre en Anton (la police du nom), le rang et la saison
+//     un billet), le titre au lettrage de l'app (Inter 900), le rang et la saison
 //     en mono dessous. Aucune couleur de métal dans la bulle : l'or, le bleu
 //     et le rouge sont aux cartes MVP, Défensive et Impact (Sabri, 24/10),
 //     seul l'objet porte son métal.
@@ -44,7 +44,6 @@ import type { Objet } from "@/lib/sfl/badges-3d/objets";
 import { CLASSEMENTS, ordinal } from "@/lib/sfl/fin-de-saison";
 import { metal, NOM_METAL, TROPHEES, type TropheeId } from "@/lib/sfl/trophees";
 
-const ANTON = "var(--font-anton), Anton, sans-serif";
 const MONO = "var(--font-jbmono), ui-monospace, monospace";
 
 /* ---------------------------------- L'objet ---------------------------------- */
@@ -140,17 +139,41 @@ export function libelleInsigne(b: BadgeCarte): { titre: string; detail: string }
   return { titre: titrePalier(b.id, b.palier), detail: `palier ${NOM_METAL[metal(b.palier)!].toLowerCase()}` };
 }
 
+/** La chasse des capitales d'une police, de A à Z puis de 0 à 9, en centièmes d'em (mesurées le 24/10). */
+function table(az: string, chiffres: string): Record<string, number> {
+  const t: Record<string, number> = {};
+  az.split(" ").forEach((w, i) => (t[String.fromCharCode(65 + i)] = Number(w) / 100));
+  chiffres.split(" ").forEach((w, i) => (t[String(i)] = Number(w) / 100));
+  return t;
+}
+
 /**
- * La chasse d'un texte en capitales d'Anton, en em, un peu large exprès
- * (mesurée le 24/10 : « PÉPITE D'OR » 4,29 em ; I et les blancs étroits, M et
- * W larges, le reste ≈ 0,47).
+ * La lettre du titre de la bulle : le lettrage de l'app (« MERCREDI » sur la
+ * Map, les titres de Ma carte), Inter au plus gras en capitales serrées.
+ * L'Anton du nom n'a pas plu à Sabri (24/10). `pas` : l'interlettrage, en
+ * em ; `max` : la taille du titre, dans le repère de la carte ; `chasse` : la
+ * largeur des capitales, en em, pour calculer la bulle sans la mesurer.
  */
-function chasseAnton(texte: string): number {
+type Lettre = { famille: string; poids: number; italique: boolean; pas: number; max: number; hauteur: number; chasse: Record<string, number>; blanc: number };
+
+const LETTRE: Lettre = {
+  famille: "var(--font-inter), Inter, system-ui, sans-serif",
+  poids: 900,
+  italique: false,
+  pas: -0.03,
+  max: 37,
+  hauteur: 0.9,
+  chasse: table("79 67 75 72 61 58 75 75 29 60 76 57 96 77 78 66 79 67 67 69 72 79 108 79 78 69", "71 45 65 67 70 65 67 59 68 67"),
+  blanc: 0.25,
+};
+
+/** La largeur d'un titre en capitales, en em, interlettrage compris. */
+function chasse(texte: string, l: Lettre): number {
   let w = 0;
-  for (const c of texte.toUpperCase()) {
-    w += " '’·.".includes(c) ? 0.24 : c === "I" || c === "1" ? 0.34 : c === "M" || c === "W" ? 0.75 : c === "×" ? 0.35 : 0.5;
+  for (const c of texte.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")) {
+    w += l.chasse[c] ?? (c === "×" ? 0.6 : c === " " ? l.blanc : 0.3);
   }
-  return w;
+  return w + texte.length * l.pas;
 }
 
 /* ---------------------------------- La bulle ---------------------------------- */
@@ -164,7 +187,6 @@ const MICRO = 11.5; // la ligne de microtexte, depuis le bord
 const MICRO_FS = 8.6;
 const AVANT = R + 22; // du bord gauche de la bulle au texte
 const APRES = 34;
-const PAS = 1.5; // l'interlettrage du titre
 const DETAIL = 23;
 const ECART = 9; // entre le titre et le détail
 
@@ -200,8 +222,8 @@ export function BulleBadge({
   const cx = x + R;
   const { titre, detail } = libelleInsigne(badge);
   const place = fin - cx - AVANT - APRES;
-  const taille = Math.min(50, (place - titre.length * PAS) / chasseAnton(titre));
-  const texte = Math.max(chasseAnton(titre) * taille + titre.length * PAS, detail.length * (0.6 * DETAIL + 0.5));
+  const taille = Math.min(LETTRE.max, place / chasse(titre, LETTRE));
+  const texte = Math.max(chasse(titre, LETTRE) * taille, detail.length * (0.6 * DETAIL + 0.5));
   const L = Math.min(fin - cx, AVANT + texte + APRES);
 
   // La ligne de microtexte : partie de l'extrémité gauche (sous l'objet), elle
@@ -255,7 +277,18 @@ export function BulleBadge({
             whiteSpace: "nowrap",
           }}
         >
-          <span style={{ fontFamily: ANTON, fontSize: u(taille), lineHeight: 0.92, letterSpacing: u(PAS), color: ink(0.94), textTransform: "uppercase" }}>
+          <span
+            style={{
+              fontFamily: LETTRE.famille,
+              fontWeight: LETTRE.poids,
+              fontStyle: LETTRE.italique ? "italic" : "normal",
+              fontSize: u(taille),
+              lineHeight: LETTRE.hauteur,
+              letterSpacing: `${LETTRE.pas}em`,
+              color: ink(0.94),
+              textTransform: "uppercase",
+            }}
+          >
             {titre}
           </span>
           <span style={{ fontFamily: MONO, fontSize: u(DETAIL), fontWeight: 600, lineHeight: 1, letterSpacing: u(0.5), color: ink(0.62) }}>{detail}</span>
