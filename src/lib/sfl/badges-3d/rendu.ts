@@ -153,14 +153,18 @@ function verre(couleur: string, opacite: number, rugosite = 0.05) {
 }
 
 /**
- * Le noir des trophées (socles, lames) : le chrome sombre et irisé des
- * premiers badges (Sabri, 22/10 : « rester dans la DA de nos premiers
- * badges »), un peu plus mat pour que le métal du rang reste ce qu'on voit
- * d'abord. Les reflets bleu, violet et orange du studio filent sur ses arêtes.
+ * Le noir des trophées (socles, lames) : un chrome noir satiné, le noir de la
+ * planche de Sabri (« socle noir », plaque de métal devant). Il était irisé
+ * comme les pièces sombres des badges, mais sur les grands pans le film
+ * virait au rose-beige (les socles) et au bordeaux (les lames), trop près du
+ * rouge réservé aux cartes Impact et du mauve des rangs des skins (24/10).
+ * L'irisation reste à la pierre du sommet ; les reflets du studio filent
+ * toujours sur les arêtes, et le vernis léger détache le socle du fond noir.
  */
 function noir() {
-  const m = chrome("#121318", 0.9, 0.3);
-  m.envMapIntensity = 0.6;
+  const m = chrome("#0a0c10", 0, 0.3);
+  m.envMapIntensity = 0.8;
+  m.clearcoat = 0.3;
   return m;
 }
 
