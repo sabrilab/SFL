@@ -16,12 +16,13 @@
  * La version en vigueur : la date du texte. La changer quand un changement
  * touche à ce que les joueurs ont accepté (un nouveau prestataire, un nouvel
  * usage de leur image) : l'app redemande alors l'accord à l'ouverture. Une
- * retouche de forme ne la change pas.
+ * retouche de forme ne la change pas. Le 24/10 : le parrainage (les joueurs
+ * invités voient les cartes, la page d'un lien peut montrer celle du parrain).
  */
-export const VERSION_POLITIQUE = "2026-10-22";
+export const VERSION_POLITIQUE = "2026-10-24";
 
 /** La même, telle qu'on l'écrit en tête du texte. */
-export const DATE_POLITIQUE = "22 octobre 2026";
+export const DATE_POLITIQUE = "24 octobre 2026";
 
 /**
  * Avant cet âge, l'accord d'un parent s'ajoute à celui du joueur (loi

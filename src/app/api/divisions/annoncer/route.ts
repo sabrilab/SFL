@@ -60,9 +60,13 @@ export async function POST(req: NextRequest) {
   const cle = cleVapid();
   if (!cle) return NextResponse.json({ envoyes: 0, fini: true });
 
-  // Les joueurs de la ligue qui ont un téléphone abonné.
-  const { data: profils } = await sb.from("profiles").select("id, name").eq("valide", true);
-  const joueurs = (profils ?? []) as { id: string; name: string }[];
+  // Les joueurs de la ligue qui ont un téléphone abonné : ceux de la saison
+  // (et les admins), pas les joueurs Bola venus par un parrain.
+  const { data: profils } = await sb.from("profiles").select("id, name, is_admin").eq("valide", true);
+  const roster = new Set((saison.roster ?? []).map((r) => r.name));
+  const joueurs = ((profils ?? []) as { id: string; name: string; is_admin: boolean | null }[]).filter(
+    (p) => p.is_admin || roster.has(p.name)
+  );
   const { data: abonnements } = await sb
     .from("push_abonnements")
     .select("user_id")

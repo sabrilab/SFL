@@ -9,8 +9,9 @@
 // activées, ce que chaque motif fait faire : ./notifications.tsx, qui lit ses
 // propres tables), pays choisis pour la carte (table photo_studio), joueurs à
 // relancer. En
-// dessous, les sujets de Bola Agent (./agent.tsx), sans le contenu, puis les
-// accords à la politique de confidentialité (./confidentialite.tsx).
+// dessous, le parrainage vers 500 joueurs (./parrainage.tsx), les sujets de
+// Bola Agent (./agent.tsx), sans le contenu, puis les accords à la politique
+// de confidentialité (./confidentialite.tsx).
 // Rien n'est agrégé en base, donc rien à maintenir quand on ajoute un type
 // d'événement.
 //
@@ -25,6 +26,7 @@ import { emailsDeContact } from "@/lib/sfl/contacts";
 import { supabase } from "@/lib/supabase";
 import { AgentStats } from "./agent";
 import { AccordsStats } from "./confidentialite";
+import { ParrainageStats } from "./parrainage";
 import { ActiviteVue, type DonneesActivite } from "./vue";
 
 /** Lignes rendues au plus par une requête au serveur (réglage Supabase). */
@@ -177,6 +179,7 @@ export default function ActivitePage() {
       error={error}
       pied={(public_, admins) => (
         <>
+          <ParrainageStats />
           <AgentStats public={public_} admins={admins} />
           <AccordsStats public={public_} admins={admins} />
         </>

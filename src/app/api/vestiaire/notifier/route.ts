@@ -28,6 +28,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cleVapid } from "@/lib/server/web-push";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { idsSfl } from "@/lib/sfl/parrainage.server";
 import { pseudosCites } from "@/lib/sfl/pseudos-cites";
 import { joueursDePiece } from "@/lib/sfl/pieces-joueurs";
 import { resumeMessage as resume } from "@/lib/sfl/resume-message";
@@ -79,7 +80,10 @@ export async function POST(req: NextRequest) {
     nom_affiche: string | null;
     valide: boolean;
   }[];
-  const membres = new Set(tous.filter((p) => p.valide).map((p) => p.id));
+  // Le Vestiaire est le salon de la SFL : un joueur Bola (venu par un
+  // parrain) ne le lit pas, il n'en est pas prévenu.
+  const sfl = await idsSfl(sb);
+  const membres = new Set(tous.filter((p) => p.valide && (!sfl || sfl.has(p.id))).map((p) => p.id));
   const nomDe = (uid: string) => {
     const p = tous.find((x) => x.id === uid);
     return (p?.nom_affiche ?? p?.name ?? "Quelqu'un").split(" ")[0];
