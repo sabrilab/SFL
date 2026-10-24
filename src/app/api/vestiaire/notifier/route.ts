@@ -8,7 +8,9 @@
 //   · l'auteur d'un message qui reçoit une RÉACTION : tout de suite, et la
 //     suivante remplace la précédente sur son écran (même étiquette) ;
 //   · tous les autres : chaque message, comme Snap ou WhatsApp (Sabri,
-//     19/10 : la notification groupée à l'heure ne se voyait pas). Deux
+//     19/10 : la notification groupée à l'heure ne se voyait pas), sauf une
+//     réponse à un autre joueur, qui ne regarde qu'eux deux (Sabri, 24/10 :
+//     « c'est la personne concernée qui doit recevoir la notif »). Deux
 //     garde-fous seulement : rien à qui a le Vestiaire sous les yeux
 //     (devant_le, redit toutes les 20 s par l'app), et pas deux
 //     notifications au même joueur à moins de RAFALE d'écart.
@@ -132,11 +134,16 @@ export async function POST(req: NextRequest) {
     const auteur = nomDe(moi.id);
     const phrase = resume(msg.texte, msg.piece);
 
-    // Celui à qui l'on répond.
+    // Celui à qui l'on répond. Une réponse à un autre joueur, c'est une
+    // conversation entre eux deux : lui seul (et les cités) en est prévenu,
+    // pas tout le Vestiaire (Sabri, 24/10 : « c'est la personne concernée qui
+    // doit recevoir la notif, et pas tout le monde »).
+    let entreEux = false;
     const repondu = typeof msg.reponse_a === "number" ? msg.reponse_a : null;
     if (repondu) {
       const { data: original } = await sb.from("messages").select("auteur").eq("id", repondu).maybeSingle();
       const cible = (original as { auteur: string } | null)?.auteur;
+      entreEux = !!cible && cible !== moi.id;
       if (cible && cible !== moi.id && modeDe(cible) !== "rien" && !devant(cible))
         envois.set(cible, {
           motif: "vestiaire-reponse",
@@ -185,10 +192,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Tous les autres : ce message, sauf à qui le regarde ou vient d'en recevoir un.
+    // Tous les autres : ce message, sauf une réponse, et sauf à qui le regarde
+    // ou vient d'en recevoir un.
     const { data: abonnes } = await sb.from("push_abonnements").select("user_id");
     courants = [...new Set(((abonnes ?? []) as { user_id: string }[]).map((a) => a.user_id))].filter((uid) => {
-      if (uid === moi.id || envois.has(uid) || modeDe(uid) !== "tout" || devant(uid)) return false;
+      if (entreEux || uid === moi.id || envois.has(uid) || modeDe(uid) !== "tout" || devant(uid)) return false;
       const dernier = suivis.get(uid)?.notifie_le;
       return !dernier || maintenant - new Date(dernier).getTime() >= RAFALE;
     });

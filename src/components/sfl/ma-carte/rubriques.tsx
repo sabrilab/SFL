@@ -20,7 +20,7 @@
 // bleu (cartes Impact et Défensive), l'or reste aux badges.
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -30,6 +30,7 @@ import { useRangXp, useXp } from "@/hooks/use-missions";
 import { useFormatCarte } from "@/hooks/use-format-carte";
 import { MiniCarte } from "@/components/sfl/mini-carte";
 import { Medaille } from "@/components/sfl/vitrine";
+import { ModePasse, retenirOrigineModePasse } from "@/components/sfl/mode-passe";
 import { cartesDeCarriere, courbeDeCarriere, type PointCourbe } from "@/lib/sfl/carriere";
 import { actionsDuJour, dimanchesDe, ficheJoueur, resultatDuJour } from "@/lib/sfl/fiche-joueur";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
@@ -76,9 +77,11 @@ function Tuile({
   nom,
   large,
   label,
+  onClick,
   children,
 }: {
   href: string;
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
   ton: Ton;
   nom: string;
   large?: boolean;
@@ -90,6 +93,7 @@ function Tuile({
     <Link
       href={href}
       aria-label={label}
+      onClick={onClick}
       className={cn("tuile flex min-h-[156px] flex-col gap-2.5 p-4", `tuile--${ton}`, large && "col-span-2 min-h-0")}
     >
       <span className="tuile__etiquette mono-label text-[10px]">{nom}</span>
@@ -137,6 +141,7 @@ export function RubriquesMaCarte() {
   const paliers = useMemo(() => vitrine(saison, player.name, new Date()), [saison, player.name]);
   const numero = saison.numero ?? 0;
   const tuiles: React.ReactNode[] = [];
+  const [passe, setPasse] = useState(false);
 
   // 1. Ma saison, en large : mon dernier dimanche en une phrase, ce qu'il m'a rapporté.
   const dernier = dimanches[0];
@@ -201,6 +206,12 @@ export function RubriquesMaCarte() {
         key="xp"
         href="/profil/xp"
         ton="xp"
+        onClick={(e) => {
+          // Le mode Passe s'ouvre par-dessus Ma carte, depuis la tuile (mode-passe.tsx).
+          e.preventDefault();
+          retenirOrigineModePasse(e.currentTarget);
+          setPasse(true);
+        }}
         nom="Niveau XP"
         label={`Niveau XP ${b.niveau}${r && r.xp > 0 ? `, rang ${r.rang}` : ""}. Passe Bola : palier ${b.passe.palier} sur ${PALIERS_PASSE}`}
       >
@@ -317,6 +328,7 @@ export function RubriquesMaCarte() {
   return (
     <nav aria-label="Ma carte en détail" className="grid grid-cols-2 gap-2.5">
       {tuiles}
+      {passe && <ModePasse player={player} saison={numero} onSortie={() => setPasse(false)} />}
     </nav>
   );
 }
