@@ -10,10 +10,14 @@
 //   · alvéoles : la cotte de mailles de la Défensive, en hexagones ;
 //   · étoiles : le ciel de la finition nuit, tiré de la graine du joueur ;
 //     les étincelles seulement au dos (sur la face, elles tombaient sur le
-//     texte).
+//     texte) ;
+//   · guilloché : les bandes de l'onyx, deux familles de vagues en
+//     opposition de phase et de longueurs d'onde voisines, qui
+//     s'entrelacent en chaînes puis se rejoignent (une moire, comme sur le
+//     revers d'un smoking).
 // Et la rosace guillochée du dos (RosaceBola), comme sur un billet.
 
-import { useId } from "react";
+import { Fragment, useId } from "react";
 import type { Motif } from "@/components/sfl/finitions-carte";
 
 const W = 1024;
@@ -43,6 +47,27 @@ function rayonsOndes(): number[] {
     r.push(v);
   }
   return r;
+}
+
+// Le guilloché de l'onyx : le pas entre deux vagues, leur amplitude, et les
+// deux longueurs d'onde (leur écart fait la moire, d'une chaîne à l'autre).
+const GUILLOCHE = { pas: 30, amplitude: 13, longueurs: [168, 186] } as const;
+
+/**
+ * Une famille de vagues, pour une tuile d'une longueur d'onde de large et
+ * d'un pas de haut : la vague de la tuile, qui déborde un peu à gauche et à
+ * droite pour que le trait ne s'arrête pas net au raccord.
+ */
+function vagues(longueur: number, phase: number): string {
+  const { pas, amplitude } = GUILLOCHE;
+  const n = 28;
+  let d = "";
+  for (let i = -3; i <= n + 3; i++) {
+    const x = (i / n) * longueur;
+    const y = pas / 2 + amplitude * Math.sin((2 * Math.PI * x) / longueur + phase);
+    d += `${i === -3 ? "M" : "L"}${f(x)} ${f(y)}`;
+  }
+  return d;
 }
 
 /** Un générateur pseudo-aléatoire stable (xorshift). */
@@ -127,6 +152,33 @@ export function MotifCarte({
         </defs>
         <rect width={W} height={H} fill={`url(#alv-o-${id})`} />
         <rect width={W} height={H} fill={`url(#alv-c-${id})`} />
+      </svg>
+    );
+  }
+
+  if (motif.type === "guilloche") {
+    // Chaque famille dans sa tuile : l'ombre décalée de 3, puis le trait clair.
+    const familles = GUILLOCHE.longueurs.map((l, i) => ({ l, d: vagues(l, i * Math.PI), cle: `gu${i}-${id}` }));
+    return (
+      <svg aria-hidden viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={style}>
+        <defs>
+          {familles.map((v) => (
+            <Fragment key={v.cle}>
+              <pattern id={`${v.cle}o`} width={v.l} height={GUILLOCHE.pas} patternUnits="userSpaceOnUse" x={W / 2} y={3}>
+                <path d={v.d} fill="none" stroke={motif.fonce} strokeWidth={2.6} />
+              </pattern>
+              <pattern id={`${v.cle}c`} width={v.l} height={GUILLOCHE.pas} patternUnits="userSpaceOnUse" x={W / 2} y={0}>
+                <path d={v.d} fill="none" stroke={motif.clair} strokeWidth={1.9} />
+              </pattern>
+            </Fragment>
+          ))}
+        </defs>
+        {familles.map((v) => (
+          <rect key={`${v.cle}o`} width={W} height={H} fill={`url(#${v.cle}o)`} />
+        ))}
+        {familles.map((v) => (
+          <rect key={`${v.cle}c`} width={W} height={H} fill={`url(#${v.cle}c)`} />
+        ))}
       </svg>
     );
   }
