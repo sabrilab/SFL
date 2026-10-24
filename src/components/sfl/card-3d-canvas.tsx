@@ -201,6 +201,7 @@ const HOLO_FRAGMENT = /* glsl */ `
   uniform vec3 uTeinte;
   uniform float uIrise;
   uniform float uPassage;
+  uniform float uOpacite;
   ${ROUNDED_MASK_GLSL}
 
   void main() {
@@ -215,7 +216,8 @@ const HOLO_FRAGMENT = /* glsl */ `
     // La lumière qui passe : une bande en biais (105°, comme la carte plate).
     float d = (vUv.x - uPassage) + (vUv.y - 0.5) * 0.27;
     float lumiere = exp(-d * d * 260.0) * 0.5;
-    gl_FragColor = vec4(couleur * alpha + mix(vec3(1.0), rainbow, 0.35) * lumiere, 1.0);
+    // uOpacite à 0 (le verre, en prémultiplié) : la lumière s'ajoute sans boucher la carte.
+    gl_FragColor = vec4(couleur * alpha + mix(vec3(1.0), rainbow, 0.35) * lumiere, uOpacite);
   }
 `;
 
@@ -454,12 +456,15 @@ export function CardMesh({
         transparent,
         depthWrite: !transparent,
       });
+    // Le verre : le papier et le dos gardent leur transparence (on voit la
+    // page, et la tranche de l'autre côté, au travers) ; le reflet ne bouche rien.
+    const vitre = !!matiere?.transparente;
     return {
-      papier: surface(bgTex, false),
+      papier: surface(bgTex, vitre),
       portrait: surface(playerTex, true),
       texte: surface(statsTex, true),
       // Le dos de repli d'abord ; la photo du vrai dos le remplace dès qu'elle est décodée (useFrame).
-      dos: surface(dosRepli, false),
+      dos: surface(dosRepli, vitre),
       tranche: new THREE.ShaderMaterial({
         vertexShader: SURFACE_VERTEX,
         fragmentShader: TRANCHE_FRAGMENT,
@@ -481,14 +486,18 @@ export function CardMesh({
           uTeinte: { value: new THREE.Vector3(...(allure.teinte ?? [1, 1, 1])) },
           uIrise: { value: allure.teinte ? 0.3 : 1 },
           uPassage: { value: -9 },
+          uOpacite: { value: vitre ? 0 : 1 },
           ...masque(),
         },
         transparent: true,
+        // Le reflet s'ajoute ; sur le verre, sans toucher à l'alpha du canvas
+        // (en additif ordinaire, il le portait à 1 et la carte redevenait opaque).
+        premultipliedAlpha: vitre,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       }),
     };
-  }, [width, height, wallRadius, allure, bgTex, playerTex, statsTex, dosRepli]);
+  }, [width, height, wallRadius, allure, bgTex, playerTex, statsTex, dosRepli, matiere]);
   useEffect(() => () => Object.values(materiaux).forEach((m) => m.dispose()), [materiaux]);
   useEffect(() => () => wallGeo.dispose(), [wallGeo]);
   useEffect(() => () => dosRepli.dispose(), [dosRepli]);

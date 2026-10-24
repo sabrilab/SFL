@@ -32,6 +32,13 @@
 //     noire polie, ses bandes ondulées gravées comme un guilloché, l'encre
 //     d'argent, une tranche de métal noir et un reflet d'argent quand on la
 //     tourne ; palier 16 du Passe Bola ;
+//   · verre (offerte, la deuxième à la carte de Sabri, 24/10 : « transparente
+//     comme du verre, mais que tu gardes un peu les détails de motif […] et
+//     que tu trouves un truc stylé pour les chiffres ») : une plaque de verre
+//     fumé qui laisse voir ce qu'il y a derrière (la page, et en 3D la
+//     tranche de l'autre côté), le guilloché de l'onyx gravé dedans comme un
+//     dépoli, l'encre blanche ; la note et le numéro taillés en biseau,
+//     creux, leur arête accrochant la lumière (chiffres: "biseau") ;
 //   · les skins du Passe Bola (lib/sfl/passe.ts, 24/10), dans
 //     skins-passe.ts et motifs-passe.tsx : givre, carbone, marbre, tes
 //     couleurs (le pays choisi, HabillageCarte.pays), néon, aurore, ki et
@@ -71,7 +78,7 @@ import { MATIERE_ARBITRE, MATIERES_ARBITRE, type FinitionArbitre, type MotifArbi
 export type EditionCarte = "base" | "mvp" | "impact" | "def";
 
 /** Les finitions de la passe, ou offertes : elles habillent la carte de saison. */
-export type Finition = "nuit" | "chrome" | "animee" | "onyx" | FinitionPasse;
+export type Finition = "nuit" | "chrome" | "animee" | "onyx" | "verre" | FinitionPasse;
 
 /** Le traitement de la photo, sans IA. */
 export type Traitement = "argentique" | "gravure" | "marbre";
@@ -187,6 +194,13 @@ export interface Matiere {
   holo: { force: number; teinte: [number, number, number] | null };
   /** La lumière passe d'elle-même sur la carte (finition animée). */
   anime?: boolean;
+  /**
+   * Une matière qu'on voit au travers (le verre) : la face floute un peu ce
+   * qu'il y a derrière, la 3D garde la transparence du papier et du dos.
+   */
+  transparente?: boolean;
+  /** La note et le numéro taillés en biseau : creux, une arête de lumière, une ombre portée. */
+  chiffres?: "biseau";
   /** Une édition d'époque : ce qu'elle reprend de son temps. */
   epoque?: Epoque;
 }
@@ -454,6 +468,41 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
     vive: "#c8cbd2",
     tranche: { couleur: "#15161a", metal: 0.85, rugosite: 0.2 },
     holo: { force: 0.38, teinte: [0.86, 0.9, 1] },
+  },
+  // Verre : une plaque de verre fumé. Le teint laisse passer ce qu'il y a
+  // derrière (plus clair en haut, où la lumière entre), un reflet en deux
+  // bandes comme sur une vitre, le guilloché de l'onyx gravé en dépoli
+  // (clair) avec son ombre dans l'épaisseur, une tranche polie qui brille.
+  // Sans couleur : ni or, ni bleu, ni rouge.
+  verre: {
+    nom: "verre",
+    titre: "verre",
+    encre: "242,244,247",
+    sombre: true,
+    papier: [
+      "linear-gradient(118deg, rgba(255,255,255,0) 28%, rgba(255,255,255,0.13) 40%, rgba(255,255,255,0.02) 45%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0) 60%)",
+      "radial-gradient(130% 70% at 20% 0%, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 55%)",
+      "linear-gradient(165deg, rgba(40,44,50,0.2) 0%, rgba(16,18,21,0.34) 58%, rgba(8,9,11,0.46) 100%)",
+    ].join(", "),
+    motif: { type: "guilloche", clair: "rgba(255,255,255,0.17)", fonce: "rgba(0,0,0,0.2)" },
+    fond: "rgba(18,20,24,0.55)",
+    lueur: "rgba(255,255,255,0.1)",
+    rayures: 0.05,
+    micro: 0.08,
+    reflet: 0.12,
+    coins: 0.8,
+    etiquette: { fond: "rgba(255,255,255,0.08)", bord: "rgba(242,244,247,0.6)", texte: "rgba(242,244,247,0.95)" },
+    symbole: "/bola/symbole-blanc.svg",
+    rebord: { lumiere: "rgba(255,255,255,0.6)", ombre: "rgba(0,0,0,0.55)" },
+    puce: "linear-gradient(135deg, rgba(255,255,255,0.7), rgba(255,255,255,0.12) 45%, rgba(255,255,255,0.5) 70%, rgba(255,255,255,0.08))",
+    cadre: "linear-gradient(152deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.14) 38%, rgba(255,255,255,0.42) 64%, rgba(255,255,255,0.1) 100%)",
+    voile: "rgba(6,7,9,0.72)",
+    onglet: { fond: "rgba(8,9,11,0.7)", encre: "#f2f4f7" },
+    vive: "#e4e8ec",
+    tranche: { couleur: "#9aa2aa", metal: 0.9, rugosite: 0.06 },
+    holo: { force: 0.38, teinte: [0.9, 0.94, 1] },
+    transparente: true,
+    chiffres: "biseau",
   },
   // L'arbitre : le jaune fluo de sa chasuble (Sabri, 24/10 : « même sa carte
   // principale à lui soit soit jaune, soit orange fluo »), dessiné dans
