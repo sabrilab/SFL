@@ -7,7 +7,10 @@
 // /api/photo-studio, /api/agent, /api/ville-devinee et /api/geocode pour ce
 // qui part chez un prestataire, lib/sfl/activity.ts pour le journal d'usage,
 // lib/server/push-envoi.ts pour le suivi des notifications (23/10),
-// lib/sfl/parrainage.ts pour le parrainage et les joueurs invités (24/10).
+// lib/sfl/parrainage.ts pour le parrainage et les joueurs invités (24/10),
+// /api/equipes/couverture pour la couverture des équipes de Bola Team (24/10
+// au soir ; son accord passe par le Règlement Team version 2, que chaque
+// joueur signe : la version de la politique n'a pas bougé).
 // Quand l'un de ces endroits change ce qu'il garde ou à qui il l'envoie, ce
 // texte change avec lui ; si le changement touche à ce que les joueurs ont
 // accepté, VERSION_POLITIQUE aussi (lib/sfl/confidentialite.ts).
@@ -159,6 +162,14 @@ export function TextePolitique() {
               <>
                 Les joueurs peuvent partager des visuels de la ligue hors de l&apos;app (une feuille de match en story,
                 par exemple) : ta carte peut y figurer.
+              </>,
+              <>
+                En Bola Team, le capitaine (ou son vice) peut créer la couverture de la page de l&apos;équipe avec le
+                même studio : la photo de carte des joueurs qui ont signé le Règlement Team version 2 part chez
+                fal.ai avec le maillot et l&apos;écusson de l&apos;équipe. L&apos;image obtenue est rangée comme ta
+                photo, dans un espace public, et se voit sur la page de l&apos;équipe. Chaque couverture créée est
+                notée (l&apos;équipe, la date), pour s&apos;en tenir à 2 par jour. Si un joueur quitte l&apos;équipe,
+                la couverture est retirée.
               </>,
               <>
                 Chaque photo faite est notée (le filtre, la date), pour s&apos;en tenir à 3 par jour ; avec le filtre

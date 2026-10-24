@@ -5,7 +5,9 @@
 // mis en avant »).
 //
 // Ordre de lecture, du plus fort au plus fin :
-//   1. lui : sa carte en grand, son nom dans le lettrage de la Map, ses
+//   1. lui : sa carte en grand, son nom dans le lettrage de la Map, son
+//      équipe de Bola Team qui mène à la page de l'équipe
+//      (equipe/equipe-du-joueur.tsx, depuis le 24/10), ses
 //      abonnés comme sur Instagram (ses abonnés et ses abonnements, « Suivi
 //      par Kader, Anis et 3 autres que tu connais » : suivre.tsx), le bouton
 //      pour le suivre, et trois chiffres de tête en Anton (son rang au Pépite
@@ -33,6 +35,7 @@ import { motion } from "motion/react";
 import { Card3D } from "@/components/sfl/card-3d";
 import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur";
 import { ComparerCartes } from "@/components/sfl/comparer-cartes";
+import { EquipeDuJoueur } from "@/components/sfl/equipe/equipe-du-joueur";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -161,6 +164,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
             {xp && ` · niveau XP ${xp.niveau}`}
             {rangXp && ` · rang ${rangXp.rang}`}
           </p>
+          <EquipeDuJoueur nom={player.name} className="mt-[var(--fib-8)]" />
           <ReseauJoueur nom={player.name} className="mt-[var(--fib-8)]" />
           <BoutonSuivre nom={player.name} className="mt-[var(--fib-8)]" />
         </div>

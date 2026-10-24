@@ -10,6 +10,11 @@
 // une feuille à remplir (contre FC Belleville, la veille) et une à
 // confirmer (le Racing Wazemmes a déjà saisi). Les résultats sont tirés
 // d'une graine fixe : la même démonstration à chaque ouverture.
+//
+// Le monde de démonstration se demande une fois par appareil (?apercu=1 sur
+// la page Team, ?apercu=0 pour revenir à la base) : la page Team, la page de
+// chaque équipe (/bola-team/[id]), le profil des joueurs et Ma carte le
+// montrent alors tous ensemble (demoToutesEquipes, hooks/use-equipes.ts).
 
 import { blasonParDefaut, PALETTE, type Blason, type Embleme, type Forme, type Motif } from "@/lib/sfl/blason";
 import type { ButeurTeam, MatchTeam } from "@/lib/sfl/championnat-team";
@@ -17,6 +22,38 @@ import { initialesDe, type Defi, type Equipe, type EquipeTeam } from "@/lib/sfl/
 import { aujourdhuiIso } from "@/lib/sfl/matchs";
 
 export const DEMO_EQUIPES = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
+
+const CLE_APERCU = "bola-apercu-team";
+const EVT_APERCU = "bola-apercu-team";
+
+/** Le monde de démonstration est-il demandé sur cet appareil ? Jamais en production. */
+export function apercuDemande(): boolean {
+  if (!DEMO_EQUIPES || typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(CLE_APERCU) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** ?apercu=1 le demande, ?apercu=0 revient à la base. */
+export function demanderApercu(oui: boolean): void {
+  if (!DEMO_EQUIPES) return;
+  try {
+    if (oui) window.localStorage.setItem(CLE_APERCU, "1");
+    else window.localStorage.removeItem(CLE_APERCU);
+  } catch {}
+  window.dispatchEvent(new Event(EVT_APERCU));
+}
+
+export function ecouterApercu(f: () => void): () => void {
+  window.addEventListener(EVT_APERCU, f);
+  window.addEventListener("storage", f);
+  return () => {
+    window.removeEventListener(EVT_APERCU, f);
+    window.removeEventListener("storage", f);
+  };
+}
 
 const couleur = (id: string) => PALETTE.find((c) => c.id === id)?.hex ?? PALETTE[0].hex;
 const b = (forme: Forme, motif: Motif, c1: string, c2: string, c3: string, embleme: Embleme): Blason => ({
@@ -83,6 +120,7 @@ export function demoEquipes(noms: string[], moi: string): { equipes: Equipe[]; d
     capitaine: `demo-${joueurs[0]}`,
     membres: joueurs.map((n, i) => m(n, i === 0 ? "capitaine" : i === 1 ? "vice" : "membre")),
     blason: ECUSSONS[id] ?? blasonParDefaut(fond),
+    couvertureLe: null,
   });
 
   const mienne = equipe(1, "Sunday Five", "SF", "noir", "Lille", [moi, ...pris(0, 4)]);
@@ -128,7 +166,10 @@ const LIEUX = ["Five Lille Sud", "Soccer Roubaix", "Five Villeneuve", "Urban Lom
  * numéros, mêmes écussons) et 27 autres, leurs matchs de la saison 1 et
  * leurs buteurs. AS Fives, en formation, n'y joue pas.
  */
-export function demoChampionnat(noms: string[], moi: string): { equipes: EquipeTeam[]; matchs: MatchTeam[]; maintenant: Date } {
+export function demoChampionnat(
+  noms: string[],
+  moi: string
+): { equipes: EquipeTeam[]; matchs: MatchTeam[]; maintenant: Date; effectifs: Map<number, string[]> } {
   const page = demoEquipes(noms, moi).equipes;
   const autres = noms.filter((n) => n !== moi);
   const hasard = graine(2410);
@@ -289,7 +330,41 @@ export function demoChampionnat(noms: string[], moi: string): { equipes: EquipeT
     saisies: [{ equipe: 3, pour: 3, contre: 5, le: "2026-12-15T09:00:00Z" }],
     buteurs: [{ equipe: 3, joueur: `demo-${effectifs.get(3)?.[0] ?? "?"}`, name: effectifs.get(3)?.[0] ?? "?", buts: 2, passes: 0 }],
   });
-  return { equipes, matchs, maintenant: MAINTENANT_DEMO };
+  return { equipes, matchs, maintenant: MAINTENANT_DEMO, effectifs };
+}
+
+/**
+ * Toutes les équipes de la démonstration, avec leurs joueurs : celles de la
+ * page Team, puis celles du seul championnat (leurs un ou deux joueurs
+ * connus, le premier capitaine). La page d'une équipe et le profil des
+ * joueurs s'en servent.
+ */
+export function demoToutesEquipes(noms: string[], moi: string): Equipe[] {
+  const page = demoEquipes(noms, moi).equipes;
+  const c = demoChampionnat(noms, moi);
+  const autres = c.equipes
+    .filter((e) => !page.some((p) => p.id === e.id))
+    .map((e): Equipe => {
+      const joueurs = c.effectifs.get(e.id) ?? [];
+      return {
+        id: e.id,
+        nom: e.nom,
+        initiales: e.initiales,
+        fond: e.fond,
+        ville: e.ville,
+        capitaine: joueurs[0] ? `demo-${joueurs[0]}` : null,
+        membres: joueurs.map((name, i) => ({
+          id: `demo-${name}`,
+          name,
+          statut: "membre",
+          role: i === 0 ? "capitaine" : i === 1 ? "vice" : "membre",
+          reglement: "v2",
+        })),
+        blason: e.blason,
+        couvertureLe: null,
+      };
+    });
+  return [...page, ...autres];
 }
 
 /** Une invitation à l'ouverture, pour la voir en développement (invitation-carte.tsx, ?invitation=equipe) : FC Belleville m'invite. */

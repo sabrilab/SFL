@@ -27,7 +27,7 @@
 // Tout vit en base (supabase/schema.sql, « Mode Team ») ; chaque écriture
 // passe par une fonction de la base qui en vérifie les règles.
 
-import { supabase } from "@/lib/supabase";
+import { SUPABASE_URL, supabase } from "@/lib/supabase";
 import { finInvitation } from "@/lib/sfl/equipes-temps";
 import { lireBlason, type Blason } from "@/lib/sfl/blason";
 import type { ButeurTeam, EquipeChampionnat, MatchTeam, SaisieTeam } from "@/lib/sfl/championnat-team";
@@ -65,6 +65,8 @@ export interface Equipe {
   membres: Membre[];
   /** L'écusson dessiné ; null : le noir et blanc des débuts, d'après fond. */
   blason: Blason | null;
+  /** Quand la couverture de sa page a été posée (sa version) ; null : la couverture dessinée. */
+  couvertureLe: string | null;
 }
 
 export interface Defi {
@@ -174,6 +176,7 @@ interface LigneEquipe {
   ville: string | null;
   capitaine: string | null;
   blason?: unknown;
+  couverture_le?: string | null;
   equipe_membres: {
     joueur: string;
     statut: Membre["statut"];
@@ -189,10 +192,10 @@ interface LigneEquipe {
 
 const MEMBRES =
   "joueur, statut, role, created_at, invite_par, signe_le, depart_le, reglement_version, p:profiles!equipe_membres_joueur_fkey(name)";
-/** Ce qu'on lit d'une équipe (l'écusson dessiné compris). */
-const EQUIPE = `id, nom, initiales, fond, ville, capitaine, blason, equipe_membres(${MEMBRES})`;
-/** Une préversion lit la base de la prod avant sa migration : pas encore de colonne blason (42703), on relit sans elle. */
-const SANS_BLASON = EQUIPE.replace(" blason,", "");
+/** Ce qu'on lit d'une équipe (l'écusson dessiné et la couverture compris). */
+const EQUIPE = `id, nom, initiales, fond, ville, capitaine, blason, couverture_le, equipe_membres(${MEMBRES})`;
+/** Une préversion lit la base de la prod avant sa migration : pas encore de colonnes blason ni couverture_le (42703), on relit sans elles. */
+const SANS_BLASON = EQUIPE.replace(" blason, couverture_le,", "");
 const sansColonne = (e: { code?: string } | null) => e?.code === "42703";
 
 const versEquipe = (r: LigneEquipe): Equipe => ({
@@ -203,6 +206,7 @@ const versEquipe = (r: LigneEquipe): Equipe => ({
   ville: r.ville,
   capitaine: r.capitaine,
   blason: lireBlason(r.blason),
+  couvertureLe: r.couverture_le ?? null,
   membres: r.equipe_membres.map((m) => ({
     id: m.joueur,
     name: un(m.p)?.name ?? "?",
@@ -382,6 +386,56 @@ export const dessinerBlason = (e: number, b: Blason) => rpc("equipe_blason", { e
 /** Un membre signe la version en cours (le Règlement et la Charte). */
 export const signerCharte = (e: number) => rpc("equipe_signer_charte", { e });
 
+/** Le bucket public des couvertures : une image par équipe, « <id>.jpg ». */
+const COUVERTURES = "couvertures";
+
+/** L'adresse de la couverture d'une équipe, versionnée par sa date de pose ; null sans couverture. */
+export function urlCouverture(e: Pick<Equipe, "id" | "couvertureLe">): string | null {
+  if (!e.couvertureLe) return null;
+  return `${SUPABASE_URL}/storage/v1/object/public/${COUVERTURES}/${e.id}.jpg?v=${Date.parse(e.couvertureLe) || 0}`;
+}
+
+/** Ce que rend la création d'une couverture : l'image, ou pourquoi pas ; et le crédit du jour de l'équipe. */
+export interface Couverture {
+  image?: string;
+  error?: string;
+  restantes?: number;
+  /** Quand le crédit repart (ISO). */
+  fin?: string;
+}
+
+/**
+ * Créer la couverture de la page de l'équipe (/api/equipes/couverture) :
+ * les photos de carte de ses joueurs, son maillot et son écusson (deux PNG
+ * en data URL). Le capitaine (ou le vice) la voit avant de la poser.
+ */
+export async function creerCouverture(e: number, maillot: string, ecusson: string): Promise<Couverture> {
+  const { data } = await supabase().auth.getSession();
+  const jeton = data.session?.access_token;
+  if (!jeton) return { error: "Session requise." };
+  try {
+    const r = await fetch("/api/equipes/couverture", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken: jeton, equipe: e, maillot, ecusson }),
+    });
+    return ((await r.json().catch(() => null)) as Couverture | null) ?? { error: "Couverture indisponible pour l'instant." };
+  } catch {
+    return { error: "Pas de réseau. Réessaie dans un instant." };
+  }
+}
+
+/** Poser la couverture créée : l'image dans le bucket, puis sa date sur l'équipe (capitaine et vice). */
+export async function poserCouverture(e: number, image: string): Promise<void> {
+  const fichier = await (await fetch(image)).blob();
+  const { error } = await supabase().storage.from(COUVERTURES).upload(`${e}.jpg`, fichier, { upsert: true, contentType: "image/jpeg" });
+  if (error) throw error;
+  await rpc("equipe_couverture", { e, posee: true });
+}
+
+/** Revenir à la couverture dessinée. */
+export const retirerCouverture = (e: number) => rpc("equipe_couverture", { e, posee: false });
+
 /**
  * La feuille d'un match : le score vu de mon équipe, ses buteurs et ses
  * passeurs ; puis l'autre capitaine est prévenu qu'il confirme.
@@ -511,7 +565,10 @@ export function urlDuLien(j: string): string {
 /**
  * « L'essentiel en 8 points » du Règlement Team (docs/gameplay/11), au-dessus
  * de la case à cocher. Version 2 (24/10) : la victoire passe à 2 points,
- * la saison à 4 mois, avec ses montées et ses descentes.
+ * la saison à 4 mois, avec ses montées et ses descentes ; et un neuvième
+ * point, la couverture de la page de l'équipe faite avec les photos de
+ * carte (Sabri, 24/10 : « une couverture faite justement en IA, avec les
+ * joueurs présents de cette équipe ») : signer, c'est l'accepter.
  */
 export const REGLEMENT = [
   "Vous ne jouez qu'avec les membres de votre équipe. Aucun joueur extérieur, même en match amical.",
@@ -522,6 +579,7 @@ export const REGLEMENT = [
   "Si 6 joueurs ou plus signalent un match, il est annulé avec ses statistiques.",
   "Au-delà de 2 rencontres contre la même équipe dans la saison, le match est amical : ni points ni stats comptabilisés.",
   "Si vous quittez l'équipe, vous ne pourrez plus jamais y revenir.",
+  "La photo de votre carte peut figurer sur la couverture de la page de l'équipe, que le capitaine ou son vice crée avec le studio de Bola. Si un joueur quitte l'équipe, la couverture est retirée.",
 ];
 
 /**
@@ -543,7 +601,7 @@ export const CHARTE = [
 
 /** La case à cocher (Formule d'acceptation, docs/gameplay/11). */
 export const ACCEPTATION =
-  "J'ai lu et j'accepte le Règlement Team et la Charte de déontologie (version 2). Je m'engage à ne jouer qu'avec les membres de mon équipe, matchs amicaux compris, à faire mon check-in à chaque match où je suis inscrit, à saisir et à voter honnêtement, et à respecter mes adversaires, mes coéquipiers et le terrain. Je sais que si je quitte cette équipe, je ne pourrai plus jamais la réintégrer.";
+  "J'ai lu et j'accepte le Règlement Team et la Charte de déontologie (version 2). Je m'engage à ne jouer qu'avec les membres de mon équipe, matchs amicaux compris, à faire mon check-in à chaque match où je suis inscrit, à saisir et à voter honnêtement, et à respecter mes adversaires, mes coéquipiers et le terrain. J'accepte que la photo de ma carte figure sur la couverture de l'équipe. Je sais que si je quitte cette équipe, je ne pourrai plus jamais la réintégrer.";
 
 /** « Règlement Team v2 signé le 04/02/2027 à 21:17 (heure de Paris). Bienvenue chez … ! » */
 export function confirmationSignature(nom: string): string {

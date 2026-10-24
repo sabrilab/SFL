@@ -6,8 +6,9 @@
 // plus envie, qu'on comprenne mieux les choses et que ce soit mieux rangé »,
 // comme le profil d'un joueur ouvert depuis la Recherche (profil-joueur.tsx),
 // dont elle reprend l'ordre de lecture, du plus fort au plus fin :
-//   1. moi : ma carte en grand, mon nom dans le lettrage de la Map, mes
-//      abonnés comme sur Instagram (mes abonnés et mes abonnements, « Kader,
+//   1. moi : ma carte en grand, mon nom dans le lettrage de la Map, mon
+//      équipe de Bola Team qui mène à sa page (equipe/equipe-du-joueur.tsx,
+//      24/10), mes abonnés comme sur Instagram (mes abonnés et mes abonnements, « Kader,
 //      Anis et 32 autres te suivent » : suivre.tsx ; Sabri, 23/10), trois
 //      chiffres de tête en Anton (mon rang au Pépite d'Or, ma note, mes
 //      dimanches), puis la phrase qui me résume (fiche-joueur.ts, la même que
@@ -48,6 +49,7 @@ import { MaSaison, type RangDuJour } from "@/components/sfl/ma-saison";
 import { NiveauXp } from "@/components/sfl/niveau-xp";
 import { Chiffre } from "@/components/sfl/profil-joueur";
 import { ReseauJoueur } from "@/components/sfl/suivre";
+import { EquipeDuJoueur } from "@/components/sfl/equipe/equipe-du-joueur";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { VitrineBadges } from "@/components/sfl/vitrine";
 import { ChoixBadge } from "@/components/sfl/choix-badge";
@@ -195,6 +197,7 @@ export default function Profil() {
                 {rangXp && ` · rang ${rangXp.rang}`}
               </span>
             </button>
+            <EquipeDuJoueur nom={player.name} />
             <ReseauJoueur nom={player.name} />
           </div>
           <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">

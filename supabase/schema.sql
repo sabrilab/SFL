@@ -3377,7 +3377,7 @@ begin
   if b is null or jsonb_typeof(b) <> 'object'
      or coalesce(b ->> 'forme', '') <> all (array['ecu', 'blason', 'rond', 'pointe', 'ovale'])
      or coalesce(b ->> 'motif', '') <> all (array['uni', 'parti', 'coupe', 'tranche', 'rayures', 'bande', 'echarpe', 'chevron', 'cercle'])
-     or coalesce(b ->> 'embleme', '') <> all (array['initiales', 'etoile', 'ballon', 'couronne', 'eclair'])
+     or coalesce(b ->> 'embleme', '') <> all (array['initiales', 'etoile', 'ballon', 'couronne', 'eclair', 'cheval', 'lion', 'aigle', 'loup', 'taureau', 'coq'])
      or coalesce(jsonb_typeof(b -> 'couleurs'), '') <> 'array'
      or jsonb_array_length(b -> 'couleurs') <> 3
      or exists (select 1 from jsonb_array_elements(b -> 'couleurs') c
@@ -3602,10 +3602,165 @@ create trigger equipe_resultats_push_effet
   after insert or update of pour, contre on public.equipe_resultats
   for each row execute function public.push_effet_resultat();
 
+-- La couverture de la page d'une équipe (Sabri, 24/10 : « un profil
+-- d'équipe qui peut accueillir une couverture faite justement en IA aussi,
+-- avec les joueurs présents de cette équipe, leur maillot et leur blason »).
+-- Le capitaine (ou le vice) la crée (/api/equipes/couverture : les photos
+-- de carte, le maillot et l'écusson partent chez fal.ai, comme au studio),
+-- la voit, puis la pose : l'image dans le bucket public « couvertures »
+-- (<id de l'équipe>.jpg), sa date dans couverture_le, qui en est la
+-- version. Sans date, l'app dessine la couverture aux couleurs du maillot.
+-- Le crédit fal est celui de Sabri : 2 créations par équipe et par jour
+-- (heure de Paris), notées avant l'appel dans equipe_couvertures. Sur
+-- l'image, seuls les joueurs qui ont signé le Règlement Team version 2, dont
+-- le neuvième point le prévoit ; et un joueur qui quitte l'équipe (départ,
+-- exclusion) emporte la couverture : sa date retombe.
+alter table public.equipes add column if not exists couverture_le timestamptz;
+
+create table if not exists public.equipe_couvertures (
+  id          bigint generated always as identity primary key,
+  equipe_id   bigint not null references public.equipes(id) on delete cascade,
+  user_id     uuid   not null default auth.uid() references auth.users(id) on delete cascade,
+  created_at  timestamptz not null default now()
+);
+create index if not exists equipe_couvertures_equipe_date on public.equipe_couvertures (equipe_id, created_at desc);
+alter table public.equipe_couvertures enable row level security;
+revoke all on public.equipe_couvertures from anon, authenticated;
+grant select, insert on public.equipe_couvertures to authenticated;
+
+drop policy if exists "equipe_couvertures: les dirigeants lisent" on public.equipe_couvertures;
+create policy "equipe_couvertures: les dirigeants lisent" on public.equipe_couvertures for select to authenticated
+  using (coalesce(public.role_equipe(equipe_id), 'membre') <> 'membre' or (select public.is_league_admin()));
+drop policy if exists "equipe_couvertures: les dirigeants notent" on public.equipe_couvertures;
+create policy "equipe_couvertures: les dirigeants notent" on public.equipe_couvertures for insert to authenticated
+  with check (user_id = (select auth.uid()) and coalesce(public.role_equipe(equipe_id), 'membre') <> 'membre');
+
+create or replace function public.equipe_couverture_credit()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  faites int;
+begin
+  -- Jusqu'à la fin de la transaction : la demande suivante pour la même
+  -- équipe attend celle-ci, puis la compte.
+  perform pg_advisory_xact_lock(hashtextextended('credit:couverture:' || new.equipe_id::text, 0));
+  select count(*) into faites from public.equipe_couvertures
+   where equipe_id = new.equipe_id
+     and created_at >= (date_trunc('day', now() at time zone 'Europe/Paris') at time zone 'Europe/Paris');
+  if faites >= 2 then
+    raise exception 'Crédit du jour épuisé.' using errcode = 'P0001', hint = 'credit-du-jour';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.equipe_couverture_credit() from public, anon, authenticated;
+drop trigger if exists equipe_couvertures_credit on public.equipe_couvertures;
+create trigger equipe_couvertures_credit before insert on public.equipe_couvertures
+  for each row execute function public.equipe_couverture_credit();
+
+-- Poser (posee) ou retirer la couverture : capitaine et vice.
+create or replace function public.equipe_couverture(e bigint, posee boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if coalesce(public.role_equipe(e), 'membre') = 'membre' then
+    raise exception 'Réservé au capitaine.' using errcode = '42501';
+  end if;
+  update public.equipes x
+     set couverture_le = case when posee then now() end
+   where x.id = e and x.dissoute_le is null;
+end;
+$$;
+
+create or replace function public.equipe_couverture_depart()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if old.statut = 'membre' and (tg_op = 'DELETE' or new.statut is distinct from 'membre') then
+    update public.equipes x set couverture_le = null
+     where x.id = old.equipe_id and x.couverture_le is not null;
+  end if;
+  return null;
+end;
+$$;
+revoke execute on function public.equipe_couverture_depart() from public, anon, authenticated;
+drop trigger if exists equipe_membres_couverture on public.equipe_membres;
+create trigger equipe_membres_couverture
+  after update of statut or delete on public.equipe_membres
+  for each row execute function public.equipe_couverture_depart();
+
+-- L'équipe que nomme un fichier du bucket (« 12.jpg ») ; null sinon.
+create or replace function public.couverture_cle_equipe(cle text)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when cle ~ '^[0-9]{1,18}\.jpg$' then split_part(cle, '.', 1)::bigint end;
+$$;
+revoke execute on function public.couverture_cle_equipe(text) from public, anon;
+grant execute on function public.couverture_cle_equipe(text) to authenticated;
+
+do $$
+begin
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('couvertures', 'couvertures', true, 3145728, array['image/jpeg'])
+  on conflict (id) do update
+    set public = true,
+        file_size_limit = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types;
+exception
+  when others then raise warning 'couvertures : bucket non créé (%)', sqlerrm;
+end;
+$$;
+
+do $$
+begin
+  drop policy if exists "couvertures: lecture ligue" on storage.objects;
+  create policy "couvertures: lecture ligue"
+    on storage.objects for select
+    to authenticated
+    using (bucket_id = 'couvertures' and (select public.est_membre()));
+
+  drop policy if exists "couvertures: les dirigeants posent" on storage.objects;
+  create policy "couvertures: les dirigeants posent"
+    on storage.objects for insert
+    to authenticated
+    with check (
+      bucket_id = 'couvertures'
+      and coalesce(public.role_equipe(public.couverture_cle_equipe(name)), 'membre') <> 'membre'
+    );
+
+  drop policy if exists "couvertures: les dirigeants remplacent" on storage.objects;
+  create policy "couvertures: les dirigeants remplacent"
+    on storage.objects for update
+    to authenticated
+    using (
+      bucket_id = 'couvertures'
+      and coalesce(public.role_equipe(public.couverture_cle_equipe(name)), 'membre') <> 'membre'
+    )
+    with check (
+      bucket_id = 'couvertures'
+      and coalesce(public.role_equipe(public.couverture_cle_equipe(name)), 'membre') <> 'membre'
+    );
+exception
+  when others then raise warning 'couvertures : règles Storage non posées (%)', sqlerrm;
+end;
+$$;
+
 revoke execute on function public.equipe_blason(bigint, jsonb), public.equipe_signer_charte(bigint),
-  public.equipe_resultat(bigint, int, int, jsonb) from public, anon;
+  public.equipe_resultat(bigint, int, int, jsonb), public.equipe_couverture(bigint, boolean) from public, anon;
 grant execute on function public.equipe_blason(bigint, jsonb), public.equipe_signer_charte(bigint),
-  public.equipe_resultat(bigint, int, int, jsonb) to authenticated;
+  public.equipe_resultat(bigint, int, int, jsonb), public.equipe_couverture(bigint, boolean) to authenticated;
 
 do $$
 begin

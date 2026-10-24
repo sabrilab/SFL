@@ -19,9 +19,11 @@
 //     meilleur passeur (« en tête » tant que la saison court) ;
 //   · les derniers résultats, un amical marqué comme tel.
 // Sur tablette et ordinateur, deux colonnes au nombre d'or : le tableau à
-// gauche, le reste à droite.
+// gauche, le reste à droite. Toucher une équipe du tableau ouvre sa page
+// (/bola-team/[id], depuis le 24/10 au soir).
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { ArrowDown, ArrowUp, Trophy } from "lucide-react";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Ecusson, EcussonVide } from "@/components/sfl/equipe/ecusson";
@@ -59,7 +61,7 @@ function Pilules<T extends string | number>({ choix, actif, onChange, label }: {
   );
 }
 
-function Tableau({ d, equipes, mienne }: { d: Division; equipes: Map<number, EquipeTeam>; mienne: number | null }) {
+function Tableau({ d, equipes, mienne, pages }: { d: Division; equipes: Map<number, EquipeTeam>; mienne: number | null; pages: boolean }) {
   const joue = d.lignes.some((l) => l.j > 0);
   const col = "w-6 text-center tabular-nums";
   return (
@@ -98,8 +100,17 @@ function Tableau({ d, equipes, mienne }: { d: Division; equipes: Map<number, Equ
                 className={cn("h-7 w-[3px] rounded-full", z === "monte" ? "bg-[#16924A]" : z === "descend" ? "bg-[#D3212C]" : "bg-transparent")}
               />
               {joue && l.j > 0 ? <RangMetal rang={podium ?? l.rang} /> : <span className="w-[26px] text-center text-foreground/30">–</span>}
-              <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={26} />
-              <span className={cn("min-w-0 flex-1 truncate text-[14.5px] font-semibold", e.dissoute && "text-muted-foreground line-through")}>{e.nom}</span>
+              {pages && !e.dissoute ? (
+                <Link href={`/bola-team/${e.id}`} className="flex min-w-0 flex-1 items-center gap-2 active:opacity-60">
+                  <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={26} />
+                  <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">{e.nom}</span>
+                </Link>
+              ) : (
+                <>
+                  <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={26} />
+                  <span className={cn("min-w-0 flex-1 truncate text-[14.5px] font-semibold", e.dissoute && "text-muted-foreground line-through")}>{e.nom}</span>
+                </>
+              )}
               <span className={cn(col, "text-[14px] text-foreground/70")}>{l.j}</span>
               <span className={cn(col, "hidden text-[14px] text-foreground/70 sm:block")}>{l.g}</span>
               <span className={cn(col, "hidden text-[14px] text-foreground/70 sm:block")}>{l.n}</span>
@@ -194,11 +205,14 @@ export function ChampionnatTeam({
   matchs,
   mienne,
   maintenant,
+  pages = true,
 }: {
   equipes: EquipeTeam[];
   matchs: MatchTeam[];
   mienne: number | null;
   maintenant?: Date;
+  /** Les équipes mènent à leur page (pas quand la démonstration s'affiche sur la vraie base). */
+  pages?: boolean;
 }) {
   const c = useMemo(() => {
     const now = maintenant ?? new Date();
@@ -239,7 +253,7 @@ export function ChampionnatTeam({
           />
         )}
         {d && d.lignes.length > 0 ? (
-          <Tableau d={d} equipes={parId} mienne={mienne} />
+          <Tableau d={d} equipes={parId} mienne={mienne} pages={pages} />
         ) : (
           <div className="flex flex-col items-center gap-3 rounded-[22px] bg-card px-5 py-8 text-center">
             <EcussonVide taille={56} className="text-foreground/25" />

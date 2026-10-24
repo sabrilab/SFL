@@ -11,9 +11,11 @@
 //   · trois couleurs, prises dans une palette de couleurs de club : la
 //     principale (le fond), la secondaire (le motif), la troisième (le
 //     liseré et l'emblème) ;
-//   · un emblème au cœur : les initiales, une étoile, un ballon, une
-//     couronne ou un éclair (avec les initiales dessous quand il y a la
-//     place).
+//   · un emblème au cœur : les initiales, une figure (étoile, ballon,
+//     couronne, éclair) ou, depuis le 24/10 au soir, un animal de club
+//     (cheval, lion, aigle, loup, taureau, coq ; Sabri : « il peut y avoir
+//     aussi des emblèmes, comme des animaux, un cheval »), les initiales
+//     sur un ruban dessous quand il y a la place (equipe/emblemes.ts).
 // Le maillot (equipe/maillot.tsx) reprend tout : le corps dans la
 // principale, le même motif dans la secondaire, col et manches dans la
 // troisième, l'écusson sur le cœur. Jamais d'image importée (règles
@@ -27,7 +29,7 @@ import type { Fond } from "@/lib/sfl/equipes";
 
 export type Forme = "ecu" | "blason" | "rond" | "pointe" | "ovale";
 export type Motif = "uni" | "parti" | "coupe" | "tranche" | "rayures" | "bande" | "echarpe" | "chevron" | "cercle";
-export type Embleme = "initiales" | "etoile" | "ballon" | "couronne" | "eclair";
+export type Embleme = "initiales" | "etoile" | "ballon" | "couronne" | "eclair" | "cheval" | "lion" | "aigle" | "loup" | "taureau" | "coq";
 
 export interface Blason {
   forme: Forme;
@@ -63,6 +65,12 @@ export const EMBLEMES: { id: Embleme; label: string }[] = [
   { id: "ballon", label: "Ballon" },
   { id: "couronne", label: "Couronne" },
   { id: "eclair", label: "Éclair" },
+  { id: "cheval", label: "Cheval" },
+  { id: "lion", label: "Lion" },
+  { id: "aigle", label: "Aigle" },
+  { id: "loup", label: "Loup" },
+  { id: "taureau", label: "Taureau" },
+  { id: "coq", label: "Coq" },
 ];
 
 /** Les couleurs de club : celles qu'on trouve sur les maillots, rien de fluo. */
@@ -119,6 +127,35 @@ export function luminance(hex: string): number {
 export function contraste(a: string, b: string): number {
   const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m);
   return (x + 0.05) / (y + 0.05);
+}
+
+/** Le mélange de deux couleurs « #RRGGBB » (t = 0 : a ; t = 1 : b). */
+export function melange(a: string, b: string, t: number): string {
+  const v = (h: string, i: number) => parseInt(h.slice(i, i + 2), 16);
+  return (
+    "#" +
+    [1, 3, 5]
+      .map((i) => Math.round(v(a, i) + (v(b, i) - v(a, i)) * t))
+      .map((x) => x.toString(16).padStart(2, "0"))
+      .join("")
+      .toUpperCase()
+  );
+}
+
+/**
+ * Le métal d'une couleur, pour le cerclage et l'emblème en relief : un
+ * reflet, un clair, la couleur, une ombre. L'or donne de l'or, l'argent et
+ * le blanc de l'argent, le noir un chrome noir, les autres un métal anodisé.
+ */
+export function metal(hex: string) {
+  const l = luminance(hex);
+  const fonce = l < 0.08;
+  return {
+    reflet: melange(hex, "#FFFFFF", fonce ? 0.62 : 0.78),
+    clair: melange(hex, "#FFFFFF", fonce ? 0.3 : 0.42),
+    base: fonce ? melange(hex, "#FFFFFF", 0.08) : hex,
+    sombre: melange(hex, "#000000", l > 0.5 ? 0.42 : 0.5),
+  };
 }
 
 /** L'encre qui se lit sur une couleur : le blanc cassé ou le noir de l'app. */

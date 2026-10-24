@@ -5,7 +5,8 @@
 // signer ») : ce qu'on signe pour entrer dans une équipe, ou pour en créer
 // une. Ce sont les seuls textes de règles du mode Team. L'écran de
 // signature suit la « Formule d'acceptation » : le titre avec la version,
-// l'essentiel en 8 points, la Charte, une case décochée par défaut, et un
+// l'essentiel en 8 points (et, en version 2, la couverture de l'équipe),
+// la Charte, une case décochée par défaut, et un
 // bouton inactif tant qu'elle ne l'est pas. Au-dessus (passe du 23/10) : qui
 // m'invite, jusqu'à quand, et les cartes de ceux qui ont déjà signé — on
 // sait où l'on entre avant de signer.

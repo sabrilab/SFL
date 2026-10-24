@@ -62,14 +62,18 @@
 //     (?invitation=id&reponse=oui|non) : Non refuse, Oui ouvre la signature ;
 //   · sans accès à Bola Team (hooks/use-acces-team.ts), la vitrine du mode
 //     à la place de « Créer mon équipe » (equipe/vitrine-team.tsx).
+// Depuis le 24/10 au soir, chaque équipe a sa page (bola-team/[id]/page.tsx :
+// sa couverture, son effectif, son maillot, sa saison) : toucher le nom de
+// mon équipe, une autre équipe ou une ligne du championnat l'ouvre.
 // En aperçu seulement (jamais en production) : ?apercu=1 montre le monde de
-// démonstration même connecté, ?vitrine=1 la vitrine ; et le championnat de
-// démonstration (lib/sfl/equipes-demo.ts) tant que la vraie saison n'a aucun
-// match validé.
+// démonstration même connecté, gardé sur l'appareil (la page des équipes, le
+// profil des joueurs et Ma carte le montrent aussi) jusqu'à ?apercu=0 ;
+// ?vitrine=1 la vitrine ; et le championnat de démonstration
+// (lib/sfl/equipes-demo.ts) tant que la vraie saison n'a aucun match validé.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { MessageCircle, Pencil, UserPlus, X } from "lucide-react";
+import { ChevronRight, MessageCircle, Pencil, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -90,6 +94,7 @@ import { TerrainPlaces, type Occupant } from "@/components/sfl/matchs/terrain-pl
 import { ChoisirJoueur } from "@/components/sfl/matchs/choisir-joueur";
 import { useSession } from "@/hooks/use-session";
 import { useAccesTeam } from "@/hooks/use-acces-team";
+import { useApercuTeam } from "@/hooks/use-equipes";
 import { signalerEquipe, useMonEquipe } from "@/hooks/use-mon-equipe";
 import { championnat, coupDEnvoiTeam, etatMatch, saisonEnCours, type EtatMatch, type MatchTeam } from "@/lib/sfl/championnat-team";
 import {
@@ -131,7 +136,7 @@ import {
 } from "@/lib/sfl/equipes";
 import { finInvitation, quandTombe, resteAvant } from "@/lib/sfl/equipes-temps";
 import { avecLaLigue, lireTerrainsNord, terrainsNordLus, type CatalogueTerrains } from "@/lib/sfl/terrains-nord";
-import { DEMO_EQUIPES, demoChampionnat, demoEquipes } from "@/lib/sfl/equipes-demo";
+import { DEMO_EQUIPES, demanderApercu, demoChampionnat, demoEquipes } from "@/lib/sfl/equipes-demo";
 import { libelleJour, listerProfils, monId, type Profil } from "@/lib/sfl/matchs";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -159,17 +164,20 @@ interface AConfirmer {
   action: () => void;
 }
 
+/** Une équipe : la toucher ouvre sa page (/bola-team/[id]) ; à droite, son geste (Défier). */
 function LigneEquipe({ e, droite }: { e: Equipe; droite?: React.ReactNode }) {
   const n = signataires(e).length;
   return (
     <div className="flex items-center gap-3 rounded-[20px] bg-card px-3 py-2.5">
-      <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={42} />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-[15.5px] font-semibold">{e.nom}</span>
-        <span className="truncate text-[12.5px] text-muted-foreground">
-          {[e.ville, `${n} / ${MAX_EQUIPE}`].filter(Boolean).join(" · ")}
+      <Link href={`/bola-team/${e.id}`} className="flex min-w-0 flex-1 items-center gap-3 transition-transform active:scale-[0.98]">
+        <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={42} />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-[15.5px] font-semibold">{e.nom}</span>
+          <span className="truncate text-[12.5px] text-muted-foreground">
+            {[e.ville, `${n} / ${MAX_EQUIPE}`].filter(Boolean).join(" · ")}
+          </span>
         </span>
-      </span>
+      </Link>
       {droite}
     </div>
   );
@@ -277,8 +285,9 @@ export default function BolaTeamPage() {
   const [defis, setDefis] = useState<Defi[]>([]);
   const [champ, setChamp] = useState<Championnat | null>(null);
   const [vue, setVue] = useState<"equipe" | "championnat">("equipe");
-  // Aperçu seulement : le monde de démonstration même connecté, la vitrine.
-  const [forceApercu, setForceApercu] = useState(false);
+  // Aperçu seulement : le monde de démonstration même connecté (demandé une
+  // fois par appareil, ?apercu=1 ; ?apercu=0 revient à la base), la vitrine.
+  const forceApercu = useApercuTeam();
   const [forceVitrine, setForceVitrine] = useState(false);
   const [profils, setProfils] = useState<Profil[]>([]);
   const [moiId, setMoiId] = useState<string | null>(null);
@@ -337,15 +346,16 @@ export default function BolaTeamPage() {
         localStorage.setItem(LIEN_EN_ATTENTE, jeton);
       } catch {}
     }
-    // Les réglages d'aperçu restent dans l'adresse ; le reste ne sert qu'une fois.
+    // Le monde de démonstration se garde sur l'appareil ; la vitrine reste
+    // dans l'adresse ; le reste ne sert qu'une fois.
+    if (DEMO_EQUIPES && q.has("apercu")) demanderApercu(q.get("apercu") !== "0");
     const garde = new URLSearchParams();
-    for (const k of ["apercu", "vitrine"]) if (DEMO_EQUIPES && q.has(k)) garde.set(k, "1");
+    if (DEMO_EQUIPES && q.has("vitrine")) garde.set("vitrine", "1");
     if ([...q.keys()].some((k) => !garde.has(k)))
       window.history.replaceState(null, "", window.location.pathname + (garde.toString() ? `?${garde}` : ""));
     const t = window.setTimeout(() => {
       if (terrain) setTerrainDefi(terrain);
       if (v === "championnat") setVue("championnat");
-      if (garde.has("apercu")) setForceApercu(true);
       if (garde.has("vitrine")) setForceVitrine(true);
     }, 0);
     return () => window.clearTimeout(t);
@@ -751,7 +761,13 @@ export default function BolaTeamPage() {
       </div>
 
       {vue === "championnat" && (
-        <ChampionnatTeam equipes={vu.equipes} matchs={vu.matchs} mienne={mienneChamp} maintenant={heureChamp} />
+        <ChampionnatTeam
+          equipes={vu.equipes}
+          matchs={vu.matchs}
+          mienne={mienneChamp}
+          maintenant={heureChamp}
+          pages={!demoChamp || (forceApercu && apercu)}
+        />
       )}
 
       {vue === "equipe" && invitations.length > 0 && (
@@ -792,7 +808,10 @@ export default function BolaTeamPage() {
               <Ecusson initiales={mienne.initiales} fond={mienne.fond} blason={mienne.blason} taille={76} />
             )}
             <div className="flex min-w-0 flex-col gap-1.5">
-              <h2 className="truncate text-[28px] leading-none font-bold tracking-tight md:text-[34px]">{mienne.nom}</h2>
+              <Link href={`/bola-team/${mienne.id}`} className="flex min-w-0 items-center gap-1 transition-opacity active:opacity-60">
+                <h2 className="truncate text-[28px] leading-none font-bold tracking-tight md:text-[34px]">{mienne.nom}</h2>
+                <ChevronRight className="size-5 shrink-0 text-foreground/35" strokeWidth={2.4} />
+              </Link>
               <span className="mono-label text-muted-foreground">{etatEquipe(mienne)}</span>
               {!active(mienne) && (
                 <span className="mono-label text-braise">Il manque {MIN_EQUIPE - signes.length}</span>
