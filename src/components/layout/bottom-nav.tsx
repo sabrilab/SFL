@@ -35,6 +35,7 @@ import { ActusIcon, CarteIcon, MapIcon, VestiaireIcon } from "./nav-icons";
 import { ongletActif } from "@/lib/nav";
 import { remonter, retrouverOnglet } from "./memoire-navigation";
 import { pastilleIcone, useVestiaireNonLus } from "@/hooks/use-vestiaire-non-lus";
+import { useMessagesPrives } from "@/hooks/use-messages-prives";
 import { useJoueurBola } from "@/components/sfl/player-provider";
 import { useInvitationsMatch } from "@/hooks/use-invitations";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
@@ -56,12 +57,13 @@ export function BottomNav() {
   // La bulle ouvre la discussion : le Vestiaire, et Bola Agent à côté. Le
   // Vestiaire est le salon de la SFL : un joueur Bola (venu par un parrain,
   // hors de la saison) n'a pas la bulle.
-  const vestiaire = pathname === "/vestiaire" || pathname === "/agent";
+  const vestiaire = pathname === "/vestiaire" || pathname === "/agent" || pathname === "/messages" || pathname.startsWith("/messages/");
   const bola = useJoueurBola();
   const clair = useModeClair() || surMap(pathname);
   const encre = clair ? "#0a0b0d" : "#ffffff";
   // Du nouveau dans la discussion : le nombre, sur la bulle.
-  const nonLus = useVestiaireNonLus();
+  // Les messages privés aussi : on y entre par le Vestiaire (messages/bouton-messages.tsx).
+  const nonLus = useVestiaireNonLus() + useMessagesPrives().nonLus;
   // Une invitation sans réponse (un match, une équipe), un message pas lu
   // dans la discussion d'un de mes matchs : le nombre, sur l'onglet Map.
   const invitations = useInvitationsMatch();

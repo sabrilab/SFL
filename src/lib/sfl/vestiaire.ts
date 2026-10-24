@@ -170,8 +170,12 @@ interface Brut {
   created_at: string;
 }
 
-/** Où vit une discussion : le Vestiaire, la discussion d'un match, ou celle d'une équipe. */
-export type Canal = { canal: "sfl" } | { canal: "match"; matchId: number } | { canal: "equipe"; equipeId: number };
+/** Où vit une discussion : le Vestiaire, la discussion d'un match, celle d'une équipe, ou une conversation privée (avec : l'autre joueur). */
+export type Canal =
+  | { canal: "sfl" }
+  | { canal: "match"; matchId: number }
+  | { canal: "equipe"; equipeId: number }
+  | { canal: "dm"; avec: string };
 const VESTIAIRE: Canal = { canal: "sfl" };
 
 export function expliquer(message: string, ou: Canal = VESTIAIRE): string {
@@ -188,6 +192,11 @@ export function expliquer(message: string, ou: Canal = VESTIAIRE): string {
     if (/equipe_id/.test(message)) return "La discussion des équipes arrive bientôt.";
     if (/row-level security|violates/i.test(message)) return "Tu n'es plus dans cette équipe.";
     return "La discussion ne répond pas. Réessaie dans un instant.";
+  }
+  if (ou.canal === "dm") {
+    // Refusé : un compte pas accepté, ou un blocage (on ne dit pas lequel).
+    if (/row-level security|violates/i.test(message)) return "Ce joueur ne peut pas recevoir ton message.";
+    return "La conversation ne répond pas. Réessaie dans un instant.";
   }
   if (/row-level security|violates/i.test(message)) return "L'admin t'a coupé la parole pour l'instant.";
   return "Le Vestiaire ne répond pas. Réessaie dans un instant.";
@@ -209,7 +218,16 @@ export async function chargerFil(
   // on relit sans elle plutôt que de laisser le Vestiaire vide.
   const lire = (colonnes: string) => {
     const q = sb.from("messages").select(colonnes).eq("canal", ou.canal);
-    const ici = ou.canal === "match" ? q.eq("match_id", ou.matchId) : ou.canal === "equipe" ? q.eq("equipe_id", ou.equipeId) : q;
+    // En privé, la base ne rend que mes conversations : celle-ci, c'est ce que
+    // l'autre m'a écrit et ce que je lui ai écrit.
+    const ici =
+      ou.canal === "match"
+        ? q.eq("match_id", ou.matchId)
+        : ou.canal === "equipe"
+          ? q.eq("equipe_id", ou.equipeId)
+          : ou.canal === "dm"
+            ? q.or(`auteur.eq.${ou.avec},destinataire.eq.${ou.avec}`)
+            : q;
     return ici.order("created_at", { ascending: false }).limit(limite);
   };
   let r = await lire("id, auteur, texte, piece, reponse_a, created_at");
@@ -259,7 +277,8 @@ export type Resultat = { ok: true; id?: number } | { ok: false; raison: string }
 /** Pourquoi écrire est impossible — null si ça l'est. */
 export function blocageVestiaire(ou: Canal = VESTIAIRE): string | null {
   const session = getSession();
-  const ici = ou.canal === "match" ? "aux joueurs du match" : ou.canal === "equipe" ? "à ton équipe" : "au Vestiaire";
+  const ici =
+    ou.canal === "match" ? "aux joueurs du match" : ou.canal === "equipe" ? "à ton équipe" : ou.canal === "dm" ? "en privé" : "au Vestiaire";
   if (!session) return `Connecte-toi pour parler ${ici}.`;
   if (!session.server) return `Déconnecte-toi puis reconnecte-toi pour écrire ${ici}.`;
   return null;
@@ -267,9 +286,15 @@ export function blocageVestiaire(ou: Canal = VESTIAIRE): string | null {
 
 export type CorpsNotif = { type: "message"; id: number } | { type: "reaction"; id: number; emoji: Emoji };
 
-/** La route qui prévient pour une discussion : celle du Vestiaire, des matchs ou des équipes. */
+/** La route qui prévient pour une discussion : celle du Vestiaire, des matchs, des équipes ou des messages privés. */
 const routeDe = (ou: Canal) =>
-  ou.canal === "match" ? "/api/matchs/discussion" : ou.canal === "equipe" ? "/api/equipes/discussion" : "/api/vestiaire/notifier";
+  ou.canal === "match"
+    ? "/api/matchs/discussion"
+    : ou.canal === "equipe"
+      ? "/api/equipes/discussion"
+      : ou.canal === "dm"
+        ? "/api/prives/notifier"
+        : "/api/vestiaire/notifier";
 
 /** Demande au serveur de prévenir qui doit l'être. Sans attendre ni échouer. */
 export function notifier(corps: CorpsNotif, ou: Canal = VESTIAIRE) {
@@ -308,7 +333,7 @@ export async function poster(ou: Canal, texte: string, piece: Piece | null, repo
     const { data: auth } = await sb.auth.getSession();
     const uid = auth.session?.user.id;
     if (!uid) return { ok: false, raison: expliquer("jwt", ou) };
-    const ligne: Record<string, unknown> = { canal: ou.canal, auteur: uid, destinataire: null, texte: propre };
+    const ligne: Record<string, unknown> = { canal: ou.canal, auteur: uid, destinataire: ou.canal === "dm" ? ou.avec : null, texte: propre };
     if (ou.canal === "match") ligne.match_id = ou.matchId;
     if (ou.canal === "equipe") ligne.equipe_id = ou.equipeId;
     if (piece) ligne.piece = piece;

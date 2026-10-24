@@ -1,8 +1,8 @@
 // Les messages pas encore lus de chaque joueur, pour la pastille rouge de
 // l'icône de l'app (le nombre que porte la notification : public/sw.js) :
 // ceux du Vestiaire, ceux des discussions de ses matchs à venir, là où il
-// joue (organisateur ou inscrit ; un invité lit sans compter), et ceux de la
-// discussion de son équipe (mode Team).
+// joue (organisateur ou inscrit ; un invité lit sans compter), ceux de la
+// discussion de son équipe (mode Team), et ceux de ses messages privés.
 //
 // Le même compte que l'app (hooks/use-vestiaire-non-lus.ts,
 // hooks/use-discussions-match.ts et hooks/use-mon-equipe.ts, additionnés par
@@ -29,7 +29,7 @@ export async function nonLus(sb: SupabaseClient, uids: string[], maintenant = Da
   const n = new Map(uids.map((u) => [u, 0]));
   if (uids.length === 0) return n;
   const t = (iso: string) => new Date(iso).getTime();
-  await nonLusEquipes(sb, uids, n, t);
+  await Promise.all([nonLusEquipes(sb, uids, n, t), nonLusPrives(sb, uids, n, t)]);
 
   // Le Vestiaire : ce que les autres ont écrit depuis ma dernière lecture,
   // trois jours au plus (qui ne l'a jamais ouvert voit ces trois jours-là).
@@ -119,5 +119,36 @@ async function nonLusEquipes(sb: SupabaseClient, uids: string[], n: Map<string, 
       (m) => m.equipe_id === l.equipe_id && m.auteur !== l.joueur && t(m.created_at) > depuis
     ).length;
     n.set(l.joueur, (n.get(l.joueur) ?? 0) + Math.min(NON_LUS_MAX_PAR_MATCH, k));
+  }
+}
+
+/**
+ * Ses messages privés : ce que chacun lui a écrit depuis sa dernière lecture
+ * de leur conversation (toute la conversation, s'il ne l'a jamais ouverte),
+ * dix au plus par conversation. Ajouté au compte `n`. Avant la migration
+ * (prive_suivi absente), rien.
+ */
+async function nonLusPrives(sb: SupabaseClient, uids: string[], n: Map<string, number>, t: (iso: string) => number) {
+  const [{ data: suivis, error }, { data: recus }] = await Promise.all([
+    sb.from("prive_suivi").select("user_id, autre, lu_jusqua").in("user_id", uids),
+    sb
+      .from("messages")
+      .select("auteur, destinataire, created_at")
+      .eq("canal", "dm")
+      .in("destinataire", uids)
+      .order("created_at", { ascending: false })
+      .limit(2000),
+  ]);
+  if (error) return;
+  const lu = new Map(((suivis ?? []) as { user_id: string; autre: string; lu_jusqua: string }[]).map((s) => [`${s.user_id}:${s.autre}`, t(s.lu_jusqua)]));
+  const parConversation = new Map<string, number>();
+  for (const m of (recus ?? []) as (Ecrit & { destinataire: string })[]) {
+    const k = `${m.destinataire}:${m.auteur}`;
+    if (t(m.created_at) <= (lu.get(k) ?? 0)) continue;
+    parConversation.set(k, Math.min(NON_LUS_MAX_PAR_MATCH, (parConversation.get(k) ?? 0) + 1));
+  }
+  for (const [k, c] of parConversation) {
+    const uid = k.slice(0, k.indexOf(":"));
+    n.set(uid, (n.get(uid) ?? 0) + c);
   }
 }

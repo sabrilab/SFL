@@ -57,6 +57,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { Nom } from "@/components/sfl/nom";
 import { PointMaillot } from "@/components/sfl/point-maillot";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
+import { BoutonMessages } from "@/components/sfl/messages/bouton-messages";
 import { TitreDiscussion } from "@/components/sfl/titre-discussion";
 import { useSession } from "@/hooks/use-session";
 import { RANKINGS } from "@/lib/sfl/rankings";
@@ -656,14 +657,24 @@ const MODES: [ModeNotifs, string][] = [
   ["rien", "Rien"],
 ];
 
-function ReglageNotifs({ mode, onMode, onFermer }: { mode: ModeNotifs; onMode: (m: ModeNotifs) => void; onFermer: () => void }) {
+function ReglageNotifs({
+  mode,
+  modes = MODES,
+  onMode,
+  onFermer,
+}: {
+  mode: ModeNotifs;
+  modes?: [ModeNotifs, string][];
+  onMode: (m: ModeNotifs) => void;
+  onFermer: () => void;
+}) {
   const [etat, setEtat] = useState<EtatNotifications | null>(null);
   useEffect(() => {
     void etatNotifications().then(setEtat);
   }, []);
   return (
     <div className="glass absolute top-[52px] right-0 z-20 w-[248px] rounded-3xl p-1.5 shadow-2xl">
-      {MODES.map(([m, label]) => (
+      {modes.map(([m, label]) => (
         <button
           key={m}
           type="button"
@@ -967,12 +978,18 @@ export function Vestiaire({ onOuvrirJournee }: { onOuvrirJournee?: (j: number) =
     <Discussion
       salon={SALON_VESTIAIRE}
       titre={<TitreDiscussion actif="/vestiaire" />}
-      aDroite={<BoutonRecherche />}
+      aDroite={
+        <>
+          <BoutonMessages className="size-10" />
+          <BoutonRecherche className="size-10" />
+        </>
+      }
       libelleNotifs="Notifications du Vestiaire"
       vide="Le Vestiaire est vide."
       onglets
       moderation
       pieces
+      serre
       demo={demo}
       onOuvrirJournee={onOuvrirJournee}
     />
@@ -1029,8 +1046,10 @@ export function Discussion({
   sousTitre,
   aDroite,
   libelleNotifs,
+  modesNotifs,
   vide,
   onglets = false,
+  serre = false,
   moderation = false,
   pieces = false,
   demo = null,
@@ -1048,10 +1067,14 @@ export function Discussion({
   /** À droite, après la cloche des notifications. */
   aDroite?: React.ReactNode;
   libelleNotifs: string;
+  /** Ce que la cloche propose (une conversation privée : Tout ou Rien, tout y est pour moi). */
+  modesNotifs?: [ModeNotifs, string][];
   /** Ce que dit le fil vide (rien si vide). */
   vide: string;
   /** La barre d'onglets reste dessous (le Vestiaire) ; sinon l'écran la recouvre, posé sur <body> (matchs/discussion-match.tsx). */
   onglets?: boolean;
+  /** Trois boutons en haut (le Vestiaire : la cloche, les messages, la loupe) : un cran plus petits, pour que le titre tienne. */
+  serre?: boolean;
   /** L'admin modère : il retire n'importe quel message et coupe la parole (le Vestiaire, lieu public). */
   moderation?: boolean;
   /** Prend la pièce préparée ailleurs (« Au Vestiaire » d'un classement, d'une feuille). */
@@ -1472,13 +1495,13 @@ export function Discussion({
       <div className="flex items-center justify-between gap-3">
         {titre}
         {!empeche && (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
               onClick={() => setReglage((v) => !v)}
               aria-label={libelleNotifs}
               aria-expanded={reglage}
-              className="bouton-secondaire bouton--mauve flex size-11 items-center justify-center"
+              className={cn("bouton-secondaire bouton--mauve flex items-center justify-center", serre ? "size-10" : "size-11")}
             >
               {mode === "rien" ? <BellOff className="size-[18px]" /> : <Bell className="size-[18px]" />}
             </button>
@@ -1487,7 +1510,7 @@ export function Discussion({
         )}
       </div>
       {sousTitre}
-      {reglage && <ReglageNotifs mode={mode} onMode={changerMode} onFermer={() => setReglage(false)} />}
+      {reglage && <ReglageNotifs mode={mode} modes={modesNotifs} onMode={changerMode} onFermer={() => setReglage(false)} />}
     </header>
   );
 

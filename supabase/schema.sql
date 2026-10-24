@@ -1942,7 +1942,12 @@ set search_path = ''
 as $$
 begin
   begin
-    if coalesce(new.piece ->> 'type', '') <> 'rejoint' then
+    if new.canal = 'dm' then
+      -- Un message privé, c'est la suite donnée aux notifications de cette
+      -- conversation (« prive:<l'autre> »).
+      perform public.push_effet(new.auteur, array['prive-message', 'prive-reaction'],
+        'prive:' || new.destinataire, 'message', interval '2 hours');
+    elsif coalesce(new.piece ->> 'type', '') <> 'rejoint' then
       perform public.push_effet_discussion(new.auteur, new.canal, new.match_id, new.equipe_id, 'message');
     end if;
   exception when others then
@@ -1969,8 +1974,11 @@ declare
   m record;
 begin
   begin
-    select canal, match_id, equipe_id into m from public.messages where id = new.message_id;
-    if found then
+    select canal, match_id, equipe_id, auteur, destinataire into m from public.messages where id = new.message_id;
+    if found and m.canal = 'dm' then
+      perform public.push_effet(new.user_id, array['prive-message', 'prive-reaction'],
+        'prive:' || (case when m.auteur = new.user_id then m.destinataire else m.auteur end), 'reaction', interval '2 hours');
+    elsif found then
       perform public.push_effet_discussion(new.user_id, m.canal, m.match_id, m.equipe_id, 'reaction');
     end if;
   exception when others then
@@ -5128,6 +5136,96 @@ exception
   when undefined_object then null;
 end;
 $$;
+
+-- ───────────────────────────── Messages privés ─────────────────────────────
+-- Sabri, 24/10 : « Permets aussi que les joueurs puissent envoyer des
+-- messages privés. » Une conversation à deux vit dans la table des messages,
+-- canal 'dm', avec son destinataire (colonne, contrôles et index posés dès la
+-- création de la table, plus haut) : elle hérite des réponses, réactions,
+-- vocaux, photos et du temps réel du Vestiaire. La lisent ses deux joueurs,
+-- et eux seuls : ni le reste de la ligue, ni l'admin (règle « messages :
+-- lecture », plus haut).
+--
+-- Écrire en privé : à un compte accepté, jamais à soi, et pas à qui m'a
+-- bloqué ni à qui j'ai bloqué (débloquer pour lui écrire à nouveau). Celui
+-- qui écrit ne sait pas qu'il est bloqué : son message est refusé comme si
+-- l'autre n'était pas joignable.
+create table if not exists public.prive_blocages (
+  user_id     uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  bloque      uuid not null references public.profiles(id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  primary key (user_id, bloque),
+  check (user_id <> bloque)
+);
+
+alter table public.prive_blocages enable row level security;
+
+-- Chacun ne voit que ceux qu'il a bloqués : jamais qui l'a bloqué.
+drop policy if exists "blocages: les miens" on public.prive_blocages;
+create policy "blocages: les miens"
+  on public.prive_blocages for all to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
+revoke all on public.prive_blocages from anon;
+revoke update on public.prive_blocages from authenticated;
+grant select, insert, delete on public.prive_blocages to authenticated;
+
+create or replace function public.peut_ecrire_en_prive(a uuid)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select a is not null
+     and a <> (select auth.uid())
+     and exists (select 1 from public.profiles p where p.id = a and p.valide)
+     and not exists (
+       select 1 from public.prive_blocages b
+        where (b.user_id = a and b.bloque = (select auth.uid()))
+           or (b.user_id = (select auth.uid()) and b.bloque = a)
+     );
+$$;
+
+revoke execute on function public.peut_ecrire_en_prive(uuid) from public, anon;
+grant execute on function public.peut_ecrire_en_prive(uuid) to authenticated;
+
+-- Restrictive : s'ajoute à « j'écris pour moi » (compte accepté, sous son nom).
+drop policy if exists "messages: le privé à qui peut le recevoir" on public.messages;
+create policy "messages: le privé à qui peut le recevoir"
+  on public.messages as restrictive for insert to authenticated
+  with check (canal <> 'dm' or public.peut_ecrire_en_prive(destinataire));
+
+-- Où en est chaque joueur avec chaque conversation : jusqu'où il l'a lue
+-- (les pastilles), ce qu'il en veut sur son téléphone ('tout' ou 'rien' ;
+-- 'cite' vaut 'tout' : en privé, tout m'est adressé), s'il l'a sous les yeux
+-- (devant_le, redit toutes les 20 s par l'app) et quand le serveur l'a
+-- prévenu pour la dernière fois (notifie_le, au serveur seul).
+create table if not exists public.prive_suivi (
+  user_id     uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  autre       uuid not null references public.profiles(id) on delete cascade,
+  lu_jusqua   timestamptz not null default now(),
+  notifs      text not null default 'tout' check (notifs in ('tout', 'cite', 'rien')),
+  devant_le   timestamptz,
+  notifie_le  timestamptz,
+  primary key (user_id, autre)
+);
+
+alter table public.prive_suivi enable row level security;
+
+drop policy if exists "suivi privé: le mien" on public.prive_suivi;
+create policy "suivi privé: le mien"
+  on public.prive_suivi for all to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
+-- notifie_le n'appartient qu'au serveur. Révoquer le droit de table AVANT de
+-- donner les colonnes, sinon le droit de table les annule.
+revoke all on public.prive_suivi from anon, authenticated;
+grant select on public.prive_suivi to authenticated;
+grant insert (user_id, autre, lu_jusqua, notifs, devant_le) on public.prive_suivi to authenticated;
+grant update (user_id, autre, lu_jusqua, notifs, devant_le) on public.prive_suivi to authenticated;
 
 -- La notification de la convocation du dimanche (motif « convocation »,
 -- /api/ligue/annoncer, rattachée à 'convocation:<id>') attend une réponse

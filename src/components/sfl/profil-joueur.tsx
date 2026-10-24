@@ -43,6 +43,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
 import { BoutonSuivre, ReseauJoueur } from "@/components/sfl/suivre";
+import { BoutonEcrire } from "@/components/sfl/messages/bouton-ecrire";
 import { FeuilleBadge, Medaille, NOM_TROPHEE, Trophee } from "@/components/sfl/vitrine";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useGrandEcran, useTresGrandEcran } from "@/hooks/use-media-query";
@@ -171,7 +172,10 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
           </p>
           <AppartenancesJoueur nom={player.name} className="mt-[var(--fib-8)]" />
           <ReseauJoueur nom={player.name} className="mt-[var(--fib-8)]" />
-          <BoutonSuivre nom={player.name} className="mt-[var(--fib-8)]" />
+          <div className="mt-[var(--fib-8)] flex items-center gap-2">
+            <BoutonSuivre nom={player.name} />
+            <BoutonEcrire nom={player.name} />
+          </div>
         </div>
         <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
           <Chiffre valeur={ordinal(rank)} quoi="Pépite d'Or" />
