@@ -28,7 +28,8 @@ import { jourMoisDuLibelle } from "./convocation-temps";
 import { rankPlayers, type Player } from "./engine";
 import {
   aParis,
-  apresLaJournee,
+  decouper,
+  ecartsDecoupage,
   etatDivisions,
   FENETRE_NOTIFICATION,
   REGLES_DIVISIONS,
@@ -64,17 +65,19 @@ export interface Outsider {
   xp: number;
   /** L'XP qui lui manque pour le rang A. */
   pourLeRangA: number;
+  /** Ses points d'avance sur le premier de la D2 (null quand la D2 est vide) : ce qu'il doit garder dimanche. */
+  avance: number | null;
 }
 
 /** Ce qu'un dimanche fait de son outsider. */
 export type Issue =
   /** La feuille n'a pas encore de résultat. */
   | "a-venir"
-  /** Pas joué (ni absence injustifiée) : rien ne bouge. */
+  /** Pas joué (ni absence injustifiée), toujours en D1. */
   | "absent"
   /** Rang A, toujours en D1 : la quête est accomplie. */
   | "accomplie"
-  /** Ses points le font redescendre en D2. */
+  /** Le Pépite d'Or du soir le fait redescendre en D2 (ou plus bas). */
   | "chute"
   /** Il reste en D1, toujours rang B : la quête continue. */
   | "tient";
@@ -101,9 +104,6 @@ export interface ArcOutsider {
   /** Le dimanche d'avant, pour le sien : la suite de l'histoire. */
   precedent: Chapitre | null;
 }
-
-/** Les points qu'il faut à un joueur de D1 pour y rester (descendre, c'est DESCENTE ou moins). */
-export const POUR_RESTER_EN_D1 = REGLES_DIVISIONS.descente + 1;
 
 /** Le journal de l'XP tel qu'il était avant la journée `j` de la saison `numero`. */
 export function journalAvant(journal: Journal, numero: number, j: number): Journal {
@@ -154,6 +154,7 @@ export function outsidersDe(
       surXp: r.sur,
       xp: r.xp,
       pourLeRangA: Math.max(1, seuilA - r.xp),
+      avance: ecartsDecoupage(etat.decoupage, p.name).avance,
     });
   }
   return out.sort((a, b) => a.placeD1 - b.placeD1 || b.placeXp - a.placeXp || a.nom.localeCompare(b.nom, "fr"));
@@ -172,16 +173,19 @@ function outsidersAvant(saison: Saison, journal: Journal, joueurs: Player[], j: 
 function chapitreDe(saison: Saison, journal: Journal, joueurs: Player[], j: number, outsiders?: Outsider[]): Chapitre | null {
   const outsider = (outsiders ?? outsidersAvant(saison, journal, joueurs, j))[0];
   if (!outsider) return null;
-  // Comme les divisions : un présent, ou une absence injustifiée, compte.
+  // Un présent, ou une absence injustifiée, a joué sa journée.
   const lignes = saison.entries.filter((e) => e.j === j && e.player === outsider.nom);
   const compte = lignes.some((e) => (e.statut === "Présent" && !e.extraTime) || e.statut === "Absence injustifiée");
   const points = lignes.reduce((a, e) => a + entryPP(e), 0);
   const jouee = journeeJouee(saison, j);
   const rangApres = jouee ? (rangsEtSeuil(journalAvant(journal, numeroSaison(saison), j + 1), joueurs).rangs.get(outsider.nom) ?? null) : null;
+  // Rester en D1, c'est rester dans ses 30 places au Pépite d'Or du soir :
+  // même sans jouer, ceux qui marquent peuvent le passer.
+  const enD1 = jouee && decouper(saison, j).parNom.get(outsider.nom)?.division === 1;
   let issue: Issue;
   if (!jouee) issue = "a-venir";
+  else if (!enD1) issue = "chute";
   else if (!compte) issue = "absent";
-  else if (apresLaJournee(1, points) > 1) issue = "chute";
   else issue = rangApres && rangApres.rang !== "B" ? "accomplie" : "tient";
   return { j, outsider, issue, points, rangApres };
 }
