@@ -181,6 +181,44 @@
     scale: 0.96;
     transition-duration: 0.1s;
   }
+
+  /* ── Le format des terrains (map/format-terrains.tsx) : les pastilles
+     sortent du bouton avec un ressort et y rentrent vite ; le format
+     choisi s'écrit dans le bouton d'un petit bond. ── */
+  .format-deplie {
+    transition:
+      opacity 0.14s ease,
+      scale 0.18s ease,
+      translate 0.18s ease,
+      visibility 0s linear 0.18s;
+  }
+  .format-deplie:not([data-ouvert="true"]) {
+    translate: 12px -50%;
+  }
+  .format-deplie[data-ouvert="true"] {
+    transition:
+      opacity 0.18s ease,
+      scale 0.42s cubic-bezier(0.3, 1.45, 0.5, 1),
+      translate 0.42s cubic-bezier(0.3, 1.45, 0.5, 1),
+      visibility 0s;
+  }
+  .format-entre {
+    animation: stk-pastille 0.42s cubic-bezier(0.3, 1.5, 0.5, 1) backwards;
+  }
+}
+
+/* Les pastilles du format, repliées dans leur bouton ou dépliées à sa gauche. */
+.format-deplie {
+  translate: 0 -50%;
+  transform-origin: right center;
+  opacity: 0;
+  scale: 0.9;
+  visibility: hidden;
+}
+.format-deplie[data-ouvert="true"] {
+  opacity: 1;
+  scale: 1;
+  visibility: visible;
 }
 
 /* La carte du carrousel, au repos : la choisie en avant. */

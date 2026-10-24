@@ -6,7 +6,8 @@
 // cerné de noir ; celui qu'on regarde se lève en mini-stade, son nom en
 // étiquette (le repère des terrains de la Map, map/stade.ts). Toucher un
 // point le met en tête de la liste ; déplacer le plan range la liste autour
-// de ce qu'il montre.
+// de ce qu'il montre. Un format choisi dont aucun complexe n'est en vue :
+// le plan s'ouvre jusqu'aux plus proches.
 //
 // Les points sont une couche du plan (une source GeoJSON), pas des éléments
 // HTML : cent cinquante repères ne coûtent rien. Jamais rendu côté serveur :
@@ -17,12 +18,14 @@ import maplibregl, { type GeoJSONSource, type Map as PlanMap, type Marker } from
 import "maplibre-gl/dist/maplibre-gl.css";
 import { styleSnap } from "@/components/sfl/map/style-snap";
 import { pointHtml } from "@/components/sfl/map/stade";
-import type { TerrainPropose } from "@/lib/sfl/terrains-nord";
+import { km, type TerrainPropose } from "@/lib/sfl/terrains-nord";
 
 const calme = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** Assez près pour lire les rues autour d'un complexe. */
 const ZOOM_TERRAIN = 14;
+/** Un format sans complexe en vue : le plan s'ouvre jusqu'à ce nombre des plus proches. */
+const PROCHES = 3;
 
 function collection(terrains: TerrainPropose[]): GeoJSON.FeatureCollection<GeoJSON.Point, { id: string; ligue: boolean }> {
   return {
@@ -51,8 +54,8 @@ export function PlanTerrains({
   focus: TerrainPropose | null;
   /** Le premier cadrage, puis chaque fois que `cadrage` change : la position trouvée. */
   centre: { lat: number; lng: number };
-  /** Change pour recadrer : sur `centre`, ou sur tous les `terrains` (une recherche). */
-  cadrage: { n: number; sur: "centre" | "terrains" };
+  /** Change pour recadrer : sur `centre`, sur tous les `terrains` (une recherche), ou sur les plus proches s'il n'y en a aucun en vue (un format). */
+  cadrage: { n: number; sur: "centre" | "terrains" | "proches" };
   /** Ta position, quand tu l'as donnée. */
   ici: { lat: number; lng: number } | null;
   onToucher: (id: string) => void;
@@ -146,12 +149,20 @@ export function PlanTerrains({
     (map.getSource("terrains") as GeoJSONSource | undefined)?.setData(collection(terrains));
   }, [terrains]);
 
-  // Recadrer : sur le centre (ta position), ou sur les complexes trouvés.
+  // Recadrer : sur le centre (ta position), sur les complexes trouvés, ou
+  // jusqu'aux plus proches quand le plan n'en montre aucun.
   useEffect(() => {
     const map = carte.current;
     if (!map || cadrage.n === 0) return;
     const duree = calme() ? 0 : 700;
-    if (cadrage.sur === "terrains" && terrains.length > 1) {
+    if (cadrage.sur === "proches") {
+      const vue = map.getBounds();
+      if (!terrains.length || terrains.some((t) => vue.contains([t.lng, t.lat]))) return;
+      const b = new maplibregl.LngLatBounds([centre.lng, centre.lat], [centre.lng, centre.lat]);
+      const proches = [...terrains].sort((x, y) => km(centre, x) - km(centre, y)).slice(0, PROCHES);
+      for (const t of proches) b.extend([t.lng, t.lat]);
+      map.fitBounds(b, { padding: 36, maxZoom: 13, duration: duree });
+    } else if (cadrage.sur === "terrains" && terrains.length > 1) {
       const b = new maplibregl.LngLatBounds();
       for (const t of terrains) b.extend([t.lng, t.lat]);
       map.fitBounds(b, { padding: 36, maxZoom: 13, duration: duree });
