@@ -1897,3 +1897,36 @@
 .ecran-discussion[data-clavier] .choix-ecriture {
   max-height: calc(var(--vue-h) * 0.4);
 }
+
+/* Le chargement d'une carte : la lune Bola qui naît et se couvre, en boucle
+   (components/sfl/chargement-bola.tsx). */
+.chargement-bola__ombre {
+  animation: chargement-bola-lune 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes chargement-bola-lune {
+  0%,
+  8% {
+    transform: none;
+  }
+  46%,
+  62% {
+    transform: var(--balle-posee);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes chargement-bola-souffle {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chargement-bola__ombre {
+    animation: none;
+    transform: var(--balle-posee);
+  }
+  .chargement-bola__lune {
+    animation: chargement-bola-souffle 2.4s ease-in-out infinite;
+  }
+}
