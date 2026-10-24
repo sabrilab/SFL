@@ -297,5 +297,10 @@ const HISTORIQUE: Ligne[] = [
   ["2026-10-24T18:01:27.000Z", "6c5bf99", 145, "Cartes : toucher une carte l'ouvre en grand, en plein écran, pour la tourner, la retourner et zoomer"],
   ["2026-10-24T18:03:30.000Z", "910deb2", 144, "Accueil de l'app : tout ce qui manque au joueur dès l'ouverture, « Homme ou femme ? », sa carte qu'il retourne, puis la visite"],
   ["2026-10-24T18:20:14.000Z", "972a8af", 149, "Ma carte : le Passe Bola de la saison, vingt skins à gagner, et le Niveau XP en encadrés"],
+  ["2026-10-24T18:31:15.000Z", "eed70dd", 150, "Cartes de la saison 0 : l'édition d'époque, aux visuels de l'été 2026 et à leur date d'émission"],
+  ["2026-10-24T18:40:01.000Z", "e83b050", 151, "Feuille de match : l'image part seule vers Snap, sans titre"],
+  ["2026-10-24T18:40:21.000Z", "6b931bd", 152, "Ma carte : les épreuves cachées"],
+  ["2026-10-24T18:55:40.000Z", "98fd547", 155, "Feuille de match : l'heure en grand, et toutes les feuilles du jour partagées d'un coup"],
+  ["2026-10-24T19:01:22.000Z", "5fbb871", null, "Activité : les repères de l'app sous les courbes, et qui ramène du monde"],
   // </historique>
 ];
