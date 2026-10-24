@@ -23,6 +23,7 @@ import {
   notificationAnnonce,
   phraseAnnonce,
   phraseBilan,
+  rangDansDivision,
   REGLES_DIVISIONS,
   taDivision,
 } from "../src/lib/sfl/divisions";
@@ -84,6 +85,17 @@ assert.equal(taDivision(d, "Eli"), "tu serais en D2, à 3 pts de la D1 et 4 pts 
 assert.equal(taDivision(d, "Dina"), "tu serais en D1, 3 pts devant la D2");
 assert.equal(taDivision(d, "Gaby"), "tu serais en D3, à 1 pt de la D2");
 assert.equal(taDivision(d, "Jade"), null);
+
+// Chaque division compte ses places depuis 1 (Sabri, 24/10 : « il faut qu'il
+// soit premier, mais de D2 ») ; les ex æquo gardent leur place commune.
+assert.equal(d.divisions[2][0].rang, 32, "au Pépite d'Or, derrière les 31 de la D1");
+for (const x of DIVISIONS) {
+  const places = d.divisions[x].map((p) => rangDansDivision(d, p));
+  assert.equal(places[0], 1, `le premier de la ${nomDivision(x)} est 1er`);
+  assert.ok(places.every((r, i) => i === 0 || r >= places[i - 1]) && places.at(-1)! <= places.length);
+}
+assert.equal(rangDansDivision(d, d.parNom.get("Chris")!), 30, "ex æquo à la 30e place : 30e de la D1");
+assert.equal(rangDansDivision(d, d.parNom.get("Dina")!), 30);
 
 // Personne sous sa division : sa place à la place de l'écart. Les neuf seuls
 // tiennent dans la D1 ; avec les 27 premiers, la D2 commence après Dina.
