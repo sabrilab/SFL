@@ -9,9 +9,12 @@
 //                          19/10 : partager les éléments de la Ligue fait
 //                          venir les joueurs ; ceux que l'élément met en avant
 //                          sont prévenus (lib/sfl/pieces-joueurs.ts).
+// Dans une saison close (les Actus d'une saison passée, son récap), ni l'un
+// ni l'autre : le Vestiaire ne connaît que la saison en cours.
 
 import { useRouter } from "next/navigation";
 import { MessageCircle } from "lucide-react";
+import { useSaisonClose } from "@/components/sfl/season-provider";
 import { preparerPiece, type Piece } from "@/lib/sfl/vestiaire";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +29,8 @@ function usePartager(piece: Piece) {
 
 export function AuVestiaire({ piece, className }: { piece: Piece; className?: string }) {
   const partager = usePartager(piece);
+  const relue = useSaisonClose();
+  if (relue) return null;
   return (
     <button
       type="button"
@@ -43,6 +48,8 @@ export function AuVestiaire({ piece, className }: { piece: Piece; className?: st
 
 export function AuVestiaireRond({ piece, className }: { piece: Piece; className?: string }) {
   const partager = usePartager(piece);
+  const relue = useSaisonClose();
+  if (relue) return null;
   return (
     <button
       type="button"
