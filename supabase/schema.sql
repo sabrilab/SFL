@@ -276,13 +276,14 @@ alter table public.profiles add column if not exists badge text
 -- débloqué se recalcule de l'XP : un choix pas débloqué ne s'affiche pas.
 -- Lu par toute la ligue, modifiable par le joueur seul (grant plus bas).
 alter table public.profiles add column if not exists habillage text
-  check (habillage is null or habillage ~ '^(auto|-|nuit|chrome|animee)/(auto|-|argentique|gravure|marbre)$');
+  check (habillage is null or habillage ~ '^(auto|-|nuit|chrome|animee)/(auto|-|argentique|gravure|marbre)(/(-|(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave)(\+(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave))*))?$');
 -- Les skins du Passe Bola (24/10, src/lib/sfl/passe.ts et skins-passe.ts) :
 -- la contrainte suit la liste des finitions ; « Tes couleurs » porte son pays
--- (couleurs:dz, couleurs:gb-eng). Refaite à chaque migration : idempotente.
+-- (couleurs:dz, couleurs:gb-eng) ; puis, depuis le 24/10, les signes choisis
+-- (/sceau+nom-grave, ou /-). Refaite à chaque migration : idempotente.
 alter table public.profiles drop constraint if exists profiles_habillage_check;
 alter table public.profiles add constraint profiles_habillage_check
-  check (habillage is null or habillage ~ '^(auto|-|nuit|chrome|animee|onyx|givre|carbone|marbre|neon|aurore|ki|meteorite|couleurs(:[a-z]{2}(-[a-z]{3})?)?)/(auto|-|argentique|gravure|marbre)$');
+  check (habillage is null or habillage ~ '^(auto|-|nuit|chrome|animee|onyx|givre|carbone|marbre|neon|aurore|ki|meteorite|couleurs(:[a-z]{2}(-[a-z]{3})?)?)/(auto|-|argentique|gravure|marbre)(/(-|(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave)(\+(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave))*))?$');
 
 -- La ville du joueur sur la Map (lib/sfl/villes.ts, 22/10) : le nom de sa
 -- commune et son CENTRE, tel que le donne le géocodeur — jamais sa position.

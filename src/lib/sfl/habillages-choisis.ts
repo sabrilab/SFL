@@ -20,7 +20,7 @@
 // chacun (use-habillage.ts), et un choix qui n'est pas débloqué ne se porte
 // pas.
 
-import type { Finition, Traitement } from "@/components/sfl/finitions-carte";
+import type { Finition, Signe, Traitement } from "@/components/sfl/finitions-carte";
 import { estPaysCouleurs } from "@/components/sfl/skins-passe";
 import { supabase } from "@/lib/supabase";
 
@@ -32,7 +32,11 @@ export interface ChoixHabillage {
   /** « Tes couleurs » : le pays choisi. */
   pays?: string;
   traitement: ChoixTraitement;
+  /** Les signes qu'il a choisi de porter (Personnaliser ma carte) : aucun tant qu'il n'a rien choisi. */
+  signes: Signe[];
 }
+
+const SIGNES: readonly Signe[] = ["lisere-argent", "lisere-platine", "sceau", "puce-noire", "nom-grave"];
 
 const FINITIONS: readonly string[] = [
   "auto",
@@ -54,17 +58,18 @@ const TRAITEMENTS: readonly string[] = ["auto", "-", "argentique", "gravure", "m
 
 /** Le choix tel qu'il est enregistré ; rien ou illisible = « auto » des deux côtés. */
 export function lireChoixHabillage(brut: string | null | undefined): ChoixHabillage {
-  const [f, t] = (brut ?? "").split("/");
+  const [f, t, g] = (brut ?? "").split("/");
   const [finition, pays] = (f ?? "").split(":");
   return {
     finition: FINITIONS.includes(finition) ? (finition as ChoixFinition) : "auto",
     pays: finition === "couleurs" && estPaysCouleurs(pays) ? pays : undefined,
     traitement: TRAITEMENTS.includes(t) ? (t as ChoixTraitement) : "auto",
+    signes: (g ?? "").split("+").filter((x): x is Signe => SIGNES.includes(x as Signe)),
   };
 }
 
 export const ecrireChoixHabillage = (c: ChoixHabillage) =>
-  `${c.finition === "couleurs" && c.pays ? `couleurs:${c.pays}` : c.finition}/${c.traitement}`;
+  `${c.finition === "couleurs" && c.pays ? `couleurs:${c.pays}` : c.finition}/${c.traitement}/${c.signes.length ? c.signes.join("+") : "-"}`;
 
 const CACHE_KEY = "sfl-habillages-choisis";
 const ATTENTE_KEY = "sfl-habillage-en-attente";

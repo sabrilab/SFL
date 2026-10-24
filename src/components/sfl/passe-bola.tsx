@@ -74,7 +74,7 @@ const CADRAGES: Partial<Record<number, Cadrage>> = {
 const PX_TAILLE_1 = 254 / 1024;
 
 /** Une carte réduite dans une fenêtre de l × h px : cadrée sur un signe, ou entière et centrée. */
-function Mini({ player, habillage, cadrage, l, h }: { player: Player; habillage: HabillageCarte; cadrage?: Cadrage; l: number; h: number }) {
+export function Mini({ player, habillage, cadrage, l, h }: { player: Player; habillage: HabillageCarte; cadrage?: Cadrage; l: number; h: number }) {
   const s = cadrage ? Math.max(l / 1024, h / 1656) * cadrage.zoom : Math.min(l / 1024, h / 1656);
   const cl = 1024 * s;
   const ch = 1656 * s;
@@ -170,7 +170,7 @@ function Vignette({
 }
 
 /** Le pays de « Tes couleurs » : une rangée de drapeaux. */
-function ChoixPays({ pays, onChoisir }: { pays: string; onChoisir: (p: string) => void }) {
+export function ChoixPays({ pays, onChoisir }: { pays: string; onChoisir: (p: string) => void }) {
   const rangee = useRef<HTMLDivElement>(null);
   // Le pays choisi se montre à l'ouverture.
   useEffect(() => {

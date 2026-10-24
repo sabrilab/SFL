@@ -27,6 +27,7 @@ import { MissionsAnnonce } from "@/components/sfl/missions-annonce";
 import { NouveauxBadges } from "@/components/sfl/vitrine";
 import { InvitationCarte } from "@/components/sfl/invitation-carte";
 import { Accueil, ApresAccueil } from "@/components/sfl/accueil/accueil";
+import { DaEssai } from "@/components/sfl/da/da-essai";
 
 // Typographie de l'app BOLA, celle de la Map (Sabri, 22/10 : « uniformise le
 // tout ») : Inter pour tout ce qui se lit (celle du site), au plus gras pour
@@ -155,6 +156,7 @@ export default function RootLayout({
                   <MemoireNavigation />
                 </Suspense>
                 <VoileEtat />
+                <DaEssai />
                 <BottomNav />
                 </AuthGate>
                 {/* Hors de la porte de connexion : le guide passe avant le
