@@ -92,6 +92,10 @@ function installer() {
   const remplacer = h.replaceState;
   h.pushState = function (data: unknown, unused: string, url?: string | URL | null) {
     const avant = marque();
+    // La page qu'on quitte laisse son ancre (#j2, #divisions…) : servie à
+    // l'arrivée, elle l'emporterait au retour sur la place où on l'avait
+    // laissée (le navigateur redescend à l'ancre, la page aussi).
+    if (window.location.hash) History.prototype.replaceState.call(h, h.state, "", adresse());
     const bola: Marque = { i: (avant?.i ?? 0) + 1, k: nouvelleCle(), de: adresse() };
     pousser.call(h, { ...(data as object | null), bola }, unused, url);
     prevenir();
