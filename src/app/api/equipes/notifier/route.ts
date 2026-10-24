@@ -9,11 +9,19 @@
 //   · signature : je viens de signer le Règlement ; le capitaine et le vice
 //     l'apprennent (« Adil a signé · 3 / 5 »), et toute l'équipe quand la
 //     cinquième signature la rend active. Une seule fois par signature.
-// Toucher une invitation ouvre la signature (/bola-team?invitation=id),
-// le reste la page Team. Chaque notification part avec son motif
-// (equipe-invitation, equipe-relance, equipe-signature, equipe-active ;
-// lib/sfl/motifs-notif.ts), rattachée à l'équipe : la base reconnaît seule
-// la réponse à une invitation (push_effet_equipe, supabase/schema.sql).
+//   · resultat (24/10) : mon équipe vient de remplir la feuille d'un match ;
+//     le capitaine et le vice de l'autre équipe l'apprennent, avec le score,
+//     pour confirmer (sans réponse, il vaut 24 h plus tard). Une fois par
+//     saisie (equipe_resultats.notifie_le).
+// Toucher une invitation ouvre la signature (/bola-team?invitation=id) ;
+// sur Android, elle porte aussi ses deux réponses, Oui et Non (Sabri,
+// 24/10 : « qu'ils soient quand même contraints de répondre à cette notif :
+// oui ou non »). Une feuille ouvre la feuille (/bola-team?feuille=id), le
+// reste la page Team. Chaque notification part avec son motif
+// (equipe-invitation, equipe-relance, equipe-signature, equipe-active,
+// equipe-resultat ; lib/sfl/motifs-notif.ts), rattachée à l'équipe ou au
+// match : la base reconnaît seule la réponse attendue (push_effet_equipe,
+// push_effet_resultat, supabase/schema.sql).
 //
 // La route agit avec la clé secrète, donc elle ne croit pas l'appelant sur
 // parole : son rôle dans l'équipe et l'état de chaque ligne sont relus ici.
@@ -26,7 +34,7 @@ import { finInvitation, quandTombe } from "@/lib/sfl/equipes-temps";
 
 export const maxDuration = 30;
 
-type Type = "invitation" | "relance" | "signature";
+type Type = "invitation" | "relance" | "signature" | "resultat";
 
 /** Une relance au plus par tranche de 12 h, pour un même invité. */
 const RELANCE = 12 * 3600_000;
@@ -53,9 +61,10 @@ export async function POST(req: NextRequest) {
   const moi = await appelant(sb, req);
   if (!moi) return NextResponse.json({ error: "Session requise." }, { status: 401 });
 
-  const corps = (await req.json().catch(() => ({}))) as { equipe?: unknown; type?: unknown; joueur?: unknown };
-  const id = Number(corps.equipe);
+  const corps = (await req.json().catch(() => ({}))) as { equipe?: unknown; type?: unknown; joueur?: unknown; defi?: unknown };
   const type = corps.type as Type;
+  if (type === "resultat") return resultat(sb, moi.id, Number(corps.defi));
+  const id = Number(corps.equipe);
   if (!Number.isInteger(id) || !["invitation", "relance", "signature"].includes(type))
     return NextResponse.json({ error: "Demande inconnue." }, { status: 400 });
 
@@ -108,6 +117,10 @@ export async function POST(req: NextRequest) {
           texte: couper(`Bola Team · ${effectif} · jusqu'à ${quandTombe(finInvitation(l.created_at), new Date(maintenant))}`, 180),
           url: `/bola-team?invitation=${id}`,
           tag: `equipe-invitation-${id}`,
+          actions: [
+            { action: "oui", titre: "Oui", url: `/bola-team?invitation=${id}&reponse=oui` },
+            { action: "non", titre: "Non", url: `/bola-team?invitation=${id}&reponse=non` },
+          ],
         },
         motif: type === "relance" ? "equipe-relance" : "equipe-invitation",
         ref,
@@ -168,5 +181,59 @@ export async function POST(req: NextRequest) {
   if (!cle || envois.size === 0) return NextResponse.json({ envoyes: 0, prevenus: envois.size });
 
   const { recus } = await prevenir(sb, cle, envois, { de: moi.id });
+  return NextResponse.json({ envoyes: recus.size, prevenus: envois.size });
+}
+
+/**
+ * La feuille d'un match vient d'être remplie par mon équipe : le capitaine
+ * et le vice de l'autre équipe confirment (ou corrigent). Relu ici : mon
+ * rôle, ma saisie (fraîche, pas encore annoncée), l'autre équipe.
+ */
+async function resultat(sb: NonNullable<ReturnType<typeof serveur>>, moi: string, d: number) {
+  if (!Number.isInteger(d)) return NextResponse.json({ error: "Demande inconnue." }, { status: 400 });
+  const { data: defi } = await sb.from("equipe_defis").select("id, de, a, statut").eq("id", d).maybeSingle();
+  if (!defi || defi.statut !== "accepte") return NextResponse.json({ error: "Match inconnu." }, { status: 404 });
+  const { data: roles } = await sb
+    .from("equipe_membres")
+    .select("equipe_id, joueur, role")
+    .in("equipe_id", [defi.de, defi.a])
+    .eq("statut", "membre");
+  const lignes = (roles ?? []) as { equipe_id: number; joueur: string; role: Ligne["role"] }[];
+  const ici = lignes.find((l) => l.joueur === moi && l.role !== "membre");
+  if (!ici) return NextResponse.json({ error: "Réservé aux capitaines." }, { status: 403 });
+  const mienne = ici.equipe_id;
+  const autre = mienne === defi.de ? defi.a : defi.de;
+  const { data: saisie } = await sb
+    .from("equipe_resultats")
+    .select("pour, contre, saisi_le, notifie_le")
+    .eq("defi_id", d)
+    .eq("equipe_id", mienne)
+    .maybeSingle();
+  if (!saisie || Date.now() - new Date(saisie.saisi_le).getTime() > FRAIS)
+    return NextResponse.json({ error: "Aucune saisie récente." }, { status: 403 });
+  if (saisie.notifie_le) return NextResponse.json({ envoyes: 0 });
+  // L'autre a déjà saisi le même score : le match est validé, rien à confirmer.
+  const { data: leur } = await sb.from("equipe_resultats").select("pour, contre").eq("defi_id", d).eq("equipe_id", autre).maybeSingle();
+  await sb.from("equipe_resultats").update({ notifie_le: new Date().toISOString() }).eq("defi_id", d).eq("equipe_id", mienne);
+  if (leur && leur.pour === saisie.contre && leur.contre === saisie.pour) return NextResponse.json({ envoyes: 0 });
+
+  const { data: noms } = await sb.from("equipes").select("id, nom").in("id", [mienne, autre]);
+  const nom = (id: number) => ((noms ?? []) as { id: number; nom: string }[]).find((x) => x.id === id)?.nom ?? "";
+  const envois = new Map<string, Envoi>();
+  for (const l of lignes)
+    if (l.equipe_id === autre && l.role !== "membre")
+      envois.set(l.joueur, {
+        notif: {
+          titre: couper(`${nom(mienne)} ${saisie.pour} – ${saisie.contre} ${nom(autre)}`, 60),
+          texte: leur ? "Ta feuille dit un autre score : corrige-la ou garde-la." : "Confirme le score et tes buteurs. Sans réponse, il vaut dans 24 h.",
+          url: `/bola-team?feuille=${d}`,
+          tag: `equipe-resultat-${d}`,
+        },
+        motif: "equipe-resultat",
+        ref: `defi:${d}`,
+      });
+  const cle = cleVapid();
+  if (!cle || envois.size === 0) return NextResponse.json({ envoyes: 0, prevenus: envois.size });
+  const { recus } = await prevenir(sb, cle, envois);
   return NextResponse.json({ envoyes: recus.size, prevenus: envois.size });
 }

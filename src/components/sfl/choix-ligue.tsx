@@ -11,9 +11,17 @@
 // comme le texte par un masque : pleins quand on y est, effacés sinon. Le
 // sigle SFL (tools/sigle-sfl.ts, 23/10) a les métriques du logo BOLA : à
 // hauteur égale, les lettres de SFL, BOLA et BOLA TEAM ont la même taille.
+//
+// Bola Team, quatre propositions (Sabri, 24/10 : « Bola, c'est exceptionnel,
+// mais le Team, propose d'autres noms ou d'autres designs ») : TEAM, CLUB et
+// FC redessinés dans les lettres du logo BOLA (tools/logo-team.mjs : même
+// graisse, même pente ; le L et le B de CLUB sont ceux du logo), et TEAM en
+// réserve dans une plaque penchée comme le flanc du B. Rien ne change en
+// production tant qu'il n'a pas choisi ; sur une préversion, ?logo=team, club,
+// fc ou plaque (gardé pour la visite, ?logo=actuel pour revenir).
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ChevronDown } from "lucide-react";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { cn } from "@/lib/utils";
@@ -26,6 +34,30 @@ const BADGES = [
 ] as const;
 // l : la largeur pour 18 px de haut. BOLA (1000 × 237) tient dans 74, donc à
 // 97,4 % de sa hauteur ; SFL (735 × 237) y est réduit d'autant : 54,4.
+
+const LOGOS_TEAM = {
+  team: { src: "/bola/bola-team.svg", l: 152.5, libelle: "Bola Team" },
+  club: { src: "/bola/bola-club.svg", l: 140.4, libelle: "Bola Club" },
+  fc: { src: "/bola/bola-fc.svg", l: 113.5, libelle: "Bola FC" },
+  plaque: { src: "/bola/bola-team-plaque.svg", l: 131.9, libelle: "Bola Team" },
+} as const;
+// l : 0,074 × la largeur du dessin, comme BOLA : les lettres gardent sa taille.
+type LogoTeam = keyof typeof LOGOS_TEAM;
+let logoApercu: LogoTeam | null | undefined;
+function lireLogoApercu(): LogoTeam | null {
+  if (logoApercu !== undefined) return logoApercu;
+  logoApercu = null;
+  if (process.env.NEXT_PUBLIC_BOLA_ENV === "production") return null;
+  try {
+    const q = new URLSearchParams(window.location.search).get("logo");
+    if (q === "actuel") localStorage.removeItem("bola-apercu-logo");
+    else if (q && q in LOGOS_TEAM) localStorage.setItem("bola-apercu-logo", q);
+    const v = localStorage.getItem("bola-apercu-logo");
+    if (v && v in LOGOS_TEAM) logoApercu = v as LogoTeam;
+  } catch {}
+  return logoApercu;
+}
+const rien = () => () => {};
 
 /**
  * L'en-tête des trois onglets (Actus, Bola, Team). Trois logos côte à côte,
@@ -100,6 +132,18 @@ export function EnteteLigue({ actif, className, children }: { actif: Actif; clas
  *  logo SFL ou Bola, à la couleur du texte ; Team, c'est « Bola Team » : le
  *  logo Bola suivi de TEAM (Sabri, 22/10). */
 export function SigleLigue({ ligue, hauteur = 12, className }: { ligue: "sfl" | "bola" | "team"; hauteur?: number; className?: string }) {
+  const logo = useSyncExternalStore(rien, lireLogoApercu, () => null);
+  if (ligue === "team" && logo) {
+    const b = LOGOS_TEAM[logo];
+    return (
+      <span
+        role="img"
+        aria-label={b.libelle}
+        className={cn("inline-block shrink-0 bg-current align-middle", className)}
+        style={{ height: hauteur, width: (b.l / 18) * hauteur, mask: `url(${b.src}) center / contain no-repeat`, WebkitMask: `url(${b.src}) center / contain no-repeat` }}
+      />
+    );
+  }
   if (ligue === "team")
     return (
       <span role="img" aria-label="Bola Team" className={cn("inline-flex shrink-0 items-center", className)} style={{ gap: hauteur * 0.3 }}>
