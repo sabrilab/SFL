@@ -8,13 +8,13 @@
 //   · le traitement de la photo : argentique (noir et blanc, grain,
 //     vignette), gravure (contraste dur et tailles-douces, comme un billet),
 //     marbre (le blanc d'une statue, ses veines) ;
-//   · le liseré d'argent ou d'or : un filet de métal autour du portrait
-//     (l'or remplace l'argent) ;
+//   · le liseré d'argent, ou de platine, doublé : un filet de métal autour du
+//     portrait (le platine remplace l'argent ; plus d'or depuis le 24/10) ;
 //   · le cran, de 1 à 4 : les coins de ce cadre, posés un par un dans le sens
 //     des aiguilles d'une montre ; à 4, le cadre est fermé ;
 //   · le sceau : un tampon à ses initiales sur le bas de la photo, comme sur
 //     une pièce d'identité ;
-//   · la puce dorée, et son nom gravé dans le microtexte (bola-card.tsx) ;
+//   · la puce noire, et son nom gravé dans le microtexte (bola-card.tsx) ;
 //   · le rang B, A ou S : l'insigne hexagonal des fiches de mission
 //     (actus/missions.css), à côté de l'étiquette.
 // Tout est en SVG ou en CSS dans le repère de la carte (1024 × 1656) : net à
@@ -74,6 +74,19 @@ export function Lisere({ metal, boite, epaisseur = 4 }: { metal: Metal; boite: B
       {/* Une ombre fine sous le filet : il est posé, pas imprimé. */}
       <rect x={x} y={y + 2} width={w} height={h} rx={r} fill="none" stroke="rgba(0,0,0,0.22)" strokeWidth={epaisseur} />
       <rect x={x} y={y} width={w} height={h} rx={r} fill="none" stroke={`url(#${id})`} strokeWidth={epaisseur} />
+      {/* Le platine est double : un second filet, plus fin, à l'intérieur. */}
+      {metal === "platine" && (
+        <rect
+          x={x + 11}
+          y={y + 11}
+          width={w - 22}
+          height={h - 22}
+          rx={Math.max(0, r - 11)}
+          fill="none"
+          stroke={`url(#${id})`}
+          strokeWidth={epaisseur * 0.6}
+        />
+      )}
     </svg>
   );
 }

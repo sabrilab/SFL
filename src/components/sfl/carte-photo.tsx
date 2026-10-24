@@ -33,7 +33,15 @@
 // classique (`data-card-part` body / player / stats).
 
 import { palierCarte } from "@/components/sfl/bola-card";
-import { lisereDe, MATIERES, METAUX, RAYON_CARTE, type HabillageCarte, type Traitement } from "@/components/sfl/finitions-carte";
+import {
+  lisereDe,
+  MATIERES,
+  matiereDe,
+  METAUX,
+  RAYON_CARTE,
+  type HabillageCarte,
+  type Traitement,
+} from "@/components/sfl/finitions-carte";
 import { filtrePhoto, InsigneRang, VoileTraitement } from "@/components/sfl/habillage-carte";
 import { ObjetBadge } from "@/components/sfl/insigne-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
@@ -141,7 +149,7 @@ export function CartePhoto({
   const p0 = palierCarte(largeur);
   const palier = vertical && p0 === "pastille" ? "reduite" : p0;
   // Le serti : la matière d'une carte à titre, ou de la finition portée.
-  const teinte = distinction ? MATIERES[distinction] : habillage?.finition ? MATIERES[habillage.finition] : null;
+  const teinte = distinction ? MATIERES[distinction] : habillage?.finition ? matiereDe("base", habillage) : null;
   // Le liseré porté : le filet autour de la photo, dans son métal (au moins 1 px).
   const lisere = lisereDe(habillage);
   const filet = lisere ? METAUX[lisere][1] : null;

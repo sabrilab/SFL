@@ -15,10 +15,13 @@
 //     opposition de phase et de longueurs d'onde voisines, qui
 //     s'entrelacent en chaînes puis se rejoignent (une moire, comme sur le
 //     revers d'un smoking).
-// Et la rosace guillochée du dos (RosaceBola), comme sur un billet.
+// Et la rosace guillochée du dos (RosaceBola), comme sur un billet. Les
+// motifs des skins du Passe Bola sont dans motifs-passe.tsx.
 
 import { Fragment, useId } from "react";
 import type { Motif } from "@/components/sfl/finitions-carte";
+import { MotifPasseSvg } from "@/components/sfl/motifs-passe";
+import { estMotifPasse } from "@/components/sfl/skins-passe";
 
 const W = 1024;
 const H = 1656;
@@ -103,6 +106,8 @@ export function MotifCarte({
 }) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");
   const style: React.CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%" };
+
+  if (estMotifPasse(motif)) return <MotifPasseSvg motif={motif} graine={graine} dos={!!centre} />;
 
   if (motif.type === "rayons") {
     const { cx, cy } = centre ?? motif;
