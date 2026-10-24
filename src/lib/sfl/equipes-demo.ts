@@ -3,7 +3,8 @@
 // Team montre un petit monde tiré des vrais noms de la ligue — mon équipe
 // (5 signataires, un invité), trois autres, un défi reçu. Rien n'est écrit.
 //
-// Depuis le 24/10, chaque équipe a son écusson dessiné, et le championnat a
+// Depuis le 24/10, chaque équipe a son écusson dessiné (des animaux depuis le
+// soir : le lion de Sunday Five, le cheval du Racing…), et le championnat a
 // sa démonstration (demoChampionnat) : 30 équipes du Nord, donc une D1 de 18
 // et une D2 de 12 (lib/sfl/championnat-team.ts), six journées jouées de la
 // saison 1, l'horloge arrêtée au soir du 15 décembre 2026. Mon équipe y a
@@ -65,30 +66,30 @@ const b = (forme: Forme, motif: Motif, c1: string, c2: string, c3: string, emble
 
 /** Les quatre équipes de la page Team, puis celles du championnat seulement. */
 const ECUSSONS: Record<number, Blason> = {
-  1: b("blason", "bande", "noir", "or", "blanc", "etoile"),
+  1: b("blason", "bande", "noir", "or", "blanc", "lion"),
   2: b("ecu", "parti", "rouge", "blanc", "noir", "initiales"),
-  3: b("rond", "rayures", "ciel", "blanc", "marine", "ballon"),
+  3: b("rond", "rayures", "ciel", "blanc", "marine", "cheval"),
   4: b("pointe", "coupe", "vert", "blanc", "noir", "eclair"),
 };
 
 const AUTRES: [string, Blason][] = [
-  ["Olympique Roubaix", b("blason", "echarpe", "marine", "rouge", "blanc", "couronne")],
+  ["Olympique Roubaix", b("blason", "echarpe", "marine", "rouge", "blanc", "aigle")],
   ["Tourcoing United", b("ecu", "chevron", "bordeaux", "or", "blanc", "initiales")],
   ["Lomme Sporting", b("pointe", "rayures", "vert", "blanc", "noir", "initiales")],
   ["Vauban FC", b("ecu", "uni", "roi", "blanc", "blanc", "etoile")],
   ["Hellemmes City", b("rond", "cercle", "ciel", "marine", "blanc", "initiales")],
-  ["Lambersart Athletic", b("blason", "coupe", "rouge", "noir", "blanc", "eclair")],
+  ["Lambersart Athletic", b("blason", "coupe", "rouge", "noir", "blanc", "loup")],
   ["Union Marcq", b("ovale", "parti", "jaune", "marine", "marine", "ballon")],
   ["Croix Rovers", b("ecu", "tranche", "orange", "noir", "blanc", "initiales")],
   ["Villeneuve Five", b("pointe", "bande", "blanc", "roi", "roi", "etoile")],
   ["Wattrelos Stars", b("blason", "uni", "violet", "or", "or", "etoile")],
   ["Saint-Maurice FC", b("rond", "rayures", "vert", "jaune", "noir", "initiales")],
-  ["Euralille FC", b("ecu", "echarpe", "noir", "rouge", "blanc", "couronne")],
+  ["Euralille FC", b("ecu", "echarpe", "noir", "rouge", "blanc", "coq")],
   ["Bois-Blancs FC", b("ovale", "coupe", "blanc", "foret", "foret", "initiales")],
   ["Mons Academy", b("blason", "chevron", "marine", "ciel", "blanc", "ballon")],
   ["Faches Futsal", b("rond", "uni", "orange", "blanc", "blanc", "ballon")],
   ["Loos Calcio", b("ecu", "rayures", "noir", "blanc", "argent", "initiales")],
-  ["Ronchin Rangers", b("blason", "bande", "foret", "blanc", "or", "couronne")],
+  ["Ronchin Rangers", b("blason", "bande", "foret", "blanc", "or", "taureau")],
   ["Haubourdin 59", b("pointe", "parti", "rouge", "jaune", "noir", "initiales")],
   ["Wambrechies FC", b("ovale", "uni", "ciel", "blanc", "marine", "etoile")],
   ["Seclin Sport", b("ecu", "chevron", "vert", "blanc", "noir", "eclair")],
