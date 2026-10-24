@@ -196,8 +196,67 @@ function useAncre(pret: boolean) {
 /** Le classement de la rangée de cartes : la Pépite d'Or de la saison. */
 const PEPITE: Categorie = RANKINGS.find((r) => r.id === "pp")!;
 
-/** L'écart d'une carte à l'autre dans la rangée, pour les faire glisser de leur ancienne place. */
-const PAS = 87;
+/**
+ * Toutes les cartes de la rangée au même format, debout, celui du premier
+ * (Sabri, 24/10 : « il n'y a pas de raison […] tous au même format que le
+ * premier »). Le podium se lit à l'écrin de la carte, pas à sa taille.
+ */
+const TAILLE = FORMAT_CARTE.moyenne;
+
+/** L'écart d'une carte à l'autre dans la rangée (carte, écrin, espace), pour les faire glisser de leur ancienne place. */
+const PAS = Math.round(254 * TAILLE) + 16 + 12;
+
+/**
+ * L'écrin d'une place du podium, dans le vocabulaire de la carte imprimée
+ * (Sabri, 24/10 : « un embellissement du fond ou bien du liseré ») : à
+ * l'encre seule, sans or ni couleur, il s'enrichit d'une marche à l'autre.
+ *   · 3e — un filet ;
+ *   · 2e — le double filet, comme sur un billet ;
+ *   · 1er — le double filet sur un fond guilloché, les vagues de l'onyx
+ *     (motif-carte.tsx) : deux familles de vagues en opposition de phase,
+ *     de longueurs d'onde voisines, qui s'entrelacent en moire.
+ */
+const GUILLOCHE = (() => {
+  let d = "";
+  for (const [lambda, phase] of [[52, 0], [47, Math.PI]] as const)
+    for (let y0 = -6; y0 <= 246; y0 += 7) {
+      for (let x = 0; x <= 100; x += 2.5) {
+        const y = y0 + 3.2 * Math.sin((2 * Math.PI * x) / lambda + phase + y0 / 30);
+        d += `${x === 0 ? "M" : "L"}${x} ${Math.round(y * 10) / 10}`;
+      }
+    }
+  return d;
+})();
+
+function Ecrin({ rang }: { rang: number }) {
+  if (rang > 3) return null;
+  return (
+    <span aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-2xl">
+      {rang === 1 && (
+        <>
+          <span className="absolute inset-0 bg-foreground/[0.05]" />
+          <svg viewBox="0 0 100 240" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full text-foreground/[0.13]">
+            <path d={GUILLOCHE} fill="none" stroke="currentColor" strokeWidth={0.45} />
+          </svg>
+        </>
+      )}
+      <span
+        className={cn(
+          "absolute inset-0 rounded-2xl ring-1 ring-inset",
+          rang === 1 ? "ring-foreground/40" : rang === 2 ? "ring-foreground/30" : "ring-foreground/20",
+        )}
+      />
+      {rang <= 2 && (
+        <span
+          className={cn(
+            "absolute inset-[3px] rounded-[13px] ring-1 ring-inset",
+            rang === 1 ? "ring-foreground/20" : "ring-foreground/12",
+          )}
+        />
+      )}
+    </span>
+  );
+}
 
 /**
  * La rangée de cartes : la Pépite d'Or, centrée sur toi, et elle seule (les
@@ -309,13 +368,15 @@ function Ticker({
             key={p.name}
             data-moi={p.name === moi ? "" : undefined}
             className={cn(
-              "flex shrink-0 flex-col items-center gap-1 rounded-2xl p-1.5",
+              "isolate flex shrink-0 flex-col items-center gap-1 rounded-2xl p-2",
               p.name === moi && "bg-foreground/10",
               pose && "transition-transform duration-[1200ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]",
-              p.name === moi && "relative z-10",
+              "relative",
+              p.name === moi && "z-10",
             )}
             style={{ transform: pose || !a ? undefined : `translateX(${(a.i - i) * PAS}px)` }}
           >
+            <Ecrin rang={p.rank} />
             <span
               className="text-[20px] leading-none"
               style={{ fontFamily: ANTON }}
@@ -324,9 +385,7 @@ function Ticker({
             </span>
             <MiniCarte
               player={p}
-              size={
-                p.rank === 1 ? FORMAT_CARTE.moyenne : FORMAT_CARTE.petite * 1.3
-              }
+              size={TAILLE}
               detail={`${p.rank}e · ${p.value} ${unite(def, p.value)}`}
               cle={cle && `${cle}-${p.name}`}
             />
