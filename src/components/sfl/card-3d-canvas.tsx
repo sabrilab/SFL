@@ -26,7 +26,7 @@
 // frameloop="demand" : aucun rendu tant que rien ne bouge (la finition
 // animée ne réveille le rendu que le temps de chaque passage de lumière).
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
 import { MATIERES, RAYON_CARTE, type NomMatiere } from "@/components/sfl/finitions-carte";
@@ -343,7 +343,18 @@ function allureDe(matiere: NomMatiere | null | undefined, mode: "simple" | "rare
 const PARTICLE_COUNT = 20;
 const BURST_DURATION = 0.7;
 
-function CardMesh({
+/**
+ * La carte tenue d'ailleurs (la scène plein écran, carte-en-grand-3d.tsx) :
+ * sa bascule (x) et son tour (y) en radians, son échelle. Relue à chaque
+ * image à la place du glissement d'ici, reflet compris.
+ */
+export interface PoseCarte {
+  x: number;
+  y: number;
+  scale: number;
+}
+
+export function CardMesh({
   background,
   playerLayer,
   stats,
@@ -355,6 +366,8 @@ function CardMesh({
   interactive = true,
   posee = false,
   onAffichee,
+  pose,
+  cadre,
 }: {
   background: string;
   playerLayer: string;
@@ -371,6 +384,10 @@ function CardMesh({
   posee?: boolean;
   /** Appelé dès la première image avec les trois calques chargés. */
   onAffichee?: () => void;
+  /** La pose, quand la scène plein écran tient la carte (avec interactive à false). */
+  pose?: RefObject<PoseCarte>;
+  /** La carte en unités monde, quand le canvas n'a pas sa forme (la scène plein écran). */
+  cadre?: { largeur: number; hauteur: number };
 }) {
   const { camera, invalidate } = useThree();
   const allure = useMemo(() => allureDe(matiere, mode, holo), [matiere, mode, holo]);
@@ -385,8 +402,8 @@ function CardMesh({
   const distance = persp.position.z;
   const vFOV = THREE.MathUtils.degToRad(persp.fov);
   const visibleHeight = 2 * Math.tan(vFOV / 2) * distance;
-  const height = visibleHeight * FILL_RATIO;
-  const width = height * persp.aspect;
+  const height = cadre?.hauteur ?? visibleHeight * FILL_RATIO;
+  const width = cadre?.largeur ?? height * persp.aspect;
 
   const groupRef = useRef<THREE.Group>(null);
   const holoMesh = useRef<THREE.Mesh>(null);
@@ -499,7 +516,13 @@ function CardMesh({
     const m = etat.current;
     const dt = Math.min(delta, 0.05);
 
-    if (m === "drag") {
+    if (pose) {
+      // La scène plein écran tient la carte : sa pose, telle quelle. C'est
+      // elle qui relance le rendu tant que la carte bouge.
+      c.x = pose.current.x;
+      c.y = pose.current.y;
+      c.scale = pose.current.scale;
+    } else if (m === "drag") {
       c.x += (t.x - c.x) * LERP_DRAG;
       const prevY = c.y;
       c.y += (t.y - c.y) * LERP_DRAG;
@@ -564,11 +587,12 @@ function CardMesh({
     }
 
     const settled =
-      etat.current !== "inertia" &&
-      etat.current !== "drag" &&
-      Math.abs(t.y - c.y) < 0.0006 &&
-      Math.abs(t.x - c.x) < 0.0006 &&
-      Math.abs(t.scale - c.scale) < 0.0006;
+      !!pose ||
+      (etat.current !== "inertia" &&
+        etat.current !== "drag" &&
+        Math.abs(t.y - c.y) < 0.0006 &&
+        Math.abs(t.x - c.x) < 0.0006 &&
+        Math.abs(t.scale - c.scale) < 0.0006);
 
     const b = burst.current;
     if (b.active) {

@@ -16,6 +16,9 @@ import type { Player } from "@/lib/sfl/engine";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
 import { appliquerVotes } from "@/lib/sfl/votes";
 import { useSuiviVotes, useVotes } from "@/hooks/use-votes";
+import { useSession } from "@/hooks/use-session";
+import type { Session } from "@/lib/sfl/auth/session";
+import { supabase } from "@/lib/supabase";
 
 export const SAISIE_EVENT = "sfl-saisie";
 
@@ -27,6 +30,64 @@ interface SeasonValue extends DerivedSeason {
    * liste publique et c'est elle qu'il faut utiliser.
    */
   allPlayers: Player[];
+  /** Le nom du joueur connecté s'il joue en Bola, hors de la SFL (voir joueurBola). */
+  bola: string | null;
+}
+
+const memeNom = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * Un joueur Bola (parrainage, 24/10/2026) : connecté et accepté, mais hors de
+ * l'effectif de la saison SFL, venu par le lien d'un joueur ou d'une équipe.
+ * Il a sa carte à lui, base 75 partout comme un nouveau de la saison, au
+ * poste de sa fiche d'inscription, dans `allPlayers` seulement et sur son
+ * seul téléphone : aucun classement ni aucune liste de la SFL ne le montre.
+ * Avant, il restait sur « Ta carte arrive » (AuthGate) tant que l'admin ne
+ * l'ajoutait pas à la saison.
+ */
+function nomBola(session: Session | null, joueurs: Player[]): string | null {
+  const nom = session?.server && !session.enAttente ? session.name : null;
+  return nom && !joueurs.some((p) => memeNom(p.name, nom)) ? nom : null;
+}
+
+function joueurBola(nom: string | null, poste: string | null): Player | null {
+  if (!nom) return null;
+  return {
+    name: nom,
+    poste: poste ?? "—",
+    pp: 0,
+    matchs: 0,
+    buts: 0,
+    passes: 0,
+    statut: "Actif",
+    stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 },
+    mvp: 0,
+    impact: 0,
+    def: 0,
+  };
+}
+
+/** Le poste qu'un joueur Bola a choisi à l'inscription (sa fiche) : sa carte le porte. */
+function usePosteBola(nom: string | null): string | null {
+  const [lu, setLu] = useState<{ nom: string; poste: string | null } | null>(null);
+  useEffect(() => {
+    if (!nom) return;
+    let fini = false;
+    const sb = supabase();
+    sb.auth
+      .getUser()
+      .then(({ data }) =>
+        data.user ? sb.from("fiches").select("poste").eq("player_id", data.user.id).maybeSingle() : null
+      )
+      .then((r) => {
+        if (!fini) setLu({ nom, poste: (r?.data as { poste?: string | null } | null)?.poste ?? null });
+      })
+      .catch(() => {});
+    return () => {
+      fini = true;
+    };
+  }, [nom]);
+  return lu && lu.nom === nom ? lu.poste : null;
 }
 
 const SeasonContext = createContext<SeasonValue | null>(null);
@@ -81,6 +142,10 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     const vote = appliquerVotes(saison, brut.journees, votes, new Date());
     return vote === saison ? brut : deriveSeason(vote);
   }, [saison, votes, horloge]);
+  const session = useSession();
+  const nom = useMemo(() => nomBola(session, derived.players), [session, derived.players]);
+  const poste = usePosteBola(nom);
+  const bola = useMemo(() => joueurBola(nom, poste), [nom, poste]);
   // `players` est la liste PUBLIQUE : les joueurs masqués n'y sont pas, donc
   // aucun classement, aucune recherche, aucun duel ne peut les faire remonter.
   const value = useMemo<SeasonValue>(
@@ -88,10 +153,11 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
       ...derived,
       players: publicOnly(derived.players),
       boostCards: derived.boostCards.filter((c) => !isHidden(c.player)),
-      allPlayers: derived.players,
+      allPlayers: bola ? [...derived.players, bola] : derived.players,
+      bola: bola?.name ?? null,
       saison,
     }),
-    [derived, saison]
+    [derived, bola, saison]
   );
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
@@ -101,6 +167,18 @@ export function useSeason(): SeasonValue {
   const value = useContext(SeasonContext);
   if (!value) throw new Error("useSeason doit être utilisé dans un SeasonProvider");
   return value;
+}
+
+const SaisonCloseContext = createContext(false);
+
+/**
+ * Lit-on une saison close (SaisonArchiveProvider) ? Rien ne s'y partage au
+ * Vestiaire ni ne s'y félicite : le Vestiaire et les félicitations ne
+ * connaissent que la saison en cours (une feuille partagée y montrerait la
+ * journée du même numéro, mais de cette saison-ci).
+ */
+export function useSaisonClose(): boolean {
+  return useContext(SaisonCloseContext);
 }
 
 /**
@@ -116,8 +194,13 @@ export function SaisonArchiveProvider({ saison, children }: { saison: Saison; ch
       players: publicOnly(derived.players),
       boostCards: derived.boostCards.filter((c) => !isHidden(c.player)),
       allPlayers: derived.players,
+      bola: null,
       saison,
     };
   }, [saison]);
-  return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
+  return (
+    <SeasonContext.Provider value={value}>
+      <SaisonCloseContext.Provider value>{children}</SaisonCloseContext.Provider>
+    </SeasonContext.Provider>
+  );
 }

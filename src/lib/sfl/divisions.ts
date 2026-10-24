@@ -11,10 +11,14 @@
 //     en D3. À égalité de points, même division : les ex æquo de la 30e
 //     place entrent tous en D1. Qui n'a pas encore joué de la saison entre
 //     en D3, la division ouverte ;
-//   · dès la J4, chaque dimanche joué fait bouger : les points Pépite de la
-//     journée (saisie/engine.ts, entryPP) font monter (MONTEE ou plus),
-//     rester, ou descendre (DESCENTE ou moins), d'une division à la fois. Un
-//     absent garde sa division ; une absence injustifiée (−2) fait descendre.
+//   · dès la J4, chaque dimanche joué refait les divisions de la même façon,
+//     sur le Pépite d'Or de la saison à ce soir-là. Pas de plage ni de seuil
+//     (Sabri, 24/10 : « il n'y a pas réellement de règle de montée ou de
+//     descente, si ce n'est le nombre de points pépites à la fin des
+//     matchs ») : tes points du dimanche et ceux de tes voisins au classement
+//     décident. On peut monter de la D3 à la D1 en un dimanche, retomber le
+//     suivant ; un absent ne marque rien, et ceux qui marquent peuvent le
+//     passer.
 //
 // Rien n'est stocké : tout se relit dans les feuilles de la saison, comme les
 // classements, si bien qu'une feuille corrigée corrige les divisions. Le
@@ -47,18 +51,14 @@ export const REGLES_DIVISIONS = {
   saison: 1,
   /** Les places de la D1 et de la D2 au découpage ; la D3 prend les autres. */
   taille: 30,
-  /** La première journée jouée en divisions ; celle d'avant fait le découpage. */
+  /** La première journée jouée en divisions ; celle d'avant fait le premier découpage. */
   depuis: 4,
-  /** Les points de la journée qui font monter d'une division. */
-  montee: 9,
-  /** Les points de la journée (ou moins) qui font descendre d'une division. */
-  descente: 3,
 } as const;
 
 /** La journée qui coupe la ligue : la dernière sans divisions. */
 export const J_DECOUPAGE = REGLES_DIVISIONS.depuis - 1;
 
-/** Une place au découpage : la division, et le rang au Pépite d'Or qui l'a donnée. */
+/** Une place au découpage : la division, et le rang au Pépite d'Or qui l'a donnée (à l'écran, sa place dans la division : rangDansDivision). */
 export interface PlaceDecoupage {
   nom: string;
   division: Division;
@@ -102,6 +102,16 @@ export function decouper(saison: Saison, jusqua?: number): Decoupage {
 }
 
 /**
+ * La place d'un joueur dans sa division, comptée depuis son premier : le
+ * premier de la D2 est 1er, pas 31e (Sabri, 24/10 : « chaque division a son
+ * premier, son deuxième, son troisième »). Les ex æquo gardent leur place
+ * commune.
+ */
+export function rangDansDivision(d: Decoupage, place: PlaceDecoupage): number {
+  return place.rang - d.divisions[place.division][0].rang + 1;
+}
+
+/**
  * Ce qui sépare un joueur des divisions voisines au découpage : les points
  * qu'il lui faut pour rejoindre le dernier de la division du dessus (à
  * égalité, on y entre), et son avance sur le premier de celle du dessous.
@@ -117,22 +127,19 @@ export function ecartsDecoupage(d: Decoupage, nom: string): { monter: number | n
   };
 }
 
-/** Où va un joueur après un dimanche joué en division `de`, avec `points` sur la journée. */
-export function apresLaJournee(de: Division, points: number): Division {
-  if (points >= REGLES_DIVISIONS.montee) return Math.max(1, de - 1) as Division;
-  if (points <= REGLES_DIVISIONS.descente) return Math.min(3, de + 1) as Division;
-  return de;
-}
-
 /** Un dimanche joué en divisions, joueur par joueur. */
 export interface Mouvement {
   nom: string;
-  /** La division où il a joué ce dimanche. */
+  /** La division où il a joué ce dimanche (la D3 pour qui n'avait pas encore joué). */
   de: Division;
   /** Celle où il jouera le suivant. */
   vers: Division;
   /** Ses points Pépite de la journée. */
   points: number;
+  /** Sur la feuille de la journée : présent, ou absent sans excuse (ses points comptent). */
+  joue: boolean;
+  /** Sa place au Pépite d'Or de la saison, ce dimanche joué. */
+  rang: number;
 }
 
 export interface EtatDivisions {
@@ -140,7 +147,7 @@ export interface EtatDivisions {
   phase: "annonce" | "divisions";
   /** La division de chacun pour le prochain dimanche ; en annonce, celle de la projection. */
   actuelle: Map<string, Division>;
-  /** Le découpage de la J3 (ou la projection de ce soir, en annonce). */
+  /** Le Pépite d'Or coupé au dernier dimanche joué (la projection de ce soir, en annonce). */
   decoupage: Decoupage;
   /** Les dimanches joués en divisions, dans l'ordre, avec qui monte et qui descend. */
   journees: { j: number; mouvements: Mouvement[] }[];
@@ -158,33 +165,35 @@ export function etatDivisions(saison: Saison): EtatDivisions | null {
       journees: [],
     };
   }
-  const decoupage = decouper(saison, J_DECOUPAGE);
+  // Chaque dimanche joué recoupe le Pépite d'Or : le dernier fait les divisions du suivant.
+  const decoupage = decouper(saison);
   const actuelle = new Map<string, Division>([...decoupage.parNom].map(([n, p]) => [n, p.division]));
   const journees: EtatDivisions["journees"] = [];
   const jouees = [...new Set(saison.journees.map((m) => m.j))]
     .filter((j) => j >= REGLES_DIVISIONS.depuis && journeeJouee(saison, j))
     .sort((a, b) => a - b);
+  let avant = jouees.length ? decouper(saison, jouees[0] - 1) : decoupage;
   for (const j of jouees) {
-    // Les points de la journée, par joueur : présents et absents injustifiés
-    // seulement. Un absent excusé, un blessé, un suspendu ne bougent pas.
+    const apres = decouper(saison, j);
+    // Les points de la journée, par joueur ; comptent les présents et les absents sans excuse.
     const points = new Map<string, number>();
-    const compte = new Set<string>();
+    const joue = new Set<string>();
     for (const e of saison.entries) {
       if (e.j !== j) continue;
-      if ((e.statut === "Présent" && !e.extraTime) || e.statut === "Absence injustifiée") compte.add(e.player);
+      if ((e.statut === "Présent" && !e.extraTime) || e.statut === "Absence injustifiée") joue.add(e.player);
       points.set(e.player, (points.get(e.player) ?? 0) + entryPP(e));
     }
-    const mouvements: Mouvement[] = [];
-    for (const nom of compte) {
-      if (isHidden(nom)) continue;
-      const de = actuelle.get(nom) ?? 3;
-      const pts = points.get(nom) ?? 0;
-      const vers = apresLaJournee(de, pts);
-      mouvements.push({ nom, de, vers, points: pts });
-      actuelle.set(nom, vers);
-    }
-    mouvements.sort((a, b) => a.de - b.de || b.points - a.points || a.nom.localeCompare(b.nom, "fr"));
+    // Tous les classés, qu'ils aient joué ou non : ceux qui marquent passent les autres.
+    const mouvements: Mouvement[] = [...apres.parNom.values()].map((p) => ({
+      nom: p.nom,
+      de: avant.parNom.get(p.nom)?.division ?? 3,
+      vers: p.division,
+      points: points.get(p.nom) ?? 0,
+      joue: joue.has(p.nom),
+      rang: p.rang,
+    }));
     journees.push({ j, mouvements });
+    avant = apres;
   }
   return { phase: "divisions", actuelle, decoupage, journees };
 }
@@ -219,8 +228,10 @@ export const enPoints = (n: number) => `${n < 0 ? "−" : ""}${Math.abs(n)} ${Ma
 
 /**
  * Ce que le dernier dimanche a fait d'un joueur, sans point final : « Tu
- * montes en D1 avec 11 pts », « Tu restes en D2 avec 6 pts, 9 pts dimanche
- * et tu montes ». null pour un joueur masqué ou sans division.
+ * montes en D1 avec 11 pts », « Tu restes en D2 avec 6 pts, à 3 pts de la
+ * D1 », « Tu restes en D1, 2 pts devant la D2 » (sans avoir joué). L'écart
+ * est celui du classement de ce soir : le dimanche suivant, chacun marque.
+ * null pour un joueur masqué ou sans division.
  */
 export function phraseBilan(etat: EtatDivisions, bilan: BilanDivisions, nom: string): string | null {
   if (isHidden(nom)) return null;
@@ -229,10 +240,17 @@ export function phraseBilan(etat: EtatDivisions, bilan: BilanDivisions, nom: str
     const d = etat.actuelle.get(nom);
     return d ? `Tu restes en ${nomDivision(d)}` : null;
   }
-  if (m.vers < m.de) return `Tu montes en ${nomDivision(m.vers)} avec ${enPoints(m.points)}`;
-  if (m.vers > m.de) return `Tu descends en ${nomDivision(m.vers)} avec ${enPoints(m.points)}`;
-  const reste = `Tu restes en ${nomDivision(m.vers)} avec ${enPoints(m.points)}`;
-  return m.vers > 1 ? `${reste}, ${REGLES_DIVISIONS.montee} pts dimanche et tu montes` : reste;
+  const avec = m.joue ? ` avec ${enPoints(m.points)}` : "";
+  if (m.vers < m.de) return `Tu montes en ${nomDivision(m.vers)}${avec}`;
+  if (m.vers > m.de) return `Tu descends en ${nomDivision(m.vers)}${avec}`;
+  const { monter, avance } = ecartsDecoupage(etat.decoupage, nom);
+  const ecart =
+    monter != null
+      ? `, à ${enPoints(monter)} de la ${nomDivision((m.vers - 1) as Division)}`
+      : avance != null
+        ? `, ${enPoints(avance)} devant la ${nomDivision(2)}`
+        : "";
+  return `Tu restes en ${nomDivision(m.vers)}${avec}${ecart}`;
 }
 
 /* ------------------------------- L'annonce ------------------------------- */
@@ -337,11 +355,8 @@ export function taDivision(d: Decoupage, nom: string, { place: avecPlace = true 
     monter != null ? `à ${pts(monter)} de la ${nomDivision((place.division - 1) as Division)}` : null,
     avance != null ? `${pts(avance)} devant la ${nomDivision((place.division + 1) as Division)}` : null,
   ].filter(Boolean);
-  if (avecPlace && avance == null && place.division < 3) {
-    // Le rang dans sa division, compté depuis son premier : la D2 commence après la 30e place.
-    const premier = d.divisions[place.division][0].rang;
-    ecarts.push(`à la ${ordinal(place.rang - premier + 1)} des ${REGLES_DIVISIONS.taille} places`);
-  }
+  if (avecPlace && avance == null && place.division < 3)
+    ecarts.push(`à la ${ordinal(rangDansDivision(d, place))} des ${REGLES_DIVISIONS.taille} places`);
   return `tu serais en ${nomDivision(place.division)}${ecarts.length ? `, ${ecarts.join(" et ")}` : ""}`;
 }
 

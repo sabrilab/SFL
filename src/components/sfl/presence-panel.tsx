@@ -8,6 +8,9 @@
 //
 // Toute la donnée vient de usePresence : partagée (Supabase, temps réel)
 // quand la base est branchée, locale sinon. L'écran ne fait pas la différence.
+//
+// Un joueur Bola (venu par un parrain, hors de la saison) la regarde en
+// spectateur : qui vient, les équipes, mais ni « Ma présence » ni boutons.
 
 import { useMemo } from "react";
 import { Check, Copy, Radio, X } from "lucide-react";
@@ -19,6 +22,7 @@ import { equipesDeConvocation } from "@/lib/sfl/saisie/equipes";
 import { PointMaillot } from "@/components/sfl/point-maillot";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { useSeason } from "@/components/sfl/season-provider";
+import { useJoueurBola } from "@/components/sfl/player-provider";
 import { divisionsDeLaJournee, terrainsDesEquipes } from "@/lib/sfl/equipes-division";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +31,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
   const admin = !!session?.admin;
   const p = usePresence();
   const { saison } = useSeason();
+  const bola = useJoueurBola();
   // Dès la J4, chaque équipe dit sa division : « Noirs · Match 2 · D1 ».
   const divisionDe = useMemo(() => {
     const etat = p.teams?.length ? divisionsDeLaJournee(saison, p.journee) : null;
@@ -72,13 +77,13 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
     <section className="glass rounded-3xl p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="mono-label text-primary">J{p.journee} · Ma présence</p>
+          <p className="mono-label text-primary">J{p.journee} · {bola ? "Sunday Five League" : "Ma présence"}</p>
           <h2 className="mt-1 text-xl font-bold tracking-tight">{p.jour}</h2>
           <p className="mt-1 text-[13px] text-foreground/45">
             {ligneDuRendezVous(p.rendezVous)}
           </p>
         </div>
-        {p.mine && (
+        {p.mine && !bola && (
           <span
             className={cn(
               "flex size-9 shrink-0 items-center justify-center rounded-full",
@@ -95,7 +100,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
       </div>
 
       {/* Les deux boutons — la réponse est modifiable jusqu'à vendredi minuit. */}
-      {p.reponsesOuvertes ? (
+      {bola ? null : p.reponsesOuvertes ? (
         <>
           <div className="mt-4 flex gap-2">
             {/* Je viens : le verre allumé ; une fois dit, il passe au vert. */}

@@ -76,6 +76,15 @@ function urlPublique(cle: string, version: string | number): string {
   return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${cle}?v=${version}`;
 }
 
+/**
+ * La photo d'un joueur par son adresse publique, sans la liste de la ligue
+ * (réservée aux membres) : la page d'un lien de parrainage, ouverte sans
+ * compte, la montre quand le joueur a accepté que sa carte sorte de l'app.
+ */
+export function photoParNom(name: string, version: string | number): string {
+  return urlPublique(cleStorage(name), version);
+}
+
 // ─────────────────────────── La liste distante ───────────────────────────
 
 let distantes: Record<string, string> | null = null;

@@ -101,9 +101,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ envoyes: 0, fini: false });
   }
   const [reponses, votes, lignesFelicitations] = lues;
-  const { data: profils, error: sansProfils } = await sb.from("profiles").select("id, name, nom_affiche, valide");
+  const { data: profils, error: sansProfils } = await sb.from("profiles").select("id, name, nom_affiche, valide, is_admin");
   if (sansProfils) return NextResponse.json({ envoyes: 0, fini: false });
-  const comptes = (profils ?? []) as { id: string; name: string; nom_affiche: string | null; valide: boolean }[];
+  const comptes = (profils ?? []) as {
+    id: string;
+    name: string;
+    nom_affiche: string | null;
+    valide: boolean;
+    is_admin: boolean | null;
+  }[];
   const nomDeId = new Map(comptes.map((p) => [p.id, p.name]));
   const felicitations: FelicitationXp[] = lignesFelicitations.flatMap((f) => {
     const de = nomDeId.get(f.de);
@@ -116,8 +122,10 @@ export async function POST(req: NextRequest) {
   const lui = comptes.find((p) => p.name === outsider.nom);
   const qui = prenom(lui?.nom_affiche ?? outsider.nom);
 
-  // Les joueurs de la ligue qui ont un téléphone abonné.
-  const joueurs = comptes.filter((p) => p.valide);
+  // Les joueurs de la ligue qui ont un téléphone abonné : ceux de la saison
+  // (et les admins), pas les joueurs Bola venus par un parrain.
+  const roster = new Set((saison.roster ?? []).map((r) => r.name));
+  const joueurs = comptes.filter((p) => p.valide && (p.is_admin || roster.has(p.name)));
   const { data: abonnements } = await sb
     .from("push_abonnements")
     .select("user_id")

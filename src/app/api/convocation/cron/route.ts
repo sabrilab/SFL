@@ -8,8 +8,9 @@
 //      passé) et en crée une neuve pour le prochain dimanche — même heure,
 //      même lieu, même effectif que la précédente, journée suivante.
 //
-// Au passage, elle vide le journal d'usage de ce qui a plus de 13 mois, comme
-// le promet la politique de confidentialité (même sans nouvelle semaine).
+// Au passage, elle vide le journal d'usage, le suivi des notifications et les
+// liens de parrainage ouverts de ce qui a plus de 13 mois, comme le promet la
+// politique de confidentialité (même sans nouvelle semaine).
 //
 // L'expiration du vendredi minuit et la révélation des équipes du vendredi
 // 19h n'ont PAS besoin du serveur : elles sont jugées à l'affichage par
@@ -94,6 +95,10 @@ export async function GET(req: NextRequest) {
               and not exists (select 1 from public.push_abonnements a where md5(a.endpoint) = h.appareil)`
         )
         .catch((e) => console.error("[cron] suivi des notifications :", e instanceof Error ? e.message : e));
+      // Les liens de parrainage ouverts : 13 mois au plus, eux aussi.
+      await client
+        .query("delete from public.parrainage_visites where created_at < now() - interval '13 months'")
+        .catch((e) => console.error("[cron] liens de parrainage ouverts :", e instanceof Error ? e.message : e));
 
       const { rows } = await client.query<DerniereConvocation>(
         `select id, journee, heure, lieu, effectif, date_label, statut

@@ -6,7 +6,8 @@
 // plus envie, qu'on comprenne mieux les choses et que ce soit mieux rangé »,
 // comme le profil d'un joueur ouvert depuis la Recherche (profil-joueur.tsx),
 // dont elle reprend l'ordre de lecture, du plus fort au plus fin :
-//   1. moi : ma carte en grand, mon nom dans le lettrage de la Map, mes
+//   1. moi : ma carte en grand (la toucher l'ouvre en plein écran, pour la
+//      manipuler : carte-en-grand.tsx, Sabri, 24/10), mon nom dans le lettrage de la Map, mes
 //      abonnés comme sur Instagram (mes abonnés et mes abonnements, « Kader,
 //      Anis et 32 autres te suivent » : suivre.tsx ; Sabri, 23/10), trois
 //      chiffres de tête en Anton (mon rang au Pépite d'Or, ma note, mes
@@ -14,7 +15,8 @@
 //      sur mon profil). Le nom se corrige en le touchant (identite.tsx).
 //      Dessous, ma photo (la toucher ouvre « Ma photo »), la carte officielle
 //      tant qu'elle n'est pas faite (carte-officielle.tsx ; ensuite, on la
-//      refait depuis « Ma photo ») et le badge de ma carte ;
+//      refait depuis « Ma photo ») et le badge de ma carte ; enfin
+//      « Inviter », mon lien de parrainage (parrainage/page.tsx, 24/10) ;
 //   2. ma saison : mon dernier dimanche en grand, mes points forts, mes
 //      autres dimanches (ma-saison.tsx) ;
 //   3. mon évolution : mon rang au Pépite d'Or ou la note de ma carte,
@@ -22,7 +24,9 @@
 //   4. mes badges : le prochain à viser, les trophées de fin de saison et
 //      les paliers (vitrine.tsx) ;
 //   5. mes cartes, saison par saison, avec les cartes spéciales gagnées ;
-//   6. les raccourcis ;
+//   6. les épreuves, à venir (le Wall of Fame est parti dans les Actus, où
+//      il est l'époque la plus longue, et la Collection est masquée pour
+//      l'instant : Sabri, 24/10 ; /palmares et /collection restent) ;
 //   7. « Se déconnecter », tout en bas, comme dans toute app
 //      (bouton-deconnexion.tsx ; Sabri, le 22/10 : « plus accessible »).
 // « Historique » est parti : chaque dimanche de Ma saison ouvre son récap. Le
@@ -36,9 +40,9 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ChevronRight, Dumbbell, Layers, Trophy } from "lucide-react";
+import { ChevronRight, Dumbbell, UserPlus } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Card3D } from "@/components/sfl/card-3d";
+import { Card3DEnGrand } from "@/components/sfl/carte-en-grand";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur";
 import { MaSaison, type RangDuJour } from "@/components/sfl/ma-saison";
@@ -169,11 +173,13 @@ export default function Profil() {
               ses bords vides passent un peu sous le titre et sous mon nom,
               qui restent au-dessus (relative) et se touchent normalement. */}
           <div className="-mt-[var(--fib-21)] -mb-[var(--fib-34)]">
-            <Card3D
+            <Card3DEnGrand
               cacheKey={`profil-simple-${player.name}`}
               mode="simple"
               size={tresGrand ? 1.15 * RACINE_PHI : grand ? 1.15 : 1}
               render={(s) => <PlayerCard player={player} size={s} />}
+              titre={identite.nom(player.name)}
+              sousTitre={identite.pseudo(player.name)}
             />
           </div>
           <div className="relative flex w-full flex-col items-center gap-[var(--fib-13)]">
@@ -216,6 +222,14 @@ export default function Profil() {
             <CarteOfficielle player={player} className="min-w-0 flex-1" />
             <ChoixBadge player={player} />
           </div>
+          {/* Inviter : mon lien et mon code de parrainage (parrainage/page.tsx) */}
+          <Link
+            href="/parrainage"
+            className="bouton-secondaire bouton--mauve flex w-full items-center justify-center gap-2 py-3.5 text-[14px] font-semibold"
+          >
+            <UserPlus className="size-4" />
+            Inviter
+          </Link>
         </div>
 
         <div className="flex min-w-0 flex-col gap-[var(--fib-21)]">
@@ -237,40 +251,8 @@ export default function Profil() {
           {/* 5. Mes cartes : la carte de chaque saison et les cartes spéciales gagnées */}
           {mesCartes.length > 0 && <CartesCarriere saisons={mesCartes} titre="Mes cartes" />}
 
-          {/* 6. Les raccourcis */}
+          {/* 6. Les épreuves */}
           <section className="flex flex-col gap-2.5">
-            {(
-              [
-                {
-                  href: "/palmares",
-                  icon: Trophy,
-                  label: "Wall of Fame",
-                  note: "Ton parcours, saison après saison",
-                },
-                {
-                  href: "/collection",
-                  icon: Layers,
-                  label: "Collection",
-                  note: "Packs et catalogue de cartes",
-                },
-              ] as const
-            ).map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className="glass-soft flex items-center gap-3.5 rounded-3xl p-4 transition-colors active:opacity-80"
-              >
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground/10">
-                  <l.icon className="size-5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-semibold">{l.label}</span>
-                  <span className="block text-[13px] text-muted-foreground">{l.note}</span>
-                </span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </Link>
-            ))}
-
             {/* Les épreuves — verrouillées : les défis filmés qui rempliront la
                 carte critère par critère arrivent avec la V2. */}
             <Locked label="Bientôt">

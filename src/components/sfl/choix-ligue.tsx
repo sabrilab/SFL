@@ -31,9 +31,10 @@ const BADGES = [
  * L'en-tête des trois onglets (Actus, Bola, Team). Trois logos côte à côte,
  * dont Bola deux fois, c'était trop (Sabri, 22/10 : « trop complexe ») :
  * seul le logo de la page où l'on est, en grand ; le toucher déroule les
- * deux autres. La loupe à droite.
+ * deux autres. La loupe à droite ; `children` se pose juste avant elle (le
+ * choix de la saison, dans les Actus).
  */
-export function EnteteLigue({ actif, className }: { actif: Actif; className?: string }) {
+export function EnteteLigue({ actif, className, children }: { actif: Actif; className?: string; children?: React.ReactNode }) {
   const liens = [
     { href: "/ligue", ligue: "sfl" },
     { href: "/ligue-vierge", ligue: "bola" },
@@ -87,7 +88,10 @@ export function EnteteLigue({ actif, className }: { actif: Actif; className?: st
           </nav>
         )}
       </div>
-      <BoutonRecherche className="size-10" />
+      <div className="flex items-center gap-2">
+        {children}
+        <BoutonRecherche className="size-10" />
+      </div>
     </div>
   );
 }

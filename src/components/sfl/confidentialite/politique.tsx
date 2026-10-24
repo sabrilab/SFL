@@ -6,10 +6,12 @@
 // supabase/schema.sql pour ce qui est gardé et qui le lit, les routes
 // /api/photo-studio, /api/agent, /api/ville-devinee et /api/geocode pour ce
 // qui part chez un prestataire, lib/sfl/activity.ts pour le journal d'usage,
-// lib/server/push-envoi.ts pour le suivi des notifications (23/10).
+// lib/server/push-envoi.ts pour le suivi des notifications (23/10),
+// lib/sfl/parrainage.ts pour le parrainage et les joueurs invités (24/10).
 // Quand l'un de ces endroits change ce qu'il garde ou à qui il l'envoie, ce
 // texte change avec lui ; si le changement touche à ce que les joueurs ont
-// accepté, VERSION_POLITIQUE aussi (lib/sfl/confidentialite.ts).
+// accepté, VERSION_POLITIQUE aussi, et VERSION_ACCEPTEE le jour où la case
+// doit revenir (lib/sfl/confidentialite.ts).
 //
 // Ce n'est pas un avis juridique. Le texte parle au nom de Bola, jamais d'une
 // personne (RESPONSABLE, lib/sfl/confidentialite.ts) ; à faire relire avant
@@ -111,7 +113,8 @@ export function TextePolitique() {
                 L&apos;email sert à te joindre et à retrouver ton compte ; il n&apos;apparaît nulle part dans l&apos;app.
               </>,
               <>
-                À l&apos;inscription : ta date de naissance, ta taille, ton poids, ta pointure, ta taille de maillot,
+                À l&apos;inscription, ou à ta première ouverture de l&apos;app : ta date de naissance, si tu es un
+                homme ou une femme, ta taille, ton poids, ta pointure, ta taille de maillot,
                 ton pied fort et ton poste. Cette fiche est privée, entre toi et les administrateurs. Elle sert à
                 vérifier ton âge, à préparer les maillots et, plus tard, ton personnage.
               </>,
@@ -175,7 +178,8 @@ export function TextePolitique() {
           <P>
             Seulement si tu l&apos;acceptes (une case à part, facultative, à changer quand tu veux dans Réglages) :
             ta carte et ta photo peuvent apparaître dans les vidéos et les visuels que Bola publie, sur les réseaux
-            sociaux par exemple, pour mettre en avant les joueurs d&apos;une journée. Pour ces vidéos, ta photo peut
+            sociaux par exemple, pour mettre en avant les joueurs d&apos;une journée, et sur la page de ton lien
+            d&apos;invitation, que voit quiconque l&apos;ouvre. Pour ces vidéos, ta photo peut
             être confiée à un outil de génération vidéo, comme Magnific. Sans cet accord, Bola ne s&apos;en sert pas
             hors de l&apos;app.
           </P>
@@ -277,6 +281,17 @@ export function TextePolitique() {
           </P>
         </Sous>
 
+        <Sous titre="Le parrainage">
+          <P>
+            Ton lien et ton code d&apos;invitation (« Inviter », dans Ma carte) sont tirés de ton pseudo. Qui ouvre ton
+            lien voit ton nom et, si tu as accepté que ta carte sorte de l&apos;app, ta carte et ta photo. L&apos;app
+            garde qui a fait venir qui (tu vois ceux que tu as invités, ton parrain te voit), combien de fois tu as
+            partagé ton lien et combien de fois il a été ouvert. Pour ne pas compter deux fois la même personne, le
+            téléphone qui l&apos;ouvre tire un identifiant au hasard : ni adresse IP, ni nom. Les administrateurs
+            suivent ces chiffres pour faire grandir Bola.
+          </P>
+        </Sous>
+
         <Sous titre="Sur ton téléphone">
           <P>
             L&apos;app y garde ta session, tes réglages et des copies (photos, noms, villes) pour s&apos;ouvrir vite,
@@ -291,20 +306,22 @@ export function TextePolitique() {
         <Liste
           items={[
             <>
-              <Fort>Les joueurs de la ligue :</Fort> ta carte et ta photo, ton nom et ton pseudo, ta ville (sauf en
-              mode fantôme), tes stats, tes présences, tes disponibilités, tes matchs publics, tes messages du
-              Vestiaire, qui tu suis et qui te suit, tes félicitations.
+              <Fort>Les joueurs de Bola</Fort>{" "}(ceux de la ligue, et ceux qu&apos;un joueur a invités) : ta carte et
+              ta photo, ton nom et ton pseudo, ta ville (sauf en mode fantôme), tes stats, tes présences, tes
+              disponibilités, tes matchs publics, qui tu suis et qui te suit, tes félicitations. Tes messages du
+              Vestiaire : les joueurs de la ligue seulement.
             </>,
             <>
               <Fort>Les administrateurs, en plus :</Fort>{" "}ton email, ta fiche, tes photos en pied, ton journal
-              d&apos;usage, le suivi de tes notifications, les statistiques du coach.
+              d&apos;usage, le suivi de tes notifications, les statistiques du coach, tes chiffres de parrainage.
             </>,
             <>
               <Fort>Toi seul :</Fort> ta conversation avec le coach. <Fort>Toi et ton correspondant :</Fort> vos
               messages privés.
             </>,
             <>
-              <Fort>Tout le monde, même sans compte :</Fort> ta photo de carte.
+              <Fort>Tout le monde, même sans compte :</Fort>{" "}ta photo de carte ; si tu as ouvert « Inviter », ton
+              nom sur la page de ton lien, et ta carte si tu acceptes qu&apos;elle sorte de l&apos;app.
             </>,
             <>
               <Fort>Personne :</Fort> le mot de passe que tu as choisi.
@@ -370,8 +387,8 @@ export function TextePolitique() {
             </>,
             <>
               <Fort>Notre intérêt légitime</Fort>{" "}à faire tourner et améliorer la bêta sans abus (article 6.1.f) : le
-              journal d&apos;usage, le suivi des notifications, les limites par jour, la modération du Vestiaire, la
-              ville devinée pour la Map. Tu peux t&apos;y opposer (voir « Tes droits »).
+              journal d&apos;usage, le suivi des notifications, le suivi du parrainage, les limites par jour, la
+              modération du Vestiaire, la ville devinée pour la Map. Tu peux t&apos;y opposer (voir « Tes droits »).
             </>,
           ]}
         />
@@ -391,7 +408,10 @@ export function TextePolitique() {
             </>,
             <>Tes selfies : jamais gardés par Bola.</>,
             <>Ta photo de carte : jusqu&apos;à ce que tu la retires, ou que ton compte soit supprimé.</>,
-            <>Le journal d&apos;usage et le suivi des notifications : 13 mois au plus.</>,
+            <>
+              Le journal d&apos;usage, le suivi des notifications et les ouvertures de liens d&apos;invitation : 13 mois
+              au plus. Qui a fait venir qui : tant que les deux comptes existent.
+            </>,
             <>Ton accord (la case cochée, sa date, sa version) : tant que ton compte existe, pour pouvoir le prouver.</>,
             <>
               Quand ton compte est supprimé, tout cela est effacé sous 30 jours. Les feuilles des matchs déjà joués
@@ -443,10 +463,10 @@ export function TextePolitique() {
 
       <Section titre="Sécurité">
         <P>
-          Seuls les joueurs acceptés par la ligue y entrent. Des règles d&apos;accès, dans la base, gardent privés ta
-          fiche, ta conversation avec le coach et tes messages privés. Les vocaux, les photos et vidéos du
-          Vestiaire, les photos en pied et les images du coach sont dans des espaces privés, ouverts par des liens
-          temporaires. Les clés des prestataires restent sur le serveur.
+          Seuls les joueurs acceptés par la ligue, ou invités par l&apos;un d&apos;eux, y entrent. Des règles
+          d&apos;accès, dans la base, gardent privés ta fiche, ta conversation avec le coach et tes messages privés.
+          Les vocaux, les photos et vidéos du Vestiaire, les photos en pied et les images du coach sont dans des
+          espaces privés, ouverts par des liens temporaires. Les clés des prestataires restent sur le serveur.
         </P>
       </Section>
 

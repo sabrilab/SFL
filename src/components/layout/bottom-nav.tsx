@@ -30,6 +30,7 @@ import { usePathname } from "next/navigation";
 import { ActusIcon, CarteIcon, MapIcon, VestiaireIcon } from "./nav-icons";
 import { ongletActif } from "@/lib/nav";
 import { pastilleIcone, useVestiaireNonLus } from "@/hooks/use-vestiaire-non-lus";
+import { useJoueurBola } from "@/components/sfl/player-provider";
 import { useInvitationsMatch } from "@/hooks/use-invitations";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
 import { useMonEquipe } from "@/hooks/use-mon-equipe";
@@ -47,8 +48,11 @@ export function BottomNav() {
   const pathname = usePathname();
   const onglet = ongletActif(pathname);
   const actif = TABS.findIndex(({ href }) => href === onglet);
-  // La bulle ouvre la discussion : le Vestiaire, et Bola Agent à côté.
+  // La bulle ouvre la discussion : le Vestiaire, et Bola Agent à côté. Le
+  // Vestiaire est le salon de la SFL : un joueur Bola (venu par un parrain,
+  // hors de la saison) n'a pas la bulle.
   const vestiaire = pathname === "/vestiaire" || pathname === "/agent";
+  const bola = useJoueurBola();
   const clair = useModeClair() || surMap(pathname);
   const encre = clair ? "#0a0b0d" : "#ffffff";
   // Du nouveau dans la discussion : le nombre, sur la bulle.
@@ -102,7 +106,7 @@ export function BottomNav() {
         })}
       </nav>
 
-      <Link
+      {!bola && <Link
         href="/vestiaire"
         aria-label={nonLus > 0 ? `Vestiaire, ${nonLus} nouveaux messages` : "Vestiaire"}
         aria-current={vestiaire ? "page" : undefined}
@@ -115,7 +119,7 @@ export function BottomNav() {
           <VestiaireIcon plein={vestiaire} />
           {nonLus > 0 && !vestiaire && <Pastille n={nonLus} clair={clair} />}
         </span>
-      </Link>
+      </Link>}
     </div>
   );
 }

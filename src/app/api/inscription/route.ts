@@ -18,11 +18,20 @@
 // aussitôt et le joueur arrive invité dans l'équipe (il signe le Règlement
 // sur la page Team).
 //
+// Venu par le lien d'un joueur, ou avec son code (champ parrain, canal
+// « lien » ou « code », parrainage) : de même, le parrain s'en porte garant
+// et le compte entre aussitôt, dans Bola et pas dans la saison SFL. Le
+// parrainage est noté (lib/sfl/parrainage.server.ts), le capitaine d'un lien
+// d'équipe comptant comme parrain ; Bola Team est offert si ce parrain joue
+// en SFL. Un code inconnu ou coupé ne bloque rien : le compte naît en
+// attente, comme sans lien.
+//
 // GET ?pseudo=… dit seulement si un pseudo est libre (pour l'écran).
 
 import { NextRequest, NextResponse } from "next/server";
 import { dejaPris, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { idsParEmail } from "@/lib/sfl/contacts";
+import { joueurSfl, noterFilleul, parrainDuCode } from "@/lib/sfl/parrainage.server";
 import {
   capitaliser,
   erreurInscription,
@@ -56,7 +65,9 @@ export async function POST(req: NextRequest) {
   const sb = serveur();
   if (!sb) return FERME;
 
-  const corps = (await req.json().catch(() => null)) as (Inscription & { site?: string; equipe?: string }) | null;
+  const corps = (await req.json().catch(() => null)) as
+    | (Inscription & { site?: string; equipe?: string; parrain?: string; canal?: string })
+    | null;
   if (!corps) return NextResponse.json({ error: "Formulaire illisible." }, { status: 400 });
   // Champ piège invisible : un humain ne le remplit jamais.
   if (corps.site) return NextResponse.json({ error: "Refusé." }, { status: 400 });
@@ -130,6 +141,9 @@ export async function POST(req: NextRequest) {
     if (places <= 0 || lien.utilisations >= places) return perime;
   }
 
+  const parrain = !lien && corps.parrain ? await parrainDuCode(sb, corps.parrain) : null;
+  const entre = !!lien || !!parrain;
+
   const name = nomDeLigue(f.prenom, f.nom, pris.noms);
 
   // L'email de connexion reste technique (pseudo@sfl.local), comme pour tous
@@ -155,7 +169,7 @@ export async function POST(req: NextRequest) {
   // si la fiche ne passe pas : pas de compte à moitié créé.
   const { error: errProfil } = await sb
     .from("profiles")
-    .update({ contact_email: f.email, pseudo_change_le: new Date().toISOString(), ...(lien ? { valide: true } : {}) })
+    .update({ contact_email: f.email, pseudo_change_le: new Date().toISOString(), ...(entre ? { valide: true } : {}) })
     .eq("id", id);
   const { error: errFiche } = await sb.from("fiches").insert({
     player_id: id,
@@ -181,7 +195,13 @@ export async function POST(req: NextRequest) {
       .from("equipe_membres")
       .insert({ equipe_id: lien.equipe_id, joueur: id, statut: "invite", invite_par: lien.cree_par })
       .then(() => {}, () => {});
+    if (lien.cree_par) {
+      const capitaine = { id: lien.cree_par, code: null, sfl: await joueurSfl(sb, lien.cree_par) };
+      await noterFilleul(sb, id, capitaine, "equipe", lien.equipe_id);
+    }
+  } else if (parrain) {
+    await noterFilleul(sb, id, parrain, corps.canal === "code" ? "code" : "lien");
   }
 
-  return NextResponse.json({ ok: true, pseudo: f.pseudo, name });
+  return NextResponse.json({ ok: true, pseudo: f.pseudo, name, entre });
 }

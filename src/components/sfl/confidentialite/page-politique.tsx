@@ -10,13 +10,13 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
 import { useAccord } from "@/hooks/use-accord";
-import { VERSION_POLITIQUE, dateAccord } from "@/lib/sfl/confidentialite";
+import { accordValable, dateAccord } from "@/lib/sfl/confidentialite";
 
 export function PagePolitique({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const session = useSession();
   const { accord } = useAccord(session?.name);
-  const accepte = accord?.version === VERSION_POLITIQUE ? accord : null;
+  const accepte = accordValable(accord?.version) ? accord : null;
 
   function retour() {
     // Arrivé par un lien : pas de page d'avant dans l'app.

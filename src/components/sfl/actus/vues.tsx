@@ -1,20 +1,22 @@
 "use client";
 
-// Les deux autres vues de l'onglet, à côté du fil des Actus (Sabri, 22/10 :
+// Les deux autres onglets des Actus, à côté de la Pépite d'Or (Sabri, 22/10 :
 // « on peut pas avoir accès à tout le classement comme on avait avant […]
-// faire un mix des deux ») : les Classements et les Matchs, tels qu'ils
-// étaient dans la Ligue avant les Actus (app/ligue/page.tsx avant #71).
-//   · Classements : le vote du jour, ma synthèse (rang, points, forme), tous
-//     les classements (classements.tsx), le Wall of Fame ;
-//   · Matchs : les journées jouées, une carte chacune ; la toucher ouvre son
+// faire un mix des deux » ; 24/10 : Buteurs, Passeurs, MVP « dans un bouton
+// Classement », et « juste à côté, l'onglet Match »), tels qu'ils étaient
+// dans la Ligue avant les Actus (app/ligue/page.tsx avant #71) :
+//   · Classement : le vote du jour, ma synthèse (rang, points, forme), tous
+//     les classements (classements.tsx) ;
+//   · Match : les journées jouées, une carte chacune ; la toucher ouvre son
 //     récap (/ligue/journee?j=N).
+// Les deux servent aussi une saison close (le choix de la saison,
+// epoques.tsx) : ma synthèse n'y paraît que si j'y ai joué. Le Wall of Fame,
+// qui avait sa carte ici, est dans le même choix.
 // Sur grand écran (dès 768 px) : les Classements au nombre d'or, ma synthèse
 // à gauche (qui reste à l'écran) et tous les classements à droite ; les
 // Matchs en grille, deux terrains de front, trois dès 1280 px.
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Crown } from "lucide-react";
 import { useCollant } from "@/hooks/use-collant";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -33,9 +35,15 @@ function useJouees() {
   return journees.filter((j) => saison.entries.some((e) => e.j === j.j && (e.result || e.buts > 0 || e.passes > 0)));
 }
 
-export function VueClassements({ vote }: { vote?: React.ReactNode }) {
+/**
+ * `classement` : celui qui s'ouvre (un id de lib/sfl/rankings.ts, ?classement=… dans l'adresse).
+ * `cle` : la clé 3D des cartes d'une saison close (classements.tsx).
+ */
+export function VueClassements({ vote, classement, cle }: { vote?: React.ReactNode; classement?: string | null; cle?: string }) {
   const { player, me } = useMyPlayer();
-  const { players, saison } = useSeason();
+  const { players, saison, allPlayers } = useSeason();
+  // Une saison close où je n'ai pas joué : pas de synthèse (ce serait celle d'un autre).
+  const joue = allPlayers.some((p) => p.name === me);
   const played = useJouees();
   const latestJ = played[played.length - 1]?.j ?? 1;
 
@@ -52,15 +60,22 @@ export function VueClassements({ vote }: { vote?: React.ReactNode }) {
     .map((e) => (e.result === "Victoire" ? "V" : e.result === "Nul" ? "N" : "D"));
   const nb = (r: string) => myForm.filter((x) => x === r).length;
   const [colonne, colonneCollante] = useCollant();
+  // Rien à mettre dans la petite colonne : les classements prennent toute la largeur.
+  const colonneVide = !vote && played.length > 0 && !joue;
 
   return (
-    <div className="flex flex-col gap-6 px-5 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.618fr)] md:items-start md:gap-[var(--fib-34)] md:px-0 min-[1440px]:gap-[var(--fib-55)]">
-      {/* La petite colonne sur grand écran : le vote, ma synthèse, le Wall of Fame. */}
-      <div ref={colonne} className={cn("flex min-w-0 flex-col gap-6", colonneCollante && "md:sticky md:top-[var(--fib-21)]")}>
+    <div
+      className={cn(
+        "flex flex-col gap-6 px-5 md:px-0",
+        !colonneVide && "md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.618fr)] md:items-start md:gap-[var(--fib-34)] min-[1440px]:gap-[var(--fib-55)]",
+      )}
+    >
+      {/* La petite colonne sur grand écran : le vote, ma synthèse. */}
+      <div ref={colonne} className={cn("flex min-w-0 flex-col gap-6", colonneVide && "hidden", colonneCollante && "md:sticky md:top-[var(--fib-21)]")}>
         {vote}
         {played.length === 0 ? (
           <StatsAVenir numero={saison.numero ?? 0} quoi="classement" archive={saison.archives?.[saison.archives.length - 1]} />
-        ) : (
+        ) : joue ? (
           /* Ma synthèse : rang, points, forme sur 5 matchs. */
           <section className="glass rounded-[26px] p-[18px]">
             <div className="flex items-center justify-between">
@@ -111,37 +126,21 @@ export function VueClassements({ vote }: { vote?: React.ReactNode }) {
               </>
             )}
           </section>
-        )}
-        <WallOfFame className="hidden md:flex" />
+        ) : null}
       </div>
-      {played.length === 0 ? <IlsSeDemarquent /> : <Classements me={me} />}
-      <WallOfFame className="md:hidden" />
+      {played.length === 0 ? <IlsSeDemarquent /> : <Classements me={me} initial={classement} cle={cle} />}
     </div>
   );
 }
 
-function WallOfFame({ className }: { className?: string }) {
-  return (
-    <Link href="/palmares" className={cn("glass flex items-center gap-3.5 rounded-3xl px-4 py-3.5", className)}>
-      <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground/10">
-        <Crown className="size-5" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-bold tracking-tight">Wall of Fame</span>
-        <span className="block truncate text-[12.5px] text-muted-foreground">Champions, légendes, ton parcours</span>
-      </span>
-      <ChevronRight className="size-4 text-muted-foreground" />
-    </Link>
-  );
-}
-
-export function VueMatchs() {
+/** `ouvrir` : où mène un terrain touché ; par défaut, le récap de ce dimanche dans la saison en cours. */
+export function VueMatchs({ ouvrir }: { ouvrir?: (j: number) => void }) {
   const router = useRouter();
   const played = useJouees();
   return (
     <div className="flex flex-col gap-3.5 px-5 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] md:px-0 xl:grid-cols-3">
       {[...played].reverse().map((jn) => (
-        <CarteJournee key={jn.j} journee={jn} onOuvrir={() => router.push(`/ligue/journee?j=${jn.j}`)} />
+        <CarteJournee key={jn.j} journee={jn} onOuvrir={() => (ouvrir ? ouvrir(jn.j) : router.push(`/ligue/journee?j=${jn.j}`))} />
       ))}
     </div>
   );

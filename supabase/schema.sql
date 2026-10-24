@@ -194,7 +194,8 @@ create policy "profiles: lecture ligue"
 
 -- Chacun ne modifie que sa fiche. L'auto-promotion admin est déjà impossible :
 -- le grant de colonnes (plus bas) ne laisse modifier que l'email de contact,
--- le badge et la ville. Ni le nom ni le pseudo : ils passent par le serveur.
+-- le badge, l'habillage, la ville et la date de l'accueil. Ni le nom ni le
+-- pseudo : ils passent par le serveur.
 drop policy if exists "profiles: mise à jour de soi" on public.profiles;
 create policy "profiles: mise à jour de soi"
   on public.profiles for update
@@ -294,6 +295,13 @@ alter table public.profiles add column if not exists ville_cachee boolean not nu
 -- Tant qu'elle est vide, l'ouverture de l'app lui propose de la donner
 -- (invitation-carte.tsx, Sabri, 22/10).
 alter table public.profiles add column if not exists ville_le timestamptz;
+
+-- L'accueil de l'app (components/sfl/accueil, Sabri, 24/10) : à la première
+-- ouverture, tout ce que l'app demande au joueur, puis la visite de l'app.
+-- accueil_le : quand il l'a fini (null = jamais : la visite l'attend à sa
+-- prochaine ouverture). Posé par le joueur seul (grant plus bas, RLS « mise
+-- à jour de soi »).
+alter table public.profiles add column if not exists accueil_le timestamptz;
 
 -- ──────────────────────────── Activité ───────────────────────────────
 -- Journal d'usage : connexions, ouvertures quotidiennes, réponses de
@@ -617,6 +625,7 @@ grant update (contact_email) on public.profiles to authenticated;
 grant update (badge) on public.profiles to authenticated;
 grant update (habillage) on public.profiles to authenticated;
 grant update (ville, ville_lat, ville_lng, ville_cachee, ville_le) on public.profiles to authenticated;
+grant update (accueil_le) on public.profiles to authenticated;
 grant insert, select on public.activity to authenticated;
 grant insert, update, delete on public.presence to authenticated;
 grant insert, update, select on public.compositions to authenticated;
@@ -1122,6 +1131,10 @@ alter table public.fiches enable row level security;
 -- Les joueurs inscrits avant les fiches n'y ont que leur prénom et leur nom,
 -- posés en confirmant leur identité depuis Ma carte : la naissance attend.
 alter table public.fiches alter column naissance drop not null;
+
+-- Homme ou femme (Sabri, 24/10) : demandé à l'accueil de l'app, juste après
+-- l'identité (components/sfl/accueil). Privé comme le reste de la fiche.
+alter table public.fiches add column if not exists sexe text check (sexe in ('homme', 'femme'));
 
 drop policy if exists "fiches: la mienne ou admin" on public.fiches;
 create policy "fiches: la mienne ou admin"
@@ -2587,6 +2600,85 @@ drop policy if exists "equipe_departs: les miens" on public.equipe_departs;
 create policy "equipe_departs: les miens" on public.equipe_departs for select to authenticated
   using (joueur = (select auth.uid()));
 
+-- Qui joue en Bola Team (Sabri, 24/10/2026) : Bola est gratuit, Bola Team
+-- est payant, sauf pour les joueurs SFL et ceux qu'un joueur SFL a fait
+-- venir — son lien de parrainage, le lien de son équipe ou son invitation
+-- (« payant si ce n'est pas un lien de parrainage de quelqu'un de la
+-- SFL »). Aucun paiement n'est codé : en attendant, sans joueur SFL
+-- derrière soi, Bola Team reste fermé (team_sur_invitation ; la mettre à
+-- false ouvre Bola Team à tous sans rien perdre des offres déjà notées).
+--
+-- Un joueur SFL : son nom est dans l'effectif de la saison en cours (le
+-- document saison, que l'admin tient). C'est la seule source : aucune
+-- colonne à tenir à jour à côté.
+create or replace function public.joueur_sfl(j uuid)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select exists (
+    select 1
+      from public.profiles p
+      join public.saison s on s.id = 1
+      cross join lateral jsonb_array_elements(coalesce(s.data -> 'roster', '[]'::jsonb)) r
+     where p.id = j and r ->> 'name' = p.name
+  );
+$$;
+
+-- Bola Team offert : à qui, par quel joueur SFL, comment et quand. Écrit par
+-- /api/inscription (lien de parrainage ou d'équipe) et par equipe_signer
+-- (invitation d'un joueur SFL) ; jamais retiré. La durée de l'offre se
+-- fixera avec le paiement.
+create table if not exists public.team_offerts (
+  joueur  uuid primary key references public.profiles(id) on delete cascade,
+  par     uuid references public.profiles(id) on delete set null,
+  via     text not null check (via in ('lien', 'code', 'equipe', 'invitation')),
+  le      timestamptz not null default now()
+);
+alter table public.team_offerts enable row level security;
+drop policy if exists "team_offerts: le mien, ceux que j'ai offerts, l'admin" on public.team_offerts;
+create policy "team_offerts: le mien, ceux que j'ai offerts, l'admin" on public.team_offerts for select to authenticated
+  using (joueur = (select auth.uid()) or par = (select auth.uid()) or (select public.is_league_admin()));
+revoke all on public.team_offerts from anon, authenticated;
+grant select on public.team_offerts to authenticated;
+
+create or replace function public.team_sur_invitation()
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select true;
+$$;
+
+create or replace function public.acces_team(j uuid)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select not public.team_sur_invitation()
+      or public.joueur_sfl(j)
+      or exists (select 1 from public.team_offerts t where t.joueur = j);
+$$;
+
+-- Ce que l'app lit pour le joueur connecté (hooks/use-acces-team.ts).
+create or replace function public.mon_acces_team()
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select public.acces_team((select auth.uid()));
+$$;
+
+revoke execute on function public.joueur_sfl(uuid), public.acces_team(uuid), public.team_sur_invitation(), public.mon_acces_team() from public, anon;
+grant execute on function public.joueur_sfl(uuid), public.acces_team(uuid), public.team_sur_invitation(), public.mon_acces_team() to authenticated;
+
 -- Mon rôle dans une équipe (null : pas membre).
 create or replace function public.role_equipe(e bigint)
 returns text
@@ -2711,6 +2803,10 @@ begin
   if moi is null or not public.est_membre() then
     raise exception 'Réservé aux joueurs.' using errcode = '42501';
   end if;
+  -- Bola Team : les joueurs SFL et ceux qu'ils ont fait venir (Parrainage, plus bas).
+  if not public.acces_team(moi) then
+    raise exception 'Bola Team : il te faut le lien d''un joueur SFL.' using errcode = 'P0001';
+  end if;
   if exists (select 1 from public.equipe_membres where joueur = moi and statut = 'membre') then
     raise exception 'Tu as déjà une équipe.' using errcode = 'P0001';
   end if;
@@ -2769,6 +2865,11 @@ begin
   if not exists (select 1 from public.profiles p where p.id = equipe_inviter.joueur and p.valide) then
     raise exception 'Son compte n''est pas encore validé.' using errcode = 'P0001';
   end if;
+  -- Bola Team : l'invitation d'un joueur SFL l'offre (à la signature) ; celle
+  -- d'un autre suppose que l'invité l'ait déjà.
+  if not public.acces_team(equipe_inviter.joueur) and not public.joueur_sfl((select auth.uid())) then
+    raise exception 'Ce joueur n''a pas Bola Team : il lui faut le lien d''un joueur SFL.' using errcode = 'P0001';
+  end if;
   if exists (select 1 from public.equipe_departs d where d.equipe_id = e and d.joueur = equipe_inviter.joueur) then
     raise exception 'Ce joueur a quitté l''équipe : il n''y revient pas.' using errcode = 'P0001';
   end if;
@@ -2792,7 +2893,9 @@ $$;
 -- joueurs le dit sur leur ligne, au lieu d'une erreur après coup.
 -- 'parti' : a quitté cette équipe ; 'equipe' : en a déjà une ; 'carence' :
 -- vient de quitter la sienne (14 jours, et l'invitation tomberait avant) ;
--- 'attente' : compte pas encore validé. Réservé au capitaine et au vice.
+-- 'attente' : compte pas encore validé ; 'team' : n'a pas Bola Team, et
+-- l'invitation ne vient pas d'un joueur SFL (qui la lui offrirait).
+-- Réservé au capitaine et au vice.
 create or replace function public.equipe_indisponibles(e bigint)
 returns table (joueur uuid, raison text)
 language sql
@@ -2808,6 +2911,7 @@ as $$
         when exists (select 1 from public.equipe_departs d
                       where d.joueur = p.id and d.parti_le > now() - interval '14 days' + interval '72 hours') then 'carence'
         when not p.valide then 'attente'
+        when not public.joueur_sfl((select auth.uid())) and not public.acces_team(p.id) then 'team'
       end as raison
     from public.profiles p
     where coalesce(public.role_equipe(e), 'membre') <> 'membre'
@@ -2840,6 +2944,7 @@ set search_path = ''
 as $$
 declare
   moi uuid := (select auth.uid());
+  offert_par uuid;
 begin
   if moi is null or not public.est_membre() then
     raise exception 'Réservé aux joueurs.' using errcode = '42501';
@@ -2852,6 +2957,16 @@ begin
   if not exists (select 1 from public.equipe_membres m where m.equipe_id = e and m.joueur = moi and m.statut = 'invite') then
     raise exception 'Invitation introuvable ou expirée.' using errcode = 'P0001';
   end if;
+  -- Bola Team (Parrainage, plus bas) : à qui ne l'a pas encore, l'invitation
+  -- d'un joueur SFL l'offre ; une autre ne suffit pas.
+  if not public.acces_team(moi) then
+    select m.invite_par into offert_par from public.equipe_membres m
+     where m.equipe_id = e and m.joueur = moi and m.statut = 'invite'
+       and m.invite_par is not null and public.joueur_sfl(m.invite_par);
+    if offert_par is null then
+      raise exception 'Bola Team : il te faut le lien d''un joueur SFL.' using errcode = 'P0001';
+    end if;
+  end if;
   if exists (select 1 from public.equipe_membres m where m.joueur = moi and m.statut = 'membre') then
     raise exception 'Tu as déjà une équipe.' using errcode = 'P0001';
   end if;
@@ -2860,6 +2975,10 @@ begin
   end if;
   if public.equipe_effectif(e) >= 7 then
     raise exception 'L''équipe est au complet.' using errcode = 'P0001';
+  end if;
+  if offert_par is not null then
+    insert into public.team_offerts (joueur, par, via) values (moi, offert_par, 'invitation')
+    on conflict (joueur) do nothing;
   end if;
   update public.equipe_membres m set statut = 'membre', signe_le = now(), reglement_version = 'v1'
    where m.equipe_id = e and m.joueur = moi;
@@ -3042,6 +3161,10 @@ begin
   end if;
   if exists (select 1 from public.equipe_membres m where m.joueur = moi and m.statut = 'membre') then
     raise exception 'Tu as déjà une équipe.' using errcode = 'P0001';
+  end if;
+  -- Bola Team : le lien d'un joueur SFL l'offre (à la signature), un autre non.
+  if not public.acces_team(moi) and (l.cree_par is null or not public.joueur_sfl(l.cree_par)) then
+    raise exception 'Bola Team : il te faut le lien d''un joueur SFL.' using errcode = 'P0001';
   end if;
   -- Comme pour une invitation : seuls les membres comptent (equipe_inviter).
   if public.equipe_effectif(l.equipe_id) >= 7 then
@@ -3792,3 +3915,298 @@ create table if not exists public.push_envoyes (
 
 alter table public.push_envoyes enable row level security;
 revoke all on public.push_envoyes from anon, authenticated;
+
+-- ───────────────────────────── Parrainage ─────────────────────────────
+-- Passer de ~100 à 500 joueurs (Sabri, 24/10/2026) : chaque joueur a son
+-- lien, /p/<code>. Un nouveau qui crée son compte par ce lien entre aussitôt
+-- dans Bola — son parrain s'en porte garant, comme le capitaine avec le lien
+-- d'une équipe — mais dans Bola, pas dans la SFL : il n'est pas ajouté à la
+-- saison. Tout le monde parraine, filleuls compris (la boule de neige) ; le
+-- lien d'un joueur SFL offre en plus Bola Team (team_offerts, mode Team).
+--
+--   · parrainage_codes : le code de chaque joueur, tiré de son pseudo la
+--     première fois qu'il ouvre « Inviter », puis figé : un pseudo changé ne
+--     casse aucun lien déjà partagé. L'admin peut couper un code ;
+--   · parrainages : qui a fait venir qui. Une ligne par compte parrainé,
+--     posée par /api/inscription à la création du compte, jamais modifiée :
+--     un compte qui existe déjà ne se fait pas parrainer ;
+--   · parrainage_visites : le haut du tunnel (lien ouvert, inscription
+--     commencée), sans rien de personnel : le code, le jour, et un
+--     identifiant tiré au hasard sur le téléphone pour ne pas compter deux
+--     fois la même personne.
+-- Seuls l'admin (tout) et les intéressés (leurs lignes) les lisent ;
+-- personne ne les écrit directement.
+create table if not exists public.parrainage_codes (
+  code        text primary key check (code ~ '^[a-z0-9][a-z0-9._]{2,19}$'),
+  joueur      uuid not null unique references public.profiles(id) on delete cascade,
+  actif       boolean not null default true,
+  created_at  timestamptz not null default now()
+);
+-- La carte que montre son lien (poste et stats), posée par son app chaque
+-- fois qu'il ouvre « Inviter » (parrainage_ma_carte) : la page publique ne
+-- lit pas la saison. Montrée seulement s'il a accepté que sa carte sorte de
+-- l'app (parrain_info).
+alter table public.parrainage_codes add column if not exists carte jsonb;
+-- Combien de fois il a partagé son lien (ou l'a copié), et la dernière fois :
+-- le premier étage du tunnel de l'admin.
+alter table public.parrainage_codes add column if not exists partages int not null default 0;
+alter table public.parrainage_codes add column if not exists partage_le timestamptz;
+
+create table if not exists public.parrainages (
+  filleul     uuid primary key references public.profiles(id) on delete cascade,
+  parrain     uuid references public.profiles(id) on delete set null,
+  code        text,
+  -- 'lien' : son lien ouvert ; 'code' : son code tapé à l'inscription ;
+  -- 'equipe' : le lien d'une équipe (le parrain est celui qui l'a créé).
+  canal       text not null check (canal in ('lien', 'code', 'equipe')),
+  equipe_id   bigint references public.equipes(id) on delete set null,
+  -- Le parrain jouait en SFL ce jour-là : Bola Team offert (team_offerts).
+  parrain_sfl boolean not null default false,
+  created_at  timestamptz not null default now(),
+  constraint parrainages_pas_soi check (parrain is null or parrain <> filleul)
+);
+create index if not exists parrainages_parrain on public.parrainages (parrain);
+
+create table if not exists public.parrainage_visites (
+  id          bigint generated always as identity primary key,
+  code        text not null references public.parrainage_codes(code) on delete cascade,
+  visiteur    text not null check (visiteur ~ '^[0-9a-f-]{8,40}$'),
+  etape       text not null check (etape in ('ouvert', 'commence')),
+  jour        date not null default ((now() at time zone 'Europe/Paris')::date),
+  created_at  timestamptz not null default now(),
+  constraint parrainage_visites_une_fois unique (code, visiteur, etape)
+);
+create index if not exists parrainage_visites_jour on public.parrainage_visites (jour);
+-- Les liens ouverts ne se gardent que 13 mois, comme le journal d'usage
+-- (politique de confidentialité) : le plus ancien part chaque lundi
+-- (/api/convocation/cron) et à chaque migration du schéma.
+delete from public.parrainage_visites where created_at < now() - interval '13 months';
+
+alter table public.parrainage_codes enable row level security;
+alter table public.parrainages enable row level security;
+alter table public.parrainage_visites enable row level security;
+
+drop policy if exists "parrainage_codes: le mien, l'admin" on public.parrainage_codes;
+create policy "parrainage_codes: le mien, l'admin" on public.parrainage_codes for select to authenticated
+  using (joueur = (select auth.uid()) or (select public.is_league_admin()));
+drop policy if exists "parrainages: mes filleuls, mon parrain, l'admin" on public.parrainages;
+create policy "parrainages: mes filleuls, mon parrain, l'admin" on public.parrainages for select to authenticated
+  using (parrain = (select auth.uid()) or filleul = (select auth.uid()) or (select public.is_league_admin()));
+drop policy if exists "parrainage_visites: l'admin" on public.parrainage_visites;
+create policy "parrainage_visites: l'admin" on public.parrainage_visites for select to authenticated
+  using ((select public.is_league_admin()));
+
+revoke all on public.parrainage_codes, public.parrainages, public.parrainage_visites from anon, authenticated;
+grant select on public.parrainage_codes, public.parrainages, public.parrainage_visites to authenticated;
+
+-- Mon code : créé à la première demande, d'après mon pseudo (sans le @) ;
+-- déjà pris par un autre (un ancien pseudo devenu code), on y ajoute un
+-- chiffre.
+create or replace function public.mon_code_parrain()
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  moi uuid := (select auth.uid());
+  base text;
+  c text;
+  i int := 1;
+begin
+  if moi is null or not public.est_membre() then
+    raise exception 'Réservé aux joueurs.' using errcode = '42501';
+  end if;
+  select x.code into c from public.parrainage_codes x where x.joueur = moi;
+  if c is not null then
+    return c;
+  end if;
+  select left(regexp_replace(lower(p.username), '[^a-z0-9._]', '', 'g'), 20) into base
+    from public.profiles p where p.id = moi;
+  base := regexp_replace(coalesce(base, ''), '^[._]+', '');
+  if base !~ '^[a-z0-9][a-z0-9._]{2,19}$' then
+    base := 'bola' || left(replace(moi::text, '-', ''), 6);
+  end if;
+  c := base;
+  loop
+    begin
+      insert into public.parrainage_codes (code, joueur) values (c, moi);
+      return c;
+    exception when unique_violation then
+      -- Deux appels en même temps : le code du joueur vient d'être posé.
+      select x.code into c from public.parrainage_codes x where x.joueur = moi;
+      if c is not null then
+        return c;
+      end if;
+      i := i + 1;
+      if i > 99 then
+        raise exception 'Code introuvable.' using errcode = 'P0001';
+      end if;
+      c := left(base, 20 - length(i::text)) || i::text;
+    end;
+  end loop;
+end;
+$$;
+
+-- Ce que montre la page d'un lien, même sans compte : le nom du parrain (sa
+-- clé de ligue et le nom que l'app affiche), son pseudo, s'il joue en SFL
+-- (Bola Team offert) et, seulement si sa carte peut sortir de l'app (son
+-- dernier accord à la politique : hors_app), sa carte et la version de sa
+-- photo (le fichier du bucket « photos », nommé d'après son nom en
+-- hexadécimal ; null s'il n'en a pas).
+create or replace function public.parrain_info(c text)
+returns jsonb
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select jsonb_build_object(
+    'code', x.code,
+    'nom', p.name,
+    'affiche', coalesce(p.nom_affiche, p.name),
+    'pseudo', p.username,
+    'sfl', public.joueur_sfl(p.id),
+    'carte', case when h.hors_app then x.carte end,
+    'photo', case when h.hors_app then (
+      select (extract(epoch from coalesce(o.updated_at, o.created_at)) * 1000)::bigint
+        from storage.objects o
+       where o.bucket_id = 'photos' and o.name = encode(convert_to(p.name, 'UTF8'), 'hex') || '.jpg'
+       limit 1
+    ) end
+  )
+  from public.parrainage_codes x
+  join public.profiles p on p.id = x.joueur
+  left join lateral (
+    select k.hors_app from public.consentements k
+     where k.user_id = p.id order by k.created_at desc limit 1
+  ) h on true
+  where x.code = lower(btrim(c)) and x.actif and p.valide;
+$$;
+
+-- Ma carte, telle que mon app la montre, pour la page de mon lien. Seuls le
+-- poste et les six stats sont gardés ; la note se recalcule (moyenne arrondie
+-- au-dessus, comme ovr dans l'app).
+create or replace function public.parrainage_ma_carte(poste text, stats jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  k text;
+  v int;
+  propres jsonb := '{}'::jsonb;
+  somme int := 0;
+begin
+  if (select auth.uid()) is null or not public.est_membre() then
+    raise exception 'Réservé aux joueurs.' using errcode = '42501';
+  end if;
+  if poste is null or char_length(poste) > 4 or jsonb_typeof(stats) is distinct from 'object' then
+    raise exception 'Carte illisible.' using errcode = '22023';
+  end if;
+  foreach k in array array['VIT', 'TIR', 'PAS', 'DRI', 'DEF', 'PHY'] loop
+    if jsonb_typeof(stats -> k) is distinct from 'number' then
+      raise exception 'Carte illisible.' using errcode = '22023';
+    end if;
+    v := round((stats ->> k)::numeric);
+    if v < 1 or v > 99 then
+      raise exception 'Carte illisible.' using errcode = '22023';
+    end if;
+    propres := propres || jsonb_build_object(k, v);
+    somme := somme + v;
+  end loop;
+  update public.parrainage_codes x
+     set carte = jsonb_build_object('poste', poste, 'stats', propres, 'note', ceil(somme / 6.0)::int)
+   where x.joueur = (select auth.uid());
+end;
+$$;
+
+-- Le haut du tunnel : un lien ouvert, une inscription commencée. Une fois par
+-- téléphone et par étape ; un code inconnu ou coupé ne laisse rien.
+create or replace function public.parrainage_vu(c text, visiteur text, etape text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.parrainage_visites (code, visiteur, etape)
+  select x.code, parrainage_vu.visiteur, parrainage_vu.etape
+    from public.parrainage_codes x
+   where x.code = lower(btrim(c)) and x.actif
+  on conflict on constraint parrainage_visites_une_fois do nothing;
+exception when check_violation then
+  return;
+end;
+$$;
+
+-- J'ai partagé (ou copié) mon lien.
+create or replace function public.parrainage_partage()
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.parrainage_codes x
+     set partages = least(x.partages + 1, 100000), partage_le = now()
+   where x.joueur = (select auth.uid());
+$$;
+
+-- L'admin coupe un code (un lien qui fuit), ou le rallume.
+create or replace function public.parrainage_code_actif(c text, actif boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_league_admin() then
+    raise exception 'Réservé à l''admin.' using errcode = '42501';
+  end if;
+  update public.parrainage_codes x set actif = parrainage_code_actif.actif where x.code = lower(btrim(c));
+end;
+$$;
+
+-- Le bas du tunnel, pour l'admin (Activité → Parrainage) : chaque filleul a-t-il
+-- joué un match (inscrit à un match passé) et rejoint une équipe Bola Team ?
+-- Les matchs privés ne se lisent pas autrement. Vide pour tout autre compte.
+create or replace function public.parrainage_suivi()
+returns table (filleul uuid, a_joue boolean, en_equipe boolean)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select p.filleul,
+         exists (
+           select 1
+             from public.match_joueurs mj
+             join public.matchs m on m.id = mj.match_id
+            where mj.player_id = p.filleul and mj.statut = 'inscrit'
+              and m.jour <= (now() at time zone 'Europe/Paris')::date
+         ),
+         exists (select 1 from public.equipe_membres em where em.joueur = p.filleul and em.statut = 'membre')
+    from public.parrainages p
+   where (select public.is_league_admin());
+$$;
+
+revoke execute on function public.mon_code_parrain(), public.parrain_info(text), public.parrainage_vu(text, text, text),
+  public.parrainage_code_actif(text, boolean), public.parrainage_ma_carte(text, jsonb), public.parrainage_partage(),
+  public.parrainage_suivi()
+  from public, anon;
+grant execute on function public.mon_code_parrain(), public.parrainage_code_actif(text, boolean),
+  public.parrainage_ma_carte(text, jsonb), public.parrainage_partage(), public.parrainage_suivi() to authenticated;
+grant execute on function public.parrain_info(text), public.parrainage_vu(text, text, text) to anon, authenticated;
+
+-- Le Vestiaire est le salon de la SFL : un joueur Bola (venu par un parrain,
+-- hors de la saison) ne le lit pas et n'y écrit pas. Ses messages privés et
+-- les discussions de ses matchs et de son équipe restent les siens. Deux
+-- règles restrictives, qui s'ajoutent à celles du salon (plus haut) : elles
+-- vivent ici parce que joueur_sfl n'existe qu'à partir du mode Team.
+drop policy if exists "messages: le Vestiaire, à la SFL" on public.messages;
+create policy "messages: le Vestiaire, à la SFL" on public.messages as restrictive for select to authenticated
+  using (canal <> 'sfl' or (select public.joueur_sfl((select auth.uid()))) or (select public.is_league_admin()));
+drop policy if exists "messages: écrire au Vestiaire, la SFL" on public.messages;
+create policy "messages: écrire au Vestiaire, la SFL" on public.messages as restrictive for insert to authenticated
+  with check (canal <> 'sfl' or (select public.joueur_sfl((select auth.uid()))) or (select public.is_league_admin()));

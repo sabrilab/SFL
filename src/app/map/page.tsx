@@ -39,10 +39,10 @@
 // « Ouvrir un match ici » (la feuille d'ouverture, le terrain déjà choisi)
 // ou, pour le capitaine d'une équipe active, « Défier une équipe ici » (la
 // page Team, le défi posé sur ce terrain). Un défi accepté s'y pose ensuite,
-// à son nom. Le bouton au petit terrain ne garde que ceux d'un format (à 3,
-// 5, 7, 8 ou 11 ; Sabri, 24/10 : « on fait actuellement du foot à 5 […]
-// qu'on puisse filtrer facilement ») : map/format-terrains.tsx, le même
-// choix que dans la feuille « Terrains du Nord ».
+// à son nom. Le menu de la Map ne garde que ceux d'un format (à 3, 5, 7, 8
+// ou 11 ; Sabri, 24/10 : « on fait actuellement du foot à 5 […] qu'on
+// puisse filtrer facilement ») : map/format-terrains.tsx, le même choix que
+// dans la feuille « Terrains du Nord ».
 //
 // Les contrats en direct (23/10) : le bouton au viseur ne laisse sur la Map
 // que les cibles des contrats signés du dimanche, sous leur viseur, leur prime
@@ -53,7 +53,25 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { CalendarDays, ChartSpline, ChevronDown, ChevronUp, Crosshair, Layers, LocateFixed, MapPin, Navigation, Plus, Search, Settings2, Star, Trash2, Users } from "lucide-react";
+import {
+  CalendarDays,
+  ChartSpline,
+  ChevronDown,
+  ChevronUp,
+  ClipboardPen,
+  Crosshair,
+  IdCard,
+  Layers,
+  LocateFixed,
+  MapPin,
+  Navigation,
+  Plus,
+  Search,
+  Settings2,
+  Star,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,7 +90,8 @@ import { InvitationsEquipe } from "@/components/sfl/equipe/invitation-map";
 import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { useParties } from "@/hooks/use-parties";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
-import { inscrits, libelleJour, placesLibres, type Partie } from "@/lib/sfl/matchs";
+import { inscrits, libelleJour, listerDispos, momentDeLHeure, placesLibres, prochainsJours, type Dispo, type Partie } from "@/lib/sfl/matchs";
+import { cleMoment, meilleurMoment, terrainPropose, type MomentPropose } from "@/lib/sfl/proposition";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
 import { usePresence } from "@/hooks/use-presence";
@@ -113,7 +132,7 @@ import { ciblesDuDimanche, contratsSignes, foyerDesCibles, villesDesCibles } fro
 import { ContratsSur } from "@/components/sfl/map/contrats-sur";
 import { cleVille, type ContratPlan, type VillePlan } from "@/components/sfl/map/joueurs";
 import { useMissionsDeLaLigue } from "@/hooks/use-missions";
-import { villeOuLigue } from "@/lib/sfl/villes";
+import { maVille, villeOuLigue } from "@/lib/sfl/villes";
 import { photoMiniature, photoPerso } from "@/lib/sfl/photos";
 import { nomAffiche } from "@/lib/sfl/identites";
 import {
@@ -136,11 +155,26 @@ import { useVillesRevision } from "@/hooks/use-villes";
 import { usePhotoRevision } from "@/hooks/use-player-photo";
 import { useIdentitesRevision } from "@/hooks/use-identites";
 import { cn } from "@/lib/utils";
-import { COULEUR_LIGUE, heureCourte, itineraires, stadeSvg, type EtatSticker, type LigueMatch, type Moment, type StickerPlan } from "@/components/sfl/map/stade";
+import {
+  COULEUR_LIGUE,
+  COULEUR_REMPLISSAGE,
+  heureCourte,
+  itineraires,
+  remplissageDe,
+  stadeSvg,
+  type EtatSticker,
+  type LigueMatch,
+  type Moment,
+  type Remplissage,
+  type StickerPlan,
+} from "@/components/sfl/map/stade";
 import { VueSatellite } from "@/components/sfl/map/vue-satellite";
-import { BoutonFormat } from "@/components/sfl/map/format-terrains";
+import { IconeTerrain, PucesFormat } from "@/components/sfl/map/format-terrains";
+import { MenuMap } from "@/components/sfl/map/menu-map";
 import { useFormatTerrain } from "@/hooks/use-format-terrain";
+import { montrerCalque, useCalquesMap } from "@/hooks/use-calques-map";
 import { SigleLigue } from "@/components/sfl/choix-ligue";
+import { Visages } from "@/components/sfl/suivre";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { useMatchsTeam, type MatchTeam } from "@/hooks/use-matchs-team";
 import type { FondCarte, PointPlan, PossiblePlan, ToiPlan } from "@/components/sfl/map/carte-map";
@@ -150,8 +184,10 @@ import "@/components/sfl/map/contrats-map.css";
 
 /** Les terrains enregistrés ne s'affichent plus sur le plan : seuls les matchs. */
 const AUCUN_POINT: PointPlan[] = [];
-/** Le filtre Contrats ôte les terrains possibles du plan. */
+/** Le filtre Contrats (ou le menu) ôte les terrains possibles du plan. */
 const SANS_POSSIBLES: PossiblePlan[] = [];
+/** Les joueurs masqués depuis le menu de la Map. */
+const AUCUNE_VILLE: VillePlan[] = [];
 /** Un terrain qui a son match n'a plus son sticker vide : à moins de 200 m, c'est le même. */
 const MEME_TERRAIN_KM = 0.2;
 /** « 23/10/2026 » */
@@ -184,6 +220,8 @@ const ENCRE = "#0A0B0D";
 const CLAIR = "#EFEFEC";
 const BLANC = "#F4F5F2";
 const BRAISE = "#FF8A4C";
+/** Le vert de ceux qui sont libres, sur le jeton sombre de la carte proposée (le ton « y aller »). */
+const VERT_LIBRES = "#84D68C";
 /** Les teintes des avatars de la grappe (des gris, comme dans l'app). */
 const TEINTES = ["#CFCFCF", "#A4A4A4", "#F0F0F0", "#C4C4C4", "#E2E2DE", "#B8B8B4"];
 /** Là où joue la ligue : les adresses proches passent devant. */
@@ -302,6 +340,8 @@ interface MatchMap {
   convoquee?: boolean;
   /** Un match ouvert par un joueur (pas une journée de ligue). */
   partie?: Partie;
+  /** Ce qu'il lui reste à remplir : rouge, orange, vert (jamais pour la ligue, sans plafond). */
+  remplissage?: Remplissage;
   /** Un match d'équipe : un défi accepté du mode Team. */
   team?: MatchTeam;
   /** Sa ligue, qui donne sa couleur au stade : la journée est SFL, le match
@@ -371,7 +411,7 @@ export default function MapPage() {
       ? "Dernier dimanche sans divisions"
       : j != null && j >= REGLES_DIVISIONS.depuis && maDivision && !journeeJouee(saison, j)
         ? `Tu joues en ${nomDivision(maDivision)}`
-        : "Sunday Five League";
+        : null; // le sigle SFL dit déjà la ligue : plus de « Sunday Five League »
 
   const terrains = useMemo(() => saison.terrains ?? [], [saison.terrains]);
   // L'heure et le lieu d'une journée, et ses matchs chacun aux siens.
@@ -523,6 +563,8 @@ export default function MapPage() {
               : etatDe(false, libres);
       const dateLabel = libelleJour(x.jour);
       return {
+        // Rouge, orange ou vert : ce qu'il manque, dit par la couleur (un privé où je ne suis pas n'en dit rien).
+        remplissage: x.visibilite === "prive" && !moiLa ? undefined : remplissageDe(libres, x.places),
         cle: `m${x.id}`,
         j: null,
         quand: quand(dateLabel, null, aujourdhui),
@@ -604,9 +646,11 @@ export default function MapPage() {
     const occupes = pris ? pris.split(";").map((x) => ({ lat: Number(x.split(",")[0]), lng: Number(x.split(",")[1]) })) : [];
     return proposables.filter((t) => !occupes.some((o) => km(o, t) < MEME_TERRAIN_KM));
   }, [proposables, pris]);
-  // Le format choisi (le bouton au petit terrain) ne garde que les complexes
+  // Le format choisi (dans le menu de la Map) ne garde que les complexes
   // qui en ont un ; un format sans aucun terrain libre s'éteint.
   const formatTerrain = useFormatTerrain();
+  // Ce que la Map montre en plus des matchs : les joueurs, les terrains libres (le menu de la Map).
+  const calques = useCalquesMap();
   const comptesFormats = useMemo(() => new Map(FORMATS.map((f) => [f, aFormat(libres, f).length])), [libres]);
   const possibles = useMemo<PossiblePlan[]>(
     () =>
@@ -645,7 +689,14 @@ export default function MapPage() {
 
   const [fiche, setFiche] = useState(false);
   const [ficheAdmin, setFicheAdmin] = useState(false);
-  const [choix, setChoix] = useState<string | null>(null);
+  const [choix, setChoixBrut] = useState<string | null>(null);
+  // La carte « Ton match » au bout du carrousel (le match que la Map propose
+  // d'ouvrir) : choisie, le plan montre son terrain ; choisir un match la quitte.
+  const [surProposition, setSurProposition] = useState(false);
+  const setChoix = useCallback((cle: string | null) => {
+    setSurProposition(false);
+    setChoixBrut(cle);
+  }, []);
   // Toucher un match sur le plan le choisit et ouvre sa fiche — un instant
   // après, qu'on voie le sticker grandir et l'onde partir.
   const choisirSticker = useCallback((id: string) => {
@@ -653,7 +704,7 @@ export default function MapPage() {
     setFicheAdmin(false);
     const calme = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.setTimeout(() => setFiche(true), calme ? 0 : 320);
-  }, []);
+  }, [setChoix]);
   // Le carrousel replié (Sabri, 22/10 : « il faut pouvoir le rendre invisible
   // pour qu'on puisse juste admirer la map »), gardé d'une visite à l'autre.
   const [replie, setReplie] = useState(false);
@@ -687,7 +738,7 @@ export default function MapPage() {
     setChoix(cle);
     setFiche(false);
     setDiscussion({ match: Number(cle.slice(1)), onglet: "match" });
-  }, []);
+  }, [setChoix]);
   const ouvrirEquipe = useCallback(() => setDiscussion({ match: null, onglet: "equipe" }), []);
   const partieDiscussion =
     discussion == null
@@ -744,7 +795,8 @@ export default function MapPage() {
   // celle qui s'arrête au centre (le plan suit), et choisir sur le plan amène
   // sa carte au centre.
   const carrousel = useRef<HTMLDivElement>(null);
-  const choisiCle = useRef<string | undefined>(undefined);
+  /** La carte au centre : la clé du match choisi, ou « proposition ». */
+  const carteCle = useRef<string | undefined>(undefined);
   const arretCarrousel = useRef(0);
   const suivreCarrousel = useCallback(() => {
     window.clearTimeout(arretCarrousel.current);
@@ -760,30 +812,32 @@ export default function MapPage() {
         if (e < ecart) [proche, ecart] = [el, e];
       }
       const cle = proche?.dataset.cle;
-      if (cle && cle !== choisiCle.current) {
+      if (cle && cle !== carteCle.current) {
         navigator.vibrate?.(5);
-        setChoix(cle);
+        if (cle === "proposition") setSurProposition(true);
+        else setChoix(cle);
       }
     }, 140);
-  }, []);
+  }, [setChoix]);
   const cleChoisie = choisi?.cle;
   useEffect(() => {
-    choisiCle.current = cleChoisie;
-    const el = cleChoisie && carrousel.current?.querySelector<HTMLElement>(`[data-cle="${cleChoisie}"]`);
+    const cle = surProposition ? "proposition" : cleChoisie;
+    carteCle.current = cle;
+    const el = cle && carrousel.current?.querySelector<HTMLElement>(`[data-cle="${cle}"]`);
     if (!el) return;
     const calme = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     el.scrollIntoView({ inline: "center", block: "nearest", behavior: calme ? "auto" : "smooth" });
-  }, [cleChoisie]);
+  }, [cleChoisie, surProposition]);
   const stickers = useMemo<StickerPlan[]>(
     () =>
       affiches
-        // Deux matchs sur le même terrain (le joué, le suivant) : on ne les
-        // empile pas ; le plan montre le choisi, sinon le premier.
-        .filter((m, i) => {
+        // Deux matchs à venir au même endroit font un paquet sur le plan
+        // (map/carte-map.tsx) ; le match joué, lui, s'efface derrière un match
+        // à venir sur son terrain, sauf quand on le choisit.
+        .filter((m) => {
           if (!m.terrain) return false;
-          const memes = affiches.filter((x) => x.terrain?.id === m.terrain!.id);
-          if (memes.some((x) => x.cle === choisi?.cle)) return m.cle === choisi?.cle;
-          return affiches.indexOf(memes.find((x) => !x.joue) ?? memes[0]) === i;
+          if (!m.joue || m.cle === choisi?.cle) return true;
+          return !affiches.some((x) => !x.joue && x.terrain && km(x.terrain, m.terrain!) < MEME_TERRAIN_KM);
         })
         .map((m) => ({
           id: m.cle,
@@ -795,6 +849,7 @@ export default function MapPage() {
           etat: m.etat,
           nom: m.terrain!.nom,
           ligue: m.ligue,
+          remplissage: m.remplissage,
           discussion: m.partie && apercus.has(m.partie.id) ? { nonLus: apercus.get(m.partie.id)!.nonLus } : undefined,
         })),
     [affiches, choisi, apercus]
@@ -821,6 +876,77 @@ export default function MapPage() {
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
     );
   }
+
+  // Le match que la Map propose d'ouvrir (lib/sfl/proposition.ts) : le moment
+  // de la semaine où le plus de joueurs sont libres, que rien n'occupe déjà,
+  // sur le terrain libre le plus proche (de toi, de ta ville, sinon de la
+  // ligue) et du format choisi. Les dispos se relisent quand Mes dispos se
+  // referme.
+  const [disposSemaine, setDisposSemaine] = useState<Dispo[]>([]);
+  useEffect(() => {
+    if (!partiesActives || dispos) return;
+    let fini = false;
+    const jours = prochainsJours(7);
+    listerDispos(jours[0], jours[jours.length - 1])
+      .then((d) => !fini && setDisposSemaine(d))
+      .catch(() => {});
+    return () => {
+      fini = true;
+    };
+  }, [partiesActives, dispos]);
+  // Ce qui occupe déjà un moment : un match ouvert qui a de la place, un des miens, une journée de la ligue.
+  const occupes = useMemo(() => {
+    const s = new Set<string>();
+    for (const m of affiches) {
+      if (m.joue) continue;
+      if (m.partie) {
+        const x = m.partie;
+        if (m.dedans || x.organisateurId === moi || (x.visibilite === "public" && placesLibres(x) > 0)) s.add(cleMoment(x.jour, momentDeLHeure(x.heure)));
+      } else if (m.team) {
+        if (m.dedans) s.add(cleMoment(m.team.defi.jour, momentDeLHeure(m.team.defi.heure)));
+      } else {
+        const d = lireDate(m.dateLabel, aujourdhui);
+        if (d) s.add(cleMoment(d.toISOString().slice(0, 10), momentDeLHeure(m.heure)));
+      }
+    }
+    return s;
+  }, [affiches, moi, aujourdhui]);
+  const momentPropose = useMemo(
+    () => (partiesActives ? meilleurMoment(disposSemaine, { moi, aujourdhui, heure, occupes }) : null),
+    [partiesActives, disposSemaine, moi, aujourdhui, heure, occupes]
+  );
+  const ville = me ? maVille(me) : null;
+  const pres = toi ?? ville ?? terrains.find((t) => t.defaut) ?? PRES_DE;
+  const [presLat, presLng] = [pres.lat, pres.lng];
+  // Sans format choisi, un terrain à 5 : un match ouvert se joue à dix, comme
+  // la ligue. Sans moment, la feuille s'ouvre à 19 h : un terrain éclairé.
+  const ouPropose = useMemo(() => {
+    if (!partiesActives) return null;
+    const auFormat = aFormat(libres, formatTerrain ?? 5);
+    return terrainPropose(auFormat.length ? auFormat : libres, { lat: presLat, lng: presLng }, momentPropose?.moment ?? "soir");
+  }, [partiesActives, libres, formatTerrain, presLat, presLng, momentPropose]);
+  const proposition = momentPropose || ouPropose ? { moment: momentPropose, terrain: ouPropose } : null;
+  // Sur la carte proposée (ou seule, sans match) : le plan montre son terrain.
+  const surCarte = !!proposition && (surProposition || affiches.length === 0);
+  const seulPropose = useMemo(() => (ouPropose ? possibles.filter((x) => x.id === ouPropose.id) : SANS_POSSIBLES), [possibles, ouPropose]);
+  const ouvrirPropose = () => {
+    navigator.vibrate?.(8);
+    const t = proposition?.terrain ?? null;
+    const deLaLigue = t?.ligue != null ? (terrains.find((x) => x.id === t.ligue) ?? null) : null;
+    setOuvrir((o) => ({
+      terrain: deLaLigue,
+      lieu: t && !deLaLigue ? { lieu: lieuDuTerrain(t), adresse: t.adresse, lat: t.lat, lng: t.lng, terrain: t } : undefined,
+      jour: proposition?.moment?.jour,
+      heure: proposition?.moment?.heure,
+      n: (o?.n ?? 0) + 1,
+    }));
+  };
+  // Sous « Ouvrir un match », ce que la Map propose : « SAM. 15H · 7 LIBRES », sinon le terrain.
+  const sousOuvrir = proposition?.moment
+    ? `${quand(libelleJour(proposition.moment.jour), null, aujourdhui).jourCourt} ${heureCourte(proposition.moment.heure.replace(":", "h"))} · ${proposition.moment.noms.length} libres`
+    : proposition?.terrain
+      ? [lieuDuTerrain(proposition.terrain), toi ? distanceLisible(toi, proposition.terrain) : null].filter(Boolean).join(" · ")
+      : null;
 
   const ios = useEstIos();
 
@@ -915,7 +1041,7 @@ export default function MapPage() {
     return p.equipesVisibles || admin ? feuilleDeConvocation(p.teams) : [];
   }, [choisi, saison.journees, journees, matchsDe, p.equipesVisibles, p.teams, admin]);
 
-  const commune = choisi?.terrain?.commune ?? terrains.find((t) => t.commune)?.commune ?? "SFL";
+  const commune = (surCarte ? proposition?.terrain?.commune : null) || choisi?.terrain?.commune || terrains.find((t) => t.commune)?.commune || "SFL";
   const n = affiches.filter((m) => !m.joue).length;
   const signes = missions ? contratsSignes(missions).length : 0;
   const compte = enContrats
@@ -954,18 +1080,18 @@ export default function MapPage() {
             stickers={stickers}
             points={AUCUN_POINT}
             toi={toi}
-            choisi={choisi?.cle ?? null}
+            choisi={surCarte ? null : (choisi?.cle ?? null)}
             onChoisir={choisirSticker}
             onBulle={ouvrirDiscussion}
-            villes={villesVues}
+            villes={enContrats || calques.joueurs ? villesVues : AUCUNE_VILLE}
             margeBas={replie || enContrats ? 150 : 380}
             onVille={ouvrirVille}
             onJoueur={toucherJoueur}
             viser={viser}
             cadrerSur={cadrage}
             matchsEnRetrait={enContrats}
-            possibles={enContrats ? SANS_POSSIBLES : possibles}
-            possibleChoisi={enContrats ? null : leve}
+            possibles={enContrats ? SANS_POSSIBLES : calques.terrains ? possibles : surCarte ? seulPropose : SANS_POSSIBLES}
+            possibleChoisi={enContrats ? null : (leve ?? (surCarte ? (ouPropose?.id ?? null) : null))}
             onPossible={toucherPossible}
             teinteFantome={tonFantomes}
             className="h-full w-full"
@@ -995,11 +1121,14 @@ export default function MapPage() {
         </div>
 
         {/* En haut à droite : la loupe (la Recherche, montée de la barre
-            d'onglets le 19/10), le format des terrains grisés (24/10), la
-            bascule plan / satellite et, pour l'admin, les stats (Activité &
-            rétention, 22/10) et le réglage des matchs — le lettrage garde sa
-            place. */}
-        <div data-traverse className="absolute right-4 z-[510] flex flex-col items-end gap-2" style={{ top: haut }}>
+            d'onglets le 19/10) et le menu de la Map (24/10, map/menu-map.tsx) :
+            ce qu'elle montre, en interrupteurs (les joueurs, les terrains
+            libres et leur format, les contrats du dimanche, le satellite), les
+            raccourcis et, pour l'admin, ses réglages. Les contrats allumés,
+            leur viseur reste dessous pour les éteindre d'un toucher. Le
+            lettrage garde sa place. La colonne passe devant la rangée du bas :
+            le menu ouvert la recouvre. */}
+        <div data-traverse className="absolute right-4 z-[520] flex flex-col items-end gap-2" style={{ top: haut }}>
           <Link
             href="/recherche"
             aria-label="Recherche"
@@ -1007,67 +1136,85 @@ export default function MapPage() {
           >
             <Search className="size-[18px]" strokeWidth={2.2} />
           </Link>
-          {admin && (
-            <Link
-              href="/admin/activite"
-              aria-label="Activité et rétention"
-              className="bouton-givre map-bord map-touche grid size-10 place-items-center"
-            >
-              <ChartSpline className="size-[18px]" strokeWidth={2.2} />
-            </Link>
-          )}
-          {(villes.length > 0 || !!me) && (
-            <button
-              type="button"
-              onClick={() => {
-                setFocusVilles(null);
-                setCatalogue(true);
-              }}
-              aria-label="Les joueurs, ville par ville"
-              className="bouton-givre bouton--mauve map-bord map-touche grid size-10 place-items-center"
-            >
-              <Users className="size-[18px]" strokeWidth={2.2} />
-            </button>
-          )}
-          {cibles.size > 0 && (
+          <MenuMap
+            filtre={!calques.joueurs || (libres.length > 0 && (!calques.terrains || formatTerrain != null)) || fond === "satellite" || enContrats}
+            bascules={[
+              {
+                id: "joueurs",
+                libelle: "Les joueurs",
+                icone: <IdCard className="size-[19px]" strokeWidth={2} />,
+                actif: calques.joueurs,
+                onChange: (v) => montrerCalque("joueurs", v),
+              },
+              ...(libres.length > 0
+                ? [
+                    {
+                      id: "terrains",
+                      libelle: "Les terrains libres",
+                      icone: <IconeTerrain className="size-[19px]" />,
+                      actif: calques.terrains,
+                      onChange: (v: boolean) => montrerCalque("terrains", v),
+                      dessous: <PucesFormat sur="plan" comptes={comptesFormats} />,
+                    },
+                  ]
+                : []),
+              ...(cibles.size > 0
+                ? [
+                    {
+                      id: "contrats",
+                      libelle: "Les contrats en jeu",
+                      icone: <Crosshair className="size-[18px]" strokeWidth={2.2} />,
+                      actif: contrats,
+                      onChange: () => basculerContrats(),
+                    },
+                  ]
+                : []),
+              {
+                id: "satellite",
+                libelle: "Vue satellite",
+                icone: <Layers className="size-[18px]" strokeWidth={2.2} />,
+                actif: fond === "satellite",
+                onChange: (v) => setFond(v ? "satellite" : "plan"),
+              },
+            ]}
+            raccourcis={[
+              ...(villes.length > 0 || !!me
+                ? [
+                    {
+                      id: "catalogue",
+                      libelle: "Les joueurs, ville par ville",
+                      icone: <Users className="size-[18px]" strokeWidth={2.2} />,
+                      ton: "#5b2141",
+                      onClick: () => {
+                        setFocusVilles(null);
+                        setCatalogue(true);
+                      },
+                    },
+                  ]
+                : []),
+              ...(partiesActives
+                ? [{ id: "dispos", libelle: "Mes dispos", icone: <CalendarDays className="size-[18px]" strokeWidth={2.2} />, ton: "#24452a", onClick: () => setDispos(true) }]
+                : []),
+            ]}
+            admin={
+              admin
+                ? [
+                    { id: "activite", libelle: "Activité et rétention", icone: <ChartSpline className="size-[18px]" strokeWidth={2.2} />, href: "/admin/activite" },
+                    { id: "matchs", libelle: "Matchs et terrains", icone: <Settings2 className="size-[18px]" strokeWidth={2.2} />, onClick: () => ouvrirFiche(true) },
+                    { id: "journee", libelle: "La journée", icone: <ClipboardPen className="size-[18px]" strokeWidth={2.2} />, href: "/admin" },
+                  ]
+                : []
+            }
+          />
+          {enContrats && (
             <button
               type="button"
               onClick={basculerContrats}
-              aria-label={contrats ? "Revoir tous les joueurs" : "Voir les contrats en jeu"}
-              aria-pressed={contrats}
-              className={cn("map-bord map-touche grid size-10 place-items-center", contrats ? "bouton-encre" : "bouton-givre")}
+              aria-label="Revoir tous les joueurs"
+              aria-pressed
+              className="bouton-encre map-bord map-touche grid size-10 place-items-center"
             >
               <Crosshair className="size-[18px]" strokeWidth={2.2} />
-            </button>
-          )}
-          {!enContrats && libres.length > 0 && <BoutonFormat comptes={comptesFormats} />}
-          <button
-            type="button"
-            onClick={() => setFond((f) => (f === "plan" ? "satellite" : "plan"))}
-            aria-label={fond === "plan" ? "Voir la photo satellite" : "Revenir au plan"}
-            aria-pressed={fond === "satellite"}
-            className={cn("map-bord map-touche map-calques grid size-10 place-items-center", fond === "satellite" ? "bouton-encre" : "bouton-givre")}
-          >
-            <Layers className="size-[18px]" strokeWidth={2.2} />
-          </button>
-          {partiesActives && (
-            <button
-              type="button"
-              onClick={() => setDispos(true)}
-              aria-label="Mes dispos"
-              className="bouton-givre bouton--vert map-bord map-touche grid size-10 place-items-center"
-            >
-              <CalendarDays className="size-[18px]" strokeWidth={2.2} />
-            </button>
-          )}
-          {admin && (
-            <button
-              type="button"
-              onClick={() => ouvrirFiche(true)}
-              aria-label="Régler les matchs et les terrains"
-              className="bouton-givre map-bord map-touche grid size-10 place-items-center"
-            >
-              <Settings2 className="size-[18px]" strokeWidth={2.2} />
             </button>
           )}
         </div>
@@ -1081,28 +1228,37 @@ export default function MapPage() {
           <InvitationsEquipe invitations={invitationsEquipe} moi={moi} />
           <Invitations invitations={invitations} onOuvrir={(p) => choisirSticker(`m${p.id}`)} />
           <div data-traverse className="flex w-full items-center justify-center gap-2 px-4">
-            {/* Tout joueur ouvre un match ; l'admin garde en plus la journée de ligue. */}
-            {partiesActives && (
+            {/* Le geste principal de la Map (24/10) : tout joueur ouvre un
+                match, et le bouton dit celui qu'elle lui propose (le moment où
+                le plus de monde est libre, sinon le terrain) ; un toucher ouvre
+                la feuille remplie. La journée de l'admin est dans le menu. */}
+            {partiesActives ? (
               <button
                 type="button"
-                onClick={() => setOuvrir((o) => ({ terrain: choisi?.partie ? null : (choisi?.terrain ?? null), n: (o?.n ?? 0) + 1 }))}
-                className="bouton-encre bouton--vert map-monte map-touche flex h-11 items-center gap-2 pr-[18px] pl-2 text-[15.5px] font-semibold"
+                onClick={ouvrirPropose}
+                aria-label={sousOuvrir ? `Ouvrir un match, ${sousOuvrir.toLowerCase()}` : "Ouvrir un match"}
+                className="bouton-encre bouton--vert map-monte map-touche flex h-[52px] max-w-[calc(100%-8.5rem)] items-center gap-2.5 pr-5 pl-2 text-left"
               >
-                <span className="grid size-7 place-items-center rounded-full" style={{ background: "var(--b-texte)", color: ENCRE }}>
-                  <Plus className="size-[13px]" strokeWidth={3} />
+                <span className="grid size-9 shrink-0 place-items-center rounded-full" style={{ background: "var(--b-texte)", color: ENCRE }}>
+                  <Plus className="size-4" strokeWidth={3} />
                 </span>
-                Ouvrir un match
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-[15.5px] leading-tight font-semibold tracking-[-0.2px]">Ouvrir un match</span>
+                  {sousOuvrir && (
+                    <span className="mt-px truncate font-mono text-[9.5px] leading-tight font-bold tracking-[0.8px] uppercase" style={{ color: "var(--b-texte)" }}>
+                      {sousOuvrir}
+                    </span>
+                  )}
+                </span>
               </button>
+            ) : (
+              admin && (
+                <Link href="/admin" className="bouton-encre bouton--vert map-monte map-touche flex h-11 items-center gap-2 px-[18px] text-[15.5px] font-semibold">
+                  Ouvrir un match
+                </Link>
+              )
             )}
-            {admin && (
-              <Link
-                href="/admin"
-                className={cn("map-monte map-touche flex h-11 items-center gap-2 px-[18px] text-[15.5px] font-semibold", partiesActives ? "bouton-givre" : "bouton-encre bouton--vert")}
-              >
-                {partiesActives ? "Journée" : "Ouvrir un match"}
-              </Link>
-            )}
-            {affiches.length > 0 && !enContrats && (
+            {(affiches.length > 0 || proposition) && !enContrats && (
               <button
                 type="button"
                 onClick={basculerCarrousel}
@@ -1135,7 +1291,7 @@ export default function MapPage() {
             ref={carrousel}
             onScroll={suivreCarrousel}
             data-traverse
-            className="flex w-full snap-x snap-mandatory items-end gap-3 overflow-x-auto pr-[max(1rem,calc(50%-103px))] pb-3 [scrollbar-width:none]"
+            className="flex w-full snap-x snap-mandatory items-end gap-3 overflow-x-auto pr-[max(1rem,calc(50%-103px))] pb-[18px] [scrollbar-width:none]"
             style={{ paddingLeft: `max(1rem, calc(50% - ${affiches[0]?.joue ? LARGEUR_JOUE / 2 + 5 : 103}px))` }}
           >
             {affiches.map((m, i) => (
@@ -1147,13 +1303,42 @@ export default function MapPage() {
                   dans={m.joue ? null : ecartJours(m.dateLabel, aujourdhui)}
                   loin={toi && m.terrain ? `à ${distanceLisible(toi, m.terrain)}` : null}
                   nonLus={m.partie ? (apercus.get(m.partie.id)?.nonLus ?? 0) : 0}
-                  onToucher={() => (m.cle !== choisi?.cle ? setChoix(m.cle) : ouvrirFiche())}
+                  onToucher={() => (m.cle !== choisi?.cle || surCarte ? setChoix(m.cle) : ouvrirFiche())}
                 />
               </div>
             ))}
+            {/* Au bout, le match que la Map propose d'ouvrir : un premier
+                toucher la choisit (le plan montre son terrain), le second
+                ouvre la feuille remplie. */}
+            {proposition && (
+              <div data-cle="proposition" className="map-monte shrink-0 snap-center" style={{ ["--i" as string]: affiches.length + 1 }}>
+                <CarteProposee
+                  moment={proposition.moment}
+                  terrain={proposition.terrain}
+                  titre={proposition.moment ? quand(libelleJour(proposition.moment.jour), null, aujourdhui).titre : "Ton match"}
+                  choisie={surCarte}
+                  loin={toi && proposition.terrain ? `à ${distanceLisible(toi, proposition.terrain)}` : null}
+                  onToucher={() => (surCarte ? ouvrirPropose() : setSurProposition(true))}
+                />
+              </div>
+            )}
           </div>
 
-          {choisi && (
+          {surCarte ? (
+            // Sur la carte proposée : son terrain, qui ouvre sa fiche (le bouton du dessus ouvre le match).
+            <div data-traverse className="flex max-w-full items-center gap-2 px-4">
+              {ouPropose && (
+                <button
+                  type="button"
+                  onClick={() => toucherPossible(ouPropose.id)}
+                  className="bouton-givre flex h-[30px] min-w-0 items-center gap-[7px] px-3.5"
+                >
+                  <span className="size-2 shrink-0 rounded-full border-[1.5px]" style={{ borderColor: ENCRE }} />
+                  <span className="truncate text-[13px] font-semibold tracking-[-0.2px]">{lieuDuTerrain(ouPropose)}</span>
+                </button>
+              )}
+            </div>
+          ) : choisi && (
             <div data-traverse className="flex max-w-full items-center gap-2 px-4">
               {choisi.terrain ? (
                 <>
@@ -1213,7 +1398,7 @@ export default function MapPage() {
                   ? `Ouvert par ${choisi.partie.organisateur}`
                   : choisi?.team
                     ? "Match d'équipe"
-                    : `${jDuChoisi != null ? `J${jDuChoisi} · ` : ""}${surtitreDeLigue(jDuChoisi)}`}
+                    : [jDuChoisi != null && `J${jDuChoisi}`, surtitreDeLigue(jDuChoisi)].filter(Boolean).join(" · ")}
               </span>
             </p>
             <SheetTitle className="text-[26px] font-bold tracking-tight">
@@ -1234,8 +1419,10 @@ export default function MapPage() {
               </>
             ) : (
               <>
-                {choisi?.terrain && <Itineraire terrain={choisi.terrain} ios={ios} />}
-                {/* Une journée : ses joueurs. La convocation : on y répond, comme avant. */}
+                {/* Les joueurs d'abord, la feuille de match tout de suite dessous
+                    (Sabri, 24/10 : plus de vue satellite en tête de la fiche) ;
+                    le chemin pour y aller vient après. Une journée : ses
+                    joueurs. La convocation : on y répond, comme avant. */}
                 {choisi?.partie ? (
                   <FichePartie
                     partie={choisi.partie}
@@ -1248,8 +1435,7 @@ export default function MapPage() {
                 ) : choisi?.team ? (
                   <FicheTeam t={choisi.team} />
                 ) : choisi?.j != null && !choisi.convoquee ? (
-                  // Les équipes faites, la feuille de match dit déjà qui vient.
-                  feuille.length === 0 && <Presents m={choisi} />
+                  <Presents m={choisi} />
                 ) : (
                   <PresencePanel />
                 )}
@@ -1267,6 +1453,7 @@ export default function MapPage() {
                   />
                 )}
                 {choisi && feuille.length > 0 && <DuelsDuJour j={choisi.j} matchs={choisi.matchsIci} />}
+                {choisi?.terrain && <Itineraire terrain={choisi.terrain} ios={ios} />}
                 {choisi?.joue && (
                   <Link
                     href="/ligue"
@@ -1482,6 +1669,8 @@ function CarteMatch({
   // ligue n'a pas de plafond : pas de jauge, le compte des participants.
   const places = joue || !m.partie ? 0 : Math.min(m.effectif, 14);
   const venus = Math.min(m.presents.length, places);
+  // Les places vides prennent la couleur de ce qu'il manque : rouge, ou la braise.
+  const manque = m.remplissage ? COULEUR_REMPLISSAGE[m.remplissage] : BRAISE;
   return (
     <div className={cn("carte-match relative", choisi && "carte-match--choisie", joue && "carte-match--joue")}>
       <button
@@ -1504,11 +1693,11 @@ function CarteMatch({
               demi={0.0009}
               rapport={196 / 140}
               hauteur={h}
-              className={cn("absolute inset-0 h-full w-full", joue ? "grayscale" : complet && "saturate-[0.35]")}
+              className={cn("absolute inset-0 h-full w-full", joue && "grayscale")}
             />
           ) : (
             <div
-              className={cn("absolute top-1/2 left-1/2 size-[118px] -translate-x-1/2 -translate-y-[calc(50%+14px)]", (complet || joue) && "saturate-0")}
+              className={cn("absolute top-1/2 left-1/2 size-[118px] -translate-x-1/2 -translate-y-[calc(50%+14px)]", joue && "saturate-0")}
               dangerouslySetInnerHTML={{ __html: stadeSvg(m.quand.moment, { fond: false, ligue: m.ligue }) }}
             />
           )}
@@ -1520,7 +1709,7 @@ function CarteMatch({
           />
           <div className={cn("absolute inset-x-0 top-0 flex items-center justify-between gap-1", joue ? "p-2" : "p-2.5")}>
             {/* Une journée de ligue : le compte des participants va en bas, en grand. */}
-            {!inscrits && <Jeton texte={m.etatTexte} ton={m.etat.genre} petit={joue} />}
+            {!inscrits && <Jeton texte={m.etatTexte} ton={m.etat.genre} couleur={m.remplissage && COULEUR_REMPLISSAGE[m.remplissage]} petit={joue} />}
             {!joue && (loin || rebours) && <Jeton texte={loin ?? rebours!} ton="neutre" />}
           </div>
           <div className={cn("absolute inset-x-0 bottom-0", joue ? "px-2.5 pb-2.5" : "px-3 pb-3")}>
@@ -1534,12 +1723,18 @@ function CarteMatch({
               {/* La ligue du match, par son sigle (SFL, Bola, Team). */}
               <SigleLigue ligue={m.ligue} hauteur={joue ? 8 : 9.5} className="text-white/90" />
               <span className="min-w-0 truncate">
-                {heureCourte(m.heure)} ·{" "}
-                {m.partie
-                  ? `${m.partie.visibilite === "prive" ? "Privé" : "Public"} · ${m.partie.organisateur}`
-                  : m.team
-                    ? `${m.team.de.nom} – ${m.team.a.nom}`
-                    : `${m.j != null ? `J${m.j} · ` : ""}Sunday Five`}
+                {[
+                  heureCourte(m.heure),
+                  m.partie
+                    ? `${m.partie.visibilite === "prive" ? "Privé" : "Public"} · ${m.partie.organisateur}`
+                    : m.team
+                      ? `${m.team.de.nom} – ${m.team.a.nom}`
+                      : m.j != null
+                        ? `J${m.j}`
+                        : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </span>
             </p>
             {inscrits && (
@@ -1563,7 +1758,11 @@ function CarteMatch({
                     style={
                       i < venus
                         ? { background: "rgba(255,255,255,0.9)" }
-                        : { background: complet ? "rgba(255,255,255,0.25)" : "rgba(255,138,76,0.28)", boxShadow: complet ? undefined : `inset 0 0 0 1px ${BRAISE}`, ["--i" as string]: i - venus }
+                        : {
+                            background: complet ? "rgba(255,255,255,0.25)" : `color-mix(in srgb, ${manque} 30%, transparent)`,
+                            boxShadow: complet ? undefined : `inset 0 0 0 1px ${manque}`,
+                            ["--i" as string]: i - venus,
+                          }
                     }
                   />
                 ))}
@@ -1583,27 +1782,108 @@ function CarteMatch({
           {nonLus > 9 ? "9+" : nonLus}
         </span>
       )}
-      {!joue && m.presents.length > 0 && (
-        <div className="pointer-events-none absolute -bottom-3 left-1/2 flex -translate-x-1/2 items-center" aria-hidden>
-          {m.presents.slice(0, 3).map((nom, i) => (
-            <span
-              key={nom}
-              className="grid size-6 place-items-center rounded-full border-[1.5px] text-[12px] font-bold shadow-[0_1px_2px_rgba(0,0,0,0.18)]"
-              style={{ background: teinte(nom), color: "rgba(10,11,13,0.78)", borderColor: BLANC, marginLeft: i ? -8 : 0 }}
-            >
-              {nom[0]}
-            </span>
-          ))}
-          {m.presents.length > 3 && (
-            <span
-              className="-ml-2 flex h-6 items-center rounded-full border-[1.5px] px-1.5 text-[9px] font-bold"
-              style={{ background: ENCRE, color: BLANC, borderColor: BLANC }}
-            >
-              +{m.presents.length - 3}
-            </span>
-          )}
-        </div>
+      {!joue && <CartesSous noms={m.presents} />}
+    </div>
+  );
+}
+
+/**
+ * Sous une carte du carrousel, ceux qui viennent (ou qui sont libres) : leurs
+ * cartes en mini, comme les visages de « Suivi par » (Sabri, 24/10 : « Fais
+ * en sorte qu'on voie leurs cartes ici en mini, comme t'as fait quand t'as un
+ * follower »), puis le compte des autres.
+ */
+function CartesSous({ noms }: { noms: string[] }) {
+  if (!noms.length) return null;
+  return (
+    <div className="pointer-events-none absolute -bottom-4 left-1/2 flex -translate-x-1/2 items-center drop-shadow-[0_1px_2px_rgba(0,0,0,0.2)]" aria-hidden>
+      <Visages noms={noms.slice(0, 3)} clair />
+      {noms.length > 3 && (
+        <span
+          className="relative -ml-[9px] flex h-[26px] items-center rounded-full pr-2 pl-[11px] text-[10px] font-bold tabular-nums ring-2 ring-[#f2f1ee]"
+          style={{ background: ENCRE, color: BLANC }}
+        >
+          +{noms.length - 3}
+        </span>
       )}
+    </div>
+  );
+}
+
+/**
+ * Le match que la Map propose d'ouvrir, au bout du carrousel : le cadre des
+ * cartes de match, le terrain vu du ciel, mais un pointillé à la place du
+ * match qui n'existe pas encore, et un « + » au milieu. Il dit quand (le
+ * jour, l'heure) et combien sont libres, en vert ; sous la carte, leurs
+ * cartes en mini, comme celles de ceux qui viennent sous un match.
+ */
+function CarteProposee({
+  moment,
+  terrain,
+  titre,
+  choisie,
+  loin,
+  onToucher,
+}: {
+  moment: MomentPropose | null;
+  terrain: TerrainPropose | null;
+  titre: string;
+  choisie: boolean;
+  loin: string | null;
+  onToucher: () => void;
+}) {
+  const [c0, c1, c2] = COULEUR_LIGUE.bola.fond;
+  const noms = moment?.noms ?? [];
+  const ou = terrain ? lieuDuTerrain(terrain) : null;
+  return (
+    <div className={cn("carte-match relative", choisie && "carte-match--choisie")}>
+      <button
+        type="button"
+        onClick={onToucher}
+        className="block rounded-[24px] p-[5px] text-left shadow-[0_8px_12px_rgba(0,0,0,0.22)]"
+        style={{ background: BLANC }}
+        aria-label={`Ouvrir un match${moment ? ` ${titre.toLowerCase()} ${moment.heure.replace(":", "h")}` : ""}${ou ? `, ${ou}` : ""}${noms.length ? `, ${noms.length} joueurs libres` : ""}`}
+        aria-pressed={choisie}
+      >
+        <div className="relative overflow-hidden rounded-[19px]" style={{ width: 196, height: 140, background: `linear-gradient(180deg, ${c0}, ${c1} 50%, ${c2})` }}>
+          {terrain ? (
+            <VueSatellite lat={terrain.lat} lng={terrain.lng} demi={0.0009} rapport={196 / 140} hauteur={140} className="absolute inset-0 h-full w-full" />
+          ) : (
+            <div
+              className="absolute top-1/2 left-1/2 size-[118px] -translate-x-1/2 -translate-y-[calc(50%+14px)] opacity-60"
+              dangerouslySetInnerHTML={{ __html: stadeSvg("semaine", { fond: false, ligue: "bola" }) }}
+            />
+          )}
+          <div className="absolute inset-0 bg-[rgba(4,5,7,0.18)]" />
+          <div className="absolute inset-x-0 bottom-0 h-[70%] bg-gradient-to-b from-transparent via-[rgba(4,5,7,0.4)] to-[rgba(3,4,6,0.82)]" />
+          {/* Le match qui n'existe pas encore : un pointillé, un « + ». */}
+          <div className="pointer-events-none absolute inset-[5px] rounded-[15px] border-[1.5px] border-dashed border-white/70" />
+          <span
+            aria-hidden
+            className="absolute top-[40%] left-1/2 grid size-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full shadow-[0_4px_10px_rgba(0,0,0,0.35)]"
+            style={{ background: BLANC, color: ENCRE }}
+          >
+            <Plus className="size-[18px]" strokeWidth={3} />
+          </span>
+          <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-1 p-2.5">
+            {noms.length > 0 ? <Jeton texte={`${noms.length} libres`} ton="neutre" couleur={VERT_LIBRES} /> : <span />}
+            {loin && <Jeton texte={loin} ton="neutre" />}
+          </div>
+          <div className="absolute inset-x-0 bottom-0 px-3 pb-3">
+            <p
+              className="truncate font-black text-white/85 uppercase"
+              style={{ fontSize: titre.length > 10 ? 22 : titre.length > 7 ? 28 : 34, letterSpacing: -1.4, lineHeight: 1 }}
+            >
+              {titre}
+            </p>
+            <p className="mt-1 flex items-center gap-1.5 font-mono text-[9.5px] font-bold tracking-[1px] text-white/70 uppercase">
+              <SigleLigue ligue="bola" hauteur={9.5} className="text-white/90" />
+              <span className="min-w-0 truncate">{[moment && heureCourte(moment.heure.replace(":", "h")), ou].filter(Boolean).join(" · ") || "Où tu veux"}</span>
+            </p>
+          </div>
+        </div>
+      </button>
+      <CartesSous noms={noms} />
     </div>
   );
 }
@@ -1668,29 +1948,13 @@ function FicheLibre({
   );
 }
 
-/** La photo satellite du terrain, et les trois façons d'y aller. */
+/** Les trois façons d'aller au terrain (l'adresse est déjà sous le titre de la fiche). */
 function Itineraire({ terrain, ios }: { terrain: Terrain; ios: boolean }) {
   const liens = itineraires(terrain.lat, terrain.lng, terrain.nom);
   // Sur iPhone, Plans d'abord ; ailleurs, Google Maps d'abord.
   const ordre = ios ? liens : [liens[1], liens[0], liens[2]];
   return (
     <section className="flex flex-col gap-3">
-      <div className="relative h-[200px] overflow-hidden rounded-[22px] border border-border bg-secondary">
-        <VueSatellite
-          lat={terrain.lat}
-          lng={terrain.lng}
-          demi={0.0011}
-          rapport={2}
-          hauteur={200}
-          titre={`Vue satellite de ${terrain.nom}`}
-          className="h-full w-full"
-        />
-        {/* L'épingle sur le terrain : la photo est centrée sur lui. */}
-        <span className="ajuster-pin pointer-events-none" style={{ left: "50%", top: "50%", cursor: "default" }} aria-hidden />
-        <span className="absolute bottom-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
-          {terrain.adresse || terrain.nom}
-        </span>
-      </div>
       <a
         href={ordre[0].url}
         target="_blank"
@@ -1716,16 +1980,14 @@ function Itineraire({ terrain, ios }: { terrain: Terrain; ios: boolean }) {
   );
 }
 
-/** Les joueurs d'une journée, tels que l'admin les a convoqués. */
+/** Les joueurs d'une journée, tels que l'admin les a convoqués : leur nombre,
+ *  jamais sur un plafond (une journée n'en a pas). */
 function Presents({ m }: { m: MatchMap }) {
   return (
     <section className="rounded-[26px] bg-card p-5">
       <div className="flex items-baseline justify-between">
         <p className="mono-label text-muted-foreground">{m.joue ? "Ils ont joué" : "Les joueurs"}</p>
-        <p className="text-[22px] font-bold tabular-nums">
-          {m.presents.length}
-          <span className="text-muted-foreground">/{m.effectif}</span>
-        </p>
+        <p className="text-[22px] font-bold tabular-nums">{m.presents.length}</p>
       </div>
       {m.presents.length ? (
         <QuiVient className="mt-3" noms={m.presents} />
@@ -1737,11 +1999,16 @@ function Presents({ m }: { m: MatchMap }) {
   );
 }
 
-function Jeton({ texte, ton, petit }: { texte: string; ton: EtatSticker["genre"] | "neutre"; petit?: boolean }) {
+function Jeton({ texte, ton, couleur, petit }: { texte: string; ton: EtatSticker["genre"] | "neutre"; couleur?: string; petit?: boolean }) {
+  // Un match ouvert par un joueur dit ce qu'il lui manque dans sa couleur (rouge, orange, vert).
   const style =
     ton === "dedans"
       ? { background: CLAIR, color: ENCRE }
-      : { background: "rgba(14,17,21,0.72)", color: ton === "manque" ? BRAISE : ton === "complet" ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.92)", boxShadow: "inset 0 0 0 0.5px rgba(255,255,255,0.15)" };
+      : {
+          background: "rgba(14,17,21,0.72)",
+          color: couleur ?? (ton === "manque" ? BRAISE : ton === "complet" ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.92)"),
+          boxShadow: "inset 0 0 0 0.5px rgba(255,255,255,0.15)",
+        };
   return (
     <span className={cn("truncate rounded-full font-medium", petit ? "px-2 py-[3px] text-[10px]" : "px-2.5 py-[4.5px] text-[11px]")} style={style}>
       {texte}
