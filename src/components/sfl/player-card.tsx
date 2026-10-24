@@ -6,8 +6,9 @@
 // (computeBoostCards). `mode` n'est gardé que pour les appels existants. La photo posée par le joueur
 // (partagée avec toute la ligue, voir lib/sfl/photos) remplit le portrait
 // carré. En petit, la carte se simplifie d'elle-même (voir palierCarte).
-// En haut à droite du portrait, le badge que le joueur a choisi (son meilleur
-// par défaut, voir lib/sfl/badge-carte).
+// Le badge que le joueur a choisi (son meilleur par défaut, voir
+// lib/sfl/badge-carte) : dans une bulle au-dessus de la note, à gauche du
+// nom ; en haut à droite de la carte photo.
 // La carte est un objet : elle ne suit pas le thème de l'app.
 // En dessous du grand format (palier « complète », < 170 px : la Ligue, les
 // terrains, les listes), c'est la carte photo (carte-photo.tsx) : la photo

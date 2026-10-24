@@ -1,4 +1,6 @@
-// Le badge posé sur la carte d'un joueur, en haut à droite du portrait.
+// Le badge posé sur la carte d'un joueur : dans une bulle à gauche de son
+// nom, au-dessus de la note (Sabri, 24/10 ; avant, en haut à droite du
+// portrait), et en haut à droite de la petite carte (insigne-carte.tsx).
 //
 // Le joueur choisit lequel (demande de Sabri, 17/10) : par défaut son
 // meilleur, sinon n'importe quel badge gagné, ou aucun. Le choix est une
@@ -21,7 +23,8 @@ import { TROPHEES, vitrine, type TropheeId } from "./trophees";
 import type { Saison } from "./saisie/types";
 
 export type BadgeCarte =
-  | { famille: "saison"; id: ClassementId; rang: number }
+  /** `saison` : la saison de ce meilleur rang, la plus récente (« Saison 0 ») ; la bulle l'écrit. */
+  | { famille: "saison"; id: ClassementId; rang: number; saison?: string }
   | { famille: "palier"; id: TropheeId; palier: number };
 
 export type ChoixBadge = string;
@@ -30,17 +33,22 @@ export function cleBadge(b: BadgeCarte): string {
   return b.famille === "saison" ? `s:${b.id}` : `p:${b.id}`;
 }
 
-const parSaison = new WeakMap<Saison, { podiums: Map<string, Map<ClassementId, number>>; joueurs: Map<string, BadgeCarte[]> }>();
+type Meilleur = { rang: number; saison: string };
+
+const parSaison = new WeakMap<Saison, { podiums: Map<string, Map<ClassementId, Meilleur>>; joueurs: Map<string, BadgeCarte[]> }>();
 
 function cache(saison: Saison) {
   let c = parSaison.get(saison);
   if (!c) {
-    // Les podiums de toutes les saisons closes, une fois : nom → classement → meilleur rang.
-    const podiums = new Map<string, Map<ClassementId, number>>();
+    // Les podiums de toutes les saisons closes, une fois : nom → classement →
+    // meilleur rang, et la saison la plus récente où il l'a eu (podiumsDe va
+    // de la plus récente à la plus ancienne : à rang égal, la première reste).
+    const podiums = new Map<string, Map<ClassementId, Meilleur>>();
     for (const def of CLASSEMENTS) {
       for (const p of podiumsDe(saison, def.id)) {
-        const m = podiums.get(p.nom) ?? new Map<ClassementId, number>();
-        m.set(def.id, Math.min(m.get(def.id) ?? 9, p.rang));
+        const m = podiums.get(p.nom) ?? new Map<ClassementId, Meilleur>();
+        const avant = m.get(def.id);
+        if (!avant || p.rang < avant.rang) m.set(def.id, { rang: p.rang, saison: p.saison });
         podiums.set(p.nom, m);
       }
     }
@@ -57,8 +65,8 @@ export function badgesGagnes(saison: Saison, nom: string): BadgeCarte[] {
   if (deja) return deja;
   const rangs = c.podiums.get(nom);
   const saisons: BadgeCarte[] = CLASSEMENTS.flatMap((def) => {
-    const rang = rangs?.get(def.id);
-    return rang ? [{ famille: "saison" as const, id: def.id, rang }] : [];
+    const m = rangs?.get(def.id);
+    return m ? [{ famille: "saison" as const, id: def.id, rang: m.rang, saison: m.saison }] : [];
   }).sort((a, b) => a.rang - b.rang);
   const ordre = new Map(TROPHEES.map((t, i) => [t.id, i]));
   const paliers: BadgeCarte[] = vitrine(saison, nom, new Date())

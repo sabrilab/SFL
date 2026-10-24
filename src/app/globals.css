@@ -1463,6 +1463,160 @@
   .trophee-eclat { animation: none; opacity: 0; }
 }
 
+/* La vitrine des trophées de Ma carte (vitrine.tsx, VitrineTrophees), en
+   gala (Sabri, 24/10 : « il faut les valoriser, pas juste qu'ils soient sur
+   un fond noir […] un peu de doré, quelque chose de starifiant »). Un écrin
+   noir chaud dans les deux modes (l'élément porte la classe dark), un
+   projecteur doré tombé d'en haut, ses rayons, un liseré d'or ; le trophée
+   vedette sous son faisceau, sur un sol qui brille ; chaque trophée gagné
+   dans sa flaque de lumière, sur l'étagère dorée. Les éclats y sont dorés.
+   Rien ne bouge avec « Réduire les animations ». */
+.vitrine-gala {
+  --eclat: #fff1c7;
+  --eclat-halo: drop-shadow(0 0 3px rgba(255, 210, 110, 0.95));
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid transparent;
+  background:
+    radial-gradient(ellipse 78% 44% at 50% 0%, rgba(255, 201, 104, 0.3) 0%, rgba(255, 201, 104, 0.08) 52%, rgba(255, 201, 104, 0) 76%) padding-box,
+    radial-gradient(ellipse 70% 26% at 50% 100%, rgba(255, 186, 86, 0.1) 0%, rgba(255, 186, 86, 0) 72%) padding-box,
+    linear-gradient(180deg, #1b140a 0%, #0f0b07 46%, #080706 100%) padding-box,
+    linear-gradient(160deg, rgba(255, 233, 172, 0.8) 0%, rgba(176, 124, 38, 0.32) 32%, rgba(255, 214, 128, 0.55) 60%, rgba(120, 82, 22, 0.35) 100%) border-box;
+  box-shadow: inset 0 1px 0 rgba(255, 238, 196, 0.16), 0 22px 44px -24px rgba(0, 0, 0, 0.75);
+}
+:root:not(.dark) .vitrine-gala {
+  box-shadow: inset 0 1px 0 rgba(255, 238, 196, 0.16), 0 1px 2px rgba(40, 26, 4, 0.25), 0 22px 40px -22px rgba(74, 48, 8, 0.55);
+}
+/* Les rayons du projecteur : de fins pinceaux dorés, effacés vers le bas. */
+.vitrine-gala::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: repeating-conic-gradient(from 180deg at 50% -12%, rgba(255, 220, 150, 0.075) 0deg 3deg, rgba(255, 220, 150, 0) 3deg 11deg);
+  -webkit-mask-image: radial-gradient(ellipse 70% 62% at 50% 0%, #000 0%, rgba(0, 0, 0, 0.4) 55%, transparent 80%);
+  mask-image: radial-gradient(ellipse 70% 62% at 50% 0%, #000 0%, rgba(0, 0, 0, 0.4) 55%, transparent 80%);
+}
+/* L'or des lettres : le titre, le nom du trophée vedette. */
+.gala-or-texte {
+  background: linear-gradient(180deg, #fff4cc 0%, #f4d27a 40%, #d39c34 72%, #f1cf7c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.gala-compte {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(240, 205, 120, 0.45);
+  color: #f2d389;
+  font-family: var(--font-jbmono), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+/* La plaque de la saison : du laiton, gravé. */
+.gala-plaque {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 11px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  color: #2b1d05;
+  background: linear-gradient(180deg, #f8e4a8 0%, #dcb054 46%, #b98829 54%, #ebc770 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -1px 0 rgba(90, 60, 10, 0.5), 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+/* Le faisceau qui tombe sur le trophée vedette, et le sol qui brille sous lui. */
+.gala-faisceau {
+  position: absolute;
+  left: 50%;
+  top: -28px;
+  z-index: -1;
+  width: 250px;
+  height: 236px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(255, 228, 164, 0.26) 0%, rgba(255, 228, 164, 0.09) 58%, rgba(255, 228, 164, 0) 100%);
+  clip-path: polygon(41% 0, 59% 0, 100% 100%, 0 100%);
+  pointer-events: none;
+}
+.gala-sol {
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  z-index: -1;
+  width: 180px;
+  height: 30px;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, rgba(255, 205, 110, 0.6) 0%, rgba(255, 205, 110, 0.14) 62%, rgba(255, 205, 110, 0) 100%);
+  animation: gala-sol 4.8s ease-in-out infinite;
+}
+@keyframes gala-sol {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+/* Le rang du trophée vedette, sur sa pastille de métal poli. */
+.gala-rang {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  color: #1d1404;
+  background: linear-gradient(140deg, #f7e3a6 0%, #b8862b 48%, #f3d48a 72%, #8a6416 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+.gala-rang[data-metal="argent"] {
+  color: #111316;
+  background: linear-gradient(140deg, #ffffff 0%, #8f959d 48%, #e9ebee 72%, #6d737b 100%);
+}
+.gala-rang[data-metal="bronze"] {
+  color: #1d0e04;
+  background: linear-gradient(140deg, #f0c09a 0%, #8f4f22 48%, #e2a77c 72%, #6a3815 100%);
+}
+/* L'étagère : un filet doré sous chaque trophée gagné (gris en jeu), son
+   reflet dessous, et la flaque de lumière où le trophée est posé. */
+.gala-etagere {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(233, 196, 106, 0.16), rgba(240, 206, 120, 0.62) 50%, rgba(233, 196, 106, 0.16));
+}
+.gala-etagere::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 1px;
+  height: 12px;
+  background: linear-gradient(180deg, rgba(255, 210, 120, 0.1), rgba(255, 210, 120, 0));
+}
+.gala-etagere--grise {
+  background: rgba(255, 255, 255, 0.14);
+}
+.gala-etagere--grise::after {
+  display: none;
+}
+.gala-flaque {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  z-index: -1;
+  width: 84%;
+  height: 22px;
+  transform: translate(-50%, 50%);
+  background: radial-gradient(closest-side, rgba(255, 205, 110, 0.34), rgba(255, 205, 110, 0) 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gala-sol { animation: none; opacity: 1; }
+}
+
 /* La finition animée de la carte (bola-card.tsx, finitions-carte.ts) : la
    lumière passe d'elle-même sur la nacre, toutes les cinq secondes, puis
    laisse la carte au repos. Rien ne bouge avec « Réduire les animations ». */

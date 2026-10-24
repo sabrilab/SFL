@@ -8,10 +8,12 @@
 //    trophées & médailles » (objets.ts). Les trois premiers du Pépite d'Or
 //    et des classements buteur, passeur, défensive et MVP (or, argent,
 //    bronze), la médaille des quinze premiers du Pépite d'Or et le trophée du
-//    joueur engagé (plus d'un match dans la saison). Ils sont rangés saison
-//    par saison, sur une étagère ; la saison en cours montre en verre ce qui
-//    est en jeu, avec le rang du moment. « Comment les gagner » ouvre la
-//    liste de tous les trophées.
+//    joueur engagé (plus d'un match dans la saison). Depuis le 24/10, ils
+//    sont en gala, dans un écrin noir et or (Sabri : « quelque chose de
+//    starifiant ») : chaque saison a sa plaque de laiton, son plus beau
+//    trophée en vedette sous un faisceau, le reste sur une étagère dorée ;
+//    la saison en cours montre en verre ce qui est en jeu, avec le rang du
+//    moment. « Comment les gagner » ouvre la liste de tous les trophées.
 // 2. Paliers (trophees.ts) : gagnés au fil des dimanches, sur deux lignes
 //    (buts, passes, matchs, victoires ; MVP, Le Mur, Impact). Quatre paliers
 //    pour tous : bronze, argent, or, puis rouge et or.
@@ -38,6 +40,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useSession } from "@/hooks/use-session";
 import {
+  CLASSEMENTS,
   finsDeSaison,
   ordinal,
   podiumsDe,
@@ -269,65 +272,165 @@ export function MedailleTop({ rang, taille = 64, gagnee = true }: { rang: number
   );
 }
 
-/** Un trophée sur l'étagère : la pièce, puis son nom et son rang. */
-function SurEtagere({ children, nom, detail, onOpen, label }: { children: React.ReactNode; nom: string; detail?: string; onOpen?: () => void; label: string }) {
+/** Le rang d'un trophée, dans son métal, sous l'étagère. */
+const TEXTE_RANG: Record<number, string> = { 1: "#f2cf74", 2: "#e3e7ec", 3: "#e8b088" };
+
+/**
+ * Un trophée sur l'étagère : la pièce, puis son nom et son rang. Gagné, il
+ * a sa flaque de lumière et l'étagère dorée sous lui ; en jeu, l'étagère
+ * reste grise.
+ */
+function SurEtagere({
+  children,
+  nom,
+  detail,
+  couleur,
+  gagne = true,
+  onOpen,
+  label,
+}: {
+  children: React.ReactNode;
+  nom: string;
+  detail?: string;
+  couleur?: string;
+  gagne?: boolean;
+  onOpen?: () => void;
+  label: string;
+}) {
   const corps = (
     <>
-      <span className="relative flex h-[100px] w-full items-end justify-center pb-1.5">
+      <span className="relative flex h-[96px] w-full items-end justify-center pb-2">
+        {gagne && <span aria-hidden className="gala-flaque" />}
         {children}
-        <span aria-hidden className="absolute inset-x-0 bottom-0 h-px bg-contraste/20" />
+        <span aria-hidden className={gagne ? "gala-etagere" : "gala-etagere gala-etagere--grise"} />
       </span>
-      <span className="mt-1.5 w-full text-[12px] leading-tight font-bold">{nom}</span>
-      {detail && <span className="text-[11px] leading-tight text-contraste/60">{detail}</span>}
+      <span className="mt-2 w-full px-0.5 text-[12px] leading-tight font-bold">{nom}</span>
+      {detail && (
+        <span className="mt-0.5 font-mono text-[11px] leading-tight font-bold" style={{ color: couleur }}>
+          {detail}
+        </span>
+      )}
     </>
   );
+  const classe = "flex min-w-0 flex-col items-center self-start text-center";
   return onOpen ? (
-    <button type="button" onClick={onOpen} aria-label={label} className="flex min-w-0 flex-col items-center self-start text-center transition-transform active:scale-95 motion-reduce:transition-none">
+    <button type="button" onClick={onOpen} aria-label={label} className={cn(classe, "transition-transform active:scale-95 motion-reduce:transition-none")}>
       {corps}
     </button>
   ) : (
-    <div role="img" aria-label={label} className="flex min-w-0 flex-col items-center self-start text-center">
+    <div role="img" aria-label={label} className={classe}>
       {corps}
     </div>
   );
 }
 
-/** L'étagère : quatre trophées par rang, chaque rang posé sur une ligne de lumière, comme une vitrine. */
-function Etagere({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-4 items-end gap-y-4">{children}</div>;
-}
-
-/** Une saison close, sur son étagère : ses trophées, sa médaille, son trophée d'engagé. */
-function SaisonEnVitrine({ s, onOpen }: { s: TropheesDeSaison; onOpen: (id: ClassementId) => void }) {
+/** L'étagère : trois trophées par rang (quatre en jeu), le dernier rang centré. */
+function Etagere({ children, colonnes = 3 }: { children: React.ReactNode; colonnes?: 3 | 4 }) {
   return (
-    <div className="flex flex-col gap-2">
-      <span className="mono-label text-[11px] text-contraste/55">{s.saison}</span>
-      <Etagere>
-        {s.podiums.map((p) => (
-          <SurEtagere
-            key={p.id}
-            nom={NOM_TROPHEE[p.id]}
-            detail={ordinal(p.rang)}
-            onOpen={() => onOpen(p.id)}
-            label={`${NOM_TROPHEE[p.id]}, ${ordinal(p.rang)}, ${s.saison}`}
-          >
-            <Trophee id={p.id} rang={p.rang} taille={p.id === "pepite" ? 94 : 86} />
-          </SurEtagere>
-        ))}
-        {s.top && (
-          <SurEtagere nom="Top 15" detail={ordinal(s.top)} label={`Médaille du Top 15, ${ordinal(s.top)} du Pépite d'Or, ${s.saison}`}>
-            <MedailleTop rang={s.top} taille={58} />
-          </SurEtagere>
-        )}
-        {s.engage && (
-          <SurEtagere nom="Joueur engagé" label={`Trophée du joueur engagé, ${s.saison}`}>
-            <TropheeObjet objet="coupe-engage" taille={84} />
-          </SurEtagere>
-        )}
-      </Etagere>
+    <div
+      className={cn(
+        "flex flex-wrap justify-center gap-y-4 [&>*]:shrink-0",
+        colonnes === 3 ? "[&>*]:basis-1/3 sm:[&>*]:basis-1/4" : "[&>*]:basis-1/4"
+      )}
+    >
+      {children}
     </div>
   );
 }
+
+/** La plaque d'une saison : le laiton gravé d'une vitrine. */
+function Plaque({ children }: { children: React.ReactNode }) {
+  return <span className="gala-plaque mono-label">{children}</span>;
+}
+
+/**
+ * Le trophée vedette d'une saison, le plus beau : sous son faisceau, sur un
+ * sol qui brille, son nom en lettres d'or, son rang et ce qui l'a fait
+ * (« 1er · 412 pts »).
+ */
+function Vedette({ id, rang, valeur, saison, onOpen }: { id: ClassementId; rang: number; valeur: number; saison: string; onOpen: () => void }) {
+  const unite = CLASSEMENTS.find((c) => c.id === id)!.unite;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`${NOM_TROPHEE[id]}, ${ordinal(rang)}, ${saison}`}
+      className="relative flex w-full flex-col items-center pt-2 pb-1 transition-transform active:scale-[0.98] motion-reduce:transition-none"
+    >
+      <span aria-hidden className="gala-faisceau" />
+      <span className="relative">
+        <span aria-hidden className="gala-sol" />
+        <Trophee id={id} rang={rang} taille={148} />
+      </span>
+      <span className="gala-or-texte titre-lettrage mt-3 text-[26px] leading-none">{NOM_TROPHEE[id]}</span>
+      <span className="mt-2.5 flex items-center gap-2 font-mono text-[12px] font-semibold text-foreground/70">
+        <span className="gala-rang" data-metal={METAL_RANG[rang]}>
+          {ordinal(rang)}
+        </span>
+        <span className="tabular-nums">
+          {valeur} {valeur > 1 ? unite[1] : unite[0]}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+/** Le trophée vedette : le meilleur rang ; à rang égal, l'ordre des classements (le Pépite d'Or d'abord). */
+function vedetteDe(s: TropheesDeSaison) {
+  return s.podiums.reduce<TropheesDeSaison["podiums"][number] | null>((v, p) => (!v || p.rang < v.rang ? p : v), null);
+}
+
+/**
+ * Une saison close : sa plaque, son trophée vedette (la plus récente
+ * seulement), puis le reste sur l'étagère, sa médaille et son trophée d'engagé.
+ */
+function SaisonEnVitrine({ s, onOpen, une }: { s: TropheesDeSaison; onOpen: (id: ClassementId) => void; une: boolean }) {
+  const star = une ? vedetteDe(s) : null;
+  const reste = s.podiums.filter((p) => p !== star);
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <Plaque>{s.saison}</Plaque>
+      {star && <Vedette id={star.id} rang={star.rang} valeur={star.valeur} saison={s.saison} onOpen={() => onOpen(star.id)} />}
+      {(reste.length > 0 || s.top || s.engage) && (
+        <div className="w-full">
+          <Etagere>
+            {reste.map((p) => (
+              <SurEtagere
+                key={p.id}
+                nom={NOM_TROPHEE[p.id]}
+                detail={ordinal(p.rang)}
+                couleur={TEXTE_RANG[p.rang]}
+                onOpen={() => onOpen(p.id)}
+                label={`${NOM_TROPHEE[p.id]}, ${ordinal(p.rang)}, ${s.saison}`}
+              >
+                <Trophee id={p.id} rang={p.rang} taille={p.id === "pepite" ? 90 : 84} />
+              </SurEtagere>
+            ))}
+            {s.top && (
+              <SurEtagere nom="Top 15" detail={ordinal(s.top)} couleur={TEXTE_RANG[1]} label={`Médaille du Top 15, ${ordinal(s.top)} du Pépite d'Or, ${s.saison}`}>
+                <MedailleTop rang={s.top} taille={56} />
+              </SurEtagere>
+            )}
+            {s.engage && (
+              <SurEtagere nom="Joueur engagé" label={`Trophée du joueur engagé, ${s.saison}`}>
+                <TropheeObjet objet="coupe-engage" taille={82} />
+              </SurEtagere>
+            )}
+          </Etagere>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Les éclats qui scintillent dans l'écrin, au-dessus du trophée vedette. */
+const ETOILES: { x: string; y: number; t: number; d: number }[] = [
+  { x: "11%", y: 64, t: 10, d: 0.3 },
+  { x: "84%", y: 46, t: 8, d: 1.9 },
+  { x: "73%", y: 168, t: 6, d: 3.2 },
+  { x: "21%", y: 196, t: 7, d: 2.5 },
+  { x: "92%", y: 236, t: 5, d: 4.1 },
+];
 
 /** « Comment les gagner » : tous les trophées d'une saison, et ce qui les donne. */
 function FeuilleTrophees() {
@@ -366,9 +469,13 @@ function FeuilleTrophees() {
 }
 
 /**
- * La vitrine des trophées, sur un panneau noir mat comme la planche (blanc
- * mat en mode clair, globals.css, .vitrine-mate) : saison close par saison
- * close, puis ce qui est en jeu dans la saison en cours.
+ * La vitrine des trophées, en gala (Sabri, 24/10 : « il faut les valoriser,
+ * pas juste qu'ils soient sur un fond noir […] un peu de doré, quelque chose
+ * de starifiant ») : un écrin noir chaud, dans les deux modes (classe dark),
+ * un projecteur doré, un liseré d'or, des éclats (globals.css,
+ * .vitrine-gala). Saison close par saison close : la plaque, le trophée
+ * vedette sous son faisceau, le reste sur l'étagère ; puis ce qui est en jeu
+ * dans la saison en cours, en verre.
  */
 export function VitrineTrophees({ nom, enJeu = true }: { nom: string; enJeu?: boolean }) {
   const { saison, allPlayers } = useSeason();
@@ -382,34 +489,48 @@ export function VitrineTrophees({ nom, enJeu = true }: { nom: string; enJeu?: bo
   if (!enJeu && !saisons.length) return null;
 
   return (
-    <section aria-labelledby="trophees-saison" className="vitrine-mate flex flex-col gap-[18px] rounded-[26px] px-4 pt-[18px] pb-4">
-      <div className="flex items-baseline justify-between">
-        <h2 id="trophees-saison" className="text-[19px] font-extrabold tracking-tight">
-          Trophées
-          {total > 0 && <span className="ml-2 font-mono text-[12px] font-bold text-contraste/45 tabular-nums">{total}</span>}
+    <section aria-labelledby="trophees-saison" className="vitrine-gala dark flex flex-col gap-5 rounded-[26px] px-4 pt-5 pb-4 text-foreground">
+      {ETOILES.map((e, i) => (
+        <svg
+          key={i}
+          aria-hidden
+          viewBox="0 0 20 20"
+          className="trophee-eclat pointer-events-none absolute"
+          style={{ left: e.x, top: e.y, width: e.t, height: e.t, animationDelay: `${e.d}s`, filter: "var(--eclat-halo)" }}
+        >
+          <path d="M10 0 C10.8 7 13 9.2 20 10 C13 10.8 10.8 13 10 20 C9.2 13 7 10.8 0 10 C7 9.2 9.2 7 10 0 Z" style={{ fill: "var(--eclat)" }} />
+        </svg>
+      ))}
+
+      <div className="flex items-center justify-between">
+        <h2 id="trophees-saison" className="flex items-center gap-2.5">
+          <span className="gala-or-texte titre-lettrage text-[22px] leading-none">Trophées</span>
+          {total > 0 && <span className="gala-compte tabular-nums">{total}</span>}
         </h2>
         <button type="button" onClick={() => setOuvert("regles")} className="bouton-discret bouton--or -mr-2 px-2 py-1 text-[13px] font-semibold">
           Comment les gagner
         </button>
       </div>
 
-      {saisons.map((s) => (
-        <SaisonEnVitrine key={s.saison} s={s} onOpen={setOuvert} />
+      {saisons.map((s, i) => (
+        <SaisonEnVitrine key={s.saison} s={s} onOpen={setOuvert} une={i === 0} />
       ))}
 
       {enJeu && courants.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <span className="mono-label text-[11px] text-contraste/55">En jeu · ton rang du moment</span>
-          <Etagere>
+        <div className="flex flex-col gap-1 rounded-[20px] border border-foreground/[0.08] bg-foreground/[0.03] px-1.5 pt-3 pb-3">
+          <span className="mono-label px-2 text-[10px] text-foreground/55">En jeu · ton rang du moment</span>
+          <Etagere colonnes={4}>
             {courants.map((e) => (
               <SurEtagere
                 key={e.def.id}
                 nom={NOM_TROPHEE[e.def.id]}
                 detail={ordinal(e.enCours!.rang)}
+                couleur="rgb(255 255 255 / 0.62)"
+                gagne={false}
                 onOpen={() => setOuvert(e.def.id)}
                 label={`${NOM_TROPHEE[e.def.id]}, ${ordinal(e.enCours!.rang)} en ce moment`}
               >
-                <Trophee id={e.def.id} rang={null} taille={e.def.id === "pepite" ? 84 : 76} />
+                <Trophee id={e.def.id} rang={null} taille={e.def.id === "pepite" ? 76 : 70} />
               </SurEtagere>
             ))}
           </Etagere>

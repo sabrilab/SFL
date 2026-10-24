@@ -9,8 +9,9 @@
 //   · Pépite d'Or → la pépite ;       · MVP → l'étoile ;
 //   · Le Mur, Défenseur → le bouclier ; · Impact → l'éclair ;
 // Les trophées de fin de saison, eux, sont de vraies pièces de vitrine
-// (TROPHEE_SAISON, voir objets.ts) : Ma carte et le profil les montrent ; le
-// badge posé sur la carte garde son objet.
+// (TROPHEE_SAISON, voir objets.ts) : Ma carte et le profil les montrent. Le
+// badge posé sur la carte n'est plus en 3D depuis le 24/10 : c'est un
+// insigne dessiné (insigne-carte.tsx), qu'on reconnaît même petit.
 // Le métal dit le niveau (bronze, argent, or ; rouge et or au dernier palier).
 // Un badge de fin de saison porte en plus son rang, gravé sur une pastille de
 // métal en bas à droite : c'est ce qui le distingue d'un palier.
@@ -20,7 +21,7 @@
 // Objet3DVivant est la vraie 3D, qui tourne et se fait tourner au doigt :
 // seulement dans la feuille d'un badge, le temps qu'elle est ouverte.
 
-import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import * as THREE from "three";
 import { EMBLEMES, EMBLEMES_SAISON } from "@/components/sfl/emblemes";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
@@ -66,22 +67,6 @@ const POLI: Record<Metal, string> = {
   argent: "linear-gradient(140deg, #ffffff 0%, #8f959d 48%, #e9ebee 72%, #6d737b 100%)",
   or: "linear-gradient(140deg, #f7e3a6 0%, #b8862b 48%, #f3d48a 72%, #8a6416 100%)",
   legende: "linear-gradient(140deg, #ff8f80 0%, #9a1712 48%, #e2493c 72%, #5a0806 100%)",
-};
-
-/** Les mêmes éclats, en arrêts de dégradé SVG (le liseré du socle). */
-const ECLATS: Record<Metal, [string, string, string, string]> = {
-  bronze: ["#f0c09a", "#8f4f22", "#e2a77c", "#6a3815"],
-  argent: ["#ffffff", "#8f959d", "#e9ebee", "#6d737b"],
-  or: ["#f7e3a6", "#b8862b", "#f3d48a", "#8a6416"],
-  legende: ["#ff8f80", "#9a1712", "#e2493c", "#5a0806"],
-};
-
-/** La teinte du verre du socle : la lumière du métal, au fond d'un verre fumé. */
-const TEINTE: Record<Metal, string> = {
-  bronze: "#d9773a",
-  argent: "#c9d3e2",
-  or: "#ffbf3a",
-  legende: "#e2281f",
 };
 
 /** Le halo sous un objet gagné : la lumière de son métal, posée sur le fond. */
@@ -218,79 +203,18 @@ export function PastilleRang({ rang, taille }: { rang: number; taille: number })
   );
 }
 
-// L'écusson des fins de saison, dans un carré de 100 : une pointe en bas.
-const ECUSSON = "M50 5 L89 15.5 V47 C89 71 72 87 50 95.5 C28 87 11 71 11 47 V15.5 Z";
-
-/**
- * Le socle d'un badge posé sur une photo (la carte, la feuille de choix). Deux
- * choses doivent se lire d'un coup d'œil, même à 20 px (Sabri, 19/10 : « il
- * faut qu'on les distingue mieux ») :
- *   · la famille, par la forme : un rond pour un palier, un écusson pour une
- *     fin de saison ;
- *   · le niveau, par le métal : un liseré épais de métal poli, et un verre
- *     fumé éclairé de la couleur du métal, d'où l'objet se détache.
- * En SVG peint (pas de flou d'arrière-plan) : html-to-image le capture tel quel.
- */
-function Socle({ m, ecusson, largeur }: { m: Metal; ecusson: boolean; largeur: number }) {
-  const id = useId().replace(/:/g, "");
-  const [a, b, c, d] = ECLATS[m];
-  const trait = ecusson ? 7 : 7.5;
-  const forme = (props: React.SVGProps<SVGPathElement> & React.SVGProps<SVGCircleElement>) =>
-    ecusson ? <path d={ECUSSON} {...props} /> : <circle cx={50} cy={50} r={50 - trait / 2 - 0.5} {...props} />;
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 100 100"
-      width={largeur}
-      height={largeur}
-      className="absolute inset-0"
-      style={{ filter: `drop-shadow(0 ${largeur * 0.05}px ${largeur * 0.08}px rgba(0,0,0,0.45))`, overflow: "visible" }}
-    >
-      <defs>
-        <radialGradient id={`v${id}`} cx="50%" cy="30%" r="70%">
-          <stop offset="0%" stopColor={TEINTE[m]} stopOpacity={0.6} />
-          <stop offset="60%" stopColor={TEINTE[m]} stopOpacity={0.15} />
-          <stop offset="100%" stopColor="#060608" stopOpacity={0.9} />
-        </radialGradient>
-        <linearGradient id={`m${id}`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={a} />
-          <stop offset="48%" stopColor={b} />
-          <stop offset="72%" stopColor={c} />
-          <stop offset="100%" stopColor={d} />
-        </linearGradient>
-      </defs>
-      {forme({ fill: "#0a0a0d" })}
-      {forme({ fill: `url(#v${id})` })}
-      {forme({ fill: "none", stroke: `url(#m${id})`, strokeWidth: trait, strokeLinejoin: "round" })}
-      {/* Le filet de lumière sur le bord intérieur du métal */}
-      {ecusson ? (
-        <path d={ECUSSON} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={0.9} transform="translate(50 50) scale(0.86) translate(-50 -50)" />
-      ) : (
-        <circle cx={50} cy={50} r={50 - trait - 1} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth={0.9} />
-      )}
-    </svg>
-  );
-}
-
 /** Un badge gagné, en 3D : son objet dans son métal, et son rang s'il vient d'une fin de saison. */
-export function Badge3D({ badge, largeur, socle = false }: { badge: BadgeCarte; largeur: number; socle?: boolean }) {
+export function Badge3D({ badge, largeur }: { badge: BadgeCarte; largeur: number }) {
   const ecusson = badge.famille === "saison";
   const Embleme = ecusson ? EMBLEMES_SAISON[badge.id] : EMBLEMES[badge.id];
   const m = metalBadge(badge);
-  // Sur le socle, l'objet tient dans le verre, à l'intérieur du liseré ; dans
-  // l'écusson, il remonte un peu, au large de la pointe.
-  const objet = socle ? largeur * (ecusson ? 0.74 : 0.8) : largeur;
-  const place = socle
-    ? { left: (largeur - objet) / 2, top: ecusson ? largeur * 0.11 : (largeur - objet) / 2 }
-    : { left: 0, top: 0 };
   return (
     <span role="img" aria-label={`Badge : ${nomBadge(badge)}`} className="relative block shrink-0" style={{ width: largeur, height: largeur }}>
-      {socle && <Socle m={m} ecusson={ecusson} largeur={largeur} />}
-      <span className="absolute" style={place}>
-        <Objet3D objet={objetBadge(badge)} matiere={m} taille={objet} embleme={Embleme} ombre={!socle} />
+      <span className="absolute" style={{ left: 0, top: 0 }}>
+        <Objet3D objet={objetBadge(badge)} matiere={m} taille={largeur} embleme={Embleme} />
       </span>
       {ecusson && (
-        <span className="absolute" style={socle ? { right: -largeur * 0.08, bottom: -largeur * 0.06 } : { right: -largeur * 0.04, bottom: -largeur * 0.02 }}>
+        <span className="absolute" style={{ right: -largeur * 0.04, bottom: -largeur * 0.02 }}>
           <PastilleRang rang={badge.rang} taille={largeur * 0.4} />
         </span>
       )}
