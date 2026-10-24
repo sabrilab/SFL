@@ -540,7 +540,7 @@ export function BolaCard({
           `inset -${u(3)}px -${u(5)}px ${u(5)}px -${u(1)}px ${p.rebord.ombre}`,
           // Le verre : son épaisseur, une arête claire tout autour et la lumière prise dans la masse.
           ...(p.transparente
-            ? [`inset 0 0 0 ${u(7)}px rgba(255,255,255,0.07)`, `inset 0 0 ${u(46)}px rgba(255,255,255,0.09)`]
+            ? [`inset 0 0 0 ${u(7)}px rgba(214,255,232,0.1)`, `inset 0 0 ${u(46)}px rgba(214,255,232,0.14)`]
             : []),
           "0 14px 38px rgba(0,0,0,0.5)",
         ].join(", "),
@@ -606,6 +606,26 @@ export function BolaCard({
             position: "absolute",
             inset: 0,
             background: `linear-gradient(115deg, transparent 30%, rgba(255,255,255,${p.reflet}) 45%, transparent 60%)`,
+          }}
+        />
+      )}
+
+      {/* Le verre : la lumière qui se décompose au bas de la plaque, en bandes arc-en-ciel qui s'effacent vers le haut */}
+      {p.irise && (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: u(560),
+            background: [
+              "linear-gradient(104deg, rgba(255,110,140,0) 2%, rgba(255,120,150,0.62) 12%, rgba(255,214,120,0.62) 21%, rgba(170,255,170,0.55) 30%, rgba(110,220,255,0.62) 39%, rgba(176,140,255,0.6) 48%, rgba(255,140,220,0) 58%, rgba(255,140,170,0.42) 68%, rgba(255,230,140,0.42) 76%, rgba(140,240,255,0.42) 84%, rgba(190,150,255,0.36) 91%, rgba(190,150,255,0) 99%)",
+            ].join(", "),
+            maskImage: "linear-gradient(0deg, #000 0%, rgba(0,0,0,0.55) 38%, transparent 100%)",
+            WebkitMaskImage: "linear-gradient(0deg, #000 0%, rgba(0,0,0,0.55) 38%, transparent 100%)",
+            mixBlendMode: "screen",
           }}
         />
       )}

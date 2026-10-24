@@ -22,7 +22,7 @@ export const FINITIONS_OFFERTES: Readonly<Record<string, readonly Finition[]>> =
 /** Ce que Personnaliser ma carte dit d'un skin offert : son nom, ce qu'il est, pourquoi il est offert. */
 export const SKINS_OFFERTS: Readonly<Partial<Record<Finition, { titre: string; quoi: string; comment: string }>>> = {
   onyx: { titre: "Onyx", quoi: "La carte noire guillochée.", comment: "Offert" },
-  verre: { titre: "Verre", quoi: "La plaque de verre fumé, gravée.", comment: "Offert" },
+  verre: { titre: "Verre", quoi: "La plaque de verre vert, gravée et irisée.", comment: "Offert" },
   pepite: { titre: "Pépite d'or", quoi: "Tout en or, gravé or sur or. La photo reste telle quelle.", comment: "Offert · Pépite d'Or saison 0" },
   palestine: { titre: "Palestine", quoi: "Le drapeau de la Palestine au dos de la carte.", comment: "Offert · Pépite d'Or saison 0" },
 };
