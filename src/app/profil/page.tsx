@@ -52,7 +52,7 @@ import { MaSaison, type RangDuJour } from "@/components/sfl/ma-saison";
 import { NiveauXp } from "@/components/sfl/niveau-xp";
 import { Chiffre } from "@/components/sfl/profil-joueur";
 import { ReseauJoueur } from "@/components/sfl/suivre";
-import { EquipeDuJoueur } from "@/components/sfl/equipe/equipe-du-joueur";
+import { AppartenancesJoueur } from "@/components/sfl/badge-sfl";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { VitrineBadges } from "@/components/sfl/vitrine";
 import { ChoixBadge } from "@/components/sfl/choix-badge";
@@ -201,7 +201,7 @@ export default function Profil() {
                 {rangXp && ` · rang ${rangXp.rang}`}
               </span>
             </button>
-            <EquipeDuJoueur nom={player.name} />
+            <AppartenancesJoueur nom={player.name} />
             <ReseauJoueur nom={player.name} />
           </div>
           <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">

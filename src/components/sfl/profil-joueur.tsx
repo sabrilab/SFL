@@ -36,7 +36,7 @@ import { motion } from "motion/react";
 import { Card3DEnGrand } from "@/components/sfl/carte-en-grand";
 import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur";
 import { ComparerCartes } from "@/components/sfl/comparer-cartes";
-import { EquipeDuJoueur } from "@/components/sfl/equipe/equipe-du-joueur";
+import { AppartenancesJoueur } from "@/components/sfl/badge-sfl";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -167,7 +167,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
             {xp && ` · niveau XP ${xp.niveau}`}
             {rangXp && ` · rang ${rangXp.rang}`}
           </p>
-          <EquipeDuJoueur nom={player.name} className="mt-[var(--fib-8)]" />
+          <AppartenancesJoueur nom={player.name} className="mt-[var(--fib-8)]" />
           <ReseauJoueur nom={player.name} className="mt-[var(--fib-8)]" />
           <BoutonSuivre nom={player.name} className="mt-[var(--fib-8)]" />
         </div>
