@@ -11,9 +11,9 @@
 // seulement mon nom sinon.
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Check, ChevronLeft, Copy } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { toast } from "sonner";
+import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { useJoueurBola, useMyPlayer } from "@/components/sfl/player-provider";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { useSession } from "@/hooks/use-session";
@@ -93,10 +93,8 @@ export default function ParrainagePage() {
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-[var(--fib-21)] px-5 py-4 sm:py-8">
-      <div className="flex items-center gap-2">
-        <Link href="/profil" aria-label="Retour" className="bouton-discret -ml-2 grid size-[34px] shrink-0 place-items-center">
-          <ChevronLeft className="size-5" />
-        </Link>
+      <div className="flex items-center gap-3">
+        <BoutonRetour />
         <h1 className="text-[30px] font-bold tracking-tight">Inviter</h1>
       </div>
 

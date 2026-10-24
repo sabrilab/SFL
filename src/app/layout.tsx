@@ -5,7 +5,9 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { Suspense } from "react";
 import { BottomNav, VoileEtat } from "@/components/layout/bottom-nav";
+import { MemoireNavigation } from "@/components/layout/memoire-navigation";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { MiseAJour } from "@/components/pwa/mise-a-jour";
 import { CouleurTheme } from "@/components/pwa/couleur-theme";
@@ -25,6 +27,7 @@ import { MissionsAnnonce } from "@/components/sfl/missions-annonce";
 import { NouveauxBadges } from "@/components/sfl/vitrine";
 import { InvitationCarte } from "@/components/sfl/invitation-carte";
 import { Accueil, ApresAccueil } from "@/components/sfl/accueil/accueil";
+import { DaEssai } from "@/components/sfl/da/da-essai";
 
 // Typographie de l'app BOLA, celle de la Map (Sabri, 22/10 : « uniformise le
 // tout ») : Inter pour tout ce qui se lit (celle du site), au plus gras pour
@@ -147,7 +150,13 @@ export default function RootLayout({
                 >
                   <main className="flex-1 pt-3 pb-32">{children}</main>
                 </div>
+                {/* Après les pages : la place d'une page se pose après le
+                    défilement de Next vers le haut. */}
+                <Suspense fallback={null}>
+                  <MemoireNavigation />
+                </Suspense>
                 <VoileEtat />
+                <DaEssai />
                 <BottomNav />
                 </AuthGate>
                 {/* Hors de la porte de connexion : le guide passe avant le

@@ -184,8 +184,8 @@ function classesCible(c: ContratPlan): string {
   return ` cible fiche--${c.rang} cible--${c.etat}${c.direct ? " cible--direct" : ""}`;
 }
 
-/** Les quatre coins du viseur. */
-const VISEUR = `<i class="cible__coin cible__coin--hg"></i><i class="cible__coin cible__coin--hd"></i><i class="cible__coin cible__coin--bg"></i><i class="cible__coin cible__coin--bd"></i>`;
+/** Les quatre coins du viseur ; les pièces des DA à l'essai (da/da.css), cachées sans elles. */
+const VISEUR = `<i class="cible__coin cible__coin--hg"></i><i class="cible__coin cible__coin--hd"></i><i class="cible__coin cible__coin--bg"></i><i class="cible__coin cible__coin--bd"></i><i class="cible__da cible__da--a"></i><i class="cible__da cible__da--b"></i>`;
 
 /** La taille de la pile suit le nombre d'or : grande, moyenne, petite. */
 function taillePile(n: number): "grande" | "moyenne" | "petite" {

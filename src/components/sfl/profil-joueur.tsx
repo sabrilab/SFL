@@ -28,6 +28,8 @@
 //   7. son profil de jeu, sa forme et ses dimanches.
 // Sous son nom, « Comparer avec ma carte » ouvre les deux cartes face à face,
 // avec le radar des deux profils de jeu superposés (comparer-cartes.tsx).
+// Comparer et un trophée s'ouvrent dans la fenêtre du profil, à sa place,
+// avec un retour vers lui (ui/sheet.tsx).
 // Une section sans rien à montrer ne s'affiche pas. Rien n'est stocké : tout
 // vient de la saison déjà en mémoire.
 
@@ -36,7 +38,7 @@ import { motion } from "motion/react";
 import { Card3DEnGrand } from "@/components/sfl/carte-en-grand";
 import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur";
 import { ComparerCartes } from "@/components/sfl/comparer-cartes";
-import { EquipeDuJoueur } from "@/components/sfl/equipe/equipe-du-joueur";
+import { AppartenancesJoueur } from "@/components/sfl/badge-sfl";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -167,7 +169,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
             {xp && ` · niveau XP ${xp.niveau}`}
             {rangXp && ` · rang ${rangXp.rang}`}
           </p>
-          <EquipeDuJoueur nom={player.name} className="mt-[var(--fib-8)]" />
+          <AppartenancesJoueur nom={player.name} className="mt-[var(--fib-8)]" />
           <ReseauJoueur nom={player.name} className="mt-[var(--fib-8)]" />
           <BoutonSuivre nom={player.name} className="mt-[var(--fib-8)]" />
         </div>
@@ -368,13 +370,13 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
         )}
       </div>
 
-      <Sheet open={!!choix} onOpenChange={(o) => !o && setChoix(null)}>
+      <Sheet open={!!choix} onOpenChange={(o) => !o && setChoix(null)} titre="ce trophée">
         <SheetContent side="bottom" className="mx-auto max-h-[90vh] w-full overflow-y-auto rounded-t-[28px] px-5 pt-6 pb-8 sm:max-w-md">
           {choix && <FeuilleBadge nom={player.name} badge={choix} />}
         </SheetContent>
       </Sheet>
 
-      <Sheet open={compare} onOpenChange={setCompare}>
+      <Sheet open={compare} onOpenChange={setCompare} titre="la comparaison">
         <SheetContent side="bottom" className="mx-auto max-h-[92vh] w-full overflow-y-auto rounded-t-[28px] px-5 pt-6 pb-8 sm:max-w-md">
           <SheetTitle className="sr-only">Comparer avec ma carte</SheetTitle>
           <SheetDescription className="sr-only">Ta carte et celle de {identite.nom(player.name)}, face à face.</SheetDescription>

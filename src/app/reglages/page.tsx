@@ -14,6 +14,7 @@ import {
   Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { isAdmin } from "@/lib/sfl/admin";
@@ -40,6 +41,7 @@ export default function ReglagesPage() {
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-7 px-5 py-4 sm:py-8">
       <div className="flex items-center gap-2.5">
+        <BoutonRetour />
         <span className="glass flex size-11 items-center justify-center rounded-2xl">
           <Settings className="size-5" />
         </span>

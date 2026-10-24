@@ -21,6 +21,7 @@ import { activeConvocation } from "@/lib/sfl/saisie/mutations";
 import { equipesDeConvocation } from "@/lib/sfl/saisie/equipes";
 import { PointMaillot } from "@/components/sfl/point-maillot";
 import { cn } from "@/lib/utils";
+import { BoutonRetour } from "@/components/layout/bouton-retour";
 
 export default function Discussions() {
   const { saison } = useSeason();
@@ -63,7 +64,10 @@ export default function Discussions() {
 
   return (
     <div className="shell py-4 sm:py-8">
-      <h1 className="mb-5 text-[30px] font-bold tracking-tight">Discussions</h1>
+      <div className="mb-5 flex items-center gap-3">
+        <BoutonRetour />
+        <h1 className="text-[30px] font-bold tracking-tight">Discussions</h1>
+      </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-start lg:gap-6">
       {/* L'invitation de match — VIVANTE : répond à la vraie convocation */}

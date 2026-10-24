@@ -21,6 +21,12 @@
 // Le métal dit le niveau, comme avant : or, argent, bronze, et au dernier
 // palier le rouge et or (corps rouge, pièces sombres en or). « fantome » est
 // le badge pas encore gagné : tout en verre dépoli, sans couleur.
+//
+// La Pépite d'Or a son propre studio (24/10) : une boîte à lumière de la
+// teinte du métal sous l'objet et derrière lui, là où le studio des badges
+// met un rose qui le teintait de rouge. La pépite est du métal brut (rôle
+// « brut ») : satiné, sans irisation, ses creux assombris par la couleur
+// de ses sommets.
 
 import * as THREE from "three";
 import { piecesDe, POSE, type Objet, type Role } from "./objets";
@@ -38,8 +44,20 @@ const CORPS: Record<Metal, string> = {
 
 /* -------------------------------- Le studio ------------------------------- */
 
-/** La carte d'environnement : un fond noir et des panneaux de lumière colorée. */
-export function environnement(renderer: THREE.WebGLRenderer): THREE.Texture {
+/** La teinte de la boîte à lumière du joaillier, sous la pépite, selon le métal. */
+const JOAILLIER: Record<Metal, string> = { or: "#ffd98a", argent: "#e8f0ff", bronze: "#ffb27a", legende: "#ffc2b0" };
+
+/** Le studio d'un objet : celui des badges, ou celui du joaillier pour la Pépite d'Or. */
+export function teinteStudio(objet: Objet, m: Matiere): string | undefined {
+  return objet === "pepite" && m !== "fantome" ? JOAILLIER[m] : undefined;
+}
+
+/**
+ * La carte d'environnement : un fond noir et des panneaux de lumière colorée.
+ * `joaillier` : la teinte de la boîte à lumière posée sous l'objet et
+ * derrière lui, à la place du rose (la Pépite d'Or).
+ */
+export function environnement(renderer: THREE.WebGLRenderer, joaillier?: string): THREE.Texture {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#040406");
   // Des boîtes à lumière de studio : le centre franc, les bords qui tombent
@@ -76,7 +94,8 @@ export function environnement(renderer: THREE.WebGLRenderer): THREE.Texture {
   panneau("#3b6cff", 9, 3, 10, -6, 1, -5); // le bleu, à gauche, derrière
   panneau("#9b4dff", 7, 6, 3, 3, 6, -5); // le violet, en haut, derrière
   panneau("#ff7a3d", 9, 3, 8, 6, -2, -4); // l'orange, à droite, derrière
-  panneau("#ff4fa3", 4, 6, 3, -2, -7, -2); // un rose, sous l'objet
+  if (joaillier) panneau(joaillier, 4, 7, 4.2, 0, -6.5, -3.5); // sous la pépite, derrière : son dessous s'allume
+  else panneau("#ff4fa3", 4, 6, 3, -2, -7, -2); // un rose, sous l'objet
   const pmrem = new THREE.PMREMGenerator(renderer);
   const tex = pmrem.fromScene(scene, 0.035).texture;
   pmrem.dispose();
@@ -133,14 +152,26 @@ function verre(couleur: string, opacite: number, rugosite = 0.05) {
 }
 
 /**
- * Le noir des trophées (socles, lames) : le chrome sombre et irisé des
- * premiers badges (Sabri, 22/10 : « rester dans la DA de nos premiers
- * badges »), un peu plus mat pour que le métal du rang reste ce qu'on voit
- * d'abord. Les reflets bleu, violet et orange du studio filent sur ses arêtes.
+ * Le noir des trophées (socles, lames) : un chrome noir satiné, le noir de la
+ * planche de Sabri (« socle noir », plaque de métal devant). Il était irisé
+ * comme les pièces sombres des badges, mais sur les grands pans le film
+ * virait au rose-beige (les socles) et au bordeaux (les lames), trop près du
+ * rouge réservé aux cartes Impact et du mauve des rangs des skins (24/10).
+ * L'irisation reste à la pierre du sommet ; les reflets du studio filent
+ * toujours sur les arêtes, et le vernis léger détache le socle du fond noir.
  */
 function noir() {
-  const m = chrome("#121318", 0.9, 0.3);
-  m.envMapIntensity = 0.6;
+  const m = chrome("#0a0c10", 0, 0.3);
+  m.envMapIntensity = 0.8;
+  m.clearcoat = 0.3;
+  return m;
+}
+
+/** Le métal brut de la pépite : satiné, sans film ni vernis, ses creux plus sombres. */
+function brut(couleur: string) {
+  const m = chrome(couleur, 0, 0.3);
+  m.clearcoat = 0;
+  m.vertexColors = true;
   return m;
 }
 
@@ -157,7 +188,7 @@ function matieresDe(m: Matiere, env: THREE.Texture): Record<Role, THREE.MeshPhys
   let r = parEnv.get(m);
   if (!r) {
     if (m === "fantome") {
-      r = { corps: verre("#dfe3ea", 0.42, 0.32), verre: verre("#dfe3ea", 0.22, 0.32), sombre: verre("#9aa0a8", 0.4, 0.32), noir: verre("#8a9098", 0.36, 0.32) };
+      r = { corps: verre("#dfe3ea", 0.42, 0.32), verre: verre("#dfe3ea", 0.22, 0.32), sombre: verre("#9aa0a8", 0.4, 0.32), noir: verre("#8a9098", 0.36, 0.32), brut: verre("#dfe3ea", 0.42, 0.32) };
     } else {
       const corps = chrome(CORPS[m], m === "argent" ? 0.6 : 0.3);
       r = {
@@ -166,6 +197,7 @@ function matieresDe(m: Matiere, env: THREE.Texture): Record<Role, THREE.MeshPhys
         // Au rouge et or, les pièces sombres passent à l'or.
         sombre: m === "legende" ? chrome(CORPS.or, 0.3) : chrome("#1b1d24", 1, 0.2),
         noir: noir(),
+        brut: brut(CORPS[m]),
       };
     }
     for (const mat of Object.values(r)) mat.envMap = env;
@@ -211,8 +243,13 @@ export function eclat(): THREE.DirectionalLight {
 
 /* -------------------------------- Les images ------------------------------- */
 
-/** Le côté des images, en pixels : net jusqu'à ~100 px à l'écran sur un iPhone. */
+/**
+ * Le côté des images, en pixels : net jusqu'à ~100 px à l'écran sur un
+ * iPhone. Le trophée vedette de la vitrine en demande une plus grande
+ * (COTE_GRAND), qui reste nette à ~260 px.
+ */
 const COTE = 384;
+export const COTE_GRAND = 768;
 
 const IMAGE_EVENT = "sfl-badge-3d";
 export { IMAGE_EVENT };
@@ -220,7 +257,15 @@ export { IMAGE_EVENT };
 const images = new Map<string, string>();
 const aFaire = new Set<string>();
 let revision = 0;
-let moteur: { renderer: THREE.WebGLRenderer; env: THREE.Texture; scene: THREE.Scene; cam: THREE.PerspectiveCamera } | null = null;
+let moteur: {
+  renderer: THREE.WebGLRenderer;
+  env: THREE.Texture;
+  /** Les studios du joaillier, un par teinte, faits à la première pépite. */
+  joailliers: Map<string, THREE.Texture>;
+  cote: number;
+  scene: THREE.Scene;
+  cam: THREE.PerspectiveCamera;
+} | null = null;
 let impossible = false;
 let planifie = false;
 
@@ -235,7 +280,7 @@ function lancerMoteur() {
     const env = environnement(renderer);
     const scene = new THREE.Scene();
     scene.add(eclat());
-    moteur = { renderer, env, scene, cam: camera() };
+    moteur = { renderer, env, joailliers: new Map(), cote: COTE, scene, cam: camera() };
   } catch {
     impossible = true;
   }
@@ -245,8 +290,19 @@ function lancerMoteur() {
 function photographier(cle: string) {
   const m = lancerMoteur();
   if (!m) return;
-  const [objet, matiere] = cle.split(":") as [Objet, Matiere];
-  const g = construire(objet, matiere, m.env);
+  const [objet, matiere, taille] = cle.split(":") as [Objet, Matiere, string | undefined];
+  const cote = taille ? Number(taille) : COTE;
+  if (cote !== m.cote) {
+    m.renderer.setSize(cote, cote, false);
+    m.cote = cote;
+  }
+  const teinte = teinteStudio(objet, matiere);
+  let env = m.env;
+  if (teinte) {
+    env = m.joailliers.get(teinte) ?? environnement(m.renderer, teinte);
+    m.joailliers.set(teinte, env);
+  }
+  const g = construire(objet, matiere, env);
   m.scene.add(g);
   m.renderer.render(m.scene, m.cam);
   images.set(cle, m.renderer.domElement.toDataURL("image/png"));
@@ -283,12 +339,13 @@ function planifier() {
 }
 
 /**
- * L'image d'un objet dans une matière : une URL data: (PNG transparent), ou
- * null tant qu'elle n'est pas faite (elle est alors demandée, et IMAGE_EVENT
- * annoncera qu'elle est prête) ou si l'appareil n'a pas WebGL.
+ * L'image d'un objet dans une matière (`cote` : son côté en pixels) : une
+ * URL data: (PNG transparent), ou null tant qu'elle n'est pas faite (elle
+ * est alors demandée, et IMAGE_EVENT annoncera qu'elle est prête) ou si
+ * l'appareil n'a pas WebGL.
  */
-export function imageBadge(objet: Objet, m: Matiere): string | null {
-  const cle = `${objet}:${m}`;
+export function imageBadge(objet: Objet, m: Matiere, cote: number = COTE): string | null {
+  const cle = cote === COTE ? `${objet}:${m}` : `${objet}:${m}:${cote}`;
   const deja = images.get(cle);
   if (deja) return deja;
   if (typeof window === "undefined" || impossible) return null;

@@ -75,7 +75,8 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, type Fenetre } from "@/components/ui/sheet";
+import { FeuilleProfil } from "@/components/sfl/card-viewer";
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
@@ -994,6 +995,8 @@ export default function MapPage() {
     );
   };
   const [catalogue, setCatalogue] = useState(false);
+  // Un joueur touché dans le catalogue : son profil s'ouvre dans sa fenêtre (ui/sheet.tsx).
+  const fenetreCatalogue = useRef<Fenetre | null>(null);
   // La notification « Mets ta ville » ouvre /map?ville : le catalogue, la recherche de ta ville ouverte.
   const [chercherVille, setChercherVille] = useState(false);
   useEffect(() => {
@@ -1388,7 +1391,7 @@ export default function MapPage() {
       </section>
 
       {/* ─── La fiche : présence, lieu, et pour l'admin les réglages ─── */}
-      <Sheet open={fiche} onOpenChange={setFiche}>
+      <Sheet open={fiche} onOpenChange={setFiche} titre="le match">
         <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
           <SheetHeader className="px-5 pt-5 pb-0">
             <p className="mono-label flex items-center gap-2 text-muted-foreground">
@@ -1454,9 +1457,10 @@ export default function MapPage() {
                 )}
                 {choisi && feuille.length > 0 && <DuelsDuJour j={choisi.j} matchs={choisi.matchsIci} />}
                 {choisi?.terrain && <Itineraire terrain={choisi.terrain} ios={ios} />}
+                {/* Son dimanche dans les Actus, pas l'Actu du jour. */}
                 {choisi?.joue && (
                   <Link
-                    href="/ligue"
+                    href={choisi.j !== null ? `/ligue#j${choisi.j}` : "/ligue"}
                     className="bouton-principal flex h-12 items-center justify-center gap-2 text-[15px] font-semibold"
                   >
                     Voir le récap de la journée
@@ -1478,7 +1482,7 @@ export default function MapPage() {
       </Sheet>
 
       {/* ─── Les joueurs, ville par ville ─── */}
-      <Sheet open={catalogue} onOpenChange={setCatalogue}>
+      <Sheet open={catalogue} onOpenChange={setCatalogue} fenetreRef={fenetreCatalogue} titre="les joueurs">
         <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
           <SheetHeader className="px-5 pt-5 pb-0">
             <p className="mono-label text-muted-foreground">
@@ -1493,7 +1497,7 @@ export default function MapPage() {
               onFocus={setFocusVilles}
               me={me}
               chercherVille={chercherVille}
-              onJoueur={setProfil}
+              onJoueur={(nom) => fenetreCatalogue.current?.poser(<FeuilleProfil nom={nom} />, "son profil")}
               onVoir={(v) => {
                 setCatalogue(false);
                 setViser((x) => ({ lat: v.lat, lng: v.lng, n: (x?.n ?? 0) + 1 }));
@@ -1515,19 +1519,33 @@ export default function MapPage() {
       />
 
       {/* ─── Les contrats sur une cible, avec le filtre Contrats ─── */}
+      {/* Ouverts depuis la pile de joueurs, les contrats et le profil y
+          ramènent par leur retour ; leur croix ferme aussi la pile. */}
       <ContratsSur
         nom={cible}
         lg={missions}
-        onFermer={() => setCible(null)}
-        onProfil={(nom) => {
+        onFermer={() => {
           setCible(null);
-          setProfil(nom);
+          fermerPile();
         }}
+        onRetour={pile ? () => setCible(null) : undefined}
       />
 
       {/* ─── Le profil d'un joueur touché sur la Map ou dans le catalogue ─── */}
-      <Sheet open={!!profilJoueur} onOpenChange={(o) => !o && setProfil(null)}>
-        <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
+      <Sheet
+        open={!!profilJoueur}
+        onOpenChange={(o) => {
+          if (o) return;
+          setProfil(null);
+          fermerPile();
+        }}
+        titre="son profil"
+      >
+        <SheetContent
+          side="bottom"
+          onRetour={pile ? () => setProfil(null) : undefined}
+          className="max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]"
+        >
           <SheetHeader className="sr-only">
             <SheetTitle>{profilJoueur ? nomAffiche(profilJoueur.name) : "Profil"}</SheetTitle>
           </SheetHeader>

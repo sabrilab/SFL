@@ -5,12 +5,14 @@
 // atteint reste acquis, palierMaxDe), les finitions qui lui sont offertes
 // (finitions-offertes.ts), et ce qu'il a choisi d'en porter
 // (habillages-choisis.ts).
-//   · le skin : son choix, s'il est débloqué ; « auto » (rien choisi) porte
-//     le dernier débloqué, sauf « Tes couleurs », qui attend qu'il choisisse
-//     son pays ; « - », rien. Le traitement de la photo n'est plus dans la
-//     passe (24/10) : la carte ne le porte plus ;
-//   · les signes débloqués, le cran du cadre (missions réussies) et le rang
-//     (XP à vie) : d'office.
+//   · le skin : son choix, s'il est débloqué ; rien de choisi (« auto »), ou
+//     « - », la carte de base. Rien n'est imposé (Sabri, 24/10 : « il faut
+//     choisir, parmi les filtres qu'il a, celui qu'il veut mettre en avant
+//     […] ça ne doit pas être imposé ») : Personnaliser ma carte
+//     (personnaliser-carte.tsx). Le traitement de la photo n'est plus dans
+//     la passe (24/10) : la carte ne le porte plus ;
+//   · les signes débloqués qu'il a choisis, aucun sinon ;
+//   · le cran du cadre (missions réussies) et le rang (XP à vie) : d'office.
 // Un choix qui n'est pas débloqué ne se porte pas : la carte d'un autre
 // joueur ne montre que ce qu'il a gagné.
 
@@ -90,19 +92,15 @@ export function useHabillage(nom: string): HabillageCarte {
     const x = cartes.parJoueur.get(nom);
     const palier = x?.palier ?? 0;
     const finitions = finitionsDe(nom, palier);
-    // « Tes couleurs » se porte avec son pays : sans pays, c'est « auto ».
-    const voulue = choix.finition === "couleurs" && !choix.pays ? "auto" : choix.finition;
-    const finition =
-      voulue === "-"
-        ? undefined
-        : voulue !== "auto" && finitions.includes(voulue)
-          ? voulue
-          : finitions.filter((f) => f !== "couleurs").at(-1);
+    // « Tes couleurs » se porte avec son pays.
+    const voulue = choix.finition === "couleurs" && !choix.pays ? "-" : choix.finition;
+    const finition = voulue !== "auto" && voulue !== "-" && finitions.includes(voulue) ? voulue : undefined;
+    const ouverts = debloquesDe(palier).signes;
     const cran = Math.min(4, x?.cran ?? 0) as HabillageCarte["cran"];
     return {
       finition,
       pays: finition === "couleurs" ? choix.pays : undefined,
-      signes: debloquesDe(palier).signes,
+      signes: choix.signes.filter((g) => ouverts.includes(g)),
       cran,
       rang: x?.rang ?? undefined,
     };

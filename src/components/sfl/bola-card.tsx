@@ -38,11 +38,14 @@
 // Le numéro de maillot s'affiche en haut à droite du portrait quand le joueur
 // en a un ; sinon, sur la carte complète, son poste prend la place.
 //
-// Avec `badge` (les cartes de la ligue, PlayerCard), le haut à droite est au
-// badge que le joueur a choisi, un objet en 3D (badge-3d.tsx, demandes de Sabri,
-// 17 et 18/10), et le poste passe en haut à gauche, à la place de l'étiquette
-// d'édition — sauf sur une carte à titre, qui y garde son titre (MVP, IMPACT,
-// DÉFENSIVE) : le poste reste dit dans la bande. `badge: null` : le coin reste vide.
+// Avec `badge` (les cartes de la ligue, PlayerCard), le badge que le joueur a
+// choisi est dans la bande, au-dessus de la note et à gauche du nom : une
+// bulle imprimée à l'encre de la carte qui le dit en toutes lettres, son
+// objet 3D au bout (insigne-carte.tsx ; Sabri, 24/10 : « essaie de le mettre
+// juste au-dessus de la grande note […] une espèce de bulle et, peut-être au
+// bout, le badge »). Il était en haut à droite du portrait depuis le 17/10,
+// dans un écusson, et on ne le reconnaissait pas. Les coins du portrait
+// reprennent l'étiquette et le numéro (ou le poste).
 //
 // La ligne de série, en bas : le numéro de la carte, puis le sigle SFL de la
 // ligue (sfl.svg), à la place de « lot s1 ». « Sunday Five League » n'est
@@ -71,7 +74,7 @@
 // au-dessus du portrait. `data-matiere` et `data-nom` lui disent quel dos
 // dessiner, `data-emission` ce qu'une carte d'époque y écrit.
 
-import { Badge3D } from "@/components/sfl/badge-3d";
+import { BulleBadge } from "@/components/sfl/insigne-carte";
 import {
   graine,
   lisereDe,
@@ -112,6 +115,9 @@ const NOM_H = 220; // 361 ÷ φ
 const FILET = BANDE + NOTE_C; // 1605
 const SERIE = 1621;
 const SERIE_X = RAYON_CARTE / PHI; // 57 : la série rentrée, loin des coins
+// La bulle du badge : son objet à la marge, entre le bas du portrait (983)
+// et le haut des chiffres de la note (~1160) ; elle s'arrête avant la colonne du nom.
+const BULLE = { x: M, centre: 1078, fin: COL_X - 22 };
 // Le cadre du portrait (liseré, crans) : 12 autour, concentrique.
 const CADRE: Boite = {
   x: PORTRAIT.x - 12,
@@ -131,9 +137,6 @@ export function palierCarte(largeurPx: number): Palier {
 
 /** La hauteur du sigle SFL d'une carte d'époque, en haut à gauche du portrait. */
 const SIGLE_H = 46;
-
-/** Les cartes à titre gardent leur titre en haut à gauche, même avec un badge. */
-const A_TITRE = new Set(["mvp", "impact", "def"]);
 
 /** Une couleur « #rrggbb » à l'opacité voulue. */
 const opaque = (hex: string, a: number) => `${hex}${Math.round(a * 255).toString(16).padStart(2, "0")}`;
@@ -254,7 +257,7 @@ export function BolaCard({
   numero?: number | null;
   /** Pastille seulement : l'onglet de la note aux couleurs d'une équipe (feuille de match). */
   onglet?: { fond: string; encre: string };
-  /** Le badge du coin ; null = coin vide ; absent = l'ancienne mise en page (numéro ou poste). */
+  /** Le badge choisi, dans sa bulle au-dessus de la note (carte complète) ; null ou absent : pas de bulle. */
   badge?: BadgeCarte | null;
   /** Ce que le joueur porte sur sa carte (finitions-carte.ts). */
   habillage?: HabillageCarte;
@@ -377,28 +380,17 @@ export function BolaCard({
   );
 
   // Le haut à droite du portrait : le numéro de maillot ; sinon le poste, en grand format seulement.
-  // Une carte d'époque : le poste, ou l'emblème d'une carte Boost.
-  const avecBadge = !era && badge !== undefined;
+  // Une carte d'époque : le poste, ou rien sous l'emblème d'une carte Boost.
+  // Le badge n'est plus dans le coin : il est dans sa bulle, sur la bande.
   const marque = era
     ? era.embleme || !complete
       ? null
       : position.toUpperCase()
-    : avecBadge
-      ? null
-      : numero != null
-        ? String(numero)
-        : complete
-          ? position.toUpperCase()
-          : null;
-  // Le badge, au nombre d'or lui aussi : le portrait ÷ φ⁴ (137), et
-  // autant ÷ φ jusqu'aux bords (85) ; rien en réduite. La complète était à
-  // ÷ φ⁵ (85) : trop petit pour reconnaître son badge (Sabri, 19/10).
-  const coteBadge = PORTRAIT.c / PHI ** 4;
-  const margeBadge = coteBadge / PHI;
-  const largeurBadge = u(coteBadge);
-  const badgeCoin = avecBadge && badge && !reduite ? badge : null;
-  // En haut à gauche : le poste à côté d'un badge, sauf une carte à titre qui y garde son titre.
-  const posteEnHaut = avecBadge && !A_TITRE.has(p.nom);
+    : numero != null
+      ? String(numero)
+      : complete
+        ? position.toUpperCase()
+        : null;
   const portraitProps = {
     photo,
     nom: name,
@@ -577,11 +569,6 @@ export function BolaCard({
               <EmblemeEpoque cote={u(124)} epoque={era} />
             </span>
           )}
-          {badgeCoin && (
-            <span className="absolute" style={{ left: u(PORTRAIT.c - margeBadge - coteBadge), top: u(margeBadge) }}>
-              <Badge3D badge={badgeCoin} largeur={largeurBadge} socle />
-            </span>
-          )}
           {complete && (
             <>
               {coin({ left: u(31), top: u(31) }, 0)}
@@ -601,8 +588,7 @@ export function BolaCard({
                   style={{ position: "absolute", left: u(61), top: u(61), width: u(51), height: u(51) }}
                 />
               )}
-              {/* Le poste, à la place de l'étiquette, quand le coin droit est au badge */}
-              {/* Après le symbole : le poste (à côté d'un badge) ou l'étiquette d'édition, puis le rang */}
+              {/* Après le symbole : l'étiquette d'édition (base, ou le titre de la carte), puis le rang */}
               <div
                 style={{
                   position: "absolute",
@@ -614,38 +600,22 @@ export function BolaCard({
                   gap: u(18),
                 }}
               >
-                {posteEnHaut ? (
-                  <div
-                    style={{
-                      fontFamily: ANTON,
-                      fontSize: u(62),
-                      lineHeight: 1,
-                      letterSpacing: u(1),
-                      color: encre(1),
-                      textShadow: photo ? `0 0 ${u(18)}px ${halo}` : undefined,
-                    }}
-                  >
-                    {position.toUpperCase()}
-                  </div>
-                ) : (
-                  /* L'étiquette d'édition : base, ou le titre de la carte */
-                  <div
-                    style={{
-                      height: u(51),
-                      padding: `0 ${u(18)}px`,
-                      boxSizing: "border-box",
-                      borderRadius: u(10),
-                      display: "flex",
-                      alignItems: "center",
-                      background: p.etiquette.fond,
-                      border: `${u(2)}px solid ${p.etiquette.bord}`,
-                      ...mono(26, 2.5, 1, 700),
-                      color: p.etiquette.texte,
-                    }}
-                  >
-                    {p.titre}
-                  </div>
-                )}
+                <div
+                  style={{
+                    height: u(51),
+                    padding: `0 ${u(18)}px`,
+                    boxSizing: "border-box",
+                    borderRadius: u(10),
+                    display: "flex",
+                    alignItems: "center",
+                    background: p.etiquette.fond,
+                    border: `${u(2)}px solid ${p.etiquette.bord}`,
+                    ...mono(26, 2.5, 1, 700),
+                    color: p.etiquette.texte,
+                  }}
+                >
+                  {p.titre}
+                </div>
                 {habillage?.rang && <InsigneRang rang={habillage.rang} hauteur={u(82)} />}
               </div>
               {era ? (
@@ -718,6 +688,9 @@ export function BolaCard({
             {overall}
           </div>
         ))}
+
+        {/* Le badge choisi : sa bulle, au-dessus de la note */}
+        {complete && badge && !era && <BulleBadge badge={badge} u={u} x={BULLE.x} centre={BULLE.centre} fin={BULLE.fin} encre={p.encre} sombre={p.sombre} />}
 
         {/* Qui : le nom en Anton, puis le pseudo et le poste (ou le poste seul, en compacte) */}
         {!reduite && (

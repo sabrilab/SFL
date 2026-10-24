@@ -17,7 +17,9 @@
 //      Dessous, ma photo (la toucher ouvre « Ma photo »), la carte officielle
 //      tant qu'elle n'est pas faite (carte-officielle.tsx ; ensuite, on la
 //      refait depuis « Ma photo ») et le badge de ma carte ; enfin
-//      « Inviter », mon lien de parrainage (parrainage/page.tsx, 24/10) ;
+//      « Personnaliser ma carte » (le skin, les signes et le badge, au choix :
+//      personnaliser-carte.tsx, 24/10), puis « Inviter », mon lien de
+//      parrainage (parrainage/page.tsx, 24/10) ;
 //   2. ma saison : mon dernier dimanche en grand, mes points forts, mes
 //      autres dimanches (ma-saison.tsx) ;
 //   3. mon évolution : mon rang au Pépite d'Or ou la note de ma carte,
@@ -52,10 +54,11 @@ import { MaSaison, type RangDuJour } from "@/components/sfl/ma-saison";
 import { NiveauXp } from "@/components/sfl/niveau-xp";
 import { Chiffre } from "@/components/sfl/profil-joueur";
 import { ReseauJoueur } from "@/components/sfl/suivre";
-import { EquipeDuJoueur } from "@/components/sfl/equipe/equipe-du-joueur";
+import { AppartenancesJoueur } from "@/components/sfl/badge-sfl";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { VitrineBadges } from "@/components/sfl/vitrine";
 import { ChoixBadge } from "@/components/sfl/choix-badge";
+import { PersonnaliserCarte } from "@/components/sfl/personnaliser-carte";
 import { CarteOfficielle } from "@/components/sfl/carte-officielle";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -201,7 +204,7 @@ export default function Profil() {
                 {rangXp && ` · rang ${rangXp.rang}`}
               </span>
             </button>
-            <EquipeDuJoueur nom={player.name} />
+            <AppartenancesJoueur nom={player.name} />
             <ReseauJoueur nom={player.name} />
           </div>
           <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
@@ -226,6 +229,8 @@ export default function Profil() {
             <CarteOfficielle player={player} className="min-w-0 flex-1" />
             <ChoixBadge player={player} />
           </div>
+          {/* Personnaliser ma carte : le skin, les signes et le badge, au choix (personnaliser-carte.tsx) */}
+          <PersonnaliserCarte player={player} />
           {/* Inviter : mon lien et mon code de parrainage (parrainage/page.tsx) */}
           <Link
             href="/parrainage"

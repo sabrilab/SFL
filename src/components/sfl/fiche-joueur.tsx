@@ -7,6 +7,8 @@
 // (les écussons et médailles de Ma carte ; toucher un badge ouvre son détail,
 // avec qui d'autre l'a). « Voir sa carte en grand » ouvre la carte en 3D,
 // comme partout ailleurs. Sa carte porte le maillot de son camp du jour.
+// Tout s'ouvre dans la fenêtre du match, à la place de la fiche, avec un
+// retour vers elle (ui/sheet.tsx) : sa carte, un badge, son profil.
 //
 // Le calcul est dans lib/sfl/fiche-joueur.ts.
 
@@ -49,15 +51,15 @@ export function FicheJoueurSheet({
   onClose: () => void;
 }) {
   return (
-    <Sheet open={!!player} onOpenChange={(o) => !o && onClose()}>
+    <Sheet open={!!player} onOpenChange={(o) => !o && onClose()} titre="sa fiche">
       <SheetContent side="bottom" className="mx-auto max-h-[92vh] w-full overflow-y-auto rounded-t-[28px] px-5 pt-6 pb-8 sm:max-w-md">
-        {player && <Fiche player={player} equipe={equipe} onClose={onClose} />}
+        {player && <Fiche player={player} equipe={equipe} />}
       </SheetContent>
     </Sheet>
   );
 }
 
-function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJour | null; onClose: () => void }) {
+function Fiche({ player, equipe }: { player: Player; equipe: EquipeDuJour | null }) {
   const { saison, allPlayers } = useSeason();
   const { open } = useCardViewer();
   const identite = useIdentites();
@@ -77,7 +79,6 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
   const [badge, setBadge] = useState<{ famille: "palier"; id: TropheeId } | { famille: "saison"; id: ClassementId } | null>(null);
 
   function voirEnGrand() {
-    onClose();
     open({
       cacheKey: `mini-${player.name}${equipe?.camp ? `-${equipe.camp}` : ""}`,
       mode: "simple",
@@ -189,7 +190,7 @@ function Fiche({ player, equipe, onClose }: { player: Player; equipe: EquipeDuJo
         Voir sa carte en grand
       </button>
 
-      <Sheet open={!!badge} onOpenChange={(o) => !o && setBadge(null)}>
+      <Sheet open={!!badge} onOpenChange={(o) => !o && setBadge(null)} titre="ce badge">
         <SheetContent side="bottom" className="mx-auto max-h-[90vh] w-full overflow-y-auto rounded-t-[28px] px-5 pt-6 pb-8 sm:max-w-md">
           {badge && <FeuilleBadge nom={player.name} badge={badge} />}
         </SheetContent>

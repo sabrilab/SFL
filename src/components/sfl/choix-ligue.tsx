@@ -1,27 +1,24 @@
 "use client";
 
-// L'en-tête des façons de jouer (Sabri, 22/10) : le sigle de la page où
-// l'on est, qui déroule les deux autres (trois côte à côte, c'était « trop
-// complexe ») :
+// L'en-tête des ligues. Sabri, 24/10 : « il n'y a qu'une seule ligue Bola,
+// et on pourra filtrer soit si on parle de nous (un joueur et sa place dans
+// la ligue Bola), soit avec le mode team ». Le sigle de la ligue où l'on
+// est, qui déroule l'autre (trois côte à côte, c'était « trop complexe »,
+// 22/10) :
 //   · SFL — la ligue privée du dimanche, avec sa saison (/ligue) ;
-//   · Bola — la ligue globale, le classement à vie des matchs que les
-//     joueurs ouvrent eux-mêmes (/ligue-vierge) ; régions et mondial plus tard.
-//   · Bola Team — les équipes et leurs défis (/bola-team).
+//   · Bola — la ligue globale, et dedans, à droite du sigle, le filtre
+//     Joueurs / Équipes : le classement à vie des matchs que les joueurs
+//     ouvrent eux-mêmes (/ligue-vierge), ou les équipes, leur championnat
+//     et leurs défis (/bola-team). On est dans la ligue Bola en joueur, en
+//     équipe, ou les deux ; plus de logo « Bola Team » à part (« la
+//     pertinence du logo, je sais pas si c'est pertinent »).
 // Les badges sont les logos (public/bola/sfl.svg, logo-blanc.svg), teintés
 // comme le texte par un masque : pleins quand on y est, effacés sinon. Le
 // sigle SFL (tools/sigle-sfl.ts, 23/10) a les métriques du logo BOLA : à
-// hauteur égale, les lettres de SFL, BOLA et BOLA TEAM ont la même taille.
-//
-// Bola Team, quatre propositions (Sabri, 24/10 : « Bola, c'est exceptionnel,
-// mais le Team, propose d'autres noms ou d'autres designs ») : TEAM, CLUB et
-// FC redessinés dans les lettres du logo BOLA (tools/logo-team.mjs : même
-// graisse, même pente ; le L et le B de CLUB sont ceux du logo), et TEAM en
-// réserve dans une plaque penchée comme le flanc du B. Rien ne change en
-// production tant qu'il n'a pas choisi ; sur une préversion, ?logo=team, club,
-// fc ou plaque (gardé pour la visite, ?logo=actuel pour revenir).
+// hauteur égale, les lettres de SFL et de BOLA ont la même taille.
 
 import Link from "next/link";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { cn } from "@/lib/utils";
@@ -35,45 +32,44 @@ const BADGES = [
 // l : la largeur pour 18 px de haut. BOLA (1000 × 237) tient dans 74, donc à
 // 97,4 % de sa hauteur ; SFL (735 × 237) y est réduit d'autant : 54,4.
 
-const LOGOS_TEAM = {
-  team: { src: "/bola/bola-team.svg", l: 152.5, libelle: "Bola Team" },
-  club: { src: "/bola/bola-club.svg", l: 140.4, libelle: "Bola Club" },
-  fc: { src: "/bola/bola-fc.svg", l: 113.5, libelle: "Bola FC" },
-  plaque: { src: "/bola/bola-team-plaque.svg", l: 131.9, libelle: "Bola Team" },
-} as const;
-// l : 0,074 × la largeur du dessin, comme BOLA : les lettres gardent sa taille.
-type LogoTeam = keyof typeof LOGOS_TEAM;
-let logoApercu: LogoTeam | null | undefined;
-function lireLogoApercu(): LogoTeam | null {
-  if (logoApercu !== undefined) return logoApercu;
-  logoApercu = null;
-  if (process.env.NEXT_PUBLIC_BOLA_ENV === "production") return null;
-  try {
-    const q = new URLSearchParams(window.location.search).get("logo");
-    if (q === "actuel") localStorage.removeItem("bola-apercu-logo");
-    else if (q && q in LOGOS_TEAM) localStorage.setItem("bola-apercu-logo", q);
-    const v = localStorage.getItem("bola-apercu-logo");
-    if (v && v in LOGOS_TEAM) logoApercu = v as LogoTeam;
-  } catch {}
-  return logoApercu;
+/** Dans la ligue Bola : soi (Joueurs) ou son équipe (Équipes). */
+function FiltreBola({ actif }: { actif: Actif }) {
+  const vues = [
+    { href: "/ligue-vierge", label: "Joueurs" },
+    { href: "/bola-team", label: "Équipes" },
+  ] as const;
+  return (
+    <nav aria-label="Filtre" className="glass flex gap-0.5 rounded-full p-1">
+      {vues.map((v) => (
+        <Link
+          key={v.href}
+          href={v.href}
+          aria-current={actif === v.href ? "page" : undefined}
+          className={cn(
+            "px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap",
+            actif === v.href ? "bouton-principal" : "bouton-discret text-muted-foreground"
+          )}
+        >
+          {v.label}
+        </Link>
+      ))}
+    </nav>
+  );
 }
-const rien = () => () => {};
 
 /**
- * L'en-tête des trois onglets (Actus, Bola, Team). Trois logos côte à côte,
- * dont Bola deux fois, c'était trop (Sabri, 22/10 : « trop complexe ») :
- * seul le logo de la page où l'on est, en grand ; le toucher déroule les
- * deux autres. La loupe à droite ; `children` se pose juste avant elle (le
- * choix de la saison, dans les Actus).
+ * L'en-tête des ligues : le logo de la ligue où l'on est, en grand ; le
+ * toucher déroule l'autre. Dans Bola, le filtre Joueurs / Équipes à sa
+ * droite. La loupe à droite ; `children` se pose juste avant elle (le choix
+ * de la saison, dans les Actus).
  */
 export function EnteteLigue({ actif, className, children }: { actif: Actif; className?: string; children?: React.ReactNode }) {
   const liens = [
     { href: "/ligue", ligue: "sfl" },
     { href: "/ligue-vierge", ligue: "bola" },
-    { href: "/bola-team", ligue: "team" },
   ] as const;
   const [ouvert, setOuvert] = useState(false);
-  const ici = liens.find((l) => l.href === actif) ?? liens[0];
+  const ici = actif === "/ligue" ? liens[0] : liens[1];
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!ouvert) return;
@@ -107,11 +103,11 @@ export function EnteteLigue({ actif, className, children }: { actif: Actif; clas
                 key={l.href}
                 href={l.href}
                 role="menuitem"
-                aria-current={actif === l.href ? "page" : undefined}
+                aria-current={ici.href === l.href ? "page" : undefined}
                 onClick={() => setOuvert(false)}
                 className={cn(
                   "flex h-12 items-center rounded-[14px] px-3.5 transition-colors",
-                  actif === l.href ? "bg-foreground/[0.08] text-foreground" : "text-foreground/60"
+                  ici.href === l.href ? "bg-foreground/[0.08] text-foreground" : "text-foreground/60"
                 )}
               >
                 <SigleLigue ligue={l.ligue} hauteur={16} />
@@ -121,6 +117,7 @@ export function EnteteLigue({ actif, className, children }: { actif: Actif; clas
         )}
       </div>
       <div className="flex items-center gap-2">
+        {ici.ligue === "bola" && <FiltreBola actif={actif} />}
         {children}
         <BoutonRecherche className="size-10" />
       </div>
@@ -132,18 +129,6 @@ export function EnteteLigue({ actif, className, children }: { actif: Actif; clas
  *  logo SFL ou Bola, à la couleur du texte ; Team, c'est « Bola Team » : le
  *  logo Bola suivi de TEAM (Sabri, 22/10). */
 export function SigleLigue({ ligue, hauteur = 12, className }: { ligue: "sfl" | "bola" | "team"; hauteur?: number; className?: string }) {
-  const logo = useSyncExternalStore(rien, lireLogoApercu, () => null);
-  if (ligue === "team" && logo) {
-    const b = LOGOS_TEAM[logo];
-    return (
-      <span
-        role="img"
-        aria-label={b.libelle}
-        className={cn("inline-block shrink-0 bg-current align-middle", className)}
-        style={{ height: hauteur, width: (b.l / 18) * hauteur, mask: `url(${b.src}) center / contain no-repeat`, WebkitMask: `url(${b.src}) center / contain no-repeat` }}
-      />
-    );
-  }
   if (ligue === "team")
     return (
       <span role="img" aria-label="Bola Team" className={cn("inline-flex shrink-0 items-center", className)} style={{ gap: hauteur * 0.3 }}>

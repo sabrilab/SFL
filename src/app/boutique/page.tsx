@@ -23,6 +23,7 @@ import { Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Locked } from "@/components/sfl/locked";
 import { useMyPlayer } from "@/components/sfl/player-provider";
+import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { useBallons } from "@/hooks/use-ballons";
 import { BALLONS_PAR_EURO, RECHARGES, ballonsPourEuros } from "@/lib/sfl/ballons";
 import { CARD_PRICES } from "@/lib/sfl/collection";
@@ -130,7 +131,8 @@ export default function Boutique() {
 
   return (
     <div className="shell flex flex-col gap-4 py-4 sm:py-8">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center gap-3">
+        <BoutonRetour />
         <div className="min-w-0">
           <h1 className="text-[30px] font-bold tracking-tight">Boutique</h1>
           <p className="mt-1 text-[13px] text-foreground/42">

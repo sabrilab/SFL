@@ -5,7 +5,7 @@
 //   · un nom, un pseudo, un poste  → le profil du joueur (profil-joueur.tsx) :
 //     sa carte en grand, ses trophées, sa saison, son parcours, son jeu
 //   · « J6 », « journée 6 », « 6 »  → la fiche de la journée : les matchs, les
-//     buteurs, les passeurs, et le lien vers son récap dans le Feed
+//     buteurs, les passeurs, et le lien vers son dimanche dans les Actus
 //
 // Tout est dérivé de la saison déjà en mémoire : la recherche ne charge rien,
 // elle filtre. Les résultats s'ouvrent sur place, sans changer de page.
@@ -16,7 +16,8 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, CalendarDays, Search, X } from "lucide-react";
+import { CalendarDays, Search, X } from "lucide-react";
+import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { ProfilJoueur } from "@/components/sfl/profil-joueur";
 import { useSeason } from "@/components/sfl/season-provider";
 import { CarteDe } from "@/components/sfl/mini-carte";
@@ -136,11 +137,12 @@ function FicheJournee({ journee }: { journee: Journee }) {
         ))
       )}
 
+      {/* Son dimanche dans les Actus. */}
       <Link
-        href="/ligue"
+        href={`/ligue#j${journee.j}`}
         className="bouton-principal block py-4 text-center text-[15px] font-bold"
       >
-        Ouvrir le récap dans la Ligue
+        Ouvrir le récap dans les Actus
       </Link>
     </motion.div>
   );
@@ -216,15 +218,14 @@ function Recherche() {
 
   return (
     <div className="shell flex flex-col gap-4 py-4 sm:py-8">
+      {/* Le retour de la page, et celui d'une fiche ouverte, qui revient à la Recherche. */}
       {fiche ? (
-        <button
-          onClick={close}
-          className="bouton-secondaire flex w-fit items-center gap-2 py-2 pr-4 pl-3 text-[13px] font-semibold"
-        >
-          <ArrowLeft className="size-4" /> Recherche
-        </button>
+        <BoutonRetour onRetour={close} titre="Recherche" />
       ) : (
-        <h1 className="text-[30px] font-bold tracking-tight">Recherche</h1>
+        <div className="flex items-center gap-3">
+          <BoutonRetour />
+          <h1 className="text-[30px] font-bold tracking-tight">Recherche</h1>
+        </div>
       )}
 
       {!fiche && (
