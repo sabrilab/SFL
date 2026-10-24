@@ -12,10 +12,12 @@
 //     principale (le fond), la secondaire (le motif), la troisième (le
 //     liseré et l'emblème) ;
 //   · un emblème au cœur : les initiales, une figure (étoile, ballon,
-//     couronne, éclair) ou, depuis le 24/10 au soir, un animal de club
-//     (cheval, lion, aigle, loup, taureau, coq ; Sabri : « il peut y avoir
-//     aussi des emblèmes, comme des animaux, un cheval »), les initiales
-//     sur un ruban dessous quand il y a la place (equipe/emblemes.ts).
+//     couronne, éclair), une forme (lune, anneau, losange, chevrons,
+//     bandes, delta, hexagone, damier ; Sabri, 24/10 : « mettre autre
+//     chose que des têtes de lion ou des animaux, comme des logos de
+//     forme ») ou un animal de club (cheval, lion, aigle, loup, taureau,
+//     coq), les initiales sur un ruban dessous quand il y a la place
+//     (equipe/emblemes.ts, dessinés sobres, en pièce découpée).
 // Le maillot (equipe/maillot.tsx) reprend tout : le corps dans la
 // principale, le même motif dans la secondaire, col et manches dans la
 // troisième, l'écusson sur le cœur. Jamais d'image importée (règles
@@ -29,7 +31,26 @@ import type { Fond } from "@/lib/sfl/equipes";
 
 export type Forme = "ecu" | "blason" | "rond" | "pointe" | "ovale";
 export type Motif = "uni" | "parti" | "coupe" | "tranche" | "rayures" | "bande" | "echarpe" | "chevron" | "cercle";
-export type Embleme = "initiales" | "etoile" | "ballon" | "couronne" | "eclair" | "cheval" | "lion" | "aigle" | "loup" | "taureau" | "coq";
+export type Embleme =
+  | "initiales"
+  | "etoile"
+  | "ballon"
+  | "couronne"
+  | "eclair"
+  | "lune"
+  | "anneau"
+  | "losange"
+  | "chevrons"
+  | "bandes"
+  | "delta"
+  | "hexagone"
+  | "damier"
+  | "cheval"
+  | "lion"
+  | "aigle"
+  | "loup"
+  | "taureau"
+  | "coq";
 
 export interface Blason {
   forme: Forme;
@@ -59,18 +80,27 @@ export const MOTIFS: { id: Motif; label: string }[] = [
   { id: "cercle", label: "Cerclé" },
 ];
 
-export const EMBLEMES: { id: Embleme; label: string }[] = [
-  { id: "initiales", label: "Initiales" },
-  { id: "etoile", label: "Étoile" },
-  { id: "ballon", label: "Ballon" },
-  { id: "couronne", label: "Couronne" },
-  { id: "eclair", label: "Éclair" },
-  { id: "cheval", label: "Cheval" },
-  { id: "lion", label: "Lion" },
-  { id: "aigle", label: "Aigle" },
-  { id: "loup", label: "Loup" },
-  { id: "taureau", label: "Taureau" },
-  { id: "coq", label: "Coq" },
+/** Les emblèmes, par famille : les signes (initiales, figures, formes) puis les animaux. */
+export const EMBLEMES: { id: Embleme; label: string; famille: "signe" | "animal" }[] = [
+  { id: "initiales", label: "Initiales", famille: "signe" },
+  { id: "etoile", label: "Étoile", famille: "signe" },
+  { id: "ballon", label: "Ballon", famille: "signe" },
+  { id: "couronne", label: "Couronne", famille: "signe" },
+  { id: "eclair", label: "Éclair", famille: "signe" },
+  { id: "lune", label: "Lune", famille: "signe" },
+  { id: "anneau", label: "Anneau", famille: "signe" },
+  { id: "losange", label: "Losange", famille: "signe" },
+  { id: "chevrons", label: "Chevrons", famille: "signe" },
+  { id: "bandes", label: "Bandes", famille: "signe" },
+  { id: "delta", label: "Delta", famille: "signe" },
+  { id: "hexagone", label: "Hexagone", famille: "signe" },
+  { id: "damier", label: "Damier", famille: "signe" },
+  { id: "cheval", label: "Cheval", famille: "animal" },
+  { id: "lion", label: "Lion", famille: "animal" },
+  { id: "aigle", label: "Aigle", famille: "animal" },
+  { id: "loup", label: "Loup", famille: "animal" },
+  { id: "taureau", label: "Taureau", famille: "animal" },
+  { id: "coq", label: "Coq", famille: "animal" },
 ];
 
 /** Les couleurs de club : celles qu'on trouve sur les maillots, rien de fluo. */
