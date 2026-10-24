@@ -19,24 +19,21 @@
 //     vue de profil, sa table, sa couronne et sa culasse, éclairée par le
 //     studio du joaillier (rendu.ts) : on la reconnaît même à 20 px, là où,
 //     vue d'en haut, elle ressemblait à un œil ;
-//   · la bulle est imprimée comme le reste de la carte, à son encre et sur
-//     son papier, comme l'étiquette, le sceau ou le microtexte : un filet,
-//     puis une ligne de microtexte qui en fait le tour en répétant le nom du
-//     badge (« PÉPITE D'OR · 1ER · SAISON 0 · », à lire de près, comme sur
-//     un billet), le titre au lettrage de l'app (Inter 900), le rang et la saison
-//     en mono dessous. Aucune couleur de métal dans la bulle : l'or, le bleu
-//     et le rouge sont aux cartes MVP, Défensive et Impact (Sabri, 24/10),
-//     seul l'objet porte son métal.
+//   · la bulle est un bouton plein, à l'encre de la carte, les lettres en
+//     réserve, rien autour : la v2 avait un filet et une ligne de microtexte
+//     autour, « un cachet d'avocat bizarre », « beaucoup de fioritures »
+//     (Sabri, 24/10). Le titre au lettrage de l'app (Inter 900 ; l'Anton du
+//     nom ne lui a pas plu), le rang et la saison dessous. Aucune couleur de
+//     métal dans la bulle : l'or, le bleu et le rouge sont aux cartes MVP,
+//     Défensive et Impact, seul l'objet porte son métal.
 // L'objet est posé au bout de la bulle, à la marge de la carte : la bulle
-// part de son centre, et sa ligne de microtexte commence sous lui (la
-// jointure ne se voit pas).
+// part de son centre.
 //
 // Sur la petite carte (carte-photo.tsx) et dans la feuille de choix, l'objet
 // est seul (ObjetBadge). Tout est peint, sans filtre CSS ni flou
 // d'arrière-plan dans la carte : html-to-image la capture telle quelle pour
 // la 3D, et attend l'image de l'objet (data-attente-3d, badge-3d.tsx).
 
-import { useId } from "react";
 import { metalBadge, Objet3D, objetBadge } from "@/components/sfl/badge-3d";
 import { EMBLEMES, EMBLEMES_SAISON } from "@/components/sfl/emblemes";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
@@ -44,7 +41,6 @@ import type { Objet } from "@/lib/sfl/badges-3d/objets";
 import { CLASSEMENTS, ordinal } from "@/lib/sfl/fin-de-saison";
 import { metal, NOM_METAL, TROPHEES, type TropheeId } from "@/lib/sfl/trophees";
 
-const MONO = "var(--font-jbmono), ui-monospace, monospace";
 
 /* ---------------------------------- L'objet ---------------------------------- */
 
@@ -181,23 +177,20 @@ function chasse(texte: string, l: Lettre): number {
 // Les cotes de la bulle, dans le repère de la carte (1024 × 1656).
 const R = 74; // la demi-boîte de l'objet : la bulle part de son centre
 const OBJET = 168; // la boîte de l'objet (avant son emprise)
-const H = 122; // la hauteur de la bulle
-const BORD = 2.5; // son filet
-const MICRO = 11.5; // la ligne de microtexte, depuis le bord
-const MICRO_FS = 8.6;
-const AVANT = R + 22; // du bord gauche de la bulle au texte
-const APRES = 34;
-const DETAIL = 23;
-const ECART = 9; // entre le titre et le détail
+const H = 110; // la hauteur de la bulle
+const AVANT = R + 24; // du bord gauche de la bulle au texte
+const APRES = 40;
+const DETAIL = 22;
+const ECART = 8; // entre le titre et le détail
 
 /**
- * La bulle de la grande carte. `u` met les cotes à l'écran, `x` est le bord
- * gauche de l'objet (la marge de la carte), `centre` sa hauteur, `fin` la
- * limite à droite (la colonne du nom commence après) ; `encre` et `sombre`
- * viennent de la matière de la carte (finitions-carte.ts). Le titre se
- * resserre s'il est trop long pour la place. La largeur est calculée, pas
- * mesurée : le tracé du microtexte en dépend, et la capture 3D le reprend tel
- * quel.
+ * La bulle de la grande carte : un bouton plein, à l'encre de la carte, les
+ * lettres en réserve (couleur du papier), rien autour (Sabri, 24/10 : « une
+ * espèce de bouton […] du minimalisme, sans truc autour »). `u` met les cotes
+ * à l'écran, `x` est le bord gauche de l'objet (la marge de la carte),
+ * `centre` sa hauteur, `fin` la limite à droite (la colonne du nom commence
+ * après) ; `encre` et `sombre` viennent de la matière de la carte
+ * (finitions-carte.ts). Le titre se resserre s'il est trop long pour la place.
  */
 export function BulleBadge({
   badge,
@@ -217,58 +210,36 @@ export function BulleBadge({
   encre: string;
   sombre: boolean;
 }) {
-  const id = `b${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
-  const ink = (a: number) => `rgba(${encre},${a})`;
+  const papier = (a: number) => (sombre ? `rgba(10,11,13,${a})` : `rgba(255,255,255,${a})`);
   const cx = x + R;
   const { titre, detail } = libelleInsigne(badge);
   const place = fin - cx - AVANT - APRES;
   const taille = Math.min(LETTRE.max, place / chasse(titre, LETTRE));
-  const texte = Math.max(chasse(titre, LETTRE) * taille, detail.length * (0.6 * DETAIL + 0.5));
+  const texte = Math.max(chasse(titre, LETTRE) * taille, detail.length * DETAIL * 0.56);
   const L = Math.min(fin - cx, AVANT + texte + APRES);
-
-  // La ligne de microtexte : partie de l'extrémité gauche (sous l'objet), elle
-  // fait le tour dans le sens des aiguilles d'une montre, et le nom s'y répète
-  // un nombre entier de fois.
-  const r = H / 2 - MICRO;
-  const trace = `M${MICRO} ${H / 2} A${r} ${r} 0 0 1 ${H / 2} ${MICRO} H${L - H / 2} A${r} ${r} 0 0 1 ${L - H / 2} ${H - MICRO} H${H / 2} A${r} ${r} 0 0 1 ${MICRO} ${H / 2} Z`;
-  const tour = 2 * (L - H) + 2 * Math.PI * r;
-  const motif = `${titre} · ${detail} · `.toUpperCase();
-  const fois = Math.max(1, Math.round(tour / (motif.length * MICRO_FS * 0.72)));
 
   return (
     <>
       <div
         role="img"
         aria-label={`Badge : ${nomInsigne(badge)}`}
-        style={{ position: "absolute", left: u(cx), top: u(centre - H / 2), width: u(L), height: u(H), pointerEvents: "none" }}
+        style={{
+          position: "absolute",
+          left: u(cx),
+          top: u(centre - H / 2),
+          width: u(L),
+          height: u(H),
+          borderRadius: u(H / 2),
+          background: `rgba(${encre},0.94)`,
+          pointerEvents: "none",
+        }}
       >
-        <svg aria-hidden viewBox={`0 0 ${L} ${H}`} width={u(L)} height={u(H)} style={{ position: "absolute", inset: 0, display: "block", overflow: "visible" }}>
-          <defs>
-            <path id={id} d={trace} />
-          </defs>
-          <rect
-            x={BORD / 2}
-            y={BORD / 2}
-            width={L - BORD}
-            height={H - BORD}
-            rx={(H - BORD) / 2}
-            fill={sombre ? "rgba(8,9,11,0.32)" : "rgba(255,255,255,0.5)"}
-            stroke={ink(0.55)}
-            strokeWidth={BORD}
-          />
-          <text fill={ink(0.42)} fontFamily={MONO} fontSize={MICRO_FS} fontWeight={600} dominantBaseline="central">
-            <textPath href={`#${id}`} xlinkHref={`#${id}`} textLength={tour - 2} lengthAdjust="spacing">
-              {motif.repeat(fois)}
-            </textPath>
-          </text>
-        </svg>
         <div
           aria-hidden
           style={{
             position: "absolute",
             left: u(AVANT),
-            // Un peu plus bas que le milieu : l'accent des capitales dépasse en haut.
-            top: u(5),
+            top: u(3),
             bottom: 0,
             display: "flex",
             flexDirection: "column",
@@ -285,13 +256,13 @@ export function BulleBadge({
               fontSize: u(taille),
               lineHeight: LETTRE.hauteur,
               letterSpacing: `${LETTRE.pas}em`,
-              color: ink(0.94),
+              color: papier(1),
               textTransform: "uppercase",
             }}
           >
             {titre}
           </span>
-          <span style={{ fontFamily: MONO, fontSize: u(DETAIL), fontWeight: 600, lineHeight: 1, letterSpacing: u(0.5), color: ink(0.62) }}>{detail}</span>
+          <span style={{ fontFamily: LETTRE.famille, fontSize: u(DETAIL), fontWeight: 600, lineHeight: 1, color: papier(0.62) }}>{detail}</span>
         </div>
       </div>
       <span aria-hidden className="pointer-events-none absolute" style={{ left: u(cx - OBJET / 2), top: u(centre - OBJET / 2), width: u(OBJET), height: u(OBJET) }}>
