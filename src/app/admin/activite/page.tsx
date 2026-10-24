@@ -11,7 +11,8 @@
 // relancer. Sous les courbes, les repères de ce que l'app a fait chaque jour
 // (journées, matchs, notifications, mises en ligne), et « Qui ramène du
 // monde » : ./lectures.ts lit leurs tables (24/10). En
-// dessous, le parrainage vers 500 joueurs (./parrainage.tsx), les sujets de
+// dessous, les vidéos de Bola (./videos.tsx : les poser, les publier, qui
+// les regarde), le parrainage vers 500 joueurs (./parrainage.tsx), les sujets de
 // Bola Agent (./agent.tsx), sans le contenu, puis les accords à la politique
 // de confidentialité (./confidentialite.tsx).
 // Rien n'est agrégé en base, donc rien à maintenir quand on ajoute un type
@@ -30,6 +31,7 @@ import { AgentStats } from "./agent";
 import { AccordsStats } from "./confidentialite";
 import { assemblerReperes, lireReperes } from "./lectures";
 import { ParrainageStats } from "./parrainage";
+import { VideosStats } from "./videos";
 import { ActiviteVue, type DonneesActivite } from "./vue";
 
 /** Lignes rendues au plus par une requête au serveur (réglage Supabase). */
@@ -185,6 +187,7 @@ export default function ActivitePage() {
       error={error}
       pied={(public_, admins) => (
         <>
+          <VideosStats public={public_} admins={admins} />
           <ParrainageStats />
           <AgentStats public={public_} admins={admins} />
           <AccordsStats public={public_} admins={admins} />

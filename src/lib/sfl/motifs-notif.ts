@@ -73,6 +73,8 @@ export const MOTIFS_NOTIF = {
   divisions: { famille: "ligue", label: "L'annonce des divisions", effet: null },
   // La veille de chaque dimanche de l'arc 1 : « J4 · La journée de Miken » (lib/sfl/outsiders.ts).
   outsider: { famille: "ligue", label: "La journée de l'outsider", effet: null },
+  // Une nouvelle vidéo dans les Actus, lancée par l'admin (lib/sfl/videos.ts).
+  video: { famille: "ligue", label: "Une nouvelle vidéo", effet: "a regardé la vidéo" },
 
   annonce: { famille: "annonce", label: "Annonce à toute la ligue", effet: null },
 } as const satisfies Record<string, DefMotif>;

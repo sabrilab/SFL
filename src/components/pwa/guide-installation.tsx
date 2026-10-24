@@ -85,7 +85,7 @@ export function GuideInstallation() {
   // stockage à part : le code du parrain serait perdu. Le compte se crée
   // d'abord ici, le guide revient ensuite sur l'app. Sortir d'une app
   // (Snapchat…) reste proposé : l'adresse garde le code.
-  if (!env.appHote && (pathname?.startsWith("/p/") || (pathname?.startsWith("/inscription") && /[?&]parrain=/.test(window.location.search))))
+  if (!env.appHote && (pathname?.startsWith("/p/") || pathname?.startsWith("/v/") || (pathname?.startsWith("/inscription") && /[?&]parrain=/.test(window.location.search))))
     return null;
   if (lire(() => sessionStorage, CLE_PLUS_TARD)) return null;
   // « C'est fait » ne vaut que dans un vrai navigateur : depuis Snapchat,

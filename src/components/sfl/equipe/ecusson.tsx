@@ -14,9 +14,10 @@
 //   · un champ d'émail, la forme et son motif, bombé (un reflet en haut, plus
 //     sombre en bas), où le cerclage pose son ombre ; un guilloché en soleil
 //     quand l'écusson est grand ;
-//   · l'emblème en relief (equipe/emblemes.ts : les animaux et les figures,
-//     taillés en facettes) : son ombre portée, son arête claire, son métal,
-//     ses facettes d'ombre et de lumière ;
+//   · l'emblème en relief (equipe/emblemes.ts : figures, formes et animaux,
+//     une pièce de métal découpée, sobre, depuis le 24/10 au soir) : son
+//     ombre portée, son arête claire, son métal, ses jours où l'on voit le
+//     champ au travers ;
 //   · sous une figure, les initiales sur un ruban de métal, quand on peut
 //     les lire (56 px et plus) ; seules, les initiales sont frappées au
 //     cœur, en Anton (« les cartes et les écussons gardent leurs lettres »).
@@ -210,17 +211,16 @@ export function Ecusson({
       {dessin ? (
         <>
           <g transform={ruban ? "translate(50 44.5) scale(0.8) translate(-50 -52)" : undefined}>
-            <clipPath id={`${id}-s`}>
-              <path d={dessin.d} />
-            </clipPath>
-            {relief(<path d={dessin.d} />)}
-            {detail && <path d={dessin.d} fill="none" stroke={me.sombre} strokeWidth={0.7} strokeLinejoin="round" />}
-            <g clipPath={`url(#${id}-s)`}>
-              {dessin.facettes?.map((f, i) => (
-                <path key={i} d={f.d} fillRule="evenodd" fill={f.ton > 0 ? me.reflet : me.sombre} opacity={f.ton > 0 ? 0.5 : 0.55} />
-              ))}
-              {dessin.creux && <path d={dessin.creux} fill={me.sombre} fillRule="evenodd" />}
-            </g>
+            {relief(<path d={dessin.d} fillRule="evenodd" />)}
+            {detail && <path d={dessin.d} fill="none" stroke={me.sombre} strokeWidth={0.6} strokeLinejoin="round" />}
+            {dessin.creux && (
+              <>
+                <clipPath id={`${id}-s`}>
+                  <path d={dessin.d} clipRule="evenodd" />
+                </clipPath>
+                <path d={dessin.creux} clipPath={`url(#${id}-s)`} fill={me.sombre} fillRule="evenodd" />
+              </>
+            )}
           </g>
           {ruban && (
             <g>

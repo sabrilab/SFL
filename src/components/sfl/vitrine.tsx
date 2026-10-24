@@ -1068,7 +1068,7 @@ export function NouveauxBadges() {
       if (!vus) {
         toast(`Tu as ${nouveaux.length} badge${nouveaux.length > 1 ? "s" : ""}`, {
           description: "Ils t'attendent dans Ma carte.",
-          action: { label: "Voir", onClick: () => (window.location.href = "/profil#badges") },
+          action: { label: "Voir", onClick: () => (window.location.href = "/profil/badges") },
         });
         return;
       }
@@ -1079,7 +1079,7 @@ export function NouveauxBadges() {
         if (!def || !m) continue;
         toast.success(`Nouveau badge · ${def.nom} ${NOM_METAL[m]}`, {
           description: def.inscription,
-          action: { label: "Voir", onClick: () => (window.location.href = "/profil#badges") },
+          action: { label: "Voir", onClick: () => (window.location.href = "/profil/badges") },
         });
       }
     }, 2500);

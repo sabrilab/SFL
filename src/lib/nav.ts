@@ -68,6 +68,12 @@ const REGLAGES: Parent = { href: "/reglages", titre: "Réglages" };
 
 /** Les pages enfants, de la plus précise à la plus large (la première qui va l'emporte). */
 const PARENTS: [string, Parent][] = [
+  // Les rubriques de Ma carte, chacune en grand (ma-carte/rubriques.tsx).
+  ["/profil/saison", MA_CARTE],
+  ["/profil/xp", MA_CARTE],
+  ["/profil/evolution", MA_CARTE],
+  ["/profil/badges", MA_CARTE],
+  ["/profil/cartes", MA_CARTE],
   ["/reglages", MA_CARTE],
   ["/collection", MA_CARTE],
   ["/carte", MA_CARTE],
@@ -77,6 +83,7 @@ const PARENTS: [string, Parent][] = [
   ["/admin/activite", MA_CARTE],
   ["/admin", REGLAGES],
   ["/ligue/journee", { href: "/ligue", titre: "Actus" }],
+  ["/ligue/contrats", { href: "/ligue", titre: "Actus" }],
   ["/discussions", { href: "/vestiaire", titre: "Vestiaire" }],
   ["/recherche", { href: "/", titre: "Map" }],
 ];
@@ -89,11 +96,17 @@ export function parentDe(pathname: string): Parent | null {
 /** Le nom d'une page, pour dire où mène un retour. */
 const TITRES: [string, string][] = [
   ["/ligue/journee", "Récap"],
+  ["/ligue/contrats", "Contrats en jeu"],
   ["/ligue-vierge", "Bola"],
   ["/ligue", "Actus"],
   ["/bola-team", "Bola Team"],
   ["/palmares", "Wall of Fame"],
   ["/saisons", "Saison"],
+  ["/profil/saison", "Ma saison"],
+  ["/profil/xp", "Niveau XP"],
+  ["/profil/evolution", "Évolution"],
+  ["/profil/badges", "Badges"],
+  ["/profil/cartes", "Mes cartes"],
   ["/profil", "Ma carte"],
   ["/reglages", "Réglages"],
   ["/collection", "Collection"],

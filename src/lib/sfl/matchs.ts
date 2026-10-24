@@ -395,7 +395,16 @@ export interface Dispo {
   moment: Moment;
 }
 
+/**
+ * Les disponibilités sont cachées (Sabri, 24/10) : ni « Mes dispos » dans le
+ * menu de la Map, ni l'onglet « Libres » quand on invite, ni le moment que la
+ * Map propose d'après elles. Rien n'est effacé : la table et le code restent,
+ * et repasser ce drapeau à true ramène tout.
+ */
+export const DISPOS_AFFICHEES = false;
+
 export async function listerDispos(du: string, au: string): Promise<Dispo[]> {
+  if (!DISPOS_AFFICHEES) return [];
   const { data, error } = await supabase()
     .from("disponibilites")
     .select("player_id, jour, moment, profiles ( name )")
