@@ -103,7 +103,7 @@ export interface HabillageCarte {
 export type EditionEpoque = "s0" | "s0-mvp" | "s0-impact" | "s0-def";
 
 /** Les matières : les quatre éditions, les finitions, l'ancienne rare, et les éditions d'époque. */
-export type NomMatiere = EditionCarte | Finition | "rare" | EditionEpoque;
+export type NomMatiere = EditionCarte | Finition | "rare" | EditionEpoque | "arbitre";
 
 /** Le motif gravé d'une matière (motif-carte.tsx le dessine). */
 export type Motif =
@@ -116,6 +116,8 @@ export type Motif =
   | { type: "pinceau"; cx: number; cy: number; noir: string }
   /** Les particules des cartes Boost de la saison 0. */
   | { type: "particules" }
+  /** Les fines rayures de la tenue, sur la carte d'arbitre. */
+  | { type: "tenue" }
   | MotifPasse;
 
 /**
@@ -449,6 +451,37 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
     vive: "#c8cbd2",
     tranche: { couleur: "#15161a", metal: 0.85, rugosite: 0.2 },
     holo: { force: 0.38, teinte: [0.86, 0.9, 1] },
+  },
+  // L'arbitre (Sabri, 24/10 : « une carte d'arbitre ») : le tissu noir mat
+  // de sa tenue et ses fines rayures, l'encre blanche, l'étiquette ARBITRE
+  // pleine, comme un brassard. Noir et blanc seulement : ni or, ni bleu, ni
+  // rouge (réservés aux cartes à titre). Mate, à l'opposé de l'onyx poli.
+  arbitre: {
+    nom: "arbitre",
+    titre: "ARBITRE",
+    encre: "240,240,236",
+    sombre: true,
+    papier: [
+      "radial-gradient(90% 55% at 50% 30%, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 70%)",
+      "linear-gradient(160deg, #2b2c30 0%, #1c1d20 55%, #121315 100%)",
+    ].join(", "),
+    motif: { type: "tenue", clair: "rgba(255,255,255,0.07)", fonce: "rgba(0,0,0,0.38)" },
+    fond: "#1a1b1e",
+    lueur: "rgba(255,255,255,0.08)",
+    rayures: 0.04,
+    micro: 0.05,
+    reflet: 0.1,
+    coins: 0.7,
+    etiquette: { fond: "#f0f0ec", bord: "#f0f0ec", texte: "#08090b" },
+    symbole: "/bola/symbole-blanc.svg",
+    rebord: { lumiere: "rgba(255,255,255,0.24)", ombre: "rgba(0,0,0,0.72)" },
+    puce: "linear-gradient(135deg, #f3f3f1, #b9bab5 45%, #e6e6e3 70%, #a7a8a3)",
+    cadre: "linear-gradient(152deg, #34353a 0%, #16171a 45%, #222327 70%, #0b0c0e 100%)",
+    voile: "rgba(6,6,8,0.84)",
+    onglet: { fond: "#f0f0ec", encre: "#08090b" },
+    vive: "#e8e8e4",
+    tranche: { couleur: "#1d1e21", metal: 0.15, rugosite: 0.75 },
+    holo: { force: 0.2, teinte: [0.92, 0.93, 0.96] },
   },
   // Saison 0, la carte de saison : la « Standard parchemin » du 12/07. Le
   // papier crème, ses coups de pinceau derrière la note et le nom.

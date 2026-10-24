@@ -70,6 +70,7 @@ import {
 import { buildQuiz, PronosticModule, QuizModule } from "@/components/sfl/feed/jeux";
 import { NEXT_MATCH } from "@/lib/sfl/data";
 import { Reveal } from "@/components/sfl/feed/reveal";
+import { ArbitresDuMatch } from "@/components/sfl/feed/arbitre-du-match";
 import { PitchSynthese } from "@/components/sfl/feed/pitch-synthese";
 import { LaUne } from "@/components/sfl/feed/la-une";
 import type { Piece } from "@/lib/sfl/vestiaire";
@@ -464,6 +465,9 @@ function JourneeRecapComplet({ j }: { j: number }) {
       <Reveal delay={0.14}>
         <ReactionRow id={`j${lastJ.j}-match`} className="-mt-2 px-1" />
       </Reveal>
+
+      {/* 4 bis · L'arbitre de chaque match, et la note des joueurs du match */}
+      <ArbitresDuMatch j={lastJ.j} />
 
       {/* 5 · Le visuel de la journée — story 9:16 */}
       {big && (

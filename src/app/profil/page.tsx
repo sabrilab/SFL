@@ -42,6 +42,9 @@
 // Le 22/10 (Sabri) : le profil de jeu (le radar) part sur le profil d'un
 // joueur dans Recherche ; « Cartes de match » disparaît, les cartes gagnées
 // sont ici, dans « Mes cartes » ; l'Arène n'est plus que la Collection.
+//
+// Un arbitre (lib/sfl/arbitres, Sabri, 24/10) a sa page à lui :
+// profil-arbitre.tsx, sa carte d'arbitre et ses matchs.
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -61,6 +64,8 @@ import { ChoixBadge } from "@/components/sfl/choix-badge";
 import { PersonnaliserCarte } from "@/components/sfl/personnaliser-carte";
 import { CarteOfficielle } from "@/components/sfl/carte-officielle";
 import { useMyPlayer } from "@/components/sfl/player-provider";
+import { ProfilArbitre } from "@/components/sfl/profil-arbitre";
+import { useArbitres } from "@/hooks/use-arbitres";
 import { useSeason } from "@/components/sfl/season-provider";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import { useGrandEcran, useTresGrandEcran } from "@/hooks/use-media-query";
@@ -109,6 +114,14 @@ function AvatarPhoto({ name }: { name: string }) {
 }
 
 export default function Profil() {
+  const { player } = useMyPlayer();
+  const arbitres = useArbitres();
+  // Un arbitre ne joue pas : sa page est celle de sa carte d'arbitre.
+  if (arbitres.estArbitre(player.name)) return <ProfilArbitre nom={player.name} />;
+  return <ProfilJoueurPage />;
+}
+
+function ProfilJoueurPage() {
   const { player } = useMyPlayer();
   const { allPlayers, saison } = useSeason();
   const division = useDivision(player.name);

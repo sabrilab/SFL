@@ -22,7 +22,9 @@
 //     hachés vers les bords, des manques au milieu, des bouts qui
 //     s'effilent) : du SVG sans filtre, que la capture de la 3D prend sur
 //     iPhone, et un coup de pinceau propre à chaque carte ;
-//   · particules : les étincelles d'énergie des cartes Boost de la saison 0.
+//   · particules : les étincelles d'énergie des cartes Boost de la saison 0 ;
+//   · tenue : les fines rayures de la carte d'arbitre, comme le tissu d'une
+//     tenue d'arbitre, un fil sur trois plus marqué.
 // Et la rosace guillochée du dos (RosaceBola), comme sur un billet. Les
 // motifs des skins du Passe Bola sont dans motifs-passe.tsx.
 
@@ -264,6 +266,31 @@ export function MotifCarte({
             </g>
           ))}
         </g>
+      </svg>
+    );
+  }
+
+  if (motif.type === "tenue") {
+    // Un fil tous les 18, le troisième plus marqué : une tuile de 54 répétée.
+    const fils = (dx: number, fort: string, fin: string, l: number) => (
+      <>
+        {[0, 18, 36].map((x, i) => (
+          <rect key={x} x={x + dx} y={0} width={i === 0 ? l * 1.6 : l} height={H} fill={i === 0 ? fort : fin} />
+        ))}
+      </>
+    );
+    return (
+      <svg aria-hidden viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={style}>
+        <defs>
+          <pattern id={`ten-o-${id}`} width={54} height={H} patternUnits="userSpaceOnUse" x={W / 2 + 3} y={0}>
+            {fils(0, motif.fonce, motif.fonce, 2.4)}
+          </pattern>
+          <pattern id={`ten-c-${id}`} width={54} height={H} patternUnits="userSpaceOnUse" x={W / 2} y={0}>
+            {fils(0, motif.clair, motif.clair.replace(/[\d.]+\)$/, (a) => `${Number.parseFloat(a) * 0.55})`), 1.8)}
+          </pattern>
+        </defs>
+        <rect width={W} height={H} fill={`url(#ten-o-${id})`} />
+        <rect width={W} height={H} fill={`url(#ten-c-${id})`} />
       </svg>
     );
   }

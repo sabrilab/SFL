@@ -71,6 +71,7 @@ import { Saisons } from "@/components/sfl/admin/saisons";
 import { Inscriptions } from "@/components/sfl/admin/inscriptions";
 import { AccesJoueur } from "@/components/sfl/admin/acces-joueur";
 import { RechercheJoueur } from "@/components/sfl/admin/recherche-joueur";
+import { ArbitresAdmin } from "@/components/sfl/admin/arbitres";
 import { chercherJoueurs } from "@/lib/sfl/recherche-joueur";
 import { useSession } from "@/hooks/use-session";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
@@ -704,6 +705,7 @@ export function AdminDashboard() {
 
         {/* ===================== JOUEURS (effectif) ===================== */}
         <TabsContent value="joueurs" className="mt-4 flex flex-col gap-3">
+          <ArbitresAdmin />
           <Requalification saison={saison} onCommit={commit} />
           <DetailPoints saison={saison} />
           <div className="flex items-center justify-between gap-3 px-1">

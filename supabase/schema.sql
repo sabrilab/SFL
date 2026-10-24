@@ -4756,3 +4756,178 @@ exception
   when undefined_object then null;
 end;
 $$;
+
+-- ───────────────────────────── Les arbitres ─────────────────────────────
+-- Sabri, 24/10 : « un nouveau type d'utilisateur qui ne serait pas des
+-- joueurs, mais des arbitres, avec une carte d'arbitre […] et des stats
+-- associées : le nombre de matchs arbitrés. […] chaque joueur du match
+-- puisse mettre une note de satisfaction à l'arbitre, et ça apparaît sur sa
+-- carte au lieu de son score de joueur. »
+--
+-- Un arbitre a un compte comme tout le monde (il se connecte, il a sa
+-- photo), mais il ne joue pas : l'app le retire de toutes les listes de
+-- joueurs (hidden.ts) et lui montre sa carte d'arbitre. Tout vit ici, HORS
+-- du document de la saison : une publication de la saison, qui remplace le
+-- document entier, ne peut ni effacer un arbitrage ni une note.
+--   · profiles.arbitre : posé par l'admin seul (poser_arbitre) ;
+--   · arbitrages : qui arbitre quel match d'une journée (saison, j, n = la
+--     place du match dans la journée, 0 pour le Match 1), et les deux
+--     équipes de ce match, recopiées au moment du choix ;
+--   · avis_arbitre : la note de 1 à 5 de chaque joueur du match. Chacun ne
+--     lit que la sienne ; la ligue et l'arbitre ne voient que les totaux
+--     (avis_des_arbitrages), pour que la note reste franche.
+alter table public.profiles add column if not exists arbitre boolean not null default false;
+
+create or replace function public.poser_arbitre(p_profil uuid, p_arbitre boolean)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_league_admin() then
+    raise exception 'Réservé à l''admin.' using errcode = '42501';
+  end if;
+  update public.profiles set arbitre = p_arbitre where id = p_profil;
+  if not found then
+    return false;
+  end if;
+  if not p_arbitre then
+    delete from public.arbitrages where arbitre_id = p_profil;
+  end if;
+  return true;
+end;
+$$;
+
+create table if not exists public.arbitrages (
+  id         bigint generated always as identity primary key,
+  saison     integer not null,
+  j          integer not null check (j > 0),
+  n          integer not null check (n between 0 and 30),
+  arbitre_id uuid    not null references public.profiles(id) on delete cascade,
+  equipes    text[]  not null default '{}',
+  cree_le    timestamptz not null default now(),
+  unique (saison, j, n)
+);
+
+alter table public.arbitrages enable row level security;
+
+drop policy if exists "arbitrages: la ligue lit tout" on public.arbitrages;
+create policy "arbitrages: la ligue lit tout"
+  on public.arbitrages for select
+  to authenticated
+  using ((select public.est_membre()));
+
+drop policy if exists "arbitrages: l'admin les pose" on public.arbitrages;
+create policy "arbitrages: l'admin les pose"
+  on public.arbitrages for all
+  to authenticated
+  using ((select public.is_league_admin()))
+  with check ((select public.is_league_admin()));
+
+revoke all on public.arbitrages from anon, authenticated;
+grant select, insert, update, delete on public.arbitrages to authenticated;
+
+create table if not exists public.avis_arbitre (
+  arbitrage_id bigint   not null references public.arbitrages(id) on delete cascade,
+  joueur_id    uuid     not null references public.profiles(id) on delete cascade,
+  note         smallint not null check (note between 1 and 5),
+  le           timestamptz not null default now(),
+  primary key (arbitrage_id, joueur_id)
+);
+
+alter table public.avis_arbitre enable row level security;
+
+drop policy if exists "avis_arbitre: chacun lit le sien" on public.avis_arbitre;
+create policy "avis_arbitre: chacun lit le sien"
+  on public.avis_arbitre for select
+  to authenticated
+  using (joueur_id = (select auth.uid()));
+
+revoke all on public.avis_arbitre from anon, authenticated;
+grant select on public.avis_arbitre to authenticated;
+
+-- Noter l'arbitre de son match : la seule porte d'écriture. La base vérifie
+-- que l'appelant a joué CE match (sa ligne de la journée, présent, avec un
+-- résultat, dans l'une des deux équipes de l'arbitrage), dans la saison en
+-- cours ; l'arbitre ne se note pas. On peut changer sa note.
+create or replace function public.noter_arbitre(p_arbitrage bigint, p_note integer)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_nom text := public.mon_nom();
+  a     public.arbitrages;
+  v_num integer;
+begin
+  if not public.est_membre() or v_nom is null then
+    raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
+  end if;
+  if p_note is null or p_note < 1 or p_note > 5 then
+    raise exception 'Une note de 1 à 5.' using errcode = '22023';
+  end if;
+  select * into a from public.arbitrages where id = p_arbitrage;
+  if not found then
+    raise exception 'Match inconnu.' using errcode = '22023';
+  end if;
+  if a.arbitre_id = (select auth.uid()) then
+    raise exception 'L''arbitre ne se note pas.' using errcode = '42501';
+  end if;
+  select coalesce((s.data ->> 'numero')::integer, 0) into v_num from public.saison s where s.id = 1;
+  if v_num is distinct from a.saison or not exists (
+    select 1
+    from public.saison s, jsonb_array_elements(s.data -> 'entries') e
+    where s.id = 1
+      and (e ->> 'j')::integer = a.j
+      and lower(e ->> 'player') = lower(v_nom)
+      and e ->> 'statut' = 'Présent'
+      and coalesce(e ->> 'result', '') <> ''
+      and coalesce((e ->> 'extraTime')::boolean, false) = false
+      and (cardinality(a.equipes) = 0 or e ->> 'team' = any (a.equipes))
+  ) then
+    raise exception 'Seuls les joueurs du match notent son arbitre.' using errcode = '42501';
+  end if;
+  insert into public.avis_arbitre (arbitrage_id, joueur_id, note, le)
+  values (p_arbitrage, (select auth.uid()), p_note, now())
+  on conflict (arbitrage_id, joueur_id) do update set note = excluded.note, le = excluded.le;
+  return true;
+end;
+$$;
+
+revoke execute on function public.noter_arbitre(bigint, integer) from public, anon;
+grant execute on function public.noter_arbitre(bigint, integer) to authenticated;
+
+-- Les totaux de chaque arbitrage : combien de notes, leur somme, combien de
+-- 5 sur 5. Jamais qui a mis quoi.
+create or replace function public.avis_des_arbitrages()
+returns table (arbitrage_id bigint, avis integer, total integer, cinq integer)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select v.arbitrage_id, count(*)::integer, sum(v.note)::integer, count(*) filter (where v.note = 5)::integer
+  from public.avis_arbitre v
+  where public.est_membre()
+  group by v.arbitrage_id;
+$$;
+
+revoke execute on function public.avis_des_arbitrages() from public, anon;
+grant execute on function public.avis_des_arbitrages() to authenticated;
+
+revoke execute on function public.poser_arbitre(uuid, boolean) from public, anon;
+grant execute on function public.poser_arbitre(uuid, boolean) to authenticated;
+
+-- Une fois : Fabio, le premier arbitre de la ligue (Sabri, 24/10 : « Et tu
+-- peux le faire pour Fabio »). Ensuite, c'est l'admin qui décide (Admin →
+-- Arbitres), et le schéma rejoué ne revient pas sur son choix.
+do $$
+begin
+  if not exists (select 1 from public.etapes_uniques where etape = 'arbitre-fabio-2026-10') then
+    update public.profiles set arbitre = true where id = '7a459cee-1e12-480f-9937-6298f1d7558e';
+    insert into public.etapes_uniques (etape) values ('arbitre-fabio-2026-10');
+  end if;
+end;
+$$;
