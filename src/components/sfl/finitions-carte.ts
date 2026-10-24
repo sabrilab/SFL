@@ -24,27 +24,42 @@
 //   · MVP, l'or : des rayons qui partent du portrait, la gloire ;
 //   · Impact, le rouge : des ondes de choc autour de la note ;
 //   · Défensive, le bleu : des alvéoles, la cotte de mailles ;
-//   · nuit (passe, palier 4) : un ciel de nuit étoilé, l'encre d'argent ;
+//   · nuit (Passe Bola, palier 5) : un ciel de nuit étoilé, l'encre d'argent ;
 //   · chrome (palier 10) : un miroir, des reflets francs ;
-//   · animée (palier 16) : la nacre irisée, et la lumière qui passe ;
+//   · animée (palier 15) : la nacre irisée, et la lumière qui passe ;
 //   · onyx (offerte, finitions-offertes.ts ; la première, à la carte de
 //     Sabri, 24/10 : « une espèce de skin noir ultra stylé ») : la pierre
 //     noire polie, ses bandes ondulées gravées comme un guilloché, l'encre
 //     d'argent, une tranche de métal noir et un reflet d'argent quand on la
-//     tourne.
+//     tourne ; palier 16 du Passe Bola ;
+//   · les skins du Passe Bola (lib/sfl/passe.ts, 24/10), dans
+//     skins-passe.ts et motifs-passe.tsx : givre, carbone, marbre, tes
+//     couleurs (le pays choisi, HabillageCarte.pays), néon, aurore, ki et
+//     météorite ; sans or, sans bleu, sans rouge, qui restent aux cartes à
+//     titre (Sabri, 24/10).
 // Toutes les cotes sont dans le repère de la carte (1024 × 1656).
+
+import {
+  MATIERES_PASSE,
+  matiereCouleurs,
+  PAYS_PAR_DEFAUT,
+  type FinitionPasse,
+  type MotifPasse,
+} from "@/components/sfl/skins-passe";
 
 /** L'édition d'une carte : la carte de saison, ou une carte à titre. */
 export type EditionCarte = "base" | "mvp" | "impact" | "def";
 
 /** Les finitions de la passe, ou offertes : elles habillent la carte de saison. */
-export type Finition = "nuit" | "chrome" | "animee" | "onyx";
+export type Finition = "nuit" | "chrome" | "animee" | "onyx" | FinitionPasse;
 
 /** Le traitement de la photo, sans IA. */
 export type Traitement = "argentique" | "gravure" | "marbre";
 
 /** Les signes distinctifs, à poser en plus. */
-export type Signe = "lisere-argent" | "lisere-or" | "sceau" | "puce-or" | "nom-grave";
+// Sans or depuis le 24/10 (Sabri : l'or, le bleu et le rouge restent aux cartes à titre) : le liseré
+// or est devenu le double liseré platine, la puce dorée la puce noire.
+export type Signe = "lisere-argent" | "lisere-platine" | "sceau" | "puce-noire" | "nom-grave";
 
 /** Le rang du joueur selon son XP, aux couleurs des rangs de mission. */
 export type RangCarte = "B" | "A" | "S";
@@ -56,6 +71,8 @@ export type RangCarte = "B" | "A" | "S";
  */
 export interface HabillageCarte {
   finition?: Finition;
+  /** « Tes couleurs » : le pays choisi (COULEURS_PAYS, skins-passe.ts). */
+  pays?: string;
   traitement?: Traitement;
   signes?: Signe[];
   /** Le cadre, construit coin par coin : de 0 (rien) à 4 (complet). */
@@ -72,7 +89,8 @@ export type Motif =
   | { type: "ondes"; cx: number; cy: number }
   | { type: "alveoles"; cote: number }
   | { type: "etoiles" }
-  | { type: "guilloche" };
+  | { type: "guilloche" }
+  | MotifPasse;
 
 export interface Matiere {
   nom: NomMatiere;
@@ -378,6 +396,10 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
     tranche: { couleur: "#15161a", metal: 0.85, rugosite: 0.2 },
     holo: { force: 0.38, teinte: [0.86, 0.9, 1] },
   },
+  // Les skins du Passe Bola (skins-passe.ts) ; « Tes couleurs » au pays par
+  // défaut, celui du joueur passe par matiereDe.
+  ...MATIERES_PASSE,
+  couleurs: matiereCouleurs(PAYS_PAR_DEFAUT),
 };
 
 /**
@@ -385,8 +407,15 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
  * finition que le joueur porte.
  */
 export function matiereDe(edition: EditionCarte | "rare", habillage?: HabillageCarte): Matiere {
-  if (edition === "base" && habillage?.finition) return MATIERES[habillage.finition];
+  if (edition === "base" && habillage?.finition)
+    return habillage.finition === "couleurs" ? matiereCouleurs(habillage.pays) : MATIERES[habillage.finition];
   return MATIERES[edition];
+}
+
+/** La matière d'un nom (data-matiere, que lit la 3D), « Tes couleurs » au pays de l'habillage ; null si inconnu. */
+export function matiereDuNom(nom: string, habillage?: HabillageCarte): Matiere | null {
+  if (nom === "couleurs") return matiereCouleurs(habillage?.pays);
+  return nom in MATIERES ? MATIERES[nom as NomMatiere] : null;
 }
 
 /** Un entier stable tiré d'un texte (la même carte garde le même microtexte et le même numéro). */
@@ -406,11 +435,13 @@ export function serieDe(nom: string): { serie: string; numero: string } {
 export const METAUX = {
   argent: ["#ffffff", "#c9ccd2", "#8a9099", "#eef0f3", "#a3a8b0"],
   or: ["#fff4cc", "#e7c46a", "#a8761f", "#f6dc92", "#b98a2c"],
+  /** Le platine : plus blanc et plus froid que l'argent ; le liseré platine est double. */
+  platine: ["#ffffff", "#eceef2", "#b6bac2", "#ffffff", "#d3d6dc"],
 } as const;
 export type Metal = keyof typeof METAUX;
 
-/** La puce dorée (signe « puce-or »). */
-export const PUCE_OR = "linear-gradient(135deg, #fff2c6, #d1a03a 45%, #f3dc98 70%, #9c6f1e)";
+/** La puce noire (signe « puce-noire ») : du noir laqué, ses contacts en argent. */
+export const PUCE_NOIRE = "linear-gradient(135deg, #4a4b51, #0c0c0e 42%, #2b2c31 68%, #050506)";
 
 /**
  * Les couleurs des rangs, recopiées de actus/missions.css (.fiche--S, --A,
@@ -423,10 +454,10 @@ export const RANGS: Record<RangCarte, { lueur: string; feu: string; sombre: stri
   B: { lueur: "222,227,236", feu: "246,248,252", sombre: "#3d434d" },
 };
 
-/** Le liseré porté : l'or remplace l'argent. */
+/** Le liseré porté : le platine (double) remplace l'argent. */
 export function lisereDe(habillage?: HabillageCarte): Metal | null {
   const s = habillage?.signes ?? [];
-  return s.includes("lisere-or") ? "or" : s.includes("lisere-argent") ? "argent" : null;
+  return s.includes("lisere-platine") ? "platine" : s.includes("lisere-argent") ? "argent" : null;
 }
 
 /** Les initiales du sceau : la première lettre des deux premiers mots du nom. */

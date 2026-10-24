@@ -50,9 +50,9 @@
 // deux bouts, pour rester loin des coins arrondis.
 //
 // L'habillage (habillage-carte.tsx, ce que le joueur porte de la passe) : la
-// photo traitée (argentique, gravure, marbre), le liseré d'argent ou d'or
+// photo traitée (argentique, gravure, marbre), le liseré d'argent ou platine
 // autour du portrait et ses coins un par cran, le sceau sur la photo, la
-// puce dorée, son nom gravé dans le microtexte, l'insigne de son rang après
+// puce noire, son nom gravé dans le microtexte, l'insigne de son rang après
 // l'étiquette. `data-habillage` le redit au dos de la 3D.
 //
 // Mêmes calques que la carte éditoriale (`data-card-part` body / player /
@@ -68,7 +68,7 @@ import {
   matiereDe,
   microtexte,
   microtexteGrave,
-  PUCE_OR,
+  PUCE_NOIRE,
   RAYON_CARTE,
   RAYON_PORTRAIT,
   serieDe,
@@ -395,6 +395,9 @@ export function BolaCard({
   };
   // L'habillage porté (habillage-carte.tsx).
   const signes = habillage?.signes ?? [];
+  // La puce noire : ses contacts en argent ; sinon, des filets d'encre sur le métal de la carte.
+  const puceNoire = signes.includes("puce-noire");
+  const contacts = puceNoire ? "rgba(214,218,226,0.62)" : "rgba(8,9,11,0.22)";
   const lisere = lisereDe(habillage);
   const cran = habillage?.cran ?? 0;
   const sceau = complete && signes.includes("sceau");
@@ -620,12 +623,12 @@ export function BolaCard({
                   width: u(87),
                   height: u(67),
                   borderRadius: u(14),
-                  background: signes.includes("puce-or") ? PUCE_OR : p.puce,
-                  boxShadow: `inset 0 0 0 ${u(2)}px rgba(8,9,11,0.22)`,
+                  background: puceNoire ? PUCE_NOIRE : p.puce,
+                  boxShadow: `inset 0 0 0 ${u(2)}px ${contacts}`,
                 }}
               >
-                <div style={{ position: "absolute", left: "50%", top: u(8), bottom: u(8), width: u(2), background: "rgba(8,9,11,0.22)" }} />
-                <div style={{ position: "absolute", top: "50%", left: u(8), right: u(8), height: u(2), background: "rgba(8,9,11,0.22)" }} />
+                <div style={{ position: "absolute", left: "50%", top: u(8), bottom: u(8), width: u(2), background: contacts }} />
+                <div style={{ position: "absolute", top: "50%", left: u(8), right: u(8), height: u(2), background: contacts }} />
               </div>
             </>
           )}

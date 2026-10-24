@@ -30,7 +30,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import dynamic from "next/dynamic";
 import { toPng } from "html-to-image";
 import { DosCarte } from "@/components/sfl/dos-carte";
-import { MATIERES, type HabillageCarte, type NomMatiere } from "@/components/sfl/finitions-carte";
+import { matiereDuNom, type HabillageCarte, type Matiere } from "@/components/sfl/finitions-carte";
 import { useBadgeRevision } from "@/hooks/use-badge-carte";
 import { useHabillageRevision } from "@/hooks/use-habillage";
 import { useIdentitesRevision } from "@/hooks/use-identites";
@@ -176,13 +176,13 @@ export interface CapturedLayers {
   stats: string;
   /** Le dos (DosCarte), s'il a pu être photographié. */
   dos?: string;
-  matiere: NomMatiere | null;
+  matiere: Matiere | null;
   width: number;
   height: number;
 }
 
 interface Dos {
-  matiere: NomMatiere;
+  matiere: Matiere;
   nom: string;
   habillage?: HabillageCarte;
 }
@@ -190,15 +190,16 @@ interface Dos {
 /** La matière, le joueur et l'habillage que la face déclare (bola-card.tsx), pour son dos. */
 function dosDe(node: HTMLElement): Dos | null {
   const corps = node.querySelector<HTMLElement>("[data-matiere]");
-  const matiere = corps?.dataset.matiere as NomMatiere | undefined;
-  if (!corps || !matiere || !(matiere in MATIERES)) return null;
+  if (!corps?.dataset.matiere) return null;
   let habillage: HabillageCarte | undefined;
   try {
     habillage = corps.dataset.habillage ? (JSON.parse(corps.dataset.habillage) as HabillageCarte) : undefined;
   } catch {
     habillage = undefined;
   }
-  return { matiere, nom: corps.dataset.nom ?? "", habillage };
+  // « Tes couleurs » : la matière du pays que porte l'habillage.
+  const matiere = matiereDuNom(corps.dataset.matiere, habillage);
+  return matiere ? { matiere, nom: corps.dataset.nom ?? "", habillage } : null;
 }
 
 /** Attend qu'un nœud soit monté, quelques images au plus. */
@@ -485,7 +486,7 @@ function Card3DInner({
           </div>
           {dos && (
             <div ref={dosRef} style={{ position: "absolute" }} aria-hidden>
-              <DosCarte matiere={MATIERES[dos.matiere]} nom={dos.nom} habillage={dos.habillage} />
+              <DosCarte matiere={dos.matiere} nom={dos.nom} habillage={dos.habillage} />
             </div>
           )}
         </div>

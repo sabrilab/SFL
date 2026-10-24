@@ -6,7 +6,8 @@
 // que les feuilles de match sont faites. Elles ne donnent jamais de point
 // Pépite (règle du fondateur, dossier BOLA 07 §2 : « Les quêtes ne rapportent
 // jamais de PP ») : elles donnent de l'XP, qui fait le niveau à vie et le
-// passe de la saison. Le terrain fait la note ; l'app fait le niveau.
+// Passe Bola de la saison (passe.ts : vingt paliers de skins, quatre
+// épreuves). Le terrain fait la note ; l'app fait le niveau.
 //
 // Le dimanche des missions, c'est la dernière journée qui a des équipes :
 //   · ses équipes faites, les missions existent ; chacun accepte ou passe
@@ -44,7 +45,7 @@ import { isHidden } from "./hidden";
 import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { ovr, type Player } from "./engine";
 import type { MatchEntry, Saison, SaisonArchivee } from "./saisie/types";
-import type { Finition, Signe, Traitement } from "@/components/sfl/finitions-carte";
+import { passeDe, type BilanPasse } from "./passe";
 
 /* ------------------------------- Le barème ------------------------------- */
 
@@ -106,9 +107,6 @@ export const NOM_DE_CODE: Record<Genre, string> = {
 export const XP_DIMANCHE = 100;
 /** Les trois missions réussies le même dimanche. */
 export const XP_PARFAIT = 150;
-/** Un palier du passe de saison. */
-export const XP_PALIER = 250;
-export const PALIERS_PASSE = 20;
 /** L'écart le plus grand entre deux rivaux d'un duel, en points Pépite. */
 export const ECART_DUEL = 5;
 /** Les crans du cadre de la carte, en missions réussies. */
@@ -622,6 +620,10 @@ export interface LigneXp {
   date: string;
   quoi: string;
   xp: number;
+  /** Une mission acceptée et jugée : son créneau, son rang, réussie ou non (les épreuves du passe, passe.ts). */
+  mission?: { creneau: Creneau; rang: Rang; reussie: boolean };
+  /** Les trois missions du même dimanche réussies. */
+  parfait?: boolean;
 }
 
 export interface BilanXp {
@@ -634,13 +636,12 @@ export interface BilanXp {
   dansLeNiveau: number;
   pourLeSuivant: number;
   /**
-   * Le palier du passe atteint (0 à 20) : un palier atteint reste acquis, même
-   * si un contrat raté fait redescendre l'XP de la saison. Puis l'XP déjà faite
-   * vers le suivant, et celle qui lui manque encore.
+   * Le palier du Passe Bola atteint (0 à 20) : un palier atteint reste acquis,
+   * même si un contrat raté fait redescendre l'XP de la saison. Le détail
+   * (l'XP vers le suivant, les épreuves) est dans `passe` (passe.ts).
    */
   palier: number;
-  versPalier: number;
-  manquePalier: number;
+  passe: BilanPasse;
   /** Les missions réussies, à vie : les crans du cadre. */
   reussies: number;
   cran: number;
@@ -714,15 +715,23 @@ export function journalXp(
         for (const mi of liste) {
           if (reponseDe(reponses, d, nom, mi)?.reponse !== "acceptee") continue;
           const v = verdictFinal(juger(mi, nom, d, sa.lue, votes), mi);
+          const mission = { creneau: mi.creneau, rang: rangDe(mi) };
           if (v.etat === "ratee")
-            de(nom).lignes.push({ saison: sa.numero, j, date: d.date, quoi: `${libelleCourt(mi)} ratée`, xp: -risqueDe(mi) });
+            de(nom).lignes.push({
+              saison: sa.numero,
+              j,
+              date: d.date,
+              quoi: `${libelleCourt(mi)} ratée`,
+              xp: -risqueDe(mi),
+              mission: { ...mission, reussie: false },
+            });
           if (v.etat !== "reussie") continue;
           ok++;
-          de(nom).lignes.push({ saison: sa.numero, j, date: d.date, quoi: libelleCourt(mi), xp: mi.xp });
+          de(nom).lignes.push({ saison: sa.numero, j, date: d.date, quoi: libelleCourt(mi), xp: mi.xp, mission: { ...mission, reussie: true } });
         }
         if (ok > 0) de(nom).reussies += ok;
         if (liste.length === 3 && ok === 3)
-          de(nom).lignes.push({ saison: sa.numero, j, date: d.date, quoi: "Trois sur trois", xp: XP_PARFAIT });
+          de(nom).lignes.push({ saison: sa.numero, j, date: d.date, quoi: "Trois sur trois", xp: XP_PARFAIT, parfait: true });
       }
     }
     passe = [...passe, ...sa.lue.entries];
@@ -783,27 +792,16 @@ export function bilanDe(
   const total = Math.max(0, x.lignes.reduce((a, l) => a + l.xp, 0));
   const saison = Math.max(0, x.lignes.filter((l) => l.saison === saisonEnCours).reduce((a, l) => a + l.xp, 0));
   const niveau = niveauDe(total);
-  // Le passe suit la saison dimanche par dimanche : le plus haut palier atteint reste.
-  const parJournee = new Map<number, number>();
-  for (const l of x.lignes)
-    if (l.saison === saisonEnCours) parJournee.set(l.j, (parJournee.get(l.j) ?? 0) + l.xp);
-  let cumul = 0;
-  let atteint = 0;
-  for (const j of [...parJournee.keys()].sort((a, b) => a - b)) {
-    cumul += parJournee.get(j) ?? 0;
-    atteint = Math.max(atteint, Math.floor(Math.max(0, cumul) / XP_PALIER));
-  }
-  const palier = Math.min(PALIERS_PASSE, atteint);
-  const fini = palier >= PALIERS_PASSE;
+  // Le passe suit la saison dimanche par dimanche : le plus haut palier atteint reste (passe.ts).
+  const passe = passeDe(x.lignes.filter((l) => l.saison === saisonEnCours));
   return {
     total,
     saison,
     niveau,
     dansLeNiveau: total - debutNiveau(niveau),
     pourLeSuivant: 100 * niveau,
-    palier,
-    versPalier: fini ? XP_PALIER : Math.max(0, Math.min(XP_PALIER, saison - palier * XP_PALIER)),
-    manquePalier: fini ? 0 : (palier + 1) * XP_PALIER - saison,
+    palier: passe.palier,
+    passe,
     reussies: x.reussies,
     cran: cranDe(x.reussies),
     lignes: [...x.lignes].sort((a, b) => b.saison - a.saison || b.j - a.j),
@@ -905,64 +903,3 @@ export function phrase(m: Mission, nom: (n: string) => string = (n) => n): strin
 export function libelleCourt(m: Pick<Mission, "genre">): string {
   return `Mission ${NOM_DE_CODE[m.genre]}`;
 }
-
-/* ------------------------------ Le passe ------------------------------ */
-// Sabri, 23/10 : « faut que tu me dises ce que je peux faire visuellement,
-// parce que là, ça fait moche quand c'est affiché. Faut qu'on puisse montrer
-// des choses », avec « des changements de code au niveau de la carte ou des
-// signes distinctifs ». Les paliers de la carte et de la photo posent donc
-// quelque chose sur la carte (`habille`, dessiné par finitions-carte.ts,
-// sans IA) : un signe, d'office une fois débloqué ; une finition ou un
-// traitement de la photo, que le joueur choisit de porter. Un palier atteint
-// une saison reste débloqué pour de bon (palierMaxDe).
-
-export type Famille = "contrats" | "photo" | "carte" | "vrai";
-
-export interface Palier {
-  n: number;
-  recompense: string;
-  famille: Famille;
-  /** Ce que le palier pose sur la carte, s'il l'habille (finitions-carte.ts). */
-  habille?: { finition?: Finition; traitement?: Traitement; signe?: Signe };
-}
-
-/** Les vingt paliers du passe de saison : chaque récompense sert à quelque chose, la moitié se voit sur la carte. */
-export const PASSE: Palier[] = [
-  { n: 1, recompense: "Liseré argent", famille: "carte", habille: { signe: "lisere-argent" } },
-  { n: 2, recompense: "Joker", famille: "contrats" },
-  { n: 3, recompense: "Photo argentique", famille: "photo", habille: { traitement: "argentique" } },
-  { n: 4, recompense: "Finition nuit", famille: "carte", habille: { finition: "nuit" } },
-  { n: 5, recompense: "Sceau à tes initiales", famille: "carte", habille: { signe: "sceau" } },
-  { n: 6, recompense: "Double ou rien", famille: "contrats" },
-  { n: 7, recompense: "Photo gravure", famille: "photo", habille: { traitement: "gravure" } },
-  { n: 8, recompense: "Puce dorée", famille: "carte", habille: { signe: "puce-or" } },
-  { n: 9, recompense: "Assurance", famille: "contrats" },
-  { n: 10, recompense: "Finition chrome", famille: "carte", habille: { finition: "chrome" } },
-  { n: 11, recompense: "Le dossier du rival", famille: "contrats" },
-  { n: 12, recompense: "Ton nom gravé", famille: "carte", habille: { signe: "nom-grave" } },
-  { n: 13, recompense: "Photo marbre", famille: "photo", habille: { traitement: "marbre" } },
-  { n: 14, recompense: "Choisir ton rival", famille: "contrats" },
-  { n: 15, recompense: "Liseré or", famille: "carte", habille: { signe: "lisere-or" } },
-  { n: 16, recompense: "Finition animée", famille: "carte", habille: { finition: "animee" } },
-  { n: 17, recompense: "Joker", famille: "contrats" },
-  { n: 18, recompense: "Séance studio offerte", famille: "photo" },
-  { n: 19, recompense: "Chaussettes Bola", famille: "vrai" },
-  { n: 20, recompense: "Carte de saison imprimée", famille: "vrai" },
-];
-
-/** Ce qu'un palier du passe a débloqué sur la carte, dans l'ordre des paliers. */
-export function debloquesDe(palier: number): { finitions: Finition[]; traitements: Traitement[]; signes: Signe[] } {
-  const ouverts = PASSE.filter((p) => p.n <= palier);
-  return {
-    finitions: ouverts.flatMap((p) => (p.habille?.finition ? [p.habille.finition] : [])),
-    traitements: ouverts.flatMap((p) => (p.habille?.traitement ? [p.habille.traitement] : [])),
-    signes: ouverts.flatMap((p) => (p.habille?.signe ? [p.habille.signe] : [])),
-  };
-}
-
-export const FAMILLES: Record<Famille, string> = {
-  contrats: "tes contrats",
-  photo: "ta photo",
-  carte: "ta carte",
-  vrai: "le vrai",
-};
