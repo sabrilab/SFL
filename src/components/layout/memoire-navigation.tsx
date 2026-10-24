@@ -123,8 +123,8 @@ function installer() {
     // Next, qui passe avant celle-ci : elle est alors déjà là.
     const m = marque();
     const top = (m && places.get(m.k)) ?? 0;
-    if (affichee === adresse()) restaurer(top, maintenant() + 2000);
-    else attendre(adresse(), top, 2000);
+    if (affichee === adresse()) restaurer(top, maintenant() + 4000);
+    else attendre(adresse(), top, 4000);
     prevenir();
   });
 
@@ -147,13 +147,20 @@ function attendre(url: string, top: number, duree: number) {
 /** Retrouver la place d'une racine, à la touche de son onglet. */
 export function retrouverOnglet(href: string) {
   if (!RACINES_MEMOIRE.includes(href)) return;
-  attendre(href, racines.get(href) ?? 0, 2000);
+  attendre(href, racines.get(href) ?? 0, 4000);
 }
 
 /** Remonter en haut de la page, à la touche de l'onglet où l'on est déjà. */
 export function remonter() {
   const reduit = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   defilant()?.scrollTo({ top: 0, behavior: reduit ? "auto" : "smooth" });
+}
+
+/** Note la place de la page affichée, et celle de sa racine. */
+function noter(el: HTMLElement) {
+  const m = marque();
+  if (m) places.set(m.k, el.scrollTop);
+  if (!window.location.search && RACINES_MEMOIRE.includes(window.location.pathname)) racines.set(window.location.pathname, el.scrollTop);
 }
 
 /** Arrête la pose en cours, quand une autre la remplace. */
@@ -175,11 +182,21 @@ function restaurer(top: number, jusqua: number) {
   let pose = false;
   let fini = false;
   let dernier = -1;
+  // Défilée par autre chose que la pose : elle s'arrête, et la page note sa place.
+  const bouge = () => {
+    if (el && dernier >= 0 && Math.abs(el.scrollTop - dernier) > 1) {
+      finir();
+      noter(el);
+    }
+  };
   const finir = () => {
     if (fini) return;
     fini = true;
     silence = 0;
-    if (el) el.style.overflowAnchor = "";
+    if (el) {
+      el.style.overflowAnchor = "";
+      el.removeEventListener("scroll", bouge);
+    }
     window.removeEventListener("touchstart", finir, true);
     window.removeEventListener("wheel", finir, true);
     if (arreter === finir) arreter = null;
@@ -192,14 +209,17 @@ function restaurer(top: number, jusqua: number) {
     if (fini) return;
     const ici = defilant();
     if (ici && ici !== el) {
-      if (el) el.style.overflowAnchor = "";
+      if (el) {
+        el.style.overflowAnchor = "";
+        el.removeEventListener("scroll", bouge);
+      }
       el = ici;
       el.style.overflowAnchor = "none";
+      el.addEventListener("scroll", bouge, { passive: true });
       pose = false;
       dernier = -1;
     }
     if (el && !pose) {
-      if (dernier >= 0 && Math.abs(el.scrollTop - dernier) > 1) return finir();
       const max = el.scrollHeight - el.clientHeight;
       el.scrollTop = dernier = Math.min(top, max);
       pose = max >= top;
@@ -218,14 +238,11 @@ export function MemoireNavigation() {
     installer();
     const el = defilant();
     if (!el) return;
-    const noter = () => {
-      if (maintenant() < silence) return;
-      const m = marque();
-      if (m) places.set(m.k, el.scrollTop);
-      if (!window.location.search && RACINES_MEMOIRE.includes(window.location.pathname)) racines.set(window.location.pathname, el.scrollTop);
+    const defile = () => {
+      if (maintenant() >= silence) noter(el);
     };
-    el.addEventListener("scroll", noter, { passive: true });
-    return () => el.removeEventListener("scroll", noter);
+    el.addEventListener("scroll", defile, { passive: true });
+    return () => el.removeEventListener("scroll", defile);
   }, []);
 
   // La page est affichée : la poser à sa place, si on en attend une, avant
