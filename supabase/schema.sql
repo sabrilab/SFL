@@ -1762,6 +1762,12 @@ create table if not exists public.push_envois (
   effet       text,
   effet_le    timestamptz
 );
+-- Le joueur dont elle vient (24/10) : celui qui a écrit, réagi, invité,
+-- suivi ou félicité ; null quand c'est l'app (rappels, annonces de la ligue,
+-- missions). Admin → Activité en tire « Qui ramène du monde » : les joueurs
+-- dont un geste fait revenir les autres. Avant cette colonne, la page le
+-- déduit, quand elle le peut, du geste qui a déclenché la notification.
+alter table public.push_envois add column if not exists de uuid references public.profiles(id) on delete set null;
 create index if not exists push_envois_envoyee on public.push_envois (envoyee_le desc);
 create index if not exists push_envois_en_attente
   on public.push_envois (user_id, envoyee_le desc) where effet_le is null;
@@ -2565,7 +2571,8 @@ grant select on public.equipes, public.equipe_membres, public.equipe_defis to au
 -- Règles complètes (Sabri, 22/10 : « bien comprendre tous les tenants et
 -- aboutissants de Team ») — docs 04 §6, 05 §5 et 11 art. 3, 4, 17 :
 --   · une invitation (et le lien) vaut 72 h, et jamais au-delà de 7 ;
---   · on signe une version du Règlement (v1), case cochée ;
+--   · on signe une version du Règlement, case cochée (v1 ; v2 depuis le
+--     24/10 : 2 points la victoire, et la Charte de déontologie) ;
 --   · 14 jours de carence après un départ avant une autre équipe ;
 --   · le capitaine exclut avec 48 h de préavis, ou dissout l'équipe ; une
 --     équipe dissoute garde son historique et son nom 180 jours ;
@@ -2576,6 +2583,11 @@ grant select on public.equipes, public.equipe_membres, public.equipe_defis to au
 --     plus ; un seul défi en cours entre deux équipes ; 3 refus d'affilée
 --     de la même équipe bloquent 14 jours.
 alter table public.equipes add column if not exists dissoute_le timestamptz;
+-- L'écusson dessiné (Sabri, 24/10 : « designer un vrai écusson d'équipe et
+-- choisir de vraies couleurs ») : forme, motif, trois couleurs, emblème
+-- (lib/sfl/blason.ts), posé par equipe_blason. Null : l'écusson noir et
+-- blanc des débuts, d'après fond.
+alter table public.equipes add column if not exists blason jsonb;
 alter table public.equipes alter column capitaine drop not null;
 do $$
 begin
@@ -2832,7 +2844,7 @@ begin
           (select p.ville from public.profiles p where p.id = moi), moi)
   returning id into e;
   insert into public.equipe_membres (equipe_id, joueur, statut, role, signe_le, reglement_version)
-  values (e, moi, 'membre', 'capitaine', now(), 'v1');
+  values (e, moi, 'membre', 'capitaine', now(), 'v2');
   return e;
 end;
 $$;
@@ -2986,7 +2998,7 @@ begin
     insert into public.team_offerts (joueur, par, via) values (moi, offert_par, 'invitation')
     on conflict (joueur) do nothing;
   end if;
-  update public.equipe_membres m set statut = 'membre', signe_le = now(), reglement_version = 'v1'
+  update public.equipe_membres m set statut = 'membre', signe_le = now(), reglement_version = 'v2'
    where m.equipe_id = e and m.joueur = moi;
   -- À 7, les autres invitations tombent.
   if public.equipe_effectif(e) >= 7 then
@@ -3130,7 +3142,7 @@ set search_path = ''
 stable
 as $$
   select jsonb_build_object(
-    'id', x.id, 'nom', x.nom, 'initiales', x.initiales, 'fond', x.fond, 'ville', x.ville,
+    'id', x.id, 'nom', x.nom, 'initiales', x.initiales, 'fond', x.fond, 'blason', x.blason, 'ville', x.ville,
     'membres', (select count(*) from public.equipe_membres m where m.equipe_id = x.id and m.statut = 'membre'),
     'capitaine', (select coalesce(p.nom_affiche, p.name) from public.profiles p where p.id = x.capitaine)
   )
@@ -3367,6 +3379,422 @@ drop trigger if exists equipe_membres_push_effet on public.equipe_membres;
 create trigger equipe_membres_push_effet
   after update of statut or delete on public.equipe_membres
   for each row execute function public.push_effet_equipe();
+
+-- ──────────── Bola Team : écusson, charte, feuille, championnat ────────────
+-- Sabri, 24/10 : un vrai écusson et de vraies couleurs ; un règlement
+-- déontologique à signer ; un championnat façon Ligue 1, 2 points la
+-- victoire, 1 le nul, 0 la défaite, sur des saisons de 4 mois, avec ses
+-- buteurs et ses passeurs. Le classement se calcule dans l'app
+-- (lib/sfl/championnat-team.ts) d'après ce qui suit.
+--
+-- L'écusson : le capitaine (ou son vice) le dessine. La base en vérifie la
+-- forme ; l'app ne propose que la palette des couleurs de club.
+create or replace function public.equipe_blason(e bigint, b jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if coalesce(public.role_equipe(e), 'membre') = 'membre' then
+    raise exception 'Réservé au capitaine.' using errcode = '42501';
+  end if;
+  if b is null or jsonb_typeof(b) <> 'object'
+     or coalesce(b ->> 'forme', '') <> all (array['ecu', 'blason', 'rond', 'pointe', 'ovale'])
+     or coalesce(b ->> 'motif', '') <> all (array['uni', 'parti', 'coupe', 'tranche', 'rayures', 'bande', 'echarpe', 'chevron', 'cercle'])
+     or coalesce(b ->> 'embleme', '') <> all (array['initiales', 'etoile', 'ballon', 'couronne', 'eclair', 'cheval', 'lion', 'aigle', 'loup', 'taureau', 'coq'])
+     or coalesce(jsonb_typeof(b -> 'couleurs'), '') <> 'array'
+     or jsonb_array_length(b -> 'couleurs') <> 3
+     or exists (select 1 from jsonb_array_elements(b -> 'couleurs') c
+                 where jsonb_typeof(c) <> 'string' or upper(c #>> '{}') !~ '^#[0-9A-F]{6}$') then
+    raise exception 'Écusson invalide.' using errcode = '22023';
+  end if;
+  update public.equipes x
+     set blason = jsonb_build_object(
+       'forme', b ->> 'forme',
+       'motif', b ->> 'motif',
+       'embleme', b ->> 'embleme',
+       'couleurs', (select jsonb_agg(upper(t.c #>> '{}') order by t.o)
+                      from jsonb_array_elements(b -> 'couleurs') with ordinality t(c, o)))
+   where x.id = e and x.dissoute_le is null;
+end;
+$$;
+
+-- Les signatures, version par version (Règlement Team art. 18.4) : chaque
+-- fois qu'un membre signe une version (en créant l'équipe, en y entrant, ou
+-- en signant la nouvelle), une ligne. Rien ne s'efface : on garde la trace.
+create table if not exists public.equipe_signatures (
+  equipe_id  bigint not null references public.equipes(id) on delete cascade,
+  joueur     uuid   not null references public.profiles(id) on delete cascade,
+  version    text   not null,
+  le         timestamptz not null default now(),
+  primary key (equipe_id, joueur, version)
+);
+alter table public.equipe_signatures enable row level security;
+drop policy if exists "equipe_signatures: lecture" on public.equipe_signatures;
+create policy "equipe_signatures: lecture" on public.equipe_signatures for select to authenticated
+  using ((select public.est_membre()) or joueur = (select auth.uid()));
+revoke all on public.equipe_signatures from anon, authenticated;
+grant select on public.equipe_signatures to authenticated;
+
+create or replace function public.equipe_signature_trace()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.statut = 'membre' and new.reglement_version is not null
+     and (tg_op = 'INSERT' or new.reglement_version is distinct from old.reglement_version) then
+    insert into public.equipe_signatures (equipe_id, joueur, version)
+    values (new.equipe_id, new.joueur, new.reglement_version)
+    on conflict do nothing;
+  end if;
+  return null;
+end;
+$$;
+revoke execute on function public.equipe_signature_trace() from public, anon, authenticated;
+drop trigger if exists equipe_membres_signature on public.equipe_membres;
+create trigger equipe_membres_signature
+  after insert or update of reglement_version on public.equipe_membres
+  for each row execute function public.equipe_signature_trace();
+-- Les signatures d'avant le 24/10, une fois pour toutes.
+insert into public.equipe_signatures (equipe_id, joueur, version, le)
+select m.equipe_id, m.joueur, m.reglement_version, coalesce(m.signe_le, m.created_at)
+  from public.equipe_membres m
+ where m.statut = 'membre' and m.reglement_version is not null
+on conflict do nothing;
+
+-- La version 2 (24/10) : 2 points la victoire, et la Charte de
+-- déontologie. Un membre qui avait signé la 1 (ou rien, avant le
+-- règlement) signe la nouvelle, depuis l'app (art. 18.2).
+create or replace function public.equipe_signer_charte(e bigint)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  moi uuid := (select auth.uid());
+begin
+  if moi is null or not exists (
+    select 1 from public.equipe_membres m where m.equipe_id = e and m.joueur = moi and m.statut = 'membre'
+  ) then
+    raise exception 'Réservé aux joueurs de l''équipe.' using errcode = '42501';
+  end if;
+  update public.equipe_membres m set reglement_version = 'v2'
+   where m.equipe_id = e and m.joueur = moi and m.reglement_version is distinct from 'v2';
+end;
+$$;
+
+-- La feuille d'un match Team (Règlement Team art. 8) : chaque capitaine (ou
+-- son vice) saisit le score final et les buteurs et passeurs de son équipe,
+-- du coup d'envoi jusqu'à 3 jours après. Deux saisies qui collent valident
+-- le match (sa feuille se ferme) ; une seule vaut au bout de 24 h ; deux
+-- qui ne collent pas : chacun peut corriger la sienne tant que la feuille
+-- est ouverte, sinon le match n'est pas classé. Un forfait (equipe_defis,
+-- 'forfait') se compte 3 – 0 sans feuille. Les buts attribués ne dépassent
+-- jamais le score, les passes jamais les buts attribués (art. 8.4).
+create table if not exists public.equipe_resultats (
+  defi_id    bigint not null references public.equipe_defis(id) on delete cascade,
+  equipe_id  bigint not null references public.equipes(id) on delete cascade,
+  pour       int    not null check (pour between 0 and 99),
+  contre     int    not null check (contre between 0 and 99),
+  saisi_par  uuid   references public.profiles(id) on delete set null,
+  saisi_le   timestamptz not null default now(),
+  -- L'autre équipe prévenue (/api/equipes/notifier, 'resultat') : une fois par saisie.
+  notifie_le timestamptz,
+  primary key (defi_id, equipe_id)
+);
+create table if not exists public.equipe_resultat_joueurs (
+  defi_id    bigint not null references public.equipe_defis(id) on delete cascade,
+  equipe_id  bigint not null references public.equipes(id) on delete cascade,
+  joueur     uuid   not null references public.profiles(id) on delete cascade,
+  buts       int    not null default 0 check (buts between 0 and 99),
+  passes     int    not null default 0 check (passes between 0 and 99),
+  primary key (defi_id, joueur)
+);
+create index if not exists equipe_resultat_joueurs_joueur on public.equipe_resultat_joueurs (joueur);
+
+alter table public.equipe_resultats enable row level security;
+alter table public.equipe_resultat_joueurs enable row level security;
+drop policy if exists "equipe_resultats: lecture" on public.equipe_resultats;
+create policy "equipe_resultats: lecture" on public.equipe_resultats for select to authenticated
+  using ((select public.est_membre()));
+drop policy if exists "equipe_resultat_joueurs: lecture" on public.equipe_resultat_joueurs;
+create policy "equipe_resultat_joueurs: lecture" on public.equipe_resultat_joueurs for select to authenticated
+  using ((select public.est_membre()));
+revoke all on public.equipe_resultats, public.equipe_resultat_joueurs from anon, authenticated;
+grant select on public.equipe_resultats, public.equipe_resultat_joueurs to authenticated;
+
+create or replace function public.equipe_resultat(d bigint, pour int, contre int, lignes jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  x record;
+  e bigint;
+  coup timestamptz;
+  mien record;
+  autre record;
+  l record;
+  tb int := 0;
+  tp int := 0;
+begin
+  select * into x from public.equipe_defis f where f.id = d for update;
+  if x is null or x.statut <> 'accepte' then
+    raise exception 'Ce match n''a pas de feuille.' using errcode = 'P0001';
+  end if;
+  if coalesce(public.role_equipe(x.de), 'membre') <> 'membre' then
+    e := x.de;
+  elsif coalesce(public.role_equipe(x.a), 'membre') <> 'membre' then
+    e := x.a;
+  else
+    raise exception 'Réservé aux capitaines.' using errcode = '42501';
+  end if;
+  coup := public.equipe_defi_heure(x.jour, x.heure);
+  if now() < coup then
+    raise exception 'La feuille s''ouvre au coup d''envoi.' using errcode = 'P0001';
+  end if;
+  if now() > coup + interval '3 days' then
+    raise exception 'La feuille de ce match est fermée.' using errcode = 'P0001';
+  end if;
+  if pour is null or contre is null or pour not between 0 and 99 or contre not between 0 and 99 then
+    raise exception 'Score invalide.' using errcode = '22023';
+  end if;
+  select r.* into mien from public.equipe_resultats r where r.defi_id = d and r.equipe_id = e;
+  select r.* into autre from public.equipe_resultats r where r.defi_id = d and r.equipe_id <> e;
+  -- Déjà validé : les deux saisies collent, ou l'une est seule depuis 24 h.
+  if (mien.defi_id is not null and autre.defi_id is not null and mien.pour = autre.contre and mien.contre = autre.pour)
+     or (mien.defi_id is null and autre.defi_id is not null and autre.saisi_le < now() - interval '24 hours')
+     or (mien.defi_id is not null and autre.defi_id is null and mien.saisi_le < now() - interval '24 hours') then
+    raise exception 'Ce résultat est validé.' using errcode = 'P0001';
+  end if;
+  if lignes is not null and jsonb_typeof(lignes) <> 'array' then
+    raise exception 'Feuille invalide.' using errcode = '22023';
+  end if;
+  for l in select * from jsonb_to_recordset(coalesce(lignes, '[]'::jsonb)) as t(joueur uuid, buts int, passes int) loop
+    if l.joueur is null or coalesce(l.buts, 0) not between 0 and 99 or coalesce(l.passes, 0) not between 0 and 99 then
+      raise exception 'Feuille invalide.' using errcode = '22023';
+    end if;
+    if not exists (select 1 from public.equipe_membres m where m.equipe_id = e and m.joueur = l.joueur and m.statut = 'membre') then
+      raise exception 'Seuls les joueurs de l''équipe marquent pour elle.' using errcode = 'P0001';
+    end if;
+    tb := tb + coalesce(l.buts, 0);
+    tp := tp + coalesce(l.passes, 0);
+  end loop;
+  if tb > pour then
+    raise exception 'Plus de buts attribués que de buts marqués.' using errcode = 'P0001';
+  end if;
+  if tp > tb then
+    raise exception 'Plus de passes décisives que de buts attribués.' using errcode = 'P0001';
+  end if;
+  insert into public.equipe_resultats (defi_id, equipe_id, pour, contre, saisi_par)
+  values (d, e, equipe_resultat.pour, equipe_resultat.contre, (select auth.uid()))
+  on conflict (defi_id, equipe_id) do update
+    set pour = excluded.pour, contre = excluded.contre, saisi_par = excluded.saisi_par, saisi_le = now(), notifie_le = null;
+  delete from public.equipe_resultat_joueurs j where j.defi_id = d and j.equipe_id = e;
+  insert into public.equipe_resultat_joueurs (defi_id, equipe_id, joueur, buts, passes)
+  select d, e, t.joueur, sum(coalesce(t.buts, 0)), sum(coalesce(t.passes, 0))
+    from jsonb_to_recordset(coalesce(lignes, '[]'::jsonb)) as t(joueur uuid, buts int, passes int)
+   group by t.joueur
+  having sum(coalesce(t.buts, 0)) + sum(coalesce(t.passes, 0)) > 0;
+end;
+$$;
+
+-- Le capitaine prévenu de la saisie de l'autre (motif 'equipe-resultat',
+-- rattachée au match) : sa propre saisie, c'est la réponse attendue.
+create or replace function public.push_effet_resultat()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    perform public.push_effet(new.saisi_par, array['equipe-resultat'], 'defi:' || new.defi_id, 'accepte', interval '72 hours');
+  exception when others then
+    raise warning 'push_effet_resultat : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+revoke execute on function public.push_effet_resultat() from public, anon, authenticated;
+drop trigger if exists equipe_resultats_push_effet on public.equipe_resultats;
+create trigger equipe_resultats_push_effet
+  after insert or update of pour, contre on public.equipe_resultats
+  for each row execute function public.push_effet_resultat();
+
+-- La couverture de la page d'une équipe (Sabri, 24/10 : « un profil
+-- d'équipe qui peut accueillir une couverture faite justement en IA aussi,
+-- avec les joueurs présents de cette équipe, leur maillot et leur blason »).
+-- Le capitaine (ou le vice) la crée (/api/equipes/couverture : les photos
+-- de carte, le maillot et l'écusson partent chez fal.ai, comme au studio),
+-- la voit, puis la pose : l'image dans le bucket public « couvertures »
+-- (<id de l'équipe>.jpg), sa date dans couverture_le, qui en est la
+-- version. Sans date, l'app dessine la couverture aux couleurs du maillot.
+-- Le crédit fal est celui de Sabri : 2 créations par équipe et par jour
+-- (heure de Paris), notées avant l'appel dans equipe_couvertures. Sur
+-- l'image, seuls les joueurs qui ont signé le Règlement Team version 2, dont
+-- le neuvième point le prévoit ; et un joueur qui quitte l'équipe (départ,
+-- exclusion) emporte la couverture : sa date retombe.
+alter table public.equipes add column if not exists couverture_le timestamptz;
+
+create table if not exists public.equipe_couvertures (
+  id          bigint generated always as identity primary key,
+  equipe_id   bigint not null references public.equipes(id) on delete cascade,
+  user_id     uuid   not null default auth.uid() references auth.users(id) on delete cascade,
+  created_at  timestamptz not null default now()
+);
+create index if not exists equipe_couvertures_equipe_date on public.equipe_couvertures (equipe_id, created_at desc);
+alter table public.equipe_couvertures enable row level security;
+revoke all on public.equipe_couvertures from anon, authenticated;
+grant select, insert on public.equipe_couvertures to authenticated;
+
+drop policy if exists "equipe_couvertures: les dirigeants lisent" on public.equipe_couvertures;
+create policy "equipe_couvertures: les dirigeants lisent" on public.equipe_couvertures for select to authenticated
+  using (coalesce(public.role_equipe(equipe_id), 'membre') <> 'membre' or (select public.is_league_admin()));
+drop policy if exists "equipe_couvertures: les dirigeants notent" on public.equipe_couvertures;
+create policy "equipe_couvertures: les dirigeants notent" on public.equipe_couvertures for insert to authenticated
+  with check (user_id = (select auth.uid()) and coalesce(public.role_equipe(equipe_id), 'membre') <> 'membre');
+
+create or replace function public.equipe_couverture_credit()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  faites int;
+begin
+  -- Jusqu'à la fin de la transaction : la demande suivante pour la même
+  -- équipe attend celle-ci, puis la compte.
+  perform pg_advisory_xact_lock(hashtextextended('credit:couverture:' || new.equipe_id::text, 0));
+  select count(*) into faites from public.equipe_couvertures
+   where equipe_id = new.equipe_id
+     and created_at >= (date_trunc('day', now() at time zone 'Europe/Paris') at time zone 'Europe/Paris');
+  if faites >= 2 then
+    raise exception 'Crédit du jour épuisé.' using errcode = 'P0001', hint = 'credit-du-jour';
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.equipe_couverture_credit() from public, anon, authenticated;
+drop trigger if exists equipe_couvertures_credit on public.equipe_couvertures;
+create trigger equipe_couvertures_credit before insert on public.equipe_couvertures
+  for each row execute function public.equipe_couverture_credit();
+
+-- Poser (posee) ou retirer la couverture : capitaine et vice.
+create or replace function public.equipe_couverture(e bigint, posee boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if coalesce(public.role_equipe(e), 'membre') = 'membre' then
+    raise exception 'Réservé au capitaine.' using errcode = '42501';
+  end if;
+  update public.equipes x
+     set couverture_le = case when posee then now() end
+   where x.id = e and x.dissoute_le is null;
+end;
+$$;
+
+create or replace function public.equipe_couverture_depart()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if old.statut = 'membre' and (tg_op = 'DELETE' or new.statut is distinct from 'membre') then
+    update public.equipes x set couverture_le = null
+     where x.id = old.equipe_id and x.couverture_le is not null;
+  end if;
+  return null;
+end;
+$$;
+revoke execute on function public.equipe_couverture_depart() from public, anon, authenticated;
+drop trigger if exists equipe_membres_couverture on public.equipe_membres;
+create trigger equipe_membres_couverture
+  after update of statut or delete on public.equipe_membres
+  for each row execute function public.equipe_couverture_depart();
+
+-- L'équipe que nomme un fichier du bucket (« 12.jpg ») ; null sinon.
+create or replace function public.couverture_cle_equipe(cle text)
+returns bigint
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when cle ~ '^[0-9]{1,18}\.jpg$' then split_part(cle, '.', 1)::bigint end;
+$$;
+revoke execute on function public.couverture_cle_equipe(text) from public, anon;
+grant execute on function public.couverture_cle_equipe(text) to authenticated;
+
+do $$
+begin
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('couvertures', 'couvertures', true, 3145728, array['image/jpeg'])
+  on conflict (id) do update
+    set public = true,
+        file_size_limit = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types;
+exception
+  when others then raise warning 'couvertures : bucket non créé (%)', sqlerrm;
+end;
+$$;
+
+do $$
+begin
+  drop policy if exists "couvertures: lecture ligue" on storage.objects;
+  create policy "couvertures: lecture ligue"
+    on storage.objects for select
+    to authenticated
+    using (bucket_id = 'couvertures' and (select public.est_membre()));
+
+  drop policy if exists "couvertures: les dirigeants posent" on storage.objects;
+  create policy "couvertures: les dirigeants posent"
+    on storage.objects for insert
+    to authenticated
+    with check (
+      bucket_id = 'couvertures'
+      and coalesce(public.role_equipe(public.couverture_cle_equipe(name)), 'membre') <> 'membre'
+    );
+
+  drop policy if exists "couvertures: les dirigeants remplacent" on storage.objects;
+  create policy "couvertures: les dirigeants remplacent"
+    on storage.objects for update
+    to authenticated
+    using (
+      bucket_id = 'couvertures'
+      and coalesce(public.role_equipe(public.couverture_cle_equipe(name)), 'membre') <> 'membre'
+    )
+    with check (
+      bucket_id = 'couvertures'
+      and coalesce(public.role_equipe(public.couverture_cle_equipe(name)), 'membre') <> 'membre'
+    );
+exception
+  when others then raise warning 'couvertures : règles Storage non posées (%)', sqlerrm;
+end;
+$$;
+
+revoke execute on function public.equipe_blason(bigint, jsonb), public.equipe_signer_charte(bigint),
+  public.equipe_resultat(bigint, int, int, jsonb), public.equipe_couverture(bigint, boolean) from public, anon;
+grant execute on function public.equipe_blason(bigint, jsonb), public.equipe_signer_charte(bigint),
+  public.equipe_resultat(bigint, int, int, jsonb), public.equipe_couverture(bigint, boolean) to authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.equipe_resultats;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
 
 -- ─────────────────── Confidentialité : les accords ───────────────────
 -- L'accord de chaque joueur à la politique de confidentialité (22/10/2026) :
@@ -4216,6 +4644,31 @@ create policy "messages: le Vestiaire, à la SFL" on public.messages as restrict
 drop policy if exists "messages: écrire au Vestiaire, la SFL" on public.messages;
 create policy "messages: écrire au Vestiaire, la SFL" on public.messages as restrictive for insert to authenticated
   with check (canal <> 'sfl' or (select public.joueur_sfl((select auth.uid()))) or (select public.is_league_admin()));
+
+-- ─────────────── Mises en ligne : les repères de la croissance ───────────────
+-- Sabri, 24/10 : « quand on voit la croissance, voir rapidement les actions
+-- qui ont été faites à ce moment-là de la part de l'application ». Chaque
+-- build de production réussi pose ici sa version (scripts/postbuild.ts) :
+-- le commit, son titre (celui de sa PR) et l'heure. Admin → Activité les
+-- montre sous les courbes, avec l'historique d'avant cette table
+-- (lib/sfl/mises-en-ligne.ts). Rien de personnel ; l'admin seul lit, le
+-- build seul écrit (connexion directe à la base, hors API).
+create table if not exists public.mises_en_ligne (
+  sha    text primary key check (sha ~ '^[0-9a-f]{7,40}$'),
+  titre  text not null check (char_length(titre) between 1 and 300),
+  pr     integer,
+  le     timestamptz not null default now()
+);
+
+alter table public.mises_en_ligne enable row level security;
+
+drop policy if exists "mises_en_ligne: l'admin lit" on public.mises_en_ligne;
+create policy "mises_en_ligne: l'admin lit"
+  on public.mises_en_ligne for select to authenticated
+  using ((select public.is_league_admin()));
+
+revoke all on public.mises_en_ligne from anon, authenticated;
+grant select on public.mises_en_ligne to authenticated;
 
 -- ───────────────────────── Les pronos Bola ─────────────────────────
 -- Sabri, 24/10 : « que le joueur puisse pronostiquer des choses dans les

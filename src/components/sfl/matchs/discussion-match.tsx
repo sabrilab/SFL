@@ -326,7 +326,7 @@ function FilDeLEquipe({
       sousTitre={<SousTitre>{[equipe.nom, equipe.ville].filter(Boolean).join(" · ")}</SousTitre>}
       tete={
         <div className="flex flex-col items-center gap-3 pt-5 pb-1">
-          <Ecusson initiales={equipe.initiales} fond={equipe.fond} taille={44} />
+          <Ecusson initiales={equipe.initiales} fond={equipe.fond} blason={equipe.blason} taille={44} />
           <Rangees n={signataires(equipe).length} cote={cotePetite(format)} label="Les joueurs de l'équipe">
             {signataires(equipe).map((m) => (
               <CarteDe key={m.id} name={m.name} size={format.petite} />

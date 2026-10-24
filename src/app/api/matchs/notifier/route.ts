@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     // Le motif, pour la page Activité : match-invitation, match-modifie ou match-annule.
     const motif = type === "invitation" ? "match-invitation" : type === "modifie" ? "match-modifie" : "match-annule";
     const envois = new Map(cibles.map((uid): [string, Envoi] => [uid, { notif, motif, ref: `match:${id}` }]));
-    envoyes = (await prevenir(sb, cle, envois)).recus.size;
+    envoyes = (await prevenir(sb, cle, envois, { de: moi.id })).recus.size;
   }
 
   return NextResponse.json({ envoyes, prevenus: cibles.length, annule: type === "annule" });

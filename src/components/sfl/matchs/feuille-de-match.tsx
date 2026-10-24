@@ -16,8 +16,10 @@
 // l'admin a dit sur quel terrain (Sabri, 23/10), chacun le porte dans un coin.
 //
 // « Partager la feuille » en fait une image au format story (1080 × 1920,
-// noir, logo BOLA) : le terrain qu'on regarde, dessiné comme dans l'app et
-// agrandi. La feuille de partage du téléphone s'ouvre, on choisit Snap.
+// noir, logo BOLA, l'heure en grand) : le terrain dessiné comme dans l'app et
+// agrandi. Plusieurs matchs le même jour : une image par match, toutes
+// partagées d'un coup (Sabri, 24/10). La feuille de partage du téléphone
+// s'ouvre, on choisit Snap.
 // L'image est préparée dès que la fiche s'ouvre, pour que le geste de partage
 // parte tout de suite (Safari refuse de partager si le geste a attendu trop
 // longtemps) ; sans feuille de partage (ordinateur), elle se télécharge.
@@ -238,12 +240,17 @@ export function FeuilleDeMatch({
   const t = terrains[Math.min(choix, terrains.length - 1)];
 
   const basEstA = !t?.b.joueurs.includes(moi);
-  // L'image montre le terrain qu'on regarde, tel qu'on le voit.
-  const image = useImage(
-    t ? { terrain: t, basEstA, label: terrains.length > 1 ? t.label : null } : null,
-    entete,
-    parNom,
+  // Une image par match du jour, chaque terrain tel qu'on le voit dans l'app.
+  const sujets = useMemo(
+    () =>
+      terrains.map((x) => ({
+        terrain: x,
+        basEstA: !x.b.joueurs.includes(moi),
+        label: terrains.length > 1 ? x.label : null,
+      })),
+    [terrains, moi],
   );
+  const image = useImage(sujets, entete, parNom);
   const [fiche, setFiche] = useState<{
     player: Player;
     equipe: EquipeDuJour;
@@ -313,7 +320,7 @@ export function FeuilleDeMatch({
         className="bouton-principal bouton--mauve flex h-12 items-center justify-center gap-2 text-[15px] font-semibold disabled:opacity-40"
       >
         <Share className="size-[18px]" />
-        Partager la feuille
+        {terrains.length > 1 ? `Partager les ${terrains.length} feuilles` : "Partager la feuille"}
       </button>
       {image.calque}
       <FicheJoueurSheet
@@ -478,53 +485,61 @@ interface SujetImage {
 }
 
 /**
- * Dessine l'image hors écran, la photographie dès que la fiche est ouverte,
- * et rend le geste de partage immédiat.
+ * Dessine les images hors écran, les photographie dès que la fiche est
+ * ouverte, et rend le geste de partage immédiat.
  */
 function useImage(
-  sujet: SujetImage | null,
+  sujets: SujetImage[],
   entete: EnTeteFeuille,
   parNom: Map<string, Player>,
 ) {
-  const ref = useRef<HTMLDivElement>(null);
-  // Une photo repeinte au maillot qui arrive : l'image se reprend, avec elle.
+  const refs = useRef<(HTMLDivElement | null)[]>([]);
+  // Une photo repeinte au maillot qui arrive : les images se reprennent, avec elle.
   const maillots = useVersionMaillots();
-  const cle = JSON.stringify([sujet, entete, maillots]);
-  // L'image tient à la feuille qu'elle montre : une autre feuille, et elle est périmée.
-  const [pris, setPris] = useState<{ cle: string; fichier: File } | null>(null);
-  const fichier = pris?.cle === cle ? pris.fichier : null;
+  const cle = JSON.stringify([sujets, entete, maillots]);
+  // Les images tiennent aux feuilles qu'elles montrent : d'autres feuilles, et elles sont périmées.
+  const [pris, setPris] = useState<{ cle: string; fichiers: File[] } | null>(null);
+  const fichiers = pris?.cle === cle ? pris.fichiers : null;
 
   useEffect(() => {
     let annule = false;
     // Laisse la fiche finir de monter, et les photos arriver.
     const minuteur = setTimeout(async () => {
-      const noeud = ref.current;
-      if (!noeud) return;
+      const noeuds = refs.current.slice(0, sujets.length);
+      if (!noeuds.length || noeuds.some((n) => !n)) return;
       try {
         await document.fonts?.ready;
-        const prendre = () =>
-          toBlob(noeud, {
-            pixelRatio: 2,
-            // Les photos changent d'adresse avec elles (?v=…) ; une photo
-            // repeinte (blob:) ne se relit pas si on lui ajoute un paramètre.
-            includeQueryParams: true,
-            width: LARGEUR,
-            height: HAUTEUR,
-          });
-        const garder = (blob: Blob | null) => {
-          if (!annule && blob)
-            setPris({
-              cle,
-              fichier: new File([blob], "feuille-de-match-bola.png", {
-                type: "image/png",
-              }),
+        const prendreTout = async () => {
+          const blobs: Blob[] = [];
+          for (const noeud of noeuds) {
+            const blob = await toBlob(noeud!, {
+              pixelRatio: 2,
+              // Les photos changent d'adresse avec elles (?v=…) ; une photo
+              // repeinte (blob:) ne se relit pas si on lui ajoute un paramètre.
+              includeQueryParams: true,
+              width: LARGEUR,
+              height: HAUTEUR,
             });
+            if (annule || !blob) return;
+            blobs.push(blob);
+          }
+          setPris({
+            cle,
+            fichiers: blobs.map(
+              (blob, i) =>
+                new File(
+                  [blob],
+                  blobs.length > 1 ? `feuille-de-match-${i + 1}-bola.png` : "feuille-de-match-bola.png",
+                  { type: "image/png" },
+                ),
+            ),
+          });
         };
-        garder(await prendre());
+        await prendreTout();
         // Safari (et tout navigateur d'iPhone) peut dessiner l'image avant
         // d'y avoir posé les photos et les logos : sa première prise sort
         // alors sans eux. La seconde les a, et remplace la première.
-        if (!annule && navigator.vendor.startsWith("Apple")) garder(await prendre());
+        if (!annule && navigator.vendor.startsWith("Apple")) await prendreTout();
       } catch {
         // Pas d'image : le bouton reste grisé, la feuille se lit quand même.
       }
@@ -533,14 +548,16 @@ function useImage(
       annule = true;
       clearTimeout(minuteur);
     };
+    // La clé dit tout ce que montrent les images.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cle]);
 
   async function partager() {
-    if (!fichier) return;
-    // Le fichier seul. Avec un titre, Safari met dans la feuille de partage un
-    // texte à part, avant l'image : Snap (comme Instagram ou WhatsApp) prend
-    // ce texte et laisse l'image, ou reste bloqué.
-    const donnees = { files: [fichier] };
+    if (!fichiers) return;
+    // Les fichiers seuls. Avec un titre, Safari met dans la feuille de partage
+    // un texte à part, avant les images : Snap (comme Instagram ou WhatsApp)
+    // prend ce texte et laisse les images, ou reste bloqué.
+    const donnees = { files: fichiers };
     if (
       typeof navigator.canShare === "function" &&
       navigator.canShare(donnees)
@@ -553,27 +570,36 @@ function useImage(
       }
       return;
     }
-    const url = URL.createObjectURL(fichier);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fichier.name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    for (const fichier of fichiers) {
+      const url = URL.createObjectURL(fichier);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fichier.name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
   }
 
-  const calque = sujet && (
+  const calque = sujets.length > 0 && (
     <div
       aria-hidden
       className="pointer-events-none fixed top-0"
       style={{ left: -10000 }}
     >
-      <div ref={ref}>
-        <ImageFeuille sujet={sujet} entete={entete} parNom={parNom} />
-      </div>
+      {sujets.map((sujet, i) => (
+        <div
+          key={sujet.terrain.label}
+          ref={(n) => {
+            refs.current[i] = n;
+          }}
+        >
+          <ImageFeuille sujet={sujet} entete={entete} parNom={parNom} />
+        </div>
+      ))}
     </div>
   );
 
-  return { pret: !!fichier, partager, calque };
+  return { pret: !!fichiers, partager, calque };
 }
 
 /**
@@ -636,18 +662,24 @@ function ImageFeuille({
             {entete.surtitre}
           </span>
         </div>
-        <div
-          style={{
-            font: "900 35px/1 var(--font-inter), Inter, system-ui, sans-serif",
-            letterSpacing: "-0.04em",
-            textTransform: "uppercase",
-          }}
-        >
-          Feuille de match
+        {/* L'heure en grand, en face du titre (Sabri, 24/10). */}
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
+          <div
+            style={{
+              font: "900 35px/1 var(--font-inter), Inter, system-ui, sans-serif",
+              letterSpacing: "-0.04em",
+              textTransform: "uppercase",
+            }}
+          >
+            Feuille de match
+          </div>
+          <div style={{ font: "64px/0.82 var(--font-anton), Anton, sans-serif", whiteSpace: "nowrap" }}>
+            {t.heure ?? entete.heure}
+          </div>
         </div>
-        <div style={{ fontSize: 16, fontWeight: 600 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {sujet.label && <span>{sujet.label} · </span>}
-          {entete.jour} · {t.heure ?? entete.heure}
+          {entete.jour}
           {(t.ou ?? entete.ou) && (
             <span style={{ fontWeight: 500, color: GRIS }}> · {t.ou ?? entete.ou}</span>
           )}

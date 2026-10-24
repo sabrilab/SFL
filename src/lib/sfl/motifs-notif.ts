@@ -57,6 +57,8 @@ export const MOTIFS_NOTIF = {
   "equipe-relance": { famille: "equipe", label: "Le capitaine relance", effet: "a répondu à l'invitation" },
   "equipe-signature": { famille: "equipe", label: "Un joueur a signé", effet: null },
   "equipe-active": { famille: "equipe", label: "L'équipe est active", effet: null },
+  // La feuille d'un match remplie par l'autre équipe : confirmer, ou corriger (24/10).
+  "equipe-resultat": { famille: "equipe", label: "Un score à confirmer", effet: "a rempli sa feuille" },
   "equipe-message": { famille: "equipe", label: "Un nouveau message", effet: A_L_EQUIPE },
   "equipe-reponse": { famille: "equipe", label: "On lui répond", effet: A_L_EQUIPE },
   "equipe-cite": { famille: "equipe", label: "On le cite (@pseudo)", effet: A_L_EQUIPE },

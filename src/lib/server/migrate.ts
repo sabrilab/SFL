@@ -126,3 +126,41 @@ export async function migrateSchema(sql: string, dbUrl?: string): Promise<Migrat
     message: `connexion impossible — ${connectErrors.join(" | ")}`,
   };
 }
+
+export interface NoteResult {
+  status: "notee" | "deja" | "not-configured" | "error";
+  message?: string;
+}
+
+/**
+ * Pose une mise en ligne dans public.mises_en_ligne (scripts/postbuild.ts),
+ * le repère « App » d'Admin → Activité. Un commit reconstruit garde sa
+ * première heure. Comme la migration, une base injoignable n'échoue rien.
+ */
+export async function noterMiseEnLigne(m: { sha: string; titre: string; pr: number | null }): Promise<NoteResult> {
+  const candidates = candidateUrls();
+  if (candidates.length === 0) return { status: "not-configured" };
+  const connectErrors: string[] = [];
+  for (const c of candidates) {
+    const client = new Client({ connectionString: normalizeDbUrl(c.url), connectionTimeoutMillis: 8000 });
+    try {
+      await client.connect();
+    } catch (e) {
+      connectErrors.push(`${c.name}: ${e instanceof Error ? e.message : String(e)}`);
+      await client.end().catch(() => {});
+      continue;
+    }
+    try {
+      const r = await client.query(
+        "insert into public.mises_en_ligne (sha, titre, pr) values ($1, $2, $3) on conflict (sha) do nothing",
+        [m.sha.toLowerCase(), m.titre.slice(0, 300), m.pr]
+      );
+      return { status: (r.rowCount ?? 0) > 0 ? "notee" : "deja" };
+    } catch (e) {
+      return { status: "error", message: `${c.name} · ${e instanceof Error ? e.message : String(e)}` };
+    } finally {
+      await client.end().catch(() => {});
+    }
+  }
+  return { status: "error", message: `connexion impossible — ${connectErrors.join(" | ")}` };
+}

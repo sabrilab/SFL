@@ -1,10 +1,15 @@
 "use client";
 
-// Les invitations de l'ouverture : l'annonce des divisions, la ville, les
-// notifications, la carte officielle, puis les joueurs à suivre. Une seule
-// par ouverture, jamais
+// Les invitations de l'ouverture : l'équipe qui m'invite, l'annonce des
+// divisions, la ville, les notifications, la carte officielle, puis les
+// joueurs à suivre. Une seule par ouverture, jamais
 // deux.
 //
+// · L'équipe, avant tout (Sabri, 24/10 : « contraints de répondre à cette
+//   notif : oui ou non ? ») : une invitation de Bola Team encore valable
+//   attend son Oui ou son Non, sans « Plus tard » ; à un membre qui avait
+//   signé la version 1 du Règlement, la Charte de déontologie à signer
+//   (equipe/reponse-equipe.tsx).
 // 0. L'annonce des divisions, jusqu'au soir de la J3 (annonce-divisions.tsx) :
 //    une fois dans la semaine, une fois le dimanche même. Pendant la fenêtre
 //    de sa notification (la veille dès 18 h, le dimanche matin), l'ouverture
@@ -56,6 +61,7 @@ import { AnnonceDivisions } from "@/components/sfl/annonce-divisions";
 import { Card3D } from "@/components/sfl/card-3d";
 import { FluxCarteOfficielle } from "@/components/sfl/carte-officielle";
 import { InvitationVille } from "@/components/sfl/invitation-ville";
+import { ReponseEquipe, equipeAOuvrir, type EquipeAOuvrir } from "@/components/sfl/equipe/reponse-equipe";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -84,9 +90,10 @@ import {
 import type { Saison } from "@/lib/sfl/saisie/types";
 import { enDemo as enDemoSuivis, liensDeLaBase, liensDemo, rafraichirSuivis, suivisLus, suivre } from "@/lib/sfl/suivis";
 import { maVille, maVilleAProposer, type VilleJoueur } from "@/lib/sfl/villes";
+import { demoInvitation } from "@/lib/sfl/equipes-demo";
 import { cn } from "@/lib/utils";
 
-export type Invitation = "divisions" | "ville" | "carte" | "notifs" | "suivre";
+export type Invitation = "equipe" | "divisions" | "ville" | "carte" | "notifs" | "suivre";
 
 const PLUS_TARD = (quoi: Invitation, nom: string) => `sfl-invitation-${quoi}-${nom}`;
 /** Combien de joueurs l'invitation propose de suivre. */
@@ -96,7 +103,7 @@ const PAUSE_MS = 2 * 24 * 3600 * 1000;
 /** Après le splash, et après la cérémonie des nouvelles cartes si elle passe. */
 const DELAI_MS = 2600;
 
-const TEXTES: Record<Exclude<Invitation, "ville" | "divisions">, { titre: string; ligne: string; bouton: string }> = {
+const TEXTES: Record<Exclude<Invitation, "ville" | "divisions" | "equipe">, { titre: string; ligne: string; bouton: string }> = {
   carte: {
     titre: "Ta carte officielle",
     ligne: "Ton visage, le maillot Bola. Elle apparaît sur ta carte, chez tout le monde.",
@@ -144,11 +151,11 @@ export function aSuivre(saison: Saison, players: Player[], nom: string, suivable
   return [...fideles, ...hauts].slice(0, PROPOSES);
 }
 
-/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville`, `?invitation=suivre` ou `?invitation=divisions` la montre sans compte vérifié (captures). */
+/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville`, `?invitation=suivre`, `?invitation=divisions` ou `?invitation=equipe` la montre sans compte vérifié (captures). */
 function apercu(): Invitation | null {
   if (process.env.NODE_ENV === "production" || typeof window === "undefined") return null;
   const v = new URLSearchParams(window.location.search).get("invitation");
-  return v === null ? null : v === "notifs" || v === "ville" || v === "suivre" || v === "divisions" ? v : "carte";
+  return v === null ? null : v === "notifs" || v === "ville" || v === "suivre" || v === "divisions" || v === "equipe" ? v : "carte";
 }
 
 export function InvitationCarte() {
@@ -163,6 +170,8 @@ export function InvitationCarte() {
   const [visible, setVisible] = useState<Invitation | null>(null);
   /** La ville que « D'où tu viens ? » propose d'emblée. */
   const [proposee, setProposee] = useState<VilleJoueur | null>(null);
+  /** L'équipe qui m'invite, ou la Charte à signer. */
+  const [equipe, setEquipe] = useState<EquipeAOuvrir | null>(null);
   const [edition, setEdition] = useState<EditionAnnonce>("avant");
   const [flux, setFlux] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -188,6 +197,8 @@ export function InvitationCarte() {
       if (forcee) {
         if (forcee === "ville") setProposee(maVille(nom));
         if (forcee === "divisions") setEdition(editionAnnonce(ligue.current.saison, maintenant) ?? "avant");
+        if (forcee === "equipe")
+          setEquipe({ quoi: "invitation", ...demoInvitation(ligue.current.players.filter((p) => p.matchs > 0).map((p) => p.name), nom) });
         setVisible(forcee);
         return;
       }
@@ -205,6 +216,14 @@ export function InvitationCarte() {
       if (annule) return;
       noterEtatNotifs(etat, nom);
       if (identiteConfirmee(nom) === false) return;
+      // L'équipe d'abord : son invitation attend un Oui ou un Non.
+      const team = await equipeAOuvrir(enPause("equipe", nom)).catch(() => null);
+      if (annule) return;
+      if (team) {
+        setEquipe(team);
+        setVisible("equipe");
+        return;
+      }
       const annonce = editionAnnonce(ligue.current.saison, maintenant);
       if (annonce && !annonceVue(annonce, nom)) {
         setEdition(annonce);
@@ -277,13 +296,14 @@ export function InvitationCarte() {
     setVisible(null);
   }
 
-  const texte = visible && visible !== "ville" && visible !== "divisions" ? TEXTES[visible] : null;
+  const texte = visible && visible !== "ville" && visible !== "divisions" && visible !== "equipe" ? TEXTES[visible] : null;
   const Icone = visible === "notifs" ? Bell : visible === "suivre" ? UserPlus : Sparkles;
   const choisis = proposes.filter((n) => !decoches.has(n)).length;
 
   return (
     <>
       <AnimatePresence>
+        {visible === "equipe" && equipe && <ReponseEquipe key="equipe" a={equipe} onFini={() => setVisible(null)} onPlusTard={plusTard} />}
         {visible === "divisions" && <AnnonceDivisions key="divisions" player={player} edition={edition} onFermer={annonceFermee} />}
         {visible === "ville" && (
           <InvitationVille key="ville" player={player} proposee={proposee} onFini={() => setVisible(null)} onPlusTard={plusTard} />
