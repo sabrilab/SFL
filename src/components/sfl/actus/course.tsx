@@ -21,7 +21,7 @@
 //   · le fil : le jour du match, la feuille en direct ; les divisions
 //     (divisions.tsx : leur annonce jusqu'à la J4, puis le bilan de chaque
 //     dimanche) ; ton dimanche (ta carte, tes chiffres, tes places) ; la
-//     convocation (qui vient, Je viens / Je passe ; « Dernier dimanche sans
+//     convocation (la météo de ton match, meteo-match.tsx ; qui vient, Je viens / Je passe ; « Dernier dimanche sans
 //     divisions » sur celle de la J3, ta division dès la J4) ; tes missions,
 //     dès que la feuille est faite (missions.tsx), puis les contrats en jeu
 //     de toute la ligue (contrats-en-jeu.tsx) ; ce qui se joue dimanche (les
@@ -70,6 +70,8 @@ import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { useCollant } from "@/hooks/use-collant";
 import { usePresence } from "@/hooks/use-presence";
+import { MeteoMatch } from "@/components/sfl/meteo-match";
+import { dateIsoDuLibelle } from "@/lib/sfl/meteo";
 import { voteOuvert } from "@/lib/sfl/convocation-temps";
 import { annonceEnCours, J_DECOUPAGE, nomDivision } from "@/lib/sfl/divisions";
 import { divisionsDeLaJournee } from "@/lib/sfl/equipes-division";
@@ -326,6 +328,10 @@ function Convocation({ className }: { className?: string }) {
   const etat = useMemo(() => divisionsDeLaJournee(saison, p.journee), [saison, p.journee]);
   const division = etat && !isHidden(me) ? (etat.actuelle.get(me) ?? 3) : null;
   const repondre = (r: "present" | "absent") => p.answer(p.mine === r ? null : r);
+  // La météo de mon match : son lieu (celui de la ligue qui porte ce nom, sinon le terrain habituel).
+  const [aujourdhui] = useState(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date()));
+  const terrains = saison.terrains ?? [];
+  const lieu = terrains.find((t) => t.nom === p.rendezVous.lieu) ?? terrains.find((t) => t.defaut) ?? terrains[0] ?? null;
   if (bola) return null;
   return (
     <section
@@ -347,6 +353,17 @@ function Convocation({ className }: { className?: string }) {
           </span>
         </span>
       </div>
+      {lieu && (
+        <MeteoMatch
+          taille="ligne"
+          lat={lieu.lat}
+          lng={lieu.lng}
+          date={dateIsoDuLibelle(p.jour, aujourdhui)}
+          heure={p.rendezVous.heure}
+          aujourdhui={aujourdhui}
+          className="border-t border-foreground/10 pt-3.5 dark:border-white/10"
+        />
+      )}
       <div className="flex items-baseline justify-between">
         <span className="mono-label text-foreground/50 dark:text-white/50">
           {p.presents.length} {p.presents.length > 1 ? "viennent" : "vient"}

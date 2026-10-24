@@ -80,6 +80,7 @@ import { FeuilleProfil } from "@/components/sfl/card-viewer";
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
+import { MeteoMatch } from "@/components/sfl/meteo-match";
 import { DiscussionMatch, type OngletDiscussion } from "@/components/sfl/matchs/discussion-match";
 import { FeuilleDeMatch } from "@/components/sfl/matchs/feuille-de-match";
 import { DuelsDuJour } from "@/components/sfl/matchs/duels";
@@ -356,6 +357,15 @@ interface MatchMap {
 function heureDe(heure: string): number {
   const m = heure.match(/(\d{1,2})\s*[h:]/i);
   return m ? Number(m[1]) : 13;
+}
+
+/** Le jour d'un match, AAAA-MM-JJ : celui de la base pour un match ouvert ou un défi, sinon lu dans son libellé. */
+function dateIsoDuMatch(m: Pick<MatchMap, "partie" | "team" | "dateLabel">, aujourdhui: string): string | null {
+  const brut = m.partie?.jour ?? m.team?.defi.jour;
+  const iso = brut?.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  if (iso) return iso;
+  const d = lireDate(m.dateLabel, aujourdhui);
+  return d ? d.toISOString().slice(0, 10) : null;
 }
 
 /** Les jours entre aujourd'hui et une date (négatif : passée) ; null si illisible. */
@@ -1415,6 +1425,18 @@ export default function MapPage() {
             )}
           </SheetHeader>
           <div className="flex flex-col gap-5 px-4">
+            {/* La météo au coup d'envoi, sur le terrain du match (Sabri, 24/10 :
+                « à telle heure, ce que ça prévoit ») : sous l'heure et l'adresse. */}
+            {!ficheAdmin && choisi && !choisi.joue && choisi.terrain && (
+              <MeteoMatch
+                key={choisi.cle}
+                lat={choisi.terrain.lat}
+                lng={choisi.terrain.lng}
+                date={dateIsoDuMatch(choisi, aujourdhui)}
+                heure={choisi.heure}
+                aujourdhui={aujourdhui}
+              />
+            )}
             {ficheAdmin ? (
               <>
                 <OuSeJouent saison={saison} matchs={ligue} terrains={terrains} matchsDe={matchsDe} onSauver={sauver} />
