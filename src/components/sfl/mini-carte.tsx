@@ -4,11 +4,16 @@
 // Bola (photo comprise), en petit. La toucher l'ouvre en grand, en 3D, avec
 // ses abonnés et de quoi le suivre (card-viewer.tsx). Sur un terrain, le
 // joueur y porte le maillot de son camp (`maillot`), en petit comme en grand.
+// La carte d'une saison close (`saison`, ou l'archive qu'on relit) garde son
+// édition d'époque une fois ouverte : la visionneuse vit hors de l'archive,
+// la saison lui est donc passée en toutes lettres (use-epoque-carte.ts).
 
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useCardViewer } from "@/components/sfl/card-viewer";
 import { prechaufferCarte } from "@/components/sfl/card-3d";
+import { aSonEpoque } from "@/components/sfl/finitions-carte";
 import { useSeason } from "@/components/sfl/season-provider";
+import { useSaisonDeCarte } from "@/hooks/use-epoque-carte";
 import type { BoostType, Player } from "@/lib/sfl/engine";
 import type { Camp } from "@/lib/sfl/maillots";
 import { cn } from "@/lib/utils";
@@ -36,6 +41,8 @@ export function MiniCarte({
   vertical,
   distinction,
   maillot,
+  saison,
+  journee,
 }: {
   player: Player;
   /** La largeur, en fraction de 254 px (voir FORMAT_CARTE). */
@@ -53,8 +60,15 @@ export function MiniCarte({
   distinction?: BoostType;
   /** Le camp du joueur dans un match : sa photo porte ce maillot-là. */
   maillot?: Camp;
+  /** La saison de la carte, quand ce n'est pas celle qu'on lit (une carte d'une saison close). */
+  saison?: number;
+  /** La journée d'une carte à titre. */
+  journee?: number;
 }) {
   const { open } = useCardViewer();
+  // La saison de la carte, figée pour la visionneuse ; dans la clé de la 3D, une carte d'époque.
+  const saisonCarte = useSaisonDeCarte(saison);
+  const epoque = aSonEpoque(saisonCarte) ? `-s${saisonCarte}${journee ? `-j${journee}` : ""}` : "";
   return (
     <button
       type="button"
@@ -62,12 +76,14 @@ export function MiniCarte({
       onClick={(e) => {
         e.stopPropagation();
         open({
-          cacheKey: cle ?? `mini-${player.name}${distinction ? `-${distinction}` : ""}${maillot ? `-${maillot}` : ""}`,
+          cacheKey: cle ?? `mini-${player.name}${distinction ? `-${distinction}` : ""}${maillot ? `-${maillot}` : ""}${epoque}`,
           mode: "simple",
           title: player.name,
           subtitle: detail,
           joueur: player.name,
-          render: (s) => <PlayerCard player={player} size={s} distinction={distinction} maillot={maillot} />,
+          render: (s) => (
+            <PlayerCard player={player} size={s} distinction={distinction} maillot={maillot} saison={saisonCarte} journee={journee} />
+          ),
         });
       }}
       aria-label={`Voir la carte de ${player.name}`}
@@ -80,6 +96,8 @@ export function MiniCarte({
         vertical={vertical}
         distinction={distinction}
         maillot={maillot}
+        saison={saisonCarte}
+        journee={journee}
       />
     </button>
   );

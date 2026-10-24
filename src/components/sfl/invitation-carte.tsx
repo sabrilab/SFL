@@ -43,6 +43,10 @@
 //    décoche un, et le bouton les suit d'un coup (suivis.ts). Décidé sur la
 //    liste relue de la base, jamais sur un cache.
 //
+// L'accueil de l'app passe avant tout (components/sfl/accueil, 24/10) : à
+// la première ouverture, il demande déjà la ville, la carte officielle, les
+// notifications et les partenaires. Ce qui a été laissé pour « Plus tard »
+// y est mis en pause ici aussi (mettreEnPause) : rien ne revient le jour même.
 // Le prénom, le nom, le pseudo et l'email passent avant tout (identite.tsx) :
 // rien ne s'ouvre ici tant que le joueur ne les a pas confirmés.
 //
@@ -89,7 +93,7 @@ import { maVille, maVilleAProposer, type VilleJoueur } from "@/lib/sfl/villes";
 import { demoInvitation } from "@/lib/sfl/equipes-demo";
 import { cn } from "@/lib/utils";
 
-type Invitation = "equipe" | "divisions" | "ville" | "carte" | "notifs" | "suivre";
+export type Invitation = "equipe" | "divisions" | "ville" | "carte" | "notifs" | "suivre";
 
 const PLUS_TARD = (quoi: Invitation, nom: string) => `sfl-invitation-${quoi}-${nom}`;
 /** Combien de joueurs l'invitation propose de suivre. */
@@ -117,7 +121,15 @@ const TEXTES: Record<Exclude<Invitation, "ville" | "divisions" | "equipe">, { ti
   },
 };
 
-function enPause(quoi: Invitation, nom: string): boolean {
+/** « Plus tard » : l'invitation se tait deux jours sur cet appareil (l'accueil s'en sert aussi). */
+export function mettreEnPause(quoi: Invitation, nom: string) {
+  try {
+    localStorage.setItem(PLUS_TARD(quoi, nom), String(Date.now()));
+  } catch {}
+}
+
+/** Remise à plus tard il y a moins de deux jours, sur cet appareil (l'accueil s'en sert aussi). */
+export function enPause(quoi: Invitation, nom: string): boolean {
   try {
     const t = Number(localStorage.getItem(PLUS_TARD(quoi, nom)) ?? 0);
     return Date.now() - t < PAUSE_MS;
@@ -130,7 +142,7 @@ function enPause(quoi: Invitation, nom: string): boolean {
  * Les joueurs à suivre : ses partenaires les plus fidèles, puis le haut du
  * Pépite d'Or ; un compte accepté (`suivable`), ni lui, ni un joueur masqué.
  */
-function aSuivre(saison: Saison, players: Player[], nom: string, suivable: (n: string) => boolean): string[] {
+export function aSuivre(saison: Saison, players: Player[], nom: string, suivable: (n: string) => boolean): string[] {
   const ok = (n: string) => n !== nom && !isHidden(n) && suivable(n);
   const fideles = [...partenaires(saison, nom).keys()].filter(ok);
   const hauts = rankPlayers(players.filter((p) => p.matchs > 0))
@@ -247,9 +259,7 @@ export function InvitationCarte() {
 
   function plusTard() {
     if (!visible) return;
-    try {
-      localStorage.setItem(PLUS_TARD(visible, nom!), String(Date.now()));
-    } catch {}
+    mettreEnPause(visible, nom!);
     if (visible === "notifs") noterNotifs("plus-tard", "ouverture");
     setVisible(null);
   }

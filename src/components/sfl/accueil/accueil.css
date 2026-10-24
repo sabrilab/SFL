@@ -1,0 +1,39 @@
+/* L'accueil de l'app (components/sfl/accueil) : la roue de la date de
+   naissance et la règle du gabarit. Leur défilement est celui du
+   navigateur, élan compris ; le calage le pose sur une valeur, et les bords
+   s'éteignent pour laisser la valeur choisie au centre. */
+
+/* La roue (roue.tsx) : calée ligne à ligne. */
+.accueil-roue {
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 32%, #000 68%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 32%, #000 68%, transparent);
+}
+.accueil-roue::-webkit-scrollbar {
+  display: none;
+}
+.accueil-roue__ligne {
+  scroll-snap-align: center;
+}
+
+/* La règle (regle.tsx) : calée cran à cran. */
+.accueil-regle {
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 24%, #000 76%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 24%, #000 76%, transparent);
+}
+.accueil-regle::-webkit-scrollbar {
+  display: none;
+}
+.accueil-regle__cran {
+  scroll-snap-align: center;
+}
+
+/* À la souris, la règle se tire : pas de calage pendant qu'on la tient. */
+@media (pointer: fine) {
+  .accueil-regle:active {
+    scroll-snap-type: none;
+  }
+}

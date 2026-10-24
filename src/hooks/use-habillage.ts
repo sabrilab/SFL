@@ -1,19 +1,21 @@
 "use client";
 
 // Ce que la carte d'un joueur porte (finitions-carte.ts) : ce qu'il a
-// débloqué dans la passe, toutes saisons (un palier atteint reste acquis,
-// palierMaxDe), les finitions qui lui sont offertes (finitions-offertes.ts),
-// et ce qu'il a choisi d'en porter (habillages-choisis.ts).
-//   · la finition et le traitement de la photo : son choix, s'il est
-//     débloqué ; « auto » (rien choisi) porte le dernier débloqué ; « - »,
-//     rien ;
+// débloqué dans le Passe Bola (lib/sfl/passe.ts), toutes saisons (un palier
+// atteint reste acquis, palierMaxDe), les finitions qui lui sont offertes
+// (finitions-offertes.ts), et ce qu'il a choisi d'en porter
+// (habillages-choisis.ts).
+//   · le skin : son choix, s'il est débloqué ; « auto » (rien choisi) porte
+//     le dernier débloqué, sauf « Tes couleurs », qui attend qu'il choisisse
+//     son pays ; « - », rien. Le traitement de la photo n'est plus dans la
+//     passe (24/10) : la carte ne le porte plus ;
 //   · les signes débloqués, le cran du cadre (missions réussies) et le rang
 //     (XP à vie) : d'office.
 // Un choix qui n'est pas débloqué ne se porte pas : la carte d'un autre
 // joueur ne montre que ce qu'il a gagné.
 
 import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from "react";
-import type { HabillageCarte } from "@/components/sfl/finitions-carte";
+import { MATIERES, type Finition, type HabillageCarte } from "@/components/sfl/finitions-carte";
 import {
   HABILLAGE_EVENT,
   habillageChoisi,
@@ -22,7 +24,8 @@ import {
   type ChoixHabillage,
 } from "@/lib/sfl/habillages-choisis";
 import { finitionsOffertes } from "@/lib/sfl/finitions-offertes";
-import { debloquesDe, type Rang } from "@/lib/sfl/missions";
+import type { Rang } from "@/lib/sfl/missions";
+import { debloquesDe } from "@/lib/sfl/passe";
 
 /** Ce que l'XP pose sur les cartes de la ligue (XpLigueProvider, xp-ligue.tsx). */
 export interface CartesXp {
@@ -72,6 +75,12 @@ export function usePalierMax(nom: string): number {
   return useContext(CartesXpContext)?.parJoueur.get(nom)?.palier ?? 0;
 }
 
+/** Les skins d'un joueur : ceux que son palier a débloqués, puis ceux qui lui sont offerts. */
+export function finitionsDe(nom: string, palier: number): Finition[] {
+  const passe = debloquesDe(palier).finitions.filter((f): f is Finition => f in MATIERES);
+  return [...passe, ...finitionsOffertes(nom).filter((f) => !passe.includes(f))];
+}
+
 /** Ce que la carte du joueur porte. Vide tant que l'XP de la ligue n'est pas calculé. */
 export function useHabillage(nom: string): HabillageCarte {
   const cartes = useContext(CartesXpContext);
@@ -79,23 +88,24 @@ export function useHabillage(nom: string): HabillageCarte {
   return useMemo(() => {
     if (!cartes) return {};
     const x = cartes.parJoueur.get(nom);
-    const d = debloquesDe(x?.palier ?? 0);
-    // Les finitions de la passe, puis celles qui lui sont offertes : « auto » porte la dernière.
-    const finitions = [...d.finitions, ...finitionsOffertes(nom).filter((f) => !d.finitions.includes(f))];
+    const palier = x?.palier ?? 0;
+    const finitions = finitionsDe(nom, palier);
+    // « Tes couleurs » se porte avec son pays : sans pays, c'est « auto ».
+    const voulue = choix.finition === "couleurs" && !choix.pays ? "auto" : choix.finition;
     const finition =
-      choix.finition === "-"
+      voulue === "-"
         ? undefined
-        : choix.finition !== "auto" && finitions.includes(choix.finition)
-          ? choix.finition
-          : finitions.at(-1);
-    const traitement =
-      choix.traitement === "-"
-        ? undefined
-        : choix.traitement !== "auto" && d.traitements.includes(choix.traitement)
-          ? choix.traitement
-          : d.traitements.at(-1);
+        : voulue !== "auto" && finitions.includes(voulue)
+          ? voulue
+          : finitions.filter((f) => f !== "couleurs").at(-1);
     const cran = Math.min(4, x?.cran ?? 0) as HabillageCarte["cran"];
-    return { finition, traitement, signes: d.signes, cran, rang: x?.rang ?? undefined };
+    return {
+      finition,
+      pays: finition === "couleurs" ? choix.pays : undefined,
+      signes: debloquesDe(palier).signes,
+      cran,
+      rang: x?.rang ?? undefined,
+    };
   }, [cartes, nom, choix]);
 }
 

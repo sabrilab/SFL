@@ -135,7 +135,12 @@ export function CarteSaison({ s, titre, lien = true, className }: { s: SaisonPal
             <div key={rang} className="flex min-w-0 flex-col items-center gap-1.5">
               {p ? (
                 <>
-                  <MiniCarte player={p} size={size} detail={`${rang}${rang === 1 ? "er" : "e"} au Pépite d'Or · ${p.pp} pts`} />
+                  <MiniCarte
+                    player={p}
+                    size={size}
+                    detail={`${rang}${rang === 1 ? "er" : "e"} au Pépite d'Or · ${p.pp} pts`}
+                    saison={s.cloturee ? s.numero : undefined}
+                  />
                   <span className={cn("max-w-[96px] truncate font-semibold", rang === 1 ? "text-[14px]" : "text-[12px] text-foreground/70")}>
                     {p.name}
                   </span>
@@ -159,7 +164,7 @@ export function CarteSaison({ s, titre, lien = true, className }: { s: SaisonPal
         {lauriers.map(([quoi, l]) =>
           l ? (
             <span key={quoi} className="inline-flex items-center gap-2 rounded-[16px] border border-foreground/15 bg-foreground/[0.05] py-1 pr-3 pl-1 text-[12px]">
-              <MiniCarte player={l.player} size={FORMAT_CARTE.petite} detail={`${quoi} · ${l.n}`} />
+              <MiniCarte player={l.player} size={FORMAT_CARTE.petite} detail={`${quoi} · ${l.n}`} saison={s.cloturee ? s.numero : undefined} />
               <span className="flex flex-col leading-tight">
                 <span className="mono-label text-foreground/45">{quoi}</span>
                 <span>

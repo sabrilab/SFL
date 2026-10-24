@@ -20,7 +20,8 @@
 //
 // Le dos (23/10, Sabri : « à l'arrière, on met Bola », de la même couleur
 // que l'avant) : la face dit sa matière et son joueur (data-matiere,
-// data-nom) ; on monte à côté d'elle, hors écran, le dos de la carte
+// data-nom ; data-emission pour une carte d'époque, sa date et son numéro
+// au dos aussi) ; on monte à côté d'elle, hors écran, le dos de la carte
 // (DosCarte), qu'on photographie aussi — la 3D le colle derrière, et prend
 // la tranche et le reflet de la même matière. La lumière qui passe sur la
 // finition animée (data-card-part="lumiere") n'est pas photographiée : la 3D
@@ -30,7 +31,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import dynamic from "next/dynamic";
 import { toPng } from "html-to-image";
 import { DosCarte } from "@/components/sfl/dos-carte";
-import { MATIERES, type HabillageCarte, type NomMatiere } from "@/components/sfl/finitions-carte";
+import { matiereDuNom, type HabillageCarte, type Matiere } from "@/components/sfl/finitions-carte";
+import type { EmissionCarte } from "@/lib/sfl/epoques";
 import { useBadgeRevision } from "@/hooks/use-badge-carte";
 import { useHabillageRevision } from "@/hooks/use-habillage";
 import { useIdentitesRevision } from "@/hooks/use-identites";
@@ -160,41 +162,54 @@ const WEBKIT =
   /AppleWebKit/.test(navigator.userAgent) &&
   !/Chrome|Chromium|Android/.test(navigator.userAgent);
 
-/** La part du canvas qu'occupe la carte 3D posée (FILL_RATIO de card-3d-canvas, recopié pour ne pas charger three ici). */
-const REMPLISSAGE_3D = 0.72;
+/**
+ * La part du canvas qu'occupe la carte 3D posée (FILL_RATIO de card-3d-canvas,
+ * recopié pour ne pas charger three ici). L'accueil s'en sert pour poser la
+ * 3D pile sur une carte plate (accueil/etape-carte.tsx).
+ */
+export const REMPLISSAGE_3D = 0.72;
 
 const TRANSPARENT_PX =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
-interface CapturedLayers {
+export interface CapturedLayers {
   background: string;
   playerLayer: string;
   stats: string;
   /** Le dos (DosCarte), s'il a pu être photographié. */
   dos?: string;
-  matiere: NomMatiere | null;
+  matiere: Matiere | null;
   width: number;
   height: number;
 }
 
 interface Dos {
-  matiere: NomMatiere;
+  matiere: Matiere;
   nom: string;
   habillage?: HabillageCarte;
+  /** Une carte d'époque : sa date d'émission et son numéro. */
+  emission?: EmissionCarte;
 }
 
-/** La matière, le joueur et l'habillage que la face déclare (bola-card.tsx), pour son dos. */
+/** Un attribut JSON de la face, ou undefined s'il manque ou ne se lit pas. */
+function lireJson<T>(texte: string | undefined): T | undefined {
+  try {
+    return texte ? (JSON.parse(texte) as T) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** La matière, le joueur, l'habillage et l'émission que la face déclare (bola-card.tsx), pour son dos. */
 function dosDe(node: HTMLElement): Dos | null {
   const corps = node.querySelector<HTMLElement>("[data-matiere]");
-  const matiere = corps?.dataset.matiere as NomMatiere | undefined;
-  if (!corps || !matiere || !(matiere in MATIERES)) return null;
-  let habillage: HabillageCarte | undefined;
-  try {
-    habillage = corps.dataset.habillage ? (JSON.parse(corps.dataset.habillage) as HabillageCarte) : undefined;
-  } catch {
-    habillage = undefined;
-  }
-  return { matiere, nom: corps.dataset.nom ?? "", habillage };
+  if (!corps?.dataset.matiere) return null;
+  const habillage = lireJson<HabillageCarte>(corps.dataset.habillage);
+  // « Tes couleurs » : la matière du pays que porte l'habillage.
+  const matiere = matiereDuNom(corps.dataset.matiere, habillage);
+  return matiere
+    ? { matiere, nom: corps.dataset.nom ?? "", habillage, emission: lireJson<EmissionCarte>(corps.dataset.emission) }
+    : null;
 }
 
 /** Attend qu'un nœud soit monté, quelques images au plus. */
@@ -216,7 +231,8 @@ function attendreNoeud<T>(lire: () => T | null, images = 30): Promise<T | null> 
 async function captureLayer(
   node: HTMLElement,
   opts: { isolatePart?: "player" | "stats"; excludeParts?: string[] },
-  fontEmbedCSS: string | undefined
+  fontEmbedCSS: string | undefined,
+  pixelRatio = 3
 ): Promise<string> {
   const transparentEls: HTMLElement[] = [];
   let isolateEl: HTMLElement | null = null;
@@ -237,7 +253,7 @@ async function captureLayer(
 
   try {
     return await toPng(node, {
-      pixelRatio: 3,
+      pixelRatio,
       fontEmbedCSS,
       // La photo change d'URL (?v=…) quand le joueur la change : sans ça,
       // le cache interne de html-to-image garderait l'ancienne.
@@ -319,6 +335,14 @@ export function Card3D(props: {
    * Pour la pop-up d'une carte qu'on vient de toucher.
    */
   apercu?: boolean;
+  /** La définition des calques photographiés, en largeurs de carte de taille 1 (254 px) : 3, davantage pour une carte vue en grand. */
+  definition?: number;
+  /**
+   * La scène qui montre les calques à la place du canvas d'ici : la carte en
+   * plein écran (carte-en-grand.tsx). Le cadre remplit alors son parent, sans
+   * squelette ni carte plate (la scène a la sienne).
+   */
+  scene?: (calques: CapturedLayers) => ReactNode;
 }) {
   // Une photo posée ou changée (chez soi ou par un autre joueur) : la capture
   // repart, sinon la 3D garderait l'ancienne image. Même chose pour le badge
@@ -340,6 +364,8 @@ function Card3DInner({
   startFace = "front",
   interactive = true,
   apercu = false,
+  definition = 3,
+  scene,
 }: {
   size?: number;
   /** Contrôle la couleur du bezel et l'intensité de l'effet holo. */
@@ -351,6 +377,8 @@ function Card3DInner({
   /** false = décorative, ne répond pas au glissement (fans de pack). */
   interactive?: boolean;
   apercu?: boolean;
+  definition?: number;
+  scene?: (calques: CapturedLayers) => ReactNode;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const captureRef = useRef<HTMLDivElement>(null);
@@ -365,6 +393,12 @@ function Card3DInner({
   /** Le dos à monter hors écran pour le photographier, lu sur la face. */
   const [dos, setDos] = useState<Dos | null>(null);
   const dosRef = useRef<HTMLDivElement>(null);
+  // En grand (scene), la face est photographiée à la taille de sa définition, en
+  // pixels CSS, plutôt qu'à la taille 1 grossie : html-to-image ramène chaque
+  // police à l'entier inférieur moins 0,1 (cloneCSSStyle). À la taille 1, le
+  // microtexte (5,95 px) y perdait 18 %, la ligne de série 14 % : en plein écran,
+  // les petits textes rétrécissaient quand la 3D remplaçait la carte plate.
+  const echelle = scene ? definition : 1;
 
   useLayoutEffect(() => {
     const node = captureRef.current;
@@ -399,24 +433,24 @@ function Card3DInner({
         const prets = await attendreBadges(node, 600);
         if (cancelled) return;
         const polices = await policesEnLigne(node);
-        const background = await captureLayer(node, { excludeParts: ["player", "stats", "lumiere"] }, polices);
+        const background = await captureLayer(node, { excludeParts: ["player", "stats", "lumiere"] }, polices, definition / echelle);
         if (cancelled) return;
         // Sur WebKit, une capture à blanc du calque joueur d'abord : elle
         // lui fait décoder la photo, que la vraie capture trouve prête.
         // (Avant, la carte se capturait deux fois par accident, ce qui le
         // masquait.)
         if (WEBKIT && node.querySelector('[data-card-part="player"] img')) {
-          await captureLayer(node, { isolatePart: "player" }, polices);
+          await captureLayer(node, { isolatePart: "player" }, polices, definition / echelle);
           if (cancelled) return;
         }
-        const playerLayer = await captureLayer(node, { isolatePart: "player" }, polices);
+        const playerLayer = await captureLayer(node, { isolatePart: "player" }, polices, definition / echelle);
         if (cancelled) return;
         // Même chose pour le sigle SFL de la ligne de série (un masque CSS).
         if (WEBKIT && node.querySelector('[data-card-part="stats"] [role="img"]')) {
-          await captureLayer(node, { isolatePart: "stats" }, polices);
+          await captureLayer(node, { isolatePart: "stats" }, polices, definition / echelle);
           if (cancelled) return;
         }
-        const stats = await captureLayer(node, { isolatePart: "stats" }, polices);
+        const stats = await captureLayer(node, { isolatePart: "stats" }, polices, definition / echelle);
         if (cancelled) return;
         // Le dos, monté à côté de la face dès qu'elle a dit sa matière.
         let dosUrl: string | undefined;
@@ -424,7 +458,7 @@ function Card3DInner({
         if (cancelled) return;
         if (dosNode) {
           try {
-            dosUrl = await captureLayer(dosNode, { excludeParts: ["lumiere"] }, await policesEnLigne(dosNode));
+            dosUrl = await captureLayer(dosNode, { excludeParts: ["lumiere"] }, await policesEnLigne(dosNode), definition);
           } catch {
             // le dos de repli (uni, à la couleur de la carte) le remplacera
           }
@@ -441,7 +475,7 @@ function Card3DInner({
     return () => {
       cancelled = true;
     };
-  }, [inView, essai]);
+  }, [inView, essai, definition, echelle]);
 
   // Dimensions estimées avant capture (base CardShell ~260×376 avec
   // bannière) pour que le skeleton occupe déjà la bonne place — la taille
@@ -451,18 +485,18 @@ function Card3DInner({
   const height = (dims ? dims.height : 376) * size;
 
   return (
-    <div ref={wrapperRef} style={{ position: "relative", width, height }}>
+    <div ref={wrapperRef} style={scene ? { position: "absolute", inset: 0 } : { position: "relative", width, height }}>
       {/* Source de capture — hors-écran (clip par un parent de taille nulle,
           jamais opacity:0 sur le nœud capturé lui-même, sinon l'image
           rasterisée hérite de cette opacité et ressort vide). */}
       {inView && (
         <div style={{ position: "absolute", top: 0, left: 0, width: 0, height: 0, overflow: "hidden" }}>
           <div ref={captureRef} style={{ position: "absolute" }} aria-hidden>
-            {render(1)}
+            {render(echelle)}
           </div>
           {dos && (
             <div ref={dosRef} style={{ position: "absolute" }} aria-hidden>
-              <DosCarte matiere={MATIERES[dos.matiere]} nom={dos.nom} habillage={dos.habillage} />
+              <DosCarte matiere={dos.matiere} nom={dos.nom} habillage={dos.habillage} emission={dos.emission} />
             </div>
           )}
         </div>
@@ -490,7 +524,9 @@ function Card3DInner({
         </div>
       )}
 
-      {captured ? (
+      {captured && scene ? (
+        scene(captured)
+      ) : captured ? (
         <CardCanvas
           background={captured.background}
           playerLayer={captured.playerLayer}
@@ -504,7 +540,7 @@ function Card3DInner({
           posee={apercu}
           onAffichee={() => setAffichee(true)}
         />
-      ) : apercu ? null : (
+      ) : apercu || scene ? null : (
         // Skeleton pendant la capture : jamais de carte 2D "flash" avant
         // le rendu 3D, juste un shimmer discret aux couleurs de la carte.
         <div

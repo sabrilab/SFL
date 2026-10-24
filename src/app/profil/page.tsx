@@ -6,7 +6,8 @@
 // plus envie, qu'on comprenne mieux les choses et que ce soit mieux rangé »,
 // comme le profil d'un joueur ouvert depuis la Recherche (profil-joueur.tsx),
 // dont elle reprend l'ordre de lecture, du plus fort au plus fin :
-//   1. moi : ma carte en grand, mon nom dans le lettrage de la Map, mon
+//   1. moi : ma carte en grand (la toucher l'ouvre en plein écran, pour la
+//      manipuler : carte-en-grand.tsx, Sabri, 24/10), mon nom dans le lettrage de la Map, mon
 //      équipe de Bola Team qui mène à sa page (equipe/equipe-du-joueur.tsx,
 //      24/10), mes abonnés comme sur Instagram (mes abonnés et mes abonnements, « Kader,
 //      Anis et 32 autres te suivent » : suivre.tsx ; Sabri, 23/10), trois
@@ -24,11 +25,13 @@
 //   4. mes badges : le prochain à viser, les trophées de fin de saison et
 //      les paliers (vitrine.tsx) ;
 //   5. mes cartes, saison par saison, avec les cartes spéciales gagnées ;
-//   6. les épreuves, à venir (le Wall of Fame est parti dans les Actus, où
-//      il est l'époque la plus longue, et la Collection est masquée pour
-//      l'instant : Sabri, 24/10 ; /palmares et /collection restent) ;
-//   7. « Se déconnecter », tout en bas, comme dans toute app
+//   6. « Se déconnecter », tout en bas, comme dans toute app
 //      (bouton-deconnexion.tsx ; Sabri, le 22/10 : « plus accessible »).
+// Le Wall of Fame est parti dans les Actus, où il est l'époque la plus
+// longue, et la Collection est masquée pour l'instant (Sabri, 24/10 ;
+// /palmares et /collection restent). Les épreuves sont cachées aussi (Sabri,
+// 24/10 : « cache les épreuves dans ma carte ») : plus d'encart « Bientôt »,
+// ni de liste dans le Passe Bola (passe-bola.tsx).
 // « Historique » est parti : chaque dimanche de Ma saison ouvre son récap. Le
 // rappel « Glisse pour tourner » aussi, comme sur le profil. Les réglages
 // (« ⋯ ») sont en haut, à côté de la loupe et du rond qui passe l'app en
@@ -40,9 +43,9 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ChevronRight, Dumbbell, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Card3D } from "@/components/sfl/card-3d";
+import { Card3DEnGrand } from "@/components/sfl/carte-en-grand";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur";
 import { MaSaison, type RangDuJour } from "@/components/sfl/ma-saison";
@@ -54,7 +57,6 @@ import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { VitrineBadges } from "@/components/sfl/vitrine";
 import { ChoixBadge } from "@/components/sfl/choix-badge";
 import { CarteOfficielle } from "@/components/sfl/carte-officielle";
-import { Locked } from "@/components/sfl/locked";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
@@ -174,11 +176,13 @@ export default function Profil() {
               ses bords vides passent un peu sous le titre et sous mon nom,
               qui restent au-dessus (relative) et se touchent normalement. */}
           <div className="-mt-[var(--fib-21)] -mb-[var(--fib-34)]">
-            <Card3D
+            <Card3DEnGrand
               cacheKey={`profil-simple-${player.name}`}
               mode="simple"
               size={tresGrand ? 1.15 * RACINE_PHI : grand ? 1.15 : 1}
               render={(s) => <PlayerCard player={player} size={s} />}
+              titre={identite.nom(player.name)}
+              sousTitre={identite.pseudo(player.name)}
             />
           </div>
           <div className="relative flex w-full flex-col items-center gap-[var(--fib-13)]">
@@ -251,27 +255,7 @@ export default function Profil() {
           {/* 5. Mes cartes : la carte de chaque saison et les cartes spéciales gagnées */}
           {mesCartes.length > 0 && <CartesCarriere saisons={mesCartes} titre="Mes cartes" />}
 
-          {/* 6. Les épreuves */}
-          <section className="flex flex-col gap-2.5">
-            {/* Les épreuves — verrouillées : les défis filmés qui rempliront la
-                carte critère par critère arrivent avec la V2. */}
-            <Locked label="Bientôt">
-              <div className="glass-soft flex items-center gap-3.5 rounded-3xl p-4">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground/10">
-                  <Dumbbell className="size-5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-semibold">Les épreuves</span>
-                  <span className="block text-[13px] text-muted-foreground">
-                    Jonglage, sprint… tes stats mesurées sur le terrain
-                  </span>
-                </span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </div>
-            </Locked>
-          </section>
-
-          {/* 7. Se déconnecter */}
+          {/* 6. Se déconnecter */}
           <BoutonDeconnexion className="w-full" />
         </div>
       </div>

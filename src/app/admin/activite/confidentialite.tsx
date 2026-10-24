@@ -1,10 +1,10 @@
 "use client";
 
 // La politique de confidentialité, côté admin (sous Activité & rétention) :
-// qui l'a acceptée dans sa version en vigueur, qui pas encore, et surtout
-// quelles cartes peuvent apparaître dans les vidéos et les posts de Bola
-// (l'accord « hors de l'app », facultatif). Avant de monter une vidéo, c'est
-// cette liste qui dit qui on peut montrer.
+// qui l'a acceptée dans une version qui vaut encore (accordValable), qui pas
+// encore, et surtout quelles cartes peuvent apparaître dans les vidéos et les
+// posts de Bola (l'accord « hors de l'app », facultatif). Avant de monter une
+// vidéo, c'est cette liste qui dit qui on peut montrer.
 //
 // La source est la table `consentements` (l'admin lit tout, par RLS) : la
 // ligne la plus récente de chaque joueur fait foi. Le public suit le choix du
@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isAdmin } from "@/lib/sfl/admin";
-import { DATE_POLITIQUE, VERSION_POLITIQUE } from "@/lib/sfl/confidentialite";
+import { DATE_POLITIQUE, accordValable } from "@/lib/sfl/confidentialite";
 import { erreurSansTable } from "@/lib/sfl/consentement";
 import { supabase } from "@/lib/supabase";
 
@@ -92,7 +92,7 @@ export function AccordsStats({
         .filter((p) => p.valide !== false)
         .map((p) => {
           const l = dernier.get(p.id);
-          const accepte = l?.version === VERSION_POLITIQUE;
+          const accepte = accordValable(l?.version);
           return { nom: p.name, accepte, horsApp: accepte && !!l?.hors_app, parent: accepte && !!l?.parent };
         })
     );

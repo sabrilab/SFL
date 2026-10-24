@@ -21,6 +21,8 @@
 // L'image est préparée dès que la fiche s'ouvre, pour que le geste de partage
 // parte tout de suite (Safari refuse de partager si le geste a attendu trop
 // longtemps) ; sans feuille de partage (ordinateur), elle se télécharge.
+// Elle part seule, sans titre : sur iPhone, un titre arrive à l'app choisie
+// comme un texte à part, avant l'image, et Snap s'y perdait.
 //
 // Les terrains viennent de lib/sfl/feuille.ts ; l'image est dessinée hors
 // écran puis photographiée par html-to-image (déjà là pour la carte 3D).
@@ -500,21 +502,29 @@ function useImage(
       if (!noeud) return;
       try {
         await document.fonts?.ready;
-        const blob = await toBlob(noeud, {
-          pixelRatio: 2,
-          // Les photos changent d'adresse avec elles (?v=…) ; une photo
-          // repeinte (blob:) ne se relit pas si on lui ajoute un paramètre.
-          includeQueryParams: true,
-          width: LARGEUR,
-          height: HAUTEUR,
-        });
-        if (!annule && blob)
-          setPris({
-            cle,
-            fichier: new File([blob], "feuille-de-match-bola.png", {
-              type: "image/png",
-            }),
+        const prendre = () =>
+          toBlob(noeud, {
+            pixelRatio: 2,
+            // Les photos changent d'adresse avec elles (?v=…) ; une photo
+            // repeinte (blob:) ne se relit pas si on lui ajoute un paramètre.
+            includeQueryParams: true,
+            width: LARGEUR,
+            height: HAUTEUR,
           });
+        const garder = (blob: Blob | null) => {
+          if (!annule && blob)
+            setPris({
+              cle,
+              fichier: new File([blob], "feuille-de-match-bola.png", {
+                type: "image/png",
+              }),
+            });
+        };
+        garder(await prendre());
+        // Safari (et tout navigateur d'iPhone) peut dessiner l'image avant
+        // d'y avoir posé les photos et les logos : sa première prise sort
+        // alors sans eux. La seconde les a, et remplace la première.
+        if (!annule && navigator.vendor.startsWith("Apple")) garder(await prendre());
       } catch {
         // Pas d'image : le bouton reste grisé, la feuille se lit quand même.
       }
@@ -527,7 +537,10 @@ function useImage(
 
   async function partager() {
     if (!fichier) return;
-    const donnees = { files: [fichier], title: "Feuille de match" };
+    // Le fichier seul. Avec un titre, Safari met dans la feuille de partage un
+    // texte à part, avant l'image : Snap (comme Instagram ou WhatsApp) prend
+    // ce texte et laisse l'image, ou reste bloqué.
+    const donnees = { files: [fichier] };
     if (
       typeof navigator.canShare === "function" &&
       navigator.canShare(donnees)
