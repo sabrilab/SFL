@@ -5,15 +5,20 @@
 // Le même contrat que les autres matières (finitions-carte.ts, qui les étale
 // dans MATIERES) : un papier, un motif gravé dessiné par le code
 // (motif-carte.tsx), une encre, un serti, une tranche et un reflet pour la
-// 3D. Rien n'est une image. Noir, blanc et métal seulement : l'or, le bleu et
-// le rouge restent aux cartes MVP, Défensive et Impact.
+// 3D. Rien n'est une image. L'or, le bleu et le rouge restent aux cartes
+// MVP, Défensive et Impact.
+//
+// Sa carte de base est jaune fluo, comme une chasuble (Sabri, 24/10 : « même
+// sa carte principale à lui soit soit jaune, soit orange fluo »), et le passe
+// fait gagner des fluos (« on veut quand même des skins de cartes qui soient
+// fluorescentes ») : orange, vert et rose fluo, tous à l'encre noire, et le
+// fluo nuit, le noir rayé de jaune fluo. Puis le noir, le blanc et le métal :
 //   · craie : la tenue blanche, les rayures de la tenue à l'encre ;
 //   · ardoise : la tenue gris ardoise ;
 //   · rayé : les larges bandes des tenues d'autrefois, noir sur graphite ;
 //   · damier : le damier du drapeau de touche, gravé ton sur ton ;
 //   · nuit de match : le noir du stade, deux faisceaux de projecteurs ;
 //   · chrono : le cadran du chronomètre, ses cercles fins ;
-//   · argent : l'argent guilloché, comme un insigne ;
 //   · platine : le platine soleillé d'un cadran de montre ;
 //   · filets : le filet du but, ses mailles d'argent sur le noir.
 // L'étiquette dit toujours ARBITRE, et son grade à côté (bola-card.tsx).
@@ -23,7 +28,19 @@
 
 import type { Matiere } from "@/components/sfl/finitions-carte";
 
-export type FinitionArbitre = "craie" | "ardoise" | "raye" | "damier" | "nuit-de-match" | "chrono" | "argent" | "platine" | "filets";
+export type FinitionArbitre =
+  | "orange-fluo"
+  | "vert-fluo"
+  | "rose-fluo"
+  | "fluo-nuit"
+  | "craie"
+  | "ardoise"
+  | "raye"
+  | "damier"
+  | "nuit-de-match"
+  | "chrono"
+  | "platine"
+  | "filets";
 export type GradeArbitre = "ligue" | "national" | "elite" | "international";
 
 export const GRADES: Record<GradeArbitre, string> = {
@@ -70,7 +87,67 @@ const CLAIR = {
   vive: "#55585e",
 } as const;
 
+/**
+ * Une carte fluo : le papier qui éclaire de lui-même (le cœur plus vif que
+ * les bords), les rayures de la tenue en creux, l'encre noire. `vif` est la
+ * couleur pleine, `clair` et `fonce` les deux bouts du dégradé.
+ */
+function fluo(nom: Matiere["nom"], vif: string, clair: string, fonce: string): Matiere {
+  return {
+    ...CLAIR,
+    nom,
+    titre: "ARBITRE",
+    encre: "10,11,8",
+    papier: [
+      "radial-gradient(85% 55% at 50% 30%, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0) 70%)",
+      `linear-gradient(162deg, ${clair} 0%, ${vif} 48%, ${fonce} 100%)`,
+    ].join(", "),
+    motif: { type: "tenue", clair: "rgba(255,255,255,0.3)", fonce: "rgba(10,11,8,0.1)" },
+    fond: vif,
+    lueur: "rgba(255,255,255,0.55)",
+    reflet: 0.28,
+    etiquette: { fond: "#0a0b08", bord: "#0a0b08", texte: vif },
+    voile: "rgba(10,11,8,0.5)",
+    onglet: { fond: "#0a0b08", encre: vif },
+    vive: "#0a0b08",
+    cadre: `linear-gradient(152deg, ${clair} 0%, ${vif} 45%, ${fonce} 80%, ${vif} 100%)`,
+    rebord: { lumiere: "rgba(255,255,255,0.85)", ombre: "rgba(10,11,8,0.28)" },
+    tranche: { couleur: vif, metal: 0.05, rugosite: 0.7 },
+    holo: { force: 0.3, teinte: [1, 1, 0.9] },
+  };
+}
+
+/** La carte d'arbitre de base : le jaune fluo de la chasuble. */
+export const MATIERE_ARBITRE: Matiere = fluo("arbitre", "#e4ff1a", "#f4ff7a", "#c4dd00");
+
 export const MATIERES_ARBITRE: Record<FinitionArbitre, Matiere> = {
+  "orange-fluo": fluo("orange-fluo", "#ff7a1a", "#ffb067", "#f05a00"),
+  "vert-fluo": fluo("vert-fluo", "#7dff3a", "#b8ff8a", "#4fd61a"),
+  "rose-fluo": fluo("rose-fluo", "#ff4fc0", "#ff94da", "#f0249f"),
+  // Le fluo nuit : le noir de la tenue, ses rayures et son encre en jaune fluo.
+  "fluo-nuit": {
+    ...SOMBRE,
+    nom: "fluo-nuit",
+    titre: "ARBITRE",
+    encre: "228,255,26",
+    papier: [
+      "radial-gradient(90% 55% at 50% 30%, rgba(228,255,26,0.07) 0%, rgba(228,255,26,0) 70%)",
+      "linear-gradient(160deg, #1d1e1a 0%, #111210 55%, #080907 100%)",
+    ].join(", "),
+    motif: { type: "tenue", clair: "rgba(228,255,26,0.16)", fonce: "rgba(0,0,0,0.5)" },
+    fond: "#121310",
+    lueur: "rgba(228,255,26,0.12)",
+    etiquette: { fond: "#e4ff1a", bord: "#e4ff1a", texte: "#0a0b08" },
+    rebord: { lumiere: "rgba(228,255,26,0.4)", ombre: "rgba(0,0,0,0.72)" },
+    onglet: { fond: "#e4ff1a", encre: "#0a0b08" },
+    vive: "#e4ff1a",
+    cadre: [
+      "repeating-linear-gradient(90deg, rgba(228,255,26,0.22) 0 2px, rgba(228,255,26,0) 2px 9px)",
+      "linear-gradient(152deg, #262722 0%, #10110e 55%, #080907 100%)",
+    ].join(", "),
+    tranche: { couleur: "#e4ff1a", metal: 0.1, rugosite: 0.6 },
+    holo: { force: 0.3, teinte: [0.95, 1, 0.7] },
+  },
   craie: {
     ...CLAIR,
     nom: "craie",
@@ -168,24 +245,6 @@ export const MATIERES_ARBITRE: Record<FinitionArbitre, Matiere> = {
     ].join(", "),
     tranche: { couleur: "#141518", metal: 0.6, rugosite: 0.3 },
     holo: { force: 0.35, teinte: [0.92, 0.93, 0.97] },
-  },
-  argent: {
-    ...CLAIR,
-    nom: "argent",
-    titre: "ARBITRE",
-    papier: [
-      "linear-gradient(118deg, rgba(255,255,255,0) 34%, rgba(255,255,255,0.55) 46%, rgba(255,255,255,0) 58%)",
-      "linear-gradient(162deg, #f1f2f3 0%, #d6d8db 40%, #b9bcc1 72%, #e2e4e6 100%)",
-    ].join(", "),
-    motif: { type: "guilloche", clair: "rgba(255,255,255,0.8)", fonce: "rgba(40,42,48,0.16)" },
-    fond: "#dcdee0",
-    reflet: 0.65,
-    cadre: [
-      "linear-gradient(118deg, rgba(255,255,255,0) 36%, rgba(255,255,255,0.65) 46%, rgba(255,255,255,0) 56%)",
-      "linear-gradient(158deg, #f6f7f8 0%, #c9ccd1 38%, #9da1a8 70%, #e4e6e8 100%)",
-    ].join(", "),
-    tranche: { couleur: "#c9ccd1", metal: 0.85, rugosite: 0.25 },
-    holo: { force: 0.65, teinte: [0.95, 0.96, 0.98] },
   },
   platine: {
     ...CLAIR,

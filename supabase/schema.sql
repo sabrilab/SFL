@@ -4937,7 +4937,7 @@ grant execute on function public.poser_arbitre(uuid, boolean) to authenticated;
 alter table public.profiles add column if not exists habillage_arbitre text;
 alter table public.profiles drop constraint if exists profiles_habillage_arbitre_check;
 alter table public.profiles add constraint profiles_habillage_arbitre_check
-  check (habillage_arbitre is null or habillage_arbitre ~ '^(-|craie|ardoise|raye|damier|nuit-de-match|chrono|argent|platine|filets)/(-|(lisere-argent|lisere-platine|puce-noire|nom-grave|sifflet|cartons)(\+(lisere-argent|lisere-platine|puce-noire|nom-grave|sifflet|cartons))*)/(-|ligue|national|elite|international)$');
+  check (habillage_arbitre is null or habillage_arbitre ~ '^(-|orange-fluo|vert-fluo|rose-fluo|fluo-nuit|craie|ardoise|raye|damier|nuit-de-match|chrono|platine|filets)/(-|(lisere-argent|lisere-platine|puce-noire|nom-grave|sifflet|cartons)(\+(lisere-argent|lisere-platine|puce-noire|nom-grave|sifflet|cartons))*)/(-|ligue|national|elite|international)$');
 grant update (habillage_arbitre) on public.profiles to authenticated;
 
 -- Les missions d'arbitre (Sabri, 24/10 : « qu'ils puissent activer, accepter

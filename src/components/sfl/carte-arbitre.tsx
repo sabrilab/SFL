@@ -5,8 +5,8 @@
 // puisse mettre une note de satisfaction à l'arbitre, et ça apparaît sur sa
 // carte au lieu de son score de joueur »).
 //
-// La carte Bola elle-même (bola-card.tsx), dans le tissu noir de la tenue
-// (finitions-carte.ts, matière « arbitre ») : sa photo du studio comme tout
+// La carte Bola elle-même (bola-card.tsx), dans le jaune fluo de la chasuble
+// (skins-arbitre.ts, matière « arbitre ») : sa photo du studio comme tout
 // le monde, l'étiquette ARBITRE, et à la place de la note de joueur sa
 // satisfaction, la moyenne des notes des joueurs sur 5, ×20 (lib/sfl/arbitres
 // ; « – » tant qu'il n'en a pas). À la place des six stats, ses chiffres :

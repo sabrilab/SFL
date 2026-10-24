@@ -56,11 +56,8 @@ const CADRAGES: Partial<Record<number, Cadrage>> = {
   1: LISERE,
   3: { x: 850, y: 150, zoom: 2.4 }, // le sifflet
   5: GRADE,
-  6: { x: 883, y: 888, zoom: 2.8 }, // la puce
   8: { x: 191, y: 831, zoom: 2.2 }, // les cartons
-  9: { x: 330, y: 1050, zoom: 2.6 }, // le nom gravé
   10: GRADE,
-  12: LISERE,
   15: GRADE,
   18: GRADE,
 };

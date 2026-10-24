@@ -69,8 +69,8 @@
 // série. Ni badge, ni habillage : elle est restée telle qu'elle a été émise.
 //
 // La carte d'un arbitre (`edition="arbitre"`, `arbitre` ; carte-arbitre.tsx,
-// Sabri 24/10) garde toute cette disposition, dans le tissu noir de sa tenue
-// (finitions-carte.ts) : sa satisfaction à la place de la note, ses chiffres
+// Sabri 24/10) garde toute cette disposition, dans le jaune fluo de sa chasuble
+// (skins-arbitre.ts) ou le skin qu'il porte : sa satisfaction à la place de la note, ses chiffres
 // (matchs arbitrés, notes reçues…) à la place des six stats.
 //
 // Mêmes calques que la carte éditoriale (`data-card-part` body / player /

@@ -7,12 +7,14 @@
 // aux paliers 5, 10, 15 et 20 ; l'XP vient de ses missions d'arbitre
 // (missions-arbitre.ts). Les récompenses sont à lui seul, sur sa carte
 // d'arbitre :
-//   · des skins de tenue, en noir, blanc et métal, jamais d'or, de bleu ni
-//     de rouge (réservés aux cartes MVP, Défensive et Impact) : craie,
-//     ardoise, rayé, damier (le drapeau de l'assistant), nuit de match (les
-//     projecteurs), chrono, argent, platine, filets (le filet du but) ;
-//   · des signes : les liserés, la puce noire et le nom gravé des joueurs,
-//     et deux à lui : le sifflet gravé et les cartons ;
+//   · des skins de tenue, jamais d'or, de bleu ni de rouge (réservés aux
+//     cartes MVP, Défensive et Impact) : les fluos (orange, vert, rose, et le
+//     fluo nuit ; Sabri, 24/10 : « on veut quand même des skins de cartes
+//     qui soient fluorescentes »), puis craie, ardoise, rayé, damier (le
+//     drapeau de l'assistant), nuit de match (les projecteurs), chrono,
+//     platine, filets (le filet du but). Sa carte de base est jaune fluo ;
+//   · des signes : le liseré d'argent, et deux à lui : le sifflet gravé et
+//     les cartons ;
 //   · ses grades, dans l'étiquette de la carte : Ligue, National, Élite,
 //     International ;
 //   · au 20, sa carte de saison imprimée, en vrai.
@@ -69,21 +71,21 @@ export interface PalierArbitre {
 
 export const PASSE_ARBITRE: readonly PalierArbitre[] = [
   { n: 1, nom: "Liseré argent", quoi: "Un filet d'argent autour de ta photo.", rang: "B", genre: "signe", habille: { signe: "lisere-argent" } },
-  { n: 2, nom: "Craie", quoi: "La tenue blanche, ses rayures à l'encre.", rang: "B", genre: "skin", habille: { finition: "craie" } },
+  { n: 2, nom: "Orange fluo", quoi: "La chasuble orange fluo.", rang: "B", genre: "skin", habille: { finition: "orange-fluo" } },
   { n: 3, nom: "Sifflet", quoi: "Ton sifflet gravé dans le coin de ta photo.", rang: "B", genre: "signe", habille: { signe: "sifflet" } },
-  { n: 4, nom: "Ardoise", quoi: "Le gris ardoise, la tenue des soirs de pluie.", rang: "B", genre: "skin", habille: { finition: "ardoise" } },
+  { n: 4, nom: "Craie", quoi: "La tenue blanche, ses rayures à l'encre.", rang: "B", genre: "skin", habille: { finition: "craie" } },
   { n: 5, nom: "Arbitre de ligue", quoi: "Ton grade dans l'étiquette : Ligue.", rang: "A", genre: "grade", habille: { grade: "ligue" } },
-  { n: 6, nom: "Puce noire", quoi: "La puce de ta carte en noir laqué.", rang: "B", genre: "signe", habille: { signe: "puce-noire" } },
-  { n: 7, nom: "Rayé", quoi: "Les larges rayures noires des tenues d'autrefois.", rang: "A", genre: "skin", habille: { finition: "raye" } },
+  { n: 6, nom: "Ardoise", quoi: "Le gris ardoise, la tenue des soirs de pluie.", rang: "B", genre: "skin", habille: { finition: "ardoise" } },
+  { n: 7, nom: "Vert fluo", quoi: "Le vert fluo qu'on voit de l'autre bout du terrain.", rang: "A", genre: "skin", habille: { finition: "vert-fluo" } },
   { n: 8, nom: "Cartons", quoi: "Tes deux cartons, gravés au bas de ta photo.", rang: "A", genre: "signe", habille: { signe: "cartons" } },
-  { n: 9, nom: "Ton nom gravé", quoi: "Ton nom caché dans la gravure fine.", rang: "B", genre: "signe", habille: { signe: "nom-grave" } },
+  { n: 9, nom: "Rayé", quoi: "Les larges rayures noires des tenues d'autrefois.", rang: "A", genre: "skin", habille: { finition: "raye" } },
   { n: 10, nom: "Arbitre national", quoi: "Ton grade dans l'étiquette : National.", rang: "A", genre: "grade", habille: { grade: "national" } },
   { n: 11, nom: "Damier", quoi: "Le damier du drapeau de touche.", rang: "A", genre: "skin", habille: { finition: "damier" } },
-  { n: 12, nom: "Liseré platine", quoi: "Un double filet de platine autour de ta photo.", rang: "A", genre: "signe", habille: { signe: "lisere-platine" } },
+  { n: 12, nom: "Rose fluo", quoi: "Le rose fluo, le plus voyant de tous.", rang: "A", genre: "skin", habille: { finition: "rose-fluo" } },
   { n: 13, nom: "Nuit de match", quoi: "Le noir du stade, les faisceaux des projecteurs.", rang: "A", genre: "skin", habille: { finition: "nuit-de-match" } },
   { n: 14, nom: "Chrono", quoi: "Le cadran du chronomètre, ses cercles fins.", rang: "S", genre: "skin", habille: { finition: "chrono" } },
   { n: 15, nom: "Arbitre élite", quoi: "Ton grade dans l'étiquette : Élite.", rang: "S", genre: "grade", habille: { grade: "elite" } },
-  { n: 16, nom: "Argent", quoi: "L'argent guilloché, comme un insigne.", rang: "S", genre: "skin", habille: { finition: "argent" } },
+  { n: 16, nom: "Fluo nuit", quoi: "La tenue noire, rayée et écrite en jaune fluo.", rang: "S", genre: "skin", habille: { finition: "fluo-nuit" } },
   { n: 17, nom: "Platine", quoi: "Le platine soleillé d'un cadran de montre.", rang: "S", genre: "skin", habille: { finition: "platine" } },
   { n: 18, nom: "International", quoi: "Le plus haut grade : International.", rang: "S", genre: "grade", habille: { grade: "international" } },
   { n: 19, nom: "Filets", quoi: "Le filet du but, tendu sur le noir.", rang: "S", genre: "skin", habille: { finition: "filets" } },
