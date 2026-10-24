@@ -19,10 +19,10 @@ import { ConsentementObligatoire } from "@/components/sfl/confidentialite/consen
 
 /**
  * Pages ouvertes à tous : le lien d'accueil personnel envoyé par l'admin, la
- * création de compte, le lien d'invitation d'une équipe (mode Team) et la
- * politique de confidentialité.
+ * création de compte, le lien d'invitation d'une équipe (mode Team), le lien
+ * d'un parrain (/p/code) et la politique de confidentialité.
  */
-const PUBLIC_ROUTES = ["/bienvenue", "/inscription", "/equipe/", "/confidentialite"];
+const PUBLIC_ROUTES = ["/bienvenue", "/inscription", "/equipe/", "/p/", "/confidentialite"];
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const isClient = useIsClient();

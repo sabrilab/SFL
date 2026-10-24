@@ -141,7 +141,9 @@ export function Inscriptions({
   const [occupe, setOccupe] = useState<string | null>(null);
   // Membres acceptés que la saison ne connaît pas : leur ajout à l'effectif
   // s'est perdu (publication écrasée par un appareil en retard, envoi raté).
-  // Sans ligne dans l'effectif, l'app n'a pas de carte à leur montrer.
+  // Sans ligne dans l'effectif, l'app n'a pas de carte à leur montrer. Les
+  // joueurs Bola venus par un parrain n'en sont pas : ils ont leur carte hors
+  // de la saison (season-provider.tsx).
   const [absents, setAbsents] = useState<{ id: string; name: string }[]>([]);
 
   const charger = useCallback(async () => {
@@ -169,13 +171,18 @@ export function Inscriptions({
         fiche: (parId.get(p.id as string) as Demande["fiche"]) ?? null,
       }))
     );
-    const { data: membres } = await sb
-      .from("profiles")
-      .select("id, name")
-      .eq("valide", true)
-      .eq("is_admin", false)
-      .eq("pseudo_a_choisir", false);
-    setAbsents(((membres ?? []) as { id: string; name: string | null }[]).flatMap((m) => (m.name ? [{ id: m.id, name: m.name }] : [])));
+    const [{ data: membres }, { data: venus }] = await Promise.all([
+      sb.from("profiles").select("id, name").eq("valide", true).eq("is_admin", false).eq("pseudo_a_choisir", false),
+      // Les joueurs Bola, venus par le lien d'un joueur ou d'une équipe : hors
+      // de la saison par choix, pas des ajouts perdus (Activité → Parrainage).
+      sb.from("parrainages").select("filleul"),
+    ]);
+    const bola = new Set(((venus ?? []) as { filleul: string }[]).map((v) => v.filleul));
+    setAbsents(
+      ((membres ?? []) as { id: string; name: string | null }[]).flatMap((m) =>
+        m.name && !bola.has(m.id) ? [{ id: m.id, name: m.name }] : []
+      )
+    );
   }, []);
   const horsSaisonComptes = absents
     .filter((m) => !rosterHasName(saison, m.name))

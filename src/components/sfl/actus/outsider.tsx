@@ -12,9 +12,10 @@
 //   · sa carte en grand, dans un halo (elle porte l'insigne de son rang) ;
 //     sa place à l'XP à vie et sa place en D1 : l'écart entre les deux fait
 //     l'histoire ;
-//   · sa quête, en deux temps : tenir la D1 ce dimanche (sous 4 points, il
-//     redescend), et gagner son rang A (l'XP qui lui manque ; en rayé, celle
-//     des missions qu'il a signées pour le dimanche) ;
+//   · sa quête, en deux temps : tenir la D1 ce dimanche (rester dans ses 30
+//     places au Pépite d'Or du soir ; avant le match, son avance sur la D2),
+//     et gagner son rang A (l'XP qui lui manque ; en rayé, celle des missions
+//     qu'il a signées pour le dimanche) ;
 //   · les contrats signés contre lui, Suivre, et le partage au Vestiaire ;
 //   · le chapitre d'avant, son verdict au tampon : tenu, tombé, accompli ;
 //   · les autres rangs B de la D1, en petites cartes.
@@ -38,7 +39,7 @@ import { useIdentites } from "@/hooks/use-identites";
 import { useMissionsDeLaLigue, useXpLigue, type MissionsDeLaLigue } from "@/hooks/use-missions";
 import { REGLES_DIVISIONS } from "@/lib/sfl/divisions";
 import { prenom } from "@/lib/sfl/missions";
-import { arcOutsider, POUR_RESTER_EN_D1, type Chapitre } from "@/lib/sfl/outsiders";
+import { arcOutsider, type Chapitre, type Outsider } from "@/lib/sfl/outsiders";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { preparerPiece } from "@/lib/sfl/vestiaire";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,8 @@ const pts = (n: number) => `${n} pt${Math.abs(n) > 1 ? "s" : ""}`;
 const pl = (n: number, un: string, plusieurs: string) => `${n} ${n > 1 ? plusieurs : un}`;
 /** Le chapitre d'une journée : la J4 ouvre l'arc. */
 const chapitreDe = (j: number) => j - REGLES_DIVISIONS.depuis + 1;
+/** Ce qu'il doit garder dimanche pour tenir la D1 : son avance sur la D2, ou ses 30 places tant que la D2 est vide. */
+const marge = (o: Outsider) => (o.avance != null ? `${pts(o.avance)} d'avance` : `Dans les ${REGLES_DIVISIONS.taille}`);
 
 /** Le dimanche de l'outsider : celui qui se joue, jusqu'à minuit ; sinon le prochain. */
 function dimancheDeLOutsider(lg: MissionsDeLaLigue | null, derniere: number): number {
@@ -161,7 +164,7 @@ function Quete({ c, toi, enDirect, enJeu }: { c: Chapitre; toi: boolean; enDirec
               <span className="mono-label">En jeu</span>
             </span>
           ) : (
-            <span className="mono-label text-white/70">{POUR_RESTER_EN_D1} pts dimanche</span>
+            <span className="mono-label text-white/70">{marge(o)}</span>
           )}
         </li>
         <li className="flex-wrap">
@@ -276,7 +279,7 @@ export function RubriqueOutsider({ className }: { className?: string }) {
         ? [
             { n: heros, v: `Rang B · ${rangTexte(o.placeD1)} de la D1` },
             { l: "XP à vie", v: `${rangTexte(o.placeXp)} sur ${o.surXp}` },
-            { l: "Sa quête", v: `${POUR_RESTER_EN_D1} pts pour tenir la D1 · rang A à ${o.pourLeRangA} XP` },
+            { l: "Sa quête", v: `Tenir la D1 (${marge(o).toLowerCase()}) · rang A à ${o.pourLeRangA} XP` },
           ]
         : [{ n: heros, v: `J${vedette.j} · ${pts(vedette.points)}` }],
     });

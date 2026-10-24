@@ -7,7 +7,8 @@
 // l'inscription classique, sans email ni mot de passe, et cette route pose le
 // vrai nom de ligue, le pseudo et la fiche, avec les mêmes contrôles que
 // /api/inscription. Le compte reste en attente : l'admin l'accepte comme les
-// autres.
+// autres. Sauf venu par le lien d'un joueur ou avec son code (parrain) :
+// comme sur /api/inscription, il entre aussitôt et le parrainage est noté.
 //
 // Trois actions, toutes avec le jeton du joueur (Authorization: Bearer) :
 //   · « verifier » : avant les questions. Si l'email du fournisseur est déjà
@@ -24,6 +25,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { appelant, dejaPris, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { idsParEmail } from "@/lib/sfl/contacts";
+import { noterFilleul, parrainDuCode } from "@/lib/sfl/parrainage.server";
 import {
   capitaliser,
   erreurInscription,
@@ -38,7 +40,7 @@ const FERME = NextResponse.json(
   { status: 503 }
 );
 
-type Corps = Partial<Omit<Inscription, "motDePasse">> & { action?: string; site?: string };
+type Corps = Partial<Omit<Inscription, "motDePasse">> & { action?: string; site?: string; parrain?: string; canal?: string };
 
 /** L'email du fournisseur appartient-il déjà à un autre compte de la ligue ? */
 async function emailDeMembre(sb: SupabaseClient, user: User): Promise<boolean> {
@@ -126,12 +128,19 @@ export async function POST(req: NextRequest) {
   }
 
   const name = nomDeLigue(f.prenom, f.nom, pris.noms);
+  const parrain = corps.parrain ? await parrainDuCode(sb, corps.parrain) : null;
 
   // Le pseudo passe par garde_pseudo (base) : pseudo_a_choisir étant encore
   // vrai, ce premier choix ne compte pas, et il date le prochain changement.
   const { error: errProfil } = await sb
     .from("profiles")
-    .update({ name, username: `@${f.pseudo}`, contact_email: email || null, pseudo_a_choisir: false })
+    .update({
+      name,
+      username: `@${f.pseudo}`,
+      contact_email: email || null,
+      pseudo_a_choisir: false,
+      ...(parrain ? { valide: true } : {}),
+    })
     .eq("id", user.id);
   if (errProfil) {
     const doublon = errProfil.code === "23505";
@@ -157,9 +166,14 @@ export async function POST(req: NextRequest) {
   });
   if (errFiche) {
     // On remet le compte en provisoire : le joueur peut réessayer.
-    await sb.from("profiles").update({ pseudo_a_choisir: true }).eq("id", user.id);
+    await sb
+      .from("profiles")
+      .update({ pseudo_a_choisir: true, ...(parrain ? { valide: false } : {}) })
+      .eq("id", user.id);
     return NextResponse.json({ error: "Création du compte impossible pour l'instant." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, pseudo: f.pseudo, name });
+  if (parrain) await noterFilleul(sb, user.id, parrain, corps.canal === "code" ? "code" : "lien");
+
+  return NextResponse.json({ ok: true, pseudo: f.pseudo, name, entre: !!parrain });
 }

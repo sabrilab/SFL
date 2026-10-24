@@ -2,7 +2,8 @@
 
 // Ce que la carte d'un joueur porte (finitions-carte.ts) : ce qu'il a
 // débloqué dans la passe, toutes saisons (un palier atteint reste acquis,
-// palierMaxDe), et ce qu'il a choisi d'en porter (habillages-choisis.ts).
+// palierMaxDe), les finitions qui lui sont offertes (finitions-offertes.ts),
+// et ce qu'il a choisi d'en porter (habillages-choisis.ts).
 //   · la finition et le traitement de la photo : son choix, s'il est
 //     débloqué ; « auto » (rien choisi) porte le dernier débloqué ; « - »,
 //     rien ;
@@ -20,6 +21,7 @@ import {
   lireChoixHabillage,
   type ChoixHabillage,
 } from "@/lib/sfl/habillages-choisis";
+import { finitionsOffertes } from "@/lib/sfl/finitions-offertes";
 import { debloquesDe, type Rang } from "@/lib/sfl/missions";
 
 /** Ce que l'XP pose sur les cartes de la ligue (XpLigueProvider, xp-ligue.tsx). */
@@ -78,12 +80,14 @@ export function useHabillage(nom: string): HabillageCarte {
     if (!cartes) return {};
     const x = cartes.parJoueur.get(nom);
     const d = debloquesDe(x?.palier ?? 0);
+    // Les finitions de la passe, puis celles qui lui sont offertes : « auto » porte la dernière.
+    const finitions = [...d.finitions, ...finitionsOffertes(nom).filter((f) => !d.finitions.includes(f))];
     const finition =
       choix.finition === "-"
         ? undefined
-        : choix.finition !== "auto" && d.finitions.includes(choix.finition)
+        : choix.finition !== "auto" && finitions.includes(choix.finition)
           ? choix.finition
-          : d.finitions.at(-1);
+          : finitions.at(-1);
     const traitement =
       choix.traitement === "-"
         ? undefined
