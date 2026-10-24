@@ -14,6 +14,12 @@
 //     tant que le vote est ouvert ;
 //   · ouvert le jour du match, fermé à minuit heure de Paris (voteOuvert) —
 //     la base refuse aussi toute écriture qui n'est pas du jour même ;
+//   · et seulement une fois la feuille de son match remplie (feuilleRemplie).
+//     Sabri, 25/10 : « ces votes-là [doivent être] ouverts à partir du moment
+//     où les feuilles de match ont été remplies […] tu peux le mettre en
+//     grisé, et ça va jusqu'à minuit dimanche ». Avant, le vote s'affiche
+//     grisé ; chaque match s'ouvre avec sa propre feuille (Match 1 et
+//     Match 2 ne finissent pas à la même heure) ;
 //   · à la fermeture, le plus voté de chaque match prend la carte ; à
 //     égalité, tous les ex æquo. Personne si personne n'a voté.
 //
@@ -136,6 +142,16 @@ export function monVote(votes: VoteFigure[], saison: number, j: number, cat: Cat
 /** Une journée où l'on vote : MVP calculé, équipes connues. */
 export function journeeAvecVote(j: Journee): boolean {
   return !!j.mvpAuto && (j.matches?.length ?? 0) > 0;
+}
+
+/**
+ * La feuille d'un match est remplie quand l'admin y a saisi un résultat
+ * (victoire, nul ou défaite) pour au moins un joueur de chacune des deux
+ * équipes. Les buts seuls ne suffisent pas : on les note pendant le match.
+ */
+export function feuilleRemplie(saison: Pick<Saison, "entries">, j: number, match: JourneeMatch): boolean {
+  const avecResultat = (nom: string) => saison.entries.some((e) => e.j === j && e.team === nom && !!e.result);
+  return avecResultat(match.teamA.name) && avecResultat(match.teamB.name);
 }
 
 /* ------------------------------ Les élus -------------------------------- */
