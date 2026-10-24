@@ -6,9 +6,16 @@
 // première ouverture de la liste, puis il reste en mémoire.
 //
 // Un complexe = une ligne : son nom, sa commune, son adresse, son point, et
-// ses terrains par format (à 5, à 8, à 11). Les terrains de la ligue s'y
-// ajoutent à leur nom (avecLaLigue) : le complexe recensé au même endroit
-// s'efface derrière eux.
+// ses terrains par format (à 3, à 5, à 7, à 8, à 11). Les terrains de la
+// ligue s'y ajoutent à leur nom (avecLaLigue) : le complexe recensé au même
+// endroit s'efface derrière eux.
+//
+// Le format se filtre (Sabri, 24/10 : « nous, on fait actuellement du foot
+// à 5, mais des fois, t'as mis des terrains qui sont pour du foot à plus que
+// ça […] qu'on puisse filtrer facilement ») : sur la Map comme dans la
+// feuille « Terrains du Nord », un format choisi ne garde que les complexes
+// qui ont au moins un terrain à ce format (aFormat ; le choix est gardé par
+// hooks/use-format-terrain.ts).
 
 import type { Terrain } from "@/lib/sfl/saisie/types";
 
@@ -21,7 +28,7 @@ export interface TerrainNord {
   adresse: string;
   lat: number;
   lng: number;
-  /** Ses terrains, du plus grand au plus petit : joueurs par équipe (5, 8, 11), 0 si on ne sait pas. */
+  /** Ses terrains, du plus grand au plus petit : joueurs par équipe (3, 5, 7, 8, 11), 0 si on ne sait pas. */
   formats: number[];
   /** Au moins un terrain éclairé : on y joue le soir. */
   eclaire: boolean;
@@ -69,10 +76,17 @@ export interface TerrainPropose extends TerrainNord {
 /** Assez près pour être le même complexe. */
 const MEME_COMPLEXE_KM = 0.25;
 
+/** Les formats qu'on choisit, en joueurs par équipe (Sabri, 24/10 : « 11 5 8 7 3 versus »). */
+export const FORMATS = [3, 5, 7, 8, 11] as const;
+
+/** La ligue joue à cinq contre cinq : ses terrains sont à 5, quoi que porte le complexe recensé à côté. */
+const FORMAT_LIGUE = 5;
+
 /**
  * Les terrains de la ligue, en tête, à leur nom (« Croix ») ; le complexe
  * recensé au même endroit s'efface derrière eux et leur laisse ses formats
- * et son éclairage.
+ * et son éclairage. Ils sont à 5 dans tous les cas : l'hippodrome n'est pas
+ * au recensement, et le filtre « à 5 » ne doit jamais le cacher.
  */
 export function avecLaLigue(recenses: TerrainNord[], ligue: Terrain[]): TerrainPropose[] {
   const repris = new Set<string>();
@@ -81,6 +95,8 @@ export function avecLaLigue(recenses: TerrainNord[], ligue: Terrain[]): TerrainP
     if (!Number.isFinite(t.lat) || !Number.isFinite(t.lng)) continue;
     const memes = recenses.filter((c) => km(c, t) < MEME_COMPLEXE_KM);
     for (const c of memes) repris.add(c.id);
+    const formats = memes.flatMap((c) => c.formats);
+    if (!formats.includes(FORMAT_LIGUE)) formats.push(FORMAT_LIGUE);
     siens.push({
       id: `ligue-${t.id}`,
       nom: t.nom,
@@ -88,13 +104,18 @@ export function avecLaLigue(recenses: TerrainNord[], ligue: Terrain[]): TerrainP
       adresse: t.adresse,
       lat: t.lat,
       lng: t.lng,
-      formats: memes.flatMap((c) => c.formats).sort((a, b) => b - a),
+      formats: formats.sort((a, b) => b - a),
       eclaire: memes.some((c) => c.eclaire),
       libre: memes.some((c) => c.libre),
       ligue: t.id,
     });
   }
   return [...siens, ...recenses.filter((c) => !repris.has(c.id))];
+}
+
+/** Les complexes qui ont au moins un terrain à ce format ; sans format choisi, tous. */
+export function aFormat<T extends Pick<TerrainNord, "formats">>(terrains: T[], format: number | null): T[] {
+  return format == null ? terrains : terrains.filter((t) => t.formats.includes(format));
 }
 
 /** Distance entre deux points, en km (haversine). */

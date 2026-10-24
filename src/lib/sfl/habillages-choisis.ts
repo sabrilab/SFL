@@ -5,7 +5,8 @@
 //
 // Le choix vit dans profiles.habillage (supabase/schema.sql), sous la forme
 // « finition/traitement » : « auto » (le dernier débloqué), « - » (rien) ou
-// l'id d'une récompense (nuit, chrome, animee ; argentique, gravure, marbre).
+// l'id d'une récompense (nuit, chrome, animee, ou onyx l'offerte ;
+// argentique, gravure, marbre).
 // Comme le badge (badges-choisis.ts), deux couches :
 //   · la liste DISTANTE — nom → choix, relue au lancement et au retour sur
 //     l'app, gardée en cache pour un affichage immédiat ;
@@ -26,7 +27,7 @@ export interface ChoixHabillage {
   traitement: ChoixTraitement;
 }
 
-const FINITIONS: readonly string[] = ["auto", "-", "nuit", "chrome", "animee"];
+const FINITIONS: readonly string[] = ["auto", "-", "nuit", "chrome", "animee", "onyx"];
 const TRAITEMENTS: readonly string[] = ["auto", "-", "argentique", "gravure", "marbre"];
 
 /** Le choix tel qu'il est enregistré ; rien ou illisible = « auto » des deux côtés. */

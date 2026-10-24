@@ -39,7 +39,10 @@
 // « Ouvrir un match ici » (la feuille d'ouverture, le terrain déjà choisi)
 // ou, pour le capitaine d'une équipe active, « Défier une équipe ici » (la
 // page Team, le défi posé sur ce terrain). Un défi accepté s'y pose ensuite,
-// à son nom.
+// à son nom. Le bouton au petit terrain ne garde que ceux d'un format (à 3,
+// 5, 7, 8 ou 11 ; Sabri, 24/10 : « on fait actuellement du foot à 5 […]
+// qu'on puisse filtrer facilement ») : map/format-terrains.tsx, le même
+// choix que dans la feuille « Terrains du Nord ».
 //
 // Les contrats en direct (23/10) : le bouton au viseur ne laisse sur la Map
 // que les cibles des contrats signés du dimanche, sous leur viseur, leur prime
@@ -114,8 +117,10 @@ import { villeOuLigue } from "@/lib/sfl/villes";
 import { photoMiniature, photoPerso } from "@/lib/sfl/photos";
 import { nomAffiche } from "@/lib/sfl/identites";
 import {
+  aFormat,
   avecLaLigue,
   communeDeLAdresse,
+  FORMATS,
   km,
   lieuDuTerrain,
   lireTerrainsNord,
@@ -133,6 +138,8 @@ import { useIdentitesRevision } from "@/hooks/use-identites";
 import { cn } from "@/lib/utils";
 import { COULEUR_LIGUE, heureCourte, itineraires, stadeSvg, type EtatSticker, type LigueMatch, type Moment, type StickerPlan } from "@/components/sfl/map/stade";
 import { VueSatellite } from "@/components/sfl/map/vue-satellite";
+import { BoutonFormat } from "@/components/sfl/map/format-terrains";
+import { useFormatTerrain } from "@/hooks/use-format-terrain";
 import { SigleLigue } from "@/components/sfl/choix-ligue";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { useMatchsTeam, type MatchTeam } from "@/hooks/use-matchs-team";
@@ -593,19 +600,26 @@ export default function MapPage() {
         .join(";"),
     [affiches]
   );
-  const possibles = useMemo<PossiblePlan[]>(() => {
+  const libres = useMemo(() => {
     const occupes = pris ? pris.split(";").map((x) => ({ lat: Number(x.split(",")[0]), lng: Number(x.split(",")[1]) })) : [];
-    return proposables
-      .filter((t) => !occupes.some((o) => km(o, t) < MEME_TERRAIN_KM))
-      .map((t) => ({
+    return proposables.filter((t) => !occupes.some((o) => km(o, t) < MEME_TERRAIN_KM));
+  }, [proposables, pris]);
+  // Le format choisi (le bouton au petit terrain) ne garde que les complexes
+  // qui en ont un ; un format sans aucun terrain libre s'éteint.
+  const formatTerrain = useFormatTerrain();
+  const comptesFormats = useMemo(() => new Map(FORMATS.map((f) => [f, aFormat(libres, f).length])), [libres]);
+  const possibles = useMemo<PossiblePlan[]>(
+    () =>
+      aFormat(libres, formatTerrain).map((t) => ({
         id: t.id,
         lat: t.lat,
         lng: t.lng,
         nom: lieuDuTerrain(t),
         // La ligue d'abord, puis les complexes les plus grands, éclairés avant les autres.
         rang: t.ligue != null ? 0 : 10 - Math.min(9, t.formats.length) + (t.eclaire ? 0 : 0.5),
-      }));
-  }, [proposables, pris]);
+      })),
+    [libres, formatTerrain]
+  );
   // Le terrain possible touché : il se lève sur le plan, puis sa fiche monte
   // (un instant après, qu'on voie l'onde partir). La fiche garde le terrain
   // le temps de redescendre.
@@ -981,9 +995,10 @@ export default function MapPage() {
         </div>
 
         {/* En haut à droite : la loupe (la Recherche, montée de la barre
-            d'onglets le 19/10), la bascule plan / satellite et, pour
-            l'admin, les stats (Activité & rétention, 22/10) et le réglage des
-            matchs — le lettrage garde sa place. */}
+            d'onglets le 19/10), le format des terrains grisés (24/10), la
+            bascule plan / satellite et, pour l'admin, les stats (Activité &
+            rétention, 22/10) et le réglage des matchs — le lettrage garde sa
+            place. */}
         <div data-traverse className="absolute right-4 z-[510] flex flex-col items-end gap-2" style={{ top: haut }}>
           <Link
             href="/recherche"
@@ -1025,6 +1040,7 @@ export default function MapPage() {
               <Crosshair className="size-[18px]" strokeWidth={2.2} />
             </button>
           )}
+          {!enContrats && libres.length > 0 && <BoutonFormat comptes={comptesFormats} />}
           <button
             type="button"
             onClick={() => setFond((f) => (f === "plan" ? "satellite" : "plan"))}
