@@ -10,17 +10,13 @@
 // complexes qui ont un terrain à ce format ; la retoucher les rend tous. Une
 // pastille sans aucun terrain s'éteint. Elle sert dans la feuille « Terrains
 // du Nord » (sur="feuille", les pilules de la page, claire ou sombre) et sur
-// la Map (sur="plan", la nacre posée sur le plan clair). Le choix est le même
-// partout et le téléphone le garde (hooks/use-format-terrain.ts).
-//
-// BoutonFormat, sur la Map : un bouton rond de la colonne de droite. Au
-// repos, un petit terrain vu de dessus ; un format choisi, il passe à
-// l'encre et l'écrit (« à 5 »). Le toucher déplie les pastilles de nacre à
-// sa gauche (map/animations.css) ; un choix les replie, comme un toucher à
-// côté, qui ne touche rien d'autre sur le plan. Les terrains grisés suivent
-// (app/map/page.tsx).
+// la Map (sur="plan", la nacre posée sur le plan clair), dans son menu, sous
+// « Les terrains libres » (map/menu-map.tsx, 24/10 : la colonne de droite
+// n'a plus que la loupe et ce menu). Le choix est le même partout et le
+// téléphone le garde (hooks/use-format-terrain.ts). Les terrains grisés
+// suivent (app/map/page.tsx). IconeTerrain, un petit terrain vu de dessus,
+// est l'icône de leur ligne dans le menu.
 
-import { useEffect, useRef, useState } from "react";
 import { choisirFormatTerrain, useFormatTerrain } from "@/hooks/use-format-terrain";
 import { FORMATS } from "@/lib/sfl/terrains-nord";
 import { cn } from "@/lib/utils";
@@ -77,65 +73,6 @@ export function PucesFormat({
           </button>
         );
       })}
-    </div>
-  );
-}
-
-export function BoutonFormat({ comptes, className }: { comptes?: ReadonlyMap<number, number>; className?: string }) {
-  const format = useFormatTerrain();
-  const [ouvert, setOuvert] = useState(false);
-  const boite = useRef<HTMLDivElement>(null);
-  const replier = useRef<number | null>(null);
-
-  // Ouvert : un toucher hors du bouton et des pastilles les replie (sur le
-  // plan, le voile le prend ; ailleurs, le toucher garde son effet), Échap aussi.
-  useEffect(() => {
-    if (!ouvert) return;
-    const dehors = (e: PointerEvent) => {
-      if (e.target instanceof Node && boite.current?.contains(e.target)) return;
-      setOuvert(false);
-    };
-    const touche = (e: KeyboardEvent) => e.key === "Escape" && setOuvert(false);
-    document.addEventListener("pointerdown", dehors, true);
-    document.addEventListener("keydown", touche);
-    return () => {
-      document.removeEventListener("pointerdown", dehors, true);
-      document.removeEventListener("keydown", touche);
-    };
-  }, [ouvert]);
-  useEffect(() => () => void (replier.current != null && window.clearTimeout(replier.current)), []);
-
-  return (
-    <div ref={boite} className={cn("relative z-10", className)}>
-      {/* Le voile : un toucher sur le plan replie les pastilles sans rien ouvrir dessous. */}
-      {ouvert && <div className="fixed inset-0" onClick={() => setOuvert(false)} aria-hidden />}
-      <button
-        type="button"
-        onClick={() => setOuvert((o) => !o)}
-        aria-expanded={ouvert}
-        aria-label={format ? `Terrains à ${format} seulement` : "Les terrains par format"}
-        className={cn("map-bord map-touche relative grid size-10 place-items-center", format ? "bouton-encre" : "bouton-givre")}
-      >
-        {format ? (
-          <span key={format} className="format-entre text-[13px] font-bold tracking-tight whitespace-nowrap tabular-nums">
-            à {format}
-          </span>
-        ) : (
-          <IconeTerrain className="size-[19px]" />
-        )}
-      </button>
-      <div data-ouvert={ouvert} inert={!ouvert} className="format-deplie absolute top-1/2 right-[calc(100%+8px)] w-max">
-        <PucesFormat
-          sur="plan"
-          comptes={comptes}
-          onChoix={() => {
-            // Le temps de voir la pastille changer, puis tout se replie.
-            if (replier.current != null) window.clearTimeout(replier.current);
-            replier.current = window.setTimeout(() => setOuvert(false), 260);
-          }}
-          className="flex"
-        />
-      </div>
     </div>
   );
 }

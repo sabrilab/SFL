@@ -33,10 +33,17 @@
 // la toucher ouvre la discussion.
 //
 // Les joueurs (22/10, façon Snap Map) : chacun dans sa ville, sous les
-// matchs. De loin des piles, de près des tournesols de cartes (la
-// disposition est dans map/joueurs.ts), refaits à chaque fin de zoom.
-// Toucher une pile approche la ville ; toucher le nom d'une ville ouverte ou
-// une carte, la page ouvre le catalogue ou le profil.
+// matchs, en piles qui restent fermées jusqu'au bout du zoom (24/10), puis en
+// tournesols de cartes (la disposition est dans map/joueurs.ts), refaits à
+// chaque fin de zoom. Toucher une pile ouvre sa collection ; toucher le nom
+// d'une ville ouverte ou une carte, la page ouvre le catalogue ou le profil.
+//
+// Les matchs qui se chevauchent à l'écran font un paquet (24/10, Sabri :
+// « Quand il y a deux matchs au même endroit, […] il faudrait que tu le
+// fasses plus stylé, parce qu'on comprend pas ») : le premier devant, les
+// vignettes des suivants qui dépassent derrière lui, leur nombre au coin
+// (map/stade.ts). Toucher un paquet approche le plan jusqu'à les séparer ;
+// au même endroit, il s'ouvre en éventail, chacun à toucher.
 //
 // Les terrains où l'on peut ouvrir un match (23/10, Sabri : « en mode grisé,
 // comme s'il fallait ouvrir le match ») : tous ceux du Nord
@@ -52,18 +59,34 @@ import { useEffect, useRef } from "react";
 import maplibregl, { type LngLatBoundsLike, type Map as PlanMap, type Marker, type PaddingOptions } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { SPLASH_FINI } from "@/components/sfl/app-splash";
-import { couleurFantome, fantomeSvg, pointHtml, stickerHtml, toiHtml, type StickerPlan, type TeinteFantome, type VarianteStade } from "./stade";
+import {
+  couleurFantome,
+  dosHtml,
+  fantomeSvg,
+  nombreHtml,
+  paquetHtml,
+  pointHtml,
+  stickerHtml,
+  toiHtml,
+  type StickerPlan,
+  type TeinteFantome,
+  type VarianteStade,
+} from "./stade";
 import {
   centreHtml,
   disposer,
+  FUSION_MATCHS,
   FUSION_PILE,
-  groupeHtml,
   grouperMatchs,
   joueurHtml,
+  joueursSousHtml,
   OUVERTE_MAX,
   pileHtml,
   R_STICKER,
   ZOOM_OUVERTURE,
+  ZOOM_OUVERTURE_CONTRATS,
+  ZOOM_VILLE,
+  type JoueurPlan,
   type VillePlan,
 } from "./joueurs";
 import { gestesOrdinateur } from "./gestes-ordinateur";
@@ -246,6 +269,29 @@ function teinterPossibles(map: PlanMap, fond: FondCarte, teinte: TeinteFantome) 
   map.setPaintProperty("possibles", "text-halo-color", sat ? "rgba(10, 11, 13, 0.85)" : "#ffffff");
 }
 
+/** Un paquet de matchs que le zoom ne séparera pas : au bout du zoom, ils se chevauchent encore. */
+function inseparables(map: PlanMap, lieux: { lat: number; lng: number }[]): boolean {
+  const k = 2 ** (map.getMaxZoom() - map.getZoom());
+  const pts = lieux.map((x) => map.project([x.lng, x.lat]));
+  return pts.every((p) => pts.every((q) => Math.hypot(p.x - q.x, p.y - q.y) * k < FUSION_MATCHS));
+}
+
+/** Au même endroit : à moins de 200 m les uns des autres (le même complexe). */
+function memeEndroit(lieux: { lat: number; lng: number }[]): boolean {
+  const [a, ...autres] = lieux;
+  const r = Math.PI / 180;
+  return autres.every((b) => {
+    const d = Math.sin(((b.lat - a.lat) * r) / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(((b.lng - a.lng) * r) / 2) ** 2;
+    return 12742 * Math.asin(Math.sqrt(d)) < 0.2;
+  });
+}
+
+/** L'écart entre deux stickers d'un éventail, en pixels (une vignette et un peu d'air). */
+const EVENTAIL = 84;
+
+const echapper = (t: string) =>
+  t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
+
 /** Voler (ou sauter, en mouvement réduit) sur une boîte, le plan incliné selon le zoom atteint. */
 function cadrer(map: PlanMap, boite: LngLatBoundsLike, padding: PaddingOptions, maxZoom: number, duree: number) {
   const cam = map.cameraForBounds(boite, { padding, maxZoom });
@@ -316,10 +362,13 @@ export function CarteMap({
   const carte = useRef<PlanMap | null>(null);
   const reperes = useRef<Marker[]>([]);
   const joueursReperes = useRef<Marker[]>([]);
-  // Les stickers posés, et le groupe que chacun mène quand des matchs se
-  // chevauchent (ses ids, et les villes de joueurs rangées dessous).
-  const stickersPoses = useRef<{ s: StickerPlan; el: HTMLElement }[]>([]);
+  // Les stickers posés (leur rang : l'ordre du temps, le joué en dernier), et
+  // le paquet que chacun mène quand des matchs se chevauchent (ses ids, et
+  // les villes de joueurs rangées contre lui).
+  const stickersPoses = useRef<{ s: StickerPlan; el: HTMLElement; rang: number }[]>([]);
   const groupeDe = useRef(new Map<string, { ids: string[]; villes: string[] }>());
+  // Le paquet ouvert en éventail (sa tête), ou aucun.
+  const evente = useRef<string | null>(null);
   const choisiRef = useRef(choisi);
   // Tout recomposer (regroupements et joueurs) : à chaque fin de zoom, et quand la liste change.
   const recomposer = useRef<() => void>(() => {});
@@ -409,6 +458,13 @@ export function CarteMap({
     // de 36 px (un point de loin est petit sous le doigt). Un sticker, une
     // carte ou toi, posés dessus, gardent le toucher pour eux.
     map.on("click", (e) => {
+      // Un éventail ouvert : toucher à côté le referme, sans rien ouvrir dessous.
+      const sur = e.originalEvent?.target;
+      if (evente.current && !(sur instanceof Element && sur.closest(".maplibregl-marker"))) {
+        evente.current = null;
+        recomposer.current();
+        return;
+      }
       const toucher = possibleRef.current;
       if (!toucher || !map.getLayer("possibles")) return;
       const cible = e.originalEvent?.target;
@@ -434,6 +490,12 @@ export function CarteMap({
       if (!mieux) return;
       onde(map, mieux.lat, mieux.lng, fondRef.current === "satellite");
       toucher(mieux.id);
+    });
+    // Zoomer referme l'éventail : le paquet se refait au nouveau zoom.
+    map.on("zoomstart", (e) => {
+      if (!evente.current || !(e as { originalEvent?: Event }).originalEvent) return;
+      evente.current = null;
+      recomposer.current();
     });
     map.on("mouseenter", "possibles", () => possibleRef.current && (map.getCanvas().style.cursor = "pointer"));
     map.on("mouseleave", "possibles", () => (map.getCanvas().style.cursor = ""));
@@ -506,7 +568,8 @@ export function CarteMap({
     for (const id of COUCHES_POSSIBLES) if (map.getLayer(id)) map.setFilter(id, filtreLeve.current);
     if (!p) return;
     const variante: VarianteStade = fondRef.current === "satellite" ? "marbre" : "mono";
-    leve.current = repere(map, p.lat, p.lng, pointHtml(p.nom, variante), { classe: "ter-ancre", z: 2, actif: false });
+    // Levé, il passe devant les matchs voisins (sous l'éventail d'un paquet ouvert).
+    leve.current = repere(map, p.lat, p.lng, pointHtml(p.nom, variante), { classe: "ter-ancre", z: 800, actif: false });
     const h = map.getContainer().clientHeight;
     const ici = map.project([p.lng, p.lat]);
     const cible = { x: map.getContainer().clientWidth / 2, y: Math.max(MARGE_HAUT + 50, h * 0.3) };
@@ -537,37 +600,54 @@ export function CarteMap({
     let rang = 0;
     const avant = dernierChoisi.current;
     const ordre = [...stickers].sort((a, b) => b.lat - a.lat);
-    const stickersVus: { s: StickerPlan; el: HTMLElement }[] = [];
+    const stickersVus: { s: StickerPlan; el: HTMLElement; rang: number }[] = [];
+    // Un choix refait les stickers : l'éventail se referme sur le choisi, devant son paquet.
+    evente.current = null;
     ordre.forEach((s, k) => {
       const est = s.id === choisi;
       const m = repere(map, s.lat, s.lng, stickerHtml(s, est, variante), { classe: "stk-ancre", z: est ? 3 + ordre.length : 3 + k });
       m.getElement().addEventListener("click", (e) => {
+        const cible = e.target as HTMLElement;
         // Sa bulle de messages : droit à la discussion.
-        if (bulleRef.current && (e.target as HTMLElement).closest(".stk__bulle")) {
+        if (bulleRef.current && cible.closest(".stk__bulle")) {
           navigator.vibrate?.(6);
           bulleRef.current(s.id);
           return;
         }
-        // Un sticker qui en range d'autres : s'approcher pour les séparer ;
-        // sa pastille de joueurs seuls ouvre leurs villes.
         const g = groupeDe.current.get(s.id);
-        if (g && (g.ids.length > 1 || (g.villes.length && (e.target as HTMLElement).closest(".stk__groupe")))) {
+        // Les joueurs rangés contre lui : leur collection.
+        if (g?.villes.length && cible.closest(".stk__joueurs")) {
           navigator.vibrate?.(6);
-          if (g.ids.length === 1 || map.getZoom() >= map.getMaxZoom() - 0.5) {
-            if (g.villes.length) villeRef.current?.(g.villes);
-            else choisirRef.current(s.id);
-            return;
-          }
-          const dans = stickers.filter((x) => g.ids.includes(x.id));
-          const b = dans.reduce((x, v) => x.extend([v.lng, v.lat]), new maplibregl.LngLatBounds([s.lng, s.lat], [s.lng, s.lat]));
-          cadrer(map, b, marges(map, MARGE_HAUT, margeBasRef.current, 90), Math.max(map.getZoom() + 2, ZOOM_OUVERTURE), doux ? 0.9 : 0);
+          villeRef.current?.(g.villes);
           return;
         }
+        // Un paquet : s'approcher jusqu'à séparer ses matchs ; au même
+        // endroit (ou au bout du zoom), il s'ouvre en éventail.
+        if (g && g.ids.length > 1 && evente.current !== s.id) {
+          navigator.vibrate?.(6);
+          const dans = stickers.filter((x) => g.ids.includes(x.id));
+          if (map.getZoom() >= map.getMaxZoom() - 0.5 || inseparables(map, dans)) {
+            evente.current = s.id;
+            recomposer.current();
+            // L'éventail tient dans l'écran : le plan glisse s'il déborde.
+            const p = map.project([s.lng, s.lat]);
+            const demi = ((g.ids.length - 1) / 2) * EVENTAIL + 46;
+            const w = map.getContainer().clientWidth;
+            const dx = p.x - demi < 12 ? p.x - demi - 12 : p.x + demi > w - 12 ? p.x + demi - (w - 12) : 0;
+            if (dx) map.panBy([dx, 0], { duration: doux ? 420 : 0 });
+            return;
+          }
+          const b = dans.reduce((x, v) => x.extend([v.lng, v.lat]), new maplibregl.LngLatBounds([s.lng, s.lat], [s.lng, s.lat]));
+          cadrer(map, b, marges(map, MARGE_HAUT, margeBasRef.current, 90), ZOOM_MAX - 0.5, doux ? 0.9 : 0);
+          return;
+        }
+        evente.current = null;
         onde(map, s.lat, s.lng, fond === "satellite");
         choisirRef.current(s.id);
       });
       poses.push(m);
-      stickersVus.push({ s, el: m.getElement() });
+      // L'ordre du temps (celui de la page), le joué en dernier : la tête d'un paquet est le prochain.
+      stickersVus.push({ s, el: m.getElement(), rang: stickers.indexOf(s) + (s.etat.genre === "joue" ? stickers.length : 0) });
       const el = m.getElement().querySelector<HTMLElement>(".stk");
       // Un message de plus depuis la dernière fois : la bulle saute.
       const nonLus = s.discussion?.nonLus ?? 0;
@@ -663,20 +743,32 @@ export function CarteMap({
       joueursReperes.current.forEach((m) => m.remove());
       joueursReperes.current = [];
     };
+    // Un sticker remis à plat : ni rangé, ni en paquet, ni en éventail.
+    const remettre = (el: HTMLElement) => {
+      el.classList.remove("stk-ancre--range");
+      if (el.dataset.z) el.style.zIndex = el.dataset.z;
+      el.querySelectorAll(".stk__dos, .stk__nombre, .stk__paquet, .stk__joueurs, .stk-eventail__nom").forEach((x) => x.remove());
+      const stk = el.querySelector<HTMLElement>(".stk");
+      if (!stk) return;
+      stk.classList.remove("stk--paquet", "stk--paquet-loin", "stk--evente");
+      for (const v of ["--ex", "--ey", "--er"]) stk.style.removeProperty(v);
+    };
     const dessiner = () => {
       vider();
-      // Les matchs qui se chevauchent d'abord : un sticker reste, les autres s'y rangent.
+      // Les matchs qui se chevauchent d'abord : un paquet, le prochain devant.
       // Effacés (matchsEnRetrait), ils ne gardent plus de joueurs sous eux.
-      const ecran = retraitRef.current ? [] : stickersPoses.current.map(({ s }) => ({ id: s.id, ...map.project([s.lng, s.lat]) }));
+      const ecran = retraitRef.current ? [] : stickersPoses.current.map(({ s, rang }) => ({ id: s.id, rang, ...map.project([s.lng, s.lat]) }));
       const groupes = grouperMatchs(ecran, choisiRef.current);
-      const absorbees = new Map<string, { villes: string[]; joueurs: number }>();
+      if (evente.current && !groupes.some((g) => g.tete === evente.current && g.ids.length > 1)) evente.current = null;
+      const absorbees = new Map<string, { villes: string[]; joueurs: JoueurPlan[] }>();
       const zoom = map.getZoom();
       const dispo = villes.length
         ? disposer(
             villes,
             zoom,
             (lat, lng) => map.project([lng, lat]),
-            groupes.map((g) => ({ x: g.x, y: g.y - 40, r: R_STICKER }))
+            groupes.map((g) => ({ x: g.x, y: g.y - 40, r: R_STICKER })),
+            retraitRef.current ? ZOOM_OUVERTURE_CONTRATS : ZOOM_OUVERTURE
           )
         : [];
       const avant = ouvertes.current;
@@ -684,13 +776,13 @@ export function CarteMap({
       const poses: Marker[] = [];
       for (const d of dispo) {
         if (d.genre === "pile") {
-          // Une pile sous un sticker s'y range : la pastille du sticker la compte.
+          // Une pile sur un sticker ou ses noms s'y range : sa pile en petit, posée contre lui.
           const p = map.project([d.lng, d.lat]);
-          const sous = groupes.find((g) => Math.hypot(g.x - p.x, g.y - 40 - p.y) < FUSION_PILE);
+          const sous = groupes.find((g) => Math.abs(p.x - g.x) < FUSION_PILE && p.y - g.y > -FUSION_PILE - 40 && p.y - g.y < FUSION_PILE);
           if (sous) {
-            const a = absorbees.get(sous.tete) ?? { villes: [], joueurs: 0 };
+            const a = absorbees.get(sous.tete) ?? { villes: [], joueurs: [] };
             a.villes.push(...d.villes.map((v) => v.id));
-            a.joueurs += d.joueurs.length;
+            a.joueurs.push(...d.joueurs);
             absorbees.set(sous.tete, a);
             continue;
           }
@@ -733,20 +825,50 @@ export function CarteMap({
       joueursReperes.current = poses;
       ouvertes.current = maintenant;
 
-      // Les stickers : les rangés s'effacent, la tête porte la pastille.
-      const tetes = new Map(groupes.map((g) => [g.tete, g]));
-      const rangeDans = new Set(groupes.flatMap((g) => g.ids.filter((id) => id !== g.tete)));
+      // Les stickers : tous remis à plat, puis les paquets (les rangés
+      // s'effacent, leurs vignettes dépassent derrière la tête) et l'éventail.
+      const parId = new Map(stickersPoses.current.map((x) => [x.s.id, x]));
+      const variante: VarianteStade = fondRef.current === "satellite" ? "marbre" : "mono";
       groupeDe.current.clear();
-      for (const { s, el } of stickersPoses.current) {
-        el.classList.toggle("stk-ancre--range", rangeDans.has(s.id));
-        el.querySelector(".stk__groupe")?.remove();
-        const g = tetes.get(s.id);
-        const a = absorbees.get(s.id);
-        const html = g ? groupeHtml(g.ids.length, a?.joueurs ?? 0) : "";
-        el.querySelector(".stk")?.classList.toggle("stk--groupe", !!g && g.ids.length > 1);
-        if (!g || !html) continue;
-        el.querySelector(".stk")?.insertAdjacentHTML("beforeend", html);
-        groupeDe.current.set(s.id, { ids: g.ids, villes: a?.villes ?? [] });
+      for (const { el } of stickersPoses.current) remettre(el);
+      for (const g of groupes) {
+        const tete = parId.get(g.tete);
+        const stk = tete?.el.querySelector<HTMLElement>(".stk");
+        if (!tete || !stk) continue;
+        const membres = g.ids.flatMap((id) => parId.get(id) ?? []);
+        if (membres.length > 1 && evente.current === g.tete) {
+          // En éventail : côte à côte au-dessus du terrain, du prochain au plus
+          // lointain, un peu penchés vers l'extérieur ; le nom une seule fois.
+          membres.forEach((x, i) => {
+            const k = i - (membres.length - 1) / 2;
+            const el = x.el.querySelector<HTMLElement>(".stk");
+            if (!el) return;
+            el.classList.add("stk--evente");
+            el.style.setProperty("--ex", `${Math.round(k * EVENTAIL)}px`);
+            el.style.setProperty("--ey", `${Math.round(16 - Math.abs(k) * 7)}px`);
+            el.style.setProperty("--er", `${(k * 6).toFixed(1)}deg`);
+            x.el.dataset.z ??= x.el.style.zIndex;
+            x.el.style.zIndex = String(900 + i);
+          });
+          const ici = memeEndroit(membres.map((x) => x.s));
+          tete.el.insertAdjacentHTML(
+            "beforeend",
+            `<span class="stk-eventail__nom">${ici ? `${echapper(tete.s.nom)} · ` : ""}${membres.length} matchs</span>`
+          );
+        } else if (membres.length > 1) {
+          for (const x of membres.slice(1)) x.el.classList.add("stk-ancre--range");
+          // Les dos sous la vignette, pas dedans : la vignette du choisi flotte
+          // (une animation, donc un plan à elle) et les aurait posés sur son bord.
+          membres.slice(1, 3).forEach((x, i) => stk.insertAdjacentHTML("afterbegin", dosHtml(x.s, (i + 1) as 1 | 2, variante)));
+          stk.querySelector(".stk__vignette")?.insertAdjacentHTML("beforeend", nombreHtml(membres.length));
+          const ici = memeEndroit(membres.map((x) => x.s));
+          stk.classList.add("stk--paquet");
+          stk.classList.toggle("stk--paquet-loin", !ici);
+          stk.insertAdjacentHTML("beforeend", paquetHtml(membres.length, ici));
+        }
+        const a = absorbees.get(g.tete);
+        if (a) stk.insertAdjacentHTML("beforeend", joueursSousHtml(a.joueurs));
+        groupeDe.current.set(g.tete, { ids: g.ids, villes: a?.villes ?? [] });
       }
     };
     recomposer.current = dessiner;
@@ -759,11 +881,11 @@ export function CarteMap({
     };
   }, [villes]);
 
-  // Aller voir une ville choisie dans le catalogue : assez près pour qu'elle s'ouvre.
+  // Aller voir une ville choisie dans le catalogue : ses rues, sa pile.
   useEffect(() => {
     const map = carte.current;
     if (!map || !viser) return;
-    const z = Math.max(map.getZoom(), ZOOM_OUVERTURE + 1);
+    const z = Math.max(map.getZoom(), ZOOM_VILLE);
     map.flyTo({ center: [viser.lng, viser.lat], zoom: z, pitch: pente(z), duration: calme() ? 0 : 1000 });
   }, [viser]);
 
@@ -774,7 +896,8 @@ export function CarteMap({
   }, [matchsEnRetrait]);
 
   // Cadrer sur des lieux que la page demande (les cibles des contrats), puis
-  // revenir sur les matchs. Une seule ville : assez près pour qu'elle s'ouvre.
+  // revenir sur les matchs. Une seule ville : assez près pour qu'elle s'ouvre
+  // (les matchs effacés, elle s'ouvre dès le quartier).
   useEffect(() => {
     const map = carte.current;
     if (!map) return;
@@ -788,7 +911,7 @@ export function CarteMap({
     ailleurs.current = true;
     const [a, ...autres] = cadrerSur.lieux;
     const b = autres.reduce((x, p) => x.extend([p.lng, p.lat]), new maplibregl.LngLatBounds([a.lng, a.lat], [a.lng, a.lat]));
-    cadrer(map, b, marge, ZOOM_OUVERTURE + 1, duree);
+    cadrer(map, b, marge, ZOOM_OUVERTURE_CONTRATS + 1, duree);
   }, [cadrerSur]);
 
   return <div ref={conteneur} className={className} role="region" aria-label="La Map des matchs" />;

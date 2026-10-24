@@ -656,7 +656,11 @@
   transform: translateX(-50%) rotate(var(--penche, 0deg));
   transform-origin: 50% 100%;
   filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2));
-  transition: transform 0.3s ease, filter 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    filter 0.3s ease,
+    left 0.46s cubic-bezier(0.3, 1.35, 0.5, 1),
+    bottom 0.46s cubic-bezier(0.3, 1.35, 0.5, 1);
   cursor: pointer;
 }
 .stk--choisi {
@@ -668,8 +672,24 @@
   width: 71px;
   height: 71px;
   padding: 3.5px;
-  background: #f4f5f2;
+  background: var(--stk-cadre, #f4f5f2);
   border-radius: 17px;
+}
+/* Un match ouvert par un joueur (24/10, stade.ts, remplissageDe) : son bord
+   prend la couleur de ce qu'il lui manque — rouge, il manque beaucoup ;
+   orange (la braise du manque), presque plein ; vert, complet. Le papier du
+   sticker reste au calendrier et au badge. */
+.stk--rouge {
+  --stk-cadre: #e5383b;
+  --stk-cadre-texte: #ffffff;
+}
+.stk--orange {
+  --stk-cadre: #ff8a4c;
+  --stk-cadre-texte: #0a0b0d;
+}
+.stk--vert {
+  --stk-cadre: #1fa055;
+  --stk-cadre-texte: #ffffff;
 }
 .stk__stade {
   width: 64px;
@@ -685,7 +705,9 @@
 .stk--team .stk__cal-jour {
   background: #1a2647;
 }
-.stk--complet .stk__stade {
+/* Joué (ou privé, sans couleur) : le stade passe au gris. Complet, un match
+   n'est pas éteint : il est vert. */
+.stk--eteint .stk__stade {
   filter: saturate(0);
   opacity: 0.8;
 }
@@ -694,7 +716,7 @@
   height: 0;
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
-  border-top: 7px solid #f4f5f2;
+  border-top: 7px solid var(--stk-cadre, #f4f5f2);
 }
 .stk__cal {
   position: absolute;
@@ -741,8 +763,11 @@
   font: 900 11.5px/1 var(--font-sans), system-ui, sans-serif;
 }
 .stk__badge--manque {
-  background: #ff8a4c;
-  color: #0a0b0d;
+  background: var(--stk-cadre, #ff8a4c);
+  color: var(--stk-cadre-texte, #0a0b0d);
+}
+.stk__badge--plein {
+  background: var(--stk-cadre, #1fa055);
 }
 .stk__badge--dedans {
   background: #0a0b0d;
@@ -820,10 +845,10 @@
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
 }
-.stk__etiquette--manque { background: #ff8a4c; color: #0a0b0d; }
+.stk__etiquette--manque { background: var(--stk-cadre, #ff8a4c); color: var(--stk-cadre-texte, #0a0b0d); }
 .stk__etiquette--dedans { background: #0a0b0d; color: #f4f5f2; }
 .stk__etiquette--inscrits { background: #f4f5f2; color: #0a0b0d; border-color: #0a0b0d; }
-.stk__etiquette--complet { background: #8f908b; color: #f4f5f2; }
+.stk__etiquette--complet { background: var(--stk-cadre, #8f908b); color: #f4f5f2; }
 
 /* Un terrain sans match : un point, et son nom. */
 .pt__dot {
@@ -1174,25 +1199,66 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
-/* Le nom du terrain sous le sticker du match. */
-/* Des matchs qui se chevauchent : un seul sticker reste, les autres s'y
-   rangent (une carte décalée derrière la vignette), et une pastille compte
-   ce qu'il range — « 2 matchs · 14 joueurs ». */
+/* Des matchs qui se chevauchent à l'écran font un paquet (24/10,
+   map/carte-map.tsx) : un seul sticker reste devant, les autres se rangent
+   derrière lui. Leurs vraies vignettes dépassent, penchées, de chaque côté
+   (stade.ts, dosHtml), leur nombre en noir au coin, comme les piles de
+   joueurs ; dessous, « 2 matchs ici », ou « 6 matchs » à la place du nom
+   quand ils sont à plusieurs endroits. Toucher le paquet l'ouvre en éventail
+   (au même endroit) ou approche le plan. */
 .maplibregl-map .maplibregl-marker.stk-ancre--range {
   visibility: hidden;
   pointer-events: none;
 }
-.stk--groupe .stk__vignette::before {
-  content: "";
+.stk__dos {
   position: absolute;
-  inset: 0;
+  left: 0;
+  top: 0;
+  width: 71px;
+  height: 71px;
   z-index: -1;
+  padding: 3.5px;
   border-radius: 17px;
-  background: #d9dad5;
-  transform: translate(6px, -6px) rotate(6deg);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
+  background: var(--dos-cadre, #f4f5f2);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.22);
 }
-.stk__groupe {
+.stk__dos--1 {
+  transform: translate(17px, -6px) rotate(11deg);
+}
+.stk__dos--2 {
+  transform: translate(-17px, -4px) rotate(-10deg);
+}
+.stk__dos--rouge { --dos-cadre: #e5383b; }
+.stk__dos--orange { --dos-cadre: #ff8a4c; }
+.stk__dos--vert { --dos-cadre: #1fa055; }
+.stk__dos--eteint .stk__stade {
+  filter: saturate(0);
+  opacity: 0.8;
+}
+/* Le paquet : le badge et la bulle du premier s'effacent devant le nombre. */
+.stk--paquet .stk__badge,
+.stk--paquet .stk__bulle {
+  display: none;
+}
+.stk__nombre {
+  position: absolute;
+  right: -11px;
+  top: -11px;
+  min-width: 25px;
+  height: 25px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #0a0b0d;
+  color: #f4f5f2;
+  border: 2px solid #f4f5f2;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.28);
+  font: 900 13px/1 var(--font-sans), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.3px;
+}
+.stk__paquet {
   position: absolute;
   top: calc(100% + 26px);
   left: 50%;
@@ -1202,8 +1268,92 @@
   border-radius: 999px;
   background: #f4f5f2;
   color: #0a0b0d;
-  font: 700 11px/1 var(--font-sans), system-ui, sans-serif;
+  font: 800 11px/1 var(--font-sans), system-ui, sans-serif;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+}
+/* À plusieurs endroits : « 6 matchs » à la place du nom. */
+.stk--paquet-loin .stk__nom {
+  display: none;
+}
+.stk__paquet--nom {
+  top: 100%;
+  margin-top: 4px;
+  background: #0a0b0d;
+  color: #f4f5f2;
+  font: 700 11.5px/1 var(--font-sans), system-ui, sans-serif;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+/* En éventail : les matchs du paquet côte à côte au-dessus de leur terrain,
+   chacun à toucher ; leur nom une seule fois, dessous. */
+.stk--evente {
+  left: var(--ex, 0px);
+  bottom: var(--ey, 0px);
+  transform: translateX(-50%) rotate(var(--er, 0deg));
+}
+.stk--evente .stk__nom {
+  display: none;
+}
+.stk-eventail__nom {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #0a0b0d;
+  color: #f4f5f2;
+  font: 700 11.5px/1 var(--font-sans), system-ui, sans-serif;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+/* Les joueurs rangés contre un sticker (map/joueurs.ts, joueursSousHtml) :
+   leur pile en petit, posée contre le coin bas gauche, et leur nombre. */
+.stk__joueurs {
+  position: absolute;
+  left: -27px;
+  bottom: 2px;
+  width: 34px;
+  height: 36px;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
+}
+.stk__joueurs::before {
+  /* Le doigt l'attrape un peu au-delà de son dessin. */
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+.stk__joueurs-carte {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 20px;
+  height: 32px;
+  margin-left: -10px;
+  border-width: 1.5px;
+  border-radius: 4px;
+  transform: translateX(var(--x)) rotate(var(--r));
+  transform-origin: 50% 100%;
+}
+.stk__joueurs-compte {
+  position: absolute;
+  left: -7px;
+  top: -9px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #0a0b0d;
+  color: #f4f5f2;
+  border: 1.5px solid #f4f5f2;
+  font: 900 10px/1 var(--font-sans), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.3px;
 }
 
 .stk__nom {
