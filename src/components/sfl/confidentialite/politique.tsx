@@ -240,6 +240,16 @@ export function TextePolitique() {
           </P>
         </Sous>
 
+        <Sous titre="Les vidéos de Bola">
+          <P>
+            Les vidéos des Actus ne se regardent que dans l&apos;app. Tes réactions et tes commentaires, les joueurs
+            de Bola les voient ; tu les retires quand tu veux. Quand tu en regardes une, l&apos;app note combien de
+            fois et jusqu&apos;où (dans le journal d&apos;usage, après ton accord), et quand tu partages son lien.
+            Qui ouvre ce lien hors de l&apos;app ne voit que le titre ; son ouverture est comptée sans rien de
+            personnel.
+          </P>
+        </Sous>
+
         <Sous titre="Les notifications">
           <P>
             Si tu les actives, ton téléphone nous donne une adresse d&apos;abonnement au service de notifications
@@ -421,7 +431,8 @@ export function TextePolitique() {
             <>Tes selfies : jamais gardés par Bola.</>,
             <>Ta photo de carte : jusqu&apos;à ce que tu la retires, ou que ton compte soit supprimé.</>,
             <>
-              Le journal d&apos;usage, le suivi des notifications et les ouvertures de liens d&apos;invitation : 13 mois
+              Le journal d&apos;usage (les vidéos vues comprises), le suivi des notifications et les ouvertures de liens
+              d&apos;invitation ou de vidéo : 13 mois
               au plus. Qui a fait venir qui : tant que les deux comptes existent.
             </>,
             <>Ton accord (la case cochée, sa date, sa version) : tant que ton compte existe, pour pouvoir le prouver.</>,
