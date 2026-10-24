@@ -114,6 +114,8 @@ export function Pastille({
             alt=""
             // Chargée comme html-to-image la relit : l'image partagée la trouve en cache.
             crossOrigin={photo.startsWith("data:") ? undefined : "anonymous"}
+            // L'adresse d'origine : l'image partagée y repeint la photo à sa taille (useImage).
+            data-photo={photo}
             className="size-full object-cover"
           />
         ) : (
@@ -477,6 +479,102 @@ const GRIS = "#8a8985";
 const CADRE_APP = 358;
 const ZOOM = 1.3;
 
+/** Les prises d'une image avant de la garder telle quelle. */
+const ESSAIS = 5;
+/** Un gif transparent d'un pixel. */
+const VIDE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+/** Le gris sous la photo d'une carte (Pastille) : ce qu'on voit quand elle manque. */
+const GRIS_SANS_PHOTO = [0xcf, 0xce, 0xca];
+
+/**
+ * Chaque photo de l'image, repeinte à la taille de sa carte (deux fois, pour
+ * l'export) en JPEG, et posée telle quelle dans la balise : une image légère,
+ * au bon type, que Safari dessine sans aller la chercher. Une photo qui ne se
+ * repeint pas (pas encore là, refusée) reste à son adresse.
+ */
+async function poserLesPhotos(noeud: HTMLElement) {
+  const imgs = Array.from(noeud.querySelectorAll<HTMLImageElement>("img[data-photo]"));
+  await Promise.all(
+    imgs.map(async (img) => {
+      const adresse = img.dataset.photo!;
+      if (img.dataset.posee === adresse) return;
+      try {
+        const source = new Image();
+        if (!adresse.startsWith("data:") && !adresse.startsWith("blob:")) source.crossOrigin = "anonymous";
+        source.src = adresse;
+        await source.decode();
+        const boite = img.getBoundingClientRect();
+        const echelle = 2 * Math.max(1, boite.width / img.offsetWidth || 1);
+        const l = Math.max(1, Math.round(img.offsetWidth * echelle));
+        const h = Math.max(1, Math.round(img.offsetHeight * echelle));
+        // object-cover : la photo couvre la carte, centrée.
+        const k = Math.max(l / source.naturalWidth, h / source.naturalHeight);
+        const sl = l / k;
+        const sh = h / k;
+        const toile = document.createElement("canvas");
+        toile.width = l;
+        toile.height = h;
+        toile
+          .getContext("2d")!
+          .drawImage(source, (source.naturalWidth - sl) / 2, (source.naturalHeight - sh) / 2, sl, sh, 0, 0, l, h);
+        const data = toile.toDataURL("image/jpeg", 0.9);
+        if (img.dataset.photo !== adresse) return;
+        img.src = data;
+        await img.decode();
+        img.dataset.posee = adresse;
+      } catch {
+        // Elle reste à son adresse : html-to-image ira la chercher.
+      }
+    }),
+  );
+}
+
+/**
+ * L'image a-t-elle toutes ses photos ? On lit, sur chaque carte qui en a une,
+ * quelques points : tous du gris d'une carte vide, elle manque.
+ */
+async function photosPresentes(noeud: HTMLElement, blob: Blob): Promise<boolean> {
+  // Seules les photos posées comptent : une photo qui n'a pas pu se charger
+  // manquera à toutes les prises.
+  const imgs = Array.from(noeud.querySelectorAll<HTMLImageElement>("img[data-posee]"));
+  if (!imgs.length) return true;
+  try {
+    const image = await createImageBitmap(blob);
+    const origine = noeud.getBoundingClientRect();
+    const kx = image.width / origine.width;
+    const ky = image.height / origine.height;
+    const toile = document.createElement("canvas");
+    toile.width = 1;
+    toile.height = 1;
+    const ctx = toile.getContext("2d", { willReadFrequently: true })!;
+    const lire = (x: number, y: number) => {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.drawImage(image, Math.round(x), Math.round(y), 1, 1, 0, 0, 1, 1);
+      return ctx.getImageData(0, 0, 1, 1).data;
+    };
+    const grise = (p: Uint8ClampedArray) => GRIS_SANS_PHOTO.every((c, i) => Math.abs(p[i] - c) <= 4);
+    const toutes = imgs.every((img) => {
+      const b = img.getBoundingClientRect();
+      const x = (b.left - origine.left) * kx;
+      const y = (b.top - origine.top) * ky;
+      const l = b.width * kx;
+      const h = b.height * ky;
+      // Le haut et le milieu : l'onglet de la note couvre le coin bas droit.
+      const points = [
+        [0.5, 0.35],
+        [0.3, 0.25],
+        [0.35, 0.55],
+      ];
+      return !points.every(([u, v]) => grise(lire(x + u * l, y + v * h)));
+    });
+    image.close();
+    return toutes;
+  } catch {
+    // Rien pour regarder : l'image est gardée telle quelle.
+    return true;
+  }
+}
+
 interface SujetImage {
   terrain: TerrainFeuille;
   basEstA: boolean;
@@ -509,17 +607,31 @@ function useImage(
       if (!noeuds.length || noeuds.some((n) => !n)) return;
       try {
         await document.fonts?.ready;
+        // Les photos, repeintes à la taille de leur carte et posées dans
+        // l'image : html-to-image n'a plus à les chercher.
+        for (const noeud of noeuds) await poserLesPhotos(noeud!);
+        if (annule) return;
         const prendreTout = async () => {
           const blobs: Blob[] = [];
           for (const noeud of noeuds) {
-            const blob = await toBlob(noeud!, {
-              pixelRatio: 2,
-              // Les photos changent d'adresse avec elles (?v=…) ; une photo
-              // repeinte (blob:) ne se relit pas si on lui ajoute un paramètre.
-              includeQueryParams: true,
-              width: LARGEUR,
-              height: HAUTEUR,
-            });
+            // Safari (et tout navigateur d'iPhone) peut dessiner l'image avant
+            // d'y avoir posé les photos : elle sort avec des cartes grises.
+            // On regarde chaque carte de l'image, et on la reprend tant
+            // qu'il en manque une (Sabri, 24/10 : « Snap » sans les photos).
+            let blob: Blob | null = null;
+            for (let essai = 0; essai < ESSAIS && !annule; essai++) {
+              blob = await toBlob(noeud!, {
+                pixelRatio: 2,
+                // Les photos changent d'adresse avec elles (?v=…) ; une photo
+                // repeinte (blob:) ne se relit pas si on lui ajoute un paramètre.
+                includeQueryParams: true,
+                // Un logo qui ne se charge pas laisse un vide, pas l'image entière.
+                imagePlaceholder: VIDE,
+                width: LARGEUR,
+                height: HAUTEUR,
+              });
+              if (!blob || (await photosPresentes(noeud!, blob))) break;
+            }
             if (annule || !blob) return;
             blobs.push(blob);
           }
@@ -536,9 +648,8 @@ function useImage(
           });
         };
         await prendreTout();
-        // Safari (et tout navigateur d'iPhone) peut dessiner l'image avant
-        // d'y avoir posé les photos et les logos : sa première prise sort
-        // alors sans eux. La seconde les a, et remplace la première.
+        // Les logos aussi peuvent manquer à la première prise de Safari :
+        // la seconde les a, et remplace la première.
         if (!annule && navigator.vendor.startsWith("Apple")) await prendreTout();
       } catch {
         // Pas d'image : le bouton reste grisé, la feuille se lit quand même.
