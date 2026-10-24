@@ -4,7 +4,8 @@
 // écusson d'équipe et choisir de vraies couleurs d'équipe ») : l'écusson et
 // le maillot en grand, qui changent à chaque toucher, puis la forme, le
 // motif, les trois couleurs (le fond, le motif, les détails : on touche une
-// des trois pastilles, puis une couleur de club) et l'emblème. Chaque choix
+// des trois pastilles, puis une couleur de club) et l'emblème : un signe
+// (initiales, figure, forme géométrique) ou, sur la rangée d'après, un animal. Chaque choix
 // se montre déjà peint aux couleurs de l'équipe, pas en pictogramme.
 //
 // EditeurBlason sert à la création de l'équipe (creer-equipe.tsx) ;
@@ -136,13 +137,15 @@ export function EditeurBlason({
           })}
         </div>
       </div>
-      <Rangee titre="Emblème">
-        {EMBLEMES.map((e) => (
-          <Choix key={e.id} actif={valeur.embleme === e.id} label={e.label} onClick={() => avec({ embleme: e.id })}>
-            <Ecusson initiales={ini} fond={fond} blason={{ ...valeur, embleme: e.id }} taille={44} />
-          </Choix>
-        ))}
-      </Rangee>
+      {(["signe", "animal"] as const).map((famille) => (
+        <Rangee key={famille} titre={famille === "signe" ? "Emblème" : "Animal"}>
+          {EMBLEMES.filter((e) => e.famille === famille).map((e) => (
+            <Choix key={e.id} actif={valeur.embleme === e.id} label={e.label} onClick={() => avec({ embleme: e.id })}>
+              <Ecusson initiales={ini} fond={fond} blason={{ ...valeur, embleme: e.id }} taille={44} />
+            </Choix>
+          ))}
+        </Rangee>
+      ))}
     </div>
   );
 }
