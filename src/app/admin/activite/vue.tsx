@@ -76,6 +76,7 @@ import { NotifsStats } from "./notifications";
 import { QuiRamene } from "./rassembleurs";
 import { CeJourLa, Pics } from "./reperes";
 import { cn } from "@/lib/utils";
+import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { Barres, CarteHoraire, Cohortes, Comparaison, Courbe, encre } from "./graphiques";
 
 /** Une photo du studio (studio, drapeau, manga) ; `pays`, celui du drapeau, manque avant le 22/10. */
@@ -434,9 +435,12 @@ export function ActiviteVue({
   return (
     <div className="shell flex flex-col gap-4 py-4 sm:py-8">
       <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-[30px] font-bold tracking-tight">Activité</h1>
-          <p className="mt-1 text-[13px] text-foreground/42">Croissance, rétention, et ce qu&apos;on en tire</p>
+        <div className="flex items-center gap-3">
+          <BoutonRetour />
+          <div>
+            <h1 className="text-[30px] font-bold tracking-tight">Activité</h1>
+            <p className="mt-1 text-[13px] text-foreground/42">Croissance, rétention, et ce qu&apos;on en tire</p>
+          </div>
         </div>
         <button
           onClick={onRefresh}

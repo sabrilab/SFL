@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { PersonStanding } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BoutonRetour } from "@/components/layout/bouton-retour";
 import {
   AVATAR_STORAGE_KEY,
   CORPULENCE_OPTIONS,
@@ -83,6 +84,7 @@ export default function AvatarPage() {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 px-5 py-4 sm:py-8">
       <div className="flex items-center gap-2.5">
+        <BoutonRetour />
         <span className="glass flex size-11 items-center justify-center rounded-2xl">
           <PersonStanding className="size-5" />
         </span>

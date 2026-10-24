@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useSession } from "@/hooks/use-session";
 import { jetonServeur } from "@/lib/sfl/auth/session";
 import { cn } from "@/lib/utils";
+import { BoutonRetour } from "@/components/layout/bouton-retour";
 
 const DASHBOARD = "https://supabase.com/dashboard/project/tpfusliksgxcvfrodchk";
 
@@ -99,11 +100,14 @@ export default function SetupPage() {
 
   return (
     <div className="shell flex flex-col gap-4 py-4 sm:py-8">
-      <div>
-        <h1 className="text-[30px] font-bold tracking-tight">Installation Supabase</h1>
-        <p className="mt-1 text-[13px] text-foreground/42">
-          Le schéma de la base s&apos;applique tout seul à chaque mise en ligne.
-        </p>
+      <div className="flex items-center gap-3">
+        <BoutonRetour />
+        <div>
+          <h1 className="text-[30px] font-bold tracking-tight">Installation Supabase</h1>
+          <p className="mt-1 text-[13px] text-foreground/42">
+            Le schéma de la base s&apos;applique tout seul à chaque mise en ligne.
+          </p>
+        </div>
       </div>
 
       <section className="glass flex flex-wrap items-center gap-2 rounded-[22px] p-4">

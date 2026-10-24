@@ -345,7 +345,11 @@ export function PhotoStudio({
   }
 
   return (
+    // À part, par-dessus « Ma photo » (ui/sheet.tsx) : le studio refuse
+    // d'être fermé pendant qu'il travaille ; posé dans la fenêtre, sa croix
+    // le fermerait avec elle.
     <Sheet
+      aPart
       open={ouvert}
       onOpenChange={(o) => {
         if (o || enCours) return;
