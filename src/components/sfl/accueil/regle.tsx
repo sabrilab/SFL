@@ -14,6 +14,16 @@ import { cn } from "@/lib/utils";
 /** L'écart entre deux crans, en px. */
 const CRAN = 10;
 
+/**
+ * Les mesures de la règle, de la plus ample (niveau 0) à la plus serrée : un
+ * écran bas la resserre pour que tout tienne sans défiler (Corps, cadre.tsx).
+ */
+const MESURES = [
+  { chiffre: "text-[44px]", ecart: "mt-[3px]", marge: "mt-[8px]", hauteur: "h-[55px]", aiguille: "h-[30px]", crans: ["h-[26px]", "h-[18px]", "h-[11px]"], nombre: "top-[32px] text-[10px]" },
+  { chiffre: "text-[34px]", ecart: "mt-[2px]", marge: "mt-[5px]", hauteur: "h-[40px]", aiguille: "h-[23px]", crans: ["h-[20px]", "h-[13px]", "h-[8px]"], nombre: "top-[24px] text-[9px]" },
+  { chiffre: "text-[28px]", ecart: "mt-[1px]", marge: "mt-[4px]", hauteur: "h-[34px]", aiguille: "h-[20px]", crans: ["h-[17px]", "h-[11px]", "h-[7px]"], nombre: "top-[20px] text-[9px]" },
+] as const;
+
 const virgule = (v: number) => String(v).replace(".", ",");
 
 export function Regle({
@@ -26,7 +36,7 @@ export function Regle({
   moyen = 5,
   valeur,
   onChange,
-  compact = false,
+  niveau = 0,
 }: {
   label: string;
   unite: string;
@@ -39,9 +49,10 @@ export function Regle({
   moyen?: number;
   valeur: number;
   onChange: (v: number) => void;
-  /** Un écran bas : le nombre et la règle se resserrent. */
-  compact?: boolean;
+  /** De la plus ample (0) à la plus serrée (2), voir MESURES. */
+  niveau?: number;
 }) {
+  const t = MESURES[Math.min(MESURES.length - 1, Math.max(0, niveau))];
   const ref = useRef<HTMLDivElement>(null);
   const crans = Math.round((max - min) / pas) + 1;
   const indice = (v: number) => Math.round((v - min) / pas);
@@ -102,10 +113,9 @@ export function Regle({
         </button>
         <div className="flex min-w-0 flex-col items-center">
           <span className="mono-label text-white/45">{label}</span>
-          <span className={cn("flex items-baseline gap-[5px]", compact ? "mt-[2px]" : "mt-[3px]")}>
-            <span
-              className={cn("font-display leading-none tracking-wide text-white tabular-nums", compact ? "text-[32px]" : "text-[44px]")}
-            >
+          <span className={cn("flex items-baseline gap-[5px]", t.ecart)}>
+            {/* L'interligne après la taille : cn() l'effacerait, posé avant. */}
+            <span className={cn("font-display tracking-wide text-white tabular-nums", t.chiffre, "leading-none")}>
               {virgule(valeur)}
             </span>
             <span className="mono-label text-white/45">{unite}</span>
@@ -121,13 +131,13 @@ export function Regle({
         </button>
       </div>
 
-      <div className={cn("relative", compact ? "mt-[5px]" : "mt-[8px]")}>
+      <div className={cn("relative", t.marge)}>
         {/* L'aiguille, au milieu. */}
         <span
           aria-hidden
           className={cn(
             "pointer-events-none absolute top-0 left-1/2 z-10 w-[3px] -translate-x-1/2 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.45)]",
-            compact ? "h-[23px]" : "h-[30px]"
+            t.aiguille
           )}
         />
         <div
@@ -170,7 +180,7 @@ export function Regle({
           }}
           className={cn(
             "accueil-regle flex overflow-x-scroll overscroll-x-contain rounded-[8px] outline-none focus-visible:ring-2 focus-visible:ring-white/50",
-            compact ? "h-[40px]" : "h-[55px]"
+            t.hauteur
           )}
         >
           {/* Des cales plutôt qu'un padding, que Safari oublie au bout d'un défilement : le premier et le dernier cran viennent sous l'aiguille. */}
@@ -185,15 +195,12 @@ export function Regle({
                   className={cn(
                     "w-[1.5px] rounded-full",
                     grand ? "bg-white/70" : milieu ? "bg-white/40" : "bg-white/25",
-                    compact ? (grand ? "h-[20px]" : milieu ? "h-[13px]" : "h-[8px]") : grand ? "h-[26px]" : milieu ? "h-[18px]" : "h-[11px]"
+                    t.crans[grand ? 0 : milieu ? 1 : 2]
                   )}
                 />
                 {grand && (
                   <span
-                    className={cn(
-                      "absolute left-1/2 -translate-x-1/2 font-mono font-semibold text-white/45 tabular-nums",
-                      compact ? "top-[24px] text-[9px]" : "top-[32px] text-[10px]"
-                    )}
+                    className={cn("absolute left-1/2 -translate-x-1/2 font-mono font-semibold text-white/45 tabular-nums", t.nombre)}
                   >
                     {virgule(v)}
                   </span>
