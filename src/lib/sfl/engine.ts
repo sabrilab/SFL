@@ -44,6 +44,9 @@ export interface MatchPlayerLine {
   // Mention affichée à côté du joueur (ex. "Extra time" : a joué la prolongation
   // sans se voir attribuer de but, mais gagne un point Pépite).
   note?: string;
+  /** Extra time : un joueur qui a déjà joué son match vient compléter cette
+   *  équipe. Ses buts comptent pour le score, pas pour lui (saisie/engine.ts). */
+  extraTime?: true;
 }
 
 export interface MatchTeam {
@@ -86,6 +89,13 @@ export interface Journee {
 
 // Localise le match et l'équipe (+ l'équipe adverse) d'un joueur pour une journée.
 export function findPlayerMatch(journee: Journee, playerName: string) {
+  // Son vrai match d'abord : un joueur venu en extra time compléter une autre
+  // équipe a aussi une ligne là-bas, mais c'est dans le sien qu'il compte.
+  const titulaire = (t: MatchTeam) => t.players.some((p) => p.name === playerName && !p.extraTime);
+  for (const match of journee.matches ?? []) {
+    if (titulaire(match.teamA)) return { match, team: match.teamA, opponents: match.teamB };
+    if (titulaire(match.teamB)) return { match, team: match.teamB, opponents: match.teamA };
+  }
   for (const match of journee.matches ?? []) {
     if (match.teamA.players.some((p) => p.name === playerName)) {
       return { match, team: match.teamA, opponents: match.teamB };

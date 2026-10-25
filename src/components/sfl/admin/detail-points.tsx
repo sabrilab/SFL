@@ -19,7 +19,8 @@ import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
 /** Le détail lisible d'une ligne : « présence 1, victoire 2, buts 3 ». */
 function decomposer(e: MatchEntry): string {
-  if (e.extraTime) return `Xtratime · bonus ${e.pepiteBonus ?? 0}`;
+  if (e.extraTime)
+    return [`Xtratime`, e.buts + e.passes > 0 && "but ou passe D 1", e.pepiteBonus && `bonus ${e.pepiteBonus}`].filter(Boolean).join(" · ");
   const bouts: string[] = [];
   if (e.statut !== "Présent") {
     bouts.push(e.statut);
@@ -69,7 +70,7 @@ export function DetailPoints({ saison }: { saison: Saison }) {
       return {
         j: meta.j,
         date: meta.date,
-        lignes: desJ.map((e) => ({ pp: e.extraTime ? (e.pepiteBonus ?? 0) : entryPP(e), texte: decomposer(e) })),
+        lignes: desJ.map((e) => ({ pp: entryPP(e), texte: decomposer(e) })),
       };
     });
     const total = rangs.reduce((s, r) => s + r.lignes.reduce((t, l) => t + l.pp, 0), 0);

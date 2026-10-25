@@ -103,7 +103,7 @@ const COLS: Col[] = [
   {
     id: "extraTime",
     label: "XT",
-    title: "Xtratime — n'ouvre ni présence ni match, seuls la mention et le bonus comptent",
+    title: "Xtratime — un joueur qui a déjà joué complète cette équipe : ses buts comptent pour le score, pas pour lui ; +1 s'il marque ou fait une passe D, ni stats ni journée de plus",
     type: "bool",
     width: 40,
   },

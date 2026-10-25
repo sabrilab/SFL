@@ -112,8 +112,9 @@ export interface Decompte {
 /** Le décompte d'un match pour un titre : seules comptent les voix d'un joueur du match pour un adversaire. */
 export function decompterMatch(votes: VoteFigure[], saison: number, j: number, match: JourneeMatch, cat: CategorieVote): Decompte {
   const equipeDe = new Map<string, "A" | "B">();
-  match.teamA.players.forEach((p) => equipeDe.set(p.name, "A"));
-  match.teamB.players.forEach((p) => equipeDe.set(p.name, "B"));
+  // Un joueur venu en extra time ne vote pas dans ce match et n'y est pas candidat.
+  match.teamA.players.forEach((p) => !p.extraTime && equipeDe.set(p.name, "A"));
+  match.teamB.players.forEach((p) => !p.extraTime && equipeDe.set(p.name, "B"));
   const compte = new Map<string, number>();
   let votants = 0;
   for (const v of votes) {

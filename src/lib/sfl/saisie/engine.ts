@@ -43,6 +43,10 @@ const BAREME = {
   // paire d'interceptions aussi. Les deux compteurs sont indépendants.
   parPaireDefensive: 1,
   paire: 2,
+  // Extra time : un joueur qui a déjà joué vient compléter une équipe. S'il
+  // marque ou fait une passe décisive, c'est +1, et rien d'autre : ni stats,
+  // ni journée de plus (Sabri, 25/10).
+  extraTime: 1,
 } as const;
 
 const STAT_CAP = 99;
@@ -82,6 +86,7 @@ const emptyAgg = (): Agg => ({
 });
 
 export function entryPP(e: MatchEntry): number {
+  if (e.extraTime) return (e.buts + e.passes > 0 ? BAREME.extraTime : 0) + (e.pepiteBonus ?? 0);
   // Une ligne qui n'est pas une présence ne rapporte pas le point de présence :
   // un blessé, un suspendu ou un absent justifié est à zéro, comme dans la
   // colonne « PP du match » du classeur. L'absence injustifiée, elle, coûte.
@@ -125,7 +130,7 @@ export function computeStandings(saison: Saison): Player[] {
   for (const e of saison.entries) {
     const a = get(e.player);
     if (e.extraTime) {
-      a.pp += e.pepiteBonus ?? 0; // extra time : ni présence ni match, juste le bonus
+      a.pp += entryPP(e); // extra time : ni présence ni match, juste son +1 et le bonus
       continue;
     }
     // UNE SEULE formule de points, celle de `entryPP` — la même que la colonne
@@ -200,7 +205,8 @@ function buildTeam(j: number, mi: number, name: string, members: MatchEntry[]): 
       name: e.player,
       buts: e.buts,
       passes: e.passes,
-      ...(e.note ? { note: e.note } : {}),
+      ...(e.note ? { note: e.note } : e.extraTime ? { note: "Extra time" } : {}),
+      ...(e.extraTime ? { extraTime: true as const } : {}),
     })),
   };
 }

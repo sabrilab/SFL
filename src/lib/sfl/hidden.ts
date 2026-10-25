@@ -24,8 +24,15 @@ export function isArbitre(name: string | null | undefined): boolean {
   return !!name && arbitres.has(name);
 }
 
+// Les places « X1 », « X2 »… : des joueurs qui n'existent pas, posés sur la
+// feuille pour compléter une équipe (Sabri, 25/10). Ils ne remontent dans
+// aucun classement. Mieux : la ligne du vrai joueur, case Xtratime cochée.
+export function isPlaceExtraTime(name: string | null | undefined): boolean {
+  return !!name && /^X\d+$/i.test(name.trim());
+}
+
 export function isHidden(name: string | null | undefined): boolean {
-  return !!name && ((HIDDEN_PLAYERS as readonly string[]).includes(name) || arbitres.has(name));
+  return !!name && ((HIDDEN_PLAYERS as readonly string[]).includes(name) || arbitres.has(name) || isPlaceExtraTime(name));
 }
 
 /** Retire les joueurs masqués de n'importe quelle liste portant un `name`. */

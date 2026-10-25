@@ -31,6 +31,7 @@ import {
 import { cn } from "@/lib/utils";
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
+import { isHidden } from "@/lib/sfl/hidden";
 
 export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
   const { saison, allPlayers } = useSeason();
@@ -91,7 +92,7 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
                 </span>
               </div>
               <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {place.opponents.players.map((p) => {
+                {place.opponents.players.filter((p) => !p.extraTime && !isHidden(p.name)).map((p) => {
                   const joueur = carte(p.name);
                   const choisi = mien === p.name;
                   return (
