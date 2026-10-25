@@ -31,9 +31,10 @@
 // vraie 3D, avec ses paliers ou ses podiums.
 //
 // NouveauxBadges, monté une fois dans la mise en page, annonce chaque palier
-// gagné depuis la dernière visite.
+// gagné depuis la dernière visite : à l'ouverture ou au retour dans l'app
+// (useMomentAnnonce), jamais pendant qu'on saisit un match en direct.
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Check, Crown } from "lucide-react";
 import { EMBLEMES, EMBLEMES_SAISON } from "@/components/sfl/emblemes";
 import { Objet3D, Objet3DVivant, OBJET_PALIER, OBJET_SAISON, PastilleRang, TROPHEE_SAISON, useImageBadge } from "@/components/sfl/badge-3d";
@@ -45,6 +46,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useSession } from "@/hooks/use-session";
+import { useMomentAnnonce } from "@/hooks/use-moment-annonce";
 import {
   CLASSEMENTS,
   finsDeSaison,
@@ -1048,10 +1050,21 @@ export function NouveauxBadges() {
   const { saison } = useSeason();
   const session = useSession();
   const actif = !!session && session.name === me;
+  const moment = useMomentAnnonce();
+  const traite = useRef("");
+  // La saison du moment, lue sans relancer l'effet : chaque « + » du direct
+  // la change, et les badges sortaient en plein match.
+  const saisonLue = useRef(saison);
+  useEffect(() => {
+    saisonLue.current = saison;
+  }, [saison]);
 
   useEffect(() => {
     if (!actif) return;
-    const etats = vitrine(saison, me, new Date());
+    const cle = `${moment}|${me}`;
+    if (moment === 0 || cle === traite.current) return;
+    traite.current = cle;
+    const etats = vitrine(saisonLue.current, me, new Date());
     const cles = clesGagnees(etats);
     let vus: string[] | null = null;
     try {
@@ -1084,7 +1097,7 @@ export function NouveauxBadges() {
       }
     }, 2500);
     return () => clearTimeout(timer);
-  }, [actif, saison, me]);
+  }, [actif, me, moment]);
 
   return null;
 }

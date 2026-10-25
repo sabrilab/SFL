@@ -11,14 +11,20 @@
 // visite, l'historique est marqué comme vu en silence — la cérémonie est
 // réservée aux cartes qui arrivent APRÈS, jamais à la reprise d'historique.
 // Fermer l'app au milieu ne perd rien : les cartes non révélées reviennent.
+//
+// Jamais en plein direct (Sabri, 25/10) : la cérémonie ne part qu'à
+// l'ouverture ou au retour dans l'app (useMomentAnnonce), jamais dans
+// l'admin, et une carte déjà vue ne revient pas quand sa note bouge pendant
+// qu'on saisit le match : elle est reconnue à son titre et à sa date.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { BoostCard, BOOST_LABELS } from "@/components/sfl/boost-card";
 import { Card3D } from "@/components/sfl/card-3d";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useSession } from "@/hooks/use-session";
+import { useMomentAnnonce } from "@/hooks/use-moment-annonce";
 import { sonRevelation } from "@/lib/sfl/son";
 import type { BoostCardData } from "@/lib/sfl/engine";
 
@@ -30,13 +36,23 @@ const GLOW: Record<string, string> = {
 
 /** Identité stable d'une carte reçue — le joueur est déjà fixé par la clé. */
 const carteKey = (c: BoostCardData) => `${c.type}|${c.date}|${c.ovr}`;
+/** La même carte, quelle que soit sa note : le titre et la date (« mvp|J3 · 25/10 »). */
+const titreDate = (cle: string) => cle.split("|").slice(0, 2).join("|");
 
 const vuKey = (me: string) => `sfl-cartes-vues-${me}`;
 
 export function NouvellesCartes() {
   const { me } = useMyPlayer();
   const { boostCards } = useSeason();
-  const session = useSession();
+  const connecte = !!useSession();
+  const moment = useMomentAnnonce();
+  const traite = useRef("");
+  // Les cartes du moment, lues par l'effet sans le relancer : une saisie en
+  // direct ne doit ni ouvrir la cérémonie, ni annuler celle qui s'apprête.
+  const cartes = useRef(boostCards);
+  useEffect(() => {
+    cartes.current = boostCards;
+  }, [boostCards]);
 
   const [queue, setQueue] = useState<BoostCardData[] | null>(null);
   const [index, setIndex] = useState(0);
@@ -44,8 +60,12 @@ export function NouvellesCartes() {
 
   useEffect(() => {
     // Pas de session : on est sur l'écran de connexion, pas de cérémonie.
-    if (!session) return;
-    const mine = boostCards.filter((c) => c.player === me);
+    if (!connecte) return;
+    // Hors des moments d'annonce, la saison qui bouge (le direct) n'ouvre rien.
+    const cle = `${moment}|${me}`;
+    if (moment === 0 || cle === traite.current) return;
+    traite.current = cle;
+    const mine = cartes.current.filter((c) => c.player === me);
     const keys = mine.map(carteKey);
     const raw = localStorage.getItem(vuKey(me));
 
@@ -64,8 +84,8 @@ export function NouvellesCartes() {
     } catch {
       seen = [];
     }
-    const seenSet = new Set(seen);
-    const fresh = mine.filter((c) => !seenSet.has(carteKey(c)));
+    const seenSet = new Set(seen.map(titreDate));
+    const fresh = mine.filter((c) => !seenSet.has(titreDate(carteKey(c))));
     if (fresh.length === 0) return;
 
     // Un temps de respiration après le splash d'ouverture, puis la cérémonie.
@@ -75,7 +95,7 @@ export function NouvellesCartes() {
       setRevealed(false);
     }, 1400);
     return () => clearTimeout(timer);
-  }, [session, me, boostCards]);
+  }, [connecte, me, moment]);
 
   if (!queue || queue.length === 0) return null;
   const current = queue[index];
