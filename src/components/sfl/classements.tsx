@@ -24,6 +24,8 @@ import { distinctions } from "@/lib/sfl/distinctions";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { Nom } from "@/components/sfl/nom";
 import { AuVestiaire } from "@/components/sfl/au-vestiaire";
+import { METAL, PastilleDivision, PlaceMetal, parDivision, useDecoupageClassement } from "@/components/sfl/metal-division";
+import { nomDivision, type Division } from "@/lib/sfl/divisions";
 
 const DAUPHIN = FORMAT_CARTE.moyenne;
 const CHAMPION = FORMAT_CARTE.grande;
@@ -84,6 +86,53 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
   );
   const ranked: Classe[] = rankByMetric(joueurs ?? players, def.value).filter((p) => def.showAll || p.value > 0);
 
+  // La Pépite d'Or de la saison, coupée en divisions dès qu'elle en a (Sabri,
+  // 25/10 : « il faut que les divisions soient visibles ») : chaque division
+  // sur son métal, ses places comptées depuis 1 ; le podium en cartes reste
+  // celui de la D1, ceux de la D2 et de la D3 portent leur place sur leur métal.
+  const decoupage = useDecoupageClassement();
+  const groupes = decoupage && !carriere && def.id === "pp" ? parDivision(decoupage, ranked) : null;
+
+  // Une ligne : la place (dans sa division, s'il y en a), la carte, le nom, les points.
+  const ligne = (p: Classe, place: number, x?: Division) => (
+    <div
+      key={p.name}
+      className={cn(
+        "glass-soft flex items-center gap-3 rounded-[18px] px-3.5 py-2.5",
+        p.name === me && "bg-primary/10"
+      )}
+    >
+      {x && place <= 3 ? (
+        <span className="grid w-7 shrink-0 place-items-center">
+          <PlaceMetal x={x} rang={place} />
+        </span>
+      ) : (
+        <span className="w-7 text-[15px] font-bold text-foreground/40 tabular-nums">{place}</span>
+      )}
+      <MiniCarte player={p} size={FORMAT_CARTE.petite} detail={`${x ? `${place === 1 ? "1er" : `${place}e`} de la ${nomDivision(x)}` : def.label} · ${p.value} ${unite(def, p.value)}`} cle={cle && `${cle}-${p.name}`} />
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="truncate text-[15px] font-semibold"><Nom n={p.name} /></span>
+        <BadgesLigne ds={parNom.get(p.name)} />
+        {!carriere && p.statut !== "Actif" && (
+          <span
+            className={cn(
+              "shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide uppercase",
+              p.statut === "Suspendu"
+                ? "bg-destructive/10 text-destructive"
+                : "bg-sky-500/10 text-sky-600 dark:text-sky-400"
+            )}
+          >
+            {p.statut}
+          </span>
+        )}
+      </span>
+      <span className="w-16 text-right text-lg font-bold tracking-tight tabular-nums">
+        {p.value}
+        <span className="mono-label ml-1 text-foreground/40">{unite(def, p.value)}</span>
+      </span>
+    </div>
+  );
+
   if (ranked.length === 0) {
     return (
       <div className="glass-soft rounded-3xl px-6 py-10 text-center text-sm text-foreground/45">
@@ -92,49 +141,47 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
     );
   }
 
+  const vestiaire = !carriere && (
+    <AuVestiaire
+      className="self-center"
+      piece={{ type: "classement", id: def.id, top: ranked.slice(0, 3).map((p) => ({ n: p.name, v: p.value })) }}
+    />
+  );
+
+  if (groupes)
+    return (
+      <div className="flex flex-col gap-4">
+        {groupes.map((g) => (
+          <div key={g.x} className={cn("flex flex-col gap-3 rounded-[24px] px-2 pt-3 pb-2 ring-1 ring-inset", METAL[g.x].voile)}>
+            <div className="flex items-center gap-2.5 px-1.5">
+              <PastilleDivision x={g.x} />
+              <span className="text-[13px] font-semibold text-foreground/75">
+                {g.joueurs.length} {g.joueurs.length > 1 ? "joueurs" : "joueur"}
+              </span>
+            </div>
+            {g.x === 1 && (
+              <>
+                <Podium def={def} top={g.joueurs.slice(0, 3)} me={me} cle={cle} />
+                {vestiaire}
+              </>
+            )}
+            {g.joueurs.length > (g.x === 1 ? 3 : 0) && (
+              <div className="flex flex-col gap-1.5">
+                {g.joueurs.slice(g.x === 1 ? 3 : 0).map((p) => ligne(p, p.place, g.x))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+
   return (
     <div className="flex flex-col gap-5">
       <Podium def={def} top={ranked.slice(0, 3)} me={me} cle={cle} />
-      {!carriere && (
-        <AuVestiaire
-          className="self-center"
-          piece={{ type: "classement", id: def.id, top: ranked.slice(0, 3).map((p) => ({ n: p.name, v: p.value })) }}
-        />
-      )}
+      {vestiaire}
 
       <div className="flex flex-col gap-1.5">
-        {ranked.slice(3).map((p) => (
-          <div
-            key={p.name}
-            className={cn(
-              "glass-soft flex items-center gap-3 rounded-[18px] px-3.5 py-2.5",
-              p.name === me && "bg-primary/10"
-            )}
-          >
-            <span className="w-7 text-[15px] font-bold text-foreground/40 tabular-nums">{p.rank}</span>
-            <MiniCarte player={p} size={FORMAT_CARTE.petite} detail={`${def.label} · ${p.value} ${unite(def, p.value)}`} cle={cle && `${cle}-${p.name}`} />
-            <span className="flex min-w-0 flex-1 items-center gap-2">
-              <span className="truncate text-[15px] font-semibold"><Nom n={p.name} /></span>
-              <BadgesLigne ds={parNom.get(p.name)} />
-              {!carriere && p.statut !== "Actif" && (
-                <span
-                  className={cn(
-                    "shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide uppercase",
-                    p.statut === "Suspendu"
-                      ? "bg-destructive/10 text-destructive"
-                      : "bg-sky-500/10 text-sky-600 dark:text-sky-400"
-                  )}
-                >
-                  {p.statut}
-                </span>
-              )}
-            </span>
-            <span className="w-16 text-right text-lg font-bold tracking-tight tabular-nums">
-              {p.value}
-              <span className="mono-label ml-1 text-foreground/40">{unite(def, p.value)}</span>
-            </span>
-          </div>
-        ))}
+        {ranked.slice(3).map((p) => ligne(p, p.rank))}
       </div>
     </div>
   );

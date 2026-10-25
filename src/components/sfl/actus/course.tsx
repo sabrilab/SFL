@@ -73,7 +73,8 @@ import { usePresence } from "@/hooks/use-presence";
 import { MeteoMatch } from "@/components/sfl/meteo-match";
 import { dateIsoDuLibelle } from "@/lib/sfl/meteo";
 import { voteOuvert } from "@/lib/sfl/convocation-temps";
-import { annonceEnCours, J_DECOUPAGE, nomDivision } from "@/lib/sfl/divisions";
+import { annonceEnCours, J_DECOUPAGE, nomDivision, type Division } from "@/lib/sfl/divisions";
+import { METAL, PastilleDivision, parDivision, useDecoupageClassement } from "@/components/sfl/metal-division";
 import { divisionsDeLaJournee } from "@/lib/sfl/equipes-division";
 import { isHidden } from "@/lib/sfl/hidden";
 import { computeStandings } from "@/lib/sfl/saisie/engine";
@@ -283,6 +284,13 @@ function Ticker({
   const rang = rankByMetric(joueurs ?? players, def.value).filter(
     (p) => def.showAll || p.value > 0,
   );
+  // La Pépite d'Or de la saison, coupée en divisions dès qu'elle en a (Sabri,
+  // 25/10 : « il faut que les divisions soient visibles ») : chaque division
+  // sur son métal, ses places comptées depuis 1, son podium à l'écrin.
+  const decoupage = useDecoupageClassement();
+  const groupes = decoupage && !joueurs && def.id === PEPITE.id ? parDivision(decoupage, rang) : null;
+  // L'ordre des cartes à l'écran, d'une division à l'autre : d'où chacune glisse.
+  const ordre = new Map((groupes?.flatMap((g) => g.joueurs) ?? []).map((p, i) => [p.name, i]));
   // Le classement d'avant le dernier dimanche joué : d'où chacun vient.
   const avant = useMemo(() => {
     if (figee) return null;
@@ -301,7 +309,13 @@ function Ticker({
     const el = ref.current?.querySelector<HTMLElement>("[data-moi]");
     if (el && ref.current)
       ref.current.scrollTo({
-        left: el.offsetLeft - ref.current.clientWidth / 2 + el.clientWidth / 2,
+        // Mesuré à l'écran : dans une division, la carte n'est plus un enfant direct de la rangée.
+        left:
+          el.getBoundingClientRect().left -
+          ref.current.getBoundingClientRect().left +
+          ref.current.scrollLeft -
+          ref.current.clientWidth / 2 +
+          el.clientWidth / 2,
         behavior: "smooth",
       });
     const a = setTimeout(() => setPose(false), 0);
@@ -338,6 +352,54 @@ function Ticker({
     const calme = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     el.scrollBy({ left: sens * el.clientWidth * 0.8, behavior: calme ? "auto" : "smooth" });
   };
+  // Une carte de la rangée : sa place (dans sa division, s'il y en a), la carte, le nom, les points.
+  const carte = (p: (typeof rang)[number], i: number, place: number, x?: Division) => {
+    const a = ancien?.get(p.name);
+    const delta = a ? a.rank - p.rank : 0;
+    return (
+    <div
+      key={p.name}
+      data-moi={p.name === moi ? "" : undefined}
+      className={cn(
+        "isolate flex shrink-0 flex-col items-center gap-1 rounded-2xl p-2",
+        p.name === moi && "bg-foreground/10",
+        pose && "transition-transform duration-[1200ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]",
+        "relative",
+        p.name === moi && "z-10",
+      )}
+      style={{ transform: pose || !a ? undefined : `translateX(${(a.i - i) * PAS}px)` }}
+    >
+      <Ecrin rang={place} />
+      <span
+        className="text-[20px] leading-none"
+        style={{ fontFamily: ANTON }}
+      >
+        {place}
+      </span>
+      <MiniCarte
+        player={p}
+        size={TAILLE}
+        detail={`${x ? `${place === 1 ? "1er" : `${place}e`} de la ${nomDivision(x)}` : `${place}e`} · ${p.value} ${unite(def, p.value)}`}
+        cle={cle && `${cle}-${p.name}`}
+      />
+      <span className="max-w-[80px] truncate text-[11px] font-semibold">
+        <Nom n={p.name} />
+      </span>
+      <span className="mono-label text-[10px] text-foreground/50 tabular-nums">
+        {p.value} {unite(def, p.value)}
+      </span>
+      <span
+        className={cn(
+          "mono-label h-3 text-[10px] tabular-nums transition-opacity delay-700 duration-500",
+          delta > 0 ? "text-primary" : "text-foreground/40",
+          pose ? "opacity-100" : "opacity-0",
+        )}
+      >
+        {delta > 0 ? `▲ ${delta}` : delta < 0 ? `▼ ${-delta}` : ""}
+      </span>
+    </div>
+    );
+  };
   return (
     <div className="md:relative">
       {(["debut", "fin"] as const).map((bout) => (
@@ -359,53 +421,23 @@ function Ticker({
         ref={ref}
         className="flex items-end gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none] md:px-14 md:[mask-image:linear-gradient(90deg,transparent,#000_56px,#000_calc(100%-56px),transparent)]"
       >
-        {rang.map((p, i) => {
-          const a = ancien?.get(p.name);
-          const delta = a ? a.rank - p.rank : 0;
-          return (
-          <div
-            key={p.name}
-            data-moi={p.name === moi ? "" : undefined}
-            className={cn(
-              "isolate flex shrink-0 flex-col items-center gap-1 rounded-2xl p-2",
-              p.name === moi && "bg-foreground/10",
-              pose && "transition-transform duration-[1200ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]",
-              "relative",
-              p.name === moi && "z-10",
-            )}
-            style={{ transform: pose || !a ? undefined : `translateX(${(a.i - i) * PAS}px)` }}
-          >
-            <Ecrin rang={p.rank} />
-            <span
-              className="text-[20px] leading-none"
-              style={{ fontFamily: ANTON }}
-            >
-              {p.rank}
-            </span>
-            <MiniCarte
-              player={p}
-              size={TAILLE}
-              detail={`${p.rank}e · ${p.value} ${unite(def, p.value)}`}
-              cle={cle && `${cle}-${p.name}`}
-            />
-            <span className="max-w-[80px] truncate text-[11px] font-semibold">
-              <Nom n={p.name} />
-            </span>
-            <span className="mono-label text-[10px] text-foreground/50 tabular-nums">
-              {p.value} {unite(def, p.value)}
-            </span>
-            <span
-              className={cn(
-                "mono-label h-3 text-[10px] tabular-nums transition-opacity delay-700 duration-500",
-                delta > 0 ? "text-primary" : "text-foreground/40",
-                pose ? "opacity-100" : "opacity-0",
-              )}
-            >
-              {delta > 0 ? `▲ ${delta}` : delta < 0 ? `▼ ${-delta}` : ""}
-            </span>
-          </div>
-          );
-        })}
+        {groupes
+          ? groupes.map((g) => (
+              // Une division : son métal, ce qu'elle compte, puis ses cartes.
+              <div
+                key={g.x}
+                className={cn("flex shrink-0 flex-col gap-1 rounded-[22px] px-1 pt-2.5 pb-0.5 ring-1 ring-inset", METAL[g.x].voile)}
+              >
+                <div className="flex items-center gap-2 px-2">
+                  <PastilleDivision x={g.x} className="h-[24px] min-w-[36px] text-[15px]" />
+                  <span className="mono-label text-[10px] text-foreground/60 tabular-nums">
+                    {g.joueurs.length} {g.joueurs.length > 1 ? "joueurs" : "joueur"}
+                  </span>
+                </div>
+                <div className="flex items-end gap-1">{g.joueurs.map((p) => carte(p, ordre.get(p.name) ?? 0, p.place, g.x))}</div>
+              </div>
+            ))
+          : rang.map((p, i) => carte(p, i, p.rank))}
       </div>
     </div>
   );
