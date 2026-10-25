@@ -61,6 +61,7 @@ import { isHidden } from "@/lib/sfl/hidden";
 import { preparerPiece, type PieceLigue } from "@/lib/sfl/vestiaire";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
+import { METAL } from "@/components/sfl/metal-division";
 import { pl, useJoueurs } from "./cinematiques";
 
 /** Le podium de chaque division, toujours montré : ses trois premiers. */
@@ -69,32 +70,6 @@ const TETE = 3;
 const ARRIVEES = 3;
 /** Sur grand écran, le classement et ses règles dessous ne font qu'une carte. */
 const CADRE = "scroll-mt-4 md:overflow-hidden md:rounded-3xl";
-
-/**
- * Le métal de chaque division : son dégradé poli (badge-3d.tsx, POLI), son
- * encre, et le voile de sa bande, plus vif en haut, avec son liseré, en clair
- * comme en sombre.
- */
-const METAL: Record<Division, { poli: string; encre: string; voile: string }> = {
-  1: {
-    poli: "linear-gradient(140deg, #f7e3a6 0%, #b8862b 48%, #f3d48a 72%, #8a6416 100%)",
-    encre: "#2b1d02",
-    voile:
-      "bg-[linear-gradient(180deg,rgba(217,165,49,0.24),rgba(217,165,49,0.07))] ring-[#d9a531]/30 dark:bg-[linear-gradient(180deg,rgba(255,200,80,0.17),rgba(255,200,80,0.04))] dark:ring-[#f4cd6a]/20",
-  },
-  2: {
-    poli: "linear-gradient(140deg, #ffffff 0%, #8f959d 48%, #e9ebee 72%, #6d737b 100%)",
-    encre: "#15171a",
-    voile:
-      "bg-[linear-gradient(180deg,rgba(130,140,155,0.22),rgba(130,140,155,0.06))] ring-[#8f959d]/30 dark:bg-[linear-gradient(180deg,rgba(214,224,240,0.13),rgba(214,224,240,0.03))] dark:ring-[#dfe3ea]/15",
-  },
-  3: {
-    poli: "linear-gradient(140deg, #f0c09a 0%, #8f4f22 48%, #e2a77c 72%, #6a3815 100%)",
-    encre: "#2a1608",
-    voile:
-      "bg-[linear-gradient(180deg,rgba(194,110,55,0.22),rgba(194,110,55,0.06))] ring-[#c27a43]/30 dark:bg-[linear-gradient(180deg,rgba(226,128,64,0.17),rgba(226,128,64,0.04))] dark:ring-[#d9773a]/20",
-  },
-};
 
 /** « 1er », « 17e » : une place au classement. */
 const rangTexte = (n: number) => (n === 1 ? "1er" : `${n}e`);
