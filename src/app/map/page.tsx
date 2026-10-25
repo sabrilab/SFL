@@ -1470,6 +1470,7 @@ export default function MapPage() {
                     key={choisi.cle}
                     terrains={feuille}
                     moi={player.name}
+                    j={choisi.j ?? null}
                     entete={{
                       surtitre: `${choisi.j != null ? `J${choisi.j} · ` : ""}Sunday Five League`,
                       jour: dateComplete(choisi.dateLabel, aujourdhui),

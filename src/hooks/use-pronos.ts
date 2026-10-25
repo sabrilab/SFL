@@ -1,7 +1,9 @@
 "use client";
 
-// Les pronos Bola côté écrans (lib/sfl/pronos.ts) : ceux de la journée en
-// cours et ceux de la saison, mes choix, ce que pense la ligue, et le verdict.
+// Le Flair côté écrans (lib/sfl/pronos.ts) : la journée en cours, mes choix,
+// ce que pense la ligue, et le verdict ; montré sur les feuilles de match
+// (matchs/flair.tsx). Les choix de saison déjà posés comptent toujours
+// (ajouterPronos) ; l'app ne propose plus d'en poser.
 // Les pronos se chargent une fois et suivent la base en temps réel, quel que
 // soit le nombre d'écrans qui les lisent (comme les réponses aux missions).
 
@@ -14,18 +16,13 @@ import { useListePronos } from "@/hooks/use-liste-pronos";
 import { rankPlayers } from "@/lib/sfl/engine";
 import {
   etatDe,
-  J_SAISON,
   journeeDesPronos,
   partsDe,
-  primeAu,
   pronoRetenu,
   resultatsDeJournee,
-  resultatsDeSaison,
-  SUJETS_SAISON,
   type EtatProno,
   type JourneePronos,
   type Prono,
-  type SujetSaison,
 } from "@/lib/sfl/pronos";
 import { APERCU_PRONOS, pronosDemo, pronostiquer } from "@/lib/sfl/pronos-store";
 
@@ -50,17 +47,6 @@ export interface MesPronos {
   phase: PhaseProno;
   sujets: Map<string, SujetVu>;
   poser: (sujet: string, choix: string | null) => Promise<void>;
-}
-
-export interface MesPronosSaison {
-  saison: number;
-  joueur: string;
-  /** Les joueurs qu'on peut choisir, dans l'ordre du Pépite d'Or. */
-  candidats: string[];
-  /** La prime d'un choix posé maintenant. */
-  primeMaintenant: number;
-  sujets: Map<SujetSaison, SujetVu & { prime: number | null }>;
-  poser: (sujet: SujetSaison, choix: string | null) => Promise<void>;
 }
 
 /** Celui qui pronostique : moi ; dans un aperçu sans nom, le premier joueur de la feuille. */
@@ -108,40 +94,4 @@ export function usePronosJournee(): MesPronos | null {
     const poser = (sujet: string, choix: string | null) => pronostiquer({ saison: p.saison, j: p.j, sujet, joueur, choix });
     return { p, joueur, phase, sujets, poser };
   }, [p, me, maintenant, pronos, jugee, players]);
-}
-
-/** Les pronos de la saison en cours : Pépite d'Or, meilleur buteur, meilleur passeur. */
-export function usePronosSaison(): MesPronosSaison | null {
-  const isClient = useIsClient();
-  const { me } = useMyPlayer();
-  const { players } = useSeason();
-  const maintenant = useMaintenant();
-  const pronos = useListePronos();
-  const { saison } = useSaisonJugee(maintenant);
-  return useMemo(() => {
-    if (!isClient) return null;
-    const numero = saison.numero ?? 0;
-    const candidats = rankPlayers(players).map((x) => x.name);
-    const joueur = quiPronostique(me, candidats);
-    if (!joueur || !candidats.length) return null;
-    const vus = avecDemo(pronos, pronosDemo(null, numero, candidats, joueur));
-    const primeMaintenant = primeAu(saison, numero, maintenant, maintenant);
-    // Les meneurs du moment, pour dire « en tête aujourd'hui » : la saison n'est jugée qu'à sa clôture.
-    const meneurs = resultatsDeSaison(saison);
-    const sujets = new Map<SujetSaison, SujetVu & { prime: number | null }>();
-    for (const sujet of SUJETS_SAISON) {
-      const mien = pronos.find((x) => x.saison === numero && x.j === J_SAISON && x.sujet === sujet && x.joueur === joueur);
-      sujets.set(sujet, {
-        sujet,
-        choix: mien?.choix ?? null,
-        etat: "attente",
-        bons: meneurs.get(sujet) ?? null,
-        parts: partsDe(vus, numero, J_SAISON, sujet),
-        prime: mien ? primeAu(saison, numero, new Date(mien.le), maintenant) : null,
-      });
-    }
-    const poser = (sujet: SujetSaison, choix: string | null) =>
-      pronostiquer({ saison: numero, j: J_SAISON, sujet, joueur, choix });
-    return { saison: numero, joueur, candidats, primeMaintenant, sujets, poser };
-  }, [isClient, saison, players, me, pronos, maintenant]);
 }

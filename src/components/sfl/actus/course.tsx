@@ -95,7 +95,6 @@ import { CouvertureRubrique, RubriqueActu, RubriqueBesoin, RubriqueEnjeux, Rubri
 import { couverturesDuDimanche, sources, type Couverture } from "@/lib/sfl/couvertures";
 import { ContratsEnJeu } from "./contrats-en-jeu";
 import { MissionsBola } from "./missions";
-import { PronosBola } from "./pronos";
 import { VideosDuFil } from "./video";
 import { VueClassements, VueMatchs } from "./vues";
 import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque, type Vue } from "./epoques";
@@ -653,9 +652,9 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
         <>
           {/* La semaine. Sur téléphone, un seul fil (l'ordre vient des order-*) :
               la vidéo de Bola, le direct, le vote, les divisions, l'outsider, ton dimanche, la
-              convocation, tes missions, tes pronos, les contrats en jeu, puis ce qui se joue.
+              convocation, tes missions, les contrats en jeu, puis ce qui se joue.
               Sur grand écran, deux colonnes : à gauche ce qui se joue (vidéo, direct,
-              vote, convocation, missions, pronos), à droite les divisions, l'outsider et
+              vote, convocation, missions), à droite les divisions, l'outsider et
               tes rubriques ; dessous, les contrats en jeu sur toute la largeur. */}
           <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3">
             <div
@@ -667,7 +666,6 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
               <VoteDuJour me={me} />
               <Convocation className="order-2 md:order-none" />
               <MissionsBola className="order-2 md:order-none" />
-              <PronosBola className="order-2 md:order-none" />
             </div>
             <div className="contents md:grid md:gap-[var(--fib-21)] xl:col-span-2 xl:grid-cols-2">
               <RubriqueDivisions className="order-1 md:order-none" />

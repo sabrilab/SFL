@@ -26,6 +26,9 @@
 // Elle part seule, sans titre : sur iPhone, un titre arrive à l'app choisie
 // comme un texte à part, avant l'image, et Snap s'y perdait.
 //
+// Sous le terrain de la journée en cours, Le Flair de ce match : qui gagne, le
+// meilleur et le buteur du jour (matchs/flair.tsx).
+//
 // Les terrains viennent de lib/sfl/feuille.ts ; l'image est dessinée hors
 // écran puis photographiée par html-to-image (déjà là pour la carte 3D).
 
@@ -51,6 +54,7 @@ import { cn } from "@/lib/utils";
 import { projeter, TERRAIN } from "@/lib/sfl/terrain-vu";
 import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
 import { Nom } from "@/components/sfl/nom";
+import { FlairDuMatch } from "@/components/sfl/matchs/flair";
 
 export interface EnTeteFeuille {
   /** « J8 · Sunday Five League ». */
@@ -228,10 +232,13 @@ export function FeuilleDeMatch({
   terrains,
   moi,
   entete,
+  j = null,
 }: {
   terrains: TerrainFeuille[];
   moi: string;
   entete: EnTeteFeuille;
+  /** La journée de la feuille, pour Le Flair (matchs/flair.tsx) ; null pour la convocation. */
+  j?: number | null;
 }) {
   const { allPlayers } = useSeason();
   const parNom = useMemo(
@@ -314,6 +321,8 @@ export function FeuilleDeMatch({
           })
         }
       />
+
+      <FlairDuMatch j={j} noirs={t.a.joueurs} blancs={t.b.joueurs} />
 
       <button
         type="button"
