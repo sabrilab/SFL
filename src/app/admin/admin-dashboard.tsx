@@ -72,6 +72,7 @@ import { Inscriptions } from "@/components/sfl/admin/inscriptions";
 import { AccesJoueur } from "@/components/sfl/admin/acces-joueur";
 import { RechercheJoueur } from "@/components/sfl/admin/recherche-joueur";
 import { ArbitresAdmin } from "@/components/sfl/admin/arbitres";
+import { ResultatsVotes } from "@/components/sfl/admin/resultats-votes";
 import { chercherJoueurs } from "@/lib/sfl/recherche-joueur";
 import { useSession } from "@/hooks/use-session";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
@@ -147,7 +148,7 @@ export function AdminDashboard() {
   const [ficheApresAcces, setFicheApresAcces] = useState<number | null>(null);
   const [newJourneeOpen, setNewJourneeOpen] = useState(false);
   const [convocOpen, setConvocOpen] = useState(false);
-  const [feuilleMode, setFeuilleMode] = useState<"direct" | "revue">("direct");
+  const [feuilleMode, setFeuilleMode] = useState<"direct" | "revue" | "votes">("direct");
   // Pré-cochés à l'ouverture de l'assistant journée (confirmés de la convocation).
   const [journeePrefill, setJourneePrefill] = useState<string[]>([]);
   // Historique : deux piles. `history` porte les états PRÉCÉDENTS (annuler),
@@ -598,13 +599,14 @@ export function AdminDashboard() {
 
         {/* ===================== FEUILLE DE MATCH (éditable) ===================== */}
         <TabsContent value="feuille" className="mt-4 flex flex-col gap-3">
-          {/* Deux usages, deux écrans : le direct au bord du terrain, la
-              consultation après coup. */}
+          {/* Trois écrans : le direct au bord du terrain, la consultation
+              après coup, et les résultats des votes Impact / Défensive. */}
           <div className="glass flex w-full rounded-full p-1">
             {(
               [
                 ["direct", "En direct"],
                 ["revue", "Consulter"],
+                ["votes", "Votes"],
               ] as const
             ).map(([mode, label]) => (
               <button
@@ -622,6 +624,8 @@ export function AdminDashboard() {
 
           {feuilleMode === "direct" ? (
             <FeuilleDirecte saison={saison} commit={commit} />
+          ) : feuilleMode === "votes" ? (
+            <ResultatsVotes />
           ) : (
           <>
           <Button variant="vert" onClick={() => setNewJourneeOpen(true)} className="rounded-full">
