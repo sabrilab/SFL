@@ -353,7 +353,7 @@ function Ticker({
     el.scrollBy({ left: sens * el.clientWidth * 0.8, behavior: calme ? "auto" : "smooth" });
   };
   // Une carte de la rangée : sa place (dans sa division, s'il y en a), la carte, le nom, les points.
-  const carte = (p: (typeof rang)[number], i: number, place: number, x?: Division) => {
+  const carte = (p: (typeof rang)[number], i: number, place: number | null, x?: Division) => {
     const a = ancien?.get(p.name);
     const delta = a ? a.rank - p.rank : 0;
     return (
@@ -369,17 +369,17 @@ function Ticker({
       )}
       style={{ transform: pose || !a ? undefined : `translateX(${(a.i - i) * PAS}px)` }}
     >
-      <Ecrin rang={place} />
+      {place != null && <Ecrin rang={place} />}
       <span
         className="text-[20px] leading-none"
         style={{ fontFamily: ANTON }}
       >
-        {place}
+        {place ?? "–"}
       </span>
       <MiniCarte
         player={p}
         size={TAILLE}
-        detail={`${x ? `${place === 1 ? "1er" : `${place}e`} de la ${nomDivision(x)}` : `${place}e`} · ${p.value} ${unite(def, p.value)}`}
+        detail={`${place == null ? nomDivision(x ?? 3) : x ? `${place === 1 ? "1er" : `${place}e`} de la ${nomDivision(x)}` : `${place}e`} · ${p.value} ${unite(def, p.value)}`}
         cle={cle && `${cle}-${p.name}`}
       />
       <span className="max-w-[80px] truncate text-[11px] font-semibold">

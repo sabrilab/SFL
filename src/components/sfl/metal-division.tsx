@@ -14,7 +14,7 @@
 
 import { useMemo } from "react";
 import { useSeason } from "@/components/sfl/season-provider";
-import { etatDivisions, nomDivision, type Decoupage, type Division } from "@/lib/sfl/divisions";
+import { etatDivisions, nomDivision, rangDansDivision, type Decoupage, type Division } from "@/lib/sfl/divisions";
 import { cn } from "@/lib/utils";
 
 const ANTON = "var(--font-anton), Anton, sans-serif";
@@ -85,21 +85,22 @@ export function useDecoupageClassement(): Decoupage | null {
 }
 
 /**
- * Un classement rangé par division : chaque joueur classé dans la sienne
- * (D3 pour qui n'est pas au découpage), l'ordre du classement gardé dans
- * chaque division, et sa place comptée depuis le premier de la division.
+ * Un classement rangé par division : chaque joueur classé dans la sienne,
+ * l'ordre du classement gardé, et sa place comptée depuis le premier de la
+ * division (rangDansDivision). Qui n'a pas encore joué n'est pas au
+ * découpage : il est de la D3 (divisionDe), après ses classés, sans place.
  */
-export function parDivision<T extends { name: string; rank: number }>(
+export function parDivision<T extends { name: string }>(
   d: Decoupage,
   classes: T[],
-): { x: Division; joueurs: (T & { place: number })[] }[] {
-  const groupes: Record<Division, T[]> = { 1: [], 2: [], 3: [] };
-  for (const p of classes) groupes[d.parNom.get(p.name)?.division ?? 3].push(p);
-  return ([1, 2, 3] as const)
-    .map((x) => {
-      const liste = groupes[x];
-      const premier = liste[0]?.rank ?? 1;
-      return { x, joueurs: liste.map((p) => ({ ...p, place: Math.max(1, p.rank - premier + 1) })) };
-    })
-    .filter((g) => g.joueurs.length > 0);
+): { x: Division; joueurs: (T & { place: number | null })[] }[] {
+  const groupes: Record<Division, (T & { place: number | null })[]> = { 1: [], 2: [], 3: [] };
+  const sans: (T & { place: null })[] = [];
+  for (const p of classes) {
+    const place = d.parNom.get(p.name);
+    if (place) groupes[place.division].push({ ...p, place: rangDansDivision(d, place) });
+    else sans.push({ ...p, place: null });
+  }
+  groupes[3].push(...sans);
+  return ([1, 2, 3] as const).map((x) => ({ x, joueurs: groupes[x] })).filter((g) => g.joueurs.length > 0);
 }

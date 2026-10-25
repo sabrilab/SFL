@@ -94,7 +94,7 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
   const groupes = decoupage && !carriere && def.id === "pp" ? parDivision(decoupage, ranked) : null;
 
   // Une ligne : la place (dans sa division, s'il y en a), la carte, le nom, les points.
-  const ligne = (p: Classe, place: number, x?: Division) => (
+  const ligne = (p: Classe, place: number | null, x?: Division) => (
     <div
       key={p.name}
       className={cn(
@@ -102,14 +102,14 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
         p.name === me && "bg-primary/10"
       )}
     >
-      {x && place <= 3 ? (
+      {x && place != null && place <= 3 ? (
         <span className="grid w-7 shrink-0 place-items-center">
           <PlaceMetal x={x} rang={place} />
         </span>
       ) : (
-        <span className="w-7 text-[15px] font-bold text-foreground/40 tabular-nums">{place}</span>
+        <span className="w-7 text-[15px] font-bold text-foreground/40 tabular-nums">{place ?? "–"}</span>
       )}
-      <MiniCarte player={p} size={FORMAT_CARTE.petite} detail={`${x ? `${place === 1 ? "1er" : `${place}e`} de la ${nomDivision(x)}` : def.label} · ${p.value} ${unite(def, p.value)}`} cle={cle && `${cle}-${p.name}`} />
+      <MiniCarte player={p} size={FORMAT_CARTE.petite} detail={`${x ? (place == null ? nomDivision(x) : `${place === 1 ? "1er" : `${place}e`} de la ${nomDivision(x)}`) : def.label} · ${p.value} ${unite(def, p.value)}`} cle={cle && `${cle}-${p.name}`} />
       <span className="flex min-w-0 flex-1 items-center gap-2">
         <span className="truncate text-[15px] font-semibold"><Nom n={p.name} /></span>
         <BadgesLigne ds={parNom.get(p.name)} />
