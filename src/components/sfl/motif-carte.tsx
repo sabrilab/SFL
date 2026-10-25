@@ -29,11 +29,14 @@
 //     les larges bandes des tenues d'autrefois, le damier du drapeau de
 //     touche, les deux faisceaux des projecteurs d'un stade la nuit.
 // Et la rosace guillochée du dos (RosaceBola), comme sur un billet. Les
-// motifs des skins du Passe Bola sont dans motifs-passe.tsx.
+// motifs des skins du Passe Bola sont dans motifs-passe.tsx, ceux des skins
+// offerts (la pépite, la palestine) dans motifs-offerts.tsx.
 
 import { Fragment, useId } from "react";
 import type { Motif } from "@/components/sfl/finitions-carte";
+import { MotifOffertSvg } from "@/components/sfl/motifs-offerts";
 import { MotifPasseSvg } from "@/components/sfl/motifs-passe";
+import { estMotifOffert } from "@/components/sfl/skins-offerts";
 import { estMotifPasse } from "@/components/sfl/skins-passe";
 
 const W = 1024;
@@ -170,6 +173,7 @@ export function MotifCarte({
   const style: React.CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%" };
 
   if (estMotifPasse(motif)) return <MotifPasseSvg motif={motif} graine={graine} dos={!!centre} />;
+  if (estMotifOffert(motif)) return <MotifOffertSvg motif={motif} dos={!!centre} />;
 
   if (motif.type === "rayons") {
     const { cx, cy } = centre ?? motif;
