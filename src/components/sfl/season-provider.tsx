@@ -33,6 +33,12 @@ function suivreArbitres(onChange: () => void) {
 interface SeasonValue extends DerivedSeason {
   saison: Saison;
   /**
+   * La saison où les élus des votes fermés (Impact, Défensive) sont posés sur
+   * leurs lignes (appliquerVotes) : pour montrer les cartes à titre de chaque
+   * match (lib/sfl/actus.ts). Absente (une saison close) : `saison` les a déjà.
+   */
+  saisonTitree?: Saison;
+  /**
    * TOUS les joueurs, masqués compris. Réservé aux écrans où quelqu'un se
    * regarde lui-même (sa fiche, sa carte) : partout ailleurs, `players` est la
    * liste publique et c'est elle qu'il faut utiliser.
@@ -163,7 +169,7 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     void horloge;
     const brut = deriveSeason(saison);
     const vote = appliquerVotes(saison, brut.journees, votes, new Date());
-    return vote === saison ? brut : deriveSeason(vote);
+    return { ...(vote === saison ? brut : deriveSeason(vote)), saisonTitree: vote };
   }, [saison, votes, horloge]);
   const nom = useMemo(() => nomBola(session, derived.players), [session, derived.players]);
   const poste = usePosteBola(nom);

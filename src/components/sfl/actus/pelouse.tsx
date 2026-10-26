@@ -42,7 +42,8 @@ import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSaisonClose, useSeason } from "@/components/sfl/season-provider";
 import { useIdentites } from "@/hooks/use-identites";
-import type { Actu } from "@/lib/sfl/actus";
+import type { Actu, Marche, Titre } from "@/lib/sfl/actus";
+import type { BoostType } from "@/lib/sfl/engine";
 import type { Enjeu, Voisins } from "@/lib/sfl/actus-toi";
 import { rankPlayers } from "@/lib/sfl/engine";
 import { exploitsDe } from "@/lib/sfl/exploits";
@@ -121,6 +122,11 @@ export interface Place {
   badge?: string;
   /** La place qu'occupe, au-dessus de la carte, ce qui s'y pose (en px à l'échelle 1) : le cadre la compte. */
   coiffe?: number;
+  /** Une carte à titre (MVP or, Impact rouge, Défensive bleu), de la journée `journee`. */
+  distinction?: BoostType;
+  /** Ses titres, en étiquette centrée sur le haut de la carte (« MVP·DÉF »). */
+  titres?: string;
+  journee?: number;
 }
 
 /** La hauteur d'une carte debout et de son nom, à l'échelle 1. */
@@ -141,7 +147,12 @@ function Debout({ p }: { p: Place }) {
           {/* En flex : un bouton (MiniCarte) seul dans un bloc garde sous lui
               la place d'une ligne de texte, qui éloignait la carte de son nom. */}
           <div className="relative flex">
-            <MiniCarte player={joueur} size={taille} vertical />
+            <MiniCarte player={joueur} size={taille} vertical distinction={p.distinction} journee={p.distinction ? p.journee : undefined} />
+            {p.titres && (
+              <span className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white px-[5px] py-[1.5px] font-mono text-[9px] leading-[1.2] font-bold whitespace-nowrap text-black shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
+                {p.titres}
+              </span>
+            )}
             {p.badge && (
               <span className="absolute top-0 right-0 translate-x-[45%] -translate-y-[35%] rounded-full bg-white px-[5px] py-[1.5px] font-mono text-[9.5px] leading-[1.2] font-bold whitespace-nowrap text-black tabular-nums shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
                 {p.badge}
@@ -847,6 +858,10 @@ export function RubriqueActu({ a }: { a: Actu }) {
         </Scene>
       );
     }
+    case "titres":
+      return <RubriqueTitres a={a} bravo={bravo} />;
+    case "podium-jour":
+      return <RubriquePodium a={a} bravo={bravo} />;
     case "equipe": {
       // Deux rangs, le second assez près de l'œil pour que ses cartes passent
       // sous les noms du premier : aucune carte ne cache un nom. Le meilleur du
@@ -873,4 +888,147 @@ export function RubriqueActu({ a }: { a: Actu }) {
     default:
       return null;
   }
+}
+
+/* ------------------------------ Les cartes à titre ------------------------------ */
+
+const NOM_TITRE: Record<BoostType, string> = { mvp: "MVP", impact: "Impact", def: "Défensive" };
+/** Sur le coin de la carte : ses titres, en capitales courtes. */
+const COIN_TITRE: Record<BoostType, string> = { mvp: "MVP", impact: "IMP", def: "DÉF" };
+
+/** « Jouneid », « Jouneid et Zakary », « Abdel, Bilal et Faycal ». */
+function enLigne(noms: string[]): string {
+  return noms.length < 2 ? (noms[0] ?? "") : `${noms.slice(0, -1).join(", ")} et ${noms[noms.length - 1]}`;
+}
+
+type Felicitable = { action: ReactNode; exploits: string[] };
+
+/**
+ * Les cartes d'un match (Sabri, 26/10 : que les cartes et la reconnaissance
+ * des joueurs « soient mises à jour dans l'interface, pour que ce soit aussi
+ * gratifiant ») : ses MVP, ses Joueurs Impact et ses Défensives, ex æquo
+ * compris, chacun dans la couleur de son plus beau titre (or, rouge, bleu),
+ * ses autres titres sur le coin. La hiérarchie des cartes : les MVP au fond,
+ * au milieu du but, en moyenne ; les autres en petite. Seul, l'homme du
+ * match se tient à côté du but, en grand. Sept cartes au plus sur le
+ * terrain ; la ligne du bas les nomme tous.
+ */
+function RubriqueTitres({ a, bravo }: { a: Extract<Actu, { type: "titres" }>; bravo: Felicitable }) {
+  const id = useIdentites();
+  const t = a.titres;
+  const avec = (type: BoostType) => t.filter((x) => x.types.includes(type)).map((x) => id.nom(x.nom));
+  const mvp = avec("mvp");
+  const lignes = (["mvp", "impact", "def"] as const)
+    .map((type) => ({ type, noms: avec(type) }))
+    .filter((l) => l.noms.length > 0);
+  const titre = mvp.length
+    ? `${enLigne(mvp.map((n) => n.split(" ")[0]))}, ${mvp.length > 1 ? "MVP ex æquo" : "MVP"}`
+    : `${enLigne(lignes[0].noms.map((n) => n.split(" ")[0]))}, ${NOM_TITRE[lignes[0].type]}`;
+  const texte = lignes.map((l) => `${NOM_TITRE[l.type]} : ${l.noms.join(", ")}${l.noms.length > 1 ? " (ex æquo)" : ""}`).join(" · ");
+  const coin = (x: Titre) => x.types.map((y) => COIN_TITRE[y]).join("·");
+  const sur = `J${a.j} · ${a.match}${a.score ? ` · ${a.score}` : ""}`;
+  const partage = { titre: `Les cartes du ${a.match.toLowerCase()}`, j: a.j, lignes: t.map((x) => ({ n: x.nom, v: x.types.map((y) => NOM_TITRE[y]).join(" · ") })) };
+
+  // Seul : l'homme du match à côté du but, en grand.
+  if (t.length === 1) {
+    const x = t[0];
+    return (
+      <Scene
+        {...bravo}
+        sur={sur}
+        titre={titre}
+        places={[{ nom: x.nom, ...A_COTE_DU_BUT, taille: T.vedette, d: 0.15, distinction: x.types[0], journee: a.j, titres: coin(x) }]}
+        jusqua={200}
+        texte={texte}
+        partage={partage}
+      >
+        <Bulle u={212} v={104} w={34} d={0.32}>
+          <Pastille clair n={NOM_TITRE[x.types[0]]} quoi={x.types[0] === "mvp" ? "homme du match" : "élu par ses adversaires"} />
+        </Bulle>
+      </Scene>
+    );
+  }
+
+  // Le fond : les MVP (trois au plus), le premier au milieu du but ; devant, les autres.
+  const visibles = t.slice(0, 7);
+  const fondN = Math.min(3, Math.max(1, mvp.length, visibles.length - 4));
+  const fond = visibles.slice(0, fondN);
+  const devant = visibles.slice(fondN);
+  const fondOrdre = fond.length === 3 ? [fond[1], fond[0], fond[2]] : fond;
+  // Celui qui se tient au milieu du but le cache en entier : en moyenne, comme un MVP.
+  const milieu = fond.length % 2 === 1 ? fondOrdre[(fond.length - 1) / 2] : null;
+  const taille = (x: Titre) => (x.types[0] === "mvp" || x === milieu ? T.moyenne : T.petite);
+  const places: Place[] = [
+    ...rang(fondOrdre.map((x) => x.nom), devant.length ? 45 : 70, fond.length > 2 ? 92 : 112, T.petite, 0.15).map((p, i) => ({
+      ...p,
+      taille: taille(fondOrdre[i]),
+      distinction: fondOrdre[i].types[0],
+      journee: a.j,
+      titres: coin(fondOrdre[i]),
+    })),
+    ...rang(devant.map((x) => x.nom), 190, devant.length > 3 ? 74 : devant.length > 2 ? 90 : 120, T.petite, 0.32).map((p, i) => ({
+      ...p,
+      distinction: devant[i].types[0],
+      journee: a.j,
+      titres: coin(devant[i]),
+    })),
+  ];
+  return (
+    <Scene {...bravo} sur={sur} titre={titre} places={places} jusqua={devant.length ? 235 : 130} texte={texte} partage={partage} />
+  );
+}
+
+/**
+ * Les meilleurs buteurs ou passeurs du jour, en podium : le premier au fond,
+ * au milieu du but, en moyenne ; les suivants devant, en petite ; leur
+ * chiffre au-dessus de leur carte, nom compris. Ex æquo à la même place.
+ */
+function RubriquePodium({ a, bravo }: { a: Extract<Actu, { type: "podium-jour" }>; bravo: Felicitable }) {
+  const id = useIdentites();
+  const m = a.marches.slice(0, 5);
+  const unite = (n: number) => (a.quoi === "buts" ? pl(n, "but", "buts") : pl(n, "passe", "passes"));
+  const premiers = m.filter((x) => x.place === 1);
+  const fond = premiers.length > 3 ? premiers.slice(0, 3) : premiers;
+  const devant = m.filter((x) => !fond.includes(x));
+  const fondOrdre = fond.length === 3 ? [fond[1], fond[0], fond[2]] : fond;
+  // Au-dessus de la carte, nom compris : le chiffre du premier en pastille, celui des autres en petit.
+  const COIFFE_TETE = 4 + 52;
+  const COIFFE = 4 + 24;
+  const poses: { x: Marche; p: Place }[] = [
+    ...rang(fondOrdre.map((x) => x.nom), 52, fond.length > 2 ? 92 : 112, T.moyenne, 0.15).map((p, i) => ({
+      x: fondOrdre[i],
+      p: { ...p, coiffe: COIFFE_TETE },
+    })),
+    ...rang(devant.map((x) => x.nom), 222, devant.length > 3 ? 70 : devant.length > 2 ? 86 : 120, T.petite, 0.3).map((p, i) => ({
+      x: devant[i],
+      p: { ...p, coiffe: COIFFE, sous: devant[i].place === 2 ? "2e" : "3e" },
+    })),
+  ];
+  const quoi = a.quoi === "buts" ? "buteurs" : "passeurs";
+  const titre = `${enLigne(premiers.map((x) => id.nom(x.nom).split(" ")[0]))}, ${premiers.length > 1 ? `meilleurs ${quoi}` : `meilleur ${quoi.slice(0, -1)}`}`;
+  return (
+    <Scene
+      {...bravo}
+      sur={`J${a.j} · les ${quoi} du jour`}
+      titre={titre}
+      places={poses.map((x) => x.p)}
+      jusqua={devant.length ? 262 : 120}
+      texte={a.marches.map((x) => `${x.place === 1 ? "1er" : `${x.place}e`} ${id.nom(x.nom)} · ${x.n}`).join(" · ")}
+      partage={{ titre: `Les ${quoi} de la J${a.j}`, j: a.j, lignes: a.marches.map((x) => ({ n: x.nom, v: `${x.n} ${unite(x.n)}` })) }}
+    >
+      {poses.map(({ x, p }) =>
+        x.place === 1 ? (
+          <Bulle key={x.nom} u={p.u} v={p.v} haut={dessus(p.taille ?? T.petite, 52)} d={(p.d ?? 0.2) + 0.15}>
+            <Pastille clair petit n={<Compte n={x.n} d={(p.d ?? 0.2) + 0.15} />} quoi={unite(x.n)} />
+          </Bulle>
+        ) : (
+          <Bulle key={x.nom} u={p.u} v={p.v} haut={dessus(p.taille ?? T.petite, 24)} d={(p.d ?? 0.2) + 0.15}>
+            <span className="grid h-6 min-w-6 place-items-center rounded-full bg-black/75 px-1.5 text-[13px] font-black text-white tabular-nums shadow-[0_6px_16px_rgba(0,0,0,0.4)]">
+              {x.n}
+            </span>
+          </Bulle>
+        ),
+      )}
+    </Scene>
+  );
 }

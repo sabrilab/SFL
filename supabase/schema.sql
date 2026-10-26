@@ -4325,13 +4325,19 @@ create table if not exists public.felicitations (
   exploit     text not null check (char_length(exploit) <= 120),
   saison      integer not null check (saison between 0 and 999),
   j           integer not null check (j between 1 and 999),
-  famille     text not null check (famille in ('mvp', 'chiffre', 'duo', 'montent', 'badge', 'equipe')),
+  famille     text not null,
   created_at  timestamptz not null default now(),
   constraint felicitations_pas_soi check (de <> a),
   constraint felicitations_une_fois unique (de, a, exploit),
   constraint felicitations_cle check (exploit like saison::text || '-' || j::text || '-' || famille || '-_%')
 );
 create index if not exists felicitations_a on public.felicitations (a, exploit);
+-- Les familles d'exploits (lib/sfl/exploits.ts). 26/10 : les titres de
+-- match élus (Joueur Impact, Défensive) et les podiums du jour (buteurs,
+-- passeurs) s'ajoutent à l'homme du dimanche.
+alter table public.felicitations drop constraint if exists felicitations_famille_check;
+alter table public.felicitations add constraint felicitations_famille_check
+  check (famille in ('mvp', 'impact', 'def', 'chiffre', 'buteur', 'passeur', 'duo', 'montent', 'badge', 'equipe'));
 
 alter table public.felicitations enable row level security;
 

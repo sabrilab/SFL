@@ -21,6 +21,8 @@ import { cleVapid } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { exploitsDeLaSaison, lireCle, type Exploit } from "@/lib/sfl/exploits";
 import type { Saison } from "@/lib/sfl/saisie/types";
+import { deriveSeason } from "@/lib/sfl/saisie/engine";
+import { appliquerVotes, type VoteFigure } from "@/lib/sfl/votes";
 
 export const maxDuration = 30;
 
@@ -72,10 +74,17 @@ export async function POST(req: NextRequest) {
   const saison = (doc as { data?: Saison } | null)?.data;
   if (!saison?.journees) return NextResponse.json({ error: "Saison introuvable." }, { status: 503 });
 
-  // Les exploits de la saison de la base, avec les noms que la ligue voit.
+  // Les exploits de la saison de la base, avec les noms que la ligue voit,
+  // et les élus des votes fermés (Impact, Défensive) posés comme dans l'app.
   const parNom = new Map(tous.filter((p) => p.valide).map((p) => [p.name, p]));
   const affiche = (n: string) => parNom.get(n)?.nom_affiche ?? n;
-  const exploits = new Map<string, Exploit>(exploitsDeLaSaison(saison, affiche).map((e) => [e.cle, e]));
+  const { data: votes } = await sb
+    .from("votes_figures")
+    .select("saison, j, categorie, votant, candidat, match_id")
+    .eq("saison", saison.numero ?? 0)
+    .limit(5000);
+  const titree = appliquerVotes(saison, deriveSeason(saison).journees, (votes ?? []) as VoteFigure[], new Date());
+  const exploits = new Map<string, Exploit>(exploitsDeLaSaison(titree, affiche).map((e) => [e.cle, e]));
 
   const lignes = demandes
     .map((c) => exploits.get(c))
