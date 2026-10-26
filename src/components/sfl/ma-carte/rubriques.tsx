@@ -31,6 +31,7 @@ import { useFormatCarte } from "@/hooks/use-format-carte";
 import { MiniCarte } from "@/components/sfl/mini-carte";
 import { Medaille } from "@/components/sfl/vitrine";
 import { ModePasse, retenirOrigineModePasse } from "@/components/sfl/mode-passe";
+import { useMissionsASigner } from "@/components/sfl/mode-passe-missions";
 import { cartesDeCarriere, courbeDeCarriere, type PointCourbe } from "@/lib/sfl/carriere";
 import { actionsDuJour, dimanchesDe, ficheJoueur, resultatDuJour } from "@/lib/sfl/fiche-joueur";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
@@ -137,6 +138,7 @@ export function RubriquesMaCarte() {
   const { player, saison, dimanches, joues, courbe, mesCartes, rangs } = useMaCarte();
   const b = useXp(player.name);
   const r = useRangXp(player.name);
+  const aSigner = useMissionsASigner();
   const format = useFormatCarte();
   const paliers = useMemo(() => vitrine(saison, player.name, new Date()), [saison, player.name]);
   const numero = saison.numero ?? 0;
@@ -228,7 +230,11 @@ export function RubriquesMaCarte() {
             ))}
           </span>
           <span className="truncate text-[12px] font-semibold">
-            {fini ? "Passe complet" : `Passe ${b.passe.palier}/${PALIERS_PASSE} · ${suivant.nom}`}
+            {aSigner > 0
+              ? `${aSigner} mission${aSigner > 1 ? "s" : ""} à signer`
+              : fini
+                ? "Passe complet"
+                : `Passe ${b.passe.palier}/${PALIERS_PASSE} · ${suivant.nom}`}
           </span>
         </span>
       </Tuile>
