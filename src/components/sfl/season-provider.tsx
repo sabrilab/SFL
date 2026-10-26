@@ -15,7 +15,7 @@ import { startSaisonSync } from "@/lib/sfl/saisie/sync";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import type { Player } from "@/lib/sfl/engine";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
-import { appliquerVotes } from "@/lib/sfl/votes";
+import { appliquerVotes, titresFaibles } from "@/lib/sfl/votes";
 import { amorcerDemo, ARBITRES_EVENT, arbitresRevision } from "@/lib/sfl/arbitres";
 import { useSuiviVotes, useVotes } from "@/hooks/use-votes";
 import { useSession } from "@/hooks/use-session";
@@ -168,8 +168,11 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   const derived = useMemo(() => {
     void horloge;
     const brut = deriveSeason(saison);
-    const vote = appliquerVotes(saison, brut.journees, votes, new Date());
-    return { ...(vote === saison ? brut : deriveSeason(vote)), saisonTitree: vote };
+    const maintenant = new Date();
+    const vote = appliquerVotes(saison, brut.journees, votes, maintenant);
+    // Un titre élu à une seule voix ne fait pas monter la note (saisie/evolution.ts).
+    const faibles = titresFaibles(saison, brut.journees, votes, maintenant);
+    return { ...(vote === saison && !faibles.size ? brut : deriveSeason(vote, faibles)), saisonTitree: vote };
   }, [saison, votes, horloge]);
   const nom = useMemo(() => nomBola(session, derived.players), [session, derived.players]);
   const poste = usePosteBola(nom);
