@@ -1,17 +1,21 @@
 "use client";
 
 // Le terrain d'un match, parmi tous ceux du Nord (Sabri, 23/10 : « tous les
-// terrains qui sont possibles sur tout le territoire du Nord ») : ceux du
-// même genre que l'hippodrome de Marcq — foot en gazon synthétique, en plein
-// air —, tirés du Recensement des équipements sportifs (lib/sfl/terrains-nord.ts,
-// le tri et ses raisons dans tools/terrains-nord.ts), et ceux de la ligue à
-// leur nom, en blanc sur le plan.
+// terrains qui sont possibles sur tout le territoire du Nord »), puis de la
+// France, de l'Europe et du Maghreb (Sabri, 26/10) : ceux du même genre que
+// l'hippodrome de Marcq — foot en gazon synthétique, en plein air —, tirés
+// du Recensement des équipements sportifs et d'OpenStreetMap
+// (lib/sfl/terrains.ts, le tri et ses raisons dans tools/terrains*.ts), et
+// ceux de la ligue à leur nom, en blanc sur le plan. Le catalogue se lit
+// case par case : autour du point d'où la liste se range, et là où se
+// trouve la ville cherchée.
 //
 // En haut, la recherche (une ville, un stade), les formats et le plan
 // (plan-terrains.tsx) ; dessous, la liste, du plus proche au plus loin : de
 // ta position si tu la donnes (le viseur), sinon de ta ville, sinon de
 // l'hippodrome. Déplacer le plan range la liste autour de ce qu'il montre ;
-// toucher un point met son terrain en tête. Chaque ligne : la photo
+// toucher un point met son terrain en tête ; la liste montre les 80 plus
+// proches. Chaque ligne : la photo
 // satellite (chargée quand elle approche de l'écran), la commune et la
 // distance, les terrains par format, éclairé, en accès libre. La toucher
 // choisit le terrain.
@@ -28,8 +32,8 @@
 // dans la recherche : la dernière ligne le reprend tel quel, sans place sur
 // la Map, comme l'ancien « Ailleurs ».
 //
-// Le recensement est sous Licence Ouverte : sa source et sa date sont citées
-// au pied de la liste.
+// Le recensement est sous Licence Ouverte, OpenStreetMap sous ODbL : la
+// source et la date des terrains montrés sont citées au pied de la liste.
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
@@ -48,12 +52,13 @@ import {
   distanceLisible,
   km,
   lieuDuTerrain,
-  lireTerrainsNord,
+  lireAutour,
+  lireCommunes,
+  sourcesCitees,
   surPlace,
-  terrainsNordLus,
-  type CatalogueTerrains,
+  useTerrainsRecenses,
   type TerrainPropose,
-} from "@/lib/sfl/terrains-nord";
+} from "@/lib/sfl/terrains";
 import type { Terrain } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +69,7 @@ const PlanTerrains = dynamic(() => import("./plan-terrains").then((m) => m.PlanT
 
 type Point = { lat: number; lng: number };
 
-/** Un lieu hors des terrains de la ligue : un terrain du Nord, ou un nom écrit en toutes lettres. */
+/** Un lieu hors des terrains de la ligue : un terrain recensé, ou un nom écrit en toutes lettres. */
 export interface LieuChoisi {
   lieu: string;
   adresse: string | null;
@@ -79,8 +84,8 @@ const LILLE: Point = { lat: 50.6329, lng: 3.0586 };
 
 const calme = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** « 23/10/2026 » */
-const dateCourte = (iso: string) => iso.split("-").reverse().join("/");
+/** Les lignes de la liste, au plus : les plus proches. */
+const LIGNES = 80;
 
 /** La photo satellite d'un terrain, chargée quand sa ligne approche de l'écran. */
 function Vignette({ t, racine, className }: { t: TerrainPropose; racine?: RefObject<HTMLElement | null>; className?: string }) {
@@ -149,40 +154,42 @@ export function ChoisirTerrain({
   onLigue: (id: number) => void;
   onLieu: (l: LieuChoisi) => void;
 }) {
-  const [catalogue, setCatalogue] = useState<CatalogueTerrains | null>(terrainsNordLus);
-  const [erreur, setErreur] = useState(false);
+  const { index, terrains: recenses, erreur } = useTerrainsRecenses();
   const [q, setQ] = useState("");
   const [position, setPosition] = useState<Point | null>(null);
   const [cherchePosition, setCherchePosition] = useState(false);
   const ici = position ?? iciConnu;
-  // Un terrain du Nord déjà choisi s'ouvre en tête, le plan posé sur lui.
+  // Un terrain recensé déjà choisi s'ouvre en tête, le plan posé sur lui.
   const [focus, setFocus] = useState<string | null>(actuel && !actuel.startsWith("ligue-") ? actuel : null);
-  const tous = useMemo(() => avecLaLigue(catalogue?.terrains ?? [], ligue), [catalogue, ligue]);
+  const tous = useMemo(() => avecLaLigue(recenses, ligue), [recenses, ligue]);
   const format = useFormatTerrain();
   // Le point d'où la liste se range : le terrain déjà choisi, toi, l'hippodrome.
   const [origine, setOrigine] = useState<Point>(() => {
     const t = ligue.find((x) => `ligue-${x.id}` === actuel) ?? ligue.find((x) => x.defaut) ?? ligue[0];
-    return (actuel && !actuel.startsWith("ligue-") ? terrainsNordLus()?.terrains.find((x) => x.id === actuel) : null) ?? iciConnu ?? t ?? LILLE;
+    return (actuel && !actuel.startsWith("ligue-") ? recenses.find((x) => x.id === actuel) : null) ?? iciConnu ?? t ?? LILLE;
   });
   const [cadrage, setCadrage] = useState<{ n: number; sur: "centre" | "terrains" | "proches" }>({ n: 0, sur: "centre" });
   const liste = useRef<HTMLDivElement>(null);
 
+  // Les terrains autour du point d'où la liste se range (les cases déjà lues ne repartent pas).
   useEffect(() => {
-    if (!open || catalogue) return;
-    let fini = false;
-    lireTerrainsNord()
-      .then((c) => !fini && setCatalogue(c))
-      .catch(() => !fini && setErreur(true));
-    return () => {
-      fini = true;
-    };
-  }, [open, catalogue]);
+    if (open) lireAutour(origine).catch(() => {});
+  }, [open, origine]);
 
-  // Une recherche : le plan cadre ce qu'elle trouve, une fois la frappe posée.
+  // Une recherche : les cases de la ville cherchée, puis le plan cadre ce
+  // qu'elle trouve, une fois la frappe posée.
   useEffect(() => {
     if (!q.trim()) return;
-    const id = setTimeout(() => setCadrage((c) => ({ n: c.n + 1, sur: "terrains" })), 350);
-    return () => clearTimeout(id);
+    let fini = false;
+    const id = setTimeout(() => {
+      lireCommunes(q)
+        .catch(() => {})
+        .finally(() => !fini && setCadrage((c) => ({ n: c.n + 1, sur: "terrains" })));
+    }, 350);
+    return () => {
+      fini = true;
+      clearTimeout(id);
+    };
   }, [q]);
 
   const trouves = useMemo(() => chercherTerrains(aFormat(tous, format), q), [tous, format, q]);
@@ -195,7 +202,9 @@ export function ChoisirTerrain({
     [trouves, origine]
   );
   const enTete = focus ? ranges.find((t) => t.id === focus) : undefined;
-  const lignes = enTete ? [enTete, ...ranges.filter((t) => t !== enTete)] : ranges;
+  const lignes = (enTete ? [enTete, ...ranges.filter((t) => t !== enTete)] : ranges).slice(0, LIGNES);
+  const charge = !!index;
+  const sources = sourcesCitees(index, lignes);
   const ecrit = q.trim().slice(0, 120);
 
   function enHaut() {
@@ -240,7 +249,7 @@ export function ChoisirTerrain({
         className="gap-3 data-[side=bottom]:h-[88dvh] rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)]"
       >
         <SheetHeader className="px-5 pt-5 pb-0">
-          <SheetTitle className="text-[24px] font-bold tracking-tight">Terrains du Nord</SheetTitle>
+          <SheetTitle className="text-[24px] font-bold tracking-tight">Terrains</SheetTitle>
         </SheetHeader>
         <div className="flex min-h-0 flex-1 flex-col gap-3 px-4">
           <div className="flex gap-2">
@@ -298,7 +307,7 @@ export function ChoisirTerrain({
           </div>
 
           <div ref={liste} className="-mx-1 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain px-1 pb-2">
-            {catalogue && (
+            {charge && (
               <p className="mono-label px-1 pb-0.5 text-muted-foreground tabular-nums">
                 {trouves.length === 0 ? "Aucun terrain" : `${trouves.length} terrain${trouves.length > 1 ? "s" : ""}`}
               </p>
@@ -350,7 +359,7 @@ export function ChoisirTerrain({
                 </span>
               </button>
             )}
-            {!catalogue && !erreur && (
+            {!charge && !erreur && (
               <div className="flex flex-col gap-1.5" aria-hidden>
                 {[0, 1, 2, 3].map((i) => (
                   <div key={i} className="h-[72px] animate-pulse rounded-[18px] bg-card" />
@@ -358,11 +367,11 @@ export function ChoisirTerrain({
               </div>
             )}
             {erreur && <p className="py-8 text-center text-[14px] text-muted-foreground">Les terrains ne se chargent pas.</p>}
-            {catalogue && (
-              <p className="px-1 pt-3 text-[10.5px] leading-snug text-muted-foreground/70">
-                {catalogue.source} · {catalogue.licence} · {dateCourte(catalogue.date)}
+            {sources.map((x) => (
+              <p key={x} className="px-1 pt-3 text-[10.5px] leading-snug text-muted-foreground/70">
+                {x}
               </p>
-            )}
+            ))}
           </div>
         </div>
       </SheetContent>

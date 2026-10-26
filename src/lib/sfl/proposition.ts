@@ -15,7 +15,7 @@
 // d'ouverture remplie, où ceux qui sont libres attendent qu'on les invite.
 
 import { MOMENTS, type Dispo, type Moment } from "@/lib/sfl/matchs";
-import { km, type TerrainPropose } from "@/lib/sfl/terrains-nord";
+import { km, type TerrainPropose } from "@/lib/sfl/terrains";
 
 /** Le coup d'envoi d'un moment : celui de Mes dispos. */
 export const HEURE_DU_MOMENT: Record<Moment, string> = { matin: "10:00", "apres-midi": "15:00", soir: "19:00" };

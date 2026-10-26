@@ -1,6 +1,6 @@
 "use client";
 
-// Le plan des terrains, dans la feuille « Terrains du Nord »
+// Le plan des terrains, dans la feuille « Terrains »
 // (choisir-terrain.tsx) : le plan de la Map (map/style-snap.ts), à plat,
 // chaque complexe en point noir cerné de blanc, ceux de la ligue en blanc
 // cerné de noir ; celui qu'on regarde se lève en mini-stade, son nom en
@@ -18,7 +18,7 @@ import maplibregl, { type GeoJSONSource, type Map as PlanMap, type Marker } from
 import "maplibre-gl/dist/maplibre-gl.css";
 import { styleSnap } from "@/components/sfl/map/style-snap";
 import { pointHtml } from "@/components/sfl/map/stade";
-import { km, type TerrainPropose } from "@/lib/sfl/terrains-nord";
+import { km, type TerrainPropose } from "@/lib/sfl/terrains";
 
 const calme = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 

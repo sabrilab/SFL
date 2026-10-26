@@ -46,11 +46,13 @@
 // au même endroit, il s'ouvre en éventail, chacun à toucher.
 //
 // Les terrains où l'on peut ouvrir un match (23/10, Sabri : « en mode grisé,
-// comme s'il fallait ouvrir le match ») : tous ceux du Nord
-// (lib/sfl/terrains-nord.ts), sauf ceux qui ont déjà le leur. De loin des
-// points ; en s'approchant, des stickers vides (map/stade.ts, fantomeSvg) ;
-// tout près, leur nom. Ce sont des couches du plan, pas des éléments HTML :
-// cent cinquante terrains ne coûtent rien, restent sous les matchs, les
+// comme s'il fallait ouvrir le match ») : ceux du recensement, en France,
+// en Europe et au Maghreb (lib/sfl/terrains.ts), sauf ceux qui ont déjà le
+// leur ; la page les lit case par case, d'après ce que le plan montre
+// (onVue, à chaque arrêt). De loin des points ; en s'approchant, des
+// stickers vides (map/stade.ts, fantomeSvg) ; tout près, leur nom. Ce sont
+// des couches du plan, pas des éléments HTML : des milliers de terrains ne
+// coûtent rien, restent sous les matchs, les
 // joueurs et toi, et s'effacent l'un devant l'autre quand ils se
 // chevauchent. Toucher un terrain lâche l'onde et le lève en mini-stade,
 // son nom à côté, au-dessus de la fiche que la page ouvre.
@@ -325,6 +327,7 @@ export function CarteMap({
   possibleChoisi = null,
   onPossible,
   teinteFantome = "gris",
+  onVue,
   className,
 }: {
   fond?: FondCarte;
@@ -335,6 +338,8 @@ export function CarteMap({
   onPossible?: (id: string) => void;
   /** Le gris du plan, ou le bleu du ciel. */
   teinteFantome?: TeinteFantome;
+  /** Ce que le plan montre, à chaque arrêt (ouest, sud, est, nord, zoom) : la page y lit les terrains (lib/sfl/terrains.ts). */
+  onVue?: (o: number, s: number, e: number, n: number, zoom: number) => void;
   /** Les joueurs, ville par ville. */
   villes?: VillePlan[];
   /** Toucher le nom d'une ville ouverte (ou une pile tout au bout du zoom) : ses dossiers. */
@@ -408,6 +413,7 @@ export function CarteMap({
   const possiblesRef = useRef(possibles);
   const possibleRef = useRef(onPossible);
   const teinteRef = useRef(teinteFantome);
+  const vueRef = useRef(onVue);
   const leve = useRef<Marker | null>(null);
   const filtreLeve = useRef<maplibregl.FilterSpecification | null>(null);
   useEffect(() => {
@@ -417,9 +423,10 @@ export function CarteMap({
     villeRef.current = onVille;
     joueurRef.current = onJoueur;
     possibleRef.current = onPossible;
+    vueRef.current = onVue;
     margeBasRef.current = margeBas;
     retraitRef.current = matchsEnRetrait;
-  }, [onChoisir, onBulle, onPoint, onVille, onJoueur, onPossible, margeBas, matchsEnRetrait]);
+  }, [onChoisir, onBulle, onPoint, onVille, onJoueur, onPossible, onVue, margeBas, matchsEnRetrait]);
   const pointsActifs = !!onPoint;
 
   // La carte, une fois.
@@ -443,7 +450,14 @@ export function CarteMap({
     map.touchZoomRotate.disableRotation();
     map.keyboard.disableRotation();
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
+    // Ce que le plan montre, à chaque arrêt : la page y lit les terrains.
+    const montrer = () => {
+      const b = map.getBounds();
+      vueRef.current?.(b.getWest(), b.getSouth(), b.getEast(), b.getNorth(), map.getZoom());
+    };
+    map.on("moveend", montrer);
     map.on("load", () => {
+      montrer();
       appliquerFond(map, fondRef.current, false);
       // L'attribution reste repliée en un petit « i » : elle s'ouvre au toucher.
       map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");

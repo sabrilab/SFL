@@ -8,8 +8,8 @@
 //
 // PucesFormat, la rangée de pastilles : en toucher une ne garde que les
 // complexes qui ont un terrain à ce format ; la retoucher les rend tous. Une
-// pastille sans aucun terrain s'éteint. Elle sert dans la feuille « Terrains
-// du Nord » (sur="feuille", les pilules de la page, claire ou sombre) et sur
+// pastille sans aucun terrain s'éteint. Elle sert dans la feuille « Terrains »
+// (sur="feuille", les pilules de la page, claire ou sombre) et sur
 // la Map (sur="plan", la nacre posée sur le plan clair), dans son menu, sous
 // « Les terrains libres » (map/menu-map.tsx, 24/10 : la colonne de droite
 // n'a plus que la loupe et ce menu). Le choix est le même partout et le
@@ -18,7 +18,7 @@
 // est l'icône de leur ligne dans le menu.
 
 import { choisirFormatTerrain, useFormatTerrain } from "@/hooks/use-format-terrain";
-import { FORMATS } from "@/lib/sfl/terrains-nord";
+import { FORMATS } from "@/lib/sfl/terrains";
 import { cn } from "@/lib/utils";
 
 /** Un petit terrain vu de dessus : la ligne médiane, le rond central, les surfaces. */

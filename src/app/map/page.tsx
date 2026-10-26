@@ -33,8 +33,9 @@
 //
 // Les terrains où l'on peut jouer (23/10, Sabri : « en mode grisé, comme
 // s'il fallait ouvrir le match […] pour que chacun puisse ouvrir un match
-// Bola ou Bola Team ») : tous ceux du Nord (lib/sfl/terrains-nord.ts), en
-// stickers vides sous les matchs ; un terrain qui a son match n'a plus le
+// Bola ou Bola Team ») : ceux du recensement, en France, en Europe et au
+// Maghreb (lib/sfl/terrains.ts, lus case par case d'après ce que la Map
+// montre), en stickers vides sous les matchs ; un terrain qui a son match n'a plus le
 // sien. En toucher un ouvre sa fiche : sa photo, ce qu'il y a sur place, et
 // « Ouvrir un match ici » (la feuille d'ouverture, le terrain déjà choisi)
 // ou, pour le capitaine d'une équipe active, « Défier une équipe ici » (la
@@ -42,7 +43,7 @@
 // à son nom. Le menu de la Map ne garde que ceux d'un format (à 3, 5, 7, 8
 // ou 11 ; Sabri, 24/10 : « on fait actuellement du foot à 5 […] qu'on
 // puisse filtrer facilement ») : map/format-terrains.tsx, le même choix que
-// dans la feuille « Terrains du Nord ».
+// dans la feuille « Terrains ».
 //
 // Les contrats en direct (23/10) : le bouton au viseur ne laisse sur la Map
 // que les cibles des contrats signés du dimanche, sous leur viseur, leur prime
@@ -144,13 +145,14 @@ import {
   FORMATS,
   km,
   lieuDuTerrain,
-  lireTerrainsNord,
+  lireAutour,
+  lireVue,
   sansAccents,
+  sourcesCitees,
   surPlace,
-  terrainsNordLus,
-  type CatalogueTerrains,
+  useTerrainsRecenses,
   type TerrainPropose,
-} from "@/lib/sfl/terrains-nord";
+} from "@/lib/sfl/terrains";
 import { active } from "@/lib/sfl/equipes";
 import type { LieuChoisi } from "@/components/sfl/matchs/choisir-terrain";
 import { useVillesRevision } from "@/hooks/use-villes";
@@ -193,7 +195,6 @@ const AUCUNE_VILLE: VillePlan[] = [];
 /** Un terrain qui a son match n'a plus son sticker vide : à moins de 200 m, c'est le même. */
 const MEME_TERRAIN_KM = 0.2;
 /** « 23/10/2026 » */
-const dateCourte = (iso: string) => iso.split("-").reverse().join("/");
 /** Le gris ou le ciel des terrains possibles (dans un aperçu, /map?fantome=ciel montre l'autre). */
 const teinteFantome = (): TeinteFantome =>
   process.env.NEXT_PUBLIC_BOLA_ENV !== "production" && new URLSearchParams(window.location.search).get("fantome") === "ciel" ? "ciel" : "gris";
@@ -433,29 +434,32 @@ export default function MapPage() {
     },
     [saison, journees, terrains, p.heure, p.lieu]
   );
-  // Les terrains du Nord (le recensement) : lus une fois, gardés en mémoire.
-  const [recensement, setRecensement] = useState<CatalogueTerrains | null>(terrainsNordLus);
+  // Les terrains recensés (France, Europe, Maghreb) : lus case par case,
+  // autour des terrains de la ligue d'abord, puis de ce que la Map montre
+  // (onVue), et gardés en mémoire (lib/sfl/terrains.ts).
+  const { index: indexTerrains, terrains: recenses } = useTerrainsRecenses();
   useEffect(() => {
-    if (recensement) return;
-    let fini = false;
-    lireTerrainsNord()
-      .then((c) => !fini && setRecensement(c))
-      .catch(() => {});
-    return () => {
-      fini = true;
-    };
-  }, [recensement]);
+    const t = terrains.find((x) => x.defaut) ?? terrains[0];
+    lireAutour(t && Number.isFinite(t.lat) ? t : { lat: 50.6329, lng: 3.0586 }).catch(() => {});
+  }, [terrains]);
+  const voirTerrains = useCallback((o: number, s: number, e: number, n: number, zoom: number) => {
+    // De trop loin (un pays entier), on ne lit rien de plus : les points ne se verraient pas.
+    if (zoom >= 7) lireVue(o, s, e, n).catch(() => {});
+  }, []);
   // Tous les terrains où l'on peut jouer : ceux de la ligue à leur nom, puis le recensement.
-  const proposables = useMemo(() => (recensement ? avecLaLigue(recensement.terrains, terrains) : []), [recensement, terrains]);
+  const proposables = useMemo(() => avecLaLigue(recenses, terrains), [recenses, terrains]);
   // Un défi d'équipe se pose sur le terrain recensé qui porte son nom (celui que la fiche du terrain lui donne).
   const recensesParNom = useMemo(() => {
     const m = new Map<string, Terrain>();
-    (recensement?.terrains ?? []).forEach((t, i) => {
+    recenses.forEach((t) => {
       const nom = lieuDuTerrain(t);
-      m.set(sansAccents(nom), { id: -(1_000_000 + i), nom, adresse: t.adresse, lat: t.lat, lng: t.lng, commune: t.commune });
+      // Un id négatif, le même tant que le terrain ne change pas (les cases arrivent dans n'importe quel ordre).
+      let h = 0;
+      for (let k = 0; k < t.id.length; k++) h = (h * 31 + t.id.charCodeAt(k)) | 0;
+      m.set(sansAccents(nom), { id: -(1_000_000 + (Math.abs(h) % 1_000_000_000)), nom, adresse: t.adresse, lat: t.lat, lng: t.lng, commune: t.commune });
     });
     return m;
-  }, [recensement]);
+  }, [recenses]);
 
   // Les journées à venir, chacune sur son terrain ; sinon la convocation du
   // dimanche. Une journée est passée quand elle est jouée (résultat saisi) ou
@@ -1108,6 +1112,7 @@ export default function MapPage() {
             possibleChoisi={enContrats ? null : (leve ?? (surCarte ? (ouPropose?.id ?? null) : null))}
             onPossible={toucherPossible}
             teinteFantome={tonFantomes}
+            onVue={voirTerrains}
             className="h-full w-full"
           />
         </div>
@@ -1600,7 +1605,7 @@ export default function MapPage() {
               ios={ios}
               defi={defiDepuisTerrain}
               ouvrir={partiesActives}
-              source={recensement ? `${recensement.source} · ${recensement.licence} · ${dateCourte(recensement.date)}` : null}
+              source={sourcesCitees(indexTerrains, [libre]).join(" · ") || null}
               onOuvrir={() => {
                 setFicheLibre(false);
                 setLeve(null);
@@ -1950,7 +1955,7 @@ function FicheLibre({
   defi: "defier" | "monter" | null;
   /** Ouvrir un match demande d'être connecté (le bouton de la Map aussi). */
   ouvrir: boolean;
-  /** Le recensement, cité sous la fiche (Licence Ouverte). */
+  /** La source du terrain, citée sous la fiche (Licence Ouverte, ODbL). */
   source: string | null;
   onOuvrir: () => void;
 }) {

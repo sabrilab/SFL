@@ -3,13 +3,13 @@
 // Le format des terrains qu'on veut voir (Sabri, 24/10 : « on fait
 // actuellement du foot à 5 […] qu'on puisse filtrer facilement pour voir
 // les terrains qui nous plaisent ») : à 3, 5, 7, 8 ou 11, ou tous. Choisi sur
-// la Map (le bouton des terrains grisés) ou dans la feuille « Terrains du
-// Nord », c'est le même aux deux endroits, et le téléphone le garde d'une
+// la Map (le bouton des terrains grisés) ou dans la feuille « Terrains »,
+// c'est le même aux deux endroits, et le téléphone le garde d'une
 // visite à l'autre. Sans stockage (navigation privée), il tient jusqu'à la
 // fermeture de l'app.
 
 import { useSyncExternalStore } from "react";
-import { FORMATS } from "@/lib/sfl/terrains-nord";
+import { FORMATS } from "@/lib/sfl/terrains";
 
 const CLE = "bola-format-terrain";
 const EVENEMENT = "bola-format-terrain";

@@ -1,18 +1,19 @@
-// Les terrains du Nord : le catalogue où l'on choisit son terrain en ouvrant
-// un match (components/sfl/matchs/choisir-terrain.tsx).
+// Les terrains de France : la part du catalogue des terrains
+// (tools/terrains.ts) qui vient du Recensement des équipements sportifs.
 //
 // Sabri, 23/10 : « une proposition d'ouverture de match sur les mêmes types
 // de terrains où on joue actuellement à l'hippodrome […] tous les terrains
-// qui sont possibles sur tout le territoire du Nord pour l'instant. »
+// qui sont possibles sur tout le territoire du Nord pour l'instant. » Puis,
+// le 26/10 : toute la France (et l'Europe, tools/terrains-osm.ts).
 //
 // À l'hippodrome de Marcq, la ligue joue sur des terrains de foot en gazon
 // synthétique, en plein air, dans un complexe municipal. On prend donc, au
 // Recensement des équipements sportifs (Data ES, ministère chargé des Sports,
 // Licence Ouverte 2.0), tous les terrains de football (et les terrains mixtes
-// ou « de soccer ») en gazon synthétique, à l'air libre, du département du
-// Nord (59). Un complexe fait une seule ligne, avec ses terrains et leur
-// format (à 3, à 5, à 7, à 8, à 11, d'après leur nom ou leurs dimensions :
-// format() ; c'est sur lui qu'on filtre dans l'app, Sabri, 24/10).
+// ou « de soccer ») en gazon synthétique, à l'air libre, de toute la France.
+// Un complexe fait une seule ligne, avec ses terrains et leur format (à 3,
+// à 5, à 7, à 8, à 11, d'après leur nom ou leurs dimensions : format() ;
+// c'est sur lui qu'on filtre dans l'app, Sabri, 24/10).
 //
 // Laissés de côté : les fives couverts (Urban Soccer…), les city-stades, les
 // terrains en herbe ; les terrains d'écoles, de lycées et d'universités, et
@@ -20,26 +21,30 @@
 // Les terrains synthétiques de l'hippodrome lui-même ne sont pas au
 // recensement : la ligue les a déjà dans ses terrains (saison.terrains).
 //
-// La source : la copie quotidienne que publie Géo2France, la plateforme de la
-// Région (WFS vrt-bot:dataes), le site du ministère ne répondant pas
-// toujours ; sinon un export déjà téléchargé.
-//
-//   npx tsx tools/terrains-nord.ts                    → public/terrains/nord.json
-//   npx tsx tools/terrains-nord.ts --depuis=res.json  (un GeoJSON du recensement)
+// La source : l'export du jeu « data-es » sur equipements.sports.gouv.fr,
+// filtré côté serveur (EXPORT) ; sinon un export déjà téléchargé
+// (npx tsx tools/terrains.ts --france=data-es.json).
 
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import type { CatalogueTerrains, TerrainNord } from "../src/lib/sfl/terrains-nord";
+import type { TerrainRecense } from "../src/lib/sfl/terrains";
 
-const SORTIE = join(import.meta.dirname, "..", "public", "terrains", "nord.json");
+const CHAMPS =
+  "inst_numero,inst_nom,inst_adresse,inst_cp,new_name,dep_code,equip_nom,equip_type_name,equip_sol,equip_nature," +
+  "equip_long,equip_larg,equip_eclair,equip_acc_libre,equip_prop_type,equip_x,equip_y";
 
-const WFS =
-  "https://www.geo2france.fr/geoserver/vrt-bot/ows?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature" +
-  "&TYPENAMES=vrt-bot:dataes&OUTPUTFORMAT=application/json&SRSNAME=EPSG:4326&COUNT=100000" +
-  "&CQL_FILTER=" +
-  encodeURIComponent("dep_code='59' AND equip_type_name IN ('Terrain de football','Terrain mixte','Terrain de soccer')");
+/** Les terrains de foot synthétiques de toute la France, en un seul export JSON (≈ 3 300 lignes). */
+export const EXPORT =
+  "https://equipements.sports.gouv.fr/api/explore/v2.1/catalog/datasets/data-es/exports/json?where=" +
+  encodeURIComponent("equip_type_name in ('Terrain de football','Terrain mixte','Terrain de soccer') and equip_sol='Gazon synthétique'") +
+  "&select=" +
+  encodeURIComponent(CHAMPS);
 
-interface Equipement {
+export const SOURCE_FRANCE = {
+  pays: ["FR"],
+  nom: "Recensement des équipements sportifs (Data ES), ministère chargé des Sports",
+  licence: "Licence Ouverte 2.0",
+};
+
+export interface Equipement {
   inst_numero: string;
   inst_nom: string | null;
   inst_adresse: string | null;
@@ -57,10 +62,6 @@ interface Equipement {
   equip_prop_type: string | null;
   equip_x: string | null;
   equip_y: string | null;
-}
-
-interface GeoJson {
-  features: { geometry: { coordinates: [number, number] } | null; properties: Equipement }[];
 }
 
 /* ──────────────────────────────── Le tri ──────────────────────────────── */
@@ -323,32 +324,18 @@ function kmEntre(a: { lat: number; lng: number }, b: { lat: number; lng: number 
   return 12742 * Math.asin(Math.sqrt(d));
 }
 
-async function lireRecensement(): Promise<GeoJson> {
-  const depuis = process.argv.find((a) => a.startsWith("--depuis="))?.slice("--depuis=".length);
-  if (depuis) return JSON.parse(readFileSync(depuis, "utf8")) as GeoJson;
-  const res = await fetch(WFS, { signal: AbortSignal.timeout(180_000) });
-  if (!res.ok) throw new Error(`Géo2France répond ${res.status}`);
-  return (await res.json()) as GeoJson;
-}
-
-async function main() {
-  const res = await lireRecensement();
+/** Les complexes de France, à partir des lignes du recensement ; leur id est celui de l'installation (« I593780006 »), sans sa case. */
+export function complexesFrance(lignes: Equipement[]): TerrainRecense[] {
   const parSite = new Map<string, Equipement[]>();
-  for (const f of res.features) {
-    const e = f.properties;
-    if (e.dep_code && e.dep_code !== "59") continue;
+  for (const e of lignes) {
     if (!retenu(e)) continue;
-    // Le point de l'équipement, sinon ses coordonnées écrites.
-    const [x, y] = f.geometry?.coordinates ?? [Number(e.equip_x), Number(e.equip_y)];
-    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    e.equip_x = String(x);
-    e.equip_y = String(y);
+    if (!Number.isFinite(Number(e.equip_x)) || !Number.isFinite(Number(e.equip_y)) || !e.equip_x || !e.equip_y) continue;
     const l = parSite.get(e.inst_numero) ?? [];
     l.push(e);
     parSite.set(e.inst_numero, l);
   }
 
-  const terrains: TerrainNord[] = [];
+  const terrains: TerrainRecense[] = [];
   for (const [id, equipements] of parSite) {
     // Le plus grand terrain d'abord : c'est lui qui place le complexe.
     equipements.sort((a, b) => format(b) - format(a) || (b.equip_long ?? 0) - (a.equip_long ?? 0));
@@ -357,14 +344,9 @@ async function main() {
     const brut = (e.inst_nom ?? e.equip_nom ?? "Terrain").trim();
     const lat = Math.round(Number(e.equip_y) * 1e5) / 1e5;
     const lng = Math.round(Number(e.equip_x) * 1e5) / 1e5;
-    // Le Nord : 49,9° à 51,1° de latitude, 2,0° à 4,3° de longitude.
-    if (lat < 49.9 || lat > 51.15 || lng < 2 || lng > 4.3) {
-      console.warn(`hors du Nord, laissé : ${brut} (${commune}) ${lat}, ${lng}`);
-      continue;
-    }
     const nom = NOMS[brut] ?? joli(brut);
     const [la, ln] = POINTS[id] ?? [lat, lng];
-    const t: TerrainNord = {
+    const t: TerrainRecense = {
       id,
       nom,
       commune,
@@ -374,6 +356,7 @@ async function main() {
       formats: equipements.map(format),
       eclaire: equipements.some((x) => x.equip_eclair === "true"),
       libre: equipements.some((x) => x.equip_acc_libre === "true"),
+      pays: "FR",
     };
     // Un même stade inscrit deux fois (deux installations à quelques pas,
     // même nom, même commune) : une seule ligne, tous ses terrains.
@@ -386,21 +369,5 @@ async function main() {
     }
     terrains.push(t);
   }
-  terrains.sort((a, b) => a.commune.localeCompare(b.commune, "fr") || a.nom.localeCompare(b.nom, "fr"));
-
-  const catalogue: CatalogueTerrains = {
-    source: "Recensement des équipements sportifs (Data ES), ministère chargé des Sports",
-    licence: "Licence Ouverte 2.0",
-    date: new Date().toISOString().slice(0, 10),
-    terrains,
-  };
-  mkdirSync(dirname(SORTIE), { recursive: true });
-  writeFileSync(SORTIE, JSON.stringify(catalogue) + "\n");
-  const n = terrains.reduce((s, t) => s + t.formats.length, 0);
-  console.log(`${terrains.length} complexes, ${n} terrains, ${new Set(terrains.map((t) => t.commune)).size} communes → ${SORTIE}`);
+  return terrains;
 }
-
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});

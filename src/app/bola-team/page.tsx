@@ -35,7 +35,7 @@
 // ouverture de la liste, et le seul geste sur un invité était de le retirer.
 //
 // Un terrain touché sur la Map (« Défier une équipe ici », /bola-team?terrain=id,
-// un terrain du Nord : lib/sfl/terrains-nord.ts) : il se pose au-dessus des
+// un terrain recensé : lib/sfl/terrains.ts) : il se pose au-dessus des
 // équipes à défier, sa photo et son adresse, et chaque défi part avec lui.
 //
 // Sur tablette et ordinateur (dès 768 px ; Sabri, 23/10 : « comme tu l'as
@@ -135,7 +135,7 @@ import {
   type Membre,
 } from "@/lib/sfl/equipes";
 import { finInvitation, quandTombe, resteAvant } from "@/lib/sfl/equipes-temps";
-import { avecLaLigue, lireTerrainsNord, terrainsNordLus, type CatalogueTerrains } from "@/lib/sfl/terrains-nord";
+import { avecLaLigue, lireTerrain, useTerrainsRecenses } from "@/lib/sfl/terrains";
 import { DEMO_EQUIPES, demanderApercu, demoChampionnat, demoEquipes } from "@/lib/sfl/equipes-demo";
 import { libelleJour, listerProfils, monId, type Profil } from "@/lib/sfl/matchs";
 import { supabase } from "@/lib/supabase";
@@ -301,7 +301,7 @@ export default function BolaTeamPage() {
   // La feuille du défi repart de zéro à chaque équipe défiée (sa clé), le terrain de la Map déjà écrit.
   const [defiN, setDefiN] = useState(0);
   const [terrainDefi, setTerrainDefi] = useState<string | null>(null);
-  const [recensement, setRecensement] = useState<CatalogueTerrains | null>(terrainsNordLus);
+  const { terrains: recenses } = useTerrainsRecenses();
   const [choisir, setChoisir] = useState(false);
   const [indispos, setIndispos] = useState<Map<string, Indispo> | null>(null);
   const [joueur, setJoueur] = useState<Membre | null>(null);
@@ -360,20 +360,13 @@ export default function BolaTeamPage() {
     }, 0);
     return () => window.clearTimeout(t);
   }, []);
-  // Le terrain venu de la Map : le recensement lu une fois, les terrains de la ligue à leur nom.
+  // Le terrain venu de la Map : sa case du recensement (son id la dit), les terrains de la ligue à leur nom.
   useEffect(() => {
-    if (!terrainDefi || recensement) return;
-    let fini = false;
-    lireTerrainsNord()
-      .then((c) => !fini && setRecensement(c))
-      .catch(() => {});
-    return () => {
-      fini = true;
-    };
-  }, [terrainDefi, recensement]);
+    if (terrainDefi) lireTerrain(terrainDefi).catch(() => {});
+  }, [terrainDefi]);
   const terrainDuDefi = useMemo(
-    () => (terrainDefi && recensement ? (avecLaLigue(recensement.terrains, saison.terrains ?? []).find((t) => t.id === terrainDefi) ?? null) : null),
-    [terrainDefi, recensement, saison.terrains]
+    () => (terrainDefi ? (avecLaLigue(recenses, saison.terrains ?? []).find((t) => t.id === terrainDefi) ?? null) : null),
+    [terrainDefi, recenses, saison.terrains]
   );
 
   // Une fois connecté : mes joueurs, un lien ouvert avant de se connecter,
