@@ -67,7 +67,8 @@ import { InvitationVille } from "@/components/sfl/invitation-ville";
 import { ReponseEquipe, equipeAOuvrir, type EquipeAOuvrir } from "@/components/sfl/equipe/reponse-equipe";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { PlayerCard } from "@/components/sfl/player-card";
-import { useMyPlayer } from "@/components/sfl/player-provider";
+import { useJoueurBola, useMyPlayer } from "@/components/sfl/player-provider";
+import { useHorsSfl } from "@/hooks/use-hors-sfl";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useIdentites } from "@/hooks/use-identites";
 import { useSession } from "@/hooks/use-session";
@@ -190,8 +191,14 @@ export function InvitationCarte() {
   );
   // La décision se prend hors du rendu, sur la saison du moment.
   const ligue = useRef({ saison, players });
+  // Un joueur Bola, hors de la SFL : ni l'annonce des divisions, ni les
+  // joueurs de la SFL à suivre (porte-sfl.tsx).
+  const horsSfl = useHorsSfl();
+  const bola = useJoueurBola();
+  const horsSflRef = useRef(false);
   useEffect(() => {
     ligue.current = { saison, players };
+    horsSflRef.current = horsSfl || bola;
   });
 
   useEffect(() => {
@@ -237,7 +244,7 @@ export function InvitationCarte() {
       const annonce = editionAnnonce(ligue.current.saison, maintenant);
       // Un arbitre apprend qu'il l'est (annonce-arbitre.tsx), une fois.
       if (etatArbitres().arbitres.includes(nom) && !annonceArbitreVue(nom)) setVisible("arbitre");
-      else if (annonce && !annonceVue(annonce, nom)) {
+      else if (annonce && !annonceVue(annonce, nom) && !horsSflRef.current) {
         setEdition(annonce);
         setVisible("divisions");
       } else if (ville?.proposer) {
@@ -245,7 +252,7 @@ export function InvitationCarte() {
         setVisible("ville");
       } else if (etat === "inactives" && !enPause("notifs", nom)) setVisible("notifs");
       else if (photoPerso(nom) === null && !enPause("carte", nom)) setVisible("carte");
-      else if (!enPause("suivre", nom)) {
+      else if (!enPause("suivre", nom) && !horsSflRef.current) {
         // La liste de la base (ou, en aperçu, la démonstration), jamais un cache.
         const demo = enDemoSuivis();
         const suitDeja = (demo ? liensDemo([], nom) : liensDeLaBase()).some(([a]) => a === nom);
