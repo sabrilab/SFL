@@ -18,7 +18,10 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { MessageCircle, Play, Send, Share, Trash2, VolumeX, X } from "lucide-react";
+import { Clapperboard, MessageCircle, Play, Send, Share, Trash2, VolumeX, X } from "lucide-react";
+import { useAccord } from "@/hooks/use-accord";
+import { accordValable } from "@/lib/sfl/confidentialite";
+import { changerHorsApp } from "@/lib/sfl/consentement";
 import { useSession } from "@/hooks/use-session";
 import { useIdentites } from "@/hooks/use-identites";
 import { Visages } from "@/components/sfl/suivre";
@@ -199,8 +202,88 @@ export function VideosDuFil({ videos, className }: { videos: Video[]; className?
       {videos.map((v) => (
         <PublicationVideo key={v.id} v={v} ouvrir={(commentaires) => setOuverte({ v, commentaires })} />
       ))}
+      <InvitationVisuels className="-mt-2" />
       {ouverte && <LecteurVideo v={ouverte.v} commentaires={ouverte.commentaires} onFermer={() => setOuverte(null)} />}
     </div>
+  );
+}
+
+/**
+ * Une ligne légère à côté des vidéos, pour qui a dit non à sa carte hors de
+ * l'app (Sabri, 26/10 : « Vous n'apparaissez pas dans les visuels. Signez
+ * tout de suite la charte […] pour qu'ils soient dans les visuels ») :
+ * signer, c'est le même geste que l'interrupteur des Réglages
+ * (« Ma carte hors de l'app »), et on peut revenir dessus là-bas. Une
+ * invitation, jamais une porte : rien ne se rouvre tout seul, et elle
+ * disparaît une fois signée.
+ */
+export function InvitationVisuels({ className }: { className?: string }) {
+  const session = useSession();
+  const nom = session?.server && !session.enAttente ? session.name : null;
+  const { accord } = useAccord(nom);
+  const [envoi, setEnvoi] = useState(false);
+  if (!nom || !accord || accord.enAttente || !accordValable(accord.version) || accord.horsApp) return null;
+  const signer = async () => {
+    if (envoi) return;
+    setEnvoi(true);
+    const ok = await changerHorsApp(nom, true);
+    setEnvoi(false);
+    toast.success("C'est signé. Tu peux être dans les prochaines vidéos.", {
+      description: ok ? "Tu changes d'avis quand tu veux dans Réglages." : "Enregistré sur ce téléphone, envoyé dès que possible.",
+    });
+  };
+  return (
+    <div className={cn("mx-5 flex items-center gap-3 border-y border-foreground/[0.08] py-2.5 md:mx-0", className)}>
+      <Clapperboard className="size-[16px] shrink-0 text-foreground/45" strokeWidth={1.8} />
+      <span className="min-w-0 flex-1 leading-snug">
+        <span className="block text-[13px] font-semibold">Tu n&apos;apparais pas dans les visuels.</span>
+        <span className="block text-[11.5px] text-foreground/50">Signe la charte pour être dans les prochains.</span>
+      </span>
+      <button type="button" disabled={envoi} onClick={() => void signer()} className="bouton-secondaire shrink-0 px-3.5 py-1.5 text-[12.5px] font-semibold disabled:opacity-50">
+        Signer
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Une vidéo dans « À la une », le carrousel en tête des Actus (course.tsx) :
+ * son image, sa durée, son titre ; la toucher ouvre le lecteur. Sa
+ * publication entière (réactions, commentaires) reste dans le fil de son
+ * dimanche.
+ */
+export function TuileVideo({ v, className }: { v: Video; className?: string }) {
+  const [ouverte, setOuverte] = useState(false);
+  const affiche = useAdresse(v.affiche);
+  const fichier = useAdresse(v.affiche ? null : v.fichier);
+  const temps = duree(v.duree);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOuverte(true)}
+        aria-label={`Regarder ${v.titre}`}
+        onContextMenu={(e) => e.preventDefault()}
+        className={cn("dark relative isolate flex flex-col justify-end overflow-hidden bg-black text-left text-white", className)}
+      >
+        {affiche ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={affiche} alt="" draggable={false} className="absolute inset-0 -z-10 size-full object-cover" />
+        ) : fichier ? (
+          <video src={`${fichier}#t=1.5`} muted playsInline preload="metadata" className="absolute inset-0 -z-10 size-full object-cover" />
+        ) : null}
+        <span aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0)_40%,rgba(0,0,0,0.85)_100%)]" />
+        <span className="absolute top-1/2 left-1/2 grid size-[56px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black/35 ring-1 ring-white/25 backdrop-blur-md">
+          <Play className="ml-0.5 size-[22px] fill-current" strokeWidth={0} />
+        </span>
+        <span className="mono-label absolute top-3 left-3 text-[10px] text-white/75">Vidéo{temps ? ` · ${temps}` : ""}</span>
+        <span className="flex flex-col gap-0.5 p-4">
+          <span className="text-[19px] leading-[1.05] font-black tracking-tight">{v.titre}</span>
+          {v.legende && <span className="line-clamp-1 text-[12.5px] text-white/60">{v.legende}</span>}
+        </span>
+      </button>
+      {ouverte && <LecteurVideo v={v} commentaires={false} onFermer={() => setOuverte(false)} />}
+    </>
   );
 }
 
