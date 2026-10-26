@@ -161,7 +161,7 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
             </div>
             {g.x === 1 && (
               <>
-                <Podium def={def} top={g.joueurs.slice(0, 3)} me={me} cle={cle} />
+                <Podium def={def} top={g.joueurs.slice(0, 3).map((p) => ({ ...p, rank: p.place ?? p.rank }))} me={me} cle={cle} />
                 {vestiaire}
               </>
             )}
