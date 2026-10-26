@@ -17,10 +17,18 @@
 // convocation des Actus : le ciel, la température et le vent sur une ligne,
 // puis les heures).
 //
+// Depuis le 26/10 (Sabri : « un terrain en 3D sur le coin […] et derrière,
+// le ciel […] qui montre vraiment la météo ») : en tête, une fenêtre sur le
+// coin du terrain à l'heure du match (meteo-scene-3d.tsx, chargée à part ;
+// en attendant, et sans WebGL, le ciel en dégradé et son pictogramme), la
+// température et le ciel posés dessus, en blanc sur un voile sombre : la
+// fenêtre est la même en clair et en sombre, comme une photo.
+//
 // Rien ne s'affiche hors de la prévision (au-delà de 15 jours, match passé)
 // ni quand la source ne répond pas.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import {
@@ -31,11 +39,15 @@ import {
   heuresAutour,
   lireMeteo,
   RAFALES_FORTES,
+  type Ciel,
   type HeureMeteo,
   type Prevision,
 } from "@/lib/sfl/meteo";
 import { minutesDe } from "@/lib/sfl/matchs-du-jour";
 import { PictoMeteo } from "@/components/sfl/meteo-pictos";
+import { ambianceDe } from "@/lib/sfl/meteo-scene";
+
+const SceneMeteo = dynamic(() => import("@/components/sfl/meteo-scene-3d").then((m) => m.SceneMeteo), { ssr: false });
 
 /** La prévision d'un terrain pour un jour, relue quand elle vieillit et quand l'app revient au premier plan. */
 function usePrevision(lat: number | null, lng: number | null, date: string | null): Prevision | null {
@@ -93,18 +105,7 @@ export function MeteoMatch({ lat, lng, date, heure, aujourdhui, taille = "pleine
   if (taille === "ligne") {
     return (
       <div className={cn("flex flex-col gap-2.5", className)} aria-label={`Météo à ${h} h : ${ciel.libelle}, ${arrondi(match.temperature)} degrés`}>
-        <div className="flex items-center gap-3">
-          <PictoMeteo ciel={ciel.ciel} className="size-8 shrink-0" />
-          <span className="text-[30px] leading-none" style={{ fontFamily: ANTON }}>
-            {arrondi(match.temperature)}°
-          </span>
-          <span className="flex min-w-0 flex-col">
-            <span className="truncate text-[13px] font-bold">{ciel.libelle}</span>
-            <span className="mono-label truncate text-[9px] text-foreground/50 dark:text-white/50">
-              {h}h · vent {arrondi(match.vent)} · rafales {arrondi(match.rafales)} km/h
-            </span>
-          </span>
-        </div>
+        <FenetreMeteo heure={match} h={h} libelle={ciel.libelle} picto={ciel.ciel} className="h-[132px]" />
         <Heures heures={autour} h={h} />
         <Source texte={source} micro={micro} />
       </div>
@@ -118,18 +119,7 @@ export function MeteoMatch({ lat, lng, date, heure, aujourdhui, taille = "pleine
     >
       <Coins />
       <p className="mono-label text-foreground/55">Météo · coup d&apos;envoi {h}h</p>
-      <div className="mt-2.5 flex items-center gap-3.5">
-        <span className="text-[56px] leading-[0.82] tracking-tight" style={{ fontFamily: ANTON }}>
-          {arrondi(match.temperature)}°
-        </span>
-        <PictoMeteo ciel={ciel.ciel} className="size-12 shrink-0" />
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate text-[17px] font-bold tracking-tight">{ciel.libelle}</span>
-          {match.ressenti != null && Math.abs(match.ressenti - match.temperature) >= 1 && (
-            <span className="text-[13px] text-foreground/55">ressenti {arrondi(match.ressenti)}°</span>
-          )}
-        </span>
-      </div>
+      <FenetreMeteo heure={match} h={h} libelle={ciel.libelle} picto={ciel.ciel} ressenti className="mt-2.5 h-[168px]" grand />
       <div className="mt-3.5 grid grid-cols-3 border-t border-foreground/15 pt-2.5">
         <Chiffre label="Pluie" valeur={match.pluie != null ? `${arrondi(match.pluie)} %` : `${match.mm.toFixed(1).replace(".", ",")} mm`} />
         <Chiffre label="Vent" valeur={`${arrondi(match.vent)}`} unite="km/h" />
@@ -138,6 +128,92 @@ export function MeteoMatch({ lat, lng, date, heure, aujourdhui, taille = "pleine
       <Heures heures={autour} h={h} className="mt-3 border-t border-foreground/15 pt-2.5" />
       <Source texte={source} micro={micro} className="mt-2.5" />
     </section>
+  );
+}
+
+/**
+ * La fenêtre sur le coin du terrain, au temps du coup d'envoi ; la
+ * température et le ciel posés en bas à gauche, en blanc sur un voile.
+ */
+export function FenetreMeteo({
+  heure,
+  h,
+  libelle,
+  picto,
+  ressenti,
+  grand,
+  className,
+}: {
+  heure: HeureMeteo;
+  h: number;
+  libelle: string;
+  picto: Ciel;
+  ressenti?: boolean;
+  grand?: boolean;
+  className?: string;
+}) {
+  const a = useMemo(() => ambianceDe(heure), [heure]);
+  const pret = useWebGL();
+  return (
+    <div
+      className={cn("relative isolate overflow-hidden rounded-[18px] text-white", className)}
+      style={{ background: `linear-gradient(180deg, ${a.zenith} 0%, ${a.horizon} 58%, ${a.pelouse[1]} 58%, ${a.pelouse[0]} 100%)` }}
+    >
+      {pret ? (
+        <SceneMeteo ambiance={a} className="absolute inset-0" />
+      ) : (
+        <PictoMeteo ciel={picto} className="absolute top-3 right-4 size-12 text-white/85" />
+      )}
+      <span aria-hidden className="absolute inset-x-0 bottom-0 h-[70%] bg-gradient-to-t from-black/60 via-black/25 to-transparent" />
+      <CoinsFenetre />
+      <span className="absolute bottom-3 left-3.5 flex items-end gap-2.5 [text-shadow:0_1px_8px_rgba(0,0,0,0.35)]">
+        <span className={cn("leading-[0.8] tracking-tight", grand ? "text-[52px]" : "text-[40px]")} style={{ fontFamily: ANTON }}>
+          {arrondi(heure.temperature)}°
+        </span>
+        <span className="flex min-w-0 flex-col pb-0.5">
+          <span className={cn("truncate font-bold tracking-tight", grand ? "text-[17px]" : "text-[14px]")}>{libelle}</span>
+          {ressenti && heure.ressenti != null && Math.abs(heure.ressenti - heure.temperature) >= 1 ? (
+            <span className="text-[12px] text-white/75">ressenti {arrondi(heure.ressenti)}°</span>
+          ) : (
+            !grand && (
+              <span className="mono-label truncate text-[9px] text-white/75">
+                {h}h · vent {arrondi(heure.vent)} · rafales {arrondi(heure.rafales)} km/h
+              </span>
+            )
+          )}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/** Le téléphone sait-il dessiner en 3D ? (Vérifié une fois, après le montage.) */
+let webgl: boolean | null = null;
+function useWebGL(): boolean {
+  const [ok, setOk] = useState(false);
+  useEffect(() => {
+    if (webgl == null) {
+      try {
+        const c = document.createElement("canvas");
+        webgl = !!(c.getContext("webgl2") ?? c.getContext("webgl"));
+      } catch {
+        webgl = false;
+      }
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique du navigateur au montage
+    setOk(webgl);
+  }, []);
+  return ok;
+}
+
+/** Les coins de repère de la carte, en blanc, dans la fenêtre. */
+function CoinsFenetre() {
+  const c = "pointer-events-none absolute size-2.5 border-white/55";
+  return (
+    <span aria-hidden>
+      <span className={cn(c, "top-2.5 left-2.5 border-t border-l")} />
+      <span className={cn(c, "top-2.5 right-2.5 border-t border-r")} />
+    </span>
   );
 }
 
