@@ -126,8 +126,9 @@ export function InvitationCharte({
           {signe ? "C'est signé" : "Tu n'es pas dans les vidéos"}
         </h2>
         <p className="max-w-[300px] text-[14px] leading-snug text-white/60">
-          Ni dans les visuels de la ligue : tu n&apos;as pas signé la charte. Sans ta signature, Bola ne montre pas ta
-          carte hors de l&apos;app.
+          {signe
+            ? "Ta carte peut apparaître dans les prochaines vidéos et les prochains visuels de Bola."
+            : "Ni dans les visuels de la ligue : tu n'as pas signé la charte. Sans ta signature, Bola ne montre pas ta carte hors de l'app."}
         </p>
       </motion.div>
 
