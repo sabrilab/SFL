@@ -584,7 +584,7 @@ function fbm(x: number, y: number, z: number, octaves: number): number {
 }
 
 /** Les lobes de la pépite : centre et rayon de boules fondues ensemble. */
-const LOBES: [number, number, number, number][] = [
+const LOBES: Lobe[] = [
   [0, 0, 0, 0.6],
   [0.6, 0.22, 0.06, 0.42],
   [0.98, -0.12, 0, 0.3],
@@ -596,12 +596,14 @@ const LOBES: [number, number, number, number][] = [
   [-0.42, 0.56, -0.05, 0.23],
 ];
 
+type Lobe = [number, number, number, number];
+
 /** La distance signée à la masse des lobes (union adoucie), et à la boule la plus proche (> 0 dans un creux). */
-function lobes(x: number, y: number, z: number): [number, number] {
+function lobes(x: number, y: number, z: number, liste: Lobe[] = LOBES): [number, number] {
   const k = 0.09;
   let res = 0;
   let proche = Infinity;
-  for (const [cx, cy, cz, r] of LOBES) {
+  for (const [cx, cy, cz, r] of liste) {
     const d = Math.hypot(x - cx, y - cy, z - cz) - r;
     proche = Math.min(proche, d);
     res += Math.exp(-d / k);
@@ -619,7 +621,12 @@ function lobes(x: number, y: number, z: number): [number, number] {
  * lumière.
  */
 function pepite(): Piece[] {
-  const g = mergeVertices(new THREE.IcosahedronGeometry(1, 40).deleteAttribute("normal").deleteAttribute("uv"), 1e-6);
+  return [{ geo: formePepite(LOBES, 40), role: "brut" }];
+}
+
+/** La masse d'une pépite faite de ces lobes, sur une sphère de `finesse` subdivisions, cadrée dans une boîte de 1,9. */
+function formePepite(liste: Lobe[], finesse: number): THREE.BufferGeometry {
+  const g = mergeVertices(new THREE.IcosahedronGeometry(1, finesse).deleteAttribute("normal").deleteAttribute("uv"), 1e-6);
   const pos = g.getAttribute("position");
   const d = new THREE.Vector3();
   const ombre = new Float32Array(pos.count);
@@ -630,11 +637,11 @@ function pepite(): Piece[] {
     let hi = 2.2;
     for (let n = 0; n < 28; n++) {
       const m = (lo + hi) / 2;
-      if (lobes(d.x * m, d.y * m, d.z * m)[0] < 0) lo = m;
+      if (lobes(d.x * m, d.y * m, d.z * m, liste)[0] < 0) lo = m;
       else hi = m;
     }
     const x = d.x * lo, y = d.y * lo, z = d.z * lo;
-    const creux = Math.max(0, lobes(x, y, z)[1]);
+    const creux = Math.max(0, lobes(x, y, z, liste)[1]);
     // Le relief : des bosses douces, puis de petites cavités.
     const bosse = 0.05 * fbm(x * 2.4, y * 2.4, z * 2.4, 3);
     const cavite = Math.max(0, fbm(x * 4.6 + 7, y * 4.6, z * 4.6, 2) - 0.1);
@@ -656,7 +663,32 @@ function pepite(): Piece[] {
   g.translate(-c.x, -c.y, -c.z);
   const k = 1.9 / Math.max(taille.x, taille.y, taille.z);
   g.scale(k, k, k);
-  return [{ geo: g, role: "brut" }];
+  return g;
+}
+
+const variantes = new Map<number, THREE.BufferGeometry>();
+
+/**
+ * Une autre pépite de la même rivière : la même matière et le même relief,
+ * d'autres lobes, tirés d'une graine (toujours les mêmes pour une graine).
+ * Moins fine que la pépite des badges : elle est faite pour être petite et
+ * nombreuse (les pépites qui flottent autour du podium, pepites-flottantes.tsx).
+ */
+export function pepiteVariante(graine: number): THREE.BufferGeometry {
+  let g = variantes.get(graine);
+  if (g) return g;
+  let s = (graine * 7919 + 104729) % 2147483647 || 1;
+  const hasard = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const liste: Lobe[] = [[0, 0, 0, 0.5 + 0.12 * hasard()]];
+  const n = 3 + Math.floor(hasard() * 4);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + hasard() * 1.2;
+    const d = 0.38 + 0.55 * hasard();
+    liste.push([Math.cos(a) * d, Math.sin(a) * d * (0.6 + 0.4 * hasard()), (hasard() - 0.5) * 0.2, 0.22 + 0.24 * hasard()]);
+  }
+  g = formePepite(liste, 14);
+  variantes.set(graine, g);
+  return g;
 }
 
 /* ------------------------ Formes plates, gonflées ------------------------- */

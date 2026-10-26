@@ -58,8 +58,10 @@
 // téléphone, l'ordre des blocs de la semaine vient des classes order-*).
 
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { Repere } from "@/components/sfl/pepites-flottantes";
 import { useJoueurBola, useMyPlayer } from "@/components/sfl/player-provider";
 import { SaisonArchiveProvider, useSeason } from "@/components/sfl/season-provider";
 import { EnteteLigue } from "@/components/sfl/choix-ligue";
@@ -270,6 +272,85 @@ function Ecrin({ rang }: { rang: number }) {
   );
 }
 
+// La toile des pépites (three.js) : chargée à part, seulement sur le client.
+const PepitesFlottantes = dynamic(() => import("@/components/sfl/pepites-flottantes").then((m) => m.PepitesFlottantes), {
+  ssr: false,
+});
+
+/**
+ * Le podium de la Pépite d'Or, en tête de l'onglet (Sabri, 26/10 : « le
+ * délire des pépites d'or […] il ne faut pas le perdre de vue ») : les trois
+ * premiers (de la D1 quand la ligue a ses divisions), le premier en grande
+ * carte au milieu, le deuxième et le troisième en moyennes de part et
+ * d'autre (le nombre d'or), et autour d'eux de vraies pépites d'or qui
+ * flottent sur des anneaux gravés (pepites-flottantes.tsx). La rangée qui
+ * suit reste centrée sur toi : le podium est toujours à l'écran, elle non.
+ */
+function PodiumPepite({
+  podium,
+  def,
+  division,
+  cle,
+}: {
+  podium: (Player & { value: number; place: number })[];
+  def: Categorie;
+  division?: Division;
+  cle?: string;
+}) {
+  const boite = useRef<HTMLDivElement>(null);
+  const premier = useRef<HTMLDivElement>(null);
+  const [repere, setRepere] = useState<Repere | null>(null);
+  useEffect(() => {
+    const b = boite.current;
+    const c = premier.current;
+    if (!b || !c) return;
+    const mesurer = () => {
+      const rb = b.getBoundingClientRect();
+      const rc = c.getBoundingClientRect();
+      const r = { x: rc.left - rb.left + rc.width / 2, y: rc.top - rb.top + rc.height / 2, demiHauteur: rc.height / 2 };
+      setRepere((v) => (v && Math.abs(v.x - r.x) < 0.5 && Math.abs(v.y - r.y) < 0.5 && v.demiHauteur === r.demiHauteur ? v : r));
+    };
+    const o = new ResizeObserver(mesurer);
+    o.observe(b);
+    o.observe(c);
+    return () => o.disconnect();
+  }, []);
+  // Le deuxième à gauche, le premier au milieu, le troisième à droite.
+  const ordre = [podium[1], podium[0], podium[2]].filter(Boolean);
+  return (
+    <div ref={boite} className="relative isolate mx-5 pt-[60px] md:mx-0">
+      {repere && <PepitesFlottantes repere={repere} className="absolute inset-0 -z-10" />}
+      <div className="flex items-end justify-center gap-[var(--fib-13,13px)]">
+        {ordre.map((p) => {
+          const un = p === podium[0];
+          const rang = `${p.place === 1 ? "1er" : `${p.place}e`}`;
+          return (
+            <div key={p.name} className="flex flex-col items-center gap-1">
+              <div ref={un ? premier : undefined}>
+                <MiniCarte
+                  player={p}
+                  size={un ? FORMAT_CARTE.grande : FORMAT_CARTE.moyenne}
+                  detail={`${division ? `${rang} de la ${nomDivision(division)}` : rang} · ${p.value} ${unite(def, p.value)}`}
+                  cle={cle && `${cle}-${p.name}`}
+                />
+              </div>
+              <span className={cn("leading-none", un ? "text-[26px]" : "text-[20px]")} style={{ fontFamily: ANTON }}>
+                {p.place}
+              </span>
+              <span className={cn("truncate font-semibold", un ? "max-w-[127px] text-[13px]" : "max-w-[80px] text-[11px]")}>
+                <Nom n={p.name} />
+              </span>
+              <span className="mono-label text-[10px] text-foreground/50 tabular-nums">
+                {p.value} {unite(def, p.value)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /**
  * La rangée de cartes : la Pépite d'Or, centrée sur toi, et elle seule (les
  * autres classements sont dans l'onglet Classement). Par défaut, les joueurs
@@ -412,7 +493,13 @@ function Ticker({
     </div>
     );
   };
+  // Le podium : les trois premiers de la D1, ou de tout le classement.
+  const podium = (groupes ? groupes[0].joueurs : rang.map((p) => ({ ...p, place: p.rank })))
+    .filter((p): p is typeof p & { place: number } => p.place != null && p.place <= 3)
+    .slice(0, 3);
   return (
+    <>
+    {podium.length === 3 && <PodiumPepite podium={podium} def={def} division={groupes?.[0].x} cle={cle} />}
     <div className="md:relative">
       {(["debut", "fin"] as const).map((bout) => (
         <button
@@ -453,6 +540,7 @@ function Ticker({
           : rang.map((p, i) => carte(p, i, p.rank))}
       </div>
     </div>
+    </>
   );
 }
 
