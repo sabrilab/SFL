@@ -18,15 +18,14 @@
 //       Match — les journées jouées (vues.tsx).
 //     L'onglet est dans l'adresse (?vue=classements, ?vue=matchs ;
 //     page-actus.tsx), et l'en-tête ne bouge pas d'un onglet à l'autre ;
-//   · le fil : le jour du match, la feuille en direct ; les divisions
-//     (divisions.tsx : leur annonce jusqu'à la J4, puis le bilan de chaque
-//     dimanche) ; ton dimanche (ta carte, tes chiffres, tes places) ; la
-//     convocation (la météo de ton match, meteo-match.tsx ; qui vient, Je viens / Je passe ; « Dernier dimanche sans
-//     divisions » sur celle de la J3, ta division dès la J4) ; tes missions,
-//     dès que la feuille est faite (missions.tsx), puis les contrats en jeu
-//     de toute la ligue (contrats-en-jeu.tsx) ; ce qui se joue dimanche (les
-//     places à un ou deux points), ton rival et ce qu'il te faut pour le
-//     passer ; puis chaque dimanche joué,
+//   · le fil : d'abord la convocation (la météo de ton match,
+//     meteo-match.tsx ; qui vient, Je viens / Je passe ; ta division dès la
+//     J4) ; le jour du match, la feuille en direct et le vote ; l'outsider ;
+//     ton dimanche (ta carte, tes chiffres, tes places) ; le vendredi et le
+//     samedi, les contrats de rang S signés (contrats-en-jeu.tsx) ; ce qui
+//     se joue dimanche (les places à un ou deux points), ton rival et ce
+//     qu'il te faut pour le passer ; puis chaque dimanche joué, avec sa
+//     vidéo s'il en a une,
 //     du plus récent : son terrain avec les cartes des joueurs (CarteJournee),
 //     et ses rubriques. Chaque rubrique est un terrain avec ses petites cartes
 //     près du but, qui s'anime au défilement, sans carrousel (pelouse.tsx ;
@@ -89,20 +88,19 @@ import { ligneDuRendezVous } from "@/lib/sfl/matchs-du-jour";
 import { legendes, saisonsPalmares, type SaisonPalmares } from "@/lib/sfl/palmares";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
-import { RubriqueDivisions } from "./divisions";
 import { RubriqueOutsider } from "./outsider";
 import { VoteDuJour } from "./fil";
 import { CouvertureRubrique, RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
 import { couverturesDuDimanche, sources, type Couverture } from "@/lib/sfl/couvertures";
 import { ContratsEnJeu } from "./contrats-en-jeu";
-import { MissionsBola } from "./missions";
-import { VideosDuFil } from "./video";
+import { journeeDeLaVideo, useVideos, VideosDuFil } from "./video";
+import type { Video } from "@/lib/sfl/videos";
 import { VueClassements, VueMatchs } from "./vues";
 import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque, type Vue } from "./epoques";
 import { CarteSaison, categoriesLegendes, Compteurs, LeMur } from "./wall-of-fame";
 
 /** Les scènes d'un dimanche qui font bouger la course. */
-const SCENES: Actu["type"][] = ["mvp", "chiffre", "duo", "montent", "badge", "badges", "equipe"];
+const SCENES: Actu["type"][] = ["titres", "mvp", "chiffre", "podium-jour", "duo", "montent", "badge", "badges", "equipe"];
 
 /**
  * Un dimanche joué : sa couverture (une photo du moodboard, J8 et sa date,
@@ -113,12 +111,26 @@ const SCENES: Actu["type"][] = ["mvp", "chiffre", "duo", "montent", "badge", "ba
  * colonne puis deux dès 1280 px. Son ancre, #j8, y mène depuis Ma saison
  * (useAncre).
  */
-function Dimanche({ j, journee, scenes, ouvrir }: { j: number; journee?: Journee; scenes: Actu[]; ouvrir: () => void }) {
+function Dimanche({
+  j,
+  journee,
+  scenes,
+  ouvrir,
+  videos = [],
+}: {
+  j: number;
+  journee?: Journee;
+  scenes: Actu[];
+  ouvrir: () => void;
+  /** Les vidéos de ce dimanche (Sabri, 26/10 : « la vidéo […] de la journée 3 dans le feed de la journée 3 »). */
+  videos?: Video[];
+}) {
   const [terrain, terrainCollant] = useCollant();
   const { chapitre, rubriques } = useMemo(() => couverturesDuDimanche(j, scenes.map((a) => a.type)), [j, scenes]);
   return (
     <section id={`j${j}`} className="flex scroll-mt-4 flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-x-[var(--fib-21)] md:gap-y-[var(--fib-21)] md:border-t md:border-contraste/[0.08] md:pt-[var(--fib-34)] xl:grid-cols-3">
       <CouvertureDimanche j={j} journee={journee} c={chapitre} />
+      {videos.length > 0 && <VideosDuFil videos={videos} className="md:col-span-full md:mx-auto md:w-full md:max-w-[560px]" />}
       {journee && (
         <div ref={terrain} className={cn("px-5 md:px-0", terrainCollant && "md:sticky md:top-[var(--fib-21)]")}>
           <CarteJournee journee={journee} onOuvrir={ouvrir} />
@@ -428,7 +440,8 @@ function Ticker({
                 key={g.x}
                 className={cn("flex shrink-0 flex-col gap-1 rounded-[22px] px-1 pt-2.5 pb-0.5 ring-1 ring-inset", METAL[g.x].voile)}
               >
-                <div className="flex items-center gap-2 px-2">
+                {/* « D1 · 31 joueurs » reste à l'écran tant qu'on parcourt sa division. */}
+                <div className="sticky left-2 flex w-fit items-center gap-2 px-2">
                   <PastilleDivision x={g.x} className="h-[24px] min-w-[36px] text-[15px]" />
                   <span className="mono-label text-[10px] text-foreground/60 tabular-nums">
                     {g.joueurs.length} {g.joueurs.length > 1 ? "joueurs" : "joueur"}
@@ -473,8 +486,8 @@ function Convocation({ className }: { className?: string }) {
           J{p.journee}
         </span>
         <span className="flex min-w-0 flex-col pb-0.5">
-          {derniere && <span className="mono-label mb-1 text-[10px] text-white/60">Dernier dimanche sans divisions</span>}
-          {division && <span className="mono-label mb-1 text-[10px] text-white/60">Tu joues en {nomDivision(division)}</span>}
+          {derniere && <span className="mono-label mb-1 text-[10px] text-foreground/60 dark:text-white/60">Dernier dimanche sans divisions</span>}
+          {division && <span className="mono-label mb-1 text-[10px] text-foreground/60 dark:text-white/60">Tu joues en {nomDivision(division)}</span>}
           <span className="text-[16px] font-bold">{p.jour}</span>
           <span className="truncate text-[12.5px] text-foreground/55 dark:text-white/55">
             {ligneDuRendezVous(p.rendezVous)}
@@ -643,11 +656,36 @@ interface PropsEpoque {
   classement?: string | null;
 }
 
-/** La saison en cours : la course, la semaine, puis chaque dimanche joué. */
+/** Vendredi ou samedi, heure de Paris : les deux jours avant le match. */
+function veilleDuMatch(d: Date): boolean {
+  const jour = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Paris", weekday: "short" }).format(d);
+  return jour === "Fri" || jour === "Sat";
+}
+
+/**
+ * La saison en cours : la course, la semaine, puis chaque dimanche joué.
+ *
+ * Sabri, 26/10, pour ranger les Actus :
+ *   · on arrive toujours en haut de l'onglet : les trois onglets, la rangée
+ *     de la Pépite d'Or, puis la convocation et sa météo, la première chose
+ *     du fil ;
+ *   · le grand classement en divisions et ses règles sortent du fil : la
+ *     rangée de la Pépite d'Or garde « D1 · 31 joueurs » sur chaque division ;
+ *   · des missions, le fil ne garde que les contrats de rang S signés, le
+ *     vendredi et le samedi ; le reste est dans le Mode Passe (Ma carte,
+ *     Niveau XP) ;
+ *   · chaque vidéo se range dans le fil de son dimanche (journeeDeLaVideo).
+ */
 function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque & { exploit?: string | null }) {
-  const { saison, journees } = useSeason();
+  const { saison, saisonTitree, journees } = useSeason();
   const { me } = useMyPlayer();
   const router = useRouter();
+  // On arrive en haut de l'onglet, sauf quand l'adresse vise un endroit du fil.
+  useEffect(() => {
+    if (exploit || /^#(j\d+|divisions)$/.test(window.location.hash)) return;
+    document.getElementById("app-scroll")?.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0 });
+  }, [exploit]);
   // La rubrique d'un exploit, une fois les terrains mesurés.
   useEffect(() => {
     if (!exploit) return;
@@ -657,15 +695,30 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
     }, 450);
     return () => clearTimeout(t);
   }, [exploit]);
+  const titree = saisonTitree ?? saison;
   const { fil, v, duels } = useMemo(
-    () => ({ fil: filDeSaison(saison, journees, me, true), v: voisins(saison, me), duels: enjeux(saison) }),
-    [saison, journees, me]
+    () => ({ fil: filDeSaison(titree, journees, me, true), v: voisins(saison, me), duels: enjeux(saison) }),
+    [saison, titree, journees, me]
   );
   // Les dimanches joués, du plus récent : le terrain, puis les scènes.
   const dimanches = useMemo(() => {
     const js = [...new Set(fil.map((a) => a.j))];
     return js.map((j) => ({ j, journee: journees.find((x) => x.j === j), scenes: fil.filter((a) => a.j === j && SCENES.includes(a.type)) }));
   }, [fil, journees]);
+  // Chaque vidéo dans le fil de son dimanche ; celles d'aucun dimanche joué, en tête.
+  const videos = useVideos();
+  const videosDe = useMemo(() => {
+    const m = new Map<number | null, Video[]>();
+    const joues = new Set(dimanches.map((d) => d.j));
+    for (const x of videos) {
+      const j = journeeDeLaVideo(x, saison.journees);
+      const cle = j != null && joues.has(j) ? j : null;
+      m.set(cle, [...(m.get(cle) ?? []), x]);
+    }
+    return m;
+  }, [videos, dimanches, saison.journees]);
+  const [maintenant] = useState(() => new Date());
+  const veille = veilleDuMatch(maintenant);
 
   const dernier = dimanches[0]?.j ?? 0;
   const [semaine, semaineCollante] = useCollant();
@@ -682,39 +735,42 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
         <VueMatchs />
       ) : (
         <>
-          {/* La semaine. Sur téléphone, un seul fil (l'ordre vient des order-*) :
-              la vidéo de Bola, le direct, le vote, les divisions, l'outsider, ton dimanche, la
-              convocation, tes missions, les contrats en jeu, puis ce qui se joue.
-              Sur grand écran, deux colonnes : à gauche ce qui se joue (vidéo, direct,
-              vote, convocation, missions), à droite les divisions, l'outsider et
-              tes rubriques ; dessous, les contrats en jeu sur toute la largeur. */}
+          {/* La semaine. Sur téléphone, un seul fil : la convocation et sa
+              météo, le direct, le vote, la vidéo sans dimanche, l'outsider,
+              ton dimanche, les contrats de rang S (vendredi et samedi), puis
+              ce qui se joue. Sur grand écran, deux colonnes : à gauche ce qui
+              se joue (convocation, direct, vote, vidéo), à droite l'outsider
+              et tes rubriques ; dessous, les contrats sur toute la largeur. */}
           <div className="flex flex-col gap-6 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3">
             <div
               ref={semaine}
               className={cn("contents md:flex md:flex-col md:gap-[var(--fib-21)]", semaineCollante && "md:sticky md:top-[var(--fib-21)]")}
             >
-              <VideosDuFil />
+              <Convocation />
               <EnDirect ouvrir={(j) => router.push(`/ligue/journee?j=${j}`)} />
               <VoteDuJour me={me} />
-              <Convocation className="order-2 md:order-none" />
-              <MissionsBola className="order-2 md:order-none" />
+              <VideosDuFil videos={videosDe.get(null) ?? []} />
             </div>
             <div className="contents md:grid md:gap-[var(--fib-21)] xl:col-span-2 xl:grid-cols-2">
-              <RubriqueDivisions className="order-1 md:order-none" />
-              <RubriqueOutsider className="order-1 md:order-none" />
-              {dernier > 0 && (
-                <RubriqueToi className="order-1 md:order-none" j={dernier} date={journees.find((x) => x.j === dernier)?.date ?? ""} />
-              )}
-              <div className="order-3 flex flex-col gap-1 md:order-none md:contents">
+              <RubriqueOutsider />
+              {dernier > 0 && <RubriqueToi j={dernier} date={journees.find((x) => x.j === dernier)?.date ?? ""} />}
+              {veille && <ContratsEnJeu apercu className="md:col-span-full" />}
+              <div className="flex flex-col gap-1 md:contents">
                 {duels.length > 0 && <RubriqueEnjeux liste={duels} moi={me} />}
                 {v && <RubriqueRival v={v} />}
                 {v?.devant && <RubriqueBesoin v={v} />}
               </div>
             </div>
-            <ContratsEnJeu apercu className="order-2 md:order-none md:col-span-full" />
           </div>
           {dimanches.map((d) => (
-            <Dimanche key={d.j} j={d.j} journee={d.journee} scenes={d.scenes} ouvrir={() => router.push(`/ligue/journee?j=${d.j}`)} />
+            <Dimanche
+              key={d.j}
+              j={d.j}
+              journee={d.journee}
+              scenes={d.scenes}
+              videos={videosDe.get(d.j)}
+              ouvrir={() => router.push(`/ligue/journee?j=${d.j}`)}
+            />
           ))}
         </>
       )}
