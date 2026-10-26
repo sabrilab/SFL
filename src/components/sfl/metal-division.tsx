@@ -14,7 +14,7 @@
 
 import { useMemo } from "react";
 import { useSeason } from "@/components/sfl/season-provider";
-import { etatDivisions, nomDivision, rangDansDivision, type Decoupage, type Division } from "@/lib/sfl/divisions";
+import { etatDivisions, nomDivision, type Decoupage, type Division } from "@/lib/sfl/divisions";
 import { cn } from "@/lib/utils";
 
 const ANTON = "var(--font-anton), Anton, sans-serif";
@@ -85,22 +85,33 @@ export function useDecoupageClassement(): Decoupage | null {
 }
 
 /**
- * Un classement rangé par division : chaque joueur classé dans la sienne,
- * l'ordre du classement gardé, et sa place comptée depuis le premier de la
- * division (rangDansDivision). Qui n'a pas encore joué n'est pas au
- * découpage : il est de la D3 (divisionDe), après ses classés, sans place.
+ * Un classement rangé par division : chaque joueur dans la sienne, l'ordre
+ * du classement gardé. Sa place est comptée dans la division sur les points
+ * affichés à côté (Sabri, 26/10 : « les points sont corrects, mais pas le
+ * classement ») : 1 + ceux de sa division qui en ont plus, les ex æquo
+ * partagent la place. Qui n'a pas encore joué n'est pas au découpage : il
+ * est de la D3 (divisionDe), après ses classés, sans place.
  */
-export function parDivision<T extends { name: string }>(
+export function parDivision<T extends { name: string; value: number }>(
   d: Decoupage,
   classes: T[],
 ): { x: Division; joueurs: (T & { place: number | null })[] }[] {
-  const groupes: Record<Division, (T & { place: number | null })[]> = { 1: [], 2: [], 3: [] };
-  const sans: (T & { place: null })[] = [];
+  const groupes: Record<Division, T[]> = { 1: [], 2: [], 3: [] };
+  const sans: T[] = [];
   for (const p of classes) {
     const place = d.parNom.get(p.name);
-    if (place) groupes[place.division].push({ ...p, place: rangDansDivision(d, place) });
-    else sans.push({ ...p, place: null });
+    if (place) groupes[place.division].push(p);
+    else sans.push(p);
   }
-  groupes[3].push(...sans);
-  return ([1, 2, 3] as const).map((x) => ({ x, joueurs: groupes[x] })).filter((g) => g.joueurs.length > 0);
+  return ([1, 2, 3] as const)
+    .map((x) => {
+      const classe = [...groupes[x]].sort((a, b) => b.value - a.value);
+      const joueurs: (T & { place: number | null })[] = classe.map((p) => ({
+        ...p,
+        place: 1 + classe.filter((q) => q.value > p.value).length,
+      }));
+      if (x === 3) joueurs.push(...sans.map((p) => ({ ...p, place: null })));
+      return { x, joueurs };
+    })
+    .filter((g) => g.joueurs.length > 0);
 }
