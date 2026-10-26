@@ -154,9 +154,12 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
       )}
       <MiniCarte player={p} size={FORMAT_CARTE.petite} detail={`${x ? (place == null ? nomDivision(x) : `${place === 1 ? "1er" : `${place}e`} de la ${nomDivision(x)}`) : def.label} · ${p.value} ${unite(def, p.value)}`} cle={cle && `${cle}-${p.name}`} />
       <span className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="truncate text-[15px] font-semibold"><Nom n={p.name} /></span>
+        {/* « Blessé » sous le nom : le nom garde toute la ligne. */}
+        <span className="flex min-w-0 flex-col items-start gap-0.5">
+          <span className="max-w-full truncate text-[15px] font-semibold"><Nom n={p.name} /></span>
+          {blesse(p) && <Blesse />}
+        </span>
         <BadgesLigne ds={parNom.get(p.name)} />
-        {blesse(p) && <Blesse />}
         {!carriere && p.statut === "Suspendu" && (
           <span
             className="shrink-0 rounded-full bg-destructive/10 px-2 py-0.5 text-[9px] font-bold tracking-wide text-destructive uppercase"
