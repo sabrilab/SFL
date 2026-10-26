@@ -32,6 +32,7 @@ import type { Saison } from "./saisie/types";
 import { voteOuvert } from "./convocation-temps";
 import { supabase } from "@/lib/supabase";
 import { isPlaceExtraTime } from "./hidden";
+import { cleTitre, VOIX_MIN } from "./saisie/evolution";
 
 export type CategorieVote = "impact" | "def";
 export const CATEGORIES_VOTE: CategorieVote[] = ["impact", "def"];
@@ -195,6 +196,27 @@ export function appliquerVotes(saison: Saison, journees: Journee[], votes: VoteF
     return next;
   });
   return change ? { ...saison, entries } : saison;
+}
+
+/**
+ * Les titres élus avec moins de VOIX_MIN voix : ils restent des titres (la
+ * carte du jour, les points Pépite), mais ne font pas monter la note
+ * (saisie/evolution.ts). Sabri a validé le seuil le 26/10 avec la
+ * proposition : à la J3, 13 votants sur 36, tous les élus l'étaient à une voix.
+ */
+export function titresFaibles(saison: Saison, journees: Journee[], votes: VoteFigure[], maintenant: Date): Set<string> {
+  const faibles = new Set<string>();
+  const numero = saison.numero ?? 0;
+  for (const jn of journees) {
+    if (!journeeAvecVote(jn) || voteOuvert(jn.date, maintenant)) continue;
+    for (const cat of CATEGORIES_VOTE) {
+      for (const m of jn.matches ?? []) {
+        const d = decompterMatch(votes, numero, jn.j, m, cat);
+        if ((d.voix[0]?.[1] ?? 0) < VOIX_MIN) d.elus.forEach((n) => faibles.add(cleTitre(jn.j, cat, n)));
+      }
+    }
+  }
+  return faibles;
 }
 
 /* ------------------------------ Le bilan admin -------------------------- */

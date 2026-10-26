@@ -135,6 +135,7 @@ const places = (n: number) => `${Math.abs(n)} ${Math.abs(n) > 1 ? "places" : "pl
 
 export function RubriquesMaCarte() {
   const { player, saison, dimanches, joues, courbe, mesCartes, rangs } = useMaCarte();
+  const { evolution } = useSeason();
   const b = useXp(player.name);
   const r = useRangXp(player.name);
   const format = useFormatCarte();
@@ -235,7 +236,10 @@ export function RubriquesMaCarte() {
     );
   }
 
-  // 3. Mon évolution : la courbe, et où elle en est.
+  // 3. Mon évolution : la courbe, et où elle en est ; les points de note déjà
+  // gagnés, pas encore officiels (ma-note.tsx), quand il y en a.
+  const ev = evolution.actif ? evolution.joueurs.get(player.name) : undefined;
+  const enAttente = ev ? Object.values(ev.enAttente).reduce((n, g) => n + (g ?? 0), 0) : 0;
   const mode = joues > 0 ? "rang" : "note";
   const lus = (mode === "rang" ? courbe.filter((p) => p.saison === numero && p.rang != null) : courbe);
   if (lus.length >= 2) {
@@ -264,7 +268,13 @@ export function RubriquesMaCarte() {
           <Trace points={lus} mode={mode} />
         </span>
         <span className="font-mono text-[11px] text-foreground/45">
-          {mode === "rang" ? (ecart ? `${places(ecart)} depuis J${premier.j}` : `depuis J${premier.j}`) : "note de ma carte"}
+          {enAttente > 0
+            ? `+${enAttente} en stats, en attente`
+            : mode === "rang"
+              ? ecart
+                ? `${places(ecart)} depuis J${premier.j}`
+                : `depuis J${premier.j}`
+              : "note de ma carte"}
         </span>
       </Tuile>
     );
