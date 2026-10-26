@@ -4,7 +4,7 @@
 // à 5, mais des fois, t'as mis des terrains qui sont pour du foot à plus que
 // ça. Donc, qu'on puisse filtrer facilement pour voir les terrains qui nous
 // plaisent ») : à 3, à 5, à 7, à 8, à 11, d'après le nom ou les dimensions de
-// chaque terrain au recensement (tools/terrains-nord.ts, format()).
+// chaque terrain au recensement (tools/terrains-france.ts et tools/terrains-osm.ts, format()).
 //
 // PucesFormat, la rangée de pastilles : en toucher une ne garde que les
 // complexes qui ont un terrain à ce format ; la retoucher les rend tous. Une

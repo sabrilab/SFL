@@ -940,12 +940,17 @@ export default function MapPage() {
   const ville = me ? maVille(me) : null;
   const pres = toi ?? ville ?? terrains.find((t) => t.defaut) ?? PRES_DE;
   const [presLat, presLng] = [pres.lat, pres.lng];
+  // Les terrains autour de toi (ou de ta ville) : la proposition les cherche là.
+  useEffect(() => {
+    lireAutour({ lat: presLat, lng: presLng }).catch(() => {});
+  }, [presLat, presLng]);
   // Sans format choisi, un terrain à 5 : un match ouvert se joue à dix, comme
   // la ligue. Sans moment, la feuille s'ouvre à 19 h : un terrain éclairé.
   const ouPropose = useMemo(() => {
     if (!partiesActives) return null;
-    const auFormat = aFormat(libres, formatTerrain ?? 5);
-    return terrainPropose(auFormat.length ? auFormat : libres, { lat: presLat, lng: presLng }, momentPropose?.moment ?? "soir");
+    const ici = { lat: presLat, lng: presLng };
+    const moment = momentPropose?.moment ?? "soir";
+    return terrainPropose(aFormat(libres, formatTerrain ?? 5), ici, moment) ?? terrainPropose(libres, ici, moment);
   }, [partiesActives, libres, formatTerrain, presLat, presLng, momentPropose]);
   const proposition = momentPropose || ouPropose ? { moment: momentPropose, terrain: ouPropose } : null;
   // Sur la carte proposée (ou seule, sans match) : le plan montre son terrain.

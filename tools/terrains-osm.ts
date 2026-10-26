@@ -156,7 +156,8 @@ function ecarte(tags: Record<string, string>): boolean {
     tags.building != null ||
     tags.disused === "yes" ||
     tags.abandoned === "yes" ||
-    ECOLE.test(`${tags.name ?? ""} ${tags.operator ?? ""}`)
+    ECOLE.test(`${tags.name ?? ""} ${tags.operator ?? ""}`) ||
+    PRO.test(tags.name ?? "")
   );
 }
 
@@ -172,7 +173,10 @@ function nomDe(tags: Record<string, string> | undefined, maghreb: boolean): stri
 }
 
 /** Les centres sportifs qui ne sont pas des terrains de foot. */
-const PAS_FOOT = /aqua|piscine|zwembad|schwimm|bad\b|swim|pool|piscina|tennis|golf|padel|équestre|equestr|manège|reit|patinoire|ijs|eis|ski|bowling|fitness/i;
+const PAS_FOOT = /aqua|piscine|zwembad|schwimm|bad\b|swim|pool|piscina|tennis|golf|padel|équestre|equestr|manège|reit|patinoire|ijs|eis|ski|bowling|fitness|hockey|cricket|rugby/i;
+
+/** Les centres d'entraînement des clubs pros, fermés aux joueurs (comme le LOSC au recensement) : leurs terrains ne sont pas proposés. */
+const PRO = /training ground|trainingsgel[äa]nde|trainingszentrum|centre d'entra[îi]nement|centre de formation|centro (di )?allenamento|ciudad deportiva|sports? academy/i;
 
 function adresseDe(tags: Record<string, string> | undefined): string | null {
   if (!tags?.["addr:street"]) return null;
@@ -262,6 +266,7 @@ export function complexesOsm(pays: string, terrains: ReponseOverpass, centres: R
     const lng = g.reduce((s, p) => s + p.lng, 0) / g.length;
     const ici = { lat, lng };
     const leCentre = lesCentres.plusProche(ici, 0.3);
+    if (leCentre && PRO.test(leCentre.e.tags?.name ?? "")) continue;
     const ville = lesVilles.plusProche(ici, 12, 2);
     const commune = ville?.nom ?? "";
     const nom = nomDe(leCentre?.e.tags, maghreb) ?? g.map((p) => nomDe(p.e.tags, maghreb)).find(Boolean) ?? (maghreb && tete.e.tags?.surface !== "artificial_turf" ? "Terrain de foot" : "Terrain synthétique");
