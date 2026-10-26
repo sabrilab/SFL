@@ -10,6 +10,11 @@ export function resumeMessage(texte: string, piece: unknown): string {
   if (type === "photo") return "📷 Photo";
   if (type === "video") return "🎬 Vidéo";
   if (type === "rejoint") return "a rejoint le match";
+  if (type === "actu") {
+    const p = piece as { titre?: unknown; montre?: unknown };
+    const titre = String(p.titre ?? "une actu");
+    return p.montre === "video" ? `a partagé la vidéo « ${titre} »` : p.montre === "carrousel" ? `a partagé le carrousel « ${titre} »` : `a partagé une image de « ${titre} »`;
+  }
   if (type === "ligue") {
     const p = piece as { titre?: unknown; j?: unknown };
     return `a partagé « ${String(p.titre ?? "la Ligue")}${typeof p.j === "number" ? ` · J${p.j}` : ""} »`;

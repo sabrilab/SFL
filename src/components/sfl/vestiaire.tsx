@@ -96,6 +96,7 @@ import {
   type Salon,
   VOCAL_MAX_S,
 } from "@/lib/sfl/vestiaire";
+import { ActuVue } from "@/components/sfl/actus/video";
 import { cn } from "@/lib/utils";
 
 /* --------------------------------- Temps -------------------------------- */
@@ -419,6 +420,7 @@ function PieceVue({ piece, onOuvrirJournee, mien = false }: { piece: Piece; onOu
   if (piece.type === "vocal") return <VocalVue piece={piece} mien={mien} />;
   if (piece.type === "photo") return <PhotoVue piece={piece} />;
   if (piece.type === "video") return <VideoVue piece={piece} />;
+  if (piece.type === "actu") return <ActuVue piece={piece} />;
   if (piece.type === "ligue") return <LigueVue piece={piece} onOuvrirJournee={onOuvrirJournee} />;
 
   if (piece.type === "carte") {
@@ -856,7 +858,7 @@ const Bulle = memo(function Bulle({
           {/* La pièce à part, sous la phrase : une carte se montre nue, une
               feuille ou un classement dans son verre. */}
           {m.piece &&
-            (m.piece.type === "carte" || m.piece.type === "vocal" || m.piece.type === "photo" || m.piece.type === "video" ? (
+            (m.piece.type === "carte" || m.piece.type === "vocal" || m.piece.type === "photo" || m.piece.type === "video" || m.piece.type === "actu" ? (
               <PieceVue piece={m.piece} mien={m.mien} />
             ) : (
               <div className="glass-soft w-[min(280px,68vw)] overflow-hidden rounded-[20px]">

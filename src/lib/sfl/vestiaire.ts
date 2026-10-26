@@ -88,7 +88,20 @@ export const LIGNES_MAX = 6;
 export interface PieceRejoint {
   type: "rejoint";
 }
-export type Piece = PieceCarte | PieceFeuille | PieceClassement | PieceVocal | PiecePhoto | PieceVideo | PieceLigue | PieceRejoint;
+/**
+ * Une actu de Bola (26/10, Sabri : « qu'on puisse envoyer soit le carousel,
+ * soit une slide du carousel, soit la vidéo dans le vestiaire ») : la vidéo
+ * des Actus par son identifiant, son carrousel entier, ou une de ses images
+ * par son rang (lib/sfl/carrousels.ts). Le fichier n'est jamais copié : la
+ * vidéo reste dans son bucket privé, lue par une adresse signée.
+ */
+export interface PieceActu {
+  type: "actu";
+  video: string;
+  titre: string;
+  montre: "video" | "carrousel" | number;
+}
+export type Piece = PieceCarte | PieceFeuille | PieceClassement | PieceVocal | PiecePhoto | PieceVideo | PieceLigue | PieceRejoint | PieceActu;
 
 export function estPiece(v: unknown): v is Piece {
   if (!v || typeof v !== "object") return false;
@@ -96,6 +109,15 @@ export function estPiece(v: unknown): v is Piece {
   if (p.type === "carte") return typeof p.joueur === "string" && p.joueur.length > 0;
   if (p.type === "feuille") return typeof p.j === "number";
   if (p.type === "rejoint") return true;
+  if (p.type === "actu")
+    return (
+      typeof p.video === "string" &&
+      p.video.length > 0 &&
+      p.video.length <= 80 &&
+      typeof p.titre === "string" &&
+      p.titre.length <= 120 &&
+      (p.montre === "video" || p.montre === "carrousel" || (Number.isInteger(p.montre) && (p.montre as number) >= 0 && (p.montre as number) < 50))
+    );
   if (p.type === "classement")
     return typeof p.id === "string" && Array.isArray(p.top) && p.top.length <= 3;
   if (p.type === "vocal") return typeof p.chemin === "string" && typeof p.duree === "number";

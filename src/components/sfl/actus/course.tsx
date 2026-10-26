@@ -62,7 +62,7 @@
 
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Repere } from "@/components/sfl/pepites-flottantes";
 import { useJoueurBola, useMyPlayer } from "@/components/sfl/player-provider";
@@ -98,7 +98,7 @@ import { VoteDuJour } from "./fil";
 import { CouvertureRubrique, RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
 import { couverturesDuDimanche, sources, type Couverture } from "@/lib/sfl/couvertures";
 import { ContratsEnJeu } from "./contrats-en-jeu";
-import { InvitationVisuels, journeeDeLaVideo, TuileVideo, useVideos, VideosDuFil } from "./video";
+import { InvitationVisuels, journeeDeLaVideo, TuileCarrousel, TuileVideo, useVideos, VideosDuFil } from "./video";
 import type { Video } from "@/lib/sfl/videos";
 import { VueClassements, VueMatchs } from "./vues";
 import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque, type Vue } from "./epoques";
@@ -878,7 +878,10 @@ function ALaUne({ videos, recap }: { videos: Video[]; recap: { j: number; journe
       <h2 className="mono-label px-5 text-foreground/50 md:px-0">À la une</h2>
       <div ref={rangee} className="flex snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 [scrollbar-width:none] md:scroll-px-0 md:px-0">
         {videos.map((v) => (
-          <TuileVideo key={v.id} v={v} className={TUILE} />
+          <Fragment key={v.id}>
+            <TuileVideo v={v} className={TUILE} />
+            <TuileCarrousel v={v} className={TUILE} />
+          </Fragment>
         ))}
         {recap && (
           <button

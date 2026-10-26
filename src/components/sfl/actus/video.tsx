@@ -16,12 +16,16 @@
 // proposé, pas d'image dans l'image.
 //
 // Une vidéo peut avoir des images après elle (lib/sfl/carrousels.ts) : sa
-// publication devient un carrousel, la vidéo d'abord.
+// publication devient un carrousel, la vidéo d'abord ; dans « À la une », le
+// carrousel a sa tuile, juste après la vidéo ; ses images s'ouvrent en grand
+// (VisionneuseDiapos). La vidéo, le carrousel ou une image partent au
+// Vestiaire (PieceActu, ActuVue pour la dessiner là-bas).
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Clapperboard, MessageCircle, Play, Send, Share, Trash2, VolumeX, X } from "lucide-react";
+import { Clapperboard, GalleryHorizontalEnd, MessageCircle, Play, Send, Share, Trash2, VolumeX, X } from "lucide-react";
 import { useAccord } from "@/hooks/use-accord";
 import { accordValable } from "@/lib/sfl/confidentialite";
 import { changerHorsApp } from "@/lib/sfl/consentement";
@@ -47,6 +51,7 @@ import {
   type Video,
 } from "@/lib/sfl/videos";
 import { diaposDe, type Diapo } from "@/lib/sfl/carrousels";
+import { preparerPiece, type PieceActu } from "@/lib/sfl/vestiaire";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { dateIsoDuLibelle, joursJusquA } from "@/lib/sfl/meteo";
@@ -326,7 +331,13 @@ function PublicationVideo({ v, ouvrir }: { v: Video; ouvrir: (commentaires: bool
   );
   return (
     <article className="actu-publication flex flex-col">
-      {diapos.length > 0 ? <Carrousel diapos={diapos}>{video}</Carrousel> : video}
+      {diapos.length > 0 ? (
+        <Carrousel v={v} diapos={diapos}>
+          {video}
+        </Carrousel>
+      ) : (
+        video
+      )}
       <div className="flex items-start gap-2 pt-2.5 pr-1.5 pl-4">
         <div className="min-w-0 flex-1">
           <p className="text-[15px] leading-snug font-semibold">{v.titre}</p>
@@ -362,9 +373,10 @@ function PublicationVideo({ v, ouvrir }: { v: Video; ouvrir: (commentaires: bool
  * un carrousel d'Instagram, une page à la fois, les points dessous (rien
  * par-dessus les images : elles ont déjà leur en-tête).
  */
-function Carrousel({ diapos, children }: { diapos: Diapo[]; children: ReactNode }) {
+function Carrousel({ v, diapos, children }: { v: Video; diapos: Diapo[]; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [rang, setRang] = useState(0);
+  const [grande, setGrande] = useState<number | null>(null);
   const total = diapos.length + 1;
   const suivre = () => {
     const el = ref.current;
@@ -386,20 +398,22 @@ function Carrousel({ diapos, children }: { diapos: Diapo[]; children: ReactNode 
         >
           {children}
           {diapos.map((d, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={d.src}
-              src={d.src}
-              alt={d.alt}
-              draggable={false}
-              loading={i === 0 ? "eager" : "lazy"}
-              decoding="async"
-              className="block w-full shrink-0 snap-center object-cover"
-              style={{ aspectRatio: "4 / 5" }}
-            />
+            <button key={d.src} type="button" onClick={() => setGrande(i)} aria-label={`Voir en grand : ${d.alt}`} className="block w-full shrink-0 snap-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={d.src}
+                alt={d.alt}
+                draggable={false}
+                loading={i === 0 ? "eager" : "lazy"}
+                decoding="async"
+                className="block w-full object-cover"
+                style={{ aspectRatio: "4 / 5" }}
+              />
+            </button>
           ))}
         </div>
       </div>
+      {grande !== null && <VisionneuseDiapos v={v} diapos={diapos} depart={grande} onFermer={() => setGrande(null)} />}
       <div className="flex justify-center gap-[5px] pt-2.5" role="tablist" aria-label="Pages du carrousel">
         {Array.from({ length: total }, (_, i) => (
           <button
@@ -414,6 +428,216 @@ function Carrousel({ diapos, children }: { diapos: Diapo[]; children: ReactNode 
         ))}
       </div>
     </div>
+  );
+}
+
+/* ------------------------- Les images en grand ------------------------- */
+
+/** Envoyer une actu au Vestiaire : elle attend dans la barre d'écriture (au-vestiaire.tsx). */
+function useAuVestiaire() {
+  const router = useRouter();
+  return (piece: PieceActu) => {
+    preparerPiece(piece);
+    router.push("/vestiaire");
+  };
+}
+
+/**
+ * Le carrousel dans « À la une » (Sabri, 26/10 : « la vidéo d'abord […] et à
+ * sa droite, tu mets le carrousel. On peut cliquer dedans et voir les
+ * différentes slides ») : sa première image, le nombre d'images ; le toucher
+ * l'ouvre en grand.
+ */
+export function TuileCarrousel({ v, className }: { v: Video; className?: string }) {
+  const diapos = diaposDe(v.id);
+  const [ouvert, setOuvert] = useState(false);
+  if (diapos.length === 0) return null;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOuvert(true)}
+        aria-label={`Voir le carrousel : ${diapos[0].alt}`}
+        onContextMenu={(e) => e.preventDefault()}
+        className={cn("dark relative isolate overflow-hidden bg-black text-white", className)}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={diapos[0].src} alt="" draggable={false} decoding="async" className="absolute inset-0 -z-10 size-full object-cover" />
+        <span className="mono-label absolute right-3 bottom-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[10px] text-white/85 tabular-nums backdrop-blur-sm">
+          <GalleryHorizontalEnd className="size-[13px]" strokeWidth={1.8} />
+          {diapos.length}
+        </span>
+      </button>
+      {ouvert && <VisionneuseDiapos v={v} diapos={diapos} depart={0} onFermer={() => setOuvert(false)} />}
+    </>
+  );
+}
+
+/**
+ * Les images d'un carrousel en grand, dans le noir, à faire glisser. En bas,
+ * de quoi l'envoyer au Vestiaire : le carrousel entier, ou l'image qu'on
+ * regarde. Posé sur <body>, comme le lecteur.
+ */
+export function VisionneuseDiapos({
+  v,
+  diapos,
+  depart,
+  onFermer,
+  envoyer = true,
+}: {
+  v: Pick<Video, "id" | "titre">;
+  diapos: Diapo[];
+  depart: number;
+  onFermer: () => void;
+  envoyer?: boolean;
+}) {
+  const auVestiaire = useAuVestiaire();
+  const ref = useRef<HTMLDivElement>(null);
+  const [rang, setRang] = useState(depart);
+  const [monte, setMonte] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (el) el.scrollLeft = depart * el.clientWidth;
+    Promise.resolve().then(() => setMonte(true));
+    const avant = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const echap = (e: KeyboardEvent) => e.key === "Escape" && onFermer();
+    window.addEventListener("keydown", echap);
+    return () => {
+      document.body.style.overflow = avant;
+      window.removeEventListener("keydown", echap);
+    };
+    // La première image n'est posée qu'à l'ouverture.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const suivre = () => {
+    const el = ref.current;
+    if (!el || !el.clientWidth) return;
+    setRang(Math.min(diapos.length - 1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth))));
+  };
+
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={v.titre}
+      onContextMenu={(e) => e.preventDefault()}
+      className={cn(
+        "dark fixed inset-0 z-[60] flex flex-col bg-black text-white transition-opacity duration-300 motion-reduce:transition-none",
+        monte ? "opacity-100" : "opacity-0"
+      )}
+    >
+      <div className="flex items-center justify-between px-4" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" }}>
+        <button type="button" onClick={onFermer} aria-label="Fermer" className="bouton-secondaire grid size-10 place-items-center">
+          <X className="size-[18px]" />
+        </button>
+        <span className="mono-label text-white/70 tabular-nums">
+          {rang + 1} / {diapos.length}
+        </span>
+        <span className="size-10" />
+      </div>
+      <div
+        ref={ref}
+        onScroll={suivre}
+        aria-roledescription="carrousel"
+        className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {diapos.map((d, i) => (
+          <div key={d.src} className="flex h-full w-full shrink-0 snap-center items-center justify-center px-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={d.src} alt={d.alt} draggable={false} loading={Math.abs(i - depart) < 2 ? "eager" : "lazy"} decoding="async" className="max-h-full max-w-full object-contain" />
+          </div>
+        ))}
+      </div>
+      {envoyer && (
+        <div className="flex justify-center gap-2 px-4 pt-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)" }}>
+          <button
+            type="button"
+            onClick={() => auVestiaire({ type: "actu", video: v.id, titre: v.titre, montre: "carrousel" })}
+            className="bouton-secondaire flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold"
+          >
+            <Send className="size-[15px]" strokeWidth={1.8} />
+            Le carrousel
+          </button>
+          <button
+            type="button"
+            onClick={() => auVestiaire({ type: "actu", video: v.id, titre: v.titre, montre: rang })}
+            className="bouton-secondaire flex items-center gap-1.5 px-4 py-2.5 text-[13.5px] font-semibold"
+          >
+            <Send className="size-[15px]" strokeWidth={1.8} />
+            Cette image
+          </button>
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+}
+
+/**
+ * Une actu dans le Vestiaire (PieceActu) : la vidéo, à regarder ; le
+ * carrousel, sa première image et le nombre d'images ; ou une image seule.
+ * Toucher ouvre le lecteur ou les images en grand.
+ */
+export function ActuVue({ piece }: { piece: PieceActu }) {
+  const session = useSession();
+  const connecte = !!session?.server && !session.enAttente;
+  const [v, setV] = useState<Video | null | undefined>(undefined);
+  const [ouvert, setOuvert] = useState(false);
+  const diapos = diaposDe(piece.video);
+  const estVideo = piece.montre === "video";
+  useEffect(() => {
+    if (!estVideo || !connecte) return;
+    let fini = false;
+    lireVideo(piece.video)
+      .then((x) => !fini && setV(x))
+      .catch(() => !fini && setV(null));
+    return () => {
+      fini = true;
+    };
+  }, [estVideo, connecte, piece.video]);
+
+  const cadre = "block w-[min(220px,56vw)] overflow-hidden rounded-[20px] bg-black lg:w-[300px]";
+  if (estVideo) {
+    if (v === null) return <p className="glass-soft rounded-[20px] px-4 py-3 text-[13px] text-foreground/50">« {piece.titre} » n&apos;est plus en ligne.</p>;
+    if (!v) return <span className={cn(cadre, "aspect-[4/5]")} />;
+    return (
+      <span onClick={(e) => e.stopPropagation()} className="contents">
+        <TuileVideo v={v} className={cn(cadre, "aspect-[4/5]")} />
+      </span>
+    );
+  }
+  const depart = typeof piece.montre === "number" ? piece.montre : 0;
+  const d = diapos[depart];
+  if (!d) return <p className="glass-soft rounded-[20px] px-4 py-3 text-[13px] text-foreground/50">« {piece.titre} »</p>;
+  return (
+    <>
+      <button type="button" onClick={(e) => {
+          e.stopPropagation();
+          setOuvert(true);
+        }} aria-label={d.alt} className={cn(cadre, "relative aspect-[4/5]")}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={d.src} alt="" draggable={false} decoding="async" className="size-full object-cover" />
+        {piece.montre === "carrousel" && (
+          <span className="mono-label absolute right-2.5 bottom-2.5 flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white/85 tabular-nums backdrop-blur-sm">
+            <GalleryHorizontalEnd className="size-[12px]" strokeWidth={1.8} />
+            {diapos.length}
+          </span>
+        )}
+      </button>
+      {ouvert && (
+        <VisionneuseDiapos
+          v={{ id: piece.video, titre: piece.titre }}
+          diapos={piece.montre === "carrousel" ? diapos : [d]}
+          depart={0}
+          envoyer={false}
+          onFermer={() => setOuvert(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -479,6 +703,7 @@ export function LecteurParLien({ id, onFermer }: { id: string; onFermer: () => v
 }
 
 export function LecteurVideo({ v, commentaires, onFermer }: { v: Video; commentaires: boolean; onFermer: () => void }) {
+  const auVestiaire = useAuVestiaire();
   const echos = useEchos(v.id);
   const src = useAdresse(v.fichier);
   const affiche = useAdresse(v.affiche);
@@ -637,6 +862,14 @@ export function LecteurVideo({ v, commentaires, onFermer }: { v: Video; commenta
             >
               <MessageCircle className="size-[16px]" strokeWidth={1.8} />
               {echos.commentaires.length > 0 && echos.commentaires.length}
+            </button>
+            <button
+              type="button"
+              onClick={() => auVestiaire({ type: "actu", video: v.id, titre: v.titre, montre: "video" })}
+              aria-label="Envoyer au Vestiaire"
+              className="grid size-8 place-items-center rounded-full bg-white/8 text-white/80 ring-1 ring-white/12"
+            >
+              <Send className="size-[15px]" strokeWidth={1.8} />
             </button>
             <button
               type="button"
