@@ -8,8 +8,8 @@
 //     les heures, de demi-heure en demi-heure ; un toucher chacune, les
 //     heures déjà passées éteintes, et le choix redit en clair à droite ;
 //   · où : les terrains de la ligue, puis « Tous les terrains », qui ouvre
-//     ceux du Nord (choisir-terrain.tsx : Sabri, 23/10, « tous les terrains
-//     qui sont possibles sur tout le territoire du Nord ») en plan et en
+//     ceux du recensement, en France, en Europe et au Maghreb
+//     (choisir-terrain.tsx : Sabri, 23/10 puis 26/10) en plan et en
 //     liste, du plus proche au plus loin ; le terrain choisi s'ajoute aux
 //     pastilles, sa photo dessous ; un lieu absent s'y écrit en toutes lettres ;
 //   · les joueurs : combien, public ou privé, et qui, sur le terrain même

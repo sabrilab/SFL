@@ -15,7 +15,7 @@ import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { defier, direErreurEquipe, type Equipe } from "@/lib/sfl/equipes";
 import { prochainsJours } from "@/lib/sfl/matchs";
 import { TerrainRetenu } from "@/components/sfl/matchs/choisir-terrain";
-import { lieuDuTerrain, type TerrainPropose } from "@/lib/sfl/terrains-nord";
+import { lieuDuTerrain, type TerrainPropose } from "@/lib/sfl/terrains";
 
 export function Defier({
   mienne,
