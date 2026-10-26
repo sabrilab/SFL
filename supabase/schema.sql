@@ -734,6 +734,8 @@ $$;
 --   · {"type":"classement","id":"buts","top":[{"n":"Ilyes","v":20},…]}
 --   · {"type":"vocal","chemin":"<uuid>/<horodatage>.m4a","duree":12.4}
 --     (19/10 : les vocaux, fichier dans le bucket « vocaux » plus bas)
+--   · {"type":"actu","video":"j3-le-recap","titre":"J3! Le Recap","montre":"carrousel"}
+--     (26/10 : une vidéo des Actus, son carrousel ou une de ses images, 0…)
 alter table public.messages add column if not exists piece jsonb;
 -- Répondre à un message précis (19/10) : la réponse cite l'original. Si
 -- l'original est retiré, la réponse reste, sans citation.
@@ -753,7 +755,7 @@ alter table public.messages add constraint messages_piece_forme check (
   piece is null
   or (
     jsonb_typeof(piece) = 'object'
-    and piece->>'type' in ('carte', 'feuille', 'classement', 'vocal', 'photo', 'video', 'ligue', 'rejoint')
+    and piece->>'type' in ('carte', 'feuille', 'classement', 'vocal', 'photo', 'video', 'ligue', 'rejoint', 'actu')
     and pg_column_size(piece) <= 4000
     and (piece->>'type' <> 'rejoint' or canal = 'match')
   )
