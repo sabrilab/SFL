@@ -1,6 +1,6 @@
 "use client";
 
-// Les vidéos de Bola dans les Actus (lib/sfl/videos.ts) : en tête du fil,
+// Les vidéos de Bola dans les Actus (lib/sfl/videos.ts) : dans le fil de leur journée (en tête du fil si aucune ne colle),
 // une publication comme les autres (l'image, puis sa légende), avec ses
 // réactions, ses commentaires et le partage du lien. La toucher ouvre le
 // lecteur, plein écran et dans le noir : la vidéo en entier, avec le son,
@@ -42,6 +42,7 @@ import {
 } from "@/lib/sfl/videos";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { dateIsoDuLibelle, joursJusquA } from "@/lib/sfl/meteo";
 
 /* ------------------------------ Les données ------------------------------ */
 
@@ -167,9 +168,30 @@ async function partager(v: Video) {
 
 /* ------------------------------ Dans le fil ------------------------------ */
 
-/** Les vidéos publiées, en tête du fil des Actus. */
-export function VideosDuFil({ className }: { className?: string }) {
-  const videos = useVideos();
+/**
+ * Le dimanche d'une vidéo (Sabri, 26/10 : « la vidéo qui a été partagée de
+ * la journée 3 [doit être] dans le feed de la journée 3 ») : celui que son
+ * titre ou son identifiant nomme (« J3 SFL », « j3-sfl ») ; sinon le
+ * dimanche le plus proche de sa publication, à trois jours près. null :
+ * aucun, elle reste en tête du fil.
+ */
+export function journeeDeLaVideo(v: Pick<Video, "id" | "titre" | "publiee_le">, journees: { j: number; date: string }[]): number | null {
+  const nomme = `${v.titre} ${v.id}`.match(/(?:^|[^a-z0-9])j(?:ourn[ée]e\s*)?(\d{1,3})(?![0-9])/i);
+  if (nomme) return Number(nomme[1]);
+  if (!v.publiee_le) return null;
+  const jour = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date(v.publiee_le));
+  let proche: { j: number; ecart: number } | null = null;
+  for (const m of journees) {
+    const iso = dateIsoDuLibelle(m.date, jour);
+    if (!iso) continue;
+    const ecart = Math.abs(joursJusquA(iso, jour));
+    if (ecart <= 3 && (!proche || ecart < proche.ecart)) proche = { j: m.j, ecart };
+  }
+  return proche?.j ?? null;
+}
+
+/** Des vidéos publiées dans le fil des Actus : en tête, ou dans le fil de leur dimanche (course.tsx). */
+export function VideosDuFil({ videos, className }: { videos: Video[]; className?: string }) {
   const [ouverte, setOuverte] = useState<{ v: Video; commentaires: boolean } | null>(null);
   if (videos.length === 0) return null;
   return (

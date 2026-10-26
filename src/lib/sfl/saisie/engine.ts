@@ -23,6 +23,7 @@ import {
 } from "../engine";
 import { equipesDuMatch, lireEquipe } from "./equipes";
 import type { MatchDuJour, MatchEntry, RosterEntry, Saison, SaisieAlert } from "./types";
+import { evoluer, officiellesAu, type Evolution, type TitresFaibles } from "./evolution";
 
 /* ------------------------------- Barème ------------------------------- */
 
@@ -59,6 +60,16 @@ function toStats(base: number[] | null | undefined): Stats {
 
 function rosterMap(saison: Saison): Map<string, RosterEntry> {
   return new Map(saison.roster.map((r) => [r.name, r]));
+}
+
+/**
+ * L'évolution des cartes de la saison (evolution.ts) : chacun part de la base
+ * de sa fiche, 75 partout sans évaluation. Les saisons d'avant la Saison 1
+ * n'évoluent pas : leurs cartes restent leur base.
+ */
+export function evolutionDe(saison: Saison, titresFaibles?: TitresFaibles): Evolution {
+  const roster = rosterMap(saison);
+  return evoluer(saison, (nom) => toStats(roster.get(nom)?.base), titresFaibles);
 }
 
 /* ---------------------------- Classements ---------------------------- */
@@ -118,7 +129,7 @@ function seasonStatut(profil: string, absInj: number): PlayerStatus {
   return "Actif";
 }
 
-export function computeStandings(saison: Saison): Player[] {
+export function computeStandings(saison: Saison, evolution: Evolution = evolutionDe(saison)): Player[] {
   const roster = rosterMap(saison);
   const agg = new Map<string, Agg>();
   const get = (n: string) => {
@@ -167,7 +178,8 @@ export function computeStandings(saison: Saison): Player[] {
       buts: a.buts,
       passes: a.passes,
       statut: seasonStatut(r?.profil ?? "Actif", a.absInj),
-      stats: toStats(r?.base),
+      // La carte officielle : la base de la fiche, puis ses mises à jour.
+      stats: evolution.joueurs.get(name)?.officielles ?? toStats(r?.base),
       mvp: a.mvp,
       impact: a.impact,
       def: a.def,
@@ -322,10 +334,10 @@ const TYPE_ORDER: Record<BoostType, number> = { mvp: 0, impact: 1, def: 2 };
  * `rareStats` — autrement dit une carte Impact rigoureusement identique à la
  * carte Rare du joueur.
  */
-function boostStats(base: number[], type: BoostType, buts: number, passes: number): Stats {
+function boostStats(base: Stats, type: BoostType, buts: number, passes: number): Stats {
   // On part de la carte Rare, calculée par la même fonction que partout
   // ailleurs dans l'app pour éviter deux formules divergentes.
-  const rare = rareStats(toStats(base));
+  const rare = rareStats(base);
   const s = STAT_KEYS.map((k) => rare[k]);
 
   if (type === "mvp" || type === "impact") {
@@ -358,14 +370,16 @@ function boostStats(base: number[], type: BoostType, buts: number, passes: numbe
   return { VIT: c[0], TIR: c[1], PAS: c[2], DRI: c[3], DEF: c[4], PHY: c[5] };
 }
 
-export function computeBoostCards(saison: Saison): BoostCardData[] {
+export function computeBoostCards(saison: Saison, evolution: Evolution = evolutionDe(saison)): BoostCardData[] {
   const roster = rosterMap(saison);
   const dateOf = new Map(saison.journees.map((m) => [m.j, m.date]));
   const cards: (BoostCardData & { _j: number })[] = [];
 
   for (const e of saison.entries) {
     if (e.statut !== "Présent" || e.extraTime) continue;
-    const base = roster.get(e.player)?.base ?? DEFAULT_BASE;
+    // La carte officielle de ce dimanche-là : une carte du jour ne descend
+    // pas sous la carte du joueur.
+    const base = officiellesAu(evolution.joueurs.get(e.player), e.j) ?? toStats(roster.get(e.player)?.base);
     const honors: BoostType[] = [];
     if (e.mvp) honors.push("mvp");
     if (e.impact) honors.push("impact");
@@ -423,17 +437,21 @@ export function computeAlerts(saison: Saison): SaisieAlert[] {
 /* ------------------------------ Aggrégat ------------------------------ */
 
 export interface DerivedSeason {
+  /** Les cartes qui évoluent : jauges, points en attente, mises à jour (evolution.ts). */
+  evolution: Evolution;
   players: Player[];
   journees: Journee[];
   boostCards: BoostCardData[];
   alerts: SaisieAlert[];
 }
 
-export function deriveSeason(saison: Saison): DerivedSeason {
+export function deriveSeason(saison: Saison, titresFaibles?: TitresFaibles): DerivedSeason {
+  const evolution = evolutionDe(saison, titresFaibles);
   return {
-    players: computeStandings(saison),
+    evolution,
+    players: computeStandings(saison, evolution),
     journees: computeJournees(saison),
-    boostCards: computeBoostCards(saison),
+    boostCards: computeBoostCards(saison, evolution),
     alerts: computeAlerts(saison),
   };
 }
