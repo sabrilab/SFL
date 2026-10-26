@@ -371,6 +371,7 @@ function Ticker({
   joueurs,
   figee = false,
   cle,
+  avecPodium = true,
 }: {
   moi: string;
   def?: Categorie;
@@ -379,6 +380,8 @@ function Ticker({
   figee?: boolean;
   /** La clé 3D de cartes qui ne sont pas les actuelles (une saison close, la carrière). */
   cle?: string;
+  /** Le podium et ses pépites au-dessus de la rangée (l'onglet Classement) ; le fil des Actus n'a que la rangée. */
+  avecPodium?: boolean;
 }) {
   const { players, saison } = useSeason();
   const rang = rankByMetric(joueurs ?? players, def.value).filter(
@@ -506,7 +509,7 @@ function Ticker({
     .slice(0, 3);
   return (
     <>
-    {podium.length === 3 && <PodiumPepite podium={podium} def={def} division={groupes?.[0].x} cle={cle} />}
+    {avecPodium && podium.length === 3 && <PodiumPepite podium={podium} def={def} division={groupes?.[0].x} cle={cle} />}
     <div className="md:relative">
       {(["debut", "fin"] as const).map((bout) => (
         <button
@@ -995,6 +998,9 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
   return (
     <div className={GABARIT}>
       <EnTete titre="Actus" epoque="present" epoques={epoques} vue={vue} onVue={onVue}>
+        {/* La rangée de la Pépite d'Or reste en tête du fil (Sabri, 26/10 : « remettre le classement qu'on avait tout en
+            haut avec toutes les cartes ») ; son podium et ses pépites, en tête de Classement. */}
+        {vue === "fil" && <Ticker moi={me} avecPodium={false} />}
         {vue === "classements" && <Ticker moi={me} />}
       </EnTete>
       {vue === "classements" ? (
@@ -1109,6 +1115,7 @@ function LectureSaison({
   return (
     <div className={GABARIT}>
       <EnTete titre={nom} epoque={numero} epoques={epoques} vue={vue} onVue={onVue}>
+        {vue === "fil" && <Ticker moi={me} figee cle={`saison-${numero}`} avecPodium={false} />}
         {vue === "classements" && <Ticker moi={me} figee cle={`saison-${numero}`} />}
       </EnTete>
       {vue === "classements" ? (
