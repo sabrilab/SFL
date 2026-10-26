@@ -80,3 +80,53 @@ export function useAccesTeam(): boolean | null {
 
   return qui && lu.qui === qui ? lu.acces : null;
 }
+
+// ─────────────── Le mois offert (Sabri, 26/10/2026) ───────────────
+//
+// Venu par un joueur SFL (son lien, le lien de son équipe, son invitation) :
+// Bola Team offert un mois, puis payer pour rester dans l'équipe, ou garder
+// Bola. La fin vient de la base (essai_team_fin) ; null : pas d'offre (un
+// joueur SFL l'a pour de bon), pas encore lue, ou base pas encore migrée.
+
+export interface EssaiTeam {
+  fin: Date;
+  /** Passé à la lecture : l'offre est finie. */
+  fini: boolean;
+}
+
+const essais = new Map<string, EssaiTeam | null>();
+const abonnesEssai = new Set<() => void>();
+let versionEssai = 0;
+
+function abonnerEssai(f: () => void) {
+  abonnesEssai.add(f);
+  return () => {
+    abonnesEssai.delete(f);
+  };
+}
+
+function relireEssai(qui: string) {
+  if (essais.has(qui)) return;
+  essais.set(qui, null);
+  void (async () => {
+    try {
+      const { data, error } = await supabase().rpc("essai_team_fin");
+      if (error || !data) return;
+      const fin = new Date(String(data));
+      if (Number.isNaN(fin.getTime())) return;
+      essais.set(qui, { fin, fini: fin.getTime() <= Date.now() });
+      versionEssai++;
+      for (const f of abonnesEssai) f();
+    } catch {}
+  })();
+}
+
+export function useEssaiTeam(): EssaiTeam | null {
+  const session = useSession();
+  const qui = session?.server ? session.user : null;
+  useSyncExternalStore(abonnerEssai, () => versionEssai, () => 0);
+  useEffect(() => {
+    if (qui) relireEssai(qui);
+  }, [qui]);
+  return qui ? (essais.get(qui) ?? null) : null;
+}

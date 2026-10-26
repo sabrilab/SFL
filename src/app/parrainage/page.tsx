@@ -80,7 +80,7 @@ export default function ParrainagePage() {
     try {
       await navigator.share({
         title: "Bola",
-        text: bola ? "Rejoins-moi sur Bola." : "Rejoins-moi sur Bola. Bola Team offert avec mon lien.",
+        text: bola ? "Rejoins-moi sur Bola." : "Rejoins-moi sur Bola. Un mois de Bola Team offert avec mon lien.",
         url: lien,
       });
       noterPartage();
@@ -110,7 +110,7 @@ export default function ParrainagePage() {
       <section className="glass flex flex-col gap-[var(--fib-13)] rounded-[28px] p-5">
         <div className="flex items-center justify-between gap-3">
           <span className="mono-label text-foreground/40">Ton lien</span>
-          {!bola && <span className="mono-label text-foreground/70">Bola Team offert</span>}
+          {!bola && <span className="mono-label text-foreground/70">Bola Team offert un mois</span>}
         </div>
         <p className="min-h-[1.4em] font-mono text-[14px] break-all text-foreground/85">
           {lien ? lien.replace(/^https?:\/\//, "") : code === null ? "Lien indisponible pour l'instant." : "…"}

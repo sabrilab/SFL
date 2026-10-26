@@ -167,9 +167,12 @@ export async function POST(req: NextRequest) {
 
   // Le trigger a posé le profil (en attente). On complète, et on annule tout
   // si la fiche ne passe pas : pas de compte à moitié créé.
+  // Le prénom, le nom et le pseudo viennent d'être tapés : l'accueil ne
+  // redemande pas « C'est bien toi ? » (identite_le, /api/identite).
+  const maintenant = new Date().toISOString();
   const { error: errProfil } = await sb
     .from("profiles")
-    .update({ contact_email: f.email, pseudo_change_le: new Date().toISOString(), ...(entre ? { valide: true } : {}) })
+    .update({ contact_email: f.email, pseudo_change_le: maintenant, identite_le: maintenant, ...(entre ? { valide: true } : {}) })
     .eq("id", id);
   const { error: errFiche } = await sb.from("fiches").insert({
     player_id: id,

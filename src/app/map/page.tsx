@@ -95,6 +95,7 @@ import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
 import { DISPOS_AFFICHEES, inscrits, libelleJour, listerDispos, momentDeLHeure, placesLibres, prochainsJours, type Dispo, type Partie } from "@/lib/sfl/matchs";
 import { cleMoment, meilleurMoment, terrainPropose, type MomentPropose } from "@/lib/sfl/proposition";
 import { useMyPlayer } from "@/components/sfl/player-provider";
+import { useHorsSfl } from "@/hooks/use-hors-sfl";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
 import { usePresence } from "@/hooks/use-presence";
 import { joueursDeLaFeuille } from "@/lib/sfl/presence-feuille";
@@ -411,6 +412,7 @@ export default function MapPage() {
   const admin = !!session?.admin;
   const p = usePresence();
   const { player, me } = useMyPlayer();
+  const horsSfl = useHorsSfl();
   const aujourdhui = useAujourdhui();
   const heure = useHeure();
   // La J3, dernier dimanche avant les divisions (lib/sfl/divisions.ts) : sa fiche le dit ;
@@ -468,7 +470,11 @@ export default function MapPage() {
   // lib/sfl/matchs-du-jour) : une journée jouée en deux lieux pose un
   // sticker sur chacun, avec ses matchs et leurs joueurs. L'heure affichée
   // est celle de mon match, sinon le premier coup d'envoi du lieu.
+  //
+  // Un joueur Bola (venu par un parrain, hors de la saison) ne voit rien de
+  // la SFL (Sabri, 26/10 : « le côté SFL doit lui être invisible »).
   const ligue = useMemo<MatchMap[]>(() => {
+    if (horsSfl) return [];
     const passee = (m: JourneeMeta) => {
       if (journeeJouee(saison, m.j)) return true;
       const e = ecartJours(m.date, aujourdhui);
@@ -551,7 +557,7 @@ export default function MapPage() {
       },
       ...recente,
     ];
-  }, [saison, matchsDe, player.name, aujourdhui, heure, p.heure, p.lieu, p.jour, p.mine, p.effectif, p.presents]);
+  }, [horsSfl, saison, matchsDe, player.name, aujourdhui, heure, p.heure, p.lieu, p.jour, p.mine, p.effectif, p.presents]);
 
   // Les matchs ouverts par les joueurs : un public montre ses places libres,
   // un privé n'apparaît qu'à ceux qui en sont.

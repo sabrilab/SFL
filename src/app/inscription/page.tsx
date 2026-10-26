@@ -1048,7 +1048,7 @@ export default function InscriptionPage() {
             {accueil && (
               <p className="mono-label text-foreground/40">
                 {parrain
-                  ? `Invité par ${parrain.p.affiche}${parrain.p.sfl ? " · Bola Team offert" : ""}`
+                  ? `Invité par ${parrain.p.affiche}${parrain.p.sfl ? " · Bola Team offert un mois" : ""}`
                   : "Bola · Sunday Five League"}
               </p>
             )}

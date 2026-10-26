@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const p = await lire(normaliser(code));
   if (!p || p === "injoignable") return { title: "Rejoins Bola" };
   const titre = `${p.affiche} t'invite sur Bola`;
-  const description = p.sfl ? "Crée ta carte. Bola Team offert." : "Crée ta carte et joue près de chez toi.";
+  const description = p.sfl ? "Crée ta carte. Un mois de Bola Team offert." : "Crée ta carte et joue près de chez toi.";
   return { title: { absolute: titre }, description, openGraph: { title: titre, description } };
 }
 

@@ -139,6 +139,8 @@ export async function POST(req: NextRequest) {
       username: `@${f.pseudo}`,
       contact_email: email || null,
       pseudo_a_choisir: false,
+      // Tout vient d'être tapé : l'accueil ne redemande pas « C'est bien toi ? ».
+      identite_le: new Date().toISOString(),
       ...(parrain ? { valide: true } : {}),
     })
     .eq("id", user.id);

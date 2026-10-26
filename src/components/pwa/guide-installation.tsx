@@ -26,6 +26,7 @@ import { useEffect, useState } from "react";
 import { Check, Copy, Ellipsis, EllipsisVertical, Share, SquarePlus } from "lucide-react";
 import { useIsClient } from "@/hooks/use-is-client";
 import { lienSortie, lireEnvironnement, type Environnement } from "@/lib/pwa/environnement";
+import { codeGarde } from "@/lib/sfl/parrainage";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -85,7 +86,17 @@ export function GuideInstallation() {
   // stockage à part : le code du parrain serait perdu. Le compte se crée
   // d'abord ici, le guide revient ensuite sur l'app. Sortir d'une app
   // (Snapchat…) reste proposé : l'adresse garde le code.
-  if (!env.appHote && (pathname?.startsWith("/p/") || pathname?.startsWith("/v/") || (pathname?.startsWith("/inscription") && /[?&]parrain=/.test(window.location.search))))
+  // Le code gardé sur le téléphone (posé par /p/) et pas l'adresse : venu de
+  // /p/ par « Créer mon compte », la page change avant l'adresse, et
+  // `?parrain=` n'était pas encore lisible (26/10 : le guide coupait
+  // l'inscription, et le parrain se perdait dans l'app installée). Le code
+  // est oublié une fois le compte créé.
+  if (
+    !env.appHote &&
+    (pathname?.startsWith("/p/") ||
+      pathname?.startsWith("/v/") ||
+      (pathname?.startsWith("/inscription") && (codeGarde() !== null || /[?&]parrain=/.test(window.location.search))))
+  )
     return null;
   if (lire(() => sessionStorage, CLE_PLUS_TARD)) return null;
   // « C'est fait » ne vaut que dans un vrai navigateur : depuis Snapchat,

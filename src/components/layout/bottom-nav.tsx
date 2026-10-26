@@ -37,6 +37,7 @@ import { remonter, retrouverOnglet } from "./memoire-navigation";
 import { pastilleIcone, useVestiaireNonLus } from "@/hooks/use-vestiaire-non-lus";
 import { useMessagesPrives } from "@/hooks/use-messages-prives";
 import { useJoueurBola } from "@/components/sfl/player-provider";
+import { useHorsSfl } from "@/hooks/use-hors-sfl";
 import { useInvitationsMatch } from "@/hooks/use-invitations";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
 import { useMonEquipe } from "@/hooks/use-mon-equipe";
@@ -59,6 +60,7 @@ export function BottomNav() {
   // hors de la saison) n'a pas la bulle.
   const vestiaire = pathname === "/vestiaire" || pathname === "/agent" || pathname === "/messages" || pathname.startsWith("/messages/");
   const bola = useJoueurBola();
+  const horsSfl = useHorsSfl();
   const clair = useModeClair() || surMap(pathname);
   const encre = clair ? "#0a0b0d" : "#ffffff";
   // Du nouveau dans la discussion : le nombre, sur la bulle.
@@ -91,11 +93,13 @@ export function BottomNav() {
         {/* La lentille de l'onglet choisi */}
         {actif >= 0 && <span aria-hidden className="liquid-tabbar__lentille" />}
 
-        {TABS.map(({ href, Icon, label }, i) => {
+        {TABS.map(({ href: racine, Icon, label }, i) => {
           const choisi = i === actif;
+          // Les Actus d'un joueur Bola sont celles de Bola (porte-sfl.tsx).
+          const href = horsSfl && racine === "/ligue" ? "/ligue-vierge" : racine;
           return (
             <Link
-              key={href}
+              key={racine}
               href={href}
               aria-current={choisi ? "page" : undefined}
               onClick={(e) => {
@@ -119,7 +123,7 @@ export function BottomNav() {
         })}
       </nav>
 
-      {!bola && <Link
+      {!bola && !horsSfl && <Link
         href="/vestiaire"
         aria-label={nonLus > 0 ? `Vestiaire, ${nonLus} nouveaux messages` : "Vestiaire"}
         aria-current={vestiaire ? "page" : undefined}

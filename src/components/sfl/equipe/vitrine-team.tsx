@@ -45,7 +45,8 @@ function useDefile(): Blason {
   return DEFILE[i];
 }
 
-export function VitrineTeam({ initiales }: { initiales: string }) {
+/** essaiFini : son mois offert par un joueur SFL est passé (hooks/use-acces-team.ts). */
+export function VitrineTeam({ initiales, essaiFini = false }: { initiales: string; essaiFini?: boolean }) {
   const b = useDefile();
   const ini = initiales || "BT";
   return (
@@ -60,7 +61,9 @@ export function VitrineTeam({ initiales }: { initiales: string }) {
           <li key={a}>{a}</li>
         ))}
       </ul>
-      <span className="mono-label text-muted-foreground">Il te faut le lien d&apos;un joueur SFL</span>
+      <span className="mono-label text-muted-foreground">
+        {essaiFini ? "L'abonnement arrive bientôt" : <>Il te faut le lien d&apos;un joueur SFL</>}
+      </span>
     </section>
   );
 }
