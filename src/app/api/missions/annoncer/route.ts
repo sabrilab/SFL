@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       notif: {
         titre: `Missions Bola · J${d.j}`,
         texte: couper(`${contrat ? `${annonce(contrat, nom)} ` : ""}Accepte avant ${quand}.`, 180),
-        url: "/ligue#missions",
+        url: "/profil/xp?vue=missions",
         tag: `missions-${d.saison}-${d.j}`,
       },
       motif: "missions",
