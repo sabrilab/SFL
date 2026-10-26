@@ -7,6 +7,9 @@
 // La carte d'une saison close (`saison`, ou l'archive qu'on relit) garde son
 // édition d'époque une fois ouverte : la visionneuse vit hors de l'archive,
 // la saison lui est donc passée en toutes lettres (use-epoque-carte.ts).
+// Blessé en ce moment, sa carte porte le sigle « Blessé » (Sabri, 26/10 :
+// « bien présent sur la carte pour qu'on comprenne que ce joueur est blessé
+// actuellement ») : à l'encre, ni rouge ni bleu (blessure.tsx).
 
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useCardViewer } from "@/components/sfl/card-viewer";
@@ -16,6 +19,8 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { useSaisonDeCarte } from "@/hooks/use-epoque-carte";
 import type { BoostType, Player } from "@/lib/sfl/engine";
 import type { Camp } from "@/lib/sfl/maillots";
+import { SigleBlesse } from "@/components/sfl/blessure";
+import { useEstBlesse } from "@/hooks/use-blessures";
 import { cn } from "@/lib/utils";
 
 /**
@@ -69,6 +74,8 @@ export function MiniCarte({
   // La saison de la carte, figée pour la visionneuse ; dans la clé de la 3D, une carte d'époque.
   const saisonCarte = useSaisonDeCarte(saison);
   const epoque = aSonEpoque(saisonCarte) ? `-s${saisonCarte}${journee ? `-j${journee}` : ""}` : "";
+  // Une carte d'une autre saison ou à titre ne dit rien d'aujourd'hui.
+  const blesse = useEstBlesse(player.name) && saison === undefined && !distinction;
   return (
     <button
       type="button"
@@ -86,8 +93,8 @@ export function MiniCarte({
           ),
         });
       }}
-      aria-label={`Voir la carte de ${player.name}`}
-      className={cn("shrink-0 transition-transform active:scale-95", className)}
+      aria-label={`Voir la carte de ${player.name}${blesse ? ", blessé" : ""}`}
+      className={cn("relative shrink-0 transition-transform active:scale-95", className)}
     >
       <PlayerCard
         player={player}
@@ -99,6 +106,7 @@ export function MiniCarte({
         saison={saisonCarte}
         journee={journee}
       />
+      {blesse && <SigleBlesse cote={254 * size} />}
     </button>
   );
 }

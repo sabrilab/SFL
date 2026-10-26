@@ -5,7 +5,7 @@
 // (use-liste-pronos.ts).
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { useSeason } from "@/components/sfl/season-provider";
+import { useSaisonClose, useSeason } from "@/components/sfl/season-provider";
 import { useSession } from "@/hooks/use-session";
 import { bilanJournees, blessesEnCours, journeesParJoueur, type BilanJournees, type Blessure } from "@/lib/sfl/blessures";
 import { APERCU_BLESSURES, blessuresEnMemoire, BLESSURES_EVENT, chargerBlessures } from "@/lib/sfl/blessures-store";
@@ -79,4 +79,20 @@ export function useJourneesDuClassement(): { journees: Map<string, number>; bles
       blesses,
     };
   }, [saison, liste]);
+}
+
+/**
+ * Est-il blessé en ce moment (déclaré, ou « Blessure » dans l'effectif) ?
+ * Pour le sigle posé sur sa carte (mini-carte.tsx) : jamais dans une saison close.
+ */
+export function useEstBlesse(nom: string): boolean {
+  const { saison } = useSeason();
+  const close = useSaisonClose();
+  const liste = useBlessures();
+  if (close) return false;
+  const numero = saison.numero ?? 0;
+  return (
+    liste.some((b) => b.saison === numero && b.joueur === nom && b.fin == null) ||
+    saison.roster.some((r) => r.name === nom && r.profil === "Blessure")
+  );
 }

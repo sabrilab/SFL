@@ -16,7 +16,9 @@
 // À côté des points, les journées jouées de chacun, comme la colonne J d'un
 // classement de Ligue 1 (Sabri, 26/10 : « s'il y a un joueur qui est blessé
 // et qui a manqué un match […] tout le monde va savoir qu'il y a une journée
-// en moins ») ; « Blessé » sous son nom tant qu'il l'est (lib/sfl/blessures.ts).
+// en moins »), en tableau : chaque colonne sous son intitulé, J puis PTS
+// (sa capture, 26/10). Blessé en ce moment, sa carte porte le sigle
+// « Blessé » (mini-carte.tsx).
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -49,11 +51,23 @@ function Journees({ n, className }: { n: number; className?: string }) {
   );
 }
 
-/** « Blessé », neutre : ni rouge ni bleu, réservés aux cartes Impact et Défensive. */
+/** « Blessé » sous le nom, à l'encre : ni rouge ni bleu, réservés aux cartes Impact et Défensive. */
 function Blesse() {
   return (
-    <span className="shrink-0 rounded-full bg-foreground/8 px-2 py-0.5 text-[9px] font-bold tracking-wide text-foreground/65 uppercase">
+    <span className="shrink-0 rounded-full bg-foreground px-2 py-0.5 text-[9px] font-extrabold tracking-wide text-background uppercase">
       Blessé
+    </span>
+  );
+}
+
+/** Une colonne du tableau, comme au classement de la Ligue 1 : l'intitulé au-dessus, le chiffre dessous. */
+function Colonne({ titre, valeur, fort, label }: { titre: string; valeur: number; fort?: boolean; label: string }) {
+  return (
+    <span className="flex w-12 shrink-0 flex-col items-center gap-1 border-l border-foreground/10 py-0.5" aria-label={label}>
+      <span className="mono-label text-[10px] text-foreground/40 uppercase">{titre}</span>
+      <span className={cn("leading-none font-bold tracking-tight tabular-nums", fort ? "text-[19px]" : "text-[17px] text-foreground/75")}>
+        {valeur}
+      </span>
     </span>
   );
 }
@@ -126,8 +140,8 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
   // Les journées de chacun : celles de la saison lue ; dans la carrière, ses matchs.
   const close = useSaisonClose();
   const { journees: parJoueur, blesses } = useJourneesDuClassement();
+  const blesse = (p: Classe) => !carriere && !close && blesses.has(p.name);
   const journees = (p: Classe) => (carriere ? p.matchs : (parJoueur.get(p.name) ?? 0));
-  const blesse = (p: Classe) => !carriere && !close && (blesses.has(p.name) || p.statut === "Blessure");
 
   // La Pépite d'Or de la saison, coupée en divisions dès qu'elle en a (Sabri,
   // 25/10 : « il faut que les divisions soient visibles ») : chaque division
@@ -154,7 +168,7 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
       )}
       <MiniCarte player={p} size={FORMAT_CARTE.petite} detail={`${x ? (place == null ? nomDivision(x) : `${place === 1 ? "1er" : `${place}e`} de la ${nomDivision(x)}`) : def.label} · ${p.value} ${unite(def, p.value)}`} cle={cle && `${cle}-${p.name}`} />
       <span className="flex min-w-0 flex-1 items-center gap-2">
-        {/* « Blessé » sous le nom : le nom garde toute la ligne. */}
+        {/* « Blessé » sous le nom, en plus du sigle sur la carte : le nom garde toute la ligne. */}
         <span className="flex min-w-0 flex-col items-start gap-0.5">
           <span className="max-w-full truncate text-[15px] font-semibold"><Nom n={p.name} /></span>
           {blesse(p) && <Blesse />}
@@ -168,10 +182,10 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
           </span>
         )}
       </span>
-      <Journees n={journees(p)} className="w-9 text-[14px]" />
-      <span className="w-16 text-right text-lg font-bold tracking-tight tabular-nums">
-        {p.value}
-        <span className="mono-label ml-1 text-foreground/40">{unite(def, p.value)}</span>
+      {/* Le tableau : J puis les points, chaque colonne sous son intitulé */}
+      <span className="flex shrink-0 items-stretch">
+        <Colonne titre="J" valeur={journees(p)} label={`${journees(p)} ${journees(p) > 1 ? "journées jouées" : "journée jouée"}`} />
+        <Colonne titre={unite(def, p.value)} valeur={p.value} fort label={`${p.value} ${unite(def, p.value)}`} />
       </span>
     </div>
   );

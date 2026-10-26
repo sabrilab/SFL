@@ -18,6 +18,34 @@ import { direJournees, prochaineJournee } from "@/lib/sfl/blessures";
 import { declarerBlessure } from "@/lib/sfl/blessures-store";
 import { cn } from "@/lib/utils";
 
+/**
+ * Le sigle « Blessé » posé sur la carte d'un joueur blessé en ce moment :
+ * une pastille à l'encre (noir sur blanc, cerclée), qui déborde du coin
+ * haut gauche ; en toutes lettres dès que la carte a la place, sinon le seul
+ * pansement. Lisible en clair comme en sombre, sur toutes les matières.
+ */
+export function SigleBlesse({ cote }: { cote: number }) {
+  const lettres = cote >= 70;
+  const h = Math.round(Math.max(24, Math.min(28, cote * 0.3)));
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute z-10 flex items-center justify-center gap-1 rounded-full bg-white font-extrabold tracking-wide text-black uppercase shadow-[0_2px_6px_rgba(0,0,0,0.45)] ring-[1.5px] ring-black"
+      style={{
+        top: -h * 0.3,
+        left: -h * 0.3,
+        height: h,
+        minWidth: h,
+        padding: lettres ? `0 ${h * 0.4}px 0 ${h * 0.3}px` : 0,
+        fontSize: h * 0.42,
+      }}
+    >
+      <Bandage style={{ width: h * 0.64, height: h * 0.64 }} strokeWidth={2.5} />
+      {lettres && "Blessé"}
+    </span>
+  );
+}
+
 /** Le chiffre de tête : « 3 » ou « 3/5 » quand il a manqué des journées. */
 export function useChiffreJournees(nom: string): { valeur: string; quoi: string } {
   const b = useBilanJournees(nom);
