@@ -76,7 +76,7 @@ export function LienParrain({ code, initial }: { code: string; initial: Parrain 
             <h1 className="mt-8 text-[34px] leading-[1.05] font-extrabold tracking-tight">
               {`${parrain.affiche} t'invite.`}
             </h1>
-            {parrain.sfl && <p className="mono-label mt-3 text-muted-foreground">Bola Team offert</p>}
+            {parrain.sfl && <p className="mono-label mt-3 text-muted-foreground">Bola Team offert un mois</p>}
             <div className="mt-9 flex w-full flex-col gap-2.5">
               {connecte ? (
                 <Link href="/" className="bouton-principal py-4 text-[15px] font-bold">

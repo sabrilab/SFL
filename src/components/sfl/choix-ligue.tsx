@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { cn } from "@/lib/utils";
+import { useHorsSfl } from "@/hooks/use-hors-sfl";
 
 type Actif = "/ligue" | "/ligue-vierge" | "/bola-team";
 
@@ -70,6 +71,9 @@ export function EnteteLigue({ actif, className, children }: { actif: Actif; clas
   ] as const;
   const [ouvert, setOuvert] = useState(false);
   const ici = actif === "/ligue" ? liens[0] : liens[1];
+  // Un joueur Bola, hors de la SFL (hooks/use-hors-sfl.ts) : le seul sigle
+  // de Bola, sans l'autre ligue à dérouler.
+  const horsSfl = useHorsSfl();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!ouvert) return;
@@ -81,6 +85,11 @@ export function EnteteLigue({ actif, className, children }: { actif: Actif; clas
   }, [ouvert]);
   return (
     <div className={cn("flex items-center justify-between", className)}>
+      {horsSfl ? (
+        <span className="flex items-center py-1.5 text-foreground">
+          <SigleLigue ligue="bola" hauteur={22} />
+        </span>
+      ) : (
       <div ref={ref} className="relative">
         <button
           type="button"
@@ -116,6 +125,7 @@ export function EnteteLigue({ actif, className, children }: { actif: Actif; clas
           </nav>
         )}
       </div>
+      )}
       <div className="flex items-center gap-2">
         {ici.ligue === "bola" && <FiltreBola actif={actif} />}
         {children}

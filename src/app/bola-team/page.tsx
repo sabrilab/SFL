@@ -93,7 +93,7 @@ import { TerrainRetenu } from "@/components/sfl/matchs/choisir-terrain";
 import { TerrainPlaces, type Occupant } from "@/components/sfl/matchs/terrain-places";
 import { ChoisirJoueur } from "@/components/sfl/matchs/choisir-joueur";
 import { useSession } from "@/hooks/use-session";
-import { useAccesTeam } from "@/hooks/use-acces-team";
+import { useAccesTeam, useEssaiTeam } from "@/hooks/use-acces-team";
 import { useApercuTeam } from "@/hooks/use-equipes";
 import { signalerEquipe, useMonEquipe } from "@/hooks/use-mon-equipe";
 import { championnat, coupDEnvoiTeam, etatMatch, saisonEnCours, type EtatMatch, type MatchTeam } from "@/lib/sfl/championnat-team";
@@ -281,6 +281,9 @@ export default function BolaTeamPage() {
   const { me } = useMyPlayer();
   const { allPlayers, saison } = useSeason();
   const acces = useAccesTeam();
+  // Le mois offert par un joueur SFL : sa fin, dite en haut de Mon équipe.
+  const essai = useEssaiTeam();
+  const essaiFini = !!essai?.fini;
   const [equipes, setEquipes] = useState<Equipe[] | null>(null);
   const [defis, setDefis] = useState<Defi[]>([]);
   const [champ, setChamp] = useState<Championnat | null>(null);
@@ -784,7 +787,15 @@ export default function BolaTeamPage() {
         </section>
       )}
 
-      {vue !== "equipe" ? null : mienne ? (
+      {vue === "equipe" && essai && (
+        <p className="mono-label text-center text-muted-foreground">
+          {essaiFini
+            ? "Ton mois Bola Team offert est fini"
+            : `Bola Team offert jusqu'au ${essai.fin.toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "Europe/Paris" })}`}
+        </p>
+      )}
+
+      {vue !== "equipe" ? null : mienne && !(sansAcces && essaiFini) ? (
         <section className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1.618fr)_minmax(0,1fr)] md:items-start md:gap-[var(--fib-34)] min-[1440px]:gap-[var(--fib-55)]">
           {/* La grande colonne : l'équipe, sa discussion, son terrain. */}
           <div className="contents md:flex md:min-w-0 md:flex-col md:gap-[var(--fib-21)]">
@@ -958,8 +969,8 @@ export default function BolaTeamPage() {
           {partir("hidden md:mt-[var(--fib-13)] md:flex")}
           </div>
         </section>
-      ) : sansAcces && invitations.length === 0 ? (
-        <VitrineTeam initiales={initialesDe(moiNom)} />
+      ) : sansAcces && (invitations.length === 0 || essaiFini) ? (
+        <VitrineTeam initiales={initialesDe(moiNom)} essaiFini={essaiFini} />
       ) : charge ? (
         <Button
           variant={invitations.length > 0 ? "secondary" : "vert"}

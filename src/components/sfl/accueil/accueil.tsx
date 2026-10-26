@@ -49,7 +49,8 @@ import { Loader2 } from "lucide-react";
 import { SPLASH_FINI } from "@/components/sfl/app-splash";
 import { ConsentementObligatoire } from "@/components/sfl/confidentialite/consentement";
 import { aSuivre, enPause } from "@/components/sfl/invitation-carte";
-import { useMyPlayer } from "@/components/sfl/player-provider";
+import { useJoueurBola, useMyPlayer } from "@/components/sfl/player-provider";
+import { useHorsSfl } from "@/hooks/use-hors-sfl";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useAccord } from "@/hooks/use-accord";
 import { useEtatAccueil } from "@/hooks/use-accueil";
@@ -189,7 +190,8 @@ async function lirePlan(
   poste: string,
   motDePasse: boolean,
   ici: boolean,
-  ligue: () => { saison: Saison; players: Player[] }
+  ligue: () => { saison: Saison; players: Player[] },
+  horsSfl: () => boolean
 ): Promise<{ plan: Plan; brouillon: Brouillon }> {
   const [fait, fiche, ville, notifs] = await Promise.all([
     ici ? Promise.resolve(true) : aTemps(accueilDejaFait(nom), null),
@@ -225,7 +227,8 @@ async function lirePlan(
     if (etapes.length > 0) etapes.push("revelation");
     if (notifs === "inactives" && !enPause("notifs", nom)) etapes.push("notifs");
     const { saison, players } = ligue();
-    proposes = enPause("suivre", nom) ? [] : partenairesAProposer(nom, saison, players);
+    // Un joueur Bola, hors de la SFL : pas de joueurs de la SFL à suivre.
+    proposes = enPause("suivre", nom) || horsSfl() ? [] : partenairesAProposer(nom, saison, players);
     if (proposes.length > 0) etapes.push("suivre");
     etapes.push("visite");
   }
@@ -278,8 +281,14 @@ export function Accueil() {
     return brouillonDe(null, v ? { ville: v.ville, lat: v.lat, lng: v.lng } : null, demo ? player.poste : "");
   });
   const ligue = useRef({ saison, players });
+  // Un joueur Bola (venu par un parrain, hors de la saison) : la base le dit
+  // (useHorsSfl), ou, à la toute première ouverture, la saison où il n'est pas.
+  const horsSfl = useHorsSfl();
+  const bola = useJoueurBola();
+  const horsSflRef = useRef(false);
   useEffect(() => {
     ligue.current = { saison, players };
+    horsSflRef.current = horsSfl || bola;
   });
 
   // L'aperçu : tout le parcours, sur la saison du moment, sans rien lire.
@@ -304,7 +313,7 @@ export function Accueil() {
     // Cet appareil le sait fini : l'app part tout de suite, la relance se lit derrière.
     poserEtatAccueil(ici ? "fini" : "verif");
     let annule = false;
-    void lirePlan(nom, nomSession, player.poste, motDePasseDu, ici, () => ligue.current).then(({ plan: p, brouillon }) => {
+    void lirePlan(nom, nomSession, player.poste, motDePasseDu, ici, () => ligue.current, () => horsSflRef.current).then(({ plan: p, brouillon }) => {
       if (annule) return;
       setB(brouillon);
       setLu({ nom, plan: p });

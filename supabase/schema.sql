@@ -2657,8 +2657,10 @@ $$;
 
 -- Bola Team offert : à qui, par quel joueur SFL, comment et quand. Écrit par
 -- /api/inscription (lien de parrainage ou d'équipe) et par equipe_signer
--- (invitation d'un joueur SFL) ; jamais retiré. La durée de l'offre se
--- fixera avec le paiement.
+-- (invitation d'un joueur SFL) ; jamais retiré. L'offre dure un mois (Sabri,
+-- 26/10 : « un accès à Bola Team pendant un mois ; après, ils devront payer
+-- pour rester dans l'équipe, ou garder leur abonnement Bola normal ») :
+-- acces_team ne la compte que 30 jours après `le` (essai_team_fin).
 create table if not exists public.team_offerts (
   joueur  uuid primary key references public.profiles(id) on delete cascade,
   par     uuid references public.profiles(id) on delete set null,
@@ -2690,7 +2692,23 @@ stable
 as $$
   select not public.team_sur_invitation()
       or public.joueur_sfl(j)
-      or exists (select 1 from public.team_offerts t where t.joueur = j);
+      or exists (select 1 from public.team_offerts t where t.joueur = j and now() < t.le + interval '30 days');
+$$;
+
+-- La fin du mois Bola Team offert au joueur connecté (null : pas d'offre, ou
+-- joueur SFL, qui l'a pour de bon). Passée, l'offre est finie : la page Team
+-- le lui dit (hooks/use-acces-team.ts).
+create or replace function public.essai_team_fin()
+returns timestamptz
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select t.le + interval '30 days'
+    from public.team_offerts t
+   where t.joueur = (select auth.uid())
+     and not public.joueur_sfl((select auth.uid()));
 $$;
 
 -- Ce que l'app lit pour le joueur connecté (hooks/use-acces-team.ts).
@@ -2704,8 +2722,8 @@ as $$
   select public.acces_team((select auth.uid()));
 $$;
 
-revoke execute on function public.joueur_sfl(uuid), public.acces_team(uuid), public.team_sur_invitation(), public.mon_acces_team() from public, anon;
-grant execute on function public.joueur_sfl(uuid), public.acces_team(uuid), public.team_sur_invitation(), public.mon_acces_team() to authenticated;
+revoke execute on function public.joueur_sfl(uuid), public.acces_team(uuid), public.team_sur_invitation(), public.mon_acces_team(), public.essai_team_fin() from public, anon;
+grant execute on function public.joueur_sfl(uuid), public.acces_team(uuid), public.team_sur_invitation(), public.mon_acces_team(), public.essai_team_fin() to authenticated;
 
 -- Mon rôle dans une équipe (null : pas membre).
 create or replace function public.role_equipe(e bigint)
@@ -4648,6 +4666,25 @@ revoke execute on function public.mon_code_parrain(), public.parrain_info(text),
 grant execute on function public.mon_code_parrain(), public.parrainage_code_actif(text, boolean),
   public.parrainage_ma_carte(text, jsonb), public.parrainage_partage(), public.parrainage_suivi() to authenticated;
 grant execute on function public.parrain_info(text), public.parrainage_vu(text, text, text) to anon, authenticated;
+
+-- Un joueur Bola (Sabri, 26/10 : « utilisateur Bola qui n'est pas à la SFL :
+-- le côté SFL doit lui être invisible ») : venu par un parrain, pas dans
+-- l'effectif de la saison, pas admin. L'app lui cache la SFL (la Map sans les
+-- journées, les Actus sur Bola ; hooks/use-hors-sfl.ts). Un compte accepté
+-- par l'admin sans parrain reste comme avant.
+create or replace function public.hors_sfl()
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select exists (select 1 from public.parrainages x where x.filleul = (select auth.uid()))
+     and not public.joueur_sfl((select auth.uid()))
+     and not (select public.is_league_admin());
+$$;
+revoke execute on function public.hors_sfl() from public, anon;
+grant execute on function public.hors_sfl() to authenticated;
 
 -- Le Vestiaire est le salon de la SFL : un joueur Bola (venu par un parrain,
 -- hors de la saison) ne le lit pas et n'y écrit pas. Ses messages privés et
