@@ -12,7 +12,7 @@
 //      abonnés comme sur Instagram (ses abonnés et ses abonnements, « Suivi
 //      par Kader, Anis et 3 autres que tu connais » : suivre.tsx), le bouton
 //      pour le suivre, et trois chiffres de tête en Anton (son rang au Pépite
-//      d'Or, sa note, ses dimanches) ;
+//      d'Or, sa note, ses journées jouées, « 3/5 » s'il en a manqué) ;
 //   2. une phrase qui le résume (fiche-joueur.ts, la même que sur la feuille
 //      de match) ;
 //   3. ses trophées, sur un panneau noir mat sans décor : d'abord les
@@ -25,7 +25,8 @@
 //      spéciales débloquées), et sa courbe : la note de sa carte ou son rang
 //      au Pépite d'Or, journée après journée (carriere.ts) ;
 //   6. son parcours, saison après saison (palmares.ts, comme le Wall of Fame) ;
-//   7. son profil de jeu, sa forme et ses dimanches.
+//   7. son profil de jeu, sa forme et ses dimanches (ceux manqués sur
+//      blessure à leur place : blessure.tsx, Sabri, 26/10).
 // Sous son nom, « Comparer avec ma carte » ouvre les deux cartes face à face,
 // avec le radar des deux profils de jeu superposés (comparer-cartes.tsx).
 // Comparer et un trophée s'ouvrent dans la fenêtre du profil, à sa place,
@@ -35,6 +36,9 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
+import { Bandage } from "lucide-react";
+import { LigneBlessure, useChiffreJournees } from "@/components/sfl/blessure";
+import { useBilanJournees } from "@/hooks/use-blessures";
 import { Card3DEnGrand } from "@/components/sfl/carte-en-grand";
 import { CartesCarriere, CourbeCarriere } from "@/components/sfl/carriere-joueur";
 import { ComparerCartes } from "@/components/sfl/comparer-cartes";
@@ -132,8 +136,6 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
         .sort((a, b) => a.j - b.j),
     [saison.entries, player.name]
   );
-  // Un dimanche peut compter plusieurs matchs : on compte les dimanches.
-  const dimanches = new Set(mine.map((e) => e.j)).size;
   const forme = mine
     .filter((e) => e.result)
     .slice(-5)
@@ -143,6 +145,13 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
   const trophees = ecussons.reduce((n, e) => n + e.podiums.length, 0) + medailles.length;
   const xp = useXp(player.name);
   const rangXp = useRangXp(player.name);
+  const journeesJouees = useChiffreJournees(player.name);
+  const bilan = useBilanJournees(player.name);
+  // Dimanche par dimanche : ses journées jouées, et celles manquées sur blessure à leur place.
+  const lignes = [
+    ...mine.map((e) => ({ j: e.j, e })),
+    ...bilan.blesse.map((j) => ({ j, e: null })),
+  ].sort((a, b) => a.j - b.j);
 
   return (
     <motion.div
@@ -181,8 +190,10 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
           <Chiffre valeur={ordinal(rank)} quoi="Pépite d'Or" />
           {division && <Chiffre valeur={nomDivision(division)} quoi="Division" />}
           <Chiffre valeur={ovr(player.stats)} quoi="Général" />
-          <Chiffre valeur={dimanches} quoi={dimanches > 1 ? "Dimanches" : "Dimanche"} />
+          <Chiffre valeur={journeesJouees.valeur} quoi={journeesJouees.quoi} />
         </div>
+        {/* Blessé : ses journées manquées, ses stats arrêtées là (blessure.tsx) */}
+        <LigneBlessure nom={player.name} />
         <p className="w-full text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
         {moi && (
           <button
@@ -345,28 +356,37 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
           </div>
         )}
 
-        {mine.length > 0 && (
+        {lignes.length > 0 && (
           <section>
             <h3 className="mono-label mb-2.5 px-1 text-muted-foreground">Dimanche par dimanche</h3>
             <div className="glass overflow-hidden rounded-[22px]">
-              {mine.map((e, i) => (
+              {lignes.map(({ j, e }, i) => (
                 <div
-                  key={e.j}
-                  className={cn("flex items-center gap-3 px-4 py-2.5 text-[13px]", i < mine.length - 1 && "border-b border-foreground/8")}
+                  key={e ? `${j}-${i}` : `blesse-${j}`}
+                  className={cn("flex items-center gap-3 px-4 py-2.5 text-[13px]", i < lignes.length - 1 && "border-b border-foreground/8")}
                 >
-                  <span className="mono-label w-7 shrink-0 text-foreground/40">J{e.j}</span>
-                  <span className="min-w-0 flex-1 truncate text-foreground/45">{dates.get(e.j) ?? ""}</span>
-                  <span className="shrink-0 tabular-nums text-foreground/70">
-                    {e.buts}⚽ {e.passes}🅰
-                  </span>
-                  <span
-                    className={cn(
-                      "w-5 shrink-0 text-right font-bold",
-                      e.result === "Victoire" ? "text-primary" : e.result === "Nul" ? "text-foreground/50" : "text-foreground/30"
-                    )}
-                  >
-                    {e.result ? e.result[0] : "–"}
-                  </span>
+                  <span className="mono-label w-7 shrink-0 text-foreground/40">J{j}</span>
+                  <span className="min-w-0 flex-1 truncate text-foreground/45">{dates.get(j) ?? ""}</span>
+                  {e ? (
+                    <>
+                      <span className="shrink-0 tabular-nums text-foreground/70">
+                        {e.buts}⚽ {e.passes}🅰
+                      </span>
+                      <span
+                        className={cn(
+                          "w-5 shrink-0 text-right font-bold",
+                          e.result === "Victoire" ? "text-primary" : e.result === "Nul" ? "text-foreground/50" : "text-foreground/30"
+                        )}
+                      >
+                        {e.result ? e.result[0] : "–"}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="flex shrink-0 items-center gap-1.5 font-semibold text-foreground/55">
+                      <Bandage className="size-3.5" aria-hidden />
+                      Blessé
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

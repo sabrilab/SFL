@@ -12,12 +12,17 @@
 // la saison en cours, une saison close (son archive), et le Wall of Fame,
 // où `joueurs` et `categories` sont les légendes de toute la carrière
 // (sans badges de saison ni partage au Vestiaire).
+//
+// À côté des points, les journées jouées de chacun, comme la colonne J d'un
+// classement de Ligue 1 (Sabri, 26/10 : « s'il y a un joueur qui est blessé
+// et qui a manqué un match […] tout le monde va savoir qu'il y a une journée
+// en moins ») ; « Blessé » sous son nom tant qu'il l'est (lib/sfl/blessures.ts).
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { BadgesLigne } from "@/components/sfl/distinctions";
-import { useSeason } from "@/components/sfl/season-provider";
+import { useSaisonClose, useSeason } from "@/components/sfl/season-provider";
 import { rankByMetric, type Player } from "@/lib/sfl/engine";
 import { RANKINGS, unite, type Categorie } from "@/lib/sfl/rankings";
 import { distinctions } from "@/lib/sfl/distinctions";
@@ -26,6 +31,7 @@ import { Nom } from "@/components/sfl/nom";
 import { AuVestiaire } from "@/components/sfl/au-vestiaire";
 import { METAL, PastilleDivision, PlaceMetal, parDivision, useDecoupageClassement } from "@/components/sfl/metal-division";
 import { nomDivision, type Division } from "@/lib/sfl/divisions";
+import { useJourneesDuClassement } from "@/hooks/use-blessures";
 
 const DAUPHIN = FORMAT_CARTE.moyenne;
 const CHAMPION = FORMAT_CARTE.grande;
@@ -33,7 +39,38 @@ const CHAMPION = FORMAT_CARTE.grande;
 
 type Classe = Player & { rank: number; value: number };
 
-function Podium({ def, top, me, cle }: { def: Categorie; top: Classe[]; me: string; cle?: string }) {
+/** Ses journées jouées : « 3 J ». */
+function Journees({ n, className }: { n: number; className?: string }) {
+  return (
+    <span className={cn("shrink-0 text-right font-semibold tabular-nums text-foreground/60", className)} aria-label={`${n} ${n > 1 ? "journées jouées" : "journée jouée"}`}>
+      {n}
+      <span className="mono-label ml-0.5 text-foreground/40">J</span>
+    </span>
+  );
+}
+
+/** « Blessé », neutre : ni rouge ni bleu, réservés aux cartes Impact et Défensive. */
+function Blesse() {
+  return (
+    <span className="shrink-0 rounded-full bg-foreground/8 px-2 py-0.5 text-[9px] font-bold tracking-wide text-foreground/65 uppercase">
+      Blessé
+    </span>
+  );
+}
+
+function Podium({
+  def,
+  top,
+  me,
+  cle,
+  journees,
+}: {
+  def: Categorie;
+  top: Classe[];
+  me: string;
+  cle?: string;
+  journees: (p: Classe) => number;
+}) {
   const [premier, deuxieme, troisieme] = [top[0], top[1] ?? null, top[2] ?? null];
   // Le podium classique : le 2e à gauche, le champion au milieu, le 3e à droite.
   const marches = [
@@ -60,6 +97,7 @@ function Podium({ def, top, me, cle }: { def: Categorie; top: Classe[]; me: stri
             <span className={cn("font-bold tabular-nums", p === premier ? "text-[20px]" : "text-[15px]")}>
               {p.value}
               <span className="mono-label ml-1 text-foreground/40">{unite(def, p.value)}</span>
+              <Journees n={journees(p)} className={cn("ml-1.5", p === premier ? "text-[14px]" : "text-[12px]")} />
             </span>
           </div>
         ) : (
@@ -85,6 +123,11 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
     [players, saison, carriere]
   );
   const ranked: Classe[] = rankByMetric(joueurs ?? players, def.value).filter((p) => def.showAll || p.value > 0);
+  // Les journées de chacun : celles de la saison lue ; dans la carrière, ses matchs.
+  const close = useSaisonClose();
+  const { journees: parJoueur, blesses } = useJourneesDuClassement();
+  const journees = (p: Classe) => (carriere ? p.matchs : (parJoueur.get(p.name) ?? 0));
+  const blesse = (p: Classe) => !carriere && !close && (blesses.has(p.name) || p.statut === "Blessure");
 
   // La Pépite d'Or de la saison, coupée en divisions dès qu'elle en a (Sabri,
   // 25/10 : « il faut que les divisions soient visibles ») : chaque division
@@ -113,19 +156,16 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
       <span className="flex min-w-0 flex-1 items-center gap-2">
         <span className="truncate text-[15px] font-semibold"><Nom n={p.name} /></span>
         <BadgesLigne ds={parNom.get(p.name)} />
-        {!carriere && p.statut !== "Actif" && (
+        {blesse(p) && <Blesse />}
+        {!carriere && p.statut === "Suspendu" && (
           <span
-            className={cn(
-              "shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide uppercase",
-              p.statut === "Suspendu"
-                ? "bg-destructive/10 text-destructive"
-                : "bg-sky-500/10 text-sky-600 dark:text-sky-400"
-            )}
+            className="shrink-0 rounded-full bg-destructive/10 px-2 py-0.5 text-[9px] font-bold tracking-wide text-destructive uppercase"
           >
             {p.statut}
           </span>
         )}
       </span>
+      <Journees n={journees(p)} className="w-9 text-[14px]" />
       <span className="w-16 text-right text-lg font-bold tracking-tight tabular-nums">
         {p.value}
         <span className="mono-label ml-1 text-foreground/40">{unite(def, p.value)}</span>
@@ -161,7 +201,7 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
             </div>
             {g.x === 1 && (
               <>
-                <Podium def={def} top={g.joueurs.slice(0, 3).map((p) => ({ ...p, rank: p.place ?? p.rank }))} me={me} cle={cle} />
+                <Podium def={def} top={g.joueurs.slice(0, 3).map((p) => ({ ...p, rank: p.place ?? p.rank }))} me={me} cle={cle} journees={journees} />
                 {vestiaire}
               </>
             )}
@@ -177,7 +217,7 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
 
   return (
     <div className="flex flex-col gap-5">
-      <Podium def={def} top={ranked.slice(0, 3)} me={me} cle={cle} />
+      <Podium def={def} top={ranked.slice(0, 3)} me={me} cle={cle} journees={journees} />
       {vestiaire}
 
       <div className="flex flex-col gap-1.5">
