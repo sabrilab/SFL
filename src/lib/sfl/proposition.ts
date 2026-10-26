@@ -76,15 +76,28 @@ export function meilleurMoment(
   };
 }
 
-/** Le terrain à proposer près d'un point, pour un moment (ou n'importe quand) ; null sans terrain. */
+/** Au-delà, un terrain n'est plus « près de toi » : on n'en propose aucun. */
+const PROCHE_KM = 40;
+
+/**
+ * Le terrain à proposer près d'un point, pour un moment (ou n'importe quand) ;
+ * null sans terrain à moins de PROCHE_KM. Le soir, un terrain éclairé ; mais
+ * l'éclairage n'est pas toujours renseigné (OpenStreetMap, au Maghreb surtout) :
+ * sans terrain éclairé autour, le plus proche.
+ */
 export function terrainPropose<T extends TerrainPropose>(terrains: T[], pres: { lat: number; lng: number }, moment: Moment | null): T | null {
   let mieux: T | null = null;
   let score = Infinity;
+  let proche: T | null = null;
+  let scoreProche = Infinity;
   for (const t of terrains) {
+    const d = km(pres, t);
+    if (d > PROCHE_KM) continue;
+    const s = d - (t.ligue != null ? AVANCE_LIGUE : 0);
+    if (s < scoreProche) [proche, scoreProche] = [t, s];
     // Le soir, il faut de la lumière : la ligue y joue déjà (son éclairage n'est pas toujours recensé).
     if (moment === "soir" && t.ligue == null && !t.eclaire) continue;
-    const s = km(pres, t) - (t.ligue != null ? AVANCE_LIGUE : 0);
     if (s < score) [mieux, score] = [t, s];
   }
-  return mieux;
+  return mieux ?? proche;
 }
