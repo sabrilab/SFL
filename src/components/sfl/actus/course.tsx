@@ -70,6 +70,7 @@ import { SaisonArchiveProvider, useSeason } from "@/components/sfl/season-provid
 import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { CarteJournee } from "@/components/sfl/carte-journee";
 import { Classements } from "@/components/sfl/classements";
+import { useJourneesDuClassement } from "@/hooks/use-blessures";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { useCollant } from "@/hooks/use-collant";
@@ -297,12 +298,15 @@ function PodiumPepite({
   podium,
   def,
   division,
+  journees,
   cle,
 }: {
   podium: (Player & { value: number; place: number })[];
   def: Categorie;
   division?: Division;
   cle?: string;
+  /** Ses journées jouées, à côté des points (comme la colonne J de la Ligue 1). */
+  journees: (p: Player) => number;
 }) {
   const boite = useRef<HTMLDivElement>(null);
   const premier = useRef<HTMLDivElement>(null);
@@ -348,7 +352,7 @@ function PodiumPepite({
                 <Nom n={p.name} />
               </span>
               <span className="mono-label text-[10px] text-foreground/50 tabular-nums">
-                {p.value} {unite(def, p.value)}
+                {p.value} {unite(def, p.value)} · {journees(p)} J
               </span>
             </div>
           );
@@ -387,6 +391,9 @@ function Ticker({
   const rang = rankByMetric(joueurs ?? players, def.value).filter(
     (p) => def.showAll || p.value > 0,
   );
+  // Les journées jouées de chacun, à côté des points ; dans la carrière, ses matchs.
+  const { journees: parJoueur } = useJourneesDuClassement();
+  const journees = (p: Player) => (joueurs ? p.matchs : (parJoueur.get(p.name) ?? 0));
   // La Pépite d'Or de la saison, coupée en divisions dès qu'elle en a (Sabri,
   // 25/10 : « il faut que les divisions soient visibles ») : chaque division
   // sur son métal, ses places comptées depuis 1, son podium à l'écrin.
@@ -489,7 +496,7 @@ function Ticker({
         <Nom n={p.name} />
       </span>
       <span className="mono-label text-[10px] text-foreground/50 tabular-nums">
-        {p.value} {unite(def, p.value)}
+        {p.value} {unite(def, p.value)} · {journees(p)} J
       </span>
       <span
         className={cn(
@@ -509,7 +516,7 @@ function Ticker({
     .slice(0, 3);
   return (
     <>
-    {avecPodium && podium.length === 3 && <PodiumPepite podium={podium} def={def} division={groupes?.[0].x} cle={cle} />}
+    {avecPodium && podium.length === 3 && <PodiumPepite podium={podium} def={def} division={groupes?.[0].x} cle={cle} journees={journees} />}
     <div className="md:relative">
       {(["debut", "fin"] as const).map((bout) => (
         <button

@@ -53,6 +53,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Card3DEnGrand } from "@/components/sfl/carte-en-grand";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { Chiffre } from "@/components/sfl/profil-joueur";
+import { BoutonBlessure, useChiffreJournees } from "@/components/sfl/blessure";
 import { ReseauJoueur } from "@/components/sfl/suivre";
 import { AppartenancesJoueur } from "@/components/sfl/badge-sfl";
 import { ProfilePhoto } from "@/components/sfl/profile-photo";
@@ -129,6 +130,7 @@ function ProfilJoueurPage() {
     [allPlayers, player.name]
   );
   const { fiche, joues } = useMaCarte();
+  const journees = useChiffreJournees(player.name);
   // La carte est le sujet de la page : elle profite de la place quand il y en
   // a, et d'un cran de plus (√φ) sur les très grands écrans.
   const grand = useGrandEcran();
@@ -202,7 +204,7 @@ function ProfilJoueurPage() {
             <Chiffre valeur={myRank != null && (joues > 0 || player.pp !== 0) ? ordinal(myRank) : "–"} quoi="Pépite d'Or" />
             {division && <Chiffre valeur={nomDivision(division)} quoi="Division" />}
             <Chiffre valeur={ovr(player.stats)} quoi="Général" />
-            <Chiffre valeur={joues} quoi={joues > 1 ? "Dimanches" : "Dimanche"} />
+            <Chiffre valeur={journees.valeur} quoi={journees.quoi} />
           </div>
           <p className="w-full text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
           {/* Ma photo, ma carte officielle (photo au maillot Bola) tant
@@ -222,6 +224,8 @@ function ProfilJoueurPage() {
           </div>
           {/* Personnaliser ma carte : le skin, les signes et le badge, au choix (personnaliser-carte.tsx) */}
           <PersonnaliserCarte player={player} />
+          {/* Je suis blessé, ou remis : mes journées manquées se lisent sur mon profil (blessure.tsx) */}
+          <BoutonBlessure nom={player.name} />
           {/* Inviter : mon lien et mon code de parrainage (parrainage/page.tsx) */}
           <Link
             href="/parrainage"

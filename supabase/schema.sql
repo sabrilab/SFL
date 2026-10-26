@@ -5555,3 +5555,90 @@ begin
   end if;
 end;
 $$;
+
+-- ───────────────────────── Les blessures déclarées ─────────────────────────
+-- Sabri, 26/10 : « une fonctionnalité qui permet à chaque utilisateur de se
+-- déclarer blessé », pour que tout le monde voie que ses stats sont restées
+-- bloquées sur ces journées-là (lib/sfl/blessures.ts). Une blessure se compte
+-- en journées : `depuis` est la première journée manquée, `fin` la dernière
+-- (comprise), null tant qu'il n'est pas remis. On ne se déclare que soi-même,
+-- par se_declarer_blesse() : la base pose le nom (mon_nom) et l'heure. Toute
+-- la ligue lit tout : c'est ce qu'on lit dans les classements et les profils.
+create table if not exists public.blessures (
+  saison     integer not null,
+  joueur     text    not null,
+  depuis     integer not null check (depuis between 1 and 99),
+  fin        integer check (fin is null or fin >= depuis),
+  joueur_id  uuid    not null references public.profiles(id) on delete cascade,
+  le         timestamptz not null default now(),
+  primary key (saison, joueur, depuis)
+);
+
+alter table public.blessures enable row level security;
+
+drop policy if exists "blessures: la ligue lit tout" on public.blessures;
+create policy "blessures: la ligue lit tout"
+  on public.blessures for select
+  to authenticated
+  using ((select public.est_membre()));
+
+revoke all on public.blessures from anon, authenticated;
+grant select on public.blessures to authenticated;
+
+-- Se déclarer blessé (p_blesse) à partir de la journée p_j, la prochaine à
+-- jouer ; ou remis (p_blesse = false) : la blessure en cours se ferme sur la
+-- journée d'avant p_j, ou disparaît si aucune journée n'a été manquée.
+create or replace function public.se_declarer_blesse(
+  p_saison integer,
+  p_j integer,
+  p_blesse boolean
+)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_nom text := public.mon_nom();
+  v_le  timestamptz := now();
+  v_depuis integer;
+begin
+  if not public.est_membre() or v_nom is null then
+    raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
+  end if;
+  if p_j < 1 or p_j > 99 then
+    raise exception 'Journée inconnue.' using errcode = '22023';
+  end if;
+  select b.depuis into v_depuis from public.blessures b
+    where b.saison = p_saison and b.joueur = v_nom and b.fin is null
+    order by b.depuis desc limit 1;
+  if p_blesse then
+    if v_depuis is null then
+      insert into public.blessures (saison, joueur, depuis, fin, joueur_id, le)
+      values (p_saison, v_nom, p_j, null, (select auth.uid()), v_le)
+      on conflict (saison, joueur, depuis) do update
+        set fin = null, joueur_id = excluded.joueur_id, le = excluded.le;
+    end if;
+  elsif v_depuis is not null then
+    if p_j - 1 < v_depuis then
+      delete from public.blessures where saison = p_saison and joueur = v_nom and depuis = v_depuis;
+    else
+      update public.blessures set fin = p_j - 1, le = v_le
+        where saison = p_saison and joueur = v_nom and depuis = v_depuis;
+    end if;
+  end if;
+  return v_le;
+end;
+$$;
+
+revoke execute on function public.se_declarer_blesse(integer, integer, boolean) from public, anon;
+grant execute on function public.se_declarer_blesse(integer, integer, boolean) to authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.blessures;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
