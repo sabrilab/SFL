@@ -14,6 +14,9 @@
 // La vidéo n'a jamais d'adresse publique : l'image d'attente et le fichier
 // arrivent par des adresses signées qui expirent ; pas de téléchargement
 // proposé, pas d'image dans l'image.
+//
+// Une vidéo peut avoir des images après elle (lib/sfl/carrousels.ts) : sa
+// publication devient un carrousel, la vidéo d'abord.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -43,6 +46,7 @@ import {
   type Echos,
   type Video,
 } from "@/lib/sfl/videos";
+import { diaposDe, type Diapo } from "@/lib/sfl/carrousels";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { dateIsoDuLibelle, joursJusquA } from "@/lib/sfl/meteo";
@@ -293,32 +297,36 @@ function PublicationVideo({ v, ouvrir }: { v: Video; ouvrir: (commentaires: bool
   // Sans image d'attente : la vidéo elle-même, arrêtée sur une image.
   const fichier = useAdresse(v.affiche ? null : v.fichier);
   const temps = duree(v.duree);
+  const diapos = diaposDe(v.id);
+  const video = (
+    <button
+      type="button"
+      onClick={() => ouvrir(false)}
+      aria-label={`Regarder ${v.titre}`}
+      className={cn("relative block w-full overflow-hidden bg-black", diapos.length ? "shrink-0 snap-center" : "sm:rounded-[22px]")}
+      style={{ aspectRatio: "4 / 5" }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {affiche ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={affiche} alt="" draggable={false} className="absolute inset-0 size-full object-cover" />
+      ) : fichier ? (
+        <video src={`${fichier}#t=1.5`} muted playsInline preload="metadata" className="absolute inset-0 size-full object-cover" />
+      ) : null}
+      <span className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/45" />
+      <span className="absolute top-1/2 left-1/2 grid size-[68px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black/35 text-white ring-1 ring-white/25 backdrop-blur-md">
+        <Play className="ml-1 size-[26px] fill-current" strokeWidth={0} />
+      </span>
+      {temps && (
+        <span className="mono-label absolute top-3 right-3 rounded-full bg-black/55 px-2.5 py-1 text-white tabular-nums backdrop-blur-sm">
+          {temps}
+        </span>
+      )}
+    </button>
+  );
   return (
     <article className="actu-publication flex flex-col">
-      <button
-        type="button"
-        onClick={() => ouvrir(false)}
-        aria-label={`Regarder ${v.titre}`}
-        className="relative block w-full overflow-hidden bg-black sm:rounded-[22px]"
-        style={{ aspectRatio: "4 / 5" }}
-        onContextMenu={(e) => e.preventDefault()}
-      >
-        {affiche ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={affiche} alt="" draggable={false} className="absolute inset-0 size-full object-cover" />
-        ) : fichier ? (
-          <video src={`${fichier}#t=1.5`} muted playsInline preload="metadata" className="absolute inset-0 size-full object-cover" />
-        ) : null}
-        <span className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/0 to-black/45" />
-        <span className="absolute top-1/2 left-1/2 grid size-[68px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black/35 text-white ring-1 ring-white/25 backdrop-blur-md">
-          <Play className="ml-1 size-[26px] fill-current" strokeWidth={0} />
-        </span>
-        {temps && (
-          <span className="mono-label absolute top-3 right-3 rounded-full bg-black/55 px-2.5 py-1 text-white tabular-nums backdrop-blur-sm">
-            {temps}
-          </span>
-        )}
-      </button>
+      {diapos.length > 0 ? <Carrousel diapos={diapos}>{video}</Carrousel> : video}
       <div className="flex items-start gap-2 pt-2.5 pr-1.5 pl-4">
         <div className="min-w-0 flex-1">
           <p className="text-[15px] leading-snug font-semibold">{v.titre}</p>
@@ -346,6 +354,66 @@ function PublicationVideo({ v, ouvrir }: { v: Video; ouvrir: (commentaires: bool
         </button>
       </div>
     </article>
+  );
+}
+
+/**
+ * La vidéo puis ses images, à faire glisser (lib/sfl/carrousels.ts) : comme
+ * un carrousel d'Instagram, une page à la fois, les points dessous (rien
+ * par-dessus les images : elles ont déjà leur en-tête).
+ */
+function Carrousel({ diapos, children }: { diapos: Diapo[]; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [rang, setRang] = useState(0);
+  const total = diapos.length + 1;
+  const suivre = () => {
+    const el = ref.current;
+    if (!el || !el.clientWidth) return;
+    setRang(Math.min(total - 1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth))));
+  };
+  const aller = (i: number) => {
+    const el = ref.current;
+    if (el) el.scrollTo({ left: i * el.clientWidth, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  };
+  return (
+    <div className="flex flex-col">
+      <div className="relative overflow-hidden bg-black sm:rounded-[22px]">
+        <div
+          ref={ref}
+          onScroll={suivre}
+          aria-roledescription="carrousel"
+          className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {children}
+          {diapos.map((d, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={d.src}
+              src={d.src}
+              alt={d.alt}
+              draggable={false}
+              loading={i === 0 ? "eager" : "lazy"}
+              decoding="async"
+              className="block w-full shrink-0 snap-center object-cover"
+              style={{ aspectRatio: "4 / 5" }}
+            />
+          ))}
+        </div>
+      </div>
+      <div className="flex justify-center gap-[5px] pt-2.5" role="tablist" aria-label="Pages du carrousel">
+        {Array.from({ length: total }, (_, i) => (
+          <button
+            key={i}
+            type="button"
+            role="tab"
+            aria-selected={i === rang}
+            aria-label={i === 0 ? "La vidéo" : diapos[i - 1].alt}
+            onClick={() => aller(i)}
+            className={cn("size-[6px] rounded-full transition-colors", i === rang ? "bg-foreground" : "bg-foreground/20")}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
