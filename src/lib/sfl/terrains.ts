@@ -176,8 +176,21 @@ export async function lireCommunes(q: string): Promise<void> {
   const mots = sansAccents(q).split(" ").filter((m) => m.length >= 3);
   if (!mots.length) return;
   const i = await lireIndexTerrains();
+  const tout = mots.join(" ");
+  // « Berlin » : Berlin d'abord, puis les communes dont un mot commence par lui ; jamais Oberlindach ni Überlingen.
+  const rang = (communes: string[]) => {
+    let r = 0;
+    for (const c of communes) {
+      const n = sansAccents(c);
+      if (n === tout) return 2;
+      if (mots.every((m) => debutDeMot(n, m))) r = 1;
+    }
+    return r;
+  };
   const cles = Object.entries(i.cases)
-    .filter(([, [, ...communes]]) => communes.some((c) => mots.every((m) => sansAccents(c).includes(m))))
+    .map(([c, [, ...communes]]) => [c, rang(communes)] as const)
+    .filter(([, r]) => r > 0)
+    .sort((a, b) => b[1] - a[1])
     .map(([c]) => c)
     .slice(0, 12);
   await lireCases(cles);
@@ -291,13 +304,18 @@ export function sansAccents(s: string): string {
     .trim();
 }
 
-/** Les complexes dont le nom, la commune ou l'adresse contiennent chaque mot cherché. */
+/** Un mot du texte commence par `m` (les deux déjà passés par sansAccents) : « berlin » trouve Berlin, pas Oberlindach. */
+function debutDeMot(texte: string, m: string): boolean {
+  return ` ${texte}`.includes(` ${m}`);
+}
+
+/** Les complexes dont le nom, la commune ou l'adresse ont un mot qui commence par chaque mot cherché. */
 export function chercherTerrains<T extends TerrainRecense>(terrains: T[], q: string): T[] {
   const mots = sansAccents(q).split(" ").filter(Boolean);
   if (!mots.length) return terrains;
   return terrains.filter((t) => {
     const texte = sansAccents(`${t.nom} ${t.commune} ${t.adresse}`);
-    return mots.every((m) => texte.includes(m));
+    return mots.every((m) => debutDeMot(texte, m));
   });
 }
 

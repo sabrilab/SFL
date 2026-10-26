@@ -173,7 +173,7 @@ function nomDe(tags: Record<string, string> | undefined, maghreb: boolean): stri
 }
 
 /** Les centres sportifs qui ne sont pas des terrains de foot. */
-const PAS_FOOT = /aqua|piscine|zwembad|schwimm|bad\b|swim|pool|piscina|tennis|golf|padel|équestre|equestr|manège|reit|patinoire|ijs|eis|ski|bowling|fitness|hockey|cricket|rugby/i;
+const PAS_FOOT = /aqua|piscine|zwembad|schwimm|bad\b|swim|pool|piscina|tennis|golf|padel|équestre|equestr|manège|reit|patinoire|ijs|eis|ski|bowling|fitness|hockey|cricket|rugby|tischtennis|^tt\b|squash|kletter|climb|boulder|trampolin|kart\b/i;
 
 /** Les centres d'entraînement des clubs pros, fermés aux joueurs (comme le LOSC au recensement) : leurs terrains ne sont pas proposés. */
 const PRO = /training ground|trainingsgel[äa]nde|trainingszentrum|centre d'entra[îi]nement|centre de formation|centro (di )?allenamento|ciudad deportiva|sports? academy/i;
