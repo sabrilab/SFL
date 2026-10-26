@@ -31,6 +31,7 @@ import type { Journee, JourneeMatch } from "./engine";
 import type { Saison } from "./saisie/types";
 import { voteOuvert } from "./convocation-temps";
 import { supabase } from "@/lib/supabase";
+import { isPlaceExtraTime } from "./hidden";
 
 export type CategorieVote = "impact" | "def";
 export const CATEGORIES_VOTE: CategorieVote[] = ["impact", "def"];
@@ -194,4 +195,79 @@ export function appliquerVotes(saison: Saison, journees: Journee[], votes: VoteF
     return next;
   });
   return change ? { ...saison, entries } : saison;
+}
+
+/* ------------------------------ Le bilan admin -------------------------- */
+// Ce que l'admin voit des votes (Admin → Feuille → Votes), ouverts ou fermés :
+// voix, élus, et qui a voté, match par match. Sabri, 25/10 : « montrer dans
+// l'espace admin les résultats des votes ».
+
+export interface BilanMatch {
+  match: JourneeMatch;
+  parCategorie: Record<CategorieVote, Decompte>;
+  /** Les joueurs du match (hors extra time) qui ont voté au moins une fois, ou pas. */
+  ontVote: string[];
+  nontPasVote: string[];
+}
+
+export interface VoixEcartee {
+  votant: string;
+  candidat: string;
+  categorie: CategorieVote;
+  raison: string;
+}
+
+export interface BilanJournee {
+  matchs: BilanMatch[];
+  /** Joueurs de la journée (hors extra time) et ceux d'entre eux qui ont voté. */
+  inscrits: number;
+  votants: number;
+  /** Les bulletins qui ne comptent dans aucun match, avec la raison. */
+  ecartees: VoixEcartee[];
+}
+
+export function bilanJournee(votes: VoteFigure[], saison: number, jn: Journee): BilanJournee {
+  const duJour = votes.filter((v) => v.saison === saison && v.j === jn.j);
+  const equipeDe = new Map<string, { m: string; t: "A" | "B" }>();
+  for (const m of jn.matches ?? []) {
+    m.teamA.players.forEach((p) => !p.extraTime && equipeDe.set(p.name, { m: m.id, t: "A" }));
+    m.teamB.players.forEach((p) => !p.extraTime && equipeDe.set(p.name, { m: m.id, t: "B" }));
+  }
+  const aVote = new Set(duJour.map((v) => v.votant));
+  // Les places « X1 », « X2 »… complètent une équipe sans être des joueurs :
+  // elles ne votent pas et ne comptent pas parmi les inscrits.
+  const vrai = (n: string) => !isPlaceExtraTime(n);
+  const matchs = (jn.matches ?? []).map((match) => {
+    const joueurs = [...match.teamA.players, ...match.teamB.players]
+      .filter((p) => !p.extraTime && vrai(p.name))
+      .map((p) => p.name);
+    const compter = (cat: CategorieVote) => ({ ...decompterMatch(votes, saison, jn.j, match, cat), inscrits: joueurs.length });
+    return {
+      match,
+      parCategorie: { impact: compter("impact"), def: compter("def") },
+      ontVote: joueurs.filter((n) => aVote.has(n)),
+      nontPasVote: joueurs.filter((n) => !aVote.has(n)),
+    };
+  });
+  const ecartees: VoixEcartee[] = [];
+  for (const v of duJour) {
+    const a = equipeDe.get(v.votant);
+    const b = equipeDe.get(v.candidat);
+    const raison = !a
+      ? "votant hors des feuilles du jour"
+      : !b
+        ? "candidat hors des feuilles du jour"
+        : a.m !== b.m
+          ? "candidat d'un autre match"
+          : a.t === b.t
+            ? "vote pour un coéquipier"
+            : null;
+    if (raison) ecartees.push({ votant: v.votant, candidat: v.candidat, categorie: v.categorie, raison });
+  }
+  return {
+    matchs,
+    inscrits: [...equipeDe.keys()].filter(vrai).length,
+    votants: [...equipeDe.keys()].filter((n) => vrai(n) && aVote.has(n)).length,
+    ecartees,
+  };
 }
