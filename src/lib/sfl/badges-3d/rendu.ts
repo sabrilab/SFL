@@ -206,6 +206,11 @@ function matieresDe(m: Matiere, env: THREE.Texture): Record<Role, THREE.MeshPhys
   return r;
 }
 
+/** Le métal brut d'une pépite, dans cet environnement (les pépites qui flottent, pepites-flottantes.tsx). */
+export function matiereBrute(m: Metal, env: THREE.Texture): THREE.MeshPhysicalMaterial {
+  return matieresDe(m, env).brut;
+}
+
 /** Libère un environnement et ses matières (le badge vivant, à sa fermeture). */
 export function liberer(env: THREE.Texture) {
   for (const r of matieres.get(env)?.values() ?? []) for (const mat of Object.values(r)) mat.dispose();
