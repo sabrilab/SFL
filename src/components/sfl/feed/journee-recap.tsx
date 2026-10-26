@@ -32,7 +32,7 @@ import {
   type Player,
 } from "@/lib/sfl/engine";
 import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
-import { publicOnly } from "@/lib/sfl/hidden";
+import { isHidden, publicOnly } from "@/lib/sfl/hidden";
 import {
   AbsentsModule,
   CouleursModule,
@@ -196,7 +196,9 @@ export function JourneeRecap({ j }: { j: number }) {
 
 function JourneeRecapComplet({ j }: { j: number }) {
   const { player } = useMyPlayer();
-  const { journees, boostCards, saison } = useSeason();
+  // Les élus des votes fermés (Impact, Défensive) posés sur leurs lignes.
+  const { journees, boostCards, saison: brute, saisonTitree } = useSeason();
+  const saison = saisonTitree ?? brute;
   // Une saison close se relit sans ses jeux (quiz, pronostic), qui sont du présent.
   const relue = useSaisonClose();
 
@@ -266,8 +268,9 @@ function JourneeRecapComplet({ j }: { j: number }) {
 
   // Lignes brutes de la journée (avec honneurs et résultat) : elles portent
   // les modules narratifs — tops au barème, débuts, duo, record.
+  // Ni les joueurs masqués ni les places « X1 » qui complètent une équipe.
   const jEntries = saisonAtJ.entries.filter(
-    (e) => e.j === lastJ.j && e.statut === "Présent" && !e.extraTime
+    (e) => e.j === lastJ.j && e.statut === "Présent" && !e.extraTime && !isHidden(e.player)
   );
   const tops = [...jEntries]
     .map((e) => ({ e, pp: entryPP(e) }))

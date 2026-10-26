@@ -8,7 +8,7 @@
   inset: 0;
   z-index: 45;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   grid-template-columns: minmax(0, 1fr);
   overflow: hidden;
   color: #f4f5f2;
@@ -341,28 +341,101 @@
   color: var(--r-texte);
 }
 
-.mp-pied {
+/* Les deux onglets, comme un passe de combat : Passe et Missions. */
+.mp-vues {
+  position: relative;
+  z-index: 2;
   display: flex;
-  justify-content: center;
-  gap: 8px;
+  justify-self: center;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.06);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
-.mp-onglet {
-  height: 36px;
-  padding: 0 16px;
+.mp-vue {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 18px;
   border-radius: 999px;
   font-family: var(--font-jbmono), ui-monospace, monospace;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgb(255 255 255 / 0.8);
-  background: rgb(255 255 255 / 0.06);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+  color: rgb(255 255 255 / 0.6);
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.mp-vue--active {
+  color: #0b0a14;
+  background: #f4f5f2;
+}
+.mp-vue__pastille {
+  display: grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0;
+  color: #0b0a14;
+  background: var(--r-texte);
+}
+.mp-vue--active .mp-vue__pastille {
+  color: #f4f5f2;
+  background: #0b0a14;
 }
 
-.mp-feuille {
-  color: #f4f5f2;
-  background: #0d0c22;
+.mp-carte {
+  grid-row: 3;
+}
+.mp-bas {
+  grid-row: 4;
+}
+
+/* La face Missions défile sous les onglets ; le reste du mode tient. */
+.mp-defile {
+  position: relative;
+  z-index: 2;
+  grid-row: 3 / -1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 18px);
+  mask-image: linear-gradient(180deg, transparent, #000 18px);
+}
+.mp-missions {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  width: 100%;
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: 22px 0 calc(env(safe-area-inset-bottom, 0px) + 28px);
+}
+.mp-source {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+}
+.mp-source__gain {
+  font-family: var(--font-jbmono), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgb(255 255 255 / 0.7);
 }
 
 @media (prefers-reduced-motion: reduce) {

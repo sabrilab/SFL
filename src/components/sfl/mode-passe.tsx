@@ -12,8 +12,11 @@
 //   · la passe en route : les vingt paliers en file, à l'horizontale, sous la
 //     carte ; on la fait glisser, le palier qui passe au centre se choisit et
 //     la carte le porte aussitôt. Le trait plein dit où j'en suis ;
-//   · le reste n'est qu'à la demande : « Contrats » (les Missions Bola du
-//     dimanche) et « Journal » (d'où vient mon XP) s'ouvrent dessus ;
+//   · deux onglets en haut, comme un passe de combat : « Passe » (la scène
+//     ci-dessus) et « Missions » (mode-passe-missions.tsx : les missions de
+//     la journée, tout ce qui rapporte de l'XP, le journal). Sabri, 26/10 :
+//     « là, je vois que les skins ». Le mode s'ouvre sur les Missions quand
+//     il y en a à signer, et sur elles par /profil/xp?vue=missions ;
 //   · on sort par la croix, Échap, ou en tirant vers le bas : le noir se
 //     referme sur la tuile.
 // Toujours en noir, en clair comme en sombre : c'est un autre monde.
@@ -24,18 +27,17 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Check, Lock, X } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
-import { MissionsBola } from "@/components/sfl/actus/missions";
 import { Card3D } from "@/components/sfl/card-3d";
+import { useMissionsASigner, VueMissions } from "@/components/sfl/mode-passe-missions";
 import type { Finition } from "@/components/sfl/finitions-carte";
 import { CADRAGES, ChoixPays, essai, etatDe, GENRE, Mini, useOntLePalier, type EtatPalier } from "@/components/sfl/passe-bola";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { Plongee } from "@/components/sfl/plongee-carte";
 import { COULEURS_PAYS, PAYS_PAR_DEFAUT } from "@/components/sfl/skins-passe";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { finitionsDe, useChoixHabillage, useHabillage, usePalierMax } from "@/hooks/use-habillage";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { useMissions, useRangXp, useXp } from "@/hooks/use-missions";
+import { useRangXp, useXp } from "@/hooks/use-missions";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import type { Player } from "@/lib/sfl/engine";
 import { choisirHabillage } from "@/lib/sfl/habillages-choisis";
@@ -46,6 +48,8 @@ import "./mode-passe.css";
 
 const xp = (n: number) => `${n.toLocaleString("fr-FR")} XP`;
 const ontLe = (n: number) => (n > 0 ? `${n} l'${n > 1 ? "ont" : "a"}` : "personne ne l'a");
+
+export type Vue = "passe" | "missions";
 
 /** Le pas d'un palier sur la route, en px (la largeur d'un arrêt). */
 const PAS = 76;
@@ -58,7 +62,13 @@ const TIRER = 110;
 /** La carte au centre, à la mesure de l'écran (le reste tient autour). */
 function tailleCarte(): number {
   if (typeof window === "undefined") return 1;
-  return Math.max(0.78, Math.min(1.3, (window.innerHeight - 430) / 330));
+  return Math.max(0.78, Math.min(1.3, (window.innerHeight - 476) / 330));
+}
+
+/** /profil/xp?vue=missions (la notification des Missions Bola) ouvre les Missions. */
+function vueDeLAdresse(): Vue | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("vue") === "missions" ? "missions" : null;
 }
 
 /* --------------------- D'où l'on entre (la tuile touchée) --------------------- */
@@ -253,42 +263,29 @@ function Palier({ p, player, b, palierMax, pays, setPays, onPlonger }: {
   );
 }
 
-/* ------------------------------ Le journal ------------------------------ */
-
-function Journal({ b, saison }: { b: BilanXp; saison: number }) {
-  return (
-    <div className="flex flex-col">
-      <div className="flex items-baseline justify-between px-5 pb-2">
-        <SheetTitle className="titre-lettrage text-[26px] text-white">Journal</SheetTitle>
-        <span className="font-mono text-[12px] text-white/50 tabular-nums">{xp(b.saison)} cette saison</span>
-      </div>
-      {b.lignes.slice(0, 12).map((l, i) => (
-        <div key={`${l.saison}-${l.j}-${l.quoi}-${i}`} className="flex items-center gap-3 border-t border-white/8 px-5 py-3">
-          <span className="w-[44px] shrink-0 font-mono text-[11px] text-white/45">
-            {l.saison === saison ? `J${l.j}` : `S${l.saison} J${l.j}`}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{l.quoi}</span>
-          <span className={cn("font-mono text-[13px] font-bold tabular-nums", l.xp < 0 && "text-[#ff9b9d]")}>
-            {l.xp < 0 ? `−${-l.xp}` : `+${l.xp}`}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /* ------------------------------- Le mode ------------------------------- */
 
 /**
  * Le mode, posé sur Ma carte. `onSortie` : ouvert par-dessus Ma carte, il s'y
  * referme ; sans lui (la page /profil/xp ouverte directement), il ramène à Ma carte.
  */
-export function ModePasse({ player, saison, onSortie }: { player: Player; saison: number; onSortie?: () => void }) {
+export function ModePasse({
+  player,
+  saison,
+  onSortie,
+  vue: vueVoulue,
+}: {
+  player: Player;
+  saison: number;
+  onSortie?: () => void;
+  /** L'onglet d'ouverture ; sinon les Missions s'il y en a à signer, sinon la Passe. */
+  vue?: Vue;
+}) {
   const router = useRouter();
   const reduit = useMediaQuery("(prefers-reduced-motion: reduce)");
   const b = useXp(player.name);
   const r = useRangXp(player.name);
-  const mm = useMissions();
+  const aSigner = useMissionsASigner();
   const porte = useHabillage(player.name);
   const choix = useChoixHabillage(player.name);
   const photo = usePlayerPhoto(player.name);
@@ -296,7 +293,15 @@ export function ModePasse({ player, saison, onSortie }: { player: Player; saison
   const prochain = Math.min(PALIERS_PASSE, (b?.passe.palier ?? 0) + 1);
   const [choisi, setChoisi] = useState(prochain);
   const [pays, setPays] = useState(choix.pays ?? PAYS_PAR_DEFAUT);
-  const [feuille, setFeuille] = useState<"contrats" | "journal" | null>(null);
+  const [vue, setVue] = useState<Vue>(() => vueVoulue ?? vueDeLAdresse() ?? "passe");
+  // Des missions à signer (connues un instant après l'ouverture) : on s'ouvre sur elles, tant qu'on n'a rien touché.
+  const vueTouchee = useRef(!!vueVoulue || !!vueDeLAdresse());
+  useEffect(() => {
+    if (!vueTouchee.current && aSigner > 0) {
+      vueTouchee.current = true;
+      setVue("missions");
+    }
+  }, [aSigner]);
   const [plonge, setPlonge] = useState(false);
   const [sortie, setSortie] = useState(false);
   const [monte, setMonte] = useState(false);
@@ -351,13 +356,14 @@ export function ModePasse({ player, saison, onSortie }: { player: Player; saison
 
   useEffect(() => {
     const touche = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !feuille && !plonge) sortir();
+      if (e.key === "Escape" && !plonge) sortir();
+      else if (vue !== "passe") return;
       else if (e.key === "ArrowLeft") setChoisi((n) => Math.max(1, n - 1));
       else if (e.key === "ArrowRight") setChoisi((n) => Math.min(PALIERS_PASSE, n + 1));
     };
     window.addEventListener("keydown", touche);
     return () => window.removeEventListener("keydown", touche);
-  }, [sortir, feuille, plonge]);
+  }, [sortir, plonge, vue]);
 
   const p = PASSE_BOLA[choisi - 1];
   const habillage = useMemo(() => essai(porte, p, pays), [porte, p, pays]);
@@ -414,59 +420,62 @@ export function ModePasse({ player, saison, onSortie }: { player: Player; saison
         </div>
       </header>
 
-      <div className="mp-carte">
-        <Card3D
-          cacheKey={`mode-passe-${p.n}-${player.name}-${p.habille?.finition === "couleurs" ? pays : ""}`}
-          size={taille}
-          apercu
-          render={(s) => <PlayerCard player={player} size={s} habillage={habillage} />}
-        />
-      </div>
-
-      <div className="mp-bas mp-entre" style={{ "--i": 2 } as React.CSSProperties} {...tirer}>
-        <Palier
-          key={p.n}
-          p={p}
-          player={player}
-          b={b}
-          palierMax={palierMax}
-          pays={pays}
-          setPays={setPays}
-          onPlonger={() => setPlonge(true)}
-        />
-        <Route
-          player={player}
-          palier={b.passe.palier}
-          avance={b.passe.bloquee ? 0 : b.passe.versPalier / Math.max(1, b.passe.coutPalier)}
-          palierMax={palierMax} choisi={choisi} onChoisir={setChoisi} />
-        <nav className="mp-pied">
-          {mm && (
-            <button type="button" className="mp-onglet" onClick={() => setFeuille("contrats")}>
-              Contrats
-            </button>
-          )}
-          <button type="button" className="mp-onglet" onClick={() => setFeuille("journal")}>
-            Journal
+      <nav className="mp-vues mp-entre" style={{ "--i": 1 } as React.CSSProperties} aria-label="Passe ou missions">
+        {(["passe", "missions"] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            aria-pressed={vue === v}
+            onClick={() => {
+              if (v !== vue) navigator.vibrate?.(6);
+              vueTouchee.current = true;
+              setVue(v);
+            }}
+            className={cn("mp-vue", vue === v && "mp-vue--active")}
+          >
+            {v === "passe" ? "Passe" : "Missions"}
+            {v === "missions" && aSigner > 0 && <span className="mp-vue__pastille tabular-nums">{aSigner}</span>}
           </button>
-        </nav>
-      </div>
+        ))}
+      </nav>
 
-      <Sheet open={feuille !== null} onOpenChange={(o) => !o && setFeuille(null)}>
-        <SheetContent
-          side="bottom"
-          showCloseButton={false}
-          className="mp-feuille dark mx-auto max-h-[82dvh] w-full gap-0 overflow-y-auto rounded-t-[28px] border-0 pt-6 pb-[calc(env(safe-area-inset-bottom,0px)+18px)] sm:max-w-md"
-        >
-          {feuille === "contrats" ? (
-            <>
-              <SheetTitle className="sr-only">Contrats</SheetTitle>
-              <MissionsBola />
-            </>
-          ) : feuille === "journal" ? (
-            <Journal b={b} saison={saison} />
-          ) : null}
-        </SheetContent>
-      </Sheet>
+      {vue === "passe" ? (
+        <>
+          <div className="mp-carte">
+            <Card3D
+              cacheKey={`mode-passe-${p.n}-${player.name}-${p.habille?.finition === "couleurs" ? pays : ""}`}
+              size={taille}
+              apercu
+              render={(s) => <PlayerCard player={player} size={s} habillage={habillage} />}
+            />
+          </div>
+
+          <div className="mp-bas mp-entre" style={{ "--i": 2 } as React.CSSProperties} {...tirer}>
+            <Palier
+              key={p.n}
+              p={p}
+              player={player}
+              b={b}
+              palierMax={palierMax}
+              pays={pays}
+              setPays={setPays}
+              onPlonger={() => setPlonge(true)}
+            />
+            <Route
+              player={player}
+              palier={b.passe.palier}
+              avance={b.passe.bloquee ? 0 : b.passe.versPalier / Math.max(1, b.passe.coutPalier)}
+              palierMax={palierMax}
+              choisi={choisi}
+              onChoisir={setChoisi}
+            />
+          </div>
+        </>
+      ) : (
+        <div className="mp-defile mp-entre" style={{ "--i": 2 } as React.CSSProperties}>
+          <VueMissions b={b} saison={saison} />
+        </div>
+      )}
 
       {plonge && (
         <Plongee

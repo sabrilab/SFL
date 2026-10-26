@@ -34,6 +34,8 @@ export interface HeureMeteo {
   mm: number;
   vent: number;
   rafales: number;
+  /** D'où vient le vent, en degrés (0 = du nord, 90 = de l'est) ; null quand aucun modèle ne le donne (et dans les prévisions gardées avant le 26/10). */
+  direction?: number | null;
   code: number;
   jour: boolean;
 }
@@ -134,7 +136,7 @@ export function adresseOpenMeteo(lat: number, lng: number, date: string): string
   const q = new URLSearchParams({
     latitude: lat.toFixed(3),
     longitude: lng.toFixed(3),
-    hourly: "temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,is_day",
+    hourly: "temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,is_day",
     models: "meteofrance_seamless,best_match",
     timezone: "Europe/Paris",
     start_date: date,
@@ -179,6 +181,7 @@ export function lirePrevision(json: unknown, date: string, lueA: number): Previs
       mm: champ("precipitation", i).v ?? 0,
       vent: champ("wind_speed_10m", i).v ?? 0,
       rafales: champ("wind_gusts_10m", i).v ?? 0,
+      direction: champ("wind_direction_10m", i).v,
       code: code.v,
       jour: (champ("is_day", i).v ?? 1) === 1,
     });
