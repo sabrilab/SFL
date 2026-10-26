@@ -7,7 +7,9 @@
 //     L'image d'attente est prise dans la vidéo elle-même. Le tout part dans
 //     le bucket privé, en brouillon : « Voir » l'ouvre dans le vrai lecteur,
 //     « Publier » la met en tête des Actus, « Retirer » l'en enlève (rien
-//     n'est effacé). « Prévenir » envoie une notification à toute l'app,
+//     n'est effacé). « Affiche » remplace l'image d'attente par une image
+//     choisie (la première image d'une vidéo est souvent noire : Sabri,
+//     26/10). « Prévenir » envoie une notification à toute l'app,
 //     dont le texte exact est lu avant (/api/videos/annoncer) ;
 //   · les lire : vue par combien de joueurs, combien de lectures, jusqu'où,
 //     les réactions, les commentaires, les partages, puis le lien hors de
@@ -240,6 +242,26 @@ export function VideosStats({
     }
   }
 
+  async function changerAffiche(v: Video, image: File) {
+    setOccupe(v.id);
+    try {
+      const sb = supabase();
+      // Un nom par image (sa date) : aucune copie en cache ne garde l'ancienne.
+      const ext = image.type === "image/png" ? "png" : image.type === "image/webp" ? "webp" : "jpg";
+      const chemin = `${v.id}/affiche-${image.lastModified.toString(36)}.${ext}`;
+      const up = await sb.storage.from(BUCKET_VIDEOS).upload(chemin, image, { upsert: true, contentType: image.type || "image/jpeg" });
+      if (up.error) throw up.error;
+      const { error } = await sb.from("videos").update({ affiche: chemin }).eq("id", v.id);
+      if (error) throw error;
+      toast.success("Nouvelle affiche en place.");
+      await lire();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Envoi impossible.");
+    } finally {
+      setOccupe(null);
+    }
+  }
+
   async function prevenir(v: Video) {
     setOccupe(v.id);
     try {
@@ -287,6 +309,21 @@ export function VideosStats({
                     <button type="button" onClick={() => setVoir(v)} className="bouton-secondaire px-3 py-1.5 text-[12px] font-semibold">
                       Voir
                     </button>
+                    <label
+                      className={`bouton-secondaire cursor-pointer px-3 py-1.5 text-[12px] font-semibold ${occupe === v.id ? "pointer-events-none opacity-50" : ""}`}
+                    >
+                      Affiche
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          e.target.value = "";
+                          if (f) void changerAffiche(v, f);
+                        }}
+                      />
+                    </label>
                     {v.publiee_le ? (
                       <>
                         <button
