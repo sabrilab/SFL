@@ -51,13 +51,14 @@
   }
 
   /* À la pose : la grille pleine se dissout dans l'ordre de Bayer. */
+  /* Le ton voilé, pas l'encre : la réponse reste lisible à travers. */
   .scelle-grille--dissout > i {
     opacity: 1;
-    background: rgb(var(--s-ton) / 0.7);
+    background: rgb(var(--s-ton) / 0.5);
     animation: scelle-eteint 0.16s linear var(--d) forwards;
   }
   .scelle-grille--dissout:not(.dark *) > i {
-    background: var(--s-sombre);
+    background: rgb(var(--s-ton) / 0.62);
   }
 
   /* ── La pilule scellée ── */
