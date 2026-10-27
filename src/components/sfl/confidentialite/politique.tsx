@@ -148,7 +148,7 @@ export function TextePolitique() {
                 Dans le studio « Photo officielle », tu prends un à trois selfies (ou tu les choisis, si la caméra ne
                 s&apos;ouvre pas). Ils partent chez <Fort>fal.ai</Fort>, un service de génération d&apos;images, qui
                 fait tourner le modèle chargé de la photo : Seedream (ByteDance) pour la photo de studio, Nano Banana
-                (Google) pour les filtres Drapeau et Manga. Ces éditeurs peuvent recevoir les images le temps de la
+                (Google) pour le filtre Drapeau. Ces éditeurs peuvent recevoir les images le temps de la
                 génération.
               </>,
               <>

@@ -6,15 +6,16 @@
 // les coloris du maillot et les limites. Les prompts restent côté serveur.
 //
 // Choix de Sabri (17-18/10/2026, planche « Avatars Bola ») : le studio fait
-// la carte officielle ; Drapeau (le drapeau de son pays derrière lui) et
-// Manga sont des filtres au choix, appliqués à la photo de studio et pas au
+// la carte officielle ; Drapeau (le drapeau de son pays derrière lui) est
+// un filtre au choix, appliqués à la photo de studio et pas au
 // selfie, pour que le visage et le maillot restent les mêmes d'un filtre à
-// l'autre. Marbre et Argentique, essayés, ont été écartés.
+// l'autre. Marbre et Argentique, essayés, ont été écartés. Manga a été
+// retiré le 27/10/2026 (Sabri : « Tu peux enlever le skin manga ») : les
+// lignes « manga » de la table photo_studio restent pour l'historique.
 
 export const FILTRES = [
   { id: "studio", label: "Neutre" },
   { id: "drapeau", label: "Drapeau" },
-  { id: "manga", label: "Manga" },
 ] as const;
 
 export type Filtre = (typeof FILTRES)[number]["id"];
@@ -216,4 +217,27 @@ export function estFiltre(v: unknown): v is Filtre {
 
 export function estColoris(v: unknown): v is Coloris {
   return COLORIS.some((c) => c.id === v);
+}
+
+/**
+ * Les cartes encore en manga quand le filtre a été retiré (27/10/2026) :
+ * le nom du joueur et l'instant où il a posé cette photo (ms). Tant que sa
+ * photo de la ligue n'est pas plus récente, l'ouverture l'invite à reposer
+ * une photo du studio (invitation-carte.tsx) ; dès qu'il l'a fait, plus rien.
+ * Relevé à l'œil sur les 54 photos du bucket, le 27/10 : trois en manga.
+ */
+export const CARTES_MANGA: Record<string, number> = {
+  Ahmed: Date.parse("2026-10-19T15:56:40Z"),
+  Badis: Date.parse("2026-10-26T12:19:50Z"),
+  "Yacine Bensalem": Date.parse("2026-10-26T12:50:02Z"),
+};
+
+/** Sa carte est encore celle en manga : `photo` est l'URL versionnée de sa photo (`?v=` en ms). */
+export function carteEnManga(nom: string, photo: string | null): boolean {
+  const posee = CARTES_MANGA[nom];
+  if (posee === undefined || !photo) return false;
+  const v = Number(new URL(photo, "https://bola.invalid").searchParams.get("v"));
+  // Une photo locale (data URL, pas encore partagée) n'a pas de version : elle est neuve.
+  if (photo.startsWith("data:")) return false;
+  return Number.isFinite(v) && v > 0 && v <= posee + 1000;
 }
