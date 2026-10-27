@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 /* Les boutons (verre bombé, grain, lumière) : leur dessin est dans boutons.css. */
 @import "./boutons.css";
+@import "./scelle.css";
 
 @custom-variant dark (&:is(.dark *));
 

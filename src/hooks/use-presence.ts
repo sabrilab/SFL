@@ -9,8 +9,14 @@
 //   · sinon → repli local (localStorage), comme avant le branchement.
 //
 // Les écrans ne connaissent que ce hook : la bascule est invisible pour eux.
+//
+// Une réponse donnée est figée (Sabri, 27/10/2026) : le joueur répond une
+// fois, « Je viens » ou « Pas dispo », et ne la change plus ni ne la retire
+// (components/sfl/reponse-scellee.tsx ; la base le refuse aussi, voir
+// supabase/schema.sql, presence). L'admin la corrige, et la feuille de la
+// journée passe devant elle.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSession } from "@/hooks/use-session";
@@ -76,7 +82,11 @@ export interface PresenceView {
   equipesVisibles: boolean;
   /** Les équipes composées par l'admin (null tant qu'il n'a rien validé). */
   teams: ConvocationTeam[] | null;
-  answer: (r: Reponse | null) => Promise<boolean>;
+  /**
+   * Répondre, une seule fois : « figee » si une réponse existe déjà (ici ou
+   * en base), « erreur » si rien n'a pu partir.
+   */
+  answer: (r: Reponse) => Promise<"ok" | "figee" | "erreur">;
   /** Publie la convocation locale vers Supabase (admin, session serveur). */
   publish: (() => Promise<boolean>) | null;
   /** Enregistre les équipes composées (admin seulement, sinon null). */
@@ -91,6 +101,8 @@ export function usePresence(): PresenceView {
   const serverActive = !!session?.server;
 
   const [server, setServer] = useState<ServerState | null>(null);
+  // Recharger la liste à la demande (une réponse refusée par la base).
+  const recharger = useRef<() => void>(() => {});
 
   // L'horloge du rythme hebdomadaire. Nulle au premier rendu (le serveur ne
   // doit pas figer une heure), posée en micro-tâche puis retenue à la minute.
@@ -146,6 +158,7 @@ export function usePresence(): PresenceView {
       }
     }
 
+    recharger.current = () => void load();
     // La ceinture de sécurité du cron : un admin qui ouvre l'app garantit que
     // la semaine est ouverte. Si elle vient d'être créée, on recharge — le
     // temps réel le ferait aussi, mais autant ne pas dépendre de lui ici.
@@ -184,50 +197,57 @@ export function usePresence(): PresenceView {
   /* ------------------------------- Réponses ------------------------------- */
 
   const answer = useCallback(
-    async (r: Reponse | null): Promise<boolean> => {
-      // Conversation expirée (vendredi minuit) : plus rien ne bouge, dans un
-      // sens comme dans l'autre — sans réponse = non-participation.
-      if (!ouvert) return false;
+    async (r: Reponse): Promise<"ok" | "figee" | "erreur"> => {
+      // Conversation expirée (vendredi minuit) : plus rien ne bouge —
+      // sans réponse = non-participation.
+      if (!ouvert) return "erreur";
       // +2 Ballons pour avoir répondu — oui ou non — une fois par convocation.
       const convocId = serverActive && server ? server.convocation.id : (activeConvocation(saison)?.id ?? null);
       const recompense = () => {
-        if (r === null || convocId === null) return;
+        if (convocId === null) return;
         // Les Ballons ne s'affichent plus : on garde le compte, sans toast.
         rewardConvocationReply(player.name, `${serverActive ? "s" : "l"}${convocId}`);
       };
       if (serverActive && server) {
+        // Déjà répondu (ou posé sur la feuille par l'admin) : figé.
+        if (server.reponses[player.name]) return "figee";
         try {
           const sb = supabase();
           const { data: auth } = await sb.auth.getUser();
           const uid = auth.user?.id;
-          if (!uid) return false;
-          if (r === null) {
-            const { error } = await sb
-              .from("presence")
-              .delete()
-              .eq("convocation_id", server.convocation.id)
-              .eq("player_id", uid);
-            // Les équipes par division déjà faites : il en sort (lib/sfl/divisions-equipes).
-            if (!error) void ajusterEquipes("reponse", server.convocation.heure);
-            return !error;
+          if (!uid) return "erreur";
+          // Une insertion, jamais un upsert : une réponse déjà en base (un
+          // autre téléphone, un double toucher) est refusée (23505), pas
+          // remplacée.
+          const { error } = await sb
+            .from("presence")
+            .insert({ convocation_id: server.convocation.id, player_id: uid, reponse: r });
+          if (error) {
+            // Seule la clé en double dit « déjà répondu » : un refus RLS
+            // (pas membre) n'est pas une réponse figée.
+            if (error.code === "23505" || /duplicate key/i.test(error.message)) {
+              recharger.current();
+              return "figee";
+            }
+            return "erreur";
           }
-          const { error } = await sb.from("presence").upsert(
-            { convocation_id: server.convocation.id, player_id: uid, reponse: r },
-            { onConflict: "convocation_id,player_id" }
+          // Tout de suite à l'écran, sans attendre le temps réel.
+          setServer((s) =>
+            s && s.convocation.id === server.convocation.id ? { ...s, reponses: { ...s.reponses, [player.name]: r } } : s
           );
-          if (!error) {
-            logActivity("presence");
-            recompense();
-            void ajusterEquipes("reponse", server.convocation.heure);
-          }
-          return !error;
+          logActivity("presence");
+          recompense();
+          void ajusterEquipes("reponse", server.convocation.heure);
+          return "ok";
         } catch {
-          return false;
+          return "erreur";
         }
       }
+      const conv = activeConvocation(saison);
+      if (conv?.reponses[player.name]) return "figee";
       const ok = setPresence(saison, player.name, r);
       if (ok) recompense();
-      return ok;
+      return ok ? "ok" : "erreur";
     },
     [serverActive, server, saison, player.name, ouvert]
   );

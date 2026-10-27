@@ -724,18 +724,16 @@ create policy "presence: je réponds pour moi"
   to authenticated
   with check ((select auth.uid()) = player_id and (select public.est_membre()));
 
+-- Une réponse donnée est figée (Sabri, 27/10/2026) : on passait sur la
+-- convocation, on décochait « Je viens » ou on cochait « Pas dispo » sans le
+-- vouloir, un téléphone qui bugue faisait le reste, et la liste ne voulait
+-- plus rien dire. Le joueur répond une fois (l'insertion ci-dessus) ; il ne
+-- modifie ni ne retire plus sa réponse : sans règle d'update ni de delete
+-- pour lui, la base refuse (un upsert sur une réponse existante lève une
+-- erreur RLS). Seul l'admin la change (correction admin, plus bas), et la
+-- feuille de la journée passe devant elle (lib/sfl/presence-feuille.ts).
 drop policy if exists "presence: je modifie ma réponse" on public.presence;
-create policy "presence: je modifie ma réponse"
-  on public.presence for update
-  to authenticated
-  using ((select auth.uid()) = player_id)
-  with check ((select auth.uid()) = player_id);
-
 drop policy if exists "presence: je retire ma réponse" on public.presence;
-create policy "presence: je retire ma réponse"
-  on public.presence for delete
-  to authenticated
-  using ((select auth.uid()) = player_id);
 
 -- L'admin peut corriger une réponse (quelqu'un qui prévient par téléphone).
 drop policy if exists "presence: correction admin" on public.presence;
@@ -1620,6 +1618,15 @@ begin
     if (new.match_id, new.player_id) is distinct from (old.match_id, old.player_id) then
       raise exception 'ligne de feuille figée' using errcode = '42501';
     end if;
+    -- La réponse du joueur est figée (27/10/2026) : de l'invitation, il passe
+    -- une fois à « inscrit » (Je viens), puis plus rien ; seuls
+    -- l'organisateur, l'admin (plus haut) et le serveur la changent.
+    if new.statut is distinct from old.statut
+       and (select auth.uid()) is not null
+       and not public.organise_match(new.match_id)
+       and not (old.statut = 'invite' and new.statut = 'inscrit') then
+      raise exception 'réponse figée' using errcode = 'P0001';
+    end if;
     if (new.equipe, new.buts, new.passes) is distinct from (old.equipe, old.buts, old.passes) then
       if not public.organise_match(new.match_id) then
         raise exception 'feuille réservée à l''organisateur' using errcode = '42501';
@@ -1658,6 +1665,43 @@ drop trigger if exists matchs_feuille on public.matchs;
 create trigger matchs_feuille before update on public.matchs
   for each row execute function public.match_feuille_gardee();
 
+-- Les refus d'invitation (27/10/2026) : « Pas dispo » retire la ligne de
+-- l'invité (match_joueurs, comme avant : aucun lecteur des joueurs d'un
+-- match ne change), et la base garde ici qu'il a répondu. Sa réponse est
+-- figée comme un « Je viens » : il ne reprend pas une place de ce match de
+-- lui-même (match_entree_gardee). L'organisateur peut le réinviter, l'admin
+-- effacer le refus. Écrit seulement par match_sortie_gardee (security
+-- definer) : aucune règle d'écriture pour les joueurs.
+create table if not exists public.match_refus (
+  match_id  bigint not null references public.matchs(id) on delete cascade,
+  player_id uuid   not null references public.profiles(id) on delete cascade,
+  refuse_le timestamptz not null default now(),
+  primary key (match_id, player_id)
+);
+
+create index if not exists match_refus_player_idx on public.match_refus (player_id);
+
+alter table public.match_refus enable row level security;
+
+drop policy if exists "match_refus: lecture" on public.match_refus;
+create policy "match_refus: lecture"
+  on public.match_refus for select
+  to authenticated
+  using (
+    player_id = (select auth.uid())
+    or (select public.organise_match(match_id))
+    or (select public.is_league_admin())
+  );
+
+drop policy if exists "match_refus: correction admin" on public.match_refus;
+create policy "match_refus: correction admin"
+  on public.match_refus for delete
+  to authenticated
+  using ((select public.is_league_admin()));
+
+revoke insert, update, truncate on public.match_refus from anon, authenticated;
+grant select, delete on public.match_refus to authenticated;
+
 -- Qui prend lui-même une place n'apporte ni équipe ni stats : c'est
 -- l'organisateur qui les écrit (match_feuille_gardee, juste au-dessus). Et il
 -- n'entre pas dans un match dont la feuille est faite : on s'ajoutait à un
@@ -1679,6 +1723,10 @@ begin
   end if;
   if exists (select 1 from public.matchs x where x.id = new.match_id and x.saisi_le is not null) then
     raise exception 'match déjà joué' using errcode = 'P0001';
+  end if;
+  -- Il a dit « Pas dispo » à ce match : sa réponse est figée (match_refus).
+  if exists (select 1 from public.match_refus r where r.match_id = new.match_id and r.player_id = new.player_id) then
+    raise exception 'réponse figée' using errcode = 'P0001';
   end if;
   return new;
 end;
@@ -1702,12 +1750,24 @@ security definer
 set search_path = ''
 as $$
 begin
-  if (select auth.uid()) is null or public.is_league_admin() or public.organise_match(old.match_id) then
+  -- pg_trigger_depth() > 1 : une suppression en cascade (le match annulé,
+  -- un compte effacé) n'est pas une réponse du joueur.
+  if (select auth.uid()) is null or public.is_league_admin() or public.organise_match(old.match_id)
+     or pg_trigger_depth() > 1 then
     return old;
   end if;
   if exists (select 1 from public.matchs x where x.id = old.match_id and x.saisi_le is not null) then
     raise exception 'match déjà joué' using errcode = 'P0001';
   end if;
+  -- Sa réponse est figée (27/10/2026) : qui a dit « Je viens » ne se retire
+  -- plus de lui-même (l'organisateur ou l'admin le retirent) ; l'invité qui
+  -- dit « Pas dispo » sort, et son refus est gardé (match_refus).
+  if old.statut = 'inscrit' then
+    raise exception 'réponse figée' using errcode = 'P0001';
+  end if;
+  insert into public.match_refus (match_id, player_id)
+  values (old.match_id, old.player_id)
+  on conflict (match_id, player_id) do update set refuse_le = now();
   return old;
 end;
 $$;
