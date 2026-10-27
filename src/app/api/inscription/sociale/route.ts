@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   if (!sb) return FERME;
 
   const user = await appelant(sb, req);
-  if (!user) return NextResponse.json({ error: "Reconnecte-toi avec Google ou Apple." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Reconnecte-toi avec Google." }, { status: 401 });
 
   const { data: profil } = await sb
     .from("profiles")

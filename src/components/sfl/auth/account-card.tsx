@@ -157,7 +157,7 @@ export function AccountCard() {
                   type="email"
                   inputMode="email"
                   autoComplete="email"
-                  placeholder="Ton email (pour Google/Apple)"
+                  placeholder="Ton email (pour Google)"
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
                   className="glass-soft min-w-0 flex-1 rounded-full px-4 py-2.5 text-[13.5px] font-medium outline-none placeholder:text-foreground/30"
