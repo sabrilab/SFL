@@ -193,7 +193,7 @@ export function Inscriptions({
   // (connexion, profil, activité), après une confirmation qui les nomme.
   async function supprimer(comptes: { id: string; name: string }[]) {
     const noms = comptes.map((c) => c.name).join(", ");
-    if (!window.confirm(`Supprimer définitivement : ${noms} ?`)) return;
+    if (!window.confirm(`Supprimer définitivement : ${noms} ? Son compte part pour de bon, sans corbeille.`)) return;
     const jeton = await jetonServeur();
     if (!jeton) {
       toast.error("Reconnecte-toi pour supprimer.");

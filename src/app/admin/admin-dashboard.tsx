@@ -14,10 +14,12 @@ import {
   Sparkles,
   Redo2,
   Table2,
+  Trash2,
   Undo2,
   UserPlus,
   Users,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -46,9 +48,6 @@ import {
   addRoster,
   closeConvocation,
   createConvocation,
-  deleteEntryAt,
-  deleteJournee,
-  deleteRosterAt,
   libelleCourt,
   newEntry,
   newRosterPlayer,
@@ -75,6 +74,9 @@ import { ArbitresAdmin } from "@/components/sfl/admin/arbitres";
 import { ResultatsVotes } from "@/components/sfl/admin/resultats-votes";
 import { chercherJoueurs } from "@/lib/sfl/recherche-joueur";
 import { useSession } from "@/hooks/use-session";
+import { Confirmer, type Confirmation } from "@/components/sfl/admin/confirmer";
+import { Corbeille } from "@/components/sfl/admin/corbeille";
+import { nommer, remettre, retirer, type ElementCorbeille } from "@/lib/sfl/saisie/corbeille";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
@@ -173,6 +175,43 @@ export function AdminDashboard() {
       persist(next);
     },
     [saison, persist]
+  );
+
+  // Supprimer (27/10/2026, après Afid sorti de l'effectif d'un toucher) :
+  // une confirmation d'abord, puis « Annuler » dans le bandeau qui suit, et
+  // la corbeille ensuite. L'un comme l'autre remettent l'élément dans la
+  // saison telle qu'elle est À CE MOMENT (lue dans le stockage, pas dans la
+  // fermeture), sans défaire ce qui s'est fait entre-temps.
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [corbeilleOpen, setCorbeilleOpen] = useState(false);
+
+  const remettreElement = useCallback(
+    (x: ElementCorbeille, label: string) => {
+      const actuelle = saisieStore.load();
+      const next = remettre(actuelle, x);
+      if (next === actuelle) return false;
+      setHistory((h) => [...h, { saison: actuelle, label, at: Date.now() }].slice(-200));
+      setFuture([]);
+      persist(next);
+      return true;
+    },
+    [persist]
+  );
+
+  const supprimer = useCallback(
+    (quoi: Parameters<typeof retirer>[1], label: string) => {
+      const actuelle = saisieStore.load();
+      const fait = retirer(actuelle, quoi);
+      if (!fait) return;
+      setHistory((h) => [...h, { saison: actuelle, label, at: Date.now() }].slice(-200));
+      setFuture([]);
+      persist(fait.saison);
+      toast(label, {
+        duration: 8000,
+        action: { label: "Annuler", onClick: () => remettreElement(fait.x, `Annulé — ${nommer(fait.x)}`) },
+      });
+    },
+    [persist, remettreElement]
   );
 
   // Les deux piles bougent ensemble, mais JAMAIS depuis la fonction de mise à
@@ -532,6 +571,18 @@ export function AdminDashboard() {
                 <Undo2 className="size-4 text-primary" /> Historique
               </span>
               <span className="flex shrink-0 gap-1.5">
+                {partage && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setCorbeilleOpen(true)}
+                    title="Corbeille"
+                    aria-label="Corbeille"
+                    className="rounded-full"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="secondary"
@@ -587,14 +638,35 @@ export function AdminDashboard() {
             </div>
           </div>
 
-          <Button variant="ghost" size="sm" onClick={() => { persist(saisieStore.reset()); setHistory([]); setFuture([]); }} className="bouton--rouge self-start">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              setConfirmation({
+                titre: "Remplacer toute la saison par les données de démo ?",
+                action: "Remplacer",
+                faire: () => {
+                  persist(saisieStore.reset());
+                  setHistory([]);
+                  setFuture([]);
+                },
+              })
+            }
+            className="bouton--rouge self-start"
+          >
             <RotateCcw className="mr-1.5 size-4" /> Réinitialiser les données de démo
           </Button>
         </TabsContent>
 
         {/* ===================== SAISIE (la grille) ===================== */}
         <TabsContent value="grille" className="mt-4 flex flex-col gap-3">
-          <GrilleSaisie saison={saison} commit={commit} />
+          <GrilleSaisie
+            saison={saison}
+            commit={commit}
+            supprimerLigne={(index, ligne) =>
+              supprimer({ genre: "ligne", ligne, index }, `Ligne supprimée — ${ligne.player}`)
+            }
+          />
         </TabsContent>
 
         {/* ===================== FEUILLE DE MATCH (éditable) ===================== */}
@@ -764,6 +836,15 @@ export function AdminDashboard() {
       </Tabs>
 
       {/* ===================== SHEETS ===================== */}
+      <Confirmer confirmation={confirmation} onFermer={() => setConfirmation(null)} />
+      {partage && (
+        <Corbeille
+          open={corbeilleOpen}
+          onOpenChange={setCorbeilleOpen}
+          saison={saison}
+          onRemettre={remettreElement}
+        />
+      )}
       <EntrySheet
         entry={editEntry}
         equipes={equipesLigne}
@@ -771,8 +852,17 @@ export function AdminDashboard() {
         onOpenChange={(o) => !o && setEditIndex(null)}
         onPatch={(patch) => editIndex != null && commit(updateEntryAt(saison, editIndex, patch), "Édition ligne")}
         onDelete={() => {
-          if (editIndex != null) commit(deleteEntryAt(saison, editIndex), "Retrait joueur (journée)");
-          setEditIndex(null);
+          if (editIndex == null || !editEntry) return;
+          const ligne = editEntry;
+          const index = editIndex;
+          setConfirmation({
+            titre: `Retirer ${ligne.player} de la J${ligne.j} ?`,
+            action: "Retirer",
+            faire: () => {
+              supprimer({ genre: "ligne", ligne, index }, `${ligne.player} retiré de la J${ligne.j}`);
+              setEditIndex(null);
+            },
+          });
         }}
       />
       <AddPlayerSheet
@@ -793,8 +883,18 @@ export function AdminDashboard() {
         onOpenChange={(o) => !o && setMetaJ(null)}
         onPatch={(patch) => metaJ != null && commit(updateJournee(saison, metaJ, patch), "Édition journée")}
         onDelete={() => {
-          if (metaJ != null) commit(deleteJournee(saison, metaJ), `Suppression journée ${metaJ}`);
-          setMetaJ(null);
+          if (metaJ == null) return;
+          const j = metaJ;
+          const n = saison.entries.filter((e) => e.j === j).length;
+          setConfirmation({
+            titre: `Supprimer la J${j} ?`,
+            detail: n > 0 ? `${n} ligne${n > 1 ? "s" : ""} partent avec elle.` : undefined,
+            action: "Supprimer",
+            faire: () => {
+              supprimer({ genre: "journee", j }, `J${j} supprimée`);
+              setMetaJ(null);
+            },
+          });
         }}
       />
       <PlayerSheet
@@ -802,8 +902,16 @@ export function AdminDashboard() {
         onOpenChange={(o) => !o && setPlayerIndex(null)}
         onPatch={(patch) => playerIndex != null && commit(updateRosterAt(saison, playerIndex, patch), "Édition fiche")}
         onDelete={() => {
-          if (playerIndex != null) commit(deleteRosterAt(saison, playerIndex), "Suppression joueur");
-          setPlayerIndex(null);
+          if (!playerEntry) return;
+          const nom = playerEntry.name;
+          setConfirmation({
+            titre: `Supprimer ${nom} de l'effectif ?`,
+            action: "Supprimer",
+            faire: () => {
+              supprimer({ genre: "joueur", nom }, `${nom} supprimé`);
+              setPlayerIndex(null);
+            },
+          });
         }}
       />
       <NewPlayerSheet

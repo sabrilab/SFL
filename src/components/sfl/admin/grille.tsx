@@ -224,9 +224,11 @@ function Enum({
 interface Props {
   saison: Saison;
   commit: (next: Saison, label: string) => void;
+  /** Supprime une ligne en gardant de quoi l'annuler (bandeau « Annuler », corbeille). */
+  supprimerLigne?: (index: number, ligne: MatchEntry) => void;
 }
 
-export function GrilleSaisie({ saison, commit }: Props) {
+export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
   const grid = useRef<HTMLDivElement>(null);
   const journees = useMemo(() => [...saison.journees].sort((a, b) => b.j - a.j), [saison.journees]);
   const [j, setJ] = useState<number>(() => journees[0]?.j ?? 1);
@@ -551,7 +553,11 @@ export function GrilleSaisie({ saison, commit }: Props) {
                       <Copy className="size-3" />
                     </button>
                     <button
-                      onClick={() => commit(deleteEntryAt(saison, row.index), `Ligne supprimée — ${e.player}`)}
+                      onClick={() =>
+                        supprimerLigne
+                          ? supprimerLigne(row.index, e)
+                          : commit(deleteEntryAt(saison, row.index), `Ligne supprimée — ${e.player}`)
+                      }
                       title="Supprimer"
                       className="text-foreground/20 transition-colors hover:text-[#c8352b] dark:hover:text-[#FF6B5E]"
                     >
