@@ -571,18 +571,6 @@ export function AdminDashboard() {
                 <Undo2 className="size-4 text-primary" /> Historique
               </span>
               <span className="flex shrink-0 gap-1.5">
-                {partage && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setCorbeilleOpen(true)}
-                    title="Corbeille"
-                    aria-label="Corbeille"
-                    className="rounded-full"
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                )}
                 <Button
                   size="sm"
                   variant="secondary"
@@ -624,6 +612,16 @@ export function AdminDashboard() {
                     </div>
                   ))}
               </div>
+            )}
+            {partage && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setCorbeilleOpen(true)}
+                className="mt-3 rounded-full"
+              >
+                <Trash2 className="mr-1.5 size-4" /> Corbeille
+              </Button>
             )}
           </div>
 
