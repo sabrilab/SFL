@@ -18,6 +18,7 @@
 //     les bons joueurs ne signent pas un rang S chaque semaine.
 // Pur : testable sans React (le composant : actus/contrat-a-la-une.tsx).
 
+import { isHidden } from "./hidden";
 import { rangDe, type Engagement, type Rang } from "./missions";
 
 /** Les places de tête de la Pépite d'Or qui font un bon joueur. */
@@ -33,9 +34,9 @@ export interface ContratDeLaUne {
   rangS: boolean;
 }
 
-/** La place de chacun à la Pépite d'Or, d'après ses points avant le dimanche ; sans point, pas de place. */
+/** La place de chacun à la Pépite d'Or, d'après ses points avant le dimanche ; sans point ou masqué, pas de place (comme le classement). */
 export function placesPepite(avant: Map<string, number>): Map<string, number> {
-  const liste = [...avant].filter(([, p]) => p > 0).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const liste = [...avant].filter(([n, p]) => p > 0 && !isHidden(n)).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   const out = new Map<string, number>();
   let place = 0;
   liste.forEach(([nom, p], i) => {
@@ -54,7 +55,7 @@ export function contratALaUne(
   const places = placesPepite(avant);
   const candidats: ContratDeLaUne[] = [];
   for (const e of engagements) {
-    if (e.m.creneau !== "contrat" || rangDe(e.m) !== "S") continue;
+    if (e.m.creneau !== "contrat" || rangDe(e.m) !== "S" || isHidden(e.joueur)) continue;
     const place = places.get(e.joueur) ?? null;
     const rangS = rangXp(e.joueur) === "S";
     if (!rangS && (place == null || place > TETE_PEPITE)) continue;

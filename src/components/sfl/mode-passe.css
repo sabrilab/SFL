@@ -374,6 +374,12 @@
     background 0.2s ease;
   -webkit-tap-highlight-color: transparent;
 }
+/* Trois faces (Passe, Missions, Les autres) : sur un téléphone étroit, la pilule se resserre. */
+@media (max-width: 374px) {
+  .mp-vue {
+    padding: 0 12px;
+  }
+}
 .mp-vue--active {
   color: #0b0a14;
   background: #f4f5f2;

@@ -938,9 +938,10 @@ function veilleDuMatch(d: Date): boolean {
  *     du fil ;
  *   · le grand classement en divisions et ses règles sortent du fil : la
  *     rangée de la Pépite d'Or garde « D1 · 31 joueurs » sur chaque division ;
- *   · des missions, le fil ne garde que les contrats de rang S signés, le
- *     vendredi et le samedi ; le reste est dans le Mode Passe (Ma carte,
- *     Niveau XP) ;
+ *   · des missions, le fil ne garde que le contrat à la une (un seul rang S
+ *     signé par un bon joueur, le vendredi et le samedi ; Sabri, 27/10) ; le
+ *     reste, l'outsider compris, est dans le Mode Passe (Ma carte, Niveau XP,
+ *     Missions et Les autres) ;
  *   · chaque vidéo se range dans le fil de son dimanche (journeeDeLaVideo).
  */
 function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque & { exploit?: string | null }) {
