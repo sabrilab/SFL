@@ -1,22 +1,24 @@
 /* ═══════════════════ La réponse scellée (27/10/2026) ═══════════════════
-   components/sfl/reponse-scellee.tsx : on tient « Je viens » ou « Pas
-   dispo », une grille de pixels remplit le bouton comme une barre de
-   progression, puis la réponse se scelle dans une pilule au cadenas.
-   Opacité et transformations seulement. « Réduire les animations » : la
-   règle globale (globals.css) éteint les durées, les délais restent — les
-   pixels s'allument en place pendant qu'on tient, le sceau se pose d'un
-   coup. Le ton est celui du geste (vert « y aller », argent neutre), jamais
-   le bleu des cartes Défensive. */
+   components/sfl/reponse-scellee.tsx : on glisse le bouton rond jusqu'au
+   bout de la piste (à droite « Je viens », à gauche « Pas dispo »), une
+   grille de pixels s'allume derrière lui, puis la réponse se scelle dans
+   une pilule au cadenas. Lâché avant le bout, il revient sur un ressort.
+   Une seule variable, --glisse-p (de -1 à 1), posée sur la piste par le
+   geste, que lisent le bouton, les libellés et chaque pixel ; déclarée
+   ci-dessous par @property pour que le retour se transitionne.
+   « Réduire les animations » : la règle globale (globals.css) éteint les
+   durées — le bouton revient d'un coup, le sceau se pose d'un coup — et le
+   reflet des libellés s'arrête. Le ton est celui du geste (vert « y aller »,
+   argent neutre), jamais le bleu des cartes Défensive ni le rouge. */
+
+@property --glisse-p {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
 
 @layer components {
-  .scelle-bouton {
-    -webkit-user-select: none;
-    user-select: none;
-    -webkit-touch-callout: none;
-    touch-action: manipulation;
-  }
-
-  /* ── La grille : des pixels carrés, un px d'écart, dans l'arrondi. ── */
+  /* ── La grille de la pose : des pixels carrés, un px d'écart, dans l'arrondi. ── */
   .scelle-grille {
     position: absolute;
     inset: 0;
@@ -32,24 +34,6 @@
     opacity: 0;
   }
 
-  /* Pendant qu'on tient : le ton du geste sur la nacre (le libellé, dans
-     l'encre du ton, reste lisible dessus) ; sur la pilule cerclée de « Pas
-     dispo », l'argent neutre — du blanc voilé, de l'encre en mode clair. */
-  .scelle-grille--remplit > i {
-    background: rgb(var(--b-ton, 222 227 236) / 0.78);
-    animation: scelle-allume 0.09s linear var(--d) forwards;
-  }
-  .bouton-secondaire .scelle-grille--remplit > i {
-    background: rgb(241 242 239 / 0.3);
-  }
-  .bouton-secondaire:not(.dark *) .scelle-grille--remplit > i {
-    background: rgb(18 19 22 / 0.16);
-  }
-  /* Lâché trop tôt : la grille s'efface, rien n'est parti. */
-  .scelle-grille--lache {
-    opacity: 0;
-  }
-
   /* À la pose : la grille pleine se dissout dans l'ordre de Bayer. */
   /* Le ton voilé, pas l'encre : la réponse reste lisible à travers. */
   .scelle-grille--dissout > i {
@@ -59,6 +43,206 @@
   }
   .scelle-grille--dissout:not(.dark *) > i {
     background: rgb(var(--s-ton) / 0.62);
+  }
+
+  /* ── La piste : une pilule à peine teintée, cerclée d'un trait fin. ── */
+  .glisse-piste {
+    --glisse-p: 0;
+    --course: 0px;
+    --g-ton: 132 214 140;
+    --g-texte: #bfe2bf;
+    --g-neutre: rgb(241 242 239 / 0.66);
+    --g-reflet: #ffffff;
+    position: relative;
+    isolation: isolate;
+    display: block;
+    overflow: hidden;
+    border-radius: 999px;
+    background-color: rgb(255 255 255 / 0.04);
+    box-shadow: inset 0 0 0 1px rgb(222 227 236 / 0.16);
+    cursor: grab;
+    touch-action: pan-y;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    /* Le ressort du retour : un léger dépassement, puis le repos. */
+    transition:
+      --glisse-p 0.48s cubic-bezier(0.32, 1.15, 0.5, 1),
+      opacity 0.2s ease;
+  }
+  .glisse-piste--md {
+    --k: 42px;
+  }
+  .glisse-piste--sm {
+    --k: 32px;
+  }
+  /* Sous le doigt, le bouton suit sans retard. */
+  .glisse-piste[data-glisse="tire"] {
+    cursor: grabbing;
+    transition: opacity 0.2s ease;
+  }
+  .glisse-piste--braise {
+    --g-ton: 255 138 76;
+    --g-texte: #ffb088;
+  }
+  .glisse-piste[aria-disabled="true"] {
+    cursor: default;
+    opacity: 0.42;
+  }
+  .glisse-piste:has(.glisse-cible:focus-visible) {
+    outline: 2px solid #f4f5f2;
+    outline-offset: 3px;
+  }
+
+  /* ── Les pixels du glissé : chacun s'allume quand le bouton dépasse son
+     seuil (--s), de son côté (--sens). Le ton du geste à droite, l'argent
+     à gauche. ── */
+  .glisse-grille {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: grid;
+    gap: 1px;
+    border-radius: inherit;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .glisse-grille > i {
+    display: block;
+    background: rgb(241 242 239 / 0.16);
+    opacity: clamp(0, (var(--glisse-p) * var(--sens) - var(--s)) * 28, 1);
+  }
+  .glisse-grille > i.d {
+    background: rgb(var(--g-ton) / 0.34);
+  }
+
+  /* ── Les libellés : chacun sur sa moitié, avec le reflet d'iOS qui passe
+     vers le bout où aller ; celui qu'on quitte s'efface. ── */
+  .glisse-libelle {
+    --g-c: var(--g-texte);
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    color: var(--g-c);
+    background-image: linear-gradient(
+      90deg,
+      var(--g-c) 0%,
+      var(--g-c) 40%,
+      color-mix(in srgb, var(--g-c) 40%, var(--g-reflet)) 50%,
+      var(--g-c) 60%,
+      var(--g-c) 100%
+    );
+    background-size: 300% 100%;
+    background-position: 100% 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: glisse-reflet 3.2s linear infinite;
+  }
+  .glisse-libelle--d {
+    left: calc(50% + var(--k) / 2);
+    right: 6px;
+    opacity: clamp(0, 1 + var(--glisse-p) * 2.5, 1);
+  }
+  .glisse-libelle--g {
+    --g-c: var(--g-neutre);
+    left: 6px;
+    right: calc(50% + var(--k) / 2);
+    opacity: clamp(0, 1 - var(--glisse-p) * 2.5, 1);
+    animation-direction: reverse;
+  }
+  .glisse-libelle--seul {
+    left: calc(4px + var(--k));
+    right: 10px;
+    opacity: clamp(0, 1 - var(--glisse-p) * 1.2, 1);
+  }
+
+  /* ── Les cibles : invisibles, une par moitié ; le clavier et VoiceOver
+     les trouvent, le doigt passe au travers jusqu'à la piste. ── */
+  .glisse-cible {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 3;
+    width: 50%;
+    opacity: 0;
+    cursor: inherit;
+    font-size: inherit;
+    outline: none;
+  }
+  .glisse-cible--g {
+    left: 0;
+  }
+  .glisse-cible--d {
+    right: 0;
+  }
+  .glisse-cible--seul {
+    left: 0;
+    width: 100%;
+  }
+
+  /* ── Le bouton rond : la nacre des boutons principaux. ── */
+  .glisse-bouton {
+    position: absolute;
+    top: 4px;
+    left: calc(50% - var(--k) / 2);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--k);
+    height: var(--k);
+    border-radius: 999px;
+    pointer-events: none;
+    color: rgb(18 19 22 / 0.5);
+    background-color: #ebe7e2;
+    background-image: linear-gradient(180deg, #fbfaf7 0%, #efebe6 55%, #e1ddd7 100%);
+    box-shadow:
+      inset 0 1px 0 #ffffff,
+      inset 0 -1px 0 rgb(0 0 0 / 0.1),
+      0 1px 1px rgb(0 0 0 / 0.45),
+      0 6px 14px -6px rgb(0 0 0 / 0.85);
+    transform: translateX(calc(var(--glisse-p) * var(--course)));
+  }
+  .glisse-piste--seul .glisse-bouton {
+    left: 4px;
+  }
+
+  /* Mode clair : la piste se pose par un trait d'encre, les pixels sont
+     d'encre ou du ton, le texte dans la version sombre du ton. */
+  .glisse-piste:not(.dark *) {
+    --g-texte: #24452a;
+    --g-neutre: rgb(18 19 22 / 0.62);
+    background-color: rgb(0 0 0 / 0.03);
+    box-shadow: inset 0 0 0 1px rgb(10 11 13 / 0.13);
+  }
+  .glisse-piste--braise:not(.dark *) {
+    --g-texte: #8a3509;
+  }
+  .glisse-piste:has(.glisse-cible:focus-visible):not(.dark *) {
+    outline-color: #0a0b0d;
+  }
+  .glisse-grille:not(.dark *) > i {
+    background: rgb(18 19 22 / 0.08);
+  }
+  .glisse-grille:not(.dark *) > i.d {
+    background: rgb(var(--g-ton) / 0.42);
+  }
+  .glisse-bouton:not(.dark *) {
+    box-shadow:
+      inset 0 1px 0 #ffffff,
+      inset 0 -1px 0 rgb(0 0 0 / 0.08),
+      0 0 0 0.5px rgb(10 11 13 / 0.14),
+      0 1px 2px rgb(10 11 13 / 0.16),
+      0 6px 12px -6px rgb(60 48 36 / 0.5);
   }
 
   /* ── La pilule scellée ── */
@@ -120,6 +304,15 @@
   }
 }
 
+@keyframes glisse-reflet {
+  0% {
+    background-position: 100% 0;
+  }
+  70%,
+  100% {
+    background-position: 0% 0;
+  }
+}
 @keyframes scelle-allume {
   to {
     opacity: 1;
@@ -152,6 +345,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Ni reflet ni ressort : les libellés sont simplement écrits. */
+  .glisse-libelle {
+    animation: none;
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+  }
+  .glisse-piste {
+    transition: none;
+  }
   /* Les délais n'ont de sens que pendant qu'on tient : la pose est immédiate. */
   .scelle-grille--dissout {
     display: none;
@@ -163,7 +365,13 @@
 }
 
 @media (forced-colors: active) {
+  .glisse-piste,
+  .glisse-bouton,
   .scelle-pilule {
     border: 1px solid CanvasText;
+  }
+  .glisse-libelle {
+    background-image: none;
+    -webkit-text-fill-color: CanvasText;
   }
 }
