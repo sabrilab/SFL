@@ -18,13 +18,19 @@
 // Il passe devant tout, écran de chargement et connexion compris : mieux
 // vaut sortir de Snapchat avant de créer son compte que de devoir se
 // reconnecter après. Sauf sur la politique de confidentialité : un lien
-// vers elle (pour un parent, par exemple) s'ouvre sur le texte.
+// vers elle (pour un parent, par exemple) s'ouvre sur le texte. Et sauf sur
+// la page d'accueil (le site Bola, « / » sans session, landing-site.tsx) :
+// depuis le 27/10 (Sabri : « l'installation, je le fais uniquement quand
+// quelqu'un veut télécharger et qu'il veut se connecter »), le visiteur
+// découvre Bola d'abord ; le guide vient quand il touche « Créer ma carte »
+// ou « Se connecter » (/inscription, /connexion).
 
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Check, Copy, Ellipsis, EllipsisVertical, Share, SquarePlus } from "lucide-react";
 import { useIsClient } from "@/hooks/use-is-client";
+import { useSession } from "@/hooks/use-session";
 import { lienSortie, lireEnvironnement, type Environnement } from "@/lib/pwa/environnement";
 import { codeGarde } from "@/lib/sfl/parrainage";
 
@@ -57,6 +63,7 @@ type Etape = { icone?: React.ReactNode; texte: React.ReactNode };
 export function GuideInstallation() {
   const isClient = useIsClient();
   const pathname = usePathname();
+  const session = useSession();
   const [invite, setInvite] = useState<BeforeInstallPromptEvent | null>(null);
   const [ferme, setFerme] = useState(false);
   const [copie, setCopie] = useState(false);
@@ -81,6 +88,8 @@ export function GuideInstallation() {
   if (!isClient || ferme || pathname?.startsWith("/confidentialite")) return null;
   const env = lireEnvironnement();
   if (env.systeme === "autre" || env.installee) return null;
+  // La page d'accueil (AuthGate : « / » sans session, hors de l'app installée)
+  if (!session && pathname === "/") return null;
   // Le lien d'un parrain, et l'inscription qui en vient : ouverte depuis
   // l'écran d'accueil, Bola démarre sur « / », et sur iPhone avec un
   // stockage à part : le code du parrain serait perdu. Le compte se crée
