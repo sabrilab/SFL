@@ -1,6 +1,6 @@
 "use client";
 
-// L'outsider, dans les Actus, sous les divisions. Sabri, 23/10 : « si on a un
+// L'outsider de l'arc 1. Sabri, 23/10 : « si on a un
 // gars qui est rang B […] et qui se retrouve en division 1, lui va faire
 // l'objet d'une quête […] il ne faut pas oublier de le gonfler dans l'actu
 // […] à la limite qu'il y ait une journée qui tourne autour de sa gueule ».
@@ -24,7 +24,11 @@
 // missions, comptée à minuit) et le suivant s'ouvre sur l'outsider du
 // dimanche d'après : le même tant qu'il tient, rang B et en D1.
 // La veille, la notification « J4 · La journée de Miken »
-// (/api/outsider/annoncer) ouvre la rubrique : /ligue#outsider.
+// (/api/outsider/annoncer) ouvre la rubrique : /profil/xp?vue=autres#outsider.
+// Sabri, 27/10 : « dans la rubrique Actu : t'as mis ARC 1 J4, la journée de
+// [X], avec une carte de mission. Il faut pas mettre ça dans l'Actu. » Elle
+// vit avec les missions des autres, dans Ma carte → Niveau XP → Les autres
+// (mode-passe-autres.tsx), en une colonne (`colonne`).
 
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -230,7 +234,7 @@ function Heros({
   );
 }
 
-export function RubriqueOutsider({ className }: { className?: string }) {
+export function RubriqueOutsider({ className, colonne }: { className?: string; colonne?: boolean }) {
   const router = useRouter();
   const { saison, allPlayers } = useSeason();
   const { me } = useMyPlayer();
@@ -245,7 +249,7 @@ export function RubriqueOutsider({ className }: { className?: string }) {
   const arc = useMemo(() => (xp ? arcOutsider(saison, xp.journal, allPlayers, j) : null), [xp, saison, allPlayers, j]);
   const ref = useRef<HTMLElement>(null);
   const present = !!arc;
-  // La notification du samedi mène à /ligue#outsider.
+  // La notification du samedi mène à /profil/xp?vue=autres#outsider.
   useEffect(() => {
     if (present && window.location.hash === "#outsider") ref.current?.scrollIntoView({ block: "start" });
   }, [present]);
@@ -288,7 +292,7 @@ export function RubriqueOutsider({ className }: { className?: string }) {
 
   return (
     <section id="outsider" ref={ref} aria-labelledby="titre-outsider" className={cn("flex scroll-mt-4 flex-col gap-4", className)}>
-      <div className="flex flex-col gap-1.5 px-5 md:px-0">
+      <div className={cn("flex flex-col gap-1.5 px-5", !colonne && "md:px-0")}>
         <div className="flex items-baseline justify-between gap-3">
           <span className="mono-label truncate text-foreground/45">
             Arc {arc.arc} · J{vedette.j}
@@ -301,7 +305,7 @@ export function RubriqueOutsider({ className }: { className?: string }) {
         </h2>
       </div>
 
-      <article aria-label={`L'outsider : ${id.nom(heros)}`} className="fiche fiche--B fiche--outsider dark mx-4 md:mx-0">
+      <article aria-label={`L'outsider : ${id.nom(heros)}`} className={cn("fiche fiche--B fiche--outsider dark mx-4", !colonne && "md:mx-0")}>
         <div className="fiche__bandeau">
           <span className="fiche__etiquette">L&apos;outsider</span>
           <span className="fiche__type mono-label text-white/75">Chapitre {chapitreDe(vedette.j)}</span>

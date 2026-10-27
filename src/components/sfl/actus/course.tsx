@@ -23,9 +23,13 @@
 //     « À la une » (les vidéos, le récap du dernier dimanche), puis la
 //     convocation (la météo de ton match,
 //     meteo-match.tsx ; qui vient, Je viens / Je passe ; ta division dès la
-//     J4) ; le jour du match, la feuille en direct et le vote ; l'outsider ;
+//     J4) ; le jour du match, la feuille en direct et le vote ;
 //     ton dimanche (ta carte, tes chiffres, tes places) ; le vendredi et le
-//     samedi, les contrats de rang S signés (contrats-en-jeu.tsx) ; ce qui
+//     samedi, le contrat à la une : un seul rang S, signé par un bon joueur
+//     (contrat-a-la-une.tsx ; Sabri, 27/10 : « Tu mets pas les missions. Tu
+//     mets juste des missions de rang S […] acceptées par de bons joueurs »).
+//     Les missions, les miennes, celles des autres et l'outsider de l'arc 1,
+//     vivent dans Ma carte → Niveau XP (mode-passe.tsx) ; ce qui
 //     se joue dimanche (les places à un ou deux points), ton rival et ce
 //     qu'il te faut pour le passer ; puis chaque dimanche joué, avec sa
 //     vidéo s'il en a une,
@@ -52,11 +56,10 @@
 // responsive pour le desktop […] et réadapte toutes les dispositions »), le
 // fil devient une grille, deux colonnes puis trois dès 1280 px (.actus-gabarit,
 // actus.css). À gauche, ce qui se joue : le direct, le vote, la convocation et
-// tes missions ; à droite, tes rubriques côte à côte ; dessous, les contrats
-// en jeu de toute la ligue, sur toute la largeur. Puis chaque dimanche : son
+// la vidéo ; à droite, le contrat à la une et tes rubriques. Puis chaque dimanche : son
 // terrain à gauche, qui reste à l'écran pendant qu'on parcourt ses rubriques
 // à droite. Les onglets restent à gauche ; la course garde sa rangée, avec
-// deux flèches pour la souris (les contrats en jeu aussi). Tout est en
+// deux flèches pour la souris. Tout est en
 // classes md: / xl: : sous 768 px, le téléphone garde son fil tel quel (sur
 // téléphone, l'ordre des blocs de la semaine vient des classes order-*).
 
@@ -95,11 +98,10 @@ import { ligneDuRendezVous } from "@/lib/sfl/matchs-du-jour";
 import { legendes, saisonsPalmares, type SaisonPalmares } from "@/lib/sfl/palmares";
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
-import { RubriqueOutsider } from "./outsider";
 import { VoteDuJour } from "./fil";
 import { CouvertureRubrique, RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
 import { couverturesDuDimanche, sources, type Couverture } from "@/lib/sfl/couvertures";
-import { ContratsEnJeu } from "./contrats-en-jeu";
+import { ContratALaUne } from "./contrat-a-la-une";
 import { InvitationVisuels, journeeDeLaVideo, TuileCarrousel, TuileVideo, useVideos, VideosDuFil } from "./video";
 import type { Video } from "@/lib/sfl/videos";
 import { VueClassements, VueMatchs } from "./vues";
@@ -1019,11 +1021,11 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
           />
           {/* Le dimanche qui se prépare. Sur téléphone, un seul fil : la
               convocation et sa météo, le direct, le vote, la vidéo sans
-              dimanche, l'outsider, les contrats de rang S (vendredi et
-              samedi), puis ce qui se joue. Sur grand écran, deux colonnes : à
+              dimanche, le contrat à la une (vendredi et samedi, s'il y en a
+              un), puis ce qui se joue. Sur grand écran, deux colonnes : à
               gauche ce qui se joue (convocation, direct, vote, vidéo), à
-              droite l'outsider et les enjeux ; dessous, les contrats sur toute
-              la largeur. Ton dernier dimanche est passé dans le sien. */}
+              droite le contrat à la une et les enjeux. Ton dernier dimanche
+              est passé dans le sien. */}
           <div
             id={etapes[0].id}
             className="flex scroll-mt-[60px] flex-col gap-6 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3"
@@ -1038,8 +1040,7 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
               <VideosDuFil videos={videosDe.get(null) ?? []} />
             </div>
             <div className="contents md:grid md:gap-[var(--fib-21)] xl:col-span-2 xl:grid-cols-2">
-              <RubriqueOutsider />
-              {veille && <ContratsEnJeu apercu className="md:col-span-full" />}
+              {veille && <ContratALaUne />}
               <div className="flex flex-col gap-1 md:contents">
                 {duels.length > 0 && <RubriqueEnjeux liste={duels} moi={me} />}
                 {v && <RubriqueRival v={v} />}

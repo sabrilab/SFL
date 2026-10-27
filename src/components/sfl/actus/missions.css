@@ -551,3 +551,59 @@
   inset-block: 0;
   background: repeating-linear-gradient(-45deg, rgb(var(--r-lueur) / 0.6) 0 3px, rgb(var(--r-lueur) / 0.14) 3px 6px);
 }
+
+/*
+ * Le contrat à la une (contrat-a-la-une.tsx) : une affiche de rang S tirée
+ * comme une impression de la carte. La rosace guillochée du dos de la carte
+ * (RosaceBola) derrière celui qui a signé, les quatre coins de repère, une
+ * ligne de microtexte et le numéro de série en pied. Rien n'y bouge à
+ * l'arrivée : le viseur est posé verrouillé, les tampons déjà encrés.
+ */
+.fiche--une .tampon,
+.fiche--une .fiche__viseur--verrou {
+  animation: none;
+}
+.fiche--une .viseur__balayage {
+  display: none;
+}
+.une__rosace {
+  position: absolute;
+  top: -40px;
+  left: -96px;
+  z-index: -1;
+  width: 340px;
+  height: 340px;
+  color: rgb(var(--r-feu) / 0.11);
+  pointer-events: none;
+}
+/* Les coins de repère, comme sur la carte : quatre équerres fines dans la marge. */
+.une__coins {
+  position: absolute;
+  inset: 8px;
+  z-index: -1;
+  pointer-events: none;
+  --c: rgb(var(--r-lueur) / 0.5);
+  background:
+    linear-gradient(var(--c), var(--c)) top left / 12px 1px,
+    linear-gradient(var(--c), var(--c)) top left / 1px 12px,
+    linear-gradient(var(--c), var(--c)) top right / 12px 1px,
+    linear-gradient(var(--c), var(--c)) top right / 1px 12px,
+    linear-gradient(var(--c), var(--c)) bottom left / 12px 1px,
+    linear-gradient(var(--c), var(--c)) bottom left / 1px 12px,
+    linear-gradient(var(--c), var(--c)) bottom right / 12px 1px,
+    linear-gradient(var(--c), var(--c)) bottom right / 1px 12px;
+  background-repeat: no-repeat;
+}
+/* La ligne de microtexte : lisible à la loupe seulement, comme celle de la carte. */
+.une__micro {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: var(--font-jbmono), ui-monospace, monospace;
+  font-size: 5.5px;
+  letter-spacing: 0.14em;
+  color: rgb(var(--r-lueur) / 0.45);
+  -webkit-mask-image: linear-gradient(90deg, #000 70%, transparent);
+  mask-image: linear-gradient(90deg, #000 70%, transparent);
+}

@@ -83,7 +83,6 @@ const PARENTS: [string, Parent][] = [
   ["/admin/activite", MA_CARTE],
   ["/admin", REGLAGES],
   ["/ligue/journee", { href: "/ligue", titre: "Actus" }],
-  ["/ligue/contrats", { href: "/ligue", titre: "Actus" }],
   ["/discussions", { href: "/vestiaire", titre: "Vestiaire" }],
   // La liste des messages privés (une conversation donne son parent elle-même : messages/conversation.tsx).
   ["/messages", { href: "/vestiaire", titre: "Vestiaire" }],
@@ -98,7 +97,6 @@ export function parentDe(pathname: string): Parent | null {
 /** Le nom d'une page, pour dire où mène un retour. */
 const TITRES: [string, string][] = [
   ["/ligue/journee", "Récap"],
-  ["/ligue/contrats", "Contrats en jeu"],
   ["/ligue-vierge", "Bola"],
   ["/ligue", "Actus"],
   ["/bola-team", "Bola Team"],

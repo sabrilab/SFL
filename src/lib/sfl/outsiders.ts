@@ -218,7 +218,7 @@ export function dimancheAAnnoncer(saison: Saison): number | null {
 }
 
 /**
- * L'outsider du dimanche `j`, calculé comme les Actus le calculent
+ * L'outsider du dimanche `j`, calculé comme Les autres (mode Passe) le calculent
  * (SeasonProvider, hooks/use-missions.ts), depuis ce que la base garde : les
  * réponses aux missions, les votes de la saison, les félicitations. null si
  * ce dimanche n'en a pas.
