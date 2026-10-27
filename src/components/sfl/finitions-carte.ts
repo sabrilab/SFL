@@ -80,12 +80,13 @@ import {
 } from "@/components/sfl/skins-passe";
 import { MATIERES_OFFERTES, type FinitionOfferte, type MotifOffert } from "@/components/sfl/skins-offerts";
 import { MATIERE_ARBITRE, MATIERES_ARBITRE, type FinitionArbitre, type MotifArbitre } from "@/components/sfl/skins-arbitre";
+import { MATIERES_RECRUES, numeroFondateur, type FinitionRecrue, type MotifRecrue } from "@/components/sfl/skins-recrues";
 
 /** L'édition d'une carte : la carte de saison, ou une carte à titre. */
 export type EditionCarte = "base" | "mvp" | "impact" | "def";
 
 /** Les finitions de la passe, ou offertes : elles habillent la carte de saison. */
-export type Finition = "nuit" | "chrome" | "animee" | "onyx" | "verre" | FinitionPasse | FinitionOfferte;
+export type Finition = "nuit" | "chrome" | "animee" | "onyx" | "verre" | FinitionPasse | FinitionOfferte | FinitionRecrue;
 
 /** Le traitement de la photo, sans IA. */
 export type Traitement = "argentique" | "gravure" | "marbre";
@@ -113,6 +114,8 @@ export interface HabillageCarte {
   /** Le cadre, construit coin par coin : de 0 (rien) à 4 (complet). */
   cran?: 0 | 1 | 2 | 3 | 4;
   rang?: RangCarte;
+  /** La carte Fondateur : son numéro sur 500, posé une fois pour toutes (skins-recrues.ts). */
+  fondateur?: number;
 }
 
 /** Les éditions d'époque : les cartes de la saison 0, dans ses visuels. */
@@ -136,6 +139,7 @@ export type Motif =
   | { type: "tenue" }
   | MotifPasse
   | MotifOffert
+  | MotifRecrue
   | MotifArbitre;
 
 /**
@@ -700,6 +704,7 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
   // défaut, celui du joueur passe par matiereDe.
   ...MATIERES_PASSE,
   ...MATIERES_OFFERTES,
+  ...MATIERES_RECRUES,
   ...MATIERES_ARBITRE,
   couleurs: matiereCouleurs(PAYS_PAR_DEFAUT),
 };
@@ -743,10 +748,15 @@ export function graine(s: string): number {
   return h;
 }
 
-/** Le numéro de série d'une carte, recto et verso. */
-export function serieDe(nom: string): { serie: string; numero: string } {
+/**
+ * Le numéro de série d'une carte, recto et verso. La carte Fondateur, portée
+ * avec son numéro, dit « FONDATEUR · N° 097 / 500 » à la place du « n° … / ∞ ».
+ */
+export function serieDe(nom: string, habillage?: HabillageCarte): { serie: string; numero: string } {
   const seed = graine(nom);
-  return { serie: `bola-fr-${String(seed % 1000000).padStart(6, "0")}`, numero: `n° ${(seed % 900) + 100} / ∞` };
+  const serie = `bola-fr-${String(seed % 1000000).padStart(6, "0")}`;
+  if (habillage?.finition === "fondateur" && habillage.fondateur) return { serie, numero: numeroFondateur(habillage.fondateur) };
+  return { serie, numero: `n° ${(seed % 900) + 100} / ∞` };
 }
 
 /** Les métaux des signes (liserés, crans, puce) : un dégradé qui accroche la lumière, du haut à gauche au bas à droite. */

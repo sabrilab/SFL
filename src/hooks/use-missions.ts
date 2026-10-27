@@ -18,6 +18,7 @@ import { useFelicitations } from "@/hooks/use-felicitations";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useSession } from "@/hooks/use-session";
 import { useListePronos } from "@/hooks/use-liste-pronos";
+import { useRecrues } from "@/hooks/use-recrues";
 import { useVotes } from "@/hooks/use-votes";
 import {
   aJoue,
@@ -57,6 +58,7 @@ import {
   reponsesEnMemoire,
 } from "@/lib/sfl/missions-reponses";
 import { ajouterPronos } from "@/lib/sfl/pronos";
+import { ajouterRecrues, type RecruesJoueur } from "@/lib/sfl/recrues";
 import { appliquerVotes } from "@/lib/sfl/votes";
 import { supabase } from "@/lib/supabase";
 import type { Saison } from "@/lib/sfl/saisie/types";
@@ -138,10 +140,25 @@ function avecVitrineXp(lg: XpLigue, s: Saison, nom: string): XpLigue {
   const rangs = new Map(lg.rangs);
   const sur = Math.max(1, ...[...lg.rangs.values()].map((r) => r.sur));
   rangs.set(nom, { rang: "S", place: 1, xp, sur, suivant: null });
-  const surLesCartes = JSON.stringify(
-    [...journal].map(([n, x]) => [n, rangs.get(n)?.rang ?? null, palierMaxDe(journal, n), cranDe(x.reussies)])
-  );
+  const surLesCartes = cartesDe(journal, rangs, lg.recrues);
   return { ...lg, journal, rangs, surLesCartes };
+}
+
+/**
+ * Ce que l'XP pose sur les cartes, en JSON : [nom, rang, plus haut palier,
+ * cran, recrues actives, numéro de Fondateur][] (use-habillage.ts, lireCartesXp).
+ */
+function cartesDe(
+  journal: Map<string, { lignes: LigneXp[]; reussies: number }>,
+  rangs: Map<string, RangJoueur>,
+  recrues: ReadonlyMap<string, RecruesJoueur>
+): string {
+  return JSON.stringify(
+    [...journal].map(([n, x]) => {
+      const r = recrues.get(n);
+      return [n, rangs.get(n)?.rang ?? null, palierMaxDe(journal, n), cranDe(x.reussies), r?.actives ?? 0, r?.fondateur ?? null];
+    })
+  );
 }
 
 /** L'heure, à la minute : le coup d'envoi et minuit se voient sans recharger. */
@@ -372,9 +389,12 @@ export interface XpLigue {
    * Ce que l'XP pose sur les cartes, joueur par joueur, en JSON : [nom, rang,
    * plus haut palier débloqué, cran du cadre][]. Une chaîne, qui ne change
    * que quand l'un d'eux change : les cartes la lisent (CartesXpContext,
-   * use-habillage.ts) sans se redessiner à chaque minute de l'horloge.
+   * use-habillage.ts) sans se redessiner à chaque minute de l'horloge. Puis,
+   * depuis le 27/10, ses recrues actives et son numéro de Fondateur.
    */
   surLesCartes: string;
+  /** Les recrues de chacun (lib/sfl/recrues.ts), par nom. */
+  recrues: ReadonlyMap<string, RecruesJoueur>;
 }
 
 export const XpLigueContext = createContext<XpLigue | null>(null);
@@ -394,17 +414,20 @@ export function useXpLigueCalcule(): XpLigue | null {
   const { toutes: felicitations } = useFelicitations();
   const pronos = useListePronos();
   const { saison, jugee, votes } = useSaisonJugee(maintenant);
+  const { me } = useMyPlayer();
+  const { ligue, miennes } = useRecrues();
   return useMemo(() => {
     if (!isClient) return null;
     const journal = journalXp(jugee, reponses, votes, maintenant, felicitations);
     ajouterPronos(journal, jugee, pronos, maintenant);
-    const rangs = rangsDesJoueurs(classementNiveau(journal, allPlayers));
-    const surLesCartes = JSON.stringify(
-      [...journal].map(([nom, x]) => [nom, rangs.get(nom)?.rang ?? null, palierMaxDe(journal, nom), cranDe(x.reussies)])
-    );
-    const lg = { journal, saison: saison.numero ?? 0, rangs, surLesCartes };
+    // +100 par recrue active, hors du rang (lib/sfl/recrues.ts).
+    ajouterRecrues(journal, jugee, ligue, me ? { nom: me, recrues: miennes } : null, maintenant);
+    const recrues = new Map(ligue.map((r) => [r.nom, r]));
+    const rangs = rangsDesJoueurs(classementNiveau(journal, allPlayers, { pourLeRang: true }));
+    const surLesCartes = cartesDe(journal, rangs, recrues);
+    const lg = { journal, saison: saison.numero ?? 0, rangs, surLesCartes, recrues };
     return vitrine ? avecVitrineXp(lg, saison, vitrine.nom) : lg;
-  }, [isClient, jugee, reponses, votes, maintenant, felicitations, pronos, saison, allPlayers, vitrine]);
+  }, [isClient, jugee, reponses, votes, maintenant, felicitations, pronos, saison, allPlayers, vitrine, ligue, miennes, me]);
 }
 
 /** L'XP de la ligue, tel que l'app l'a calculé (null avant le premier rendu côté client). */

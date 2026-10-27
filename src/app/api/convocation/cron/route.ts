@@ -10,7 +10,8 @@
 //
 // Au passage, elle vide le journal d'usage, le suivi des notifications et les
 // liens de parrainage ouverts de ce qui a plus de 13 mois, comme le promet la
-// politique de confidentialité (même sans nouvelle semaine).
+// politique de confidentialité (même sans nouvelle semaine), et numérote les
+// nouveaux Fondateurs (fondateurs_attribuer, 10 recrues actives).
 //
 // L'expiration du vendredi minuit et la révélation des équipes du vendredi
 // 19h n'ont PAS besoin du serveur : elles sont jugées à l'affichage par
@@ -99,6 +100,11 @@ export async function GET(req: NextRequest) {
       await client
         .query("delete from public.parrainage_visites where created_at < now() - interval '13 months'")
         .catch((e) => console.error("[cron] liens de parrainage ouverts :", e instanceof Error ? e.message : e));
+      // Les Fondateurs : ceux qui ont passé 10 recrues actives cette semaine
+      // reçoivent leur numéro sur 500 (l'app le fait aussi à l'ouverture).
+      await client
+        .query("select public.fondateurs_attribuer()")
+        .catch((e) => console.error("[cron] fondateurs :", e instanceof Error ? e.message : e));
       // Les vidéos : qui les a vues, et les liens partagés ouverts (13 mois).
       await client
         .query(

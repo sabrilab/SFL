@@ -9,13 +9,29 @@
 // offert »). À l'ouverture, ma carte part avec mon code (poste et stats) :
 // la page de mon lien la montre si j'ai accepté qu'elle sorte de l'app, et
 // seulement mon nom sinon.
+//
+// Les paliers (Sabri, 27/10, skins-recrues.ts) : une recrue compte une fois
+// qu'elle a vraiment joué son premier match (lib/sfl/recrues.ts). Le grand
+// chiffre dit mes recrues actives ; puis les quatre paliers et leur
+// progression (+100 XP chacune, Recruteur à 3, Filigrane à 5, Fondateur à
+// 10, numérotée sur 500), et mes filleuls : ceux qui jouent, et ceux qui sont
+// inscrits sans avoir encore joué. Aucune limite au nombre de liens ni de
+// recrues. Démo hors production : /parrainage?paliers=0|1|3|5|10
+// (recrues-store.ts).
 
 import { useEffect, useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { useJoueurBola, useMyPlayer } from "@/components/sfl/player-provider";
 import { QuiVient } from "@/components/sfl/qui-vient";
+import { Mini } from "@/components/sfl/passe-bola";
+import { FONDATEURS_MAX, numeroFondateur, PALIERS_RECRUES, type PalierRecrues } from "@/components/sfl/skins-recrues";
+import type { HabillageCarte } from "@/components/sfl/finitions-carte";
+import { useHabillage } from "@/hooks/use-habillage";
+import { rechargerRecrues, useRecrues } from "@/hooks/use-recrues";
+import { paliersDemandes, poserDemoRecrues } from "@/lib/sfl/recrues-store";
+import type { Player } from "@/lib/sfl/engine";
 import { useSession } from "@/hooks/use-session";
 import { monId } from "@/lib/sfl/matchs";
 import type { Stats } from "@/lib/sfl/engine";
@@ -39,6 +55,16 @@ export default function ParrainagePage() {
   const pseudo = session?.user ?? null;
   // Ma carte, en clé stable : la saison se recalcule sans que la carte change.
   const carte = JSON.stringify([player.poste, player.stats]);
+  const recrues = useRecrues();
+  const porte = useHabillage(player.name);
+
+  // La démo des paliers (hors production), sinon la relecture : les
+  // Fondateurs du jour sont numérotés avant (recrues-store.ts).
+  useEffect(() => {
+    const n = paliersDemandes();
+    if (n !== null) poserDemoRecrues(n, player.name);
+    else void rechargerRecrues();
+  }, [player.name]);
 
   useEffect(() => {
     let fini = false;
@@ -89,7 +115,15 @@ export default function ParrainagePage() {
     }
   }
 
-  const n = filleuls?.length ?? 0;
+  // Avant que la base réponde (ou sans ses fonctions), mes filleuls comme avant.
+  const parBase = recrues.charge;
+  const actifs = parBase ? recrues.miennes.filter((r) => r.activeLe) : [];
+  const enAttente = parBase ? recrues.miennes.filter((r) => !r.activeLe) : [];
+  const n = actifs.length;
+  const moi = recrues.ligue.find((r) => r.nom === player.name);
+  const fondateur = moi?.fondateur ?? null;
+  // Les 500 places prises (le plus haut numéro posé), et pas la mienne : fermé.
+  const ferme = !fondateur && recrues.ligue.some((r) => (r.fondateur ?? 0) >= FONDATEURS_MAX);
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-[var(--fib-21)] px-5 py-4 sm:py-8">
@@ -103,7 +137,7 @@ export default function ParrainagePage() {
         <span className="text-[89px] leading-[0.8] tabular-nums" style={{ fontFamily: ANTON }}>
           {n}
         </span>
-        <span className="mono-label pb-1 text-foreground/45">{n > 1 ? "venus par toi" : "venu par toi"}</span>
+        <span className="mono-label pb-1 text-foreground/45">{n > 1 ? "recrues actives" : "recrue active"}</span>
       </div>
 
       {/* Mon lien */}
@@ -142,12 +176,108 @@ export default function ParrainagePage() {
         </div>
       )}
 
-      {/* Mes filleuls */}
-      {n > 0 && (
-        <section className="flex flex-col gap-2.5">
-          <h2 className="px-1 text-[17px] font-bold tracking-tight">Ils sont là</h2>
-          <QuiVient noms={filleuls!.map((f) => f.nom)} />
-        </section>
+      {/* Les paliers */}
+      <section className="flex flex-col gap-2">
+        <h2 className="px-1 text-[17px] font-bold tracking-tight">Paliers</h2>
+        {PALIERS_RECRUES.map((p) => (
+          <LignePalier
+            key={p.n}
+            palier={p}
+            actives={n}
+            player={player}
+            base={{ cran: porte.cran, rang: porte.rang }}
+            fondateur={fondateur}
+            ferme={p.finition === "fondateur" && ferme}
+          />
+        ))}
+        <p className="px-1 pt-1 text-[13px] leading-[1.4] text-foreground/70">
+          Fondateur : ceux qui ont lancé la première grande vague de Bola. Numérotée sur {FONDATEURS_MAX}, jamais réémise.
+        </p>
+        {fondateur && <p className="px-1 font-mono text-[13px] font-medium tracking-wide">{numeroFondateur(fondateur)}</p>}
+      </section>
+
+      {/* Mes filleuls : ceux qui jouent, ceux qui n'ont pas encore joué */}
+      {parBase ? (
+        <>
+          {actifs.length > 0 && (
+            <section className="flex flex-col gap-2.5">
+              <h2 className="px-1 text-[17px] font-bold tracking-tight">Ils jouent</h2>
+              <QuiVient noms={actifs.map((f) => f.nom)} />
+            </section>
+          )}
+          {enAttente.length > 0 && (
+            <section className="flex flex-col gap-2.5">
+              <div className="flex items-baseline justify-between px-1">
+                <h2 className="text-[17px] font-bold tracking-tight">En attente</h2>
+                <span className="mono-label text-foreground/45">{enAttente.length}</span>
+              </div>
+              <div className="opacity-55">
+                <QuiVient noms={enAttente.map((f) => f.nom)} />
+              </div>
+            </section>
+          )}
+        </>
+      ) : (
+        (filleuls?.length ?? 0) > 0 && (
+          <section className="flex flex-col gap-2.5">
+            <h2 className="px-1 text-[17px] font-bold tracking-tight">Ils sont là</h2>
+            <QuiVient noms={filleuls!.map((f) => f.nom)} />
+          </section>
+        )
+      )}
+    </div>
+  );
+}
+
+/** Un palier : sa carte (ou ses XP), ce qu'il donne, où j'en suis. */
+function LignePalier({
+  palier,
+  actives,
+  player,
+  base,
+  fondateur,
+  ferme,
+}: {
+  palier: PalierRecrues;
+  actives: number;
+  player: Player;
+  base: HabillageCarte;
+  fondateur: number | null;
+  ferme: boolean;
+}) {
+  // Le Fondateur tient à son numéro ; les autres, au compte de recrues.
+  const atteint = palier.finition === "fondateur" ? !!fondateur : actives >= palier.n;
+  const fait = Math.min(actives, palier.n);
+  return (
+    <div className={`flex items-center gap-3.5 rounded-[18px] bg-foreground/[0.05] px-3 py-2.5 ${atteint ? "" : "opacity-70"}`}>
+      <span className="relative h-[71px] w-11 shrink-0 overflow-hidden rounded-[7px]">
+        {palier.finition ? (
+          <Mini
+            player={player}
+            habillage={{ ...base, finition: palier.finition, fondateur: palier.finition === "fondateur" ? (fondateur ?? undefined) : undefined }}
+            l={44}
+            h={71}
+          />
+        ) : (
+          <span className="flex h-full items-center justify-center bg-foreground/[0.06] font-mono text-[13px] font-bold">+100</span>
+        )}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="flex items-baseline justify-between gap-2">
+          <span className="text-[15px] leading-tight font-bold">{palier.titre}</span>
+          <span className="mono-label shrink-0 text-foreground/60 tabular-nums">
+            {ferme ? "fermé" : `${fait} / ${palier.n}`}
+          </span>
+        </span>
+        <span className="mono-label text-foreground/45">{palier.donne}</span>
+        <span className="relative h-[3px] overflow-hidden rounded-full bg-foreground/15">
+          <span className="absolute inset-y-0 left-0 rounded-full bg-foreground" style={{ width: `${(fait / palier.n) * 100}%` }} />
+        </span>
+      </span>
+      {atteint ? (
+        <Check className="size-5 shrink-0" aria-hidden />
+      ) : (
+        <Lock className="size-4 shrink-0 text-foreground/50" aria-hidden />
       )}
     </div>
   );

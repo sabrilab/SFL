@@ -88,7 +88,7 @@ export function DosCarte({
   const era = p.epoque;
   const habillage = era ? undefined : habillageDemande;
   const ligne = era ? ligneDEmission(emission ?? { saison: era.saison, le: null, n: null, sur: null }) : null;
-  const { serie, numero } = ligne ? { serie: ligne.date, numero: ligne.numero } : serieDe(nom);
+  const { serie, numero } = ligne ? { serie: ligne.date, numero: ligne.numero } : serieDe(nom, p.nom === "fondateur" ? habillage : undefined);
   const sLune = LUNE / BOITE_SYMBOLE.c;
   const lisere = lisereDe(habillage);
   const cran = habillage?.cran ?? 0;
@@ -114,7 +114,7 @@ export function DosCarte({
       }}
     >
       {p.motif && (
-        <MotifCarte motif={p.motif} graine={seed} centre={p.motif.type === "pinceau" ? PINCEAU_DOS : { cx: ROSACE.cx, cy: ROSACE.cy }} />
+        <MotifCarte motif={p.motif} graine={seed} nom={nom} centre={p.motif.type === "pinceau" ? PINCEAU_DOS : { cx: ROSACE.cx, cy: ROSACE.cy }} />
       )}
       <div
         aria-hidden

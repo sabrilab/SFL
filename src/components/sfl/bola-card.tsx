@@ -360,7 +360,7 @@ export function BolaCard({
   const habillage = era ? undefined : habillageDemande;
   const encre = (a: number) => `rgba(${p.encre},${a})`;
   const seed = graine(name);
-  const { serie, numero: numeroSerie } = serieDe(name);
+  const { serie, numero: numeroSerie } = serieDe(name, p.nom === "fondateur" ? habillage : undefined);
   const emission = p.epoque ? ligneDEmission(epoque ?? { saison: p.epoque.saison, le: null, n: null, sur: null }) : null;
   const nomUp = (affiche ?? name).toUpperCase();
 
@@ -551,7 +551,7 @@ export function BolaCard({
       }}
     >
       {/* La matière : le motif gravé ton sur ton (or, rouge, cobalt, nuit) */}
-      {p.motif && <MotifCarte motif={p.motif} graine={seed} eclats={false} />}
+      {p.motif && <MotifCarte motif={p.motif} graine={seed} eclats={false} nom={affiche ?? name} />}
       {/* Le papier : microtexte gravé et lignes de scan */}
       <div
         aria-hidden

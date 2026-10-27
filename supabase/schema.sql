@@ -281,10 +281,12 @@ alter table public.profiles add column if not exists habillage text
 -- la contrainte suit la liste des finitions ; « Tes couleurs » porte son pays
 -- (couleurs:dz, couleurs:gb-eng) ; puis, depuis le 24/10, les signes choisis
 -- (/sceau+nom-grave, ou /-). Les skins offerts aussi (onyx, verre, pepite,
--- palestine : finitions-offertes.ts). Refaite à chaque migration : idempotente.
+-- palestine : finitions-offertes.ts), et ceux des recrues (recruteur,
+-- filigrane, fondateur : skins-recrues.ts, 27/10). Refaite à chaque migration :
+-- idempotente.
 alter table public.profiles drop constraint if exists profiles_habillage_check;
 alter table public.profiles add constraint profiles_habillage_check
-  check (habillage is null or habillage ~ '^(auto|-|nuit|chrome|animee|onyx|verre|pepite|palestine|givre|carbone|marbre|neon|aurore|ki|meteorite|couleurs(:[a-z]{2}(-[a-z]{3})?)?)/(auto|-|argentique|gravure|marbre)(/(-|(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave)(\+(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave))*))?$');
+  check (habillage is null or habillage ~ '^(auto|-|nuit|chrome|animee|onyx|verre|pepite|palestine|recruteur|filigrane|fondateur|givre|carbone|marbre|neon|aurore|ki|meteorite|couleurs(:[a-z]{2}(-[a-z]{3})?)?)/(auto|-|argentique|gravure|marbre)(/(-|(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave)(\+(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave))*))?$');
 
 -- La ville du joueur sur la Map (lib/sfl/villes.ts, 22/10) : le nom de sa
 -- commune et son CENTRE, tel que le donne le géocodeur — jamais sa position.
@@ -4787,9 +4789,300 @@ begin
 end;
 $$;
 
--- Le bas du tunnel, pour l'admin (Activité → Parrainage) : chaque filleul a-t-il
--- joué un match (inscrit à un match passé) et rejoint une équipe Bola Team ?
--- Les matchs privés ne se lisent pas autrement. Vide pour tout autre compte.
+-- ─────────────────────── Les recrues et leurs paliers ───────────────────────
+-- Sabri, 27/10/2026 : une recrue (un filleul de parrainages) ne compte qu'une
+-- fois qu'il a VRAIMENT joué son premier match après la création de son
+-- compte. Jamais de limite au nombre de liens partagés ni de recrues. Par
+-- recrue active, le parrain gagne 100 XP (lib/sfl/recrues.ts, hors du rang) ;
+-- à 3, le skin Recruteur ; à 5, le Filigrane ; à 10, la carte Fondateur,
+-- numérotée sur 500 dans l'ordre où chacun atteint 10, jamais réémise.
+--
+-- « Vraiment joué » : une ligne de feuille validée, pas une inscription. La
+-- PWA n'a pas de check-in ; la présence se lit donc :
+--   · match Bola : la feuille saisie (saisi_le et les deux scores), le joueur
+--     chez les Clairs ou les Foncés (pas « absent ») ;
+--   · journée SFL : statut « Présent », résultat saisi, pas d'extra time
+--     (saison en cours et archives), comme noter_arbitre plus bas.
+-- Les défis Bola Team ne gardent que les buteurs et les passeurs : on ne peut
+-- pas y prouver qui était là, ils ne comptent pas (pour l'instant).
+-- Le match compte s'il réunit au moins 4 présents distincts qui ne sont pas
+-- tous les filleuls d'un même parrain. Un compte supprimé (cascade), un
+-- parrain supprimé, un filleul non validé ou un code coupé : pas de recrue.
+
+-- Une étiquette de journée (« 26 oct. », « 4 juil. », « 3 févr. », écrite par
+-- toLocaleDateString, sans année) en date. L'année est celle de la référence
+-- (maintenant, ou la clôture d'une saison archivée), moins un si la date
+-- tomberait plus d'une semaine après elle. Illisible : null.
+create or replace function public.date_de_journee(etiquette text, ref timestamptz)
+returns date
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  t text := translate(lower(btrim(coalesce(etiquette, ''))), 'éèêëûùôîïàâç', 'eeeeuuoiiaac');
+  d int;
+  m int;
+  y int;
+  r date;
+begin
+  if ref is null or t = '' then
+    return null;
+  end if;
+  if t ~ '^\d{4}-\d{2}-\d{2}' then
+    return left(t, 10)::date;
+  end if;
+  d := substring(t from '(\d{1,2})')::int;
+  -- Quatre lettres au moins pour juin et juillet.
+  m := case
+         when t ~ 'janv' then 1 when t ~ 'fev' then 2 when t ~ 'mars' then 3
+         when t ~ 'avr' then 4 when t ~ 'mai' then 5 when t ~ 'juin' then 6
+         when t ~ 'juil' then 7 when t ~ 'aou' then 8 when t ~ 'sep' then 9
+         when t ~ 'oct' then 10 when t ~ 'nov' then 11 when t ~ 'dec' then 12
+       end;
+  if d is null or m is null then
+    return null;
+  end if;
+  y := extract(year from (ref at time zone 'Europe/Paris'))::int;
+  r := make_date(y, m, d);
+  if r > (ref at time zone 'Europe/Paris')::date + 7 then
+    r := make_date(y - 1, m, d);
+  end if;
+  return r;
+exception when others then
+  -- Un 31 dans un mois de 30 jours, un 29 février hors bissextile.
+  return null;
+end;
+$$;
+revoke execute on function public.date_de_journee(text, timestamptz) from public, anon, authenticated;
+
+-- Les présences réelles, tous matchs : une ligne par (match, joueur présent).
+--   · cle : « m:<id> » pour un match Bola, « j:<saison>:<journée> » en SFL ;
+--   · joueur : le compte ; null pour un nom de l'effectif sans compte
+--     (présent, filleul de personne) ;
+--   · quand : le coup d'envoi (Bola), ou le jour de la journée à minuit,
+--     heure de Paris (SFL) ; jour_seul : seulement le jour est connu.
+-- Brique interne des fonctions ci-dessous : personne ne l'appelle.
+create or replace function public.presences_reelles()
+returns table (cle text, joueur uuid, nom text, quand timestamptz, jour_seul boolean)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select 'm:' || m.id, mj.player_id, p.name,
+         case
+           when m.heure ~ '^\s*\d{1,2}\s*([:hH]\s*\d{0,2})?\s*$'
+             then (m.jour + make_interval(
+                     hours => substring(m.heure from '^\s*(\d{1,2})')::int,
+                     mins => coalesce(substring(m.heure from '[:hH]\s*(\d{2})')::int, 0)
+                   )) at time zone 'Europe/Paris'
+           else m.jour::timestamp at time zone 'Europe/Paris'
+         end,
+         m.heure !~ '^\s*\d{1,2}\s*([:hH]\s*\d{0,2})?\s*$'
+    from public.matchs m
+    join public.match_joueurs mj on mj.match_id = m.id and mj.equipe in ('clairs', 'fonces')
+    join public.profiles p on p.id = mj.player_id
+   where m.mode = 'bola'
+     and m.saisi_le is not null
+     and m.score_clairs is not null
+     and m.score_fonces is not null
+  union all
+  select 'j:' || sa.numero || ':' || (e ->> 'j'), p.id, e ->> 'player',
+         public.date_de_journee(jj.meta ->> 'date', sa.ref)::timestamp at time zone 'Europe/Paris',
+         true
+    from public.saison s
+    cross join lateral (
+      select coalesce((s.data ->> 'numero')::int, 0) as numero, now() as ref,
+             s.data -> 'entries' as entries, s.data -> 'journees' as journees
+      union all
+      select coalesce((a ->> 'numero')::int, 0), coalesce((a ->> 'cloturee')::timestamptz, now()),
+             a -> 'entries', a -> 'journees'
+        from jsonb_array_elements(case when jsonb_typeof(s.data -> 'archives') = 'array' then s.data -> 'archives' else '[]'::jsonb end) a
+    ) sa
+    cross join lateral jsonb_array_elements(case when jsonb_typeof(sa.entries) = 'array' then sa.entries else '[]'::jsonb end) e
+    join lateral (
+      select x as meta
+        from jsonb_array_elements(case when jsonb_typeof(sa.journees) = 'array' then sa.journees else '[]'::jsonb end) x
+       where (x ->> 'j') = (e ->> 'j')
+       limit 1
+    ) jj on true
+    left join public.profiles p on lower(p.name) = lower(e ->> 'player')
+   where s.id = 1
+     and e ->> 'statut' = 'Présent'
+     and coalesce(e ->> 'result', '') <> ''
+     and coalesce((e ->> 'extraTime')::boolean, false) = false;
+$$;
+revoke execute on function public.presences_reelles() from public, anon, authenticated;
+
+-- Chaque filleul et son premier vrai match après la création de son compte
+-- (null : pas encore). Au jour près pour une journée SFL (elle n'a que son
+-- jour), au coup d'envoi près pour un match Bola. Quel que soit l'état du
+-- code ou du parrain : c'est ce que lit l'admin (parrainage_suivi) ; les
+-- paliers, eux, passent par recrues(). Brique interne.
+create or replace function public.premiers_matchs()
+returns table (filleul uuid, parrain uuid, code text, inscrit_le timestamptz, joue_le timestamptz)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  with pr as (
+    select * from public.presences_reelles()
+  ),
+  valides as (
+    -- Au moins 4 présents distincts, pas tous filleuls d'un même parrain : un
+    -- présent qui n'est le filleul de personne (le parrain lui-même, un joueur
+    -- sans compte) suffit, ou des filleuls de deux parrains.
+    select pr.cle
+      from pr
+      left join public.parrainages x on x.filleul = pr.joueur
+     group by pr.cle
+    having count(distinct coalesce(pr.joueur::text, 'n:' || lower(pr.nom))) >= 4
+       and (count(*) filter (where x.parrain is null) > 0 or count(distinct x.parrain) > 1)
+  )
+  select pa.filleul, pa.parrain, pa.code, pa.created_at,
+         (select min(pr.quand)
+            from pr
+            join valides v on v.cle = pr.cle
+           where pr.joueur = pa.filleul
+             and pr.quand <= now()
+             and pr.quand >= case
+                               when pr.jour_seul
+                                 then date_trunc('day', pa.created_at at time zone 'Europe/Paris') at time zone 'Europe/Paris'
+                               else pa.created_at
+                             end)
+    from public.parrainages pa;
+$$;
+revoke execute on function public.premiers_matchs() from public, anon, authenticated;
+
+-- Les recrues qui comptent pour les paliers : parrain et filleul existants,
+-- filleul validé, code ni coupé (le code utilisé ; pour le lien d'une équipe,
+-- qui n'en porte pas toujours, celui du parrain). active_le : son premier
+-- vrai match, null tant qu'il n'a pas joué. Brique interne.
+create or replace function public.recrues()
+returns table (parrain uuid, filleul uuid, nom text, inscrit_le timestamptz, active_le timestamptz)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select pm.parrain, pm.filleul, f.name, pm.inscrit_le, pm.joue_le
+    from public.premiers_matchs() pm
+    join public.profiles f on f.id = pm.filleul and f.valide
+   where pm.parrain is not null
+     and coalesce(
+           (select c.actif from public.parrainage_codes c where c.code = pm.code),
+           (select c.actif from public.parrainage_codes c where c.joueur = pm.parrain),
+           true
+         );
+$$;
+revoke execute on function public.recrues() from public, anon, authenticated;
+
+-- Les Fondateurs : n° 1 à 500, dans l'ordre où chacun atteint 10 recrues
+-- actives (atteint : sa dixième). Jamais renumérotés ni réémis : un compte
+-- supprimé laisse son numéro vide (joueur à null), la ligne reste, et le
+-- numéro suivant part toujours du plus haut posé. Au-delà de 500, fermé.
+-- Lu par la ligue (la carte d'un autre montre son numéro) ; écrit seulement
+-- par fondateurs_attribuer.
+create table if not exists public.fondateurs (
+  numero   smallint primary key check (numero between 1 and 500),
+  joueur   uuid unique references public.profiles(id) on delete set null,
+  atteint  timestamptz not null,
+  le       timestamptz not null default now()
+);
+alter table public.fondateurs enable row level security;
+drop policy if exists "fondateurs: lecture ligue" on public.fondateurs;
+create policy "fondateurs: lecture ligue" on public.fondateurs for select to authenticated
+  using ((select public.est_membre()));
+revoke all on public.fondateurs from anon, authenticated;
+grant select on public.fondateurs to authenticated;
+
+-- Pose les numéros de ceux qui ont passé 10 recrues actives sans en avoir
+-- encore, dans l'ordre de leur dixième. Appelée par l'app (au lancement et à
+-- l'ouverture d'Inviter) et par le cron du lundi ; ne touche jamais un numéro
+-- déjà posé. Un verrou : deux appels en même temps ne prennent pas le même.
+create or replace function public.fondateurs_attribuer()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  x record;
+  n int;
+begin
+  -- Sans session : le cron (connexion directe). Avec : un membre seulement.
+  if (select auth.uid()) is not null and not public.est_membre() then
+    return;
+  end if;
+  perform pg_advisory_xact_lock(hashtext('bola.fondateurs'));
+  for x in
+    select r.parrain, (array_agg(r.active_le order by r.active_le))[10] as dixieme
+      from public.recrues() r
+     where r.active_le is not null
+       and not exists (select 1 from public.fondateurs f where f.joueur = r.parrain)
+     group by r.parrain
+    having count(r.active_le) >= 10
+     order by 2, 1
+  loop
+    select coalesce(max(f.numero), 0) + 1 into n from public.fondateurs f;
+    exit when n > 500;
+    insert into public.fondateurs (numero, joueur, atteint) values (n, x.parrain, x.dixieme);
+  end loop;
+end;
+$$;
+
+-- La ligue (XP, skins et cartes de chacun) : par parrain, le nombre de
+-- recrues actives, la date de chaque activation et son numéro de Fondateur.
+-- Sans un nom de filleul : qui a fait venir qui reste entre eux.
+create or replace function public.recrues_de_la_ligue()
+returns table (joueur uuid, nom text, actives int, activations timestamptz[], fondateur smallint)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  with r as (
+    select x.parrain,
+           count(x.active_le)::int as n,
+           array_agg(x.active_le order by x.active_le) filter (where x.active_le is not null) as a
+      from public.recrues() x
+     group by x.parrain
+  )
+  select p.id, p.name, coalesce(r.n, 0), coalesce(r.a, '{}'::timestamptz[]), fo.numero
+    from public.profiles p
+    left join r on r.parrain = p.id
+    left join public.fondateurs fo on fo.joueur = p.id
+   where (select public.est_membre())
+     and (r.n > 0 or fo.numero is not null);
+$$;
+
+-- Mes filleuls, nom par nom : depuis quand il joue (active_le), ou en attente
+-- (null). Ceux d'un code coupé n'y sont pas : ils ne comptent pas.
+create or replace function public.mes_recrues()
+returns table (filleul uuid, nom text, inscrit_le timestamptz, active_le timestamptz)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select r.filleul, r.nom, r.inscrit_le, r.active_le
+    from public.recrues() r
+   where r.parrain = (select auth.uid())
+     and (select public.est_membre())
+   order by r.active_le desc nulls first, r.inscrit_le desc;
+$$;
+
+revoke execute on function public.fondateurs_attribuer(), public.recrues_de_la_ligue(), public.mes_recrues() from public, anon;
+grant execute on function public.fondateurs_attribuer(), public.recrues_de_la_ligue(), public.mes_recrues() to authenticated;
+
+-- Le bas du tunnel, pour l'admin (Activité → Parrainage) : chaque filleul
+-- a-t-il vraiment joué (la règle des recrues : une ligne de feuille validée
+-- après son inscription, dans un match de 4 présents au moins qui ne sont pas
+-- tous ses frères de parrain), et rejoint une équipe Bola Team ? Avant le
+-- 27/10, une simple inscription à un match passé suffisait. Vide pour tout
+-- autre compte.
 create or replace function public.parrainage_suivi()
 returns table (filleul uuid, a_joue boolean, en_equipe boolean)
 language sql
@@ -4797,16 +5090,10 @@ security definer
 set search_path = ''
 stable
 as $$
-  select p.filleul,
-         exists (
-           select 1
-             from public.match_joueurs mj
-             join public.matchs m on m.id = mj.match_id
-            where mj.player_id = p.filleul and mj.statut = 'inscrit'
-              and m.jour <= (now() at time zone 'Europe/Paris')::date
-         ),
-         exists (select 1 from public.equipe_membres em where em.joueur = p.filleul and em.statut = 'membre')
-    from public.parrainages p
+  select pm.filleul,
+         pm.joue_le is not null,
+         exists (select 1 from public.equipe_membres em where em.joueur = pm.filleul and em.statut = 'membre')
+    from public.premiers_matchs() pm
    where (select public.is_league_admin());
 $$;
 

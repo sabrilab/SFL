@@ -12,7 +12,8 @@
 // saison 0.
 // `?joueur=Nom` choisit le joueur ; par défaut, soi. `?trois=mvp` (ou base,
 // impact, def, givre, carbone, nuit, marbre, couleurs, couleurs-br, chrome,
-// neon, aurore, ki, animee, onyx, meteorite, h1, h2, h3, s0, s0-mvp,
+// neon, aurore, ki, animee, onyx, meteorite, recruteur, filigrane,
+// fondateur, h1, h2, h3, s0, s0-mvp,
 // s0-impact, s0-def) montre d'abord cette carte en 3D, à tourner ; `&dos=1`
 // la pose sur son dos. `?seul=h1,h2` ne montre que ces cartes-là.
 
@@ -59,6 +60,9 @@ const LOOKS: { cle: string; titre: string; edition: EditionCarte; habillage?: Ha
   { cle: "pepite", titre: "Pépite d'or (offerte, Ilyes)", edition: "base", habillage: { finition: "pepite" } },
   { cle: "palestine", titre: "Palestine (offerte, Ilyes)", edition: "base", habillage: { finition: "palestine" } },
   { cle: "meteorite", titre: "Météorite · palier 17", edition: "base", habillage: { finition: "meteorite" } },
+  { cle: "recruteur", titre: "Recruteur · 3 recrues", edition: "base", habillage: { finition: "recruteur" } },
+  { cle: "filigrane", titre: "Filigrane · 5 recrues", edition: "base", habillage: { finition: "filigrane" } },
+  { cle: "fondateur", titre: "Fondateur · 10 recrues · n° 97", edition: "base", habillage: { finition: "fondateur", fondateur: 97 } },
   {
     cle: "h1",
     titre: "Habillage · liseré argent, 1 cran, rang B",
