@@ -114,6 +114,9 @@ const elu = titree.entries.find((e) => e.j === J && e.player === ILYES && !e.ext
 assert.ok(elu.impact && elu.def, "Ilyes est élu Impact et Défensive");
 assert.equal(saison.entries.find((e) => e.j === J && e.player === ILYES)!.impact, false, "le document brut n'a pas les titres");
 assert.equal(votesDuJour(votes, "5 juil.").length, votes.length - 3, "le vote d'après minuit est écarté");
+assert.equal(votesDuJour(votes, "5 juil.", J).length, votes.length - 3, "écarté aussi décompté par journée");
+// La date de la journée corrigée après le vote : aucun vote n'est du jour affiché, on les garde tous.
+assert.equal(votesDuJour(votes, "12 juil.", J).length, votes.length, "date corrigée après coup : les élus restent");
 
 /* ------------------- Le cas d'Ilyes : avant le correctif ------------------- */
 // En prod, la courbe de Ma carte lisait la saison brute : 2 points de moins.

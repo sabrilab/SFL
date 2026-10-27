@@ -16,6 +16,7 @@ import type { Saison } from "@/lib/sfl/saisie/types";
 import type { Player } from "@/lib/sfl/engine";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
 import { appliquerVotes, titresFaibles } from "@/lib/sfl/votes";
+import { voteOuvert } from "@/lib/sfl/convocation-temps";
 import { amorcerDemo, ARBITRES_EVENT, arbitresRevision } from "@/lib/sfl/arbitres";
 import { useSuiviVotes, useVotes } from "@/hooks/use-votes";
 import { useSession } from "@/hooks/use-session";
@@ -178,15 +179,28 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     const id = window.setInterval(() => setHorloge((h) => h + 1), 5 * 60 * 1000);
     return () => window.clearInterval(id);
   }, []);
-  const derived = useMemo(() => {
+  // Ce que l'horloge change vraiment : quelles journées ont leur vote ouvert
+  // (appliquerVotes et titresFaibles ne lisent l'heure que par voteOuvert).
+  // Sans cette clé, chaque tic de cinq minutes refaisait une saison neuve, et
+  // avec elle tout ce que les écrans rangent à partir d'elle (courbes, rangs,
+  // divisions) — depuis que `saison` est la saison des votes (27/10).
+  const votesOuverts = useMemo(() => {
     void horloge;
+    const maintenant = new Date();
+    return saison.journees
+      .filter((m) => voteOuvert(m.date, maintenant))
+      .map((m) => m.j)
+      .join(",");
+  }, [saison, horloge]);
+  const derived = useMemo(() => {
+    void votesOuverts;
     const brut = deriveSeason(saison);
     const maintenant = new Date();
     const vote = appliquerVotes(saison, brut.journees, votes, maintenant);
     // Un titre élu à une seule voix ne fait pas monter la note (saisie/evolution.ts).
     const faibles = titresFaibles(saison, brut.journees, votes, maintenant);
     return { ...(vote === saison && !faibles.size ? brut : deriveSeason(vote, faibles)), saisonTitree: vote, faibles };
-  }, [saison, votes, horloge]);
+  }, [saison, votes, votesOuverts]);
   const nom = useMemo(() => nomBola(session, derived.players), [session, derived.players]);
   const poste = usePosteBola(nom);
   const bola = useMemo(() => joueurBola(nom, poste), [nom, poste]);
