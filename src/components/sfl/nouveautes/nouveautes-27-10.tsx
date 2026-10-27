@@ -8,11 +8,12 @@
 //   1. « Invite. Monte. » : les paliers des recrues (skins-recrues.ts) sur la
 //      vraie carte du joueur en Fondateur, numérotée, et la rangée des
 //      quatre paliers (+100 XP, Recruteur, Filigrane, Fondateur).
-//   2. « Une réponse, une seule. » : « Je viens » se tient, une grille de
-//      pixels le remplit, la réponse se scelle au cadenas. Recréé ici, sans
-//      rien importer de la réponse scellée elle-même : la même grille de
-//      Bayer, le même pas, le même vert « y aller » ; « Pas dispo » reste
-//      dans le neutre (ni rouge ni bleu dans une annonce).
+//   2. « Une réponse, une seule. » : le bouton rond glisse de la piste
+//      jusqu'à « Je viens », la grille de pixels s'allume derrière lui, la
+//      réponse se scelle au cadenas. La piste et sa grille sont celles de la
+//      réponse scellée (GrilleGlisse, les classes de scelle.css), menées ici
+//      par une horloge ; « Pas dispo » reste dans le neutre (ni rouge ni
+//      bleu dans une annonce).
 //   3. « Les missions sont dans Ma carte. » : les onglets du Niveau XP
 //      (Passe, Missions, Les autres), recréés ; l'onglet passe des miennes à
 //      celles de toute la ligue, sur les vraies cartes des joueurs.
@@ -24,10 +25,11 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Lock } from "lucide-react";
+import { ChevronsLeftRight, Lock } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
+import { course, GrilleGlisse } from "@/components/sfl/reponse-scellee";
 import { Mini } from "@/components/sfl/passe-bola";
 import { useSeason } from "@/components/sfl/season-provider";
 import {
@@ -53,7 +55,7 @@ export function diaposNouveautes2710(player: Player): Diapo[] {
       visuel: <ReponseQuiSeScelle />,
       titre: "Une réponse, une seule.",
       ligne:
-        "Tiens « Je viens » ou « Pas dispo » : ta réponse se scelle et ne change plus.",
+        "Glisse jusqu'au bout : ta réponse se scelle et ne change plus.",
     },
     {
       visuel: <OngletsNiveau moi={player.name} />,
@@ -159,25 +161,20 @@ function PaliersRecrues({ player }: { player: Player }) {
 
 /* --------------------------- 2. La réponse scellée --------------------------- */
 
-// La grille de la réponse scellée : la matrice de Bayer 4×4, des pixels de 7 px.
-const BAYER = [
-  [0, 8, 2, 10],
-  [12, 4, 14, 6],
-  [3, 11, 1, 9],
-  [15, 7, 13, 5],
-];
-const TENIR = 700;
-const COLS = 21;
-const ROWS = 7;
+// La piste du diaporama : la taille « md » de la réponse scellée, à la largeur
+// que laisse le plus petit iPhone (320 px moins les marges du diaporama) : la
+// course du bouton est calculée pour elle, la piste ne doit donc pas rétrécir.
+const PISTE = { largeur: 276, hauteur: 50, seul: false };
+const GLISSER = 900;
 // Le vert « y aller » des boutons (boutons.css, bouton--vert).
 const VERT = "132 214 140";
 // La trame qui reste dans la pilule : deux pixels sur seize.
 const TRAME =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Crect width='6' height='6'/%3E%3Crect x='14' y='14' width='6' height='6'/%3E%3C/svg%3E\")";
 
-type Temps = "repos" | "tient" | "scelle";
+type Temps = "repos" | "glisse" | "scelle";
 
-/** Le doigt se pose sur « Je viens », la grille le remplit, la pilule se scelle ; puis on recommence. */
+/** Le doigt pousse le bouton jusqu'à « Je viens », la grille s'allume derrière, la pilule se scelle ; puis on recommence. */
 function ReponseQuiSeScelle() {
   const reduit = useReducedMotion();
   const [boucle, setT] = useState<Temps>("repos");
@@ -187,8 +184,8 @@ function ReponseQuiSeScelle() {
   useEffect(() => {
     if (reduit) return;
     const suite: Record<Temps, [Temps, number]> = {
-      repos: ["tient", 900],
-      tient: ["scelle", TENIR + 60],
+      repos: ["glisse", 1100],
+      glisse: ["scelle", GLISSER + 120],
       scelle: ["repos", 2600],
     };
     const [apres, ms] = suite[t];
@@ -196,63 +193,40 @@ function ReponseQuiSeScelle() {
     return () => clearTimeout(m);
   }, [t, reduit]);
 
-  const pixels = useMemo(() => {
-    const out: { cle: number; d: number }[] = [];
-    for (let y = 0; y < ROWS; y++)
-      for (let x = 0; x < COLS; x++) {
-        const b = BAYER[y % 4][x % 4] / 16;
-        out.push({
-          cle: y * COLS + x,
-          d: Math.round(((x + b * 3) / (COLS + 3)) * TENIR * 0.94),
-        });
-      }
-    return out;
-  }, []);
-
   return (
-    <div className="relative h-[50px] w-full max-w-[320px]">
-      {/* Les boutons s'effacent d'abord, la pilule arrive ensuite (jamais deux « Je viens »). */}
+    <div className="relative h-[50px] w-[276px]">
+      {/* La piste s'efface d'abord, la pilule arrive ensuite (jamais deux « Je viens »). */}
       <AnimatePresence initial={false} mode="wait">
         {t !== "scelle" ? (
           <motion.div
-            key="boutons"
+            key="piste"
             exit={{ opacity: 0 }}
             transition={{ duration: 0.16 }}
-            className="absolute inset-0 flex gap-2"
+            aria-hidden
+            className="absolute inset-0"
           >
-            <span className="bouton-principal bouton--vert pointer-events-none relative flex h-[50px] flex-1 items-center justify-center overflow-hidden text-[15px] font-bold">
-              <span
-                aria-hidden
-                className="absolute inset-0 grid gap-px overflow-hidden rounded-[inherit]"
-                style={{
-                  gridTemplateColumns: `repeat(${COLS}, 1fr)`,
-                  gridTemplateRows: `repeat(${ROWS}, 1fr)`,
-                }}
-              >
-                {pixels.map((p) => (
-                  <i
-                    key={p.cle}
-                    className="block"
-                    style={{
-                      background: `rgb(${VERT} / 0.78)`,
-                      opacity: t === "tient" ? 1 : 0,
-                      transition:
-                        t === "tient" ? `opacity 90ms linear ${p.d}ms` : "none",
-                    }}
-                  />
-                ))}
+            <div
+              className="glisse-piste glisse-piste--md pointer-events-none h-[50px] text-[15px]"
+              style={
+                {
+                  "--glisse-p": t === "glisse" ? 1 : 0,
+                  "--course": `${course(PISTE)}px`,
+                  transition: `--glisse-p ${GLISSER}ms cubic-bezier(0.55, 0, 0.3, 1)`,
+                } as CSSProperties
+              }
+            >
+              <GrilleGlisse mesures={PISTE} />
+              <span className="glisse-libelle glisse-libelle--g">Pas dispo</span>
+              <span className="glisse-libelle glisse-libelle--d">Je viens</span>
+              <span className="glisse-bouton">
+                <ChevronsLeftRight className="size-[17px]" strokeWidth={2.2} />
+                {/* Le doigt qui pousse. */}
+                <span
+                  className="absolute -inset-1 rounded-full bg-white/20 ring-1 ring-white/40 transition-opacity duration-150"
+                  style={{ opacity: t === "glisse" ? 1 : 0 }}
+                />
               </span>
-              <span className="relative">Je viens</span>
-              {/* Le doigt qui tient. */}
-              <span
-                aria-hidden
-                className="absolute top-1/2 left-[38%] size-[34px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/25 ring-1 ring-white/40 transition-opacity duration-150"
-                style={{ opacity: t === "tient" ? 1 : 0 }}
-              />
-            </span>
-            <span className="bouton-secondaire pointer-events-none flex h-[50px] flex-1 items-center justify-center text-[15px] font-semibold">
-              Pas dispo
-            </span>
+            </div>
           </motion.div>
         ) : (
           <motion.div

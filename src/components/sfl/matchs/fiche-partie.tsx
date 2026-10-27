@@ -9,7 +9,7 @@
 // match. Une réponse se donne une fois et se scelle (Sabri, 27/10 ;
 // reponse-scellee.tsx, et la base le garde : match_refus,
 // match_sortie_gardee) : plus de « Me retirer », et les + du terrain ne
-// prennent plus de place d'un toucher — seul le geste tenu répond.
+// prennent plus de place d'un toucher — seul le glissé jusqu'au bout répond.
 // L'organisateur garde la main jusqu'au coup d'envoi (Sabri, 22/10) : il
 // retire un joueur en touchant sa carte, et « Modifier » rouvre la feuille
 // du match (ouvrir-match.tsx) pour en changer le jour, l'heure, le lieu ou
@@ -238,9 +238,9 @@ export function FichePartie({
         </>
       )}
 
-      {/* Ma réponse : deux boutons à l'invitation, un seul (la braise : il
-          manque des joueurs) pour prendre une place ; une fois donnée, le
-          sceau. L'organisateur, lui, est du match d'office. */}
+      {/* Ma réponse : la piste à deux sens à l'invitation, à un sens (la
+          braise : il manque des joueurs) pour prendre une place ; une fois
+          donnée, le sceau. L'organisateur, lui, est du match d'office. */}
       {!joue && !organise && moiLa?.statut === "invite" && (
         <ReponseScellee
           mine={null}

@@ -622,7 +622,7 @@ function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; clas
         </span>
       </div>
       {p.presents.length > 0 && <QuiVient noms={p.presents} size={FORMAT_CARTE.petite * 1.2} />}
-      {/* Ta réponse, d'un geste tenu : elle se scelle (reponse-scellee.tsx). */}
+      {/* Ta réponse, d'un glissé jusqu'au bout : elle se scelle (reponse-scellee.tsx). */}
       <ReponseScellee
         taille="sm"
         mine={p.mine}
