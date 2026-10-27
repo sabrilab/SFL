@@ -9,7 +9,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { useSession } from "@/hooks/use-session";
 import { chargerRecrues, recruesEnMemoire, RECRUES_EVENT, type EtatRecrues } from "@/lib/sfl/recrues-store";
 
-const VIDE: EtatRecrues = { ligue: [], miennes: [], charge: false };
+const VIDE: EtatRecrues = { ligue: [], miennes: [], complet: false, charge: false };
 let abonnes = 0;
 let base = false;
 
@@ -18,9 +18,12 @@ function abonner(onChange: () => void) {
   return () => window.removeEventListener(RECRUES_EVENT, onChange);
 }
 
-/** Relit les recrues (Inviter, au retour sur l'app). Jamais bloquant. */
-export function rechargerRecrues(): Promise<void> {
-  return chargerRecrues(base).catch(() => {
+/**
+ * Relit les recrues (au retour sur l'app ; Inviter avec `numeroter`, qui pose
+ * d'abord les nouveaux Fondateurs). Jamais bloquant.
+ */
+export function rechargerRecrues(numeroter = false): Promise<void> {
+  return chargerRecrues(base, numeroter).catch(() => {
     /* base injoignable, ou fonctions pas encore en place : on garde ce qu'on a */
   });
 }

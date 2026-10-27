@@ -31,6 +31,7 @@ import type { HabillageCarte } from "@/components/sfl/finitions-carte";
 import { useHabillage } from "@/hooks/use-habillage";
 import { rechargerRecrues, useRecrues } from "@/hooks/use-recrues";
 import { paliersDemandes, poserDemoRecrues } from "@/lib/sfl/recrues-store";
+import { estActive } from "@/lib/sfl/recrues";
 import type { Player } from "@/lib/sfl/engine";
 import { useSession } from "@/hooks/use-session";
 import { monId } from "@/lib/sfl/matchs";
@@ -63,7 +64,7 @@ export default function ParrainagePage() {
   useEffect(() => {
     const n = paliersDemandes();
     if (n !== null) poserDemoRecrues(n, player.name);
-    else void rechargerRecrues();
+    else void rechargerRecrues(true);
   }, [player.name]);
 
   useEffect(() => {
@@ -117,13 +118,14 @@ export default function ParrainagePage() {
 
   // Avant que la base réponde (ou sans ses fonctions), mes filleuls comme avant.
   const parBase = recrues.charge;
-  const actifs = parBase ? recrues.miennes.filter((r) => r.activeLe) : [];
-  const enAttente = parBase ? recrues.miennes.filter((r) => !r.activeLe) : [];
+  // En attente : pas encore joué, ou ne compte pas (compte pas validé, code coupé).
+  const actifs = parBase ? recrues.miennes.filter(estActive) : [];
+  const enAttente = parBase ? recrues.miennes.filter((r) => !estActive(r)) : [];
   const n = actifs.length;
   const moi = recrues.ligue.find((r) => r.nom === player.name);
   const fondateur = moi?.fondateur ?? null;
   // Les 500 places prises (le plus haut numéro posé), et pas la mienne : fermé.
-  const ferme = !fondateur && recrues.ligue.some((r) => (r.fondateur ?? 0) >= FONDATEURS_MAX);
+  const ferme = !fondateur && recrues.complet;
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-[var(--fib-21)] px-5 py-4 sm:py-8">
@@ -191,9 +193,9 @@ export default function ParrainagePage() {
           />
         ))}
         <p className="px-1 pt-1 text-[13px] leading-[1.4] text-foreground/70">
-          Fondateur : ceux qui ont lancé la première grande vague de Bola. Numérotée sur {FONDATEURS_MAX}, jamais réémise.
+          Fondateur : la carte de ceux qui ont lancé la première grande vague de Bola. Numérotée sur {FONDATEURS_MAX}, jamais réémise.
         </p>
-        {fondateur && <p className="px-1 font-mono text-[13px] font-medium tracking-wide">{numeroFondateur(fondateur)}</p>}
+        {fondateur && <p className="mono-label px-1 text-foreground/85">{numeroFondateur(fondateur)}</p>}
       </section>
 
       {/* Mes filleuls : ceux qui jouent, ceux qui n'ont pas encore joué */}
@@ -247,7 +249,9 @@ function LignePalier({
 }) {
   // Le Fondateur tient à son numéro ; les autres, au compte de recrues.
   const atteint = palier.finition === "fondateur" ? !!fondateur : actives >= palier.n;
-  const fait = Math.min(actives, palier.n);
+  // Un Fondateur numéroté l'est pour de bon : le palier reste plein même si
+  // ses recrues actives redescendent.
+  const fait = palier.finition === "fondateur" && fondateur ? palier.n : Math.min(actives, palier.n);
   return (
     <div className={`flex items-center gap-3.5 rounded-[18px] bg-foreground/[0.05] px-3 py-2.5 ${atteint ? "" : "opacity-70"}`}>
       <span className="relative h-[71px] w-11 shrink-0 overflow-hidden rounded-[7px]">

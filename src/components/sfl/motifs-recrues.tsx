@@ -106,7 +106,7 @@ function Filigrane({ m, nom, id }: { m: Couleurs; nom: string; id: string }) {
           key={i}
           x={i % 2 ? -260 : -60}
           y={i * 132 - 120}
-          fontFamily="Inter, var(--font-sans), system-ui, sans-serif"
+          style={{ fontFamily: "var(--font-sans), system-ui, sans-serif" }}
           fontWeight={900}
           fontSize={92}
           letterSpacing={-3}

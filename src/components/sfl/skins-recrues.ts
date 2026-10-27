@@ -109,7 +109,7 @@ export const MATIERES_RECRUES: Record<FinitionRecrue, Matiere> = {
     onglet: { fond: "#08090b", encre: "#f5f5f3" },
     vive: "#f5f5f3",
     tranche: { couleur: "#0b0c0e", metal: 0.2, rugosite: 0.55 },
-    holo: { force: 0.22, teinte: null },
+    holo: { force: 0.22, teinte: [0.95, 0.96, 0.97] },
     dos: {
       encre: "244,244,240",
       sombre: true,
@@ -144,7 +144,7 @@ export const MATIERES_RECRUES: Record<FinitionRecrue, Matiere> = {
     onglet: { fond: "#08090b", encre: "#f5f5f3" },
     vive: "#f5f5f3",
     tranche: { couleur: "#f2f2ee", metal: 0.05, rugosite: 0.7 },
-    holo: { force: 0.18, teinte: null },
+    holo: { force: 0.18, teinte: [0.95, 0.96, 0.97] },
   },
   // Fondateur : le papier blanc, gravé d'un guilloché graphite et d'une
   // grande rosace sous les stats, le microtexte plus présent, les repères de
@@ -172,6 +172,6 @@ export const MATIERES_RECRUES: Record<FinitionRecrue, Matiere> = {
     onglet: { fond: "#08090b", encre: "#f5f5f3" },
     vive: "#f5f5f3",
     tranche: { couleur: "#e4e4df", metal: 0.1, rugosite: 0.6 },
-    holo: { force: 0.2, teinte: null },
+    holo: { force: 0.2, teinte: [0.95, 0.96, 0.97] },
   },
 };

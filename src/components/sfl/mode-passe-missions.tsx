@@ -34,6 +34,7 @@ import {
   type LigneXp,
 } from "@/lib/sfl/missions";
 import { XP_MATCH_ARBITRE } from "@/lib/sfl/missions-arbitre";
+import { XP_RECRUE } from "@/components/sfl/skins-recrues";
 import { PLAFOND_JOURNEE } from "@/lib/sfl/pronos";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { cn } from "@/lib/utils";
@@ -121,6 +122,14 @@ const SOURCES: Source[] = [
     gain: `+${XP_MATCH_ARBITRE}`,
     detail: "par match",
     de: (l) => /arbitré/.test(l.quoi),
+    discrete: true,
+  },
+  {
+    cle: "recrues",
+    nom: "Recrues",
+    gain: `+${XP_RECRUE}`,
+    detail: "par recrue · son 1er match",
+    de: (l) => !!l.horsRang,
     discrete: true,
   },
 ];

@@ -13,7 +13,7 @@
 // `?joueur=Nom` choisit le joueur ; par défaut, soi. `?trois=mvp` (ou base,
 // impact, def, givre, carbone, nuit, marbre, couleurs, couleurs-br, chrome,
 // neon, aurore, ki, animee, onyx, meteorite, recruteur, filigrane,
-// fondateur, h1, h2, h3, s0, s0-mvp,
+// fondateur (ces trois-là hors production), h1, h2, h3, s0, s0-mvp,
 // s0-impact, s0-def) montre d'abord cette carte en 3D, à tourner ; `&dos=1`
 // la pose sur son dos. `?seul=h1,h2` ne montre que ces cartes-là.
 
@@ -28,6 +28,11 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { cartesDeCarriere } from "@/lib/sfl/carriere";
 import { rankPlayers } from "@/lib/sfl/engine";
+
+// Les trois cartes des recrues (un faux « N° 097 / 500 ») : hors production
+// seulement, elles ne se montrent ni ne se capturent en ligne sans être gagnées.
+const PRODUCTION = process.env.NEXT_PUBLIC_BOLA_ENV === "production";
+const RECRUES_SEULES = new Set(["recruteur", "filigrane", "fondateur"]);
 
 const LOOKS: { cle: string; titre: string; edition: EditionCarte; habillage?: HabillageCarte; saison?: number }[] = [
   { cle: "base", titre: "Carte de saison", edition: "base" },
@@ -112,7 +117,7 @@ function Atelier() {
     const c = s.speciales.find((x) => x.carte.type === l.edition);
     return c ? { player: c.player, journee: c.j } : null;
   };
-  const looks = LOOKS.filter((l) => version(l));
+  const looks = LOOKS.filter((l) => !(PRODUCTION && RECRUES_SEULES.has(l.cle)) && version(l));
   const trois = looks.find((l) => l.cle === params.get("trois"));
   if (!player) return null;
   const taille = 0.68;

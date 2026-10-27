@@ -39,7 +39,15 @@ export interface MaRecrue {
   inscritLe: string;
   /** Son premier vrai match ; null : inscrit, pas encore joué. */
   activeLe: string | null;
+  /**
+   * Il compte pour mes paliers (compte validé, code pas coupé). Sinon, même
+   * s'il a joué, il reste « en attente » sur Inviter.
+   */
+  compte: boolean;
 }
+
+/** Mes recrues actives : celles qui comptent et ont joué. */
+export const estActive = (r: MaRecrue): boolean => r.compte && !!r.activeLe;
 
 // Les mois des étiquettes de journée (« 26 oct. », « 3 févr. ») : quatre
 // lettres au moins, juin et juillet ne se confondent pas.
@@ -86,6 +94,9 @@ function placeDe(s: Saison, t: Date, maintenant: Date): { saison: number; j: num
     const jour = jourDeJournee(m.date ?? "", reference);
     if (jour && jour.getTime() <= fin.getTime() && m.j > j) j = m.j;
   }
+  // Avant la première journée datée de sa saison (ou sans date lisible) : la
+  // première journée, jamais une « J0 » avant tous les dimanches.
+  if (j === 0 && journees.length) j = Math.min(...(journees as JourneeMeta[]).map((m) => m.j));
   return { saison: numero, j };
 }
 
@@ -111,7 +122,7 @@ export function ajouterRecrues(
     const noms =
       moi && moi.nom === r.nom
         ? moi.recrues
-            .filter((x) => x.activeLe)
+            .filter(estActive)
             .sort((a, b) => a.activeLe!.localeCompare(b.activeLe!))
             .map((x) => x.nom)
         : [];
