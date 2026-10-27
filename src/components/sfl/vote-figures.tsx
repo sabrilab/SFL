@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
 import { isHidden } from "@/lib/sfl/hidden";
+import { voteOuvert } from "@/lib/sfl/convocation-temps";
 
 export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
   const { saison, allPlayers } = useSeason();
@@ -46,6 +47,12 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
 
   async function choisir(cat: CategorieVote, candidat: string) {
     if (!place || !ouvert || envoi) return;
+    // L'écran a pu rester ouvert après minuit : le vote est fermé, la base
+    // l'accepterait quand même (elle ne connaît que le jour d'envoi).
+    if (!voteOuvert(journee.date, new Date())) {
+      toast.error("Le vote est fermé depuis minuit.");
+      return;
+    }
     setEnvoi(cat);
     try {
       await voter({ saison: numero, j: journee.j, categorie: cat, votant: me, candidat, match_id: place.match.id });

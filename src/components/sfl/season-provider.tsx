@@ -31,14 +31,25 @@ function suivreArbitres(onChange: () => void) {
 }
 
 interface SeasonValue extends DerivedSeason {
+  /**
+   * La saison À LIRE : celle où les élus des votes fermés (Impact, Défensive)
+   * sont posés sur leurs lignes (appliquerVotes), avec ses titres faibles
+   * (Saison.titresFaibles). C'est elle que dérivent `players` et tous les
+   * classements : un écran qui recompte des points, des rangs, des badges ou
+   * des divisions depuis `saison` voit donc les mêmes chiffres que la Ligue.
+   * Avant le 27/10, `saison` était le document brut, sans les titres votés :
+   * Ma carte, les flèches ▲/▼, les divisions, les badges et les missions
+   * comptaient d'autres points que le classement (Ilyes, 7e au lieu de 6e).
+   * Ne jamais l'écrire : pour une écriture, `saisonBrute`.
+   */
   saison: Saison;
   /**
-   * La saison où les élus des votes fermés (Impact, Défensive) sont posés sur
-   * leurs lignes (appliquerVotes) : pour montrer les cartes à titre de chaque
-   * match (lib/sfl/actus.ts), et celles de chacun dans Ma carte et sur son
-   * profil (lib/sfl/carriere.ts, avec `evolution`). Absente (une saison
-   * close) : `saison` les a déjà.
+   * Le document tel qu'il est stocké (compte vitrine compris sur son écran) :
+   * le seul à passer à une écriture (saisieStore.save, setPresence…), pour
+   * ne jamais figer les élus d'un vote dans le document.
    */
+  saisonBrute: Saison;
+  /** Même objet que `saison` (ancien nom, gardé pour les appelants). */
   saisonTitree?: Saison;
   /**
    * TOUS les joueurs, masqués compris. Réservé aux écrans où quelqu'un se
@@ -174,7 +185,7 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     const vote = appliquerVotes(saison, brut.journees, votes, maintenant);
     // Un titre élu à une seule voix ne fait pas monter la note (saisie/evolution.ts).
     const faibles = titresFaibles(saison, brut.journees, votes, maintenant);
-    return { ...(vote === saison && !faibles.size ? brut : deriveSeason(vote, faibles)), saisonTitree: vote };
+    return { ...(vote === saison && !faibles.size ? brut : deriveSeason(vote, faibles)), saisonTitree: vote, faibles };
   }, [saison, votes, horloge]);
   const nom = useMemo(() => nomBola(session, derived.players), [session, derived.players]);
   const poste = usePosteBola(nom);
@@ -182,25 +193,40 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   // Les arbitres (lib/sfl/arbitres) sont masqués comme des joueurs : la
   // liste publique se refait quand la base les donne.
   const arbitres = useSyncExternalStore(suivreArbitres, arbitresRevision, () => -1);
+  // La saison à lire : un objet neuf quand la liste des arbitres change, pour
+  // que tout ce qui range à partir d'elle (isHidden) se recalcule — la liste
+  // vient de la base après le premier rendu, et les mémos d'avant gardaient
+  // un arbitre dans les rangs de Ma carte.
+  const titree = derived.saisonTitree;
+  const cleFaibles = [...derived.faibles].sort().join("|");
+  const vue = useMemo<Saison>(() => {
+    void arbitres;
+    const faibles = cleFaibles ? cleFaibles.split("|") : [];
+    return { ...titree, ...(faibles.length ? { titresFaibles: faibles } : {}) };
+  }, [titree, cleFaibles, arbitres]);
   useEffect(
     () => amorcerDemo(saison.numero ?? 0, derived.journees, new Set(saison.entries.filter((e) => e.result).map((e) => e.j))),
     [saison.numero, saison.entries, derived.journees]
   );
   // `players` est la liste PUBLIQUE : les joueurs masqués n'y sont pas, donc
   // aucun classement, aucune recherche, aucun duel ne peut les faire remonter.
-  const value = useMemo<SeasonValue>(
-    () => ({
-      ...derived,
-      players: publicOnly(derived.players),
-      boostCards: derived.boostCards.filter((c) => !isHidden(c.player)),
-      allPlayers: bola ? [...derived.players, bola] : derived.players,
+  const value = useMemo<SeasonValue>(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { saisonTitree, faibles, ...derives } = derived;
+    return {
+      ...derives,
+      players: publicOnly(derives.players),
+      boostCards: derives.boostCards.filter((c) => !isHidden(c.player)),
+      // Une liste neuve à chaque recalcul (arbitres compris), pour la même raison que `vue`.
+      allPlayers: bola ? [...derives.players, bola] : [...derives.players],
       bola: bola?.name ?? null,
-      saison,
+      saison: vue,
+      saisonTitree: vue,
+      saisonBrute: saison,
       arbitres,
       vitrine,
-    }),
-    [derived, bola, saison, arbitres, vitrine]
-  );
+    };
+  }, [derived, bola, vue, saison, arbitres, vitrine]);
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
 }
@@ -238,6 +264,7 @@ export function SaisonArchiveProvider({ saison, children }: { saison: Saison; ch
       allPlayers: derived.players,
       bola: null,
       saison,
+      saisonBrute: saison,
     };
   }, [saison]);
   return (

@@ -68,6 +68,7 @@ import { DEMO_LIGUE_VIERGE, demoFeuille, demoMatchs } from "@/lib/sfl/ligue-vier
 import { aujourdhuiIso, libelleJour, listerMesDerniers, lireLigueVierge, monId, type Partie } from "@/lib/sfl/matchs";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { isHidden } from "@/lib/sfl/hidden";
 
 /** La carte d'un joueur de Bola : sa carte de la SFL s'il en a une, sinon une carte neutre. */
 function Carte({ name, size, detail }: { name: string; size: number; detail?: string }) {
@@ -307,7 +308,8 @@ export default function LigueViergePage() {
     () => (apercu ? compterMatchs(demoMatchs(noms, aujourdhuiIso())) : matchs),
     [apercu, noms, matchs]
   );
-  const classement = useMemo(() => (vus ? classementAVie(vus) : []), [vus]);
+  // Les masqués (Sabri, les arbitres) hors du classement, sauf soi-même.
+  const classement = useMemo(() => (vus ? classementAVie(vus, (c) => c.id === moi || !isHidden(c.name)) : []), [vus, moi]);
   // Mes feuilles : j'organise, le coup d'envoi est passé, et la feuille reste ouverte (24 h après la saisie).
   const aTenir = mesParties.filter(
     (p) =>

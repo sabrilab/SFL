@@ -21,7 +21,7 @@ import { useCollant } from "@/hooks/use-collant";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { rankPlayers } from "@/lib/sfl/engine";
-import { computeStandings } from "@/lib/sfl/saisie/engine";
+import { rangPepiteApres } from "@/lib/sfl/rangs";
 import { StatsAVenir } from "@/components/sfl/feed/stats-a-venir";
 import { IlsSeDemarquent } from "@/components/sfl/distinctions";
 import { Classements } from "@/components/sfl/classements";
@@ -41,7 +41,7 @@ function useJouees() {
  */
 export function VueClassements({ vote, classement, cle }: { vote?: React.ReactNode; classement?: string | null; cle?: string }) {
   const { player, me } = useMyPlayer();
-  const { players, saison, allPlayers } = useSeason();
+  const { players, saison, allPlayers, evolution } = useSeason();
   // Une saison close où je n'ai pas joué : pas de synthèse (ce serait celle d'un autre).
   const joue = allPlayers.some((p) => p.name === me);
   const played = useJouees();
@@ -49,10 +49,11 @@ export function VueClassements({ vote, classement, cle }: { vote?: React.ReactNo
 
   const RANKED = rankPlayers(players);
   const myRank = RANKED.find((p) => p.name === player.name)?.rank ?? RANKED.length;
-  const rankBefore = rankPlayers(computeStandings({ ...saison, entries: saison.entries.filter((e) => e.j !== latestJ) })).find(
-    (p) => p.name === player.name
-  )?.rank;
-  const myDelta = rankBefore ? rankBefore - myRank : 0;
+  // Avant / après le dernier dimanche, sur la même règle (rangs.ts).
+  const precedente = played.length > 1 ? played[played.length - 2].j : 0;
+  const rankBefore = precedente ? rangPepiteApres(saison, player.name, precedente, evolution) : null;
+  const rankNow = rangPepiteApres(saison, player.name, latestJ, evolution);
+  const myDelta = rankBefore && rankNow ? rankBefore - rankNow : 0;
   const myForm = saison.entries
     .filter((e) => e.player === player.name && e.statut === "Présent" && !e.extraTime && e.result)
     .sort((a, b) => a.j - b.j)

@@ -18,7 +18,8 @@
 // J4 ou après, pas encore jouée) ; rien non plus quand l'admin a déjà fait
 // les équipes sur la feuille : la feuille est sa parole.
 //
-// Le document de la saison est lu, jamais écrit : seule la convocation change.
+// Le document de la saison est lu (votes appliqués, saison-serveur.server.ts),
+// jamais écrit : seule la convocation change.
 // Une composition ne passe que sur des équipes encore vides ; un ajustement
 // repart des équipes du moment, si bien qu'un appel perdu se rattrape au
 // suivant.
@@ -38,7 +39,8 @@ import {
 } from "@/lib/sfl/equipes-division";
 import { isHidden } from "@/lib/sfl/hidden";
 import { joueursDeLaFeuille } from "@/lib/sfl/presence-feuille";
-import type { ConvocationTeam, Saison } from "@/lib/sfl/saisie/types";
+import type { ConvocationTeam } from "@/lib/sfl/saisie/types";
+import { lireSaisonServeur } from "@/lib/sfl/saison-serveur.server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -67,8 +69,16 @@ async function ajuster(sb: SupabaseClient): Promise<{ statut: Statut; equipes?: 
   // CRON_SECRET posé dans Vercel, n'importe qui peut l'appeler, et l'heure le garde.
   if (!equipesEnCours(new Date(), conv.heure)) return { statut: "hors-du-week-end" };
 
-  const { data: doc } = await sb.from("saison").select("data").eq("id", 1).maybeSingle();
-  const saison = (doc as { data?: Saison } | null)?.data;
+  // La saison comme les téléphones la lisent : votes appliqués, arbitres
+  // masqués (saison-serveur.server.ts). Sinon les divisions des équipes ne
+  // sont pas celles de l'app, ni les notes qui les équilibrent.
+  let lue;
+  try {
+    lue = await lireSaisonServeur(sb);
+  } catch {
+    return { statut: "erreur" };
+  }
+  const saison = lue?.saison;
   if (!saison) return { statut: "sans-divisions" };
   const j = journeeDeConvocation(saison, conv.date_label);
   const etat = divisionsDeLaJournee(saison, j);

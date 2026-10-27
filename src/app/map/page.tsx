@@ -104,11 +104,13 @@ import { annonceEnCours, J_DECOUPAGE, nomDivision, REGLES_DIVISIONS } from "@/li
 import { useDivision } from "@/hooks/use-division";
 import { useSession } from "@/hooks/use-session";
 import { saisieStore } from "@/lib/sfl/saisie/store";
+import { dernierEnvoiAuto, SYNC_EVENT } from "@/lib/sfl/saisie/sync";
 import {
   ajouterTerrain,
   definirTerrainParDefaut,
   deplacerTerrain,
   journeeJouee,
+  journeeTerminee,
   placerJourneeSurNouveauTerrain,
   placerMatchDuJourSurNouveauLieu,
   reglerMatchDuJour,
@@ -408,7 +410,8 @@ function etatDe(dedans: boolean, manque: number): { etat: EtatSticker; texte: st
 }
 
 export default function MapPage() {
-  const { saison, journees, players } = useSeason();
+  // La Map écrit la saison (terrains, horaires) : elle part du document stocké.
+  const { saisonBrute: saison, journees, players } = useSeason();
   const session = useSession();
   const admin = !!session?.admin;
   const p = usePresence();
@@ -423,7 +426,7 @@ export default function MapPage() {
   const surtitreDeLigue = (j: number | null | undefined) =>
     j === J_DECOUPAGE && sansDivisions
       ? "Dernier dimanche sans divisions"
-      : j != null && j >= REGLES_DIVISIONS.depuis && maDivision && !journeeJouee(saison, j)
+      : j != null && j >= REGLES_DIVISIONS.depuis && maDivision && !journeeTerminee(saison, j)
         ? `Tu joues en ${nomDivision(maDivision)}`
         : null; // le sigle SFL dit déjà la ligue : plus de « Sunday Five League »
 
@@ -1080,6 +1083,15 @@ export default function MapPage() {
       : "MATCH JOUÉ";
 
   function sauver(next: Saison, message: string) {
+    // L'envoi en base suit la sauvegarde : un refus (un autre admin a publié)
+    // se dit ici, au lieu de laisser ce téléphone ne plus suivre la base sans
+    // le savoir.
+    const apres = () => {
+      window.removeEventListener(SYNC_EVENT, apres);
+      const envoi = dernierEnvoiAuto();
+      if (envoi && !envoi.ok) toast.error(envoi.raison ?? "Pas publié en base.", { description: "Admin → Synchro" });
+    };
+    window.addEventListener(SYNC_EVENT, apres);
     saisieStore.save(next);
     window.dispatchEvent(new Event(SAISIE_EVENT));
     toast.success(message);

@@ -24,6 +24,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { cleVapid, type CleVapid } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { chargerArbitresServeur } from "@/lib/sfl/saison-serveur.server";
 import {
   convocationAAnnoncer,
   resultatsAAnnoncer,
@@ -84,6 +85,8 @@ export async function POST(req: NextRequest) {
   const ligne = doc as { data?: Saison; updated_at?: string } | null;
   const saison = ligne?.data;
   if (!saison) return NextResponse.json({ envoyes: 0, fini: true });
+  // Les arbitres masqués, comme sur les téléphones : aucun texte ne les nomme.
+  await chargerArbitresServeur(sb);
   const { data: convocations } = await sb
     .from("convocations")
     .select("id, date_label, created_at")

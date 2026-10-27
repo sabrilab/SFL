@@ -58,7 +58,7 @@ import { useIdentites } from "@/hooks/use-identites";
 import { useRangXp, useXp } from "@/hooks/use-missions";
 import { cartesDeCarriere, courbeDeCarriere } from "@/lib/sfl/carriere";
 import { ovr, rankPlayers, STAT_KEYS, type Player } from "@/lib/sfl/engine";
-import { isHidden } from "@/lib/sfl/hidden";
+import { classables, rangDans } from "@/lib/sfl/rangs";
 import { ficheJoueur } from "@/lib/sfl/fiche-joueur";
 import { finsDeSaison, ordinal, type ClassementId } from "@/lib/sfl/fin-de-saison";
 import { POSTES } from "@/lib/sfl/inscription";
@@ -108,9 +108,13 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
   const moi = me && me !== player.name ? allPlayers.find((p) => p.name === me) : undefined;
   // Les rangs de la comparaison : le classement public, plus soi-même s'on est masqué.
   const rangs = useMemo(
-    () => new Map(rankPlayers(allPlayers.filter((p) => p.matchs > 0 && (!isHidden(p.name) || p.name === me))).map((p) => [p.name, p.rank])),
+    () => new Map(rankPlayers(classables(allPlayers, me)).map((p) => [p.name, p.rank])),
     [allPlayers, me]
   );
+  // Son rang : la règle du classement (rangs.ts), quel que soit l'écran qui
+  // ouvre le profil (la recherche, la Map, la visionneuse rangeaient chacune
+  // sur leur liste, masqués compris pour l'une).
+  const rangPepite = useMemo(() => rangDans(allPlayers, player.name)?.rang ?? rank, [allPlayers, player.name, rank]);
   const cartes = useMemo(() => cartesDeCarriere(saison, player.name, evolution), [saison, player.name, evolution]);
   const courbe = useMemo(() => courbeDeCarriere(saison, player.name, evolution), [saison, player.name, evolution]);
 
@@ -189,7 +193,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
           </div>
         </div>
         <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
-          <Chiffre valeur={ordinal(rank)} quoi="Pépite d'Or" />
+          <Chiffre valeur={ordinal(rangPepite)} quoi="Pépite d'Or" />
           {division && <Chiffre valeur={nomDivision(division)} quoi="Division" />}
           <Chiffre valeur={ovr(player.stats)} quoi="Général" />
           <Chiffre valeur={journeesJouees.valeur} quoi={journeesJouees.quoi} />

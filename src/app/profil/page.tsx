@@ -73,9 +73,9 @@ import { nomDivision } from "@/lib/sfl/divisions";
 import { FormulaireIdentite } from "@/components/sfl/identite";
 import { useIdentites } from "@/hooks/use-identites";
 import { useRangXp, useXp } from "@/hooks/use-missions";
-import { ovr, rankPlayers } from "@/lib/sfl/engine";
+import { ovr } from "@/lib/sfl/engine";
+import { rangDans } from "@/lib/sfl/rangs";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
-import { isHidden } from "@/lib/sfl/hidden";
 import { POSTES } from "@/lib/sfl/inscription";
 import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { BoutonStats } from "@/components/layout/bouton-stats";
@@ -119,16 +119,15 @@ export default function Profil() {
 
 function ProfilJoueurPage() {
   const { player } = useMyPlayer();
-  const { allPlayers } = useSeason();
+  const { allPlayers, arbitres } = useSeason();
   const division = useDivision(player.name);
-  // Mon rang : celui du classement de la Ligue (sans les joueurs masqués),
-  // où je figure toujours, même masqué.
-  const myRank = useMemo(
-    () =>
-      rankPlayers(allPlayers.filter((p) => !isHidden(p.name) || p.name === player.name)).find((p) => p.name === player.name)
-        ?.rank ?? null,
-    [allPlayers, player.name]
-  );
+  // Mon rang : celui du classement de la Ligue (rangs.ts : sans les joueurs
+  // masqués, journées jouées seulement), où je figure toujours, même masqué.
+  // `arbitres` : la liste des masqués peut arriver après le premier calcul.
+  const myRank = useMemo(() => {
+    void arbitres;
+    return rangDans(allPlayers, player.name)?.rang ?? null;
+  }, [allPlayers, player.name, arbitres]);
   const { fiche, joues } = useMaCarte();
   const journees = useChiffreJournees(player.name);
   // La carte est le sujet de la page : elle profite de la place quand il y en

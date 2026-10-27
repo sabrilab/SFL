@@ -69,7 +69,46 @@ function rosterMap(saison: Saison): Map<string, RosterEntry> {
  */
 export function evolutionDe(saison: Saison, titresFaibles?: TitresFaibles): Evolution {
   const roster = rosterMap(saison);
-  return evoluer(saison, (nom) => toStats(roster.get(nom)?.base), titresFaibles);
+  // Une saison close porte ses titres faibles, figés à la clôture (cloturerSaison).
+  const faibles = titresFaibles ?? (saison.titresFaibles?.length ? new Set(saison.titresFaibles) : undefined);
+  return evoluer(saison, (nom) => toStats(roster.get(nom)?.base), faibles);
+}
+
+/** Une journée est jouée quand ses actions sont saisies : un résultat, un but ou une passe. */
+export function journeeJouee(saison: Pick<Saison, "entries">, j: number): boolean {
+  return saison.entries.some((e) => e.j === j && (!!e.result || e.buts > 0 || e.passes > 0));
+}
+
+/**
+ * Une journée est terminée quand chaque équipe de sa feuille a son résultat
+ * (comme feuilleRemplie, équipe par équipe). Le premier but saisi en direct
+ * rend la journée « jouée » — les classements suivent le direct —, mais les
+ * divisions ne se recoupent, et le dimanche suivant ne s'annonce, qu'une fois
+ * la feuille finie : sinon les joueurs changeaient de division en plein match.
+ */
+export function journeeTerminee(saison: Pick<Saison, "entries">, j: number): boolean {
+  if (!journeeJouee(saison, j)) return false;
+  const equipes = new Map<string, boolean>();
+  for (const e of saison.entries) {
+    if (e.j !== j || e.statut !== "Présent" || e.extraTime || !e.team) continue;
+    equipes.set(e.team, (equipes.get(e.team) ?? false) || !!e.result);
+  }
+  return [...equipes.values()].every(Boolean);
+}
+
+/**
+ * Les lignes qui comptent dans les classements : celles des journées jouées.
+ * Une feuille posée avant le dimanche (poserEquipes, « Préparer la journée »)
+ * donnerait sinon le point de présence et un match à chacun de ses joueurs
+ * avant le coup d'envoi — ce que le découpage des divisions et la courbe de
+ * Ma carte ne comptent pas (27/10 : deux places différentes pour le même
+ * joueur selon l'écran). Même référence si rien n'est retiré.
+ */
+export function saisonJouee(saison: Saison): Saison {
+  const jouees = new Set<number>();
+  for (const e of saison.entries) if (e.result || e.buts > 0 || e.passes > 0) jouees.add(e.j);
+  const entries = saison.entries.filter((e) => jouees.has(e.j));
+  return entries.length === saison.entries.length ? saison : { ...saison, entries };
 }
 
 /* ---------------------------- Classements ---------------------------- */
@@ -449,7 +488,9 @@ export function deriveSeason(saison: Saison, titresFaibles?: TitresFaibles): Der
   const evolution = evolutionDe(saison, titresFaibles);
   return {
     evolution,
-    players: computeStandings(saison, evolution),
+    // Les classements ne lisent que les journées jouées (saisonJouee) ; les
+    // journées, elles, montrent aussi la feuille posée du prochain dimanche.
+    players: computeStandings(saisonJouee(saison), evolution),
     journees: computeJournees(saison),
     boostCards: computeBoostCards(saison, evolution),
     alerts: computeAlerts(saison),

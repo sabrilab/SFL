@@ -25,6 +25,7 @@
 import { instantParis, jourMoisDuLibelle, labelDateFr, prochainDimanche } from "./convocation-temps";
 import { aParis } from "./divisions";
 import { findPlayerMatch } from "./engine";
+import { isHidden } from "./hidden";
 import { computeJournees } from "./saisie/engine";
 import { appliquerMvpAuto } from "./saisie/mvp";
 import { journeeJouee, terrainDeJournee } from "./saisie/mutations";
@@ -154,7 +155,8 @@ function etListe(noms: string[]): string {
 /** Le texte des résultats d'une journée pour un joueur (son nom de saison). */
 export function texteResultats(saison: Saison, j: number, joueur: string): { titre: string; texte: string } {
   const s = appliquerMvpAuto(saison);
-  const mvps = [...new Set(s.entries.filter((e) => e.j === j && e.mvp).map((e) => e.player))];
+  // Jamais un joueur masqué (Sabri, un arbitre, une place X) dans un texte envoyé à la ligue.
+  const mvps = [...new Set(s.entries.filter((e) => e.j === j && e.mvp && !isHidden(e.player)).map((e) => e.player))];
   const ligne = s.entries.find((e) => e.j === j && e.player === joueur && e.statut === "Présent" && !e.extraTime);
   const prenom = (nom: string) => nom.split(" ")[0];
 

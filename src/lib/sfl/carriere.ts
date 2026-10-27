@@ -16,7 +16,7 @@
 //      ceux joués l'un contre l'autre.
 //
 // La saison à donner est celle où les élus des votes sont posés
-// (useSeason().saisonTitree ?? saison), avec son `evolution` : les titres
+// (useSeason().saison depuis le 27/10), avec son `evolution` : les titres
 // Impact et Défensive votés ne sont jamais écrits dans le document de saison
 // (votes.ts), et sans eux ni leurs cartes ni leurs points n'existent ici
 // (Sabri, 27/10 : la carte Impact de Bilal à la J3, absente de Ma carte alors
@@ -24,11 +24,11 @@
 // seule voix, qui ne font pas monter la note : la même que le reste de l'app.
 
 import { ovr, type BoostCardData, type Player } from "./engine";
-import { computeBoostCards, computeJournees, computeStandings, entryPP, evolutionDe } from "./saisie/engine";
+import { computeBoostCards, computeJournees, computeStandings, evolutionDe } from "./saisie/engine";
 import { journeeJouee, saisonDepuisArchive } from "./saisie/mutations";
 import type { Evolution } from "./saisie/evolution";
 import type { Saison } from "./saisie/types";
-import { isHidden } from "./hidden";
+import { rangDans, standingsJusqua } from "./rangs";
 
 /** Les saisons, closes puis en cours, de la plus ancienne à la plus récente. */
 function toutesLesSaisons(saison: Saison): { s: Saison; nom: string; enCours: boolean }[] {
@@ -99,7 +99,8 @@ export interface PointCourbe {
 /**
  * Sa courbe : un point par journée jouée par la ligue, toutes saisons à la
  * suite, depuis sa première. Le rang se recalcule après chaque journée,
- * comme le classement le ferait ce soir-là (masqués retirés, sauf lui).
+ * comme le classement le ferait ce soir-là (rangs.ts : masqués retirés, sauf
+ * lui ; la formule de points du moteur, extra time compris).
  */
 export function courbeDeCarriere(saison: Saison, nom: string, evolution?: Evolution): PointCourbe[] {
   const out: PointCourbe[] = [];
@@ -111,17 +112,12 @@ export function courbeDeCarriere(saison: Saison, nom: string, evolution?: Evolut
     const speciales = computeBoostCards(s, ev).filter((c) => c.player === nom);
     const jours = [...s.journees].sort((a, b) => a.j - b.j).filter((m) => journeeJouee(s, m.j));
 
-    const pp = new Map<string, number>();
-    const joues = new Set<string>();
+    // Le rang de chaque soir : la règle du classement (rangs.ts), mêmes
+    // points (entryPP, extra time compris), même population, mêmes ex æquo.
     for (const m of jours) {
-      for (const e of s.entries) {
-        if (e.j !== m.j) continue;
-        pp.set(e.player, (pp.get(e.player) ?? 0) + (e.extraTime ? (e.pepiteBonus ?? 0) : entryPP(e)));
-        if (e.statut === "Présent" && !e.extraTime) joues.add(e.player);
-      }
-      const classes = [...joues].filter((n) => n === nom || !isHidden(n));
-      const mien = pp.get(nom) ?? 0;
-      const rang = joues.has(nom) ? 1 + classes.filter((n) => (pp.get(n) ?? 0) > mien).length : null;
+      const classe = rangDans(standingsJusqua(s, m.j, ev), nom);
+      const joueAvant = s.entries.some((e) => e.j <= m.j && e.player === nom && e.statut === "Présent" && !e.extraTime);
+      const rang = joueAvant ? (classe?.rang ?? null) : null;
       const jour = speciales.filter((c) => c.date.startsWith(`J${m.j} `)).sort((a, b) => b.ovr - a.ovr)[0];
       out.push({
         saison: s.numero ?? 0,
@@ -131,7 +127,7 @@ export function courbeDeCarriere(saison: Saison, nom: string, evolution?: Evolut
         note,
         speciale: jour ? { type: jour.type, note: jour.ovr } : null,
         rang,
-        sur: classes.length,
+        sur: classe?.sur ?? 0,
         joue: s.entries.some((e) => e.j === m.j && e.player === nom && e.statut === "Présent" && !e.extraTime),
       });
     }

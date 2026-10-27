@@ -29,7 +29,7 @@
 
 import type { Journee, JourneeMatch } from "./engine";
 import type { Saison } from "./saisie/types";
-import { voteOuvert } from "./convocation-temps";
+import { jourMoisDuLibelle, voteOuvert } from "./convocation-temps";
 import { supabase } from "@/lib/supabase";
 import { isPlaceExtraTime } from "./hidden";
 import { cleTitre, VOIX_MIN } from "./saisie/evolution";
@@ -48,11 +48,28 @@ export interface VoteFigure {
   votant: string;
   candidat: string;
   match_id: string;
+  /** Le jour d'envoi à Paris (« 2026-10-25 ») ; absent des votes posés par ce téléphone. */
+  jour?: string;
+}
+
+/**
+ * Les votes envoyés le jour du match. La base n'exige que « le jour même de
+ * l'envoi » sans le comparer à la journée : un téléphone resté ouvert passé
+ * minuit pouvait encore poser un premier vote et changer un titre fermé.
+ */
+export function votesDuJour(votes: VoteFigure[], libelleJournee: string): VoteFigure[] {
+  const jm = jourMoisDuLibelle(libelleJournee);
+  if (!jm) return votes;
+  return votes.filter((v) => {
+    if (!v.jour) return true;
+    const [, mois, jour] = v.jour.split("-").map(Number);
+    return mois === jm.mois && jour === jm.jour;
+  });
 }
 
 /* ------------------------------ Le magasin ------------------------------ */
 // Les votes de la saison en cours, en mémoire, rechargés en temps réel.
-// Quelques dizaines de lignes par journée : on prend tout d'un coup.
+// Quelques dizaines de lignes par journée, lues page par page (chargerVotes).
 
 export const VOTES_EVENT = "sfl-votes";
 let cache: VoteFigure[] = [];
@@ -66,13 +83,28 @@ export function votesEnMemoire(): VoteFigure[] {
   return cache;
 }
 
+/**
+ * Tous les votes de la saison, page par page et dans un ordre fixe : la base
+ * n'en rend que 1 000 d'un coup, et sans ordre la page coupée changeait d'un
+ * téléphone à l'autre (vers la J14, les élus auraient différé).
+ */
 export async function chargerVotes(saison: number): Promise<void> {
-  const { data, error } = await supabase()
-    .from("votes_figures")
-    .select("saison, j, categorie, votant, candidat, match_id")
-    .eq("saison", saison);
-  if (error) throw error;
-  cache = (data ?? []) as VoteFigure[];
+  const tous: VoteFigure[] = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await supabase()
+      .from("votes_figures")
+      .select("saison, j, categorie, votant, candidat, match_id, jour")
+      .eq("saison", saison)
+      .order("j")
+      .order("categorie")
+      .order("votant")
+      .range(de, de + 999);
+    if (error) throw error;
+    const page = (data ?? []) as VoteFigure[];
+    tous.push(...page);
+    if (page.length < 1000) break;
+  }
+  cache = tous;
   charge = true;
   emit();
 }
@@ -175,7 +207,8 @@ export function appliquerVotes(saison: Saison, journees: Journee[], votes: VoteF
     for (const cat of CATEGORIES_VOTE) {
       if (!votes.some((v) => v.saison === numero && v.j === jn.j && v.categorie === cat)) continue;
       const set = new Set<string>();
-      for (const m of jn.matches ?? []) decompterMatch(votes, numero, jn.j, m, cat).elus.forEach((n) => set.add(n));
+      const valables = votesDuJour(votes, jn.date);
+      for (const m of jn.matches ?? []) decompterMatch(valables, numero, jn.j, m, cat).elus.forEach((n) => set.add(n));
       if (!set.size) continue;
       if (!elus.has(jn.j)) elus.set(jn.j, new Map());
       elus.get(jn.j)!.set(cat, set);
@@ -211,7 +244,7 @@ export function titresFaibles(saison: Saison, journees: Journee[], votes: VoteFi
     if (!journeeAvecVote(jn) || voteOuvert(jn.date, maintenant)) continue;
     for (const cat of CATEGORIES_VOTE) {
       for (const m of jn.matches ?? []) {
-        const d = decompterMatch(votes, numero, jn.j, m, cat);
+        const d = decompterMatch(votesDuJour(votes, jn.date), numero, jn.j, m, cat);
         if ((d.voix[0]?.[1] ?? 0) < VOIX_MIN) d.elus.forEach((n) => faibles.add(cleTitre(jn.j, cat, n)));
       }
     }

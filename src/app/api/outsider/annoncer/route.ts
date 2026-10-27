@@ -30,7 +30,6 @@
 // La route agit avec la clé secrète : elle exige une session de membre.
 
 import { NextRequest, NextResponse } from "next/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { cleVapid } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
@@ -38,25 +37,12 @@ import { prenom, type FelicitationXp, type Reponse } from "@/lib/sfl/missions";
 import { dimancheAAnnoncer, fenetreOutsider, notificationOutsider, outsiderDuDimanche } from "@/lib/sfl/outsiders";
 import { numeroSaison, type Saison } from "@/lib/sfl/saisie/types";
 import type { VoteFigure } from "@/lib/sfl/votes";
+import { chargerArbitresServeur, toutesLesLignes, votesDeLaSaison } from "@/lib/sfl/saison-serveur.server";
 import type { Notif } from "@/lib/sfl/push";
 
 export const maxDuration = 30;
 
 const couper = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
-
-/** Toutes les lignes d'une table, page par page (la base en rend 1 000 au plus d'un coup). */
-async function toutesLesLignes<T>(sb: SupabaseClient, table: string, colonnes: string, ordre: string[]): Promise<T[]> {
-  const out: T[] = [];
-  for (let de = 0; ; de += 1000) {
-    let q = sb.from(table).select(colonnes);
-    for (const o of ordre) q = q.order(o);
-    const { data, error } = await q.range(de, de + 999);
-    if (error) throw error;
-    const page = (data ?? []) as T[];
-    out.push(...page);
-    if (page.length < 1000) return out;
-  }
-}
 
 export async function POST(req: NextRequest) {
   const sb = serveur();
@@ -66,9 +52,12 @@ export async function POST(req: NextRequest) {
   const { data: profil } = await sb.from("profiles").select("valide").eq("id", moi.id).maybeSingle();
   if (!profil?.valide) return NextResponse.json({ error: "Réservé aux joueurs de la ligue." }, { status: 403 });
 
+  // Le document stocké, avec les arbitres masqués (saison-serveur.server.ts) ;
+  // outsiderDuDimanche y applique lui-même les votes, lus plus bas.
   const { data: doc } = await sb.from("saison").select("data").eq("id", 1).maybeSingle();
   const saison = (doc as { data?: Saison } | null)?.data;
   if (!saison) return NextResponse.json({ envoyes: 0, fini: true });
+  await chargerArbitresServeur(sb);
   const j = dimancheAAnnoncer(saison);
   if (j === null) return NextResponse.json({ envoyes: 0, fini: true });
   const { data: convocations } = await sb
@@ -91,9 +80,7 @@ export async function POST(req: NextRequest) {
   try {
     lues = await Promise.all([
       toutesLesLignes<Reponse>(sb, "missions_reponses", "saison, j, mission, joueur, reponse, cible, le", ["saison", "j", "mission", "joueur"]),
-      toutesLesLignes<VoteFigure>(sb, "votes_figures", "saison, j, categorie, votant, candidat, match_id", ["saison", "j", "categorie", "votant"]).then(
-        (v) => v.filter((x) => x.saison === numero)
-      ),
+      votesDeLaSaison(sb, numero),
       toutesLesLignes<Felicitation>(sb, "felicitations", "de, a, exploit, saison, j", ["id"]),
     ]);
   } catch {

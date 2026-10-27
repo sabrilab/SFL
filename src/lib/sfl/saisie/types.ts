@@ -147,6 +147,12 @@ export interface SaisonArchivee {
   roster: RosterEntry[];
   entries: MatchEntry[];
   events?: MatchEvent[];
+  /**
+   * Les titres votés élus à une seule voix (votes.ts, titresFaibles), figés à
+   * la clôture : ils restent des titres, sans faire monter la note. Les lignes
+   * archivées portent déjà les élus des votes (cloturerSaison).
+   */
+  titresFaibles?: string[];
 }
 
 // État complet de la saison, unité de stockage (localStorage / Supabase).
@@ -166,6 +172,12 @@ export interface Saison {
   events?: MatchEvent[];
   /** Les saisons closes, de la plus ancienne à la plus récente. */
   archives?: SaisonArchivee[];
+  /**
+   * Seulement sur une saison close relue (saisonDepuisArchive) : ses titres
+   * faibles, que evolutionDe lit. Jamais écrit sur la saison en cours, dont
+   * les votes se décomptent à la lecture (SeasonProvider).
+   */
+  titresFaibles?: string[];
   /** Les terrains de la ligue, posés sur la Map. */
   terrains?: Terrain[];
 }

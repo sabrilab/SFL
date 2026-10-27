@@ -20,9 +20,13 @@
 // Une journée sans équipes est un seul match.
 
 import type { MatchEntry, Saison } from "./types";
+import { isPlaceExtraTime } from "../hidden";
 
 export function noteDeMatch(e: MatchEntry): number {
-  if (e.statut !== "Présent" || e.extraTime) return 0;
+  // Une place « X1 », « X2 »… complète une équipe : ce n'est pas un joueur,
+  // elle ne prend jamais le MVP (27/10 : elle l'aurait pris dans la grille et
+  // la notification des résultats, alors que l'app la masque partout).
+  if (e.statut !== "Présent" || e.extraTime || isPlaceExtraTime(e.player)) return 0;
   let n = e.buts + e.passes;
   if (e.cleanSheet) n += 3;
   n += Math.floor((e.arrets ?? 0) / 2) + Math.floor((e.interceptions ?? 0) / 2);

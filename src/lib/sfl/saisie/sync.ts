@@ -85,6 +85,9 @@ export function accepteRemote(
 export async function pullSaison(): Promise<boolean> {
   const session = getSession();
   if (!session?.server) return false;
+  // Un compte qui n'est pas admin ne publiera jamais ce qu'il garde : on le
+  // libère (les téléphones déjà figés repartent de la base).
+  if (publicationEnAttente() && !session.admin) marquerAPublier(false);
   if (publicationEnAttente()) return false;
   try {
     const { data, error } = await supabase()
@@ -264,7 +267,12 @@ export async function pushSaison(saison: Saison, { forcer = false } = {}): Promi
     ok: r.ok,
     ...(r.ok ? {} : { raison: r.raison, ...(r.conflit ? { conflit: true } : {}) }),
   };
-  marquerAPublier(!r.ok);
+  // « À publier » fige le téléphone sur sa copie (pullSaison n'adopte plus
+  // rien) : seulement pour un échec que CET appareil pourra rattraper, celui
+  // d'un admin. Un joueur (une présence posée en local avant le chargement de
+  // la convocation, par exemple) ne publiera jamais : il restait figé sur de
+  // vieux classements jusqu'à « Reprendre la base » (27/10).
+  marquerAPublier(!r.ok && !!getSession()?.admin);
   signalerEnvoi();
   return r.ok;
 }
@@ -284,6 +292,10 @@ function signalerEnvoi() {
  */
 export async function rattraperPublication(): Promise<boolean> {
   if (!publicationEnAttente()) return false;
+  if (!getSession()?.admin) {
+    marquerAPublier(false);
+    return false;
+  }
   if (blocage()) return false;
   const { saisieStore } = await import("./store");
   return pushSaison(saisieStore.load());

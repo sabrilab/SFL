@@ -20,7 +20,8 @@ import { voteOuvert } from "@/lib/sfl/convocation-temps";
 import { rankPlayers } from "@/lib/sfl/engine";
 import { isHidden } from "@/lib/sfl/hidden";
 import { MAILLOTS } from "@/lib/sfl/maillots";
-import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
+import { entryPP } from "@/lib/sfl/saisie/engine";
+import { rangPepiteApres } from "@/lib/sfl/rangs";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { TROPHEES, NOM_METAL, metal } from "@/lib/sfl/trophees";
 import { journeeAvecVote } from "@/lib/sfl/votes";
@@ -421,17 +422,17 @@ export function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu
 /** Ton dimanche : la première publication du fil, si tu as joué le dernier. */
 export function TonDimanche({ j, date }: { j: number; date: string }) {
   const { player, me } = useMyPlayer();
-  const { saison } = useSeason();
+  const { saison, evolution } = useSeason();
   const lignes = saison.entries.filter((e) => e.j === j && e.player === me);
   const joue = lignes.some((e) => e.statut === "Présent" && !e.extraTime);
   const delta = useMemo(() => {
     const avant = Math.max(0, ...saison.journees.map((m) => m.j).filter((x) => x < j && journeeJouee(saison, x)));
     if (!avant) return 0;
-    const rang = (s: typeof saison) => rankPlayers(computeStandings(s).filter((p) => !isHidden(p.name))).find((p) => p.name === me)?.rank;
-    const r1 = rang({ ...saison, entries: saison.entries.filter((e) => e.j <= j) });
-    const r0 = rang({ ...saison, entries: saison.entries.filter((e) => e.j <= avant) });
+    // La règle du classement (rangs.ts), sur la saison des votes appliqués.
+    const r1 = rangPepiteApres(saison, me, j, evolution);
+    const r0 = rangPepiteApres(saison, me, avant, evolution);
     return r0 && r1 ? r0 - r1 : 0;
-  }, [saison, j, me]);
+  }, [saison, j, me, evolution]);
   if (!joue || !player) return null;
   const buts = lignes.reduce((t, e) => t + e.buts, 0);
   const passes = lignes.reduce((t, e) => t + e.passes, 0);
@@ -455,8 +456,13 @@ export function TonDimanche({ j, date }: { j: number; date: string }) {
 export function VoteDuJour({ me }: { me: string }) {
   const isClient = useIsClient();
   const { journees } = useSeason();
+  // Se relit chaque minute : à minuit, la section disparaît d'elle-même.
+  const [maintenant, setMaintenant] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setMaintenant(new Date()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
   if (!isClient) return null;
-  const maintenant = new Date();
   const ouvertes = journees.filter((j) => journeeAvecVote(j) && voteOuvert(j.date, maintenant));
   return (
     <>

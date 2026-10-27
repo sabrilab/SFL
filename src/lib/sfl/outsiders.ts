@@ -35,7 +35,6 @@ import {
   REGLES_DIVISIONS,
   type EtatDivisions,
 } from "./divisions";
-import { isHidden } from "./hidden";
 import { heureMin } from "./ligue-vierge";
 import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import {
@@ -47,9 +46,10 @@ import {
   type RangJoueur,
   type Reponse,
 } from "./missions";
-import { computeJournees, computeStandings, deriveSeason, entryPP } from "./saisie/engine";
-import { journeeJouee } from "./saisie/mutations";
+import { computeJournees, deriveSeason, entryPP } from "./saisie/engine";
+import { journeeJouee, journeeTerminee } from "./saisie/mutations";
 import { numeroSaison, type Saison } from "./saisie/types";
+import { classables, standingsJusqua } from "./rangs";
 import { appliquerVotes, type VoteFigure } from "./votes";
 
 type Journal = Map<string, { lignes: LigneXp[]; reussies: number }>;
@@ -136,12 +136,7 @@ export function outsidersDe(
 ): Outsider[] {
   if (etat.phase !== "divisions") return [];
   // Le Pépite d'Or des journées jouées, comme le découpage (decouper).
-  const jouees = new Set(saison.journees.map((m) => m.j).filter((j) => journeeJouee(saison, j)));
-  const classes = rankPlayers(
-    computeStandings({ ...saison, entries: saison.entries.filter((e) => jouees.has(e.j)) }).filter(
-      (p) => etat.actuelle.get(p.name) === 1 && !isHidden(p.name)
-    )
-  );
+  const classes = rankPlayers(classables(standingsJusqua(saison)).filter((p) => etat.actuelle.get(p.name) === 1));
   const out: Outsider[] = [];
   for (const p of classes) {
     const r = rangs.get(p.name);
@@ -217,7 +212,8 @@ export const TEXTE_NOTIFICATION: "recit" | "chiffres" = "recit";
 /** Le dimanche dont l'outsider s'annonce : celui d'après la dernière journée jouée, dans l'arc. */
 export function dimancheAAnnoncer(saison: Saison): number | null {
   if (numeroSaison(saison) !== REGLES_DIVISIONS.saison) return null;
-  const j = Math.max(0, ...saison.journees.map((m) => m.j).filter((x) => journeeJouee(saison, x))) + 1;
+  // Après la dernière feuille FINIE : un but saisi en direct ne fait pas sauter au dimanche suivant.
+  const j = Math.max(0, ...saison.journees.map((m) => m.j).filter((x) => journeeTerminee(saison, x))) + 1;
   return j >= REGLES_DIVISIONS.depuis ? j : null;
 }
 
@@ -238,7 +234,9 @@ export function outsiderDuDimanche(
   const derivee = vote === saison ? brut : deriveSeason(vote);
   const jugee = appliquerVotes(saison, derivee.journees, base.votes, maintenant);
   const journal = journalXp(jugee, base.reponses, base.votes, maintenant, base.felicitations);
-  return arcOutsider(saison, journal, derivee.players, j)?.chapitre?.outsider ?? null;
+  // Les divisions et le Pépite d'Or de l'arc : sur la saison des votes
+  // appliqués, comme les Actus (avant le 27/10, la saison brute).
+  return arcOutsider(vote, journal, derivee.players, j)?.chapitre?.outsider ?? null;
 }
 
 /** Un samedi soir ou un dimanche, à Paris : l'app ne sonne la route qu'alors (le serveur juge du reste). */

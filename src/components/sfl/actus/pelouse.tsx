@@ -45,10 +45,9 @@ import { useIdentites } from "@/hooks/use-identites";
 import type { Actu, Marche, Titre } from "@/lib/sfl/actus";
 import type { BoostType } from "@/lib/sfl/engine";
 import type { Enjeu, Voisins } from "@/lib/sfl/actus-toi";
-import { rankPlayers } from "@/lib/sfl/engine";
 import { exploitsDe } from "@/lib/sfl/exploits";
-import { isHidden } from "@/lib/sfl/hidden";
-import { computeStandings, entryPP } from "@/lib/sfl/saisie/engine";
+import { entryPP } from "@/lib/sfl/saisie/engine";
+import { rangPepiteApres } from "@/lib/sfl/rangs";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { projeter, trace, vue } from "@/lib/sfl/terrain-vu";
 import { metal, NOM_METAL, TROPHEES } from "@/lib/sfl/trophees";
@@ -585,17 +584,17 @@ function rang(noms: string[], v: number, ecart: number, taille: number, d0: numb
 /** Ton dimanche : ta carte à côté du but, tes buts au fond du filet, tes chiffres autour. */
 export function RubriqueToi({ j, date, className }: { j: number; date: string; className?: string }) {
   const { player, me } = useMyPlayer();
-  const { saison } = useSeason();
+  const { saison, evolution } = useSeason();
   const lignes = saison.entries.filter((e) => e.j === j && e.player === me);
   const joue = lignes.some((e) => e.statut === "Présent" && !e.extraTime);
   const delta = useMemo(() => {
     const avant = Math.max(0, ...saison.journees.map((m) => m.j).filter((x) => x < j && journeeJouee(saison, x)));
     if (!avant) return 0;
-    const rangDe = (s: typeof saison) => rankPlayers(computeStandings(s).filter((p) => !isHidden(p.name))).find((p) => p.name === me)?.rank;
-    const r1 = rangDe({ ...saison, entries: saison.entries.filter((e) => e.j <= j) });
-    const r0 = rangDe({ ...saison, entries: saison.entries.filter((e) => e.j <= avant) });
+    // La règle du classement (rangs.ts), sur la saison des votes appliqués.
+    const r1 = rangPepiteApres(saison, me, j, evolution);
+    const r0 = rangPepiteApres(saison, me, avant, evolution);
     return r0 && r1 ? r0 - r1 : 0;
-  }, [saison, j, me]);
+  }, [saison, j, me, evolution]);
   if (!joue || !player) return null;
   const buts = lignes.reduce((t, e) => t + e.buts, 0);
   const passes = lignes.reduce((t, e) => t + e.passes, 0);
