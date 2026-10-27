@@ -120,7 +120,7 @@ function saisonAvant(saison: Saison, j: number): Saison {
 
 /** Les rangs à l'XP à vie, et l'XP qui ouvre le rang A (le moins d'XP parmi ceux qui l'ont). */
 function rangsEtSeuil(journal: Journal, joueurs: Player[]): { rangs: Map<string, RangJoueur>; seuilA: number } {
-  const classement = classementNiveau(journal, joueurs);
+  const classement = classementNiveau(journal, joueurs, { pourLeRang: true });
   const rangs = rangsDesJoueurs(classement);
   const placeA = [...rangs.values()].find((r) => r.rang === "B")?.suivant?.place ?? 0;
   const dansA = classement.filter((c) => c.rank <= placeA && c.xp > 0);

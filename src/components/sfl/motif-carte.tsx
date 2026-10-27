@@ -30,13 +30,16 @@
 //     touche, les deux faisceaux des projecteurs d'un stade la nuit.
 // Et la rosace guillochée du dos (RosaceBola), comme sur un billet. Les
 // motifs des skins du Passe Bola sont dans motifs-passe.tsx, ceux des skins
-// offerts (la pépite, la palestine) dans motifs-offerts.tsx.
+// offerts (la pépite, la palestine) dans motifs-offerts.tsx, ceux des recrues
+// (recruteur, filigrane, fondateur) dans motifs-recrues.tsx.
 
 import { Fragment, useId } from "react";
 import type { Motif } from "@/components/sfl/finitions-carte";
 import { MotifOffertSvg } from "@/components/sfl/motifs-offerts";
 import { MotifPasseSvg } from "@/components/sfl/motifs-passe";
+import { MotifRecrueSvg } from "@/components/sfl/motifs-recrues";
 import { estMotifOffert } from "@/components/sfl/skins-offerts";
+import { estMotifRecrue } from "@/components/sfl/skins-recrues";
 import { estMotifPasse } from "@/components/sfl/skins-passe";
 
 const W = 1024;
@@ -160,6 +163,7 @@ export function MotifCarte({
   graine = 1,
   centre,
   eclats = true,
+  nom,
 }: {
   motif: Motif & { clair: string; fonce: string };
   /** Les étoiles : le ciel propre à chaque joueur. */
@@ -168,12 +172,15 @@ export function MotifCarte({
   centre?: { cx: number; cy: number };
   /** Les étincelles du ciel (le dos) ; sur la face, seulement les points. */
   eclats?: boolean;
+  /** Le nom du joueur (le filigrane l'écrit dans le papier). */
+  nom?: string;
 }) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");
   const style: React.CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%" };
 
   if (estMotifPasse(motif)) return <MotifPasseSvg motif={motif} graine={graine} dos={!!centre} />;
   if (estMotifOffert(motif)) return <MotifOffertSvg motif={motif} dos={!!centre} />;
+  if (estMotifRecrue(motif)) return <MotifRecrueSvg motif={motif} dos={!!centre} nom={nom} />;
 
   if (motif.type === "rayons") {
     const { cx, cy } = centre ?? motif;

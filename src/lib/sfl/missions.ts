@@ -637,6 +637,12 @@ export interface LigneXp {
   mission?: { creneau: Creneau | CreneauArbitre; rang: Rang; reussie: boolean };
   /** Les trois missions du même dimanche réussies. */
   parfait?: boolean;
+  /**
+   * Hors du rang (Sabri, 27/10) : l'XP d'une recrue active (lib/sfl/recrues.ts)
+   * compte pour le Niveau et le passe, jamais pour le rang B, A, S
+   * (classementNiveau avec pourLeRang) ni pour une épreuve (pas de mission).
+   */
+  horsRang?: true;
 }
 
 export interface BilanXp {
@@ -821,15 +827,20 @@ export function bilanDe(
   };
 }
 
-/** Le classement du niveau : l'XP de chacun, à vie (masqués exclus), du plus haut au plus bas. */
+/**
+ * Le classement du niveau : l'XP de chacun, à vie (masqués exclus), du plus
+ * haut au plus bas. `pourLeRang` : sans l'XP hors du rang (les recrues), celui
+ * qui donne les rangs (rangsDesJoueurs).
+ */
 export function classementNiveau(
   journal: Map<string, { lignes: LigneXp[]; reussies: number }>,
-  joueurs: Player[]
+  joueurs: Player[],
+  { pourLeRang = false }: { pourLeRang?: boolean } = {}
 ): { name: string; xp: number; niveau: number; rank: number }[] {
   const liste = joueurs
     .filter((p) => !isHidden(p.name))
     .map((p) => {
-      const xp = (journal.get(p.name)?.lignes ?? []).reduce((a, l) => a + l.xp, 0);
+      const xp = (journal.get(p.name)?.lignes ?? []).reduce((a, l) => a + (pourLeRang && l.horsRang ? 0 : l.xp), 0);
       return { name: p.name, xp, niveau: niveauDe(xp) };
     })
     .sort((a, b) => b.xp - a.xp || a.name.localeCompare(b.name));

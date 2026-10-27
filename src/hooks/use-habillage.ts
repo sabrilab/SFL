@@ -3,8 +3,9 @@
 // Ce que la carte d'un joueur porte (finitions-carte.ts) : ce qu'il a
 // débloqué dans le Passe Bola (lib/sfl/passe.ts), toutes saisons (un palier
 // atteint reste acquis, palierMaxDe), les finitions qui lui sont offertes
-// (finitions-offertes.ts), et ce qu'il a choisi d'en porter
-// (habillages-choisis.ts).
+// (finitions-offertes.ts), ceux que ses recrues ont ouverts (skins-recrues.ts :
+// 3 recrues actives, Recruteur ; 5, Filigrane ; son numéro, Fondateur), et ce
+// qu'il a choisi d'en porter (habillages-choisis.ts).
 //   · le skin : son choix, s'il est débloqué ; rien de choisi (« auto »), ou
 //     « - », la carte de base. Rien n'est imposé (Sabri, 24/10 : « il faut
 //     choisir, parmi les filtres qu'il a, celui qu'il veut mettre en avant
@@ -26,13 +27,17 @@ import {
   type ChoixHabillage,
 } from "@/lib/sfl/habillages-choisis";
 import { finitionsOffertes } from "@/lib/sfl/finitions-offertes";
+import { finitionsRecrues } from "@/components/sfl/skins-recrues";
 import type { Rang } from "@/lib/sfl/missions";
 import { debloquesDe } from "@/lib/sfl/passe";
 
 /** Ce que l'XP pose sur les cartes de la ligue (XpLigueProvider, xp-ligue.tsx). */
 export interface CartesXp {
-  /** Par joueur : son rang (XP à vie), le plus haut palier débloqué, le cran du cadre. */
-  parJoueur: Map<string, { rang: Rang | null; palier: number; cran: number }>;
+  /**
+   * Par joueur : son rang (XP à vie), le plus haut palier débloqué, le cran du
+   * cadre, ses recrues actives et son numéro de Fondateur.
+   */
+  parJoueur: Map<string, { rang: Rang | null; palier: number; cran: number; recrues: number; fondateur: number | null }>;
   /** Change avec l'un d'eux : la 3D recapture. */
   revision: string;
 }
@@ -47,9 +52,11 @@ function empreinte(texte: string): string {
 
 /** Relit XpLigue.surLesCartes (use-missions.ts). */
 export function lireCartesXp(surLesCartes: string): CartesXp {
-  const lignes = JSON.parse(surLesCartes) as [string, Rang | null, number, number][];
+  const lignes = JSON.parse(surLesCartes) as [string, Rang | null, number, number, number?, (number | null)?][];
   return {
-    parJoueur: new Map(lignes.map(([nom, rang, palier, cran]) => [nom, { rang, palier, cran }])),
+    parJoueur: new Map(
+      lignes.map(([nom, rang, palier, cran, recrues, fondateur]) => [nom, { rang, palier, cran, recrues: recrues ?? 0, fondateur: fondateur ?? null }])
+    ),
     revision: empreinte(surLesCartes),
   };
 }
@@ -77,10 +84,20 @@ export function usePalierMax(nom: string): number {
   return useContext(CartesXpContext)?.parJoueur.get(nom)?.palier ?? 0;
 }
 
-/** Les skins d'un joueur : ceux que son palier a débloqués, puis ceux qui lui sont offerts. */
-export function finitionsDe(nom: string, palier: number): Finition[] {
+/** Les recrues actives d'un joueur et son numéro de Fondateur (0 et null tant que rien n'est chargé). */
+export function useRecruesCarte(nom: string): { recrues: number; fondateur: number | null } {
+  const x = useContext(CartesXpContext)?.parJoueur.get(nom);
+  return { recrues: x?.recrues ?? 0, fondateur: x?.fondateur ?? null };
+}
+
+/**
+ * Les skins d'un joueur : ceux que son palier a débloqués, ceux qui lui sont
+ * offerts, puis ceux de ses recrues.
+ */
+export function finitionsDe(nom: string, palier: number, recrues = 0, fondateur: number | null = null): Finition[] {
   const passe = debloquesDe(palier).finitions.filter((f): f is Finition => f in MATIERES);
-  return [...passe, ...finitionsOffertes(nom).filter((f) => !passe.includes(f))];
+  const autres = [...finitionsOffertes(nom), ...finitionsRecrues(recrues, fondateur)];
+  return [...passe, ...autres.filter((f, i) => !passe.includes(f) && autres.indexOf(f) === i)];
 }
 
 /** Ce que la carte du joueur porte. Vide tant que l'XP de la ligue n'est pas calculé. */
@@ -91,7 +108,8 @@ export function useHabillage(nom: string): HabillageCarte {
     if (!cartes) return {};
     const x = cartes.parJoueur.get(nom);
     const palier = x?.palier ?? 0;
-    const finitions = finitionsDe(nom, palier);
+    const fondateur = x?.fondateur ?? null;
+    const finitions = finitionsDe(nom, palier, x?.recrues ?? 0, fondateur);
     // « Tes couleurs » se porte avec son pays.
     const voulue = choix.finition === "couleurs" && !choix.pays ? "-" : choix.finition;
     const finition = voulue !== "auto" && voulue !== "-" && finitions.includes(voulue) ? voulue : undefined;
@@ -103,6 +121,8 @@ export function useHabillage(nom: string): HabillageCarte {
       signes: choix.signes.filter((g) => ouverts.includes(g)),
       cran,
       rang: x?.rang ?? undefined,
+      // La carte Fondateur porte son numéro (la ligne de série, bola-card.tsx).
+      fondateur: finition === "fondateur" && fondateur ? fondateur : undefined,
     };
   }, [cartes, nom, choix]);
 }

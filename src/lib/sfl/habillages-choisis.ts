@@ -7,7 +7,8 @@
 // « finition/traitement » : « auto » (le dernier débloqué), « - » (rien) ou
 // l'id d'une récompense (nuit, chrome, animee, onyx, et les skins du Passe
 // Bola : givre, carbone, marbre, neon, aurore, ki, meteorite, et « Tes
-// couleurs » avec son pays, couleurs:dz). Le traitement de la photo
+// couleurs » avec son pays, couleurs:dz ; ceux des recrues : recruteur,
+// filigrane, fondateur). Le traitement de la photo
 // (argentique, gravure, marbre) n'est plus dans la passe depuis le 24/10
 // (Sabri : « Tu peux tirer tout ce qui est carte argentique ») : il reste
 // lisible, la carte ne le porte plus.
@@ -48,6 +49,9 @@ const FINITIONS: readonly string[] = [
   "verre",
   "pepite",
   "palestine",
+  "recruteur",
+  "filigrane",
+  "fondateur",
   "givre",
   "carbone",
   "marbre",

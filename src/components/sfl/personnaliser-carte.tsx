@@ -7,8 +7,9 @@
 // porté d'office (use-habillage.ts) : la carte de base tant qu'il n'a rien
 // choisi. Une feuille, la carte en haut, qui change à chaque choix, puis :
 //   · le skin : un seul à la fois, ou aucun ; chacun dit ce qu'il est et
-//     comment on l'a (le palier du Passe Bola, ou offert). Ceux qu'il n'a pas
-//     encore restent visibles, au cadenas : c'est ce qui donne envie ;
+//     comment on l'a (le palier du Passe Bola, offert, ou ses recrues : 3, 5,
+//     10, page Inviter). Ceux qu'il n'a pas encore restent visibles, au
+//     cadenas : c'est ce qui donne envie ;
 //   · les signes : autant qu'il veut, chacun s'allume ou s'éteint ;
 //   · le badge : le meilleur (par défaut), un badge gagné ou aucun ; chacun
 //     dit comment il a été gagné.
@@ -25,7 +26,8 @@ import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
 import { COULEURS_PAYS, PAYS_PAR_DEFAUT } from "@/components/sfl/skins-passe";
 import { useChoixBadge } from "@/hooks/use-badge-carte";
-import { finitionsDe, useChoixHabillage, useHabillage, usePalierMax } from "@/hooks/use-habillage";
+import { finitionsDe, useChoixHabillage, useHabillage, usePalierMax, useRecruesCarte } from "@/hooks/use-habillage";
+import { FINITIONS_RECRUES, SKINS_RECRUES, type FinitionRecrue } from "@/components/sfl/skins-recrues";
 import { badgesGagnes, cleBadge, type BadgeCarte } from "@/lib/sfl/badge-carte";
 import { choisirBadge } from "@/lib/sfl/badges-choisis";
 import type { Player } from "@/lib/sfl/engine";
@@ -55,7 +57,7 @@ function commentBadge(b: BadgeCarte): { quoi: string; court: string } {
   };
 }
 
-function Ligne({
+export function Ligne({
   actif,
   ouvert = true,
   onClick,
@@ -118,8 +120,11 @@ export function PersonnaliserCarte({ player }: { player: Player }) {
   const palierMax = usePalierMax(nom);
   const choix = useChoixHabillage(nom);
   const porte = useHabillage(nom);
-  const mesSkins = finitionsDe(nom, palierMax);
-  const offerts = mesSkins.filter((f) => !SKINS.some((s) => s.habille?.finition === f));
+  const { recrues, fondateur } = useRecruesCarte(nom);
+  const mesSkins = finitionsDe(nom, palierMax, recrues, fondateur);
+  const offerts = mesSkins.filter(
+    (f) => !SKINS.some((s) => s.habille?.finition === f) && !FINITIONS_RECRUES.includes(f as FinitionRecrue)
+  );
   const badges = badgesGagnes(saison, nom);
   const choixBadge = useChoixBadge(nom) ?? "auto";
   const badgeActif = choixBadge === "aucun" ? "aucun" : badges.some((b) => cleBadge(b) === choixBadge) ? choixBadge : "auto";
@@ -201,6 +206,22 @@ export function PersonnaliserCarte({ player }: { player: Player }) {
                   comment={SKINS_OFFERTS[f]?.comment ?? "Offert"}
                 />
               ))}
+              {FINITIONS_RECRUES.map((f) => {
+                const r = SKINS_RECRUES[f];
+                const a = mesSkins.includes(f);
+                return (
+                  <Ligne
+                    key={f}
+                    actif={porte.finition === f}
+                    ouvert={a}
+                    onClick={() => porterSkin(f)}
+                    vignette={vignette({ finition: f, fondateur: f === "fondateur" ? (fondateur ?? undefined) : undefined })}
+                    titre={r.titre}
+                    quoi={r.quoi}
+                    comment={a ? `Recrues · ${r.n} actives` : `À gagner · ${r.n} recrues actives`}
+                  />
+                );
+              })}
             </Rubrique>
 
             <Rubrique titre="Signes" sous={`${nSignes} à toi`}>
