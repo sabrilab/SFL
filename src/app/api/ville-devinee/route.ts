@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
   const pres = lat && lon ? `&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}` : "";
   try {
     const res = await fetch(`https://data.geopf.fr/geocodage/search?q=${encodeURIComponent(nom)}&limit=1&type=municipality${pres}`, {
-      headers: { "User-Agent": "Bola-SFL/1.0 (https://sfl-eight.vercel.app)", Accept: "application/json" },
+      headers: { "User-Agent": "Bola-SFL/1.0 (https://getbola.app)", Accept: "application/json" },
       cache: "no-store",
       signal: AbortSignal.timeout(4000),
     });

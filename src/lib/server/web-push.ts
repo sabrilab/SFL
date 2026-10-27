@@ -56,7 +56,7 @@ export function cleVapid(): CleVapid | null {
     return {
       publique: b64(ecdh.getPublicKey()),
       privee,
-      sujet: process.env.VAPID_SUBJECT ?? "https://sfl-eight.vercel.app",
+      sujet: process.env.VAPID_SUBJECT ?? "https://getbola.app",
     };
   } catch {
     return null;

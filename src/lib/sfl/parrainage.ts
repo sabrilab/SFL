@@ -14,8 +14,8 @@
 // Un compte n'a qu'un parrain, fixé à sa création ; Bola Team lui est offert
 // si ce parrain joue en SFL (hooks/use-acces-team.ts).
 //
-// L'adresse des liens : NEXT_PUBLIC_ADRESSE quand Bola aura son nom de
-// domaine, sinon celle où l'app est ouverte. Le code ne dépend pas de
+// L'adresse des liens : NEXT_PUBLIC_ADRESSE (https://getbola.app en prod
+// depuis le 27/10), sinon celle où l'app est ouverte. Le code ne dépend pas de
 // l'adresse : un lien partagé avant le changement continue de marcher.
 //
 // Les liens ouverts sont comptés une fois par téléphone et par étape (ouvert,

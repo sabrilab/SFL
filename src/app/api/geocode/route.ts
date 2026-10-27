@@ -53,7 +53,7 @@ interface Photon {
 async function lire<T>(url: string, ms = 4000): Promise<T | null> {
   try {
     const res = await fetch(url, {
-      headers: { "User-Agent": "Bola-SFL/1.0 (https://sfl-eight.vercel.app)", Accept: "application/json" },
+      headers: { "User-Agent": "Bola-SFL/1.0 (https://getbola.app)", Accept: "application/json" },
       cache: "no-store",
       signal: AbortSignal.timeout(ms),
     });
