@@ -46,12 +46,15 @@ const majuscule = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** Ce que Ma carte et ses pages lisent de ma saison : calculé au même endroit. */
 export function useMaCarte() {
   const { player } = useMyPlayer();
-  const { allPlayers, saison } = useSeason();
+  // La saison où les élus des votes (Impact, Défensive) sont posés : sans
+  // elle, leurs cartes et leurs points manquent à Ma carte (carriere.ts).
+  const { allPlayers, saison: brute, saisonTitree, evolution } = useSeason();
+  const saison = saisonTitree ?? brute;
   const fiche = useMemo(() => ficheJoueur(saison, player, allPlayers), [saison, player, allPlayers]);
   const dimanches = useMemo(() => dimanchesDe(saison, player.name), [saison, player.name]);
   const joues = dimanches.filter((d) => !d.horsMatch).length;
-  const courbe = useMemo(() => courbeDeCarriere(saison, player.name), [saison, player.name]);
-  const mesCartes = useMemo(() => cartesDeCarriere(saison, player.name), [saison, player.name]);
+  const courbe = useMemo(() => courbeDeCarriere(saison, player.name, evolution), [saison, player.name, evolution]);
+  const mesCartes = useMemo(() => cartesDeCarriere(saison, player.name, evolution), [saison, player.name, evolution]);
   // Ma place au Pépite d'Or après chaque journée de la saison, et les places
   // gagnées ou perdues depuis la précédente : la courbe les a déjà.
   const rangs = useMemo(() => {

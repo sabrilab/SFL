@@ -88,7 +88,8 @@ const LOOKS: { cle: string; titre: string; edition: EditionCarte; habillage?: Ha
 ];
 
 function Atelier() {
-  const { players, allPlayers, saison } = useSeason();
+  const { players, allPlayers, saison: brute, saisonTitree, evolution } = useSeason();
+  const saison = saisonTitree ?? brute;
   const { me } = useMyPlayer();
   const params = useSearchParams();
   const demande = params.get("joueur");
@@ -98,7 +99,7 @@ function Atelier() {
   const player =
     allPlayers.find((p) => p.name.toLowerCase() === (demande ?? me ?? "").toLowerCase()) ?? classes[0];
   // Ses cartes d'une saison close : le joueur tel qu'il était alors, et la journée d'une carte à titre.
-  const carriere = useMemo(() => (player ? cartesDeCarriere(saison, player.name) : []), [saison, player]);
+  const carriere = useMemo(() => (player ? cartesDeCarriere(saison, player.name, evolution) : []), [saison, player, evolution]);
   const version = (l: (typeof LOOKS)[number]) => {
     if (l.saison == null) return player ? { player, journee: undefined } : null;
     const s = carriere.find((c) => c.numero === l.saison && !c.enCours);
