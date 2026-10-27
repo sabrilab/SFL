@@ -16,6 +16,10 @@
 //   jusqu'à ce qu'il signe ; « Plus tard » la fait taire une semaine
 //   (invitation-charte.tsx). Jamais à qui a signé, et l'accord ne change pas
 //   de version.
+// · Les nouveautés (Sabri, 26/10 : « une espèce de slideshow en intro assez
+//   élégante qui montre la fonctionnalité ») : celles qu'il a choisi
+//   d'annoncer, une fois par joueur, chacune à son tour (lib/sfl/nouveautes,
+//   components/sfl/nouveautes). Ni « Plus tard » ni retour : fermée, elle est vue.
 // · L'arbitre, ensuite (Sabri, 24/10) : une fois, sa carte d'arbitre et
 //   « Tu es arbitre » (annonce-arbitre.tsx).
 // 0. L'annonce des divisions, jusqu'au soir de la J3 (annonce-divisions.tsx) :
@@ -71,6 +75,7 @@ import { Card3D } from "@/components/sfl/card-3d";
 import { FluxCarteOfficielle } from "@/components/sfl/carte-officielle";
 import { InvitationCharte, charteAProposer } from "@/components/sfl/invitation-charte";
 import { InvitationVille } from "@/components/sfl/invitation-ville";
+import { AnnonceNouveaute } from "@/components/sfl/nouveautes/annonce-nouveaute";
 import { ReponseEquipe, equipeAOuvrir, type EquipeAOuvrir } from "@/components/sfl/equipe/reponse-equipe";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { PlayerCard } from "@/components/sfl/player-card";
@@ -89,6 +94,7 @@ import { ajusterEquipes } from "@/lib/sfl/divisions-equipes";
 import { rankPlayers, type Player } from "@/lib/sfl/engine";
 import { isHidden } from "@/lib/sfl/hidden";
 import { identiteConfirmee, rafraichirIdentites } from "@/lib/sfl/identites";
+import { NOUVEAUTES, noterNouveauteVue, nouveauteAMontrer } from "@/lib/sfl/nouveautes";
 import { annoncerOutsider } from "@/lib/sfl/outsider-annonce";
 import { dimancheAAnnoncer, peutEtreLaVeille } from "@/lib/sfl/outsiders";
 import { partenaires } from "@/lib/sfl/partenaires";
@@ -107,7 +113,7 @@ import { maVille, maVilleAProposer, type VilleJoueur } from "@/lib/sfl/villes";
 import { demoInvitation } from "@/lib/sfl/equipes-demo";
 import { cn } from "@/lib/utils";
 
-export type Invitation = "equipe" | "charte" | "arbitre" | "divisions" | "ville" | "carte" | "notifs" | "suivre";
+export type Invitation = "equipe" | "charte" | "nouveaute" | "arbitre" | "divisions" | "ville" | "carte" | "notifs" | "suivre";
 
 const PLUS_TARD = (quoi: Invitation, nom: string) => `sfl-invitation-${quoi}-${nom}`;
 /** Combien de joueurs l'invitation propose de suivre. */
@@ -119,7 +125,7 @@ const PAUSES: Partial<Record<Invitation, number>> = { charte: 7 * 24 * 3600 * 10
 /** Après le splash, et après la cérémonie des nouvelles cartes si elle passe. */
 const DELAI_MS = 2600;
 
-const TEXTES: Record<Exclude<Invitation, "ville" | "divisions" | "equipe" | "charte" | "arbitre">, { titre: string; ligne: string; bouton: string }> = {
+const TEXTES: Record<Exclude<Invitation, "ville" | "divisions" | "equipe" | "charte" | "nouveaute" | "arbitre">, { titre: string; ligne: string; bouton: string }> = {
   carte: {
     titre: "Ta carte officielle",
     ligne: "Ton visage, le maillot Bola. Elle apparaît sur ta carte, chez tout le monde.",
@@ -167,11 +173,11 @@ export function aSuivre(saison: Saison, players: Player[], nom: string, suivable
   return [...fideles, ...hauts].slice(0, PROPOSES);
 }
 
-/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville`, `?invitation=suivre`, `?invitation=divisions`, `?invitation=equipe`, `?invitation=charte` ou `?invitation=arbitre` la montre sans compte vérifié (captures). */
+/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville`, `?invitation=suivre`, `?invitation=divisions`, `?invitation=equipe`, `?invitation=charte`, `?invitation=nouveaute` (la dernière annoncée) ou `?invitation=arbitre` la montre sans compte vérifié (captures). */
 function apercu(): Invitation | null {
   if (process.env.NODE_ENV === "production" || typeof window === "undefined") return null;
   const v = new URLSearchParams(window.location.search).get("invitation");
-  return v === null ? null : v === "notifs" || v === "ville" || v === "suivre" || v === "divisions" || v === "equipe" || v === "charte" || v === "arbitre" ? v : "carte";
+  return v === null ? null : v === "notifs" || v === "ville" || v === "suivre" || v === "divisions" || v === "equipe" || v === "charte" || v === "nouveaute" || v === "arbitre" ? v : "carte";
 }
 
 export function InvitationCarte() {
@@ -188,6 +194,8 @@ export function InvitationCarte() {
   const [proposee, setProposee] = useState<VilleJoueur | null>(null);
   /** L'équipe qui m'invite, ou la Charte à signer. */
   const [equipe, setEquipe] = useState<EquipeAOuvrir | null>(null);
+  /** La nouveauté annoncée à cette ouverture. */
+  const [nouveaute, setNouveaute] = useState<string | null>(null);
   const [edition, setEdition] = useState<EditionAnnonce>("avant");
   const [flux, setFlux] = useState(false);
   const [etatNotifs, setEtatNotifs] = useState<Awaited<ReturnType<typeof etatNotifications>>>("indisponible");
@@ -220,6 +228,7 @@ export function InvitationCarte() {
       if (forcee) {
         if (forcee === "ville") setProposee(maVille(nom));
         if (forcee === "divisions") setEdition(editionAnnonce(ligue.current.saison, maintenant) ?? "avant");
+        if (forcee === "nouveaute") setNouveaute(NOUVEAUTES[NOUVEAUTES.length - 1].id);
         if (forcee === "equipe")
           setEquipe({ quoi: "invitation", ...demoInvitation(ligue.current.players.filter((p) => p.matchs > 0).map((p) => p.name), nom) });
         setVisible(forcee);
@@ -255,6 +264,15 @@ export function InvitationCarte() {
       // Puis la charte : sans elle, pas de carte dans les vidéos ni les visuels.
       if (charteAProposer(nom) && !enPause("charte", nom)) {
         setVisible("charte");
+        return;
+      }
+      // Puis la nouveauté que Sabri a choisi d'annoncer, pas encore vue.
+      const arbitre = etatArbitres().arbitres.includes(nom);
+      const n = await nouveauteAMontrer(nom, !horsSflRef.current && !arbitre).catch(() => null);
+      if (annule) return;
+      if (n) {
+        setNouveaute(n.id);
+        setVisible("nouveaute");
         return;
       }
       const annonce = editionAnnonce(ligue.current.saison, maintenant);
@@ -331,7 +349,7 @@ export function InvitationCarte() {
     setVisible(null);
   }
 
-  const texte = visible && visible !== "ville" && visible !== "divisions" && visible !== "equipe" && visible !== "charte" && visible !== "arbitre" ? TEXTES[visible] : null;
+  const texte = visible && visible !== "ville" && visible !== "divisions" && visible !== "equipe" && visible !== "charte" && visible !== "nouveaute" && visible !== "arbitre" ? TEXTES[visible] : null;
   const Icone = visible === "notifs" ? Bell : visible === "suivre" ? UserPlus : Sparkles;
   const choisis = proposes.filter((n) => !decoches.has(n)).length;
 
@@ -341,6 +359,17 @@ export function InvitationCarte() {
         {visible === "equipe" && equipe && <ReponseEquipe key="equipe" a={equipe} onFini={() => setVisible(null)} onPlusTard={plusTard} />}
         {visible === "charte" && (
           <InvitationCharte key="charte" player={player} nom={nom} onFini={() => setVisible(null)} onPlusTard={plusTard} />
+        )}
+        {visible === "nouveaute" && nouveaute && (
+          <AnnonceNouveaute
+            key={`nouveaute-${nouveaute}`}
+            id={nouveaute}
+            player={player}
+            onFini={() => {
+              if (!forcee) void noterNouveauteVue(nouveaute, nom);
+              setVisible(null);
+            }}
+          />
         )}
         {visible === "arbitre" && <AnnonceArbitre key="arbitre" nom={nom} etat={etatNotifs} onFermer={() => setVisible(null)} />}
         {visible === "divisions" && <AnnonceDivisions key="divisions" player={player} edition={edition} onFermer={annonceFermee} />}

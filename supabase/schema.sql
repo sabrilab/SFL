@@ -311,6 +311,12 @@ alter table public.profiles add column if not exists ville_le timestamptz;
 -- à jour de soi »).
 alter table public.profiles add column if not exists accueil_le timestamptz;
 
+-- Les nouveautés annoncées (lib/sfl/nouveautes.ts, Sabri, 26/10) : à
+-- l'ouverture, un diaporama par nouveauté que Sabri a choisi d'annoncer, une
+-- fois par joueur. nouveautes_vues : les ids déjà vus. Posé par le joueur
+-- seul (grant plus bas, RLS « mise à jour de soi »).
+alter table public.profiles add column if not exists nouveautes_vues text[] not null default '{}';
+
 -- ──────────────────────────── Activité ───────────────────────────────
 -- Journal d'usage : connexions, ouvertures quotidiennes, réponses de
 -- présence. Alimente le tableau de bord admin (qui vient, quand, rétention).
@@ -634,6 +640,7 @@ grant update (badge) on public.profiles to authenticated;
 grant update (habillage) on public.profiles to authenticated;
 grant update (ville, ville_lat, ville_lng, ville_cachee, ville_le) on public.profiles to authenticated;
 grant update (accueil_le) on public.profiles to authenticated;
+grant update (nouveautes_vues) on public.profiles to authenticated;
 grant insert, select on public.activity to authenticated;
 grant insert, update, delete on public.presence to authenticated;
 grant insert, update, select on public.compositions to authenticated;
