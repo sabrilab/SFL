@@ -5,8 +5,8 @@
 // de face, puis la tête un peu tournée de chaque côté —, ou la galerie si la
 // caméra n'est pas là. 2. Maillot : blanc ou noir. 3. Photo : une photo de studio au maillot Bola,
 // la même mise en scène pour toutes les cartes, sur fond gris (Neutre). Il
-// peut ensuite mettre le drapeau de son pays derrière lui (Drapeau) ou la
-// passer en Manga, puis la poser sur sa carte : elle repart alors dans le
+// peut ensuite mettre le drapeau de son pays derrière lui (Drapeau), puis la
+// poser sur sa carte : elle repart alors dans le
 // recadrage habituel (recadrer-photo.tsx).
 //
 // Les images sont faites côté serveur (/api/photo-studio, fal.ai) ; chaque
@@ -68,7 +68,6 @@ const ETAPES = ["Visage", "Maillot", "Photo"] as const;
 
 /** Les légendes d'un filtre en cours. */
 function seanceFiltre(f: Exclude<Filtre, "studio">, pays: Pays | null): string[] {
-  if (f === "manga") return ["On sort l'encre", "Les traits", "Les trames", "Derniers coups de plume"];
   const p = pays ? unPays(pays) : undefined;
   return ["On déplie le drapeau", p ? `${emojiDrapeau(p.id)}  ${p.nom}` : "Le drapeau", "Mise au point"];
 }

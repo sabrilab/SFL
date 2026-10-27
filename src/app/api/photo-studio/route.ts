@@ -10,7 +10,6 @@
 //     le modèle le recopie) donnent la photo de studio ;
 //   · { filtre: "drapeau", pays, source: dataURL } : le fond gris de la photo
 //     de studio devient le drapeau du pays choisi, le reste gardé ;
-//   · { filtre: "manga", source: dataURL } : la photo de studio redessinée.
 //
 // Le crédit fal est celui de Sabri : chaque appel est noté dans la table
 // photo_studio, et un joueur a LIMITE_JOUR photos par jour, studio et filtres
@@ -57,7 +56,7 @@ const SUPABASE_KEY =
 
 /** La photo de studio (selfies + maillot). */
 const MODELE_STUDIO = process.env.FAL_MODEL_STUDIO ?? "bytedance/seedream/v5/pro/edit";
-/** Les filtres (drapeau, manga), à partir de la photo de studio. */
+/** Le filtre Drapeau, à partir de la photo de studio. */
 const MODELE = process.env.FAL_MODEL ?? "fal-ai/nano-banana/edit";
 /** Une data URL d'image, au plus ~3 Mo une fois décodée. */
 const IMAGE_MAX = 4_000_000;
@@ -80,9 +79,6 @@ function promptStudio(coloris: Coloris): string {
 function promptDrapeau(pays: string): string {
   return `Keep this exact photo: same person, same face, same expression, same pose, same framing, same BOLA jersey with its marks, same studio lighting on the person. Only replace the plain grey backdrop with the national flag of ${pays}, large and gently waving, filling the whole background behind the player, slightly out of focus like a backdrop in a football team photo shoot. The flag colours and emblem must be accurate. No text, no other people.`;
 }
-
-const PROMPT_MANGA =
-  "Redraw this exact photo as a black and white manga panel: same person, recognisable face, same hairstyle and facial hair, same pose, same framing, same jersey with its BOLA and SFL marks. Clean confident ink lines, screentone shading, speed lines radiating softly behind the head, pure white paper. Sports manga cover style. No speech bubbles, no extra text.";
 
 function estImage(v: unknown): v is string {
   return (
@@ -139,15 +135,11 @@ export async function POST(req: NextRequest) {
   } else {
     if (!estImage(corps.source)) return erreur("Photo de studio manquante.", 400);
     images = [corps.source];
-    if (filtre === "drapeau") {
-      const pays = corps.pays;
-      if (!estPays(pays)) return erreur("Choisis un pays.", 400);
-      const p = unPays(pays)!;
-      // Le code ISO lève les doutes sur les pays au nom ambigu ou peu connu.
-      prompt = promptDrapeau(p.id.length === 2 ? `${p.en} (ISO country code ${p.id.toUpperCase()})` : p.en);
-    } else {
-      prompt = PROMPT_MANGA;
-    }
+    const pays = corps.pays;
+    if (!estPays(pays)) return erreur("Choisis un pays.", 400);
+    const p = unPays(pays)!;
+    // Le code ISO lève les doutes sur les pays au nom ambigu ou peu connu.
+    prompt = promptDrapeau(p.id.length === 2 ? `${p.en} (ISO country code ${p.id.toUpperCase()})` : p.en);
   }
 
   // L'appelant : un joueur accepté, avec ses propres droits (RLS).

@@ -48,6 +48,11 @@
 //    le parcours (carte-officielle.tsx). On ne décide qu'après avoir relu la
 //    liste des photos de la ligue : un cache vide sur un nouvel appareil ne
 //    doit pas inviter quelqu'un qui a déjà sa photo.
+// 3 bis. La carte en manga (Sabri, 27/10 : « enlève le skin manga et refais
+//    les images de ceux qui ont choisi manga ») : le filtre n'existe plus ; à
+//    qui porte encore sa photo manga (CARTES_MANGA, lib/sfl/photo-studio),
+//    sa carte arrive et un bouton rouvre le studio, sur le visage gardé dans
+//    son album s'il y est. Passe avant les autres, après les nouveautés.
 // 4. Les joueurs à suivre (Sabri, 22/10 : « incite-le dans l'application
 //    pour nos utilisateurs actuels »). Tant que le joueur ne suit personne,
 //    ses six partenaires les plus fidèles arrivent en cartes (partenaires.ts,
@@ -99,6 +104,7 @@ import { annoncerOutsider } from "@/lib/sfl/outsider-annonce";
 import { dimancheAAnnoncer, peutEtreLaVeille } from "@/lib/sfl/outsiders";
 import { partenaires } from "@/lib/sfl/partenaires";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
+import { carteEnManga } from "@/lib/sfl/photo-studio";
 import { rafraichirAccord } from "@/lib/sfl/consentement";
 import {
   activerNotifications,
@@ -113,7 +119,7 @@ import { maVille, maVilleAProposer, type VilleJoueur } from "@/lib/sfl/villes";
 import { demoInvitation } from "@/lib/sfl/equipes-demo";
 import { cn } from "@/lib/utils";
 
-export type Invitation = "equipe" | "charte" | "nouveaute" | "arbitre" | "divisions" | "ville" | "carte" | "notifs" | "suivre";
+export type Invitation = "equipe" | "charte" | "nouveaute" | "arbitre" | "divisions" | "ville" | "carte" | "manga" | "notifs" | "suivre";
 
 const PLUS_TARD = (quoi: Invitation, nom: string) => `sfl-invitation-${quoi}-${nom}`;
 /** Combien de joueurs l'invitation propose de suivre. */
@@ -130,6 +136,11 @@ const TEXTES: Record<Exclude<Invitation, "ville" | "divisions" | "equipe" | "cha
     titre: "Ta carte officielle",
     ligne: "Ton visage, le maillot Bola. Elle apparaît sur ta carte, chez tout le monde.",
     bouton: "Créer ma carte officielle",
+  },
+  manga: {
+    titre: "Le manga s'arrête",
+    ligne: "Ta carte repasse en photo du studio : neutre ou au drapeau. Elle change chez tout le monde.",
+    bouton: "Refaire ma photo",
   },
   notifs: {
     titre: "Les notifications",
@@ -173,11 +184,11 @@ export function aSuivre(saison: Saison, players: Player[], nom: string, suivable
   return [...fideles, ...hauts].slice(0, PROPOSES);
 }
 
-/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville`, `?invitation=suivre`, `?invitation=divisions`, `?invitation=equipe`, `?invitation=charte`, `?invitation=nouveaute` (la dernière annoncée) ou `?invitation=arbitre` la montre sans compte vérifié (captures). */
+/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville`, `?invitation=suivre`, `?invitation=divisions`, `?invitation=equipe`, `?invitation=charte`, `?invitation=nouveaute` (la dernière annoncée), `?invitation=manga` ou `?invitation=arbitre` la montre sans compte vérifié (captures). */
 function apercu(): Invitation | null {
   if (process.env.NODE_ENV === "production" || typeof window === "undefined") return null;
   const v = new URLSearchParams(window.location.search).get("invitation");
-  return v === null ? null : v === "notifs" || v === "ville" || v === "suivre" || v === "divisions" || v === "equipe" || v === "charte" || v === "nouveaute" || v === "arbitre" ? v : "carte";
+  return v === null ? null : v === "notifs" || v === "ville" || v === "suivre" || v === "divisions" || v === "equipe" || v === "charte" || v === "nouveaute" || v === "arbitre" || v === "manga" ? v : "carte";
 }
 
 export function InvitationCarte() {
@@ -275,6 +286,11 @@ export function InvitationCarte() {
         setVisible("nouveaute");
         return;
       }
+      // Puis la carte encore en manga : le filtre n'existe plus.
+      if (carteEnManga(nom, photoPerso(nom)) && !enPause("manga", nom)) {
+        setVisible("manga");
+        return;
+      }
       const annonce = editionAnnonce(ligue.current.saison, maintenant);
       // Un arbitre apprend qu'il l'est (annonce-arbitre.tsx), une fois.
       if (etatArbitres().arbitres.includes(nom) && !annonceArbitreVue(nom)) setVisible("arbitre");
@@ -318,7 +334,7 @@ export function InvitationCarte() {
   }
 
   async function oui() {
-    if (visible === "carte") {
+    if (visible === "carte" || visible === "manga") {
       setVisible(null);
       setFlux(true);
       return;
