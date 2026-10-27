@@ -223,7 +223,9 @@ export function usePresence(): PresenceView {
             .from("presence")
             .insert({ convocation_id: server.convocation.id, player_id: uid, reponse: r });
           if (error) {
-            if (error.code === "23505" || /duplicate|row-level security/i.test(error.message)) {
+            // Seule la clé en double dit « déjà répondu » : un refus RLS
+            // (pas membre) n'est pas une réponse figée.
+            if (error.code === "23505" || /duplicate key/i.test(error.message)) {
               recharger.current();
               return "figee";
             }
