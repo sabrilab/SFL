@@ -62,7 +62,7 @@ const barlow = Barlow_Condensed({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://sfl-eight.vercel.app"),
+  metadataBase: new URL("https://getbola.app"),
   title: {
     default: "Bola — Sunday Five League",
     template: "%s · Bola",

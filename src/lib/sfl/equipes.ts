@@ -559,7 +559,8 @@ export async function lireLien(j: string): Promise<InfoLien | null> {
 }
 
 export function urlDuLien(j: string): string {
-  return `${window.location.origin}/equipe/${j}`;
+  const base = (process.env.NEXT_PUBLIC_ADRESSE || window.location.origin).replace(/\/+$/, "");
+  return `${base}/equipe/${j}`;
 }
 
 /**
