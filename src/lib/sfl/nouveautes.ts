@@ -33,6 +33,9 @@ export interface Nouveaute {
 /** Les nouveautés annoncées, de la plus ancienne à la plus récente. */
 export const NOUVEAUTES: readonly Nouveaute[] = [
   { id: "journees-et-blessures", le: "2026-10-27T00:45:00+01:00", jusquAu: "2026-11-24T00:00:00+01:00", ligueSeulement: true },
+  // Parrainage paliers, réponse scellée, missions dans Ma carte : pour tous (le
+  // drapeau vaut pour la nouveauté entière, pas pour une diapo).
+  { id: "nouveautes-27-10", le: "2026-10-27T19:40:00+01:00", jusquAu: "2026-11-24T19:40:00+01:00" },
 ];
 
 const cleIci = (id: string, nom: string) => `bola-nouveaute-${id}-${nom}`;
