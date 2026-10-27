@@ -14,10 +14,19 @@
 //      chaque journée ;
 //   3. un face-à-face avec un autre joueur : les matchs joués ensemble, et
 //      ceux joués l'un contre l'autre.
+//
+// La saison à donner est celle où les élus des votes sont posés
+// (useSeason().saisonTitree ?? saison), avec son `evolution` : les titres
+// Impact et Défensive votés ne sont jamais écrits dans le document de saison
+// (votes.ts), et sans eux ni leurs cartes ni leurs points n'existent ici
+// (Sabri, 27/10 : la carte Impact de Bilal à la J3, absente de Ma carte alors
+// qu'il est au classement Impact). L'évolution porte les titres élus à une
+// seule voix, qui ne font pas monter la note : la même que le reste de l'app.
 
 import { ovr, type BoostCardData, type Player } from "./engine";
-import { computeBoostCards, computeJournees, computeStandings, entryPP } from "./saisie/engine";
+import { computeBoostCards, computeJournees, computeStandings, entryPP, evolutionDe } from "./saisie/engine";
 import { journeeJouee, saisonDepuisArchive } from "./saisie/mutations";
+import type { Evolution } from "./saisie/evolution";
 import type { Saison } from "./saisie/types";
 import { isHidden } from "./hidden";
 
@@ -49,12 +58,13 @@ export interface CartesDeSaison {
 }
 
 /** Ses cartes, une saison après l'autre, de la plus récente à la plus ancienne. */
-export function cartesDeCarriere(saison: Saison, nom: string): CartesDeSaison[] {
+export function cartesDeCarriere(saison: Saison, nom: string, evolution?: Evolution): CartesDeSaison[] {
   return toutesLesSaisons(saison)
     .flatMap(({ s, nom: nomSaison, enCours }) => {
-      const player = computeStandings(s).find((p) => p.name === nom);
+      const ev = enCours && evolution ? evolution : evolutionDe(s);
+      const player = computeStandings(s, ev).find((p) => p.name === nom);
       if (!player || player.matchs === 0) return [];
-      const speciales = computeBoostCards(s)
+      const speciales = computeBoostCards(s, ev)
         .filter((c) => c.player === nom)
         .map((c) => ({
           carte: c,
@@ -91,13 +101,14 @@ export interface PointCourbe {
  * suite, depuis sa première. Le rang se recalcule après chaque journée,
  * comme le classement le ferait ce soir-là (masqués retirés, sauf lui).
  */
-export function courbeDeCarriere(saison: Saison, nom: string): PointCourbe[] {
+export function courbeDeCarriere(saison: Saison, nom: string, evolution?: Evolution): PointCourbe[] {
   const out: PointCourbe[] = [];
-  for (const { s, nom: nomSaison } of toutesLesSaisons(saison)) {
-    const base = computeStandings(s).find((p) => p.name === nom);
+  for (const { s, nom: nomSaison, enCours } of toutesLesSaisons(saison)) {
+    const ev = enCours && evolution ? evolution : evolutionDe(s);
+    const base = computeStandings(s, ev).find((p) => p.name === nom);
     if (!base) continue;
     const note = ovr(base.stats);
-    const speciales = computeBoostCards(s).filter((c) => c.player === nom);
+    const speciales = computeBoostCards(s, ev).filter((c) => c.player === nom);
     const jours = [...s.journees].sort((a, b) => a.j - b.j).filter((m) => journeeJouee(s, m.j));
 
     const pp = new Map<string, number>();

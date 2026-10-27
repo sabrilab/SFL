@@ -95,7 +95,9 @@ export function Chiffre({ valeur, quoi }: { valeur: string | number; quoi: strin
 }
 
 export function ProfilJoueur({ player, rank }: { player: Player; rank: number }) {
-  const { saison, journees, allPlayers } = useSeason();
+  // Les élus des votes (Impact, Défensive) posés : ses cartes et ses points (carriere.ts).
+  const { saison: brute, saisonTitree, evolution, journees, allPlayers } = useSeason();
+  const saison = saisonTitree ?? brute;
   const grand = useGrandEcran();
   const tresGrand = useTresGrandEcran();
   const identite = useIdentites();
@@ -109,8 +111,8 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
     () => new Map(rankPlayers(allPlayers.filter((p) => p.matchs > 0 && (!isHidden(p.name) || p.name === me))).map((p) => [p.name, p.rank])),
     [allPlayers, me]
   );
-  const cartes = useMemo(() => cartesDeCarriere(saison, player.name), [saison, player.name]);
-  const courbe = useMemo(() => courbeDeCarriere(saison, player.name), [saison, player.name]);
+  const cartes = useMemo(() => cartesDeCarriere(saison, player.name, evolution), [saison, player.name, evolution]);
+  const courbe = useMemo(() => courbeDeCarriere(saison, player.name, evolution), [saison, player.name, evolution]);
 
   const fiche = useMemo(() => ficheJoueur(saison, player, allPlayers), [saison, player, allPlayers]);
   const ecussons = useMemo(

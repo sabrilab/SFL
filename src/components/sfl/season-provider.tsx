@@ -35,7 +35,9 @@ interface SeasonValue extends DerivedSeason {
   /**
    * La saison où les élus des votes fermés (Impact, Défensive) sont posés sur
    * leurs lignes (appliquerVotes) : pour montrer les cartes à titre de chaque
-   * match (lib/sfl/actus.ts). Absente (une saison close) : `saison` les a déjà.
+   * match (lib/sfl/actus.ts), et celles de chacun dans Ma carte et sur son
+   * profil (lib/sfl/carriere.ts, avec `evolution`). Absente (une saison
+   * close) : `saison` les a déjà.
    */
   saisonTitree?: Saison;
   /**
