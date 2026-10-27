@@ -481,6 +481,148 @@ drop trigger if exists saison_par_publication on public.saison;
 create trigger saison_par_publication before insert or update on public.saison
   for each row execute function public.saison_par_publication();
 
+-- ─────────────────── Historique et corbeille de la saison ───────────────────
+-- 27/10/2026 : Afid a été retiré de l'effectif d'un geste, et la saison
+-- n'avait aucune mémoire — chaque publication remplace le document entier.
+-- Désormais, chaque publication garde l'état qu'elle remplace :
+--   · saison_historique : le document précédent tel quel (les 200 derniers),
+--     pour retrouver n'importe quel état en SQL ;
+--   · saison_corbeille : ce que la publication a fait disparaître — un
+--     joueur de l'effectif, une journée (avec ses lignes), une ligne d'une
+--     journée qui reste. L'admin les voit et les remet d'un geste (Admin →
+--     Historique → Corbeille), 60 jours durant.
+-- Le passage d'une saison à la suivante (numero qui change) vide l'effectif
+-- et les lignes par nature : il n'entre pas dans la corbeille.
+create table if not exists public.saison_historique (
+  id           bigint generated always as identity primary key,
+  version      bigint not null,
+  data         jsonb not null,
+  seed         int not null default 0,
+  remplacee_le timestamptz not null default now(),
+  par          uuid
+);
+
+alter table public.saison_historique enable row level security;
+revoke all on public.saison_historique from anon, authenticated;
+grant select on public.saison_historique to authenticated;
+
+drop policy if exists "saison_historique: l'admin lit" on public.saison_historique;
+create policy "saison_historique: l'admin lit"
+  on public.saison_historique for select to authenticated
+  using ((select public.is_league_admin()));
+
+create table if not exists public.saison_corbeille (
+  id          bigint generated always as identity primary key,
+  genre       text not null check (genre in ('joueur', 'journee', 'ligne')),
+  cle         text not null,
+  libelle     text not null,
+  element     jsonb not null,
+  supprime_le timestamptz not null default now(),
+  par         uuid,
+  restaure_le timestamptz
+);
+
+create index if not exists saison_corbeille_le on public.saison_corbeille (supprime_le desc);
+
+alter table public.saison_corbeille enable row level security;
+revoke all on public.saison_corbeille from anon, authenticated;
+grant select on public.saison_corbeille to authenticated;
+grant update (restaure_le) on public.saison_corbeille to authenticated;
+
+drop policy if exists "saison_corbeille: l'admin lit" on public.saison_corbeille;
+create policy "saison_corbeille: l'admin lit"
+  on public.saison_corbeille for select to authenticated
+  using ((select public.is_league_admin()));
+
+drop policy if exists "saison_corbeille: l'admin remet" on public.saison_corbeille;
+create policy "saison_corbeille: l'admin remet"
+  on public.saison_corbeille for update to authenticated
+  using ((select public.is_league_admin()))
+  with check ((select public.is_league_admin()));
+
+create or replace function public.saison_garde_trace()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  qui uuid := auth.uid();
+begin
+  if old.data is not distinct from new.data then
+    return new;
+  end if;
+
+  insert into public.saison_historique (version, data, seed, par)
+  values (old.version, old.data, old.seed, qui);
+  delete from public.saison_historique
+   where id in (select h.id from public.saison_historique h order by h.id desc offset 200);
+  delete from public.saison_corbeille where supprime_le < now() - interval '60 days';
+
+  if coalesce(old.data->>'numero', '') is distinct from coalesce(new.data->>'numero', '') then
+    return new;
+  end if;
+
+  -- Joueurs sortis de l'effectif.
+  insert into public.saison_corbeille (genre, cle, libelle, element, par)
+  select 'joueur', r->>'name', r->>'name', r, qui
+    from jsonb_array_elements(coalesce(old.data->'roster', '[]'::jsonb)) r
+   where not exists (
+     select 1 from jsonb_array_elements(coalesce(new.data->'roster', '[]'::jsonb)) n
+      where n->>'name' = r->>'name'
+   );
+
+  -- Journées supprimées, avec leurs lignes.
+  insert into public.saison_corbeille (genre, cle, libelle, element, par)
+  select 'journee', m->>'j', 'J' || (m->>'j'),
+         jsonb_build_object(
+           'journee', m,
+           'lignes', coalesce((
+             select jsonb_agg(e)
+               from jsonb_array_elements(coalesce(old.data->'entries', '[]'::jsonb)) e
+              where e->>'j' = m->>'j'
+           ), '[]'::jsonb)
+         ),
+         qui
+    from jsonb_array_elements(coalesce(old.data->'journees', '[]'::jsonb)) m
+   where not exists (
+     select 1 from jsonb_array_elements(coalesce(new.data->'journees', '[]'::jsonb)) n
+      where n->>'j' = m->>'j'
+   );
+
+  -- Lignes retirées d'une journée qui reste : un joueur compte autant de
+  -- lignes qu'il en a dans la journée ; s'il en a moins, les dernières
+  -- manquent. Modifier une ligne (ses buts, son équipe) ne la jette pas.
+  with avant as (
+    select e, e->>'j' as j, e->>'player' as p,
+           row_number() over (partition by e->>'j', e->>'player' order by o) as rang
+      from jsonb_array_elements(coalesce(old.data->'entries', '[]'::jsonb)) with ordinality t(e, o)
+  ),
+  apres as (
+    select e->>'j' as j, e->>'player' as p, count(*) as n
+      from jsonb_array_elements(coalesce(new.data->'entries', '[]'::jsonb)) e
+     group by 1, 2
+  )
+  insert into public.saison_corbeille (genre, cle, libelle, element, par)
+  select 'ligne', a.j || '·' || a.p, a.p || ' · J' || a.j, a.e, qui
+    from avant a
+    left join apres b on b.j = a.j and b.p = a.p
+   where a.rang > coalesce(b.n, 0)
+     and exists (
+       select 1 from jsonb_array_elements(coalesce(new.data->'journees', '[]'::jsonb)) m
+        where m->>'j' = a.j
+     );
+
+  return new;
+end;
+$$;
+
+revoke execute on function public.saison_garde_trace() from public, anon, authenticated;
+
+drop trigger if exists saison_garde_trace on public.saison;
+create trigger saison_garde_trace after update on public.saison
+  for each row execute function public.saison_garde_trace();
+
 -- ─────────────────────────── Compositions ────────────────────────────
 -- Les compositions 5v5 déposées dans l'Arène : une par joueur et par
 -- dimanche (la nouvelle remplace l'ancienne). Elles serviront à générer les
