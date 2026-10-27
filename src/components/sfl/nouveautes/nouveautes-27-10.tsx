@@ -80,6 +80,8 @@ function PaliersRecrues({ player }: { player: Player }) {
   // La carte entière (Mini la dessine en grand puis la réduit) : la ligne de série se lit.
   const l = court ? 112 : 146;
   const h = Math.round((l * 1656) / 1024);
+  // Les miniatures des paliers : assez grandes pour que les trois papiers se distinguent.
+  const mini = court ? { l: 36, h: 58 } : { l: 44, h: 71 };
   return (
     <div className="flex w-full flex-col items-center gap-[21px] [@media(max-height:739px)]:gap-[13px]">
       <motion.div
@@ -116,7 +118,10 @@ function PaliersRecrues({ player }: { player: Player }) {
             transition={{ ...ressort, delay: reduit ? 0 : 0.08 + 0.14 * k }}
             className="flex flex-1 flex-col items-center gap-1.5"
           >
-            <span className="relative block h-[58px] w-9 overflow-hidden rounded-[6px]">
+            <span
+              className="relative block overflow-hidden rounded-[6px]"
+              style={{ width: mini.l, height: mini.h }}
+            >
               {p.finition ? (
                 <Mini
                   player={player}
@@ -126,12 +131,13 @@ function PaliersRecrues({ player }: { player: Player }) {
                     fondateur:
                       p.finition === "fondateur" ? NUMERO_EXEMPLE : undefined,
                   }}
-                  l={36}
-                  h={58}
+                  l={mini.l}
+                  h={mini.h}
                 />
               ) : (
-                <span className="flex h-full items-center justify-center bg-white/[0.08] font-mono text-[11px] font-bold">
-                  +100
+                <span className="flex h-full flex-col items-center justify-center gap-0.5 bg-white/[0.08] font-mono font-bold leading-none">
+                  <span className="text-[11px]">+100</span>
+                  <span className="text-[9px] text-white/60">XP</span>
                 </span>
               )}
             </span>
@@ -142,7 +148,7 @@ function PaliersRecrues({ player }: { player: Player }) {
               {p.n}
             </span>
             <span className="mono-label text-[9.5px] text-white/50">
-              {p.finition ? p.titre : "XP"}
+              {p.finition ? p.titre : "Par recrue"}
             </span>
           </motion.li>
         ))}
@@ -205,7 +211,8 @@ function ReponseQuiSeScelle() {
 
   return (
     <div className="relative h-[50px] w-full max-w-[320px]">
-      <AnimatePresence initial={false}>
+      {/* Les boutons s'effacent d'abord, la pilule arrive ensuite (jamais deux « Je viens »). */}
+      <AnimatePresence initial={false} mode="wait">
         {t !== "scelle" ? (
           <motion.div
             key="boutons"

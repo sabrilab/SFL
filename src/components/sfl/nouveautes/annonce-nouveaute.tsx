@@ -10,35 +10,13 @@ import { Diaporama, type Diapo } from "./diaporama";
 import { diaposJourneesEtBlessures } from "./journees-et-blessures";
 import { diaposNouveautes2710 } from "./nouveautes-27-10";
 
-const DIAPOS: Record<
-  string,
-  {
-    diapos: (player: Player) => Diapo[];
-    aller?: { label: string; href: string };
-  }
-> = {
-  "journees-et-blessures": {
-    diapos: diaposJourneesEtBlessures,
-    aller: { label: "Voir Ma carte", href: "/profil" },
-  },
-  "nouveautes-27-10": {
-    diapos: diaposNouveautes2710,
-    aller: { label: "Voir Ma carte", href: "/profil/xp?vue=autres" },
-  },
+const DIAPOS: Record<string, { diapos: (player: Player) => Diapo[]; aller?: { label: string; href: string } }> = {
+  "journees-et-blessures": { diapos: diaposJourneesEtBlessures, aller: { label: "Voir Ma carte", href: "/profil" } },
+  "nouveautes-27-10": { diapos: diaposNouveautes2710, aller: { label: "Voir Ma carte", href: "/profil/xp?vue=autres" } },
 };
 
-export function AnnonceNouveaute({
-  id,
-  player,
-  onFini,
-}: {
-  id: string;
-  player: Player;
-  onFini: () => void;
-}): ReactNode {
+export function AnnonceNouveaute({ id, player, onFini }: { id: string; player: Player; onFini: () => void }): ReactNode {
   const n = DIAPOS[id];
   if (!n) return null;
-  return (
-    <Diaporama diapos={n.diapos(player)} aller={n.aller} onFini={onFini} />
-  );
+  return <Diaporama diapos={n.diapos(player)} aller={n.aller} onFini={onFini} />;
 }
