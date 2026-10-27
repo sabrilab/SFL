@@ -13,7 +13,8 @@
 
 import { rankPlayers } from "./engine";
 import { isHidden } from "./hidden";
-import { computeStandings, entryPP } from "./saisie/engine";
+import { entryPP } from "./saisie/engine";
+import { classables, standingsJusqua } from "./rangs";
 import { journeeJouee } from "./saisie/mutations";
 import type { Saison } from "./saisie/types";
 import { vitrine, type TropheeId } from "./trophees";
@@ -131,7 +132,8 @@ export function honneurDe(saison: Saison, j: number, moi?: string): Honneur {
   const precedent = Math.max(0, ...saison.journees.map((m) => m.j).filter((x) => x < j && journeeJouee(saison, x)));
   let montent: Honneur["montent"] = [];
   if (precedent > 0) {
-    const rangs = (s: Saison) => new Map(rankPlayers(computeStandings(s).filter((p) => !isHidden(p.name))).map((p) => [p.name, p.rank]));
+    // La règle du classement (rangs.ts).
+    const rangs = (s: Saison) => new Map(rankPlayers(classables(standingsJusqua(s))).map((p) => [p.name, p.rank]));
     const r1 = rangs(apres);
     const r0 = rangs(jusqua(saison, precedent));
     montent = presents

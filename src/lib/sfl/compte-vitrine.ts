@@ -144,8 +144,18 @@ function sansEffectif(roster: RosterEntry[]): RosterEntry[] {
   });
 }
 
-/** La vraie saison : tout ce que la vitrine avait ajouté, retiré. Appelé avant toute écriture. */
-export function sansVitrine(saison: Saison): Saison {
+/**
+ * La vraie saison : tout ce que la vitrine avait ajouté, retiré. Appelé avant
+ * toute écriture. Retire aussi les titres faibles posés à la lecture
+ * (SeasonProvider) : ils se décomptent des votes, ils ne s'écrivent pas.
+ */
+export function sansVitrine(entree: Saison): Saison {
+  let saison = entree;
+  if (saison.titresFaibles) {
+    const { titresFaibles: _lus, ...reste } = saison;
+    void _lus;
+    saison = reste;
+  }
   const touchee =
     saison.entries.some((e) => e.vitrine) ||
     saison.roster.some((r) => r.vitrine) ||

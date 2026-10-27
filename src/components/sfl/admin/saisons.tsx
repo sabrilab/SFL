@@ -10,9 +10,14 @@
 //
 // Tant que la saison nouvelle est vierge, la clôture s'annule d'un geste.
 // Au-delà, non : on n'écrase jamais du travail saisi.
+//
+// Les élus des votes (Impact, Défensive) partent avec l'archive : ils ne sont
+// jamais écrits dans le document, et les votes d'une saison close ne se
+// rechargent plus. La clôture attend donc que les votes soient chargés et que
+// le dernier vote soit fermé (minuit, heure de Paris).
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Archive, ChevronRight, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +26,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { cloturerSaison, restaurationPossible, restaurerSaison } from "@/lib/sfl/saisie/mutations";
 import { numeroSaison, type Saison } from "@/lib/sfl/saisie/types";
+import { deriveSeason } from "@/lib/sfl/saisie/engine";
+import { appliquerVotes, journeeAvecVote, titresFaibles, votesCharges } from "@/lib/sfl/votes";
+import { voteOuvert } from "@/lib/sfl/convocation-temps";
+import { useVotes } from "@/hooks/use-votes";
 
 function dateCourte(iso: string) {
   try {
@@ -44,6 +53,20 @@ export function Saisons({
   const journees = saison.journees.length;
   const lignes = saison.entries.length;
   const vierge = journees === 0 && lignes === 0;
+  const votes = useVotes();
+  const charges = votesCharges() || !saison.journees.some((m) => m.mvpAuto);
+  // Calculé à l'ouverture de la fenêtre : la saison que l'archive gardera, élus compris.
+  const titres = useMemo(() => {
+    if (!ouvert) return null;
+    const brut = deriveSeason(saison);
+    const maintenant = new Date();
+    return {
+      entries: appliquerVotes(saison, brut.journees, votes, maintenant).entries,
+      faibles: titresFaibles(saison, brut.journees, votes, maintenant),
+      voteEnCours: brut.journees.some((jn) => journeeAvecVote(jn) && voteOuvert(jn.date, maintenant)),
+    };
+  }, [ouvert, saison, votes]);
+  const bloque = !charges ? "Les votes ne sont pas encore chargés." : titres?.voteEnCours ? "Le vote du dernier dimanche est ouvert jusqu'à minuit." : null;
 
   return (
     <div className="overflow-hidden rounded-3xl bg-card">
@@ -125,12 +148,15 @@ export function Saisons({
             <Button
               variant="vert"
               className="rounded-full"
+              disabled={!!bloque || !titres}
+              title={bloque ?? undefined}
               onClick={() => {
-                onCommit(cloturerSaison(saison, nom), `Clôture de la saison ${numero}`);
+                if (!titres || bloque) return;
+                onCommit(cloturerSaison(saison, nom, titres), `Clôture de la saison ${numero}`);
                 setOuvert(false);
               }}
             >
-              Clôturer et ouvrir la saison {numero + 1}
+              {bloque ?? `Clôturer et ouvrir la saison ${numero + 1}`}
             </Button>
           </DialogFooter>
         </DialogContent>

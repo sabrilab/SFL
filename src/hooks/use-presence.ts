@@ -84,7 +84,8 @@ export interface PresenceView {
 }
 
 export function usePresence(): PresenceView {
-  const { saison, journees } = useSeason();
+  // Le document stocké : setPresence et les équipes l'écrivent.
+  const { saisonBrute: saison, journees } = useSeason();
   const { player } = useMyPlayer();
   const session = useSession();
   const serverActive = !!session?.server;

@@ -29,7 +29,7 @@
 
 import type { Journee, JourneeMatch } from "./engine";
 import type { Saison } from "./saisie/types";
-import { voteOuvert } from "./convocation-temps";
+import { jourMoisDuLibelle, voteOuvert } from "./convocation-temps";
 import { supabase } from "@/lib/supabase";
 import { isPlaceExtraTime } from "./hidden";
 import { cleTitre, VOIX_MIN } from "./saisie/evolution";
@@ -48,11 +48,38 @@ export interface VoteFigure {
   votant: string;
   candidat: string;
   match_id: string;
+  /** Le jour d'envoi à Paris (« 2026-10-25 ») ; absent des votes posés par ce téléphone. */
+  jour?: string;
+}
+
+/**
+ * Les votes envoyés le jour du match. La base n'exige que « le jour même de
+ * l'envoi » sans le comparer à la journée : un téléphone resté ouvert passé
+ * minuit pouvait encore poser un premier vote et changer un titre fermé.
+ *
+ * `j` : la journée décomptée. Si AUCUN de ses votes datés n'est du jour de son
+ * libellé, c'est la date de la journée qui a été corrigée après le vote (un
+ * vote ne s'envoie que le jour affiché, convocation-temps.voteOuvert) : on les
+ * garde tous, plutôt que d'effacer d'un coup les titres élus du dimanche.
+ */
+export function votesDuJour(votes: VoteFigure[], libelleJournee: string, j?: number): VoteFigure[] {
+  const jm = jourMoisDuLibelle(libelleJournee);
+  if (!jm) return votes;
+  const bonJour = (v: VoteFigure) => {
+    if (!v.jour) return true;
+    const [, mois, jour] = v.jour.split("-").map(Number);
+    return mois === jm.mois && jour === jm.jour;
+  };
+  if (j != null) {
+    const dates = votes.filter((v) => v.j === j && v.jour);
+    if (dates.length && !dates.some(bonJour)) return votes;
+  }
+  return votes.filter(bonJour);
 }
 
 /* ------------------------------ Le magasin ------------------------------ */
 // Les votes de la saison en cours, en mémoire, rechargés en temps réel.
-// Quelques dizaines de lignes par journée : on prend tout d'un coup.
+// Quelques dizaines de lignes par journée, lues page par page (chargerVotes).
 
 export const VOTES_EVENT = "sfl-votes";
 let cache: VoteFigure[] = [];
@@ -66,13 +93,28 @@ export function votesEnMemoire(): VoteFigure[] {
   return cache;
 }
 
+/**
+ * Tous les votes de la saison, page par page et dans un ordre fixe : la base
+ * n'en rend que 1 000 d'un coup, et sans ordre la page coupée changeait d'un
+ * téléphone à l'autre (vers la J14, les élus auraient différé).
+ */
 export async function chargerVotes(saison: number): Promise<void> {
-  const { data, error } = await supabase()
-    .from("votes_figures")
-    .select("saison, j, categorie, votant, candidat, match_id")
-    .eq("saison", saison);
-  if (error) throw error;
-  cache = (data ?? []) as VoteFigure[];
+  const tous: VoteFigure[] = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await supabase()
+      .from("votes_figures")
+      .select("saison, j, categorie, votant, candidat, match_id, jour")
+      .eq("saison", saison)
+      .order("j")
+      .order("categorie")
+      .order("votant")
+      .range(de, de + 999);
+    if (error) throw error;
+    const page = (data ?? []) as VoteFigure[];
+    tous.push(...page);
+    if (page.length < 1000) break;
+  }
+  cache = tous;
   charge = true;
   emit();
 }
@@ -175,7 +217,8 @@ export function appliquerVotes(saison: Saison, journees: Journee[], votes: VoteF
     for (const cat of CATEGORIES_VOTE) {
       if (!votes.some((v) => v.saison === numero && v.j === jn.j && v.categorie === cat)) continue;
       const set = new Set<string>();
-      for (const m of jn.matches ?? []) decompterMatch(votes, numero, jn.j, m, cat).elus.forEach((n) => set.add(n));
+      const valables = votesDuJour(votes, jn.date, jn.j);
+      for (const m of jn.matches ?? []) decompterMatch(valables, numero, jn.j, m, cat).elus.forEach((n) => set.add(n));
       if (!set.size) continue;
       if (!elus.has(jn.j)) elus.set(jn.j, new Map());
       elus.get(jn.j)!.set(cat, set);
@@ -211,7 +254,7 @@ export function titresFaibles(saison: Saison, journees: Journee[], votes: VoteFi
     if (!journeeAvecVote(jn) || voteOuvert(jn.date, maintenant)) continue;
     for (const cat of CATEGORIES_VOTE) {
       for (const m of jn.matches ?? []) {
-        const d = decompterMatch(votes, numero, jn.j, m, cat);
+        const d = decompterMatch(votesDuJour(votes, jn.date, jn.j), numero, jn.j, m, cat);
         if ((d.voix[0]?.[1] ?? 0) < VOIX_MIN) d.elus.forEach((n) => faibles.add(cleTitre(jn.j, cat, n)));
       }
     }
@@ -250,12 +293,16 @@ export interface BilanJournee {
 
 export function bilanJournee(votes: VoteFigure[], saison: number, jn: Journee): BilanJournee {
   const duJour = votes.filter((v) => v.saison === saison && v.j === jn.j);
+  // Le même décompte qu'appliquerVotes : un vote envoyé un autre jour que
+  // celui du match ne compte pas, et l'admin le voit écarté.
+  const valables = votesDuJour(duJour, jn.date, jn.j);
+  const horsJour = new Set(duJour.filter((v) => !valables.includes(v)));
   const equipeDe = new Map<string, { m: string; t: "A" | "B" }>();
   for (const m of jn.matches ?? []) {
     m.teamA.players.forEach((p) => !p.extraTime && equipeDe.set(p.name, { m: m.id, t: "A" }));
     m.teamB.players.forEach((p) => !p.extraTime && equipeDe.set(p.name, { m: m.id, t: "B" }));
   }
-  const aVote = new Set(duJour.map((v) => v.votant));
+  const aVote = new Set(valables.map((v) => v.votant));
   // Les places « X1 », « X2 »… complètent une équipe sans être des joueurs :
   // elles ne votent pas et ne comptent pas parmi les inscrits.
   const vrai = (n: string) => !isPlaceExtraTime(n);
@@ -263,7 +310,7 @@ export function bilanJournee(votes: VoteFigure[], saison: number, jn: Journee): 
     const joueurs = [...match.teamA.players, ...match.teamB.players]
       .filter((p) => !p.extraTime && vrai(p.name))
       .map((p) => p.name);
-    const compter = (cat: CategorieVote) => ({ ...decompterMatch(votes, saison, jn.j, match, cat), inscrits: joueurs.length });
+    const compter = (cat: CategorieVote) => ({ ...decompterMatch(valables, saison, jn.j, match, cat), inscrits: joueurs.length });
     return {
       match,
       parCategorie: { impact: compter("impact"), def: compter("def") },
@@ -275,7 +322,9 @@ export function bilanJournee(votes: VoteFigure[], saison: number, jn: Journee): 
   for (const v of duJour) {
     const a = equipeDe.get(v.votant);
     const b = equipeDe.get(v.candidat);
-    const raison = !a
+    const raison = horsJour.has(v)
+      ? "envoyé après le jour du match"
+      : !a
       ? "votant hors des feuilles du jour"
       : !b
         ? "candidat hors des feuilles du jour"

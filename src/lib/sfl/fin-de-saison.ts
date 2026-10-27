@@ -11,7 +11,9 @@
 import type { Player } from "./engine";
 import { deriveSeason } from "./saisie/engine";
 import { journeeJouee, saisonDepuisArchive } from "./saisie/mutations";
-import type { Saison } from "./saisie/types";
+import type { Saison, SaisonArchivee } from "./saisie/types";
+import { isHidden } from "./hidden";
+import { rangDans } from "./rangs";
 
 export type ClassementId = "pepite" | "buteur" | "passeur" | "defenseur" | "mvp";
 
@@ -48,17 +50,22 @@ export interface EtatClassement {
   enCours: { rang: number; valeur: number } | null;
 }
 
-/** Le rang d'un joueur : 1 + le nombre de joueurs devant lui. Les ex aequo le partagent. */
+/**
+ * Le rang d'un joueur : 1 + le nombre de joueurs devant lui, les ex aequo le
+ * partagent — la règle des classements (rangs.ts) : les joueurs masqués
+ * (Sabri, les arbitres, les places X) ne comptent pas, sauf lui-même.
+ */
 function rang(players: Player[], nom: string, valeur: (p: Player) => number): { rang: number; valeur: number } | null {
-  const moi = players.find((p) => p.name === nom);
-  if (!moi || valeur(moi) <= 0) return null;
-  const v = valeur(moi);
-  return { rang: 1 + players.filter((p) => valeur(p) > v).length, valeur: v };
+  const r = rangDans(players, nom, valeur, false);
+  return r && { rang: r.rang, valeur: r.valeur };
 }
+
+/** Une saison close, dérivée comme elle l'était (élus des votes et titres faibles figés à la clôture). */
+const joueursDeArchive = (a: SaisonArchivee) => deriveSeason(saisonDepuisArchive(a)).players;
 
 /** Les cinq classements d'un joueur : ses podiums passés et son rang du moment. */
 export function finsDeSaison(saison: Saison, nom: string, players: Player[]): EtatClassement[] {
-  const closes = (saison.archives ?? []).map((a) => ({ nom: a.nom, players: deriveSeason(saisonDepuisArchive(a)).players }));
+  const closes = (saison.archives ?? []).map((a) => ({ nom: a.nom, players: joueursDeArchive(a) }));
   const jouee = saison.journees.some((m) => journeeJouee(saison, m.j));
 
   return CLASSEMENTS.map((def) => {
@@ -78,10 +85,12 @@ export function podiumsDe(saison: Saison, id: ClassementId, noms?: Set<string>):
   const def = CLASSEMENTS.find((c) => c.id === id)!;
   const out: { nom: string; rang: number; saison: string }[] = [];
   for (const a of [...(saison.archives ?? [])].reverse()) {
-    const players = deriveSeason(saisonDepuisArchive(a)).players;
+    const players = joueursDeArchive(a);
     const podium: { nom: string; rang: number; saison: string }[] = [];
     for (const p of players) {
       if (noms && !noms.has(p.name)) continue;
+      // Un masqué ne monte sur aucun podium public.
+      if (isHidden(p.name)) continue;
       const r = rang(players, p.name, def.valeur);
       if (r && r.rang <= 3) podium.push({ nom: p.name, rang: r.rang, saison: a.nom });
     }
@@ -121,7 +130,7 @@ export function tropheesParSaison(saison: Saison, nom: string): TropheesDeSaison
   return [...(saison.archives ?? [])]
     .sort((a, b) => b.numero - a.numero)
     .map((a) => {
-      const players = deriveSeason(saisonDepuisArchive(a)).players;
+      const players = joueursDeArchive(a);
       const moi = players.find((p) => p.name === nom);
       const podiums = CLASSEMENTS.flatMap((def) => {
         const r = rang(players, nom, def.valeur);

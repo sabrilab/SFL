@@ -154,7 +154,14 @@ export function useMaintenant(): Date {
   return useMemo(() => new Date(t), [t]);
 }
 
-/** La saison telle qu'on la juge : les élus des votes fermés posés sur les lignes. */
+/**
+ * La saison telle qu'on la juge : les élus des votes fermés posés sur les
+ * lignes. Les missions se TIRENT aussi sur elle (rivaux, « passe devant »,
+ * record) : tirées sur la saison brute, elles ne visaient pas les joueurs du
+ * classement affiché, et le journal d'XP, qui les retire sur la saison jugée,
+ * pouvait rejeter un contrat montré réussi (27/10). Le provider pose déjà les
+ * votes (useSeason().saison) ; ceci les rejuge à la minute, pour minuit.
+ */
 export function useSaisonJugee(maintenant: Date) {
   const { saison, journees } = useSeason();
   const votes = useVotes();
@@ -230,9 +237,9 @@ export function useMissions(): MesMissions | null {
   const { me } = useMyPlayer();
   const maintenant = useMaintenant();
   const reponses = useReponses();
-  const { saison, jugee, votes } = useSaisonJugee(maintenant);
+  const { jugee, votes } = useSaisonJugee(maintenant);
 
-  const d = useMemo(() => (isClient ? dimancheEnCours(saison, maintenant) : null), [isClient, saison, maintenant]);
+  const d = useMemo(() => (isClient ? dimancheEnCours(jugee, maintenant) : null), [isClient, jugee, maintenant]);
 
   return useMemo(() => {
     if (!d) return null;
@@ -296,9 +303,9 @@ export function useMissionsDeLaLigue(): MissionsDeLaLigue | null {
   const { me } = useMyPlayer();
   const maintenant = useMaintenant();
   const reponses = useReponses();
-  const { saison, jugee, votes } = useSaisonJugee(maintenant);
+  const { jugee, votes } = useSaisonJugee(maintenant);
 
-  const d = useMemo(() => (isClient ? dimancheEnCours(saison, maintenant) : null), [isClient, saison, maintenant]);
+  const d = useMemo(() => (isClient ? dimancheEnCours(jugee, maintenant) : null), [isClient, jugee, maintenant]);
 
   return useMemo(() => {
     if (!d) return null;

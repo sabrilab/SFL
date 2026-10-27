@@ -27,7 +27,8 @@
 
 import { isHidden } from "./hidden";
 import { missionsDeJournee, type DimancheMissions, type LigneXp } from "./missions";
-import { computeStandings, entryPP } from "./saisie/engine";
+import { entryPP } from "./saisie/engine";
+import { classables, standingsJusqua } from "./rangs";
 import { journeeJouee } from "./saisie/mutations";
 import type { MatchEntry, Saison } from "./saisie/types";
 
@@ -219,7 +220,8 @@ export function primeAu(s: Pick<Saison, "journees" | "entries" | "roster">, nume
 
 /** Les premiers de la saison sur chaque sujet. */
 export function resultatsDeSaison(s: Saison): Map<SujetSaison, string[]> {
-  const joueurs = computeStandings(s).filter((p) => !isHidden(p.name));
+  // La règle du classement (rangs.ts) : journées jouées, masqués retirés.
+  const joueurs = classables(standingsJusqua(s));
   const de = (f: (p: (typeof joueurs)[number]) => number) => premiers(new Map(joueurs.map((p) => [p.name, f(p)])));
   return new Map<SujetSaison, string[]>([
     ["pepite", de((p) => p.pp)],

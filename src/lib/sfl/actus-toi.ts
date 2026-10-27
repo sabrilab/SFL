@@ -10,11 +10,12 @@
 // Pur : ni React ni réseau. Les joueurs masqués n'y paraissent pas.
 
 import { rankPlayers, type RankedPlayer } from "./engine";
-import { isHidden } from "./hidden";
-import { computeStandings } from "./saisie/engine";
+import { classables, standingsJusqua } from "./rangs";
 import type { Saison } from "./saisie/types";
 
-const classes = (s: Saison) => rankPlayers(computeStandings(s).filter((p) => !isHidden(p.name)));
+// La règle du classement (rangs.ts) : la saison des votes appliqués
+// (useSeason().saison), journées jouées seulement, masqués retirés sauf soi.
+const classes = (s: Saison, moi?: string) => rankPlayers(classables(standingsJusqua(s), moi));
 
 export interface Voisins {
   moi: RankedPlayer;
@@ -25,7 +26,7 @@ export interface Voisins {
 
 /** Ceux qui t'encadrent au Pépite d'Or. */
 export function voisins(saison: Saison, moi: string): Voisins | null {
-  const c = classes(saison);
+  const c = classes(saison, moi);
   const i = c.findIndex((p) => p.name === moi);
   if (i < 0) return null;
   const me = c[i];

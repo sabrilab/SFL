@@ -39,9 +39,10 @@ import { isHidden } from "./hidden";
 import { jourMoisDuLibelle, voteOuvert } from "./convocation-temps";
 import { heureMin } from "./ligue-vierge";
 import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
-import { computeJournees, computeStandings, entryPP } from "./saisie/engine";
-import { journeeJouee } from "./saisie/mutations";
+import { computeJournees, entryPP } from "./saisie/engine";
+import { journeeJouee, journeeTerminee } from "./saisie/mutations";
 import { numeroSaison, type Saison } from "./saisie/types";
+import { classables, standingsJusqua } from "./rangs";
 
 export type Division = 1 | 2 | 3;
 export const DIVISIONS: readonly Division[] = [1, 2, 3];
@@ -83,11 +84,11 @@ export interface Decoupage {
  * match de la saison ; les joueurs masqués restent hors de la liste publique.
  */
 export function decouper(saison: Saison, jusqua?: number): Decoupage {
-  const jouees = new Set(saison.journees.map((m) => m.j).filter((j) => journeeJouee(saison, j)));
-  const entries = saison.entries.filter((e) => jouees.has(e.j) && (jusqua == null || e.j <= jusqua));
-  const classes: RankedPlayer[] = rankPlayers(
-    computeStandings({ ...saison, entries }).filter((p) => p.matchs > 0 && !isHidden(p.name))
-  );
+  // La règle du classement (rangs.ts) : journées jouées, joueurs publics
+  // qui ont joué un match. La saison à donner est celle des votes appliqués
+  // (useSeason().saison, saisonServeur côté serveur) : les Impact et
+  // Défensive élus comptent au Pépite d'Or qui fait les divisions.
+  const classes: RankedPlayer[] = rankPlayers(classables(standingsJusqua(saison, jusqua)));
   const { taille } = REGLES_DIVISIONS;
   const divisions: Record<Division, PlaceDecoupage[]> = { 1: [], 2: [], 3: [] };
   const parNom = new Map<string, PlaceDecoupage>();
@@ -156,7 +157,9 @@ export interface EtatDivisions {
 /** La saison des divisions ; null pour une saison qui n'en a pas (la saison 0). */
 export function etatDivisions(saison: Saison): EtatDivisions | null {
   if (numeroSaison(saison) !== REGLES_DIVISIONS.saison) return null;
-  if (!journeeJouee(saison, J_DECOUPAGE)) {
+  // Le découpage suit les feuilles FINIES (journeeTerminee) : le premier but
+  // saisi en direct ne fait changer personne de division en plein match.
+  if (!journeeTerminee(saison, J_DECOUPAGE)) {
     const decoupage = decouper(saison);
     return {
       phase: "annonce",
@@ -166,12 +169,11 @@ export function etatDivisions(saison: Saison): EtatDivisions | null {
     };
   }
   // Chaque dimanche joué recoupe le Pépite d'Or : le dernier fait les divisions du suivant.
-  const decoupage = decouper(saison);
+  const terminees = [...new Set(saison.journees.map((m) => m.j))].filter((j) => journeeTerminee(saison, j)).sort((a, b) => a - b);
+  const decoupage = decouper(saison, terminees.at(-1));
   const actuelle = new Map<string, Division>([...decoupage.parNom].map(([n, p]) => [n, p.division]));
   const journees: EtatDivisions["journees"] = [];
-  const jouees = [...new Set(saison.journees.map((m) => m.j))]
-    .filter((j) => j >= REGLES_DIVISIONS.depuis && journeeJouee(saison, j))
-    .sort((a, b) => a - b);
+  const jouees = terminees.filter((j) => j >= REGLES_DIVISIONS.depuis);
   let avant = jouees.length ? decouper(saison, jouees[0] - 1) : decoupage;
   for (const j of jouees) {
     const apres = decouper(saison, j);

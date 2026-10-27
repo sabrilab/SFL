@@ -120,8 +120,13 @@ export function compterMatchs(matchs: MatchBola[]): MatchCompte[] {
   });
 }
 
-/** Le classement à vie : points, puis MVP, puis victoires, puis le moins de matchs. */
-export function classementAVie(comptes: MatchCompte[]): Classe[] {
+/**
+ * Le classement à vie : points, puis MVP, puis victoires, puis le moins de
+ * matchs. `garder` écarte des joueurs AVANT de ranger (les masqués de
+ * hidden.ts : ils ne paraissent dans aucun classement), pour que les places
+ * se suivent sans trou.
+ */
+export function classementAVie(comptes: MatchCompte[], garder?: (c: Pick<Classe, "id" | "name">) => boolean): Classe[] {
   const parId = new Map<string, Classe>();
   for (const m of comptes) {
     for (const j of m.joueurs) {
@@ -137,7 +142,7 @@ export function classementAVie(comptes: MatchCompte[]): Classe[] {
       parId.set(j.id, c);
     }
   }
-  const tries = [...parId.values()].sort(
+  const tries = [...parId.values()].filter((c) => !garder || garder(c)).sort(
     (a, b) =>
       b.points - a.points || b.mvp - a.mvp || b.victoires - a.victoires || a.matchs - b.matchs || a.name.localeCompare(b.name, "fr")
   );

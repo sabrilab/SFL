@@ -28,8 +28,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { cleVapid } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { lireSaisonServeur } from "@/lib/sfl/saison-serveur.server";
 import { decouper, editionAnnonce, fenetreNotification, J_DECOUPAGE, notificationAnnonce } from "@/lib/sfl/divisions";
-import { numeroSaison, type Saison } from "@/lib/sfl/saisie/types";
+import { numeroSaison } from "@/lib/sfl/saisie/types";
 import type { Notif } from "@/lib/sfl/push";
 
 export const maxDuration = 30;
@@ -44,8 +45,14 @@ export async function POST(req: NextRequest) {
   const { data: profil } = await sb.from("profiles").select("valide").eq("id", moi.id).maybeSingle();
   if (!profil?.valide) return NextResponse.json({ error: "Réservé aux joueurs de la ligue." }, { status: 403 });
 
-  const { data: doc } = await sb.from("saison").select("data").eq("id", 1).maybeSingle();
-  const saison = (doc as { data?: Saison } | null)?.data;
+  // Votes appliqués et arbitres masqués, comme sur les téléphones (saison-serveur.server.ts).
+  let lue;
+  try {
+    lue = await lireSaisonServeur(sb);
+  } catch {
+    return NextResponse.json({ envoyes: 0, fini: false });
+  }
+  const saison = lue?.saison;
   if (!saison) return NextResponse.json({ envoyes: 0, fini: true });
   const { data: convocations } = await sb
     .from("convocations")

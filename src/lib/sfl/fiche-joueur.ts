@@ -14,6 +14,7 @@
 import type { Player } from "./engine";
 import { ordinal } from "./fin-de-saison";
 import { entryPP } from "./saisie/engine";
+import { rangDans } from "./rangs";
 import { journeeJouee } from "./saisie/mutations";
 import type { MatchEntry, PlayerStatutSaisie, Saison } from "./saisie/types";
 
@@ -47,11 +48,13 @@ export interface FicheJoueur {
 
 const pluriel = (n: number, un: string, plusieurs: string) => `${n} ${n > 1 ? plusieurs : un}`;
 
-/** Le rang d'un joueur dans la ligue (ex aequo partagés), null s'il est à zéro. */
+/**
+ * Le rang d'un joueur dans la ligue, null s'il est à zéro : la règle des
+ * classements (rangs.ts) — les joueurs masqués ne comptent pas, sauf lui.
+ */
 function rangDe(players: Player[], moi: Player, valeur: (p: Player) => number): number | null {
-  const v = valeur(moi);
-  if (v <= 0) return null;
-  return 1 + players.filter((p) => valeur(p) > v).length;
+  const liste = players.some((p) => p.name === moi.name) ? players : [...players, moi];
+  return rangDans(liste, moi.name, valeur, false)?.rang ?? null;
 }
 
 interface Mesure {
@@ -221,7 +224,8 @@ export function dimanchesDe(saison: Saison, nom: string): Dimanche[] {
   const out: Dimanche[] = [];
   for (const [j, lignes] of parJour) {
     const matchs = lignes.filter((e) => !e.extraTime && e.statut === "Présent");
-    const points = lignes.reduce((n, e) => n + (e.extraTime ? (e.pepiteBonus ?? 0) : entryPP(e)), 0);
+    // Les points du moteur, extra time compris (son +1 quand il marque ou passe).
+    const points = lignes.reduce((n, e) => n + entryPP(e), 0);
     if ((!matchs.length && !points) || !journeeJouee(saison, j)) continue;
     const absence = lignes.find((e) => !e.extraTime && e.statut !== "Présent");
     out.push({

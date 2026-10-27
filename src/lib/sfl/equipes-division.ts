@@ -45,7 +45,7 @@ import { heureMin } from "./ligue-vierge";
 import { journeeDuJour } from "./presence-feuille";
 import { computeJournees, computeStandings, entryPP } from "./saisie/engine";
 import { equipesDuMatch } from "./saisie/equipes";
-import { journeeJouee, saisonDepuisArchive } from "./saisie/mutations";
+import { journeeJouee, journeeTerminee, saisonDepuisArchive } from "./saisie/mutations";
 import type { ConvocationTeam, Saison } from "./saisie/types";
 
 export const REGLES_EQUIPES = {
@@ -435,5 +435,6 @@ export function journeeDeConvocation(saison: Saison, dateLabel: string): number 
 /** Les divisions de la journée `j`, si elle se joue en divisions et pas encore jouée ; sinon null. */
 export function divisionsDeLaJournee(saison: Saison, j: number): EtatDivisions | null {
   const etat = etatDivisions(saison);
-  return etat?.phase === "divisions" && j >= REGLES_DIVISIONS.depuis && !journeeJouee(saison, j) ? etat : null;
+  // Jusqu'à la feuille finie : le premier but saisi en direct n'efface pas les divisions du dimanche.
+  return etat?.phase === "divisions" && j >= REGLES_DIVISIONS.depuis && !journeeTerminee(saison, j) ? etat : null;
 }

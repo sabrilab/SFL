@@ -4,6 +4,7 @@
 // index. Le store persiste le résultat.
 
 import { computeJournees } from "./engine";
+import { labelDateFr, prochainDimanche } from "../convocation-temps";
 import { equipesDuMatch } from "./equipes";
 import { numeroSaison, type MatchDuJour, type SaisonArchivee, type Terrain } from "./types";
 import type {
@@ -106,17 +107,28 @@ export function duplicateEntryAt(saison: Saison, index: number): Saison {
   return { ...saison, entries };
 }
 
-function shortToday(): string {
-  return new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+/**
+ * Le dimanche de la journée qu'on crée, en libellé court (« 1 nov. ») :
+ * aujourd'hui si l'on est dimanche à Paris, sinon le prochain. Avant, une
+ * journée préparée le vendredi portait la date du vendredi : son vote
+ * s'ouvrait et se fermait ce jour-là, et la convocation ne la retrouvait pas.
+ */
+export function dimancheDeJournee(maintenant = new Date()): string {
+  const jour = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Paris", weekday: "short" }).format(maintenant);
+  return libelleCourt(labelDateFr(jour === "Sun" ? maintenant : prochainDimanche(maintenant)));
 }
 
-/** Crée une nouvelle journée (numéro suivant) et renvoie la saison + son numéro. */
-export function addJournee(saison: Saison): { saison: Saison; j: number } {
+/**
+ * Crée une nouvelle journée (numéro suivant) et renvoie la saison + son
+ * numéro. `date` : celle de la convocation qu'elle prépare (« 1 nov. ») ;
+ * à défaut, le dimanche qui vient.
+ */
+export function addJournee(saison: Saison, date?: string): { saison: Saison; j: number } {
   const j = saison.journees.reduce((m, x) => Math.max(m, x.j), 0) + 1;
   return {
     saison: {
       ...saison,
-      journees: [...saison.journees, { j, date: shortToday(), sflTime: false, mvpAuto: true }],
+      journees: [...saison.journees, { j, date: date?.trim() || dimancheDeJournee(), sflTime: false, mvpAuto: true }],
     },
     j,
   };
@@ -220,9 +232,10 @@ export function generateBalancedTeams(
 /** Crée une journée complète à partir d'équipes générées (une ligne par joueur). */
 export function addJourneeWithTeams(
   saison: Saison,
-  teams: BalancedTeam[]
+  teams: BalancedTeam[],
+  date?: string
 ): { saison: Saison; j: number } {
-  const { saison: withJournee, j } = addJournee(saison);
+  const { saison: withJournee, j } = addJournee(saison, date);
   const entries: MatchEntry[] = teams.flatMap((t) =>
     t.players.map((p) => newEntry(j, p.name, t.name))
   );
@@ -262,7 +275,7 @@ export function poserEquipes(saison: Saison, j: number, teams: ConvocationTeam[]
         ...s.journees,
         {
           j,
-          date: date ?? shortToday(),
+          date: date ?? dimancheDeJournee(),
           sflTime: avant?.sflTime ?? false,
           mvpAuto: true,
           ...(avant?.terrainId != null ? { terrainId: avant.terrainId } : {}),
@@ -377,17 +390,29 @@ export function closeConvocation(saison: Saison, id: number): Saison {
  *
  * Rien n'est perdu : `restaurerSaison` refait le chemin inverse tant que la
  * nouvelle saison est encore vierge.
+ *
+ * `titres` : les élus des votes (Impact, Défensive), qui ne sont jamais écrits
+ * dans le document — sans eux, la saison close perdrait leurs cartes et leurs
+ * points dès le lendemain de la clôture (les votes d'une saison ne se
+ * rechargent plus une fois la suivante ouverte). `entries` vient de
+ * appliquerVotes(saison, …), `faibles` de titresFaibles(…).
  */
-export function cloturerSaison(saison: Saison, nom?: string): Saison {
+export function cloturerSaison(
+  saison: Saison,
+  nom?: string,
+  titres?: { entries: MatchEntry[]; faibles: Iterable<string> }
+): Saison {
   const numero = numeroSaison(saison);
+  const faibles = titres ? [...titres.faibles] : [];
   const archive: SaisonArchivee = {
     numero,
     nom: nom?.trim() || `Saison ${numero}`,
     cloturee: new Date().toISOString(),
     journees: structuredClone(saison.journees),
     roster: structuredClone(saison.roster),
-    entries: structuredClone(saison.entries),
+    entries: structuredClone(titres?.entries ?? saison.entries),
     ...(saison.events?.length ? { events: structuredClone(saison.events) } : {}),
+    ...(faibles.length ? { titresFaibles: faibles } : {}),
   };
   return {
     ...saison,
@@ -427,7 +452,7 @@ export function restaurerSaison(saison: Saison): Saison {
 /** Une archive relue comme une saison, pour que le moteur la dérive telle quelle. */
 export function saisonDepuisArchive(a: SaisonArchivee): Saison {
   return { numero: a.numero, journees: a.journees, roster: a.roster, entries: a.entries,
-    events: a.events ?? [], convocations: [], archives: [] };
+    events: a.events ?? [], convocations: [], archives: [], ...(a.titresFaibles?.length ? { titresFaibles: a.titresFaibles } : {}) };
 }
 
 /* -------------------------------- Terrains -------------------------------- */
@@ -541,10 +566,8 @@ export function placerMatchDuJourSurNouveauLieu(
   return reglerMatchDuJour(avec, j, n, { lieuId: id });
 }
 
-/** Une journée est jouée quand ses actions sont saisies : un résultat, un but ou une passe. */
-export function journeeJouee(saison: Pick<Saison, "entries">, j: number): boolean {
-  return saison.entries.some((e) => e.j === j && (!!e.result || e.buts > 0 || e.passes > 0));
-}
+// Une journée est jouée quand ses actions sont saisies (le moteur, engine.ts).
+export { journeeJouee, journeeTerminee } from "./engine";
 
 /** Le terrain d'une journée : le sien, sinon celui du lieu de la convocation, sinon le défaut. */
 export function terrainDeJournee(

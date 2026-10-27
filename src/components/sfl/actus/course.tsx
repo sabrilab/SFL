@@ -82,7 +82,7 @@ import { annonceEnCours, J_DECOUPAGE, nomDivision, type Division } from "@/lib/s
 import { METAL, PastilleDivision, parDivision, useDecoupageClassement } from "@/components/sfl/metal-division";
 import { divisionsDeLaJournee } from "@/lib/sfl/equipes-division";
 import { isHidden } from "@/lib/sfl/hidden";
-import { computeStandings } from "@/lib/sfl/saisie/engine";
+import { standingsJusqua } from "@/lib/sfl/rangs";
 import { journeeJouee, saisonDepuisArchive } from "@/lib/sfl/saisie/mutations";
 import { Nom } from "@/components/sfl/nom";
 import { filDeSaison, type Actu } from "@/lib/sfl/actus";
@@ -387,7 +387,7 @@ function Ticker({
   /** Le podium et ses pépites au-dessus de la rangée (l'onglet Classement) ; le fil des Actus n'a que la rangée. */
   avecPodium?: boolean;
 }) {
-  const { players, saison } = useSeason();
+  const { players, saison, evolution } = useSeason();
   const rang = rankByMetric(joueurs ?? players, def.value).filter(
     (p) => def.showAll || p.value > 0,
   );
@@ -404,9 +404,14 @@ function Ticker({
   // Le classement d'avant le dernier dimanche joué : d'où chacun vient.
   const avant = useMemo(() => {
     if (figee) return null;
-    const d = Math.max(0, ...saison.journees.map((m) => m.j).filter((j) => journeeJouee(saison, j)));
-    return d ? computeStandings({ ...saison, entries: saison.entries.filter((e) => e.j !== d) }) : null;
-  }, [saison, figee]);
+    // La même saison et la même règle que le classement (rangs.ts) : sinon la
+    // flèche compte comme une place gagnée un titre voté ou un masqué.
+    const jouees = saison.journees.map((m) => m.j).filter((j) => journeeJouee(saison, j));
+    const d = Math.max(0, ...jouees);
+    if (!d) return null;
+    const precedente = Math.max(0, ...jouees.filter((j) => j < d));
+    return standingsJusqua(saison, precedente, evolution);
+  }, [saison, figee, evolution]);
   const noms = new Set(rang.map((p) => p.name));
   const ancien = avant ? new Map(rankByMetric(avant.filter((p) => noms.has(p.name)), def.value).map((p, i) => [p.name, { rank: p.rank, i }])) : null;
   // Les cartes partent de leur place de la semaine passée, puis glissent à la

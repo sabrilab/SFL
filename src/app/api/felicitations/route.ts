@@ -23,6 +23,7 @@ import { exploitsDeLaSaison, lireCle, type Exploit } from "@/lib/sfl/exploits";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
 import { appliquerVotes, type VoteFigure } from "@/lib/sfl/votes";
+import { votesDeLaSaison } from "@/lib/sfl/saison-serveur.server";
 
 export const maxDuration = 30;
 
@@ -78,12 +79,14 @@ export async function POST(req: NextRequest) {
   // et les élus des votes fermés (Impact, Défensive) posés comme dans l'app.
   const parNom = new Map(tous.filter((p) => p.valide).map((p) => [p.name, p]));
   const affiche = (n: string) => parNom.get(n)?.nom_affiche ?? n;
-  const { data: votes } = await sb
-    .from("votes_figures")
-    .select("saison, j, categorie, votant, candidat, match_id")
-    .eq("saison", saison.numero ?? 0)
-    .limit(5000);
-  const titree = appliquerVotes(saison, deriveSeason(saison).journees, (votes ?? []) as VoteFigure[], new Date());
+  // Tous les votes, page par page : `.limit(5000)` était plafonné à 1 000 par la base.
+  let votes: VoteFigure[];
+  try {
+    votes = await votesDeLaSaison(sb, saison.numero ?? 0);
+  } catch {
+    return NextResponse.json({ error: "Votes illisibles, réessaie." }, { status: 503 });
+  }
+  const titree = appliquerVotes(saison, deriveSeason(saison).journees, votes, new Date());
   const exploits = new Map<string, Exploit>(exploitsDeLaSaison(titree, affiche).map((e) => [e.cle, e]));
 
   const lignes = demandes

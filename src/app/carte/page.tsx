@@ -20,11 +20,11 @@ import {
   fixedBonuses,
   freePool,
   ovr,
-  rankPlayers,
   tierBonus,
   type Allocation,
   type StatKey,
 } from "@/lib/sfl/engine";
+import { rangDans } from "@/lib/sfl/rangs";
 
 function SectionTitle({
   children,
@@ -46,9 +46,11 @@ export default function CartePage() {
   const { allPlayers, boostCards } = useSeason();
   const [alloc, setAlloc] = useState<Allocation>(emptyAllocation());
 
-  // Sa carte, sa page : le rang se calcule sur tout le monde.
-  const RANKED = rankPlayers(allPlayers);
-  const myRank = RANKED.find((p) => p.name === player.name)?.rank ?? RANKED.length;
+  // Le rang et le total du classement public (rangs.ts) : les masqués n'y
+  // comptent pas, sauf soi-même. Avant, ils déplaçaient les seuils des tiers.
+  const classe = rangDans(allPlayers.some((p) => p.name === player.name) ? allPlayers : [...allPlayers, player], player.name);
+  const RANKED = { length: classe?.sur ?? 1 };
+  const myRank = classe?.rang ?? RANKED.length;
   const myBoosts = boostCards.filter((c) => c.player === player.name);
 
   // Le bonus de tiers fait partie des points libres du mois : il était

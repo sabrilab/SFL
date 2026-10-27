@@ -33,8 +33,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { cleVapid } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { lireSaisonServeur } from "@/lib/sfl/saison-serveur.server";
 import { dimancheEnCours, phrase, rangDe, risqueDe, type Mission } from "@/lib/sfl/missions";
-import type { Saison } from "@/lib/sfl/saisie/types";
 
 export const maxDuration = 30;
 
@@ -71,13 +71,20 @@ export async function POST(req: NextRequest) {
   const { data: profil } = await sb.from("profiles").select("valide").eq("id", moi.id).maybeSingle();
   if (!profil?.valide) return NextResponse.json({ error: "Réservé aux joueurs de la ligue." }, { status: 403 });
 
-  const { data: doc } = await sb.from("saison").select("data, updated_at").eq("id", 1).maybeSingle();
-  const saison = (doc as { data?: Saison } | null)?.data;
-  if (!saison) return NextResponse.json({ envoyes: 0, fini: true });
+  // Les missions se tirent sur la saison des votes appliqués, comme sur les
+  // téléphones (use-missions.ts) : mêmes rivaux, mêmes cibles.
   const maintenant = new Date();
+  let lue;
+  try {
+    lue = await lireSaisonServeur(sb, maintenant);
+  } catch {
+    return NextResponse.json({ envoyes: 0, fini: false });
+  }
+  const saison = lue?.saison;
+  if (!saison) return NextResponse.json({ envoyes: 0, fini: true });
   const d = dimancheEnCours(saison, maintenant);
   if (!d || d.joue || maintenant.getTime() >= d.coupEnvoi.getTime()) return NextResponse.json({ envoyes: 0, fini: true });
-  const publieLe = new Date((doc as { updated_at?: string }).updated_at ?? 0).getTime();
+  const publieLe = new Date(lue?.updatedAt ?? 0).getTime();
   if (maintenant.getTime() - publieLe < CALME) return NextResponse.json({ envoyes: 0, attente: true });
   const heure = heureParis(maintenant);
   if (heure < JOUR[0] || heure >= JOUR[1]) return NextResponse.json({ envoyes: 0, attente: true });

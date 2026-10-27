@@ -153,6 +153,8 @@ export function AdminDashboard() {
   const [feuilleMode, setFeuilleMode] = useState<"direct" | "revue" | "votes">("direct");
   // Pré-cochés à l'ouverture de l'assistant journée (confirmés de la convocation).
   const [journeePrefill, setJourneePrefill] = useState<string[]>([]);
+  // La date de la convocation que la journée prépare (« Préparer la journée »).
+  const [journeeDate, setJourneeDate] = useState<string | undefined>(undefined);
   // Historique : deux piles. `history` porte les états PRÉCÉDENTS (annuler),
   // `future` les états repris d'une annulation (rétablir). Toute nouvelle
   // action vide `future` — c'est le comportement attendu partout ailleurs.
@@ -547,6 +549,7 @@ export function AdminDashboard() {
                       disabled={convocGroups.present.length < 2}
                       onClick={() => {
                         setJourneePrefill(convocGroups.present);
+                        setJourneeDate(libelleCourt(convoc.date));
                         setNewJourneeOpen(true);
                       }}
                       className="rounded-full"
@@ -943,13 +946,16 @@ export function AdminDashboard() {
         open={newJourneeOpen}
         onOpenChange={(o) => {
           setNewJourneeOpen(o);
-          if (!o) setJourneePrefill([]);
+          if (!o) {
+            setJourneePrefill([]);
+            setJourneeDate(undefined);
+          }
         }}
         roster={journeeRoster}
         initialChecked={journeePrefill}
         lieux={saison.terrains ?? []}
         onCreate={(teams, reglages) => {
-          const cree = addJourneeWithTeams(saison, teams);
+          const cree = addJourneeWithTeams(saison, teams, journeeDate);
           const { j } = cree;
           // Chaque match à son heure, son terrain et son lieu, quand l'admin les a donnés.
           const s = reglages.reduce(
@@ -959,6 +965,7 @@ export function AdminDashboard() {
           commit(s, `Nouvelle journée ${j}`);
           setNewJourneeOpen(false);
           setJourneePrefill([]);
+          setJourneeDate(undefined);
         }}
       />
       <ConvocationSheet
