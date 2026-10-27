@@ -4,8 +4,12 @@
 // (terrain-places.tsx), qui vient, qui est invité (carte effacée), et un +
 // sur chaque place libre — l'organisateur y invite un joueur
 // (choisir-joueur.tsx), un autre y prend sa place si le match est public.
-// Puis le seul geste qui compte pour moi ici : accepter, me retirer, ou
-// annuler si c'est mon match.
+// Puis le seul geste qui compte pour moi ici : répondre (Je viens, Pas
+// dispo, ou prendre une place d'un match public), ou annuler si c'est mon
+// match. Une réponse se donne une fois et se scelle (Sabri, 27/10 ;
+// reponse-scellee.tsx, et la base le garde : match_refus,
+// match_sortie_gardee) : plus de « Me retirer », et les + du terrain ne
+// prennent plus de place d'un toucher — seul le geste tenu répond.
 // L'organisateur garde la main jusqu'au coup d'envoi (Sabri, 22/10) : il
 // retire un joueur en touchant sa carte, et « Modifier » rouvre la feuille
 // du match (ouvrir-match.tsx) pour en changer le jour, l'heure, le lieu ou
@@ -22,9 +26,11 @@ import { QuiVient } from "@/components/sfl/qui-vient";
 import { TerrainPlaces } from "@/components/sfl/matchs/terrain-places";
 import { ChoisirJoueur } from "@/components/sfl/matchs/choisir-joueur";
 import { OuvrirMatch } from "@/components/sfl/matchs/ouvrir-match";
+import { ReponseScellee, type IssueReponse } from "@/components/sfl/reponse-scellee";
 import type { Terrain } from "@/lib/sfl/saisie/types";
 import {
   accepter,
+  aiRefuse,
   annuler,
   direErreur,
   inscrits,
@@ -33,7 +39,7 @@ import {
   listerProfils,
   momentDeLHeure,
   placesLibres,
-  quitter,
+  refuser,
   rejoindre,
   retirerJoueur,
   type Partie,
@@ -99,7 +105,35 @@ export function FichePartie({
     ...attendus.filter((j) => j !== orga),
   ].map((j) => ({ cle: j.id, nom: j.name, enAttente: j.statut === "invite" }));
   const moiNom = moiLa?.name;
-  const prendrePlace = !joue && !moiLa && partie.visibilite === "public" && libres > 0 && !!moi;
+
+  // Ai-je déjà dit « Pas dispo » à ce match ? Alors c'est scellé.
+  const [refuse, setRefuse] = useState(false);
+  useEffect(() => {
+    if (!moi || moiLa) return;
+    let fini = false;
+    aiRefuse(partie.id)
+      .then((r) => !fini && setRefuse(r))
+      .catch(() => {});
+    return () => {
+      fini = true;
+    };
+  }, [moi, moiLa, partie.id]);
+
+  /** Une réponse du joueur, pour le sceau : « figee » quand la base l'a déjà. */
+  async function repondre(action: () => Promise<void>): Promise<IssueReponse> {
+    try {
+      await action();
+      return "ok";
+    } catch (e) {
+      const dit = direErreur(e);
+      if (/déjà donnée/.test(dit)) {
+        onChange();
+        return "figee";
+      }
+      toast.error(dit);
+      return "dite";
+    }
+  }
 
   async function faire(action: () => Promise<void>, ok: string) {
     setOccupe(true);
@@ -161,9 +195,7 @@ export function FichePartie({
               ? undefined
               : organise
                 ? () => setChoisir(true)
-                : prendrePlace
-                  ? () => void faire(() => rejoindre(partie.id), "Place prise, à toi de jouer.")
-                  : undefined
+                : undefined
           }
         />
       </div>
@@ -206,26 +238,33 @@ export function FichePartie({
         </>
       )}
 
-      {!joue && moiLa?.statut === "invite" && (
-        <div className="grid grid-cols-2 gap-2">
-          <button disabled={occupe} onClick={() => faire(() => accepter(partie.id), "C'est noté, tu joues.")} className={cn(bouton, "bouton-principal bouton--vert")}>
-            Je viens
-          </button>
-          <button disabled={occupe} onClick={() => faire(() => quitter(partie.id), "Invitation déclinée.")} className={cn(bouton, "bouton-secondaire bouton--rouge")}>
-            Pas dispo
-          </button>
-        </div>
+      {/* Ma réponse : deux boutons à l'invitation, un seul (la braise : il
+          manque des joueurs) pour prendre une place ; une fois donnée, le
+          sceau. L'organisateur, lui, est du match d'office. */}
+      {!joue && !organise && moiLa?.statut === "invite" && (
+        <ReponseScellee
+          mine={null}
+          onRepondre={(r) =>
+            repondre(async () => {
+              if (r === "present") return accepter(partie.id);
+              await refuser(partie.id);
+              setRefuse(true);
+            })
+          }
+          onScellee={onChange}
+        />
       )}
-      {/* Il manque des joueurs : la place à prendre s'allume en braise. */}
-      {!joue && !moiLa && partie.visibilite === "public" && libres > 0 && (
-        <button disabled={occupe || !moi} onClick={() => faire(() => rejoindre(partie.id), "Place prise, à toi de jouer.")} className={cn(bouton, "bouton-principal bouton--braise")}>
-          Prendre une place
-        </button>
+      {!joue && !organise && (moiLa?.statut === "inscrit" || (!moiLa && refuse)) && (
+        <ReponseScellee mine={moiLa ? "present" : "absent"} onRepondre={async () => "figee"} />
       )}
-      {!joue && moiLa?.statut === "inscrit" && !organise && (
-        <button disabled={occupe} onClick={() => faire(() => quitter(partie.id), "Tu as libéré ta place.")} className={cn(bouton, "bouton-secondaire bouton--rouge")}>
-          Me retirer
-        </button>
+      {!joue && !moiLa && !refuse && partie.visibilite === "public" && libres > 0 && !!moi && (
+        <ReponseScellee
+          mine={null}
+          seul={{ r: "present", libelle: "Prendre une place" }}
+          tonSeul="braise"
+          onRepondre={() => repondre(() => rejoindre(partie.id))}
+          onScellee={onChange}
+        />
       )}
       {organise && !joue && (
         <div className="grid grid-cols-2 gap-2">

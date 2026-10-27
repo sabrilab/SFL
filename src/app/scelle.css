@@ -1,0 +1,168 @@
+/* ═══════════════════ La réponse scellée (27/10/2026) ═══════════════════
+   components/sfl/reponse-scellee.tsx : on tient « Je viens » ou « Pas
+   dispo », une grille de pixels remplit le bouton comme une barre de
+   progression, puis la réponse se scelle dans une pilule au cadenas.
+   Opacité et transformations seulement. « Réduire les animations » : la
+   règle globale (globals.css) éteint les durées, les délais restent — les
+   pixels s'allument en place pendant qu'on tient, le sceau se pose d'un
+   coup. Le ton est celui du geste (vert « y aller », argent neutre), jamais
+   le bleu des cartes Défensive. */
+
+@layer components {
+  .scelle-bouton {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: manipulation;
+  }
+
+  /* ── La grille : des pixels carrés, un px d'écart, dans l'arrondi. ── */
+  .scelle-grille {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    gap: 1px;
+    border-radius: inherit;
+    overflow: hidden;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+  .scelle-grille > i {
+    display: block;
+    opacity: 0;
+  }
+
+  /* Pendant qu'on tient : le ton du geste sur la nacre (le libellé, dans
+     l'encre du ton, reste lisible dessus) ; sur la pilule cerclée de « Pas
+     dispo », l'argent neutre — du blanc voilé, de l'encre en mode clair. */
+  .scelle-grille--remplit > i {
+    background: rgb(var(--b-ton, 222 227 236) / 0.78);
+    animation: scelle-allume 0.09s linear var(--d) forwards;
+  }
+  .bouton-secondaire .scelle-grille--remplit > i {
+    background: rgb(241 242 239 / 0.3);
+  }
+  .bouton-secondaire:not(.dark *) .scelle-grille--remplit > i {
+    background: rgb(18 19 22 / 0.16);
+  }
+  /* Lâché trop tôt : la grille s'efface, rien n'est parti. */
+  .scelle-grille--lache {
+    opacity: 0;
+  }
+
+  /* À la pose : la grille pleine se dissout dans l'ordre de Bayer. */
+  .scelle-grille--dissout > i {
+    opacity: 1;
+    background: rgb(var(--s-ton) / 0.7);
+    animation: scelle-eteint 0.16s linear var(--d) forwards;
+  }
+  .scelle-grille--dissout:not(.dark *) > i {
+    background: var(--s-sombre);
+  }
+
+  /* ── La pilule scellée ── */
+  .scelle-pilule {
+    --s-ton: 222 227 236;
+    --s-texte: #f1f2ef;
+    --s-sombre: #121316;
+    position: relative;
+    isolation: isolate;
+    color: var(--s-texte);
+    background-color: rgb(var(--s-ton) / 0.1);
+    box-shadow: inset 0 0 0 1px rgb(var(--s-ton) / 0.34);
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .scelle--vert {
+    --s-ton: 132 214 140;
+    --s-texte: #bfe2bf;
+    --s-sombre: #24452a;
+  }
+  /* La trame qui reste : deux pixels sur seize, au même pas que la grille. */
+  .scelle-pilule::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: rgb(var(--s-ton) / 0.17);
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Crect width='6' height='6'/%3E%3Crect x='14' y='14' width='6' height='6'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Crect width='6' height='6'/%3E%3Crect x='14' y='14' width='6' height='6'/%3E%3C/svg%3E");
+    -webkit-mask-size: 28px 28px;
+    mask-size: 28px 28px;
+  }
+  .scelle-pilule:not(.dark *) {
+    color: var(--s-sombre);
+    background-color: rgb(var(--s-ton) / 0.16);
+    box-shadow: inset 0 0 0 1px rgb(10 11 13 / 0.14);
+  }
+  .scelle--argent:not(.dark *) {
+    background-color: rgb(10 11 13 / 0.05);
+  }
+  .scelle-pilule:not(.dark *)::before {
+    background: rgb(10 11 13 / 0.08);
+  }
+
+  /* La pose : les boutons s'effacent, la pilule arrive, le cadenas se ferme. */
+  .scelle-efface {
+    animation: scelle-eteint 0.16s ease forwards;
+  }
+  .scelle-arrive {
+    animation: scelle-arrive 0.24s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  }
+  .scelle-arrive::before {
+    opacity: 0;
+    animation: scelle-allume 0.2s ease 0.22s forwards;
+  }
+  .scelle-arrive .scelle-cadenas {
+    animation: scelle-cadenas 0.26s cubic-bezier(0.3, 1.5, 0.5, 1) 0.16s both;
+  }
+}
+
+@keyframes scelle-allume {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes scelle-eteint {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes scelle-arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes scelle-cadenas {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Les délais n'ont de sens que pendant qu'on tient : la pose est immédiate. */
+  .scelle-grille--dissout {
+    display: none;
+  }
+  .scelle-arrive::before,
+  .scelle-arrive .scelle-cadenas {
+    animation-delay: 0s !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .scelle-pilule {
+    border: 1px solid CanvasText;
+  }
+}

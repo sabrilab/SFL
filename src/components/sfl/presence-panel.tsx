@@ -11,9 +11,12 @@
 //
 // Un joueur Bola (venu par un parrain, hors de la saison) la regarde en
 // spectateur : qui vient, les équipes, mais ni « Ma présence » ni boutons.
+//
+// La réponse se donne une fois et se scelle (reponse-scellee.tsx, 27/10).
 
 import { useMemo } from "react";
 import { Check, Copy, Radio, X } from "lucide-react";
+import { ReponseScellee } from "@/components/sfl/reponse-scellee";
 import { toast } from "sonner";
 import { useSession } from "@/hooks/use-session";
 import { usePresence } from "@/hooks/use-presence";
@@ -37,22 +40,6 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
     const etat = p.teams?.length ? divisionsDeLaJournee(saison, p.journee) : null;
     return new Map(etat && p.teams ? terrainsDesEquipes(p.teams, etat).flatMap(({ divisions, equipes }) => equipes.map((e) => [e.name, divisions] as const)) : []);
   }, [saison, p.journee, p.teams]);
-
-  async function answer(value: "present" | "absent") {
-    const next = p.mine === value ? null : value;
-    const ok = await p.answer(next);
-    if (!ok) {
-      toast.error("Réponse impossible à enregistrer. Réessaie dans un instant.");
-      return;
-    }
-    toast.success(
-      next === "present"
-        ? "C'est noté : tu es de la partie ⚽"
-        : next === "absent"
-          ? "C'est noté : tu passes ton tour."
-          : "Réponse retirée."
-    );
-  }
 
   function copyRelances() {
     const list = p.sansReponse.join(", ");
@@ -99,31 +86,16 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
         )}
       </div>
 
-      {/* Les deux boutons — la réponse est modifiable jusqu'à vendredi minuit. */}
+      {/* Les deux boutons, jusqu'à vendredi minuit ; une fois la réponse
+          donnée, elle est scellée. */}
       {bola ? null : p.reponsesOuvertes ? (
         <>
-          <div className="mt-4 flex gap-2">
-            {/* Je viens : le verre allumé ; une fois dit, il passe au vert. */}
-            <button
-              onClick={() => answer("present")}
-              className={cn(
-                "bouton-principal bouton--vert flex-1 py-3.5 text-[15px] font-bold"
-              )}
-            >
-              {p.mine === "present" ? "Je viens ✓" : "Je viens"}
-            </button>
-            <button
-              onClick={() => answer("absent")}
-              className={cn(
-                "bouton-secondaire bouton--rouge flex-1 py-3.5 text-[15px] font-semibold"
-              )}
-            >
-              {p.mine === "absent" ? "Pas dispo ✓" : "Pas dispo"}
-            </button>
-          </div>
-          <p className="mono-label mt-2.5 text-center text-foreground/30">
-            Réponses jusqu&apos;à vendredi minuit
-          </p>
+          <ReponseScellee className="mt-4" mine={p.mine} onRepondre={p.answer} />
+          {!p.mine && (
+            <p className="mono-label mt-2.5 text-center text-foreground/30">
+              Réponses jusqu&apos;à vendredi minuit
+            </p>
+          )}
         </>
       ) : (
         <p className="mt-4 rounded-[14px] bg-contraste/5 px-3.5 py-3 text-[12.5px] leading-snug text-foreground/45">

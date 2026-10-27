@@ -10,11 +10,11 @@
 // Et la messagerie l'est aussi désormais : le salon de la ligue et les
 // conversations à deux vivent en base, en temps réel (voir messagerie.tsx).
 
-import { toast } from "sonner";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { Messagerie } from "@/components/sfl/messagerie";
 import { usePresence } from "@/hooks/use-presence";
+import { ReponseScellee } from "@/components/sfl/reponse-scellee";
 import { useSession } from "@/hooks/use-session";
 import { NEXT_MATCH } from "@/lib/sfl/data";
 import { activeConvocation } from "@/lib/sfl/saisie/mutations";
@@ -43,24 +43,6 @@ export default function Discussions() {
   const dJour = dateMatch?.[1] ?? next.date.split(" ")[0];
   const dMois = dateMatch?.[2] ?? next.date.split(" ")[1];
   const moisNum = MOIS[Object.keys(MOIS).find((m) => (dMois ?? "").startsWith(m)) ?? "août"];
-
-  async function answer(value: "present" | "absent") {
-    const nextVal = presence.mine === value ? null : value;
-    const ok = await presence.answer(nextVal);
-    if (!ok) {
-      toast.error("Réponse impossible à enregistrer. Réessaie dans un instant.");
-      return;
-    }
-    toast.success(
-      nextVal === "present"
-        ? "C'est noté : tu es de la partie ⚽"
-        : nextVal === "absent"
-          ? "C'est noté : tu passes ton tour."
-          : "Réponse retirée."
-    );
-  }
-
-
 
   return (
     <div className="shell py-4 sm:py-8">
@@ -131,19 +113,9 @@ export default function Discussions() {
               )}
             </div>
             {presence.reponsesOuvertes ? (
-              <div className="flex gap-2 px-3 pb-3">
-                <button
-                  onClick={() => answer("present")}
-                  className="bouton-principal bouton--vert flex-1 py-2.5 text-center text-[13px] font-bold"
-                >
-                  {presence.mine === "present" ? "Je viens ✓" : "Je viens"}
-                </button>
-                <button
-                  onClick={() => answer("absent")}
-                  className="bouton-secondaire bouton--rouge flex-1 py-2.5 text-center text-[13px] font-semibold"
-                >
-                  {presence.mine === "absent" ? "Pas dispo ✓" : "Pas dispo"}
-                </button>
+              // Une réponse, une seule : elle se scelle (reponse-scellee.tsx).
+              <div className="px-3 pb-3">
+                <ReponseScellee taille="sm" mine={presence.mine} onRepondre={presence.answer} />
               </div>
             ) : (
               // Vendredi minuit est passé : la conversation est close, la

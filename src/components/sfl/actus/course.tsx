@@ -75,6 +75,7 @@ import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { QuiVient } from "@/components/sfl/qui-vient";
 import { useCollant } from "@/hooks/use-collant";
 import { usePresence } from "@/hooks/use-presence";
+import { ReponseScellee } from "@/components/sfl/reponse-scellee";
 import { MeteoMatch } from "@/components/sfl/meteo-match";
 import { dateIsoDuLibelle } from "@/lib/sfl/meteo";
 import { voteOuvert } from "@/lib/sfl/convocation-temps";
@@ -577,7 +578,6 @@ function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; clas
   // Dès la J4, la division où l'on joue ce dimanche-là.
   const etat = useMemo(() => divisionsDeLaJournee(saison, p.journee), [saison, p.journee]);
   const division = etat && !isHidden(me) ? (etat.actuelle.get(me) ?? 3) : null;
-  const repondre = (r: "present" | "absent") => p.answer(p.mine === r ? null : r);
   // La météo de mon match : son lieu (celui de la ligue qui porte ce nom, sinon le terrain habituel).
   const [aujourdhui] = useState(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date()));
   const terrains = saison.terrains ?? [];
@@ -620,26 +620,14 @@ function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; clas
         </span>
       </div>
       {p.presents.length > 0 && <QuiVient noms={p.presents} size={FORMAT_CARTE.petite * 1.2} />}
-      <div className="grid grid-cols-2 gap-2">
-        {(["present", "absent"] as const).map((r) => (
-          <button
-            key={r}
-            type="button"
-            disabled={!p.reponsesOuvertes}
-            onClick={() => repondre(r)}
-            className={cn(
-              "rounded-full py-3 text-[14px] font-bold transition-colors disabled:opacity-40",
-              p.mine === r
-                ? r === "present"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-foreground text-background"
-                : "bg-foreground/[0.07] dark:bg-white/10",
-            )}
-          >
-            {r === "present" ? "Je viens" : "Je passe"}
-          </button>
-        ))}
-      </div>
+      {/* Ta réponse, d'un geste tenu : elle se scelle (reponse-scellee.tsx). */}
+      <ReponseScellee
+        taille="sm"
+        mine={p.mine}
+        ouvert={p.reponsesOuvertes}
+        libelles={{ absent: "Je passe" }}
+        onRepondre={p.answer}
+      />
     </section>
   );
 }

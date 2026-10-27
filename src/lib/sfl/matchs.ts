@@ -349,12 +349,26 @@ export async function accepter(id: number): Promise<void> {
   annoncer(id);
 }
 
-/** Se retirer d'un match (ou refuser l'invitation). */
-export async function quitter(id: number): Promise<void> {
+/**
+ * Refuser l'invitation (« Pas dispo ») : la ligne de l'invité part, et la
+ * base garde son refus (match_refus). Sa réponse est figée (Sabri, 27/10) :
+ * qui a dit « Je viens » ne se retire plus de lui-même, qui a dit « Pas
+ * dispo » ne reprend pas de place ; la base le refuse (« réponse figée »).
+ * L'organisateur, lui, retire toujours un joueur (retirerJoueur).
+ */
+export async function refuser(id: number): Promise<void> {
   const moi = await monId();
   if (!moi) return;
   const { error } = await supabase().from("match_joueurs").delete().eq("match_id", id).eq("player_id", moi);
   if (error) throw error;
+}
+
+/** Ai-je déjà dit « Pas dispo » à ce match ? Sans la table (base pas encore migrée) : non. */
+export async function aiRefuse(id: number): Promise<boolean> {
+  const moi = await monId();
+  if (!moi) return false;
+  const { data, error } = await supabase().from("match_refus").select("match_id").eq("match_id", id).eq("player_id", moi).maybeSingle();
+  return !error && !!data;
 }
 
 /** L'organisateur invite un joueur de plus. */
@@ -445,6 +459,7 @@ export function prochainsJours(n: number): string[] {
 /** Un message d'erreur de la base, dit simplement. */
 export function direErreur(e: unknown): string {
   const msg = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : "";
+  if (/réponse figée/i.test(msg)) return "Ta réponse est déjà donnée.";
   if (/complet/i.test(msg)) return "Le match est complet.";
   if (/duplicate|already exists|23505/i.test(msg)) return "Ce joueur est déjà dans le match.";
   if (/feuille close/i.test(msg)) return "La feuille est close : 24 h sont passées.";
