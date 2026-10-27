@@ -1,6 +1,8 @@
 "use client";
 
-// Porte d'entrée de l'app : sans session, on ne voit que l'écran de connexion.
+// Porte d'entrée de l'app : sans session, on ne voit que la page d'accueil
+// (landing.tsx, à l'adresse « / » dans un navigateur) ou l'écran de connexion
+// (l'app installée, et toute autre adresse).
 // Au chargement, on tente d'abord de reprendre une session Supabase existante
 // (retour d'une connexion Google/Apple, ou session persistée) — l'écran de
 // connexion n'apparaît que si rien n'est en attente.
@@ -11,6 +13,8 @@ import { useIsClient } from "@/hooks/use-is-client";
 import { useSession } from "@/hooks/use-session";
 import { bootstrapServerSession, inscriptionSocialeEnCours } from "@/lib/sfl/auth/session";
 import { LoginScreen } from "./login-screen";
+import { Landing } from "./landing";
+import { lireEnvironnement } from "@/lib/pwa/environnement";
 import { VoileEtat } from "@/components/layout/bottom-nav";
 import { EnAttente } from "./en-attente";
 import { NouveauMotDePasse } from "./nouveau-mot-de-passe";
@@ -57,6 +61,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   if (PUBLIC_ROUTES.some((r) => pathname?.startsWith(r))) return <>{children}</>;
   if (!isClient) return null;
   if (!session && !bootstrapped) return null;
+  if (!session && pathname === "/" && !lireEnvironnement().installee)
+    return (
+      <div className="h-full overflow-y-auto" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        <Landing />
+        <VoileEtat partout />
+      </div>
+    );
   if (!session)
     return (
       // Le body ne défile jamais : l'écran de connexion porte son propre

@@ -1,6 +1,7 @@
 "use client";
 
-// Écran de connexion — première chose que voit un membre de la ligue.
+// Écran de connexion — dans l'app installée, et à toute adresse autre que
+// « / » (là, c'est la page d'accueil, landing.tsx, qui porte la connexion).
 // Repris du langage du design : fond #070707 et orbes, verre, micro-libellés
 // en JetBrains Mono, une seule action blanche.
 
@@ -16,12 +17,24 @@ const MESSAGES: Record<string, string> = {
   unavailable: "Pas de réponse du serveur. Vérifie ta connexion et réessaie.",
 };
 
-export function LoginScreen() {
+/**
+ * Le pseudo, le mot de passe et « Entrer dans la ligue » : l'écran de
+ * connexion et l'encart de la page d'accueil (landing.tsx) le partagent.
+ */
+export function FormulaireConnexion({
+  error,
+  setError,
+  className,
+}: {
+  /** L'erreur montrée sous les champs : la sienne, ou celle de Google / Apple. */
+  error: string | null;
+  setError: (message: string | null) => void;
+  className?: string;
+}) {
   const [user, setUser] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,6 +50,72 @@ export function LoginScreen() {
   }
 
   return (
+    <form onSubmit={submit} className={cn("flex flex-col gap-3", className)}>
+      <label className="glass-soft flex flex-col gap-1.5 rounded-[18px] px-4 py-3">
+        <span className="mono-label text-foreground/40">Pseudo ou identifiant</span>
+        <input
+          value={user}
+          onChange={(e) => {
+            setUser(e.target.value);
+            setError(null);
+          }}
+          autoCapitalize="none"
+          autoCorrect="off"
+          autoComplete="username"
+          spellCheck={false}
+          placeholder="ilyes"
+          className="w-full bg-transparent text-[16px] font-semibold outline-none placeholder:text-foreground/25"
+        />
+      </label>
+
+      <label className="glass-soft flex flex-col gap-1.5 rounded-[18px] px-4 py-3">
+        <span className="mono-label text-foreground/40">Mot de passe</span>
+        <span className="flex items-center gap-2">
+          <input
+            type={show ? "text" : "password"}
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError(null);
+            }}
+            autoComplete="current-password"
+            placeholder="••••••••"
+            className="min-w-0 flex-1 bg-transparent text-[16px] font-semibold outline-none placeholder:text-foreground/25"
+          />
+          <button
+            type="button"
+            onClick={() => setShow((s) => !s)}
+            aria-label={show ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+            className="shrink-0 text-foreground/40"
+          >
+            {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          </button>
+        </span>
+      </label>
+
+      {error && (
+        <p className="px-1 text-[12.5px] font-medium text-[#c8352b] dark:text-[#FF6B5E]">{error}</p>
+      )}
+
+      <button
+        type="submit"
+        disabled={busy || !user || !password}
+        className={cn(
+          "bouton-principal bouton--vert mt-1 flex items-center justify-center gap-2 py-4 text-[15px] font-bold",
+          (busy || !user || !password) && "opacity-40"
+        )}
+      >
+        {busy && <Loader2 className="size-4 animate-spin" />}
+        Entrer dans la ligue
+      </button>
+    </form>
+  );
+}
+
+export function LoginScreen() {
+  const [error, setError] = useState<string | null>(null);
+
+  return (
     <div className="flex min-h-dvh flex-col justify-center px-6 py-10">
       <div className="mx-auto w-full max-w-sm">
         <p className="mono-label text-primary">Sunday Five League</p>
@@ -50,65 +129,7 @@ export function LoginScreen() {
           ta carte, tes points, et tu pourras répondre aux convocations.
         </p>
 
-        <form onSubmit={submit} className="mt-7 flex flex-col gap-3">
-          <label className="glass-soft flex flex-col gap-1.5 rounded-[18px] px-4 py-3">
-            <span className="mono-label text-foreground/40">Pseudo ou identifiant</span>
-            <input
-              value={user}
-              onChange={(e) => {
-                setUser(e.target.value);
-                setError(null);
-              }}
-              autoCapitalize="none"
-              autoCorrect="off"
-              autoComplete="username"
-              spellCheck={false}
-              placeholder="ilyes"
-              className="w-full bg-transparent text-[16px] font-semibold outline-none placeholder:text-foreground/25"
-            />
-          </label>
-
-          <label className="glass-soft flex flex-col gap-1.5 rounded-[18px] px-4 py-3">
-            <span className="mono-label text-foreground/40">Mot de passe</span>
-            <span className="flex items-center gap-2">
-              <input
-                type={show ? "text" : "password"}
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setError(null);
-                }}
-                autoComplete="current-password"
-                placeholder="••••••••"
-                className="min-w-0 flex-1 bg-transparent text-[16px] font-semibold outline-none placeholder:text-foreground/25"
-              />
-              <button
-                type="button"
-                onClick={() => setShow((s) => !s)}
-                aria-label={show ? "Masquer le mot de passe" : "Afficher le mot de passe"}
-                className="shrink-0 text-foreground/40"
-              >
-                {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            </span>
-          </label>
-
-          {error && (
-            <p className="px-1 text-[12.5px] font-medium text-[#c8352b] dark:text-[#FF6B5E]">{error}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={busy || !user || !password}
-            className={cn(
-              "bouton-principal bouton--vert mt-1 flex items-center justify-center gap-2 py-4 text-[15px] font-bold",
-              (busy || !user || !password) && "opacity-40"
-            )}
-          >
-            {busy && <Loader2 className="size-4 animate-spin" />}
-            Entrer dans la ligue
-          </button>
-        </form>
+        <FormulaireConnexion error={error} setError={setError} className="mt-7" />
 
         <div className="mt-5 flex items-center gap-3">
           <span className="h-px flex-1 bg-contraste/8" />
