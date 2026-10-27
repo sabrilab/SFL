@@ -161,8 +161,10 @@ function PaliersRecrues({ player }: { player: Player }) {
 
 /* --------------------------- 2. La réponse scellée --------------------------- */
 
-// La piste du diaporama : la taille « md » de la réponse scellée.
-const PISTE = { largeur: 300, hauteur: 50, seul: false };
+// La piste du diaporama : la taille « md » de la réponse scellée, à la largeur
+// que laisse le plus petit iPhone (320 px moins les marges du diaporama) : la
+// course du bouton est calculée pour elle, la piste ne doit donc pas rétrécir.
+const PISTE = { largeur: 276, hauteur: 50, seul: false };
 const GLISSER = 900;
 // Le vert « y aller » des boutons (boutons.css, bouton--vert).
 const VERT = "132 214 140";
@@ -192,7 +194,7 @@ function ReponseQuiSeScelle() {
   }, [t, reduit]);
 
   return (
-    <div className="relative h-[50px] w-[300px] max-w-full">
+    <div className="relative h-[50px] w-[276px]">
       {/* La piste s'efface d'abord, la pilule arrive ensuite (jamais deux « Je viens »). */}
       <AnimatePresence initial={false} mode="wait">
         {t !== "scelle" ? (

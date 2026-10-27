@@ -214,6 +214,8 @@
   }
   .glisse-piste--seul .glisse-bouton {
     left: 4px;
+    /* Le ressort ne dépasse pas le départ : le bouton ne mord pas sur le bord. */
+    transform: translateX(calc(max(0, var(--glisse-p)) * var(--course)));
   }
 
   /* Mode clair : la piste se pose par un trait d'encre, les pixels sont

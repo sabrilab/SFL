@@ -139,7 +139,9 @@ export function ReponseScellee({
   const cibles = useRef<Partial<Record<ReponseScellable, HTMLButtonElement | null>>>({});
   const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retour = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const geste = useRef<{ id: number; x: number; y: number; engage: boolean; course: number } | null>(null);
+  const geste = useRef<{ id: number; x: number; y: number; engage: boolean; course: number; depart: number } | null>(
+    null
+  );
   const fini = useRef(false);
   const vivant = useRef(true);
   useEffect(
@@ -218,7 +220,9 @@ export function ReponseScellee({
   const poser = (e: PointerEvent<HTMLDivElement>) => {
     if (!ouvert || phase.t !== "repos" || fini.current) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    geste.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engage: false, course: 1 };
+    // Un deuxième doigt ne vole pas le geste du premier.
+    if (geste.current) return;
+    geste.current = { id: e.pointerId, x: e.clientX, y: e.clientY, engage: false, course: 1, depart: 0 };
   };
 
   const bouger = (e: PointerEvent<HTMLDivElement>) => {
@@ -235,6 +239,10 @@ export function ReponseScellee({
       if (Math.abs(dx) < ENGAGE || Math.abs(dx) < Math.abs(dy)) return;
       g.engage = true;
       g.course = mesurer();
+      // Repris en plein ressort, le bouton part d'où il est, sans saut.
+      const el = piste.current;
+      const ici = el ? parseFloat(getComputedStyle(el).getPropertyValue("--glisse-p")) : 0;
+      g.depart = Number.isFinite(ici) ? ici : 0;
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
       } catch {
@@ -242,7 +250,7 @@ export function ReponseScellee({
       }
       tirer(true);
     }
-    const p = Math.max(unSens ? 0 : -1, Math.min(1, dx / g.course));
+    const p = Math.max(unSens ? 0 : -1, Math.min(1, g.depart + dx / g.course));
     placer(p);
     if (Math.abs(p) >= BOUT) {
       // Au bout : la réponse part, plus rien ne bouge.
@@ -315,7 +323,12 @@ export function ReponseScellee({
         onPointerMove={bouger}
         onPointerUp={lever}
         onPointerCancel={lever}
-        onLostPointerCapture={lever}
+        onLostPointerCapture={(e) => {
+          // Au toucher, le navigateur capture d'office le doigt sur la cible
+          // touchée ; la piste le reprend au début du glissé, et la cible le
+          // perd : ce n'est pas la fin du geste.
+          if (e.target === e.currentTarget) lever(e);
+        }}
         onContextMenu={(e) => e.preventDefault()}
         onKeyDown={touche}
         onBlur={(e) => {
