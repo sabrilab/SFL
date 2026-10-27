@@ -643,7 +643,7 @@ export function AdminDashboard() {
             size="sm"
             onClick={() =>
               setConfirmation({
-                titre: "Remplacer toute la saison par les données de démo ?",
+                titre: "Remplacer toute la saison par les données de démo ?",
                 action: "Remplacer",
                 faire: () => {
                   persist(saisieStore.reset());
@@ -856,7 +856,7 @@ export function AdminDashboard() {
           const ligne = editEntry;
           const index = editIndex;
           setConfirmation({
-            titre: `Retirer ${ligne.player} de la J${ligne.j} ?`,
+            titre: `Retirer ${ligne.player} de la J${ligne.j} ?`,
             action: "Retirer",
             faire: () => {
               supprimer({ genre: "ligne", ligne, index }, `${ligne.player} retiré de la J${ligne.j}`);
@@ -887,7 +887,7 @@ export function AdminDashboard() {
           const j = metaJ;
           const n = saison.entries.filter((e) => e.j === j).length;
           setConfirmation({
-            titre: `Supprimer la J${j} ?`,
+            titre: `Supprimer la J${j} ?`,
             detail: n > 0 ? `${n} ligne${n > 1 ? "s" : ""} partent avec elle.` : undefined,
             action: "Supprimer",
             faire: () => {
@@ -905,7 +905,7 @@ export function AdminDashboard() {
           if (!playerEntry) return;
           const nom = playerEntry.name;
           setConfirmation({
-            titre: `Supprimer ${nom} de l'effectif ?`,
+            titre: `Supprimer ${nom} de l'effectif ?`,
             action: "Supprimer",
             faire: () => {
               supprimer({ genre: "joueur", nom }, `${nom} supprimé`);
