@@ -16,7 +16,11 @@
 //     ci-dessus) et « Missions » (mode-passe-missions.tsx : les missions de
 //     la journée, tout ce qui rapporte de l'XP, le journal). Sabri, 26/10 :
 //     « là, je vois que les skins ». Le mode s'ouvre sur les Missions quand
-//     il y en a à signer, et sur elles par /profil/xp?vue=missions ;
+//     il y en a à signer, et sur elles par /profil/xp?vue=missions ; un
+//     troisième, « Les autres » (mode-passe-autres.tsx : l'outsider de
+//     l'arc 1 et les missions acceptées de toute la ligue ; Sabri, 27/10 :
+//     « pour qu'on puisse voir les missions et les missions des gens »),
+//     par /profil/xp?vue=autres ;
 //   · on sort par la croix, Échap, ou en tirant vers le bas : le noir se
 //     referme sur la tuile.
 // Toujours en noir, en clair comme en sombre : c'est un autre monde.
@@ -29,6 +33,7 @@ import { Check, Lock, X } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { Card3D } from "@/components/sfl/card-3d";
 import { useMissionsASigner, VueMissions } from "@/components/sfl/mode-passe-missions";
+import { VueAutres } from "@/components/sfl/mode-passe-autres";
 import type { Finition } from "@/components/sfl/finitions-carte";
 import { CADRAGES, ChoixPays, essai, etatDe, GENRE, Mini, useOntLePalier, type EtatPalier } from "@/components/sfl/passe-bola";
 import { PlayerCard } from "@/components/sfl/player-card";
@@ -49,7 +54,9 @@ import "./mode-passe.css";
 const xp = (n: number) => `${n.toLocaleString("fr-FR")} XP`;
 const ontLe = (n: number) => (n > 0 ? `${n} l'${n > 1 ? "ont" : "a"}` : "personne ne l'a");
 
-export type Vue = "passe" | "missions";
+export type Vue = "passe" | "missions" | "autres";
+const VUES: Vue[] = ["passe", "missions", "autres"];
+const NOM_VUE: Record<Vue, string> = { passe: "Passe", missions: "Missions", autres: "Les autres" };
 
 /** Le pas d'un palier sur la route, en px (la largeur d'un arrêt). */
 const PAS = 76;
@@ -65,10 +72,11 @@ function tailleCarte(): number {
   return Math.max(0.78, Math.min(1.3, (window.innerHeight - 476) / 330));
 }
 
-/** /profil/xp?vue=missions (la notification des Missions Bola) ouvre les Missions. */
+/** /profil/xp?vue=missions (la notification des Missions Bola) ouvre les Missions ; ?vue=autres, Les autres (celle de l'outsider). */
 function vueDeLAdresse(): Vue | null {
   if (typeof window === "undefined") return null;
-  return new URLSearchParams(window.location.search).get("vue") === "missions" ? "missions" : null;
+  const v = new URLSearchParams(window.location.search).get("vue");
+  return v === "missions" || v === "autres" ? v : null;
 }
 
 /* --------------------- D'où l'on entre (la tuile touchée) --------------------- */
@@ -420,8 +428,8 @@ export function ModePasse({
         </div>
       </header>
 
-      <nav className="mp-vues mp-entre" style={{ "--i": 1 } as React.CSSProperties} aria-label="Passe ou missions">
-        {(["passe", "missions"] as const).map((v) => (
+      <nav className="mp-vues mp-entre" style={{ "--i": 1 } as React.CSSProperties} aria-label="Passe, missions, les autres">
+        {VUES.map((v) => (
           <button
             key={v}
             type="button"
@@ -433,7 +441,7 @@ export function ModePasse({
             }}
             className={cn("mp-vue", vue === v && "mp-vue--active")}
           >
-            {v === "passe" ? "Passe" : "Missions"}
+            {NOM_VUE[v]}
             {v === "missions" && aSigner > 0 && <span className="mp-vue__pastille tabular-nums">{aSigner}</span>}
           </button>
         ))}
@@ -472,8 +480,8 @@ export function ModePasse({
           </div>
         </>
       ) : (
-        <div className="mp-defile mp-entre" style={{ "--i": 2 } as React.CSSProperties}>
-          <VueMissions b={b} saison={saison} />
+        <div key={vue} className="mp-defile mp-entre" style={{ "--i": 2 } as React.CSSProperties}>
+          {vue === "missions" ? <VueMissions b={b} saison={saison} /> : <VueAutres />}
         </div>
       )}
 

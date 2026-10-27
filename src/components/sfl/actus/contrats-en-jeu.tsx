@@ -1,6 +1,6 @@
 "use client";
 
-// Les Contrats en jeu, dans les Actus, sous les Missions Bola. Sabri, 23/10 :
+// Les Contrats en jeu : les missions acceptées de la ligue. Sabri, 23/10 :
 // « montrer tous les contrats qui sont acceptés, les missions qui sont en
 // jeu ». Toute la ligue, pas seulement les siennes :
 //   · les contrats signés, en affiches qu'on fait défiler : la cible sous le
@@ -16,16 +16,19 @@
 // (missions_reponses, schema.sql). Rien ne s'affiche tant que personne n'a
 // signé. Dans un aperçu, la ligue est simulée (reponsesDemo) : rien n'y
 // compte.
-// Sur ordinateur (course.tsx), le bloc prend toute la largeur sous la
-// semaine : la rangée y prend les deux flèches et le fondu de la course, le
-// défi et la ligue se posent côte à côte.
+// Sur ordinateur, la rangée prend les deux flèches et le fondu de la course ;
+// hors du mode Passe (sans `colonne`), le défi et la ligue se posent côte à
+// côte.
 // Sabri, 24/10 : « sur l'actu principale de tout le monde, tu laisses que
-// les rang S de visible en aperçu ». Dans les Actus (`apercu`), seuls les
-// contrats de rang S ; « Tout voir » ouvre la page enfant /ligue/contrats,
-// qui montre tout : face-à-face, rangs A et B, défi et ligue.
+// les rang S de visible en aperçu » ; puis, 27/10 : « On veut pas voir les
+// missions de tout le monde. Il faut que ça soit accessible dans l'onglet Ma
+// carte, dans les niveaux XP ». Le bloc entier vit donc dans Ma carte →
+// Niveau XP → Les autres (mode-passe-autres.tsx, `colonne` : une seule
+// colonne, celle du mode Passe, à toutes les largeurs) ; les Actus n'en
+// gardent qu'une pièce, le contrat à la une (contrat-a-la-une.tsx).
+// /ligue/contrats y renvoie.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { useIdentites } from "@/hooks/use-identites";
@@ -46,7 +49,7 @@ const pl = (n: number, un: string, plusieurs: string) => `${n} ${n > 1 ? plusieu
 const plusieursMatchs = (lg: Ligue) => new Set([...lg.d.camps.values()].map((c) => c.terrain)).size > 1;
 
 /** La note aux couleurs de son équipe du dimanche. */
-function onglet(lg: Ligue, nom: string) {
+export function onglet(lg: Ligue, nom: string) {
   const c = lg.d.camps.get(nom);
   return c ? (c.equipe === "noirs" ? NOIRS : BLANCS) : undefined;
 }
@@ -54,12 +57,12 @@ function onglet(lg: Ligue, nom: string) {
 /** Le verdict se lit dès que la feuille le donne, jamais avant le coup d'envoi. */
 const tranche = (e: Engagement, lg: Ligue) => lg.phase !== "ouvert" && e.verdict.etat !== "en-jeu";
 
-function etatViseur(e: Engagement, lg: Ligue): EtatViseur {
+export function etatViseur(e: Engagement, lg: Ligue): EtatViseur {
   if (!tranche(e, lg)) return "verrou";
   return e.verdict.etat === "ratee" ? "rate" : e.verdict.etat === "annulee" ? "eteint" : "verrou";
 }
 
-function etatFiche(e: Engagement, lg: Ligue): string | null {
+export function etatFiche(e: Engagement, lg: Ligue): string | null {
   if (!tranche(e, lg)) return null;
   return { reussie: "fiche--reussie", ratee: "fiche--ratee", annulee: "fiche--eteinte", "en-jeu": null }[e.verdict.etat];
 }
@@ -79,8 +82,8 @@ function Moment({ lg }: { lg: Ligue }) {
   );
 }
 
-/** Le bas d'une affiche : prime et risque, puis « En jeu », puis le tampon du verdict. */
-function Resultat({ e, lg, court }: { e: Engagement; lg: Ligue; court?: boolean }) {
+/** Le bas d'une affiche : prime et risque, puis « En jeu », puis le tampon du verdict. Aussi le contrat à la une (contrat-a-la-une.tsx). */
+export function Resultat({ e, lg, court }: { e: Engagement; lg: Ligue; court?: boolean }) {
   const e_ = e.m.creneau === "contrat" ? "" : "e";
   if (tranche(e, lg)) {
     const v = e.verdict.etat;
@@ -239,7 +242,7 @@ function etatEngage(e: Engagement, lg: Ligue): string | null {
 }
 
 /** Les engagés d'une même mission (« Gagnez. », le Jury) : leurs cartes, équipe par équipe quand elle se gagne à plusieurs. */
-function Engages({ titre, liste, lg }: { titre: string; liste: Engagement[]; lg: Ligue }) {
+function Engages({ titre, liste, lg, colonne }: { titre: string; liste: Engagement[]; lg: Ligue; colonne?: boolean }) {
   const m = liste[0].m;
   const rang = rangDe(m);
   const objectif = m.genre === "record" ? "Bats ton record." : phrase(m);
@@ -261,7 +264,7 @@ function Engages({ titre, liste, lg }: { titre: string; liste: Engagement[]; lg:
   const reussies = tranches.filter((e) => e.verdict.etat === "reussie").length;
   const ratees = tranches.filter((e) => e.verdict.etat === "ratee").length;
   return (
-    <article aria-label={`${titre} : ${NOM_DE_CODE[m.genre]}`} className={cn("fiche fiche--engages dark mx-4 md:mx-0", `fiche--${rang}`)}>
+    <article aria-label={`${titre} : ${NOM_DE_CODE[m.genre]}`} className={cn("fiche fiche--engages dark mx-4", !colonne && "md:mx-0", `fiche--${rang}`)}>
       <div className="fiche__bandeau">
         <span className="fiche__etiquette">{titre}</span>
         <span className="fiche__type mono-label text-white/75">{pl(liste.length, "engagé", "engagés")}</span>
@@ -389,17 +392,14 @@ function Rangee({ cles, children }: { cles: string; children: ReactNode }) {
   );
 }
 
-export function ContratsEnJeu({ className, apercu }: { className?: string; apercu?: boolean }) {
+export function ContratsEnJeu({ className, colonne }: { className?: string; colonne?: boolean }) {
   const lg = useMissionsDeLaLigue();
   if (!lg || lg.total === 0) return null;
   const { d, faceAFace, contrats, defis, ligue } = lg;
   const signes = faceAFace.length * 2 + contrats.length;
-  const rangS = contrats.filter((e) => rangDe(e.m) === "S");
-  const duels = apercu ? [] : faceAFace;
-  const affiches = apercu ? rangS : contrats;
   return (
     <section aria-labelledby="titre-contrats-en-jeu" className={cn("flex flex-col gap-4", className)}>
-      <div className="flex flex-col gap-1.5 px-5 md:px-0">
+      <div className={cn("flex flex-col gap-1.5 px-5", !colonne && "md:px-0")}>
         <div className="flex items-baseline justify-between gap-3">
           <span className="mono-label truncate text-foreground/45">J{d.j} · Toute la ligue</span>
           <Moment lg={lg} />
@@ -409,45 +409,37 @@ export function ContratsEnJeu({ className, apercu }: { className?: string; aperc
         </h2>
       </div>
 
-      {(apercu || signes > 0) && (
+      {signes > 0 && (
         <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-3 px-5 md:px-0">
+          <div className={cn("flex items-center justify-between gap-3 px-5", !colonne && "md:px-0")}>
             <span className="mono-label truncate text-foreground/45">
-              {apercu
-                ? rangS.length > 0 && pl(rangS.length, "contrat rang S", "contrats rang S")
-                : (faceAFace.length > 0 ? `${faceAFace.length} face-à-face · ` : "") + pl(signes, "contrat signé", "contrats signés")}
+              {(faceAFace.length > 0 ? `${faceAFace.length} face-à-face · ` : "") + pl(signes, "contrat signé", "contrats signés")}
             </span>
-            {apercu && (
-              <Link
-                href="/ligue/contrats"
-                className="bouton-discret flex shrink-0 items-center gap-0.5 py-1.5 pr-1 pl-2.5 text-[13.5px] font-semibold"
-              >
-                Tout voir · {lg.total}
-                <ChevronRight className="size-4" />
-              </Link>
-            )}
           </div>
-          {affiches.length + duels.length > 0 && (
-            <Rangee cles={[...duels.map((f) => `${f.duel.noirs}-${f.duel.blancs}`), ...affiches.map((e) => e.joueur)].join("|")}>
-              {duels.map((f) => (
-                <AfficheDuel key={`${f.duel.noirs}-${f.duel.blancs}`} f={f} lg={lg} />
-              ))}
-              {affiches.map((e) => (
-                <Affiche key={e.joueur} e={e} lg={lg} />
-              ))}
-            </Rangee>
-          )}
+          <Rangee
+            cles={[...faceAFace.map((f) => `${f.duel.noirs}-${f.duel.blancs}`), ...contrats.map((e) => e.joueur)].join("|")}
+          >
+            {faceAFace.map((f) => (
+              <AfficheDuel key={`${f.duel.noirs}-${f.duel.blancs}`} f={f} lg={lg} />
+            ))}
+            {contrats.map((e) => (
+              <Affiche key={e.joueur} e={e} lg={lg} />
+            ))}
+          </Rangee>
         </div>
       )}
 
-      {!apercu && (
-        <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3">
-          {[...new Set(defis.map((e) => e.m.genre))].map((g) => (
-            <Engages key={g} titre="Défi du dimanche" liste={defis.filter((e) => e.m.genre === g)} lg={lg} />
-          ))}
-          {ligue.length > 0 && <Engages titre="La ligue" liste={ligue} lg={lg} />}
-        </div>
-      )}
+      <div
+        className={cn(
+          "flex flex-col gap-4",
+          !colonne && "md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3"
+        )}
+      >
+        {[...new Set(defis.map((e) => e.m.genre))].map((g) => (
+          <Engages key={g} titre="Défi du dimanche" liste={defis.filter((e) => e.m.genre === g)} lg={lg} colonne={colonne} />
+        ))}
+        {ligue.length > 0 && <Engages titre="La ligue" liste={ligue} lg={lg} colonne={colonne} />}
+      </div>
     </section>
   );
 }

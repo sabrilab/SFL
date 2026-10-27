@@ -7,13 +7,13 @@
 //   « Personne ne l'attendait en D1. Demain, Miken joue son rang A. »
 // L'outsider, lui, reçoit « J4 · Ta journée », « Personne ne t'attendait en
 // D1. Demain, tu joues ton rang A. » Le dimanche matin, « Aujourd'hui ».
-// Toucher la notification ouvre sa fiche dans les Actus.
+// Toucher la notification ouvre sa fiche dans Ma carte → Niveau XP → Les autres.
 //
 // Quand : la veille du dimanche dès 18 h, ou le dimanche même de 9 h au coup
 // d'envoi, à l'heure de Paris (fenetreOutsider). Un dimanche sans outsider
 // (plus aucun rang B en D1) n'envoie rien.
 //
-// L'outsider se calcule ici comme dans les Actus : le journal de l'XP de
+// L'outsider se calcule ici comme dans Ma carte → Niveau XP → Les autres : le journal de l'XP de
 // toute la ligue (journalXp, avec les réponses aux missions, les votes et les
 // félicitations de la base), puis arcOutsider. Jamais sur la parole d'un
 // téléphone : son nom part à toute la ligue.
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   const cle = cleVapid();
   if (!cle) return NextResponse.json({ envoyes: 0, fini: true });
 
-  // L'outsider du dimanche, comme les Actus le calculent (outsiderDuDimanche).
+  // L'outsider du dimanche, comme Les autres le calculent (outsiderDuDimanche).
   const numero = numeroSaison(saison);
   type Felicitation = { de: string; a: string; exploit: string; saison: number; j: number };
   let lues: [Reponse[], VoteFigure[], Felicitation[]];
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
     const uid = idDe.get(joueur);
     if (!uid) continue;
     const { titre, texte } = notificationOutsider(outsider, j, joueur, qui, moment);
-    const notif: Notif = { titre: couper(titre, 60), texte: couper(texte, 180), url: "/ligue#outsider", tag: annonce };
+    const notif: Notif = { titre: couper(titre, 60), texte: couper(texte, 180), url: "/profil/xp?vue=autres#outsider", tag: annonce };
     envois.set(uid, { notif, motif: "outsider", ref: annonce });
   }
   const { recus } = await prevenir(sb, cle, envois);
