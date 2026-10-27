@@ -589,7 +589,7 @@ export default function InscriptionPage() {
       if (!jeton) {
         setSociale(null);
         setEtape("accueil");
-        setErreur("La connexion a expiré. Recommence avec Google ou Apple.");
+        setErreur("La connexion a expiré. Recommence avec Google.");
         return;
       }
       const { email: _email, ...fiche } = f;
