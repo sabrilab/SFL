@@ -84,6 +84,20 @@ function demo(code: string): Parrain {
   };
 }
 
+/**
+ * lireParrain, retentée une fois après une erreur réseau. Lève encore si la
+ * seconde lecture échoue : l'appelant garde alors le code brut, que les
+ * routes d'inscription revérifient (parrainDuCode, 28/10/2026).
+ */
+export async function lireParrainTenace(brut: string): Promise<Parrain | null> {
+  try {
+    return await lireParrain(brut);
+  } catch {
+    await new Promise((r) => setTimeout(r, 1500));
+    return lireParrain(brut);
+  }
+}
+
 /** Qui invite, d'après un code ; null : code inconnu ou coupé. */
 export async function lireParrain(brut: string): Promise<Parrain | null> {
   const code = normaliserCode(brut);

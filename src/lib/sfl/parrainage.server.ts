@@ -4,7 +4,10 @@
 // Appelé par /api/inscription et /api/inscription/sociale, avec le client à
 // clé secrète, juste après la création du compte : une ligne dans
 // parrainages, et Bola Team offert (team_offerts) si le parrain joue en SFL
-// ce jour-là. Un échec ici ne défait jamais le compte.
+// ce jour-là. La ligne de parrainages fait du filleul un joueur Bola
+// (hors_sfl en base) : sans elle, un compte validé d'office voyait toute la
+// SFL. Son échec est donc rendu, et la route défait le compte (28/10/2026) ;
+// celui de team_offerts ne défait rien.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -36,26 +39,42 @@ export async function joueurSfl(sb: SupabaseClient, id: string): Promise<boolean
   return data === true;
 }
 
+/**
+ * Note le parrainage. `parrain` null : le lien d'une équipe dont le créateur
+ * n'existe plus (cree_par effacé) ; la ligne est écrite quand même, sans
+ * parrain. Rend l'erreur de la ligne de parrainages, null si elle est posée.
+ */
 export async function noterFilleul(
   sb: SupabaseClient,
   filleul: string,
-  parrain: ParrainServeur,
+  parrain: ParrainServeur | null,
   canal: "lien" | "code" | "equipe",
   equipeId: number | null = null
-): Promise<void> {
+): Promise<{ error: string | null }> {
   try {
-    await sb.from("parrainages").upsert(
-      { filleul, parrain: parrain.id, code: parrain.code, canal, equipe_id: equipeId, parrain_sfl: parrain.sfl },
+    const { error } = await sb.from("parrainages").upsert(
+      {
+        filleul,
+        parrain: parrain?.id ?? null,
+        code: parrain?.code ?? null,
+        canal,
+        equipe_id: equipeId,
+        parrain_sfl: parrain?.sfl ?? false,
+      },
       { onConflict: "filleul", ignoreDuplicates: true }
     );
-    if (parrain.sfl) {
-      await sb
-        .from("team_offerts")
-        .upsert({ joueur: filleul, par: parrain.id, via: canal }, { onConflict: "joueur", ignoreDuplicates: true });
-    }
-  } catch {
-    // Le compte existe : le parrainage manquera aux statistiques, rien de plus.
+    if (error) return { error: error.message };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "parrainage non noté" };
   }
+  if (parrain?.sfl) {
+    // Bola Team offert : un échec ne coûte que le cadeau.
+    await sb
+      .from("team_offerts")
+      .upsert({ joueur: filleul, par: parrain.id, via: canal }, { onConflict: "joueur", ignoreDuplicates: true })
+      .then(() => {}, () => {});
+  }
+  return { error: null };
 }
 
 /**

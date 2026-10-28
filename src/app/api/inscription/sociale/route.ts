@@ -175,7 +175,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Création du compte impossible pour l'instant." }, { status: 500 });
   }
 
-  if (parrain) await noterFilleul(sb, user.id, parrain, corps.canal === "code" ? "code" : "lien");
+  // Validé d'office, il doit être noté filleul, ce qui le garde en mode Bola
+  // (hors_sfl) : sinon on remet le compte en provisoire, comme pour la fiche
+  // (28/10/2026).
+  if (parrain) {
+    const { error: errParrainage } = await noterFilleul(sb, user.id, parrain, corps.canal === "code" ? "code" : "lien");
+    if (errParrainage) {
+      await sb.from("profiles").update({ pseudo_a_choisir: true, valide: false }).eq("id", user.id);
+      return NextResponse.json({ error: "Création du compte impossible pour l'instant." }, { status: 500 });
+    }
+  }
 
   return NextResponse.json({ ok: true, pseudo: f.pseudo, name, entre: !!parrain });
 }

@@ -29,7 +29,10 @@
 // De même par le lien d'un joueur (?parrain=code, ou le code gardé 30 jours
 // par la page /p/code, ou tapé ici : lib/sfl/parrainage.ts) : le parrain
 // s'en porte garant et le compte entre aussitôt dans Bola. Ces deux parcours
-// sont plus courts (pas les quatre photos en pied).
+// sont plus courts (pas les quatre photos en pied). Si le code n'a pas pu
+// être lu (réseau), il part quand même, brut, avec l'inscription, qui le
+// revérifie : le filleul ne naît pas en attente, hors de Bola, pour une
+// lecture manquée (28/10/2026).
 //
 // Page publique (hors de la porte de connexion, voir AuthGate).
 
@@ -61,6 +64,7 @@ import {
   codeValide,
   garderCode,
   lireParrain,
+  lireParrainTenace,
   normaliserCode,
   noterVisite,
   oublierCode,
@@ -266,6 +270,13 @@ export default function InscriptionPage() {
   const [equipe, setEquipe] = useState<string | null>(null);
   // Venu par le lien d'un joueur, ou avec son code : son parrain (parrainage).
   const [parrain, setParrain] = useState<{ p: Parrain; canal: Canal } | null>(null);
+  // Un code que le réseau n'a pas laissé lire : envoyé brut à l'inscription.
+  const [codeNonLu, setCodeNonLu] = useState<{ code: string; canal: Canal } | null>(null);
+  const parrainEnvoye = parrain
+    ? { parrain: parrain.p.code, canal: parrain.canal }
+    : codeNonLu
+      ? { parrain: codeNonLu.code, canal: codeNonLu.canal }
+      : null;
   const [codeOuvert, setCodeOuvert] = useState(false);
   const [codeSaisi, setCodeSaisi] = useState("");
   const [codeEtat, setCodeEtat] = useState<"?" | "verif" | "inconnu">("?");
@@ -281,9 +292,10 @@ export default function InscriptionPage() {
     const garde = codeValide(lien) ? { code: lien, canal: "lien" as const } : codeGarde();
     if (!garde) return;
     let annule = false;
-    lireParrain(garde.code)
+    lireParrainTenace(garde.code)
       .then((p) => {
         if (annule || !p) return;
+        setCodeNonLu(null);
         garderCode(p.code, garde.canal);
         setParrain({ p, canal: garde.canal });
         // Un code tapé avant un détour par Google ou Apple se retrouve dans son champ.
@@ -292,7 +304,9 @@ export default function InscriptionPage() {
           setCodeOuvert(true);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!annule) setCodeNonLu(garde);
+      });
     return () => {
       annule = true;
     };
@@ -330,6 +344,7 @@ export default function InscriptionPage() {
       lireParrain(codeNormalise)
         .then((p) => {
           if (annule) return;
+          setCodeNonLu(null);
           if (p) {
             garderCode(p.code, "code");
             setParrain({ p, canal: "code" });
@@ -339,7 +354,11 @@ export default function InscriptionPage() {
             setCodeEtat("inconnu");
           }
         })
-        .catch(() => !annule && setCodeEtat("?"));
+        .catch(() => {
+          if (annule) return;
+          setCodeEtat("?");
+          setCodeNonLu({ code: codeNormalise, canal: "code" });
+        });
     }, 420);
     return () => {
       annule = true;
@@ -535,7 +554,7 @@ export default function InscriptionPage() {
           pseudo,
           motDePasse,
           site: piege,
-          ...(equipe ? { equipe } : parrain ? { parrain: parrain.p.code, canal: parrain.canal } : {}),
+          ...(equipe ? { equipe } : (parrainEnvoye ?? {})),
         }),
       });
       const d = (await r.json().catch(() => ({}))) as {
@@ -555,7 +574,7 @@ export default function InscriptionPage() {
       }
       const nom = d.name;
       setEntre(!!d.entre);
-      if (d.entre && parrain) oublierCode();
+      if (d.entre && parrainEnvoye) oublierCode();
       // Connexion immédiate, puis les quatre prises, envoyées sous sa
       // propre session.
       const connexion = await signIn(pseudo, motDePasse);
@@ -602,7 +621,7 @@ export default function InscriptionPage() {
           ...fiche,
           pseudo,
           site: piege,
-          ...(parrain ? { parrain: parrain.p.code, canal: parrain.canal } : {}),
+          ...(parrainEnvoye ?? {}),
         }),
       });
       const d = (await r.json().catch(() => ({}))) as {
@@ -622,7 +641,7 @@ export default function InscriptionPage() {
       }
       const nom = d.name;
       setEntre(!!d.entre);
-      if (d.entre && parrain) oublierCode();
+      if (d.entre && parrainEnvoye) oublierCode();
       // La session Supabase est déjà là : elle devient la session de ligue
       // (en attente, sauf venu par un parrain), puis les photos partent sous elle.
       await bootstrapServerSession();

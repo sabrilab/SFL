@@ -74,6 +74,7 @@ import { ArbitresAdmin } from "@/components/sfl/admin/arbitres";
 import { ResultatsVotes } from "@/components/sfl/admin/resultats-votes";
 import { chercherJoueurs } from "@/lib/sfl/recherche-joueur";
 import { useSession } from "@/hooks/use-session";
+import { jetonServeur } from "@/lib/sfl/auth/session";
 import { Confirmer, type Confirmation } from "@/components/sfl/admin/confirmer";
 import { Corbeille } from "@/components/sfl/admin/corbeille";
 import { nommer, remettre, retirer, type ElementCorbeille } from "@/lib/sfl/saisie/corbeille";
@@ -144,6 +145,28 @@ export function AdminDashboard() {
   const [metaJ, setMetaJ] = useState<number | null>(null);
   const [playerIndex, setPlayerIndex] = useState<number | null>(null);
   const [newPlayerOpen, setNewPlayerOpen] = useState(false);
+  // Les noms des joueurs Bola (hors de l'effectif) : un nouveau joueur ne
+  // prend pas l'un d'eux, sinon il hériterait de son compte (28/10/2026).
+  // Relus à chaque ouverture de la fenêtre ; /api/comptes/creer refait le
+  // contrôle si la lecture n'a pas abouti.
+  const [nomsBola, setNomsBola] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    if (!newPlayerOpen) return;
+    let annule = false;
+    (async () => {
+      const jeton = await jetonServeur();
+      if (!jeton) return;
+      const r = await fetch("/api/comptes/joueurs-bola", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jeton}` },
+      }).catch(() => null);
+      const j = r?.ok ? ((await r.json().catch(() => null)) as { noms?: string[] } | null) : null;
+      if (!annule && j?.noms) setNomsBola(new Set(j.noms));
+    })();
+    return () => {
+      annule = true;
+    };
+  }, [newPlayerOpen]);
   // Le joueur qui vient d'être ajouté : ses accès s'affichent aussitôt, et
   // sa fiche n'ouvre qu'après — sinon elle se pose par-dessus et les masque.
   const [accesPour, setAccesPour] = useState<string | null>(null);
@@ -918,7 +941,7 @@ export function AdminDashboard() {
       <NewPlayerSheet
         open={newPlayerOpen}
         onOpenChange={setNewPlayerOpen}
-        exists={(name) => rosterHasName(saison, name)}
+        exists={(name) => rosterHasName(saison, name) || nomsBola.has(name.toLowerCase())}
         onCreate={(name) => {
           const idx = saison.roster.length;
           commit(addRoster(saison, newRosterPlayer(name)), `Nouveau joueur — ${name}`);
