@@ -3,17 +3,19 @@
 // La feuille d'un match Bola, tenue par l'organisateur après le coup d'envoi :
 // chaque joueur chez les Clairs, chez les Foncés ou absent, ses buts, ses
 // passes ; le score en haut, jamais sous les buts marqués. Corrigeable 24 h
-// (la base ferme la feuille ensuite).
+// (la base ferme la feuille ensuite). Sous les 8 présents, le match est
+// amical, et l'enregistrement le dit.
 //
 // Le MVP n'est jamais choisi ici : l'app le tire des stats (le plus haut
-// buts + passes du match, ex æquo compris), et il s'affiche dès qu'il change.
+// buts + passes du match ; à égalité, le plus de passes, Sabri 28/10 ; deux
+// MVP seulement en égalité parfaite), et il s'affiche dès qu'il change.
 
 import { useMemo, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { direErreur, saisirFeuille, type EquipeFeuille, type Partie } from "@/lib/sfl/matchs";
-import { mvpsDuMatch } from "@/lib/sfl/ligue-vierge";
+import { mvpsDuMatch, QUORUM } from "@/lib/sfl/ligue-vierge";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
 
@@ -119,7 +121,10 @@ export function FeuilleBola({
         scoreFonces: score.fonces,
         lignes: lignes.map(({ playerId, equipe, buts, passes }) => ({ playerId, equipe, buts, passes })),
       });
-      toast.success("Feuille enregistrée, le classement Bola est à jour.");
+      // Sous le quorum, le match est amical : rien ne bouge au classement,
+      // le dire plutôt qu'annoncer un classement « à jour » (28/10/2026).
+      if (presents < QUORUM) toast(`Feuille enregistrée. Match amical : moins de ${QUORUM} joueurs.`);
+      else toast.success("Feuille enregistrée, le classement Bola est à jour.");
       onSaisie();
       onOpenChange(false);
     } catch (e) {

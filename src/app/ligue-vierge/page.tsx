@@ -3,7 +3,8 @@
 // La Ligue vierge — les matchs Bola, ceux que les joueurs ouvrent eux-mêmes
 // hors de la SFL, comptés à vie (Sabri, 22/10) : pas de saison, pas de
 // trophée de fin de saison, ni Impact ni Défensive ; seulement le MVP que
-// l'app désigne à chaque match (ex æquo compris). Le barème et les règles
+// l'app désigne à chaque match (à égalité, le plus de passes ; ex æquo
+// seulement en égalité parfaite, Sabri 28/10). Le barème et les règles
 // sont dans lib/sfl/ligue-vierge.ts.
 //
 // Le même dessin que Bola Team (Sabri, 26/10 : « quand on va dans Bola, il
@@ -36,7 +37,7 @@
 // (sur une préversion, ?apercu=1 force la démonstration). Et pour qui n'a pas d'équipe, la vitrine
 // de Bola Team en une ligne (equipe/vitrine-team.tsx).
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
@@ -70,10 +71,19 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { isHidden } from "@/lib/sfl/hidden";
 
-/** La carte d'un joueur de Bola : sa carte de la SFL s'il en a une, sinon une carte neutre. */
+/** Le poste de la fiche de chaque joueur des matchs Bola (ligue_vierge), par nom en minuscules. */
+const PostesBola = createContext<Map<string, string>>(new Map());
+
+/**
+ * La carte d'un joueur de Bola : sa carte de la SFL s'il en a une, sinon une
+ * carte neutre, au poste de sa fiche (28/10/2026 : « — » pour tous les autres
+ * joueurs Bola).
+ */
 function Carte({ name, size, detail }: { name: string; size: number; detail?: string }) {
   const { allPlayers } = useSeason();
-  const p = allPlayers.find((x) => x.name.toLowerCase() === name.trim().toLowerCase()) ?? carteNeutre(name);
+  const postes = useContext(PostesBola);
+  const cle = name.trim().toLowerCase();
+  const p = allPlayers.find((x) => x.name.toLowerCase() === cle) ?? { ...carteNeutre(name), poste: postes.get(cle) ?? "—" };
   return <MiniCarte player={p} size={size} detail={detail} cle={`lv-${name}`} />;
 }
 
@@ -308,6 +318,11 @@ export default function LigueViergePage() {
     () => (apercu ? compterMatchs(demoMatchs(noms, aujourdhuiIso())) : matchs),
     [apercu, noms, matchs]
   );
+  const postes = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const x of vus ?? []) for (const j of x.joueurs) if (j.poste) m.set(j.name.trim().toLowerCase(), j.poste);
+    return m;
+  }, [vus]);
   // Les masqués (Sabri, les arbitres) hors du classement, sauf soi-même.
   const classement = useMemo(() => (vus ? classementAVie(vus, (c) => c.id === moi || !isHidden(c.name)) : []), [vus, moi]);
   // Mes feuilles : j'organise, le coup d'envoi est passé, et la feuille reste ouverte (24 h après la saisie).
@@ -340,6 +355,7 @@ export default function LigueViergePage() {
   const vide = (texte: string) => <div className="rounded-[22px] bg-card px-5 py-8 text-center text-[14px] text-muted-foreground">{texte}</div>;
 
   return (
+    <PostesBola.Provider value={postes}>
     <div className="gabarit-ligue mx-auto flex w-full max-w-[470px] flex-col gap-7 px-5 pt-2 pb-8 sm:pt-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
       <h1 className="sr-only">Bola</h1>
       {/* Le même haut que Bola Team (Sabri, 26/10 : « le même design que
@@ -476,5 +492,6 @@ export default function LigueViergePage() {
           </div>
         ))}
     </div>
+    </PostesBola.Provider>
   );
 }

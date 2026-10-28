@@ -13,9 +13,21 @@
 // On ne devine rien sur le téléphone (la saison peut arriver après la
 // session, et un joueur SFL passerait un instant pour un joueur Bola) : la
 // réponse vient de la base, gardée sur le téléphone pour l'ouverture
-// suivante. false tant qu'on ne sait pas, et si la base ne connaît pas
-// encore la fonction (une préversion avant la mise en ligne) : l'app reste
-// telle qu'avant.
+// suivante. useHorsSfl : false tant qu'on ne sait pas, et si la base ne
+// connaît pas encore la fonction (une préversion avant la mise en ligne) :
+// l'app reste telle qu'avant.
+//
+// useHorsSflEtat dit aussi « on ne sait pas encore » (null) : à la toute
+// première ouverture d'un compte, avant la réponse de la base. Ce qui montre
+// la SFL (Actus et convocation sur la Map, pages de la ligue) attend alors,
+// au lieu de la montrer un instant à un joueur Bola (28/10/2026). La réponse
+// gardée sur le téléphone fait que, pour un joueur SFL, cette attente n'a
+// lieu qu'une fois. Une base qui ne connaît pas la fonction répond « non ».
+// Toute autre erreur (coupure réseau, jeton en cours de rafraîchissement,
+// délai dépassé : supabase-js les rend en { error } sans lever) laisse
+// l'état inconnu, relu quelques secondes plus tard, au retour du réseau ou
+// quand l'app revient au premier plan : un joueur Bola hors réseau ne voit
+// jamais la SFL faute de réponse.
 
 import { useEffect, useSyncExternalStore } from "react";
 import { useSession } from "@/hooks/use-session";
@@ -52,32 +64,80 @@ function abonner(f: () => void) {
   };
 }
 
+// PostgREST (PGRST202) ou Postgres (42883) : la fonction n'existe pas.
+const FONCTION_ABSENTE = new Set(["PGRST202", "42883"]);
+
+let minuterie: ReturnType<typeof setTimeout> | null = null;
+
+function relireBientot(qui: string) {
+  // Une réponse déjà gardée pour ce compte vaut mieux qu'une relance en boucle.
+  if (minuterie || lire().qui === qui) return;
+  minuterie = setTimeout(() => {
+    minuterie = null;
+    void relire(qui);
+  }, 5000);
+}
+
 function relire(qui: string): Promise<void> {
   const deja = enVol.get(qui);
   if (deja) return deja;
   const p = (async () => {
     try {
       const { data, error } = await supabase().rpc("hors_sfl");
-      if (error) return;
+      if (error) {
+        // La base a répondu sans connaître la fonction (préversion) : « non »,
+        // pour cette ouverture seulement (rien de gardé).
+        if (FONCTION_ABSENTE.has(error.code ?? "")) {
+          if (!etat || etat.qui !== qui) {
+            etat = { qui, hors: false };
+            for (const f of abonnes) f();
+          }
+          return;
+        }
+        // Autre erreur : l'état reste tel qu'il est (inconnu à la première
+        // ouverture, sinon la réponse gardée), relu plus tard.
+        relireBientot(qui);
+        return;
+      }
       etat = { qui, hors: data === true };
       try {
         localStorage.setItem(CLE, JSON.stringify(etat));
       } catch {}
       for (const f of abonnes) f();
-    } catch {}
+    } catch {
+      relireBientot(qui);
+    }
   })().finally(() => enVol.delete(qui));
   enVol.set(qui, p);
   return p;
 }
 
-export function useHorsSfl(): boolean {
+/** true : joueur Bola ; false : non ; null : la base n'a pas encore répondu pour ce compte. */
+export function useHorsSflEtat(): boolean | null {
   const session = useSession();
   const qui = session?.server && !session.enAttente ? session.user : null;
   const lu = useSyncExternalStore(abonner, lire, () => VIDE);
 
   useEffect(() => {
-    if (qui) void relire(qui);
+    if (!qui) return;
+    void relire(qui);
+    // Retour du réseau ou de l'app au premier plan : relire si on ne sait
+    // toujours pas (une réponse gardée pour ce compte suffit).
+    const reprendre = () => {
+      if (lire().qui !== qui) void relire(qui);
+    };
+    window.addEventListener("online", reprendre);
+    window.addEventListener("focus", reprendre);
+    return () => {
+      window.removeEventListener("online", reprendre);
+      window.removeEventListener("focus", reprendre);
+    };
   }, [qui]);
 
-  return !!qui && !session?.admin && lu.qui === qui && lu.hors;
+  if (!qui || session?.admin) return false;
+  return lu.qui === qui ? lu.hors : null;
+}
+
+export function useHorsSfl(): boolean {
+  return useHorsSflEtat() === true;
 }

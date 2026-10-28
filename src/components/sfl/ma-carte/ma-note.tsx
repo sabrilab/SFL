@@ -9,14 +9,17 @@
 //     faut pour +1 ; ma série de présence (trois dimanches de suite) ;
 //   · mes dimanches, du plus récent : ce qui a versé des crans, ce qui a fait
 //     prendre un point ; et les mises à jour passées ;
-//   · « Comment ma note monte » : le barème, replié.
+//   · « Comment ma note monte » : le barème, replié. Pas pour un joueur
+//     Bola (hors de la SFL) : il parle des titres Impact et Défensive et
+//     des votes du dimanche, qu'il n'a pas (28/10/2026).
 // Le but : que chacun puisse refaire le calcul, et donc croire sa note.
 // Noir et blanc, en currentColor et en opacités (clair comme sombre) ; les
 // chiffres en Anton, les étiquettes en JetBrains Mono.
 
 import { useMemo } from "react";
 import { ANTON } from "@/components/sfl/actus/ecran";
-import { useMyPlayer } from "@/components/sfl/player-provider";
+import { useJoueurBola, useMyPlayer } from "@/components/sfl/player-provider";
+import { useHorsSfl } from "@/hooks/use-hors-sfl";
 import { useSeason } from "@/components/sfl/season-provider";
 import { ovr, STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
 import { CRANS, JOURNEES_PAR_MAJ, SERIE, VOIX_MIN, type EvolutionJoueur } from "@/lib/sfl/saisie/evolution";
@@ -86,6 +89,8 @@ function Stat({ k, ev }: { k: StatKey; ev: EvolutionJoueur }) {
 export function MaNote() {
   const { player } = useMyPlayer();
   const { evolution } = useSeason();
+  const joueurBola = useJoueurBola();
+  const horsSfl = useHorsSfl();
   const ev = evolution.actif ? evolution.joueurs.get(player.name) : undefined;
   const cal = evolution.calendrier;
   const enDirect = useMemo(() => (ev ? plus(ev.officielles, ev.enAttente) : null), [ev]);
@@ -142,7 +147,7 @@ export function MaNote() {
         <p className="text-[15px] text-foreground/60">Ta note bougera dès ton premier dimanche joué.</p>
       )}
 
-      <Bareme />
+      {!joueurBola && !horsSfl && <Bareme />}
     </section>
   );
 }

@@ -1,5 +1,6 @@
 // Ce que les routes de comptes partagent côté SERVEUR : le client Supabase à
-// clé secrète, et la liste des pseudos et des noms déjà pris.
+// clé secrète, la liste des pseudos et des noms déjà pris, et les noms des
+// joueurs Bola (que l'admin ne donne pas à un nouveau joueur de l'effectif).
 //
 // La clé secrète n'existe que dans les variables de Vercel (production) et ne
 // part jamais au navigateur. Sans elle, les routes répondent « fermé ».
@@ -73,4 +74,34 @@ export async function dejaPris(sb: SupabaseClient, sauf?: string) {
   for (const n of roster) noms.add(n.toLowerCase());
   for (const a of ACCOUNTS) noms.add(a.name.toLowerCase());
   return { pseudos, noms };
+}
+
+/**
+ * Les noms (en minuscules : nom et nom affiché) des joueurs Bola : venus par
+ * un parrain ou un lien d'équipe (parrainages), absents de l'effectif. Un
+ * joueur que l'admin ajoute à l'effectif sous l'un de ces noms prendrait le
+ * compte de ce joueur Bola, et toute sa SFL avec (28/10/2026).
+ */
+export async function nomsJoueursBola(sb: SupabaseClient): Promise<Map<string, string>> {
+  const { data: filleuls, error } = await sb.from("parrainages").select("filleul");
+  if (error) throw error;
+  const ids = new Set(((filleuls ?? []) as { filleul: string }[]).map((f) => f.filleul));
+  const noms = new Map<string, string>();
+  if (ids.size === 0) return noms;
+  type Profil = { id: string; name: string; nom_affiche?: string | null };
+  // nom_affiche : absent avant la migration de la base (aperçus), comme dans dejaPris.
+  let lu = await sb.from("profiles").select("id, name, nom_affiche");
+  if (lu.error) lu = (await sb.from("profiles").select("id, name")) as typeof lu;
+  if (lu.error) throw lu.error;
+  const profils = (lu.data ?? []) as Profil[];
+  const { data: doc } = await sb.from("saison").select("data").eq("id", 1).maybeSingle();
+  const roster = new Set(
+    ((doc as { data?: { roster?: { name: string }[] } } | null)?.data?.roster ?? []).map((r) => r.name)
+  );
+  for (const p of profils) {
+    if (!ids.has(p.id) || roster.has(p.name)) continue;
+    noms.set(p.name.toLowerCase(), p.id);
+    if (p.nom_affiche) noms.set(p.nom_affiche.toLowerCase(), p.id);
+  }
+  return noms;
 }

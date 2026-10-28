@@ -96,7 +96,7 @@ import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
 import { DISPOS_AFFICHEES, inscrits, libelleJour, listerDispos, momentDeLHeure, placesLibres, prochainsJours, type Dispo, type Partie } from "@/lib/sfl/matchs";
 import { cleMoment, meilleurMoment, terrainPropose, type MomentPropose } from "@/lib/sfl/proposition";
 import { useMyPlayer } from "@/components/sfl/player-provider";
-import { useHorsSfl } from "@/hooks/use-hors-sfl";
+import { useHorsSflEtat } from "@/hooks/use-hors-sfl";
 import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
 import { usePresence } from "@/hooks/use-presence";
 import { joueursDeLaFeuille } from "@/lib/sfl/presence-feuille";
@@ -416,7 +416,11 @@ export default function MapPage() {
   const admin = !!session?.admin;
   const p = usePresence();
   const { player, me } = useMyPlayer();
-  const horsSfl = useHorsSfl();
+  // Joueur Bola (true), joueur SFL (false), ou pas encore su (null : la
+  // toute première ouverture d'un compte) : dans le doute, rien de la SFL
+  // (28/10/2026).
+  const horsSflEtat = useHorsSflEtat();
+  const sansSfl = horsSflEtat !== false;
   const aujourdhui = useAujourdhui();
   const heure = useHeure();
   // La J3, dernier dimanche avant les divisions (lib/sfl/divisions.ts) : sa fiche le dit ;
@@ -481,7 +485,7 @@ export default function MapPage() {
   // Un joueur Bola (venu par un parrain, hors de la saison) ne voit rien de
   // la SFL (Sabri, 26/10 : « le côté SFL doit lui être invisible »).
   const ligue = useMemo<MatchMap[]>(() => {
-    if (horsSfl) return [];
+    if (sansSfl) return [];
     const passee = (m: JourneeMeta) => {
       if (journeeJouee(saison, m.j)) return true;
       const e = ecartJours(m.date, aujourdhui);
@@ -564,7 +568,7 @@ export default function MapPage() {
       },
       ...recente,
     ];
-  }, [horsSfl, saison, matchsDe, player.name, aujourdhui, heure, p.heure, p.lieu, p.jour, p.mine, p.effectif, p.presents]);
+  }, [sansSfl, saison, matchsDe, player.name, aujourdhui, heure, p.heure, p.lieu, p.jour, p.mine, p.effectif, p.presents]);
 
   // Les matchs ouverts par les joueurs : un public montre ses places libres,
   // un privé n'apparaît qu'à ceux qui en sont.
@@ -980,12 +984,13 @@ export default function MapPage() {
 
   const ios = useEstIos();
 
-  // Les joueurs, ville par ville, du mieux noté au moins bien noté.
+  // Les joueurs, ville par ville, du mieux noté au moins bien noté. Ce sont
+  // ceux de la SFL : un joueur Bola ne les voit pas (28/10/2026).
   const revVilles = useVillesRevision();
   const revPhotos = usePhotoRevision();
   const revNoms = useIdentitesRevision();
   const villes = useMemo<VillePlan[]>(() => {
-    if (revVilles < 0) return [];
+    if (revVilles < 0 || sansSfl) return [];
     void revPhotos;
     void revNoms;
     const parVille = new Map<string, VillePlan>();
@@ -1002,7 +1007,7 @@ export default function MapPage() {
     }
     for (const g of parVille.values()) g.joueurs.sort((a, b) => b.note - a.note || a.affiche.localeCompare(b.affiche));
     return [...parVille.values()];
-  }, [players, revVilles, revPhotos, revNoms]);
+  }, [players, revVilles, revPhotos, revNoms, sansSfl]);
   // Le filtre Contrats : seules les cibles du dimanche, chacune avec son
   // contrat. L'horloge des missions recalcule tout chaque minute : les cibles
   // passent par une chaîne, pour que le plan ne redessine ses joueurs que
@@ -1011,7 +1016,8 @@ export default function MapPage() {
   const [contrats, setContrats] = useState(false);
   const ciblesCle = useMemo(() => JSON.stringify(missions ? [...ciblesDuDimanche(missions)] : []), [missions]);
   const cibles = useMemo(() => new Map(JSON.parse(ciblesCle) as [string, ContratPlan][]), [ciblesCle]);
-  const enContrats = contrats && cibles.size > 0;
+  // Les contrats sont ceux du dimanche de la SFL : pas pour un joueur Bola.
+  const enContrats = !sansSfl && contrats && cibles.size > 0;
   const villesVues = useMemo(() => (enContrats ? villesDesCibles(villes, cibles) : villes), [enContrats, villes, cibles]);
   // Allumer le filtre cadre le plan sur le foyer des cibles ; l'éteindre le ramène sur les matchs.
   const [cadrage, setCadrage] = useState<{ lieux: { lat: number; lng: number }[]; n: number } | null>(null);
@@ -1200,7 +1206,7 @@ export default function MapPage() {
                     },
                   ]
                 : []),
-              ...(cibles.size > 0
+              ...(!sansSfl && cibles.size > 0
                 ? [
                     {
                       id: "contrats",
@@ -1220,7 +1226,7 @@ export default function MapPage() {
               },
             ]}
             raccourcis={[
-              ...(villes.length > 0 || !!me
+              ...(!sansSfl && (villes.length > 0 || !!me)
                 ? [
                     {
                       id: "catalogue",
@@ -1656,6 +1662,7 @@ export default function MapPage() {
           heureInitial={ouvrir.heure}
           moi={moi}
           ici={toi}
+          sansTerrainParDefaut={sansSfl}
           onSfl={
             admin
               ? () => {

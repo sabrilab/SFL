@@ -191,6 +191,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Création du compte impossible pour l'instant." }, { status: 500 });
   }
 
+  // Validé d'office, il doit être noté filleul : c'est ce qui le garde en
+  // mode Bola (hors_sfl). Sans cette ligne, il voyait toute la SFL ; on
+  // défait le compte, comme pour la fiche (28/10/2026). Un lien d'équipe
+  // sans créateur (compte effacé) est noté sans parrain.
+  if (entre) {
+    const capitaine = lien?.cree_par ? { id: lien.cree_par, code: null, sfl: await joueurSfl(sb, lien.cree_par) } : null;
+    const { error: errParrainage } = lien
+      ? await noterFilleul(sb, id, capitaine, "equipe", lien.equipe_id)
+      : await noterFilleul(sb, id, parrain, corps.canal === "code" ? "code" : "lien");
+    if (errParrainage) {
+      await sb.auth.admin.deleteUser(id).catch(() => {});
+      return NextResponse.json({ error: "Création du compte impossible pour l'instant." }, { status: 500 });
+    }
+  }
+
   if (lien) {
     await sb.from("equipe_liens").update({ utilisations: lien.utilisations + 1 }).eq("jeton", lien.jeton);
     // L'équipe l'attend ; si l'invitation échoue, le compte reste valable.
@@ -198,12 +213,6 @@ export async function POST(req: NextRequest) {
       .from("equipe_membres")
       .insert({ equipe_id: lien.equipe_id, joueur: id, statut: "invite", invite_par: lien.cree_par })
       .then(() => {}, () => {});
-    if (lien.cree_par) {
-      const capitaine = { id: lien.cree_par, code: null, sfl: await joueurSfl(sb, lien.cree_par) };
-      await noterFilleul(sb, id, capitaine, "equipe", lien.equipe_id);
-    }
-  } else if (parrain) {
-    await noterFilleul(sb, id, parrain, corps.canal === "code" ? "code" : "lien");
   }
 
   return NextResponse.json({ ok: true, pseudo: f.pseudo, name, entre });

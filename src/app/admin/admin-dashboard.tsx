@@ -74,6 +74,7 @@ import { ArbitresAdmin } from "@/components/sfl/admin/arbitres";
 import { ResultatsVotes } from "@/components/sfl/admin/resultats-votes";
 import { chercherJoueurs } from "@/lib/sfl/recherche-joueur";
 import { useSession } from "@/hooks/use-session";
+import { jetonServeur } from "@/lib/sfl/auth/session";
 import { Confirmer, type Confirmation } from "@/components/sfl/admin/confirmer";
 import { Corbeille } from "@/components/sfl/admin/corbeille";
 import { nommer, remettre, retirer, type ElementCorbeille } from "@/lib/sfl/saisie/corbeille";
@@ -144,9 +145,36 @@ export function AdminDashboard() {
   const [metaJ, setMetaJ] = useState<number | null>(null);
   const [playerIndex, setPlayerIndex] = useState<number | null>(null);
   const [newPlayerOpen, setNewPlayerOpen] = useState(false);
+  // Les joueurs Bola (hors de l'effectif), nom exact → pseudo : un nouveau
+  // joueur qui porte le nom de l'un d'eux hériterait de son compte
+  // (28/10/2026). L'admin confirme donc que c'est bien lui (il passe alors
+  // dans la SFL, avec son compte : `lier`), sinon il choisit un autre nom.
+  // Relus à chaque ouverture de la fenêtre ; /api/comptes/creer refait le
+  // contrôle si la lecture n'a pas abouti.
+  const [joueursBola, setJoueursBola] = useState<Map<string, string>>(() => new Map());
+  useEffect(() => {
+    if (!newPlayerOpen) return;
+    let annule = false;
+    (async () => {
+      const jeton = await jetonServeur();
+      if (!jeton) return;
+      const r = await fetch("/api/comptes/joueurs-bola", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jeton}` },
+      }).catch(() => null);
+      const j = r?.ok
+        ? ((await r.json().catch(() => null)) as { joueurs?: { name: string; username: string }[] } | null)
+        : null;
+      if (!annule && j?.joueurs) setJoueursBola(new Map(j.joueurs.map((x) => [x.name, x.username])));
+    })();
+    return () => {
+      annule = true;
+    };
+  }, [newPlayerOpen]);
   // Le joueur qui vient d'être ajouté : ses accès s'affichent aussitôt, et
   // sa fiche n'ouvre qu'après — sinon elle se pose par-dessus et les masque.
   const [accesPour, setAccesPour] = useState<string | null>(null);
+  const [accesLier, setAccesLier] = useState(false);
   const [ficheApresAcces, setFicheApresAcces] = useState<number | null>(null);
   const [newJourneeOpen, setNewJourneeOpen] = useState(false);
   const [convocOpen, setConvocOpen] = useState(false);
@@ -920,21 +948,34 @@ export function AdminDashboard() {
         onOpenChange={setNewPlayerOpen}
         exists={(name) => rosterHasName(saison, name)}
         onCreate={(name) => {
-          const idx = saison.roster.length;
-          commit(addRoster(saison, newRosterPlayer(name)), `Nouveau joueur — ${name}`);
+          const ajouter = (lier: boolean) => {
+            const idx = saison.roster.length;
+            commit(addRoster(saison, newRosterPlayer(name)), `Nouveau joueur — ${name}`);
+            // Ajouter quelqu'un à l'effectif sans lui donner de quoi se
+            // connecter n'a aucun sens : ses accès arrivent d'abord, la fiche
+            // à compléter juste après.
+            setAccesLier(lier);
+            setAccesPour(name);
+            setFicheApresAcces(idx);
+          };
           setNewPlayerOpen(false);
-          // Ajouter quelqu'un à l'effectif sans lui donner de quoi se
-          // connecter n'a aucun sens : ses accès arrivent d'abord, la fiche
-          // à compléter juste après.
-          setAccesPour(name);
-          setFicheApresAcces(idx);
+          const pseudo = joueursBola.get(name);
+          if (pseudo === undefined) return ajouter(false);
+          setConfirmation({
+            titre: `${name} est déjà un joueur Bola (@${pseudo.replace(/^@/, "")}).`,
+            detail: "L'ajouter à l'effectif lui ouvre la SFL avec son compte. Si ce n'est pas lui, choisis un autre nom.",
+            action: "L'ajouter à la SFL",
+            faire: () => ajouter(true),
+          });
         }}
       />
       <AccesJoueur
-        key={accesPour ?? "aucun"}
+        key={`${accesPour ?? "aucun"}-${accesLier}`}
         nom={accesPour}
+        lier={accesLier}
         onClose={() => {
           setAccesPour(null);
+          setAccesLier(false);
           if (ficheApresAcces !== null) {
             setPlayerIndex(ficheApresAcces);
             setFicheApresAcces(null);

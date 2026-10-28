@@ -378,17 +378,31 @@ export async function inviter(id: number, playerId: string): Promise<void> {
   notifierMatch(id, "invitation");
 }
 
-/** L'organisateur annule son match : le serveur prévient les joueurs puis l'efface ; sans lui, on l'efface d'ici. */
+/**
+ * L'organisateur annule son match : le serveur prévient les joueurs puis l'efface ; sans lui, on l'efface d'ici.
+ * Un match à la feuille faite ne s'annule plus (409 ; la base le refuse aussi, 28/10/2026).
+ */
 export async function annuler(id: number): Promise<void> {
   const r = await appelNotifier({ id, type: "annule" });
+  if (r?.status === 409) throw new Error("match déjà joué");
   if (r?.ok && ((await r.json().catch(() => ({}))) as { annule?: boolean }).annule) return;
-  const { error } = await supabase().from("matchs").delete().eq("id", id);
+  // La base refuse sans erreur (rien d'effacé) un match déjà joué : le dire.
+  const { data, error } = await supabase().from("matchs").delete().eq("id", id).select("id");
   if (error) throw error;
+  if (!data?.length) throw new Error("match déjà joué");
 }
 
-/** Les joueurs de la ligue, pour les ajouter par leur identifiant ou leur nom. */
-export async function listerProfils(): Promise<Profil[]> {
-  const { data, error } = await supabase().from("profiles").select("id, name, username").order("name");
+/**
+ * Les joueurs de la ligue, pour les ajouter par leur identifiant ou leur nom :
+ * les comptes acceptés et finis seulement (28/10/2026). Un compte en attente,
+ * ou revenu de Google sans avoir choisi son pseudo (un nom provisoire), ne se
+ * proposait pas moins qu'un autre.
+ */
+export async function listerProfils({ tous = false }: { tous?: boolean } = {}): Promise<Profil[]> {
+  let requete = supabase().from("profiles").select("id, name, username");
+  // `tous` : un annuaire (le nom d'une conversation déjà ouverte), pas une invitation.
+  if (!tous) requete = requete.eq("valide", true).eq("pseudo_a_choisir", false);
+  const { data, error } = await requete.order("name");
   if (error) throw error;
   return (data ?? []) as Profil[];
 }
@@ -463,6 +477,8 @@ export function direErreur(e: unknown): string {
   if (/complet/i.test(msg)) return "Le match est complet.";
   if (/duplicate|already exists|23505/i.test(msg)) return "Ce joueur est déjà dans le match.";
   if (/feuille close/i.test(msg)) return "La feuille est close : 24 h sont passées.";
+  if (/déjà joué/i.test(msg)) return "Ce match est déjà joué : sa feuille est faite.";
+  if (/pas commencé/i.test(msg)) return "La feuille s'ouvre au coup d'envoi.";
   if (/feuille réservée/i.test(msg)) return "Seul l'organisateur tient la feuille.";
   if (/row-level security|42501/i.test(msg)) return "Ce match ne t'est pas ouvert.";
   if (/places_check|check constraint/i.test(msg)) return "Entre 2 et 22 places.";

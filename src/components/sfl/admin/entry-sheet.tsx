@@ -494,7 +494,7 @@ export function PlayerSheet({
   );
 }
 
-/** Création d'un joueur : saisie du nom (unicité vérifiée). */
+/** Création d'un joueur : saisie du nom (unicité vérifiée : l'effectif, et les joueurs Bola depuis le 28/10). */
 export function NewPlayerSheet({
   open,
   onOpenChange,

@@ -23,7 +23,7 @@ interface Acces {
   deja?: boolean;
 }
 
-async function appel(route: string, name: string): Promise<Acces & { error?: string }> {
+async function appel(route: string, name: string, lier = false): Promise<Acces & { error?: string }> {
   const jeton = await jetonServeur();
   if (!jeton) {
     return {
@@ -35,17 +35,20 @@ async function appel(route: string, name: string): Promise<Acces & { error?: str
   const r = await fetch(route, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${jeton}` },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(lier ? { name, lier } : { name }),
   });
   return (await r.json()) as Acces & { error?: string };
 }
 
 export function AccesJoueur({
   nom,
+  lier = false,
   onClose,
 }: {
   /** Le joueur qui vient d'être ajouté — null ferme la fenêtre. */
   nom: string | null;
+  /** Un joueur Bola que l'admin a confirmé : son compte est rattaché à l'effectif. */
+  lier?: boolean;
   onClose: () => void;
 }) {
   const [acces, setAcces] = useState<Acces | null>(null);
@@ -61,7 +64,7 @@ export function AccesJoueur({
     // à zéro sans que l'effet ait à le faire.
     (async () => {
       try {
-        const j = await appel("/api/comptes/creer", nom);
+        const j = await appel("/api/comptes/creer", nom, lier);
         if (annule) return;
         if (j.error) setErreur(j.error);
         else setAcces(j);
@@ -73,7 +76,7 @@ export function AccesJoueur({
     return () => {
       annule = true;
     };
-  }, [nom]);
+  }, [nom, lier]);
 
   async function provisoire() {
     if (!nom) return;

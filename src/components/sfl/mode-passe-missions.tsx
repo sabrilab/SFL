@@ -13,11 +13,16 @@
 //     cette saison (le barème vient des constantes de lib/sfl/missions.ts et
 //     lib/sfl/pronos.ts : il suit leurs réglages) ;
 //   · le journal : d'où vient chaque XP, pertes en rouge.
+// Un joueur Bola (hors de la SFL) n'a ni les missions du dimanche ni ce qui
+// ne s'y gagne (jouer le dimanche, contrat, défi, vote, trois sur trois) :
+// il garde le reste et son journal (28/10/2026).
 
 import { useMemo } from "react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { MissionsBola } from "@/components/sfl/actus/missions";
+import { useJoueurBola } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
+import { useHorsSfl } from "@/hooks/use-hors-sfl";
 import { useMissions } from "@/hooks/use-missions";
 import {
   FELICITATIONS_DONNEES_JOURNEE,
@@ -68,6 +73,15 @@ interface Source {
   de: (l: LigneXp) => boolean;
   /** Montrée seulement si elle a déjà rapporté (arbitrer). */
   discrete?: boolean;
+  /** Ne se gagne qu'au dimanche de la SFL : pas pour un joueur Bola. */
+  sfl?: boolean;
+}
+
+/** Le joueur connecté joue en Bola, hors de la SFL (la saison ou la base le disent). */
+export function useHorsDeLaSfl(): boolean {
+  const bola = useJoueurBola();
+  const hors = useHorsSfl();
+  return bola || hors;
 }
 
 const SOURCES: Source[] = [
@@ -77,6 +91,7 @@ const SOURCES: Source[] = [
     gain: `+${XP_DIMANCHE}`,
     detail: "sur la feuille de match",
     de: (l) => l.quoi === "Dimanche joué",
+    sfl: true,
   },
   ...(["contrat", "defi", "ligue"] as const).map((c) => {
     const f = fourchette(c);
@@ -86,6 +101,7 @@ const SOURCES: Source[] = [
       gain: f.gain,
       detail: `${f.perte} si ratée`,
       de: (l: LigneXp) => l.mission?.creneau === c,
+      sfl: true,
     };
   }),
   {
@@ -94,6 +110,7 @@ const SOURCES: Source[] = [
     gain: `+${XP_PARFAIT}`,
     detail: "les trois missions du dimanche",
     de: (l) => !!l.parfait,
+    sfl: true,
   },
   {
     cle: "flair",
@@ -150,6 +167,7 @@ function Attente() {
 }
 
 function Sources({ b, saison }: { b: BilanXp; saison: number }) {
+  const horsSfl = useHorsDeLaSfl();
   const lignes = useMemo(() => b.lignes.filter((l) => l.saison === saison), [b.lignes, saison]);
   return (
     <section className="flex flex-col" aria-labelledby="titre-gagner-xp">
@@ -162,6 +180,7 @@ function Sources({ b, saison }: { b: BilanXp; saison: number }) {
       {SOURCES.map((s) => {
         const miennes = lignes.filter(s.de);
         if (s.discrete && miennes.length === 0) return null;
+        if (s.sfl && horsSfl) return null;
         const total = miennes.reduce((a, l) => a + l.xp, 0);
         const fois = miennes.filter((l) => l.xp > 0).length;
         return (
@@ -209,9 +228,10 @@ function Journal({ b, saison }: { b: BilanXp; saison: number }) {
 /** La face Missions du mode Passe : elle défile, le reste du mode reste en place. */
 export function VueMissions({ b, saison }: { b: BilanXp; saison: number }) {
   const mm = useMissions();
+  const horsSfl = useHorsDeLaSfl();
   return (
     <div className="mp-missions">
-      {mm ? <MissionsBola /> : <Attente />}
+      {!horsSfl && (mm ? <MissionsBola /> : <Attente />)}
       <Sources b={b} saison={saison} />
       <Journal b={b} saison={saison} />
     </div>
@@ -221,6 +241,7 @@ export function VueMissions({ b, saison }: { b: BilanXp; saison: number }) {
 /** Des missions à signer : le mode s'ouvre alors sur elles. */
 export function useMissionsASigner(): number {
   const mm = useMissions();
-  if (!mm || mm.apercu || mm.phase !== "ouvert") return 0;
+  const horsSfl = useHorsDeLaSfl();
+  if (horsSfl || !mm || mm.apercu || mm.phase !== "ouvert") return 0;
   return mm.lignes.filter((l) => !l.reponse).length;
 }

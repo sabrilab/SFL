@@ -15,10 +15,15 @@
 // comme l'inscription autonome : « Allow new users to sign up » peut rester
 // fermé dans Supabase. L'appelant prouve qu'il est admin par son jeton de
 // session (« Authorization: Bearer … »).
+//
+// Un nom déjà porté par un joueur Bola (venu par un parrain, hors de
+// l'effectif) est refusé (409) : ce compte n'est peut-être pas celui du
+// nouveau joueur. Sauf si l'admin a confirmé que c'est bien lui (`lier`) :
+// son compte est alors rattaché (deja), et il passe dans la SFL.
 
 import { NextRequest, NextResponse } from "next/server";
 import { identifiantPour, motDePasseProvisoire } from "@/lib/sfl/auth/derive.server";
-import { appelant, estAdmin, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { appelant, estAdmin, nomsJoueursBola, serveur } from "@/lib/sfl/serveur-ligue.server";
 
 const email = (user: string) => `${user}@sfl.local`;
 
@@ -29,7 +34,7 @@ export async function POST(req: NextRequest) {
   if (!moi) return NextResponse.json({ error: "Session serveur requise." }, { status: 401 });
   if (!(await estAdmin(sb, moi.id))) return NextResponse.json({ error: "Réservé à l'admin." }, { status: 403 });
 
-  const { name } = (await req.json().catch(() => ({}))) as { name?: string };
+  const { name, lier } = (await req.json().catch(() => ({}))) as { name?: string; lier?: boolean };
   if (!name?.trim()) return NextResponse.json({ error: "Nom manquant." }, { status: 400 });
   const joueur = name.trim();
 
@@ -38,10 +43,20 @@ export async function POST(req: NextRequest) {
   //     provisoire, depuis Les accès.
   const { data: existant } = await sb
     .from("profiles")
-    .select("username")
+    .select("id, username")
     .eq("name", joueur)
     .maybeSingle();
   if (existant) {
+    // Le compte d'un joueur Bola, hors de l'effectif : sans confirmation de
+    // l'admin, ce n'est pas le sien. Répondre « déjà inscrit » donnait son
+    // compte, et la SFL, au nouveau venu de l'effectif (28/10/2026).
+    if (lier !== true) {
+      const bola = await nomsJoueursBola(sb).catch(() => null);
+      if (!bola) return NextResponse.json({ error: "Lecture des comptes impossible. Réessaie." }, { status: 500 });
+      if ([...bola.values()].includes((existant as { id: string }).id)) {
+        return NextResponse.json({ error: "Ce nom est celui d'un joueur Bola. Choisis-en un autre." }, { status: 409 });
+      }
+    }
     const user = (existant as { username: string }).username.replace(/^@/, "");
     return NextResponse.json({ user, deja: true });
   }

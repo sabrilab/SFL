@@ -49,6 +49,7 @@ import {
   useFenetre,
   useRetourDEcran,
 } from "@/components/ui/sheet";
+import { useHorsSfl } from "@/hooks/use-hors-sfl";
 import { useIdentites } from "@/hooks/use-identites";
 import { useGrandEcran } from "@/hooks/use-media-query";
 import { rankPlayers } from "@/lib/sfl/engine";
@@ -126,11 +127,13 @@ function EcranCarte({ viewed }: { viewed: ViewedCard }) {
   const fenetre = useFenetre();
   const retour = useRetourDEcran();
   const profils = useProfilsOuverts();
+  const horsSfl = useHorsSfl();
 
   // Un joueur masqué ne montre que sa carte, sauf à ceux qu'il suit et qui le
   // suivent (useProfilsOuverts) ; un joueur d'une autre saison, pas de profil.
   const joueur = viewed.joueur && profils.ouvert(viewed.joueur) ? viewed.joueur : null;
-  const aUnProfil = !!joueur && joueur !== me && allPlayers.some((p) => p.name === joueur);
+  // Le profil, c'est sa saison SFL : un joueur Bola (hors de la SFL) n'en voit pas (28/10/2026).
+  const aUnProfil = !!joueur && joueur !== me && !horsSfl && allPlayers.some((p) => p.name === joueur);
 
   return (
     <>
