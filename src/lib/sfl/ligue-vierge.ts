@@ -64,6 +64,8 @@ export interface MatchBola {
   joueurs: LigneBola[];
   /** L'état de sa confirmation par les joueurs (ligue_vierge) ; absent : il compte. */
   etat?: EtatResultat | null;
+  /** Le match passe par la confirmation (faux : saisi avant le 28/10). */
+  requise?: boolean;
 }
 
 /** Le quorum des règles : 8 présents, un 4 contre 4. */

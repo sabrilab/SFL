@@ -4,12 +4,15 @@
 // lib/sfl/confirmation-resultat.ts), sous son score : dans la fiche du
 // match, dans Bola (mes derniers matchs) et dans la feuille de
 // l'organisateur.
-//   · tout le monde : l'état en mono (« En attente · 3/7 », « Contesté »,
-//     « Compte », « Ne compte pas ») et, tant que la fenêtre est ouverte,
-//     jusqu'à quelle heure ;
-//   · un joueur de la feuille qui n'a pas répondu : « Confirmer le
-//     résultat », qui ouvre l'écran (resultat-a-confirmer.tsx) ; une fois
-//     répondu, son sceau ;
+//   · tout le monde : l'état en mono (« En attente · 3/4 », les
+//     confirmations vers le seuil ; « Contesté », « Validé », « Non
+//     validé ») et, à droite, la suite : « validé demain à 0h46 » si
+//     personne n'a infirmé, sinon l'heure limite ; l'organisateur lit « à
+//     corriger avant… » tant que sa fenêtre de correction est ouverte
+//     (issueResultat) ;
+//   · un joueur de la feuille qui n'a pas répondu : « Voir le résultat »,
+//     qui ouvre l'écran (resultat-a-confirmer.tsx) ; une fois répondu, son
+//     sceau ;
 //   · l'organisateur : chaque joueur, ✓, ✕ ou ·, et le motif sous un ✕, en
 //     direct (match_confirmations, realtime).
 // Rien pour un match saisi avant le 28/10 : il compte tel quel.
@@ -19,6 +22,7 @@ import { ouvrirResultat } from "@/components/sfl/invitation-carte";
 import { Nom } from "@/components/sfl/nom";
 import { ReponseScellee } from "@/components/sfl/reponse-scellee";
 import {
+  issueResultat,
   libelleEtat,
   reponseOuverte,
   type BilanFeuille,
@@ -27,13 +31,6 @@ import {
 import { bilansFeuilles, reponsesDuMatch } from "@/lib/sfl/matchs";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
-
-const heure = (iso: string) =>
-  new Intl.DateTimeFormat("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Paris",
-  }).format(new Date(iso));
 
 export type Bilan = BilanFeuille & { reponses?: ReponseDuJoueur[] | null };
 
@@ -109,6 +106,7 @@ export function BilanResultat({
   const b = useBilan(matchId, organise, demo);
   if (!b || !b.requise || !b.etat) return null;
   const ouverte = reponseOuverte(b);
+  const suite = issueResultat(b, organise);
   const aRepondre = b.destinataire && !b.mienne && ouverte;
   const reponses = organise ? (b.reponses ?? []) : [];
   return (
@@ -122,9 +120,9 @@ export function BilanResultat({
         >
           {libelleEtat(b.etat, b.c, b.n)}
         </span>
-        {ouverte && b.jusqua && (
-          <span className="mono-label text-muted-foreground">
-            jusqu&apos;à {heure(b.jusqua)}
+        {suite && (
+          <span className="mono-label text-right text-muted-foreground">
+            {suite}
           </span>
         )}
       </div>
@@ -134,7 +132,7 @@ export function BilanResultat({
           onClick={() => ouvrirResultat(matchId)}
           className="bouton-principal flex h-12 items-center justify-center text-[15px] font-semibold"
         >
-          Confirmer le résultat
+          Voir le résultat
         </button>
       )}
       {b.mienne && (

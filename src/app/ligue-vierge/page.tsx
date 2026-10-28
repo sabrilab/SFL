@@ -22,8 +22,9 @@
 // Depuis le 28/10, les joueurs confirment le résultat (lib/sfl/
 // confirmation-resultat.ts) : un match en attente, contesté ou qui ne compte
 // pas le dit à la place de « Amical » ; mes matchs des derniers jours portent
-// leur état et « Confirmer le résultat » (bilan-resultat.tsx), puisque la Map
-// ne montre plus un match passé ; l'organisateur voit les réponses dans sa
+// leur état et « Voir le résultat » (bilan-resultat.tsx), puisque la Map
+// ne montre plus un match passé ; leur score touché rouvre le résultat
+// entier, même répondu (en lecture) ; l'organisateur voit les réponses dans sa
 // feuille, que ?feuille=id ouvre (la notification d'un « infirme »).
 //
 // Sur tablette et ordinateur (dès 768 px), la largeur des Actus
@@ -56,6 +57,7 @@ import { carteNeutre } from "@/components/sfl/qui-vient";
 import { useSeason } from "@/components/sfl/season-provider";
 import { FeuilleBola } from "@/components/sfl/matchs/feuille-bola";
 import { BilanResultat } from "@/components/sfl/matchs/bilan-resultat";
+import { ouvrirResultat } from "@/components/sfl/invitation-carte";
 import { libelleEtat } from "@/lib/sfl/confirmation-resultat";
 import { Nom } from "@/components/sfl/nom";
 import { EnteteLigue } from "@/components/sfl/choix-ligue";
@@ -201,25 +203,43 @@ const recent = (jour: string) => Date.now() - Date.parse(`${jour}T00:00:00Z`) < 
 function MatchJoue({ m, bilan = false }: { m: MatchCompte; bilan?: boolean }) {
   const format = useFormatCarte();
   const mvps = m.joueurs.filter((j) => j.mvp);
+  // Le bilan dit déjà l'état, en bas : pas deux fois (28/10).
+  const avecBilan = bilan && m.id > 0 && recent(m.jour);
+  // Le score touché rouvre le résultat entier, en lecture (match à confirmer seulement).
+  const revoir = bilan && m.id > 0 && !!m.requise;
+  const score = (
+    <>
+      <span className="mono-label text-muted-foreground">Clairs</span>
+      <span className="text-[36px] leading-none font-extrabold tracking-tight tabular-nums">
+        {m.scoreClairs} <span className="text-foreground/25">–</span> {m.scoreFonces}
+      </span>
+      <span className="mono-label text-muted-foreground">Foncés</span>
+    </>
+  );
   return (
     <article className="glass flex flex-col gap-4 rounded-[26px] p-[18px]">
       <div className="flex items-baseline justify-between">
         <span className="mono-label text-foreground/40">
           {libelleJour(m.jour)} · {m.heure}
         </span>
-        {m.etat && m.etat !== "compte" ? (
+        {avecBilan ? null : m.etat && m.etat !== "compte" ? (
           <span className="mono-label text-foreground/40">{libelleEtat(m.etat)}</span>
         ) : (
           !m.valide && <span className="mono-label text-foreground/40">Amical</span>
         )}
       </div>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
-        <span className="mono-label text-muted-foreground">Clairs</span>
-        <span className="text-[36px] leading-none font-extrabold tracking-tight tabular-nums">
-          {m.scoreClairs} <span className="text-foreground/25">–</span> {m.scoreFonces}
-        </span>
-        <span className="mono-label text-muted-foreground">Foncés</span>
-      </div>
+      {revoir ? (
+        <button
+          type="button"
+          onClick={() => ouvrirResultat(m.id)}
+          aria-label={`Résultat du match : Clairs ${m.scoreClairs}, Foncés ${m.scoreFonces}`}
+          className="bouton-discret grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-2xl py-1 text-center"
+        >
+          {score}
+        </button>
+      ) : (
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">{score}</div>
+      )}
       {mvps.length > 0 && (
         <div className="flex flex-col items-center gap-2">
           <span className="mono-label text-foreground/40">{mvps.length > 1 ? "MVP ex æquo" : "MVP"}</span>
@@ -236,7 +256,7 @@ function MatchJoue({ m, bilan = false }: { m: MatchCompte; bilan?: boolean }) {
           </div>
         </div>
       )}
-      {bilan && m.id > 0 && recent(m.jour) && <BilanResultat matchId={m.id} className="border-t border-contraste/[0.06] pt-4" />}
+      {avecBilan && <BilanResultat matchId={m.id} className="border-t border-contraste/[0.06] pt-4" />}
     </article>
   );
 }

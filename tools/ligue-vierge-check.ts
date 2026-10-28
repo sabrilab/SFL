@@ -2,7 +2,7 @@
 // officielles (ilyesbensal/BOLA, docs/gameplay/03-mode-bola.md §7) :
 //   npx tsx tools/ligue-vierge-check.ts
 import assert from "node:assert/strict";
-import { etatResultat, DELAI_REPONSE_MS, libelleEtat, maLigne } from "../src/lib/sfl/confirmation-resultat";
+import { etatResultat, DELAI_REPONSE_MS, heureLimite, issueResultat, libelleEtat, maLigne, statsCourtes, statsLues } from "../src/lib/sfl/confirmation-resultat";
 import { classementAVie, compterMatchs, coupDEnvoiPasse, mvpsDuMatch, type LigneBola, type MatchBola } from "../src/lib/sfl/ligue-vierge";
 
 const l = (name: string, equipe: "clairs" | "fonces", buts: number, passes: number): LigneBola => ({ id: name, name, equipe, buts, passes });
@@ -97,9 +97,27 @@ assert.equal(etatResultat({ ...base, c: 3, i: 1, maintenant: a(DELAI_REPONSE_MS 
 assert.equal(etatResultat({ ...base, c: 3, i: 1, maintenant: a(DELAI_REPONSE_MS) }), "ne_compte_pas");
 assert.equal(etatResultat({ ...base, c: 4, i: 3, maintenant: a(1) }), "compte"); // la moitié confirme
 assert.equal(etatResultat({ ...base, n: 8, c: 4, i: 4, maintenant: a(1) }), "ne_compte_pas"); // jamais atteint : la base fige au 1er seuil
-assert.equal(etatResultat({ ...base, n: 0, c: 0, i: 0, maintenant: a(1) }), "compte");
+assert.equal(etatResultat({ ...base, n: 0, c: 0, i: 0, maintenant: a(1) }), "en_attente"); // sans destinataire : les 24 h
+assert.equal(etatResultat({ ...base, n: 0, c: 0, i: 0, maintenant: a(DELAI_REPONSE_MS) }), "compte");
 assert.equal(etatResultat({ ...base, requise: false, c: 0, i: 5, maintenant: a(1) }), "compte");
-assert.equal(libelleEtat("en_attente", 3, 7), "En attente · 3/7");
+assert.equal(libelleEtat("en_attente", 3, 7), "En attente · 3/4"); // vers le seuil
+assert.equal(libelleEtat("conteste", 2, 8), "Contesté · 2/4");
+assert.equal(libelleEtat("compte"), "Validé");
+assert.equal(libelleEtat("ne_compte_pas"), "Non validé");
+// L'heure limite, heure de Paris, au format de l'app ; « demain » s'il le faut.
+const soirP = new Date("2026-10-28T19:46:00Z"); // 20h46 à Paris
+assert.deepEqual(heureLimite("2026-10-28T23:46:00Z", soirP), { h: "0h46", demain: true, autreJour: null });
+assert.deepEqual(heureLimite("2026-10-28T21:05:00Z", soirP), { h: "22h05", demain: false, autreJour: null });
+const ouvert = { etat: "en_attente" as const, i: 0, jusqua: "2026-10-28T23:46:00Z", corrigerJusqua: "2026-10-28T23:46:00Z" };
+assert.equal(issueResultat(ouvert, false, soirP), "validé demain à 0h46");
+assert.equal(issueResultat({ ...ouvert, etat: "conteste", i: 1 }, false, soirP), "jusqu'à demain 0h46");
+assert.equal(issueResultat({ ...ouvert, etat: "conteste", i: 1 }, true, soirP), "à corriger avant demain 0h46");
+assert.equal(issueResultat({ ...ouvert, etat: "ne_compte_pas", i: 4 }, true, soirP), "à corriger avant demain 0h46");
+assert.equal(issueResultat({ ...ouvert, etat: "ne_compte_pas", i: 4 }, false, soirP), null);
+assert.equal(issueResultat({ ...ouvert, etat: "compte", i: 0 }, true, soirP), "modifiable jusqu'à demain 0h46");
+assert.equal(issueResultat(ouvert, false, new Date("2026-10-29T00:00:00Z")), null); // échu
+assert.equal(statsCourtes({ buts: 1, passes: 2 }), "1 B · 2 P");
+assert.equal(statsLues({ buts: 1, passes: 2 }), "1 but, 2 passes");
 assert.equal(maLigne({ equipe: "clairs", buts: 2, passes: 1 }), "2 buts · 1 passe");
 assert.equal(maLigne({ equipe: "absent", buts: 0, passes: 0 }), "Absent");
 

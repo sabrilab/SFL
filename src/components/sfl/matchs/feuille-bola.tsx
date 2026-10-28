@@ -14,7 +14,7 @@
 // part aux joueurs, qui la confirment ou l'infirment ; leurs réponses
 // s'affichent en tête de la feuille (bilan-resultat.tsx). Corriger une feuille
 // à laquelle des joueurs ont déjà répondu remet leurs réponses à zéro : on le
-// demande d'abord.
+// demande d'abord, dans la feuille même (pas une boîte du système).
 
 import { useMemo, useState } from "react";
 import { Minus, Plus } from "lucide-react";
@@ -98,6 +98,8 @@ export function FeuilleBola({
   const [lignes, setLignes] = useState<Ligne[]>(() => lignesDe(partie));
   const [score, setScore] = useState({ clairs: partie.scoreClairs ?? 0, fonces: partie.scoreFonces ?? 0 });
   const [envoi, setEnvoi] = useState(false);
+  /** La correction attend son accord : les réponses des joueurs repartiront à zéro. */
+  const [raz, setRaz] = useState(false);
   const bilan = useBilan(partie.saisiLe ? partie.id : 0, true, apercu ? (demoBilan ?? null) : undefined);
 
   const butsDe = (e: "clairs" | "fonces") => lignes.filter((l) => l.equipe === e).reduce((s, l) => s + l.buts, 0);
@@ -115,6 +117,7 @@ export function FeuilleBola({
     const suivantes = lignes.map((l) => (l.playerId === id ? { ...l, ...patch } : l));
     // Le score suit les buts : il ne descend jamais sous ceux qu'on a marqués.
     const b = (e: "clairs" | "fonces") => suivantes.filter((l) => l.equipe === e).reduce((s, l) => s + l.buts, 0);
+    setRaz(false);
     setLignes(suivantes);
     setScore((s) => ({ clairs: Math.max(s.clairs, b("clairs")), fonces: Math.max(s.fonces, b("fonces")) }));
   }
@@ -127,7 +130,11 @@ export function FeuilleBola({
         onOpenChange(false);
         return;
       }
-      if (bilan?.requise && bilan.c + bilan.i > 0 && !window.confirm("Les réponses des joueurs repartent à zéro ?")) return;
+      if (bilan?.requise && bilan.c + bilan.i > 0 && !raz) {
+        setRaz(true);
+        return;
+      }
+      setRaz(false);
       await saisirFeuille(partie.id, {
         scoreClairs: score.clairs,
         scoreFonces: score.fonces,
@@ -216,14 +223,38 @@ export function FeuilleBola({
             ))}
           </div>
 
-          <button
-            type="button"
-            disabled={envoi || !coherent || presents < 2}
-            onClick={valider}
-            className="bouton-principal bouton--vert flex h-12 items-center justify-center text-[15px] font-semibold disabled:opacity-40"
-          >
-            {coherent ? `Valider · ${score.clairs} – ${score.fonces}` : "Plus de passes que de buts"}
-          </button>
+          {raz ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-center text-[14px] font-semibold text-muted-foreground">Les réponses des joueurs repartent à zéro.</p>
+              <div className="grid grid-cols-[auto_1fr] gap-2">
+                <button
+                  type="button"
+                  disabled={envoi}
+                  onClick={() => setRaz(false)}
+                  className="bouton-discret h-12 px-5 text-[15px] font-semibold text-muted-foreground"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  disabled={envoi}
+                  onClick={valider}
+                  className="bouton-principal flex h-12 items-center justify-center text-[15px] font-semibold disabled:opacity-40"
+                >
+                  {`Corriger · ${score.clairs} – ${score.fonces}`}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={envoi || !coherent || presents < 2}
+              onClick={valider}
+              className="bouton-principal bouton--vert flex h-12 items-center justify-center text-[15px] font-semibold disabled:opacity-40"
+            >
+              {coherent ? `Valider · ${score.clairs} – ${score.fonces}` : "Plus de passes que de buts"}
+            </button>
+          )}
         </div>
       </SheetContent>
     </Sheet>

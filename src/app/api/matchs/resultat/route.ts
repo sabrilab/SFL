@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
 
   const { data: feuille } = await sb
     .from("match_feuilles")
-    .select("instantane, resultat_notifie_le")
+    .select("instantane, resultat_notifie_le, destinataires")
     .eq("match_id", id)
     .eq("version", version)
     .maybeSingle();
@@ -104,30 +104,19 @@ export async function POST(req: NextRequest) {
       .select("version");
     if (!pris?.length) return NextResponse.json({ envoyes: 0, prevenus: 0 });
 
-    // Les destinataires : comme destinataires_feuille (supabase/schema.sql).
+    // Les destinataires : la liste figée de la version (match_feuilles).
+    const dest = new Set((feuille.destinataires as string[] | null) ?? []);
     const { data: lignes } = await sb
       .from("match_joueurs")
-      .select("player_id, statut, equipe, profiles ( valide, name )")
+      .select("player_id, profiles ( name )")
       .eq("match_id", id);
     type L = {
       player_id: string;
-      statut: string;
-      equipe: string | null;
-      profiles:
-        | { valide?: boolean; name?: string }
-        | { valide?: boolean; name?: string }[]
-        | null;
+      profiles: { name?: string } | { name?: string }[] | null;
     };
     const prof = (l: L) =>
       (Array.isArray(l.profiles) ? l.profiles[0] : l.profiles) ?? null;
-    const cibles = ((lignes ?? []) as L[]).filter(
-      (l) =>
-        l.player_id !== match.organisateur &&
-        !!prof(l)?.valide &&
-        (l.equipe === "clairs" ||
-          l.equipe === "fonces" ||
-          (l.equipe === "absent" && l.statut === "inscrit")),
-    );
+    const cibles = [...dest].map((player_id) => ({ player_id }));
     const noms = new Map(
       ((lignes ?? []) as L[]).map((l) => [
         l.player_id,

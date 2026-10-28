@@ -257,6 +257,16 @@ export async function mesResultatsAConfirmer(): Promise<ResultatAConfirmer[]> {
   return (data ?? []) as ResultatAConfirmer[];
 }
 
+/** Le résultat d'un match que je vois, même déjà répondu (en lecture) ; null pour un match saisi avant le 28/10. */
+export async function resultatDuMatch(id: number): Promise<ResultatAConfirmer | null> {
+  const { data, error } = await supabase().rpc("resultat_du_match", { m: id });
+  if (error) {
+    if (sansFonction(error)) return null;
+    throw error;
+  }
+  return data ? ({ ...(data as ResultatAConfirmer), lecture: true } as ResultatAConfirmer) : null;
+}
+
 /** Confirmer ou infirmer la version vue ; l'organisateur est prévenu d'un « infirme ». Renvoie le nouvel état. */
 export async function repondreResultat(id: number, version: number, reponse: ReponseResultat, motif?: string): Promise<EtatResultat> {
   const { data, error } = await supabase().rpc("repondre_resultat", {

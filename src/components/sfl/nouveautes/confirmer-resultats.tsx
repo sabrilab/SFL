@@ -9,7 +9,7 @@
 //      « Résultat du match » se pose dessous : le score, ma ligne, le MVP.
 //   2. « Confirme. Ou infirme. » : le bouton rond glisse jusqu'à
 //      « Confirmer », la grille de pixels s'allume, le sceau se pose ; puis
-//      le compteur passe de « En attente · 3/7 » à « Compte » (4 sur 7 :
+//      le compteur passe de « En attente · 3/4 » à « Validé » (4 sur 7 :
 //      la moitié confirme). La piste et sa
 //      grille sont celles de la réponse scellée (GrilleGlisse, scelle.css),
 //      menées par une horloge, comme nouveautes-27-10.tsx.
@@ -41,7 +41,7 @@ export function diaposConfirmerResultats(player: Player): Diapo[] {
     {
       visuel: <ConfirmeOuInfirme />,
       titre: "Confirme. Ou infirme.",
-      ligne: "Le match compte quand la moitié des joueurs confirme.",
+      ligne: "Le match est validé quand la moitié des joueurs confirme.",
     },
   ];
 }
@@ -224,7 +224,7 @@ function ConfirmeOuInfirme() {
               t === "compte" ? "text-white" : "text-white/50",
             )}
           >
-            {t === "compte" ? "Compte" : "En attente · 3/7"}
+            {t === "compte" ? "Validé" : "En attente · 3/4"}
           </motion.span>
         </AnimatePresence>
       </div>

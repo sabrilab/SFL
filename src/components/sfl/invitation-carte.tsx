@@ -66,7 +66,10 @@
 //   (mes_resultats_a_confirmer), jamais sur un cache ; pour tous, de la SFL
 //   ou non. La croix le ferme pour cette ouverture seulement. Toucher la
 //   notification (/?resultat=id) l'ouvre aussitôt sur ce match, et la fiche
-//   du match ou Bola l'ouvrent de même (ouvrirResultat).
+//   du match ou Bola l'ouvrent de même (ouvrirResultat) ; un match déjà
+//   répondu s'y revoit en lecture (resultat_du_match). Le premier jour, la
+//   nouveauté qui l'annonce (« confirmer-resultats ») passe juste avant, et
+//   l'écran suit dès qu'elle se ferme : on ne le découvre pas sans elle.
 //
 // L'accueil de l'app passe avant tout (components/sfl/accueil, 24/10) : à
 // la première ouverture, il demande déjà la ville, la carte officielle, les
@@ -92,7 +95,7 @@ import { AnnonceNouveaute } from "@/components/sfl/nouveautes/annonce-nouveaute"
 import { ResultatsAConfirmer } from "@/components/sfl/matchs/resultat-a-confirmer";
 import type { ResultatAConfirmer } from "@/lib/sfl/confirmation-resultat";
 import { demoResultat } from "@/lib/sfl/ligue-vierge-demo";
-import { aujourdhuiIso, mesResultatsAConfirmer, monId } from "@/lib/sfl/matchs";
+import { aujourdhuiIso, mesResultatsAConfirmer, monId, resultatDuMatch } from "@/lib/sfl/matchs";
 import { ReponseEquipe, equipeAOuvrir, type EquipeAOuvrir } from "@/components/sfl/equipe/reponse-equipe";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { PlayerCard } from "@/components/sfl/player-card";
@@ -234,6 +237,8 @@ export function InvitationCarte() {
   /** Un résultat ouvert d'un lien ou d'un bouton : l'ouverture ne propose rien d'autre. */
   const parLien = useRef(false);
   const lienResultat = useRef<number | null>(null);
+  /** La nouveauté qui annonce l'écran passe d'abord ; l'écran la suit. */
+  const resultatEnsuite = useRef(false);
   /** Ceux qu'on a décochés dans l'invitation à suivre. */
   const [decoches, setDecoches] = useState<Set<string>>(() => new Set());
 
@@ -299,6 +304,15 @@ export function InvitationCarte() {
       if (aConfirmer.length > 0) {
         setMoiId(uid);
         setResultats(aConfirmer);
+        const arbitreR = etatArbitres().arbitres.includes(nom);
+        const annonceR = await nouveauteAMontrer(nom, !horsSflRef.current && !arbitreR).catch(() => null);
+        if (annule || parLien.current) return;
+        if (annonceR?.id === "confirmer-resultats") {
+          resultatEnsuite.current = true;
+          setNouveaute(annonceR.id);
+          setVisible("nouveaute");
+          return;
+        }
         setVisible("resultat");
         return;
       }
@@ -366,11 +380,18 @@ export function InvitationCarte() {
       parLien.current = true;
       const [file, uid] = await Promise.all([mesResultatsAConfirmer().catch(() => null), monId()]);
       if (fini || !file) return;
-      const tri = [...file.filter((r) => r.id === id), ...file.filter((r) => r.id !== id)];
+      let tri = [...file.filter((r) => r.id === id), ...file.filter((r) => r.id !== id)];
       if (!tri.length || tri[0].id !== id) {
-        toast("Ce résultat n'attend plus ta réponse.");
-        if (!tri.length) return;
+        // Déjà répondu, ou décidé : le résultat en lecture, seul.
+        const lu = await resultatDuMatch(id).catch(() => null);
+        if (fini) return;
+        if (!lu) {
+          toast("Résultat introuvable.");
+          return;
+        }
+        tri = [lu];
       }
+      resultatEnsuite.current = false;
       setMoiId(uid);
       setResultats(tri);
       setVisible("resultat");
@@ -471,7 +492,9 @@ export function InvitationCarte() {
             player={player}
             onFini={() => {
               if (!forcee) void noterNouveauteVue(nouveaute, nom);
-              setVisible(null);
+              const ensuite = resultatEnsuite.current && resultats.length > 0;
+              resultatEnsuite.current = false;
+              setVisible(ensuite ? "resultat" : null);
             }}
           />
         )}

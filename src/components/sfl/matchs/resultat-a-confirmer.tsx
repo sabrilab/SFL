@@ -4,7 +4,9 @@
 // (Sabri, 28/10 : « Par un écran qui s'affiche confirmer ou infirmer les
 // résultats »). Il arrive à l'ouverture de l'app (invitation-carte.tsx), au
 // toucher de la notification (/?resultat=id), ou depuis la fiche du match et
-// Bola (« Confirmer le résultat »).
+// Bola (« Voir le résultat »). Un résultat déjà répondu, ou décidé, s'y
+// revoit en lecture (resultat_du_match, le score touché dans Mes derniers
+// matchs) : l'état et mon sceau à la place de la piste.
 //
 // Sur le noir, dans les deux thèmes, comme les autres écrans d'ouverture :
 // le score (mon équipe à pleine encre, l'autre effacée), ma ligne avec ma
@@ -20,6 +22,14 @@
 // attente prend sa place, ou l'écran se ferme. La croix ferme pour cette
 // ouverture : l'écran revient tant que la fenêtre est ouverte, et le silence
 // vaut accord au bout de 24 h (supabase/schema.sql, etat_resultat).
+//
+// Le champ « Motif » est toujours monté (caché sous la piste) : il prend le
+// focus dans le geste même qui atteint « Infirmer ». Sur iPhone, Safari
+// n'ouvre pas le clavier hors d'un toucher : il faut alors toucher le champ.
+//
+// Lisible dehors, au soleil : seul le score adverse s'efface (40 %) ; la
+// colonne adverse reste à 75 %, les absents à 55 %. Les stats suivent la
+// notation de Bola (« 1 B · 2 P »), lues « 1 but, 2 passes ».
 //
 // Tic au scellement (la réponse scellée), double tic à l'envoi réussi.
 // « Réduire les animations » : rien ne glisse, le sceau se pose d'un coup.
@@ -39,9 +49,13 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { tic } from "@/lib/sfl/haptique";
 import {
   MOTIF_MAX,
+  issueResultat,
+  libelleEtat,
   maLigne,
   matchDe,
   mvpsDuResultat,
+  statsCourtes,
+  statsLues,
   type LigneResultat,
   type ResultatAConfirmer,
 } from "@/lib/sfl/confirmation-resultat";
@@ -178,9 +192,7 @@ function Ecran({
     },
     [],
   );
-  useEffect(() => {
-    if (phase.t === "motif") champ.current?.focus({ preventScroll: true });
-  }, [phase.t]);
+  const motifVisible = phase.t === "motif" || phase.t === "envoi";
 
   const mvps = new Set(mvpsDuResultat(r));
   const mienne = r.lignes.find((l) => l.id === moi) ?? null;
@@ -285,6 +297,8 @@ function Ecran({
           {/* Le score : mon équipe à pleine encre. */}
           <motion.div
             {...entree(1)}
+            role="img"
+            aria-label={`Clairs ${r.scoreClairs}, Foncés ${r.scoreFonces}`}
             className="grid grid-cols-[1fr_auto_1fr] items-end gap-3 text-center"
           >
             {(["clairs", "fonces"] as const).map((e, k) => (
@@ -340,7 +354,7 @@ function Ecran({
                 key={e}
                 className={cn(
                   "flex flex-col gap-[7px]",
-                  monCamp && monCamp !== e && "opacity-55",
+                  monCamp && monCamp !== e && "opacity-75",
                 )}
               >
                 {camp(e).map((l) => (
@@ -357,16 +371,19 @@ function Ecran({
                       <Nom n={l.name} />
                     </span>
                     {mvps.has(l.id) && <MVP />}
-                    <span className="shrink-0 font-mono text-[11.5px] text-white/50 tabular-nums">
-                      {l.buts}·{l.passes}
+                    <span
+                      aria-label={statsLues(l)}
+                      className="shrink-0 font-mono text-[11px] whitespace-nowrap text-white/60 tabular-nums"
+                    >
+                      {statsCourtes(l)}
                     </span>
                   </li>
                 ))}
               </ul>
             ))}
             {absents.length > 0 && (
-              <p className="col-span-2 mt-2 truncate text-[12.5px] text-white/40">
-                <span className="mono-label mr-2 text-[10px] text-white/35">
+              <p className="col-span-2 mt-2 truncate text-[12.5px] text-white/55">
+                <span className="mono-label mr-2 text-[10px] text-white/45">
                   Absents
                 </span>
                 {absents.map((l, k) => (
@@ -381,10 +398,63 @@ function Ecran({
         </div>
       </div>
 
-      {/* La réponse. */}
-      <div className="shrink-0 pt-[8px]">
+      {/* La réponse, ou en lecture l'état et mon sceau. */}
+      <div className="relative shrink-0 pt-[8px]">
+        {/* Le motif, monté d'avance : le focus se donne dans le geste même. */}
+        <form
+          id={`motif-${r.id}`}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (phase.t === "motif") void infirmer();
+          }}
+          aria-hidden={!motifVisible || undefined}
+          className={cn(
+            motifVisible
+              ? "mb-2"
+              : "pointer-events-none absolute inset-x-0 top-[8px] opacity-0",
+          )}
+        >
+          <input
+            ref={champ}
+            value={motif}
+            onChange={(e) => setMotif(e.target.value.slice(0, MOTIF_MAX))}
+            maxLength={MOTIF_MAX}
+            placeholder="Motif"
+            enterKeyHint="send"
+            aria-label="Motif"
+            tabIndex={motifVisible ? 0 : -1}
+            className="h-[50px] w-full rounded-full bg-white/[0.08] px-5 text-[15px] text-white outline-none placeholder:text-white/40 focus:ring-1 focus:ring-white/30"
+          />
+        </form>
         <AnimatePresence mode="wait" initial={false}>
-          {phase.t === "choix" && (
+          {r.lecture && (
+            <motion.div key="lecture" className="flex flex-col gap-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <span
+                  className={cn(
+                    "mono-label",
+                    r.etat === "compte" ? "text-white" : "text-white/60",
+                  )}
+                >
+                  {libelleEtat(r.etat, r.c, r.n)}
+                </span>
+                {issueResultat(r, false) && (
+                  <span className="mono-label text-right text-white/60">
+                    {issueResultat(r, false)}
+                  </span>
+                )}
+              </div>
+              {r.mienne && (
+                <ReponseScellee
+                  mine={r.mienne === "confirme" ? "present" : "absent"}
+                  libelles={LIBELLES}
+                  scelles={SCELLES}
+                  onRepondre={async () => "figee"}
+                />
+              )}
+            </motion.div>
+          )}
+          {!r.lecture && phase.t === "choix" && (
             <motion.div
               key="piste"
               exit={{ opacity: 0, transition: { duration: reduit ? 0 : 0.14 } }}
@@ -395,7 +465,9 @@ function Ecran({
                 scelles={SCELLES}
                 onRepondre={async (rep) => {
                   if (rep === "absent") {
-                    // Le motif d'abord, facultatif : rien ne part encore.
+                    // Le motif d'abord, facultatif : rien ne part encore. Le
+                    // focus avant tout await, dans le geste.
+                    champ.current?.focus({ preventScroll: true });
                     setPhase({ t: "motif" });
                     return "dite";
                   }
@@ -409,48 +481,36 @@ function Ecran({
               />
             </motion.div>
           )}
-          {(phase.t === "motif" || phase.t === "envoi") && (
-            <motion.form
+          {!r.lecture && motifVisible && (
+            <motion.div
               key="motif"
               initial={reduit ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, transition: { duration: reduit ? 0 : 0.14 } }}
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (phase.t === "motif") void infirmer();
-              }}
-              className="flex flex-col gap-2"
+              className="grid grid-cols-[auto_1fr] gap-2"
             >
-              <input
-                ref={champ}
-                value={motif}
-                onChange={(e) => setMotif(e.target.value.slice(0, MOTIF_MAX))}
-                maxLength={MOTIF_MAX}
-                placeholder="Motif"
-                enterKeyHint="send"
-                aria-label="Motif"
-                className="h-[50px] w-full rounded-full bg-white/[0.08] px-5 text-[15px] text-white outline-none placeholder:text-white/35 focus:ring-1 focus:ring-white/30"
-              />
-              <div className="grid grid-cols-[auto_1fr] gap-2">
-                <button
-                  type="button"
-                  disabled={phase.t === "envoi"}
-                  onClick={() => setPhase({ t: "choix" })}
-                  className="bouton-discret h-[50px] px-5 text-[15px] font-semibold text-white/60"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={phase.t === "envoi"}
-                  className="bouton-secondaire h-[50px] text-[15px] font-semibold disabled:opacity-50"
-                >
-                  Infirmer
-                </button>
-              </div>
-            </motion.form>
+              <button
+                type="button"
+                disabled={phase.t === "envoi"}
+                onClick={() => {
+                  champ.current?.blur();
+                  setPhase({ t: "choix" });
+                }}
+                className="bouton-discret h-[50px] px-5 text-[15px] font-semibold text-white/60"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                form={`motif-${r.id}`}
+                disabled={phase.t === "envoi"}
+                className="bouton-secondaire h-[50px] text-[15px] font-semibold disabled:opacity-50"
+              >
+                Infirmer
+              </button>
+            </motion.div>
           )}
-          {phase.t === "fait" && (
+          {!r.lecture && phase.t === "fait" && (
             <motion.div
               key="fait"
               initial={reduit ? false : { opacity: 0, scale: 0.97 }}
