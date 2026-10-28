@@ -126,10 +126,14 @@ function compter(s: Saison, nom: string, c: Compteurs, maintenant?: Date) {
 }
 
 /** La vitrine d'un joueur : toutes les médailles, gagnées ou en chemin. */
-export function vitrine(saison: Saison, nom: string, maintenant?: Date): EtatTrophee[] {
+export function vitrine(saison: Saison, nom: string, maintenant?: Date, enPlus: readonly Saison[] = []): EtatTrophee[] {
   const c = Object.fromEntries(TROPHEES.map((t) => [t.id, 0])) as Compteurs;
   for (const a of saison.archives ?? []) compter(saisonDepuisArchive(a), nom, c);
   compter(saison, nom, c, maintenant);
+  // Ses matchs Bola validés (carte-bola.ts, saisonBola), sur son seul
+  // téléphone : buts, passes, matchs, victoires et MVP y comptent aussi
+  // (choix par défaut, 28/10) ; la saison SFL, elle, n'en reçoit rien.
+  for (const s of enPlus) compter(s, nom, c);
 
   return TROPHEES.map((def) => {
     // Le compte vitrine a tout, au plus haut palier (compte-vitrine.ts).

@@ -2,6 +2,7 @@
 // officielles (ilyesbensal/BOLA, docs/gameplay/03-mode-bola.md §7) :
 //   npx tsx tools/ligue-vierge-check.ts
 import assert from "node:assert/strict";
+import { etatResultat, DELAI_REPONSE_MS, heureLimite, issueResultat, libelleEtat, maLigne, statsCourtes, statsLues } from "../src/lib/sfl/confirmation-resultat";
 import { classementAVie, compterMatchs, coupDEnvoiPasse, mvpsDuMatch, type LigneBola, type MatchBola } from "../src/lib/sfl/ligue-vierge";
 
 const l = (name: string, equipe: "clairs" | "fonces", buts: number, passes: number): LigneBola => ({ id: name, name, equipe, buts, passes });
@@ -64,4 +65,60 @@ assert.equal(coupDEnvoiPasse("2026-10-20", "19h00", new Date("2026-10-20T17:30:0
 assert.equal(coupDEnvoiPasse("2026-10-20", "19h00", new Date("2026-10-20T16:30:00Z")), false);
 assert.equal(coupDEnvoiPasse("2026-10-19", "23h00", new Date("2026-10-20T06:00:00Z")), true);
 
-console.log("ligue vierge : barème et exemples des règles, tout est bon");
+// La confirmation des résultats (Sabri, 28/10) : seul l'état « compte » compte.
+for (const etat of ["en_attente", "conteste", "ne_compte_pas"] as const) {
+  const [c] = compterMatchs([{ ...m73, etat }]);
+  assert.equal(c.valide, false, etat);
+  assert.ok(c.joueurs.every((j) => j.points === 0 && !j.classe), etat);
+  assert.deepEqual(c.mvps, ["Clara"], `${etat} : le MVP reste désigné`);
+}
+assert.equal(compterMatchs([{ ...m73, etat: "compte" }])[0].valide, true);
+assert.equal(compterMatchs([{ ...m73, etat: null }])[0].valide, true); // saisi avant : compte
+// Un match en attente le midi ne prend pas la place de celui du soir…
+const midi: MatchBola = { ...m73, id: 10, heure: "12h00", etat: "en_attente" };
+const soir2: MatchBola = { ...m73, id: 11, heure: "21h00", etat: "compte" };
+let deux = compterMatchs([midi, soir2]);
+assert.ok(deux[0].joueurs.every((j) => !j.classe));
+assert.ok(deux[1].joueurs.every((j) => j.classe));
+// … et quand il passe à « compte », le soir redevient amical.
+deux = compterMatchs([{ ...midi, etat: "compte" }, soir2]);
+assert.ok(deux[0].joueurs.every((j) => j.classe));
+assert.ok(deux[1].joueurs.every((j) => !j.classe && j.points === 0));
+
+// etatResultat, le jumeau de etat_resultat (SQL).
+const t0 = Date.parse("2026-10-28T19:30:00Z");
+const a = (ms: number) => new Date(t0 + ms);
+const base = { requise: true, n: 7, enregistreeLe: t0 };
+assert.equal(etatResultat({ ...base, c: 4, i: 0, maintenant: a(60_000) }), "compte");
+assert.equal(etatResultat({ ...base, c: 0, i: 4, maintenant: a(60_000) }), "ne_compte_pas");
+assert.equal(etatResultat({ ...base, c: 3, i: 0, maintenant: a(DELAI_REPONSE_MS - 1) }), "en_attente");
+assert.equal(etatResultat({ ...base, c: 3, i: 0, maintenant: a(DELAI_REPONSE_MS) }), "compte");
+assert.equal(etatResultat({ ...base, c: 3, i: 1, maintenant: a(DELAI_REPONSE_MS - 1) }), "conteste");
+assert.equal(etatResultat({ ...base, c: 3, i: 1, maintenant: a(DELAI_REPONSE_MS) }), "ne_compte_pas");
+assert.equal(etatResultat({ ...base, c: 4, i: 3, maintenant: a(1) }), "compte"); // la moitié confirme
+assert.equal(etatResultat({ ...base, n: 8, c: 4, i: 4, maintenant: a(1) }), "ne_compte_pas"); // jamais atteint : la base fige au 1er seuil
+assert.equal(etatResultat({ ...base, n: 0, c: 0, i: 0, maintenant: a(1) }), "en_attente"); // sans destinataire : les 24 h
+assert.equal(etatResultat({ ...base, n: 0, c: 0, i: 0, maintenant: a(DELAI_REPONSE_MS) }), "compte");
+assert.equal(etatResultat({ ...base, requise: false, c: 0, i: 5, maintenant: a(1) }), "compte");
+assert.equal(libelleEtat("en_attente", 3, 7), "En attente · 3/4"); // vers le seuil
+assert.equal(libelleEtat("conteste", 2, 8), "Contesté · 2/4");
+assert.equal(libelleEtat("compte"), "Validé");
+assert.equal(libelleEtat("ne_compte_pas"), "Non validé");
+// L'heure limite, heure de Paris, au format de l'app ; « demain » s'il le faut.
+const soirP = new Date("2026-10-28T19:46:00Z"); // 20h46 à Paris
+assert.deepEqual(heureLimite("2026-10-28T23:46:00Z", soirP), { h: "0h46", demain: true, autreJour: null });
+assert.deepEqual(heureLimite("2026-10-28T21:05:00Z", soirP), { h: "22h05", demain: false, autreJour: null });
+const ouvert = { etat: "en_attente" as const, i: 0, jusqua: "2026-10-28T23:46:00Z", corrigerJusqua: "2026-10-28T23:46:00Z" };
+assert.equal(issueResultat(ouvert, false, soirP), "validé demain à 0h46");
+assert.equal(issueResultat({ ...ouvert, etat: "conteste", i: 1 }, false, soirP), "jusqu'à demain 0h46");
+assert.equal(issueResultat({ ...ouvert, etat: "conteste", i: 1 }, true, soirP), "à corriger avant demain 0h46");
+assert.equal(issueResultat({ ...ouvert, etat: "ne_compte_pas", i: 4 }, true, soirP), "à corriger avant demain 0h46");
+assert.equal(issueResultat({ ...ouvert, etat: "ne_compte_pas", i: 4 }, false, soirP), null);
+assert.equal(issueResultat({ ...ouvert, etat: "compte", i: 0 }, true, soirP), "modifiable jusqu'à demain 0h46");
+assert.equal(issueResultat(ouvert, false, new Date("2026-10-29T00:00:00Z")), null); // échu
+assert.equal(statsCourtes({ buts: 1, passes: 2 }), "1 B · 2 P");
+assert.equal(statsLues({ buts: 1, passes: 2 }), "1 but, 2 passes");
+assert.equal(maLigne({ equipe: "clairs", buts: 2, passes: 1 }), "2 buts · 1 passe");
+assert.equal(maLigne({ equipe: "absent", buts: 0, passes: 0 }), "Absent");
+
+console.log("ligue vierge : barème, exemples des règles et confirmation des résultats, tout est bon");

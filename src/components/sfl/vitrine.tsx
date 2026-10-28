@@ -78,6 +78,7 @@ import {
 } from "@/lib/sfl/trophees";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
+import { saisonsBolaDe } from "@/lib/sfl/carte-bola";
 
 /** Les métaux : le dégradé, l'encre gravée dessus, le listel du bord. */
 const METAL: Record<Metal, { stops: [string, string, string]; encre: string; listel: string; trait: string }> = {
@@ -724,8 +725,8 @@ type Choix = { famille: "palier"; id: TropheeId } | null;
 
 /** Les badges du joueur connecté, pour Ma carte. */
 export function VitrineBadges({ nom }: { nom: string }) {
-  const { saison } = useSeason();
-  const paliers = useMemo(() => vitrine(saison, nom, new Date()), [saison, nom]);
+  const { saison, bolaCarte } = useSeason();
+  const paliers = useMemo(() => vitrine(saison, nom, new Date(), saisonsBolaDe(bolaCarte, nom)), [saison, nom, bolaCarte]);
   const [choix, setChoix] = useState<Choix>(null);
   const suivant = prochain(paliers);
   const gagnes = paliers.filter((e) => e.palier > 0).length;

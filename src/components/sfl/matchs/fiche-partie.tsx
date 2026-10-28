@@ -15,7 +15,8 @@
 // du match (ouvrir-match.tsx) pour en changer le jour, l'heure, le lieu ou
 // les places.
 // Le coup d'envoi passé, l'organisateur tient la feuille (feuille-bola.tsx)
-// et tout le monde voit le score et le ou les MVP.
+// et tout le monde voit le score et le ou les MVP, puis où en est la
+// confirmation du résultat par les joueurs (28/10, bilan-resultat.tsx).
 // Ceux du match (organisateur, inscrits, invités) ont en haut la porte de sa
 // discussion (22/10, matchs/discussion-match.tsx), avec ce qu'ils n'ont pas lu.
 
@@ -47,6 +48,7 @@ import {
 } from "@/lib/sfl/matchs";
 import { coupDEnvoiPasse, feuilleOuverte, mvpsDuMatch } from "@/lib/sfl/ligue-vierge";
 import { FeuilleBola } from "@/components/sfl/matchs/feuille-bola";
+import { BilanResultat } from "@/components/sfl/matchs/bilan-resultat";
 import { cn } from "@/lib/utils";
 
 export function FichePartie({
@@ -226,6 +228,7 @@ export function FichePartie({
               <QuiVient className="justify-center" noms={presents.filter((j) => mvps.includes(j.id)).map((j) => j.name)} />
             </div>
           )}
+          <BilanResultat matchId={partie.id} organise={organise} className="mt-5 border-t border-contraste/[0.06] pt-4" />
         </div>
       )}
 

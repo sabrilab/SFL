@@ -19,6 +19,14 @@
 //     argent, bronze), puis les buteurs et les passeurs et les derniers
 //     matchs avec leur score et leurs MVP.
 //
+// Depuis le 28/10, les joueurs confirment le résultat (lib/sfl/
+// confirmation-resultat.ts) : un match en attente, contesté ou qui ne compte
+// pas le dit à la place de « Amical » ; mes matchs des derniers jours portent
+// leur état et « Voir le résultat » (bilan-resultat.tsx), puisque la Map
+// ne montre plus un match passé ; leur score touché rouvre le résultat
+// entier, même répondu (en lecture) ; l'organisateur voit les réponses dans sa
+// feuille, que ?feuille=id ouvre (la notification d'un « infirme »).
+//
 // Sur tablette et ordinateur (dès 768 px), la largeur des Actus
 // (.gabarit-ligue) et deux colonnes au nombre d'or : le classement dans la
 // grande, qui reste à l'écran s'il y tient (useCollant), les derniers matchs
@@ -37,7 +45,7 @@
 // (sur une préversion, ?apercu=1 force la démonstration). Et pour qui n'a pas d'équipe, la vitrine
 // de Bola Team en une ligne (equipe/vitrine-team.tsx).
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
@@ -48,6 +56,9 @@ import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { carteNeutre } from "@/components/sfl/qui-vient";
 import { useSeason } from "@/components/sfl/season-provider";
 import { FeuilleBola } from "@/components/sfl/matchs/feuille-bola";
+import { BilanResultat } from "@/components/sfl/matchs/bilan-resultat";
+import { ouvrirResultat } from "@/components/sfl/invitation-carte";
+import { libelleEtat } from "@/lib/sfl/confirmation-resultat";
 import { Nom } from "@/components/sfl/nom";
 import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { useSession } from "@/hooks/use-session";
@@ -70,20 +81,23 @@ import { aujourdhuiIso, libelleJour, listerMesDerniers, lireLigueVierge, monId, 
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { isHidden } from "@/lib/sfl/hidden";
+import { cartesDesJoueursBola } from "@/lib/sfl/carte-bola";
+import type { Player } from "@/lib/sfl/engine";
 
-/** Le poste de la fiche de chaque joueur des matchs Bola (ligue_vierge), par nom en minuscules. */
-const PostesBola = createContext<Map<string, string>>(new Map());
+/** La carte Bola de chaque joueur des matchs Bola (ligue_vierge), par nom en minuscules. */
+const CartesBola = createContext<Map<string, Player>>(new Map());
 
 /**
- * La carte d'un joueur de Bola : sa carte de la SFL s'il en a une, sinon une
- * carte neutre, au poste de sa fiche (28/10/2026 : « — » pour tous les autres
- * joueurs Bola).
+ * La carte d'un joueur de Bola : sa carte de la SFL s'il en a une, sinon sa
+ * carte de joueur Bola, au poste de sa fiche, calculée sur ses matchs validés
+ * comme sur son téléphone (lib/sfl/carte-bola.ts, 28/10/2026 : elle restait à
+ * 75 pour tous).
  */
 function Carte({ name, size, detail }: { name: string; size: number; detail?: string }) {
   const { allPlayers } = useSeason();
-  const postes = useContext(PostesBola);
+  const cartes = useContext(CartesBola);
   const cle = name.trim().toLowerCase();
-  const p = allPlayers.find((x) => x.name.toLowerCase() === cle) ?? { ...carteNeutre(name), poste: postes.get(cle) ?? "—" };
+  const p = allPlayers.find((x) => x.name.toLowerCase() === cle) ?? cartes.get(cle) ?? carteNeutre(name);
   return <MiniCarte player={p} size={size} detail={detail} cle={`lv-${name}`} />;
 }
 
@@ -186,24 +200,49 @@ function Pilules<T extends string | number>({ choix, actif, onChange, label }: {
   );
 }
 
-function MatchJoue({ m }: { m: MatchCompte }) {
+/** Un match des trois derniers jours : sa confirmation peut encore attendre. */
+const recent = (jour: string) => Date.now() - Date.parse(`${jour}T00:00:00Z`) < 3 * 86_400_000;
+
+function MatchJoue({ m, bilan = false }: { m: MatchCompte; bilan?: boolean }) {
   const format = useFormatCarte();
   const mvps = m.joueurs.filter((j) => j.mvp);
+  // Le bilan dit déjà l'état, en bas : pas deux fois (28/10).
+  const avecBilan = bilan && m.id > 0 && recent(m.jour);
+  // Le score touché rouvre le résultat entier, en lecture (match à confirmer seulement).
+  const revoir = bilan && m.id > 0 && !!m.requise;
+  const score = (
+    <>
+      <span className="mono-label text-muted-foreground">Clairs</span>
+      <span className="text-[36px] leading-none font-extrabold tracking-tight tabular-nums">
+        {m.scoreClairs} <span className="text-foreground/25">–</span> {m.scoreFonces}
+      </span>
+      <span className="mono-label text-muted-foreground">Foncés</span>
+    </>
+  );
   return (
     <article className="glass flex flex-col gap-4 rounded-[26px] p-[18px]">
       <div className="flex items-baseline justify-between">
         <span className="mono-label text-foreground/40">
           {libelleJour(m.jour)} · {m.heure}
         </span>
-        {!m.valide && <span className="mono-label text-foreground/40">Amical</span>}
+        {avecBilan ? null : m.etat && m.etat !== "compte" ? (
+          <span className="mono-label text-foreground/40">{libelleEtat(m.etat)}</span>
+        ) : (
+          !m.valide && <span className="mono-label text-foreground/40">Amical</span>
+        )}
       </div>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
-        <span className="mono-label text-muted-foreground">Clairs</span>
-        <span className="text-[36px] leading-none font-extrabold tracking-tight tabular-nums">
-          {m.scoreClairs} <span className="text-foreground/25">–</span> {m.scoreFonces}
-        </span>
-        <span className="mono-label text-muted-foreground">Foncés</span>
-      </div>
+      {revoir ? (
+        <button
+          type="button"
+          onClick={() => ouvrirResultat(m.id)}
+          aria-label={`Résultat du match : Clairs ${m.scoreClairs}, Foncés ${m.scoreFonces}`}
+          className="bouton-discret grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-2xl py-1 text-center"
+        >
+          {score}
+        </button>
+      ) : (
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">{score}</div>
+      )}
       {mvps.length > 0 && (
         <div className="flex flex-col items-center gap-2">
           <span className="mono-label text-foreground/40">{mvps.length > 1 ? "MVP ex æquo" : "MVP"}</span>
@@ -220,12 +259,24 @@ function MatchJoue({ m }: { m: MatchCompte }) {
           </div>
         </div>
       )}
+      {avecBilan && <BilanResultat matchId={m.id} className="border-t border-contraste/[0.06] pt-4" />}
     </article>
   );
 }
 
-function MesFeuilles({ parties, onSaisie, apercu }: { parties: Partie[]; onSaisie: () => void; apercu: boolean }) {
+function MesFeuilles({ parties, onSaisie, apercu, aOuvrir }: { parties: Partie[]; onSaisie: () => void; apercu: boolean; aOuvrir: number | null }) {
   const [ouverte, setOuverte] = useState<Partie | null>(null);
+  // ?feuille=id (la notification d'un « infirme ») : la feuille s'ouvre, une fois.
+  const [ouverteParLien, setOuverteParLien] = useState(false);
+  const cible = aOuvrir && !ouverteParLien ? (parties.find((p) => p.id === aOuvrir) ?? null) : null;
+  useEffect(() => {
+    if (!cible) return;
+    const t = window.setTimeout(() => {
+      setOuverte(cible);
+      setOuverteParLien(true);
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [cible]);
   if (parties.length === 0) return null;
   return (
     <section className="flex flex-col gap-2 md:grid md:grid-cols-2 md:gap-[var(--fib-13)] xl:grid-cols-3">
@@ -273,7 +324,25 @@ export default function LigueViergePage() {
   // Ma carte / Classement, comme Mon équipe / Championnat dans Bola Team.
   const [vue, setVue] = useState<"moi" | "classement">("moi");
   const [forceApercu, setForceApercu] = useState(false);
+  const [feuilleLien, setFeuilleLien] = useState<number | null>(null);
   const recharger = useCallback(() => setTick((n) => n + 1), []);
+
+  // ?feuille=id ouvre ma feuille de ce match (la notification d'un « infirme »).
+  // Lu une fois et gardé : l'effet remonté (mode strict) ne le relit pas dans l'adresse.
+  const lienFeuille = useRef<number | null>(null);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const lu = Number(url.searchParams.get("feuille"));
+    if (Number.isInteger(lu) && lu > 0) {
+      lienFeuille.current = lu;
+      url.searchParams.delete("feuille");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
+    const id = lienFeuille.current;
+    if (id === null) return;
+    const t = window.setTimeout(() => setFeuilleLien(id), 0);
+    return () => window.clearTimeout(t);
+  }, []);
 
   // Sur une préversion, ?apercu=1 montre la démonstration même s'il y a déjà de vrais matchs.
   useEffect(() => {
@@ -318,11 +387,21 @@ export default function LigueViergePage() {
     () => (apercu ? compterMatchs(demoMatchs(noms, aujourdhuiIso())) : matchs),
     [apercu, noms, matchs]
   );
-  const postes = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const x of vus ?? []) for (const j of x.joueurs) if (j.poste) m.set(j.name.trim().toLowerCase(), j.poste);
+  // La carte des autres joueurs Bola : leurs lignes `carteBola` seulement (la
+  // règle de mes_matchs_bola : filleul, avant son entrée en SFL), pour que la
+  // Ligue montre la carte que son téléphone lui montre. Recalculée quand les
+  // matchs changent, pas à chaque nouvelle liste de joueurs (revue, 28/10).
+  const parId = useMemo(() => (vus ? cartesDesJoueursBola(vus) : new Map<string, Player>()), [vus]);
+  const nomsConnus = useMemo(() => allPlayers.map((p) => p.name.trim().toLowerCase()).join("\n"), [allPlayers]);
+  const cartesBola = useMemo(() => {
+    const connus = new Set(nomsConnus.split("\n"));
+    const m = new Map<string, Player>();
+    for (const p of parId.values()) {
+      const cle = p.name.trim().toLowerCase();
+      if (!connus.has(cle)) m.set(cle, p);
+    }
     return m;
-  }, [vus]);
+  }, [parId, nomsConnus]);
   // Les masqués (Sabri, les arbitres) hors du classement, sauf soi-même.
   const classement = useMemo(() => (vus ? classementAVie(vus, (c) => c.id === moi || !isHidden(c.name)) : []), [vus, moi]);
   // Mes feuilles : j'organise, le coup d'envoi est passé, et la feuille reste ouverte (24 h après la saisie).
@@ -355,7 +434,7 @@ export default function LigueViergePage() {
   const vide = (texte: string) => <div className="rounded-[22px] bg-card px-5 py-8 text-center text-[14px] text-muted-foreground">{texte}</div>;
 
   return (
-    <PostesBola.Provider value={postes}>
+    <CartesBola.Provider value={cartesBola}>
     <div className="gabarit-ligue mx-auto flex w-full max-w-[470px] flex-col gap-7 px-5 pt-2 pb-8 sm:pt-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
       <h1 className="sr-only">Bola</h1>
       {/* Le même haut que Bola Team (Sabri, 26/10 : « le même design que
@@ -412,13 +491,13 @@ export default function LigueViergePage() {
                 )}
               </div>
             </div>
-            <MesFeuilles parties={feuilles} onSaisie={recharger} apercu={apercu} />
+            <MesFeuilles parties={feuilles} onSaisie={recharger} apercu={apercu} aOuvrir={feuilleLien} />
             {vus !== null && mesDerniers.length === 0 && vide("Aucun match Bola pour l'instant.")}
             {mesDerniers.length > 0 && (
               <div className="flex flex-col gap-3">
                 <h2 className="px-1 text-[17px] font-bold tracking-tight">Mes derniers matchs</h2>
                 {mesDerniers.map((m) => (
-                  <MatchJoue key={m.id} m={m} />
+                  <MatchJoue key={m.id} m={m} bilan />
                 ))}
               </div>
             )}
@@ -492,6 +571,6 @@ export default function LigueViergePage() {
           </div>
         ))}
     </div>
-    </PostesBola.Provider>
+    </CartesBola.Provider>
   );
 }

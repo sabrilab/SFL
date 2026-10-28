@@ -409,6 +409,15 @@ function boostStats(base: Stats, type: BoostType, buts: number, passes: number):
   return { VIT: c[0], TIR: c[1], PAS: c[2], DRI: c[3], DEF: c[4], PHY: c[5] };
 }
 
+/**
+ * Les stats d'une carte à titre, pour qui n'a pas de ligne de saison : la
+ * carte MVP d'un match Bola (lib/sfl/carte-bola.ts). La même formule que les
+ * cartes de la SFL (boostStats), rien de plus.
+ */
+export function statsCarteTitre(base: Stats, type: BoostType, buts: number, passes: number): Stats {
+  return boostStats(base, type, buts, passes);
+}
+
 export function computeBoostCards(saison: Saison, evolution: Evolution = evolutionDe(saison)): BoostCardData[] {
   const roster = rosterMap(saison);
   const dateOf = new Map(saison.journees.map((m) => [m.j, m.date]));

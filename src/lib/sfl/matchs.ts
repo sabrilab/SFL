@@ -20,6 +20,14 @@
 
 import { supabase } from "@/lib/supabase";
 import type { MatchBola } from "@/lib/sfl/ligue-vierge";
+import {
+  MOTIF_MAX,
+  type BilanFeuille,
+  type EtatResultat,
+  type ReponseDuJoueur,
+  type ReponseResultat,
+  type ResultatAConfirmer,
+} from "@/lib/sfl/confirmation-resultat";
 
 export type Visibilite = "public" | "prive";
 export type Moment = "matin" | "apres-midi" | "soir";
@@ -196,27 +204,142 @@ export interface Feuille {
   lignes: { playerId: string; equipe: EquipeFeuille; buts: number; passes: number }[];
 }
 
-export async function saisirFeuille(id: number, f: Feuille): Promise<void> {
+/** La fonction n'existe pas encore en base (une préversion sur une base pas migrée). */
+const sansFonction = (e: { code?: string; message?: string } | null) =>
+  !!e && (e.code === "PGRST202" || /could not find the function/i.test(e.message ?? ""));
+
+/**
+ * L'organisateur enregistre la feuille, d'un coup (enregistrer_feuille_bola,
+ * 28/10/2026) : les lignes, le score, puis une nouvelle version si elle a
+ * changé. Les joueurs de la feuille reçoivent alors le résultat à confirmer
+ * (/api/matchs/resultat). Renvoie la version courante. Sur une base pas
+ * encore migrée, l'écriture d'avant, ligne par ligne.
+ */
+export async function saisirFeuille(id: number, f: Feuille): Promise<number> {
   const sb = supabase();
+  const { data, error } = await sb.rpc("enregistrer_feuille_bola", {
+    m: id,
+    clairs: f.scoreClairs,
+    fonces: f.scoreFonces,
+    lignes: f.lignes.map((l) => ({ ...l, buts: l.equipe === "absent" ? 0 : l.buts, passes: l.equipe === "absent" ? 0 : l.passes })),
+  });
+  if (!error) {
+    notifierResultat(id, "feuille");
+    return Number(data ?? 0);
+  }
+  if (!sansFonction(error)) throw error;
   // Les lignes d'abord : la règle de la base ferme la feuille 24 h après la
   // première saisie du score, qui date tout le reste.
   for (const l of f.lignes) {
     const absent = l.equipe === "absent";
-    const { error } = await sb
+    const { error: e } = await sb
       .from("match_joueurs")
       .update({ equipe: l.equipe, buts: absent ? 0 : l.buts, passes: absent ? 0 : l.passes })
       .eq("match_id", id)
       .eq("player_id", l.playerId);
-    if (error) throw error;
+    if (e) throw e;
   }
-  const { error } = await sb.from("matchs").update({ score_clairs: f.scoreClairs, score_fonces: f.scoreFonces }).eq("id", id);
+  const { error: e } = await sb.from("matchs").update({ score_clairs: f.scoreClairs, score_fonces: f.scoreFonces }).eq("id", id);
+  if (e) throw e;
+  return 0;
+}
+
+// ─────────────── La confirmation des résultats (28/10/2026) ───────────────
+// lib/sfl/confirmation-resultat.ts pour les règles ; la base décide.
+
+/** Les résultats qui attendent ma réponse, du plus ancien au plus récent ; rien sur une base pas migrée. */
+export async function mesResultatsAConfirmer(): Promise<ResultatAConfirmer[]> {
+  const { data, error } = await supabase().rpc("mes_resultats_a_confirmer");
+  if (error) {
+    if (sansFonction(error)) return [];
+    throw error;
+  }
+  return (data ?? []) as ResultatAConfirmer[];
+}
+
+/** Le résultat d'un match que je vois, même déjà répondu (en lecture) ; null pour un match saisi avant le 28/10. */
+export async function resultatDuMatch(id: number): Promise<ResultatAConfirmer | null> {
+  const { data, error } = await supabase().rpc("resultat_du_match", { m: id });
+  if (error) {
+    if (sansFonction(error)) return null;
+    throw error;
+  }
+  return data ? ({ ...(data as ResultatAConfirmer), lecture: true } as ResultatAConfirmer) : null;
+}
+
+/** Confirmer ou infirmer la version vue ; l'organisateur est prévenu d'un « infirme ». Renvoie le nouvel état. */
+export async function repondreResultat(id: number, version: number, reponse: ReponseResultat, motif?: string): Promise<EtatResultat> {
+  const { data, error } = await supabase().rpc("repondre_resultat", {
+    m: id,
+    v: version,
+    r: reponse,
+    motif: reponse === "infirme" ? motif?.trim().slice(0, MOTIF_MAX) || null : null,
+  });
   if (error) throw error;
+  if (reponse === "infirme") notifierResultat(id, "conteste");
+  // Ma réponse peut faire compter le match : ma carte se relit (use-bola-carte.ts).
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(MES_MATCHS_BOLA_EVENT));
+  return data as EtatResultat;
+}
+
+/** L'état de ces matchs et ma réponse, par id ; rien si la base ne le sait pas encore. */
+export async function bilansFeuilles(ids: number[]): Promise<Map<number, BilanFeuille>> {
+  if (ids.length === 0) return new Map();
+  const { data, error } = await supabase().rpc("bilans_feuilles", { ids });
+  if (error) return new Map();
+  return new Map(Object.entries((data ?? {}) as Record<string, BilanFeuille>).map(([k, v]) => [Number(k), v]));
+}
+
+/** Les réponses à la feuille courante, pour l'organisateur. */
+export async function reponsesDuMatch(id: number): Promise<(BilanFeuille & { reponses: ReponseDuJoueur[] | null }) | null> {
+  const { data, error } = await supabase().rpc("reponses_du_match", { m: id });
+  if (error) return null;
+  return (data ?? null) as (BilanFeuille & { reponses: ReponseDuJoueur[] | null }) | null;
+}
+
+/**
+ * Le résultat envoyé aux joueurs (feuille), ou l'organisateur prévenu d'un
+ * « infirme » (conteste) : /api/matchs/resultat. Une notification perdue ne
+ * bloque rien : l'écran arrive à l'ouverture, et les 24 h décident.
+ */
+export function notifierResultat(id: number, type: "feuille" | "conteste"): void {
+  void (async () => {
+    try {
+      const { data } = await supabase().auth.getSession();
+      const jeton = data.session?.access_token;
+      if (!jeton) return;
+      await fetch("/api/matchs/resultat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jeton}` },
+        body: JSON.stringify({ id, type }),
+        keepalive: true,
+      });
+    } catch {}
+  })();
 }
 
 /** Tous les matchs Bola joués, pour la Ligue vierge (fonction ligue_vierge en base). */
 export async function lireLigueVierge(): Promise<MatchBola[]> {
   const { data, error } = await supabase().rpc("ligue_vierge");
   if (error) throw error;
+  return (data ?? []) as MatchBola[];
+}
+
+/** Émis quand ma réponse à un résultat change ce que valent mes matchs Bola (use-bola-carte.ts). */
+export const MES_MATCHS_BOLA_EVENT = "bola-mes-matchs";
+
+/**
+ * Mes matchs Bola saisis, au format de lireLigueVierge, où je suis compté
+ * (mes_matchs_bola, supabase/schema.sql) : la carte, l'XP et les missions
+ * d'un joueur Bola (lib/sfl/carte-bola.ts). null : la base ne connaît pas
+ * encore la fonction (préversion).
+ */
+export async function lireMesMatchsBola(): Promise<MatchBola[] | null> {
+  const { data, error } = await supabase().rpc("mes_matchs_bola");
+  if (error) {
+    if (sansFonction(error)) return null;
+    throw error;
+  }
   return (data ?? []) as MatchBola[];
 }
 
@@ -474,6 +597,11 @@ export function prochainsJours(n: number): string[] {
 export function direErreur(e: unknown): string {
   const msg = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : "";
   if (/réponse figée/i.test(msg)) return "Ta réponse est déjà donnée.";
+  if (/feuille corrigée/i.test(msg)) return "La feuille vient d'être corrigée.";
+  if (/résultat décidé/i.test(msg)) return "Le résultat est déjà décidé.";
+  if (/feuille par l'app/i.test(msg)) return "Mets l'app à jour pour tenir la feuille.";
+  if (/feuille incohérente/i.test(msg)) return "Plus de buts ou de passes que le score.";
+  if (/pas sur la feuille/i.test(msg)) return "Tu n'es pas sur cette feuille.";
   if (/complet/i.test(msg)) return "Le match est complet.";
   if (/duplicate|already exists|23505/i.test(msg)) return "Ce joueur est déjà dans le match.";
   if (/feuille close/i.test(msg)) return "La feuille est close : 24 h sont passées.";

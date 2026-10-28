@@ -80,8 +80,11 @@ export function jourDeJournee(etiquette: string, reference: Date): Date | null {
   return x;
 }
 
-/** La saison et le dimanche d'une activation : la première saison close après elle, sinon celle en cours. */
-function placeDe(s: Saison, t: Date, maintenant: Date): { saison: number; j: number } {
+/**
+ * La saison et le dimanche d'une activation : la première saison close après
+ * elle, sinon celle en cours. Aussi l'XP d'un match Bola (lib/sfl/carte-bola.ts).
+ */
+export function placeDe(s: Saison, t: Date, maintenant: Date): { saison: number; j: number } {
   const archives = [...(s.archives ?? [])].sort((a, b) => a.cloturee.localeCompare(b.cloturee));
   const close = archives.find((a) => new Date(a.cloturee).getTime() >= t.getTime());
   const { numero, journees, reference } = close

@@ -213,7 +213,8 @@ export function NouvellesCartes() {
               />
               <div className="flex flex-col items-center gap-0.5">
                 <span className="text-sm font-bold text-white">
-                  Elle est à toi, {me} — bien joué dimanche.
+                  {/* Une carte MVP de Bola (lib/sfl/carte-bola.ts) vient d'un match, pas d'un dimanche. */}
+                  Elle est à toi, {me} — bien joué{current.date.startsWith("Bola") ? "" : " dimanche"}.
                 </span>
                 <span className="text-xs text-white/60">
                   {index + 1}/{queue.length} — touche pour continuer

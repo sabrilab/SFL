@@ -62,6 +62,8 @@ import { ajouterRecrues, type RecruesJoueur } from "@/lib/sfl/recrues";
 import { appliquerVotes } from "@/lib/sfl/votes";
 import { supabase } from "@/lib/supabase";
 import type { Saison } from "@/lib/sfl/saisie/types";
+import { ajouterBola, lignesXpBola, missionsPerso } from "@/lib/sfl/missions-perso";
+import { EPREUVES_BOLA, type Epreuve } from "@/lib/sfl/passe";
 
 const AUCUNE: Reponse[] = [];
 let abonnes = 0;
@@ -140,7 +142,7 @@ function avecVitrineXp(lg: XpLigue, s: Saison, nom: string): XpLigue {
   const rangs = new Map(lg.rangs);
   const sur = Math.max(1, ...[...lg.rangs.values()].map((r) => r.sur));
   rangs.set(nom, { rang: "S", place: 1, xp, sur, suivant: null });
-  const surLesCartes = cartesDe(journal, rangs, lg.recrues);
+  const surLesCartes = cartesDe(journal, rangs, lg.recrues, lg.bola);
   return { ...lg, journal, rangs, surLesCartes };
 }
 
@@ -151,15 +153,19 @@ function avecVitrineXp(lg: XpLigue, s: Saison, nom: string): XpLigue {
 function cartesDe(
   journal: Map<string, { lignes: LigneXp[]; reussies: number }>,
   rangs: Map<string, RangJoueur>,
-  recrues: ReadonlyMap<string, RecruesJoueur>
+  recrues: ReadonlyMap<string, RecruesJoueur>,
+  bola: string | null
 ): string {
   return JSON.stringify(
     [...journal].map(([n, x]) => {
       const r = recrues.get(n);
-      return [n, rangs.get(n)?.rang ?? null, palierMaxDe(journal, n), cranDe(x.reussies), r?.actives ?? 0, r?.fondateur ?? null];
+      return [n, rangs.get(n)?.rang ?? null, palierMaxDe(journal, n, epreuvesDe(n, bola)), cranDe(x.reussies), r?.actives ?? 0, r?.fondateur ?? null];
     })
   );
 }
+
+/** Les épreuves du passe de ce joueur : celles d'un joueur Bola pour moi si je joue en Bola, sinon celles de la SFL. */
+const epreuvesDe = (nom: string, bola: string | null): readonly Epreuve[] | undefined => (bola && nom === bola ? EPREUVES_BOLA : undefined);
 
 /** L'heure, à la minute : le coup d'envoi et minuit se voient sans recharger. */
 export function useMaintenant(): Date {
@@ -395,6 +401,8 @@ export interface XpLigue {
   surLesCartes: string;
   /** Les recrues de chacun (lib/sfl/recrues.ts), par nom. */
   recrues: ReadonlyMap<string, RecruesJoueur>;
+  /** Mon nom si je joue en Bola, hors de la SFL : mon passe suit les épreuves Bola (EPREUVES_BOLA). */
+  bola: string | null;
 }
 
 export const XpLigueContext = createContext<XpLigue | null>(null);
@@ -410,7 +418,7 @@ export function useXpLigueCalcule(): XpLigue | null {
   const isClient = useIsClient();
   const maintenant = useMaintenant();
   const reponses = useReponses();
-  const { allPlayers, vitrine } = useSeason();
+  const { allPlayers, vitrine, bola, bolaCarte } = useSeason();
   const { toutes: felicitations } = useFelicitations();
   const pronos = useListePronos();
   const { saison, jugee, votes } = useSaisonJugee(maintenant);
@@ -422,12 +430,18 @@ export function useXpLigueCalcule(): XpLigue | null {
     ajouterPronos(journal, jugee, pronos, maintenant);
     // +100 par recrue active, hors du rang (lib/sfl/recrues.ts).
     ajouterRecrues(journal, jugee, ligue, me ? { nom: me, recrues: miennes } : null, maintenant);
+    // Mes matchs Bola validés et mes missions perso (lib/sfl/missions-perso.ts), hors du rang ;
+    // sur mon seul téléphone. Gardés si je suis entré en SFL depuis.
+    if (bolaCarte) {
+      const { faites } = missionsPerso(bolaCarte.valides, maintenant);
+      ajouterBola(journal, bolaCarte.nom, lignesXpBola(bolaCarte.valides, faites, jugee, maintenant));
+    }
     const recrues = new Map(ligue.map((r) => [r.nom, r]));
     const rangs = rangsDesJoueurs(classementNiveau(journal, allPlayers, { pourLeRang: true }));
-    const surLesCartes = cartesDe(journal, rangs, recrues);
-    const lg = { journal, saison: saison.numero ?? 0, rangs, surLesCartes, recrues };
+    const surLesCartes = cartesDe(journal, rangs, recrues, bola);
+    const lg = { journal, saison: saison.numero ?? 0, rangs, surLesCartes, recrues, bola };
     return vitrine ? avecVitrineXp(lg, saison, vitrine.nom) : lg;
-  }, [isClient, jugee, reponses, votes, maintenant, felicitations, pronos, saison, allPlayers, vitrine, ligue, miennes, me]);
+  }, [isClient, jugee, reponses, votes, maintenant, felicitations, pronos, saison, allPlayers, vitrine, ligue, miennes, me, bola, bolaCarte]);
 }
 
 /** L'XP de la ligue, tel que l'app l'a calculé (null avant le premier rendu côté client). */
@@ -443,7 +457,7 @@ export function useXp(nom?: string): BilanXp | null {
   const { me } = useMyPlayer();
   const lg = useXpLigue();
   const qui = nom ?? me;
-  return useMemo(() => (lg && qui ? bilanDe(lg.journal, qui, lg.saison) : null), [lg, qui]);
+  return useMemo(() => (lg && qui ? bilanDe(lg.journal, qui, lg.saison, epreuvesDe(qui, lg.bola)) : null), [lg, qui]);
 }
 
 /** Le rang d'un joueur (B, A, S) ; null pour un joueur masqué ou inconnu. */

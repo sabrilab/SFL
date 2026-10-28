@@ -58,6 +58,10 @@ export const MOTIFS_NOTIF = {
   "match-veille": { famille: "match", label: "Le rappel de la veille", effet: AU_MATCH },
   "match-modifie": { famille: "match", label: "Nouveau rendez-vous", effet: AU_MATCH },
   "match-annule": { famille: "match", label: "Match annulé", effet: null },
+  // Le résultat d'un match Bola, à confirmer ou infirmer (28/10) ; « accepte » ou « refuse » (push_effet_confirmation).
+  "match-resultat": { famille: "match", label: "Un résultat à confirmer", effet: "a confirmé ou infirmé" },
+  // Un joueur infirme : l'organisateur peut corriger la feuille (enregistrer_feuille_bola, « corrige »).
+  "match-conteste": { famille: "match", label: "Résultat infirmé", effet: "a corrigé la feuille" },
 
   "equipe-invitation": { famille: "equipe", label: "Invitation à signer", effet: "a répondu à l'invitation" },
   "equipe-relance": { famille: "equipe", label: "Le capitaine relance", effet: "a répondu à l'invitation" },
@@ -110,6 +114,7 @@ function invitations(oui: number, non: number): string {
  */
 export const REPONSES_NOTIF: Partial<Record<MotifNotif, (oui: number, non: number) => string>> = {
   "match-invitation": invitations,
+  "match-resultat": (oui, non) => `${oui} ${oui > 1 ? "confirmés" : "confirmé"} · ${non} ${non > 1 ? "infirmés" : "infirmé"}`,
   "equipe-invitation": invitations,
   "equipe-relance": invitations,
   missions: (oui, non) => `${oui} ${oui > 1 ? "ont accepté" : "a accepté"} · ${non} ${non > 1 ? "ont passé" : "a passé"}`,

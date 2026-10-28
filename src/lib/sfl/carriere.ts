@@ -45,6 +45,8 @@ export interface CarteSpeciale {
   /** Le joueur tel que la carte l'a figé ce jour-là : à passer à PlayerCard. */
   player: Player;
   j: number;
+  /** Ce qui date la carte sous elle, quand ce n'est pas « J4 » (une carte MVP de Bola : « 22 oct. »). */
+  etiquette?: string;
 }
 
 export interface CartesDeSaison {
@@ -55,6 +57,8 @@ export interface CartesDeSaison {
   player: Player;
   note: number;
   speciales: CarteSpeciale[];
+  /** La carte de joueur Bola (lib/sfl/carte-bola.ts), à côté des saisons de la SFL. */
+  bola?: true;
 }
 
 /** Ses cartes, une saison après l'autre, de la plus récente à la plus ancienne. */

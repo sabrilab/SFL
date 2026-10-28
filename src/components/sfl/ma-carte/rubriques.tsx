@@ -32,7 +32,9 @@ import { MiniCarte } from "@/components/sfl/mini-carte";
 import { Medaille } from "@/components/sfl/vitrine";
 import { ModePasse, retenirOrigineModePasse } from "@/components/sfl/mode-passe";
 import { useMissionsASigner } from "@/components/sfl/mode-passe-missions";
-import { cartesDeCarriere, courbeDeCarriere, type PointCourbe } from "@/lib/sfl/carriere";
+import { cartesDeCarriere, courbeDeCarriere, type CartesDeSaison, type PointCourbe } from "@/lib/sfl/carriere";
+import { ovr } from "@/lib/sfl/engine";
+import { saisonsBolaDe } from "@/lib/sfl/carte-bola";
 import { actionsDuJour, dimanchesDe, ficheJoueur, resultatDuJour } from "@/lib/sfl/fiche-joueur";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
 import { PALIERS_PASSE, PASSE_BOLA } from "@/lib/sfl/passe";
@@ -48,13 +50,32 @@ export function useMaCarte() {
   const { player } = useMyPlayer();
   // La saison où les élus des votes (Impact, Défensive) sont posés : sans
   // elle, leurs cartes et leurs points manquent à Ma carte (carriere.ts).
-  const { allPlayers, saison: brute, saisonTitree, evolution } = useSeason();
+  const { allPlayers, saison: brute, saisonTitree, evolution, bolaCarte } = useSeason();
   const saison = saisonTitree ?? brute;
   const fiche = useMemo(() => ficheJoueur(saison, player, allPlayers), [saison, player, allPlayers]);
   const dimanches = useMemo(() => dimanchesDe(saison, player.name), [saison, player.name]);
   const joues = dimanches.filter((d) => !d.horsMatch).length;
   const courbe = useMemo(() => courbeDeCarriere(saison, player.name, evolution), [saison, player.name, evolution]);
-  const mesCartes = useMemo(() => cartesDeCarriere(saison, player.name, evolution), [saison, player.name, evolution]);
+  const mesCartes = useMemo(() => {
+    const sfl = cartesDeCarriere(saison, player.name, evolution);
+    // Ma carte de joueur Bola et ses cartes MVP (lib/sfl/carte-bola.ts) : en tête tant que je joue en
+    // Bola ; après les saisons de la SFL si j'y suis entré depuis (elle reste, figée).
+    if (!bolaCarte || bolaCarte.nom !== player.name || !bolaCarte.valides.length) return sfl;
+    const enBola = sfl.length === 0;
+    const carte = enBola ? player : bolaCarte.player;
+    const entree: CartesDeSaison = {
+      numero: -1,
+      nom: "Bola",
+      enCours: enBola,
+      bola: true,
+      player: carte,
+      note: ovr(carte.stats),
+      speciales: bolaCarte.cartesMvp
+        .map((c) => ({ carte: c.carte, player: c.player, j: c.k, etiquette: c.libelle.split(" · ")[0] }))
+        .sort((a, b) => b.carte.ovr - a.carte.ovr || b.j - a.j),
+    };
+    return enBola ? [entree] : [...sfl, entree];
+  }, [saison, player, evolution, bolaCarte]);
   // Ma place au Pépite d'Or après chaque journée de la saison, et les places
   // gagnées ou perdues depuis la précédente : la courbe les a déjà.
   const rangs = useMemo(() => {
@@ -139,12 +160,17 @@ const places = (n: number) => `${Math.abs(n)} ${Math.abs(n) > 1 ? "places" : "pl
 
 export function RubriquesMaCarte() {
   const { player, saison, dimanches, joues, courbe, mesCartes, rangs } = useMaCarte();
-  const { evolution } = useSeason();
+  const { evolution, bolaCarte, bola } = useSeason();
+  const bolaJoueur = bola !== null;
   const b = useXp(player.name);
   const r = useRangXp(player.name);
   const aSigner = useMissionsASigner();
   const format = useFormatCarte();
-  const paliers = useMemo(() => vitrine(saison, player.name, new Date()), [saison, player.name]);
+  // Mes badges comptent aussi mes matchs Bola validés : MVP en Bola, la tuile le dit.
+  const paliers = useMemo(
+    () => vitrine(saison, player.name, new Date(), saisonsBolaDe(bolaCarte, player.name)),
+    [saison, player.name, bolaCarte]
+  );
   const numero = saison.numero ?? 0;
   const tuiles: React.ReactNode[] = [];
   const [passe, setPasse] = useState(false);
@@ -284,6 +310,44 @@ export function RubriquesMaCarte() {
                 ? `${places(ecart)} depuis J${premier.j}`
                 : `depuis J${premier.j}`
               : "note de ma carte"}
+        </span>
+      </Tuile>
+    );
+  }
+
+  // 3 bis. Joueur Bola : sa note, match après match (lib/sfl/carte-bola.ts), 75 au départ.
+  if (bolaJoueur && bolaCarte && bolaCarte.notes.length > 0) {
+    const points: PointCourbe[] = [{ note: 75, libelle: "" }, ...bolaCarte.notes].map((n, i) => ({
+      saison: 0,
+      nomSaison: "Bola",
+      j: i,
+      date: n.libelle,
+      note: n.note,
+      speciale: null,
+      rang: null,
+      sur: 0,
+      joue: true,
+    }));
+    const fin = points[points.length - 1].note;
+    const ecart = fin - 75;
+    const n = bolaCarte.notes.length;
+    tuiles.push(
+      <Tuile key="evolution" href="/profil/evolution" ton="evolution" nom="Évolution" label={`Évolution : note ${fin}, ${n} ${n > 1 ? "matchs validés" : "match validé"}`}>
+        <span className="flex items-baseline gap-1.5">
+          <span style={{ ...NOMBRE, fontSize: 34 }} className="tabular-nums">
+            {fin}
+          </span>
+          {ecart !== 0 && (
+            <span className="tuile__etiquette font-mono text-[12px] font-bold">
+              {fleche(ecart)} {Math.abs(ecart)}
+            </span>
+          )}
+        </span>
+        <span className="mt-auto">
+          <Trace points={points} mode="note" />
+        </span>
+        <span className="font-mono text-[11px] text-foreground/45">
+          {n} {n > 1 ? "matchs validés" : "match validé"}
         </span>
       </Tuile>
     );

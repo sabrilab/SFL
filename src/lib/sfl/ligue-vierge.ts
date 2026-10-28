@@ -24,10 +24,21 @@
 //   · une exhibition ne compte jamais ;
 //   · ni Impact, ni Défensive, ni trophée de fin de saison : il n'y a pas de
 //     saison, le classement cumule tout depuis le premier match.
+//   · depuis le 28/10, les joueurs confirment le résultat
+//     (lib/sfl/confirmation-resultat.ts) : un match ne compte qu'à l'état
+//     « compte » que la base lui donne (etat). En attente ou contesté, il ne
+//     prend la place du 1er match classé de la journée de personne ; quand
+//     il passe à « compte », l'ordre est recalculé, et un match du soir déjà
+//     classé redevient amical pour ceux qui ont joué les deux : c'est voulu.
+//     Le MVP reste désigné même quand le match ne compte pas, comme sous le
+//     quorum. Sans état (les matchs saisis avant, une base pas migrée), il
+//     compte.
 // Pas encore là : l'absence injustifiée (−2), faute de check-in.
 //
 // Module pur, sans React ni base : la page (app/ligue-vierge) lui passe les
 // matchs lus par la fonction `ligue_vierge()` (supabase/schema.sql).
+
+import type { EtatResultat } from "@/lib/sfl/confirmation-resultat";
 
 export type Equipe = "clairs" | "fonces";
 
@@ -39,6 +50,12 @@ export interface LigneBola {
   passes: number;
   /** Le poste de sa fiche (ligue_vierge), pour la carte d'un joueur hors de la SFL. */
   poste?: string | null;
+  /**
+   * Ce match fait-il bouger sa carte Bola (match_bola_json) : un filleul,
+   * avant son entrée en SFL, la règle même de mes_matchs_bola. La Ligue lit
+   * la carte des autres joueurs Bola sur ces lignes seulement.
+   */
+  carteBola?: boolean;
 }
 
 export interface MatchBola {
@@ -51,6 +68,10 @@ export interface MatchBola {
   scoreClairs: number;
   scoreFonces: number;
   joueurs: LigneBola[];
+  /** L'état de sa confirmation par les joueurs (ligue_vierge) ; absent : il compte. */
+  etat?: EtatResultat | null;
+  /** Le match passe par la confirmation (faux : saisi avant le 28/10). */
+  requise?: boolean;
 }
 
 /** Le quorum des règles : 8 présents, un 4 contre 4. */
@@ -67,7 +88,7 @@ export interface LigneComptee extends LigneBola {
 }
 
 export interface MatchCompte extends Omit<MatchBola, "joueurs"> {
-  /** Le match compte (assez de joueurs, pas une exhibition). */
+  /** Le match compte (assez de joueurs, pas une exhibition, confirmé). */
   valide: boolean;
   mvps: string[];
   joueurs: LigneComptee[];
@@ -111,7 +132,7 @@ export function compterMatchs(matchs: MatchBola[]): MatchCompte[] {
   // Les journées où chacun a déjà son match classé.
   const dejaClasse = new Set<string>();
   return ordre.map((m) => {
-    const valide = m.genre !== "exhibition" && m.joueurs.length >= QUORUM;
+    const valide = m.genre !== "exhibition" && m.joueurs.length >= QUORUM && (!m.etat || m.etat === "compte");
     const mvps = mvpsDuMatch(m.joueurs);
     const joueurs = m.joueurs.map((j): LigneComptee => {
       const r = resultat(m, j.equipe);

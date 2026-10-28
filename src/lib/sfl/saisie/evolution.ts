@@ -149,7 +149,14 @@ export function evolutionActive(saison: Pick<Saison, "numero">): boolean {
 export function evoluer(
   saison: Saison,
   depart: (nom: string) => Stats,
-  titresFaibles: TitresFaibles = new Set()
+  titresFaibles: TitresFaibles = new Set(),
+  /**
+   * La raison écrite sous la série de physique : « 3 dimanches de suite »
+   * pour la SFL, « 3 matchs de suite » pour un joueur Bola (lib/sfl/
+   * carte-bola.ts, choix par défaut, 28/10), dont chaque match validé est
+   * une « journée ». Rien d'autre ne change.
+   */
+  options: { raisonSerie?: string } = {}
 ): Evolution {
   const jouees = journeesJouees(saison);
   const derniere = jouees.length >= JOURNEES_PAR_MAJ ? jouees[Math.floor(jouees.length / JOURNEES_PAR_MAJ) * JOURNEES_PAR_MAJ - 1] : null;
@@ -237,7 +244,7 @@ export function evoluer(
         if (e.retard) s.serie = 0;
         else if (++s.serie >= SERIE) {
           s.serie = 0;
-          verser("PHY", CRANS.serie, `${SERIE} dimanches de suite`);
+          verser("PHY", CRANS.serie, options.raisonSerie ?? `${SERIE} dimanches de suite`);
         }
         jour.serie = s.serie;
       } else {

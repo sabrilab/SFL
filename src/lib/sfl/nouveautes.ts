@@ -28,6 +28,8 @@ export interface Nouveaute {
   jusquAu: string;
   /** Pour les joueurs de la ligue seulement (ni joueurs Bola hors saison, ni arbitres). */
   ligueSeulement?: boolean;
+  /** Pour les joueurs Bola seulement (hors de la SFL) : le symétrique de ligueSeulement. */
+  bolaSeulement?: boolean;
 }
 
 /** Les nouveautés annoncées, de la plus ancienne à la plus récente. */
@@ -36,6 +38,13 @@ export const NOUVEAUTES: readonly Nouveaute[] = [
   // Parrainage paliers, réponse scellée, missions dans Ma carte : pour tous (le
   // drapeau vaut pour la nouveauté entière, pas pour une diapo).
   { id: "nouveautes-27-10", le: "2026-10-27T19:40:00+01:00", jusquAu: "2026-11-24T19:40:00+01:00" },
+  // Confirmer ou infirmer le résultat d'un match Bola (28/10) : pour tous. À
+  // recaler sur l'heure de mise en ligne.
+  { id: "confirmer-resultats", le: "2026-10-28T20:00:00+01:00", jusquAu: "2026-11-25T20:00:00+01:00" },
+  // La carte des joueurs Bola qui bouge à chaque match, la carte MVP, les
+  // missions perso (28/10) : pour les joueurs Bola. À recaler sur l'heure de
+  // mise en ligne.
+  { id: "carte-bola", le: "2026-10-28T21:00:00+01:00", jusquAu: "2026-11-25T21:00:00+01:00", bolaSeulement: true },
 ];
 
 const cleIci = (id: string, nom: string) => `bola-nouveaute-${id}-${nom}`;
@@ -66,11 +75,18 @@ async function lireProfil(): Promise<{ uid: string; vues: string[]; accueil: str
 /**
  * La nouveauté à montrer à ce joueur à cette ouverture, ou null.
  * `ligue` : c'est un joueur de la ligue (ni Bola hors saison, ni arbitre).
+ * `bola` : c'est un joueur Bola, hors de la SFL (un arbitre est hors ligue
+ * sans être joueur Bola).
  */
-export async function nouveauteAMontrer(nom: string, ligue: boolean, maintenant = new Date()): Promise<Nouveaute | null> {
+export async function nouveauteAMontrer(nom: string, ligue: boolean, bola = false, maintenant = new Date()): Promise<Nouveaute | null> {
   const t = maintenant.getTime();
   const enCours = NOUVEAUTES.filter(
-    (n) => t >= Date.parse(n.le) && t < Date.parse(n.jusquAu) && (ligue || !n.ligueSeulement) && !vueIci(n.id, nom)
+    (n) =>
+      t >= Date.parse(n.le) &&
+      t < Date.parse(n.jusquAu) &&
+      (ligue || !n.ligueSeulement) &&
+      (bola || !n.bolaSeulement) &&
+      !vueIci(n.id, nom)
   );
   if (!enCours.length) return null;
   const profil = await lireProfil();

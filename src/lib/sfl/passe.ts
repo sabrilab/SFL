@@ -62,16 +62,62 @@ export interface Epreuve {
 }
 
 const reussie = (l: LigneXp) => l.mission?.reussie === true;
+/**
+ * Une épreuve de la SFL : rien de ce qui vient d'un match Bola (`l.bola`, une
+ * mission perso) ne l'ouvre, même pour un filleul entré en SFL (revue, 28/10).
+ */
+const sfl = (l: LigneXp) => l.bola !== true && l.mission?.creneau !== "perso";
 
 export const EPREUVES: readonly Epreuve[] = [
-  { numero: 1, romain: "I", palier: 5, nom: "Signer", phrase: "Réussis une mission que tu as acceptée.", faite: reussie },
+  // Une mission perso (joueur Bola, missions-perso.ts) ne s'accepte pas : elle ne signe rien.
+  {
+    numero: 1,
+    romain: "I",
+    palier: 5,
+    nom: "Signer",
+    phrase: "Réussis une mission que tu as acceptée.",
+    faite: (l) => sfl(l) && reussie(l),
+  },
   {
     numero: 2,
     romain: "II",
     palier: 10,
     nom: "Le contrat",
     phrase: "Réussis un contrat.",
-    faite: (l) => reussie(l) && l.mission?.creneau === "contrat",
+    faite: (l) => sfl(l) && reussie(l) && l.mission?.creneau === "contrat",
+  },
+  {
+    numero: 3,
+    romain: "III",
+    palier: 15,
+    nom: "Rang S",
+    phrase: "Réussis une mission de rang S.",
+    faite: (l) => sfl(l) && reussie(l) && l.mission?.rang === "S",
+  },
+  {
+    numero: 4,
+    romain: "IV",
+    palier: 20,
+    nom: "Trois sur trois",
+    phrase: "Réussis les trois missions d'un même dimanche.",
+    faite: (l) => sfl(l) && l.parfait === true,
+  },
+];
+
+/**
+ * Les épreuves d'un joueur Bola, hors de la SFL (choix par défaut, 28/10) :
+ * il n'a ni contrat ni dimanche ; avec EPREUVES, il restait au palier 4 pour
+ * toujours. Ses missions perso (missions-perso.ts) ouvrent les mêmes paliers.
+ */
+export const EPREUVES_BOLA: readonly Epreuve[] = [
+  { numero: 1, romain: "I", palier: 5, nom: "Première", phrase: "Réussis une mission perso.", faite: reussie },
+  {
+    numero: 2,
+    romain: "II",
+    palier: 10,
+    nom: "Série",
+    phrase: "Gagne deux matchs de suite.",
+    faite: (l) => reussie(l) && l.mission?.perso === "serie",
   },
   {
     numero: 3,
@@ -85,9 +131,9 @@ export const EPREUVES: readonly Epreuve[] = [
     numero: 4,
     romain: "IV",
     palier: 20,
-    nom: "Trois sur trois",
-    phrase: "Réussis les trois missions d'un même dimanche.",
-    faite: (l) => l.parfait === true,
+    nom: "Trois en une semaine",
+    phrase: "Réussis trois missions perso la même semaine.",
+    faite: (l) => l.mission?.troisieme === true,
   },
 ];
 

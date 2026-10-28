@@ -5,6 +5,7 @@
 
 import type { MatchBola } from "@/lib/sfl/ligue-vierge";
 import type { Partie } from "@/lib/sfl/matchs";
+import type { ResultatAConfirmer } from "@/lib/sfl/confirmation-resultat";
 
 export const DEMO_LIGUE_VIERGE = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
 
@@ -72,5 +73,41 @@ export function demoFeuille(noms: string[], aujourdhui: string, moi: string): Pa
     scoreClairs: null,
     scoreFonces: null,
     saisiLe: null,
+  };
+}
+
+/**
+ * Un résultat à confirmer, pour voir l'écran « Résultat du match » en
+ * aperçu (?invitation=resultat) : moi chez les Clairs, 6 – 4, rien n'est envoyé.
+ */
+export function demoResultat(noms: string[], moi: string, aujourdhui: string): ResultatAConfirmer {
+  const autres = noms.filter((n) => n !== moi);
+  const tous = [moi, ...autres].slice(0, 10);
+  while (tous.length < 10) tous.push(`Joueur ${tous.length + 1}`);
+  const stats: [number, number][] = [[2, 1], [1, 2], [2, 0], [1, 0], [0, 1], [2, 1], [1, 0], [1, 1], [0, 1], [0, 0]];
+  const lignes = tous.map((name, i) => ({
+    id: i === 0 ? moi : `demo-${name}`,
+    name,
+    equipe: (i < 5 ? "clairs" : i < 9 ? "fonces" : "absent") as "clairs" | "fonces" | "absent",
+    buts: i < 9 ? stats[i][0] : 0,
+    passes: i < 9 ? stats[i][1] : 0,
+  }));
+  const [a, m, d] = aujourdhui.split("-").map(Number);
+  return {
+    id: -200,
+    version: 1,
+    jour: new Date(Date.UTC(a, m - 1, d - 1)).toISOString().slice(0, 10),
+    heure: "19h30",
+    lieu: "Five Lille Sud",
+    organisateurId: `demo-${tous[5]}`,
+    organisateur: tous[5],
+    scoreClairs: 6,
+    scoreFonces: 4,
+    lignes,
+    n: 8,
+    c: 3,
+    i: 0,
+    etat: "en_attente",
+    jusqua: new Date(Date.now() + 20 * 3600 * 1000).toISOString(),
   };
 }

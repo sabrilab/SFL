@@ -9,6 +9,12 @@
 // Le MVP n'est jamais choisi ici : l'app le tire des stats (le plus haut
 // buts + passes du match ; à égalité, le plus de passes, Sabri 28/10 ; deux
 // MVP seulement en égalité parfaite), et il s'affiche dès qu'il change.
+//
+// Depuis le 28/10 (lib/sfl/confirmation-resultat.ts) : la feuille enregistrée
+// part aux joueurs, qui la confirment ou l'infirment ; leurs réponses
+// s'affichent en tête de la feuille (bilan-resultat.tsx). Corriger une feuille
+// à laquelle des joueurs ont déjà répondu remet leurs réponses à zéro : on le
+// demande d'abord, dans la feuille même (pas une boîte du système).
 
 import { useMemo, useState } from "react";
 import { Minus, Plus } from "lucide-react";
@@ -18,6 +24,7 @@ import { direErreur, saisirFeuille, type EquipeFeuille, type Partie } from "@/li
 import { mvpsDuMatch, QUORUM } from "@/lib/sfl/ligue-vierge";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
+import { BilanResultat, useBilan, type Bilan } from "@/components/sfl/matchs/bilan-resultat";
 
 interface Ligne {
   playerId: string;
@@ -77,7 +84,10 @@ export function FeuilleBola({
   onOpenChange,
   onSaisie,
   apercu = false,
+  demoBilan,
 }: {
+  /** Un bilan de démonstration (aperçus). */
+  demoBilan?: Bilan | null;
   partie: Partie;
   /** Une feuille de démonstration : rien n'est envoyé. */
   apercu?: boolean;
@@ -88,6 +98,9 @@ export function FeuilleBola({
   const [lignes, setLignes] = useState<Ligne[]>(() => lignesDe(partie));
   const [score, setScore] = useState({ clairs: partie.scoreClairs ?? 0, fonces: partie.scoreFonces ?? 0 });
   const [envoi, setEnvoi] = useState(false);
+  /** La correction attend son accord : les réponses des joueurs repartiront à zéro. */
+  const [raz, setRaz] = useState(false);
+  const bilan = useBilan(partie.saisiLe ? partie.id : 0, true, apercu ? (demoBilan ?? null) : undefined);
 
   const butsDe = (e: "clairs" | "fonces") => lignes.filter((l) => l.equipe === e).reduce((s, l) => s + l.buts, 0);
   const passesDe = (e: "clairs" | "fonces") => lignes.filter((l) => l.equipe === e).reduce((s, l) => s + l.passes, 0);
@@ -104,6 +117,7 @@ export function FeuilleBola({
     const suivantes = lignes.map((l) => (l.playerId === id ? { ...l, ...patch } : l));
     // Le score suit les buts : il ne descend jamais sous ceux qu'on a marqués.
     const b = (e: "clairs" | "fonces") => suivantes.filter((l) => l.equipe === e).reduce((s, l) => s + l.buts, 0);
+    setRaz(false);
     setLignes(suivantes);
     setScore((s) => ({ clairs: Math.max(s.clairs, b("clairs")), fonces: Math.max(s.fonces, b("fonces")) }));
   }
@@ -116,6 +130,11 @@ export function FeuilleBola({
         onOpenChange(false);
         return;
       }
+      if (bilan?.requise && bilan.c + bilan.i > 0 && !raz) {
+        setRaz(true);
+        return;
+      }
+      setRaz(false);
       await saisirFeuille(partie.id, {
         scoreClairs: score.clairs,
         scoreFonces: score.fonces,
@@ -124,7 +143,7 @@ export function FeuilleBola({
       // Sous le quorum, le match est amical : rien ne bouge au classement,
       // le dire plutôt qu'annoncer un classement « à jour » (28/10/2026).
       if (presents < QUORUM) toast(`Feuille enregistrée. Match amical : moins de ${QUORUM} joueurs.`);
-      else toast.success("Feuille enregistrée, le classement Bola est à jour.");
+      else toast.success("Feuille enregistrée, envoyée aux joueurs.");
       onSaisie();
       onOpenChange(false);
     } catch (e) {
@@ -142,6 +161,9 @@ export function FeuilleBola({
         </SheetHeader>
 
         <div className="flex flex-col gap-5 px-4">
+          {partie.saisiLe && (
+            <BilanResultat matchId={partie.id} organise demo={bilan} className="rounded-[26px] bg-card p-4" />
+          )}
           {/* Le score, les deux équipes face à face. */}
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-[26px] bg-card p-4">
             {(["clairs", "fonces"] as const).map((e, i) => (
@@ -201,14 +223,38 @@ export function FeuilleBola({
             ))}
           </div>
 
-          <button
-            type="button"
-            disabled={envoi || !coherent || presents < 2}
-            onClick={valider}
-            className="bouton-principal bouton--vert flex h-12 items-center justify-center text-[15px] font-semibold disabled:opacity-40"
-          >
-            {coherent ? `Valider · ${score.clairs} – ${score.fonces}` : "Plus de passes que de buts"}
-          </button>
+          {raz ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-center text-[14px] font-semibold text-muted-foreground">Les réponses des joueurs repartent à zéro.</p>
+              <div className="grid grid-cols-[auto_1fr] gap-2">
+                <button
+                  type="button"
+                  disabled={envoi}
+                  onClick={() => setRaz(false)}
+                  className="bouton-discret h-12 px-5 text-[15px] font-semibold text-muted-foreground"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  disabled={envoi}
+                  onClick={valider}
+                  className="bouton-principal flex h-12 items-center justify-center text-[15px] font-semibold disabled:opacity-40"
+                >
+                  {`Corriger · ${score.clairs} – ${score.fonces}`}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={envoi || !coherent || presents < 2}
+              onClick={valider}
+              className="bouton-principal bouton--vert flex h-12 items-center justify-center text-[15px] font-semibold disabled:opacity-40"
+            >
+              {coherent ? `Valider · ${score.clairs} – ${score.fonces}` : "Plus de passes que de buts"}
+            </button>
+          )}
         </div>
       </SheetContent>
     </Sheet>

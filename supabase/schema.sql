@@ -1594,6 +1594,22 @@ $$;
 alter table public.matchs add column if not exists score_clairs int check (score_clairs between 0 and 99);
 alter table public.matchs add column if not exists score_fonces int check (score_fonces between 0 and 99);
 alter table public.matchs add column if not exists saisi_le timestamptz;
+-- La confirmation des résultats (Sabri, 28/10 : « dans le mode Bola, il n'y
+-- a pas de vote de la part des joueurs. Il n'y a qu'une confirmation des
+-- statistiques du match » ; « Par un écran qui s'affiche confirmer ou
+-- infirmer les résultats ») : chaque enregistrement qui change la feuille
+-- en fait une nouvelle version (match_feuilles, plus bas), que les joueurs
+-- confirment ou infirment (match_confirmations). Les matchs saisis avant
+-- restent comptés tels quels : choix par défaut, 28/10. L'exemption tient
+-- aux lignes présentes au déploiement (l'ajout de la colonne les met à
+-- false), pas à la valeur par défaut : un match créé ensuite naît à true
+-- (match_naissance_gardee le force), et le mode d'un match ne change plus
+-- (match_feuille_gardee) — on saisissait un match en « team » pour le
+-- repasser en « bola », compté sans personne. Seule la fonction
+-- enregistrer_feuille_bola écrit ces deux colonnes (match_feuille_gardee).
+alter table public.matchs add column if not exists feuille_version int not null default 0;
+alter table public.matchs add column if not exists confirmation_requise boolean not null default false;
+alter table public.matchs alter column confirmation_requise set default true;
 
 -- equipe : null tant que rien n'est saisi, puis clairs, fonces ou absent.
 alter table public.match_joueurs add column if not exists equipe text check (equipe in ('clairs', 'fonces', 'absent'));
@@ -1638,6 +1654,7 @@ declare
   saisi timestamptz;
   m_jour date;
   m_heure text;
+  m_mode text;
 begin
   if public.is_league_admin() then
     return new;
@@ -1657,11 +1674,20 @@ begin
        and not (old.statut = 'invite' and new.statut = 'inscrit') then
       raise exception 'réponse figée' using errcode = 'P0001';
     end if;
+    -- Une invitation ne s'accepte plus, dans un match Bola, une fois la
+    -- feuille faite (28/10/2026) : on entrait au classement d'un match où
+    -- on n'avait rien dit.
+    if old.statut = 'invite' and new.statut = 'inscrit'
+       and (select auth.uid()) is not null
+       and not public.organise_match(new.match_id)
+       and exists (select 1 from public.matchs x where x.id = new.match_id and x.mode = 'bola' and x.saisi_le is not null) then
+      raise exception 'match déjà joué' using errcode = 'P0001';
+    end if;
     if (new.equipe, new.buts, new.passes) is distinct from (old.equipe, old.buts, old.passes) then
       if not public.organise_match(new.match_id) then
         raise exception 'feuille réservée à l''organisateur' using errcode = '42501';
       end if;
-      select saisi_le, jour, heure into saisi, m_jour, m_heure from public.matchs where id = new.match_id;
+      select saisi_le, jour, heure, mode into saisi, m_jour, m_heure, m_mode from public.matchs where id = new.match_id;
       if saisi is not null and saisi < now() - interval '24 hours' then
         raise exception 'feuille close' using errcode = 'P0001';
       end if;
@@ -1669,8 +1695,32 @@ begin
          and public.coup_d_envoi(m_jour, m_heure) > now() then
         raise exception 'match pas commencé' using errcode = 'P0001';
       end if;
+      -- Une feuille Bola ne s'écrit plus que par enregistrer_feuille_bola
+      -- (28/10/2026) : une ligne changée à côté, après les confirmations des
+      -- joueurs, ne ferait pas de nouvelle version. Une app restée en cache
+      -- l'écrivait en direct : « Mets l'app à jour » (direErreur).
+      if m_mode = 'bola' and (select auth.uid()) is not null
+         and current_setting('bola.feuille', true) is distinct from '1' then
+        raise exception 'feuille par l''app' using errcode = 'P0001';
+      end if;
     end if;
   else
+    -- Le mode d'un match ne change pas (28/10/2026) : saisi en « team »,
+    -- repassé en « bola », il comptait sans confirmation. L'app ne le
+    -- change jamais ; l'admin (plus haut) et le serveur passent.
+    if new.mode is distinct from old.mode and (select auth.uid()) is not null then
+      raise exception 'mode figé' using errcode = 'P0001';
+    end if;
+    -- La version de la feuille et sa confirmation : la fonction seule les
+    -- écrit, et le score d'un match Bola ne change que par elle (28/10/2026).
+    if current_setting('bola.feuille', true) is distinct from '1' then
+      new.feuille_version := old.feuille_version;
+      new.confirmation_requise := old.confirmation_requise;
+      if new.mode = 'bola' and (select auth.uid()) is not null
+         and (new.score_clairs, new.score_fonces) is distinct from (old.score_clairs, old.score_fonces) then
+        raise exception 'feuille par l''app' using errcode = 'P0001';
+      end if;
+    end if;
     if old.saisi_le is null and (select auth.uid()) is not null
        and new.score_clairs is not null and new.score_fonces is not null
        and public.coup_d_envoi(new.jour, new.heure) > now() then
@@ -1757,8 +1807,17 @@ security definer
 set search_path = ''
 as $$
 begin
-  -- Le serveur (clé secrète), l'admin et l'organisateur passent.
-  if (select auth.uid()) is null or public.is_league_admin() or public.organise_match(new.match_id) then
+  -- Le serveur (clé secrète) et l'admin passent.
+  if (select auth.uid()) is null or public.is_league_admin() then
+    return new;
+  end if;
+  -- L'organisateur aussi, sauf dans un match Bola à la feuille faite : la
+  -- ligne arrivait avec ses stats, hors de toute version de la feuille que
+  -- les joueurs confirment (28/10/2026).
+  if public.organise_match(new.match_id) then
+    if exists (select 1 from public.matchs x where x.id = new.match_id and x.mode = 'bola' and x.saisi_le is not null) then
+      raise exception 'match déjà joué' using errcode = 'P0001';
+    end if;
     return new;
   end if;
   if new.equipe is not null or new.buts <> 0 or new.passes <> 0 then
@@ -1795,8 +1854,17 @@ as $$
 begin
   -- pg_trigger_depth() > 1 : une suppression en cascade (le match annulé,
   -- un compte effacé) n'est pas une réponse du joueur.
-  if (select auth.uid()) is null or public.is_league_admin() or public.organise_match(old.match_id)
-     or pg_trigger_depth() > 1 then
+  if (select auth.uid()) is null or public.is_league_admin() or pg_trigger_depth() > 1 then
+    return old;
+  end if;
+  -- L'organisateur retire qui il veut, jusqu'à la feuille d'un match Bola :
+  -- ensuite, un joueur qui n'est pas venu passe « Absent » sur la feuille
+  -- (une nouvelle version, que les joueurs confirment). Retirer sa ligne
+  -- changeait les stats sans rien dire à personne (28/10/2026).
+  if public.organise_match(old.match_id) then
+    if exists (select 1 from public.matchs x where x.id = old.match_id and x.mode = 'bola' and x.saisi_le is not null) then
+      raise exception 'match déjà joué' using errcode = 'P0001';
+    end if;
     return old;
   end if;
   if exists (select 1 from public.matchs x where x.id = old.match_id and x.saisi_le is not null) then
@@ -1821,43 +1889,560 @@ drop trigger if exists match_joueurs_sortie on public.match_joueurs;
 create trigger match_joueurs_sortie before delete on public.match_joueurs
   for each row execute function public.match_sortie_gardee();
 
--- La Ligue vierge lit tous les matchs Bola joués, privés compris : seulement
--- le jour, l'heure et qui a fait quoi — ni le lieu, ni les invités. Pour les
--- membres seulement : un compte en attente reçoit une liste vide. Avec le
--- poste de la fiche de chacun (28/10/2026) : la carte d'un joueur Bola, hors
--- de la SFL, le montrait en « — ».
-create or replace function public.ligue_vierge()
-returns jsonb
-language sql
-security definer
-set search_path = ''
-stable
-as $$
-  select coalesce(jsonb_agg(jsonb_build_object(
-           'id', m.id,
-           'jour', m.jour,
-           'heure', m.heure,
-           'genre', m.genre,
-           'scoreClairs', m.score_clairs,
-           'scoreFonces', m.score_fonces,
-           'joueurs', (
-             select coalesce(jsonb_agg(jsonb_build_object(
-                      'id', j.player_id, 'name', p.name, 'equipe', j.equipe, 'buts', j.buts, 'passes', j.passes,
-                      'poste', f.poste)), '[]'::jsonb)
-               from public.match_joueurs j
-               join public.profiles p on p.id = j.player_id
-               left join public.fiches f on f.player_id = j.player_id
-              where j.match_id = m.id and j.equipe in ('clairs', 'fonces')
-           )
-         ) order by m.jour, m.heure, m.id), '[]'::jsonb)
-    from public.matchs m
-   where public.est_membre()
-     and m.mode = 'bola' and m.saisi_le is not null
-     and m.score_clairs is not null and m.score_fonces is not null;
+-- ─────────────── Mode Bola : les joueurs confirment le résultat ───────────────
+-- Sabri, 28/10 : « à la fin, ils puissent noter les résultats du match et,
+-- par la même occasion, que le résultat puisse être envoyé à chaque joueur
+-- qui confirme » ; « dans le mode Bola, il n'y a pas de vote de la part des
+-- joueurs. Il n'y a qu'une confirmation des statistiques du match » ; « Par
+-- un écran qui s'affiche confirmer ou infirmer les résultats ».
+--
+-- L'organisateur enregistre la feuille (enregistrer_feuille_bola) : chaque
+-- enregistrement qui la change en fait une version (match_feuilles). Chaque
+-- joueur de la feuille qui a un compte reçoit le résultat (notification,
+-- /api/matchs/resultat) et l'écran « Résultat du match » à l'ouverture de
+-- l'app (resultat-a-confirmer.tsx) : il confirme ou il infirme, une fois par
+-- version (match_confirmations). Règles, choix par défaut, 28/10 (Sabri peut
+-- les changer) :
+--   · les destinataires : les joueurs de la feuille (Clairs, Foncés, ou
+--     Absent après avoir dit « Je viens » : il peut dire qu'il y était),
+--     comptes acceptés, sauf l'organisateur — sa saisie vaut sa déclaration ;
+--   · la liste des destinataires est figée dans chaque version (une
+--     invitation acceptée après coup ne change plus le compte), et ceux de
+--     la version d'avant restent sur celle d'une correction ;
+--   · le match compte dès que la moitié des destinataires confirme ; il ne
+--     compte pas dès que la moitié infirme ; le premier seuil atteint fige
+--     la décision (match_feuilles.decide ; à 4 contre 4 sur 8, c'est le
+--     premier arrivé) ;
+--   · 24 h après la version (la même fenêtre que la correction) : il compte
+--     si personne n'a infirmé, sinon il ne compte pas ;
+--   · une correction de l'organisateur (dans ses 24 h, comme avant) remet
+--     les réponses à zéro : nouvelle version, nouvelle notification ;
+--   · aucune notification quand le match bascule, pour ne pas faire de bruit ;
+--   · les matchs saisis avant (confirmation_requise à false) comptent tels
+--     quels, même corrigés après ;
+--   · les journées de la SFL et le mode Team (equipe_resultat) ne sont pas
+--     concernés.
+-- L'état se calcule à la lecture (etat_resultat, comparé à now()) : aucune
+-- tâche planifiée. Le même calcul, en TypeScript, dans
+-- lib/sfl/confirmation-resultat.ts (etatResultat) : valeurs recopiées.
+
+-- Une ligne par version enregistrée : ce que les joueurs ont jugé, et
+-- l'historique en cas de litige. L'heure de la version fait partir les 24 h.
+create table if not exists public.match_feuilles (
+  match_id       bigint not null references public.matchs(id) on delete cascade,
+  version        int    not null,
+  enregistree_le timestamptz not null default now(),
+  par            uuid references public.profiles(id) on delete set null,
+  -- { scoreClairs, scoreFonces, lignes: [{ id, equipe, buts, passes }] }
+  instantane     jsonb  not null,
+  -- Les joueurs prévenus (/api/matchs/resultat, clé secrète) : une fois.
+  resultat_notifie_le timestamptz,
+  -- Ceux qui répondent à cette version, figés à l'enregistrement : une
+  -- invitation acceptée après coup, un compte validé ou effacé ne changent
+  -- plus le compte (n), et un joueur qui répondait reste sur la liste d'une
+  -- correction (enregistrer_feuille_bola).
+  destinataires  uuid[] not null default '{}',
+  -- Le seuil atteint (la moitié confirme ou infirme) : la décision, figée.
+  decide         text check (decide in ('compte', 'ne_compte_pas')),
+  decide_le      timestamptz,
+  primary key (match_id, version)
+);
+
+alter table public.match_feuilles add column if not exists destinataires uuid[] not null default '{}';
+alter table public.match_feuilles add column if not exists decide text check (decide in ('compte', 'ne_compte_pas'));
+alter table public.match_feuilles add column if not exists decide_le timestamptz;
+
+alter table public.match_feuilles enable row level security;
+
+drop policy if exists "match_feuilles: lecture" on public.match_feuilles;
+create policy "match_feuilles: lecture"
+  on public.match_feuilles for select
+  to authenticated
+  using ((select public.voit_match(match_id)));
+
+revoke all on public.match_feuilles from anon, authenticated;
+grant select on public.match_feuilles to authenticated;
+
+-- Une réponse par joueur et par version : figée, comme « Je viens ». Le
+-- motif d'un « infirme » reste entre le joueur, l'organisateur et l'admin.
+create table if not exists public.match_confirmations (
+  match_id  bigint not null references public.matchs(id) on delete cascade,
+  joueur    uuid   not null references public.profiles(id) on delete cascade,
+  version   int    not null,
+  reponse   text   not null check (reponse in ('confirme', 'infirme')),
+  motif     text   check (motif is null or char_length(btrim(motif)) between 1 and 140),
+  le        timestamptz not null default now(),
+  -- Un « infirme » signalé à l'organisateur (/api/matchs/resultat) : une fois.
+  notifie_le timestamptz,
+  primary key (match_id, joueur, version)
+);
+
+create index if not exists match_confirmations_joueur_idx on public.match_confirmations (joueur);
+
+alter table public.match_confirmations enable row level security;
+
+drop policy if exists "match_confirmations: lecture" on public.match_confirmations;
+create policy "match_confirmations: lecture"
+  on public.match_confirmations for select
+  to authenticated
+  using (
+    joueur = (select auth.uid())
+    or (select public.organise_match(match_id))
+    or (select public.is_league_admin())
+  );
+
+-- Personne n'écrit ici en direct : repondre_resultat seule (et la clé secrète).
+revoke all on public.match_confirmations from anon, authenticated;
+grant select on public.match_confirmations to authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.match_confirmations;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
 $$;
 
-revoke execute on function public.ligue_vierge() from public, anon;
-grant execute on function public.ligue_vierge() to authenticated;
+-- L'état d'un résultat, d'après ses chiffres : n destinataires, c « confirme »,
+-- i « infirme », jusqua la fin des 24 h. Le premier cas vrai l'emporte. Le
+-- même calcul que etatResultat (lib/sfl/confirmation-resultat.ts). Choix
+-- par défaut, 28/10 : à l'échéance, un seul « infirme » sans la moitié de
+-- confirmations suffit à ce que le match ne compte pas (la consigne : il
+-- compte si la moitié confirme, ou si personne ne conteste) ; un joueur
+-- bloque donc seul un match si les autres ne répondent pas. Sans
+-- destinataire (n = 0), le match attend aussi ses 24 h.
+create or replace function public.etat_resultat(requise boolean, saisi boolean, n int, c int, i int, jusqua timestamptz, maintenant timestamptz)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case
+    when not saisi then null
+    when not requise then 'compte'
+    when n = 0 then case when jusqua is null or maintenant >= jusqua then 'compte' else 'en_attente' end
+    when i * 2 >= n then 'ne_compte_pas'
+    when c * 2 >= n then 'compte'
+    when jusqua is null or maintenant >= jusqua then case when i = 0 then 'compte' else 'ne_compte_pas' end
+    when i > 0 then 'conteste'
+    else 'en_attente'
+  end;
+$$;
+
+grant execute on function public.etat_resultat(boolean, boolean, int, int, int, timestamptz, timestamptz) to authenticated;
+
+-- Ceux qui répondent pour la feuille d'un match (voir plus haut), au moment
+-- où elle s'enregistre : enregistrer_feuille_bola les fige dans la version.
+-- Un « Absent » ne répond que s'il avait lui-même dit « Je viens »
+-- (accepte_le) : l'organisateur inscrit qui il veut.
+create or replace function public.destinataires_feuille(m bigint)
+returns setof uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select j.player_id
+    from public.match_joueurs j
+    join public.matchs x on x.id = j.match_id
+    join public.profiles p on p.id = j.player_id
+   where j.match_id = m
+     and j.player_id <> x.organisateur
+     and p.valide
+     and (j.equipe in ('clairs', 'fonces') or (j.equipe = 'absent' and j.statut = 'inscrit' and j.accepte_le is not null));
+$$;
+
+-- Le bilan de la version courante. Sans contrôle d'accès : réservé aux
+-- fonctions plus bas, qui le font.
+create or replace function public.bilan_feuille(m bigint)
+returns table (requise boolean, saisi boolean, version int, n int, c int, i int, jusqua timestamptz, etat text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select b.requise, b.saisi, b.version, b.n, b.c, b.i, b.jusqua,
+         coalesce(b.decide, public.etat_resultat(b.requise, b.saisi, b.n, b.c, b.i, b.jusqua, now()))
+    from (
+      select x.confirmation_requise as requise,
+             (x.saisi_le is not null and x.score_clairs is not null and x.score_fonces is not null) as saisi,
+             x.feuille_version as version,
+             coalesce(cardinality(f.destinataires), 0) as n,
+             (select count(*)::int from public.match_confirmations r
+               where r.match_id = m and r.version = x.feuille_version and r.reponse = 'confirme'
+                 and r.joueur = any (f.destinataires)) as c,
+             (select count(*)::int from public.match_confirmations r
+               where r.match_id = m and r.version = x.feuille_version and r.reponse = 'infirme'
+                 and r.joueur = any (f.destinataires)) as i,
+             -- La fenêtre de réponse : 24 h par version (choix par défaut, 28/10).
+             f.enregistree_le + interval '24 hours' as jusqua,
+             f.decide
+        from public.matchs x
+        left join public.match_feuilles f on f.match_id = x.id and f.version = x.feuille_version
+       where x.id = m
+    ) b;
+$$;
+
+create or replace function public.etat_feuille(m bigint)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select b.etat from public.bilan_feuille(m) b;
+$$;
+
+revoke execute on function public.destinataires_feuille(bigint) from public, anon, authenticated;
+revoke execute on function public.bilan_feuille(bigint) from public, anon, authenticated;
+revoke execute on function public.etat_feuille(bigint) from public, anon, authenticated;
+
+-- L'organisateur (ou l'admin) enregistre la feuille d'un match Bola, d'un
+-- coup : les lignes, le score, puis la version. Les règles de la feuille
+-- (match_feuille_gardee : le coup d'envoi, les 24 h, l'organisateur)
+-- s'appliquent comme avant. Une feuille réenregistrée telle quelle ne fait
+-- pas de version : rien ne repart à zéro. Renvoie la version courante.
+create or replace function public.enregistrer_feuille_bola(m bigint, clairs int, fonces int, lignes jsonb)
+returns int
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  x public.matchs%rowtype;
+  l jsonb;
+  n int;
+  premiere boolean;
+  inst jsonb;
+  avant jsonb;
+  dest_avant uuid[];
+  dest uuid[];
+  v int;
+begin
+  select * into x from public.matchs where id = m for update;
+  if not found or x.mode <> 'bola' then
+    raise exception 'match inconnu' using errcode = 'P0002';
+  end if;
+  if x.organisateur is distinct from (select auth.uid()) and not public.is_league_admin() then
+    raise exception 'feuille réservée à l''organisateur' using errcode = '42501';
+  end if;
+  if x.saisi_le is not null and x.saisi_le < now() - interval '24 hours' and not public.is_league_admin() then
+    raise exception 'feuille close' using errcode = 'P0001';
+  end if;
+  if clairs is null or fonces is null or jsonb_typeof(lignes) is distinct from 'array' then
+    raise exception 'feuille incomplète' using errcode = '22023';
+  end if;
+  premiere := x.saisi_le is null;
+  perform set_config('bola.feuille', '1', true);
+  for l in select * from jsonb_array_elements(lignes) loop
+    -- Chaque ligne dans une équipe ou absente : une ligne remise à null
+    -- sortait de la feuille un joueur qui avait infirmé.
+    if (l ->> 'equipe') is null or (l ->> 'equipe') not in ('clairs', 'fonces', 'absent') then
+      raise exception 'feuille incomplète' using errcode = '22023';
+    end if;
+    update public.match_joueurs j
+       set equipe = l ->> 'equipe',
+           buts   = case when l ->> 'equipe' = 'absent' then 0 else coalesce((l ->> 'buts')::int, 0) end,
+           passes = case when l ->> 'equipe' = 'absent' then 0 else coalesce((l ->> 'passes')::int, 0) end
+     where j.match_id = m and j.player_id = (l ->> 'playerId')::uuid;
+    get diagnostics n = row_count;
+    if n = 0 then
+      raise exception 'joueur absent de la feuille' using errcode = '22023';
+    end if;
+  end loop;
+  -- Toute la feuille : aucun joueur du match laissé de côté.
+  if exists (select 1 from public.match_joueurs j where j.match_id = m and j.equipe is null) then
+    raise exception 'feuille incomplète' using errcode = '22023';
+  end if;
+  update public.matchs set score_clairs = clairs, score_fonces = fonces where id = m;
+  -- Jamais plus de buts ni de passes qu'un score n'en compte.
+  if exists (
+    select 1
+      from public.match_joueurs j
+     where j.match_id = m and j.equipe in ('clairs', 'fonces')
+     group by j.equipe
+    having sum(j.buts) > case j.equipe when 'clairs' then clairs else fonces end
+        or sum(j.passes) > case j.equipe when 'clairs' then clairs else fonces end
+  ) then
+    raise exception 'feuille incohérente' using errcode = '22023';
+  end if;
+  select jsonb_build_object(
+           'scoreClairs', clairs,
+           'scoreFonces', fonces,
+           'lignes', coalesce(jsonb_agg(jsonb_build_object('id', j.player_id, 'equipe', j.equipe, 'buts', j.buts, 'passes', j.passes)
+                                        order by j.player_id), '[]'::jsonb))
+    into inst
+    from public.match_joueurs j
+   where j.match_id = m and j.equipe is not null;
+  select f.instantane, f.destinataires into avant, dest_avant
+    from public.match_feuilles f where f.match_id = m and f.version = x.feuille_version;
+  if avant is not null and avant = inst then
+    return x.feuille_version;
+  end if;
+  -- Les destinataires de la version : ceux d'aujourd'hui, plus ceux de la
+  -- version d'avant (qui a infirmé juge aussi la correction).
+  select coalesce(array_agg(distinct d order by d), '{}') into dest
+    from (
+      select public.destinataires_feuille(m) as d
+      union
+      select unnest(coalesce(dest_avant, '{}'))
+    ) t
+   where d is not null and d is distinct from x.organisateur;
+  v := x.feuille_version + 1;
+  insert into public.match_feuilles (match_id, version, par, instantane, destinataires)
+  values (m, v, (select auth.uid()), inst, dest);
+  update public.matchs
+     set feuille_version = v,
+         confirmation_requise = confirmation_requise or premiere
+   where id = m;
+  -- Une correction : ce qu'attendait la notification « Résultat infirmé ».
+  if v > 1 then
+    begin
+      perform public.push_effet(x.organisateur, array['match-conteste'], 'match:' || m, 'corrige', interval '2 days');
+    exception when others then
+      raise warning 'enregistrer_feuille_bola : %', sqlerrm;
+    end;
+  end if;
+  return v;
+end;
+$$;
+
+revoke execute on function public.enregistrer_feuille_bola(bigint, int, int, jsonb) from public, anon;
+grant execute on function public.enregistrer_feuille_bola(bigint, int, int, jsonb) to authenticated;
+
+-- Un joueur confirme ou infirme la version v (celle qu'il a vue). Une
+-- réponse par version, figée ; plus rien une fois le résultat décidé.
+-- Renvoie le nouvel état.
+create or replace function public.repondre_resultat(m bigint, v int, r text, motif text default null)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  x public.matchs%rowtype;
+  e text;
+begin
+  -- Le verrou : deux réponses au même instant ne passent pas un seuil à deux.
+  select * into x from public.matchs where id = m for update;
+  if not found or x.mode <> 'bola' or not x.confirmation_requise or x.saisi_le is null then
+    raise exception 'aucun résultat à confirmer' using errcode = 'P0002';
+  end if;
+  if r is null or r not in ('confirme', 'infirme') then
+    raise exception 'réponse inconnue' using errcode = '22023';
+  end if;
+  if v is distinct from x.feuille_version then
+    raise exception 'feuille corrigée' using errcode = 'P0001';
+  end if;
+  if not exists (select 1 from public.match_feuilles f
+                  where f.match_id = m and f.version = v and (select auth.uid()) = any (f.destinataires)) then
+    raise exception 'pas sur la feuille' using errcode = '42501';
+  end if;
+  if exists (select 1 from public.match_confirmations c
+              where c.match_id = m and c.joueur = (select auth.uid()) and c.version = v) then
+    raise exception 'réponse figée' using errcode = 'P0001';
+  end if;
+  if public.etat_feuille(m) not in ('en_attente', 'conteste') then
+    raise exception 'résultat décidé' using errcode = 'P0001';
+  end if;
+  insert into public.match_confirmations (match_id, joueur, version, reponse, motif)
+  values (m, (select auth.uid()), v, r, case when r = 'infirme' then nullif(btrim(left(motif, 140)), '') end);
+  e := public.etat_feuille(m);
+  -- Un seuil franchi (la réponse arrive avant l'échéance) : la décision se
+  -- fige dans la version.
+  if e in ('compte', 'ne_compte_pas') then
+    update public.match_feuilles set decide = e, decide_le = now()
+     where match_id = m and version = v and decide is null;
+  end if;
+  return e;
+end;
+$$;
+
+revoke execute on function public.repondre_resultat(bigint, int, text, text) from public, anon;
+grant execute on function public.repondre_resultat(bigint, int, text, text) to authenticated;
+
+-- Ce que montre l'écran « Résultat du match » : le match, la version
+-- jugée (avec les noms), le bilan. Sans contrôle d'accès : réservé aux
+-- fonctions qui le font.
+create or replace function public.feuille_vue(m bigint)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+           'id', x.id,
+           'version', x.feuille_version,
+           'jour', x.jour,
+           'heure', x.heure,
+           'lieu', x.lieu,
+           'organisateurId', x.organisateur,
+           'organisateur', o.name,
+           'scoreClairs', f.instantane -> 'scoreClairs',
+           'scoreFonces', f.instantane -> 'scoreFonces',
+           'lignes', (
+             select coalesce(jsonb_agg(jsonb_build_object(
+                      'id', l ->> 'id', 'name', coalesce(p.name, '—'), 'equipe', l ->> 'equipe',
+                      'buts', (l ->> 'buts')::int, 'passes', (l ->> 'passes')::int, 'poste', fi.poste)
+                      order by p.name), '[]'::jsonb)
+               from jsonb_array_elements(f.instantane -> 'lignes') l
+               left join public.profiles p on p.id = (l ->> 'id')::uuid
+               left join public.fiches fi on fi.player_id = (l ->> 'id')::uuid
+           ),
+           'n', b.n, 'c', b.c, 'i', b.i, 'etat', b.etat, 'jusqua', b.jusqua
+         )
+    from public.matchs x
+    join public.match_feuilles f on f.match_id = x.id and f.version = x.feuille_version
+    left join public.profiles o on o.id = x.organisateur
+    cross join lateral public.bilan_feuille(x.id) b
+   where x.id = m;
+$$;
+
+revoke execute on function public.feuille_vue(bigint) from public, anon, authenticated;
+
+-- Les résultats qui attendent ma réponse : je suis sur la feuille, je n'ai
+-- pas répondu à sa version courante, rien n'est décidé. Du plus ancien au
+-- plus récent.
+create or replace function public.mes_resultats_a_confirmer()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  -- Depuis mes lignes (match_joueurs_player_idx) : l'appel de chaque
+  -- ouverture de l'app ne parcourt pas tous les matchs. Une version sans
+  -- décision, de moins de 24 h, est forcément en attente ou contestée.
+  select coalesce(jsonb_agg(public.feuille_vue(x.id) order by f.enregistree_le, x.id), '[]'::jsonb)
+    from public.match_joueurs j
+    join public.matchs x on x.id = j.match_id
+    join public.match_feuilles f on f.match_id = x.id and f.version = x.feuille_version
+   where j.player_id = (select auth.uid())
+     and x.mode = 'bola' and x.confirmation_requise and x.saisi_le is not null
+     and f.decide is null
+     and f.enregistree_le > now() - interval '24 hours'
+     and (select auth.uid()) = any (f.destinataires)
+     and not exists (select 1 from public.match_confirmations c
+                      where c.match_id = x.id and c.joueur = (select auth.uid()) and c.version = x.feuille_version);
+$$;
+
+revoke execute on function public.mes_resultats_a_confirmer() from public, anon;
+grant execute on function public.mes_resultats_a_confirmer() to authenticated;
+
+-- L'état des matchs que je vois (la fiche, mes derniers matchs), et ma
+-- réponse : { "12": { etat, version, n, c, i, jusqua, requise, destinataire, mienne } }.
+create or replace function public.bilans_feuilles(ids bigint[])
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_object_agg(x.id::text, jsonb_build_object(
+           'etat', b.etat, 'version', b.version, 'n', b.n, 'c', b.c, 'i', b.i, 'jusqua', b.jusqua,
+           'requise', b.requise,
+           'corrigerJusqua', x.saisi_le + interval '24 hours',
+           'destinataire', exists (select 1 from public.match_feuilles f
+                                    where f.match_id = x.id and f.version = x.feuille_version
+                                      and (select auth.uid()) = any (f.destinataires)),
+           'mienne', (select c.reponse from public.match_confirmations c
+                       where c.match_id = x.id and c.joueur = (select auth.uid()) and c.version = x.feuille_version)
+         )), '{}'::jsonb)
+    from public.matchs x
+    cross join lateral public.bilan_feuille(x.id) b
+   where x.id = any (ids[1:100])
+     and x.mode = 'bola'
+     and public.voit_match(x.id);
+$$;
+
+revoke execute on function public.bilans_feuilles(bigint[]) from public, anon;
+grant execute on function public.bilans_feuilles(bigint[]) to authenticated;
+
+-- Les réponses à la version courante, pour l'organisateur (ou l'admin) :
+-- chaque destinataire, sa réponse et son motif. Un autre joueur du match
+-- n'a que le bilan et sa réponse.
+create or replace function public.reponses_du_match(m bigint)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+           'etat', b.etat, 'version', b.version, 'n', b.n, 'c', b.c, 'i', b.i, 'jusqua', b.jusqua, 'requise', b.requise,
+           'corrigerJusqua', (select x.saisi_le + interval '24 hours' from public.matchs x where x.id = m),
+           'mienne', (select c.reponse from public.match_confirmations c
+                       where c.match_id = m and c.joueur = (select auth.uid()) and c.version = b.version),
+           'reponses', case when public.organise_match(m) or public.is_league_admin() then (
+             select coalesce(jsonb_agg(jsonb_build_object(
+                      'id', d, 'name', p.name, 'reponse', c.reponse, 'motif', c.motif, 'le', c.le)
+                      order by (c.reponse = 'infirme') desc nulls last, p.name), '[]'::jsonb)
+               from unnest((select f.destinataires from public.match_feuilles f
+                             where f.match_id = m and f.version = b.version)) d
+               join public.profiles p on p.id = d
+               left join public.match_confirmations c on c.match_id = m and c.joueur = d and c.version = b.version
+           ) end
+         )
+    from public.bilan_feuille(m) b
+   where public.voit_match(m);
+$$;
+
+revoke execute on function public.reponses_du_match(bigint) from public, anon;
+grant execute on function public.reponses_du_match(bigint) to authenticated;
+
+-- Le résultat d'un match que je vois, même déjà répondu : l'écran « Résultat
+-- du match » en lecture (Mes derniers matchs), avec ma réponse. Null pour un
+-- match sans feuille versionnée (saisi avant le 28/10/2026).
+create or replace function public.resultat_du_match(m bigint)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.feuille_vue(x.id) || jsonb_build_object(
+           'mienne', (select c.reponse from public.match_confirmations c
+                       where c.match_id = x.id and c.joueur = (select auth.uid()) and c.version = x.feuille_version),
+           'destinataire', (select auth.uid()) = any (f.destinataires))
+    from public.matchs x
+    join public.match_feuilles f on f.match_id = x.id and f.version = x.feuille_version
+   where x.id = m
+     and x.mode = 'bola'
+     and (select auth.uid()) is not null
+     and public.voit_match(x.id);
+$$;
+
+revoke execute on function public.resultat_du_match(bigint) from public, anon;
+grant execute on function public.resultat_du_match(bigint) to authenticated;
+
+-- Une réponse donnée : ce qu'attendait la notification « Un résultat à
+-- confirmer » (push_envois). « accepte » pour un oui, « refuse » pour un
+-- non : la page Activité les compte comme les invitations.
+create or replace function public.push_effet_confirmation()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    perform public.push_effet(new.joueur, array['match-resultat'], 'match:' || new.match_id,
+                              case when new.reponse = 'confirme' then 'accepte' else 'refuse' end, interval '2 days');
+  exception when others then
+    raise warning 'push_effet_confirmation : %', sqlerrm;
+  end;
+  return null;
+end;
+$$;
+
+revoke execute on function public.push_effet_confirmation() from public, anon, authenticated;
+
+drop trigger if exists match_confirmations_push_effet on public.match_confirmations;
+create trigger match_confirmations_push_effet
+  after insert on public.match_confirmations
+  for each row execute function public.push_effet_confirmation();
 
 -- ─────────────────────────── Disponibilités ──────────────────────────
 -- Chaque joueur dit quand il peut jouer : un jour, un moment. La ligue s'en
@@ -5036,6 +5621,9 @@ begin
   new.score_clairs := null;
   new.score_fonces := null;
   new.saisi_le := null;
+  -- Un match né après le 28/10/2026 passe par la confirmation des joueurs.
+  new.feuille_version := 0;
+  new.confirmation_requise := true;
   return new;
 end;
 $$;
@@ -5396,6 +5984,208 @@ as $$
 $$;
 revoke execute on function public.hors_sfl() from public, anon;
 grant execute on function public.hors_sfl() to authenticated;
+
+-- La carte, l'XP et les missions d'un joueur Bola (Sabri, 28/10/2026 : « leur
+-- carte s'actualise à chaque match », « Pareil pour xp etc ») : rien n'est
+-- stocké, l'app les recalcule (lib/sfl/carte-bola.ts, missions-perso.ts) à
+-- partir de ses matchs Bola saisis, lus ici.
+--
+-- L'entrée en SFL d'un filleul : le jour où son nom entre dans l'effectif
+-- de la saison. Ce qu'il a gagné avant (XP, missions, cartes MVP) lui reste ;
+-- ses matchs Bola d'après ne lui rapportent plus rien de Bola, et ses stats
+-- Bola n'entrent jamais dans la saison SFL (choix par défaut, 28/10). Écrite
+-- par le déclencheur ci-dessous seulement ; chacun lit la sienne.
+create table if not exists public.entrees_sfl (
+  joueur uuid primary key references public.profiles(id) on delete cascade,
+  le     timestamptz not null default now()
+);
+alter table public.entrees_sfl enable row level security;
+drop policy if exists "entrees_sfl: la mienne" on public.entrees_sfl;
+create policy "entrees_sfl: la mienne"
+  on public.entrees_sfl for select
+  to authenticated
+  using (joueur = (select auth.uid()));
+revoke all on public.entrees_sfl from anon, authenticated;
+grant select on public.entrees_sfl to authenticated;
+
+-- Le nom d'un filleul est-il dans cet effectif ? Sans tenir compte de la
+-- casse ni des espaces autour, comme l'app (memeNom, season-provider.tsx) :
+-- « Nassim B » dans l'effectif et « nassim b » au profil, c'est lui.
+create or replace function public.nom_dans_effectif(roster jsonb, nom text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select exists (
+    select 1 from jsonb_array_elements(coalesce(roster, '[]'::jsonb)) r
+     where lower(btrim(r ->> 'name')) = lower(btrim(nom))
+  );
+$$;
+revoke execute on function public.nom_dans_effectif(jsonb, text) from public, anon, authenticated;
+
+-- Une seule fois (etapes_uniques) : les filleuls déjà dans l'effectif avant
+-- cette règle sont entrés le jour de leur inscription (aucun match Bola
+-- d'avant ne leur est rendu). Rejouée à chaque déploiement, elle aurait daté
+-- de son inscription un filleul entré plus tard sans que le déclencheur le
+-- voie, et lui aurait retiré après coup son XP Bola (revue, 28/10).
+do $$
+begin
+  if not exists (select 1 from public.etapes_uniques where etape = 'entrees-sfl-2026-10') then
+    insert into public.entrees_sfl (joueur, le)
+    select x.filleul, x.created_at
+      from public.parrainages x
+      join public.profiles p on p.id = x.filleul
+      join public.saison s on s.id = 1
+     where public.nom_dans_effectif(s.data -> 'roster', p.name)
+    on conflict (joueur) do nothing;
+    insert into public.etapes_uniques (etape) values ('entrees-sfl-2026-10');
+  end if;
+end;
+$$;
+
+-- Ensuite, à chaque déploiement : un filleul que le déclencheur n'a pas vu
+-- entrer (son nom de profil corrigé pour coller à l'effectif) est noté entré
+-- maintenant ; une date déjà posée ne bouge jamais.
+insert into public.entrees_sfl (joueur, le)
+select x.filleul, now()
+  from public.parrainages x
+  join public.profiles p on p.id = x.filleul
+  join public.saison s on s.id = 1
+ where public.nom_dans_effectif(s.data -> 'roster', p.name)
+on conflict (joueur) do nothing;
+
+create or replace function public.noter_entrees_sfl()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.entrees_sfl (joueur, le)
+  select x.filleul, now()
+    from public.parrainages x
+    join public.profiles p on p.id = x.filleul
+   where public.nom_dans_effectif(new.data -> 'roster', p.name)
+     and (tg_op = 'INSERT' or not public.nom_dans_effectif(old.data -> 'roster', p.name))
+  on conflict (joueur) do nothing;
+  return null;
+end;
+$$;
+revoke execute on function public.noter_entrees_sfl() from public, anon, authenticated;
+
+drop trigger if exists saison_entrees_sfl on public.saison;
+create trigger saison_entrees_sfl
+  after insert or update of data on public.saison
+  for each row execute function public.noter_entrees_sfl();
+
+-- La Ligue vierge lit tous les matchs Bola joués, privés compris : seulement
+-- le jour, l'heure et qui a fait quoi — ni le lieu, ni les invités. Pour les
+-- membres seulement : un compte en attente reçoit une liste vide. Avec le
+-- poste de la fiche de chacun (28/10/2026) : la carte d'un joueur Bola, hors
+-- de la SFL, le montrait en « — ». Depuis le 28/10/2026, l'état de chaque
+-- match (etat : compte, en_attente, conteste, ne_compte_pas ; voir plus
+-- haut) : le moteur (lib/sfl/ligue-vierge.ts) ne compte que « compte ». Et
+-- dans un match à confirmer, un joueur mis sur la feuille sans avoir jamais
+-- accepté de lui-même (accepte_le), ou dont le compte attend sa validation,
+-- n'y paraît que s'il a confirmé (choix par défaut, 28/10) : sinon
+-- l'organisateur remplissait le quorum avec des joueurs qui n'avaient rien dit.
+-- Un match Bola saisi, tel que la Ligue vierge et mes_matchs_bola le lisent
+-- (28/10/2026, carte des joueurs Bola) : la même brique pour les deux, pour
+-- que la carte d'un joueur Bola et le classement ne divergent jamais. Interne.
+-- Posée ici, après parrainages et entrees_sfl qu'elle lit (carteBola) : sur
+-- une base neuve, une fonction sql ne se crée pas avant ses tables.
+create or replace function public.match_bola_json(mid bigint)
+returns jsonb
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select jsonb_build_object(
+           'id', m.id,
+           'jour', m.jour,
+           'heure', m.heure,
+           'genre', m.genre,
+           'scoreClairs', m.score_clairs,
+           'scoreFonces', m.score_fonces,
+           -- Un match saisi avant le 28/10/2026 compte sans calcul.
+           'etat', case when m.confirmation_requise then public.etat_feuille(m.id) else 'compte' end,
+           'requise', m.confirmation_requise,
+           'joueurs', (
+             select coalesce(jsonb_agg(jsonb_build_object(
+                      'id', j.player_id, 'name', p.name, 'equipe', j.equipe, 'buts', j.buts, 'passes', j.passes,
+                      'poste', f.poste,
+                      -- Ce match fait-il bouger SA carte Bola ? La règle de
+                      -- mes_matchs_bola : un filleul, avant son entrée en SFL.
+                      'carteBola', exists (select 1 from public.parrainages x where x.filleul = j.player_id)
+                                   and public.coup_d_envoi(m.jour, m.heure)
+                                       < coalesce((select e.le from public.entrees_sfl e where e.joueur = j.player_id),
+                                                  'infinity'::timestamptz))), '[]'::jsonb)
+               from public.match_joueurs j
+               join public.profiles p on p.id = j.player_id
+               left join public.fiches f on f.player_id = j.player_id
+              where j.match_id = m.id and j.equipe in ('clairs', 'fonces')
+                and (not m.confirmation_requise
+                     or j.player_id = m.organisateur
+                     or (j.statut = 'inscrit' and j.accepte_le is not null and p.valide)
+                     or exists (select 1 from public.match_confirmations c
+                                 where c.match_id = m.id and c.joueur = j.player_id
+                                   and c.version = m.feuille_version and c.reponse = 'confirme'))
+           )
+         )
+    from public.matchs m
+   where m.id = mid;
+$$;
+revoke execute on function public.match_bola_json(bigint) from public, anon, authenticated;
+
+create or replace function public.ligue_vierge()
+returns jsonb
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select coalesce(jsonb_agg(public.match_bola_json(m.id) order by m.jour, m.heure, m.id), '[]'::jsonb)
+    from public.matchs m
+   where public.est_membre()
+     and m.mode = 'bola' and m.saisi_le is not null
+     and m.score_clairs is not null and m.score_fonces is not null;
+$$;
+
+revoke execute on function public.ligue_vierge() from public, anon;
+grant execute on function public.ligue_vierge() to authenticated;
+
+-- Mes matchs Bola saisis, au format de ligue_vierge() (match_bola_json) :
+-- seulement ceux où je suis compté (la même règle que le classement), et
+-- seulement pour un filleul (un joueur venu par un lien) ; jusqu'à son entrée
+-- en SFL. Toute la ligne des joueurs du match vient avec : le MVP se calcule
+-- sur tous (ligue_vierge les montre déjà à tout membre).
+create or replace function public.mes_matchs_bola()
+returns jsonb
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  with moi as (select (select auth.uid()) as id),
+  lus as (
+    select m.id, m.jour, m.heure, public.match_bola_json(m.id) as j
+      from public.matchs m, moi
+     where public.est_membre()
+       and exists (select 1 from public.parrainages x where x.filleul = moi.id)
+       and m.mode = 'bola' and m.saisi_le is not null
+       and m.score_clairs is not null and m.score_fonces is not null
+       and exists (select 1 from public.match_joueurs mj where mj.match_id = m.id and mj.player_id = moi.id)
+       and public.coup_d_envoi(m.jour, m.heure)
+           < coalesce((select e.le from public.entrees_sfl e where e.joueur = moi.id), 'infinity'::timestamptz)
+  )
+  select coalesce(jsonb_agg(l.j order by l.jour, l.heure, l.id), '[]'::jsonb)
+    from lus l, moi
+   where exists (select 1 from jsonb_array_elements(l.j -> 'joueurs') x where x ->> 'id' = moi.id::text);
+$$;
+revoke execute on function public.mes_matchs_bola() from public, anon;
+grant execute on function public.mes_matchs_bola() to authenticated;
 
 -- Le Vestiaire est le salon de la SFL : un joueur Bola (venu par un parrain,
 -- hors de la saison) ne le lit pas et n'y écrit pas. Ses messages privés et
