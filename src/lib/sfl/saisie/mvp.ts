@@ -4,6 +4,9 @@
 // l'app d'après les statistiques des joueurs du match. Le ou les meilleurs
 // prennent la carte MVP ; à égalité, ils l'ont tous. Pas de vote des joueurs.
 // Le vote (meilleur joueur, meilleur défenseur, MVP) reste pour le mode Team.
+// Ce module ne sert qu'aux journées de la SFL : les matchs Bola ouverts par
+// les joueurs ont leur propre règle (le plus de passes départage, Sabri 28/10),
+// dans lib/sfl/ligue-vierge.ts (mvpsDuMatch).
 //
 // La note de match reprend le barème Pépite, sans ce qui ne dit rien du jeu
 // (présence, retard, bonus manuel) ni les titres eux-mêmes (MVP, Impact,

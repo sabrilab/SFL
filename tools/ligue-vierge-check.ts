@@ -2,11 +2,12 @@
 // officielles (ilyesbensal/BOLA, docs/gameplay/03-mode-bola.md §7) :
 //   npx tsx tools/ligue-vierge-check.ts
 import assert from "node:assert/strict";
-import { classementAVie, compterMatchs, coupDEnvoiPasse, type LigneBola, type MatchBola } from "../src/lib/sfl/ligue-vierge";
+import { classementAVie, compterMatchs, coupDEnvoiPasse, mvpsDuMatch, type LigneBola, type MatchBola } from "../src/lib/sfl/ligue-vierge";
 
 const l = (name: string, equipe: "clairs" | "fonces", buts: number, passes: number): LigneBola => ({ id: name, name, equipe, buts, passes });
 
-// §7.3 : 6-4, trois MVP ex æquo.
+// §7.3 : 6-4, trois joueurs à 3 (buts + passes) ; depuis le 28/10 (Sabri),
+// le plus de passes départage : Clara (1 but, 2 passes) seule MVP.
 const m73: MatchBola = {
   id: 1, jour: "2026-10-20", heure: "19h00", genre: "match", scoreClairs: 6, scoreFonces: 4,
   joueurs: [
@@ -15,10 +16,16 @@ const m73: MatchBola = {
   ],
 };
 const [c73] = compterMatchs([m73]);
-assert.deepEqual([...c73.mvps].sort(), ["Ayoub", "Clara", "Mehdi"]);
+assert.deepEqual([...c73.mvps], ["Clara"]);
 const pts = Object.fromEntries(c73.joueurs.map((j) => [j.name, j.points]));
-assert.deepEqual(pts, { Ayoub: 7, Clara: 7, Thomas: 5, Adam: 5, Bilal: 3, Mehdi: 5, Julien: 3, Romain: 3, Sofia: 1, Omar: 1 });
-assert.equal(c73.joueurs.reduce((s, j) => s + j.points, 0), 40);
+assert.deepEqual(pts, { Ayoub: 6, Clara: 7, Thomas: 5, Adam: 5, Bilal: 3, Mehdi: 4, Julien: 3, Romain: 3, Sofia: 1, Omar: 1 });
+assert.equal(c73.joueurs.reduce((s, j) => s + j.points, 0), 38);
+
+// L'exemple de Sabri (28/10) : 5 buts 2 passes contre 2 buts 5 passes, même
+// total ; le MVP est celui qui a mis plus de passes.
+assert.deepEqual(mvpsDuMatch([{ id: "Buteur", buts: 5, passes: 2 }, { id: "Passeur", buts: 2, passes: 5 }, { id: "X", buts: 1, passes: 1 }]), ["Passeur"]);
+// « Si vraiment c'est une égalité, les deux reçoivent MVP. »
+assert.deepEqual(mvpsDuMatch([{ id: "A", buts: 3, passes: 2 }, { id: "B", buts: 3, passes: 2 }, { id: "C", buts: 4, passes: 0 }]), ["A", "B"]);
 
 // §7.2 : 0-0 à 8, aucun MVP, 2 points chacun.
 const m72: MatchBola = {
@@ -42,10 +49,12 @@ const c2 = compterMatchs([soir, m73]);
 assert.equal(c2[0].id, 1);
 assert.ok(c2[1].joueurs.every((j) => !j.classe && j.points === 0));
 const cl = classementAVie(c2);
+assert.equal(cl[0].name, "Clara");
 assert.equal(cl[0].points, 7);
 assert.equal(cl[0].matchs, 1);
 assert.equal(cl[0].rank, 1);
-assert.equal(cl[1].rank, 1); // Ayoub et Clara, ex æquo parfaits
+assert.equal(cl[1].name, "Ayoub");
+assert.equal(cl[1].rank, 2); // 6 points : la carte MVP a départagé
 
 // Exhibition : jamais comptée.
 assert.equal(compterMatchs([{ ...m73, genre: "exhibition" }])[0].valide, false);

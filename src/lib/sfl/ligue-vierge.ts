@@ -12,7 +12,12 @@
 //   · Points Perso d'un match = présence 1 + résultat (victoire 2, nul 1,
 //     défaite 0) + 1 par but + 1 par passe + 1 si MVP ;
 //   · MVP jamais voté : l'app prend le plus haut buts + passes du match,
-//     toutes équipes confondues ; à égalité, plusieurs MVP ; à 0, aucun ;
+//     toutes équipes confondues ; à 0, aucun. À égalité, celui qui a fait le
+//     plus de passes (Sabri, 28/10 : « un joueur qui fait 5 buts, 2 passes D
+//     a le même nombre de points qu'un joueur qui fait 2 buts, 5 passes D,
+//     mais on choisira le MVP qui a mis plus de passes. Si vraiment c'est une
+//     égalité, les deux reçoivent MVP. ») ; plusieurs MVP seulement si buts
+//     et passes sont les mêmes ;
 //   · un seul match Bola classé par jour et par joueur : les suivants sont
 //     amicaux pour lui (il garde la carte MVP, pas les points) ;
 //   · au moins 8 joueurs présents (un 4 contre 4) pour qu'un match compte ;
@@ -78,11 +83,16 @@ export interface Classe {
   mvp: number;
 }
 
-/** Les MVP d'un match : le plus haut buts + passes, ex æquo compris ; aucun à 0. */
+/**
+ * Les MVP d'un match : le plus haut buts + passes ; à égalité, le plus de
+ * passes (Sabri, 28/10) ; plusieurs seulement en égalité parfaite ; aucun à 0.
+ */
 export function mvpsDuMatch(joueurs: { id: string; buts: number; passes: number }[]): string[] {
   const meilleur = Math.max(0, ...joueurs.map((j) => j.buts + j.passes));
   if (meilleur === 0) return [];
-  return joueurs.filter((j) => j.buts + j.passes === meilleur).map((j) => j.id);
+  const top = joueurs.filter((j) => j.buts + j.passes === meilleur);
+  const maxP = Math.max(...top.map((j) => j.passes));
+  return top.filter((j) => j.passes === maxP).map((j) => j.id);
 }
 
 function resultat(m: MatchBola, e: Equipe): "V" | "N" | "D" {

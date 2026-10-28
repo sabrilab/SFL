@@ -6,7 +6,8 @@
 // (la base ferme la feuille ensuite).
 //
 // Le MVP n'est jamais choisi ici : l'app le tire des stats (le plus haut
-// buts + passes du match, ex æquo compris), et il s'affiche dès qu'il change.
+// buts + passes du match ; à égalité, le plus de passes, Sabri 28/10 ; deux
+// MVP seulement en égalité parfaite), et il s'affiche dès qu'il change.
 
 import { useMemo, useState } from "react";
 import { Minus, Plus } from "lucide-react";

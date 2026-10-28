@@ -3,7 +3,8 @@
 // La Ligue vierge — les matchs Bola, ceux que les joueurs ouvrent eux-mêmes
 // hors de la SFL, comptés à vie (Sabri, 22/10) : pas de saison, pas de
 // trophée de fin de saison, ni Impact ni Défensive ; seulement le MVP que
-// l'app désigne à chaque match (ex æquo compris). Le barème et les règles
+// l'app désigne à chaque match (à égalité, le plus de passes ; ex æquo
+// seulement en égalité parfaite, Sabri 28/10). Le barème et les règles
 // sont dans lib/sfl/ligue-vierge.ts.
 //
 // Le même dessin que Bola Team (Sabri, 26/10 : « quand on va dans Bola, il
