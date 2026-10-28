@@ -219,12 +219,14 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   // et bouge à chaque match, au lieu de rester à 75 (avant le 28/10).
   const mesBola = useMesMatchsBola(nom !== null);
   const bolaCarte = useMemo(() => {
-    const qui = nom ?? nomSession;
+    // Entré en SFL : son nom tel que l'effectif l'écrit (memeNom), pour que
+    // journal d'XP, cartes MVP et Mes cartes le retrouvent (revue, 28/10).
+    const qui = nom ?? (nomSession ? (derived.players.find((p) => memeNom(p.name, nomSession))?.name ?? nomSession) : null);
     if (!mesBola || !qui || (!nom && !mesBola.matchs.length)) return null;
     const comptes = compterMatchs(mesBola.matchs);
     const posteLu = poste ?? comptes.flatMap((m) => m.joueurs).find((j) => j.id === mesBola.uid && j.poste)?.poste ?? null;
     return carteBola(comptes, mesBola.uid, qui, posteLu);
-  }, [mesBola, nom, nomSession, poste]);
+  }, [mesBola, nom, nomSession, poste, derived.players]);
   const bola = useMemo(() => {
     const p = joueurBola(nom, poste);
     return p && bolaCarte && bolaCarte.nom === p.name ? { ...bolaCarte.player, poste: p.poste !== "—" ? p.poste : bolaCarte.player.poste } : p;

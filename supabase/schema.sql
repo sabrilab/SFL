@@ -2444,75 +2444,6 @@ create trigger match_confirmations_push_effet
   after insert on public.match_confirmations
   for each row execute function public.push_effet_confirmation();
 
--- La Ligue vierge lit tous les matchs Bola joués, privés compris : seulement
--- le jour, l'heure et qui a fait quoi — ni le lieu, ni les invités. Pour les
--- membres seulement : un compte en attente reçoit une liste vide. Avec le
--- poste de la fiche de chacun (28/10/2026) : la carte d'un joueur Bola, hors
--- de la SFL, le montrait en « — ». Depuis le 28/10/2026, l'état de chaque
--- match (etat : compte, en_attente, conteste, ne_compte_pas ; voir plus
--- haut) : le moteur (lib/sfl/ligue-vierge.ts) ne compte que « compte ». Et
--- dans un match à confirmer, un joueur mis sur la feuille sans avoir jamais
--- accepté de lui-même (accepte_le), ou dont le compte attend sa validation,
--- n'y paraît que s'il a confirmé (choix par défaut, 28/10) : sinon
--- l'organisateur remplissait le quorum avec des joueurs qui n'avaient rien dit.
--- Un match Bola saisi, tel que la Ligue vierge et mes_matchs_bola le lisent
--- (28/10/2026, carte des joueurs Bola) : la même brique pour les deux, pour
--- que la carte d'un joueur Bola et le classement ne divergent jamais. Interne.
-create or replace function public.match_bola_json(mid bigint)
-returns jsonb
-language sql
-security definer
-set search_path = ''
-stable
-as $$
-  select jsonb_build_object(
-           'id', m.id,
-           'jour', m.jour,
-           'heure', m.heure,
-           'genre', m.genre,
-           'scoreClairs', m.score_clairs,
-           'scoreFonces', m.score_fonces,
-           -- Un match saisi avant le 28/10/2026 compte sans calcul.
-           'etat', case when m.confirmation_requise then public.etat_feuille(m.id) else 'compte' end,
-           'requise', m.confirmation_requise,
-           'joueurs', (
-             select coalesce(jsonb_agg(jsonb_build_object(
-                      'id', j.player_id, 'name', p.name, 'equipe', j.equipe, 'buts', j.buts, 'passes', j.passes,
-                      'poste', f.poste)), '[]'::jsonb)
-               from public.match_joueurs j
-               join public.profiles p on p.id = j.player_id
-               left join public.fiches f on f.player_id = j.player_id
-              where j.match_id = m.id and j.equipe in ('clairs', 'fonces')
-                and (not m.confirmation_requise
-                     or j.player_id = m.organisateur
-                     or (j.statut = 'inscrit' and j.accepte_le is not null and p.valide)
-                     or exists (select 1 from public.match_confirmations c
-                                 where c.match_id = m.id and c.joueur = j.player_id
-                                   and c.version = m.feuille_version and c.reponse = 'confirme'))
-           )
-         )
-    from public.matchs m
-   where m.id = mid;
-$$;
-revoke execute on function public.match_bola_json(bigint) from public, anon, authenticated;
-
-create or replace function public.ligue_vierge()
-returns jsonb
-language sql
-security definer
-set search_path = ''
-stable
-as $$
-  select coalesce(jsonb_agg(public.match_bola_json(m.id) order by m.jour, m.heure, m.id), '[]'::jsonb)
-    from public.matchs m
-   where public.est_membre()
-     and m.mode = 'bola' and m.saisi_le is not null
-     and m.score_clairs is not null and m.score_fonces is not null;
-$$;
-
-revoke execute on function public.ligue_vierge() from public, anon;
-grant execute on function public.ligue_vierge() to authenticated;
-
 -- ─────────────────────────── Disponibilités ──────────────────────────
 -- Chaque joueur dit quand il peut jouer : un jour, un moment. La ligue s'en
 -- sert pour composer des matchs et inviter (matchmaking), et chacun voit,
@@ -6077,12 +6008,51 @@ create policy "entrees_sfl: la mienne"
 revoke all on public.entrees_sfl from anon, authenticated;
 grant select on public.entrees_sfl to authenticated;
 
--- Les filleuls déjà dans l'effectif avant cette règle : entrés le jour de
--- leur inscription (aucun match Bola d'avant ne leur est rendu).
+-- Le nom d'un filleul est-il dans cet effectif ? Sans tenir compte de la
+-- casse ni des espaces autour, comme l'app (memeNom, season-provider.tsx) :
+-- « Nassim B » dans l'effectif et « nassim b » au profil, c'est lui.
+create or replace function public.nom_dans_effectif(roster jsonb, nom text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select exists (
+    select 1 from jsonb_array_elements(coalesce(roster, '[]'::jsonb)) r
+     where lower(btrim(r ->> 'name')) = lower(btrim(nom))
+  );
+$$;
+revoke execute on function public.nom_dans_effectif(jsonb, text) from public, anon, authenticated;
+
+-- Une seule fois (etapes_uniques) : les filleuls déjà dans l'effectif avant
+-- cette règle sont entrés le jour de leur inscription (aucun match Bola
+-- d'avant ne leur est rendu). Rejouée à chaque déploiement, elle aurait daté
+-- de son inscription un filleul entré plus tard sans que le déclencheur le
+-- voie, et lui aurait retiré après coup son XP Bola (revue, 28/10).
+do $$
+begin
+  if not exists (select 1 from public.etapes_uniques where etape = 'entrees-sfl-2026-10') then
+    insert into public.entrees_sfl (joueur, le)
+    select x.filleul, x.created_at
+      from public.parrainages x
+      join public.profiles p on p.id = x.filleul
+      join public.saison s on s.id = 1
+     where public.nom_dans_effectif(s.data -> 'roster', p.name)
+    on conflict (joueur) do nothing;
+    insert into public.etapes_uniques (etape) values ('entrees-sfl-2026-10');
+  end if;
+end;
+$$;
+
+-- Ensuite, à chaque déploiement : un filleul que le déclencheur n'a pas vu
+-- entrer (son nom de profil corrigé pour coller à l'effectif) est noté entré
+-- maintenant ; une date déjà posée ne bouge jamais.
 insert into public.entrees_sfl (joueur, le)
-select x.filleul, x.created_at
+select x.filleul, now()
   from public.parrainages x
- where public.joueur_sfl(x.filleul)
+  join public.profiles p on p.id = x.filleul
+  join public.saison s on s.id = 1
+ where public.nom_dans_effectif(s.data -> 'roster', p.name)
 on conflict (joueur) do nothing;
 
 create or replace function public.noter_entrees_sfl()
@@ -6096,11 +6066,8 @@ begin
   select x.filleul, now()
     from public.parrainages x
     join public.profiles p on p.id = x.filleul
-   where exists (select 1 from jsonb_array_elements(coalesce(new.data -> 'roster', '[]'::jsonb)) r
-                  where r ->> 'name' = p.name)
-     and (tg_op = 'INSERT'
-          or not exists (select 1 from jsonb_array_elements(coalesce(old.data -> 'roster', '[]'::jsonb)) r
-                          where r ->> 'name' = p.name))
+   where public.nom_dans_effectif(new.data -> 'roster', p.name)
+     and (tg_op = 'INSERT' or not public.nom_dans_effectif(old.data -> 'roster', p.name))
   on conflict (joueur) do nothing;
   return null;
 end;
@@ -6111,6 +6078,83 @@ drop trigger if exists saison_entrees_sfl on public.saison;
 create trigger saison_entrees_sfl
   after insert or update of data on public.saison
   for each row execute function public.noter_entrees_sfl();
+
+-- La Ligue vierge lit tous les matchs Bola joués, privés compris : seulement
+-- le jour, l'heure et qui a fait quoi — ni le lieu, ni les invités. Pour les
+-- membres seulement : un compte en attente reçoit une liste vide. Avec le
+-- poste de la fiche de chacun (28/10/2026) : la carte d'un joueur Bola, hors
+-- de la SFL, le montrait en « — ». Depuis le 28/10/2026, l'état de chaque
+-- match (etat : compte, en_attente, conteste, ne_compte_pas ; voir plus
+-- haut) : le moteur (lib/sfl/ligue-vierge.ts) ne compte que « compte ». Et
+-- dans un match à confirmer, un joueur mis sur la feuille sans avoir jamais
+-- accepté de lui-même (accepte_le), ou dont le compte attend sa validation,
+-- n'y paraît que s'il a confirmé (choix par défaut, 28/10) : sinon
+-- l'organisateur remplissait le quorum avec des joueurs qui n'avaient rien dit.
+-- Un match Bola saisi, tel que la Ligue vierge et mes_matchs_bola le lisent
+-- (28/10/2026, carte des joueurs Bola) : la même brique pour les deux, pour
+-- que la carte d'un joueur Bola et le classement ne divergent jamais. Interne.
+-- Posée ici, après parrainages et entrees_sfl qu'elle lit (carteBola) : sur
+-- une base neuve, une fonction sql ne se crée pas avant ses tables.
+create or replace function public.match_bola_json(mid bigint)
+returns jsonb
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select jsonb_build_object(
+           'id', m.id,
+           'jour', m.jour,
+           'heure', m.heure,
+           'genre', m.genre,
+           'scoreClairs', m.score_clairs,
+           'scoreFonces', m.score_fonces,
+           -- Un match saisi avant le 28/10/2026 compte sans calcul.
+           'etat', case when m.confirmation_requise then public.etat_feuille(m.id) else 'compte' end,
+           'requise', m.confirmation_requise,
+           'joueurs', (
+             select coalesce(jsonb_agg(jsonb_build_object(
+                      'id', j.player_id, 'name', p.name, 'equipe', j.equipe, 'buts', j.buts, 'passes', j.passes,
+                      'poste', f.poste,
+                      -- Ce match fait-il bouger SA carte Bola ? La règle de
+                      -- mes_matchs_bola : un filleul, avant son entrée en SFL.
+                      'carteBola', exists (select 1 from public.parrainages x where x.filleul = j.player_id)
+                                   and public.coup_d_envoi(m.jour, m.heure)
+                                       < coalesce((select e.le from public.entrees_sfl e where e.joueur = j.player_id),
+                                                  'infinity'::timestamptz))), '[]'::jsonb)
+               from public.match_joueurs j
+               join public.profiles p on p.id = j.player_id
+               left join public.fiches f on f.player_id = j.player_id
+              where j.match_id = m.id and j.equipe in ('clairs', 'fonces')
+                and (not m.confirmation_requise
+                     or j.player_id = m.organisateur
+                     or (j.statut = 'inscrit' and j.accepte_le is not null and p.valide)
+                     or exists (select 1 from public.match_confirmations c
+                                 where c.match_id = m.id and c.joueur = j.player_id
+                                   and c.version = m.feuille_version and c.reponse = 'confirme'))
+           )
+         )
+    from public.matchs m
+   where m.id = mid;
+$$;
+revoke execute on function public.match_bola_json(bigint) from public, anon, authenticated;
+
+create or replace function public.ligue_vierge()
+returns jsonb
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select coalesce(jsonb_agg(public.match_bola_json(m.id) order by m.jour, m.heure, m.id), '[]'::jsonb)
+    from public.matchs m
+   where public.est_membre()
+     and m.mode = 'bola' and m.saisi_le is not null
+     and m.score_clairs is not null and m.score_fonces is not null;
+$$;
+
+revoke execute on function public.ligue_vierge() from public, anon;
+grant execute on function public.ligue_vierge() to authenticated;
 
 -- Mes matchs Bola saisis, au format de ligue_vierge() (match_bola_json) :
 -- seulement ceux où je suis compté (la même règle que le classement), et

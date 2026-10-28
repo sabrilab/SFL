@@ -410,7 +410,7 @@ export function ModePasse({
 
       <header className="mp-hud mp-entre" style={{ "--i": 1 } as React.CSSProperties} {...tirer}>
         <div className="flex flex-col gap-1">
-          <span className="mono-label text-white/50">Passe Bola · Saison {saison}</span>
+          <span className="mono-label text-white/50">{horsSfl ? "Passe Bola" : `Passe Bola · Saison ${saison}`}</span>
           <span className="flex items-baseline gap-1.5">
             <span className="tabular-nums" style={{ fontFamily: ANTON, fontSize: 54, lineHeight: 0.85 }}>
               {b.passe.palier}

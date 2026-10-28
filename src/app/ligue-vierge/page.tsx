@@ -81,7 +81,7 @@ import { aujourdhuiIso, libelleJour, listerMesDerniers, lireLigueVierge, monId, 
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { isHidden } from "@/lib/sfl/hidden";
-import { carteBola } from "@/lib/sfl/carte-bola";
+import { cartesDesJoueursBola } from "@/lib/sfl/carte-bola";
 import type { Player } from "@/lib/sfl/engine";
 
 /** La carte Bola de chaque joueur des matchs Bola (ligue_vierge), par nom en minuscules. */
@@ -387,17 +387,21 @@ export default function LigueViergePage() {
     () => (apercu ? compterMatchs(demoMatchs(noms, aujourdhuiIso())) : matchs),
     [apercu, noms, matchs]
   );
+  // La carte des autres joueurs Bola : leurs lignes `carteBola` seulement (la
+  // règle de mes_matchs_bola : filleul, avant son entrée en SFL), pour que la
+  // Ligue montre la carte que son téléphone lui montre. Recalculée quand les
+  // matchs changent, pas à chaque nouvelle liste de joueurs (revue, 28/10).
+  const parId = useMemo(() => (vus ? cartesDesJoueursBola(vus) : new Map<string, Player>()), [vus]);
+  const nomsConnus = useMemo(() => allPlayers.map((p) => p.name.trim().toLowerCase()).join("\n"), [allPlayers]);
   const cartesBola = useMemo(() => {
-    const ids = new Map<string, { name: string; poste: string | null }>();
-    for (const x of vus ?? []) for (const j of x.joueurs) ids.set(j.id, { name: j.name, poste: j.poste ?? ids.get(j.id)?.poste ?? null });
+    const connus = new Set(nomsConnus.split("\n"));
     const m = new Map<string, Player>();
-    for (const [id, j] of ids) {
-      const cle = j.name.trim().toLowerCase();
-      if (allPlayers.some((p) => p.name.toLowerCase() === cle)) continue;
-      m.set(cle, carteBola(vus ?? [], id, j.name, j.poste).player);
+    for (const p of parId.values()) {
+      const cle = p.name.trim().toLowerCase();
+      if (!connus.has(cle)) m.set(cle, p);
     }
     return m;
-  }, [vus, allPlayers]);
+  }, [parId, nomsConnus]);
   // Les masqués (Sabri, les arbitres) hors du classement, sauf soi-même.
   const classement = useMemo(() => (vus ? classementAVie(vus, (c) => c.id === moi || !isHidden(c.name)) : []), [vus, moi]);
   // Mes feuilles : j'organise, le coup d'envoi est passé, et la feuille reste ouverte (24 h après la saisie).

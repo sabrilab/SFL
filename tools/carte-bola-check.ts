@@ -2,11 +2,12 @@
 // Bola (lib/sfl/carte-bola.ts, lib/sfl/missions-perso.ts) :
 //   npx tsx tools/carte-bola-check.ts
 import assert from "node:assert/strict";
-import { BASE_BOLA, carteBola, enDirect, evolutionBrute, mesMatchsValides, RAISON_SERIE_BOLA, saisonBola } from "../src/lib/sfl/carte-bola";
+import { BASE_BOLA, carteBola, cartesDesJoueursBola, cartesSuccessives, enDirect, evolutionBrute, mesMatchsValides, RAISON_SERIE_BOLA, saisonBola, saisonsBolaDe } from "../src/lib/sfl/carte-bola";
 import { ovr } from "../src/lib/sfl/engine";
 import { classementAVie, compterMatchs, type LigneBola, type MatchBola } from "../src/lib/sfl/ligue-vierge";
 import { bilanDe, classementNiveau, journalXp, rangsDesJoueurs, XP_DIMANCHE } from "../src/lib/sfl/missions";
-import { ajouterBola, lignesXpBola, missionsPerso, semaineDe } from "../src/lib/sfl/missions-perso";
+import { ajouterBola, instantParis, lignesXpBola, missionsPerso, semaineDe } from "../src/lib/sfl/missions-perso";
+import { vitrine } from "../src/lib/sfl/trophees";
 import { EPREUVES, EPREUVES_BOLA } from "../src/lib/sfl/passe";
 import { deriveSeason, statsCarteTitre } from "../src/lib/sfl/saisie/engine";
 import { evoluer } from "../src/lib/sfl/saisie/evolution";
@@ -56,7 +57,7 @@ assert.equal(c3.valides[2].ligne.mvp, true);
 const ev3 = evolutionBrute(c3.valides, NOM)!;
 const f3 = ev3.journal[0].faits.map((f) => `${f.raison}>${f.stat}:${f.crans}`);
 assert.ok(f3.includes(`${RAISON_SERIE_BOLA}>PHY:3`), f3.join(", "));
-assert.equal(RAISON_SERIE_BOLA, "3 matchs de suite");
+assert.equal(RAISON_SERIE_BOLA, "3 matchs validés");
 assert.deepEqual(c3.stats, enDirect(ev3));
 assert.equal(c3.stats.TIR, 77, "TIR : 2 crans puis 1 + 2 MVP = 76 puis 77");
 assert.equal(c3.stats.PAS, 76);
@@ -195,6 +196,45 @@ assert.equal(bSfl.passe.palier, 4, "« Signer » ne s'ouvre pas avec une mission
 assert.ok(bBola.passe.palier >= 5, `palier Bola ${bBola.passe.palier}`);
 assert.ok(bBola.passe.epreuves.every((e) => e.j !== null), "les quatre épreuves Bola faites");
 assert.equal(jb.get(NOM)!.reussies, 7);
+// Aucune épreuve de la SFL ne s'ouvre avec une ligne Bola (rang S d'une mission perso compris) :
+// le Passe SFL d'un filleul entré en SFL ne change pas.
+assert.ok(lignes.some((l) => l.mission?.rang === "S"));
+assert.ok(bSfl.passe.epreuves.every((e) => e.j === null), "aucune épreuve SFL par le Bola");
+for (const e of EPREUVES) assert.ok(!lignes.some((l) => e.faite(l)), `épreuve SFL ${e.romain}`);
+
+// ── 6 bis. L'heure du match est celle de Paris, quel que soit le téléphone ──
+assert.equal(instantParis("2026-10-20", "19h00").toISOString(), "2026-10-20T17:00:00.000Z"); // été
+assert.equal(instantParis("2026-10-26", "19h00").toISOString(), "2026-10-26T18:00:00.000Z"); // hiver
+assert.equal(instantParis("2026-10-25", "03h30").toISOString(), "2026-10-25T02:30:00.000Z"); // la nuit du changement
+assert.equal(instantParis("2026-03-29", "12:00").toISOString(), "2026-03-29T10:00:00.000Z");
+// Match validé 30 min après son coup d'envoi : son XP est là, même sur un téléphone à New York.
+const juste = mesMatchsValides(compterMatchs([match("2026-10-27", "20h00", { buts: 0, passes: 0 }, [1, 0])]), MOI);
+assert.equal(lignesXpBola(juste, [], seed, new Date("2026-10-27T19:30:00Z")).length, 1);
+assert.equal(lignesXpBola(juste, [], seed, new Date("2026-10-27T18:59:00Z")).length, 0);
+
+// ── 6 ter. La courbe en un passage, la Ligue, les badges ──
+const succ = cartesSuccessives(c4.valides, NOM);
+assert.equal(succ.length, 5);
+assert.deepEqual(succ[0], BASE_BOLA);
+assert.deepEqual(succ[4], c4.stats);
+assert.deepEqual(c4.notes.map((n) => n.note), succ.slice(1).map(ovr));
+// La Ligue : la carte d'un autre joueur ne suit que ses lignes `carteBola` (filleul, avant son entrée en SFL).
+const marques = compterMatchs(quatre.map((m, i) => ({ ...m, joueurs: m.joueurs.map((j) => ({ ...j, carteBola: j.id === MOI ? i < 3 : false })) })));
+const ligue = cartesDesJoueursBola(marques);
+assert.deepEqual(ligue.get(MOI)!.stats, c3.stats, "trois lignes comptées sur quatre");
+assert.equal(ligue.get(MOI)!.matchs, 3);
+assert.deepEqual(ligue.get("p1")!.stats, BASE_BOLA, "non filleul : 75");
+assert.equal(ligue.size, 8);
+assert.equal(cartesDesJoueursBola(compterMatchs(quatre)).get(MOI)!.matchs, 0, "sans drapeau : rien ne compte");
+// Badges : mes matchs Bola validés y comptent, sur mon téléphone ; pas pour un autre nom.
+const vSans = vitrine(seed, NOM);
+const vAvec = vitrine(seed, NOM, undefined, saisonsBolaDe(cMv, NOM));
+const val = (v: typeof vSans, id: string) => v.find((e) => e.def.id === id)!.valeur;
+assert.equal(val(vAvec, "mvp") - val(vSans, "mvp"), 2);
+assert.equal(val(vAvec, "matchs") - val(vSans, "matchs"), 3);
+assert.equal(val(vAvec, "buts") - val(vSans, "buts"), 3);
+assert.equal(val(vAvec, "victoires") - val(vSans, "victoires"), 2);
+assert.equal(saisonsBolaDe(cMv, "Autre").length, 0);
 
 // ── 7. La SFL ne change pas ──
 const snap = (s: Saison) => {

@@ -50,7 +50,9 @@ export const UN_PAR_JOUR = false;
 export const BASE_BOLA: Stats = { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 };
 
 /** La raison de la série de physique, un match validé valant une journée (choix par défaut, 28/10). */
-export const RAISON_SERIE_BOLA = `${SERIE} matchs de suite`;
+// « De suite » ne disait rien : chaque match validé compte, même à des
+// semaines d'écart (revue, 28/10).
+export const RAISON_SERIE_BOLA = `${SERIE} matchs validés`;
 
 /** Un match validé, et ma ligne. */
 export interface MatchValide {
@@ -165,10 +167,20 @@ export function evolutionEnDirect(ev: EvolutionJoueur): EvolutionJoueur {
   return { ...ev, officielles: enDirect(ev), enAttente: {}, majs: [] };
 }
 
-const statsAvant = (valides: readonly MatchValide[], k: number, nom: string): Stats => {
-  const ev = evolutionBrute(valides.slice(0, k), nom);
-  return ev ? enDirect(ev) : { ...BASE_BOLA };
-};
+/**
+ * Sa carte en direct après chacun de ses k premiers matchs validés : [0] la
+ * base, [k] après le k-ième. Un seul passage pour la courbe et les cartes
+ * MVP (la carte en direct dépend de la période des combinées : on rejoue le
+ * moteur sur chaque début de liste, une fois chacun).
+ */
+export function cartesSuccessives(valides: readonly MatchValide[], nom: string): Stats[] {
+  const out: Stats[] = [{ ...BASE_BOLA }];
+  for (let k = 1; k <= valides.length; k++) {
+    const ev = evolutionBrute(valides.slice(0, k), nom);
+    out.push(ev ? enDirect(ev) : { ...BASE_BOLA });
+  }
+  return out;
+}
 
 /** Le joueur Bola tel que l'app le montre : sa carte en direct, ses cumuls des matchs validés. */
 export function cartePlayer(nom: string, poste: string | null | undefined, stats: Stats, valides: readonly MatchValide[]): Player {
@@ -188,11 +200,16 @@ export function cartePlayer(nom: string, poste: string | null | undefined, stats
 }
 
 /** Ses cartes MVP : une par match validé où il est MVP, sur sa carte d'avant ce match. */
-export function cartesMvpBola(valides: readonly MatchValide[], nom: string, poste: string | null | undefined): CarteMvpBola[] {
+export function cartesMvpBola(
+  valides: readonly MatchValide[],
+  nom: string,
+  poste: string | null | undefined,
+  successives: readonly Stats[] = cartesSuccessives(valides, nom)
+): CarteMvpBola[] {
   const out: CarteMvpBola[] = [];
   valides.forEach((v, i) => {
     if (!v.ligne.mvp) return;
-    const stats = statsCarteTitre(statsAvant(valides, i, nom), "mvp", v.ligne.buts, v.ligne.passes);
+    const stats = statsCarteTitre(successives[i], "mvp", v.ligne.buts, v.ligne.passes);
     const carte: BoostCardData = {
       player: nom,
       type: "mvp",
@@ -212,7 +229,8 @@ export function carteBola(comptes: readonly MatchCompte[], moi: string, nom: str
   const valides = mesMatchsValides(comptes, moi);
   const brute = evolutionBrute(valides, nom);
   const stats = brute ? enDirect(brute) : { ...BASE_BOLA };
-  const notes = valides.map((v, i) => ({ libelle: v.libelle, note: ovr(statsAvant(valides, i + 1, nom)) }));
+  const successives = cartesSuccessives(valides, nom);
+  const notes = valides.map((v, i) => ({ libelle: v.libelle, note: ovr(successives[i + 1]) }));
   return {
     nom,
     poste: poste || "—",
@@ -221,6 +239,36 @@ export function carteBola(comptes: readonly MatchCompte[], moi: string, nom: str
     stats,
     player: cartePlayer(nom, poste, stats, valides),
     notes,
-    cartesMvp: cartesMvpBola(valides, nom, poste),
+    cartesMvp: cartesMvpBola(valides, nom, poste, successives),
   };
+}
+
+/**
+ * La carte des autres joueurs Bola, pour la Ligue : un seul passage sur les
+ * matchs, chacun sur ses lignes `carteBola` (la règle du serveur : filleul,
+ * avant son entrée en SFL), sans courbe ni cartes MVP. Clé : son id ; chacun y est, 75 sans match.
+ */
+export function cartesDesJoueursBola(comptes: readonly MatchCompte[]): Map<string, Player> {
+  const parJoueur = new Map<string, { nom: string; poste: string | null; valides: MatchValide[] }>();
+  for (const m of comptes) {
+    for (const ligne of m.joueurs) {
+      let x = parJoueur.get(ligne.id);
+      if (!x) parJoueur.set(ligne.id, (x = { nom: ligne.name, poste: null, valides: [] }));
+      x.poste = ligne.poste ?? x.poste;
+      if (!m.valide || !ligne.carteBola || (UN_PAR_JOUR && !ligne.classe)) continue;
+      x.valides.push({ m, ligne, libelle: libelleMatch(m) });
+    }
+  }
+  const out = new Map<string, Player>();
+  for (const [id, x] of parJoueur) {
+    // Sans match qui compte pour sa carte : 75, au poste de sa fiche.
+    const ev = evolutionBrute(x.valides, x.nom);
+    out.set(id, cartePlayer(x.nom, x.poste, ev ? enDirect(ev) : { ...BASE_BOLA }, x.valides));
+  }
+  return out;
+}
+
+/** Mes matchs Bola validés en saison synthétique, pour les badges (trophees.ts, vitrine) ; [] si ce n'est pas moi. */
+export function saisonsBolaDe(carte: CarteBola | null | undefined, nom: string): Saison[] {
+  return carte && carte.nom === nom && carte.valides.length ? [saisonBola(carte.valides, nom)] : [];
 }

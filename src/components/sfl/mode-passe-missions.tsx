@@ -176,6 +176,9 @@ const SOURCES: Source[] = [
   },
 ];
 
+/** Les sources d'XP tenues aux journées de la SFL. */
+const JOURNEE_SFL = new Set(["flair", "recues", "donnees"]);
+
 /** La prochaine journée, quand ses missions ne sont pas encore là. */
 function Attente() {
   const { saison } = useSeason();
@@ -200,12 +203,18 @@ function Sources({ b, saison }: { b: BilanXp; saison: number }) {
         <h2 id="titre-gagner-xp" className="titre-lettrage text-[26px]">
           Gagner de l&apos;XP
         </h2>
-        <span className="font-mono text-[12px] text-white/50 tabular-nums">{xp(b.saison)} cette saison</span>
+        <span className="font-mono text-[12px] text-white/50 tabular-nums">
+          {xp(b.saison)}
+          {horsSfl ? "" : " cette saison"}
+        </span>
       </div>
       {SOURCES.map((s) => {
         const miennes = lignes.filter(s.de);
         if (s.discrete && miennes.length === 0) return null;
         if (s.sfl && horsSfl) return null;
+        // Le Flair et les félicitations se jouent sur les journées de la SFL :
+        // hors de la SFL, seulement s'il en a déjà gagné (revue, 28/10).
+        if (horsSfl && JOURNEE_SFL.has(s.cle) && miennes.length === 0) return null;
         if (s.bola && !horsSfl && miennes.length === 0) return null;
         const total = miennes.reduce((a, l) => a + l.xp, 0);
         const fois = miennes.filter((l) => l.xp > 0).length;
@@ -240,7 +249,7 @@ function Journal({ b, saison }: { b: BilanXp; saison: number }) {
       </h2>
       {b.lignes.slice(0, 20).map((l, i) => (
         <div key={`${l.saison}-${l.j}-${l.quoi}-${i}`} className="flex items-center gap-3 border-t border-white/8 px-5 py-3">
-          <span className={cn("shrink-0 font-mono text-[11px] text-white/45", l.bola ? "w-[54px]" : "w-[44px]")}>
+          <span className={cn("shrink-0 whitespace-nowrap font-mono text-[11px] text-white/45", l.bola ? "w-[60px]" : "w-[44px]")}>
             {l.bola ? l.date.split(" · ")[0] : l.saison === saison ? `J${l.j}` : `S${l.saison} J${l.j}`}
           </span>
           <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{l.quoi}</span>

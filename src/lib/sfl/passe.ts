@@ -62,6 +62,11 @@ export interface Epreuve {
 }
 
 const reussie = (l: LigneXp) => l.mission?.reussie === true;
+/**
+ * Une épreuve de la SFL : rien de ce qui vient d'un match Bola (`l.bola`, une
+ * mission perso) ne l'ouvre, même pour un filleul entré en SFL (revue, 28/10).
+ */
+const sfl = (l: LigneXp) => l.bola !== true && l.mission?.creneau !== "perso";
 
 export const EPREUVES: readonly Epreuve[] = [
   // Une mission perso (joueur Bola, missions-perso.ts) ne s'accepte pas : elle ne signe rien.
@@ -71,7 +76,7 @@ export const EPREUVES: readonly Epreuve[] = [
     palier: 5,
     nom: "Signer",
     phrase: "Réussis une mission que tu as acceptée.",
-    faite: (l) => reussie(l) && l.mission?.creneau !== "perso",
+    faite: (l) => sfl(l) && reussie(l),
   },
   {
     numero: 2,
@@ -79,7 +84,7 @@ export const EPREUVES: readonly Epreuve[] = [
     palier: 10,
     nom: "Le contrat",
     phrase: "Réussis un contrat.",
-    faite: (l) => reussie(l) && l.mission?.creneau === "contrat",
+    faite: (l) => sfl(l) && reussie(l) && l.mission?.creneau === "contrat",
   },
   {
     numero: 3,
@@ -87,7 +92,7 @@ export const EPREUVES: readonly Epreuve[] = [
     palier: 15,
     nom: "Rang S",
     phrase: "Réussis une mission de rang S.",
-    faite: (l) => reussie(l) && l.mission?.rang === "S",
+    faite: (l) => sfl(l) && reussie(l) && l.mission?.rang === "S",
   },
   {
     numero: 4,
@@ -95,7 +100,7 @@ export const EPREUVES: readonly Epreuve[] = [
     palier: 20,
     nom: "Trois sur trois",
     phrase: "Réussis les trois missions d'un même dimanche.",
-    faite: (l) => l.parfait === true,
+    faite: (l) => sfl(l) && l.parfait === true,
   },
 ];
 

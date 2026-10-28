@@ -6,7 +6,8 @@
 //
 // Un seul chargement pour toute l'app (SeasonProvider le lit), par la
 // fonction mes_matchs_bola() : vide pour qui n'a jamais été filleul, donc
-// un joueur SFL ne change pas d'un octet. Relu à l'ouverture, au retour au
+// un joueur SFL ne change pas d'un octet (et ne la lit qu'une fois : une
+// réponse vide est gardée et suffit). Relu à l'ouverture, au retour au
 // premier plan et du réseau, après ma propre réponse Confirmer ou Infirmer
 // (MES_MATCHS_BOLA_EVENT) et, pour un joueur Bola, toutes les 5 minutes
 // quand l'app est visible : un match passe à « compte » par la réponse des
@@ -88,10 +89,19 @@ export function useMesMatchsBola(bola: boolean): MesMatchsBola | null {
 
   useEffect(() => {
     if (!qui) return;
+    let ici: MesMatchsBola | null = null;
     if (!lu || etat?.qui !== qui) {
       lu = true;
-      const ici = lireIci(qui);
+      ici = lireIci(qui);
       if (ici) poser(ici);
+    } else ici = etat;
+    // Hors du mode Bola (un joueur SFL) : une seule lecture, gardée. Vide, la
+    // réponse ne changera plus (on n'est filleul qu'à l'inscription) : plus
+    // aucune requête ; un ancien filleul entré en SFL relit à l'ouverture,
+    // sans suivre le premier plan ni le réseau (revue, 28/10).
+    if (!bola) {
+      if (!ici || ici.matchs.length > 0) void relire(qui);
+      return;
     }
     void relire(qui);
     const reprendre = () => {
@@ -101,12 +111,12 @@ export function useMesMatchsBola(bola: boolean): MesMatchsBola | null {
     document.addEventListener("visibilitychange", reprendre);
     window.addEventListener("online", tout);
     window.addEventListener(MES_MATCHS_BOLA_EVENT, tout);
-    const minuterie = bola ? window.setInterval(reprendre, 5 * 60 * 1000) : null;
+    const minuterie = window.setInterval(reprendre, 5 * 60 * 1000);
     return () => {
       document.removeEventListener("visibilitychange", reprendre);
       window.removeEventListener("online", tout);
       window.removeEventListener(MES_MATCHS_BOLA_EVENT, tout);
-      if (minuterie) window.clearInterval(minuterie);
+      window.clearInterval(minuterie);
     };
   }, [qui, bola]);
 

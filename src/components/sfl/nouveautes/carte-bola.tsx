@@ -128,7 +128,7 @@ function TesMissions() {
             </span>
             <span className="-ml-4 flex min-w-0 flex-1 flex-col">
               <span className="titre-lettrage truncate pt-[2px] text-[18px] leading-[1.15]">{m.code}</span>
-              <span className="truncate font-mono text-[10.5px] text-white/50">{m.phrase}</span>
+              <span className="line-clamp-2 font-mono text-[10.5px] leading-snug text-white/50">{m.phrase}</span>
             </span>
             <span className="fiche__ton shrink-0 text-[19px] leading-none" style={{ fontFamily: ANTON }}>
               +{m.xp}

@@ -69,7 +69,7 @@ export const MISSIONS_PERSO: readonly MissionPerso[] = [
   {
     genre: "regulier",
     code: "Régulier",
-    phrase: "Joue trois matchs dans la semaine, trois jours différents.",
+    phrase: "Joue trois jours différents dans la semaine.",
     xp: 100,
     objectif: 3,
   },
@@ -198,10 +198,38 @@ export function missionsPerso(
   return { faites, semaine };
 }
 
-const instant = (jour: string, heure: string) => {
+/** L'écart de Paris à UTC à cet instant, en ms (+1 h l'hiver, +2 h l'été). */
+function decalageParis(t: number): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    hourCycle: "h23",
+  }).formatToParts(new Date(t));
+  const v = (k: string) => Number(parts.find((p) => p.type === k)?.value ?? 0);
+  return Date.UTC(v("year"), v("month") - 1, v("day"), v("hour"), v("minute")) - Math.floor(t / 60_000) * 60_000;
+}
+
+/**
+ * Le coup d'envoi : le jour et l'heure du match sont à l'heure de Paris
+ * (coup_d_envoi en base), quel que soit le fuseau du téléphone (revue, 28/10).
+ */
+export function instantParis(jour: string, heure: string): Date {
   const [y, m, d] = jour.split("-").map(Number);
   const n = heureMin(heure);
-  return new Date(y, m - 1, d, Math.floor(n / 60), n % 60);
+  const naif = Date.UTC(y, m - 1, d, Math.floor(n / 60), n % 60);
+  let t = naif - decalageParis(naif);
+  t = naif - decalageParis(t); // au changement d'heure, l'écart de l'instant lui-même
+  return new Date(t);
+}
+
+/** Midi du jour du match, à l'heure du téléphone : pour le ranger à son dimanche (placeDe lit le jour local). */
+const midiDuJour = (jour: string) => {
+  const [y, m, d] = jour.split("-").map(Number);
+  return new Date(y, m - 1, d, 12);
 };
 
 /**
@@ -218,9 +246,9 @@ export function lignesXpBola(
   // Du plus récent au plus ancien (le journal ne range que par journée), la mission au-dessus de son match.
   const rangees: { t: number; ordre: number; l: LigneXp }[] = [];
   for (const v of valides) {
-    const t = instant(v.m.jour, v.m.heure);
+    const t = instantParis(v.m.jour, v.m.heure);
     if (t.getTime() > maintenant.getTime()) continue;
-    const { saison, j } = placeDe(s, t, maintenant);
+    const { saison, j } = placeDe(s, midiDuJour(v.m.jour), maintenant);
     rangees.push({
       t: t.getTime(),
       ordre: 0,
@@ -236,10 +264,10 @@ export function lignesXpBola(
     });
   }
   for (const f of faites) {
-    const t = instant(f.jour, f.heure);
+    const t = instantParis(f.jour, f.heure);
     if (t.getTime() > maintenant.getTime()) continue;
     const m = PAR_GENRE.get(f.genre)!;
-    const { saison, j } = placeDe(s, t, maintenant);
+    const { saison, j } = placeDe(s, midiDuJour(f.jour), maintenant);
     rangees.push({
       t: t.getTime(),
       ordre: 1,

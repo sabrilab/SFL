@@ -50,6 +50,12 @@ export interface LigneBola {
   passes: number;
   /** Le poste de sa fiche (ligue_vierge), pour la carte d'un joueur hors de la SFL. */
   poste?: string | null;
+  /**
+   * Ce match fait-il bouger sa carte Bola (match_bola_json) : un filleul,
+   * avant son entrée en SFL, la règle même de mes_matchs_bola. La Ligue lit
+   * la carte des autres joueurs Bola sur ces lignes seulement.
+   */
+  carteBola?: boolean;
 }
 
 export interface MatchBola {

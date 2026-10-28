@@ -34,6 +34,7 @@ import { ModePasse, retenirOrigineModePasse } from "@/components/sfl/mode-passe"
 import { useMissionsASigner } from "@/components/sfl/mode-passe-missions";
 import { cartesDeCarriere, courbeDeCarriere, type CartesDeSaison, type PointCourbe } from "@/lib/sfl/carriere";
 import { ovr } from "@/lib/sfl/engine";
+import { saisonsBolaDe } from "@/lib/sfl/carte-bola";
 import { actionsDuJour, dimanchesDe, ficheJoueur, resultatDuJour } from "@/lib/sfl/fiche-joueur";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
 import { PALIERS_PASSE, PASSE_BOLA } from "@/lib/sfl/passe";
@@ -165,7 +166,11 @@ export function RubriquesMaCarte() {
   const r = useRangXp(player.name);
   const aSigner = useMissionsASigner();
   const format = useFormatCarte();
-  const paliers = useMemo(() => vitrine(saison, player.name, new Date()), [saison, player.name]);
+  // Mes badges comptent aussi mes matchs Bola validés : MVP en Bola, la tuile le dit.
+  const paliers = useMemo(
+    () => vitrine(saison, player.name, new Date(), saisonsBolaDe(bolaCarte, player.name)),
+    [saison, player.name, bolaCarte]
+  );
   const numero = saison.numero ?? 0;
   const tuiles: React.ReactNode[] = [];
   const [passe, setPasse] = useState(false);

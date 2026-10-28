@@ -138,8 +138,8 @@ export function MaNote() {
           </div>
 
           <div className="flex items-center justify-between gap-3">
-            <span className="mono-label text-[10px] text-foreground/55">Série de présence</span>
-            <span className="flex items-center gap-1.5" aria-label={`Série de présence : ${ev.serie} sur ${SERIE}`}>
+            <span className="mono-label text-[10px] text-foreground/55">{joueurBola ? "Série" : "Série de présence"}</span>
+            <span className="flex items-center gap-1.5" aria-label={`${joueurBola ? "Série" : "Série de présence"} : ${ev.serie} sur ${SERIE}`}>
               {Array.from({ length: SERIE }, (_, i) => (
                 <span key={i} className={cn("size-2.5 rounded-full", i < ev.serie ? "bg-foreground" : "bg-foreground/15")} />
               ))}
