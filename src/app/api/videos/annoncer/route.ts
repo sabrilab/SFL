@@ -11,12 +11,17 @@
 // « video » (lib/sfl/motifs-notif.ts) : Admin → Activité → Notifs compte qui
 // l'a touchée, et qui l'a regardée dans la semaine (push_effet_video).
 //
+// Les vidéos vivent dans les Actus de la SFL : un joueur Bola (venu par un
+// parrain, hors de l'effectif, pas admin : hors_sfl en base) ne peut pas les
+// voir, il n'en est pas prévenu (28/10/2026), comme pour le Vestiaire.
+//
 // Réservée à l'admin (lu dans profiles, jamais dans le jeton).
 
 import { NextRequest, NextResponse } from "next/server";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { cleVapid } from "@/lib/server/web-push";
 import { appelant, estAdmin, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { idsSfl } from "@/lib/sfl/parrainage.server";
 import type { Notif } from "@/lib/sfl/push";
 import { texteAnnonceVideo } from "@/lib/sfl/videos-annonce";
 
@@ -39,9 +44,18 @@ export async function POST(req: NextRequest) {
   const cle = cleVapid();
   if (!cle) return NextResponse.json({ error: "Notifications pas configurées." }, { status: 503 });
 
-  // Tous les comptes acceptés (la ligue et les joueurs Bola) qui ont un téléphone abonné.
-  const { data: profils } = await sb.from("profiles").select("id, name").eq("valide", true);
-  const joueurs = (profils ?? []) as { id: string; name: string }[];
+  // Tous les comptes acceptés qui ont un téléphone abonné, sauf les joueurs
+  // Bola : filleuls (parrainages) hors de l'effectif et pas admins. La saison
+  // illisible, on ne filtre pas (comme le Vestiaire).
+  const [{ data: profils }, { data: filleuls }, sfl] = await Promise.all([
+    sb.from("profiles").select("id, name").eq("valide", true),
+    sb.from("parrainages").select("filleul"),
+    idsSfl(sb),
+  ]);
+  const bola = new Set(((filleuls ?? []) as { filleul: string }[]).map((f) => f.filleul));
+  const joueurs = ((profils ?? []) as { id: string; name: string }[]).filter(
+    (p) => !sfl || !bola.has(p.id) || sfl.has(p.id)
+  );
   const { data: abonnements } = await sb
     .from("push_abonnements")
     .select("user_id")

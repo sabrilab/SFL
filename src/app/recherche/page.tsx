@@ -11,8 +11,17 @@
 // elle filtre. Les résultats s'ouvrent sur place, sans changer de page.
 // ?joueur=Nom ouvre directement un profil (la carte en grand, la
 // notification « … te suit »).
+//
+// Un joueur Bola (hors de la SFL, hooks/use-hors-sfl.ts) n'y trouve ni les
+// journées ni l'effectif de la SFL : il cherche parmi les comptes de Bola
+// (listerProfils), et le joueur trouvé s'ouvre en carte, sans le profil de
+// sa saison SFL (28/10/2026).
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { carteNeutre } from "@/components/sfl/qui-vient";
+import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
+import { useHorsSflEtat } from "@/hooks/use-hors-sfl";
+import { chercherProfils, listerProfils, type Profil } from "@/lib/sfl/matchs";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
@@ -152,11 +161,77 @@ function FicheJournee({ journee }: { journee: Journee }) {
 /* --------------------------------- page ---------------------------------- */
 
 export default function RecherchePage() {
+  const horsSfl = useHorsSflEtat();
+  // Tant qu'on ne sait pas (la toute première ouverture), rien de la SFL.
+  if (horsSfl === null) return null;
+  if (horsSfl) return <RechercheBola />;
   // useSearchParams impose une frontière Suspense côté App Router.
   return (
     <Suspense fallback={null}>
       <Recherche />
     </Suspense>
+  );
+}
+
+/** La Recherche d'un joueur Bola : les comptes de Bola, chacun en carte. */
+function RechercheBola() {
+  const { allPlayers } = useSeason();
+  const [q, setQ] = useState("");
+  const [profils, setProfils] = useState<Profil[]>([]);
+  useEffect(() => {
+    let fini = false;
+    listerProfils()
+      .then((p) => !fini && setProfils(p))
+      .catch(() => {});
+    return () => {
+      fini = true;
+    };
+  }, []);
+  const trouves = useMemo(() => chercherProfils(profils, q), [profils, q]);
+  // Sa carte, comme dans les classements de Bola (ligue-vierge) : celle qu'il a, sinon une carte neutre.
+  const carte = (name: string) => allPlayers.find((p) => p.name.toLowerCase() === name.toLowerCase()) ?? carteNeutre(name);
+
+  return (
+    <div className="shell flex flex-col gap-4 py-4 sm:py-8">
+      <div className="flex items-center gap-3">
+        <BoutonRetour />
+        <h1 className="text-[30px] font-bold tracking-tight">Recherche</h1>
+      </div>
+      <div className="glass flex items-center gap-2.5 rounded-full px-4 py-3.5">
+        <Search className="size-[18px] shrink-0 text-foreground/35" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          autoFocus
+          placeholder="Un joueur, un pseudo…"
+          className="min-w-0 flex-1 bg-transparent text-[15px] font-medium outline-none placeholder:text-foreground/30"
+        />
+        {q && (
+          <button onClick={() => setQ("")} aria-label="Effacer" className="shrink-0 text-foreground/35">
+            <X className="size-[18px]" />
+          </button>
+        )}
+      </div>
+      {trouves.length > 0 && (
+        <section>
+          <h2 className="mb-2.5 px-1 text-[14px] font-bold tracking-tight text-foreground/60">Joueurs · {trouves.length}</h2>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {trouves.map((p) => (
+              <div key={p.id} className="glass flex items-center gap-3.5 rounded-[22px] px-4 py-3">
+                <MiniCarte player={carte(p.name)} size={FORMAT_CARTE.petite} cle={`recherche-${p.id}`} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-semibold"><Nom n={p.name} /></span>
+                  <span className="block truncate text-[12.5px] text-foreground/42">{p.username}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {q.trim() && trouves.length === 0 && (
+        <div className="glass rounded-[26px] px-6 py-10 text-center text-[13px] text-foreground/45">Rien trouvé pour « {q} ».</div>
+      )}
+    </div>
   );
 }
 

@@ -180,6 +180,7 @@ export function OuvrirMatch({
   partie,
   onSfl,
   ici,
+  sansTerrainParDefaut = false,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -198,6 +199,11 @@ export function OuvrirMatch({
   onSfl?: () => void;
   /** Ta position, si tu l'as donnée sur la Map : les terrains du Nord se rangent autour. */
   ici?: { lat: number; lng: number } | null;
+  /**
+   * Un joueur Bola (hors de la SFL) : aucun terrain de la ligue choisi
+   * d'avance quand rien n'est proposé ; il choisit le sien (28/10/2026).
+   */
+  sansTerrainParDefaut?: boolean;
 }) {
   const aujourdhui = aujourdhuiIso();
   const heureLa = maintenant();
@@ -215,7 +221,11 @@ export function OuvrirMatch({
   );
   const terrainDuMatch = partie ? (terrains.find((t) => t.nom === partie.lieu) ?? null) : null;
   const [terrainId, setTerrainId] = useState<number | null>(
-    partie ? (terrainDuMatch?.id ?? null) : lieuInitial ? null : (terrainInitial?.id ?? terrains.find((t) => t.defaut)?.id ?? null)
+    partie
+      ? (terrainDuMatch?.id ?? null)
+      : lieuInitial
+        ? null
+        : (terrainInitial?.id ?? (sansTerrainParDefaut ? null : (terrains.find((t) => t.defaut)?.id ?? null)))
   );
   const modif = !!partie;
   // Hors des terrains de la ligue : un terrain du Nord, ou un lieu écrit en toutes lettres.

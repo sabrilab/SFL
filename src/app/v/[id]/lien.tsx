@@ -5,13 +5,16 @@
 // et deux portes : « Se connecter » (puis le lecteur) et « Créer mon
 // compte », par le parrain qui a partagé le lien quand il y en a un. Le lien
 // ouvert et le pas vers l'app se comptent une fois par téléphone
-// (noterLien), pour Admin → Activité → Vidéos.
+// (noterLien), pour Admin → Activité → Vidéos. Un joueur Bola connecté
+// (hors de la SFL) ne voit pas les Actus de la SFL : il arrive sur la Map
+// (28/10/2026).
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Play } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
+import { useHorsSflEtat } from "@/hooks/use-hors-sfl";
 import { codeValide, garderCode, normaliserCode } from "@/lib/sfl/parrainage";
 import { DEMO_VIDEOS, VIDEO_FACTICE, noterLien } from "@/lib/sfl/videos";
 import { SigleLigue } from "@/components/sfl/choix-ligue";
@@ -39,11 +42,14 @@ export function LienVideo({ id, de: brut, initial }: { id: string; de: string | 
       fini = true;
     };
   }, [id, initial]);
+  const horsSfl = useHorsSflEtat();
   const lecteur = `/ligue?video=${encodeURIComponent(id)}`;
+  // Connecté : le lecteur, sauf pour un joueur Bola (la Map) ; on attend de savoir lequel.
+  const vers = connecte && v && horsSfl !== null ? (horsSfl ? "/" : lecteur) : null;
 
   useEffect(() => {
-    if (connecte && v) router.replace(lecteur);
-  }, [connecte, v, router, lecteur]);
+    if (vers) router.replace(vers);
+  }, [vers, router]);
 
   useEffect(() => {
     if (!v || connecte) return;

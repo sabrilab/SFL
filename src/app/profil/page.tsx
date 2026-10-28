@@ -13,7 +13,9 @@
 //      Anis et 32 autres te suivent » : suivre.tsx ; Sabri, 23/10), trois
 //      chiffres de tête en Anton (mon rang au Pépite d'Or, ma note, mes
 //      dimanches), puis la phrase qui me résume (fiche-joueur.ts, la même que
-//      sur mon profil). Le nom se corrige en le touchant (identite.tsx).
+//      sur mon profil) ; un joueur Bola, hors de la SFL, n'a que sa note
+//      (ni Pépite d'Or, ni dimanches, ni phrase, ni blessure : 28/10). Le nom
+//      se corrige en le touchant (identite.tsx).
 //      Dessous, ma photo (la toucher ouvre « Ma photo »), la carte officielle
 //      tant qu'elle n'est pas faite (carte-officielle.tsx ; ensuite, on la
 //      refait depuis « Ma photo ») et le badge de ma carte ; enfin
@@ -61,7 +63,7 @@ import { ChoixBadge } from "@/components/sfl/choix-badge";
 import { PersonnaliserCarte } from "@/components/sfl/personnaliser-carte";
 import { CarteOfficielle } from "@/components/sfl/carte-officielle";
 import { RubriquesMaCarte, useMaCarte } from "@/components/sfl/ma-carte/rubriques";
-import { useMyPlayer } from "@/components/sfl/player-provider";
+import { useJoueurBola, useMyPlayer } from "@/components/sfl/player-provider";
 import { ProfilArbitre } from "@/components/sfl/profil-arbitre";
 import { useArbitres } from "@/hooks/use-arbitres";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -121,6 +123,10 @@ function ProfilJoueurPage() {
   const { player } = useMyPlayer();
   const { allPlayers, arbitres } = useSeason();
   const division = useDivision(player.name);
+  // Un joueur Bola (hors de la SFL) : ni Pépite d'Or, ni journées, ni
+  // synthèse de saison, ni blessure, qui sont ceux du dimanche de la SFL
+  // (28/10/2026).
+  const bola = useJoueurBola();
   // Mon rang : celui du classement de la Ligue (rangs.ts : sans les joueurs
   // masqués, journées jouées seulement), où je figure toujours, même masqué.
   // `arbitres` : la liste des masqués peut arriver après le premier calcul.
@@ -200,12 +206,14 @@ function ProfilJoueurPage() {
             <ReseauJoueur nom={player.name} />
           </div>
           <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
-            <Chiffre valeur={myRank != null && (joues > 0 || player.pp !== 0) ? ordinal(myRank) : "–"} quoi="Pépite d'Or" />
+            {!bola && (
+              <Chiffre valeur={myRank != null && (joues > 0 || player.pp !== 0) ? ordinal(myRank) : "–"} quoi="Pépite d'Or" />
+            )}
             {division && <Chiffre valeur={nomDivision(division)} quoi="Division" />}
             <Chiffre valeur={ovr(player.stats)} quoi="Général" />
-            <Chiffre valeur={journees.valeur} quoi={journees.quoi} />
+            {!bola && <Chiffre valeur={journees.valeur} quoi={journees.quoi} />}
           </div>
-          <p className="w-full text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
+          {!bola && <p className="w-full text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>}
           {/* Ma photo, ma carte officielle (photo au maillot Bola) tant
               qu'elle n'est pas faite, le badge de ma carte. Sans elle, les
               deux ronds se centrent. */}
@@ -224,7 +232,7 @@ function ProfilJoueurPage() {
           {/* Personnaliser ma carte : le skin, les signes et le badge, au choix (personnaliser-carte.tsx) */}
           <PersonnaliserCarte player={player} />
           {/* Je suis blessé, ou remis : mes journées manquées se lisent sur mon profil (blessure.tsx) */}
-          <BoutonBlessure nom={player.name} />
+          {!bola && <BoutonBlessure nom={player.name} />}
           {/* Inviter : mon lien et mon code de parrainage (parrainage/page.tsx) */}
           <Link
             href="/parrainage"

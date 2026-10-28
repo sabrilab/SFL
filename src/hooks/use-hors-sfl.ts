@@ -13,9 +13,16 @@
 // On ne devine rien sur le téléphone (la saison peut arriver après la
 // session, et un joueur SFL passerait un instant pour un joueur Bola) : la
 // réponse vient de la base, gardée sur le téléphone pour l'ouverture
-// suivante. false tant qu'on ne sait pas, et si la base ne connaît pas
-// encore la fonction (une préversion avant la mise en ligne) : l'app reste
-// telle qu'avant.
+// suivante. useHorsSfl : false tant qu'on ne sait pas, et si la base ne
+// connaît pas encore la fonction (une préversion avant la mise en ligne) :
+// l'app reste telle qu'avant.
+//
+// useHorsSflEtat dit aussi « on ne sait pas encore » (null) : à la toute
+// première ouverture d'un compte, avant la réponse de la base. Ce qui montre
+// la SFL (Actus et convocation sur la Map, pages de la ligue) attend alors,
+// au lieu de la montrer un instant à un joueur Bola (28/10/2026). La réponse
+// gardée sur le téléphone fait que, pour un joueur SFL, cette attente n'a
+// lieu qu'une fois. Une base qui ne connaît pas la fonction répond « non ».
 
 import { useEffect, useSyncExternalStore } from "react";
 import { useSession } from "@/hooks/use-session";
@@ -58,7 +65,16 @@ function relire(qui: string): Promise<void> {
   const p = (async () => {
     try {
       const { data, error } = await supabase().rpc("hors_sfl");
-      if (error) return;
+      if (error) {
+        // La base a répondu sans connaître la fonction (préversion) : « non »,
+        // pour cette ouverture seulement (rien de gardé). Une coupure réseau
+        // lève plus bas et laisse l'état inconnu, relu à la prochaine fois.
+        if (!etat || etat.qui !== qui) {
+          etat = { qui, hors: false };
+          for (const f of abonnes) f();
+        }
+        return;
+      }
       etat = { qui, hors: data === true };
       try {
         localStorage.setItem(CLE, JSON.stringify(etat));
@@ -70,7 +86,8 @@ function relire(qui: string): Promise<void> {
   return p;
 }
 
-export function useHorsSfl(): boolean {
+/** true : joueur Bola ; false : non ; null : la base n'a pas encore répondu pour ce compte. */
+export function useHorsSflEtat(): boolean | null {
   const session = useSession();
   const qui = session?.server && !session.enAttente ? session.user : null;
   const lu = useSyncExternalStore(abonner, lire, () => VIDE);
@@ -79,5 +96,10 @@ export function useHorsSfl(): boolean {
     if (qui) void relire(qui);
   }, [qui]);
 
-  return !!qui && !session?.admin && lu.qui === qui && lu.hors;
+  if (!qui || session?.admin) return false;
+  return lu.qui === qui ? lu.hors : null;
+}
+
+export function useHorsSfl(): boolean {
+  return useHorsSflEtat() === true;
 }

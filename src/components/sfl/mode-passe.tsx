@@ -20,7 +20,8 @@
 //     troisième, « Les autres » (mode-passe-autres.tsx : l'outsider de
 //     l'arc 1 et les missions acceptées de toute la ligue ; Sabri, 27/10 :
 //     « pour qu'on puisse voir les missions et les missions des gens »),
-//     par /profil/xp?vue=autres ;
+//     par /profil/xp?vue=autres. Un joueur Bola, hors de la SFL, n'a pas
+//     « Les autres » : ce sont les missions de la ligue du dimanche (28/10) ;
 //   · on sort par la croix, Échap, ou en tirant vers le bas : le noir se
 //     referme sur la tuile.
 // Toujours en noir, en clair comme en sombre : c'est un autre monde.
@@ -32,7 +33,7 @@ import { useRouter } from "next/navigation";
 import { Check, Lock, X } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { Card3D } from "@/components/sfl/card-3d";
-import { useMissionsASigner, VueMissions } from "@/components/sfl/mode-passe-missions";
+import { useHorsDeLaSfl, useMissionsASigner, VueMissions } from "@/components/sfl/mode-passe-missions";
 import { VueAutres } from "@/components/sfl/mode-passe-autres";
 import type { Finition } from "@/components/sfl/finitions-carte";
 import { CADRAGES, ChoixPays, essai, etatDe, GENRE, Mini, useOntLePalier, type EtatPalier } from "@/components/sfl/passe-bola";
@@ -301,7 +302,10 @@ export function ModePasse({
   const prochain = Math.min(PALIERS_PASSE, (b?.passe.palier ?? 0) + 1);
   const [choisi, setChoisi] = useState(prochain);
   const [pays, setPays] = useState(choix.pays ?? PAYS_PAR_DEFAUT);
-  const [vue, setVue] = useState<Vue>(() => vueVoulue ?? vueDeLAdresse() ?? "passe");
+  const horsSfl = useHorsDeLaSfl();
+  const vues = horsSfl ? VUES.filter((v) => v !== "autres") : VUES;
+  const [vueChoisie, setVue] = useState<Vue>(() => vueVoulue ?? vueDeLAdresse() ?? "passe");
+  const vue: Vue = horsSfl && vueChoisie === "autres" ? "passe" : vueChoisie;
   // Des missions à signer (connues un instant après l'ouverture) : on s'ouvre sur elles, tant qu'on n'a rien touché.
   const vueTouchee = useRef(!!vueVoulue || !!vueDeLAdresse());
   useEffect(() => {
@@ -428,8 +432,8 @@ export function ModePasse({
         </div>
       </header>
 
-      <nav className="mp-vues mp-entre" style={{ "--i": 1 } as React.CSSProperties} aria-label="Passe, missions, les autres">
-        {VUES.map((v) => (
+      <nav className="mp-vues mp-entre" style={{ "--i": 1 } as React.CSSProperties} aria-label={horsSfl ? "Passe, missions" : "Passe, missions, les autres"}>
+        {vues.map((v) => (
           <button
             key={v}
             type="button"

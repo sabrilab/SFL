@@ -37,7 +37,7 @@ import { remonter, retrouverOnglet } from "./memoire-navigation";
 import { pastilleIcone, useVestiaireNonLus } from "@/hooks/use-vestiaire-non-lus";
 import { useMessagesPrives } from "@/hooks/use-messages-prives";
 import { useJoueurBola } from "@/components/sfl/player-provider";
-import { useHorsSfl } from "@/hooks/use-hors-sfl";
+import { useHorsSflEtat } from "@/hooks/use-hors-sfl";
 import { useInvitationsMatch } from "@/hooks/use-invitations";
 import { useDiscussionsMatch } from "@/hooks/use-discussions-match";
 import { useMonEquipe } from "@/hooks/use-mon-equipe";
@@ -60,7 +60,11 @@ export function BottomNav() {
   // hors de la saison) n'a pas la bulle.
   const vestiaire = pathname === "/vestiaire" || pathname === "/agent" || pathname === "/messages" || pathname.startsWith("/messages/");
   const bola = useJoueurBola();
-  const horsSfl = useHorsSfl();
+  // null : la base n'a pas encore dit (toute première ouverture) ; la bulle
+  // du Vestiaire attend, l'onglet Actus mène à la SFL, que la porte couvre
+  // jusqu'à la réponse (porte-sfl.tsx, 28/10/2026).
+  const horsSflEtat = useHorsSflEtat();
+  const horsSfl = horsSflEtat === true;
   const clair = useModeClair() || surMap(pathname);
   const encre = clair ? "#0a0b0d" : "#ffffff";
   // Du nouveau dans la discussion : le nombre, sur la bulle.
@@ -123,7 +127,7 @@ export function BottomNav() {
         })}
       </nav>
 
-      {!bola && !horsSfl && <Link
+      {!bola && horsSflEtat === false && <Link
         href="/vestiaire"
         aria-label={nonLus > 0 ? `Vestiaire, ${nonLus} nouveaux messages` : "Vestiaire"}
         aria-current={vestiaire ? "page" : undefined}
