@@ -7,7 +7,9 @@
 //     sont reçoivent le nouveau rendez-vous ; la notification remplace la
 //     précédente du même match sur l'écran (même étiquette) ;
 //   · annule : le serveur prévient tout le monde, puis efface le match (il
-//     faut lire les joueurs avant qu'ils disparaissent avec lui).
+//     faut lire les joueurs avant qu'ils disparaissent avec lui). Pas un
+//     match dont la feuille est faite (409) : il compte dans la Ligue vierge,
+//     comme le refuse la base (« matchs: j'annule le mien », 28/10/2026).
 // Toucher la notification ouvre la fiche du match sur la Map (/?match=id).
 //
 // La route agit avec la clé secrète : elle vérifie que l'appelant est bien
@@ -40,11 +42,12 @@ export async function POST(req: NextRequest) {
 
   const { data: match } = await sb
     .from("matchs")
-    .select("id, organisateur, jour, heure, lieu")
+    .select("id, organisateur, jour, heure, lieu, saisi_le")
     .eq("id", id)
     .maybeSingle();
   if (!match) return NextResponse.json({ error: "Match inconnu." }, { status: 404 });
   if (match.organisateur !== moi.id) return NextResponse.json({ error: "Ce match n'est pas le tien." }, { status: 403 });
+  if (type === "annule" && match.saisi_le) return NextResponse.json({ error: "match déjà joué" }, { status: 409 });
 
   const { data: lignes } = await sb.from("match_joueurs").select("*").eq("match_id", id);
   const joueurs = ((lignes ?? []) as { player_id: string; statut: string; notifie_le?: string | null }[]).filter(

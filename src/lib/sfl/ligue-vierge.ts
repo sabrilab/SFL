@@ -37,6 +37,8 @@ export interface LigneBola {
   equipe: Equipe;
   buts: number;
   passes: number;
+  /** Le poste de sa fiche (ligue_vierge), pour la carte d'un joueur hors de la SFL. */
+  poste?: string | null;
 }
 
 export interface MatchBola {

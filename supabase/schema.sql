@@ -1489,11 +1489,14 @@ create policy "matchs: je modifie le mien"
   using (organisateur = (select auth.uid()) or (select public.is_league_admin()))
   with check (organisateur = (select auth.uid()) or (select public.is_league_admin()));
 
+-- Un match dont la feuille est faite ne s'efface plus que par l'admin :
+-- l'organisateur effaçait un match perdu, et la Ligue vierge oubliait la
+-- défaite de tous ses joueurs (28/10/2026).
 drop policy if exists "matchs: j'annule le mien" on public.matchs;
 create policy "matchs: j'annule le mien"
   on public.matchs for delete
   to authenticated
-  using (organisateur = (select auth.uid()) or (select public.is_league_admin()));
+  using ((organisateur = (select auth.uid()) and saisi_le is null) or (select public.is_league_admin()));
 
 drop policy if exists "match_joueurs: lecture" on public.match_joueurs;
 create policy "match_joueurs: lecture"
@@ -1597,9 +1600,34 @@ alter table public.match_joueurs add column if not exists equipe text check (equ
 alter table public.match_joueurs add column if not exists buts int not null default 0 check (buts between 0 and 99);
 alter table public.match_joueurs add column if not exists passes int not null default 0 check (passes between 0 and 99);
 
+-- Le coup d'envoi d'un match, heure de Paris : « 19h00 », « 19:00 », « 19 » ;
+-- une heure illisible compte pour le début du jour (comme presences_reelles).
+-- Le même calcul que coupDEnvoiPasse (lib/sfl/ligue-vierge.ts), qui ouvre la
+-- feuille dans l'app.
+create or replace function public.coup_d_envoi(j date, h text)
+returns timestamptz
+language sql
+stable
+set search_path = ''
+as $$
+  select case
+           when h ~ '^\s*\d{1,2}\s*([:hH]\s*\d{0,2})?\s*$'
+             then (j + make_interval(
+                     hours => substring(h from '^\s*(\d{1,2})')::int,
+                     mins => coalesce(substring(h from '[:hH]\s*(\d{2})')::int, 0)
+                   )) at time zone 'Europe/Paris'
+           else j::timestamp at time zone 'Europe/Paris'
+         end;
+$$;
+
 -- Un joueur accepte son invitation (sa ligne), mais seul l'organisateur (ou
 -- l'admin) écrit les stats ; une ligne ne change jamais de match ni de
 -- joueur ; et une feuille ne se corrige plus 24 h après sa première saisie.
+-- Depuis le 28/10/2026 : pas de feuille avant le coup d'envoi (on saisissait
+-- un match pas encore joué), et une fois la feuille faite, le jour et l'heure
+-- ne bougent plus (un match déplacé après coup changeait la journée où il
+-- compte). L'admin passe toujours ; le serveur (clé secrète) aussi, pour ces
+-- deux règles-là.
 create or replace function public.match_feuille_gardee()
 returns trigger
 language plpgsql
@@ -1608,6 +1636,8 @@ set search_path = ''
 as $$
 declare
   saisi timestamptz;
+  m_jour date;
+  m_heure text;
 begin
   if public.is_league_admin() then
     return new;
@@ -1631,12 +1661,25 @@ begin
       if not public.organise_match(new.match_id) then
         raise exception 'feuille réservée à l''organisateur' using errcode = '42501';
       end if;
-      select saisi_le into saisi from public.matchs where id = new.match_id;
+      select saisi_le, jour, heure into saisi, m_jour, m_heure from public.matchs where id = new.match_id;
       if saisi is not null and saisi < now() - interval '24 hours' then
         raise exception 'feuille close' using errcode = 'P0001';
       end if;
+      if saisi is null and (select auth.uid()) is not null
+         and public.coup_d_envoi(m_jour, m_heure) > now() then
+        raise exception 'match pas commencé' using errcode = 'P0001';
+      end if;
     end if;
   else
+    if old.saisi_le is null and (select auth.uid()) is not null
+       and new.score_clairs is not null and new.score_fonces is not null
+       and public.coup_d_envoi(new.jour, new.heure) > now() then
+      raise exception 'match pas commencé' using errcode = 'P0001';
+    end if;
+    if old.saisi_le is not null and (select auth.uid()) is not null
+       and (new.jour, new.heure) is distinct from (old.jour, old.heure) then
+      raise exception 'match déjà joué' using errcode = 'P0001';
+    end if;
     if (new.score_clairs, new.score_fonces) is distinct from (old.score_clairs, old.score_fonces)
        and old.saisi_le is not null and old.saisi_le < now() - interval '24 hours' then
       raise exception 'feuille close' using errcode = 'P0001';
@@ -1780,7 +1823,9 @@ create trigger match_joueurs_sortie before delete on public.match_joueurs
 
 -- La Ligue vierge lit tous les matchs Bola joués, privés compris : seulement
 -- le jour, l'heure et qui a fait quoi — ni le lieu, ni les invités. Pour les
--- membres seulement : un compte en attente reçoit une liste vide.
+-- membres seulement : un compte en attente reçoit une liste vide. Avec le
+-- poste de la fiche de chacun (28/10/2026) : la carte d'un joueur Bola, hors
+-- de la SFL, le montrait en « — ».
 create or replace function public.ligue_vierge()
 returns jsonb
 language sql
@@ -1797,9 +1842,11 @@ as $$
            'scoreFonces', m.score_fonces,
            'joueurs', (
              select coalesce(jsonb_agg(jsonb_build_object(
-                      'id', j.player_id, 'name', p.name, 'equipe', j.equipe, 'buts', j.buts, 'passes', j.passes)), '[]'::jsonb)
+                      'id', j.player_id, 'name', p.name, 'equipe', j.equipe, 'buts', j.buts, 'passes', j.passes,
+                      'poste', f.poste)), '[]'::jsonb)
                from public.match_joueurs j
                join public.profiles p on p.id = j.player_id
+               left join public.fiches f on f.player_id = j.player_id
               where j.match_id = m.id and j.equipe in ('clairs', 'fonces')
            )
          ) order by m.jour, m.heure, m.id), '[]'::jsonb)
