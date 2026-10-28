@@ -109,6 +109,7 @@ export function ReponseScellee({
   onScellee,
   ouvert = true,
   libelles,
+  scelles,
   seul,
   tonSeul = "vert",
   taille = "md",
@@ -123,6 +124,8 @@ export function ReponseScellee({
   /** Faux : les réponses sont closes, la piste éteinte. */
   ouvert?: boolean;
   libelles?: Partial<Record<ReponseScellable, string>>;
+  /** Le libellé du sceau posé, quand il diffère du geste (« Confirmer » → « Confirmé »). */
+  scelles?: Partial<Record<ReponseScellable, string>>;
   /** Un seul sens (prendre une place d'un match public : c'est un « Je viens »). */
   seul?: { r: ReponseScellable; libelle: string };
   /** Le ton de la piste à un sens (la braise quand il manque des joueurs). */
@@ -144,16 +147,18 @@ export function ReponseScellee({
   );
   const fini = useRef(false);
   const vivant = useRef(true);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // Remonté (le double montage du mode strict, en dev) : de nouveau vivant.
+    vivant.current = true;
+    return () => {
       vivant.current = false;
       if (minuteur.current) clearTimeout(minuteur.current);
       if (retour.current) clearTimeout(retour.current);
-    },
-    []
-  );
+    };
+  }, []);
 
   const nom = (r: ReponseScellable) => (seul && seul.r === r ? LIBELLES[r] : (libelles?.[r] ?? LIBELLES[r]));
+  const sceau = (r: ReponseScellable) => scelles?.[r] ?? nom(r);
   const hauteur = taille === "sm" ? "h-10 text-[13px]" : "h-[50px] text-[15px]";
   const affichee = mine ?? scellee;
   const unSens = !!seul;
@@ -296,7 +301,7 @@ export function ReponseScellee({
 
   // Sceau posé, plus rien à toucher.
   if (affichee && phase.t !== "pose") {
-    return <Pilule r={affichee} libelle={nom(affichee)} hauteur={hauteur} className={className} />;
+    return <Pilule r={affichee} libelle={sceau(affichee)} hauteur={hauteur} className={className} />;
   }
 
   const cotes: { r: ReponseScellable; libelle: string; cote: "d" | "g" | "seul" }[] = seul
@@ -374,7 +379,7 @@ export function ReponseScellee({
       {phase.t === "pose" && (
         <Pilule
           r={phase.r}
-          libelle={nom(phase.r)}
+          libelle={sceau(phase.r)}
           hauteur={hauteur}
           className="absolute inset-0 scelle-arrive"
           grille={{ cols: phase.cols, rows: phase.rows }}

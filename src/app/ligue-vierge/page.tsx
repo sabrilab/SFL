@@ -19,6 +19,13 @@
 //     argent, bronze), puis les buteurs et les passeurs et les derniers
 //     matchs avec leur score et leurs MVP.
 //
+// Depuis le 28/10, les joueurs confirment le résultat (lib/sfl/
+// confirmation-resultat.ts) : un match en attente, contesté ou qui ne compte
+// pas le dit à la place de « Amical » ; mes matchs des derniers jours portent
+// leur état et « Confirmer le résultat » (bilan-resultat.tsx), puisque la Map
+// ne montre plus un match passé ; l'organisateur voit les réponses dans sa
+// feuille, que ?feuille=id ouvre (la notification d'un « infirme »).
+//
 // Sur tablette et ordinateur (dès 768 px), la largeur des Actus
 // (.gabarit-ligue) et deux colonnes au nombre d'or : le classement dans la
 // grande, qui reste à l'écran s'il y tient (useCollant), les derniers matchs
@@ -37,7 +44,7 @@
 // (sur une préversion, ?apercu=1 force la démonstration). Et pour qui n'a pas d'équipe, la vitrine
 // de Bola Team en une ligne (equipe/vitrine-team.tsx).
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
@@ -48,6 +55,8 @@ import { useMonEquipe } from "@/hooks/use-mon-equipe";
 import { carteNeutre } from "@/components/sfl/qui-vient";
 import { useSeason } from "@/components/sfl/season-provider";
 import { FeuilleBola } from "@/components/sfl/matchs/feuille-bola";
+import { BilanResultat } from "@/components/sfl/matchs/bilan-resultat";
+import { libelleEtat } from "@/lib/sfl/confirmation-resultat";
 import { Nom } from "@/components/sfl/nom";
 import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { useSession } from "@/hooks/use-session";
@@ -186,7 +195,10 @@ function Pilules<T extends string | number>({ choix, actif, onChange, label }: {
   );
 }
 
-function MatchJoue({ m }: { m: MatchCompte }) {
+/** Un match des trois derniers jours : sa confirmation peut encore attendre. */
+const recent = (jour: string) => Date.now() - Date.parse(`${jour}T00:00:00Z`) < 3 * 86_400_000;
+
+function MatchJoue({ m, bilan = false }: { m: MatchCompte; bilan?: boolean }) {
   const format = useFormatCarte();
   const mvps = m.joueurs.filter((j) => j.mvp);
   return (
@@ -195,7 +207,11 @@ function MatchJoue({ m }: { m: MatchCompte }) {
         <span className="mono-label text-foreground/40">
           {libelleJour(m.jour)} · {m.heure}
         </span>
-        {!m.valide && <span className="mono-label text-foreground/40">Amical</span>}
+        {m.etat && m.etat !== "compte" ? (
+          <span className="mono-label text-foreground/40">{libelleEtat(m.etat)}</span>
+        ) : (
+          !m.valide && <span className="mono-label text-foreground/40">Amical</span>
+        )}
       </div>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
         <span className="mono-label text-muted-foreground">Clairs</span>
@@ -220,12 +236,24 @@ function MatchJoue({ m }: { m: MatchCompte }) {
           </div>
         </div>
       )}
+      {bilan && m.id > 0 && recent(m.jour) && <BilanResultat matchId={m.id} className="border-t border-contraste/[0.06] pt-4" />}
     </article>
   );
 }
 
-function MesFeuilles({ parties, onSaisie, apercu }: { parties: Partie[]; onSaisie: () => void; apercu: boolean }) {
+function MesFeuilles({ parties, onSaisie, apercu, aOuvrir }: { parties: Partie[]; onSaisie: () => void; apercu: boolean; aOuvrir: number | null }) {
   const [ouverte, setOuverte] = useState<Partie | null>(null);
+  // ?feuille=id (la notification d'un « infirme ») : la feuille s'ouvre, une fois.
+  const [ouverteParLien, setOuverteParLien] = useState(false);
+  const cible = aOuvrir && !ouverteParLien ? (parties.find((p) => p.id === aOuvrir) ?? null) : null;
+  useEffect(() => {
+    if (!cible) return;
+    const t = window.setTimeout(() => {
+      setOuverte(cible);
+      setOuverteParLien(true);
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [cible]);
   if (parties.length === 0) return null;
   return (
     <section className="flex flex-col gap-2 md:grid md:grid-cols-2 md:gap-[var(--fib-13)] xl:grid-cols-3">
@@ -273,7 +301,25 @@ export default function LigueViergePage() {
   // Ma carte / Classement, comme Mon équipe / Championnat dans Bola Team.
   const [vue, setVue] = useState<"moi" | "classement">("moi");
   const [forceApercu, setForceApercu] = useState(false);
+  const [feuilleLien, setFeuilleLien] = useState<number | null>(null);
   const recharger = useCallback(() => setTick((n) => n + 1), []);
+
+  // ?feuille=id ouvre ma feuille de ce match (la notification d'un « infirme »).
+  // Lu une fois et gardé : l'effet remonté (mode strict) ne le relit pas dans l'adresse.
+  const lienFeuille = useRef<number | null>(null);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const lu = Number(url.searchParams.get("feuille"));
+    if (Number.isInteger(lu) && lu > 0) {
+      lienFeuille.current = lu;
+      url.searchParams.delete("feuille");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
+    const id = lienFeuille.current;
+    if (id === null) return;
+    const t = window.setTimeout(() => setFeuilleLien(id), 0);
+    return () => window.clearTimeout(t);
+  }, []);
 
   // Sur une préversion, ?apercu=1 montre la démonstration même s'il y a déjà de vrais matchs.
   useEffect(() => {
@@ -412,13 +458,13 @@ export default function LigueViergePage() {
                 )}
               </div>
             </div>
-            <MesFeuilles parties={feuilles} onSaisie={recharger} apercu={apercu} />
+            <MesFeuilles parties={feuilles} onSaisie={recharger} apercu={apercu} aOuvrir={feuilleLien} />
             {vus !== null && mesDerniers.length === 0 && vide("Aucun match Bola pour l'instant.")}
             {mesDerniers.length > 0 && (
               <div className="flex flex-col gap-3">
                 <h2 className="px-1 text-[17px] font-bold tracking-tight">Mes derniers matchs</h2>
                 {mesDerniers.map((m) => (
-                  <MatchJoue key={m.id} m={m} />
+                  <MatchJoue key={m.id} m={m} bilan />
                 ))}
               </div>
             )}

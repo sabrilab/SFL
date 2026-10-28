@@ -9,6 +9,12 @@
 // Le MVP n'est jamais choisi ici : l'app le tire des stats (le plus haut
 // buts + passes du match ; à égalité, le plus de passes, Sabri 28/10 ; deux
 // MVP seulement en égalité parfaite), et il s'affiche dès qu'il change.
+//
+// Depuis le 28/10 (lib/sfl/confirmation-resultat.ts) : la feuille enregistrée
+// part aux joueurs, qui la confirment ou l'infirment ; leurs réponses
+// s'affichent en tête de la feuille (bilan-resultat.tsx). Corriger une feuille
+// à laquelle des joueurs ont déjà répondu remet leurs réponses à zéro : on le
+// demande d'abord.
 
 import { useMemo, useState } from "react";
 import { Minus, Plus } from "lucide-react";
@@ -18,6 +24,7 @@ import { direErreur, saisirFeuille, type EquipeFeuille, type Partie } from "@/li
 import { mvpsDuMatch, QUORUM } from "@/lib/sfl/ligue-vierge";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
+import { BilanResultat, useBilan, type Bilan } from "@/components/sfl/matchs/bilan-resultat";
 
 interface Ligne {
   playerId: string;
@@ -77,7 +84,10 @@ export function FeuilleBola({
   onOpenChange,
   onSaisie,
   apercu = false,
+  demoBilan,
 }: {
+  /** Un bilan de démonstration (aperçus). */
+  demoBilan?: Bilan | null;
   partie: Partie;
   /** Une feuille de démonstration : rien n'est envoyé. */
   apercu?: boolean;
@@ -88,6 +98,7 @@ export function FeuilleBola({
   const [lignes, setLignes] = useState<Ligne[]>(() => lignesDe(partie));
   const [score, setScore] = useState({ clairs: partie.scoreClairs ?? 0, fonces: partie.scoreFonces ?? 0 });
   const [envoi, setEnvoi] = useState(false);
+  const bilan = useBilan(partie.saisiLe ? partie.id : 0, true, apercu ? (demoBilan ?? null) : undefined);
 
   const butsDe = (e: "clairs" | "fonces") => lignes.filter((l) => l.equipe === e).reduce((s, l) => s + l.buts, 0);
   const passesDe = (e: "clairs" | "fonces") => lignes.filter((l) => l.equipe === e).reduce((s, l) => s + l.passes, 0);
@@ -116,6 +127,7 @@ export function FeuilleBola({
         onOpenChange(false);
         return;
       }
+      if (bilan?.requise && bilan.c + bilan.i > 0 && !window.confirm("Les réponses des joueurs repartent à zéro ?")) return;
       await saisirFeuille(partie.id, {
         scoreClairs: score.clairs,
         scoreFonces: score.fonces,
@@ -124,7 +136,7 @@ export function FeuilleBola({
       // Sous le quorum, le match est amical : rien ne bouge au classement,
       // le dire plutôt qu'annoncer un classement « à jour » (28/10/2026).
       if (presents < QUORUM) toast(`Feuille enregistrée. Match amical : moins de ${QUORUM} joueurs.`);
-      else toast.success("Feuille enregistrée, le classement Bola est à jour.");
+      else toast.success("Feuille enregistrée, envoyée aux joueurs.");
       onSaisie();
       onOpenChange(false);
     } catch (e) {
@@ -142,6 +154,9 @@ export function FeuilleBola({
         </SheetHeader>
 
         <div className="flex flex-col gap-5 px-4">
+          {partie.saisiLe && (
+            <BilanResultat matchId={partie.id} organise demo={bilan} className="rounded-[26px] bg-card p-4" />
+          )}
           {/* Le score, les deux équipes face à face. */}
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-[26px] bg-card p-4">
             {(["clairs", "fonces"] as const).map((e, i) => (

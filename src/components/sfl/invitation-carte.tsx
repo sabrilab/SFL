@@ -60,6 +60,14 @@
 //    décoche un, et le bouton les suit d'un coup (suivis.ts). Décidé sur la
 //    liste relue de la base, jamais sur un cache.
 //
+// · Le résultat d'un match Bola à confirmer (Sabri, 28/10 : « Par un écran
+//   qui s'affiche confirmer ou infirmer les résultats ») : juste après
+//   l'identité, avant l'équipe, parce qu'il expire en 24 h. Lu dans la base
+//   (mes_resultats_a_confirmer), jamais sur un cache ; pour tous, de la SFL
+//   ou non. La croix le ferme pour cette ouverture seulement. Toucher la
+//   notification (/?resultat=id) l'ouvre aussitôt sur ce match, et la fiche
+//   du match ou Bola l'ouvrent de même (ouvrirResultat).
+//
 // L'accueil de l'app passe avant tout (components/sfl/accueil, 24/10) : à
 // la première ouverture, il demande déjà la ville, la carte officielle, les
 // notifications et les partenaires. Ce qui a été laissé pour « Plus tard »
@@ -81,6 +89,10 @@ import { FluxCarteOfficielle } from "@/components/sfl/carte-officielle";
 import { InvitationCharte, charteAProposer } from "@/components/sfl/invitation-charte";
 import { InvitationVille } from "@/components/sfl/invitation-ville";
 import { AnnonceNouveaute } from "@/components/sfl/nouveautes/annonce-nouveaute";
+import { ResultatsAConfirmer } from "@/components/sfl/matchs/resultat-a-confirmer";
+import type { ResultatAConfirmer } from "@/lib/sfl/confirmation-resultat";
+import { demoResultat } from "@/lib/sfl/ligue-vierge-demo";
+import { aujourdhuiIso, mesResultatsAConfirmer, monId } from "@/lib/sfl/matchs";
 import { ReponseEquipe, equipeAOuvrir, type EquipeAOuvrir } from "@/components/sfl/equipe/reponse-equipe";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { PlayerCard } from "@/components/sfl/player-card";
@@ -119,7 +131,12 @@ import { maVille, maVilleAProposer, type VilleJoueur } from "@/lib/sfl/villes";
 import { demoInvitation } from "@/lib/sfl/equipes-demo";
 import { cn } from "@/lib/utils";
 
-export type Invitation = "equipe" | "charte" | "nouveaute" | "arbitre" | "divisions" | "ville" | "carte" | "manga" | "notifs" | "suivre";
+export type Invitation = "resultat" | "equipe" | "charte" | "nouveaute" | "arbitre" | "divisions" | "ville" | "carte" | "manga" | "notifs" | "suivre";
+
+/** Ouvrir l'écran « Résultat du match » sur ce match, d'où qu'on soit (la fiche, Bola). */
+export function ouvrirResultat(id: number) {
+  window.dispatchEvent(new CustomEvent("bola:resultat", { detail: id }));
+}
 
 const PLUS_TARD = (quoi: Invitation, nom: string) => `sfl-invitation-${quoi}-${nom}`;
 /** Combien de joueurs l'invitation propose de suivre. */
@@ -131,7 +148,7 @@ const PAUSES: Partial<Record<Invitation, number>> = { charte: 7 * 24 * 3600 * 10
 /** Après le splash, et après la cérémonie des nouvelles cartes si elle passe. */
 const DELAI_MS = 2600;
 
-const TEXTES: Record<Exclude<Invitation, "ville" | "divisions" | "equipe" | "charte" | "nouveaute" | "arbitre">, { titre: string; ligne: string; bouton: string }> = {
+const TEXTES: Record<Exclude<Invitation, "resultat" | "ville" | "divisions" | "equipe" | "charte" | "nouveaute" | "arbitre">, { titre: string; ligne: string; bouton: string }> = {
   carte: {
     titre: "Ta carte officielle",
     ligne: "Ton visage, le maillot Bola. Elle apparaît sur ta carte, chez tout le monde.",
@@ -184,11 +201,11 @@ export function aSuivre(saison: Saison, players: Player[], nom: string, suivable
   return [...fideles, ...hauts].slice(0, PROPOSES);
 }
 
-/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville`, `?invitation=suivre`, `?invitation=divisions`, `?invitation=equipe`, `?invitation=charte`, `?invitation=nouveaute` (la dernière annoncée), `?invitation=manga` ou `?invitation=arbitre` la montre sans compte vérifié (captures). */
+/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville`, `?invitation=suivre`, `?invitation=divisions`, `?invitation=equipe`, `?invitation=charte`, `?invitation=nouveaute` (la dernière annoncée), `?invitation=manga`, `?invitation=resultat` ou `?invitation=arbitre` la montre sans compte vérifié (captures). */
 function apercu(): Invitation | null {
   if (process.env.NODE_ENV === "production" || typeof window === "undefined") return null;
   const v = new URLSearchParams(window.location.search).get("invitation");
-  return v === null ? null : v === "notifs" || v === "ville" || v === "suivre" || v === "divisions" || v === "equipe" || v === "charte" || v === "nouveaute" || v === "arbitre" || v === "manga" ? v : "carte";
+  return v === null ? null : v === "notifs" || v === "ville" || v === "suivre" || v === "divisions" || v === "equipe" || v === "charte" || v === "nouveaute" || v === "arbitre" || v === "manga" || v === "resultat" ? v : "carte";
 }
 
 export function InvitationCarte() {
@@ -211,6 +228,12 @@ export function InvitationCarte() {
   const [flux, setFlux] = useState(false);
   const [etatNotifs, setEtatNotifs] = useState<Awaited<ReturnType<typeof etatNotifications>>>("indisponible");
   const [busy, setBusy] = useState(false);
+  /** Les résultats qui attendent ma réponse, et mon id. */
+  const [resultats, setResultats] = useState<ResultatAConfirmer[]>([]);
+  const [moiId, setMoiId] = useState<string | null>(null);
+  /** Un résultat ouvert d'un lien ou d'un bouton : l'ouverture ne propose rien d'autre. */
+  const parLien = useRef(false);
+  const lienResultat = useRef<number | null>(null);
   /** Ceux qu'on a décochés dans l'invitation à suivre. */
   const [decoches, setDecoches] = useState<Set<string>>(() => new Set());
 
@@ -240,6 +263,11 @@ export function InvitationCarte() {
         if (forcee === "ville") setProposee(maVille(nom));
         if (forcee === "divisions") setEdition(editionAnnonce(ligue.current.saison, maintenant) ?? "avant");
         if (forcee === "nouveaute") setNouveaute(NOUVEAUTES[NOUVEAUTES.length - 1].id);
+        if (forcee === "resultat") {
+          const noms = ligue.current.players.filter((p) => p.matchs > 0).map((p) => p.name);
+          setMoiId(nom);
+          setResultats([demoResultat(noms, nom, aujourdhuiIso())]);
+        }
         if (forcee === "equipe")
           setEquipe({ quoi: "invitation", ...demoInvitation(ligue.current.players.filter((p) => p.matchs > 0).map((p) => p.name), nom) });
         setVisible(forcee);
@@ -264,6 +292,16 @@ export function InvitationCarte() {
       noterEtatNotifs(etat, nom);
       setEtatNotifs(etat);
       if (identiteConfirmee(nom) === false) return;
+      if (parLien.current) return;
+      // Le résultat d'un match d'abord : il expire en 24 h.
+      const [aConfirmer, uid] = await Promise.all([mesResultatsAConfirmer().catch(() => []), monId()]);
+      if (annule || parLien.current) return;
+      if (aConfirmer.length > 0) {
+        setMoiId(uid);
+        setResultats(aConfirmer);
+        setVisible("resultat");
+        return;
+      }
       // L'équipe d'abord : son invitation attend un Oui ou un Non.
       const team = await equipeAOuvrir(enPause("equipe", nom)).catch(() => null);
       if (annule) return;
@@ -318,6 +356,47 @@ export function InvitationCarte() {
     };
   }, [nom, forcee]);
 
+  // Le lien de la notification (/?resultat=id), et les boutons de la fiche
+  // et de Bola (ouvrirResultat) : l'écran s'ouvre aussitôt, sur ce match
+  // d'abord, puis les autres en attente.
+  useEffect(() => {
+    if (!nom || forcee) return;
+    let fini = false;
+    const ouvrir = async (id: number) => {
+      parLien.current = true;
+      const [file, uid] = await Promise.all([mesResultatsAConfirmer().catch(() => null), monId()]);
+      if (fini || !file) return;
+      const tri = [...file.filter((r) => r.id === id), ...file.filter((r) => r.id !== id)];
+      if (!tri.length || tri[0].id !== id) {
+        toast("Ce résultat n'attend plus ta réponse.");
+        if (!tri.length) return;
+      }
+      setMoiId(uid);
+      setResultats(tri);
+      setVisible("resultat");
+    };
+    // Lu une fois et gardé : l'effet remonté (mode strict) ne le relit pas dans l'adresse.
+    const url = new URL(window.location.href);
+    const lu = Number(url.searchParams.get("resultat"));
+    if (Number.isInteger(lu) && lu > 0) {
+      lienResultat.current = lu;
+      url.searchParams.delete("resultat");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
+    if (lienResultat.current !== null) {
+      const lien = lienResultat.current;
+      void ouvrir(lien).then(() => {
+        if (!fini) lienResultat.current = null;
+      });
+    }
+    const ecoute = (e: Event) => void ouvrir(Number((e as CustomEvent<number>).detail));
+    window.addEventListener("bola:resultat", ecoute);
+    return () => {
+      fini = true;
+      window.removeEventListener("bola:resultat", ecoute);
+    };
+  }, [nom, forcee]);
+
   // L'invitation aux notifications, montrée : le journal d'usage le note,
   // puis la réponse (lib/sfl/notifications.ts, page Activité de l'admin).
   useEffect(() => {
@@ -365,13 +444,22 @@ export function InvitationCarte() {
     setVisible(null);
   }
 
-  const texte = visible && visible !== "ville" && visible !== "divisions" && visible !== "equipe" && visible !== "charte" && visible !== "nouveaute" && visible !== "arbitre" ? TEXTES[visible] : null;
+  const texte = visible && visible !== "resultat" && visible !== "ville" && visible !== "divisions" && visible !== "equipe" && visible !== "charte" && visible !== "nouveaute" && visible !== "arbitre" ? TEXTES[visible] : null;
   const Icone = visible === "notifs" ? Bell : visible === "suivre" ? UserPlus : Sparkles;
   const choisis = proposes.filter((n) => !decoches.has(n)).length;
 
   return (
     <>
       <AnimatePresence>
+        {visible === "resultat" && resultats.length > 0 && (
+          <ResultatsAConfirmer
+            key={`resultat-${resultats.map((r) => r.id).join("-")}`}
+            file={resultats}
+            moi={moiId}
+            apercu={!!forcee}
+            onFini={() => setVisible(null)}
+          />
+        )}
         {visible === "equipe" && equipe && <ReponseEquipe key="equipe" a={equipe} onFini={() => setVisible(null)} onPlusTard={plusTard} />}
         {visible === "charte" && (
           <InvitationCharte key="charte" player={player} nom={nom} onFini={() => setVisible(null)} onPlusTard={plusTard} />
