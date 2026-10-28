@@ -390,9 +390,19 @@ export async function annuler(id: number): Promise<void> {
   if (error) throw error;
 }
 
-/** Les joueurs de la ligue, pour les ajouter par leur identifiant ou leur nom. */
+/**
+ * Les joueurs de la ligue, pour les ajouter par leur identifiant ou leur nom :
+ * les comptes acceptés et finis seulement (28/10/2026). Un compte en attente,
+ * ou revenu de Google sans avoir choisi son pseudo (un nom provisoire), ne se
+ * proposait pas moins qu'un autre.
+ */
 export async function listerProfils(): Promise<Profil[]> {
-  const { data, error } = await supabase().from("profiles").select("id, name, username").order("name");
+  const { data, error } = await supabase()
+    .from("profiles")
+    .select("id, name, username")
+    .eq("valide", true)
+    .eq("pseudo_a_choisir", false)
+    .order("name");
   if (error) throw error;
   return (data ?? []) as Profil[];
 }
