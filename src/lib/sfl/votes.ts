@@ -1,6 +1,12 @@
-"use client";
-
 // Le vote des figures de match — Joueur Impact et meilleur défenseur.
+//
+// Module partagé, sans "use client" (28/10) : les routes du serveur
+// (félicitations, divisions, équipes du vendredi, outsider, missions,
+// annonces ; saison-serveur.server.ts) appellent appliquerVotes et
+// titresFaibles. Marqué client, Next.js leur passait une référence client à
+// la place de la fonction : « Attempted to call appliquerVotes() from the
+// server », et la route tombait. Seuls chargerVotes et voter parlent à la
+// base, et seulement depuis le téléphone.
 //
 // Remis le 17/10 à la demande de Sabri, partagé en base (supabase/schema.sql,
 // table votes_figures) : avant, chaque vote restait sur le téléphone de son
