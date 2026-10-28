@@ -277,6 +277,8 @@ export async function repondreResultat(id: number, version: number, reponse: Rep
   });
   if (error) throw error;
   if (reponse === "infirme") notifierResultat(id, "conteste");
+  // Ma réponse peut faire compter le match : ma carte se relit (use-bola-carte.ts).
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(MES_MATCHS_BOLA_EVENT));
   return data as EtatResultat;
 }
 
@@ -320,6 +322,24 @@ export function notifierResultat(id: number, type: "feuille" | "conteste"): void
 export async function lireLigueVierge(): Promise<MatchBola[]> {
   const { data, error } = await supabase().rpc("ligue_vierge");
   if (error) throw error;
+  return (data ?? []) as MatchBola[];
+}
+
+/** Émis quand ma réponse à un résultat change ce que valent mes matchs Bola (use-bola-carte.ts). */
+export const MES_MATCHS_BOLA_EVENT = "bola-mes-matchs";
+
+/**
+ * Mes matchs Bola saisis, au format de lireLigueVierge, où je suis compté
+ * (mes_matchs_bola, supabase/schema.sql) : la carte, l'XP et les missions
+ * d'un joueur Bola (lib/sfl/carte-bola.ts). null : la base ne connaît pas
+ * encore la fonction (préversion).
+ */
+export async function lireMesMatchsBola(): Promise<MatchBola[] | null> {
+  const { data, error } = await supabase().rpc("mes_matchs_bola");
+  if (error) {
+    if (sansFonction(error)) return null;
+    throw error;
+  }
   return (data ?? []) as MatchBola[];
 }
 

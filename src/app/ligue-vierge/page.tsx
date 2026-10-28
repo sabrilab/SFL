@@ -81,20 +81,23 @@ import { aujourdhuiIso, libelleJour, listerMesDerniers, lireLigueVierge, monId, 
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { isHidden } from "@/lib/sfl/hidden";
+import { carteBola } from "@/lib/sfl/carte-bola";
+import type { Player } from "@/lib/sfl/engine";
 
-/** Le poste de la fiche de chaque joueur des matchs Bola (ligue_vierge), par nom en minuscules. */
-const PostesBola = createContext<Map<string, string>>(new Map());
+/** La carte Bola de chaque joueur des matchs Bola (ligue_vierge), par nom en minuscules. */
+const CartesBola = createContext<Map<string, Player>>(new Map());
 
 /**
- * La carte d'un joueur de Bola : sa carte de la SFL s'il en a une, sinon une
- * carte neutre, au poste de sa fiche (28/10/2026 : « — » pour tous les autres
- * joueurs Bola).
+ * La carte d'un joueur de Bola : sa carte de la SFL s'il en a une, sinon sa
+ * carte de joueur Bola, au poste de sa fiche, calculée sur ses matchs validés
+ * comme sur son téléphone (lib/sfl/carte-bola.ts, 28/10/2026 : elle restait à
+ * 75 pour tous).
  */
 function Carte({ name, size, detail }: { name: string; size: number; detail?: string }) {
   const { allPlayers } = useSeason();
-  const postes = useContext(PostesBola);
+  const cartes = useContext(CartesBola);
   const cle = name.trim().toLowerCase();
-  const p = allPlayers.find((x) => x.name.toLowerCase() === cle) ?? { ...carteNeutre(name), poste: postes.get(cle) ?? "—" };
+  const p = allPlayers.find((x) => x.name.toLowerCase() === cle) ?? cartes.get(cle) ?? carteNeutre(name);
   return <MiniCarte player={p} size={size} detail={detail} cle={`lv-${name}`} />;
 }
 
@@ -384,11 +387,17 @@ export default function LigueViergePage() {
     () => (apercu ? compterMatchs(demoMatchs(noms, aujourdhuiIso())) : matchs),
     [apercu, noms, matchs]
   );
-  const postes = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const x of vus ?? []) for (const j of x.joueurs) if (j.poste) m.set(j.name.trim().toLowerCase(), j.poste);
+  const cartesBola = useMemo(() => {
+    const ids = new Map<string, { name: string; poste: string | null }>();
+    for (const x of vus ?? []) for (const j of x.joueurs) ids.set(j.id, { name: j.name, poste: j.poste ?? ids.get(j.id)?.poste ?? null });
+    const m = new Map<string, Player>();
+    for (const [id, j] of ids) {
+      const cle = j.name.trim().toLowerCase();
+      if (allPlayers.some((p) => p.name.toLowerCase() === cle)) continue;
+      m.set(cle, carteBola(vus ?? [], id, j.name, j.poste).player);
+    }
     return m;
-  }, [vus]);
+  }, [vus, allPlayers]);
   // Les masqués (Sabri, les arbitres) hors du classement, sauf soi-même.
   const classement = useMemo(() => (vus ? classementAVie(vus, (c) => c.id === moi || !isHidden(c.name)) : []), [vus, moi]);
   // Mes feuilles : j'organise, le coup d'envoi est passé, et la feuille reste ouverte (24 h après la saisie).
@@ -421,7 +430,7 @@ export default function LigueViergePage() {
   const vide = (texte: string) => <div className="rounded-[22px] bg-card px-5 py-8 text-center text-[14px] text-muted-foreground">{texte}</div>;
 
   return (
-    <PostesBola.Provider value={postes}>
+    <CartesBola.Provider value={cartesBola}>
     <div className="gabarit-ligue mx-auto flex w-full max-w-[470px] flex-col gap-7 px-5 pt-2 pb-8 sm:pt-6 md:gap-[var(--fib-34)] md:pt-4 lg:pt-[var(--fib-34)]">
       <h1 className="sr-only">Bola</h1>
       {/* Le même haut que Bola Team (Sabri, 26/10 : « le même design que
@@ -558,6 +567,6 @@ export default function LigueViergePage() {
           </div>
         ))}
     </div>
-    </PostesBola.Provider>
+    </CartesBola.Provider>
   );
 }

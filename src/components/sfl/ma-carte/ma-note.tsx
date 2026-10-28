@@ -12,6 +12,9 @@
 //   · « Comment ma note monte » : le barème, replié. Pas pour un joueur
 //     Bola (hors de la SFL) : il parle des titres Impact et Défensive et
 //     des votes du dimanche, qu'il n'a pas (28/10/2026).
+// Un joueur Bola (28/10/2026, lib/sfl/carte-bola.ts) lit la même page sur
+// ses matchs validés : sa carte bouge à chaque match, sans « en attente » ni
+// mise à jour officielle ; son journal date chaque match au lieu de « J4 ».
 // Le but : que chacun puisse refaire le calcul, et donc croire sa note.
 // Noir et blanc, en currentColor et en opacités (clair comme sombre) ; les
 // chiffres en Anton, les étiquettes en JetBrains Mono.
@@ -88,13 +91,13 @@ function Stat({ k, ev }: { k: StatKey; ev: EvolutionJoueur }) {
 
 export function MaNote() {
   const { player } = useMyPlayer();
-  const { evolution } = useSeason();
+  const { evolution, bolaCarte } = useSeason();
   const joueurBola = useJoueurBola();
   const horsSfl = useHorsSfl();
-  const ev = evolution.actif ? evolution.joueurs.get(player.name) : undefined;
+  const ev = joueurBola ? (bolaCarte?.ev ?? undefined) : evolution.actif ? evolution.joueurs.get(player.name) : undefined;
   const cal = evolution.calendrier;
   const enDirect = useMemo(() => (ev ? plus(ev.officielles, ev.enAttente) : null), [ev]);
-  if (!evolution.actif) return null;
+  if (!evolution.actif && !joueurBola) return null;
 
   const note = ovr(player.stats);
   const gagne = enDirect ? ovr(enDirect) - note : 0;
@@ -117,11 +120,13 @@ export function MaNote() {
             </span>
           )}
         </div>
-        <div className="flex flex-col items-end gap-1 text-right">
-          <span className="mono-label text-[10px] text-foreground/55">Mise à jour officielle</span>
-          <span className="text-[15px] font-semibold">{prochaine}</span>
-          {reste && <span className="font-mono text-[11px] text-foreground/45">{reste}</span>}
-        </div>
+        {!joueurBola && (
+          <div className="flex flex-col items-end gap-1 text-right">
+            <span className="mono-label text-[10px] text-foreground/55">Mise à jour officielle</span>
+            <span className="text-[15px] font-semibold">{prochaine}</span>
+            {reste && <span className="font-mono text-[11px] text-foreground/45">{reste}</span>}
+          </div>
+        )}
       </div>
 
       {ev ? (
@@ -141,10 +146,12 @@ export function MaNote() {
             </span>
           </div>
 
-          <Journal ev={ev} />
+          <Journal ev={ev} bola={joueurBola} />
         </>
       ) : (
-        <p className="text-[15px] text-foreground/60">Ta note bougera dès ton premier dimanche joué.</p>
+        <p className="text-[15px] text-foreground/60">
+          {joueurBola ? "Ta note bouge dès ton premier match validé." : "Ta note bougera dès ton premier dimanche joué."}
+        </p>
       )}
 
       {!joueurBola && !horsSfl && <Bareme />}
@@ -153,7 +160,7 @@ export function MaNote() {
 }
 
 /** Mes dimanches et mes mises à jour, mêlés, du plus récent au plus ancien. */
-function Journal({ ev }: { ev: EvolutionJoueur }) {
+function Journal({ ev, bola }: { ev: EvolutionJoueur; bola?: boolean }) {
   type Ligne = { j: number; ordre: number; node: React.ReactNode };
   const lignes: Ligne[] = [];
   for (const m of ev.majs) {
@@ -180,10 +187,14 @@ function Journal({ ev }: { ev: EvolutionJoueur }) {
       node: (
         <li key={`j-${d.j}`} className="flex flex-col gap-1.5 border-b border-foreground/10 py-3 last:border-0">
           <span className="flex items-baseline justify-between gap-3">
-            <span className="text-[14px] font-semibold">
-              J{d.j}
-              {d.date && <span className="ml-2 font-mono text-[11px] font-normal text-foreground/45">{d.date}</span>}
-            </span>
+            {bola ? (
+              <span className="text-[14px] font-semibold">{d.date}</span>
+            ) : (
+              <span className="text-[14px] font-semibold">
+                J{d.j}
+                {d.date && <span className="ml-2 font-mono text-[11px] font-normal text-foreground/45">{d.date}</span>}
+              </span>
+            )}
             {Object.keys(d.points).length > 0 && (
               <span className="font-mono text-[12px] font-bold tabular-nums">{listeGains(d.points)}</span>
             )}
@@ -207,7 +218,7 @@ function Journal({ ev }: { ev: EvolutionJoueur }) {
   lignes.sort((a, b) => b.j - a.j || b.ordre - a.ordre);
   return (
     <div className="flex flex-col gap-2">
-      <h2 className="mono-label text-[10px] text-foreground/55">Mes dimanches</h2>
+      <h2 className="mono-label text-[10px] text-foreground/55">{bola ? "Mes matchs" : "Mes dimanches"}</h2>
       <ul className="flex flex-col gap-1">{lignes.map((l) => l.node)}</ul>
     </div>
   );

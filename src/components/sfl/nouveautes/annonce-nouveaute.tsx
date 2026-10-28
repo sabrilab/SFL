@@ -10,11 +10,13 @@ import { Diaporama, type Diapo } from "./diaporama";
 import { diaposJourneesEtBlessures } from "./journees-et-blessures";
 import { diaposNouveautes2710 } from "./nouveautes-27-10";
 import { diaposConfirmerResultats } from "./confirmer-resultats";
+import { diaposCarteBola } from "./carte-bola";
 
 const DIAPOS: Record<string, { diapos: (player: Player) => Diapo[]; aller?: { label: string; href: string } }> = {
   "journees-et-blessures": { diapos: diaposJourneesEtBlessures, aller: { label: "Voir Ma carte", href: "/profil" } },
   "nouveautes-27-10": { diapos: diaposNouveautes2710, aller: { label: "Voir Ma carte", href: "/profil/xp?vue=autres" } },
   "confirmer-resultats": { diapos: diaposConfirmerResultats, aller: { label: "Voir Bola", href: "/ligue-vierge" } },
+  "carte-bola": { diapos: diaposCarteBola, aller: { label: "Voir mes missions", href: "/profil/xp?vue=missions" } },
 };
 
 export function AnnonceNouveaute({ id, player, onFini }: { id: string; player: Player; onFini: () => void }): ReactNode {

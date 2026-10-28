@@ -51,11 +51,11 @@ export function CartesCarriere({ saisons, titre = "Ses cartes" }: { saisons: Car
           const avant = saisons[i + 1];
           const ecart = avant ? s.note - avant.note : 0;
           return (
-            <div key={s.numero} className={cn("flex flex-col gap-[var(--fib-13)] py-[var(--fib-13)]", i > 0 && "border-t border-foreground/8")}>
+            <div key={s.bola ? "bola" : s.numero} className={cn("flex flex-col gap-[var(--fib-13)] py-[var(--fib-13)]", i > 0 && "border-t border-foreground/8")}>
               <div className="flex items-baseline justify-between px-4">
                 <span className="text-[15px] font-semibold">
                   {s.nom}
-                  {s.enCours && <span className="font-normal text-foreground/45"> · en cours</span>}
+                  {s.enCours && !s.bola && <span className="font-normal text-foreground/45"> · en cours</span>}
                 </span>
                 <span className="flex items-baseline gap-1.5">
                   {avant && ecart !== 0 && (
@@ -73,27 +73,27 @@ export function CartesCarriere({ saisons, titre = "Ses cartes" }: { saisons: Car
                   <MiniCarte
                     player={s.player}
                     size={format.grande}
-                    cle={`saison-${s.numero}-${s.player.name}`}
+                    cle={`saison-${s.bola ? "bola" : s.numero}-${s.player.name}`}
                     detail={`${s.nom} · ${s.note}`}
-                    saison={s.enCours ? undefined : s.numero}
+                    saison={s.enCours || s.bola ? undefined : s.numero}
                   />
                 </figure>
                 {/* Sur téléphone, sans boîte : les cartes spéciales suivent dans la rangée. */}
                 <div className="contents md:flex md:min-w-0 md:flex-1 md:flex-wrap md:items-end md:gap-[var(--fib-13)]">
                   {s.speciales.map((c) => (
-                    <figure key={c.carte.type + c.j} className="flex shrink-0 flex-col items-center gap-1.5">
+                    <figure key={c.carte.type + c.j + (c.etiquette ?? "")} className="flex shrink-0 flex-col items-center gap-1.5">
                       <MiniCarte
                         player={c.player}
                         size={format.moyenne}
-                        cle={`speciale-${s.numero}-${c.j}-${c.carte.type}-${c.player.name}`}
+                        cle={`speciale-${s.bola ? "bola" : s.numero}-${c.j}-${c.carte.type}-${c.player.name}`}
                         distinction={c.carte.type}
                         detail={`${BOOST_LABELS[c.carte.type]} · ${c.carte.date}`}
-                        saison={s.enCours ? undefined : s.numero}
-                        journee={c.j}
+                        saison={s.enCours || s.bola ? undefined : s.numero}
+                        journee={s.bola ? undefined : c.j}
                       />
                       <figcaption className="flex flex-col items-center leading-tight">
                         <span className="text-[11px] font-bold">{BOOST_LABELS[c.carte.type]}</span>
-                        <span className="font-mono text-[10px] text-foreground/45">J{c.j}</span>
+                        <span className="font-mono text-[10px] text-foreground/45">{c.etiquette ?? `J${c.j}`}</span>
                       </figcaption>
                     </figure>
                   ))}

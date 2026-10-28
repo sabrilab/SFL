@@ -23,6 +23,9 @@ import { useSession } from "@/hooks/use-session";
 import type { Session } from "@/lib/sfl/auth/session";
 import { supabase } from "@/lib/supabase";
 import { avecVitrine, vitrineDe, type Vitrine } from "@/lib/sfl/compte-vitrine";
+import { useMesMatchsBola } from "@/hooks/use-bola-carte";
+import { carteBola, type CarteBola } from "@/lib/sfl/carte-bola";
+import { compterMatchs } from "@/lib/sfl/ligue-vierge";
 
 export const SAISIE_EVENT = "sfl-saisie";
 
@@ -60,6 +63,13 @@ interface SeasonValue extends DerivedSeason {
   allPlayers: Player[];
   /** Le nom du joueur connecté s'il joue en Bola, hors de la SFL (voir joueurBola). */
   bola: string | null;
+  /**
+   * Ma carte de joueur Bola (lib/sfl/carte-bola.ts) : celle qui bouge à
+   * chaque match validé, mes matchs validés, mes cartes MVP. Aussi pour un
+   * ancien joueur Bola entré en SFL (ses matchs d'avant), qui garde ses
+   * cartes MVP et son XP ; null pour tous les autres.
+   */
+  bolaCarte: CarteBola | null;
   /** Change avec la liste des arbitres (masqués des listes) ; absent hors de la saison en cours. */
   arbitres?: number;
   /** Le compte vitrine connecté, et son modèle (compte-vitrine.ts) ; null sinon. */
@@ -74,6 +84,8 @@ const memeNom = (a: string, b: string) => a.trim().toLowerCase() === b.trim().to
  * Il a sa carte à lui, base 75 partout comme un nouveau de la saison, au
  * poste de sa fiche d'inscription, dans `allPlayers` seulement et sur son
  * seul téléphone : aucun classement ni aucune liste de la SFL ne le montre.
+ * Depuis le 28/10, elle bouge à chaque match Bola validé (bolaCarte,
+ * lib/sfl/carte-bola.ts).
  * Avant, il restait sur « Ta carte arrive » (AuthGate) tant que l'admin ne
  * l'ajoutait pas à la saison.
  */
@@ -203,7 +215,20 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   }, [saison, votes, votesOuverts]);
   const nom = useMemo(() => nomBola(session, derived.players), [session, derived.players]);
   const poste = usePosteBola(nom);
-  const bola = useMemo(() => joueurBola(nom, poste), [nom, poste]);
+  // Mes matchs Bola validés font ma carte (carte-bola.ts) : elle part de 75
+  // et bouge à chaque match, au lieu de rester à 75 (avant le 28/10).
+  const mesBola = useMesMatchsBola(nom !== null);
+  const bolaCarte = useMemo(() => {
+    const qui = nom ?? nomSession;
+    if (!mesBola || !qui || (!nom && !mesBola.matchs.length)) return null;
+    const comptes = compterMatchs(mesBola.matchs);
+    const posteLu = poste ?? comptes.flatMap((m) => m.joueurs).find((j) => j.id === mesBola.uid && j.poste)?.poste ?? null;
+    return carteBola(comptes, mesBola.uid, qui, posteLu);
+  }, [mesBola, nom, nomSession, poste]);
+  const bola = useMemo(() => {
+    const p = joueurBola(nom, poste);
+    return p && bolaCarte && bolaCarte.nom === p.name ? { ...bolaCarte.player, poste: p.poste !== "—" ? p.poste : bolaCarte.player.poste } : p;
+  }, [nom, poste, bolaCarte]);
   // Les arbitres (lib/sfl/arbitres) sont masqués comme des joueurs : la
   // liste publique se refait quand la base les donne.
   const arbitres = useSyncExternalStore(suivreArbitres, arbitresRevision, () => -1);
@@ -230,17 +255,19 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     return {
       ...derives,
       players: publicOnly(derives.players),
-      boostCards: derives.boostCards.filter((c) => !isHidden(c.player)),
+      // Mes cartes MVP de Bola (sur mon seul téléphone) : la cérémonie et Mes cartes les lisent.
+      boostCards: [...derives.boostCards.filter((c) => !isHidden(c.player)), ...(bolaCarte?.cartesMvp.map((c) => c.carte) ?? [])],
       // Une liste neuve à chaque recalcul (arbitres compris), pour la même raison que `vue`.
       allPlayers: bola ? [...derives.players, bola] : [...derives.players],
       bola: bola?.name ?? null,
+      bolaCarte,
       saison: vue,
       saisonTitree: vue,
       saisonBrute: saison,
       arbitres,
       vitrine,
     };
-  }, [derived, bola, vue, saison, arbitres, vitrine]);
+  }, [derived, bola, bolaCarte, vue, saison, arbitres, vitrine]);
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
 }
@@ -277,6 +304,7 @@ export function SaisonArchiveProvider({ saison, children }: { saison: Saison; ch
       boostCards: derived.boostCards.filter((c) => !isHidden(c.player)),
       allPlayers: derived.players,
       bola: null,
+      bolaCarte: null,
       saison,
       saisonBrute: saison,
     };

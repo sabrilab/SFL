@@ -305,7 +305,7 @@ export function InvitationCarte() {
         setMoiId(uid);
         setResultats(aConfirmer);
         const arbitreR = etatArbitres().arbitres.includes(nom);
-        const annonceR = await nouveauteAMontrer(nom, !horsSflRef.current && !arbitreR).catch(() => null);
+        const annonceR = await nouveauteAMontrer(nom, !horsSflRef.current && !arbitreR, horsSflRef.current && !arbitreR).catch(() => null);
         if (annule || parLien.current) return;
         if (annonceR?.id === "confirmer-resultats") {
           resultatEnsuite.current = true;
@@ -331,7 +331,7 @@ export function InvitationCarte() {
       }
       // Puis la nouveauté que Sabri a choisi d'annoncer, pas encore vue.
       const arbitre = etatArbitres().arbitres.includes(nom);
-      const n = await nouveauteAMontrer(nom, !horsSflRef.current && !arbitre).catch(() => null);
+      const n = await nouveauteAMontrer(nom, !horsSflRef.current && !arbitre, horsSflRef.current && !arbitre).catch(() => null);
       if (annule) return;
       if (n) {
         setNouveaute(n.id);

@@ -45,7 +45,7 @@ import { isHidden } from "./hidden";
 import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { ovr, type Player } from "./engine";
 import type { MatchEntry, Saison, SaisonArchivee } from "./saisie/types";
-import { passeDe, type BilanPasse } from "./passe";
+import { passeDe, type BilanPasse, type Epreuve } from "./passe";
 import type { CreneauArbitre } from "./missions-arbitre";
 
 /* ------------------------------- Le barème ------------------------------- */
@@ -633,8 +633,19 @@ export interface LigneXp {
   date: string;
   quoi: string;
   xp: number;
-  /** Une mission acceptée et jugée : son créneau, son rang, réussie ou non (les épreuves du passe, passe.ts). */
-  mission?: { creneau: Creneau | CreneauArbitre; rang: Rang; reussie: boolean };
+  /**
+   * Une mission acceptée et jugée : son créneau, son rang, réussie ou non (les
+   * épreuves du passe, passe.ts). « perso » : une mission personnelle d'un
+   * joueur Bola (missions-perso.ts), réussie sur un match validé ; `perso`
+   * dit laquelle, `troisieme` qu'elle est sa troisième de la semaine.
+   */
+  mission?: {
+    creneau: Creneau | CreneauArbitre | "perso";
+    rang: Rang;
+    reussie: boolean;
+    perso?: string;
+    troisieme?: true;
+  };
   /** Les trois missions du même dimanche réussies. */
   parfait?: boolean;
   /**
@@ -643,6 +654,12 @@ export interface LigneXp {
    * (classementNiveau avec pourLeRang) ni pour une épreuve (pas de mission).
    */
   horsRang?: true;
+  /**
+   * Gagnée sur un match Bola validé (lib/sfl/carte-bola.ts) : le match ou une
+   * mission perso. Le journal l'affiche à sa date (`date`) au lieu de « J4 ».
+   * Toujours hors du rang.
+   */
+  bola?: true;
 }
 
 export interface BilanXp {
@@ -804,7 +821,9 @@ export function journalXp(
 export function bilanDe(
   journal: Map<string, { lignes: LigneXp[]; reussies: number }>,
   joueur: string,
-  saisonEnCours: number
+  saisonEnCours: number,
+  /** Les épreuves du passe : celles de la SFL, ou celles d'un joueur Bola (EPREUVES_BOLA). */
+  epreuves?: readonly Epreuve[]
 ): BilanXp {
   const x = journal.get(joueur) ?? { lignes: [], reussies: 0 };
   // Les risques font baisser l'XP ; jamais sous zéro.
@@ -812,7 +831,7 @@ export function bilanDe(
   const saison = Math.max(0, x.lignes.filter((l) => l.saison === saisonEnCours).reduce((a, l) => a + l.xp, 0));
   const niveau = niveauDe(total);
   // Le passe suit la saison dimanche par dimanche : le plus haut palier atteint reste (passe.ts).
-  const passe = passeDe(x.lignes.filter((l) => l.saison === saisonEnCours));
+  const passe = passeDe(x.lignes.filter((l) => l.saison === saisonEnCours), epreuves);
   return {
     total,
     saison,
@@ -890,10 +909,14 @@ export function rangsDesJoueurs(classement: { name: string; xp: number; rank: nu
 }
 
 /** Le plus haut palier du passe atteint, toutes saisons confondues : ce qu'il a débloqué pour de bon. */
-export function palierMaxDe(journal: Map<string, { lignes: LigneXp[]; reussies: number }>, joueur: string): number {
+export function palierMaxDe(
+  journal: Map<string, { lignes: LigneXp[]; reussies: number }>,
+  joueur: string,
+  epreuves?: readonly Epreuve[]
+): number {
   const saisons = new Set((journal.get(joueur)?.lignes ?? []).map((l) => l.saison));
   let max = 0;
-  for (const s of saisons) max = Math.max(max, bilanDe(journal, joueur, s).palier);
+  for (const s of saisons) max = Math.max(max, bilanDe(journal, joueur, s, epreuves).palier);
   return max;
 }
 

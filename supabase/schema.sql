@@ -2455,14 +2455,17 @@ create trigger match_confirmations_push_effet
 -- accepté de lui-même (accepte_le), ou dont le compte attend sa validation,
 -- n'y paraît que s'il a confirmé (choix par défaut, 28/10) : sinon
 -- l'organisateur remplissait le quorum avec des joueurs qui n'avaient rien dit.
-create or replace function public.ligue_vierge()
+-- Un match Bola saisi, tel que la Ligue vierge et mes_matchs_bola le lisent
+-- (28/10/2026, carte des joueurs Bola) : la même brique pour les deux, pour
+-- que la carte d'un joueur Bola et le classement ne divergent jamais. Interne.
+create or replace function public.match_bola_json(mid bigint)
 returns jsonb
 language sql
 security definer
 set search_path = ''
 stable
 as $$
-  select coalesce(jsonb_agg(jsonb_build_object(
+  select jsonb_build_object(
            'id', m.id,
            'jour', m.jour,
            'heure', m.heure,
@@ -2487,7 +2490,20 @@ as $$
                                  where c.match_id = m.id and c.joueur = j.player_id
                                    and c.version = m.feuille_version and c.reponse = 'confirme'))
            )
-         ) order by m.jour, m.heure, m.id), '[]'::jsonb)
+         )
+    from public.matchs m
+   where m.id = mid;
+$$;
+revoke execute on function public.match_bola_json(bigint) from public, anon, authenticated;
+
+create or replace function public.ligue_vierge()
+returns jsonb
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select coalesce(jsonb_agg(public.match_bola_json(m.id) order by m.jour, m.heure, m.id), '[]'::jsonb)
     from public.matchs m
    where public.est_membre()
      and m.mode = 'bola' and m.saisi_le is not null
@@ -6037,6 +6053,95 @@ as $$
 $$;
 revoke execute on function public.hors_sfl() from public, anon;
 grant execute on function public.hors_sfl() to authenticated;
+
+-- La carte, l'XP et les missions d'un joueur Bola (Sabri, 28/10/2026 : « leur
+-- carte s'actualise à chaque match », « Pareil pour xp etc ») : rien n'est
+-- stocké, l'app les recalcule (lib/sfl/carte-bola.ts, missions-perso.ts) à
+-- partir de ses matchs Bola saisis, lus ici.
+--
+-- L'entrée en SFL d'un filleul : le jour où son nom entre dans l'effectif
+-- de la saison. Ce qu'il a gagné avant (XP, missions, cartes MVP) lui reste ;
+-- ses matchs Bola d'après ne lui rapportent plus rien de Bola, et ses stats
+-- Bola n'entrent jamais dans la saison SFL (choix par défaut, 28/10). Écrite
+-- par le déclencheur ci-dessous seulement ; chacun lit la sienne.
+create table if not exists public.entrees_sfl (
+  joueur uuid primary key references public.profiles(id) on delete cascade,
+  le     timestamptz not null default now()
+);
+alter table public.entrees_sfl enable row level security;
+drop policy if exists "entrees_sfl: la mienne" on public.entrees_sfl;
+create policy "entrees_sfl: la mienne"
+  on public.entrees_sfl for select
+  to authenticated
+  using (joueur = (select auth.uid()));
+revoke all on public.entrees_sfl from anon, authenticated;
+grant select on public.entrees_sfl to authenticated;
+
+-- Les filleuls déjà dans l'effectif avant cette règle : entrés le jour de
+-- leur inscription (aucun match Bola d'avant ne leur est rendu).
+insert into public.entrees_sfl (joueur, le)
+select x.filleul, x.created_at
+  from public.parrainages x
+ where public.joueur_sfl(x.filleul)
+on conflict (joueur) do nothing;
+
+create or replace function public.noter_entrees_sfl()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.entrees_sfl (joueur, le)
+  select x.filleul, now()
+    from public.parrainages x
+    join public.profiles p on p.id = x.filleul
+   where exists (select 1 from jsonb_array_elements(coalesce(new.data -> 'roster', '[]'::jsonb)) r
+                  where r ->> 'name' = p.name)
+     and (tg_op = 'INSERT'
+          or not exists (select 1 from jsonb_array_elements(coalesce(old.data -> 'roster', '[]'::jsonb)) r
+                          where r ->> 'name' = p.name))
+  on conflict (joueur) do nothing;
+  return null;
+end;
+$$;
+revoke execute on function public.noter_entrees_sfl() from public, anon, authenticated;
+
+drop trigger if exists saison_entrees_sfl on public.saison;
+create trigger saison_entrees_sfl
+  after insert or update of data on public.saison
+  for each row execute function public.noter_entrees_sfl();
+
+-- Mes matchs Bola saisis, au format de ligue_vierge() (match_bola_json) :
+-- seulement ceux où je suis compté (la même règle que le classement), et
+-- seulement pour un filleul (un joueur venu par un lien) ; jusqu'à son entrée
+-- en SFL. Toute la ligne des joueurs du match vient avec : le MVP se calcule
+-- sur tous (ligue_vierge les montre déjà à tout membre).
+create or replace function public.mes_matchs_bola()
+returns jsonb
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  with moi as (select (select auth.uid()) as id),
+  lus as (
+    select m.id, m.jour, m.heure, public.match_bola_json(m.id) as j
+      from public.matchs m, moi
+     where public.est_membre()
+       and exists (select 1 from public.parrainages x where x.filleul = moi.id)
+       and m.mode = 'bola' and m.saisi_le is not null
+       and m.score_clairs is not null and m.score_fonces is not null
+       and exists (select 1 from public.match_joueurs mj where mj.match_id = m.id and mj.player_id = moi.id)
+       and public.coup_d_envoi(m.jour, m.heure)
+           < coalesce((select e.le from public.entrees_sfl e where e.joueur = moi.id), 'infinity'::timestamptz)
+  )
+  select coalesce(jsonb_agg(l.j order by l.jour, l.heure, l.id), '[]'::jsonb)
+    from lus l, moi
+   where exists (select 1 from jsonb_array_elements(l.j -> 'joueurs') x where x ->> 'id' = moi.id::text);
+$$;
+revoke execute on function public.mes_matchs_bola() from public, anon;
+grant execute on function public.mes_matchs_bola() to authenticated;
 
 -- Le Vestiaire est le salon de la SFL : un joueur Bola (venu par un parrain,
 -- hors de la saison) ne le lit pas et n'y écrit pas. Ses messages privés et

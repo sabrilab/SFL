@@ -212,6 +212,8 @@ function ProfilJoueurPage() {
             {division && <Chiffre valeur={nomDivision(division)} quoi="Division" />}
             <Chiffre valeur={ovr(player.stats)} quoi="Général" />
             {!bola && <Chiffre valeur={journees.valeur} quoi={journees.quoi} />}
+            {/* Joueur Bola : ses matchs validés, ceux qui font sa carte (lib/sfl/carte-bola.ts). */}
+            {bola && <Chiffre valeur={player.matchs} quoi={player.matchs > 1 ? "Matchs" : "Match"} />}
           </div>
           {!bola && <p className="w-full text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>}
           {/* Ma photo, ma carte officielle (photo au maillot Bola) tant

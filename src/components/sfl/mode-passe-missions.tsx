@@ -15,11 +15,16 @@
 //   · le journal : d'où vient chaque XP, pertes en rouge.
 // Un joueur Bola (hors de la SFL) n'a ni les missions du dimanche ni ce qui
 // ne s'y gagne (jouer le dimanche, contrat, défi, vote, trois sur trois) :
-// il garde le reste et son journal (28/10/2026).
+// il garde le reste et son journal (28/10/2026). À leur place, ses missions
+// perso (missions-perso.tsx) et ce que rapportent ses matchs Bola validés ;
+// son journal date ses lignes Bola (« 22 oct. · 19h30 ») au lieu d'une
+// journée de la SFL (choix par défaut, 28/10).
 
 import { useMemo } from "react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { MissionsBola } from "@/components/sfl/actus/missions";
+import { MissionsPerso } from "@/components/sfl/missions-perso";
+import { MISSIONS_PERSO, XP_MATCH_BOLA } from "@/lib/sfl/missions-perso";
 import { useJoueurBola } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useHorsSfl } from "@/hooks/use-hors-sfl";
@@ -75,7 +80,11 @@ interface Source {
   discrete?: boolean;
   /** Ne se gagne qu'au dimanche de la SFL : pas pour un joueur Bola. */
   sfl?: boolean;
+  /** Ne se gagne qu'en Bola : montrée à un joueur Bola, ou si elle a déjà rapporté. */
+  bola?: boolean;
 }
+
+const primesPerso = MISSIONS_PERSO.map((m) => m.xp);
 
 /** Le joueur connecté joue en Bola, hors de la SFL (la saison ou la base le disent). */
 export function useHorsDeLaSfl(): boolean {
@@ -85,6 +94,22 @@ export function useHorsDeLaSfl(): boolean {
 }
 
 const SOURCES: Source[] = [
+  {
+    cle: "match-bola",
+    nom: "Jouer un match Bola",
+    gain: `+${XP_MATCH_BOLA}`,
+    detail: "validé",
+    de: (l) => l.bola === true && !l.mission,
+    bola: true,
+  },
+  {
+    cle: "perso",
+    nom: "Missions perso",
+    gain: `+${Math.min(...primesPerso)} à +${Math.max(...primesPerso)}`,
+    detail: "une fois par semaine chacune",
+    de: (l) => l.mission?.creneau === "perso",
+    bola: true,
+  },
   {
     cle: "jouer",
     nom: "Jouer le dimanche",
@@ -146,7 +171,7 @@ const SOURCES: Source[] = [
     nom: "Recrues",
     gain: `+${XP_RECRUE}`,
     detail: "par recrue · son 1er match",
-    de: (l) => !!l.horsRang,
+    de: (l) => !!l.horsRang && !l.bola,
     discrete: true,
   },
 ];
@@ -181,6 +206,7 @@ function Sources({ b, saison }: { b: BilanXp; saison: number }) {
         const miennes = lignes.filter(s.de);
         if (s.discrete && miennes.length === 0) return null;
         if (s.sfl && horsSfl) return null;
+        if (s.bola && !horsSfl && miennes.length === 0) return null;
         const total = miennes.reduce((a, l) => a + l.xp, 0);
         const fois = miennes.filter((l) => l.xp > 0).length;
         return (
@@ -214,8 +240,8 @@ function Journal({ b, saison }: { b: BilanXp; saison: number }) {
       </h2>
       {b.lignes.slice(0, 20).map((l, i) => (
         <div key={`${l.saison}-${l.j}-${l.quoi}-${i}`} className="flex items-center gap-3 border-t border-white/8 px-5 py-3">
-          <span className="w-[44px] shrink-0 font-mono text-[11px] text-white/45">
-            {l.saison === saison ? `J${l.j}` : `S${l.saison} J${l.j}`}
+          <span className={cn("shrink-0 font-mono text-[11px] text-white/45", l.bola ? "w-[54px]" : "w-[44px]")}>
+            {l.bola ? l.date.split(" · ")[0] : l.saison === saison ? `J${l.j}` : `S${l.saison} J${l.j}`}
           </span>
           <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{l.quoi}</span>
           <span className={cn("font-mono text-[13px] font-bold tabular-nums", l.xp < 0 && "text-[#ff9b9d]")}>{signe(l.xp)}</span>
@@ -231,7 +257,7 @@ export function VueMissions({ b, saison }: { b: BilanXp; saison: number }) {
   const horsSfl = useHorsDeLaSfl();
   return (
     <div className="mp-missions">
-      {!horsSfl && (mm ? <MissionsBola /> : <Attente />)}
+      {horsSfl ? <MissionsPerso /> : mm ? <MissionsBola /> : <Attente />}
       <Sources b={b} saison={saison} />
       <Journal b={b} saison={saison} />
     </div>
