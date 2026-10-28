@@ -1600,24 +1600,24 @@ alter table public.match_joueurs add column if not exists equipe text check (equ
 alter table public.match_joueurs add column if not exists buts int not null default 0 check (buts between 0 and 99);
 alter table public.match_joueurs add column if not exists passes int not null default 0 check (passes between 0 and 99);
 
--- Le coup d'envoi d'un match, heure de Paris : « 19h00 », « 19:00 », « 19 » ;
--- une heure illisible compte pour le début du jour (comme presences_reelles).
--- Le même calcul que coupDEnvoiPasse (lib/sfl/ligue-vierge.ts), qui ouvre la
--- feuille dans l'app.
+-- Le coup d'envoi d'un match, heure de Paris : « 19h00 », « 19:00 », « 19h » ;
+-- une heure illisible compte pour midi. Le même calcul que heureMin et
+-- coupDEnvoiPasse (lib/sfl/ligue-vierge.ts), qui ouvrent la feuille dans
+-- l'app : la base ne refuse pas une feuille que l'app propose, ni l'inverse.
 create or replace function public.coup_d_envoi(j date, h text)
 returns timestamptz
 language sql
 stable
 set search_path = ''
 as $$
-  select case
-           when h ~ '^\s*\d{1,2}\s*([:hH]\s*\d{0,2})?\s*$'
-             then (j + make_interval(
-                     hours => substring(h from '^\s*(\d{1,2})')::int,
-                     mins => coalesce(substring(h from '[:hH]\s*(\d{2})')::int, 0)
-                   )) at time zone 'Europe/Paris'
-           else j::timestamp at time zone 'Europe/Paris'
-         end;
+  select (j + case
+                when h ~* '^\d{1,2}\s*[h:]'
+                  then make_interval(
+                         hours => substring(h from '^(\d{1,2})')::int,
+                         mins => coalesce(nullif(substring(h from '^\d{1,2}\s*[hH:]\s*(\d{0,2})'), '')::int, 0)
+                       )
+                else interval '12 hours'
+              end) at time zone 'Europe/Paris';
 $$;
 
 -- Un joueur accepte son invitation (sa ligne), mais seul l'organisateur (ou

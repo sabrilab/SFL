@@ -9,7 +9,8 @@
 //   · annule : le serveur prévient tout le monde, puis efface le match (il
 //     faut lire les joueurs avant qu'ils disparaissent avec lui). Pas un
 //     match dont la feuille est faite (409) : il compte dans la Ligue vierge,
-//     comme le refuse la base (« matchs: j'annule le mien », 28/10/2026).
+//     comme le refuse la base (« matchs: j'annule le mien », 28/10/2026),
+//     sauf pour l'admin.
 // Toucher la notification ouvre la fiche du match sur la Map (/?match=id).
 //
 // La route agit avec la clé secrète : elle vérifie que l'appelant est bien
@@ -18,7 +19,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cleVapid } from "@/lib/server/web-push";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
-import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
+import { appelant, estAdmin, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { jourLong } from "@/lib/sfl/jour-long";
 import type { Notif } from "@/lib/sfl/push";
 
@@ -47,7 +48,9 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (!match) return NextResponse.json({ error: "Match inconnu." }, { status: 404 });
   if (match.organisateur !== moi.id) return NextResponse.json({ error: "Ce match n'est pas le tien." }, { status: 403 });
-  if (type === "annule" && match.saisi_le) return NextResponse.json({ error: "match déjà joué" }, { status: 409 });
+  // L'admin garde la main, comme en base (or is_league_admin()).
+  if (type === "annule" && match.saisi_le && !(await estAdmin(sb, moi.id)))
+    return NextResponse.json({ error: "match déjà joué" }, { status: 409 });
 
   const { data: lignes } = await sb.from("match_joueurs").select("*").eq("match_id", id);
   const joueurs = ((lignes ?? []) as { player_id: string; statut: string; notifie_le?: string | null }[]).filter(

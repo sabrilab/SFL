@@ -49,7 +49,11 @@ export default function MessagesPage() {
   const { me } = useMyPlayer();
   const { players } = useSeason();
   const vrai = useMessagesPrives();
+  // Ceux qu'on peut choisir pour un nouveau message (les comptes acceptés) ;
+  // l'annuaire, lui, nomme toutes les conversations, même avec un compte
+  // remis en attente ou provisoire (28/10/2026).
   const [profils, setProfils] = useState<Profil[]>([]);
+  const [annuaire, setAnnuaire] = useState<Profil[]>([]);
   const [moi, setMoi] = useState<string | null>(null);
   const [choisir, setChoisir] = useState(false);
 
@@ -68,6 +72,9 @@ export default function MessagesPage() {
     listerProfils()
       .then((p) => vivant && setProfils(p))
       .catch(() => {});
+    listerProfils({ tous: true })
+      .then((p) => vivant && setAnnuaire(p))
+      .catch(() => {});
     return () => {
       vivant = false;
     };
@@ -77,9 +84,9 @@ export default function MessagesPage() {
   const charge = demo !== null || vrai.charge || !session?.server;
   // En démo, l'identifiant d'une conversation est déjà le nom.
   const nomDe = useMemo(() => {
-    const parId = new Map(profils.map((p) => [p.id, p.name]));
+    const parId = new Map(annuaire.map((p) => [p.id, p.name]));
     return (id: string) => (demo ? id : (parId.get(id) ?? ""));
-  }, [profils, demo]);
+  }, [annuaire, demo]);
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-[var(--fib-13)] px-5 py-4 sm:py-8 lg:max-w-[760px]">

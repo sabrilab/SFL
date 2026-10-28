@@ -23,6 +23,11 @@
 // au lieu de la montrer un instant à un joueur Bola (28/10/2026). La réponse
 // gardée sur le téléphone fait que, pour un joueur SFL, cette attente n'a
 // lieu qu'une fois. Une base qui ne connaît pas la fonction répond « non ».
+// Toute autre erreur (coupure réseau, jeton en cours de rafraîchissement,
+// délai dépassé : supabase-js les rend en { error } sans lever) laisse
+// l'état inconnu, relu quelques secondes plus tard, au retour du réseau ou
+// quand l'app revient au premier plan : un joueur Bola hors réseau ne voit
+// jamais la SFL faute de réponse.
 
 import { useEffect, useSyncExternalStore } from "react";
 import { useSession } from "@/hooks/use-session";
@@ -59,6 +64,20 @@ function abonner(f: () => void) {
   };
 }
 
+// PostgREST (PGRST202) ou Postgres (42883) : la fonction n'existe pas.
+const FONCTION_ABSENTE = new Set(["PGRST202", "42883"]);
+
+let minuterie: ReturnType<typeof setTimeout> | null = null;
+
+function relireBientot(qui: string) {
+  // Une réponse déjà gardée pour ce compte vaut mieux qu'une relance en boucle.
+  if (minuterie || lire().qui === qui) return;
+  minuterie = setTimeout(() => {
+    minuterie = null;
+    void relire(qui);
+  }, 5000);
+}
+
 function relire(qui: string): Promise<void> {
   const deja = enVol.get(qui);
   if (deja) return deja;
@@ -67,12 +86,17 @@ function relire(qui: string): Promise<void> {
       const { data, error } = await supabase().rpc("hors_sfl");
       if (error) {
         // La base a répondu sans connaître la fonction (préversion) : « non »,
-        // pour cette ouverture seulement (rien de gardé). Une coupure réseau
-        // lève plus bas et laisse l'état inconnu, relu à la prochaine fois.
-        if (!etat || etat.qui !== qui) {
-          etat = { qui, hors: false };
-          for (const f of abonnes) f();
+        // pour cette ouverture seulement (rien de gardé).
+        if (FONCTION_ABSENTE.has(error.code ?? "")) {
+          if (!etat || etat.qui !== qui) {
+            etat = { qui, hors: false };
+            for (const f of abonnes) f();
+          }
+          return;
         }
+        // Autre erreur : l'état reste tel qu'il est (inconnu à la première
+        // ouverture, sinon la réponse gardée), relu plus tard.
+        relireBientot(qui);
         return;
       }
       etat = { qui, hors: data === true };
@@ -80,7 +104,9 @@ function relire(qui: string): Promise<void> {
         localStorage.setItem(CLE, JSON.stringify(etat));
       } catch {}
       for (const f of abonnes) f();
-    } catch {}
+    } catch {
+      relireBientot(qui);
+    }
   })().finally(() => enVol.delete(qui));
   enVol.set(qui, p);
   return p;
@@ -93,7 +119,19 @@ export function useHorsSflEtat(): boolean | null {
   const lu = useSyncExternalStore(abonner, lire, () => VIDE);
 
   useEffect(() => {
-    if (qui) void relire(qui);
+    if (!qui) return;
+    void relire(qui);
+    // Retour du réseau ou de l'app au premier plan : relire si on ne sait
+    // toujours pas (une réponse gardée pour ce compte suffit).
+    const reprendre = () => {
+      if (lire().qui !== qui) void relire(qui);
+    };
+    window.addEventListener("online", reprendre);
+    window.addEventListener("focus", reprendre);
+    return () => {
+      window.removeEventListener("online", reprendre);
+      window.removeEventListener("focus", reprendre);
+    };
   }, [qui]);
 
   if (!qui || session?.admin) return false;

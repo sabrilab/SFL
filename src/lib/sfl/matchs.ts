@@ -386,8 +386,10 @@ export async function annuler(id: number): Promise<void> {
   const r = await appelNotifier({ id, type: "annule" });
   if (r?.status === 409) throw new Error("match déjà joué");
   if (r?.ok && ((await r.json().catch(() => ({}))) as { annule?: boolean }).annule) return;
-  const { error } = await supabase().from("matchs").delete().eq("id", id);
+  // La base refuse sans erreur (rien d'effacé) un match déjà joué : le dire.
+  const { data, error } = await supabase().from("matchs").delete().eq("id", id).select("id");
   if (error) throw error;
+  if (!data?.length) throw new Error("match déjà joué");
 }
 
 /**
@@ -396,13 +398,11 @@ export async function annuler(id: number): Promise<void> {
  * ou revenu de Google sans avoir choisi son pseudo (un nom provisoire), ne se
  * proposait pas moins qu'un autre.
  */
-export async function listerProfils(): Promise<Profil[]> {
-  const { data, error } = await supabase()
-    .from("profiles")
-    .select("id, name, username")
-    .eq("valide", true)
-    .eq("pseudo_a_choisir", false)
-    .order("name");
+export async function listerProfils({ tous = false }: { tous?: boolean } = {}): Promise<Profil[]> {
+  let requete = supabase().from("profiles").select("id, name, username");
+  // `tous` : un annuaire (le nom d'une conversation déjà ouverte), pas une invitation.
+  if (!tous) requete = requete.eq("valide", true).eq("pseudo_a_choisir", false);
+  const { data, error } = await requete.order("name");
   if (error) throw error;
   return (data ?? []) as Profil[];
 }
