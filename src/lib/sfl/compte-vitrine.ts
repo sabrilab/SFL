@@ -23,8 +23,9 @@
 // Ce qui ne bouge pas :
 //   - les autres : le compte reste masqué, aucun classement, aucune liste,
 //     aucun fil ne le montre, ni chez eux ni chez lui ;
-//   - les scores : chaque ligne ajoutée porte en bonus d'équipe l'opposé de
-//     ses buts, le score d'un match reste celui de la feuille ;
+//   - les compositions et les scores : chaque ligne ajoutée est sans équipe
+//     (30/10 : il apparaissait sur le terrain de chaque match), le score
+//     d'un match reste celui de la feuille ;
 //   - la base : les lignes ajoutées sont marquées (`vitrine`), et la
 //     sauvegarde comme la publication de la saison (saisie/store.ts,
 //     saisie/sync.ts) les retirent avant d'écrire quoi que ce soit ;
@@ -87,7 +88,9 @@ function lignes(entries: MatchEntry[], nom: string): MatchEntry[] {
     copies.push({
       j,
       player: nom,
-      team: modele.team,
+      // Jamais d'équipe (30/10) : sa ligne ne touche ni les compositions ni
+      // les scores ; le résultat suffit à Ma carte (victoires, points).
+      team: null,
       statut: "Présent",
       result: modele.result,
       sflTime: true,
@@ -100,7 +103,6 @@ function lignes(entries: MatchEntry[], nom: string): MatchEntry[] {
       retard: false,
       arrets: max(du, (e) => e.arrets ?? 0),
       interceptions: max(du, (e) => e.interceptions ?? 0),
-      teamScoreBonus: -buts,
       vitrine: true,
     });
   }

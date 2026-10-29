@@ -107,7 +107,7 @@ export interface PresenceView {
 
 export function usePresence(): PresenceView {
   // Le document stocké : setPresence et les équipes l'écrivent.
-  const { saisonBrute: saison, journees } = useSeason();
+  const { saisonLue: saison, journees } = useSeason();
   const { player } = useMyPlayer();
   const session = useSession();
   const serverActive = !!session?.server;
@@ -300,14 +300,16 @@ export function usePresence(): PresenceView {
           return false;
         }
       }
-      const localId = activeConvocation(saison)?.id;
+      // L'écriture part du document entier, jamais de la saison lue (sans brouillons).
+      const doc = saisieStore.load();
+      const localId = activeConvocation(doc)?.id;
       if (localId !== undefined) {
-        saisieStore.save(setConvocationTeams(saison, localId, teams));
+        saisieStore.save(setConvocationTeams(doc, localId, teams));
         window.dispatchEvent(new Event(SAISIE_EVENT));
       }
       return true;
     },
-    [serverActive, server, saison]
+    [serverActive, server]
   );
 
   /* -------------------------------- La vue -------------------------------- */

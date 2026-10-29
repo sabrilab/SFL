@@ -27,3 +27,26 @@ export function tic(motif: number | number[] = 12): void {
     // Pas de retour haptique possible ici.
   }
 }
+
+/** Les gestes clés de l'admin (30/10/2026) ; rien sous « Réduire les animations ». */
+function vibrer(motif: number | number[]): void {
+  try {
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  } catch {
+    /* sans matchMedia : on vibre */
+  }
+  tic(motif);
+}
+
+export const haptique = {
+  /** Toucher une carte, un segmenté. */
+  choix: () => vibrer(8),
+  /** « + », un but, une passe. */
+  ajout: () => vibrer([8, 40, 8]),
+  /** Retirer. */
+  retrait: () => vibrer(12),
+  /** Une écriture refusée (un doublon, un non-joueur…). */
+  refus: () => vibrer([20, 40, 20]),
+  /** Publier, remettre en brouillon, clôturer. */
+  sceau: () => vibrer([12, 60, 24]),
+};

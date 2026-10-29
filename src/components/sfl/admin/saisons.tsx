@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cloturerSaison, restaurationPossible, restaurerSaison } from "@/lib/sfl/saisie/mutations";
+import { estBrouillon } from "@/lib/sfl/saisie/brouillon";
 import { numeroSaison, type Saison } from "@/lib/sfl/saisie/types";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
 import { appliquerVotes, journeeAvecVote, titresFaibles, votesCharges } from "@/lib/sfl/votes";
@@ -66,7 +67,14 @@ export function Saisons({
       voteEnCours: brut.journees.some((jn) => journeeAvecVote(jn) && voteOuvert(jn.date, maintenant)),
     };
   }, [ouvert, saison, votes]);
-  const bloque = !charges ? "Les votes ne sont pas encore chargés." : titres?.voteEnCours ? "Le vote du dernier dimanche est ouvert jusqu'à minuit." : null;
+  const brouillon = saison.journees.find(estBrouillon);
+  const bloque = brouillon
+    ? `J${brouillon.j} en brouillon`
+    : !charges
+      ? "Les votes ne sont pas encore chargés."
+      : titres?.voteEnCours
+        ? "Le vote du dernier dimanche est ouvert jusqu'à minuit."
+        : null;
 
   return (
     <div className="overflow-hidden rounded-3xl bg-card">

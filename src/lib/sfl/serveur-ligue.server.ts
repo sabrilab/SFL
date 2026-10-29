@@ -8,6 +8,7 @@
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { ACCOUNTS } from "@/lib/sfl/auth/accounts";
 import { username } from "@/lib/sfl/usernames";
+import { lireEffectifServeur } from "./saison-serveur.server";
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL ??
@@ -49,10 +50,7 @@ export async function dejaPris(sb: SupabaseClient, sauf?: string) {
   let { data: profils, error } = await sb.from("profiles").select("id, name, username, nom_affiche");
   if (error) ({ data: profils, error } = await sb.from("profiles").select("id, name, username"));
   if (error) throw error;
-  const { data: doc } = await sb.from("saison").select("data").eq("id", 1).maybeSingle();
-  const roster = ((doc as { data?: { roster?: { name: string }[] } } | null)?.data?.roster ?? []).map(
-    (r) => r.name
-  );
+  const roster = ((await lireEffectifServeur(sb)) ?? []).map((r) => r.name);
   const liste = ((profils ?? []) as { id: string; name: string; username: string; nom_affiche?: string | null }[]).filter(
     (p) => p.id !== sauf
   );
@@ -94,10 +92,7 @@ export async function nomsJoueursBola(sb: SupabaseClient): Promise<Map<string, s
   if (lu.error) lu = (await sb.from("profiles").select("id, name")) as typeof lu;
   if (lu.error) throw lu.error;
   const profils = (lu.data ?? []) as Profil[];
-  const { data: doc } = await sb.from("saison").select("data").eq("id", 1).maybeSingle();
-  const roster = new Set(
-    ((doc as { data?: { roster?: { name: string }[] } } | null)?.data?.roster ?? []).map((r) => r.name)
-  );
+  const roster = new Set(((await lireEffectifServeur(sb)) ?? []).map((r) => r.name));
   for (const p of profils) {
     if (!ids.has(p.id) || roster.has(p.name)) continue;
     noms.set(p.name.toLowerCase(), p.id);

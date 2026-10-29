@@ -11,6 +11,7 @@ import { usePathname } from "next/navigation";
 import { useIsClient } from "@/hooks/use-is-client";
 import { deriveSeason, type DerivedSeason } from "@/lib/sfl/saisie/engine";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
+import { sansBrouillons } from "@/lib/sfl/saisie/brouillon";
 import { startSaisonSync } from "@/lib/sfl/saisie/sync";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import type { Player } from "@/lib/sfl/engine";
@@ -44,15 +45,17 @@ interface SeasonValue extends DerivedSeason {
    * Avant le 27/10, `saison` était le document brut, sans les titres votés :
    * Ma carte, les flèches ▲/▼, les divisions, les badges et les missions
    * comptaient d'autres points que le classement (Ilyes, 7e au lieu de 6e).
-   * Ne jamais l'écrire : pour une écriture, `saisonBrute`.
+   * Ne jamais l'écrire : une écriture part de saisieStore.load().
    */
   saison: Saison;
   /**
-   * Le document tel qu'il est stocké (compte vitrine compris sur son écran) :
-   * le seul à passer à une écriture (saisieStore.save, setPresence…), pour
-   * ne jamais figer les élus d'un vote dans le document.
+   * La saison lue, sans les votes appliqués (compte vitrine compris sur son
+   * écran) et, comme tout ce que la ligue voit, SANS les journées en
+   * brouillon (30/10/2026, saisie/brouillon.ts). Jamais à écrire telle
+   * quelle : une écriture part toujours du document entier,
+   * saisieStore.load() (sinon elle effacerait le brouillon — integrite.ts, I8).
    */
-  saisonBrute: Saison;
+  saisonLue: Saison;
   /** Même objet que `saison` (ancien nom, gardé pour les appelants). */
   saisonTitree?: Saison;
   /**
@@ -179,7 +182,8 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   );
   const saison = useMemo(() => {
     void version; // relit le store à chaque incrément de version (édition admin)
-    return avecVitrine(isClient ? saisieStore.load() : seedSaison(), vitrine);
+    // Ce que voit la ligue : jamais une journée en brouillon (brouillon.ts).
+    return avecVitrine(sansBrouillons(isClient ? saisieStore.load() : seedSaison()), vitrine);
   }, [isClient, version, vitrine]);
   // Les votes Impact / Défensive : leurs élus sont posés sur les lignes une
   // fois le vote fermé (minuit, heure de Paris). L'horloge avance toutes les
@@ -265,7 +269,7 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
       bolaCarte,
       saison: vue,
       saisonTitree: vue,
-      saisonBrute: saison,
+      saisonLue: saison,
       arbitres,
       vitrine,
     };
@@ -308,7 +312,7 @@ export function SaisonArchiveProvider({ saison, children }: { saison: Saison; ch
       bola: null,
       bolaCarte: null,
       saison,
-      saisonBrute: saison,
+      saisonLue: saison,
     };
   }, [saison]);
   return (

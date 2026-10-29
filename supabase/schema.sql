@@ -411,6 +411,179 @@ create policy "saison: écriture admin"
   using ((select public.is_league_admin()))
   with check ((select public.is_league_admin()));
 
+-- ─────────── Journée en brouillon, membres qui ne jouent pas, feuille saine (30/10/2026) ───────────
+-- Additif et idempotent (rejoué à chaque déploiement qui change ce fichier).
+--   · profiles.joue : « ne joue pas » devient une donnée du compte, plus un
+--     nom écrit en dur (Sabri apparaissait dans les compositions, 28/10).
+--     Sabri passe à false une seule fois, à la création de la colonne : un
+--     réglage fait ensuite par l'admin (poser_joue) n'est jamais écrasé.
+--   · est_brouillon / sans_brouillons : la même règle que saisie/brouillon.ts.
+--     Une journée sans le champ « brouillon » est publiée (toutes celles
+--     d'avant) : aucune donnée à migrer.
+--   · feuille_saine : refuse, sur les journées que la publication modifie,
+--     un joueur de plus en double, un membre de plus qui ne joue pas, une
+--     ligne vitrine, une deuxième journée pour une même date. Appelée par
+--     publier_saison, MÊME avec « Écraser » : quel que soit l'écran,
+--     l'appareil ou la version de l'app, les matchs 5 et 6 de la J3 et ses
+--     doublons (28/10) ne passent plus. Un défaut ancien ne bloque jamais.
+--   · saison_publique / saison_signal (plus bas) : la lecture des joueurs
+--     sans les brouillons, livrée sans rien fermer. La fermeture de la lecture
+--     brute aux joueurs viendra à part, quand toutes les versions de l'app en
+--     service liront saison_publique (supprimer « saison: lecture ligue »).
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public' and table_name = 'profiles' and column_name = 'joue'
+  ) then
+    alter table public.profiles add column joue boolean not null default true;
+    update public.profiles set joue = false where name = 'Sabri';
+  end if;
+end;
+$$;
+-- Aucun « grant update (joue) » : un joueur ne se change pas lui-même.
+
+create or replace function public.poser_joue(p_profil uuid, p_joue boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_league_admin() then
+    raise exception 'Réservé à l''admin.' using errcode = '42501';
+  end if;
+  update public.profiles set joue = coalesce(p_joue, true) where id = p_profil;
+end;
+$$;
+revoke execute on function public.poser_joue(uuid, boolean) from public, anon;
+grant execute on function public.poser_joue(uuid, boolean) to authenticated;
+
+-- La règle unique : absent, null ou false = publiée ; tout le reste = brouillon.
+create or replace function public.est_brouillon(p_meta jsonb)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(p_meta -> 'brouillon', 'null'::jsonb) not in ('null'::jsonb, 'false'::jsonb);
+$$;
+grant execute on function public.est_brouillon(jsonb) to authenticated;
+
+-- Le document sans les journées en brouillon, ni leurs lignes, ni leurs buts
+-- minutés (même résultat que sansBrouillons) ; l'ordre est gardé.
+create or replace function public.sans_brouillons(p_data jsonb)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  with b as (
+    select coalesce(array_agg(m ->> 'j'), '{}'::text[]) as js
+      from jsonb_array_elements(
+             case when jsonb_typeof(p_data -> 'journees') = 'array' then p_data -> 'journees' else '[]'::jsonb end
+           ) m
+     where public.est_brouillon(m)
+  )
+  select case
+    when cardinality(b.js) = 0 then p_data
+    else p_data
+      || jsonb_build_object('journees', (
+           select coalesce(jsonb_agg(x order by i), '[]'::jsonb)
+             from jsonb_array_elements(p_data -> 'journees') with ordinality t(x, i)
+            where not ((x ->> 'j') = any (b.js))))
+      || case when jsonb_typeof(p_data -> 'entries') = 'array' then jsonb_build_object('entries', (
+           select coalesce(jsonb_agg(x order by i), '[]'::jsonb)
+             from jsonb_array_elements(p_data -> 'entries') with ordinality t(x, i)
+            where not ((x ->> 'j') = any (b.js)))) else '{}'::jsonb end
+      || case when jsonb_typeof(p_data -> 'events') = 'array' then jsonb_build_object('events', (
+           select coalesce(jsonb_agg(x order by i), '[]'::jsonb)
+             from jsonb_array_elements(p_data -> 'events') with ordinality t(x, i)
+            where not ((x ->> 'j') = any (b.js)))) else '{}'::jsonb end
+  end
+  from b;
+$$;
+grant execute on function public.sans_brouillons(jsonb) to authenticated;
+
+-- Une feuille saine. Ne regarde que les journées dont les lignes changent, et
+-- n'y refuse que ce qui EMPIRE : un joueur une fois de plus en double, un
+-- membre qui ne joue pas une fois de plus — la J3 se répare ligne à ligne.
+-- Renvoie les défauts (vide = saine), au format « I1 J4 Ilyes » :
+--   I0 une ligne du compte vitrine · I1 un joueur deux fois (sa ligne
+--   Xtratime à part) · I2 un membre qui ne joue pas · I6 deux journées pour
+--   une même date (seulement si ça empire).
+create or replace function public.feuille_saine(p_nouveau jsonb, p_ancien jsonb)
+returns text[]
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with
+  n as (
+    select e from jsonb_array_elements(
+      case when jsonb_typeof(p_nouveau -> 'entries') = 'array' then p_nouveau -> 'entries' else '[]'::jsonb end) e
+  ),
+  a as (
+    select e from jsonb_array_elements(
+      case when jsonb_typeof(p_ancien -> 'entries') = 'array' then p_ancien -> 'entries' else '[]'::jsonb end) e
+  ),
+  ln as (select e ->> 'j' as j, jsonb_agg(e order by e::text) as l from n group by 1),
+  la as (select e ->> 'j' as j, jsonb_agg(e order by e::text) as l from a group by 1),
+  touchees as (select ln.j from ln left join la using (j) where la.l is distinct from ln.l),
+  -- Les lignes « jouées » (hors Xtratime) par journée et par nom, avant et après.
+  cn as (
+    select e ->> 'j' as j, lower(btrim(e ->> 'player')) as nom, min(e ->> 'player') as affiche, count(*) as c
+      from n where lower(coalesce(e ->> 'extraTime', 'false')) not in ('true', '1') group by 1, 2
+  ),
+  ca as (
+    select e ->> 'j' as j, lower(btrim(e ->> 'player')) as nom, count(*) as c
+      from a where lower(coalesce(e ->> 'extraTime', 'false')) not in ('true', '1') group by 1, 2
+  ),
+  tn as (select e ->> 'j' as j, lower(btrim(e ->> 'player')) as nom, min(e ->> 'player') as affiche, count(*) as c from n group by 1, 2),
+  ta as (select e ->> 'j' as j, lower(btrim(e ->> 'player')) as nom, count(*) as c from a group by 1, 2),
+  i0 as (  -- une ligne de la vitrine n'est jamais écrite
+    select 'I0 J' || (e ->> 'j') || ' ' || (e ->> 'player') as d
+      from n
+     where (e ->> 'j') in (select j from touchees)
+       and lower(coalesce(e ->> 'vitrine', 'false')) in ('true', '1')
+  ),
+  i1 as (  -- un joueur au plus une fois par journée
+    select 'I1 J' || cn.j || ' ' || cn.affiche as d
+      from cn left join ca using (j, nom)
+     where cn.j in (select j from touchees)
+       and cn.c > 1 and cn.c > coalesce(ca.c, 0)
+  ),
+  i2 as (  -- un membre qui ne joue pas n'a pas de ligne
+    select 'I2 J' || tn.j || ' ' || tn.affiche as d
+      from tn
+      left join ta using (j, nom)
+      join public.profiles p on lower(p.name) = tn.nom and not p.joue
+     where tn.j in (select j from touchees)
+       and tn.c > coalesce(ta.c, 0)
+  ),
+  dn as (
+    select m ->> 'date' as date, count(*) as c
+      from jsonb_array_elements(
+        case when jsonb_typeof(p_nouveau -> 'journees') = 'array' then p_nouveau -> 'journees' else '[]'::jsonb end) m
+     group by 1
+  ),
+  da as (
+    select m ->> 'date' as date, count(*) as c
+      from jsonb_array_elements(
+        case when jsonb_typeof(p_ancien -> 'journees') = 'array' then p_ancien -> 'journees' else '[]'::jsonb end) m
+     group by 1
+  ),
+  i6 as (  -- une seule journée par date (n'empire jamais)
+    select 'I6 ' || dn.date as d from dn left join da using (date)
+     where dn.c > 1 and dn.c > coalesce(da.c, 0)
+  )
+  select coalesce(array_agg(d order by d), '{}'::text[])
+    from (select d from i0 union all select d from i1 union all select d from i2 union all select d from i6) x;
+$$;
+revoke execute on function public.feuille_saine(jsonb, jsonb) from public, anon;
+grant execute on function public.feuille_saine(jsonb, jsonb) to authenticated;
+
 -- Publier sans écraser plus neuf (22/10/2026). Chaque publication remplace
 -- le document entier : un appareil admin resté sur une vieille copie
 -- effaçait donc les journées saisies ailleurs depuis (la J11 de la saison 0,
@@ -433,14 +606,22 @@ set search_path = ''
 as $$
 declare
   courante bigint;
+  ancien   jsonb;
   nouvelle bigint;
+  defauts  text[];
 begin
   if not public.is_league_admin() then
     raise exception 'Réservé à l''admin.' using errcode = '42501';
   end if;
-  select s.version into courante from public.saison s where s.id = 1 for update;
+  select s.version, s.data into courante, ancien from public.saison s where s.id = 1 for update;
   if found and not p_forcer and courante is distinct from p_base then
     return jsonb_build_object('ok', false, 'version', courante);
+  end if;
+  -- Une feuille malsaine n'est jamais écrite, même en écrasant (30/10/2026).
+  defauts := public.feuille_saine(p_data, coalesce(ancien, '{}'::jsonb));
+  if cardinality(defauts) > 0 then
+    raise exception 'Feuille refusée : %', array_to_string(defauts, ' · ')
+      using errcode = 'P0001', hint = 'feuille-saine', detail = array_to_string(defauts, '|');
   end if;
   nouvelle := greatest((extract(epoch from clock_timestamp()) * 1000)::bigint, coalesce(courante, 0) + 1);
   perform set_config('sfl.publication_saison', 'oui', true);
@@ -482,6 +663,70 @@ revoke execute on function public.saison_par_publication() from public, anon, au
 drop trigger if exists saison_par_publication on public.saison;
 create trigger saison_par_publication before insert or update on public.saison
   for each row execute function public.saison_par_publication();
+
+-- La lecture des joueurs (30/10/2026) : le document sans les journées en
+-- brouillon, et un signal temps réel qui ne porte que la version (le joueur
+-- relit alors saison_publique). L'admin garde la lecture du document entier.
+create or replace function public.saison_publique()
+returns table (data jsonb, version bigint, seed int, updated_at timestamptz)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.sans_brouillons(s.data), s.version, s.seed, s.updated_at
+    from public.saison s
+   where s.id = 1
+     and (select public.est_membre());
+$$;
+revoke execute on function public.saison_publique() from public, anon;
+grant execute on function public.saison_publique() to authenticated;
+
+create table if not exists public.saison_signal (
+  id      int primary key default 1 check (id = 1),
+  version bigint not null,
+  le      timestamptz not null default now()
+);
+alter table public.saison_signal enable row level security;
+drop policy if exists "saison_signal: lecture ligue" on public.saison_signal;
+create policy "saison_signal: lecture ligue"
+  on public.saison_signal for select
+  to authenticated
+  using ((select public.est_membre()));
+revoke insert, update, delete, truncate on public.saison_signal from anon, authenticated;
+grant select on public.saison_signal to authenticated;
+
+create or replace function public.saison_vers_signal()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.saison_signal (id, version, le)
+  values (1, new.version, now())
+  on conflict (id) do update set version = excluded.version, le = excluded.le;
+  return new;
+end;
+$$;
+revoke execute on function public.saison_vers_signal() from public, anon, authenticated;
+
+drop trigger if exists saison_vers_signal on public.saison;
+create trigger saison_vers_signal after insert or update on public.saison
+  for each row execute function public.saison_vers_signal();
+
+insert into public.saison_signal (id, version)
+select 1, s.version from public.saison s where s.id = 1
+on conflict (id) do nothing;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.saison_signal;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
 
 -- ─────────────────── Historique et corbeille de la saison ───────────────────
 -- 27/10/2026 : Afid a été retiré de l'effectif d'un geste, et la saison
@@ -5730,6 +5975,8 @@ as $$
     ) jj on true
     left join public.profiles p on lower(p.name) = lower(e ->> 'player')
    where s.id = 1
+     -- Une journée en brouillon n'est pas encore jouée pour la ligue (30/10/2026).
+     and not public.est_brouillon(jj.meta)
      and e ->> 'statut' = 'Présent'
      and coalesce(e ->> 'result', '') <> ''
      and lower(coalesce(e ->> 'extraTime', 'false')) not in ('true', '1');
@@ -6940,6 +7187,11 @@ begin
     select 1
     from public.saison s, jsonb_array_elements(s.data -> 'entries') e
     where s.id = 1
+      -- Jamais une journée en brouillon (30/10/2026).
+      and not exists (
+        select 1 from jsonb_array_elements(s.data -> 'journees') m
+         where (m ->> 'j')::integer = a.j and public.est_brouillon(m)
+      )
       and (e ->> 'j')::integer = a.j
       and lower(e ->> 'player') = lower(v_nom)
       and e ->> 'statut' = 'Présent'

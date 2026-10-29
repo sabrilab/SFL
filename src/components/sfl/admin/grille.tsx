@@ -15,25 +15,38 @@
 //   · Entrée et les flèches descendent d'une ligne dans la MÊME colonne,
 //     Tab passe à la colonne suivante — on saisit une colonne entière sans
 //     jamais lâcher le clavier ;
-//   · dupliquer une ligne (⌘D) reprend l'équipe, le statut et le résultat :
-//     composer une équipe de six, c'est une ligne saisie puis cinq copies ;
 //   · tout est annulable (⌘Z / ⌘⇧Z), y compris une suppression.
+//
+// Ce qu'elle ne fait plus (30/10/2026, après les matchs 5 et 6 de la J3) :
+// « Ajouter une équipe » (6 noms par ordre alphabétique d'un toucher),
+// Dupliquer et ⌘D (le même joueur deux fois), le « match de plus » offert
+// dans chaque sélecteur d'équipe. Un match ne naît que par « + Match N »,
+// vide ; « + Ligne » ouvre le choix d'un joueur qui n'est pas encore sur la
+// feuille — de TOUTE la journée, jamais du filtre affiché ; le sélecteur
+// Joueur d'une ligne ne propose que l'effectif qui joue, moins la feuille.
+// Elle s'ouvre sur la prochaine journée à jouer, jamais la dernière jouée.
 //
 // Le composant ne stocke rien : il reçoit la saison et remonte chaque
 // modification par `commit`, qui empile l'historique côté tableau de bord.
 
-import { useMemo, useRef, useState } from "react";
-import { Copy, Plus, Trash2, Users } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { computeJournees, entryPP } from "@/lib/sfl/saisie/engine";
 import {
   addEntry,
+  ajouterMatch,
   deleteEntryAt,
-  duplicateEntryAt,
+  matchsDeclares,
   newEntry,
   updateEntryAt,
 } from "@/lib/sfl/saisie/mutations";
 import { choixDEquipe } from "@/lib/sfl/saisie/equipes";
+import { effectifJouable, placementsDeLaJournee, surLaFeuille } from "@/lib/sfl/saisie/effectif";
+import { estBrouillon } from "@/lib/sfl/saisie/brouillon";
+import { prochaineJournee } from "@/lib/sfl/saisie/etat-journee";
+import { TERRAINS_MAX } from "@/lib/sfl/equipes-division";
+import { ChoisirJoueurs } from "@/components/sfl/admin/choisir-joueurs";
 import { PointMaillot } from "@/components/sfl/point-maillot";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
@@ -231,13 +244,18 @@ interface Props {
 export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
   const grid = useRef<HTMLDivElement>(null);
   const journees = useMemo(() => [...saison.journees].sort((a, b) => b.j - a.j), [saison.journees]);
-  const [j, setJ] = useState<number>(() => journees[0]?.j ?? 1);
+  // La prochaine journée à jouer (ou celle du jour) ; à défaut, la dernière.
+  const [j, setJ] = useState<number>(() => prochaineJournee(saison, new Date()) ?? journees[0]?.j ?? 1);
   const [q, setQ] = useState("");
+  const [choisir, setChoisir] = useState(false);
+  const [aide, setAide] = useState(false);
 
-  const rosterNames = useMemo(
-    () => [...saison.roster.map((r) => r.name)].sort((a, b) => a.localeCompare(b, "fr")),
-    [saison.roster]
-  );
+  // L'effectif qui joue (jamais un membre qui ne joue pas, ni un arbitre).
+  const rosterNames = useMemo(() => effectifJouable(saison).map((r) => r.name), [saison]);
+  // Déjà sur la feuille : toute la journée, jamais le seul filtre affiché.
+  const deja = useMemo(() => surLaFeuille(saison, j), [saison, j]);
+  const declares = useMemo(() => matchsDeclares(saison, j), [saison, j]);
+  const places = useMemo(() => placementsDeLaJournee(saison, j, declares), [saison, j, declares]);
 
   // On garde l'INDEX réel dans saison.entries : c'est lui que les mutations
   // attendent. Filtrer ne doit jamais faire perdre la trace de la ligne.
@@ -249,15 +267,12 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
       .filter((x) => !needle || x.e.player.toLowerCase().includes(needle));
   }, [saison.entries, j, q]);
 
-  // Les équipes qu'une ligne peut prendre : celles de la journée, match par
-  // match, puis les Noirs et les Blancs d'un match de plus.
+  // Les équipes qu'une ligne peut prendre : celles des matchs qui existent
+  // dans la journée, match par match (y compris un match encore vide).
   const choix = useMemo(() => {
     const noms = [...new Set(saison.entries.filter((e) => e.j === j && e.team).map((e) => e.team as string))];
-    return choixDEquipe(
-      computeJournees(saison).find((x) => x.j === j),
-      noms
-    );
-  }, [saison, j]);
+    return choixDEquipe(computeJournees(saison).find((x) => x.j === j), noms, declares);
+  }, [saison, j, declares]);
   const optionsEquipe = useMemo(
     () => [{ value: "", label: "—" }, ...choix.map((t) => ({ value: t.nom, label: t.court }))],
     [choix]
@@ -307,27 +322,29 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
     } else if (e.key === "ArrowUp" || (e.key === "Enter" && e.shiftKey)) {
       e.preventDefault();
       move(r, c, -1);
-    } else if ((e.metaKey || e.ctrlKey) && (e.key === "d" || e.key === "D")) {
-      // ⌘D : la ligne d'à côté, déjà remplie — l'équipe se saisit en six frappes.
-      e.preventDefault();
-      const row = rows[r];
-      if (row) commit(duplicateEntryAt(saison, row.index), `Ligne dupliquée — ${row.e.player}`);
     }
   }
 
-  function ajouterLigne(team: string | null = null) {
-    const libre = rosterNames.find((n) => !rows.some((x) => x.e.player === n)) ?? rosterNames[0];
-    if (!libre) return;
-    commit(addEntry(saison, { ...newEntry(j, libre, team), sflTime: false }), "Ligne ajoutée");
+  // L'aide-mémoire des raccourcis ne s'ouvre que sur « ? ».
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.key !== "?" || t?.closest("input, textarea, select")) return;
+      setAide((a) => !a);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const libres = rosterNames.filter((n) => !deja.has(n.trim().toLowerCase()));
+
+  function ajouterLigne(nom: string) {
+    commit(addEntry(saison, { ...newEntry(j, nom, null), sflTime: false }), `Ligne ajoutée — ${nom}`);
   }
 
-  /** Le geste du dimanche : poser une équipe entière d'un coup. */
-  function ajouterEquipe(team: string) {
-    let next = saison;
-    const deja = new Set(rows.map((x) => x.e.player));
-    const libres = rosterNames.filter((n) => !deja.has(n)).slice(0, 6);
-    for (const name of libres) next = addEntry(next, newEntry(j, name, team));
-    commit(next, `${choix.find((t) => t.nom === team)?.libelle ?? team} ajoutés`);
+  function ajouterUnMatch() {
+    const fait = ajouterMatch(saison, j, {}, TERRAINS_MAX);
+    commit(fait.saison, `Match ${fait.n} ajouté`);
   }
 
   const meta = saison.journees.find((m) => m.j === j);
@@ -343,7 +360,8 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
         >
           {journees.map((m) => (
             <option key={m.j} value={m.j} className="bg-white text-[#08090b] dark:bg-[#141414] dark:text-white">
-              Journée {m.j} · {m.date}
+              {estBrouillon(m) ? "○ " : ""}Journée {m.j} · {m.date}
+              {estBrouillon(m) ? " · brouillon" : ""}
             </option>
           ))}
         </select>
@@ -356,28 +374,29 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
         />
 
         <button
-          onClick={() => ajouterLigne()}
-          className="bouton-principal bouton--vert flex h-9 items-center gap-1.5 px-3.5 text-[13px] font-bold"
+          onClick={() => setChoisir(true)}
+          disabled={libres.length === 0}
+          className="bouton-principal flex h-9 items-center gap-1.5 px-3.5 text-[13px] font-bold disabled:opacity-40"
         >
           <Plus className="size-3.5" /> Ligne
         </button>
+        <button
+          onClick={ajouterUnMatch}
+          disabled={!meta}
+          className="bouton-secondaire flex h-9 items-center gap-1.5 px-3.5 text-[13px] font-bold disabled:opacity-40"
+        >
+          <Plus className="size-3.5" /> Match {declares.length + 1}
+        </button>
       </div>
 
-      {/* Poser une équipe entière */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="mono-label text-foreground/30">Ajouter une équipe</span>
-        {choix.map((t) => (
-          <button
-            key={t.nom}
-            onClick={() => ajouterEquipe(t.nom)}
-            className="bouton-secondaire bouton--vert flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-semibold"
-          >
-            <Users className="size-3" />
-            {t.camp && <PointMaillot camp={t.camp} className="size-2" />}
-            {t.libelle}
-          </button>
-        ))}
-      </div>
+      <ChoisirJoueurs
+        open={choisir}
+        onOpenChange={setChoisir}
+        saison={saison}
+        titre={`Ajouter à la J${j}`}
+        places={places}
+        onChoisir={ajouterLigne}
+      />
 
       {/* La feuille */}
       <div className="glass overflow-hidden rounded-[18px]">
@@ -467,7 +486,8 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
                           <Enum
                             {...nav}
                             value={e.player}
-                            options={rosterNames.map((n) => ({ value: n, label: n }))}
+                            // L'effectif qui joue, moins la feuille, plus le joueur de la ligne.
+                            options={[e.player, ...libres.filter((n) => n !== e.player)].map((n) => ({ value: n, label: n }))}
                             onSet={(v) => patch(row.index, { player: v }, `Joueur — ${v}`)}
                           />
                         </span>
@@ -545,15 +565,6 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
                   >
                     <button
                       onClick={() =>
-                        commit(duplicateEntryAt(saison, row.index), `Ligne dupliquée — ${e.player}`)
-                      }
-                      title="Dupliquer (⌘D)"
-                      className="text-foreground/20 transition-colors hover:text-foreground/60"
-                    >
-                      <Copy className="size-3" />
-                    </button>
-                    <button
-                      onClick={() =>
                         supprimerLigne
                           ? supprimerLigne(row.index, e)
                           : commit(deleteEntryAt(saison, row.index), `Ligne supprimée — ${e.player}`)
@@ -569,9 +580,8 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
             })}
 
             {rows.length === 0 && (
-              <p className="px-4 py-10 text-center text-[13px] text-foreground/40">
-                Aucune ligne pour la journée {j}
-                {q && ` avec « ${q} »`}. Pose une équipe entière ci-dessus, puis corrige.
+              <p className="mono-label px-4 py-10 text-center text-foreground/40">
+                J{j} · 0 ligne{q && ` · « ${q} »`}
               </p>
             )}
           </div>
@@ -600,36 +610,31 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
         </span>
       </div>
 
-      {/* L'aide-mémoire des raccourcis */}
-      <div className="glass-soft rounded-[18px] px-4 py-3">
-        <p className="mono-label text-foreground/35">Raccourcis</p>
-        <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-[12px] text-foreground/50 sm:grid-cols-2">
-          {(
-            [
-              ["Entrée · ↓ · ↑", "descendre / remonter d'une ligne, même colonne"],
-              ["Tab · ⇧Tab", "colonne suivante / précédente"],
-              ["Espace", "cocher une case (SFL, CS, MVP, XT…)"],
-              ["+ · −", "incrémenter un chiffre sans le retaper"],
-              ["⌘D", "dupliquer la ligne (équipe, statut, résultat compris)"],
-              ["⌘Z · ⌘⇧Z", "annuler / rétablir"],
-            ] as const
-          ).map(([k, v]) => (
-            <div key={k} className="flex items-baseline gap-2">
-              <kbd className="shrink-0 rounded-md border border-contraste/12 bg-contraste/6 px-1.5 py-0.5 font-mono text-[10.5px] text-foreground/70">
-                {k}
-              </kbd>
-              <span className="min-w-0">{v}</span>
-            </div>
-          ))}
+      {/* L'aide-mémoire des raccourcis : seulement sur « ? » */}
+      {aide && (
+        <div className="glass-soft rounded-[18px] px-4 py-3">
+          <p className="mono-label text-foreground/35">Raccourcis</p>
+          <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-[12px] text-foreground/50 sm:grid-cols-2">
+            {(
+              [
+                ["Entrée · ↓ · ↑", "ligne suivante / précédente"],
+                ["Tab · ⇧Tab", "colonne suivante / précédente"],
+                ["Espace", "cocher"],
+                ["+ · −", "un de plus / un de moins"],
+                ["⌘Z · ⌘⇧Z", "annuler / rétablir"],
+              ] as const
+            ).map(([k, v]) => (
+              <div key={k} className="flex items-baseline gap-2">
+                <kbd className="shrink-0 rounded-md border border-contraste/12 bg-contraste/6 px-1.5 py-0.5 font-mono text-[10.5px] text-foreground/70">
+                  {k}
+                </kbd>
+                <span className="min-w-0">{v}</span>
+              </div>
+            ))}
+          </div>
+          {meta && <p className="mono-label mt-2.5 border-t border-contraste/8 pt-2.5 text-foreground/40">J{meta.j} · {meta.date} · XT = Xtratime · 2 arrêts = 1 PP · 2 interc. = 1 PP</p>}
         </div>
-        {meta && (
-          <p className="mt-2.5 border-t border-contraste/8 pt-2.5 text-[12px] text-foreground/40">
-            Journée {meta.j} du {meta.date}. Une ligne <strong>Xtratime</strong> n&apos;ouvre ni
-            présence ni match : seuls sa mention et son bonus comptent. Chaque paire
-            d&apos;arrêts et chaque paire d&apos;interceptions vaut 1 point Pépite.
-          </p>
-        )}
-      </div>
+      )}
     </div>
   );
 }

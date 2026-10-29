@@ -87,6 +87,8 @@ export const MOTIFS_NOTIF = {
   convocation: { famille: "ligue", label: "La convocation du dimanche", effet: "a répondu à la convocation" },
   // Les résultats et les MVP d'une journée, une fois la feuille remplie (lib/sfl/annonces-ligue.ts).
   resultats: { famille: "ligue", label: "Les résultats de la journée", effet: null },
+  // « J4 en ligne » : l'admin publie une journée préparée en brouillon (30/10, saisie/brouillon.ts).
+  publication: { famille: "ligue", label: "La journée en ligne", effet: null },
   // Une nouvelle vidéo dans les Actus, lancée par l'admin (lib/sfl/videos.ts).
   video: { famille: "ligue", label: "Une nouvelle vidéo", effet: "a regardé la vidéo" },
 

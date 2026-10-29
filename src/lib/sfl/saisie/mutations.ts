@@ -5,7 +5,9 @@
 
 import { computeJournees } from "./engine";
 import { labelDateFr, prochainDimanche } from "../convocation-temps";
-import { equipesDuMatch } from "./equipes";
+import { equipesDuMatch, equipesDuMatchSuivant } from "./equipes";
+import { dejaSurLaFeuille, jouable } from "./effectif";
+import { resteUnBrouillon } from "./brouillon";
 import { numeroSaison, type MatchDuJour, type SaisonArchivee, type Terrain } from "./types";
 import type {
   Convocation,
@@ -40,6 +42,10 @@ export function updateEntryAt(
 export function remplacerJoueurAt(saison: Saison, index: number, nouveau: string): Saison {
   const ligne = saison.entries[index];
   if (!ligne || ligne.player === nouveau) return saison;
+  // Jamais un joueur déjà sur la journée (il y serait deux fois) ni un
+  // membre qui ne joue pas : pour changer deux joueurs de camp, on échange
+  // les camps (echangerCampsAt), pas les noms.
+  if (!jouable(nouveau) || (!ligne.extraTime && dejaSurLaFeuille(saison, ligne.j, nouveau))) return saison;
   const ancien = ligne.player;
   const entries = saison.entries.map((e, i) => (i === index ? { ...e, player: nouveau } : e));
   const events = saison.events?.map((ev) =>
@@ -70,11 +76,36 @@ export function changerEquipeAt(saison: Saison, index: number, team: string): Sa
   });
 }
 
+/**
+ * Échange les camps de deux lignes de la même journée (le Direct, « Échanger ») :
+ * chacun prend l'équipe — et le résultat déjà posé — de l'autre.
+ */
+export function echangerCampsAt(saison: Saison, a: number, b: number): Saison {
+  const la = saison.entries[a];
+  const lb = saison.entries[b];
+  if (!la || !lb || a === b || la.j !== lb.j || la.team === lb.team) return saison;
+  const entries = saison.entries.map((e, i) =>
+    i === a
+      ? { ...e, team: lb.team, result: lb.result, cleanSheet: lb.cleanSheet }
+      : i === b
+        ? { ...e, team: la.team, result: la.result, cleanSheet: la.cleanSheet }
+        : e
+  );
+  return { ...saison, entries };
+}
+
 export function deleteEntryAt(saison: Saison, index: number): Saison {
   return { ...saison, entries: saison.entries.filter((_, i) => i !== index) };
 }
 
+/**
+ * Ajoute une ligne. Refusée (la saison revient inchangée) pour un membre
+ * qui ne joue pas, ou un joueur déjà sur la feuille de cette journée — sauf
+ * sa ligne Xtratime, qui n'est pas un doublon (integrite.ts, I1 et I2).
+ */
 export function addEntry(saison: Saison, entry: MatchEntry): Saison {
+  if (!jouable(entry.player)) return saison;
+  if (!entry.extraTime && dejaSurLaFeuille(saison, entry.j, entry.player)) return saison;
   return { ...saison, entries: [...saison.entries, entry] };
 }
 
@@ -98,15 +129,6 @@ export function newEntry(j: number, player: string, team: string | null): MatchE
   };
 }
 
-/** Duplique une ligne juste en dessous — le geste le plus courant en saisie. */
-export function duplicateEntryAt(saison: Saison, index: number): Saison {
-  const source = saison.entries[index];
-  if (!source) return saison;
-  const entries = [...saison.entries];
-  entries.splice(index + 1, 0, { ...source });
-  return { ...saison, entries };
-}
-
 /**
  * Le dimanche de la journée qu'on crée, en libellé court (« 1 nov. ») :
  * aujourd'hui si l'on est dimanche à Paris, sinon le prochain. Avant, une
@@ -118,20 +140,136 @@ export function dimancheDeJournee(maintenant = new Date()): string {
   return libelleCourt(labelDateFr(jour === "Sun" ? maintenant : prochainDimanche(maintenant)));
 }
 
+/** Les deux journées ont-elles la même date ? « 1 nov. » et « 1 novembre », sans casse. */
+export function memeDate(a: string, b: string): boolean {
+  const n = (x: string) => libelleCourt(x).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  return n(a) === n(b);
+}
+
+/** La journée de cette date, s'il y en a une. */
+export function journeeDeLaDate(saison: Pick<Saison, "journees">, date: string) {
+  return saison.journees.find((m) => memeDate(m.date, date));
+}
+
 /**
- * Crée une nouvelle journée (numéro suivant) et renvoie la saison + son
- * numéro. `date` : celle de la convocation qu'elle prépare (« 1 nov. ») ;
- * à défaut, le dimanche qui vient.
+ * Prépare la journée d'un dimanche (« Préparer la J5 ») : celle de cette date
+ * si elle existe déjà — une seule journée par dimanche (integrite.ts, I6) —,
+ * sinon la suivante, `max(j) + 1`, avec l'heure, le terrain et le SFL Time
+ * de la précédente. `brouillon` : elle naît cachée aux joueurs, le temps de
+ * la préparer (saisie/brouillon.ts). Remplace addJournee, qui créait une
+ * journée de plus à chaque appel, même pour un dimanche qui avait la sienne.
  */
-export function addJournee(saison: Saison, date?: string): { saison: Saison; j: number } {
+export function preparerJournee(
+  saison: Saison,
+  date?: string,
+  opts: { brouillon?: { par: string; le: Date } } = {}
+): { saison: Saison; j: number; existante: boolean } {
+  const quand = date?.trim() || dimancheDeJournee();
+  const deja = journeeDeLaDate(saison, quand);
+  if (deja) return { saison, j: deja.j, existante: true };
   const j = saison.journees.reduce((m, x) => Math.max(m, x.j), 0) + 1;
+  const avant = [...saison.journees].sort((a, b) => b.j - a.j)[0];
   return {
     saison: {
       ...saison,
-      journees: [...saison.journees, { j, date: date?.trim() || dimancheDeJournee(), sflTime: false, mvpAuto: true }],
+      journees: [
+        ...saison.journees,
+        {
+          j,
+          date: quand,
+          sflTime: avant?.sflTime ?? false,
+          mvpAuto: true,
+          ...(avant?.heure ? { heure: avant.heure } : {}),
+          ...(avant?.terrainId != null ? { terrainId: avant.terrainId } : {}),
+          ...(opts.brouillon ? { brouillon: { depuis: opts.brouillon.le.toISOString(), par: opts.brouillon.par } } : {}),
+        },
+      ],
     },
     j,
+    existante: false,
   };
+}
+
+/**
+ * Les matchs d'une journée tels que l'admin les a écrits, dans l'ordre :
+ * ceux de `matchsDuJour` (y compris un match encore vide, né de
+ * « + Match 3 »), puis ceux que forme le moteur et qui n'y sont pas (une
+ * journée d'avant le 23/10).
+ */
+export function matchsDeclares(saison: Saison, j: number): MatchDuJour[] {
+  const meta = saison.journees.find((m) => m.j === j);
+  const out: MatchDuJour[] = [];
+  const vus = new Set<string>();
+  for (const m of meta?.matchsDuJour ?? []) {
+    if (vus.has(m.equipes[0]) || vus.has(m.equipes[1]) || m.equipes[0] === m.equipes[1]) continue;
+    vus.add(m.equipes[0]);
+    vus.add(m.equipes[1]);
+    out.push(m);
+  }
+  for (const m of computeJournees(saison).find((x) => x.j === j)?.matches ?? []) {
+    if (vus.has(m.teamA.name) || vus.has(m.teamB.name)) continue;
+    vus.add(m.teamA.name);
+    vus.add(m.teamB.name);
+    out.push({
+      equipes: [m.teamA.name, m.teamB.name],
+      ...(m.heure ? { heure: m.heure } : {}),
+      ...(m.lieuId != null ? { lieuId: m.lieuId } : {}),
+      ...(m.terrain ? { terrain: m.terrain } : {}),
+    });
+  }
+  return out;
+}
+
+/** Le coup d'envoi le plus prisé de la journée qui n'a pas encore ses `max` matchs. */
+function creneauLibre(saison: Saison, j: number, max: number): string | undefined {
+  const meta = saison.journees.find((m) => m.j === j);
+  const parHeure = new Map<string, number>();
+  for (const m of matchsDeclares(saison, j)) {
+    const h = m.heure ?? meta?.heure;
+    if (h) parHeure.set(h, (parHeure.get(h) ?? 0) + 1);
+  }
+  if (!parHeure.size) return meta?.heure;
+  for (const [h, n] of parHeure) if (n < max) return h;
+  return undefined;
+}
+
+/**
+ * « + Match N » : le seul chemin vers un match de plus (30/10). La paire
+ * « Noirs N » / « Blancs N » est écrite dans matchsDuJour, sans aucun
+ * joueur ; N passe après tous les numéros déjà pris. L'heure est celle du
+ * premier créneau qui n'a pas encore ses `terrainsMax` matchs. Un match vide
+ * ne se voit pas chez les joueurs (le moteur l'ignore) et ne se publie pas.
+ */
+export function ajouterMatch(
+  saison: Saison,
+  j: number,
+  reglage: { heure?: string; terrain?: string; lieuId?: number } = {},
+  terrainsMax = 2
+): { saison: Saison; n: number; equipes: [string, string] } {
+  const declares = matchsDeclares(saison, j);
+  const noms = [...new Set([...declares.flatMap((m) => m.equipes), ...saison.entries.filter((e) => e.j === j && e.team).map((e) => e.team as string)])];
+  const equipes = equipesDuMatchSuivant(noms, declares.length);
+  const heure = reglage.heure?.trim() || creneauLibre(saison, j, terrainsMax);
+  const meta = saison.journees.find((m) => m.j === j);
+  const nouveau: MatchDuJour = {
+    equipes,
+    ...(heure && heure !== meta?.heure ? { heure } : {}),
+    ...(reglage.lieuId != null ? { lieuId: reglage.lieuId } : {}),
+    ...(reglage.terrain?.trim() ? { terrain: reglage.terrain } : {}),
+  };
+  return {
+    saison: { ...saison, journees: saison.journees.map((m) => (m.j === j ? { ...m, matchsDuJour: [...declares, nouveau] } : m)) },
+    n: declares.length + 1,
+    equipes,
+  };
+}
+
+/** Retire un match encore vide (« + Match 3 » touché pour rien). Un match qui a des joueurs reste. */
+export function retirerMatchVide(saison: Saison, j: number, equipes: [string, string]): Saison {
+  const occupe = saison.entries.some((e) => e.j === j && (e.team === equipes[0] || e.team === equipes[1]));
+  if (occupe) return saison;
+  const declares = matchsDeclares(saison, j).filter((m) => m.equipes[0] !== equipes[0] || m.equipes[1] !== equipes[1]);
+  return { ...saison, journees: saison.journees.map((m) => (m.j === j ? { ...m, matchsDuJour: declares } : m)) };
 }
 
 export function updateJournee(
@@ -229,17 +367,40 @@ export function generateBalancedTeams(
   return teams;
 }
 
-/** Crée une journée complète à partir d'équipes générées (une ligne par joueur). */
+/**
+ * Prépare la journée d'un dimanche avec des équipes générées (Nouvelle
+ * journée) : celle de cette date si elle existe, sinon la suivante
+ * (preparerJournee). Un joueur déjà sur la feuille garde sa ligne et prend
+ * son équipe ; un nom en double ou un membre qui ne joue pas n'entre pas.
+ * Les matchs sont écrits en toutes lettres, deux équipes par match.
+ */
 export function addJourneeWithTeams(
   saison: Saison,
   teams: BalancedTeam[],
-  date?: string
+  date?: string,
+  opts: { brouillon?: { par: string; le: Date } } = {}
 ): { saison: Saison; j: number } {
-  const { saison: withJournee, j } = addJournee(saison, date);
-  const entries: MatchEntry[] = teams.flatMap((t) =>
-    t.players.map((p) => newEntry(j, p.name, t.name))
+  const { saison: avec, j } = preparerJournee(saison, date, opts);
+  const posee = poserEquipes(
+    avec,
+    j,
+    teams.map((t) => ({ name: t.name, players: t.players.map((p) => p.name) }))
   );
-  return { saison: { ...withJournee, entries: [...withJournee.entries, ...entries] }, j };
+  return { saison: posee, j };
+}
+
+/** Ce que la pose retire des équipes : un nom déjà pris plus haut, ou un membre qui ne joue pas. */
+export function retiresDeLaPose(teams: ConvocationTeam[]): { nom: string; raison: "double" | "ne-joue-pas" }[] {
+  const vus = new Set<string>();
+  const out: { nom: string; raison: "double" | "ne-joue-pas" }[] = [];
+  for (const t of teams)
+    for (const nom of t.players) {
+      const cle = nom.trim().toLowerCase();
+      if (!jouable(nom)) out.push({ nom, raison: "ne-joue-pas" });
+      else if (vus.has(cle)) out.push({ nom, raison: "double" });
+      vus.add(cle);
+    }
+  return out;
 }
 
 /** « 1 novembre » → « 1 nov. » : le libellé d'une convocation, à la façon des journées. */
@@ -265,7 +426,26 @@ export function libelleCourt(dateLabel: string): string {
  * elle naît, datée du dimanche de la convocation, et reprend de la
  * précédente le SFL Time et le terrain.
  */
-export function poserEquipes(saison: Saison, j: number, teams: ConvocationTeam[], date?: string): Saison {
+export function poserEquipes(
+  saison: Saison,
+  j: number,
+  teamsBrutes: ConvocationTeam[],
+  date?: string,
+  opts: { brouillon?: { par: string; le: Date } } = {}
+): Saison {
+  // Chaque nom une seule fois (sa première place), jamais un membre qui ne
+  // joue pas : une composition qui porte un joueur deux fois ne le fait plus
+  // entrer deux fois sur la feuille (30/10).
+  const vus = new Set<string>();
+  const teams = teamsBrutes.map((t) => ({
+    ...t,
+    players: t.players.filter((nom) => {
+      const cle = nom.trim().toLowerCase();
+      if (!jouable(nom) || vus.has(cle)) return false;
+      vus.add(cle);
+      return true;
+    }),
+  }));
   let s = saison;
   if (!s.journees.some((m) => m.j === j)) {
     const avant = [...s.journees].sort((a, b) => b.j - a.j)[0];
@@ -279,6 +459,7 @@ export function poserEquipes(saison: Saison, j: number, teams: ConvocationTeam[]
           sflTime: avant?.sflTime ?? false,
           mvpAuto: true,
           ...(avant?.terrainId != null ? { terrainId: avant.terrainId } : {}),
+          ...(opts.brouillon ? { brouillon: { depuis: opts.brouillon.le.toISOString(), par: opts.brouillon.par } } : {}),
         },
       ],
     };
@@ -290,7 +471,7 @@ export function poserEquipes(saison: Saison, j: number, teams: ConvocationTeam[]
   const posees: MatchEntry[] = [];
   for (const t of teams) {
     for (const nom of t.players) {
-      const ligne = lignes.find((e) => e.player === nom && !prises.has(e));
+      const ligne = lignes.find((e) => e.player === nom && !prises.has(e) && !e.extraTime);
       if (ligne) prises.add(ligne);
       posees.push(ligne ? { ...ligne, team: t.name } : { ...newEntry(j, nom, t.name), sflTime });
     }
@@ -402,6 +583,9 @@ export function cloturerSaison(
   nom?: string,
   titres?: { entries: MatchEntry[]; faibles: Iterable<string> }
 ): Saison {
+  // Jamais tant qu'une journée attend en brouillon (30/10) : elle partirait
+  // en archive sans que la ligue l'ait jamais vue.
+  if (resteUnBrouillon(saison)) return saison;
   const numero = numeroSaison(saison);
   const faibles = titres ? [...titres.faibles] : [];
   const archive: SaisonArchivee = {
@@ -537,18 +721,35 @@ export function reglerMatchDuJour(
   n: number,
   reglage: { heure?: string; lieuId?: number; terrain?: string }
 ): Saison {
+  // `n` : le rang du match tel que le moteur le forme (les écrans d'avant) ;
+  // le réglage va au match de ces deux équipes, et les matchs encore vides
+  // (« + Match 3 ») restent écrits.
   const matches = computeJournees(saison).find((x) => x.j === j)?.matches ?? [];
   if (!matches[n]) return saison;
+  return reglerMatch(saison, j, [matches[n].teamA.name, matches[n].teamB.name], reglage);
+}
+
+/** Donne au match de ces deux équipes son heure, son lieu ou son terrain ; un texte vide rend ceux de la journée. */
+export function reglerMatch(
+  saison: Saison,
+  j: number,
+  equipes: [string, string],
+  reglage: { heure?: string; lieuId?: number; terrain?: string }
+): Saison {
+  const declares = matchsDeclares(saison, j);
+  if (!declares.some((m) => m.equipes[0] === equipes[0] && m.equipes[1] === equipes[1])) return saison;
   const plein = (texte: string | undefined) => (texte?.trim() ? texte : undefined);
-  const matchsDuJour = matches.map((m, i): MatchDuJour => {
-    const r = i === n ? { heure: m.heure, lieuId: m.lieuId, terrain: m.terrain, ...reglage } : m;
+  const matchsDuJour = declares.map((m): MatchDuJour => {
+    if (m.equipes[0] !== equipes[0] || m.equipes[1] !== equipes[1]) return m;
+    const r = { heure: m.heure, lieuId: m.lieuId, terrain: m.terrain, ...reglage };
     const heure = plein(r.heure);
     const terrain = plein(r.terrain);
     return {
-      equipes: [m.teamA.name, m.teamB.name],
+      equipes: m.equipes,
       ...(heure ? { heure } : {}),
       ...(r.lieuId != null ? { lieuId: r.lieuId } : {}),
       ...(terrain ? { terrain } : {}),
+      ...(m.arbitre ? { arbitre: m.arbitre } : {}),
     };
   });
   return { ...saison, journees: saison.journees.map((m) => (m.j === j ? { ...m, matchsDuJour } : m)) };

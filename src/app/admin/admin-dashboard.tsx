@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CalendarPlus,
@@ -49,6 +49,7 @@ import {
   closeConvocation,
   createConvocation,
   libelleCourt,
+  matchsDeclares,
   newEntry,
   newRosterPlayer,
   poserEquipes,
@@ -61,8 +62,11 @@ import {
 } from "@/lib/sfl/saisie/mutations";
 import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
 import { choixDEquipe, equipesDuJour } from "@/lib/sfl/saisie/equipes";
+import { effectifJouable } from "@/lib/sfl/saisie/effectif";
+import { estBrouillon } from "@/lib/sfl/saisie/brouillon";
 import { PointMaillot } from "@/components/sfl/point-maillot";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
+import { SYNC_EVENT } from "@/lib/sfl/saisie/sync";
 import { Synchro } from "@/components/sfl/admin/synchro";
 import { DetailPoints } from "@/components/sfl/admin/detail-points";
 import { Requalification } from "@/components/sfl/admin/requalification";
@@ -189,9 +193,53 @@ export function AdminDashboard() {
   type Step = { saison: Saison; label: string; at: number };
   const [history, setHistory] = useState<Step[]>([]);
   const [future, setFuture] = useState<Step[]>([]);
+  // Les piles ne valent que pour la version de la base sur laquelle elles
+  // ont été faites (30/10) : si la base change par ailleurs (un autre admin,
+  // une réparation SQL comme celle de la J3), « Annuler » republierait une
+  // copie d'avant. Elles se vident.
+  const [versionDesPiles, setVersionDesPiles] = useState<string | null>(null);
+  // Nos propres envois changent aussi la version : ils ne vident rien.
+  const enEnvoi = useRef(false);
+  useEffect(() => {
+    const lire = () => {
+      try {
+        return localStorage.getItem("sfl-saison-remote-version");
+      } catch {
+        return null;
+      }
+    };
+    const verifier = () => {
+      const v = lire();
+      setVersionDesPiles((avant) => {
+        if (avant !== null && v !== avant && !enEnvoi.current) {
+          setHistory([]);
+          setFuture([]);
+        }
+        return v;
+      });
+    };
+    verifier();
+    window.addEventListener(SAISIE_EVENT, verifier);
+    return () => window.removeEventListener(SAISIE_EVENT, verifier);
+  }, []);
+  void versionDesPiles;
+  useEffect(() => {
+    const fin = () => {
+      try {
+        setVersionDesPiles(localStorage.getItem("sfl-saison-remote-version"));
+      } catch {
+        /* stockage indisponible */
+      }
+      enEnvoi.current = false;
+    };
+    window.addEventListener(SYNC_EVENT, fin);
+    return () => window.removeEventListener(SYNC_EVENT, fin);
+  }, []);
 
-  const persist = useCallback((next: Saison) => {
-    saisieStore.save(next);
+  const persist = useCallback((next: Saison, opts?: { jeter?: number }) => {
+    enEnvoi.current = true;
+    const refus = saisieStore.save(next, opts);
+    if (refus.length) enEnvoi.current = false;
     // Prévient l'app joueur (SeasonProvider) ET cet écran : tous deux
     // relisent le stockage, personne ne garde de copie à part.
     window.dispatchEvent(new Event(SAISIE_EVENT));
@@ -326,16 +374,14 @@ export function AdminDashboard() {
       });
   }, [saison, derived]);
 
-  const rosterNames = useMemo(
-    () => [...saison.roster.map((r) => r.name)].sort((a, b) => a.localeCompare(b)),
-    [saison]
-  );
+  // L'effectif des sélecteurs : ceux qui jouent (effectif.ts) — jamais le
+  // compte d'un admin qui ne joue pas (30/10 : Sabri sur le terrain).
+  const rosterNames = useMemo(() => effectifJouable(saison).map((r) => r.name), [saison]);
 
   // Sélection « nouvelle journée » : nom + OVR carte + dispo (profil actif).
   const journeeRoster = useMemo(
     () =>
-      [...saison.roster]
-        .sort((a, b) => a.name.localeCompare(b.name))
+      effectifJouable(saison)
         .map((r) => ({
           name: r.name,
           ovr: Math.ceil((r.base ?? [75, 75, 75, 75, 75, 75]).reduce((a, b) => a + b, 0) / 6),
@@ -369,8 +415,8 @@ export function AdminDashboard() {
   const equipesLigne = useMemo(() => {
     if (!editEntry) return [];
     const noms = [...new Set(saison.entries.filter((e) => e.j === editEntry.j && e.team).map((e) => e.team as string))];
-    return choixDEquipe(derived.journees.find((x) => x.j === editEntry.j), noms);
-  }, [editEntry, saison.entries, derived]);
+    return choixDEquipe(derived.journees.find((x) => x.j === editEntry.j), noms, matchsDeclares(saison, editEntry.j));
+  }, [editEntry, saison, derived]);
   const metaEntry = metaJ != null ? saison.journees.find((m) => m.j === metaJ) ?? null : null;
   // Ses matchs, chacun avec son heure, son lieu et son terrain quand il a les siens.
   const metaDuJour = useMemo(
@@ -592,7 +638,13 @@ export function AdminDashboard() {
 
           {/* Les équipes de dimanche — générées depuis les « oui » */}
           <EquipesDimanche
-            onPoser={(j, teams, date) => commit(poserEquipes(saison, j, teams, libelleCourt(date)), `Équipes de la J${j} sur la feuille`)}
+            onPoser={(j, teams, date) =>
+              commit(
+                poserEquipes(saison, j, teams, libelleCourt(date), { brouillon: { par: me ?? "admin", le: new Date() } }),
+                `Équipes de la J${j} sur la feuille`
+              )
+            }
+            libellePoser={(j) => (saison.journees.some((m) => m.j === j && !estBrouillon(m)) ? `Poser sur la J${j}` : "Poser en brouillon")}
           />
 
           {/* Historique / annulation */}
@@ -667,6 +719,7 @@ export function AdminDashboard() {
             </div>
           </div>
 
+          {process.env.NODE_ENV !== "production" && (
           <Button
             variant="ghost"
             size="sm"
@@ -685,6 +738,7 @@ export function AdminDashboard() {
           >
             <RotateCcw className="mr-1.5 size-4" /> Réinitialiser les données de démo
           </Button>
+          )}
         </TabsContent>
 
         {/* ===================== SAISIE (la grille) ===================== */}
@@ -739,6 +793,7 @@ export function AdminDashboard() {
               <div className="flex items-center justify-between gap-3 px-5 py-3.5">
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-bold tracking-tight">Journée {meta.j}</span>
+                  {estBrouillon(meta) && <span className="mono-label text-foreground/60">○ Brouillon</span>}
                   {meta.sflTime && (
                     <Badge className="rounded-full bg-primary/12 px-2 py-0 text-[10px] text-primary">SFL Time</Badge>
                   )}
@@ -996,7 +1051,7 @@ export function AdminDashboard() {
         initialChecked={journeePrefill}
         lieux={saison.terrains ?? []}
         onCreate={(teams, reglages) => {
-          const cree = addJourneeWithTeams(saison, teams, journeeDate);
+          const cree = addJourneeWithTeams(saison, teams, journeeDate, { brouillon: { par: me ?? "admin", le: new Date() } });
           const { j } = cree;
           // Chaque match à son heure, son terrain et son lieu, quand l'admin les a donnés.
           const s = reglages.reduce(

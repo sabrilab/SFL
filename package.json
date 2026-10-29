@@ -9,6 +9,7 @@
     "lint": "eslint",
     "saison:check": "tsx tools/saison-snapshot.ts",
     "saison:bless": "tsx tools/saison-snapshot.ts --bless",
+    "checks": "sh -c 'for f in tools/*-check.ts; do tsx \"$f\" > /dev/null || { echo \"$f\"; exit 1; }; done; echo checks: ok'",
     "prebuild": "tsx scripts/prebuild.ts",
     "postbuild": "tsx scripts/postbuild.ts"
   },
