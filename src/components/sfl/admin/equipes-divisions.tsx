@@ -10,6 +10,12 @@
 //   · ensuite, les équipes de la convocation, terrain par terrain.
 // Il peut les composer plus tôt, les recomposer avec les réponses du moment,
 // et, le jour venu, les poser sur la feuille de la journée en un geste.
+//
+// Depuis l'incident de la J4 (29/10) : jamais plus de TERRAINS_MAX terrains
+// (equipes-division.ts) ; « Composer maintenant », « Recomposer » et « Poser
+// sur la feuille » disent d'abord ce qui va se passer (« 4 équipes sur
+// 2 terrains, 3 joueurs sans équipe : continuer ? ») ; ceux qui viennent sans
+// place sont listés, remplaçants.
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -17,7 +23,16 @@ import { ClipboardList, RefreshCw, Users } from "lucide-react";
 import { useSeason } from "@/components/sfl/season-provider";
 import type { PresenceView } from "@/hooks/use-presence";
 import type { EtatDivisions } from "@/lib/sfl/divisions";
-import { composer, HEURE_DES_EQUIPES, terrainsDesEquipes } from "@/lib/sfl/equipes-division";
+import {
+  composer,
+  HEURE_DES_EQUIPES,
+  questionDeComposition,
+  resumer,
+  TERRAINS_MAX,
+  terrainsDesEquipes,
+  type Resume,
+} from "@/lib/sfl/equipes-division";
+import { Confirmer, type Confirmation } from "@/components/sfl/admin/confirmer";
 import { PointMaillot } from "@/components/sfl/point-maillot";
 import { joueursDeLaFeuille } from "@/lib/sfl/presence-feuille";
 import { lireEquipe } from "@/lib/sfl/saisie/equipes";
@@ -35,14 +50,25 @@ export function EquipesParDivision({
 }) {
   const { saison } = useSeason();
   const [saving, setSaving] = useState(false);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const venus = presence.presents;
+  // L'ordre d'arrivée : quand les places manquent, les derniers sont remplaçants.
+  const ordre = presence.ordreDesVenus.length ? presence.ordreDesVenus : venus;
   // La liste change d'identité à chaque rendu ; la composition ne suit que son contenu.
-  const cle = venus.join("\n");
+  const cle = ordre.join("\n");
   const apercu = useMemo(() => composer(saison, cle ? cle.split("\n") : [], etat), [saison, cle, etat]);
   const enBase = presence.teams && presence.teams.length > 0 ? presence.teams : null;
   const affichees = enBase ?? apercu.teams;
   const surLaFeuille = joueursDeLaFeuille(saison, presence.journee).equipes;
   const note = (n: string) => apercu.niveaux.get(n)?.note ?? null;
+  // Posées sur la feuille, les « Je viens » sans équipe n'y sont plus : le hook les garde (remplacants).
+  const sansEquipe = surLaFeuille ? presence.remplacants : resumer(affichees, ordre).sansEquipe;
+
+  /** « N équipes sur T terrains, X joueurs sans équipe : continuer ? », et ce qui suit. */
+  function demander(r: Resume, suite: string, action: string, faire: () => void) {
+    const detail = [suite, r.auDela ? `C'est plus que les ${TERRAINS_MAX} terrains prévus.` : null].filter(Boolean).join(" ");
+    setConfirmation({ titre: questionDeComposition(r), detail, action, faire });
+  }
 
   async function enregistrer(teams: ConvocationTeam[], message: string) {
     if (!presence.saveTeams) return;
@@ -98,10 +124,30 @@ export function EquipesParDivision({
         ))}
       </div>
 
+      {sansEquipe.length > 0 && (
+        <div className="mt-2 rounded-2xl bg-secondary/40 p-3">
+          <p className="mono-label mb-1.5 text-foreground/50">
+            Sans équipe · remplaçant{sansEquipe.length > 1 ? "s" : ""} · {sansEquipe.length}
+          </p>
+          <p className="text-[12.5px] leading-snug text-foreground/55">{sansEquipe.join(" · ")}</p>
+        </div>
+      )}
+
       {presence.saveTeams && !surLaFeuille && (
         <div className="mt-3 flex flex-wrap gap-2">
           <button
-            onClick={() => void enregistrer(apercu.teams, enBase ? "Équipes recomposées" : "Équipes composées")}
+            onClick={() =>
+              demander(
+                resumer(apercu.teams, ordre),
+                enBase
+                  ? "Les équipes actuelles sont remplacées."
+                  : presence.equipesVisibles
+                    ? "Toute la ligue les voit tout de suite."
+                    : "La ligue les voit vendredi à 19h.",
+                enBase ? "Recomposer" : "Composer",
+                () => void enregistrer(apercu.teams, enBase ? "Équipes recomposées" : "Équipes composées")
+              )
+            }
             disabled={saving || apercu.teams.length < 2}
             className="bouton-secondaire bouton--vert flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-bold disabled:opacity-50"
           >
@@ -109,7 +155,14 @@ export function EquipesParDivision({
           </button>
           {enBase && onPoser && (
             <button
-              onClick={() => onPoser(presence.journee, enBase, presence.jour.replace(/^\S+\s+/, ""))}
+              onClick={() =>
+                demander(
+                  resumer(enBase, ordre),
+                  `La J${presence.journee} s'ouvre sur la feuille : la Map et la Ligue montrent ces matchs tout de suite.`,
+                  "Poser",
+                  () => onPoser(presence.journee, enBase, presence.jour.replace(/^\S+\s+/, ""))
+                )
+              }
               className="bouton-principal bouton--vert flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-bold"
             >
               <ClipboardList className="size-3.5" /> Poser sur la feuille de la J{presence.journee}
@@ -117,6 +170,7 @@ export function EquipesParDivision({
           )}
         </div>
       )}
+      <Confirmer confirmation={confirmation} onFermer={() => setConfirmation(null)} />
     </div>
   );
 }

@@ -76,3 +76,23 @@ export function avecLaFeuille<T extends Reponses>(r: T, feuille: Feuille, masque
     sansReponse: r.sansReponse.filter((n) => !sur.has(n)),
   };
 }
+
+/**
+ * Les remplaçants : ceux qui ont dit « Je viens » et qui ne sont dans aucune
+ * équipe, pour qu'ils ne disparaissent pas de la liste (incident de la J4).
+ * Les équipes de la feuille d'abord, dès qu'il y en a ; sinon celles de la
+ * convocation, si `teams` est donné (null tant qu'elles ne se montrent pas).
+ * Sans équipes, personne n'est remplaçant : tout le monde vient.
+ */
+export function remplacantsDe(
+  presents: string[],
+  saison: Pick<Saison, "entries">,
+  j: number | null,
+  teams: { players: string[] }[] | null,
+  masque: (nom: string) => boolean
+): string[] {
+  const feuille = joueursDeLaFeuille(saison, j);
+  const dedans = feuille.equipes ? new Set(feuille.noms) : teams?.length ? new Set(teams.flatMap((t) => t.players)) : null;
+  if (!dedans) return [];
+  return [...new Set(presents)].filter((n) => !masque(n) && !dedans.has(n));
+}

@@ -5,7 +5,9 @@
 // la convocation, pour qu'un « Je viens » tardif trouve sa place, et à
 // l'ouverture de l'app pendant le week-end des équipes, au plus toutes les
 // 20 minutes : un appel perdu se rattrape au suivant. Le reste de la
-// semaine, il ne l'appelle pas.
+// semaine, il ne l'appelle pas. Le téléphone ne fait que compléter les
+// équipes qui existent (jamais d'équipe ni de terrain de plus, incident de
+// la J4) : composer revient au cron et à l'admin.
 
 import { supabase } from "@/lib/supabase";
 import { equipesEnCours } from "./equipes-division";

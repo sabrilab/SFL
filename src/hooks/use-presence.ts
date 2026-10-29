@@ -33,7 +33,8 @@ import { NEXT_MATCH } from "@/lib/sfl/data";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/sfl/activity";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
-import { avecLaFeuille, joueursDeLaFeuille, jourMois, journeeDuJour } from "@/lib/sfl/presence-feuille";
+import { avecLaFeuille, joueursDeLaFeuille, jourMois, journeeDuJour, remplacantsDe } from "@/lib/sfl/presence-feuille";
+import { ordreDArrivee } from "@/lib/sfl/equipes-division";
 import { terrainDeJournee } from "@/lib/sfl/saisie/mutations";
 import { matchsDeJournee, rendezVousDe, type RendezVous } from "@/lib/sfl/matchs-du-jour";
 
@@ -51,6 +52,8 @@ interface ServerConvocation {
 interface ServerState {
   convocation: ServerConvocation;
   reponses: Record<string, Reponse>;
+  /** L'heure de chaque réponse (ISO) : l'ordre d'arrivée des « Je viens ». */
+  quand: Record<string, string>;
 }
 
 // Compteur de noms de canaux : chaque abonné temps réel reçoit le sien.
@@ -74,6 +77,15 @@ export interface PresenceView {
   rendezVous: RendezVous;
   mine: Reponse | null;
   presents: string[];
+  /**
+   * Ceux qui ont dit « Je viens » sans être dans une équipe (celles de la
+   * feuille, ou celles de la convocation une fois visibles, vendredi 19 h) :
+   * les remplaçants. Ils ne sont pas dans `presents` dès que la feuille a ses
+   * équipes, mais ne disparaissent plus de la liste.
+   */
+  remplacants: string[];
+  /** `presents` dans l'ordre où les places leur reviennent (equipes-division.ts, ordreDArrivee). */
+  ordreDesVenus: string[];
   absents: string[];
   sansReponse: string[];
   /** Vrai du lundi au vendredi minuit — après, la conversation est expirée. */
@@ -141,17 +153,19 @@ export function usePresence(): PresenceView {
         }
         const { data: rows } = await sb
           .from("presence")
-          .select("reponse, profiles ( name )")
+          .select("reponse, updated_at, profiles ( name )")
           .eq("convocation_id", convocation.id);
         const reponses: Record<string, Reponse> = {};
+        const quand: Record<string, string> = {};
         // Selon l'inférence de la relation, PostgREST renvoie `profiles` comme
         // objet ou comme tableau à un élément : on accepte les deux.
-        type Row = { reponse: Reponse; profiles: { name: string } | { name: string }[] | null };
+        type Row = { reponse: Reponse; updated_at?: string; profiles: { name: string } | { name: string }[] | null };
         for (const r of (rows ?? []) as unknown as Row[]) {
           const prof = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
           if (prof?.name) reponses[prof.name] = r.reponse;
+          if (prof?.name && r.updated_at) quand[prof.name] = r.updated_at;
         }
-        if (!cancelled) setServer({ convocation, reponses });
+        if (!cancelled) setServer({ convocation, reponses, quand });
       } catch {
         // Base injoignable : on retombe sur le mode local sans casser l'écran.
         if (!cancelled) setServer(null);
@@ -318,9 +332,10 @@ export function usePresence(): PresenceView {
   if (serverActive && server) {
     const names = publicOnly(saison.roster).map((r) => ({ name: r.name, actif: r.profil === "Actif" }));
     const rep = server.reponses;
+    const jeViens = names.filter((n) => rep[n.name] === "present").map((n) => n.name);
     const reponses = avecLaFeuille(
       {
-        presents: names.filter((n) => rep[n.name] === "present").map((n) => n.name),
+        presents: jeViens,
         absents: names.filter((n) => rep[n.name] === "absent").map((n) => n.name),
         sansReponse: names.filter((n) => !rep[n.name] && n.actif).map((n) => n.name),
       },
@@ -337,6 +352,8 @@ export function usePresence(): PresenceView {
       rendezVous: rendezVousDuDimanche(server.convocation.heure, server.convocation.lieu),
       mine: surLaFeuille ? "present" : (rep[player.name] ?? null),
       ...reponses,
+      remplacants: remplacantsDe(jeViens, saison, jDuJour, revele ? server.convocation.teams : null, isHidden),
+      ordreDesVenus: ordreDArrivee(reponses.presents, feuille.noms, (n) => server.quand[n]).filter((n) => reponses.presents.includes(n)),
       reponsesOuvertes: ouvert,
       equipesVisibles: revele,
       teams: server.convocation.teams ?? null,
@@ -361,6 +378,8 @@ export function usePresence(): PresenceView {
     rendezVous: rendezVousDuDimanche(localConv?.heure ?? NEXT_MATCH.heure, localConv?.lieu ?? NEXT_MATCH.lieu),
     mine: surLaFeuille ? "present" : localConv ? ((localConv.reponses[player.name] as Reponse | undefined) ?? null) : null,
     ...reponsesLocales,
+    remplacants: remplacantsDe(local.presents, saison, jDuJour, revele ? (localConv?.teams ?? null) : null, isHidden),
+    ordreDesVenus: ordreDArrivee(reponsesLocales.presents, feuille.noms, () => null).filter((n) => reponsesLocales.presents.includes(n)),
     reponsesOuvertes: ouvert,
     equipesVisibles: revele,
     teams: localConv?.teams ?? null,

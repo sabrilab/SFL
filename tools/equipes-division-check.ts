@@ -1,7 +1,10 @@
 // Vérifie les équipes d'un dimanche en divisions (lib/sfl/equipes-division.ts)
 // sur une saison fabriquée : les terrains par division, l'équilibre, le
 // mélange de ceux qui ont déjà joué ensemble, les gardiens, les réponses
-// tardives, et qu'un même appel rend toujours les mêmes équipes.
+// tardives, et qu'un même appel rend toujours les mêmes équipes. Depuis
+// l'incident de la J4 (29/10) : jamais plus de TERRAINS_MAX terrains (33, 45
+// et 73 venus), les remplaçants dans l'ordre d'arrivée, completer qui ne
+// remplit pas un terrain plein, les confirmations de l'admin.
 //   npx tsx tools/equipes-division-check.ts
 // Avec une saison réelle (le document de la table saison, en JSON), compose
 // en plus les équipes des inscrits de sa dernière feuille, avec les divisions
@@ -14,6 +17,12 @@ import {
   completer,
   composer,
   divisionsDeLaJournee,
+  ordreDArrivee,
+  questionDeComposition,
+  REGLES_EQUIPES,
+  repartir,
+  resumer,
+  TERRAINS_MAX,
   equipesEnCours,
   historique,
   journeeDeConvocation,
@@ -26,18 +35,20 @@ import {
 import { ovr, rareStats } from "../src/lib/sfl/engine";
 import { computeJournees, computeStandings } from "../src/lib/sfl/saisie/engine";
 import { generateBalancedTeams, libelleCourt, newEntry, poserEquipes } from "../src/lib/sfl/saisie/mutations";
+import { remplacantsDe } from "../src/lib/sfl/presence-feuille";
 import type { MatchEntry, Saison } from "../src/lib/sfl/saisie/types";
 
 const niveau = (nom: string, division: Division, valeur: number, gardien = false): Niveau => ({ nom, division, note: 75, ppm: null, valeur, gardien });
 
-// Les terrains : la D1 trop courte (6) rejoint la D2 (10), et ces 16 prennent
-// deux terrains, les meilleurs ensemble ; la D3 (20) en prend deux aussi.
+// Les terrains, sans plafond : la D1 trop courte (6) rejoint la D2 (10), et
+// ces 16 prennent deux terrains, les meilleurs ensemble ; la D3 (20) en prend
+// deux aussi. (Avec le plafond, plus bas.)
 const joueurs = [
   ...Array.from({ length: 6 }, (_, i) => niveau(`a${i}`, 1, 2 - i * 0.1)),
   ...Array.from({ length: 10 }, (_, i) => niveau(`b${i}`, 2, 1 - i * 0.1)),
   ...Array.from({ length: 20 }, (_, i) => niveau(`c${i}`, 3, -i * 0.1)),
 ];
-const terrains = repartirSurTerrains(joueurs);
+const terrains = repartirSurTerrains(joueurs, Infinity);
 assert.deepEqual(terrains.map((t) => t.length), [8, 8, 10, 10]);
 assert.deepEqual(terrains[0].map((p) => p.nom), ["a0", "a1", "a2", "a3", "a4", "a5", "b0", "b1"]);
 assert.ok(terrains[2].every((p) => p.division === 3) && terrains[2][0].nom === "c0");
@@ -172,7 +183,152 @@ assert.deepEqual(poserEquipes(reglee, 4, c4.teams).journees.find((m) => m.j === 
   { equipes: ["Noirs 1", "Blancs 1"], heure: "14h30", lieuId: 2, terrain: "Terrain 3" },
 ]);
 
-console.log("équipes par division : terrains, équilibre, mélange, gardiens, réponses tardives, calendrier, feuille, tout est bon");
+
+/* ------------------- Le plafond de terrains (incident de la J4) ------------------- */
+
+assert.equal(TERRAINS_MAX, 2, "2 terrains en attendant Sabri : à changer ici et dans equipes-division.ts ensemble");
+const { maxParTerrain } = REGLES_EQUIPES;
+const places = TERRAINS_MAX * maxParTerrain;
+
+// Ceux qui viennent, D1, D2 puis D3 : `parDivision` joueurs chacune, dans
+// l'ordre d'arrivée donné (un sur trois de chaque division à tour de rôle).
+function venusEnDivisions(n1: number, n2: number, n3: number): Niveau[] {
+  const d = (div: Division, n: number) => Array.from({ length: n }, (_, i) => niveau(`d${div}-${String(i).padStart(2, "0")}`, div, (3 - div) - i * 0.03));
+  const listes = [d(1, n1), d(2, n2), d(3, n3)];
+  const out: Niveau[] = [];
+  for (let i = 0; out.length < n1 + n2 + n3; i++) for (const l of listes) if (l[i]) out.push(l[i]);
+  return out;
+}
+const rangDe = (l: Niveau[]) => new Map(l.map((p, i) => [p.nom, i]));
+
+for (const [n1, n2, n3] of [
+  [11, 11, 11], // 33 : trois terrains avant, deux maintenant
+  [15, 15, 15], // 45
+  [25, 24, 24], // 73 : cinq terrains et plus avant
+  [10, 10, 10], // 30 : juste ce que tiennent deux terrains
+  [16, 9, 8], // la D1 trop pleine
+  [3, 20, 10], // la D1 trop courte
+]) {
+  const tous = venusEnDivisions(n1, n2, n3);
+  const total = tous.length;
+  const sansPlafond = repartirSurTerrains(tous, Infinity);
+  const { terrains: ts, remplacants } = repartir(tous);
+  const dit = `${total} venus (${n1}/${n2}/${n3})`;
+  assert.ok(ts.length <= TERRAINS_MAX, `${dit} : ${ts.length} terrains, ${TERRAINS_MAX} au plus`);
+  assert.ok(ts.every((t) => t.length <= maxParTerrain && t.length >= 2), `${dit} : ${ts.map((t) => t.length)} par terrain`);
+  assert.equal(ts.flat().length + remplacants.length, total, `${dit} : personne ne se perd`);
+  assert.equal(new Set([...ts.flat(), ...remplacants].map((p) => p.nom)).size, total, `${dit} : chacun une seule fois`);
+  assert.equal(ts.flat().length, Math.min(total, places), `${dit} : toutes les places servent`);
+  // Les remplaçants sont les derniers arrivés.
+  const rang = rangDe(tous);
+  const dernierQuiJoue = Math.max(...ts.flat().map((p) => rang.get(p.nom)!));
+  assert.ok(remplacants.every((p) => rang.get(p.nom)! > dernierQuiJoue), `${dit} : les remplaçants sont les derniers arrivés`);
+  // L'ordre des divisions : la D1 sur le premier terrain, jamais une D3 avant une D1.
+  const plusHaute = (t: Niveau[]) => Math.min(...t.map((p) => p.division));
+  const plusBasse = (t: Niveau[]) => Math.max(...t.map((p) => p.division));
+  for (let k = 1; k < ts.length; k++) assert.ok(plusBasse(ts[k - 1]) <= plusHaute(ts[k]), `${dit} : les divisions dans l'ordre`);
+  // Sous le plafond, rien ne change.
+  if (sansPlafond.length <= TERRAINS_MAX) assert.deepEqual(ts, sansPlafond, `${dit} : comme avant`);
+  else assert.ok(sansPlafond.length > ts.length, `${dit} : ${sansPlafond.length} terrains avant`);
+  console.log(`  ${dit} : ${sansPlafond.length} terrain(s) sans plafond → ${ts.length} (${ts.map((t) => t.length).join(" + ")}), ${remplacants.length} remplaçant(s)`);
+}
+// 33 venus, 11 par division : D1 et D2 ne tiennent pas sur un terrain (22),
+// D2 et D3 non plus : l'échelle coupée en deux, la D1 entière sur le premier.
+{
+  const { terrains: ts, remplacants } = repartir(venusEnDivisions(11, 11, 11));
+  assert.deepEqual(ts.map((t) => t.length), [15, 15]);
+  assert.equal(remplacants.length, 3);
+  // Les 30 premiers arrivés jouent : 10 de chaque division ; la D1 entière sur le premier terrain.
+  assert.equal(ts[0].filter((p) => p.division === 1).length, 10, "la D1 entière sur le premier terrain");
+  assert.ok(ts[1].every((p) => p.division >= 2), "rien de la D1 sur le second");
+}
+// 20 venus, 8/6/6 : sans plafond D1 (8) et D2–D3 (12), deux terrains : rien ne change.
+assert.deepEqual(repartir(venusEnDivisions(8, 6, 6)).terrains.map((t) => t.length), [8, 12]);
+// 26 venus, 9/9/8 : trois terrains avant ; maintenant D1 seule, D2 et D3 ensemble ? 17 > 15 :
+// l'échelle en deux (13 + 13).
+assert.deepEqual(repartir(venusEnDivisions(9, 9, 8)).terrains.map((t) => t.length), [13, 13]);
+// 24 venus, 12/8/4 : la D3 courte rejoint la D2 → 12 + 12 : deux terrains, divisions entières.
+{
+  const ts = repartir(venusEnDivisions(12, 8, 4)).terrains;
+  assert.deepEqual(ts.map((t) => t.length), [12, 12]);
+  assert.ok(ts[0].every((p) => p.division === 1));
+}
+// Un plafond de 3 se respecte aussi.
+assert.ok(repartir(venusEnDivisions(25, 24, 24), 3).terrains.length === 3);
+
+// composer avec de vraies divisions : 33, 45, 73 venus, TERRAINS_MAX respecté,
+// les remplaçants dans l'ordre d'arrivée.
+{
+  const vrais = (n: number) => Array.from({ length: n }, (_, i) => `J${String(i).padStart(2, "0")}`);
+  for (const n of [33, 45, 73]) {
+    const noms = vrais(n);
+    const etatN: EtatDivisions = {
+      phase: "divisions",
+      actuelle: new Map(noms.map((nom, i) => [nom, ((i % 3) + 1) as Division])),
+      decoupage: {} as EtatDivisions["decoupage"],
+      journees: [],
+    };
+    const saisonN: Saison = {
+      ...saison,
+      roster: noms.map((name, i) => ({ name, poste: i % 7 === 0 ? "G" : "MC", profil: "Actif", base: [70 + (i % 20), 70, 70, 70, 70, 70] })),
+      entries: [],
+    };
+    const comp = composer(saisonN, noms, etatN);
+    assert.ok(comp.terrains.length <= TERRAINS_MAX, `${n} venus : ${comp.terrains.length} terrains`);
+    assert.equal(comp.teams.length, comp.terrains.length * 2);
+    const dedans = comp.teams.flatMap((t) => t.players);
+    assert.equal(dedans.length, Math.min(n, places), `${n} venus : ${dedans.length} placés`);
+    assert.equal(dedans.length + comp.remplacants.length, n, `${n} venus : personne ne se perd`);
+    assert.deepEqual(comp.remplacants, noms.slice(places), `${n} venus : les derniers arrivés remplaçants`);
+    assert.ok(comp.teams.every((t) => t.players.length >= Math.floor(maxParTerrain / 2)), `${n} venus : du 7 contre 8, pas du 5 contre 5`);
+    const r = resumer(comp.teams, noms);
+    assert.equal(r.terrains, TERRAINS_MAX);
+    assert.equal(r.auDela, false);
+    assert.equal(r.sansEquipe.length, n - places);
+    // Le téléphone d'un retardataire ne crée rien : les terrains sont pleins, il reste remplaçant.
+    assert.equal(completer(saisonN, comp.teams, [...noms, "Zoé"], etatN), null, `${n} venus : un terrain plein ne prend personne`);
+    // Un départ libère une place : le premier remplaçant arrivé la prend, pas un autre.
+    const parti = comp.teams[0].players[0];
+    const ajuste = completer(saisonN, comp.teams, [...noms.filter((x) => x !== parti), "Zoé"], etatN)!;
+    assert.equal(ajuste.length, comp.teams.length, "jamais d'équipe de plus");
+    assert.ok(ajuste.flatMap((t) => t.players).includes(noms[places]), "le premier remplaçant entre");
+    assert.ok(!ajuste.flatMap((t) => t.players).includes("Zoé"), "Zoé, arrivée après, attend");
+    console.log(`  composer, ${n} venus : ${comp.terrains.length} terrains (${comp.terrains.map((t) => t.equipes.map((e) => e.players.length).join(" contre ")).join(", ")}), ${comp.remplacants.length} remplaçants`);
+  }
+}
+
+// completer ne fait jamais d'équipe : sans équipes, rien ; avec, autant d'équipes qu'avant.
+assert.equal(completer(saison, [], NOMS, null), null);
+assert.equal(tard.length, c.teams.length);
+
+// L'ordre d'arrivée : la feuille d'abord, puis les réponses par heure, sans heure à la fin.
+assert.deepEqual(
+  ordreDArrivee(["Ana", "Bilal", "Chris", "Dina"], ["Eli", "Bilal"], (n) => ({ Ana: "2026-10-28T10:00:00Z", Chris: "2026-10-26T09:00:00Z", Dina: "2026-10-27T09:00:00Z" })[n]),
+  ["Eli", "Bilal", "Chris", "Dina", "Ana"]
+);
+
+// Les confirmations de l'admin.
+assert.equal(
+  questionDeComposition(resumer([{ name: "Noirs 1", players: ["Ana"] }, { name: "Blancs 1", players: ["Bilal"] }], ["Ana", "Bilal", "Chris"])),
+  "2 équipes sur 1 terrain, 1 joueur sans équipe : continuer ?"
+);
+{
+  const six = ["Noirs 1", "Blancs 1", "Noirs 2", "Blancs 2", "Noirs 3", "Blancs 3"].map((name, i) => ({ name, players: [`p${i}`] }));
+  const r = resumer(six, [...six.map((t) => t.players[0]), "q1", "q2", "Sabri"]);
+  assert.equal(questionDeComposition(r), "6 équipes sur 3 terrains, 2 joueurs sans équipe : continuer ?", "Sabri, masqué, ne compte pas");
+  assert.equal(r.auDela, true);
+  assert.equal(questionDeComposition(resumer(six.slice(0, 4), six.slice(0, 4).map((t) => t.players[0]))), "4 équipes sur 2 terrains, chacun a son équipe : continuer ?");
+}
+
+// Les remplaçants restent dans la liste : « Je viens » sans équipe sur la feuille, ou dans la convocation.
+{
+  const f: Saison = { ...coupee, entries: [...coupee.entries, newEntry(4, "Ana", "Noirs 1"), newEntry(4, "Bilal", "Blancs 1"), newEntry(4, "Kenza", null)] };
+  assert.deepEqual(remplacantsDe(["Ana", "Chris", "Bilal", "Sabri"], f, 4, null, (n) => n === "Sabri"), ["Chris"], "la feuille fait foi");
+  assert.deepEqual(remplacantsDe(["Ana", "Chris"], coupee, 4, [{ players: ["Ana"] }], () => false), ["Chris"], "les équipes de la convocation");
+  assert.deepEqual(remplacantsDe(["Ana", "Chris"], coupee, 4, null, () => false), [], "sans équipes, tout le monde vient");
+}
+
+console.log("équipes par division : terrains, plafond de terrains, remplaçants, équilibre, mélange, gardiens, réponses tardives, calendrier, feuille, confirmations, tout est bon");
 
 // Une saison réelle : les inscrits de sa dernière feuille, avec les divisions du moment.
 const fichier = process.argv[2];

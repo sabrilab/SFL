@@ -140,6 +140,14 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
         )
       )}
 
+      {/* « Je viens » sans équipe : remplaçants, ils ne disparaissent pas de la liste. */}
+      {p.remplacants.length > 0 && (
+        <div className="mt-4 border-t border-contraste/8 pt-3.5">
+          <p className="mono-label mb-2 text-foreground/40">Remplaçants · {p.remplacants.length}</p>
+          <QuiVient noms={p.remplacants} />
+        </div>
+      )}
+
       {p.shared ? (
         <p className="mono-label mt-3 flex items-center gap-1.5 text-primary">
           <Radio className="size-3" /> En direct — toute la ligue voit cette liste

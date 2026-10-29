@@ -11,7 +11,10 @@
 //   1. Les terrains. Chaque division joue sur le sien (divisions.ts), la D1
 //      sur le premier. Une division de moins de 8 joueurs rejoint sa voisine
 //      la moins remplie ; au-delà de 15, elle prend un terrain de plus, les
-//      meilleurs niveaux ensemble.
+//      meilleurs niveaux ensemble. Jamais plus de TERRAINS_MAX terrains
+//      (incident de la J4, 29/10) : au-delà, les divisions voisines jouent
+//      ensemble au lieu d'ouvrir un terrain, et qui ne tient pas dans les
+//      places (TERRAINS_MAX × 15) reste remplaçant, dans l'ordre d'arrivée.
 //   2. Le niveau de chacun : la note de sa carte et ses points Pépite par
 //      match, à parts égales, en écarts à la moyenne de ceux qui viennent. Les
 //      points par match prennent la saison entière et les saisons d'avant pour
@@ -26,7 +29,11 @@
 //
 // Les réponses tardives (completer) : un nouveau venu entre sur le terrain de
 // sa division, dans l'équipe qui a le moins de joueurs, sans rien rebattre ;
-// qui se désiste en sort.
+// qui se désiste en sort. completer ne crée jamais d'équipe ni de terrain :
+// un terrain plein (15) ne prend plus personne, et le retardataire reste
+// remplaçant jusqu'à ce qu'une place se libère. C'est tout ce que peut faire
+// le téléphone d'un joueur (/api/divisions/equipes) ; composer est réservé
+// au cron du vendredi et à l'admin.
 //
 // Le calendrier (bas du fichier) : les équipes se composent le vendredi à
 // 18 h, une heure avant d'être révélées (convocation-temps.ts), avec toutes
@@ -48,8 +55,17 @@ import { equipesDuMatch } from "./saisie/equipes";
 import { journeeJouee, journeeTerminee, saisonDepuisArchive } from "./saisie/mutations";
 import type { ConvocationTeam, Saison } from "./saisie/types";
 
+/**
+ * Le nombre de terrains du dimanche, au plus (l'Hippodrome). Seul endroit à
+ * changer : composer, completer, l'aperçu et les confirmations de l'admin le
+ * lisent tous ici. 2 en attendant la réponse de Sabri (incident de la J4,
+ * 29/10 : un terrain par division, plus un au-delà de 15 joueurs, et rien ne
+ * limitait leur nombre). À CONFIRMER PAR SABRI.
+ */
+export const TERRAINS_MAX = 2;
+
 export const REGLES_EQUIPES = {
-  /** Au-delà, une division prend un terrain de plus. */
+  /** Au-delà, une division prend un terrain de plus ; c'est aussi le plein d'un terrain (TERRAINS_MAX). */
   maxParTerrain: 15,
   /** En dessous, une division joue avec sa voisine. */
   minParTerrain: 8,
@@ -85,6 +101,8 @@ export interface Composition {
   terrains: TerrainCompose[];
   /** Les équipes dans l'ordre des terrains : ce que la convocation garde. */
   teams: ConvocationTeam[];
+  /** Ceux qui viennent sans place sur les TERRAINS_MAX terrains, dans l'ordre d'arrivée. */
+  remplacants: string[];
   niveaux: Map<string, Niveau>;
 }
 
@@ -194,8 +212,8 @@ const parNiveau = (a: Niveau, b: Niveau) => b.valeur - a.valeur || a.nom.localeC
 
 const lesDivisions = (joueurs: Niveau[]) => [...new Set(joueurs.map((p) => p.division))].sort((a, b) => a - b);
 
-/** Qui joue sur quel terrain : une division par terrain, sauf trop courte ou trop pleine. */
-export function repartirSurTerrains(joueurs: Niveau[]): Niveau[][] {
+/** Une division par terrain, sauf trop courte ou trop pleine : le calcul sans plafond. */
+function parDivision(joueurs: Niveau[]): Niveau[][] {
   const { minParTerrain, maxParTerrain } = REGLES_EQUIPES;
   const groupes = DIVISIONS.map((d) => joueurs.filter((p) => p.division === d)).filter((g) => g.length > 0);
   // La plus courte des divisions trop courtes rejoint sa voisine la moins
@@ -209,20 +227,70 @@ export function repartirSurTerrains(joueurs: Niveau[]): Niveau[][] {
     groupes.splice(debut, 2, [...groupes[debut], ...groupes[debut + 1]]);
   }
   // Trop pleine : un terrain de plus, par tranches de niveau.
-  return groupes.flatMap((g) => {
-    const n = Math.ceil(g.length / maxParTerrain);
-    if (n <= 1) return [g];
-    const tries = [...g].sort(parNiveau);
-    const base = Math.floor(tries.length / n);
-    const reste = tries.length % n;
-    const out: Niveau[][] = [];
-    for (let t = 0, debut = 0; t < n; t++) {
-      const taille = base + (t < reste ? 1 : 0);
-      out.push(tries.slice(debut, debut + taille));
-      debut += taille;
+  return groupes.flatMap((g) => trancher([...g].sort(parNiveau), Math.ceil(g.length / maxParTerrain)));
+}
+
+/** `tries` en `n` tranches qui se suivent, les plus grandes d'abord. */
+function trancher(tries: Niveau[], n: number): Niveau[][] {
+  if (n <= 1) return [tries];
+  const base = Math.floor(tries.length / n);
+  const reste = tries.length % n;
+  const out: Niveau[][] = [];
+  for (let t = 0, debut = 0; t < n; t++) {
+    const taille = base + (t < reste ? 1 : 0);
+    out.push(tries.slice(debut, debut + taille));
+    debut += taille;
+  }
+  return out;
+}
+
+/**
+ * Trop de terrains pour `plafond` : les divisions voisines se regroupent,
+ * dans l'ordre D1, D2, D3. D'abord des divisions entières, la paire voisine
+ * la moins remplie à chaque fois, si chaque terrain tient alors (8 à 15) ;
+ * sinon l'échelle entière (la D1, puis la D2, puis la D3, les meilleurs
+ * d'abord dans chacune) coupée en tranches égales qui se suivent.
+ */
+function regrouper(joueurs: Niveau[], plafond: number): Niveau[][] {
+  const { minParTerrain, maxParTerrain } = REGLES_EQUIPES;
+  const groupes = DIVISIONS.map((d) => joueurs.filter((p) => p.division === d)).filter((g) => g.length > 0);
+  while (groupes.length > plafond) {
+    let i = 0;
+    for (let k = 1; k < groupes.length - 1; k++) {
+      if (groupes[k].length + groupes[k + 1].length < groupes[i].length + groupes[i + 1].length) i = k;
     }
-    return out;
-  });
+    groupes.splice(i, 2, [...groupes[i], ...groupes[i + 1]]);
+  }
+  const tiennent = groupes.every((g) => g.length <= maxParTerrain && (g.length >= minParTerrain || groupes.length === 1));
+  if (tiennent) return groupes;
+  const echelle = DIVISIONS.flatMap((d) => joueurs.filter((p) => p.division === d).sort(parNiveau));
+  return trancher(echelle, Math.min(plafond, Math.ceil(echelle.length / maxParTerrain)));
+}
+
+export interface Repartition {
+  /** Les terrains, TERRAINS_MAX au plus, la D1 sur le premier. */
+  terrains: Niveau[][];
+  /** Ceux qui n'ont pas de place : les derniers arrivés. */
+  remplacants: Niveau[];
+}
+
+/**
+ * Qui joue sur quel terrain. `joueurs` dans l'ordre d'arrivée : quand les
+ * places manquent (plafond × 15), les premiers arrivés jouent, les autres
+ * sont remplaçants. Jamais plus de `plafond` terrains.
+ */
+export function repartir(joueurs: Niveau[], plafond: number = TERRAINS_MAX): Repartition {
+  const max = Math.max(1, Math.floor(plafond));
+  const places = max * REGLES_EQUIPES.maxParTerrain;
+  const retenus = joueurs.slice(0, places);
+  const remplacants = joueurs.slice(places);
+  const libres = parDivision(retenus);
+  return { terrains: libres.length <= max ? libres : regrouper(retenus, max), remplacants };
+}
+
+/** Qui joue sur quel terrain, sans les remplaçants (repartir). */
+export function repartirSurTerrains(joueurs: Niveau[], plafond: number = TERRAINS_MAX): Niveau[][] {
+  return repartir(joueurs, plafond).terrains;
 }
 
 /* ------------------------------- Les équipes ------------------------------- */
@@ -317,15 +385,26 @@ function ordreDeJeu(joueurs: Niveau[], fiche: Map<string, string>): string[] {
 }
 
 /**
- * Les équipes du dimanche pour `venus` (dans n'importe quel ordre ; les
- * joueurs masqués n'y entrent pas), d'après les divisions de `etat`.
+ * Les équipes du dimanche pour `venus`, d'après les divisions de `etat` ; les
+ * joueurs masqués n'y entrent pas. `venus` dans l'ordre d'arrivée
+ * (ordreDArrivee) : tant que tout le monde a sa place, l'ordre ne change
+ * rien ; au-delà de `plafond` terrains pleins, les derniers arrivés sont
+ * remplaçants.
  */
-export function composer(saison: Saison, venus: string[], etat: EtatDivisions | null): Composition {
-  const noms = [...new Set(venus)].filter((n) => !isHidden(n)).sort((a, b) => a.localeCompare(b, "fr"));
+export function composer(saison: Saison, venus: string[], etat: EtatDivisions | null, plafond: number = TERRAINS_MAX): Composition {
+  const arrivee = [...new Set(venus)].filter((n) => !isHidden(n));
+  const noms = [...arrivee].sort((a, b) => a.localeCompare(b, "fr"));
   const parNom = niveaux(saison, noms, etat);
   const h = historique(saison);
   const fiche = new Map(saison.roster.map((r) => [r.name, r.poste ?? ""]));
-  const groupes = repartirSurTerrains([...parNom.values()]).filter((g) => g.length >= 2);
+  const repartition = repartir(
+    arrivee.map((n) => parNom.get(n)!),
+    plafond
+  );
+  // Un terrain d'un seul joueur ne fait pas de match : il attend avec les remplaçants.
+  const groupes = repartition.terrains.filter((g) => g.length >= 2);
+  const seuls = repartition.terrains.filter((g) => g.length < 2).flat();
+  const remplacants = arrivee.filter((n) => [...seuls, ...repartition.remplacants].some((p) => p.nom === n));
   const couleurs = nomsDEquipes(groupes.length * 2);
   const terrains: TerrainCompose[] = groupes.map((g, t) => {
     const tries = [...g].sort(parNiveau);
@@ -339,7 +418,7 @@ export function composer(saison: Saison, venus: string[], etat: EtatDivisions | 
       ecart,
     };
   });
-  return { terrains, teams: terrains.flatMap((t) => t.equipes), niveaux: parNom };
+  return { terrains, teams: terrains.flatMap((t) => t.equipes), remplacants, niveaux: parNom };
 }
 
 /* -------------------------- Les réponses tardives -------------------------- */
@@ -349,13 +428,16 @@ export function composer(saison: Saison, venus: string[], etat: EtatDivisions | 
  * se désiste sort ; un nouveau venu entre sur le terrain de sa division (le
  * plus proche de son niveau s'il y en a deux, le plus proche tout court si sa
  * division n'a pas de terrain), dans l'équipe qui a le moins de joueurs, la
- * plus faible à égalité. Un terrain qui se retrouve à deux joueurs d'écart
- * en fait passer un, celui qui équilibre le mieux. null si rien ne change.
+ * plus faible à égalité. Un terrain plein (15) ne prend plus personne : sans
+ * place libre, le nouveau venu reste remplaçant. `venus` dans l'ordre
+ * d'arrivée : les places libres vont aux premiers arrivés. Jamais d'équipe ni
+ * de terrain de plus. Un terrain qui se retrouve à deux joueurs d'écart en
+ * fait passer un, celui qui équilibre le mieux. null si rien ne change.
  */
 export function completer(saison: Saison, teams: ConvocationTeam[], venus: string[], etat: EtatDivisions | null): ConvocationTeam[] | null {
   const ici = new Set(venus.filter((n) => !isHidden(n)));
   const places = new Set(teams.flatMap((t) => t.players));
-  const nouveaux = [...ici].filter((n) => !places.has(n)).sort((a, b) => a.localeCompare(b, "fr"));
+  const nouveaux = [...ici].filter((n) => !places.has(n));
   const partis = [...places].filter((n) => !ici.has(n));
   if (!nouveaux.length && !partis.length) return null;
 
@@ -366,17 +448,31 @@ export function completer(saison: Saison, teams: ConvocationTeam[], venus: strin
   const paires = Array.from({ length: Math.floor(out.length / 2) }, (_, i) => [out[i * 2], out[i * 2 + 1]] as const);
   if (!paires.length) return null;
 
-  for (const nom of [...nouveaux].sort((a, b) => valeur(b) - valeur(a) || a.localeCompare(b, "fr"))) {
+  // Les places, dans l'ordre d'arrivée : chacun choisit son terrain parmi
+  // ceux qui ont encore de la place.
+  const tous = (p: (typeof paires)[number]) => [...p[0].players, ...p[1].players];
+  const charge = paires.map((p) => tous(p).length);
+  const admis = paires.map(() => [] as string[]);
+  for (const nom of nouveaux) {
     const division = etat ? divisionDe(etat, nom) : 3;
-    const tous = (p: (typeof paires)[number]) => [...p[0].players, ...p[1].players];
-    const siens = paires.filter((p) => tous(p).some((n) => (parNom.get(n)?.division ?? 3) === division));
-    const terrain = (siens.length ? siens : paires)
-      .map((p, i) => ({ p, i, d: Math.abs(moy(tous(p)) - valeur(nom)) }))
-      .sort((x, y) => x.d - y.d || x.i - y.i)[0].p;
-    const [a, b] = terrain;
-    const cible = a.players.length !== b.players.length ? (a.players.length < b.players.length ? a : b) : moy(a.players) <= moy(b.players) ? a : b;
-    cible.players.push(nom);
+    const libres = paires.map((p, i) => ({ p, i })).filter(({ i }) => charge[i] < REGLES_EQUIPES.maxParTerrain);
+    if (!libres.length) continue;
+    const siens = libres.filter(({ p }) => tous(p).some((n) => (parNom.get(n)?.division ?? 3) === division));
+    const { i } = (siens.length ? siens : libres)
+      .map((x) => ({ ...x, d: Math.abs(moy(tous(x.p)) - valeur(nom)) }))
+      .sort((x, y) => x.d - y.d || x.i - y.i)[0];
+    charge[i]++;
+    admis[i].push(nom);
   }
+  if (!partis.length && admis.every((a) => !a.length)) return null;
+
+  // Sur chaque terrain, les admis entrent du plus fort au moins fort.
+  paires.forEach(([a, b], i) => {
+    for (const nom of [...admis[i]].sort((x, y) => valeur(y) - valeur(x) || x.localeCompare(y, "fr"))) {
+      const cible = a.players.length !== b.players.length ? (a.players.length < b.players.length ? a : b) : moy(a.players) <= moy(b.players) ? a : b;
+      cible.players.push(nom);
+    }
+  });
 
   for (const [a, b] of paires) {
     while (Math.abs(a.players.length - b.players.length) >= 2) {
@@ -390,6 +486,56 @@ export function completer(saison: Saison, teams: ConvocationTeam[], venus: strin
     }
   }
   return out;
+}
+
+/* ------------------------------ L'ordre d'arrivée ------------------------------ */
+
+/**
+ * Ceux qui viennent, dans l'ordre où les places leur reviennent : les joueurs
+ * que l'admin a posés sur la feuille d'abord (sa parole), puis les « Je
+ * viens » du premier au dernier (`quand` : l'heure de la réponse, ISO ; sans
+ * heure, après les autres, dans l'ordre donné).
+ */
+export function ordreDArrivee(presents: string[], feuille: string[], quand: (nom: string) => string | null | undefined): string[] {
+  const rang = new Map(presents.map((n, i) => [n, i]));
+  const parHeure = [...presents].sort((a, b) => {
+    const x = quand(a) ?? "\uffff";
+    const y = quand(b) ?? "\uffff";
+    return x < y ? -1 : x > y ? 1 : rang.get(a)! - rang.get(b)!;
+  });
+  return [...new Set([...feuille, ...parHeure])];
+}
+
+/* ------------------------------ Les confirmations ------------------------------ */
+
+export interface Resume {
+  equipes: number;
+  /** Un terrain par paire d'équipes. */
+  terrains: number;
+  /** Ceux qui viennent sans être dans une équipe : les remplaçants. */
+  sansEquipe: string[];
+  /** Plus de terrains que TERRAINS_MAX. */
+  auDela: boolean;
+}
+
+/** Ce que des équipes font de ceux qui viennent : de quoi le dire avant d'écrire. */
+export function resumer(teams: ConvocationTeam[], venus: string[], plafond: number = TERRAINS_MAX): Resume {
+  const dedans = new Set(teams.flatMap((t) => t.players));
+  const terrains = Math.floor(teams.length / 2);
+  return {
+    equipes: teams.length,
+    terrains,
+    sansEquipe: [...new Set(venus)].filter((n) => !isHidden(n) && !dedans.has(n)),
+    auDela: terrains > plafond,
+  };
+}
+
+const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`;
+
+/** « 4 équipes sur 2 terrains, 3 joueurs sans équipe : continuer ? » */
+export function questionDeComposition(r: Resume): string {
+  const sans = r.sansEquipe.length ? `${pluriel(r.sansEquipe.length, "joueur")} sans équipe` : "chacun a son équipe";
+  return `${pluriel(r.equipes, "équipe")} sur ${pluriel(r.terrains, "terrain")}, ${sans} : continuer ?`;
 }
 
 /* ------------------------------- Les étiquettes ------------------------------- */
