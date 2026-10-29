@@ -13,7 +13,6 @@ import { useState } from "react";
 import { MiniCarte, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { carteNeutre } from "@/components/sfl/qui-vient";
 import { useSeason } from "@/components/sfl/season-provider";
-import { Nom } from "@/components/sfl/nom";
 import { ChoisirJoueurs } from "@/components/sfl/admin/choisir-joueurs";
 import { entryPP } from "@/lib/sfl/saisie/engine";
 import type { EquipeDuJour } from "@/lib/sfl/saisie/equipes";
@@ -104,8 +103,7 @@ export function FeuilleLigne({
         <div className="flex items-center gap-4">
           <MiniCarte player={player} size={FORMAT_CARTE.moyenne} maillot={sienne?.camp ?? undefined} />
           <div className="flex min-w-0 flex-col gap-1">
-            <span className="truncate text-[18px] font-bold"><Nom n={e.player} /></span>
-            <span className="mono-label text-foreground/55">{sienne?.libelle ?? "Sans équipe"}</span>
+            <span className="mono-label text-foreground/75">{sienne?.libelle ?? "Sans équipe"}</span>
           </div>
         </div>
 

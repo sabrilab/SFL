@@ -105,7 +105,8 @@ export function FeuillePublier({
       {defauts.length ? (
         <div className="flex flex-wrap gap-1.5">
           {defauts.map((d) => (
-            <span key={libelleEcart(d)} className="mono-label rounded-full px-3 py-1.5 line-through decoration-2 shadow-[inset_0_0_0_1px_currentColor]">
+            <span key={libelleEcart(d)} className="mono-label inline-flex items-center gap-1.5 rounded-full bg-foreground px-3 py-1.5 text-background">
+              <span aria-hidden>!</span>
               {libelleEcart(d)}
             </span>
           ))}

@@ -42,7 +42,7 @@ import { placementsDeLaJournee } from "@/lib/sfl/saisie/effectif";
 import { etatJournee, gesteDuMoment, prochaineJournee } from "@/lib/sfl/saisie/etat-journee";
 import { verifierFeuille } from "@/lib/sfl/saisie/integrite";
 import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
-import { addEntry, ajouterMatch, matchsDeclares, newEntry, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
+import { addEntry, ajouterMatch, matchsDeclares, memeDate, newEntry, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
 import { saisieStore } from "@/lib/sfl/saisie/store";
 import type { MatchDuJour } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
@@ -97,7 +97,13 @@ export function PageJournee() {
   const etat = j != null && meta ? etatJournee(saison, j, maintenant) : "brouillon";
   const geste = gesteDuMoment(saison, meta ? j : null, maintenant);
   const par = me ?? "admin";
-  const viens = useMemo(() => new Set([...presence.presents, ...presence.remplacants]), [presence.presents, presence.remplacants]);
+  // La convocation n'est celle de la journée ouverte que si c'est son dimanche :
+  // sinon ses « Je viens » et son « Il manque N » parleraient d'un autre jour.
+  const convocationDuJour = !!meta && memeDate(presence.jour.replace(/^\D+/, ""), meta.date);
+  const viens = useMemo(
+    () => (convocationDuJour ? new Set([...presence.presents, ...presence.remplacants]) : new Set<string>()),
+    [convocationDuJour, presence.presents, presence.remplacants]
+  );
 
   // Hors des camps : les lignes sans équipe (remplaçants), puis les « Je viens » pas encore sur la feuille.
   const camps = new Set(declares.flatMap((m) => m.equipes));
@@ -108,7 +114,7 @@ export function PageJournee() {
   const frise = useRef<HTMLDivElement>(null);
   useEffect(() => {
     frise.current?.querySelector<HTMLElement>("[aria-current='true']")?.scrollIntoView({ inline: "center", block: "nearest" });
-  }, [j]);
+  }, [j, isClient]);
 
   if (!isClient) return null;
   if (!isAdmin(me)) {
@@ -257,7 +263,7 @@ export function PageJournee() {
             )
           ) : (
             <>
-              {(etat === "brouillon" || etat === "en-ligne") && (
+              {convocationDuJour && (etat === "brouillon" || etat === "en-ligne") && (
                 <BlocConvocation presence={presence} matchs={Math.max(1, matchs.length)} onOuvrir={() => setConvocation(true)} />
               )}
 
@@ -269,7 +275,9 @@ export function PageJournee() {
                 onCourant={setMatchCourant}
                 onPlus={(equipe) => setAjouterA(equipe)}
                 onCarte={setLigne}
-                onAjouterMatch={ajouterUnMatch}
+                // Pas de match de plus une fois le coup d'envoi passé : c'est ainsi
+                // qu'étaient nés les matchs 5 et 6 de la J3, déjà jouée (28/10).
+                onAjouterMatch={etat === "brouillon" || etat === "en-ligne" ? ajouterUnMatch : undefined}
                 onReglerMatch={(n) => setQuandOu(n)}
                 onArbitre={(n) => setArbitre(n)}
                 arbitre={(n) => declares[n - 1]?.arbitre ?? null}

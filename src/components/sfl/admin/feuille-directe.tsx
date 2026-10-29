@@ -91,7 +91,12 @@ interface Props {
   commit: (next: Saison, label: string) => void;
 }
 
-export function FeuilleDirecte({ saison, commit, jInitial }: Props & { jInitial?: number }) {
+/**
+ * `embarque` : dans le Direct de la page Journée (journee/feuille-direct.tsx),
+ * qui porte déjà la journée et un tableau d'affichage par match : ni le choix
+ * de la journée ni un second tableau.
+ */
+export function FeuilleDirecte({ saison, commit, jInitial, embarque = false }: Props & { jInitial?: number; embarque?: boolean }) {
   const journees = useMemo(() => [...saison.journees].sort((a, b) => b.j - a.j), [saison.journees]);
   // La journée du jour ou la prochaine ; jamais d'office la dernière jouée.
   const [j, setJ] = useState<number>(() => jInitial ?? prochaineJournee(saison, new Date()) ?? journees[0]?.j ?? 1);
@@ -140,37 +145,39 @@ export function FeuilleDirecte({ saison, commit, jInitial }: Props & { jInitial?
   return (
     <div className="flex flex-col gap-3">
       {/* Journée + tableau d'affichage */}
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={j}
-          onChange={(e) => setJ(Number(e.target.value))}
-          className="glass-soft h-9 cursor-pointer rounded-full px-3.5 text-[13px] font-bold outline-none"
-        >
-          {journees.map((m) => (
-            <option key={m.j} value={m.j} className="bg-white text-[#08090b] dark:bg-[#141414] dark:text-white">
-              Journée {m.j} · {m.date}
-            </option>
-          ))}
-        </select>
-        <div className="glass flex min-w-0 flex-1 items-center justify-center gap-3 rounded-full px-4 py-2">
-          {scores.length === 0 ? (
-            <span className="text-[12.5px] text-foreground/40">Pas encore d&apos;équipes</span>
-          ) : (
-            <>
-              {nbMatchs > 1 && active?.match != null && (
-                <span className="mono-label text-foreground/40">Match {active.match}</span>
-              )}
-              {scores.map((x, i) => (
-                <span key={x.nom} className="flex items-center gap-2">
-                  {i > 0 && <span className="text-foreground/25">—</span>}
-                  {x.camp && <PointMaillot camp={x.camp} />}
-                  <span className="text-[17px] font-extrabold tabular-nums">{x.buts}</span>
-                </span>
-              ))}
-            </>
-          )}
+      {!embarque && (
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={j}
+            onChange={(e) => setJ(Number(e.target.value))}
+            className="glass-soft h-9 cursor-pointer rounded-full px-3.5 text-[13px] font-bold outline-none"
+          >
+            {journees.map((m) => (
+              <option key={m.j} value={m.j} className="bg-white text-[#08090b] dark:bg-[#141414] dark:text-white">
+                Journée {m.j} · {m.date}
+              </option>
+            ))}
+          </select>
+          <div className="glass flex min-w-0 flex-1 items-center justify-center gap-3 rounded-full px-4 py-2">
+            {scores.length === 0 ? (
+              <span className="text-[12.5px] text-foreground/40">Pas encore d&apos;équipes</span>
+            ) : (
+              <>
+                {nbMatchs > 1 && active?.match != null && (
+                  <span className="mono-label text-foreground/40">Match {active.match}</span>
+                )}
+                {scores.map((x, i) => (
+                  <span key={x.nom} className="flex items-center gap-2">
+                    {i > 0 && <span className="text-foreground/25">—</span>}
+                    {x.camp && <PointMaillot camp={x.camp} />}
+                    <span className="text-[17px] font-extrabold tabular-nums">{x.buts}</span>
+                  </span>
+                ))}
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Le match qu'on suit, un jour à plusieurs matchs */}
       {nbMatchs > 1 && (

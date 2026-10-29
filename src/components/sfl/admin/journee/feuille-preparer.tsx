@@ -53,7 +53,8 @@ export function FeuillePreparer({
 }) {
   const dimanches = useMemo(() => dimanchesAVenir(), []);
   const avant = [...saison.journees].sort((a, b) => b.j - a.j)[0];
-  const [date, setDate] = useState(dimanches[0]);
+  // Le premier dimanche encore libre : toucher « J10 + » prépare la J10, pas la J9 déjà posée.
+  const [date, setDate] = useState(() => dimanches.find((d) => !journeeDeLaDate(saison, d)) ?? dimanches[0]);
   const [heure, setHeure] = useState(avant?.heure ?? "12h30");
   const [terrainId, setTerrainId] = useState<number | undefined>(avant?.terrainId ?? saison.terrains?.find((t) => t.defaut)?.id);
   const [matchs, setMatchs] = useState(Math.min(TERRAINS_MAX, Math.max(1, Math.round(viennent / 10)) || 1));

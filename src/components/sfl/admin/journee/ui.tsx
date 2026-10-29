@@ -195,7 +195,7 @@ export function Feuille({
           haute && "data-[side=bottom]:h-[92dvh]"
         )}
       >
-        <SheetHeader className="items-start gap-2 px-5 pt-5 pr-14 pb-3">
+        <SheetHeader className="items-start gap-2 px-5 pt-8 pr-14 pb-3">
           <SheetTitle className="text-[26px] leading-tight font-bold tracking-tight">{titre}</SheetTitle>
           {etat}
         </SheetHeader>

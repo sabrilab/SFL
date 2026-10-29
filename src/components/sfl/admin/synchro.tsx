@@ -168,7 +168,8 @@ export function Synchro({ saison, nu = false }: { saison: Saison; nu?: boolean }
       {feuille?.length ? (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {feuille.map((d) => (
-            <span key={d} className="mono-label rounded-full px-3 py-1.5 text-foreground line-through decoration-2 shadow-[inset_0_0_0_1px_currentColor]">
+            <span key={d} className="mono-label inline-flex items-center gap-1.5 rounded-full bg-foreground px-3 py-1.5 text-background">
+              <span aria-hidden>!</span>
               {lireDefaut(d)}
             </span>
           ))}
@@ -181,7 +182,7 @@ export function Synchro({ saison, nu = false }: { saison: Saison; nu?: boolean }
         <button
           onClick={() => void publier()}
           disabled={occupe || !!empeche}
-          className="bouton-principal flex h-12 flex-1 items-center justify-center gap-2 text-[15px] font-semibold disabled:opacity-40"
+          className="bouton-principal flex h-12 shrink-0 items-center justify-center gap-2 text-[15px] font-semibold disabled:opacity-40 sm:flex-1"
         >
           {etat.phase === "envoi" ? "Envoi…" : "Renvoyer"}
         </button>

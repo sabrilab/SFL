@@ -6,7 +6,8 @@
 // libre est un « + » : il ouvre le sélecteur de joueurs, pour ce camp. Le
 // dernier segment, en pointillé, est « + Match N » : le seul chemin vers un
 // match de plus (30/10/2026). Un segment porte « ! » quand son match a un
-// défaut ; le défaut se lit sur l'objet, barré.
+// défaut ; le défaut se lit au-dessus du terrain, en pastille inversée
+// « ! ADIL ×2 » (barré, on le lisait comme déjà réglé).
 
 import { useMemo } from "react";
 import { TerrainPlaces, type Occupant } from "@/components/sfl/matchs/terrain-places";
@@ -131,9 +132,10 @@ export function BlocMatchs({
                 key={libelleEcart(e)}
                 type="button"
                 onClick={() => (i != null ? onCarte?.(i) : "match" in e ? onCourant(e.match) : undefined)}
-                className="mono-label rounded-full px-3 py-1.5 text-foreground line-through decoration-2 shadow-[inset_0_0_0_1px_currentColor]"
+                className="mono-label inline-flex items-center gap-1.5 rounded-full bg-foreground px-3 py-1.5 text-background"
               >
-                {libelleEcart(e)}
+                <span aria-hidden>!</span>
+              {libelleEcart(e)}
               </button>
             );
           })}
@@ -162,14 +164,17 @@ export function BlocMatchs({
               <PastilleMaillot camp="Blancs" />
             </div>
           )}
+          <p className="mono-label -mb-1 text-center text-foreground/55">
+            {mv.m.equipes[0]} · {mv.noirs.length}
+          </p>
           <TerrainPlaces
             places={places}
             occupants={occupants}
             onPlus={onPlus ? (_i, devant) => onPlus(devant ? mv.m.equipes[1] : mv.m.equipes[0]) : undefined}
             onOccupant={onCarte ? (o) => onCarte(Number(o.cle)) : undefined}
           />
-          <p className="mono-label text-center text-foreground/45">
-            ● {mv.noirs.length} · ○ {mv.blancs.length}
+          <p className="mono-label -mt-1 text-center text-foreground/55">
+            {mv.m.equipes[1]} · {mv.blancs.length}
           </p>
         </>
       ) : (

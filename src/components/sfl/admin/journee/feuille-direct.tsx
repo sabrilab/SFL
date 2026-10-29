@@ -59,7 +59,7 @@ export function FeuilleDirect({
             );
           })}
       </div>
-      <FeuilleDirecte key={j} saison={saison} jInitial={j} commit={(next, label) => void commit(next, label)} />
+      <FeuilleDirecte key={j} saison={saison} jInitial={j} embarque commit={(next, label) => void commit(next, label)} />
     </Feuille>
   );
 }
