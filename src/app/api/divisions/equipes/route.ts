@@ -8,12 +8,18 @@
 //   · le téléphone d'un joueur qui vient de répondre à la convocation, et
 //     l'app à son ouverture pendant le week-end (lib/sfl/divisions-equipes.ts) :
 //     les équipes faites, un nouveau venu y entre et qui se désiste en sort
-//     (completer), sans rien rebattre ; si le cron a manqué son heure, le
-//     premier appel compose.
+//     (completer), sans rien rebattre. Depuis l'incident de la J4 (29/10),
+//     un téléphone ne compose plus jamais : sans équipes, il attend le cron
+//     ou l'admin (« Composer maintenant »). Il ne crée ni équipe ni terrain ;
+//     un terrain plein laisse le retardataire remplaçant.
 //
-// Ceux qui viennent : les « Je viens » de la convocation, et les joueurs que
-// l'admin a posés sur la feuille de la journée (presence-feuille.ts), comme
-// l'app les compte. Rien avant le vendredi 18 h (heure de Paris), rien après
+// Le cron recompose aussi des équipes qui prennent plus de TERRAINS_MAX
+// terrains (equipes-division.ts) : c'est ce qui s'est passé pour la J4.
+//
+// Ceux qui viennent : les joueurs que l'admin a posés sur la feuille de la
+// journée (presence-feuille.ts), puis les « Je viens » de la convocation dans
+// l'ordre des réponses (ordreDArrivee) : quand les places manquent, les
+// derniers arrivés sont remplaçants. Rien avant le vendredi 18 h (heure de Paris), rien après
 // le coup d'envoi ; rien hors des divisions (saison coupée, convocation de la
 // J4 ou après, pas encore jouée) ; rien non plus quand l'admin a déjà fait
 // les équipes sur la feuille : la feuille est sa parole.
@@ -36,6 +42,8 @@ import {
   divisionsDeLaJournee,
   equipesEnCours,
   journeeDeConvocation,
+  ordreDArrivee,
+  TERRAINS_MAX,
 } from "@/lib/sfl/equipes-division";
 import { isHidden } from "@/lib/sfl/hidden";
 import { joueursDeLaFeuille } from "@/lib/sfl/presence-feuille";
@@ -50,12 +58,17 @@ type Statut =
   | "sans-convocation"
   | "sans-divisions"
   | "feuille-de-l-admin"
+  | "en-attente-des-equipes"
   | "composees"
   | "ajustees"
   | "a-jour"
   | "erreur";
 
-async function ajuster(sb: SupabaseClient): Promise<{ statut: Statut; equipes?: number }> {
+/**
+ * `composer` : le cron seul. Un téléphone (POST) ne fait que compléter les
+ * équipes qui existent.
+ */
+async function ajuster(sb: SupabaseClient, peutComposer: boolean): Promise<{ statut: Statut; equipes?: number }> {
   const { data: convocations } = await sb
     .from("convocations")
     .select("id, date_label, heure, teams")
@@ -86,22 +99,31 @@ async function ajuster(sb: SupabaseClient): Promise<{ statut: Statut; equipes?: 
   const feuille = joueursDeLaFeuille(saison, j);
   if (feuille.equipes) return { statut: "feuille-de-l-admin" };
 
-  // Ceux qui viennent, comme l'app les compte (use-presence.ts) : les « Je
-  // viens » de l'effectif, puis ceux de la feuille.
+  // Ceux qui viennent, comme l'app les compte (use-presence.ts) : ceux de la
+  // feuille, puis les « Je viens » de l'effectif, du premier au dernier.
   const { data: lignes } = await sb
     .from("presence")
-    .select("profiles ( name )")
+    .select("updated_at, profiles ( name )")
     .eq("convocation_id", conv.id)
-    .eq("reponse", "present");
+    .eq("reponse", "present")
+    .order("updated_at", { ascending: true });
   const effectif = new Set(saison.roster.map((r) => r.name));
+  const quand = new Map<string, string>();
   const nomDe = (l: unknown) => {
-    const p = (l as { profiles?: { name?: string } | { name?: string }[] | null }).profiles;
-    return (Array.isArray(p) ? p[0]?.name : p?.name) ?? null;
+    const ligne = l as { updated_at?: string; profiles?: { name?: string } | { name?: string }[] | null };
+    const p = ligne.profiles;
+    const nom = (Array.isArray(p) ? p[0]?.name : p?.name) ?? null;
+    if (nom && ligne.updated_at) quand.set(nom, ligne.updated_at);
+    return nom;
   };
   const presents = ((lignes ?? []) as unknown[]).map(nomDe).filter((n): n is string => !!n && effectif.has(n));
-  const venus = [...new Set([...presents, ...feuille.noms])].filter((n) => !isHidden(n));
+  const venus = ordreDArrivee(presents, feuille.noms, (n) => quand.get(n)).filter((n) => !isHidden(n));
 
-  if (!conv.teams?.length) {
+  // Des équipes sur plus de terrains que l'Hippodrome n'en a (la J4, avant
+  // le plafond) : le cron les refait. Un téléphone n'y touche pas.
+  const tropDeTerrains = !!conv.teams && Math.floor(conv.teams.length / 2) > TERRAINS_MAX;
+  if (!conv.teams?.length || (peutComposer && tropDeTerrains)) {
+    if (!peutComposer) return { statut: "en-attente-des-equipes" };
     const { teams } = composer(saison, venus, etat);
     if (teams.length < 2) return { statut: "a-jour", equipes: 0 };
     const ecrire = sb.from("convocations").update({ teams }).eq("id", conv.id);
@@ -124,7 +146,7 @@ export async function GET(req: NextRequest) {
   }
   const sb = serveur();
   if (!sb) return NextResponse.json({ statut: "pas-branche" }, { status: 503 });
-  return NextResponse.json(await ajuster(sb));
+  return NextResponse.json(await ajuster(sb, true));
 }
 
 /** Un téléphone de la ligue, après une réponse ou à l'ouverture. */
@@ -135,5 +157,6 @@ export async function POST(req: NextRequest) {
   if (!moi) return NextResponse.json({ error: "Session requise." }, { status: 401 });
   const { data: profil } = await sb.from("profiles").select("valide").eq("id", moi.id).maybeSingle();
   if (!profil?.valide) return NextResponse.json({ error: "Réservé aux joueurs de la ligue." }, { status: 403 });
-  return NextResponse.json(await ajuster(sb));
+  // Un téléphone complète, ne compose jamais.
+  return NextResponse.json(await ajuster(sb, false));
 }
