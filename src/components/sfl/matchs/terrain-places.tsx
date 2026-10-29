@@ -72,8 +72,8 @@ export function TerrainPlaces({
   occupants: Occupant[];
   /** Mon nom : ma carte est cerclée et dite « Toi ». */
   moi?: string;
-  /** Toucher une place libre ; sans, les + ne se touchent pas. */
-  onPlus?: () => void;
+  /** Toucher une place libre (son rang, et si elle est devant, côté clair) ; sans, les + ne se touchent pas. */
+  onPlus?: (i: number, devant: boolean) => void;
   onOccupant?: (o: Occupant) => void;
   /** Toucher une carte (autre que la mienne) la retire : une petite croix le montre. */
   retirable?: boolean;
@@ -190,7 +190,7 @@ export function TerrainPlaces({
                     <button
                       type="button"
                       disabled={!onPlus}
-                      onClick={onPlus}
+                      onClick={() => onPlus?.(i, chezMoi)}
                       aria-label="Ajouter un joueur"
                       className="grid size-[42px] place-items-center rounded-[10px] border-[1.5px] border-dashed border-contraste/45 bg-contraste/[0.06] text-contraste/80 transition-transform active:scale-95 disabled:opacity-50"
                     >

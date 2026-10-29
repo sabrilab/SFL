@@ -779,3 +779,38 @@ export function terrainDeJournee(
   const propre = meta.terrainId != null ? (saison.terrains ?? []).find((t) => t.id === meta.terrainId) : undefined;
   return propre ?? terrainDuMatch(saison, lieuConvocation);
 }
+
+/**
+ * « Fin du match · 3 – 2 » (le Direct, 30/10/2026) : pose la victoire, la
+ * défaite ou le nul sur TOUTES les lignes présentes des deux camps, d'après
+ * le score de la feuille. Un camp n'a donc jamais deux résultats (integrite.ts, I7).
+ */
+export function finDuMatch(saison: Saison, j: number, equipes: [string, string]): Saison {
+  const m = computeJournees(saison)
+    .find((x) => x.j === j)
+    ?.matches?.find((x) => x.teamA.name === equipes[0] && x.teamB.name === equipes[1]);
+  if (!m) return saison;
+  const [a, b] = [m.teamA.score, m.teamB.score];
+  const pour = (team: string | null): MatchEntry["result"] | undefined =>
+    team === equipes[0] ? (a > b ? "Victoire" : a < b ? "Défaite" : "Nul") : team === equipes[1] ? (b > a ? "Victoire" : b < a ? "Défaite" : "Nul") : undefined;
+  return {
+    ...saison,
+    entries: saison.entries.map((e) => {
+      if (e.j !== j || e.statut !== "Présent" || e.extraTime) return e;
+      const r = pour(e.team);
+      return r ? { ...e, result: r } : e;
+    }),
+  };
+}
+
+/** L'arbitre d'un match, gardé sur la journée (en brouillon : écrit dans `arbitrages` à la publication). */
+export function poserArbitreDuMatch(saison: Saison, j: number, equipes: [string, string], arbitre: string | null): Saison {
+  const declares = matchsDeclares(saison, j);
+  const matchsDuJour = declares.map((m) => {
+    if (m.equipes[0] !== equipes[0] || m.equipes[1] !== equipes[1]) return m;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { arbitre: _avant, ...reste } = m;
+    return arbitre ? { ...reste, arbitre } : reste;
+  });
+  return { ...saison, journees: saison.journees.map((m) => (m.j === j ? { ...m, matchsDuJour } : m)) };
+}

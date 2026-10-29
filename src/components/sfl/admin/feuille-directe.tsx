@@ -23,6 +23,7 @@ import { ChangerJoueurSheet } from "@/components/sfl/admin/changer-joueur-sheet"
 import { PointMaillot } from "@/components/sfl/point-maillot";
 import { changerEquipeAt, echangerCampsAt, remplacerJoueurAt, updateEntryAt } from "@/lib/sfl/saisie/mutations";
 import { equipesDuJour } from "@/lib/sfl/saisie/equipes";
+import { prochaineJournee } from "@/lib/sfl/saisie/etat-journee";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
 /** Les quatre compteurs du direct. */
@@ -90,9 +91,10 @@ interface Props {
   commit: (next: Saison, label: string) => void;
 }
 
-export function FeuilleDirecte({ saison, commit }: Props) {
+export function FeuilleDirecte({ saison, commit, jInitial }: Props & { jInitial?: number }) {
   const journees = useMemo(() => [...saison.journees].sort((a, b) => b.j - a.j), [saison.journees]);
-  const [j, setJ] = useState<number>(() => journees[0]?.j ?? 1);
+  // La journée du jour ou la prochaine ; jamais d'office la dernière jouée.
+  const [j, setJ] = useState<number>(() => jInitial ?? prochaineJournee(saison, new Date()) ?? journees[0]?.j ?? 1);
 
   const rows = useMemo(
     () =>

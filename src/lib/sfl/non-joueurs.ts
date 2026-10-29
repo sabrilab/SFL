@@ -10,16 +10,22 @@ import { definirNonJoueurs, nonJoueursRevision } from "./hidden";
 
 const CLE = "sfl-non-joueurs";
 
-function cache(): string[] {
+/** La liste gardée de la dernière lecture ; null si la base n'a jamais répondu (la liste de départ reste). */
+function cache(): string[] | null {
   try {
-    const v = JSON.parse(localStorage.getItem(CLE) ?? "[]");
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+    const brut = localStorage.getItem(CLE);
+    if (brut === null) return null;
+    const v = JSON.parse(brut);
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : null;
   } catch {
-    return [];
+    return null;
   }
 }
 
-if (typeof window !== "undefined") definirNonJoueurs(cache());
+if (typeof window !== "undefined") {
+  const lu = cache();
+  if (lu) definirNonJoueurs(lu);
+}
 
 let enCours: Promise<void> | null = null;
 

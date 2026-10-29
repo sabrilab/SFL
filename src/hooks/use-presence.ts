@@ -94,6 +94,8 @@ export interface PresenceView {
   equipesVisibles: boolean;
   /** Les équipes composées par l'admin (null tant qu'il n'a rien validé). */
   teams: ConvocationTeam[] | null;
+  /** La convocation en base (public.convocations.id) ; null en local. L'admin y corrige une réponse. */
+  convocationId: number | null;
   /**
    * Répondre, une seule fois : « figee » si une réponse existe déjà (ici ou
    * en base), « erreur » si rien n'a pu partir.
@@ -359,6 +361,7 @@ export function usePresence(): PresenceView {
       reponsesOuvertes: ouvert,
       equipesVisibles: revele,
       teams: server.convocation.teams ?? null,
+      convocationId: server.convocation.id,
       answer,
       publish: null,
       saveTeams: session?.admin ? saveTeams : null,
@@ -385,6 +388,7 @@ export function usePresence(): PresenceView {
     reponsesOuvertes: ouvert,
     equipesVisibles: revele,
     teams: localConv?.teams ?? null,
+    convocationId: null,
     answer,
     // Publier n'a de sens que pour l'admin, connecté côté serveur.
     publish: serverActive && session?.admin ? publish : null,
