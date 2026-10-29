@@ -479,12 +479,14 @@ export function poserEquipes(
   const reste = lignes.filter((e) => !prises.has(e)).map((e) => ({ ...e, team: null }));
   const avant = s.journees.find((m) => m.j === j)?.matchsDuJour ?? [];
   const matchsDuJour = Array.from({ length: Math.floor(teams.length / 2) }, (_, n): MatchDuJour => {
-    const { heure, lieuId, terrain } = avant[n] ?? {};
+    const { heure, lieuId, terrain, arbitre } = avant[n] ?? {};
     return {
       equipes: [teams[n * 2].name, teams[n * 2 + 1].name],
       ...(heure ? { heure } : {}),
       ...(lieuId != null ? { lieuId } : {}),
       ...(terrain ? { terrain } : {}),
+      // L'arbitre désigné en brouillon reste sur son match, comme l'heure et le lieu.
+      ...(arbitre ? { arbitre } : {}),
     };
   });
   return {

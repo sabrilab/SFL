@@ -10,6 +10,8 @@ import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
 import { useArbitres } from "@/hooks/use-arbitres";
 import { designerArbitre } from "@/lib/sfl/arbitres";
+import { heuresDeJournee } from "@/lib/sfl/missions";
+import { saisieStore } from "@/lib/sfl/saisie/store";
 import { poserArbitreDuMatch } from "@/lib/sfl/saisie/mutations";
 import { numeroSaison, type MatchDuJour, type Saison } from "@/lib/sfl/saisie/types";
 import { haptique } from "@/lib/sfl/haptique";
@@ -43,7 +45,9 @@ export function FeuilleArbitre({
     haptique.choix();
     faire((s) => poserArbitreDuMatch(s, j, match.equipes, nom), `Arbitre du match ${n}`);
     if (!brouillon) {
-      const err = await designerArbitre(numeroSaison(saison), j, n - 1, [...match.equipes], nom);
+      // Les notes des joueurs ferment le mardi à minuit qui suit le match (comme l'ancien tableau).
+      const fermeLe = heuresDeJournee(saisieStore.load(), j, new Date())?.finDesNotes ?? null;
+      const err = await designerArbitre(numeroSaison(saison), j, n - 1, [...match.equipes], nom, fermeLe);
       if (err) toast(err);
     }
     onOpenChange(false);

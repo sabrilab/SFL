@@ -153,6 +153,8 @@ async function lireDocument(admin: boolean): Promise<{ data: Saison; version: nu
  */
 export type Resultat = { ok: true } | { ok: false; raison: string; conflit?: true; feuille?: string[] };
 
+const PUBLIQUE = "Cet appareil n'a que la saison des joueurs, sans les brouillons. Reprends la base avant d'écrire.";
+
 const CONFLIT =
   "Un autre admin a publié depuis ta dernière synchro. Reprends la base pour repartir de sa version, ou écrase-la avec la tienne.";
 
@@ -218,6 +220,11 @@ let fileDePublication: Promise<unknown> = Promise.resolve();
 async function publierMaintenant(saison: Saison, forcer: boolean): Promise<Resultat> {
   const empeche = blocage();
   if (empeche) return { ok: false, raison: empeche };
+  // Un appareil qui n'a lu que la saison des joueurs (saison_publique, sans
+  // les brouillons) n'écrit jamais : son document effacerait en base les
+  // journées en brouillon, à version égale. « Écraser » n'y peut rien ;
+  // « Reprendre la base » relit le document entier.
+  if (lectureLocale() === "publique") return { ok: false, raison: PUBLIQUE, conflit: true };
   try {
     const { data, error } = await supabase().rpc("publier_saison", {
       p_data: saison,

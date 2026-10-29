@@ -22,6 +22,7 @@ import { useSession } from "@/hooks/use-session";
 import { attendreEnvoi } from "@/hooks/use-saisie-admin";
 import { jetonServeur } from "@/lib/sfl/auth/session";
 import { designerArbitre } from "@/lib/sfl/arbitres";
+import { heuresDeJournee } from "@/lib/sfl/missions";
 import { QUI_PREVENIR, destinatairesPublication, textePublication, type QuiPrevenir } from "@/lib/sfl/annonce-publication";
 import { apercuPublication, publierJournee, remettreEnBrouillon } from "@/lib/sfl/saisie/brouillon";
 import { compteurs } from "@/lib/sfl/saisie/etat-journee";
@@ -77,8 +78,10 @@ export function FeuillePublier({
       // Les arbitres désignés pendant le brouillon : écrits maintenant que la base est d'accord.
       const doc = saisieStore.load();
       const numero = numeroSaison(doc);
+      // Les notes des joueurs ferment le mardi à minuit qui suit le match (comme l'ancien tableau).
+      const fermeLe = heuresDeJournee(doc, j, new Date())?.finDesNotes ?? null;
       await Promise.all(
-        matchsDeclares(doc, j).map((m, n) => (m.arbitre ? designerArbitre(numero, j, n, [...m.equipes], m.arbitre) : null))
+        matchsDeclares(doc, j).map((m, n) => (m.arbitre ? designerArbitre(numero, j, n, [...m.equipes], m.arbitre, fermeLe) : null))
       );
       if (qui !== "personne") {
         const jeton = await jetonServeur();
