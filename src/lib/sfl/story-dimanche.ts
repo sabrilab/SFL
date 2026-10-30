@@ -154,14 +154,51 @@ function pose(t: number, debut: number, duree: number): number {
   return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2);
 }
 
+/** 0 → 1, lent au départ et à l'arrivée : le mouvement d'une grue de cinéma. */
+function grue(t: number, debut: number, duree: number): number {
+  const x = Math.min(1, Math.max(0, (t - debut) / duree));
+  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+}
+
+/**
+ * Une image dessinée en contre-plongée : tranche par tranche, le bas plus
+ * large que le haut (`fuite` : ce que le haut perd, 0 = de face). `sx` est
+ * l'écrasement horizontal de la carte qui tourne.
+ */
+function enFuite(
+  ctx: CanvasRenderingContext2D,
+  img: CanvasImageSource,
+  x: number,
+  y: number,
+  l: number,
+  h: number,
+  sx: number,
+  fuite: number,
+) {
+  const iw = (img as HTMLImageElement).naturalWidth || (img as HTMLCanvasElement).width;
+  const ih = (img as HTMLImageElement).naturalHeight || (img as HTMLCanvasElement).height;
+  if (fuite < 0.002) {
+    ctx.drawImage(img, x + (l - l * sx) / 2, y, l * sx, h);
+    return;
+  }
+  const n = 48;
+  for (let i = 0; i < n; i++) {
+    const f = (i + 0.5) / n;
+    const lt = l * sx * (1 - fuite * (1 - f));
+    ctx.drawImage(img, 0, (ih * i) / n, iw, ih / n + 1, x + (l - lt) / 2, y + (h * i) / n, lt, h / n + 0.6);
+  }
+}
+
 /**
  * Dessine l'image de l'instant `t` (en secondes). Au-delà de la durée, la
  * dernière image : celle qu'on partage en photo.
  *
- * La page blanche du site et de la vidéo des compos (J4, plan « solo ») : les
- * deux colonnes de marbre aux bords, qui s'écartent ; ta note en très grand
- * derrière, en gris clair ; ta carte arrive en tournant, se pose d'un coup
- * (éclair, onde), puis le score et tes chiffres. Le texte est à l'encre.
+ * La page blanche du site et de la vidéo des compos (J4, plan « solo »).
+ * L'ouverture est un plan de grue : la caméra part en bas, en contre-plongée
+ * (les deux colonnes de marbre fuient vers le haut, comme à l'écran 1 du
+ * site, la carte arrive au-dessus de nous en tournant), puis elle monte et se
+ * met de face, au moment où la carte se pose d'un coup (éclair, onde). Les
+ * chiffres sont cadrés dans un bloc à l'encre, comme un habillage télé.
  */
 export function dessinerStory(ctx: CanvasRenderingContext2D, t: number, d: StoryDimanche, c: CalquesStory, p: PolicesStory) {
   const { largeur: W, hauteur: H } = STORY;
@@ -171,97 +208,105 @@ export function dessinerStory(ctx: CanvasRenderingContext2D, t: number, d: Story
   ctx.textBaseline = "alphabetic";
   ctx.textAlign = "center";
 
-  // Les colonnes : elles entrent serrées et s'écartent jusqu'au bout.
-  if (c.colonne) {
-    const ouvre = arrivee(t, 0, STORY.duree);
-    const ec = 1.08 - 0.08 * ouvre;
-    const lcol = 294 * ec;
-    const hcol = 2028 * ec;
-    ctx.globalAlpha = arrivee(t, 0, 0.5);
-    // Le bord droit de l'image garde une trace sombre en bas : on le laisse de côté.
-    const sl = 200;
-    const sh = 1560;
-    ctx.drawImage(c.colonne, 0, 0, sl, sh, -150 + (1 - ouvre) * 70, -40, lcol * (sl / 226), hcol);
-    ctx.drawImage(c.colonne, 0, 0, sl, sh, W - 104 - (1 - ouvre) * 70, -40, lcol * (sl / 226), hcol);
-  }
+  // La caméra : basse et proche au départ (bas = 1), de face à la fin (bas = 0).
+  const tPose = 1.5;
+  const bas = 1 - grue(t, 0, tPose + 0.1);
+  /** Monte une couche selon sa profondeur (k grand = proche de la caméra). */
+  const plan = (k: number, cy: number) => {
+    const z = 1 + 0.55 * bas * k;
+    ctx.translate(W / 2, cy + bas * 520 * k);
+    ctx.scale(z, z);
+    ctx.translate(-W / 2, -cy);
+  };
 
-  // La carte, posée : 470 de large, sous le titre.
+  // La carte posée : 470 de large, sous le titre.
   const lc = 470;
   const hc = lc * c.ratio;
   const xc = (W - lc) / 2;
   const yc = 400;
-  const tPose = 1.35;
+  const cyc = yc + hc / 2;
 
-  // Ta note en très grand derrière la carte, qui remonte doucement.
+  // Les colonnes, au premier plan : elles fuient vers le haut et se redressent.
+  if (c.colonne) {
+    const sl = 200; // le bord droit de l'image garde une trace sombre en bas
+    const lcol = 260;
+    const hcol = 2028;
+    ctx.globalAlpha = arrivee(t, 0, 0.35);
+    [-1, 1].forEach((cote) => {
+      ctx.save();
+      // Contre-plongée : vues d'en bas, les colonnes sont plus grandes et leur
+      // haut penche vers le milieu ; la caméra monte, elles se redressent.
+      const z = 1 + 0.5 * bas;
+      const x0 = cote < 0 ? -150 + lcol / 2 + bas * 30 : W - 110 + lcol / 2 - bas * 30;
+      ctx.translate(x0, H + 40);
+      ctx.transform(1, 0, cote * 0.15 * bas, 1, 0, 0);
+      ctx.scale(z, z);
+      ctx.drawImage(c.colonne!, 0, 0, sl, 1560, -lcol / 2, -hcol, lcol, hcol);
+      ctx.restore();
+    });
+  }
+
+  // Ta note en très grand derrière la carte, au fond.
   if (d.note != null) {
-    const an = arrivee(t, 0.1, 0.6);
-    ctx.globalAlpha = an;
-    ctx.fillStyle = "#ededed";
+    ctx.save();
+    plan(0.45, cyc);
+    ctx.globalAlpha = arrivee(t, 0, 0.5);
+    ctx.fillStyle = "#ececec";
     ctx.font = `400 900px ${p.chiffres}`;
-    ctx.fillText(`${d.note}`, W / 2, yc + hc / 2 + 330 + (1 - an) * 160 - arrivee(t, 0.7, STORY.duree) * 40);
+    ctx.fillText(`${d.note}`, W / 2, cyc + 330 - arrivee(t, 0.5, STORY.duree) * 40);
+    ctx.restore();
   }
 
-  // L'en-tête : le logo, la journée, le titre.
-  const a0 = arrivee(t, 0.05, 0.6);
-  ctx.globalAlpha = a0;
-  if (c.logo) {
-    const h = 50;
-    const l = h * (((c.logo as HTMLImageElement).naturalWidth || 4) / ((c.logo as HTMLImageElement).naturalHeight || 1));
-    ctx.drawImage(c.logo, (W - l) / 2, 96, l, h);
-  }
-  ctx.fillStyle = NOIR(0.55);
-  ctx.font = `700 28px ${p.texte}`;
-  etiquette(ctx, [`J${d.j}`, d.date, ligneDuLieu(d)].filter(Boolean).join(" · "), W / 2, 214, 4);
-  const a1 = arrivee(t, 0.2, 0.7);
-  ctx.globalAlpha = a1;
-  ctx.fillStyle = NOIR(1);
-  ctx.font = `900 112px ${p.texte}`;
-  ctx.fillText("MON DIMANCHE.", W / 2, 334 + (1 - a1) * 36, W - 220);
-
-  // La carte arrive en tournant (une fois et demie), monte et se pose.
-  const ac = arrivee(t, 0.35, tPose - 0.35);
-  if (t >= 0.35) {
+  // La carte : elle passe au-dessus de nous en tournant, puis se pose de face.
+  const ac = arrivee(t, 0.15, tPose - 0.15);
+  if (t >= 0.15) {
     const angle = (1 - ac) * Math.PI * 3;
     const cos = Math.cos(angle);
-    const coup = t > tPose ? 1 + 0.045 * Math.max(0, 1 - (t - tPose) / 0.3) : 1;
+    const coup = t > tPose ? 1 + 0.05 * Math.max(0, 1 - (t - tPose) / 0.3) : 1;
+    const fuite = 0.32 * bas;
+    const hv = hc * (1 - 0.12 * bas);
     ctx.save();
-    ctx.globalAlpha = Math.min(1, ac * 3);
-    ctx.translate(W / 2, yc + hc / 2 + (1 - ac) * 700);
-    ctx.rotate((1 - ac) * -0.25);
-    ctx.scale(Math.max(0.02, Math.abs(cos)) * coup, coup);
-    ctx.translate(-W / 2, -(yc + hc / 2));
+    plan(1, cyc);
+    ctx.globalAlpha = Math.min(1, ac * 4);
+    ctx.translate(W / 2, cyc - (1 - ac) * 260);
+    ctx.rotate((1 - ac) * -0.2);
+    ctx.scale(coup, coup);
+    ctx.translate(-W / 2, -cyc);
+    const yv = cyc - hv / 2;
+    const sx = Math.max(0.02, Math.abs(cos));
     // L'ombre sur la page.
     ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.22)";
+    ctx.shadowColor = `rgba(0,0,0,${0.24 * ac})`;
     ctx.shadowBlur = 70;
     ctx.shadowOffsetY = 36;
-    arrondi(ctx, xc, yc, lc, hc, lc * 0.06);
+    arrondi(ctx, xc + (lc - lc * sx) / 2 + (lc * sx * fuite) / 4, yv, lc * sx * (1 - fuite / 2), hv, lc * 0.06);
     ctx.fillStyle = "#fff";
     ctx.fill();
     ctx.restore();
     if (cos >= 0) {
-      ctx.drawImage(c.fond, xc, yc, lc, hc);
-      ctx.drawImage(c.joueur, xc, yc + (1 - ac) * 40, lc, hc);
-      ctx.drawImage(c.stats, xc, yc + (1 - ac) * 80, lc, hc);
+      enFuite(ctx, c.fond, xc, yv, lc, hv, sx, fuite);
+      enFuite(ctx, c.joueur, xc, yv + (1 - ac) * 40, lc, hv, sx, fuite);
+      enFuite(ctx, c.stats, xc, yv + (1 - ac) * 80, lc, hv, sx, fuite);
     } else {
       // Le dos BOLA, de la couleur de la face.
-      arrondi(ctx, xc, yc, lc, hc, lc * 0.06);
+      ctx.save();
+      ctx.translate(W / 2, cyc);
+      ctx.scale(sx, 1);
+      arrondi(ctx, -lc / 2, -hv / 2, lc, hv, lc * 0.06);
       ctx.fillStyle = "#f4f4f2";
       ctx.fill();
-      ctx.strokeStyle = NOIR(0.08);
+      ctx.strokeStyle = NOIR(0.1);
       ctx.lineWidth = 3;
       ctx.stroke();
       if (c.symbole) {
         const s = lc * 0.36;
-        ctx.save();
-        ctx.translate(W / 2, yc + hc / 2);
         ctx.scale(-1, 1);
         ctx.drawImage(c.symbole, -s / 2, -s / 2, s, s);
-        ctx.restore();
       }
+      ctx.restore();
     }
     // Un reflet traverse la carte une fois, posée.
-    const ar = Math.min(1, Math.max(0, (t - 3.6) / 0.9));
+    const ar = Math.min(1, Math.max(0, (t - 3.7) / 0.9));
     if (ar > 0 && ar < 1) {
       ctx.save();
       arrondi(ctx, xc, yc, lc, hc, lc * 0.06);
@@ -286,7 +331,7 @@ export function dessinerStory(ctx: CanvasRenderingContext2D, t: number, d: Story
     ctx.strokeStyle = "#000";
     ctx.lineWidth = 6 * (1 - ao) + 1;
     ctx.beginPath();
-    ctx.ellipse(W / 2, yc + hc / 2, lc * (0.6 + e * 0.9), hc * (0.6 + e * 0.6), 0, 0, Math.PI * 2);
+    ctx.ellipse(W / 2, cyc, lc * (0.6 + e * 0.9), hc * (0.6 + e * 0.6), 0, 0, Math.PI * 2);
     ctx.stroke();
   }
   const ae = (t - tPose) / 0.25;
@@ -296,80 +341,120 @@ export function dessinerStory(ctx: CanvasRenderingContext2D, t: number, d: Story
     ctx.fillRect(0, 0, W, H);
   }
 
-  // Le score, ton camp à l'encre pleine.
-  let y = yc + hc + 175;
-  const as = pose(t, 1.55, 0.5);
-  if (d.pour != null && d.contre != null && d.camp) {
-    ctx.globalAlpha = Math.min(1, Math.max(0, (t - 1.55) / 0.2));
-    const dy = (1 - as) * 50;
-    const autre = d.camp === "Noirs" ? "Blancs" : "Noirs";
-    ctx.textAlign = "center";
-    ctx.font = `400 150px ${p.chiffres}`;
-    ctx.fillStyle = NOIR(1);
-    ctx.fillText(`${d.pour}`, W / 2 - 110, y + dy);
-    ctx.fillStyle = NOIR(0.3);
-    ctx.fillText("–", W / 2, y + dy);
-    ctx.fillText(`${d.contre}`, W / 2 + 110, y + dy);
-    ctx.font = `800 30px ${p.texte}`;
-    ctx.fillStyle = NOIR(1);
-    ctx.textAlign = "right";
-    etiquette(ctx, d.camp, W / 2 - 210, y - 50 + dy, 4);
-    ctx.fillStyle = NOIR(0.35);
-    ctx.textAlign = "left";
-    etiquette(ctx, autre, W / 2 + 210, y - 50 + dy, 4);
-    const r = resultat(d);
-    if (r) {
-      ctx.fillStyle = NOIR(0.55);
-      ctx.font = `700 28px ${p.texte}`;
-      ctx.textAlign = "center";
-      etiquette(ctx, r, W / 2, y + 58 + dy, 5);
-    }
-    y += 230;
-  } else {
-    y += 60;
+  // L'en-tête, une fois la caméra posée : le logo, la journée, le titre.
+  const a0 = arrivee(t, tPose - 0.2, 0.6);
+  ctx.globalAlpha = a0;
+  if (c.logo) {
+    const h = 50;
+    const l = h * (((c.logo as HTMLImageElement).naturalWidth || 4) / ((c.logo as HTMLImageElement).naturalHeight || 1));
+    ctx.drawImage(c.logo, (W - l) / 2, 96 - (1 - a0) * 30, l, h);
   }
+  ctx.fillStyle = NOIR(0.55);
+  ctx.font = `700 28px ${p.texte}`;
+  etiquette(ctx, [`J${d.j}`, d.date, ligneDuLieu(d)].filter(Boolean).join(" · "), W / 2, 214 - (1 - a0) * 30, 4);
+  const a1 = arrivee(t, tPose - 0.1, 0.6);
+  ctx.globalAlpha = a1;
+  ctx.fillStyle = NOIR(1);
+  ctx.font = `900 112px ${p.texte}`;
+  ctx.fillText("MON DIMANCHE.", W / 2, 334 - (1 - a1) * 40, W - 220);
 
-  // Tes chiffres, qui tombent en place et défilent jusqu'au vrai.
-  const colonnes = [
-    { n: d.buts, l: d.buts > 1 ? "buts" : "but" },
-    { n: d.passes, l: d.passes > 1 ? "passes" : "passe" },
-    { n: d.points, l: "points", plus: true },
-  ];
-  colonnes.forEach((col, i) => {
-    const debut = 2.05 + i * 0.18;
-    const a = pose(t, debut, 0.5);
-    const compte = Math.round(col.n * arrivee(t, debut, 0.9));
-    const x = W / 2 + (i - 1) * 290;
-    ctx.globalAlpha = Math.min(1, Math.max(0, (t - debut) / 0.15));
-    ctx.textAlign = "center";
-    ctx.fillStyle = NOIR(1);
-    ctx.font = `400 136px ${p.chiffres}`;
-    ctx.fillText(`${col.plus && col.n > 0 ? "+" : ""}${compte}`, x, y + (1 - a) * 60);
-    ctx.fillStyle = NOIR(0.5);
-    ctx.font = `700 26px ${p.texte}`;
-    etiquette(ctx, col.l, x, y + 52 + (1 - a) * 60, 4);
-  });
+  // Le bloc à l'encre : le score, tes chiffres, ta place. Il s'ouvre de bas en haut.
+  const bx = 120;
+  const bl = W - 2 * bx;
+  const by = yc + hc + 50;
+  const r1 = 190;
+  const r2 = 200;
+  const r3 = 84;
+  const bh = r1 + r2 + r3;
+  const ab = grue(t, tPose + 0.15, 0.45);
+  if (ab > 0) {
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.rect(0, by + bh * (1 - ab), W, bh * ab);
+    ctx.clip();
+    arrondi(ctx, bx, by, bl, bh, 28);
+    ctx.fillStyle = "#0b0b0b";
+    ctx.fill();
+    // Les filets entre les rangées et les colonnes.
+    ctx.fillStyle = BLANC(0.16);
+    ctx.fillRect(bx + 36, by + r1, bl - 72, 2);
+    ctx.fillRect(bx + 36, by + r1 + r2, bl - 72, 2);
+    ctx.fillRect(bx + bl / 3, by + r1 + 30, 2, r2 - 60);
+    ctx.fillRect(bx + (2 * bl) / 3, by + r1 + 30, 2, r2 - 60);
 
-  const rang = ligneDuRang(d);
-  if (rang) {
-    const a = arrivee(t, 2.9, 0.6);
-    ctx.globalAlpha = a;
-    ctx.fillStyle = NOIR(0.8);
-    ctx.font = `700 34px ${p.texte}`;
-    ctx.textAlign = "center";
-    ctx.fillText(rang, W / 2, y + 140 + (1 - a) * 20);
+    // Rangée 1 : le score, ton camp en blanc plein.
+    const as = pose(t, tPose + 0.35, 0.5);
+    if (d.pour != null && d.contre != null && d.camp) {
+      ctx.globalAlpha = Math.min(1, Math.max(0, (t - tPose - 0.35) / 0.2));
+      const dy = (1 - as) * 40;
+      const autre = d.camp === "Noirs" ? "Blancs" : "Noirs";
+      ctx.font = `800 26px ${p.texte}`;
+      ctx.textAlign = "left";
+      ctx.fillStyle = BLANC(1);
+      etiquette(ctx, d.camp, bx + 44, by + 62, 4);
+      ctx.textAlign = "right";
+      ctx.fillStyle = BLANC(0.4);
+      etiquette(ctx, autre, bx + bl - 44, by + 62, 4);
+      const r = resultat(d);
+      if (r) {
+        ctx.textAlign = "center";
+        ctx.fillStyle = BLANC(0.55);
+        etiquette(ctx, r, W / 2, by + 62, 5);
+      }
+      ctx.textAlign = "center";
+      ctx.font = `400 116px ${p.chiffres}`;
+      ctx.fillStyle = BLANC(1);
+      ctx.fillText(`${d.pour}`, W / 2 - 100, by + 166 + dy);
+      ctx.fillStyle = BLANC(0.35);
+      ctx.fillText("–", W / 2, by + 166 + dy);
+      ctx.fillText(`${d.contre}`, W / 2 + 100, by + 166 + dy);
+    }
+
+    // Rangée 2 : tes chiffres, qui défilent jusqu'au vrai.
+    const colonnes = [
+      { n: d.buts, l: d.buts > 1 ? "buts" : "but" },
+      { n: d.passes, l: d.passes > 1 ? "passes" : "passe" },
+      { n: d.points, l: "points", plus: true },
+    ];
+    colonnes.forEach((col, i) => {
+      const debut = tPose + 0.55 + i * 0.15;
+      const a = pose(t, debut, 0.5);
+      const compte = Math.round(col.n * arrivee(t, debut, 0.9));
+      const x = bx + (bl / 3) * (i + 0.5);
+      ctx.globalAlpha = Math.min(1, Math.max(0, (t - debut) / 0.15));
+      ctx.textAlign = "center";
+      ctx.fillStyle = BLANC(1);
+      ctx.font = `400 112px ${p.chiffres}`;
+      ctx.fillText(`${col.plus && col.n > 0 ? "+" : ""}${compte}`, x, by + r1 + 130 + (1 - a) * 40);
+      ctx.fillStyle = BLANC(0.5);
+      ctx.font = `700 24px ${p.texte}`;
+      etiquette(ctx, col.l, x, by + r1 + 172, 4);
+    });
+
+    // Rangée 3 : ta place au classement.
+    const rang = ligneDuRang(d);
+    if (rang) {
+      const a = arrivee(t, tPose + 1.1, 0.5);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = BLANC(0.85);
+      ctx.font = `700 30px ${p.texte}`;
+      ctx.textAlign = "center";
+      ctx.fillText(rang, W / 2, by + r1 + r2 + 54);
+    }
+    ctx.restore();
   }
 
   // La fin, pour qui ne connaît pas Bola.
-  const af = arrivee(t, 3.3, 0.7);
+  const af = arrivee(t, tPose + 1.4, 0.7);
   ctx.globalAlpha = af;
   ctx.textAlign = "center";
   ctx.fillStyle = NOIR(0.55);
   ctx.font = `600 30px ${p.texte}`;
-  ctx.fillText(ligneDeFin(d), W / 2, H - 132);
+  ctx.fillText(ligneDeFin(d), W / 2, H - 120);
   ctx.fillStyle = NOIR(1);
   ctx.font = `900 46px ${p.texte}`;
-  ctx.fillText("getbola.app", W / 2, H - 74);
+  ctx.fillText("getbola.app", W / 2, H - 64);
 
   ctx.restore();
 }
