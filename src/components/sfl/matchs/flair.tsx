@@ -48,7 +48,7 @@ const pourcent = (n: number, total: number) => (total ? Math.round((n * 100) / t
 const totalDe = (parts: [string, number][]) => parts.reduce((a, [, n]) => a + n, 0);
 
 /** Le temps qui reste avant le premier coup d'envoi : « 1 j 02:14 ». */
-function FermeDans({ fin }: { fin: Date }) {
+export function FermeDans({ fin }: { fin: Date }) {
   const [t, setT] = useState(() => Date.now());
   useEffect(() => {
     const id = window.setInterval(() => setT(Date.now()), 30_000);

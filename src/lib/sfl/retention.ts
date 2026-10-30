@@ -194,6 +194,7 @@ export const PATH_FR: Record<string, string> = {
   "/profil/evolution": "Évolution",
   "/profil/badges": "Badges",
   "/profil/cartes": "Mes cartes",
+  "/profil/flair": "Le Flair",
   "/duel": "Collection",
   "/collection": "Collection",
   "/discussions": "Discussions",

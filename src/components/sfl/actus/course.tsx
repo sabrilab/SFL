@@ -102,6 +102,7 @@ import { VoteDuJour } from "./fil";
 import { CouvertureRubrique, RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
 import { couverturesDuDimanche, sources, type Couverture } from "@/lib/sfl/couvertures";
 import { ContratALaUne } from "./contrat-a-la-une";
+import { RubriqueFlair } from "@/components/sfl/flair/mon-flair";
 import { InvitationVisuels, journeeDeLaVideo, TuileCarrousel, TuileVideo, useVideos, VideosDuFil } from "./video";
 import type { Video } from "@/lib/sfl/videos";
 import { VueClassements, VueMatchs } from "./vues";
@@ -1056,7 +1057,13 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
               journee={d.journee}
               scenes={d.scenes}
               videos={videosDe.get(d.j)}
-              avant={d.j === dernier ? <RubriqueToi j={dernier} date={d.journee?.date ?? ""} /> : undefined}
+              avant={
+                <>
+                  {d.j === dernier && <RubriqueToi j={dernier} date={d.journee?.date ?? ""} />}
+                  {/* Mon Flair de ce dimanche, jugé (Sabri, 30/10). */}
+                  <RubriqueFlair j={d.j} />
+                </>
+              }
               ouvrir={() => router.push(`/ligue/journee?j=${d.j}`)}
             />
           ))}

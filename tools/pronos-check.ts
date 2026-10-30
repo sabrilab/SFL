@@ -9,7 +9,9 @@ import assert from "node:assert/strict";
 import { journalXp } from "../src/lib/sfl/missions";
 import {
   ajouterPronos,
+  choixDeSaisonDu,
   choixPermis,
+  flairsDuJoueur,
   J_SAISON,
   lignesPronos,
   PLAFOND_JOURNEE,
@@ -80,4 +82,17 @@ const avantTotal = [...journal.values()].reduce((a, x) => a + x.lignes.length, 0
 ajouterPronos(journal, s, pronos, now);
 const apresTotal = [...journal.values()].reduce((a, x) => a + x.lignes.length, 0);
 assert.equal(apresTotal - avantTotal, lignes.length);
+// Mon Flair (Ma carte, récaps) : les mêmes verdicts et la même XP que le journal.
+if (neutre) {
+  const [f] = flairsDuJoueur(s, numero, false, pronos, neutre, now, now);
+  assert.ok(f && f.j === j && f.choix.length === 3, "trois choix relus");
+  assert.equal(f.choix[0].sujet, `match:${m0.n}`, "le match d'abord");
+  assert.equal(f.xp, lignes.find((x) => x.joueur === neutre)?.ligne.xp ?? 0, "la même XP que le journal");
+}
+const [ft] = flairsDuJoueur(s, numero, false, pronos, tard, now, now);
+assert.equal(ft.choix[0].etat, "hors-delai", "un choix tardif se dit tardif");
+assert.equal(ft.xp, 0);
+const cs = choixDeSaisonDu(s, numero, true, [{ saison: numero, j: J_SAISON, sujet: "pepite", joueur: "Testeur", choix: tete[0], le: new Date(0).toISOString() }], "Testeur", loin);
+assert.equal(cs[0].etat, "juste");
+assert.equal(cs[0].prime, primeSaison(0));
 console.log("pronos : tout est bon");
