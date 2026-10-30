@@ -89,7 +89,7 @@ export function BoutonSuivre({
             ? "bouton-secondaire"
             : "bouton-principal bouton--mauve",
         "flex shrink-0 items-center justify-center gap-1.5 font-semibold whitespace-nowrap",
-        petit ? "h-8 px-3.5 text-[13px]" : "h-10 px-6 text-[14px]",
+        petit ? "h-8 px-3.5 text-corps" : "h-10 px-6 text-ligne",
         className
       )}
     >
@@ -186,7 +186,7 @@ export function ReseauJoueur({
   const reste = montres.length - noms.length;
 
   const fort = clair ? "text-[#0a0b0d]" : "text-foreground";
-  const doux = clair ? "text-[#0a0b0d]/55" : "text-foreground/45";
+  const doux = clair ? "text-[#0a0b0d]/55" : "text-encre-3";
   const gras = (n: string) => (
     <span key={n} className={cn("font-semibold", fort)}>
       {id.nom(n)}
@@ -212,7 +212,7 @@ export function ReseauJoueur({
 
   return (
     <div className={cn("flex w-full flex-col gap-[var(--fib-8)]", centre ? "items-center" : "items-start", className)}>
-      <div className={cn("flex items-center gap-[var(--fib-13)] font-mono text-[13px]", doux)}>
+      <div className={cn("flex items-center gap-[var(--fib-13)] font-mono text-corps", doux)}>
         {(
           [
             ["abonnes", abonnes.length, pluriel(abonnes.length, "abonné", "abonnés")],
@@ -240,7 +240,7 @@ export function ReseauJoueur({
             ouvrir("abonnes");
           }}
           className={cn(
-            "flex items-center gap-2.5 text-[13.5px] leading-[1.3] transition-transform active:scale-[0.98] motion-reduce:transition-none",
+            "flex items-center gap-2.5 text-ligne leading-[1.3] transition-transform active:scale-[0.98] motion-reduce:transition-none",
             centre ? "max-w-[300px]" : "max-w-full",
             doux
           )}
@@ -302,8 +302,8 @@ function ListeSuivis({
     <Sheet open={ouvert} onOpenChange={(o) => !o && onFermer()} titre={onglet === "abonnes" ? "ses abonnés" : "ses abonnements"}>
       <SheetContent side="bottom" className="data-[side=bottom]:h-[80dvh] rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
         <div className="flex flex-col gap-1 px-5 pt-5">
-          <SheetTitle className="titre-lettrage text-[24px] leading-[0.95] font-black">{id.nom(nom)}</SheetTitle>
-          <SheetDescription className="font-mono text-[12px] text-muted-foreground">{id.pseudo(nom)}</SheetDescription>
+          <SheetTitle className="titre-lettrage text-titre-g leading-[0.95] font-black">{id.nom(nom)}</SheetTitle>
+          <SheetDescription className="font-mono text-petit text-muted-foreground">{id.pseudo(nom)}</SheetDescription>
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-3 px-4">
           <div className="grid grid-cols-2 gap-1 rounded-full bg-secondary p-1">
@@ -317,7 +317,7 @@ function ListeSuivis({
                 key={o}
                 type="button"
                 onClick={() => onOnglet(o)}
-                className={cn("py-2 text-[13.5px] font-semibold", onglet === o ? "bouton-principal" : "bouton-discret text-muted-foreground")}
+                className={cn("py-2 text-ligne font-semibold", onglet === o ? "bouton-principal" : "bouton-discret text-muted-foreground")}
               >
                 <span className="tabular-nums">{listes[o].length}</span> {libelle}
               </button>
@@ -328,10 +328,10 @@ function ListeSuivis({
               <div key={n} className="flex items-center gap-3 rounded-[18px] bg-card px-3 py-2.5">
                 <CarteDe name={n} size={FORMAT_CARTE.petite} />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-[15px] font-semibold">
+                  <span className="truncate text-lecture font-semibold">
                     <Nom n={n} />
                   </span>
-                  <span className="truncate font-mono text-[12px] text-muted-foreground">
+                  <span className="truncate font-mono text-petit text-muted-foreground">
                     {me ? lien(n, me, s, ensemble, id.pseudo(n)) : id.pseudo(n)}
                   </span>
                 </span>

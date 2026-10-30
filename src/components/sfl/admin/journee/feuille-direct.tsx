@@ -40,9 +40,9 @@ export function FeuilleDirect({
             const fini = saison.entries.some((e) => e.j === j && e.team === m.m.equipes[0] && e.result);
             return (
               <div key={m.n} className="glass flex items-center gap-3 rounded-[22px] px-4 py-3">
-                <span className="mono-label w-8 text-foreground/45">M{m.n}</span>
+                <span className="mono-label w-8 text-encre-3">M{m.n}</span>
                 <PastilleMaillot camp="Noirs" className="hidden min-[400px]:inline-flex" />
-                <span className="font-display flex-1 text-center text-[30px] leading-none tabular-nums">
+                <span className="font-display flex-1 text-center text-titre-l leading-none tabular-nums">
                   {m.score[0]} – {m.score[1]}
                 </span>
                 <PastilleMaillot camp="Blancs" className="hidden min-[400px]:inline-flex" />
@@ -51,7 +51,7 @@ export function FeuilleDirect({
                   onClick={() => {
                     if (faire((s) => finDuMatch(s, j, m.m.equipes), `Fin du match ${m.n} · ${m.score[0]} – ${m.score[1]}`)) haptique.sceau();
                   }}
-                  className={fini ? "bouton-secondaire h-11 px-4 text-[13px] font-semibold" : "bouton-principal h-11 px-4 text-[13px] font-semibold"}
+                  className={fini ? "bouton-secondaire h-11 px-4 text-corps font-semibold" : "bouton-principal h-11 px-4 text-corps font-semibold"}
                 >
                   {fini ? "✓ Fin" : "Fin du match"}
                 </button>

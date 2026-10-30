@@ -16,7 +16,7 @@ import { haptique } from "@/lib/sfl/haptique";
 import { dimanchesAVenir } from "./feuille-preparer";
 import { Etiquette, Feuille, Pastille } from "./ui";
 
-const champ = "glass-soft h-11 w-full min-w-0 rounded-full px-4 text-[15px] outline-none placeholder:text-foreground/30";
+const champ = "glass-soft h-11 w-full min-w-0 rounded-full px-4 text-lecture outline-none placeholder:text-encre-4";
 
 export function FeuilleQuandOu({
   open,
@@ -69,15 +69,15 @@ export function FeuilleQuandOu({
       titre={`J${j} · quand et où`}
       bas={
         <>
-          <button type="button" onClick={enregistrer} className="bouton-principal h-12 text-[15px] font-semibold">
+          <button type="button" onClick={enregistrer} className="bouton-principal h-12 text-lecture font-semibold">
             Enregistrer
           </button>
           {dejaPubliee(meta) ? (
-            <button type="button" onClick={onSupprimer} className="bouton-discret h-10 text-[14px] font-semibold">
+            <button type="button" onClick={onSupprimer} className="bouton-discret h-10 text-ligne font-semibold">
               Supprimer la journée
             </button>
           ) : (
-            <button type="button" onClick={onJeter} className="bouton-discret h-10 text-[14px] font-semibold">
+            <button type="button" onClick={onJeter} className="bouton-discret h-10 text-ligne font-semibold">
               Jeter le brouillon
             </button>
           )}

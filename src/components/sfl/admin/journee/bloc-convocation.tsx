@@ -31,9 +31,9 @@ export function BlocConvocation({ presence, matchs, onOuvrir }: { presence: Pres
     <section className="flex flex-col gap-2">
       <button type="button" onClick={onOuvrir} className="flex items-center justify-between gap-2 text-left">
         <Etiquette>Convocation · {presence.jour}</Etiquette>
-        <ChevronRight className="size-4 text-foreground/40" />
+        <ChevronRight className="size-4 text-encre-3" />
       </button>
-      <p className="mono-label text-foreground/75">
+      <p className="mono-label text-encre-2">
         {presence.presents.length} oui · {presence.absents.length} non · {presence.sansReponse.length} sans réponse
       </p>
       {presence.presents.length > 0 && (
@@ -41,7 +41,7 @@ export function BlocConvocation({ presence, matchs, onOuvrir }: { presence: Pres
           <QuiVient noms={presence.ordreDesVenus.length ? presence.ordreDesVenus : presence.presents} />
         </div>
       )}
-      {n > 0 && <p className="text-[15px] font-semibold text-[#FF8A4C]">Il manque {n}</p>}
+      {n > 0 && <p className="text-lecture font-semibold text-[#FF8A4C]">Il manque {n}</p>}
     </section>
   );
 }
@@ -68,7 +68,7 @@ export function FeuilleConvocation({ open, onOpenChange, presence }: { open: boo
   }
 
   return (
-    <Feuille open={open} onOpenChange={onOpenChange} titre="Convocation" etat={<span className="mono-label text-foreground/55">{presence.jour}</span>} haute>
+    <Feuille open={open} onOpenChange={onOpenChange} titre="Convocation" etat={<span className="mono-label text-encre-3">{presence.jour}</span>} haute>
       <Segmente
         taille="sm"
         label="Réponses"
@@ -81,7 +81,7 @@ export function FeuilleConvocation({ open, onOpenChange, presence }: { open: boo
         onChange={setOnglet}
       />
       {presence.remplacants.length > 0 && onglet === "oui" && (
-        <p className="mono-label text-foreground/55">{presence.remplacants.length} remplaçants</p>
+        <p className="mono-label text-encre-3">{presence.remplacants.length} remplaçants</p>
       )}
       <div className="grid grid-cols-3 gap-3 min-[430px]:grid-cols-4">
         {listes[onglet].map((nom) => (
@@ -93,14 +93,14 @@ export function FeuilleConvocation({ open, onOpenChange, presence }: { open: boo
             className="flex flex-col items-center gap-1 transition-transform active:scale-95"
           >
             <CarteDe name={nom} size={FORMAT_CARTE.petite * 1.3} inerte />
-            <span className={cn("max-w-full truncate text-[12px] font-semibold")}>
+            <span className={cn("max-w-full truncate text-petit font-semibold")}>
               <Nom n={nom} />
             </span>
-            {corriges.has(nom) && <span className="mono-label text-foreground/55">corrigé</span>}
+            {corriges.has(nom) && <span className="mono-label text-encre-3">corrigé</span>}
           </button>
         ))}
       </div>
-      {listes[onglet].length === 0 && <p className="mono-label py-8 text-center text-foreground/40">Personne</p>}
+      {listes[onglet].length === 0 && <p className="mono-label py-8 text-center text-encre-3">Personne</p>}
     </Feuille>
   );
 }

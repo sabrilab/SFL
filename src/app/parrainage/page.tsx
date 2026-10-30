@@ -131,7 +131,7 @@ export default function ParrainagePage() {
     <div className="mx-auto flex w-full max-w-xl flex-col gap-[var(--fib-21)] px-5 py-4 sm:py-8">
       <div className="flex items-center gap-3">
         <BoutonRetour />
-        <h1 className="text-[30px] font-bold tracking-tight">Inviter</h1>
+        <h1 className="text-titre-l font-bold tracking-tight">Inviter</h1>
       </div>
 
       {/* Ceux que j'ai fait venir : le nombre, en grand */}
@@ -139,23 +139,23 @@ export default function ParrainagePage() {
         <span className="text-[89px] leading-[0.8] tabular-nums" style={{ fontFamily: ANTON }}>
           {n}
         </span>
-        <span className="mono-label pb-1 text-foreground/45">{n > 1 ? "recrues actives" : "recrue active"}</span>
+        <span className="mono-label pb-1 text-encre-3">{n > 1 ? "recrues actives" : "recrue active"}</span>
       </div>
 
       {/* Mon lien */}
       <section className="glass flex flex-col gap-[var(--fib-13)] rounded-[28px] p-5">
         <div className="flex items-center justify-between gap-3">
-          <span className="mono-label text-foreground/40">Ton lien</span>
-          {!bola && <span className="mono-label text-foreground/70">Bola Team offert un mois</span>}
+          <span className="mono-label text-encre-3">Ton lien</span>
+          {!bola && <span className="mono-label text-encre-2">Bola Team offert un mois</span>}
         </div>
-        <p className="min-h-[1.4em] font-mono text-[14px] break-all text-foreground/85">
+        <p className="min-h-[1.4em] font-mono text-ligne break-all text-encre-2">
           {lien ? lien.replace(/^https?:\/\//, "") : code === null ? "Lien indisponible pour l'instant." : "…"}
         </p>
         <button
           type="button"
           disabled={!lien}
           onClick={() => void partager()}
-          className="bouton-principal bouton--mauve py-4 text-[15px] font-bold disabled:opacity-40"
+          className="bouton-principal bouton--mauve py-4 text-lecture font-bold disabled:opacity-40"
         >
           Partager mon lien
         </button>
@@ -163,7 +163,7 @@ export default function ParrainagePage() {
           type="button"
           disabled={!lien}
           onClick={() => void copier()}
-          className="bouton-secondaire bouton--mauve flex items-center justify-center gap-2 py-3 text-[14px] font-semibold disabled:opacity-40"
+          className="bouton-secondaire bouton--mauve flex items-center justify-center gap-2 py-3 text-ligne font-semibold disabled:opacity-40"
         >
           {copie ? <Check className="size-4" /> : <Copy className="size-4" />}
           {copie ? "Copié" : "Copier"}
@@ -173,14 +173,14 @@ export default function ParrainagePage() {
       {/* Mon code, pour le dire de vive voix */}
       {code && (
         <div className="flex items-baseline justify-between px-1">
-          <span className="mono-label text-foreground/40">Ton code</span>
-          <span className="font-mono text-[17px] font-bold tracking-wide">{code}</span>
+          <span className="mono-label text-encre-3">Ton code</span>
+          <span className="font-mono text-titre font-bold tracking-wide">{code}</span>
         </div>
       )}
 
       {/* Les paliers */}
       <section className="flex flex-col gap-2">
-        <h2 className="px-1 text-[17px] font-bold tracking-tight">Paliers</h2>
+        <h2 className="px-1 text-titre font-bold tracking-tight">Paliers</h2>
         {PALIERS_RECRUES.map((p) => (
           <LignePalier
             key={p.n}
@@ -192,10 +192,10 @@ export default function ParrainagePage() {
             ferme={p.finition === "fondateur" && ferme}
           />
         ))}
-        <p className="px-1 pt-1 text-[13px] leading-[1.4] text-foreground/70">
+        <p className="px-1 pt-1 text-corps leading-[1.4] text-encre-2">
           Fondateur : la carte de ceux qui ont lancé la première grande vague de Bola. Numérotée sur {FONDATEURS_MAX}, jamais réémise.
         </p>
-        {fondateur && <p className="mono-label px-1 text-foreground/85">{numeroFondateur(fondateur)}</p>}
+        {fondateur && <p className="mono-label px-1 text-encre-2">{numeroFondateur(fondateur)}</p>}
       </section>
 
       {/* Mes filleuls : ceux qui jouent, ceux qui n'ont pas encore joué */}
@@ -203,15 +203,15 @@ export default function ParrainagePage() {
         <>
           {actifs.length > 0 && (
             <section className="flex flex-col gap-2.5">
-              <h2 className="px-1 text-[17px] font-bold tracking-tight">Ils jouent</h2>
+              <h2 className="px-1 text-titre font-bold tracking-tight">Ils jouent</h2>
               <QuiVient noms={actifs.map((f) => f.nom)} />
             </section>
           )}
           {enAttente.length > 0 && (
             <section className="flex flex-col gap-2.5">
               <div className="flex items-baseline justify-between px-1">
-                <h2 className="text-[17px] font-bold tracking-tight">En attente</h2>
-                <span className="mono-label text-foreground/45">{enAttente.length}</span>
+                <h2 className="text-titre font-bold tracking-tight">En attente</h2>
+                <span className="mono-label text-encre-3">{enAttente.length}</span>
               </div>
               <div className="opacity-55">
                 <QuiVient noms={enAttente.map((f) => f.nom)} />
@@ -222,7 +222,7 @@ export default function ParrainagePage() {
       ) : (
         (filleuls?.length ?? 0) > 0 && (
           <section className="flex flex-col gap-2.5">
-            <h2 className="px-1 text-[17px] font-bold tracking-tight">Ils sont là</h2>
+            <h2 className="px-1 text-titre font-bold tracking-tight">Ils sont là</h2>
             <QuiVient noms={filleuls!.map((f) => f.nom)} />
           </section>
         )
@@ -263,17 +263,17 @@ function LignePalier({
             h={71}
           />
         ) : (
-          <span className="flex h-full items-center justify-center bg-foreground/[0.06] font-mono text-[13px] font-bold">+100</span>
+          <span className="flex h-full items-center justify-center bg-foreground/[0.06] font-mono text-corps font-bold">+100</span>
         )}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex items-baseline justify-between gap-2">
-          <span className="text-[15px] leading-tight font-bold">{palier.titre}</span>
-          <span className="mono-label shrink-0 text-foreground/60 tabular-nums">
+          <span className="text-lecture leading-tight font-bold">{palier.titre}</span>
+          <span className="mono-label shrink-0 text-encre-2 tabular-nums">
             {ferme ? "fermé" : `${fait} / ${palier.n}`}
           </span>
         </span>
-        <span className="mono-label text-foreground/45">{palier.donne}</span>
+        <span className="mono-label text-encre-3">{palier.donne}</span>
         <span className="relative h-[3px] overflow-hidden rounded-full bg-foreground/15">
           <span className="absolute inset-y-0 left-0 rounded-full bg-foreground" style={{ width: `${(fait / palier.n) * 100}%` }} />
         </span>
@@ -281,7 +281,7 @@ function LignePalier({
       {atteint ? (
         <Check className="size-5 shrink-0" aria-hidden />
       ) : (
-        <Lock className="size-4 shrink-0 text-foreground/50" aria-hidden />
+        <Lock className="size-4 shrink-0 text-encre-3" aria-hidden />
       )}
     </div>
   );

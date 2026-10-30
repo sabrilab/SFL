@@ -48,7 +48,7 @@ export function ProfilArbitre({ nom }: { nom: string }) {
   return (
     <div className="shell py-4 sm:py-8 lg:pt-[var(--fib-55)]">
       <div className="relative z-10 mb-[18px] flex items-center justify-between gap-3 lg:mb-[var(--fib-34)]">
-        <h1 className="text-[30px] font-bold tracking-tight lg:text-[34px]">Ma carte</h1>
+        <h1 className="text-titre-l font-bold tracking-tight lg:text-nom">Ma carte</h1>
         <div className="flex items-center gap-2">
           <BoutonTheme />
           <Link
@@ -76,8 +76,8 @@ export function ProfilArbitre({ nom }: { nom: string }) {
             />
           </div>
           <div className="relative flex w-full flex-col items-center gap-[var(--fib-8)] text-center">
-            <span className="titre-lettrage text-[34px] leading-[0.95] break-words">{identite.nom(nom)}</span>
-            <span className="font-mono text-[12px] text-foreground/45">{identite.pseudo(nom)} · arbitre</span>
+            <span className="titre-lettrage text-nom leading-[0.95] break-words">{identite.nom(nom)}</span>
+            <span className="font-mono text-petit text-encre-3">{identite.pseudo(nom)} · arbitre</span>
           </div>
           <div className="flex w-full items-stretch divide-x divide-foreground/10 border-y border-foreground/10 py-[var(--fib-13)]">
             <Chiffre valeur={s.matchs} quoi={s.matchs > 1 ? "Matchs arbitrés" : "Match arbitré"} />
@@ -87,7 +87,7 @@ export function ProfilArbitre({ nom }: { nom: string }) {
           <button
             type="button"
             onClick={() => setPhotoOuverte(true)}
-            className="bouton-secondaire flex w-full items-center justify-center py-3.5 text-[14px] font-semibold"
+            className="bouton-secondaire flex w-full items-center justify-center py-3.5 text-ligne font-semibold"
           >
             Ma photo
           </button>
@@ -99,7 +99,7 @@ export function ProfilArbitre({ nom }: { nom: string }) {
           <section>
             <h2 className="mb-3 px-1 text-lg font-semibold tracking-tight">Mes matchs</h2>
             {s.liste.length === 0 ? (
-              <p className="px-1 text-[14px] text-foreground/45">Aucun match pour l&apos;instant.</p>
+              <p className="px-1 text-ligne text-encre-3">Aucun match pour l&apos;instant.</p>
             ) : (
               <ul className="flex flex-col divide-y divide-foreground/10 border-y border-foreground/10">
                 {s.liste.map((a) => {
@@ -108,8 +108,8 @@ export function ProfilArbitre({ nom }: { nom: string }) {
                   return (
                     <li key={a.id} className="flex items-center gap-3 py-3">
                       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="truncate text-[15px] font-semibold">{affiche(a.equipes)}</span>
-                        <span className="font-mono text-[11px] text-foreground/45">
+                        <span className="truncate text-lecture font-semibold">{affiche(a.equipes)}</span>
+                        <span className="font-mono text-legende text-encre-3">
                           {a.saison === numero ? "" : `Saison ${a.saison} · `}J{a.j} · Match {a.n + 1}
                           {jr?.date ? ` · ${jr.date}` : ""}
                         </span>
@@ -117,13 +117,13 @@ export function ProfilArbitre({ nom }: { nom: string }) {
                       <div className="flex shrink-0 flex-col items-end gap-0.5">
                         {a.joue && sat != null ? (
                           <>
-                            <span className="text-[22px] leading-none font-black tracking-tight tabular-nums italic">{sat}</span>
-                            <span className="font-mono text-[10px] text-foreground/45">
+                            <span className="text-titre-m leading-none font-black tracking-tight tabular-nums italic">{sat}</span>
+                            <span className="font-mono text-etiquette text-encre-3">
                               {a.totaux!.avis} note{a.totaux!.avis > 1 ? "s" : ""}
                             </span>
                           </>
                         ) : (
-                          <span className="font-mono text-[11px] text-foreground/45">{a.joue ? "pas encore noté" : "à venir"}</span>
+                          <span className="font-mono text-legende text-encre-3">{a.joue ? "pas encore noté" : "à venir"}</span>
                         )}
                       </div>
                     </li>
@@ -138,7 +138,7 @@ export function ProfilArbitre({ nom }: { nom: string }) {
 
       <Sheet open={photoOuverte} onOpenChange={setPhotoOuverte}>
         <SheetContent side="bottom" className="mx-auto w-full rounded-t-[28px] px-5 pt-6 pb-8 sm:max-w-md">
-          <SheetTitle className="text-[19px] font-extrabold tracking-tight">Ma photo</SheetTitle>
+          <SheetTitle className="text-titre-fort font-extrabold tracking-tight">Ma photo</SheetTitle>
           <ProfilePhoto name={nom} />
         </SheetContent>
       </Sheet>

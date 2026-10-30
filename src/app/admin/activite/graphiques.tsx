@@ -337,18 +337,18 @@ export function Courbe({
       )}
       {point && largeur > 0 && (
         <div
-          className="glass-soft pointer-events-none absolute top-0 rounded-xl px-2.5 py-1.5 text-[11px] leading-tight whitespace-nowrap backdrop-blur-md"
+          className="glass-soft pointer-events-none absolute top-0 rounded-xl px-2.5 py-1.5 text-legende leading-tight whitespace-nowrap backdrop-blur-md"
           style={{
             left: Math.min(Math.max(x(i) - 56, 0), largeur - 112),
             width: 112,
           }}
         >
-          <span className="mono-label block text-[8.5px] text-foreground/45">
+          <span className="mono-label block text-micro text-encre-3">
             {new Date(point.t).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })}
           </span>
           <span className="font-bold tabular-nums">{format(point.v)}</span>
           {avant?.[i] != null && (
-            <span className="text-foreground/45 tabular-nums"> · avant {format(avant[i]!)}</span>
+            <span className="text-encre-3 tabular-nums"> · avant {format(avant[i]!)}</span>
           )}
         </div>
       )}
@@ -370,7 +370,7 @@ export function CarteHoraire({ carte }: { carte: number[][] }) {
       <div className="flex flex-col gap-[3px]">
         {carte.map((ligne, j) => (
           <div key={j} className="flex items-center gap-[3px]">
-            <span className="mono-label w-7 shrink-0 text-[8px] text-foreground/40">{JOURS_COURTS[j]}</span>
+            <span className="mono-label w-7 shrink-0 text-micro text-encre-3">{JOURS_COURTS[j]}</span>
             {ligne.map((v, hr) => (
               <button
                 key={hr}
@@ -388,12 +388,12 @@ export function CarteHoraire({ carte }: { carte: number[][] }) {
       </div>
       <div className="mt-1.5 flex pl-[31px]">
         {[0, 6, 12, 18].map((hr) => (
-          <span key={hr} className="mono-label flex-1 text-[8px] text-foreground/30">
+          <span key={hr} className="mono-label flex-1 text-micro text-encre-4">
             {hr} h
           </span>
         ))}
       </div>
-      <p className="mt-2 min-h-[18px] text-[12px] text-foreground/55">
+      <p className="mt-2 min-h-[18px] text-petit text-encre-3">
         {choix
           ? `${JOURS_LONGS[choix[0]][0].toUpperCase()}${JOURS_LONGS[choix[0]].slice(1)}, ${choix[1]} h – ${choix[1] + 1} h : ${carte[choix[0]][choix[1]]} présences (${total ? pct(carte[choix[0]][choix[1]] / total) : "0 %"})`
           : "Touche une case pour lire le chiffre."}
@@ -411,9 +411,9 @@ export function Cohortes({ cohortes }: { cohortes: Cohorte[] }) {
       <table className="w-full border-separate" style={{ borderSpacing: 3 }}>
         <thead>
           <tr>
-            <th className="mono-label pr-1 text-left text-[8px] font-bold text-foreground/35">Arrivés</th>
+            <th className="mono-label pr-1 text-left text-micro font-bold text-encre-4">Arrivés</th>
             {Array.from({ length: cols }, (_, k) => (
-              <th key={k} className="mono-label min-w-[30px] text-center text-[8px] font-bold text-foreground/35">
+              <th key={k} className="mono-label min-w-[30px] text-center text-micro font-bold text-encre-4">
                 {k === 0 ? "S0" : `+${k}`}
               </th>
             ))}
@@ -422,9 +422,9 @@ export function Cohortes({ cohortes }: { cohortes: Cohorte[] }) {
         <tbody>
           {cohortes.map((c) => (
             <tr key={c.semaine}>
-              <td className="pr-1 text-[11px] whitespace-nowrap">
+              <td className="pr-1 text-legende whitespace-nowrap">
                 <span className="font-semibold">{jjmm(c.semaine)}</span>
-                <span className="text-foreground/40"> · {c.taille}</span>
+                <span className="text-encre-3"> · {c.taille}</span>
               </td>
               {Array.from({ length: cols }, (_, k) => {
                 const p = c.parts[k];
@@ -433,7 +433,7 @@ export function Cohortes({ cohortes }: { cohortes: Cohorte[] }) {
                 return (
                   <td
                     key={k}
-                    className="h-7 rounded-[5px] text-center text-[10px] font-bold tabular-nums"
+                    className="h-7 rounded-[5px] text-center text-etiquette font-bold tabular-nums"
                     style={{
                       background: encre(fond),
                       color: fond > 0.55 ? "var(--background)" : undefined,
@@ -477,21 +477,21 @@ export function Comparaison({
   return (
     <div>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[13px] font-semibold">{label}</span>
-        <span className="text-[11px] text-foreground/45 tabular-nums">
+        <span className="text-corps font-semibold">{label}</span>
+        <span className="text-legende text-encre-3 tabular-nums">
           {avec - sans >= 0 ? "+" : "−"}
           {Math.abs(Math.round((avec - sans) * 100))} pts
         </span>
       </div>
       <div className="mt-1.5 flex items-center gap-2">
-        <span className="mono-label w-[68px] shrink-0 text-[8.5px] whitespace-nowrap text-foreground/55">Oui · {nAvec}</span>
+        <span className="mono-label w-[68px] shrink-0 text-micro whitespace-nowrap text-encre-3">Oui · {nAvec}</span>
         {barre(avec, true)}
-        <span className="w-9 shrink-0 text-right text-[11px] font-bold tabular-nums">{pct(avec)}</span>
+        <span className="w-9 shrink-0 text-right text-legende font-bold tabular-nums">{pct(avec)}</span>
       </div>
       <div className="mt-1 flex items-center gap-2">
-        <span className="mono-label w-[68px] shrink-0 text-[8.5px] whitespace-nowrap text-foreground/35">Non · {nSans}</span>
+        <span className="mono-label w-[68px] shrink-0 text-micro whitespace-nowrap text-encre-4">Non · {nSans}</span>
         {barre(sans, false)}
-        <span className="w-9 shrink-0 text-right text-[11px] text-foreground/55 tabular-nums">{pct(sans)}</span>
+        <span className="w-9 shrink-0 text-right text-legende text-encre-3 tabular-nums">{pct(sans)}</span>
       </div>
     </div>
   );
@@ -500,16 +500,16 @@ export function Comparaison({
 /** Des barres horizontales, une ligne par libellé. */
 export function Barres({ lignes }: { lignes: { label: string; value: number }[] }) {
   const max = Math.max(1, ...lignes.map((l) => l.value));
-  if (lignes.length === 0) return <p className="text-[12.5px] text-foreground/40">Rien sur cette période.</p>;
+  if (lignes.length === 0) return <p className="text-corps text-encre-3">Rien sur cette période.</p>;
   return (
     <div className="flex flex-col gap-2.5">
       {lignes.map((l) => (
         <div key={l.label} className="flex items-center gap-3">
-          <span className="w-[46%] shrink-0 truncate text-[12.5px] font-medium">{l.label}</span>
+          <span className="w-[46%] shrink-0 truncate text-corps font-medium">{l.label}</span>
           <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/8">
             <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${(l.value / max) * 100}%` }} />
           </span>
-          <span className="w-[52px] shrink-0 text-right text-[12px] font-bold tabular-nums">{milliers(l.value)}</span>
+          <span className="w-[52px] shrink-0 text-right text-petit font-bold tabular-nums">{milliers(l.value)}</span>
         </div>
       ))}
     </div>

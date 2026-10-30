@@ -170,9 +170,9 @@ async function lireNotifs(now: number): Promise<Lecture> {
 function Tuile({ label, valeur, sous }: { label: string; valeur: string; sous: string }) {
   return (
     <div className="glass rounded-2xl px-3 py-3">
-      <p className="mono-label text-[8.5px] whitespace-nowrap text-foreground/45">{label}</p>
-      <div className="mt-1.5 text-[24px] leading-none font-extrabold tabular-nums">{valeur}</div>
-      <p className="mt-1.5 text-[10.5px] leading-tight text-foreground/45 tabular-nums">{sous}</p>
+      <p className="mono-label text-micro whitespace-nowrap text-encre-3">{label}</p>
+      <div className="mt-1.5 text-titre-g leading-none font-extrabold tabular-nums">{valeur}</div>
+      <p className="mt-1.5 text-legende leading-tight text-encre-3 tabular-nums">{sous}</p>
     </div>
   );
 }
@@ -180,7 +180,7 @@ function Tuile({ label, valeur, sous }: { label: string; valeur: string; sous: s
 function Titre({ children, droite }: { children: React.ReactNode; droite?: React.ReactNode }) {
   return (
     <div className="mb-2.5 flex items-baseline justify-between gap-3">
-      <p className="mono-label text-[8.5px] text-foreground/45">{children}</p>
+      <p className="mono-label text-micro text-encre-3">{children}</p>
       {droite}
     </div>
   );
@@ -198,7 +198,7 @@ function LigneRetenir({ r }: { r: Retenir }) {
       >
         <Icone className="size-3" />
       </span>
-      <p className="pt-0.5 text-[12.5px] leading-snug">{r.texte}</p>
+      <p className="pt-0.5 text-corps leading-snug">{r.texte}</p>
     </div>
   );
 }
@@ -208,12 +208,12 @@ function Part({ label, n, sur, onClick, ouvert }: { label: string; n: number; su
   const contenu = (
     <>
       <span className="flex items-baseline gap-2">
-        <span className="min-w-0 flex-1 truncate text-left text-[12.5px] font-medium">{label}</span>
-        <span className="w-10 shrink-0 text-right text-[12px] font-bold tabular-nums">{pct(part(n, sur))}</span>
-        <span className="w-6 shrink-0 text-right text-[10.5px] text-foreground/40 tabular-nums">{n}</span>
+        <span className="min-w-0 flex-1 truncate text-left text-corps font-medium">{label}</span>
+        <span className="w-10 shrink-0 text-right text-petit font-bold tabular-nums">{pct(part(n, sur))}</span>
+        <span className="w-6 shrink-0 text-right text-legende text-encre-3 tabular-nums">{n}</span>
         {onClick && (
           <ChevronDown
-            className={cn("size-3 shrink-0 self-center text-foreground/30 transition-transform", ouvert && "rotate-180")}
+            className={cn("size-3 shrink-0 self-center text-encre-4 transition-transform", ouvert && "rotate-180")}
           />
         )}
       </span>
@@ -235,13 +235,13 @@ function Part({ label, n, sur, onClick, ouvert }: { label: string; n: number; su
 function Colonnes({ t, fort }: { t: Taux; fort?: boolean }) {
   return (
     <>
-      <span className={cn("w-12 shrink-0 text-right tabular-nums", fort ? "text-[12.5px] font-bold" : "text-[11.5px] text-foreground/50")}>
+      <span className={cn("w-12 shrink-0 text-right tabular-nums", fort ? "text-corps font-bold" : "text-petit text-encre-3")}>
         {milliers(t.envoyees)}
       </span>
-      <span className={cn("w-11 shrink-0 text-right tabular-nums", fort ? "text-[12.5px] font-extrabold" : "text-[12px] font-bold")}>
+      <span className={cn("w-11 shrink-0 text-right tabular-nums", fort ? "text-corps font-extrabold" : "text-petit font-bold")}>
         {pct(part(t.touchees, t.envoyees))}
       </span>
-      <span className={cn("w-10 shrink-0 text-right tabular-nums", fort ? "text-[12.5px] font-bold" : "text-[12px] text-foreground/60")}>
+      <span className={cn("w-10 shrink-0 text-right tabular-nums", fort ? "text-corps font-bold" : "text-petit text-encre-2")}>
         {t.attendues ? pct(part(t.suivies, t.attendues)) : "—"}
       </span>
     </>
@@ -274,11 +274,11 @@ function Motif({ m }: { m: LigneMotif }) {
   return (
     <div className="py-2 pl-3">
       <div className="flex items-baseline gap-2">
-        <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{m.label}</span>
+        <span className="min-w-0 flex-1 truncate text-petit font-medium">{m.label}</span>
         <Colonnes t={m} />
       </div>
       <Barre t={m} />
-      {reponses && <p className="mt-1 text-[10.5px] text-foreground/45 tabular-nums">{reponses}</p>}
+      {reponses && <p className="mt-1 text-legende text-encre-3 tabular-nums">{reponses}</p>}
     </div>
   );
 }
@@ -356,25 +356,25 @@ export function NotifsStats({
 
   return (
     <section id="activite-notifs" className="glass scroll-mt-16 rounded-3xl p-5">
-      <h2 className="text-[17px] font-bold tracking-tight">Notifications</h2>
-      <p className="mt-0.5 text-[12px] leading-snug text-foreground/45">
+      <h2 className="text-titre font-bold tracking-tight">Notifications</h2>
+      <p className="mt-0.5 text-petit leading-snug text-encre-3">
         Qui les a activées, et ce que chaque motif leur fait faire, {periode}.{comptees}
       </p>
       {demo && (
-        <p className="glass-soft mt-3 rounded-2xl px-3 py-2 text-[11.5px] leading-snug text-foreground/60">
+        <p className="glass-soft mt-3 rounded-2xl px-3 py-2 text-petit leading-snug text-encre-2">
           Aperçu : des données d&apos;exemple, prénoms inventés. Les vraies se remplissent dès la mise en ligne.
         </p>
       )}
 
       {lecture.etat === "lecture" && (
-        <div className="flex justify-center py-10 text-foreground/40">
+        <div className="flex justify-center py-10 text-encre-3">
           <Loader2 className="size-5 animate-spin" />
         </div>
       )}
       {lecture.etat === "absent" && (
-        <p className="mt-3 text-[12.5px] text-foreground/55">Le suivi des notifications arrive avec la prochaine mise en ligne.</p>
+        <p className="mt-3 text-corps text-encre-3">Le suivi des notifications arrive avec la prochaine mise en ligne.</p>
       )}
-      {lecture.etat === "erreur" && <p className="mt-3 text-[12.5px] text-[#c8352b] dark:text-[#FF6B5E]">{lecture.message}</p>}
+      {lecture.etat === "erreur" && <p className="mt-3 text-corps text-[#c8352b] dark:text-[#FF6B5E]">{lecture.message}</p>}
 
       {a && (
         <div className="mt-4 flex flex-col gap-6">
@@ -413,8 +413,8 @@ export function NotifsStats({
           <div>
             <Titre>Joueurs qui les ont activées</Titre>
             <div className="flex items-baseline gap-2.5">
-              <span className="text-[22px] font-extrabold tracking-tight tabular-nums">{`${a.activees.joueurs} aujourd'hui`}</span>
-              <span className="text-[11.5px] text-foreground/50 tabular-nums">
+              <span className="text-titre-m font-extrabold tracking-tight tabular-nums">{`${a.activees.joueurs} aujourd'hui`}</span>
+              <span className="text-petit text-encre-3 tabular-nums">
                 +{a.activees.gagnes}
                 {a.activees.perdus > 0 && ` · −${a.activees.perdus}`} {surPeriode}
               </span>
@@ -422,7 +422,7 @@ export function NotifsStats({
             <div className="mt-2">
               <Courbe points={a.courbe} format={(v) => milliers(Math.round(v))} hauteur={150} />
             </div>
-            <p className="mt-2 text-[11.5px] leading-snug text-foreground/45">
+            <p className="mt-2 text-petit leading-snug text-encre-3">
               {a.activees.telephones} {a.activees.telephones > 1 ? "téléphones" : "téléphone"}
               {a.services.length > 0 && <> : {a.services.map((s) => `${s.n} ${s.label}`).join(", ")}</>}.
             </p>
@@ -435,7 +435,7 @@ export function NotifsStats({
                 Sans notifications · {sansNotifs} des {a.activees.actifs} actifs
               </Titre>
               {sansNotifs === 0 ? (
-                <p className="text-[12.5px] text-foreground/55">Tous les joueurs actifs les ont activées.</p>
+                <p className="text-corps text-encre-3">Tous les joueurs actifs les ont activées.</p>
               ) : (
                 <div className="flex flex-col gap-2.5">
                   {a.raisons.map((r) => (
@@ -448,7 +448,7 @@ export function NotifsStats({
                         onClick={() => setRaison((o) => (o === r.id ? null : r.id))}
                       />
                       {raison === r.id && (
-                        <p className="mt-1.5 text-[12px] leading-relaxed text-foreground/55">{r.noms.join(", ")}</p>
+                        <p className="mt-1.5 text-petit leading-relaxed text-encre-3">{r.noms.join(", ")}</p>
                       )}
                     </div>
                   ))}
@@ -464,7 +464,7 @@ export function NotifsStats({
               {a.invitation.proposes > 0 && ` · proposée à ${a.invitation.proposes}`}
             </Titre>
             {a.invitation.proposes === 0 ? (
-              <p className="text-[12.5px] text-foreground/45">Pas encore proposée sur la période.</p>
+              <p className="text-corps text-encre-3">Pas encore proposée sur la période.</p>
             ) : (
               <div className="flex flex-col gap-2.5">
                 {a.invitation.issues.map((i) => (
@@ -473,7 +473,7 @@ export function NotifsStats({
               </div>
             )}
             {a.invitation.ailleurs.length > 0 && (
-              <p className="mt-2.5 text-[11.5px] text-foreground/45">
+              <p className="mt-2.5 text-petit text-encre-3">
                 Activées ailleurs : {a.invitation.ailleurs.map((x) => `${x.label} ${x.n}`).join(", ")}.
               </p>
             )}
@@ -482,33 +482,33 @@ export function NotifsStats({
           {/* 5. Motif par motif */}
           <div>
             <div className="mb-1 flex items-baseline gap-2">
-              <p className="mono-label min-w-0 flex-1 text-[8.5px] text-foreground/45">Par motif</p>
+              <p className="mono-label min-w-0 flex-1 text-micro text-encre-3">Par motif</p>
               {/* Pas de .mono-label ici : son interlettrage, hors des couches de
                   Tailwind, ferait se chevaucher les trois en-têtes. */}
-              <span className="w-12 shrink-0 text-right font-mono text-[8px] font-bold text-foreground/40 uppercase">Envoyées</span>
-              <span className="w-11 shrink-0 text-right font-mono text-[8px] font-bold text-foreground/40 uppercase">Touchées</span>
-              <span className="w-10 shrink-0 text-right font-mono text-[8px] font-bold text-foreground/40 uppercase">Suivies</span>
+              <span className="w-12 shrink-0 text-right font-mono text-micro font-bold text-encre-3 uppercase">Envoyées</span>
+              <span className="w-11 shrink-0 text-right font-mono text-micro font-bold text-encre-3 uppercase">Touchées</span>
+              <span className="w-10 shrink-0 text-right font-mono text-micro font-bold text-encre-3 uppercase">Suivies</span>
             </div>
             {a.familles.length === 0 ? (
-              <p className="py-2 text-[12.5px] text-foreground/45">Aucune notification envoyée sur la période.</p>
+              <p className="py-2 text-corps text-encre-3">Aucune notification envoyée sur la période.</p>
             ) : (
               <div className="flex flex-col">
                 {a.familles.map((f) => (
                   <div key={f.id} className="border-b border-foreground/6 py-2.5 last:border-0">
                     <div className="flex items-baseline gap-2">
-                      <span className="min-w-0 flex-1 truncate text-[13.5px] font-bold">{f.label}</span>
+                      <span className="min-w-0 flex-1 truncate text-ligne font-bold">{f.label}</span>
                       <Colonnes t={f} fort />
                     </div>
                     <Barre t={f} epaisse />
                     {f.motifs.length > 1 && f.motifs.map((m) => <Motif key={m.motif} m={m} />)}
                     {f.motifs.length === 1 && seulMotif(f) && (
-                      <p className="mt-1 text-[11px] text-foreground/45 tabular-nums">{seulMotif(f)}</p>
+                      <p className="mt-1 text-legende text-encre-3 tabular-nums">{seulMotif(f)}</p>
                     )}
                   </div>
                 ))}
               </div>
             )}
-            <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-foreground/45">
+            <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-legende text-encre-3">
               <span className="flex items-center gap-1.5">
                 <span className="h-1.5 w-4 rounded-full" style={{ background: encre(0.32) }} />
                 touchées
@@ -529,8 +529,8 @@ export function NotifsStats({
                 aria-expanded={parJoueur}
                 className="flex w-full items-center justify-between gap-3"
               >
-                <span className="mono-label text-[8.5px] text-foreground/45">Par joueur · {a.joueurs.length}</span>
-                <ChevronDown className={cn("size-3.5 text-foreground/40 transition-transform", parJoueur && "rotate-180")} />
+                <span className="mono-label text-micro text-encre-3">Par joueur · {a.joueurs.length}</span>
+                <ChevronDown className={cn("size-3.5 text-encre-3 transition-transform", parJoueur && "rotate-180")} />
               </button>
               {parJoueur && (
                 <div className="mt-1.5 flex flex-col">
@@ -543,18 +543,18 @@ export function NotifsStats({
                     >
                       <span className="min-w-0 flex-1">
                         <span className="flex items-baseline justify-between gap-3">
-                          <span className="truncate text-[13.5px] font-semibold">{j.nom}</span>
-                          <span className="mono-label shrink-0 text-[8.5px] text-foreground/45">
+                          <span className="truncate text-ligne font-semibold">{j.nom}</span>
+                          <span className="mono-label shrink-0 text-micro text-encre-3">
                             {j.telephones === 0 ? "plus abonné" : j.telephones > 1 ? `${j.telephones} téléphones` : "activées"}
                           </span>
                         </span>
-                        <span className="mt-0.5 block text-[11.5px] leading-snug text-foreground/45 tabular-nums">
+                        <span className="mt-0.5 block text-petit leading-snug text-encre-3 tabular-nums">
                           {j.recues} {j.recues > 1 ? "reçues" : "reçue"} · {j.touchees} {j.touchees > 1 ? "touchées" : "touchée"}
                           {j.attendues > 0 && ` · ${j.suivies} suivies d'effet`}
                           {j.derniere !== null && ` · dernière touchée le ${jjmm(j.derniere)}`}
                         </span>
                       </span>
-                      {onJoueur && <ChevronRight className="size-4 shrink-0 text-foreground/40" />}
+                      {onJoueur && <ChevronRight className="size-4 shrink-0 text-encre-3" />}
                     </button>
                   ))}
                 </div>
@@ -562,7 +562,7 @@ export function NotifsStats({
             </div>
           )}
 
-          <p className="text-[11px] leading-relaxed text-foreground/35">{note(a.total)}</p>
+          <p className="text-legende leading-relaxed text-encre-4">{note(a.total)}</p>
         </div>
       )}
     </section>

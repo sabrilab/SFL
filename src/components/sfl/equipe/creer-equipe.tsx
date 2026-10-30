@@ -62,7 +62,7 @@ export function CreerEquipe({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
         <SheetHeader className="px-5 pt-5 pb-0">
-          <SheetTitle className="text-[26px] font-bold tracking-tight">Créer mon équipe</SheetTitle>
+          <SheetTitle className="text-titre-g font-bold tracking-tight">Créer mon équipe</SheetTitle>
         </SheetHeader>
         <div className="flex flex-col gap-5 px-4">
           <div className="flex items-end justify-center gap-5 py-1">
@@ -83,7 +83,7 @@ export function CreerEquipe({
           <ReglementListe />
           <CharteListe />
           <CaseAcceptation coche={coche} onChange={setCoche} />
-          <Button variant="vert" disabled={!pret || !coche || envoi} onClick={creer} className="h-12 rounded-full text-[15px] font-semibold">
+          <Button variant="vert" disabled={!pret || !coche || envoi} onClick={creer} className="h-12 rounded-full text-lecture font-semibold">
             Signer et créer l&apos;équipe
           </Button>
         </div>

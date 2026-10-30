@@ -158,13 +158,13 @@ export function BlocMatchs({
           {direct && (
             <div className="flex items-center justify-center gap-4">
               <PastilleMaillot camp="Noirs" />
-              <span className="font-display text-[40px] leading-none tabular-nums">
+              <span className="font-display text-affiche leading-none tabular-nums">
                 {mv.score[0]} – {mv.score[1]}
               </span>
               <PastilleMaillot camp="Blancs" />
             </div>
           )}
-          <p className="mono-label -mb-1 text-center text-foreground/55">
+          <p className="mono-label -mb-1 text-center text-encre-3">
             {mv.m.equipes[0]} · {mv.noirs.length}
           </p>
           <TerrainPlaces
@@ -173,7 +173,7 @@ export function BlocMatchs({
             onPlus={onPlus ? (_i, devant) => onPlus(devant ? mv.m.equipes[1] : mv.m.equipes[0]) : undefined}
             onOccupant={onCarte ? (o) => onCarte(Number(o.cle)) : undefined}
           />
-          <p className="mono-label -mt-1 text-center text-foreground/55">
+          <p className="mono-label -mt-1 text-center text-encre-3">
             {mv.m.equipes[1]} · {mv.blancs.length}
           </p>
         </>
@@ -182,7 +182,7 @@ export function BlocMatchs({
           type="button"
           onClick={onAjouterMatch}
           disabled={!onAjouterMatch}
-          className="mono-label grid h-40 place-items-center rounded-[22px] border-[1.5px] border-dashed border-foreground/25 text-foreground/60"
+          className="mono-label grid h-40 place-items-center rounded-[22px] border-[1.5px] border-dashed border-foreground/25 text-encre-2"
         >
           + Match 1
         </button>

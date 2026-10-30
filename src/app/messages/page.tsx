@@ -92,7 +92,7 @@ export default function MessagesPage() {
     <div className="mx-auto flex w-full max-w-xl flex-col gap-[var(--fib-13)] px-5 py-4 sm:py-8 lg:max-w-[760px]">
       <div className="flex items-center gap-3">
         <BoutonRetour />
-        <h1 className="min-w-0 flex-1 text-[30px] font-bold tracking-tight">Messages</h1>
+        <h1 className="min-w-0 flex-1 text-titre-l font-bold tracking-tight">Messages</h1>
         {session?.server && (
           <button
             type="button"
@@ -107,14 +107,14 @@ export default function MessagesPage() {
 
       {charge && conversations.length === 0 && (
         <div className="flex flex-col items-center gap-[var(--fib-21)] pt-[18vh]">
-          <span className="flex size-20 items-center justify-center rounded-full border border-foreground/12 text-foreground/30">
+          <span className="flex size-20 items-center justify-center rounded-full border border-foreground/12 text-encre-4">
             <Send className="size-8 -translate-x-0.5 translate-y-0.5" strokeWidth={1.6} />
           </span>
           {session?.server && (
             <button
               type="button"
               onClick={() => setChoisir(true)}
-              className="bouton-principal bouton--mauve flex h-12 items-center justify-center px-6 text-[15px] font-semibold"
+              className="bouton-principal bouton--mauve flex h-12 items-center justify-center px-6 text-lecture font-semibold"
             >
               Écrire à un joueur
             </button>
@@ -135,22 +135,22 @@ export default function MessagesPage() {
                 <CarteDe name={nom || "?"} size={FORMAT_CARTE.petite} inerte />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="flex items-baseline gap-2">
-                    <span className={cn("min-w-0 flex-1 truncate text-[16px] tracking-tight", lu ? "font-semibold" : "font-bold")}>
+                    <span className={cn("min-w-0 flex-1 truncate text-titre tracking-tight", lu ? "font-semibold" : "font-bold")}>
                       {nom ? <Nom n={nom} /> : "Un joueur"}
                     </span>
-                    <span className={cn("shrink-0 text-[12px] tabular-nums", lu ? "text-foreground/40" : "font-semibold text-foreground")}>
+                    <span className={cn("shrink-0 text-petit tabular-nums", lu ? "text-encre-3" : "font-semibold text-foreground")}>
                       {quand(c.dernier.at)}
                     </span>
                   </span>
                   <span className="flex items-center gap-2">
-                    <span className={cn("min-w-0 flex-1 truncate text-[14px]", lu ? "text-foreground/50" : "font-semibold text-foreground/85")}>
+                    <span className={cn("min-w-0 flex-1 truncate text-ligne", lu ? "text-encre-3" : "font-semibold text-encre-2")}>
                       {c.dernier.mien ? "Toi : " : ""}
                       {resumeMessage(c.dernier.texte, c.dernier.piece)}
                     </span>
                     {!lu && (
                       <span
                         aria-label={`${c.nonLus} pas lu${c.nonLus > 1 ? "s" : ""}`}
-                        className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-[5px] text-[11.5px] leading-none font-bold text-white tabular-nums"
+                        className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-[5px] text-petit leading-none font-bold text-white tabular-nums"
                         style={{ background: "#FF3B30" }}
                       >
                         {c.nonLus > 9 ? "9+" : c.nonLus}

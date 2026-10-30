@@ -146,7 +146,7 @@ const DROITE_ACTIONS = { right: 0 } as const;
 /* -------------------------------- cellules ------------------------------- */
 
 const cellBase =
-  "h-[30px] w-full rounded-[7px] border border-transparent bg-transparent px-1.5 text-[12px] " +
+  "h-[30px] w-full rounded-[7px] border border-transparent bg-transparent px-1.5 text-petit " +
   "outline-none transition-colors focus:border-primary/60 focus:bg-primary/8";
 
 function Bool({
@@ -356,7 +356,7 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
         <select
           value={j}
           onChange={(e) => setJ(Number(e.target.value))}
-          className="glass-soft h-9 cursor-pointer rounded-full px-3.5 text-[13px] font-bold outline-none"
+          className="glass-soft h-9 cursor-pointer rounded-full px-3.5 text-corps font-bold outline-none"
         >
           {journees.map((m) => (
             <option key={m.j} value={m.j} className="bg-white text-[#08090b] dark:bg-[#141414] dark:text-white">
@@ -370,20 +370,20 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Filtrer un joueur…"
-          className="glass-soft h-9 min-w-0 flex-1 rounded-full px-4 text-[13px] outline-none placeholder:text-foreground/30"
+          className="glass-soft h-9 min-w-0 flex-1 rounded-full px-4 text-corps outline-none placeholder:text-encre-4"
         />
 
         <button
           onClick={() => setChoisir(true)}
           disabled={libres.length === 0}
-          className="bouton-principal flex h-9 items-center gap-1.5 px-3.5 text-[13px] font-bold disabled:opacity-40"
+          className="bouton-principal flex h-9 items-center gap-1.5 px-3.5 text-corps font-bold disabled:opacity-40"
         >
           <Plus className="size-3.5" /> Ligne
         </button>
         <button
           onClick={ajouterUnMatch}
           disabled={!meta}
-          className="bouton-secondaire flex h-9 items-center gap-1.5 px-3.5 text-[13px] font-bold disabled:opacity-40"
+          className="bouton-secondaire flex h-9 items-center gap-1.5 px-3.5 text-corps font-bold disabled:opacity-40"
         >
           <Plus className="size-3.5" /> Match {declares.length + 1}
         </button>
@@ -405,7 +405,7 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
             {/* En-tête */}
             <div className="flex items-center border-b border-contraste/10 bg-[#eceee9] py-2 pr-1.5 dark:bg-[#141414]">
               <span
-                className={cn(FIGE, "mono-label w-[30px] shrink-0 text-center text-foreground/25")}
+                className={cn(FIGE, "mono-label w-[30px] shrink-0 text-center text-encre-4")}
                 style={GAUCHE_NUM}
               >
                 #
@@ -417,7 +417,7 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
                     key={c.id}
                     title={c.title ?? c.label}
                     className={cn(
-                      "mono-label shrink-0 px-1.5 text-foreground/35",
+                      "mono-label shrink-0 px-1.5 text-encre-4",
                       fige && FIGE,
                       c.id === "player" && "border-r border-contraste/8",
                       c.id === "pp" && "border-l border-contraste/8 text-center text-primary"
@@ -450,7 +450,7 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
                   <span
                     className={cn(
                       FIGE,
-                      "mono-label w-[30px] shrink-0 text-center text-foreground/25 tabular-nums"
+                      "mono-label w-[30px] shrink-0 text-center text-encre-4 tabular-nums"
                     )}
                     style={GAUCHE_NUM}
                   >
@@ -468,7 +468,7 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
                           style={{ ...w, ...DROITE_PP }}
                           className={cn(
                             FIGE,
-                            "shrink-0 border-l border-contraste/8 px-1.5 text-center text-[12px] font-extrabold tabular-nums"
+                            "shrink-0 border-l border-contraste/8 px-1.5 text-center text-petit font-extrabold tabular-nums"
                           )}
                         >
                           {pp}
@@ -580,7 +580,7 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
             })}
 
             {rows.length === 0 && (
-              <p className="mono-label px-4 py-10 text-center text-foreground/40">
+              <p className="mono-label px-4 py-10 text-center text-encre-3">
                 J{j} · 0 ligne{q && ` · « ${q} »`}
               </p>
             )}
@@ -593,19 +593,19 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
         {equipes.map((t) => (
           <span
             key={t.nom}
-            className="glass-soft flex items-baseline gap-1.5 rounded-full px-3 py-1.5 text-[12px]"
+            className="glass-soft flex items-baseline gap-1.5 rounded-full px-3 py-1.5 text-petit"
           >
             <strong className="flex items-center gap-1.5 self-center font-bold">
               {t.camp && <PointMaillot camp={t.camp} className="size-2" />}
               {t.libelle}
             </strong>
-            <span className="tabular-nums text-foreground/45">
+            <span className="tabular-nums text-encre-3">
               {t.buts} but{t.buts > 1 ? "s" : ""} · {t.passes} passe{t.passes > 1 ? "s" : ""} ·{" "}
               {t.joueurs} joueur{t.joueurs > 1 ? "s" : ""}
             </span>
           </span>
         ))}
-        <span className="glass-soft ml-auto rounded-full px-3 py-1.5 text-[12px] font-bold tabular-nums">
+        <span className="glass-soft ml-auto rounded-full px-3 py-1.5 text-petit font-bold tabular-nums">
           {rows.length} ligne{rows.length > 1 ? "s" : ""} · {ppTotal} PP
         </span>
       </div>
@@ -613,8 +613,8 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
       {/* L'aide-mémoire des raccourcis : seulement sur « ? » */}
       {aide && (
         <div className="glass-soft rounded-[18px] px-4 py-3">
-          <p className="mono-label text-foreground/35">Raccourcis</p>
-          <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-[12px] text-foreground/50 sm:grid-cols-2">
+          <p className="mono-label text-encre-4">Raccourcis</p>
+          <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-petit text-encre-3 sm:grid-cols-2">
             {(
               [
                 ["Entrée · ↓ · ↑", "ligne suivante / précédente"],
@@ -625,14 +625,14 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
               ] as const
             ).map(([k, v]) => (
               <div key={k} className="flex items-baseline gap-2">
-                <kbd className="shrink-0 rounded-md border border-contraste/12 bg-contraste/6 px-1.5 py-0.5 font-mono text-[10.5px] text-foreground/70">
+                <kbd className="shrink-0 rounded-md border border-contraste/12 bg-contraste/6 px-1.5 py-0.5 font-mono text-legende text-encre-2">
                   {k}
                 </kbd>
                 <span className="min-w-0">{v}</span>
               </div>
             ))}
           </div>
-          {meta && <p className="mono-label mt-2.5 border-t border-contraste/8 pt-2.5 text-foreground/40">J{meta.j} · {meta.date} · XT = Xtratime · 2 arrêts = 1 PP · 2 interc. = 1 PP</p>}
+          {meta && <p className="mono-label mt-2.5 border-t border-contraste/8 pt-2.5 text-encre-3">J{meta.j} · {meta.date} · XT = Xtratime · 2 arrêts = 1 PP · 2 interc. = 1 PP</p>}
         </div>
       )}
     </div>

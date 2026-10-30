@@ -37,8 +37,8 @@ function Bascule({ libelle, on, onChange, verrou }: { libelle: string; on: boole
         onChange(!on);
       }}
       className={cn(
-        "flex h-11 items-center justify-center gap-1.5 rounded-full px-4 text-[13.5px] font-semibold transition-colors disabled:opacity-60",
-        on ? "bg-foreground text-background" : "bg-secondary text-foreground/70"
+        "flex h-11 items-center justify-center gap-1.5 rounded-full px-4 text-ligne font-semibold transition-colors disabled:opacity-60",
+        on ? "bg-foreground text-background" : "bg-secondary text-encre-2"
       )}
     >
       {libelle}
@@ -88,13 +88,13 @@ export function FeuilleLigne({
         open={open}
         onOpenChange={(o) => !o && onClose()}
         titre={e.player}
-        etat={<span className="mono-label text-foreground/55">J{e.j} · {entryPP(e)} PP</span>}
+        etat={<span className="mono-label text-encre-3">J{e.j} · {entryPP(e)} PP</span>}
         bas={
           <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => setRemplacer(true)} className="bouton-secondaire h-12 text-[15px] font-semibold">
+            <button type="button" onClick={() => setRemplacer(true)} className="bouton-secondaire h-12 text-lecture font-semibold">
               Remplacer
             </button>
-            <button type="button" onClick={() => onRetirer(index, e)} className="bouton-secondaire h-12 text-[15px] font-semibold">
+            <button type="button" onClick={() => onRetirer(index, e)} className="bouton-secondaire h-12 text-lecture font-semibold">
               Retirer
             </button>
           </div>
@@ -103,7 +103,7 @@ export function FeuilleLigne({
         <div className="flex items-center gap-4">
           <MiniCarte player={player} size={FORMAT_CARTE.moyenne} maillot={sienne?.camp ?? undefined} />
           <div className="flex min-w-0 flex-col gap-1">
-            <span className="mono-label text-foreground/75">{sienne?.libelle ?? "Sans équipe"}</span>
+            <span className="mono-label text-encre-2">{sienne?.libelle ?? "Sans équipe"}</span>
           </div>
         </div>
 

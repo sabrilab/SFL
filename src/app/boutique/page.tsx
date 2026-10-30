@@ -55,11 +55,11 @@ function GuichetBallons({
   return (
     <Dialog open={ouvert} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85dvh] max-w-md overflow-y-auto">
-        <DialogTitle className="text-[20px] font-bold tracking-tight">
+        <DialogTitle className="text-titre-fort font-bold tracking-tight">
           Acheter des Ballons
         </DialogTitle>
-        <p className="-mt-1 text-[13px] leading-snug text-foreground/45">
-          La monnaie de la ligue, au taux de <b className="font-semibold text-foreground/70">10 €
+        <p className="-mt-1 text-corps leading-snug text-encre-3">
+          La monnaie de la ligue, au taux de <b className="font-semibold text-encre-2">10 €
           pour 1 000 ⚽</b>. Tout se gagne aussi en jouant : connexion, votes, duels, convocation,
           compositions.
         </p>
@@ -76,12 +76,12 @@ function GuichetBallons({
             {RECHARGES.map((r) => (
               <div key={r.euros} className="glass rounded-[20px] px-3.5 py-3">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[18px] leading-none font-extrabold tracking-tight tabular-nums">
+                  <span className="text-titre-fort leading-none font-extrabold tracking-tight tabular-nums">
                     {milliers(r.ballons)} ⚽
                   </span>
-                  <span className="text-[13px] font-bold tabular-nums">{r.euros} €</span>
+                  <span className="text-corps font-bold tabular-nums">{r.euros} €</span>
                 </div>
-                <p className="mono-label mt-1.5 text-foreground/40">
+                <p className="mono-label mt-1.5 text-encre-3">
                   {r.bonus ? `+${r.bonus} offerts` : "Taux normal"}
                 </p>
               </div>
@@ -91,7 +91,7 @@ function GuichetBallons({
 
         {/* Ce que les Ballons achètent — informatif, pas en vitrine */}
         <div className="mt-1 border-t border-contraste/8 pt-3.5">
-          <p className="mono-label text-foreground/35">Ce qu&apos;ils achètent</p>
+          <p className="mono-label text-encre-4">Ce qu&apos;ils achètent</p>
           <div className="mt-2.5 flex flex-col gap-1.5">
             {(
               [
@@ -101,10 +101,10 @@ function GuichetBallons({
                 ["Carte MVP", CARD_PRICES.mvp],
               ] as const
             ).map(([label, prix]) => (
-              <div key={label} className="flex items-baseline justify-between gap-3 text-[13px]">
+              <div key={label} className="flex items-baseline justify-between gap-3 text-corps">
                 <span className="font-medium">{label}</span>
                 <span className="flex items-baseline gap-2">
-                  <span className="mono-label text-foreground/25">{euros(prix)} €</span>
+                  <span className="mono-label text-encre-4">{euros(prix)} €</span>
                   <span className="font-bold tabular-nums">{prix} ⚽</span>
                 </span>
               </div>
@@ -112,7 +112,7 @@ function GuichetBallons({
           </div>
           <Link
             href="/collection"
-            className="bouton-secondaire bouton--or mt-3.5 block py-2.5 text-center text-[13.5px] font-semibold"
+            className="bouton-secondaire bouton--or mt-3.5 block py-2.5 text-center text-ligne font-semibold"
           >
             Voir le catalogue de cartes
           </Link>
@@ -134,8 +134,8 @@ export default function Boutique() {
       <div className="flex items-center gap-3">
         <BoutonRetour />
         <div className="min-w-0">
-          <h1 className="text-[30px] font-bold tracking-tight">Boutique</h1>
-          <p className="mt-1 text-[13px] text-foreground/42">
+          <h1 className="text-titre-l font-bold tracking-tight">Boutique</h1>
+          <p className="mt-1 text-corps text-encre-3">
             Maillots, survêts, montres · payables en Ballons
           </p>
         </div>
@@ -145,13 +145,13 @@ export default function Boutique() {
           Une ligne, pas une devanture. */}
       <div className="glass-soft flex items-center justify-between gap-2 rounded-full py-2 pr-2 pl-4">
         <span className="flex min-w-0 items-baseline gap-1.5 whitespace-nowrap">
-          <span className="text-[17px] font-extrabold tabular-nums">{milliers(ballons)}</span>
-          <span className="text-[13px]">⚽</span>
-          <span className="mono-label truncate text-foreground/35">Ballons</span>
+          <span className="text-titre font-extrabold tabular-nums">{milliers(ballons)}</span>
+          <span className="text-corps">⚽</span>
+          <span className="mono-label truncate text-encre-4">Ballons</span>
         </span>
         <button
           onClick={() => setGuichet(true)}
-          className="bouton-principal bouton--or flex shrink-0 items-center gap-1.5 px-3.5 py-2 text-[13px] font-bold whitespace-nowrap"
+          className="bouton-principal bouton--or flex shrink-0 items-center gap-1.5 px-3.5 py-2 text-corps font-bold whitespace-nowrap"
         >
           <Plus className="size-3.5" strokeWidth={3} />
           {/* Le libellé entier ne tient pas à côté d'un solde à cinq chiffres sur
@@ -170,7 +170,7 @@ export default function Boutique() {
           bloc elle retombait sur le bouton d'achat, dedans elle recouvrait les
           catégories. */}
       <div className="relative mt-1">
-        <h2 className="mb-2.5 px-1 text-[17px] font-bold tracking-tight">Le rayon</h2>
+        <h2 className="mb-2.5 px-1 text-titre font-bold tracking-tight">Le rayon</h2>
         <Locked
           label="Bientôt"
           chipClassName="-top-8 right-1"
@@ -184,8 +184,8 @@ export default function Boutique() {
                   key={c}
                   className={
                     i === 0
-                      ? "shrink-0 rounded-full bg-foreground px-[15px] py-2.5 text-[13px] font-bold text-background"
-                      : "glass-soft shrink-0 rounded-full px-[15px] py-2.5 text-[13px] font-semibold text-foreground/72"
+                      ? "shrink-0 rounded-full bg-foreground px-[15px] py-2.5 text-corps font-bold text-background"
+                      : "glass-soft shrink-0 rounded-full px-[15px] py-2.5 text-corps font-semibold text-encre-2"
                   }
                 >
                   {c}
@@ -203,29 +203,29 @@ export default function Boutique() {
                     "repeating-linear-gradient(115deg, rgb(var(--contraste-rgb) / 0.06) 0 9px, rgb(var(--contraste-rgb) / 0.012) 9px 18px), radial-gradient(120% 90% at 70% 15%, rgb(var(--contraste-rgb) / 0.07), rgba(0,0,0,0) 60%)",
                 }}
               >
-                <span className="mono-label absolute top-3.5 left-3.5 rounded-full border border-contraste/16 bg-contraste/10 px-[11px] py-[5px] text-foreground/80">
+                <span className="mono-label absolute top-3.5 left-3.5 rounded-full border border-contraste/16 bg-contraste/10 px-[11px] py-[5px] text-encre-2">
                   Nouveau · Domicile 25/26
                 </span>
-                <span className="mono-label absolute right-3.5 bottom-3.5 text-foreground/35">
+                <span className="mono-label absolute right-3.5 bottom-3.5 text-encre-4">
                   Visuel produit
                 </span>
               </div>
               <div className="flex flex-1 flex-col justify-center p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-[19px] leading-[1.25] font-bold tracking-tight">
+                    <div className="text-titre-fort leading-[1.25] font-bold tracking-tight">
                       {UNE.name}
                     </div>
-                    <p className="mt-[5px] text-[13px] text-foreground/42">{UNE.note}</p>
+                    <p className="mt-[5px] text-corps text-encre-3">{UNE.note}</p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <div className="text-[22px] font-extrabold tracking-tight tabular-nums">
+                    <div className="text-titre-m font-extrabold tracking-tight tabular-nums">
                       {milliers(ballonsPourEuros(UNE.euros))}
                     </div>
                     <div className="mono-label mt-[3px] text-primary">Ballons</div>
                   </div>
                 </div>
-                <div className="mt-3.5 rounded-full bg-foreground py-[15px] text-center text-[15px] font-bold text-background">
+                <div className="mt-3.5 rounded-full bg-foreground py-[15px] text-center text-lecture font-bold text-background">
                   Échanger mes Ballons
                 </div>
               </div>
@@ -243,16 +243,16 @@ export default function Boutique() {
                         "repeating-linear-gradient(115deg, rgb(var(--contraste-rgb) / 0.06) 0 9px, rgb(var(--contraste-rgb) / 0.012) 9px 18px), rgb(var(--contraste-rgb) / 0.02)",
                     }}
                   >
-                    <span className="mono-label absolute top-2.5 left-2.5 text-foreground/40">
+                    <span className="mono-label absolute top-2.5 left-2.5 text-encre-3">
                       {it.tag}
                     </span>
                   </div>
                   <div className="px-3 pt-3 pb-3.5">
-                    <div className="text-[14px] leading-[1.3] font-bold tracking-tight">
+                    <div className="text-ligne leading-[1.3] font-bold tracking-tight">
                       {it.name}
                     </div>
                     <div className="mt-2 flex items-baseline justify-between">
-                      <span className="text-[16px] font-extrabold tracking-tight tabular-nums">
+                      <span className="text-titre font-extrabold tracking-tight tabular-nums">
                         {milliers(ballonsPourEuros(it.euros))}
                       </span>
                       <span className="mono-label text-primary">Ballons</span>
@@ -265,7 +265,7 @@ export default function Boutique() {
             {/* Le drop de la semaine */}
             <div className="glass rounded-3xl p-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-[16px] font-bold tracking-tight">Drop de la semaine</h2>
+                <h2 className="text-titre font-bold tracking-tight">Drop de la semaine</h2>
                 <span className="mono-label text-[#c8352b] dark:text-[#FF6B5E]">Fin dans 2 j</span>
               </div>
               <div className="mt-3 flex gap-[11px]">
@@ -277,12 +277,12 @@ export default function Boutique() {
                   }}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[15px] font-bold">Montre SFL · série verte</div>
-                  <p className="mt-1 text-[12.5px] leading-[1.45] text-foreground/42">
+                  <div className="text-lecture font-bold">Montre SFL · série verte</div>
+                  <p className="mt-1 text-corps leading-[1.45] text-encre-3">
                     Bracelet nylon, cadran noir mat, index vert. 200 pièces.
                   </p>
                   <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-[17px] font-extrabold tabular-nums">
+                    <span className="text-titre font-extrabold tabular-nums">
                       {milliers(ballonsPourEuros(63))}
                     </span>
                     <span className="mono-label text-primary">Ballons</span>

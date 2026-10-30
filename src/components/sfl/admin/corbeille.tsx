@@ -104,11 +104,11 @@ export function Corbeille({
         </SheetHeader>
         <div className="flex flex-col divide-y divide-border/60 px-1 pb-6">
           {lignes === null ? (
-            <p className="py-6 text-center text-[13px] text-muted-foreground">…</p>
+            <p className="py-6 text-center text-corps text-muted-foreground">…</p>
           ) : erreur ? (
-            <p className="py-6 text-center text-[13px] text-muted-foreground">Indisponible ici.</p>
+            <p className="py-6 text-center text-corps text-muted-foreground">Indisponible ici.</p>
           ) : visibles.length === 0 ? (
-            <p className="py-6 text-center text-[13px] text-muted-foreground">Vide.</p>
+            <p className="py-6 text-center text-corps text-muted-foreground">Vide.</p>
           ) : (
             visibles.map((r) => {
               const x = { genre: r.genre, element: r.element } as ElementCorbeille;
@@ -117,8 +117,8 @@ export function Corbeille({
               return (
                 <div key={r.id} className="flex items-center gap-3 py-2.5">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[15px] font-semibold">{nommer(x)}</div>
-                    <div className="text-[11px] text-muted-foreground tabular-nums">
+                    <div className="truncate text-lecture font-semibold">{nommer(x)}</div>
+                    <div className="text-legende text-muted-foreground tabular-nums">
                       {GENRES[r.genre]} · {quand(r.supprime_le)}
                       {qui ? ` · ${qui}` : ""}
                       {bloque ? ` · ${bloque}` : ""}

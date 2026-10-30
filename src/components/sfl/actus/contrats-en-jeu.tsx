@@ -70,15 +70,15 @@ export function etatFiche(e: Engagement, lg: Ligue): string | null {
 /** En haut à droite : les signatures, puis le match en cours, puis le verdict. */
 function Moment({ lg }: { lg: Ligue }) {
   if (lg.phase === "ouvert")
-    return <span className="mono-label shrink-0 text-foreground/45">{pl(lg.total, "signature", "signatures")}</span>;
+    return <span className="mono-label shrink-0 text-encre-3">{pl(lg.total, "signature", "signatures")}</span>;
   if (lg.phase === "en-jeu" && !lg.d.joue)
     return (
-      <span className="mono-label flex shrink-0 items-center gap-2 text-foreground/80">
+      <span className="mono-label flex shrink-0 items-center gap-2 text-encre-2">
         <Pouls bat /> En jeu
       </span>
     );
   return (
-    <span className="mono-label shrink-0 text-foreground/55">{lg.phase === "en-jeu" ? "Verdict à minuit" : "Verdict"}</span>
+    <span className="mono-label shrink-0 text-encre-3">{lg.phase === "en-jeu" ? "Verdict à minuit" : "Verdict"}</span>
   );
 }
 
@@ -111,7 +111,7 @@ export function Resultat({ e, lg, court }: { e: Engagement; lg: Ligue; court?: b
   return (
     <span className="flex w-full items-baseline justify-between gap-2">
       <span className="fiche__ton flex items-baseline gap-1">
-        <span className="text-[21px] leading-none" style={{ fontFamily: ANTON }}>
+        <span className="text-titre-m leading-none" style={{ fontFamily: ANTON }}>
           +{e.m.xp}
         </span>
         <span className="mono-label">XP</span>
@@ -158,7 +158,7 @@ export function Affiche({ e, lg, vise }: { e: Engagement; lg: Ligue; vise?: stri
         </div>
         <div className="flex w-full min-w-0 flex-col gap-1.5">
           <span className="mono-label fiche__ton">{code}</span>
-          <p className="line-clamp-3 text-[14px] leading-[1.18] font-bold break-words">{phrase(e.m, identite.nom)}</p>
+          <p className="line-clamp-3 text-ligne leading-[1.18] font-bold break-words">{phrase(e.m, identite.nom)}</p>
         </div>
         <div className="flex w-full items-center gap-2 border-t border-white/10 pt-3">
           {tete ? (
@@ -168,7 +168,7 @@ export function Affiche({ e, lg, vise }: { e: Engagement; lg: Ligue; vise?: stri
               <Carte nom={e.joueur} size={FORMAT_CARTE.petite} onglet={onglet(lg, e.joueur)} />
               <span className="flex min-w-0 flex-col gap-1">
                 <span className="mono-label text-white/45">Signé par</span>
-                <span className="truncate text-[13px] leading-tight font-bold">
+                <span className="truncate text-corps leading-tight font-bold">
                   {e.joueur === lg.moi ? "Toi" : prenom(identite.nom(e.joueur))}
                 </span>
               </span>
@@ -193,13 +193,13 @@ function Cote({ e, lg, couleurs }: { e: Engagement; lg: Ligue; couleurs: { fond:
         <Carte nom={e.joueur} size={FORMAT_CARTE.moyenne} onglet={couleurs} />
       </div>
       <div className="flex w-full min-w-0 flex-col items-center gap-1.5 text-center">
-        <span className="w-full truncate text-[14px] leading-tight font-bold">
+        <span className="w-full truncate text-ligne leading-tight font-bold">
           {e.joueur === lg.moi ? "Toi" : prenom(identite.nom(e.joueur))}
         </span>
         <span className="mono-label fiche__ton">
           {NOM_DE_CODE[e.m.genre]} · {rang}
         </span>
-        <p className="line-clamp-3 text-[13px] leading-[1.18] font-bold break-words text-white/75">
+        <p className="line-clamp-3 text-corps leading-[1.18] font-bold break-words text-white/75">
           {phrase(e.m, identite.nom)}
         </p>
       </div>
@@ -227,7 +227,7 @@ export function AfficheDuel({ f, lg }: { f: FaceAFace; lg: Ligue }) {
       </div>
       <div className="flex flex-1 items-stretch justify-center gap-1.5 px-3 pt-4 pb-3.5">
         <Cote e={f.noirs} lg={lg} couleurs={NOIRS} />
-        <span className="shrink-0 pt-[52px] text-[17px] leading-none text-white/40" style={{ fontFamily: ANTON }}>
+        <span className="shrink-0 pt-[52px] text-titre leading-none text-white/40" style={{ fontFamily: ANTON }}>
           VS
         </span>
         <Cote e={f.blancs} lg={lg} couleurs={BLANCS} />
@@ -272,12 +272,12 @@ function Engages({ titre, liste, lg, colonne }: { titre: string; liste: Engageme
       <div className="flex flex-col gap-4 px-[18px] pt-4 pb-5">
         <div className="flex items-end justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-2">
-            <h3 className="titre-lettrage text-[26px] leading-[0.9] break-words">{NOM_DE_CODE[m.genre]}</h3>
+            <h3 className="titre-lettrage text-titre-g leading-[0.9] break-words">{NOM_DE_CODE[m.genre]}</h3>
             <span className="mono-label fiche__ton">Rang {rang}</span>
           </div>
           <span className="flex shrink-0 items-baseline gap-2">
             <span className="fiche__ton flex items-baseline gap-1">
-              <span className="text-[21px] leading-none" style={{ fontFamily: ANTON }}>
+              <span className="text-titre-m leading-none" style={{ fontFamily: ANTON }}>
                 +{m.xp}
               </span>
               <span className="mono-label">XP</span>
@@ -285,7 +285,7 @@ function Engages({ titre, liste, lg, colonne }: { titre: string; liste: Engageme
             <span className="mono-label text-[#ff9b9d]">−{risqueDe(m)}</span>
           </span>
         </div>
-        <p className="text-[17px] leading-[1.15] font-bold tracking-[-0.2px]">{objectif}</p>
+        <p className="text-titre leading-[1.15] font-bold tracking-[-0.2px]">{objectif}</p>
         {groupes.map((g) => {
           const juge = g.label ? g.liste.find((e) => tranche(e, lg) && e.verdict.etat !== "annulee") : undefined;
           return (
@@ -401,10 +401,10 @@ export function ContratsEnJeu({ className, colonne }: { className?: string; colo
     <section aria-labelledby="titre-contrats-en-jeu" className={cn("flex flex-col gap-4", className)}>
       <div className={cn("flex flex-col gap-1.5 px-5", !colonne && "md:px-0")}>
         <div className="flex items-baseline justify-between gap-3">
-          <span className="mono-label truncate text-foreground/45">J{d.j} · Toute la ligue</span>
+          <span className="mono-label truncate text-encre-3">J{d.j} · Toute la ligue</span>
           <Moment lg={lg} />
         </div>
-        <h2 id="titre-contrats-en-jeu" className="titre-lettrage text-[30px] leading-[0.95]">
+        <h2 id="titre-contrats-en-jeu" className="titre-lettrage text-titre-l leading-[0.95]">
           Contrats en jeu
         </h2>
       </div>
@@ -412,7 +412,7 @@ export function ContratsEnJeu({ className, colonne }: { className?: string; colo
       {signes > 0 && (
         <div className="flex flex-col gap-1">
           <div className={cn("flex items-center justify-between gap-3 px-5", !colonne && "md:px-0")}>
-            <span className="mono-label truncate text-foreground/45">
+            <span className="mono-label truncate text-encre-3">
               {(faceAFace.length > 0 ? `${faceAFace.length} face-à-face · ` : "") + pl(signes, "contrat signé", "contrats signés")}
             </span>
           </div>

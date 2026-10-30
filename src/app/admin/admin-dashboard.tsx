@@ -109,7 +109,7 @@ function Stat({ label, value, tone }: { label: string; value: string | number; t
   return (
     <div className="rounded-2xl bg-card px-3.5 py-3">
       <div className={cn("text-2xl font-bold tracking-tight tabular-nums", tone)}>{value}</div>
-      <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
+      <div className="text-legende font-medium text-muted-foreground">{label}</div>
     </div>
   );
 }
@@ -480,11 +480,11 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
           <div className="flex items-center gap-3">
             <BoutonRetour />
             <div>
-              <p className="mono-label text-foreground/45">Ligue</p>
-              <h1 className="text-[30px] font-bold tracking-tight">Tableau complet</h1>
+              <p className="mono-label text-encre-3">Ligue</p>
+              <h1 className="text-titre-l font-bold tracking-tight">Tableau complet</h1>
             </div>
           </div>
-          <span className="mono-label rounded-full bg-secondary px-3 py-1.5 text-foreground/70">{partage ? "Partagé" : "Local"}</span>
+          <span className="mono-label rounded-full bg-secondary px-3 py-1.5 text-encre-2">{partage ? "Partagé" : "Local"}</span>
         </div>
       </div>
 
@@ -494,18 +494,18 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
         {/* Quatre onglets ne tiennent pas sur un téléphone : les libellés
             s'abrègent, et la barre défile en dernier recours. */}
         <TabsList className="w-full overflow-x-auto rounded-full bg-card p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <TabsTrigger value="overview" className="flex-1 shrink-0 rounded-full text-[13px] whitespace-nowrap">
+          <TabsTrigger value="overview" className="flex-1 shrink-0 rounded-full text-corps whitespace-nowrap">
             <LayoutDashboard className="mr-1.5 size-4" /> Vue
             <span className="hidden sm:inline">&nbsp;d&apos;ensemble</span>
           </TabsTrigger>
-          <TabsTrigger value="grille" className="flex-1 shrink-0 rounded-full text-[13px] whitespace-nowrap">
+          <TabsTrigger value="grille" className="flex-1 shrink-0 rounded-full text-corps whitespace-nowrap">
             <Table2 className="mr-1.5 size-4" /> Saisie
           </TabsTrigger>
-          <TabsTrigger value="feuille" className="flex-1 shrink-0 rounded-full text-[13px] whitespace-nowrap">
+          <TabsTrigger value="feuille" className="flex-1 shrink-0 rounded-full text-corps whitespace-nowrap">
             <ClipboardList className="mr-1.5 size-4" /> Feuille
             <span className="hidden sm:inline">&nbsp;de match</span>
           </TabsTrigger>
-          <TabsTrigger value="joueurs" className="flex-1 shrink-0 rounded-full text-[13px] whitespace-nowrap">
+          <TabsTrigger value="joueurs" className="flex-1 shrink-0 rounded-full text-corps whitespace-nowrap">
             <Users className="mr-1.5 size-4" /> Joueurs
           </TabsTrigger>
         </TabsList>
@@ -528,11 +528,11 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
               <AlertTriangle className="size-4" /> Contrôles de cohérence
             </div>
             {derived.alerts.length === 0 ? (
-              <p className="mono-label text-foreground/45">0 alerte</p>
+              <p className="mono-label text-encre-3">0 alerte</p>
             ) : (
               <div className="flex flex-col gap-1.5">
                 {derived.alerts.map((a, i) => (
-                  <div key={i} className="flex items-center gap-2 text-[13px]">
+                  <div key={i} className="flex items-center gap-2 text-corps">
                     <span className={cn("size-1.5 shrink-0 rounded-full", a.level === "error" ? "bg-foreground" : "bg-foreground/40")} />
                     <span className="font-medium">J{a.j}</span>
                     <span className="text-muted-foreground">· {a.player} —</span>
@@ -551,7 +551,7 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
                   <Send className="size-4 text-primary" /> Convocation
                 </div>
                 {convoc ? (
-                  <p className="mt-1 text-[13px] text-muted-foreground">
+                  <p className="mt-1 text-corps text-muted-foreground">
                     <span className="font-semibold text-foreground">
                       {convoc.jour} {convoc.date} · {convoc.heure}
                     </span>
@@ -560,7 +560,7 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
                     {convoc.lieu}
                   </p>
                 ) : (
-                  <p className="mt-1 text-[13px] text-muted-foreground">
+                  <p className="mt-1 text-corps text-muted-foreground">
                     Aucune convocation ouverte.
                   </p>
                 )}
@@ -585,7 +585,7 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
                         key={name}
                         type="button"
                         onClick={() => cycleReponse(name)}
-                        className={cn("bouton-secondaire px-2.5 py-1 text-[12px] font-semibold", cls)}
+                        className={cn("bouton-secondaire px-2.5 py-1 text-petit font-semibold", cls)}
                       >
                         {key === "present" ? "✓ " : key === "absent" ? "✗ " : ""}
                         {name}
@@ -594,7 +594,7 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
                   )}
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[12px] text-muted-foreground tabular-nums">
+                  <p className="text-petit text-muted-foreground tabular-nums">
                     {convocGroups.present.length} confirmés · {convocGroups.absent.length} absents ·{" "}
                     {convocGroups.sans.length} sans réponse
                   </p>
@@ -667,16 +667,16 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
               </span>
             </div>
             {history.length === 0 ? (
-              <p className="mono-label text-foreground/45">0 geste</p>
+              <p className="mono-label text-encre-3">0 geste</p>
             ) : (
               <div className="flex flex-col gap-1">
                 {[...history]
                   .slice(-6)
                   .reverse()
                   .map((h, i) => (
-                    <div key={h.at + "-" + i} className="flex items-center justify-between text-[13px]">
+                    <div key={h.at + "-" + i} className="flex items-center justify-between text-corps">
                       <span className={cn(i === 0 && "font-semibold")}>{h.label}</span>
-                      <span className="text-[11px] text-muted-foreground tabular-nums">
+                      <span className="text-legende text-muted-foreground tabular-nums">
                         {new Date(h.at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                       </span>
                     </div>
@@ -744,8 +744,8 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
                 key={mode}
                 onClick={() => setFeuilleMode(mode)}
                 className={cn(
-                  "flex-1 py-2 text-[13px] font-semibold",
-                  feuilleMode === mode ? "bouton-principal" : "bouton-discret text-foreground/45"
+                  "flex-1 py-2 text-corps font-semibold",
+                  feuilleMode === mode ? "bouton-principal" : "bouton-discret text-encre-3"
                 )}
               >
                 {label}
@@ -769,11 +769,11 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
               <div className="flex items-center justify-between gap-3 px-5 py-3.5">
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-bold tracking-tight">Journée {meta.j}</span>
-                  {estBrouillon(meta) && <span className="mono-label text-foreground/60">○ Brouillon</span>}
+                  {estBrouillon(meta) && <span className="mono-label text-encre-2">○ Brouillon</span>}
                   {meta.sflTime && (
-                    <span className="mono-label rounded-full bg-secondary px-2 py-0.5 text-foreground/70">SFL Time</span>
+                    <span className="mono-label rounded-full bg-secondary px-2 py-0.5 text-encre-2">SFL Time</span>
                   )}
-                  <span className="text-[13px] text-muted-foreground">{meta.date}</span>
+                  <span className="text-corps text-muted-foreground">{meta.date}</span>
                 </div>
                 <button
                   type="button"
@@ -806,13 +806,13 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
                             className="flex items-center gap-2 rounded-lg px-1 py-2 text-left active:bg-secondary"
                           >
                             <span className={cn("flex min-w-0 flex-1 items-center gap-1.5", absent && "opacity-50")}>
-                              <span className="truncate text-[14px] font-medium">{e.player}</span>
+                              <span className="truncate text-ligne font-medium">{e.player}</span>
                               {e.note && (
-                                <span className="shrink-0 rounded-full bg-primary/12 px-1.5 py-0.5 text-[8px] font-bold text-primary uppercase">{e.note}</span>
+                                <span className="shrink-0 rounded-full bg-primary/12 px-1.5 py-0.5 text-micro font-bold text-primary uppercase">{e.note}</span>
                               )}
                               <HonorBadges e={e} />
                               {absent && (
-                                <span className="shrink-0 text-[10px] text-muted-foreground">{e.statut}</span>
+                                <span className="shrink-0 text-etiquette text-muted-foreground">{e.statut}</span>
                               )}
                             </span>
                             <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{e.buts}b · {e.passes}pd</span>
@@ -841,7 +841,7 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
           <Requalification saison={saison} onCommit={commit} />
           <DetailPoints saison={saison} />
           <div className="flex items-center justify-between gap-3 px-1">
-            <p className="mono-label text-foreground/45">{rosterViews.length} joueurs</p>
+            <p className="mono-label text-encre-3">{rosterViews.length} joueurs</p>
             <Button size="sm" variant="vert" onClick={() => setNewPlayerOpen(true)} className="rounded-full">
               <UserPlus className="mr-1.5 size-4" /> Ajouter
             </Button>
@@ -853,7 +853,7 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
             onEntree={() => rosterTrouves[0] && setPlayerIndex(rosterTrouves[0].i)}
           />
           <div className="overflow-hidden rounded-3xl bg-card">
-            <div className="flex items-center gap-3 border-b border-border/60 px-4 py-2.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            <div className="flex items-center gap-3 border-b border-border/60 px-4 py-2.5 text-legende font-semibold tracking-wide text-muted-foreground uppercase">
               <span className="flex-1">Joueur</span>
               <span className="w-10 text-center">OVR</span>
               <span className="w-10 text-center">PP</span>
@@ -861,7 +861,7 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
               <span className="w-8 text-center">B</span>
             </div>
             {rosterTrouves.length === 0 && (
-              <p className="px-4 py-6 text-center text-[13px] text-muted-foreground">
+              <p className="px-4 py-6 text-center text-corps text-muted-foreground">
                 Personne ne répond à « {rechercheJoueur} ».
               </p>
             )}
@@ -873,10 +873,10 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
                 className="flex w-full items-center gap-3 border-b border-border/40 px-4 py-2 text-left last:border-0 active:bg-secondary"
               >
                 <span className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="truncate text-[14px] font-semibold">{r.name}</span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">{r.poste ?? "—"}</span>
+                  <span className="truncate text-ligne font-semibold">{r.name}</span>
+                  <span className="shrink-0 text-legende text-muted-foreground">{r.poste ?? "—"}</span>
                   {r.profil !== "Actif" && (
-                    <span className="mono-label shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-[8px] text-foreground/70">{r.profil}</span>
+                    <span className="mono-label shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-micro text-encre-2">{r.profil}</span>
                   )}
                 </span>
                 <span className="w-10 text-center text-sm font-bold tabular-nums">{ovr}</span>

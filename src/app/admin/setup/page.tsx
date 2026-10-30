@@ -37,7 +37,7 @@ function Pill({ ok, label }: { ok: boolean | null; label: string }) {
       className={cn(
         "mono-label rounded-full px-2.5 py-1",
         ok === null
-          ? "glass-soft text-foreground/40"
+          ? "glass-soft text-encre-3"
           : ok
             ? "bg-primary/15 text-primary"
             : "bg-[#FF6B5E]/12 text-[#c8352b] dark:text-[#FF6B5E]"
@@ -90,7 +90,7 @@ export default function SetupPage() {
 
   if (!session?.admin) {
     return (
-      <div className="mx-auto max-w-2xl px-5 py-16 text-center text-sm text-foreground/45">
+      <div className="mx-auto max-w-2xl px-5 py-16 text-center text-sm text-encre-3">
         Cette page est réservée à l&apos;admin de la ligue.
       </div>
     );
@@ -103,8 +103,8 @@ export default function SetupPage() {
       <div className="flex items-center gap-3">
         <BoutonRetour />
         <div>
-          <h1 className="text-[30px] font-bold tracking-tight">Installation Supabase</h1>
-          <p className="mt-1 text-[13px] text-foreground/42">
+          <h1 className="text-titre-l font-bold tracking-tight">Installation Supabase</h1>
+          <p className="mt-1 text-corps text-encre-3">
             Le schéma de la base s&apos;applique tout seul à chaque mise en ligne.
           </p>
         </div>
@@ -136,16 +136,16 @@ export default function SetupPage() {
       </section>
 
       {db === "error" && dbMessage && (
-        <p className="glass-soft rounded-2xl p-3.5 font-mono text-[11px] leading-relaxed break-all text-[#c8352b] dark:text-[#FF6B5E]">
+        <p className="glass-soft rounded-2xl p-3.5 font-mono text-legende leading-relaxed break-all text-[#c8352b] dark:text-[#FF6B5E]">
           Migration : {dbMessage}
         </p>
       )}
 
       <section className="glass rounded-[26px] p-5">
-        <h2 className="text-[17px] font-bold tracking-tight">Les tables</h2>
-        <div className="mt-3.5 flex flex-col gap-3 text-[13.5px] leading-relaxed text-foreground/60">
+        <h2 className="text-titre font-bold tracking-tight">Les tables</h2>
+        <div className="mt-3.5 flex flex-col gap-3 text-ligne leading-relaxed text-encre-2">
           {aJour ? (
-            <p className="flex items-center gap-2 rounded-2xl bg-primary/10 px-3.5 py-2.5 text-[12.5px] text-primary">
+            <p className="flex items-center gap-2 rounded-2xl bg-primary/10 px-3.5 py-2.5 text-corps text-primary">
               <Check className="size-3.5 shrink-0" />
               {db === "applied"
                 ? "Base mise à jour automatiquement — rien à faire ici."
@@ -154,7 +154,7 @@ export default function SetupPage() {
           ) : (
             <p>
               {db === "not-configured" && (
-                <span className="mb-2 block text-[12px] text-foreground/40">
+                <span className="mb-2 block text-petit text-encre-3">
                   (Astuce : ajoute SUPABASE_DB_URL dans Vercel et cette étape deviendra
                   automatique à chaque déploiement — voir docs/SUPABASE.md.)
                 </span>
@@ -166,7 +166,7 @@ export default function SetupPage() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={copierSchema}
-              className="bouton-principal flex items-center gap-2 px-4 py-2.5 text-[13px] font-bold"
+              className="bouton-principal flex items-center gap-2 px-4 py-2.5 text-corps font-bold"
             >
               <Copy className="size-3.5" /> Copier le script SQL
             </button>
@@ -174,7 +174,7 @@ export default function SetupPage() {
               href={`${DASHBOARD}/sql/new`}
               target="_blank"
               rel="noreferrer"
-              className="bouton-secondaire flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-semibold"
+              className="bouton-secondaire flex items-center gap-1.5 px-4 py-2.5 text-corps font-semibold"
             >
               Ouvrir l&apos;éditeur SQL <ExternalLink className="size-3.5" />
             </a>

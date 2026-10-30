@@ -64,10 +64,10 @@ export function LigneBlessure({ nom, className }: { nom: string; className?: str
     : null;
   return (
     <div className={cn("glass-soft flex w-full items-center gap-3 rounded-[18px] px-4 py-3", className)}>
-      <Bandage className="size-4 shrink-0 text-foreground/60" aria-hidden />
+      <Bandage className="size-4 shrink-0 text-encre-2" aria-hidden />
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[14px] font-semibold">{enCours ? `Blessé depuis la J${enCours.depuis}` : "Blessure"}</span>
-        <span className="font-mono text-[11px] text-foreground/50">
+        <span className="text-ligne font-semibold">{enCours ? `Blessé depuis la J${enCours.depuis}` : "Blessure"}</span>
+        <span className="font-mono text-legende text-encre-3">
           {b.jouees.length} sur {b.total} {b.total > 1 ? "journées jouées" : "journée jouée"}
           {manquees && ` · ${manquees}`}
         </span>
@@ -103,12 +103,12 @@ export function BoutonBlessure({ nom }: { nom: string }) {
         onClick={basculer}
         disabled={envoi}
         aria-pressed={blesse}
-        className="bouton-secondaire flex w-full items-center justify-center gap-2 py-3.5 text-[14px] font-semibold disabled:opacity-60"
+        className="bouton-secondaire flex w-full items-center justify-center gap-2 py-3.5 text-ligne font-semibold disabled:opacity-60"
       >
         <Bandage className="size-4" aria-hidden />
         {blesse ? "Je suis remis" : "Je suis blessé"}
       </button>
-      {erreur && <p className="text-center text-[12px] text-foreground/55">{erreur}</p>}
+      {erreur && <p className="text-center text-petit text-encre-3">{erreur}</p>}
     </div>
   );
 }

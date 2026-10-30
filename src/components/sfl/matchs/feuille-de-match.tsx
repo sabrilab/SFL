@@ -288,7 +288,7 @@ export function FeuilleDeMatch({
                 type="button"
                 onClick={() => setChoix(i)}
                 className={cn(
-                  "h-[30px] px-3 text-[12.5px] font-semibold",
+                  "h-[30px] px-3 text-corps font-semibold",
                   i === choix
                     ? "bouton-principal"
                     : "bouton-discret",
@@ -328,7 +328,7 @@ export function FeuilleDeMatch({
         type="button"
         disabled={!image.pret}
         onClick={image.partager}
-        className="bouton-principal bouton--mauve flex h-12 items-center justify-center gap-2 text-[15px] font-semibold disabled:opacity-40"
+        className="bouton-principal bouton--mauve flex h-12 items-center justify-center gap-2 text-lecture font-semibold disabled:opacity-40"
       >
         <Share className="size-[18px]" />
         {terrains.length > 1 ? `Partager les ${terrains.length} feuilles` : "Partager la feuille"}
@@ -432,7 +432,7 @@ function TerrainVu({
                 </div>
               </div>
               <span
-                className="whitespace-nowrap rounded-full px-[7px] py-[2px] text-[11px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
+                className="whitespace-nowrap rounded-full px-[7px] py-[2px] text-legende shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
                 style={{
                   background: p.couleur,
                   color: p.encre,
@@ -448,7 +448,7 @@ function TerrainVu({
       <NomEquipe nom={haut.nom} couleur={haut.couleur} className="left-[18px] top-4" />
       <NomEquipe nom={bas.nom} couleur={bas.couleur} className="bottom-[70px] left-[18px]" />
       {horaire && (
-        <span className="absolute top-3.5 right-3.5 max-w-[55%] truncate rounded-full bg-black/55 px-2.5 py-1 text-[11.5px] font-semibold text-white backdrop-blur">
+        <span className="absolute top-3.5 right-3.5 max-w-[55%] truncate rounded-full bg-black/55 px-2.5 py-1 text-petit font-semibold text-white backdrop-blur">
           {horaire}
         </span>
       )}
@@ -472,7 +472,7 @@ function NomEquipe({
         className="size-3 rounded-full shadow-[inset_0_0_0_1px_rgba(128,128,128,0.6)]"
         style={{ background: couleur }}
       />
-      <span className="text-[14px] font-extrabold text-[#0A0B0D] dark:text-white">
+      <span className="text-ligne font-extrabold text-[#0A0B0D] dark:text-white">
         <Nom n={nom} />
       </span>
     </div>

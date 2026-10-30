@@ -13,9 +13,13 @@
       en clair (:root) et en sombre (.dark).
    2. Les gris du texte, quatre niveaux : text-encre, text-encre-2 (70 %),
       text-encre-3 (45 %, les étiquettes), text-encre-4 (30 %, l'éteint).
-   3. Les tailles de texte, neuf : text-micro 9, text-legende 11,
-      text-petit 12, text-corps 13, text-lecture 15, text-titre 17,
-      text-titre-m 22, text-titre-l 30, text-affiche 44.
+   3. Les tailles de texte, quatorze, les plus employées de l'app (il y en
+      avait 30, demi-pixels compris ; chacune va à la plus proche) :
+      text-micro 9, text-etiquette 10, text-legende 11, text-petit 12,
+      text-corps 13, text-ligne 14, text-lecture 15, text-titre 17,
+      text-titre-fort 19, text-titre-m 22, text-titre-g 26, text-titre-l 30,
+      text-nom 34, text-affiche 44. Au-delà, des chiffres d'affiche dessinés
+      un par un.
    4. Les arrondis, cinq : rounded-petit 10, rounded-champ 16,
       rounded-tuile 22, rounded-feuille 28, rounded-full.
 
@@ -159,13 +163,18 @@
 
 @theme static {
   --text-micro: 9px;
+  --text-etiquette: 10px;
   --text-legende: 11px;
   --text-petit: 12px;
   --text-corps: 13px;
+  --text-ligne: 14px;
   --text-lecture: 15px;
   --text-titre: 17px;
+  --text-titre-fort: 19px;
   --text-titre-m: 22px;
+  --text-titre-g: 26px;
   --text-titre-l: 30px;
+  --text-nom: 34px;
   --text-affiche: 44px;
 
   --radius-petit: 10px;

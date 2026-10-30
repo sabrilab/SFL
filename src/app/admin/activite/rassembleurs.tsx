@@ -262,8 +262,8 @@ export function QuiRamene({
 
   return (
     <section id="activite-ramene" className="glass scroll-mt-16 rounded-3xl p-5">
-      <h2 className="text-[17px] font-bold tracking-tight">Qui ramène du monde</h2>
-      <p className="mt-0.5 text-[12px] leading-snug text-foreground/45">
+      <h2 className="text-titre font-bold tracking-tight">Qui ramène du monde</h2>
+      <p className="mt-0.5 text-petit leading-snug text-encre-3">
         Les joueurs dont un message, une invitation, un suivi, une félicitation ou un parrainage a fait venir ou revenir
         quelqu&apos;un, {libellePeriode}.
       </p>
@@ -274,19 +274,19 @@ export function QuiRamene({
             <Etoile r={choisi} />
           </div>
           <div className="mt-1 flex items-start justify-between gap-3">
-            <p className="text-[12.5px] leading-snug">
+            <p className="text-corps leading-snug">
               {phraseDe(choisi)}
-              {venuPar && <span className="text-foreground/50"> Lui-même est venu par {venuPar}.</span>}
+              {venuPar && <span className="text-encre-3"> Lui-même est venu par {venuPar}.</span>}
             </p>
             <button
               onClick={() => onFiche(choisi.nom)}
-              className="bouton-secondaire mono-label flex shrink-0 items-center gap-1 px-2.5 py-1 text-[9px]"
+              className="bouton-secondaire mono-label flex shrink-0 items-center gap-1 px-2.5 py-1 text-micro"
             >
               Fiche
               <ChevronRight className="size-3" />
             </button>
           </div>
-          <div className="mt-2 flex flex-wrap gap-x-3.5 gap-y-1 text-[10.5px] text-foreground/45">
+          <div className="mt-2 flex flex-wrap gap-x-3.5 gap-y-1 text-legende text-encre-3">
             <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-foreground/85" />
               revenu, a signé ou a joué par lui
@@ -310,48 +310,48 @@ export function QuiRamene({
                   r === choisi && "bg-foreground/[0.05]"
                 )}
               >
-                <span className="mono-label w-4 shrink-0 text-[9px] text-foreground/40 tabular-nums">{k + 1}</span>
+                <span className="mono-label w-4 shrink-0 text-micro text-encre-3 tabular-nums">{k + 1}</span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline gap-1.5">
-                    <span className="truncate text-[14px] font-semibold">{r.nom}</span>
-                    {admins.has(r.nom) && <span className="mono-label text-[8px] text-foreground/40">admin</span>}
+                    <span className="truncate text-ligne font-semibold">{r.nom}</span>
+                    {admins.has(r.nom) && <span className="mono-label text-micro text-encre-3">admin</span>}
                   </span>
-                  <span className="block text-[11.5px] leading-snug text-foreground/45">{detailDe(r)}</span>
+                  <span className="block text-petit leading-snug text-encre-3">{detailDe(r)}</span>
                 </span>
                 <span className="shrink-0 text-right">
-                  <span className="block text-[18px] leading-none font-extrabold tabular-nums">{r.joueurs}</span>
-                  <span className="mono-label text-[8px] text-foreground/40">{r.joueurs > 1 ? "joueurs" : "joueur"}</span>
+                  <span className="block text-titre-fort leading-none font-extrabold tabular-nums">{r.joueurs}</span>
+                  <span className="mono-label text-micro text-encre-3">{r.joueurs > 1 ? "joueurs" : "joueur"}</span>
                 </span>
               </button>
             ))}
             {rassembleurs.length > PREMIERS && (
-              <button onClick={() => setTout((v) => !v)} className="mono-label mt-2 self-start text-[9px] text-foreground/55">
+              <button onClick={() => setTout((v) => !v)} className="mono-label mt-2 self-start text-micro text-encre-3">
                 {tout ? "Moins" : `Tout voir · ${rassembleurs.length}`}
               </button>
             )}
           </div>
         </>
       ) : (
-        <p className="mt-4 text-[12.5px] text-foreground/45">Personne n&apos;a encore fait venir ou revenir quelqu&apos;un {libellePeriode}.</p>
+        <p className="mt-4 text-corps text-encre-3">Personne n&apos;a encore fait venir ou revenir quelqu&apos;un {libellePeriode}.</p>
       )}
 
       {(app.envoyees > 0 || app.retours > 0) && (
         <div className="mt-3 flex items-center gap-3 rounded-xl border border-dashed border-foreground/15 px-3 py-2.5">
           <span className="min-w-0 flex-1">
-            <span className="block text-[13px] font-semibold">L&apos;app elle-même</span>
-            <span className="block text-[11.5px] leading-snug text-foreground/45">
+            <span className="block text-corps font-semibold">L&apos;app elle-même</span>
+            <span className="block text-petit leading-snug text-encre-3">
               Annonces, divisions, missions, rappels de la veille · {pluriel(app.retours, "retour", "retours")} sur{" "}
               {pluriel(app.envoyees, "notification", "notifications")}
             </span>
           </span>
           <span className="shrink-0 text-right">
-            <span className="block text-[18px] leading-none font-extrabold text-foreground/70 tabular-nums">{app.joueurs}</span>
-            <span className="mono-label text-[8px] text-foreground/40">{app.joueurs > 1 ? "joueurs" : "joueur"}</span>
+            <span className="block text-titre-fort leading-none font-extrabold text-encre-2 tabular-nums">{app.joueurs}</span>
+            <span className="mono-label text-micro text-encre-3">{app.joueurs > 1 ? "joueurs" : "joueur"}</span>
           </span>
         </div>
       )}
 
-      <p className="mt-3 text-[11px] leading-snug text-foreground/40">
+      <p className="mt-3 text-legende leading-snug text-encre-3">
         Revenu : il a rouvert l&apos;app dans les 2 h après une notification née du geste de ce joueur, sans l&apos;avoir
         ouverte depuis au moins 1 h (une seule notification compte par retour : celle qu&apos;il a touchée, sinon la
         dernière). Venu : son filleul. Signé : dans sa Bola Team, sur son invitation. Joué : à un match qu&apos;il a ouvert.

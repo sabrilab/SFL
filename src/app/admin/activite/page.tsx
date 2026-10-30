@@ -158,7 +158,7 @@ export default function ActivitePage() {
     // dit, avec le geste qui répare.
     const adminConnu = isAdmin(session?.name);
     return (
-      <div className="mx-auto max-w-2xl px-5 py-16 text-center text-sm text-foreground/45">
+      <div className="mx-auto max-w-2xl px-5 py-16 text-center text-sm text-encre-3">
         {adminConnu ? (
           <>
             Ton compte est administrateur dans l&apos;app, mais la base ne le sait pas encore.
@@ -173,7 +173,7 @@ export default function ActivitePage() {
   }
   if (!session.server) {
     return (
-      <div className="mx-auto max-w-2xl px-5 py-16 text-center text-sm text-foreground/45">
+      <div className="mx-auto max-w-2xl px-5 py-16 text-center text-sm text-encre-3">
         Reconnecte-toi (session serveur) pour lire le journal d&apos;activité.
       </div>
     );

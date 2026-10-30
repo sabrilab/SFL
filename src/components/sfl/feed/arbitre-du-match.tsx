@@ -39,7 +39,7 @@ export function ArbitresDuMatch({ j }: { j: number }) {
   return (
     <Reveal>
       <section className="glass rounded-3xl p-5">
-        <p className="mono-label text-foreground/55">{liste.length > 1 ? "Les arbitres" : "L'arbitre"}</p>
+        <p className="mono-label text-encre-3">{liste.length > 1 ? "Les arbitres" : "L'arbitre"}</p>
         <div className="mt-3 flex flex-col gap-4">
           {liste.map((a) => {
             const sat = satisfactionDe(arbitres.avis[a.id]);
@@ -53,21 +53,21 @@ export function ArbitresDuMatch({ j }: { j: number }) {
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <div className="flex flex-col gap-0.5">
-                    <span className="truncate text-[17px] font-bold tracking-tight">{identite.nom(a.arbitre)}</span>
-                    <span className="truncate font-mono text-[11px] text-foreground/45">
+                    <span className="truncate text-titre font-bold tracking-tight">{identite.nom(a.arbitre)}</span>
+                    <span className="truncate font-mono text-legende text-encre-3">
                       Match {a.n + 1}
                       {a.equipes.length === 2 ? ` · ${a.equipes[0]} – ${a.equipes[1]}` : ""}
                     </span>
                   </div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-[28px] leading-none font-black tracking-tight tabular-nums italic">{sat ?? "–"}</span>
-                    <span className="font-mono text-[11px] whitespace-nowrap text-foreground/45">
+                    <span className="text-titre-l leading-none font-black tracking-tight tabular-nums italic">{sat ?? "–"}</span>
+                    <span className="font-mono text-legende whitespace-nowrap text-encre-3">
                       {avis > 0 ? `sur ce match · ${avis} note${avis > 1 ? "s" : ""}` : "sur ce match"}
                     </span>
                   </div>
                   {peutNoter && (
                     <div className="flex flex-col gap-1.5">
-                      <span className="font-mono text-[11px] text-foreground/55">{maNote ? "ta note" : "note l'arbitre"}</span>
+                      <span className="font-mono text-legende text-encre-3">{maNote ? "ta note" : "note l'arbitre"}</span>
                       <div
                         className="flex gap-1.5"
                         role="radiogroup"
@@ -86,8 +86,8 @@ export function ArbitresDuMatch({ j }: { j: number }) {
                               else if (typeof navigator !== "undefined") navigator.vibrate?.(8);
                             }}
                             className={cn(
-                              "flex size-10 items-center justify-center text-[16px] font-bold tabular-nums",
-                              maNote === n ? "rounded-full bg-foreground text-background" : "bouton-secondaire text-foreground/70"
+                              "flex size-10 items-center justify-center text-titre font-bold tabular-nums",
+                              maNote === n ? "rounded-full bg-foreground text-background" : "bouton-secondaire text-encre-2"
                             )}
                           >
                             {n}
@@ -101,7 +101,7 @@ export function ArbitresDuMatch({ j }: { j: number }) {
             );
           })}
         </div>
-        {erreur && <p className="mt-3 text-[13px] text-foreground/60">{erreur}</p>}
+        {erreur && <p className="mt-3 text-corps text-encre-2">{erreur}</p>}
       </section>
     </Reveal>
   );
