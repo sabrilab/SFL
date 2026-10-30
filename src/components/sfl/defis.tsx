@@ -111,9 +111,11 @@ export function Defis({ nom }: { nom: string }) {
         <FicheDefi key={d.etat.def.id} d={d} />
       ))}
       {defis.length > 3 && (
-        <button type="button" onClick={() => setTous((t) => !t)} className="mp-bouton mp-bouton--creux mx-auto">
-          {tous ? "Moins de défis" : `Tous les défis · ${defis.length}`}
-        </button>
+        <div className="px-4 md:px-0">
+          <button type="button" onClick={() => setTous((t) => !t)} className="mp-bouton mp-bouton--creux w-full">
+            {tous ? "Moins de défis" : `Tous les défis · ${defis.length}`}
+          </button>
+        </div>
       )}
     </section>
   );
