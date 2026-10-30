@@ -22,7 +22,7 @@ import { Card3D, type CapturedLayers } from "@/components/sfl/card-3d";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
-import { findPlayerMatch, type Player } from "@/lib/sfl/engine";
+import { findPlayerMatch, ovr, type Player } from "@/lib/sfl/engine";
 import { nomDuTerrain } from "@/lib/sfl/matchs-du-jour";
 import { rangPepiteApres } from "@/lib/sfl/rangs";
 import { terrainDeJournee } from "@/lib/sfl/saisie/mutations";
@@ -70,11 +70,13 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
     if (!calques) return;
     let annule = false;
     (async () => {
-      const [fond, joueur, stats, logo] = await Promise.all([
+      const [fond, joueur, stats, logo, symbole, colonne] = await Promise.all([
         charger(calques.background),
         charger(calques.playerLayer),
         charger(calques.stats),
-        charger("/bola/logo-blanc.svg"),
+        charger("/bola/logo-noir.svg"),
+        charger("/bola/symbole-noir.svg"),
+        charger("/story/colonne.png"),
       ]);
       const canvas = toile.current;
       const ctx = canvas?.getContext("2d");
@@ -82,7 +84,7 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
       const p = polices();
       await Promise.all([document.fonts.load(`900 104px ${p.texte}`), document.fonts.load(`400 128px ${p.chiffres}`)]).catch(() => {});
       if (annule) return;
-      const c: CalquesStory = { fond, joueur, stats, logo, ratio: calques.height / calques.width };
+      const c: CalquesStory = { fond, joueur, stats, logo, symbole, colonne, ratio: calques.height / calques.width };
       const dessiner = (t: number) => dessinerStory(ctx, t, donnees, c, p);
       setEtat({ quoi: "film", avance: 0 });
       const blob = await enregistrerStory(canvas, dessiner, (avance) => !annule && setEtat({ quoi: "film", avance }));
@@ -226,8 +228,9 @@ export function BoutonStoryDimanche({ j, date, buts, passes, points, delta }: { 
       points,
       delta,
       rang: rangPepiteApres(saison, me, j, evolution),
+      note: player ? ovr(player.stats) : null,
     };
-  }, [ouverte, me, journees, saison, evolution, j, date, buts, passes, points, delta]);
+  }, [ouverte, player, me, journees, saison, evolution, j, date, buts, passes, points, delta]);
   if (!player) return null;
   return (
     <>

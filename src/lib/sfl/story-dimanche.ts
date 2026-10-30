@@ -14,8 +14,9 @@
 // téléphone enregistre (MediaRecorder). Ici, les données et le dessin ; la
 // fenêtre qui enregistre et partage est dans components/sfl/story/.
 //
-// Mouvements : tout arrive en glissant puis se pose, sans rebond ni
-// tremblement ; la seconde moitié est fixe, pour qu'on ait le temps de lire.
+// Mouvements : le motion design des vidéos de journée (la page blanche aux
+// deux colonnes du plan « solo » de la J4) ; tout arrive puis se pose, sans
+// tremblement, et la seconde moitié est fixe, pour qu'on ait le temps de lire.
 
 import { findPlayerMatch, type Journee } from "./engine";
 import type { Camp } from "./maillots";
@@ -41,6 +42,8 @@ export interface StoryDimanche {
   /** Les places gagnées (positif) ou perdues au Pépite d'Or ; ta place après. */
   delta: number;
   rang: number | null;
+  /** Ta note, en très grand derrière la carte. */
+  note: number | null;
 }
 
 /** Ton match de la journée : ton camp et le score, ton équipe d'abord. */
@@ -100,6 +103,9 @@ export interface CalquesStory {
   /** Hauteur / largeur de la carte. */
   ratio: number;
   logo: CanvasImageSource | null;
+  /** Le symbole BOLA du dos, et la colonne de marbre du décor. */
+  symbole: CanvasImageSource | null;
+  colonne: CanvasImageSource | null;
 }
 
 export interface PolicesStory {
@@ -115,6 +121,7 @@ function arrivee(t: number, debut: number, duree: number): number {
 }
 
 const BLANC = (a: number) => `rgba(255,255,255,${a})`;
+const NOIR = (a: number) => `rgba(0,0,0,${a})`;
 
 function arrondi(ctx: CanvasRenderingContext2D, x: number, y: number, l: number, h: number, r: number) {
   ctx.beginPath();
@@ -140,158 +147,229 @@ function etiquette(ctx: CanvasRenderingContext2D, texte: string, x: number, y: n
   ctx.textAlign = align;
 }
 
+/** Un instant de la courbe, ralenti puis posé, avec un léger dépassement. */
+function pose(t: number, debut: number, duree: number): number {
+  const x = Math.min(1, Math.max(0, (t - debut) / duree));
+  const c = 1.4;
+  return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2);
+}
+
 /**
  * Dessine l'image de l'instant `t` (en secondes). Au-delà de la durée, la
  * dernière image : celle qu'on partage en photo.
+ *
+ * La page blanche du site et de la vidéo des compos (J4, plan « solo ») : les
+ * deux colonnes de marbre aux bords, qui s'écartent ; ta note en très grand
+ * derrière, en gris clair ; ta carte arrive en tournant, se pose d'un coup
+ * (éclair, onde), puis le score et tes chiffres. Le texte est à l'encre.
  */
 export function dessinerStory(ctx: CanvasRenderingContext2D, t: number, d: StoryDimanche, c: CalquesStory, p: PolicesStory) {
   const { largeur: W, hauteur: H } = STORY;
-  const marge = 72;
   ctx.save();
-  ctx.fillStyle = "#000";
+  ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, W, H);
   ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "center";
 
-  // L'en-tête : le logo, et la journée.
-  const a0 = arrivee(t, 0, 0.6);
-  ctx.globalAlpha = a0;
-  if (c.logo) {
-    const h = 54;
-    const l = h * (((c.logo as HTMLImageElement).naturalWidth || 4) / ((c.logo as HTMLImageElement).naturalHeight || 1));
-    ctx.drawImage(c.logo, marge, 92, l, h);
-  }
-  ctx.fillStyle = BLANC(0.6);
-  ctx.font = `600 30px ${p.texte}`;
-  ctx.textAlign = "right";
-  etiquette(ctx, `J${d.j} · ${d.date}`, W - marge, 132, 3);
-
-  // Le titre et le lieu.
-  const a1 = arrivee(t, 0.15, 0.8);
-  ctx.globalAlpha = a1;
-  ctx.textAlign = "left";
-  ctx.fillStyle = BLANC(1);
-  ctx.font = `900 104px ${p.texte}`;
-  ctx.fillText("Mon dimanche.", marge, 292 + (1 - a1) * 30);
-  const lieu = ligneDuLieu(d);
-  if (lieu) {
-    ctx.fillStyle = BLANC(0.6);
-    ctx.font = `500 34px ${p.texte}`;
-    ctx.fillText(lieu, marge, 352 + (1 - a1) * 30, W - 2 * marge);
+  // Les colonnes : elles entrent serrées et s'écartent jusqu'au bout.
+  if (c.colonne) {
+    const ouvre = arrivee(t, 0, STORY.duree);
+    const ec = 1.08 - 0.08 * ouvre;
+    const lcol = 294 * ec;
+    const hcol = 2028 * ec;
+    ctx.globalAlpha = arrivee(t, 0, 0.5);
+    // Le bord droit de l'image garde une trace sombre en bas : on le laisse de côté.
+    const sl = 200;
+    const sh = 1560;
+    ctx.drawImage(c.colonne, 0, 0, sl, sh, -150 + (1 - ouvre) * 70, -40, lcol * (sl / 226), hcol);
+    ctx.drawImage(c.colonne, 0, 0, sl, sh, W - 104 - (1 - ouvre) * 70, -40, lcol * (sl / 226), hcol);
   }
 
-  // La carte : elle monte et se pose ; ses calques arrivent chacun à son pas.
-  const ac = arrivee(t, 0.35, 1.5);
+  // La carte, posée : 470 de large, sous le titre.
   const lc = 470;
   const hc = lc * c.ratio;
   const xc = (W - lc) / 2;
-  const yc = 420;
-  const monte = (1 - ac) * 420;
-  ctx.globalAlpha = Math.min(1, ac * 1.6);
-  // Une lueur derrière la carte, très douce.
-  const lueur = ctx.createRadialGradient(W / 2, yc + hc / 2, 40, W / 2, yc + hc / 2, lc);
-  lueur.addColorStop(0, BLANC(0.14 * ac));
-  lueur.addColorStop(1, BLANC(0));
-  ctx.fillStyle = lueur;
-  ctx.fillRect(0, yc - 120, W, hc + 240);
-  const echelle = 0.9 + 0.1 * ac;
-  ctx.save();
-  ctx.translate(W / 2, yc + hc / 2 + monte);
-  ctx.scale(echelle, echelle);
-  ctx.translate(-W / 2, -(yc + hc / 2));
-  ctx.drawImage(c.fond, xc, yc, lc, hc);
-  ctx.drawImage(c.joueur, xc, yc + (1 - ac) * 70, lc, hc);
-  ctx.drawImage(c.stats, xc, yc + (1 - ac) * 130, lc, hc);
-  // Un reflet traverse la carte une fois, posée.
-  const ar = Math.min(1, Math.max(0, (t - 3.9) / 0.9));
-  if (ar > 0 && ar < 1) {
+  const yc = 400;
+  const tPose = 1.35;
+
+  // Ta note en très grand derrière la carte, qui remonte doucement.
+  if (d.note != null) {
+    const an = arrivee(t, 0.1, 0.6);
+    ctx.globalAlpha = an;
+    ctx.fillStyle = "#ededed";
+    ctx.font = `400 900px ${p.chiffres}`;
+    ctx.fillText(`${d.note}`, W / 2, yc + hc / 2 + 330 + (1 - an) * 160 - arrivee(t, 0.7, STORY.duree) * 40);
+  }
+
+  // L'en-tête : le logo, la journée, le titre.
+  const a0 = arrivee(t, 0.05, 0.6);
+  ctx.globalAlpha = a0;
+  if (c.logo) {
+    const h = 50;
+    const l = h * (((c.logo as HTMLImageElement).naturalWidth || 4) / ((c.logo as HTMLImageElement).naturalHeight || 1));
+    ctx.drawImage(c.logo, (W - l) / 2, 96, l, h);
+  }
+  ctx.fillStyle = NOIR(0.55);
+  ctx.font = `700 28px ${p.texte}`;
+  etiquette(ctx, [`J${d.j}`, d.date, ligneDuLieu(d)].filter(Boolean).join(" · "), W / 2, 214, 4);
+  const a1 = arrivee(t, 0.2, 0.7);
+  ctx.globalAlpha = a1;
+  ctx.fillStyle = NOIR(1);
+  ctx.font = `900 112px ${p.texte}`;
+  ctx.fillText("MON DIMANCHE.", W / 2, 334 + (1 - a1) * 36, W - 220);
+
+  // La carte arrive en tournant (une fois et demie), monte et se pose.
+  const ac = arrivee(t, 0.35, tPose - 0.35);
+  if (t >= 0.35) {
+    const angle = (1 - ac) * Math.PI * 3;
+    const cos = Math.cos(angle);
+    const coup = t > tPose ? 1 + 0.045 * Math.max(0, 1 - (t - tPose) / 0.3) : 1;
     ctx.save();
+    ctx.globalAlpha = Math.min(1, ac * 3);
+    ctx.translate(W / 2, yc + hc / 2 + (1 - ac) * 700);
+    ctx.rotate((1 - ac) * -0.25);
+    ctx.scale(Math.max(0.02, Math.abs(cos)) * coup, coup);
+    ctx.translate(-W / 2, -(yc + hc / 2));
+    // L'ombre sur la page.
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.22)";
+    ctx.shadowBlur = 70;
+    ctx.shadowOffsetY = 36;
     arrondi(ctx, xc, yc, lc, hc, lc * 0.06);
-    ctx.clip();
-    const bx = xc - lc * 0.6 + ar * lc * 2.2;
-    const reflet = ctx.createLinearGradient(bx - 120, yc, bx + 120, yc + 160);
-    reflet.addColorStop(0, BLANC(0));
-    reflet.addColorStop(0.5, BLANC(0.28));
-    reflet.addColorStop(1, BLANC(0));
-    ctx.fillStyle = reflet;
-    ctx.fillRect(xc, yc, lc, hc);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+    ctx.restore();
+    if (cos >= 0) {
+      ctx.drawImage(c.fond, xc, yc, lc, hc);
+      ctx.drawImage(c.joueur, xc, yc + (1 - ac) * 40, lc, hc);
+      ctx.drawImage(c.stats, xc, yc + (1 - ac) * 80, lc, hc);
+    } else {
+      // Le dos BOLA, de la couleur de la face.
+      arrondi(ctx, xc, yc, lc, hc, lc * 0.06);
+      ctx.fillStyle = "#f4f4f2";
+      ctx.fill();
+      ctx.strokeStyle = NOIR(0.08);
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      if (c.symbole) {
+        const s = lc * 0.36;
+        ctx.save();
+        ctx.translate(W / 2, yc + hc / 2);
+        ctx.scale(-1, 1);
+        ctx.drawImage(c.symbole, -s / 2, -s / 2, s, s);
+        ctx.restore();
+      }
+    }
+    // Un reflet traverse la carte une fois, posée.
+    const ar = Math.min(1, Math.max(0, (t - 3.6) / 0.9));
+    if (ar > 0 && ar < 1) {
+      ctx.save();
+      arrondi(ctx, xc, yc, lc, hc, lc * 0.06);
+      ctx.clip();
+      const bx = xc - lc * 0.6 + ar * lc * 2.2;
+      const reflet = ctx.createLinearGradient(bx - 120, yc, bx + 120, yc + 160);
+      reflet.addColorStop(0, BLANC(0));
+      reflet.addColorStop(0.5, BLANC(0.45));
+      reflet.addColorStop(1, BLANC(0));
+      ctx.fillStyle = reflet;
+      ctx.fillRect(xc, yc, lc, hc);
+      ctx.restore();
+    }
     ctx.restore();
   }
-  ctx.restore();
 
-  // Le score, ton camp en blanc plein.
-  let y = yc + hc + 150;
-  const as = arrivee(t, 1.6, 0.7);
+  // Le coup de la pose : une onde à l'encre et un éclair blanc.
+  const ao = (t - tPose) / 0.7;
+  if (ao > 0 && ao < 1) {
+    const e = 1 - Math.pow(1 - ao, 3);
+    ctx.globalAlpha = (1 - ao) * 0.5;
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 6 * (1 - ao) + 1;
+    ctx.beginPath();
+    ctx.ellipse(W / 2, yc + hc / 2, lc * (0.6 + e * 0.9), hc * (0.6 + e * 0.6), 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  const ae = (t - tPose) / 0.25;
+  if (ae > 0 && ae < 1) {
+    ctx.globalAlpha = (1 - ae) * 0.7;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Le score, ton camp à l'encre pleine.
+  let y = yc + hc + 175;
+  const as = pose(t, 1.55, 0.5);
   if (d.pour != null && d.contre != null && d.camp) {
-    ctx.globalAlpha = as;
-    const dy = (1 - as) * 40;
+    ctx.globalAlpha = Math.min(1, Math.max(0, (t - 1.55) / 0.2));
+    const dy = (1 - as) * 50;
     const autre = d.camp === "Noirs" ? "Blancs" : "Noirs";
     ctx.textAlign = "center";
     ctx.font = `400 150px ${p.chiffres}`;
-    ctx.fillStyle = BLANC(1);
+    ctx.fillStyle = NOIR(1);
     ctx.fillText(`${d.pour}`, W / 2 - 110, y + dy);
-    ctx.fillStyle = BLANC(0.4);
+    ctx.fillStyle = NOIR(0.3);
     ctx.fillText("–", W / 2, y + dy);
     ctx.fillText(`${d.contre}`, W / 2 + 110, y + dy);
-    ctx.font = `700 30px ${p.texte}`;
-    ctx.fillStyle = BLANC(1);
+    ctx.font = `800 30px ${p.texte}`;
+    ctx.fillStyle = NOIR(1);
     ctx.textAlign = "right";
-    etiquette(ctx, d.camp, W / 2 - 210, y - 50 + dy, 3);
-    ctx.fillStyle = BLANC(0.4);
+    etiquette(ctx, d.camp, W / 2 - 210, y - 50 + dy, 4);
+    ctx.fillStyle = NOIR(0.35);
     ctx.textAlign = "left";
-    etiquette(ctx, autre, W / 2 + 210, y - 50 + dy, 3);
+    etiquette(ctx, autre, W / 2 + 210, y - 50 + dy, 4);
     const r = resultat(d);
     if (r) {
-      ctx.fillStyle = BLANC(0.6);
-      ctx.font = `600 34px ${p.texte}`;
+      ctx.fillStyle = NOIR(0.55);
+      ctx.font = `700 28px ${p.texte}`;
       ctx.textAlign = "center";
-      ctx.fillText(r, W / 2, y + 62 + dy);
+      etiquette(ctx, r, W / 2, y + 58 + dy, 5);
     }
-    y += 210;
+    y += 230;
   } else {
-    y += 40;
+    y += 60;
   }
 
-  // Tes chiffres, qui défilent jusqu'au vrai.
+  // Tes chiffres, qui tombent en place et défilent jusqu'au vrai.
   const colonnes = [
     { n: d.buts, l: d.buts > 1 ? "buts" : "but" },
     { n: d.passes, l: d.passes > 1 ? "passes" : "passe" },
     { n: d.points, l: "points", plus: true },
   ];
   colonnes.forEach((col, i) => {
-    const debut = 2.2 + i * 0.22;
-    const a = arrivee(t, debut, 0.5);
-    const compte = Math.round(col.n * arrivee(t, debut, 1));
-    const x = W / 2 + (i - 1) * 320;
-    ctx.globalAlpha = a;
+    const debut = 2.05 + i * 0.18;
+    const a = pose(t, debut, 0.5);
+    const compte = Math.round(col.n * arrivee(t, debut, 0.9));
+    const x = W / 2 + (i - 1) * 290;
+    ctx.globalAlpha = Math.min(1, Math.max(0, (t - debut) / 0.15));
     ctx.textAlign = "center";
-    ctx.fillStyle = BLANC(1);
-    ctx.font = `400 128px ${p.chiffres}`;
-    ctx.fillText(`${col.plus && col.n > 0 ? "+" : ""}${compte}`, x, y + (1 - a) * 30);
-    ctx.fillStyle = BLANC(0.55);
-    ctx.font = `600 28px ${p.texte}`;
-    etiquette(ctx, col.l, x, y + 52 + (1 - a) * 30, 3);
+    ctx.fillStyle = NOIR(1);
+    ctx.font = `400 136px ${p.chiffres}`;
+    ctx.fillText(`${col.plus && col.n > 0 ? "+" : ""}${compte}`, x, y + (1 - a) * 60);
+    ctx.fillStyle = NOIR(0.5);
+    ctx.font = `700 26px ${p.texte}`;
+    etiquette(ctx, col.l, x, y + 52 + (1 - a) * 60, 4);
   });
 
   const rang = ligneDuRang(d);
   if (rang) {
-    const a = arrivee(t, 3.1, 0.6);
+    const a = arrivee(t, 2.9, 0.6);
     ctx.globalAlpha = a;
-    ctx.fillStyle = BLANC(0.8);
-    ctx.font = `600 34px ${p.texte}`;
+    ctx.fillStyle = NOIR(0.8);
+    ctx.font = `700 34px ${p.texte}`;
     ctx.textAlign = "center";
-    ctx.fillText(rang, W / 2, y + 140);
+    ctx.fillText(rang, W / 2, y + 140 + (1 - a) * 20);
   }
 
   // La fin, pour qui ne connaît pas Bola.
-  const af = arrivee(t, 3.5, 0.7);
+  const af = arrivee(t, 3.3, 0.7);
   ctx.globalAlpha = af;
   ctx.textAlign = "center";
-  ctx.fillStyle = BLANC(0.55);
-  ctx.font = `500 30px ${p.texte}`;
+  ctx.fillStyle = NOIR(0.55);
+  ctx.font = `600 30px ${p.texte}`;
   ctx.fillText(ligneDeFin(d), W / 2, H - 132);
-  ctx.fillStyle = BLANC(1);
-  ctx.font = `800 44px ${p.texte}`;
-  ctx.fillText("getbola.app", W / 2, H - 76);
+  ctx.fillStyle = NOIR(1);
+  ctx.font = `900 46px ${p.texte}`;
+  ctx.fillText("getbola.app", W / 2, H - 74);
 
   ctx.restore();
 }
