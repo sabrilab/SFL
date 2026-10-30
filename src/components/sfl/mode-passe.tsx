@@ -25,6 +25,9 @@
 //   · on sort par la croix, Échap, ou en tirant vers le bas : le noir se
 //     referme sur la tuile.
 // Toujours en noir, en clair comme en sombre : c'est un autre monde.
+// Ce qui défile porte overflow-y-auto / overflow-x-auto : le verrou du rebond
+// d'iOS (pwa/viewport-lock.tsx) bloque tout autre glissé hors de #app-scroll,
+// et le mode, posé dans body, en est hors (30/10 : « on ne peut pas scroller »).
 // « Réduire les animations » : on entre et on sort sans ouverture ni montée.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -170,7 +173,7 @@ function Route({
 
   return (
     <div className="mp-route" role="group" aria-label="Les vingt paliers">
-      <div ref={ref} onScroll={suivre} className="mp-route__piste">
+      <div ref={ref} onScroll={suivre} className="mp-route__piste overflow-x-auto">
         <div className="mp-route__rail" style={{ width: PALIERS_PASSE * PAS }}>
           <span className="mp-route__trait" />
           <span className="mp-route__fait" style={{ width: Math.min(PALIERS_PASSE - 1, Math.max(0, palier - 1 + avance)) * PAS }} />
@@ -484,8 +487,8 @@ export function ModePasse({
           </div>
         </>
       ) : (
-        <div key={vue} className="mp-defile mp-entre" style={{ "--i": 2 } as React.CSSProperties}>
-          {vue === "missions" ? <VueMissions b={b} saison={saison} /> : <VueAutres />}
+        <div key={vue} className="mp-defile overflow-y-auto mp-entre" style={{ "--i": 2 } as React.CSSProperties}>
+          {vue === "missions" ? <VueMissions b={b} saison={saison} nom={player.name} /> : <VueAutres />}
         </div>
       )}
 

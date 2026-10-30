@@ -58,6 +58,7 @@ import {
   reponsesEnMemoire,
 } from "@/lib/sfl/missions-reponses";
 import { ajouterPronos } from "@/lib/sfl/pronos";
+import { ajouterDefis } from "@/lib/sfl/defis";
 import { ajouterRecrues, type RecruesJoueur } from "@/lib/sfl/recrues";
 import { appliquerVotes } from "@/lib/sfl/votes";
 import { supabase } from "@/lib/supabase";
@@ -428,6 +429,8 @@ export function useXpLigueCalcule(): XpLigue | null {
     if (!isClient) return null;
     const journal = journalXp(jugee, reponses, votes, maintenant, felicitations);
     ajouterPronos(journal, jugee, pronos, maintenant);
+    // Les badges de palier franchis depuis S1 J4 : la prime de leur défi (lib/sfl/defis.ts).
+    ajouterDefis(journal, jugee);
     // +100 par recrue active, hors du rang (lib/sfl/recrues.ts).
     ajouterRecrues(journal, jugee, ligue, me ? { nom: me, recrues: miennes } : null, maintenant);
     // Mes matchs Bola validés et mes missions perso (lib/sfl/missions-perso.ts), hors du rang ;

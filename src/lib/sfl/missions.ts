@@ -660,6 +660,8 @@ export interface LigneXp {
    * Toujours hors du rang.
    */
   bola?: true;
+  /** Un badge de palier franchi (lib/sfl/defis.ts) : sa prime de défi. */
+  defi?: true;
 }
 
 export interface BilanXp {
