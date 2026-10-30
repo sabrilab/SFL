@@ -773,7 +773,7 @@ function ImageFeuille({
           />
           <span
             style={{
-              font: `500 12px/1 var(--font-jbmono), monospace`,
+              font: `500 12px/1 var(--font-inter), system-ui, sans-serif`,
               letterSpacing: 1,
               color: GRIS,
               textTransform: "uppercase",
@@ -832,7 +832,7 @@ function ImageFeuille({
         <img src="/bola/symbole-blanc.svg" alt="" width={22} height={22} />
         <span
           style={{
-            font: "500 12px/1 var(--font-jbmono), monospace",
+            font: "500 12px/1 var(--font-inter), system-ui, sans-serif",
             letterSpacing: 0.6,
             color: GRIS,
           }}

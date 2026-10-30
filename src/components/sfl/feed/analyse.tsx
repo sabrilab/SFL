@@ -679,7 +679,7 @@ export function RadarModule({
               <tspan
                 x={lx}
                 dy="-2"
-                style={{ fontFamily: "var(--font-jbmono)", fontSize: 9, letterSpacing: 2, fill: "rgb(var(--contraste-rgb) / 0.4)" }}
+                style={{ fontFamily: "var(--font-inter)", fontSize: 9, letterSpacing: 2, fill: "rgb(var(--contraste-rgb) / 0.4)" }}
               >
                 {k}
               </tspan>
