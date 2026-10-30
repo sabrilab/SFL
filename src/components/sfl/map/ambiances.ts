@@ -257,7 +257,7 @@ export function teinterZones(map: PlanMap, ambiance: Ambiance, satellite: boolea
   // plus en plus larges ; l'opacité est celle de chacun. Plus de trait ni de
   // hachures (Sabri, 30/10 : « pas une fracture […] que ça se fonde ») : hors
   // des zones le plan se grise peu à peu, dedans il reste clair.
-  const voile = sans || satellite ? 0 : ambiance === "territoire" ? 0.105 : ambiance === "nuit" ? 0.13 : 0.08;
+  const voile = sans || satellite ? 0 : ambiance === "territoire" ? 0.15 : ambiance === "nuit" ? 0.18 : 0.12;
   set("zones-voile", "fill-color", ambiance === "nuit" ? "#030304" : ambiance === "encre" ? "#cfcec8" : "#c9cac6");
   set("zones-voile", "fill-opacity", voile);
   set("zones-hachures", "fill-opacity", 0);

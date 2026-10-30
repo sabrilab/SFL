@@ -67,7 +67,7 @@ export interface Zone {
 
 export const LIEN_KM = 20;
 export const VILLES_KM = 15;
-export const MARGE_KM = 2.5;
+export const MARGE_KM = 5;
 const NOUVELLE_JOURS = 3;
 /** Une zone en attente demande au moins ce nombre de joueurs. */
 const ATTENTE_MIN = 2;
@@ -255,7 +255,9 @@ export function voileHorsZones(zones: Zone[]): GeoJSON.Feature<GeoJSON.Polygon> 
  * fonde ») : des voiles de plus en plus larges autour des zones ouvertes,
  * chacun presque transparent ; empilés, ils grisent le plan de plus en plus
  * à mesure qu'on s'éloigne, sans bord visible. Les marges croissent en
- * progression géométrique : le fondu est serré près de la zone, large au loin.
+ * progression géométrique, de MARGE_KM (5 km) à 16 km des lieux et des villes : la
+ * métropole lilloise reste claire jusqu'à Armentières et Mouscron, puis le gris
+ * monte (Sabri, 30/10 : « ça commence à se terminer » vers là).
  */
 export const FONDU_PAS = 10;
 export function voilesEnFondu(zones: Zone[]): GeoJSON.FeatureCollection<GeoJSON.Polygon> {
@@ -269,7 +271,7 @@ export function voilesEnFondu(zones: Zone[]): GeoJSON.FeatureCollection<GeoJSON.
   ];
   const features: GeoJSON.Feature<GeoJSON.Polygon>[] = [];
   for (let k = 0; k < FONDU_PAS; k++) {
-    const marge = 1.2 * 1.38 ** k;
+    const marge = MARGE_KM * 1.14 ** k;
     features.push({
       type: "Feature",
       properties: { k },
