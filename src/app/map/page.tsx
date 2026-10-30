@@ -138,6 +138,8 @@ import { ciblesDuDimanche, contratsSignes, foyerDesCibles, villesDesCibles } fro
 import { ContratsSur } from "@/components/sfl/map/contrats-sur";
 import { cleVille, type ContratPlan, type VillePlan } from "@/components/sfl/map/joueurs";
 import { useMissionsDeLaLigue } from "@/hooks/use-missions";
+import { AMBIANCES, type Ambiance } from "@/components/sfl/map/ambiances";
+import { calculerZones, dansContour, numeroZone, type Foyer, type VilleZone, type Zone } from "@/lib/sfl/zones";
 import { maVille, villeOuLigue } from "@/lib/sfl/villes";
 import { photoMiniature, photoPerso } from "@/lib/sfl/photos";
 import { nomAffiche } from "@/lib/sfl/identites";
@@ -195,12 +197,29 @@ const AUCUN_POINT: PointPlan[] = [];
 const SANS_POSSIBLES: PossiblePlan[] = [];
 /** Les joueurs masqués depuis le menu de la Map. */
 const AUCUNE_VILLE: VillePlan[] = [];
+const AUCUNE_ZONE: Zone[] = [];
 /** Un terrain qui a son match n'a plus son sticker vide : à moins de 200 m, c'est le même. */
 const MEME_TERRAIN_KM = 0.2;
 /** « 23/10/2026 » */
 /** Le gris ou le ciel des terrains possibles (dans un aperçu, /map?fantome=ciel montre l'autre). */
 const teinteFantome = (): TeinteFantome =>
   process.env.NEXT_PUBLIC_BOLA_ENV !== "production" && new URLSearchParams(window.location.search).get("fantome") === "ciel" ? "ciel" : "gris";
+
+/**
+ * L'ambiance du plan (30/10, les essais des zones Bola) : dans un aperçu,
+ * « Territoire » d'office, les autres par /?ambiance=nuit|encre|classique ;
+ * en production, le plan d'avant tant que Sabri n'a pas choisi.
+ */
+const ESSAIS = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
+const ambianceDeLAdresse = (): Ambiance => {
+  if (!ESSAIS) return "classique";
+  const a = new URLSearchParams(window.location.search).get("ambiance");
+  return AMBIANCES.includes(a as Ambiance) ? (a as Ambiance) : "territoire";
+};
+/** Dans un aperçu, /?zones=demo ajoute une zone qui vient de s'ouvrir (Lens) et une zone fermée (Paris), pour voir le récit. */
+const zonesDemo = () => ESSAIS && new URLSearchParams(window.location.search).get("zones") === "demo";
+const useZonesDemo = () => useSyncExternalStore(rienAEcouter, zonesDemo, () => false);
+const NOMS_AMBIANCES: Record<Ambiance, string> = { territoire: "Territoire", nuit: "Nuit", encre: "Encre", classique: "Avant" };
 
 const CarteMap = dynamic(() => import("@/components/sfl/map/carte-map").then((m) => m.CarteMap), {
   ssr: false,
@@ -1008,6 +1027,71 @@ export default function MapPage() {
     for (const g of parVille.values()) g.joueurs.sort((a, b) => b.note - a.note || a.affiche.localeCompare(b.affiche));
     return [...parVille.values()];
   }, [players, revVilles, revPhotos, revNoms, sansSfl]);
+
+  // Les zones Bola (lib/sfl/zones.ts) : là où l'on joue, et d'où viennent
+  // ceux qui y jouent. La ligue ouvre la première ; chaque match ouvert ou
+  // défi d'équipe loin de tout en ouvre une nouvelle.
+  const ambianceAdresse = useSyncExternalStore(rienAEcouter, ambianceDeLAdresse, (): Ambiance => "classique");
+  const [choixAmbiance, setAmbiance] = useState<Ambiance | null>(null);
+  const ambiance = choixAmbiance ?? ambianceAdresse;
+  // Midi, aujourd'hui à Paris : l'âge des zones (une zone de moins de trois jours est nouvelle).
+  const maintenant = aujourdhui ? Date.parse(`${aujourdhui}T12:00:00`) : 0;
+  const demoZones = useZonesDemo();
+  const foyers = useMemo<Foyer[]>(() => {
+    const f: Foyer[] = sansSfl ? [] : terrains.map((t) => ({ lat: t.lat, lng: t.lng, genre: "sfl" as const, nom: t.nom, commune: t.commune }));
+    for (const m of matchs) {
+      if (!m.terrain || m.ligue === "sfl") continue;
+      const depuis = m.partie ? Date.parse(`${m.partie.jour}T12:00:00`) : m.team ? Date.parse(`${m.team.defi.jour}T12:00:00`) : undefined;
+      f.push({ lat: m.terrain.lat, lng: m.terrain.lng, genre: m.ligue === "team" ? "team" : "bola", nom: m.terrain.nom, commune: m.terrain.commune, depuis, par: m.partie?.organisateur });
+    }
+    if (demoZones) f.push({ lat: 50.4296, lng: 2.8307, genre: "bola", nom: "Five de Lens", commune: "Lens", depuis: maintenant, par: "Sami" });
+    return f;
+  }, [terrains, matchs, sansSfl, demoZones, maintenant]);
+  const villesZones = useMemo<VilleZone[]>(() => {
+    const v = villes.map((x) => ({ ville: x.ville, lat: x.lat, lng: x.lng, n: x.joueurs.length }));
+    if (demoZones) v.push({ ville: "Paris", lat: 48.8566, lng: 2.3522, n: 5 }, { ville: "Lens", lat: 50.4296, lng: 2.8307, n: 3 });
+    // Une ville, une fois (la démo des aperçus peut doubler une vraie).
+    const parNom = new Map<string, VilleZone>();
+    for (const x of v) {
+      const deja = parNom.get(x.ville);
+      if (deja) deja.n += x.n;
+      else parNom.set(x.ville, { ...x });
+    }
+    return [...parNom.values()];
+  }, [villes, demoZones]);
+  const dimanches = useMemo(() => saison.journees.filter((j) => journeeJouee(saison, j.j)).length, [saison]);
+  const zones = useMemo<Zone[]>(() => {
+    if (ambiance === "classique") return [];
+    return calculerZones(foyers, villesZones, maintenant).map((z) => {
+      const ligue = z.foyers.some((f) => f.genre === "sfl");
+      const matchsIci = z.foyers.filter((f) => f.genre !== "sfl").length;
+      const sous = z.ouverte
+        ? [`${z.joueurs} joueur${z.joueurs > 1 ? "s" : ""}`, ligue && dimanches ? `${dimanches} dimanche${dimanches > 1 ? "s" : ""}` : null, matchsIci ? `${matchsIci} match${matchsIci > 1 ? "s" : ""}` : null]
+            .filter(Boolean)
+            .join(" · ")
+        : `${z.joueurs} joueurs · aucun match`;
+      return { ...z, sous };
+    });
+  }, [ambiance, foyers, villesZones, dimanches, maintenant]);
+  const [zoneOuverte, setZoneOuverte] = useState<string | null>(null);
+  const zoneVue = zones.find((z) => z.id === zoneOuverte) ?? null;
+  /** La zone d'un point : ouverte, sinon celle qu'un match là-bas ouvrirait (son numéro à venir). */
+  const zoneDe = useCallback(
+    (lat: number, lng: number) => {
+      const ici = zones.find((z) => z.ouverte && dansContour(z.contour, lat, lng));
+      if (ici) return { zone: ici, ouvre: false };
+      const prochaine = zones.filter((z) => z.ouverte).length + 1;
+      const attente = zones.find((z) => !z.ouverte && dansContour(z.contour, lat, lng));
+      return { zone: attente ?? null, ouvre: true, numero: prochaine };
+    },
+    [zones]
+  );
+  const zoneDuLibre = useMemo(() => {
+    if (!libre || !zones.length) return null;
+    const z = zoneDe(libre.lat, libre.lng);
+    if (!z.ouvre) return `Zone ${numeroZone(z.zone!.numero)} · ${z.zone!.nom}`;
+    return `Hors zone · ton match ouvre la zone ${numeroZone(z.numero!)}${z.zone ? ` · ${z.zone.nom}` : ""}`;
+  }, [libre, zones, zoneDe]);
   // Le filtre Contrats : seules les cibles du dimanche, chacune avec son
   // contrat. L'horloge des missions recalcule tout chaque minute : les cibles
   // passent par une chaîne, pour que le plan ne redessine ses joueurs que
@@ -1142,6 +1226,9 @@ export default function MapPage() {
             onPossible={toucherPossible}
             teinteFantome={tonFantomes}
             onVue={voirTerrains}
+            zones={enContrats ? AUCUNE_ZONE : zones}
+            ambiance={ambiance}
+            onZone={setZoneOuverte}
             className="h-full w-full"
           />
         </div>
@@ -1167,6 +1254,33 @@ export default function MapPage() {
             {compte}
           </span>
         </div>
+
+        {/* Les essais de la Map (aperçus seulement, 30/10) : passer d'une ambiance à l'autre. */}
+        {ESSAIS && !enContrats && (
+          <div
+            data-traverse
+            className="absolute left-4 z-[510] flex gap-1 rounded-full border border-black/10 bg-[#f4f5f2]/90 p-1 shadow-[0_2px_8px_rgba(0,0,0,0.15)] backdrop-blur"
+            style={{ top: `calc(${haut} + 74px)` }}
+          >
+            {AMBIANCES.map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => {
+                  navigator.vibrate?.(6);
+                  setAmbiance(a);
+                  const u = new URL(window.location.href);
+                  u.searchParams.set("ambiance", a);
+                  window.history.replaceState(null, "", u);
+                }}
+                className="h-7 rounded-full px-2.5 text-[11.5px] font-bold"
+                style={a === ambiance ? { background: ENCRE, color: BLANC } : { color: ENCRE }}
+              >
+                {NOMS_AMBIANCES[a]}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* En haut à droite : la loupe (la Recherche, montée de la barre
             d'onglets le 19/10) et le menu de la Map (24/10, map/menu-map.tsx) :
@@ -1539,6 +1653,23 @@ export default function MapPage() {
         </SheetContent>
       </Sheet>
 
+      {/* ─── Une zone Bola : son récit (30/10) ─── */}
+      <Sheet open={!!zoneVue} onOpenChange={(o) => !o && setZoneOuverte(null)} titre="la zone">
+        <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
+          {zoneVue && (
+            <RecitZone
+              zone={zoneVue}
+              dimanches={dimanches}
+              ouvrir={partiesActives}
+              onOuvrir={() => {
+                setZoneOuverte(null);
+                setOuvrir((o) => ({ terrain: null, n: (o?.n ?? 0) + 1 }));
+              }}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
+
       {/* ─── Les joueurs, ville par ville ─── */}
       <Sheet open={catalogue} onOpenChange={setCatalogue} fenetreRef={fenetreCatalogue} titre="les joueurs">
         <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
@@ -1635,6 +1766,7 @@ export default function MapPage() {
               defi={defiDepuisTerrain}
               ouvrir={partiesActives}
               source={sourcesCitees(indexTerrains, [libre]).join(" · ") || null}
+              zone={zoneDuLibre}
               onOuvrir={() => {
                 setFicheLibre(false);
                 setLeve(null);
@@ -1967,6 +2099,75 @@ function CarteProposee({
   );
 }
 
+const DATE_COURTE = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: "Europe/Paris" });
+
+/**
+ * Le récit d'une zone (30/10) : son numéro, ce qu'elle compte, et comment
+ * elle s'est ouverte, lieu par lieu, dans l'ordre ; ses villes ensuite. Une
+ * zone fermée dit seulement qui y attend, et s'ouvre d'un match.
+ */
+function RecitZone({ zone, dimanches, ouvrir, onOuvrir }: { zone: Zone; dimanches: number; ouvrir: boolean; onOuvrir: () => void }) {
+  const ligue = zone.foyers.some((f) => f.genre === "sfl");
+  const lieux = zone.foyers.length;
+  const chiffres: [number, string][] = [
+    [zone.joueurs, zone.joueurs > 1 ? "joueurs" : "joueur"],
+    zone.ouverte ? [lieux, lieux > 1 ? "terrains" : "terrain"] : [0, "match"],
+    ...(ligue && dimanches ? [[dimanches, dimanches > 1 ? "dimanches" : "dimanche"] as [number, string]] : []),
+  ];
+  const recit = [...zone.foyers].sort((a, b) => (a.depuis ?? 0) - (b.depuis ?? 0));
+  return (
+    <>
+      <SheetHeader className="px-5 pt-5 pb-0">
+        <p className="mono-label text-muted-foreground">{zone.ouverte ? `Zone ${numeroZone(zone.numero)}${zone.nouvelle ? " · nouvelle" : ""}` : "Zone fermée"}</p>
+        <SheetTitle className="text-[30px] leading-none font-black tracking-tight uppercase italic">{zone.nom}</SheetTitle>
+      </SheetHeader>
+      <div className="flex flex-col gap-4 px-4 pt-3">
+        <div className="grid grid-cols-3 gap-2">
+          {chiffres.map(([n, l]) => (
+            <div key={l} className="rounded-[18px] border border-border bg-secondary/60 px-3 py-2.5">
+              <p className="font-display text-[30px] leading-none tabular-nums">{n}</p>
+              <p className="mono-label mt-1 text-muted-foreground">{l}</p>
+            </div>
+          ))}
+        </div>
+        {recit.length > 0 && (
+          <ol className="relative flex flex-col gap-3 border-l-[1.5px] border-foreground/80 pl-4">
+            {recit.map((f, i) => (
+              <li key={`${f.lat},${f.lng},${i}`} className="relative">
+                <span aria-hidden className="absolute top-1 -left-[21.5px] size-[11px] rounded-full border-[1.5px] border-foreground bg-background" />
+                <p className="mono-label flex items-center gap-1.5 text-muted-foreground">
+                  <SigleLigue ligue={f.genre} hauteur={10} className="text-foreground" />
+                  {[i === 0 ? "L'ouverture" : null, f.depuis ? DATE_COURTE.format(f.depuis) : f.genre === "sfl" ? "Chaque dimanche" : null].filter(Boolean).join(" · ")}
+                </p>
+                <p className="text-[15px] leading-snug font-semibold">{f.nom}</p>
+                {f.par && <p className="text-[13px] text-muted-foreground">par {f.par}</p>}
+              </li>
+            ))}
+          </ol>
+        )}
+        {zone.villes.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {[...zone.villes]
+              .sort((a, b) => b.n - a.n)
+              .map((v) => (
+                <span key={v.ville} className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border px-2.5 text-[12.5px] font-semibold">
+                  {v.ville}
+                  <span className="text-muted-foreground tabular-nums">{v.n}</span>
+                </span>
+              ))}
+          </div>
+        )}
+        {ouvrir && (
+          <Button variant="vert" onClick={onOuvrir} className="h-12 w-full gap-2.5 rounded-full text-[15px] font-semibold">
+            <SigleLigue ligue="bola" hauteur={12} />
+            {zone.ouverte ? "Ouvrir un match dans la zone" : "Ouvrir la zone"}
+          </Button>
+        )}
+      </div>
+    </>
+  );
+}
+
 /**
  * La fiche d'un terrain possible : sa photo, le chemin pour y aller, et les
  * deux façons d'y jouer — un match Bola ouvert à tous, ou le défi d'une
@@ -1978,6 +2179,7 @@ function FicheLibre({
   defi,
   ouvrir,
   source,
+  zone,
   onOuvrir,
 }: {
   t: TerrainPropose;
@@ -1987,6 +2189,8 @@ function FicheLibre({
   ouvrir: boolean;
   /** La source du terrain, citée sous la fiche (Licence Ouverte, ODbL). */
   source: string | null;
+  /** La zone du terrain : la sienne, ou celle que son premier match ouvrira. */
+  zone?: string | null;
   onOuvrir: () => void;
 }) {
   const lien = itineraires(t.lat, t.lng, t.nom)[ios ? 0 : 1];
@@ -2007,6 +2211,7 @@ function FicheLibre({
           <Navigation className="size-[10px]" strokeWidth={2.6} /> Y aller
         </a>
       </div>
+      {zone && <p className="mono-label text-center text-muted-foreground">{zone}</p>}
       {ouvrir && (
         <Button variant="vert" onClick={onOuvrir} className="h-12 w-full gap-2.5 rounded-full text-[15px] font-semibold">
           <SigleLigue ligue="bola" hauteur={12} />
