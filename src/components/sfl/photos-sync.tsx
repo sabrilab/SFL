@@ -20,11 +20,28 @@ import { rafraichirFelicitations } from "@/lib/sfl/felicitations";
 import { envoyerPhotosEnAttente, rafraichirPhotos } from "@/lib/sfl/photos";
 import { rafraichirSuivis } from "@/lib/sfl/suivis";
 import { rafraichirArbitres } from "@/lib/sfl/arbitres";
+import { rafraichirNonJoueurs } from "@/lib/sfl/non-joueurs";
+import { REFUS_EVENT } from "@/lib/sfl/saisie/store";
+import { libelleEcart, type Ecart } from "@/lib/sfl/saisie/integrite";
+import { haptique } from "@/lib/sfl/haptique";
+import { toast } from "sonner";
 import { poserVilleDevinee, rafraichirVilles } from "@/lib/sfl/villes";
 
 export function PhotosSync() {
   const session = useSession();
   const nom = session?.server ? session.name : null;
+
+  // Une écriture de la saison refusée (saisie/integrite.ts) : l'objet en
+  // cause, en quelques mots, et rien n'est parti.
+  useEffect(() => {
+    const refus = (e: Event) => {
+      const ecarts = (e as CustomEvent<Ecart[]>).detail ?? [];
+      haptique.refus();
+      toast(ecarts.map(libelleEcart).join(" · ") || "Refusé", { id: "saisie-refus" });
+    };
+    window.addEventListener(REFUS_EVENT, refus);
+    return () => window.removeEventListener(REFUS_EVENT, refus);
+  }, []);
 
   useEffect(() => {
     void rafraichirPhotos();
@@ -35,6 +52,7 @@ export function PhotosSync() {
     void rafraichirSuivis();
     void rafraichirFelicitations();
     void rafraichirArbitres();
+    void rafraichirNonJoueurs();
     const auRetour = () => {
       if (document.visibilityState !== "visible") return;
       void rafraichirPhotos();
@@ -45,6 +63,7 @@ export function PhotosSync() {
       void rafraichirSuivis();
       void rafraichirFelicitations();
       void rafraichirArbitres();
+      void rafraichirNonJoueurs();
     };
     document.addEventListener("visibilitychange", auRetour);
     return () => document.removeEventListener("visibilitychange", auRetour);

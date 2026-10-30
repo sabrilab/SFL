@@ -23,7 +23,7 @@ import { exploitsDeLaSaison, lireCle, type Exploit } from "@/lib/sfl/exploits";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
 import { appliquerVotes, type VoteFigure } from "@/lib/sfl/votes";
-import { votesDeLaSaison } from "@/lib/sfl/saison-serveur.server";
+import { lireSaisonServeur, votesDeLaSaison } from "@/lib/sfl/saison-serveur.server";
 
 export const maxDuration = 30;
 
@@ -65,14 +65,15 @@ export async function POST(req: NextRequest) {
     : [];
   if (demandes.length === 0) return NextResponse.json({ error: "Exploit inconnu." }, { status: 400 });
 
-  const [{ data: profils }, { data: doc }] = await Promise.all([
+  // La saison publiée : un exploit d'une journée en brouillon n'existe pas encore.
+  const [{ data: profils }, lue] = await Promise.all([
     sb.from("profiles").select("id, name, nom_affiche, valide"),
-    sb.from("saison").select("data").eq("id", 1).maybeSingle(),
+    lireSaisonServeur(sb).catch(() => null),
   ]);
   const tous = (profils ?? []) as Profil[];
   const lui = tous.find((p) => p.id === moi.id);
   if (!lui?.valide) return NextResponse.json({ error: "Compte pas encore accepté." }, { status: 403 });
-  const saison = (doc as { data?: Saison } | null)?.data;
+  const saison: Saison | undefined = lue?.brute;
   if (!saison?.journees) return NextResponse.json({ error: "Saison introuvable." }, { status: 503 });
 
   // Les exploits de la saison de la base, avec les noms que la ligue voit,

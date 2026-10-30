@@ -33,10 +33,14 @@
   --color-foreground: var(--foreground);
   /* Typographie de l'app BOLA, celle de la Map : Inter pour tout ce qui se
      lit, et au plus gras pour les titres en capitales (.titre-lettrage) ;
-     JetBrains Mono en capitales pour ce qui s'étiquette (.mono-label).
+     Inter aussi, en capitales espacées, pour ce qui s'étiquette
+     (.mono-label, font-mono). La police machine à écrire (JetBrains Mono) a
+     quitté l'interface le 30/10 (Sabri : « supprimer un type de
+     typographie partout »), cartes joueurs comprises (« il y en a aussi
+     sur la carte »).
      Anton ne sert plus qu'aux chiffres. */
   --font-sans: var(--font-inter);
-  --font-mono: var(--font-jbmono);
+  --font-mono: var(--font-inter);
   --font-heading: var(--font-sans);
   --font-display: var(--font-anton);
   --color-vert: var(--vert);

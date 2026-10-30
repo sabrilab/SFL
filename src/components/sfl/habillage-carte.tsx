@@ -33,7 +33,7 @@ import {
 const W = 1024;
 const H = 1656;
 const ANTON = "var(--font-anton), Anton, sans-serif";
-const MONO = "var(--font-jbmono), ui-monospace, monospace";
+const MONO = "var(--font-inter), system-ui, sans-serif";
 
 /** Un rectangle aux coins arrondis, dans le repère de la carte. */
 export interface Boite {

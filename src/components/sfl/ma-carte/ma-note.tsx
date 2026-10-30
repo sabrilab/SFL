@@ -17,7 +17,7 @@
 // mise à jour officielle ; son journal date chaque match au lieu de « J4 ».
 // Le but : que chacun puisse refaire le calcul, et donc croire sa note.
 // Noir et blanc, en currentColor et en opacités (clair comme sombre) ; les
-// chiffres en Anton, les étiquettes en JetBrains Mono.
+// chiffres en Anton, les étiquettes en Inter capitales.
 
 import { useMemo } from "react";
 import { ANTON } from "@/components/sfl/actus/ecran";

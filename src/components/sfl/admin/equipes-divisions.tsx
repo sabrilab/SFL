@@ -42,11 +42,14 @@ export function EquipesParDivision({
   presence,
   etat,
   onPoser,
+  libellePoser,
 }: {
   presence: PresenceView;
   etat: EtatDivisions;
   /** Pose les équipes sur la feuille de la journée (l'admin écrit la saison) ; `date` : « 1 novembre ». */
   onPoser?: (j: number, teams: ConvocationTeam[], date: string) => void;
+  /** « Poser en brouillon » (30/10) ; « Poser sur la J4 » quand elle est déjà en ligne. */
+  libellePoser?: (j: number) => string;
 }) {
   const { saison } = useSeason();
   const [saving, setSaving] = useState(false);
@@ -158,14 +161,16 @@ export function EquipesParDivision({
               onClick={() =>
                 demander(
                   resumer(enBase, ordre),
-                  `La J${presence.journee} s'ouvre sur la feuille : la Map et la Ligue montrent ces matchs tout de suite.`,
+                  libellePoser && libellePoser(presence.journee) !== "Poser en brouillon"
+                    ? `La J${presence.journee} est en ligne : la Map et la Ligue montrent ces matchs tout de suite.`
+                    : `La J${presence.journee} reste en brouillon.`,
                   "Poser",
                   () => onPoser(presence.journee, enBase, presence.jour.replace(/^\S+\s+/, ""))
                 )
               }
               className="bouton-principal bouton--vert flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-bold"
             >
-              <ClipboardList className="size-3.5" /> Poser sur la feuille de la J{presence.journee}
+              <ClipboardList className="size-3.5" /> {libellePoser?.(presence.journee) ?? `Poser sur la feuille de la J${presence.journee}`}
             </button>
           )}
         </div>

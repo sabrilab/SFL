@@ -14,12 +14,20 @@
 //   · les votes de la saison, page par page (la base en rend 1 000 au plus) ;
 //   · appliquerVotes et titresFaibles, comme le SeasonProvider.
 // `saison` est la saison à lire (votes appliqués, titres faibles portés) ;
-// `brute` le document tel qu'il est stocké — le serveur ne l'écrit jamais.
+// `brute` la même sans les votes ; `document` le document tel qu'il est
+// stocké — le serveur ne l'écrit jamais.
+//
+// Les journées en brouillon (30/10/2026, saisie/brouillon.ts) : `saison` et
+// `brute` ne les ont pas. Aucune annonce, aucune mission, aucun calcul ne
+// part d'une feuille que la ligue ne voit pas. C'est la SEULE lecture de la
+// saison côté serveur (tools/lecteurs-check.ts le vérifie) ; ce qui n'a
+// besoin que de l'effectif passe par lireEffectifServeur.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { definirArbitres } from "./hidden";
+import { definirArbitres, definirNonJoueurs } from "./hidden";
 import { deriveSeason } from "./saisie/engine";
-import { numeroSaison, type Saison } from "./saisie/types";
+import { numeroSaison, type RosterEntry, type Saison } from "./saisie/types";
+import { sansBrouillons } from "./saisie/brouillon";
 import { appliquerVotes, titresFaibles, type VoteFigure } from "./votes";
 
 /** Toutes les lignes d'une requête, page par page (la base en rend 1 000 au plus d'un coup). */
@@ -56,6 +64,16 @@ export async function chargerArbitresServeur(sb: SupabaseClient): Promise<string
   const { data, error } = await sb.from("profiles").select("name").eq("arbitre", true);
   const noms = error ? [] : ((data ?? []) as { name: string | null }[]).flatMap((p) => (p.name ? [p.name] : []));
   definirArbitres(noms);
+  await chargerNonJoueursServeur(sb);
+  return noms;
+}
+
+/** Pose dans hidden.ts les membres qui ne jouent pas (profiles.joue = false). Sans la colonne : la liste de départ. */
+export async function chargerNonJoueursServeur(sb: SupabaseClient): Promise<string[] | null> {
+  const { data, error } = await sb.from("profiles").select("name").eq("joue", false);
+  if (error) return null;
+  const noms = ((data ?? []) as { name: string | null }[]).flatMap((p) => (p.name ? [p.name] : []));
+  definirNonJoueurs(noms);
   return noms;
 }
 
@@ -68,10 +86,12 @@ export function saisonAvecVotes(brute: Saison, votes: VoteFigure[], maintenant: 
 }
 
 export interface SaisonServeur {
-  /** La saison à lire (votes appliqués). */
+  /** La saison à lire : publiée (sans brouillons), votes appliqués. */
   saison: Saison;
-  /** Le document stocké. */
+  /** La saison publiée, sans les votes. */
   brute: Saison;
+  /** Le document stocké, brouillons compris : à ne lire qu'en connaissance de cause. */
+  document: Saison;
   votes: VoteFigure[];
   updatedAt: string | null;
 }
@@ -85,8 +105,20 @@ export async function lireSaisonServeur(sb: SupabaseClient, maintenant = new Dat
   const { data: doc, error } = await sb.from("saison").select("data, updated_at").eq("id", 1).maybeSingle();
   if (error) throw error;
   const ligne = doc as { data?: Saison; updated_at?: string | null } | null;
-  const brute = ligne?.data;
-  if (!brute) return null;
+  const document = ligne?.data;
+  if (!document) return null;
+  const brute = sansBrouillons(document);
   const [votes] = await Promise.all([votesDeLaSaison(sb, numeroSaison(brute)), chargerArbitresServeur(sb)]);
-  return { saison: saisonAvecVotes(brute, votes, maintenant), brute, votes, updatedAt: ligne?.updated_at ?? null };
+  return { saison: saisonAvecVotes(brute, votes, maintenant), brute, document, votes, updatedAt: ligne?.updated_at ?? null };
+}
+
+/**
+ * L'effectif seul (comptes, identité, parrainage) : un brouillon n'y change
+ * rien. null si la saison n'a pas pu être lue.
+ */
+export async function lireEffectifServeur(sb: SupabaseClient): Promise<RosterEntry[] | null> {
+  const { data, error } = await sb.from("saison").select("data").eq("id", 1).maybeSingle();
+  if (error) return null;
+  const roster = (data as { data?: { roster?: RosterEntry[] } } | null)?.data?.roster;
+  return Array.isArray(roster) ? roster : null;
 }

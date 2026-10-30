@@ -31,8 +31,35 @@ export function isPlaceExtraTime(name: string | null | undefined): boolean {
   return !!name && /^X\d+$/i.test(name.trim());
 }
 
+// Les membres qui ne jouent pas (profiles.joue = false, 30/10/2026) : un
+// admin qui organise sans jouer. « Ne joue pas » est une donnée du compte,
+// plus un nom écrit en dur ; tant que la base n'a pas répondu, la liste de
+// départ est HIDDEN_PLAYERS, exactement la même aujourd'hui (rien ne
+// clignote). Comparés sans casse ni espaces.
+const cleNom = (n: string) => n.trim().toLowerCase();
+let nonJoueurs: ReadonlySet<string> = new Set(HIDDEN_PLAYERS.map(cleNom));
+let revisionNonJoueurs = 0;
+
+/** Pose la liste des membres qui ne jouent pas (non-joueurs.ts, saison-serveur.server.ts). */
+export function definirNonJoueurs(noms: readonly string[]): void {
+  const next = new Set(noms.map(cleNom));
+  if (next.size === nonJoueurs.size && [...next].every((n) => nonJoueurs.has(n))) return;
+  nonJoueurs = next;
+  revisionNonJoueurs++;
+}
+
+/** Change à chaque nouvelle liste : pour les mémos qui en dépendent. */
+export function nonJoueursRevision(): number {
+  return revisionNonJoueurs;
+}
+
+/** Ce membre ne joue pas (il organise) : aucune ligne, aucune équipe. */
+export function neJouePas(name: string | null | undefined): boolean {
+  return !!name && nonJoueurs.has(cleNom(name));
+}
+
 export function isHidden(name: string | null | undefined): boolean {
-  return !!name && ((HIDDEN_PLAYERS as readonly string[]).includes(name) || arbitres.has(name) || isPlaceExtraTime(name));
+  return !!name && ((HIDDEN_PLAYERS as readonly string[]).includes(name) || neJouePas(name) || arbitres.has(name) || isPlaceExtraTime(name));
 }
 
 /** Retire les joueurs masqués de n'importe quelle liste portant un `name`. */

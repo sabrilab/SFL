@@ -37,7 +37,8 @@ import { prenom, type FelicitationXp, type Reponse } from "@/lib/sfl/missions";
 import { dimancheAAnnoncer, fenetreOutsider, notificationOutsider, outsiderDuDimanche } from "@/lib/sfl/outsiders";
 import { numeroSaison, type Saison } from "@/lib/sfl/saisie/types";
 import type { VoteFigure } from "@/lib/sfl/votes";
-import { chargerArbitresServeur, toutesLesLignes, votesDeLaSaison } from "@/lib/sfl/saison-serveur.server";
+import { lireSaisonServeur, toutesLesLignes, votesDeLaSaison } from "@/lib/sfl/saison-serveur.server";
+import { neJouePas } from "@/lib/sfl/hidden";
 import type { Notif } from "@/lib/sfl/push";
 
 export const maxDuration = 30;
@@ -54,10 +55,15 @@ export async function POST(req: NextRequest) {
 
   // Le document stocké, avec les arbitres masqués (saison-serveur.server.ts) ;
   // outsiderDuDimanche y applique lui-même les votes, lus plus bas.
-  const { data: doc } = await sb.from("saison").select("data").eq("id", 1).maybeSingle();
-  const saison = (doc as { data?: Saison } | null)?.data;
+  // La saison publiée, sans les brouillons (saison-serveur.server.ts).
+  let lue: Awaited<ReturnType<typeof lireSaisonServeur>>;
+  try {
+    lue = await lireSaisonServeur(sb);
+  } catch {
+    return NextResponse.json({ envoyes: 0, fini: false });
+  }
+  const saison: Saison | undefined = lue?.brute;
   if (!saison) return NextResponse.json({ envoyes: 0, fini: true });
-  await chargerArbitresServeur(sb);
   const j = dimancheAAnnoncer(saison);
   if (j === null) return NextResponse.json({ envoyes: 0, fini: true });
   const { data: convocations } = await sb
@@ -112,7 +118,7 @@ export async function POST(req: NextRequest) {
   // Les joueurs de la ligue qui ont un téléphone abonné : ceux de la saison
   // (et les admins), pas les joueurs Bola venus par un parrain.
   const roster = new Set((saison.roster ?? []).map((r) => r.name));
-  const joueurs = comptes.filter((p) => p.valide && (p.is_admin || roster.has(p.name)));
+  const joueurs = comptes.filter((p) => p.valide && (p.is_admin || roster.has(p.name)) && !neJouePas(p.name));
   const { data: abonnements } = await sb
     .from("push_abonnements")
     .select("user_id")

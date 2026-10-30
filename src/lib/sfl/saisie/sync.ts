@@ -54,6 +54,24 @@ export function publicationEnAttente(): boolean {
   }
 }
 
+const LECTURE_KEY = "sfl-saison-lecture";
+
+function lectureLocale(): string | null {
+  try {
+    return localStorage.getItem(LECTURE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function retenirLecture(l: "entiere" | "publique") {
+  try {
+    localStorage.setItem(LECTURE_KEY, l);
+  } catch {
+    /* stockage indisponible */
+  }
+}
+
 function localVersion(): number {
   const n = parseInt(localStorage.getItem(VERSION_KEY) ?? "0", 10);
   return Number.isFinite(n) ? n : 0;
@@ -90,14 +108,14 @@ export async function pullSaison(): Promise<boolean> {
   if (publicationEnAttente() && !session.admin) marquerAPublier(false);
   if (publicationEnAttente()) return false;
   try {
-    const { data, error } = await supabase()
-      .from("saison")
-      .select("data, version, seed")
-      .eq("id", 1)
-      .maybeSingle();
-    if (error || !data) return false;
-    const doc = data as { data: Saison; version: number; seed: number };
-    if (!accepteRemote(doc.seed, doc.version, localVersion())) return false;
+    const doc = await lireDocument(!!session.admin);
+    if (!doc) return false;
+    // Un admin sur un appareil qui n'avait que la saison des joueurs (sans
+    // brouillons) reprend le document entier, même à version égale.
+    const lecture = session.admin ? "entiere" : "publique";
+    const versionConnue = lectureLocale() === lecture ? localVersion() : 0;
+    if (!accepteRemote(doc.seed, doc.version, versionConnue)) return false;
+    retenirLecture(lecture);
     adoptSaison(doc.data);
     localStorage.setItem(VERSION_KEY, String(doc.version));
     window.dispatchEvent(new Event(SAISIE_EVENT));
@@ -108,11 +126,34 @@ export async function pullSaison(): Promise<boolean> {
 }
 
 /**
+ * Le document à adopter. L'admin lit le document entier, brouillons compris :
+ * c'est là qu'il prépare. Un joueur lit la saison sans les journées en
+ * brouillon (public.saison_publique, 30/10/2026) ; une base qui n'a pas
+ * encore la fonction répond par l'ancienne lecture, que l'app filtre de
+ * toute façon (SeasonProvider, sansBrouillons).
+ */
+async function lireDocument(admin: boolean): Promise<{ data: Saison; version: number; seed: number } | null> {
+  if (!admin) {
+    const { data, error } = await supabase().rpc("saison_publique");
+    if (!error) {
+      const ligne = (Array.isArray(data) ? data[0] : data) as { data: Saison; version: number; seed: number } | undefined;
+      return ligne?.data ? ligne : null;
+    }
+    if (error.code !== "PGRST202" && error.code !== "42883") return null;
+  }
+  const { data, error } = await supabase().from("saison").select("data, version, seed").eq("id", 1).maybeSingle();
+  if (error || !data) return null;
+  return data as { data: Saison; version: number; seed: number };
+}
+
+/**
  * Issue d'une synchronisation — le motif sert à l'afficher tel quel.
  * `conflit` : la base a changé depuis la version sur laquelle cet appareil a
  * travaillé ; l'admin choisit entre reprendre la base et écraser.
  */
-export type Resultat = { ok: true } | { ok: false; raison: string; conflit?: true };
+export type Resultat = { ok: true } | { ok: false; raison: string; conflit?: true; feuille?: string[] };
+
+const PUBLIQUE = "Cet appareil n'a que la saison des joueurs, sans les brouillons. Reprends la base avant d'écrire.";
 
 const CONFLIT =
   "Un autre admin a publié depuis ta dernière synchro. Reprends la base pour repartir de sa version, ou écrase-la avec la tienne.";
@@ -179,6 +220,11 @@ let fileDePublication: Promise<unknown> = Promise.resolve();
 async function publierMaintenant(saison: Saison, forcer: boolean): Promise<Resultat> {
   const empeche = blocage();
   if (empeche) return { ok: false, raison: empeche };
+  // Un appareil qui n'a lu que la saison des joueurs (saison_publique, sans
+  // les brouillons) n'écrit jamais : son document effacerait en base les
+  // journées en brouillon, à version égale. « Écraser » n'y peut rien ;
+  // « Reprendre la base » relit le document entier.
+  if (lectureLocale() === "publique") return { ok: false, raison: PUBLIQUE, conflit: true };
   try {
     const { data, error } = await supabase().rpc("publier_saison", {
       p_data: saison,
@@ -189,6 +235,11 @@ async function publierMaintenant(saison: Saison, forcer: boolean): Promise<Resul
     // La base n'a pas encore la fonction (un aperçu avant la migration) :
     // l'ancien envoi.
     if (error?.code === "PGRST202") return ecrireDocument(saison);
+    // La base refuse une feuille malsaine (public.feuille_saine) : un joueur
+    // en double, un membre qui ne joue pas, deux journées pour un dimanche.
+    // « Écraser » n'y peut rien, c'est voulu.
+    if (error?.hint === "feuille-saine")
+      return { ok: false, raison: "Feuille refusée par la base.", feuille: (error.details ?? "").split("|").filter(Boolean) };
     if (error) return { ok: false, raison: motif(error.message) };
     const r = data as { ok: boolean; version: number };
     if (!r.ok) return { ok: false, raison: CONFLIT, conflit: true };
@@ -251,6 +302,8 @@ export interface EnvoiAuto {
   ok: boolean;
   raison?: string;
   conflit?: boolean;
+  /** Les défauts que la base a refusés (« I1 J4 Ilyes »). */
+  feuille?: string[];
 }
 
 let dernier: EnvoiAuto | null = null;
@@ -265,7 +318,7 @@ export async function pushSaison(saison: Saison, { forcer = false } = {}): Promi
   dernier = {
     at: Date.now(),
     ok: r.ok,
-    ...(r.ok ? {} : { raison: r.raison, ...(r.conflit ? { conflit: true } : {}) }),
+    ...(r.ok ? {} : { raison: r.raison, ...(r.conflit ? { conflit: true } : {}), ...(r.feuille ? { feuille: r.feuille } : {}) }),
   };
   // « À publier » fige le téléphone sur sa copie (pullSaison n'adopte plus
   // rien) : seulement pour un échec que CET appareil pourra rattraper, celui
@@ -414,15 +467,10 @@ export async function reprendreDeLaBase(): Promise<Resultat> {
   const session = getSession();
   if (!session?.server) return { ok: false, raison: "Session serveur requise." };
   try {
-    const { data, error } = await supabase()
-      .from("saison")
-      .select("data, version, seed")
-      .eq("id", 1)
-      .maybeSingle();
-    if (error) return { ok: false, raison: error.message };
-    if (!data) return { ok: false, raison: "Aucune saison en base pour l'instant." };
-    const doc = data as { data: Saison; version: number; seed: number };
+    const doc = await lireDocument(!!session.admin);
+    if (!doc) return { ok: false, raison: "Aucune saison lisible en base pour l'instant." };
     adoptSaison(doc.data);
+    retenirLecture(session.admin ? "entiere" : "publique");
     localStorage.setItem(VERSION_KEY, String(doc.version));
     // Plus rien n'attend de partir : ce qui restait ici a été remplacé.
     marquerAPublier(false);
@@ -484,9 +532,15 @@ export function startSaisonSync(): () => void {
     .then(() => rattraperPublication());
   try {
     const sb = supabase();
+    // Un joueur suit aussi saison_signal (30/10/2026) : la seule version, qui
+    // lui fait relire saison_publique. Le jour où la lecture brute lui est
+    // fermée (L1b), c'est par là que le temps réel lui arrive.
     const channel = sb
       .channel(`sfl-saison-${++saisonSeq}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "saison" }, () => {
+        void pullSaison();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "saison_signal" }, () => {
         void pullSaison();
       })
       .subscribe();

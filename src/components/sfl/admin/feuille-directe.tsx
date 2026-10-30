@@ -21,16 +21,17 @@ import { cn } from "@/lib/utils";
 import { computeJournees, entryPP } from "@/lib/sfl/saisie/engine";
 import { ChangerJoueurSheet } from "@/components/sfl/admin/changer-joueur-sheet";
 import { PointMaillot } from "@/components/sfl/point-maillot";
-import { changerEquipeAt, remplacerJoueurAt, updateEntryAt } from "@/lib/sfl/saisie/mutations";
+import { changerEquipeAt, echangerCampsAt, remplacerJoueurAt, updateEntryAt } from "@/lib/sfl/saisie/mutations";
 import { equipesDuJour } from "@/lib/sfl/saisie/equipes";
+import { prochaineJournee } from "@/lib/sfl/saisie/etat-journee";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
 /** Les quatre compteurs du direct. */
 const COMPTEURS = [
-  { key: "buts", label: "Buts", icone: "⚽" },
-  { key: "passes", label: "Passes", icone: "🅰" },
-  { key: "arrets", label: "Arrêts", icone: "🧤" },
-  { key: "interceptions", label: "Interc.", icone: "🛡" },
+  { key: "buts", label: "Buts", icone: "" },
+  { key: "passes", label: "Passes", icone: "" },
+  { key: "arrets", label: "Arrêts", icone: "" },
+  { key: "interceptions", label: "Interc.", icone: "" },
 ] as const;
 
 const HONNEURS = [
@@ -54,7 +55,7 @@ function Stepper({
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
       <span className="mono-label text-[8px] text-foreground/35">
-        {icone} {label}
+        {icone ? `${icone} ` : ""}{label}
       </span>
       <div className="glass-soft flex w-full items-center justify-between rounded-full p-1">
         <button
@@ -90,9 +91,15 @@ interface Props {
   commit: (next: Saison, label: string) => void;
 }
 
-export function FeuilleDirecte({ saison, commit }: Props) {
+/**
+ * `embarque` : dans le Direct de la page Journée (journee/feuille-direct.tsx),
+ * qui porte déjà la journée et un tableau d'affichage par match : ni le choix
+ * de la journée ni un second tableau.
+ */
+export function FeuilleDirecte({ saison, commit, jInitial, embarque = false }: Props & { jInitial?: number; embarque?: boolean }) {
   const journees = useMemo(() => [...saison.journees].sort((a, b) => b.j - a.j), [saison.journees]);
-  const [j, setJ] = useState<number>(() => journees[0]?.j ?? 1);
+  // La journée du jour ou la prochaine ; jamais d'office la dernière jouée.
+  const [j, setJ] = useState<number>(() => jInitial ?? prochaineJournee(saison, new Date()) ?? journees[0]?.j ?? 1);
 
   const rows = useMemo(
     () =>
@@ -138,37 +145,39 @@ export function FeuilleDirecte({ saison, commit }: Props) {
   return (
     <div className="flex flex-col gap-3">
       {/* Journée + tableau d'affichage */}
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={j}
-          onChange={(e) => setJ(Number(e.target.value))}
-          className="glass-soft h-9 cursor-pointer rounded-full px-3.5 text-[13px] font-bold outline-none"
-        >
-          {journees.map((m) => (
-            <option key={m.j} value={m.j} className="bg-white text-[#08090b] dark:bg-[#141414] dark:text-white">
-              Journée {m.j} · {m.date}
-            </option>
-          ))}
-        </select>
-        <div className="glass flex min-w-0 flex-1 items-center justify-center gap-3 rounded-full px-4 py-2">
-          {scores.length === 0 ? (
-            <span className="text-[12.5px] text-foreground/40">Pas encore d&apos;équipes</span>
-          ) : (
-            <>
-              {nbMatchs > 1 && active?.match != null && (
-                <span className="mono-label text-foreground/40">Match {active.match}</span>
-              )}
-              {scores.map((x, i) => (
-                <span key={x.nom} className="flex items-center gap-2">
-                  {i > 0 && <span className="text-foreground/25">—</span>}
-                  {x.camp && <PointMaillot camp={x.camp} />}
-                  <span className="text-[17px] font-extrabold tabular-nums">{x.buts}</span>
-                </span>
-              ))}
-            </>
-          )}
+      {!embarque && (
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={j}
+            onChange={(e) => setJ(Number(e.target.value))}
+            className="glass-soft h-9 cursor-pointer rounded-full px-3.5 text-[13px] font-bold outline-none"
+          >
+            {journees.map((m) => (
+              <option key={m.j} value={m.j} className="bg-white text-[#08090b] dark:bg-[#141414] dark:text-white">
+                Journée {m.j} · {m.date}
+              </option>
+            ))}
+          </select>
+          <div className="glass flex min-w-0 flex-1 items-center justify-center gap-3 rounded-full px-4 py-2">
+            {scores.length === 0 ? (
+              <span className="text-[12.5px] text-foreground/40">Pas encore d&apos;équipes</span>
+            ) : (
+              <>
+                {nbMatchs > 1 && active?.match != null && (
+                  <span className="mono-label text-foreground/40">Match {active.match}</span>
+                )}
+                {scores.map((x, i) => (
+                  <span key={x.nom} className="flex items-center gap-2">
+                    {i > 0 && <span className="text-foreground/25">—</span>}
+                    {x.camp && <PointMaillot camp={x.camp} />}
+                    <span className="text-[17px] font-extrabold tabular-nums">{x.buts}</span>
+                  </span>
+                ))}
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Le match qu'on suit, un jour à plusieurs matchs */}
       {nbMatchs > 1 && (
@@ -224,8 +233,7 @@ export function FeuilleDirecte({ saison, commit }: Props) {
       {/* Les joueurs */}
       {visibles.length === 0 ? (
         <div className="glass rounded-[22px] px-6 py-10 text-center text-[13px] text-foreground/45">
-          Aucun joueur sur cette feuille. Compose la journée dans l&apos;onglet Saisie, puis
-          reviens ici pour le direct.
+          <span className="mono-label">0 joueur</span>
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">
@@ -286,8 +294,8 @@ export function FeuilleDirecte({ saison, commit }: Props) {
                         className={cn(
                           "px-2.5 py-1 text-[11.5px] font-bold",
                           on
-                            ? "bouton-principal bouton--or"
-                            : "bouton-secondaire bouton--or text-foreground/45"
+                            ? "bouton-principal"
+                            : "bouton-secondaire text-foreground/45"
                         )}
                       >
                         {h.label}
@@ -311,6 +319,13 @@ export function FeuilleDirecte({ saison, commit }: Props) {
           commit(remplacerJoueurAt(saison, choix, nom), `${ligneChoisie.player} → ${nom}`);
           setChoix(null);
         }}
+        onEchanger={(autre) => {
+          if (choix == null || !ligneChoisie) return;
+          const i = saison.entries.findIndex((e) => e === autre);
+          if (i < 0) return;
+          commit(echangerCampsAt(saison, choix, i), `${ligneChoisie.player} ⇄ ${autre.player}`);
+          setChoix(null);
+        }}
         onChangerEquipe={(t) => {
           if (choix == null || !ligneChoisie) return;
           commit(
@@ -321,11 +336,6 @@ export function FeuilleDirecte({ saison, commit }: Props) {
         }}
       />
 
-      <p className="px-1 text-[12px] leading-relaxed text-foreground/35">
-        Chaque geste est enregistré tout de suite et annulable (⌘Z). Deux arrêts ou deux
-        interceptions valent 1 point Pépite — le compteur « défensif » à droite du nom le montre
-        dès qu&apos;il tombe.
-      </p>
     </div>
   );
 }

@@ -32,7 +32,13 @@ import { PointMaillot } from "@/components/sfl/point-maillot";
 import { EquipesParDivision } from "./equipes-divisions";
 import { cn } from "@/lib/utils";
 
-export function EquipesDimanche({ onPoser }: { onPoser?: (j: number, teams: ConvocationTeam[], date: string) => void }) {
+export function EquipesDimanche({
+  onPoser,
+  libellePoser,
+}: {
+  onPoser?: (j: number, teams: ConvocationTeam[], date: string) => void;
+  libellePoser?: (j: number) => string;
+}) {
   const presence = usePresence();
   const { saison, allPlayers } = useSeason();
   const [draft, setDraft] = useState<BalancedTeam[] | null>(null);
@@ -41,7 +47,7 @@ export function EquipesDimanche({ onPoser }: { onPoser?: (j: number, teams: Conv
 
   // Réservé à l'admin — le hook ne donne saveTeams qu'à lui.
   if (!presence.saveTeams) return null;
-  if (etat) return <EquipesParDivision presence={presence} etat={etat} onPoser={onPoser} />;
+  if (etat) return <EquipesParDivision presence={presence} etat={etat} onPoser={onPoser} libellePoser={libellePoser} />;
 
   const confirmés = presence.presents;
   // Un match jusqu'à 12 confirmés, deux au-delà.
