@@ -67,7 +67,7 @@ const BADGE = 942 / PHI ** 4; // 137, comme la classique
 const BADGE_M = BADGE / PHI; // 85
 const CADRE = W / PHI ** 6; // 57, le serti des cartes à titre
 const SANS = "var(--font-inter), Inter, system-ui, sans-serif";
-const MONO = "var(--font-jbmono), ui-monospace, monospace";
+const MONO = "var(--font-inter), system-ui, sans-serif";
 const NOIR = "#08090b";
 const BLANC = "#f5f5f3";
 /** Rapprocher : la photo grossie, ancrée au-dessus des yeux. */

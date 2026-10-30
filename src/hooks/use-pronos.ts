@@ -15,12 +15,16 @@ import { useMaintenant, useSaisonJugee } from "@/hooks/use-missions";
 import { useListePronos } from "@/hooks/use-liste-pronos";
 import { rankPlayers } from "@/lib/sfl/engine";
 import {
+  choixDeSaisonDu,
   etatDe,
+  flairsDuJoueur,
   journeeDesPronos,
   partsDe,
   pronoRetenu,
   resultatsDeJournee,
+  type ChoixDeSaison,
   type EtatProno,
+  type FlairDeJournee,
   type JourneePronos,
   type Prono,
 } from "@/lib/sfl/pronos";
@@ -94,4 +98,43 @@ export function usePronosJournee(): MesPronos | null {
     const poser = (sujet: string, choix: string | null) => pronostiquer({ saison: p.saison, j: p.j, sujet, joueur, choix });
     return { p, joueur, phase, sujets, poser };
   }, [p, me, maintenant, pronos, jugee, players]);
+}
+
+export interface MonFlair {
+  /** Mes journées de Flair, toutes saisons, de la plus récente à la plus ancienne. */
+  journees: FlairDeJournee[];
+  /** Mes choix de saison, saison en cours d'abord. */
+  saison: (ChoixDeSaison & { numero: number; close: boolean })[];
+  /** L'XP que le Flair m'a rapporté cette saison (journées finies). */
+  xpSaison: number;
+  /** La journée en cours, si ses équipes sont faites (pour choisir, même sans rien avoir posé). */
+  enCours: MesPronos | null;
+}
+
+/**
+ * Mon Flair, pour Ma carte et les récaps (Sabri, 30/10) : chaque journée où
+ * j'ai choisi, ce que j'ai choisi, le verdict, l'XP. Lit la saison jugée
+ * (votes posés), comme le journal d'XP, et ses archives, closes.
+ */
+export function useMonFlair(): MonFlair | null {
+  const isClient = useIsClient();
+  const { me } = useMyPlayer();
+  const maintenant = useMaintenant();
+  const pronos = useListePronos();
+  const { jugee } = useSaisonJugee(maintenant);
+  const enCours = usePronosJournee();
+  return useMemo(() => {
+    if (!isClient || !me) return null;
+    const numero = jugee.numero ?? 0;
+    const saisons = [
+      { numero, lue: jugee, close: false, reference: maintenant },
+      ...[...(jugee.archives ?? [])].reverse().map((a) => ({ numero: a.numero, lue: a, close: true, reference: new Date(a.cloturee) })),
+    ];
+    const journees = saisons.flatMap((sa) => flairsDuJoueur(sa.lue, sa.numero, sa.close, pronos, me, maintenant, sa.reference));
+    const saison = saisons.flatMap((sa) =>
+      choixDeSaisonDu(sa.lue, sa.numero, sa.close, pronos, me, sa.reference).map((c) => ({ ...c, numero: sa.numero, close: sa.close }))
+    );
+    const xpSaison = journees.filter((f) => f.saison === numero && f.phase === "fini").reduce((a, f) => a + f.xp, 0);
+    return { journees, saison, xpSaison, enCours: enCours && enCours.joueur === me ? enCours : null };
+  }, [isClient, me, jugee, pronos, maintenant, enCours]);
 }

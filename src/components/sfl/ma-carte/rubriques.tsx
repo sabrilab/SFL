@@ -16,7 +16,7 @@
 //
 // Une rubrique vide ne se montre pas (pas encore de dimanche, pas d'XP, une
 // seule journée pour la courbe). Les tuiles tiennent en clair comme en sombre.
-// Les chiffres en Anton, les étiquettes en JetBrains Mono ; aucun rouge ni
+// Les chiffres en Anton, les étiquettes en Inter capitales ; aucun rouge ni
 // bleu (cartes Impact et Défensive), l'or reste aux badges.
 
 import Link from "next/link";
@@ -32,6 +32,10 @@ import { MiniCarte } from "@/components/sfl/mini-carte";
 import { Medaille } from "@/components/sfl/vitrine";
 import { ModePasse, retenirOrigineModePasse } from "@/components/sfl/mode-passe";
 import { useMissionsASigner } from "@/components/sfl/mode-passe-missions";
+import { NOM_CAMP } from "@/components/sfl/flair/mon-flair";
+import { FermeDans } from "@/components/sfl/matchs/flair";
+import { useIdentites } from "@/hooks/use-identites";
+import { useMonFlair } from "@/hooks/use-pronos";
 import { cartesDeCarriere, courbeDeCarriere, type CartesDeSaison, type PointCourbe } from "@/lib/sfl/carriere";
 import { ovr } from "@/lib/sfl/engine";
 import { saisonsBolaDe } from "@/lib/sfl/carte-bola";
@@ -93,7 +97,7 @@ export function useMaCarte() {
 
 /* ------------------------------- Les tuiles ------------------------------- */
 
-type Ton = "saison" | "xp" | "evolution" | "badges" | "cartes";
+type Ton = "saison" | "xp" | "evolution" | "badges" | "cartes" | "flair";
 
 /** Une tuile : son ton, son étiquette, son contenu ; la toucher ouvre sa page. */
 function Tuile({
@@ -119,7 +123,8 @@ function Tuile({
       href={href}
       aria-label={label}
       onClick={onClick}
-      className={cn("tuile flex min-h-[156px] flex-col gap-2.5 p-4", `tuile--${ton}`, large && "col-span-2 min-h-0")}
+      // Le Flair garde sa fiche noire dans les deux modes (matchs/flair.css) : une île sombre.
+      className={cn("tuile flex min-h-[156px] flex-col gap-2.5 p-4", `tuile--${ton}`, large && "col-span-2 min-h-0", ton === "flair" && "dark text-foreground")}
     >
       <span className="tuile__etiquette mono-label text-[10px]">{nom}</span>
       {children}
@@ -166,6 +171,8 @@ export function RubriquesMaCarte() {
   const r = useRangXp(player.name);
   const aSigner = useMissionsASigner();
   const format = useFormatCarte();
+  const flair = useMonFlair();
+  const identite = useIdentites();
   // Mes badges comptent aussi mes matchs Bola validés : MVP en Bola, la tuile le dit.
   const paliers = useMemo(
     () => vitrine(saison, player.name, new Date(), saisonsBolaDe(bolaCarte, player.name)),
@@ -404,6 +411,72 @@ export function RubriquesMaCarte() {
             </span>
           </span>
         </span>
+      </Tuile>
+    );
+  }
+
+  // 6. Le Flair (Sabri, 30/10) : ma dernière journée jugée, mes choix, l'XP ;
+  // sinon la journée ouverte, pour aller choisir sur sa feuille de match.
+  const ouverte = flair?.enCours?.phase === "ouvert" ? flair.enCours : null;
+  const derniere = flair?.journees.find((f) => f.phase !== "ouvert");
+  if (flair && (derniere || ouverte)) {
+    tuiles.push(
+      <Tuile
+        key="flair"
+        href="/profil/flair"
+        ton="flair"
+        nom={derniere ? `Le Flair · J${derniere.j}` : "Le Flair"}
+        large
+        label={
+          derniere
+            ? `Le Flair, J${derniere.j} : ${derniere.justes} sur ${derniere.choix.length}, +${derniere.xp} XP`
+            : `Le Flair : J${ouverte!.p.j} ouverte`
+        }
+      >
+        {derniere ? (
+          <>
+            <span className="flex items-end gap-5">
+              <span className="flex flex-col gap-1">
+                <span style={{ ...NOMBRE, fontSize: 38 }} className="tabular-nums">
+                  +{derniere.xp}
+                </span>
+                <span className="mono-label text-[9px] text-foreground/45">{derniere.phase === "en-jeu" ? "XP · verdict à minuit" : "XP"}</span>
+              </span>
+              {derniere.juges > 0 && (
+                <span className="flex flex-col gap-1">
+                  <span style={{ ...NOMBRE, fontSize: 38 }} className="tabular-nums">
+                    {derniere.justes}
+                    <span className="text-foreground/35">/{derniere.choix.length}</span>
+                  </span>
+                  <span className="mono-label text-[9px] text-foreground/45">Vu juste</span>
+                </span>
+              )}
+              <span className="ml-auto flex flex-col items-end gap-1">
+                <span className="font-mono text-[11px] text-foreground/45 tabular-nums">+{flair.xpSaison} XP cette saison</span>
+              </span>
+            </span>
+            <span className="flex flex-wrap gap-1.5">
+              {derniere.choix.map((c) => (
+                <span
+                  key={c.sujet}
+                  className={cn(
+                    "flex h-6 items-center gap-1 rounded-full px-2.5 text-[12px] font-semibold",
+                    c.etat === "juste" ? "bg-[#9fe0a8] text-[#0b0a0e]" : "bg-foreground/10 text-foreground/70",
+                    c.etat === "faux" && "line-through decoration-2 opacity-70"
+                  )}
+                >
+                  {c.etat === "juste" && <span aria-hidden>✓</span>}
+                  {NOM_CAMP[c.choix] ?? identite.nom(c.choix).split(" ")[0]}
+                </span>
+              ))}
+            </span>
+          </>
+        ) : (
+          <span className="flex items-end justify-between gap-3">
+            <span className="text-[19px] leading-[1.2] font-bold tracking-[-0.3px]">J{ouverte!.p.j} ouverte</span>
+            <FermeDans fin={ouverte!.p.coupEnvoi} />
+          </span>
+        )}
       </Tuile>
     );
   }

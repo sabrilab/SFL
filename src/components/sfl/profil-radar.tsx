@@ -87,7 +87,7 @@ export function ProfilRadar({ stats, overall }: { stats: Player["stats"]; overal
           />
         ))}
         <g
-          style={{ fontFamily: "var(--font-jbmono)", fontSize: 9, letterSpacing: 1.4 }}
+          style={{ fontFamily: "var(--font-inter)", fontSize: 9, letterSpacing: 1.4 }}
           fill="currentColor"
           fillOpacity={0.45}
         >
@@ -156,7 +156,7 @@ export function RadarDuel({ toi, lui, nomLui }: { toi: Player["stats"]; lui: Pla
         <path d={STAT_KEYS.map((_, i) => `M${CX},${CY} L${px(i, R)},${py(i, R)}`).join(" ")} stroke="currentColor" strokeOpacity={0.1} strokeWidth="1" />
         <polygon points={poly(lui)} fill="currentColor" fillOpacity={0.16} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
         <polygon points={poly(toi)} fill="none" stroke="currentColor" strokeOpacity={0.75} strokeWidth="1.6" strokeDasharray="4 3" strokeLinejoin="round" />
-        <g style={{ fontFamily: "var(--font-jbmono)", fontSize: 9, letterSpacing: 1.4 }} fill="currentColor" fillOpacity={0.45}>
+        <g style={{ fontFamily: "var(--font-inter)", fontSize: 9, letterSpacing: 1.4 }} fill="currentColor" fillOpacity={0.45}>
           {STAT_KEYS.map((k, i) => (
             <text key={k} x={RADAR_LABELS[i][0]} y={RADAR_LABELS[i][1]} textAnchor={RADAR_LABELS[i][3]}>
               {k}

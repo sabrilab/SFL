@@ -51,7 +51,7 @@ const chiffres = (l: MatchPlayerLine) => [l.buts > 0 && `${l.buts}B`, l.passes >
 
 /**
  * La largeur d'une étiquette entière, à l'échelle 1 : le prénom en Inter
- * 10,5 px (gras pour le meilleur), les chiffres en JetBrains Mono 9 px, les
+ * 10,5 px (gras pour le meilleur), les chiffres en Inter 9 px, les
  * marges. Comptée un peu large, lettre par lettre (mesuré dans Chrome le
  * 23/10 : jamais en dessous du vrai) : places-journee.ts s'en sert pour
  * laisser un prénom long prendre la place que ses voisins n'utilisent pas.

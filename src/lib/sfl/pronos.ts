@@ -329,3 +329,120 @@ export function ajouterPronos(
     }
   }
 }
+
+/* ------------------------------ Mon Flair ------------------------------ */
+
+// Le Flair d'un joueur, journée par journée (Sabri, 30/10 : « le flair doit
+// apparaître dans Ma carte » ; « sur les récaps, il y ait le résultat du
+// flair ») : ce qu'il a choisi, s'il a vu juste, l'XP. Les mêmes règles que
+// lignesPronos : posé avant le coup d'envoi, plafond par journée, acquis à
+// minuit (ou à la clôture).
+
+export type PhaseFlair = "ouvert" | "en-jeu" | "fini";
+
+export interface ChoixFlair {
+  sujet: string;
+  /** « Match 1 », « Le match », « Le buteur du jour », « Le meilleur du jour ». */
+  titre: string;
+  choix: string;
+  etat: EtatProno | "hors-delai";
+  /** Les bonnes réponses, une fois la feuille remplie. */
+  bons: string[] | null;
+  /** L'XP de ce choix s'il est juste (avant plafond). */
+  xp: number;
+}
+
+export interface FlairDeJournee {
+  saison: number;
+  j: number;
+  date: string;
+  phase: PhaseFlair;
+  choix: ChoixFlair[];
+  justes: number;
+  /** Les choix déjà jugés (justes ou ratés). */
+  juges: number;
+  /** L'XP de la journée, plafonnée ; acquise quand la phase est finie. */
+  xp: number;
+}
+
+const ORDRE_JOUR = ["pepite", "buteur"];
+const rangSujet = (s: string) => (s.startsWith("match:") ? Number(s.slice(6)) : 100 + ORDRE_JOUR.indexOf(s));
+
+/** Mon Flair dans une saison, de la journée la plus récente à la plus ancienne. */
+export function flairsDuJoueur(
+  lue: SaisonLue,
+  numero: number,
+  close: boolean,
+  pronos: Prono[],
+  joueur: string,
+  maintenant: Date,
+  reference: Date
+): FlairDeJournee[] {
+  const miens = pronos.filter((x) => x.saison === numero && x.joueur === joueur && x.j !== J_SAISON);
+  const js = [...new Set(miens.map((x) => x.j))].sort((a, b) => b - a);
+  const out: FlairDeJournee[] = [];
+  for (const j of js) {
+    const p = pronosDeJournee(lue, numero, j, reference);
+    if (!p) continue;
+    const t = maintenant.getTime();
+    const phase: PhaseFlair = close ? "fini" : t < p.coupEnvoi.getTime() ? "ouvert" : t < p.finDuJour.getTime() ? "en-jeu" : "fini";
+    const res = p.joue ? resultatsDeJournee(p, lue.entries) : new Map<string, string[]>();
+    const choix: ChoixFlair[] = miens
+      .filter((x) => x.j === j)
+      .sort((a, b) => rangSujet(a.sujet) - rangSujet(b.sujet))
+      .flatMap((x) => {
+        let titre: string;
+        if (x.sujet.startsWith("match:")) {
+          const m = p.matchs.find((m) => m.n === Number(x.sujet.slice(6)));
+          if (!m) return [];
+          titre = p.matchs.length > 1 ? m.label : "Le match";
+        } else titre = x.sujet === "buteur" ? "Le buteur du jour" : "Le meilleur du jour";
+        const retenu = pronoRetenu(pronos, p, joueur, x.sujet);
+        return [{ sujet: x.sujet, titre, choix: x.choix, etat: retenu ? etatDe(retenu, res) : "hors-delai", bons: res.get(x.sujet) ?? null, xp: xpSujet(x.sujet) }];
+      });
+    if (!choix.length) continue;
+    const justes = choix.filter((c) => c.etat === "juste");
+    out.push({
+      saison: numero,
+      j,
+      date: p.date,
+      phase,
+      choix,
+      justes: justes.length,
+      juges: choix.filter((c) => c.etat === "juste" || c.etat === "faux").length,
+      xp: Math.min(PLAFOND_JOURNEE, justes.reduce((a, c) => a + c.xp, 0)),
+    });
+  }
+  return out;
+}
+
+export interface ChoixDeSaison {
+  sujet: SujetSaison;
+  titre: string;
+  choix: string;
+  /** La prime si c'est juste (selon l'heure du dernier changement). */
+  prime: number;
+  /** Jugé à la clôture : « attente » tant que la saison court. */
+  etat: EtatProno;
+}
+
+/** Mes choix de saison (posés quand l'app les proposait encore) : jugés à la clôture. */
+export function choixDeSaisonDu(lue: SaisonLue, numero: number, close: boolean, pronos: Prono[], joueur: string, reference: Date): ChoixDeSaison[] {
+  const miens = pronos.filter((x) => x.saison === numero && x.joueur === joueur && x.j === J_SAISON);
+  if (!miens.length) return [];
+  const res = close ? resultatsDeSaison(lue as Saison) : null;
+  return SUJETS_SAISON.flatMap((sujet) => {
+    const x = miens.find((r) => r.sujet === sujet);
+    if (!x) return [];
+    const bons = res?.get(sujet);
+    return [
+      {
+        sujet,
+        titre: TITRE_SAISON[sujet],
+        choix: x.choix,
+        prime: primeAu(lue, numero, new Date(x.le), reference),
+        etat: !bons ? "attente" : bons.includes(x.choix) ? "juste" : "faux",
+      } satisfies ChoixDeSaison,
+    ];
+  });
+}
