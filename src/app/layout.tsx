@@ -29,6 +29,7 @@ import { NouveauxBadges } from "@/components/sfl/vitrine";
 import { InvitationCarte } from "@/components/sfl/invitation-carte";
 import { Accueil, ApresAccueil } from "@/components/sfl/accueil/accueil";
 import { PorteSfl } from "@/components/sfl/porte-sfl";
+import { EssaiDesign } from "@/components/ds/essai-design";
 
 // Typographie de l'app BOLA, celle de la Map (Sabri, 22/10 : « uniformise le
 // tout ») : Inter pour tout ce qui se lit (celle du site), au plus gras pour
@@ -159,6 +160,9 @@ export default function RootLayout({
                 <VoileEtat />
                 <PorteSfl />
                 <BottomNav />
+                {/* Un essai de design en cours (Admin → Design), sur ce
+                    téléphone seulement. */}
+                <EssaiDesign />
                 </AuthGate>
                 {/* Hors de la porte de connexion : le guide passe avant le
                     compte, pour ne pas se connecter dans Snapchat. */}
