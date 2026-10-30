@@ -10,6 +10,7 @@
 // celui de team_offerts ne défait rien.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { lireEffectifServeur } from "./saison-serveur.server";
 
 export interface ParrainServeur {
   id: string;
@@ -84,12 +85,11 @@ export async function noterFilleul(
  * null : la saison n'a pas pu être lue, l'appelant ne filtre pas.
  */
 export async function idsSfl(sb: SupabaseClient): Promise<Set<string> | null> {
-  const [{ data: doc, error: e1 }, { data: profils, error: e2 }] = await Promise.all([
-    sb.from("saison").select("data").eq("id", 1).maybeSingle(),
+  const [roster, { data: profils, error: e2 }] = await Promise.all([
+    lireEffectifServeur(sb),
     sb.from("profiles").select("id, name, is_admin"),
   ]);
-  const roster = (doc as { data?: { roster?: { name: string }[] } } | null)?.data?.roster;
-  if (e1 || e2 || !roster) return null;
+  if (e2 || !roster) return null;
   const noms = new Set(roster.map((r) => r.name));
   return new Set(
     ((profils ?? []) as { id: string; name: string; is_admin: boolean | null }[])

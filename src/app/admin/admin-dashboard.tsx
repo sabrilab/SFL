@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CalendarPlus,
@@ -11,7 +11,6 @@ import {
   Pencil,
   RotateCcw,
   Send,
-  Sparkles,
   Redo2,
   Table2,
   Trash2,
@@ -20,7 +19,6 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -49,6 +47,7 @@ import {
   closeConvocation,
   createConvocation,
   libelleCourt,
+  matchsDeclares,
   newEntry,
   newRosterPlayer,
   poserEquipes,
@@ -61,8 +60,11 @@ import {
 } from "@/lib/sfl/saisie/mutations";
 import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
 import { choixDEquipe, equipesDuJour } from "@/lib/sfl/saisie/equipes";
+import { effectifJouable } from "@/lib/sfl/saisie/effectif";
+import { estBrouillon } from "@/lib/sfl/saisie/brouillon";
 import { PointMaillot } from "@/components/sfl/point-maillot";
 import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
+import { SYNC_EVENT } from "@/lib/sfl/saisie/sync";
 import { Synchro } from "@/components/sfl/admin/synchro";
 import { DetailPoints } from "@/components/sfl/admin/detail-points";
 import { Requalification } from "@/components/sfl/admin/requalification";
@@ -82,10 +84,11 @@ import { BoutonRetour } from "@/components/layout/bouton-retour";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
 
+// Les honneurs en pastilles mono, noir et blanc (30/10/2026 : plus de dégradés de couleur).
 const HONORS: [key: "mvp" | "impact" | "def", label: string, cls: string][] = [
-  ["mvp", "M", "bg-gradient-to-b from-[#FFF3C6] via-[#F4C542] to-[#8A5A12] text-[#3a2703]"],
-  ["impact", "I", "bg-gradient-to-b from-[#FFB88A] via-[#FF5A1F] to-[#7A1E05] text-[#2b0a01]"],
-  ["def", "D", "bg-gradient-to-b from-[#D8F1FF] via-[#7FD4FF] to-[#1C4E77] text-[#06202f]"],
+  ["mvp", "M", "bg-foreground text-background"],
+  ["impact", "I", "bg-foreground text-background"],
+  ["def", "D", "bg-foreground text-background"],
 ];
 
 function HonorBadges({ e }: { e: MatchEntry }) {
@@ -111,7 +114,7 @@ function Stat({ label, value, tone }: { label: string; value: string | number; t
   );
 }
 
-export function AdminDashboard() {
+export function AdminDashboard({ onglet = "overview", mode = "direct" }: { onglet?: string; mode?: string } = {}) {
   const isClient = useIsClient();
   const { me } = useMyPlayer();
   const session = useSession();
@@ -178,7 +181,9 @@ export function AdminDashboard() {
   const [ficheApresAcces, setFicheApresAcces] = useState<number | null>(null);
   const [newJourneeOpen, setNewJourneeOpen] = useState(false);
   const [convocOpen, setConvocOpen] = useState(false);
-  const [feuilleMode, setFeuilleMode] = useState<"direct" | "revue" | "votes">("direct");
+  const [feuilleMode, setFeuilleMode] = useState<"direct" | "revue" | "votes">(
+    mode === "votes" || mode === "revue" ? mode : "direct"
+  );
   // Pré-cochés à l'ouverture de l'assistant journée (confirmés de la convocation).
   const [journeePrefill, setJourneePrefill] = useState<string[]>([]);
   // La date de la convocation que la journée prépare (« Préparer la journée »).
@@ -189,9 +194,53 @@ export function AdminDashboard() {
   type Step = { saison: Saison; label: string; at: number };
   const [history, setHistory] = useState<Step[]>([]);
   const [future, setFuture] = useState<Step[]>([]);
+  // Les piles ne valent que pour la version de la base sur laquelle elles
+  // ont été faites (30/10) : si la base change par ailleurs (un autre admin,
+  // une réparation SQL comme celle de la J3), « Annuler » republierait une
+  // copie d'avant. Elles se vident.
+  const [versionDesPiles, setVersionDesPiles] = useState<string | null>(null);
+  // Nos propres envois changent aussi la version : ils ne vident rien.
+  const enEnvoi = useRef(false);
+  useEffect(() => {
+    const lire = () => {
+      try {
+        return localStorage.getItem("sfl-saison-remote-version");
+      } catch {
+        return null;
+      }
+    };
+    const verifier = () => {
+      const v = lire();
+      setVersionDesPiles((avant) => {
+        if (avant !== null && v !== avant && !enEnvoi.current) {
+          setHistory([]);
+          setFuture([]);
+        }
+        return v;
+      });
+    };
+    verifier();
+    window.addEventListener(SAISIE_EVENT, verifier);
+    return () => window.removeEventListener(SAISIE_EVENT, verifier);
+  }, []);
+  void versionDesPiles;
+  useEffect(() => {
+    const fin = () => {
+      try {
+        setVersionDesPiles(localStorage.getItem("sfl-saison-remote-version"));
+      } catch {
+        /* stockage indisponible */
+      }
+      enEnvoi.current = false;
+    };
+    window.addEventListener(SYNC_EVENT, fin);
+    return () => window.removeEventListener(SYNC_EVENT, fin);
+  }, []);
 
-  const persist = useCallback((next: Saison) => {
-    saisieStore.save(next);
+  const persist = useCallback((next: Saison, opts?: { jeter?: number }) => {
+    enEnvoi.current = true;
+    const refus = saisieStore.save(next, opts);
+    if (refus.length) enEnvoi.current = false;
     // Prévient l'app joueur (SeasonProvider) ET cet écran : tous deux
     // relisent le stockage, personne ne garde de copie à part.
     window.dispatchEvent(new Event(SAISIE_EVENT));
@@ -326,16 +375,14 @@ export function AdminDashboard() {
       });
   }, [saison, derived]);
 
-  const rosterNames = useMemo(
-    () => [...saison.roster.map((r) => r.name)].sort((a, b) => a.localeCompare(b)),
-    [saison]
-  );
+  // L'effectif des sélecteurs : ceux qui jouent (effectif.ts) — jamais le
+  // compte d'un admin qui ne joue pas (30/10 : Sabri sur le terrain).
+  const rosterNames = useMemo(() => effectifJouable(saison).map((r) => r.name), [saison]);
 
   // Sélection « nouvelle journée » : nom + OVR carte + dispo (profil actif).
   const journeeRoster = useMemo(
     () =>
-      [...saison.roster]
-        .sort((a, b) => a.name.localeCompare(b.name))
+      effectifJouable(saison)
         .map((r) => ({
           name: r.name,
           ovr: Math.ceil((r.base ?? [75, 75, 75, 75, 75, 75]).reduce((a, b) => a + b, 0) / 6),
@@ -369,8 +416,8 @@ export function AdminDashboard() {
   const equipesLigne = useMemo(() => {
     if (!editEntry) return [];
     const noms = [...new Set(saison.entries.filter((e) => e.j === editEntry.j && e.team).map((e) => e.team as string))];
-    return choixDEquipe(derived.journees.find((x) => x.j === editEntry.j), noms);
-  }, [editEntry, saison.entries, derived]);
+    return choixDEquipe(derived.journees.find((x) => x.j === editEntry.j), noms, matchsDeclares(saison, editEntry.j));
+  }, [editEntry, saison, derived]);
   const metaEntry = metaJ != null ? saison.journees.find((m) => m.j === metaJ) ?? null : null;
   // Ses matchs, chacun avec son heure, son lieu et son terrain quand il a les siens.
   const metaDuJour = useMemo(
@@ -433,27 +480,17 @@ export function AdminDashboard() {
           <div className="flex items-center gap-3">
             <BoutonRetour />
             <div>
-              <p className="text-[13px] font-medium text-muted-foreground">Espace administrateur</p>
-              <h1 className="text-[30px] font-bold tracking-tight">Admin</h1>
+              <p className="mono-label text-foreground/45">Ligue</p>
+              <h1 className="text-[30px] font-bold tracking-tight">Tableau complet</h1>
             </div>
           </div>
-          <Badge
-            variant="secondary"
-            className={cn("rounded-full", partage && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400")}
-          >
-            {partage ? "Partagé" : "Local"}
-          </Badge>
+          <span className="mono-label rounded-full bg-secondary px-3 py-1.5 text-foreground/70">{partage ? "Partagé" : "Local"}</span>
         </div>
-        {/* L'état du partage est dit une seule fois, par le panneau de
-            synchronisation juste en dessous. */}
-        <p className="mt-1 text-sm text-muted-foreground">
-          Feuilles de match, convocations et effectif — la saisie se fait ici.
-        </p>
       </div>
 
       <Synchro saison={saison} />
 
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue={["overview", "grille", "feuille", "joueurs"].includes(onglet) ? onglet : "overview"}>
         {/* Quatre onglets ne tiennent pas sur un téléphone : les libellés
             s'abrègent, et la barre défile en dernier recours. */}
         <TabsList className="w-full overflow-x-auto rounded-full bg-card p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -483,20 +520,20 @@ export function AdminDashboard() {
             <Stat label="Buts" value={totals.buts} />
             <Stat label="Passes D." value={totals.passes} />
             <Stat label="PP distribués" value={totals.pp} />
-            <Stat label="Alertes" value={totals.alertes} tone={totals.alertes ? "text-amber-700 dark:text-amber-500" : "text-emerald-700 dark:text-emerald-500"} />
+            <Stat label="Alertes" value={totals.alertes} />
           </div>
 
           <div className="rounded-3xl bg-card p-4">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-              <AlertTriangle className="size-4 text-amber-700 dark:text-amber-500" /> Contrôles de cohérence
+              <AlertTriangle className="size-4" /> Contrôles de cohérence
             </div>
             {derived.alerts.length === 0 ? (
-              <p className="text-[13px] text-muted-foreground">Aucune anomalie détectée — saisie propre ✓</p>
+              <p className="mono-label text-foreground/45">0 alerte</p>
             ) : (
               <div className="flex flex-col gap-1.5">
                 {derived.alerts.map((a, i) => (
                   <div key={i} className="flex items-center gap-2 text-[13px]">
-                    <span className={cn("size-1.5 shrink-0 rounded-full", a.level === "error" ? "bg-destructive" : "bg-amber-500")} />
+                    <span className={cn("size-1.5 shrink-0 rounded-full", a.level === "error" ? "bg-foreground" : "bg-foreground/40")} />
                     <span className="font-medium">J{a.j}</span>
                     <span className="text-muted-foreground">· {a.player} —</span>
                     <span>{a.message}</span>
@@ -548,7 +585,6 @@ export function AdminDashboard() {
                         key={name}
                         type="button"
                         onClick={() => cycleReponse(name)}
-                        title="Toucher pour basculer présent / absent / sans réponse"
                         className={cn("bouton-secondaire px-2.5 py-1 text-[12px] font-semibold", cls)}
                       >
                         {key === "present" ? "✓ " : key === "absent" ? "✗ " : ""}
@@ -592,7 +628,13 @@ export function AdminDashboard() {
 
           {/* Les équipes de dimanche — générées depuis les « oui » */}
           <EquipesDimanche
-            onPoser={(j, teams, date) => commit(poserEquipes(saison, j, teams, libelleCourt(date)), `Équipes de la J${j} sur la feuille`)}
+            onPoser={(j, teams, date) =>
+              commit(
+                poserEquipes(saison, j, teams, libelleCourt(date), { brouillon: { par: me ?? "admin", le: new Date() } }),
+                `Équipes de la J${j} sur la feuille`
+              )
+            }
+            libellePoser={(j) => (saison.journees.some((m) => m.j === j && !estBrouillon(m)) ? `Poser sur la J${j}` : "Poser en brouillon")}
           />
 
           {/* Historique / annulation */}
@@ -625,10 +667,7 @@ export function AdminDashboard() {
               </span>
             </div>
             {history.length === 0 ? (
-              <p className="text-[13px] text-muted-foreground">
-                Aucune modification cette session. Chaque changement est annulable — ⌘Z pour
-                revenir en arrière, ⌘⇧Z pour rétablir, autant de fois qu&apos;il faut.
-              </p>
+              <p className="mono-label text-foreground/45">0 geste</p>
             ) : (
               <div className="flex flex-col gap-1">
                 {[...history]
@@ -656,17 +695,7 @@ export function AdminDashboard() {
             )}
           </div>
 
-          <div className="flex items-start gap-3 rounded-2xl bg-card/60 p-3.5 opacity-70">
-            <Sparkles className="mt-0.5 size-5 text-primary" />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[15px] font-semibold">EvoDay</span>
-                <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">Bientôt</Badge>
-              </div>
-              <p className="text-[12px] text-muted-foreground">Évolution mensuelle des cartes.</p>
-            </div>
-          </div>
-
+          {process.env.NODE_ENV !== "production" && (
           <Button
             variant="ghost"
             size="sm"
@@ -685,6 +714,7 @@ export function AdminDashboard() {
           >
             <RotateCcw className="mr-1.5 size-4" /> Réinitialiser les données de démo
           </Button>
+          )}
         </TabsContent>
 
         {/* ===================== SAISIE (la grille) ===================== */}
@@ -739,8 +769,9 @@ export function AdminDashboard() {
               <div className="flex items-center justify-between gap-3 px-5 py-3.5">
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-bold tracking-tight">Journée {meta.j}</span>
+                  {estBrouillon(meta) && <span className="mono-label text-foreground/60">○ Brouillon</span>}
                   {meta.sflTime && (
-                    <Badge className="rounded-full bg-primary/12 px-2 py-0 text-[10px] text-primary">SFL Time</Badge>
+                    <span className="mono-label rounded-full bg-secondary px-2 py-0.5 text-foreground/70">SFL Time</span>
                   )}
                   <span className="text-[13px] text-muted-foreground">{meta.date}</span>
                 </div>
@@ -800,10 +831,6 @@ export function AdminDashboard() {
             </div>
           ))}
           </div>
-          <p className="px-1 text-[12px] text-muted-foreground">
-            Touche un joueur pour éditer sa ligne (statut, buts, passes, honneurs…). Tout est
-            sauvegardé et recalculé en direct.
-          </p>
           </>
           )}
         </TabsContent>
@@ -814,9 +841,7 @@ export function AdminDashboard() {
           <Requalification saison={saison} onCommit={commit} />
           <DetailPoints saison={saison} />
           <div className="flex items-center justify-between gap-3 px-1">
-            <p className="text-[13px] text-muted-foreground">
-              {rosterViews.length} joueurs — touche une fiche pour éditer poste, statut et stats.
-            </p>
+            <p className="mono-label text-foreground/45">{rosterViews.length} joueurs</p>
             <Button size="sm" variant="vert" onClick={() => setNewPlayerOpen(true)} className="rounded-full">
               <UserPlus className="mr-1.5 size-4" /> Ajouter
             </Button>
@@ -851,7 +876,7 @@ export function AdminDashboard() {
                   <span className="truncate text-[14px] font-semibold">{r.name}</span>
                   <span className="shrink-0 text-[11px] text-muted-foreground">{r.poste ?? "—"}</span>
                   {r.profil !== "Actif" && (
-                    <span className="shrink-0 rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[8px] font-bold text-sky-600 uppercase dark:text-sky-400">{r.profil}</span>
+                    <span className="mono-label shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-[8px] text-foreground/70">{r.profil}</span>
                   )}
                 </span>
                 <span className="w-10 text-center text-sm font-bold tabular-nums">{ovr}</span>
@@ -996,7 +1021,7 @@ export function AdminDashboard() {
         initialChecked={journeePrefill}
         lieux={saison.terrains ?? []}
         onCreate={(teams, reglages) => {
-          const cree = addJourneeWithTeams(saison, teams, journeeDate);
+          const cree = addJourneeWithTeams(saison, teams, journeeDate, { brouillon: { par: me ?? "admin", le: new Date() } });
           const { j } = cree;
           // Chaque match à son heure, son terrain et son lieu, quand l'admin les a donnés.
           const s = reglages.reduce(

@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { ACCOUNTS } from "@/lib/sfl/auth/accounts";
 import { identifiantPour } from "@/lib/sfl/auth/derive.server";
+import { lireEffectifServeur } from "@/lib/sfl/saison-serveur.server";
 
 const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://tpfusliksgxcvfrodchk.supabase.co";
@@ -76,9 +77,7 @@ export async function POST(req: NextRequest) {
   );
   const motifParNom = new Map(profilsListe.map((p) => [p.name, motifParId.get(p.id)]));
 
-  const { data: doc } = await sb.from("saison").select("data").eq("id", 1).maybeSingle();
-  const roster =
-    (doc as { data?: { roster?: { name: string }[] } } | null)?.data?.roster ?? [];
+  const roster = (await lireEffectifServeur(sb)) ?? [];
 
   const parNom = new Map<string, CompteLigue>();
   const pris = new Set<string>();

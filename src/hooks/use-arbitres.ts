@@ -48,10 +48,14 @@ export function useArbitres(): Arbitres {
     const jouees = new Set(saison.entries.filter((x) => x.result).map((x) => x.j));
     const jouee = (s: number, j: number) => (s === numero ? jouees.has(j) : s < numero);
     const arbitres = new Set(e.arbitres);
+    // Seulement les journées que la ligue voit : jamais celle remise en brouillon.
+    const visibles = new Set(saison.journees.map((m) => m.j));
+    const arbitrages = e.arbitrages.filter((a) => a.saison !== numero || visibles.has(a.j));
     return {
       ...e,
+      arbitrages,
       estArbitre: (nom) => arbitres.has(nom),
-      duMatch: (j, n) => e.arbitrages.find((a) => a.saison === numero && a.j === j && a.n === n) ?? null,
+      duMatch: (j, n) => arbitrages.find((a) => a.saison === numero && a.j === j && a.n === n) ?? null,
       stats: (nom) => statsArbitre(nom, e, jouee),
       choix: (nom) => lireChoixArbitre(e.habillages[nom]),
     };

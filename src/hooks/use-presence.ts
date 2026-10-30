@@ -94,6 +94,8 @@ export interface PresenceView {
   equipesVisibles: boolean;
   /** Les équipes composées par l'admin (null tant qu'il n'a rien validé). */
   teams: ConvocationTeam[] | null;
+  /** La convocation en base (public.convocations.id) ; null en local. L'admin y corrige une réponse. */
+  convocationId: number | null;
   /**
    * Répondre, une seule fois : « figee » si une réponse existe déjà (ici ou
    * en base), « erreur » si rien n'a pu partir.
@@ -107,7 +109,7 @@ export interface PresenceView {
 
 export function usePresence(): PresenceView {
   // Le document stocké : setPresence et les équipes l'écrivent.
-  const { saisonBrute: saison, journees } = useSeason();
+  const { saisonLue: saison, journees } = useSeason();
   const { player } = useMyPlayer();
   const session = useSession();
   const serverActive = !!session?.server;
@@ -300,14 +302,16 @@ export function usePresence(): PresenceView {
           return false;
         }
       }
-      const localId = activeConvocation(saison)?.id;
+      // L'écriture part du document entier, jamais de la saison lue (sans brouillons).
+      const doc = saisieStore.load();
+      const localId = activeConvocation(doc)?.id;
       if (localId !== undefined) {
-        saisieStore.save(setConvocationTeams(saison, localId, teams));
+        saisieStore.save(setConvocationTeams(doc, localId, teams));
         window.dispatchEvent(new Event(SAISIE_EVENT));
       }
       return true;
     },
-    [serverActive, server, saison]
+    [serverActive, server]
   );
 
   /* -------------------------------- La vue -------------------------------- */
@@ -357,6 +361,7 @@ export function usePresence(): PresenceView {
       reponsesOuvertes: ouvert,
       equipesVisibles: revele,
       teams: server.convocation.teams ?? null,
+      convocationId: server.convocation.id,
       answer,
       publish: null,
       saveTeams: session?.admin ? saveTeams : null,
@@ -383,6 +388,7 @@ export function usePresence(): PresenceView {
     reponsesOuvertes: ouvert,
     equipesVisibles: revele,
     teams: localConv?.teams ?? null,
+    convocationId: null,
     answer,
     // Publier n'a de sens que pour l'admin, connecté côté serveur.
     publish: serverActive && session?.admin ? publish : null,

@@ -56,7 +56,9 @@ export function listPresence(saison: Saison, roster: { name: string; profil: str
  * Enregistre la réponse d'un joueur. `null` retire la réponse.
  * Renvoie false si aucune convocation n'est ouverte.
  */
-export function setPresence(saison: Saison, player: string, reponse: Reponse | null): boolean {
+export function setPresence(_lue: Saison, player: string, reponse: Reponse | null): boolean {
+  // L'écriture part du document entier (jamais d'une saison filtrée : brouillon.ts).
+  const saison = saisieStore.load();
   const convocation = activeConvocation(saison);
   if (!convocation) return false;
   saisieStore.save(respondConvocation(saison, convocation.id, player, reponse));

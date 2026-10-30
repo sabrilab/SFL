@@ -72,6 +72,15 @@ export interface JourneeMeta {
    * l'heure et au lieu de la journée.
    */
   matchsDuJour?: MatchDuJour[];
+  /**
+   * La journée en brouillon (30/10/2026) : seule l'organisation la voit, le
+   * temps de la préparer ; « Publier pour tout le monde » retire ce champ.
+   * Absent (toutes les journées d'avant) : publiée. La même règle en base :
+   * public.est_brouillon (supabase/schema.sql), saisie/brouillon.ts ici.
+   */
+  brouillon?: { depuis: string; par: string };
+  /** Sa dernière publication (« En ligne · 18:42 »), gardée si on la remet en brouillon. */
+  publiee?: { le: string; par: string };
 }
 
 /**
@@ -95,6 +104,8 @@ export interface MatchDuJour {
   lieuId?: number;
   /** Le terrain qu'il occupe sur place, « Terrain 3 » ou « 3 ». */
   terrain?: string;
+  /** L'arbitre désigné pendant le brouillon ; écrit dans `arbitrages` à la publication. */
+  arbitre?: string;
 }
 
 // Événement minuté d'un match — alimente la timeline et la détection du
