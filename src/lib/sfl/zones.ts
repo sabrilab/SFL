@@ -259,7 +259,7 @@ export function voileHorsZones(zones: Zone[]): GeoJSON.Feature<GeoJSON.Polygon> 
  * métropole lilloise reste claire jusqu'à Armentières et Mouscron, puis le gris
  * monte (Sabri, 30/10 : « ça commence à se terminer » vers là).
  */
-export const FONDU_PAS = 10;
+export const FONDU_PAS = 16;
 export function voilesEnFondu(zones: Zone[]): GeoJSON.FeatureCollection<GeoJSON.Polygon> {
   const ouvertes = zones.filter((z) => z.ouverte && z.appuis.length);
   const monde: [number, number][] = [
@@ -271,7 +271,7 @@ export function voilesEnFondu(zones: Zone[]): GeoJSON.FeatureCollection<GeoJSON.
   ];
   const features: GeoJSON.Feature<GeoJSON.Polygon>[] = [];
   for (let k = 0; k < FONDU_PAS; k++) {
-    const marge = MARGE_KM * 1.14 ** k;
+    const marge = MARGE_KM * 1.08 ** k;
     features.push({
       type: "Feature",
       properties: { k },

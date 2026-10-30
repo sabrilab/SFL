@@ -138,7 +138,7 @@ import { ciblesDuDimanche, contratsSignes, foyerDesCibles, villesDesCibles } fro
 import { ContratsSur } from "@/components/sfl/map/contrats-sur";
 import { cleVille, type ContratPlan, type VillePlan } from "@/components/sfl/map/joueurs";
 import { useMissionsDeLaLigue } from "@/hooks/use-missions";
-import { AMBIANCES, type Ambiance } from "@/components/sfl/map/ambiances";
+import { AMBIANCES, TOUTES_AMBIANCES, type Ambiance } from "@/components/sfl/map/ambiances";
 import { calculerZones, dansContour, numeroZone, type Foyer, type VilleZone, type Zone } from "@/lib/sfl/zones";
 import { maVille, villeOuLigue } from "@/lib/sfl/villes";
 import { photoMiniature, photoPerso } from "@/lib/sfl/photos";
@@ -207,19 +207,27 @@ const teinteFantome = (): TeinteFantome =>
 
 /**
  * L'ambiance du plan (30/10, les essais des zones Bola) : dans un aperçu,
- * « Territoire » d'office, les autres par /?ambiance=nuit|encre|classique ;
+ * « Brume » d'office, les autres par /?ambiance=rouge|braise|territoire|nuit|encre|classique ;
  * en production, le plan d'avant tant que Sabri n'a pas choisi.
  */
 const ESSAIS = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
 const ambianceDeLAdresse = (): Ambiance => {
   if (!ESSAIS) return "classique";
   const a = new URLSearchParams(window.location.search).get("ambiance");
-  return AMBIANCES.includes(a as Ambiance) ? (a as Ambiance) : "territoire";
+  return TOUTES_AMBIANCES.includes(a as Ambiance) ? (a as Ambiance) : "brume";
 };
 /** Dans un aperçu, /?zones=demo ajoute une zone qui vient de s'ouvrir (Lens) et une zone fermée (Paris), pour voir le récit. */
 const zonesDemo = () => ESSAIS && new URLSearchParams(window.location.search).get("zones") === "demo";
 const useZonesDemo = () => useSyncExternalStore(rienAEcouter, zonesDemo, () => false);
-const NOMS_AMBIANCES: Record<Ambiance, string> = { territoire: "Territoire", nuit: "Nuit", encre: "Encre", classique: "Avant" };
+const NOMS_AMBIANCES: Record<Ambiance, string> = {
+  brume: "Brume",
+  rouge: "Rouge",
+  braise: "Braise",
+  territoire: "Fondu",
+  nuit: "Nuit",
+  encre: "Encre",
+  classique: "Avant",
+};
 
 const CarteMap = dynamic(() => import("@/components/sfl/map/carte-map").then((m) => m.CarteMap), {
   ssr: false,

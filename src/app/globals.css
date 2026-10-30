@@ -1240,6 +1240,15 @@
   color: #84d68c;
   border-color: #84d68c;
 }
+/* Les essais à frontière (30/10) : le jeton de la zone prend sa couleur. */
+[data-ambiance="rouge"] .zone-etiq:not(.zone-etiq--attente) .zone-etiq__tete {
+  background: #e3262e;
+  color: #ffffff;
+}
+[data-ambiance="braise"] .zone-etiq:not(.zone-etiq--attente) .zone-etiq__tete {
+  background: #ff6a1a;
+  color: #0a0b0d;
+}
 @media (prefers-reduced-motion: no-preference) {
   /* Une nouvelle zone : son jeton bat, un anneau en part. */
   .zone-etiq--neuve .zone-etiq__tete {
