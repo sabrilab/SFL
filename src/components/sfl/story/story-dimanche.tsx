@@ -70,13 +70,14 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
     if (!calques) return;
     let annule = false;
     (async () => {
-      const [fond, joueur, stats, logo, symbole, colonne] = await Promise.all([
+      const [fond, joueur, stats, logo, symbole, colonne, dos] = await Promise.all([
         charger(calques.background),
         charger(calques.playerLayer),
         charger(calques.stats),
         charger("/bola/logo-noir.svg"),
         charger("/bola/symbole-noir.svg"),
         charger("/story/colonne.png"),
+        calques.dos ? charger(calques.dos) : Promise.resolve(null),
       ]);
       const canvas = toile.current;
       const ctx = canvas?.getContext("2d");
@@ -84,7 +85,7 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
       const p = polices();
       await Promise.all([document.fonts.load(`900 104px ${p.texte}`), document.fonts.load(`400 128px ${p.chiffres}`)]).catch(() => {});
       if (annule) return;
-      const c: CalquesStory = { fond, joueur, stats, logo, symbole, colonne, ratio: calques.height / calques.width };
+      const c: CalquesStory = { fond, joueur, stats, logo, dos, symbole, colonne, ratio: calques.height / calques.width };
       const dessiner = (t: number) => dessinerStory(ctx, t, donnees, c, p);
       setEtat({ quoi: "film", avance: 0 });
       const blob = await enregistrerStory(canvas, dessiner, (avance) => !annule && setEtat({ quoi: "film", avance }));
