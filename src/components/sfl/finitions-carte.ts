@@ -95,7 +95,18 @@ export type Traitement = "argentique" | "gravure" | "marbre";
 // Sans or depuis le 24/10 (Sabri : l'or, le bleu et le rouge restent aux cartes à titre) : le liseré
 // or est devenu le double liseré platine, la puce dorée la puce noire.
 // Le sifflet et les cartons ne sont qu'aux arbitres (passe-arbitre.ts).
-export type Signe = "lisere-argent" | "lisere-platine" | "sceau" | "puce-noire" | "nom-grave" | "sifflet" | "cartons";
+// Saison Givre (30/10) : le liseré de fer, la frise de runes et le nom en runes du dos.
+export type Signe =
+  | "lisere-argent"
+  | "lisere-platine"
+  | "sceau"
+  | "puce-noire"
+  | "nom-grave"
+  | "sifflet"
+  | "cartons"
+  | "lisere-fer"
+  | "runes"
+  | "nom-runes";
 
 /** Le rang du joueur selon son XP, aux couleurs des rangs de mission. */
 export type RangCarte = "B" | "A" | "S";

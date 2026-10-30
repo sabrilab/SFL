@@ -22,7 +22,6 @@
 // Sous les missions, pour tout le monde, les défis (defis.tsx) : le prochain
 // badge de chaque famille, toujours là, même sans feuille (30/10).
 
-import { useMemo } from "react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { MissionsBola } from "@/components/sfl/actus/missions";
 import { MissionsPerso } from "@/components/sfl/missions-perso";
@@ -205,9 +204,10 @@ function Attente() {
   );
 }
 
-function Sources({ b, saison }: { b: BilanXp; saison: number }) {
+function Sources({ b }: { b: BilanXp }) {
   const horsSfl = useHorsDeLaSfl();
-  const lignes = useMemo(() => b.lignes.filter((l) => l.saison === saison), [b.lignes, saison]);
+  // Les lignes de la saison du Passe en cours (saisons-passe.ts).
+  const lignes = b.lignesSaison;
   return (
     <section className="flex flex-col" aria-labelledby="titre-gagner-xp">
       <div className="flex items-baseline justify-between px-5 pb-2">
@@ -279,7 +279,7 @@ export function VueMissions({ b, saison, nom }: { b: BilanXp; saison: number; no
     <div className="mp-missions">
       {horsSfl ? <MissionsPerso /> : mm ? <MissionsBola /> : <Attente />}
       <Defis nom={nom} />
-      <Sources b={b} saison={saison} />
+      <Sources b={b} />
       <Journal b={b} saison={saison} />
     </div>
   );

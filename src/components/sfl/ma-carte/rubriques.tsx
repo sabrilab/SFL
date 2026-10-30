@@ -41,7 +41,6 @@ import { ovr } from "@/lib/sfl/engine";
 import { saisonsBolaDe } from "@/lib/sfl/carte-bola";
 import { actionsDuJour, dimanchesDe, ficheJoueur, resultatDuJour } from "@/lib/sfl/fiche-joueur";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
-import { PALIERS_PASSE, PASSE_BOLA } from "@/lib/sfl/passe";
 import { metal, NOM_METAL, prochain, vitrine } from "@/lib/sfl/trophees";
 import { cn } from "@/lib/utils";
 import "./rubriques.css";
@@ -236,10 +235,12 @@ export function RubriquesMaCarte() {
     );
   }
 
-  // 2. Mon Niveau XP, et le Passe Bola en vingt traits.
+  // 2. Mon Niveau XP, et le Passe Bola de la saison en cours, un trait par palier.
   if (b) {
+    const piste = b.saisonPasse.paliers;
+    const PALIERS_PASSE = piste.length;
     const fini = b.passe.palier >= PALIERS_PASSE;
-    const suivant = PASSE_BOLA[Math.min(PALIERS_PASSE, b.passe.palier + 1) - 1];
+    const suivant = piste[Math.min(PALIERS_PASSE, b.passe.palier + 1) - 1];
     tuiles.push(
       <Tuile
         key="xp"

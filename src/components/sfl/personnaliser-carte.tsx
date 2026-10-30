@@ -26,7 +26,7 @@ import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
 import { COULEURS_PAYS, PAYS_PAR_DEFAUT } from "@/components/sfl/skins-passe";
 import { useChoixBadge } from "@/hooks/use-badge-carte";
-import { finitionsDe, useChoixHabillage, useHabillage, usePalierMax, useRecruesCarte } from "@/hooks/use-habillage";
+import { finitionsDe, useChoixHabillage, useHabillage, usePaliers, useRecruesCarte } from "@/hooks/use-habillage";
 import { FINITIONS_RECRUES, SKINS_RECRUES, type FinitionRecrue } from "@/components/sfl/skins-recrues";
 import { badgesGagnes, cleBadge, type BadgeCarte } from "@/lib/sfl/badge-carte";
 import { choisirBadge } from "@/lib/sfl/badges-choisis";
@@ -34,12 +34,34 @@ import type { Player } from "@/lib/sfl/engine";
 import { CLASSEMENTS } from "@/lib/sfl/fin-de-saison";
 import { SKINS_OFFERTS } from "@/lib/sfl/finitions-offertes";
 import { choisirHabillage } from "@/lib/sfl/habillages-choisis";
-import { PASSE_BOLA } from "@/lib/sfl/passe";
+import type { PaliersAtteints, PalierPasse } from "@/lib/sfl/passe";
+import { saisonsPasseOuvertes, type SaisonPasse } from "@/lib/sfl/saisons-passe";
 import { NOM_METAL, TROPHEES, metal } from "@/lib/sfl/trophees";
 import { cn } from "@/lib/utils";
 
-const SKINS = PASSE_BOLA.filter((p) => p.genre === "skin");
-const SIGNES = PASSE_BOLA.filter((p) => p.genre === "signe");
+/** Une récompense du Passe et sa saison. */
+interface Recompense {
+  p: PalierPasse;
+  s: SaisonPasse;
+  /** Gagnée. */
+  a: boolean;
+}
+
+/**
+ * Les récompenses du Passe à montrer : celles de la saison en cours, gagnées
+ * ou non, et celles des saisons finies qu'il a gagnées ; une saison qui n'a
+ * pas commencé ne se montre pas (saisons-passe.ts).
+ */
+function recompenses(paliers: PaliersAtteints, genre: PalierPasse["genre"]): Recompense[] {
+  const ouvertes = saisonsPasseOuvertes(new Date());
+  const courante = ouvertes[ouvertes.length - 1];
+  return [...ouvertes]
+    .reverse()
+    .flatMap((s) => s.paliers.filter((p) => p.genre === genre).map((p) => ({ p, s, a: p.n <= (paliers[s.id] ?? 0) })))
+    .filter((r) => r.a || r.s === courante);
+}
+
+const commentDe = ({ p, s, a }: Recompense) => (a ? `${s.nom} · palier ${p.n}` : `À gagner · palier ${p.n} de la ${s.nom}`);
 
 const ordinal = (n: number) => (n === 1 ? "1er" : `${n}e`);
 
@@ -117,13 +139,15 @@ export function PersonnaliserCarte({ player }: { player: Player }) {
   const nom = player.name;
   const { saison } = useSeason();
   const [ouvert, setOuvert] = useState(false);
-  const palierMax = usePalierMax(nom);
+  const paliers = usePaliers(nom);
+  const SKINS = recompenses(paliers, "skin");
+  const SIGNES = recompenses(paliers, "signe");
   const choix = useChoixHabillage(nom);
   const porte = useHabillage(nom);
   const { recrues, fondateur } = useRecruesCarte(nom);
-  const mesSkins = finitionsDe(nom, palierMax, recrues, fondateur);
+  const mesSkins = finitionsDe(nom, paliers, recrues, fondateur);
   const offerts = mesSkins.filter(
-    (f) => !SKINS.some((s) => s.habille?.finition === f) && !FINITIONS_RECRUES.includes(f as FinitionRecrue)
+    (f) => !SKINS.some((r) => r.p.habille?.finition === f) && !FINITIONS_RECRUES.includes(f as FinitionRecrue)
   );
   const badges = badgesGagnes(saison, nom);
   const choixBadge = useChoixBadge(nom) ?? "auto";
@@ -140,7 +164,7 @@ export function PersonnaliserCarte({ player }: { player: Player }) {
     });
   const vignette = (h: HabillageCarte) => <Mini player={player} habillage={{ ...base, ...h }} l={44} h={71} />;
   const nSkins = mesSkins.length;
-  const nSignes = SIGNES.filter((s) => s.n <= palierMax).length;
+  const nSignes = SIGNES.filter((r) => r.a).length;
 
   return (
     <>
@@ -173,11 +197,12 @@ export function PersonnaliserCarte({ player }: { player: Player }) {
                 quoi="Ta carte de saison, sans skin."
                 comment="Toujours à toi"
               />
-              {SKINS.map((p) => {
+              {SKINS.map((r) => {
+                const { p } = r;
                 const f = p.habille!.finition as Finition;
                 const a = mesSkins.includes(f);
                 return (
-                  <div key={p.n} className="flex flex-col gap-2">
+                  <div key={`${r.s.id}-${p.n}`} className="flex flex-col gap-2">
                     <Ligne
                       actif={porte.finition === f}
                       ouvert={a}
@@ -185,7 +210,7 @@ export function PersonnaliserCarte({ player }: { player: Player }) {
                       vignette={vignette({ finition: f, pays: f === "couleurs" ? pays : undefined })}
                       titre={f === "couleurs" && a ? `${p.nom} · ${COULEURS_PAYS[pays]?.nom ?? ""}` : p.nom}
                       quoi={p.quoi}
-                      comment={a ? `Passe Bola · palier ${p.n}` : `À gagner · palier ${p.n} du Passe Bola`}
+                      comment={commentDe({ ...r, a })}
                     />
                     {f === "couleurs" && porte.finition === "couleurs" && (
                       <div className="-mx-4">
@@ -225,19 +250,19 @@ export function PersonnaliserCarte({ player }: { player: Player }) {
             </Rubrique>
 
             <Rubrique titre="Signes" sous={`${nSignes} à toi`}>
-              {SIGNES.map((p) => {
+              {SIGNES.map((r) => {
+                const { p, a } = r;
                 const g = p.habille!.signe as Signe;
-                const a = p.n <= palierMax;
                 return (
                   <Ligne
-                    key={p.n}
+                    key={`${r.s.id}-${p.n}`}
                     actif={a && choix.signes.includes(g)}
                     ouvert={a}
                     onClick={() => basculerSigne(g)}
                     vignette={vignette({ signes: [g] })}
                     titre={p.nom}
                     quoi={p.quoi}
-                    comment={a ? `Passe Bola · palier ${p.n}` : `À gagner · palier ${p.n} du Passe Bola`}
+                    comment={commentDe(r)}
                   />
                 );
               })}
