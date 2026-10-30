@@ -22,6 +22,9 @@
 //     frontière ») : la zone teintée et bordée d'une frontière de couleur
 //     franche qui luit, le dehors grisé. Le rouge est réservé aux cartes
 //     Impact : la braise est l'essai de rechange.
+//   · « nuit-brume » et « nuit-braise » (Sabri, 30/10 : « tester aussi des
+//     modes nuit ») : les mêmes sur le plan noir ; la brume y devient une
+//     fumée sombre traversée de nuées pâles.
 //
 // « classique » : le plan d'avant, sans zones. Seul l'essai « rouge »
 // prend une couleur réservée (Impact), pour que Sabri tranche.
@@ -31,10 +34,12 @@
 import type { Map as PlanMap } from "maplibre-gl";
 import { chaleur, contoursDesZones, FONDU_PAS, voilesEnFondu, type Zone } from "@/lib/sfl/zones";
 
-export type Ambiance = "classique" | "territoire" | "nuit" | "encre" | "brume" | "rouge" | "braise";
-/** Les essais montrés dans l'aperçu (nuit et encre restent par l'adresse). */
-export const AMBIANCES: Ambiance[] = ["brume", "rouge", "braise", "territoire", "classique"];
-export const TOUTES_AMBIANCES: Ambiance[] = [...AMBIANCES, "nuit", "encre"];
+export type Ambiance = "classique" | "territoire" | "nuit" | "encre" | "brume" | "rouge" | "braise" | "nuit-brume" | "nuit-braise";
+/** Les essais montrés dans l'aperçu (l'encre reste par l'adresse). */
+export const AMBIANCES: Ambiance[] = ["brume", "rouge", "braise", "nuit-brume", "nuit-braise", "nuit", "territoire", "classique"];
+export const TOUTES_AMBIANCES: Ambiance[] = [...AMBIANCES, "encre"];
+/** Les ambiances sur le plan noir. */
+export const estNuit = (a: Ambiance) => a === "nuit" || a === "nuit-brume" || a === "nuit-braise";
 
 interface Palette {
   terre: string;
@@ -125,10 +130,10 @@ const ENCRE: Palette = {
   halo: "#ffffff",
 };
 
-const PALETTES: Record<Ambiance, Palette> = { classique: SNAP, territoire: SNAP, nuit: NUIT, encre: ENCRE, brume: SNAP, rouge: SNAP, braise: SNAP };
+const PALETTES: Record<Ambiance, Palette> = { classique: SNAP, territoire: SNAP, nuit: NUIT, encre: ENCRE, brume: SNAP, rouge: SNAP, braise: SNAP, "nuit-brume": NUIT, "nuit-braise": NUIT };
 
 /** La couleur de frontière des essais « rouge » et « braise ». */
-const FRONTIERE: Partial<Record<Ambiance, string>> = { rouge: "#E3262E", braise: "#FF6A1A" };
+const FRONTIERE: Partial<Record<Ambiance, string>> = { rouge: "#E3262E", braise: "#FF6A1A", "nuit-braise": "#FF6A1A" };
 
 /** Les libellés d'une ambiance (le fond satellite garde son blanc sur noir). */
 export function couleurLibelle(ambiance: Ambiance, id: string, satellite: boolean): { texte: string; halo: string } {
@@ -148,6 +153,7 @@ const ROUTES: [string, keyof Palette, keyof Palette][] = [
 /** Repeindre le plan dans une ambiance. */
 export function peindre(map: PlanMap, ambiance: Ambiance) {
   const p = PALETTES[ambiance];
+  const nuit = estNuit(ambiance);
   const set = (id: string, prop: string, v: unknown) => map.getLayer(id) && map.setPaintProperty(id, prop, v);
   set("terre", "background-color", p.terre);
   set("quartiers", "fill-color", p.quartier);
@@ -155,9 +161,9 @@ export function peindre(map: PlanMap, ambiance: Ambiance) {
   set("herbe", "fill-color", p.parc);
   set("parcs", "fill-color", p.parc);
   set("terrains", "fill-color", p.terrain);
-  set("terrains", "fill-outline-color", ambiance === "nuit" ? "#2c5a35" : "#ffffff");
+  set("terrains", "fill-outline-color", nuit ? "#2c5a35" : "#ffffff");
   set("ombrage", "hillshade-shadow-color", p.ombre);
-  set("ombrage", "hillshade-highlight-color", ambiance === "nuit" ? "rgba(255, 255, 255, 0.05)" : "rgba(255, 255, 255, 0.6)");
+  set("ombrage", "hillshade-highlight-color", nuit ? "rgba(255, 255, 255, 0.05)" : "rgba(255, 255, 255, 0.6)");
   set("rivieres", "line-color", p.eau);
   set("eau", "fill-color", p.eau);
   set("eau", "fill-outline-color", p.eauBord);
@@ -166,7 +172,7 @@ export function peindre(map: PlanMap, ambiance: Ambiance) {
     set(id, "line-color", p[c]);
     set(`${id}-bord`, "line-color", p[b]);
   }
-  set("chemins", "line-color", ambiance === "nuit" ? "#1f2125" : ambiance === "encre" ? "#f8f8f5" : "#fbfaf6");
+  set("chemins", "line-color", nuit ? "#1f2125" : ambiance === "encre" ? "#f8f8f5" : "#fbfaf6");
   set("bati", "fill-color", p.bati);
   set("volumes", "fill-extrusion-color", p.volume);
 }
@@ -336,18 +342,19 @@ export function teinterZones(map: PlanMap, ambiance: Ambiance, satellite: boolea
   // plus en plus larges ; l'opacité est celle de chacun. Plus de trait ni de
   // hachures (Sabri, 30/10 : « pas une fracture […] que ça se fonde ») : hors
   // des zones le plan se grise peu à peu, dedans il reste clair.
-  const brume = ambiance === "brume";
+  const nuit = estNuit(ambiance);
+  const brume = ambiance === "brume" || ambiance === "nuit-brume";
   const frontiere = FRONTIERE[ambiance];
   const voile =
-    sans || satellite ? 0 : (brume ? 0.2 : frontiere ? 0.17 : ambiance === "territoire" ? 0.15 : ambiance === "nuit" ? 0.18 : 0.12) * (10 / FONDU_PAS);
-  set("zones-voile", "fill-color", ambiance === "nuit" ? "#030304" : ambiance === "encre" ? "#cfcec8" : brume ? "#f6f7f8" : frontiere ? "#bfc0bc" : "#c9cac6");
+    sans || satellite ? 0 : (brume ? (nuit ? 0.24 : 0.2) : frontiere ? (nuit ? 0.2 : 0.17) : ambiance === "territoire" ? 0.15 : ambiance === "nuit" ? 0.18 : 0.12) * (10 / FONDU_PAS);
+  set("zones-voile", "fill-color", nuit ? "#030304" : ambiance === "encre" ? "#cfcec8" : brume ? "#f6f7f8" : frontiere ? "#bfc0bc" : "#c9cac6");
   set("zones-voile", "fill-opacity", voile);
   set("zones-hachures", "fill-opacity", 0);
   // La brume : des nuages blancs qui s'épaississent en s'éloignant de la zone.
-  set("zones-nuages", "fill-opacity", brume && !satellite ? 0.14 : 0);
+  set("zones-nuages", "fill-opacity", brume && !satellite ? (nuit ? 0.028 : 0.14) : 0);
   // La zone teintée de sa couleur, à peine (« rouge », « braise »).
   set("zones-teinte", "fill-color", frontiere ?? "#ffffff");
-  set("zones-teinte", "fill-opacity", frontiere && !satellite ? 0.07 : 0);
+  set("zones-teinte", "fill-opacity", frontiere && !satellite ? (nuit ? 0.09 : 0.07) : 0);
   // Les halos : de la lumière là où l'on joue et d'où l'on vient, plus
   // forte la nuit ; à l'encre, une encre plus dense.
   set("zones-chaleur", "heatmap-opacity", sans || satellite ? 0 : 1);
@@ -356,7 +363,7 @@ export function teinterZones(map: PlanMap, ambiance: Ambiance, satellite: boolea
     "heatmap-color",
     ambiance === "encre"
       ? ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(10,11,13,0)", 0.15, "rgba(10,11,13,0.04)", 0.5, "rgba(10,11,13,0.1)", 1, "rgba(10,11,13,0.22)"]
-      : ambiance === "nuit"
+      : nuit
         ? ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.15, "rgba(255,255,255,0.06)", 0.5, "rgba(246,247,242,0.2)", 1, "rgba(246,247,242,0.42)"]
         : ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.15, "rgba(255,255,253,0.18)", 0.5, "rgba(255,255,253,0.38)", 1, "rgba(255,255,253,0.6)"]
   );
@@ -366,12 +373,12 @@ export function teinterZones(map: PlanMap, ambiance: Ambiance, satellite: boolea
   // de nuages posé au bord de la zone.
   if (!satellite && (frontiere || brume)) {
     const largeur = ["interpolate", ["linear"], ["zoom"], 6, 1.6, 10, 3, 14, 4.5];
-    set("zones-lueur", "line-color", frontiere ?? "#3a3d42");
+    set("zones-lueur", "line-color", frontiere ?? (nuit ? "#f4f5f2" : "#3a3d42"));
     set("zones-lueur", "line-width", ["interpolate", ["linear"], ["zoom"], 6, 10, 10, 26, 14, 44]);
     set("zones-lueur", "line-blur", ["interpolate", ["linear"], ["zoom"], 6, 8, 10, 20, 14, 34]);
-    set("zones-lueur", "line-opacity", frontiere ? 0.38 : 0.16);
+    set("zones-lueur", "line-opacity", frontiere ? (nuit ? 0.5 : 0.38) : nuit ? 0.1 : 0.16);
     if (frontiere) {
-      set("zones-lisere", "line-color", "#ffffff");
+      set("zones-lisere", "line-color", nuit ? "#0a0b0d" : "#ffffff");
       set("zones-lisere", "line-width", ["interpolate", ["linear"], ["zoom"], 6, 3.6, 10, 6, 14, 8.5]);
       set("zones-lisere", "line-opacity", 0.9);
       set("zones-trait", "line-color", frontiere);
@@ -381,7 +388,7 @@ export function teinterZones(map: PlanMap, ambiance: Ambiance, satellite: boolea
   }
   // Les terrains possibles, de loin : des points cerclés, à peine la nuit.
   if (map.getLayer("possibles-points") && !satellite) {
-    map.setPaintProperty("possibles-points", "circle-stroke-color", ambiance === "nuit" ? "rgba(246,247,242,0.35)" : "#ffffff");
-    map.setPaintProperty("possibles-points", "circle-color", ["case", ["get", "horsZone"], ambiance === "nuit" ? "#84D68C" : "#1F8A45", ambiance === "nuit" ? "#5d6067" : ambiance === "encre" ? "#6b6c70" : "#8a8c91"]);
+    map.setPaintProperty("possibles-points", "circle-stroke-color", nuit ? "rgba(246,247,242,0.35)" : "#ffffff");
+    map.setPaintProperty("possibles-points", "circle-color", ["case", ["get", "horsZone"], nuit ? "#84D68C" : "#1F8A45", nuit ? "#5d6067" : ambiance === "encre" ? "#6b6c70" : "#8a8c91"]);
   }
 }

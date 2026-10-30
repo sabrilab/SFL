@@ -1220,22 +1220,22 @@
   font-size: 15px;
   opacity: 0.8;
 }
-[data-ambiance="nuit"] .zone-etiq__tete {
+[data-ambiance^="nuit"] .zone-etiq__tete {
   background: #f4f5f2;
   color: #0a0b0d;
   border-color: #0a0b0d;
 }
-[data-ambiance="nuit"] .zone-etiq__nom {
+[data-ambiance^="nuit"] .zone-etiq__nom {
   color: #f4f5f2;
   text-shadow:
     2.6px 0 0 #0a0b0d, -2.6px 0 0 #0a0b0d, 0 2.6px 0 #0a0b0d, 0 -2.6px 0 #0a0b0d,
     1.9px 1.9px 0 #0a0b0d, -1.9px 1.9px 0 #0a0b0d, 1.9px -1.9px 0 #0a0b0d, -1.9px -1.9px 0 #0a0b0d;
 }
-[data-ambiance="nuit"] .zone-etiq__sous {
+[data-ambiance^="nuit"] .zone-etiq__sous {
   background: rgba(10, 11, 13, 0.85);
   color: #f4f5f2;
 }
-[data-ambiance="nuit"] .zone-etiq--attente .zone-etiq__tete {
+[data-ambiance^="nuit"] .zone-etiq--attente .zone-etiq__tete {
   background: #0a0b0d;
   color: #84d68c;
   border-color: #84d68c;
@@ -1245,7 +1245,7 @@
   background: #e3262e;
   color: #ffffff;
 }
-[data-ambiance="braise"] .zone-etiq:not(.zone-etiq--attente) .zone-etiq__tete {
+[data-ambiance$="braise"] .zone-etiq:not(.zone-etiq--attente) .zone-etiq__tete {
   background: #ff6a1a;
   color: #0a0b0d;
 }

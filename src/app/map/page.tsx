@@ -207,7 +207,7 @@ const teinteFantome = (): TeinteFantome =>
 
 /**
  * L'ambiance du plan (30/10, les essais des zones Bola) : dans un aperçu,
- * « Brume » d'office, les autres par /?ambiance=rouge|braise|territoire|nuit|encre|classique ;
+ * « Brume » d'office, les autres par /?ambiance=rouge|braise|nuit-brume|nuit-braise|territoire|nuit|encre|classique ;
  * en production, le plan d'avant tant que Sabri n'a pas choisi.
  */
 const ESSAIS = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
@@ -225,6 +225,8 @@ const NOMS_AMBIANCES: Record<Ambiance, string> = {
   braise: "Braise",
   territoire: "Fondu",
   nuit: "Nuit",
+  "nuit-brume": "Nuit brume",
+  "nuit-braise": "Nuit braise",
   encre: "Encre",
   classique: "Avant",
 };
@@ -1276,7 +1278,7 @@ export default function MapPage() {
         {ESSAIS && !enContrats && (
           <div
             data-traverse
-            className="absolute left-4 z-[510] flex gap-1 rounded-full border border-black/10 bg-[#f4f5f2]/90 p-1 shadow-[0_2px_8px_rgba(0,0,0,0.15)] backdrop-blur"
+            className="absolute left-4 right-4 z-[510] flex max-w-max gap-1 overflow-x-auto rounded-full border [scrollbar-width:none] border-black/10 bg-[#f4f5f2]/90 p-1 shadow-[0_2px_8px_rgba(0,0,0,0.15)] backdrop-blur"
             style={{ top: `calc(${haut} + 74px)` }}
           >
             {AMBIANCES.map((a) => (
@@ -1290,7 +1292,7 @@ export default function MapPage() {
                   u.searchParams.set("ambiance", a);
                   window.history.replaceState(null, "", u);
                 }}
-                className="h-7 rounded-full px-2.5 text-[11.5px] font-bold"
+                className="h-7 shrink-0 whitespace-nowrap rounded-full px-2.5 text-[11.5px] font-bold"
                 style={a === ambiance ? { background: ENCRE, color: BLANC } : { color: ENCRE }}
               >
                 {NOMS_AMBIANCES[a]}
