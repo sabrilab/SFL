@@ -103,8 +103,10 @@ export interface CalquesStory {
   /** Hauteur / largeur de la carte. */
   ratio: number;
   logo: CanvasImageSource | null;
-  /** Le symbole BOLA du dos, et la colonne de marbre du décor. */
+  /** Le vrai dos de la carte (DosCarte, photographié par card-3d.tsx), sinon le symbole BOLA. */
+  dos: CanvasImageSource | null;
   symbole: CanvasImageSource | null;
+  /** La colonne de marbre du décor. */
   colonne: CanvasImageSource | null;
 }
 
@@ -287,8 +289,11 @@ export function dessinerStory(ctx: CanvasRenderingContext2D, t: number, d: Story
       enFuite(ctx, c.fond, xc, yv, lc, hv, sx, fuite);
       enFuite(ctx, c.joueur, xc, yv + (1 - ac) * 40, lc, hv, sx, fuite);
       enFuite(ctx, c.stats, xc, yv + (1 - ac) * 80, lc, hv, sx, fuite);
+    } else if (c.dos) {
+      // Le vrai dos de la carte, de la couleur de la face.
+      enFuite(ctx, c.dos, xc, yv, lc, hv, sx, fuite);
     } else {
-      // Le dos BOLA, de la couleur de la face.
+      // Repli : un dos uni avec le symbole BOLA.
       ctx.save();
       ctx.translate(W / 2, cyc);
       ctx.scale(sx, 1);
