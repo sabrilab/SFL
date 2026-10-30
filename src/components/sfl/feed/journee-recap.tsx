@@ -67,8 +67,8 @@ import {
   TournantModule,
   useAnalysePlus,
 } from "@/components/sfl/feed/analyse-plus";
-import { buildQuiz, PronosticModule, QuizModule } from "@/components/sfl/feed/jeux";
-import { NEXT_MATCH } from "@/lib/sfl/data";
+import { buildQuiz, QuizModule } from "@/components/sfl/feed/jeux";
+import { RubriqueFlair } from "@/components/sfl/flair/mon-flair";
 import { Reveal } from "@/components/sfl/feed/reveal";
 import { ArbitresDuMatch } from "@/components/sfl/feed/arbitre-du-match";
 import { PitchSynthese } from "@/components/sfl/feed/pitch-synthese";
@@ -199,7 +199,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
   // Les élus des votes fermés (Impact, Défensive) posés sur leurs lignes.
   const { journees, boostCards, saison: brute, saisonTitree } = useSeason();
   const saison = saisonTitree ?? brute;
-  // Une saison close se relit sans ses jeux (quiz, pronostic), qui sont du présent.
+  // Une saison close se relit sans ses jeux (le quiz), qui sont du présent.
   const relue = useSaisonClose();
 
   // Barre de progression de lecture — le scroll vit dans #app-scroll.
@@ -323,18 +323,6 @@ function JourneeRecapComplet({ j }: { j: number }) {
   const analyse = useAnalyse(saisonAtJ, players, journeesAtJ, lastJ);
   const plus = useAnalysePlus(saisonAtJ, players, journeesAtJ, lastJ, player.name);
 
-  // Le pronostic porte sur la journée suivante : la prochaine convocation
-  // quand on lit le dernier récap, la journée d'après sinon (déjà jouée, donc
-  // résolue tout de suite).
-  const nextJ = journees.find((x) => x.j === j + 1);
-  const pronoJ = nextJ ? nextJ.j : NEXT_MATCH.journee;
-  const pronoDate = nextJ ? nextJ.date : `${NEXT_MATCH.jour} ${NEXT_MATCH.date}`;
-  const pronoCandidates = [...players]
-    .filter((p) => p.matchs > 0)
-    .sort((a, b) => b.pp - a.pp)
-    .slice(0, 6);
-  const pronoResolved =
-    saison.entries.find((e) => e.j === pronoJ && e.mvp && !e.extraTime)?.player ?? null;
   const quiz = buildQuiz(
     lastJ,
     jEntries.map((e) => ({ name: e.player, buts: e.buts }))
@@ -1169,17 +1157,11 @@ function JourneeRecapComplet({ j }: { j: number }) {
         </Reveal>
       )}
 
-      {!relue && (
-        <Reveal>
-          <PronosticModule
-            journee={pronoJ}
-            date={pronoDate}
-            candidates={pronoCandidates}
-            me={player.name}
-            resolvedMvp={pronoResolved}
-          />
-        </Reveal>
-      )}
+      {/* Mon Flair de cette journée, jugé (Sabri, 30/10 : « sur les récaps, le
+          résultat du flair ») ; il remplace l'ancien pronostic du MVP. */}
+      <Reveal>
+        <RubriqueFlair j={lastJ.j} className="mx-0 my-0" />
+      </Reveal>
 
       {/* 15 · Le vestiaire */}
       <Reveal>
