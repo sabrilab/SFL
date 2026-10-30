@@ -127,16 +127,16 @@ function Champ({
   return (
     <label className="block">
       <span className="glass-soft flex flex-col gap-[8px] rounded-[21px] px-[21px] py-[13px]">
-        <span className="mono-label text-foreground/40">{label}</span>
+        <span className="mono-label text-encre-3">{label}</span>
         {children}
       </span>
-      {note && <span className="mt-[8px] block px-[13px] text-[12.5px] font-medium">{note}</span>}
+      {note && <span className="mt-[8px] block px-[13px] text-corps font-medium">{note}</span>}
     </label>
   );
 }
 
 const SAISIE =
-  "w-full bg-transparent text-[21px] font-bold tracking-tight outline-none placeholder:text-foreground/20";
+  "w-full bg-transparent text-titre-m font-bold tracking-tight outline-none placeholder:text-foreground/20";
 
 function Puces<T extends string>({
   options,
@@ -161,12 +161,12 @@ function Puces<T extends string>({
           }}
           className={cn(
             "bouton--or flex min-h-[55px] flex-col items-center justify-center rounded-[13px] px-[8px] py-[8px]",
-            valeur === o.id ? "bouton-principal" : "bouton-secondaire text-foreground/70"
+            valeur === o.id ? "bouton-principal" : "bouton-secondaire text-encre-2"
           )}
         >
-          <span className="text-[15px] font-extrabold tracking-tight">{o.label}</span>
+          <span className="text-lecture font-extrabold tracking-tight">{o.label}</span>
           {o.detail && (
-            <span className={cn("mt-0.5 text-[10.5px] leading-tight", valeur === o.id ? "bouton-sous" : "text-foreground/35")}>
+            <span className={cn("mt-0.5 text-legende leading-tight", valeur === o.id ? "bouton-sous" : "text-encre-4")}>
               {o.detail}
             </span>
           )}
@@ -198,7 +198,7 @@ function Reglage({
   return (
     <div className="glass-soft rounded-[21px] px-[21px] pt-[13px] pb-[21px]">
       <div className="flex items-center justify-between">
-        <span className="mono-label text-foreground/40">{label}</span>
+        <span className="mono-label text-encre-3">{label}</span>
         <div className="flex items-center gap-[13px]">
           <button
             type="button"
@@ -208,9 +208,9 @@ function Reglage({
           >
             <Minus className="size-4" />
           </button>
-          <span className="min-w-[89px] text-center text-[34px] leading-none font-black tracking-tight tabular-nums">
+          <span className="min-w-[89px] text-center text-nom leading-none font-black tracking-tight tabular-nums">
             {String(valeur).replace(".", ",")}
-            <span className="ml-1 text-[13px] font-bold text-foreground/40">{unite}</span>
+            <span className="ml-1 text-corps font-bold text-encre-3">{unite}</span>
           </span>
           <button
             type="button"
@@ -714,7 +714,7 @@ export default function InscriptionPage() {
             codeEtat === "inconnu" ? (
               <span className="text-[#c8352b] dark:text-[#FF6B5E]">Code inconnu.</span>
             ) : parrain ? (
-              <span className="text-foreground/55">
+              <span className="text-encre-3">
                 <Check className="mr-1 inline size-3.5" />
                 {parrain.p.affiche}
               </span>
@@ -740,14 +740,14 @@ export default function InscriptionPage() {
               placeholder="code"
               className={SAISIE}
             />
-            {codeEtat === "verif" && <Loader2 className="size-4 shrink-0 animate-spin text-foreground/30" />}
+            {codeEtat === "verif" && <Loader2 className="size-4 shrink-0 animate-spin text-encre-4" />}
           </span>
         </Champ>
       ) : (
         <button
           type="button"
           onClick={() => setCodeOuvert(true)}
-          className="bouton-discret -ml-[8px] px-[8px] py-[8px] text-[13px] font-semibold"
+          className="bouton-discret -ml-[8px] px-[8px] py-[8px] text-corps font-semibold"
         >
           J&apos;ai un code
         </button>
@@ -787,7 +787,7 @@ export default function InscriptionPage() {
               pseudoEtat === "pris" ? (
                 <span className="text-[#c8352b] dark:text-[#FF6B5E]">Déjà pris.</span>
               ) : pseudoEtat === "libre" ? (
-                <span className="text-foreground/55">
+                <span className="text-encre-3">
                   <Check className="mr-1 inline size-3.5" />
                   {sociale ? "Libre." : "Libre. C\u2019est aussi ton identifiant."}
                 </span>
@@ -795,7 +795,7 @@ export default function InscriptionPage() {
             }
           >
             <span className="flex items-center">
-              <span className="text-[21px] font-bold text-foreground/30">@</span>
+              <span className="text-titre-m font-bold text-encre-4">@</span>
               <input
                 autoFocus
                 value={f.pseudo}
@@ -808,7 +808,7 @@ export default function InscriptionPage() {
                 placeholder="pseudo"
                 className={SAISIE}
               />
-              {pseudoEtat === "verif" && <Loader2 className="size-4 shrink-0 animate-spin text-foreground/30" />}
+              {pseudoEtat === "verif" && <Loader2 className="size-4 shrink-0 animate-spin text-encre-4" />}
             </span>
           </Champ>
           {!sociale && (
@@ -832,7 +832,7 @@ export default function InscriptionPage() {
       corps = (
         <Champ
           label="Né le"
-          note={ans !== null && ans >= 0 ? <span className="text-foreground/45">{ans} ans</span> : null}
+          note={ans !== null && ans >= 0 ? <span className="text-encre-3">{ans} ans</span> : null}
         >
           <input
             autoFocus
@@ -853,7 +853,7 @@ export default function InscriptionPage() {
           <Reglage label="Poids" unite="kg" valeur={f.poids} min={BORNES.poids.min} max={BORNES.poids.max} onChange={(v) => maj("poids", v)} />
           <Reglage label="Pointure" unite="EU" valeur={f.pointure} min={BORNES.pointure.min} max={BORNES.pointure.max} pas={0.5} onChange={(v) => maj("pointure", v)} />
           <div>
-            <p className="mono-label mb-[8px] px-[13px] text-foreground/40">Maillot</p>
+            <p className="mono-label mb-[8px] px-[13px] text-encre-3">Maillot</p>
             <Puces
               options={MAILLOTS.map((m) => ({ id: m, label: m }))}
               valeur={f.maillot}
@@ -868,7 +868,7 @@ export default function InscriptionPage() {
       corps = (
         <div className="flex flex-col gap-[21px]">
           <div>
-            <p className="mono-label mb-[8px] px-[13px] text-foreground/40">Poste</p>
+            <p className="mono-label mb-[8px] px-[13px] text-encre-3">Poste</p>
             <Puces
               options={POSTES.map((p) => ({ id: p.id, label: p.id, detail: p.label }))}
               valeur={f.poste}
@@ -876,7 +876,7 @@ export default function InscriptionPage() {
             />
           </div>
           <div>
-            <p className="mono-label mb-[8px] px-[13px] text-foreground/40">Pied fort</p>
+            <p className="mono-label mb-[8px] px-[13px] text-encre-3">Pied fort</p>
             <Puces
               options={PIEDS.map((p) => ({ id: p, label: p.charAt(0).toUpperCase() + p.slice(1) }))}
               valeur={f.pied}
@@ -912,7 +912,7 @@ export default function InscriptionPage() {
                   </span>
                 )}
                 <span className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 to-transparent px-[13px] pt-[21px] pb-[13px]">
-                  <span className="text-[13px] font-bold text-white">{a.label}</span>
+                  <span className="text-corps font-bold text-white">{a.label}</span>
                   {src ? <RotateCcw className="size-3.5 text-white/70" /> : null}
                 </span>
               </button>
@@ -938,7 +938,7 @@ export default function InscriptionPage() {
                 placeholder="••••••••"
                 className={SAISIE}
               />
-              <button type="button" onClick={() => setVoir((v) => !v)} aria-label={voir ? "Masquer" : "Afficher"} className="text-foreground/40">
+              <button type="button" onClick={() => setVoir((v) => !v)} aria-label={voir ? "Masquer" : "Afficher"} className="text-encre-3">
                 {voir ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </span>
@@ -965,8 +965,8 @@ export default function InscriptionPage() {
             onChange={(e) => setPiege(e.target.value)}
             className="absolute -left-[9999px] h-0 w-0 opacity-0"
           />
-          <p className="px-[13px] text-[12.5px] text-foreground/40">
-            Tu te connecteras avec <span className="font-bold text-foreground/70">@{pseudo}</span> et ce mot de passe.
+          <p className="px-[13px] text-corps text-encre-3">
+            Tu te connecteras avec <span className="font-bold text-encre-2">@{pseudo}</span> et ce mot de passe.
           </p>
         </div>
       );
@@ -975,12 +975,12 @@ export default function InscriptionPage() {
       corps = (
         <div className="flex flex-col gap-[13px]">
           {!entre && <div className="glass-soft rounded-[21px] px-[21px] py-[13px]">
-            <p className="mono-label text-foreground/40">En attente</p>
-            <p className="mt-[8px] text-[15px] leading-snug font-semibold">
+            <p className="mono-label text-encre-3">En attente</p>
+            <p className="mt-[8px] text-lecture leading-snug font-semibold">
               La ligue valide ton entrée. Ta carte s&apos;ouvre dès que c&apos;est fait.
             </p>
           </div>}
-          {avertissement && <p className="px-[13px] text-[12.5px] text-[#c8352b] dark:text-[#FF6B5E]">{avertissement}</p>}
+          {avertissement && <p className="px-[13px] text-corps text-[#c8352b] dark:text-[#FF6B5E]">{avertissement}</p>}
           {aRenvoyer && nomFinal && (
             <button
               type="button"
@@ -990,7 +990,7 @@ export default function InscriptionPage() {
                 await envoyerPhotos();
                 setEnvoi(false);
               }}
-              className="bouton-secondaire bouton--or py-[13px] text-[14px] font-semibold"
+              className="bouton-secondaire bouton--or py-[13px] text-ligne font-semibold"
             >
               Renvoyer les photos
             </button>
@@ -1065,7 +1065,7 @@ export default function InscriptionPage() {
           {/* Le grand segment (0,618) : la question */}
           <div className="flex flex-1 flex-col pt-[34px]">
             {accueil && (
-              <p className="mono-label text-foreground/40">
+              <p className="mono-label text-encre-3">
                 {parrain
                   ? `Invité par ${parrain.p.affiche}${parrain.p.sfl ? " · Bola Team offert un mois" : ""}`
                   : "Bola · Sunday Five League"}
@@ -1073,17 +1073,17 @@ export default function InscriptionPage() {
             )}
             {/* La taille AVANT l'interligne : tailwind-merge retire un leading-*
                 placé avant un text-[…], qui peut porter le sien. */}
-            <h1 className={cn("font-extrabold tracking-tight", accueil || fini ? "mt-[8px] text-[42px]" : "text-[34px]", "leading-[1.05]")}>
+            <h1 className={cn("font-extrabold tracking-tight", accueil || fini ? "mt-[8px] text-affiche" : "text-nom", "leading-[1.05]")}>
               {titre}
             </h1>
-            {sousTitre && <p className="mt-[8px] text-[13px] leading-snug text-foreground/45">{sousTitre}</p>}
+            {sousTitre && <p className="mt-[8px] text-corps leading-snug text-encre-3">{sousTitre}</p>}
             <div className="mt-[21px]">{corps}</div>
             {accueil && ouvert === false && (
-              <p className="mt-[13px] text-[13px] text-foreground/50">
+              <p className="mt-[13px] text-corps text-encre-3">
                 Les inscriptions ouvrent bientôt. En attendant, l&apos;admin te donne ton accès.
               </p>
             )}
-            {erreur && <p className="mt-[13px] px-[13px] text-[12.5px] font-medium text-[#c8352b] dark:text-[#FF6B5E]">{erreur}</p>}
+            {erreur && <p className="mt-[13px] px-[13px] text-corps font-medium text-[#c8352b] dark:text-[#FF6B5E]">{erreur}</p>}
             <div className="min-h-[34px] flex-1" />
           </div>
         </div>
@@ -1124,7 +1124,7 @@ export default function InscriptionPage() {
             else aller(1);
           }}
           className={cn(
-            "bouton-principal bouton--vert flex w-full items-center justify-center gap-2 py-[17px] text-[15px] font-bold",
+            "bouton-principal bouton--vert flex w-full items-center justify-center gap-2 py-[17px] text-lecture font-bold",
             (envoi || (accueil && ouvert === false) || (etape === derniere && !!bloquantAccord())) && "opacity-40"
           )}
         >
@@ -1139,12 +1139,12 @@ export default function InscriptionPage() {
             <button
               type="button"
               onClick={() => void annulerSociale()}
-              className="bouton-discret mt-[13px] block w-full py-[8px] text-center text-[13px] font-semibold"
+              className="bouton-discret mt-[13px] block w-full py-[8px] text-center text-corps font-semibold"
             >
               Annuler
             </button>
           ) : (
-            <Link href="/" className="bouton-discret mt-[13px] block py-[8px] text-center text-[13px] font-semibold">
+            <Link href="/" className="bouton-discret mt-[13px] block py-[8px] text-center text-corps font-semibold">
               J&apos;ai déjà un compte
             </Link>
           ))}

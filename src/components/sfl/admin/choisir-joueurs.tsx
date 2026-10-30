@@ -131,7 +131,7 @@ export function ChoisirJoueurs({
     <Sheet open={open} onOpenChange={fermer} titre={titre}>
       <SheetContent side="bottom" className="data-[side=bottom]:h-[86dvh] rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
         <SheetHeader className="px-5 pt-5 pb-0">
-          <SheetTitle className="text-[26px] font-bold tracking-tight">{titre}</SheetTitle>
+          <SheetTitle className="text-titre-g font-bold tracking-tight">{titre}</SheetTitle>
         </SheetHeader>
         <div className="flex min-h-0 flex-1 flex-col gap-3 px-4">
           <label className="glass-soft flex h-11 items-center gap-2 rounded-full px-4">
@@ -144,7 +144,7 @@ export function ChoisirJoueurs({
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-foreground/30"
+              className="min-w-0 flex-1 bg-transparent text-lecture outline-none placeholder:text-encre-4"
             />
           </label>
           {filtres.length > 1 && (
@@ -160,7 +160,7 @@ export function ChoisirJoueurs({
                   }}
                   className={cn(
                     "mono-label h-8 shrink-0 rounded-full px-3.5",
-                    filtre === id ? "bg-foreground text-background" : "bg-secondary text-foreground/60"
+                    filtre === id ? "bg-foreground text-background" : "bg-secondary text-encre-2"
                   )}
                 >
                   {libelle}
@@ -195,17 +195,17 @@ export function ChoisirJoueurs({
                 >
                   <CarteDe name={x.nom} size={FORMAT_CARTE.petite} inerte />
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-[15px] font-semibold">
+                    <span className="truncate text-lecture font-semibold">
                       <Nom n={x.nom} />
                     </span>
-                    <span className="mono-label truncate text-foreground/45">
+                    <span className="mono-label truncate text-encre-3">
                       {[String(x.note), x.poste, x.division ? `D${x.division}` : null, x.viens ? "JE VIENS" : null, x.profil !== "Actif" ? x.profil.toUpperCase() : null]
                         .filter(Boolean)
                         .join(" · ")}
                     </span>
                   </span>
                   {x.lieu ? (
-                    <span className="mono-label shrink-0 text-right text-foreground/70">{x.lieu}</span>
+                    <span className="mono-label shrink-0 text-right text-encre-2">{x.lieu}</span>
                   ) : plusieurs ? (
                     <span
                       aria-hidden
@@ -220,7 +220,7 @@ export function ChoisirJoueurs({
                 </button>
               );
             })}
-            {liste.length === 0 && <p className="mono-label py-10 text-center text-foreground/40">Personne</p>}
+            {liste.length === 0 && <p className="mono-label py-10 text-center text-encre-3">Personne</p>}
           </div>
           {plusieurs && coches.length > 0 && (
             <button
@@ -230,7 +230,7 @@ export function ChoisirJoueurs({
                 plusieurs.onValider(coches);
                 fermer(false);
               }}
-              className="bouton-principal h-12 shrink-0 text-[15px] font-semibold"
+              className="bouton-principal h-12 shrink-0 text-lecture font-semibold"
             >
               {plusieurs.libelle(coches.length)}
             </button>

@@ -72,11 +72,11 @@ function Moment({ lg, j }: { lg: MissionsDeLaLigue | null; j: number }) {
   if (!lg || lg.d.j !== j || lg.phase !== "en-jeu") return null;
   if (!lg.d.joue)
     return (
-      <span className="mono-label flex shrink-0 items-center gap-2 text-foreground/80">
+      <span className="mono-label flex shrink-0 items-center gap-2 text-encre-2">
         <Pouls bat /> En jeu
       </span>
     );
-  return <span className="mono-label shrink-0 text-foreground/55">Verdict à minuit</span>;
+  return <span className="mono-label shrink-0 text-encre-3">Verdict à minuit</span>;
 }
 
 /** Ce que dit un chapitre fermé, à la troisième personne ou à toi. */
@@ -124,7 +124,7 @@ function Precedent({ c, me }: { c: Chapitre; me: string }) {
           Chapitre {chapitreDe(c.j)} · J{c.j}
           {c.issue !== "absent" && ` · ${pts(c.points)}`}
         </span>
-        <span className="text-[14px] leading-tight font-bold break-words">{phraseDe(c, prenom(id.nom(c.outsider.nom)), toi)}</span>
+        <span className="text-ligne leading-tight font-bold break-words">{phraseDe(c, prenom(id.nom(c.outsider.nom)), toi)}</span>
       </div>
       <TamponDe c={c} />
     </div>
@@ -294,13 +294,13 @@ export function RubriqueOutsider({ className, colonne }: { className?: string; c
     <section id="outsider" ref={ref} aria-labelledby="titre-outsider" className={cn("flex scroll-mt-4 flex-col gap-4", className)}>
       <div className={cn("flex flex-col gap-1.5 px-5", !colonne && "md:px-0")}>
         <div className="flex items-baseline justify-between gap-3">
-          <span className="mono-label truncate text-foreground/45">
+          <span className="mono-label truncate text-encre-3">
             Arc {arc.arc} · J{vedette.j}
             {date ? ` · ${date}` : ""}
           </span>
           <Moment lg={lg} j={j} />
         </div>
-        <h2 id="titre-outsider" className="titre-lettrage text-[30px] leading-[0.95] break-words">
+        <h2 id="titre-outsider" className="titre-lettrage text-titre-l leading-[0.95] break-words">
           {titre}
         </h2>
       </div>

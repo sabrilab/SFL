@@ -47,15 +47,15 @@ export default function ReglagesPage() {
           <Settings className="size-5" />
         </span>
         <div>
-          <p className="text-[13px] font-medium text-foreground/45">Personnalisation</p>
-          <h1 className="text-[28px] font-bold tracking-tight">Réglages</h1>
+          <p className="text-corps font-medium text-encre-3">Personnalisation</p>
+          <h1 className="text-titre-l font-bold tracking-tight">Réglages</h1>
         </div>
       </div>
 
       <AccountCard />
 
       <section>
-        <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Apparence</h2>
+        <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">Apparence</h2>
         <div role="radiogroup" aria-label="Apparence" className="glass flex rounded-2xl p-1">
           {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
             const active = current === value;
@@ -68,7 +68,7 @@ export default function ReglagesPage() {
                 onClick={() => setTheme(value)}
                 className={cn(
                   "flex flex-1 flex-col items-center gap-1.5 rounded-xl py-3 text-xs font-semibold",
-                  active ? "bouton-principal" : "bouton-discret text-foreground/45"
+                  active ? "bouton-principal" : "bouton-discret text-encre-3"
                 )}
               >
                 <Icon className="relative size-5" />
@@ -80,12 +80,12 @@ export default function ReglagesPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Notifications</h2>
+        <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">Notifications</h2>
         <ReglageNotifications />
       </section>
 
       <section>
-        <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Confidentialité</h2>
+        <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">Confidentialité</h2>
         <ReglageConfidentialite />
       </section>
 
@@ -95,7 +95,7 @@ export default function ReglagesPage() {
 
       {admin && (
         <section>
-          <h2 className="mb-3 px-1 text-sm font-semibold text-foreground/45">Général</h2>
+          <h2 className="mb-3 px-1 text-sm font-semibold text-encre-3">Général</h2>
           <Link
             href="/admin"
             className="glass flex items-center gap-3 rounded-2xl px-4 py-3.5 transition-opacity active:opacity-70"
@@ -104,12 +104,12 @@ export default function ReglagesPage() {
               <ShieldCheck className="size-[18px]" />
             </span>
             <span className="flex-1">
-              <span className="block text-[15px] font-semibold">Espace admin</span>
-              <span className="block text-[12px] text-foreground/45">
+              <span className="block text-lecture font-semibold">Espace admin</span>
+              <span className="block text-petit text-encre-3">
                 Gérer les matchs, convocations et résultats
               </span>
             </span>
-            <ChevronRight className="size-4 text-foreground/45" />
+            <ChevronRight className="size-4 text-encre-3" />
           </Link>
           <Link
             href="/admin/notifications"
@@ -119,12 +119,12 @@ export default function ReglagesPage() {
               <Bell className="size-[18px]" />
             </span>
             <span className="flex-1">
-              <span className="block text-[15px] font-semibold">Envoyer une notification</span>
-              <span className="block text-[12px] text-foreground/45">
+              <span className="block text-lecture font-semibold">Envoyer une notification</span>
+              <span className="block text-petit text-encre-3">
                 Sur le téléphone des joueurs qui les ont activées
               </span>
             </span>
-            <ChevronRight className="size-4 text-foreground/45" />
+            <ChevronRight className="size-4 text-encre-3" />
           </Link>
           <Link
             href="/admin/setup"
@@ -134,12 +134,12 @@ export default function ReglagesPage() {
               <ShieldCheck className="size-[18px]" />
             </span>
             <span className="flex-1">
-              <span className="block text-[15px] font-semibold">Installation Supabase</span>
-              <span className="block text-[12px] text-foreground/45">
+              <span className="block text-lecture font-semibold">Installation Supabase</span>
+              <span className="block text-petit text-encre-3">
                 Les tables de la base, mises à jour à chaque mise en ligne
               </span>
             </span>
-            <ChevronRight className="size-4 text-foreground/45" />
+            <ChevronRight className="size-4 text-encre-3" />
           </Link>
           <Link
             href="/admin/comptes"
@@ -149,12 +149,12 @@ export default function ReglagesPage() {
               <ShieldCheck className="size-[18px]" />
             </span>
             <span className="flex-1">
-              <span className="block text-[15px] font-semibold">Les accès</span>
-              <span className="block text-[12px] text-foreground/45">
+              <span className="block text-lecture font-semibold">Les accès</span>
+              <span className="block text-petit text-encre-3">
                 Identifiants des 71 joueurs, prêts à envoyer
               </span>
             </span>
-            <ChevronRight className="size-4 text-foreground/45" />
+            <ChevronRight className="size-4 text-encre-3" />
           </Link>
           <Link
             href="/admin/activite"
@@ -164,12 +164,12 @@ export default function ReglagesPage() {
               <ShieldCheck className="size-[18px]" />
             </span>
             <span className="flex-1">
-              <span className="block text-[15px] font-semibold">Activité &amp; rétention</span>
-              <span className="block text-[12px] text-foreground/45">
+              <span className="block text-lecture font-semibold">Activité &amp; rétention</span>
+              <span className="block text-petit text-encre-3">
                 Qui se connecte, quand — et les emails collectés
               </span>
             </span>
-            <ChevronRight className="size-4 text-foreground/45" />
+            <ChevronRight className="size-4 text-encre-3" />
           </Link>
           <Link
             href="/admin/design"
@@ -179,12 +179,12 @@ export default function ReglagesPage() {
               <Palette className="size-[18px]" />
             </span>
             <span className="flex-1">
-              <span className="block text-[15px] font-semibold">Design</span>
-              <span className="block text-[12px] text-foreground/45">
+              <span className="block text-lecture font-semibold">Design</span>
+              <span className="block text-petit text-encre-3">
                 Couleurs, tailles, boutons : les voir et les essayer
               </span>
             </span>
-            <ChevronRight className="size-4 text-foreground/45" />
+            <ChevronRight className="size-4 text-encre-3" />
           </Link>
           {/* Page statique servie depuis public/ : une vraie navigation, pas
               une route Next — d'où le <a> et non <Link>. Elle s'ouvre à qui a
@@ -199,12 +199,12 @@ export default function ReglagesPage() {
               <FlaskConical className="size-[18px]" />
             </span>
             <span className="flex-1">
-              <span className="block text-[15px] font-semibold">Note — Le Labo</span>
-              <span className="block text-[12px] text-foreground/45">
+              <span className="block text-lecture font-semibold">Note — Le Labo</span>
+              <span className="block text-petit text-encre-3">
                 Direction produit : la carte par les tests · lien partageable
               </span>
             </span>
-            <ArrowUpRight className="size-4 text-foreground/45" />
+            <ArrowUpRight className="size-4 text-encre-3" />
           </a>
         </section>
       )}

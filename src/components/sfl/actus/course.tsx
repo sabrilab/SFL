@@ -349,13 +349,13 @@ function PodiumPepite({
                   cle={cle && `${cle}-${p.name}`}
                 />
               </div>
-              <span className={cn("leading-none", un ? "text-[26px]" : "text-[20px]")} style={{ fontFamily: ANTON }}>
+              <span className={cn("leading-none", un ? "text-titre-g" : "text-titre-fort")} style={{ fontFamily: ANTON }}>
                 {p.place}
               </span>
-              <span className={cn("truncate font-semibold", un ? "max-w-[127px] text-[13px]" : "max-w-[80px] text-[11px]")}>
+              <span className={cn("truncate font-semibold", un ? "max-w-[127px] text-corps" : "max-w-[80px] text-legende")}>
                 <Nom n={p.name} />
               </span>
-              <span className="mono-label text-[10px] text-foreground/50 tabular-nums">
+              <span className="mono-label text-etiquette text-encre-3 tabular-nums">
                 {p.value} {unite(def, p.value)} · {journees(p)} J
               </span>
             </div>
@@ -490,7 +490,7 @@ function Ticker({
     >
       {place != null && <Ecrin rang={place} />}
       <span
-        className="text-[20px] leading-none"
+        className="text-titre-fort leading-none"
         style={{ fontFamily: ANTON }}
       >
         {place ?? "–"}
@@ -501,16 +501,16 @@ function Ticker({
         detail={`${place == null ? nomDivision(x ?? 3) : x ? `${place === 1 ? "1er" : `${place}e`} de la ${nomDivision(x)}` : `${place}e`} · ${p.value} ${unite(def, p.value)}`}
         cle={cle && `${cle}-${p.name}`}
       />
-      <span className="max-w-[80px] truncate text-[11px] font-semibold">
+      <span className="max-w-[80px] truncate text-legende font-semibold">
         <Nom n={p.name} />
       </span>
-      <span className="mono-label text-[10px] text-foreground/50 tabular-nums">
+      <span className="mono-label text-etiquette text-encre-3 tabular-nums">
         {p.value} {unite(def, p.value)} · {journees(p)} J
       </span>
       <span
         className={cn(
-          "mono-label h-3 text-[10px] tabular-nums transition-opacity delay-700 duration-500",
-          delta > 0 ? "text-primary" : "text-foreground/40",
+          "mono-label h-3 text-etiquette tabular-nums transition-opacity delay-700 duration-500",
+          delta > 0 ? "text-primary" : "text-encre-3",
           pose ? "opacity-100" : "opacity-0",
         )}
       >
@@ -555,8 +555,8 @@ function Ticker({
               >
                 {/* « D1 · 31 joueurs » reste à l'écran tant qu'on parcourt sa division. */}
                 <div className="sticky left-2 flex w-fit items-center gap-2 px-2">
-                  <PastilleDivision x={g.x} className="h-[24px] min-w-[36px] text-[15px]" />
-                  <span className="mono-label text-[10px] text-foreground/60 tabular-nums">
+                  <PastilleDivision x={g.x} className="h-[24px] min-w-[36px] text-lecture" />
+                  <span className="mono-label text-etiquette text-encre-2 tabular-nums">
                     {g.joueurs.length} {g.joueurs.length > 1 ? "joueurs" : "joueur"}
                   </span>
                 </div>
@@ -598,10 +598,10 @@ function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; clas
           J{p.journee}
         </span>
         <span className="flex min-w-0 flex-col pb-0.5">
-          {derniere && <span className="mono-label mb-1 text-[10px] text-foreground/60 dark:text-white/60">Dernier dimanche sans divisions</span>}
-          {division && <span className="mono-label mb-1 text-[10px] text-foreground/60 dark:text-white/60">Tu joues en {nomDivision(division)}</span>}
-          <span className="text-[16px] font-bold">{p.jour}</span>
-          <span className="truncate text-[12.5px] text-foreground/55 dark:text-white/55">
+          {derniere && <span className="mono-label mb-1 text-etiquette text-encre-2 dark:text-white/60">Dernier dimanche sans divisions</span>}
+          {division && <span className="mono-label mb-1 text-etiquette text-encre-2 dark:text-white/60">Tu joues en {nomDivision(division)}</span>}
+          <span className="text-titre font-bold">{p.jour}</span>
+          <span className="truncate text-corps text-encre-3 dark:text-white/55">
             {ligneDuRendezVous(p.rendezVous)}
           </span>
         </span>
@@ -618,7 +618,7 @@ function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; clas
         />
       )}
       <div className="flex items-baseline justify-between">
-        <span className="mono-label text-foreground/50 dark:text-white/50">
+        <span className="mono-label text-encre-3 dark:text-white/50">
           {p.presents.length} {p.presents.length > 1 ? "viennent" : "vient"}
         </span>
       </div>
@@ -648,7 +648,7 @@ function EnDirect({ ouvrir }: { ouvrir: (j: number) => void }) {
           <span className="absolute inset-0 animate-ping rounded-full bg-red-500 opacity-70 motion-reduce:animate-none" />
           <span className="relative size-2.5 rounded-full bg-red-500" />
         </span>
-        <span className="mono-label text-foreground/70">En direct · J{live.j}</span>
+        <span className="mono-label text-encre-2">En direct · J{live.j}</span>
       </span>
       <CarteJournee journee={live} onOuvrir={() => ouvrir(live.j)} />
     </section>
@@ -714,7 +714,7 @@ function EnTete({
               aria-selected={vue === o.id}
               onClick={() => onVue(o.id)}
               className={cn(
-                "flex-1 px-4 py-2 text-[13px] font-semibold whitespace-nowrap md:flex-none md:px-6",
+                "flex-1 px-4 py-2 text-corps font-semibold whitespace-nowrap md:flex-none md:px-6",
                 vue === o.id ? "bouton-principal" : "bouton-discret text-muted-foreground",
               )}
             >
@@ -838,13 +838,13 @@ function RailJournees({ etapes }: { etapes: Etape[] }) {
               onClick={() => aller(e.id)}
               className={cn(
                 "flex h-9 shrink-0 items-baseline gap-1.5 rounded-full px-3.5 pt-[7px] transition-colors duration-300",
-                ici ? "bg-foreground text-background" : "text-foreground/55 ring-1 ring-foreground/[0.12] ring-inset",
+                ici ? "bg-foreground text-background" : "text-encre-3 ring-1 ring-foreground/[0.12] ring-inset",
               )}
             >
-              <span className="text-[17px] leading-none" style={{ fontFamily: ANTON }}>
+              <span className="text-titre leading-none" style={{ fontFamily: ANTON }}>
                 {e.label}
               </span>
-              {e.sous && <span className={cn("mono-label text-[9.5px]", ici ? "text-background/65" : "text-foreground/40")}>{e.sous}</span>}
+              {e.sous && <span className={cn("mono-label text-etiquette", ici ? "text-background/65" : "text-encre-3")}>{e.sous}</span>}
             </button>
           );
         })}
@@ -878,7 +878,7 @@ function ALaUne({ videos, recap }: { videos: Video[]; recap: { j: number; journe
   };
   return (
     <section aria-label="À la une" className="flex flex-col gap-2.5">
-      <h2 className="mono-label px-5 text-foreground/50 md:px-0">À la une</h2>
+      <h2 className="mono-label px-5 text-encre-3 md:px-0">À la une</h2>
       <div ref={rangee} className="flex snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 [scrollbar-width:none] md:scroll-px-0 md:px-0">
         {videos.map((v) => (
           <Fragment key={v.id}>
@@ -903,12 +903,12 @@ function ALaUne({ videos, recap }: { videos: Video[]; recap: { j: number; journe
               style={{ objectPosition: recap.c.point }}
             />
             <span aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0)_35%,rgba(0,0,0,0.85)_100%)]" />
-            <span className="mono-label absolute top-3 left-3 text-[10px] text-white/75">Le récap</span>
+            <span className="mono-label absolute top-3 left-3 text-etiquette text-white/75">Le récap</span>
             <span className="flex flex-col gap-1.5 p-4">
               <span className="text-[72px] leading-[0.8] tracking-tight" style={{ fontFamily: ANTON }}>
                 {`J${recap.j}`}
               </span>
-              <span className="mono-label text-[10px] text-white/60">
+              <span className="mono-label text-etiquette text-white/60">
                 {[recap.journee?.date, matchs.length ? `${matchs.length} ${matchs.length > 1 ? "matchs" : "match"} · ${buts} ${buts > 1 ? "buts" : "but"}` : null]
                   .filter(Boolean)
                   .join(" · ")}
@@ -1093,7 +1093,7 @@ function EpoqueSaisonClose({ numero, epoques, vue, onVue, classement }: PropsEpo
     return (
       <div className={GABARIT}>
         <EnTete titre="Actus" epoque={numero} epoques={epoques} vue={vue} onVue={onVue} vues={[]} />
-        <p className="px-5 text-[14px] text-muted-foreground md:px-0">Cette saison n&apos;est pas dans les archives.</p>
+        <p className="px-5 text-ligne text-muted-foreground md:px-0">Cette saison n&apos;est pas dans les archives.</p>
       </div>
     );
   return (

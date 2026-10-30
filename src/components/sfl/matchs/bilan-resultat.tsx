@@ -130,7 +130,7 @@ export function BilanResultat({
         <button
           type="button"
           onClick={() => ouvrirResultat(matchId)}
-          className="bouton-principal flex h-12 items-center justify-center text-[15px] font-semibold"
+          className="bouton-principal flex h-12 items-center justify-center text-lecture font-semibold"
         >
           Voir le résultat
         </button>
@@ -153,7 +153,7 @@ export function BilanResultat({
               <span className="flex items-center gap-3">
                 <span
                   className={cn(
-                    "min-w-0 flex-1 truncate text-[14.5px] font-semibold",
+                    "min-w-0 flex-1 truncate text-lecture font-semibold",
                     !r.reponse && "text-muted-foreground",
                   )}
                 >
@@ -168,7 +168,7 @@ export function BilanResultat({
                         : "Sans réponse"
                   }
                   className={cn(
-                    "w-5 text-center font-mono text-[15px] font-bold",
+                    "w-5 text-center font-mono text-lecture font-bold",
                     !r.reponse && "text-muted-foreground",
                   )}
                 >
@@ -180,7 +180,7 @@ export function BilanResultat({
                 </span>
               </span>
               {r.reponse === "infirme" && r.motif && (
-                <span className="text-[13px] leading-snug text-muted-foreground">
+                <span className="text-corps leading-snug text-muted-foreground">
                   « {r.motif} »
                 </span>
               )}

@@ -29,8 +29,8 @@ interface Joueur {
 function Tuile({ label, valeur }: { label: string; valeur: number }) {
   return (
     <div className="glass rounded-2xl px-3.5 py-3">
-      <p className="mono-label text-[8.5px] text-foreground/45">{label}</p>
-      <div className="mt-1.5 text-[24px] leading-none font-extrabold tabular-nums">{valeur}</div>
+      <p className="mono-label text-micro text-encre-3">{label}</p>
+      <div className="mt-1.5 text-titre-g leading-none font-extrabold tabular-nums">{valeur}</div>
     </div>
   );
 }
@@ -39,10 +39,10 @@ function Noms({ titre, noms }: { titre: string; noms: string[] }) {
   if (!noms.length) return null;
   return (
     <div>
-      <p className="mono-label mb-2 text-[8.5px] text-foreground/45">
+      <p className="mono-label mb-2 text-micro text-encre-3">
         {titre} · {noms.length}
       </p>
-      <p className="text-[13px] leading-relaxed text-foreground/75">{noms.join(", ")}</p>
+      <p className="text-corps leading-relaxed text-encre-2">{noms.join(", ")}</p>
     </div>
   );
 }
@@ -118,11 +118,11 @@ export function AccordsStats({
 
   return (
     <section className="glass rounded-3xl p-5">
-      <h2 className="text-[17px] font-bold tracking-tight">Confidentialité</h2>
-      <p className="mt-0.5 text-[12px] leading-snug text-foreground/45">
+      <h2 className="text-titre font-bold tracking-tight">Confidentialité</h2>
+      <p className="mt-0.5 text-petit leading-snug text-encre-3">
         La politique du {DATE_POLITIQUE}{" "}: qui l&apos;a acceptée, et quelles cartes peuvent sortir de l&apos;app.
       </p>
-      {erreur && <p className="mt-3 text-[12.5px] text-foreground/55">{erreur}</p>}
+      {erreur && <p className="mt-3 text-corps text-encre-3">{erreur}</p>}
       {a && !erreur && (
         <div className="mt-4 flex flex-col gap-5">
           <div className="grid grid-cols-3 gap-2">
@@ -133,7 +133,7 @@ export function AccordsStats({
           <Noms titre="Cartes utilisables dans les vidéos et les posts" noms={a.horsApp} />
           <Noms titre="Pas encore acceptée" noms={a.attendus} />
           {a.parents > 0 && (
-            <p className="text-[12.5px] text-foreground/55">
+            <p className="text-corps text-encre-3">
               {a.parents === 1 ? "1 joueur de moins de 15 ans" : `${a.parents} joueurs de moins de 15 ans`}, avec
               l&apos;accord d&apos;un parent.
             </p>

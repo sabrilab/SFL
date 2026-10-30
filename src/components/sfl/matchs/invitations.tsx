@@ -43,15 +43,15 @@ export function Invitations({ invitations, onOuvrir }: { invitations: Partie[]; 
           <span aria-hidden className="absolute -top-1 -right-1 size-3 rounded-full" style={{ background: "#FF3B30", boxShadow: `0 0 0 2px ${BLANC}` }} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[15px] font-bold tracking-[-0.2px]">
+          <span className="truncate text-lecture font-bold tracking-[-0.2px]">
             {orga.split(" ")[0]} t&apos;invite
           </span>
-          <span className="truncate text-[13px] font-medium opacity-60">
+          <span className="truncate text-corps font-medium opacity-60">
             {jourCourt(p.jour, aujourdhuiIso())} · {p.heure} · {p.lieu}
           </span>
         </span>
         {autres > 0 && (
-          <span className="shrink-0 rounded-full px-2 py-0.5 text-[12px] font-bold tabular-nums" style={{ background: ENCRE, color: BLANC }}>
+          <span className="shrink-0 rounded-full px-2 py-0.5 text-petit font-bold tabular-nums" style={{ background: ENCRE, color: BLANC }}>
             +{autres}
           </span>
         )}

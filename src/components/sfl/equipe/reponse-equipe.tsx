@@ -115,10 +115,10 @@ export function ReponseEquipe({ a, onFini, onPlusTard }: { a: EquipeAOuvrir; onF
       </motion.div>
       <div className="flex max-w-sm flex-col items-center gap-2 text-center">
         <span className="mono-label text-white/50">{a.quoi === "invitation" ? "Bola Team" : `Version ${VERSION_REGLEMENT.slice(1)}`}</span>
-        <h2 className="text-[30px] leading-none font-bold tracking-tight text-white">
+        <h2 className="text-titre-l leading-none font-bold tracking-tight text-white">
           {a.quoi === "invitation" ? e.nom : "Charte de déontologie"}
         </h2>
-        <p className="text-[15px] text-white/70">
+        <p className="text-lecture text-white/70">
           {a.quoi === "invitation"
             ? [invitation && `${inviteur(e, invitation)} t'invite`, invitation?.depuis && `jusqu'à ${quandTombe(finInvitation(invitation.depuis))}`]
                 .filter(Boolean)
@@ -131,26 +131,26 @@ export function ReponseEquipe({ a, onFini, onPlusTard }: { a: EquipeAOuvrir; onF
           {deja.map((m) => (
             <span key={m.id} className="flex w-[52px] flex-col items-center gap-1">
               <CarteDe name={m.name} size={FORMAT_CARTE.petite} inerte />
-              <span className="w-full truncate text-center text-[11.5px] font-medium text-white/80">{m.name.split(" ")[0]}</span>
+              <span className="w-full truncate text-center text-petit font-medium text-white/80">{m.name.split(" ")[0]}</span>
             </span>
           ))}
         </div>
       )}
       {a.quoi === "invitation" ? (
         <div className="grid w-full max-w-sm grid-cols-2 gap-3">
-          <Button variant="destructive" disabled={envoi} onClick={non} className="h-12 rounded-full text-[16px] font-semibold">
+          <Button variant="destructive" disabled={envoi} onClick={non} className="h-12 rounded-full text-titre font-semibold">
             Non
           </Button>
-          <Button variant="vert" disabled={envoi} onClick={oui} className="h-12 rounded-full text-[16px] font-semibold">
+          <Button variant="vert" disabled={envoi} onClick={oui} className="h-12 rounded-full text-titre font-semibold">
             Oui
           </Button>
         </div>
       ) : (
         <div className="flex w-full max-w-sm flex-col gap-2">
-          <Button variant="vert" onClick={oui} className="h-12 rounded-full text-[16px] font-semibold">
+          <Button variant="vert" onClick={oui} className="h-12 rounded-full text-titre font-semibold">
             Lire et signer
           </Button>
-          <Button variant="ghost" onClick={onPlusTard} className="h-12 rounded-full text-[15px] font-semibold text-white/60">
+          <Button variant="ghost" onClick={onPlusTard} className="h-12 rounded-full text-lecture font-semibold text-white/60">
             Plus tard
           </Button>
         </div>

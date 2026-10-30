@@ -130,7 +130,7 @@ export function InvitationVille({
                   animate={{ scale: 1, opacity: 1, rotate: -2 }}
                   exit={{ scale: 0.5, opacity: 0 }}
                   transition={{ type: "spring", stiffness: 420, damping: 20 }}
-                  className="inline-flex h-[27px] max-w-[260px] items-center gap-[5px] rounded-full bg-[#f4f5f2] px-[11px] text-[14px] leading-none font-extrabold tracking-[-0.2px] whitespace-nowrap text-[#0a0b0d] shadow-[0_2px_6px_rgba(0,0,0,0.35)]"
+                  className="inline-flex h-[27px] max-w-[260px] items-center gap-[5px] rounded-full bg-[#f4f5f2] px-[11px] text-ligne leading-none font-extrabold tracking-[-0.2px] whitespace-nowrap text-[#0a0b0d] shadow-[0_2px_6px_rgba(0,0,0,0.35)]"
                 >
                   <MapPin className="size-[13px] shrink-0" strokeWidth={2.6} />
                   <span className="truncate">{choisie.ville}</span>
@@ -140,14 +140,14 @@ export function InvitationVille({
           </div>
         </motion.div>
 
-        <h2 id={titre} className="text-center text-[24px] leading-tight font-extrabold tracking-tight text-white">
+        <h2 id={titre} className="text-center text-titre-g leading-tight font-extrabold tracking-tight text-white">
           D&apos;où tu viens ?
         </h2>
         <motion.p
           initial={false}
           animate={cherche ? replie : deplie}
           transition={pli}
-          className="max-w-[290px] text-center text-[14px] leading-snug text-white/60"
+          className="max-w-[290px] text-center text-ligne leading-snug text-white/60"
         >
           <span className="block pt-[6px]">Ta carte apparaît sur la Map, au centre de ta commune. Jamais ta position.</span>
         </motion.p>
@@ -182,7 +182,7 @@ export function InvitationVille({
               autoCorrect="off"
               spellCheck={false}
               maxLength={60}
-              className="min-w-0 flex-1 bg-transparent py-[13px] text-[15px] font-semibold text-white outline-none placeholder:font-medium placeholder:text-white/30"
+              className="min-w-0 flex-1 bg-transparent py-[13px] text-lecture font-semibold text-white outline-none placeholder:font-medium placeholder:text-white/30"
             />
             {cherche && (
               <button
@@ -207,8 +207,8 @@ export function InvitationVille({
                   className="flex items-center gap-[10px] rounded-2xl px-4 py-[11px] text-left active:bg-white/8"
                 >
                   <MapPin className="size-4 shrink-0 text-white/40" />
-                  <span className="min-w-0 truncate text-[15px] font-semibold text-white">{ville}</span>
-                  {departement && <span className="ml-auto shrink-0 text-[13px] text-white/40">{departement}</span>}
+                  <span className="min-w-0 truncate text-lecture font-semibold text-white">{ville}</span>
+                  {departement && <span className="ml-auto shrink-0 text-corps text-white/40">{departement}</span>}
                 </button>
               );
             })}
@@ -225,12 +225,12 @@ export function InvitationVille({
               type="button"
               onClick={valider}
               disabled={!choisie || envoi}
-              className="bouton-principal bouton--vert flex w-full items-center justify-center gap-2 py-[15px] text-[15px] font-bold disabled:opacity-40"
+              className="bouton-principal bouton--vert flex w-full items-center justify-center gap-2 py-[15px] text-lecture font-bold disabled:opacity-40"
             >
               {envoi ? <Loader2 className="size-4 animate-spin" /> : <MapPin className="size-4" />}
               C&apos;est ma ville
             </button>
-            <button type="button" onClick={onPlusTard} className="bouton-discret px-6 py-3 text-[14px] font-semibold">
+            <button type="button" onClick={onPlusTard} className="bouton-discret px-6 py-3 text-ligne font-semibold">
               Plus tard
             </button>
           </div>

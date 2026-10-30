@@ -91,7 +91,7 @@ export function FeuillePreparer({
       titre={existante ? `La J${j}` : `Préparer la J${j}`}
       etat={<PastilleEtat etat="brouillon" />}
       bas={
-        <button type="button" onClick={preparer} className="bouton-principal h-12 text-[15px] font-semibold">
+        <button type="button" onClick={preparer} className="bouton-principal h-12 text-lecture font-semibold">
           {existante
             ? `Ouvrir la J${j}`
             : `Préparer la J${j} · dim ${date}${avecEquipes && pleines.length >= 2 ? ` · ${Math.floor(pleines.length / 2)} match${pleines.length >= 4 ? "s" : ""}` : ` · ${matchs} match${matchs > 1 ? "s" : ""}`}`}
@@ -152,7 +152,7 @@ export function FeuillePreparer({
               ))}
             </div>
           )}
-          <p className="mono-label text-foreground/45">{viennent} JE VIENS</p>
+          <p className="mono-label text-encre-3">{viennent} JE VIENS</p>
         </section>
       )}
     </Feuille>

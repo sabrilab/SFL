@@ -68,8 +68,8 @@ function Pastille({ r }: { r: Resultat }) {
   return (
     <span
       className={cn(
-        "flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
-        r === "V" ? "bg-primary text-primary-foreground" : r === "N" ? "bg-foreground/12 text-foreground/70" : "bg-foreground/6 text-foreground/40"
+        "flex size-6 shrink-0 items-center justify-center rounded-full text-legende font-bold",
+        r === "V" ? "bg-primary text-primary-foreground" : r === "N" ? "bg-foreground/12 text-encre-2" : "bg-foreground/6 text-encre-3"
       )}
     >
       {r}
@@ -83,7 +83,7 @@ function Titres({ titres, taille = "petit" }: { titres: TitreDuJour[]; taille?: 
   return (
     <span className={cn("flex flex-wrap items-center", taille === "grand" ? "gap-x-3.5 gap-y-1.5" : "gap-x-2.5 gap-y-1")}>
       {titres.map((t) => (
-        <span key={t} className={cn("flex items-center", taille === "grand" ? "gap-2 text-[14px] font-semibold" : "gap-1.5")}>
+        <span key={t} className={cn("flex items-center", taille === "grand" ? "gap-2 text-ligne font-semibold" : "gap-1.5")}>
           <span
             aria-hidden
             className={cn("shrink-0 rounded-full", taille === "grand" ? "size-2.5" : "size-2")}
@@ -112,13 +112,13 @@ function DernierDimanche({ d, rang }: { d: Dimanche; rang?: RangDuJour }) {
       >
         <span className="flex items-center justify-between gap-3">
           <span className="mono-label text-muted-foreground">Dernier dimanche</span>
-          <span className="flex items-center gap-1 font-mono text-[11px] text-foreground/45">
+          <span className="flex items-center gap-1 font-mono text-legende text-encre-3">
             J{d.j} · {d.date}
             <ChevronRight className="size-3.5" aria-hidden />
           </span>
         </span>
         <span className="flex flex-col gap-[var(--fib-8)]">
-          <span className="text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{phraseDuJour(sansTitres)}</span>
+          <span className="text-titre-fort leading-[1.25] font-bold tracking-[-0.4px]">{phraseDuJour(sansTitres)}</span>
           <Titres titres={d.titres} taille="grand" />
         </span>
       </Link>
@@ -151,16 +151,16 @@ function Fort({ f }: { f: PointFort }) {
       className="bouton-secondaire flex min-w-0 flex-col gap-1.5 rounded-2xl bg-secondary px-3 pt-3 pb-2.5"
     >
       <span className="flex items-start justify-between gap-1">
-        <span className="text-[26px] leading-none font-black tracking-[-1px] italic tabular-nums">{f.chiffre}</span>
-        <ChevronRight className="size-4 shrink-0 text-foreground/35" aria-hidden />
+        <span className="text-titre-g leading-none font-black tracking-[-1px] italic tabular-nums">{f.chiffre}</span>
+        <ChevronRight className="size-4 shrink-0 text-encre-4" aria-hidden />
       </span>
-      <span className="text-[12px] font-semibold">{f.quoi}</span>
-      <span className="font-mono text-[10.5px] leading-tight text-muted-foreground">
+      <span className="text-petit font-semibold">{f.quoi}</span>
+      <span className="font-mono text-legende leading-tight text-muted-foreground">
         {f.place != null && (
           <span
             className={cn(
               "mr-1 inline-block rounded-full px-1.5 py-px font-bold tabular-nums",
-              podium ? "bg-foreground text-background" : "text-foreground/80 ring-1 ring-foreground/20 ring-inset"
+              podium ? "bg-foreground text-background" : "text-encre-2 ring-1 ring-foreground/20 ring-inset"
             )}
           >
             {ordinal(f.place)}
@@ -183,23 +183,23 @@ function LigneDimanche({ d, premiere }: { d: Dimanche; premiere: boolean }) {
       className={cn("flex min-h-[60px] items-center gap-3 px-4 py-2.5 active:bg-foreground/[0.04]", !premiere && "border-t border-foreground/8")}
     >
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className={cn("truncate text-[15px] font-semibold", d.horsMatch && "text-foreground/60")}>
+        <span className={cn("truncate text-lecture font-semibold", d.horsMatch && "text-encre-2")}>
           {d.horsMatch ?? majuscule(actions ?? resultat ?? "présent")}
         </span>
-        <span className="flex min-w-0 items-center gap-2.5 font-mono text-[11px] text-foreground/45">
+        <span className="flex min-w-0 items-center gap-2.5 font-mono text-legende text-encre-3">
           <span className="shrink-0">
             J{d.j} · {d.date}
           </span>
           <Titres titres={d.titres} />
         </span>
       </span>
-      <span className="shrink-0 font-mono text-[12px] font-bold text-foreground/70 tabular-nums">{signe(d.points)}</span>
+      <span className="shrink-0 font-mono text-petit font-bold text-encre-2 tabular-nums">{signe(d.points)}</span>
       <span className="flex shrink-0 gap-1">
         {d.resultats.map((r, i) => (
           <Pastille key={i} r={r} />
         ))}
       </span>
-      <ChevronRight className="size-4 shrink-0 text-foreground/30" aria-hidden />
+      <ChevronRight className="size-4 shrink-0 text-encre-4" aria-hidden />
     </Link>
   );
 }
@@ -232,7 +232,7 @@ export function MaSaison({
         <h2 id="ma-saison" className="mono-label text-muted-foreground">
           Ma saison
         </h2>
-        <span className="font-mono text-[12px] font-bold text-foreground/45">
+        <span className="font-mono text-petit font-bold text-encre-3">
           {saison}
           {apres > 0 && ` · après J${apres}`}
         </span>
@@ -258,7 +258,7 @@ export function MaSaison({
               type="button"
               onClick={() => setTout((t) => !t)}
               aria-expanded={tout}
-              className="border-t border-foreground/8 py-3.5 text-[13px] font-semibold text-foreground/70 active:bg-foreground/[0.04]"
+              className="border-t border-foreground/8 py-3.5 text-corps font-semibold text-encre-2 active:bg-foreground/[0.04]"
             >
               {tout ? "Moins" : "Tous mes dimanches"}
             </button>

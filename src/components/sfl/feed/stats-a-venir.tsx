@@ -30,11 +30,11 @@ export function StatsAVenir({
 }) {
   return (
     <section className={compact ? "glass-soft rounded-[22px] px-4 py-4" : "glass rounded-[26px] px-5 py-7 text-center"}>
-      <p className="mono-label text-foreground/40">Saison {numero}</p>
-      <h2 className={compact ? "mt-0.5 text-[16px] font-bold tracking-tight" : "mt-1 text-[20px] font-bold tracking-tight"}>
+      <p className="mono-label text-encre-3">Saison {numero}</p>
+      <h2 className={compact ? "mt-0.5 text-titre font-bold tracking-tight" : "mt-1 text-titre-fort font-bold tracking-tight"}>
         Stats à venir
       </h2>
-      <p className={compact ? "mt-1 text-[12.5px] text-muted-foreground" : "mx-auto mt-2 max-w-[36ch] text-[13px] text-muted-foreground"}>
+      <p className={compact ? "mt-1 text-corps text-muted-foreground" : "mx-auto mt-2 max-w-[36ch] text-corps text-muted-foreground"}>
         {QUOI[quoi]}
       </p>
       {archive && (
@@ -42,8 +42,8 @@ export function StatsAVenir({
           href={`/saisons/${archive.numero}`}
           className={
             compact
-              ? "mt-2 inline-flex items-center gap-1 text-[12.5px] font-semibold text-foreground/80"
-              : "bouton-secondaire mt-4 inline-flex items-center gap-1 px-4 py-2 text-[13px] font-semibold"
+              ? "mt-2 inline-flex items-center gap-1 text-corps font-semibold text-encre-2"
+              : "bouton-secondaire mt-4 inline-flex items-center gap-1 px-4 py-2 text-corps font-semibold"
           }
         >
           Relire {archive.nom} <ChevronRight className="size-3.5" />

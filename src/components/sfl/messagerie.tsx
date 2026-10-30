@@ -137,8 +137,8 @@ export function Messagerie() {
   if (empeche) {
     return (
       <div className="glass rounded-3xl p-4">
-        <h2 className="text-[16px] font-bold tracking-tight">Discussions</h2>
-        <p className="mt-2 flex items-start gap-1.5 text-[13px] leading-snug text-amber-700 dark:text-amber-400">
+        <h2 className="text-titre font-bold tracking-tight">Discussions</h2>
+        <p className="mt-2 flex items-start gap-1.5 text-corps leading-snug text-amber-700 dark:text-amber-400">
           <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
           {empeche}
         </p>
@@ -162,17 +162,17 @@ export function Messagerie() {
           </button>
           <span
             className={cn(
-              "flex size-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+              "flex size-9 shrink-0 items-center justify-center rounded-full text-legende font-bold",
               salonOuvert ? "bg-primary/20 text-primary" : "bg-contraste/8"
             )}
           >
             {salonOuvert ? <Hash className="size-4" /> : initiales(filOuvert.titre)}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[15px] font-bold tracking-tight">
+            <span className="block truncate text-lecture font-bold tracking-tight">
               {filOuvert.titre}
             </span>
-            <span className="mono-label block text-foreground/35">
+            <span className="mono-label block text-encre-4">
               {salonOuvert ? "Toute la ligue" : "Conversation privée"}
             </span>
           </span>
@@ -180,7 +180,7 @@ export function Messagerie() {
 
         <div className="flex max-h-[52dvh] min-h-[220px] flex-col gap-2 overflow-y-auto px-3.5 py-3">
           {filOuvert.messages.length === 0 && (
-            <p className="py-8 text-center text-[13px] text-foreground/35">
+            <p className="py-8 text-center text-corps text-encre-4">
               {salonOuvert
                 ? "Personne n'a encore parlé. Lance la conversation."
                 : `Écris le premier message à ${filOuvert.titre}.`}
@@ -195,17 +195,17 @@ export function Messagerie() {
                 className={cn("flex flex-col", m.mien ? "items-end" : "items-start")}
               >
                 {salonOuvert && !m.mien && !suite && (
-                  <span className="mono-label mb-0.5 px-1 text-foreground/35">{m.auteur}</span>
+                  <span className="mono-label mb-0.5 px-1 text-encre-4">{m.auteur}</span>
                 )}
                 <span
                   className={cn(
-                    "max-w-[80%] rounded-2xl px-3.5 py-2 text-[14px] leading-snug break-words",
+                    "max-w-[80%] rounded-2xl px-3.5 py-2 text-ligne leading-snug break-words",
                     m.mien ? "bg-primary text-primary-foreground" : "bg-contraste/8"
                   )}
                 >
                   {m.texte}
                 </span>
-                <span className="mono-label mt-0.5 px-1 text-foreground/25">{heure(m.at)}</span>
+                <span className="mono-label mt-0.5 px-1 text-encre-4">{heure(m.at)}</span>
               </div>
             );
           })}
@@ -213,7 +213,7 @@ export function Messagerie() {
         </div>
 
         {erreur && (
-          <p className="flex items-start gap-1.5 border-t border-contraste/8 px-3.5 py-2 text-[12.5px] leading-snug text-red-600 dark:text-red-300">
+          <p className="flex items-start gap-1.5 border-t border-contraste/8 px-3.5 py-2 text-corps leading-snug text-red-600 dark:text-red-300">
             <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
             {erreur}
           </p>
@@ -231,7 +231,7 @@ export function Messagerie() {
             onChange={(e) => setTexte(e.target.value)}
             placeholder={salonOuvert ? "Écrire au salon…" : `Écrire à ${filOuvert.titre}…`}
             maxLength={2000}
-            className="glass-soft min-w-0 flex-1 rounded-full px-4 py-2.5 text-[14px] outline-none placeholder:text-foreground/30"
+            className="glass-soft min-w-0 flex-1 rounded-full px-4 py-2.5 text-ligne outline-none placeholder:text-encre-4"
           />
           <button
             type="submit"
@@ -266,15 +266,15 @@ export function Messagerie() {
           >
             <ArrowLeft className="size-4" />
           </button>
-          <h2 className="text-[15px] font-bold tracking-tight">À qui veux-tu écrire ?</h2>
+          <h2 className="text-lecture font-bold tracking-tight">À qui veux-tu écrire ?</h2>
         </div>
         <label className="glass-soft mt-3 flex items-center gap-2 rounded-full px-3.5 py-2.5">
-          <Search className="size-4 shrink-0 text-foreground/35" />
+          <Search className="size-4 shrink-0 text-encre-4" />
           <input
             value={recherche}
             onChange={(e) => setRecherche(e.target.value)}
             placeholder="Un joueur…"
-            className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-foreground/30"
+            className="min-w-0 flex-1 bg-transparent text-ligne outline-none placeholder:text-encre-4"
           />
         </label>
         <div className="mt-2 flex max-h-[46dvh] flex-col overflow-y-auto">
@@ -288,14 +288,14 @@ export function Messagerie() {
               }}
               className="flex items-center gap-2.5 border-b border-contraste/6 py-2.5 text-left last:border-0"
             >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-contraste/8 text-[10px] font-bold">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-contraste/8 text-etiquette font-bold">
                 {initiales(p.name)}
               </span>
-              <span className="min-w-0 flex-1 truncate text-[14px] font-semibold"><Nom n={p.name} /></span>
+              <span className="min-w-0 flex-1 truncate text-ligne font-semibold"><Nom n={p.name} /></span>
             </button>
           ))}
           {visibles.length === 0 && (
-            <p className="py-6 text-center text-[13px] text-foreground/35">Personne à ce nom.</p>
+            <p className="py-6 text-center text-corps text-encre-4">Personne à ce nom.</p>
           )}
         </div>
       </div>
@@ -309,10 +309,10 @@ export function Messagerie() {
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex items-center justify-between px-1">
-        <h2 className="text-[16px] font-bold tracking-tight">Discussions</h2>
+        <h2 className="text-titre font-bold tracking-tight">Discussions</h2>
         <button
           onClick={() => setChoix(true)}
-          className="bouton-principal bouton--mauve flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-bold"
+          className="bouton-principal bouton--mauve flex items-center gap-1.5 px-3 py-1.5 text-corps font-bold"
         >
           <Plus className="size-3.5" strokeWidth={3} /> Nouveau
         </button>
@@ -320,14 +320,14 @@ export function Messagerie() {
 
       {erreur && (
         <div className="rounded-2xl border border-amber-500/25 bg-amber-500/8 px-3.5 py-3">
-          <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-amber-700 dark:text-amber-300">
+          <p className="flex items-start gap-1.5 text-corps leading-snug text-amber-700 dark:text-amber-300">
             <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
             {erreur}
           </p>
           {erreur.includes("Installation Supabase") && (
             <Link
               href="/admin/setup"
-              className="bouton-secondaire mt-2.5 block py-2 text-center text-[13px] font-semibold"
+              className="bouton-secondaire mt-2.5 block py-2 text-center text-corps font-semibold"
             >
               Ouvrir l&apos;installation
             </Link>
@@ -335,7 +335,7 @@ export function Messagerie() {
         </div>
       )}
 
-      {!prete && <p className="px-1 text-[13px] text-foreground/35">Chargement…</p>}
+      {!prete && <p className="px-1 text-corps text-encre-4">Chargement…</p>}
 
       {fils.map((f) => {
         const neufs = nonLus(f);
@@ -348,7 +348,7 @@ export function Messagerie() {
           >
             <span
               className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+                "flex size-10 shrink-0 items-center justify-center rounded-full text-legende font-bold",
                 estSalon ? "bg-primary/20 text-primary" : "bg-contraste/8"
               )}
             >
@@ -356,15 +356,15 @@ export function Messagerie() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-[14.5px] font-bold tracking-tight">{f.titre}</span>
+                <span className="truncate text-lecture font-bold tracking-tight">{f.titre}</span>
                 {f.dernier && (
-                  <span className="mono-label shrink-0 text-foreground/30">
+                  <span className="mono-label shrink-0 text-encre-4">
                     {heure(f.dernier.at)}
                   </span>
                 )}
               </span>
               <span className="mt-0.5 flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-[12.5px] text-foreground/42">
+                <span className="min-w-0 flex-1 truncate text-corps text-encre-3">
                   {f.dernier
                     ? `${f.dernier.mien ? "Toi : " : estSalon ? `${f.dernier.auteur} : ` : ""}${f.dernier.texte}`
                     : estSalon
@@ -372,7 +372,7 @@ export function Messagerie() {
                       : "Aucun message"}
                 </span>
                 {neufs > 0 && (
-                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground tabular-nums">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-etiquette font-bold text-primary-foreground tabular-nums">
                     {neufs > 9 ? "9+" : neufs}
                   </span>
                 )}

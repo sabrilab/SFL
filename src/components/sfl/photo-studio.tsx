@@ -361,7 +361,7 @@ export function PhotoStudio({
         className="max-h-[94dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)]"
       >
         <SheetHeader className="px-5 pt-5 pb-0">
-          <SheetTitle className="text-[22px] font-bold tracking-tight">Photo officielle</SheetTitle>
+          <SheetTitle className="text-titre-m font-bold tracking-tight">Photo officielle</SheetTitle>
         </SheetHeader>
 
         <div className="flex flex-col gap-4 px-5">
@@ -372,7 +372,7 @@ export function PhotoStudio({
               return (
                 <li key={nom} className="flex flex-1 flex-col gap-1.5" aria-current={i === actuelle ? "step" : undefined}>
                   <span className={cn("h-1 rounded-full", i <= actuelle ? "bg-foreground" : "bg-foreground/15")} />
-                  <span className={cn("text-[11px] font-semibold", i === actuelle ? "text-foreground" : "text-muted-foreground")}>
+                  <span className={cn("text-legende font-semibold", i === actuelle ? "text-foreground" : "text-muted-foreground")}>
                     {i + 1}. {nom}
                   </span>
                 </li>
@@ -453,7 +453,7 @@ export function PhotoStudio({
                 {!sansCamera && (
                   <Button
                     variant="secondary"
-                    className="bouton--or h-12 flex-1 gap-2 rounded-full text-[14px]"
+                    className="bouton--or h-12 flex-1 gap-2 rounded-full text-ligne"
                     onClick={() => input.current?.click()}
                     disabled={selfies.length >= SELFIES_MAX}
                   >
@@ -462,7 +462,7 @@ export function PhotoStudio({
                 )}
                 <Button
                   variant="or"
-                  className="h-12 flex-1 rounded-full text-[15px] font-semibold"
+                  className="h-12 flex-1 rounded-full text-lecture font-semibold"
                   disabled={selfies.length === 0}
                   onClick={() => setEtape("maillot")}
                 >
@@ -472,7 +472,7 @@ export function PhotoStudio({
               {visages.length > 0 && (
                 <Button
                   variant="ghost"
-                  className="bouton--or h-10 rounded-full text-[13px]"
+                  className="bouton--or h-10 rounded-full text-corps"
                   onClick={() => setEtape("photo")}
                 >
                   Revenir à mes photos
@@ -483,7 +483,7 @@ export function PhotoStudio({
             <>
               {/* La séance : la photo arrivera exactement à cette place. */}
               <AttenteStudio visage={selfies[0]} />
-              <p className="text-center text-[13px] text-muted-foreground">
+              <p className="text-center text-corps text-muted-foreground">
                 Moins d&apos;une minute. Garde l&apos;app ouverte.
               </p>
             </>
@@ -510,7 +510,7 @@ export function PhotoStudio({
                     disabled={!!enCours}
                     onClick={() => setColoris(c.id)}
                     className={cn(
-                      "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-[13px] font-semibold",
+                      "flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-corps font-semibold",
                       coloris === c.id ? "bouton-principal bouton--or" : "bouton-discret text-muted-foreground"
                     )}
                   >
@@ -528,7 +528,7 @@ export function PhotoStudio({
 
               <Button
                 variant="or"
-                className="h-12 rounded-full text-[15px] font-semibold"
+                className="h-12 rounded-full text-lecture font-semibold"
                 disabled={selfies.length === 0 || !!enCours || epuise}
                 onClick={faireStudio}
               >
@@ -537,7 +537,7 @@ export function PhotoStudio({
               <Compteur credit={credit} />
               <Button
                 variant="ghost"
-                className="bouton--or h-10 rounded-full text-[13px]"
+                className="bouton--or h-10 rounded-full text-corps"
                 disabled={!!enCours}
                 onClick={() => setEtape("visage")}
               >
@@ -623,7 +623,7 @@ export function PhotoStudio({
                       </span>
                       <span
                         className={cn(
-                          "text-[12px] font-semibold",
+                          "text-petit font-semibold",
                           filtre === f.id ? "text-foreground" : "text-muted-foreground"
                         )}
                       >
@@ -647,7 +647,7 @@ export function PhotoStudio({
                       enterKeyHint="search"
                       autoComplete="off"
                       disabled={!!enCours}
-                      className="min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
+                      className="min-w-0 flex-1 bg-transparent text-titre outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
                     />
                     {recherche && (
                       <button
@@ -669,7 +669,7 @@ export function PhotoStudio({
               <div className="flex gap-2.5">
                 <Button
                   variant="secondary"
-                  className="bouton--or h-12 flex-1 gap-2 rounded-full text-[15px]"
+                  className="bouton--or h-12 flex-1 gap-2 rounded-full text-lecture"
                   disabled={!!enCours || epuise}
                   onClick={nouvellePhoto}
                 >
@@ -677,7 +677,7 @@ export function PhotoStudio({
                 </Button>
                 <Button
                   variant="or"
-                  className="h-12 flex-1 rounded-full text-[15px] font-semibold"
+                  className="h-12 flex-1 rounded-full text-lecture font-semibold"
                   disabled={!affichee || !!enCours}
                   onClick={() => affichee && onChoisir(affichee.image)}
                 >
@@ -705,7 +705,7 @@ function Compteur({ credit }: { credit: Credit | null }) {
   if (!credit) return null;
   const n = credit.restantes;
   return (
-    <div className="flex flex-col items-center gap-1 text-center text-[12.5px] text-muted-foreground">
+    <div className="flex flex-col items-center gap-1 text-center text-corps text-muted-foreground">
       <p className="flex items-center gap-2">
         <span className="flex shrink-0 gap-1" aria-hidden>
           {Array.from({ length: LIMITE_JOUR }, (_, i) => (
@@ -745,7 +745,7 @@ function ListePays({
     if (p) liste = [p, ...liste];
   }
   if (cherche && liste.length === 0) {
-    return <p className="py-3 text-center text-[13px] text-muted-foreground">Aucun pays à ce nom.</p>;
+    return <p className="py-3 text-center text-corps text-muted-foreground">Aucun pays à ce nom.</p>;
   }
   return (
     <div
@@ -767,8 +767,8 @@ function ListePays({
             choisi === p.id ? "bg-foreground/10 ring-1 ring-foreground/30" : "bg-secondary/60"
           )}
         >
-          <span className="text-[26px] leading-none">{emojiDrapeau(p.id)}</span>
-          <span className="max-w-full truncate text-[11px] font-semibold text-muted-foreground">{p.nom}</span>
+          <span className="text-titre-g leading-none">{emojiDrapeau(p.id)}</span>
+          <span className="max-w-full truncate text-legende font-semibold text-muted-foreground">{p.nom}</span>
         </button>
       ))}
     </div>

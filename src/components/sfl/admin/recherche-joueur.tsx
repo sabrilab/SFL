@@ -49,12 +49,12 @@ export function RechercheJoueur({
         autoCapitalize="off"
         spellCheck={false}
         enterKeyHint="go"
-        className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
+        className="min-w-0 flex-1 bg-transparent text-ligne outline-none placeholder:text-muted-foreground [&::-webkit-search-cancel-button]:hidden"
       />
       {valeur ? (
         <>
           {resultats != null && (
-            <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+            <span className="shrink-0 text-legende text-muted-foreground tabular-nums">
               {resultats === 0 ? "aucun" : resultats}
             </span>
           )}
@@ -62,7 +62,7 @@ export function RechercheJoueur({
             type="button"
             onClick={() => onChange("")}
             aria-label="Effacer la recherche"
-            className="grid size-6 shrink-0 place-items-center rounded-full bg-foreground/10 text-foreground/70"
+            className="grid size-6 shrink-0 place-items-center rounded-full bg-foreground/10 text-encre-2"
           >
             <X className="size-3" strokeWidth={2.5} />
           </button>

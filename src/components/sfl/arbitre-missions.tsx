@@ -56,11 +56,11 @@ function Action({ l, mm, attente, repondre }: { l: LigneMissionArbitre; mm: Miss
             type="button"
             disabled={attente}
             onClick={() => repondre("acceptee")}
-            className="bouton-principal bouton--vert h-12 flex-1 text-[15px] font-bold"
+            className="bouton-principal bouton--vert h-12 flex-1 text-lecture font-bold"
           >
             Accepter la mission
           </button>
-          <button type="button" disabled={attente} onClick={() => repondre("passee")} className="bouton-discret h-12 px-4 text-[14px] font-semibold">
+          <button type="button" disabled={attente} onClick={() => repondre("passee")} className="bouton-discret h-12 px-4 text-ligne font-semibold">
             Passer
           </button>
         </div>
@@ -73,7 +73,7 @@ function Action({ l, mm, attente, repondre }: { l: LigneMissionArbitre; mm: Miss
           disabled={attente}
           onClick={() => repondre(r === "acceptee" ? "passee" : "acceptee")}
           className={cn(
-            "h-11 text-[14px]",
+            "h-11 text-ligne",
             r === "acceptee" ? "bouton-discret px-4 font-semibold" : "bouton-secondaire bouton--vert px-5 font-bold"
           )}
         >
@@ -89,7 +89,7 @@ function Action({ l, mm, attente, repondre }: { l: LigneMissionArbitre; mm: Miss
       </div>
     );
   const v = l.verdict;
-  const detail = v.detail ? <span className="font-mono text-[12px] leading-[1.35] text-white/55">{v.detail}</span> : null;
+  const detail = v.detail ? <span className="font-mono text-petit leading-[1.35] text-white/55">{v.detail}</span> : null;
   if (v.etat === "en-jeu")
     return (
       <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1.5 pl-1">
@@ -120,7 +120,7 @@ function Fiche({ l, mm, attente, repondre }: { l: LigneMissionArbitre; mm: Missi
   const code = NOM_DE_CODE_ARBITRE[l.m.creneau];
   const acceptee = l.reponse?.reponse === "acceptee";
   const apres = mm.phase !== "ouvert";
-  const chiffre = "text-[25px] leading-none";
+  const chiffre = "text-titre-g leading-none";
   return (
     <article
       aria-label={`Mission ${code}, rang ${rang}`}
@@ -139,14 +139,14 @@ function Fiche({ l, mm, attente, repondre }: { l: LigneMissionArbitre; mm: Missi
       <div className="flex flex-col gap-5 px-[18px] pt-4 pb-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-2.5 pt-1.5">
-            <h3 className="titre-lettrage text-[32px] leading-[0.9] break-words">{code}</h3>
+            <h3 className="titre-lettrage text-nom leading-[0.9] break-words">{code}</h3>
             <Difficulte rang={rang} />
           </div>
           <Insigne rang={rang} />
         </div>
         <div className="flex flex-col gap-1.5">
           <span className="mono-label text-white/45">Objectif</span>
-          <p className="text-[20px] leading-[1.15] font-bold tracking-[-0.3px]">{phraseArbitre(l.m, d.arbitrages.length)}</p>
+          <p className="text-titre-fort leading-[1.15] font-bold tracking-[-0.3px]">{phraseArbitre(l.m, d.arbitrages.length)}</p>
         </div>
         <div className="fiche__champs">
           <div>
@@ -169,7 +169,7 @@ function Fiche({ l, mm, attente, repondre }: { l: LigneMissionArbitre; mm: Missi
           </div>
           <div>
             <span className="mono-label text-white/45">{mm.phase === "ouvert" ? "Avant" : "Verdict"}</span>
-            <span className="truncate text-[15px] leading-[25px] font-bold">
+            <span className="truncate text-lecture leading-[25px] font-bold">
               {mm.phase === "ouvert" ? limite(d.coupEnvoi, d.heure) : mm.phase === "en-jeu" ? "Mardi 0h" : "Définitif"}
             </span>
           </div>
@@ -199,14 +199,14 @@ export function MissionsArbitre({ nom }: { nom: string }) {
   return (
     <section aria-labelledby="titre-missions-arbitre" className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5 px-1">
-        <span className="mono-label truncate text-foreground/45">
+        <span className="mono-label truncate text-encre-3">
           J{d.j} · {d.date} · {d.heure}
         </span>
-        <h2 id="titre-missions-arbitre" className="titre-lettrage text-[30px] leading-[0.95]">
+        <h2 id="titre-missions-arbitre" className="titre-lettrage text-titre-l leading-[0.95]">
           Missions d&apos;arbitre
         </h2>
         {matchs.map((m) => (
-          <span key={m} className="font-mono text-[12px] text-foreground/55">
+          <span key={m} className="font-mono text-petit text-encre-3">
             {m}
           </span>
         ))}
@@ -215,10 +215,10 @@ export function MissionsArbitre({ nom }: { nom: string }) {
         <Fiche key={l.m.creneau} l={l} mm={mm} attente={attente} repondre={(r) => void repondre(l.m.creneau)(r)} />
       ))}
       <div className="flex items-baseline justify-between gap-3 px-1">
-        <span className="mono-label text-foreground/45">
+        <span className="mono-label text-encre-3">
           {mm.phase === "ouvert" ? "Les trois accomplies" : mm.phase === "en-jeu" ? "Mardi à minuit" : "Ta journée"}
         </span>
-        <span className={cn("mono-label", mm.phase === "fini" && xpJournee < 0 ? "text-[#c8352b] dark:text-[#ff9b9d]" : "text-foreground/70")}>
+        <span className={cn("mono-label", mm.phase === "fini" && xpJournee < 0 ? "text-[#c8352b] dark:text-[#ff9b9d]" : "text-encre-2")}>
           {mm.phase === "ouvert" ? `+${XP_PARFAIT} XP de bonus` : `${signe(xpJournee)} XP`}
         </span>
       </div>

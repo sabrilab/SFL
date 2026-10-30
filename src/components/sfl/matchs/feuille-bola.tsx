@@ -58,7 +58,7 @@ function Pas({ valeur, min = 0, onChange, label }: { valeur: number; min?: numbe
       >
         <Minus className="size-3.5" />
       </button>
-      <span className="w-6 text-center text-[17px] font-bold tabular-nums">{valeur}</span>
+      <span className="w-6 text-center text-titre font-bold tabular-nums">{valeur}</span>
       <button
         type="button"
         aria-label={`${label} : un de plus`}
@@ -157,7 +157,7 @@ export function FeuilleBola({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
         <SheetHeader className="px-5 pt-5 pb-0">
-          <SheetTitle className="text-[26px] font-bold tracking-tight">Feuille de match</SheetTitle>
+          <SheetTitle className="text-titre-g font-bold tracking-tight">Feuille de match</SheetTitle>
         </SheetHeader>
 
         <div className="flex flex-col gap-5 px-4">
@@ -169,11 +169,11 @@ export function FeuilleBola({
             {(["clairs", "fonces"] as const).map((e, i) => (
               <div key={e} className={cn("flex flex-col items-center gap-2", i === 1 && "col-start-3")}>
                 <span className="mono-label text-muted-foreground">{e === "clairs" ? "Clairs" : "Foncés"}</span>
-                <span className="text-[44px] leading-none font-extrabold tracking-tight tabular-nums">{score[e]}</span>
+                <span className="text-affiche leading-none font-extrabold tracking-tight tabular-nums">{score[e]}</span>
                 <Pas valeur={score[e]} min={min[e]} label={`Score des ${e === "clairs" ? "Clairs" : "Foncés"}`} onChange={(n) => setScore((s) => ({ ...s, [e]: n }))} />
               </div>
             ))}
-            <span className="col-start-2 row-start-1 text-[28px] font-bold text-foreground/25">–</span>
+            <span className="col-start-2 row-start-1 text-titre-l font-bold text-encre-4">–</span>
           </div>
 
           <div className="flex flex-col gap-2.5">
@@ -185,10 +185,10 @@ export function FeuilleBola({
             {lignes.map((l) => (
               <div key={l.playerId} className={cn("flex flex-col gap-2 rounded-2xl bg-card p-3", l.equipe === "absent" && "opacity-55")}>
                 <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3">
-                  <span className="flex min-w-0 items-center gap-1.5 text-[15px] font-semibold">
+                  <span className="flex min-w-0 items-center gap-1.5 text-lecture font-semibold">
                     <span className="truncate"><Nom n={l.name} /></span>
                     {mvps.has(l.playerId) && (
-                      <span className="shrink-0 rounded-full bg-foreground px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-background">MVP</span>
+                      <span className="shrink-0 rounded-full bg-foreground px-1.5 py-0.5 text-etiquette font-bold tracking-wide text-background">MVP</span>
                     )}
                   </span>
                   {l.equipe === "absent" ? (
@@ -207,7 +207,7 @@ export function FeuilleBola({
                       type="button"
                       onClick={() => changer(l.playerId, { equipe: o.id })}
                       className={cn(
-                        "py-1.5 text-[13px] font-semibold",
+                        "py-1.5 text-corps font-semibold",
                         l.equipe !== o.id
                           ? "bouton-discret text-muted-foreground"
                           : o.id === "absent"
@@ -225,13 +225,13 @@ export function FeuilleBola({
 
           {raz ? (
             <div className="flex flex-col gap-2">
-              <p className="text-center text-[14px] font-semibold text-muted-foreground">Les réponses des joueurs repartent à zéro.</p>
+              <p className="text-center text-ligne font-semibold text-muted-foreground">Les réponses des joueurs repartent à zéro.</p>
               <div className="grid grid-cols-[auto_1fr] gap-2">
                 <button
                   type="button"
                   disabled={envoi}
                   onClick={() => setRaz(false)}
-                  className="bouton-discret h-12 px-5 text-[15px] font-semibold text-muted-foreground"
+                  className="bouton-discret h-12 px-5 text-lecture font-semibold text-muted-foreground"
                 >
                   Annuler
                 </button>
@@ -239,7 +239,7 @@ export function FeuilleBola({
                   type="button"
                   disabled={envoi}
                   onClick={valider}
-                  className="bouton-principal flex h-12 items-center justify-center text-[15px] font-semibold disabled:opacity-40"
+                  className="bouton-principal flex h-12 items-center justify-center text-lecture font-semibold disabled:opacity-40"
                 >
                   {`Corriger · ${score.clairs} – ${score.fonces}`}
                 </button>
@@ -250,7 +250,7 @@ export function FeuilleBola({
               type="button"
               disabled={envoi || !coherent || presents < 2}
               onClick={valider}
-              className="bouton-principal bouton--vert flex h-12 items-center justify-center text-[15px] font-semibold disabled:opacity-40"
+              className="bouton-principal bouton--vert flex h-12 items-center justify-center text-lecture font-semibold disabled:opacity-40"
             >
               {coherent ? `Valider · ${score.clairs} – ${score.fonces}` : "Plus de passes que de buts"}
             </button>

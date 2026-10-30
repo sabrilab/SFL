@@ -100,7 +100,7 @@ export function FeuillePublier({
 
   return (
     <Feuille open={open} onOpenChange={onOpenChange} titre={`Publier la J${j}`} etat={<PastilleEtat etat="brouillon" />} haute>
-      {apercu ? <CarteJournee journee={apercu} /> : <div className="glass rounded-3xl px-5 py-10 text-center mono-label text-foreground/45">J{j} · 0 joueur</div>}
+      {apercu ? <CarteJournee journee={apercu} /> : <div className="glass rounded-3xl px-5 py-10 text-center mono-label text-encre-3">J{j} · 0 joueur</div>}
 
       {defauts.length ? (
         <div className="flex flex-wrap gap-1.5">
@@ -113,8 +113,8 @@ export function FeuillePublier({
         </div>
       ) : (
         <div className="flex flex-col gap-1">
-          <p className="mono-label text-foreground/70">{compteursEnMots(saison, j)}</p>
-          {declares.length > 0 && <p className="mono-label text-foreground/45">Arbitres {arbitres} sur {declares.length}</p>}
+          <p className="mono-label text-encre-2">{compteursEnMots(saison, j)}</p>
+          {declares.length > 0 && <p className="mono-label text-encre-3">Arbitres {arbitres} sur {declares.length}</p>}
         </div>
       )}
 
@@ -123,10 +123,10 @@ export function FeuillePublier({
         <Segmente taille="sm" label="Prévenir" options={QUI_PREVENIR.map((q) => ({ id: q.id, libelle: q.libelle }))} valeur={qui} onChange={setQui} />
         {qui !== "personne" && (
           <div className="glass-soft flex flex-col gap-1 rounded-[20px] px-4 py-3">
-            <span className="mono-label text-foreground/45">SFL</span>
-            <span className="text-[15px] font-semibold">{texte.titre}</span>
-            <span className="text-[14px] text-foreground/70">{texte.texte}</span>
-            <span className="mono-label mt-1 text-foreground/45">{pluriel(destinataires.length, "JOUEUR")}</span>
+            <span className="mono-label text-encre-3">SFL</span>
+            <span className="text-lecture font-semibold">{texte.titre}</span>
+            <span className="text-ligne text-encre-2">{texte.texte}</span>
+            <span className="mono-label mt-1 text-encre-3">{pluriel(destinataires.length, "JOUEUR")}</span>
           </div>
         )}
       </section>
@@ -199,11 +199,11 @@ export function FeuilleRemettre({
   return (
     <Feuille open={open} onOpenChange={onOpenChange} titre={`Remettre la J${j}`} etat={<PastilleEtat etat="en-ligne" suffixe={le} />}>
       <div className="flex flex-col gap-1.5">
-        <p className="mono-label text-foreground/70">{compteursEnMots(saison, j)}</p>
+        <p className="mono-label text-encre-2">{compteursEnMots(saison, j)}</p>
         {prevenus && (
           <>
-            <p className="mono-label text-foreground/70">J{j} en ligne · {prevenus.publication} prévenus</p>
-            <p className="mono-label text-foreground/70">Missions · J{j} · {prevenus.missions} prévenus</p>
+            <p className="mono-label text-encre-2">J{j} en ligne · {prevenus.publication} prévenus</p>
+            <p className="mono-label text-encre-2">Missions · J{j} · {prevenus.missions} prévenus</p>
           </>
         )}
       </div>

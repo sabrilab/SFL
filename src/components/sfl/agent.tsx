@@ -86,7 +86,7 @@ const Fiche = memo(function Fiche({ dossier }: { dossier: DossierJoueur }) {
       <ol className="flex min-w-0 flex-1 flex-col gap-[7px]">
         {dossier.stats.map((s, i) => (
           <li key={s.id} className="flex items-center gap-2.5">
-            <span className="w-[62px] shrink-0 text-[12.5px] font-semibold text-foreground/60">{s.nom}</span>
+            <span className="w-[62px] shrink-0 text-corps font-semibold text-encre-2">{s.nom}</span>
             <span className="relative h-[5px] min-w-0 flex-1 overflow-hidden rounded-full bg-contraste/[0.08]">
               <span
                 className="absolute inset-y-0 left-0 rounded-full bg-foreground"
@@ -94,7 +94,7 @@ const Fiche = memo(function Fiche({ dossier }: { dossier: DossierJoueur }) {
                 style={{ width: `${Math.min(100, (s.valeur / 99) * 100)}%`, opacity: 1 - (i / Math.max(1, n - 1)) * 0.6 }}
               />
             </span>
-            <span className="w-6 shrink-0 text-right text-[13px] font-bold tabular-nums">{s.valeur}</span>
+            <span className="w-6 shrink-0 text-right text-corps font-bold tabular-nums">{s.valeur}</span>
           </li>
         ))}
       </ol>
@@ -111,14 +111,14 @@ function CarteVue({ carte, dossier }: { carte: CarteCoach; dossier: DossierJoueu
     <div className="glass-soft w-full overflow-hidden rounded-[22px]">
       <div className="flex items-start justify-between gap-3 px-4 pt-3.5 pb-3">
         <div className="min-w-0">
-          <span className="block text-[11px] font-bold tracking-[0.08em] text-foreground/40 uppercase">{LIBELLE_CARTE[carte.type]}</span>
-          <span className="mt-0.5 block text-[17px] leading-tight font-bold tracking-tight">{carte.titre}</span>
-          {carte.sousTitre && <span className="mt-1 block text-[13px] text-foreground/55">{carte.sousTitre}</span>}
+          <span className="block text-legende font-bold tracking-[0.08em] text-encre-3 uppercase">{LIBELLE_CARTE[carte.type]}</span>
+          <span className="mt-0.5 block text-titre leading-tight font-bold tracking-tight">{carte.titre}</span>
+          {carte.sousTitre && <span className="mt-1 block text-corps text-encre-3">{carte.sousTitre}</span>}
         </div>
         {cible && (
           <span className="flex shrink-0 items-baseline gap-1 rounded-full border border-contraste/15 px-2.5 py-1">
-            <span className="text-[11.5px] font-semibold text-foreground/60">{NOMS_STATS[cible.id]}</span>
-            <span className="text-[13px] font-bold tabular-nums">{cible.valeur}</span>
+            <span className="text-petit font-semibold text-encre-2">{NOMS_STATS[cible.id]}</span>
+            <span className="text-corps font-bold tabular-nums">{cible.valeur}</span>
           </span>
         )}
       </div>
@@ -126,12 +126,12 @@ function CarteVue({ carte, dossier }: { carte: CarteCoach; dossier: DossierJoueu
         <ol className="border-t border-contraste/[0.07]">
           {carte.lignes.map((l, i) => (
             <li key={i} className="flex items-start gap-3 border-b border-contraste/[0.07] px-4 py-2.5 last:border-b-0">
-              {numerotee && <span className="w-4 shrink-0 pt-px text-[13px] font-bold text-foreground/35 tabular-nums">{i + 1}</span>}
+              {numerotee && <span className="w-4 shrink-0 pt-px text-corps font-bold text-encre-4 tabular-nums">{i + 1}</span>}
               <span className="min-w-0 flex-1">
-                <span className="block text-[14.5px] leading-snug font-semibold">{l.label}</span>
-                {l.detail && <span className="mt-0.5 block text-[13px] leading-snug text-foreground/55">{l.detail}</span>}
+                <span className="block text-lecture leading-snug font-semibold">{l.label}</span>
+                {l.detail && <span className="mt-0.5 block text-corps leading-snug text-encre-3">{l.detail}</span>}
               </span>
-              {l.valeur && <span className="max-w-[40%] shrink-0 pt-px text-right text-[13.5px] font-bold tabular-nums">{l.valeur}</span>}
+              {l.valeur && <span className="max-w-[40%] shrink-0 pt-px text-right text-ligne font-bold tabular-nums">{l.valeur}</span>}
             </li>
           ))}
         </ol>
@@ -181,7 +181,7 @@ function ImageVue({ image }: { image: ImageCoach }) {
         {/* eslint-disable-next-line @next/next/no-img-element -- lien signé ou data URL */}
         {src && <img src={src} alt={image.legende} className="size-full object-cover" />}
       </button>
-      {image.legende && <figcaption className="mt-1.5 px-1 text-[12.5px] leading-snug text-foreground/50">{image.legende}</figcaption>}
+      {image.legende && <figcaption className="mt-1.5 px-1 text-corps leading-snug text-encre-3">{image.legende}</figcaption>}
       {/* Posée sur la page même : dans l'écran de discussion (décalé quand le
           clavier est là), elle ne couvrait pas tout l'écran et les onglets
           passaient dessus. */}
@@ -213,7 +213,7 @@ const Message = memo(function Message({ m, dossier }: { m: MessageAgent; dossier
       {m.texte && (
         <p
           className={cn(
-            "max-w-[82%] rounded-[20px] px-3.5 py-2 text-[15px] leading-snug break-words whitespace-pre-wrap",
+            "max-w-[82%] rounded-[20px] px-3.5 py-2 text-lecture leading-snug break-words whitespace-pre-wrap",
             mien ? "bg-foreground text-background" : "glass-soft"
           )}
         >
@@ -438,7 +438,7 @@ export function Agent() {
       <div className="mx-auto w-full max-w-[640px] shrink-0 px-3 pt-2 lg:max-w-[760px]" style={{ paddingBottom: "var(--pied-ecriture)" }}>
         {!peutEcrire ? (
           pret !== null && (
-            <p className="glass rounded-full px-4 py-3 text-center text-[13.5px] font-semibold text-foreground/55">
+            <p className="glass rounded-full px-4 py-3 text-center text-ligne font-semibold text-encre-3">
               {!connecte ? "Connecte-toi pour parler à ton coach." : "Bola Agent arrive bientôt."}
             </p>
           )
@@ -452,7 +452,7 @@ export function Agent() {
                     key={d.label}
                     type="button"
                     onClick={() => void demander(d.question, d.id)}
-                    className="bouton-secondaire bouton--mauve shrink-0 px-3.5 py-2 text-[13.5px] font-semibold"
+                    className="bouton-secondaire bouton--mauve shrink-0 px-3.5 py-2 text-ligne font-semibold"
                   >
                     {d.label}
                   </button>
@@ -480,7 +480,7 @@ export function Agent() {
                 rows={1}
                 maxLength={QUESTION_MAX}
                 placeholder="Écris à ton coach"
-                className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent py-[9px] text-[16px] leading-snug outline-none placeholder:text-foreground/30 [field-sizing:content]"
+                className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent py-[9px] text-titre leading-snug outline-none placeholder:text-encre-4 [field-sizing:content]"
               />
               <button
                 type="submit"

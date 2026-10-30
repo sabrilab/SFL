@@ -39,7 +39,7 @@ export function ConvocationSheet({
 
   const field = (label: string, key: keyof ConvocationInfo, placeholder: string, list?: string) => (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-semibold">{label}</span>
+      <span className="text-corps font-semibold">{label}</span>
       <Input
         value={info[key]}
         placeholder={placeholder}

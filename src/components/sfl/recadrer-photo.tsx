@@ -174,8 +174,8 @@ export function RecadrerPhoto({
     <Sheet aPart open={!!src} onOpenChange={(o) => !o && onFermer()}>
       <SheetContent side="bottom" className="max-h-[94dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)]">
         <SheetHeader className="px-5 pt-5 pb-0">
-          <SheetTitle className="text-[22px] font-bold tracking-tight">Placer ma photo</SheetTitle>
-          <p className="text-[13px] text-muted-foreground">Fais glisser pour centrer ton visage, pince ou utilise le curseur pour zoomer.</p>
+          <SheetTitle className="text-titre-m font-bold tracking-tight">Placer ma photo</SheetTitle>
+          <p className="text-corps text-muted-foreground">Fais glisser pour centrer ton visage, pince ou utilise le curseur pour zoomer.</p>
         </SheetHeader>
 
         <div className="flex flex-col gap-4 px-5">
@@ -230,18 +230,18 @@ export function RecadrerPhoto({
           {/* L'aperçu : la carte telle que la ligue la verra */}
           <div className="flex items-center gap-4 rounded-[22px] bg-secondary/60 p-3">
             <BolaCard {...carte} edition="base" size={0.42} photo={apercu} />
-            <p className="text-[13px] leading-snug text-muted-foreground">
+            <p className="text-corps leading-snug text-muted-foreground">
               Ta carte, telle que toute la ligue la verra.
             </p>
           </div>
 
           <div className="flex gap-2.5">
-            <Button variant="secondary" className="h-12 flex-1 rounded-full text-[15px]" onClick={onFermer}>
+            <Button variant="secondary" className="h-12 flex-1 rounded-full text-lecture" onClick={onFermer}>
               Annuler
             </Button>
             <Button
               variant="or"
-              className="h-12 flex-1 rounded-full text-[15px] font-semibold"
+              className="h-12 flex-1 rounded-full text-lecture font-semibold"
               disabled={!image}
               onClick={() => {
                 const d = decouper(pos);

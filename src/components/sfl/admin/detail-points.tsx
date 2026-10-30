@@ -80,19 +80,19 @@ export function DetailPoints({ saison }: { saison: Saison }) {
 
   return (
     <div className="glass rounded-3xl p-4">
-      <h2 className="text-[16px] font-bold tracking-tight">D&apos;où viennent les points</h2>
-      <p className="mt-1 text-[12.5px] leading-snug text-foreground/45">
+      <h2 className="text-titre font-bold tracking-tight">D&apos;où viennent les points</h2>
+      <p className="mt-1 text-corps leading-snug text-encre-3">
         Le total d&apos;un joueur, décomposé journée par journée. Une journée sans ligne est
         signalée : c&apos;est presque toujours là que se cachent les points manquants.
       </p>
 
       <label className="glass-soft mt-3 flex items-center gap-2 rounded-full px-3.5 py-2.5">
-        <Search className="size-4 shrink-0 text-foreground/35" />
+        <Search className="size-4 shrink-0 text-encre-4" />
         <input
           value={recherche}
           onChange={(e) => setRecherche(e.target.value)}
           placeholder="Un joueur…"
-          className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-foreground/30"
+          className="min-w-0 flex-1 bg-transparent text-ligne outline-none placeholder:text-encre-4"
         />
       </label>
 
@@ -105,13 +105,13 @@ export function DetailPoints({ saison }: { saison: Saison }) {
                 setJoueur(n);
                 setRecherche("");
               }}
-              className="bouton-secondaire px-3 py-1.5 text-[13px] font-semibold"
+              className="bouton-secondaire px-3 py-1.5 text-corps font-semibold"
             >
               {n}
             </button>
           ))}
           {noms.length === 0 && (
-            <p className="px-1 text-[13px] text-foreground/35">Aucun joueur de ce nom.</p>
+            <p className="px-1 text-corps text-encre-4">Aucun joueur de ce nom.</p>
           )}
         </div>
       )}
@@ -119,15 +119,15 @@ export function DetailPoints({ saison }: { saison: Saison }) {
       {detail && joueur && (
         <div className="mt-4">
           <div className="flex items-baseline justify-between gap-3 border-b border-contraste/10 pb-2.5">
-            <span className="text-[15px] font-bold tracking-tight">{joueur}</span>
+            <span className="text-lecture font-bold tracking-tight">{joueur}</span>
             <span className="flex items-baseline gap-1.5">
-              <span className="text-[22px] font-extrabold tabular-nums">{detail.total}</span>
-              <span className="mono-label text-foreground/35">PP</span>
+              <span className="text-titre-m font-extrabold tabular-nums">{detail.total}</span>
+              <span className="mono-label text-encre-4">PP</span>
             </span>
           </div>
 
           {detail.absentes.length > 0 && (
-            <p className="mt-2.5 flex items-start gap-1.5 rounded-2xl bg-amber-500/10 px-3 py-2 text-[12.5px] leading-snug text-amber-700 dark:text-amber-300">
+            <p className="mt-2.5 flex items-start gap-1.5 rounded-2xl bg-amber-500/10 px-3 py-2 text-corps leading-snug text-amber-700 dark:text-amber-300">
               <AlertCircle className="mt-[2px] size-3.5 shrink-0" />
               <span>
                 Aucune ligne en {detail.absentes.map((j) => `J${j}`).join(", ")}.{" "}
@@ -151,25 +151,25 @@ export function DetailPoints({ saison }: { saison: Saison }) {
                     vide && "opacity-45"
                   )}
                 >
-                  <span className="mono-label w-14 shrink-0 pt-0.5 text-foreground/40">
+                  <span className="mono-label w-14 shrink-0 pt-0.5 text-encre-3">
                     J{r.j}
                   </span>
                   <span className="min-w-0 flex-1">
                     {vide ? (
-                      <span className="text-[13px] text-amber-700/80 dark:text-amber-300/80">aucune ligne</span>
+                      <span className="text-corps text-amber-700/80 dark:text-amber-300/80">aucune ligne</span>
                     ) : (
                       r.lignes.map((l, i) => (
-                        <span key={i} className="block text-[12.5px] leading-snug text-foreground/60">
+                        <span key={i} className="block text-corps leading-snug text-encre-2">
                           {l.texte}
                         </span>
                       ))
                     )}
-                    <span className="mono-label mt-0.5 block text-foreground/25">{r.date}</span>
+                    <span className="mono-label mt-0.5 block text-encre-4">{r.date}</span>
                   </span>
                   <span
                     className={cn(
-                      "w-9 shrink-0 text-right text-[15px] font-bold tabular-nums",
-                      vide && "text-foreground/25"
+                      "w-9 shrink-0 text-right text-lecture font-bold tabular-nums",
+                      vide && "text-encre-4"
                     )}
                   >
                     {vide ? "—" : ppJ}

@@ -98,7 +98,7 @@ function Fenetre({
             <span key={bg} className={cn("size-2 rounded-full", bg)} />
           ))}
         </span>
-        <span className="min-w-0 flex-1 truncate text-[13.5px] font-bold tracking-tight">
+        <span className="min-w-0 flex-1 truncate text-ligne font-bold tracking-tight">
           {c.name}
         </span>
         {c.sansCompte ? (
@@ -106,7 +106,7 @@ function Fenetre({
             À inscrire
           </span>
         ) : c.aChanger && !provisoire ? (
-          <span className="mono-label shrink-0 rounded-full bg-foreground/10 px-2 py-0.5 text-foreground/55">
+          <span className="mono-label shrink-0 rounded-full bg-foreground/10 px-2 py-0.5 text-encre-3">
             Mot de passe à choisir
           </span>
         ) : (
@@ -121,7 +121,7 @@ function Fenetre({
             onClick={copier}
             aria-label={`Copier les accès de ${c.name}`}
             className={cn(
-              "flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-[11.5px] font-bold",
+              "flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 text-petit font-bold",
               copied ? "bouton-principal bouton--vert" : "bouton-secondaire bouton--mauve"
             )}
           >
@@ -132,13 +132,13 @@ function Fenetre({
       </div>
 
       {/* Le corps monospace */}
-      <pre className="overflow-x-auto px-3.5 py-3 font-mono text-[12.5px] leading-[1.8] text-foreground/80">
-        <span className="text-foreground/35">Identifiant  </span>
+      <pre className="overflow-x-auto px-3.5 py-3 font-mono text-corps leading-[1.8] text-encre-2">
+        <span className="text-encre-4">Identifiant  </span>
         <span className="font-bold text-foreground">{c.user}</span>
         {provisoire && (
           <>
             {"\n"}
-            <span className="text-foreground/35">Provisoire   </span>
+            <span className="text-encre-4">Provisoire   </span>
             <span className="font-bold text-primary">{provisoire}</span>
           </>
         )}
@@ -150,7 +150,7 @@ function Fenetre({
             onClick={() => (confirmer ? void donnerProvisoire() : setConfirmer(true))}
             disabled={busy}
             className={cn(
-              "flex w-full items-center justify-center gap-1.5 py-2 text-[12px] font-semibold",
+              "flex w-full items-center justify-center gap-1.5 py-2 text-petit font-semibold",
               confirmer ? "bouton-principal bouton--vert" : "bouton-secondaire bouton--vert"
             )}
           >
@@ -211,7 +211,7 @@ export default function ComptesPage() {
 
   if (!session?.admin) {
     return (
-      <div className="mx-auto max-w-2xl px-5 py-16 text-center text-sm text-foreground/45">
+      <div className="mx-auto max-w-2xl px-5 py-16 text-center text-sm text-encre-3">
         Cette page est réservée à l&apos;admin de la ligue.
       </div>
     );
@@ -258,8 +258,8 @@ export default function ComptesPage() {
       <div className="flex items-center gap-3">
         <BoutonRetour />
         <div>
-          <h1 className="text-[30px] font-bold tracking-tight">Les accès</h1>
-          <p className="mt-1 text-[13px] text-foreground/42">
+          <h1 className="text-titre-l font-bold tracking-tight">Les accès</h1>
+          <p className="mt-1 text-corps text-encre-3">
             Une fenêtre par joueur · un mot de passe provisoire s&apos;il a perdu le sien
           </p>
         </div>
@@ -268,28 +268,28 @@ export default function ComptesPage() {
       {/* Recherche — pour ne pas dérouler les 71 à chaque fois */}
       {comptes && (
         <div className="glass-soft flex items-center gap-2.5 rounded-full px-4 py-3">
-          <Search className="size-4 shrink-0 text-foreground/35" />
+          <Search className="size-4 shrink-0 text-encre-4" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Chercher un joueur…"
-            className="min-w-0 flex-1 bg-transparent text-[14px] font-medium outline-none placeholder:text-foreground/30"
+            className="min-w-0 flex-1 bg-transparent text-ligne font-medium outline-none placeholder:text-encre-4"
           />
-          <span className="mono-label shrink-0 text-foreground/35">
+          <span className="mono-label shrink-0 text-encre-4">
             {filtered.length}/{comptes.length}
           </span>
         </div>
       )}
 
       {loading && (
-        <p className="flex items-center justify-center gap-2 py-10 text-[13px] text-foreground/40">
+        <p className="flex items-center justify-center gap-2 py-10 text-corps text-encre-3">
           <Loader2 className="size-4 animate-spin" /> Chargement des accès…
         </p>
       )}
 
       {error && (
         <div className="glass-soft rounded-2xl p-4">
-          <p className="text-[12.5px] leading-snug text-[#c8352b] dark:text-[#FF6B5E]">{error}</p>
+          <p className="text-corps leading-snug text-[#c8352b] dark:text-[#FF6B5E]">{error}</p>
           <button
             onClick={load}
             className="bouton-secondaire mono-label mt-3 px-3 py-1.5"
@@ -300,7 +300,7 @@ export default function ComptesPage() {
       )}
 
       {comptes && aChoisir > 0 && (
-        <p className="px-1 text-[12.5px] leading-snug text-foreground/45">
+        <p className="px-1 text-corps leading-snug text-encre-3">
           {aChoisir > 1
             ? `${aChoisir} joueurs doivent encore choisir leur mot de passe : l'app le leur demande à la prochaine ouverture.`
             : "1 joueur doit encore choisir son mot de passe : l'app le lui demande à la prochaine ouverture."}
@@ -311,7 +311,7 @@ export default function ComptesPage() {
           pas côté serveur, la personne ne peut pas entrer. */}
       {manquants.length > 0 && (
         <div className="rounded-2xl border border-amber-500/25 bg-amber-500/8 px-3.5 py-3">
-          <p className="text-[13px] leading-snug text-amber-700 dark:text-amber-300">
+          <p className="text-corps leading-snug text-amber-700 dark:text-amber-300">
             <b className="font-semibold">
               {manquants.length} joueur{manquants.length > 1 ? "s" : ""} sans compte.
             </b>{" "}
@@ -322,7 +322,7 @@ export default function ComptesPage() {
           <button
             onClick={() => void inscrireManquants()}
             disabled={!!inscription && !inscription.erreur}
-            className="bouton-principal bouton--vert mt-2.5 w-full py-2.5 text-[13.5px] font-bold disabled:opacity-50"
+            className="bouton-principal bouton--vert mt-2.5 w-full py-2.5 text-ligne font-bold disabled:opacity-50"
           >
             {inscription && !inscription.erreur
               ? `Inscription… ${inscription.faits}/${inscription.total}`
@@ -331,7 +331,7 @@ export default function ComptesPage() {
                 : "Créer le compte manquant"}
           </button>
           {inscription?.erreur && (
-            <p className="mt-2 text-[12.5px] leading-snug text-red-600 dark:text-red-300">
+            <p className="mt-2 text-corps leading-snug text-red-600 dark:text-red-300">
               Arrêté après {inscription.faits} sur {inscription.total} — {inscription.erreur}
             </p>
           )}
@@ -345,11 +345,11 @@ export default function ComptesPage() {
       </div>
 
       {comptes && filtered.length === 0 && !loading && (
-        <p className="py-8 text-center text-[13px] text-foreground/40">Aucun joueur trouvé.</p>
+        <p className="py-8 text-center text-corps text-encre-3">Aucun joueur trouvé.</p>
       )}
 
       {comptes && (
-        <p className="px-1 pb-2 text-[12px] leading-relaxed text-foreground/35">
+        <p className="px-1 pb-2 text-petit leading-relaxed text-encre-4">
           Un mot de passe provisoire ne s&apos;affiche qu&apos;ici, pendant cette visite :
           envoie-le en privé. Le joueur en choisit un à lui en se connectant.
         </p>

@@ -76,9 +76,9 @@ function TableauJournees({ moi }: { moi: string }) {
             k === 2 && lignes.length === 4 && "[@media(max-height:739px)]:hidden"
           )}
         >
-          <span className="w-6 text-[15px] font-bold text-foreground/40 tabular-nums">{p.rank}</span>
+          <span className="w-6 text-lecture font-bold text-encre-3 tabular-nums">{p.rank}</span>
           <CarteDe name={p.name} size={FORMAT_CARTE.petite} inerte />
-          <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">
+          <span className="min-w-0 flex-1 truncate text-lecture font-semibold">
             <Nom n={p.name} />
           </span>
           <span className="flex shrink-0 items-stretch">
@@ -89,12 +89,12 @@ function TableauJournees({ moi }: { moi: string }) {
               transition={{ ...ressort, delay: reduit ? 0 : 0.55 + 0.07 * k }}
               className="flex w-12 flex-col items-center gap-1 rounded-[10px] bg-white/[0.09] py-1"
             >
-              <span className="mono-label text-[10px] text-white/55 uppercase">J</span>
-              <span className="text-[17px] leading-none font-bold tracking-tight text-white tabular-nums">{journees.get(p.name) ?? 0}</span>
+              <span className="mono-label text-etiquette text-white/55 uppercase">J</span>
+              <span className="text-titre leading-none font-bold tracking-tight text-white tabular-nums">{journees.get(p.name) ?? 0}</span>
             </motion.span>
             <span className="flex w-12 flex-col items-center gap-1 py-1">
-              <span className="mono-label text-[10px] text-foreground/40 uppercase">pts</span>
-              <span className="text-[19px] leading-none font-bold tracking-tight tabular-nums">{p.pp}</span>
+              <span className="mono-label text-etiquette text-encre-3 uppercase">pts</span>
+              <span className="text-titre-fort leading-none font-bold tracking-tight tabular-nums">{p.pp}</span>
             </span>
           </span>
         </motion.div>
@@ -127,7 +127,7 @@ function CarteBlessee({ player }: { player: Player }) {
         initial={reduit ? false : { scale: 1 }}
         animate={reduit ? undefined : { scale: [1, 0.95, 1] }}
         transition={{ duration: 0.32, delay: 0.6, times: [0, 0.4, 1] }}
-        className="bouton-secondaire pointer-events-none flex w-[240px] items-center justify-center gap-2 py-3 text-[14px] font-semibold"
+        className="bouton-secondaire pointer-events-none flex w-[240px] items-center justify-center gap-2 py-3 text-ligne font-semibold"
       >
         <Bandage className="size-4" />
         Je suis blessé
@@ -165,7 +165,7 @@ function FrisePause() {
             >
               {joue ? <Check className="size-5" strokeWidth={3} /> : <Bandage className="size-5" strokeWidth={2.2} />}
             </span>
-            <span className={cn("mono-label text-[11px]", joue ? "text-white/70" : "text-white")}>J{j}</span>
+            <span className={cn("mono-label text-legende", joue ? "text-white/70" : "text-white")}>J{j}</span>
           </motion.li>
         ))}
       </ol>
@@ -176,10 +176,10 @@ function FrisePause() {
         transition={{ ...ressort, delay: reduit ? 0 : 1.05 }}
         className="glass-soft flex w-full max-w-[340px] items-center gap-3 rounded-[18px] px-4 py-3"
       >
-        <Bandage className="size-4 shrink-0 text-foreground/60" aria-hidden />
+        <Bandage className="size-4 shrink-0 text-encre-2" aria-hidden />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-[14px] font-semibold">Blessé depuis la J4</span>
-          <span className="font-mono text-[11px] text-foreground/50">3 sur 5 journées jouées · J4 et J5 manquées sur blessure</span>
+          <span className="text-ligne font-semibold">Blessé depuis la J4</span>
+          <span className="font-mono text-legende text-encre-3">3 sur 5 journées jouées · J4 et J5 manquées sur blessure</span>
         </span>
       </motion.div>
     </div>

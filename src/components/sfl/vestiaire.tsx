@@ -207,7 +207,7 @@ function VocalVue({ piece, mien }: { piece: PieceVocal; mien: boolean }) {
           />
         ))}
       </span>
-      <span className="shrink-0 text-[11.5px] font-semibold tabular-nums opacity-70">
+      <span className="shrink-0 text-petit font-semibold tabular-nums opacity-70">
         {minutes(lecture || pos > 0 ? pos : piece.duree)}
       </span>
     </div>
@@ -385,7 +385,7 @@ function VideoVue({ piece }: { piece: PieceVideo }) {
             <Play className="ml-0.5 size-5 fill-current" />
           </span>
         </span>
-        <span className="absolute right-2.5 bottom-2 rounded-full bg-black/55 px-2 py-0.5 text-[11.5px] font-bold text-white tabular-nums">
+        <span className="absolute right-2.5 bottom-2 rounded-full bg-black/55 px-2 py-0.5 text-petit font-bold text-white tabular-nums">
           {minutes(piece.duree)}
         </span>
       </button>
@@ -435,17 +435,17 @@ function PieceVue({ piece, onOuvrirJournee, mien = false }: { piece: Piece; onOu
     const def = RANKINGS.find((r) => r.id === piece.id);
     return (
       <div className="flex flex-col gap-1.5 px-3 py-3">
-        <p className="mono-label text-foreground/45">{def?.label ?? "Classement"}</p>
+        <p className="mono-label text-encre-3">{def?.label ?? "Classement"}</p>
         {piece.top.map((l, i) => (
           <div key={l.n} className="flex items-center gap-2.5">
-            <span className="w-4 text-[13px] font-bold text-foreground/40 tabular-nums">{i + 1}</span>
+            <span className="w-4 text-corps font-bold text-encre-3 tabular-nums">{i + 1}</span>
             <CarteDe name={l.n} size={format.petite} />
-            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">
+            <span className="min-w-0 flex-1 truncate text-ligne font-semibold">
               <Nom n={l.n} />
             </span>
-            <span className="text-[15px] font-bold tabular-nums">
+            <span className="text-lecture font-bold tabular-nums">
               {l.v}
-              <span className="mono-label ml-1 text-foreground/40">{def?.unit}</span>
+              <span className="mono-label ml-1 text-encre-3">{def?.unit}</span>
             </span>
           </div>
         ))}
@@ -454,7 +454,7 @@ function PieceVue({ piece, onOuvrirJournee, mien = false }: { piece: Piece; onOu
   }
 
   const jn = journees.find((x) => x.j === piece.j);
-  if (!jn) return <p className="px-3 py-3 text-[13px] text-foreground/45">Journée {piece.j}</p>;
+  if (!jn) return <p className="px-3 py-3 text-corps text-encre-3">Journée {piece.j}</p>;
   return <FeuilleVue journee={jn} onOuvrir={onOuvrirJournee ? () => onOuvrirJournee(jn.j) : undefined} />;
 }
 
@@ -475,32 +475,32 @@ function LigueVue({ piece, onOuvrirJournee }: { piece: PieceLigue; onOuvrirJourn
       className="flex w-full flex-col gap-2.5 px-3 py-3 text-left"
     >
       <span>
-        <span className="mono-label block text-foreground/45">Ligue{piece.j != null && ` · J${piece.j}`}</span>
-        <span className="block text-[15px] leading-tight font-bold">{piece.titre}</span>
+        <span className="mono-label block text-encre-3">Ligue{piece.j != null && ` · J${piece.j}`}</span>
+        <span className="block text-lecture leading-tight font-bold">{piece.titre}</span>
       </span>
       {joueurs.length === 1 ? (
         <span className="flex flex-col items-center gap-1.5 pt-1">
           <CarteDe name={joueurs[0].n!} size={format.grande} detail={piece.titre} inerte />
-          <span className="text-center text-[13px] font-semibold text-foreground/70">{joueurs[0].v}</span>
+          <span className="text-center text-corps font-semibold text-encre-2">{joueurs[0].v}</span>
         </span>
       ) : joueurs.length === 2 ? (
         <span className="flex justify-center gap-4 pt-1">
           {joueurs.map((l) => (
             <span key={l.n} className="flex flex-col items-center gap-1.5">
               <CarteDe name={l.n!} size={format.moyenne} detail={piece.titre} inerte />
-              <span className="max-w-[110px] text-center text-[12.5px] leading-tight font-semibold text-foreground/70">{l.v}</span>
+              <span className="max-w-[110px] text-center text-corps leading-tight font-semibold text-encre-2">{l.v}</span>
             </span>
           ))}
         </span>
       ) : (
         joueurs.map((l, i) => (
           <span key={l.n} className="flex items-center gap-2.5">
-            <span className="w-4 text-[13px] font-bold text-foreground/40 tabular-nums">{i + 1}</span>
+            <span className="w-4 text-corps font-bold text-encre-3 tabular-nums">{i + 1}</span>
             <CarteDe name={l.n!} size={format.petite} inerte />
-            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">
+            <span className="min-w-0 flex-1 truncate text-ligne font-semibold">
               <Nom n={l.n!} />
             </span>
-            <span className="shrink-0 text-right text-[13px] font-bold tabular-nums">{l.v}</span>
+            <span className="shrink-0 text-right text-corps font-bold tabular-nums">{l.v}</span>
           </span>
         ))
       )}
@@ -508,8 +508,8 @@ function LigueVue({ piece, onOuvrirJournee }: { piece: PieceLigue; onOuvrirJourn
         <span className="grid grid-cols-2 gap-2">
           {chiffres.map((l) => (
             <span key={l.l} className="flex flex-col rounded-2xl bg-contraste/[0.06] px-3 py-2.5">
-              <span className="text-[22px] leading-none font-bold tabular-nums">{l.v}</span>
-              <span className="mono-label mt-1 text-foreground/45">{l.l}</span>
+              <span className="text-titre-m leading-none font-bold tabular-nums">{l.v}</span>
+              <span className="mono-label mt-1 text-encre-3">{l.l}</span>
             </span>
           ))}
         </span>
@@ -537,19 +537,19 @@ function FeuilleVue({ journee, onOuvrir }: { journee: Journee; onOuvrir?: () => 
       }}
       className="block w-full px-3 py-3 text-left"
     >
-      <p className="mono-label text-foreground/45">
+      <p className="mono-label text-encre-3">
         Feuille de match · J{journee.j} · {journee.date}
       </p>
       <div className="mt-2 flex flex-col gap-1">
         {matches.map((m, i) => (
-          <div key={m.id} className="flex items-center justify-between gap-2 text-[13.5px] font-semibold">
+          <div key={m.id} className="flex items-center justify-between gap-2 text-ligne font-semibold">
             <span className="flex min-w-0 flex-1 items-center gap-1.5 truncate">
-              {matches.length > 1 && <span className="mono-label mr-0.5 text-foreground/35">T{i + 1}</span>}
+              {matches.length > 1 && <span className="mono-label mr-0.5 text-encre-4">T{i + 1}</span>}
               <PointMaillot camp="Noirs" /> Noirs
             </span>
-            <span className="shrink-0 text-[17px] font-extrabold tabular-nums">
+            <span className="shrink-0 text-titre font-extrabold tabular-nums">
               {m.teamA.score}
-              <span className="mx-1 text-foreground/30">–</span>
+              <span className="mx-1 text-encre-4">–</span>
               {m.teamB.score}
             </span>
             <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5 truncate">
@@ -563,7 +563,7 @@ function FeuilleVue({ journee, onOuvrir }: { journee: Journee; onOuvrir?: () => 
           {decisifs.map((l) => (
             <span key={l.name} className="flex min-w-0 flex-col items-center gap-1">
               <CarteDe name={l.name} size={format.petite} inerte />
-              <span className="mono-label text-[9px] text-foreground/55 tabular-nums">
+              <span className="mono-label text-micro text-encre-3 tabular-nums">
                 {l.buts > 0 && `${l.buts}B`}
                 {l.buts > 0 && l.passes > 0 && " "}
                 {l.passes > 0 && `${l.passes}P`}
@@ -587,12 +587,12 @@ function ChoixPiece({ onChoix, onPhoto, onFermer }: { onChoix: (p: Piece) => voi
     [journees, saison]
   );
 
-  const ligne = "flex w-full items-center justify-between gap-3 rounded-2xl px-3.5 py-3 text-left text-[14.5px] font-semibold active:bg-contraste/8";
+  const ligne = "flex w-full items-center justify-between gap-3 rounded-2xl px-3.5 py-3 text-left text-lecture font-semibold active:bg-contraste/8";
 
   return (
     <div className="glass mb-2 overflow-hidden rounded-3xl p-1.5">
       <div className="flex items-center justify-between px-2.5 pt-1.5 pb-1">
-        <span className="mono-label text-foreground/45">
+        <span className="mono-label text-encre-3">
           {etape === "menu" ? "Partager" : etape === "feuille" ? "Feuille de match" : "Classement"}
         </span>
         <button type="button" onClick={onFermer} aria-label="Fermer" className="bouton-discret flex size-7 items-center justify-center">
@@ -620,7 +620,7 @@ function ChoixPiece({ onChoix, onPhoto, onFermer }: { onChoix: (p: Piece) => voi
           jouees.map((j) => (
             <button key={j.j} type="button" className={ligne} onClick={() => onChoix({ type: "feuille", j: j.j })}>
               <span>J{j.j}</span>
-              <span className="text-[13px] font-medium text-foreground/50">{j.date}</span>
+              <span className="text-corps font-medium text-encre-3">{j.date}</span>
             </button>
           ))}
         {etape === "classement" &&
@@ -637,7 +637,7 @@ function ChoixPiece({ onChoix, onPhoto, onFermer }: { onChoix: (p: Piece) => voi
                 onClick={() => onChoix({ type: "classement", id: r.id, top: top.map((p) => ({ n: p.name, v: p.value })) })}
               >
                 <span>{r.label}</span>
-                <span className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-foreground/50">
+                <span className="flex min-w-0 items-center gap-2 text-corps font-medium text-encre-3">
                   <CarteDe name={top[0].name} size={FORMAT_CARTE.petite * 0.62} inerte />
                   <span className="truncate">
                     <Nom n={top[0].name} /> · {top[0].value}
@@ -684,7 +684,7 @@ function ReglageNotifs({
             onMode(m);
             onFermer();
           }}
-          className="flex w-full items-center justify-between rounded-2xl px-3.5 py-2.5 text-left text-[14px] font-semibold active:bg-contraste/8"
+          className="flex w-full items-center justify-between rounded-2xl px-3.5 py-2.5 text-left text-ligne font-semibold active:bg-contraste/8"
         >
           {label}
           {mode === m && <Check className="size-4" />}
@@ -698,7 +698,7 @@ function ReglageNotifs({
             setEtat(e);
             if (e === "actives") toast.success("Notifications activées");
           }}
-          className="bouton-principal bouton--mauve mt-1 w-full py-2.5 text-[13px] font-bold"
+          className="bouton-principal bouton--mauve mt-1 w-full py-2.5 text-corps font-bold"
         >
           Activer sur ce téléphone
         </button>
@@ -814,7 +814,7 @@ const Bulle = memo(function Bulle({
         ))}
       <div className={cn("flex min-w-0 max-w-[78%] flex-col", m.mien ? "items-end" : "items-start")}>
         {!m.mien && !suite && (
-          <span className="mb-1 px-1 text-[12px] font-semibold text-foreground/55">
+          <span className="mb-1 px-1 text-petit font-semibold text-encre-3">
             {m.auteur ? <Nom n={m.auteur} /> : "Quelqu'un"}
           </span>
         )}
@@ -839,16 +839,16 @@ const Bulle = memo(function Bulle({
               }}
               className="max-w-full rounded-2xl border-l-[3px] border-foreground/45 bg-contraste/[0.06] py-1.5 pr-3 pl-2.5 text-left"
             >
-              <span className="block text-[11.5px] font-bold text-foreground/65">
+              <span className="block text-petit font-bold text-encre-2">
                 {cite.mien ? "Toi" : cite.auteur ? <Nom n={cite.auteur} /> : "Quelqu'un"}
               </span>
-              <span className="line-clamp-2 text-[13px] leading-snug text-foreground/55">{apercu(cite)}</span>
+              <span className="line-clamp-2 text-corps leading-snug text-encre-3">{apercu(cite)}</span>
             </button>
           )}
           {m.texte && (
             <p
               className={cn(
-                "rounded-[20px] px-3.5 py-2 text-[15px] leading-snug break-words whitespace-pre-wrap",
+                "rounded-[20px] px-3.5 py-2 text-lecture leading-snug break-words whitespace-pre-wrap",
                 m.mien ? "bg-foreground text-background" : "glass-soft"
               )}
             >
@@ -878,11 +878,11 @@ const Bulle = memo(function Bulle({
                   type="button"
                   onClick={() => onReagir(e)}
                   className={cn(
-                    "flex h-6 items-center gap-1 px-1.5 text-[12px] font-bold tabular-nums",
+                    "flex h-6 items-center gap-1 px-1.5 text-petit font-bold tabular-nums",
                     mienne ? "bouton-secondaire bouton--mauve" : "bouton-secondaire"
                   )}
                 >
-                  <span className="text-[13px] leading-none">{e}</span>
+                  <span className="text-corps leading-none">{e}</span>
                   {qui.length > 1 && qui.length}
                 </button>
               );
@@ -899,7 +899,7 @@ const Bulle = memo(function Bulle({
                   type="button"
                   onClick={() => onReagir(e)}
                   className={cn(
-                    "flex size-9 items-center justify-center text-[20px]",
+                    "flex size-9 items-center justify-center text-titre-fort",
                     moi && m.reactions[e]?.includes(moi) ? "bouton-secondaire bouton--mauve" : "bouton-discret"
                   )}
                 >
@@ -909,11 +909,11 @@ const Bulle = memo(function Bulle({
             </div>
             {(m.mien || admin) && (
               <div className="flex gap-1.5">
-                <button type="button" onClick={() => actions.retirer(m)} className="bouton-secondaire bouton--rouge px-3 py-1.5 text-[12.5px] font-semibold">
+                <button type="button" onClick={() => actions.retirer(m)} className="bouton-secondaire bouton--rouge px-3 py-1.5 text-corps font-semibold">
                   Retirer
                 </button>
                 {admin && !m.mien && (
-                  <button type="button" onClick={() => actions.couper(m)} className="bouton-secondaire bouton--rouge px-3 py-1.5 text-[12.5px] font-semibold">
+                  <button type="button" onClick={() => actions.couper(m)} className="bouton-secondaire bouton--rouge px-3 py-1.5 text-corps font-semibold">
                     Couper la parole 24 h
                   </button>
                 )}
@@ -924,7 +924,7 @@ const Bulle = memo(function Bulle({
 
         {/* L'heure, et sous chaque bulle les deux gestes : répondre, réagir. */}
         <div className={cn("mt-0.5 flex items-center gap-0.5", m.mien ? "flex-row-reverse" : "flex-row", attente && "pointer-events-none")}>
-          <span className="px-1 text-[10.5px] font-medium text-foreground/30 tabular-nums">{quand(m.at)}</span>
+          <span className="px-1 text-legende font-medium text-encre-4 tabular-nums">{quand(m.at)}</span>
           <button
             type="button"
             onClick={onRepondre}
@@ -955,10 +955,10 @@ const LigneArrivee = memo(function LigneArrivee({ m }: { m: MessageV }) {
   return (
     <div id={`m-${m.id}`} data-ancre="" className="mt-[var(--fib-13)] flex items-center justify-center gap-2 px-6 text-center">
       <CarteDe name={m.auteur || "?"} size={FORMAT_CARTE.petite * 0.62} inerte />
-      <span className="text-[13px] font-semibold text-foreground/55">
+      <span className="text-corps font-semibold text-encre-3">
         {m.mien ? "Tu as rejoint le match" : m.auteur ? <><Nom n={m.auteur} /> a rejoint le match</> : "Quelqu'un a rejoint le match"}
       </span>
-      <span className="text-[10.5px] font-medium text-foreground/30 tabular-nums">{quand(m.at)}</span>
+      <span className="text-legende font-medium text-encre-4 tabular-nums">{quand(m.at)}</span>
     </div>
   );
 });
@@ -1540,13 +1540,13 @@ export function Discussion({
           onClick={(e) => e.target === e.currentTarget && setOuvert(null)}
         >
           {empeche && (
-            <p className="glass my-auto flex items-start gap-1.5 rounded-3xl p-4 text-[13.5px] leading-snug text-foreground/70">
+            <p className="glass my-auto flex items-start gap-1.5 rounded-3xl p-4 text-ligne leading-snug text-encre-2">
               <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
               {empeche}
             </p>
           )}
           {erreur && !empeche && (
-            <p className="mb-auto flex items-start gap-1.5 rounded-2xl border border-contraste/10 px-3.5 py-3 text-[13px] leading-snug text-foreground/70">
+            <p className="mb-auto flex items-start gap-1.5 rounded-2xl border border-contraste/10 px-3.5 py-3 text-corps leading-snug text-encre-2">
               <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
               {erreur}
             </p>
@@ -1555,7 +1555,7 @@ export function Discussion({
               posée seule, elle sautait en haut quand ils arrivaient. */}
           {!empeche && prete && tete}
           {!empeche && prete && lignes.length === 0 && !erreur && vide && (
-            <p className="my-auto text-center text-[15px] font-semibold text-foreground/35">{vide}</p>
+            <p className="my-auto text-center text-lecture font-semibold text-encre-4">{vide}</p>
           )}
           {lignes.map(({ cle, m, attente }, i) => {
             if (m.piece?.type === "rejoint") return <LigneArrivee key={cle} m={m} />;
@@ -1610,7 +1610,7 @@ export function Discussion({
                   className="bouton-secondaire bouton--mauve flex shrink-0 items-center gap-2 py-1 pr-3.5 pl-1"
                 >
                   <CarteDe name={p.name} size={FORMAT_CARTE.petite * 0.62} inerte />
-                  <span className="text-[13px] font-semibold">@{p.pseudo}</span>
+                  <span className="text-corps font-semibold">@{p.pseudo}</span>
                 </button>
               ))}
             </div>
@@ -1618,12 +1618,12 @@ export function Discussion({
 
           {reponse && (
             <div className="glass mb-2 flex items-center gap-2 rounded-3xl py-2 pr-2 pl-3.5">
-              <Reply className="size-4 shrink-0 text-foreground/50" />
+              <Reply className="size-4 shrink-0 text-encre-3" />
               <div className="min-w-0 flex-1 border-l-[3px] border-foreground/45 pl-2.5">
-                <span className="block text-[11.5px] font-bold text-foreground/65">
+                <span className="block text-petit font-bold text-encre-2">
                   {reponse.mien ? "Toi" : reponse.auteur ? <Nom n={reponse.auteur} /> : "Quelqu'un"}
                 </span>
-                <span className="block truncate text-[13px] text-foreground/55">{apercu(reponse)}</span>
+                <span className="block truncate text-corps text-encre-3">{apercu(reponse)}</span>
               </div>
               <button type="button" onClick={() => setReponse(null)} aria-label="Ne plus répondre" className="bouton-secondaire flex size-7 shrink-0 items-center justify-center">
                 <X className="size-3.5" />
@@ -1639,7 +1639,7 @@ export function Discussion({
               ) : (
                 <span className="relative h-24 max-w-[60%] overflow-hidden rounded-[16px]">
                   <video src={`${piece.chemin}#t=0.1`} muted playsInline preload="metadata" className="h-full object-cover" />
-                  <span className="absolute right-1.5 bottom-1.5 rounded-full bg-black/55 px-1.5 text-[11px] font-bold text-white tabular-nums">
+                  <span className="absolute right-1.5 bottom-1.5 rounded-full bg-black/55 px-1.5 text-legende font-bold text-white tabular-nums">
                     {minutes(piece.duree)}
                   </span>
                 </span>
@@ -1671,7 +1671,7 @@ export function Discussion({
           )}
 
           {sourdine ? (
-            <p className="glass rounded-full px-4 py-3 text-center text-[13.5px] font-semibold text-foreground/55">
+            <p className="glass rounded-full px-4 py-3 text-center text-ligne font-semibold text-encre-3">
               Parole coupée jusqu&apos;à {quand(sourdine)}
             </p>
           ) : micro.secondes !== null ? (
@@ -1687,8 +1687,8 @@ export function Discussion({
               </button>
               <span className="flex min-w-0 flex-1 items-center gap-2.5 px-2">
                 <span className="size-2.5 shrink-0 animate-pulse rounded-full bg-foreground motion-reduce:animate-none" />
-                <span className="text-[16px] font-semibold tabular-nums">{minutes(micro.secondes)}</span>
-                <span className="text-[13px] font-medium text-foreground/35 tabular-nums">/ {minutes(VOCAL_MAX_S)}</span>
+                <span className="text-titre font-semibold tabular-nums">{minutes(micro.secondes)}</span>
+                <span className="text-corps font-medium text-encre-4 tabular-nums">/ {minutes(VOCAL_MAX_S)}</span>
               </span>
               <button
                 type="button"
@@ -1730,7 +1730,7 @@ export function Discussion({
                 rows={1}
                 maxLength={2000}
                 placeholder="Message"
-                className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-[9px] text-[16px] leading-snug outline-none placeholder:text-foreground/30 [field-sizing:content]"
+                className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-[9px] text-titre leading-snug outline-none placeholder:text-encre-4 [field-sizing:content]"
               />
               <input
                 ref={choixPhoto}

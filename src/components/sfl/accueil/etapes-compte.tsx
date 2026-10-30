@@ -169,7 +169,7 @@ export function EtapeMotDePasse({ session, onFini }: { session: Session | null; 
                 }}
                 autoComplete="current-password"
                 placeholder="••••••••"
-                className="w-full bg-transparent text-[16px] font-semibold text-white outline-none placeholder:text-white/25"
+                className="w-full bg-transparent text-titre font-semibold text-white outline-none placeholder:text-white/25"
               />
             </label>
           )}
@@ -185,7 +185,7 @@ export function EtapeMotDePasse({ session, onFini }: { session: Session | null; 
                 }}
                 autoComplete="new-password"
                 placeholder={`${BORNES.motDePasse} caractères au moins`}
-                className="min-w-0 flex-1 bg-transparent text-[16px] font-semibold text-white outline-none placeholder:text-white/25"
+                className="min-w-0 flex-1 bg-transparent text-titre font-semibold text-white outline-none placeholder:text-white/25"
               />
               <button
                 type="button"
@@ -197,7 +197,7 @@ export function EtapeMotDePasse({ session, onFini }: { session: Session | null; 
               </button>
             </span>
           </label>
-          {error && <p className="px-1 text-[12.5px] font-medium text-[#FF6B5E]">{error}</p>}
+          {error && <p className="px-1 text-corps font-medium text-[#FF6B5E]">{error}</p>}
         </div>
       </Corps>
     </form>
@@ -272,8 +272,8 @@ export function EtapeAccord({ nom, mineur, onFini }: { nom: string; mineur: bool
               <Icone className="size-[16px] text-white/80" />
             </span>
             <span className="min-w-0 pt-[1px]">
-              <span className="block text-[14.5px] leading-tight font-bold text-white">{titre}</span>
-              <span className="mt-[3px] block text-[13px] leading-snug text-white/55">{texte}</span>
+              <span className="block text-lecture leading-tight font-bold text-white">{titre}</span>
+              <span className="mt-[3px] block text-corps leading-snug text-white/55">{texte}</span>
             </span>
           </li>
         ))}
@@ -281,7 +281,7 @@ export function EtapeAccord({ nom, mineur, onFini }: { nom: string; mineur: bool
       <button
         type="button"
         onClick={() => setLecture(true)}
-        className="bouton-secondaire mt-[21px] flex w-full items-center justify-center gap-[6px] py-[12px] text-[14px] font-bold"
+        className="bouton-secondaire mt-[21px] flex w-full items-center justify-center gap-[6px] py-[12px] text-ligne font-bold"
       >
         Lire la politique en entier
         <ChevronRight className="size-4" />
