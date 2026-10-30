@@ -13,9 +13,12 @@
 // spectateur : qui vient, les équipes, mais ni « Ma présence » ni boutons.
 //
 // La réponse se donne une fois et se scelle (reponse-scellee.tsx, 27/10).
+//
+// La vue admin reste discrète (Sabri, 30/10) : repliée sur une ligne, les
+// trois chiffres seuls ; on la déplie pour voir qui manque et relancer.
 
-import { useMemo } from "react";
-import { Check, Copy, Radio, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, ChevronDown, Copy, Radio, X } from "lucide-react";
 import { ReponseScellee } from "@/components/sfl/reponse-scellee";
 import { toast } from "sonner";
 import { useSession } from "@/hooks/use-session";
@@ -35,6 +38,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
   const p = usePresence();
   const { saison } = useSeason();
   const bola = useJoueurBola();
+  const [vueAdmin, setVueAdmin] = useState(false);
   // Dès la J4, chaque équipe dit sa division : « Noirs · Match 2 · D1 ».
   const divisionDe = useMemo(() => {
     const etat = p.teams?.length ? divisionsDeLaJournee(saison, p.journee) : null;
@@ -169,60 +173,74 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
         </button>
       )}
 
-      {/* Vue admin : le tableau complet */}
+      {/* Vue admin : repliée par défaut, le tableau complet une fois dépliée */}
       {admin && !compact && (
-        <div className="mt-5 border-t border-contraste/8 pt-4">
-          <div className="flex items-center justify-between">
-            <p className="mono-label text-primary">Vue admin · les réponses</p>
-            {p.sansReponse.length > 0 && (
-              <button
-                onClick={copyRelances}
-                className="bouton-secondaire bouton--mauve mono-label flex items-center gap-1.5 px-2.5 py-1"
-              >
-                <Copy className="size-3" /> Relance
-              </button>
-            )}
-          </div>
+        <div className="mt-5 border-t border-contraste/8 pt-1">
+          <button
+            type="button"
+            onClick={() => setVueAdmin((o) => !o)}
+            aria-expanded={vueAdmin}
+            className="flex w-full items-center justify-between gap-3 py-2.5 text-left"
+          >
+            <span className="mono-label text-foreground/40">Vue admin</span>
+            <span className="mono-label flex items-center gap-2 text-foreground/40 tabular-nums">
+              {p.presents.length} · {p.absents.length} · {p.sansReponse.length}
+              <ChevronDown className={cn("size-3.5 transition-transform", vueAdmin && "rotate-180")} />
+            </span>
+          </button>
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            {(
-              [
-                [p.presents.length, "Présents", "text-foreground"],
-                [p.absents.length, "Absents", "text-foreground/60"],
-                [p.sansReponse.length, "Sans réponse", "text-foreground/60"],
-              ] as const
-            ).map(([n, label, cls]) => (
-              <div key={label} className="glass-soft rounded-2xl px-2 py-3 text-center">
-                <div className={cn("text-[22px] leading-none font-extrabold tabular-nums", cls)}>
-                  {n}
-                </div>
-                <p className="mono-label mt-1.5 text-foreground/40">{label}</p>
-              </div>
-            ))}
-          </div>
-
-          {(
-            [
-              // Les présents sont déjà en cartes plus haut ; ici, qui manque.
-              ["Absents", p.absents, "glass-soft text-foreground/50"],
-              ["Sans réponse", p.sansReponse, "glass-soft text-foreground/80"],
-            ] as const
-          ).map(([label, list, cls]) =>
-            list.length > 0 ? (
-              <div key={label} className="mt-3.5">
-                <p className="mono-label mb-2 text-foreground/40">{label}</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {list.map((n) => (
-                    <span
-                      key={n}
-                      className={cn("rounded-full px-2.5 py-1 text-[12.5px] font-semibold", cls)}
-                    >
+          {vueAdmin && (
+            <div className="pb-1 pt-1.5">
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    [p.presents.length, "Présents", "text-foreground"],
+                    [p.absents.length, "Absents", "text-foreground/60"],
+                    [p.sansReponse.length, "Sans réponse", "text-foreground/60"],
+                  ] as const
+                ).map(([n, label, cls]) => (
+                  <div key={label} className="glass-soft rounded-2xl px-2 py-3 text-center">
+                    <div className={cn("text-[22px] leading-none font-extrabold tabular-nums", cls)}>
                       {n}
-                    </span>
-                  ))}
-                </div>
+                    </div>
+                    <p className="mono-label mt-1.5 text-foreground/40">{label}</p>
+                  </div>
+                ))}
               </div>
-            ) : null
+
+              {(
+                [
+                  // Les présents sont déjà en cartes plus haut ; ici, qui manque.
+                  ["Absents", p.absents, "glass-soft text-foreground/50"],
+                  ["Sans réponse", p.sansReponse, "glass-soft text-foreground/80"],
+                ] as const
+              ).map(([label, list, cls]) =>
+                list.length > 0 ? (
+                  <div key={label} className="mt-3.5">
+                    <p className="mono-label mb-2 text-foreground/40">{label}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {list.map((n) => (
+                        <span
+                          key={n}
+                          className={cn("rounded-full px-2.5 py-1 text-[12.5px] font-semibold", cls)}
+                        >
+                          {n}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null
+              )}
+
+              {p.sansReponse.length > 0 && (
+                <button
+                  onClick={copyRelances}
+                  className="bouton-secondaire bouton--mauve mono-label mt-4 flex w-full items-center justify-center gap-1.5 py-2.5"
+                >
+                  <Copy className="size-3" /> Copier la relance
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
