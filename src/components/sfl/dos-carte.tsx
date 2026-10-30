@@ -54,7 +54,7 @@ const PHI = (1 + Math.sqrt(5)) / 2;
 const SERIE_X = RAYON_CARTE / PHI; // la série rentrée, comme sur la face
 // Le cadre intérieur (liseré, crans) : à 29 du bord, comme celui du portrait.
 const CADRE: Boite = { x: 29, y: 29, w: W - 58, h: H - 58, r: RAYON_CARTE - 29 };
-const MONO = "var(--font-jbmono), ui-monospace, monospace";
+const MONO = "var(--font-inter), system-ui, sans-serif";
 
 // La rosace et la lune, puis le logotype, centrés sur la hauteur.
 const ROSACE = { cx: 512, cy: 738, r1: 236, r2: 318 };

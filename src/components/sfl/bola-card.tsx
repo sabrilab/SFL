@@ -124,7 +124,7 @@ const H = 1656;
 const M = 41;
 const ANTON = "var(--font-anton), Anton, sans-serif";
 const SANS = "var(--font-inter), Inter, system-ui, sans-serif";
-const MONO = "var(--font-jbmono), ui-monospace, monospace";
+const MONO = "var(--font-inter), system-ui, sans-serif";
 
 // Le nombre d'or, cote par cote (repère 1024 × 1656).
 const PHI = (1 + Math.sqrt(5)) / 2;

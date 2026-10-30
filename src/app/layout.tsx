@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono, Anton, Barlow_Condensed } from "next/font/google";
+import { Inter, Anton, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 import "@/components/sfl/actus/lune.css";
 
@@ -39,14 +39,8 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
-// JetBrains Mono : seulement sur les cartes joueurs (bola-card, carte-photo,
-// dos-carte, habillage-carte, editorial-card). Sabri l'a retirée de
-// l'interface le 30/10 ; on ne retouche pas les cartes.
-const jbMono = JetBrains_Mono({
-  weight: ["400", "600", "700"],
-  variable: "--font-jbmono",
-  subsets: ["latin"],
-});
+// JetBrains Mono (la police « machine à écrire ») n'est plus chargée depuis
+// le 30/10 : Sabri l'a retirée de l'interface puis des cartes.
 
 // Les chiffres : rangs, scores, notes. Les titres l'ont quittée le 22/10
 // pour le lettrage de la Map ; les cartes et les écussons gardent leurs lettres.
@@ -95,7 +89,7 @@ export default function RootLayout({
     <html
       lang="fr"
       suppressHydrationWarning
-      className={`${inter.variable} ${jbMono.variable} ${anton.variable} ${barlow.variable} h-full antialiased`}
+      className={`${inter.variable} ${anton.variable} ${barlow.variable} h-full antialiased`}
     >
       {/* body ne défile jamais lui-même (overflow hidden, hauteur figée à
           celle de l'écran) : c'est le conteneur interne juste en dessous

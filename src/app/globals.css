@@ -15,7 +15,8 @@
      Inter aussi, en capitales espacées, pour ce qui s'étiquette
      (.mono-label, font-mono). La police machine à écrire (JetBrains Mono) a
      quitté l'interface le 30/10 (Sabri : « supprimer un type de
-     typographie partout ») ; seules les cartes joueurs la gardent.
+     typographie partout »), cartes joueurs comprises (« il y en a aussi
+     sur la carte »).
      Anton ne sert plus qu'aux chiffres. */
   --font-sans: var(--font-inter);
   --font-mono: var(--font-inter);
