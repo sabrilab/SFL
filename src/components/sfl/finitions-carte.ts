@@ -776,6 +776,8 @@ export const METAUX = {
   or: ["#fff4cc", "#e7c46a", "#a8761f", "#f6dc92", "#b98a2c"],
   /** Le platine : plus blanc et plus froid que l'argent ; le liseré platine est double. */
   platine: ["#ffffff", "#eceef2", "#b6bac2", "#ffffff", "#d3d6dc"],
+  /** Le fer forgé de la Saison Givre : sombre et mat, rivé aux coins. */
+  fer: ["#9a9da2", "#55585d", "#2b2d31", "#74777c", "#3a3c40"],
 } as const;
 export type Metal = keyof typeof METAUX;
 
@@ -793,11 +795,19 @@ export const RANGS: Record<RangCarte, { lueur: string; feu: string; sombre: stri
   B: { lueur: "222,227,236", feu: "246,248,252", sombre: "#3d434d" },
 };
 
-/** Le liseré porté : le platine (double) remplace l'argent. */
+/**
+ * Le liseré porté : le platine (double) remplace l'argent ; le fer, s'il a
+ * été mis après eux (on n'en porte qu'un, le dernier choisi l'emporte).
+ */
 export function lisereDe(habillage?: HabillageCarte): Metal | null {
   const s = habillage?.signes ?? [];
-  return s.includes("lisere-platine") ? "platine" : s.includes("lisere-argent") ? "argent" : null;
+  const avant = s.includes("lisere-platine") ? "platine" : s.includes("lisere-argent") ? "argent" : null;
+  if (!s.includes("lisere-fer")) return avant;
+  return avant && s.indexOf(`lisere-${avant}`) > s.indexOf("lisere-fer") ? avant : "fer";
 }
+
+/** Les signes qui se voient au dos de la carte : leur vignette montre le dos. */
+export const SIGNES_DU_DOS: ReadonlySet<Signe> = new Set<Signe>(["runes", "nom-runes"]);
 
 /** Les initiales du sceau : la première lettre des deux premiers mots du nom. */
 export function initiales(nom: string): string {

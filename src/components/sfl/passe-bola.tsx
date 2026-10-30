@@ -29,7 +29,8 @@ import { Check, Lock, Play, X } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { Champ, Insigne, Tampon, Viseur } from "@/components/sfl/actus/missions";
 import { Card3D } from "@/components/sfl/card-3d";
-import type { Finition, HabillageCarte } from "@/components/sfl/finitions-carte";
+import { DosCarte } from "@/components/sfl/dos-carte";
+import { matiereDe, type Finition, type HabillageCarte } from "@/components/sfl/finitions-carte";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { Plongee, useAppuiLong } from "@/components/sfl/plongee-carte";
 import { COULEURS_PAYS, PAYS_PAR_DEFAUT } from "@/components/sfl/skins-passe";
@@ -59,6 +60,8 @@ interface Cadrage {
   x: number;
   y: number;
   zoom: number;
+  /** Le signe est au dos : la vignette montre le dos. */
+  dos?: true;
 }
 
 const CADRAGES: Partial<Record<string, Cadrage>> = {
@@ -68,6 +71,8 @@ const CADRAGES: Partial<Record<string, Cadrage>> = {
   sceau: { x: 191, y: 831, zoom: 2.2 },
   "puce-noire": { x: 883, y: 888, zoom: 2.8 }, // la puce
   "nom-grave": { x: 330, y: 1050, zoom: 2.6 }, // le nom gravé, dans le microtexte au-dessus de la note
+  runes: { x: 512, y: 420, zoom: 1.9, dos: true }, // la frise, au-dessus de la rosace du dos
+  "nom-runes": { x: 512, y: 1330, zoom: 2.2, dos: true }, // le nom en runes, sous le logotype du dos
 };
 
 /** La vignette d'un palier : un signe de près, sinon la carte entière. */
@@ -77,7 +82,22 @@ export const cadrageDe = (p: PalierPasse): Cadrage | undefined => (p.habille?.si
 const PX_TAILLE_1 = 254 / 1024;
 
 /** Une carte réduite dans une fenêtre de l × h px : cadrée sur un signe, ou entière et centrée. */
-export function Mini({ player, habillage, cadrage, l, h }: { player: Player; habillage: HabillageCarte; cadrage?: Cadrage; l: number; h: number }) {
+export function Mini({
+  player,
+  habillage,
+  cadrage,
+  dos = cadrage?.dos ?? false,
+  l,
+  h,
+}: {
+  player: Player;
+  habillage: HabillageCarte;
+  cadrage?: Cadrage;
+  /** Le dos de la carte (les runes de la Saison Givre). */
+  dos?: boolean;
+  l: number;
+  h: number;
+}) {
   const s = cadrage ? Math.max(l / 1024, h / 1656) * cadrage.zoom : Math.min(l / 1024, h / 1656);
   const cl = 1024 * s;
   const ch = 1656 * s;
@@ -89,7 +109,11 @@ export function Mini({ player, habillage, cadrage, l, h }: { player: Player; hab
       className="pointer-events-none absolute top-0 left-0"
       style={{ transformOrigin: "0 0", transform: `translate(${tx}px, ${ty}px) scale(${s / PX_TAILLE_1})` }}
     >
-      <PlayerCard player={player} size={1} habillage={habillage} />
+      {dos ? (
+        <DosCarte matiere={matiereDe("base", habillage)} nom={player.name} habillage={habillage} />
+      ) : (
+        <PlayerCard player={player} size={1} habillage={habillage} />
+      )}
     </span>
   );
 }

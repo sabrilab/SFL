@@ -20,7 +20,7 @@ import { useState } from "react";
 import { Check, Lock, Palette } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Badge3D, nomBadge } from "@/components/sfl/badge-3d";
-import type { Finition, HabillageCarte, Signe } from "@/components/sfl/finitions-carte";
+import { SIGNES_DU_DOS, type Finition, type HabillageCarte, type Signe } from "@/components/sfl/finitions-carte";
 import { ChoixPays, Mini } from "@/components/sfl/passe-bola";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -162,7 +162,7 @@ export function PersonnaliserCarte({ player }: { player: Player }) {
       ...choix,
       signes: choix.signes.includes(g) ? choix.signes.filter((x) => x !== g) : [...choix.signes, g],
     });
-  const vignette = (h: HabillageCarte) => <Mini player={player} habillage={{ ...base, ...h }} l={44} h={71} />;
+  const vignette = (h: HabillageCarte, dos = false) => <Mini player={player} habillage={{ ...base, ...h }} dos={dos} l={44} h={71} />;
   const nSkins = mesSkins.length;
   const nSignes = SIGNES.filter((r) => r.a).length;
 
@@ -259,7 +259,7 @@ export function PersonnaliserCarte({ player }: { player: Player }) {
                     actif={a && choix.signes.includes(g)}
                     ouvert={a}
                     onClick={() => basculerSigne(g)}
-                    vignette={vignette({ signes: [g] })}
+                    vignette={vignette({ signes: [g] }, SIGNES_DU_DOS.has(g))}
                     titre={p.nom}
                     quoi={p.quoi}
                     comment={commentDe(r)}

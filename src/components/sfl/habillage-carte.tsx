@@ -10,6 +10,7 @@
 //     marbre (le blanc d'une statue, ses veines) ;
 //   · le liseré d'argent, ou de platine, doublé : un filet de métal autour du
 //     portrait (le platine remplace l'argent ; plus d'or depuis le 24/10) ;
+//     ou de fer (Saison Givre), rivé aux quatre coins ;
 //   · le cran, de 1 à 4 : les coins de ce cadre, posés un par un dans le sens
 //     des aiguilles d'une montre ; à 4, le cadre est fermé ;
 //   · le sceau : un tampon à ses initiales sur le bas de la photo, comme sur
@@ -74,6 +75,20 @@ export function Lisere({ metal, boite, epaisseur = 4 }: { metal: Metal; boite: B
       {/* Une ombre fine sous le filet : il est posé, pas imprimé. */}
       <rect x={x} y={y + 2} width={w} height={h} rx={r} fill="none" stroke="rgba(0,0,0,0.22)" strokeWidth={epaisseur} />
       <rect x={x} y={y} width={w} height={h} rx={r} fill="none" stroke={`url(#${id})`} strokeWidth={epaisseur} />
+      {/* Le fer est rivé : un rivet à chaque coin, là où l'arrondi commence. */}
+      {metal === "fer" &&
+        [
+          [x + r * 0.3, y + r * 0.3],
+          [x + w - r * 0.3, y + r * 0.3],
+          [x + w - r * 0.3, y + h - r * 0.3],
+          [x + r * 0.3, y + h - r * 0.3],
+        ].map(([cx, cy]) => (
+          <g key={`${cx}-${cy}`}>
+            <circle cx={cx + 1} cy={cy + 2} r={epaisseur * 2.4} fill="rgba(0,0,0,0.3)" />
+            <circle cx={cx} cy={cy} r={epaisseur * 2.2} fill={`url(#${id})`} />
+            <circle cx={cx - epaisseur * 0.7} cy={cy - epaisseur * 0.7} r={epaisseur * 0.7} fill="rgba(255,255,255,0.7)" />
+          </g>
+        ))}
       {/* Le platine est double : un second filet, plus fin, à l'intérieur. */}
       {metal === "platine" && (
         <rect
