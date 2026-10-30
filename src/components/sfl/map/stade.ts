@@ -343,7 +343,8 @@ export function pointHtml(nom: string, variante?: VarianteStade): string {
 }
 
 /** Le ton des terrains où l'on peut ouvrir un match : le gris du plan, ou le bleu du ciel. */
-export type TeinteFantome = "gris" | "ciel";
+/** « vert » : un terrain hors des zones Bola, dont le premier match ouvre une zone (30/10). */
+export type TeinteFantome = "gris" | "ciel" | "vert";
 
 const TONS_FANTOME: Record<TeinteFantome, Record<"plan" | "satellite", { trait: string; op: number; fond: string }>> = {
   gris: {
@@ -353,6 +354,10 @@ const TONS_FANTOME: Record<TeinteFantome, Record<"plan" | "satellite", { trait: 
   ciel: {
     plan: { trait: "#1E8FFF", op: 0.85, fond: "rgba(226,241,255,0.75)" },
     satellite: { trait: "#9AD4FF", op: 0.95, fond: "rgba(8,30,56,0.5)" },
+  },
+  vert: {
+    plan: { trait: "#1F8A45", op: 0.95, fond: "rgba(226,247,230,0.85)" },
+    satellite: { trait: "#84D68C", op: 0.95, fond: "rgba(8,40,18,0.5)" },
   },
 };
 

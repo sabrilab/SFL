@@ -119,6 +119,8 @@ export interface PossiblePlan {
   nom: string;
   /** Qui passe devant quand deux se chevauchent : le plus petit (la ligue, puis les plus grands complexes). */
   rang: number;
+  /** Hors des zones Bola : son premier match ouvre une zone (en vert, 30/10). */
+  horsZone?: boolean;
 }
 
 export type FondCarte = "plan" | "satellite";
@@ -189,13 +191,13 @@ function onde(map: PlanMap, lat: number, lng: number, clair: boolean) {
   window.setTimeout(() => r.remove(), 1150);
 }
 
-function collectionPossibles(possibles: PossiblePlan[]): GeoJSON.FeatureCollection<GeoJSON.Point, { id: string; nom: string; rang: number }> {
+function collectionPossibles(possibles: PossiblePlan[]): GeoJSON.FeatureCollection<GeoJSON.Point, { id: string; nom: string; rang: number; horsZone: boolean }> {
   return {
     type: "FeatureCollection",
     features: possibles.map((p) => ({
       type: "Feature",
       geometry: { type: "Point", coordinates: [p.lng, p.lat] },
-      properties: { id: p.id, nom: p.nom, rang: p.rang },
+      properties: { id: p.id, nom: p.nom, rang: p.rang, horsZone: !!p.horsZone },
     })),
   };
 }
@@ -215,7 +217,7 @@ function imageSvg(svg: string): Promise<HTMLImageElement> {
  * leur nom. Les quatre images (gris ou ciel, plan ou satellite) d'abord.
  */
 async function poserPossibles(map: PlanMap, donnees: () => PossiblePlan[], encore: () => boolean): Promise<boolean> {
-  const tons = (["gris", "ciel"] as const).flatMap((t) => (["plan", "satellite"] as const).map((f) => [t, f] as const));
+  const tons = (["gris", "ciel", "vert"] as const).flatMap((t) => (["plan", "satellite"] as const).map((f) => [t, f] as const));
   const images = await Promise.all(tons.map(([t, f]) => imageSvg(fantomeSvg(t, f)).then((img) => [`fantome-${t}-${f}`, img] as const)));
   if (!encore() || map.getSource("possibles")) return false;
   for (const [nom, img] of images) if (!map.hasImage(nom)) map.addImage(nom, img, { pixelRatio: 2 });
@@ -271,10 +273,11 @@ function teinterPossibles(map: PlanMap, fond: FondCarte, teinte: TeinteFantome) 
   if (!map.getLayer("possibles")) return;
   const sat = fond === "satellite";
   const trait = couleurFantome(teinte, fond);
-  map.setLayoutProperty("possibles", "icon-image", `fantome-${teinte}-${fond}`);
-  map.setPaintProperty("possibles-points", "circle-color", trait);
+  // Hors des zones, le terrain « à ouvrir » passe au vert, quel que soit le ton choisi.
+  map.setLayoutProperty("possibles", "icon-image", ["case", ["get", "horsZone"], `fantome-vert-${fond}`, `fantome-${teinte}-${fond}`]);
+  map.setPaintProperty("possibles-points", "circle-color", ["case", ["get", "horsZone"], couleurFantome("vert", fond), trait]);
   map.setPaintProperty("possibles-points", "circle-stroke-color", sat ? "rgba(10, 11, 13, 0.7)" : "#ffffff");
-  map.setPaintProperty("possibles", "text-color", sat ? "#f4f5f2" : teinte === "ciel" ? "#1673d6" : "#55575c");
+  map.setPaintProperty("possibles", "text-color", sat ? "#f4f5f2" : ["case", ["get", "horsZone"], "#1f8a45", teinte === "ciel" ? "#1673d6" : "#55575c"]);
   map.setPaintProperty("possibles", "text-halo-color", sat ? "rgba(10, 11, 13, 0.85)" : "#ffffff");
 }
 
@@ -340,7 +343,7 @@ function degagerEtiquettes(reperes: Marker[]) {
 /** L'étiquette d'une zone, posée au-dessus de son contour : son numéro, son nom, ce qu'elle compte. */
 function zoneHtml(z: Zone): string {
   const classe = `zone-etiq${z.ouverte ? "" : " zone-etiq--attente"}${z.nouvelle ? " zone-etiq--neuve" : ""}`;
-  const tete = z.ouverte ? (z.nouvelle ? `Nouvelle zone · ${numeroZone(z.numero)}` : `Zone ${numeroZone(z.numero)}`) : "Zone fermée";
+  const tete = z.ouverte ? `${z.nouvelle ? "Nouvelle zone" : z.aMoi ? "Ta zone" : "Zone"} · ${numeroZone(z.numero)}` : z.aMoi ? "Ta zone · à ouvrir" : "Zone à ouvrir";
   return `<button type="button" class="${classe}" data-zone="${z.id}"><span class="zone-etiq__tete">${echapper(tete)}</span><span class="zone-etiq__nom">${echapper(z.nom)}</span>${z.sous ? `<span class="zone-etiq__sous">${echapper(z.sous)}</span>` : ""}</button>`;
 }
 

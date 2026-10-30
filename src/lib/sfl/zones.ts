@@ -57,6 +57,10 @@ export interface Zone {
   joueurs: number;
   depuis?: number;
   par?: string;
+  /** Les points qui la tiennent (lieux et villes) : son fondu en part. */
+  appuis: { lat: number; lng: number }[];
+  /** La zone où vit le joueur qui regarde (la page le dit) : « Ta zone ». */
+  aMoi?: boolean;
   /** Ce que dit son étiquette sous le nom (la page l'écrit : « 62 joueurs · 4 dimanches »). */
   sous?: string;
 }
@@ -196,6 +200,7 @@ export function calculerZones(foyers: Foyer[], villes: VilleZone[], maintenant: 
         nouvelle: premier.depuis != null && maintenant - premier.depuis < NOUVELLE_JOURS * 86_400_000,
         centre,
         contour: contourDe([...g, ...vs]),
+        appuis: [...g, ...vs],
         foyers: g,
         villes: vs,
         joueurs: vs.reduce((s, v) => s + v.n, 0),
@@ -209,7 +214,7 @@ export function calculerZones(foyers: Foyer[], villes: VilleZone[], maintenant: 
     .map((vs): Zone => {
       const centre = centreDe(vs);
       const joueurs = vs.reduce((s, v) => s + v.n, 0);
-      return { id: "", numero: 0, nom: nomDe(centre, vs, []), ouverte: false, nouvelle: false, centre, contour: contourDe(vs, 4), foyers: [], villes: vs, joueurs };
+      return { id: "", numero: 0, nom: nomDe(centre, vs, []), ouverte: false, nouvelle: false, centre, contour: contourDe(vs, 4), appuis: vs, foyers: [], villes: vs, joueurs };
     })
     .filter((z) => z.joueurs >= ATTENTE_MIN)
     .sort((a, b) => b.joueurs - a.joueurs)
@@ -245,6 +250,35 @@ export function voileHorsZones(zones: Zone[]): GeoJSON.Feature<GeoJSON.Polygon> 
   };
 }
 
+/**
+ * Le fondu (Sabri, 30/10 : « pas une fracture […] il faudrait que ça se
+ * fonde ») : des voiles de plus en plus larges autour des zones ouvertes,
+ * chacun presque transparent ; empilés, ils grisent le plan de plus en plus
+ * à mesure qu'on s'éloigne, sans bord visible. Les marges croissent en
+ * progression géométrique : le fondu est serré près de la zone, large au loin.
+ */
+export const FONDU_PAS = 10;
+export function voilesEnFondu(zones: Zone[]): GeoJSON.FeatureCollection<GeoJSON.Polygon> {
+  const ouvertes = zones.filter((z) => z.ouverte && z.appuis.length);
+  const monde: [number, number][] = [
+    [-180, -85],
+    [180, -85],
+    [180, 85],
+    [-180, 85],
+    [-180, -85],
+  ];
+  const features: GeoJSON.Feature<GeoJSON.Polygon>[] = [];
+  for (let k = 0; k < FONDU_PAS; k++) {
+    const marge = 1.2 * 1.38 ** k;
+    features.push({
+      type: "Feature",
+      properties: { k },
+      geometry: { type: "Polygon", coordinates: [dansLeSens(monde, true), ...ouvertes.map((z) => dansLeSens(contourDe(z.appuis, marge), false))] },
+    });
+  }
+  return { type: "FeatureCollection", features };
+}
+
 /** Les contours, pour leurs traits (ouverte ou en attente). */
 export function contoursDesZones(zones: Zone[]): GeoJSON.FeatureCollection<GeoJSON.LineString, { id: string; ouverte: boolean; nouvelle: boolean }> {
   return {
@@ -267,3 +301,43 @@ export function chaleur(zones: Zone[]): GeoJSON.FeatureCollection<GeoJSON.Point,
 
 /** « 01 » */
 export const numeroZone = (n: number) => String(n).padStart(2, "0");
+
+/** Un match qui a ouvert une zone : à qui en revient le mérite (l'XP, lib/sfl/missions.ts). */
+export interface OuvertureDeZone {
+  partieId: number;
+  organisateurId: string;
+  organisateur: string;
+  /** ISO, « 2026-11-07 ». */
+  jour: string;
+  lieu: string;
+}
+
+/**
+ * Les ouvertures de zones (Sabri, 30/10 : « donner un mérite à ceux qui
+ * ouvrent des matchs dans une région ou dans une zone différente, leur
+ * donner de l'XP ») : dans l'ordre des jours, un match ouvert JOUÉ (sa
+ * feuille saisie) à plus de LIEN_KM de tout terrain de la ligue et de tout
+ * match joué avant lui ouvre une zone ; le mérite revient à son
+ * organisateur. Un match pas encore joué n'ouvre rien (ni ne compte pour
+ * les suivants) : on ne gagne pas d'XP en annonçant un match qu'on annule.
+ * Ne dépend que des matchs et des terrains, pas de ce que la Map montre :
+ * le même calcul sur chaque téléphone.
+ */
+export function ouverturesDeZones(
+  ligue: { lat: number; lng: number }[],
+  parties: { id: number; organisateurId: string; organisateur: string; jour: string; lieu: string; lat: number | null; lng: number | null; saisiLe: string | null }[]
+): OuvertureDeZone[] {
+  const connus = [...ligue];
+  const ouvertures: OuvertureDeZone[] = [];
+  const jouees = parties
+    .filter((p) => p.saisiLe && p.lat != null && p.lng != null)
+    .sort((a, b) => a.jour.localeCompare(b.jour) || (a.saisiLe ?? "").localeCompare(b.saisiLe ?? "") || a.id - b.id);
+  for (const p of jouees) {
+    const ici = { lat: p.lat!, lng: p.lng! };
+    if (connus.every((c) => km(c, ici) > LIEN_KM)) {
+      ouvertures.push({ partieId: p.id, organisateurId: p.organisateurId, organisateur: p.organisateur, jour: p.jour, lieu: p.lieu });
+    }
+    connus.push(ici);
+  }
+  return ouvertures;
+}

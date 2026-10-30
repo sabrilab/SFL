@@ -20,7 +20,7 @@
 // pointillé dans les trois.
 
 import type { Map as PlanMap } from "maplibre-gl";
-import { chaleur, contoursDesZones, voileHorsZones, type Zone } from "@/lib/sfl/zones";
+import { chaleur, contoursDesZones, voilesEnFondu, type Zone } from "@/lib/sfl/zones";
 
 export type Ambiance = "classique" | "territoire" | "nuit" | "encre";
 export const AMBIANCES: Ambiance[] = ["territoire", "nuit", "encre", "classique"];
@@ -183,8 +183,10 @@ export function poserZones(map: PlanMap, zones: Zone[]) {
   if (map.getSource("zones-voile")) return;
   if (!map.hasImage("hachures")) map.addImage("hachures", hachures(), { pixelRatio: 2 });
   map.addSource("zones-chaleur", { type: "geojson", data: chaleur(zones) });
-  map.addSource("zones-voile", { type: "geojson", data: voileHorsZones(zones) });
+  map.addSource("zones-voile", { type: "geojson", data: voilesEnFondu(zones) });
   map.addSource("zones-traits", { type: "geojson", data: contoursDesZones(zones) });
+  map.addLayer({ id: "zones-voile", type: "fill", source: "zones-voile", paint: { "fill-opacity": 0, "fill-antialias": false } }, AVANT);
+  map.addLayer({ id: "zones-hachures", type: "fill", source: "zones-voile", paint: { "fill-pattern": "hachures", "fill-opacity": 0, "fill-antialias": false } }, AVANT);
   map.addLayer(
     {
       id: "zones-chaleur",
@@ -200,8 +202,6 @@ export function poserZones(map: PlanMap, zones: Zone[]) {
     },
     AVANT
   );
-  map.addLayer({ id: "zones-voile", type: "fill", source: "zones-voile", paint: { "fill-opacity": 0, "fill-antialias": false } }, AVANT);
-  map.addLayer({ id: "zones-hachures", type: "fill", source: "zones-voile", paint: { "fill-pattern": "hachures", "fill-opacity": 0, "fill-antialias": false } }, AVANT);
   map.addLayer(
     {
       id: "zones-lisere",
@@ -244,47 +244,39 @@ export function majZones(map: PlanMap, zones: Zone[]) {
     if (s && "setData" in s) (s as { setData: (d: GeoJSON.GeoJSON) => void }).setData(data);
   };
   set("zones-chaleur", chaleur(zones));
-  set("zones-voile", voileHorsZones(zones));
+  set("zones-voile", voilesEnFondu(zones));
   set("zones-traits", contoursDesZones(zones));
 }
-
-const loinPres = (loin: number, pres: number, z1 = 6, z2 = 13) => ["interpolate", ["linear"], ["zoom"], z1, loin, z2, pres];
 
 /** Le ton des zones, selon l'ambiance (et le fond : la photo satellite n'a pas de voile). */
 export function teinterZones(map: PlanMap, ambiance: Ambiance, satellite: boolean) {
   if (!map.getLayer("zones-voile")) return;
   const set = (id: string, prop: string, v: unknown) => map.setPaintProperty(id, prop, v);
   const sans = ambiance === "classique";
-  // Le voile : papier hachuré, nuit, ou presque rien (l'encre dit la data par la chaleur).
-  const voile = sans || satellite ? 0 : ambiance === "territoire" ? 0.62 : ambiance === "nuit" ? 0.7 : 0.5;
-  set("zones-voile", "fill-color", ambiance === "nuit" ? "#030304" : ambiance === "encre" ? "#d6d5cf" : "#f3f1ea");
+  // Le voile en fondu (zones.ts, voilesEnFondu) : dix voiles empilés, de
+  // plus en plus larges ; l'opacité est celle de chacun. Plus de trait ni de
+  // hachures (Sabri, 30/10 : « pas une fracture […] que ça se fonde ») : hors
+  // des zones le plan se grise peu à peu, dedans il reste clair.
+  const voile = sans || satellite ? 0 : ambiance === "territoire" ? 0.105 : ambiance === "nuit" ? 0.13 : 0.08;
+  set("zones-voile", "fill-color", ambiance === "nuit" ? "#030304" : ambiance === "encre" ? "#cfcec8" : "#c9cac6");
   set("zones-voile", "fill-opacity", voile);
-  set("zones-hachures", "fill-opacity", ambiance === "territoire" && !satellite ? 1 : 0);
-  // La chaleur : des projecteurs la nuit, de l'encre sur le papier.
-  set("zones-chaleur", "heatmap-opacity", sans || satellite || ambiance === "territoire" ? 0 : ambiance === "nuit" ? 0.95 : 0.9);
+  set("zones-hachures", "fill-opacity", 0);
+  // Les halos : de la lumière là où l'on joue et d'où l'on vient, plus
+  // forte la nuit ; à l'encre, une encre plus dense.
+  set("zones-chaleur", "heatmap-opacity", sans || satellite ? 0 : 1);
   set(
     "zones-chaleur",
     "heatmap-color",
-    ambiance === "nuit"
-      ? ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.15, "rgba(255,255,255,0.06)", 0.5, "rgba(246,247,242,0.2)", 1, "rgba(246,247,242,0.42)"]
-      : ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(10,11,13,0)", 0.15, "rgba(10,11,13,0.05)", 0.5, "rgba(10,11,13,0.14)", 1, "rgba(10,11,13,0.3)"]
+    ambiance === "encre"
+      ? ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(10,11,13,0)", 0.15, "rgba(10,11,13,0.04)", 0.5, "rgba(10,11,13,0.1)", 1, "rgba(10,11,13,0.22)"]
+      : ambiance === "nuit"
+        ? ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.15, "rgba(255,255,255,0.06)", 0.5, "rgba(246,247,242,0.2)", 1, "rgba(246,247,242,0.42)"]
+        : ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.15, "rgba(255,255,253,0.18)", 0.5, "rgba(255,255,253,0.38)", 1, "rgba(255,255,253,0.6)"]
   );
-  // Le contour : encre sur liseré blanc, trait de lumière, ou double filet.
-  const encre = ambiance === "nuit" || satellite ? "#f4f5f2" : "#0a0b0d";
-  set("zones-trait", "line-color", encre);
-  set("zones-trait", "line-opacity", sans ? 0 : 1);
-  set("zones-trait", "line-width", ambiance === "encre" ? loinPres(0.7, 1.1) : loinPres(1.6, 2.6));
-  set("zones-trait", "line-gap-width", ambiance === "encre" ? loinPres(2, 4) : 0);
-  set("zones-trait", "line-blur", ambiance === "nuit" ? 0.6 : 0);
-  set("zones-lisere", "line-color", ambiance === "nuit" ? "rgba(246,247,242,0.18)" : "#ffffff");
-  set("zones-lisere", "line-opacity", sans || ambiance === "encre" ? 0 : 1);
-  set("zones-lisere", "line-width", ambiance === "nuit" ? loinPres(8, 14) : loinPres(5, 8));
-  set("zones-lisere", "line-blur", ambiance === "nuit" ? 6 : 0);
-  set("zones-attente", "line-color", encre);
-  set("zones-attente", "line-opacity", sans ? 0 : 0.55);
+  for (const id of ["zones-trait", "zones-lisere", "zones-attente"]) set(id, "line-opacity", 0);
   // Les terrains possibles, de loin : des points cerclés, à peine la nuit.
   if (map.getLayer("possibles-points") && !satellite) {
     map.setPaintProperty("possibles-points", "circle-stroke-color", ambiance === "nuit" ? "rgba(246,247,242,0.35)" : "#ffffff");
-    map.setPaintProperty("possibles-points", "circle-color", ambiance === "nuit" ? "#5d6067" : ambiance === "encre" ? "#6b6c70" : "#8a8c91");
+    map.setPaintProperty("possibles-points", "circle-color", ["case", ["get", "horsZone"], ambiance === "nuit" ? "#84D68C" : "#1F8A45", ambiance === "nuit" ? "#5d6067" : ambiance === "encre" ? "#6b6c70" : "#8a8c91"]);
   }
 }

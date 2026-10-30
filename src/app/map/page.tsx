@@ -1060,6 +1060,7 @@ export default function MapPage() {
     return [...parNom.values()];
   }, [villes, demoZones]);
   const dimanches = useMemo(() => saison.journees.filter((j) => journeeJouee(saison, j.j)).length, [saison]);
+  const chezMoi = useMemo(() => (me && villes.length ? villeOuLigue(me) : null), [me, villes]);
   const zones = useMemo<Zone[]>(() => {
     if (ambiance === "classique") return [];
     return calculerZones(foyers, villesZones, maintenant).map((z) => {
@@ -1070,9 +1071,11 @@ export default function MapPage() {
             .filter(Boolean)
             .join(" · ")
         : `${z.joueurs} joueurs · aucun match`;
-      return { ...z, sous };
+      // La zone où je vis : « Ta zone ».
+      const aMoi = !!chezMoi && dansContour(z.contour, chezMoi.lat, chezMoi.lng);
+      return { ...z, sous, aMoi };
     });
-  }, [ambiance, foyers, villesZones, dimanches, maintenant]);
+  }, [ambiance, foyers, villesZones, dimanches, maintenant, chezMoi]);
   const [zoneOuverte, setZoneOuverte] = useState<string | null>(null);
   const zoneVue = zones.find((z) => z.id === zoneOuverte) ?? null;
   /** La zone d'un point : ouverte, sinon celle qu'un match là-bas ouvrirait (son numéro à venir). */
@@ -1086,11 +1089,17 @@ export default function MapPage() {
     },
     [zones]
   );
+  // Les terrains hors des zones passent au vert : leur premier match ouvre une zone.
+  const possiblesZones = useMemo(() => {
+    const ouvertes = zones.filter((z) => z.ouverte);
+    if (!ouvertes.length) return possibles;
+    return possibles.map((x) => ({ ...x, horsZone: !ouvertes.some((z) => dansContour(z.contour, x.lat, x.lng)) }));
+  }, [possibles, zones]);
   const zoneDuLibre = useMemo(() => {
     if (!libre || !zones.length) return null;
     const z = zoneDe(libre.lat, libre.lng);
-    if (!z.ouvre) return `Zone ${numeroZone(z.zone!.numero)} · ${z.zone!.nom}`;
-    return `Hors zone · ton match ouvre la zone ${numeroZone(z.numero!)}${z.zone ? ` · ${z.zone.nom}` : ""}`;
+    if (!z.ouvre) return { texte: `Zone ${numeroZone(z.zone!.numero)} · ${z.zone!.nom}`, ouvre: false };
+    return { texte: `Ton match ouvre la zone ${numeroZone(z.numero!)}${z.zone ? ` · ${z.zone.nom}` : ""}`, ouvre: true };
   }, [libre, zones, zoneDe]);
   // Le filtre Contrats : seules les cibles du dimanche, chacune avec son
   // contrat. L'horloge des missions recalcule tout chaque minute : les cibles
@@ -1221,7 +1230,7 @@ export default function MapPage() {
             viser={viser}
             cadrerSur={cadrage}
             matchsEnRetrait={enContrats}
-            possibles={enContrats ? SANS_POSSIBLES : calques.terrains ? possibles : surCarte ? seulPropose : SANS_POSSIBLES}
+            possibles={enContrats ? SANS_POSSIBLES : calques.terrains ? possiblesZones : surCarte ? seulPropose : SANS_POSSIBLES}
             possibleChoisi={enContrats ? null : (leve ?? (surCarte ? (ouPropose?.id ?? null) : null))}
             onPossible={toucherPossible}
             teinteFantome={tonFantomes}
@@ -2118,7 +2127,7 @@ function RecitZone({ zone, dimanches, ouvrir, onOuvrir }: { zone: Zone; dimanche
   return (
     <>
       <SheetHeader className="px-5 pt-5 pb-0">
-        <p className="mono-label text-muted-foreground">{zone.ouverte ? `Zone ${numeroZone(zone.numero)}${zone.nouvelle ? " · nouvelle" : ""}` : "Zone fermée"}</p>
+        <p className="mono-label text-muted-foreground">{zone.ouverte ? `${zone.aMoi ? "Ta zone" : "Zone"} ${numeroZone(zone.numero)}${zone.nouvelle ? " · nouvelle" : ""}` : "Zone à ouvrir"}</p>
         <SheetTitle className="text-[30px] leading-none font-black tracking-tight uppercase italic">{zone.nom}</SheetTitle>
       </SheetHeader>
       <div className="flex flex-col gap-4 px-4 pt-3">
@@ -2190,7 +2199,7 @@ function FicheLibre({
   /** La source du terrain, citée sous la fiche (Licence Ouverte, ODbL). */
   source: string | null;
   /** La zone du terrain : la sienne, ou celle que son premier match ouvrira. */
-  zone?: string | null;
+  zone?: { texte: string; ouvre: boolean } | null;
   onOuvrir: () => void;
 }) {
   const lien = itineraires(t.lat, t.lng, t.nom)[ios ? 0 : 1];
@@ -2211,11 +2220,11 @@ function FicheLibre({
           <Navigation className="size-[10px]" strokeWidth={2.6} /> Y aller
         </a>
       </div>
-      {zone && <p className="mono-label text-center text-muted-foreground">{zone}</p>}
+      {zone && <p className={`mono-label text-center ${zone.ouvre ? "font-bold text-[#1F8A45] dark:text-[#84D68C]" : "text-muted-foreground"}`}>{zone.texte}</p>}
       {ouvrir && (
         <Button variant="vert" onClick={onOuvrir} className="h-12 w-full gap-2.5 rounded-full text-[15px] font-semibold">
           <SigleLigue ligue="bola" hauteur={12} />
-          Ouvrir un match ici
+          {zone?.ouvre ? "Ouvrir la zone ici" : "Ouvrir un match ici"}
         </Button>
       )}
       {defi && (
