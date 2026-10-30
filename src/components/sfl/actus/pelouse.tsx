@@ -38,6 +38,7 @@ import { MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Badge3D } from "@/components/sfl/badge-3d";
 import { MiniCarte } from "@/components/sfl/mini-carte";
+import { BoutonStoryDimanche } from "@/components/sfl/story/story-dimanche";
 import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSaisonClose, useSeason } from "@/components/sfl/season-provider";
@@ -608,6 +609,7 @@ export function RubriqueToi({ j, date, className }: { j: number; date: string; c
       jusqua={225}
       texte={delta > 0 ? `▲ ${delta} au Pépite d'Or` : delta < 0 ? `▼ ${-delta} au Pépite d'Or` : "Même place au Pépite d'Or"}
       partage={{ titre: "Mon dimanche", j, lignes: [{ n: me, v: `${buts} buts · ${passes} passes · +${pp} pts` }] }}
+      action={<BoutonStoryDimanche j={j} date={date} buts={buts} passes={passes} points={pp} delta={delta} />}
     >
       <SesChiffres buts={buts} passes={passes} pp={pp} />
     </Scene>
