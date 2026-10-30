@@ -16,7 +16,7 @@
 //
 // Une rubrique vide ne se montre pas (pas encore de dimanche, pas d'XP, une
 // seule journée pour la courbe). Les tuiles tiennent en clair comme en sombre.
-// Les chiffres en Anton, les étiquettes en JetBrains Mono ; aucun rouge ni
+// Les chiffres en Anton, les étiquettes en Inter capitales ; aucun rouge ni
 // bleu (cartes Impact et Défensive), l'or reste aux badges.
 
 import Link from "next/link";

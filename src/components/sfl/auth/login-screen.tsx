@@ -2,7 +2,7 @@
 
 // Écran de connexion — première chose que voit un membre de la ligue.
 // Repris du langage du design : fond #070707 et orbes, verre, micro-libellés
-// en JetBrains Mono, une seule action blanche.
+// en capitales Inter, une seule action blanche.
 
 import { useState } from "react";
 import Link from "next/link";

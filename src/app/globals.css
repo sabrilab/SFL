@@ -12,10 +12,13 @@
   --color-foreground: var(--foreground);
   /* Typographie de l'app BOLA, celle de la Map : Inter pour tout ce qui se
      lit, et au plus gras pour les titres en capitales (.titre-lettrage) ;
-     JetBrains Mono en capitales pour ce qui s'étiquette (.mono-label).
+     Inter aussi, en capitales espacées, pour ce qui s'étiquette
+     (.mono-label, font-mono). La police machine à écrire (JetBrains Mono) a
+     quitté l'interface le 30/10 (Sabri : « supprimer un type de
+     typographie partout ») ; seules les cartes joueurs la gardent.
      Anton ne sert plus qu'aux chiffres. */
   --font-sans: var(--font-inter);
-  --font-mono: var(--font-jbmono);
+  --font-mono: var(--font-inter);
   --font-heading: var(--font-sans);
   --font-display: var(--font-anton);
   --color-vert: var(--vert);
@@ -283,12 +286,23 @@
 .orbs > i:nth-child(2) { top: 330px; right: -110px; width: 280px; height: 280px; filter: blur(24px); animation-duration: 21s; animation-direction: reverse; background: radial-gradient(circle, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 70%); }
 .orbs > i:nth-child(3) { bottom: -80px; left: 30px; width: 320px; height: 260px; filter: blur(30px); animation-duration: 25s; background: radial-gradient(circle, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 70%); }
 
-/* Micro-label — l'étiquette de la Map (« 3 MATCHS OUVERTS ») : JetBrains
-   Mono partout, iPhone compris, capitales espacées, en gras. Avant le 22/10,
-   l'iPhone prenait SF Mono, plus sèche que l'étiquette de la Map (Sabri :
-   « uniformise le tout »). */
+/* font-mono vaut Inter depuis le 30/10 : on garde aux chiffres la chasse fixe
+   qu'ils avaient (heures, scores, colonnes). En base, pour que tabular-nums,
+   ordinal… restent maîtres. */
+@layer base {
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Micro-label — l'étiquette de la Map (« 3 MATCHS OUVERTS ») : Inter en
+   capitales espacées, en gras, chiffres à chasse fixe pour que les colonnes
+   tiennent. C'était JetBrains Mono du 22/10 au 30/10 ; Sabri l'a retirée
+   (« un truc qui ressemble à du courrier ») : le nom garde « mono » pour ne
+   pas toucher aux centaines d'appels. */
 .mono-label {
-  font-family: var(--font-jbmono), ui-monospace, monospace;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -737,7 +751,7 @@
   height: 11px;
   background: #0a0b0d;
   color: #f4f5f2;
-  font: 700 7px/11px var(--font-jbmono), ui-monospace, monospace;
+  font: 700 7px/11px var(--font-inter), system-ui, sans-serif;
   letter-spacing: 0.4px;
   text-align: center;
   text-transform: uppercase;
@@ -1043,7 +1057,7 @@
 }
 .grp__plus,
 .vil__reste {
-  font: 700 9px/1 var(--font-jbmono), ui-monospace, monospace;
+  font: 700 9px/1 var(--font-inter), system-ui, sans-serif;
   color: #8f908b;
 }
 
@@ -1065,7 +1079,7 @@
   cursor: pointer;
 }
 .vil__compte {
-  font: 700 9.5px/1 var(--font-jbmono), ui-monospace, monospace;
+  font: 700 9.5px/1 var(--font-inter), system-ui, sans-serif;
   font-style: normal;
   color: rgba(244, 245, 242, 0.6);
 }
@@ -1654,7 +1668,7 @@
   white-space: nowrap;
   padding-block: 3px;
   border-block: 1px solid rgba(227, 194, 122, 0.16);
-  font-family: var(--font-jbmono), ui-monospace, monospace;
+  font-family: var(--font-inter), system-ui, sans-serif;
   font-size: 6.5px;
   font-weight: 700;
   line-height: 1;

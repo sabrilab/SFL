@@ -32,14 +32,16 @@ import { PorteSfl } from "@/components/sfl/porte-sfl";
 
 // Typographie de l'app BOLA, celle de la Map (Sabri, 22/10 : « uniformise le
 // tout ») : Inter pour tout ce qui se lit (celle du site), au plus gras pour
-// les titres en capitales, et JetBrains Mono pour les étiquettes en
-// capitales, sur tous les appareils (globals.css, .titre-lettrage et
-// .mono-label).
+// les titres en capitales, et en capitales espacées pour les étiquettes
+// (globals.css, .titre-lettrage et .mono-label).
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
 });
 
+// JetBrains Mono : seulement sur les cartes joueurs (bola-card, carte-photo,
+// dos-carte, habillage-carte, editorial-card). Sabri l'a retirée de
+// l'interface le 30/10 ; on ne retouche pas les cartes.
 const jbMono = JetBrains_Mono({
   weight: ["400", "600", "700"],
   variable: "--font-jbmono",
