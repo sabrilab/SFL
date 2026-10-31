@@ -34,6 +34,7 @@ import {
   type CalquesStory,
   type PolicesStory,
   type StoryDimanche,
+  type TonStory,
 } from "@/lib/sfl/story-dimanche";
 
 function charger(src: string): Promise<HTMLImageElement | null> {
@@ -66,9 +67,7 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
   const [etat, setEtat] = useState<Etat>({ quoi: "carte" });
   const [url, setUrl] = useState<string | null>(null);
 
-  // Une seule vidéo par ouverture : la carte peut se rephotographier (un badge
-  // arrivé en retard), on garde la première photo.
-  const lance = useRef(false);
+  const [ton, setTon] = useState<TonStory>("blanc");
   const fermerRef = useRef(onFermer);
   useEffect(() => {
     fermerRef.current = onFermer;
@@ -84,22 +83,25 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
     return () => clearTimeout(garde);
   }, [calques]);
 
+  // Les images, chargées une fois : la carte peut se rephotographier (un badge
+  // arrivé en retard), on garde la première photo.
+  const [images, setImages] = useState<{ c: CalquesStory; p: PolicesStory } | null>(null);
+  const charge = useRef(false);
   useEffect(() => {
-    if (!calques || lance.current) return;
-    lance.current = true;
+    if (!calques || charge.current) return;
+    charge.current = true;
     (async () => {
-      const [fond, joueur, stats, logo, symbole, colonne, dos] = await Promise.all([
+      const [fond, joueur, stats, logoNoir, logoBlanc, symbole, colonne, dos] = await Promise.all([
         charger(calques.background),
         charger(calques.playerLayer),
         charger(calques.stats),
         charger("/bola/logo-noir.svg"),
+        charger("/bola/logo-blanc.svg"),
         charger("/bola/symbole-noir.svg"),
         charger("/story/colonne.png"),
         calques.dos ? charger(calques.dos) : Promise.resolve(null),
       ]);
-      const canvas = toile.current;
-      const ctx = canvas?.getContext("2d");
-      if (!canvas || !ctx || !fond || !joueur || !stats) {
+      if (!fond || !joueur || !stats) {
         toast.error("Ta story n'a pas pu se faire. Réessaie dans un instant.");
         fermerRef.current();
         return;
@@ -110,23 +112,39 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
         Promise.all([document.fonts.load(`900 104px ${p.texte}`), document.fonts.load(`400 128px ${p.chiffres}`)]).catch(() => {}),
         new Promise((ok) => setTimeout(ok, 2000)),
       ]);
-      const c: CalquesStory = { fond, joueur, stats, logo, dos, symbole, colonne, ratio: calques.height / calques.width };
-      const dessiner = (t: number) => dessinerStory(ctx, t, donnees, c, p);
-      setEtat({ quoi: "film", avance: 0 });
-      const blob = await enregistrerStory(canvas, dessiner, (avance) => setEtat({ quoi: "film", avance }));
+      const ratio = calques.height / calques.width;
+      setImages({ c: { fond, joueur, stats, logo: logoNoir, logoBlanc, dos, symbole, colonne, ratio }, p });
+    })();
+  }, [calques]);
+
+  // Une vidéo par ton : changer de ton arrête celle en cours et refait l'autre.
+  useEffect(() => {
+    const canvas = toile.current;
+    const ctx = canvas?.getContext("2d");
+    if (!images || !canvas || !ctx) return;
+    const arret = new AbortController();
+    const c = { ...images.c, logo: ton === "noir" ? (images.c.logoBlanc ?? null) : images.c.logo };
+    const dessiner = (t: number) => dessinerStory(ctx, t, donnees, c, images.p, ton);
+    setUrl(null);
+    setEtat({ quoi: "film", avance: 0 });
+    (async () => {
+      const blob = await enregistrerStory(canvas, dessiner, (avance) => setEtat({ quoi: "film", avance }), arret.signal);
+      if (arret.signal.aborted) return;
       dessiner(STORY.duree + 1);
+      const nom = `mon-dimanche-j${donnees.j}-bola`;
       if (blob) {
         const ext = blob.type.includes("mp4") ? "mp4" : "webm";
         setUrl(URL.createObjectURL(blob));
-        setEtat({ quoi: "pret", video: true, fichier: new File([blob], `mon-dimanche-j${donnees.j}-bola.${ext}`, { type: blob.type }) });
+        setEtat({ quoi: "pret", video: true, fichier: new File([blob], `${nom}.${ext}`, { type: blob.type }) });
         return;
       }
       // Pas d'enregistrement possible : l'image de la fin.
       const png = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/png"));
-      if (!png) return;
-      setEtat({ quoi: "pret", video: false, fichier: new File([png], `mon-dimanche-j${donnees.j}-bola.png`, { type: "image/png" }) });
+      if (!png || arret.signal.aborted) return;
+      setEtat({ quoi: "pret", video: false, fichier: new File([png], `${nom}.png`, { type: "image/png" }) });
     })();
-  }, [calques, donnees]);
+    return () => arret.abort();
+  }, [images, ton, donnees]);
 
   useEffect(() => () => void (url && URL.revokeObjectURL(url)), [url]);
 
@@ -201,7 +219,21 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
         </div>
       </div>
 
-      <div className="shrink-0 px-4 pb-[max(16px,env(safe-area-inset-bottom))]">
+      <div className="flex shrink-0 flex-col gap-3 px-4 pb-[max(16px,env(safe-area-inset-bottom))]">
+        <div role="radiogroup" aria-label="Fond" className="mx-auto flex rounded-full bg-white/10 p-1">
+          {(["blanc", "noir"] as const).map((x) => (
+            <button
+              key={x}
+              type="button"
+              role="radio"
+              aria-checked={ton === x}
+              onClick={() => setTon(x)}
+              className={`h-8 rounded-full px-4 text-[13px] font-semibold capitalize transition-colors ${ton === x ? "bg-white text-black" : "text-white/70"}`}
+            >
+              {x}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={partager}
