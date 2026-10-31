@@ -45,7 +45,8 @@ import { isHidden } from "./hidden";
 import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { ovr, type Player } from "./engine";
 import type { MatchEntry, Saison, SaisonArchivee } from "./saisie/types";
-import { passeDe, type BilanPasse, type Epreuve } from "./passe";
+import { passeDe, type BilanPasse, type Epreuve, type PaliersAtteints } from "./passe";
+import { saisonPasseA, saisonPasseDeLigne, SAISONS_PASSE, type SaisonPasse } from "./saisons-passe";
 import type { CreneauArbitre } from "./missions-arbitre";
 
 /* ------------------------------- Le barème ------------------------------- */
@@ -660,19 +661,24 @@ export interface LigneXp {
    * Toujours hors du rang.
    */
   bola?: true;
+  /** Un badge de palier franchi (lib/sfl/defis.ts) : sa prime de défi. */
+  defi?: true;
 }
 
 export interface BilanXp {
   /** À vie. */
   total: number;
-  /** Gagnés dans la saison en cours : le passe. */
+  /** Gagnés dans la saison du Passe en cours (saisons-passe.ts). */
   saison: number;
+  /** La saison du Passe en cours, et ses lignes. */
+  saisonPasse: SaisonPasse;
+  lignesSaison: LigneXp[];
   niveau: number;
   /** Dans le niveau en cours, et ce qu'il faut pour le suivant (100 × niveau). */
   dansLeNiveau: number;
   pourLeSuivant: number;
   /**
-   * Le palier du Passe Bola atteint (0 à 20) : un palier atteint reste acquis,
+   * Le palier du Passe Bola atteint dans la saison en cours : un palier atteint reste acquis,
    * même si un contrat raté fait redescendre l'XP de la saison. Le détail
    * (l'XP vers le suivant, les épreuves) est dans `passe` (passe.ts).
    */
@@ -817,24 +823,31 @@ export function journalXp(
   return out;
 }
 
-/** Le bilan d'un joueur, tiré du journal. */
+/** Le bilan d'un joueur, tiré du journal, dans la saison du Passe de `maintenant`. */
 export function bilanDe(
   journal: Map<string, { lignes: LigneXp[]; reussies: number }>,
   joueur: string,
-  saisonEnCours: number,
+  maintenant: Date,
   /** Les épreuves du passe : celles de la SFL, ou celles d'un joueur Bola (EPREUVES_BOLA). */
-  epreuves?: readonly Epreuve[]
+  epreuves?: readonly Epreuve[],
+  /** Une autre saison du Passe que celle de `maintenant` (paliersDe). */
+  saisonVoulue?: SaisonPasse
 ): BilanXp {
   const x = journal.get(joueur) ?? { lignes: [], reussies: 0 };
+  const saisonPasse = saisonVoulue ?? saisonPasseA(maintenant);
+  const lignesSaison = x.lignes.filter((l) => saisonPasseDeLigne(l, maintenant) === saisonPasse);
   // Les risques font baisser l'XP ; jamais sous zéro.
   const total = Math.max(0, x.lignes.reduce((a, l) => a + l.xp, 0));
-  const saison = Math.max(0, x.lignes.filter((l) => l.saison === saisonEnCours).reduce((a, l) => a + l.xp, 0));
+  const saison = Math.max(0, lignesSaison.reduce((a, l) => a + l.xp, 0));
   const niveau = niveauDe(total);
   // Le passe suit la saison dimanche par dimanche : le plus haut palier atteint reste (passe.ts).
-  const passe = passeDe(x.lignes.filter((l) => l.saison === saisonEnCours), epreuves);
+  const passe = passeDe(lignesSaison, epreuves, saisonPasse.paliers.length);
+  const recent = (a: LigneXp, b: LigneXp) => b.saison - a.saison || b.j - a.j;
   return {
     total,
     saison,
+    saisonPasse,
+    lignesSaison: [...lignesSaison].sort(recent),
     niveau,
     dansLeNiveau: total - debutNiveau(niveau),
     pourLeSuivant: 100 * niveau,
@@ -842,7 +855,7 @@ export function bilanDe(
     passe,
     reussies: x.reussies,
     cran: cranDe(x.reussies),
-    lignes: [...x.lignes].sort((a, b) => b.saison - a.saison || b.j - a.j),
+    lignes: [...x.lignes].sort(recent),
   };
 }
 
@@ -908,16 +921,19 @@ export function rangsDesJoueurs(classement: { name: string; xp: number; rank: nu
   return out;
 }
 
-/** Le plus haut palier du passe atteint, toutes saisons confondues : ce qu'il a débloqué pour de bon. */
-export function palierMaxDe(
+/** Le palier atteint dans chaque saison du Passe : ce qu'il a débloqué pour de bon (debloquesDe). */
+export function paliersDe(
   journal: Map<string, { lignes: LigneXp[]; reussies: number }>,
   joueur: string,
+  maintenant: Date,
   epreuves?: readonly Epreuve[]
-): number {
-  const saisons = new Set((journal.get(joueur)?.lignes ?? []).map((l) => l.saison));
-  let max = 0;
-  for (const s of saisons) max = Math.max(max, bilanDe(journal, joueur, s, epreuves).palier);
-  return max;
+): PaliersAtteints {
+  const out: Record<string, number> = {};
+  for (const s of SAISONS_PASSE) {
+    const p = bilanDe(journal, joueur, maintenant, epreuves, s).palier;
+    if (p > 0) out[s.id] = p;
+  }
+  return out;
 }
 
 /* ------------------------------ Les libellés ------------------------------ */

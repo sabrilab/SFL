@@ -189,9 +189,10 @@ const beaucoup = [...lignes];
 const unMatch = lignes.find((l) => l.quoi === "Match Bola")!;
 for (let i = 0; i < 30; i++) beaucoup.push({ ...unMatch });
 ajouterBola(jb, NOM, beaucoup);
-const saisonEnCours = seed.numero ?? 0;
-const bSfl = bilanDe(jb, NOM, saisonEnCours, EPREUVES);
-const bBola = bilanDe(jb, NOM, saisonEnCours, EPREUVES_BOLA);
+// La saison du Passe de fin octobre 2026 : la Saison 1 (saisons-passe.ts).
+const finOctobre = new Date("2026-10-30T12:00:00Z");
+const bSfl = bilanDe(jb, NOM, finOctobre, EPREUVES);
+const bBola = bilanDe(jb, NOM, finOctobre, EPREUVES_BOLA);
 assert.equal(bSfl.passe.palier, 4, "« Signer » ne s'ouvre pas avec une mission perso");
 assert.ok(bBola.passe.palier >= 5, `palier Bola ${bBola.passe.palier}`);
 assert.ok(bBola.passe.epreuves.every((e) => e.j !== null), "les quatre épreuves Bola faites");

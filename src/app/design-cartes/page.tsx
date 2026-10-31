@@ -7,7 +7,9 @@
 // paliers (lib/sfl/passe.ts : givre, carbone, nuit, marbre, tes couleurs,
 // chrome, néon, aurore, ki, animée, onyx, météorite) et trois habillages
 // (signes, crans, rang), chacune de face et de dos, puis en petit (compacte,
-// réduite, pastille). Puis l'édition d'époque de la saison 0 (sa carte de
+// réduite, pastille). Puis les skins et les signes de la Saison Givre
+// (bois-brule, fer, pierre, nuit-polaire, frimas, damas, aurore-polaire,
+// tempete, jarl, g1). Puis l'édition d'époque de la saison 0 (sa carte de
 // saison et ses trois cartes Boost), quand l'appareil a l'archive de la
 // saison 0.
 // `?joueur=Nom` choisit le joueur ; par défaut, soi. `?trois=mvp` (ou base,
@@ -64,7 +66,23 @@ const LOOKS: { cle: string; titre: string; edition: EditionCarte; habillage?: Ha
   { cle: "verre", titre: "Verre (offerte)", edition: "base", habillage: { finition: "verre" } },
   { cle: "pepite", titre: "Pépite d'or (offerte, Ilyes)", edition: "base", habillage: { finition: "pepite" } },
   { cle: "palestine", titre: "Palestine (offerte, Ilyes)", edition: "base", habillage: { finition: "palestine" } },
-  { cle: "meteorite", titre: "Météorite · palier 17", edition: "base", habillage: { finition: "meteorite" } },
+  { cle: "meteorite", titre: "Météorite · palier 16", edition: "base", habillage: { finition: "meteorite" } },
+  // La Saison Givre (9 novembre 2026, PASSE_GIVRE).
+  { cle: "bois-brule", titre: "Givre · Bois brûlé · palier 2", edition: "base", habillage: { finition: "bois-brule" } },
+  { cle: "fer", titre: "Givre · Fer · palier 4", edition: "base", habillage: { finition: "fer" } },
+  { cle: "pierre", titre: "Givre · Pierre runique · palier 6", edition: "base", habillage: { finition: "pierre" } },
+  { cle: "nuit-polaire", titre: "Givre · Nuit polaire · palier 7", edition: "base", habillage: { finition: "nuit-polaire" } },
+  { cle: "frimas", titre: "Givre · Frimas · palier 8", edition: "base", habillage: { finition: "frimas" } },
+  { cle: "damas", titre: "Givre · Damas · palier 9", edition: "base", habillage: { finition: "damas" } },
+  { cle: "aurore-polaire", titre: "Givre · Aurore polaire · palier 10", edition: "base", habillage: { finition: "aurore-polaire" } },
+  { cle: "tempete", titre: "Givre · Tempête · palier 11", edition: "base", habillage: { finition: "tempete" } },
+  { cle: "jarl", titre: "Givre · Jarl · palier 12", edition: "base", habillage: { finition: "jarl" } },
+  {
+    cle: "g1",
+    titre: "Givre · liseré de fer, runes, ton nom en runes",
+    edition: "base",
+    habillage: { signes: ["lisere-fer", "runes", "nom-runes"], cran: 4 },
+  },
   { cle: "recruteur", titre: "Recruteur · 3 recrues", edition: "base", habillage: { finition: "recruteur" } },
   { cle: "filigrane", titre: "Filigrane · 5 recrues", edition: "base", habillage: { finition: "filigrane" } },
   { cle: "fondateur", titre: "Fondateur · 10 recrues · n° 97", edition: "base", habillage: { finition: "fondateur", fondateur: 97 } },

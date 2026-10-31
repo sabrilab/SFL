@@ -25,6 +25,9 @@
 //   · on sort par la croix, Échap, ou en tirant vers le bas : le noir se
 //     referme sur la tuile.
 // Toujours en noir, en clair comme en sombre : c'est un autre monde.
+// Ce qui défile porte overflow-y-auto / overflow-x-auto : le verrou du rebond
+// d'iOS (pwa/viewport-lock.tsx) bloque tout autre glissé hors de #app-scroll,
+// et le mode, posé dans body, en est hors (30/10 : « on ne peut pas scroller »).
 // « Réduire les animations » : on entre et on sort sans ouverture ni montée.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -36,11 +39,11 @@ import { Card3D } from "@/components/sfl/card-3d";
 import { useHorsDeLaSfl, useMissionsASigner, VueMissions } from "@/components/sfl/mode-passe-missions";
 import { VueAutres } from "@/components/sfl/mode-passe-autres";
 import type { Finition } from "@/components/sfl/finitions-carte";
-import { CADRAGES, ChoixPays, essai, etatDe, GENRE, Mini, useOntLePalier, type EtatPalier } from "@/components/sfl/passe-bola";
+import { cadrageDe, ChoixPays, essai, etatDe, GENRE, Mini, useOntLePalier, type EtatPalier } from "@/components/sfl/passe-bola";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { Plongee } from "@/components/sfl/plongee-carte";
 import { COULEURS_PAYS, PAYS_PAR_DEFAUT } from "@/components/sfl/skins-passe";
-import { finitionsDe, useChoixHabillage, useHabillage, usePalierMax } from "@/hooks/use-habillage";
+import { finitionsDe, useChoixHabillage, useHabillage, usePaliers } from "@/hooks/use-habillage";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useRangXp, useXp } from "@/hooks/use-missions";
@@ -48,7 +51,8 @@ import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import type { Player } from "@/lib/sfl/engine";
 import { choisirHabillage } from "@/lib/sfl/habillages-choisis";
 import type { BilanXp } from "@/lib/sfl/missions";
-import { epreuveDu, PALIERS_PASSE, PASSE_BOLA, seuilPalier, type PalierPasse } from "@/lib/sfl/passe";
+import { epreuveDu, seuilPalier, type PalierPasse } from "@/lib/sfl/passe";
+import { saisonPasseSuivante, type SaisonPasse } from "@/lib/sfl/saisons-passe";
 import { cn } from "@/lib/utils";
 import "./mode-passe.css";
 
@@ -117,7 +121,7 @@ function Arret({
       style={{ width: PAS }}
     >
       <span className="mp-arret__vignette">
-        <Mini player={player} habillage={essai(porte, p)} cadrage={CADRAGES[p.n]} l={40} h={64} />
+        <Mini player={player} habillage={essai(porte, p)} cadrage={cadrageDe(p)} l={40} h={64} />
         {etat === "verrou" && (
           <span className="mp-arret__cadenas">
             <Lock className="size-2.5" strokeWidth={2.8} />
@@ -132,6 +136,7 @@ function Arret({
 
 /** Les vingt paliers en file : celui qui passe au centre est choisi. */
 function Route({
+  piste,
   player,
   palier,
   avance,
@@ -139,6 +144,8 @@ function Route({
   choisi,
   onChoisir,
 }: {
+  /** Les paliers de la saison du Passe en cours. */
+  piste: readonly PalierPasse[];
   player: Player;
   palier: number;
   /** La part du palier suivant déjà faite, de 0 à 1. */
@@ -164,17 +171,17 @@ function Route({
   const suivre = () => {
     const r = ref.current;
     if (!r) return;
-    const n = Math.min(PALIERS_PASSE, Math.max(1, Math.round(r.scrollLeft / PAS) + 1));
+    const n = Math.min(piste.length, Math.max(1, Math.round(r.scrollLeft / PAS) + 1));
     if (n !== choisi) onChoisir(n);
   };
 
   return (
-    <div className="mp-route" role="group" aria-label="Les vingt paliers">
-      <div ref={ref} onScroll={suivre} className="mp-route__piste">
-        <div className="mp-route__rail" style={{ width: PALIERS_PASSE * PAS }}>
+    <div className="mp-route" role="group" aria-label={`Les ${piste.length} paliers`}>
+      <div ref={ref} onScroll={suivre} className="mp-route__piste overflow-x-auto">
+        <div className="mp-route__rail" style={{ width: piste.length * PAS }}>
           <span className="mp-route__trait" />
-          <span className="mp-route__fait" style={{ width: Math.min(PALIERS_PASSE - 1, Math.max(0, palier - 1 + avance)) * PAS }} />
-          {PASSE_BOLA.map((x) => (
+          <span className="mp-route__fait" style={{ width: Math.min(piste.length - 1, Math.max(0, palier - 1 + avance)) * PAS }} />
+          {piste.map((x) => (
             <Arret
               key={x.n}
               p={x}
@@ -204,11 +211,12 @@ function Palier({ p, player, b, palierMax, pays, setPays, onPlonger }: {
   const nom = player.name;
   const porte = useHabillage(nom);
   const choix = useChoixHabillage(nom);
-  const combien = useOntLePalier();
+  const combien = useOntLePalier(b.saisonPasse.id);
+  const paliers = usePaliers(nom);
   const etat = etatDe(p.n, b.palier, palierMax);
   const ouvert = etat === "gagne" || etat === "acquis";
   const finition = p.habille?.finition as Finition | undefined;
-  const aLeSkin = !!finition && (ouvert || finitionsDe(nom, palierMax).includes(finition));
+  const aLeSkin = !!finition && (ouvert || finitionsDe(nom, paliers).includes(finition));
   const portee = !!finition && porte.finition === finition && (finition !== "couleurs" || porte.pays === pays);
   const { passe } = b;
 
@@ -272,6 +280,62 @@ function Palier({ p, player, b, palierMax, pays, setPays, onPlonger }: {
   );
 }
 
+/* ------------------------- La saison qui vient ------------------------- */
+
+/** Les deux semaines avant la saison suivante : sa devise et son jour (Sabri, 30/10 : « dès que c'est l'hiver »). */
+const ANNONCE_JOURS = 14;
+
+function Annonce({ maintenant }: { maintenant: Date }) {
+  const suivante = saisonPasseSuivante(maintenant);
+  if (!suivante?.debut || !suivante.devise) return null;
+  const debut = new Date(`${suivante.debut}T12:00:00`);
+  const jours = Math.ceil((debut.getTime() - maintenant.getTime()) / 86_400_000);
+  if (jours > ANNONCE_JOURS) return null;
+  const quand = debut.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  return (
+    <p className="mp-annonce">
+      <span className="mp-annonce__devise titre-lettrage">{suivante.devise}.</span>
+      <span className="mono-label text-white/55">
+        {suivante.nom} · {quand}
+      </span>
+    </p>
+  );
+}
+
+/**
+ * Une saison qui vient de s'ouvrir se dévoile, une fois par téléphone (Sabri,
+ * 30/10 : les saisons ne se montrent pas avant, elles se débloquent).
+ */
+function Debloquee({ saison }: { saison: SaisonPasse }) {
+  const cle = `bola-saison-passe-vue-${saison.id}`;
+  const [ouverte, setOuverte] = useState(() => {
+    if (!saison.debut) return false;
+    try {
+      return !localStorage.getItem(cle);
+    } catch {
+      return false;
+    }
+  });
+  if (!ouverte) return null;
+  const fermer = () => {
+    try {
+      localStorage.setItem(cle, String(Date.now()));
+    } catch {}
+    setOuverte(false);
+  };
+  return (
+    <div className="mp-debloquee" role="dialog" aria-label={`${saison.nom} débloquée`}>
+      <span className="mono-label text-white/55">Débloquée</span>
+      <h2 className="mp-debloquee__nom titre-lettrage">{saison.nom}</h2>
+      {saison.devise && <p className="mp-debloquee__devise">{saison.devise}.</p>}
+      <span className="mono-label text-white/45">{saison.paliers.length} paliers · jusqu&apos;au {new Date(`${saison.fin}T12:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}</span>
+      <button type="button" onClick={fermer} className="mp-bouton">
+        Voir la saison
+      </button>
+    </div>
+  );
+}
+
 /* ------------------------------- Le mode ------------------------------- */
 
 /**
@@ -298,7 +362,10 @@ export function ModePasse({
   const porte = useHabillage(player.name);
   const choix = useChoixHabillage(player.name);
   const photo = usePlayerPhoto(player.name);
-  const palierMax = Math.max(usePalierMax(player.name), b?.palier ?? 0);
+  // La saison du Passe en cours et sa piste (saisons-passe.ts) ; un palier atteint y reste.
+  const piste = b?.saisonPasse.paliers ?? [];
+  const PALIERS_PASSE = Math.max(1, piste.length);
+  const palierMax = b?.palier ?? 0;
   const prochain = Math.min(PALIERS_PASSE, (b?.passe.palier ?? 0) + 1);
   const [choisi, setChoisi] = useState(prochain);
   const [pays, setPays] = useState(choix.pays ?? PAYS_PAR_DEFAUT);
@@ -375,11 +442,11 @@ export function ModePasse({
     };
     window.addEventListener("keydown", touche);
     return () => window.removeEventListener("keydown", touche);
-  }, [sortir, plonge, vue]);
+  }, [sortir, plonge, vue, PALIERS_PASSE]);
 
-  const p = PASSE_BOLA[choisi - 1];
-  const habillage = useMemo(() => essai(porte, p, pays), [porte, p, pays]);
-  if (!pret || !b) return null;
+  const p = piste[Math.min(choisi, PALIERS_PASSE) - 1] ?? piste[0];
+  const habillage = useMemo(() => (p ? essai(porte, p, pays) : porte), [porte, p, pays]);
+  if (!pret || !b || !p) return null;
 
   // Tirer vers le bas, depuis le haut ou le bas de l'écran (la carte, elle, tourne au doigt).
   const tirer = {
@@ -410,7 +477,7 @@ export function ModePasse({
 
       <header className="mp-hud mp-entre" style={{ "--i": 1 } as React.CSSProperties} {...tirer}>
         <div className="flex flex-col gap-1">
-          <span className="mono-label text-white/50">{horsSfl ? "Passe Bola" : `Passe Bola · Saison ${saison}`}</span>
+          <span className="mono-label text-white/50">{`Passe Bola · ${b.saisonPasse.nom}`}</span>
           <span className="flex items-baseline gap-1.5">
             <span className="tabular-nums" style={{ fontFamily: ANTON, fontSize: 54, lineHeight: 0.85 }}>
               {b.passe.palier}
@@ -463,6 +530,7 @@ export function ModePasse({
           </div>
 
           <div className="mp-bas mp-entre" style={{ "--i": 2 } as React.CSSProperties} {...tirer}>
+            <Annonce maintenant={new Date()} />
             <Palier
               key={p.n}
               p={p}
@@ -474,6 +542,7 @@ export function ModePasse({
               onPlonger={() => setPlonge(true)}
             />
             <Route
+              piste={piste}
               player={player}
               palier={b.passe.palier}
               avance={b.passe.bloquee ? 0 : b.passe.versPalier / Math.max(1, b.passe.coutPalier)}
@@ -484,10 +553,12 @@ export function ModePasse({
           </div>
         </>
       ) : (
-        <div key={vue} className="mp-defile mp-entre" style={{ "--i": 2 } as React.CSSProperties}>
-          {vue === "missions" ? <VueMissions b={b} saison={saison} /> : <VueAutres />}
+        <div key={vue} className="mp-defile overflow-y-auto mp-entre" style={{ "--i": 2 } as React.CSSProperties}>
+          {vue === "missions" ? <VueMissions b={b} saison={saison} nom={player.name} /> : <VueAutres />}
         </div>
       )}
+
+      <Debloquee saison={b.saisonPasse} />
 
       {plonge && (
         <Plongee

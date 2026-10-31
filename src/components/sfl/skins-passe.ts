@@ -29,12 +29,39 @@
 //     (figures de Widmanstätten), comme les cadrans de montre en météorite.
 // L'onyx (palier 16) vient du fil de la carte noire, qui le dessine.
 //
+// La Saison Givre (9 novembre 2026, PASSE_GIVRE) : l'hiver du Nord et les
+// Vikings, sans bleu glacier (le bleu est à la Défensive). Ses motifs sont
+// dans motifs-givre.tsx :
+//   · bois brûlé (palier 2) : le noir du bois brûlé, fendu en écailles ;
+//   · fer (4) : le fer martelé gris mat, ses rivets ;
+//   · pierre (6) : le granit des pierres runiques, le ruban torsadé du bord ;
+//   · nuit polaire (7) : le noir, les étoiles, la lune basse d'argent, la neige ;
+//   · frimas (8) : la glace blanche, ses fêlures, les cristaux à six branches ;
+//   · damas (9) : l'acier damassé, ses couches qui ondulent ;
+//   · aurore polaire (10) : un grand rideau vert et violet au-dessus d'un
+//     fjord noir, la lumière qui passe ;
+//   · tempête (11) : la neige poussée par le vent sur le gris de l'orage ;
+//   · jarl (12) : le fer noir, le double filet d'argent rivé, la neige, le
+//     souffle qui fume.
+//
 // Ce fichier n'importe que des types de finitions-carte.ts : c'est elle qui
 // l'importe (pas de cycle).
 
 import type { Matiere } from "@/components/sfl/finitions-carte";
 
-export type FinitionPasse = "givre" | "carbone" | "marbre" | "couleurs" | "neon" | "aurore" | "ki" | "meteorite";
+export type FinitionPasse =
+  | "givre"
+  | "carbone"
+  | "marbre"
+  | "couleurs"
+  | "neon"
+  | "aurore"
+  | "ki"
+  | "meteorite"
+  | TypeMotifGivre;
+
+/** Les skins de la Saison Givre : chacun son motif, du même nom. */
+export type TypeMotifGivre = "bois-brule" | "fer" | "pierre" | "nuit-polaire" | "frimas" | "damas" | "aurore-polaire" | "tempete" | "jarl";
 
 /** Les motifs gravés des skins (motifs-passe.tsx les dessine). */
 export type MotifPasse =
@@ -45,15 +72,271 @@ export type MotifPasse =
   | { type: "neon" }
   | { type: "aurore" }
   | { type: "ki" }
-  | { type: "meteorite" };
+  | { type: "meteorite" }
+  | { type: TypeMotifGivre };
 
-const TYPES_MOTIF_PASSE = new Set<string>(["givre", "carbone", "marbre", "couleurs", "neon", "aurore", "ki", "meteorite"]);
+const TYPES_MOTIF_GIVRE = new Set<string>(["bois-brule", "fer", "pierre", "nuit-polaire", "frimas", "damas", "aurore-polaire", "tempete", "jarl"]);
+const TYPES_MOTIF_PASSE = new Set<string>(["givre", "carbone", "marbre", "couleurs", "neon", "aurore", "ki", "meteorite", ...TYPES_MOTIF_GIVRE]);
+
+export const estMotifGivre = (m: { type: string }): m is { type: TypeMotifGivre } => TYPES_MOTIF_GIVRE.has(m.type);
 
 export function estMotifPasse(m: { type: string }): m is MotifPasse {
   return TYPES_MOTIF_PASSE.has(m.type);
 }
 
 const BLANC = "rgba(255,255,255,0.95)";
+
+/* ------------------------------ Saison Givre ------------------------------ */
+
+/** Ce qui change d'un skin de la Saison Givre à l'autre ; le reste suit le clair ou le sombre. */
+interface Givre {
+  nom: TypeMotifGivre;
+  titre: string;
+  encre: string;
+  sombre: boolean;
+  papier: string;
+  motif: { clair: string; fonce: string };
+  fond: string;
+  cadre: string;
+  vive: string;
+  tranche: Matiere["tranche"];
+  reflet: number;
+  holo: Matiere["holo"];
+  anime?: boolean;
+  puce?: string;
+  lueur?: string;
+  onglet?: Matiere["onglet"];
+}
+
+function givre(g: Givre): Matiere {
+  const e = (a: number) => `rgba(${g.encre},${a})`;
+  return {
+    nom: g.nom,
+    titre: g.titre,
+    encre: g.encre,
+    sombre: g.sombre,
+    papier: g.papier,
+    motif: { type: g.nom, ...g.motif },
+    fond: g.fond,
+    lueur: g.lueur ?? (g.sombre ? "rgba(220,224,230,0.14)" : BLANC),
+    rayures: 0.05,
+    micro: g.sombre ? 0.06 : 0.05,
+    reflet: g.reflet,
+    coins: g.sombre ? 0.8 : 0.6,
+    etiquette: { fond: "transparent", bord: e(0.5), texte: e(g.sombre ? 0.88 : 0.78) },
+    symbole: g.sombre ? "/bola/symbole-blanc.svg" : "/bola/symbole-noir.svg",
+    rebord: g.sombre
+      ? { lumiere: "rgba(255,255,255,0.36)", ombre: "rgba(0,0,0,0.7)" }
+      : { lumiere: "rgba(255,255,255,1)", ombre: "rgba(30,31,34,0.22)" },
+    puce: g.puce ?? (g.sombre ? "linear-gradient(135deg, #d9dce1, #55585e 45%, #b8bcc2 70%, #2a2c30)" : "linear-gradient(135deg, #ffffff, #c2c4c7 45%, #f2f2f1 70%, #96999e)"),
+    cadre: g.cadre,
+    voile: g.sombre ? "rgba(6,7,8,0.82)" : "rgba(16,17,20,0.55)",
+    onglet: g.onglet ?? (g.sombre ? { fond: "#eef0f2", encre: "#0b0c0e" } : { fond: "#121316", encre: "#f2f3f4" }),
+    vive: g.vive,
+    tranche: g.tranche,
+    holo: g.holo,
+    ...(g.anime && { anime: true }),
+  };
+}
+
+const MATIERES_GIVRE: Record<TypeMotifGivre, Matiere> = {
+  // Bois brûlé : le noir du charbon, à peine chaud, les écailles qui prennent un reflet de cendre.
+  "bois-brule": givre({
+    nom: "bois-brule",
+    titre: "bois brûlé",
+    encre: "236,233,228",
+    sombre: true,
+    papier: [
+      "linear-gradient(115deg, rgba(255,255,255,0) 34%, rgba(255,255,255,0.06) 46%, rgba(255,255,255,0) 58%)",
+      "radial-gradient(110% 70% at 30% 18%, #2a2725 0%, #161413 55%, #0b0a09 100%)",
+    ].join(", "),
+    motif: { clair: "rgba(226,220,212,1)", fonce: "rgba(0,0,0,1)" },
+    fond: "#1a1817",
+    cadre: [
+      "repeating-linear-gradient(0deg, rgba(0,0,0,0.6) 0 2px, rgba(0,0,0,0) 2px 9px)",
+      "repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, rgba(255,255,255,0) 1px 14px)",
+      "linear-gradient(160deg, #2c2927 0%, #141211 60%, #0a0908 100%)",
+    ].join(", "),
+    vive: "#a49d94",
+    tranche: { couleur: "#141211", metal: 0.05, rugosite: 0.85 },
+    reflet: 0.1,
+    holo: { force: 0.25, teinte: [0.92, 0.9, 0.88] },
+  }),
+  // Fer : le gris mat du fer martelé, l'encre d'argent.
+  fer: givre({
+    nom: "fer",
+    titre: "fer",
+    encre: "238,239,241",
+    sombre: true,
+    papier: [
+      "linear-gradient(122deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.1) 42%, rgba(255,255,255,0) 54%)",
+      "radial-gradient(105% 64% at 30% 18%, #5a5d62 0%, #3a3c40 50%, #222427 100%)",
+    ].join(", "),
+    motif: { clair: "rgba(240,242,245,1)", fonce: "rgba(8,9,11,1)" },
+    fond: "#323438",
+    cadre: [
+      "radial-gradient(circle at 30% 30%, rgba(255,255,255,0.12) 0 4px, rgba(255,255,255,0) 5px)",
+      "linear-gradient(150deg, #5a5d62 0%, #34363a 50%, #4a4d52 70%, #1e2023 100%)",
+    ].join(", "),
+    vive: "#a3a7ad",
+    tranche: { couleur: "#3a3c40", metal: 0.85, rugosite: 0.5 },
+    reflet: 0.24,
+    holo: { force: 0.4, teinte: [0.95, 0.96, 0.98] },
+  }),
+  // Pierre : le gris des stèles, grenu, l'encre presque noire.
+  pierre: givre({
+    nom: "pierre",
+    titre: "pierre",
+    encre: "24,24,26",
+    sombre: false,
+    papier: [
+      "radial-gradient(90% 60% at 26% 14%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 70%)",
+      "linear-gradient(160deg, #d9d7d2 0%, #c8c6c0 46%, #b4b1ab 100%)",
+    ].join(", "),
+    motif: { clair: "rgba(250,249,246,1)", fonce: "rgba(40,39,42,1)" },
+    fond: "#cfcdc8",
+    cadre: "linear-gradient(150deg, #dcdad5 0%, #b9b6b0 40%, #a19e98 62%, #cfcdc8 100%)",
+    vive: "#8e8b85",
+    tranche: { couleur: "#bdbab4", metal: 0, rugosite: 0.9 },
+    reflet: 0.25,
+    holo: { force: 0.2, teinte: null },
+  }),
+  // Nuit polaire : le noir de décembre, la lune d'argent.
+  "nuit-polaire": givre({
+    nom: "nuit-polaire",
+    titre: "nuit polaire",
+    encre: "240,241,244",
+    sombre: true,
+    papier: [
+      "radial-gradient(60% 34% at 75% 14%, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 70%)",
+      "linear-gradient(180deg, #121317 0%, #0a0b0d 52%, #050506 100%)",
+    ].join(", "),
+    motif: { clair: "rgba(236,238,242,1)", fonce: "rgba(0,0,0,1)" },
+    fond: "#101114",
+    cadre: [
+      "radial-gradient(circle at 76% 14%, rgba(255,255,255,0.9) 0 7%, rgba(255,255,255,0.12) 8%, rgba(255,255,255,0) 20%)",
+      "linear-gradient(180deg, #16171b 0%, #060607 100%)",
+    ].join(", "),
+    vive: "#e8eaee",
+    tranche: { couleur: "#0e0f12", metal: 0.4, rugosite: 0.35 },
+    reflet: 0.12,
+    holo: { force: 0.45, teinte: [0.96, 0.97, 1] },
+  }),
+  // Frimas : la glace blanche, sans une goutte de bleu, l'encre presque noire.
+  frimas: givre({
+    nom: "frimas",
+    titre: "frimas",
+    encre: "16,17,20",
+    sombre: false,
+    papier: [
+      "radial-gradient(80% 50% at 20% 8%, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 70%)",
+      "linear-gradient(120deg, rgba(255,255,255,0) 34%, rgba(255,255,255,0.7) 46%, rgba(255,255,255,0) 58%)",
+      "linear-gradient(165deg, #fbfbfb 0%, #eeefef 44%, #dfe0e1 100%)",
+    ].join(", "),
+    motif: { clair: "rgba(255,255,255,1)", fonce: "rgba(60,62,68,0.62)" },
+    fond: "#f3f3f3",
+    cadre: [
+      "linear-gradient(120deg, rgba(255,255,255,0) 34%, rgba(255,255,255,0.8) 46%, rgba(255,255,255,0) 58%)",
+      "linear-gradient(160deg, #ffffff 0%, #e4e5e6 40%, #c4c6c9 70%, #f4f4f4 100%)",
+    ].join(", "),
+    vive: "#c0c2c5",
+    tranche: { couleur: "#eeeff0", metal: 0.2, rugosite: 0.2 },
+    reflet: 0.7,
+    holo: { force: 0.65, teinte: [0.97, 0.98, 0.99] },
+  }),
+  // Damas : l'acier poli des lames, ses couches, l'encre d'argent.
+  damas: givre({
+    nom: "damas",
+    titre: "damas",
+    encre: "242,243,245",
+    sombre: true,
+    papier: [
+      "linear-gradient(118deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.14) 44%, rgba(255,255,255,0) 58%)",
+      "radial-gradient(110% 66% at 28% 16%, #6a6d73 0%, #44474c 48%, #26282b 100%)",
+    ].join(", "),
+    motif: { clair: "rgba(255,255,255,1)", fonce: "rgba(10,11,13,1)" },
+    fond: "#3e4146",
+    cadre: [
+      "repeating-linear-gradient(170deg, rgba(255,255,255,0.12) 0 2px, rgba(0,0,0,0.18) 2px 5px, rgba(255,255,255,0) 5px 8px)",
+      "linear-gradient(150deg, #6a6d73 0%, #3a3d42 50%, #575a60 70%, #202225 100%)",
+    ].join(", "),
+    vive: "#b4b8be",
+    tranche: { couleur: "#4a4d52", metal: 0.95, rugosite: 0.22 },
+    reflet: 0.32,
+    holo: { force: 0.55, teinte: [0.96, 0.97, 0.99] },
+  }),
+  // Aurore polaire : le noir du grand nord, un rideau vert et violet, la lumière qui passe.
+  "aurore-polaire": givre({
+    nom: "aurore-polaire",
+    titre: "aurore polaire",
+    encre: "236,248,242",
+    sombre: true,
+    papier: [
+      "radial-gradient(90% 46% at 30% 58%, rgba(60,224,160,0.2) 0%, rgba(60,224,160,0) 70%)",
+      "radial-gradient(70% 40% at 86% 16%, rgba(178,110,255,0.18) 0%, rgba(178,110,255,0) 70%)",
+      "linear-gradient(180deg, #0a100f 0%, #070b0a 50%, #030404 100%)",
+    ].join(", "),
+    motif: { clair: "rgba(110,255,196,1)", fonce: "rgba(182,118,255,1)" },
+    fond: "#0a1211",
+    lueur: "rgba(90,230,170,0.18)",
+    cadre: [
+      "linear-gradient(35deg, rgba(80,240,170,0) 22%, rgba(80,240,170,0.6) 44%, rgba(182,118,255,0.5) 64%, rgba(182,118,255,0) 84%)",
+      "linear-gradient(180deg, #0c1513 0%, #030505 100%)",
+    ].join(", "),
+    vive: "#5fe3ad",
+    onglet: { fond: "#5fe3ad", encre: "#04120c" },
+    tranche: { couleur: "#0b1412", metal: 0.35, rugosite: 0.35 },
+    reflet: 0.3,
+    holo: { force: 0.8, teinte: [0.64, 1, 0.84] },
+    anime: true,
+  }),
+  // Tempête : le gris de l'orage de neige, les flocons blancs, l'encre presque noire.
+  tempete: givre({
+    nom: "tempete",
+    titre: "tempête",
+    encre: "16,17,19",
+    sombre: false,
+    papier: [
+      "radial-gradient(90% 50% at 22% 10%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 70%)",
+      "linear-gradient(170deg, #d4d5d7 0%, #b9bbbe 50%, #9c9fa3 100%)",
+    ].join(", "),
+    motif: { clair: "rgba(255,255,255,1)", fonce: "rgba(30,31,34,1)" },
+    fond: "#c6c8ca",
+    cadre: [
+      "repeating-linear-gradient(55deg, rgba(255,255,255,0.55) 0 2px, rgba(255,255,255,0) 2px 11px)",
+      "linear-gradient(170deg, #d9dadc 0%, #a9acaf 60%, #8e9195 100%)",
+    ].join(", "),
+    vive: "#f4f5f6",
+    tranche: { couleur: "#b3b5b8", metal: 0.2, rugosite: 0.5 },
+    reflet: 0.45,
+    holo: { force: 0.5, teinte: null },
+    anime: true,
+  }),
+  // Jarl : le fer noir, l'argent, la neige ; la lumière qui passe.
+  jarl: givre({
+    nom: "jarl",
+    titre: "jarl",
+    encre: "244,245,247",
+    sombre: true,
+    papier: [
+      "linear-gradient(122deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.08) 42%, rgba(255,255,255,0) 54%)",
+      "radial-gradient(110% 66% at 30% 16%, #2e3034 0%, #17181b 50%, #08090a 100%)",
+    ].join(", "),
+    motif: { clair: "rgba(236,239,243,1)", fonce: "rgba(0,0,0,1)" },
+    fond: "#1a1b1e",
+    lueur: "rgba(236,239,243,0.2)",
+    cadre: [
+      "linear-gradient(90deg, rgba(236,239,243,0.9) 0 1.2%, rgba(0,0,0,0) 1.2% 2.4%, rgba(236,239,243,0.6) 2.4% 3%, rgba(0,0,0,0) 3% 97%, rgba(236,239,243,0.6) 97% 97.6%, rgba(0,0,0,0) 97.6% 98.8%, rgba(236,239,243,0.9) 98.8%)",
+      "linear-gradient(160deg, #2e3034 0%, #121315 60%, #060607 100%)",
+    ].join(", "),
+    vive: "#eceff3",
+    onglet: { fond: "#eceff3", encre: "#08090a" },
+    tranche: { couleur: "#1d1e21", metal: 0.95, rugosite: 0.3 },
+    reflet: 0.28,
+    holo: { force: 0.65, teinte: [0.96, 0.97, 1] },
+    anime: true,
+  }),
+};
 
 export const MATIERES_PASSE: Record<Exclude<FinitionPasse, "couleurs">, Matiere> = {
   // Givre : le métal givré, gris argent sans une goutte de bleu, l'encre presque noire.
@@ -275,6 +558,7 @@ export const MATIERES_PASSE: Record<Exclude<FinitionPasse, "couleurs">, Matiere>
     tranche: { couleur: "#3a3d42", metal: 0.9, rugosite: 0.32 },
     holo: { force: 0.45, teinte: [0.95, 0.96, 0.98] },
   },
+  ...MATIERES_GIVRE,
 };
 
 /* ------------------------------ Tes couleurs ------------------------------ */
