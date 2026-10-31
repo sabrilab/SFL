@@ -109,7 +109,7 @@ export const classesTuile = (ton: Ton) => cn("tuile tuile--objet flex flex-col g
  * Une tuile : son ton, son étiquette, son contenu ; la toucher ouvre sa page.
  * Son fond est un objet en relief (Sabri, 31/10 : « des espèces d'objets […]
  * des images, mais on dirait des objets 3D », comme les boutons d'Higgsfield) :
- * le ballon de ma saison, le jeton Bola de l'XP, les marches de l'évolution,
+ * le ballon Bola de ma saison, le jeton Bola de l'XP, les marches de l'évolution,
  * la coupe chrome des badges, mes cartes en pile, la boule du Flair
  * (public/objets, rendus GPT Image, fonds transparents). L'objet déborde du
  * coin, sous le texte, qui garde sa place.
