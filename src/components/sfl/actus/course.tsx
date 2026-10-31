@@ -19,22 +19,24 @@
 //       Match — les journées jouées (vues.tsx).
 //     L'onglet est dans l'adresse (?vue=classements, ?vue=matchs ;
 //     page-actus.tsx), et l'en-tête ne bouge pas d'un onglet à l'autre ;
-//   · le fil : le rail des journées, collé en haut (J4 à venir, J3, J2…),
-//     « À la une » (les vidéos, le récap du dernier dimanche), puis la
-//     convocation (la météo de ton match,
-//     meteo-match.tsx ; qui vient, Je viens / Je passe ; ta division dès la
-//     J4) ; le jour du match, la feuille en direct et le vote ;
-//     ton dimanche (ta carte, tes chiffres, tes places) ; le vendredi et le
+//   · le fil (Sabri, 31/10 : « plus je scrolle, plus je découvre », pas
+//     revenir sur ce qu'on connaît déjà) : le rail des journées, collé en
+//     haut ; le jour du match, la feuille en direct ; puis, du dimanche soir
+//     au mercredi, le dernier dimanche joué d'abord (sa couverture, ses
+//     vidéos, son terrain, le vote du soir, ton dimanche, ton Flair, ses
+//     rubriques), et la semaine qui se prépare ensuite ; du jeudi au matin
+//     du match, la semaine d'abord. La semaine : la convocation (la météo de
+//     ton match, meteo-match.tsx ; qui vient, Je viens / Je passe ; ta
+//     division), tant que son dimanche n'est pas joué ; le vendredi et le
 //     samedi, le contrat à la une : un seul rang S, signé par un bon joueur
 //     (contrat-a-la-une.tsx ; Sabri, 27/10 : « Tu mets pas les missions. Tu
-//     mets juste des missions de rang S […] acceptées par de bons joueurs »).
-//     Les missions, les miennes, celles des autres et l'outsider de l'arc 1,
-//     vivent dans Ma carte → Niveau XP (mode-passe.tsx) ; ce qui
-//     se joue dimanche (les places à un ou deux points), ton rival et ce
-//     qu'il te faut pour le passer ; puis chaque dimanche joué, avec sa
-//     vidéo s'il en a une,
-//     du plus récent : son terrain avec les cartes des joueurs (CarteJournee),
-//     et ses rubriques. Chaque rubrique est un terrain avec ses petites cartes
+//     mets juste des missions de rang S […] acceptées par de bons joueurs ») ;
+//     ce qui se joue dimanche (les places à un ou deux points), ton rival et
+//     ce qu'il te faut pour le passer. Les missions, les miennes, celles des
+//     autres et l'outsider de l'arc 1, vivent dans Ma carte → Niveau XP
+//     (mode-passe.tsx). Enfin les journées d'avant, repliées, une ligne
+//     chacune (JourneeDAvant) : la toucher la déplie sur place. Le fil a une
+//     fin. Chaque rubrique est un terrain avec ses petites cartes
 //     près du but, qui s'anime au défilement, sans carrousel (pelouse.tsx ;
 //     Sabri, 22/10 : « que tout se fasse en scroll et qu'il y ait plus de vie »).
 // Les modules « toi » : lib/sfl/actus-toi.ts et cine-toi.tsx.
@@ -65,8 +67,8 @@
 
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Repere } from "@/components/sfl/pepites-flottantes";
 import { useJoueurBola, useMyPlayer } from "@/components/sfl/player-provider";
 import { SaisonArchiveProvider, useSeason } from "@/components/sfl/season-provider";
@@ -80,7 +82,7 @@ import { useCollant } from "@/hooks/use-collant";
 import { usePresence } from "@/hooks/use-presence";
 import { ReponseScellee } from "@/components/sfl/reponse-scellee";
 import { MeteoMatch } from "@/components/sfl/meteo-match";
-import { dateIsoDuLibelle } from "@/lib/sfl/meteo";
+import { dateIsoDuLibelle, joursJusquA } from "@/lib/sfl/meteo";
 import { voteOuvert } from "@/lib/sfl/convocation-temps";
 import { annonceEnCours, J_DECOUPAGE, nomDivision, type Division } from "@/lib/sfl/divisions";
 import { METAL, PastilleDivision, parDivision, useDecoupageClassement } from "@/components/sfl/metal-division";
@@ -103,7 +105,7 @@ import { CouvertureRubrique, RubriqueActu, RubriqueBesoin, RubriqueEnjeux, Rubri
 import { couverturesDuDimanche, sources, type Couverture } from "@/lib/sfl/couvertures";
 import { ContratALaUne } from "./contrat-a-la-une";
 import { RubriqueFlair } from "@/components/sfl/flair/mon-flair";
-import { InvitationVisuels, journeeDeLaVideo, TuileCarrousel, TuileVideo, useVideos, VideosDuFil } from "./video";
+import { journeeDeLaVideo, useVideos, VideosDuFil } from "./video";
 import type { Video } from "@/lib/sfl/videos";
 import { VueClassements, VueMatchs } from "./vues";
 import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque, type Vue } from "./epoques";
@@ -128,6 +130,7 @@ function Dimanche({
   ouvrir,
   videos = [],
   avant,
+  depliee = false,
 }: {
   j: number;
   journee?: Journee;
@@ -137,12 +140,20 @@ function Dimanche({
   videos?: Video[];
   /** Ce qui ouvre ses rubriques : ton dimanche, pour le dernier joué. */
   avant?: React.ReactNode;
+  /** Déplié depuis sa ligne (JourneeDAvant) : la ligne porte l'ancre et tient lieu de couverture. */
+  depliee?: boolean;
 }) {
   const [terrain, terrainCollant] = useCollant();
   const { chapitre, rubriques } = useMemo(() => couverturesDuDimanche(j, scenes.map((a) => a.type)), [j, scenes]);
   return (
-    <section id={`j${j}`} className="flex scroll-mt-[60px] flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-x-[var(--fib-21)] md:gap-y-[var(--fib-21)] md:border-t md:border-contraste/[0.08] md:pt-[var(--fib-34)] xl:grid-cols-3">
-      <CouvertureDimanche j={j} journee={journee} c={chapitre} />
+    <section
+      id={depliee ? undefined : `j${j}`}
+      className={cn(
+        "flex scroll-mt-[60px] flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-x-[var(--fib-21)] md:gap-y-[var(--fib-21)] xl:grid-cols-3",
+        !depliee && "md:border-t md:border-contraste/[0.08] md:pt-[var(--fib-34)]",
+      )}
+    >
+      {!depliee && <CouvertureDimanche j={j} journee={journee} c={chapitre} />}
       {videos.length > 0 && <VideosDuFil videos={videos} className="md:col-span-full md:mx-auto md:w-full md:max-w-[560px]" />}
       {journee && (
         <div ref={terrain} className={cn("px-5 md:px-0", terrainCollant && "md:sticky md:top-[var(--fib-21)]")}>
@@ -636,11 +647,12 @@ function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; clas
 }
 
 /** Le dimanche en direct : le jour du match, la feuille se remplit sous tes yeux (la base pousse chaque saisie). */
-function EnDirect({ ouvrir }: { ouvrir: (j: number) => void }) {
+function EnDirect({ ouvrir, sauf }: { ouvrir: (j: number) => void; sauf?: number }) {
   const { journees } = useSeason();
   const [maintenant] = useState(() => new Date());
   const live = journees.find((j) => (j.matches?.length ?? 0) > 0 && voteOuvert(j.date, maintenant));
-  if (!live) return null;
+  // Le dimanche en tête du fil a déjà son terrain, qui se remplit de même.
+  if (!live || live.j === sauf) return null;
   return (
     <section className="flex flex-col gap-3 px-5 md:px-0">
       <span className="flex items-center gap-2">
@@ -777,7 +789,7 @@ interface Etape {
  * reconnaissance des différentes journées ») : J4 à venir, puis J3, J2, J1.
  * Celle qu'on lit est à l'encre pleine ; en toucher une y descend.
  */
-function RailJournees({ etapes }: { etapes: Etape[] }) {
+function RailJournees({ etapes, deplier }: { etapes: Etape[]; deplier?: (id: string) => void }) {
   const [active, setActive] = useState(etapes[0]?.id);
   const rail = useRef<HTMLDivElement>(null);
   const cles = etapes.map((e) => e.id).join("|");
@@ -818,7 +830,11 @@ function RailJournees({ etapes }: { etapes: Etape[] }) {
   }, [active]);
   const aller = (id: string) => {
     const calme = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    document.getElementById(id)?.scrollIntoView({ block: "start", behavior: calme ? "auto" : "smooth" });
+    // Une journée d'avant se déplie d'abord : on arrive sur elle, et on peut la parcourir.
+    deplier?.(id);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "start", behavior: calme ? "auto" : "smooth" })),
+    );
   };
   if (etapes.length < 2) return null;
   return (
@@ -850,77 +866,6 @@ function RailJournees({ etapes }: { etapes: Etape[] }) {
         })}
       </div>
     </nav>
-  );
-}
-
-/** La largeur d'une tuile d'« À la une » : la suivante dépasse, on sait qu'on peut glisser. */
-const TUILE = "aspect-[4/5] w-[min(72vw,288px)] shrink-0 snap-start rounded-[22px] md:w-[264px]";
-
-/**
- * « À la une », en tête du fil (Sabri, 26/10 : « dès qu'on arrive, on voie
- * les vidéos, les carrousels, les petits récaps ») : les vidéos, de la plus
- * récente, puis le récap du dernier dimanche (sa couverture ; la toucher
- * descend jusqu'à lui). Chaque vidéo garde sa publication entière, avec ses
- * réactions, dans le fil de son dimanche.
- */
-function ALaUne({ videos, recap }: { videos: Video[]; recap: { j: number; journee?: Journee; c: Couverture } | null }) {
-  // Les vidéos arrivent après le récap : le défilement accroché revient au début, sur la plus récente.
-  const rangee = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    rangee.current?.scrollTo({ left: 0 });
-  }, [videos.length]);
-  if (videos.length === 0 && !recap) return null;
-  const matchs = recap?.journee?.matches ?? [];
-  const buts = matchs.reduce((n, m) => n + m.teamA.score + m.teamB.score, 0);
-  const aller = (id: string) => {
-    const calme = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    document.getElementById(id)?.scrollIntoView({ block: "start", behavior: calme ? "auto" : "smooth" });
-  };
-  return (
-    <section aria-label="À la une" className="flex flex-col gap-2.5">
-      <h2 className="mono-label px-5 text-encre-3 md:px-0">À la une</h2>
-      <div ref={rangee} className="flex snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 [scrollbar-width:none] md:scroll-px-0 md:px-0">
-        {videos.map((v) => (
-          <Fragment key={v.id}>
-            <TuileVideo v={v} className={TUILE} />
-            <TuileCarrousel v={v} className={TUILE} />
-          </Fragment>
-        ))}
-        {recap && (
-          <button
-            type="button"
-            onClick={() => aller(`j${recap.j}`)}
-            className={cn("dark relative isolate flex flex-col justify-end overflow-hidden bg-black text-left text-white", TUILE)}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element -- une image fixe du moodboard, en srcset */}
-            <img
-              src={sources(recap.c).src}
-              srcSet={sources(recap.c).srcSet}
-              sizes="300px"
-              alt=""
-              decoding="async"
-              className="absolute inset-0 -z-10 size-full object-cover"
-              style={{ objectPosition: recap.c.point }}
-            />
-            <span aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(0,0,0,0)_35%,rgba(0,0,0,0.85)_100%)]" />
-            <span className="mono-label absolute top-3 left-3 text-etiquette text-white/75">Le récap</span>
-            <span className="flex flex-col gap-1.5 p-4">
-              <span className="text-[72px] leading-[0.8] tracking-tight" style={{ fontFamily: ANTON }}>
-                {`J${recap.j}`}
-              </span>
-              <span className="mono-label text-etiquette text-white/60">
-                {[recap.journee?.date, matchs.length ? `${matchs.length} ${matchs.length > 1 ? "matchs" : "match"} · ${buts} ${buts > 1 ? "buts" : "but"}` : null]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </span>
-            </span>
-          </button>
-        )}
-        {/* Le dernier pas du défilement s'arrête sur la marge de droite. */}
-        <span aria-hidden className="w-2 shrink-0 md:hidden" />
-      </div>
-      {videos.length > 0 && <InvitationVisuels className="md:max-w-[560px]" />}
-    </section>
   );
 }
 
@@ -990,17 +935,96 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
   const veille = veilleDuMatch(maintenant);
 
   const dernier = dimanches[0]?.j ?? 0;
+  const une = dimanches[0];
+  const avantes = dimanches.slice(1);
   const [semaine, semaineCollante] = useCollant();
+  // Les journées d'avant, repliées ; dépliées une à une (leur ligne, le rail, #j2, un exploit).
+  const [ouvertes, setOuvertes] = useState<ReadonlySet<number>>(() => new Set());
+  const deplier = (id: string) => {
+    const m = /^j(\d+)$/.exec(id);
+    const j = m ? Number(m[1]) : null;
+    if (j == null || !avantes.some((d) => d.j === j)) return;
+    setOuvertes((o) => (o.has(j) ? o : new Set(o).add(j)));
+  };
+  const basculer = (j: number) =>
+    setOuvertes((o) => {
+      const n = new Set(o);
+      if (!n.delete(j)) n.add(j);
+      return n;
+    });
+  // Une adresse en #j2 déplie ce dimanche avant que useAncre y descende.
+  useEffect(() => {
+    const m = /^#j(\d+)$/.exec(window.location.hash);
+    if (!m) return;
+    const t = setTimeout(() => setOuvertes((o) => new Set(o).add(Number(m[1]))), 0);
+    return () => clearTimeout(t);
+  }, []);
+  // La félicitation d'un exploit peut viser une journée d'avant : tout est déplié.
+  const deplie = (j: number) => !!exploit || ouvertes.has(j);
   useAncre(vue === "fil" && dimanches.length > 0);
   // Le dimanche qui se prépare (celui de la convocation), s'il n'est pas déjà joué.
   const presence = usePresence();
   const prochain = presence.journee;
   const aVenir = prochain > 0 && !dimanches.some((d) => d.j === prochain);
+  // Le dimanche soir et jusqu'au mercredi, le dernier dimanche passe devant : on vient voir ce qui
+  // s'est passé (le journal d'activité : trois quarts du temps passé dans l'app, du lundi au
+  // mercredi). Du jeudi au dimanche du match, la semaine qui se prépare passe devant.
+  const [aujourdhui] = useState(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date()));
+  const isoDernier = une?.journee?.date ? dateIsoDuLibelle(une.journee.date, aujourdhui) : null;
+  const ecart = isoDernier ? joursJusquA(isoDernier, aujourdhui) : null;
+  const recapDabord = ecart != null && ecart <= 0 && ecart >= -3;
+  const etapeSemaine: Etape = { id: aVenir ? `j${prochain}` : "semaine", label: aVenir ? `J${prochain}` : "Semaine", sous: aVenir ? "à venir" : null };
+  const etapeUne: Etape[] = une ? [{ id: `j${une.j}`, label: `J${une.j}`, sous: une.journee?.date ?? null }] : [];
   const etapes: Etape[] = [
-    { id: aVenir ? `j${prochain}` : "semaine", label: aVenir ? `J${prochain}` : "Semaine", sous: aVenir ? "à venir" : null },
-    ...dimanches.map((d) => ({ id: `j${d.j}`, label: `J${d.j}`, sous: d.journee?.date ?? null })),
+    ...(recapDabord ? [...etapeUne, etapeSemaine] : [etapeSemaine, ...etapeUne]),
+    ...avantes.map((d) => ({ id: `j${d.j}`, label: `J${d.j}`, sous: d.journee?.date ?? null })),
   ];
-  const une = dimanches[0];
+
+  const leDernier = une && (
+    <Dimanche
+      j={une.j}
+      journee={une.journee}
+      scenes={une.scenes}
+      videos={videosDe.get(une.j)}
+      avant={
+        <>
+          {/* Le soir du match, le vote est dans son dimanche, juste après la feuille. */}
+          {recapDabord && <VoteDuJour me={me} />}
+          <RubriqueToi j={dernier} date={une.journee?.date ?? ""} />
+          {/* Mon Flair de ce dimanche, jugé (Sabri, 30/10). */}
+          <RubriqueFlair j={une.j} />
+        </>
+      }
+      ouvrir={() => router.push(`/ligue/journee?j=${une.j}`)}
+    />
+  );
+  // Le dimanche qui se prépare. Sur téléphone, un seul fil : la convocation et sa météo (tant
+  // que son dimanche n'est pas joué), le vote, la vidéo sans dimanche, le contrat à la une
+  // (vendredi et samedi, s'il y en a un), puis ce qui se joue. Sur grand écran, deux colonnes :
+  // à gauche ce qui se joue, à droite le contrat à la une et les enjeux.
+  const laSemaine = (
+    <div
+      id={etapeSemaine.id}
+      className="flex scroll-mt-[60px] flex-col gap-6 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3"
+    >
+      <div
+        ref={semaine}
+        className={cn("contents md:flex md:flex-col md:gap-[var(--fib-21)]", semaineCollante && "md:sticky md:top-[var(--fib-21)]")}
+      >
+        {aVenir && <Convocation p={presence} />}
+        {!recapDabord && <VoteDuJour me={me} />}
+        <VideosDuFil videos={videosDe.get(null) ?? []} />
+      </div>
+      <div className="contents md:grid md:gap-[var(--fib-21)] xl:col-span-2 xl:grid-cols-2">
+        {veille && <ContratALaUne />}
+        <div className="flex flex-col gap-1 md:contents">
+          {duels.length > 0 && <RubriqueEnjeux liste={duels} moi={me} />}
+          {v && <RubriqueRival v={v} />}
+          {v?.devant && <RubriqueBesoin v={v} />}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className={GABARIT}>
@@ -1016,58 +1040,97 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
         <VueMatchs />
       ) : (
         <>
-          <RailJournees etapes={etapes} />
-          <ALaUne
-            videos={videos}
-            recap={une ? { j: une.j, journee: une.journee, c: couverturesDuDimanche(une.j, une.scenes.map((a) => a.type)).chapitre } : null}
-          />
-          {/* Le dimanche qui se prépare. Sur téléphone, un seul fil : la
-              convocation et sa météo, le direct, le vote, la vidéo sans
-              dimanche, le contrat à la une (vendredi et samedi, s'il y en a
-              un), puis ce qui se joue. Sur grand écran, deux colonnes : à
-              gauche ce qui se joue (convocation, direct, vote, vidéo), à
-              droite le contrat à la une et les enjeux. Ton dernier dimanche
-              est passé dans le sien. */}
-          <div
-            id={etapes[0].id}
-            className="flex scroll-mt-[60px] flex-col gap-6 md:grid md:grid-cols-2 md:items-start md:gap-[var(--fib-21)] xl:grid-cols-3"
-          >
-            <div
-              ref={semaine}
-              className={cn("contents md:flex md:flex-col md:gap-[var(--fib-21)]", semaineCollante && "md:sticky md:top-[var(--fib-21)]")}
-            >
-              <Convocation p={presence} />
-              <EnDirect ouvrir={(j) => router.push(`/ligue/journee?j=${j}`)} />
-              <VoteDuJour me={me} />
-              <VideosDuFil videos={videosDe.get(null) ?? []} />
-            </div>
-            <div className="contents md:grid md:gap-[var(--fib-21)] xl:col-span-2 xl:grid-cols-2">
-              {veille && <ContratALaUne />}
-              <div className="flex flex-col gap-1 md:contents">
-                {duels.length > 0 && <RubriqueEnjeux liste={duels} moi={me} />}
-                {v && <RubriqueRival v={v} />}
-                {v?.devant && <RubriqueBesoin v={v} />}
-              </div>
-            </div>
-          </div>
-          {dimanches.map((d) => (
-            <Dimanche
-              key={d.j}
-              j={d.j}
-              journee={d.journee}
-              scenes={d.scenes}
-              videos={videosDe.get(d.j)}
-              avant={
-                <>
-                  {d.j === dernier && <RubriqueToi j={dernier} date={d.journee?.date ?? ""} />}
-                  {/* Mon Flair de ce dimanche, jugé (Sabri, 30/10). */}
-                  <RubriqueFlair j={d.j} />
-                </>
-              }
-              ouvrir={() => router.push(`/ligue/journee?j=${d.j}`)}
-            />
-          ))}
+          <RailJournees etapes={etapes} deplier={deplier} />
+          {/* Le jour du match, la feuille qui se remplit, avant tout le reste. */}
+          <EnDirect ouvrir={(j) => router.push(`/ligue/journee?j=${j}`)} sauf={recapDabord ? une?.j : undefined} />
+          {recapDabord ? (
+            <>
+              {leDernier}
+              {laSemaine}
+            </>
+          ) : (
+            <>
+              {laSemaine}
+              {leDernier}
+            </>
+          )}
+          {avantes.length > 0 && (
+            <section aria-label="Les journées d'avant" className="flex flex-col md:border-t md:border-contraste/[0.08] md:pt-[var(--fib-34)]">
+              <h2 className="mono-label px-5 pb-2 text-encre-3 md:px-0">Les journées d&apos;avant</h2>
+              {avantes.map((d) => (
+                <JourneeDAvant
+                  key={d.j}
+                  d={d}
+                  ouverte={deplie(d.j)}
+                  basculer={() => basculer(d.j)}
+                  videos={videosDe.get(d.j)}
+                  ouvrir={() => router.push(`/ligue/journee?j=${d.j}`)}
+                />
+              ))}
+            </section>
+          )}
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Une journée d'avant, repliée sur une ligne (Sabri, 31/10 : « plus je
+ * scrolle, plus je découvre », pas revenir sur ce qu'on connaît déjà) : J4,
+ * sa date, ses matchs et ses buts. La toucher la déplie sur place, avec son
+ * terrain, ton Flair et ses rubriques ; la retoucher la replie. La ligne
+ * porte l'ancre (#j4) que visent le rail et Ma saison.
+ */
+function JourneeDAvant({
+  d,
+  ouverte,
+  basculer,
+  videos,
+  ouvrir,
+}: {
+  d: { j: number; journee?: Journee; scenes: Actu[] };
+  ouverte: boolean;
+  basculer: () => void;
+  videos?: Video[];
+  ouvrir: () => void;
+}) {
+  const matchs = d.journee?.matches ?? [];
+  const buts = matchs.reduce((n, m) => n + m.teamA.score + m.teamB.score, 0);
+  const ligne = matchs.length ? `${matchs.length} ${matchs.length > 1 ? "matchs" : "match"} · ${buts} ${buts > 1 ? "buts" : "but"}` : null;
+  return (
+    <div id={`j${d.j}`} className="flex scroll-mt-[60px] flex-col">
+      <button
+        type="button"
+        aria-expanded={ouverte}
+        onClick={basculer}
+        className="mx-5 flex items-end gap-4 border-t border-foreground/[0.08] py-3.5 text-left md:mx-0"
+      >
+        <span className="w-[72px] text-[44px] leading-[0.8] tracking-tight" style={{ fontFamily: ANTON }}>
+          {`J${d.j}`}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col gap-1 pb-0.5">
+          <span className="mono-label text-encre-2">{d.journee?.date}</span>
+          {ligne && <span className="mono-label text-encre-3">{ligne}</span>}
+        </span>
+        <ChevronDown
+          aria-hidden
+          className={cn("mb-1 size-5 shrink-0 text-encre-3 transition-transform duration-300 motion-reduce:transition-none", ouverte && "rotate-180")}
+          strokeWidth={1.8}
+        />
+      </button>
+      {ouverte && (
+        <div className="pb-6">
+          <Dimanche
+            j={d.j}
+            journee={d.journee}
+            scenes={d.scenes}
+            videos={videos}
+            depliee
+            avant={<RubriqueFlair j={d.j} />}
+            ouvrir={ouvrir}
+          />
+        </div>
       )}
     </div>
   );
