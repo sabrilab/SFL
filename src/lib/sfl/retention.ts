@@ -205,6 +205,11 @@ export const PATH_FR: Record<string, string> = {
   "/avatar": "Photo",
   "/stats": "Historique",
   "/recherche": "Recherche",
+  "/ligue-vierge": "Ligue Bola",
+  "/bola-team": "Bola Team",
+  "/messages": "Messages",
+  "/parrainage": "Parrainage",
+  "/saisons": "Saisons",
   "/reglages": "Réglages",
   "/palmares": "Wall of Fame",
 };

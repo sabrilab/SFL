@@ -88,7 +88,7 @@ export default function ActivitePage() {
           if (!data || data.length < PAGE) return lignes;
         }
       };
-      const [actData, prof, studioBrut, emails, reperesBrut] = await Promise.all([
+      const [actData, prof, studioBrut, emails, reperesBrut, parrainagesBrut] = await Promise.all([
         lireTout(),
         sb.from("profiles").select("id, name, created_at, is_admin"),
         lireStudio(),
@@ -96,6 +96,8 @@ export default function ActivitePage() {
         emailsDeContact(sb).catch(() => new Map<string, string>()),
         // Les repères et « Qui ramène » : une lecture ratée les laisse vides.
         lireReperes(sb).catch(() => null),
+        // Qui a fait venir qui, pour les nouveaux arrivants (./nouveaux.tsx).
+        sb.from("parrainages").select("filleul, parrain"),
       ]);
       if (prof.error) throw new Error(prof.error.message);
 
@@ -138,7 +140,16 @@ export default function ActivitePage() {
           at: new Date(d.created_at).getTime(),
         })) ?? null;
       const reperes = reperesBrut ? assemblerReperes(reperesBrut, noms) : null;
-      setData({ evenements, profiles, studio, reperes, now: Date.now() });
+      const parrains = parrainagesBrut.error
+        ? null
+        : new Map(
+            ((parrainagesBrut.data ?? []) as { filleul: string; parrain: string }[]).flatMap((x) => {
+              const f = noms.get(x.filleul);
+              const pa = noms.get(x.parrain);
+              return f && pa ? [[f, pa] as const] : [];
+            })
+          );
+      setData({ evenements, profiles, studio, reperes, parrains, now: Date.now() });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Lecture impossible.");
     }

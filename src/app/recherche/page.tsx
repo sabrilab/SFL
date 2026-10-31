@@ -42,6 +42,7 @@ import {
   ovr,
   rankPlayers,
   type Journee,
+  type Player,
 } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
@@ -173,17 +174,15 @@ export default function RecherchePage() {
 }
 
 /**
- * La Recherche d'un joueur Bola : les comptes de Bola, chacun en carte. Toucher
- * un résultat ouvre sa carte (la visionneuse, card-viewer.tsx), comme dans le
- * classement de Bola ; ?joueur=Nom (la notification « … te suit ») l'ouvre
- * d'emblée. Les joueurs masqués (lib/sfl/hidden.ts) n'y sont pas, comme dans
- * ce classement.
+ * Les comptes de Bola et leur carte : celle qu'il a dans la saison, sinon une
+ * carte neutre, comme dans les classements de Bola (ligue-vierge). `ouvrir`
+ * la montre dans la visionneuse (card-viewer.tsx) ; `demande` (?joueur=Nom)
+ * l'ouvre d'emblée, une fois les comptes lus (un nom inconnu ou masqué
+ * n'ouvre rien). Les joueurs masqués (lib/sfl/hidden.ts) n'y sont pas.
  */
-function RechercheBola() {
+function useCartesBola(demande: string | null) {
   const { allPlayers } = useSeason();
   const { open } = useCardViewer();
-  const demande = useSearchParams().get("joueur");
-  const [q, setQ] = useState("");
   const [profils, setProfils] = useState<Profil[]>([]);
   useEffect(() => {
     let fini = false;
@@ -194,8 +193,6 @@ function RechercheBola() {
       fini = true;
     };
   }, []);
-  const trouves = useMemo(() => chercherProfils(profils, q), [profils, q]);
-  // Sa carte, comme dans les classements de Bola (ligue-vierge) : celle qu'il a, sinon une carte neutre.
   const carte = useCallback(
     (name: string) => allPlayers.find((p) => p.name.toLowerCase() === name.toLowerCase()) ?? carteNeutre(name),
     [allPlayers]
@@ -213,7 +210,6 @@ function RechercheBola() {
     },
     [carte, open]
   );
-  // Le joueur demandé par le lien, une fois les comptes lus (un nom inconnu ou masqué n'ouvre rien).
   const ouvert = useRef<string | null>(null);
   useEffect(() => {
     if (!demande || demande === ouvert.current) return;
@@ -222,6 +218,42 @@ function RechercheBola() {
     ouvert.current = demande;
     ouvrir(p.name);
   }, [demande, profils, ouvrir]);
+  return { profils, carte, ouvrir };
+}
+
+/** Un compte de Bola en résultat : sa petite carte, son nom, son pseudo. */
+function LigneBola({ p, carte, ouvrir }: { p: Profil; carte: (name: string) => Player; ouvrir: (name: string) => void }) {
+  return (
+    <button
+      type="button"
+      onPointerDown={(e) => prechaufferCarte(e.currentTarget)}
+      onClick={() => ouvrir(p.name)}
+      aria-label={`Voir la carte de ${p.name}`}
+      className="glass flex items-center gap-3.5 rounded-[22px] px-4 py-3 text-left transition-transform active:scale-[0.98]"
+    >
+      <span className="shrink-0">
+        <PlayerCard player={carte(p.name)} size={FORMAT_CARTE.petite} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-lecture font-semibold"><Nom n={p.name} /></span>
+        <span className="block truncate text-corps text-encre-3">{p.username}</span>
+      </span>
+    </button>
+  );
+}
+
+/**
+ * La Recherche d'un joueur Bola : les comptes de Bola, chacun en carte. Toucher
+ * un résultat ouvre sa carte (la visionneuse, card-viewer.tsx), comme dans le
+ * classement de Bola ; ?joueur=Nom (la notification « … te suit ») l'ouvre
+ * d'emblée. Les joueurs masqués (lib/sfl/hidden.ts) n'y sont pas, comme dans
+ * ce classement.
+ */
+function RechercheBola() {
+  const demande = useSearchParams().get("joueur");
+  const [q, setQ] = useState("");
+  const { profils, carte, ouvrir } = useCartesBola(demande);
+  const trouves = useMemo(() => chercherProfils(profils, q), [profils, q]);
 
   return (
     <div className="shell flex flex-col gap-4 py-4 sm:py-8">
@@ -249,22 +281,7 @@ function RechercheBola() {
           <h2 className="mb-2.5 px-1 text-ligne font-bold tracking-tight text-encre-2">Joueurs · {trouves.length}</h2>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
             {trouves.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onPointerDown={(e) => prechaufferCarte(e.currentTarget)}
-                onClick={() => ouvrir(p.name)}
-                aria-label={`Voir la carte de ${p.name}`}
-                className="glass flex items-center gap-3.5 rounded-[22px] px-4 py-3 text-left transition-transform active:scale-[0.98]"
-              >
-                <span className="shrink-0">
-                  <PlayerCard player={carte(p.name)} size={FORMAT_CARTE.petite} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-lecture font-semibold"><Nom n={p.name} /></span>
-                  <span className="block truncate text-corps text-encre-3">{p.username}</span>
-                </span>
-              </button>
+              <LigneBola key={p.id} p={p} carte={carte} ouvrir={ouvrir} />
             ))}
           </div>
         </section>
@@ -277,7 +294,7 @@ function RechercheBola() {
 }
 
 function Recherche() {
-  const { players, journees } = useSeason();
+  const { players, allPlayers, journees } = useSeason();
   const demande = useSearchParams().get("joueur");
   const [q, setQ] = useState("");
   const [openPlayer, setOpenPlayer] = useState<string | null>(demande);
@@ -329,6 +346,24 @@ function Recherche() {
     if (asJournee !== null) return journees.filter((j) => j.j === asJournee);
     return journees.filter((j) => fold(j.date).includes(needle)).slice(0, 6);
   }, [journees, needle, asJournee]);
+
+  // Les comptes de Bola hors de l'effectif de la saison (les filleuls venus
+  // par un lien) : ils se cherchent aussi, et s'ouvrent en carte comme dans la
+  // Recherche d'un joueur Bola ; ?joueur=Nom aussi (Sabri, 31/10/2026 : « Il
+  // n'apparaît pas dans les recherches »). Un joueur de l'effectif, masqué ou
+  // non, n'y est jamais : il reste au profil de sa saison.
+  const dansLaSaison = useMemo(() => new Set(allPlayers.map((p) => p.name.toLowerCase())), [allPlayers]);
+  const { profils, carte, ouvrir } = useCartesBola(
+    demande && !dansLaSaison.has(demande.toLowerCase()) ? demande : null
+  );
+  const comptesBola = useMemo(
+    () => profils.filter((p) => !dansLaSaison.has(p.name.toLowerCase())),
+    [profils, dansLaSaison]
+  );
+  const bolaTrouves = useMemo(
+    () => (asJournee !== null ? [] : chercherProfils(comptesBola, q)),
+    [comptesBola, q, asJournee]
+  );
 
   const selectedPlayer = openPlayer ? ranked.find((p) => p.name === openPlayer) : undefined;
   const selectedJournee =
@@ -482,9 +517,36 @@ function Recherche() {
                 </div>
               </motion.section>
             )}
+
+            {bolaTrouves.length > 0 && (
+              <motion.section
+                key="bola"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="mt-1"
+              >
+                <h2 className="mb-2.5 px-1 text-ligne font-bold tracking-tight text-encre-2">
+                  Joueurs Bola · {bolaTrouves.length}
+                </h2>
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                  {bolaTrouves.map((p) => (
+                    <LigneBola
+                      key={p.id}
+                      p={p}
+                      carte={carte}
+                      ouvrir={(name) => {
+                        logActivity("recherche", { meta: { joueur: name } });
+                        ouvrir(name);
+                      }}
+                    />
+                  ))}
+                </div>
+              </motion.section>
+            )}
           </AnimatePresence>
 
-          {q && joueurs.length === 0 && journeesTrouvees.length === 0 && (
+          {q && joueurs.length === 0 && journeesTrouvees.length === 0 && bolaTrouves.length === 0 && (
             <div className="glass rounded-[26px] px-6 py-10 text-center text-corps text-encre-3">
               Rien trouvé pour « {q} ».
             </div>
