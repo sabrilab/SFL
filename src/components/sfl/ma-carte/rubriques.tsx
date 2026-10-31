@@ -6,8 +6,8 @@
 // mes chiffres), Ma carte ne montre plus qu'une tuile par rubrique, chacune
 // dans son ton (rubriques.css ; Sabri, 24/10 : la liste « pas ouf », « des
 // cartes séparées », « un peu plus de couleurs ») : ma saison en large, puis
-// deux par deux le Niveau XP, l'évolution (sa courbe), les badges (les vrais
-// objets) et mes cartes (la dernière, en vrai). La toucher ouvre sa
+// deux par deux le Niveau XP, l'évolution (sa courbe), les badges et mes
+// cartes, chacune sur son objet en relief (Tuile). La toucher ouvre sa
 // page, enfant de Ma carte (lib/nav.ts) : /profil/saison, /profil/xp,
 // /profil/evolution, /profil/badges, /profil/cartes. Chaque page reprend tel
 // quel le bloc qui était dans Ma carte (ma-saison.tsx, niveau-xp.tsx,
@@ -27,9 +27,6 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import type { RangDuJour } from "@/components/sfl/ma-saison";
 import { useRangXp, useXp } from "@/hooks/use-missions";
-import { useFormatCarte } from "@/hooks/use-format-carte";
-import { MiniCarte } from "@/components/sfl/mini-carte";
-import { Medaille } from "@/components/sfl/vitrine";
 import { ModePasse, retenirOrigineModePasse } from "@/components/sfl/mode-passe";
 import { useMissionsASigner } from "@/components/sfl/mode-passe-missions";
 import { NOM_CHOIX } from "@/components/sfl/flair/mon-flair";
@@ -97,9 +94,26 @@ export function useMaCarte() {
 
 /* ------------------------------- Les tuiles ------------------------------- */
 
-type Ton = "saison" | "xp" | "evolution" | "badges" | "cartes" | "flair";
+type Ton = "saison" | "xp" | "evolution" | "badges" | "cartes" | "flair" | "personnaliser" | "inviter";
 
-/** Une tuile : son ton, son étiquette, son contenu ; la toucher ouvre sa page. */
+/** L'objet en relief d'une tuile (public/objets/<ton>.webp), sous son texte. */
+export function ObjetDeTuile({ ton }: { ton: Ton }) {
+  // eslint-disable-next-line @next/next/no-img-element -- un fond décoratif, déjà à sa taille
+  return <img src={`/objets/${ton}.webp`} alt="" aria-hidden className="tuile__objet" decoding="async" draggable={false} />;
+}
+
+/** Les classes d'une tuile à objet, pour un bouton d'ailleurs (Personnaliser, Inviter). */
+export const classesTuile = (ton: Ton) => cn("tuile tuile--objet flex flex-col gap-2.5 p-4", `tuile--${ton}`);
+
+/**
+ * Une tuile : son ton, son étiquette, son contenu ; la toucher ouvre sa page.
+ * Son fond est un objet en relief (Sabri, 31/10 : « des espèces d'objets […]
+ * des images, mais on dirait des objets 3D », comme les boutons d'Higgsfield) :
+ * le ballon de ma saison, le jeton Bola de l'XP, les marches de l'évolution,
+ * la coupe chrome des badges, mes cartes en pile, la boule du Flair
+ * (public/objets, rendus GPT Image, fonds transparents). L'objet déborde du
+ * coin, sous le texte, qui garde sa place.
+ */
 function Tuile({
   href,
   ton,
@@ -124,8 +138,14 @@ function Tuile({
       aria-label={label}
       onClick={onClick}
       // Le Flair garde sa fiche noire dans les deux modes (matchs/flair.css) : une île sombre.
-      className={cn("tuile flex min-h-[156px] flex-col gap-2.5 p-4", `tuile--${ton}`, large && "col-span-2 min-h-0", ton === "flair" && "dark text-foreground")}
+      className={cn(
+        "tuile tuile--objet flex min-h-[156px] flex-col gap-2.5 p-4",
+        `tuile--${ton}`,
+        large && "tuile--large col-span-2 min-h-[148px]",
+        ton === "flair" && "dark text-foreground"
+      )}
     >
+      <ObjetDeTuile ton={ton} />
       <span className="tuile__etiquette mono-label text-[10px]">{nom}</span>
       {children}
     </Link>
@@ -170,7 +190,6 @@ export function RubriquesMaCarte() {
   const b = useXp(player.name);
   const r = useRangXp(player.name);
   const aSigner = useMissionsASigner();
-  const format = useFormatCarte();
   const flair = useMonFlair();
   const blesse = useEstBlesse(player.name);
   const identite = useIdentites();
@@ -363,7 +382,7 @@ export function RubriquesMaCarte() {
     );
   }
 
-  // 4. Mes badges : ceux que j'ai, en vrai, et le prochain.
+  // 4. Mes badges : combien de paliers, et le prochain ; la coupe en fond.
   const suivant = prochain(paliers);
   const gagnes = paliers.filter((e) => e.palier > 0).sort((x, y) => y.palier - x.palier);
   tuiles.push(
@@ -374,16 +393,12 @@ export function RubriquesMaCarte() {
       nom="Badges"
       label={`Badges : ${gagnes.length} paliers sur ${paliers.length}${suivant ? `, prochain ${suivant.def.nom}` : ""}`}
     >
-      <span className="flex items-center">
-        {(gagnes.length ? gagnes : paliers).slice(0, 3).map((e, i) => (
-          <span key={e.def.id} className={cn(i > 0 && "-ml-2.5")}>
-            <Medaille e={e} diametre={40} />
-          </span>
-        ))}
+      <span style={{ ...NOMBRE, fontSize: 34 }} className="tabular-nums">
+        {gagnes.length}
       </span>
       <span className="mt-auto flex flex-col gap-0.5">
         <span className="text-[13px] font-semibold">
-          {gagnes.length} / {paliers.length} paliers
+          sur {paliers.length} paliers
         </span>
         {suivant && (
           <span className="font-mono text-[11px] leading-snug text-foreground/45">
@@ -394,24 +409,18 @@ export function RubriquesMaCarte() {
     </Tuile>
   );
 
-  // 5. Mes cartes : la dernière en vrai, et combien j'en ai.
+  // 5. Mes cartes : combien j'en ai ; la pile en fond.
   if (mesCartes.length > 0) {
     const speciales = mesCartes.reduce((n, s) => n + s.speciales.length, 0);
     const total = mesCartes.length + speciales;
-    const s = mesCartes[0];
     tuiles.push(
       <Tuile key="cartes" href="/profil/cartes" ton="cartes" nom="Mes cartes" label={`Mes cartes : ${total}`}>
-        <span className="flex items-end gap-3">
-          <span className="pointer-events-none -mb-1 shrink-0">
-            <MiniCarte player={s.player} size={format.moyenne} cle={`tuile-${s.numero}-${s.player.name}`} saison={s.enCours ? undefined : s.numero} />
+        <span className="mt-auto flex flex-col gap-1">
+          <span style={{ ...NOMBRE, fontSize: 34 }} className="tabular-nums">
+            {total}
           </span>
-          <span className="flex min-w-0 flex-col gap-1 pb-0.5">
-            <span style={{ ...NOMBRE, fontSize: 34 }} className="tabular-nums">
-              {total}
-            </span>
-            <span className="text-[12px] leading-tight font-semibold">
-              {speciales > 0 ? `dont ${speciales} ${speciales > 1 ? "spéciales" : "spéciale"}` : total > 1 ? "cartes" : "carte"}
-            </span>
+          <span className="text-[12px] leading-tight font-semibold">
+            {speciales > 0 ? `dont ${speciales} ${speciales > 1 ? "spéciales" : "spéciale"}` : total > 1 ? "cartes" : "carte"}
           </span>
         </span>
       </Tuile>

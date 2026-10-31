@@ -38,6 +38,7 @@ import type { PaliersAtteints, PalierPasse } from "@/lib/sfl/passe";
 import { saisonsPasseOuvertes, type SaisonPasse } from "@/lib/sfl/saisons-passe";
 import { NOM_METAL, TROPHEES, metal } from "@/lib/sfl/trophees";
 import { cn } from "@/lib/utils";
+import { classesTuile, ObjetDeTuile } from "@/components/sfl/ma-carte/rubriques";
 
 /** Une récompense du Passe et sa saison. */
 interface Recompense {
@@ -135,7 +136,7 @@ function Rubrique({ titre, sous, children }: { titre: string; sous: string; chil
   );
 }
 
-export function PersonnaliserCarte({ player }: { player: Player }) {
+export function PersonnaliserCarte({ player, tuile }: { player: Player; /** En tuile à objet (Ma carte, Sabri 31/10). */ tuile?: boolean }) {
   const nom = player.name;
   const { saison } = useSeason();
   const [ouvert, setOuvert] = useState(false);
@@ -168,14 +169,25 @@ export function PersonnaliserCarte({ player }: { player: Player }) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOuvert(true)}
-        className="bouton-secondaire bouton--or flex w-full items-center justify-center gap-2 py-3.5 text-[14px] font-semibold"
-      >
-        <Palette className="size-4" />
-        Personnaliser ma carte
-      </button>
+      {tuile ? (
+        <button type="button" onClick={() => setOuvert(true)} className={cn(classesTuile("personnaliser"), "tuile--court text-left")}>
+          <ObjetDeTuile ton="personnaliser" />
+          <span className="mt-auto text-[16px] leading-[1.15] font-bold tracking-[-0.2px]">
+            Personnaliser
+            <br />
+            ma carte
+          </span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOuvert(true)}
+          className="bouton-secondaire bouton--or flex w-full items-center justify-center gap-2 py-3.5 text-[14px] font-semibold"
+        >
+          <Palette className="size-4" />
+          Personnaliser ma carte
+        </button>
+      )}
 
       <Sheet open={ouvert} onOpenChange={setOuvert}>
         <SheetContent
