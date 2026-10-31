@@ -32,12 +32,12 @@ export function EquipeDuJoueur({ nom, className }: { nom: string; className?: st
     >
       <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={36} />
       <span className="flex min-w-0 flex-col">
-        <span className="truncate text-[15px] leading-tight font-bold tracking-tight">{e.nom}</span>
-        <span className="mono-label truncate text-[9px] text-foreground/45">
+        <span className="truncate text-lecture leading-tight font-bold tracking-tight">{e.nom}</span>
+        <span className="mono-label truncate text-micro text-encre-3">
           {[NOM_ROLE[membre.role], e.ville].filter(Boolean).join(" · ")}
         </span>
       </span>
-      <ChevronRight className="size-4 shrink-0 text-foreground/35" strokeWidth={2.4} />
+      <ChevronRight className="size-4 shrink-0 text-encre-4" strokeWidth={2.4} />
     </Link>
   );
 }

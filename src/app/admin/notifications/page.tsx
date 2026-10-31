@@ -60,7 +60,7 @@ export default function NotificationsAdmin() {
   }, [session?.server, session?.admin, tour]);
 
   if (!session?.admin) {
-    return <p className="px-5 py-10 text-center text-foreground/50">Réservé à l&apos;admin.</p>;
+    return <p className="px-5 py-10 text-center text-encre-3">Réservé à l&apos;admin.</p>;
   }
 
   const valide = notif.titre.trim().length > 0 && notif.texte.trim().length > 0;
@@ -101,8 +101,8 @@ export default function NotificationsAdmin() {
           <Bell className="size-5" />
         </span>
         <div>
-          <p className="text-[13px] font-medium text-foreground/45">Admin</p>
-          <h1 className="text-[28px] font-bold tracking-tight">Notification</h1>
+          <p className="text-corps font-medium text-encre-3">Admin</p>
+          <h1 className="text-titre-l font-bold tracking-tight">Notification</h1>
         </div>
       </div>
 
@@ -116,7 +116,7 @@ export default function NotificationsAdmin() {
           maxLength={TITRE_MAX}
           onChange={(e) => setNotif({ ...notif, titre: e.target.value })}
           placeholder="Titre"
-          className="glass-soft rounded-2xl px-4 py-3.5 text-[15px] font-semibold outline-none placeholder:text-foreground/30"
+          className="glass-soft rounded-2xl px-4 py-3.5 text-lecture font-semibold outline-none placeholder:text-encre-4"
         />
         <textarea
           value={notif.texte}
@@ -124,7 +124,7 @@ export default function NotificationsAdmin() {
           rows={3}
           onChange={(e) => setNotif({ ...notif, texte: e.target.value })}
           placeholder="Texte"
-          className="glass-soft resize-none rounded-2xl px-4 py-3.5 text-[15px] outline-none placeholder:text-foreground/30"
+          className="glass-soft resize-none rounded-2xl px-4 py-3.5 text-lecture outline-none placeholder:text-encre-4"
         />
         <div className="glass flex rounded-2xl p-1">
           {PAGES.map((p) => (
@@ -133,8 +133,8 @@ export default function NotificationsAdmin() {
               type="button"
               onClick={() => setNotif({ ...notif, url: p.url })}
               className={cn(
-                "flex-1 rounded-xl py-2.5 text-[13px] font-semibold",
-                notif.url === p.url ? "bouton-principal" : "bouton-discret text-foreground/45"
+                "flex-1 rounded-xl py-2.5 text-corps font-semibold",
+                notif.url === p.url ? "bouton-principal" : "bouton-discret text-encre-3"
               )}
             >
               {p.label}
@@ -149,14 +149,14 @@ export default function NotificationsAdmin() {
         <img src="/icon-192.png" alt="" className="size-[38px] rounded-[9px]" />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="truncate text-[14px] font-semibold">{notif.titre || "Titre"}</span>
-            <span className="shrink-0 text-[12px] text-foreground/40">maintenant</span>
+            <span className="truncate text-ligne font-semibold">{notif.titre || "Titre"}</span>
+            <span className="shrink-0 text-petit text-encre-3">maintenant</span>
           </div>
-          <p className="text-[14px] leading-snug text-foreground/75">{notif.texte || "Texte"}</p>
+          <p className="text-ligne leading-snug text-encre-2">{notif.texte || "Texte"}</p>
         </div>
       </div>
 
-      <p className="px-1 text-[13px] text-foreground/50">
+      <p className="px-1 text-corps text-encre-3">
         {abonnes === null
           ? " "
           : abonnes.joueurs === 0
@@ -169,7 +169,7 @@ export default function NotificationsAdmin() {
           type="button"
           disabled={!valide || busy !== null || !branchees}
           onClick={() => envoyer(true)}
-          className="bouton-secondaire bouton--mauve flex items-center justify-center gap-2 py-[14px] text-[15px] font-bold disabled:opacity-40"
+          className="bouton-secondaire bouton--mauve flex items-center justify-center gap-2 py-[14px] text-lecture font-bold disabled:opacity-40"
         >
           {busy === "essai" && <Loader2 className="size-4 animate-spin" />}
           M&apos;envoyer un essai
@@ -179,7 +179,7 @@ export default function NotificationsAdmin() {
             type="button"
             disabled={!valide || busy !== null || !branchees || !abonnes?.telephones}
             onClick={() => setConfirmer(true)}
-            className="bouton-principal bouton--mauve py-[15px] text-[15px] font-bold disabled:opacity-40"
+            className="bouton-principal bouton--mauve py-[15px] text-lecture font-bold disabled:opacity-40"
           >
             Envoyer à toute la ligue
           </button>
@@ -188,7 +188,7 @@ export default function NotificationsAdmin() {
             type="button"
             disabled={busy !== null}
             onClick={() => envoyer(false)}
-            className="bouton-principal bouton--braise flex items-center justify-center gap-2 py-[15px] text-[15px] font-bold disabled:opacity-40"
+            className="bouton-principal bouton--braise flex items-center justify-center gap-2 py-[15px] text-lecture font-bold disabled:opacity-40"
           >
             {busy === "tous" && <Loader2 className="size-4 animate-spin" />}
             Confirmer l&apos;envoi à {abonnes?.telephones} téléphone{(abonnes?.telephones ?? 0) > 1 ? "s" : ""}

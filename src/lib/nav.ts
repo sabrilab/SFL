@@ -82,6 +82,7 @@ const PARENTS: [string, Parent][] = [
   ["/avatar", REGLAGES],
   ["/boutique", { href: "/collection", titre: "Collection" }],
   ["/admin/activite", MA_CARTE],
+  ["/admin/design", REGLAGES],
   ["/admin", REGLAGES],
   ["/ligue/journee", { href: "/ligue", titre: "Actus" }],
   ["/discussions", { href: "/vestiaire", titre: "Vestiaire" }],
@@ -118,6 +119,7 @@ const TITRES: [string, string][] = [
   ["/messages", "Messages"],
   ["/agent", "Bola Agent"],
   ["/admin/activite", "Activité"],
+  ["/admin/design", "Design"],
   ["/admin", "Admin"],
   ["/map", "Map"],
 ];

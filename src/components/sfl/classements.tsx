@@ -44,9 +44,9 @@ type Classe = Player & { rank: number; value: number };
 /** Ses journées jouées : « 3 J ». */
 function Journees({ n, className }: { n: number; className?: string }) {
   return (
-    <span className={cn("shrink-0 text-right font-semibold tabular-nums text-foreground/60", className)} aria-label={`${n} ${n > 1 ? "journées jouées" : "journée jouée"}`}>
+    <span className={cn("shrink-0 text-right font-semibold tabular-nums text-encre-2", className)} aria-label={`${n} ${n > 1 ? "journées jouées" : "journée jouée"}`}>
       {n}
-      <span className="mono-label ml-0.5 text-foreground/40">J</span>
+      <span className="mono-label ml-0.5 text-encre-3">J</span>
     </span>
   );
 }
@@ -54,7 +54,7 @@ function Journees({ n, className }: { n: number; className?: string }) {
 /** « Blessé » sous le nom, à l'encre : ni rouge ni bleu, réservés aux cartes Impact et Défensive. */
 function Blesse() {
   return (
-    <span className="shrink-0 rounded-full bg-foreground px-2 py-0.5 text-[9px] font-extrabold tracking-wide text-background uppercase">
+    <span className="shrink-0 rounded-full bg-foreground px-2 py-0.5 text-micro font-extrabold tracking-wide text-background uppercase">
       Blessé
     </span>
   );
@@ -64,8 +64,8 @@ function Blesse() {
 function Colonne({ titre, valeur, fort, label }: { titre: string; valeur: number; fort?: boolean; label: string }) {
   return (
     <span className="flex w-12 shrink-0 flex-col items-center gap-1 border-l border-foreground/10 py-0.5" aria-label={label}>
-      <span className="mono-label text-[10px] text-foreground/40 uppercase">{titre}</span>
-      <span className={cn("leading-none font-bold tracking-tight tabular-nums", fort ? "text-[19px]" : "text-[17px] text-foreground/75")}>
+      <span className="mono-label text-etiquette text-encre-3 uppercase">{titre}</span>
+      <span className={cn("leading-none font-bold tracking-tight tabular-nums", fort ? "text-titre-fort" : "text-titre text-encre-2")}>
         {valeur}
       </span>
     </span>
@@ -102,16 +102,16 @@ function Podium({
             <span
               className={cn(
                 "max-w-[120px] truncate font-semibold",
-                p === premier ? "text-[15px]" : "text-[12.5px] text-foreground/70",
+                p === premier ? "text-lecture" : "text-corps text-encre-2",
                 p.name === me && "text-primary"
               )}
             >
-              <span className="text-foreground/40 tabular-nums">{p.rank}</span> <Nom n={p.name} />
+              <span className="text-encre-3 tabular-nums">{p.rank}</span> <Nom n={p.name} />
             </span>
-            <span className={cn("font-bold tabular-nums", p === premier ? "text-[20px]" : "text-[15px]")}>
+            <span className={cn("font-bold tabular-nums", p === premier ? "text-titre-fort" : "text-lecture")}>
               {p.value}
-              <span className="mono-label ml-1 text-foreground/40">{unite(def, p.value)}</span>
-              <Journees n={journees(p)} className={cn("ml-1.5", p === premier ? "text-[14px]" : "text-[12px]")} />
+              <span className="mono-label ml-1 text-encre-3">{unite(def, p.value)}</span>
+              <Journees n={journees(p)} className={cn("ml-1.5", p === premier ? "text-ligne" : "text-petit")} />
             </span>
           </div>
         ) : (
@@ -164,19 +164,19 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
           <PlaceMetal x={x} rang={place} />
         </span>
       ) : (
-        <span className="w-7 text-[15px] font-bold text-foreground/40 tabular-nums">{place ?? "–"}</span>
+        <span className="w-7 text-lecture font-bold text-encre-3 tabular-nums">{place ?? "–"}</span>
       )}
       <MiniCarte player={p} size={FORMAT_CARTE.petite} detail={`${x ? (place == null ? nomDivision(x) : `${place === 1 ? "1er" : `${place}e`} de la ${nomDivision(x)}`) : def.label} · ${p.value} ${unite(def, p.value)}`} cle={cle && `${cle}-${p.name}`} />
       <span className="flex min-w-0 flex-1 items-center gap-2">
         {/* « Blessé » sous le nom, en plus du sigle sur la carte : le nom garde toute la ligne. */}
         <span className="flex min-w-0 flex-col items-start gap-0.5">
-          <span className="max-w-full truncate text-[15px] font-semibold"><Nom n={p.name} /></span>
+          <span className="max-w-full truncate text-lecture font-semibold"><Nom n={p.name} /></span>
           {blesse(p) && <Blesse />}
         </span>
         <BadgesLigne ds={parNom.get(p.name)} />
         {!carriere && p.statut === "Suspendu" && (
           <span
-            className="shrink-0 rounded-full bg-destructive/10 px-2 py-0.5 text-[9px] font-bold tracking-wide text-destructive uppercase"
+            className="shrink-0 rounded-full bg-destructive/10 px-2 py-0.5 text-micro font-bold tracking-wide text-destructive uppercase"
           >
             {p.statut}
           </span>
@@ -192,7 +192,7 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
 
   if (ranked.length === 0) {
     return (
-      <div className="glass-soft rounded-3xl px-6 py-10 text-center text-sm text-foreground/45">
+      <div className="glass-soft rounded-3xl px-6 py-10 text-center text-sm text-encre-3">
         Personne dans ce classement pour l&apos;instant.
       </div>
     );
@@ -212,7 +212,7 @@ function Liste({ def, me, joueurs, cle }: { def: Categorie; me: string; joueurs?
           <div key={g.x} className={cn("flex flex-col gap-3 rounded-[24px] px-2 pt-3 pb-2 ring-1 ring-inset", METAL[g.x].voile)}>
             <div className="flex items-center gap-2.5 px-1.5">
               <PastilleDivision x={g.x} />
-              <span className="text-[13px] font-semibold text-foreground/75">
+              <span className="text-corps font-semibold text-encre-2">
                 {g.joueurs.length} {g.joueurs.length > 1 ? "joueurs" : "joueur"}
               </span>
             </div>
@@ -302,8 +302,8 @@ export function Classements({
             aria-selected={id === r.id}
             onClick={() => setId(r.id)}
             className={cn(
-              "shrink-0 px-4 py-2 text-[13px] font-semibold whitespace-nowrap",
-              id === r.id ? "bouton-principal" : "bouton-secondaire text-foreground/60"
+              "shrink-0 px-4 py-2 text-corps font-semibold whitespace-nowrap",
+              id === r.id ? "bouton-principal" : "bouton-secondaire text-encre-2"
             )}
           >
             {r.label}

@@ -70,19 +70,19 @@ export function Defier({
     <Sheet open={!!adversaire} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
         <SheetHeader className="px-5 pt-5 pb-0">
-          <SheetTitle className="text-[26px] font-bold tracking-tight">Défier</SheetTitle>
+          <SheetTitle className="text-titre-g font-bold tracking-tight">Défier</SheetTitle>
         </SheetHeader>
         {mienne && adversaire && (
           <div className="flex flex-col gap-5 px-4">
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-2">
               <div className="flex flex-col items-center gap-2">
                 <Ecusson initiales={mienne.initiales} fond={mienne.fond} blason={mienne.blason} taille={72} />
-                <span className="text-center text-[14px] font-semibold">{mienne.nom}</span>
+                <span className="text-center text-ligne font-semibold">{mienne.nom}</span>
               </div>
-              <span className="text-[15px] font-bold text-muted-foreground">VS</span>
+              <span className="text-lecture font-bold text-muted-foreground">VS</span>
               <div className="flex flex-col items-center gap-2">
                 <Ecusson initiales={adversaire.initiales} fond={adversaire.fond} blason={adversaire.blason} taille={72} />
-                <span className="text-center text-[14px] font-semibold">{adversaire.nom}</span>
+                <span className="text-center text-ligne font-semibold">{adversaire.nom}</span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -100,7 +100,7 @@ export function Defier({
             ) : (
               <Input value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Le terrain" maxLength={120} autoFocus={!!terrain} />
             )}
-            <Button variant="mauve" disabled={!pret || envoi} onClick={envoyer} className="h-12 rounded-full text-[15px] font-semibold">
+            <Button variant="mauve" disabled={!pret || envoi} onClick={envoyer} className="h-12 rounded-full text-lecture font-semibold">
               Envoyer le défi
             </Button>
           </div>

@@ -41,12 +41,12 @@ export function ReglageConfidentialite() {
           <ShieldCheck className="size-[18px]" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[15px] font-semibold">Politique de confidentialité</span>
-          <span className="block text-[12px] text-foreground/45">
+          <span className="block text-lecture font-semibold">Politique de confidentialité</span>
+          <span className="block text-petit text-encre-3">
             {accepte && !accepte.enAttente ? `Acceptée le ${dateAccord(accepte.le)}` : `Version du ${DATE_POLITIQUE}`}
           </span>
         </span>
-        <ChevronRight className="size-4 text-foreground/45" />
+        <ChevronRight className="size-4 text-encre-3" />
       </Link>
       {accepte && (
         <label className="glass flex items-center gap-3 rounded-2xl px-4 py-3.5">
@@ -54,8 +54,8 @@ export function ReglageConfidentialite() {
             <Clapperboard className="size-[18px]" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold">Ma carte hors de l&apos;app</span>
-            <span className="block text-[12px] text-foreground/45">Dans les vidéos et les posts de Bola</span>
+            <span className="block text-lecture font-semibold">Ma carte hors de l&apos;app</span>
+            <span className="block text-petit text-encre-3">Dans les vidéos et les posts de Bola</span>
           </span>
           <Switch checked={accepte.horsApp} disabled={envoi} onCheckedChange={(v) => void changer(v)} />
         </label>

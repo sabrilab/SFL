@@ -29,14 +29,14 @@ export function Locked({
       </div>
       <span
         className={cn(
-          "absolute z-10 flex items-center gap-1.5 rounded-full bg-foreground/85 px-2.5 py-1 text-[11px] font-bold tracking-wide text-background uppercase",
+          "absolute z-10 flex items-center gap-1.5 rounded-full bg-foreground/85 px-2.5 py-1 text-legende font-bold tracking-wide text-background uppercase",
           chipClassName ?? "top-3 right-3"
         )}
       >
         <Lock className="size-3" /> {label}
       </span>
       {note && (
-        <p className="mt-2 px-1 text-[12px] leading-snug text-muted-foreground">{note}</p>
+        <p className="mt-2 px-1 text-petit leading-snug text-muted-foreground">{note}</p>
       )}
     </div>
   );

@@ -60,7 +60,7 @@ export function FermeDans({ fin }: { fin: Date }) {
   return (
     <span className="mono-label flex shrink-0 items-baseline gap-2 text-white/50">
       Ferme dans
-      <span className="text-[12px] text-white tabular-nums">
+      <span className="text-petit text-white tabular-nums">
         {j > 0 && `${j} j `}
         {deux(Math.floor((m % 1440) / 60))}:{deux(m % 60)}
       </span>
@@ -110,9 +110,9 @@ function Choix({
       )}
       style={ton ? { background: ton.fond, color: ton.encre } : undefined}
     >
-      <span className="text-[15px] leading-none font-bold">{libelle}</span>
-      <span className="font-mono text-[11px] leading-none tabular-nums opacity-70">{part} %</span>
-      {bon && <span className="absolute top-1.5 right-2 text-[11px] font-bold" aria-label="Le bon résultat">✓</span>}
+      <span className="text-lecture leading-none font-bold">{libelle}</span>
+      <span className="font-mono text-legende leading-none tabular-nums opacity-70">{part} %</span>
+      {bon && <span className="absolute top-1.5 right-2 text-legende font-bold" aria-label="Le bon résultat">✓</span>}
       <span aria-hidden className="absolute bottom-0 left-0 h-[3px] bg-current opacity-35" style={{ width: `${part}%` }} />
     </button>
   );
@@ -170,7 +170,7 @@ function ChoixJoueur({
             <PlayerCard player={choisi} size={FORMAT_CARTE.petite} />
           ) : (
             <span
-              className="grid place-items-center rounded-[8px] border border-dashed border-white/30 text-[20px] text-white/50"
+              className="grid place-items-center rounded-[8px] border border-dashed border-white/30 text-titre-fort text-white/50"
               style={{ width: 254 * FORMAT_CARTE.petite, height: 254 * FORMAT_CARTE.petite * 1.4 }}
             >
               +
@@ -179,10 +179,10 @@ function ChoixJoueur({
         </button>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="mono-label text-white/55">{titre}</span>
-          <span className="truncate text-[17px] leading-tight font-bold">
+          <span className="truncate text-titre leading-tight font-bold">
             {choisi ? identite.nom(choisi.name) : ferme ? "Aucun choix" : "Choisir"}
           </span>
-          {choisi && total > 0 && <span className="font-mono text-[11px] text-white/50 tabular-nums">{part(choisi.name)} % de la ligue</span>}
+          {choisi && total > 0 && <span className="font-mono text-legende text-white/50 tabular-nums">{part(choisi.name)} % de la ligue</span>}
           {sous}
         </div>
         <div className="shrink-0 text-right">{droite}</div>
@@ -205,8 +205,8 @@ function ChoixJoueur({
                 className={cn("flex shrink-0 flex-col items-center gap-1.5 rounded-[12px] p-1 transition-transform active:scale-95", actif && "ring-2 ring-white")}
               >
                 <PlayerCard player={p} size={FORMAT_CARTE.moyenne} />
-                <span className="max-w-[78px] truncate text-[12px] leading-none font-semibold">{prenomDe(identite, nom)}</span>
-                <span className="font-mono text-[10px] leading-none text-white/50 tabular-nums">{part(nom)} %</span>
+                <span className="max-w-[78px] truncate text-petit leading-none font-semibold">{prenomDe(identite, nom)}</span>
+                <span className="font-mono text-etiquette leading-none text-white/50 tabular-nums">{part(nom)} %</span>
               </button>
             );
           })}
@@ -259,7 +259,7 @@ export function FlairDuMatch({ j, noirs, blancs }: { j: number | null; noirs: st
   return (
     <section aria-labelledby={`flair-${m.n}`} className="flair flex flex-col gap-4 p-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 id={`flair-${m.n}`} className="titre-lettrage text-[22px] leading-[0.95]">
+        <h3 id={`flair-${m.n}`} className="titre-lettrage text-titre-m leading-[0.95]">
           Le Flair
         </h3>
         {mp.phase === "ouvert" ? (
@@ -310,7 +310,7 @@ export function FlairDuMatch({ j, noirs, blancs }: { j: number | null; noirs: st
             candidats={candidats}
             ferme={ferme}
             droite={vs.etat === "attente" || !vs.choix ? <span className="mono-label text-white/50">+{xp} XP</span> : <Verdict v={vs} xp={xp} />}
-            sous={reponse ? <span className="font-mono text-[11px] text-white/50">C&apos;est {reponse}</span> : undefined}
+            sous={reponse ? <span className="font-mono text-legende text-white/50">C&apos;est {reponse}</span> : undefined}
             onChoix={(nom) => void poser(mp, s, nom)}
           />
         );

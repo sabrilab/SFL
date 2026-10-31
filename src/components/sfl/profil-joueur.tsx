@@ -73,11 +73,11 @@ type Choix = { famille: "palier"; id: TropheeId } | { famille: "saison"; id: Cla
 function StatBar({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="mono-label w-8 shrink-0 text-foreground/40">{label}</span>
+      <span className="mono-label w-8 shrink-0 text-encre-3">{label}</span>
       <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/8">
         <span className="block h-full rounded-full bg-foreground/80" style={{ width: `${Math.min(100, value)}%` }} />
       </span>
-      <span className="w-7 shrink-0 text-right text-[13px] font-bold tabular-nums">{value}</span>
+      <span className="w-7 shrink-0 text-right text-corps font-bold tabular-nums">{value}</span>
     </div>
   );
 }
@@ -89,7 +89,7 @@ export function Chiffre({ valeur, quoi }: { valeur: string | number; quoi: strin
       <span style={{ fontFamily: ANTON, fontSize: 34, lineHeight: 0.9 }} className="tabular-nums">
         {valeur}
       </span>
-      <span className="mono-label text-[9px] text-foreground/45">{quoi}</span>
+      <span className="mono-label text-micro text-encre-3">{quoi}</span>
     </div>
   );
 }
@@ -177,10 +177,10 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
           sousTitre={identite.pseudo(player.name)}
         />
         <div className="flex w-full flex-col items-center gap-[var(--fib-8)] text-center">
-          <h2 className="titre-lettrage text-[34px] leading-[0.95] break-words">
+          <h2 className="titre-lettrage text-nom leading-[0.95] break-words">
             {identite.nom(player.name)}
           </h2>
-          <p className="font-mono text-[12px] text-foreground/45">
+          <p className="font-mono text-petit text-encre-3">
             {identite.pseudo(player.name)} · {poste.toLowerCase()}
             {xp && ` · niveau XP ${xp.niveau}`}
             {rangXp && ` · rang ${rangXp.rang}`}
@@ -200,12 +200,12 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
         </div>
         {/* Blessé : ses journées manquées, ses stats arrêtées là (blessure.tsx) */}
         <LigneBlessure nom={player.name} />
-        <p className="w-full text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
+        <p className="w-full text-titre-fort leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
         {moi && (
           <button
             type="button"
             onClick={() => setCompare(true)}
-            className="bouton-principal bouton--or flex h-12 w-full items-center justify-center text-[15px] font-semibold"
+            className="bouton-principal bouton--or flex h-12 w-full items-center justify-center text-lecture font-semibold"
           >
             Comparer avec ma carte
           </button>
@@ -221,10 +221,10 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
             className="vitrine-mate flex flex-col gap-[var(--fib-21)] rounded-[21px] p-[var(--fib-21)]"
           >
             <div className="flex items-baseline justify-between">
-              <h3 id="trophees" className="text-[19px] font-extrabold tracking-tight">
+              <h3 id="trophees" className="text-titre-fort font-extrabold tracking-tight">
                 Trophées
               </h3>
-              <span className="font-mono text-[12px] font-bold text-contraste/45 tabular-nums">{trophees}</span>
+              <span className="font-mono text-petit font-bold text-contraste/45 tabular-nums">{trophees}</span>
             </div>
 
             {ecussons.length > 0 && (
@@ -238,8 +238,8 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
                   >
                     <Trophee id={e.def.id} rang={e.meilleur!.rang} taille={84} />
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="text-[17px] font-extrabold">{NOM_TROPHEE[e.def.id]}</span>
-                      <span className="font-mono text-[11px] text-contraste/55">
+                      <span className="text-titre font-extrabold">{NOM_TROPHEE[e.def.id]}</span>
+                      <span className="font-mono text-legende text-contraste/55">
                         {e.podiums.map((p) => `${ordinal(p.rang)} · ${p.saison}`).join("  ·  ")}
                       </span>
                     </span>
@@ -265,9 +265,9 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
                     className="flex flex-col items-center gap-1.5 text-center transition-transform active:scale-95 motion-reduce:transition-none"
                   >
                     <Medaille e={e} diametre={52} />
-                    <span className="w-full text-[12px] leading-tight font-bold">{e.def.nom}</span>
-                    <span className="font-mono text-[12px] font-bold tabular-nums">{e.valeur}</span>
-                    <span className="text-[11px] font-semibold text-contraste/55">{NOM_METAL[metal(e.palier)!]}</span>
+                    <span className="w-full text-petit leading-tight font-bold">{e.def.nom}</span>
+                    <span className="font-mono text-petit font-bold tabular-nums">{e.valeur}</span>
+                    <span className="text-legende font-semibold text-contraste/55">{NOM_METAL[metal(e.palier)!]}</span>
                   </button>
                 ))}
               </div>
@@ -284,9 +284,9 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
           <div className="grid grid-cols-3 gap-2">
             {fiche.forts.map((f) => (
               <div key={f.rang} className="flex flex-col gap-1.5 rounded-2xl bg-secondary px-3 pt-3 pb-2.5">
-                <span className="text-[26px] leading-none font-black tracking-[-1px] italic tabular-nums">{f.chiffre}</span>
-                <span className="text-[12px] font-semibold">{f.quoi}</span>
-                <span className="font-mono text-[10.5px] leading-tight text-muted-foreground">{f.rang}</span>
+                <span className="text-titre-g leading-none font-black tracking-[-1px] italic tabular-nums">{f.chiffre}</span>
+                <span className="text-petit font-semibold">{f.quoi}</span>
+                <span className="font-mono text-legende leading-tight text-muted-foreground">{f.rang}</span>
               </div>
             ))}
           </div>
@@ -297,8 +297,8 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
             <h3 className="mono-label text-muted-foreground">Faits marquants</h3>
             {fiche.faits.map((f) => (
               <div key={f.quand + f.quoi} className="flex items-baseline gap-3">
-                <span className="w-[34px] shrink-0 font-mono text-[11px] font-bold text-muted-foreground">{f.quand}</span>
-                <span className="text-[15px] font-semibold">{f.quoi}</span>
+                <span className="w-[34px] shrink-0 font-mono text-legende font-bold text-muted-foreground">{f.quand}</span>
+                <span className="text-lecture font-semibold">{f.quoi}</span>
               </div>
             ))}
           </section>
@@ -318,15 +318,15 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
                     {ordinal(e.rang)}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-semibold">
+                    <span className="block truncate text-lecture font-semibold">
                       {e.saison.nom}
-                      {!e.saison.cloturee && <span className="font-normal text-foreground/45"> · en cours</span>}
+                      {!e.saison.cloturee && <span className="font-normal text-encre-3"> · en cours</span>}
                     </span>
-                    <span className="block truncate font-mono text-[11px] text-foreground/45">
+                    <span className="block truncate font-mono text-legende text-encre-3">
                       sur {e.sur} · {e.bilan.victoires}V {e.bilan.nuls}N {e.bilan.defaites}D
                     </span>
                   </span>
-                  <span className="shrink-0 text-right font-mono text-[12px] text-foreground/70 tabular-nums">
+                  <span className="shrink-0 text-right font-mono text-petit text-encre-2 tabular-nums">
                     {e.player.buts} b · {e.player.passes} p
                   </span>
                 </div>
@@ -337,7 +337,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
 
         {/* 7. Son jeu */}
         <section className="glass flex flex-col gap-2.5 rounded-[26px] px-[18px] py-[17px]">
-          <p className="mono-label text-foreground/40">Profil de jeu</p>
+          <p className="mono-label text-encre-3">Profil de jeu</p>
           {STAT_KEYS.map((k) => (
             <StatBar key={k} label={k} value={player.stats[k]} />
           ))}
@@ -345,14 +345,14 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
 
         {forme.length > 0 && (
           <div className="glass-soft flex items-center justify-between rounded-[20px] px-4 py-3">
-            <span className="mono-label text-foreground/40">Forme · 5 derniers</span>
+            <span className="mono-label text-encre-3">Forme · 5 derniers</span>
             <span className="flex gap-1.5">
               {forme.map((r, i) => (
                 <span
                   key={i}
                   className={cn(
-                    "flex size-6 items-center justify-center rounded-full text-[11px] font-bold",
-                    r === "V" ? "bg-primary text-primary-foreground" : r === "N" ? "bg-foreground/12 text-foreground/70" : "bg-foreground/6 text-foreground/35"
+                    "flex size-6 items-center justify-center rounded-full text-legende font-bold",
+                    r === "V" ? "bg-primary text-primary-foreground" : r === "N" ? "bg-foreground/12 text-encre-2" : "bg-foreground/6 text-encre-4"
                   )}
                 >
                   {r}
@@ -369,26 +369,26 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
               {lignes.map(({ j, e }, i) => (
                 <div
                   key={e ? `${j}-${i}` : `blesse-${j}`}
-                  className={cn("flex items-center gap-3 px-4 py-2.5 text-[13px]", i < lignes.length - 1 && "border-b border-foreground/8")}
+                  className={cn("flex items-center gap-3 px-4 py-2.5 text-corps", i < lignes.length - 1 && "border-b border-foreground/8")}
                 >
-                  <span className="mono-label w-7 shrink-0 text-foreground/40">J{j}</span>
-                  <span className="min-w-0 flex-1 truncate text-foreground/45">{dates.get(j) ?? ""}</span>
+                  <span className="mono-label w-7 shrink-0 text-encre-3">J{j}</span>
+                  <span className="min-w-0 flex-1 truncate text-encre-3">{dates.get(j) ?? ""}</span>
                   {e ? (
                     <>
-                      <span className="shrink-0 tabular-nums text-foreground/70">
+                      <span className="shrink-0 tabular-nums text-encre-2">
                         {e.buts}⚽ {e.passes}🅰
                       </span>
                       <span
                         className={cn(
                           "w-5 shrink-0 text-right font-bold",
-                          e.result === "Victoire" ? "text-primary" : e.result === "Nul" ? "text-foreground/50" : "text-foreground/30"
+                          e.result === "Victoire" ? "text-primary" : e.result === "Nul" ? "text-encre-3" : "text-encre-4"
                         )}
                       >
                         {e.result ? e.result[0] : "–"}
                       </span>
                     </>
                   ) : (
-                    <span className="flex shrink-0 items-center gap-1.5 font-semibold text-foreground/55">
+                    <span className="flex shrink-0 items-center gap-1.5 font-semibold text-encre-3">
                       <Bandage className="size-3.5" aria-hidden />
                       Blessé
                     </span>

@@ -87,7 +87,7 @@ export function PronosticModule({
           <h2 className="mt-1 text-xl font-bold tracking-tight">
             Qui sera MVP de la J{journee} ?
           </h2>
-          <p className="mt-1 text-[12.5px] text-foreground/45">{date}</p>
+          <p className="mt-1 text-corps text-encre-3">{date}</p>
         </div>
       </div>
 
@@ -101,7 +101,7 @@ export function PronosticModule({
               onClick={() => choose(p.name)}
               disabled={!!pick || !!resolvedMvp}
               className={cn(
-                "flex items-center gap-2 px-3.5 py-2 text-[13px] font-semibold",
+                "flex items-center gap-2 px-3.5 py-2 text-corps font-semibold",
                 isAnswer
                   ? "bouton-principal bouton--vert"
                   : active
@@ -116,7 +116,7 @@ export function PronosticModule({
         })}
       </div>
 
-      <p className="mt-3.5 text-[12.5px] text-foreground/45">
+      <p className="mt-3.5 text-corps text-encre-3">
         {!isClient
           ? "Choisis ton MVP avant le coup d'envoi."
           : resolvedMvp
@@ -247,8 +247,8 @@ export function QuizModule({
           const chosen = answers[i];
           return (
             <div key={q.q}>
-              <p className="text-[14px] font-semibold">
-                <span className="mono-label mr-2 text-foreground/30">{i + 1}</span>
+              <p className="text-ligne font-semibold">
+                <span className="mono-label mr-2 text-encre-4">{i + 1}</span>
                 {q.q}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -261,13 +261,13 @@ export function QuizModule({
                       onClick={() => answer(i, o)}
                       disabled={!!chosen}
                       className={cn(
-                        "px-3.5 py-2 text-[13px] font-semibold",
+                        "px-3.5 py-2 text-corps font-semibold",
                         chosen
                           ? isGood
                             ? "bouton-principal bouton--vert"
                             : isChosen
                               ? "bouton-secondaire bouton--rouge line-through"
-                              : "bouton-secondaire text-foreground/35"
+                              : "bouton-secondaire text-encre-4"
                           : "bouton-secondaire"
                       )}
                     >
@@ -282,7 +282,7 @@ export function QuizModule({
       </div>
 
       {done && (
-        <p className="mt-4 text-[12.5px] text-foreground/45">
+        <p className="mt-4 text-corps text-encre-3">
           {score === questions.length
             ? "Sans faute."
             : "Nouveau quiz la semaine prochaine."}

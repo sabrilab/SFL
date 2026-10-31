@@ -44,7 +44,7 @@ export function ReglementListe() {
       <p className="mono-label text-muted-foreground">Règlement Team · version {VERSION_REGLEMENT.slice(1)}</p>
       <ol className="flex flex-col gap-1.5 rounded-[18px] bg-card px-4 py-3.5">
         {REGLEMENT.map((r, i) => (
-          <li key={i} className="grid grid-cols-[18px_1fr] gap-2 text-[13.5px] leading-snug">
+          <li key={i} className="grid grid-cols-[18px_1fr] gap-2 text-ligne leading-snug">
             <span className="font-bold text-muted-foreground tabular-nums">{i + 1}</span>
             <span>{r}</span>
           </li>
@@ -60,7 +60,7 @@ export function CharteListe() {
       <p className="mono-label text-muted-foreground">Charte de déontologie · version {VERSION_REGLEMENT.slice(1)}</p>
       <ol className="flex flex-col gap-1.5 rounded-[18px] bg-card px-4 py-3.5">
         {CHARTE.map((r, i) => (
-          <li key={i} className="grid grid-cols-[18px_1fr] gap-2 text-[13.5px] leading-snug">
+          <li key={i} className="grid grid-cols-[18px_1fr] gap-2 text-ligne leading-snug">
             <span className="font-bold text-muted-foreground tabular-nums">{i + 1}</span>
             <span>{r}</span>
           </li>
@@ -78,7 +78,7 @@ export function CaseAcceptation({ coche, onChange }: { coche: boolean; onChange:
       role="checkbox"
       aria-checked={coche}
       onClick={() => onChange(!coche)}
-      className="grid grid-cols-[24px_1fr] gap-3 rounded-[18px] bg-card px-4 py-3.5 text-left text-[13.5px] leading-snug"
+      className="grid grid-cols-[24px_1fr] gap-3 rounded-[18px] bg-card px-4 py-3.5 text-left text-ligne leading-snug"
     >
       <span
         className={cn(
@@ -147,9 +147,9 @@ export function SignerReglement({
             <SheetHeader className="flex-row items-center gap-3 px-5 pt-5 pb-0">
               <Ecusson initiales={equipe.initiales} fond={equipe.fond} blason={equipe.blason} taille={44} />
               <span className="flex min-w-0 flex-col gap-0.5 pr-10">
-                <SheetTitle className="truncate text-[24px] font-bold tracking-tight">{equipe.nom}</SheetTitle>
+                <SheetTitle className="truncate text-titre-g font-bold tracking-tight">{equipe.nom}</SheetTitle>
                 {invitation && (
-                  <span className="truncate text-[13.5px] text-muted-foreground">
+                  <span className="truncate text-ligne text-muted-foreground">
                     {[`${inviteur(equipe, invitation)} t'invite`, invitation.depuis && `jusqu'à ${quandTombe(finInvitation(invitation.depuis))}`]
                       .filter(Boolean)
                       .join(" · ")}
@@ -165,7 +165,7 @@ export function SignerReglement({
                     {deja.map((m) => (
                       <span key={m.id} className="flex w-[52px] flex-col items-center gap-1">
                         <CarteDe name={m.name} size={FORMAT_CARTE.petite} />
-                        <span className="w-full truncate text-center text-[11.5px] font-medium">{m.name.split(" ")[0]}</span>
+                        <span className="w-full truncate text-center text-petit font-medium">{m.name.split(" ")[0]}</span>
                       </span>
                     ))}
                   </div>
@@ -174,7 +174,7 @@ export function SignerReglement({
               <ReglementListe />
               <CharteListe />
               <CaseAcceptation coche={coche} onChange={setCoche} />
-              <Button variant="vert" disabled={!coche || envoi} onClick={signer} className="h-12 rounded-full text-[15px] font-semibold">
+              <Button variant="vert" disabled={!coche || envoi} onClick={signer} className="h-12 rounded-full text-lecture font-semibold">
                 Signer et rejoindre {equipe.nom}
               </Button>
             </div>
@@ -232,7 +232,7 @@ export function SignerCharte({
             <SheetHeader className="flex-row items-center gap-3 px-5 pt-5 pb-0">
               <Ecusson initiales={equipe.initiales} fond={equipe.fond} blason={equipe.blason} taille={44} />
               <span className="flex min-w-0 flex-col gap-0.5 pr-10">
-                <SheetTitle className="truncate text-[24px] font-bold tracking-tight">{equipe.nom}</SheetTitle>
+                <SheetTitle className="truncate text-titre-g font-bold tracking-tight">{equipe.nom}</SheetTitle>
                 <span className="mono-label text-muted-foreground">
                   {signataires(equipe).filter((m) => m.reglement === VERSION_REGLEMENT).length} / {signataires(equipe).length} ont signé
                 </span>
@@ -242,7 +242,7 @@ export function SignerCharte({
               <CharteListe />
               <ReglementListe />
               <CaseAcceptation coche={coche} onChange={setCoche} />
-              <Button variant="vert" disabled={!coche || envoi} onClick={signer} className="h-12 rounded-full text-[15px] font-semibold">
+              <Button variant="vert" disabled={!coche || envoi} onClick={signer} className="h-12 rounded-full text-lecture font-semibold">
                 Signer
               </Button>
             </div>

@@ -40,7 +40,7 @@ export function Entete({
             type="button"
             onClick={onRetour}
             aria-label="Retour"
-            className="glass-soft grid size-[34px] place-items-center rounded-full text-foreground/80 active:scale-95"
+            className="glass-soft grid size-[34px] place-items-center rounded-full text-encre-2 active:scale-95"
           >
             <ChevronLeft className="size-[18px]" />
           </button>
@@ -184,7 +184,7 @@ export function Corps({
                 type="button"
                 onClick={descendre}
                 aria-label="Voir la suite"
-                className="glass-soft pointer-events-auto grid size-[34px] place-items-center rounded-full bg-background/80 text-foreground/80 active:scale-95"
+                className="glass-soft pointer-events-auto grid size-[34px] place-items-center rounded-full bg-background/80 text-encre-2 active:scale-95"
               >
                 <motion.span
                   className="grid place-items-center"
@@ -213,7 +213,7 @@ export function Corps({
 
 export function Titre({ children, id }: { children: ReactNode; id?: string }) {
   return (
-    <h1 id={id} className="text-center text-[30px] leading-[1.06] font-extrabold tracking-tight text-balance text-white">
+    <h1 id={id} className="text-center text-titre-l leading-[1.06] font-extrabold tracking-tight text-balance text-white">
       {children}
     </h1>
   );
@@ -221,7 +221,7 @@ export function Titre({ children, id }: { children: ReactNode; id?: string }) {
 
 export function Ligne({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <p className={cn("mt-[8px] max-w-[310px] text-center text-[14.5px] leading-snug text-pretty text-white/60", className)}>
+    <p className={cn("mt-[8px] max-w-[310px] text-center text-lecture leading-snug text-pretty text-white/60", className)}>
       {children}
     </p>
   );
@@ -251,7 +251,7 @@ export function BoutonPrincipal({
       disabled={disabled}
       aria-disabled={eteint || undefined}
       className={cn(
-        "bouton-principal flex w-full items-center justify-center gap-2 py-[16px] text-[15px] font-bold disabled:opacity-40",
+        "bouton-principal flex w-full items-center justify-center gap-2 py-[16px] text-lecture font-bold disabled:opacity-40",
         eteint && "opacity-40",
         ton === "vert" ? "bouton--vert" : ton === "or" ? "bouton--or" : "bouton--mauve"
       )}
@@ -275,7 +275,7 @@ export function BoutonDiscret({
     <button
       type="button"
       onClick={onClick}
-      className={cn("bouton-discret px-6 py-[10px] text-[14px] font-semibold", rouge && "bouton--rouge text-[13px]")}
+      className={cn("bouton-discret px-6 py-[10px] text-ligne font-semibold", rouge && "bouton--rouge text-corps")}
     >
       {children}
     </button>

@@ -86,7 +86,7 @@ export function Conversation({
           </h1>
         </div>
       }
-      sousTitre={bloque ? <p className="mt-1 pl-14 text-[12.5px] font-semibold text-foreground/45">Bloqué</p> : undefined}
+      sousTitre={bloque ? <p className="mt-1 pl-14 text-corps font-semibold text-encre-3">Bloqué</p> : undefined}
       aDroite={
         <div className="relative">
           <button
@@ -103,7 +103,7 @@ export function Conversation({
               <button
                 type="button"
                 onClick={() => void basculerBlocage()}
-                className="flex w-full items-center rounded-2xl px-3.5 py-2.5 text-left text-[14px] font-semibold active:bg-contraste/8"
+                className="flex w-full items-center rounded-2xl px-3.5 py-2.5 text-left text-ligne font-semibold active:bg-contraste/8"
               >
                 {bloque ? "Débloquer" : "Bloquer"}
               </button>

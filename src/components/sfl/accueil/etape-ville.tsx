@@ -87,7 +87,7 @@ export function EtapeVille({
               type="button"
               onClick={() => poser(true)}
               disabled={!!envoi}
-              className="bouton-discret flex items-center gap-[6px] px-6 py-[10px] text-[14px] font-semibold disabled:opacity-50"
+              className="bouton-discret flex items-center gap-[6px] px-6 py-[10px] text-ligne font-semibold disabled:opacity-50"
             >
               {envoi === "fantome" ? <Loader2 className="size-4 animate-spin" /> : <Ghost className="size-4" />}
               Mode fantôme
@@ -109,7 +109,7 @@ export function EtapeVille({
                 animate={{ scale: 1, opacity: 1, rotate: -2 }}
                 exit={{ scale: 0.5, opacity: 0 }}
                 transition={{ type: "spring", stiffness: 420, damping: 20 }}
-                className="inline-flex h-[27px] max-w-[260px] items-center gap-[5px] rounded-full bg-[#f4f5f2] px-[11px] text-[14px] leading-none font-extrabold tracking-[-0.2px] whitespace-nowrap text-[#0a0b0d] shadow-[0_2px_6px_rgba(0,0,0,0.35)]"
+                className="inline-flex h-[27px] max-w-[260px] items-center gap-[5px] rounded-full bg-[#f4f5f2] px-[11px] text-ligne leading-none font-extrabold tracking-[-0.2px] whitespace-nowrap text-[#0a0b0d] shadow-[0_2px_6px_rgba(0,0,0,0.35)]"
               >
                 <MapPin className="size-[13px] shrink-0" strokeWidth={2.6} />
                 <span className="truncate">{b.ville.ville}</span>
@@ -151,7 +151,7 @@ export function EtapeVille({
             autoCorrect="off"
             spellCheck={false}
             maxLength={60}
-            className="min-w-0 flex-1 bg-transparent py-[13px] text-[16px] font-semibold text-white outline-none placeholder:font-medium placeholder:text-white/30"
+            className="min-w-0 flex-1 bg-transparent py-[13px] text-titre font-semibold text-white outline-none placeholder:font-medium placeholder:text-white/30"
           />
           {cherche && (
             <button
@@ -176,8 +176,8 @@ export function EtapeVille({
                 className="flex items-center gap-[10px] rounded-2xl px-4 py-[11px] text-left active:bg-white/8"
               >
                 <MapPin className="size-4 shrink-0 text-white/40" />
-                <span className="min-w-0 truncate text-[15px] font-semibold text-white">{ville}</span>
-                {departement && <span className="ml-auto shrink-0 text-[13px] text-white/40">{departement}</span>}
+                <span className="min-w-0 truncate text-lecture font-semibold text-white">{ville}</span>
+                {departement && <span className="ml-auto shrink-0 text-corps text-white/40">{departement}</span>}
               </button>
             );
           })}

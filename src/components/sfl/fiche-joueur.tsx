@@ -97,7 +97,7 @@ function Fiche({ player, equipe }: { player: Player; equipe: EquipeDuJour | null
         <div className="flex min-w-0 flex-col gap-2 pb-1">
           {equipe && (
             <span
-              className="flex items-center gap-1.5 self-start rounded-full py-1 pr-2.5 pl-1.5 text-[12px] font-bold shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
+              className="flex items-center gap-1.5 self-start rounded-full py-1 pr-2.5 pl-1.5 text-petit font-bold shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
               style={{ background: equipe.couleur, color: equipe.encre }}
             >
               <span aria-hidden className="size-2.5 rounded-full shadow-[inset_0_0_0_1.5px_currentColor]" />
@@ -105,10 +105,10 @@ function Fiche({ player, equipe }: { player: Player; equipe: EquipeDuJour | null
             </span>
           )}
           {/* font-black : le font-medium de SheetTitle passerait devant le lettrage. */}
-          <SheetTitle className="titre-lettrage text-[29px] leading-[0.95] font-black break-words">
+          <SheetTitle className="titre-lettrage text-titre-l leading-[0.95] font-black break-words">
             {identite.nom(player.name)}
           </SheetTitle>
-          <SheetDescription className="font-mono text-[12px] text-muted-foreground">
+          <SheetDescription className="font-mono text-petit text-muted-foreground">
             {identite.pseudo(player.name)}
             {poste && ` · ${poste.toLowerCase()}`}
           </SheetDescription>
@@ -118,15 +118,15 @@ function Fiche({ player, equipe }: { player: Player; equipe: EquipeDuJour | null
 
       <ReseauJoueur nom={player.name} centre={false} />
 
-      <p className="text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
+      <p className="text-titre-fort leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>
 
       {fiche.forts.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {fiche.forts.map((f) => (
             <div key={f.rang} className="flex flex-col gap-1.5 rounded-2xl bg-secondary px-3 pt-3 pb-2.5">
-              <span className="text-[26px] leading-none font-black tracking-[-1px] italic tabular-nums">{f.chiffre}</span>
-              <span className="text-[12px] font-semibold">{f.quoi}</span>
-              <span className="font-mono text-[10.5px] leading-tight text-muted-foreground">{f.rang}</span>
+              <span className="text-titre-g leading-none font-black tracking-[-1px] italic tabular-nums">{f.chiffre}</span>
+              <span className="text-petit font-semibold">{f.quoi}</span>
+              <span className="font-mono text-legende leading-tight text-muted-foreground">{f.rang}</span>
             </div>
           ))}
         </div>
@@ -137,8 +137,8 @@ function Fiche({ player, equipe }: { player: Player; equipe: EquipeDuJour | null
           <h3 className="mono-label text-muted-foreground">Faits marquants</h3>
           {fiche.faits.map((f) => (
             <div key={f.quand + f.quoi} className="flex items-baseline gap-3">
-              <span className="w-[34px] shrink-0 font-mono text-[11px] font-bold text-muted-foreground">{f.quand}</span>
-              <span className="text-[15px] font-semibold">{f.quoi}</span>
+              <span className="w-[34px] shrink-0 font-mono text-legende font-bold text-muted-foreground">{f.quand}</span>
+              <span className="text-lecture font-semibold">{f.quoi}</span>
             </div>
           ))}
         </section>
@@ -156,8 +156,8 @@ function Fiche({ player, equipe }: { player: Player; equipe: EquipeDuJour | null
                 className="flex shrink-0 flex-col items-center gap-1 transition-transform active:scale-95 motion-reduce:transition-none"
               >
                 <Trophee id={e.def.id} rang={e.meilleur!.rang} taille={52} />
-                <span className="text-[10.5px] font-bold">{e.def.nom}</span>
-                <span className="font-mono text-[10px] text-muted-foreground">
+                <span className="text-legende font-bold">{e.def.nom}</span>
+                <span className="font-mono text-etiquette text-muted-foreground">
                   {ordinal(e.meilleur!.rang)} · {e.meilleur!.saison}
                 </span>
               </button>
@@ -171,12 +171,12 @@ function Fiche({ player, equipe }: { player: Player; equipe: EquipeDuJour | null
                 className="flex shrink-0 flex-col items-center gap-1 transition-transform active:scale-95 motion-reduce:transition-none"
               >
                 <Medaille e={e} diametre={44} />
-                <span className="text-[10.5px] font-bold">{e.def.nom}</span>
-                <span className="font-mono text-[10px] text-muted-foreground tabular-nums">{e.valeur}</span>
+                <span className="text-legende font-bold">{e.def.nom}</span>
+                <span className="font-mono text-etiquette text-muted-foreground tabular-nums">{e.valeur}</span>
               </button>
             ))}
             {medailles.length > MEDAILLES && (
-              <span className="mb-9 ml-auto shrink-0 font-mono text-[12px] font-bold text-muted-foreground">+{medailles.length - MEDAILLES}</span>
+              <span className="mb-9 ml-auto shrink-0 font-mono text-petit font-bold text-muted-foreground">+{medailles.length - MEDAILLES}</span>
             )}
           </div>
         </section>
@@ -185,7 +185,7 @@ function Fiche({ player, equipe }: { player: Player; equipe: EquipeDuJour | null
       <button
         type="button"
         onClick={voirEnGrand}
-        className="bouton-principal mt-1 flex h-12 items-center justify-center text-[15px] font-semibold"
+        className="bouton-principal mt-1 flex h-12 items-center justify-center text-lecture font-semibold"
       >
         Voir sa carte en grand
       </button>

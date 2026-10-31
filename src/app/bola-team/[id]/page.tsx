@@ -64,7 +64,7 @@ type Championnat = { equipes: EquipeTeam[]; matchs: MatchTeam[]; maintenant?: Da
 function Titre({ children, droite }: { children: React.ReactNode; droite?: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 px-1">
-      <h2 className="text-[19px] font-extrabold tracking-tight">{children}</h2>
+      <h2 className="text-titre-fort font-extrabold tracking-tight">{children}</h2>
       {droite}
     </div>
   );
@@ -145,9 +145,9 @@ export default function PageEquipe() {
   if (!montree)
     return (
       <div className="mx-auto flex w-full max-w-[470px] flex-col items-center gap-4 px-5 pt-[var(--fib-55)] text-center">
-        <EcussonVide taille={64} className="text-foreground/25" />
-        <p className="text-[15px] text-muted-foreground">Équipe introuvable.</p>
-        <Link href="/bola-team" className="bouton-secondaire px-5 py-2.5 text-[14px] font-semibold">
+        <EcussonVide taille={64} className="text-encre-4" />
+        <p className="text-lecture text-muted-foreground">Équipe introuvable.</p>
+        <Link href="/bola-team" className="bouton-secondaire px-5 py-2.5 text-ligne font-semibold">
           Bola Team
         </Link>
       </div>
@@ -186,7 +186,7 @@ export default function PageEquipe() {
             <button
               type="button"
               onClick={() => setCouverture(true)}
-              className="absolute top-3 right-3 flex items-center gap-1.5 rounded-full bg-black/45 px-3 py-1.5 text-[12.5px] font-semibold text-white backdrop-blur-md transition-transform active:scale-95"
+              className="absolute top-3 right-3 flex items-center gap-1.5 rounded-full bg-black/45 px-3 py-1.5 text-corps font-semibold text-white backdrop-blur-md transition-transform active:scale-95"
             >
               <Camera className="size-3.5" strokeWidth={2.4} />
               Couverture
@@ -197,12 +197,12 @@ export default function PageEquipe() {
           <Ecusson initiales={montree.initiales} fond={montree.fond} blason={montree.blason} taille={104} />
         </div>
         <div className="mt-[var(--fib-13)] flex w-full flex-col items-center gap-[var(--fib-8)] text-center">
-          <p className="titre-lettrage text-[34px] leading-[0.95] break-words" aria-hidden>
+          <p className="titre-lettrage text-nom leading-[0.95] break-words" aria-hidden>
             {montree.nom}
           </p>
-          <p className="font-mono text-[12px] text-foreground/45">{etat}</p>
+          <p className="font-mono text-petit text-encre-3">{etat}</p>
           {place && (
-            <Link href="/bola-team?vue=championnat" className="glass mt-[var(--fib-8)] rounded-full px-3.5 py-1.5 text-[13px] font-semibold">
+            <Link href="/bola-team?vue=championnat" className="glass mt-[var(--fib-8)] rounded-full px-3.5 py-1.5 text-corps font-semibold">
               {place}
             </Link>
           )}
@@ -235,7 +235,7 @@ export default function PageEquipe() {
 
           {/* L'effectif. */}
           <section className="flex flex-col gap-[var(--fib-13)]">
-            <Titre droite={<span className="font-mono text-[12px] font-bold text-foreground/45 tabular-nums">{joueurs.length} / {MAX_EQUIPE}</span>}>
+            <Titre droite={<span className="font-mono text-petit font-bold text-encre-3 tabular-nums">{joueurs.length} / {MAX_EQUIPE}</span>}>
               Effectif
             </Titre>
             <div className="grid grid-cols-3 gap-x-2 gap-y-[var(--fib-21)] sm:grid-cols-4">
@@ -244,10 +244,10 @@ export default function PageEquipe() {
                 return (
                   <div key={m.id} className="flex min-w-0 flex-col items-center gap-1.5 text-center">
                     <CarteDe name={m.name} size={FORMAT_CARTE.moyenne} />
-                    <span className="w-full truncate text-[14px] leading-tight font-bold">
+                    <span className="w-full truncate text-ligne leading-tight font-bold">
                       <Nom n={m.name} />
                     </span>
-                    <span className="mono-label -mt-1 text-[9px] text-foreground/45">
+                    <span className="mono-label -mt-1 text-micro text-encre-3">
                       {m.role !== "membre" ? NOM_ROLE[m.role] : s ? `${s.buts} b · ${s.passes} pd` : NOM_ROLE.membre}
                     </span>
                   </div>
@@ -269,8 +269,8 @@ export default function PageEquipe() {
                     <div className="flex items-center gap-3 rounded-[20px] bg-card px-3 py-2.5">
                       {autre && <Ecusson initiales={autre.initiales} fond={autre.fond} blason={autre.blason} taille={34} />}
                       <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-[15px] font-semibold">{autre?.nom ?? "Adversaire"}</span>
-                        <span className="truncate text-[12.5px] text-muted-foreground">
+                        <span className="truncate text-lecture font-semibold">{autre?.nom ?? "Adversaire"}</span>
+                        <span className="truncate text-corps text-muted-foreground">
                           {libelleJour(prochain.jour)} · {prochain.heure.slice(0, 5)} · {prochain.lieu}
                         </span>
                       </span>
@@ -294,14 +294,14 @@ export default function PageEquipe() {
                     <Pastille r={r} taille={22} />
                     {autre && <Ecusson initiales={autre.initiales} fond={autre.fond} blason={autre.blason} taille={30} />}
                     <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-[14.5px] font-semibold">{autre?.nom ?? "Adversaire"}</span>
-                      <span className="mono-label text-foreground/40">
+                      <span className="truncate text-lecture font-semibold">{autre?.nom ?? "Adversaire"}</span>
+                      <span className="mono-label text-encre-3">
                         {libelleJour(m.jour)}
                         {em.forfaitDe != null ? " · forfait" : !compte ? " · amical" : ""}
                       </span>
                     </span>
-                    <span className="shrink-0 text-[22px] leading-none tabular-nums" style={{ fontFamily: ANTON }}>
-                      {pour} <span className="text-foreground/25">–</span> {contre}
+                    <span className="shrink-0 text-titre-m leading-none tabular-nums" style={{ fontFamily: ANTON }}>
+                      {pour} <span className="text-encre-4">–</span> {contre}
                     </span>
                   </Link>
                 );
@@ -319,7 +319,7 @@ export default function PageEquipe() {
                   <button
                     type="button"
                     onClick={() => setBlasonOuvert(true)}
-                    className="bouton-discret flex items-center gap-1.5 px-2.5 py-1 text-[13px] font-semibold text-muted-foreground"
+                    className="bouton-discret flex items-center gap-1.5 px-2.5 py-1 text-corps font-semibold text-muted-foreground"
                   >
                     <Pencil className="size-3.5" strokeWidth={2.4} />
                     Modifier
@@ -336,7 +336,7 @@ export default function PageEquipe() {
               </div>
               <div className="flex flex-wrap justify-center gap-1.5">
                 {b.couleurs.map((c, i) => (
-                  <span key={i} className="flex items-center gap-1.5 rounded-full bg-background/60 py-1 pr-2.5 pl-1 text-[12.5px] font-semibold">
+                  <span key={i} className="flex items-center gap-1.5 rounded-full bg-background/60 py-1 pr-2.5 pl-1 text-corps font-semibold">
                     <span className="size-4 rounded-full border border-contraste/25" style={{ background: c }} />
                     {libelleCouleur(c)}
                   </span>
@@ -362,12 +362,12 @@ export default function PageEquipe() {
                   <div key={`${cle}-${x.joueur}`} className="flex items-center gap-3 rounded-[18px] bg-card px-3 py-2">
                     <RangMetal rang={i + 1} />
                     <CarteDe name={x.name} size={FORMAT_CARTE.petite} />
-                    <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">
+                    <span className="min-w-0 flex-1 truncate text-lecture font-semibold">
                       <Nom n={x.name} />
                     </span>
-                    <span className="w-16 text-right text-[18px] font-extrabold tabular-nums">
+                    <span className="w-16 text-right text-titre-fort font-extrabold tabular-nums">
                       {x[cle]}
-                      <span className="mono-label ml-1 text-foreground/40">{unite}</span>
+                      <span className="mono-label ml-1 text-encre-3">{unite}</span>
                     </span>
                   </div>
                 ))

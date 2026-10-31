@@ -81,24 +81,24 @@ export function VueClassements({ vote, classement, cle }: { vote?: React.ReactNo
           <section className="glass rounded-[26px] p-[18px]">
             <div className="flex items-center justify-between">
               <div>
-                <p className="mono-label text-foreground/40">
+                <p className="mono-label text-encre-3">
                   <Nom n={player.name} />
                 </p>
                 <div className="mt-1 flex items-baseline gap-2">
-                  <span className="text-[34px] leading-none font-extrabold tracking-tight">
+                  <span className="text-nom leading-none font-extrabold tracking-tight">
                     {myRank}
-                    <span className="text-[17px] text-foreground/40">e</span>
+                    <span className="text-titre text-encre-3">e</span>
                   </span>
                   {myDelta !== 0 && (
-                    <span className={cn("mono-label", myDelta > 0 ? "text-primary" : "text-foreground/40")}>
+                    <span className={cn("mono-label", myDelta > 0 ? "text-primary" : "text-encre-3")}>
                       {myDelta > 0 ? `▲ ${myDelta}` : `▼ ${-myDelta}`}
                     </span>
                   )}
                 </div>
               </div>
               <div className="text-right">
-                <p className="mono-label text-foreground/40">Points</p>
-                <div className="mt-1 text-[34px] leading-none font-extrabold tracking-tight tabular-nums">{player.pp}</div>
+                <p className="mono-label text-encre-3">Points</p>
+                <div className="mt-1 text-nom leading-none font-extrabold tracking-tight tabular-nums">{player.pp}</div>
               </div>
             </div>
             {myForm.length > 0 && (
@@ -120,7 +120,7 @@ export function VueClassements({ vote, classement, cle }: { vote?: React.ReactNo
                     </span>
                   ))}
                 </div>
-                <p className="mt-[11px] text-[12.5px] text-foreground/40">
+                <p className="mt-[11px] text-corps text-encre-3">
                   Cinq derniers matchs · {nb("V")} victoire{nb("V") > 1 ? "s" : ""}, {nb("N")} nul{nb("N") > 1 ? "s" : ""}, {nb("D")} défaite
                   {nb("D") > 1 ? "s" : ""}
                 </p>

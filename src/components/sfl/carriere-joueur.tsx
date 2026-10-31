@@ -44,7 +44,7 @@ export function CartesCarriere({ saisons, titre = "Ses cartes" }: { saisons: Car
         <h3 id="ses-cartes" className="mono-label text-muted-foreground">
           {titre}
         </h3>
-        <span className="font-mono text-[12px] font-bold text-foreground/45 tabular-nums">{total}</span>
+        <span className="font-mono text-petit font-bold text-encre-3 tabular-nums">{total}</span>
       </div>
       <div className="glass flex flex-col overflow-hidden rounded-[22px]">
         {saisons.map((s, i) => {
@@ -53,13 +53,13 @@ export function CartesCarriere({ saisons, titre = "Ses cartes" }: { saisons: Car
           return (
             <div key={s.bola ? "bola" : s.numero} className={cn("flex flex-col gap-[var(--fib-13)] py-[var(--fib-13)]", i > 0 && "border-t border-foreground/8")}>
               <div className="flex items-baseline justify-between px-4">
-                <span className="text-[15px] font-semibold">
+                <span className="text-lecture font-semibold">
                   {s.nom}
-                  {s.enCours && !s.bola && <span className="font-normal text-foreground/45"> · en cours</span>}
+                  {s.enCours && !s.bola && <span className="font-normal text-encre-3"> · en cours</span>}
                 </span>
                 <span className="flex items-baseline gap-1.5">
                   {avant && ecart !== 0 && (
-                    <span className="font-mono text-[11px] font-bold text-foreground/55 tabular-nums">
+                    <span className="font-mono text-legende font-bold text-encre-3 tabular-nums">
                       {ecart > 0 ? `+${ecart}` : `−${-ecart}`}
                     </span>
                   )}
@@ -92,8 +92,8 @@ export function CartesCarriere({ saisons, titre = "Ses cartes" }: { saisons: Car
                         journee={s.bola ? undefined : c.j}
                       />
                       <figcaption className="flex flex-col items-center leading-tight">
-                        <span className="text-[11px] font-bold">{BOOST_LABELS[c.carte.type]}</span>
-                        <span className="font-mono text-[10px] text-foreground/45">{c.etiquette ?? `J${c.j}`}</span>
+                        <span className="text-legende font-bold">{BOOST_LABELS[c.carte.type]}</span>
+                        <span className="font-mono text-etiquette text-encre-3">{c.etiquette ?? `J${c.j}`}</span>
                       </figcaption>
                     </figure>
                   ))}
@@ -204,8 +204,8 @@ export function CourbeCarriere({ points, depart = "note" }: { points: PointCourb
               aria-selected={mode === m}
               onClick={() => setMode(m)}
               className={cn(
-                "px-3 py-1 text-[12px] font-semibold",
-                mode === m ? "bouton-principal" : "bouton-discret text-foreground/55"
+                "px-3 py-1 text-petit font-semibold",
+                mode === m ? "bouton-principal" : "bouton-discret text-encre-3"
               )}
             >
               {m === "note" ? "Note" : "Pépite d'Or"}
@@ -220,7 +220,7 @@ export function CourbeCarriere({ points, depart = "note" }: { points: PointCourb
           <span style={{ fontFamily: ANTON, fontSize: 34, lineHeight: 0.9 }} className="tabular-nums">
             {valeurActive == null ? "–" : mode === "note" ? valeurActive : ordinal(valeurActive)}
           </span>
-          <span className="font-mono text-[11px] text-foreground/55">
+          <span className="font-mono text-legende text-encre-3">
             {mode === "note"
               ? p.speciale
                 ? `carte ${BOOST_LABELS[p.speciale.type]} ${p.speciale.note}`
@@ -230,7 +230,7 @@ export function CourbeCarriere({ points, depart = "note" }: { points: PointCourb
                 : `sur ${p.sur}`}
           </span>
         </span>
-        <span className="text-right font-mono text-[11px] leading-tight text-foreground/45">
+        <span className="text-right font-mono text-legende leading-tight text-encre-3">
           {p.nomSaison} · J{p.j}
           <br />
           {p.date}

@@ -176,14 +176,14 @@ export function FormulaireIdentite({ onFini }: { onFini?: () => void }) {
         <PlayerCard player={player} size={0.7} affiche={prenom || " "} pseudo={pseudo ? `@${pseudo}` : ""} />
       </motion.div>
 
-      <h2 className="text-center text-[24px] leading-tight font-extrabold tracking-tight">C&apos;est bien toi ?</h2>
+      <h2 className="text-center text-titre-g leading-tight font-extrabold tracking-tight">C&apos;est bien toi ?</h2>
 
       <ChampsIdentite saisie={saisieIdentite} />
 
       <button
         type="submit"
         disabled={!pret || envoi}
-        className="bouton-principal bouton--vert flex w-full items-center justify-center gap-2 py-[15px] text-[15px] font-bold disabled:opacity-40"
+        className="bouton-principal bouton--vert flex w-full items-center justify-center gap-2 py-[15px] text-lecture font-bold disabled:opacity-40"
       >
         {envoi && <Loader2 className="size-4 animate-spin" />}
         C&apos;est moi
@@ -197,7 +197,7 @@ export function ChampsIdentite({ saisie: s }: { saisie: ReturnType<typeof useSai
   const { etat, saisie, setSaisie, libre, champ, bloque, pseudoChange } = s;
   const ligne = "glass-soft flex items-center rounded-2xl px-4";
   const entree =
-    "min-w-0 flex-1 bg-transparent py-[13px] text-[15px] font-medium text-foreground outline-none placeholder:text-foreground/30";
+    "min-w-0 flex-1 bg-transparent py-[13px] text-lecture font-medium text-foreground outline-none placeholder:text-encre-4";
   return (
     <div className="flex w-full flex-col gap-2">
       <div className="grid grid-cols-2 gap-2">
@@ -226,7 +226,7 @@ export function ChampsIdentite({ saisie: s }: { saisie: ReturnType<typeof useSai
       </div>
 
       <label className={cn(ligne, champ === "pseudo" && "ring-1 ring-[#FF6B5E]")}>
-        <span className="text-[15px] font-bold text-foreground/30">@</span>
+        <span className="text-lecture font-bold text-encre-4">@</span>
         <input
           value={saisie.pseudo}
           onChange={(e) => setSaisie({ ...saisie, pseudo: normaliserPseudo(e.target.value) })}
@@ -237,12 +237,12 @@ export function ChampsIdentite({ saisie: s }: { saisie: ReturnType<typeof useSai
           maxLength={20}
           placeholder="pseudo"
           aria-label="Pseudo"
-          className={cn(entree, bloque && "text-foreground/50")}
+          className={cn(entree, bloque && "text-encre-3")}
         />
         {bloque ? (
-          <span className="mono-label shrink-0 text-foreground/35">Jusqu&apos;au {jour(etat.prochain!)}</span>
+          <span className="mono-label shrink-0 text-encre-4">Jusqu&apos;au {jour(etat.prochain!)}</span>
         ) : pseudoChange && libre === true ? (
-          <Check className="size-4 shrink-0 text-foreground/55" />
+          <Check className="size-4 shrink-0 text-encre-3" />
         ) : pseudoChange && libre === false ? (
           <span className="mono-label shrink-0 text-[#c8352b] dark:text-[#FF6B5E]">Pris</span>
         ) : null}

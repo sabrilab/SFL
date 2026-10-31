@@ -73,10 +73,10 @@ function Ligne({
             )}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[15px] font-bold">
+            <span className="block truncate text-lecture font-bold">
               {d.name} <span className="font-medium text-muted-foreground">{d.username}</span>
             </span>
-            <span className="block truncate text-[12px] text-muted-foreground">
+            <span className="block truncate text-petit text-muted-foreground">
               {[f?.poste, ans !== null ? `${ans} ans` : null, f?.taille_cm ? `${f.taille_cm} cm` : null, f?.poids_kg ? `${f.poids_kg} kg` : null]
                 .filter(Boolean)
                 .join(" · ")}
@@ -92,7 +92,7 @@ function Ligne({
 
       {ouvert && (
         <div className="px-4 pb-4">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12.5px]">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-corps">
             <dt className="text-muted-foreground">Nom</dt>
             <dd>{f ? `${f.prenom} ${f.nom}` : "—"}</dd>
             <dt className="text-muted-foreground">Email</dt>
@@ -112,12 +112,12 @@ function Ligne({
                     // eslint-disable-next-line @next/next/no-img-element -- lien signé Storage
                     <img src={refs[a.id]} alt={a.label} className="size-full object-cover" />
                   ) : (
-                    <div className="grid size-full place-items-center text-[11px] text-muted-foreground">
+                    <div className="grid size-full place-items-center text-legende text-muted-foreground">
                       {refs ? "—" : <Loader2 className="size-3.5 animate-spin" />}
                     </div>
                   )}
                 </div>
-                <figcaption className="px-1.5 py-1 text-[10.5px] text-muted-foreground">{a.label}</figcaption>
+                <figcaption className="px-1.5 py-1 text-legende text-muted-foreground">{a.label}</figcaption>
               </figure>
             ))}
           </div>
@@ -261,8 +261,8 @@ export function Inscriptions({
       <div className="overflow-hidden rounded-3xl bg-card">
         <div className="flex items-end justify-between gap-3 px-4 pt-3 pb-2">
           <div>
-            <p className="mono-label text-[10px] text-muted-foreground">EFFECTIF</p>
-            <p className="text-[17px] font-extrabold tracking-tight">
+            <p className="mono-label text-etiquette text-muted-foreground">EFFECTIF</p>
+            <p className="text-titre font-extrabold tracking-tight">
               {horsSaison.length} membre{horsSaison.length > 1 ? "s" : ""} sans carte dans la saison
             </p>
           </div>
@@ -272,14 +272,14 @@ export function Inscriptions({
                 type="button"
                 disabled={occupe === "suppression"}
                 onClick={() => void supprimer(horsSaisonComptes)}
-                className="bouton-secondaire bouton--rouge px-3.5 py-1.5 text-[12.5px] font-semibold disabled:opacity-50"
+                className="bouton-secondaire bouton--rouge px-3.5 py-1.5 text-corps font-semibold disabled:opacity-50"
               >
                 Tout supprimer
               </button>
               <button
                 type="button"
                 onClick={() => ajouter(horsSaison)}
-                className="bouton-principal bouton--vert px-3.5 py-1.5 text-[12.5px] font-bold"
+                className="bouton-principal bouton--vert px-3.5 py-1.5 text-corps font-bold"
               >
                 Tout ajouter
               </button>
@@ -288,20 +288,20 @@ export function Inscriptions({
         </div>
         {horsSaisonComptes.map((m) => (
           <div key={m.id} className="flex items-center justify-between gap-3 border-t border-border/60 px-4 py-2.5">
-            <span className="text-[14.5px] font-semibold">{m.name}</span>
+            <span className="text-lecture font-semibold">{m.name}</span>
             <div className="flex gap-1.5">
               <button
                 type="button"
                 disabled={occupe === "suppression"}
                 onClick={() => void supprimer([m])}
-                className="bouton-discret bouton--rouge px-3 py-1.5 text-[12.5px] font-semibold disabled:opacity-50"
+                className="bouton-discret bouton--rouge px-3 py-1.5 text-corps font-semibold disabled:opacity-50"
               >
                 Supprimer
               </button>
               <button
                 type="button"
                 onClick={() => ajouter([m.name])}
-                className="bouton-secondaire bouton--vert px-3 py-1.5 text-[12.5px] font-semibold"
+                className="bouton-secondaire bouton--vert px-3 py-1.5 text-corps font-semibold"
               >
                 Ajouter
               </button>
@@ -313,8 +313,8 @@ export function Inscriptions({
     {demandes.length > 0 && (
     <div className="overflow-hidden rounded-3xl bg-card">
       <div className="px-4 pt-3 pb-1">
-        <p className="mono-label text-[10px] text-muted-foreground">INSCRIPTIONS</p>
-        <p className="text-[17px] font-extrabold tracking-tight">
+        <p className="mono-label text-etiquette text-muted-foreground">INSCRIPTIONS</p>
+        <p className="text-titre font-extrabold tracking-tight">
           {demandes.length} joueur{demandes.length > 1 ? "s" : ""} à valider
         </p>
       </div>

@@ -71,7 +71,7 @@ function Recap() {
     return (
       <div className="shell flex flex-col items-center gap-4 py-10 text-center">
         <p className="text-muted-foreground">Cette saison n&apos;est pas dans les archives.</p>
-        <Link href="/ligue" className="bouton-secondaire px-5 py-2.5 text-[14px] font-semibold">
+        <Link href="/ligue" className="bouton-secondaire px-5 py-2.5 text-ligne font-semibold">
           Actus
         </Link>
       </div>
@@ -153,7 +153,7 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
   // qui défile sur téléphone ; en grille dans la petite colonne sur ordinateur.
   const capsules = (grille: boolean) => (
     <div>
-      <p className="mono-label mb-2 px-1 text-foreground/30">
+      <p className="mono-label mb-2 px-1 text-encre-4">
         Les journées · touche pour ouvrir
       </p>
       <div
@@ -184,16 +184,16 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
               </span>
               <span
                 className={cn(
-                  "text-[12.5px] font-semibold whitespace-nowrap",
-                  !active && "text-foreground/70"
+                  "text-corps font-semibold whitespace-nowrap",
+                  !active && "text-encre-2"
                 )}
               >
                 {jn.date}
               </span>
               <span
                 className={cn(
-                  "mono-label text-[8px]",
-                  active ? "bouton-sous" : "text-foreground/30"
+                  "mono-label text-micro",
+                  active ? "bouton-sous" : "text-encre-4"
                 )}
               >
                 {buts} buts
@@ -228,7 +228,7 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
         titre={saisonClose ? saisonClose.nom : "Actus"}
         className="size-10 sm:size-11"
       />
-      <h1 className="hidden text-[34px] font-bold tracking-tight lg:mr-auto lg:block">Le récap</h1>
+      <h1 className="hidden text-nom font-bold tracking-tight lg:mr-auto lg:block">Le récap</h1>
       <div className="glass flex flex-1 gap-1 rounded-full p-1 lg:w-[420px] lg:flex-none" role="tablist" aria-label="Vue du récap">
         {VUES.map(([id, label]) => (
           <button
@@ -237,7 +237,7 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
             aria-selected={view === id}
             onClick={() => setView(id)}
             className={cn(
-              "flex-auto px-[7px] py-2 text-[12.5px] whitespace-nowrap font-semibold min-[400px]:px-2.5 min-[400px]:text-[13px] sm:px-4 sm:text-sm",
+              "flex-auto px-[7px] py-2 text-corps whitespace-nowrap font-semibold min-[400px]:px-2.5 min-[400px]:text-corps sm:px-4 sm:text-sm",
               view === id ? "bouton-principal bouton--vert" : "bouton-discret text-muted-foreground"
             )}
           >
@@ -251,7 +251,7 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
 
       {view === "matchs" ? (
         <>
-          <p className="px-1 text-[13px] text-foreground/40">
+          <p className="px-1 text-corps text-encre-3">
             Chaque dimanche sur son terrain · {played.length} journée
             {played.length > 1 ? "s" : ""} jouée{played.length > 1 ? "s" : ""}
           </p>
@@ -285,7 +285,7 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
                 // Rien de joué cette saison : le dernier récap de la saison
                 // passée, en attendant le premier de la nouvelle.
                 <>
-                  <p className="mono-label px-1 text-foreground/40">
+                  <p className="mono-label px-1 text-encre-3">
                     {derniereArchive.nom} · le dernier récap — la saison {saison.numero ?? 0} commence
                   </p>
                   <SaisonArchiveProvider saison={saisonArchive!}>
@@ -303,14 +303,14 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
               {!saisonClose && (
                 <section className="mesure lg:max-w-none">
                   <div className="mb-3 px-1">
-                    <h2 className="text-[17px] font-bold tracking-tight">Les prochaines journées</h2>
+                    <h2 className="text-titre font-bold tracking-tight">Les prochaines journées</h2>
                   </div>
                   <PresencePanel />
                   <div className="mt-2.5 flex flex-col gap-2 opacity-50">
                     {dimanchesSuivants.map(([jj, d]) => (
                       <div key={jj} className="flex items-center justify-between rounded-2xl bg-card px-4 py-3">
                         <span className="mono-label text-muted-foreground">{jj}</span>
-                        <span className="text-[14px] font-semibold">{d}</span>
+                        <span className="text-ligne font-semibold">{d}</span>
                         <span className="mono-label text-muted-foreground">À venir</span>
                       </div>
                     ))}

@@ -27,7 +27,7 @@ export function PastilleEtat({ etat, suffixe, className }: { etat: EtatJournee; 
     <span
       className={cn(
         "mono-label inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full px-3",
-        etat === "brouillon" ? "border border-dashed border-foreground/55 text-foreground/85" : "bg-foreground text-background",
+        etat === "brouillon" ? "border border-dashed border-foreground/55 text-encre-2" : "bg-foreground text-background",
         className
       )}
     >
@@ -68,13 +68,13 @@ export function Segmente<T extends string | number>({
           }}
           className={cn(
             "relative flex flex-1 items-center justify-center gap-1 rounded-full font-semibold whitespace-nowrap transition-colors",
-            taille === "sm" ? "h-8 px-3 text-[12.5px]" : "h-10 px-3.5 text-[14px]",
-            valeur === o.id ? "bouton-principal" : "text-foreground/55",
+            taille === "sm" ? "h-8 px-3 text-corps" : "h-10 px-3.5 text-ligne",
+            valeur === o.id ? "bouton-principal" : "text-encre-3",
             o.pointille && valeur !== o.id && "border border-dashed border-foreground/35"
           )}
         >
           {o.libelle}
-          {o.marque && <span aria-label="à corriger" className="mono-label absolute -top-1 -right-0.5 grid size-4 place-items-center rounded-full bg-foreground text-[9px] text-background">!</span>}
+          {o.marque && <span aria-label="à corriger" className="mono-label absolute -top-1 -right-0.5 grid size-4 place-items-center rounded-full bg-foreground text-micro text-background">!</span>}
         </button>
       ))}
     </div>
@@ -112,7 +112,7 @@ export function Pas({
       >
         <Minus className="size-4" />
       </button>
-      <span className={cn("text-center font-bold tabular-nums", grand ? "w-9 text-[24px]" : "w-7 text-[18px]")}>{valeur}</span>
+      <span className={cn("text-center font-bold tabular-nums", grand ? "w-9 text-titre-g" : "w-7 text-titre-fort")}>{valeur}</span>
       <button
         type="button"
         aria-label={`${label} : un de plus`}
@@ -131,7 +131,7 @@ export function Pas({
 
 /** Une étiquette en mono, comme « QUAND », « BUTS ». */
 export function Etiquette({ children, className }: { children: ReactNode; className?: string }) {
-  return <p className={cn("mono-label text-foreground/45", className)}>{children}</p>;
+  return <p className={cn("mono-label text-encre-3", className)}>{children}</p>;
 }
 
 /** Une pastille qui se touche (date, heure, lieu, un choix parmi d'autres). */
@@ -158,7 +158,7 @@ export function Pastille({
       aria-pressed={actif}
       className={cn(
         "mono-label inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 transition-colors",
-        actif ? "bg-foreground text-background" : "bg-secondary text-foreground/75",
+        actif ? "bg-foreground text-background" : "bg-secondary text-encre-2",
         pointille && !actif && "border border-dashed border-foreground/35 bg-transparent",
         className
       )}
@@ -196,7 +196,7 @@ export function Feuille({
         )}
       >
         <SheetHeader className="items-start gap-2 px-5 pt-8 pr-14 pb-3">
-          <SheetTitle className="text-[26px] leading-tight font-bold tracking-tight">{titre}</SheetTitle>
+          <SheetTitle className="text-titre-g leading-tight font-bold tracking-tight">{titre}</SheetTitle>
           {etat}
         </SheetHeader>
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4">{children}</div>

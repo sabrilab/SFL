@@ -85,7 +85,7 @@ function Carte({ l, size }: { l: LigneResultat; size: number }) {
 }
 
 const MVP = () => (
-  <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[9.5px] leading-none font-bold tracking-wide text-black">
+  <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-etiquette leading-none font-bold tracking-wide text-black">
     MVP
   </span>
 );
@@ -288,7 +288,7 @@ function Ecran({
         <div className="my-auto flex flex-col gap-[21px] [@media(max-height:739px)]:gap-[13px]">
           <motion.p
             {...entree(0)}
-            className="mono-label text-center text-[10.5px] text-white/45"
+            className="mono-label text-center text-legende text-white/45"
           >
             {matchDe(r.organisateur.split(" ")[0])} · {libelleJour(r.jour)} ·{" "}
             {r.heure} · {r.lieu}
@@ -318,7 +318,7 @@ function Ecran({
                 </span>
               </div>
             ))}
-            <span className="col-start-2 row-start-1 pb-2 text-[32px] font-bold text-white/25">
+            <span className="col-start-2 row-start-1 pb-2 text-nom font-bold text-white/25">
               –
             </span>
           </motion.div>
@@ -331,13 +331,13 @@ function Ecran({
             >
               <Carte l={mienne} size={FORMAT_CARTE.petite * 1.15} />
               <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className="flex items-center gap-2 truncate text-[17px] font-bold">
+                <span className="flex items-center gap-2 truncate text-titre font-bold">
                   <span className="truncate">
                     <Nom n={mienne.name} />
                   </span>
                   {mvps.has(mienne.id) && <MVP />}
                 </span>
-                <span className="text-[15px] font-semibold text-white/75 tabular-nums">
+                <span className="text-lecture font-semibold text-white/75 tabular-nums">
                   {maLigne(mienne)}
                 </span>
               </div>
@@ -360,7 +360,7 @@ function Ecran({
                 {camp(e).map((l) => (
                   <li
                     key={l.id}
-                    className="flex items-center gap-1.5 text-[13.5px] leading-tight"
+                    className="flex items-center gap-1.5 text-ligne leading-tight"
                   >
                     <span
                       className={cn(
@@ -373,7 +373,7 @@ function Ecran({
                     {mvps.has(l.id) && <MVP />}
                     <span
                       aria-label={statsLues(l)}
-                      className="shrink-0 font-mono text-[11px] whitespace-nowrap text-white/60 tabular-nums"
+                      className="shrink-0 font-mono text-legende whitespace-nowrap text-white/60 tabular-nums"
                     >
                       {statsCourtes(l)}
                     </span>
@@ -382,8 +382,8 @@ function Ecran({
               </ul>
             ))}
             {absents.length > 0 && (
-              <p className="col-span-2 mt-2 truncate text-[12.5px] text-white/55">
-                <span className="mono-label mr-2 text-[10px] text-white/45">
+              <p className="col-span-2 mt-2 truncate text-corps text-white/55">
+                <span className="mono-label mr-2 text-etiquette text-white/45">
                   Absents
                 </span>
                 {absents.map((l, k) => (
@@ -423,7 +423,7 @@ function Ecran({
             enterKeyHint="send"
             aria-label="Motif"
             tabIndex={motifVisible ? 0 : -1}
-            className="h-[50px] w-full rounded-full bg-white/[0.08] px-5 text-[15px] text-white outline-none placeholder:text-white/40 focus:ring-1 focus:ring-white/30"
+            className="h-[50px] w-full rounded-full bg-white/[0.08] px-5 text-lecture text-white outline-none placeholder:text-white/40 focus:ring-1 focus:ring-white/30"
           />
         </form>
         <AnimatePresence mode="wait" initial={false}>
@@ -496,7 +496,7 @@ function Ecran({
                   champ.current?.blur();
                   setPhase({ t: "choix" });
                 }}
-                className="bouton-discret h-[50px] px-5 text-[15px] font-semibold text-white/60"
+                className="bouton-discret h-[50px] px-5 text-lecture font-semibold text-white/60"
               >
                 Annuler
               </button>
@@ -504,7 +504,7 @@ function Ecran({
                 type="submit"
                 form={`motif-${r.id}`}
                 disabled={phase.t === "envoi"}
-                className="bouton-secondaire h-[50px] text-[15px] font-semibold disabled:opacity-50"
+                className="bouton-secondaire h-[50px] text-lecture font-semibold disabled:opacity-50"
               >
                 Infirmer
               </button>

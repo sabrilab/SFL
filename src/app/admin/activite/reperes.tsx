@@ -83,14 +83,14 @@ export function Pics({
   if (pics.length === 0) return null;
   return (
     <div className="mb-3 flex items-center gap-2 overflow-x-auto [scrollbar-width:none]">
-      <span className="mono-label shrink-0 text-[8.5px] text-foreground/45">Pics</span>
+      <span className="mono-label shrink-0 text-micro text-encre-3">Pics</span>
       {pics.map((p) => (
         <button
           key={p.t}
           onClick={() => onChoisir(p.i)}
           className={cn(
-            "shrink-0 px-2.5 py-1 text-[11.5px] font-semibold tabular-nums",
-            actif === p.i ? "bouton-principal" : "bouton-secondaire text-foreground/60"
+            "shrink-0 px-2.5 py-1 text-petit font-semibold tabular-nums",
+            actif === p.i ? "bouton-principal" : "bouton-secondaire text-encre-2"
           )}
         >
           {jjmm(p.t)} · {etiquettePic(p.ecart)}
@@ -126,16 +126,16 @@ export function CeJourLa({
   const heure = (at: number) => new Date(at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   return (
     <div>
-      <p className="mono-label text-[9px] text-foreground/45">
+      <p className="mono-label text-micro text-encre-3">
         {aujourdhui ? "Aujourd'hui · " : ""}
         {new Date(t).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
       </p>
-      <p className="mt-1 text-[13px] leading-snug">
+      <p className="mt-1 text-corps leading-snug">
         <span className="font-bold tabular-nums">{valeur}</span>
-        {phrase && <span className="text-foreground/50 tabular-nums"> · {phrase}</span>}
+        {phrase && <span className="text-encre-3 tabular-nums"> · {phrase}</span>}
       </p>
       {reperes.length === 0 ? (
-        <p className="mt-2 text-[12px] text-foreground/40">Ni match, ni notification de l&apos;app, ni mise en ligne ce jour-là.</p>
+        <p className="mt-2 text-petit text-encre-3">Ni match, ni notification de l&apos;app, ni mise en ligne ce jour-là.</p>
       ) : (
         <ul className="mt-2 flex flex-col">
           {visibles.map((r, k) => (
@@ -143,15 +143,15 @@ export function CeJourLa({
               <Marque r={r} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[13px] leading-snug font-semibold">{r.titre}</span>
+                  <span className="text-corps leading-snug font-semibold">{r.titre}</span>
                   {!r.parJour && (
-                    <span className="mono-label shrink-0 text-[9px] text-foreground/40 tabular-nums">{heure(r.at)}</span>
+                    <span className="mono-label shrink-0 text-micro text-encre-3 tabular-nums">{heure(r.at)}</span>
                   )}
                 </div>
                 {(r.detail || r.pr) && (
-                  <p className="mt-0.5 text-[11.5px] leading-snug text-foreground/50">
+                  <p className="mt-0.5 text-petit leading-snug text-encre-3">
                     {r.detail}
-                    {r.pr ? <span className="text-foreground/30 tabular-nums">{r.detail ? " · " : ""}#{r.pr}</span> : null}
+                    {r.pr ? <span className="text-encre-4 tabular-nums">{r.detail ? " · " : ""}#{r.pr}</span> : null}
                   </p>
                 )}
               </div>
@@ -160,7 +160,7 @@ export function CeJourLa({
         </ul>
       )}
       {reperes.length > VISIBLES && (
-        <button onClick={() => setTout((v) => !v)} className="mono-label mt-1 text-[9px] text-foreground/55">
+        <button onClick={() => setTout((v) => !v)} className="mono-label mt-1 text-micro text-encre-3">
           {tout ? "Moins" : `Et ${reperes.length - VISIBLES} autres`}
         </button>
       )}

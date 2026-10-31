@@ -163,7 +163,7 @@ export function PageJournee() {
       {/* En-tête : le retour, la synchro, la Ligue. */}
       <header className="flex items-center gap-2">
         <BoutonRetour />
-        <h1 className="titre-lettrage flex-1 text-[22px]">SFL</h1>
+        <h1 className="titre-lettrage flex-1 text-titre-m">SFL</h1>
         <PastilleSynchro onClick={() => setSynchro(true)} />
         <Link href="/admin/ligue" aria-label="Ligue" className="bouton-secondaire grid size-11 place-items-center">
           <Menu className="size-5" />
@@ -189,12 +189,12 @@ export function PageJournee() {
               }}
               className={cn(
                 "relative flex h-14 min-w-12 shrink-0 flex-col items-center justify-center rounded-[18px] px-2.5",
-                actif ? "bg-foreground text-background" : "text-foreground/55",
+                actif ? "bg-foreground text-background" : "text-encre-3",
                 estBrouillon(m) && !actif && "border border-dashed border-foreground/35"
               )}
             >
-              <span className="font-display text-[22px] leading-none">J{m.j}</span>
-              <span className="mono-label h-3 text-[9px] leading-3">{estBrouillon(m) ? "○" : defaut ? "!" : ""}</span>
+              <span className="font-display text-titre-m leading-none">J{m.j}</span>
+              <span className="mono-label h-3 text-micro leading-3">{estBrouillon(m) ? "○" : defaut ? "!" : ""}</span>
             </button>
           );
         })}
@@ -208,12 +208,12 @@ export function PageJournee() {
           }}
           className={cn(
             "flex h-14 min-w-12 shrink-0 flex-col items-center justify-center rounded-[18px] border-[1.5px] border-dashed px-2.5",
-            j == null ? "border-foreground text-foreground" : "border-foreground/30 text-foreground/45"
+            j == null ? "border-foreground text-foreground" : "border-foreground/30 text-encre-3"
           )}
           aria-label={`Préparer la J${aPreparer}`}
         >
-          <span className="font-display text-[22px] leading-none">J{aPreparer}</span>
-          <span className="mono-label h-3 text-[9px] leading-3">+</span>
+          <span className="font-display text-titre-m leading-none">J{aPreparer}</span>
+          <span className="mono-label h-3 text-micro leading-3">+</span>
         </button>
       </div>
 
@@ -241,7 +241,7 @@ export function PageJournee() {
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="font-display mr-1 text-[44px] leading-[0.9]">J{j}</span>
+            <span className="font-display mr-1 text-affiche leading-[0.9]">J{j}</span>
             <Pastille onClick={() => setQuandOu(null)}>Dim {meta.date}</Pastille>
             <Pastille onClick={() => setQuandOu(null)} pointille={!meta.heure}>
               {meta.heure ?? "Heure"}
@@ -258,7 +258,7 @@ export function PageJournee() {
             ) : (
               <div className="flex flex-col gap-3">
                 <Etiquette>La ligue voit{derniereVue ? ` · J${derniereVue.j}` : ""}</Etiquette>
-                {derniereVue ? <CarteJournee journee={derniereVue} /> : <p className="mono-label py-8 text-center text-foreground/40">Rien</p>}
+                {derniereVue ? <CarteJournee journee={derniereVue} /> : <p className="mono-label py-8 text-center text-encre-3">Rien</p>}
               </div>
             )
           ) : (
@@ -287,7 +287,7 @@ export function PageJournee() {
                 lieu={(m) => terrainDe(m.lieuId ?? meta.terrainId)}
               />
               {matchs.length > 0 && matchs.every((m) => !m.noirs.length && !m.blancs.length) === false && (
-                <p className="mono-label text-foreground/55">{compteursEnMots(saison, j)}</p>
+                <p className="mono-label text-encre-3">{compteursEnMots(saison, j)}</p>
               )}
               {matchs[matchCourant - 1] && !matchs[matchCourant - 1].noirs.length && !matchs[matchCourant - 1].blancs.length && (
                 <button
@@ -309,7 +309,7 @@ export function PageJournee() {
                     {horsCamps.map(({ e, i }) => (
                       <button key={`l${i}`} type="button" onClick={() => setLigne(i)} className="flex shrink-0 flex-col items-center gap-1">
                         <CarteDe name={e.player} size={FORMAT_CARTE.petite} inerte />
-                        <span className="mono-label max-w-[72px] truncate text-[9px] text-foreground/60">{e.statut === "Présent" ? e.player.split(" ")[0] : e.statut}</span>
+                        <span className="mono-label max-w-[72px] truncate text-micro text-encre-2">{e.statut === "Présent" ? e.player.split(" ")[0] : e.statut}</span>
                       </button>
                     ))}
                     {sansPlace.map((nom) => (
@@ -317,7 +317,7 @@ export function PageJournee() {
                         <span className="rounded-[13px] border-[1.5px] border-dashed border-foreground/40 p-[2px]">
                           <CarteDe name={nom} size={FORMAT_CARTE.petite} inerte />
                         </span>
-                        <span className="mono-label max-w-[72px] truncate text-[9px] text-foreground/60">{nom.split(" ")[0]}</span>
+                        <span className="mono-label max-w-[72px] truncate text-micro text-encre-2">{nom.split(" ")[0]}</span>
                       </button>
                     ))}
                   </div>
@@ -342,8 +342,8 @@ export function PageJournee() {
           onClick={() => setPreparer(true)}
           className="flex min-h-[280px] flex-col items-center justify-center gap-2 rounded-[28px] border-[1.5px] border-dashed border-foreground/30"
         >
-          <span className="font-display text-[64px] leading-none text-foreground/40">J{aPreparer}</span>
-          <span className="mono-label text-foreground/50">À préparer</span>
+          <span className="font-display text-[64px] leading-none text-encre-3">J{aPreparer}</span>
+          <span className="mono-label text-encre-3">À préparer</span>
         </button>
       )}
 
@@ -351,15 +351,15 @@ export function PageJournee() {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/50 bg-background/95 pb-[calc(env(safe-area-inset-bottom,0px)+10px)] backdrop-blur-xl">
         <div className="shell flex flex-col gap-2 pt-3 sm:max-w-[600px]">
           {geste.t === "preparer" || geste.t === "apres" ? (
-            <button type="button" onClick={() => setPreparer(true)} className="bouton-principal h-12 text-[15px] font-semibold">
+            <button type="button" onClick={() => setPreparer(true)} className="bouton-principal h-12 text-lecture font-semibold">
               Préparer la J{geste.t === "apres" ? geste.suivante.j : geste.j} · dim {geste.t === "apres" ? geste.suivante.date : geste.date}
             </button>
           ) : geste.t === "corriger" ? (
-            <button type="button" onClick={() => setPublier(true)} className="bouton-secondaire h-12 text-[15px] font-semibold">
+            <button type="button" onClick={() => setPublier(true)} className="bouton-secondaire h-12 text-lecture font-semibold">
               {geste.ecarts.length} à corriger
             </button>
           ) : geste.t === "publier" ? (
-            <button type="button" onClick={() => setPublier(true)} className="bouton-principal h-12 text-[15px] font-semibold">
+            <button type="button" onClick={() => setPublier(true)} className="bouton-principal h-12 text-lecture font-semibold">
               Publier pour tout le monde
             </button>
           ) : geste.t === "en-ligne" ? (
@@ -367,12 +367,12 @@ export function PageJournee() {
               <span className="mono-label flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-foreground text-background">
                 ● En ligne{geste.le ? ` · ${heureDe(geste.le)}` : ""}
               </span>
-              <button type="button" onClick={() => setRemettre(true)} className="bouton-discret h-12 px-3 text-[13.5px] font-semibold">
+              <button type="button" onClick={() => setRemettre(true)} className="bouton-discret h-12 px-3 text-ligne font-semibold">
                 Remettre en brouillon
               </button>
             </div>
           ) : (
-            <button type="button" onClick={() => setDirect(true)} className="bouton-principal h-12 text-[15px] font-semibold">
+            <button type="button" onClick={() => setDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">
               Direct · Match {geste.match}
               {geste.heure ? ` · ${geste.heure}` : ""}
             </button>

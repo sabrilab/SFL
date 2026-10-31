@@ -112,7 +112,7 @@ export function InvitationCharte({
         </motion.div>
         <span
           className={cn(
-            "mono-label absolute -bottom-3 flex items-center whitespace-nowrap gap-1.5 rounded-full px-3 py-1 text-[10px] ring-1 transition-colors duration-500",
+            "mono-label absolute -bottom-3 flex items-center whitespace-nowrap gap-1.5 rounded-full px-3 py-1 text-etiquette ring-1 transition-colors duration-500",
             signe ? "bg-white text-black ring-white" : "bg-black text-white/75 ring-white/20"
           )}
         >
@@ -122,10 +122,10 @@ export function InvitationCharte({
       </div>
 
       <motion.div {...entre(0.3)} className="flex flex-col items-center gap-1.5 text-center">
-        <h2 className="text-[24px] leading-tight font-extrabold tracking-tight text-white">
+        <h2 className="text-titre-g leading-tight font-extrabold tracking-tight text-white">
           {signe ? "C'est signé" : "Tu n'es pas dans les vidéos"}
         </h2>
-        <p className="max-w-[300px] text-[14px] leading-snug text-white/60">
+        <p className="max-w-[300px] text-ligne leading-snug text-white/60">
           {signe
             ? "Ta carte peut apparaître dans les prochaines vidéos et les prochains visuels de Bola."
             : "Ni dans les visuels de la ligue : tu n'as pas signé la charte. Sans ta signature, Bola ne montre pas ta carte hors de l'app."}
@@ -137,19 +137,19 @@ export function InvitationCharte({
           type="button"
           onClick={() => void signer()}
           disabled={envoi || signe}
-          className="bouton-principal bouton--vert flex w-full items-center justify-center gap-2 py-[15px] text-[15px] font-bold disabled:opacity-60"
+          className="bouton-principal bouton--vert flex w-full items-center justify-center gap-2 py-[15px] text-lecture font-bold disabled:opacity-60"
         >
           {signe ? <Check className="size-4" strokeWidth={3} /> : null}
           {signe ? "Signé" : "Signer la charte"}
         </button>
         <div className="flex items-center">
-          <Link href="/confidentialite" onClick={onFini} className="bouton-discret px-4 py-3 text-[14px] font-semibold">
+          <Link href="/confidentialite" onClick={onFini} className="bouton-discret px-4 py-3 text-ligne font-semibold">
             Lire la charte
           </Link>
           <span aria-hidden className="text-white/25">
             ·
           </span>
-          <button type="button" onClick={onPlusTard} disabled={signe} className="bouton-discret px-4 py-3 text-[14px] font-semibold">
+          <button type="button" onClick={onPlusTard} disabled={signe} className="bouton-discret px-4 py-3 text-ligne font-semibold">
             Plus tard
           </button>
         </div>

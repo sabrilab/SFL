@@ -121,7 +121,7 @@ function Scene({
 function Titre({ children, j, partage }: { children: string; j?: number; partage?: PieceLigue["lignes"] }) {
   return (
     <>
-      <h2 className="absolute top-[var(--fib-13)] left-[var(--fib-21)] z-10 text-[15px] font-bold tracking-tight text-contraste/90">
+      <h2 className="absolute top-[var(--fib-13)] left-[var(--fib-21)] z-10 text-lecture font-bold tracking-tight text-contraste/90">
         {children}
         {j != null && <span className="text-contraste/40"> · J{j}</span>}
       </h2>
@@ -142,7 +142,7 @@ function Chiffre({ n, label, taille = 55, couleur }: { n: ReactNode; label: stri
       <span style={{ fontFamily: ANTON, fontSize: taille, lineHeight: 0.9, color: couleur }} className="tabular-nums">
         {n}
       </span>
-      <span className="mono-label mt-1 text-[9px] text-contraste/45">{label}</span>
+      <span className="mono-label mt-1 text-micro text-contraste/45">{label}</span>
     </div>
   );
 }
@@ -270,7 +270,7 @@ function Joueur({ p, size, moi, detail, chiffre, dessus, marge = 21, echelle = 1
       >
         {p.name}
       </span>
-      {chiffre && <span className="mono-label mt-0.5 text-[9px] text-contraste/55 tabular-nums">{chiffre}</span>}
+      {chiffre && <span className="mono-label mt-0.5 text-micro text-contraste/55 tabular-nums">{chiffre}</span>}
     </div>
   );
 }
@@ -414,8 +414,8 @@ export function ALHonneur({ j }: { j: number }) {
       {decroches.length > 0 && (
         <section className="flex flex-col gap-[var(--fib-13)]">
           <div className="flex items-center justify-between gap-2 px-1">
-            <h2 className="text-[17px] font-bold tracking-tight">
-              Ils ont décroché <span className="text-foreground/40">· J{j}</span>
+            <h2 className="text-titre font-bold tracking-tight">
+              Ils ont décroché <span className="text-encre-3">· J{j}</span>
             </h2>
             <AuVestiaireRond
               piece={{
@@ -488,13 +488,13 @@ function HommeDuDimanche({ j, m, p, moi }: { j: number; m: Mvp; p: Player; moi: 
         </div>
         {/* Les chiffres du jour. */}
         <div className="absolute flex flex-col items-end gap-[var(--fib-13)]" style={{ right: 20, top: 52 }}>
-          <span className="mono-label text-[9px] text-[#9a6b12] dark:text-[#ffc75a]">MVP</span>
+          <span className="mono-label text-micro text-[#9a6b12] dark:text-[#ffc75a]">MVP</span>
           {m.buts > 0 && <Chiffre n={m.buts} label={unite("buts", m.buts)} />}
           {m.passes > 0 && <Chiffre n={m.passes} label={unite("passes", m.passes)} taille={m.buts ? 34 : 55} />}
           <Chiffre n={`+${m.pp}`} label="pts" taille={34} couleur="rgb(var(--contraste-rgb) / 0.55)" />
         </div>
         <span
-          className={cn("titre-lettrage absolute right-5 bottom-[var(--fib-13)] max-w-[40%] text-[16px] leading-none break-words text-right", m.nom === moi ? "text-primary" : "text-contraste")}
+          className={cn("titre-lettrage absolute right-5 bottom-[var(--fib-13)] max-w-[40%] text-titre leading-none break-words text-right", m.nom === moi ? "text-primary" : "text-contraste")}
         >
           {m.nom}
         </span>
@@ -524,10 +524,10 @@ function HommesDuDimanche({ j, mvp, moi }: { j: number; mvp: (Mvp & { p: Player 
         <div className="absolute inset-x-0 bottom-[var(--fib-13)] flex justify-center gap-[var(--fib-34)]">
           {deux.map((m) => (
             <div key={m.nom} className="flex flex-col items-center" style={{ width: W(MOYENNE) }}>
-              <span className={cn("titre-lettrage max-w-full text-center text-[13px] leading-none tracking-[-0.02em] break-words", m.nom === moi ? "text-primary" : "text-contraste")}>
+              <span className={cn("titre-lettrage max-w-full text-center text-corps leading-none tracking-[-0.02em] break-words", m.nom === moi ? "text-primary" : "text-contraste")}>
                 {m.nom}
               </span>
-              <span className="mono-label text-[9px] text-contraste/45 tabular-nums">
+              <span className="mono-label text-micro text-contraste/45 tabular-nums">
                 {[m.buts && `${m.buts} ${unite("buts", m.buts)}`, m.passes && `${m.passes} ${unite("passes", m.passes)}`, `+${m.pp} pts`].filter(Boolean).join(" · ")}
               </span>
             </div>
@@ -567,8 +567,8 @@ function Vitrine({ d, p }: { d: { nom: string; id: TropheeId; palier: number }; 
           <span style={{ fontFamily: ANTON, fontSize: 55, lineHeight: 0.85 }} className="tabular-nums">
             {seuil}
           </span>
-          <span className="mono-label mt-[var(--fib-8)] text-[9px] text-contraste/55">{unite(d.id, seuil)}</span>
-          <span className="mono-label text-[9px] text-contraste/30">{NOM_METAL[m]}</span>
+          <span className="mono-label mt-[var(--fib-8)] text-micro text-contraste/55">{unite(d.id, seuil)}</span>
+          <span className="mono-label text-micro text-contraste/30">{NOM_METAL[m]}</span>
         </div>
       </div>
     </div>
@@ -647,10 +647,10 @@ function Duo({ j, duo, passeur, buteur, moi }: { j: number; duo: { passeur: stri
             { nom: duo.buteur, label: unite("buts", duo.n) },
           ].map((x) => (
             <div key={x.nom} className="flex flex-col items-center" style={{ width: W(MOYENNE) }}>
-              <span className={cn("titre-lettrage max-w-full text-center text-[13px] leading-none tracking-[-0.02em] break-words", x.nom === moi ? "text-primary" : "text-contraste")}>
+              <span className={cn("titre-lettrage max-w-full text-center text-corps leading-none tracking-[-0.02em] break-words", x.nom === moi ? "text-primary" : "text-contraste")}>
                 {x.nom}
               </span>
-              <span className="mono-label text-[9px] text-contraste/45">{x.label}</span>
+              <span className="mono-label text-micro text-contraste/45">{x.label}</span>
             </div>
           ))}
         </div>
@@ -691,8 +691,8 @@ function IlsMontent({ montent, moi }: { montent: { nom: string; gain: number; ra
                     <span className="text-primary tabular-nums" style={{ fontFamily: ANTON, fontSize: 21, lineHeight: 1 }}>
                       ▲{m.gain}
                     </span>
-                    <span className={cn("mt-0.5 max-w-full px-1 text-center text-[10px] leading-tight font-semibold break-words", m.nom === moi ? "text-primary" : "text-contraste/75")}>{m.nom}</span>
-                    <span className="mono-label text-[8.5px] text-contraste/40 tabular-nums">{m.rang}e</span>
+                    <span className={cn("mt-0.5 max-w-full px-1 text-center text-etiquette leading-tight font-semibold break-words", m.nom === moi ? "text-primary" : "text-contraste/75")}>{m.nom}</span>
+                    <span className="mono-label text-micro text-contraste/40 tabular-nums">{m.rang}e</span>
                   </div>
                 </div>
               </div>

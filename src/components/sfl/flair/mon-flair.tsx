@@ -40,7 +40,7 @@ export function PastilleCamp({ camp, barre }: { camp: string; barre?: boolean })
   return (
     <span
       className={cn(
-        "inline-flex h-7 items-center rounded-full px-3 text-[13px] font-bold",
+        "inline-flex h-7 items-center rounded-full px-3 text-corps font-bold",
         !ton && "bg-white/[0.08] text-white",
         camp === "noirs" && "shadow-[inset_0_0_0_1px_rgb(255_255_255/0.22)]",
         barre && "line-through decoration-2 opacity-60"
@@ -78,9 +78,9 @@ function LigneChoix({ c }: { c: ChoixFlair }) {
             <PastilleCamp camp={c.choix} barre={rate} />
           </span>
         ) : (
-          <span className={cn("truncate text-[16px] leading-tight font-bold", rate && "text-white/60 line-through decoration-2")}>{identite.nom(c.choix)}</span>
+          <span className={cn("truncate text-titre leading-tight font-bold", rate && "text-white/60 line-through decoration-2")}>{identite.nom(c.choix)}</span>
         )}
-        {reponse && <span className="font-mono text-[11px] text-white/50">C&apos;était {reponse}</span>}
+        {reponse && <span className="font-mono text-legende text-white/50">C&apos;était {reponse}</span>}
       </div>
       <span className="shrink-0 text-right">
         <VerdictFlair etat={c.etat} xp={c.etat === "juste" ? c.xp : undefined} />
@@ -116,7 +116,7 @@ export function FicheFlair({ f, titre = "Ton Flair", className }: { f: FlairDeJo
     <section aria-label={`${titre}, J${f.j}`} className={cn("flair flex flex-col gap-3.5 p-4", className)}>
       <div className="flex items-baseline justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
-          <h3 className="titre-lettrage text-[22px] leading-[0.95]">{titre}</h3>
+          <h3 className="titre-lettrage text-titre-m leading-[0.95]">{titre}</h3>
           <span className="mono-label text-white/50">{[titre === "Ton Flair" ? `J${f.j}` : null, f.date || null].filter(Boolean).join(" · ")}</span>
         </div>
         <EtatJournee f={f} />

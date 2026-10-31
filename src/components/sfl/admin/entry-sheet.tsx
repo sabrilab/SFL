@@ -77,7 +77,7 @@ export function Stepper({
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2.5">
-      <span className="text-[15px] font-medium">{label}</span>
+      <span className="text-lecture font-medium">{label}</span>
       {children}
     </div>
   );
@@ -303,7 +303,7 @@ export function JourneeMetaSheet({
                   {duJour.map((t, n) => (
                     <div key={t.label} className="flex flex-col gap-1.5">
                       <p className="flex items-baseline justify-between gap-3">
-                        <span className="text-[15px] font-medium">{t.label}</span>
+                        <span className="text-lecture font-medium">{t.label}</span>
                         <span className="truncate text-xs text-muted-foreground">{t.joueurs}</span>
                       </p>
                       <div className="grid grid-cols-[4.75rem_5.5rem_minmax(0,1fr)] gap-2">
@@ -405,7 +405,7 @@ export function AddPlayerSheet({
                 disabled={already}
                 onClick={() => onAdd(name, null)}
                 className={cn(
-                  "flex items-center justify-between rounded-2xl px-4 py-3 text-left text-[15px] font-medium active:bg-secondary",
+                  "flex items-center justify-between rounded-2xl px-4 py-3 text-left text-lecture font-medium active:bg-secondary",
                   already ? "opacity-40" : "hover:bg-secondary"
                 )}
               >
@@ -472,7 +472,7 @@ export function PlayerSheet({
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 pt-2">
                 {STAT_LABELS.map((label, i) => (
                   <div key={label} className="flex items-center justify-between py-1.5">
-                    <span className="text-[13px] font-semibold text-muted-foreground">{label}</span>
+                    <span className="text-corps font-semibold text-muted-foreground">{label}</span>
                     <Stepper value={base[i]} min={0} onChange={(v) => setStat(i, v)} />
                   </div>
                 ))}

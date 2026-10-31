@@ -58,11 +58,11 @@ function Niveau({ b, r }: { b: BilanXp; r: RangJoueur | null }) {
           {b.niveau}
         </h3>
         <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <span className="truncate text-[15px] font-bold">Vers le niveau {b.niveau + 1}</span>
+          <span className="truncate text-lecture font-bold">Vers le niveau {b.niveau + 1}</span>
           <div className="passe__barre">
             <span style={{ width: `${Math.min(1, b.dansLeNiveau / Math.max(1, b.pourLeSuivant)) * 100}%` }} />
           </div>
-          <span className="font-mono text-[11px] text-white/55 tabular-nums">
+          <span className="font-mono text-legende text-white/55 tabular-nums">
             {b.dansLeNiveau} / {b.pourLeSuivant} XP
           </span>
           {r?.suivant && (
@@ -81,8 +81,8 @@ function Encadre({ ton, chiffre, titre, sous }: { ton: string; chiffre: React.Re
   return (
     <div className={cn("xp__encadre", ton)}>
       <span className="xp__chiffre tabular-nums">{chiffre}</span>
-      <span className="text-[12px] leading-[1.2] font-semibold">{titre}</span>
-      {sous && <span className="font-mono text-[10.5px] leading-tight text-white/50 tabular-nums">{sous}</span>}
+      <span className="text-petit leading-[1.2] font-semibold">{titre}</span>
+      {sous && <span className="font-mono text-legende leading-tight text-white/50 tabular-nums">{sous}</span>}
     </div>
   );
 }
@@ -104,7 +104,7 @@ export function NiveauXp({ saison, player }: { saison: number; player: Player })
         <h2 id="niveau-xp" className="mono-label text-muted-foreground">
           Niveau XP
         </h2>
-        <span className="font-mono text-[12px] font-bold text-foreground/45 tabular-nums">
+        <span className="font-mono text-petit font-bold text-encre-3 tabular-nums">
           {b.total.toLocaleString("fr-FR")} XP à vie
         </span>
       </div>
@@ -145,12 +145,12 @@ export function NiveauXp({ saison, player }: { saison: number; player: Player })
               key={`${l.saison}-${l.j}-${l.quoi}-${i}`}
               className={cn("flex items-center gap-3 px-[18px] py-3", i > 0 && "border-t border-white/8", tonDe(l))}
             >
-              <span className="w-[44px] shrink-0 font-mono text-[11px] text-white/45">
+              <span className="w-[44px] shrink-0 font-mono text-legende text-white/45">
                 {l.saison === saison ? `J${l.j}` : `S${l.saison} J${l.j}`}
               </span>
-              <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{l.quoi}</span>
+              <span className="min-w-0 flex-1 truncate text-ligne font-semibold">{l.quoi}</span>
               {l.mission && l.xp > 0 && <span className="passe__rang shrink-0">{l.mission.rang}</span>}
-              <span className={cn("font-mono text-[13px] font-bold tabular-nums", tonDe(l) && "xp__gain")}>
+              <span className={cn("font-mono text-corps font-bold tabular-nums", tonDe(l) && "xp__gain")}>
                 {l.xp < 0 ? `−${-l.xp}` : `+${l.xp}`}
               </span>
             </div>

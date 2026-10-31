@@ -16,7 +16,7 @@ export default function CollectionPage() {
     <div className="shell flex flex-col gap-6 py-4 sm:py-8">
       <div className="flex items-center gap-3">
         <BoutonRetour />
-        <h1 className="text-[30px] font-bold tracking-tight">Collection</h1>
+        <h1 className="text-titre-l font-bold tracking-tight">Collection</h1>
       </div>
       <CollectionPanel me={me} />
     </div>

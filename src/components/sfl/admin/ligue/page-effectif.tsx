@@ -67,8 +67,8 @@ export function PageEffectif() {
     <div className="shell flex flex-col gap-4 py-4 sm:max-w-[600px]">
       <header className="flex items-center gap-2">
         <BoutonRetour parent="/admin/ligue" titre="la Ligue" />
-        <h1 className="titre-lettrage flex-1 text-[22px]">Effectif</h1>
-        <span className="mono-label text-foreground/55">{saison.roster.length}</span>
+        <h1 className="titre-lettrage flex-1 text-titre-m">Effectif</h1>
+        <span className="mono-label text-encre-3">{saison.roster.length}</span>
       </header>
       <label className="glass-soft flex h-11 items-center gap-2 rounded-full px-4">
         <Search className="size-4 text-muted-foreground" aria-hidden />
@@ -79,7 +79,7 @@ export function PageEffectif() {
           aria-label="Chercher un joueur"
           autoCapitalize="none"
           autoCorrect="off"
-          className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-foreground/30"
+          className="min-w-0 flex-1 bg-transparent text-lecture outline-none placeholder:text-encre-4"
         />
       </label>
       <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 [scrollbar-width:none]">
@@ -103,23 +103,23 @@ export function PageEffectif() {
             <span className={neJouePas(x.name) ? "opacity-40" : ""}>
               <CarteDe name={x.name} size={FORMAT_CARTE.petite * 1.35} inerte />
             </span>
-            <span className="max-w-full truncate text-[12px] font-semibold">
+            <span className="max-w-full truncate text-petit font-semibold">
               <Nom n={x.name} />
             </span>
-            <span className="mono-label h-3 text-[9px] text-foreground/50">
+            <span className="mono-label h-3 text-micro text-encre-3">
               {neJouePas(x.name) ? "ne joue pas" : isArbitre(x.name) ? "arbitre" : x.profil !== "Actif" ? x.profil : x.poste && x.poste !== "—" ? x.poste : ""}
             </span>
           </button>
         ))}
       </div>
-      {liste.length === 0 && <p className="mono-label py-10 text-center text-foreground/40">Personne</p>}
+      {liste.length === 0 && <p className="mono-label py-10 text-center text-encre-3">Personne</p>}
 
       <Feuille
         open={!!r}
         onOpenChange={(o) => !o && setFiche(null)}
         titre={r?.name ?? ""}
         bas={
-          <Link href="/admin/tableau?onglet=joueurs" className="bouton-secondaire grid h-12 place-items-center text-[15px] font-semibold">
+          <Link href="/admin/tableau?onglet=joueurs" className="bouton-secondaire grid h-12 place-items-center text-lecture font-semibold">
             Fiche complète
           </Link>
         }
@@ -129,7 +129,7 @@ export function PageEffectif() {
             <div className="flex items-center gap-4">
               <CarteDe name={r.name} size={FORMAT_CARTE.moyenne} />
               <div className="flex flex-col gap-1">
-                <span className="mono-label text-foreground/55">{[r.poste && r.poste !== "—" ? r.poste : null, r.profil].filter(Boolean).join(" · ")}</span>
+                <span className="mono-label text-encre-3">{[r.poste && r.poste !== "—" ? r.poste : null, r.profil].filter(Boolean).join(" · ")}</span>
               </div>
             </div>
             <section className="flex flex-col gap-2">

@@ -179,7 +179,7 @@ export function ChoisirJoueur({
     <Sheet open={open} onOpenChange={fermer}>
       <SheetContent side="bottom" className="data-[side=bottom]:h-[80dvh] rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
         <SheetHeader className="px-5 pt-5 pb-0">
-          <SheetTitle className="text-[24px] font-bold tracking-tight">{titre ?? (plusieurs ? "Inviter des joueurs" : "Ajouter un joueur")}</SheetTitle>
+          <SheetTitle className="text-titre-g font-bold tracking-tight">{titre ?? (plusieurs ? "Inviter des joueurs" : "Ajouter un joueur")}</SheetTitle>
         </SheetHeader>
         <div className="flex min-h-0 flex-1 flex-col gap-3 px-4">
           {onLien && (
@@ -191,7 +191,7 @@ export function ChoisirJoueur({
               <span className="grid size-10 shrink-0 place-items-center rounded-full bg-foreground text-background">
                 <Link2 className="size-5" strokeWidth={2.2} />
               </span>
-              <span className="flex-1 text-[15px] font-semibold">Inviter par lien</span>
+              <span className="flex-1 text-lecture font-semibold">Inviter par lien</span>
             </button>
           )}
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nom ou identifiant" autoCapitalize="none" autoCorrect="off" />
@@ -203,7 +203,7 @@ export function ChoisirJoueur({
                   type="button"
                   onClick={() => setChoix(id)}
                   className={cn(
-                    "flex-1 px-3 py-2 text-[13.5px] font-semibold whitespace-nowrap",
+                    "flex-1 px-3 py-2 text-ligne font-semibold whitespace-nowrap",
                     onglet === id ? "bouton-principal" : "bouton-discret text-muted-foreground"
                   )}
                 >
@@ -239,8 +239,8 @@ export function ChoisirJoueur({
                 >
                   <CarteDe name={profil.name} size={FORMAT_CARTE.petite} inerte />
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-[15px] font-semibold"><Nom n={profil.name} /></span>
-                    <span className="truncate text-[12.5px] text-muted-foreground">{raison ?? detail}</span>
+                    <span className="truncate text-lecture font-semibold"><Nom n={profil.name} /></span>
+                    <span className="truncate text-corps text-muted-foreground">{raison ?? detail}</span>
                   </span>
                   {raison ? null : plusieurs ? (
                     <span
@@ -253,12 +253,12 @@ export function ChoisirJoueur({
                       {coche && <Check className="size-4" strokeWidth={3} />}
                     </span>
                   ) : (
-                    <span className="shrink-0 rounded-full bg-foreground px-3.5 py-1.5 text-[13px] font-semibold text-background">{geste}</span>
+                    <span className="shrink-0 rounded-full bg-foreground px-3.5 py-1.5 text-corps font-semibold text-background">{geste}</span>
                   )}
                 </button>
               );
             })}
-            {recherche && lignes.length === 0 && <p className="py-8 text-center text-[14px] text-muted-foreground">Personne à ce nom.</p>}
+            {recherche && lignes.length === 0 && <p className="py-8 text-center text-ligne text-muted-foreground">Personne à ce nom.</p>}
           </div>
           {plusieurs && coches.length > 0 && (
             <button
@@ -267,7 +267,7 @@ export function ChoisirJoueur({
                 plusieurs.onInviter(coches);
                 fermer(false);
               }}
-              className="bouton-principal bouton--mauve h-12 shrink-0 text-[15px] font-semibold"
+              className="bouton-principal bouton--mauve h-12 shrink-0 text-lecture font-semibold"
             >
               Inviter {coches.length === 1 ? coches[0].name.split(" ")[0] : `${coches.length} joueurs`}
             </button>
