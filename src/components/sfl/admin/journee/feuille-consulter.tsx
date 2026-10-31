@@ -53,7 +53,7 @@ function Lignes({ lignes, onLigne }: { lignes: Ligne[]; onLigne: (i: number) => 
             </span>
             <span className="w-9 shrink-0 text-right text-lecture font-bold tabular-nums">{entryPP(e)}</span>
           </span>
-          <span className="truncate text-corps text-encre-3">{decomposer(e)}</span>
+          <span className="text-corps leading-snug text-encre-3">{decomposer(e)}</span>
         </button>
       ))}
     </div>
