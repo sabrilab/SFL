@@ -190,9 +190,8 @@ import { useFormatTerrain } from "@/hooks/use-format-terrain";
 import { montrerCalque, useCalquesMap } from "@/hooks/use-calques-map";
 import { SigleLigue } from "@/components/sfl/choix-ligue";
 import { Visages } from "@/components/sfl/suivre";
-import { afficheDe, type Affiche } from "@/lib/sfl/affiche";
+import { afficheDe, parNote, useAffiches, type Affiche } from "@/lib/sfl/affiche";
 import { AfficheDuMatch } from "@/components/sfl/map/affiche-du-match";
-import { MosaiqueCarte, MosaiqueGrande, type Mosaique } from "@/components/sfl/map/mosaique-match";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { useMatchsTeam, type MatchTeam } from "@/hooks/use-matchs-team";
 import type { FondCarte, PointPlan, PossiblePlan, ToiPlan } from "@/components/sfl/map/carte-map";
@@ -716,33 +715,25 @@ export default function MapPage() {
     const mien = prochain?.j != null ? affiches.find((m) => !m.joue && m.j === prochain.j && m.dedans) : undefined;
     return mien ?? prochain ?? affiches[0];
   }, [affiches, aujourdhui]);
-  // L'affiche d'un match à venir : ses deux meilleures notes (lib/sfl/affiche.ts).
+  // L'affiche d'un match à venir (lib/sfl/affiche.ts) : le meilleur des
+  // Noirs contre le meilleur des Blancs une fois les équipes faites, sinon
+  // les deux meilleures notes parmi ceux qui viennent (ou les habitués).
+  const versionAffiches = useAffiches();
   const afficheDu = useCallback(
-    (m: MatchMap) =>
-      m.joue ? null : afficheDe(m.presents.length ? m.presents : m.ligue === "sfl" ? habitues : [], (nom) => players.find((p) => p.name === nom)),
-    [habitues, players]
-  );
-  // Qui joue contre qui : les deux équipes d'une journée composée ou jouée,
-  // chacune triée par note, son meilleur en grand (map/mosaique-match.tsx).
-  const mosaiqueDu = useCallback(
-    (m: MatchMap): Mosaique | null => {
-      if (m.j == null || m.ligue !== "sfl") return null;
-      const match = journees.find((x) => x.j === m.j)?.matches?.[m.matchsIci?.[0] ?? 0];
-      if (!match) return null;
-      const note = (nom: string) => {
-        const p = players.find((x) => x.name === nom);
-        return p ? ovr(p.stats) : 0;
-      };
+    (m: MatchMap): Affiche | null => {
+      if (m.joue) return null;
+      const joueur = (nom: string) => players.find((p) => p.name === nom);
+      const match = m.j != null && m.ligue === "sfl" ? journees.find((x) => x.j === m.j)?.matches?.[m.matchsIci?.[0] ?? 0] : undefined;
       const cote = (equipe: string) =>
-        saison.entries
-          .filter((e) => e.j === m.j && e.team === equipe && e.statut === "Présent")
-          .map((e) => ({ nom: e.player, note: note(e.player) }))
-          .sort((x, y) => y.note - x.note);
-      const a = cote(match.teamA.name);
-      const b = cote(match.teamB.name);
-      return a.length && b.length ? { a, b } : null;
+        saison.entries.filter((e) => e.j === m.j && e.team === equipe && e.statut === "Présent").map((e) => e.player);
+      const noirs = match ? parNote(cote(match.teamA.name), joueur) : [];
+      const blancs = match ? parNote(cote(match.teamB.name), joueur) : [];
+      if (noirs.length && blancs.length) return afficheDe({ noirs, blancs }, joueur);
+      return afficheDe({ joueurs: parNote(m.presents.length ? m.presents : m.ligue === "sfl" ? habitues : [], joueur) }, joueur);
     },
-    [journees, players, saison.entries]
+    // versionAffiches : relire quand une affiche arrive du serveur.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [habitues, players, journees, saison.entries, versionAffiches]
   );
 
   // Les terrains possibles, en stickers vides : tous, sauf ceux qui ont déjà
@@ -1650,7 +1641,6 @@ export default function MapPage() {
                   choisi={m.cle === choisi?.cle}
                   une={m.cle === une?.cle && !m.joue}
                   affiche={afficheDu(m)}
-                  mosaique={mosaiqueDu(m)}
                   dans={m.joue ? null : ecartJours(m.dateLabel, aujourdhui)}
                   loin={toi && m.terrain ? `à ${distanceLisible(toi, m.terrain)}` : null}
                   nonLus={m.partie ? (apercus.get(m.partie.id)?.nonLus ?? 0) : 0}
@@ -1824,7 +1814,6 @@ export default function MapPage() {
                     choisi={m.cle === choisi.cle}
                     une={false}
                     affiche={afficheDu(m)}
-                  mosaique={mosaiqueDu(m)}
                     dans={m.joue ? null : ecartJours(m.dateLabel, aujourdhui)}
                     loin={null}
                     nonLus={m.partie ? (apercus.get(m.partie.id)?.nonLus ?? 0) : 0}
@@ -1840,12 +1829,8 @@ export default function MapPage() {
           {/* La carte dit déjà le jour et l'heure ; dessous, seulement la division du dimanche. */}
           {choisi && surtitreDeLigue(jDuChoisi) && <p className="mono-label mt-2 shrink-0 text-center text-foreground">{surtitreDeLigue(jDuChoisi)}</p>}
           <div className="mt-5 flex shrink-0 flex-col gap-5 px-4 pb-32">
-                {/* L'affiche : les deux meilleures notes du match, en grand. */}
-                {choisi && mosaiqueDu(choisi) ? (
-                  <MosaiqueGrande m={mosaiqueDu(choisi)!} />
-                ) : (
-                  choisi && afficheDu(choisi) && <AfficheDuMatch affiche={afficheDu(choisi)!} />
-                )}
+                {/* L'affiche du match, en grand. */}
+                {choisi && afficheDu(choisi) && <AfficheDuMatch affiche={afficheDu(choisi)!} />}
                 {/* Le tableau de bord du match (31/10) : le grand chiffre, puis la journée en étapes. */}
                 {choisi && !choisi.joue && (
                   <Rebours
@@ -2182,15 +2167,12 @@ function CarteMatch({
   loin,
   nonLus = 0,
   affiche,
-  mosaique,
   onToucher,
 }: {
   m: MatchMap;
   choisi: boolean;
   /** Son affiche : les deux meilleures notes, à la place du terrain. */
   affiche?: Affiche | null;
-  /** Qui joue contre qui, une fois les équipes faites : il passe avant tout. */
-  mosaique?: Mosaique | null;
   /** Le prochain match : la une de la Map, avec ses places. */
   une: boolean;
   /** Les jours avant le match (null : joué ou date illisible). */
@@ -2230,9 +2212,7 @@ function CarteMatch({
           className={cn("relative overflow-hidden", joue ? "rounded-[15px]" : "rounded-[19px]")}
           style={{ width: l, height: h, background: `linear-gradient(180deg, ${c0}, ${c1} 50%, ${c2})` }}
         >
-          {mosaique ? (
-            <MosaiqueCarte m={mosaique} className={cn("absolute inset-0", joue && "grayscale")} />
-          ) : affiche ? (
+          {affiche ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={affiche.image} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-[50%_30%]" draggable={false} />
           ) : m.terrain ? (
