@@ -31,7 +31,8 @@ export type ActivityKind =
   | "achat"
   | "recherche"
   | "compo"
-  | "notifs";
+  | "notifs"
+  | "map";
 
 const SESSION_KEY = "sfl-activity-session";
 

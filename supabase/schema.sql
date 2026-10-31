@@ -355,7 +355,8 @@ alter table public.activity add constraint activity_kind_check
     'achat',      -- achat d'une carte
     'recherche',  -- une recherche lancée
     'compo',      -- une composition 5v5 déposée dans l'Arène
-    'notifs'      -- l'invitation aux notifications montrée, et la réponse
+    'notifs',     -- l'invitation aux notifications montrée, et la réponse
+    'map'         -- un geste dans la Map (meta.geste : stade, y-aller, je-viens, ouvrir, zone)
   ));
 
 create index if not exists activity_player_created_idx

@@ -320,6 +320,8 @@ const AUCUNE_ZONE: Zone[] = [];
 const ZOOM_ETIQUETTES_ZONES = 12.5;
 /** Plus loin, une zone n'est qu'une tache : pas d'étiquette. */
 const ZOOM_ETIQUETTES_LOIN = 7;
+/** En dessous, avec des zones, les piles de joueurs se fondent dans l'étiquette de leur zone (31/10). */
+const ZOOM_REGION = 10.5;
 
 /**
  * Les étiquettes sont posées dans l'ordre des zones : une étiquette qui en
@@ -328,7 +330,9 @@ const ZOOM_ETIQUETTES_LOIN = 7;
  */
 function degagerEtiquettes(reperes: Marker[]) {
   const plan = reperes[0]?.getElement().closest(".maplibregl-map");
-  const gardees: DOMRect[] = plan ? [...plan.querySelectorAll(".stk-ancre .stk, .grp__pile")].map((x) => x.getBoundingClientRect()) : [];
+  // Vue région avec des zones : les piles sont fondues dans l'étiquette, elles ne la cachent pas.
+  const sansPiles = plan?.classList.contains("zones-region") && plan.classList.contains("avec-zones");
+  const gardees: DOMRect[] = plan ? [...plan.querySelectorAll(sansPiles ? ".stk-ancre .stk" : ".stk-ancre .stk, .grp__pile")].map((x) => x.getBoundingClientRect()) : [];
   for (const m of reperes) {
     const b = m.getElement().querySelector<HTMLElement>(".zone-etiq");
     if (!b) continue;
@@ -522,6 +526,7 @@ export function CarteMap({
       const c = map.getContainer().classList;
       c.toggle("zones-proches", map.getZoom() > ZOOM_ETIQUETTES_ZONES);
       c.toggle("zones-loin", map.getZoom() < ZOOM_ETIQUETTES_LOIN);
+      c.toggle("zones-region", map.getZoom() < ZOOM_REGION);
     };
     map.on("zoom", pres);
     pres();
@@ -656,6 +661,7 @@ export function CarteMap({
     if (map.getSource("zones-voile")) majZones(map, zones);
     etiquettes.current.forEach((m) => m.remove());
     etiquettes.current = [];
+    map.getContainer().classList.toggle("avec-zones", ambiance !== "classique" && zones.some((z) => z.ouverte));
     if (ambiance === "classique") return;
     for (const z of zones) {
       if (z.contour.length < 4) continue;

@@ -1000,6 +1000,16 @@
 .zone-etiq {
   transition: opacity 0.25s ease;
 }
+/* Vue région avec des zones (31/10) : les piles de joueurs se fondent dans
+   l'étiquette de leur zone, qui dit déjà « 59 joueurs » ; elles reviennent
+   en s'approchant. */
+.grp {
+  transition: opacity 0.25s ease;
+}
+.avec-zones.zones-region .grp {
+  opacity: 0;
+  pointer-events: none;
+}
 /* Sur l'étiquette, pas sur son repère : MapLibre pose l'opacité du repère en ligne. */
 .zones-proches .zone-etiq,
 .zones-loin .zone-etiq,

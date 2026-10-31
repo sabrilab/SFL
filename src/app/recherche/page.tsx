@@ -33,7 +33,8 @@ import { CalendarDays, Search, X } from "lucide-react";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { ProfilJoueur } from "@/components/sfl/profil-joueur";
 import { useSeason } from "@/components/sfl/season-provider";
-import { useProfilsOuverts } from "@/hooks/use-suivis";
+import { useProfilsOuverts, useSuivis } from "@/hooks/use-suivis";
+import { useSession } from "@/hooks/use-session";
 import { CarteDe } from "@/components/sfl/mini-carte";
 import { logActivity } from "@/lib/sfl/activity";
 import { nomAffiche, pseudoAffiche } from "@/lib/sfl/identites";
@@ -298,6 +299,14 @@ function Recherche() {
   // Un joueur masqué ne se trouve que pour ceux qu'il suit et qui le suivent
   // (useProfilsOuverts), à la place qu'il aurait, sans déplacer les autres.
   const { relies } = useProfilsOuverts();
+  // Avant de taper : ceux que je suis (31/10, à la place de la phrase d'aide).
+  const moi = useSession()?.name ?? null;
+  const suivis = useSuivis();
+  const jeSuis = useMemo(() => {
+    if (!moi) return [];
+    const connus = new Set(players.map((x) => x.name));
+    return suivis.abonnements(moi).filter((n) => connus.has(n) && !isHidden(n)).slice(0, 12);
+  }, [moi, suivis, players]);
   const ranked = useMemo(() => {
     const publics = rankPlayers(players);
     const masques = relies.flatMap((r) => rankPlayers([...players, r]).filter((p) => p.name === r.name));
@@ -377,10 +386,27 @@ function Recherche() {
 
           {!q && (
             <>
-              <p className="px-1 text-corps leading-snug text-encre-3">
-                Cherche n&apos;importe quel joueur inscrit — sa carte, ses notes, ses chiffres —
-                ou tape le numéro d&apos;une journée pour retrouver ses matchs.
-              </p>
+              {jeSuis.length > 0 && (
+                <section>
+                  <h2 className="mb-2.5 px-1 text-ligne font-bold tracking-tight text-encre-2">Tu suis</h2>
+                  <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+                    {jeSuis.map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => {
+                          logActivity("recherche", { meta: { joueur: n, suivi: true } });
+                          setOpenPlayer(n);
+                        }}
+                        className="flex w-[64px] shrink-0 flex-col items-center gap-1.5 transition-transform active:scale-[0.96]"
+                      >
+                        <Avatar name={n} />
+                        <span className="w-full truncate text-center text-[11.5px] font-semibold">{pseudoAffiche(n)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
               <section>
                 <h2 className="mb-2.5 px-1 text-ligne font-bold tracking-tight text-encre-2">
                   Les journées
