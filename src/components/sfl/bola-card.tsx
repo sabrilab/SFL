@@ -69,8 +69,9 @@
 // série. Ni badge, ni habillage : elle est restée telle qu'elle a été émise.
 //
 // La carte d'un gardien (poste G, Sabri 31/10) : la même carte, ses six cases
-// sous des stats de gardien (plo, réf, dég, jma, pla, phy ; lib/sfl/gardien.ts),
-// chacune avec sa petite icône (icones-gardien.tsx), et « gardien » dans l'étiquette.
+// sous des stats de gardien (plongeon, réflexes, dégagement, jeu à la main,
+// placement, physique ; lib/sfl/gardien.ts), et « gardien » dans l'étiquette.
+// Chaque stat se lit par son icône pleine, joueur comme gardien (icones-stats.tsx).
 //
 // La carte d'un arbitre (`edition="arbitre"`, `arbitre` ; carte-arbitre.tsx,
 // Sabri 24/10) garde toute cette disposition, dans le jaune fluo de sa chasuble
@@ -104,8 +105,8 @@ import { BordEpoque, EmblemeEpoque, LosangeBallon, SigleSfl, SigleSouligne } fro
 import { MotifCarte } from "@/components/sfl/motif-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
-import { abrege, estGardien } from "@/lib/sfl/gardien";
-import { IconeStatGardien } from "@/components/sfl/icones-gardien";
+import { abrege, estGardien, nomStat } from "@/lib/sfl/gardien";
+import { IconeStat } from "@/components/sfl/icones-stats";
 import { ligneDEmission, type EmissionCarte } from "@/lib/sfl/epoques";
 
 export type BolaEdition = "base" | "rare" | "mvp" | "impact" | "def" | "arbitre";
@@ -365,6 +366,8 @@ export function BolaCard({
   const gardien = !arbitre && estGardien(position);
   // Une carte d'époque est restée telle qu'elle a été émise : sans habillage ni badge.
   const era = p.epoque;
+  // Les icônes à la place des libellés (icones-stats.tsx) ; une carte d'époque et celle d'un arbitre gardent leurs mots.
+  const icones = !arbitre && !era;
   const habillage = era ? undefined : habillageDemande;
   const encre = (a: number) => `rgba(${p.encre},${a})`;
   const seed = graine(name);
@@ -904,7 +907,8 @@ export function BolaCard({
 
         {complete && (
           <>
-            {/* Les six stats, deux par rangée, dans le carré sous le nom : « vit 84 » */}
+            {/* Les six stats, deux par rangée, dans le carré sous le nom : l'icône pleine puis le chiffre
+                (Sabri, 31/10, icones-stats.tsx) ; « vit 84 » sur une carte d'époque ou d'arbitre */}
             <div
               style={{
                 position: "absolute",
@@ -914,17 +918,21 @@ export function BolaCard({
                 display: "grid",
                 gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
                 rowGap: u(36),
-                // Un gardien : l'icône devant chaque libellé, les deux colonnes un peu plus écartées.
-                columnGap: u(gardien ? 30 : 16),
+                columnGap: u(icones ? 28 : 16),
               }}
             >
               {(arbitre?.stats ?? STAT_KEYS.map((k) => [k, stats[k]] as const)).map(([k, valeur]) => {
                 const actif = highlightStats?.includes(k as StatKey);
                 const libelle = gardien ? abrege(k as StatKey, true) : k;
                 return (
-                  <div key={k} style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: u(gardien ? 7 : 12) }}>
-                    {gardien && <IconeStatGardien k={k as StatKey} taille={u(34)} couleur={era ? era.libelle : encre(0.7)} />}
-                    {era ? (
+                  <div
+                    key={k}
+                    aria-label={icones ? `${nomStat(k as StatKey, gardien)} ${valeur}` : undefined}
+                    style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: u(12) }}
+                  >
+                    {icones ? (
+                      <IconeStat k={k as StatKey} gardien={gardien} taille={u(42)} couleur={encre(0.78)} />
+                    ) : era ? (
                       // Les libellés d'alors : en capitales, dans le brun (ou le métal) de l'édition.
                       <span style={{ ...mono(23, 2.5, 1, 700), color: era.libelle }}>{libelle.toUpperCase()}</span>
                     ) : (
@@ -936,7 +944,7 @@ export function BolaCard({
                         fontWeight: 800,
                         fontSize: u(56),
                         lineHeight: 1,
-                        minWidth: u(gardien ? 62 : 70),
+                        minWidth: u(70),
                         textAlign: "right",
                         color: encre(1),
                         textDecoration: actif ? "underline" : "none",
