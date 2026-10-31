@@ -143,8 +143,11 @@ const TABLEAU: Palette = {
   parc: "#0f1110",
   bois: "#0e100f",
   terrain: "#15241a",
-  eau: "#060607",
-  eauBord: "#060607",
+  // L'eau en bleu nuit (Sabri, 31/10 : « quand on dézoome, tout est noir et
+  // on comprend pas […] avoir l'eau d'une couleur pertinente ») : on lit
+  // les côtes, les lacs et les fleuves, sans que rien d'autre ne brille.
+  eau: "#122436",
+  eauBord: "#1a3047",
   rue: "#26272a",
   rueBord: "#0a0a0b",
   grande: "#38393d",
@@ -155,7 +158,7 @@ const TABLEAU: Palette = {
   ombre: "rgba(0, 0, 0, 0.7)",
   texte: "#7b7e84",
   texteRues: "#45484d",
-  texteEau: "#45484d",
+  texteEau: "#5a7a96",
   halo: "#0a0a0b",
 };
 
@@ -289,6 +292,22 @@ export function poserZones(map: PlanMap, zones: Zone[]) {
     AVANT
   );
   map.addLayer({ id: "zones-hachures", type: "fill", source: "zones-voile", paint: { "fill-pattern": "hachures", "fill-opacity": 0, "fill-antialias": false } }, AVANT);
+  // L'eau par-dessus le voile, de loin seulement (Sabri, 31/10 : dézoomé,
+  // « tout est noir et on comprend pas ») : les terres s'éteignent loin des
+  // zones, la mer et les lacs restent lisibles. De près, l'eau du plan
+  // reprend la main (les ponts passent au-dessus).
+  map.addLayer(
+    {
+      id: "eau-de-loin",
+      type: "fill",
+      source: "osm",
+      "source-layer": "water",
+      maxzoom: 12,
+      filter: ["!=", ["get", "brunnel"], "tunnel"],
+      paint: { "fill-opacity": 0, "fill-antialias": false },
+    },
+    AVANT
+  );
   map.addLayer(
     {
       id: "zones-chaleur",
@@ -379,6 +398,8 @@ export function teinterZones(map: PlanMap, ambiance: Ambiance, satellite: boolea
   set("zones-voile", "fill-color", nuit ? "#030304" : ambiance === "encre" ? "#cfcec8" : brume ? "#f6f7f8" : frontiere ? "#bfc0bc" : "#c9cac6");
   set("zones-voile", "fill-opacity", voile);
   set("zones-hachures", "fill-opacity", 0);
+  set("eau-de-loin", "fill-color", PALETTES[ambiance].eau);
+  set("eau-de-loin", "fill-opacity", ambiance === "nuit-encre" && !satellite ? ["interpolate", ["linear"], ["zoom"], 9, 1, 11.5, 0] : 0);
   // La brume : des nuages blancs qui s'épaississent en s'éloignant de la zone.
   set("zones-nuages", "fill-opacity", brume && !satellite ? (nuit ? 0.028 : 0.14) : 0);
   // La zone teintée de sa couleur, à peine (« rouge », « braise »).
