@@ -143,9 +143,10 @@ import { ciblesDuDimanche, contratsSignes, foyerDesCibles, villesDesCibles } fro
 import { ContratsSur } from "@/components/sfl/map/contrats-sur";
 import { cleVille, type ContratPlan, type VillePlan } from "@/components/sfl/map/joueurs";
 import { useMissionsDeLaLigue } from "@/hooks/use-missions";
-import { AMBIANCES, TOUTES_AMBIANCES, type Ambiance } from "@/components/sfl/map/ambiances";
+import { TOUTES_AMBIANCES, type Ambiance } from "@/components/sfl/map/ambiances";
 import { calculerZones, dansContour, numeroZone, type Foyer, type VilleZone, type Zone } from "@/lib/sfl/zones";
 import { maVille, villeOuLigue } from "@/lib/sfl/villes";
+import { garderPosition, positionGardee } from "@/lib/sfl/activation";
 import { photoMiniature, photoPerso } from "@/lib/sfl/photos";
 import { nomAffiche } from "@/lib/sfl/identites";
 import {
@@ -156,6 +157,7 @@ import {
   km,
   lieuDuTerrain,
   lireAutour,
+  lireTerrain,
   lireVue,
   sansAccents,
   sourcesCitees,
@@ -214,31 +216,19 @@ const teinteFantome = (): TeinteFantome =>
   process.env.NEXT_PUBLIC_BOLA_ENV !== "production" && new URLSearchParams(window.location.search).get("fantome") === "ciel" ? "ciel" : "gris";
 
 /**
- * L'ambiance du plan (30/10, les essais des zones Bola) : dans un aperçu,
- * « Nuit braise » d'office, les autres par /?ambiance=rouge|braise|nuit-brume|nuit-braise|territoire|nuit|encre|classique ;
- * en production, le plan d'avant tant que Sabri n'a pas choisi.
+ * L'ambiance du plan : « Tableau » (nuit-encre), choisie par Sabri le 31/10
+ * (« Publie cela »). Dans un aperçu, les autres restent essayables par
+ * /?ambiance=rouge|braise|nuit-brume|nuit-braise|territoire|nuit|encre|classique.
  */
 const ESSAIS = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
 const ambianceDeLAdresse = (): Ambiance => {
-  if (!ESSAIS) return "classique";
+  if (!ESSAIS) return "nuit-encre";
   const a = new URLSearchParams(window.location.search).get("ambiance");
   return TOUTES_AMBIANCES.includes(a as Ambiance) ? (a as Ambiance) : "nuit-encre";
 };
 /** Dans un aperçu, /?zones=demo ajoute une zone qui vient de s'ouvrir (Lens) et une zone fermée (Paris), pour voir le récit. */
 const zonesDemo = () => ESSAIS && new URLSearchParams(window.location.search).get("zones") === "demo";
 const useZonesDemo = () => useSyncExternalStore(rienAEcouter, zonesDemo, () => false);
-const NOMS_AMBIANCES: Record<Ambiance, string> = {
-  brume: "Brume",
-  rouge: "Rouge",
-  braise: "Braise",
-  territoire: "Fondu",
-  nuit: "Nuit",
-  "nuit-brume": "Nuit brume",
-  "nuit-braise": "Nuit braise",
-  "nuit-encre": "Tableau",
-  encre: "Encre",
-  classique: "Avant",
-};
 
 const CarteMap = dynamic(() => import("@/components/sfl/map/carte-map").then((m) => m.CarteMap), {
   ssr: false,
@@ -792,6 +782,33 @@ export default function MapPage() {
   const [ouvrir, setOuvrir] = useState<{ terrain: Terrain | null; lieu?: LieuChoisi; jour?: string; heure?: string; n: number } | null>(null);
   const [dispos, setDispos] = useState(false);
 
+  // « Ton premier match » (components/sfl/invitation-premier-match.tsx) :
+  // /map?ouvrir=id ouvre la feuille d'ouverture sur ce terrain du catalogue,
+  // dès que sa case est lue ; /map?ouvrir= l'ouvre vide. Lu une fois et gardé
+  // (l'effet remonté du mode strict ne le relit pas dans l'adresse).
+  const aOuvrir = useRef<string | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (!q.has("ouvrir")) return;
+    aOuvrir.current = q.get("ouvrir") ?? "";
+    if (aOuvrir.current) lireTerrain(aOuvrir.current).catch(() => {});
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+  useEffect(() => {
+    const id = aOuvrir.current;
+    if (id === null || !partiesActives) return;
+    const t = id ? recenses.find((x) => x.id === id) : null;
+    if (id && !t) return;
+    aOuvrir.current = null;
+    void Promise.resolve().then(() =>
+      setOuvrir((o) => ({
+        terrain: null,
+        lieu: t ? { lieu: lieuDuTerrain(t), adresse: t.adresse, lat: t.lat, lng: t.lng, terrain: t } : undefined,
+        n: (o?.n ?? 0) + 1,
+      }))
+    );
+  }, [recenses, partiesActives]);
+
   const [fiche, setFiche] = useState(false);
   const [ficheAdmin, setFicheAdmin] = useState(false);
   const [choix, setChoixBrut] = useState<string | null>(null);
@@ -978,6 +995,14 @@ export default function MapPage() {
   // Toi : ta position, quand tu la donnes.
   const [toi, setToi] = useState<ToiPlan | null>(null);
   const [cherchePosition, setCherchePosition] = useState(false);
+  // Donnée il y a moins d'une heure sur ce téléphone (« Ton premier match ») :
+  // la Map le place au même endroit, sans redemander.
+  const noteToi = ovr(player.stats);
+  const teinteToi = teinte(player.name);
+  useEffect(() => {
+    const p = positionGardee();
+    if (p) void Promise.resolve().then(() => setToi((t) => t ?? { ...p, note: noteToi, teinte: teinteToi }));
+  }, [noteToi, teinteToi]);
   function localiser() {
     if (!("geolocation" in navigator)) {
       toast.error("Ce navigateur ne donne pas la position.");
@@ -986,6 +1011,7 @@ export default function MapPage() {
     setCherchePosition(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        garderPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setToi({ lat: pos.coords.latitude, lng: pos.coords.longitude, note: ovr(player.stats), teinte: teinte(player.name) });
         setCherchePosition(false);
       },
@@ -1152,9 +1178,7 @@ export default function MapPage() {
   // Les zones Bola (lib/sfl/zones.ts) : là où l'on joue, et d'où viennent
   // ceux qui y jouent. La ligue ouvre la première ; chaque match ouvert ou
   // défi d'équipe loin de tout en ouvre une nouvelle.
-  const ambianceAdresse = useSyncExternalStore(rienAEcouter, ambianceDeLAdresse, (): Ambiance => "classique");
-  const [choixAmbiance, setAmbiance] = useState<Ambiance | null>(null);
-  const ambiance = choixAmbiance ?? ambianceAdresse;
+  const ambiance = useSyncExternalStore(rienAEcouter, ambianceDeLAdresse, (): Ambiance => "nuit-encre");
   // Midi, aujourd'hui à Paris : l'âge des zones (une zone de moins de trois jours est nouvelle).
   const maintenant = aujourdhui ? Date.parse(`${aujourdhui}T12:00:00`) : 0;
   const demoZones = useZonesDemo();
@@ -1434,33 +1458,6 @@ export default function MapPage() {
             {compte}
           </span>
         </div>
-
-        {/* Les essais de la Map (aperçus seulement, 30/10) : passer d'une ambiance à l'autre. */}
-        {ESSAIS && !enContrats && (
-          <div
-            data-traverse
-            className="absolute left-4 right-4 z-[510] flex max-w-max gap-1 overflow-x-auto rounded-full border [scrollbar-width:none] border-black/10 bg-[#f4f5f2]/90 p-1 shadow-[0_2px_8px_rgba(0,0,0,0.15)] backdrop-blur"
-            style={{ top: `calc(${haut} + 74px)` }}
-          >
-            {AMBIANCES.map((a) => (
-              <button
-                key={a}
-                type="button"
-                onClick={() => {
-                  navigator.vibrate?.(6);
-                  setAmbiance(a);
-                  const u = new URL(window.location.href);
-                  u.searchParams.set("ambiance", a);
-                  window.history.replaceState(null, "", u);
-                }}
-                className="h-7 shrink-0 whitespace-nowrap rounded-full px-2.5 text-[11.5px] font-bold"
-                style={a === ambiance ? { background: ENCRE, color: BLANC } : { color: ENCRE }}
-              >
-                {NOMS_AMBIANCES[a]}
-              </button>
-            ))}
-          </div>
-        )}
 
         {/* En haut à droite : la loupe (la Recherche, montée de la barre
             d'onglets le 19/10) et le menu de la Map (24/10, map/menu-map.tsx) :

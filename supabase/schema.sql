@@ -356,6 +356,7 @@ alter table public.activity add constraint activity_kind_check
     'recherche',  -- une recherche lancée
     'compo',      -- une composition 5v5 déposée dans l'Arène
     'notifs',     -- l'invitation aux notifications montrée, et la réponse
+    'activation', -- « Ton premier match » d'un joueur Bola : vu, position, terrain, invitation
     'map'         -- un geste dans la Map (meta.geste : stade, y-aller, je-viens, ouvrir, zone)
   ));
 
@@ -6476,8 +6477,9 @@ grant select on public.mises_en_ligne to authenticated;
 -- Sabri, 24/10 : « que le joueur puisse pronostiquer des choses dans les
 -- matchs à venir ou les journées », « qui finira meilleur buteur, qui finira
 -- meilleure Pépite d'Or ». Un prono par joueur et par sujet (lib/sfl/pronos.ts) :
---   · j > 0, la journée : 'match:0' (Noirs, nul ou Blancs), 'buteur',
---     'pepite' (un nom de joueur) ;
+--   · j > 0, la journée : par match, 'match:0' (Noirs, nul ou Blancs),
+--     'ecart:0' (serré, net, large), 'duel:0', 'mvp:0', 'buteur:0',
+--     'passeur:0' (un nom) ; pour la journée, 'pepite', 'buteur', 'passeur' ;
 --   · j = 0, la saison : 'pepite', 'buteur', 'passeur'.
 -- On ne pose que pour soi, par pronostiquer() : la base met le nom (mon_nom)
 -- et l'heure (now()), jamais le téléphone. L'app ne retient qu'un prono posé
@@ -6487,13 +6489,19 @@ grant select on public.mises_en_ligne to authenticated;
 create table if not exists public.pronos (
   saison     integer not null,
   j          integer not null check (j >= 0),
-  sujet      text    not null check (sujet ~ '^(match:[0-9]{1,2}|buteur|pepite|passeur)$'),
+  sujet      text    not null check (sujet ~ '^((match|ecart|duel|mvp|buteur|passeur):[0-9]{1,2}|buteur|pepite|passeur)$'),
   joueur     text    not null,
   choix      text    not null check (char_length(choix) between 1 and 80),
   joueur_id  uuid    not null references public.profiles(id) on delete cascade,
   le         timestamptz not null default now(),
   primary key (saison, j, sujet, joueur)
 );
+
+-- Sabri, 31/10 : chaque match a aussi son écart, son duel, son MVP, son
+-- buteur et son passeur ('mvp:0'…), et la journée son passeur.
+alter table public.pronos drop constraint if exists pronos_sujet_check;
+alter table public.pronos add constraint pronos_sujet_check
+  check (sujet ~ '^((match|ecart|duel|mvp|buteur|passeur):[0-9]{1,2}|buteur|pepite|passeur)$');
 
 alter table public.pronos enable row level security;
 
@@ -6526,16 +6534,16 @@ begin
   if not public.est_membre() or v_nom is null then
     raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
   end if;
-  if p_j < 0 or p_sujet !~ '^(match:[0-9]{1,2}|buteur|pepite|passeur)$'
-     or (p_j = 0 and p_sujet not in ('pepite', 'buteur', 'passeur'))
-     or (p_j > 0 and p_sujet = 'passeur') then
+  if p_j < 0 or p_sujet !~ '^((match|ecart|duel|mvp|buteur|passeur):[0-9]{1,2}|buteur|pepite|passeur)$'
+     or (p_j = 0 and p_sujet not in ('pepite', 'buteur', 'passeur')) then
     raise exception 'Prono inconnu.' using errcode = '22023';
   end if;
   if nullif(btrim(p_choix), '') is null then
     delete from public.pronos where saison = p_saison and j = p_j and sujet = p_sujet and joueur = v_nom;
     return v_le;
   end if;
-  if p_sujet like 'match:%' and p_choix not in ('noirs', 'nul', 'blancs') then
+  if (p_sujet like 'match:%' and p_choix not in ('noirs', 'nul', 'blancs'))
+     or (p_sujet like 'ecart:%' and p_choix not in ('serre', 'net', 'large')) then
     raise exception 'Prono inconnu.' using errcode = '22023';
   end if;
   insert into public.pronos (saison, j, sujet, joueur, choix, joueur_id, le)

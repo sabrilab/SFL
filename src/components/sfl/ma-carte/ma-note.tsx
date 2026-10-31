@@ -15,6 +15,8 @@
 // Un joueur Bola (28/10/2026, lib/sfl/carte-bola.ts) lit la même page sur
 // ses matchs validés : sa carte bouge à chaque match, sans « en attente » ni
 // mise à jour officielle ; son journal date chaque match au lieu de « J4 ».
+// Un gardien (poste G, 31/10) lit ses stats de gardien et son barème à lui
+// (lib/sfl/gardien.ts).
 // Le but : que chacun puisse refaire le calcul, et donc croire sa note.
 // Noir et blanc, en currentColor et en opacités (clair comme sombre) ; les
 // chiffres en Anton, les étiquettes en Inter capitales.
@@ -26,16 +28,9 @@ import { useHorsSfl } from "@/hooks/use-hors-sfl";
 import { useSeason } from "@/components/sfl/season-provider";
 import { ovr, STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
 import { CRANS, JOURNEES_PAR_MAJ, SERIE, VOIX_MIN, type EvolutionJoueur } from "@/lib/sfl/saisie/evolution";
+import { abrege, estGardien, nomStat } from "@/lib/sfl/gardien";
 import { cn } from "@/lib/utils";
 
-const NOMS: Record<StatKey, string> = {
-  VIT: "Vitesse",
-  TIR: "Tir",
-  PAS: "Passe",
-  DRI: "Dribble",
-  DEF: "Défense",
-  PHY: "Physique",
-};
 
 const NOMBRE = { fontFamily: ANTON, lineHeight: 0.9 } as const;
 
@@ -45,9 +40,9 @@ const plus = (stats: Stats, attente: Partial<Record<StatKey, number>>): Stats =>
   return s;
 };
 
-const listeGains = (g: Partial<Record<StatKey, number>>) =>
+const listeGains = (g: Partial<Record<StatKey, number>>, gardien: boolean) =>
   STAT_KEYS.filter((k) => g[k])
-    .map((k) => `${k} +${g[k]}`)
+    .map((k) => `${abrege(k, gardien)} +${g[k]}`)
     .join(" · ");
 
 /** La jauge d'une stat : un trait par cran à verser, pleins ceux déjà versés. */
@@ -62,15 +57,15 @@ function Jauge({ crans, taille }: { crans: number; taille: number }) {
   );
 }
 
-function Stat({ k, ev }: { k: StatKey; ev: EvolutionJoueur }) {
+function Stat({ k, ev, gardien }: { k: StatKey; ev: EvolutionJoueur; gardien: boolean }) {
   const j = ev.jauges[k];
   const attente = ev.enAttente[k] ?? 0;
   return (
     <div
       className="flex flex-col gap-2 rounded-2xl bg-foreground/[0.05] p-3"
-      aria-label={`${NOMS[k]} ${ev.officielles[k]}${attente ? `, +${attente} en attente` : ""}${j.taille ? `, jauge ${j.crans} sur ${j.taille}` : ""}`}
+      aria-label={`${nomStat(k, gardien)} ${ev.officielles[k]}${attente ? `, +${attente} en attente` : ""}${j.taille ? `, jauge ${j.crans} sur ${j.taille}` : ""}`}
     >
-      <span className="mono-label text-[10px] text-foreground/55">{k}</span>
+      <span className="mono-label text-[10px] text-foreground/55">{abrege(k, gardien)}</span>
       <span className="flex items-baseline gap-1.5">
         <span style={{ ...NOMBRE, fontSize: 30 }} className="tabular-nums">
           {ev.officielles[k]}
@@ -96,6 +91,8 @@ export function MaNote() {
   const horsSfl = useHorsSfl();
   const ev = joueurBola ? (bolaCarte?.ev ?? undefined) : evolution.actif ? evolution.joueurs.get(player.name) : undefined;
   const cal = evolution.calendrier;
+  // Un gardien de la ligue lit ses stats de gardien (lib/sfl/gardien.ts).
+  const gardien = !joueurBola && estGardien(player.poste);
   const enDirect = useMemo(() => (ev ? plus(ev.officielles, ev.enAttente) : null), [ev]);
   if (!evolution.actif && !joueurBola) return null;
 
@@ -133,7 +130,7 @@ export function MaNote() {
         <>
           <div className="grid grid-cols-3 gap-2">
             {STAT_KEYS.map((k) => (
-              <Stat key={k} k={k} ev={ev} />
+              <Stat key={k} k={k} ev={ev} gardien={gardien} />
             ))}
           </div>
 
@@ -146,7 +143,7 @@ export function MaNote() {
             </span>
           </div>
 
-          <Journal ev={ev} bola={joueurBola} />
+          <Journal ev={ev} bola={joueurBola} gardien={gardien} />
         </>
       ) : (
         <p className="text-[15px] text-foreground/60">
@@ -154,13 +151,13 @@ export function MaNote() {
         </p>
       )}
 
-      {!joueurBola && !horsSfl && <Bareme />}
+      {!joueurBola && !horsSfl && <Bareme gardien={gardien} />}
     </section>
   );
 }
 
 /** Mes dimanches et mes mises à jour, mêlés, du plus récent au plus ancien. */
-function Journal({ ev, bola }: { ev: EvolutionJoueur; bola?: boolean }) {
+function Journal({ ev, bola, gardien }: { ev: EvolutionJoueur; bola?: boolean; gardien: boolean }) {
   type Ligne = { j: number; ordre: number; node: React.ReactNode };
   const lignes: Ligne[] = [];
   for (const m of ev.majs) {
@@ -171,7 +168,7 @@ function Journal({ ev, bola }: { ev: EvolutionJoueur; bola?: boolean }) {
         <li key={`maj-${m.apresJ}`} className="flex items-center justify-between gap-3 rounded-2xl bg-foreground py-3 pr-4 pl-4 text-background">
           <span className="flex flex-col gap-0.5">
             <span className="mono-label text-[10px] opacity-60">Mise à jour · après J{m.apresJ}</span>
-            <span className="text-[13px] font-semibold">{listeGains(m.gains)}</span>
+            <span className="text-[13px] font-semibold">{listeGains(m.gains, gardien)}</span>
           </span>
           <span style={{ ...NOMBRE, fontSize: 30 }} className="tabular-nums">
             {ovr(m.stats)}
@@ -196,14 +193,14 @@ function Journal({ ev, bola }: { ev: EvolutionJoueur; bola?: boolean }) {
               </span>
             )}
             {Object.keys(d.points).length > 0 && (
-              <span className="font-mono text-[12px] font-bold tabular-nums">{listeGains(d.points)}</span>
+              <span className="font-mono text-[12px] font-bold tabular-nums">{listeGains(d.points, gardien)}</span>
             )}
           </span>
           {d.faits.length > 0 ? (
             <span className="flex flex-wrap gap-1.5">
               {d.faits.map((f, i) => (
                 <span key={i} className="rounded-full bg-foreground/[0.07] px-2.5 py-1 font-mono text-[11px] text-foreground/70">
-                  {f.raison} → {f.stat} {f.crans > 1 ? `${f.crans} crans` : "1 cran"}
+                  {f.raison} → {abrege(f.stat, gardien)} {f.crans > 1 ? `${f.crans} crans` : "1 cran"}
                 </span>
               ))}
             </span>
@@ -224,8 +221,17 @@ function Journal({ ev, bola }: { ev: EvolutionJoueur; bola?: boolean }) {
   );
 }
 
-function Bareme() {
-  const lignes: [string, string][] = [
+function Bareme({ gardien }: { gardien: boolean }) {
+  const lignes: [string, string][] = gardien ? [
+    ["Réflexes", `${CRANS.arret} cran par arrêt`],
+    ["Dégagement", `${CRANS.passe} cran par passe décisive ou par but`],
+    ["Placement", `${CRANS.cleanSheet} crans par match sans encaisser, ${CRANS.defensive} par titre Défensive, 1 pour 2 interceptions`],
+    ["Physique", `${CRANS.serie} crans pour ${SERIE} dimanches de suite, sans retard`],
+    ["Jeu à la main", `${CRANS.impact} crans par titre Impact`],
+    ["MVP", `${CRANS.mvp} crans sur tes deux meilleures stats`],
+    ["Plongeon", "+1 quand réflexes et placement prennent un point dans la même mise à jour"],
+    ["Jeu à la main", "+1 quand placement et physique prennent un point dans la même mise à jour"],
+  ] : [
     ["Tir", `${CRANS.but} cran par but`],
     ["Passe", `${CRANS.passe} cran par passe décisive`],
     ["Défense", `${CRANS.defensive} crans par titre Défensive, 1 cran pour 2 interceptions ou 2 arrêts`],

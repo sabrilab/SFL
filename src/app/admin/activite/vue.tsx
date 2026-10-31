@@ -15,7 +15,8 @@
 //   3. ce qu'il faut retenir — les conclusions, calculées sur les vraies
 //      données (lib/sfl/retention.ts), chacune avec la chose à faire, en
 //      une rangée qu'on fait glisser et qu'on peut masquer ; puis les
-//      nouveaux venus à suivre de près (lib/sfl/suivi-joueur.ts) ;
+//      nouveaux venus à suivre de près (lib/sfl/suivi-joueur.ts), et tous
+//      les nouveaux arrivants, SFL et Bola à part (./nouveaux.tsx, 31/10) ;
 //   4. qui est là aujourd'hui (nouveaux, fidèles, à risque, décrochés…) ;
 //   5. la rétention — combien reviennent, cohorte par cohorte ;
 //   6. ce qui fait revenir — les gestes de la première semaine ; puis qui
@@ -71,6 +72,8 @@ import {
 import { aSuivre } from "@/lib/sfl/suivi-joueur";
 import { useSeason } from "@/components/sfl/season-provider";
 import { FicheJoueur } from "./fiche";
+import { NouveauxArrivants } from "./nouveaux";
+import type { Parcours } from "./parcours";
 import type { DonneesReperes } from "./lectures";
 import { NotifsStats } from "./notifications";
 import { QuiRamene } from "./rassembleurs";
@@ -94,6 +97,10 @@ export interface DonneesActivite {
   studio: PhotoStudio[] | null;
   /** Les repères sous les courbes et « Qui ramène du monde » (./lectures.ts), ou null si la lecture a échoué. */
   reperes: DonneesReperes | null;
+  /** Le parrain de chaque filleul, par nom (table parrainages), ou null si la lecture a échoué. */
+  parrains: ReadonlyMap<string, string> | null;
+  /** Le parcours de chaque nouvel arrivant, par nom (./parcours.ts), ou null si la lecture a échoué. */
+  parcours: ReadonlyMap<string, Parcours> | null;
   /** Instant de la lecture — figé pour garder le rendu pur. */
   now: number;
 }
@@ -240,6 +247,7 @@ const PARTIES = [
   { id: "courbes", label: "Courbes" },
   { id: "conseils", label: "Conseils" },
   { id: "suivre", label: "À suivre" },
+  { id: "nouveaux", label: "Nouveaux" },
   { id: "qui", label: "Qui est là" },
   { id: "retention", label: "Rétention" },
   { id: "ramene", label: "Qui ramène" },
@@ -657,6 +665,20 @@ export function ActiviteVue({
                   </button>
                 ))}
               </div>
+            </Section>
+          )}
+
+          {/* 3 ter. Les nouveaux arrivants : SFL et Bola à part, leur carte, ce qu'ils ont fait */}
+          {vu && data && (
+            <Section id="nouveaux" titre="Nouveaux arrivants">
+              <NouveauxArrivants
+                evenements={data.evenements}
+                profiles={data.profiles}
+                parrains={data.parrains}
+                parcours={data.parcours}
+                now={data.now}
+                onFiche={setFiche}
+              />
             </Section>
           )}
 

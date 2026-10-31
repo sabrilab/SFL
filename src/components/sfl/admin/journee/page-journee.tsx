@@ -12,6 +12,11 @@
 // convocation (la vraie, en cartes ; « Il manque N » en braise), les matchs
 // un par un sur leur terrain, les remplaçants. En bas, sous le pouce, le
 // geste du moment — il n'y en a jamais qu'un (etat-journee.ts) — et ↶ ↷.
+// Sous les matchs, les outils de la journée, à toute heure (31/10/2026 :
+// Sabri ne les trouvait plus derrière ≡) : la Feuille à consulter (lignes,
+// points décomposés, alertes), la Saisie (le direct de toujours), les Votes,
+// les Points d'un joueur et la Grille. Les « Je viens » de la convocation
+// se posent sur les terrains d'un geste (venus-sur-la-feuille.ts).
 // Tout le reste de la ligue est derrière ≡ (Ligue), rien n'est perdu.
 //
 // Aucune phrase d'aide : la pastille, le pointillé et le libellé de chaque
@@ -29,6 +34,7 @@ import { ChoisirJoueurs } from "@/components/sfl/admin/choisir-joueurs";
 import { Confirmer, type Confirmation } from "@/components/sfl/admin/confirmer";
 import { PastilleSynchro, Synchro } from "@/components/sfl/admin/synchro";
 import { ResultatsVotes } from "@/components/sfl/admin/resultats-votes";
+import { DetailPoints } from "@/components/sfl/admin/detail-points";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { usePresence } from "@/hooks/use-presence";
 import { useSaisieAdmin } from "@/hooks/use-saisie-admin";
@@ -42,13 +48,15 @@ import { placementsDeLaJournee } from "@/lib/sfl/saisie/effectif";
 import { etatJournee, gesteDuMoment, prochaineJournee } from "@/lib/sfl/saisie/etat-journee";
 import { verifierFeuille } from "@/lib/sfl/saisie/integrite";
 import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
-import { addEntry, ajouterMatch, matchsDeclares, memeDate, newEntry, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
+import { addEntry, ajouterMatch, matchsDeclares, memeDate, newEntry, poserEquipes, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
+import { equipesDesVenus, joueursPoses } from "@/lib/sfl/saisie/venus-sur-la-feuille";
 import { saisieStore } from "@/lib/sfl/saisie/store";
 import type { MatchDuJour } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
 import { BlocConvocation, FeuilleConvocation } from "./bloc-convocation";
 import { BlocMatchs, matchsVus } from "./bloc-matchs";
 import { FeuilleArbitre } from "./feuille-arbitre";
+import { FeuilleConsulter } from "./feuille-consulter";
 import { FeuilleDirect } from "./feuille-direct";
 import { FeuilleLigne } from "./feuille-ligne";
 import { FeuillePreparer } from "./feuille-preparer";
@@ -82,6 +90,10 @@ export function PageJournee() {
   const [arbitre, setArbitre] = useState<number | null>(null);
   const [synchro, setSynchro] = useState(false);
   const [votes, setVotes] = useState(false);
+  const [consulter, setConsulter] = useState(false);
+  const [points, setPoints] = useState(false);
+  // Une ligne ouverte depuis la Feuille y ramène en se fermant.
+  const [retourFeuille, setRetourFeuille] = useState(false);
   const [ajouterA, setAjouterA] = useState<string | null | false>(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
 
@@ -103,6 +115,12 @@ export function PageJournee() {
   const viens = useMemo(
     () => (convocationDuJour ? new Set([...presence.presents, ...presence.remplacants]) : new Set<string>()),
     [convocationDuJour, presence.presents, presence.remplacants]
+  );
+
+  // Les « Je viens » de ce dimanche qui ne sont pas encore sur les terrains, posés d'un geste.
+  const proposition = useMemo(
+    () => (j != null && convocationDuJour ? equipesDesVenus(saison, j, presence.ordreDesVenus, presence.teams) : null),
+    [saison, j, convocationDuJour, presence.ordreDesVenus, presence.teams]
   );
 
   // Hors des camps : les lignes sans équipe (remplaçants), puis les « Je viens » pas encore sur la feuille.
@@ -147,6 +165,14 @@ export function PageJournee() {
     faire((s) => addEntry(s, newEntry(j, nom, null)), `${nom} sur la J${j}`);
     const i = saisieStore.load().entries.findIndex((e) => e.j === j && e.player === nom && !e.extraTime);
     if (i >= 0) setLigne(i);
+  }
+
+  function placerLesVenus() {
+    if (j == null || !proposition) return;
+    if (faire((s) => poserEquipes(s, j, proposition, meta?.date), `Je viens posés sur la J${j}`)) {
+      haptique.ajout();
+      setMatchCourant(1);
+    }
   }
 
   function ajouterUnMatch() {
@@ -302,6 +328,12 @@ export function PageJournee() {
                 </button>
               )}
 
+              {proposition && (etat === "brouillon" || etat === "en-ligne") && (
+                <button type="button" onClick={placerLesVenus} className="bouton-secondaire h-11 self-center px-5 text-ligne font-semibold">
+                  Placer les {sansPlace.length || joueursPoses(proposition)} Je viens
+                </button>
+              )}
+
               {(horsCamps.length > 0 || sansPlace.length > 0) && (
                 <section className="flex flex-col gap-2">
                   <Etiquette>Remplaçants · {horsCamps.length + sansPlace.length}</Etiquette>
@@ -324,15 +356,18 @@ export function PageJournee() {
                 </section>
               )}
 
-              {geste.t === "apres" && (
-                <section className="flex flex-col gap-2">
-                  <Etiquette>Après</Etiquette>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Pastille onClick={() => setVotes(true)}>Votes</Pastille>
-                    <Pastille onClick={() => setDirect(true)}>Corriger</Pastille>
-                  </div>
-                </section>
-              )}
+              <section className="flex flex-col gap-2">
+                <Etiquette>Outils</Etiquette>
+                <div className="flex flex-wrap gap-1.5">
+                  <Pastille onClick={() => setConsulter(true)}>Feuille{ecarts.length ? ` · ${ecarts.length} !` : ""}</Pastille>
+                  <Pastille onClick={() => setDirect(true)}>Saisie</Pastille>
+                  <Pastille onClick={() => setVotes(true)}>Votes</Pastille>
+                  <Pastille onClick={() => setPoints(true)}>Points</Pastille>
+                  <Link href="/admin/tableau?onglet=grille" className="mono-label inline-flex h-9 shrink-0 items-center rounded-full bg-secondary px-3.5 text-encre-2">
+                    Grille
+                  </Link>
+                </div>
+              </section>
             </>
           )}
         </section>
@@ -397,6 +432,7 @@ export function PageJournee() {
         saison={saison}
         viennent={presence.presents.length}
         equipesConvocation={presence.teams}
+        convocation={{ jour: presence.jour, venus: presence.ordreDesVenus }}
         par={par}
         faire={faire}
         onOuverte={(n) => {
@@ -446,7 +482,13 @@ export function PageJournee() {
             equipes={equipes}
             mvpAuto={mvpAutomatique(saison, j)}
             places={places}
-            onClose={() => setLigne(null)}
+            onClose={() => {
+              setLigne(null);
+              if (retourFeuille) {
+                setRetourFeuille(false);
+                setConsulter(true);
+              }
+            }}
             faire={faire}
             onRetirer={(index, l) =>
               setConfirmation({
@@ -458,6 +500,18 @@ export function PageJournee() {
                 },
               })
             }
+          />
+          <FeuilleConsulter
+            open={consulter}
+            onOpenChange={setConsulter}
+            saison={saison}
+            j={j}
+            matchs={matchs}
+            onLigne={(i) => {
+              setConsulter(false);
+              setRetourFeuille(true);
+              setLigne(i);
+            }}
           />
           <FeuillePublier key={`pub-${publier}`} open={publier} onOpenChange={setPublier} saison={saison} j={j} par={par} faire={faire} />
           <FeuilleRemettre key={`rem-${remettre}`} open={remettre} onOpenChange={setRemettre} saison={saison} j={j} par={par} faire={faire} />
@@ -488,7 +542,10 @@ export function PageJournee() {
         <Synchro saison={saison} nu />
       </Feuille>
       <Feuille open={votes} onOpenChange={setVotes} titre="Votes" haute>
-        <ResultatsVotes />
+        <ResultatsVotes key={j ?? 0} j={j ?? undefined} />
+      </Feuille>
+      <Feuille open={points} onOpenChange={setPoints} titre="Points" haute>
+        <DetailPoints saison={saison} />
       </Feuille>
       <Confirmer confirmation={confirmation} onFermer={() => setConfirmation(null)} />
     </div>

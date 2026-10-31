@@ -16,17 +16,22 @@ import { useListePronos } from "@/hooks/use-liste-pronos";
 import { rankPlayers } from "@/lib/sfl/engine";
 import {
   choixDeSaisonDu,
+  classementFlair,
   etatDe,
   flairsDuJoueur,
   journeeDesPronos,
   partsDe,
+  plafondDe,
   pronoRetenu,
+  SUJETS_JOUR,
+  SUJETS_MATCH,
   resultatsDeJournee,
   type ChoixDeSaison,
   type EtatProno,
   type FlairDeJournee,
   type JourneePronos,
   type Prono,
+  type RangFlair,
 } from "@/lib/sfl/pronos";
 import { APERCU_PRONOS, pronosDemo, pronostiquer } from "@/lib/sfl/pronos-store";
 
@@ -50,6 +55,8 @@ export interface MesPronos {
   joueur: string;
   phase: PhaseProno;
   sujets: Map<string, SujetVu>;
+  /** Mon plafond d'XP de la journée : la feuille (100) ou la tribune (150). */
+  plafond: number;
   poser: (sujet: string, choix: string | null) => Promise<void>;
 }
 
@@ -84,7 +91,11 @@ export function usePronosJournee(): MesPronos | null {
     const vus = avecDemo(pronos, pronosDemo(p, p.saison, rankPlayers(players).map((x) => x.name), joueur));
     const res = p.joue ? resultatsDeJournee(p, jugee.entries) : new Map<string, string[]>();
     const sujets = new Map<string, SujetVu>();
-    for (const sujet of [...p.matchs.map((m) => `match:${m.n}`), "buteur", "pepite"]) {
+    const tous = [
+      ...p.matchs.flatMap((m) => SUJETS_MATCH.filter((g) => g !== "duel" || m.duel).map((g) => `${g}:${m.n}`)),
+      ...SUJETS_JOUR,
+    ];
+    for (const sujet of tous) {
       const mien = pronos.find((x) => x.saison === p.saison && x.j === p.j && x.sujet === sujet && x.joueur === joueur);
       const retenu = pronoRetenu(pronos, p, joueur, sujet);
       sujets.set(sujet, {
@@ -96,11 +107,14 @@ export function usePronosJournee(): MesPronos | null {
       });
     }
     const poser = (sujet: string, choix: string | null) => pronostiquer({ saison: p.saison, j: p.j, sujet, joueur, choix });
-    return { p, joueur, phase, sujets, poser };
+    return { p, joueur, phase, sujets, poser, plafond: plafondDe(p, joueur) };
   }, [p, me, maintenant, pronos, jugee, players]);
 }
 
 export interface MonFlair {
+  /** Le classement du Flair de la saison en cours, et ma place (null si je n'y suis pas). */
+  classement: RangFlair[];
+  rang: number | null;
   /** Mes journées de Flair, toutes saisons, de la plus récente à la plus ancienne. */
   journees: FlairDeJournee[];
   /** Mes choix de saison, saison en cours d'abord. */
@@ -135,6 +149,8 @@ export function useMonFlair(): MonFlair | null {
       choixDeSaisonDu(sa.lue, sa.numero, sa.close, pronos, me, sa.reference).map((c) => ({ ...c, numero: sa.numero, close: sa.close }))
     );
     const xpSaison = journees.filter((f) => f.saison === numero && f.phase === "fini").reduce((a, f) => a + f.xp, 0);
-    return { journees, saison, xpSaison, enCours: enCours && enCours.joueur === me ? enCours : null };
+    const classement = classementFlair(jugee, numero, false, pronos, maintenant, maintenant);
+    const i = classement.findIndex((r) => r.joueur === me);
+    return { journees, saison, xpSaison, classement, rang: i < 0 ? null : i + 1, enCours: enCours && enCours.joueur === me ? enCours : null };
   }, [isClient, me, jugee, pronos, maintenant, enCours]);
 }
