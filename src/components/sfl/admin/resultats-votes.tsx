@@ -63,13 +63,14 @@ function Colonne({ titre, d }: { titre: string; d: Decompte }) {
   );
 }
 
-export function ResultatsVotes() {
+/** `j` : la journée ouverte d'abord (la page de la journée) ; sinon la dernière avec vote. */
+export function ResultatsVotes({ j }: { j?: number } = {}) {
   const { saison, journees } = useSeason();
   const votes = useVotes();
   const session = useSession();
   const numero = saison.numero ?? 0;
   const avecVote = useMemo(() => journees.filter(journeeAvecVote).sort((a, b) => b.j - a.j), [journees]);
-  const [choix, setChoix] = useState<number | null>(null);
+  const [choix, setChoix] = useState<number | null>(j ?? null);
   const jn = avecVote.find((x) => x.j === choix) ?? avecVote[0];
   const bilan = useMemo(() => (jn ? bilanJournee(votes, numero, jn) : null), [votes, numero, jn]);
 
