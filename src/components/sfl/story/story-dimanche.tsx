@@ -14,7 +14,8 @@
 // Ta carte vient de la capture de la carte 3D (Card3D, ses trois calques) :
 // la même que dans Ma carte, finition comprise.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
 import { Share, X } from "lucide-react";
 import { toast } from "sonner";
@@ -32,9 +33,14 @@ import {
   scoreDuJoueur,
   STORY,
   type CalquesStory,
+  type Carte3DStory,
   type PolicesStory,
   type StoryDimanche,
+  type TonStory,
 } from "@/lib/sfl/story-dimanche";
+
+// La vraie carte 3D de la story (three), chargée seulement à l'ouverture.
+const CarteStory3D = dynamic(() => import("./carte-story-3d").then((m) => m.CarteStory3D), { ssr: false });
 
 function charger(src: string): Promise<HTMLImageElement | null> {
   return new Promise((fin) => {
@@ -66,46 +72,93 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
   const [etat, setEtat] = useState<Etat>({ quoi: "carte" });
   const [url, setUrl] = useState<string | null>(null);
 
+  const [ton, setTon] = useState<TonStory>("blanc");
+  const fermerRef = useRef(onFermer);
+  useEffect(() => {
+    fermerRef.current = onFermer;
+  }, [onFermer]);
+
+  // Si la carte ne s'est pas photographiée en 25 secondes, on le dit et on ferme.
+  useEffect(() => {
+    if (calques) return;
+    const garde = setTimeout(() => {
+      toast.error("Ta story n'a pas pu se faire. Réessaie dans un instant.");
+      fermerRef.current();
+    }, 25_000);
+    return () => clearTimeout(garde);
+  }, [calques]);
+
+  // Les images, chargées une fois : la carte peut se rephotographier (un badge
+  // arrivé en retard), on garde la première photo.
+  const [images, setImages] = useState<{ c: CalquesStory; p: PolicesStory } | null>(null);
+  // La carte 3D : prête, ou abandonnée (null) si WebGL n'a pas suivi en 8 s.
+  const [plateau, setPlateau] = useState<{ f: Carte3DStory | null } | undefined>(undefined);
+  const carte3d = plateau === undefined ? undefined : plateau.f;
+  const recevoir3d = useCallback((f: Carte3DStory) => setPlateau((avant) => avant ?? { f }), []);
   useEffect(() => {
     if (!calques) return;
-    let annule = false;
+    const garde = setTimeout(() => setPlateau((avant) => avant ?? { f: null }), 8000);
+    return () => clearTimeout(garde);
+  }, [calques]);
+  const charge = useRef(false);
+  useEffect(() => {
+    if (!calques || charge.current) return;
+    charge.current = true;
     (async () => {
-      const [fond, joueur, stats, logo, symbole, colonne, dos] = await Promise.all([
+      const [fond, joueur, stats, logoNoir, logoBlanc, symbole, colonne, dos] = await Promise.all([
         charger(calques.background),
         charger(calques.playerLayer),
         charger(calques.stats),
         charger("/bola/logo-noir.svg"),
+        charger("/bola/logo-blanc.svg"),
         charger("/bola/symbole-noir.svg"),
         charger("/story/colonne.png"),
         calques.dos ? charger(calques.dos) : Promise.resolve(null),
       ]);
-      const canvas = toile.current;
-      const ctx = canvas?.getContext("2d");
-      if (annule || !canvas || !ctx || !fond || !joueur || !stats) return;
+      if (!fond || !joueur || !stats) {
+        toast.error("Ta story n'a pas pu se faire. Réessaie dans un instant.");
+        fermerRef.current();
+        return;
+      }
       const p = polices();
-      await Promise.all([document.fonts.load(`900 104px ${p.texte}`), document.fonts.load(`400 128px ${p.chiffres}`)]).catch(() => {});
-      if (annule) return;
-      const c: CalquesStory = { fond, joueur, stats, logo, dos, symbole, colonne, ratio: calques.height / calques.width };
-      const dessiner = (t: number) => dessinerStory(ctx, t, donnees, c, p);
-      setEtat({ quoi: "film", avance: 0 });
-      const blob = await enregistrerStory(canvas, dessiner, (avance) => !annule && setEtat({ quoi: "film", avance }));
-      if (annule) return;
+      // Les polices, sans attendre plus de deux secondes.
+      await Promise.race([
+        Promise.all([document.fonts.load(`900 104px ${p.texte}`), document.fonts.load(`400 128px ${p.chiffres}`)]).catch(() => {}),
+        new Promise((ok) => setTimeout(ok, 2000)),
+      ]);
+      const ratio = calques.height / calques.width;
+      setImages({ c: { fond, joueur, stats, logo: logoNoir, logoBlanc, dos, symbole, colonne, ratio }, p });
+    })();
+  }, [calques]);
+
+  // Une vidéo par ton : changer de ton arrête celle en cours et refait l'autre.
+  useEffect(() => {
+    const canvas = toile.current;
+    const ctx = canvas?.getContext("2d");
+    if (!images || carte3d === undefined || !canvas || !ctx) return;
+    const arret = new AbortController();
+    const c = { ...images.c, logo: ton === "noir" ? (images.c.logoBlanc ?? null) : images.c.logo, carte3d };
+    const dessiner = (t: number) => dessinerStory(ctx, t, donnees, c, images.p, ton);
+    setUrl(null);
+    setEtat({ quoi: "film", avance: 0 });
+    (async () => {
+      const blob = await enregistrerStory(canvas, dessiner, (avance) => setEtat({ quoi: "film", avance }), arret.signal);
+      if (arret.signal.aborted) return;
       dessiner(STORY.duree + 1);
+      const nom = `mon-dimanche-j${donnees.j}-bola`;
       if (blob) {
         const ext = blob.type.includes("mp4") ? "mp4" : "webm";
         setUrl(URL.createObjectURL(blob));
-        setEtat({ quoi: "pret", video: true, fichier: new File([blob], `mon-dimanche-j${donnees.j}-bola.${ext}`, { type: blob.type }) });
+        setEtat({ quoi: "pret", video: true, fichier: new File([blob], `${nom}.${ext}`, { type: blob.type }) });
         return;
       }
       // Pas d'enregistrement possible : l'image de la fin.
       const png = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/png"));
-      if (annule || !png) return;
-      setEtat({ quoi: "pret", video: false, fichier: new File([png], `mon-dimanche-j${donnees.j}-bola.png`, { type: "image/png" }) });
+      if (!png || arret.signal.aborted) return;
+      setEtat({ quoi: "pret", video: false, fichier: new File([png], `${nom}.png`, { type: "image/png" }) });
     })();
-    return () => {
-      annule = true;
-    };
-  }, [calques, donnees]);
+    return () => arret.abort();
+  }, [images, carte3d, ton, donnees]);
 
   useEffect(() => () => void (url && URL.revokeObjectURL(url)), [url]);
 
@@ -167,20 +220,35 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
           </span>
         </div>
 
+        {calques && carte3d !== null && <CarteStory3D calques={calques} onPret={recevoir3d} />}
         {/* La carte à photographier : la 3D n'est jamais montrée, seuls ses calques servent. */}
         <div aria-hidden className="pointer-events-none absolute top-0 left-0 size-px overflow-hidden opacity-0">
           <div className="relative size-[300px]">
             <Card3D
               cacheKey={`story-${player.name}`}
               render={(s) => <PlayerCard player={player} size={s} />}
-              definition={4}
+              definition={2}
               scene={(c) => <Recevoir calques={c} onPrets={setCalques} />}
             />
           </div>
         </div>
       </div>
 
-      <div className="shrink-0 px-4 pb-[max(16px,env(safe-area-inset-bottom))]">
+      <div className="flex shrink-0 flex-col gap-3 px-4 pb-[max(16px,env(safe-area-inset-bottom))]">
+        <div role="radiogroup" aria-label="Fond" className="mx-auto flex rounded-full bg-white/10 p-1">
+          {(["blanc", "noir"] as const).map((x) => (
+            <button
+              key={x}
+              type="button"
+              role="radio"
+              aria-checked={ton === x}
+              onClick={() => setTon(x)}
+              className={`h-8 rounded-full px-4 text-[13px] font-semibold capitalize transition-colors ${ton === x ? "bg-white text-black" : "text-white/70"}`}
+            >
+              {x}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={partager}
@@ -203,9 +271,11 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
 export function BoutonStoryDimanche({ j, date, buts, passes, points, delta }: { j: number; date: string; buts: number; passes: number; points: number; delta: number }) {
   const { player, me } = useMyPlayer();
   const { saison, journees, evolution } = useSeason();
-  const [ouverte, setOuverte] = useState(false);
-  const donnees = useMemo<StoryDimanche | null>(() => {
-    if (!ouverte || !me) return null;
+  // Les chiffres sont figés au toucher : une mise à jour de la saison en
+  // direct ne doit pas relancer la vidéo en train de se faire.
+  const [donnees, setDonnees] = useState<StoryDimanche | null>(null);
+  function ouvrir() {
+    if (!me) return;
     const journee = journees.find((x) => x.j === j);
     const meta = saison.journees.find((x) => x.j === j);
     const match = journee ? findPlayerMatch(journee, me)?.match : undefined;
@@ -214,7 +284,7 @@ export function BoutonStoryDimanche({ j, date, buts, passes, points, delta }: { 
       (match?.lieuId != null ? saison.terrains?.find((t) => t.id === match.lieuId) : undefined) ??
       (meta ? terrainDeJournee(saison, meta) : null);
     const score = scoreDuJoueur(journee, me);
-    return {
+    setDonnees({
       j,
       date,
       lieu: lieu?.nom ?? null,
@@ -230,20 +300,20 @@ export function BoutonStoryDimanche({ j, date, buts, passes, points, delta }: { 
       delta,
       rang: rangPepiteApres(saison, me, j, evolution),
       note: player ? ovr(player.stats) : null,
-    };
-  }, [ouverte, player, me, journees, saison, evolution, j, date, buts, passes, points, delta]);
+    });
+  }
   if (!player) return null;
   return (
     <>
       <button
         type="button"
-        onClick={() => setOuverte(true)}
+        onClick={ouvrir}
         className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold text-foreground/75 transition-transform active:scale-95 dark:text-white/75"
       >
         <Share className="size-[16px]" strokeWidth={2} />
         Story
       </button>
-      {donnees && <StoryDimancheFenetre player={player} donnees={donnees} onFermer={() => setOuverte(false)} />}
+      {donnees && <StoryDimancheFenetre player={player} donnees={donnees} onFermer={() => setDonnees(null)} />}
     </>
   );
 }
