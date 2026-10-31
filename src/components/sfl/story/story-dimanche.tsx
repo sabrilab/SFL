@@ -14,7 +14,8 @@
 // Ta carte vient de la capture de la carte 3D (Card3D, ses trois calques) :
 // la même que dans Ma carte, finition comprise.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
 import { Share, X } from "lucide-react";
 import { toast } from "sonner";
@@ -32,10 +33,14 @@ import {
   scoreDuJoueur,
   STORY,
   type CalquesStory,
+  type Carte3DStory,
   type PolicesStory,
   type StoryDimanche,
   type TonStory,
 } from "@/lib/sfl/story-dimanche";
+
+// La vraie carte 3D de la story (three), chargée seulement à l'ouverture.
+const CarteStory3D = dynamic(() => import("./carte-story-3d").then((m) => m.CarteStory3D), { ssr: false });
 
 function charger(src: string): Promise<HTMLImageElement | null> {
   return new Promise((fin) => {
@@ -86,6 +91,15 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
   // Les images, chargées une fois : la carte peut se rephotographier (un badge
   // arrivé en retard), on garde la première photo.
   const [images, setImages] = useState<{ c: CalquesStory; p: PolicesStory } | null>(null);
+  // La carte 3D : prête, ou abandonnée (null) si WebGL n'a pas suivi en 8 s.
+  const [plateau, setPlateau] = useState<{ f: Carte3DStory | null } | undefined>(undefined);
+  const carte3d = plateau === undefined ? undefined : plateau.f;
+  const recevoir3d = useCallback((f: Carte3DStory) => setPlateau((avant) => avant ?? { f }), []);
+  useEffect(() => {
+    if (!calques) return;
+    const garde = setTimeout(() => setPlateau((avant) => avant ?? { f: null }), 8000);
+    return () => clearTimeout(garde);
+  }, [calques]);
   const charge = useRef(false);
   useEffect(() => {
     if (!calques || charge.current) return;
@@ -121,9 +135,9 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
   useEffect(() => {
     const canvas = toile.current;
     const ctx = canvas?.getContext("2d");
-    if (!images || !canvas || !ctx) return;
+    if (!images || carte3d === undefined || !canvas || !ctx) return;
     const arret = new AbortController();
-    const c = { ...images.c, logo: ton === "noir" ? (images.c.logoBlanc ?? null) : images.c.logo };
+    const c = { ...images.c, logo: ton === "noir" ? (images.c.logoBlanc ?? null) : images.c.logo, carte3d };
     const dessiner = (t: number) => dessinerStory(ctx, t, donnees, c, images.p, ton);
     setUrl(null);
     setEtat({ quoi: "film", avance: 0 });
@@ -144,7 +158,7 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
       setEtat({ quoi: "pret", video: false, fichier: new File([png], `${nom}.png`, { type: "image/png" }) });
     })();
     return () => arret.abort();
-  }, [images, ton, donnees]);
+  }, [images, carte3d, ton, donnees]);
 
   useEffect(() => () => void (url && URL.revokeObjectURL(url)), [url]);
 
@@ -206,6 +220,7 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
           </span>
         </div>
 
+        {calques && carte3d !== null && <CarteStory3D calques={calques} onPret={recevoir3d} />}
         {/* La carte à photographier : la 3D n'est jamais montrée, seuls ses calques servent. */}
         <div aria-hidden className="pointer-events-none absolute top-0 left-0 size-px overflow-hidden opacity-0">
           <div className="relative size-[300px]">

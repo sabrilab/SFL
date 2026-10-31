@@ -55,6 +55,36 @@ export interface StoryDimanche {
 /** La page blanche, ou la page noire. */
 export type TonStory = "blanc" | "noir";
 
+/** La carte posée dans la story : sa largeur et son haut, en pixels. */
+export const CARTE_STORY = { largeur: 470, haut: 400 } as const;
+
+/** Le moment où la carte se pose, et la caméra avec elle. */
+const POSE = 1.7;
+
+/**
+ * Le mouvement de la carte et de la caméra à l'instant `t` : `bas` = 1 quand
+ * la grue est en bas (contre-plongée), 0 de face ; `montee` = 1 quand la
+ * carte est encore au-dessus, 0 posée ; `angle`, le tour qu'il lui reste.
+ */
+export interface MouvementCarte {
+  bas: number;
+  montee: number;
+  angle: number;
+}
+
+export function mouvementCarte(t: number): MouvementCarte {
+  const bas = 1 - grue(t, 0, POSE + 0.2);
+  const montee = 1 - arrivee(t, 0.1, POSE - 0.1);
+  return { bas, montee, angle: montee * Math.PI * 2 };
+}
+
+/**
+ * La vraie carte 3D (components/sfl/story/carte-story-3d.tsx) : rend l'image
+ * de la carte pour ce mouvement, à la taille de la story, fond transparent.
+ * `avant` est le mouvement de l'image d'avant (le flou de mouvement).
+ */
+export type Carte3DStory = (m: MouvementCarte, avant?: MouvementCarte) => CanvasImageSource;
+
 /** Ton match de la journée : ton camp et le score, ton équipe d'abord. */
 export function scoreDuJoueur(
   journee: Journee | undefined,
@@ -119,6 +149,8 @@ export interface CalquesStory {
   symbole: CanvasImageSource | null;
   /** La colonne de marbre du décor. */
   colonne: CanvasImageSource | null;
+  /** La vraie carte 3D ; sans elle, la carte est dessinée à plat. */
+  carte3d?: Carte3DStory | null;
 }
 
 export interface PolicesStory {
@@ -234,6 +266,23 @@ function enFuite(
   }
 }
 
+/** Un reflet traverse la carte une fois, posée (`t` compté depuis la pose). */
+function refletPose(ctx: CanvasRenderingContext2D, t: number, xc: number, yc: number, lc: number, hc: number) {
+  const ar = grue(t, 0.1, 1.1);
+  if (ar <= 0 || ar >= 1) return;
+  ctx.save();
+  arrondi(ctx, xc, yc, lc, hc, lc * 0.06);
+  ctx.clip();
+  const bx = xc - lc * 0.6 + ar * lc * 2.2;
+  const reflet = ctx.createLinearGradient(bx - 120, yc, bx + 120, yc + 160);
+  reflet.addColorStop(0, BLANC(0));
+  reflet.addColorStop(0.5, BLANC(0.4));
+  reflet.addColorStop(1, BLANC(0));
+  ctx.fillStyle = reflet;
+  ctx.fillRect(xc, yc, lc, hc);
+  ctx.restore();
+}
+
 /**
  * Dessine l'image de l'instant `t` (en secondes). Au-delà de la durée, la
  * dernière image : celle qu'on partage en photo.
@@ -263,8 +312,9 @@ export function dessinerStory(
   ctx.textAlign = "center";
 
   // La caméra : basse et proche au départ (bas = 1), de face à la fin (bas = 0).
-  const tPose = 1.7;
-  const bas = 1 - grue(t, 0, tPose + 0.2);
+  const tPose = POSE;
+  const mvt = mouvementCarte(t);
+  const bas = mvt.bas;
   /** Monte une couche selon sa profondeur (k grand = proche de la caméra). */
   const plan = (k: number, cy: number) => {
     const z = 1 + 0.55 * bas * k;
@@ -274,10 +324,10 @@ export function dessinerStory(
   };
 
   // La carte posée : 470 de large, sous le titre.
-  const lc = 470;
+  const lc = CARTE_STORY.largeur;
   const hc = lc * c.ratio;
   const xc = (W - lc) / 2;
-  const yc = 400;
+  const yc = CARTE_STORY.haut;
   const cyc = yc + hc / 2;
   const { face, ombre, marge } = preparer(c, lc, hc);
 
@@ -314,9 +364,22 @@ export function dessinerStory(
 
   // La carte : elle passe au-dessus de nous en faisant un tour (son dos,
   // puis sa face), et ralentit jusqu'à se poser de face. Une seule courbe.
-  const ac = arrivee(t, 0.1, tPose - 0.1);
-  if (t >= 0.1) {
-    const angle = (1 - ac) * Math.PI * 2;
+  const ac = 1 - mvt.montee;
+  if (t >= 0.1 && c.carte3d) {
+    // La vraie carte 3D, filmée par la grue ; son ombre sur la page d'abord.
+    const sx = Math.max(0.02, Math.abs(Math.cos(mvt.angle)));
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (t - 0.1) / 0.3) * T.ombre * ac;
+    const so = sx * (1 - 0.15 * bas);
+    ctx.drawImage(ombre, W / 2 - (lc / 2 + marge) * so, yc - marge + 36, (lc + 2 * marge) * so, hc + 2 * marge);
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (t - 0.1) / 0.3);
+    ctx.drawImage(c.carte3d(mvt, mouvementCarte(Math.max(0, t - 1 / STORY.ips))), 0, 0, W, H);
+    ctx.restore();
+    refletPose(ctx, t - tPose, xc, yc, lc, hc);
+  } else if (t >= 0.1) {
+    const angle = mvt.angle;
     const cos = Math.cos(angle);
     const fuite = 0.32 * bas;
     const hv = hc * (1 - 0.12 * bas);
@@ -358,21 +421,7 @@ export function dessinerStory(
       }
       ctx.restore();
     }
-    // Un reflet traverse la carte une fois, posée.
-    const ar = grue(t, tPose + 0.1, 1.1);
-    if (ar > 0 && ar < 1) {
-      ctx.save();
-      arrondi(ctx, xc, yc, lc, hc, lc * 0.06);
-      ctx.clip();
-      const bx = xc - lc * 0.6 + ar * lc * 2.2;
-      const reflet = ctx.createLinearGradient(bx - 120, yc, bx + 120, yc + 160);
-      reflet.addColorStop(0, BLANC(0));
-      reflet.addColorStop(0.5, BLANC(0.4));
-      reflet.addColorStop(1, BLANC(0));
-      ctx.fillStyle = reflet;
-      ctx.fillRect(xc, yc, lc, hc);
-      ctx.restore();
-    }
+    refletPose(ctx, t - tPose, xc, yc, lc, hc);
     ctx.restore();
   }
 
