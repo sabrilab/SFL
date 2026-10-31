@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import type { Map as PlanMap } from "maplibre-gl";
 import { cn } from "@/lib/utils";
 import { LIBELLES, styleSnap } from "./style-snap";
+import { peindre, type Ambiance } from "./ambiances";
 
 /** La taille de l'image prise, en px CSS (×2 à l'écran). */
 const LARGEUR = 392;
@@ -25,11 +26,13 @@ const VUE = { zoom: 16.7, pitch: 52, bearing: -20 };
 
 const images = new Map<string, string>();
 const attentes = new Map<string, ((url: string) => void)[]>();
-const file: { cle: string; lat: number; lng: number }[] = [];
+const file: { cle: string; lat: number; lng: number; ambiance: Ambiance }[] = [];
+let peinte: Ambiance = "classique";
 let plan: Promise<PlanMap> | null = null;
 let occupe = false;
 
-const cleDe = (lat: number, lng: number) => `${lat.toFixed(5)},${lng.toFixed(5)}`;
+// Une vue par terrain et par ambiance : le tableau de bord (nuit-encre) a son terrain noir.
+const cleDe = (lat: number, lng: number, a: Ambiance) => `${a}:${lat.toFixed(5)},${lng.toFixed(5)}`;
 
 function lePlan(): Promise<PlanMap> {
   plan ??= import("maplibre-gl").then(({ default: maplibregl }) => {
@@ -67,6 +70,10 @@ async function suivante() {
   occupe = true;
   try {
     const map = await lePlan();
+    if (t.ambiance !== peinte) {
+      peindre(map, t.ambiance);
+      peinte = t.ambiance;
+    }
     map.jumpTo({ center: [t.lng, t.lat], ...VUE });
     await new Promise<void>((ok) => {
       // Un plan qui ne se termine jamais (réseau coupé) rend quand même la main.
@@ -88,8 +95,8 @@ async function suivante() {
   }
 }
 
-function demander(lat: number, lng: number, f: (url: string) => void): () => void {
-  const cle = cleDe(lat, lng);
+function demander(lat: number, lng: number, ambiance: Ambiance, f: (url: string) => void): () => void {
+  const cle = cleDe(lat, lng, ambiance);
   const deja = images.get(cle);
   if (deja) {
     f(deja);
@@ -99,7 +106,7 @@ function demander(lat: number, lng: number, f: (url: string) => void): () => voi
   if (liste) liste.push(f);
   else {
     attentes.set(cle, [f]);
-    file.push({ cle, lat, lng });
+    file.push({ cle, lat, lng, ambiance });
     void suivante();
   }
   return () => {
@@ -108,10 +115,24 @@ function demander(lat: number, lng: number, f: (url: string) => void): () => voi
   };
 }
 
-export function VueTerrain({ lat, lng, titre, className }: { lat: number; lng: number; /** Ce que dit l'image ; sans titre, elle est décorative. */ titre?: string; className?: string }) {
-  const [url, setUrl] = useState<string | null>(() => images.get(cleDe(lat, lng)) ?? null);
-  useEffect(() => demander(lat, lng, setUrl), [lat, lng]);
-  if (!url) return <div aria-hidden className={cn("bg-[#efebe1]", className)} />;
+export function VueTerrain({
+  lat,
+  lng,
+  ambiance = "classique",
+  titre,
+  className,
+}: {
+  lat: number;
+  lng: number;
+  /** Le plan dans lequel on le dessine : celui de la Map. */
+  ambiance?: Ambiance;
+  /** Ce que dit l'image ; sans titre, elle est décorative. */
+  titre?: string;
+  className?: string;
+}) {
+  const [url, setUrl] = useState<string | null>(() => images.get(cleDe(lat, lng, ambiance)) ?? null);
+  useEffect(() => demander(lat, lng, ambiance, setUrl), [lat, lng, ambiance]);
+  if (!url) return <div aria-hidden className={cn(ambiance === "nuit-encre" ? "bg-[#0a0a0b]" : "bg-[#efebe1]", className)} />;
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={url} alt={titre ?? ""} aria-hidden={titre ? undefined : true} className={cn("object-cover", className)} draggable={false} />;
 }

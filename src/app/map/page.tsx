@@ -53,7 +53,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   CalendarDays,
   ChartSpline,
@@ -77,6 +77,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/sfl/activity";
+import { dureeLisible, trajetVers, type Trajet } from "@/lib/sfl/trajet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, type Fenetre } from "@/components/ui/sheet";
@@ -182,6 +183,7 @@ import {
   type StickerPlan,
 } from "@/components/sfl/map/stade";
 import { VueTerrain } from "@/components/sfl/map/vue-terrain";
+import { FriseDimanche, Rebours, SerieDimanches, type Etape } from "@/components/sfl/map/tableau-lieu";
 import { IconeTerrain, PucesFormat } from "@/components/sfl/map/format-terrains";
 import { MenuMap } from "@/components/sfl/map/menu-map";
 import { useFormatTerrain } from "@/hooks/use-format-terrain";
@@ -218,7 +220,7 @@ const ESSAIS = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
 const ambianceDeLAdresse = (): Ambiance => {
   if (!ESSAIS) return "classique";
   const a = new URLSearchParams(window.location.search).get("ambiance");
-  return TOUTES_AMBIANCES.includes(a as Ambiance) ? (a as Ambiance) : "nuit-braise";
+  return TOUTES_AMBIANCES.includes(a as Ambiance) ? (a as Ambiance) : "nuit-encre";
 };
 /** Dans un aperçu, /?zones=demo ajoute une zone qui vient de s'ouvrir (Lens) et une zone fermée (Paris), pour voir le récit. */
 const zonesDemo = () => ESSAIS && new URLSearchParams(window.location.search).get("zones") === "demo";
@@ -231,6 +233,7 @@ const NOMS_AMBIANCES: Record<Ambiance, string> = {
   nuit: "Nuit",
   "nuit-brume": "Nuit brume",
   "nuit-braise": "Nuit braise",
+  "nuit-encre": "Tableau",
   encre: "Encre",
   classique: "Avant",
 };
@@ -1052,6 +1055,32 @@ export default function MapPage() {
   const ios = useEstIos();
   // Les gestes faits dans la Map, au journal d'activité (31/10 : aucun ne
   // l'était ; on saura ce qui sert).
+  // Le coup d'envoi du choisi, en ms (l'heure du téléphone, en France).
+  const debutDuChoisi = useMemo(() => {
+    if (!choisi || choisi.joue) return null;
+    const iso = dateIsoDuMatch(choisi, aujourdhui);
+    const h = choisi.heure.match(/(\d{1,2})\s*[h:]\s*(\d{2})?/i);
+    if (!iso || !h) return null;
+    const t = new Date(`${iso}T${h[1].padStart(2, "0")}:${h[2] ?? "00"}:00`).getTime();
+    return Number.isFinite(t) ? t : null;
+  }, [choisi, aujourdhui]);
+  // Ton trajet jusqu'au match choisi (31/10) : il brille sur le plan, et
+  // « Y aller » dit son temps. Seulement quand on sait où tu es, et pas
+  // au-delà de 60 km (un autre pays n'est pas un trajet).
+  const [trajet, setTrajet] = useState<(Trajet & { cle: string }) | null>(null);
+  const cibleTrajet = !surCarte && toi && choisi?.terrain && !choisi.joue ? choisi.terrain : null;
+  const cleTrajet = toi && cibleTrajet ? `${toi.lat.toFixed(3)},${toi.lng.toFixed(3)}>${cibleTrajet.lat},${cibleTrajet.lng}` : null;
+  useEffect(() => {
+    if (!cleTrajet || !toi || !cibleTrajet) return;
+    if (Math.hypot(toi.lat - cibleTrajet.lat, (toi.lng - cibleTrajet.lng) * 0.64) > 0.55) return;
+    let vivant = true;
+    void trajetVers(toi, cibleTrajet).then((t) => vivant && setTrajet({ ...t, cle: cleTrajet }));
+    return () => {
+      vivant = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cleTrajet]);
+  const trajetIci = trajet && trajet.cle === cleTrajet ? trajet : null;
   // Le match choisi se pose au centre du carrousel du lieu, à l'ouverture et à chaque choix (pas à chaque rendu : on y glisse du doigt).
   useEffect(() => {
     if (!fiche) return;
@@ -1248,6 +1277,29 @@ export default function MapPage() {
     if (deJournee.length || (choisi.j != null && !choisi.convoquee)) return deJournee;
     return p.equipesVisibles || admin ? feuilleDeConvocation(p.teams) : [];
   }, [choisi, saison.journees, journees, matchsDe, p.equipesVisibles, p.teams, admin]);
+  // La journée en étapes : un dimanche de la ligue seulement.
+  const etapesDuChoisi = useMemo<Etape[]>(() => {
+    if (!choisi || choisi.ligue !== "sfl") return [];
+    const joue = !!choisi.joue;
+    const convocation = joue || !!choisi.convoquee || choisi.cle === "convocation" || choisi.presents.length > 0;
+    const votesClos = joue && (ecartJours(choisi.dateLabel, aujourdhui) ?? 0) < 0;
+    return [
+      { nom: "Convocation", sous: convocation && !joue && p.presents.length ? `${p.presents.length} je viens` : "le lundi", faite: convocation },
+      { nom: "Les équipes", sous: "vendredi 19 h", faite: joue || feuille.length > 0 },
+      { nom: "Coup d'envoi", sous: choisi.heure, faite: joue },
+      { nom: "Feuille de match", sous: "buts, passes, MVP", faite: joue },
+      { nom: "Les votes", sous: "jusqu'à minuit", faite: votesClos },
+    ];
+  }, [choisi, aujourdhui, feuille.length, p.presents.length]);
+  // Ta série : tes dimanches J1…Jn (les neuf derniers), joués, manqués ou à venir.
+  const maSerie = useMemo(
+    () =>
+      [...saison.journees]
+        .sort((a, b) => a.j - b.j)
+        .slice(-9)
+        .map((m) => ({ j: m.j, joue: journeeJouee(saison, m.j) ? joueursDeLaFeuille(saison, m.j).noms.includes(player.name) : null })),
+    [saison, player.name]
+  );
 
   const communeDuMatch = (surCarte ? proposition?.terrain?.commune : null) || choisi?.terrain?.commune || terrains.find((t) => t.commune)?.commune || "SFL";
   const n = affiches.filter((m) => !m.joue).length;
@@ -1301,7 +1353,7 @@ export default function MapPage() {
   const bas = "calc(env(safe-area-inset-bottom, 0px) + 92px)";
 
   return (
-    <>
+    <AmbianceDuPlan.Provider value={ambiance}>
       {/* ─── Le plan, tout l'écran ─── */}
       <section className="fixed inset-0 isolate overflow-hidden bg-[#e9eae6] [--sous-entete:0.75rem] lg:[--sous-entete:1.25rem]">
         <div className="absolute inset-0">
@@ -1310,6 +1362,7 @@ export default function MapPage() {
             stickers={stickers}
             points={AUCUN_POINT}
             toi={toi}
+            trajet={trajetIci?.coords ?? null}
             choisi={surCarte ? null : (choisi?.cle ?? null)}
             onChoisir={(cle) => {
               geste("stade");
@@ -1636,7 +1689,7 @@ export default function MapPage() {
                     onClick={() => geste("y-aller")}
                     className="bouton-givre bouton--vert flex h-[30px] shrink-0 items-center gap-[5px] px-3 text-[12.5px] font-semibold"
                   >
-                    <Navigation className="size-[11px]" strokeWidth={2.6} /> Y aller
+                    <Navigation className="size-[11px]" strokeWidth={2.6} /> Y aller{trajetIci ? ` · ${dureeLisible(trajetIci.minutes)}` : ""}
                   </a>
                 </>
               ) : choisi.partie ? (
@@ -1752,6 +1805,15 @@ export default function MapPage() {
           {/* La carte dit déjà le jour et l'heure ; dessous, seulement la division du dimanche. */}
           {choisi && surtitreDeLigue(jDuChoisi) && <p className="mono-label mt-2 shrink-0 text-center text-foreground">{surtitreDeLigue(jDuChoisi)}</p>}
           <div className="mt-5 flex shrink-0 flex-col gap-5 px-4 pb-32">
+                {/* Le tableau de bord du match (31/10) : le grand chiffre, puis la journée en étapes. */}
+                {choisi && !choisi.joue && (
+                  <Rebours
+                    debut={debutDuChoisi}
+                    joueurs={choisi.presents.length || (choisi.ligue === "sfl" ? habitues.length : 0)}
+                    libelleJoueurs={choisi.presents.length || choisi.ligue !== "sfl" ? "joueurs" : "habitués"}
+                  />
+                )}
+                {choisi && etapesDuChoisi.length > 0 && <FriseDimanche etapes={etapesDuChoisi} />}
                 {/* Les joueurs d'abord, la feuille de match tout de suite dessous
                     (Sabri, 24/10 : plus de vue satellite en tête de la fiche) ;
                     le chemin pour y aller vient après. Une journée : ses
@@ -1790,6 +1852,7 @@ export default function MapPage() {
                 {/* La météo au coup d'envoi (Sabri, 24/10 : « à telle heure, ce
                     que ça prévoit »), en une ligne depuis le 31/10 : les gens
                     d'abord, le ciel ensuite, juste avant la route. */}
+                {choisi?.ligue === "sfl" && <SerieDimanches jours={maSerie} />}
                 {choisi && !choisi.joue && choisi.terrain && (
                   <MeteoMatch
                     key={choisi.cle}
@@ -1857,7 +1920,7 @@ export default function MapPage() {
                     onClick={() => geste("y-aller", { depuis: "lieu" })}
                     className="bouton-principal bouton--vert pointer-events-auto flex h-12 items-center gap-2 px-6 text-[15px] font-semibold"
                   >
-                    <Navigation className="size-4" /> Y aller
+                    <Navigation className="size-4" /> Y aller{trajetIci ? ` · ${dureeLisible(trajetIci.minutes)}` : ""}
                   </a>
                 </>
               ) : null}
@@ -2046,11 +2109,20 @@ export default function MapPage() {
           onFermer={fermerDiscussion}
         />
       )}
-    </>
+    </AmbianceDuPlan.Provider>
   );
 }
 
 /* ------------------------- La carte d'un match ------------------------- */
+
+/** L'ambiance du plan, pour que les cartes dessinent leur terrain comme la Map. */
+const AmbianceDuPlan = createContext<Ambiance>("classique");
+
+/** Le vrai terrain dessiné : noir au tableau de bord, crème sinon. */
+function TerrainDessine(props: { lat: number; lng: number; titre?: string; className?: string }) {
+  const a = useContext(AmbianceDuPlan);
+  return <VueTerrain {...props} ambiance={a === "nuit-encre" ? "nuit-encre" : "classique"} />;
+}
 
 /** La carte du match joué, en retrait : plus petite, en gris. */
 const LARGEUR_JOUE = 150;
@@ -2113,7 +2185,7 @@ function CarteMatch({
         >
           {m.terrain ? (
             // Le vrai terrain, dessiné et vu un peu de haut (31/10 : plus de satellite).
-            <VueTerrain lat={m.terrain.lat} lng={m.terrain.lng} className={cn("absolute inset-0 h-full w-full", joue && "grayscale")} />
+            <TerrainDessine lat={m.terrain.lat} lng={m.terrain.lng} className={cn("absolute inset-0 h-full w-full", joue && "grayscale")} />
           ) : (
             <div
               className={cn("absolute top-1/2 left-1/2 size-[118px] -translate-x-1/2 -translate-y-[calc(50%+14px)]", joue && "saturate-0")}
@@ -2269,7 +2341,7 @@ function CarteProposee({
       >
         <div className="relative overflow-hidden rounded-[19px]" style={{ width: 196, height: 140, background: `linear-gradient(180deg, ${c0}, ${c1} 50%, ${c2})` }}>
           {terrain ? (
-            <VueTerrain lat={terrain.lat} lng={terrain.lng} className="absolute inset-0 h-full w-full" />
+            <TerrainDessine lat={terrain.lat} lng={terrain.lng} className="absolute inset-0 h-full w-full" />
           ) : (
             <div
               className="absolute top-1/2 left-1/2 size-[118px] -translate-x-1/2 -translate-y-[calc(50%+14px)] opacity-60"
@@ -2417,7 +2489,7 @@ function FicheLibre({
   return (
     <div className="flex flex-col gap-3 px-4">
       <div className="relative h-[180px] overflow-hidden rounded-[22px] border border-border bg-secondary">
-        <VueTerrain lat={t.lat} lng={t.lng} titre={`Le terrain ${t.nom}`} className="h-full w-full" />
+        <TerrainDessine lat={t.lat} lng={t.lng} titre={`Le terrain ${t.nom}`} className="h-full w-full" />
         <span className="ajuster-pin pointer-events-none" style={{ left: "50%", top: "50%", cursor: "default" }} aria-hidden />
         <span className="absolute bottom-2 left-2 max-w-[calc(100%-6.5rem)] truncate rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
           {t.adresse || t.commune}

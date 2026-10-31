@@ -1102,7 +1102,8 @@
   background: #e3262e;
   color: #ffffff;
 }
-[data-ambiance$="braise"] .zone-etiq:not(.zone-etiq--attente) .zone-etiq__tete {
+[data-ambiance$="braise"] .zone-etiq:not(.zone-etiq--attente) .zone-etiq__tete,
+[data-ambiance="nuit-encre"] .zone-etiq:not(.zone-etiq--attente) .zone-etiq__tete {
   background: #ff6a1a;
   color: #0a0b0d;
 }

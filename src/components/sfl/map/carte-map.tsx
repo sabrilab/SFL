@@ -381,8 +381,11 @@ export function CarteMap({
   zones = AUCUNE_ZONE,
   ambiance = "classique",
   onZone,
+  trajet = null,
   className,
 }: {
+  /** Ton chemin jusqu'au match choisi (lon, lat), qui brille sur le plan (31/10, le tableau de bord). */
+  trajet?: [number, number][] | null;
   /** Les zones Bola (lib/sfl/zones.ts) : ouvertes, puis en attente. */
   zones?: Zone[];
   /** L'ambiance du plan (map/ambiances.ts). */
@@ -467,6 +470,7 @@ export function CarteMap({
   const maison = useRef<maplibregl.LngLatBounds | null>(null);
   const ailleurs = useRef(false);
   const retraitRef = useRef(matchsEnRetrait);
+  const trajetRef = useRef(trajet);
   // Les terrains possibles : leurs données et leur ton, lus quand leurs
   // couches se posent ; celui qui est levé, et le filtre qui l'ôte des couches.
   const possiblesRef = useRef(possibles);
@@ -538,6 +542,7 @@ export function CarteMap({
       poserZones(map, zonesRef.current);
       teinterZones(map, ambianceRef.current, fondRef.current === "satellite");
       appliquerFond(map, fondRef.current, false, ambianceRef.current);
+      poserTrajet(map, trajetRef.current, ambianceRef.current);
       // L'attribution reste repliée en un petit « i » : elle s'ouvre au toucher.
       map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
       poserPossibles(map, () => possiblesRef.current, () => carte.current === map)
@@ -639,6 +644,13 @@ export function CarteMap({
     teinterZones(map, ambianceRef.current, fond === "satellite");
     return appliquerFond(map, fond, !calme(), ambianceRef.current);
   }, [fond]);
+
+  // Le trajet jusqu'au match : sa ligne et sa lueur, dans le ton du plan.
+  useEffect(() => {
+    trajetRef.current = trajet;
+    const map = carte.current;
+    if (map?.getLayer("terre")) poserTrajet(map, trajet, ambiance);
+  }, [trajet, ambiance]);
 
   // L'ambiance : le plan repeint, les zones dans leur ton.
   useEffect(() => {
@@ -1087,4 +1099,20 @@ function appliquerFond(map: PlanMap, fond: FondCarte, doux: boolean, ambiance: A
   map.setPaintProperty("satellite", "raster-opacity", 0);
   const t = window.setTimeout(() => map.setLayoutProperty("satellite", "visibility", "none"), duree);
   return () => window.clearTimeout(t);
+}
+
+/** Le trajet : une lueur large et floue sous un trait net ; la braise la nuit, le vert Bola le jour. */
+function poserTrajet(map: PlanMap, trajet: [number, number][] | null, ambiance: Ambiance) {
+  const donnees: GeoJSON.Feature<GeoJSON.LineString> = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: trajet && trajet.length > 1 ? trajet : [] } };
+  const source = map.getSource("trajet") as maplibregl.GeoJSONSource | undefined;
+  if (source) source.setData(donnees);
+  else {
+    map.addSource("trajet", { type: "geojson", data: donnees });
+    const avant = map.getLayer("noms-rues") ? "noms-rues" : undefined;
+    map.addLayer({ id: "trajet-lueur", type: "line", source: "trajet", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-width": 16, "line-blur": 10, "line-opacity": 0.5 } }, avant);
+    map.addLayer({ id: "trajet-trait", type: "line", source: "trajet", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-width": 3.5 } }, avant);
+  }
+  const couleur = ambiance.startsWith("nuit") ? "#FF6A1A" : "#1F8A45";
+  map.setPaintProperty("trajet-lueur", "line-color", couleur);
+  map.setPaintProperty("trajet-trait", "line-color", couleur);
 }
