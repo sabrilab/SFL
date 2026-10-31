@@ -367,7 +367,8 @@ export function dessinerStory(ctx: CanvasRenderingContext2D, t: number, d: Story
   const bx = 120;
   const bl = W - 2 * bx;
   const by = yc + hc + 50;
-  const r1 = 190;
+  const avecScore = d.pour != null && d.contre != null && d.camp != null;
+  const r1 = avecScore ? 190 : 0;
   const r2 = 200;
   const r3 = 84;
   const bh = r1 + r2 + r3;
@@ -383,7 +384,7 @@ export function dessinerStory(ctx: CanvasRenderingContext2D, t: number, d: Story
     ctx.fill();
     // Les filets entre les rangées et les colonnes.
     ctx.fillStyle = BLANC(0.16);
-    ctx.fillRect(bx + 36, by + r1, bl - 72, 2);
+    if (avecScore) ctx.fillRect(bx + 36, by + r1, bl - 72, 2);
     ctx.fillRect(bx + 36, by + r1 + r2, bl - 72, 2);
     ctx.fillRect(bx + bl / 3, by + r1 + 30, 2, r2 - 60);
     ctx.fillRect(bx + (2 * bl) / 3, by + r1 + 30, 2, r2 - 60);
@@ -494,7 +495,14 @@ export function enregistrerStory(
 ): Promise<Blob | null> {
   const format = formatVideo();
   if (!format) return Promise.resolve(null);
-  return new Promise((fin) => {
+  return new Promise((rendre) => {
+    let fini = false;
+    const fin = (b: Blob | null) => {
+      if (fini) return;
+      fini = true;
+      clearTimeout(garde);
+      rendre(b);
+    };
     let flux: MediaStream;
     let r: MediaRecorder;
     try {
@@ -506,17 +514,34 @@ export function enregistrerStory(
       return;
     }
     const bouts: Blob[] = [];
+    const assembler = () => (bouts.length ? new Blob(bouts, { type: format.mime.split(";")[0] }) : null);
     r.ondataavailable = (e) => e.data.size > 0 && bouts.push(e.data);
     r.onstop = () => {
       flux.getTracks().forEach((piste) => piste.stop());
-      fin(bouts.length ? new Blob(bouts, { type: format.mime.split(";")[0] }) : null);
+      fin(assembler());
     };
     r.onerror = () => fin(null);
+    // Un téléphone dont l'enregistreur ne rend jamais la main (vu sur iPhone) :
+    // au-delà de la durée et d'une marge, on prend ce qui a été enregistré, ou
+    // l'image de la fin.
+    const garde = setTimeout(() => {
+      try {
+        if (r.state !== "inactive") r.stop();
+      } catch {
+        // déjà arrêté
+      }
+      setTimeout(() => fin(assembler()), 1500);
+    }, (STORY.duree + 4) * 1000);
     r.start(500);
     const t0 = performance.now();
     const image = (maintenant: number) => {
       const t = (maintenant - t0) / 1000;
-      dessiner(t);
+      // Une image qui échoue ne doit pas arrêter le film.
+      try {
+        dessiner(t);
+      } catch {
+        // l'image suivante réessaie
+      }
       surAvance?.(Math.min(1, t / STORY.duree));
       if (t < STORY.duree) requestAnimationFrame(image);
       // Une dernière image, pour que la fin tienne à l'écran.

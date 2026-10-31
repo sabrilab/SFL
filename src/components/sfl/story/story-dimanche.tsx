@@ -14,7 +14,7 @@
 // Ta carte vient de la capture de la carte 3D (Card3D, ses trois calques) :
 // la même que dans Ma carte, finition comprise.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Share, X } from "lucide-react";
 import { toast } from "sonner";
@@ -66,9 +66,27 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
   const [etat, setEtat] = useState<Etat>({ quoi: "carte" });
   const [url, setUrl] = useState<string | null>(null);
 
+  // Une seule vidéo par ouverture : la carte peut se rephotographier (un badge
+  // arrivé en retard), on garde la première photo.
+  const lance = useRef(false);
+  const fermerRef = useRef(onFermer);
   useEffect(() => {
-    if (!calques) return;
-    let annule = false;
+    fermerRef.current = onFermer;
+  }, [onFermer]);
+
+  // Si la carte ne s'est pas photographiée en 25 secondes, on le dit et on ferme.
+  useEffect(() => {
+    if (calques) return;
+    const garde = setTimeout(() => {
+      toast.error("Ta story n'a pas pu se faire. Réessaie dans un instant.");
+      fermerRef.current();
+    }, 25_000);
+    return () => clearTimeout(garde);
+  }, [calques]);
+
+  useEffect(() => {
+    if (!calques || lance.current) return;
+    lance.current = true;
     (async () => {
       const [fond, joueur, stats, logo, symbole, colonne, dos] = await Promise.all([
         charger(calques.background),
@@ -81,15 +99,21 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
       ]);
       const canvas = toile.current;
       const ctx = canvas?.getContext("2d");
-      if (annule || !canvas || !ctx || !fond || !joueur || !stats) return;
+      if (!canvas || !ctx || !fond || !joueur || !stats) {
+        toast.error("Ta story n'a pas pu se faire. Réessaie dans un instant.");
+        fermerRef.current();
+        return;
+      }
       const p = polices();
-      await Promise.all([document.fonts.load(`900 104px ${p.texte}`), document.fonts.load(`400 128px ${p.chiffres}`)]).catch(() => {});
-      if (annule) return;
+      // Les polices, sans attendre plus de deux secondes.
+      await Promise.race([
+        Promise.all([document.fonts.load(`900 104px ${p.texte}`), document.fonts.load(`400 128px ${p.chiffres}`)]).catch(() => {}),
+        new Promise((ok) => setTimeout(ok, 2000)),
+      ]);
       const c: CalquesStory = { fond, joueur, stats, logo, dos, symbole, colonne, ratio: calques.height / calques.width };
       const dessiner = (t: number) => dessinerStory(ctx, t, donnees, c, p);
       setEtat({ quoi: "film", avance: 0 });
-      const blob = await enregistrerStory(canvas, dessiner, (avance) => !annule && setEtat({ quoi: "film", avance }));
-      if (annule) return;
+      const blob = await enregistrerStory(canvas, dessiner, (avance) => setEtat({ quoi: "film", avance }));
       dessiner(STORY.duree + 1);
       if (blob) {
         const ext = blob.type.includes("mp4") ? "mp4" : "webm";
@@ -99,12 +123,9 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
       }
       // Pas d'enregistrement possible : l'image de la fin.
       const png = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/png"));
-      if (annule || !png) return;
+      if (!png) return;
       setEtat({ quoi: "pret", video: false, fichier: new File([png], `mon-dimanche-j${donnees.j}-bola.png`, { type: "image/png" }) });
     })();
-    return () => {
-      annule = true;
-    };
   }, [calques, donnees]);
 
   useEffect(() => () => void (url && URL.revokeObjectURL(url)), [url]);
@@ -173,7 +194,7 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
             <Card3D
               cacheKey={`story-${player.name}`}
               render={(s) => <PlayerCard player={player} size={s} />}
-              definition={4}
+              definition={2}
               scene={(c) => <Recevoir calques={c} onPrets={setCalques} />}
             />
           </div>
@@ -203,9 +224,11 @@ export function StoryDimancheFenetre({ player, donnees, onFermer }: { player: Pl
 export function BoutonStoryDimanche({ j, date, buts, passes, points, delta }: { j: number; date: string; buts: number; passes: number; points: number; delta: number }) {
   const { player, me } = useMyPlayer();
   const { saison, journees, evolution } = useSeason();
-  const [ouverte, setOuverte] = useState(false);
-  const donnees = useMemo<StoryDimanche | null>(() => {
-    if (!ouverte || !me) return null;
+  // Les chiffres sont figés au toucher : une mise à jour de la saison en
+  // direct ne doit pas relancer la vidéo en train de se faire.
+  const [donnees, setDonnees] = useState<StoryDimanche | null>(null);
+  function ouvrir() {
+    if (!me) return;
     const journee = journees.find((x) => x.j === j);
     const meta = saison.journees.find((x) => x.j === j);
     const match = journee ? findPlayerMatch(journee, me)?.match : undefined;
@@ -214,7 +237,7 @@ export function BoutonStoryDimanche({ j, date, buts, passes, points, delta }: { 
       (match?.lieuId != null ? saison.terrains?.find((t) => t.id === match.lieuId) : undefined) ??
       (meta ? terrainDeJournee(saison, meta) : null);
     const score = scoreDuJoueur(journee, me);
-    return {
+    setDonnees({
       j,
       date,
       lieu: lieu?.nom ?? null,
@@ -230,20 +253,20 @@ export function BoutonStoryDimanche({ j, date, buts, passes, points, delta }: { 
       delta,
       rang: rangPepiteApres(saison, me, j, evolution),
       note: player ? ovr(player.stats) : null,
-    };
-  }, [ouverte, player, me, journees, saison, evolution, j, date, buts, passes, points, delta]);
+    });
+  }
   if (!player) return null;
   return (
     <>
       <button
         type="button"
-        onClick={() => setOuverte(true)}
+        onClick={ouvrir}
         className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold text-foreground/75 transition-transform active:scale-95 dark:text-white/75"
       >
         <Share className="size-[16px]" strokeWidth={2} />
         Story
       </button>
-      {donnees && <StoryDimancheFenetre player={player} donnees={donnees} onFermer={() => setOuverte(false)} />}
+      {donnees && <StoryDimancheFenetre player={player} donnees={donnees} onFermer={() => setDonnees(null)} />}
     </>
   );
 }
