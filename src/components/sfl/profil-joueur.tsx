@@ -58,6 +58,7 @@ import { useIdentites } from "@/hooks/use-identites";
 import { useRangXp, useXp } from "@/hooks/use-missions";
 import { cartesDeCarriere, courbeDeCarriere } from "@/lib/sfl/carriere";
 import { ovr, rankPlayers, STAT_KEYS, type Player } from "@/lib/sfl/engine";
+import { abrege, estGardien } from "@/lib/sfl/gardien";
 import { classables, rangDans } from "@/lib/sfl/rangs";
 import { ficheJoueur } from "@/lib/sfl/fiche-joueur";
 import { finsDeSaison, ordinal, type ClassementId } from "@/lib/sfl/fin-de-saison";
@@ -339,7 +340,7 @@ export function ProfilJoueur({ player, rank }: { player: Player; rank: number })
         <section className="glass flex flex-col gap-2.5 rounded-[26px] px-[18px] py-[17px]">
           <p className="mono-label text-encre-3">Profil de jeu</p>
           {STAT_KEYS.map((k) => (
-            <StatBar key={k} label={k} value={player.stats[k]} />
+            <StatBar key={k} label={abrege(k, estGardien(player.poste))} value={player.stats[k]} />
           ))}
         </section>
 
