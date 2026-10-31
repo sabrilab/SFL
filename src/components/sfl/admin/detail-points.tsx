@@ -18,7 +18,7 @@ import { entryPP } from "@/lib/sfl/saisie/engine";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
 
 /** Le détail lisible d'une ligne : « présence 1, victoire 2, buts 3 ». */
-function decomposer(e: MatchEntry): string {
+export function decomposer(e: MatchEntry): string {
   if (e.extraTime)
     return [`Xtratime`, e.buts + e.passes > 0 && "but ou passe D 1", e.pepiteBonus && `bonus ${e.pepiteBonus}`].filter(Boolean).join(" · ");
   const bouts: string[] = [];
