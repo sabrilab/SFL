@@ -24,6 +24,7 @@
 // dépassement et lui propose des options. Ses stats les plus basses sont sa
 // marge de progression, pas « sa pire stat » : l'écran le dit ainsi aussi.
 
+import { estGardien, NOMS_GARDIEN } from "./gardien";
 import { STAT_KEYS, ovr, type Player, type StatKey } from "./engine";
 import { jourMoisDuLibelle } from "./convocation-temps";
 import { ficheJoueur } from "./fiche-joueur";
@@ -169,7 +170,9 @@ function sesObjectifs(saison: Saison, nom: string, maintenant: Date): ObjectifDo
 
 /** Les stats d'une carte, de la meilleure à la pire (à égalité, l'ordre de la carte). */
 export function statsTriees(p: Player): DossierJoueur["stats"] {
-  return STAT_KEYS.map((id) => ({ id, nom: NOMS_STATS[id], valeur: p.stats[id] })).sort(
+  // Un gardien : ses stats de gardien (lib/sfl/gardien.ts).
+  const gardien = estGardien(p.poste);
+  return STAT_KEYS.map((id) => ({ id, nom: gardien ? NOMS_GARDIEN[id] : NOMS_STATS[id], valeur: p.stats[id] })).sort(
     (a, b) => b.valeur - a.valeur || STAT_KEYS.indexOf(a.id) - STAT_KEYS.indexOf(b.id)
   );
 }

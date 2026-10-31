@@ -32,6 +32,12 @@
 //   · un titre voté (Impact, Défensive) ne compte pour la note qu'avec
 //     VOIX_MIN voix : à la J3, treize Défensive étaient élues à une voix.
 //
+// Un gardien (poste G, Sabri 31/10) garde les six cases, sous des stats de
+// gardien, avec son barème : arrêts → réflexes (TIR), passes D. et buts →
+// dégagement (PAS), match sans encaisser et titre Défensive → placement
+// (DEF), Impact → jeu à la main (DRI), +1 plongeon (VIT) quand réflexes et
+// placement montent ensemble (lib/sfl/gardien.ts).
+//
 // On compte depuis la Saison 1 (SAISON_DEPART). Les saisons d'avant gardent
 // leurs cartes telles qu'elles étaient. Pur, sans stockage : le moteur
 // (computeStandings, computeBoostCards) le rappelle à chaque dérivation.
@@ -62,6 +68,9 @@ export const CRANS = {
   serie: 3,
   /** Pour chaque paire d'interceptions, et pour chaque paire d'arrêts. */
   paireDefensive: 1,
+  /** Un gardien : par arrêt (réflexes), par match sans encaisser (placement). */
+  arret: 1,
+  cleanSheet: 3,
 } as const;
 
 export const SERIE = 3;
@@ -132,6 +141,15 @@ export const cleTitre = (j: number, cat: "impact" | "def", joueur: string) => `$
 const vide = (): Record<StatKey, number> => ({ VIT: 0, TIR: 0, PAS: 0, DRI: 0, DEF: 0, PHY: 0 });
 const pluriel = (n: number, s: string, p: string) => `${n} ${n > 1 ? p : s}`;
 
+/**
+ * La première combinée : +1 VIT quand TIR et PAS prennent un point ensemble ;
+ * pour un gardien, +1 plongeon (VIT) quand réflexes (TIR) et placement (DEF)
+ * le font.
+ */
+function combineeVit(periode: Record<StatKey, number>, gardien: boolean): number {
+  return Math.min(periode.TIR, gardien ? periode.DEF : periode.PAS);
+}
+
 /** Une journée est jouée quand l'admin y a saisi au moins un résultat. */
 export function journeesJouees(saison: Pick<Saison, "entries" | "journees">): number[] {
   const avecResultat = new Set(saison.entries.filter((e) => e.result && !e.extraTime).map((e) => e.j));
@@ -156,8 +174,15 @@ export function evoluer(
    * carte-bola.ts, choix par défaut, 28/10), dont chaque match validé est
    * une « journée ». Rien d'autre ne change.
    */
-  options: { raisonSerie?: string } = {}
+  options: {
+    raisonSerie?: string;
+    /** Les gardiens (poste G) suivent leur barème à eux (lib/sfl/gardien.ts). */
+    gardien?: (nom: string) => boolean;
+    /** Les buts encaissés par l'équipe du joueur ce jour-là, quand on les connaît. */
+    encaisses?: (j: number, nom: string) => number | null;
+  } = {}
 ): Evolution {
+  const estGardien = options.gardien ?? (() => false);
   const jouees = journeesJouees(saison);
   const derniere = jouees.length >= JOURNEES_PAR_MAJ ? jouees[Math.floor(jouees.length / JOURNEES_PAR_MAJ) * JOURNEES_PAR_MAJ - 1] : null;
   const reste = JOURNEES_PAR_MAJ - (jouees.length % JOURNEES_PAR_MAJ);
@@ -223,7 +248,19 @@ export function evoluer(
         s.crans[stat] += crans;
         jour.faits.push({ stat, crans, raison });
       };
-      if (e.statut === "Présent") {
+      if (e.statut === "Présent" && estGardien(e.player)) {
+        // Le gardien (lib/sfl/gardien.ts) : TIR = réflexes, PAS = dégagement,
+        // DEF = placement, DRI = jeu à la main ; PLO (VIT) vient des combinées.
+        verser("TIR", (e.arrets ?? 0) * CRANS.arret, pluriel(e.arrets ?? 0, "arrêt", "arrêts"));
+        verser("PAS", e.passes * CRANS.passe, pluriel(e.passes, "passe D.", "passes D."));
+        verser("PAS", e.buts * CRANS.but, pluriel(e.buts, "but", "buts"));
+        const encaisses = e.result ? (options.encaisses?.(j, e.player) ?? null) : null;
+        if (e.cleanSheet || encaisses === 0) verser("DEF", CRANS.cleanSheet, "aucun but encaissé");
+        if (e.def && !titresFaibles.has(cleTitre(j, "def", e.player))) verser("DEF", CRANS.defensive, "titre Défensive");
+        const paires = Math.floor((e.interceptions ?? 0) / 2);
+        if (paires > 0) verser("DEF", paires * CRANS.paireDefensive, pluriel(e.interceptions ?? 0, "interception", "interceptions"));
+        if (e.impact && !titresFaibles.has(cleTitre(j, "impact", e.player))) verser("DRI", CRANS.impact, "titre Impact");
+      } else if (e.statut === "Présent") {
         verser("TIR", e.buts * CRANS.but, pluriel(e.buts, "but", "buts"));
         verser("PAS", e.passes * CRANS.passe, pluriel(e.passes, "passe D.", "passes D."));
         if (e.def && !titresFaibles.has(cleTitre(j, "def", e.player))) verser("DEF", CRANS.defensive, "titre Défensive");
@@ -236,6 +273,8 @@ export function evoluer(
           verser("DEF", paires * CRANS.paireDefensive, quoi.join(", "));
         }
         if (e.impact && !titresFaibles.has(cleTitre(j, "impact", e.player))) verser("DRI", CRANS.impact, "titre Impact");
+      }
+      if (e.statut === "Présent") {
         if (e.mvp) {
           // Ses deux meilleures stats du moment, la première dans l'ordre de la carte à égalité.
           const top = [...STAT_KEYS].sort((a, b) => s.live[b] - s.live[a] || STAT_KEYS.indexOf(a) - STAT_KEYS.indexOf(b)).slice(0, 2);
@@ -269,8 +308,8 @@ export function evoluer(
 
     // Le jour de la mise à jour : les combinées, puis la carte devient officielle.
     if ((idx + 1) % JOURNEES_PAR_MAJ === 0) {
-      for (const s of etats.values()) {
-        const vit = Math.min(s.periode.TIR, s.periode.PAS);
+      for (const [nom, s] of etats) {
+        const vit = combineeVit(s.periode, estGardien(nom));
         const dri = Math.min(s.periode.DEF, s.periode.PHY);
         s.live.VIT = Math.min(PLAFOND, s.live.VIT + vit);
         s.live.DRI = Math.min(PLAFOND, s.live.DRI + dri);
@@ -292,7 +331,7 @@ export function evoluer(
       const g = s.live[k] - s.officielles[k];
       if (g > 0) enAttente[k] = g;
     }
-    const vit = Math.min(s.periode.TIR, s.periode.PAS);
+    const vit = combineeVit(s.periode, estGardien(nom));
     const dri = Math.min(s.periode.DEF, s.periode.PHY);
     if (vit) enAttente.VIT = Math.min(PLAFOND - s.officielles.VIT, (enAttente.VIT ?? 0) + vit) || undefined;
     if (dri) enAttente.DRI = Math.min(PLAFOND - s.officielles.DRI, (enAttente.DRI ?? 0) + dri) || undefined;

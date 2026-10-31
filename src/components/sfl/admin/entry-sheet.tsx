@@ -1,5 +1,6 @@
 "use client";
 
+import { abrege, estGardien } from "@/lib/sfl/gardien";
 import { useState } from "react";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -472,7 +473,8 @@ export function PlayerSheet({
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 pt-2">
                 {STAT_LABELS.map((label, i) => (
                   <div key={label} className="flex items-center justify-between py-1.5">
-                    <span className="text-corps font-semibold text-muted-foreground">{label}</span>
+                    {/* Un gardien (poste G) est évalué sur ses stats de gardien (lib/sfl/gardien.ts). */}
+                    <span className="text-corps font-semibold text-muted-foreground">{abrege(label, estGardien(entry.poste))}</span>
                     <Stepper value={base[i]} min={0} onChange={(v) => setStat(i, v)} />
                   </div>
                 ))}
