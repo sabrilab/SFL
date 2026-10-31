@@ -193,7 +193,6 @@ import { montrerCalque, useCalquesMap } from "@/hooks/use-calques-map";
 import { SigleLigue } from "@/components/sfl/choix-ligue";
 import { Visages } from "@/components/sfl/suivre";
 import { afficheDe, parNote, useAffiches, type Affiche } from "@/lib/sfl/affiche";
-import { AfficheDuMatch } from "@/components/sfl/map/affiche-du-match";
 import { Ecusson } from "@/components/sfl/equipe/ecusson";
 import { useMatchsTeam, type MatchTeam } from "@/hooks/use-matchs-team";
 import type { FondCarte, PointPlan, PossiblePlan, ToiPlan } from "@/components/sfl/map/carte-map";
@@ -1799,7 +1798,7 @@ export default function MapPage() {
           )}
           {/* Les matchs du lieu : on glisse de l'un à l'autre, le choisi au centre. */}
           {choisi && auLieu.length > 1 && (
-            <div className="mt-5 flex shrink-0 snap-x snap-mandatory items-center gap-1 overflow-x-auto px-[calc(50%-80px)] py-3 [scrollbar-width:none]">
+            <div className="mt-5 flex shrink-0 snap-x snap-mandatory items-center gap-1 overflow-x-auto px-[calc(50%-150px)] py-3 [scrollbar-width:none]">
               {auLieu.map((m) => (
                 <div
                   key={m.cle}
@@ -1810,6 +1809,7 @@ export default function MapPage() {
                     m={m}
                     choisi={m.cle === choisi.cle}
                     une={false}
+                    grand
                     affiche={afficheDu(m)}
                     dans={m.joue ? null : ecartJours(m.dateLabel, aujourdhui)}
                     loin={null}
@@ -1827,7 +1827,21 @@ export default function MapPage() {
           {choisi && surtitreDeLigue(jDuChoisi) && <p className="mono-label mt-2 shrink-0 text-center text-foreground">{surtitreDeLigue(jDuChoisi)}</p>}
           <div className="mt-5 flex shrink-0 flex-col gap-5 px-4 pb-32">
                 {/* L'affiche du match, en grand. */}
-                {choisi && afficheDu(choisi) && <AfficheDuMatch affiche={afficheDu(choisi)!} />}
+                {/* Les terrains de la journée d'abord, en carrousel (Sabri, 31/10 : « qu'on le voie dès qu'on arrive »). */}
+                {choisi && feuille.length > 0 && (
+                  <FeuilleDeMatch
+                    key={choisi.cle}
+                    terrains={feuille}
+                    moi={player.name}
+                    j={choisi.j ?? null}
+                    entete={{
+                      surtitre: `${choisi.j != null ? `J${choisi.j} · ` : ""}Sunday Five League`,
+                      jour: dateComplete(choisi.dateLabel, aujourdhui),
+                      heure: choisi.heure,
+                      ou: choisi.terrain ? choisi.terrain.nom : null,
+                    }}
+                  />
+                )}
                 {/* Le tableau de bord du match (31/10) : le grand chiffre, puis la journée en étapes. */}
                 {choisi && !choisi.joue && (
                   <Rebours
@@ -1856,20 +1870,6 @@ export default function MapPage() {
                   <Presents m={choisi} habitues={habitues} />
                 ) : (
                   <PresencePanel />
-                )}
-                {choisi && feuille.length > 0 && (
-                  <FeuilleDeMatch
-                    key={choisi.cle}
-                    terrains={feuille}
-                    moi={player.name}
-                    j={choisi.j ?? null}
-                    entete={{
-                      surtitre: `${choisi.j != null ? `J${choisi.j} · ` : ""}Sunday Five League`,
-                      jour: dateComplete(choisi.dateLabel, aujourdhui),
-                      heure: choisi.heure,
-                      ou: choisi.terrain ? choisi.terrain.nom : null,
-                    }}
-                  />
                 )}
                 {choisi && feuille.length > 0 && <DuelsDuJour j={choisi.j} matchs={choisi.matchsIci} />}
                 {/* La météo au coup d'envoi (Sabri, 24/10 : « à telle heure, ce
@@ -2164,12 +2164,15 @@ function CarteMatch({
   loin,
   nonLus = 0,
   affiche,
+  grand = false,
   onToucher,
 }: {
   m: MatchMap;
   choisi: boolean;
   /** Son affiche : les deux meilleures notes, à la place du terrain. */
   affiche?: Affiche | null;
+  /** Dans la page du lieu : la carte en grand, l'affiche bien visible (Sabri, 31/10). */
+  grand?: boolean;
   /** Le prochain match : la une de la Map, avec ses places. */
   une: boolean;
   /** Les jours avant le match (null : joué ou date illisible). */
@@ -2187,7 +2190,7 @@ function CarteMatch({
   // « demain » ne se répète pas quand le titre le dit déjà (31/10).
   const reste = compteARebours(dans);
   const rebours = reste && reste.toLowerCase() !== titre.toLowerCase() ? reste : null;
-  const [l, h] = joue ? [LARGEUR_JOUE, 104] : [196, 140];
+  const [l, h] = grand ? (joue ? [216, 150] : [300, 200]) : joue ? [LARGEUR_JOUE, 104] : [196, 140];
   // Les places d'un match ouvert par un joueur : une encoche par joueur
   // attendu ; les vides sont celles qu'il manque, en braise. Une journée de
   // ligue n'a pas de plafond : pas de jauge, le compte des participants.
