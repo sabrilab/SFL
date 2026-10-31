@@ -19,12 +19,14 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { BLANCS, NOIRS, Pouls } from "@/components/sfl/actus/missions";
 import { useIdentites } from "@/hooks/use-identites";
 import { useMonFlair } from "@/hooks/use-pronos";
-import { PLAFOND_JOURNEE, type ChoixFlair, type FlairDeJournee } from "@/lib/sfl/pronos";
+import { NOM_ECART, type ChoixFlair, type FlairDeJournee } from "@/lib/sfl/pronos";
 import { cn } from "@/lib/utils";
 import "@/components/sfl/matchs/flair.css";
 
 export const NOM_CAMP: Record<string, string> = { noirs: "Noirs", nul: "Nul", blancs: "Blancs" };
-const estCamp = (s: string) => s in NOM_CAMP;
+/** Un choix qui n'est pas un joueur : un camp (Noirs, Nul, Blancs) ou un écart (Serré, Net, Large). */
+export const NOM_CHOIX: Record<string, string> = { ...NOM_CAMP, ...NOM_ECART };
+const estCamp = (s: string) => s in NOM_CHOIX;
 
 /** Juste · +20 XP, Raté, Posé trop tard, ou rien tant que la feuille n'est pas remplie. */
 export function VerdictFlair({ etat, xp }: { etat: ChoixFlair["etat"]; xp?: number }) {
@@ -47,7 +49,7 @@ export function PastilleCamp({ camp, barre }: { camp: string; barre?: boolean })
       )}
       style={ton ? { background: ton.fond, color: ton.encre } : undefined}
     >
-      {NOM_CAMP[camp] ?? camp}
+      {NOM_CHOIX[camp] ?? camp}
     </span>
   );
 }
@@ -59,7 +61,7 @@ function LigneChoix({ c }: { c: ChoixFlair }) {
   const rate = c.etat === "faux";
   const camp = estCamp(c.choix);
   const p = camp ? undefined : allPlayers.find((x) => x.name === c.choix);
-  const reponse = rate && c.bons?.length ? c.bons.map((n) => (estCamp(n) ? NOM_CAMP[n] : identite.nom(n).split(" ")[0])).join(", ") : null;
+  const reponse = rate && c.bons?.length ? c.bons.map((n) => (estCamp(n) ? NOM_CHOIX[n] : identite.nom(n).split(" ")[0])).join(", ") : null;
   return (
     <div className="flex items-center gap-3">
       {!camp && (
@@ -128,7 +130,7 @@ export function FicheFlair({ f, titre = "Ton Flair", className }: { f: FlairDeJo
       </div>
       {f.juges > 0 && (
         <p className="mono-label text-white/45">
-          {f.justes} sur {f.choix.length} · {PLAFOND_JOURNEE} XP au plus par journée
+          {f.justes} sur {f.choix.length} · {f.plafond} XP au plus par journée
         </p>
       )}
     </section>

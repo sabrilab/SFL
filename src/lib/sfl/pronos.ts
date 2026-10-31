@@ -13,6 +13,16 @@
 //     meilleur du jour (le plus de points Pépite, titres du vote compris).
 //     Sur ton propre match, tu ne peux soutenir que ton camp. Le verdict est
 //     définitif à minuit, quand le vote Impact et Défensive se ferme ;
+//     Sabri, 31/10 : « pour chaque match qui se joue dans une journée SFL, on
+//     puisse déterminer avec le flair le meilleur buteur, le meilleur passeur
+//     et le MVP du match », « le meilleur passeur du jour », « des choix en
+//     fonction des matchs, pas juste qui va gagner ». Chaque match a donc, en
+//     plus du vainqueur, son MVP, son buteur, son passeur, son écart (serré,
+//     net, large) et son duel (les deux rivaux du contrat, missions.ts : qui
+//     finit devant l'autre en points du jour) ; la journée a son passeur.
+//     Et pour celui qui ne joue pas (blessé, absent, en tribune : « même s'il
+//     ne peut plus jouer, il peut quand même participer »), le plafond monte
+//     à PLAFOND_TRIBUNE : toujours moins qu'un dimanche joué, Flair compris ;
 //   · la saison : la Pépite d'Or, le meilleur buteur, le meilleur passeur.
 //     Ouverts toute la saison, jugés à sa clôture. Plus on s'y prend tôt, plus
 //     ça rapporte : la prime suit le nombre de journées déjà jouées au moment
@@ -21,7 +31,8 @@
 //
 // Une égalité en tête donne raison à tous ceux qui ont choisi l'un des
 // premiers. Une journée de pronos rapporte au plus PLAFOND_JOURNEE, autant
-// que jouer le dimanche : jamais plus que jouer.
+// que jouer le dimanche : jamais plus que jouer ; PLAFOND_TRIBUNE pour qui
+// n'est pas sur la feuille.
 //
 // Pur : ni React ni réseau. Les pronos arrivent en paramètres (pronos-store.ts).
 
@@ -34,8 +45,12 @@ import type { MatchEntry, Saison } from "./saisie/types";
 
 /* ------------------------------- Le barème ------------------------------- */
 
-/** Un sujet de la journée : `match:0` pour le Match 1, le buteur, le meilleur du jour. */
-export type SujetJournee = `match:${number}` | "buteur" | "pepite";
+/** Les sujets d'un match : `match:0` (qui gagne le Match 1), `mvp:0`, `buteur:0`… */
+export const SUJETS_MATCH = ["match", "ecart", "duel", "mvp", "buteur", "passeur"] as const;
+export type GenreMatch = (typeof SUJETS_MATCH)[number];
+/** Un sujet de la journée : ceux de chaque match, puis le meilleur, le buteur et le passeur du jour. */
+export type SujetJournee = `${GenreMatch}:${number}` | "pepite" | "buteur" | "passeur";
+export const SUJETS_JOUR = ["pepite", "buteur", "passeur"] as const;
 /** Un sujet de la saison. */
 export type SujetSaison = "pepite" | "buteur" | "passeur";
 
@@ -45,8 +60,26 @@ export const J_SAISON = 0;
 export const XP_VAINQUEUR = 20;
 export const XP_BUTEUR_DU_JOUR = 40;
 export const XP_MEILLEUR_DU_JOUR = 40;
+export const XP_PASSEUR_DU_JOUR = 40;
+/** Ce que rapporte chaque sujet d'un match. */
+export const XP_MATCH: Record<GenreMatch, number> = { match: XP_VAINQUEUR, ecart: 15, duel: 15, mvp: 20, buteur: 15, passeur: 15 };
 /** Une journée de pronos rapporte au plus un dimanche joué (XP_DIMANCHE). */
 export const PLAFOND_JOURNEE = 100;
+/** Pour qui n'est pas sur la feuille : le Flair est son dimanche (100 XP joué + 100 de Flair restent devant). */
+export const PLAFOND_TRIBUNE = 150;
+
+/** L'écart d'un match, buts d'écart au coup de sifflet : serré (0 ou 1), net (2 ou 3), large (4 et plus). */
+export type Ecart = "serre" | "net" | "large";
+export const ECARTS: Ecart[] = ["serre", "net", "large"];
+export const NOM_ECART: Record<Ecart, string> = { serre: "Serré", net: "Net", large: "Large" };
+export const DETAIL_ECART: Record<Ecart, string> = { serre: "0-1 but", net: "2-3 buts", large: "4 et +" };
+export const ecartDe = (d: number): Ecart => (Math.abs(d) <= 1 ? "serre" : Math.abs(d) <= 3 ? "net" : "large");
+
+/** Le genre et le match d'un sujet : `mvp:1` → ["mvp", 1] ; un sujet du jour → [sujet, null]. */
+export function lireSujet(sujet: string): [string, number | null] {
+  const i = sujet.indexOf(":");
+  return i < 0 ? [sujet, null] : [sujet.slice(0, i), Number(sujet.slice(i + 1))];
+}
 
 export const PRIME_SAISON_MAX = 300;
 export const PRIME_SAISON_MIN = 60;
@@ -85,6 +118,8 @@ export interface MatchProno {
   label: string;
   noirs: string[];
   blancs: string[];
+  /** Le duel du match (le premier contrat de rivaux, missions.ts) : [noirs, blancs] ; null sans duel. */
+  duel: [string, string] | null;
 }
 
 export interface JourneePronos {
@@ -117,7 +152,10 @@ export function pronosDeJournee(
   const parMatch = new Map<number, MatchProno>();
   for (const [nom, c] of d.camps) {
     let m = parMatch.get(c.terrain);
-    if (!m) parMatch.set(c.terrain, (m = { n: c.terrain, label: c.label, noirs: [], blancs: [] }));
+    if (!m) {
+      const duel = d.duels.find((x) => x.terrain === c.terrain);
+      parMatch.set(c.terrain, (m = { n: c.terrain, label: c.label, noirs: [], blancs: [], duel: duel ? [duel.noirs, duel.blancs] : null }));
+    }
     (c.equipe === "noirs" ? m.noirs : m.blancs).push(nom);
   }
   const matchs = [...parMatch.values()].sort((a, b) => a.n - b.n);
@@ -151,6 +189,27 @@ export function choixPermis(p: JourneePronos, n: number, joueur: string): Camp[]
   return ["noirs", "nul", "blancs"];
 }
 
+/** Ce qu'un joueur peut choisir sur le duel d'un match : l'un ou l'autre, ou lui-même s'il en est. */
+export function duelPermis(p: JourneePronos, n: number, joueur: string): string[] {
+  const d = p.matchs.find((m) => m.n === n)?.duel;
+  if (!d) return [];
+  return d.includes(joueur) ? [joueur] : [...d];
+}
+
+/** Le choix est-il permis sur ce sujet ? (Les noms de joueurs se vérifient à la lecture.) */
+export function permis(p: JourneePronos, sujet: string, joueur: string, choix: string): boolean {
+  const [genre, n] = lireSujet(sujet);
+  if (n == null) return (SUJETS_JOUR as readonly string[]).includes(genre);
+  if (!p.matchs.some((m) => m.n === n)) return false;
+  if (genre === "match") return choixPermis(p, n, joueur).includes(choix as Camp);
+  if (genre === "ecart") return (ECARTS as string[]).includes(choix);
+  if (genre === "duel") return duelPermis(p, n, joueur).includes(choix);
+  return (SUJETS_MATCH as readonly string[]).includes(genre);
+}
+
+/** Le plafond d'XP d'une journée pour ce joueur : celui de la feuille, ou de la tribune. */
+export const plafondDe = (p: Pick<JourneePronos, "camps">, joueur: string) => (p.camps.has(joueur) ? PLAFOND_JOURNEE : PLAFOND_TRIBUNE);
+
 const joue = (e: MatchEntry) => e.statut === "Présent" && !e.extraTime;
 
 /** Les premiers d'un compte, égalités comprises ; vide si personne n'a rien. */
@@ -166,34 +225,57 @@ export function resultatsDeJournee(
   p: Pick<JourneePronos, "j" | "matchs">,
   entries: MatchEntry[]
 ): Map<string, string[]> {
-  const lignes = entries.filter((e) => e.j === p.j && joue(e));
+  const duJour = entries.filter((e) => e.j === p.j);
+  const lignes = duJour.filter(joue);
   const out = new Map<string, string[]>();
+  const somme = (ls: MatchEntry[], f: (e: MatchEntry) => number) => {
+    const m = new Map<string, number>();
+    for (const e of ls) m.set(e.player, (m.get(e.player) ?? 0) + f(e));
+    return m;
+  };
   for (const m of p.matchs) {
-    const r = lignes.find((e) => m.noirs.includes(e.player) && e.result)?.result;
-    if (!r) continue;
-    out.set(`match:${m.n}`, [r === "Nul" ? "nul" : r === "Victoire" ? "noirs" : "blancs"]);
-  }
-  const buts = new Map<string, number>();
-  const pp = new Map<string, number>();
-  for (const e of lignes) {
-    buts.set(e.player, (buts.get(e.player) ?? 0) + e.buts);
-    pp.set(e.player, (pp.get(e.player) ?? 0) + entryPP(e));
+    const ici = new Set([...m.noirs, ...m.blancs]);
+    const dans = lignes.filter((e) => ici.has(e.player));
+    const r = dans.find((e) => m.noirs.includes(e.player) && e.result)?.result;
+    if (r) {
+      out.set(`match:${m.n}`, [r === "Nul" ? "nul" : r === "Victoire" ? "noirs" : "blancs"]);
+      // Le score, comme le moteur : les buts de l'équipe du jour et ses buts non attribués.
+      const equipe = (noms: string[]) => duJour.find((e) => noms.includes(e.player) && e.team)?.team ?? null;
+      const score = (t: string | null) =>
+        t ? duJour.filter((e) => e.team === t && e.statut === "Présent").reduce((a, e) => a + e.buts + (e.teamScoreBonus ?? 0), 0) : 0;
+      out.set(`ecart:${m.n}`, [ecartDe(score(equipe(m.noirs)) - score(equipe(m.blancs)))]);
+    }
+    if (!dans.some((e) => e.result || e.buts > 0)) continue;
+    out.set(`buteur:${m.n}`, premiers(somme(dans, (e) => e.buts)));
+    out.set(`passeur:${m.n}`, premiers(somme(dans, (e) => e.passes)));
+    const mvp = dans.filter((e) => e.mvp && !isHidden(e.player)).map((e) => e.player);
+    if (mvp.length) out.set(`mvp:${m.n}`, [...new Set(mvp)]);
+    if (m.duel) {
+      const pp = somme(dans, entryPP);
+      const [a, b] = m.duel.map((x) => pp.get(x) ?? 0);
+      // À égalité, le duel donne raison aux deux.
+      out.set(`duel:${m.n}`, a === b ? [...m.duel] : [a > b ? m.duel[0] : m.duel[1]]);
+    }
   }
   if (lignes.some((e) => e.result || e.buts > 0)) {
-    out.set("buteur", premiers(buts));
-    out.set("pepite", premiers(pp));
+    out.set("buteur", premiers(somme(lignes, (e) => e.buts)));
+    out.set("passeur", premiers(somme(lignes, (e) => e.passes)));
+    out.set("pepite", premiers(somme(lignes, entryPP)));
   }
   return out;
 }
 
-export const xpSujet = (sujet: string) =>
-  sujet.startsWith("match:") ? XP_VAINQUEUR : sujet === "buteur" ? XP_BUTEUR_DU_JOUR : XP_MEILLEUR_DU_JOUR;
+export const xpSujet = (sujet: string) => {
+  const [genre, n] = lireSujet(sujet);
+  if (n != null) return XP_MATCH[genre as GenreMatch] ?? 0;
+  return genre === "buteur" ? XP_BUTEUR_DU_JOUR : genre === "passeur" ? XP_PASSEUR_DU_JOUR : XP_MEILLEUR_DU_JOUR;
+};
 
 /** Le prono retenu : posé avant le coup d'envoi, et jamais contre son propre camp. */
 export function pronoRetenu(pronos: Prono[], p: JourneePronos, joueur: string, sujet: string): Prono | null {
   const x = pronos.find((r) => r.saison === p.saison && r.j === p.j && r.sujet === sujet && r.joueur === joueur);
   if (!x || new Date(x.le).getTime() > p.coupEnvoi.getTime()) return null;
-  if (sujet.startsWith("match:") && !choixPermis(p, Number(sujet.slice(6)), joueur).includes(x.choix as Camp)) return null;
+  if (!permis(p, sujet, joueur, x.choix)) return null;
   return x;
 }
 
@@ -271,7 +353,7 @@ export function lignesPronos(
       if (!b.justes) continue;
       out.push({
         joueur,
-        ligne: { saison: numero, j, date: p.date, quoi: `Flair, ${b.justes} sur ${b.total}`, xp: Math.min(b.xp, PLAFOND_JOURNEE) },
+        ligne: { saison: numero, j, date: p.date, quoi: `Flair, ${b.justes} sur ${b.total}`, xp: Math.min(b.xp, plafondDe(p, joueur)) },
       });
     }
   }
@@ -294,6 +376,50 @@ export function lignesPronos(
     }
   }
   return out;
+}
+
+/* ---------------------------- Les meilleurs flairs ---------------------------- */
+
+export interface RangFlair {
+  joueur: string;
+  justes: number;
+  juges: number;
+  xp: number;
+  /** Les matchs où il a vu juste au moins une fois sur un sujet du match. */
+  matchs: number;
+}
+
+/**
+ * Le classement du Flair d'une saison (Sabri, 31/10 : « que ce soit visible
+ * pour les joueurs ») : les choix justes, jugés journée finie, à égalité
+ * l'XP, puis le moins de choix jugés (le plus juste).
+ */
+export function classementFlair(lue: SaisonLue, numero: number, close: boolean, pronos: Prono[], maintenant: Date, reference: Date): RangFlair[] {
+  const miens = pronos.filter((x) => x.saison === numero && x.j !== J_SAISON);
+  const par = new Map<string, RangFlair & { vus: Set<string> }>();
+  for (const j of [...new Set(miens.map((x) => x.j))]) {
+    const p = pronosDeJournee(lue, numero, j, reference);
+    if (!p || !p.joue || (!close && maintenant.getTime() < p.finDuJour.getTime())) continue;
+    const res = resultatsDeJournee(p, lue.entries);
+    const xpJour = new Map<string, number>();
+    for (const x of miens.filter((r) => r.j === j)) {
+      const etat = etatDe(pronoRetenu(miens, p, x.joueur, x.sujet), res);
+      if (etat === "attente") continue;
+      let r = par.get(x.joueur);
+      if (!r) par.set(x.joueur, (r = { joueur: x.joueur, justes: 0, juges: 0, xp: 0, matchs: 0, vus: new Set() }));
+      r.juges++;
+      if (etat !== "juste") continue;
+      r.justes++;
+      xpJour.set(x.joueur, (xpJour.get(x.joueur) ?? 0) + xpSujet(x.sujet));
+      const [, n] = lireSujet(x.sujet);
+      if (n != null) r.vus.add(`${j}:${n}`);
+    }
+    for (const [joueur, xp] of xpJour) par.get(joueur)!.xp += Math.min(xp, plafondDe(p, joueur));
+  }
+  return [...par.values()]
+    .filter((r) => !isHidden(r.joueur))
+    .map(({ vus, ...r }) => ({ ...r, matchs: vus.size }))
+    .sort((a, b) => b.justes - a.justes || b.xp - a.xp || a.juges - b.juges || a.joueur.localeCompare(b.joueur));
 }
 
 /* ---------------------------- Ce que pense la ligue ---------------------------- */
@@ -342,7 +468,7 @@ export type PhaseFlair = "ouvert" | "en-jeu" | "fini";
 
 export interface ChoixFlair {
   sujet: string;
-  /** « Match 1 », « Le match », « Le buteur du jour », « Le meilleur du jour ». */
+  /** « Match 1 · Qui gagne », « Le MVP », « Le buteur du jour »… */
   titre: string;
   choix: string;
   etat: EtatProno | "hors-delai";
@@ -363,10 +489,39 @@ export interface FlairDeJournee {
   juges: number;
   /** L'XP de la journée, plafonnée ; acquise quand la phase est finie. */
   xp: number;
+  /** Son plafond : celui de la feuille, ou de la tribune. */
+  plafond: number;
 }
 
-const ORDRE_JOUR = ["pepite", "buteur"];
-const rangSujet = (s: string) => (s.startsWith("match:") ? Number(s.slice(6)) : 100 + ORDRE_JOUR.indexOf(s));
+/** L'ordre de lecture : chaque match, sujet par sujet, puis la journée. */
+export function rangSujet(sujet: string): number {
+  const [genre, n] = lireSujet(sujet);
+  return n != null ? n * 10 + SUJETS_MATCH.indexOf(genre as GenreMatch) : 1000 + SUJETS_JOUR.indexOf(genre as (typeof SUJETS_JOUR)[number]);
+}
+
+export const TITRE_MATCH: Record<GenreMatch, string> = {
+  match: "Qui gagne",
+  ecart: "L'écart",
+  duel: "Le duel",
+  mvp: "Le MVP",
+  buteur: "Le buteur",
+  passeur: "Le passeur",
+};
+export const TITRE_JOUR: Record<(typeof SUJETS_JOUR)[number], string> = {
+  pepite: "Le meilleur du jour",
+  buteur: "Le buteur du jour",
+  passeur: "Le passeur du jour",
+};
+
+/** Le titre d'un sujet, avec son match quand la journée en a plusieurs : « Match 2 · Le MVP ». */
+export function titreSujet(p: Pick<JourneePronos, "matchs">, sujet: string): string | null {
+  const [genre, n] = lireSujet(sujet);
+  if (n == null) return TITRE_JOUR[genre as (typeof SUJETS_JOUR)[number]] ?? null;
+  const m = p.matchs.find((x) => x.n === n);
+  const t = TITRE_MATCH[genre as GenreMatch];
+  if (!m || !t) return null;
+  return p.matchs.length > 1 ? `${m.label} · ${t}` : t === "Qui gagne" ? "Le match" : t;
+}
 
 /** Mon Flair dans une saison, de la journée la plus récente à la plus ancienne. */
 export function flairsDuJoueur(
@@ -391,12 +546,8 @@ export function flairsDuJoueur(
       .filter((x) => x.j === j)
       .sort((a, b) => rangSujet(a.sujet) - rangSujet(b.sujet))
       .flatMap((x) => {
-        let titre: string;
-        if (x.sujet.startsWith("match:")) {
-          const m = p.matchs.find((m) => m.n === Number(x.sujet.slice(6)));
-          if (!m) return [];
-          titre = p.matchs.length > 1 ? m.label : "Le match";
-        } else titre = x.sujet === "buteur" ? "Le buteur du jour" : "Le meilleur du jour";
+        const titre = titreSujet(p, x.sujet);
+        if (!titre) return [];
         const retenu = pronoRetenu(pronos, p, joueur, x.sujet);
         return [{ sujet: x.sujet, titre, choix: x.choix, etat: retenu ? etatDe(retenu, res) : "hors-delai", bons: res.get(x.sujet) ?? null, xp: xpSujet(x.sujet) }];
       });
@@ -410,7 +561,8 @@ export function flairsDuJoueur(
       choix,
       justes: justes.length,
       juges: choix.filter((c) => c.etat === "juste" || c.etat === "faux").length,
-      xp: Math.min(PLAFOND_JOURNEE, justes.reduce((a, c) => a + c.xp, 0)),
+      xp: Math.min(plafondDe(p, joueur), justes.reduce((a, c) => a + c.xp, 0)),
+      plafond: plafondDe(p, joueur),
     });
   }
   return out;

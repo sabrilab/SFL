@@ -32,10 +32,11 @@ import { MiniCarte } from "@/components/sfl/mini-carte";
 import { Medaille } from "@/components/sfl/vitrine";
 import { ModePasse, retenirOrigineModePasse } from "@/components/sfl/mode-passe";
 import { useMissionsASigner } from "@/components/sfl/mode-passe-missions";
-import { NOM_CAMP } from "@/components/sfl/flair/mon-flair";
+import { NOM_CHOIX } from "@/components/sfl/flair/mon-flair";
 import { FermeDans } from "@/components/sfl/matchs/flair";
 import { useIdentites } from "@/hooks/use-identites";
 import { useMonFlair } from "@/hooks/use-pronos";
+import { useEstBlesse } from "@/hooks/use-blessures";
 import { cartesDeCarriere, courbeDeCarriere, type CartesDeSaison, type PointCourbe } from "@/lib/sfl/carriere";
 import { ovr } from "@/lib/sfl/engine";
 import { saisonsBolaDe } from "@/lib/sfl/carte-bola";
@@ -171,6 +172,7 @@ export function RubriquesMaCarte() {
   const aSigner = useMissionsASigner();
   const format = useFormatCarte();
   const flair = useMonFlair();
+  const blesse = useEstBlesse(player.name);
   const identite = useIdentites();
   // Mes badges comptent aussi mes matchs Bola validés : MVP en Bola, la tuile le dit.
   const paliers = useMemo(
@@ -467,19 +469,31 @@ export function RubriquesMaCarte() {
                   )}
                 >
                   {c.etat === "juste" && <span aria-hidden>✓</span>}
-                  {NOM_CAMP[c.choix] ?? identite.nom(c.choix).split(" ")[0]}
+                  {NOM_CHOIX[c.choix] ?? identite.nom(c.choix).split(" ")[0]}
                 </span>
               ))}
             </span>
           </>
         ) : (
           <span className="flex items-end justify-between gap-3">
-            <span className="text-[19px] leading-[1.2] font-bold tracking-[-0.3px]">J{ouverte!.p.j} ouverte</span>
+            <span className="flex flex-col gap-1">
+              <span className="text-[19px] leading-[1.2] font-bold tracking-[-0.3px]">J{ouverte!.p.j} ouverte</span>
+              <span className="font-mono text-[11px] text-foreground/45 tabular-nums">
+                {[...ouverte!.sujets.values()].filter((v) => v.choix).length}/{ouverte!.sujets.size} choix
+              </span>
+            </span>
             <FermeDans fin={ouverte!.p.coupEnvoi} />
           </span>
         )}
       </Tuile>
     );
+  }
+
+  // Blessé, le Flair est son dimanche (Sabri, 31/10 : « son gameplay […] soit
+  // davantage sur le flair ») : sa tuile passe en tête tant qu'une journée est ouverte.
+  if (blesse && ouverte) {
+    const i = tuiles.findIndex((t) => (t as React.ReactElement | null)?.key === "flair");
+    if (i > 0) tuiles.unshift(...tuiles.splice(i, 1));
   }
 
   return (
