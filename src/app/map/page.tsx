@@ -139,6 +139,7 @@ import { ContratsSur } from "@/components/sfl/map/contrats-sur";
 import { cleVille, type ContratPlan, type VillePlan } from "@/components/sfl/map/joueurs";
 import { useMissionsDeLaLigue } from "@/hooks/use-missions";
 import { maVille, villeOuLigue } from "@/lib/sfl/villes";
+import { garderPosition, positionGardee } from "@/lib/sfl/activation";
 import { photoMiniature, photoPerso } from "@/lib/sfl/photos";
 import { nomAffiche } from "@/lib/sfl/identites";
 import {
@@ -149,6 +150,7 @@ import {
   km,
   lieuDuTerrain,
   lireAutour,
+  lireTerrain,
   lireVue,
   sansAccents,
   sourcesCitees,
@@ -715,6 +717,33 @@ export default function MapPage() {
   const [ouvrir, setOuvrir] = useState<{ terrain: Terrain | null; lieu?: LieuChoisi; jour?: string; heure?: string; n: number } | null>(null);
   const [dispos, setDispos] = useState(false);
 
+  // « Ton premier match » (components/sfl/invitation-premier-match.tsx) :
+  // /map?ouvrir=id ouvre la feuille d'ouverture sur ce terrain du catalogue,
+  // dès que sa case est lue ; /map?ouvrir= l'ouvre vide. Lu une fois et gardé
+  // (l'effet remonté du mode strict ne le relit pas dans l'adresse).
+  const aOuvrir = useRef<string | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (!q.has("ouvrir")) return;
+    aOuvrir.current = q.get("ouvrir") ?? "";
+    if (aOuvrir.current) lireTerrain(aOuvrir.current).catch(() => {});
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+  useEffect(() => {
+    const id = aOuvrir.current;
+    if (id === null || !partiesActives) return;
+    const t = id ? recenses.find((x) => x.id === id) : null;
+    if (id && !t) return;
+    aOuvrir.current = null;
+    void Promise.resolve().then(() =>
+      setOuvrir((o) => ({
+        terrain: null,
+        lieu: t ? { lieu: lieuDuTerrain(t), adresse: t.adresse, lat: t.lat, lng: t.lng, terrain: t } : undefined,
+        n: (o?.n ?? 0) + 1,
+      }))
+    );
+  }, [recenses, partiesActives]);
+
   const [fiche, setFiche] = useState(false);
   const [ficheAdmin, setFicheAdmin] = useState(false);
   const [choix, setChoixBrut] = useState<string | null>(null);
@@ -886,6 +915,14 @@ export default function MapPage() {
   // Toi : ta position, quand tu la donnes.
   const [toi, setToi] = useState<ToiPlan | null>(null);
   const [cherchePosition, setCherchePosition] = useState(false);
+  // Donnée il y a moins d'une heure sur ce téléphone (« Ton premier match ») :
+  // la Map le place au même endroit, sans redemander.
+  const noteToi = ovr(player.stats);
+  const teinteToi = teinte(player.name);
+  useEffect(() => {
+    const p = positionGardee();
+    if (p) void Promise.resolve().then(() => setToi((t) => t ?? { ...p, note: noteToi, teinte: teinteToi }));
+  }, [noteToi, teinteToi]);
   function localiser() {
     if (!("geolocation" in navigator)) {
       toast.error("Ce navigateur ne donne pas la position.");
@@ -894,6 +931,7 @@ export default function MapPage() {
     setCherchePosition(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        garderPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setToi({ lat: pos.coords.latitude, lng: pos.coords.longitude, note: ovr(player.stats), teinte: teinte(player.name) });
         setCherchePosition(false);
       },

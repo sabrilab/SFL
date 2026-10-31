@@ -182,6 +182,8 @@ export const KIND_FR: Record<string, string> = {
   achat: "Achats de cartes",
   recherche: "Recherches",
   compo: "Compositions",
+  notifs: "Invitation aux notifications",
+  activation: "Ton premier match",
 };
 
 export const PATH_FR: Record<string, string> = {
