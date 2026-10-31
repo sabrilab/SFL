@@ -110,6 +110,16 @@
   --t: 214 220 230;
   --t-sombre: #3d434d;
 }
+/* Les deux boutons du haut de Ma carte, en tuiles à objet (profil/page.tsx) :
+   la bombe de peinture irisée de Personnaliser, l'enveloppe mauve d'Inviter. */
+.tuile--personnaliser {
+  --t: 200 214 196;
+  --t-sombre: #3f5a3a;
+}
+.tuile--inviter {
+  --t: 224 179 203;
+  --t-sombre: #6e2c52;
+}
 
 /* Le Flair : la fiche noire de la feuille de match (matchs/flair.css), dans
    les deux modes ; la tuile porte la classe dark, son texte suit. */
@@ -131,4 +141,59 @@
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.12),
     0 14px 34px -22px rgb(0 0 0 / 0.85);
+}
+
+/* L'objet en relief (Sabri, 31/10) : une image détourée qui déborde du coin
+   haut droit, sous le texte (z-index négatif dans la tuile isolée). Sa lueur
+   passe du coin haut gauche au coin de l'objet ; le coin de coupe d'en haut
+   s'efface, l'objet le remplace. En large, l'objet déborde du coin bas droit, le
+   texte lui laisse sa place. */
+.tuile--objet:not(.tuile--flair) {
+  background:
+    radial-gradient(90% 80% at 100% 0%, rgb(var(--t) / 0.34), transparent 64%),
+    linear-gradient(168deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.55));
+}
+.dark .tuile--objet:not(.tuile--flair) {
+  background:
+    radial-gradient(90% 80% at 100% 0%, rgb(var(--t) / 0.26), transparent 64%),
+    linear-gradient(168deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+}
+.tuile--objet::before {
+  display: none;
+}
+.tuile__objet {
+  position: absolute;
+  z-index: -1;
+  top: -14px;
+  right: -22px;
+  width: 64%;
+  max-width: 150px;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 14px 16px rgb(0 0 0 / 0.28));
+  transform: rotate(-6deg);
+}
+.dark .tuile__objet {
+  filter: drop-shadow(0 16px 20px rgb(0 0 0 / 0.55));
+}
+.tuile--large {
+  padding-right: 28%;
+}
+.tuile--large .tuile__objet {
+  top: auto;
+  right: -26px;
+  bottom: -30px;
+  width: 44%;
+  max-width: 200px;
+}
+
+/* Une tuile courte (Personnaliser, Inviter) : l'objet plus petit, au-dessus
+   du titre posé en bas. */
+.tuile--court {
+  min-height: 112px;
+}
+.tuile--court .tuile__objet {
+  top: -16px;
+  right: -14px;
+  width: 50%;
 }
