@@ -13,6 +13,11 @@
 // de lui (lib/sfl/suivi-joueur.ts) : sessions, temps passé, dernière venue,
 // les pages vues et ses gestes. Le reste de la ligne ouvre sa fiche
 // (./fiche.tsx). Les admins n'y sont pas.
+//
+// Sous chaque joueur Bola, son parcours vers son premier match (Sabri, 31/10 :
+// « pour voir le comportement de l'utilisateur […] on veut l'activer »),
+// étape par étape (./parcours.ts) : franchie en encre pleine, à venir en
+// creux. En tête de l'onglet, combien en sont à chaque étape.
 
 import { useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
@@ -25,9 +30,36 @@ import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { prechaufferCarte } from "@/components/sfl/card-3d";
 import { carteNeutre } from "@/components/sfl/qui-vient";
 import { cn } from "@/lib/utils";
+import { ETAPES, type Parcours } from "./parcours";
 
-/** Depuis combien de temps un compte compte comme nouveau. */
-const FENETRE = 30 * DAY;
+function Etapes({ p }: { p: Parcours }) {
+  return (
+    <span className="flex flex-wrap gap-1 pt-1.5">
+      {ETAPES.map((e) => {
+        const faite = e.faite(p);
+        const refus = e.id === "position" && p.position === "non";
+        return (
+          <span
+            key={e.id}
+            className={cn(
+              "rounded-full px-2 py-[3px] text-[10.5px] leading-none font-semibold",
+              faite ? "bg-foreground text-background" : "border border-foreground/15 text-encre-3",
+              refus && "line-through"
+            )}
+          >
+            {e.label}
+            {e.id === "vu" && p.vu > 1 && ` ×${p.vu}`}
+            {e.id === "organise" && p.organise > 1 && ` ×${p.organise}`}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+/** Depuis combien de temps un compte compte comme nouveau (la page ne lit le parcours que de ceux-là). */
+export const FENETRE_NOUVEAUX = 30 * DAY;
+const FENETRE = FENETRE_NOUVEAUX;
 
 const QUAND = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
@@ -46,6 +78,7 @@ export function NouveauxArrivants({
   evenements,
   profiles,
   parrains,
+  parcours,
   now,
   onFiche,
 }: {
@@ -53,6 +86,8 @@ export function NouveauxArrivants({
   profiles: Profil[];
   /** Le parrain de chaque filleul, par nom ; null si la lecture a échoué. */
   parrains: ReadonlyMap<string, string> | null;
+  /** Le parcours de chacun, par nom ; null si la lecture a échoué. */
+  parcours: ReadonlyMap<string, Parcours> | null;
   now: number;
   onFiche: (name: string) => void;
 }) {
@@ -89,6 +124,11 @@ export function NouveauxArrivants({
   };
 
   const liste = onglet === "sfl" ? sfl : bola;
+  // Combien de joueurs Bola en sont à chaque étape.
+  const entonnoir =
+    parcours && bola.length > 0
+      ? ETAPES.map((e) => ({ ...e, n: bola.filter((l) => { const p = parcours.get(l.name); return !!p && e.faite(p); }).length }))
+      : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -111,6 +151,20 @@ export function NouveauxArrivants({
           </button>
         ))}
       </div>
+
+      {onglet === "bola" && entonnoir && (
+        <div className="grid grid-cols-4 gap-x-2 gap-y-2.5 rounded-2xl border border-foreground/8 px-3 py-3">
+          {entonnoir.map((e) => (
+            <div key={e.id} className="flex flex-col">
+              <span className="text-[20px] leading-none font-extrabold tabular-nums">
+                {e.n}
+                <span className="text-[12px] font-semibold text-encre-3">/{bola.length}</span>
+              </span>
+              <span className="pt-1 text-[10.5px] leading-tight text-encre-3">{e.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {liste.length === 0 ? (
         <p className="py-6 text-center text-corps text-encre-3">Personne depuis 30 jours.</p>
@@ -155,6 +209,7 @@ export function NouveauxArrivants({
                         .join(" · ")}
                     </span>
                   )}
+                  {onglet === "bola" && parcours?.get(l.name) && <Etapes p={parcours.get(l.name)!} />}
                 </span>
                 <ChevronRight className="size-4 shrink-0 text-encre-3" />
               </button>

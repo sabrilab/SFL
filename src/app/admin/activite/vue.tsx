@@ -73,6 +73,7 @@ import { aSuivre } from "@/lib/sfl/suivi-joueur";
 import { useSeason } from "@/components/sfl/season-provider";
 import { FicheJoueur } from "./fiche";
 import { NouveauxArrivants } from "./nouveaux";
+import type { Parcours } from "./parcours";
 import type { DonneesReperes } from "./lectures";
 import { NotifsStats } from "./notifications";
 import { QuiRamene } from "./rassembleurs";
@@ -98,6 +99,8 @@ export interface DonneesActivite {
   reperes: DonneesReperes | null;
   /** Le parrain de chaque filleul, par nom (table parrainages), ou null si la lecture a échoué. */
   parrains: ReadonlyMap<string, string> | null;
+  /** Le parcours de chaque nouvel arrivant, par nom (./parcours.ts), ou null si la lecture a échoué. */
+  parcours: ReadonlyMap<string, Parcours> | null;
   /** Instant de la lecture — figé pour garder le rendu pur. */
   now: number;
 }
@@ -672,6 +675,7 @@ export function ActiviteVue({
                 evenements={data.evenements}
                 profiles={data.profiles}
                 parrains={data.parrains}
+                parcours={data.parcours}
                 now={data.now}
                 onFiche={setFiche}
               />

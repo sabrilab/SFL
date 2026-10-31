@@ -33,6 +33,8 @@ import { assemblerReperes, lireReperes } from "./lectures";
 import { ParrainageStats } from "./parrainage";
 import { VideosStats } from "./videos";
 import { ActiviteVue, type DonneesActivite } from "./vue";
+import { lireParcours } from "./parcours";
+import { FENETRE_NOUVEAUX } from "./nouveaux";
 
 /** Lignes rendues au plus par une requête au serveur (réglage Supabase). */
 const PAGE = 1000;
@@ -149,7 +151,14 @@ export default function ActivitePage() {
               return f && pa ? [[f, pa] as const] : [];
             })
           );
-      setData({ evenements, profiles, studio, reperes, parrains, now: Date.now() });
+      // Le parcours des comptes de moins de 30 jours (./parcours.ts), pour Nouveaux arrivants.
+      const recents = new Map(
+        ((prof.data ?? []) as ProfilBrut[])
+          .filter((p) => p.created_at && Date.now() - new Date(p.created_at).getTime() <= FENETRE_NOUVEAUX)
+          .map((p) => [p.id, p.name] as const)
+      );
+      const parcours = await lireParcours(sb, recents).catch(() => null);
+      setData({ evenements, profiles, studio, reperes, parrains, parcours, now: Date.now() });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Lecture impossible.");
     }
