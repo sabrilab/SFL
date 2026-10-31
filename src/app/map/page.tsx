@@ -1336,6 +1336,20 @@ export default function MapPage() {
       { nom: "Les votes", sous: "jusqu'à minuit", faite: votesClos },
     ];
   }, [choisi, aujourdhui, feuille.length, p.presents.length]);
+  // Le tableau de bord du match (31/10) : le grand chiffre, puis la journée en étapes.
+  // Avec une feuille, il passe entre les terrains et Le Flair (Sabri, 31/10 : « met-la avant le Flair »).
+  const tableauDeBord = choisi && (!choisi.joue || etapesDuChoisi.length > 0) ? (
+    <>
+      {!choisi.joue && (
+        <Rebours
+          debut={debutDuChoisi}
+          joueurs={choisi.presents.length || (choisi.ligue === "sfl" ? habitues.length : 0)}
+          libelleJoueurs={choisi.presents.length || choisi.ligue !== "sfl" ? "joueurs" : "habitués"}
+        />
+      )}
+      {etapesDuChoisi.length > 0 && <FriseDimanche etapes={etapesDuChoisi} />}
+    </>
+  ) : null;
   // Ta série : tes dimanches J1…Jn (les neuf derniers), joués, manqués ou à venir.
   const maSerie = useMemo(
     () =>
@@ -1826,7 +1840,6 @@ export default function MapPage() {
           {/* La carte dit déjà le jour et l'heure ; dessous, seulement la division du dimanche. */}
           {choisi && surtitreDeLigue(jDuChoisi) && <p className="mono-label mt-2 shrink-0 text-center text-foreground">{surtitreDeLigue(jDuChoisi)}</p>}
           <div className="mt-5 flex shrink-0 flex-col gap-5 px-4 pb-32">
-                {/* L'affiche du match, en grand. */}
                 {/* Les terrains de la journée d'abord, en carrousel (Sabri, 31/10 : « qu'on le voie dès qu'on arrive »). */}
                 {choisi && feuille.length > 0 && (
                   <FeuilleDeMatch
@@ -1834,6 +1847,7 @@ export default function MapPage() {
                     terrains={feuille}
                     moi={player.name}
                     j={choisi.j ?? null}
+                    avantFlair={tableauDeBord}
                     entete={{
                       surtitre: `${choisi.j != null ? `J${choisi.j} · ` : ""}Sunday Five League`,
                       jour: dateComplete(choisi.dateLabel, aujourdhui),
@@ -1842,15 +1856,8 @@ export default function MapPage() {
                     }}
                   />
                 )}
-                {/* Le tableau de bord du match (31/10) : le grand chiffre, puis la journée en étapes. */}
-                {choisi && !choisi.joue && (
-                  <Rebours
-                    debut={debutDuChoisi}
-                    joueurs={choisi.presents.length || (choisi.ligue === "sfl" ? habitues.length : 0)}
-                    libelleJoueurs={choisi.presents.length || choisi.ligue !== "sfl" ? "joueurs" : "habitués"}
-                  />
-                )}
-                {choisi && etapesDuChoisi.length > 0 && <FriseDimanche etapes={etapesDuChoisi} />}
+                {/* Avec une feuille, le tableau de bord passe entre les terrains et Le Flair (Sabri, 31/10). */}
+                {choisi && feuille.length === 0 && tableauDeBord}
                 {/* Les joueurs d'abord, la feuille de match tout de suite dessous
                     (Sabri, 24/10 : plus de vue satellite en tête de la fiche) ;
                     le chemin pour y aller vient après. Une journée : ses
