@@ -42,11 +42,14 @@ export function EquipesParDivision({
   presence,
   etat,
   onPoser,
+  libellePoser,
 }: {
   presence: PresenceView;
   etat: EtatDivisions;
   /** Pose les équipes sur la feuille de la journée (l'admin écrit la saison) ; `date` : « 1 novembre ». */
   onPoser?: (j: number, teams: ConvocationTeam[], date: string) => void;
+  /** « Poser en brouillon » (30/10) ; « Poser sur la J4 » quand elle est déjà en ligne. */
+  libellePoser?: (j: number) => string;
 }) {
   const { saison } = useSeason();
   const [saving, setSaving] = useState(false);
@@ -85,11 +88,11 @@ export function EquipesParDivision({
         <span className="flex items-center gap-2 text-sm font-semibold">
           <Users className="size-4 text-primary" /> Les équipes de la J{presence.journee}
         </span>
-        <span className="mono-label shrink-0 text-foreground/40">
+        <span className="mono-label shrink-0 text-encre-3">
           {venus.length} confirmé{venus.length > 1 ? "s" : ""}
         </span>
       </div>
-      <p className="mono-label text-foreground/45">
+      <p className="mono-label text-encre-3">
         {surLaFeuille
           ? "Sur la feuille de la journée"
           : enBase
@@ -102,7 +105,7 @@ export function EquipesParDivision({
       <div className="mt-3 flex flex-col gap-2">
         {terrainsDesEquipes(affichees, etat).map(({ label, equipes }) => (
           <div key={label} className="rounded-2xl bg-secondary/40 p-3">
-            <p className="mono-label mb-1.5 text-foreground/50">{label}</p>
+            <p className="mono-label mb-1.5 text-encre-3">{label}</p>
             {equipes.map((t) => {
               const notes = t.players.map(note).filter((x): x is number => x != null);
               const moyenne = notes.length ? Math.round(notes.reduce((s, x) => s + x, 0) / notes.length) : null;
@@ -110,13 +113,13 @@ export function EquipesParDivision({
               return (
                 <div key={t.name} className="py-1">
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-[13px] font-bold">
+                    <span className="flex items-center gap-1.5 text-corps font-bold">
                       {camp && <PointMaillot camp={camp} />}
                       {camp ?? t.name}
                     </span>
-                    {moyenne != null && <span className="mono-label text-foreground/40">OVR {moyenne}</span>}
+                    {moyenne != null && <span className="mono-label text-encre-3">OVR {moyenne}</span>}
                   </div>
-                  <p className="text-[12.5px] leading-snug text-foreground/55">{t.players.join(" · ")}</p>
+                  <p className="text-corps leading-snug text-encre-3">{t.players.join(" · ")}</p>
                 </div>
               );
             })}
@@ -126,10 +129,10 @@ export function EquipesParDivision({
 
       {sansEquipe.length > 0 && (
         <div className="mt-2 rounded-2xl bg-secondary/40 p-3">
-          <p className="mono-label mb-1.5 text-foreground/50">
+          <p className="mono-label mb-1.5 text-encre-3">
             Sans équipe · remplaçant{sansEquipe.length > 1 ? "s" : ""} · {sansEquipe.length}
           </p>
-          <p className="text-[12.5px] leading-snug text-foreground/55">{sansEquipe.join(" · ")}</p>
+          <p className="text-corps leading-snug text-encre-3">{sansEquipe.join(" · ")}</p>
         </div>
       )}
 
@@ -149,7 +152,7 @@ export function EquipesParDivision({
               )
             }
             disabled={saving || apercu.teams.length < 2}
-            className="bouton-secondaire bouton--vert flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-bold disabled:opacity-50"
+            className="bouton-secondaire bouton--vert flex items-center gap-1.5 px-3.5 py-2 text-corps font-bold disabled:opacity-50"
           >
             <RefreshCw className="size-3.5" /> {enBase ? "Recomposer" : "Composer maintenant"}
           </button>
@@ -158,14 +161,16 @@ export function EquipesParDivision({
               onClick={() =>
                 demander(
                   resumer(enBase, ordre),
-                  `La J${presence.journee} s'ouvre sur la feuille : la Map et la Ligue montrent ces matchs tout de suite.`,
+                  libellePoser && libellePoser(presence.journee) !== "Poser en brouillon"
+                    ? `La J${presence.journee} est en ligne : la Map et la Ligue montrent ces matchs tout de suite.`
+                    : `La J${presence.journee} reste en brouillon.`,
                   "Poser",
                   () => onPoser(presence.journee, enBase, presence.jour.replace(/^\S+\s+/, ""))
                 )
               }
-              className="bouton-principal bouton--vert flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-bold"
+              className="bouton-principal bouton--vert flex items-center gap-1.5 px-3.5 py-2 text-corps font-bold"
             >
-              <ClipboardList className="size-3.5" /> Poser sur la feuille de la J{presence.journee}
+              <ClipboardList className="size-3.5" /> {libellePoser?.(presence.journee) ?? `Poser sur la feuille de la J${presence.journee}`}
             </button>
           )}
         </div>

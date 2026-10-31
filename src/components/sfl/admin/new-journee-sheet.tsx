@@ -194,7 +194,7 @@ export function NewJourneeSheet({
                     setPinceau(TEAM_PRESETS[0]);
                   }}
                   className={cn(
-                    "px-3.5 py-1.5 text-[13px] font-semibold",
+                    "px-3.5 py-1.5 text-corps font-semibold",
                     teamCount === n ? "bouton-principal" : "bouton-secondaire text-muted-foreground"
                   )}
                 >
@@ -237,7 +237,7 @@ export function NewJourneeSheet({
                     type="button"
                     onClick={() => setPinceau(eq)}
                     className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-semibold",
+                      "flex items-center gap-1.5 px-3 py-1.5 text-corps font-semibold",
                       actif
                         ? "bouton-principal"
                         : "bouton-secondaire text-muted-foreground"
@@ -247,7 +247,7 @@ export function NewJourneeSheet({
                     {eq === A_PLACER ? "Vestiaire" : (lu?.camp ?? eq)}
                     <span className="tabular-nums opacity-70">{n}</span>
                     {moyenne > 0 && eq !== A_PLACER && (
-                      <span className="text-[10px] opacity-55 tabular-nums">Ø{moyenne}</span>
+                      <span className="text-etiquette opacity-55 tabular-nums">Ø{moyenne}</span>
                     )}
                   </button>
                   </Fragment>
@@ -268,7 +268,7 @@ export function NewJourneeSheet({
                   type="button"
                   onClick={repartir}
                   disabled={aPlacer.length === 0}
-                  className="bouton-discret bouton--vert -mx-2 flex items-center gap-1 px-2 py-1 text-[13px] font-semibold disabled:opacity-35"
+                  className="bouton-discret bouton--vert -mx-2 flex items-center gap-1 px-2 py-1 text-corps font-semibold disabled:opacity-35"
                 >
                   <Dices className="size-3.5" /> Répartir le vestiaire
                 </button>
@@ -276,7 +276,7 @@ export function NewJourneeSheet({
                   type="button"
                   onClick={viderEquipes}
                   disabled={retenus.length === 0}
-                  className="bouton-discret bouton--rouge -mx-2 flex items-center gap-1 px-2 py-1 text-[13px] font-semibold disabled:opacity-35"
+                  className="bouton-discret bouton--rouge -mx-2 flex items-center gap-1 px-2 py-1 text-corps font-semibold disabled:opacity-35"
                 >
                   <Eraser className="size-3.5" /> Vider
                 </button>
@@ -295,7 +295,7 @@ export function NewJourneeSheet({
                     disabled={!r.actif}
                     onClick={() => toucher(r.name)}
                     className={cn(
-                      "flex items-center justify-between rounded-xl border px-3 py-2 text-left text-[13px] font-medium transition-colors",
+                      "flex items-center justify-between rounded-xl border px-3 py-2 text-left text-corps font-medium transition-colors",
                       !r.actif && "opacity-35",
                       place
                         ? "border-foreground/25 bg-secondary"
@@ -312,12 +312,12 @@ export function NewJourneeSheet({
                       )}
                       <span className="truncate">{r.name}</span>
                       {lu && teamCount > 2 && (
-                        <span className="shrink-0 text-[10px] font-semibold text-muted-foreground tabular-nums">
+                        <span className="shrink-0 text-etiquette font-semibold text-muted-foreground tabular-nums">
                           M{lu.n}
                         </span>
                       )}
                     </span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                    <span className="shrink-0 text-legende text-muted-foreground tabular-nums">
                       {r.ovr}
                     </span>
                   </button>

@@ -86,7 +86,7 @@ export function Diaporama({
         segments={{ i, n: diapos.length }}
         droite={
           !derniere && (
-            <button type="button" onClick={onFini} className="bouton-discret px-[13px] py-[8px] text-[14px] font-semibold">
+            <button type="button" onClick={onFini} className="bouton-discret px-[13px] py-[8px] text-ligne font-semibold">
               Passer
             </button>
           )
@@ -112,7 +112,7 @@ export function Diaporama({
             <div className="mx-auto flex min-h-full w-full max-w-[420px] flex-col items-center justify-center px-[21px] py-[13px]">
               <div className="grid min-h-[300px] w-full place-items-center [@media(max-height:739px)]:min-h-0">{diapos[i].visuel}</div>
               <div className="mt-[21px] flex flex-col items-center [@media(max-height:739px)]:mt-[13px]">
-                <span className="mono-label mb-[8px] text-[10px] tracking-[0.18em] text-white/45 uppercase">Nouveau</span>
+                <span className="mono-label mb-[8px] text-etiquette tracking-[0.18em] text-white/45 uppercase">Nouveau</span>
                 <Titre id={titre}>{diapos[i].titre}</Titre>
                 <Ligne>{diapos[i].ligne}</Ligne>
               </div>

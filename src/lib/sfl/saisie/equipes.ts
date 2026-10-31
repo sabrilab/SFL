@@ -97,7 +97,7 @@ export function equipesDeConvocation(
 /**
  * Les deux équipes d'un match de plus dans une journée qui en a déjà
  * `nbMatchs` : leur numéro passe après tous ceux déjà pris, pour qu'aucun
- * nom ne serve deux fois.
+ * nom ne serve deux fois. Ne sert plus qu'à « + Match N » (ajouterMatch).
  */
 export function equipesDuMatchSuivant(noms: string[], nbMatchs: number): [string, string] {
   const pris = noms.map((n) => lireEquipe(n)?.n ?? 0);
@@ -105,10 +105,25 @@ export function equipesDuMatchSuivant(noms: string[], nbMatchs: number): [string
 }
 
 /**
- * Les équipes qu'on peut donner à une ligne de saisie : celles de sa
- * journée, match par match, puis les Noirs et les Blancs d'un match de plus.
+ * Les équipes qu'on peut donner à une ligne de saisie : celles des matchs
+ * qui EXISTENT dans sa journée, match par match — ceux que forme le moteur,
+ * puis les matchs déclarés encore vides (`declares`, « + Match 3 »). Plus
+ * jamais les équipes d'un « match de plus » : c'est ce choix, offert dans
+ * chaque sélecteur, qui a fait naître les matchs 5 et 6 de la J3 (28/10).
+ * Un match ne naît que par « + Match N ».
  */
-export function choixDEquipe(journee: Pick<Journee, "matches"> | undefined, noms: string[]): EquipeDuJour[] {
-  const suivant = equipesDuMatchSuivant(noms, journee?.matches?.length ?? 0);
-  return [...equipesDuJour(journee, noms), ...suivant.map(sansAdversaire)];
+export function choixDEquipe(
+  journee: Pick<Journee, "matches"> | undefined,
+  noms: string[],
+  declares: readonly { equipes: [string, string] }[] = []
+): EquipeDuJour[] {
+  const out = equipesDuJour(journee, noms);
+  const plusieurs = (journee?.matches?.length ?? 0) + declares.length > 1;
+  let n = journee?.matches?.length ?? 0;
+  for (const m of declares) {
+    if (out.some((e) => e.nom === m.equipes[0] || e.nom === m.equipes[1])) continue;
+    n++;
+    out.push(equipe(m.equipes[0], "Noirs", n, plusieurs), equipe(m.equipes[1], "Blancs", n, plusieurs));
+  }
+  return out;
 }

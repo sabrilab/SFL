@@ -68,12 +68,12 @@ export function Ecarts({ className, max = 8 }: { className?: string; max?: numbe
     const estMoi = p.name === moi.name;
     return (
       <li key={p.name} className={cn("flex items-center gap-3 px-3.5 py-2.5", estMoi && "bg-foreground/[0.07]")}>
-        <span className="w-[20px] text-[13px] font-bold text-foreground/45 tabular-nums">{p.rank}</span>
+        <span className="w-[20px] text-corps font-bold text-encre-3 tabular-nums">{p.rank}</span>
         <MiniCarte player={p} size={FORMAT_CARTE.petite} detail={`${p.rank}e au Pépite d'Or · ${pts(p.pp)}`} />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <span className={cn("truncate text-[14px] font-semibold", estMoi && "font-bold")}><Nom n={p.name} /></span>
-            <span className="shrink-0 text-[14px] font-bold tabular-nums">{p.pp}</span>
+            <span className={cn("truncate text-ligne font-semibold", estMoi && "font-bold")}><Nom n={p.name} /></span>
+            <span className="shrink-0 text-ligne font-bold tabular-nums">{p.pp}</span>
           </div>
           <div className="mt-1.5 flex items-center gap-2">
             <span className="relative h-[5px] flex-1 overflow-hidden rounded-full bg-foreground/[0.08]">
@@ -82,7 +82,7 @@ export function Ecarts({ className, max = 8 }: { className?: string; max?: numbe
                 style={{ width: `${Math.max(4, (p.pp / leader.pp) * 100)}%` }}
               />
             </span>
-            <span className={cn("w-[52px] shrink-0 text-right font-mono text-[11px] tabular-nums", retard === 0 ? "text-foreground" : "text-foreground/50")}>
+            <span className={cn("w-[52px] shrink-0 text-right font-mono text-legende tabular-nums", retard === 0 ? "text-foreground" : "text-encre-3")}>
               {retard === 0 ? "en tête" : `−${retard}`}
             </span>
           </div>
@@ -94,9 +94,9 @@ export function Ecarts({ className, max = 8 }: { className?: string; max?: numbe
   return (
     <section className={cn("glass flex flex-col gap-3.5 rounded-[26px] p-[18px]", className)}>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[17px] font-bold tracking-tight">La course au Pépite d&apos;Or</h2>
+        <h2 className="text-titre font-bold tracking-tight">La course au Pépite d&apos;Or</h2>
         <span className="flex items-center gap-2">
-          {source && <span className="mono-label shrink-0 text-foreground/40">{source}</span>}
+          {source && <span className="mono-label shrink-0 text-encre-3">{source}</span>}
           <AuVestiaireRond
             piece={{
               type: "ligue",
@@ -106,15 +106,15 @@ export function Ecarts({ className, max = 8 }: { className?: string; max?: numbe
           />
         </span>
       </div>
-      <p className="text-[15px] leading-snug font-semibold text-balance">{titre}</p>
+      <p className="text-lecture leading-snug font-semibold text-balance">{titre}</p>
 
       {duel && (
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[16px] bg-foreground/[0.06] px-3.5 py-2.5 text-[13px]">
-          <span className="mono-label text-foreground/45">Le duel le plus serré</span>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[16px] bg-foreground/[0.06] px-3.5 py-2.5 text-corps">
+          <span className="mono-label text-encre-3">Le duel le plus serré</span>
           <span className="font-semibold">
             {duel[0].name} – {duel[1].name}
           </span>
-          <span className="text-foreground/55">· {pts(duel[2])} d&apos;écart</span>
+          <span className="text-encre-3">· {pts(duel[2])} d&apos;écart</span>
         </div>
       )}
 
@@ -122,7 +122,7 @@ export function Ecarts({ className, max = 8 }: { className?: string; max?: numbe
         {tete.map(ligne)}
         {!moiDedans && monRang >= 0 && (
           <>
-            <li aria-hidden className="px-3.5 py-0.5 text-center text-[11px] text-foreground/30">
+            <li aria-hidden className="px-3.5 py-0.5 text-center text-legende text-encre-4">
               ···
             </li>
             {ligne(actifs[monRang])}
@@ -131,7 +131,7 @@ export function Ecarts({ className, max = 8 }: { className?: string; max?: numbe
       </ol>
 
       {monRang >= 0 && (
-        <p className="text-[13px] text-foreground/60">
+        <p className="text-corps text-encre-2">
           {monRang === 0
             ? coLeaders.length > 1
               ? "Tu partages la tête : un point de plus et elle est à toi."

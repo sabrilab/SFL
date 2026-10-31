@@ -440,7 +440,7 @@ function etatDe(dedans: boolean, manque: number): { etat: EtatSticker; texte: st
 
 export default function MapPage() {
   // La Map écrit la saison (terrains, horaires) : elle part du document stocké.
-  const { saisonBrute: saison, journees, players } = useSeason();
+  const { saisonLue: saison, journees, players } = useSeason();
   const session = useSession();
   const admin = !!session?.admin;
   const p = usePresence();
@@ -1607,8 +1607,10 @@ export default function MapPage() {
             )}
             {ficheAdmin ? (
               <>
-                <OuSeJouent saison={saison} matchs={ligue} terrains={terrains} matchsDe={matchsDe} onSauver={sauver} />
-                <Terrains saison={saison} terrains={terrains} onSauver={sauver} />
+                {/* L'admin écrit depuis le document entier, brouillons compris
+                    (saisie/brouillon.ts) : jamais depuis la saison des joueurs. */}
+                <OuSeJouent saison={saisieStore.load()} matchs={ligue} terrains={terrains} matchsDe={matchsDe} onSauver={sauver} />
+                <Terrains saison={saisieStore.load()} terrains={terrains} onSauver={sauver} />
               </>
             ) : (
               <>

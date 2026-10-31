@@ -36,12 +36,12 @@ function FichePerso({ p }: { p: ProgresPerso }) {
       <div className="flex flex-col gap-4 px-[18px] pt-4 pb-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-2 pt-1">
-            <h3 className="titre-lettrage text-[28px] leading-[0.9] break-words">{p.m.code}</h3>
+            <h3 className="titre-lettrage text-titre-l leading-[0.9] break-words">{p.m.code}</h3>
             <span className="mono-label fiche__ton leading-none">Rang {rang}</span>
           </div>
           <Insigne rang={rang} />
         </div>
-        <p className="text-[18px] leading-[1.15] font-bold tracking-[-0.3px]">{p.m.phrase}</p>
+        <p className="text-titre-fort leading-[1.15] font-bold tracking-[-0.3px]">{p.m.phrase}</p>
         <div className="flex items-end justify-between gap-4">
           {p.faite ? (
             <Tampon>Accomplie · +{p.m.xp} XP</Tampon>
@@ -52,13 +52,13 @@ function FichePerso({ p }: { p: ProgresPerso }) {
                   <span key={i} className={cn("h-[5px] flex-1 rounded-full", i < p.progres ? "bg-white" : "bg-white/15")} />
                 ))}
               </span>
-              <span className="font-mono text-[12px] text-white/55 tabular-nums">
+              <span className="font-mono text-petit text-white/55 tabular-nums">
                 {p.progres}/{p.m.objectif}
               </span>
             </span>
           )}
           <span className="fiche__ton flex shrink-0 items-baseline gap-1">
-            <span className="text-[25px] leading-none" style={{ fontFamily: ANTON }}>
+            <span className="text-titre-g leading-none" style={{ fontFamily: ANTON }}>
               +{p.m.xp}
             </span>
             <span className="mono-label">XP</span>
@@ -86,7 +86,7 @@ export function MissionsPerso() {
     <section aria-labelledby="titre-missions-perso" className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5 px-5 md:px-0">
         <span className="mono-label text-white/45">Semaine du {jourCourt(lundi)}</span>
-        <h2 id="titre-missions-perso" className="titre-lettrage text-[30px] leading-[0.95]">
+        <h2 id="titre-missions-perso" className="titre-lettrage text-titre-l leading-[0.95]">
           Missions perso
         </h2>
       </div>

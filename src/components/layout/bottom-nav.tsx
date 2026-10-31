@@ -79,6 +79,10 @@ export function BottomNav() {
   // L'icône de l'app : tous les messages pas lus, comme les notifications.
   useEffect(() => pastilleIcone(nonLus + discussions + equipe), [nonLus, discussions, equipe]);
 
+  // L'admin est un outil (30/10/2026) : son geste du moment occupe le bas de
+  // l'écran, sous le pouce ; le retour en haut à gauche ramène à l'app.
+  if (pathname.startsWith("/admin")) return null;
+
   return (
     <div
       className="fixed left-1/2 z-40 flex [html[data-clavier]_&]:hidden -translate-x-1/2 items-center gap-2"
@@ -151,7 +155,7 @@ function Pastille({ n, clair }: { n: number; clair: boolean }) {
   return (
     <span
       aria-hidden
-      className="absolute -top-2 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] text-[11.5px] leading-none font-bold tabular-nums text-white"
+      className="absolute -top-2 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] text-petit leading-none font-bold tabular-nums text-white"
       style={{ background: "#FF3B30", boxShadow: `0 0 0 2px ${clair ? "#ffffff" : "#0a0b0d"}` }}
     >
       {n > 9 ? "9+" : n}

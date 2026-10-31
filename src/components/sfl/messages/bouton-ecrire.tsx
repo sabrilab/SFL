@@ -28,7 +28,7 @@ export function BoutonEcrire({ nom, rond = false, className }: { nom: string; ro
       aria-label={rond ? "Écrire" : undefined}
       className={cn(
         "flex shrink-0 items-center justify-center gap-1.5 font-semibold whitespace-nowrap",
-        rond ? "bouton-givre size-11" : "bouton-secondaire h-10 px-6 text-[14px]",
+        rond ? "bouton-givre size-11" : "bouton-secondaire h-10 px-6 text-ligne",
         className
       )}
     >

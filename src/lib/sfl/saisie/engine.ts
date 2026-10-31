@@ -22,6 +22,7 @@ import {
   type Stats,
 } from "../engine";
 import { equipesDuMatch, lireEquipe } from "./equipes";
+import { neJouePas } from "../hidden";
 import type { MatchDuJour, MatchEntry, RosterEntry, Saison, SaisieAlert } from "./types";
 import { evoluer, officiellesAu, type Evolution, type TitresFaibles } from "./evolution";
 
@@ -280,8 +281,11 @@ export function computeJournees(saison: Saison): Journee[] {
         passeur: bestFait(played, "passes", "passe D.", "passes D."),
       };
 
+      // Jamais dans une équipe : une ligne du compte vitrine (elle ne vit
+      // que sur son écran) ni celle d'un membre qui ne joue pas (30/10 : le
+      // compte de Sabri apparaissait sur le terrain de chaque match).
       const teamEntries = entries.filter(
-        (e) => e.team && (e.statut === "Présent" || e.extraTime)
+        (e) => e.team && (e.statut === "Présent" || e.extraTime) && !e.vitrine && !neJouePas(e.player)
       );
 
       if (teamEntries.length > 0) {
@@ -323,7 +327,11 @@ export function computeJournees(saison: Saison): Journee[] {
         }
         numerotes.sort((x, y) => x.n - y.n);
         const appariees = new Set(numerotes.flatMap((x) => [x.noirs, x.blancs]));
-        const reste = order.filter((t) => !prises.has(t) && !appariees.has(t));
+        // L'appariement par ordre d'arrivée ne sert qu'aux journées d'avant
+        // les matchs écrits (23/10) : sinon une équipe hors des matchs déclarés
+        // devenait un « Match 5 » inventé (la J3, 28/10). Elle reste à part,
+        // et l'admin la voit comme un défaut (integrite.ts, I3).
+        const reste = meta.matchsDuJour?.length ? [] : order.filter((t) => !prises.has(t) && !appariees.has(t));
         for (let i = 0; i + 1 < reste.length; i += 2) prendre(reste[i], reste[i + 1]);
         for (const x of numerotes) prendre(x.noirs, x.blancs);
 

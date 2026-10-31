@@ -24,6 +24,7 @@
 // La veille du dimanche, toute la ligue apprend dont c'est la journée, par
 // notification (notificationOutsider, /api/outsider/annoncer).
 
+import { ajouterDefis } from "./defis";
 import { jourMoisDuLibelle } from "./convocation-temps";
 import { rankPlayers, type Player } from "./engine";
 import {
@@ -234,6 +235,7 @@ export function outsiderDuDimanche(
   const derivee = vote === saison ? brut : deriveSeason(vote);
   const jugee = appliquerVotes(saison, derivee.journees, base.votes, maintenant);
   const journal = journalXp(jugee, base.reponses, base.votes, maintenant, base.felicitations);
+  ajouterDefis(journal, jugee);
   // Les divisions et le Pépite d'Or de l'arc : sur la saison des votes
   // appliqués, comme les Actus (avant le 27/10, la saison brute).
   return arcOutsider(vote, journal, derivee.players, j)?.chapitre?.outsider ?? null;

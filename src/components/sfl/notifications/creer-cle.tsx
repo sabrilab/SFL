@@ -50,24 +50,24 @@ export function CreerCle() {
         <button
           type="button"
           onClick={creer}
-          className="bouton-principal bouton--vert py-[14px] text-[15px] font-bold"
+          className="bouton-principal bouton--vert py-[14px] text-lecture font-bold"
         >
           Créer la clé
         </button>
       ) : (
         <>
-          <code className="glass-soft rounded-2xl px-4 py-3 font-mono text-[12px] break-all select-all">{cle}</code>
+          <code className="glass-soft rounded-2xl px-4 py-3 font-mono text-petit break-all select-all">{cle}</code>
           <button
             type="button"
             onClick={copier}
-            className="bouton-principal flex items-center justify-center gap-2 py-[14px] text-[15px] font-bold"
+            className="bouton-principal flex items-center justify-center gap-2 py-[14px] text-lecture font-bold"
           >
             <Copy className="size-4" /> Copier
           </button>
-          <ol className="list-decimal space-y-1 pl-5 text-[13px] leading-snug text-foreground/60">
+          <ol className="list-decimal space-y-1 pl-5 text-corps leading-snug text-encre-2">
             <li>Vercel → projet sfl → Settings → Environment Variables.</li>
             <li>
-              Nom <span className="font-mono text-foreground/85">VAPID_PRIVATE_KEY</span>, valeur : la clé copiée,
+              Nom <span className="font-mono text-encre-2">VAPID_PRIVATE_KEY</span>, valeur : la clé copiée,
               environnement Production, type Sensitive.
             </li>
             <li>Deployments → le dernier → Redeploy.</li>

@@ -99,10 +99,10 @@ function LeScoreArrive({ moi }: { moi: string }) {
                 className="size-[38px] shrink-0 rounded-[9px]"
               />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[14px] font-semibold">
+                <span className="truncate text-ligne font-semibold">
                   {matchDe(prenom(orga))} · 6 – 4
                 </span>
-                <span className="truncate text-[13px] text-white/70">
+                <span className="truncate text-corps text-white/70">
                   Toi : 2 buts, 1 passe · MVP {prenom(mvp)}
                 </span>
               </span>
@@ -121,34 +121,34 @@ function LeScoreArrive({ moi }: { moi: string }) {
             aria-hidden
             className="flex w-full flex-col gap-[13px] rounded-[26px] bg-white/[0.06] p-[18px] shadow-[inset_0_0_0_1px_rgb(255_255_255/0.08)]"
           >
-            <span className="mono-label text-center text-[10px] text-white/50">
+            <span className="mono-label text-center text-etiquette text-white/50">
               Résultat du match
             </span>
             <div className="grid grid-cols-[1fr_auto_1fr] items-end text-center">
               <span className="flex flex-col items-center gap-1">
-                <span className="mono-label text-[10px] text-white/60">
+                <span className="mono-label text-etiquette text-white/60">
                   Clairs
                 </span>
                 <span
                   className={cn(
                     "leading-[0.9] font-extrabold tracking-tight tabular-nums",
-                    court ? "text-[40px]" : "text-[48px]",
+                    court ? "text-affiche" : "text-[48px]",
                   )}
                 >
                   6
                 </span>
               </span>
-              <span className="px-3 pb-1 text-[24px] font-bold text-white/25">
+              <span className="px-3 pb-1 text-titre-g font-bold text-white/25">
                 –
               </span>
               <span className="flex flex-col items-center gap-1 opacity-40">
-                <span className="mono-label text-[10px] text-white/60">
+                <span className="mono-label text-etiquette text-white/60">
                   Foncés
                 </span>
                 <span
                   className={cn(
                     "leading-[0.9] font-extrabold tracking-tight tabular-nums",
-                    court ? "text-[40px]" : "text-[48px]",
+                    court ? "text-affiche" : "text-[48px]",
                   )}
                 >
                   4
@@ -158,16 +158,16 @@ function LeScoreArrive({ moi }: { moi: string }) {
             <div className="flex items-center gap-3 rounded-[18px] bg-white/[0.06] p-2.5">
               <CarteDe name={moi} size={FORMAT_CARTE.petite} inerte />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[15px] font-bold">
+                <span className="truncate text-lecture font-bold">
                   {id.nom(moi)}
                 </span>
-                <span className="text-[13px] font-semibold text-white/70">
+                <span className="text-corps font-semibold text-white/70">
                   2 buts · 1 passe
                 </span>
               </span>
             </div>
-            <div className="flex items-center justify-center gap-2 text-[13px] font-semibold">
-              <span className="rounded-full bg-white px-1.5 py-0.5 text-[9.5px] leading-none font-bold tracking-wide text-black">
+            <div className="flex items-center justify-center gap-2 text-corps font-semibold">
+              <span className="rounded-full bg-white px-1.5 py-0.5 text-etiquette leading-none font-bold tracking-wide text-black">
                 MVP
               </span>
               {id.nom(mvp)}
@@ -220,7 +220,7 @@ function ConfirmeOuInfirme() {
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.22 }}
             className={cn(
-              "mono-label text-[12px]",
+              "mono-label text-petit",
               t === "compte" ? "text-white" : "text-white/50",
             )}
           >
@@ -239,7 +239,7 @@ function ConfirmeOuInfirme() {
               className="absolute inset-0"
             >
               <div
-                className="glisse-piste glisse-piste--md pointer-events-none h-[50px] text-[15px]"
+                className="glisse-piste glisse-piste--md pointer-events-none h-[50px] text-lecture"
                 style={
                   {
                     "--glisse-p": t === "glisse" ? 1 : 0,
@@ -276,7 +276,7 @@ function ConfirmeOuInfirme() {
               transition={{ duration: 0.24, ease: [0.2, 0.9, 0.3, 1] }}
               role="img"
               aria-label="Confirmé, réponse scellée"
-              className="absolute inset-0 isolate flex items-center justify-center gap-2 overflow-hidden rounded-full text-[15px] font-semibold"
+              className="absolute inset-0 isolate flex items-center justify-center gap-2 overflow-hidden rounded-full text-lecture font-semibold"
               style={{
                 color: "#bfe2bf",
                 backgroundColor: `rgb(${VERT} / 0.1)`,

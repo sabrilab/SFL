@@ -81,7 +81,7 @@ export function MesDispos({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
         <SheetHeader className="px-5 pt-5 pb-0">
-          <SheetTitle className="text-[26px] font-bold tracking-tight">Mes dispos</SheetTitle>
+          <SheetTitle className="text-titre-g font-bold tracking-tight">Mes dispos</SheetTitle>
         </SheetHeader>
         <div className="flex flex-col gap-5 px-4">
           <div className="grid grid-cols-[auto_repeat(3,1fr)] gap-1.5">
@@ -93,7 +93,7 @@ export function MesDispos({
             ))}
             {jours.map((j) => (
               <div key={j} className="contents">
-                <span className="self-center pr-2 text-[13px] font-semibold">{nomJour(j)}</span>
+                <span className="self-center pr-2 text-corps font-semibold">{nomJour(j)}</span>
                 {MOMENTS.map((m) => {
                   const a = miennes.has(cle(j, m.id));
                   const n = autres.get(cle(j, m.id))?.length ?? 0;
@@ -106,7 +106,7 @@ export function MesDispos({
                       aria-label={`${nomJour(j)} ${m.libelle}${n ? `, ${n} autres libres` : ""}`}
                       onClick={() => basculer(j, m.id)}
                       className={cn(
-                        "h-11 rounded-2xl text-[13px] font-semibold tabular-nums",
+                        "h-11 rounded-2xl text-corps font-semibold tabular-nums",
                         a ? "bouton-principal bouton--vert" : "bouton-secondaire text-muted-foreground"
                       )}
                     >
@@ -127,7 +127,7 @@ export function MesDispos({
               <button
                 type="button"
                 onClick={() => onOuvrir(e.jour, HEURE[e.moment.id])}
-                className="bouton-principal bouton--vert mt-3 flex h-11 w-full items-center justify-center text-[14px] font-semibold"
+                className="bouton-principal bouton--vert mt-3 flex h-11 w-full items-center justify-center text-ligne font-semibold"
               >
                 Ouvrir un match
               </button>

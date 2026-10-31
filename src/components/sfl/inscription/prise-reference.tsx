@@ -141,7 +141,7 @@ export function PriseReference({
           <p className="mono-label text-white/45">
             {ANGLES.findIndex((a) => a.id === angle) + 1} / 4
           </p>
-          <p className="text-[21px] leading-tight font-extrabold tracking-tight">{info.label}</p>
+          <p className="text-titre-m leading-tight font-extrabold tracking-tight">{info.label}</p>
         </div>
         <button onClick={onFermer} aria-label="Fermer" className="bouton-secondaire grid size-10 place-items-center">
           <X className="size-5" />
@@ -162,10 +162,10 @@ export function PriseReference({
           <div className="absolute inset-0 grid place-items-center p-8 text-center">
             <div>
               <Camera className="mx-auto size-8 text-white/50" />
-              <p className="mt-3 text-[14px] text-white/60">La caméra ne s&apos;ouvre pas ici.</p>
+              <p className="mt-3 text-ligne text-white/60">La caméra ne s&apos;ouvre pas ici.</p>
               <button
                 onClick={() => fichier.current?.click()}
-                className="bouton-principal bouton--or mt-5 px-6 py-3 text-[14px] font-bold"
+                className="bouton-principal bouton--or mt-5 px-6 py-3 text-ligne font-bold"
               >
                 Ouvrir l&apos;appareil photo
               </button>
@@ -190,7 +190,7 @@ export function PriseReference({
         {flash && <div className="absolute inset-0 animate-out fade-out bg-white duration-300" />}
       </div>
 
-      <p className="px-8 pt-3 text-center text-[13px] leading-snug text-white/60">{info.consigne}</p>
+      <p className="px-8 pt-3 text-center text-corps leading-snug text-white/60">{info.consigne}</p>
 
       {/* Commandes */}
       <div className="mt-auto flex items-center justify-between px-8 pt-3" style={{ paddingBottom: "max(env(safe-area-inset-bottom), 21px)" }}>
@@ -200,7 +200,7 @@ export function PriseReference({
               key={r}
               onClick={() => setRetard(r)}
               className={cn(
-                "px-2.5 py-1.5 text-[12px] font-bold tabular-nums",
+                "px-2.5 py-1.5 text-petit font-bold tabular-nums",
                 retard === r ? "bouton-principal" : "bouton-discret text-white/60"
               )}
             >

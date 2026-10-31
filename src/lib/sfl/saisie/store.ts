@@ -8,6 +8,7 @@
 import { SEED_ENTRIES, SEED_JOURNEES, SEED_ROSTER } from "./seed";
 import { appliquerMvpAuto } from "./mvp";
 import { sansVitrine } from "../compte-vitrine";
+import { bloquantsEcriture, nouveauxEcarts, type Ecart } from "./integrite";
 import type { Saison } from "./types";
 
 const STORAGE_KEY = "sfl-saisie-v1";
@@ -58,11 +59,16 @@ function migrate(s: Saison): Saison {
   return s;
 }
 
+export interface OptionsSauvegarde {
+  /** La journée en brouillon que ce geste jette exprès (« Jeter le brouillon »). */
+  jeter?: number;
+}
+
 export interface SaisieStore {
   /** Charge la saison courante (seed si rien n'est encore stocké). */
   load(): Saison;
-  /** Persiste la saison. */
-  save(saison: Saison): void;
+  /** Persiste la saison ; renvoie les écarts qui l'en ont empêché (vide : écrite). */
+  save(saison: Saison, opts?: OptionsSauvegarde): Ecart[] | void;
   /** Réinitialise au seed et renvoie la copie. */
   reset(): Saison;
 }
@@ -157,13 +163,34 @@ export function adoptSaison(saison: Saison) {
 //
 // C'est aussi le seul chemin d'écriture : les MVP automatiques y sont posés,
 // pour que la grille, les classements et la base lisent les mêmes lignes.
-export const saisieStore: SaisieStore = {
+// Une écriture refusée (integrite.ts) : l'écran qui l'a tentée le montre sur
+// l'objet en cause (detail : les écarts). Rien n'est écrit, rien ne part.
+export const REFUS_EVENT = "sfl-saisie-refus";
+
+export interface SaisieStoreSur extends Omit<SaisieStore, "save"> {
+  save(saison: Saison, opts?: OptionsSauvegarde): Ecart[];
+}
+
+export const saisieStore: SaisieStoreSur = {
   load: () => localStorageStore.load(),
-  save(input) {
+  save(input, opts = {}) {
     // Les lignes du compte vitrine ne vivent que sur son écran (compte-vitrine.ts).
     const saison = appliquerMvpAuto(sansVitrine(input));
+    // Une feuille saine (30/10, après les matchs 5 et 6 de la J3) : un doublon,
+    // un membre qui ne joue pas, une deuxième journée pour un dimanche ou un
+    // brouillon effacé par une saison filtrée ne s'écrivent pas.
+    const refus = bloquantsEcriture(nouveauxEcarts(localStorageStore.load(), saison, opts));
+    if (refus.length) {
+      try {
+        window.dispatchEvent(new CustomEvent(REFUS_EVENT, { detail: refus }));
+      } catch {
+        /* hors navigateur */
+      }
+      return refus;
+    }
     localStorageStore.save(saison);
     void import("./sync").then((m) => m.pushSaison(saison)).catch(() => {});
+    return [];
   },
   reset: () => localStorageStore.reset(),
 };

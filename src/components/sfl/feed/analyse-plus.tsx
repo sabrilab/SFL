@@ -563,23 +563,23 @@ export function TimelineModule({ timeline }: { timeline: AnalysePlus["timeline"]
             const maillot = e.noirs ? MAILLOTS.Noirs : MAILLOTS.Blancs;
             return (
               <div key={i} className="relative">
-                <span className="mono-label absolute top-0.5 -left-[86px] w-[34px] text-right text-foreground/40">
+                <span className="mono-label absolute top-0.5 -left-[86px] w-[34px] text-right text-encre-3">
                   {e.minute}′
                 </span>
                 <PointMaillot camp={maillot.nom} className="absolute top-1 -left-[28px]" />
                 <span className="mono-label absolute top-0.5 -left-[40px] hidden">·</span>
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="min-w-0 truncate text-[14px] font-semibold">
+                  <span className="min-w-0 truncate text-ligne font-semibold">
                     {e.player}
                     {e.passeur && (
-                      <span className="font-normal text-foreground/40"> · s/ {e.passeur}</span>
+                      <span className="font-normal text-encre-3"> · s/ {e.passeur}</span>
                     )}
                   </span>
-                  <span className="shrink-0 text-[13px] font-bold tabular-nums">
+                  <span className="shrink-0 text-corps font-bold tabular-nums">
                     {e.scoreA}–{e.scoreB}
                   </span>
                 </div>
-                <span className="mono-label text-foreground/35">{maillot.nom}</span>
+                <span className="mono-label text-encre-4">{maillot.nom}</span>
               </div>
             );
           })}
@@ -599,15 +599,15 @@ export function TournantModule({ tournant }: { tournant: AnalysePlus["tournant"]
         {tournant.runs} buts d&apos;affilée pour {tournant.les}
       </h2>
       <div className="mt-4 flex items-center gap-3">
-        <span className="text-[22px] font-extrabold tracking-tight tabular-nums text-foreground/40">
+        <span className="text-titre-m font-extrabold tracking-tight tabular-nums text-encre-3">
           {tournant.from}
         </span>
         <span className="h-px flex-1 bg-gradient-to-r from-contraste/10 to-primary" />
-        <span className="text-[22px] font-extrabold tracking-tight tabular-nums text-primary">
+        <span className="text-titre-m font-extrabold tracking-tight tabular-nums text-primary">
           {tournant.to}
         </span>
       </div>
-      <p className="mt-2.5 text-[12.5px] text-foreground/45">
+      <p className="mt-2.5 text-corps text-encre-3">
         Entre la {tournant.window}, le match a basculé.
       </p>
     </section>
@@ -627,16 +627,16 @@ export function FacteurXModule({ facteurX }: { facteurX: AnalysePlus["facteurX"]
         {facteurX.map((f) => (
           <div key={f.name} className="flex items-center gap-3">
             <Avatar name={f.name} size={26} />
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold"><Nom n={f.name} /></span>
+            <span className="min-w-0 flex-1 truncate text-corps font-semibold"><Nom n={f.name} /></span>
             <div className="h-1.5 w-[84px] overflow-hidden rounded-full bg-foreground/10">
               <div className="h-full rounded-full bg-primary" style={{ width: `${f.winRate}%` }} />
             </div>
-            <span className="w-9 text-right text-[13px] font-bold tabular-nums">{f.winRate}%</span>
+            <span className="w-9 text-right text-corps font-bold tabular-nums">{f.winRate}%</span>
             <span className="mono-label w-8 text-right text-primary">+{f.diff}</span>
           </div>
         ))}
       </div>
-      <p className="mt-3 text-[12px] text-foreground/40">
+      <p className="mt-3 text-petit text-encre-3">
         Taux de victoire personnel, comparé à la moyenne de la ligue.
       </p>
     </section>
@@ -656,10 +656,10 @@ export function PairesModule({ paires }: { paires: AnalysePlus["paires"] }) {
               <Avatar name={p.a} size={28} />
               <Avatar name={p.b} size={28} />
             </span>
-            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">
+            <span className="min-w-0 flex-1 truncate text-ligne font-semibold">
               {p.a} &amp; {p.b}
             </span>
-            <span className="mono-label text-foreground/40">
+            <span className="mono-label text-encre-3">
               {p.wins}/{p.games}
             </span>
             <span className="mono-label rounded-full bg-primary/15 px-2.5 py-1 text-primary">
@@ -681,7 +681,7 @@ export function BeteNoireModule({ beteNoire, me }: { beteNoire: AnalysePlus["bet
       <h2 className="mt-1 text-xl font-bold tracking-tight"><Nom n={beteNoire.name} /> te réussit mal</h2>
       <div className="mt-4 flex items-center gap-3.5">
         <Avatar name={beteNoire.name} size={40} />
-        <p className="min-w-0 flex-1 text-[13px] leading-snug text-foreground/50">
+        <p className="min-w-0 flex-1 text-corps leading-snug text-encre-3">
           Tu l&apos;as croisé <span className="font-semibold text-foreground">{beteNoire.faced} fois</span> en
           face — et tu es reparti battu{" "}
           <span className="font-semibold text-foreground">{beteNoire.lost} fois</span>.
@@ -690,7 +690,7 @@ export function BeteNoireModule({ beteNoire, me }: { beteNoire: AnalysePlus["bet
           {Math.round((beteNoire.lost / beteNoire.faced) * 100)}%
         </span>
       </div>
-      <p className="mt-3 text-[12px] text-foreground/35">Calculé sur les matchs de {me}.</p>
+      <p className="mt-3 text-petit text-encre-4">Calculé sur les matchs de {me}.</p>
     </section>
   );
 }
@@ -703,16 +703,16 @@ export function FairplayModule({ fairplay }: { fairplay: AnalysePlus["fairplay"]
       <Head label="Fair-play" title="La discipline du dimanche" />
       <div className="grid grid-cols-2 gap-2.5">
         <div className="glass rounded-3xl p-4">
-          <p className="mono-label text-foreground/40">Retards</p>
+          <p className="mono-label text-encre-3">Retards</p>
           <div className="mt-1 text-2xl font-bold tabular-nums">{fairplay.retards.length}</div>
-          <p className="mt-0.5 text-[12px] leading-snug text-foreground/45">
+          <p className="mt-0.5 text-petit leading-snug text-encre-3">
             {fairplay.retards.length > 0 ? fairplay.retards.join(", ") : "Tout le monde à l'heure"}
           </p>
         </div>
         <div className="glass rounded-3xl p-4">
-          <p className="mono-label text-foreground/40">Clean sheets</p>
+          <p className="mono-label text-encre-3">Clean sheets</p>
           <div className="mt-1 text-2xl font-bold tabular-nums">{fairplay.cleanSheets.length}</div>
-          <p className="mt-0.5 text-[12px] leading-snug text-foreground/45">
+          <p className="mt-0.5 text-petit leading-snug text-encre-3">
             {fairplay.cleanSheets.length > 0
               ? fairplay.cleanSheets.join(", ")
               : "Personne n'a gardé sa cage"}
@@ -725,11 +725,11 @@ export function FairplayModule({ fairplay }: { fairplay: AnalysePlus["fairplay"]
               {fairplay.exemplaires.map((e) => (
                 <span
                   key={e.name}
-                  className="glass-soft flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-semibold"
+                  className="glass-soft flex items-center gap-2 rounded-full px-3 py-1.5 text-corps font-semibold"
                 >
                   <Avatar name={e.name} size={20} />
                   <Nom n={e.name} />
-                  <span className="mono-label text-foreground/40">{e.matchs}M</span>
+                  <span className="mono-label text-encre-3">{e.matchs}M</span>
                 </span>
               ))}
             </div>
@@ -770,8 +770,8 @@ export function MonDimancheModule({
               ] as const
             ).map(([v, l]) => (
               <div key={l} className="glass-soft rounded-2xl px-2 py-3 text-center">
-                <div className="text-[22px] leading-none font-extrabold tabular-nums">{v}</div>
-                <p className="mono-label mt-1.5 text-foreground/40">{l}</p>
+                <div className="text-titre-m leading-none font-extrabold tabular-nums">{v}</div>
+                <p className="mono-label mt-1.5 text-encre-3">{l}</p>
               </div>
             ))}
           </div>
@@ -782,7 +782,7 @@ export function MonDimancheModule({
                   "mono-label rounded-full px-2.5 py-1",
                   mine.result === "Victoire"
                     ? "bg-primary/15 text-primary"
-                    : "glass-soft text-foreground/50"
+                    : "glass-soft text-encre-3"
                 )}
               >
                 {mine.result}
@@ -794,12 +794,12 @@ export function MonDimancheModule({
               </span>
             ))}
             {delta !== 0 && (
-              <span className="mono-label glass-soft rounded-full px-2.5 py-1 text-foreground/60">
+              <span className="mono-label glass-soft rounded-full px-2.5 py-1 text-encre-2">
                 {delta > 0 ? `▲ ${delta} place${delta > 1 ? "s" : ""}` : `▼ ${-delta}`}
               </span>
             )}
           </div>
-          <p className="mt-3 text-[12.5px] text-foreground/45">
+          <p className="mt-3 text-corps text-encre-3">
             Ton point fort reste le {mine.best.toLowerCase()}, ton chantier le{" "}
             {mine.worst.toLowerCase()}.
           </p>
@@ -807,7 +807,7 @@ export function MonDimancheModule({
       ) : (
         <>
           <h2 className="mt-1 text-xl font-bold tracking-tight">Tu as manqué ce dimanche</h2>
-          <p className="mt-2 text-[13px] leading-snug text-foreground/45">
+          <p className="mt-2 text-corps leading-snug text-encre-3">
             {me}, tu es {mine.rankTo}e au Pépite d&apos;Or — les absents ne marquent pas de points.
             Rendez-vous à la prochaine convocation.
           </p>
@@ -826,30 +826,30 @@ export function ProjectionModule({ projection }: { projection: AnalysePlus["proj
       <p className="mono-label text-primary">Si tu gardes ce rythme</p>
       <h2 className="mt-1 text-xl font-bold tracking-tight">
         Dans {projection.horizon} journées : {projection.rank}
-        <span className="text-foreground/40">e</span> avec {projection.pp} points
+        <span className="text-encre-3">e</span> avec {projection.pp} points
       </h2>
       <div className="mt-4 flex items-center gap-3">
         <div className="flex-1">
-          <p className="mono-label text-foreground/40">Aujourd&apos;hui</p>
+          <p className="mono-label text-encre-3">Aujourd&apos;hui</p>
           <div className="mt-1 text-2xl font-extrabold tabular-nums">
             {projection.ppNow}
-            <span className="ml-1.5 text-[13px] font-semibold text-foreground/40">
+            <span className="ml-1.5 text-corps font-semibold text-encre-3">
               {projection.rankNow}e
             </span>
           </div>
         </div>
-        <span className="mono-label text-foreground/30">→</span>
+        <span className="mono-label text-encre-4">→</span>
         <div className="flex-1 text-right">
           <p className="mono-label text-primary">Projection</p>
           <div className="mt-1 text-2xl font-extrabold text-primary tabular-nums">
             {projection.pp}
-            <span className="ml-1.5 text-[13px] font-semibold text-primary/60">
+            <span className="ml-1.5 text-corps font-semibold text-primary/60">
               {projection.rank}e
             </span>
           </div>
         </div>
       </div>
-      <p className="mt-3 text-[12px] text-foreground/40">
+      <p className="mt-3 text-petit text-encre-3">
         {up > 0
           ? `Tu gagnerais ${up} place${up > 1 ? "s" : ""} — à condition d'être là chaque dimanche.`
           : up < 0
@@ -867,14 +867,14 @@ export function RecordPersoModule({ record }: { record: AnalysePlus["recordPerso
     <section className="glass flex items-center justify-between gap-4 rounded-3xl p-5">
       <div className="min-w-0">
         <p className="mono-label text-primary">Record personnel battu</p>
-        <div className="mt-1.5 text-[26px] leading-none font-extrabold tracking-tight">
+        <div className="mt-1.5 text-titre-g leading-none font-extrabold tracking-tight">
           {record.value}
         </div>
-        <p className="mt-1.5 text-[12.5px] text-foreground/45">
+        <p className="mt-1.5 text-corps text-encre-3">
           {record.label} · {record.previous}
         </p>
       </div>
-      <span className="shrink-0 text-[34px]">🏅</span>
+      <span className="shrink-0 text-nom">🏅</span>
     </section>
   );
 }
@@ -902,7 +902,7 @@ export function JumeauModule({
           const b = jumeau.stats[k];
           return (
             <div key={k} className="flex items-center gap-2">
-              <span className="w-7 text-right text-[12px] font-bold tabular-nums">{a}</span>
+              <span className="w-7 text-right text-petit font-bold tabular-nums">{a}</span>
               <div className="flex h-1.5 flex-1 gap-1">
                 <div className="flex flex-1 justify-end overflow-hidden rounded-full bg-foreground/10">
                   <div className="h-full rounded-full bg-primary" style={{ width: `${a}%` }} />
@@ -911,13 +911,13 @@ export function JumeauModule({
                   <div className="h-full rounded-full bg-foreground/35" style={{ width: `${b}%` }} />
                 </div>
               </div>
-              <span className="w-7 text-[12px] font-bold tabular-nums">{b}</span>
-              <span className="mono-label w-8 text-foreground/40">{k}</span>
+              <span className="w-7 text-petit font-bold tabular-nums">{b}</span>
+              <span className="mono-label w-8 text-encre-3">{k}</span>
             </div>
           );
         })}
       </div>
-      <p className="mt-3 text-[12px] text-foreground/40">
+      <p className="mt-3 text-petit text-encre-3">
         {me} en bleu · {jumeau.name} en blanc — {jumeau.distance} points d&apos;écart au total.
       </p>
     </section>
@@ -961,7 +961,7 @@ export function EvolutionModule({ evolution }: { evolution: AnalysePlus["evoluti
         ))}
       </svg>
       <div className="flex justify-between px-1">
-        <span className="mono-label text-foreground/30">
+        <span className="mono-label text-encre-4">
           J{evolution.js[0]} · {evolution.ovrs[0]}
         </span>
         <span className="mono-label text-primary">
@@ -975,7 +975,7 @@ export function EvolutionModule({ evolution }: { evolution: AnalysePlus["evoluti
               key={g.key}
               className={cn(
                 "mono-label rounded-full px-2.5 py-1",
-                g.delta > 0 ? "bg-primary/15 text-primary" : "glass-soft text-foreground/45"
+                g.delta > 0 ? "bg-primary/15 text-primary" : "glass-soft text-encre-3"
               )}
             >
               {g.key} {g.delta > 0 ? `+${g.delta}` : g.delta}
@@ -1000,12 +1000,12 @@ export function MercatoModule({ mercato }: { mercato: AnalysePlus["mercato"] }) 
         {mercato.map((m) => (
           <div key={m.name} className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3">
             <Avatar name={m.name} size={28} />
-            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold"><Nom n={m.name} /></span>
-            <span className="text-[14px] font-bold tabular-nums">{fmt(m.value)}</span>
+            <span className="min-w-0 flex-1 truncate text-ligne font-semibold"><Nom n={m.name} /></span>
+            <span className="text-ligne font-bold tabular-nums">{fmt(m.value)}</span>
             <span
               className={cn(
                 "mono-label w-14 text-right",
-                m.delta > 0 ? "text-primary" : "text-foreground/35"
+                m.delta > 0 ? "text-primary" : "text-encre-4"
               )}
             >
               {m.delta > 0 ? `▲ ${fmt(m.delta)}` : `▼ ${fmt(-m.delta)}`}
@@ -1013,7 +1013,7 @@ export function MercatoModule({ mercato }: { mercato: AnalysePlus["mercato"] }) 
           </div>
         ))}
       </div>
-      <p className="mt-2.5 px-1 text-[12px] text-foreground/35">
+      <p className="mt-2.5 px-1 text-petit text-encre-4">
         Valeur fictive dérivée de la note, des points et de la production. Pour le plaisir du débat.
       </p>
     </section>
@@ -1030,14 +1030,14 @@ export function CinqModule({ cinq }: { cinq: AnalysePlus["cinq"] }) {
         {cinq.map((p) => (
           <div key={p.name} className="glass flex flex-col items-center gap-1.5 rounded-2xl px-1 py-3">
             <Avatar name={p.name} size={30} />
-            <span className="w-full truncate px-0.5 text-center text-[11px] font-bold">
+            <span className="w-full truncate px-0.5 text-center text-legende font-bold">
               {p.name}
             </span>
-            <span className="mono-label text-[8px] text-foreground/35">{p.poste}</span>
-            <span className="mono-label rounded bg-primary px-1 py-px text-[9px] text-primary-foreground">
+            <span className="mono-label text-micro text-encre-4">{p.poste}</span>
+            <span className="mono-label rounded bg-primary px-1 py-px text-micro text-primary-foreground">
               {p.ovr}
             </span>
-            <span className="mono-label text-foreground/40">{p.pp} PP</span>
+            <span className="mono-label text-encre-3">{p.pp} PP</span>
           </div>
         ))}
       </div>
@@ -1055,9 +1055,9 @@ export function SeriesModule({ series }: { series: AnalysePlus["series"] }) {
         {series.map((s) => (
           <div key={s.kind} className="glass flex flex-col items-center gap-1.5 rounded-3xl px-2 py-4">
             <p className="mono-label text-primary">{s.kind}</p>
-            <div className="text-[28px] leading-none font-extrabold tabular-nums">{s.count}</div>
-            <p className="mono-label text-[8px] text-foreground/35">{s.unit}</p>
-            <span className="mt-0.5 w-full truncate text-center text-[12px] font-semibold">
+            <div className="text-titre-l leading-none font-extrabold tabular-nums">{s.count}</div>
+            <p className="mono-label text-micro text-encre-4">{s.unit}</p>
+            <span className="mt-0.5 w-full truncate text-center text-petit font-semibold">
               <Nom n={s.name} />
             </span>
           </div>
@@ -1094,8 +1094,8 @@ export function MeteoModule({ meteo }: { meteo: AnalysePlus["meteo"] }) {
         ).map(([v, l, sub, hot]) => (
           <div key={l} className="glass rounded-3xl p-4">
             <div className={cn("text-2xl font-bold tabular-nums", hot && "text-primary")}>{v}</div>
-            <p className="mono-label mt-1.5 text-foreground/40">{l}</p>
-            <p className="mt-0.5 text-[11px] text-foreground/30">{sub}</p>
+            <p className="mono-label mt-1.5 text-encre-3">{l}</p>
+            <p className="mt-0.5 text-legende text-encre-4">{sub}</p>
           </div>
         ))}
       </div>
@@ -1109,10 +1109,10 @@ export function CitationModule({ citation }: { citation: AnalysePlus["citation"]
   return (
     <section className="px-1 py-2">
       <p className="mono-label text-primary">La phrase du dimanche</p>
-      <blockquote className="mt-2.5 text-[22px] leading-[1.25] font-extrabold tracking-tight text-balance">
+      <blockquote className="mt-2.5 text-titre-m leading-[1.25] font-extrabold tracking-tight text-balance">
         « {citation.text} »
       </blockquote>
-      <p className="mono-label mt-2.5 text-foreground/30">{citation.author}</p>
+      <p className="mono-label mt-2.5 text-encre-4">{citation.author}</p>
     </section>
   );
 }
@@ -1124,22 +1124,22 @@ export function AlternatifModule({ alternatif }: { alternatif: AnalysePlus["alte
     <section className="glass rounded-3xl p-5">
       <p className="mono-label text-primary">Le classement de la semaine</p>
       <h2 className="mt-1 text-xl font-bold tracking-tight">{alternatif.title}</h2>
-      <p className="mt-1 text-[12.5px] text-foreground/45">{alternatif.sub}</p>
+      <p className="mt-1 text-corps text-encre-3">{alternatif.sub}</p>
       <div className="mt-4 flex flex-col gap-2.5">
         {alternatif.top.map((t, i) => (
           <div key={t.name} className="flex items-center gap-3">
             <span
               className={cn(
-                "w-4 text-center text-[12px] font-bold tabular-nums",
-                i === 0 ? "text-primary" : "text-foreground/40"
+                "w-4 text-center text-petit font-bold tabular-nums",
+                i === 0 ? "text-primary" : "text-encre-3"
               )}
             >
               {i + 1}
             </span>
             <Avatar name={t.name} size={26} />
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold"><Nom n={t.name} /></span>
-            <span className="text-[13px] font-bold tabular-nums">{t.value}</span>
-            <span className="mono-label w-[68px] text-right text-foreground/35">
+            <span className="min-w-0 flex-1 truncate text-corps font-semibold"><Nom n={t.name} /></span>
+            <span className="text-corps font-bold tabular-nums">{t.value}</span>
+            <span className="mono-label w-[68px] text-right text-encre-4">
               {alternatif.unit}
             </span>
           </div>

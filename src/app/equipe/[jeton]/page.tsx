@@ -72,7 +72,7 @@ export default function LienEquipePage() {
         {info ? (
           <>
             <Ecusson initiales={info.initiales} fond={info.fond} blason={info.blason} taille={132} />
-            <h1 className="mt-6 text-[34px] leading-none font-bold tracking-tight">{info.nom}</h1>
+            <h1 className="mt-6 text-nom leading-none font-bold tracking-tight">{info.nom}</h1>
             <p className="mono-label mt-3 text-muted-foreground">
               {[info.ville, `${info.membres} / ${MAX_EQUIPE}`, info.capitaine && `Cap. ${info.capitaine}`].filter(Boolean).join(" · ")}
             </p>
@@ -82,7 +82,7 @@ export default function LienEquipePage() {
                   type="button"
                   disabled={envoi}
                   onClick={rejoindre}
-                  className="bouton-principal bouton--vert py-4 text-[15px] font-bold disabled:opacity-60"
+                  className="bouton-principal bouton--vert py-4 text-lecture font-bold disabled:opacity-60"
                 >
                   Rejoindre {info.nom}
                 </button>
@@ -90,11 +90,11 @@ export default function LienEquipePage() {
                 <>
                   <Link
                     href={`/inscription?equipe=${encodeURIComponent(jeton)}`}
-                    className="bouton-principal bouton--vert py-4 text-[15px] font-bold"
+                    className="bouton-principal bouton--vert py-4 text-lecture font-bold"
                   >
                     Créer mon compte
                   </Link>
-                  <Link href="/bola-team" onClick={garder} className="bouton-discret py-3.5 text-[14px] font-semibold">
+                  <Link href="/bola-team" onClick={garder} className="bouton-discret py-3.5 text-ligne font-semibold">
                     J&apos;ai déjà un compte
                   </Link>
                 </>
@@ -103,8 +103,8 @@ export default function LienEquipePage() {
           </>
         ) : (
           <>
-            <h1 className="text-[26px] font-bold tracking-tight">Lien expiré</h1>
-            <Link href="/" className="bouton-principal mt-6 px-6 py-3.5 text-[15px] font-bold">
+            <h1 className="text-titre-g font-bold tracking-tight">Lien expiré</h1>
+            <Link href="/" className="bouton-principal mt-6 px-6 py-3.5 text-lecture font-bold">
               Ouvrir Bola
             </Link>
           </>

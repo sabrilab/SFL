@@ -28,12 +28,14 @@
 //     chaque grain du métal tourné à sa façon.
 // Ce qui est tiré au hasard l'est de la graine du joueur : chacun a son
 // givre, son marbre, son aurore, ses éclairs, sa météorite, et toujours les
-// mêmes. Les tracés ne dépendent que du skin et de la graine : ils sont
+// mêmes. Ceux de la Saison Givre sont dans motifs-givre.tsx. Les tracés
+// ne dépendent que du skin et de la graine : ils sont
 // calculés une fois (memo), les couleurs viennent de la matière.
 
 import { useId } from "react";
 import { RAYON_CARTE } from "@/components/sfl/finitions-carte";
-import type { MotifPasse } from "@/components/sfl/skins-passe";
+import { MotifGivre } from "@/components/sfl/motifs-givre";
+import { estMotifGivre, type MotifPasse } from "@/components/sfl/skins-passe";
 
 const W = 1024;
 const H = 1656;
@@ -889,7 +891,9 @@ export function MotifPasseSvg({
   const m = { clair: motif.clair, fonce: motif.fonce };
   return (
     <svg aria-hidden viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={style}>
-      {motif.type === "givre" ? (
+      {estMotifGivre(motif) ? (
+        <MotifGivre type={motif.type} m={m} graine={graine} id={id} />
+      ) : motif.type === "givre" ? (
         <Givre m={m} seed={graine} id={id} />
       ) : motif.type === "carbone" ? (
         <Carbone m={m} id={id} />

@@ -126,7 +126,14 @@ function compter(s: Saison, nom: string, c: Compteurs, maintenant?: Date) {
 }
 
 /** La vitrine d'un joueur : toutes les médailles, gagnées ou en chemin. */
-export function vitrine(saison: Saison, nom: string, maintenant?: Date, enPlus: readonly Saison[] = []): EtatTrophee[] {
+export function vitrine(
+  saison: Saison,
+  nom: string,
+  maintenant?: Date,
+  enPlus: readonly Saison[] = [],
+  /** Les vrais compteurs, même pour le compte vitrine (ses défis, defis.tsx). */
+  brut = false
+): EtatTrophee[] {
   const c = Object.fromEntries(TROPHEES.map((t) => [t.id, 0])) as Compteurs;
   for (const a of saison.archives ?? []) compter(saisonDepuisArchive(a), nom, c);
   compter(saison, nom, c, maintenant);
@@ -137,7 +144,7 @@ export function vitrine(saison: Saison, nom: string, maintenant?: Date, enPlus: 
 
   return TROPHEES.map((def) => {
     // Le compte vitrine a tout, au plus haut palier (compte-vitrine.ts).
-    const valeur = estVitrine(nom) ? Math.max(c[def.id], def.paliers[def.paliers.length - 1]) : c[def.id];
+    const valeur = !brut && estVitrine(nom) ? Math.max(c[def.id], def.paliers[def.paliers.length - 1]) : c[def.id];
     const palier = def.paliers.filter((p) => valeur >= p).length;
     const cible = def.paliers[palier] ?? null;
     const base = palier ? def.paliers[palier - 1] : 0;

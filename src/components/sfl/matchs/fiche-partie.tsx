@@ -150,7 +150,7 @@ export function FichePartie({
     }
   }
 
-  const bouton = "flex h-12 items-center justify-center text-[15px] font-semibold disabled:opacity-40";
+  const bouton = "flex h-12 items-center justify-center text-lecture font-semibold disabled:opacity-40";
 
   return (
     <section className="flex flex-col gap-4">
@@ -159,7 +159,7 @@ export function FichePartie({
           <p className="mono-label text-muted-foreground">
             Match {partie.visibilite === "prive" ? "privé" : "public"} · par {partie.organisateur}
           </p>
-          <p className="text-[22px] font-bold tabular-nums">
+          <p className="text-titre-m font-bold tabular-nums">
             {venus.length}
             <span className="text-muted-foreground">/{partie.places}</span>
           </p>
@@ -170,7 +170,7 @@ export function FichePartie({
           <MessageCircle className="size-[18px]" strokeWidth={2.2} />
           Discussion du match
           {nonLus > 0 && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] text-[11.5px] leading-none font-bold text-white tabular-nums" style={{ background: "#FF3B30" }}>
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] text-petit leading-none font-bold text-white tabular-nums" style={{ background: "#FF3B30" }}>
               {nonLus > 9 ? "9+" : nonLus}
             </span>
           )}
@@ -217,8 +217,8 @@ export function FichePartie({
         <div className="rounded-[26px] bg-card p-5">
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
             <span className="mono-label text-muted-foreground">Clairs</span>
-            <span className="text-[40px] leading-none font-extrabold tracking-tight tabular-nums">
-              {partie.scoreClairs} <span className="text-foreground/25">–</span> {partie.scoreFonces}
+            <span className="text-affiche leading-none font-extrabold tracking-tight tabular-nums">
+              {partie.scoreClairs} <span className="text-encre-4">–</span> {partie.scoreFonces}
             </span>
             <span className="mono-label text-muted-foreground">Foncés</span>
           </div>

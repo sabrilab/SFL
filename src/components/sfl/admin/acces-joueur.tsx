@@ -99,25 +99,25 @@ export function AccesJoueur({
   return (
     <Dialog open={!!nom} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-sm">
-        <DialogTitle className="flex items-center gap-2 text-[19px] font-bold tracking-tight">
+        <DialogTitle className="flex items-center gap-2 text-titre-fort font-bold tracking-tight">
           <KeyRound className="size-4.5" /> Accès de {nom}
         </DialogTitle>
 
         {!acces && !erreur && (
-          <p className="text-[13.5px] text-foreground/45">Création du compte…</p>
+          <p className="text-ligne text-encre-3">Création du compte…</p>
         )}
 
         {acces && (
           <>
             <div className="glass-soft flex flex-col gap-2 rounded-2xl px-4 py-3.5">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="mono-label text-foreground/35">Identifiant</span>
-                <span className="font-mono text-[15px] font-bold">{acces.user}</span>
+                <span className="mono-label text-encre-4">Identifiant</span>
+                <span className="font-mono text-lecture font-bold">{acces.user}</span>
               </div>
               {acces.password && (
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="mono-label text-foreground/35">Provisoire</span>
-                  <span className="font-mono text-[15px] font-bold">{acces.password}</span>
+                  <span className="mono-label text-encre-4">Provisoire</span>
+                  <span className="font-mono text-lecture font-bold">{acces.password}</span>
                 </div>
               )}
             </div>
@@ -129,7 +129,7 @@ export function AccesJoueur({
                     () => {}
                   );
                 }}
-                className="bouton-principal bouton--mauve flex items-center justify-center gap-1.5 py-2.5 text-[13.5px] font-bold"
+                className="bouton-principal bouton--mauve flex items-center justify-center gap-1.5 py-2.5 text-ligne font-bold"
               >
                 {copie ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                 {copie ? "Copié" : "Copier pour l'envoyer"}
@@ -137,13 +137,13 @@ export function AccesJoueur({
             ) : (
               acces.deja && (
                 <>
-                  <p className="text-[12.5px] leading-snug text-foreground/45">
+                  <p className="text-corps leading-snug text-encre-3">
                     Ce joueur avait déjà un compte. Son mot de passe n&apos;est connu que de lui.
                   </p>
                   <button
                     onClick={() => void provisoire()}
                     disabled={busy}
-                    className="bouton-secondaire bouton--vert flex items-center justify-center gap-1.5 py-2.5 text-[13.5px] font-semibold"
+                    className="bouton-secondaire bouton--vert flex items-center justify-center gap-1.5 py-2.5 text-ligne font-semibold"
                   >
                     {busy ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
                     Lui donner un mot de passe provisoire
@@ -155,14 +155,14 @@ export function AccesJoueur({
         )}
 
         {erreur && (
-          <p className="flex items-start gap-1.5 rounded-2xl border border-amber-500/25 bg-amber-500/8 px-3 py-2.5 text-[12.5px] leading-snug text-amber-700 dark:text-amber-300">
+          <p className="flex items-start gap-1.5 rounded-2xl border border-amber-500/25 bg-amber-500/8 px-3 py-2.5 text-corps leading-snug text-amber-700 dark:text-amber-300">
             <AlertTriangle className="mt-[2px] size-3.5 shrink-0" />
             {erreur}
           </p>
         )}
 
         {acces?.password && (
-          <p className="text-[11.5px] leading-relaxed text-foreground/30">
+          <p className="text-petit leading-relaxed text-encre-4">
             Il ne s&apos;affiche qu&apos;ici : envoie-le en privé. À sa première connexion, le joueur
             en choisit un à lui.
           </p>

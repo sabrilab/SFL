@@ -89,15 +89,15 @@ export function ProfilePhoto({ name }: { name: string }) {
         </button>
   
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold">Ma photo</p>
-          <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+          <p className="text-lecture font-semibold">Ma photo</p>
+          <p className="mt-0.5 text-petit leading-snug text-muted-foreground">
             Elle apparaît sur ta carte, chez tous les joueurs de la ligue.
           </p>
           {hasCustom && (
             <Button
               variant="ghost"
               size="sm"
-              className="bouton--or mt-1.5 -ml-2 h-7 gap-1.5 px-2 text-[12px]"
+              className="bouton--or mt-1.5 -ml-2 h-7 gap-1.5 px-2 text-petit"
               onClick={() => setStudio(true)}
             >
               <Sparkles className="size-3.5" /> Photo officielle
@@ -107,7 +107,7 @@ export function ProfilePhoto({ name }: { name: string }) {
             <Button
               variant="ghost"
               size="sm"
-              className="bouton--rouge mt-1.5 h-7 gap-1.5 px-2 text-[12px]"
+              className="bouton--rouge mt-1.5 h-7 gap-1.5 px-2 text-petit"
               onClick={async () => {
                 await removePhoto(name);
                 setBroken(false);
@@ -121,7 +121,7 @@ export function ProfilePhoto({ name }: { name: string }) {
             <Button
               variant="ghost"
               size="sm"
-              className="bouton--or mt-1.5 h-7 gap-1.5 px-2 text-[12px]"
+              className="bouton--or mt-1.5 h-7 gap-1.5 px-2 text-petit"
               onClick={() => setARecadrer(perso)}
             >
               <Crop className="size-3.5" /> Recadrer
@@ -132,7 +132,7 @@ export function ProfilePhoto({ name }: { name: string }) {
 
       {/* Pas encore de photo : la photo officielle passe devant. */}
       {!hasCustom && (
-        <Button variant="or" className="h-12 gap-2 rounded-full text-[15px] font-semibold" onClick={() => setStudio(true)}>
+        <Button variant="or" className="h-12 gap-2 rounded-full text-lecture font-semibold" onClick={() => setStudio(true)}>
           <Sparkles className="size-4" /> Créer ma photo officielle
         </Button>
       )}

@@ -52,7 +52,7 @@ export function QuiVient({
       {noms.map((nom) => (
         <div key={nom} className="flex shrink-0 flex-col items-center gap-1">
           <MiniCarte player={parNom.get(nom) ?? carteNeutre(nom)} size={size} />
-          <span className="max-w-[72px] truncate text-[11px] font-semibold"><Nom n={nom} /></span>
+          <span className="max-w-[72px] truncate text-legende font-semibold"><Nom n={nom} /></span>
         </div>
       ))}
       {Array.from({ length: Math.min(places, 10) }, (_, i) => (
@@ -61,7 +61,7 @@ export function QuiVient({
             className="border-[1.5px] border-dashed border-foreground/20"
             style={{ width: w, height: h, borderRadius: w < 70 ? w * 0.24 : 10 }}
           />
-          <span className="text-[11px] text-muted-foreground">libre</span>
+          <span className="text-legende text-muted-foreground">libre</span>
         </div>
       ))}
     </div>

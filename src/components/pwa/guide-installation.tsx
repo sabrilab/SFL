@@ -182,7 +182,7 @@ export function GuideInstallation() {
             <button
               type="button"
               onClick={fait}
-              className="bouton-discret bouton--vert w-full py-3 text-[14px] font-semibold"
+              className="bouton-discret bouton--vert w-full py-3 text-ligne font-semibold"
             >
               C&apos;est fait
             </button>
@@ -190,7 +190,7 @@ export function GuideInstallation() {
           <button
             type="button"
             onClick={plusTard}
-            className="bouton-discret px-4 py-2 text-[12.5px] font-medium"
+            className="bouton-discret px-4 py-2 text-corps font-medium"
           >
             {env.appHote ? `Rester dans ${env.appHote === "une app" ? "cette app" : env.appHote}` : "Plus tard"}
           </button>
@@ -241,8 +241,8 @@ function SortieApp({
 
   return (
     <>
-      <p className="mono-label mt-10 text-foreground/40">Ouvert dans {dans}</p>
-      <h1 id="guide-installation-titre" className="mt-2 text-[32px] leading-[1.05] font-extrabold tracking-tight">
+      <p className="mono-label mt-10 text-encre-3">Ouvert dans {dans}</p>
+      <h1 id="guide-installation-titre" className="mt-2 text-nom leading-[1.05] font-extrabold tracking-tight">
         Ouvre Bola
         <br />
         dans {navigateur}.
@@ -251,19 +251,19 @@ function SortieApp({
       {lien && (
         <a
           href={lien}
-          className="bouton-principal bouton--vert mt-8 flex items-center justify-center py-4 text-[15px] font-bold"
+          className="bouton-principal bouton--vert mt-8 flex items-center justify-center py-4 text-lecture font-bold"
         >
           Ouvrir dans {navigateur}
         </a>
       )}
 
-      <p className="mono-label mt-8 text-foreground/30">Si rien ne s&apos;ouvre</p>
+      <p className="mono-label mt-8 text-encre-4">Si rien ne s&apos;ouvre</p>
       <Etapes etapes={etapes} />
 
       <button
         type="button"
         onClick={onCopier}
-        className="bouton-secondaire mt-4 flex items-center justify-center gap-2 py-3.5 text-[14px] font-semibold"
+        className="bouton-secondaire mt-4 flex items-center justify-center gap-2 py-3.5 text-ligne font-semibold"
       >
         {copie ? <Check className="size-4" /> : <Copy className="size-4" />}
         {copie ? `Lien copié, colle-le dans ${navigateur}` : "Copier le lien"}
@@ -352,8 +352,8 @@ function Installation({
 
   return (
     <>
-      <p className="mono-label mt-10 text-foreground/40">Installer Bola</p>
-      <h1 id="guide-installation-titre" className="mt-2 text-[32px] leading-[1.05] font-extrabold tracking-tight">
+      <p className="mono-label mt-10 text-encre-3">Installer Bola</p>
+      <h1 id="guide-installation-titre" className="mt-2 text-nom leading-[1.05] font-extrabold tracking-tight">
         Bola sur ton
         <br />
         écran d&apos;accueil.
@@ -363,13 +363,13 @@ function Installation({
         <button
           type="button"
           onClick={onInstaller}
-          className="bouton-principal bouton--vert mt-8 flex items-center justify-center py-4 text-[15px] font-bold"
+          className="bouton-principal bouton--vert mt-8 flex items-center justify-center py-4 text-lecture font-bold"
         >
           Installer
         </button>
       )}
 
-      {peutInstaller && <p className="mono-label mt-8 text-foreground/30">Ou à la main</p>}
+      {peutInstaller && <p className="mono-label mt-8 text-encre-4">Ou à la main</p>}
       <Etapes etapes={etapes} large={!peutInstaller} />
     </>
   );
@@ -380,11 +380,11 @@ function Etapes({ etapes, large = false }: { etapes: Etape[]; large?: boolean })
     <ol className={large ? "mt-8 flex flex-col gap-2.5" : "mt-3 flex flex-col gap-2.5"}>
       {etapes.map((etape, i) => (
         <li key={i} className="glass-soft flex items-center gap-3.5 rounded-[18px] px-4 py-3.5">
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground text-[12px] font-bold text-background">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground text-petit font-bold text-background">
             {i + 1}
           </span>
-          <span className="flex-1 text-[14px] leading-snug text-foreground/85">{etape.texte}</span>
-          {etape.icone && <span className="shrink-0 text-foreground/50">{etape.icone}</span>}
+          <span className="flex-1 text-ligne leading-snug text-encre-2">{etape.texte}</span>
+          {etape.icone && <span className="shrink-0 text-encre-3">{etape.icone}</span>}
         </li>
       ))}
     </ol>

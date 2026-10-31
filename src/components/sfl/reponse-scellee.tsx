@@ -128,8 +128,12 @@ export function ReponseScellee({
   scelles?: Partial<Record<ReponseScellable, string>>;
   /** Un seul sens (prendre une place d'un match public : c'est un « Je viens »). */
   seul?: { r: ReponseScellable; libelle: string };
-  /** Le ton de la piste à un sens (la braise quand il manque des joueurs). */
-  tonSeul?: "vert" | "braise";
+  /**
+   * Le ton de la piste à un sens (la braise quand il manque des joueurs) ;
+   * « blanc » pour les gestes de l'organisation (Publier pour tout le monde,
+   * 30/10) : blanc sur noir, noir sur blanc en thème clair, sceau compris.
+   */
+  tonSeul?: "vert" | "braise" | "blanc";
   taille?: "md" | "sm";
   className?: string;
 }) {
@@ -301,7 +305,7 @@ export function ReponseScellee({
 
   // Sceau posé, plus rien à toucher.
   if (affichee && phase.t !== "pose") {
-    return <Pilule r={affichee} libelle={sceau(affichee)} hauteur={hauteur} className={className} />;
+    return <Pilule r={affichee} libelle={sceau(affichee)} hauteur={hauteur} className={className} blanc={tonSeul === "blanc"} />;
   }
 
   const cotes: { r: ReponseScellable; libelle: string; cote: "d" | "g" | "seul" }[] = seul
@@ -321,6 +325,7 @@ export function ReponseScellee({
           taille === "sm" ? "glisse-piste--sm" : "glisse-piste--md",
           unSens && "glisse-piste--seul",
           unSens && tonSeul === "braise" && "glisse-piste--braise",
+          unSens && tonSeul === "blanc" && "glisse-piste--blanc",
           hauteur,
           phase.t === "pose" && "scelle-efface"
         )}
@@ -383,6 +388,7 @@ export function ReponseScellee({
           hauteur={hauteur}
           className="absolute inset-0 scelle-arrive"
           grille={{ cols: phase.cols, rows: phase.rows }}
+          blanc={tonSeul === "blanc"}
         />
       )}
     </div>
@@ -396,11 +402,13 @@ function Pilule({
   hauteur,
   className,
   grille,
+  blanc = false,
 }: {
   r: ReponseScellable;
   libelle: string;
   hauteur: string;
   className?: string;
+  blanc?: boolean;
   /** Pendant la pose : la grille pleine qui se dissout dans la trame. */
   grille?: { cols: number; rows: number };
 }) {
@@ -410,7 +418,7 @@ function Pilule({
       aria-label={`${libelle}, réponse scellée`}
       className={cn(
         "scelle-pilule flex items-center justify-center gap-2 overflow-hidden rounded-full font-semibold",
-        r === "present" ? "scelle--vert" : "scelle--argent",
+        blanc ? "scelle--blanc" : r === "present" ? "scelle--vert" : "scelle--argent",
         hauteur,
         className
       )}

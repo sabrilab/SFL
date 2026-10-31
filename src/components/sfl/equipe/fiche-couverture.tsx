@@ -146,7 +146,7 @@ export function FicheCouverture({
         {equipe && (
           <>
             <SheetHeader className="px-5 pt-5 pb-0">
-              <SheetTitle className="pr-10 text-[24px] font-bold tracking-tight">Couverture</SheetTitle>
+              <SheetTitle className="pr-10 text-titre-g font-bold tracking-tight">Couverture</SheetTitle>
             </SheetHeader>
             <div className="mx-auto flex w-full max-w-[560px] flex-col gap-5 px-4">
               <div className="relative aspect-[16/9] overflow-hidden rounded-[22px] bg-card">
@@ -172,7 +172,7 @@ export function FicheCouverture({
                   {surLaPhoto.map((m) => (
                     <CarteDe key={m.id} name={m.name} size={FORMAT_CARTE.petite} inerte />
                   ))}
-                  {surLaPhoto.length > 0 && <span className="px-1 text-[18px] font-light text-muted-foreground">+</span>}
+                  {surLaPhoto.length > 0 && <span className="px-1 text-titre-fort font-light text-muted-foreground">+</span>}
                   <span className="grid size-12 shrink-0 place-items-center rounded-[12px] bg-card">
                     <Maillot initiales={equipe.initiales} fond={equipe.fond} blason={equipe.blason} taille={44} />
                   </span>
@@ -181,7 +181,7 @@ export function FicheCouverture({
                   </span>
                 </div>
                 {absents.length > 0 && (
-                  <p className="text-[12.5px] leading-snug text-muted-foreground">
+                  <p className="text-corps leading-snug text-muted-foreground">
                     {absents.map((m) => `${prenom(m.name)} (${raison(m)})`).join(", ")}
                   </p>
                 )}
@@ -193,12 +193,12 @@ export function FicheCouverture({
                     variant="secondary"
                     disabled={enCours || envoi || plusDeCredit}
                     onClick={creer}
-                    className="h-12 gap-2 rounded-full text-[15px] font-semibold"
+                    className="h-12 gap-2 rounded-full text-lecture font-semibold"
                   >
                     <RotateCcw className="size-4" strokeWidth={2.4} />
                     Refaire
                   </Button>
-                  <Button variant="vert" disabled={enCours || envoi} onClick={poser} className="h-12 rounded-full text-[15px] font-semibold">
+                  <Button variant="vert" disabled={enCours || envoi} onClick={poser} className="h-12 rounded-full text-lecture font-semibold">
                     Poser
                   </Button>
                 </div>
@@ -207,7 +207,7 @@ export function FicheCouverture({
                   variant="vert"
                   disabled={enCours || envoi || surLaPhoto.length < 2 || plusDeCredit}
                   onClick={creer}
-                  className="h-12 rounded-full text-[15px] font-semibold"
+                  className="h-12 rounded-full text-lecture font-semibold"
                 >
                   Créer la couverture
                 </Button>
@@ -225,7 +225,7 @@ export function FicheCouverture({
                   type="button"
                   disabled={envoi || enCours}
                   onClick={retirer}
-                  className="bouton-discret bouton--rouge self-center px-4 py-2 text-[13px] font-semibold disabled:opacity-50"
+                  className="bouton-discret bouton--rouge self-center px-4 py-2 text-corps font-semibold disabled:opacity-50"
                 >
                   Retirer la couverture
                 </button>

@@ -68,7 +68,7 @@ export function Visite({ player, onFini }: { player: Player; onFini: () => void 
       <Entete
         onRetour={i > 0 ? () => aller(i - 1) : undefined}
         droite={
-          <button type="button" onClick={onFini} className="bouton-discret px-[13px] py-[8px] text-[14px] font-semibold">
+          <button type="button" onClick={onFini} className="bouton-discret px-[13px] py-[8px] text-ligne font-semibold">
             Passer
           </button>
         }
@@ -243,8 +243,8 @@ function Podium() {
             className="flex flex-col items-center gap-[6px]"
           >
             <CarteDe name={p.name} size={premier ? FORMAT_CARTE.grande : FORMAT_CARTE.moyenne} inerte />
-            <span className="font-display text-[21px] leading-none text-white">{p.rank}</span>
-            <span className="max-w-[90px] truncate text-[12px] font-semibold text-white/70">{id.nom(p.name).split(" ")[0]}</span>
+            <span className="font-display text-titre-m leading-none text-white">{p.rank}</span>
+            <span className="max-w-[90px] truncate text-petit font-semibold text-white/70">{id.nom(p.name).split(" ")[0]}</span>
           </motion.div>
         );
       })}

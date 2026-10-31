@@ -24,7 +24,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { prevenir, type Envoi } from "@/lib/server/push-envoi";
 import { cleVapid, type CleVapid } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
-import { chargerArbitresServeur } from "@/lib/sfl/saison-serveur.server";
+import { lireSaisonServeur } from "@/lib/sfl/saison-serveur.server";
+import { neJouePas } from "@/lib/sfl/hidden";
 import {
   convocationAAnnoncer,
   resultatsAAnnoncer,
@@ -33,7 +34,6 @@ import {
 } from "@/lib/sfl/annonces-ligue";
 import type { MotifNotif } from "@/lib/sfl/motifs-notif";
 import type { Notif } from "@/lib/sfl/push";
-import type { Saison } from "@/lib/sfl/saisie/types";
 
 export const maxDuration = 30;
 
@@ -81,12 +81,18 @@ export async function POST(req: NextRequest) {
   const { data: profil } = await sb.from("profiles").select("valide").eq("id", moi.id).maybeSingle();
   if (!profil?.valide) return NextResponse.json({ error: "Réservé aux joueurs de la ligue." }, { status: 403 });
 
-  const { data: doc } = await sb.from("saison").select("data, updated_at").eq("id", 1).maybeSingle();
-  const ligne = doc as { data?: Saison; updated_at?: string } | null;
-  const saison = ligne?.data;
+  // La saison publiée (sans les journées en brouillon : aucun « J4 · Tu es
+  // le MVP » ne part d'une feuille cachée), les arbitres et les membres qui
+  // ne jouent pas masqués, comme sur les téléphones.
+  let lue: Awaited<ReturnType<typeof lireSaisonServeur>>;
+  try {
+    lue = await lireSaisonServeur(sb);
+  } catch {
+    return NextResponse.json({ envoyes: 0, fini: false });
+  }
+  const saison = lue?.brute;
   if (!saison) return NextResponse.json({ envoyes: 0, fini: true });
-  // Les arbitres masqués, comme sur les téléphones : aucun texte ne les nomme.
-  await chargerArbitresServeur(sb);
+  const ligne = { updated_at: lue?.updatedAt ?? undefined };
   const { data: convocations } = await sb
     .from("convocations")
     .select("id, date_label, created_at")
@@ -106,8 +112,10 @@ export async function POST(req: NextRequest) {
   // (et les admins), pas les joueurs Bola venus par un parrain.
   const { data: profils } = await sb.from("profiles").select("id, name, is_admin").eq("valide", true);
   const roster = new Set((saison.roster ?? []).map((r) => r.name));
+  // Jamais un membre qui ne joue pas (profiles.joue = false) : un admin qui
+  // organise ne reçoit ni convocation ni résultats de joueur (30/10).
   const joueurs = ((profils ?? []) as { id: string; name: string; is_admin: boolean | null }[]).filter(
-    (p) => p.is_admin || roster.has(p.name)
+    (p) => (p.is_admin || roster.has(p.name)) && !neJouePas(p.name)
   );
   const { data: abonnements } = await sb
     .from("push_abonnements")

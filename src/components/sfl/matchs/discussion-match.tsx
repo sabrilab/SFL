@@ -165,13 +165,13 @@ function Onglets({
             type="button"
             onClick={() => onOnglet(id)}
             aria-label={nonLus[id] > 0 ? `${label}, ${nonLus[id]} message${nonLus[id] > 1 ? "s" : ""} pas lu${nonLus[id] > 1 ? "s" : ""}` : label}
-            className={cn("relative text-foreground/25 transition-colors active:text-foreground/45", taille)}
+            className={cn("relative text-encre-4 transition-colors active:text-encre-3", taille)}
           >
             {label}
             {nonLus[id] > 0 && (
               <span
                 aria-hidden
-                className="absolute -top-1 -right-3.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-[5px] text-[11px] leading-none font-bold tracking-normal text-white tabular-nums"
+                className="absolute -top-1 -right-3.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-[5px] text-legende leading-none font-bold tracking-normal text-white tabular-nums"
                 style={{ background: "#FF3B30", boxShadow: "0 0 0 2px var(--background)" }}
               >
                 {nonLus[id] > 9 ? "9+" : nonLus[id]}
@@ -207,7 +207,7 @@ function EnTete({ onglets, onFermer }: { onglets: React.ReactNode; onFermer: () 
  * sur les onglets, après le retour (44 px) et son écart (12 px).
  */
 function SousTitre({ children }: { children: React.ReactNode }) {
-  return <p className="mt-1 truncate pl-14 text-[12.5px] font-semibold text-foreground/50">{children}</p>;
+  return <p className="mt-1 truncate pl-14 text-corps font-semibold text-encre-3">{children}</p>;
 }
 
 /* --------------------------------- Match -------------------------------- */
@@ -361,8 +361,8 @@ function SansEquipe({
       </header>
       {charge && (
         <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8 pb-[14vh]">
-          <EcussonVide taille={84} className="text-foreground/25" />
-          <Link href="/bola-team" className={cn(buttonVariants({ variant: "vert" }), "h-12 rounded-full px-6 text-[15px] font-semibold")}>
+          <EcussonVide taille={84} className="text-encre-4" />
+          <Link href="/bola-team" className={cn(buttonVariants({ variant: "vert" }), "h-12 rounded-full px-6 text-lecture font-semibold")}>
             Créer mon équipe
           </Link>
         </div>

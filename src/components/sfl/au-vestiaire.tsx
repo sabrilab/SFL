@@ -36,7 +36,7 @@ export function AuVestiaire({ piece, className }: { piece: Piece; className?: st
       type="button"
       onClick={partager}
       className={cn(
-        "bouton-secondaire bouton--mauve flex items-center justify-center gap-1.5 px-4 py-3 text-[14px] font-semibold",
+        "bouton-secondaire bouton--mauve flex items-center justify-center gap-1.5 px-4 py-3 text-ligne font-semibold",
         className
       )}
     >

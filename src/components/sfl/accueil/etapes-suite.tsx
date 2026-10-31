@@ -94,10 +94,10 @@ export function EtapeNotifs({ nom, onFini }: { nom: string; onFini: () => void }
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-[13.5px] font-bold text-white">{de}</span>
-                <span className="shrink-0 text-[12px] text-white/40">{i === 0 ? "maintenant" : `il y a ${i * 5} min`}</span>
+                <span className="truncate text-ligne font-bold text-white">{de}</span>
+                <span className="shrink-0 text-petit text-white/40">{i === 0 ? "maintenant" : `il y a ${i * 5} min`}</span>
               </span>
-              <span className="block truncate text-[13.5px] text-white/70">{texte}</span>
+              <span className="block truncate text-ligne text-white/70">{texte}</span>
             </span>
           </motion.li>
         ))}
@@ -183,7 +183,7 @@ export function EtapeSuivre({ nom, proposes, onFini }: { nom: string; proposes: 
                   <Check className="size-3.5" strokeWidth={3} />
                 </span>
               </span>
-              <span className={cn("max-w-[86px] truncate text-[12px] font-semibold text-white", !pris && "text-white/40")}>
+              <span className={cn("max-w-[86px] truncate text-petit font-semibold text-white", !pris && "text-white/40")}>
                 {id.nom(n).split(" ")[0]}
               </span>
             </motion.button>

@@ -32,9 +32,9 @@ export function Confirmer({
       <DialogContent showCloseButton={false} className="gap-3 rounded-3xl p-5 text-center sm:max-w-xs">
         {confirmation && (
           <>
-            <DialogTitle className="text-[17px] leading-snug font-semibold">{confirmation.titre}</DialogTitle>
+            <DialogTitle className="text-titre leading-snug font-semibold">{confirmation.titre}</DialogTitle>
             {confirmation.detail && (
-              <DialogDescription className="text-[13px]">{confirmation.detail}</DialogDescription>
+              <DialogDescription className="text-corps">{confirmation.detail}</DialogDescription>
             )}
             <DialogFooter className="mx-0 mb-0 grid grid-cols-2 gap-2 rounded-none border-0 bg-transparent p-0 pt-2 sm:flex-none">
               <Button variant="secondary" onClick={onFermer} className="rounded-full">
