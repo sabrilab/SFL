@@ -63,6 +63,7 @@ import {
   ClipboardPen,
   Crosshair,
   IdCard,
+  MessageCircle,
   Layers,
   LocateFixed,
   MapPin,
@@ -79,6 +80,7 @@ import { logActivity } from "@/lib/sfl/activity";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, type Fenetre } from "@/components/ui/sheet";
+import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { FeuilleProfil } from "@/components/sfl/card-viewer";
 import { PresencePanel } from "@/components/sfl/presence-panel";
 import { QuiVient } from "@/components/sfl/qui-vient";
@@ -179,7 +181,7 @@ import {
   type Remplissage,
   type StickerPlan,
 } from "@/components/sfl/map/stade";
-import { VueSatellite } from "@/components/sfl/map/vue-satellite";
+import { VueTerrain } from "@/components/sfl/map/vue-terrain";
 import { IconeTerrain, PucesFormat } from "@/components/sfl/map/format-terrains";
 import { MenuMap } from "@/components/sfl/map/menu-map";
 import { useFormatTerrain } from "@/hooks/use-format-terrain";
@@ -525,8 +527,10 @@ export default function MapPage() {
   //
   // Un joueur Bola (venu par un parrain, hors de la saison) ne voit rien de
   // la SFL (Sabri, 26/10 : « le côté SFL doit lui être invisible »).
-  const ligue = useMemo<MatchMap[]>(() => {
-    if (sansSfl) return [];
+  // La ligue sur la Map, et tous ses dimanches joués (la page d'un lieu les
+  // remonte : « les matchs précédents », Sabri 31/10).
+  const { liste: ligue, jouees: ligueJouees } = useMemo<{ liste: MatchMap[]; jouees: MatchMap[] }>(() => {
+    if (sansSfl) return { liste: [], jouees: [] };
     const passee = (m: JourneeMeta) => {
       if (journeeJouee(saison, m.j)) return true;
       const e = ecartJours(m.date, aujourdhui);
@@ -585,14 +589,15 @@ export default function MapPage() {
     const derniere = parDate.filter(passee).at(-1);
     const eDerniere = derniere ? ecartJours(derniere.date, aujourdhui) : null;
     const recente = derniere && (eDerniere == null || eDerniere >= -6) ? versMatchs(derniere, true) : [];
+    const jouees = parDate.filter(passee).flatMap((m) => versMatchs(m, true));
 
-    if (aVenir.length) return [...aVenir, ...recente];
+    if (aVenir.length) return { liste: [...aVenir, ...recente], jouees };
     // Pas de journée à venir : la convocation du dimanche, si elle n'est pas
     // elle-même passée (l'admin ouvre la suivante en ouvrant l'app).
-    if (ecartConvocation != null && ecartConvocation < 0) return recente;
+    if (ecartConvocation != null && ecartConvocation < 0) return { liste: recente, jouees };
     const dedans = p.mine === "present";
     const { etat, texte } = etatLigue(dedans, p.presents.length);
-    return [
+    const liste: MatchMap[] = [
       {
         cle: "convocation",
         j: null,
@@ -609,6 +614,7 @@ export default function MapPage() {
       },
       ...recente,
     ];
+    return { liste, jouees };
   }, [sansSfl, saison, matchsDe, player.name, aujourdhui, heure, p.heure, p.lieu, p.jour, p.mine, p.effectif, p.presents]);
   // Les habitués : ceux du dernier dimanche joué (la fiche d'une journée pas encore composée).
   const habitues = useMemo(() => {
@@ -800,7 +806,22 @@ export default function MapPage() {
     });
   };
   // Le match choisi : celui qu'on a touché s'il est encore là, sinon la une.
-  const choisi = affiches.find((m) => m.cle === choix) ?? une;
+  // Un dimanche plus ancien se choisit depuis la page de son lieu.
+  const choisi = affiches.find((m) => m.cle === choix) ?? matchs.find((m) => m.cle === choix) ?? ligueJouees.find((m) => m.cle === choix) ?? une;
+  // Les matchs du lieu du choisi, du plus ancien au prochain : la page du
+  // lieu les fait défiler (Sabri, 31/10 : « on pourrait même voir les autres
+  // matchs précédents »).
+  const auLieu = useMemo<MatchMap[]>(() => {
+    const t = choisi?.terrain;
+    if (!choisi || !t) return choisi ? [choisi] : [];
+    const ici = (m: MatchMap) =>
+      !!m.terrain && (m.terrain.id === t.id || sansAccents(m.terrain.nom) === sansAccents(t.nom) || Math.hypot(m.terrain.lat - t.lat, (m.terrain.lng - t.lng) * 0.64) < 0.0015);
+    const vus = new Set<string>();
+    const ordre = (m: MatchMap) => (ecartJours(m.dateLabel, aujourdhui) ?? (m.joue ? -999 : 99)) * 24 + heureDe(m.heure);
+    return [...ligueJouees, ...matchs]
+      .filter((m) => ici(m) && !vus.has(m.cle) && !!vus.add(m.cle))
+      .sort((a, b) => ordre(a) - ordre(b));
+  }, [choisi, ligueJouees, matchs, aujourdhui]);
   // La convocation d'un dimanche que la saison n'a pas encore : le numéro de sa journée.
   const jDuChoisi = choisi?.j ?? (choisi?.cle === "convocation" && p.shared ? p.journee : null);
 
@@ -1031,6 +1052,23 @@ export default function MapPage() {
   const ios = useEstIos();
   // Les gestes faits dans la Map, au journal d'activité (31/10 : aucun ne
   // l'était ; on saura ce qui sert).
+  // Le match choisi se pose au centre du carrousel du lieu, à l'ouverture et à chaque choix (pas à chaque rendu : on y glisse du doigt).
+  useEffect(() => {
+    if (!fiche) return;
+    const t = window.setTimeout(() => document.querySelector("[data-lieu-choisi]")?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 60);
+    return () => window.clearTimeout(t);
+  }, [fiche, choisi?.cle]);
+  // La page d'un lieu s'ouvre depuis l'endroit touché : le dernier toucher,
+  // posé en variables CSS (sans redessiner la Map à chaque doigt).
+  useEffect(() => {
+    const noter = (e: PointerEvent) => {
+      const r = document.documentElement.style;
+      r.setProperty("--lieu-x", `${Math.round(e.clientX)}px`);
+      r.setProperty("--lieu-y", `${Math.round(e.clientY)}px`);
+    };
+    window.addEventListener("pointerdown", noter, { capture: true, passive: true });
+    return () => window.removeEventListener("pointerdown", noter, { capture: true });
+  }, []);
   const geste = useCallback((g: string, meta?: Record<string, string | number | boolean>) => logActivity("map", { path: "/", meta: { geste: g, ...meta } }), []);
   // Le match du dimanche, convocation ouverte : on y répond depuis la Map.
   const repondreIci = !!choisi && !choisi.joue && !choisi.partie && !choisi.team && (!!choisi.convoquee || choisi.cle === "convocation") && p.reponsesOuvertes;
@@ -1629,40 +1667,91 @@ export default function MapPage() {
         </div>
       </section>
 
-      {/* ─── La fiche : présence, lieu, et pour l'admin les réglages ─── */}
-      <Sheet open={fiche} onOpenChange={setFiche} titre="le match">
+      {/* ─── Les réglages des matchs (admin) : la feuille du bas, comme avant ─── */}
+      <Sheet open={fiche && ficheAdmin} onOpenChange={(o) => { setFiche(o); if (!o) setFicheAdmin(false); }} titre="les matchs">
         <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
           <SheetHeader className="px-5 pt-5 pb-0">
-            <p className="mono-label flex items-center gap-2 text-muted-foreground">
-              {choisi && !ficheAdmin && <SigleLigue ligue={choisi.ligue} hauteur={11} className="text-foreground" />}
-              <span className="min-w-0 truncate">
-                {choisi?.partie
-                  ? `Ouvert par ${choisi.partie.organisateur}`
-                  : choisi?.team
-                    ? "Match d'équipe"
-                    : [jDuChoisi != null && `J${jDuChoisi}`, surtitreDeLigue(jDuChoisi)].filter(Boolean).join(" · ")}
-              </span>
-            </p>
-            <SheetTitle className="text-[26px] font-bold tracking-tight">
-              {ficheAdmin ? "Les matchs" : (choisi?.terrain?.nom ?? choisi?.partie?.lieu ?? choisi?.team?.defi.lieu ?? (choisi?.j != null ? `Journée ${choisi.j}` : "Le match"))}
-            </SheetTitle>
-            {!ficheAdmin && choisi && (
-              <p className="text-[14px] text-muted-foreground">
-                {choisi.joue ? `Le match du ${dateLongue(choisi.dateLabel, aujourdhui)} · joué` : choisi.quand.titre} · {choisi.heure}
-                {choisi.terrain ? ` · ${choisi.terrain.adresse}` : choisi.team ? "" : " · lieu à venir"}
-              </p>
-            )}
+            <SheetTitle className="text-[26px] font-bold tracking-tight">Les matchs</SheetTitle>
           </SheetHeader>
           <div className="flex flex-col gap-5 px-4">
-            {ficheAdmin ? (
-              <>
-                {/* L'admin écrit depuis le document entier, brouillons compris
-                    (saisie/brouillon.ts) : jamais depuis la saison des joueurs. */}
-                <OuSeJouent saison={saisieStore.load()} matchs={ligue} terrains={terrains} matchsDe={matchsDe} onSauver={sauver} />
-                <Terrains saison={saisieStore.load()} terrains={terrains} onSauver={sauver} />
-              </>
-            ) : (
-              <>
+            {/* L'admin écrit depuis le document entier, brouillons compris
+                (saisie/brouillon.ts) : jamais depuis la saison des joueurs. */}
+            <OuSeJouent saison={saisieStore.load()} matchs={ligue} terrains={terrains} matchsDe={matchsDe} onSauver={sauver} />
+            <Terrains saison={saisieStore.load()} terrains={terrains} onSauver={sauver} />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ─── La page d'un lieu (Sabri, 31/10, d'après une app de souvenirs
+          sur carte) : toucher un match l'ouvre en grand depuis l'endroit
+          touché, un écran enfant plein écran avec son retour. En tête le
+          lieu en lettrage, ses matchs en carrousel (les précédents à gauche,
+          le prochain à droite), puis tout ce qu'il y a à savoir du match
+          choisi ; le geste du moment est en bas, sous le pouce. ─── */}
+      <Sheet open={fiche && !ficheAdmin} onOpenChange={setFiche} titre={choisi?.terrain?.nom ?? "le match"}>
+        <SheetContent
+          side="bottom"
+          showCloseButton={false}
+          className="page-lieu top-0 duration-[380ms] ease-[cubic-bezier(0.2,0.85,0.25,1)] h-[100dvh] origin-[var(--lieu-x,50%)_var(--lieu-y,50%)] max-h-none gap-0 overflow-y-auto rounded-none border-0 bg-background data-starting-style:scale-[0.55] data-ending-style:scale-[0.55] data-[side=bottom]:data-starting-style:translate-y-0 data-[side=bottom]:data-ending-style:translate-y-0"
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>{choisi?.terrain?.nom ?? choisi?.partie?.lieu ?? "Le match"}</SheetTitle>
+          </SheetHeader>
+          {choisi && (
+            <div className="relative flex shrink-0 flex-col items-center px-4 pt-[calc(env(safe-area-inset-top,0px)+10px)]">
+              <BoutonRetour onRetour={() => setFiche(false)} titre="la Map" className="absolute left-4 top-[calc(env(safe-area-inset-top,0px)+10px)]" />
+              {(() => {
+                const nom = choisi.terrain?.nom ?? choisi.partie?.lieu ?? choisi.team?.defi.lieu ?? (choisi.j != null ? `Journée ${choisi.j}` : "Le match");
+                return (
+                  <span
+                    className="lettrage mt-12 max-w-full -rotate-[3deg] text-center"
+                    style={{ ["--taille" as string]: nom.length <= 9 ? "34px" : nom.length <= 13 ? "27px" : "21px" }}
+                  >
+                    {nom}
+                  </span>
+                );
+              })()}
+              <p className="mono-label mt-2 flex items-center gap-2 text-muted-foreground">
+                <SigleLigue ligue={choisi.ligue} hauteur={10} className="text-foreground" />
+                <span>
+                  {auLieu.length > 1 ? `${auLieu.length} matchs ici` : choisi.partie ? `Ouvert par ${choisi.partie.organisateur}` : choisi.team ? "Match d'équipe" : "1 match ici"}
+                  {choisi.terrain?.commune ? ` · ${choisi.terrain.commune}` : ""}
+                </span>
+              </p>
+              {(() => {
+                const noms = [...new Set(auLieu.flatMap((m) => m.presents))].slice(0, 5);
+                return noms.length > 0 ? <span className="mt-3"><Visages noms={noms} /></span> : null;
+              })()}
+            </div>
+          )}
+          {/* Les matchs du lieu : on glisse de l'un à l'autre, le choisi au centre. */}
+          {choisi && auLieu.length > 1 && (
+            <div className="mt-5 flex shrink-0 snap-x snap-mandatory items-center gap-1 overflow-x-auto px-[calc(50%-80px)] py-3 [scrollbar-width:none]">
+              {auLieu.map((m) => (
+                <div
+                  key={m.cle}
+                  data-lieu-choisi={m.cle === choisi.cle || undefined}
+                  className="shrink-0 snap-center"
+                >
+                  <CarteMatch
+                    m={m}
+                    choisi={m.cle === choisi.cle}
+                    une={false}
+                    dans={m.joue ? null : ecartJours(m.dateLabel, aujourdhui)}
+                    loin={null}
+                    nonLus={m.partie ? (apercus.get(m.partie.id)?.nonLus ?? 0) : 0}
+                    onToucher={() => {
+                      navigator.vibrate?.(5);
+                      setChoix(m.cle);
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          {/* La carte dit déjà le jour et l'heure ; dessous, seulement la division du dimanche. */}
+          {choisi && surtitreDeLigue(jDuChoisi) && <p className="mono-label mt-2 shrink-0 text-center text-foreground">{surtitreDeLigue(jDuChoisi)}</p>}
+          <div className="mt-5 flex shrink-0 flex-col gap-5 px-4 pb-32">
                 {/* Les joueurs d'abord, la feuille de match tout de suite dessous
                     (Sabri, 24/10 : plus de vue satellite en tête de la fiche) ;
                     le chemin pour y aller vient après. Une journée : ses
@@ -1712,28 +1801,68 @@ export default function MapPage() {
                     taille="ligne"
                   />
                 )}
-                {choisi?.terrain && <Itineraire terrain={choisi.terrain} ios={ios} />}
-                {/* Son dimanche dans les Actus, pas l'Actu du jour. */}
-                {choisi?.joue && (
-                  <Link
-                    href={choisi.j !== null ? `/ligue#j${choisi.j}` : "/ligue"}
-                    className="bouton-principal flex h-12 items-center justify-center gap-2 text-[15px] font-semibold"
-                  >
-                    Voir le récap de la journée
-                  </Link>
-                )}
+                {choisi?.terrain && <Itineraire terrain={choisi.terrain} ios={ios} autres />}
                 {admin && !choisi?.partie && !choisi?.team && (
                   <button
                     type="button"
-                    onClick={() => setFicheAdmin(true)}
+                    onClick={() => ouvrirFiche(true)}
                     className="bouton-secondaire flex h-11 items-center justify-center gap-2 text-[14px] font-semibold"
                   >
                     <Settings2 className="size-4" /> Date, heure et adresse des matchs
                   </button>
                 )}
-              </>
-            )}
           </div>
+          {/* Le geste du moment, en bas sous le pouce : venir, y aller, ou revoir le dimanche. */}
+          {choisi && (
+            <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex items-center justify-end gap-2 bg-gradient-to-t from-background via-background/90 to-transparent px-4 pt-8 pb-[calc(env(safe-area-inset-bottom,0px)+14px)]">
+              {choisi.partie && (
+                <button
+                  type="button"
+                  onClick={() => ouvrirDiscussion(choisi.cle)}
+                  className="bouton-secondaire pointer-events-auto mr-auto flex h-12 items-center gap-2 px-4 text-[14px] font-semibold"
+                >
+                  <MessageCircle className="size-4" /> Discussion
+                </button>
+              )}
+              {choisi.joue ? (
+                <Link
+                  href={choisi.j !== null ? `/ligue#j${choisi.j}` : "/ligue"}
+                  className="bouton-principal pointer-events-auto flex h-12 items-center gap-2 px-6 text-[15px] font-semibold"
+                >
+                  Le récap
+                </Link>
+              ) : repondreIci && p.mine !== "present" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.vibrate?.(10);
+                    geste("je-viens", { depuis: "lieu" });
+                    void p.answer("present");
+                  }}
+                  className="bouton-encre pointer-events-auto flex h-12 items-center gap-2 px-6 text-[15px] font-semibold"
+                >
+                  Je viens
+                </button>
+              ) : choisi.terrain ? (
+                <>
+                  {repondreIci && (
+                    <span className="flex h-12 items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold" style={{ background: ENCRE, color: BLANC }}>
+                      <Check className="size-4" strokeWidth={3} /> Tu viens
+                    </span>
+                  )}
+                  <a
+                    href={urlItineraire(choisi.terrain, ios)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => geste("y-aller", { depuis: "lieu" })}
+                    className="bouton-principal bouton--vert pointer-events-auto flex h-12 items-center gap-2 px-6 text-[15px] font-semibold"
+                  >
+                    <Navigation className="size-4" /> Y aller
+                  </a>
+                </>
+              ) : null}
+            </div>
+          )}
         </SheetContent>
       </Sheet>
 
@@ -1983,15 +2112,8 @@ function CarteMatch({
           style={{ width: l, height: h, background: `linear-gradient(180deg, ${c0}, ${c1} 50%, ${c2})` }}
         >
           {m.terrain ? (
-            // La vue aérienne du vrai terrain, comme dans l'app iPhone.
-            <VueSatellite
-              lat={m.terrain.lat}
-              lng={m.terrain.lng}
-              demi={0.0009}
-              rapport={196 / 140}
-              hauteur={h}
-              className={cn("absolute inset-0 h-full w-full", joue && "grayscale")}
-            />
+            // Le vrai terrain, dessiné et vu un peu de haut (31/10 : plus de satellite).
+            <VueTerrain lat={m.terrain.lat} lng={m.terrain.lng} className={cn("absolute inset-0 h-full w-full", joue && "grayscale")} />
           ) : (
             <div
               className={cn("absolute top-1/2 left-1/2 size-[118px] -translate-x-1/2 -translate-y-[calc(50%+14px)]", joue && "saturate-0")}
@@ -2147,7 +2269,7 @@ function CarteProposee({
       >
         <div className="relative overflow-hidden rounded-[19px]" style={{ width: 196, height: 140, background: `linear-gradient(180deg, ${c0}, ${c1} 50%, ${c2})` }}>
           {terrain ? (
-            <VueSatellite lat={terrain.lat} lng={terrain.lng} demi={0.0009} rapport={196 / 140} hauteur={140} className="absolute inset-0 h-full w-full" />
+            <VueTerrain lat={terrain.lat} lng={terrain.lng} className="absolute inset-0 h-full w-full" />
           ) : (
             <div
               className="absolute top-1/2 left-1/2 size-[118px] -translate-x-1/2 -translate-y-[calc(50%+14px)] opacity-60"
@@ -2295,7 +2417,7 @@ function FicheLibre({
   return (
     <div className="flex flex-col gap-3 px-4">
       <div className="relative h-[180px] overflow-hidden rounded-[22px] border border-border bg-secondary">
-        <VueSatellite lat={t.lat} lng={t.lng} demi={0.0011} rapport={2} hauteur={180} titre={`Vue satellite de ${t.nom}`} className="h-full w-full" />
+        <VueTerrain lat={t.lat} lng={t.lng} titre={`Le terrain ${t.nom}`} className="h-full w-full" />
         <span className="ajuster-pin pointer-events-none" style={{ left: "50%", top: "50%", cursor: "default" }} aria-hidden />
         <span className="absolute bottom-2 left-2 max-w-[calc(100%-6.5rem)] truncate rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
           {t.adresse || t.commune}
@@ -2331,20 +2453,20 @@ function FicheLibre({
 }
 
 /** Les trois façons d'aller au terrain (l'adresse est déjà sous le titre de la fiche). */
-function Itineraire({ terrain, ios }: { terrain: Terrain; ios: boolean }) {
+function Itineraire({ terrain, ios, autres }: { terrain: Terrain; ios: boolean; /** Le premier est déjà « Y aller », en bas de la page : les deux autres seulement. */ autres?: boolean }) {
   const liens = itineraires(terrain.lat, terrain.lng, terrain.nom);
   // Sur iPhone, Plans d'abord ; ailleurs, Google Maps d'abord.
   const ordre = ios ? liens : [liens[1], liens[0], liens[2]];
   return (
     <section className="flex flex-col gap-3">
-      <a
+      {!autres && <a
         href={ordre[0].url}
         target="_blank"
         rel="noopener noreferrer"
         className="bouton-principal bouton--vert flex h-12 items-center justify-center gap-2 text-[15px] font-semibold"
       >
         <Navigation className="size-4" /> Itinéraire avec {ordre[0].libelle}
-      </a>
+      </a>}
       <div className="grid grid-cols-2 gap-2">
         {ordre.slice(1).map((l) => (
           <a
