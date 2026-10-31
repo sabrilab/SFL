@@ -69,9 +69,9 @@
 // série. Ni badge, ni habillage : elle est restée telle qu'elle a été émise.
 //
 // La carte d'un gardien (poste G, Sabri 31/10) : la même carte, ses six cases
-// sous des stats de gardien (plongeon, réflexes, dégagement, jeu à la main,
-// placement, physique ; lib/sfl/gardien.ts), et « gardien » dans l'étiquette.
-// Chaque stat se lit par son icône pleine, joueur comme gardien (icones-stats.tsx).
+// sous des stats de gardien (plo, réf, dég, jma, pla, phy ; lib/sfl/gardien.ts)
+// et « gardien » dans l'étiquette. Sans icônes : Sabri a essayé au trait puis en
+// plein, et préféré les mots (31/10).
 //
 // La carte d'un arbitre (`edition="arbitre"`, `arbitre` ; carte-arbitre.tsx,
 // Sabri 24/10) garde toute cette disposition, dans le jaune fluo de sa chasuble
@@ -105,8 +105,7 @@ import { BordEpoque, EmblemeEpoque, LosangeBallon, SigleSfl, SigleSouligne } fro
 import { MotifCarte } from "@/components/sfl/motif-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
-import { abrege, estGardien, nomStat } from "@/lib/sfl/gardien";
-import { IconeStat } from "@/components/sfl/icones-stats";
+import { abrege, estGardien } from "@/lib/sfl/gardien";
 import { ligneDEmission, type EmissionCarte } from "@/lib/sfl/epoques";
 
 export type BolaEdition = "base" | "rare" | "mvp" | "impact" | "def" | "arbitre";
@@ -366,8 +365,6 @@ export function BolaCard({
   const gardien = !arbitre && estGardien(position);
   // Une carte d'époque est restée telle qu'elle a été émise : sans habillage ni badge.
   const era = p.epoque;
-  // Les icônes à la place des libellés (icones-stats.tsx) ; une carte d'époque et celle d'un arbitre gardent leurs mots.
-  const icones = !arbitre && !era;
   const habillage = era ? undefined : habillageDemande;
   const encre = (a: number) => `rgba(${p.encre},${a})`;
   const seed = graine(name);
@@ -907,8 +904,7 @@ export function BolaCard({
 
         {complete && (
           <>
-            {/* Les six stats, deux par rangée, dans le carré sous le nom : l'icône pleine puis le chiffre
-                (Sabri, 31/10, icones-stats.tsx) ; « vit 84 » sur une carte d'époque ou d'arbitre */}
+            {/* Les six stats, deux par rangée, dans le carré sous le nom : « vit 84 » (« réf 89 » pour un gardien) */}
             <div
               style={{
                 position: "absolute",
@@ -918,21 +914,15 @@ export function BolaCard({
                 display: "grid",
                 gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
                 rowGap: u(36),
-                columnGap: u(icones ? 28 : 16),
+                columnGap: u(16),
               }}
             >
               {(arbitre?.stats ?? STAT_KEYS.map((k) => [k, stats[k]] as const)).map(([k, valeur]) => {
                 const actif = highlightStats?.includes(k as StatKey);
                 const libelle = gardien ? abrege(k as StatKey, true) : k;
                 return (
-                  <div
-                    key={k}
-                    aria-label={icones ? `${nomStat(k as StatKey, gardien)} ${valeur}` : undefined}
-                    style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: u(12) }}
-                  >
-                    {icones ? (
-                      <IconeStat k={k as StatKey} gardien={gardien} taille={u(42)} couleur={encre(0.78)} />
-                    ) : era ? (
+                  <div key={k} style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: u(12) }}>
+                    {era ? (
                       // Les libellés d'alors : en capitales, dans le brun (ou le métal) de l'édition.
                       <span style={{ ...mono(23, 2.5, 1, 700), color: era.libelle }}>{libelle.toUpperCase()}</span>
                     ) : (
