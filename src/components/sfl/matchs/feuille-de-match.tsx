@@ -32,7 +32,7 @@
 // Les terrains viennent de lib/sfl/feuille.ts ; l'image est dessinée hors
 // écran puis photographiée par html-to-image (déjà là pour la carte 3D).
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toBlob } from "html-to-image";
 import { toast } from "sonner";
 import { Share } from "lucide-react";
@@ -233,12 +233,15 @@ export function FeuilleDeMatch({
   moi,
   entete,
   j = null,
+  avantFlair = null,
 }: {
   terrains: TerrainFeuille[];
   moi: string;
   entete: EnTeteFeuille;
   /** La journée de la feuille, pour Le Flair (matchs/flair.tsx) ; null pour la convocation. */
   j?: number | null;
+  /** Ce qui passe entre les terrains et Le Flair (la page du lieu : le compte à rebours et la journée en étapes). */
+  avantFlair?: ReactNode;
 }) {
   const { allPlayers } = useSeason();
   const parNom = useMemo(
@@ -355,6 +358,8 @@ export function FeuilleDeMatch({
           );
         })}
       </div>
+
+      {avantFlair && <div className="mt-2 flex flex-col gap-5">{avantFlair}</div>}
 
       <FlairDuMatch j={j} noirs={t.a.joueurs} blancs={t.b.joueurs} />
 
