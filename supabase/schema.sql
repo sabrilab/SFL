@@ -356,7 +356,8 @@ alter table public.activity add constraint activity_kind_check
     'recherche',  -- une recherche lancée
     'compo',      -- une composition 5v5 déposée dans l'Arène
     'notifs',     -- l'invitation aux notifications montrée, et la réponse
-    'activation'  -- « Ton premier match » d'un joueur Bola : vu, position, terrain, invitation
+    'activation', -- « Ton premier match » d'un joueur Bola : vu, position, terrain, invitation
+    'map'         -- un geste dans la Map (meta.geste : stade, y-aller, je-viens, ouvrir, zone)
   ));
 
 create index if not exists activity_player_created_idx
@@ -7399,5 +7400,42 @@ begin
 exception
   when duplicate_object then null;
   when undefined_object then null;
+end;
+$$;
+
+-- ─────────────────── Map : l'affiche du match ───────────────────
+-- L'affiche d'un match (Sabri, 31/10 : l'image générée des deux meilleurs
+-- joueurs, « comme ça ça pourrait être l'affiche du match ») : une image par
+-- paire de joueurs, faite une seule fois par fal côté serveur (api/affiche)
+-- et gardée dans le bucket public « affiches ». Seuls les joueurs qui ont
+-- accepté l'usage de leur carte hors de l'app (consentements.hors_app) et
+-- qui ont une photo de carte y figurent. Seule la clé secrète écrit ici ;
+-- tout le monde lit (l'image est publique, comme les photos de carte).
+create table if not exists public.match_affiches (
+  paire       text primary key,
+  joueurs     text[] not null,
+  chemin      text,
+  statut      text not null default 'en_cours' check (statut in ('en_cours', 'prete', 'ratee')),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists match_affiches_date on public.match_affiches (created_at desc);
+alter table public.match_affiches enable row level security;
+revoke all on public.match_affiches from anon, authenticated;
+grant select on public.match_affiches to anon, authenticated;
+drop policy if exists "match_affiches: tout le monde lit" on public.match_affiches;
+create policy "match_affiches: tout le monde lit" on public.match_affiches for select to anon, authenticated
+  using (statut = 'prete');
+
+do $$
+begin
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('affiches', 'affiches', true, 3145728, array['image/jpeg'])
+  on conflict (id) do update
+    set public = true,
+        file_size_limit = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types;
+exception
+  when others then raise warning 'affiches : bucket non créé (%)', sqlerrm;
 end;
 $$;

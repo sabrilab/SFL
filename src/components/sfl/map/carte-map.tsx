@@ -94,6 +94,8 @@ import {
 } from "./joueurs";
 import { gestesOrdinateur } from "./gestes-ordinateur";
 import { FONDU, LIBELLES, styleSnap } from "./style-snap";
+import { couleurLibelle, majZones, peindre, poserZones, teinterZones, type Ambiance } from "./ambiances";
+import { dansContour, numeroZone, type Zone } from "@/lib/sfl/zones";
 
 export interface PointPlan {
   id: string;
@@ -117,6 +119,8 @@ export interface PossiblePlan {
   nom: string;
   /** Qui passe devant quand deux se chevauchent : le plus petit (la ligue, puis les plus grands complexes). */
   rang: number;
+  /** Hors des zones Bola : son premier match ouvre une zone (en vert, 30/10). */
+  horsZone?: boolean;
 }
 
 export type FondCarte = "plan" | "satellite";
@@ -132,6 +136,10 @@ const MARGE_HAUT = 140;
 const MARGE_BAS = 380;
 /** Le premier vol, et l'écart entre deux stickers qui tombent. */
 const VOL = 1.5;
+/** Le temps passé au-dessus de la zone, au premier vol, avant de plonger sur les matchs (ms). */
+const PAUSE_ZONE = 1300;
+/** Le survol d'une zone : assez haut pour la voir entière, assez près pour lire son étiquette. */
+const ZOOM_SURVOL = 10.5;
 const CADENCE = 110;
 /**
  * Les terrains possibles : des points jusque-là, des stickers vides au-delà ;
@@ -183,13 +191,13 @@ function onde(map: PlanMap, lat: number, lng: number, clair: boolean) {
   window.setTimeout(() => r.remove(), 1150);
 }
 
-function collectionPossibles(possibles: PossiblePlan[]): GeoJSON.FeatureCollection<GeoJSON.Point, { id: string; nom: string; rang: number }> {
+function collectionPossibles(possibles: PossiblePlan[]): GeoJSON.FeatureCollection<GeoJSON.Point, { id: string; nom: string; rang: number; horsZone: boolean }> {
   return {
     type: "FeatureCollection",
     features: possibles.map((p) => ({
       type: "Feature",
       geometry: { type: "Point", coordinates: [p.lng, p.lat] },
-      properties: { id: p.id, nom: p.nom, rang: p.rang },
+      properties: { id: p.id, nom: p.nom, rang: p.rang, horsZone: !!p.horsZone },
     })),
   };
 }
@@ -209,7 +217,7 @@ function imageSvg(svg: string): Promise<HTMLImageElement> {
  * leur nom. Les quatre images (gris ou ciel, plan ou satellite) d'abord.
  */
 async function poserPossibles(map: PlanMap, donnees: () => PossiblePlan[], encore: () => boolean): Promise<boolean> {
-  const tons = (["gris", "ciel"] as const).flatMap((t) => (["plan", "satellite"] as const).map((f) => [t, f] as const));
+  const tons = (["gris", "ciel", "vert"] as const).flatMap((t) => (["plan", "satellite"] as const).map((f) => [t, f] as const));
   const images = await Promise.all(tons.map(([t, f]) => imageSvg(fantomeSvg(t, f)).then((img) => [`fantome-${t}-${f}`, img] as const)));
   if (!encore() || map.getSource("possibles")) return false;
   for (const [nom, img] of images) if (!map.hasImage(nom)) map.addImage(nom, img, { pixelRatio: 2 });
@@ -265,10 +273,11 @@ function teinterPossibles(map: PlanMap, fond: FondCarte, teinte: TeinteFantome) 
   if (!map.getLayer("possibles")) return;
   const sat = fond === "satellite";
   const trait = couleurFantome(teinte, fond);
-  map.setLayoutProperty("possibles", "icon-image", `fantome-${teinte}-${fond}`);
-  map.setPaintProperty("possibles-points", "circle-color", trait);
+  // Hors des zones, le terrain « à ouvrir » passe au vert, quel que soit le ton choisi.
+  map.setLayoutProperty("possibles", "icon-image", ["case", ["get", "horsZone"], `fantome-vert-${fond}`, `fantome-${teinte}-${fond}`]);
+  map.setPaintProperty("possibles-points", "circle-color", ["case", ["get", "horsZone"], couleurFantome("vert", fond), trait]);
   map.setPaintProperty("possibles-points", "circle-stroke-color", sat ? "rgba(10, 11, 13, 0.7)" : "#ffffff");
-  map.setPaintProperty("possibles", "text-color", sat ? "#f4f5f2" : teinte === "ciel" ? "#1673d6" : "#55575c");
+  map.setPaintProperty("possibles", "text-color", sat ? "#f4f5f2" : ["case", ["get", "horsZone"], "#1f8a45", teinte === "ciel" ? "#1673d6" : "#55575c"]);
   map.setPaintProperty("possibles", "text-halo-color", sat ? "rgba(10, 11, 13, 0.85)" : "#ffffff");
 }
 
@@ -306,6 +315,47 @@ function cadrer(map: PlanMap, boite: LngLatBoundsLike, padding: PaddingOptions, 
 }
 
 const AUCUN_POSSIBLE: PossiblePlan[] = [];
+const AUCUNE_ZONE: Zone[] = [];
+/** Plus près que ça, on est dans la zone : son étiquette se retire. */
+const ZOOM_ETIQUETTES_ZONES = 12.5;
+/** Plus loin, une zone n'est qu'une tache : pas d'étiquette. */
+const ZOOM_ETIQUETTES_LOIN = 7;
+/** En dessous, avec des zones, les piles de joueurs se fondent dans l'étiquette de leur zone (31/10). */
+const ZOOM_REGION = 10.5;
+
+/**
+ * Les étiquettes sont posées dans l'ordre des zones : une étiquette qui en
+ * chevauche une d'avant, un sticker de match ou une pile de joueurs, se
+ * cache (de loin, la zone tient sous eux : ils passent devant).
+ */
+function degagerEtiquettes(reperes: Marker[]) {
+  const plan = reperes[0]?.getElement().closest(".maplibregl-map");
+  // Vue région avec des zones : les piles sont fondues dans l'étiquette, elles ne la cachent pas.
+  const sansPiles = plan?.classList.contains("zones-region") && plan.classList.contains("avec-zones");
+  const gardees: DOMRect[] = plan ? [...plan.querySelectorAll(sansPiles ? ".stk-ancre .stk" : ".stk-ancre .stk, .grp__pile")].map((x) => x.getBoundingClientRect()) : [];
+  for (const m of reperes) {
+    const b = m.getElement().querySelector<HTMLElement>(".zone-etiq");
+    if (!b) continue;
+    b.classList.remove("zone-etiq--cachee");
+    const r = b.getBoundingClientRect();
+    const touche = gardees.some((g) => r.left < g.right + 6 && r.right > g.left - 6 && r.top < g.bottom + 4 && r.bottom > g.top - 4);
+    if (touche) b.classList.add("zone-etiq--cachee");
+    else gardees.push(r);
+  }
+}
+
+/** L'étiquette d'une zone, posée au-dessus de son contour : son numéro, son nom, ce qu'elle compte. */
+function zoneHtml(z: Zone): string {
+  const classe = `zone-etiq${z.ouverte ? "" : " zone-etiq--attente"}${z.nouvelle ? " zone-etiq--neuve" : ""}`;
+  const tete = z.ouverte ? `${z.nouvelle ? "Nouvelle zone" : z.aMoi ? "Ta zone" : "Zone"} · ${numeroZone(z.numero)}` : z.aMoi ? "Ta zone · à ouvrir" : "Zone à ouvrir";
+  return `<button type="button" class="${classe}" data-zone="${z.id}"><span class="zone-etiq__tete">${echapper(tete)}</span><span class="zone-etiq__nom">${echapper(z.nom)}</span>${z.sous ? `<span class="zone-etiq__sous">${echapper(z.sous)}</span>` : ""}</button>`;
+}
+
+/** Le haut d'un contour : l'étiquette s'y pose, au-dessus de la zone. */
+function hautDe(z: Zone): { lat: number; lng: number } {
+  const [lng, lat] = z.contour.reduce((a, p) => (p[1] > a[1] ? p : a), z.contour[0] ?? [z.centre.lng, z.centre.lat]);
+  return { lat, lng: (lng + z.centre.lng) / 2 };
+}
 
 export function CarteMap({
   stickers,
@@ -328,8 +378,20 @@ export function CarteMap({
   onPossible,
   teinteFantome = "gris",
   onVue,
+  zones = AUCUNE_ZONE,
+  ambiance = "classique",
+  onZone,
+  trajet = null,
   className,
 }: {
+  /** Ton chemin jusqu'au match choisi (lon, lat), qui brille sur le plan (31/10, le tableau de bord). */
+  trajet?: [number, number][] | null;
+  /** Les zones Bola (lib/sfl/zones.ts) : ouvertes, puis en attente. */
+  zones?: Zone[];
+  /** L'ambiance du plan (map/ambiances.ts). */
+  ambiance?: Ambiance;
+  /** Toucher l'étiquette d'une zone : son récit. */
+  onZone?: (id: string) => void;
   fond?: FondCarte;
   /** Les terrains où l'on peut ouvrir un match, sans ceux qui ont déjà le leur. */
   possibles?: PossiblePlan[];
@@ -408,6 +470,7 @@ export function CarteMap({
   const maison = useRef<maplibregl.LngLatBounds | null>(null);
   const ailleurs = useRef(false);
   const retraitRef = useRef(matchsEnRetrait);
+  const trajetRef = useRef(trajet);
   // Les terrains possibles : leurs données et leur ton, lus quand leurs
   // couches se posent ; celui qui est levé, et le filtre qui l'ôte des couches.
   const possiblesRef = useRef(possibles);
@@ -416,6 +479,13 @@ export function CarteMap({
   const vueRef = useRef(onVue);
   const leve = useRef<Marker | null>(null);
   const filtreLeve = useRef<maplibregl.FilterSpecification | null>(null);
+  const zonesRef = useRef(zones);
+  const ambianceRef = useRef<Ambiance>(ambiance);
+  const zoneRef = useRef(onZone);
+  const etiquettes = useRef<Marker[]>([]);
+  useEffect(() => {
+    zoneRef.current = onZone;
+  }, [onZone]);
   useEffect(() => {
     choisirRef.current = onChoisir;
     bulleRef.current = onBulle;
@@ -456,15 +526,30 @@ export function CarteMap({
       vueRef.current?.(b.getWest(), b.getSouth(), b.getEast(), b.getNorth(), map.getZoom());
     };
     map.on("moveend", montrer);
+    const pres = () => {
+      const c = map.getContainer().classList;
+      c.toggle("zones-proches", map.getZoom() > ZOOM_ETIQUETTES_ZONES);
+      c.toggle("zones-loin", map.getZoom() < ZOOM_ETIQUETTES_LOIN);
+      c.toggle("zones-region", map.getZoom() < ZOOM_REGION);
+    };
+    map.on("zoom", pres);
+    pres();
+    // Deux étiquettes de zones qui se chevauchent : la plus ancienne zone reste.
+    map.on("moveend", () => degagerEtiquettes(etiquettes.current));
     map.on("load", () => {
       montrer();
-      appliquerFond(map, fondRef.current, false);
+      peindre(map, ambianceRef.current);
+      poserZones(map, zonesRef.current);
+      teinterZones(map, ambianceRef.current, fondRef.current === "satellite");
+      appliquerFond(map, fondRef.current, false, ambianceRef.current);
+      poserTrajet(map, trajetRef.current, ambianceRef.current);
       // L'attribution reste repliée en un petit « i » : elle s'ouvre au toucher.
       map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
       poserPossibles(map, () => possiblesRef.current, () => carte.current === map)
         .then((pose) => {
           if (!pose) return;
           teinterPossibles(map, fondRef.current, teinteRef.current);
+          teinterZones(map, ambianceRef.current, fondRef.current === "satellite");
           for (const id of COUCHES_POSSIBLES) map.setFilter(id, filtreLeve.current);
         })
         .catch(() => {});
@@ -556,10 +641,55 @@ export function CarteMap({
     map.getContainer().classList.toggle("fond-satellite", fond === "satellite");
     if (!map.isStyleLoaded()) return;
     teinterPossibles(map, fond, teinteRef.current);
-    return appliquerFond(map, fond, !calme());
+    teinterZones(map, ambianceRef.current, fond === "satellite");
+    return appliquerFond(map, fond, !calme(), ambianceRef.current);
   }, [fond]);
 
-  // Les terrains possibles : leurs données, puis leur ton.
+  // Le trajet jusqu'au match : sa ligne et sa lueur, dans le ton du plan.
+  useEffect(() => {
+    trajetRef.current = trajet;
+    const map = carte.current;
+    if (map?.getLayer("terre")) poserTrajet(map, trajet, ambiance);
+  }, [trajet, ambiance]);
+
+  // L'ambiance : le plan repeint, les zones dans leur ton.
+  useEffect(() => {
+    ambianceRef.current = ambiance;
+    const map = carte.current;
+    if (!map) return;
+    map.getContainer().dataset.ambiance = ambiance;
+    if (!map.getLayer("zones-voile")) return;
+    peindre(map, ambiance);
+    teinterZones(map, ambiance, fondRef.current === "satellite");
+    appliquerFond(map, fondRef.current, false, ambiance);
+  }, [ambiance]);
+
+  // Les zones : leurs couches, et leurs étiquettes en repères (au-dessus du
+  // plan, sous les matchs). La nouvelle zone s'ouvre avec un anneau.
+  useEffect(() => {
+    zonesRef.current = zones;
+    const map = carte.current;
+    if (!map) return;
+    if (map.getSource("zones-voile")) majZones(map, zones);
+    etiquettes.current.forEach((m) => m.remove());
+    etiquettes.current = [];
+    map.getContainer().classList.toggle("avec-zones", ambiance !== "classique" && zones.some((z) => z.ouverte));
+    if (ambiance === "classique") return;
+    for (const z of zones) {
+      if (z.contour.length < 4) continue;
+      const h = hautDe(z);
+      const m = repere(map, h.lat, h.lng, zoneHtml(z), { classe: "zone-ancre", z: 1 });
+      m.getElement().querySelector("button")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        navigator.vibrate?.(8);
+        zoneRef.current?.(z.id);
+      });
+      etiquettes.current.push(m);
+    }
+    degagerEtiquettes(etiquettes.current);
+  }, [zones, ambiance]);
+
+  // Les terrains possibles : leurs données, puis leur ton (plus discret la nuit).
   useEffect(() => {
     possiblesRef.current = possibles;
     const source = carte.current?.getSource("possibles");
@@ -568,7 +698,9 @@ export function CarteMap({
   useEffect(() => {
     teinteRef.current = teinteFantome;
     const map = carte.current;
-    if (map) teinterPossibles(map, fondRef.current, teinteFantome);
+    if (!map) return;
+    teinterPossibles(map, fondRef.current, teinteFantome);
+    teinterZones(map, ambianceRef.current, fondRef.current === "satellite");
   }, [teinteFantome]);
 
   // Le terrain possible touché se lève : le mini-stade et son nom, à sa
@@ -733,9 +865,18 @@ export function CarteMap({
       cibleVol.current = boite();
       const voler = () => {
         if (carte.current !== map || !cibleVol.current) return;
-        origine.current = performance.now() + VOL * 1000 - 250;
-        volFini.current = performance.now() + VOL * 1000;
-        cadrer(map, cibleVol.current, marges(map, MARGE_HAUT, margeBasRef.current), ZOOM_CADRE, VOL);
+        // Avec les zones (30/10) : le vol se pose d'abord sur la zone des
+        // matchs, son étiquette en titre, puis plonge sur eux.
+        const c = cibleVol.current.getCenter();
+        const zone = ambianceRef.current === "classique" ? undefined : zonesRef.current.find((z) => z.ouverte && dansContour(z.contour, c.lat, c.lng));
+        const survol = zone ? VOL * 1000 + PAUSE_ZONE : 0;
+        origine.current = performance.now() + survol + VOL * 1000 - 250;
+        volFini.current = performance.now() + survol + VOL * 1000;
+        const plonger = () => carte.current === map && cibleVol.current && cadrer(map, cibleVol.current, marges(map, MARGE_HAUT, margeBasRef.current), ZOOM_CADRE, VOL);
+        if (!zone) return plonger();
+        const b = zone.contour.reduce((x, p) => x.extend(p), new maplibregl.LngLatBounds(zone.contour[0], zone.contour[0]));
+        cadrer(map, b, marges(map, MARGE_HAUT + 60, margeBasRef.current), ZOOM_SURVOL, VOL);
+        window.setTimeout(plonger, survol);
       };
       // Sous l'écran de chargement, puis sous l'accueil de l'app
       // (components/sfl/accueil), le vol attend qu'ils se lèvent (les
@@ -939,13 +1080,14 @@ export function CarteMap({
  * les volumes s'effacent sous la photo et les libellés passent en blanc.
  * Renvoie de quoi annuler la fin du fondu.
  */
-function appliquerFond(map: PlanMap, fond: FondCarte, doux: boolean): (() => void) | undefined {
+function appliquerFond(map: PlanMap, fond: FondCarte, doux: boolean, ambiance: Ambiance): (() => void) | undefined {
   const sat = fond === "satellite";
   const duree = doux ? FONDU : 0;
   map.setPaintProperty("satellite", "raster-opacity-transition", { duration: duree, delay: 0 });
   for (const id of LIBELLES) {
-    map.setPaintProperty(id, "text-color", sat ? "#f4f5f2" : id === "noms-rues" ? "#6d6a64" : id === "noms-eau" ? "#3d8fbf" : "#6b6d72");
-    map.setPaintProperty(id, "text-halo-color", sat ? "rgba(10, 11, 13, 0.85)" : "#ffffff");
+    const { texte, halo } = couleurLibelle(ambiance, id, sat);
+    map.setPaintProperty(id, "text-color", texte);
+    map.setPaintProperty(id, "text-halo-color", halo);
   }
   if (sat) {
     map.setLayoutProperty("satellite", "visibility", "visible");
@@ -957,4 +1099,20 @@ function appliquerFond(map: PlanMap, fond: FondCarte, doux: boolean): (() => voi
   map.setPaintProperty("satellite", "raster-opacity", 0);
   const t = window.setTimeout(() => map.setLayoutProperty("satellite", "visibility", "none"), duree);
   return () => window.clearTimeout(t);
+}
+
+/** Le trajet : une lueur large et floue sous un trait net ; la braise la nuit, le vert Bola le jour. */
+function poserTrajet(map: PlanMap, trajet: [number, number][] | null, ambiance: Ambiance) {
+  const donnees: GeoJSON.Feature<GeoJSON.LineString> = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: trajet && trajet.length > 1 ? trajet : [] } };
+  const source = map.getSource("trajet") as maplibregl.GeoJSONSource | undefined;
+  if (source) source.setData(donnees);
+  else {
+    map.addSource("trajet", { type: "geojson", data: donnees });
+    const avant = map.getLayer("noms-rues") ? "noms-rues" : undefined;
+    map.addLayer({ id: "trajet-lueur", type: "line", source: "trajet", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-width": 16, "line-blur": 10, "line-opacity": 0.5 } }, avant);
+    map.addLayer({ id: "trajet-trait", type: "line", source: "trajet", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-width": 3.5 } }, avant);
+  }
+  const couleur = ambiance.startsWith("nuit") ? "#FF6A1A" : "#1F8A45";
+  map.setPaintProperty("trajet-lueur", "line-color", couleur);
+  map.setPaintProperty("trajet-trait", "line-color", couleur);
 }
