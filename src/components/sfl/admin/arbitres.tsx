@@ -45,22 +45,22 @@ export function ArbitresAdmin() {
   return (
     <section className="overflow-hidden rounded-3xl bg-card">
       <div className="px-5 pt-4 pb-2">
-        <h3 className="text-[15px] font-bold tracking-tight">Arbitres</h3>
+        <h3 className="text-lecture font-bold tracking-tight">Arbitres</h3>
       </div>
 
       <div className="flex flex-col gap-2 px-4 pb-3">
-        {arbitres.arbitres.length === 0 && <p className="px-1 text-[13px] text-muted-foreground">Aucun arbitre.</p>}
+        {arbitres.arbitres.length === 0 && <p className="px-1 text-corps text-muted-foreground">Aucun arbitre.</p>}
         {arbitres.arbitres.map((nom) => {
           const s = arbitres.stats(nom);
           return (
             <div key={nom} className="flex items-center gap-3 rounded-2xl bg-secondary/40 px-3 py-2.5">
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] font-semibold">{identite.nom(nom)}</span>
-                <span className="block text-[11px] text-muted-foreground tabular-nums">
+                <span className="block truncate text-ligne font-semibold">{identite.nom(nom)}</span>
+                <span className="block text-legende text-muted-foreground tabular-nums">
                   {s.matchs} match{s.matchs > 1 ? "s" : ""} · satisfaction {s.satisfaction ?? "–"}
                 </span>
               </span>
-              <button type="button" onClick={() => faire(nom, false)} className="bouton-secondaire shrink-0 px-3 py-1.5 text-[12px] font-semibold">
+              <button type="button" onClick={() => faire(nom, false)} className="bouton-secondaire shrink-0 px-3 py-1.5 text-petit font-semibold">
                 Rendre joueur
               </button>
             </div>
@@ -80,18 +80,18 @@ export function ArbitresAdmin() {
             onClick={() => faire(p.name, true)}
             className="flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-left active:bg-secondary"
           >
-            <span className="truncate text-[14px] font-medium">{identite.nom(p.name)}</span>
-            <span className="shrink-0 text-[12px] font-semibold text-muted-foreground">Faire arbitre</span>
+            <span className="truncate text-ligne font-medium">{identite.nom(p.name)}</span>
+            <span className="shrink-0 text-petit font-semibold text-muted-foreground">Faire arbitre</span>
           </button>
         ))}
-        {message && <p className="px-1 text-[12px] text-muted-foreground">{message}</p>}
+        {message && <p className="px-1 text-petit text-muted-foreground">{message}</p>}
       </div>
 
       {arbitres.arbitres.length > 0 && avecMatchs.length > 0 && (
         <div className="flex flex-col gap-3 border-t border-border/60 px-4 py-4">
           {avecMatchs.map((jr) => (
             <div key={jr.j} className="flex flex-col gap-1.5">
-              <span className="px-1 text-[13px] font-bold">
+              <span className="px-1 text-corps font-bold">
                 Journée {jr.j} <span className="font-normal text-muted-foreground">· {jr.date}</span>
               </span>
               {jr.matches!.map((m, n) => {
@@ -100,8 +100,8 @@ export function ArbitresAdmin() {
                 return (
                   <label key={m.id} className="flex items-center gap-3 rounded-2xl bg-secondary/40 px-3 py-2">
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[13px] font-semibold">Match {n + 1}</span>
-                      <span className="block truncate text-[11px] text-muted-foreground">
+                      <span className="block text-corps font-semibold">Match {n + 1}</span>
+                      <span className="block truncate text-legende text-muted-foreground">
                         {equipes.join(" – ")}
                       </span>
                     </span>
@@ -115,7 +115,7 @@ export function ArbitresAdmin() {
                         const err = await designerArbitre(numero, jr.j, n, equipes, e.target.value || null, fermeLe);
                         if (err) setMessage(err);
                       }}
-                      className="h-9 max-w-[45%] shrink-0 rounded-full bg-background px-3 text-[13px] font-medium"
+                      className="h-9 max-w-[45%] shrink-0 rounded-full bg-background px-3 text-corps font-medium"
                     >
                       <option value="">Pas d&apos;arbitre</option>
                       {arbitres.arbitres.map((nom) => (

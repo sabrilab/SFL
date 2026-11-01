@@ -24,7 +24,7 @@ function Cote({ nom, camp, droite }: { nom: string; camp: Camp; droite?: boolean
       ) : (
         <CarteDe name={nom} size={FORMAT_CARTE.petite} />
       )}
-      <span className="line-clamp-2 min-w-0 text-[15px] leading-[1.15] font-bold break-words">
+      <span className="line-clamp-2 min-w-0 text-lecture leading-[1.15] font-bold break-words">
         <Nom n={nom} />
       </span>
     </span>
@@ -56,13 +56,13 @@ export function DuelsDuJour({
           >
             <div className="flex items-center gap-2">
               <Cote nom={d.noirs} camp="Noirs" />
-              <span className="shrink-0 text-[17px] leading-none text-foreground/35" style={{ fontFamily: ANTON }}>
+              <span className="shrink-0 text-titre leading-none text-encre-4" style={{ fontFamily: ANTON }}>
                 VS
               </span>
               <Cote nom={d.blancs} camp="Blancs" droite />
             </div>
             {duels.some((x) => x.label !== d.label) && (
-              <span className="mono-label self-center text-[9px] text-foreground/40">{d.label}</span>
+              <span className="mono-label self-center text-micro text-encre-3">{d.label}</span>
             )}
           </div>
         ))}

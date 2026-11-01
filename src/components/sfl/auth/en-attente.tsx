@@ -55,11 +55,11 @@ export function EnAttente({ session, horsSaison = false }: { session: Session; h
         </div>
       </div>
       <div className="mx-auto w-full max-w-[420px] pt-[34px]">
-        <p className="mono-label text-foreground/40">En attente</p>
-        <h1 className="mt-[8px] text-[34px] leading-[1.05] font-extrabold tracking-tight">
+        <p className="mono-label text-encre-3">En attente</p>
+        <h1 className="mt-[8px] text-nom leading-[1.05] font-extrabold tracking-tight">
           {horsSaison ? "Ta carte arrive." : "Tu es sur la liste."}
         </h1>
-        <p className="mt-[13px] text-[15px] leading-snug text-foreground/55">
+        <p className="mt-[13px] text-lecture leading-snug text-encre-3">
           {horsSaison
             ? "Ton compte est validé. Ta carte s'ouvre dès que la saison t'a ajouté."
             : "La ligue valide ton entrée. Ta carte s'ouvre dès que c'est fait."}
@@ -69,7 +69,7 @@ export function EnAttente({ session, horsSaison = false }: { session: Session; h
         <button
           type="button"
           onClick={verifier}
-          className="bouton-principal bouton--vert flex w-full items-center justify-center gap-2 py-[17px] text-[15px] font-bold"
+          className="bouton-principal bouton--vert flex w-full items-center justify-center gap-2 py-[17px] text-lecture font-bold"
         >
           {verif && <Loader2 className="size-4 animate-spin" />}
           Vérifier
@@ -77,7 +77,7 @@ export function EnAttente({ session, horsSaison = false }: { session: Session; h
         <button
           type="button"
           onClick={signOut}
-          className="bouton-discret bouton--rouge mt-[13px] w-full py-[8px] text-center text-[13px] font-semibold"
+          className="bouton-discret bouton--rouge mt-[13px] w-full py-[8px] text-center text-corps font-semibold"
         >
           Se déconnecter
         </button>

@@ -67,8 +67,8 @@ import {
   TournantModule,
   useAnalysePlus,
 } from "@/components/sfl/feed/analyse-plus";
-import { buildQuiz, PronosticModule, QuizModule } from "@/components/sfl/feed/jeux";
-import { NEXT_MATCH } from "@/lib/sfl/data";
+import { buildQuiz, QuizModule } from "@/components/sfl/feed/jeux";
+import { RubriqueFlair } from "@/components/sfl/flair/mon-flair";
 import { Reveal } from "@/components/sfl/feed/reveal";
 import { ArbitresDuMatch } from "@/components/sfl/feed/arbitre-du-match";
 import { PitchSynthese } from "@/components/sfl/feed/pitch-synthese";
@@ -120,18 +120,18 @@ function ReactionRow({ id, className }: { id: string; className?: string }) {
             key={emoji}
             onClick={() => toggle(emoji)}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-semibold",
+              "flex items-center gap-1.5 px-3 py-1.5 text-corps font-semibold",
               active ? "bouton-secondaire bouton--mauve" : "bouton-secondaire"
             )}
           >
-            <span className="text-[15px] leading-none">{emoji}</span>
+            <span className="text-lecture leading-none">{emoji}</span>
             <span className="tabular-nums">{base + (active ? 1 : 0)}</span>
           </button>
         );
       })}
       <button
         onClick={() => toggle("👏")}
-        className="bouton-secondaire bouton--mauve flex items-center justify-center px-3 py-1.5 text-[13px] font-semibold"
+        className="bouton-secondaire bouton--mauve flex items-center justify-center px-3 py-1.5 text-corps font-semibold"
       >
         +
       </button>
@@ -147,7 +147,7 @@ function ModuleTitle({ label, title, partage }: { label?: string; title: string;
     <div className="mb-3 flex items-start justify-between gap-2 px-1">
       <div>
         {label && <p className="mono-label text-primary">{label}</p>}
-        <h2 className="mt-0.5 text-[17px] font-bold tracking-tight">{title}</h2>
+        <h2 className="mt-0.5 text-titre font-bold tracking-tight">{title}</h2>
       </div>
       {partage && <AuVestiaireRond piece={partage} />}
     </div>
@@ -199,7 +199,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
   // Les élus des votes fermés (Impact, Défensive) posés sur leurs lignes.
   const { journees, boostCards, saison: brute, saisonTitree } = useSeason();
   const saison = saisonTitree ?? brute;
-  // Une saison close se relit sans ses jeux (quiz, pronostic), qui sont du présent.
+  // Une saison close se relit sans ses jeux (le quiz), qui sont du présent.
   const relue = useSaisonClose();
 
   // Barre de progression de lecture — le scroll vit dans #app-scroll.
@@ -323,18 +323,6 @@ function JourneeRecapComplet({ j }: { j: number }) {
   const analyse = useAnalyse(saisonAtJ, players, journeesAtJ, lastJ);
   const plus = useAnalysePlus(saisonAtJ, players, journeesAtJ, lastJ, player.name);
 
-  // Le pronostic porte sur la journée suivante : la prochaine convocation
-  // quand on lit le dernier récap, la journée d'après sinon (déjà jouée, donc
-  // résolue tout de suite).
-  const nextJ = journees.find((x) => x.j === j + 1);
-  const pronoJ = nextJ ? nextJ.j : NEXT_MATCH.journee;
-  const pronoDate = nextJ ? nextJ.date : `${NEXT_MATCH.jour} ${NEXT_MATCH.date}`;
-  const pronoCandidates = [...players]
-    .filter((p) => p.matchs > 0)
-    .sort((a, b) => b.pp - a.pp)
-    .slice(0, 6);
-  const pronoResolved =
-    saison.entries.find((e) => e.j === pronoJ && e.mvp && !e.extraTime)?.player ?? null;
   const quiz = buildQuiz(
     lastJ,
     jEntries.map((e) => ({ name: e.player, buts: e.buts }))
@@ -362,7 +350,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
         <div className="glass-soft flex items-center justify-between gap-3 rounded-full px-3.5 py-2.5">
           <div className="flex min-w-0 items-center gap-2.5">
             <Visages noms={participants.slice(0, 4)} />
-            <span className="truncate text-[12.5px] text-foreground/60">
+            <span className="truncate text-corps text-encre-2">
               {participants.slice(0, 2).join(", ")} et {participants.length - 2} autres ont joué
             </span>
           </div>
@@ -377,12 +365,12 @@ function JourneeRecapComplet({ j }: { j: number }) {
       <Reveal delay={0.05}>
         <div className="px-1">
           <div className="flex items-start justify-between gap-2">
-            <h2 className="text-[22px] leading-[1.15] font-extrabold tracking-tight">
+            <h2 className="text-titre-m leading-[1.15] font-extrabold tracking-tight">
               Journée {lastJ.j} : le récap
             </h2>
             <AuVestiaireRond piece={{ type: "feuille", j: lastJ.j }} />
           </div>
-          <p className="mt-[7px] text-[13px] leading-snug text-foreground/40">
+          <p className="mt-[7px] text-corps leading-snug text-encre-3">
             SFL · Sunday Five League · {matches.length} match{matches.length > 1 ? "s" : ""} ·{" "}
             {totalButs} buts
           </p>
@@ -428,13 +416,13 @@ function JourneeRecapComplet({ j }: { j: number }) {
             </p>
             <div className="mt-3 flex items-center justify-between gap-3">
               <div className="flex min-w-0 flex-1 justify-center">
-                <PastilleMaillot camp="Noirs" className="text-[15px]" />
+                <PastilleMaillot camp="Noirs" className="text-lecture" />
               </div>
-              <div className="shrink-0 text-[44px] leading-none font-bold tracking-tight tabular-nums">
+              <div className="shrink-0 text-affiche leading-none font-bold tracking-tight tabular-nums">
                 {big.teamA.score}–{big.teamB.score}
               </div>
               <div className="flex min-w-0 flex-1 justify-center">
-                <PastilleMaillot camp="Blancs" className="text-[15px]" />
+                <PastilleMaillot camp="Blancs" className="text-lecture" />
               </div>
             </div>
             <Link
@@ -484,19 +472,19 @@ function JourneeRecapComplet({ j }: { j: number }) {
                 style={{ aspectRatio: "9/16" }}
               >
                 <p className="mono-label text-primary">SFL · J{lastJ.j}</p>
-                <div className="mt-6 text-[44px] leading-none font-bold tabular-nums">
+                <div className="mt-6 text-affiche leading-none font-bold tabular-nums">
                   {big.teamA.score}
                   <br />
                   {big.teamB.score}
                 </div>
-                <p className="mt-4 text-[15px] leading-snug font-bold">
+                <p className="mt-4 text-lecture leading-snug font-bold">
                   {vainqueurDu(big) === MAILLOTS.Noirs
                     ? "Les Noirs font tomber les Blancs"
                     : vainqueurDu(big) === MAILLOTS.Blancs
                       ? "Les Blancs font tomber les Noirs"
                       : "Noirs et Blancs dos à dos"}
                 </p>
-                <p className="absolute bottom-4 left-4 text-[11px] text-muted-foreground">
+                <p className="absolute bottom-4 left-4 text-legende text-muted-foreground">
                   {lastJ.date} · {totalButs} buts
                 </p>
               </div>
@@ -541,7 +529,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                 </div>
               ))}
             </div>
-            <p className="mono-label mt-3 text-center text-foreground/30">
+            <p className="mono-label mt-3 text-center text-encre-4">
               Glisse une carte pour la faire tourner
             </p>
           </section>
@@ -602,7 +590,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                           {decisifs.map((p) => (
                             <span
                               key={p.name}
-                              className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold"
+                              className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-petit font-semibold"
                               style={{ background: maillot.fond, color: maillot.encre, boxShadow: LISERE_CAMP }}
                             >
                               {p.name}
@@ -651,13 +639,13 @@ function JourneeRecapComplet({ j }: { j: number }) {
               {others.map((m) => (
                 <div key={m.id} className="rounded-2xl bg-card px-4 py-3">
                   {numeroDu(lastJ, m) && (
-                    <p className="mono-label mb-2 text-foreground/40">{numeroDu(lastJ, m)}</p>
+                    <p className="mono-label mb-2 text-encre-3">{numeroDu(lastJ, m)}</p>
                   )}
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 flex-1">
                       <PastilleMaillot camp="Noirs" />
                     </span>
-                    <span className="shrink-0 text-[15px] font-bold tabular-nums">
+                    <span className="shrink-0 text-lecture font-bold tabular-nums">
                       {m.teamA.score}–{m.teamB.score}
                     </span>
                     <span className="flex min-w-0 flex-1 justify-end">
@@ -732,7 +720,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
               <div key={t.label} className="glass rounded-3xl p-4">
                 <p className="mono-label text-primary">{t.label}</p>
                 <div className="mt-1 text-2xl font-bold tabular-nums">{t.value}</div>
-                <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{t.sub}</p>
+                <p className="mt-0.5 text-petit leading-snug text-muted-foreground">{t.sub}</p>
               </div>
             ))}
           </div>
@@ -777,12 +765,12 @@ function JourneeRecapComplet({ j }: { j: number }) {
                   key={e.player}
                   className="flex items-center gap-3 rounded-2xl bg-card px-4 py-3"
                 >
-                  <span className="w-5 text-center text-[13px] font-bold text-muted-foreground tabular-nums">
+                  <span className="w-5 text-center text-corps font-bold text-muted-foreground tabular-nums">
                     {i + 1}
                   </span>
                   <Avatar name={e.player} size={28} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-semibold"><Nom n={e.player} /></span>
+                    <span className="block truncate text-ligne font-semibold"><Nom n={e.player} /></span>
                     <span className="mono-label text-muted-foreground">
                       {[
                         e.buts > 0 && `${e.buts}B`,
@@ -827,7 +815,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                 titre={nomAffiche(duelA.name)}
                 sousTitre={`Le duel · J${lastJ.j}`}
               />
-              <span className="mono-label shrink-0 text-foreground/40">VS</span>
+              <span className="mono-label shrink-0 text-encre-3">VS</span>
               <Card3DEnGrand
                 cacheKey={`feed-duel-${lastJ.j}-${duelB.name}`}
                 mode="simple"
@@ -840,7 +828,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
             <div className="mb-3 flex items-center justify-between">
               {[duelA, duelB].map((p) => (
                 <div key={p.name} className="text-center first:text-left last:text-right">
-                  <div className="text-[14px] font-bold"><Nom n={p.name} /></div>
+                  <div className="text-ligne font-bold"><Nom n={p.name} /></div>
                   <div className="mono-label text-muted-foreground">
                     {feat(p.name) ?? p.poste}
                   </div>
@@ -853,7 +841,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                 const b = duelB.stats[k];
                 return (
                   <div key={k} className="flex items-center gap-2">
-                    <span className="w-7 text-right text-[12px] font-bold tabular-nums">{a}</span>
+                    <span className="w-7 text-right text-petit font-bold tabular-nums">{a}</span>
                     <div className="flex h-1.5 flex-1 gap-1">
                       <div className="flex flex-1 justify-end overflow-hidden rounded-full bg-foreground/10">
                         <div
@@ -868,7 +856,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                         />
                       </div>
                     </div>
-                    <span className="w-7 text-[12px] font-bold tabular-nums">{b}</span>
+                    <span className="w-7 text-petit font-bold tabular-nums">{b}</span>
                     <span className="mono-label w-8 text-muted-foreground">{k}</span>
                   </div>
                 );
@@ -893,7 +881,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
               {debuts.map((e) => (
                 <div key={e.player} className="flex items-center gap-2.5">
                   <Avatar name={e.player} size={26} />
-                  <p className="text-[13px] text-muted-foreground">
+                  <p className="text-corps text-muted-foreground">
                     <span className="font-semibold text-foreground"><Nom n={e.player} /></span>{" "}
                     {e.buts > 0
                       ? `plante ${e.buts} but${e.buts > 1 ? "s" : ""} pour sa première`
@@ -940,12 +928,12 @@ function JourneeRecapComplet({ j }: { j: number }) {
                 <div className="rounded-3xl bg-card p-4">
                   <div className="flex items-center gap-2.5">
                     <Avatar name="Ilyes" size={26} />
-                    <p className="text-[13px]">
+                    <p className="text-corps">
                       <span className="font-semibold">Ilyes</span>{" "}
                       <span className="text-muted-foreground">— énorme dimanche, rien à dire.</span>
                     </p>
                   </div>
-                  <div className="mt-3 h-10 rounded-full bg-foreground/8 px-4 text-[13px] leading-10 text-muted-foreground">
+                  <div className="mt-3 h-10 rounded-full bg-foreground/8 px-4 text-corps leading-10 text-muted-foreground">
                     Balance ton avis…
                   </div>
                 </div>
@@ -1036,7 +1024,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                   <span className="absolute top-2 left-2 flex size-7 items-center justify-center rounded-full bg-foreground/15">
                     <Play className="size-3.5" />
                   </span>
-                  <span className="absolute right-2 bottom-2 left-2 text-[11px] leading-tight font-semibold">
+                  <span className="absolute right-2 bottom-2 left-2 text-legende leading-tight font-semibold">
                     {t}
                   </span>
                 </div>
@@ -1065,7 +1053,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                   <Avatar key={e.player} name={e.player} size={34} />
                 ))}
               </div>
-              <p className="min-w-0 flex-1 text-[13px] leading-snug text-muted-foreground">
+              <p className="min-w-0 flex-1 text-corps leading-snug text-muted-foreground">
                 <span className="font-semibold text-foreground">
                   {duo.best.map((e) => e.player).join(" et ")}
                 </span>{" "}
@@ -1123,7 +1111,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
                 <Play className="size-6" />
               </span>
               <div className="absolute right-4 bottom-3 left-4">
-                <p className="text-[15px] font-bold">Le but qui a plié le match</p>
+                <p className="text-lecture font-bold">Le but qui a plié le match</p>
                 <p className="mono-label mt-0.5 text-muted-foreground">
                   @{lastJ.faits.buteur ?? "joueur"} · J{lastJ.j}
                 </p>
@@ -1169,17 +1157,11 @@ function JourneeRecapComplet({ j }: { j: number }) {
         </Reveal>
       )}
 
-      {!relue && (
-        <Reveal>
-          <PronosticModule
-            journee={pronoJ}
-            date={pronoDate}
-            candidates={pronoCandidates}
-            me={player.name}
-            resolvedMvp={pronoResolved}
-          />
-        </Reveal>
-      )}
+      {/* Mon Flair de cette journée, jugé (Sabri, 30/10 : « sur les récaps, le
+          résultat du flair ») ; il remplace l'ancien pronostic du MVP. */}
+      <Reveal>
+        <RubriqueFlair j={lastJ.j} className="mx-0 my-0" />
+      </Reveal>
 
       {/* 15 · Le vestiaire */}
       <Reveal>
@@ -1189,7 +1171,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
             <div className="glass rounded-3xl p-4">
               <div className="flex items-center gap-2.5">
                 <Avatar name="Ilyes" size={26} />
-                <p className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">
+                <p className="min-w-0 flex-1 truncate text-corps text-muted-foreground">
                   Dimanche on remet ça. Il me manque deux joueurs, réponds vite.
                 </p>
               </div>

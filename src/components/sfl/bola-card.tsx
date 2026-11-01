@@ -68,6 +68,11 @@
 // la place de la puce, et sa date d'émission et son numéro dans la ligne de
 // série. Ni badge, ni habillage : elle est restée telle qu'elle a été émise.
 //
+// La carte d'un gardien (poste G, Sabri 31/10) : la même carte, ses six cases
+// sous des stats de gardien (plo, réf, dég, jma, pla, phy ; lib/sfl/gardien.ts)
+// et « gardien » dans l'étiquette. Sans icônes : Sabri a essayé au trait puis en
+// plein, et préféré les mots (31/10).
+//
 // La carte d'un arbitre (`edition="arbitre"`, `arbitre` ; carte-arbitre.tsx,
 // Sabri 24/10) garde toute cette disposition, dans le jaune fluo de sa chasuble
 // (skins-arbitre.ts) ou le skin qu'il porte : sa satisfaction à la place de la note, ses chiffres
@@ -100,6 +105,7 @@ import { BordEpoque, EmblemeEpoque, LosangeBallon, SigleSfl, SigleSouligne } fro
 import { MotifCarte } from "@/components/sfl/motif-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
+import { abrege, estGardien } from "@/lib/sfl/gardien";
 import { ligneDEmission, type EmissionCarte } from "@/lib/sfl/epoques";
 
 export type BolaEdition = "base" | "rare" | "mvp" | "impact" | "def" | "arbitre";
@@ -124,7 +130,7 @@ const H = 1656;
 const M = 41;
 const ANTON = "var(--font-anton), Anton, sans-serif";
 const SANS = "var(--font-inter), Inter, system-ui, sans-serif";
-const MONO = "var(--font-jbmono), ui-monospace, monospace";
+const MONO = "var(--font-inter), system-ui, sans-serif";
 
 // Le nombre d'or, cote par cote (repère 1024 × 1656).
 const PHI = (1 + Math.sqrt(5)) / 2;
@@ -355,6 +361,8 @@ export function BolaCard({
   // L'arbitre a sa matière à lui (ou le skin de tenue qu'il porte), sans époque.
   const p = edition === "arbitre" ? MATIERES[arbitre?.finition ?? "arbitre"] : matiereDe(edition, habillageDemande, epoque?.saison);
   const note = arbitre ? arbitre.note : overall;
+  // Un gardien (poste G) : les mêmes six cases, sous des stats de gardien (lib/sfl/gardien.ts).
+  const gardien = !arbitre && estGardien(position);
   // Une carte d'époque est restée telle qu'elle a été émise : sans habillage ni badge.
   const era = p.epoque;
   const habillage = era ? undefined : habillageDemande;
@@ -889,14 +897,14 @@ export function BolaCard({
                 ...(era && { color: era.libelle }),
               }}
             >
-              {complete ? `${username ? `${username} · ` : ""}${position.toLowerCase()}` : position.toUpperCase()}
+              {complete ? `${username ? `${username} · ` : ""}${gardien ? "gardien" : position.toLowerCase()}` : position.toUpperCase()}
             </div>
           </>
         )}
 
         {complete && (
           <>
-            {/* Les six stats, deux par rangée, dans le carré sous le nom : « vit 84 » */}
+            {/* Les six stats, deux par rangée, dans le carré sous le nom : « vit 84 » (« réf 89 » pour un gardien) */}
             <div
               style={{
                 position: "absolute",
@@ -911,13 +919,14 @@ export function BolaCard({
             >
               {(arbitre?.stats ?? STAT_KEYS.map((k) => [k, stats[k]] as const)).map(([k, valeur]) => {
                 const actif = highlightStats?.includes(k as StatKey);
+                const libelle = gardien ? abrege(k as StatKey, true) : k;
                 return (
                   <div key={k} style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: u(12) }}>
                     {era ? (
                       // Les libellés d'alors : en capitales, dans le brun (ou le métal) de l'édition.
-                      <span style={{ ...mono(23, 2.5, 1, 700), color: era.libelle }}>{k.toUpperCase()}</span>
+                      <span style={{ ...mono(23, 2.5, 1, 700), color: era.libelle }}>{libelle.toUpperCase()}</span>
                     ) : (
-                      <span style={mono(26, 1, 0.62, 500)}>{k.toLowerCase()}</span>
+                      <span style={mono(26, 1, 0.62, 500)}>{libelle.toLowerCase()}</span>
                     )}
                     <span
                       style={{

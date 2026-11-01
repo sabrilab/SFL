@@ -313,12 +313,12 @@ export function MedailleTop({ rang, taille = 64, gagnee = true }: { rang: number
       <circle cx={cx} cy={cy} r={39.6} fill={`url(#${id}f)`} />
       <circle cx={cx} cy={cy} r={38.7} fill="none" stroke={moyen} strokeWidth={0.5} opacity={0.55} />
       <path d={rosace(cx, cy, 12, 29.5)} fill="none" stroke={moyen} strokeWidth={0.32} opacity={0.3} />
-      <text fill={moyen} opacity={0.6} style={{ fontFamily: "var(--font-jbmono), ui-monospace, monospace", fontSize: 3.3, fontWeight: 700 }} dominantBaseline="central">
+      <text fill={moyen} opacity={0.6} style={{ fontFamily: "var(--font-inter), system-ui, sans-serif", fontSize: 3.3, fontWeight: 700 }} dominantBaseline="central">
         <textPath href={`#${id}m`} xlinkHref={`#${id}m`} textLength={tour - 1} lengthAdjust="spacing">
           {`TOP ${TOP_MEDAILLE} · ${ordinal(rang).toUpperCase()} · BOLA · `.repeat(4)}
         </textPath>
       </text>
-      <text x={cx} y={cy - 13} textAnchor="middle" fill={moyen} style={{ fontFamily: "var(--font-jbmono), ui-monospace, monospace", fontSize: 6.4, fontWeight: 700, letterSpacing: 1.4 }}>
+      <text x={cx} y={cy - 13} textAnchor="middle" fill={moyen} style={{ fontFamily: "var(--font-inter), system-ui, sans-serif", fontSize: 6.4, fontWeight: 700, letterSpacing: 1.4 }}>
         TOP
       </text>
       {[

@@ -61,15 +61,15 @@ export function FeuilleArbitre({
             <span className={cn("rounded-[14px] p-[3px]", actuel === nom && "bg-foreground")}>
               <CarteDe name={nom} size={FORMAT_CARTE.petite * 1.3} inerte />
             </span>
-            <span className="max-w-full truncate text-[12px] font-semibold">
+            <span className="max-w-full truncate text-petit font-semibold">
               <Nom n={nom} />
             </span>
           </button>
         ))}
       </div>
-      {arbitres.arbitres.length === 0 && <p className="mono-label py-8 text-center text-foreground/40">0 arbitre</p>}
+      {arbitres.arbitres.length === 0 && <p className="mono-label py-8 text-center text-encre-3">0 arbitre</p>}
       {actuel && (
-        <button type="button" onClick={() => void choisir(null)} className="bouton-discret h-11 text-[14px] font-semibold">
+        <button type="button" onClick={() => void choisir(null)} className="bouton-discret h-11 text-ligne font-semibold">
           Pas d&apos;arbitre
         </button>
       )}

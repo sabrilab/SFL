@@ -26,6 +26,13 @@
 // un contrat raté fait redescendre l'XP ; une récompense gagnée une saison
 // reste à soi les suivantes (palierMaxDe, missions.ts).
 //
+// Depuis le 30/10 (Sabri : « que ce soit comme des saisons, un peu comme
+// dans les jeux Fortnite, Call of Duty »), le Passe a des saisons à dates,
+// chacune ses paliers (saisons-passe.ts) : la Saison 1 (PASSE_SAISON_1, le
+// Passe ci-dessous, sans le sceau, les séquences ni la carte imprimée), puis
+// la Saison Givre (PASSE_GIVRE). Le coût des paliers et les épreuves restent
+// ceux d'ici ; une saison n'a que ses paliers (16, 12).
+//
 // Pur : ni React ni réseau. Le journal d'XP vient de missions.ts.
 
 import type { Signe } from "@/components/sfl/finitions-carte";
@@ -142,9 +149,14 @@ export const epreuveDu = (n: number, epreuves: readonly Epreuve[] = EPREUVES): E
   epreuves.find((e) => e.palier === n);
 
 /** Le palier que paient `xp` points de la saison, les épreuves faites ouvrant leur porte. */
-export function palierPour(xp: number, faites: ReadonlySet<number>, epreuves: readonly Epreuve[] = EPREUVES): number {
+export function palierPour(
+  xp: number,
+  faites: ReadonlySet<number>,
+  epreuves: readonly Epreuve[] = EPREUVES,
+  max: number = PALIERS_PASSE
+): number {
   let p = 0;
-  while (p < PALIERS_PASSE && xp >= seuilPalier(p + 1)) p++;
+  while (p < max && xp >= seuilPalier(p + 1)) p++;
   for (const e of epreuves) if (p >= e.palier && !faites.has(e.numero)) return e.palier - 1;
   return p;
 }
@@ -170,27 +182,52 @@ export interface PalierPasse {
   habille?: { finition?: string; signe?: Signe };
 }
 
-export const PASSE_BOLA: readonly PalierPasse[] = [
+/**
+ * La Saison 1 : le Passe tel qu'il était, sans le sceau (Sabri, 30/10 : « c'est
+ * moche, on l'a pas bien travaillé ») ni ce qui n'est pas tranché (les deux
+ * séquences Seedance et la carte imprimée : « si on n'a pas tranché sur ça,
+ * tu mets pas »). Seize paliers, tous sur la carte ; renumérotés, donc un
+ * joueur garde au moins ce qu'il avait (un palier de plus au même rang).
+ */
+export const PASSE_SAISON_1: readonly PalierPasse[] = [
   { n: 1, nom: "Liseré argent", quoi: "Un filet d'argent autour de ta photo.", rang: "B", genre: "signe", habille: { signe: "lisere-argent" } },
   { n: 2, nom: "Givre", quoi: "Le métal givré, le givre qui pousse des bords.", rang: "B", genre: "skin", habille: { finition: "givre" } },
-  { n: 3, nom: "Sceau", quoi: "Un sceau à tes initiales sur ta photo.", rang: "B", genre: "signe", habille: { signe: "sceau" } },
-  { n: 4, nom: "Carbone", quoi: "La fibre de carbone tissée, gris anthracite.", rang: "B", genre: "skin", habille: { finition: "carbone" } },
-  { n: 5, nom: "Nuit", quoi: "Le ciel de nuit, l'encre d'argent.", rang: "A", genre: "skin", habille: { finition: "nuit" } },
-  { n: 6, nom: "Puce noire", quoi: "La puce de ta carte en noir laqué, ses contacts d'argent.", rang: "B", genre: "signe", habille: { signe: "puce-noire" } },
-  { n: 7, nom: "Marbre", quoi: "Le marbre blanc veiné des statues.", rang: "A", genre: "skin", habille: { finition: "marbre" } },
-  { n: 8, nom: "Tes couleurs", quoi: "Ton drapeau le long des bords : à l'encre sur la face, en couleurs au dos.", rang: "A", genre: "skin", habille: { finition: "couleurs" } },
-  { n: 9, nom: "Ton nom gravé", quoi: "Ton nom caché dans la gravure fine.", rang: "B", genre: "signe", habille: { signe: "nom-grave" } },
-  { n: 10, nom: "Chrome", quoi: "Le métal poli, des reflets francs.", rang: "A", genre: "skin", habille: { finition: "chrome" } },
-  { n: 11, nom: "Néon", quoi: "Un tube de néon fuchsia qui suit le bord, sur le noir.", rang: "A", genre: "skin", habille: { finition: "neon" } },
-  { n: 12, nom: "Aurore", quoi: "Les rideaux d'une aurore boréale.", rang: "A", genre: "skin", habille: { finition: "aurore" } },
-  { n: 13, nom: "Liseré platine", quoi: "Un double filet de platine autour de ta photo.", rang: "A", genre: "signe", habille: { signe: "lisere-platine" } },
-  { n: 14, nom: "Ki", quoi: "L'aura blanche qui monte, les éclairs autour de toi.", rang: "S", genre: "skin", habille: { finition: "ki" } },
-  { n: 15, nom: "Animée", quoi: "La nacre, et une lumière qui passe.", rang: "S", genre: "skin", habille: { finition: "animee" } },
-  { n: 16, nom: "Onyx", quoi: "La carte noire guillochée.", rang: "S", genre: "skin", habille: { finition: "onyx" } },
-  { n: 17, nom: "Météorite", quoi: "Le fer d'une météorite, ses lamelles croisées.", rang: "S", genre: "skin", habille: { finition: "meteorite" } },
-  { n: 18, nom: "Ta séquence", quoi: "6 secondes de toi, animées. Appui long sur ta carte.", rang: "S", genre: "sequence" },
-  { n: 19, nom: "Seconde séquence", quoi: "Un deuxième thème pour ta séquence.", rang: "S", genre: "sequence" },
-  { n: 20, nom: "Ta carte en vrai", quoi: "Ta carte de saison imprimée, avec ton skin.", rang: "S", genre: "vrai" },
+  { n: 3, nom: "Carbone", quoi: "La fibre de carbone tissée, gris anthracite.", rang: "B", genre: "skin", habille: { finition: "carbone" } },
+  { n: 4, nom: "Nuit", quoi: "Le ciel de nuit, l'encre d'argent.", rang: "A", genre: "skin", habille: { finition: "nuit" } },
+  { n: 5, nom: "Puce noire", quoi: "La puce de ta carte en noir laqué, ses contacts d'argent.", rang: "B", genre: "signe", habille: { signe: "puce-noire" } },
+  { n: 6, nom: "Marbre", quoi: "Le marbre blanc veiné des statues.", rang: "A", genre: "skin", habille: { finition: "marbre" } },
+  { n: 7, nom: "Tes couleurs", quoi: "Ton drapeau le long des bords : à l'encre sur la face, en couleurs au dos.", rang: "A", genre: "skin", habille: { finition: "couleurs" } },
+  { n: 8, nom: "Ton nom gravé", quoi: "Ton nom caché dans la gravure fine.", rang: "B", genre: "signe", habille: { signe: "nom-grave" } },
+  { n: 9, nom: "Chrome", quoi: "Le métal poli, des reflets francs.", rang: "A", genre: "skin", habille: { finition: "chrome" } },
+  { n: 10, nom: "Néon", quoi: "Un tube de néon fuchsia qui suit le bord, sur le noir.", rang: "A", genre: "skin", habille: { finition: "neon" } },
+  { n: 11, nom: "Aurore", quoi: "Les rideaux d'une aurore boréale.", rang: "A", genre: "skin", habille: { finition: "aurore" } },
+  { n: 12, nom: "Liseré platine", quoi: "Un double filet de platine autour de ta photo.", rang: "A", genre: "signe", habille: { signe: "lisere-platine" } },
+  { n: 13, nom: "Ki", quoi: "L'aura blanche qui monte, les éclairs autour de toi.", rang: "S", genre: "skin", habille: { finition: "ki" } },
+  { n: 14, nom: "Animée", quoi: "La nacre, et une lumière qui passe.", rang: "S", genre: "skin", habille: { finition: "animee" } },
+  { n: 15, nom: "Onyx", quoi: "La carte noire guillochée.", rang: "S", genre: "skin", habille: { finition: "onyx" } },
+  { n: 16, nom: "Météorite", quoi: "Le fer d'une météorite, ses lamelles croisées.", rang: "S", genre: "skin", habille: { finition: "meteorite" } },
+];
+
+/**
+ * La Saison Givre (9 novembre 2026 – 3 janvier 2027 ; Sabri, 30/10) : l'hiver
+ * nordique par sa matière (fer, runes, bois brûlé, givre), jamais par ses
+ * clichés. Rien que la carte. Sans bleu (le bleu est aux cartes Défensive) :
+ * blanc, argent, gris fer ; la seule couleur, l'aurore, verte et violette.
+ * Un palier dont le dessin n'est pas encore là ne pose rien (estFinition).
+ */
+export const PASSE_GIVRE: readonly PalierPasse[] = [
+  { n: 1, nom: "Liseré de fer", quoi: "Un filet de fer forgé autour de ta photo, rivé aux coins.", rang: "B", genre: "signe", habille: { signe: "lisere-fer" } },
+  { n: 2, nom: "Bois brûlé", quoi: "Le bois brûlé noir, son grain en relief.", rang: "B", genre: "skin", habille: { finition: "bois-brule" } },
+  { n: 3, nom: "Runes", quoi: "Une frise de runes gravée au dos, en microtexte.", rang: "B", genre: "signe", habille: { signe: "runes" } },
+  { n: 4, nom: "Fer", quoi: "Le fer martelé, gris mat, ses coups de marteau.", rang: "B", genre: "skin", habille: { finition: "fer" } },
+  { n: 5, nom: "Ton nom en runes", quoi: "Ton nom écrit en runes, sous le sigle du dos.", rang: "A", genre: "signe", habille: { signe: "nom-runes" } },
+  { n: 6, nom: "Pierre runique", quoi: "La pierre grise des stèles, gravée d'entrelacs.", rang: "A", genre: "skin", habille: { finition: "pierre" } },
+  { n: 7, nom: "Nuit polaire", quoi: "Le noir de décembre, une lune basse d'argent.", rang: "A", genre: "skin", habille: { finition: "nuit-polaire" } },
+  { n: 8, nom: "Frimas", quoi: "La carte prise dans la glace blanche, les cristaux sur la photo.", rang: "A", genre: "skin", habille: { finition: "frimas" } },
+  { n: 9, nom: "Damas", quoi: "L'acier damassé des lames, ses veines d'argent.", rang: "S", genre: "skin", habille: { finition: "damas" } },
+  { n: 10, nom: "Aurore polaire", quoi: "L'aurore verte et violette qui ondule derrière toi.", rang: "S", genre: "skin", habille: { finition: "aurore-polaire" } },
+  { n: 11, nom: "Tempête", quoi: "La neige qui tombe sur ta carte, le vent qui la pousse.", rang: "S", genre: "skin", habille: { finition: "tempete" } },
+  { n: 12, nom: "Jarl", quoi: "Le fer noir et l'argent, la neige, ton souffle qui fume.", rang: "S", genre: "skin", habille: { finition: "jarl" } },
 ];
 
 /* ------------------------------- Le bilan ------------------------------- */
@@ -220,7 +257,12 @@ export interface BilanPasse {
  * Le passe d'un joueur, tiré de ses lignes d'XP de la saison (dans n'importe
  * quel ordre). Le passe d'arbitre (passe-arbitre.ts) a ses épreuves à lui.
  */
-export function passeDe(lignes: readonly LigneXp[], epreuves: readonly Epreuve[] = EPREUVES): BilanPasse {
+export function passeDe(
+  lignes: readonly LigneXp[],
+  epreuves: readonly Epreuve[] = EPREUVES,
+  /** Le nombre de paliers de la saison (16 pour la Saison 1, 12 pour Givre ; 20 pour les arbitres). */
+  max: number = PALIERS_PASSE
+): BilanPasse {
   const parJournee = new Map<number, LigneXp[]>();
   for (const l of lignes) {
     const liste = parJournee.get(l.j);
@@ -235,11 +277,11 @@ export function passeDe(lignes: readonly LigneXp[], epreuves: readonly Epreuve[]
     const du = parJournee.get(j) ?? [];
     cumul += du.reduce((a, l) => a + l.xp, 0);
     for (const e of epreuves) if (!faites.has(e.numero) && du.some(e.faite)) faites.set(e.numero, j);
-    palier = Math.max(palier, palierPour(Math.max(0, cumul), new Set(faites.keys()), epreuves));
+    palier = Math.max(palier, palierPour(Math.max(0, cumul), new Set(faites.keys()), epreuves, max));
   }
   const xp = Math.max(0, lignes.reduce((a, l) => a + l.xp, 0));
   const etats = epreuves.map((e) => ({ e, j: faites.get(e.numero) ?? null }));
-  if (palier >= PALIERS_PASSE)
+  if (palier >= max)
     return { palier, xp, versPalier: 0, coutPalier: 0, manque: 0, bloquee: null, epreuves: etats };
   const suivant = palier + 1;
   const cout = coutPalier(suivant);
@@ -255,9 +297,18 @@ export function passeDe(lignes: readonly LigneXp[], epreuves: readonly Epreuve[]
   };
 }
 
-/** Ce que les paliers atteints ont débloqué sur la carte, dans l'ordre des paliers. */
-export function debloquesDe(palier: number): { finitions: string[]; signes: Signe[] } {
-  const ouverts = PASSE_BOLA.filter((p) => p.n <= palier);
+/** Les paliers atteints, saison par saison du Passe (saisons-passe.ts) : `{ s1: 9, givre: 4 }`. */
+export type PaliersAtteints = Readonly<Record<string, number>>;
+
+/**
+ * Ce que les paliers atteints ont débloqué sur la carte, saison par saison :
+ * une récompense gagnée une saison reste à soi pour de bon.
+ */
+export function debloquesDe(
+  paliers: PaliersAtteints,
+  saisons: readonly { id: string; paliers: readonly PalierPasse[] }[]
+): { finitions: string[]; signes: Signe[] } {
+  const ouverts = saisons.flatMap((s) => s.paliers.filter((p) => p.n <= (paliers[s.id] ?? 0)));
   return {
     finitions: ouverts.flatMap((p) => (p.habille?.finition ? [p.habille.finition] : [])),
     signes: ouverts.flatMap((p) => (p.habille?.signe ? [p.habille.signe] : [])),

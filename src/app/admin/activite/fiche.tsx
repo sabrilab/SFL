@@ -32,8 +32,8 @@ function depuis(ts: number, now: number): string {
 function Bloc({ titre, sous, children }: { titre: string; sous?: string; children: React.ReactNode }) {
   return (
     <section className="glass rounded-3xl p-5">
-      <h2 className="text-[17px] font-bold tracking-tight">{titre}</h2>
-      {sous && <p className="mt-0.5 text-[12px] leading-snug text-foreground/45">{sous}</p>}
+      <h2 className="text-titre font-bold tracking-tight">{titre}</h2>
+      {sous && <p className="mt-0.5 text-petit leading-snug text-encre-3">{sous}</p>}
       <div className="mt-4">{children}</div>
     </section>
   );
@@ -42,9 +42,9 @@ function Bloc({ titre, sous, children }: { titre: string; sous?: string; childre
 function Chiffre({ label, valeur, sous }: { label: string; valeur: string; sous?: string }) {
   return (
     <div className="glass rounded-2xl px-3.5 py-3">
-      <p className="mono-label text-[8.5px] text-foreground/45">{label}</p>
-      <div className="mt-1.5 text-[24px] leading-none font-extrabold tabular-nums">{valeur}</div>
-      <p className="mt-1.5 min-h-[15px] text-[11px] leading-snug text-foreground/50">{sous}</p>
+      <p className="mono-label text-micro text-encre-3">{label}</p>
+      <div className="mt-1.5 text-titre-g leading-none font-extrabold tabular-nums">{valeur}</div>
+      <p className="mt-1.5 min-h-[15px] text-legende leading-snug text-encre-3">{sous}</p>
     </div>
   );
 }
@@ -84,19 +84,19 @@ export function FicheJoueur({
           >
             <ChevronLeft className="size-5" />
           </button>
-          <p className="mono-label text-[9px] text-foreground/45">Fiche joueur</p>
+          <p className="mono-label text-micro text-encre-3">Fiche joueur</p>
         </div>
 
         {!f ? (
-          <p className="py-16 text-center text-[13px] text-foreground/45">Rien dans le journal pour {name}.</p>
+          <p className="py-16 text-center text-corps text-encre-3">Rien dans le journal pour {name}.</p>
         ) : (
           <>
             <div>
-              <h1 className="flex items-center gap-2.5 text-[30px] font-bold tracking-tight">
+              <h1 className="flex items-center gap-2.5 text-titre-l font-bold tracking-tight">
                 {name}
                 <Mail className={cn("size-4", email ? "text-foreground" : "text-foreground/15")} />
               </h1>
-              <p className="mt-1 text-[13px] text-foreground/50">
+              <p className="mt-1 text-corps text-encre-3">
                 Arrivé {JOUR.format(f.premier)} à {HEURE.format(f.premier)} · vu {depuis(f.last, now)}
               </p>
             </div>
@@ -130,7 +130,7 @@ export function FicheJoueur({
                   />
                 ))}
               </div>
-              <div className="mt-1.5 flex justify-between text-[10.5px] text-foreground/40 tabular-nums">
+              <div className="mt-1.5 flex justify-between text-legende text-encre-3 tabular-nums">
                 <span>{f.pas === "heure" ? `${JOUR.format(f.rythme[0].t)} ${HEURE.format(f.rythme[0].t)}` : JOUR.format(f.rythme[0].t)}</span>
                 <span>
                   {f.pas === "heure"
@@ -154,12 +154,12 @@ export function FicheJoueur({
               <Bloc titre="Studio photo" sous={`${photos.length} ${photos.length > 1 ? "photos générées" : "photo générée"} pour sa carte.`}>
                 <div className="flex flex-wrap gap-1.5">
                   {[...parFiltre.entries()].map(([filtre, n]) => (
-                    <span key={filtre} className="glass-soft rounded-full px-3 py-1.5 text-[12px] font-semibold">
+                    <span key={filtre} className="glass-soft rounded-full px-3 py-1.5 text-petit font-semibold">
                       {n} {FILTRE_FR[filtre]?.[n > 1 ? 1 : 0] ?? filtre}
                     </span>
                   ))}
                   {pays.map((p) => (
-                    <span key={p} className="glass-soft rounded-full px-3 py-1.5 text-[12px] font-semibold">
+                    <span key={p} className="glass-soft rounded-full px-3 py-1.5 text-petit font-semibold">
                       {emojiDrapeau(p)} {unPays(p)?.nom ?? p}
                     </span>
                   ))}
@@ -172,12 +172,12 @@ export function FicheJoueur({
                 {f.sessions.map((s) => (
                   <div key={s.debut} className="border-b border-foreground/6 py-2.5 last:border-0">
                     <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-[13px] font-semibold">
+                      <span className="text-corps font-semibold">
                         {JOUR.format(s.debut)} · {HEURE.format(s.debut)}
                       </span>
-                      <span className="shrink-0 text-[12px] font-bold tabular-nums">{duree(s.ms)}</span>
+                      <span className="shrink-0 text-petit font-bold tabular-nums">{duree(s.ms)}</span>
                     </div>
-                    <p className="mt-0.5 text-[11.5px] leading-snug text-foreground/45">
+                    <p className="mt-0.5 text-petit leading-snug text-encre-3">
                       {s.pages.length ? s.pages.join(" → ") : "Aucune page vue"}
                     </p>
                   </div>

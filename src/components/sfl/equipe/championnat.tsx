@@ -52,7 +52,7 @@ function Pilules<T extends string | number>({ choix, actif, onChange, label }: {
           role="tab"
           aria-selected={actif === c.id}
           onClick={() => onChange(c.id)}
-          className={cn("shrink-0 px-4 py-2 text-[13px] font-semibold whitespace-nowrap", actif === c.id ? "bouton-principal" : "bouton-secondaire text-foreground/60")}
+          className={cn("shrink-0 px-4 py-2 text-corps font-semibold whitespace-nowrap", actif === c.id ? "bouton-principal" : "bouton-secondaire text-encre-2")}
         >
           {c.label}
         </button>
@@ -66,7 +66,7 @@ function Tableau({ d, equipes, mienne, pages }: { d: Division; equipes: Map<numb
   const col = "w-6 text-center tabular-nums";
   return (
     <div className="overflow-hidden rounded-[22px] bg-card">
-      <div className="mono-label flex items-center gap-2 px-3 pt-3 pb-2 text-foreground/40">
+      <div className="mono-label flex items-center gap-2 px-3 pt-3 pb-2 text-encre-3">
         <span className="w-[3px]" />
         <span className="w-[26px] text-center">#</span>
         <span className="flex-1">Équipe</span>
@@ -99,26 +99,26 @@ function Tableau({ d, equipes, mienne, pages }: { d: Division; equipes: Map<numb
                 aria-hidden
                 className={cn("h-7 w-[3px] rounded-full", z === "monte" ? "bg-[#16924A]" : z === "descend" ? "bg-[#D3212C]" : "bg-transparent")}
               />
-              {joue && l.j > 0 ? <RangMetal rang={podium ?? l.rang} /> : <span className="w-[26px] text-center text-foreground/30">–</span>}
+              {joue && l.j > 0 ? <RangMetal rang={podium ?? l.rang} /> : <span className="w-[26px] text-center text-encre-4">–</span>}
               {pages && !e.dissoute ? (
                 <Link href={`/bola-team/${e.id}`} className="flex min-w-0 flex-1 items-center gap-2 active:opacity-60">
                   <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={26} />
-                  <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">{e.nom}</span>
+                  <span className="min-w-0 flex-1 truncate text-lecture font-semibold">{e.nom}</span>
                 </Link>
               ) : (
                 <>
                   <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={26} />
-                  <span className={cn("min-w-0 flex-1 truncate text-[14.5px] font-semibold", e.dissoute && "text-muted-foreground line-through")}>{e.nom}</span>
+                  <span className={cn("min-w-0 flex-1 truncate text-lecture font-semibold", e.dissoute && "text-muted-foreground line-through")}>{e.nom}</span>
                 </>
               )}
-              <span className={cn(col, "text-[14px] text-foreground/70")}>{l.j}</span>
-              <span className={cn(col, "hidden text-[14px] text-foreground/70 sm:block")}>{l.g}</span>
-              <span className={cn(col, "hidden text-[14px] text-foreground/70 sm:block")}>{l.n}</span>
-              <span className={cn(col, "hidden text-[14px] text-foreground/70 sm:block")}>{l.p}</span>
-              <span className={cn(col, "hidden text-[14px] text-foreground/70 lg:block")}>{l.bp}</span>
-              <span className={cn(col, "hidden text-[14px] text-foreground/70 lg:block")}>{l.bc}</span>
-              <span className="w-8 text-center text-[14px] text-foreground/70 tabular-nums">{l.diff > 0 ? `+${l.diff}` : l.diff}</span>
-              <span className="w-8 text-center text-[16px] font-extrabold tabular-nums">{l.pts}</span>
+              <span className={cn(col, "text-ligne text-encre-2")}>{l.j}</span>
+              <span className={cn(col, "hidden text-ligne text-encre-2 sm:block")}>{l.g}</span>
+              <span className={cn(col, "hidden text-ligne text-encre-2 sm:block")}>{l.n}</span>
+              <span className={cn(col, "hidden text-ligne text-encre-2 sm:block")}>{l.p}</span>
+              <span className={cn(col, "hidden text-ligne text-encre-2 lg:block")}>{l.bp}</span>
+              <span className={cn(col, "hidden text-ligne text-encre-2 lg:block")}>{l.bc}</span>
+              <span className="w-8 text-center text-ligne text-encre-2 tabular-nums">{l.diff > 0 ? `+${l.diff}` : l.diff}</span>
+              <span className="w-8 text-center text-titre font-extrabold tabular-nums">{l.pts}</span>
               <span className="hidden w-[68px] justify-center gap-[3px] xl:flex">
                 {l.forme.map((r, i) => (
                   <span
@@ -137,7 +137,7 @@ function Tableau({ d, equipes, mienne, pages }: { d: Division; equipes: Map<numb
         })}
       </ol>
       {joue && (d.montent > 0 || d.descendent > 0) && (
-        <div className="mono-label flex gap-4 border-t border-contraste/[0.06] px-4 py-2.5 text-foreground/45">
+        <div className="mono-label flex gap-4 border-t border-contraste/[0.06] px-4 py-2.5 text-encre-3">
           {d.montent > 0 && (
             <span className="flex items-center gap-1.5">
               <ArrowUp className="size-3 text-[#16924A]" strokeWidth={3} />
@@ -158,7 +158,7 @@ function Tableau({ d, equipes, mienne, pages }: { d: Division; equipes: Map<numb
 
 function ListeJoueurs({ joueurs, cle, equipes, unite }: { joueurs: Classe[]; cle: "buts" | "passes"; equipes: Map<number, EquipeTeam>; unite: string }) {
   const [tout, setTout] = useState(false);
-  if (joueurs.length === 0) return <div className="rounded-[22px] bg-card px-5 py-6 text-center text-[14px] text-muted-foreground">Personne pour l&apos;instant.</div>;
+  if (joueurs.length === 0) return <div className="rounded-[22px] bg-card px-5 py-6 text-center text-ligne text-muted-foreground">Personne pour l&apos;instant.</div>;
   return (
     <div className="flex flex-col gap-1.5">
       {joueurs.slice(0, tout ? undefined : 10).map((c) => {
@@ -168,21 +168,21 @@ function ListeJoueurs({ joueurs, cle, equipes, unite }: { joueurs: Classe[]; cle
             <RangMetal rang={c.rang} />
             <CarteDe name={c.name} size={FORMAT_CARTE.petite} />
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[14.5px] font-semibold">
+              <span className="truncate text-lecture font-semibold">
                 <Nom n={c.name} />
               </span>
-              {e && <span className="truncate text-[12px] text-muted-foreground">{e.nom}</span>}
+              {e && <span className="truncate text-petit text-muted-foreground">{e.nom}</span>}
             </span>
             {e && <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={22} />}
-            <span className="w-14 text-right text-[18px] font-extrabold tabular-nums">
+            <span className="w-14 text-right text-titre-fort font-extrabold tabular-nums">
               {c[cle]}
-              <span className="mono-label ml-1 text-foreground/40">{unite}</span>
+              <span className="mono-label ml-1 text-encre-3">{unite}</span>
             </span>
           </div>
         );
       })}
       {!tout && joueurs.length > 10 && (
-        <button type="button" onClick={() => setTout(true)} className="bouton-secondaire self-center px-5 py-2.5 text-[13px] font-semibold">
+        <button type="button" onClick={() => setTout(true)} className="bouton-secondaire self-center px-5 py-2.5 text-corps font-semibold">
           Tout le classement · {joueurs.length}
         </button>
       )}
@@ -195,7 +195,7 @@ function Recompense({ titre, enTete, children }: { titre: string; enTete: boolea
     <div className="flex min-w-0 flex-col items-center gap-1.5 rounded-[22px] bg-card px-2 pt-3 pb-3 text-center">
       <span className="mono-label text-[#94640f] dark:text-[#e2b13c]">{titre}</span>
       {children}
-      {enTete && <span className="mono-label text-foreground/40">En tête</span>}
+      {enTete && <span className="mono-label text-encre-3">En tête</span>}
     </div>
   );
 }
@@ -235,7 +235,7 @@ export function ChampionnatTeam({
       <section className="flex flex-col gap-3 md:min-w-0">
         <div className="flex items-end justify-between gap-3 px-1">
           <div className="flex min-w-0 flex-col gap-1">
-            <h2 className="text-[24px] leading-none font-bold tracking-tight">Saison {c.saison}</h2>
+            <h2 className="text-titre-g leading-none font-bold tracking-tight">Saison {c.saison}</h2>
             <span className="mono-label text-muted-foreground">{periodeSaison(c.saison)}</span>
           </div>
           {engagees > 0 && (
@@ -256,8 +256,8 @@ export function ChampionnatTeam({
           <Tableau d={d} equipes={parId} mienne={mienne} pages={pages} />
         ) : (
           <div className="flex flex-col items-center gap-3 rounded-[22px] bg-card px-5 py-8 text-center">
-            <EcussonVide taille={56} className="text-foreground/25" />
-            <span className="text-[14px] text-muted-foreground">Aucune équipe engagée pour l&apos;instant.</span>
+            <EcussonVide taille={56} className="text-encre-4" />
+            <span className="text-ligne text-muted-foreground">Aucune équipe engagée pour l&apos;instant.</span>
           </div>
         )}
       </section>
@@ -283,7 +283,7 @@ export function ChampionnatTeam({
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="px-1 text-[17px] font-bold tracking-tight">Récompenses</h2>
+          <h2 className="px-1 text-titre font-bold tracking-tight">Récompenses</h2>
           <div className="grid grid-cols-3 gap-2">
             <Recompense titre="Champion" enTete={!c.finie && !!champion}>
               {champion ? (
@@ -292,12 +292,12 @@ export function ChampionnatTeam({
                     <Ecusson initiales={champion.initiales} fond={champion.fond} blason={champion.blason} taille={46} />
                     <Trophy className="absolute -top-1 -right-2 size-4 text-[#d9a531]" strokeWidth={2.4} />
                   </span>
-                  <span className="w-full truncate text-[12.5px] font-semibold">{champion.nom}</span>
+                  <span className="w-full truncate text-corps font-semibold">{champion.nom}</span>
                 </>
               ) : (
                 <>
-                  <EcussonVide taille={46} className="text-foreground/25" />
-                  <span className="text-[12.5px] text-muted-foreground">–</span>
+                  <EcussonVide taille={46} className="text-encre-4" />
+                  <span className="text-corps text-muted-foreground">–</span>
                 </>
               )}
             </Recompense>
@@ -309,13 +309,13 @@ export function ChampionnatTeam({
                 {r.j ? (
                   <>
                     <CarteDe name={r.j.name} size={FORMAT_CARTE.petite} />
-                    <span className="w-full truncate text-[12.5px] font-semibold">{r.j.name.split(" ")[0]}</span>
-                    <span className="mono-label text-foreground/60">
+                    <span className="w-full truncate text-corps font-semibold">{r.j.name.split(" ")[0]}</span>
+                    <span className="mono-label text-encre-2">
                       {r.v} {r.u}
                     </span>
                   </>
                 ) : (
-                  <span className="py-3 text-[12.5px] text-muted-foreground">–</span>
+                  <span className="py-3 text-corps text-muted-foreground">–</span>
                 )}
               </Recompense>
             ))}
@@ -324,7 +324,7 @@ export function ChampionnatTeam({
 
         {valides.length > 0 && (
           <section className="flex flex-col gap-2">
-            <h2 className="px-1 text-[17px] font-bold tracking-tight">Derniers résultats</h2>
+            <h2 className="px-1 text-titre font-bold tracking-tight">Derniers résultats</h2>
             {valides.slice(0, 8).map(({ m, etat, compte }) => {
               if (etat.etat !== "valide") return null;
               const a = parId.get(m.de);
@@ -332,21 +332,21 @@ export function ChampionnatTeam({
               if (!a || !b) return null;
               return (
                 <div key={m.id} className="flex flex-col gap-1.5 rounded-[20px] bg-card px-3 py-2.5">
-                  <span className="mono-label flex justify-between text-foreground/40">
+                  <span className="mono-label flex justify-between text-encre-3">
                     <span>{libelleJour(m.jour)}</span>
                     {etat.forfaitDe != null ? <span>Forfait</span> : !compte ? <span>Amical</span> : null}
                   </span>
                   <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                     <span className="flex min-w-0 items-center justify-end gap-2">
-                      <span className="truncate text-right text-[13.5px] font-semibold">{a.nom}</span>
+                      <span className="truncate text-right text-ligne font-semibold">{a.nom}</span>
                       <Ecusson initiales={a.initiales} fond={a.fond} blason={a.blason} taille={24} />
                     </span>
-                    <span className="font-display text-[22px] leading-none tabular-nums">
-                      {etat.buts[0]} <span className="text-foreground/25">–</span> {etat.buts[1]}
+                    <span className="font-display text-titre-m leading-none tabular-nums">
+                      {etat.buts[0]} <span className="text-encre-4">–</span> {etat.buts[1]}
                     </span>
                     <span className="flex min-w-0 items-center gap-2">
                       <Ecusson initiales={b.initiales} fond={b.fond} blason={b.blason} taille={24} />
-                      <span className="truncate text-[13.5px] font-semibold">{b.nom}</span>
+                      <span className="truncate text-ligne font-semibold">{b.nom}</span>
                     </span>
                   </div>
                 </div>

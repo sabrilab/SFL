@@ -51,17 +51,17 @@ export function ReglageNotifications() {
         )}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-semibold">Notifications</span>
-        <span className="block text-[12px] text-foreground/45">{etat ? LIBELLE[etat] : " "}</span>
+        <span className="block text-lecture font-semibold">Notifications</span>
+        <span className="block text-petit text-encre-3">{etat ? LIBELLE[etat] : " "}</span>
       </span>
       {actives ? (
-        <Check className="size-4 text-foreground/60" />
+        <Check className="size-4 text-encre-2" />
       ) : etat === "inactives" ? (
         <button
           type="button"
           onClick={activer}
           disabled={busy}
-          className="bouton-principal bouton--mauve shrink-0 px-4 py-2 text-[13px] font-bold disabled:opacity-40"
+          className="bouton-principal bouton--mauve shrink-0 px-4 py-2 text-corps font-bold disabled:opacity-40"
         >
           Activer
         </button>

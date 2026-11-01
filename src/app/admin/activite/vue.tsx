@@ -15,7 +15,8 @@
 //   3. ce qu'il faut retenir — les conclusions, calculées sur les vraies
 //      données (lib/sfl/retention.ts), chacune avec la chose à faire, en
 //      une rangée qu'on fait glisser et qu'on peut masquer ; puis les
-//      nouveaux venus à suivre de près (lib/sfl/suivi-joueur.ts) ;
+//      nouveaux venus à suivre de près (lib/sfl/suivi-joueur.ts), et tous
+//      les nouveaux arrivants, SFL et Bola à part (./nouveaux.tsx, 31/10) ;
 //   4. qui est là aujourd'hui (nouveaux, fidèles, à risque, décrochés…) ;
 //   5. la rétention — combien reviennent, cohorte par cohorte ;
 //   6. ce qui fait revenir — les gestes de la première semaine ; puis qui
@@ -71,6 +72,8 @@ import {
 import { aSuivre } from "@/lib/sfl/suivi-joueur";
 import { useSeason } from "@/components/sfl/season-provider";
 import { FicheJoueur } from "./fiche";
+import { NouveauxArrivants } from "./nouveaux";
+import type { Parcours } from "./parcours";
 import type { DonneesReperes } from "./lectures";
 import { NotifsStats } from "./notifications";
 import { QuiRamene } from "./rassembleurs";
@@ -94,6 +97,10 @@ export interface DonneesActivite {
   studio: PhotoStudio[] | null;
   /** Les repères sous les courbes et « Qui ramène du monde » (./lectures.ts), ou null si la lecture a échoué. */
   reperes: DonneesReperes | null;
+  /** Le parrain de chaque filleul, par nom (table parrainages), ou null si la lecture a échoué. */
+  parrains: ReadonlyMap<string, string> | null;
+  /** Le parcours de chaque nouvel arrivant, par nom (./parcours.ts), ou null si la lecture a échoué. */
+  parcours: ReadonlyMap<string, Parcours> | null;
   /** Instant de la lecture — figé pour garder le rendu pur. */
   now: number;
 }
@@ -145,8 +152,8 @@ function relative(ts: number, now: number): string {
 function Section({ id, titre, sous, children }: { id?: string; titre: string; sous?: string; children: React.ReactNode }) {
   return (
     <section id={id ? `activite-${id}` : undefined} className="glass scroll-mt-16 rounded-3xl p-5">
-      <h2 className="text-[17px] font-bold tracking-tight">{titre}</h2>
-      {sous && <p className="mt-0.5 text-[12px] leading-snug text-foreground/45">{sous}</p>}
+      <h2 className="text-titre font-bold tracking-tight">{titre}</h2>
+      {sous && <p className="mt-0.5 text-petit leading-snug text-encre-3">{sous}</p>}
       <div className="mt-4">{children}</div>
     </section>
   );
@@ -155,12 +162,12 @@ function Section({ id, titre, sous, children }: { id?: string; titre: string; so
 function Delta({ c, suffixe = "" }: { c: Chiffre; suffixe?: string }) {
   const e = evolution(c);
   if (e === null) {
-    if (c.avant === 0 && c.valeur > 0) return <span className="text-[11px] text-foreground/50">nouveau{suffixe}</span>;
+    if (c.avant === 0 && c.valeur > 0) return <span className="text-legende text-encre-3">nouveau{suffixe}</span>;
     return null;
   }
   const Icone = e >= 0 ? TrendingUp : TrendingDown;
   return (
-    <span className={cn("inline-flex items-center gap-1 text-[11px] font-semibold tabular-nums", e >= 0 ? "text-foreground/75" : "text-foreground/45")}>
+    <span className={cn("inline-flex items-center gap-1 text-legende font-semibold tabular-nums", e >= 0 ? "text-encre-2" : "text-encre-3")}>
       <Icone className="size-3" />
       {e >= 0 ? "+" : "−"}
       {Math.abs(Math.round(e * 100))} %{suffixe}
@@ -171,8 +178,8 @@ function Delta({ c, suffixe = "" }: { c: Chiffre; suffixe?: string }) {
 function Tuile({ label, valeur, c }: { label: string; valeur: string; c: Chiffre }) {
   return (
     <div className="glass rounded-2xl px-3.5 py-3">
-      <p className="mono-label text-[8.5px] text-foreground/45">{label}</p>
-      <div className="mt-1.5 text-[24px] leading-none font-extrabold tabular-nums">{valeur}</div>
+      <p className="mono-label text-micro text-encre-3">{label}</p>
+      <div className="mt-1.5 text-titre-g leading-none font-extrabold tabular-nums">{valeur}</div>
       <div className="mt-1.5 min-h-[15px]">
         <Delta c={c} />
       </div>
@@ -200,11 +207,11 @@ function CarteConclusion({ c }: { c: Conclusion }) {
         >
           <Icone className="size-3" />
         </span>
-        <p className="text-[13.5px] leading-snug font-bold">{c.titre}</p>
+        <p className="text-ligne leading-snug font-bold">{c.titre}</p>
       </div>
-      {ouvert && <p className="mt-2 text-[12px] leading-snug text-foreground/55">{c.detail}</p>}
-      <p className={cn("mt-2 text-[12.5px] leading-snug", !ouvert && "line-clamp-3")}>
-        <span className="mono-label mr-1.5 text-[8.5px] text-foreground/45">À faire</span>
+      {ouvert && <p className="mt-2 text-petit leading-snug text-encre-3">{c.detail}</p>}
+      <p className={cn("mt-2 text-corps leading-snug", !ouvert && "line-clamp-3")}>
+        <span className="mono-label mr-1.5 text-micro text-encre-3">À faire</span>
         {c.action}
       </p>
     </button>
@@ -240,6 +247,7 @@ const PARTIES = [
   { id: "courbes", label: "Courbes" },
   { id: "conseils", label: "Conseils" },
   { id: "suivre", label: "À suivre" },
+  { id: "nouveaux", label: "Nouveaux" },
   { id: "qui", label: "Qui est là" },
   { id: "retention", label: "Rétention" },
   { id: "ramene", label: "Qui ramène" },
@@ -439,8 +447,8 @@ export function ActiviteVue({
         <div className="flex items-center gap-3">
           <BoutonRetour />
           <div>
-            <h1 className="text-[30px] font-bold tracking-tight">Activité</h1>
-            <p className="mt-1 text-[13px] text-foreground/42">Croissance, rétention, et ce qu&apos;on en tire</p>
+            <h1 className="text-titre-l font-bold tracking-tight">Activité</h1>
+            <p className="mt-1 text-corps text-encre-3">Croissance, rétention, et ce qu&apos;on en tire</p>
           </div>
         </div>
         <button
@@ -459,8 +467,8 @@ export function ActiviteVue({
             key={p.id}
             onClick={() => setPublic(p.id)}
             className={cn(
-              "flex-1 py-1.5 text-[13px] font-semibold",
-              public_ === p.id ? "bouton-principal bouton--mauve" : "bouton-discret text-foreground/45"
+              "flex-1 py-1.5 text-corps font-semibold",
+              public_ === p.id ? "bouton-principal bouton--mauve" : "bouton-discret text-encre-3"
             )}
           >
             {p.label}
@@ -468,7 +476,7 @@ export function ActiviteVue({
         ))}
       </div>
       {vu && vu.admins.length > 0 && (
-        <p className="-mt-1.5 px-1 text-[11.5px] leading-snug text-foreground/45">
+        <p className="-mt-1.5 px-1 text-petit leading-snug text-encre-3">
           {public_ === "joueurs"
             ? `Sans ${listeNoms(vu.admins)}, qui font ${pct(vu.partAdmins)} de l'activité enregistrée.`
             : public_ === "admins"
@@ -483,8 +491,8 @@ export function ActiviteVue({
             key={p.id}
             onClick={() => setPeriode(p.id)}
             className={cn(
-              "flex-1 py-1.5 text-[13px] font-semibold",
-              periode === p.id ? "bouton-principal" : "bouton-discret text-foreground/45"
+              "flex-1 py-1.5 text-corps font-semibold",
+              periode === p.id ? "bouton-principal" : "bouton-discret text-encre-3"
             )}
           >
             {p.label}
@@ -501,7 +509,7 @@ export function ActiviteVue({
             <button
               key={p.id}
               onClick={() => allerA(p.id)}
-              className="bouton-secondaire shrink-0 px-3 py-1.5 text-[12px] font-semibold"
+              className="bouton-secondaire shrink-0 px-3 py-1.5 text-petit font-semibold"
             >
               {p.label}
             </button>
@@ -510,13 +518,13 @@ export function ActiviteVue({
       )}
 
       {error && (
-        <p className="glass-soft rounded-2xl p-3.5 text-[12.5px] text-[#c8352b] dark:text-[#FF6B5E]">
+        <p className="glass-soft rounded-2xl p-3.5 text-corps text-[#c8352b] dark:text-[#FF6B5E]">
           {error} — as-tu bien rejoué le script SQL (table activity) ?
         </p>
       )}
 
       {!a && loading && (
-        <div className="flex justify-center py-16 text-foreground/40">
+        <div className="flex justify-center py-16 text-encre-3">
           <Loader2 className="size-5 animate-spin" />
         </div>
       )}
@@ -525,7 +533,7 @@ export function ActiviteVue({
         <>
           {/* 1. Les chiffres de la période */}
           <div>
-            <p className="mono-label mb-2 px-1 text-[9px] text-foreground/40">
+            <p className="mono-label mb-2 px-1 text-micro text-encre-3">
               {libellePeriode}
               {comparaison}
             </p>
@@ -539,26 +547,26 @@ export function ActiviteVue({
 
           {/* 2. La croissance */}
           <section id="activite-courbes" className="glass scroll-mt-16 rounded-3xl p-5">
-            <h2 className="text-[17px] font-bold tracking-tight">Croissance</h2>
+            <h2 className="text-titre font-bold tracking-tight">Croissance</h2>
             <div className="-mx-5 mt-3 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none]">
               {METRIQUES.map((m) => (
                 <button
                   key={m.id}
                   onClick={() => setMetrique(m.id)}
                   className={cn(
-                    "shrink-0 px-3 py-1.5 text-[12px] font-semibold",
-                    metrique === m.id ? "bouton-principal" : "bouton-secondaire text-foreground/55"
+                    "shrink-0 px-3 py-1.5 text-petit font-semibold",
+                    metrique === m.id ? "bouton-principal" : "bouton-secondaire text-encre-3"
                   )}
                 >
                   {m.court}
                 </button>
               ))}
             </div>
-            <p className="mono-label mt-4 text-[9px] text-foreground/45">
+            <p className="mono-label mt-4 text-micro text-encre-3">
               {METRIQUES.find((m) => m.id === metrique)?.label}
             </p>
             <div className="mt-1 flex items-baseline gap-2.5">
-              <span className="text-[22px] font-extrabold tracking-tight tabular-nums">{courbe.titre}</span>
+              <span className="text-titre-m font-extrabold tracking-tight tabular-nums">{courbe.titre}</span>
               <Delta c={courbe.c} />
             </div>
             <div className="mt-3">
@@ -572,7 +580,7 @@ export function ActiviteVue({
                 onActif={(i) => setJourChoisi(i === null ? null : (courbe.points[i]?.t ?? null))}
               />
             </div>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-foreground/45">
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-legende text-encre-3">
               <span className="flex items-center gap-1.5">
                 <span className="h-0.5 w-4 rounded bg-foreground" />
                 {libellePeriode}
@@ -604,16 +612,16 @@ export function ActiviteVue({
           {/* 3. Ce qu'il faut retenir : une rangée qu'on fait glisser, qu'on peut masquer */}
           <section id="activite-conseils" className="scroll-mt-16">
             <div className="mb-2.5 flex items-center justify-between px-1">
-              <h2 className="text-[16px] font-bold tracking-tight">
+              <h2 className="text-titre font-bold tracking-tight">
                 Ce qu&apos;il faut retenir
                 {a.conclusions.length > 0 && (
-                  <span className="ml-1.5 text-[13px] font-semibold text-foreground/40">{a.conclusions.length}</span>
+                  <span className="ml-1.5 text-corps font-semibold text-encre-3">{a.conclusions.length}</span>
                 )}
               </h2>
               {a.conclusions.length > 0 && (
                 <button
                   onClick={() => ecrireMasques(!masques)}
-                  className="mono-label flex items-center gap-1 text-foreground/55"
+                  className="mono-label flex items-center gap-1 text-encre-3"
                 >
                   {masques ? "Afficher" : "Masquer"}
                   {masques ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
@@ -621,7 +629,7 @@ export function ActiviteVue({
               )}
             </div>
             {a.conclusions.length === 0 ? (
-              <p className="px-1 text-[12.5px] text-foreground/45">Pas encore assez de données pour conclure.</p>
+              <p className="px-1 text-corps text-encre-3">Pas encore assez de données pour conclure.</p>
             ) : (
               !masques && (
                 <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 items-start gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
@@ -648,15 +656,29 @@ export function ActiviteVue({
                     className="flex items-center gap-3 border-b border-foreground/6 py-2.5 text-left last:border-0"
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-semibold">{j.name}</span>
-                      <span className="block text-[11.5px] text-foreground/45">
+                      <span className="block truncate text-ligne font-semibold">{j.name}</span>
+                      <span className="block text-petit text-encre-3">
                         {duree(j.ms)} dans ses premières 24 h · {Math.round(j.fois)} fois la médiane · arrivé le {jjmm(j.premier)}
                       </span>
                     </span>
-                    <ChevronRight className="size-4 shrink-0 text-foreground/40" />
+                    <ChevronRight className="size-4 shrink-0 text-encre-3" />
                   </button>
                 ))}
               </div>
+            </Section>
+          )}
+
+          {/* 3 ter. Les nouveaux arrivants : SFL et Bola à part, leur carte, ce qu'ils ont fait */}
+          {vu && data && (
+            <Section id="nouveaux" titre="Nouveaux arrivants">
+              <NouveauxArrivants
+                evenements={data.evenements}
+                profiles={data.profiles}
+                parrains={data.parrains}
+                parcours={data.parcours}
+                now={data.now}
+                onFiche={setFiche}
+              />
             </Section>
           )}
 
@@ -682,14 +704,14 @@ export function ActiviteVue({
                   >
                     <span className="size-2.5 shrink-0 rounded-full ring-1 ring-foreground/15" style={{ background: encre(TEINTE[f.id]) }} />
                     <span className="min-w-0 flex-1">
-                      <span className="text-[13.5px] font-semibold">{f.label}</span>
-                      <span className="block text-[11.5px] text-foreground/40">{f.note}</span>
+                      <span className="text-ligne font-semibold">{f.label}</span>
+                      <span className="block text-petit text-encre-3">{f.note}</span>
                     </span>
-                    <span className="text-[15px] font-extrabold tabular-nums">{f.noms.length}</span>
-                    <ChevronDown className={cn("size-3.5 text-foreground/30 transition-transform", ouverte === f.id && "rotate-180")} />
+                    <span className="text-lecture font-extrabold tabular-nums">{f.noms.length}</span>
+                    <ChevronDown className={cn("size-3.5 text-encre-4 transition-transform", ouverte === f.id && "rotate-180")} />
                   </button>
                   {ouverte === f.id && (
-                    <p className="pb-3 pl-5.5 text-[12px] leading-relaxed text-foreground/55">
+                    <p className="pb-3 pl-5.5 text-petit leading-relaxed text-encre-3">
                       {f.noms.length ? [...f.noms].sort((x, y) => x.localeCompare(y, "fr")).join(", ") : "Personne."}
                     </p>
                   )}
@@ -705,22 +727,22 @@ export function ActiviteVue({
                 .filter((r) => r.eligibles > 0)
                 .map((r) => (
                   <div key={r.jours} className="flex items-center gap-3">
-                    <span className="w-[104px] shrink-0 text-[12.5px] font-medium whitespace-nowrap">
+                    <span className="w-[104px] shrink-0 text-corps font-medium whitespace-nowrap">
                       Après {r.jours} {r.jours === 1 ? "jour" : "jours"}
                     </span>
                     <span className="h-2 flex-1 overflow-hidden rounded-full bg-foreground/8">
                       <span className="block h-full rounded-full bg-foreground/80" style={{ width: `${(r.revenus / r.eligibles) * 100}%` }} />
                     </span>
-                    <span className="w-10 shrink-0 text-right text-[12px] font-bold tabular-nums">{pct(r.revenus / r.eligibles)}</span>
-                    <span className="w-11 shrink-0 text-right text-[10.5px] text-foreground/40 tabular-nums">
+                    <span className="w-10 shrink-0 text-right text-petit font-bold tabular-nums">{pct(r.revenus / r.eligibles)}</span>
+                    <span className="w-11 shrink-0 text-right text-legende text-encre-3 tabular-nums">
                       {r.revenus}/{r.eligibles}
                     </span>
                   </div>
                 ))}
             </div>
-            <p className="mono-label mt-6 mb-2 text-[9px] text-foreground/45">Par semaine d&apos;arrivée · % encore actifs</p>
+            <p className="mono-label mt-6 mb-2 text-micro text-encre-3">Par semaine d&apos;arrivée · % encore actifs</p>
             <Cohortes cohortes={a.cohortes} />
-            <p className="mt-2 text-[11px] leading-snug text-foreground/40">
+            <p className="mt-2 text-legende leading-snug text-encre-3">
               Chaque ligne : les joueurs arrivés la semaine du lundi indiqué (et combien). S0 = leur première semaine,
               +1 la suivante, etc. Plus la case est foncée, plus ils sont restés.
             </p>
@@ -799,25 +821,25 @@ export function ActiviteVue({
               <div className="flex flex-col gap-2.5">
                 {pays.lignes.map((l) => (
                   <div key={l.id} className="flex items-center gap-3">
-                    <span className="w-[44%] shrink-0 truncate text-[12.5px] font-medium">
+                    <span className="w-[44%] shrink-0 truncate text-corps font-medium">
                       <span className="mr-1.5">{l.drapeau}</span>
                       {l.nom}
                     </span>
                     <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/8">
                       <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${(l.n / pays.joueurs) * 100}%` }} />
                     </span>
-                    <span className="w-10 shrink-0 text-right text-[12px] font-bold tabular-nums">{pct(l.n / pays.joueurs)}</span>
-                    <span className="w-6 shrink-0 text-right text-[10.5px] text-foreground/40 tabular-nums">{l.n}</span>
+                    <span className="w-10 shrink-0 text-right text-petit font-bold tabular-nums">{pct(l.n / pays.joueurs)}</span>
+                    <span className="w-6 shrink-0 text-right text-legende text-encre-3 tabular-nums">{l.n}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-[12.5px] text-foreground/40">
+              <p className="text-corps text-encre-3">
                 Aucun pays enregistré pour l&apos;instant : ils s&apos;enregistrent depuis le 22/10, à chaque carte au drapeau.
               </p>
             )}
             {pays && pays.sansPays > 0 && (
-              <p className="mt-3 text-[11px] leading-snug text-foreground/40">
+              <p className="mt-3 text-legende leading-snug text-encre-3">
                 {pays.sansPays} {pays.sansPays > 1 ? "cartes au drapeau faites" : "carte au drapeau faite"} avant le 22/10, sans pays enregistré.
               </p>
             )}
@@ -833,9 +855,9 @@ export function ActiviteVue({
                     onClick={() => setFiche(j.name)}
                     className="flex items-center gap-3 border-b border-foreground/6 py-2.5 text-left last:border-0"
                   >
-                    <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold">{j.name}</span>
-                    <span className="mono-label text-[9px] whitespace-nowrap text-foreground/40">{j.jours} j venus</span>
-                    <span className="mono-label text-right text-[9px] whitespace-nowrap text-foreground/55">{relative(j.last, a.now)}</span>
+                    <span className="min-w-0 flex-1 truncate text-ligne font-semibold">{j.name}</span>
+                    <span className="mono-label text-micro whitespace-nowrap text-encre-3">{j.jours} j venus</span>
+                    <span className="mono-label text-right text-micro whitespace-nowrap text-encre-3">{relative(j.last, a.now)}</span>
                     <Mail className={cn("size-3.5", j.email ? "text-foreground" : "text-foreground/15")} />
                   </button>
                 ))}
@@ -846,7 +868,7 @@ export function ActiviteVue({
           {/* 10. Par joueur */}
           <section id="activite-joueurs" className="scroll-mt-16">
             <div className="mb-2.5 flex items-center justify-between px-1">
-              <h2 className="text-[16px] font-bold tracking-tight">Par joueur</h2>
+              <h2 className="text-titre font-bold tracking-tight">Par joueur</h2>
               <div className="glass-soft flex rounded-full p-0.5">
                 {(
                   [
@@ -859,8 +881,8 @@ export function ActiviteVue({
                     key={id}
                     onClick={() => setTri(id)}
                     className={cn(
-                      "rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors",
-                      tri === id ? "bg-foreground text-background" : "text-foreground/45"
+                      "rounded-full px-2.5 py-1 text-legende font-bold transition-colors",
+                      tri === id ? "bg-foreground text-background" : "text-encre-3"
                     )}
                   >
                     {label}
@@ -877,10 +899,10 @@ export function ActiviteVue({
                 >
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline justify-between gap-3">
-                      <span className="truncate text-[14px] font-semibold">{p.name}</span>
-                      <span className="shrink-0 text-[13px] font-bold tabular-nums">{duree(p.temps)}</span>
+                      <span className="truncate text-ligne font-semibold">{p.name}</span>
+                      <span className="shrink-0 text-corps font-bold tabular-nums">{duree(p.temps)}</span>
                     </span>
-                    <span className="mt-0.5 block text-[11.5px] leading-snug text-foreground/45">
+                    <span className="mt-0.5 block text-petit leading-snug text-encre-3">
                       Vu {relative(p.last, a.now)} · {p.sessions} {p.sessions > 1 ? "sessions" : "session"}, {duree(p.moyenne)} en moyenne · {p.jours} j actifs · {milliers(p.actions)} actions · arrivé le {jjmm(p.premier)}
                     </span>
                   </span>
@@ -888,7 +910,7 @@ export function ActiviteVue({
                 </button>
               ))}
               {joueursTries.length === 0 && (
-                <p className="px-4 py-8 text-center text-[13px] text-foreground/40">
+                <p className="px-4 py-8 text-center text-corps text-encre-3">
                   Personne sur cette période — le journal se remplit tout seul.
                 </p>
               )}
@@ -897,26 +919,26 @@ export function ActiviteVue({
 
           {/* 11. Les emails collectés */}
           <section className="glass rounded-3xl p-5">
-            <p className="mono-label text-foreground/60">
+            <p className="mono-label text-encre-2">
               Emails collectés · {emails.length}/{a.comptes}
             </p>
             {emails.length > 0 ? (
               <div className="mt-3 flex flex-col gap-1.5">
                 {emails.map((p) => (
                   <div key={p.name} className="flex items-baseline justify-between gap-3">
-                    <span className="text-[13px] font-semibold">{p.name}</span>
-                    <span className="mono-label min-w-0 truncate text-foreground/50">{p.contact_email}</span>
+                    <span className="text-corps font-semibold">{p.name}</span>
+                    <span className="mono-label min-w-0 truncate text-encre-3">{p.contact_email}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="mt-2 text-[12.5px] text-foreground/40">
+              <p className="mt-2 text-corps text-encre-3">
                 Aucun pour l&apos;instant — chaque joueur est invité à laisser le sien en tête du fil et dans Réglages.
               </p>
             )}
           </section>
 
-          <p className="px-1 pb-2 text-[11px] leading-relaxed text-foreground/30">
+          <p className="px-1 pb-2 text-legende leading-relaxed text-encre-4">
             {milliers(a.evenementsLus)} événements lus, depuis le {a.serie[0] ? jjmm(a.serie[0].t) : "—"}. Une session,
             c&apos;est un onglet ouvert ; sa durée, c&apos;est le temps passé au premier plan, mesuré par ses signes de vie
             (l&apos;app en émet un toutes les 90 secondes tant qu&apos;elle est au premier plan) ; un silence de plus de

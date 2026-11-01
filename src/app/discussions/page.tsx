@@ -48,7 +48,7 @@ export default function Discussions() {
     <div className="shell py-4 sm:py-8">
       <div className="mb-5 flex items-center gap-3">
         <BoutonRetour />
-        <h1 className="text-[30px] font-bold tracking-tight">Discussions</h1>
+        <h1 className="text-titre-l font-bold tracking-tight">Discussions</h1>
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-start lg:gap-6">
@@ -57,25 +57,25 @@ export default function Discussions() {
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-[7px]">
             <span className="size-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(111,168,255,0.8)]" />
-            <span className="mono-label text-foreground/50">
+            <span className="mono-label text-encre-3">
               {presence.shared ? "Convocation · en direct" : "Convocation"}
             </span>
           </span>
-          <span className="mono-label text-foreground/32">J{presence.journee}</span>
+          <span className="mono-label text-encre-4">J{presence.journee}</span>
         </div>
 
         <div className="glass overflow-hidden rounded-[26px]">
           <div className="px-4 pt-3.5">
             <div className="flex items-center gap-2.5">
-              <span className="glass-soft flex size-[30px] shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold text-foreground/85">
+              <span className="glass-soft flex size-[30px] shrink-0 items-center justify-center rounded-full text-etiquette font-extrabold text-encre-2">
                 IL
               </span>
               <div className="min-w-0">
-                <div className="text-[13.5px] font-bold">Ilyes</div>
-                <div className="mono-label mt-0.5 text-foreground/35">Admin · SFL</div>
+                <div className="text-ligne font-bold">Ilyes</div>
+                <div className="mono-label mt-0.5 text-encre-4">Admin · SFL</div>
               </div>
             </div>
-            <p className="mt-[11px] text-[13.5px] leading-[1.45] text-foreground/62">
+            <p className="mt-[11px] text-ligne leading-[1.45] text-encre-2">
               Salut {player.name.split(" ")[0]}, dispo ce {presence.jour.toLowerCase()} pour la J
               {presence.journee} de la SFL ? Réponds avant vendredi minuit — oui ou non, ça
               rapporte 2 ⚽.
@@ -85,16 +85,16 @@ export default function Discussions() {
           <div className="m-3 overflow-hidden rounded-[20px] border border-contraste/10 bg-contraste/5">
             <div className="flex items-center gap-3.5 px-[15px] py-3.5">
               <div className="w-[46px] shrink-0">
-                <div className="mono-label text-foreground/40">J{presence.journee}</div>
+                <div className="mono-label text-encre-3">J{presence.journee}</div>
                 <div className="text-2xl leading-[1.1] font-extrabold tracking-tight">
                   {String(dJour).padStart(2, "0")}
-                  <span className="text-[12px] text-foreground/40">/{moisNum}</span>
+                  <span className="text-petit text-encre-3">/{moisNum}</span>
                 </div>
               </div>
               <span className="h-10 w-px bg-contraste/10" />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[15px] font-semibold">{presence.rendezVous.lieu}</div>
-                <div className="mt-[3px] text-[12.5px] text-foreground/42">
+                <div className="truncate text-lecture font-semibold">{presence.rendezVous.lieu}</div>
+                <div className="mt-[3px] text-corps text-encre-3">
                   {[presence.rendezVous.match, presence.rendezVous.terrain, presence.rendezVous.heure].filter(Boolean).join(" · ")} ·{" "}
                   {presence.presents.length} inscrit{presence.presents.length > 1 ? "s" : ""}
                 </div>
@@ -105,7 +105,7 @@ export default function Discussions() {
                     "mono-label shrink-0 rounded-full px-2.5 py-1",
                     presence.mine === "present"
                       ? "bg-primary/15 text-primary"
-                      : "glass-soft text-foreground/50"
+                      : "glass-soft text-encre-3"
                   )}
                 >
                   {presence.mine === "present" ? "Inscrit ✓" : "Pas dispo"}
@@ -120,7 +120,7 @@ export default function Discussions() {
             ) : (
               // Vendredi minuit est passé : la conversation est close, la
               // règle est la règle — sans réponse, pas de dimanche.
-              <p className="mx-3 mb-3 rounded-[14px] bg-contraste/5 px-3.5 py-2.5 text-[12.5px] leading-snug text-foreground/45">
+              <p className="mx-3 mb-3 rounded-[14px] bg-contraste/5 px-3.5 py-2.5 text-corps leading-snug text-encre-3">
                 Conversation clôturée vendredi à minuit.
                 {presence.mine === "present"
                   ? " Tu es sur la liste — à dimanche ⚽"
@@ -142,15 +142,15 @@ export default function Discussions() {
                     <div key={t.nom}>
                       <p
                         className={cn(
-                          "flex items-center gap-1.5 text-[12.5px] font-bold",
-                          mine ? "text-primary" : "text-foreground/70"
+                          "flex items-center gap-1.5 text-corps font-bold",
+                          mine ? "text-primary" : "text-encre-2"
                         )}
                       >
                         {t.camp && <PointMaillot camp={t.camp} />}
                         {t.libelle}
                         {mine && " · ton équipe"}
                       </p>
-                      <p className="mt-0.5 text-[12.5px] leading-snug text-foreground/45">
+                      <p className="mt-0.5 text-corps leading-snug text-encre-3">
                         {t.joueurs.join(" · ")}
                       </p>
                     </div>
@@ -164,7 +164,7 @@ export default function Discussions() {
           {session?.admin && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-contraste/8 px-4 py-2.5">
               <span className="mono-label text-primary">{presence.presents.length} présents</span>
-              <span className="mono-label text-foreground/45">{presence.absents.length} absents</span>
+              <span className="mono-label text-encre-3">{presence.absents.length} absents</span>
               <span className="mono-label text-[#c8352b] dark:text-[#FF6B5E]">
                 {presence.sansReponse.length} sans réponse
               </span>

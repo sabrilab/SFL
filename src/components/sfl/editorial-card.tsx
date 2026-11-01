@@ -3,7 +3,7 @@
 // Carte joueur « éditoriale » — portage DOM/CSS fidèle de la carte retenue
 // dans le design de référence (card3d.js, layouts « editorial » et « legend »,
 // police sans-serif). Photo plein cadre sur fond teinté, typo Anton +
-// JetBrains Mono, rangée de six stats, filigrane géant, vignette et grain.
+// Inter, rangée de six stats, filigrane géant, vignette et grain.
 //
 // Le moteur du design travaille sur un canvas de 1024×1536 : toutes les
 // cotes ci-dessous sont exprimées dans ces unités et converties en pixels
@@ -47,7 +47,7 @@ const GRAIN =
   );
 
 const ANTON = "var(--font-anton), Anton, sans-serif";
-const JBMONO = "var(--font-jbmono), ui-monospace, monospace";
+const MONO_INTER = "var(--font-inter), system-ui, sans-serif";
 
 /** Réduit la taille du nom pour tenir dans la largeur (fitFont du design). */
 function fitName(name: string, max: number, width: number) {
@@ -113,7 +113,7 @@ export function EditorialCard({
   const ny = H - 356;
 
   const mono = (fs: number, w: number, ls: number, color: string) => ({
-    fontFamily: JBMONO,
+    fontFamily: MONO_INTER,
     fontSize: u(fs),
     fontWeight: w,
     letterSpacing: u(ls),
@@ -162,7 +162,7 @@ export function EditorialCard({
               left: 0,
               right: 0,
               textAlign: "center",
-              fontFamily: JBMONO,
+              fontFamily: MONO_INTER,
               fontWeight: 700,
               fontSize: u(34),
               letterSpacing: u(4),

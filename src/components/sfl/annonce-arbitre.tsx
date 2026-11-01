@@ -88,8 +88,8 @@ export function AnnonceArbitre({ nom, etat, onFermer }: { nom: string; etat: Eta
       </motion.div>
 
       <motion.div {...entre(0.3)} className="flex flex-col items-center gap-1.5 text-center">
-        <h2 className="text-[24px] leading-tight font-extrabold tracking-tight text-white">Tu es arbitre</h2>
-        <p className="max-w-[290px] text-[14px] leading-snug text-white/60">
+        <h2 className="text-titre-g leading-tight font-extrabold tracking-tight text-white">Tu es arbitre</h2>
+        <p className="max-w-[290px] text-ligne leading-snug text-white/60">
           Les joueurs de tes matchs te notent : ta satisfaction devient la note de ta carte.
         </p>
       </motion.div>
@@ -99,11 +99,11 @@ export function AnnonceArbitre({ nom, etat, onFermer }: { nom: string; etat: Eta
           type="button"
           onClick={oui}
           disabled={busy}
-          className="bouton-principal flex w-full items-center justify-center gap-2 py-[15px] text-[15px] font-bold disabled:opacity-50"
+          className="bouton-principal flex w-full items-center justify-center gap-2 py-[15px] text-lecture font-bold disabled:opacity-50"
         >
           {notifs ? "Activer les notifications" : "Voir ma carte"}
         </button>
-        <button type="button" onClick={fermer} className="bouton-discret px-6 py-3 text-[14px] font-semibold">
+        <button type="button" onClick={fermer} className="bouton-discret px-6 py-3 text-ligne font-semibold">
           Fermer
         </button>
       </motion.div>

@@ -76,7 +76,7 @@ function Progression({ legendes, p }: { legendes: string[]; p: number }) {
   const i = Math.min(legendes.length - 1, Math.floor(p * legendes.length * 1.08));
   return (
     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-6 pt-14 pb-9">
-      <p key={i} className="studio-legende text-[15px] font-semibold tracking-tight text-white" aria-live="polite">
+      <p key={i} className="studio-legende text-lecture font-semibold tracking-tight text-white" aria-live="polite">
         {legendes[i]}
       </p>
       <div className="mt-3 h-[3px] overflow-hidden rounded-full bg-white/20">

@@ -47,7 +47,7 @@ function FiltreBola({ actif }: { actif: Actif }) {
           href={v.href}
           aria-current={actif === v.href ? "page" : undefined}
           className={cn(
-            "px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap",
+            "px-3 py-1.5 text-corps font-semibold whitespace-nowrap",
             actif === v.href ? "bouton-principal" : "bouton-discret text-muted-foreground"
           )}
         >
@@ -116,7 +116,7 @@ export function EnteteLigue({ actif, className, children }: { actif: Actif; clas
                 onClick={() => setOuvert(false)}
                 className={cn(
                   "flex h-12 items-center rounded-[14px] px-3.5 transition-colors",
-                  ici.href === l.href ? "bg-foreground/[0.08] text-foreground" : "text-foreground/60"
+                  ici.href === l.href ? "bg-foreground/[0.08] text-foreground" : "text-encre-2"
                 )}
               >
                 <SigleLigue ligue={l.ligue} hauteur={16} />

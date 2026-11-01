@@ -19,11 +19,14 @@
 // perso (missions-perso.tsx) et ce que rapportent ses matchs Bola validés ;
 // son journal date ses lignes Bola (« 22 oct. · 19h30 ») au lieu d'une
 // journée de la SFL (choix par défaut, 28/10).
+// Sous les missions, pour tout le monde, les défis (defis.tsx) : le prochain
+// badge de chaque famille, toujours là, même sans feuille (30/10).
 
-import { useMemo } from "react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { MissionsBola } from "@/components/sfl/actus/missions";
 import { MissionsPerso } from "@/components/sfl/missions-perso";
+import { Defis } from "@/components/sfl/defis";
+import { PRIME_DEFI } from "@/lib/sfl/defis";
 import { MISSIONS_PERSO, XP_MATCH_BOLA } from "@/lib/sfl/missions-perso";
 import { useJoueurBola } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -111,6 +114,13 @@ const SOURCES: Source[] = [
     bola: true,
   },
   {
+    cle: "defis",
+    nom: "Défis",
+    gain: `+${Math.min(...PRIME_DEFI)} à +${Math.max(...PRIME_DEFI)}`,
+    detail: "chaque badge franchi",
+    de: (l) => !!l.defi,
+  },
+  {
     cle: "jouer",
     nom: "Jouer le dimanche",
     gain: `+${XP_DIMANCHE}`,
@@ -194,9 +204,10 @@ function Attente() {
   );
 }
 
-function Sources({ b, saison }: { b: BilanXp; saison: number }) {
+function Sources({ b }: { b: BilanXp }) {
   const horsSfl = useHorsDeLaSfl();
-  const lignes = useMemo(() => b.lignes.filter((l) => l.saison === saison), [b.lignes, saison]);
+  // Les lignes de la saison du Passe en cours (saisons-passe.ts).
+  const lignes = b.lignesSaison;
   return (
     <section className="flex flex-col" aria-labelledby="titre-gagner-xp">
       <div className="flex items-baseline justify-between px-5 pb-2">
@@ -261,13 +272,14 @@ function Journal({ b, saison }: { b: BilanXp; saison: number }) {
 }
 
 /** La face Missions du mode Passe : elle défile, le reste du mode reste en place. */
-export function VueMissions({ b, saison }: { b: BilanXp; saison: number }) {
+export function VueMissions({ b, saison, nom }: { b: BilanXp; saison: number; nom: string }) {
   const mm = useMissions();
   const horsSfl = useHorsDeLaSfl();
   return (
     <div className="mp-missions">
       {horsSfl ? <MissionsPerso /> : mm ? <MissionsBola /> : <Attente />}
-      <Sources b={b} saison={saison} />
+      <Defis nom={nom} />
+      <Sources b={b} />
       <Journal b={b} saison={saison} />
     </div>
   );

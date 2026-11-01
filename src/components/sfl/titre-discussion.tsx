@@ -18,7 +18,7 @@ export function TitreDiscussion({ actif }: { actif: "/vestiaire" | "/agent" }) {
     <nav aria-label="Discussion" className="flex min-w-0 items-baseline gap-3">
       {ECRANS.map(({ href, label }) =>
         href === actif ? (
-          <h1 key={href} className="text-[clamp(24px,7vw,28px)] font-bold tracking-tight lg:text-[34px]">
+          <h1 key={href} className="text-[clamp(24px,7vw,28px)] font-bold tracking-tight lg:text-nom">
             {label}
           </h1>
         ) : (
@@ -26,7 +26,7 @@ export function TitreDiscussion({ actif }: { actif: "/vestiaire" | "/agent" }) {
             key={href}
             href={href}
             replace
-            className="text-[clamp(24px,7vw,28px)] font-bold tracking-tight text-foreground/25 transition-colors active:text-foreground/45 lg:text-[34px]"
+            className="text-[clamp(24px,7vw,28px)] font-bold tracking-tight text-encre-4 transition-colors active:text-encre-3 lg:text-nom"
           >
             {label}
           </Link>

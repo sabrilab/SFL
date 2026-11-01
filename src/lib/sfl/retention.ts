@@ -182,6 +182,8 @@ export const KIND_FR: Record<string, string> = {
   achat: "Achats de cartes",
   recherche: "Recherches",
   compo: "Compositions",
+  notifs: "Invitation aux notifications",
+  activation: "Ton premier match",
 };
 
 export const PATH_FR: Record<string, string> = {
@@ -194,6 +196,7 @@ export const PATH_FR: Record<string, string> = {
   "/profil/evolution": "Évolution",
   "/profil/badges": "Badges",
   "/profil/cartes": "Mes cartes",
+  "/profil/flair": "Le Flair",
   "/duel": "Collection",
   "/collection": "Collection",
   "/discussions": "Discussions",
@@ -204,6 +207,11 @@ export const PATH_FR: Record<string, string> = {
   "/avatar": "Photo",
   "/stats": "Historique",
   "/recherche": "Recherche",
+  "/ligue-vierge": "Ligue Bola",
+  "/bola-team": "Bola Team",
+  "/messages": "Messages",
+  "/parrainage": "Parrainage",
+  "/saisons": "Saisons",
   "/reglages": "Réglages",
   "/palmares": "Wall of Fame",
 };

@@ -105,7 +105,7 @@ export function PastilleSynchro({ onClick, className }: { onClick?: () => void; 
       aria-label={`Synchronisation : ${etat === "ok" ? "à jour" : etat === "attente" ? "en attente" : etat === "refus" ? "refusée" : "locale"}`}
       className={cn(
         "mono-label flex h-9 items-center gap-1.5 rounded-full px-3",
-        etat === "refus" ? "bg-foreground text-background" : "bg-secondary text-foreground/70",
+        etat === "refus" ? "bg-foreground text-background" : "bg-secondary text-encre-2",
         className
       )}
     >
@@ -159,8 +159,8 @@ export function Synchro({ saison, nu = false }: { saison: Saison; nu?: boolean }
   return (
     <div className={cn(!nu && "glass rounded-3xl p-4")}>
       <div className="flex items-center justify-between gap-3">
-        <p className="mono-label text-foreground/45">{partage ? "Partagé" : "Local"} · {derniere}</p>
-        <span className="mono-label text-foreground/70">
+        <p className="mono-label text-encre-3">{partage ? "Partagé" : "Local"} · {derniere}</p>
+        <span className="mono-label text-encre-2">
           {envoi?.ok ? `✓ ${quand(envoi.at)}` : enAttente ? "⟳ 1 en attente" : envoi && !envoi.ok ? "! refusé" : ""}
         </span>
       </div>
@@ -175,31 +175,31 @@ export function Synchro({ saison, nu = false }: { saison: Saison; nu?: boolean }
           ))}
         </div>
       ) : envoi && !envoi.ok && !conflit ? (
-        <p className="mono-label mt-3 text-foreground/70">{envoi.raison}</p>
+        <p className="mono-label mt-3 text-encre-2">{envoi.raison}</p>
       ) : null}
 
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <button
           onClick={() => void publier()}
           disabled={occupe || !!empeche}
-          className="bouton-principal flex h-12 shrink-0 items-center justify-center gap-2 text-[15px] font-semibold disabled:opacity-40 sm:flex-1"
+          className="bouton-principal flex h-12 shrink-0 items-center justify-center gap-2 text-lecture font-semibold disabled:opacity-40 sm:flex-1"
         >
           {etat.phase === "envoi" ? "Envoi…" : "Renvoyer"}
         </button>
         <button
           onClick={reprendre}
           disabled={occupe || !session?.server}
-          className="bouton-secondaire flex h-12 items-center justify-center gap-2 px-4 text-[14px] font-semibold disabled:opacity-40"
+          className="bouton-secondaire flex h-12 items-center justify-center gap-2 px-4 text-ligne font-semibold disabled:opacity-40"
         >
           <RotateCcw className="size-4" />
           {etat.phase === "reprise" ? "Reprise…" : "Reprendre la base"}
         </button>
       </div>
 
-      {empeche && <p className="mt-2.5 text-[12.5px] leading-snug text-foreground/60">{empeche}</p>}
+      {empeche && <p className="mt-2.5 text-corps leading-snug text-encre-2">{empeche}</p>}
 
       {etat.phase === "ok" && (
-        <p className="mono-label mt-2.5 flex items-center gap-1.5 text-foreground/70">
+        <p className="mono-label mt-2.5 flex items-center gap-1.5 text-encre-2">
           <Check className="size-3.5 shrink-0" />
           {etat.message}
         </p>
@@ -207,7 +207,7 @@ export function Synchro({ saison, nu = false }: { saison: Saison; nu?: boolean }
 
       {conflit && (
         <div className="mt-3 rounded-2xl px-3 py-2.5 shadow-[inset_0_0_0_1px_var(--border)]">
-          <p className="mono-label text-foreground/70">Base plus récente · rien d&apos;écrasé</p>
+          <p className="mono-label text-encre-2">Base plus récente · rien d&apos;écrasé</p>
           <button
             onClick={() => (ecraser ? void publier(true) : setEcraser(true))}
             disabled={occupe}
@@ -219,7 +219,7 @@ export function Synchro({ saison, nu = false }: { saison: Saison; nu?: boolean }
       )}
 
       {etat.phase === "erreur" && !etat.conflit && !etat.feuille && (
-        <p className="mt-2.5 text-[12.5px] leading-snug text-foreground/60">{etat.message}</p>
+        <p className="mt-2.5 text-corps leading-snug text-encre-2">{etat.message}</p>
       )}
 
       <button
@@ -241,15 +241,15 @@ export function Synchro({ saison, nu = false }: { saison: Saison; nu?: boolean }
             <div key={e.titre} className="flex items-start gap-2">
               <span
                 className={cn(
-                  "mt-[3px] flex size-3.5 shrink-0 items-center justify-center rounded-full text-[9px] font-black",
+                  "mt-[3px] flex size-3.5 shrink-0 items-center justify-center rounded-full text-micro font-black",
                   e.ok ? "bg-foreground/15 text-foreground" : "bg-foreground text-background"
                 )}
               >
                 {e.ok ? "✓" : "✕"}
               </span>
               <span className="min-w-0">
-                <span className="block text-[12.5px] font-semibold">{e.titre}</span>
-                <span className="block text-[12px] leading-snug text-foreground/45">{e.detail}</span>
+                <span className="block text-corps font-semibold">{e.titre}</span>
+                <span className="block text-petit leading-snug text-encre-3">{e.detail}</span>
               </span>
             </div>
           ))}

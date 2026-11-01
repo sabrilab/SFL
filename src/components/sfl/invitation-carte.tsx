@@ -35,6 +35,11 @@
 //    lui-même (lib/sfl/villes, maVilleAProposer), « D'où tu viens ? » lui
 //    montre celle que sa connexion a devinée, ou la lui fait chercher
 //    (invitation-ville.tsx).
+// 1 bis. « Ton premier match » (Sabri, 31/10 : « fais un match ici, fais un
+//    match là, organise là, invite ») : à un joueur Bola qui n'a ni ouvert ni
+//    rejoint de match, les terrains les plus proches et son lien
+//    d'invitation (invitation-premier-match.tsx, lib/sfl/activation), une
+//    fois par jour au plus.
 // 2. Les notifications (Sabri, 19/10 : « quand quelqu'un
 //    télécharge l'application, fais-lui autoriser les notifs directement »).
 //    Dès la première ouverture où ce téléphone peut en recevoir sans les
@@ -91,6 +96,8 @@ import { Card3D } from "@/components/sfl/card-3d";
 import { FluxCarteOfficielle } from "@/components/sfl/carte-officielle";
 import { InvitationCharte, charteAProposer } from "@/components/sfl/invitation-charte";
 import { InvitationVille } from "@/components/sfl/invitation-ville";
+import { InvitationPremierMatch } from "@/components/sfl/invitation-premier-match";
+import { aDejaUnMatch, noterActivation, noterPremierMatchVu, premierMatchVuAujourdhui } from "@/lib/sfl/activation";
 import { AnnonceNouveaute } from "@/components/sfl/nouveautes/annonce-nouveaute";
 import { ResultatsAConfirmer } from "@/components/sfl/matchs/resultat-a-confirmer";
 import type { ResultatAConfirmer } from "@/lib/sfl/confirmation-resultat";
@@ -134,7 +141,19 @@ import { maVille, maVilleAProposer, type VilleJoueur } from "@/lib/sfl/villes";
 import { demoInvitation } from "@/lib/sfl/equipes-demo";
 import { cn } from "@/lib/utils";
 
-export type Invitation = "resultat" | "equipe" | "charte" | "nouveaute" | "arbitre" | "divisions" | "ville" | "carte" | "manga" | "notifs" | "suivre";
+export type Invitation =
+  | "resultat"
+  | "equipe"
+  | "charte"
+  | "nouveaute"
+  | "arbitre"
+  | "divisions"
+  | "ville"
+  | "premier-match"
+  | "carte"
+  | "manga"
+  | "notifs"
+  | "suivre";
 
 /** Ouvrir l'écran « Résultat du match » sur ce match, d'où qu'on soit (la fiche, Bola). */
 export function ouvrirResultat(id: number) {
@@ -151,7 +170,7 @@ const PAUSES: Partial<Record<Invitation, number>> = { charte: 7 * 24 * 3600 * 10
 /** Après le splash, et après la cérémonie des nouvelles cartes si elle passe. */
 const DELAI_MS = 2600;
 
-const TEXTES: Record<Exclude<Invitation, "resultat" | "ville" | "divisions" | "equipe" | "charte" | "nouveaute" | "arbitre">, { titre: string; ligne: string; bouton: string }> = {
+const TEXTES: Record<Exclude<Invitation, "resultat" | "ville" | "premier-match" | "divisions" | "equipe" | "charte" | "nouveaute" | "arbitre">, { titre: string; ligne: string; bouton: string }> = {
   carte: {
     titre: "Ta carte officielle",
     ligne: "Ton visage, le maillot Bola. Elle apparaît sur ta carte, chez tout le monde.",
@@ -204,11 +223,11 @@ export function aSuivre(saison: Saison, players: Player[], nom: string, suivable
   return [...fideles, ...hauts].slice(0, PROPOSES);
 }
 
-/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville`, `?invitation=suivre`, `?invitation=divisions`, `?invitation=equipe`, `?invitation=charte`, `?invitation=nouveaute` (la dernière annoncée), `?invitation=manga`, `?invitation=resultat` ou `?invitation=arbitre` la montre sans compte vérifié (captures). */
+/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville`, `?invitation=premier-match`, `?invitation=suivre`, `?invitation=divisions`, `?invitation=equipe`, `?invitation=charte`, `?invitation=nouveaute` (la dernière annoncée), `?invitation=manga`, `?invitation=resultat` ou `?invitation=arbitre` la montre sans compte vérifié (captures). */
 function apercu(): Invitation | null {
   if (process.env.NODE_ENV === "production" || typeof window === "undefined") return null;
   const v = new URLSearchParams(window.location.search).get("invitation");
-  return v === null ? null : v === "notifs" || v === "ville" || v === "suivre" || v === "divisions" || v === "equipe" || v === "charte" || v === "nouveaute" || v === "arbitre" || v === "manga" || v === "resultat" ? v : "carte";
+  return v === null ? null : v === "notifs" || v === "ville" || v === "premier-match" || v === "suivre" || v === "divisions" || v === "equipe" || v === "charte" || v === "nouveaute" || v === "arbitre" || v === "manga" || v === "resultat" ? v : "carte";
 }
 
 export function InvitationCarte() {
@@ -343,6 +362,12 @@ export function InvitationCarte() {
         setVisible("manga");
         return;
       }
+      // Un joueur Bola sans match : « Ton premier match », une fois par jour au plus.
+      const premier =
+        horsSflRef.current && !enPause("premier-match", nom) && !premierMatchVuAujourdhui(nom)
+          ? !(await aDejaUnMatch().catch(() => true))
+          : false;
+      if (annule) return;
       const annonce = editionAnnonce(ligue.current.saison, maintenant);
       // Un arbitre apprend qu'il l'est (annonce-arbitre.tsx), une fois.
       if (etatArbitres().arbitres.includes(nom) && !annonceArbitreVue(nom)) setVisible("arbitre");
@@ -352,7 +377,8 @@ export function InvitationCarte() {
       } else if (ville?.proposer) {
         setProposee(ville.ville);
         setVisible("ville");
-      } else if (etat === "inactives" && !enPause("notifs", nom)) setVisible("notifs");
+      } else if (premier) setVisible("premier-match");
+      else if (etat === "inactives" && !enPause("notifs", nom)) setVisible("notifs");
       else if (photoPerso(nom) === null && !enPause("carte", nom)) setVisible("carte");
       else if (!enPause("suivre", nom) && !horsSflRef.current) {
         // La liste de la base (ou, en aperçu, la démonstration), jamais un cache.
@@ -422,7 +448,11 @@ export function InvitationCarte() {
   // puis la réponse (lib/sfl/notifications.ts, page Activité de l'admin).
   useEffect(() => {
     if (visible === "notifs" && !forcee) noterNotifs("proposee", "ouverture");
-  }, [visible, forcee]);
+    if (visible === "premier-match" && !forcee && nom) {
+      noterPremierMatchVu(nom);
+      noterActivation("vu");
+    }
+  }, [visible, forcee, nom]);
 
   if (!nom) return null;
 
@@ -430,6 +460,7 @@ export function InvitationCarte() {
     if (!visible) return;
     mettreEnPause(visible, nom!);
     if (visible === "notifs") noterNotifs("plus-tard", "ouverture");
+    if (visible === "premier-match") noterActivation("plus-tard");
     setVisible(null);
   }
 
@@ -465,7 +496,7 @@ export function InvitationCarte() {
     setVisible(null);
   }
 
-  const texte = visible && visible !== "resultat" && visible !== "ville" && visible !== "divisions" && visible !== "equipe" && visible !== "charte" && visible !== "nouveaute" && visible !== "arbitre" ? TEXTES[visible] : null;
+  const texte = visible && visible !== "resultat" && visible !== "ville" && visible !== "premier-match" && visible !== "divisions" && visible !== "equipe" && visible !== "charte" && visible !== "nouveaute" && visible !== "arbitre" ? TEXTES[visible] : null;
   const Icone = visible === "notifs" ? Bell : visible === "suivre" ? UserPlus : Sparkles;
   const choisis = proposes.filter((n) => !decoches.has(n)).length;
 
@@ -502,6 +533,9 @@ export function InvitationCarte() {
         {visible === "divisions" && <AnnonceDivisions key="divisions" player={player} edition={edition} onFermer={annonceFermee} />}
         {visible === "ville" && (
           <InvitationVille key="ville" player={player} proposee={proposee} onFini={() => setVisible(null)} onPlusTard={plusTard} />
+        )}
+        {visible === "premier-match" && (
+          <InvitationPremierMatch key="premier-match" player={player} onFini={() => setVisible(null)} onPlusTard={plusTard} />
         )}
         {texte && (
           <motion.div

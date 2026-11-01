@@ -58,7 +58,7 @@ function Carrousel({ images, ratio }: { images: { duree: number; media: ReactNod
           </div>
         ))}
       </div>
-      <span className="pointer-events-none absolute top-3 right-3 z-20 rounded-full bg-black/60 px-2.5 py-1 text-[12px] font-semibold text-white tabular-nums backdrop-blur-sm">
+      <span className="pointer-events-none absolute top-3 right-3 z-20 rounded-full bg-black/60 px-2.5 py-1 text-petit font-semibold text-white tabular-nums backdrop-blur-sm">
         {i + 1}/{images.length}
       </span>
       <div className="pointer-events-none absolute inset-x-0 -bottom-[22px] flex justify-center gap-1.5">
@@ -101,7 +101,7 @@ function Publication(props: Parameters<typeof PublicationPost>[0]) {
         <Reduit ratio={ratio}>
           {images ? <Ecran duree={images[0].duree} ratio={ratio}>{images[0].media}</Ecran> : <Ecran duree={duree} ratio={ratio}>{media}</Ecran>}
         </Reduit>
-        <p className="line-clamp-1 px-0.5 text-[12px] leading-tight font-semibold text-foreground/80">{titre}</p>
+        <p className="line-clamp-1 px-0.5 text-petit leading-tight font-semibold text-encre-2">{titre}</p>
       </article>
     );
   }
@@ -143,7 +143,7 @@ function PublicationFilm({ j, date, saison, duree, media, ratio = 4 / 5, images,
       {images ? <Carrousel images={images} ratio={ratio} /> : <Ecran duree={duree} ratio={ratio}>{media}</Ecran>}
       <div className={cn("flex min-h-10 items-center gap-2 pr-1.5 pl-4", images && "pt-5")}>
         <span className="mono-label shrink-0 text-white/40">{[saison, j != null && `J${j}`, date].filter(Boolean).join(" · ")}</span>
-        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-white/85">{titre}</span>
+        <span className="min-w-0 flex-1 truncate text-corps font-semibold text-white/85">{titre}</span>
         {action}
         {partage && (
           <button
@@ -197,8 +197,8 @@ function PublicationPost({
       </div>
       <div className={cn("flex items-start gap-2 pr-1.5 pl-4", images ? "pt-6" : "pt-2.5")}>
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] leading-snug font-semibold">{titre}</p>
-          {texte && <p className="mt-0.5 line-clamp-2 text-[13.5px] leading-snug text-foreground/55">{texte}</p>}
+          <p className="text-lecture leading-snug font-semibold">{titre}</p>
+          {texte && <p className="mt-0.5 line-clamp-2 text-ligne leading-snug text-encre-3">{texte}</p>}
         </div>
         {action}
         {partage && (
@@ -360,7 +360,7 @@ export function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu
           texte={top.map((p) => `${p.rank}. ${id.nom(p.name)} ${p.pp} pts`).join(" · ")}
           partage={{ titre: "Le podium du Pépite d'Or", j: a.j, lignes: top.map((p) => ({ n: p.name, v: `${p.rank}e · ${p.pp} pts` })) }}
           action={
-            <button type="button" onClick={onClassements} className="bouton-discret bouton--or -mt-1 flex shrink-0 items-center gap-0.5 py-1.5 pr-1 pl-2.5 text-[13.5px] font-semibold">
+            <button type="button" onClick={onClassements} className="bouton-discret bouton--or -mt-1 flex shrink-0 items-center gap-0.5 py-1.5 pr-1 pl-2.5 text-ligne font-semibold">
               Classements <ChevronRight className="size-4" />
             </button>
           }
@@ -408,7 +408,7 @@ export function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu
           texte={`${a.buts} ${pl(a.buts, "but", "buts")} · ${a.matchs} ${pl(a.matchs, "match", "matchs")} · ${joueurs} joueurs`}
           action={
             enCours ? (
-              <Link href={`/ligue/journee?j=${a.j}`} className="bouton-discret bouton--vert -mt-1 flex shrink-0 items-center gap-0.5 py-1.5 pr-1 pl-2.5 text-[13.5px] font-semibold">
+              <Link href={`/ligue/journee?j=${a.j}`} className="bouton-discret bouton--vert -mt-1 flex shrink-0 items-center gap-0.5 py-1.5 pr-1 pl-2.5 text-ligne font-semibold">
                 Le récap <ChevronRight className="size-4" />
               </Link>
             ) : null
@@ -468,8 +468,8 @@ export function VoteDuJour({ me }: { me: string }) {
     <>
       {ouvertes.map((j) => (
         <section key={j.j} className="glass mx-4 flex flex-col gap-3 rounded-[26px] p-[18px] md:mx-0">
-          <h2 className="text-[17px] font-bold tracking-tight">
-            Vote du jour <span className="text-foreground/40">· J{j.j}</span>
+          <h2 className="text-titre font-bold tracking-tight">
+            Vote du jour <span className="text-encre-3">· J{j.j}</span>
           </h2>
           <VoteFigures journee={j} me={me} />
         </section>

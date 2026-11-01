@@ -28,9 +28,9 @@ function Groupe({ lignes }: { lignes: Ligne[] }) {
           href={l.href}
           className={`flex min-h-[54px] items-center gap-3 px-4 transition-colors active:bg-secondary ${i ? "border-t border-border/50" : ""}`}
         >
-          <span className="flex-1 text-[15.5px] font-semibold">{l.titre}</span>
-          {l.compteur && <span className="mono-label text-foreground/55">{l.compteur}</span>}
-          <ChevronRight className="size-4 shrink-0 text-foreground/35" />
+          <span className="flex-1 text-lecture font-semibold">{l.titre}</span>
+          {l.compteur && <span className="mono-label text-encre-3">{l.compteur}</span>}
+          <ChevronRight className="size-4 shrink-0 text-encre-4" />
         </Link>
       ))}
     </div>
@@ -55,7 +55,7 @@ export function PageLigue() {
     <div className="shell flex flex-col gap-5 py-4 sm:max-w-[600px]">
       <header className="flex items-center gap-2">
         <BoutonRetour parent="/admin" titre="la journée" />
-        <h1 className="titre-lettrage flex-1 text-[22px]">Ligue</h1>
+        <h1 className="titre-lettrage flex-1 text-titre-m">Ligue</h1>
       </header>
 
       <Groupe

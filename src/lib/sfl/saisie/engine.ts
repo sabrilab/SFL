@@ -24,6 +24,7 @@ import {
 import { equipesDuMatch, lireEquipe } from "./equipes";
 import { neJouePas } from "../hidden";
 import type { MatchDuJour, MatchEntry, RosterEntry, Saison, SaisieAlert } from "./types";
+import { estGardien } from "../gardien";
 import { evoluer, officiellesAu, type Evolution, type TitresFaibles } from "./evolution";
 
 /* ------------------------------- Barème ------------------------------- */
@@ -72,7 +73,19 @@ export function evolutionDe(saison: Saison, titresFaibles?: TitresFaibles): Evol
   const roster = rosterMap(saison);
   // Une saison close porte ses titres faibles, figés à la clôture (cloturerSaison).
   const faibles = titresFaibles ?? (saison.titresFaibles?.length ? new Set(saison.titresFaibles) : undefined);
-  return evoluer(saison, (nom) => toStats(roster.get(nom)?.base), faibles);
+  // Les buts encaissés, pour le barème des gardiens : le score d'en face.
+  const encaisses = new Map<string, number>();
+  for (const jr of computeJournees(saison))
+    for (const m of jr.matches ?? [])
+      for (const [moi, eux] of [
+        [m.teamA, m.teamB],
+        [m.teamB, m.teamA],
+      ])
+        for (const l of moi.players) encaisses.set(`${jr.j}:${l.name}`, eux.score);
+  return evoluer(saison, (nom) => toStats(roster.get(nom)?.base), faibles, {
+    gardien: (nom) => estGardien(roster.get(nom)?.poste),
+    encaisses: (j, nom) => encaisses.get(`${j}:${nom}`) ?? null,
+  });
 }
 
 /** Une journée est jouée quand ses actions sont saisies : un résultat, un but ou une passe. */

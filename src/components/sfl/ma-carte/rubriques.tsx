@@ -6,8 +6,8 @@
 // mes chiffres), Ma carte ne montre plus qu'une tuile par rubrique, chacune
 // dans son ton (rubriques.css ; Sabri, 24/10 : la liste « pas ouf », « des
 // cartes séparées », « un peu plus de couleurs ») : ma saison en large, puis
-// deux par deux le Niveau XP, l'évolution (sa courbe), les badges (les vrais
-// objets) et mes cartes (la dernière, en vrai). La toucher ouvre sa
+// deux par deux le Niveau XP, l'évolution (sa courbe), les badges et mes
+// cartes, chacune sur son objet en relief (Tuile). La toucher ouvre sa
 // page, enfant de Ma carte (lib/nav.ts) : /profil/saison, /profil/xp,
 // /profil/evolution, /profil/badges, /profil/cartes. Chaque page reprend tel
 // quel le bloc qui était dans Ma carte (ma-saison.tsx, niveau-xp.tsx,
@@ -16,7 +16,7 @@
 //
 // Une rubrique vide ne se montre pas (pas encore de dimanche, pas d'XP, une
 // seule journée pour la courbe). Les tuiles tiennent en clair comme en sombre.
-// Les chiffres en Anton, les étiquettes en JetBrains Mono ; aucun rouge ni
+// Les chiffres en Anton, les étiquettes en Inter capitales ; aucun rouge ni
 // bleu (cartes Impact et Défensive), l'or reste aux badges.
 
 import Link from "next/link";
@@ -27,17 +27,18 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import type { RangDuJour } from "@/components/sfl/ma-saison";
 import { useRangXp, useXp } from "@/hooks/use-missions";
-import { useFormatCarte } from "@/hooks/use-format-carte";
-import { MiniCarte } from "@/components/sfl/mini-carte";
-import { Medaille } from "@/components/sfl/vitrine";
 import { ModePasse, retenirOrigineModePasse } from "@/components/sfl/mode-passe";
 import { useMissionsASigner } from "@/components/sfl/mode-passe-missions";
+import { NOM_CHOIX } from "@/components/sfl/flair/mon-flair";
+import { FermeDans } from "@/components/sfl/matchs/flair";
+import { useIdentites } from "@/hooks/use-identites";
+import { useMonFlair } from "@/hooks/use-pronos";
+import { useEstBlesse } from "@/hooks/use-blessures";
 import { cartesDeCarriere, courbeDeCarriere, type CartesDeSaison, type PointCourbe } from "@/lib/sfl/carriere";
 import { ovr } from "@/lib/sfl/engine";
 import { saisonsBolaDe } from "@/lib/sfl/carte-bola";
 import { actionsDuJour, dimanchesDe, ficheJoueur, resultatDuJour } from "@/lib/sfl/fiche-joueur";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
-import { PALIERS_PASSE, PASSE_BOLA } from "@/lib/sfl/passe";
 import { metal, NOM_METAL, prochain, vitrine } from "@/lib/sfl/trophees";
 import { cn } from "@/lib/utils";
 import "./rubriques.css";
@@ -93,9 +94,26 @@ export function useMaCarte() {
 
 /* ------------------------------- Les tuiles ------------------------------- */
 
-type Ton = "saison" | "xp" | "evolution" | "badges" | "cartes";
+type Ton = "saison" | "xp" | "evolution" | "badges" | "cartes" | "flair" | "personnaliser" | "inviter";
 
-/** Une tuile : son ton, son étiquette, son contenu ; la toucher ouvre sa page. */
+/** L'objet en relief d'une tuile (public/objets/<ton>.webp), sous son texte. */
+export function ObjetDeTuile({ ton }: { ton: Ton }) {
+  // eslint-disable-next-line @next/next/no-img-element -- un fond décoratif, déjà à sa taille
+  return <img src={`/objets/${ton}.webp`} alt="" aria-hidden className="tuile__objet" decoding="async" draggable={false} />;
+}
+
+/** Les classes d'une tuile à objet, pour un bouton d'ailleurs (Personnaliser, Inviter). */
+export const classesTuile = (ton: Ton) => cn("tuile tuile--objet flex flex-col gap-2.5 p-4", `tuile--${ton}`);
+
+/**
+ * Une tuile : son ton, son étiquette, son contenu ; la toucher ouvre sa page.
+ * Son fond est un objet en relief (Sabri, 31/10 : « des espèces d'objets […]
+ * des images, mais on dirait des objets 3D », comme les boutons d'Higgsfield) :
+ * le ballon Bola de ma saison, le jeton Bola de l'XP, les marches de l'évolution,
+ * la coupe chrome des badges, mes cartes en pile, la boule du Flair
+ * (public/objets, rendus GPT Image, fonds transparents). L'objet déborde du
+ * coin, sous le texte, qui garde sa place.
+ */
 function Tuile({
   href,
   ton,
@@ -119,8 +137,15 @@ function Tuile({
       href={href}
       aria-label={label}
       onClick={onClick}
-      className={cn("tuile flex min-h-[156px] flex-col gap-2.5 p-4", `tuile--${ton}`, large && "col-span-2 min-h-0")}
+      // Le Flair garde sa fiche noire dans les deux modes (matchs/flair.css) : une île sombre.
+      className={cn(
+        "tuile tuile--objet flex min-h-[156px] flex-col gap-2.5 p-4",
+        `tuile--${ton}`,
+        large && "tuile--large col-span-2 min-h-[148px]",
+        ton === "flair" && "dark text-foreground"
+      )}
     >
+      <ObjetDeTuile ton={ton} />
       <span className="tuile__etiquette mono-label text-[10px]">{nom}</span>
       {children}
     </Link>
@@ -165,7 +190,9 @@ export function RubriquesMaCarte() {
   const b = useXp(player.name);
   const r = useRangXp(player.name);
   const aSigner = useMissionsASigner();
-  const format = useFormatCarte();
+  const flair = useMonFlair();
+  const blesse = useEstBlesse(player.name);
+  const identite = useIdentites();
   // Mes badges comptent aussi mes matchs Bola validés : MVP en Bola, la tuile le dit.
   const paliers = useMemo(
     () => vitrine(saison, player.name, new Date(), saisonsBolaDe(bolaCarte, player.name)),
@@ -229,10 +256,12 @@ export function RubriquesMaCarte() {
     );
   }
 
-  // 2. Mon Niveau XP, et le Passe Bola en vingt traits.
+  // 2. Mon Niveau XP, et le Passe Bola de la saison en cours, un trait par palier.
   if (b) {
+    const piste = b.saisonPasse.paliers;
+    const PALIERS_PASSE = piste.length;
     const fini = b.passe.palier >= PALIERS_PASSE;
-    const suivant = PASSE_BOLA[Math.min(PALIERS_PASSE, b.passe.palier + 1) - 1];
+    const suivant = piste[Math.min(PALIERS_PASSE, b.passe.palier + 1) - 1];
     tuiles.push(
       <Tuile
         key="xp"
@@ -353,7 +382,7 @@ export function RubriquesMaCarte() {
     );
   }
 
-  // 4. Mes badges : ceux que j'ai, en vrai, et le prochain.
+  // 4. Mes badges : combien de paliers, et le prochain ; la coupe en fond.
   const suivant = prochain(paliers);
   const gagnes = paliers.filter((e) => e.palier > 0).sort((x, y) => y.palier - x.palier);
   tuiles.push(
@@ -364,16 +393,12 @@ export function RubriquesMaCarte() {
       nom="Badges"
       label={`Badges : ${gagnes.length} paliers sur ${paliers.length}${suivant ? `, prochain ${suivant.def.nom}` : ""}`}
     >
-      <span className="flex items-center">
-        {(gagnes.length ? gagnes : paliers).slice(0, 3).map((e, i) => (
-          <span key={e.def.id} className={cn(i > 0 && "-ml-2.5")}>
-            <Medaille e={e} diametre={40} />
-          </span>
-        ))}
+      <span style={{ ...NOMBRE, fontSize: 34 }} className="tabular-nums">
+        {gagnes.length}
       </span>
       <span className="mt-auto flex flex-col gap-0.5">
         <span className="text-[13px] font-semibold">
-          {gagnes.length} / {paliers.length} paliers
+          sur {paliers.length} paliers
         </span>
         {suivant && (
           <span className="font-mono text-[11px] leading-snug text-foreground/45">
@@ -384,28 +409,100 @@ export function RubriquesMaCarte() {
     </Tuile>
   );
 
-  // 5. Mes cartes : la dernière en vrai, et combien j'en ai.
+  // 5. Mes cartes : combien j'en ai ; la pile en fond.
   if (mesCartes.length > 0) {
     const speciales = mesCartes.reduce((n, s) => n + s.speciales.length, 0);
     const total = mesCartes.length + speciales;
-    const s = mesCartes[0];
     tuiles.push(
       <Tuile key="cartes" href="/profil/cartes" ton="cartes" nom="Mes cartes" label={`Mes cartes : ${total}`}>
-        <span className="flex items-end gap-3">
-          <span className="pointer-events-none -mb-1 shrink-0">
-            <MiniCarte player={s.player} size={format.moyenne} cle={`tuile-${s.numero}-${s.player.name}`} saison={s.enCours ? undefined : s.numero} />
+        <span className="mt-auto flex flex-col gap-1">
+          <span style={{ ...NOMBRE, fontSize: 34 }} className="tabular-nums">
+            {total}
           </span>
-          <span className="flex min-w-0 flex-col gap-1 pb-0.5">
-            <span style={{ ...NOMBRE, fontSize: 34 }} className="tabular-nums">
-              {total}
-            </span>
-            <span className="text-[12px] leading-tight font-semibold">
-              {speciales > 0 ? `dont ${speciales} ${speciales > 1 ? "spéciales" : "spéciale"}` : total > 1 ? "cartes" : "carte"}
-            </span>
+          <span className="text-[12px] leading-tight font-semibold">
+            {speciales > 0 ? `dont ${speciales} ${speciales > 1 ? "spéciales" : "spéciale"}` : total > 1 ? "cartes" : "carte"}
           </span>
         </span>
       </Tuile>
     );
+  }
+
+  // 6. Le Flair (Sabri, 30/10) : ma dernière journée jugée, mes choix, l'XP ;
+  // sinon la journée ouverte, pour aller choisir sur sa feuille de match.
+  const ouverte = flair?.enCours?.phase === "ouvert" ? flair.enCours : null;
+  const derniere = flair?.journees.find((f) => f.phase !== "ouvert");
+  if (flair && (derniere || ouverte)) {
+    tuiles.push(
+      <Tuile
+        key="flair"
+        href="/profil/flair"
+        ton="flair"
+        nom={derniere ? `Le Flair · J${derniere.j}` : "Le Flair"}
+        large
+        label={
+          derniere
+            ? `Le Flair, J${derniere.j} : ${derniere.justes} sur ${derniere.choix.length}, +${derniere.xp} XP`
+            : `Le Flair : J${ouverte!.p.j} ouverte`
+        }
+      >
+        {derniere ? (
+          <>
+            <span className="flex items-end gap-5">
+              <span className="flex flex-col gap-1">
+                <span style={{ ...NOMBRE, fontSize: 38 }} className="tabular-nums">
+                  +{derniere.xp}
+                </span>
+                <span className="mono-label text-[9px] text-foreground/45">{derniere.phase === "en-jeu" ? "XP · verdict à minuit" : "XP"}</span>
+              </span>
+              {derniere.juges > 0 && (
+                <span className="flex flex-col gap-1">
+                  <span style={{ ...NOMBRE, fontSize: 38 }} className="tabular-nums">
+                    {derniere.justes}
+                    <span className="text-foreground/35">/{derniere.choix.length}</span>
+                  </span>
+                  <span className="mono-label text-[9px] text-foreground/45">Vu juste</span>
+                </span>
+              )}
+              <span className="ml-auto flex flex-col items-end gap-1">
+                <span className="font-mono text-[11px] text-foreground/45 tabular-nums">+{flair.xpSaison} XP cette saison</span>
+              </span>
+            </span>
+            <span className="flex flex-wrap gap-1.5">
+              {derniere.choix.map((c) => (
+                <span
+                  key={c.sujet}
+                  className={cn(
+                    "flex h-6 items-center gap-1 rounded-full px-2.5 text-[12px] font-semibold",
+                    c.etat === "juste" ? "bg-[#9fe0a8] text-[#0b0a0e]" : "bg-foreground/10 text-foreground/70",
+                    c.etat === "faux" && "line-through decoration-2 opacity-70"
+                  )}
+                >
+                  {c.etat === "juste" && <span aria-hidden>✓</span>}
+                  {NOM_CHOIX[c.choix] ?? identite.nom(c.choix).split(" ")[0]}
+                </span>
+              ))}
+            </span>
+          </>
+        ) : (
+          <span className="flex items-end justify-between gap-3">
+            <span className="flex flex-col gap-1">
+              <span className="text-[19px] leading-[1.2] font-bold tracking-[-0.3px]">J{ouverte!.p.j} ouverte</span>
+              <span className="font-mono text-[11px] text-foreground/45 tabular-nums">
+                {[...ouverte!.sujets.values()].filter((v) => v.choix).length}/{ouverte!.sujets.size} choix
+              </span>
+            </span>
+            <FermeDans fin={ouverte!.p.coupEnvoi} />
+          </span>
+        )}
+      </Tuile>
+    );
+  }
+
+  // Blessé, le Flair est son dimanche (Sabri, 31/10 : « son gameplay […] soit
+  // davantage sur le flair ») : sa tuile passe en tête tant qu'une journée est ouverte.
+  if (blesse && ouverte) {
+    const i = tuiles.findIndex((t) => (t as React.ReactElement | null)?.key === "flair");
+    if (i > 0) tuiles.unshift(...tuiles.splice(i, 1));
   }
 
   return (

@@ -172,8 +172,8 @@ function LigneEquipe({ e, droite }: { e: Equipe; droite?: React.ReactNode }) {
       <Link href={`/bola-team/${e.id}`} className="flex min-w-0 flex-1 items-center gap-3 transition-transform active:scale-[0.98]">
         <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={42} />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-[15.5px] font-semibold">{e.nom}</span>
-          <span className="truncate text-[12.5px] text-muted-foreground">
+          <span className="truncate text-lecture font-semibold">{e.nom}</span>
+          <span className="truncate text-corps text-muted-foreground">
             {[e.ville, `${n} / ${MAX_EQUIPE}`].filter(Boolean).join(" · ")}
           </span>
         </span>
@@ -190,7 +190,7 @@ function Pilule({ children, onClick, plein = true, ton, disabled }: { children: 
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "shrink-0 px-3.5 py-1.5 text-[13px] font-semibold disabled:opacity-50",
+        "shrink-0 px-3.5 py-1.5 text-corps font-semibold disabled:opacity-50",
         plein ? "bouton-principal" : "bouton-secondaire",
         ton
       )}
@@ -228,12 +228,12 @@ function CarteFeuille({
     >
       <Ecusson initiales={adverse.initiales} fond={adverse.fond} blason={adverse.blason} taille={36} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15px] font-bold">{adverse.nom}</span>
+        <span className="block truncate text-lecture font-bold">{adverse.nom}</span>
         <span className={cn("mono-label", envoyee ? "text-muted-foreground" : "bouton-sous")}>
           {libelleJour(m.jour)} · {m.heure}
         </span>
       </span>
-      <span className={cn("shrink-0 text-[14px] font-semibold", envoyee && "text-muted-foreground")}>{action}</span>
+      <span className={cn("shrink-0 text-ligne font-semibold", envoyee && "text-muted-foreground")}>{action}</span>
     </button>
   );
 }
@@ -247,9 +247,9 @@ function InvitationRecue({ e, moi, onRefuser, onRejoindre }: { e: Equipe; moi: s
       <div className="flex items-center gap-3">
         <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={50} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-[18px] leading-tight font-bold tracking-tight">{e.nom}</span>
+          <span className="truncate text-titre-fort leading-tight font-bold tracking-tight">{e.nom}</span>
           {m && (
-            <span className="truncate text-[13px] text-muted-foreground">
+            <span className="truncate text-corps text-muted-foreground">
               {inviteur(e, m)} t&apos;invite{m.depuis && <> · jusqu&apos;à {quandTombe(finInvitation(m.depuis))}</>}
             </span>
           )}
@@ -264,10 +264,10 @@ function InvitationRecue({ e, moi, onRefuser, onRejoindre }: { e: Equipe; moi: s
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="destructive" className="h-11 rounded-full text-[15px] font-semibold" onClick={onRefuser}>
+        <Button variant="destructive" className="h-11 rounded-full text-lecture font-semibold" onClick={onRefuser}>
           Refuser
         </Button>
-        <Button variant="vert" className="h-11 rounded-full text-[15px] font-semibold" onClick={onRejoindre}>
+        <Button variant="vert" className="h-11 rounded-full text-lecture font-semibold" onClick={onRejoindre}>
           Rejoindre
         </Button>
       </div>
@@ -704,7 +704,7 @@ export default function BolaTeamPage() {
               action: () => void agir(() => quitterEquipe(mienne.id)),
             })
           }
-          className="bouton-discret bouton--rouge px-4 py-2 text-[13px] font-semibold"
+          className="bouton-discret bouton--rouge px-4 py-2 text-corps font-semibold"
         >
           Quitter l&apos;équipe
         </button>
@@ -719,7 +719,7 @@ export default function BolaTeamPage() {
                 action: () => void agir(() => dissoudreEquipe(mienne.id)),
               })
             }
-            className="bouton-discret bouton--rouge px-4 py-2 text-[13px] font-semibold"
+            className="bouton-discret bouton--rouge px-4 py-2 text-corps font-semibold"
           >
             Dissoudre
           </button>
@@ -746,7 +746,7 @@ export default function BolaTeamPage() {
               aria-selected={vue === id}
               onClick={() => setVue(id)}
               className={cn(
-                "flex-1 px-4 py-2 text-[13.5px] font-semibold whitespace-nowrap",
+                "flex-1 px-4 py-2 text-ligne font-semibold whitespace-nowrap",
                 vue === id ? "bouton-principal bouton--vert" : "bouton-discret text-muted-foreground"
               )}
             >
@@ -813,8 +813,8 @@ export default function BolaTeamPage() {
             )}
             <div className="flex min-w-0 flex-col gap-1.5">
               <Link href={`/bola-team/${mienne.id}`} className="flex min-w-0 items-center gap-1 transition-opacity active:opacity-60">
-                <h2 className="truncate text-[28px] leading-none font-bold tracking-tight md:text-[34px]">{mienne.nom}</h2>
-                <ChevronRight className="size-5 shrink-0 text-foreground/35" strokeWidth={2.4} />
+                <h2 className="truncate text-titre-l leading-none font-bold tracking-tight md:text-nom">{mienne.nom}</h2>
+                <ChevronRight className="size-5 shrink-0 text-encre-4" strokeWidth={2.4} />
               </Link>
               <span className="mono-label text-muted-foreground">{etatEquipe(mienne)}</span>
               {!active(mienne) && (
@@ -834,10 +834,10 @@ export default function BolaTeamPage() {
               className="bouton-principal bouton--vert flex w-full items-center gap-3 rounded-[22px] px-4 py-3.5 text-left transition-transform active:scale-[0.98]"
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[15px] font-bold">Charte de déontologie</span>
+                <span className="block truncate text-lecture font-bold">Charte de déontologie</span>
                 <span className="mono-label bouton-sous">Règlement Team · version {VERSION_REGLEMENT.slice(1)}</span>
               </span>
-              <span className="shrink-0 text-[14px] font-semibold">Signer</span>
+              <span className="shrink-0 text-ligne font-semibold">Signer</span>
             </button>
           )}
           {aRemplir.map(({ m, etat }) => {
@@ -847,7 +847,7 @@ export default function BolaTeamPage() {
             ) : null;
           })}
           {peutInviter && !active(mienne) && (
-            <Button variant="mauve" onClick={ouvrirChoix} className="h-12 gap-2.5 rounded-full text-[15px] font-semibold">
+            <Button variant="mauve" onClick={ouvrirChoix} className="h-12 gap-2.5 rounded-full text-lecture font-semibold">
               <UserPlus className="size-[18px]" strokeWidth={2.2} />
               Inviter des joueurs
             </Button>
@@ -855,13 +855,13 @@ export default function BolaTeamPage() {
           {!apercu && (
             <Link
               href="/?discussion=equipe"
-              className="bouton-secondaire bouton--mauve flex h-12 items-center justify-center gap-2.5 text-[15px] font-semibold"
+              className="bouton-secondaire bouton--mauve flex h-12 items-center justify-center gap-2.5 text-lecture font-semibold"
             >
               <MessageCircle className="size-[18px]" strokeWidth={2.2} />
               Discussion de l&apos;équipe
               {nonLus > 0 && (
                 <span
-                  className="flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] text-[11.5px] leading-none font-bold text-white tabular-nums"
+                  className="flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] text-petit leading-none font-bold text-white tabular-nums"
                   style={{ background: "#FF3B30" }}
                 >
                   {nonLus > 9 ? "9+" : nonLus}
@@ -889,7 +889,7 @@ export default function BolaTeamPage() {
                   key={m.id}
                   type="button"
                   onClick={() => setJoueur(m)}
-                  className="flex items-center gap-2.5 rounded-[18px] bg-card py-1.5 pr-3.5 pl-1.5 text-[13.5px] font-semibold transition-transform active:scale-95"
+                  className="flex items-center gap-2.5 rounded-[18px] bg-card py-1.5 pr-3.5 pl-1.5 text-ligne font-semibold transition-transform active:scale-95"
                 >
                   <span className="flex rounded-[14px] border-[1.5px] border-dashed border-contraste/60 p-px opacity-60">
                     <CarteDe name={m.name} size={FORMAT_CARTE.petite} inerte />
@@ -901,7 +901,7 @@ export default function BolaTeamPage() {
             </div>
           )}
           {peutInviter && active(mienne) && (
-            <Button variant="secondary" onClick={ouvrirChoix} className="bouton--mauve h-12 gap-2.5 rounded-full text-[15px] font-semibold">
+            <Button variant="secondary" onClick={ouvrirChoix} className="bouton--mauve h-12 gap-2.5 rounded-full text-lecture font-semibold">
               <UserPlus className="size-[18px]" strokeWidth={2.2} />
               Inviter des joueurs
             </Button>
@@ -915,7 +915,7 @@ export default function BolaTeamPage() {
             return e ? (
               <div key={d.id} className="flex flex-col gap-2.5 rounded-[22px] bg-card p-3">
                 <LigneEquipe e={e} droite={<span className="mono-label pr-1 text-foreground">Défi</span>} />
-                <p className="px-1 text-[14px] font-semibold">{quand(d)}</p>
+                <p className="px-1 text-ligne font-semibold">{quand(d)}</p>
                 {capitaine && (
                   <div className="grid grid-cols-2 gap-2">
                     <Pilule plein={false} ton="bouton--rouge" onClick={() => void agir(() => repondreDefi(d.id, "refuse"))}>
@@ -937,8 +937,8 @@ export default function BolaTeamPage() {
                   <div key={d.id} className="flex items-center gap-3 rounded-[20px] bg-card px-3 py-2.5">
                     <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={36} />
                     <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-[15px] font-semibold">{e.nom}</span>
-                      <span className="truncate text-[12.5px] text-muted-foreground">{quand(d)}</span>
+                      <span className="truncate text-lecture font-semibold">{e.nom}</span>
+                      <span className="truncate text-corps text-muted-foreground">{quand(d)}</span>
                     </span>
                     {d.statut === "propose" ? (
                       capitaine && d.de === mienne.id ? (
@@ -968,7 +968,7 @@ export default function BolaTeamPage() {
         <Button
           variant={invitations.length > 0 ? "secondary" : "vert"}
           onClick={() => setCreer(true)}
-          className={cn("h-12 rounded-full text-[15px] font-semibold md:w-[320px] md:self-center", invitations.length > 0 && "bouton--vert")}
+          className={cn("h-12 rounded-full text-lecture font-semibold md:w-[320px] md:self-center", invitations.length > 0 && "bouton--vert")}
         >
           Créer mon équipe
         </Button>
@@ -1105,14 +1105,14 @@ export default function BolaTeamPage() {
       <Sheet open={!!confirmer} onOpenChange={(o) => !o && setConfirmer(null)}>
         <SheetContent side="bottom" className="rounded-t-[28px] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
           <SheetHeader className="px-5 pt-5 pb-0">
-            <SheetTitle className="pr-10 text-[22px] font-bold tracking-tight">{confirmer?.titre}</SheetTitle>
-            {confirmer?.texte && <p className="text-[14px] text-muted-foreground">{confirmer.texte}</p>}
+            <SheetTitle className="pr-10 text-titre-m font-bold tracking-tight">{confirmer?.titre}</SheetTitle>
+            {confirmer?.texte && <p className="text-ligne text-muted-foreground">{confirmer.texte}</p>}
           </SheetHeader>
           {confirmer && (
             <div className="flex flex-col gap-2 px-4">
               <Button
                 variant="destructive"
-                className="h-12 rounded-full text-[15px] font-semibold"
+                className="h-12 rounded-full text-lecture font-semibold"
                 onClick={() => {
                   setConfirmer(null);
                   confirmer.action();
@@ -1120,7 +1120,7 @@ export default function BolaTeamPage() {
               >
                 {confirmer.oui}
               </Button>
-              <Button variant="ghost" className="h-12 rounded-full text-[15px] font-semibold" onClick={() => setConfirmer(null)}>
+              <Button variant="ghost" className="h-12 rounded-full text-lecture font-semibold" onClick={() => setConfirmer(null)}>
                 {confirmer.non}
               </Button>
             </div>
@@ -1168,17 +1168,17 @@ function FicheJoueur({
           <CarteDe name={joueur.name} size={FORMAT_CARTE.moyenne} />
         </span>
         <span className="flex min-w-0 flex-col gap-1 pr-8">
-          <SheetTitle className="text-[24px] leading-tight font-bold tracking-tight">{joueur.name}</SheetTitle>
-          <span className="text-[14px] text-muted-foreground">{etat.filter(Boolean).join(" · ")}</span>
-          {joueur.departLe && <span className="text-[14px] font-semibold text-foreground">Part {date(joueur.departLe, true)}</span>}
+          <SheetTitle className="text-titre-g leading-tight font-bold tracking-tight">{joueur.name}</SheetTitle>
+          <span className="text-ligne text-muted-foreground">{etat.filter(Boolean).join(" · ")}</span>
+          {joueur.departLe && <span className="text-ligne font-semibold text-foreground">Part {date(joueur.departLe, true)}</span>}
         </span>
       </SheetHeader>
       {invite && capitaine ? (
         <div className="flex flex-col gap-2 px-4">
-          <Button variant="mauve" className="h-12 rounded-full text-[15px] font-semibold" onClick={onRelancer}>
+          <Button variant="mauve" className="h-12 rounded-full text-lecture font-semibold" onClick={onRelancer}>
             Relancer {prenom(joueur.name)}
           </Button>
-          <Button variant="ghost" className="bouton--rouge h-12 rounded-full text-[15px] font-semibold" onClick={onRetirer}>
+          <Button variant="ghost" className="bouton--rouge h-12 rounded-full text-lecture font-semibold" onClick={onRetirer}>
             Retirer l&apos;invitation
           </Button>
         </div>
@@ -1187,13 +1187,13 @@ function FicheJoueur({
           {!joueur.departLe && (
             <Button
               variant="secondary"
-              className={cn(joueur.role === "vice" ? "bouton--rouge" : "bouton--or", "h-12 rounded-full text-[15px] font-semibold")}
+              className={cn(joueur.role === "vice" ? "bouton--rouge" : "bouton--or", "h-12 rounded-full text-lecture font-semibold")}
               onClick={onVice}
             >
               {joueur.role === "vice" ? "Retirer le brassard de vice" : "Nommer vice-capitaine"}
             </Button>
           )}
-          <Button variant={joueur.departLe ? "secondary" : "ghost"} className={cn("h-12 rounded-full text-[15px] font-semibold", !joueur.departLe && "bouton--rouge")} onClick={onExclure}>
+          <Button variant={joueur.departLe ? "secondary" : "ghost"} className={cn("h-12 rounded-full text-lecture font-semibold", !joueur.departLe && "bouton--rouge")} onClick={onExclure}>
             {joueur.departLe ? "Annuler l'exclusion" : "Exclure (48 h de préavis)"}
           </Button>
         </div>

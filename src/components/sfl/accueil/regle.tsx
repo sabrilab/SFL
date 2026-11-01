@@ -19,9 +19,9 @@ const CRAN = 10;
  * écran bas la resserre pour que tout tienne sans défiler (Corps, cadre.tsx).
  */
 const MESURES = [
-  { chiffre: "text-[44px]", ecart: "mt-[3px]", marge: "mt-[8px]", hauteur: "h-[55px]", aiguille: "h-[30px]", crans: ["h-[26px]", "h-[18px]", "h-[11px]"], nombre: "top-[32px] text-[10px]" },
-  { chiffre: "text-[34px]", ecart: "mt-[2px]", marge: "mt-[5px]", hauteur: "h-[40px]", aiguille: "h-[23px]", crans: ["h-[20px]", "h-[13px]", "h-[8px]"], nombre: "top-[24px] text-[9px]" },
-  { chiffre: "text-[28px]", ecart: "mt-[1px]", marge: "mt-[4px]", hauteur: "h-[34px]", aiguille: "h-[20px]", crans: ["h-[17px]", "h-[11px]", "h-[7px]"], nombre: "top-[20px] text-[9px]" },
+  { chiffre: "text-affiche", ecart: "mt-[3px]", marge: "mt-[8px]", hauteur: "h-[55px]", aiguille: "h-[30px]", crans: ["h-[26px]", "h-[18px]", "h-[11px]"], nombre: "top-[32px] text-etiquette" },
+  { chiffre: "text-nom", ecart: "mt-[2px]", marge: "mt-[5px]", hauteur: "h-[40px]", aiguille: "h-[23px]", crans: ["h-[20px]", "h-[13px]", "h-[8px]"], nombre: "top-[24px] text-micro" },
+  { chiffre: "text-titre-l", ecart: "mt-[1px]", marge: "mt-[4px]", hauteur: "h-[34px]", aiguille: "h-[20px]", crans: ["h-[17px]", "h-[11px]", "h-[7px]"], nombre: "top-[20px] text-micro" },
 ] as const;
 
 const virgule = (v: number) => String(v).replace(".", ",");

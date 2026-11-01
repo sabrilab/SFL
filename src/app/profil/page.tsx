@@ -20,8 +20,8 @@
 //      tant qu'elle n'est pas faite (carte-officielle.tsx ; ensuite, on la
 //      refait depuis « Ma photo ») et le badge de ma carte ; enfin
 //      « Personnaliser ma carte » (le skin, les signes et le badge, au choix :
-//      personnaliser-carte.tsx, 24/10), puis « Inviter », mon lien de
-//      parrainage (parrainage/page.tsx, 24/10) ;
+//      personnaliser-carte.tsx, 24/10) et, à côté, « Inviter », mon lien de
+//      parrainage (parrainage/page.tsx, 24/10), en tuiles à objet (31/10) ;
 //   2. le reste, en résumé (Sabri, 24/10 : « plus agréable à parcourir » ;
 //      « si on veut approfondir dans une rubrique, on puisse y aller ») : une
 //      liste groupée comme les Réglages d'un iPhone, une rangée par rubrique,
@@ -50,7 +50,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { UserPlus } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Card3DEnGrand } from "@/components/sfl/carte-en-grand";
 import { PlayerCard } from "@/components/sfl/player-card";
@@ -62,7 +62,7 @@ import { ProfilePhoto } from "@/components/sfl/profile-photo";
 import { ChoixBadge } from "@/components/sfl/choix-badge";
 import { PersonnaliserCarte } from "@/components/sfl/personnaliser-carte";
 import { CarteOfficielle } from "@/components/sfl/carte-officielle";
-import { RubriquesMaCarte, useMaCarte } from "@/components/sfl/ma-carte/rubriques";
+import { classesTuile, ObjetDeTuile, RubriquesMaCarte, useMaCarte } from "@/components/sfl/ma-carte/rubriques";
 import { useJoueurBola, useMyPlayer } from "@/components/sfl/player-provider";
 import { ProfilArbitre } from "@/components/sfl/profil-arbitre";
 import { useArbitres } from "@/hooks/use-arbitres";
@@ -90,7 +90,7 @@ function AvatarPhoto({ name }: { name: string }) {
   const src = usePlayerPhoto(name);
   const [broken, setBroken] = useState(false);
   return (
-    <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-foreground/10 text-[14px] font-bold">
+    <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-foreground/10 text-ligne font-bold">
       {broken ? (
         name[0]
       ) : (
@@ -150,7 +150,7 @@ function ProfilJoueurPage() {
   return (
     <div className="shell py-4 sm:py-8 lg:pt-[var(--fib-55)]">
       <div className="relative z-10 mb-[18px] flex items-center justify-between gap-3 lg:mb-[var(--fib-34)]">
-        <h1 className="text-[30px] font-bold tracking-tight lg:text-[34px]">Ma carte</h1>
+        <h1 className="text-titre-l font-bold tracking-tight lg:text-nom">Ma carte</h1>
         <div className="flex items-center gap-2">
           <BoutonStats />
           <BoutonRecherche />
@@ -193,10 +193,10 @@ function ProfilJoueurPage() {
               aria-label={`${identite.nom(player.name)}, ${identite.pseudo(player.name)}. Modifier mon nom et mon pseudo`}
               className="flex w-full flex-col items-center gap-[var(--fib-8)] text-center"
             >
-              <span className="titre-lettrage text-[34px] leading-[0.95] break-words">
+              <span className="titre-lettrage text-nom leading-[0.95] break-words">
                 {identite.nom(player.name)}
               </span>
-              <span className="font-mono text-[12px] text-foreground/45">
+              <span className="font-mono text-petit text-encre-3">
                 {identite.pseudo(player.name)} · {poste.toLowerCase()}
                 {xp && ` · niveau XP ${xp.niveau}`}
                 {rangXp && ` · rang ${rangXp.rang}`}
@@ -215,7 +215,7 @@ function ProfilJoueurPage() {
             {/* Joueur Bola : ses matchs validés, ceux qui font sa carte (lib/sfl/carte-bola.ts). */}
             {bola && <Chiffre valeur={player.matchs} quoi={player.matchs > 1 ? "Matchs" : "Match"} />}
           </div>
-          {!bola && <p className="w-full text-[19px] leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>}
+          {!bola && <p className="w-full text-titre-fort leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>}
           {/* Ma photo, ma carte officielle (photo au maillot Bola) tant
               qu'elle n'est pas faite, le badge de ma carte. Sans elle, les
               deux ronds se centrent. */}
@@ -231,18 +231,19 @@ function ProfilJoueurPage() {
             <CarteOfficielle player={player} className="min-w-0 flex-1" />
             <ChoixBadge player={player} />
           </div>
-          {/* Personnaliser ma carte : le skin, les signes et le badge, au choix (personnaliser-carte.tsx) */}
-          <PersonnaliserCarte player={player} />
+          {/* Personnaliser ma carte (le skin, les signes et le badge, au choix :
+              personnaliser-carte.tsx) et Inviter (mon lien et mon code de
+              parrainage : parrainage/page.tsx), côte à côte, en tuiles à objet
+              comme les rubriques (Sabri, 31/10) */}
+          <div className="grid w-full grid-cols-2 gap-2.5">
+            <PersonnaliserCarte player={player} tuile />
+            <Link href="/parrainage" className={cn(classesTuile("inviter"), "tuile--court")}>
+              <ObjetDeTuile ton="inviter" />
+              <span className="mt-auto text-[16px] leading-[1.15] font-bold tracking-[-0.2px]">Inviter</span>
+            </Link>
+          </div>
           {/* Je suis blessé, ou remis : mes journées manquées se lisent sur mon profil (blessure.tsx) */}
           {!bola && <BoutonBlessure nom={player.name} />}
-          {/* Inviter : mon lien et mon code de parrainage (parrainage/page.tsx) */}
-          <Link
-            href="/parrainage"
-            className="bouton-secondaire bouton--mauve flex w-full items-center justify-center gap-2 py-3.5 text-[14px] font-semibold"
-          >
-            <UserPlus className="size-4" />
-            Inviter
-          </Link>
         </div>
 
         <div className="flex min-w-0 flex-col gap-[var(--fib-21)]">
@@ -267,7 +268,7 @@ function ProfilJoueurPage() {
       {/* La photo de profil, à part : on y entre en touchant la photo */}
       <Sheet open={photoOuverte} onOpenChange={setPhotoOuverte}>
         <SheetContent side="bottom" className="mx-auto w-full rounded-t-[28px] px-5 pt-6 pb-8 sm:max-w-md">
-          <SheetTitle className="text-[19px] font-extrabold tracking-tight">Ma photo</SheetTitle>
+          <SheetTitle className="text-titre-fort font-extrabold tracking-tight">Ma photo</SheetTitle>
           <ProfilePhoto name={player.name} />
         </SheetContent>
       </Sheet>

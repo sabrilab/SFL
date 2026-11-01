@@ -30,7 +30,7 @@ import {
   engagementsDe,
   journalXp,
   juger,
-  palierMaxDe,
+  paliersDe,
   rangsDesJoueurs,
   reponseDe,
   risqueDe,
@@ -58,12 +58,14 @@ import {
   reponsesEnMemoire,
 } from "@/lib/sfl/missions-reponses";
 import { ajouterPronos } from "@/lib/sfl/pronos";
+import { ajouterDefis } from "@/lib/sfl/defis";
 import { ajouterRecrues, type RecruesJoueur } from "@/lib/sfl/recrues";
 import { appliquerVotes } from "@/lib/sfl/votes";
 import { supabase } from "@/lib/supabase";
 import type { Saison } from "@/lib/sfl/saisie/types";
 import { ajouterBola, lignesXpBola, missionsPerso } from "@/lib/sfl/missions-perso";
 import { EPREUVES_BOLA, type Epreuve } from "@/lib/sfl/passe";
+import { saisonsPasseOuvertes } from "@/lib/sfl/saisons-passe";
 
 const AUCUNE: Reponse[] = [];
 let abonnes = 0;
@@ -135,6 +137,17 @@ function avecVitrineXp(lg: XpLigue, s: Saison, nom: string): XpLigue {
       lignes.push({ saison: numero, j: m.j, date: m.date, quoi: "Trois sur trois", xp: part, parfait: true });
     }
   }
+  // Chaque saison du Passe commencée (Givre…) : de quoi la finir aussi, au jour de son début.
+  const MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+  for (const sp of saisonsPasseOuvertes(lg.maintenant)) {
+    if (!sp.debut) continue;
+    const [, m, j] = sp.debut.split("-").map(Number);
+    const date = `${j} ${MOIS[m - 1]}`;
+    const numero = s.numero ?? 0;
+    for (const creneau of ["contrat", "defi", "ligue"] as const)
+      lignes.push({ saison: numero, j: 0, date, quoi: `${sp.nom} · rang S`, xp: XP_VITRINE / 4, mission: { creneau, rang: "S", reussie: true } });
+    lignes.push({ saison: numero, j: 0, date, quoi: "Trois sur trois", xp: XP_VITRINE / 4, parfait: true });
+  }
   const avant = lg.journal.get(nom) ?? { lignes: [], reussies: 0 };
   const journal = new Map(lg.journal);
   journal.set(nom, { lignes: [...avant.lignes, ...lignes], reussies: Math.max(avant.reussies, CRANS[CRANS.length - 1]) });
@@ -142,24 +155,26 @@ function avecVitrineXp(lg: XpLigue, s: Saison, nom: string): XpLigue {
   const rangs = new Map(lg.rangs);
   const sur = Math.max(1, ...[...lg.rangs.values()].map((r) => r.sur));
   rangs.set(nom, { rang: "S", place: 1, xp, sur, suivant: null });
-  const surLesCartes = cartesDe(journal, rangs, lg.recrues, lg.bola);
+  const surLesCartes = cartesDe(journal, rangs, lg.recrues, lg.bola, lg.maintenant);
   return { ...lg, journal, rangs, surLesCartes };
 }
 
 /**
- * Ce que l'XP pose sur les cartes, en JSON : [nom, rang, plus haut palier,
- * cran, recrues actives, numéro de Fondateur][] (use-habillage.ts, lireCartesXp).
+ * Ce que l'XP pose sur les cartes, en JSON : [nom, rang, paliers atteints par
+ * saison du Passe, cran, recrues actives, numéro de Fondateur][]
+ * (use-habillage.ts, lireCartesXp).
  */
 function cartesDe(
   journal: Map<string, { lignes: LigneXp[]; reussies: number }>,
   rangs: Map<string, RangJoueur>,
   recrues: ReadonlyMap<string, RecruesJoueur>,
-  bola: string | null
+  bola: string | null,
+  maintenant: Date
 ): string {
   return JSON.stringify(
     [...journal].map(([n, x]) => {
       const r = recrues.get(n);
-      return [n, rangs.get(n)?.rang ?? null, palierMaxDe(journal, n, epreuvesDe(n, bola)), cranDe(x.reussies), r?.actives ?? 0, r?.fondateur ?? null];
+      return [n, rangs.get(n)?.rang ?? null, paliersDe(journal, n, maintenant, epreuvesDe(n, bola)), cranDe(x.reussies), r?.actives ?? 0, r?.fondateur ?? null];
     })
   );
 }
@@ -387,8 +402,10 @@ export function useDuelsAcceptes(j: number | null | undefined): Duel[] {
 /** L'XP de toute la ligue, calculé une fois pour l'app (XpLigueProvider). */
 export interface XpLigue {
   journal: Map<string, { lignes: LigneXp[]; reussies: number }>;
-  /** Le numéro de la saison en cours, celle du passe. */
+  /** Le numéro de la saison SFL en cours. */
   saison: number;
+  /** L'heure du calcul (à la minute) : elle dit la saison du Passe (saisons-passe.ts). */
+  maintenant: Date;
   /** Le rang de chaque joueur classé : S, A ou B selon sa place dans l'XP à vie. */
   rangs: Map<string, RangJoueur>;
   /**
@@ -428,6 +445,8 @@ export function useXpLigueCalcule(): XpLigue | null {
     if (!isClient) return null;
     const journal = journalXp(jugee, reponses, votes, maintenant, felicitations);
     ajouterPronos(journal, jugee, pronos, maintenant);
+    // Les badges de palier franchis depuis S1 J4 : la prime de leur défi (lib/sfl/defis.ts).
+    ajouterDefis(journal, jugee);
     // +100 par recrue active, hors du rang (lib/sfl/recrues.ts).
     ajouterRecrues(journal, jugee, ligue, me ? { nom: me, recrues: miennes } : null, maintenant);
     // Mes matchs Bola validés et mes missions perso (lib/sfl/missions-perso.ts), hors du rang ;
@@ -438,8 +457,8 @@ export function useXpLigueCalcule(): XpLigue | null {
     }
     const recrues = new Map(ligue.map((r) => [r.nom, r]));
     const rangs = rangsDesJoueurs(classementNiveau(journal, allPlayers, { pourLeRang: true }));
-    const surLesCartes = cartesDe(journal, rangs, recrues, bola);
-    const lg = { journal, saison: saison.numero ?? 0, rangs, surLesCartes, recrues, bola };
+    const surLesCartes = cartesDe(journal, rangs, recrues, bola, maintenant);
+    const lg = { journal, saison: saison.numero ?? 0, maintenant, rangs, surLesCartes, recrues, bola };
     return vitrine ? avecVitrineXp(lg, saison, vitrine.nom) : lg;
   }, [isClient, jugee, reponses, votes, maintenant, felicitations, pronos, saison, allPlayers, vitrine, ligue, miennes, me, bola, bolaCarte]);
 }
@@ -457,7 +476,7 @@ export function useXp(nom?: string): BilanXp | null {
   const { me } = useMyPlayer();
   const lg = useXpLigue();
   const qui = nom ?? me;
-  return useMemo(() => (lg && qui ? bilanDe(lg.journal, qui, lg.saison, epreuvesDe(qui, lg.bola)) : null), [lg, qui]);
+  return useMemo(() => (lg && qui ? bilanDe(lg.journal, qui, lg.maintenant, epreuvesDe(qui, lg.bola)) : null), [lg, qui]);
 }
 
 /** Le rang d'un joueur (B, A, S) ; null pour un joueur masqué ou inconnu. */

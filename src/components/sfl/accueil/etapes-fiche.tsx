@@ -194,7 +194,7 @@ export function EtapeNaissance({
         />
       </div>
       {vue && !valide && ans !== null && (
-        <p className="mt-[13px] text-center text-[13px] font-medium text-[#FF6B5E]">
+        <p className="mt-[13px] text-center text-corps font-medium text-[#FF6B5E]">
           {ans < BORNES.ageMin ? `Bola est ouverte dès ${BORNES.ageMin} ans.` : "Vérifie ta date de naissance."}
         </p>
       )}
@@ -274,7 +274,7 @@ export function EtapeGabarit({ b, maj, onFini }: { b: Brouillon; maj: (p: Partia
                       maj({ maillot: m });
                     }}
                     className={cn(
-                      "bouton--or grid place-items-center rounded-[13px] text-[14px] font-extrabold tracking-tight",
+                      "bouton--or grid place-items-center rounded-[13px] text-ligne font-extrabold tracking-tight",
                       n === 0 ? "h-[44px]" : n < 3 ? "h-[40px]" : "h-[36px]",
                       b.maillot === m ? "bouton-principal" : "bouton-secondaire text-white/70"
                     )}

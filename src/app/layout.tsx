@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono, Anton, Barlow_Condensed } from "next/font/google";
+import { Inter, Anton, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 import "@/components/sfl/actus/lune.css";
 
@@ -29,22 +29,19 @@ import { NouveauxBadges } from "@/components/sfl/vitrine";
 import { InvitationCarte } from "@/components/sfl/invitation-carte";
 import { Accueil, ApresAccueil } from "@/components/sfl/accueil/accueil";
 import { PorteSfl } from "@/components/sfl/porte-sfl";
+import { EssaiDesign } from "@/components/ds/essai-design";
 
 // Typographie de l'app BOLA, celle de la Map (Sabri, 22/10 : « uniformise le
 // tout ») : Inter pour tout ce qui se lit (celle du site), au plus gras pour
-// les titres en capitales, et JetBrains Mono pour les étiquettes en
-// capitales, sur tous les appareils (globals.css, .titre-lettrage et
-// .mono-label).
+// les titres en capitales, et en capitales espacées pour les étiquettes
+// (globals.css, .titre-lettrage et .mono-label).
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
 });
 
-const jbMono = JetBrains_Mono({
-  weight: ["400", "600", "700"],
-  variable: "--font-jbmono",
-  subsets: ["latin"],
-});
+// JetBrains Mono (la police « machine à écrire ») n'est plus chargée depuis
+// le 30/10 : Sabri l'a retirée de l'interface puis des cartes.
 
 // Les chiffres : rangs, scores, notes. Les titres l'ont quittée le 22/10
 // pour le lettrage de la Map ; les cartes et les écussons gardent leurs lettres.
@@ -93,7 +90,7 @@ export default function RootLayout({
     <html
       lang="fr"
       suppressHydrationWarning
-      className={`${inter.variable} ${jbMono.variable} ${anton.variable} ${barlow.variable} h-full antialiased`}
+      className={`${inter.variable} ${anton.variable} ${barlow.variable} h-full antialiased`}
     >
       {/* body ne défile jamais lui-même (overflow hidden, hauteur figée à
           celle de l'écran) : c'est le conteneur interne juste en dessous
@@ -159,6 +156,9 @@ export default function RootLayout({
                 <VoileEtat />
                 <PorteSfl />
                 <BottomNav />
+                {/* Un essai de design en cours (Admin → Design), sur ce
+                    téléphone seulement. */}
+                <EssaiDesign />
                 </AuthGate>
                 {/* Hors de la porte de connexion : le guide passe avant le
                     compte, pour ne pas se connecter dans Snapchat. */}

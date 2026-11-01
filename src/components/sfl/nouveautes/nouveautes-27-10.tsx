@@ -107,7 +107,7 @@ function PaliersRecrues({ player }: { player: Player }) {
             h={h}
           />
         </span>
-        <span className="mono-label text-[10px] text-white/70">
+        <span className="mono-label text-etiquette text-white/70">
           {numeroFondateur(NUMERO_EXEMPLE)}
         </span>
       </motion.div>
@@ -138,18 +138,18 @@ function PaliersRecrues({ player }: { player: Player }) {
                 />
               ) : (
                 <span className="flex h-full flex-col items-center justify-center gap-0.5 bg-white/[0.08] font-mono font-bold leading-none">
-                  <span className="text-[11px]">+100</span>
-                  <span className="text-[9px] text-white/60">XP</span>
+                  <span className="text-legende">+100</span>
+                  <span className="text-micro text-white/60">XP</span>
                 </span>
               )}
             </span>
             <span
-              className="text-[19px] leading-none tracking-tight tabular-nums"
+              className="text-titre-fort leading-none tracking-tight tabular-nums"
               style={{ fontFamily: ANTON }}
             >
               {p.n}
             </span>
-            <span className="mono-label text-[9.5px] text-white/50">
+            <span className="mono-label text-etiquette text-white/50">
               {p.finition ? p.titre : "Par recrue"}
             </span>
           </motion.li>
@@ -206,7 +206,7 @@ function ReponseQuiSeScelle() {
             className="absolute inset-0"
           >
             <div
-              className="glisse-piste glisse-piste--md pointer-events-none h-[50px] text-[15px]"
+              className="glisse-piste glisse-piste--md pointer-events-none h-[50px] text-lecture"
               style={
                 {
                   "--glisse-p": t === "glisse" ? 1 : 0,
@@ -237,7 +237,7 @@ function ReponseQuiSeScelle() {
             transition={{ duration: 0.24, ease: [0.2, 0.9, 0.3, 1] }}
             role="img"
             aria-label="Je viens, réponse scellée"
-            className="absolute inset-0 isolate flex items-center justify-center gap-2 overflow-hidden rounded-full text-[15px] font-semibold"
+            className="absolute inset-0 isolate flex items-center justify-center gap-2 overflow-hidden rounded-full text-lecture font-semibold"
             style={{
               color: "#bfe2bf",
               backgroundColor: `rgb(${VERT} / 0.1)`,
@@ -340,7 +340,7 @@ function OngletsNiveau({ moi }: { moi: string }) {
           <span
             key={o.v}
             className={cn(
-              "relative flex h-8 items-center px-[14px] font-mono text-[11px] font-bold tracking-[0.08em] uppercase transition-colors duration-200",
+              "relative flex h-8 items-center px-[14px] font-mono text-legende font-bold tracking-[0.08em] uppercase transition-colors duration-200",
               vue === o.v ? "text-[#0b0a14]" : "text-white/60",
             )}
           >
@@ -379,21 +379,21 @@ function OngletsNiveau({ moi }: { moi: string }) {
             >
               <CarteDe name={l.nom} size={FORMAT_CARTE.petite} inerte />
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-[15px] font-semibold">
+                <span className="truncate text-lecture font-semibold">
                   <Nom n={l.nom} />
                 </span>
-                <span className="mono-label truncate text-[10.5px] text-white/50">
+                <span className="mono-label truncate text-legende text-white/50">
                   Mission {NOM_DE_CODE[l.g]}
                 </span>
               </span>
               <span className="flex shrink-0 flex-col items-end gap-0.5">
                 <span
-                  className="text-[19px] leading-none text-white"
+                  className="text-titre-fort leading-none text-white"
                   style={{ fontFamily: ANTON }}
                 >
                   {rangDe({ xp: PRIME[l.g] })}
                 </span>
-                <span className="font-mono text-[10.5px] text-white/55 tabular-nums">
+                <span className="font-mono text-legende text-white/55 tabular-nums">
                   +{PRIME[l.g]} XP
                 </span>
               </span>

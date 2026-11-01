@@ -82,16 +82,16 @@ export function ContratALaUne({ className }: { className?: string }) {
     <section aria-labelledby="titre-contrat-une" className={cn("flex flex-col gap-4", className)}>
       <div className="flex flex-col gap-1.5 px-5 md:px-0">
         <div className="flex items-center justify-between gap-3">
-          <span className="mono-label truncate text-foreground/45">J{lg.d.j} · À la une</span>
+          <span className="mono-label truncate text-encre-3">J{lg.d.j} · À la une</span>
           <Link
             href="/profil/xp?vue=autres"
-            className="bouton-discret flex shrink-0 items-center gap-0.5 py-1.5 pr-1 pl-2.5 text-[13.5px] font-semibold"
+            className="bouton-discret flex shrink-0 items-center gap-0.5 py-1.5 pr-1 pl-2.5 text-ligne font-semibold"
           >
             Tout voir · {lg.total}
             <ChevronRight className="size-4" />
           </Link>
         </div>
-        <h2 id="titre-contrat-une" className="titre-lettrage text-[30px] leading-[0.95] break-words">
+        <h2 id="titre-contrat-une" className="titre-lettrage text-titre-l leading-[0.95] break-words">
           {titre}
         </h2>
       </div>
@@ -156,7 +156,7 @@ export function ContratALaUne({ className }: { className?: string }) {
             )}
             <div className="flex min-w-0 flex-1 flex-col gap-3">
               <span className="mono-label fiche__ton">{tete ? "Défend la 1re place" : "La cible"}</span>
-              <p className="titre-lettrage text-[22px] leading-[0.98] break-words">{objectif}</p>
+              <p className="titre-lettrage text-titre-m leading-[0.98] break-words">{objectif}</p>
               <Resultat e={e} lg={lg} />
             </div>
           </div>

@@ -80,9 +80,9 @@ export function Saisons({
     <div className="overflow-hidden rounded-3xl bg-card">
       <div className="flex items-center gap-3 px-4 py-3">
         <div className="min-w-0 flex-1">
-          <p className="mono-label text-[10px] text-muted-foreground">SAISON EN COURS</p>
-          <p className="text-[17px] font-extrabold tracking-tight">Saison {numero}</p>
-          <p className="text-[12px] text-muted-foreground">
+          <p className="mono-label text-etiquette text-muted-foreground">SAISON EN COURS</p>
+          <p className="text-titre font-extrabold tracking-tight">Saison {numero}</p>
+          <p className="text-petit text-muted-foreground">
             {journees} journée{journees > 1 ? "s" : ""} · {lignes} ligne{lignes > 1 ? "s" : ""} saisie{lignes > 1 ? "s" : ""}
             {vierge ? " · rien n'est encore joué" : ""}
           </p>
@@ -112,11 +112,11 @@ export function Saisons({
               className="flex items-center gap-3 border-b border-border/40 px-4 py-2.5 last:border-0 active:bg-secondary"
             >
               <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15">
-                <span className="mono-label text-[10px] text-primary">S{a.numero}</span>
+                <span className="mono-label text-etiquette text-primary">S{a.numero}</span>
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] font-semibold">{a.nom}</span>
-                <span className="block text-[11.5px] text-muted-foreground">
+                <span className="block truncate text-ligne font-semibold">{a.nom}</span>
+                <span className="block text-petit text-muted-foreground">
                   {a.journees.length} journées · {a.entries.length} lignes · close le {dateCourte(a.cloturee)}
                 </span>
               </span>
@@ -131,7 +131,7 @@ export function Saisons({
           <DialogHeader>
             <DialogTitle>Clôturer la saison {numero} et ouvrir la saison {numero + 1}</DialogTitle>
             {/* Un bloc, pas un paragraphe : base-ui remplace l'élément par `render`. */}
-            <DialogDescription render={<div />} className="space-y-2 text-left text-[13.5px]">
+            <DialogDescription render={<div />} className="space-y-2 text-left text-ligne">
               <div>
                 <p>
                   Les {journees} journées et leurs {lignes} lignes partent en archive, lisibles par
@@ -148,7 +148,7 @@ export function Saisons({
             </DialogDescription>
           </DialogHeader>
           <label className="block">
-            <span className="mono-label text-[10px] text-muted-foreground">NOM DE L&apos;ARCHIVE</span>
+            <span className="mono-label text-etiquette text-muted-foreground">NOM DE L&apos;ARCHIVE</span>
             <Input value={nom} onChange={(e) => setNom(e.target.value)} className="mt-1 rounded-xl" maxLength={40} />
           </label>
           <DialogFooter className="gap-2">

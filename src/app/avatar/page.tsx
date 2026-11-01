@@ -43,7 +43,7 @@ function Segmented<T extends string>({
             key={opt.value}
             onClick={() => onChange(opt.value)}
             className={cn(
-              "relative flex-1 rounded-xl py-2.5 text-[13px] font-semibold transition-colors",
+              "relative flex-1 rounded-xl py-2.5 text-corps font-semibold transition-colors",
               active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
@@ -89,8 +89,8 @@ export default function AvatarPage() {
           <PersonStanding className="size-5" />
         </span>
         <div>
-          <p className="text-[13px] font-medium text-muted-foreground">Personnalisation</p>
-          <h1 className="text-[28px] font-bold tracking-tight">Mon avatar</h1>
+          <p className="text-corps font-medium text-muted-foreground">Personnalisation</p>
+          <h1 className="text-titre-l font-bold tracking-tight">Mon avatar</h1>
         </div>
       </div>
 
@@ -98,7 +98,7 @@ export default function AvatarPage() {
         {/* Aperçu 3D — plein cadre sur mobile, colonne principale sur desktop */}
         <div className="glass relative h-[46vh] min-h-[320px] overflow-hidden rounded-3xl md:h-[560px] md:flex-1">
           <AvatarViewer config={config} />
-          <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-[11px] text-muted-foreground">
+          <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-legende text-muted-foreground">
             Glisse pour faire tourner
           </p>
         </div>
@@ -147,7 +147,7 @@ export default function AvatarPage() {
                     />
                     <span
                       className={cn(
-                        "text-[11px] font-semibold",
+                        "text-legende font-semibold",
                         active ? "text-foreground" : "text-muted-foreground"
                       )}
                     >

@@ -458,13 +458,13 @@ export function CourseModule({
         <div className="flex min-w-0 flex-1 flex-col gap-2.5">
           {course.top.map((p, i) => (
             <div key={p.name} className="flex items-center gap-2.5">
-              <span className="w-4 text-center text-[12px] font-bold text-muted-foreground">
+              <span className="w-4 text-center text-petit font-bold text-muted-foreground">
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-[13px] font-semibold"><Nom n={p.name} /></span>
-                  <span className="text-[13px] font-bold tabular-nums">
+                  <span className="truncate text-corps font-semibold"><Nom n={p.name} /></span>
+                  <span className="text-corps font-bold tabular-nums">
                     {p.pp}
                     {p.earned > 0 && (
                       <span className="mono-label ml-1.5 text-primary">+{p.earned}</span>
@@ -547,15 +547,15 @@ export function RaceModule({ race }: { race: Analyse["race"] }) {
         ))}
       </svg>
       <div className="mt-1 flex justify-between px-1">
-        <span className="mono-label text-foreground/30">J{race.js[0]}</span>
-        <span className="mono-label text-foreground/30">J{race.js[race.js.length - 1]}</span>
+        <span className="mono-label text-encre-4">J{race.js[0]}</span>
+        <span className="mono-label text-encre-4">J{race.js[race.js.length - 1]}</span>
       </div>
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
         {race.names.map((n, i) => (
-          <span key={n} className="flex items-center gap-1.5 text-[12.5px] font-semibold">
+          <span key={n} className="flex items-center gap-1.5 text-corps font-semibold">
             <span className="size-2 rounded-full" style={{ background: STROKES[i] }} />
             {n}
-            <span className="mono-label text-foreground/40 tabular-nums">
+            <span className="mono-label text-encre-3 tabular-nums">
               {race.series[i][race.series[i].length - 1]}
             </span>
           </span>
@@ -588,8 +588,8 @@ export function PulseModule({ pulse }: { pulse: Analyse["pulse"] }) {
             <div key={p.j} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
               <span
                 className={cn(
-                  "text-[11px] font-bold tabular-nums",
-                  active ? "text-primary" : "text-foreground/40"
+                  "text-legende font-bold tabular-nums",
+                  active ? "text-primary" : "text-encre-3"
                 )}
               >
                 {p.buts}
@@ -612,14 +612,14 @@ export function PulseModule({ pulse }: { pulse: Analyse["pulse"] }) {
             key={p.j}
             className={cn(
               "mono-label flex-1 text-center",
-              p.j === last.j ? "text-primary" : "text-foreground/30"
+              p.j === last.j ? "text-primary" : "text-encre-4"
             )}
           >
             J{p.j}
           </span>
         ))}
       </div>
-      <p className="mt-3 text-[12.5px] text-foreground/40">
+      <p className="mt-3 text-corps text-encre-3">
         {avg} buts de moyenne par dimanche depuis le début de saison.
       </p>
     </section>
@@ -679,7 +679,7 @@ export function RadarModule({
               <tspan
                 x={lx}
                 dy="-2"
-                style={{ fontFamily: "var(--font-jbmono)", fontSize: 9, letterSpacing: 2, fill: "rgb(var(--contraste-rgb) / 0.4)" }}
+                style={{ fontFamily: "var(--font-inter)", fontSize: 9, letterSpacing: 2, fill: "rgb(var(--contraste-rgb) / 0.4)" }}
               >
                 {k}
               </tspan>
@@ -691,10 +691,10 @@ export function RadarModule({
         })}
       </svg>
       <div className="mt-2 flex items-center justify-center gap-4">
-        <span className="flex items-center gap-1.5 text-[12.5px] font-semibold">
+        <span className="flex items-center gap-1.5 text-corps font-semibold">
           <span className="size-2 rounded-full bg-primary" /> <Nom n={name} /> · GÉN {ovrValue}
         </span>
-        <span className="flex items-center gap-1.5 text-[12.5px] text-foreground/50">
+        <span className="flex items-center gap-1.5 text-corps text-encre-3">
           <span className="size-2 rounded-full bg-foreground/30" /> Ligue · GÉN {avgOvr}
         </span>
       </div>
@@ -725,8 +725,8 @@ export function MilestonesModule({ milestones }: { milestones: Analyse["mileston
             <Avatar name={m.name} size={28} />
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-[14px] font-semibold"><Nom n={m.name} /></span>
-                <span className="mono-label text-foreground/40 tabular-nums">
+                <span className="truncate text-ligne font-semibold"><Nom n={m.name} /></span>
+                <span className="mono-label text-encre-3 tabular-nums">
                   {m.crossed ? `${m.current} ${m.label}` : `${m.current}/${m.target} ${m.label}`}
                 </span>
               </div>
@@ -760,7 +760,7 @@ export function FidelesModule({ fideles }: { fideles: Analyse["fideles"] }) {
       <div className="mt-4 flex flex-col gap-2.5">
         {fideles.rows.map((r) => (
           <div key={r.name} className="flex items-center gap-2.5">
-            <span className="w-[72px] truncate text-[13px] font-semibold"><Nom n={r.name} /></span>
+            <span className="w-[72px] truncate text-corps font-semibold"><Nom n={r.name} /></span>
             <div className="flex flex-1 justify-between gap-1">
               {r.cells.map((on, i) => (
                 <span
@@ -777,7 +777,7 @@ export function FidelesModule({ fideles }: { fideles: Analyse["fideles"] }) {
                 />
               ))}
             </div>
-            <span className="mono-label w-9 text-right text-foreground/40 tabular-nums">
+            <span className="mono-label w-9 text-right text-encre-3 tabular-nums">
               {r.count}/{fideles.js.length}
             </span>
           </div>
@@ -787,7 +787,7 @@ export function FidelesModule({ fideles }: { fideles: Analyse["fideles"] }) {
         <span className="w-[72px]" />
         <div className="flex flex-1 justify-between gap-1">
           {fideles.js.map((j) => (
-            <span key={j} className="mono-label w-[9px] text-center text-[8px] text-foreground/25">
+            <span key={j} className="mono-label w-[9px] text-center text-micro text-encre-4">
               {j}
             </span>
           ))}
@@ -816,7 +816,7 @@ export function CouleursModule({ couleurs }: { couleurs: Analyse["couleurs"] }) 
       <div className="glass-soft flex flex-col gap-3 rounded-3xl p-4">
         {couleurs.map((c) => (
           <div key={c.camp} className="flex items-center gap-3">
-            <span className="flex w-[72px] items-center gap-1.5 text-[13px] font-semibold">
+            <span className="flex w-[72px] items-center gap-1.5 text-corps font-semibold">
               <PointMaillot camp={c.camp} />
               {MAILLOTS[c.camp].nom}
             </span>
@@ -840,12 +840,12 @@ export function CouleursModule({ couleurs }: { couleurs: Analyse["couleurs"] }) 
                 />
               )}
             </div>
-            <span className="mono-label w-[72px] shrink-0 text-right text-foreground/40 tabular-nums">
+            <span className="mono-label w-[72px] shrink-0 text-right text-encre-3 tabular-nums">
               {c.v}V {c.n}N {c.d}D
             </span>
           </div>
         ))}
-        <p className="mono-label mt-1 flex items-center gap-3 text-foreground/30">
+        <p className="mono-label mt-1 flex items-center gap-3 text-encre-4">
           <span className="flex items-center gap-1.5">
             <span className="size-1.5 rounded-full bg-primary" /> Victoires
           </span>
@@ -877,7 +877,7 @@ export function RecordsModule({ records }: { records: Analyse["records"] }) {
               {r.label}
             </p>
             <div className="mt-1 text-2xl font-bold tabular-nums">{r.value}</div>
-            <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+            <p className="mt-0.5 text-petit leading-snug text-muted-foreground">
               {r.sub}
               {r.fresh && <span className="text-primary"> · ce dimanche</span>}
             </p>
@@ -904,7 +904,7 @@ export function MouvementsModule({ mouvements }: { mouvements: Analyse["mouvemen
               <TrendingUp className="size-3.5" />
             </span>
             <Avatar name={m.name} size={26} />
-            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold"><Nom n={m.name} /></span>
+            <span className="min-w-0 flex-1 truncate text-ligne font-semibold"><Nom n={m.name} /></span>
             <span className="mono-label text-muted-foreground">
               {m.from}e → {m.to}e
             </span>
@@ -940,7 +940,7 @@ export function FormeModule({
           {forme.map((f) => (
             <div key={f.name} className="flex items-center gap-2.5">
               <Avatar name={f.name} size={26} />
-              <p className="min-w-0 flex-1 text-[13px] text-muted-foreground">
+              <p className="min-w-0 flex-1 text-corps text-muted-foreground">
                 <span className="font-semibold text-foreground"><Nom n={f.name} /></span> — {f.goals} buts
                 sur ses {f.streak} dernières journées
               </p>
@@ -972,7 +972,7 @@ export function AbsentsModule({ absents }: { absents: Analyse["absents"] }) {
         {absents.map((a) => (
           <span
             key={a.name}
-            className="flex items-center gap-2 rounded-full bg-card px-3 py-2 text-[13px] font-semibold"
+            className="flex items-center gap-2 rounded-full bg-card px-3 py-2 text-corps font-semibold"
           >
             <Avatar name={a.name} size={22} />
             {a.name}
