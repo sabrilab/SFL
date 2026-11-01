@@ -8,7 +8,7 @@
 
 import type { ReactNode } from "react";
 import { Minus, Plus } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, useRetourDEcran } from "@/components/ui/sheet";
 import type { EtatJournee } from "@/lib/sfl/saisie/etat-journee";
 import { haptique } from "@/lib/sfl/haptique";
 import { cn } from "@/lib/utils";
@@ -169,6 +169,16 @@ export function Pastille({
 }
 
 /** La feuille du bas des écrans joueurs : titre en 26 px, l'état à droite, un bouton en bas. */
+/**
+ * L'en-tête d'une feuille. `serre` (la feuille de match en direct, où chaque
+ * ligne compte) : sous la rangée du retour, le titre la suit sans marge ;
+ * sans retour, il garde juste la place de la poignée.
+ */
+function EnTeteDeFeuille({ serre, children }: { serre: boolean; children: ReactNode }) {
+  const retour = useRetourDEcran();
+  return <SheetHeader className={cn("items-start gap-2 px-5 pt-8 pr-14 pb-3", serre && (retour ? "pt-0" : "pt-6"))}>{children}</SheetHeader>;
+}
+
 export function Feuille({
   open,
   onOpenChange,
@@ -177,6 +187,7 @@ export function Feuille({
   bas,
   children,
   haute = false,
+  serre = false,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -185,6 +196,8 @@ export function Feuille({
   bas?: ReactNode;
   children: ReactNode;
   haute?: boolean;
+  /** L'en-tête au plus près (la feuille de match en direct). */
+  serre?: boolean;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange} titre={titre}>
@@ -195,10 +208,10 @@ export function Feuille({
           haute && "data-[side=bottom]:h-[92dvh]"
         )}
       >
-        <SheetHeader className="items-start gap-2 px-5 pt-8 pr-14 pb-3">
+        <EnTeteDeFeuille serre={serre}>
           <SheetTitle className="text-titre-g leading-tight font-bold tracking-tight">{titre}</SheetTitle>
           {etat}
-        </SheetHeader>
+        </EnTeteDeFeuille>
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4">{children}</div>
         {bas && <div className="flex shrink-0 flex-col gap-2 px-4 pt-2">{bas}</div>}
       </SheetContent>
