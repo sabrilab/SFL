@@ -1149,7 +1149,8 @@ export default function MapPage() {
   }, []);
   const geste = useCallback((g: string, meta?: Record<string, string | number | boolean>) => logActivity("map", { path: "/", meta: { geste: g, ...meta } }), []);
   // Le match du dimanche, convocation ouverte : on y répond depuis la Map.
-  const repondreIci = !!choisi && !choisi.joue && !choisi.partie && !choisi.team && (!!choisi.convoquee || choisi.cle === "convocation") && p.reponsesOuvertes;
+  // Un suspendu (carton rouge, lib/sfl/cartons.ts) ne répond pas « Je viens » : sa convocation le dit.
+  const repondreIci = !!choisi && !choisi.joue && !choisi.partie && !choisi.team && (!!choisi.convoquee || choisi.cle === "convocation") && p.reponsesOuvertes && !p.suspendu;
 
   // Les joueurs, ville par ville, du mieux noté au moins bien noté. Ce sont
   // ceux de la SFL : un joueur Bola ne les voit pas (28/10/2026).

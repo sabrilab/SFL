@@ -191,6 +191,20 @@ export interface Saison {
   titresFaibles?: string[];
   /** Les terrains de la ligue, posés sur la Map. */
   terrains?: Terrain[];
+  /**
+   * Les suspensions de carton rouge que l'admin a levées (01/11/2026,
+   * lib/sfl/cartons.ts) : le joueur peut jouer la journée `j`. Les cartons
+   * eux-mêmes ne sont pas écrits : ils se lisent dans les retards.
+   */
+  suspensionsLevees?: SuspensionLevee[];
+}
+
+/** Une suspension levée par l'admin : `joueur` peut jouer la J`j`. */
+export interface SuspensionLevee {
+  joueur: string;
+  j: number;
+  par: string;
+  le: string;
 }
 
 /**

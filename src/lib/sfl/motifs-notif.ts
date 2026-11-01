@@ -89,6 +89,8 @@ export const MOTIFS_NOTIF = {
   resultats: { famille: "ligue", label: "Les résultats de la journée", effet: null },
   // « J4 en ligne » : l'admin publie une journée préparée en brouillon (30/10, saisie/brouillon.ts).
   publication: { famille: "ligue", label: "La journée en ligne", effet: null },
+  // Un carton jaune (un retard) ou rouge (le troisième), au seul joueur qui le reçoit (01/11, lib/sfl/cartons.ts).
+  carton: { famille: "ligue", label: "Un carton reçu", effet: null },
   // Une nouvelle vidéo dans les Actus, lancée par l'admin (lib/sfl/videos.ts).
   video: { famille: "ligue", label: "Une nouvelle vidéo", effet: "a regardé la vidéo" },
 

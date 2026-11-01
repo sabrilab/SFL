@@ -14,15 +14,18 @@
 // null quand il n'y a rien à poser.
 
 import { completer, composer, divisionsDeLaJournee } from "../equipes-division";
+import { sansSuspendus } from "../cartons";
 import { matchsDeclares } from "./mutations";
 import type { ConvocationTeam, Saison } from "./types";
 
 export function equipesDesVenus(
   saison: Saison,
   j: number,
-  venus: string[],
+  venusBruts: string[],
   composees: ConvocationTeam[] | null = null
 ): ConvocationTeam[] | null {
+  // Un suspendu (carton rouge) ne prend pas de place, même s'il a dit « Je viens ».
+  const venus = sansSuspendus(saison, j, venusBruts);
   const etat = divisionsDeLaJournee(saison, j);
   const declares = matchsDeclares(saison, j);
   const lignes = saison.entries.filter((e) => e.j === j && !e.extraTime && e.statut === "Présent" && e.team);

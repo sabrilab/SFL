@@ -8089,3 +8089,14 @@ $$;
 revoke execute on function public.sceller_feuille(int, text, text) from public, anon;
 grant execute on function public.sceller_feuille(int, text, text) to authenticated;
 
+-- ─────────────────────── Les cartons de la SFL (01/11/2026) ───────────────────────
+-- Sabri, 01/11 : « à chaque fois que je vais mettre un retard à quelqu'un
+-- […] cette personne-là reçoit un carton […] une animation qu'il reçoit dès
+-- qu'il ouvre l'appli […] au bout de 3 cartons jaunes […] un carton rouge
+-- [qui] lui bloque la prochaine journée ». Rien n'est stocké des cartons
+-- eux-mêmes : ils se lisent dans les retards de la saison (lib/sfl/cartons.ts,
+-- dès la J4 de la saison 1). La base ne garde que ceux que le joueur a déjà
+-- vus, pour ne pas lui rejouer l'animation sur un autre téléphone. Posé par
+-- le joueur seul (RLS « mise à jour de soi »), comme nouveautes_vues.
+alter table public.profiles add column if not exists cartons_vus text[] not null default '{}';
+grant update (cartons_vus) on public.profiles to authenticated;

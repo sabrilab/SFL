@@ -49,6 +49,7 @@ import { TERRAINS_MAX } from "@/lib/sfl/equipes-division";
 import { ChoisirJoueurs } from "@/components/sfl/admin/choisir-joueurs";
 import { PointMaillot } from "@/components/sfl/point-maillot";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
+import { suspendusPour } from "@/lib/sfl/cartons";
 
 /* ------------------------------- colonnes -------------------------------- */
 
@@ -395,6 +396,7 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
         saison={saison}
         titre={`Ajouter à la J${j}`}
         places={places}
+        suspendus={suspendusPour(saison, j)}
         onChoisir={ajouterLigne}
       />
 

@@ -16,6 +16,10 @@
 //
 // La vue admin reste discrète (Sabri, 30/10) : repliée sur une ligne, les
 // trois chiffres seuls ; on la déplie pour voir qui manque et relancer.
+//
+// Un joueur suspendu pour cette journée (carton rouge, lib/sfl/cartons.ts,
+// 01/11) ne répond pas : à la place du glissé, « Suspendu · J5 » et son
+// carton rouge.
 
 import { useMemo, useState } from "react";
 import { Check, ChevronDown, Copy, Radio, X } from "lucide-react";
@@ -31,6 +35,7 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { useJoueurBola } from "@/components/sfl/player-provider";
 import { divisionsDeLaJournee, terrainsDesEquipes } from "@/lib/sfl/equipes-division";
 import { cn } from "@/lib/utils";
+import { Suspendu } from "@/components/sfl/cartons/mes-cartons";
 
 export function PresencePanel({ compact = false }: { compact?: boolean }) {
   const session = useSession();
@@ -74,7 +79,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
             {ligneDuRendezVous(p.rendezVous)}
           </p>
         </div>
-        {p.mine && !bola && (
+        {p.mine && !bola && !p.suspendu && (
           <span
             className={cn(
               "flex size-9 shrink-0 items-center justify-center rounded-full",
@@ -92,7 +97,9 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
 
       {/* Les deux boutons, jusqu'à vendredi minuit ; une fois la réponse
           donnée, elle est scellée. */}
-      {bola ? null : p.reponsesOuvertes ? (
+      {bola ? null : p.suspendu ? (
+        <Suspendu j={p.suspendu.j} className="mt-4" />
+      ) : p.reponsesOuvertes ? (
         <>
           <ReponseScellee className="mt-4" mine={p.mine} onRepondre={p.answer} />
           {!p.mine && (

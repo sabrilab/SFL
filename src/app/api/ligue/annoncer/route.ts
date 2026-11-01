@@ -34,6 +34,7 @@ import {
 } from "@/lib/sfl/annonces-ligue";
 import type { MotifNotif } from "@/lib/sfl/motifs-notif";
 import type { Notif } from "@/lib/sfl/push";
+import { suspenduPour } from "@/lib/sfl/cartons";
 
 export const maxDuration = 30;
 
@@ -131,7 +132,9 @@ export async function POST(req: NextRequest) {
   let envoyes = 0;
   let fini = true;
   if (convocation) {
-    const r = await annoncer(sb, cle, convocation.cle, idDe, "convocation", `convocation:${convocations![0].id}`, () => ({
+    // Un suspendu (carton rouge, lib/sfl/cartons.ts) n'est pas convoqué : « Tu viens ? » ne lui part pas.
+    const convoques = new Map([...idDe].filter(([nom]) => !suspenduPour(saison, nom, convocation.j)));
+    const r = await annoncer(sb, cle, convocation.cle, convoques, "convocation", `convocation:${convocations![0].id}`, () => ({
       titre: couper(convocation.titre, 60),
       texte: couper(convocation.texte, 180),
       url: "/",

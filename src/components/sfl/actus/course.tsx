@@ -110,6 +110,7 @@ import type { Video } from "@/lib/sfl/videos";
 import { VueClassements, VueMatchs } from "./vues";
 import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque, type Vue } from "./epoques";
 import { CarteSaison, categoriesLegendes, Compteurs, LeMur } from "./wall-of-fame";
+import { Suspendu } from "@/components/sfl/cartons/mes-cartons";
 
 /** Les scènes d'un dimanche qui font bouger la course. */
 const SCENES: Actu["type"][] = ["titres", "mvp", "chiffre", "podium-jour", "duo", "montent", "badge", "badges", "equipe"];
@@ -635,13 +636,17 @@ function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; clas
       </div>
       {p.presents.length > 0 && <QuiVient noms={p.presents} size={FORMAT_CARTE.petite * 1.2} />}
       {/* Ta réponse, d'un glissé jusqu'au bout : elle se scelle (reponse-scellee.tsx). */}
-      <ReponseScellee
-        taille="sm"
-        mine={p.mine}
-        ouvert={p.reponsesOuvertes}
-        libelles={{ absent: "Je passe" }}
-        onRepondre={p.answer}
-      />
+      {p.suspendu ? (
+        <Suspendu j={p.suspendu.j} taille="sm" />
+      ) : (
+        <ReponseScellee
+          taille="sm"
+          mine={p.mine}
+          ouvert={p.reponsesOuvertes}
+          libelles={{ absent: "Je passe" }}
+          onRepondre={p.answer}
+        />
+      )}
     </section>
   );
 }

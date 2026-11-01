@@ -8,6 +8,7 @@ import { labelDateFr, prochainDimanche } from "../convocation-temps";
 import { equipesDuMatch, equipesDuMatchSuivant } from "./equipes";
 import { dejaSurLaFeuille, jouable } from "./effectif";
 import { resteUnBrouillon } from "./brouillon";
+import { suspendusPour } from "../cartons";
 import { numeroSaison, type MatchDuJour, type SaisonArchivee, type Terrain } from "./types";
 import type {
   Convocation,
@@ -435,13 +436,15 @@ export function poserEquipes(
 ): Saison {
   // Chaque nom une seule fois (sa première place), jamais un membre qui ne
   // joue pas : une composition qui porte un joueur deux fois ne le fait plus
-  // entrer deux fois sur la feuille (30/10).
+  // entrer deux fois sur la feuille (30/10). Ni un suspendu (carton rouge,
+  // cartons.ts, 01/11).
   const vus = new Set<string>();
+  const suspendus = suspendusPour(saison, j);
   const teams = teamsBrutes.map((t) => ({
     ...t,
     players: t.players.filter((nom) => {
       const cle = nom.trim().toLowerCase();
-      if (!jouable(nom) || vus.has(cle)) return false;
+      if (!jouable(nom) || vus.has(cle) || suspendus.has(cle)) return false;
       vus.add(cle);
       return true;
     }),

@@ -16,7 +16,9 @@
 //   · chaque joueur avec le visage de sa carte, sa note, son poste ;
 //   · un joueur déjà sur la feuille est grisé, avec l'endroit où il est : on
 //     ne l'ajoute jamais deux fois ;
-//   · les membres qui ne jouent pas n'y sont jamais (effectifJouable).
+//   · les membres qui ne jouent pas n'y sont jamais (effectifJouable) ;
+//   · un suspendu de la journée (carton rouge, lib/sfl/cartons.ts, 01/11)
+//     est grisé, « SUSPENDU » : le toucher propose de lever sa suspension.
 
 import { useMemo, useState } from "react";
 import { Check, Search } from "lucide-react";
@@ -45,6 +47,8 @@ export function ChoisirJoueurs({
   garder,
   plusieurs,
   onChoisir,
+  suspendus,
+  onLever,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -60,6 +64,10 @@ export function ChoisirJoueurs({
   /** Plusieurs d'un coup (au plus `max`), validés ensemble. */
   plusieurs?: { max: number; libelle: (n: number) => string; onValider: (noms: string[]) => void };
   onChoisir?: (nom: string) => void;
+  /** Les suspendus de la journée (noms sans casse) : jamais choisis tels quels. */
+  suspendus?: ReadonlySet<string>;
+  /** Toucher un suspendu : lever sa suspension (l'appelant confirme). */
+  onLever?: (nom: string) => void;
 }) {
   const { saison: lue, allPlayers } = useSeason();
   const ids = useIdentites();
@@ -94,10 +102,11 @@ export function ChoisirJoueurs({
           division: divisions(r.name),
           viens: !!viens?.has(r.name),
           lieu,
+          suspendu: !lieu && !!suspendus?.has(r.name.trim().toLowerCase()),
           profil: r.profil,
         };
       }),
-    [saison, parNom, places, garder, viens, divisions]
+    [saison, parNom, places, garder, viens, divisions, suspendus]
   );
 
   const postes = useMemo(() => [...new Set(joueurs.map((x) => x.poste).filter((p): p is string => !!p))].sort(), [joueurs]);
@@ -119,8 +128,8 @@ export function ChoisirJoueurs({
       if (/^d\d$/.test(filtre)) return x.division === Number(filtre.slice(1));
       return true;
     });
-    // Sans recherche : les « Je viens » pas encore placés d'abord, les placés à la fin.
-    const ordre = (x: (typeof garde)[number]) => (x.lieu ? 2 : x.viens ? 0 : 1);
+    // Sans recherche : les « Je viens » pas encore placés d'abord, les placés (et les suspendus) à la fin.
+    const ordre = (x: (typeof garde)[number]) => (x.lieu || x.suspendu ? 2 : x.viens ? 0 : 1);
     const range = [...garde].sort((a, b) => ordre(a) - ordre(b) || a.nom.localeCompare(b.nom, "fr"));
     return chercherTolerant(range, (x) => [x.nom, ids.nom(x.nom), ids.pseudo(x.nom), x.poste, x.division ? `d${x.division}` : null, x.lieu], q);
   }, [joueurs, filtre, q, ids]);
@@ -171,7 +180,7 @@ export function ChoisirJoueurs({
           <div className="-mx-1 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-1 pb-2" role="listbox" aria-label={titre}>
             {liste.map((x) => {
               const coche = coches.includes(x.nom);
-              const bloque = !!x.lieu || (plein && !coche);
+              const bloque = !!x.lieu || (x.suspendu && !onLever) || (plein && !coche);
               return (
                 <button
                   key={x.nom}
@@ -181,6 +190,10 @@ export function ChoisirJoueurs({
                   disabled={bloque}
                   onClick={() => {
                     haptique.choix();
+                    if (x.suspendu) {
+                      onLever?.(x.nom);
+                      return;
+                    }
                     if (plusieurs) {
                       setCoches((l) => (coche ? l.filter((n) => n !== x.nom) : [...l, x.nom]));
                       return;
@@ -190,7 +203,7 @@ export function ChoisirJoueurs({
                   }}
                   className={cn(
                     "flex min-h-[60px] items-center gap-3 rounded-[18px] bg-card px-3 py-2 text-left transition-transform active:scale-[0.98] disabled:active:scale-100",
-                    bloque && "[&>*]:opacity-40"
+                    (bloque || x.suspendu) && "[&>*]:opacity-40"
                   )}
                 >
                   <CarteDe name={x.nom} size={FORMAT_CARTE.petite} inerte />
@@ -206,6 +219,8 @@ export function ChoisirJoueurs({
                   </span>
                   {x.lieu ? (
                     <span className="mono-label shrink-0 text-right text-encre-2">{x.lieu}</span>
+                  ) : x.suspendu ? (
+                    <span className="mono-label shrink-0 text-right text-encre-2">Suspendu</span>
                   ) : plusieurs ? (
                     <span
                       aria-hidden

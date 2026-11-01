@@ -69,6 +69,7 @@ import { FeuillePreparer } from "./feuille-preparer";
 import { compteursEnMots, FeuillePublier, FeuilleRemettre } from "./feuille-publier";
 import { FeuilleQuandOu } from "./feuille-quand-ou";
 import { Etiquette, Feuille, Pastille, PastilleEtat, Segmente } from "./ui";
+import { leverSuspension, suspendusPour } from "@/lib/sfl/cartons";
 
 const heureDe = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null);
 
@@ -564,6 +565,16 @@ export function PageJournee() {
             titre={ajouterA ? `${ajouterA.replace(/ (\d+)$/, " · Match $1")}` : `Ajouter à la J${j}`}
             places={places}
             viens={viens}
+            suspendus={suspendusPour(saison, j)}
+            onLever={(nom) =>
+              setConfirmation({
+                titre: `Lever la suspension de ${nom} pour la J${j} ?`,
+                action: "Lever",
+                faire: () => {
+                  if (faire((s) => leverSuspension(s, nom, j, par, new Date()), `Suspension de ${nom} levée`)) haptique.sceau();
+                },
+              })
+            }
             onChoisir={(nom) => ajouter(nom, ajouterA || null)}
           />
         </>

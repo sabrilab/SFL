@@ -49,6 +49,7 @@ import { isHidden } from "@/lib/sfl/hidden";
 import { joueursDeLaFeuille } from "@/lib/sfl/presence-feuille";
 import type { ConvocationTeam } from "@/lib/sfl/saisie/types";
 import { lireSaisonServeur } from "@/lib/sfl/saison-serveur.server";
+import { sansSuspendus } from "@/lib/sfl/cartons";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -117,7 +118,9 @@ async function ajuster(sb: SupabaseClient, peutComposer: boolean): Promise<{ sta
     return nom;
   };
   const presents = ((lignes ?? []) as unknown[]).map(nomDe).filter((n): n is string => !!n && effectif.has(n));
-  const venus = ordreDArrivee(presents, feuille.noms, (n) => quand.get(n)).filter((n) => !isHidden(n));
+  // Ni un masqué, ni un suspendu (carton rouge, lib/sfl/cartons.ts) : la
+  // composition ne lui donne pas de place.
+  const venus = sansSuspendus(saison, j, ordreDArrivee(presents, feuille.noms, (n) => quand.get(n)).filter((n) => !isHidden(n)));
 
   // Des équipes sur plus de terrains que l'Hippodrome n'en a (la J4, avant
   // le plafond) : le cron les refait. Un téléphone n'y touche pas.

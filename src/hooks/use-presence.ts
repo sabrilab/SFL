@@ -37,6 +37,7 @@ import { avecLaFeuille, joueursDeLaFeuille, jourMois, journeeDuJour, remplacants
 import { ordreDArrivee } from "@/lib/sfl/equipes-division";
 import { terrainDeJournee } from "@/lib/sfl/saisie/mutations";
 import { matchsDeJournee, rendezVousDe, type RendezVous } from "@/lib/sfl/matchs-du-jour";
+import { sansSuspendus, suspensionPour } from "@/lib/sfl/cartons";
 
 interface ServerConvocation {
   id: number;
@@ -96,6 +97,11 @@ export interface PresenceView {
   teams: ConvocationTeam[] | null;
   /** La convocation en base (public.convocations.id) ; null en local. L'admin y corrige une réponse. */
   convocationId: number | null;
+  /**
+   * Suspendu pour cette journée (carton rouge, lib/sfl/cartons.ts) : il ne
+   * répond pas « Je viens », et l'écran le dit. null sinon, ou levée.
+   */
+  suspendu: { j: number } | null;
   /**
    * Répondre, une seule fois : « figee » si une réponse existe déjà (ici ou
    * en base), « erreur » si rien n'a pu partir.
@@ -202,6 +208,14 @@ export function usePresence(): PresenceView {
     };
   }, [serverActive]);
 
+  // Le carton rouge : suspendu pour la journée de cette convocation (levée par l'admin : il joue).
+  const dateDeLaConvocation = serverActive && server ? server.convocation.date_label : (activeConvocation(saison)?.date ?? NEXT_MATCH.date);
+  const jDeLaConvocation = useMemo(() => numeroDuDimanche(saison, dateDeLaConvocation), [saison, dateDeLaConvocation]);
+  const jSuspendu = useMemo(() => {
+    const s = suspensionPour(saison, player.name, jDeLaConvocation);
+    return s && !s.levee ? s.j : null;
+  }, [saison, player.name, jDeLaConvocation]);
+
   /* ------------------------------ Repli local ------------------------------ */
 
   const local = useMemo(
@@ -217,6 +231,8 @@ export function usePresence(): PresenceView {
       // Conversation expirée (vendredi minuit) : plus rien ne bouge —
       // sans réponse = non-participation.
       if (!ouvert) return "erreur";
+      // Suspendu (carton rouge) : pas de « Je viens » (l'écran ne le propose pas).
+      if (jSuspendu != null && r === "present") return "erreur";
       // +2 Ballons pour avoir répondu — oui ou non — une fois par convocation.
       const convocId = serverActive && server ? server.convocation.id : (activeConvocation(saison)?.id ?? null);
       const recompense = () => {
@@ -265,7 +281,7 @@ export function usePresence(): PresenceView {
       if (ok) recompense();
       return ok ? "ok" : "erreur";
     },
-    [serverActive, server, saison, player.name, ouvert]
+    [serverActive, server, saison, player.name, ouvert, jSuspendu]
   );
 
   const publish = useCallback(async (): Promise<boolean> => {
@@ -336,7 +352,8 @@ export function usePresence(): PresenceView {
   if (serverActive && server) {
     const names = publicOnly(saison.roster).map((r) => ({ name: r.name, actif: r.profil === "Actif" }));
     const rep = server.reponses;
-    const jeViens = names.filter((n) => rep[n.name] === "present").map((n) => n.name);
+    // Un suspendu (carton rouge) ne vient pas, même s'il l'a dit avant son rouge.
+    const jeViens = sansSuspendus(saison, jDeLaConvocation, names.filter((n) => rep[n.name] === "present").map((n) => n.name));
     const reponses = avecLaFeuille(
       {
         presents: jeViens,
@@ -362,6 +379,7 @@ export function usePresence(): PresenceView {
       equipesVisibles: revele,
       teams: server.convocation.teams ?? null,
       convocationId: server.convocation.id,
+      suspendu: jSuspendu != null ? { j: jSuspendu } : null,
       answer,
       publish: null,
       saveTeams: session?.admin ? saveTeams : null,
@@ -369,7 +387,7 @@ export function usePresence(): PresenceView {
   }
 
   const reponsesLocales = avecLaFeuille(
-    { presents: local.presents, absents: local.absents, sansReponse: local.sansReponse },
+    { presents: sansSuspendus(saison, jDeLaConvocation, local.presents), absents: local.absents, sansReponse: local.sansReponse },
     feuille,
     isHidden
   );
@@ -389,6 +407,7 @@ export function usePresence(): PresenceView {
     equipesVisibles: revele,
     teams: localConv?.teams ?? null,
     convocationId: null,
+    suspendu: jSuspendu != null ? { j: jSuspendu } : null,
     answer,
     // Publier n'a de sens que pour l'admin, connecté côté serveur.
     publish: serverActive && session?.admin ? publish : null,

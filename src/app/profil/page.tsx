@@ -45,6 +45,10 @@
 // joueur dans Recherche ; « Cartes de match » disparaît, les cartes gagnées
 // sont ici, dans « Mes cartes » ; l'Arène n'est plus que la Collection.
 //
+// Sous les trois chiffres, discrètement, mes cartons de la SFL s'il y en a
+// (cartons/mes-cartons.tsx, 01/11) : la série en cours, un rouge, une
+// suspension à venir.
+//
 // Un arbitre (lib/sfl/arbitres, Sabri, 24/10) a sa page à lui :
 // profil-arbitre.tsx, sa carte d'arbitre et ses matchs.
 
@@ -83,6 +87,7 @@ import { BoutonRecherche } from "@/components/layout/bouton-recherche";
 import { BoutonStats } from "@/components/layout/bouton-stats";
 import { BoutonTheme } from "@/components/layout/bouton-theme";
 import { BoutonDeconnexion } from "@/components/sfl/auth/bouton-deconnexion";
+import { MesCartons } from "@/components/sfl/cartons/mes-cartons";
 
 /* ------------------------------ Petits blocs ------------------------------ */
 
@@ -215,6 +220,8 @@ function ProfilJoueurPage() {
             {/* Joueur Bola : ses matchs validés, ceux qui font sa carte (lib/sfl/carte-bola.ts). */}
             {bola && <Chiffre valeur={player.matchs} quoi={player.matchs > 1 ? "Matchs" : "Match"} />}
           </div>
+          {/* Mes cartons de la SFL, s'il y en a (lib/sfl/cartons.ts, 01/11) */}
+          {!bola && <MesCartons nom={player.name} />}
           {!bola && <p className="w-full text-titre-fort leading-[1.25] font-bold tracking-[-0.4px]">{fiche.synthese}</p>}
           {/* Ma photo, ma carte officielle (photo au maillot Bola) tant
               qu'elle n'est pas faite, le badge de ma carte. Sans elle, les

@@ -76,6 +76,13 @@
 //   nouveauté qui l'annonce (« confirmer-resultats ») passe juste avant, et
 //   l'écran suit dès qu'elle se ferme : on ne le découvre pas sans elle.
 //
+// · Un carton (Sabri, 01/11 : « une animation qu'il reçoit dès qu'il ouvre
+//   l'appli […] avec un vrai carton jaune ») : un carton jaune ou rouge pas
+//   encore vu (lib/sfl/cartons.ts) passe avant tout le reste, juste après
+//   l'identité ; il se brandit plein écran (cartons/carton-recu.tsx) et ne
+//   revient sur aucun téléphone (profiles.cartons_vus). L'ouverture sonne
+//   aussi sa notification (lib/sfl/cartons-annonce.ts).
+//
 // L'accueil de l'app passe avant tout (components/sfl/accueil, 24/10) : à
 // la première ouverture, il demande déjà la ville, la carte officielle, les
 // notifications et les partenaires. Ce qui a été laissé pour « Plus tard »
@@ -128,6 +135,10 @@ import { partenaires } from "@/lib/sfl/partenaires";
 import { photoPerso, rafraichirPhotos } from "@/lib/sfl/photos";
 import { carteEnManga } from "@/lib/sfl/photo-studio";
 import { rafraichirAccord } from "@/lib/sfl/consentement";
+import { CartonRecu } from "@/components/sfl/cartons/carton-recu";
+import { cartonsDe, type Carton } from "@/lib/sfl/cartons";
+import { cartonsAMontrerA, noterCartonVu } from "@/lib/sfl/cartons-vus";
+import { annoncerCartons } from "@/lib/sfl/cartons-annonce";
 import {
   activerNotifications,
   etatNotifications,
@@ -142,6 +153,7 @@ import { demoInvitation } from "@/lib/sfl/equipes-demo";
 import { cn } from "@/lib/utils";
 
 export type Invitation =
+  | "carton"
   | "resultat"
   | "equipe"
   | "charte"
@@ -170,7 +182,7 @@ const PAUSES: Partial<Record<Invitation, number>> = { charte: 7 * 24 * 3600 * 10
 /** Après le splash, et après la cérémonie des nouvelles cartes si elle passe. */
 const DELAI_MS = 2600;
 
-const TEXTES: Record<Exclude<Invitation, "resultat" | "ville" | "premier-match" | "divisions" | "equipe" | "charte" | "nouveaute" | "arbitre">, { titre: string; ligne: string; bouton: string }> = {
+const TEXTES: Record<Exclude<Invitation, "carton" | "resultat" | "ville" | "premier-match" | "divisions" | "equipe" | "charte" | "nouveaute" | "arbitre">, { titre: string; ligne: string; bouton: string }> = {
   carte: {
     titre: "Ta carte officielle",
     ligne: "Ton visage, le maillot Bola. Elle apparaît sur ta carte, chez tout le monde.",
@@ -223,11 +235,23 @@ export function aSuivre(saison: Saison, players: Player[], nom: string, suivable
   return [...fideles, ...hauts].slice(0, PROPOSES);
 }
 
-/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville`, `?invitation=premier-match`, `?invitation=suivre`, `?invitation=divisions`, `?invitation=equipe`, `?invitation=charte`, `?invitation=nouveaute` (la dernière annoncée), `?invitation=manga`, `?invitation=resultat` ou `?invitation=arbitre` la montre sans compte vérifié (captures). */
+/** En dev, `?invitation`, `?invitation=notifs`, `?invitation=ville`, `?invitation=premier-match`, `?invitation=suivre`, `?invitation=divisions`, `?invitation=equipe`, `?invitation=charte`, `?invitation=nouveaute` (la dernière annoncée), `?invitation=manga`, `?invitation=resultat`, `?invitation=arbitre`, `?invitation=carton` (un 2e jaune) ou `?invitation=carton-rouge` (le 3e jaune, puis le rouge) la montre sans compte vérifié (captures). */
 function apercu(): Invitation | null {
   if (process.env.NODE_ENV === "production" || typeof window === "undefined") return null;
   const v = new URLSearchParams(window.location.search).get("invitation");
+  if (v === "carton" || v === "carton-rouge") return "carton";
   return v === null ? null : v === "notifs" || v === "ville" || v === "premier-match" || v === "suivre" || v === "divisions" || v === "equipe" || v === "charte" || v === "nouveaute" || v === "arbitre" || v === "manga" || v === "resultat" ? v : "carte";
+}
+
+/** Les cartons de l'aperçu (captures) : un 2e jaune, ou le 3e jaune et son rouge. */
+function cartonsDApercu(nom: string): Carton[] {
+  const rouge = new URLSearchParams(window.location.search).get("invitation") === "carton-rouge";
+  return rouge
+    ? [
+        { id: "s1-j6-jaune", joueur: nom, couleur: "jaune", j: 6, rang: 3 },
+        { id: "s1-j6-rouge", joueur: nom, couleur: "rouge", j: 6, rang: 3, suspenduPour: 7 },
+      ]
+    : [{ id: "s1-j4-jaune", joueur: nom, couleur: "jaune", j: 4, rang: 2 }];
 }
 
 export function InvitationCarte() {
@@ -258,6 +282,8 @@ export function InvitationCarte() {
   const lienResultat = useRef<number | null>(null);
   /** La nouveauté qui annonce l'écran passe d'abord ; l'écran la suit. */
   const resultatEnsuite = useRef(false);
+  /** Les cartons pas encore vus, à brandir à cette ouverture. */
+  const [cartons, setCartons] = useState<Carton[]>([]);
   /** Ceux qu'on a décochés dans l'invitation à suivre. */
   const [decoches, setDecoches] = useState<Set<string>>(() => new Set());
 
@@ -294,6 +320,7 @@ export function InvitationCarte() {
         }
         if (forcee === "equipe")
           setEquipe({ quoi: "invitation", ...demoInvitation(ligue.current.players.filter((p) => p.matchs > 0).map((p) => p.name), nom) });
+        if (forcee === "carton") setCartons(cartonsDApercu(nom));
         setVisible(forcee);
         return;
       }
@@ -301,6 +328,8 @@ export function InvitationCarte() {
       if (dimancheAAnnoncer(ligue.current.saison) !== null && peutEtreLaVeille(maintenant)) void annoncerOutsider();
       // La convocation du lundi, les résultats du dimanche : le serveur juge.
       void annoncerLigue();
+      // Les cartons de la SFL : la notification de chacun, une fois.
+      void annoncerCartons();
       // Le week-end des équipes par division : elles se tiennent à jour.
       void ajusterEquipes("ouverture");
       const [etat, ville] = await Promise.all([
@@ -317,6 +346,14 @@ export function InvitationCarte() {
       setEtatNotifs(etat);
       if (identiteConfirmee(nom) === false) return;
       if (parLien.current) return;
+      // Un carton pas encore vu, avant tout : il se brandit dès l'ouverture.
+      const recus = await cartonsAMontrerA(nom, cartonsDe(ligue.current.saison, nom).cartons).catch(() => [] as Carton[]);
+      if (annule || parLien.current) return;
+      if (recus.length > 0) {
+        setCartons(recus);
+        setVisible("carton");
+        return;
+      }
       // Le résultat d'un match d'abord : il expire en 24 h.
       const [aConfirmer, uid] = await Promise.all([mesResultatsAConfirmer().catch(() => []), monId()]);
       if (annule || parLien.current) return;
@@ -496,12 +533,22 @@ export function InvitationCarte() {
     setVisible(null);
   }
 
-  const texte = visible && visible !== "resultat" && visible !== "ville" && visible !== "premier-match" && visible !== "divisions" && visible !== "equipe" && visible !== "charte" && visible !== "nouveaute" && visible !== "arbitre" ? TEXTES[visible] : null;
+  const texte = visible && visible !== "carton" && visible !== "resultat" && visible !== "ville" && visible !== "premier-match" && visible !== "divisions" && visible !== "equipe" && visible !== "charte" && visible !== "nouveaute" && visible !== "arbitre" ? TEXTES[visible] : null;
   const Icone = visible === "notifs" ? Bell : visible === "suivre" ? UserPlus : Sparkles;
   const choisis = proposes.filter((n) => !decoches.has(n)).length;
 
   return (
     <>
+      {visible === "carton" && cartons.length > 0 && (
+        <CartonRecu
+          key={`carton-${cartons.map((c) => c.id).join("-")}`}
+          cartons={cartons}
+          onVu={(c) => {
+            if (!forcee) void noterCartonVu(c.id, nom);
+          }}
+          onFini={() => setVisible(null)}
+        />
+      )}
       <AnimatePresence>
         {visible === "resultat" && resultats.length > 0 && (
           <ResultatsAConfirmer

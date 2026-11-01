@@ -21,6 +21,8 @@ import type { MatchEntry, MatchResult, PlayerStatutSaisie, Saison } from "@/lib/
 import { haptique } from "@/lib/sfl/haptique";
 import { cn } from "@/lib/utils";
 import { Etiquette, Feuille, Pas, Pastille, Segmente } from "./ui";
+import { cartonsDe, REGLES_CARTONS, suspendusPour } from "@/lib/sfl/cartons";
+import { annoncerCartonsApresEnvoi } from "@/lib/sfl/cartons-annonce";
 
 const STATUTS: PlayerStatutSaisie[] = ["Présent", "Absent justifié", "Absence injustifiée", "Blessure", "Suspendu"];
 const RESULTATS: (MatchResult | null)[] = [null, "Victoire", "Nul", "Défaite"];
@@ -81,6 +83,10 @@ export function FeuilleLigne({
     }, `${label} — ${e.player}`);
   const present = e.statut === "Présent";
   const sienne = equipes.find((t) => t.nom === e.team);
+  // Le carton que vaut ce retard : « 2/3 », « 3/3 · rouge ».
+  const cartons = e.retard ? cartonsDe(saison, e.player).cartons.filter((c) => c.j === e.j) : [];
+  const jaune = cartons.find((c) => c.couleur === "jaune");
+  const carton = jaune ? `${jaune.rang}/${REGLES_CARTONS.jaunesPourUnRouge}${cartons.some((c) => c.couleur === "rouge") ? " · rouge" : ""}` : null;
 
   return (
     <>
@@ -179,7 +185,15 @@ export function FeuilleLigne({
             <Bascule libelle="Défensive" on={e.def} onChange={(v) => patch({ def: v }, "Défensive")} />
             <Bascule libelle="CS" on={e.cleanSheet} onChange={(v) => patch({ cleanSheet: v }, "Clean sheet")} />
             <Bascule libelle="SFL Time" on={e.sflTime} onChange={(v) => patch({ sflTime: v }, "SFL Time")} />
-            <Bascule libelle="Retard" on={e.retard} onChange={(v) => patch({ retard: v }, "Retard")} />
+            <Bascule
+              libelle="Retard"
+              on={e.retard}
+              verrou={carton ?? undefined}
+              onChange={(v) => {
+                // Un retard dès la J4 est un carton (lib/sfl/cartons.ts) : sa notification part avec la saison.
+                if (patch({ retard: v }, "Retard") && v) annoncerCartonsApresEnvoi();
+              }}
+            />
             <Bascule libelle="Extra" on={!!e.extraTime} onChange={(v) => patch({ extraTime: v || undefined }, "Xtratime")} />
           </div>
         </section>
@@ -202,6 +216,7 @@ export function FeuilleLigne({
         saison={saison}
         titre={`Remplacer ${e.player}`}
         places={places}
+        suspendus={suspendusPour(saison, e.j)}
         onChoisir={(nom) =>
           faire((s) => {
             const i = s.entries.findIndex((x, k) => k === index && x.player === e.player);

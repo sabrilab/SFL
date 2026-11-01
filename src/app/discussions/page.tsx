@@ -22,6 +22,7 @@ import { equipesDeConvocation } from "@/lib/sfl/saisie/equipes";
 import { PointMaillot } from "@/components/sfl/point-maillot";
 import { cn } from "@/lib/utils";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
+import { Suspendu } from "@/components/sfl/cartons/mes-cartons";
 
 export default function Discussions() {
   const { saison } = useSeason();
@@ -112,7 +113,12 @@ export default function Discussions() {
                 </span>
               )}
             </div>
-            {presence.reponsesOuvertes ? (
+            {presence.suspendu ? (
+              // Suspendu (carton rouge, lib/sfl/cartons.ts) : pas de « Je viens ».
+              <div className="px-3 pb-3">
+                <Suspendu j={presence.suspendu.j} taille="sm" />
+              </div>
+            ) : presence.reponsesOuvertes ? (
               // Une réponse, une seule : elle se scelle (reponse-scellee.tsx).
               <div className="px-3 pb-3">
                 <ReponseScellee taille="sm" mine={presence.mine} onRepondre={presence.answer} />

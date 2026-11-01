@@ -112,7 +112,7 @@ export function BlocMatchs({
     ...(onAjouterMatch ? [{ id: -1, libelle: `+ M${matchs.length + 1}`, pointille: true }] : []),
   ];
   const parLigne = new Map(saison.entries.map((e, i) => [i, e]));
-  const barres = ecarts.filter((e) => e.r === "I1" || e.r === "I2" || e.r === "I3" || e.r === "I4" || e.r === "I5" || e.r === "I7");
+  const barres = ecarts.filter((e) => e.r === "I1" || e.r === "I2" || e.r === "I3" || e.r === "I4" || e.r === "I5" || e.r === "I7" || e.r === "I9");
   const tenue = mv ? (feuille?.(mv.n) ?? null) : null;
   const score = tenue?.ouverte ? tenue.score : mv?.score;
 

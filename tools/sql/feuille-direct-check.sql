@@ -178,5 +178,11 @@ select pg_temp.vrai('T11 rouvrir', (select r ->> 'ok' = 'true' and r -> 'feuille
   from (select pg_temp.en('Ilyes', $$public.feuille_admin(4, 'Noirs 1', 'Blancs 1', 'rouvrir')$$) as r) x));
 select pg_temp.vrai('T11 Sami la tient encore', (select preneur_nom = 'Sami' from public.feuilles_direct where j = 4 and noirs = 'Noirs 1'));
 
+-- 12 · Les cartons vus : le joueur les pose sur sa ligne, pas sur celle d'un autre.
+select pg_temp.vrai('T12 Théo note un carton vu', pg_temp.ecrire_en('Théo', $$update public.profiles set cartons_vus = cartons_vus || '{s1-j4-jaune}' where id = auth.uid()$$) = '1');
+select pg_temp.vrai('T12 il est noté', (select cartons_vus = '{s1-j4-jaune}' from public.profiles where name = 'Théo' and id::text like 'd0000000-%'));
+select pg_temp.vrai('T12 pas chez un autre', pg_temp.ecrire_en('Théo', $$update public.profiles set cartons_vus = '{x}' where name = 'Badis'$$) = '0');
+select pg_temp.vrai('T12 ni ses autres colonnes', pg_temp.ecrire_en('Théo', $$update public.profiles set is_admin = true where id = auth.uid()$$) like 'refus%');
+
 select 'feuille-direct-check : tout est ok' as bilan;
 rollback;

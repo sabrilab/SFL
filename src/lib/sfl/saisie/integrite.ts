@@ -19,11 +19,16 @@
 //   I6  deux journées pour une même date
 //   I7  un camp aux résultats différents, ou incohérent avec son adversaire
 //   I8  une écriture qui fait disparaître un brouillon sans « Jeter »
+//   I9  un joueur suspendu (carton rouge, cartons.ts) sur la journée de sa
+//       suspension — bloque seulement une ligne NOUVELLE : noter le retard
+//       qui fait le rouge ne bloque pas une J5 déjà composée, qui garde son
+//       défaut à corriger avant d'être publiée
 //
 // Pur.
 
 import { TERRAINS_MAX } from "../equipes-division";
 import { isArbitre, neJouePas } from "../hidden";
+import { suspendusPour } from "../cartons";
 import { estBrouillon } from "./brouillon";
 import type { MatchDuJour, MatchEntry, Saison } from "./types";
 import { libelleCourt } from "./mutations";
@@ -37,12 +42,13 @@ export type Ecart =
   | { r: "I5"; j: number; match: number }
   | { r: "I6"; date: string; js: number[] }
   | { r: "I7"; j: number; equipe: string }
-  | { r: "I8"; j: number };
+  | { r: "I8"; j: number }
+  | { r: "I9"; j: number; joueur: string };
 
 export type Regle = Ecart["r"];
 
-export const BLOQUE_L_ECRITURE: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I6", "I8"]);
-export const BLOQUE_LA_PUBLICATION: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7"]);
+export const BLOQUE_L_ECRITURE: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I6", "I8", "I9"]);
+export const BLOQUE_LA_PUBLICATION: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I9"]);
 
 const cle = (n: string) => n.trim().toLowerCase();
 const dateCle = (d: string) => libelleCourt(d).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
@@ -53,6 +59,7 @@ export function cleEcart(e: Ecart): string {
     case "I0":
     case "I1":
     case "I2":
+    case "I9":
       return `${e.r}|${e.j}|${cle(e.joueur)}`;
     case "I3":
     case "I7":
@@ -88,6 +95,8 @@ export function libelleEcart(e: Ecart): string {
       return `${e.equipe} · résultats`;
     case "I8":
       return `J${e.j} · brouillon perdu`;
+    case "I9":
+      return `${e.joueur} · suspendu`;
   }
 }
 
@@ -119,6 +128,17 @@ export function verifierFeuille(s: Saison, j: number, terrainsMax = TERRAINS_MAX
     const n = (vus.get(cle(e.player)) ?? 0) + 1;
     vus.set(cle(e.player), n);
     if (n === 2) out.push({ r: "I1", j, joueur: e.player });
+  }
+
+  // I9 : un suspendu (carton rouge) sur la journée de sa suspension.
+  const suspendus = suspendusPour(s, j);
+  if (suspendus.size) {
+    const signales = new Set<string>();
+    for (const e of lignes) {
+      if (e.vitrine || (e.statut !== "Présent" && !e.extraTime) || !suspendus.has(cle(e.player)) || signales.has(cle(e.player))) continue;
+      signales.add(cle(e.player));
+      out.push({ r: "I9", j, joueur: e.player });
+    }
   }
 
   // I3, I4, I5
@@ -175,7 +195,13 @@ export function ecartsDeLaSaison(s: Saison): Ecart[] {
  */
 export function nouveauxEcarts(avant: Saison, apres: Saison, opts: { jeter?: number } = {}): Ecart[] {
   const vieux = new Set(ecartsDeLaSaison(avant).map(cleEcart));
-  const out = ecartsDeLaSaison(apres).filter((e) => !vieux.has(cleEcart(e)));
+  // Un suspendu n'est un écart nouveau que s'il entre sur la feuille : le
+  // retard qui fait le rouge ne bloque pas une journée déjà composée.
+  const lignesDe = (s: Saison, j: number, nom: string) =>
+    s.entries.filter((e) => e.j === j && cle(e.player) === cle(nom) && (e.statut === "Présent" || e.extraTime)).length;
+  const out = ecartsDeLaSaison(apres).filter(
+    (e) => !vieux.has(cleEcart(e)) && (e.r !== "I9" || lignesDe(apres, e.j, e.joueur) > lignesDe(avant, e.j, e.joueur))
+  );
   // Une nouvelle saison (clôture) vide les journées par nature.
   if ((apres.numero ?? 0) === (avant.numero ?? 0)) {
     for (const m of avant.journees) {
