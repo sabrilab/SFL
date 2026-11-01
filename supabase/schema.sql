@@ -399,12 +399,12 @@ create table if not exists public.saison (
 
 alter table public.saison enable row level security;
 
--- Toute la ligue lit la même saison ; seuls les admins écrivent.
+-- Seuls les admins lisent et écrivent le document brut (« saison: écriture
+-- admin », for all). Un joueur lit la saison sans les journées en brouillon,
+-- par public.saison_publique() : la lecture brute de la ligue est fermée
+-- depuis le 01/11/2026 (L1b), après 48 h où toutes les versions de l'app en
+-- service lisaient déjà saison_publique (SFL#228).
 drop policy if exists "saison: lecture ligue" on public.saison;
-create policy "saison: lecture ligue"
-  on public.saison for select
-  to authenticated
-  using ((select public.est_membre()));
 
 drop policy if exists "saison: écriture admin" on public.saison;
 create policy "saison: écriture admin"
@@ -429,9 +429,8 @@ create policy "saison: écriture admin"
 --     l'appareil ou la version de l'app, les matchs 5 et 6 de la J3 et ses
 --     doublons (28/10) ne passent plus. Un défaut ancien ne bloque jamais.
 --   · saison_publique / saison_signal (plus bas) : la lecture des joueurs
---     sans les brouillons, livrée sans rien fermer. La fermeture de la lecture
---     brute aux joueurs viendra à part, quand toutes les versions de l'app en
---     service liront saison_publique (supprimer « saison: lecture ligue »).
+--     sans les brouillons. La lecture brute leur est fermée depuis le
+--     01/11/2026 (« saison: lecture ligue » supprimée, plus haut).
 do $$
 begin
   if not exists (
