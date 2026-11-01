@@ -38,6 +38,8 @@ export interface TerrainFeuille {
   b: EquipeFeuille;
   /** Son coup d'envoi, son lieu et son terrain sur place, quand la journée les connaît (lib/sfl/matchs-du-jour). */
   heure?: string;
+  /** Les noms des deux équipes du jour (« Noirs 1 », « Blancs 1 ») : la feuille en direct s'y rattache. */
+  equipes?: [string, string];
   ou?: string | null;
   terrain?: string | null;
 }
@@ -54,6 +56,7 @@ export function feuilleDeJournee(journee: Journee | undefined): TerrainFeuille[]
     label: plusieurs ? `Match ${i + 1}` : "Le match",
     a: noirs(m.teamA.players.map((p) => p.name)),
     b: blancs(m.teamB.players.map((p) => p.name)),
+    equipes: [m.teamA.name, m.teamB.name],
   }));
 }
 

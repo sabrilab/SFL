@@ -17,6 +17,9 @@
 // points décomposés, alertes), la Saisie (le direct de toujours), les Votes,
 // les Points d'un joueur et la Grille. Les « Je viens » de la convocation
 // se posent sur les terrains d'un geste (venus-sur-la-feuille.ts).
+// La feuille en direct d'un match tenue par un de ses joueurs (01/11/2026,
+// components/sfl/direct) se voit sur son terrain : qui la tient, son score ;
+// la toucher l'ouvre, pour la reprendre, la libérer ou la rouvrir.
 // Tout le reste de la ligue est derrière ≡ (Ligue), rien n'est perdu.
 //
 // Aucune phrase d'aide : la pastille, le pointillé et le libellé de chaque
@@ -38,6 +41,9 @@ import { DetailPoints } from "@/components/sfl/admin/detail-points";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { usePresence } from "@/hooks/use-presence";
 import { useSaisieAdmin } from "@/hooks/use-saisie-admin";
+import { useFeuillesDirect } from "@/hooks/use-feuilles-direct";
+import { FeuilleDuMatch } from "@/components/sfl/direct/feuille-du-match";
+import { scoreDeLaFeuille } from "@/lib/sfl/feuille-direct";
 import { isAdmin } from "@/lib/sfl/admin";
 import { TERRAINS_MAX } from "@/lib/sfl/equipes-division";
 import { haptique } from "@/lib/sfl/haptique";
@@ -85,7 +91,7 @@ export function PageJournee() {
   const [ligne, setLigne] = useState<number | null>(null);
   const [publier, setPublier] = useState(false);
   const [remettre, setRemettre] = useState(false);
-  const [direct, setDirect] = useState(false);
+  const [enDirect, setEnDirect] = useState(false);
   const [convocation, setConvocation] = useState(false);
   const [arbitre, setArbitre] = useState<number | null>(null);
   const [synchro, setSynchro] = useState(false);
@@ -96,6 +102,7 @@ export function PageJournee() {
   const [retourFeuille, setRetourFeuille] = useState(false);
   const [ajouterA, setAjouterA] = useState<string | null | false>(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [feuilleOuverte, setFeuilleOuverte] = useState<number | null>(null);
 
   const declares = useMemo<MatchDuJour[]>(() => (j != null && meta ? matchsDeclares(saison, j) : []), [saison, j, meta]);
   const matchs = useMemo(() => (j != null ? matchsVus(saison, j, declares) : []), [saison, j, declares]);
@@ -106,7 +113,11 @@ export function PageJournee() {
     const noms = [...new Set(saison.entries.filter((e) => e.j === j && e.team).map((e) => e.team as string))];
     return choixDEquipe(computeJournees(saison).find((x) => x.j === j), noms, declares);
   }, [saison, j, declares]);
-  const etat = j != null && meta ? etatJournee(saison, j, maintenant) : "brouillon";
+  // Les feuilles en direct tenues par les joueurs (01/11/2026) : une feuille
+  // prise, c'est le coup d'envoi, la journée en ligne passe « en direct ».
+  const direct = useFeuillesDirect(j ?? null);
+  const etatSaisi = j != null && meta ? etatJournee(saison, j, maintenant) : "brouillon";
+  const etat = etatSaisi === "en-ligne" && direct.feuilles.size > 0 ? "en-direct" : etatSaisi;
   const geste = gesteDuMoment(saison, meta ? j : null, maintenant);
   const par = me ?? "admin";
   // La convocation n'est celle de la journée ouverte que si c'est son dimanche :
@@ -311,6 +322,14 @@ export function PageJournee() {
                 direct={etat === "en-direct" || etat === "terminee"}
                 heureJournee={meta.heure}
                 lieu={(m) => terrainDe(m.lieuId ?? meta.terrainId)}
+                feuille={(n) => {
+                  const m = declares[n - 1];
+                  const f = m ? direct.feuilleDe(m.equipes) : null;
+                  return m && f
+                    ? { libelle: `Feuille · ${f.preneur_nom ?? "libre"}`, ouverte: !f.fin, score: scoreDeLaFeuille(saison, j, m.equipes, f.compteurs) }
+                    : null;
+                }}
+                onFeuille={setFeuilleOuverte}
               />
               {matchs.length > 0 && matchs.every((m) => !m.noirs.length && !m.blancs.length) === false && (
                 <p className="mono-label text-encre-3">{compteursEnMots(saison, j)}</p>
@@ -360,7 +379,7 @@ export function PageJournee() {
                 <Etiquette>Outils</Etiquette>
                 <div className="flex flex-wrap gap-1.5">
                   <Pastille onClick={() => setConsulter(true)}>Feuille{ecarts.length ? ` · ${ecarts.length} !` : ""}</Pastille>
-                  <Pastille onClick={() => setDirect(true)}>Saisie</Pastille>
+                  <Pastille onClick={() => setEnDirect(true)}>Saisie</Pastille>
                   <Pastille onClick={() => setVotes(true)}>Votes</Pastille>
                   <Pastille onClick={() => setPoints(true)}>Points</Pastille>
                   <Link href="/admin/tableau?onglet=grille" className="mono-label inline-flex h-9 shrink-0 items-center rounded-full bg-secondary px-3.5 text-encre-2">
@@ -407,7 +426,7 @@ export function PageJournee() {
               </button>
             </div>
           ) : (
-            <button type="button" onClick={() => setDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">
+            <button type="button" onClick={() => setEnDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">
               Direct · Match {geste.match}
               {geste.heure ? ` · ${geste.heure}` : ""}
             </button>
@@ -515,7 +534,19 @@ export function PageJournee() {
           />
           <FeuillePublier key={`pub-${publier}`} open={publier} onOpenChange={setPublier} saison={saison} j={j} par={par} faire={faire} />
           <FeuilleRemettre key={`rem-${remettre}`} open={remettre} onOpenChange={setRemettre} saison={saison} j={j} par={par} faire={faire} />
-          <FeuilleDirect open={direct} onOpenChange={setDirect} saison={saison} j={j} matchs={matchs} commit={commit} faire={faire} />
+          <FeuilleDirect open={enDirect} onOpenChange={setEnDirect} saison={saison} j={j} matchs={matchs} commit={commit} faire={faire} direct={direct} />
+          {feuilleOuverte != null && declares[feuilleOuverte - 1] && (
+            <FeuilleDuMatch
+              open
+              onOpenChange={(o) => !o && setFeuilleOuverte(null)}
+              saison={saison}
+              j={j}
+              equipes={declares[feuilleOuverte - 1].equipes}
+              label={`Match ${feuilleOuverte}`}
+              direct={direct}
+              mode="admin"
+            />
+          )}
           <FeuilleArbitre
             open={arbitre != null}
             onOpenChange={(o) => !o && setArbitre(null)}

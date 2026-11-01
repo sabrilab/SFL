@@ -156,7 +156,7 @@ export type Resultat = { ok: true } | { ok: false; raison: string; conflit?: tru
 const PUBLIQUE = "Cet appareil n'a que la saison des joueurs, sans les brouillons. Reprends la base avant d'écrire.";
 
 const CONFLIT =
-  "Un autre admin a publié depuis ta dernière synchro. Reprends la base pour repartir de sa version, ou écrase-la avec la tienne.";
+  "La base a changé depuis ta dernière synchro (un autre admin, ou la feuille d'un match scellée par un joueur). Reprends la base pour repartir de sa version, ou écrase-la avec la tienne.";
 
 /** Date de la dernière publication réussie, pour l'afficher à l'admin. */
 const PUBLIE_KEY = "sfl-saison-publiee-le";
@@ -240,6 +240,12 @@ async function publierMaintenant(saison: Saison, forcer: boolean): Promise<Resul
     // « Écraser » n'y peut rien, c'est voulu.
     if (error?.hint === "feuille-saine")
       return { ok: false, raison: "Feuille refusée par la base.", feuille: (error.details ?? "").split("|").filter(Boolean) };
+    // Les chiffres d'un match dont la feuille est tenue par un joueur, ou
+    // scellée depuis ta synchro (01/11/2026, public.feuilles_ecrasees) : la
+    // base les garde, même en écrasant. « Reprendre la base » repart de sa
+    // version ; la feuille, elle, se reprend ou se libère depuis son match.
+    if (error?.hint === "feuille-tenue")
+      return { ok: false, raison: "Feuille de match tenue par un joueur.", feuille: (error.details ?? "").split("|").filter(Boolean) };
     if (error) return { ok: false, raison: motif(error.message) };
     const r = data as { ok: boolean; version: number };
     if (!r.ok) return { ok: false, raison: CONFLIT, conflit: true };

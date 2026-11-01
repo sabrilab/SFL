@@ -8,6 +8,9 @@
 // match de plus (30/10/2026). Un segment porte « ! » quand son match a un
 // défaut ; le défaut se lit au-dessus du terrain, en pastille inversée
 // « ! ADIL ×2 » (barré, on le lisait comme déjà réglé).
+// La feuille en direct d'un match tenue par un joueur (01/11/2026) se lit
+// sur sa pastille, « ◉ Feuille · Ilyes » puis « ✓ Feuille · Ilyes » ; la
+// toucher l'ouvre. Pendant qu'elle est tenue, le score est le sien.
 
 import { useMemo } from "react";
 import { TerrainPlaces, type Occupant } from "@/components/sfl/matchs/terrain-places";
@@ -76,6 +79,8 @@ export function BlocMatchs({
   direct,
   heureJournee,
   lieu,
+  feuille,
+  onFeuille,
 }: {
   saison: Saison;
   j: number;
@@ -95,6 +100,9 @@ export function BlocMatchs({
   direct?: boolean;
   heureJournee?: string;
   lieu?: (m: MatchDuJour) => string | null;
+  /** La feuille en direct du match n (tenue par un joueur), et son score tant qu'elle est ouverte. */
+  feuille?: (n: number) => { libelle: string; ouverte: boolean; score: [number, number] } | null;
+  onFeuille?: (n: number) => void;
 }) {
   const mv = matchs.find((x) => x.n === courant) ?? matchs[0];
   const { places, occupants } = useMemo(() => (mv ? occupantsDe(mv) : { places: 10, occupants: [] }), [mv]);
@@ -105,6 +113,8 @@ export function BlocMatchs({
   ];
   const parLigne = new Map(saison.entries.map((e, i) => [i, e]));
   const barres = ecarts.filter((e) => e.r === "I1" || e.r === "I2" || e.r === "I3" || e.r === "I4" || e.r === "I5" || e.r === "I7");
+  const tenue = mv ? (feuille?.(mv.n) ?? null) : null;
+  const score = tenue?.ouverte ? tenue.score : mv?.score;
 
   return (
     <section className="flex flex-col gap-3">
@@ -154,12 +164,18 @@ export function BlocMatchs({
                 {arbitre?.(mv.n) ? `Arbitre · ${arbitre(mv.n)}` : "+ Arbitre"}
               </Pastille>
             )}
+            {tenue && (
+              <Pastille onClick={() => onFeuille?.(mv.n)} actif>
+                <span aria-hidden>{tenue.ouverte ? "◉" : "✓"}</span>
+                {tenue.libelle}
+              </Pastille>
+            )}
           </div>
-          {direct && (
+          {(direct || tenue?.ouverte) && score && (
             <div className="flex items-center justify-center gap-4">
               <PastilleMaillot camp="Noirs" />
               <span className="font-display text-affiche leading-none tabular-nums">
-                {mv.score[0]} – {mv.score[1]}
+                {score[0]} – {score[1]}
               </span>
               <PastilleMaillot camp="Blancs" />
             </div>

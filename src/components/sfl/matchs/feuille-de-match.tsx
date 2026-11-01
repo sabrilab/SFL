@@ -234,6 +234,7 @@ export function FeuilleDeMatch({
   entete,
   j = null,
   avantFlair = null,
+  sousTerrain,
 }: {
   terrains: TerrainFeuille[];
   moi: string;
@@ -242,6 +243,8 @@ export function FeuilleDeMatch({
   j?: number | null;
   /** Ce qui passe entre les terrains et Le Flair (la page du lieu : le compte à rebours et la journée en étapes). */
   avantFlair?: ReactNode;
+  /** Sous le terrain qu'on regarde : sa feuille en direct (components/sfl/direct, 01/11/2026). */
+  sousTerrain?: (t: TerrainFeuille) => ReactNode;
 }) {
   const { allPlayers } = useSeason();
   const parNom = useMemo(
@@ -358,6 +361,8 @@ export function FeuilleDeMatch({
           );
         })}
       </div>
+
+      {sousTerrain?.(t)}
 
       {avantFlair && <div className="mt-2 flex flex-col gap-5">{avantFlair}</div>}
 

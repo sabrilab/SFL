@@ -89,6 +89,8 @@ import { FichePartie } from "@/components/sfl/matchs/fiche-partie";
 import { MeteoMatch } from "@/components/sfl/meteo-match";
 import { DiscussionMatch, type OngletDiscussion } from "@/components/sfl/matchs/discussion-match";
 import { FeuilleDeMatch } from "@/components/sfl/matchs/feuille-de-match";
+import { DirectDuMatch } from "@/components/sfl/direct/direct-du-match";
+import { useFeuillesDirect } from "@/hooks/use-feuilles-direct";
 import { DuelsDuJour } from "@/components/sfl/matchs/duels";
 import { feuilleDeConvocation, feuilleDeJournee, type TerrainFeuille } from "@/lib/sfl/feuille";
 import { MesDispos } from "@/components/sfl/matchs/mes-dispos";
@@ -1322,6 +1324,10 @@ export default function MapPage() {
     if (deJournee.length || (choisi.j != null && !choisi.convoquee)) return deJournee;
     return p.equipesVisibles || admin ? feuilleDeConvocation(p.teams) : [];
   }, [choisi, saison.journees, journees, matchsDe, p.equipesVisibles, p.teams, admin]);
+  // Les feuilles en direct du dimanche choisi (01/11/2026) : une feuille prise,
+  // c'est le coup d'envoi (« le match commence au premier appui »).
+  const direct = useFeuillesDirect(choisi?.ligue === "sfl" ? (choisi.j ?? null) : null);
+  const enDirect = direct.feuilles.size > 0;
   // La journée en étapes : un dimanche de la ligue seulement.
   const etapesDuChoisi = useMemo<Etape[]>(() => {
     if (!choisi || choisi.ligue !== "sfl") return [];
@@ -1331,16 +1337,16 @@ export default function MapPage() {
     return [
       { nom: "Convocation", sous: convocation && !joue && p.presents.length ? `${p.presents.length} je viens` : "le lundi", faite: convocation },
       { nom: "Les équipes", sous: "vendredi 19 h", faite: joue || feuille.length > 0 },
-      { nom: "Coup d'envoi", sous: choisi.heure, faite: joue },
+      { nom: "Coup d'envoi", sous: choisi.heure, faite: joue || enDirect },
       { nom: "Feuille de match", sous: "buts, passes, MVP", faite: joue },
       { nom: "Les votes", sous: "jusqu'à minuit", faite: votesClos },
     ];
-  }, [choisi, aujourdhui, feuille.length, p.presents.length]);
+  }, [choisi, aujourdhui, feuille.length, p.presents.length, enDirect]);
   // Le tableau de bord du match (31/10) : le grand chiffre, puis la journée en étapes.
   // Avec une feuille, il passe entre les terrains et Le Flair (Sabri, 31/10 : « met-la avant le Flair »).
   const tableauDeBord = choisi && (!choisi.joue || etapesDuChoisi.length > 0) ? (
     <>
-      {!choisi.joue && (
+      {!choisi.joue && !enDirect && (
         <Rebours
           debut={debutDuChoisi}
           joueurs={choisi.presents.length || (choisi.ligue === "sfl" ? habitues.length : 0)}
@@ -1848,6 +1854,12 @@ export default function MapPage() {
                     moi={player.name}
                     j={choisi.j ?? null}
                     avantFlair={tableauDeBord}
+                    // La feuille en direct de ce match, prise par un de ses joueurs (01/11/2026).
+                    sousTerrain={
+                      choisi.ligue === "sfl" && choisi.j != null
+                        ? (t) => (t.equipes ? <DirectDuMatch key={`${choisi.j}-${t.equipes.join("-")}`} j={choisi.j!} equipes={t.equipes} label={t.label === "Le match" ? "Match 1" : t.label} direct={direct} /> : null)
+                        : undefined
+                    }
                     entete={{
                       surtitre: `${choisi.j != null ? `J${choisi.j} · ` : ""}Sunday Five League`,
                       jour: dateComplete(choisi.dateLabel, aujourdhui),
