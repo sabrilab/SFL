@@ -248,7 +248,9 @@ export function appliquerFeuille(saison: Saison, j: number, equipes: Equipes, c:
 
 /**
  * Peut-on prendre la feuille de ce match ? null : oui ; sinon le motif. Le
- * miroir de public.droit_feuille, pour l'écran : la base décide.
+ * miroir de public.droit_feuille, pour l'écran : la base décide. « Pas ton
+ * match » passe avant « terminé » : une feuille rouverte se reprend par un
+ * joueur du match, et par lui seul (relecture du 01/11).
  */
 export function droitDePrendre(
   saison: Saison,
@@ -260,7 +262,6 @@ export function droitDePrendre(
   const meta = saison.journees.find((m) => m.j === j);
   if (!meta) return "journee";
   if (estBrouillon(meta)) return "brouillon";
-  if (!voteOuvert(meta.date, maintenant)) return "pas-du-jour";
   const declares = meta.matchsDuJour ?? [];
   if (declares.length) {
     if (!declares.some((m) => m.equipes[0] === equipes[0] && m.equipes[1] === equipes[1])) return "match";
@@ -268,10 +269,21 @@ export function droitDePrendre(
     const n = equipes[0].match(/^Noirs (\d+)$/)?.[1];
     if (!n || equipes[1] !== `Blancs ${n}`) return "match";
   }
+  if (!voteOuvert(meta.date, maintenant)) return "pas-du-jour";
   const lignes = lignesDuMatch(saison, j, equipes);
-  if (lignes.some((l) => !l.extra && !!l.e.result)) return "terminee";
   if (!moi || !lignes.some((l) => memeNom(l.e.player, moi))) return "pas-ton-match";
+  if (lignes.some((l) => !l.extra && !!l.e.result)) return "terminee";
   return null;
+}
+
+/**
+ * Ce joueur peut-il prendre cette feuille, telle qu'elle est ? Personne ne la
+ * tient et le droit le permet — ou la feuille, rouverte par l'admin puis
+ * libérée, porte un match déjà terminé dont il est (public.prendre_feuille).
+ */
+export function peutPrendre(f: FeuilleDirect | null | undefined, droit: RefusFeuille | null): boolean {
+  if (f && (f.preneur || f.fin)) return false;
+  return droit === null || (!!f && droit === "terminee");
 }
 
 /** Les matchs d'une journée tels que le moteur les affiche, avec leurs camps. */

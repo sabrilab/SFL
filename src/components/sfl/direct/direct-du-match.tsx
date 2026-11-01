@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useFeuillesDirect, type FeuillesDirect } from "@/hooks/use-feuilles-direct";
-import { droitDePrendre, etatDeLaFeuille, joueursDuMatch, MOTS_DU_REFUS, scoreDeLaFeuille, type Equipes } from "@/lib/sfl/feuille-direct";
+import { droitDePrendre, etatDeLaFeuille, joueursDuMatch, MOTS_DU_REFUS, peutPrendre, scoreDeLaFeuille, type Equipes } from "@/lib/sfl/feuille-direct";
 import { voteOuvert } from "@/lib/sfl/convocation-temps";
 import { journeeAvecVote } from "@/lib/sfl/votes";
 import { haptique } from "@/lib/sfl/haptique";
@@ -46,13 +46,15 @@ export function DirectDuMatch({
   const feuille = direct.feuilleDe(equipes);
   const etat = etatDeLaFeuille(feuille, direct.monId);
   const droit = droitDePrendre(saisonLue, j, equipes, me, new Date());
+  // Libre et à moi de la prendre (une feuille rouverte puis libérée aussi) ;
+  // une feuille libérée se suit encore en lecture par toute la ligue.
+  const prenable = peutPrendre(feuille, droit);
 
   if (!direct.pret) return null;
-  if ((!feuille || etat === "libre") && droit !== null) return null;
 
   const sheet = <FeuilleDuMatch open={ouverte} onOpenChange={setOuverte} saison={saisonLue} j={j} equipes={equipes} label={label} direct={direct} />;
 
-  if (!feuille || etat === "libre") {
+  if (prenable) {
     return (
       <>
         <button
@@ -79,6 +81,7 @@ export function DirectDuMatch({
     );
   }
 
+  if (!feuille) return null;
   const score = scoreDeLaFeuille(saisonLue, j, equipes, feuille.compteurs);
   // Le vote du soir, pour qui a joué ce match.
   const jn = journees.find((x) => x.j === j);

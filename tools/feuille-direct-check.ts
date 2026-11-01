@@ -12,6 +12,7 @@ import {
   joueursDuMatch,
   libelleEntree,
   minuteDe,
+  peutPrendre,
   pileDuJournal,
   scoreDeLaFeuille,
   type Compteurs,
@@ -67,6 +68,10 @@ assert.equal(droitDePrendre(saison, 9, N1, "Théo", maintenant), "journee");
 assert.equal(droitDePrendre(saison, 4, N1, "Théo", new Date("2026-11-02T00:30:00Z")), "pas-du-jour", "minuit passé à Paris");
 const terminee = { ...saison, entries: saison.entries.map((e) => (e.j === 4 && e.team === "Noirs 1" ? { ...e, result: "Victoire" as const } : e)) };
 assert.equal(droitDePrendre(terminee, 4, N1, "Théo", maintenant), "terminee");
+// « Pas ton match » avant « terminé » (relecture du 01/11) : une feuille
+// rouverte puis libérée ne se reprend que par un joueur du match.
+assert.equal(droitDePrendre(terminee, 4, N1, "Kader", maintenant), "pas-ton-match");
+assert.equal(droitDePrendre(terminee, 4, N1, "Sabri", maintenant), "pas-ton-match");
 
 // 2 · Les joueurs du match : les présents, puis l'Xtratime ; jamais la vitrine.
 assert.deepEqual(joueursDuMatch(saison, 4, N1), { noirs: ["Ilyes", "Théo", "Anis"], blancs: ["Badis", "Sami", "Yanis"] });
@@ -150,5 +155,15 @@ assert.equal(etatDeLaFeuille(f({ preneur: "u1" }), "u1"), "mienne");
 assert.equal(etatDeLaFeuille(f({ preneur: "u1" }), "u2"), "tenue");
 assert.equal(etatDeLaFeuille(f({ preneur: null }), "u2"), "libre", "libérée par l'admin");
 assert.equal(etatDeLaFeuille(f({ preneur: "u1", fin: t(3000) }), "u1"), "scellee");
+
+// 8 · Prendre la feuille telle qu'elle est (public.prendre_feuille).
+assert.equal(peutPrendre(null, null), true, "personne ne l'a prise, et c'est mon match");
+assert.equal(peutPrendre(null, "pas-ton-match"), false);
+assert.equal(peutPrendre(null, "terminee"), false, "un match fini sans feuille ne s'ouvre pas");
+assert.equal(peutPrendre(f({ preneur: null }), null), true, "libérée par l'admin");
+assert.equal(peutPrendre(f({ preneur: null }), "terminee"), true, "rouverte puis libérée, par un joueur du match");
+assert.equal(peutPrendre(f({ preneur: null }), "pas-ton-match"), false, "rouverte puis libérée, pas par un autre");
+assert.equal(peutPrendre(f({ preneur: "u1" }), null), false, "tenue");
+assert.equal(peutPrendre(f({ preneur: null, fin: t(3000) }), null), false, "scellée");
 
 console.log("feuille-direct-check : ok");

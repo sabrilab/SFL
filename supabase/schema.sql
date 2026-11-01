@@ -7611,16 +7611,17 @@ as $$
 $$;
 revoke execute on function public.compteurs_du_document(jsonb, int, text, text) from public, anon, authenticated;
 
--- Peut-on prendre la feuille de ce match ? null : oui ; sinon le motif.
---   journee · la journée n'existe pas ;  brouillon · pas encore publiée ;
---   pas-du-jour · elle ne se joue pas aujourd'hui (heure de Paris) ;
---   match · ces deux camps ne forment pas un match de la journée ;
---   terminee · le match a déjà son résultat ;
---   pas-ton-match · `p_nom` ne joue pas ce match.
-create or replace function public.droit_feuille(p_data jsonb, p_j int, p_noirs text, p_blancs text, p_nom text, p_maintenant timestamptz)
+-- La feuille d'un match peut-elle encore s'écrire, quel que soit le jour ?
+-- null : oui ; sinon le motif.
+--   journee · la journée n'existe pas ;  brouillon · pas (ou plus) publiée ;
+--   match · ces deux camps ne forment pas un match de la journée.
+-- Une journée remise en brouillon (avant son coup d'envoi, brouillon.ts) gèle
+-- sa feuille : rien de la composition préparée ne doit passer par une
+-- feuille que toute la ligue lit (relecture du 01/11).
+create or replace function public.feuille_hors_jeu(p_data jsonb, p_j int, p_noirs text, p_blancs text)
 returns text
 language plpgsql
-stable
+immutable
 set search_path = ''
 as $$
 declare
@@ -7638,9 +7639,6 @@ begin
   if public.est_brouillon(meta) then
     return 'brouillon';
   end if;
-  if public.date_de_journee(meta ->> 'date', p_maintenant) is distinct from (p_maintenant at time zone 'Europe/Paris')::date then
-    return 'pas-du-jour';
-  end if;
   declares := case when jsonb_typeof(meta -> 'matchsDuJour') = 'array' then meta -> 'matchsDuJour' else '[]'::jsonb end;
   if jsonb_array_length(declares) > 0 then
     if not exists (
@@ -7652,17 +7650,63 @@ begin
   elsif not (p_noirs ~ '^Noirs \d+$' and p_blancs = 'Blancs ' || substring(p_noirs from '\d+$')) then
     return 'match';
   end if;
+  return null;
+end;
+$$;
+revoke execute on function public.feuille_hors_jeu(jsonb, int, text, text) from public, anon, authenticated;
+
+-- `p_nom` joue-t-il ce match (une ligne de présent ou d'Xtratime) ?
+create or replace function public.joue_le_match(p_data jsonb, p_j int, p_noirs text, p_blancs text, p_nom text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select p_nom is not null and exists (
+    select 1 from public.lignes_du_match(p_data, p_j, p_noirs, p_blancs) l
+     where lower(btrim(l.joueur)) = lower(btrim(p_nom))
+  );
+$$;
+revoke execute on function public.joue_le_match(jsonb, int, text, text, text) from public, anon, authenticated;
+
+-- Peut-on prendre la feuille de ce match ? null : oui ; sinon le motif.
+--   journee, brouillon, match · feuille_hors_jeu ;
+--   pas-du-jour · elle ne se joue pas aujourd'hui (heure de Paris) ;
+--   pas-ton-match · `p_nom` ne joue pas ce match ;
+--   terminee · le match a déjà son résultat.
+-- « pas-ton-match » passe AVANT « terminee » : prendre_feuille laisse
+-- reprendre une feuille rouverte (match terminé) à un joueur du match, et à
+-- lui seul (relecture du 01/11 : rouverte puis libérée, n'importe quel
+-- membre la prenait).
+create or replace function public.droit_feuille(p_data jsonb, p_j int, p_noirs text, p_blancs text, p_nom text, p_maintenant timestamptz)
+returns text
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  meta jsonb;
+  refus text;
+begin
+  refus := public.feuille_hors_jeu(p_data, p_j, p_noirs, p_blancs);
+  if refus is not null then
+    return refus;
+  end if;
+  select m into meta
+    from jsonb_array_elements(p_data -> 'journees') m
+   where m ->> 'j' = p_j::text
+   limit 1;
+  if public.date_de_journee(meta ->> 'date', p_maintenant) is distinct from (p_maintenant at time zone 'Europe/Paris')::date then
+    return 'pas-du-jour';
+  end if;
+  if not public.joue_le_match(p_data, p_j, p_noirs, p_blancs, p_nom) then
+    return 'pas-ton-match';
+  end if;
   if exists (
     select 1 from public.lignes_du_match(p_data, p_j, p_noirs, p_blancs) l
      where not l.extra and coalesce(l.e ->> 'result', '') <> ''
   ) then
     return 'terminee';
-  end if;
-  if not exists (
-    select 1 from public.lignes_du_match(p_data, p_j, p_noirs, p_blancs) l
-     where lower(btrim(l.joueur)) = lower(btrim(p_nom))
-  ) then
-    return 'pas-ton-match';
   end if;
   return null;
 end;
@@ -7810,7 +7854,12 @@ begin
   if nom is null then
     raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
   end if;
-  select s.data into doc from public.saison s where s.id = 1;
+  -- La saison, verrouillée en partage : une publication de l'admin en cours
+  -- (publier_saison la tient « for update ») passe d'abord, et la prise lit
+  -- ce qu'elle a écrit — la fin du match qu'il vient de poser refuse la
+  -- prise, au lieu d'ouvrir une feuille qui l'écraserait au sceau. Deux
+  -- prises au même instant ne s'attendent pas pour autant.
+  select s.data into doc from public.saison s where s.id = 1 for share;
   n := coalesce(public.entier_sur(doc ->> 'numero'), 0);
   -- Une feuille déjà là : la sienne, une libérée, ou celle d'un autre.
   select * into f from public.feuilles_direct d
@@ -7821,7 +7870,8 @@ begin
   end if;
   refus := public.droit_feuille(doc, p_j, p_noirs, p_blancs, nom, now());
   -- Une feuille rouverte par l'admin se reprend, même si la saison porte
-  -- déjà le résultat du match.
+  -- déjà le résultat du match — par un joueur du match seulement :
+  -- droit_feuille ne répond « terminee » qu'une fois « pas-ton-match » passé.
   if refus is not null and not (existe and f.fin is null and refus = 'terminee') then
     return jsonb_build_object('ok', false, 'refus', refus, 'feuille', case when existe then to_jsonb(f) end);
   end if;
@@ -7855,6 +7905,11 @@ grant execute on function public.prendre_feuille(int, text, text) to authenticat
 -- sur des joueurs du match, par celui qui tient la feuille seulement, avant
 -- la fin. Un compteur reste entre 0 et 99. p_gestes : [{ joueur, quoi, d }],
 -- quoi ∈ buts, passes, arrets, interceptions, csc.
+-- Relecture du 01/11 : un compte en attente ne lit rien par les refus (la
+-- feuille n'est qu'aux membres, comme sa lecture) ; une journée remise en
+-- brouillon gèle sa feuille ; un joueur sorti du match par l'admin ne
+-- compte plus (l'admin, lui, compte la feuille qu'il a reprise) ; le
+-- journal garde ses 500 derniers gestes.
 create or replace function public.compter_feuille(p_j int, p_noirs text, p_blancs text, p_gestes jsonb)
 returns jsonb
 language plpgsql
@@ -7863,6 +7918,7 @@ set search_path = ''
 as $$
 declare
   moi uuid := auth.uid();
+  nom text;
   doc jsonb;
   n   int;
   f   public.feuilles_direct;
@@ -7872,8 +7928,13 @@ declare
   quoi text;
   d   int;
   v   int;
+  refus text;
   faits jsonb := '[]'::jsonb;
 begin
+  select p.name into nom from public.profiles p where p.id = moi and p.valide;
+  if nom is null then
+    raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
+  end if;
   select s.data into doc from public.saison s where s.id = 1;
   n := coalesce(public.entier_sur(doc ->> 'numero'), 0);
   select * into f from public.feuilles_direct x
@@ -7887,6 +7948,13 @@ begin
   end if;
   if f.preneur is distinct from moi then
     return jsonb_build_object('ok', false, 'refus', 'pas-preneur', 'feuille', to_jsonb(f));
+  end if;
+  refus := public.feuille_hors_jeu(doc, p_j, p_noirs, p_blancs);
+  if refus is null and not public.joue_le_match(doc, p_j, p_noirs, p_blancs, nom) and not public.is_league_admin() then
+    refus := 'pas-ton-match';
+  end if;
+  if refus is not null then
+    return jsonb_build_object('ok', false, 'refus', refus, 'feuille', to_jsonb(f));
   end if;
   if jsonb_typeof(p_gestes) is distinct from 'array' or jsonb_array_length(p_gestes) not between 1 and 4 then
     return jsonb_build_object('ok', false, 'refus', 'geste', 'feuille', to_jsonb(f));
@@ -7899,7 +7967,7 @@ begin
     d := public.entier_sur(g ->> 'd');
     if quoi is null or quoi not in ('buts', 'passes', 'arrets', 'interceptions', 'csc')
        or d is null or d not in (-1, 1)
-       or not ((g ->> 'joueur') = any (joueurs)) then
+       or (g ->> 'joueur') is null or not ((g ->> 'joueur') = any (joueurs)) then
       return jsonb_build_object('ok', false, 'refus', 'geste', 'feuille', to_jsonb(f));
     end if;
     v := coalesce(public.entier_sur(c -> (g ->> 'joueur') ->> quoi), 0);
@@ -7911,7 +7979,11 @@ begin
   if jsonb_array_length(faits) > 0 then
     update public.feuilles_direct x
        set compteurs = c,
-           journal = x.journal || jsonb_build_array(jsonb_build_object('le', now(), 'gestes', faits)),
+           journal = (
+             select coalesce(jsonb_agg(e order by i), '[]'::jsonb)
+               from jsonb_array_elements(x.journal || jsonb_build_array(jsonb_build_object('le', now(), 'gestes', faits)))
+                    with ordinality t(e, i)
+              where i > jsonb_array_length(x.journal) + 1 - 500),
            maj_le = now()
      where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs
     returning * into f;
@@ -7923,7 +7995,9 @@ revoke execute on function public.compter_feuille(int, text, text, jsonb) from p
 grant execute on function public.compter_feuille(int, text, text, jsonb) to authenticated;
 
 -- Passer la main : celui qui tient la feuille la donne à un joueur du match
--- qui a son compte (sinon : « sans-compte »).
+-- qui a son compte (sinon : « sans-compte »). Un membre seulement, sur une
+-- journée publiée (relecture du 01/11, comme compter_feuille) ; un preneur
+-- que l'admin a sorti du match peut encore la donner à un joueur du match.
 create or replace function public.passer_feuille(p_j int, p_noirs text, p_blancs text, p_a text)
 returns jsonb
 language plpgsql
@@ -7936,7 +8010,11 @@ declare
   n   int;
   f   public.feuilles_direct;
   qui public.profiles;
+  refus text;
 begin
+  if not public.est_membre() then
+    raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
+  end if;
   select s.data into doc from public.saison s where s.id = 1;
   n := coalesce(public.entier_sur(doc ->> 'numero'), 0);
   select * into f from public.feuilles_direct x
@@ -7951,10 +8029,11 @@ begin
   if f.preneur is distinct from moi then
     return jsonb_build_object('ok', false, 'refus', 'pas-preneur', 'feuille', to_jsonb(f));
   end if;
-  if not exists (
-    select 1 from public.lignes_du_match(doc, p_j, p_noirs, p_blancs) l
-     where lower(btrim(l.joueur)) = lower(btrim(p_a))
-  ) then
+  refus := public.feuille_hors_jeu(doc, p_j, p_noirs, p_blancs);
+  if refus is not null then
+    return jsonb_build_object('ok', false, 'refus', refus, 'feuille', to_jsonb(f));
+  end if;
+  if not public.joue_le_match(doc, p_j, p_noirs, p_blancs, p_a) then
     return jsonb_build_object('ok', false, 'refus', 'pas-ton-match', 'feuille', to_jsonb(f));
   end if;
   select p.* into qui from public.profiles p
@@ -7976,7 +8055,10 @@ grant execute on function public.passer_feuille(int, text, text, text) to authen
 -- L'admin : « reprendre » (il la tient ; une feuille que personne n'a prise
 -- naît à son nom), « liberer » (personne ne la tient, un joueur du match la
 -- reprend), « rouvrir » (une feuille scellée repart des chiffres que porte
--- la saison, corrections de l'admin comprises).
+-- la saison, corrections de l'admin comprises). Reprendre et rouvrir
+-- copient des chiffres de la saison dans une feuille que toute la ligue lit :
+-- jamais sur une journée en brouillon, ni pour deux camps qui ne forment pas
+-- un match de la journée (relecture du 01/11). Libérer, toujours.
 create or replace function public.feuille_admin(p_j int, p_noirs text, p_blancs text, p_geste text)
 returns jsonb
 language plpgsql
@@ -7989,6 +8071,7 @@ declare
   doc jsonb;
   n   int;
   f   public.feuilles_direct;
+  refus text;
 begin
   if not public.is_league_admin() then
     raise exception 'Réservé à l''admin.' using errcode = '42501';
@@ -7996,6 +8079,14 @@ begin
   select p.name into nom from public.profiles p where p.id = moi;
   select s.data into doc from public.saison s where s.id = 1;
   n := coalesce(public.entier_sur(doc ->> 'numero'), 0);
+  if p_geste in ('reprendre', 'rouvrir') then
+    refus := public.feuille_hors_jeu(doc, p_j, p_noirs, p_blancs);
+    if refus is not null then
+      select * into f from public.feuilles_direct x
+       where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs;
+      return jsonb_build_object('ok', false, 'refus', refus, 'feuille', case when f.saison is not null then to_jsonb(f) end);
+    end if;
+  end if;
   if p_geste = 'reprendre' then
     insert into public.feuilles_direct (saison, j, noirs, blancs, preneur, preneur_nom, pris_le, compteurs)
     values (n, p_j, p_noirs, p_blancs, moi, nom, now(), public.compteurs_du_document(doc, p_j, p_noirs, p_blancs))
@@ -8036,6 +8127,8 @@ grant execute on function public.feuille_admin(int, text, text, text) to authent
 -- l'historique garde l'état d'avant (saison_garde_trace, avec le joueur pour
 -- auteur), que les téléphones relisent la saison (saison_signal) et qu'un
 -- appareil d'admin resté sur l'ancienne version doit reprendre la base.
+-- Un joueur ne scelle que la feuille d'un match qu'il joue encore, sur une
+-- journée publiée ; l'admin scelle toute feuille ouverte (relecture du 01/11).
 create or replace function public.sceller_feuille(p_j int, p_noirs text, p_blancs text)
 returns jsonb
 language plpgsql
@@ -8044,14 +8137,21 @@ set search_path = ''
 as $$
 declare
   moi      uuid := auth.uid();
+  nom      text;
+  admin    boolean := public.is_league_admin();
   doc      jsonb;
   neuf     jsonb;
   courante bigint;
   nouvelle bigint;
   n        int;
   defauts  text[];
+  refus    text;
   f        public.feuilles_direct;
 begin
+  select p.name into nom from public.profiles p where p.id = moi and p.valide;
+  if nom is null then
+    raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
+  end if;
   select s.data, s.version into doc, courante from public.saison s where s.id = 1 for update;
   if doc is null then
     return jsonb_build_object('ok', false, 'refus', 'sans-saison');
@@ -8066,8 +8166,17 @@ begin
   if f.fin is not null then
     return jsonb_build_object('ok', false, 'refus', 'scellee', 'feuille', to_jsonb(f));
   end if;
-  if f.preneur is distinct from moi and not public.is_league_admin() then
+  if f.preneur is distinct from moi and not admin then
     return jsonb_build_object('ok', false, 'refus', 'pas-preneur', 'feuille', to_jsonb(f));
+  end if;
+  if not admin then
+    refus := public.feuille_hors_jeu(doc, p_j, p_noirs, p_blancs);
+    if refus is null and not public.joue_le_match(doc, p_j, p_noirs, p_blancs, nom) then
+      refus := 'pas-ton-match';
+    end if;
+    if refus is not null then
+      return jsonb_build_object('ok', false, 'refus', refus, 'feuille', to_jsonb(f));
+    end if;
   end if;
   neuf := doc || jsonb_build_object('entries', public.appliquer_feuille(doc, p_j, p_noirs, p_blancs, f.compteurs));
   defauts := public.feuille_saine(neuf, doc);
