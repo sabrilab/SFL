@@ -54,7 +54,7 @@ function Stepper({
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
-      <span className="mono-label text-[8px] text-foreground/35">
+      <span className="mono-label text-micro text-encre-4">
         {icone ? `${icone} ` : ""}{label}
       </span>
       <div className="glass-soft flex w-full items-center justify-between rounded-full p-1">
@@ -68,8 +68,8 @@ function Stepper({
         </button>
         <span
           className={cn(
-            "min-w-[18px] text-center text-[15px] font-extrabold tabular-nums",
-            value === 0 && "text-foreground/25"
+            "min-w-[18px] text-center text-lecture font-extrabold tabular-nums",
+            value === 0 && "text-encre-4"
           )}
         >
           {value}
@@ -150,7 +150,7 @@ export function FeuilleDirecte({ saison, commit, jInitial, embarque = false }: P
           <select
             value={j}
             onChange={(e) => setJ(Number(e.target.value))}
-            className="glass-soft h-9 cursor-pointer rounded-full px-3.5 text-[13px] font-bold outline-none"
+            className="glass-soft h-9 cursor-pointer rounded-full px-3.5 text-corps font-bold outline-none"
           >
             {journees.map((m) => (
               <option key={m.j} value={m.j} className="bg-white text-[#08090b] dark:bg-[#141414] dark:text-white">
@@ -160,17 +160,17 @@ export function FeuilleDirecte({ saison, commit, jInitial, embarque = false }: P
           </select>
           <div className="glass flex min-w-0 flex-1 items-center justify-center gap-3 rounded-full px-4 py-2">
             {scores.length === 0 ? (
-              <span className="text-[12.5px] text-foreground/40">Pas encore d&apos;équipes</span>
+              <span className="text-corps text-encre-3">Pas encore d&apos;équipes</span>
             ) : (
               <>
                 {nbMatchs > 1 && active?.match != null && (
-                  <span className="mono-label text-foreground/40">Match {active.match}</span>
+                  <span className="mono-label text-encre-3">Match {active.match}</span>
                 )}
                 {scores.map((x, i) => (
                   <span key={x.nom} className="flex items-center gap-2">
-                    {i > 0 && <span className="text-foreground/25">—</span>}
+                    {i > 0 && <span className="text-encre-4">—</span>}
                     {x.camp && <PointMaillot camp={x.camp} />}
-                    <span className="text-[17px] font-extrabold tabular-nums">{x.buts}</span>
+                    <span className="text-titre font-extrabold tabular-nums">{x.buts}</span>
                   </span>
                 ))}
               </>
@@ -187,8 +187,8 @@ export function FeuilleDirecte({ saison, commit, jInitial, embarque = false }: P
               key={n}
               onClick={() => setTeam(equipes.find((x) => x.match === n)?.nom ?? null)}
               className={cn(
-                "px-3.5 py-1.5 text-[13px] font-semibold",
-                active?.match === n ? "bouton-principal" : "bouton-secondaire text-foreground/45"
+                "px-3.5 py-1.5 text-corps font-semibold",
+                active?.match === n ? "bouton-principal" : "bouton-secondaire text-encre-3"
               )}
             >
               Match {n}
@@ -201,8 +201,8 @@ export function FeuilleDirecte({ saison, commit, jInitial, embarque = false }: P
                 key={x.nom}
                 onClick={() => setTeam(x.nom)}
                 className={cn(
-                  "px-3.5 py-1.5 text-[13px] font-semibold",
-                  teamActive === x.nom ? "bouton-principal" : "bouton-secondaire text-foreground/45"
+                  "px-3.5 py-1.5 text-corps font-semibold",
+                  teamActive === x.nom ? "bouton-principal" : "bouton-secondaire text-encre-3"
                 )}
               >
                 {x.libelle}
@@ -219,8 +219,8 @@ export function FeuilleDirecte({ saison, commit, jInitial, embarque = false }: P
               key={x.nom}
               onClick={() => setTeam(x.nom)}
               className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 py-2 text-[13px] font-semibold",
-                teamActive === x.nom ? "bouton-principal" : "bouton-discret text-foreground/45"
+                "flex flex-1 items-center justify-center gap-1.5 py-2 text-corps font-semibold",
+                teamActive === x.nom ? "bouton-principal" : "bouton-discret text-encre-3"
               )}
             >
               {x.camp && <PointMaillot camp={x.camp} />}
@@ -232,7 +232,7 @@ export function FeuilleDirecte({ saison, commit, jInitial, embarque = false }: P
 
       {/* Les joueurs */}
       {visibles.length === 0 ? (
-        <div className="glass rounded-[22px] px-6 py-10 text-center text-[13px] text-foreground/45">
+        <div className="glass rounded-[22px] px-6 py-10 text-center text-corps text-encre-3">
           <span className="mono-label">0 joueur</span>
         </div>
       ) : (
@@ -248,19 +248,19 @@ export function FeuilleDirecte({ saison, commit, jInitial, embarque = false }: P
                     aria-label={`Changer ${e.player}`}
                     className="flex min-w-0 flex-1 items-center gap-1 text-left transition-opacity active:opacity-60"
                   >
-                    <span className="min-w-0 truncate text-[15px] font-bold tracking-tight">
+                    <span className="min-w-0 truncate text-lecture font-bold tracking-tight">
                       {e.player}
                     </span>
-                    <ChevronDown className="size-3.5 shrink-0 text-foreground/35" />
+                    <ChevronDown className="size-3.5 shrink-0 text-encre-4" />
                   </button>
                   {bonusDefensif > 0 && (
                     <span className="mono-label shrink-0 rounded-full bg-primary/14 px-2 py-1 text-primary">
                       +{bonusDefensif} défensif
                     </span>
                   )}
-                  <span className="shrink-0 text-[15px] font-extrabold tabular-nums">
+                  <span className="shrink-0 text-lecture font-extrabold tabular-nums">
                     {entryPP(e)}
-                    <span className="mono-label ml-1 text-foreground/35">PP</span>
+                    <span className="mono-label ml-1 text-encre-4">PP</span>
                   </span>
                 </div>
 
@@ -292,10 +292,10 @@ export function FeuilleDirecte({ saison, commit, jInitial, embarque = false }: P
                           )
                         }
                         className={cn(
-                          "px-2.5 py-1 text-[11.5px] font-bold",
+                          "px-2.5 py-1 text-petit font-bold",
                           on
                             ? "bouton-principal"
-                            : "bouton-secondaire text-foreground/45"
+                            : "bouton-secondaire text-encre-3"
                         )}
                       >
                         {h.label}

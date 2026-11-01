@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 function Section({ titre, children }: { titre: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-[13px]">
-      <h2 className="text-[19px] leading-tight font-bold tracking-tight text-foreground">{titre}</h2>
+      <h2 className="text-titre-fort leading-tight font-bold tracking-tight text-foreground">{titre}</h2>
       {children}
     </section>
   );
@@ -40,21 +40,21 @@ function Section({ titre, children }: { titre: string; children: React.ReactNode
 function Sous({ titre, children }: { titre: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-[8px]">
-      <h3 className="text-[15px] font-semibold text-foreground">{titre}</h3>
+      <h3 className="text-lecture font-semibold text-foreground">{titre}</h3>
       {children}
     </div>
   );
 }
 
 function P({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <p className={cn("text-[14.5px] leading-relaxed text-foreground/70", className)}>{children}</p>;
+  return <p className={cn("text-lecture leading-relaxed text-encre-2", className)}>{children}</p>;
 }
 
 function Liste({ items }: { items: React.ReactNode[] }) {
   return (
     <ul className="flex flex-col gap-[8px]">
       {items.map((item, i) => (
-        <li key={i} className="flex gap-[10px] text-[14.5px] leading-relaxed text-foreground/70">
+        <li key={i} className="flex gap-[10px] text-lecture leading-relaxed text-encre-2">
           <span aria-hidden className="mt-[10px] size-[4px] shrink-0 rounded-full bg-foreground/40" />
           <span className="min-w-0">{item}</span>
         </li>
@@ -64,7 +64,7 @@ function Liste({ items }: { items: React.ReactNode[] }) {
 }
 
 function Fort({ children }: { children: React.ReactNode }) {
-  return <span className="font-semibold text-foreground/90">{children}</span>;
+  return <span className="font-semibold text-encre">{children}</span>;
 }
 
 const contact = RESPONSABLE.email ? (
@@ -83,9 +83,9 @@ export function TextePolitique() {
   return (
     <article className="flex flex-col gap-[34px]">
       <header>
-        <p className="mono-label text-foreground/40">Bola · Bêta fermée</p>
-        <h1 className="mt-2 text-[32px] leading-[1.05] font-extrabold tracking-tight">Politique de confidentialité</h1>
-        <p className="mt-[13px] text-[13px] text-foreground/45">Version du {DATE_POLITIQUE}</p>
+        <p className="mono-label text-encre-3">Bola · Bêta fermée</p>
+        <h1 className="mt-2 text-nom leading-[1.05] font-extrabold tracking-tight">Politique de confidentialité</h1>
+        <p className="mt-[13px] text-corps text-encre-3">Version du {DATE_POLITIQUE}</p>
         <P className="mt-[21px]">
           Bola est l&apos;app de la Sunday Five League : la Map des matchs, ta carte de joueur, la ligue et le
           Vestiaire. Cette page dit ce que l&apos;app garde sur toi, pourquoi, qui le voit, et comment tout reprendre.

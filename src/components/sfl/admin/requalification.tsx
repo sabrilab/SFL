@@ -72,13 +72,13 @@ export function Requalification({
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
       >
         <span>
-          <span className="block text-[15px] font-bold tracking-tight">Requalifier les cartes</span>
-          <span className="block text-[12px] text-muted-foreground">
+          <span className="block text-lecture font-bold tracking-tight">Requalifier les cartes</span>
+          <span className="block text-petit text-muted-foreground">
             {lignes.length} joueurs · les six stats de base, toutes sur une grille
             {derniere ? ` · référence : ${derniere.nom}` : ""}
           </span>
         </span>
-        <span className="text-[12px] font-semibold text-primary">{ouvert ? "Fermer" : "Ouvrir"}</span>
+        <span className="text-petit font-semibold text-primary">{ouvert ? "Fermer" : "Ouvrir"}</span>
       </button>
 
       {ouvert && (
@@ -86,7 +86,7 @@ export function Requalification({
           <div className="px-4 pt-3">
             <RechercheJoueur valeur={recherche} onChange={setRecherche} resultats={visibles.length} autoFocus />
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+          <div className="flex items-center gap-2 px-4 py-2 text-etiquette font-semibold tracking-wide text-muted-foreground uppercase">
             <span className="w-[88px] shrink-0">Joueur</span>
             {derniere && <span className="w-[72px] shrink-0 text-center">{derniere.nom.replace("Saison ", "S")} pp·b·p</span>}
             <span className="flex-1" />
@@ -98,27 +98,27 @@ export function Requalification({
             return (
               <div key={r.name} className="border-t border-border/40 px-4 py-2.5">
                 <div className="flex items-center gap-2">
-                  <span className="w-[88px] shrink-0 truncate text-[13.5px] font-semibold">{r.name}</span>
+                  <span className="w-[88px] shrink-0 truncate text-ligne font-semibold">{r.name}</span>
                   {derniere && (
-                    <span className="w-[72px] shrink-0 text-center text-[11px] text-muted-foreground tabular-nums">
+                    <span className="w-[72px] shrink-0 text-center text-legende text-muted-foreground tabular-nums">
                       {ref ? `${ref.pp}·${ref.buts}·${ref.passes}` : "—"}
                     </span>
                   )}
                   <span className="flex-1" />
-                  <span className={cn("w-9 text-center text-[15px] font-black tabular-nums", !r.base && "text-muted-foreground")}>
+                  <span className={cn("w-9 text-center text-lecture font-black tabular-nums", !r.base && "text-muted-foreground")}>
                     {ovrDe(base)}
                   </span>
                 </div>
                 <div className="mt-1.5 grid grid-cols-3 gap-1 sm:grid-cols-6">
                   {STATS.map((nom, k) => (
                     <div key={nom} className="flex flex-col items-center rounded-xl bg-secondary/60 py-1">
-                      <span className="text-[9px] font-bold tracking-wider text-muted-foreground">{nom}</span>
+                      <span className="text-micro font-bold tracking-wider text-muted-foreground">{nom}</span>
                       <div className="flex items-center gap-0.5">
                         <button type="button" aria-label={`${nom} −1`} onClick={() => poser(i, r, k, base[k] - 1)}
                           className="bouton-discret grid size-6 place-items-center">
                           <Minus className="size-3" />
                         </button>
-                        <span className="w-6 text-center text-[13px] font-bold tabular-nums">{base[k]}</span>
+                        <span className="w-6 text-center text-corps font-bold tabular-nums">{base[k]}</span>
                         <button type="button" aria-label={`${nom} +1`} onClick={() => poser(i, r, k, base[k] + 1)}
                           className="bouton-discret grid size-6 place-items-center">
                           <Plus className="size-3" />
@@ -131,13 +131,13 @@ export function Requalification({
             );
           })}
           <div className="flex items-center justify-between gap-3 border-t border-border/60 px-4 py-2.5">
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-legende text-muted-foreground">
               Entre 40 et 99. La note générale est la moyenne des six, arrondie au-dessus.
             </p>
             <Button
               variant="ghost"
               size="sm"
-              className="bouton--rouge rounded-full text-[12px]"
+              className="bouton--rouge rounded-full text-petit"
               onClick={() => {
                 // Remise à 75 partout : le point de départ neutre d'une saison.
                 let next = saison;

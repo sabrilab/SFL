@@ -155,7 +155,7 @@ function Pastille({ n, clair }: { n: number; clair: boolean }) {
   return (
     <span
       aria-hidden
-      className="absolute -top-2 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] text-[11.5px] leading-none font-bold tabular-nums text-white"
+      className="absolute -top-2 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full px-[5px] text-petit leading-none font-bold tabular-nums text-white"
       style={{ background: "#FF3B30", boxShadow: `0 0 0 2px ${clair ? "#ffffff" : "#0a0b0d"}` }}
     >
       {n > 9 ? "9+" : n}

@@ -101,9 +101,9 @@ function CompteARebours({ fin }: { fin: Date }) {
   const j = Math.floor(s / 86400);
   const deux = (n: number) => String(n).padStart(2, "0");
   return (
-    <span className="mono-label flex shrink-0 items-baseline gap-2 text-foreground/45">
+    <span className="mono-label flex shrink-0 items-baseline gap-2 text-encre-3">
       Expire dans
-      <span className="text-[12px] text-foreground tabular-nums">
+      <span className="text-petit text-foreground tabular-nums">
         {j > 0 && `${j} j `}
         {deux(Math.floor((s % 86400) / 3600))}:{deux(Math.floor((s % 3600) / 60))}:{deux(s % 60)}
       </span>
@@ -127,12 +127,12 @@ function Moment({ mm }: { mm: MesMissions }) {
   if (mm.phase === "ouvert") return <CompteARebours fin={mm.d.coupEnvoi} />;
   if (mm.phase === "en-jeu" && !mm.d.joue)
     return (
-      <span className="mono-label flex shrink-0 items-center gap-2 text-foreground/80">
+      <span className="mono-label flex shrink-0 items-center gap-2 text-encre-2">
         <Pouls bat /> En jeu
       </span>
     );
   return (
-    <span className="mono-label shrink-0 text-foreground/55">{mm.phase === "en-jeu" ? "Verdict à minuit" : "Verdict"}</span>
+    <span className="mono-label shrink-0 text-encre-3">{mm.phase === "en-jeu" ? "Verdict à minuit" : "Verdict"}</span>
   );
 }
 
@@ -173,7 +173,7 @@ export function Champ({ label, grand, children }: { label: string; grand?: boole
       <dd
         className={cn(
           "min-w-0 break-words",
-          grand ? "titre-lettrage text-[24px] leading-[0.95]" : "text-[15px] leading-[1.2] font-bold"
+          grand ? "titre-lettrage text-titre-g leading-[0.95]" : "text-lecture leading-[1.2] font-bold"
         )}
       >
         {children}
@@ -207,7 +207,7 @@ function Cible({ l, mm }: { l: LigneMission; mm: MesMissions }) {
                 </div>
                 <Viseur etat={etat} petit />
               </div>
-              <span className="line-clamp-2 text-center text-[13px] leading-tight font-bold break-words">
+              <span className="line-clamp-2 text-center text-corps leading-tight font-bold break-words">
                 <Nom n={n} />
               </span>
               <span className="mono-label text-white/45">{pts(de(n).pp)}</span>
@@ -292,7 +292,7 @@ function Escouade({ mm }: { mm: MesMissions }) {
 
 /** Prime, risque et délai : ce que la mission rapporte, ce qu'elle coûte ratée, jusqu'à quand. */
 function Champs({ l, mm }: { l: LigneMission; mm: MesMissions }) {
-  const chiffre = "text-[25px] leading-none";
+  const chiffre = "text-titre-g leading-none";
   return (
     <div className="fiche__champs">
       <div>
@@ -315,7 +315,7 @@ function Champs({ l, mm }: { l: LigneMission; mm: MesMissions }) {
       </div>
       <div>
         <span className="mono-label text-white/45">{mm.phase === "ouvert" ? "Avant" : "Verdict"}</span>
-        <span className="truncate text-[15px] leading-[25px] font-bold">
+        <span className="truncate text-lecture leading-[25px] font-bold">
           {mm.phase === "ouvert" ? limite(mm.d.coupEnvoi, mm.d.heure) : mm.phase === "en-jeu" ? "Minuit" : "Définitif"}
         </span>
       </div>
@@ -351,7 +351,7 @@ function Action({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions
             type="button"
             disabled={attente}
             onClick={() => dire("acceptee")}
-            className="bouton-principal bouton--vert h-12 flex-1 text-[15px] font-bold"
+            className="bouton-principal bouton--vert h-12 flex-1 text-lecture font-bold"
           >
             Accepter {contrat ? "le contrat" : "la mission"}
           </button>
@@ -359,7 +359,7 @@ function Action({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions
             type="button"
             disabled={attente}
             onClick={() => dire("passee")}
-            className="bouton-discret h-12 px-4 text-[14px] font-semibold"
+            className="bouton-discret h-12 px-4 text-ligne font-semibold"
           >
             Passer
           </button>
@@ -379,7 +379,7 @@ function Action({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions
             type="button"
             disabled={attente}
             onClick={() => dire("passee")}
-            className="bouton-discret h-11 px-4 text-[14px] font-semibold"
+            className="bouton-discret h-11 px-4 text-ligne font-semibold"
           >
             Passer
           </button>
@@ -388,7 +388,7 @@ function Action({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions
             type="button"
             disabled={attente}
             onClick={() => dire("acceptee")}
-            className="bouton-secondaire bouton--vert h-11 px-5 text-[14px] font-bold"
+            className="bouton-secondaire bouton--vert h-11 px-5 text-ligne font-bold"
           >
             Accepter
           </button>
@@ -404,7 +404,7 @@ function Action({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions
       </div>
     );
   const v = l.verdict;
-  const detail = v.detail ? <span className="font-mono text-[12px] leading-[1.35] text-white/55">{v.detail}</span> : null;
+  const detail = v.detail ? <span className="font-mono text-petit leading-[1.35] text-white/55">{v.detail}</span> : null;
   if (v.etat === "en-jeu")
     return (
       <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1.5 pl-1">
@@ -465,7 +465,7 @@ function Fiche({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions;
       <div className="flex flex-col gap-5 px-[18px] pt-4 pb-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-2.5 pt-1.5">
-            <h3 className="titre-lettrage text-[32px] leading-[0.9] break-words">{code}</h3>
+            <h3 className="titre-lettrage text-nom leading-[0.9] break-words">{code}</h3>
             <Difficulte rang={rang} />
           </div>
           <Insigne rang={rang} />
@@ -475,7 +475,7 @@ function Fiche({ l, mm, attente, repondre }: { l: LigneMission; mm: MesMissions;
         {contre.length > 0 && <span className="fiche__duel mono-label">{signatures(contre, identite.nom)}</span>}
         <div className="flex flex-col gap-1.5">
           <span className="mono-label text-white/45">Objectif</span>
-          <p className="text-[20px] leading-[1.15] font-bold tracking-[-0.3px]">{phrase(l.m, identite.nom)}</p>
+          <p className="text-titre-fort leading-[1.15] font-bold tracking-[-0.3px]">{phrase(l.m, identite.nom)}</p>
         </div>
         <Champs l={l} mm={mm} />
         <Action l={l} mm={mm} attente={attente} repondre={repondre} />
@@ -512,13 +512,13 @@ export function MissionsBola({ className }: { className?: string }) {
     <section ref={ref} id="missions" aria-labelledby="titre-missions" className={cn("flex scroll-mt-4 flex-col gap-4", className)}>
       <div className="flex flex-col gap-1.5 px-5 md:px-0">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="mono-label truncate text-foreground/45">
+          <span className="mono-label truncate text-encre-3">
             J{d.j} · {d.date}
             {apercu ? ` · ${identite.nom(joueur).split(" ")[0]}` : ""}
           </span>
           <Moment mm={mm} />
         </div>
-        <h2 id="titre-missions" className="titre-lettrage text-[30px] leading-[0.95]">
+        <h2 id="titre-missions" className="titre-lettrage text-titre-l leading-[0.95]">
           Missions Bola
         </h2>
       </div>
@@ -530,10 +530,10 @@ export function MissionsBola({ className }: { className?: string }) {
       {/* Le bonus des trois ; puis, une fois la feuille remplie, l'XP du dimanche. */}
       {(phase === "ouvert" || d.joue) && (
         <div className="flex items-baseline justify-between gap-3 px-5 md:px-0">
-          <span className="mono-label text-foreground/45">
+          <span className="mono-label text-encre-3">
             {phase === "ouvert" ? "Les trois accomplies" : phase === "en-jeu" ? "À minuit" : "Ton dimanche"}
           </span>
-          <span className={cn("mono-label", phase !== "ouvert" && xp < 0 ? "text-[#c8352b] dark:text-[#ff9b9d]" : "text-foreground/70")}>
+          <span className={cn("mono-label", phase !== "ouvert" && xp < 0 ? "text-[#c8352b] dark:text-[#ff9b9d]" : "text-encre-2")}>
             {phase === "ouvert" ? `+${XP_PARFAIT} XP de bonus` : `${signe(xp)} XP`}
           </span>
         </div>

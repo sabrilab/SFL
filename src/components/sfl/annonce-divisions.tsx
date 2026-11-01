@@ -68,7 +68,7 @@ export function AnnonceDivisions({ player, edition, onFermer }: { player: Player
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: reduit ? 0 : 0.25 + i * 0.08 }}
               className={cn(
-                "grid h-[52px] w-[72px] place-items-center rounded-2xl text-[30px] leading-none",
+                "grid h-[52px] w-[72px] place-items-center rounded-2xl text-titre-l leading-none",
                 x === mienne ? "bg-white text-black shadow-[0_0_32px_rgba(255,255,255,0.35)]" : "bg-white/[0.07] text-white/35",
               )}
               style={{ fontFamily: ANTON }}
@@ -80,13 +80,13 @@ export function AnnonceDivisions({ player, edition, onFermer }: { player: Player
       </div>
 
       <motion.div {...entre(0.45)} className="flex flex-col items-center gap-2 text-center">
-        <span className="mono-label text-[10px] text-white/50">
+        <span className="mono-label text-etiquette text-white/50">
           J{J_DECOUPAGE} · {edition === "jour" ? "aujourd'hui" : `dimanche ${j3?.date ?? ""}`.trim()}
         </span>
-        <h2 id={titre} className="titre-lettrage max-w-[320px] text-[26px] leading-[0.95] text-white">
+        <h2 id={titre} className="titre-lettrage max-w-[320px] text-titre-g leading-[0.95] text-white">
           Dernier dimanche sans divisions
         </h2>
-        <p className="max-w-[300px] pt-1 text-[14px] leading-snug text-white/60">
+        <p className="max-w-[300px] pt-1 text-ligne leading-snug text-white/60">
           {enteteAnnonce(edition)}.{phrase ? ` ${phrase}.` : ""}
         </p>
       </motion.div>
@@ -98,11 +98,11 @@ export function AnnonceDivisions({ player, edition, onFermer }: { player: Player
             onFermer();
             router.push("/ligue#divisions");
           }}
-          className="bouton-principal flex w-full items-center justify-center py-[15px] text-[15px] font-bold"
+          className="bouton-principal flex w-full items-center justify-center py-[15px] text-lecture font-bold"
         >
           Voir les divisions
         </button>
-        <button type="button" onClick={onFermer} className="bouton-discret px-6 py-3 text-[14px] font-semibold">
+        <button type="button" onClick={onFermer} className="bouton-discret px-6 py-3 text-ligne font-semibold">
           Fermer
         </button>
       </motion.div>

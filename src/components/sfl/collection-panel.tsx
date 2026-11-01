@@ -84,14 +84,14 @@ function CardModal({
             <div className="glass flex flex-col items-center gap-2 rounded-[26px] px-5 py-4 text-center">
               <span
                 className={cn(
-                  "rounded-full px-2.5 py-1 text-[10px] font-bold uppercase",
+                  "rounded-full px-2.5 py-1 text-etiquette font-bold uppercase",
                   KIND_STYLES[card.kind]
                 )}
               >
                 {KIND_LABELS[card.kind]}
               </span>
               <span className="text-lg font-bold"><Nom n={card.player.name} /></span>
-              <span className="text-xs font-medium text-foreground/45">
+              <span className="text-xs font-medium text-encre-3">
                 n°{card.serial}/{card.total} {has && `· ×${count} en collection`}
               </span>
               {!has && (
@@ -99,7 +99,7 @@ function CardModal({
                   <Button size="sm" variant="or" className="mt-1 font-semibold" onClick={() => onBuy(card)}>
                     Acheter · {card.price} ⚽
                   </Button>
-                  <span className="text-[11px] text-foreground/35">
+                  <span className="text-legende text-encre-4">
                     Tu en reçois une copie — {card.player.name} garde la sienne
                   </span>
                 </>
@@ -182,7 +182,7 @@ export function CollectionPanel({ me }: { me: string }) {
             <PackVisual />
           </div>
         </div>
-        <p className="text-center text-[13px] leading-snug text-foreground/45">
+        <p className="text-center text-corps leading-snug text-encre-3">
           {PACK_SIZE} cartes par pack — Standard, Rare, et une chance infime de tomber sur une
           hors-série Défensive, Impact ou MVP.
         </p>
@@ -196,14 +196,14 @@ export function CollectionPanel({ me }: { me: string }) {
           <PackageOpen /> Ouvrir un pack · {PACK_COST} ⚽
         </Button>
         {isClient && balance < PACK_COST && (
-          <p className="text-xs text-foreground/45">
+          <p className="text-xs text-encre-3">
             Il te manque {PACK_COST - balance} ⚽ — reviens après tes duels du jour.
           </p>
         )}
       </div>
 
       {/* Comment gagner des Ballons */}
-      <div className="glass overflow-hidden rounded-[26px] text-[13.5px]">
+      <div className="glass overflow-hidden rounded-[26px] text-ligne">
         {[
           [`Connexion du jour`, `+${DAILY_LOGIN_REWARD} ⚽`],
           [`Premier vote du jour (figures de match)`, `+${DAILY_VOTE_REWARD} ⚽`],
@@ -223,7 +223,7 @@ export function CollectionPanel({ me }: { me: string }) {
       </div>
 
       {/* Le catalogue */}
-      <p className="px-1 text-[13px] text-foreground/45">
+      <p className="px-1 text-corps text-encre-3">
         <strong className="font-semibold text-foreground">
           {uniqueOwned}/{CATALOG.length}
         </strong>{" "}
@@ -239,8 +239,8 @@ export function CollectionPanel({ me }: { me: string }) {
             key={f.id}
             onClick={() => setFilter(f.id)}
             className={cn(
-              "shrink-0 px-3.5 py-1.5 text-[13px] font-semibold whitespace-nowrap",
-              filter === f.id ? "bouton-principal" : "bouton-secondaire text-foreground/60"
+              "shrink-0 px-3.5 py-1.5 text-corps font-semibold whitespace-nowrap",
+              filter === f.id ? "bouton-principal" : "bouton-secondaire text-encre-2"
             )}
           >
             {f.label}
@@ -249,7 +249,7 @@ export function CollectionPanel({ me }: { me: string }) {
         <button
           onClick={() => setOwnedOnly((v) => !v)}
           className={cn(
-            "shrink-0 px-3.5 py-1.5 text-[13px] font-semibold whitespace-nowrap",
+            "shrink-0 px-3.5 py-1.5 text-corps font-semibold whitespace-nowrap",
             ownedOnly ? "bouton-principal bouton--or" : "bouton-secondaire bouton--or"
           )}
         >
@@ -271,12 +271,12 @@ export function CollectionPanel({ me }: { me: string }) {
                 <CollectionCardVisual card={card} size={0.32} />
               </div>
               {has ? (
-                <span className="text-[10px] font-semibold text-foreground/45 tabular-nums">
+                <span className="text-etiquette font-semibold text-encre-3 tabular-nums">
                   n°{card.serial}/{card.total}
                   {count > 1 && <span className="text-primary"> ×{count}</span>}
                 </span>
               ) : (
-                <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold tabular-nums">
+                <span className="rounded-full bg-secondary px-2 py-0.5 text-etiquette font-bold tabular-nums">
                   {card.price} ⚽
                 </span>
               )}
@@ -286,7 +286,7 @@ export function CollectionPanel({ me }: { me: string }) {
       </div>
 
       {filtered.length === 0 && (
-        <div className="glass rounded-[26px] px-6 py-10 text-center text-sm text-foreground/45">
+        <div className="glass rounded-[26px] px-6 py-10 text-center text-sm text-encre-3">
           Aucune carte pour ce filtre.
         </div>
       )}
@@ -300,8 +300,8 @@ export function CollectionPanel({ me }: { me: string }) {
 
       {/* Les Ballons en argent réel — la boutique s'en chargera */}
       <div className="glass-soft rounded-[22px] px-4 py-3.5">
-        <p className="text-[13px] font-semibold">Besoin de Ballons ?</p>
-        <p className="mt-1 text-[12.5px] leading-snug text-foreground/45">
+        <p className="text-corps font-semibold">Besoin de Ballons ?</p>
+        <p className="mt-1 text-corps leading-snug text-encre-3">
           Les recharges arrivent dans la Boutique — 10 € pour 1 000 ⚽, de quoi se faire plaisir.
           En attendant, tout se gagne : connexion, votes et duels du jour.
         </p>

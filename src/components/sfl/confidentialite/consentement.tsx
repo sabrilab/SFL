@@ -111,9 +111,9 @@ export function CaseAccord({
       >
         {coche && <Check className="size-[15px]" strokeWidth={3} />}
       </span>
-      <span className="min-w-0 text-[13.5px] leading-snug font-medium text-foreground/80">
+      <span className="min-w-0 text-ligne leading-snug font-medium text-encre-2">
         {children}
-        {note && <span className="ml-[6px] text-foreground/40">{note}</span>}
+        {note && <span className="ml-[6px] text-encre-3">{note}</span>}
       </span>
     </label>
   );
@@ -151,7 +151,7 @@ export function LecturePolitique({ onRetour }: { onRetour: () => void }) {
         <button
           type="button"
           onClick={onRetour}
-          className="bouton-discret flex items-center gap-[2px] py-[8px] pr-[13px] pl-[6px] text-[14px] font-semibold"
+          className="bouton-discret flex items-center gap-[2px] py-[8px] pr-[13px] pl-[6px] text-ligne font-semibold"
         >
           <ChevronLeft className="size-5" />
           Retour
@@ -166,7 +166,7 @@ export function LecturePolitique({ onRetour }: { onRetour: () => void }) {
           <button
             type="button"
             onClick={onRetour}
-            className="bouton-secondaire mt-[34px] w-full py-[15px] text-[15px] font-bold"
+            className="bouton-secondaire mt-[34px] w-full py-[15px] text-lecture font-bold"
           >
             Revenir à l&apos;accord
           </button>
@@ -278,10 +278,10 @@ function Accord({
       <div className="flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto flex w-full max-w-[420px] flex-col px-[21px] pt-[21px] pb-[21px]">
           <Image src="/bola/logo-blanc.svg" alt="Bola" width={101} height={24} className="self-start" priority />
-          <p className="mono-label mt-[34px] text-foreground/40">
+          <p className="mono-label mt-[34px] text-encre-3">
             {nouvelle ? `Nouvelle version · ${DATE_POLITIQUE}` : "Bêta fermée · Confidentialité"}
           </p>
-          <h1 id={titre} className="mt-[8px] text-[34px] leading-[1.05] font-extrabold tracking-tight">
+          <h1 id={titre} className="mt-[8px] text-nom leading-[1.05] font-extrabold tracking-tight">
             Ton image, tes données.
           </h1>
 
@@ -289,11 +289,11 @@ function Accord({
             {POINTS.map(({ icone: Icone, titre: t, texte }) => (
               <li key={t} className="flex gap-[13px]">
                 <span className="glass-soft grid size-[34px] shrink-0 place-items-center rounded-full">
-                  <Icone className="size-[16px] text-foreground/80" />
+                  <Icone className="size-[16px] text-encre-2" />
                 </span>
                 <span className="min-w-0 pt-[1px]">
-                  <span className="block text-[15px] leading-tight font-bold">{t}</span>
-                  <span className="mt-[5px] block text-[13.5px] leading-snug text-foreground/55">{texte}</span>
+                  <span className="block text-lecture leading-tight font-bold">{t}</span>
+                  <span className="mt-[5px] block text-ligne leading-snug text-encre-3">{texte}</span>
                 </span>
               </li>
             ))}
@@ -302,7 +302,7 @@ function Accord({
           <button
             type="button"
             onClick={() => setLecture(true)}
-            className="bouton-secondaire mt-[34px] flex items-center justify-center gap-[6px] py-[13px] text-[14px] font-bold"
+            className="bouton-secondaire mt-[34px] flex items-center justify-center gap-[6px] py-[13px] text-ligne font-bold"
           >
             Lire la politique en entier
             <ChevronRight className="size-4" />
@@ -330,7 +330,7 @@ function Accord({
           type="button"
           onClick={continuer}
           disabled={!pret || envoi}
-          className="bouton-principal bouton--vert mt-[13px] flex w-full items-center justify-center gap-2 py-[16px] text-[15px] font-bold disabled:opacity-40"
+          className="bouton-principal bouton--vert mt-[13px] flex w-full items-center justify-center gap-2 py-[16px] text-lecture font-bold disabled:opacity-40"
         >
           {envoi && <Loader2 className="size-4 animate-spin" />}
           Continuer
@@ -338,7 +338,7 @@ function Accord({
         <button
           type="button"
           onClick={signOut}
-          className="bouton-discret bouton--rouge mt-[5px] block w-full py-[8px] text-center text-[13px] font-semibold"
+          className="bouton-discret bouton--rouge mt-[5px] block w-full py-[8px] text-center text-corps font-semibold"
         >
           Me déconnecter
         </button>

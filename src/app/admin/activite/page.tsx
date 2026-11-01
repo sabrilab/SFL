@@ -33,6 +33,8 @@ import { assemblerReperes, lireReperes } from "./lectures";
 import { ParrainageStats } from "./parrainage";
 import { VideosStats } from "./videos";
 import { ActiviteVue, type DonneesActivite } from "./vue";
+import { lireParcours } from "./parcours";
+import { FENETRE_NOUVEAUX } from "./nouveaux";
 
 /** Lignes rendues au plus par une requête au serveur (réglage Supabase). */
 const PAGE = 1000;
@@ -88,7 +90,7 @@ export default function ActivitePage() {
           if (!data || data.length < PAGE) return lignes;
         }
       };
-      const [actData, prof, studioBrut, emails, reperesBrut] = await Promise.all([
+      const [actData, prof, studioBrut, emails, reperesBrut, parrainagesBrut] = await Promise.all([
         lireTout(),
         sb.from("profiles").select("id, name, created_at, is_admin"),
         lireStudio(),
@@ -96,6 +98,8 @@ export default function ActivitePage() {
         emailsDeContact(sb).catch(() => new Map<string, string>()),
         // Les repères et « Qui ramène » : une lecture ratée les laisse vides.
         lireReperes(sb).catch(() => null),
+        // Qui a fait venir qui, pour les nouveaux arrivants (./nouveaux.tsx).
+        sb.from("parrainages").select("filleul, parrain"),
       ]);
       if (prof.error) throw new Error(prof.error.message);
 
@@ -138,7 +142,23 @@ export default function ActivitePage() {
           at: new Date(d.created_at).getTime(),
         })) ?? null;
       const reperes = reperesBrut ? assemblerReperes(reperesBrut, noms) : null;
-      setData({ evenements, profiles, studio, reperes, now: Date.now() });
+      const parrains = parrainagesBrut.error
+        ? null
+        : new Map(
+            ((parrainagesBrut.data ?? []) as { filleul: string; parrain: string }[]).flatMap((x) => {
+              const f = noms.get(x.filleul);
+              const pa = noms.get(x.parrain);
+              return f && pa ? [[f, pa] as const] : [];
+            })
+          );
+      // Le parcours des comptes de moins de 30 jours (./parcours.ts), pour Nouveaux arrivants.
+      const recents = new Map(
+        ((prof.data ?? []) as ProfilBrut[])
+          .filter((p) => p.created_at && Date.now() - new Date(p.created_at).getTime() <= FENETRE_NOUVEAUX)
+          .map((p) => [p.id, p.name] as const)
+      );
+      const parcours = await lireParcours(sb, recents).catch(() => null);
+      setData({ evenements, profiles, studio, reperes, parrains, parcours, now: Date.now() });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Lecture impossible.");
     }
@@ -158,7 +178,7 @@ export default function ActivitePage() {
     // dit, avec le geste qui répare.
     const adminConnu = isAdmin(session?.name);
     return (
-      <div className="mx-auto max-w-2xl px-5 py-16 text-center text-sm text-foreground/45">
+      <div className="mx-auto max-w-2xl px-5 py-16 text-center text-sm text-encre-3">
         {adminConnu ? (
           <>
             Ton compte est administrateur dans l&apos;app, mais la base ne le sait pas encore.
@@ -173,7 +193,7 @@ export default function ActivitePage() {
   }
   if (!session.server) {
     return (
-      <div className="mx-auto max-w-2xl px-5 py-16 text-center text-sm text-foreground/45">
+      <div className="mx-auto max-w-2xl px-5 py-16 text-center text-sm text-encre-3">
         Reconnecte-toi (session serveur) pour lire le journal d&apos;activité.
       </div>
     );

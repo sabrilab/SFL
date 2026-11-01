@@ -33,7 +33,8 @@ import { CalendarDays, Search, X } from "lucide-react";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { ProfilJoueur } from "@/components/sfl/profil-joueur";
 import { useSeason } from "@/components/sfl/season-provider";
-import { useProfilsOuverts } from "@/hooks/use-suivis";
+import { useProfilsOuverts, useSuivis } from "@/hooks/use-suivis";
+import { useSession } from "@/hooks/use-session";
 import { CarteDe } from "@/components/sfl/mini-carte";
 import { logActivity } from "@/lib/sfl/activity";
 import { nomAffiche, pseudoAffiche } from "@/lib/sfl/identites";
@@ -42,6 +43,7 @@ import {
   ovr,
   rankPlayers,
   type Journee,
+  type Player,
 } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
@@ -83,12 +85,12 @@ function FicheJournee({ journee }: { journee: Journee }) {
     >
       <section className="glass rounded-[28px] px-[18px] py-[17px]">
         <p className="mono-label text-primary">Journée {journee.j}</p>
-        <h2 className="mt-1.5 text-[28px] leading-[1.1] font-extrabold tracking-tight">
+        <h2 className="mt-1.5 text-titre-l leading-[1.1] font-extrabold tracking-tight">
           {journee.date}
         </h2>
         <div className="mt-3 flex flex-wrap gap-2">
           {score && (
-            <span className="glass-soft mono-label rounded-full px-3 py-1.5 text-foreground/60">
+            <span className="glass-soft mono-label rounded-full px-3 py-1.5 text-encre-2">
               {score.label}
             </span>
           )}
@@ -98,12 +100,12 @@ function FicheJournee({ journee }: { journee: Journee }) {
             </span>
           )}
           {journee.faits.buteur && (
-            <span className="glass-soft mono-label rounded-full px-3 py-1.5 text-foreground/60">
+            <span className="glass-soft mono-label rounded-full px-3 py-1.5 text-encre-2">
               Buteur · {journee.faits.buteur}
             </span>
           )}
           {journee.faits.passeur && (
-            <span className="glass-soft mono-label rounded-full px-3 py-1.5 text-foreground/60">
+            <span className="glass-soft mono-label rounded-full px-3 py-1.5 text-encre-2">
               Passeur · {journee.faits.passeur}
             </span>
           )}
@@ -111,15 +113,15 @@ function FicheJournee({ journee }: { journee: Journee }) {
       </section>
 
       {matches.length === 0 ? (
-        <div className="glass rounded-[26px] px-6 py-10 text-center text-[13px] text-foreground/45">
+        <div className="glass rounded-[26px] px-6 py-10 text-center text-corps text-encre-3">
           Cette journée n&apos;a pas encore de feuille de match.
         </div>
       ) : (
         matches.map((m) => (
           <section key={m.id} className="glass overflow-hidden rounded-[26px]">
             <div className="flex items-center justify-between border-b border-contraste/8 px-4 py-3">
-              <span className="mono-label text-foreground/40">{m.label}</span>
-              <span className="text-[19px] font-extrabold tracking-tight tabular-nums">
+              <span className="mono-label text-encre-3">{m.label}</span>
+              <span className="text-titre-fort font-extrabold tracking-tight tabular-nums">
                 {m.teamA.score} – {m.teamB.score}
               </span>
             </div>
@@ -132,10 +134,10 @@ function FicheJournee({ journee }: { journee: Journee }) {
                   <PastilleMaillot camp={ti === 0 ? "Noirs" : "Blancs"} className="mb-2.5" />
                   <div className="flex flex-col gap-1.5">
                     {team.players.map((p) => (
-                      <div key={p.name} className="flex items-baseline gap-1.5 text-[12.5px]">
+                      <div key={p.name} className="flex items-baseline gap-1.5 text-corps">
                         <span className="min-w-0 flex-1 truncate font-medium"><Nom n={p.name} /></span>
                         {(p.buts > 0 || p.passes > 0) && (
-                          <span className="shrink-0 text-[11px] tabular-nums text-primary">
+                          <span className="shrink-0 text-legende tabular-nums text-primary">
                             {p.buts > 0 && `${p.buts}⚽`}
                             {p.buts > 0 && p.passes > 0 && " "}
                             {p.passes > 0 && `${p.passes}🅰`}
@@ -154,7 +156,7 @@ function FicheJournee({ journee }: { journee: Journee }) {
       {/* Son dimanche dans les Actus. */}
       <Link
         href={`/ligue#j${journee.j}`}
-        className="bouton-principal block py-4 text-center text-[15px] font-bold"
+        className="bouton-principal block py-4 text-center text-lecture font-bold"
       >
         Ouvrir le récap dans les Actus
       </Link>
@@ -173,17 +175,15 @@ export default function RecherchePage() {
 }
 
 /**
- * La Recherche d'un joueur Bola : les comptes de Bola, chacun en carte. Toucher
- * un résultat ouvre sa carte (la visionneuse, card-viewer.tsx), comme dans le
- * classement de Bola ; ?joueur=Nom (la notification « … te suit ») l'ouvre
- * d'emblée. Les joueurs masqués (lib/sfl/hidden.ts) n'y sont pas, comme dans
- * ce classement.
+ * Les comptes de Bola et leur carte : celle qu'il a dans la saison, sinon une
+ * carte neutre, comme dans les classements de Bola (ligue-vierge). `ouvrir`
+ * la montre dans la visionneuse (card-viewer.tsx) ; `demande` (?joueur=Nom)
+ * l'ouvre d'emblée, une fois les comptes lus (un nom inconnu ou masqué
+ * n'ouvre rien). Les joueurs masqués (lib/sfl/hidden.ts) n'y sont pas.
  */
-function RechercheBola() {
+function useCartesBola(demande: string | null) {
   const { allPlayers } = useSeason();
   const { open } = useCardViewer();
-  const demande = useSearchParams().get("joueur");
-  const [q, setQ] = useState("");
   const [profils, setProfils] = useState<Profil[]>([]);
   useEffect(() => {
     let fini = false;
@@ -194,8 +194,6 @@ function RechercheBola() {
       fini = true;
     };
   }, []);
-  const trouves = useMemo(() => chercherProfils(profils, q), [profils, q]);
-  // Sa carte, comme dans les classements de Bola (ligue-vierge) : celle qu'il a, sinon une carte neutre.
   const carte = useCallback(
     (name: string) => allPlayers.find((p) => p.name.toLowerCase() === name.toLowerCase()) ?? carteNeutre(name),
     [allPlayers]
@@ -213,7 +211,6 @@ function RechercheBola() {
     },
     [carte, open]
   );
-  // Le joueur demandé par le lien, une fois les comptes lus (un nom inconnu ou masqué n'ouvre rien).
   const ouvert = useRef<string | null>(null);
   useEffect(() => {
     if (!demande || demande === ouvert.current) return;
@@ -222,62 +219,83 @@ function RechercheBola() {
     ouvert.current = demande;
     ouvrir(p.name);
   }, [demande, profils, ouvrir]);
+  return { profils, carte, ouvrir };
+}
+
+/** Un compte de Bola en résultat : sa petite carte, son nom, son pseudo. */
+function LigneBola({ p, carte, ouvrir }: { p: Profil; carte: (name: string) => Player; ouvrir: (name: string) => void }) {
+  return (
+    <button
+      type="button"
+      onPointerDown={(e) => prechaufferCarte(e.currentTarget)}
+      onClick={() => ouvrir(p.name)}
+      aria-label={`Voir la carte de ${p.name}`}
+      className="glass flex items-center gap-3.5 rounded-[22px] px-4 py-3 text-left transition-transform active:scale-[0.98]"
+    >
+      <span className="shrink-0">
+        <PlayerCard player={carte(p.name)} size={FORMAT_CARTE.petite} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-lecture font-semibold"><Nom n={p.name} /></span>
+        <span className="block truncate text-corps text-encre-3">{p.username}</span>
+      </span>
+    </button>
+  );
+}
+
+/**
+ * La Recherche d'un joueur Bola : les comptes de Bola, chacun en carte. Toucher
+ * un résultat ouvre sa carte (la visionneuse, card-viewer.tsx), comme dans le
+ * classement de Bola ; ?joueur=Nom (la notification « … te suit ») l'ouvre
+ * d'emblée. Les joueurs masqués (lib/sfl/hidden.ts) n'y sont pas, comme dans
+ * ce classement.
+ */
+function RechercheBola() {
+  const demande = useSearchParams().get("joueur");
+  const [q, setQ] = useState("");
+  const { profils, carte, ouvrir } = useCartesBola(demande);
+  const trouves = useMemo(() => chercherProfils(profils, q), [profils, q]);
 
   return (
     <div className="shell flex flex-col gap-4 py-4 sm:py-8">
       <div className="flex items-center gap-3">
         <BoutonRetour />
-        <h1 className="text-[30px] font-bold tracking-tight">Recherche</h1>
+        <h1 className="text-titre-l font-bold tracking-tight">Recherche</h1>
       </div>
       <div className="glass flex items-center gap-2.5 rounded-full px-4 py-3.5">
-        <Search className="size-[18px] shrink-0 text-foreground/35" />
+        <Search className="size-[18px] shrink-0 text-encre-4" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoFocus={!demande}
           placeholder="Un joueur, un pseudo…"
-          className="min-w-0 flex-1 bg-transparent text-[15px] font-medium outline-none placeholder:text-foreground/30"
+          className="min-w-0 flex-1 bg-transparent text-lecture font-medium outline-none placeholder:text-encre-4"
         />
         {q && (
-          <button onClick={() => setQ("")} aria-label="Effacer" className="shrink-0 text-foreground/35">
+          <button onClick={() => setQ("")} aria-label="Effacer" className="shrink-0 text-encre-4">
             <X className="size-[18px]" />
           </button>
         )}
       </div>
       {trouves.length > 0 && (
         <section>
-          <h2 className="mb-2.5 px-1 text-[14px] font-bold tracking-tight text-foreground/60">Joueurs · {trouves.length}</h2>
+          <h2 className="mb-2.5 px-1 text-ligne font-bold tracking-tight text-encre-2">Joueurs · {trouves.length}</h2>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
             {trouves.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onPointerDown={(e) => prechaufferCarte(e.currentTarget)}
-                onClick={() => ouvrir(p.name)}
-                aria-label={`Voir la carte de ${p.name}`}
-                className="glass flex items-center gap-3.5 rounded-[22px] px-4 py-3 text-left transition-transform active:scale-[0.98]"
-              >
-                <span className="shrink-0">
-                  <PlayerCard player={carte(p.name)} size={FORMAT_CARTE.petite} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-semibold"><Nom n={p.name} /></span>
-                  <span className="block truncate text-[12.5px] text-foreground/42">{p.username}</span>
-                </span>
-              </button>
+              <LigneBola key={p.id} p={p} carte={carte} ouvrir={ouvrir} />
             ))}
           </div>
         </section>
       )}
       {q.trim() && trouves.length === 0 && (
-        <div className="glass rounded-[26px] px-6 py-10 text-center text-[13px] text-foreground/45">Rien trouvé pour « {q} ».</div>
+        <div className="glass rounded-[26px] px-6 py-10 text-center text-corps text-encre-3">Rien trouvé pour « {q} ».</div>
       )}
     </div>
   );
 }
 
 function Recherche() {
-  const { players, journees } = useSeason();
+  const { players, allPlayers, journees } = useSeason();
   const demande = useSearchParams().get("joueur");
   const [q, setQ] = useState("");
   const [openPlayer, setOpenPlayer] = useState<string | null>(demande);
@@ -298,6 +316,14 @@ function Recherche() {
   // Un joueur masqué ne se trouve que pour ceux qu'il suit et qui le suivent
   // (useProfilsOuverts), à la place qu'il aurait, sans déplacer les autres.
   const { relies } = useProfilsOuverts();
+  // Avant de taper : ceux que je suis (31/10, à la place de la phrase d'aide).
+  const moi = useSession()?.name ?? null;
+  const suivis = useSuivis();
+  const jeSuis = useMemo(() => {
+    if (!moi) return [];
+    const connus = new Set(players.map((x) => x.name));
+    return suivis.abonnements(moi).filter((n) => connus.has(n) && !isHidden(n)).slice(0, 12);
+  }, [moi, suivis, players]);
   const ranked = useMemo(() => {
     const publics = rankPlayers(players);
     const masques = relies.flatMap((r) => rankPlayers([...players, r]).filter((p) => p.name === r.name));
@@ -330,6 +356,24 @@ function Recherche() {
     return journees.filter((j) => fold(j.date).includes(needle)).slice(0, 6);
   }, [journees, needle, asJournee]);
 
+  // Les comptes de Bola hors de l'effectif de la saison (les filleuls venus
+  // par un lien) : ils se cherchent aussi, et s'ouvrent en carte comme dans la
+  // Recherche d'un joueur Bola ; ?joueur=Nom aussi (Sabri, 31/10/2026 : « Il
+  // n'apparaît pas dans les recherches »). Un joueur de l'effectif, masqué ou
+  // non, n'y est jamais : il reste au profil de sa saison.
+  const dansLaSaison = useMemo(() => new Set(allPlayers.map((p) => p.name.toLowerCase())), [allPlayers]);
+  const { profils, carte, ouvrir } = useCartesBola(
+    demande && !dansLaSaison.has(demande.toLowerCase()) ? demande : null
+  );
+  const comptesBola = useMemo(
+    () => profils.filter((p) => !dansLaSaison.has(p.name.toLowerCase())),
+    [profils, dansLaSaison]
+  );
+  const bolaTrouves = useMemo(
+    () => (asJournee !== null ? [] : chercherProfils(comptesBola, q)),
+    [comptesBola, q, asJournee]
+  );
+
   const selectedPlayer = openPlayer ? ranked.find((p) => p.name === openPlayer) : undefined;
   const selectedJournee =
     openJournee !== null ? journees.find((j) => j.j === openJournee) : undefined;
@@ -348,7 +392,7 @@ function Recherche() {
       ) : (
         <div className="flex items-center gap-3">
           <BoutonRetour />
-          <h1 className="text-[30px] font-bold tracking-tight">Recherche</h1>
+          <h1 className="text-titre-l font-bold tracking-tight">Recherche</h1>
         </div>
       )}
 
@@ -356,19 +400,19 @@ function Recherche() {
         <>
           {/* Le champ */}
           <div className="glass flex items-center gap-2.5 rounded-full px-4 py-3.5">
-            <Search className="size-[18px] shrink-0 text-foreground/35" />
+            <Search className="size-[18px] shrink-0 text-encre-4" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               autoFocus
               placeholder="Un joueur, un pseudo, ou « J6 »…"
-              className="min-w-0 flex-1 bg-transparent text-[15px] font-medium outline-none placeholder:text-foreground/30"
+              className="min-w-0 flex-1 bg-transparent text-lecture font-medium outline-none placeholder:text-encre-4"
             />
             {q && (
               <button
                 onClick={() => setQ("")}
                 aria-label="Effacer"
-                className="shrink-0 text-foreground/35"
+                className="shrink-0 text-encre-4"
               >
                 <X className="size-[18px]" />
               </button>
@@ -377,12 +421,29 @@ function Recherche() {
 
           {!q && (
             <>
-              <p className="px-1 text-[12.5px] leading-snug text-foreground/40">
-                Cherche n&apos;importe quel joueur inscrit — sa carte, ses notes, ses chiffres —
-                ou tape le numéro d&apos;une journée pour retrouver ses matchs.
-              </p>
+              {jeSuis.length > 0 && (
+                <section>
+                  <h2 className="mb-2.5 px-1 text-ligne font-bold tracking-tight text-encre-2">Tu suis</h2>
+                  <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+                    {jeSuis.map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => {
+                          logActivity("recherche", { meta: { joueur: n, suivi: true } });
+                          setOpenPlayer(n);
+                        }}
+                        className="flex w-[64px] shrink-0 flex-col items-center gap-1.5 transition-transform active:scale-[0.96]"
+                      >
+                        <Avatar name={n} />
+                        <span className="w-full truncate text-center text-[11.5px] font-semibold">{pseudoAffiche(n)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
               <section>
-                <h2 className="mb-2.5 px-1 text-[14px] font-bold tracking-tight text-foreground/60">
+                <h2 className="mb-2.5 px-1 text-ligne font-bold tracking-tight text-encre-2">
                   Les journées
                 </h2>
                 <div className="flex flex-wrap gap-2">
@@ -390,9 +451,9 @@ function Recherche() {
                     <button
                       key={j.j}
                       onClick={() => setOpenJournee(j.j)}
-                      className="bouton-secondaire flex items-center gap-2 py-2 pr-4 pl-3 text-[13px] font-semibold"
+                      className="bouton-secondaire flex items-center gap-2 py-2 pr-4 pl-3 text-corps font-semibold"
                     >
-                      <CalendarDays className="size-3.5 text-foreground/35" />J{j.j}
+                      <CalendarDays className="size-3.5 text-encre-4" />J{j.j}
                     </button>
                   ))}
                 </div>
@@ -409,7 +470,7 @@ function Recherche() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
               >
-                <h2 className="mb-2.5 px-1 text-[14px] font-bold tracking-tight text-foreground/60">
+                <h2 className="mb-2.5 px-1 text-ligne font-bold tracking-tight text-encre-2">
                   Journées
                 </h2>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -424,14 +485,14 @@ function Recherche() {
                         }}
                         className="glass flex items-center gap-3.5 rounded-[22px] px-4 py-3.5 text-left transition-transform active:scale-[0.99]"
                       >
-                        <span className="glass-soft flex size-10 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold">
+                        <span className="glass-soft flex size-10 shrink-0 items-center justify-center rounded-full text-corps font-extrabold">
                           J{j.j}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[15px] font-semibold">
+                          <span className="block truncate text-lecture font-semibold">
                             Journée {j.j}
                           </span>
-                          <span className="block truncate text-[12.5px] text-foreground/42">
+                          <span className="block truncate text-corps text-encre-3">
                             {j.date}
                             {score ? ` · ${score.label}` : " · pas encore jouée"}
                           </span>
@@ -451,7 +512,7 @@ function Recherche() {
                 exit={{ opacity: 0 }}
                 className="mt-1"
               >
-                <h2 className="mb-2.5 px-1 text-[14px] font-bold tracking-tight text-foreground/60">
+                <h2 className="mb-2.5 px-1 text-ligne font-bold tracking-tight text-encre-2">
                   Joueurs · {joueurs.length}
                 </h2>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -466,26 +527,53 @@ function Recherche() {
                     >
                       <Avatar name={p.name} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[15px] font-semibold"><Nom n={p.name} /></span>
-                        <span className="block truncate text-[12.5px] text-foreground/42">
+                        <span className="block truncate text-lecture font-semibold"><Nom n={p.name} /></span>
+                        <span className="block truncate text-corps text-encre-3">
                           {pseudoAffiche(p.name)} · {p.poste} · {rankOf.get(p.name)}e
                         </span>
                       </span>
                       <span className="shrink-0 text-right">
-                        <span className="block text-[17px] leading-none font-extrabold tabular-nums">
+                        <span className="block text-titre leading-none font-extrabold tabular-nums">
                           {ovr(p.stats)}
                         </span>
-                        <span className="mono-label mt-1 block text-foreground/35">Gén</span>
+                        <span className="mono-label mt-1 block text-encre-4">Gén</span>
                       </span>
                     </button>
                   ))}
                 </div>
               </motion.section>
             )}
+
+            {bolaTrouves.length > 0 && (
+              <motion.section
+                key="bola"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="mt-1"
+              >
+                <h2 className="mb-2.5 px-1 text-ligne font-bold tracking-tight text-encre-2">
+                  Joueurs Bola · {bolaTrouves.length}
+                </h2>
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                  {bolaTrouves.map((p) => (
+                    <LigneBola
+                      key={p.id}
+                      p={p}
+                      carte={carte}
+                      ouvrir={(name) => {
+                        logActivity("recherche", { meta: { joueur: name } });
+                        ouvrir(name);
+                      }}
+                    />
+                  ))}
+                </div>
+              </motion.section>
+            )}
           </AnimatePresence>
 
-          {q && joueurs.length === 0 && journeesTrouvees.length === 0 && (
-            <div className="glass rounded-[26px] px-6 py-10 text-center text-[13px] text-foreground/45">
+          {q && joueurs.length === 0 && journeesTrouvees.length === 0 && bolaTrouves.length === 0 && (
+            <div className="glass rounded-[26px] px-6 py-10 text-center text-corps text-encre-3">
               Rien trouvé pour « {q} ».
             </div>
           )}

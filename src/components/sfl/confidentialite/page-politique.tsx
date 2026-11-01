@@ -35,7 +35,7 @@ export function PagePolitique({ children }: { children: React.ReactNode }) {
         <button
           type="button"
           onClick={retour}
-          className="bouton-discret flex items-center gap-[2px] py-[8px] pr-[13px] pl-[6px] text-[14px] font-semibold"
+          className="bouton-discret flex items-center gap-[2px] py-[8px] pr-[13px] pl-[6px] text-ligne font-semibold"
         >
           <ChevronLeft className="size-5" />
           Retour
@@ -48,7 +48,7 @@ export function PagePolitique({ children }: { children: React.ReactNode }) {
         >
           {children}
           {accepte && (
-            <p className="mono-label mt-[55px] text-foreground/40">
+            <p className="mono-label mt-[55px] text-encre-3">
               {accepte.enAttente ? "Acceptée sur ce téléphone" : `Acceptée le ${dateAccord(accepte.le)}`}
               {" · "}
               {accepte.horsApp ? "Carte hors de l'app : oui" : "Carte hors de l'app : non"}

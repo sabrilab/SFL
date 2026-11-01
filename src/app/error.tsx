@@ -84,7 +84,7 @@ export default function Error({
       {/* La panne, en clair et DÉPLIÉE : c'est ce bloc qu'on photographie. */}
       <div className="mt-8 w-full text-left">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <span className="mono-label text-foreground/35">Détail de l&apos;erreur</span>
+          <span className="mono-label text-encre-4">Détail de l&apos;erreur</span>
           <button
             onClick={() => {
               void navigator.clipboard?.writeText(texte).then(
@@ -98,12 +98,12 @@ export default function Error({
             {copie ? "Copié" : "Copier"}
           </button>
         </div>
-        <pre className="glass-soft max-h-[38dvh] overflow-auto rounded-2xl px-3.5 py-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-foreground/60">
+        <pre className="glass-soft max-h-[38dvh] overflow-auto rounded-2xl px-3.5 py-3 font-mono text-legende leading-relaxed whitespace-pre-wrap text-encre-2">
           {texte}
         </pre>
       </div>
 
-      <p className="mt-4 text-[11.5px] leading-relaxed text-foreground/30">
+      <p className="mt-4 text-petit leading-relaxed text-encre-4">
         « Réparer l&apos;app » vide le cache et recharge. Ta session, ta saison et tes Ballons
         sont conservés.
       </p>

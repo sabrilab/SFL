@@ -127,12 +127,12 @@ function Ligne({ c, rang, moi, cle, unite }: { c: LigneBolaClassee; rang?: numbe
       <RangMetal rang={rang ?? c.place} />
       <Carte name={c.name} size={format.petite} detail={`Bola · ${c.valeur} ${unite}`} />
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-[15px] font-semibold"><Nom n={c.name} /></span>
-        <span className="mono-label text-foreground/40">{detail.join(" · ")}</span>
+        <span className="truncate text-lecture font-semibold"><Nom n={c.name} /></span>
+        <span className="mono-label text-encre-3">{detail.join(" · ")}</span>
       </span>
       <span className="w-16 text-right text-lg font-bold tracking-tight tabular-nums">
         {c.valeur}
-        <span className="mono-label ml-1 text-foreground/40">{unite}</span>
+        <span className="mono-label ml-1 text-encre-3">{unite}</span>
       </span>
     </div>
   );
@@ -147,7 +147,7 @@ function TableauPoints({ lignes, decalage, moi }: { lignes: LigneBolaClassee[]; 
   const col = "w-8 text-center tabular-nums";
   return (
     <div className="overflow-hidden rounded-[22px] bg-card">
-      <div className="mono-label flex items-center gap-2 px-3 pt-3 pb-2 text-foreground/40">
+      <div className="mono-label flex items-center gap-2 px-3 pt-3 pb-2 text-encre-3">
         <span className="w-[26px] text-center">#</span>
         <span className="flex-1">Joueur</span>
         <span className={col}>J</span>
@@ -166,13 +166,13 @@ function TableauPoints({ lignes, decalage, moi }: { lignes: LigneBolaClassee[]; 
             >
               <RangMetal rang={rang} />
               <Carte name={l.name} size={FORMAT_CARTE.petite} detail={`Bola · ${l.points} pts`} />
-              <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">
+              <span className="min-w-0 flex-1 truncate text-lecture font-semibold">
                 <Nom n={l.name} />
               </span>
-              <span className={cn(col, "text-[14px] text-foreground/70")}>{l.matchs}</span>
-              <span className={cn(col, "hidden text-[14px] text-foreground/70 sm:block")}>{l.victoires}</span>
-              <span className={cn(col, "text-[14px] text-foreground/70")}>{l.mvp}</span>
-              <span className={cn(col, "text-[16px] font-extrabold")}>{l.points}</span>
+              <span className={cn(col, "text-ligne text-encre-2")}>{l.matchs}</span>
+              <span className={cn(col, "hidden text-ligne text-encre-2 sm:block")}>{l.victoires}</span>
+              <span className={cn(col, "text-ligne text-encre-2")}>{l.mvp}</span>
+              <span className={cn(col, "text-titre font-extrabold")}>{l.points}</span>
             </li>
           );
         })}
@@ -191,7 +191,7 @@ function Pilules<T extends string | number>({ choix, actif, onChange, label }: {
           role="tab"
           aria-selected={actif === c.id}
           onClick={() => onChange(c.id)}
-          className={cn("shrink-0 px-4 py-2 text-[13px] font-semibold whitespace-nowrap", actif === c.id ? "bouton-principal" : "bouton-secondaire text-foreground/60")}
+          className={cn("shrink-0 px-4 py-2 text-corps font-semibold whitespace-nowrap", actif === c.id ? "bouton-principal" : "bouton-secondaire text-encre-2")}
         >
           {c.label}
         </button>
@@ -213,8 +213,8 @@ function MatchJoue({ m, bilan = false }: { m: MatchCompte; bilan?: boolean }) {
   const score = (
     <>
       <span className="mono-label text-muted-foreground">Clairs</span>
-      <span className="text-[36px] leading-none font-extrabold tracking-tight tabular-nums">
-        {m.scoreClairs} <span className="text-foreground/25">–</span> {m.scoreFonces}
+      <span className="text-nom leading-none font-extrabold tracking-tight tabular-nums">
+        {m.scoreClairs} <span className="text-encre-4">–</span> {m.scoreFonces}
       </span>
       <span className="mono-label text-muted-foreground">Foncés</span>
     </>
@@ -222,13 +222,13 @@ function MatchJoue({ m, bilan = false }: { m: MatchCompte; bilan?: boolean }) {
   return (
     <article className="glass flex flex-col gap-4 rounded-[26px] p-[18px]">
       <div className="flex items-baseline justify-between">
-        <span className="mono-label text-foreground/40">
+        <span className="mono-label text-encre-3">
           {libelleJour(m.jour)} · {m.heure}
         </span>
         {avecBilan ? null : m.etat && m.etat !== "compte" ? (
-          <span className="mono-label text-foreground/40">{libelleEtat(m.etat)}</span>
+          <span className="mono-label text-encre-3">{libelleEtat(m.etat)}</span>
         ) : (
-          !m.valide && <span className="mono-label text-foreground/40">Amical</span>
+          !m.valide && <span className="mono-label text-encre-3">Amical</span>
         )}
       </div>
       {revoir ? (
@@ -245,13 +245,13 @@ function MatchJoue({ m, bilan = false }: { m: MatchCompte; bilan?: boolean }) {
       )}
       {mvps.length > 0 && (
         <div className="flex flex-col items-center gap-2">
-          <span className="mono-label text-foreground/40">{mvps.length > 1 ? "MVP ex æquo" : "MVP"}</span>
+          <span className="mono-label text-encre-3">{mvps.length > 1 ? "MVP ex æquo" : "MVP"}</span>
           <div className="flex flex-wrap justify-center gap-3">
             {mvps.map((j) => (
               <div key={j.id} className="flex flex-col items-center gap-1">
                 <Carte name={j.name} size={format.moyenne} detail={`MVP · ${j.buts} but${j.buts > 1 ? "s" : ""}, ${j.passes} passe${j.passes > 1 ? "s" : ""}`} />
-                <span className="text-[12.5px] font-semibold"><Nom n={j.name} /></span>
-                <span className="mono-label text-foreground/40">
+                <span className="text-corps font-semibold"><Nom n={j.name} /></span>
+                <span className="mono-label text-encre-3">
                   {j.buts} B · {j.passes} P
                 </span>
               </div>
@@ -288,12 +288,12 @@ function MesFeuilles({ parties, onSaisie, apercu, aOuvrir }: { parties: Partie[]
           className="bouton-principal bouton--vert flex items-center gap-3 rounded-[22px] px-4 py-3.5 text-left"
         >
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[15px] font-bold">{p.lieu}</span>
+            <span className="block truncate text-lecture font-bold">{p.lieu}</span>
             <span className="mono-label bouton-sous">
               {libelleJour(p.jour)} · {p.heure}
             </span>
           </span>
-          <span className="shrink-0 text-[14px] font-semibold">
+          <span className="shrink-0 text-ligne font-semibold">
             {p.saisiLe ? `${p.scoreClairs} – ${p.scoreFonces}` : "Feuille de match"}
           </span>
         </button>
@@ -431,7 +431,7 @@ export default function LigueViergePage() {
   const visiblesTableau = tout ? lignesTableau : lignesTableau.slice(0, 20);
   const mesDerniers = derniers.filter((m) => m.joueurs.some((j) => j.id === moi || (apercu && j.name === player.name)));
 
-  const vide = (texte: string) => <div className="rounded-[22px] bg-card px-5 py-8 text-center text-[14px] text-muted-foreground">{texte}</div>;
+  const vide = (texte: string) => <div className="rounded-[22px] bg-card px-5 py-8 text-center text-ligne text-muted-foreground">{texte}</div>;
 
   return (
     <CartesBola.Provider value={cartesBola}>
@@ -456,7 +456,7 @@ export default function LigueViergePage() {
               aria-selected={vue === id}
               onClick={() => setVue(id)}
               className={cn(
-                "flex-1 px-4 py-2 text-[13.5px] font-semibold whitespace-nowrap",
+                "flex-1 px-4 py-2 text-ligne font-semibold whitespace-nowrap",
                 vue === id ? "bouton-principal bouton--vert" : "bouton-discret text-muted-foreground"
               )}
             >
@@ -474,10 +474,10 @@ export default function LigueViergePage() {
               <MiniCarte player={player} size={FORMAT_CARTE.petite * 1.25} cle="lv-moi" />
               <div className="flex min-w-0 flex-col gap-1.5">
                 <Link href="/profil" className="flex min-w-0 items-center gap-1 transition-opacity active:opacity-60">
-                  <h2 className="truncate text-[28px] leading-none font-bold tracking-tight md:text-[34px]">
+                  <h2 className="truncate text-titre-l leading-none font-bold tracking-tight md:text-nom">
                     <Nom n={player.name} />
                   </h2>
-                  <ChevronRight className="size-5 shrink-0 text-foreground/35" strokeWidth={2.4} />
+                  <ChevronRight className="size-5 shrink-0 text-encre-4" strokeWidth={2.4} />
                 </Link>
                 <span className="mono-label text-muted-foreground">
                   {mien ? `${mien.matchs} match${mien.matchs > 1 ? "s" : ""} · ${mien.buts} but${mien.buts > 1 ? "s" : ""} · ${mien.passes} pd` : "Bola · à vie"}
@@ -495,7 +495,7 @@ export default function LigueViergePage() {
             {vus !== null && mesDerniers.length === 0 && vide("Aucun match Bola pour l'instant.")}
             {mesDerniers.length > 0 && (
               <div className="flex flex-col gap-3">
-                <h2 className="px-1 text-[17px] font-bold tracking-tight">Mes derniers matchs</h2>
+                <h2 className="px-1 text-titre font-bold tracking-tight">Mes derniers matchs</h2>
                 {mesDerniers.map((m) => (
                   <MatchJoue key={m.id} m={m} bilan />
                 ))}
@@ -519,7 +519,7 @@ export default function LigueViergePage() {
             >
               {/* Comme « Saison 1 » du championnat : Bola se compte à vie. */}
               <div className="flex items-end justify-between gap-3">
-                <h2 className="text-[28px] leading-none font-bold tracking-tight">À vie</h2>
+                <h2 className="text-titre-l leading-none font-bold tracking-tight">À vie</h2>
                 <span className="mono-label text-muted-foreground">
                   {vus.length} match{vus.length > 1 ? "s" : ""} · {classement.length} joueur{classement.length > 1 ? "s" : ""}
                 </span>
@@ -537,7 +537,7 @@ export default function LigueViergePage() {
               )}
               <TableauPoints lignes={visiblesTableau} decalage={decalage} moi={apercu ? (mien?.id ?? null) : moi} />
               {!tout && lignesTableau.length > 20 && (
-                <button type="button" onClick={() => setTout(true)} className="bouton-secondaire self-center px-5 py-2.5 text-[13px] font-semibold">
+                <button type="button" onClick={() => setTout(true)} className="bouton-secondaire self-center px-5 py-2.5 text-corps font-semibold">
                   Tout le classement · {lignesTableau.length}
                 </button>
               )}
@@ -563,7 +563,7 @@ export default function LigueViergePage() {
                   </div>
                 );
               })()}
-              <h2 className="px-1 pt-2 text-[17px] font-bold tracking-tight">Derniers matchs</h2>
+              <h2 className="px-1 pt-2 text-titre font-bold tracking-tight">Derniers matchs</h2>
               {derniers.map((m) => (
                 <MatchJoue key={m.id} m={m} />
               ))}

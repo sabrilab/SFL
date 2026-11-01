@@ -97,7 +97,7 @@ function Choix<T extends string>({
           aria-checked={valeur === o.id}
           onClick={() => onChange(o.id)}
           className={cn(
-            "flex h-10 items-center justify-center gap-2 text-[14px] font-semibold",
+            "flex h-10 items-center justify-center gap-2 text-ligne font-semibold",
             valeur === o.id ? "bouton-principal" : "bouton-discret text-muted-foreground"
           )}
         >
@@ -156,11 +156,11 @@ function LigueOrganisee({ onSfl, terrain }: { onSfl?: () => void; terrain?: stri
         <span aria-hidden className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-foreground" />
       </span>
       {onSfl && (
-        <button type="button" onClick={onSfl} className={cn(onglet, "text-foreground/35 active:text-foreground/60")}>
+        <button type="button" onClick={onSfl} className={cn(onglet, "text-encre-4 active:text-encre-2")}>
           <SigleLigue ligue="sfl" hauteur={14} />
         </button>
       )}
-      <Link href={terrain ? `/bola-team?terrain=${encodeURIComponent(terrain)}` : "/bola-team"} className={cn(onglet, "text-foreground/35 active:text-foreground/60")}>
+      <Link href={terrain ? `/bola-team?terrain=${encodeURIComponent(terrain)}` : "/bola-team"} className={cn(onglet, "text-encre-4 active:text-encre-2")}>
         <SigleLigue ligue="team" hauteur={14} />
       </Link>
     </nav>
@@ -357,7 +357,7 @@ export function OuvrirMatch({
 
   const restantes = places - invites.length - 1;
   const bouton = (
-    <Button variant="vert" disabled={!pret || envoi} onClick={ouvrir} className="h-12 w-full rounded-full text-[15px] font-semibold">
+    <Button variant="vert" disabled={!pret || envoi} onClick={ouvrir} className="h-12 w-full rounded-full text-lecture font-semibold">
       {partie
         ? "Enregistrer"
         : visibilite === "public"
@@ -404,10 +404,10 @@ export function OuvrirMatch({
                     choisi ? "bouton-principal" : "bouton-secondaire"
                   )}
                 >
-                  <span className={cn("text-[11px] leading-none", choisi ? "bouton-sous" : "text-muted-foreground")}>
+                  <span className={cn("text-legende leading-none", choisi ? "bouton-sous" : "text-muted-foreground")}>
                     {j === aujourdhui ? "Auj." : JOURS[dateDe(j).getUTCDay()]}
                   </span>
-                  <span className="text-[19px] leading-none font-bold tabular-nums">{dateDe(j).getUTCDate()}</span>
+                  <span className="text-titre-fort leading-none font-bold tabular-nums">{dateDe(j).getUTCDate()}</span>
                 </button>
               );
             })}
@@ -434,7 +434,7 @@ export function OuvrirMatch({
                 aria-checked={h === heure}
                 disabled={passee(h)}
                 onClick={() => setHeure(h)}
-                className={cn(pastille, "h-10 px-3.5 text-[14px] tabular-nums", h === heure ? "bouton-principal" : "bouton-secondaire")}
+                className={cn(pastille, "h-10 px-3.5 text-ligne tabular-nums", h === heure ? "bouton-principal" : "bouton-secondaire")}
               >
                 {h}
               </button>
@@ -452,7 +452,7 @@ export function OuvrirMatch({
                   role="radio"
                   aria-checked={t.id === terrainId}
                   onClick={() => setTerrainId(t.id)}
-                  className={cn(pastille, "h-9 px-3.5 text-[14px]", t.id === terrainId ? "bouton-principal" : "bouton-secondaire")}
+                  className={cn(pastille, "h-9 px-3.5 text-ligne", t.id === terrainId ? "bouton-principal" : "bouton-secondaire")}
                 >
                   {t.nom}
                 </button>
@@ -465,7 +465,7 @@ export function OuvrirMatch({
                   onClick={() => setTerrainId(null)}
                   className={cn(
                     pastille,
-                    "h-9 max-w-full truncate px-3.5 text-[14px]",
+                    "h-9 max-w-full truncate px-3.5 text-ligne",
                     terrainId == null ? "bouton-principal" : "bouton-secondaire"
                   )}
                 >
@@ -476,7 +476,7 @@ export function OuvrirMatch({
             <button
               type="button"
               onClick={() => setTerrainsNord((o) => ({ n: o.n + 1, open: true }))}
-              className={cn(pastille, "bouton-secondaire flex h-9 items-center gap-1.5 px-3.5 text-[14px]")}
+              className={cn(pastille, "bouton-secondaire flex h-9 items-center gap-1.5 px-3.5 text-ligne")}
             >
               <MapPinned className="size-4" strokeWidth={2.2} />
               Tous les terrains

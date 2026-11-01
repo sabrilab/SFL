@@ -13,6 +13,16 @@
 //   · le meilleur du jour (le plus de points Pépite) et le buteur du jour,
 //     choisis sur les cartes de la feuille, ce match d'abord ;
 //   · en pied, ce que ça rapporte.
+// Sabri, 31/10 : « pour chaque match […] le meilleur buteur, le meilleur
+// passeur et le MVP du match », « le meilleur passeur du jour », « des choix
+// en fonction des matchs, pas juste qui va gagner », « que ça fasse vraiment
+// stylé ». Chaque match a son bloc : qui gagne, l'écart (serré, net, large),
+// le duel (deux cartes face à face : qui finit devant l'autre), puis son
+// MVP, son buteur et son passeur, choisis parmi ses seuls joueurs ; la
+// journée a le sien (le meilleur, le buteur, le passeur du jour). Une jauge
+// sous le titre compte les choix posés. FlairDeLaJournee met toute la journée
+// sur une page (Ma carte → Le Flair), pour qui ne joue pas : le blessé, le
+// remplaçant, la tribune, dont le plafond monte (PLAFOND_TRIBUNE).
 // Tout ferme au premier coup d'envoi de la journée ; le verdict tombe avec la
 // feuille remplie, définitif à minuit. Les règles et l'XP ne changent pas
 // (lib/sfl/pronos.ts) : l'XP va au Niveau XP et au passe, jamais aux points
@@ -31,12 +41,17 @@ import { useIdentites } from "@/hooks/use-identites";
 import { usePronosJournee, type MesPronos, type SujetVu } from "@/hooks/use-pronos";
 import {
   choixPermis,
-  PLAFOND_JOURNEE,
-  XP_BUTEUR_DU_JOUR,
-  XP_MEILLEUR_DU_JOUR,
-  XP_VAINQUEUR,
+  DETAIL_ECART,
+  duelPermis,
+  ECARTS,
+  NOM_ECART,
+  PLAFOND_TRIBUNE,
+  SUJETS_JOUR,
+  TITRE_JOUR,
+  TITRE_MATCH,
   xpSujet,
   type Camp,
+  type MatchProno,
 } from "@/lib/sfl/pronos";
 import { cn } from "@/lib/utils";
 import { BLANCS, NOIRS, Pouls } from "@/components/sfl/actus/missions";
@@ -60,7 +75,7 @@ export function FermeDans({ fin }: { fin: Date }) {
   return (
     <span className="mono-label flex shrink-0 items-baseline gap-2 text-white/50">
       Ferme dans
-      <span className="text-[12px] text-white tabular-nums">
+      <span className="text-petit text-white tabular-nums">
         {j > 0 && `${j} j `}
         {deux(Math.floor((m % 1440) / 60))}:{deux(m % 60)}
       </span>
@@ -81,6 +96,7 @@ function Verdict({ v, xp }: { v: SujetVu; xp: number }) {
 /** Un bouton de choix, avec la part de la ligue dessous. */
 function Choix({
   libelle,
+  detail,
   part,
   actif,
   bon,
@@ -89,6 +105,7 @@ function Choix({
   onClick,
 }: {
   libelle: string;
+  detail?: string;
   part: number;
   actif: boolean;
   bon: boolean;
@@ -110,9 +127,10 @@ function Choix({
       )}
       style={ton ? { background: ton.fond, color: ton.encre } : undefined}
     >
-      <span className="text-[15px] leading-none font-bold">{libelle}</span>
-      <span className="font-mono text-[11px] leading-none tabular-nums opacity-70">{part} %</span>
-      {bon && <span className="absolute top-1.5 right-2 text-[11px] font-bold" aria-label="Le bon résultat">✓</span>}
+      <span className="text-lecture leading-none font-bold">{libelle}</span>
+      {detail && <span className="text-legende leading-none opacity-60">{detail}</span>}
+      <span className="font-mono text-legende leading-none tabular-nums opacity-70">{part} %</span>
+      {bon && <span className="absolute top-1.5 right-2 text-legende font-bold" aria-label="Le bon résultat">✓</span>}
       <span aria-hidden className="absolute bottom-0 left-0 h-[3px] bg-current opacity-35" style={{ width: `${part}%` }} />
     </button>
   );
@@ -156,7 +174,7 @@ function ChoixJoueur({
     if (ouvert) ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [ouvert]);
   return (
-    <div ref={ref} className="flair__bloc flex flex-col gap-3">
+    <div ref={ref} className="flex flex-col gap-3">
       <div className="flex items-center gap-3.5">
         <button
           type="button"
@@ -170,7 +188,7 @@ function ChoixJoueur({
             <PlayerCard player={choisi} size={FORMAT_CARTE.petite} />
           ) : (
             <span
-              className="grid place-items-center rounded-[8px] border border-dashed border-white/30 text-[20px] text-white/50"
+              className="grid place-items-center rounded-[8px] border border-dashed border-white/30 text-titre-fort text-white/50"
               style={{ width: 254 * FORMAT_CARTE.petite, height: 254 * FORMAT_CARTE.petite * 1.4 }}
             >
               +
@@ -179,10 +197,10 @@ function ChoixJoueur({
         </button>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="mono-label text-white/55">{titre}</span>
-          <span className="truncate text-[17px] leading-tight font-bold">
+          <span className="truncate text-titre leading-tight font-bold">
             {choisi ? identite.nom(choisi.name) : ferme ? "Aucun choix" : "Choisir"}
           </span>
-          {choisi && total > 0 && <span className="font-mono text-[11px] text-white/50 tabular-nums">{part(choisi.name)} % de la ligue</span>}
+          {choisi && total > 0 && <span className="font-mono text-legende text-white/50 tabular-nums">{part(choisi.name)} % de la ligue</span>}
           {sous}
         </div>
         <div className="shrink-0 text-right">{droite}</div>
@@ -205,8 +223,8 @@ function ChoixJoueur({
                 className={cn("flex shrink-0 flex-col items-center gap-1.5 rounded-[12px] p-1 transition-transform active:scale-95", actif && "ring-2 ring-white")}
               >
                 <PlayerCard player={p} size={FORMAT_CARTE.moyenne} />
-                <span className="max-w-[78px] truncate text-[12px] leading-none font-semibold">{prenomDe(identite, nom)}</span>
-                <span className="font-mono text-[10px] leading-none text-white/50 tabular-nums">{part(nom)} %</span>
+                <span className="max-w-[78px] truncate text-petit leading-none font-semibold">{prenomDe(identite, nom)}</span>
+                <span className="font-mono text-etiquette leading-none text-white/50 tabular-nums">{part(nom)} %</span>
               </button>
             );
           })}
@@ -216,10 +234,222 @@ function ChoixJoueur({
   );
 }
 
-const SUJETS_JOUR = [
-  ["pepite", "Le meilleur du jour", XP_MEILLEUR_DU_JOUR],
-  ["buteur", "Le buteur du jour", XP_BUTEUR_DU_JOUR],
-] as const;
+/** Ce que rapporte un sujet, ou son verdict une fois jugé. */
+function Gain({ v }: { v: SujetVu }) {
+  const xp = xpSujet(v.sujet);
+  return v.choix && v.etat !== "attente" ? <Verdict v={v} xp={xp} /> : <span className="mono-label text-white/50">+{xp} XP</span>;
+}
+
+/** Une question à boutons (qui gagne, l'écart) : son titre, son gain, ses choix. */
+function Question({ titre, v, children }: { titre: string; v: SujetVu; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="mono-label text-white/55">{titre}</span>
+        <Gain v={v} />
+      </div>
+      <div className="flex gap-2">{children}</div>
+    </div>
+  );
+}
+
+/** Le duel d'un match : deux cartes face à face, on touche celle qui finira devant. */
+function Duel({ mp, m, ferme }: { mp: MesPronos; m: MatchProno; ferme: boolean }) {
+  const { allPlayers } = useSeason();
+  const identite = useIdentites();
+  const v = mp.sujets.get(`duel:${m.n}`);
+  if (!v || !m.duel) return null;
+  const ok = duelPermis(mp.p, m.n, mp.joueur);
+  const total = totalDe(v.parts);
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="mono-label text-white/55">
+          {TITRE_MATCH.duel} · qui finit devant{ok.length === 1 ? " · toi" : ""}
+        </span>
+        <Gain v={v} />
+      </div>
+      <div className="flex items-stretch gap-2">
+        {m.duel.map((nom, i) => {
+          const p = allPlayers.find((x) => x.name === nom);
+          const actif = v.choix === nom;
+          const part = pourcent(v.parts.find(([x]) => x === nom)?.[1] ?? 0, total);
+          const ton = i === 0 ? NOIRS : BLANCS;
+          return (
+            <span key={nom} className="contents">
+              {i === 1 && (
+                <span aria-hidden className="titre-lettrage self-center text-titre-m text-white/35">
+                  vs
+                </span>
+              )}
+              <button
+                type="button"
+                disabled={ferme || !ok.includes(nom)}
+                aria-pressed={actif}
+                onClick={() => void poser(mp, v.sujet, actif ? null : nom)}
+                className={cn(
+                  "relative flex flex-1 flex-col items-center gap-1.5 overflow-hidden rounded-[14px] border px-2 pt-2.5 pb-2 transition-transform active:scale-[0.97] disabled:active:scale-100",
+                  actif ? "border-white ring-2 ring-white ring-offset-2 ring-offset-[#0b0a0e]" : "border-white/15",
+                  (ferme || !ok.includes(nom)) && !actif && "opacity-50"
+                )}
+                style={{ background: ton.fond, color: ton.encre }}
+              >
+                {p && <PlayerCard player={p} size={FORMAT_CARTE.moyenne} />}
+                <span className="max-w-full truncate text-lecture leading-none font-bold">{prenomDe(identite, nom)}</span>
+                <span className="font-mono text-legende leading-none tabular-nums opacity-70">{part} %</span>
+                {v.bons?.includes(nom) && <span className="absolute top-1.5 right-2 text-legende font-bold" aria-label="Le bon résultat">✓</span>}
+                <span aria-hidden className="absolute bottom-0 left-0 h-[3px] bg-current opacity-35" style={{ width: `${part}%` }} />
+              </button>
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Un sujet à cartes (MVP, buteur, passeur) : le choix, et la rangée qui se déplie. */
+function SujetJoueur({ mp, sujet, titre, candidats, ferme }: { mp: MesPronos; sujet: string; titre: string; candidats: string[]; ferme: boolean }) {
+  const identite = useIdentites();
+  const v = mp.sujets.get(sujet);
+  if (!v) return null;
+  const reponse = mp.p.joue && v.bons?.length ? v.bons.map((n) => prenomDe(identite, n)).join(", ") : null;
+  return (
+    <ChoixJoueur
+      titre={titre}
+      v={v}
+      candidats={candidats}
+      ferme={ferme}
+      droite={<Gain v={v} />}
+      sous={reponse ? <span className="font-mono text-legende text-white/50">C&apos;est {reponse}</span> : undefined}
+      onChoix={(nom) => void poser(mp, sujet, nom)}
+    />
+  );
+}
+
+/** Le bloc d'un match : qui gagne, l'écart, le duel, son MVP, son buteur, son passeur. */
+function BlocMatch({ mp, m, entete }: { mp: MesPronos; m: MatchProno; entete?: boolean }) {
+  const ferme = mp.phase !== "ouvert";
+  const v = mp.sujets.get(`match:${m.n}`)!;
+  const e = mp.sujets.get(`ecart:${m.n}`)!;
+  const permis = choixPermis(mp.p, m.n, mp.joueur);
+  const sien = permis.length === 1;
+  const total = totalDe(v.parts);
+  const totalE = totalDe(e.parts);
+  const ici = [...m.noirs, ...m.blancs];
+  const plusieurs = mp.p.matchs.length > 1;
+  return (
+    <div className="flair__bloc flex flex-col gap-4">
+      {entete && (
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="titre-lettrage text-titre leading-none">{plusieurs ? m.label : "Le match"}</span>
+          <span className="mono-label text-white/45">
+            {m.noirs.length} contre {m.blancs.length}
+          </span>
+        </div>
+      )}
+      <Question titre={`${!entete && plusieurs ? `Qui gagne le ${m.label.toLowerCase()} ?` : "Qui gagne ?"}${sien ? " · ton camp" : ""}`} v={v}>
+        {(["noirs", "nul", "blancs"] as Camp[]).map((c) => (
+          <Choix
+            key={c}
+            libelle={NOM_CAMP[c]}
+            part={pourcent(v.parts.find(([x]) => x === c)?.[1] ?? 0, total)}
+            actif={v.choix === c}
+            bon={!!v.bons?.includes(c)}
+            ferme={ferme || !permis.includes(c)}
+            ton={c === "noirs" ? NOIRS : c === "blancs" ? BLANCS : undefined}
+            onClick={() => void poser(mp, v.sujet, v.choix === c ? null : c)}
+          />
+        ))}
+      </Question>
+      <Question titre={TITRE_MATCH.ecart} v={e}>
+        {ECARTS.map((c) => (
+          <Choix
+            key={c}
+            libelle={NOM_ECART[c]}
+            detail={DETAIL_ECART[c]}
+            part={pourcent(e.parts.find(([x]) => x === c)?.[1] ?? 0, totalE)}
+            actif={e.choix === c}
+            bon={!!e.bons?.includes(c)}
+            ferme={ferme}
+            onClick={() => void poser(mp, e.sujet, e.choix === c ? null : c)}
+          />
+        ))}
+      </Question>
+      <Duel mp={mp} m={m} ferme={ferme} />
+      {(["mvp", "buteur", "passeur"] as const).map((g) => (
+        <SujetJoueur key={g} mp={mp} sujet={`${g}:${m.n}`} titre={`${TITRE_MATCH[g]} du match`} candidats={ici} ferme={ferme} />
+      ))}
+    </div>
+  );
+}
+
+/** Le bloc de la journée : le meilleur, le buteur et le passeur du jour, sur toute la feuille. */
+function BlocJour({ mp, devant = [] }: { mp: MesPronos; devant?: string[] }) {
+  const ferme = mp.phase !== "ouvert";
+  const ici = new Set(devant);
+  const candidats = [...mp.p.joueurs.filter((x) => ici.has(x)), ...mp.p.joueurs.filter((x) => !ici.has(x))];
+  return (
+    <div className="flair__bloc flex flex-col gap-4">
+      <span className="titre-lettrage text-titre leading-none">La journée</span>
+      {SUJETS_JOUR.map((s) => (
+        <SujetJoueur key={s} mp={mp} sujet={s} titre={TITRE_JOUR[s]} candidats={candidats} ferme={ferme} />
+      ))}
+    </div>
+  );
+}
+
+/** L'en-tête : le titre, ce qui reste avant la fermeture ou le verdict, et la jauge des choix posés. */
+function EnTete({ mp, id, titre, sujets }: { mp: MesPronos; id: string; titre: string; sujets: string[] }) {
+  const vus = sujets.map((s) => mp.sujets.get(s)).filter((v): v is SujetVu => !!v);
+  const poses = vus.filter((v) => v.choix).length;
+  const juge = mp.p.joue && vus.some((x) => x.bons);
+  const gagne = Math.min(
+    mp.plafond,
+    [...mp.sujets.values()].filter((x) => x.etat === "juste").reduce((a, x) => a + xpSujet(x.sujet), 0)
+  );
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 id={id} className="titre-lettrage text-titre-m leading-[0.95]">
+          {titre}
+        </h3>
+        {mp.phase === "ouvert" ? (
+          <FermeDans fin={mp.p.coupEnvoi} />
+        ) : juge ? (
+          <span className={cn("mono-label shrink-0", gagne ? "text-[#9fe0a8]" : "text-white/55")}>
+            {mp.phase === "en-jeu" ? "Verdict à minuit · " : ""}+{gagne} XP
+          </span>
+        ) : (
+          <span className="mono-label flex shrink-0 items-center gap-2 text-white/80">
+            <Pouls bat={mp.phase === "en-jeu"} /> {mp.phase === "en-jeu" ? "En jeu" : "Fermé"}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="relative h-[3px] flex-1 overflow-hidden rounded-full bg-white/10" aria-hidden>
+          <span className="absolute inset-y-0 left-0 rounded-full bg-white transition-[width] duration-500" style={{ width: `${pourcent(poses, vus.length)}%` }} />
+        </span>
+        <span className="mono-label shrink-0 text-white/55 tabular-nums">
+          {poses}/{vus.length} choix
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function Pied({ mp }: { mp: MesPronos }) {
+  const tribune = mp.plafond === PLAFOND_TRIBUNE;
+  return (
+    <p className="mono-label text-white/45">
+      {`Toute la journée · ${mp.plafond} XP au plus${tribune ? " depuis la tribune" : ""} · `}
+      {mp.phase === "ouvert" ? "ferme au premier coup d'envoi" : "définitif à minuit"}
+    </p>
+  );
+}
+
+const sujetsDe = (mp: MesPronos, m: MatchProno | null) =>
+  [...mp.sujets.keys()].filter((s) => !s.includes(":") || (m != null && s.endsWith(`:${m.n}`)));
 
 /** Le match de la journée du Flair qui a ces joueurs ; null si ce n'est pas elle. */
 function leMatch(mp: MesPronos, noirs: string[], blancs: string[]) {
@@ -239,88 +469,28 @@ function leMatch(mp: MesPronos, noirs: string[], blancs: string[]) {
  */
 export function FlairDuMatch({ j, noirs, blancs }: { j: number | null; noirs: string[]; blancs: string[] }) {
   const mp = usePronosJournee();
-  const identite = useIdentites();
   const m = useMemo(() => (mp && (j == null || j === mp.p.j) ? leMatch(mp, noirs, blancs) : null), [mp, j, noirs, blancs]);
   if (!mp || !m) return null;
-  const sujet = `match:${m.n}`;
-  const v = mp.sujets.get(sujet)!;
-  const permis = choixPermis(mp.p, m.n, mp.joueur);
-  const sien = permis.length === 1;
-  const total = totalDe(v.parts);
-  const ferme = mp.phase !== "ouvert";
-  const juge = mp.p.joue && [...mp.sujets.values()].some((x) => x.bons);
-  const gagne = Math.min(
-    PLAFOND_JOURNEE,
-    [...mp.sujets.values()].filter((x) => x.etat === "juste").reduce((a, x) => a + xpSujet(x.sujet), 0)
-  );
-  // Ce match d'abord dans les rangées de cartes, puis le reste de la journée.
-  const ici = new Set([...m.noirs, ...m.blancs]);
-  const candidats = [...mp.p.joueurs.filter((x) => ici.has(x)), ...mp.p.joueurs.filter((x) => !ici.has(x))];
   return (
     <section aria-labelledby={`flair-${m.n}`} className="flair flex flex-col gap-4 p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 id={`flair-${m.n}`} className="titre-lettrage text-[22px] leading-[0.95]">
-          Le Flair
-        </h3>
-        {mp.phase === "ouvert" ? (
-          <FermeDans fin={mp.p.coupEnvoi} />
-        ) : juge ? (
-          <span className={cn("mono-label shrink-0", gagne ? "text-[#9fe0a8]" : "text-white/55")}>
-            {mp.phase === "en-jeu" ? "Verdict à minuit · " : ""}+{gagne} XP
-          </span>
-        ) : (
-          <span className="mono-label flex shrink-0 items-center gap-2 text-white/80">
-            <Pouls bat={mp.phase === "en-jeu"} /> {mp.phase === "en-jeu" ? "En jeu" : "Fermé"}
-          </span>
-        )}
-      </div>
+      <EnTete mp={mp} id={`flair-${m.n}`} titre="Le Flair" sujets={sujetsDe(mp, m)} />
+      <BlocMatch mp={mp} m={m} />
+      <BlocJour mp={mp} devant={[...m.noirs, ...m.blancs]} />
+      <Pied mp={mp} />
+    </section>
+  );
+}
 
-      <div className="flex flex-col gap-2.5">
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="mono-label text-white/55">
-            {mp.p.matchs.length > 1 ? `Qui gagne le ${m.label.toLowerCase()} ?` : "Qui gagne ?"}
-            {sien ? " · ton camp" : ""}
-          </span>
-          {v.choix && v.etat !== "attente" ? <Verdict v={v} xp={XP_VAINQUEUR} /> : <span className="mono-label text-white/50">+{XP_VAINQUEUR} XP</span>}
-        </div>
-        <div className="flex gap-2">
-          {(["noirs", "nul", "blancs"] as Camp[]).map((c) => (
-            <Choix
-              key={c}
-              libelle={NOM_CAMP[c]}
-              part={pourcent(v.parts.find(([x]) => x === c)?.[1] ?? 0, total)}
-              actif={v.choix === c}
-              bon={!!v.bons?.includes(c)}
-              ferme={ferme || !permis.includes(c)}
-              ton={c === "noirs" ? NOIRS : c === "blancs" ? BLANCS : undefined}
-              onClick={() => void poser(mp, sujet, v.choix === c ? null : c)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {SUJETS_JOUR.map(([s, titre, xp]) => {
-        const vs = mp.sujets.get(s)!;
-        const reponse = mp.p.joue && vs.bons?.length ? vs.bons.map((n) => prenomDe(identite, n)).join(", ") : null;
-        return (
-          <ChoixJoueur
-            key={s}
-            titre={titre}
-            v={vs}
-            candidats={candidats}
-            ferme={ferme}
-            droite={vs.etat === "attente" || !vs.choix ? <span className="mono-label text-white/50">+{xp} XP</span> : <Verdict v={vs} xp={xp} />}
-            sous={reponse ? <span className="font-mono text-[11px] text-white/50">C&apos;est {reponse}</span> : undefined}
-            onChoix={(nom) => void poser(mp, s, nom)}
-          />
-        );
-      })}
-
-      <p className="mono-label text-white/45">
-        {mp.phase === "ouvert"
-          ? `Toute la journée · ${PLAFOND_JOURNEE} XP au plus · ferme au premier coup d'envoi`
-          : `Toute la journée · ${PLAFOND_JOURNEE} XP au plus · définitif à minuit`}
-      </p>
+/** Toute la journée du Flair sur une page (Ma carte → Le Flair) : la journée, puis chaque match. */
+export function FlairDeLaJournee({ mp }: { mp: MesPronos }) {
+  return (
+    <section aria-labelledby="flair-journee" className="flair flex flex-col gap-4 p-4">
+      <EnTete mp={mp} id="flair-journee" titre={`J${mp.p.j}`} sujets={[...mp.sujets.keys()]} />
+      <BlocJour mp={mp} />
+      {mp.p.matchs.map((m) => (
+        <BlocMatch key={m.n} mp={mp} m={m} entete />
+      ))}
+      <Pied mp={mp} />
     </section>
   );
 }

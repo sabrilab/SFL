@@ -125,7 +125,7 @@ export function CameraVisage({
             opacity="0.9"
           />
         </svg>
-        <div className="absolute inset-x-0 bottom-0 px-4 pb-4 text-center text-[15px] font-semibold text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.6)]">
+        <div className="absolute inset-x-0 bottom-0 px-4 pb-4 text-center text-lecture font-semibold text-white [text-shadow:0_1px_8px_rgba(0,0,0,0.6)]">
           {consigne}
         </div>
         {!prete && (

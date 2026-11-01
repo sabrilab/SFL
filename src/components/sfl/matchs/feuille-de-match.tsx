@@ -32,7 +32,7 @@
 // Les terrains viennent de lib/sfl/feuille.ts ; l'image est dessinée hors
 // écran puis photographiée par html-to-image (déjà là pour la carte 3D).
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toBlob } from "html-to-image";
 import { toast } from "sonner";
 import { Share } from "lucide-react";
@@ -233,12 +233,15 @@ export function FeuilleDeMatch({
   moi,
   entete,
   j = null,
+  avantFlair = null,
 }: {
   terrains: TerrainFeuille[];
   moi: string;
   entete: EnTeteFeuille;
   /** La journée de la feuille, pour Le Flair (matchs/flair.tsx) ; null pour la convocation. */
   j?: number | null;
+  /** Ce qui passe entre les terrains et Le Flair (la page du lieu : le compte à rebours et la journée en étapes). */
+  avantFlair?: ReactNode;
 }) {
   const { allPlayers } = useSeason();
   const parNom = useMemo(
@@ -247,8 +250,27 @@ export function FeuilleDeMatch({
   );
   const [choix, setChoix] = useState(() => monTerrain(terrains, moi));
   const t = terrains[Math.min(choix, terrains.length - 1)];
+  // Plusieurs matchs : on glisse d'un terrain à l'autre (Sabri, 31/10), les
+  // pastilles suivent et y mènent. Au départ, le terrain où je joue.
+  const rail = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const r = rail.current;
+    if (r) r.scrollLeft = choix * r.clientWidth;
+    // Une seule fois, à l'ouverture : ensuite c'est le doigt qui mène.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const suivre = () => {
+    const r = rail.current;
+    if (!r) return;
+    const i = Math.round(r.scrollLeft / r.clientWidth);
+    if (i !== choix && i >= 0 && i < terrains.length) setChoix(i);
+  };
+  const aller = (i: number) => {
+    const r = rail.current;
+    if (r) r.scrollTo({ left: i * r.clientWidth, behavior: "smooth" });
+    setChoix(i);
+  };
 
-  const basEstA = !t?.b.joueurs.includes(moi);
   // Une image par match du jour, chaque terrain tel qu'on le voit dans l'app.
   const sujets = useMemo(
     () =>
@@ -266,29 +288,30 @@ export function FeuilleDeMatch({
   } | null>(null);
 
   if (!t) return null;
-  const [bas, haut] = basEstA ? [t.a, t.b] : [t.b, t.a];
-  const poses = poser(t, basEstA);
   // Des matchs à des heures ou des lieux différents : chacun dit les siens,
   // et le terrain qu'il occupe sur place quand l'admin l'a donné.
   const heures = new Set(terrains.map((x) => x.heure)).size > 1;
   const lieux = new Set(terrains.map((x) => x.ou)).size > 1;
-  const horaire = [heures && t.heure, lieux && t.ou, t.terrain].filter(Boolean).join(" · ");
+  const horaireDe = (x: TerrainFeuille) => [heures && x.heure, lieux && x.ou, x.terrain].filter(Boolean).join(" · ");
 
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="mono-label pl-1 text-muted-foreground">
-          Feuille de match
-        </p>
+        {/* Avec plus de deux matchs, les pastilles prennent toute la ligne. */}
+        {terrains.length <= 2 && (
+          <p className="mono-label pl-1 text-muted-foreground">
+            Feuille de match
+          </p>
+        )}
         {terrains.length > 1 && (
-          <div className="flex gap-1 rounded-full bg-secondary p-[3px]">
+          <div className={cn("flex gap-1 rounded-full bg-secondary p-[3px]", terrains.length > 2 && "flex-1")}>
             {terrains.map((x, i) => (
               <button
                 key={x.label}
                 type="button"
-                onClick={() => setChoix(i)}
+                onClick={() => aller(i)}
                 className={cn(
-                  "h-[30px] px-3 text-[12.5px] font-semibold",
+                  "h-[30px] whitespace-nowrap px-3 text-corps font-semibold", terrains.length > 2 && "flex-1",
                   i === choix
                     ? "bouton-principal"
                     : "bouton-discret",
@@ -301,26 +324,42 @@ export function FeuilleDeMatch({
         )}
       </div>
 
-      <TerrainVu
-        poses={poses}
-        haut={haut}
-        bas={bas}
-        moi={moi}
-        parNom={parNom}
-        horaire={horaire}
-        onChoisir={(p, player) =>
-          setFiche({
-            player,
-            equipe: {
-              nom: p.equipe,
-              camp: p.camp,
-              couleur: p.couleur,
-              encre: p.encre,
-              terrain: terrains.length > 1 ? t.label : null,
-            },
-          })
-        }
-      />
+      <div
+        ref={rail}
+        onScroll={suivre}
+        className="-mx-4 flex snap-x snap-mandatory gap-0 overflow-x-auto [scrollbar-width:none]"
+      >
+        {terrains.map((x) => {
+          const basA = !x.b.joueurs.includes(moi);
+          const [bas, haut] = basA ? [x.a, x.b] : [x.b, x.a];
+          return (
+            <div key={x.label} className="w-full shrink-0 snap-center px-4">
+              <TerrainVu
+                poses={poser(x, basA)}
+                haut={haut}
+                bas={bas}
+                moi={moi}
+                parNom={parNom}
+                horaire={horaireDe(x)}
+                onChoisir={(p, player) =>
+                  setFiche({
+                    player,
+                    equipe: {
+                      nom: p.equipe,
+                      camp: p.camp,
+                      couleur: p.couleur,
+                      encre: p.encre,
+                      terrain: terrains.length > 1 ? x.label : null,
+                    },
+                  })
+                }
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {avantFlair && <div className="mt-2 flex flex-col gap-5">{avantFlair}</div>}
 
       <FlairDuMatch j={j} noirs={t.a.joueurs} blancs={t.b.joueurs} />
 
@@ -328,7 +367,7 @@ export function FeuilleDeMatch({
         type="button"
         disabled={!image.pret}
         onClick={image.partager}
-        className="bouton-principal bouton--mauve flex h-12 items-center justify-center gap-2 text-[15px] font-semibold disabled:opacity-40"
+        className="bouton-principal bouton--mauve flex h-12 items-center justify-center gap-2 text-lecture font-semibold disabled:opacity-40"
       >
         <Share className="size-[18px]" />
         {terrains.length > 1 ? `Partager les ${terrains.length} feuilles` : "Partager la feuille"}
@@ -432,7 +471,7 @@ function TerrainVu({
                 </div>
               </div>
               <span
-                className="whitespace-nowrap rounded-full px-[7px] py-[2px] text-[11px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
+                className="whitespace-nowrap rounded-full px-[7px] py-[2px] text-legende shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
                 style={{
                   background: p.couleur,
                   color: p.encre,
@@ -448,7 +487,7 @@ function TerrainVu({
       <NomEquipe nom={haut.nom} couleur={haut.couleur} className="left-[18px] top-4" />
       <NomEquipe nom={bas.nom} couleur={bas.couleur} className="bottom-[70px] left-[18px]" />
       {horaire && (
-        <span className="absolute top-3.5 right-3.5 max-w-[55%] truncate rounded-full bg-black/55 px-2.5 py-1 text-[11.5px] font-semibold text-white backdrop-blur">
+        <span className="absolute top-3.5 right-3.5 max-w-[55%] truncate rounded-full bg-black/55 px-2.5 py-1 text-petit font-semibold text-white backdrop-blur">
           {horaire}
         </span>
       )}
@@ -472,7 +511,7 @@ function NomEquipe({
         className="size-3 rounded-full shadow-[inset_0_0_0_1px_rgba(128,128,128,0.6)]"
         style={{ background: couleur }}
       />
-      <span className="text-[14px] font-extrabold text-[#0A0B0D] dark:text-white">
+      <span className="text-ligne font-extrabold text-[#0A0B0D] dark:text-white">
         <Nom n={nom} />
       </span>
     </div>

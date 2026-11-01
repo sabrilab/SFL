@@ -21,7 +21,7 @@ export function BoutonMessages({ className }: { className?: string }) {
       {nonLus > 0 && (
         <span
           aria-hidden
-          className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-[5px] text-[11px] leading-none font-bold text-white tabular-nums"
+          className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-[5px] text-legende leading-none font-bold text-white tabular-nums"
           style={{ background: "#FF3B30", boxShadow: "0 0 0 2px var(--background)" }}
         >
           {nonLus > 9 ? "9+" : nonLus}

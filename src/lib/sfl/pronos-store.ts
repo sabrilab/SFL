@@ -14,7 +14,7 @@
 // ligue y est simulé (pronosDemo) pour voir les parts : jamais dans l'XP.
 
 import { supabase } from "@/lib/supabase";
-import { choixPermis, J_SAISON, SUJETS_SAISON, type JourneePronos, type Prono } from "./pronos";
+import { choixPermis, duelPermis, ECARTS, J_SAISON, SUJETS_SAISON, type JourneePronos, type Prono } from "./pronos";
 
 export const PRONOS_EVENT = "sfl-pronos";
 export const APERCU_PRONOS = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
@@ -123,9 +123,16 @@ export function pronosDemo(p: JourneePronos | null, saison: number, candidats: s
         const t = tirage(`${p.j}·${m.n}·${joueur}`);
         const choix = permis.length === 1 ? permis[0] : t < 0.55 ? penche : t < 0.75 ? "nul" : penche === "noirs" ? "blancs" : "noirs";
         liste.push({ saison, j: p.j, sujet: `match:${m.n}`, joueur, choix, le });
+        const ici = [...m.noirs, ...m.blancs];
+        liste.push({ saison, j: p.j, sujet: `ecart:${m.n}`, joueur, choix: parmi(`${p.j}·${m.n}·e·${joueur}`, ECARTS), le });
+        const duel = duelPermis(p, m.n, joueur);
+        if (duel.length) liste.push({ saison, j: p.j, sujet: `duel:${m.n}`, joueur, choix: parmi(`${p.j}·${m.n}·d·${joueur}`, duel), le });
+        for (const g of ["mvp", "buteur", "passeur"])
+          liste.push({ saison, j: p.j, sujet: `${g}:${m.n}`, joueur, choix: parmi(`${p.j}·${m.n}·${g}·${joueur}`, ici.slice(0, 4)), le });
       }
       const tete = p.joueurs.slice(0, 6);
       liste.push({ saison, j: p.j, sujet: "buteur", joueur, choix: parmi(`${p.j}·b·${joueur}`, tete), le });
+      liste.push({ saison, j: p.j, sujet: "passeur", joueur, choix: parmi(`${p.j}·pa·${joueur}`, tete), le });
       liste.push({ saison, j: p.j, sujet: "pepite", joueur, choix: parmi(`${p.j}·p·${joueur}`, tete), le });
     }
     for (const sujet of SUJETS_SAISON)

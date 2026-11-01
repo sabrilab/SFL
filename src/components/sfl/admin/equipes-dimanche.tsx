@@ -98,14 +98,14 @@ export function EquipesDimanche({
         <span className="flex items-center gap-2 text-sm font-semibold">
           <Users className="size-4 text-primary" /> Les équipes de dimanche
         </span>
-        <span className="mono-label text-foreground/40">
+        <span className="mono-label text-encre-3">
           {confirmés.length} confirmé{confirmés.length > 1 ? "s" : ""} → {nbEquipes / 2} match{nbEquipes > 2 ? "s" : ""}
         </span>
       </div>
-      <p className="text-[12.5px] leading-snug text-muted-foreground">
+      <p className="text-corps leading-snug text-muted-foreground">
         Générées depuis les « oui » de la convocation, équilibrées à l&apos;OVR des cartes.
         Validées, elles tombent dans la conversation de chaque joueur{" "}
-        <strong className="text-foreground/80">vendredi à 19h</strong> — c&apos;est l&apos;envoi
+        <strong className="text-encre-2">vendredi à 19h</strong> — c&apos;est l&apos;envoi
         du vendredi soir.
       </p>
 
@@ -115,13 +115,13 @@ export function EquipesDimanche({
           {equipesDeConvocation(validées).map((t) => (
             <div key={t.nom} className="rounded-2xl bg-secondary/40 p-3">
               <div className="mb-1 flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-[13px] font-bold">
+                <span className="flex items-center gap-1.5 text-corps font-bold">
                   {t.camp && <PointMaillot camp={t.camp} />}
                   {t.libelle}
                 </span>
-                <span className="mono-label text-foreground/40">{t.joueurs.length} joueur{t.joueurs.length > 1 ? "s" : ""}</span>
+                <span className="mono-label text-encre-3">{t.joueurs.length} joueur{t.joueurs.length > 1 ? "s" : ""}</span>
               </div>
-              <p className="text-[12.5px] leading-snug text-foreground/55">
+              <p className="text-corps leading-snug text-encre-3">
                 {t.joueurs.join(" · ")}
               </p>
             </div>
@@ -138,15 +138,15 @@ export function EquipesDimanche({
           {equipesDeConvocation(affichées.map((t) => ({ name: t.name, players: t.players.map((p) => p.name) }))).map((t) => (
             <div key={t.nom} className="rounded-2xl bg-secondary/40 p-3">
               <div className="mb-1 flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-[13px] font-bold">
+                <span className="flex items-center gap-1.5 text-corps font-bold">
                   {t.camp && <PointMaillot camp={t.camp} />}
                   {t.libelle}
                 </span>
-                <span className="mono-label text-foreground/40">
+                <span className="mono-label text-encre-3">
                   OVR {affichées.find((x) => x.name === t.nom)?.totalOvr}
                 </span>
               </div>
-              <p className="text-[12.5px] leading-snug text-foreground/55">
+              <p className="text-corps leading-snug text-encre-3">
                 {t.joueurs.join(" · ")}
               </p>
             </div>
@@ -158,7 +158,7 @@ export function EquipesDimanche({
         <button
           onClick={generer}
           className={cn(
-            "flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-bold",
+            "flex items-center gap-1.5 px-3.5 py-2 text-corps font-bold",
             affichées ? "bouton-secondaire bouton--vert" : "bouton-principal bouton--vert"
           )}
         >
@@ -168,7 +168,7 @@ export function EquipesDimanche({
           <button
             onClick={valider}
             disabled={saving}
-            className="bouton-principal bouton--vert flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-bold disabled:opacity-50"
+            className="bouton-principal bouton--vert flex items-center gap-1.5 px-3.5 py-2 text-corps font-bold disabled:opacity-50"
           >
             <Send className="size-3.5" /> Valider — envoi vendredi 19h
           </button>
@@ -176,13 +176,13 @@ export function EquipesDimanche({
         {validées && validées.length > 0 && !affichées && (
           <button
             onClick={retirer}
-            className="bouton-secondaire bouton--rouge px-3.5 py-2 text-[13px] font-semibold"
+            className="bouton-secondaire bouton--rouge px-3.5 py-2 text-corps font-semibold"
           >
             Retirer
           </button>
         )}
         <Locked label="Bientôt" note="Utilisera les compositions déposées dans l'Arène.">
-          <span className="glass-soft block rounded-full px-3.5 py-2 text-[13px] font-semibold text-foreground/60">
+          <span className="glass-soft block rounded-full px-3.5 py-2 text-corps font-semibold text-encre-2">
             Selon l&apos;avis des joueurs
           </span>
         </Locked>

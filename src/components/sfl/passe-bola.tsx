@@ -20,7 +20,8 @@
 //     un skin débloqué (profiles.habillage) ; « Tes couleurs » se porte avec
 //     son pays ; aux paliers 18 et 19, l'appui long sur la carte (ou le
 //     bouton) joue l'aperçu de la séquence (plongee-carte.tsx).
-// Un palier atteint une saison reste débloqué (usePalierMax) : « Acquis ».
+// Un palier atteint une saison reste débloqué (usePaliers) ; la piste est celle
+// de la saison du Passe en cours (saisons-passe.ts).
 // Noire dans les deux modes, comme les fiches (la classe dark).
 
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
@@ -28,19 +29,20 @@ import { Check, Lock, Play, X } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { Champ, Insigne, Tampon, Viseur } from "@/components/sfl/actus/missions";
 import { Card3D } from "@/components/sfl/card-3d";
-import type { Finition, HabillageCarte } from "@/components/sfl/finitions-carte";
+import { DosCarte } from "@/components/sfl/dos-carte";
+import { matiereDe, type Finition, type HabillageCarte } from "@/components/sfl/finitions-carte";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { Plongee, useAppuiLong } from "@/components/sfl/plongee-carte";
 import { COULEURS_PAYS, PAYS_PAR_DEFAUT } from "@/components/sfl/skins-passe";
 import { Poignee, Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import { CartesXpContext, finitionsDe, useChoixHabillage, useHabillage, usePalierMax } from "@/hooks/use-habillage";
+import { CartesXpContext, finitionsDe, useChoixHabillage, useHabillage, usePaliers } from "@/hooks/use-habillage";
 import { useGrandEcran } from "@/hooks/use-media-query";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import type { Player } from "@/lib/sfl/engine";
 import { choisirHabillage } from "@/lib/sfl/habillages-choisis";
 import { isHidden } from "@/lib/sfl/hidden";
 import type { BilanXp, Rang } from "@/lib/sfl/missions";
-import { epreuveDu, PALIERS_PASSE, PASSE_BOLA, seuilPalier, type GenrePalier, type PalierPasse } from "@/lib/sfl/passe";
+import { epreuveDu, seuilPalier, type GenrePalier, type PalierPasse } from "@/lib/sfl/passe";
 import { cn } from "@/lib/utils";
 import "./passe-bola.css";
 
@@ -58,23 +60,44 @@ interface Cadrage {
   x: number;
   y: number;
   zoom: number;
+  /** Le signe est au dos : la vignette montre le dos. */
+  dos?: true;
 }
 
-export const CADRAGES: Partial<Record<number, Cadrage>> = {
-  1: { x: 150, y: 150, zoom: 2.3 }, // le liseré, au coin du portrait
-  3: { x: 191, y: 831, zoom: 2.2 }, // le sceau
-  6: { x: 883, y: 888, zoom: 2.8 }, // la puce
-  9: { x: 330, y: 1050, zoom: 2.6 }, // le nom gravé, dans le microtexte au-dessus de la note
-  13: { x: 150, y: 150, zoom: 2.3 },
-  18: { x: 512, y: 430, zoom: 1.5 }, // le visage : la séquence
-  19: { x: 512, y: 430, zoom: 1.5 },
+const CADRAGES: Partial<Record<string, Cadrage>> = {
+  "lisere-argent": { x: 150, y: 150, zoom: 2.3 }, // le liseré, au coin du portrait
+  "lisere-platine": { x: 150, y: 150, zoom: 2.3 },
+  "lisere-fer": { x: 150, y: 150, zoom: 2.3 },
+  sceau: { x: 191, y: 831, zoom: 2.2 },
+  "puce-noire": { x: 883, y: 888, zoom: 2.8 }, // la puce
+  "nom-grave": { x: 330, y: 1050, zoom: 2.6 }, // le nom gravé, dans le microtexte au-dessus de la note
+  runes: { x: 512, y: 420, zoom: 1.9, dos: true }, // la frise, au-dessus de la rosace du dos
+  "nom-runes": { x: 512, y: 1330, zoom: 2.2, dos: true }, // le nom en runes, sous le logotype du dos
 };
+
+/** La vignette d'un palier : un signe de près, sinon la carte entière. */
+export const cadrageDe = (p: PalierPasse): Cadrage | undefined => (p.habille?.signe ? CADRAGES[p.habille.signe] : undefined);
 
 // La carte joueur fait 254 px de large à la taille 1 (bola-card.tsx).
 const PX_TAILLE_1 = 254 / 1024;
 
 /** Une carte réduite dans une fenêtre de l × h px : cadrée sur un signe, ou entière et centrée. */
-export function Mini({ player, habillage, cadrage, l, h }: { player: Player; habillage: HabillageCarte; cadrage?: Cadrage; l: number; h: number }) {
+export function Mini({
+  player,
+  habillage,
+  cadrage,
+  dos = cadrage?.dos ?? false,
+  l,
+  h,
+}: {
+  player: Player;
+  habillage: HabillageCarte;
+  cadrage?: Cadrage;
+  /** Le dos de la carte (les runes de la Saison Givre). */
+  dos?: boolean;
+  l: number;
+  h: number;
+}) {
   const s = cadrage ? Math.max(l / 1024, h / 1656) * cadrage.zoom : Math.min(l / 1024, h / 1656);
   const cl = 1024 * s;
   const ch = 1656 * s;
@@ -86,7 +109,11 @@ export function Mini({ player, habillage, cadrage, l, h }: { player: Player; hab
       className="pointer-events-none absolute top-0 left-0"
       style={{ transformOrigin: "0 0", transform: `translate(${tx}px, ${ty}px) scale(${s / PX_TAILLE_1})` }}
     >
-      <PlayerCard player={player} size={1} habillage={habillage} />
+      {dos ? (
+        <DosCarte matiere={matiereDe("base", habillage)} nom={player.name} habillage={habillage} />
+      ) : (
+        <PlayerCard player={player} size={1} habillage={habillage} />
+      )}
     </span>
   );
 }
@@ -107,13 +134,15 @@ export function etatDe(n: number, palier: number, palierMax: number): EtatPalier
   return n === palier + 1 ? "prochain" : "verrou";
 }
 
-/** Combien de joueurs ont débloqué chaque palier (toutes saisons), sans les joueurs masqués. */
-export function useOntLePalier(): (n: number) => number {
+/** Combien de joueurs ont débloqué chaque palier d'une saison du Passe, sans les joueurs masqués. */
+export function useOntLePalier(saison: string): (n: number) => number {
   const cartes = useContext(CartesXpContext);
   return useMemo(() => {
-    const paliers = [...(cartes?.parJoueur ?? new Map()).entries()].filter(([nom]) => !isHidden(nom)).map(([, x]) => x.palier);
+    const paliers = [...(cartes?.parJoueur ?? new Map()).entries()]
+      .filter(([nom]) => !isHidden(nom))
+      .map(([, x]) => x.paliers[saison] ?? 0);
     return (n: number) => paliers.filter((p) => p >= n).length;
-  }, [cartes]);
+  }, [cartes, saison]);
 }
 
 function Vignette({
@@ -146,7 +175,7 @@ function Vignette({
       </span>
       <span className={cn("passe__fenetre", etui && "passe__fenetre--etui")}>
         <span className="passe__mini">
-          <Mini player={player} habillage={essai(porte, p)} cadrage={CADRAGES[p.n]} l={etui ? 70 : 84} h={etui ? 120 : 136} />
+          <Mini player={player} habillage={essai(porte, p)} cadrage={cadrageDe(p)} l={etui ? 70 : 84} h={etui ? 120 : 136} />
         </span>
         {etat === "prochain" && <Viseur etat="verrou" petit />}
         {p.genre === "sequence" && (
@@ -201,7 +230,8 @@ function ApercuPalier({ p, player, b, palierMax }: { p: PalierPasse; player: Pla
   const porte = useHabillage(nom);
   const choix = useChoixHabillage(nom);
   const photo = usePlayerPhoto(nom);
-  const ontLe = useOntLePalier();
+  const ontLe = useOntLePalier(b.saisonPasse.id);
+  const paliers = usePaliers(nom);
   const [pays, setPays] = useState(choix.pays ?? PAYS_PAR_DEFAUT);
   const [plonge, setPlonge] = useState(false);
   const sequence = p.genre === "sequence";
@@ -210,7 +240,7 @@ function ApercuPalier({ p, player, b, palierMax }: { p: PalierPasse; player: Pla
   const ouvert = etat === "gagne" || etat === "acquis";
   const finition = p.habille?.finition as Finition | undefined;
   // Un skin offert (l'onyx de Sabri) se porte aussi sans le palier.
-  const aLeSkin = !!finition && (ouvert || finitionsDe(nom, palierMax).includes(finition));
+  const aLeSkin = !!finition && (ouvert || finitionsDe(nom, paliers).includes(finition));
   const portee = !!finition && porte.finition === finition && (finition !== "couleurs" || porte.pays === pays);
   const habillage = essai(porte, p, pays);
   const e = epreuveDu(p.n);
@@ -249,7 +279,7 @@ function ApercuPalier({ p, player, b, palierMax }: { p: PalierPasse; player: Pla
         <dl className="fiche__champs">
           <Champ label="Palier">
             <span className="tabular-nums">
-              {p.n} / {PALIERS_PASSE}
+              {p.n} / {b.saisonPasse.paliers.length}
             </span>
           </Champ>
           <Champ label="Il faut">
@@ -325,15 +355,17 @@ function ApercuPalier({ p, player, b, palierMax }: { p: PalierPasse; player: Pla
 }
 
 export function PasseBola({ player, saison, b, rang }: { player: Player; saison: number; b: BilanXp; rang: Rang }) {
-  const palierMax = Math.max(usePalierMax(player.name), b.palier);
+  const palierMax = b.palier;
+  const piste_ = b.saisonPasse.paliers;
+  const PALIERS_PASSE = piste_.length;
   const porte = useHabillage(player.name);
   const piste = useRef<HTMLDivElement>(null);
   const [vu, setVu] = useState<number | null>(null);
   const [ouvert, setOuvert] = useState(false);
   const { passe } = b;
   const fini = passe.palier >= PALIERS_PASSE;
-  const prochain = PASSE_BOLA[Math.min(PALIERS_PASSE, passe.palier + 1) - 1];
-  const p = PASSE_BOLA.find((x) => x.n === vu);
+  const prochain = piste_[Math.min(PALIERS_PASSE, passe.palier + 1) - 1];
+  const p = piste_.find((x) => x.n === vu);
 
   // La piste s'ouvre sur le prochain palier, le précédent encore en vue.
   useEffect(() => {
@@ -405,7 +437,7 @@ export function PasseBola({ player, saison, b, rang }: { player: Player; saison:
       </div>
 
       <div ref={piste} role="group" className="passe__piste" aria-label="Les vingt paliers">
-        {PASSE_BOLA.map((x) => {
+        {piste_.map((x) => {
           const etat = etatDe(x.n, passe.palier, palierMax);
           return (
             <Vignette

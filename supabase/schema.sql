@@ -355,7 +355,9 @@ alter table public.activity add constraint activity_kind_check
     'achat',      -- achat d'une carte
     'recherche',  -- une recherche lancée
     'compo',      -- une composition 5v5 déposée dans l'Arène
-    'notifs'      -- l'invitation aux notifications montrée, et la réponse
+    'notifs',     -- l'invitation aux notifications montrée, et la réponse
+    'activation', -- « Ton premier match » d'un joueur Bola : vu, position, terrain, invitation
+    'map'         -- un geste dans la Map (meta.geste : stade, y-aller, je-viens, ouvrir, zone)
   ));
 
 create index if not exists activity_player_created_idx
@@ -6475,8 +6477,9 @@ grant select on public.mises_en_ligne to authenticated;
 -- Sabri, 24/10 : « que le joueur puisse pronostiquer des choses dans les
 -- matchs à venir ou les journées », « qui finira meilleur buteur, qui finira
 -- meilleure Pépite d'Or ». Un prono par joueur et par sujet (lib/sfl/pronos.ts) :
---   · j > 0, la journée : 'match:0' (Noirs, nul ou Blancs), 'buteur',
---     'pepite' (un nom de joueur) ;
+--   · j > 0, la journée : par match, 'match:0' (Noirs, nul ou Blancs),
+--     'ecart:0' (serré, net, large), 'duel:0', 'mvp:0', 'buteur:0',
+--     'passeur:0' (un nom) ; pour la journée, 'pepite', 'buteur', 'passeur' ;
 --   · j = 0, la saison : 'pepite', 'buteur', 'passeur'.
 -- On ne pose que pour soi, par pronostiquer() : la base met le nom (mon_nom)
 -- et l'heure (now()), jamais le téléphone. L'app ne retient qu'un prono posé
@@ -6486,13 +6489,19 @@ grant select on public.mises_en_ligne to authenticated;
 create table if not exists public.pronos (
   saison     integer not null,
   j          integer not null check (j >= 0),
-  sujet      text    not null check (sujet ~ '^(match:[0-9]{1,2}|buteur|pepite|passeur)$'),
+  sujet      text    not null check (sujet ~ '^((match|ecart|duel|mvp|buteur|passeur):[0-9]{1,2}|buteur|pepite|passeur)$'),
   joueur     text    not null,
   choix      text    not null check (char_length(choix) between 1 and 80),
   joueur_id  uuid    not null references public.profiles(id) on delete cascade,
   le         timestamptz not null default now(),
   primary key (saison, j, sujet, joueur)
 );
+
+-- Sabri, 31/10 : chaque match a aussi son écart, son duel, son MVP, son
+-- buteur et son passeur ('mvp:0'…), et la journée son passeur.
+alter table public.pronos drop constraint if exists pronos_sujet_check;
+alter table public.pronos add constraint pronos_sujet_check
+  check (sujet ~ '^((match|ecart|duel|mvp|buteur|passeur):[0-9]{1,2}|buteur|pepite|passeur)$');
 
 alter table public.pronos enable row level security;
 
@@ -6525,16 +6534,16 @@ begin
   if not public.est_membre() or v_nom is null then
     raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
   end if;
-  if p_j < 0 or p_sujet !~ '^(match:[0-9]{1,2}|buteur|pepite|passeur)$'
-     or (p_j = 0 and p_sujet not in ('pepite', 'buteur', 'passeur'))
-     or (p_j > 0 and p_sujet = 'passeur') then
+  if p_j < 0 or p_sujet !~ '^((match|ecart|duel|mvp|buteur|passeur):[0-9]{1,2}|buteur|pepite|passeur)$'
+     or (p_j = 0 and p_sujet not in ('pepite', 'buteur', 'passeur')) then
     raise exception 'Prono inconnu.' using errcode = '22023';
   end if;
   if nullif(btrim(p_choix), '') is null then
     delete from public.pronos where saison = p_saison and j = p_j and sujet = p_sujet and joueur = v_nom;
     return v_le;
   end if;
-  if p_sujet like 'match:%' and p_choix not in ('noirs', 'nul', 'blancs') then
+  if (p_sujet like 'match:%' and p_choix not in ('noirs', 'nul', 'blancs'))
+     or (p_sujet like 'ecart:%' and p_choix not in ('serre', 'net', 'large')) then
     raise exception 'Prono inconnu.' using errcode = '22023';
   end if;
   insert into public.pronos (saison, j, sujet, joueur, choix, joueur_id, le)
@@ -7391,5 +7400,42 @@ begin
 exception
   when duplicate_object then null;
   when undefined_object then null;
+end;
+$$;
+
+-- ─────────────────── Map : l'affiche du match ───────────────────
+-- L'affiche d'un match (Sabri, 31/10 : l'image générée des deux meilleurs
+-- joueurs, « comme ça ça pourrait être l'affiche du match ») : une image par
+-- paire de joueurs, faite une seule fois par fal côté serveur (api/affiche)
+-- et gardée dans le bucket public « affiches ». Seuls les joueurs qui ont
+-- accepté l'usage de leur carte hors de l'app (consentements.hors_app) et
+-- qui ont une photo de carte y figurent. Seule la clé secrète écrit ici ;
+-- tout le monde lit (l'image est publique, comme les photos de carte).
+create table if not exists public.match_affiches (
+  paire       text primary key,
+  joueurs     text[] not null,
+  chemin      text,
+  statut      text not null default 'en_cours' check (statut in ('en_cours', 'prete', 'ratee')),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists match_affiches_date on public.match_affiches (created_at desc);
+alter table public.match_affiches enable row level security;
+revoke all on public.match_affiches from anon, authenticated;
+grant select on public.match_affiches to anon, authenticated;
+drop policy if exists "match_affiches: tout le monde lit" on public.match_affiches;
+create policy "match_affiches: tout le monde lit" on public.match_affiches for select to anon, authenticated
+  using (statut = 'prete');
+
+do $$
+begin
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('affiches', 'affiches', true, 3145728, array['image/jpeg'])
+  on conflict (id) do update
+    set public = true,
+        file_size_limit = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types;
+exception
+  when others then raise warning 'affiches : bucket non créé (%)', sqlerrm;
 end;
 $$;

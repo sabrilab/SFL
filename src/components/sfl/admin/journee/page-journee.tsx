@@ -12,6 +12,11 @@
 // convocation (la vraie, en cartes ; « Il manque N » en braise), les matchs
 // un par un sur leur terrain, les remplaçants. En bas, sous le pouce, le
 // geste du moment — il n'y en a jamais qu'un (etat-journee.ts) — et ↶ ↷.
+// Sous les matchs, les outils de la journée, à toute heure (31/10/2026 :
+// Sabri ne les trouvait plus derrière ≡) : la Feuille à consulter (lignes,
+// points décomposés, alertes), la Saisie (le direct de toujours), les Votes,
+// les Points d'un joueur et la Grille. Les « Je viens » de la convocation
+// se posent sur les terrains d'un geste (venus-sur-la-feuille.ts).
 // Tout le reste de la ligue est derrière ≡ (Ligue), rien n'est perdu.
 //
 // Aucune phrase d'aide : la pastille, le pointillé et le libellé de chaque
@@ -29,6 +34,7 @@ import { ChoisirJoueurs } from "@/components/sfl/admin/choisir-joueurs";
 import { Confirmer, type Confirmation } from "@/components/sfl/admin/confirmer";
 import { PastilleSynchro, Synchro } from "@/components/sfl/admin/synchro";
 import { ResultatsVotes } from "@/components/sfl/admin/resultats-votes";
+import { DetailPoints } from "@/components/sfl/admin/detail-points";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { usePresence } from "@/hooks/use-presence";
 import { useSaisieAdmin } from "@/hooks/use-saisie-admin";
@@ -42,13 +48,15 @@ import { placementsDeLaJournee } from "@/lib/sfl/saisie/effectif";
 import { etatJournee, gesteDuMoment, prochaineJournee } from "@/lib/sfl/saisie/etat-journee";
 import { verifierFeuille } from "@/lib/sfl/saisie/integrite";
 import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
-import { addEntry, ajouterMatch, matchsDeclares, memeDate, newEntry, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
+import { addEntry, ajouterMatch, matchsDeclares, memeDate, newEntry, poserEquipes, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
+import { equipesDesVenus, joueursPoses } from "@/lib/sfl/saisie/venus-sur-la-feuille";
 import { saisieStore } from "@/lib/sfl/saisie/store";
 import type { MatchDuJour } from "@/lib/sfl/saisie/types";
 import { cn } from "@/lib/utils";
 import { BlocConvocation, FeuilleConvocation } from "./bloc-convocation";
 import { BlocMatchs, matchsVus } from "./bloc-matchs";
 import { FeuilleArbitre } from "./feuille-arbitre";
+import { FeuilleConsulter } from "./feuille-consulter";
 import { FeuilleDirect } from "./feuille-direct";
 import { FeuilleLigne } from "./feuille-ligne";
 import { FeuillePreparer } from "./feuille-preparer";
@@ -82,6 +90,10 @@ export function PageJournee() {
   const [arbitre, setArbitre] = useState<number | null>(null);
   const [synchro, setSynchro] = useState(false);
   const [votes, setVotes] = useState(false);
+  const [consulter, setConsulter] = useState(false);
+  const [points, setPoints] = useState(false);
+  // Une ligne ouverte depuis la Feuille y ramène en se fermant.
+  const [retourFeuille, setRetourFeuille] = useState(false);
   const [ajouterA, setAjouterA] = useState<string | null | false>(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
 
@@ -103,6 +115,12 @@ export function PageJournee() {
   const viens = useMemo(
     () => (convocationDuJour ? new Set([...presence.presents, ...presence.remplacants]) : new Set<string>()),
     [convocationDuJour, presence.presents, presence.remplacants]
+  );
+
+  // Les « Je viens » de ce dimanche qui ne sont pas encore sur les terrains, posés d'un geste.
+  const proposition = useMemo(
+    () => (j != null && convocationDuJour ? equipesDesVenus(saison, j, presence.ordreDesVenus, presence.teams) : null),
+    [saison, j, convocationDuJour, presence.ordreDesVenus, presence.teams]
   );
 
   // Hors des camps : les lignes sans équipe (remplaçants), puis les « Je viens » pas encore sur la feuille.
@@ -149,6 +167,14 @@ export function PageJournee() {
     if (i >= 0) setLigne(i);
   }
 
+  function placerLesVenus() {
+    if (j == null || !proposition) return;
+    if (faire((s) => poserEquipes(s, j, proposition, meta?.date), `Je viens posés sur la J${j}`)) {
+      haptique.ajout();
+      setMatchCourant(1);
+    }
+  }
+
   function ajouterUnMatch() {
     if (j == null) return;
     const fait = ajouterMatch(saisieStore.load(), j, {}, TERRAINS_MAX);
@@ -163,7 +189,7 @@ export function PageJournee() {
       {/* En-tête : le retour, la synchro, la Ligue. */}
       <header className="flex items-center gap-2">
         <BoutonRetour />
-        <h1 className="titre-lettrage flex-1 text-[22px]">SFL</h1>
+        <h1 className="titre-lettrage flex-1 text-titre-m">SFL</h1>
         <PastilleSynchro onClick={() => setSynchro(true)} />
         <Link href="/admin/ligue" aria-label="Ligue" className="bouton-secondaire grid size-11 place-items-center">
           <Menu className="size-5" />
@@ -189,12 +215,12 @@ export function PageJournee() {
               }}
               className={cn(
                 "relative flex h-14 min-w-12 shrink-0 flex-col items-center justify-center rounded-[18px] px-2.5",
-                actif ? "bg-foreground text-background" : "text-foreground/55",
+                actif ? "bg-foreground text-background" : "text-encre-3",
                 estBrouillon(m) && !actif && "border border-dashed border-foreground/35"
               )}
             >
-              <span className="font-display text-[22px] leading-none">J{m.j}</span>
-              <span className="mono-label h-3 text-[9px] leading-3">{estBrouillon(m) ? "○" : defaut ? "!" : ""}</span>
+              <span className="font-display text-titre-m leading-none">J{m.j}</span>
+              <span className="mono-label h-3 text-micro leading-3">{estBrouillon(m) ? "○" : defaut ? "!" : ""}</span>
             </button>
           );
         })}
@@ -208,12 +234,12 @@ export function PageJournee() {
           }}
           className={cn(
             "flex h-14 min-w-12 shrink-0 flex-col items-center justify-center rounded-[18px] border-[1.5px] border-dashed px-2.5",
-            j == null ? "border-foreground text-foreground" : "border-foreground/30 text-foreground/45"
+            j == null ? "border-foreground text-foreground" : "border-foreground/30 text-encre-3"
           )}
           aria-label={`Préparer la J${aPreparer}`}
         >
-          <span className="font-display text-[22px] leading-none">J{aPreparer}</span>
-          <span className="mono-label h-3 text-[9px] leading-3">+</span>
+          <span className="font-display text-titre-m leading-none">J{aPreparer}</span>
+          <span className="mono-label h-3 text-micro leading-3">+</span>
         </button>
       </div>
 
@@ -241,7 +267,7 @@ export function PageJournee() {
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="font-display mr-1 text-[44px] leading-[0.9]">J{j}</span>
+            <span className="font-display mr-1 text-affiche leading-[0.9]">J{j}</span>
             <Pastille onClick={() => setQuandOu(null)}>Dim {meta.date}</Pastille>
             <Pastille onClick={() => setQuandOu(null)} pointille={!meta.heure}>
               {meta.heure ?? "Heure"}
@@ -258,7 +284,7 @@ export function PageJournee() {
             ) : (
               <div className="flex flex-col gap-3">
                 <Etiquette>La ligue voit{derniereVue ? ` · J${derniereVue.j}` : ""}</Etiquette>
-                {derniereVue ? <CarteJournee journee={derniereVue} /> : <p className="mono-label py-8 text-center text-foreground/40">Rien</p>}
+                {derniereVue ? <CarteJournee journee={derniereVue} /> : <p className="mono-label py-8 text-center text-encre-3">Rien</p>}
               </div>
             )
           ) : (
@@ -287,7 +313,7 @@ export function PageJournee() {
                 lieu={(m) => terrainDe(m.lieuId ?? meta.terrainId)}
               />
               {matchs.length > 0 && matchs.every((m) => !m.noirs.length && !m.blancs.length) === false && (
-                <p className="mono-label text-foreground/55">{compteursEnMots(saison, j)}</p>
+                <p className="mono-label text-encre-3">{compteursEnMots(saison, j)}</p>
               )}
               {matchs[matchCourant - 1] && !matchs[matchCourant - 1].noirs.length && !matchs[matchCourant - 1].blancs.length && (
                 <button
@@ -302,6 +328,12 @@ export function PageJournee() {
                 </button>
               )}
 
+              {proposition && (etat === "brouillon" || etat === "en-ligne") && (
+                <button type="button" onClick={placerLesVenus} className="bouton-secondaire h-11 self-center px-5 text-ligne font-semibold">
+                  Placer les {sansPlace.length || joueursPoses(proposition)} Je viens
+                </button>
+              )}
+
               {(horsCamps.length > 0 || sansPlace.length > 0) && (
                 <section className="flex flex-col gap-2">
                   <Etiquette>Remplaçants · {horsCamps.length + sansPlace.length}</Etiquette>
@@ -309,7 +341,7 @@ export function PageJournee() {
                     {horsCamps.map(({ e, i }) => (
                       <button key={`l${i}`} type="button" onClick={() => setLigne(i)} className="flex shrink-0 flex-col items-center gap-1">
                         <CarteDe name={e.player} size={FORMAT_CARTE.petite} inerte />
-                        <span className="mono-label max-w-[72px] truncate text-[9px] text-foreground/60">{e.statut === "Présent" ? e.player.split(" ")[0] : e.statut}</span>
+                        <span className="mono-label max-w-[72px] truncate text-micro text-encre-2">{e.statut === "Présent" ? e.player.split(" ")[0] : e.statut}</span>
                       </button>
                     ))}
                     {sansPlace.map((nom) => (
@@ -317,22 +349,25 @@ export function PageJournee() {
                         <span className="rounded-[13px] border-[1.5px] border-dashed border-foreground/40 p-[2px]">
                           <CarteDe name={nom} size={FORMAT_CARTE.petite} inerte />
                         </span>
-                        <span className="mono-label max-w-[72px] truncate text-[9px] text-foreground/60">{nom.split(" ")[0]}</span>
+                        <span className="mono-label max-w-[72px] truncate text-micro text-encre-2">{nom.split(" ")[0]}</span>
                       </button>
                     ))}
                   </div>
                 </section>
               )}
 
-              {geste.t === "apres" && (
-                <section className="flex flex-col gap-2">
-                  <Etiquette>Après</Etiquette>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Pastille onClick={() => setVotes(true)}>Votes</Pastille>
-                    <Pastille onClick={() => setDirect(true)}>Corriger</Pastille>
-                  </div>
-                </section>
-              )}
+              <section className="flex flex-col gap-2">
+                <Etiquette>Outils</Etiquette>
+                <div className="flex flex-wrap gap-1.5">
+                  <Pastille onClick={() => setConsulter(true)}>Feuille{ecarts.length ? ` · ${ecarts.length} !` : ""}</Pastille>
+                  <Pastille onClick={() => setDirect(true)}>Saisie</Pastille>
+                  <Pastille onClick={() => setVotes(true)}>Votes</Pastille>
+                  <Pastille onClick={() => setPoints(true)}>Points</Pastille>
+                  <Link href="/admin/tableau?onglet=grille" className="mono-label inline-flex h-9 shrink-0 items-center rounded-full bg-secondary px-3.5 text-encre-2">
+                    Grille
+                  </Link>
+                </div>
+              </section>
             </>
           )}
         </section>
@@ -342,8 +377,8 @@ export function PageJournee() {
           onClick={() => setPreparer(true)}
           className="flex min-h-[280px] flex-col items-center justify-center gap-2 rounded-[28px] border-[1.5px] border-dashed border-foreground/30"
         >
-          <span className="font-display text-[64px] leading-none text-foreground/40">J{aPreparer}</span>
-          <span className="mono-label text-foreground/50">À préparer</span>
+          <span className="font-display text-[64px] leading-none text-encre-3">J{aPreparer}</span>
+          <span className="mono-label text-encre-3">À préparer</span>
         </button>
       )}
 
@@ -351,15 +386,15 @@ export function PageJournee() {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/50 bg-background/95 pb-[calc(env(safe-area-inset-bottom,0px)+10px)] backdrop-blur-xl">
         <div className="shell flex flex-col gap-2 pt-3 sm:max-w-[600px]">
           {geste.t === "preparer" || geste.t === "apres" ? (
-            <button type="button" onClick={() => setPreparer(true)} className="bouton-principal h-12 text-[15px] font-semibold">
+            <button type="button" onClick={() => setPreparer(true)} className="bouton-principal h-12 text-lecture font-semibold">
               Préparer la J{geste.t === "apres" ? geste.suivante.j : geste.j} · dim {geste.t === "apres" ? geste.suivante.date : geste.date}
             </button>
           ) : geste.t === "corriger" ? (
-            <button type="button" onClick={() => setPublier(true)} className="bouton-secondaire h-12 text-[15px] font-semibold">
+            <button type="button" onClick={() => setPublier(true)} className="bouton-secondaire h-12 text-lecture font-semibold">
               {geste.ecarts.length} à corriger
             </button>
           ) : geste.t === "publier" ? (
-            <button type="button" onClick={() => setPublier(true)} className="bouton-principal h-12 text-[15px] font-semibold">
+            <button type="button" onClick={() => setPublier(true)} className="bouton-principal h-12 text-lecture font-semibold">
               Publier pour tout le monde
             </button>
           ) : geste.t === "en-ligne" ? (
@@ -367,12 +402,12 @@ export function PageJournee() {
               <span className="mono-label flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-foreground text-background">
                 ● En ligne{geste.le ? ` · ${heureDe(geste.le)}` : ""}
               </span>
-              <button type="button" onClick={() => setRemettre(true)} className="bouton-discret h-12 px-3 text-[13.5px] font-semibold">
+              <button type="button" onClick={() => setRemettre(true)} className="bouton-discret h-12 px-3 text-ligne font-semibold">
                 Remettre en brouillon
               </button>
             </div>
           ) : (
-            <button type="button" onClick={() => setDirect(true)} className="bouton-principal h-12 text-[15px] font-semibold">
+            <button type="button" onClick={() => setDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">
               Direct · Match {geste.match}
               {geste.heure ? ` · ${geste.heure}` : ""}
             </button>
@@ -397,6 +432,7 @@ export function PageJournee() {
         saison={saison}
         viennent={presence.presents.length}
         equipesConvocation={presence.teams}
+        convocation={{ jour: presence.jour, venus: presence.ordreDesVenus }}
         par={par}
         faire={faire}
         onOuverte={(n) => {
@@ -446,7 +482,13 @@ export function PageJournee() {
             equipes={equipes}
             mvpAuto={mvpAutomatique(saison, j)}
             places={places}
-            onClose={() => setLigne(null)}
+            onClose={() => {
+              setLigne(null);
+              if (retourFeuille) {
+                setRetourFeuille(false);
+                setConsulter(true);
+              }
+            }}
             faire={faire}
             onRetirer={(index, l) =>
               setConfirmation({
@@ -458,6 +500,18 @@ export function PageJournee() {
                 },
               })
             }
+          />
+          <FeuilleConsulter
+            open={consulter}
+            onOpenChange={setConsulter}
+            saison={saison}
+            j={j}
+            matchs={matchs}
+            onLigne={(i) => {
+              setConsulter(false);
+              setRetourFeuille(true);
+              setLigne(i);
+            }}
           />
           <FeuillePublier key={`pub-${publier}`} open={publier} onOpenChange={setPublier} saison={saison} j={j} par={par} faire={faire} />
           <FeuilleRemettre key={`rem-${remettre}`} open={remettre} onOpenChange={setRemettre} saison={saison} j={j} par={par} faire={faire} />
@@ -488,7 +542,10 @@ export function PageJournee() {
         <Synchro saison={saison} nu />
       </Feuille>
       <Feuille open={votes} onOpenChange={setVotes} titre="Votes" haute>
-        <ResultatsVotes />
+        <ResultatsVotes key={j ?? 0} j={j ?? undefined} />
+      </Feuille>
+      <Feuille open={points} onOpenChange={setPoints} titre="Points" haute>
+        <DetailPoints saison={saison} />
       </Feuille>
       <Confirmer confirmation={confirmation} onFermer={() => setConfirmation(null)} />
     </div>

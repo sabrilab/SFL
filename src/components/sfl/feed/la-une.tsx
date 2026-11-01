@@ -114,13 +114,13 @@ export function LaUne({
       <div className="px-5 pt-5 pb-3">
         <Filet epais />
         <div className="flex items-baseline justify-between gap-2 py-2.5">
-          <span className="mono-label text-foreground/35">Édition du dimanche</span>
-          <span className="mono-label text-foreground/35">{date}</span>
+          <span className="mono-label text-encre-4">Édition du dimanche</span>
+          <span className="mono-label text-encre-4">{date}</span>
         </div>
-        <h2 className="titre-lettrage text-center text-[30px] leading-[0.9]">
+        <h2 className="titre-lettrage text-center text-titre-l leading-[0.9]">
           La Gazette
         </h2>
-        <p className="mono-label mt-1.5 text-center text-foreground/40">
+        <p className="mono-label mt-1.5 text-center text-encre-3">
           Sunday Five League · Journée {journee}
         </p>
         <div className="mt-2.5">
@@ -130,10 +130,10 @@ export function LaUne({
 
       {/* La manchette */}
       <div className="px-5 pb-4">
-        <h3 className="titre-lettrage text-[23px] leading-[0.98]">
+        <h3 className="titre-lettrage text-titre-m leading-[0.98]">
           {titre}
         </h3>
-        <p className="mt-2 text-[13.5px] leading-[1.5] text-foreground/55">{chapeau}</p>
+        <p className="mt-2 text-ligne leading-[1.5] text-encre-3">{chapeau}</p>
       </div>
 
       {/* Les cartes gagnées — les « photos » de la une */}
@@ -165,7 +165,7 @@ export function LaUne({
                 />
                 <figcaption className="max-w-[130px] text-center">
                   <span className="mono-label block text-primary">{TITRES[c.type] ?? c.type}</span>
-                  <span className="mt-0.5 block truncate text-[12.5px] font-bold"><Nom n={c.player} /></span>
+                  <span className="mt-0.5 block truncate text-corps font-bold"><Nom n={c.player} /></span>
                 </figcaption>
               </motion.figure>
             ))}
@@ -176,7 +176,7 @@ export function LaUne({
       {/* Le palmarès — tout le monde, en colonnes de journal */}
       <div className="px-5 pb-5">
         <Filet />
-        <p className="mono-label py-2.5 text-foreground/35">
+        <p className="mono-label py-2.5 text-encre-4">
           Le dimanche de tout le monde · {classees.length} joueurs
         </p>
         <div className="grid grid-cols-1 gap-x-5 sm:grid-cols-2">
@@ -184,14 +184,14 @@ export function LaUne({
             <div
               key={l.player}
               className={cn(
-                "flex items-baseline gap-2 border-b border-contraste/6 py-[7px] text-[12.5px]",
+                "flex items-baseline gap-2 border-b border-contraste/6 py-[7px] text-corps",
                 i === 0 && "border-b-contraste/14"
               )}
             >
               <span
                 className={cn(
                   "w-[18px] shrink-0 text-right tabular-nums",
-                  i === 0 ? "font-bold text-primary" : "text-foreground/25"
+                  i === 0 ? "font-bold text-primary" : "text-encre-4"
                 )}
               >
                 {i + 1}
@@ -199,19 +199,19 @@ export function LaUne({
               <span className="min-w-0 flex-1 truncate font-semibold">
                 {l.player}
                 {(l.mvp || l.impact || l.def) && (
-                  <span className="mono-label ml-1.5 text-[8px] text-primary">
+                  <span className="mono-label ml-1.5 text-micro text-primary">
                     {l.mvp ? "MVP" : l.impact ? "IMP" : "DÉF"}
                   </span>
                 )}
               </span>
-              <span className="shrink-0 tabular-nums text-foreground/40">
+              <span className="shrink-0 tabular-nums text-encre-3">
                 {l.buts}·{l.passes}
               </span>
               <span className="w-[26px] shrink-0 text-right font-bold tabular-nums">{l.pp}</span>
             </div>
           ))}
         </div>
-        <p className="mono-label mt-3 text-center text-foreground/25">
+        <p className="mono-label mt-3 text-center text-encre-4">
           Buts · Passes · Points Pépite — Respect, passion, solidarité
         </p>
       </div>

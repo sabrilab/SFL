@@ -24,7 +24,7 @@ export function BoutonDeconnexion({ className }: { className?: string }) {
         toast.success("À dimanche 👋");
       }}
       className={cn(
-        "bouton-secondaire bouton--rouge flex items-center justify-center gap-2 py-[15px] text-[15px] font-semibold",
+        "bouton-secondaire bouton--rouge flex items-center justify-center gap-2 py-[15px] text-lecture font-semibold",
         className
       )}
     >

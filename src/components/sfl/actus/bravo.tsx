@@ -51,7 +51,7 @@ export function Bravo({ exploits }: { exploits: Exploit[] }) {
           type="button"
           onClick={() => setListe(true)}
           aria-label={`${qui.length} ${qui.length > 1 ? "félicitations" : "félicitation"}`}
-          className="bouton-secondaire bouton--mauve flex h-9 shrink-0 items-center gap-1.5 px-3.5 text-[13px] font-semibold tabular-nums"
+          className="bouton-secondaire bouton--mauve flex h-9 shrink-0 items-center gap-1.5 px-3.5 text-corps font-semibold tabular-nums"
         >
           <span aria-hidden>👏</span>
           {qui.length}
@@ -59,10 +59,10 @@ export function Bravo({ exploits }: { exploits: Exploit[] }) {
         <Sheet open={liste} onOpenChange={setListe} titre="les félicitations">
           <SheetContent side="bottom" className="mx-auto max-h-[80dvh] w-full rounded-t-[28px] px-4 pt-6 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] sm:max-w-md">
             <div className="flex flex-col gap-1 px-1">
-              <SheetTitle className="titre-lettrage text-[24px] leading-[0.95] font-black">
+              <SheetTitle className="titre-lettrage text-titre-g leading-[0.95] font-black">
                 {qui.length > 1 ? `${qui.length} joueurs t'ont félicité` : "Un joueur t'a félicité"}
               </SheetTitle>
-              <SheetDescription className="font-mono text-[12px] text-muted-foreground">
+              <SheetDescription className="font-mono text-petit text-muted-foreground">
                 {visibles.length === 1 ? `J${visibles[0].j} · ${visibles[0].quoi}` : `J${visibles[0].j}`}
               </SheetDescription>
             </div>
@@ -74,10 +74,10 @@ export function Bravo({ exploits }: { exploits: Exploit[] }) {
                   <div key={x.de} className="flex items-center gap-3 rounded-[18px] bg-card px-3 py-2.5">
                     <CarteDe name={x.de} size={FORMAT_CARTE.petite} />
                     <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-[15px] font-semibold">
+                      <span className="truncate text-lecture font-semibold">
                         <Nom n={x.de} />
                       </span>
-                      <span className="truncate font-mono text-[12px] text-muted-foreground">{id.pseudo(x.de)}</span>
+                      <span className="truncate font-mono text-petit text-muted-foreground">{id.pseudo(x.de)}</span>
                     </span>
                   </div>
                 ))}
@@ -109,7 +109,7 @@ export function Bravo({ exploits }: { exploits: Exploit[] }) {
   return (
     <span className="relative flex shrink-0">
       {envol > 0 && xp && (
-        <span key={envol} aria-hidden className="bravo-xp pointer-events-none absolute bottom-full left-1/2 mb-1 font-mono text-[12px] font-bold whitespace-nowrap text-foreground">
+        <span key={envol} aria-hidden className="bravo-xp pointer-events-none absolute bottom-full left-1/2 mb-1 font-mono text-petit font-bold whitespace-nowrap text-foreground">
           +{XP_RECUE} XP
         </span>
       )}
@@ -119,7 +119,7 @@ export function Bravo({ exploits }: { exploits: Exploit[] }) {
         onClick={() => void basculer()}
         className={cn(
           fait ? "bouton-principal" : "bouton-secondaire",
-          "bouton--mauve flex h-9 items-center gap-1.5 px-3.5 text-[13px] font-semibold"
+          "bouton--mauve flex h-9 items-center gap-1.5 px-3.5 text-corps font-semibold"
         )}
       >
         <span aria-hidden className={cn(envol > 0 && fait && "bravo-clap inline-block")} key={`clap-${envol}`}>

@@ -47,7 +47,7 @@ function compter<T extends string>(lignes: Ligne[], cle: (l: Ligne) => T[]): Map
 
 function Barres({ lignes, total }: { lignes: { label: string; n: number; avant?: number }[]; total: number }) {
   const max = Math.max(1, ...lignes.map((l) => l.n));
-  if (!lignes.length) return <p className="text-[12.5px] text-foreground/40">Rien sur les 30 derniers jours.</p>;
+  if (!lignes.length) return <p className="text-corps text-encre-3">Rien sur les 30 derniers jours.</p>;
   return (
     <div className="flex flex-col gap-2.5">
       {lignes.map((l) => {
@@ -55,16 +55,16 @@ function Barres({ lignes, total }: { lignes: { label: string; n: number; avant?:
         const baisse = l.avant != null && l.n < l.avant;
         return (
           <div key={l.label} className="flex items-center gap-3">
-            <span className="w-[42%] shrink-0 truncate text-[12.5px] font-medium">{l.label}</span>
+            <span className="w-[42%] shrink-0 truncate text-corps font-medium">{l.label}</span>
             <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/8">
               <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${(l.n / max) * 100}%` }} />
             </span>
-            <span className="w-[38px] shrink-0 text-right text-[12px] font-bold tabular-nums">
+            <span className="w-[38px] shrink-0 text-right text-petit font-bold tabular-nums">
               {total ? Math.round((l.n / total) * 100) : 0} %
             </span>
             <span className="flex w-[14px] shrink-0 justify-end">
-              {monte && <TrendingUp className="size-3 text-foreground/75" />}
-              {baisse && <TrendingDown className="size-3 text-foreground/40" />}
+              {monte && <TrendingUp className="size-3 text-encre-2" />}
+              {baisse && <TrendingDown className="size-3 text-encre-3" />}
             </span>
           </div>
         );
@@ -76,8 +76,8 @@ function Barres({ lignes, total }: { lignes: { label: string; n: number; avant?:
 function Tuile({ label, valeur }: { label: string; valeur: number }) {
   return (
     <div className="glass rounded-2xl px-3.5 py-3">
-      <p className="mono-label text-[8.5px] text-foreground/45">{label}</p>
-      <div className="mt-1.5 text-[24px] leading-none font-extrabold tabular-nums">{valeur}</div>
+      <p className="mono-label text-micro text-encre-3">{label}</p>
+      <div className="mt-1.5 text-titre-g leading-none font-extrabold tabular-nums">{valeur}</div>
     </div>
   );
 }
@@ -179,11 +179,11 @@ export function AgentStats({
 
   return (
     <section className="glass rounded-3xl p-5">
-      <h2 className="text-[17px] font-bold tracking-tight">Bola Agent</h2>
-      <p className="mt-0.5 text-[12px] leading-snug text-foreground/45">
+      <h2 className="text-titre font-bold tracking-tight">Bola Agent</h2>
+      <p className="mt-0.5 text-petit leading-snug text-encre-3">
         30 derniers jours, admins exclus. Seul le sujet de chaque échange est compté, jamais ce qui s&apos;y dit.
       </p>
-      {erreur && <p className="mt-3 text-[12.5px] text-[#c8352b] dark:text-[#FF6B5E]">{erreur}</p>}
+      {erreur && <p className="mt-3 text-corps text-[#c8352b] dark:text-[#FF6B5E]">{erreur}</p>}
       {a && (
         <div className="mt-4 flex flex-col gap-5">
           <div className="grid grid-cols-3 gap-2">
@@ -192,25 +192,25 @@ export function AgentStats({
             <Tuile label="Visuels" valeur={a.visuels} />
           </div>
           {a.premier && (
-            <p className="text-[13.5px] leading-snug font-semibold">
+            <p className="text-ligne leading-snug font-semibold">
               Ce qu&apos;ils viennent chercher d&apos;abord : {LIBELLE_SUJET[a.premier].toLowerCase()}.
               {a.monte && a.monte !== LIBELLE_SUJET[a.premier] && <> En hausse : {a.monte.toLowerCase()}.</>}
             </p>
           )}
           <div>
-            <p className="mono-label mb-2.5 text-[8.5px] text-foreground/45">Sujets</p>
+            <p className="mono-label mb-2.5 text-micro text-encre-3">Sujets</p>
             <Barres lignes={a.sujets} total={a.echanges} />
           </div>
           <div>
-            <p className="mono-label mb-2.5 text-[8.5px] text-foreground/45">Comment ils demandent</p>
+            <p className="mono-label mb-2.5 text-micro text-encre-3">Comment ils demandent</p>
             <Barres lignes={a.raccourcis} total={a.echanges} />
           </div>
           <div className={cn(!a.montres.length && "hidden")}>
-            <p className="mono-label mb-2.5 text-[8.5px] text-foreground/45">Ce qu&apos;il montre</p>
+            <p className="mono-label mb-2.5 text-micro text-encre-3">Ce qu&apos;il montre</p>
             <Barres lignes={a.montres} total={a.visuels} />
           </div>
           <div className={cn(!a.cartes.length && "hidden")}>
-            <p className="mono-label mb-2.5 text-[8.5px] text-foreground/45">Cartes posées</p>
+            <p className="mono-label mb-2.5 text-micro text-encre-3">Cartes posées</p>
             <Barres lignes={a.cartes} total={a.totalCartes} />
           </div>
         </div>

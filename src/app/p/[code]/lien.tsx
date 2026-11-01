@@ -73,35 +73,35 @@ export function LienParrain({ code, initial }: { code: string; initial: Parrain 
                 />
               </div>
             )}
-            <h1 className="mt-8 text-[34px] leading-[1.05] font-extrabold tracking-tight">
+            <h1 className="mt-8 text-nom leading-[1.05] font-extrabold tracking-tight">
               {`${parrain.affiche} t'invite.`}
             </h1>
             {parrain.sfl && <p className="mono-label mt-3 text-muted-foreground">Bola Team offert un mois</p>}
             <div className="mt-9 flex w-full flex-col gap-2.5">
               {connecte ? (
-                <Link href="/" className="bouton-principal py-4 text-[15px] font-bold">
+                <Link href="/" className="bouton-principal py-4 text-lecture font-bold">
                   Ouvrir Bola
                 </Link>
               ) : (
                 <>
                   <Link
                     href={`/inscription?parrain=${encodeURIComponent(parrain.code)}`}
-                    className="bouton-principal bouton--vert py-4 text-[15px] font-bold"
+                    className="bouton-principal bouton--vert py-4 text-lecture font-bold"
                   >
                     Créer mon compte
                   </Link>
-                  <Link href="/" className="bouton-discret py-3.5 text-[14px] font-semibold">
+                  <Link href="/" className="bouton-discret py-3.5 text-ligne font-semibold">
                     J&apos;ai déjà un compte
                   </Link>
                 </>
               )}
             </div>
-            <p className="mono-label mt-8 text-foreground/35">Code · {parrain.code}</p>
+            <p className="mono-label mt-8 text-encre-4">Code · {parrain.code}</p>
           </>
         ) : (
           <>
-            <h1 className="text-[26px] font-bold tracking-tight">Lien expiré</h1>
-            <Link href="/" className="bouton-principal mt-6 px-6 py-3.5 text-[15px] font-bold">
+            <h1 className="text-titre-g font-bold tracking-tight">Lien expiré</h1>
+            <Link href="/" className="bouton-principal mt-6 px-6 py-3.5 text-lecture font-bold">
               Ouvrir Bola
             </Link>
           </>

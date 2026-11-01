@@ -14,7 +14,9 @@
 // billet, puis le logotype. En bas, comme sur la face, le filet pointillé et
 // le numéro de série de la carte.
 //
-// L'habillage du joueur s'y retrouve : son nom gravé dans le microtexte, le
+// L'habillage du joueur s'y retrouve : son nom gravé dans le microtexte, la
+// frise de runes autour de la rosace et son nom en runes sous le logotype
+// (Saison Givre, runes.tsx), le
 // liseré d'argent ou d'or et ses coins par cran, en cadre intérieur, à la
 // même distance du bord que celui du portrait sur la face.
 //
@@ -45,6 +47,7 @@ import {
 import { Crans, Lisere, type Boite } from "@/components/sfl/habillage-carte";
 import { BordEpoque } from "@/components/sfl/marques-carte";
 import { MotifCarte, RosaceBola } from "@/components/sfl/motif-carte";
+import { RunesEnCercle, RunesEnLigne } from "@/components/sfl/runes";
 import { ligneDEmission, type EmissionCarte } from "@/lib/sfl/epoques";
 
 const W = 1024;
@@ -93,6 +96,8 @@ export function DosCarte({
   const lisere = lisereDe(habillage);
   const cran = habillage?.cran ?? 0;
   const nomGrave = !!nom && !!habillage?.signes?.includes("nom-grave");
+  const runes = !!habillage?.signes?.includes("runes");
+  const nomRunes = !!nom && !!habillage?.signes?.includes("nom-runes");
   const sLogo = LOGOTYPE.h / BOITE_LOGOTYPE.h;
 
   return (
@@ -210,6 +215,29 @@ export function DosCarte({
           fillRule="evenodd"
           transform={`translate(${W / 2 - (BOITE_LOGOTYPE.x + BOITE_LOGOTYPE.l / 2) * sLogo} ${LOGOTYPE.cy - (BOITE_LOGOTYPE.y + BOITE_LOGOTYPE.h / 2) * sLogo}) scale(${sLogo})`}
         />
+        {/* Saison Givre : la frise de runes autour de la rosace, le nom en runes sous le logotype. */}
+        {runes && (
+          <RunesEnCercle
+            texte="bola · dès que c'est l'hiver · saison givre"
+            cx={ROSACE.cx}
+            cy={ROSACE.cy}
+            r={ROSACE.r2 + 24}
+            h={30}
+            couleur={encre(0.34)}
+            epaisseur={2.6}
+          />
+        )}
+        {nomRunes && (
+          <RunesEnLigne
+            texte={nom}
+            cx={W / 2}
+            cy={LOGOTYPE.cy + LOGOTYPE.h / 2 + 100}
+            h={56}
+            largeur={760}
+            couleur={encre(0.62)}
+            epaisseur={4.2}
+          />
+        )}
       </svg>
       )}
 

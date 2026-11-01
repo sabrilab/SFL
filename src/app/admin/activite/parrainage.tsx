@@ -65,8 +65,8 @@ interface Donnees {
 function Tuile({ label, valeur }: { label: string; valeur: number | string }) {
   return (
     <div className="glass rounded-2xl px-3.5 py-3">
-      <p className="mono-label text-[8.5px] text-foreground/45">{label}</p>
-      <div className="mt-1.5 text-[24px] leading-none font-extrabold tabular-nums">{valeur}</div>
+      <p className="mono-label text-micro text-encre-3">{label}</p>
+      <div className="mt-1.5 text-titre-g leading-none font-extrabold tabular-nums">{valeur}</div>
     </div>
   );
 }
@@ -84,12 +84,12 @@ function Tunnel({ etapes }: { etapes: { label: string; n: number }[] }) {
         const avant = i > 0 ? etapes[i - 1].n : null;
         return (
           <div key={e.label} className="flex items-center gap-3">
-            <span className="w-[42%] shrink-0 truncate text-[12.5px] font-medium">{e.label}</span>
+            <span className="w-[42%] shrink-0 truncate text-corps font-medium">{e.label}</span>
             <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-foreground/8">
               <span className="block h-full rounded-full bg-foreground/70" style={{ width: `${(e.n / max) * 100}%` }} />
             </span>
-            <span className="w-[34px] shrink-0 text-right text-[12px] font-bold tabular-nums">{e.n}</span>
-            <span className="w-[38px] shrink-0 text-right text-[11px] text-foreground/45 tabular-nums">
+            <span className="w-[34px] shrink-0 text-right text-petit font-bold tabular-nums">{e.n}</span>
+            <span className="w-[38px] shrink-0 text-right text-legende text-encre-3 tabular-nums">
               {!avant
                 ? ""
                 : e.n > avant
@@ -291,17 +291,17 @@ export function ParrainageStats() {
 
   return (
     <section className="glass rounded-3xl p-5">
-      <h2 className="text-[17px] font-bold tracking-tight">Parrainage</h2>
-      <p className="mt-0.5 text-[12px] leading-snug text-foreground/45">
+      <h2 className="text-titre font-bold tracking-tight">Parrainage</h2>
+      <p className="mt-0.5 text-petit leading-snug text-encre-3">
         {`Vers ${OBJECTIF_JOUEURS} joueurs : d'où viennent les comptes, et où le tunnel perd du monde.`}
       </p>
-      {erreur && <p className="mt-3 text-[12.5px] text-foreground/55">{erreur}</p>}
+      {erreur && <p className="mt-3 text-corps text-encre-3">{erreur}</p>}
       {a && !erreur && (
         <div className="mt-4 flex flex-col gap-5">
           <div>
             <div className="flex items-end gap-2">
-              <span className="text-[44px] leading-[0.85] font-extrabold tabular-nums">{a.n}</span>
-              <span className="mono-label pb-0.5 text-[9px] text-foreground/45">/ {OBJECTIF_JOUEURS} comptes</span>
+              <span className="text-affiche leading-[0.85] font-extrabold tabular-nums">{a.n}</span>
+              <span className="mono-label pb-0.5 text-micro text-encre-3">/ {OBJECTIF_JOUEURS} comptes</span>
             </div>
             <div
               className="mt-3 h-1.5 overflow-hidden rounded-full bg-foreground/8"
@@ -316,7 +316,7 @@ export function ParrainageStats() {
                 style={{ width: `${Math.min(100, (a.n / OBJECTIF_JOUEURS) * 100)}%` }}
               />
             </div>
-            <p className="mt-2 text-[12.5px] text-foreground/55">
+            <p className="mt-2 text-corps text-encre-3">
               +{a.semaine} cette semaine
               {a.n >= OBJECTIF_JOUEURS
                 ? " · objectif atteint"
@@ -331,25 +331,25 @@ export function ParrainageStats() {
             <Tuile label="Parrains" valeur={a.parrains} />
             <Tuile label="Viralité" valeur={fr2(a.k)} />
           </div>
-          <p className="-mt-2 text-[12.5px] leading-snug text-foreground/55">
+          <p className="-mt-2 text-corps leading-snug text-encre-3">
             {a.k >= 1
               ? "Chaque compte en amène plus d'un en 30 jours : la croissance s'entretient d'elle-même."
               : `Pour 100 comptes, ${Math.round(a.k * 100)} filleuls en 30 jours. À partir de 100, la courbe s'emballe.`}
           </p>
 
           <div>
-            <p className="mono-label mb-2.5 text-[8.5px] text-foreground/45">Tunnel des liens et des codes</p>
+            <p className="mono-label mb-2.5 text-micro text-encre-3">Tunnel des liens et des codes</p>
             <Tunnel etapes={a.etapes} />
           </div>
 
-          <div className="flex flex-col gap-1.5 text-[12.5px] text-foreground/70">
+          <div className="flex flex-col gap-1.5 text-corps text-encre-2">
             <p>
-              <span className="mono-label mr-2 text-[8.5px] text-foreground/45">Canaux</span>
+              <span className="mono-label mr-2 text-micro text-encre-3">Canaux</span>
               {`lien ${a.canaux.lien} · code ${a.canaux.code} · lien d'équipe ${a.canaux.equipe}`}
             </p>
             {a.generations.length > 0 && (
               <p>
-                <span className="mono-label mr-2 text-[8.5px] text-foreground/45">Générations</span>
+                <span className="mono-label mr-2 text-micro text-encre-3">Générations</span>
                 {a.generations.map((g, i) => `${i + 1}${i ? "e" : "re"} ${g ?? 0}`).join(" · ")}
               </p>
             )}
@@ -357,27 +357,27 @@ export function ParrainageStats() {
 
           {a.classement.length > 0 && (
             <div>
-              <p className="mono-label mb-1 text-[8.5px] text-foreground/45">Ceux qui font venir</p>
+              <p className="mono-label mb-1 text-micro text-encre-3">Ceux qui font venir</p>
               <div className="flex flex-col">
                 {a.classement.slice(0, 15).map((p) => (
                   <div key={p.id} className="flex items-center gap-3 border-t border-foreground/8 py-2 first:border-t-0">
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[14px] font-semibold">
+                      <span className="block truncate text-ligne font-semibold">
                         {p.nom}
-                        {p.sfl && <span className="mono-label ml-2 text-[8.5px] text-foreground/45">SFL</span>}
+                        {p.sfl && <span className="mono-label ml-2 text-micro text-encre-3">SFL</span>}
                       </span>
-                      <span className="block truncate font-mono text-[11px] text-foreground/45">
+                      <span className="block truncate font-mono text-legende text-encre-3">
                         {p.code ? `${p.code.code} · ${p.code.partages} partage${p.code.partages > 1 ? "s" : ""}` : "lien d'équipe"}
                         {p.code && !p.code.actif && " · coupé"}
                       </span>
                     </span>
-                    <span className="text-[17px] font-extrabold tabular-nums">{p.filleuls}</span>
+                    <span className="text-titre font-extrabold tabular-nums">{p.filleuls}</span>
                     {p.code && (
                       <button
                         type="button"
                         disabled={occupe === p.code.code}
                         onClick={() => void basculer(p.code!, p.nom)}
-                        className={`${p.code.actif ? "bouton-discret bouton--rouge" : "bouton-secondaire"} px-3 py-1.5 text-[12px] font-semibold disabled:opacity-50`}
+                        className={`${p.code.actif ? "bouton-discret bouton--rouge" : "bouton-secondaire"} px-3 py-1.5 text-petit font-semibold disabled:opacity-50`}
                       >
                         {p.code.actif ? "Couper" : "Rallumer"}
                       </button>

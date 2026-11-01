@@ -1,166 +1,13 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-/* Les boutons (verre bombé, grain, lumière) : leur dessin est dans boutons.css. */
+/* Les réglages du design (couleurs, tailles, arrondis) : tokens.css, le seul
+   endroit à changer. Les boutons (verre bombé, grain, lumière) : boutons.css. */
+@import "./tokens.css";
 @import "./boutons.css";
 @import "./scelle.css";
 
 @custom-variant dark (&:is(.dark *));
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  /* Typographie de l'app BOLA, celle de la Map : Inter pour tout ce qui se
-     lit, et au plus gras pour les titres en capitales (.titre-lettrage) ;
-     Inter aussi, en capitales espacées, pour ce qui s'étiquette
-     (.mono-label, font-mono). La police machine à écrire (JetBrains Mono) a
-     quitté l'interface le 30/10 (Sabri : « supprimer un type de
-     typographie partout »), cartes joueurs comprises (« il y en a aussi
-     sur la carte »).
-     Anton ne sert plus qu'aux chiffres. */
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-inter);
-  --font-heading: var(--font-sans);
-  --font-display: var(--font-anton);
-  --color-vert: var(--vert);
-  --color-braise: var(--braise);
-  --color-mauve: var(--mauve);
-  --color-contraste: var(--contraste);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
-
-/* Thème clair — la charte BOLA sur papier : Blanc Craie, encre Noir Nuit,
-   le gris béton pour ce qui s'efface. Depuis le 23/10, chaque joueur choisit
-   (Sabri : « un mode clair et un mode sombre, qu'on peut accéder
-   facilement ») : le rond en haut de Ma carte (bouton-theme.tsx), ou Clair,
-   Sombre et Auto dans les réglages. Le sombre reste le thème par défaut
-   (layout.tsx). Les cartes des joueurs, les écussons, la Map et ses
-   stickers ne changent pas d'un mode à l'autre : ce sont des objets. */
-:root {
-  --background: #f4f5f2;
-  --foreground: #08090b;
-  --card: #ffffff;
-  --card-foreground: #08090b;
-  --popover: #ffffff;
-  --popover-foreground: #08090b;
-  --primary: #08090b;
-  --primary-foreground: #f4f5f2;
-  --secondary: #e9eae6;
-  --secondary-foreground: #08090b;
-  --muted: #e9eae6;
-  --muted-foreground: #8f908b;
-  --accent: #e3e4e0;
-  --accent-foreground: #08090b;
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: #e0e1dd;
-  --input: #e0e1dd;
-  --ring: #08090b;
-  --chart-1: #3f5e40;
-  --chart-2: #ff8a4c;
-  --chart-3: #5b2141;
-  --chart-4: #8f908b;
-  --chart-5: #8b7e83;
-  --radius: 1rem;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #08090b;
-  --sidebar-primary: #08090b;
-  --sidebar-primary-foreground: #f4f5f2;
-  --sidebar-accent: #e3e4e0;
-  --sidebar-accent-foreground: #08090b;
-  --sidebar-border: #e0e1dd;
-  --sidebar-ring: #08090b;
-  /* Les trois accents de la charte, par leur nom. */
-  --vert: #3f5e40;
-  --braise: #ff8a4c;
-  --mauve: #5b2141;
-  /* Le plein contraste du mode : l'encre sur le papier du clair, le blanc pur
-     sur le noir (et non le Blanc Craie de --foreground). Pour le texte et les
-     traits des scènes qui étaient blancs : text-contraste/45 garde au sombre
-     exactement son blanc à 45 %. */
-  --contraste: #08090b;
-}
-
-/* Thème sombre — l'app BOLA (DA/Theme.swift) : noir profond, neutres purs,
-   le bouton plein en clair sur encre. Une seule couleur chaude, la braise,
-   réservée au manque ; le vert et le mauve restent ceux des cartes.
-   Un objet qui reste sombre dans les deux modes (la vitrine des trophées,
-   une cérémonie, une image du fil) porte lui-même la classe dark : dedans,
-   les couleurs, les variantes dark: et les boutons restent ceux du sombre
-   (les règles du clair s'écrivent X:not(.dark *)). */
-.dark {
-  --background: #08090b;
-  --foreground: #f4f5f2;
-  --card: #0d0f12;
-  --card-foreground: #f4f5f2;
-  --popover: #14171b;
-  --popover-foreground: #f4f5f2;
-  --primary: #efefec;
-  --primary-foreground: #0a0b0d;
-  /* Les boutons secondaires doivent se voir au repos, sur la page comme dans
-     les feuilles (popover #14171b) : #17181b s'y confondait. */
-  --secondary: #26282d;
-  --secondary-foreground: #f4f5f2;
-  --muted: #14171b;
-  --muted-foreground: #8f908b;
-  --accent: #1c1f24;
-  --accent-foreground: #f4f5f2;
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: rgba(244, 245, 242, 0.12);
-  --input: rgba(244, 245, 242, 0.12);
-  --ring: #f4f5f2;
-  --chart-1: #a9cba9;
-  --chart-2: #ff8a4c;
-  --chart-3: #e0b3cb;
-  --chart-4: #8f908b;
-  --chart-5: #8b7e83;
-  --sidebar: #0f1114;
-  --sidebar-foreground: #f4f5f2;
-  --sidebar-primary: #f4f5f2;
-  --sidebar-primary-foreground: #08090b;
-  --sidebar-accent: #22262b;
-  --sidebar-accent-foreground: #f4f5f2;
-  --sidebar-border: rgba(244, 245, 242, 0.08);
-  --sidebar-ring: #f4f5f2;
-  --vert: #a9cba9;
-  --braise: #ff8a4c;
-  --mauve: #e0b3cb;
-  --contraste: #ffffff;
-}
 
 @layer base {
   * {
@@ -1144,6 +991,135 @@
     3.2px 1.3px 0 #f4f5f2, -3.2px 1.3px 0 #f4f5f2, 3.2px -1.3px 0 #f4f5f2, -3.2px -1.3px 0 #f4f5f2,
     1.3px 3.2px 0 #f4f5f2, -1.3px 3.2px 0 #f4f5f2, 1.3px -3.2px 0 #f4f5f2, -1.3px -3.2px 0 #f4f5f2;
   filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.22));
+}
+
+/* Les zones Bola (map/ambiances.ts) : leur étiquette au-dessus du contour,
+   le numéro en jeton d'encre, le nom en lettrage découpé, ce qu'elle compte
+   dessous. En attente : le jeton en pointillé. Tout près, elle se retire
+   (on est dedans). La nuit, le jeton passe en blanc. */
+.zone-etiq {
+  transition: opacity 0.25s ease;
+}
+/* Vue région avec des zones (31/10) : les piles de joueurs se fondent dans
+   l'étiquette de leur zone, qui dit déjà « 59 joueurs » ; elles reviennent
+   en s'approchant. */
+.grp {
+  transition: opacity 0.25s ease;
+}
+.avec-zones.zones-region .grp {
+  opacity: 0;
+  pointer-events: none;
+}
+/* Sur l'étiquette, pas sur son repère : MapLibre pose l'opacité du repère en ligne. */
+.zones-proches .zone-etiq,
+.zones-loin .zone-etiq,
+.zone-etiq--cachee {
+  opacity: 0;
+  pointer-events: none;
+}
+.zone-etiq {
+  position: absolute;
+  left: 0;
+  top: 0;
+  translate: -50% calc(-100% - 6px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.zone-etiq__tete {
+  display: inline-flex;
+  height: 18px;
+  align-items: center;
+  border-radius: 999px;
+  border: 1.5px solid #f4f5f2;
+  background: #0a0b0d;
+  color: #f4f5f2;
+  padding: 0 8px;
+  font: 800 9px/1 var(--font-sans), system-ui, sans-serif;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.zone-etiq__nom {
+  font: 900 italic 19px/1 var(--font-sans), system-ui, sans-serif;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+  color: #0a0b0d;
+  rotate: -3deg;
+  text-shadow:
+    2.6px 0 0 #f4f5f2, -2.6px 0 0 #f4f5f2, 0 2.6px 0 #f4f5f2, 0 -2.6px 0 #f4f5f2,
+    1.9px 1.9px 0 #f4f5f2, -1.9px 1.9px 0 #f4f5f2, 1.9px -1.9px 0 #f4f5f2, -1.9px -1.9px 0 #f4f5f2;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+.zone-etiq__sous {
+  margin-top: 2px;
+  border-radius: 999px;
+  background: rgba(244, 245, 242, 0.92);
+  padding: 2px 7px;
+  font: 700 10.5px/1.2 var(--font-sans), system-ui, sans-serif;
+  color: #0a0b0d;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+/* Une zone à ouvrir : le vert des terrains hors zone (le ton « y aller »). */
+.zone-etiq--attente .zone-etiq__tete {
+  background: #f4f5f2;
+  color: #1f8a45;
+  border: 1.5px dashed #1f8a45;
+}
+.zone-etiq--attente .zone-etiq__nom {
+  font-size: 15px;
+  opacity: 0.8;
+}
+[data-ambiance^="nuit"] .zone-etiq__tete {
+  background: #f4f5f2;
+  color: #0a0b0d;
+  border-color: #0a0b0d;
+}
+[data-ambiance^="nuit"] .zone-etiq__nom {
+  color: #f4f5f2;
+  text-shadow:
+    2.6px 0 0 #0a0b0d, -2.6px 0 0 #0a0b0d, 0 2.6px 0 #0a0b0d, 0 -2.6px 0 #0a0b0d,
+    1.9px 1.9px 0 #0a0b0d, -1.9px 1.9px 0 #0a0b0d, 1.9px -1.9px 0 #0a0b0d, -1.9px -1.9px 0 #0a0b0d;
+}
+[data-ambiance^="nuit"] .zone-etiq__sous {
+  background: rgba(10, 11, 13, 0.85);
+  color: #f4f5f2;
+}
+[data-ambiance^="nuit"] .zone-etiq--attente .zone-etiq__tete {
+  background: #0a0b0d;
+  color: #84d68c;
+  border-color: #84d68c;
+}
+/* Les essais à frontière (30/10) : le jeton de la zone prend sa couleur. */
+[data-ambiance="rouge"] .zone-etiq:not(.zone-etiq--attente) .zone-etiq__tete {
+  background: #e3262e;
+  color: #ffffff;
+}
+[data-ambiance$="braise"] .zone-etiq:not(.zone-etiq--attente) .zone-etiq__tete,
+[data-ambiance="nuit-encre"] .zone-etiq:not(.zone-etiq--attente) .zone-etiq__tete {
+  background: #ff6a1a;
+  color: #0a0b0d;
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* Une nouvelle zone : son jeton bat, un anneau en part. */
+  .zone-etiq--neuve .zone-etiq__tete {
+    animation: zone-neuve 1.8s cubic-bezier(0.3, 1.4, 0.5, 1) infinite;
+  }
+  @keyframes zone-neuve {
+    0%, 60%, 100% { scale: 1; box-shadow: 0 0 0 0 rgba(244, 245, 242, 0.9); }
+    20% { scale: 1.12; box-shadow: 0 0 0 7px rgba(244, 245, 242, 0); }
+  }
+  .zone-etiq:active {
+    scale: 0.94;
+    transition: scale 0.12s ease-out;
+  }
 }
 
 /* L'épingle qu'on déplace sur la photo satellite (ajuster-point.tsx). */

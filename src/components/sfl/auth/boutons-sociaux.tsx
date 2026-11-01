@@ -96,7 +96,7 @@ export function BoutonsSociaux({
           onClick={() => void partir(f)}
           className={cn(
             // Du verre : l'action blanche de l'écran reste la seule.
-            "bouton-secondaire flex min-w-0 flex-1 items-center justify-center gap-[8px] py-[15px] text-[15px] font-semibold",
+            "bouton-secondaire flex min-w-0 flex-1 items-center justify-center gap-[8px] py-[15px] text-lecture font-semibold",
             depart && depart !== f && "opacity-40"
           )}
         >

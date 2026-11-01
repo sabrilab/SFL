@@ -39,7 +39,7 @@ function Pas({ valeur, onMoins, onPlus, plusOff, grand }: { valeur: number; onMo
       >
         <Minus className={grand ? "size-5" : "size-3.5"} strokeWidth={2.6} />
       </button>
-      <span className={cn("text-center font-display tabular-nums", grand ? "w-12 text-[44px] leading-none" : "w-5 text-[17px]")}>
+      <span className={cn("text-center font-display tabular-nums", grand ? "w-12 text-affiche leading-none" : "w-5 text-titre")}>
         {valeur}
       </span>
       <button
@@ -165,7 +165,7 @@ function Contenu({
   return (
     <>
       <SheetHeader className="px-5 pt-5 pb-0">
-        <SheetTitle className="pr-10 text-[22px] font-bold tracking-tight">Feuille de match</SheetTitle>
+        <SheetTitle className="pr-10 text-titre-m font-bold tracking-tight">Feuille de match</SheetTitle>
         <span className="mono-label text-muted-foreground">
           {libelleJour(match.jour)} · {match.heure} · {match.lieu}
         </span>
@@ -178,9 +178,9 @@ function Contenu({
           ].map(({ e, v, set }) => (
             <div key={e.id} className="flex min-w-0 flex-col items-center gap-2.5">
               <Ecusson initiales={e.initiales} fond={e.fond} blason={e.blason} taille={52} />
-              <span className="w-full truncate text-center text-[14px] font-semibold">{e.nom}</span>
+              <span className="w-full truncate text-center text-ligne font-semibold">{e.nom}</span>
               {ferme ? (
-                <span className="font-display text-[44px] leading-none tabular-nums">{v}</span>
+                <span className="font-display text-affiche leading-none tabular-nums">{v}</span>
               ) : (
                 <Pas grand valeur={v} onMoins={() => set(Math.max(0, v - 1))} onPlus={() => set(Math.min(99, v + 1))} />
               )}
@@ -198,7 +198,7 @@ function Contenu({
             <span className="mono-label opacity-75">Feuille de {adverse.nom}</span>
             <span className="flex items-center gap-3">
               <Ecusson initiales={mienne.initiales} fond={mienne.fond} blason={mienne.blason} taille={24} />
-              <span className="font-display text-[22px] leading-none tabular-nums">
+              <span className="font-display text-titre-m leading-none tabular-nums">
                 {leur.contre} – {leur.pour}
               </span>
               <Ecusson initiales={adverse.initiales} fond={adverse.fond} blason={adverse.blason} taille={24} />
@@ -223,13 +223,13 @@ function Contenu({
                 return (
                   <div key={j.id} className="flex items-center gap-3 rounded-[18px] bg-card px-3 py-2">
                     <CarteDe name={j.name} size={FORMAT_CARTE.petite} />
-                    <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">{j.name.split(" ")[0]}</span>
+                    <span className="min-w-0 flex-1 truncate text-lecture font-semibold">{j.name.split(" ")[0]}</span>
                     <div className="flex flex-col items-center gap-0.5">
-                      <span className="mono-label text-foreground/40">B</span>
+                      <span className="mono-label text-encre-3">B</span>
                       <Pas valeur={l.buts} onMoins={() => changer(j.id, "buts", -1)} onPlus={() => changer(j.id, "buts", 1)} plusOff={butsAttribues >= pour} />
                     </div>
                     <div className="flex flex-col items-center gap-0.5">
-                      <span className="mono-label text-foreground/40">P</span>
+                      <span className="mono-label text-encre-3">P</span>
                       <Pas
                         valeur={l.passes}
                         onMoins={() => changer(j.id, "passes", -1)}
@@ -253,7 +253,7 @@ function Contenu({
             variant="vert"
             disabled={envoi || coup.getTime() > (maintenant ?? new Date()).getTime() || butsAttribues > pour || passes > butsAttribues}
             onClick={valider}
-            className="h-12 rounded-full text-[15px] font-semibold"
+            className="h-12 rounded-full text-lecture font-semibold"
           >
             {colle ? "Valider le match" : ma ? "Corriger la feuille" : "Envoyer la feuille"}
           </Button>
