@@ -30,6 +30,8 @@ export interface EquipeFeuille {
   couleur: string;
   encre: string;
   joueurs: string[];
+  /** Par joueur (même ordre) : venu en extra time ? Sa carte n'y porte pas de puce, ses titres sont ceux de son match. */
+  extraTime?: boolean[];
 }
 
 export interface TerrainFeuille {
@@ -54,8 +56,8 @@ export function feuilleDeJournee(journee: Journee | undefined): TerrainFeuille[]
   const plusieurs = journee.matches.length > 1;
   return journee.matches.map((m, i) => ({
     label: plusieurs ? `Match ${i + 1}` : "Le match",
-    a: noirs(m.teamA.players.map((p) => p.name)),
-    b: blancs(m.teamB.players.map((p) => p.name)),
+    a: { ...noirs(m.teamA.players.map((p) => p.name)), extraTime: m.teamA.players.map((p) => !!p.extraTime) },
+    b: { ...blancs(m.teamB.players.map((p) => p.name)), extraTime: m.teamB.players.map((p) => !!p.extraTime) },
     equipes: [m.teamA.name, m.teamB.name],
   }));
 }

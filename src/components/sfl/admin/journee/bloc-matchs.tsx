@@ -11,6 +11,10 @@
 // La feuille en direct d'un match tenue par un joueur (01/11/2026) se lit
 // sur sa pastille, « ◉ Feuille · Ilyes » puis « ✓ Feuille · Ilyes » ; la
 // toucher l'ouvre. Pendant qu'elle est tenue, le score est le sien.
+// Une carte à titre porte ses puces (or MVP, rouge Impact, bleu Défensive,
+// 02/11/2026) telles que la ligue les voit : lues dans la vue de la ligue
+// (hooks/use-titres-du-jour.ts), pas dans la saison qu'on édite ici, pour
+// ne rien montrer avant que le titre soit attribué.
 
 import { useMemo } from "react";
 import { TerrainPlaces, type Occupant } from "@/components/sfl/matchs/terrain-places";
@@ -20,12 +24,14 @@ import { computeJournees } from "@/lib/sfl/saisie/engine";
 import { libelleEcart, type Ecart } from "@/lib/sfl/saisie/integrite";
 import type { MatchDuJour, Saison } from "@/lib/sfl/saisie/types";
 import { Etiquette, Pastille, Segmente } from "./ui";
+import { useTitresDuJour } from "@/hooks/use-titres-du-jour";
+import type { BoostType } from "@/lib/sfl/engine";
 
 export interface MatchVu {
   n: number;
   m: MatchDuJour;
-  noirs: { i: number; nom: string }[];
-  blancs: { i: number; nom: string }[];
+  noirs: { i: number; nom: string; extraTime?: boolean }[];
+  blancs: { i: number; nom: string; extraTime?: boolean }[];
   score: [number, number];
 }
 
@@ -40,14 +46,17 @@ export function matchsVus(saison: Saison, j: number, declares: MatchDuJour[]): M
   return declares.map((m, k) => ({
     n: k + 1,
     m,
-    noirs: lignes.filter((x) => x.e.team === m.equipes[0]).map((x) => ({ i: x.i, nom: x.e.player })),
-    blancs: lignes.filter((x) => x.e.team === m.equipes[1]).map((x) => ({ i: x.i, nom: x.e.player })),
+    noirs: lignes.filter((x) => x.e.team === m.equipes[0]).map((x) => ({ i: x.i, nom: x.e.player, ...(x.e.extraTime ? { extraTime: true } : {}) })),
+    blancs: lignes.filter((x) => x.e.team === m.equipes[1]).map((x) => ({ i: x.i, nom: x.e.player, ...(x.e.extraTime ? { extraTime: true } : {}) })),
     score: [scores.get(m.equipes[0]) ?? 0, scores.get(m.equipes[1]) ?? 0],
   }));
 }
 
 /** Les cartes sur le terrain : les Blancs aux places de devant, les Noirs à celles du fond. */
-function occupantsDe(mv: MatchVu): { places: number; occupants: Occupant[] } {
+function occupantsDe(
+  mv: MatchVu,
+  titresDe: (nom: string, equipes: readonly [string, string]) => BoostType[],
+): { places: number; occupants: Occupant[] } {
   const cote = Math.max(5, mv.noirs.length, mv.blancs.length);
   const places = cote * 2;
   const dispo = placerTerrain(places).places;
@@ -55,10 +64,10 @@ function occupantsDe(mv: MatchVu): { places: number; occupants: Occupant[] } {
   const fond = dispo.filter((p) => !p.chezMoi).map((p) => p.i);
   const occupants: Occupant[] = [];
   mv.blancs.forEach((x, k) => {
-    if (devant[k] != null) occupants[devant[k]] = { cle: String(x.i), nom: x.nom };
+    if (devant[k] != null) occupants[devant[k]] = { cle: String(x.i), nom: x.nom, titres: x.extraTime ? [] : titresDe(x.nom, mv.m.equipes) };
   });
   mv.noirs.forEach((x, k) => {
-    if (fond[k] != null) occupants[fond[k]] = { cle: String(x.i), nom: x.nom };
+    if (fond[k] != null) occupants[fond[k]] = { cle: String(x.i), nom: x.nom, titres: x.extraTime ? [] : titresDe(x.nom, mv.m.equipes) };
   });
   return { places, occupants };
 }
@@ -105,7 +114,8 @@ export function BlocMatchs({
   onFeuille?: (n: number) => void;
 }) {
   const mv = matchs.find((x) => x.n === courant) ?? matchs[0];
-  const { places, occupants } = useMemo(() => (mv ? occupantsDe(mv) : { places: 10, occupants: [] }), [mv]);
+  const titresDe = useTitresDuJour(j);
+  const { places, occupants } = useMemo(() => (mv ? occupantsDe(mv, titresDe) : { places: 10, occupants: [] }), [mv, titresDe]);
   const defautDe = (n: number) => ecarts.some((e) => ("match" in e && e.match === n) || ("equipe" in e && matchs[n - 1]?.m.equipes.includes(e.equipe)));
   const options = [
     ...matchs.map((x) => ({ id: x.n, libelle: `M${x.n}`, marque: defautDe(x.n) })),

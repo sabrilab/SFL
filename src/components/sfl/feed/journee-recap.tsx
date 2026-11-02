@@ -317,7 +317,7 @@ function JourneeRecapComplet({ j }: { j: number }) {
   // Lignes enrichies des honneurs, pour la synthèse sur le terrain.
   const pitchLines = lines.map((l) => {
     const e = jEntries.find((x) => x.player === l.name);
-    return { name: l.name, buts: l.buts, passes: l.passes, mvp: e?.mvp, impact: e?.impact, def: e?.def };
+    return { name: l.name, buts: l.buts, passes: l.passes, mvp: e?.mvp, impact: e?.impact, def: e?.def, ...(l.extraTime ? { extraTime: true } : {}) };
   });
 
   const analyse = useAnalyse(saisonAtJ, players, journeesAtJ, lastJ);

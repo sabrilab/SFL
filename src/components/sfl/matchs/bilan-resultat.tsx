@@ -95,15 +95,18 @@ export function BilanResultat({
   matchId,
   organise = false,
   demo,
+  bilan,
   className,
 }: {
   matchId: number;
   /** L'organisateur voit chaque réponse. */
   organise?: boolean;
   demo?: Bilan | null;
+  /** Le bilan déjà lu par l'écran (useBilan de la fiche, pour ses puces) : rien n'est relu ici. */
+  bilan?: Bilan | null;
   className?: string;
 }) {
-  const b = useBilan(matchId, organise, demo);
+  const b = useBilan(matchId, organise, bilan !== undefined ? bilan : demo);
   if (!b || !b.requise || !b.etat) return null;
   const ouverte = reponseOuverte(b);
   const suite = issueResultat(b, organise);

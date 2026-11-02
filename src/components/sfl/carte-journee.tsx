@@ -18,6 +18,10 @@
 // couleur du jour de l'admin (Orange, Bleu…) ne s'y montre plus. Chaque
 // joueur y porte aussi le maillot de son camp, sa photo repeinte par le code
 // (lib/sfl/maillot-des-photos.ts).
+//
+// Une carte à titre porte ses puces sur son coin (Ilyes, 02/11/2026) : dorée
+// pour le MVP, rouge pour l'Impact, bleue pour la Défensive, une fois le
+// titre attribué (puces-titres.tsx, hooks/use-titres-du-jour.ts).
 
 import { useState } from "react";
 import { CarteDe, MiniCarte } from "@/components/sfl/mini-carte";
@@ -30,6 +34,8 @@ import { projeter } from "@/lib/sfl/terrain-vu";
 import { placerJournee, VUE_JOURNEE as VUE } from "@/lib/sfl/places-journee";
 import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
 import { AuVestiaire } from "@/components/sfl/au-vestiaire";
+import { PucesTitres } from "@/components/sfl/puces-titres";
+import { useTitresDuJour } from "@/hooks/use-titres-du-jour";
 
 /** La ligne d'un poste, du but vers l'avant : 0 gardien … 3 attaque. Sans poste connu : le milieu. */
 function ligneDuPoste(poste: string | undefined): number {
@@ -72,8 +78,9 @@ function largeurEtiquette(prenom: string, stats: string, gras: boolean): number 
  * cache la carte ou le prénom d'une autre. Le meilleur du jour de chaque
  * équipe (buts et passes), un seul, à peine plus grand, son nom en gras.
  */
-function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
+function Terrain({ j, a, b }: { j: number; a: MatchTeam; b: MatchTeam }) {
   const { allPlayers } = useSeason();
+  const titresDe = useTitresDuJour(j);
   const trouver = (l: MatchPlayerLine) => allPlayers.find((p) => p.name.toLowerCase() === l.name.trim().toLowerCase());
   const poids = (p: MatchPlayerLine) => p.buts * 2 + p.passes;
   // Chaque équipe du but vers l'avant : le gardien d'abord, s'il est déclaré à ce poste.
@@ -137,24 +144,28 @@ function Terrain({ a, b }: { a: MatchTeam; b: MatchTeam }) {
           const player = trouver(ligne);
           // Une étiquette qui ne tient pas entière se resserre un peu (lettres et marges), comme sur iPhone, avant que le prénom s'abrège.
           const serre = Math.min(1, Math.max(0.86, etiquette / voulue));
+          const titres = ligne.extraTime ? [] : titresDe(ligne.name, [a.name, b.name]);
           return (
             <div key={ligne.name} className="absolute size-0" style={{ left: `calc(50% + ${x}px)`, top: y }}>
               <div
                 className="absolute bottom-0 left-0 flex flex-col items-center"
                 style={{ transformOrigin: "50% 100%", transform: `translateX(-50%) scale(${k})` }}
               >
-                {player ? (
-                  <MiniCarte
-                    player={player}
-                    size={taille}
-                    onglet={{ fond: maillot.fond, encre: maillot.encre }}
-                    maillot={maillot.nom}
-                    vertical
-                    detail={ligne.buts || ligne.passes ? `${ligne.buts} B · ${ligne.passes} P` : undefined}
-                  />
-                ) : (
-                  <CarteDe name={ligne.name} size={taille} />
-                )}
+                <div className="relative flex">
+                  {player ? (
+                    <MiniCarte
+                      player={player}
+                      size={taille}
+                      onglet={{ fond: maillot.fond, encre: maillot.encre }}
+                      maillot={maillot.nom}
+                      vertical
+                      detail={ligne.buts || ligne.passes ? `${ligne.buts} B · ${ligne.passes} P` : undefined}
+                    />
+                  ) : (
+                    <CarteDe name={ligne.name} size={taille} />
+                  )}
+                  <PucesTitres titres={titres} echelle={k} />
+                </div>
                 <span
                   className="mt-[4px] flex items-center gap-[0.48em] whitespace-nowrap rounded-full px-[0.667em] py-[2px] leading-[12.6px] shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
                   style={{ background: maillot.fond, color: maillot.encre, fontWeight: star ? 800 : 600, maxWidth: etiquette, fontSize: 10.5 * serre }}
@@ -248,7 +259,7 @@ export function CarteJournee({
       </div>
 
       <div className="px-4">
-        <Terrain a={match.teamA} b={match.teamB} />
+        <Terrain j={journee.j} a={match.teamA} b={match.teamB} />
       </div>
 
       <div className="mx-4 mt-3 mb-4 flex gap-2">

@@ -47,6 +47,9 @@ export const REGLAGES: Reglage[] = [
   { nom: "--vert", libelle: "Vert", role: "Y aller : venir, valider, créer", famille: "couleur", classe: "text-vert" },
   { nom: "--mauve", libelle: "Mauve", role: "Les autres : Vestiaire, partager", famille: "couleur", classe: "text-mauve" },
   { nom: "--braise", libelle: "Braise", role: "Seulement « Il manque N »", famille: "couleur", classe: "text-braise" },
+  { nom: "--titre-mvp", libelle: "MVP", role: "La puce dorée d'un MVP, sur sa carte", famille: "couleur", classe: "bg-titre-mvp" },
+  { nom: "--titre-impact", libelle: "Impact", role: "La puce rouge d'un joueur Impact, sur sa carte", famille: "couleur", classe: "bg-titre-impact" },
+  { nom: "--titre-def", libelle: "Défensive", role: "La puce bleue d'une Défensive, sur sa carte", famille: "couleur", classe: "bg-titre-def" },
 
   { nom: "--text-micro", libelle: "Micro", role: "Les mentions minuscules", famille: "taille", classe: "text-micro" },
   { nom: "--text-etiquette", libelle: "Étiquette", role: "Les étiquettes en capitales", famille: "taille", classe: "text-etiquette" },
