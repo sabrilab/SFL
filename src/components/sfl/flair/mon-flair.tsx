@@ -14,6 +14,7 @@
 // vert, le raté barré.
 
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
+import { heureLisible } from "@/lib/sfl/revelation";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
 import { BLANCS, NOIRS, Pouls } from "@/components/sfl/actus/missions";
@@ -107,7 +108,7 @@ function EtatJournee({ f }: { f: FlairDeJournee }) {
     );
   return (
     <span className={cn("mono-label shrink-0", f.xp ? "text-[#9fe0a8]" : "text-white/55")}>
-      {f.phase === "en-jeu" ? "Verdict à minuit · " : ""}+{f.xp} XP
+      {f.phase === "en-jeu" ? `Verdict à ${heureLisible(f.finDuJour)} · ` : ""}+{f.xp} XP
     </span>
   );
 }

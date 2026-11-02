@@ -492,6 +492,8 @@ export interface FlairDeJournee {
   xp: number;
   /** Son plafond : celui de la feuille, ou de la tribune. */
   plafond: number;
+  /** Le verdict définitif : la révélation de la journée (revelation.ts : 19 h dès la J5, minuit avant). */
+  finDuJour: Date;
 }
 
 /** L'ordre de lecture : chaque match, sujet par sujet, puis la journée. */
@@ -564,6 +566,7 @@ export function flairsDuJoueur(
       juges: choix.filter((c) => c.etat === "juste" || c.etat === "faux").length,
       xp: Math.min(plafondDe(p, joueur), justes.reduce((a, c) => a + c.xp, 0)),
       plafond: plafondDe(p, joueur),
+      finDuJour: p.finDuJour,
     });
   }
   return out;

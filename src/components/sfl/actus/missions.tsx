@@ -19,7 +19,8 @@
 //     coûte la moitié de sa prime, risqueDe), l'heure limite ;
 //   · accepter ou passer jusqu'au coup d'envoi, puis le tampon du verdict.
 // Le compte à rebours du haut court jusqu'au coup d'envoi ; le verdict tombe
-// à mesure que la feuille se remplit et devient définitif à minuit. L'XP va
+// à mesure que la feuille se remplit et devient définitif à la révélation
+// (19 h ; minuit jusqu'à la J4). L'XP va
 // au Niveau XP et au passe de la saison (Ma carte), jamais aux points Pépite.
 //
 // Toute la ligue voit les missions acceptées, sous les fiches (Contrats en
@@ -27,6 +28,7 @@
 // ta fiche le dit, « Abdel a signé contre toi », que tu aies signé ou non.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { heureLisible } from "@/lib/sfl/revelation";
 import { toast } from "sonner";
 import { CarteDe, FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
@@ -50,6 +52,9 @@ import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
 import "./missions.css";
 import "./lune.css";
+
+/** « Minuit », « 19 h » : l'heure du verdict en tête de case. */
+const capitale = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 
 const TYPE: Record<Creneau, string> = { contrat: "Contrat", defi: "Défi du dimanche", ligue: "La ligue" };
 /** Les crans allumés à côté du rang : de la plus dure à la plus facile. */
@@ -132,7 +137,7 @@ function Moment({ mm }: { mm: MesMissions }) {
       </span>
     );
   return (
-    <span className="mono-label shrink-0 text-encre-3">{mm.phase === "en-jeu" ? "Verdict à minuit" : "Verdict"}</span>
+    <span className="mono-label shrink-0 text-encre-3">{mm.phase === "en-jeu" ? `Verdict à ${heureLisible(mm.d.finDuJour)}` : "Verdict"}</span>
   );
 }
 
@@ -316,7 +321,7 @@ function Champs({ l, mm }: { l: LigneMission; mm: MesMissions }) {
       <div>
         <span className="mono-label text-white/45">{mm.phase === "ouvert" ? "Avant" : "Verdict"}</span>
         <span className="truncate text-lecture leading-[25px] font-bold">
-          {mm.phase === "ouvert" ? limite(mm.d.coupEnvoi, mm.d.heure) : mm.phase === "en-jeu" ? "Minuit" : "Définitif"}
+          {mm.phase === "ouvert" ? limite(mm.d.coupEnvoi, mm.d.heure) : mm.phase === "en-jeu" ? capitale(heureLisible(mm.d.finDuJour)) : "Définitif"}
         </span>
       </div>
     </div>

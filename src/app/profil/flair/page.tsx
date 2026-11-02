@@ -30,7 +30,7 @@ export default function PageFlair() {
   const cetteSaison = journees.filter((f) => f.saison === numero);
   const justes = cetteSaison.reduce((a, f) => a + f.justes, 0);
   const juges = cetteSaison.reduce((a, f) => a + f.juges, 0);
-  // La journée en cours, de l'ouverture à minuit : on choisit, puis on suit le verdict.
+  // La journée en cours, de l'ouverture à la révélation : on choisit, puis on suit le verdict.
   const ouverte = enCours && enCours.phase !== "fini" ? enCours : null;
   const tete = classement.slice(0, 5);
   const saisons = [...new Set(journees.map((f) => f.saison))];

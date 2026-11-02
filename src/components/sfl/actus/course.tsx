@@ -102,6 +102,7 @@ import { legendes, saisonsPalmares, type SaisonPalmares } from "@/lib/sfl/palmar
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
 import { VoteDuJour } from "./fil";
+import { DivisionsApres } from "./divisions-apres";
 import { CouvertureRubrique, RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
 import { couverturesDuDimanche, sources, type Couverture } from "@/lib/sfl/couvertures";
 import { ContratALaUne } from "./contrat-a-la-une";
@@ -1004,6 +1005,8 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
         <>
           {/* Le soir du match, le vote est dans son dimanche, juste après la feuille. */}
           {recapDabord && <VoteDuJour me={me} />}
+          {/* Le vote fini, la révélation : les divisions après la journée (revelation.ts). */}
+          <DivisionsApres j={une.j} me={me} />
           <RubriqueToi j={dernier} date={une.journee?.date ?? ""} />
           {/* Mon Flair de ce dimanche, jugé (Sabri, 30/10). */}
           <RubriqueFlair j={une.j} />
