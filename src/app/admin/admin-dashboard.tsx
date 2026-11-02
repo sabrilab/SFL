@@ -47,8 +47,8 @@ import {
   closeConvocation,
   createConvocation,
   libelleCourt,
+  ligneNeuve,
   matchsDeclares,
-  newEntry,
   newRosterPlayer,
   poserEquipes,
   reglerMatchDuJour,
@@ -925,7 +925,7 @@ export function AdminDashboard({ onglet = "overview", mode = "direct" }: { ongle
         roster={rosterNames}
         existing={addToJ != null ? journeeViews.find((v) => v.meta.j === addToJ)?.players ?? new Set() : new Set()}
         onAdd={(player, team) => {
-          if (addToJ != null) commit(addEntry(saison, newEntry(addToJ, player, team)), `Ajout — ${player}`);
+          if (addToJ != null) commit(addEntry(saison, ligneNeuve(saison, addToJ, player, team)), `Ajout — ${player}`);
           setAddToJ(null);
         }}
       />

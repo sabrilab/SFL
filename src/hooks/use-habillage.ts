@@ -30,7 +30,7 @@ import { finitionsOffertes } from "@/lib/sfl/finitions-offertes";
 import { finitionsRecrues } from "@/components/sfl/skins-recrues";
 import type { Rang } from "@/lib/sfl/missions";
 import { debloquesDe, type PaliersAtteints } from "@/lib/sfl/passe";
-import { SAISONS_PASSE } from "@/lib/sfl/saisons-passe";
+import { saisonsPasseOuvertes } from "@/lib/sfl/saisons-passe";
 
 /** Ce que l'XP pose sur les cartes de la ligue (XpLigueProvider, xp-ligue.tsx). */
 export interface CartesXp {
@@ -39,14 +39,25 @@ export interface CartesXp {
    * Passe (saisons-passe.ts), le cran du cadre, ses recrues actives et son
    * numéro de Fondateur.
    */
-  parJoueur: Map<string, { rang: Rang | null; paliers: PaliersAtteints; cran: number; recrues: number; fondateur: number | null }>;
+  parJoueur: Map<
+    string,
+    {
+      rang: Rang | null;
+      paliers: PaliersAtteints;
+      cran: number;
+      recrues: number;
+      fondateur: number | null;
+      /** Les skins du PACK AFRIQUE 2027 obtenus (achats_xp) : [nation, numéro de série][]. */
+      afrique?: readonly (readonly [string, number])[];
+    }
+  >;
   /** Change avec l'un d'eux : la 3D recapture. */
   revision: string;
 }
 
 export const CartesXpContext = createContext<CartesXp | null>(null);
 
-function empreinte(texte: string): string {
+export function empreinte(texte: string): string {
   let h = 5381;
   for (let i = 0; i < texte.length; i++) h = ((h << 5) + h + texte.charCodeAt(i)) | 0;
   return (h >>> 0).toString(36);
@@ -94,13 +105,30 @@ export function useRecruesCarte(nom: string): { recrues: number; fondateur: numb
   return { recrues: x?.recrues ?? 0, fondateur: x?.fondateur ?? null };
 }
 
+/** Les skins de nation qu'un joueur a obtenus (PACK AFRIQUE 2027), tels que CartesXp les porte. */
+export function useAfriqueCarte(nom: string): readonly (readonly [string, number])[] {
+  return useContext(CartesXpContext)?.parJoueur.get(nom)?.afrique ?? AUCUNE_NATION;
+}
+const AUCUNE_NATION: readonly (readonly [string, number])[] = [];
+
 /**
  * Les skins d'un joueur : ceux que son palier a débloqués, ceux qui lui sont
- * offerts, puis ceux de ses recrues.
+ * offerts, ceux de ses recrues, puis ceux qu'il a obtenus avec son XP (PACK
+ * AFRIQUE 2027 : les missions et le Passe n'y touchent jamais).
  */
-export function finitionsDe(nom: string, paliers: PaliersAtteints, recrues = 0, fondateur: number | null = null): Finition[] {
-  const passe = debloquesDe(paliers, SAISONS_PASSE).finitions.filter((f): f is Finition => f in MATIERES);
-  const autres = [...finitionsOffertes(nom), ...finitionsRecrues(recrues, fondateur)];
+export function finitionsDe(
+  nom: string,
+  paliers: PaliersAtteints,
+  recrues = 0,
+  fondateur: number | null = null,
+  afrique: readonly (readonly [string, number])[] = AUCUNE_NATION,
+  maintenant: Date = new Date()
+): Finition[] {
+  // Les saisons du Passe commencées seulement : un palier d'une saison à venir
+  // (Givre avant le 9/11), d'où qu'il vienne, n'habille aucune carte.
+  const passe = debloquesDe(paliers, saisonsPasseOuvertes(maintenant)).finitions.filter((f): f is Finition => f in MATIERES);
+  const nations = afrique.map(([n]) => `afrique-${n}`).filter((f): f is Finition => f in MATIERES);
+  const autres = [...finitionsOffertes(nom), ...finitionsRecrues(recrues, fondateur), ...nations];
   return [...passe, ...autres.filter((f, i) => !passe.includes(f) && autres.indexOf(f) === i)];
 }
 
@@ -113,11 +141,13 @@ export function useHabillage(nom: string): HabillageCarte {
     const x = cartes.parJoueur.get(nom);
     const paliers = x?.paliers ?? AUCUN;
     const fondateur = x?.fondateur ?? null;
-    const finitions = finitionsDe(nom, paliers, x?.recrues ?? 0, fondateur);
+    const afrique = x?.afrique ?? AUCUNE_NATION;
+    const maintenant = new Date();
+    const finitions = finitionsDe(nom, paliers, x?.recrues ?? 0, fondateur, afrique, maintenant);
     // « Tes couleurs » se porte avec son pays.
     const voulue = choix.finition === "couleurs" && !choix.pays ? "-" : choix.finition;
     const finition = voulue !== "auto" && voulue !== "-" && finitions.includes(voulue) ? voulue : undefined;
-    const ouverts = debloquesDe(paliers, SAISONS_PASSE).signes;
+    const ouverts = debloquesDe(paliers, saisonsPasseOuvertes(maintenant)).signes;
     const cran = Math.min(4, x?.cran ?? 0) as HabillageCarte["cran"];
     return {
       finition,
@@ -127,6 +157,8 @@ export function useHabillage(nom: string): HabillageCarte {
       rang: x?.rang ?? undefined,
       // La carte Fondateur porte son numéro (la ligne de série, bola-card.tsx).
       fondateur: finition === "fondateur" && fondateur ? fondateur : undefined,
+      // Un skin de nation porte son numéro de série au dos (dos-carte.tsx, serieDe).
+      serieNation: finition?.startsWith("afrique-") ? afrique.find(([n]) => `afrique-${n}` === finition)?.[1] : undefined,
     };
   }, [cartes, nom, choix]);
 }

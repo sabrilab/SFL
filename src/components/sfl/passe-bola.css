@@ -1,5 +1,5 @@
 /*
- * Le Passe Bola (passe-bola.tsx), le Niveau XP (niveau-xp.tsx) et la plongée
+ * Le Passe Bola (passe-bola.tsx), le compteur d'XP (compteur-xp.tsx) et la plongée
  * dans la carte (plongee-carte.tsx), dans la DA des fiches de contrat
  * (actus/missions.css) : ils en reprennent les variables du rang (--r-lueur,
  * --r-feu, --r-texte, --r-sombre), que posent .fiche--S, --A et --B. Chaque

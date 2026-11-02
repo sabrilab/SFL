@@ -30,6 +30,8 @@ import { avecFinsDeLaBase } from "../revelation";
 // Même canal d'événement que SeasonProvider (littéral pour éviter le cycle
 // d'imports : season-provider importe store, qui importe ce module).
 const SAISIE_EVENT = "sfl-saisie";
+/** Émis quand la base a pris la saison (publier_saison). */
+export const SAISON_PUBLIEE_EVENT = "sfl-saison-publiee";
 const VERSION_KEY = "sfl-saison-remote-version";
 
 // Une sauvegarde qui n'a pas atteint la base laisse une marque. Sans elle,
@@ -252,6 +254,8 @@ async function publierMaintenant(saison: Saison, forcer: boolean): Promise<Resul
     if (!r.ok) return { ok: false, raison: CONFLIT, conflit: true };
     retenir(r.version);
     if (r.fins) adopterFins(r.fins);
+    // Le bilan d'XP du serveur se refait (hooks/use-bilan-serveur.ts) : une journée publiée ouvre des paliers.
+    window.dispatchEvent(new Event(SAISON_PUBLIEE_EVENT));
     return { ok: true };
   } catch (e) {
     return { ok: false, raison: e instanceof Error ? e.message : "Base injoignable." };

@@ -26,7 +26,9 @@ import { PlayerCard } from "@/components/sfl/player-card";
 import { useSeason } from "@/components/sfl/season-provider";
 import { COULEURS_PAYS, PAYS_PAR_DEFAUT } from "@/components/sfl/skins-passe";
 import { useChoixBadge } from "@/hooks/use-badge-carte";
-import { finitionsDe, useChoixHabillage, useHabillage, usePaliers, useRecruesCarte } from "@/hooks/use-habillage";
+import { finitionsDe, useAfriqueCarte, useChoixHabillage, useHabillage, usePaliers, useRecruesCarte } from "@/hooks/use-habillage";
+import { SKINS_AFRIQUE } from "@/components/sfl/afrique/registre";
+import { NATIONS, nationsMontrees, numeroSerieNation, packOuvert } from "@/lib/sfl/pack-afrique";
 import { FINITIONS_RECRUES, SKINS_RECRUES, type FinitionRecrue } from "@/components/sfl/skins-recrues";
 import { badgesGagnes, cleBadge, type BadgeCarte } from "@/lib/sfl/badge-carte";
 import { choisirBadge } from "@/lib/sfl/badges-choisis";
@@ -146,10 +148,13 @@ export function PersonnaliserCarte({ player, tuile }: { player: Player; /** En t
   const choix = useChoixHabillage(nom);
   const porte = useHabillage(nom);
   const { recrues, fondateur } = useRecruesCarte(nom);
-  const mesSkins = finitionsDe(nom, paliers, recrues, fondateur);
+  const afrique = useAfriqueCarte(nom);
+  const mesSkins = finitionsDe(nom, paliers, recrues, fondateur, afrique);
   const offerts = mesSkins.filter(
-    (f) => !SKINS.some((r) => r.p.habille?.finition === f) && !FINITIONS_RECRUES.includes(f as FinitionRecrue)
+    (f) => !SKINS.some((r) => r.p.habille?.finition === f) && !FINITIONS_RECRUES.includes(f as FinitionRecrue) && !f.startsWith("afrique-")
   );
+  // Le PACK AFRIQUE 2027 : les nations obtenues, puis celles qui restent, scellées, tant que le pack est ouvert.
+  const nations = nationsMontrees().filter((n) => afrique.some(([x]) => x === n) || packOuvert());
   const badges = badgesGagnes(saison, nom);
   const choixBadge = useChoixBadge(nom) ?? "auto";
   const badgeActif = choixBadge === "aucun" ? "aucun" : badges.some((b) => cleBadge(b) === choixBadge) ? choixBadge : "auto";
@@ -260,6 +265,32 @@ export function PersonnaliserCarte({ player, tuile }: { player: Player; /** En t
                 );
               })}
             </Rubrique>
+
+            {nations.length > 0 && (
+              <Rubrique titre="Afrique 2027" sous={`${afrique.length}/${nationsMontrees().length}`}>
+                {[...nations]
+                  .sort((a, b) => Number(afrique.some(([x]) => x === b)) - Number(afrique.some(([x]) => x === a)))
+                  .map((n) => {
+                    const f = `afrique-${n}` as Finition;
+                    const obtenu = afrique.find(([x]) => x === n);
+                    const skin = SKINS_AFRIQUE[n];
+                    const nation = NATIONS.find((x) => x.id === n)!;
+                    return (
+                      <Ligne
+                        key={f}
+                        actif={porte.finition === f}
+                        ouvert={!!obtenu}
+                        onClick={() => porterSkin(f)}
+                        vignette={vignette({ finition: f, serieNation: obtenu?.[1] || undefined })}
+                        titre={`${skin.nom} · ${nation.nom}`}
+                        quoi={skin.quoi}
+                        // Pas de prix sur une nation qu'on n'a pas : le pack se tire au hasard, une nation ne s'achète pas.
+                        comment={obtenu?.[1] ? `Pack Afrique 2027 · ${numeroSerieNation(obtenu[1])}` : "Pack Afrique 2027"}
+                      />
+                    );
+                  })}
+              </Rubrique>
+            )}
 
             <Rubrique titre="Signes" sous={`${nSignes} à toi`}>
               {SIGNES.map((r) => {

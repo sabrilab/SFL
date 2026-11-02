@@ -10,6 +10,9 @@
 // L'XP de toute la ligue se calcule une seule fois pour l'app
 // (XpLigueProvider, xp-ligue.tsx) : mon XP, celui d'un profil et le rang de
 // chacun (B, A, S) le lisent sans recalculer, autant de cartes qu'il y ait.
+// Les XP S (lib/sfl/xp-s.ts) sortent du même calcul (journalCompletAvecS) :
+// useXpS les lit, au plus haut avec le dernier bilan du serveur quand le
+// calcul de l'appareil est incomplet.
 
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -29,7 +32,6 @@ import {
   CRANS,
   dimancheEnCours,
   engagementsDe,
-  journalXp,
   juger,
   paliersDe,
   rangsDesJoueurs,
@@ -55,16 +57,19 @@ import {
   chargerReponses,
   MISSIONS_EVENT,
   repondreMission,
+  reponsesChargees,
   reponsesDemo,
   reponsesEnMemoire,
 } from "@/lib/sfl/missions-reponses";
-import { ajouterPronos } from "@/lib/sfl/pronos";
-import { ajouterDefis } from "@/lib/sfl/defis";
-import { ajouterRecrues, type RecruesJoueur } from "@/lib/sfl/recrues";
+import { publicationEnAttente } from "@/lib/sfl/saisie/sync";
+import { bilanAffiche, parNom, xpSAffiche } from "@/lib/sfl/xp-acquis";
+import { useBilanServeur, usePaliersGardes } from "@/hooks/use-bilan-serveur";
+import type { RecruesJoueur } from "@/lib/sfl/recrues";
+import { journalCompletAvecS } from "@/lib/sfl/xp-calcul";
+import { bilanXpS, type JournalXpS, type LigneXpS } from "@/lib/sfl/xp-s";
 import { appliquerVotes } from "@/lib/sfl/votes";
 import { supabase } from "@/lib/supabase";
 import type { Saison } from "@/lib/sfl/saisie/types";
-import { ajouterBola, lignesXpBola, missionsPerso } from "@/lib/sfl/missions-perso";
 import { EPREUVES_BOLA, type Epreuve } from "@/lib/sfl/passe";
 import { saisonsPasseOuvertes } from "@/lib/sfl/saisons-passe";
 
@@ -417,6 +422,8 @@ export function useDuelsAcceptes(j: number | null | undefined): Duel[] {
 /** L'XP de toute la ligue, calculé une fois pour l'app (XpLigueProvider). */
 export interface XpLigue {
   journal: Map<string, { lignes: LigneXp[]; reussies: number }>;
+  /** Les XP S de chacun (lib/sfl/xp-s.ts), du même calcul. */
+  journalS: JournalXpS;
   /** Le numéro de la saison SFL en cours. */
   saison: number;
   /** L'heure du calcul (à la minute) : elle dit la saison du Passe (saisons-passe.ts). */
@@ -435,6 +442,8 @@ export interface XpLigue {
   recrues: ReadonlyMap<string, RecruesJoueur>;
   /** Mon nom si je joue en Bola, hors de la SFL : mon passe suit les épreuves Bola (EPREUVES_BOLA). */
   bola: string | null;
+  /** Le compte vitrine, s'il est allumé sur ce téléphone (compte-vitrine.ts) : un aperçu, jamais écrit. */
+  vitrine?: string | null;
 }
 
 export const XpLigueContext = createContext<XpLigue | null>(null);
@@ -448,9 +457,20 @@ export const XpLigueContext = createContext<XpLigue | null>(null);
  */
 export function useXpLigueCalcule(): XpLigue | null {
   const isClient = useIsClient();
-  const maintenant = useMaintenant();
+  const tic = useMaintenant();
   const reponses = useReponses();
-  const { allPlayers, vitrine, bola, bolaCarte } = useSeason();
+  const { allPlayers, vitrine, bola, bolaCarte, revelation } = useSeason();
+  // L'heure du calcul : la minute de l'horloge, et l'instant où la vue de la ligue change (la
+  // révélation de 19 h, un minuit : le SeasonProvider s'y règle). Contrôle visuel du 02/11 : l'app
+  // ouverte à 19 h, la journée revenait tout de suite mais ses XP S (et le Flair, les missions)
+  // attendaient le tic suivant de l'horloge, jusqu'à une minute plus tard, et s'annonçaient à part.
+  // L'heure du serveur, comme le tic et la vue de la ligue (horloge.ts) : un téléphone à l'heure
+  // fausse ne compte ni avant, ni après les autres.
+  const maintenant = useMemo(() => {
+    void revelation;
+    const t = new Date(maintenantMs());
+    return t.getTime() - tic.getTime() < 1000 ? tic : t;
+  }, [tic, revelation]);
   const { toutes: felicitations } = useFelicitations();
   const pronos = useListePronos();
   const { saison, jugee, votes } = useSaisonJugee(maintenant);
@@ -458,22 +478,21 @@ export function useXpLigueCalcule(): XpLigue | null {
   const { ligue, miennes } = useRecrues();
   return useMemo(() => {
     if (!isClient) return null;
-    const journal = journalXp(jugee, reponses, votes, maintenant, felicitations);
-    ajouterPronos(journal, jugee, pronos, maintenant);
-    // Les badges de palier franchis depuis S1 J4 : la prime de leur défi (lib/sfl/defis.ts).
-    ajouterDefis(journal, jugee);
-    // +100 par recrue active, hors du rang (lib/sfl/recrues.ts).
-    ajouterRecrues(journal, jugee, ligue, me ? { nom: me, recrues: miennes } : null, maintenant);
-    // Mes matchs Bola validés et mes missions perso (lib/sfl/missions-perso.ts), hors du rang ;
-    // sur mon seul téléphone. Gardés si je suis entré en SFL depuis.
-    if (bolaCarte) {
-      const { faites } = missionsPerso(bolaCarte.valides, maintenant);
-      ajouterBola(journal, bolaCarte.nom, lignesXpBola(bolaCarte.valides, faites, jugee, maintenant));
-    }
+    const { journal, journalS } = journalCompletAvecS({
+      jugee,
+      reponses,
+      votes,
+      felicitations,
+      pronos,
+      ligueRecrues: ligue,
+      moi: me ? { nom: me, recrues: miennes } : null,
+      bolaCarte,
+      maintenant,
+    });
     const recrues = new Map(ligue.map((r) => [r.nom, r]));
     const rangs = rangsDesJoueurs(classementNiveau(journal, allPlayers, { pourLeRang: true }));
     const surLesCartes = cartesDe(journal, rangs, recrues, bola, maintenant);
-    const lg = { journal, saison: saison.numero ?? 0, maintenant, rangs, surLesCartes, recrues, bola };
+    const lg = { journal, journalS, saison: saison.numero ?? 0, maintenant, rangs, surLesCartes, recrues, bola, vitrine: vitrine?.nom ?? null };
     return vitrine ? avecVitrineXp(lg, saison, vitrine.nom) : lg;
   }, [isClient, jugee, reponses, votes, maintenant, felicitations, pronos, saison, allPlayers, vitrine, ligue, miennes, me, bola, bolaCarte]);
 }
@@ -490,8 +509,54 @@ export function useXpLigue(): XpLigue | null {
 export function useXp(nom?: string): BilanXp | null {
   const { me } = useMyPlayer();
   const lg = useXpLigue();
+  const session = useSession();
   const qui = nom ?? me;
-  return useMemo(() => (lg && qui ? bilanDe(lg.journal, qui, lg.maintenant, epreuvesDe(qui, lg.bola)) : null), [lg, qui]);
+  const serveur = useBilanServeur(qui === me ? qui : null);
+  const garde = parNom(usePaliersGardes(), qui);
+  // Mes réponses aux missions arrivent un instant après l'ouverture : useReponses suit leur chargement.
+  useReponses();
+  const complet = !!session?.server && reponsesChargees() && !publicationEnAttente();
+  return useMemo(() => {
+    if (!lg || !qui) return null;
+    const b = bilanDe(lg.journal, qui, lg.maintenant, epreuvesDe(qui, lg.bola));
+    // Le compte vitrine garde son calcul (un aperçu voulu, sur son seul téléphone).
+    if (lg.vitrine === qui) return b;
+    // Le palier gardé par le serveur ; un calcul incomplet, au plus haut avec son dernier bilan (xp-acquis.ts).
+    return bilanAffiche(b, { complet, serveur, garde });
+  }, [lg, qui, complet, serveur, garde]);
+}
+
+/** Les XP S d'un joueur telles que l'écran les montre : gagnées à vie, et leurs lignes. */
+export interface XpSAffichees {
+  /** Gagnées, à vie : le calcul de l'appareil, au plus haut avec le serveur s'il est incomplet. */
+  gagne: number;
+  /** Le détail, de la plus récente à la plus ancienne (xp-s.ts, bilanXpS). */
+  lignes: LigneXpS[];
+  /** Le calcul de l'appareil a tout ce qu'il lui faut (session vérifiée, réponses chargées) : l'annonce l'attend. */
+  complet: boolean;
+}
+
+/**
+ * Mes XP S (ou celles de `nom`) : le même journal que le serveur (xp-s.ts),
+ * pris au plus haut avec son dernier bilan tant que le calcul de l'appareil
+ * est incomplet (xp-acquis.ts, xpSAffiche). Le serveur seul décide d'un
+ * achat (ouvrir_pack_xp) ; ce chiffre ne fait que s'afficher.
+ */
+export function useXpS(nom?: string): XpSAffichees | null {
+  const { me } = useMyPlayer();
+  const lg = useXpLigue();
+  const session = useSession();
+  const qui = nom ?? me;
+  const serveur = useBilanServeur(qui === me ? qui : null);
+  useReponses();
+  const complet = !!session?.server && reponsesChargees() && !publicationEnAttente();
+  return useMemo(() => {
+    if (!lg || !qui) return null;
+    const b = bilanXpS(lg.journalS, qui);
+    // Le compte vitrine garde son calcul (un aperçu, sur son seul téléphone).
+    if (lg.vitrine === qui) return { gagne: b.gagne, lignes: b.lignes, complet: true };
+    return { gagne: xpSAffiche(b.gagne, { complet, serveur }), lignes: b.lignes, complet };
+  }, [lg, qui, complet, serveur]);
 }
 
 /** Le rang d'un joueur (B, A, S) ; null pour un joueur masqué ou inconnu. */

@@ -10,7 +10,7 @@
 // cartes, chacune sur son objet en relief (Tuile). La toucher ouvre sa
 // page, enfant de Ma carte (lib/nav.ts) : /profil/saison, /profil/xp,
 // /profil/evolution, /profil/badges, /profil/cartes. Chaque page reprend tel
-// quel le bloc qui était dans Ma carte (ma-saison.tsx, niveau-xp.tsx,
+// quel le bloc qui était dans Ma carte (ma-saison.tsx, le mode Passe,
 // carriere-joueur.tsx, vitrine.tsx), sous le retour de toute l'app
 // (bouton-retour.tsx), qui ramène à Ma carte là où on l'avait laissée.
 //
@@ -20,13 +20,14 @@
 // bleu (cartes Impact et Défensive), l'or reste aux badges.
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import type { RangDuJour } from "@/components/sfl/ma-saison";
-import { useRangXp, useXp } from "@/hooks/use-missions";
+import { useRangXp, useXp, useXpS, type XpSAffichees } from "@/hooks/use-missions";
 import { ModePasse, retenirOrigineModePasse } from "@/components/sfl/mode-passe";
 import { useMissionsASigner } from "@/components/sfl/mode-passe-missions";
 import { NOM_CHOIX } from "@/components/sfl/flair/mon-flair";
@@ -40,6 +41,14 @@ import { saisonsBolaDe } from "@/lib/sfl/carte-bola";
 import { actionsDuJour, dimanchesDe, ficheJoueur, resultatDuJour } from "@/lib/sfl/fiche-joueur";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
 import { metal, NOM_METAL, prochain, vitrine } from "@/lib/sfl/trophees";
+import { ligneCompteur, partDuNiveau, xpFr, xpSFr } from "@/lib/sfl/compteur-xp";
+import { useSoldeXpS } from "@/hooks/use-achats-xp";
+import { MontantXpS, PastilleS } from "@/components/sfl/xp-s";
+import { annonceXpS, type VuXpS } from "@/lib/sfl/xp-s";
+import { haptique } from "@/lib/sfl/haptique";
+import { ceremonieOuverte, useCeremonieOuverte } from "@/hooks/use-ceremonie";
+import type { BilanXp } from "@/lib/sfl/missions";
+import { palierAAnnoncer } from "@/lib/sfl/xp-acquis";
 import { cn } from "@/lib/utils";
 import "./rubriques.css";
 
@@ -190,6 +199,10 @@ export function RubriquesMaCarte() {
   const b = useXp(player.name);
   const r = useRangXp(player.name);
   const aSigner = useMissionsASigner();
+  // Les XP S qui restent à dépenser (lib/sfl/xp-s.ts) : la seconde monnaie, celle des Packs.
+  const soldeS = useSoldeXpS(player.name);
+  const xpS = useXpS(player.name);
+  useAnnonces(b, xpS, player.name);
   const flair = useMonFlair();
   const blesse = useEstBlesse(player.name);
   const identite = useIdentites();
@@ -260,8 +273,13 @@ export function RubriquesMaCarte() {
   if (b) {
     const piste = b.saisonPasse.paliers;
     const PALIERS_PASSE = piste.length;
-    const fini = b.passe.palier >= PALIERS_PASSE;
-    const suivant = piste[Math.min(PALIERS_PASSE, b.passe.palier + 1) - 1];
+    // Le palier que le mode Passe montre : au moins celui que le serveur a
+    // gardé (b.palier, lib/sfl/xp-acquis.ts). La tuile lisait le seul calcul de
+    // l'appareil (b.passe.palier) : « Passe 4/16 » ici, 13/16 dans le Passe
+    // (relecture du 02/11/2026).
+    const palier = Math.max(b.palier, b.passe.palier);
+    const fini = palier >= PALIERS_PASSE;
+    const suivant = piste[Math.min(PALIERS_PASSE, palier + 1) - 1];
     tuiles.push(
       <Tuile
         key="xp"
@@ -274,7 +292,7 @@ export function RubriquesMaCarte() {
           setPasse(true);
         }}
         nom="Niveau XP"
-        label={`Niveau XP ${b.niveau}${r && r.xp > 0 ? `, rang ${r.rang}` : ""}. Passe Bola : palier ${b.passe.palier} sur ${PALIERS_PASSE}`}
+        label={`Niveau XP ${b.niveau}${r && r.xp > 0 ? `, rang ${r.rang}` : ""}, ${ligneCompteur(b)}${soldeS != null ? `, ${xpSFr(soldeS)}` : ""}. Passe Bola : palier ${palier} sur ${PALIERS_PASSE}`}
       >
         <span className="flex items-baseline gap-2">
           <span style={{ ...NOMBRE, fontSize: 52 }} className="tabular-nums">
@@ -282,10 +300,26 @@ export function RubriquesMaCarte() {
           </span>
           {r && r.xp > 0 && <span className="tuile__etiquette font-mono text-[12px] font-bold">rang {r.rang}</span>}
         </span>
+        <span className="flex flex-col gap-1">
+          {/* L'XP gagnée, nette (c'est elle qu'Ilyes cherchait), puis les XP S qui restent : « 1 630 XP · ▣S 59 ».
+              Trop étroit, les XP S passent dessous, entières, avec leur point (rien ne se casse au milieu). */}
+          <span className="flex flex-wrap items-baseline gap-x-1.5 font-mono text-[11px] font-bold tabular-nums leading-tight">
+            <span className="text-foreground">{xpFr(b.total)}</span>
+            {soldeS != null && (
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-foreground/70">
+                <span aria-hidden>·</span>
+                <MontantXpS n={soldeS} />
+              </span>
+            )}
+          </span>
+          <span className="tuile__barre" aria-hidden>
+            <span style={{ width: `${partDuNiveau(b) * 100}%` }} />
+          </span>
+        </span>
         <span className="mt-auto flex flex-col gap-1.5">
           <span className="flex gap-[2px]" aria-hidden>
             {Array.from({ length: PALIERS_PASSE }, (_, i) => (
-              <span key={i} className={cn("h-[5px] flex-1 rounded-full", i < b.passe.palier ? "tuile__plein" : "tuile__trait")} />
+              <span key={i} className={cn("h-[5px] flex-1 rounded-full", i < palier ? "tuile__plein" : "tuile__trait")} />
             ))}
           </span>
           <span className="truncate text-[12px] font-semibold">
@@ -293,7 +327,7 @@ export function RubriquesMaCarte() {
               ? `${aSigner} mission${aSigner > 1 ? "s" : ""} à signer`
               : fini
                 ? "Passe complet"
-                : `Passe ${b.passe.palier}/${PALIERS_PASSE} · ${suivant.nom}`}
+                : `Passe ${palier}/${PALIERS_PASSE} · ${suivant.nom}`}
           </span>
         </span>
       </Tuile>
@@ -511,6 +545,98 @@ export function RubriquesMaCarte() {
       {passe && <ModePasse player={player} saison={numero} onSortie={() => setPasse(false)} />}
     </nav>
   );
+}
+
+/* ------------------------- Un palier qui s'ouvre ------------------------- */
+
+const CLE_VU = "sfl-passe-vu";
+const CLE_XPS_VU = "sfl-xps-vu";
+
+/**
+ * Un palier qui s'ouvre se dit, une fois par téléphone (Ilyes, 01/11 : « je
+ * sais même pas comment je les ai déverrouillés ») : « Palier 13 · Animée »,
+ * avec l'haptique. D'où vient l'XP, la liste « Gagner de l'XP » le dit.
+ *
+ * Les XP S (lib/sfl/xp-s.ts, 02/11/2026) aussi, à la révélation : un toast
+ * discret « +15 ▣S », d'où elles viennent (« MVP · Flair »), une haptique
+ * légère ; seulement ce qui vient de tomber (annonceXpS), une fois le calcul
+ * de l'appareil complet et posé (quatre secondes sans bouger : les réponses
+ * aux missions arrivent un instant après l'ouverture). La première fois,
+ * rien : le stock d'avant se lit sur la tuile. Un palier qui s'ouvre au même
+ * moment passe dans la même annonce, sur sa propre ligne (« Passe Bola ·
+ * Palier 14 · Animée », sous les sources : le nom du palier ne se lit pas
+ * comme une source), avec l'haptique du palier. Aucun nombre ne s'anime.
+ * Une cérémonie plein écran ouverte (Nouvelle carte, les divisions) tient
+ * l'annonce jusqu'à sa fermeture (use-ceremonie.ts).
+ */
+const POSE_MS = 4000;
+
+function useAnnonces(b: BilanXp | null, s: XpSAffichees | null, nom: string) {
+  const sp = b?.saisonPasse;
+  const palier = b ? Math.max(b.palier, b.passe.palier) : 0;
+  const lignes = s?.complet ? s.lignes : null;
+  const ceremonie = useCeremonieOuverte();
+  useEffect(() => {
+    if (ceremonie) return;
+    const id = window.setTimeout(() => {
+      // Ouverte pendant l'attente : l'effet reprend à sa fermeture.
+      if (ceremonieOuverte()) return;
+      let n: number | null = null;
+      if (sp && palier > 0) {
+        let vus: Record<string, number> = {};
+        try {
+          vus = JSON.parse(localStorage.getItem(CLE_VU) ?? "{}") as Record<string, number>;
+        } catch {}
+        n = palierAAnnoncer(palier, vus[sp.id] ?? null);
+        if (n !== null)
+          try {
+            localStorage.setItem(CLE_VU, JSON.stringify({ ...vus, [sp.id]: n }));
+          } catch {}
+      }
+      const p = n !== null ? sp?.paliers[n - 1] : undefined;
+      let annonce: { plus: number; sources: string[] } | null = null;
+      if (lignes) {
+        let brut: string | null = null;
+        let vu: VuXpS | null = null;
+        try {
+          brut = localStorage.getItem(CLE_XPS_VU);
+          vu = JSON.parse(brut ?? "null") as VuXpS | null;
+        } catch {}
+        const r = annonceXpS(nom, lignes, vu, new Date());
+        annonce = r.annonce;
+        const garde = JSON.stringify(r.vu);
+        if (garde !== brut)
+          try {
+            localStorage.setItem(CLE_XPS_VU, garde);
+          } catch {}
+      }
+      if (annonce) {
+        if (p) haptique.sceau();
+        else haptique.choix();
+        // D'où elles viennent ; le palier, s'il s'ouvre en même temps, sur sa propre ligne.
+        const description =
+          annonce.sources.length || p ? (
+            <span className="flex flex-col">
+              {annonce.sources.length > 0 && <span>{annonce.sources.join(" · ")}</span>}
+              {p && <span>{`Passe Bola · Palier ${n} · ${p.nom}`}</span>}
+            </span>
+          ) : null;
+        toast(
+          <span className="inline-flex items-center gap-1.5 tabular-nums">
+            <span className="sr-only">{`+${xpSFr(annonce.plus)}`}</span>
+            <span aria-hidden>+{annonce.plus}</span>
+            <PastilleS />
+          </span>,
+          description ? { description } : undefined
+        );
+        return;
+      }
+      if (!p || !sp) return;
+      haptique.sceau();
+      toast(`Palier ${n} · ${p.nom}`, { description: `Passe Bola · ${sp.nom}` });
+    }, POSE_MS);
+    return () => window.clearTimeout(id);
+  }, [sp, palier, lignes, nom, ceremonie]);
 }
 
 /* ----------------------------- La page enfant ----------------------------- */

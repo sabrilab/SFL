@@ -22,8 +22,16 @@
 //     « pour qu'on puisse voir les missions et les missions des gens »),
 //     par /profil/xp?vue=autres. Un joueur Bola, hors de la SFL, n'a pas
 //     « Les autres » : ce sont les missions de la ligue du dimanche (28/10) ;
-//   · on sort par la croix, Échap, ou en tirant vers le bas : le noir se
-//     referme sur la tuile.
+//   · un quatrième, « Packs » (mode-passe-packs.tsx, 01/11/2026) : le PACK
+//     AFRIQUE 2027, payé en XP, par /profil/xp?vue=packs ;
+//   · le compteur d'XP en tête (Ilyes, 01/11 : « je vois que je suis niveau
+//     6, mais pas le nombre d'XP que j'ai gagné ») : compteur-xp.tsx ;
+//   · la route se pilote à la souris, à la molette, au doigt et au clavier
+//     d'un seul comportement (lib/sfl/route-passe.ts), avec précédent et
+//     suivant à l'ordinateur ; un palier qu'on n'a pas se porte en aperçu,
+//     et le dit ;
+//   · on sort par la croix, Échap, ou en tirant vers le bas au doigt (jamais
+//     depuis la route) : le noir se referme sur la tuile.
 // Toujours en noir, en clair comme en sombre : c'est un autre monde.
 // Ce qui défile porte overflow-y-auto / overflow-x-auto : le verrou du rebond
 // d'iOS (pwa/viewport-lock.tsx) bloque tout autre glissé hors de #app-scroll,
@@ -33,9 +41,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Check, Lock, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Lock, X } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
-import { Card3D } from "@/components/sfl/card-3d";
+import { Card3D, REMPLISSAGE_3D } from "@/components/sfl/card-3d";
 import { useHorsDeLaSfl, useMissionsASigner, VueMissions } from "@/components/sfl/mode-passe-missions";
 import { VueAutres } from "@/components/sfl/mode-passe-autres";
 import type { Finition } from "@/components/sfl/finitions-carte";
@@ -43,28 +51,50 @@ import { cadrageDe, ChoixPays, essai, etatDe, GENRE, Mini, useOntLePalier, type 
 import { PlayerCard } from "@/components/sfl/player-card";
 import { Plongee } from "@/components/sfl/plongee-carte";
 import { COULEURS_PAYS, PAYS_PAR_DEFAUT } from "@/components/sfl/skins-passe";
-import { finitionsDe, useChoixHabillage, useHabillage, usePaliers } from "@/hooks/use-habillage";
+import { CompteurXp } from "@/components/sfl/compteur-xp";
+import { libelleXpS, MontantXpS } from "@/components/sfl/xp-s";
+import { VuePacks } from "@/components/sfl/mode-passe-packs";
+import { useSoldeXpS } from "@/hooks/use-achats-xp";
+import { finitionsDe, useAfriqueCarte, useChoixHabillage, useHabillage, usePaliers } from "@/hooks/use-habillage";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { useRangXp, useXp } from "@/hooks/use-missions";
+import { useRangXp, useXp, useXpLigue } from "@/hooks/use-missions";
 import { usePlayerPhoto } from "@/hooks/use-player-photo";
 import type { Player } from "@/lib/sfl/engine";
 import { choisirHabillage } from "@/lib/sfl/habillages-choisis";
 import type { BilanXp } from "@/lib/sfl/missions";
 import { epreuveDu, seuilPalier, type PalierPasse } from "@/lib/sfl/passe";
+import { packOuvert } from "@/lib/sfl/pack-afrique";
 import { saisonPasseSuivante, type SaisonPasse } from "@/lib/sfl/saisons-passe";
+import {
+  borner,
+  CALME,
+  estUnClic,
+  FIN_DU_PILOTAGE,
+  molette,
+  PAS_ROUTE,
+  palierAuCentre,
+  piloter,
+  piloteExpire,
+  positionDe,
+  sansPilote,
+  surDefilement,
+  surMolette,
+  toucheRoute,
+  type Pilote,
+} from "@/lib/sfl/route-passe";
 import { cn } from "@/lib/utils";
 import "./mode-passe.css";
 
 const xp = (n: number) => `${n.toLocaleString("fr-FR")} XP`;
 const ontLe = (n: number) => (n > 0 ? `${n} l'${n > 1 ? "ont" : "a"}` : "personne ne l'a");
 
-export type Vue = "passe" | "missions" | "autres";
-const VUES: Vue[] = ["passe", "missions", "autres"];
-const NOM_VUE: Record<Vue, string> = { passe: "Passe", missions: "Missions", autres: "Les autres" };
+export type Vue = "passe" | "missions" | "autres" | "packs";
+const VUES: Vue[] = ["passe", "missions", "autres", "packs"];
+const NOM_VUE: Record<Vue, string> = { passe: "Passe", missions: "Missions", autres: "Les autres", packs: "Packs" };
 
 /** Le pas d'un palier sur la route, en px (la largeur d'un arrêt). */
-const PAS = 76;
+const PAS = PAS_ROUTE;
 /** L'ouverture du noir depuis la tuile, puis sa fermeture. */
 const OUVERTURE = 560;
 const FERMETURE = 380;
@@ -74,14 +104,31 @@ const TIRER = 110;
 /** La carte au centre, à la mesure de l'écran (le reste tient autour). */
 function tailleCarte(): number {
   if (typeof window === "undefined") return 1;
-  return Math.max(0.78, Math.min(1.3, (window.innerHeight - 476) / 330));
+  return Math.max(0.74, Math.min(1.3, (window.innerHeight - 512) / 330));
+}
+
+/** La hauteur de la carte posée dans sa 3D, à la taille 1 (Card3D : 72 % de son cadre). */
+const HAUTEUR_POSEE = ((254 * 1656) / 1024) * REMPLISSAGE_3D;
+/** Ce que la carte laisse libre dans sa place : la puce « Aperçu » au-dessus, un souffle dessous. */
+const MARGE_CARTE = 24;
+/** Jamais plus petite (un téléphone bas, 375 × 667) ; jamais sur les onglets ni sur le palier. */
+const TAILLE_MIN = 0.5;
+
+/**
+ * La taille qui tient dans la place de la carte (la rangée que lui laisse la
+ * grille du mode, mesurée) : sur un téléphone bas, la carte passait sous les
+ * onglets et sous l'annonce de la saison (02/11, 375 × 667).
+ */
+function tailleDansLaPlace(taille: number, place: number): number {
+  if (place <= 0) return taille;
+  return Math.max(TAILLE_MIN, Math.min(taille, (place - MARGE_CARTE) / HAUTEUR_POSEE));
 }
 
 /** /profil/xp?vue=missions (la notification des Missions Bola) ouvre les Missions ; ?vue=autres, Les autres (celle de l'outsider). */
 function vueDeLAdresse(): Vue | null {
   if (typeof window === "undefined") return null;
   const v = new URLSearchParams(window.location.search).get("vue");
-  return v === "missions" || v === "autres" ? v : null;
+  return v === "missions" || v === "autres" || v === "packs" ? v : null;
 }
 
 /* --------------------- D'où l'on entre (la tuile touchée) --------------------- */
@@ -115,9 +162,10 @@ function Arret({
       type="button"
       data-n={p.n}
       onClick={onChoisir}
-      aria-pressed={choisi}
-      aria-label={`Palier ${p.n}, ${p.nom}`}
+      aria-current={choisi ? "step" : undefined}
+      aria-label={`Palier ${p.n}, ${p.nom}${etat === "verrou" ? ", verrouillé" : ""}`}
       className={cn("mp-arret", `fiche--${p.rang}`, `mp-arret--${etat}`, choisi && "mp-arret--choisi")}
+      data-etat={etat}
       style={{ width: PAS }}
     >
       <span className="mp-arret__vignette">
@@ -134,7 +182,13 @@ function Arret({
   );
 }
 
-/** Les vingt paliers en file : celui qui passe au centre est choisi. */
+/**
+ * Les paliers en file : celui qui passe au centre est choisi. Un seul
+ * comportement pour la souris, la molette, le glissé, le doigt et le clavier
+ * (lib/sfl/route-passe.ts) : quand l'app pilote le défilement, le défilement
+ * ne choisit rien ; quand on glisse, le palier du centre se choisit une fois
+ * le geste calmé. À l'ordinateur, deux boutons aux bouts de la route.
+ */
 function Route({
   piste,
   player,
@@ -143,6 +197,7 @@ function Route({
   palierMax,
   choisi,
   onChoisir,
+  reduit,
 }: {
   /** Les paliers de la saison du Passe en cours. */
   piste: readonly PalierPasse[];
@@ -153,34 +208,156 @@ function Route({
   palierMax: number;
   choisi: number;
   onChoisir: (n: number) => void;
+  reduit: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const premier = useRef(true);
+  const pilote = useRef<Pilote>(sansPilote());
+  const parGlisse = useRef(false);
+  const calme = useRef<number | undefined>(undefined);
+  const lacher = useRef<number | undefined>(undefined);
+  const saisie = useRef<{ x: number; y: number; depart: number; id: number; bouge: boolean } | null>(null);
+  const sansClic = useRef(false);
+  const [saisi, setSaisi] = useState(false);
+  const n = piste.length;
+  // Les gestes lisent le palier choisi au moment où ils arrivent.
+  const choisiRef = useRef(choisi);
+  useEffect(() => {
+    choisiRef.current = choisi;
+  }, [choisi]);
 
-  // Le palier choisi vient au centre (sans glisser à l'ouverture).
+  /** L'app amène la piste sur le palier `cible` : rien d'autre ne choisit en chemin. */
+  const amener = useCallback(
+    (cible: number) => {
+      const r = ref.current;
+      if (!r) return;
+      const left = positionDe(cible);
+      if (Math.abs(r.scrollLeft - left) < 2) {
+        pilote.current = sansPilote();
+        return;
+      }
+      pilote.current = piloter(pilote.current, cible, performance.now());
+      r.scrollTo({ left, behavior: premier.current || reduit ? "instant" : "smooth" });
+      window.clearTimeout(lacher.current);
+      lacher.current = window.setTimeout(function attendre() {
+        const p = piloteExpire(pilote.current, performance.now());
+        pilote.current = p;
+        if (p.cible !== null) lacher.current = window.setTimeout(attendre, 120);
+      }, FIN_DU_PILOTAGE);
+    },
+    [reduit]
+  );
+
+  // Le palier choisi vient au centre (sans glisser à l'ouverture), sauf s'il vient d'un glissé.
+  useEffect(() => {
+    const glisse = parGlisse.current;
+    parGlisse.current = false;
+    if (!glisse) amener(choisi);
+    premier.current = false;
+  }, [choisi, amener]);
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(calme.current);
+      window.clearTimeout(lacher.current);
+    },
+    []
+  );
+
+  /** Un choix de l'app (clic, bouton, molette) : la piste suit, même si le palier ne change pas. */
+  const choisir = useCallback(
+    (cible: number) => {
+      const c = borner(cible, n);
+      if (c === choisiRef.current) amener(c);
+      else onChoisir(c);
+    },
+    [n, onChoisir, amener]
+  );
+
+  // Au doigt ou au trackpad : le palier du centre, une fois le geste calmé.
+  const surScroll = () => {
+    const r = ref.current;
+    if (!r) return;
+    const { pilote: p, choisit } = surDefilement(pilote.current, r.scrollLeft, performance.now());
+    pilote.current = p;
+    if (!choisit || saisie.current) return;
+    window.clearTimeout(calme.current);
+    calme.current = window.setTimeout(() => {
+      const c = palierAuCentre(r.scrollLeft, n);
+      if (c !== choisiRef.current) {
+        parGlisse.current = true;
+        onChoisir(c);
+      }
+    }, CALME);
+  };
+
+  // La molette verticale avance d'un palier par geste ; la page ne défile pas.
   useEffect(() => {
     const r = ref.current;
     if (!r) return;
-    const cible = (choisi - 1) * PAS;
-    if (Math.abs(r.scrollLeft - cible) < 2) return;
-    r.scrollTo({ left: cible, behavior: premier.current ? "instant" : "smooth" });
-    premier.current = false;
-  }, [choisi]);
+    let m = molette();
+    const surRoue = (e: WheelEvent) => {
+      const x = surMolette(m, e.deltaX, e.deltaY, performance.now());
+      m = x.molette;
+      if (!x.pris) return;
+      e.preventDefault();
+      if (x.pas) choisir(choisiRef.current + x.pas);
+    };
+    r.addEventListener("wheel", surRoue, { passive: false });
+    return () => r.removeEventListener("wheel", surRoue);
+  }, [choisir]);
 
-  // En glissant, le palier au centre se choisit.
-  const suivre = () => {
-    const r = ref.current;
-    if (!r) return;
-    const n = Math.min(piste.length, Math.max(1, Math.round(r.scrollLeft / PAS) + 1));
-    if (n !== choisi) onChoisir(n);
+  // Glisser à la souris : la piste suit la main, l'aimant coupé ; au relâcher, le palier le plus proche.
+  const souris = {
+    onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerType !== "mouse" || e.button !== 0 || !ref.current) return;
+      saisie.current = { x: e.clientX, y: e.clientY, depart: ref.current.scrollLeft, id: e.pointerId, bouge: false };
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
+      const s = saisie.current;
+      const r = ref.current;
+      if (!s || !r || s.id !== e.pointerId) return;
+      const dx = e.clientX - s.x;
+      if (!s.bouge && estUnClic(dx, e.clientY - s.y)) return;
+      if (!s.bouge) {
+        s.bouge = true;
+        pilote.current = sansPilote();
+        setSaisi(true);
+        r.setPointerCapture?.(e.pointerId);
+      }
+      r.scrollLeft = s.depart - dx;
+    },
+    onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => {
+      const s = saisie.current;
+      saisie.current = null;
+      const r = ref.current;
+      if (!s || !r || s.id !== e.pointerId || !s.bouge) return;
+      setSaisi(false);
+      sansClic.current = true;
+      window.setTimeout(() => (sansClic.current = false), 0);
+      choisir(palierAuCentre(r.scrollLeft, n));
+    },
+    onPointerCancel: () => {
+      saisie.current = null;
+      setSaisi(false);
+    },
+    // Un glissé n'est pas un clic sur le palier où il finit.
+    onClickCapture: (e: React.MouseEvent) => {
+      if (!sansClic.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+    },
   };
 
   return (
-    <div className="mp-route" role="group" aria-label={`Les ${piste.length} paliers`}>
-      <div ref={ref} onScroll={suivre} className="mp-route__piste overflow-x-auto">
-        <div className="mp-route__rail" style={{ width: piste.length * PAS }}>
+    <div className="mp-route" role="group" aria-label={`Les ${n} paliers`}>
+      <button type="button" className="mp-route__fleche mp-route__fleche--avant" aria-label="Palier précédent" disabled={choisi <= 1} onClick={() => choisir(choisi - 1)}>
+        <ChevronLeft className="size-5" strokeWidth={2.2} />
+      </button>
+      <div ref={ref} onScroll={surScroll} {...souris} className={cn("mp-route__piste overflow-x-auto", saisi && "mp-route__piste--saisie")}>
+        <div className="mp-route__rail" style={{ width: n * PAS }}>
           <span className="mp-route__trait" />
-          <span className="mp-route__fait" style={{ width: Math.min(piste.length - 1, Math.max(0, palier - 1 + avance)) * PAS }} />
+          <span className="mp-route__fait" style={{ width: Math.min(n - 1, Math.max(0, palier - 1 + avance)) * PAS }} />
           {piste.map((x) => (
             <Arret
               key={x.n}
@@ -188,11 +365,14 @@ function Route({
               etat={etatDe(x.n, palier, palierMax)}
               choisi={x.n === choisi}
               player={player}
-              onChoisir={() => onChoisir(x.n)}
+              onChoisir={() => choisir(x.n)}
             />
           ))}
         </div>
       </div>
+      <button type="button" className="mp-route__fleche mp-route__fleche--apres" aria-label="Palier suivant" disabled={choisi >= n} onClick={() => choisir(choisi + 1)}>
+        <ChevronRight className="size-5" strokeWidth={2.2} />
+      </button>
     </div>
   );
 }
@@ -260,9 +440,14 @@ function Palier({ p, player, b, palierMax, pays, setPays, onPlonger }: {
           <span className="font-mono text-[11px] text-white/60 tabular-nums">encore {xp(passe.manque)}</span>
         </div>
       ) : etat === "prochain" && passe.bloquee ? (
-        <p className="mp-palier__ligne">
-          Épreuve {passe.bloquee.romain} · {passe.bloquee.phrase}
-        </p>
+        <>
+          <p className="mp-palier__ligne">
+            Épreuve {passe.bloquee.romain} · {passe.bloquee.phrase}
+          </p>
+          <span className="font-mono text-[11px] text-white/60 tabular-nums">
+            {passe.xp.toLocaleString("fr-FR")} / {xp(seuilPalier(p.n))}
+          </span>
+        </>
       ) : ouvert ? (
         <p className="mp-palier__ligne mp-palier__ligne--a-toi">
           <Check className="size-3.5" strokeWidth={3} /> {etat === "acquis" ? "Acquis" : "Gagné"} · {ontLe(combien(p.n))}
@@ -366,13 +551,30 @@ export function ModePasse({
   const piste = b?.saisonPasse.paliers ?? [];
   const PALIERS_PASSE = Math.max(1, piste.length);
   const palierMax = b?.palier ?? 0;
-  const prochain = Math.min(PALIERS_PASSE, (b?.passe.palier ?? 0) + 1);
+  // Le palier atteint : au moins celui que le serveur a gardé (b.palier, lib/sfl/xp-acquis.ts).
+  const prochain = Math.min(PALIERS_PASSE, Math.max(b?.palier ?? 0, b?.passe.palier ?? 0) + 1);
   const [choisi, setChoisi] = useState(prochain);
+  const choisiRef = useRef(choisi);
+  useEffect(() => {
+    choisiRef.current = choisi;
+  }, [choisi]);
+  // L'XP arrive parfois après l'ouverture (les réponses aux missions) : tant qu'on n'a rien touché, la route suit le prochain palier.
+  const routeTouchee = useRef(false);
+  useEffect(() => {
+    if (!routeTouchee.current) setChoisi(prochain);
+  }, [prochain]);
   const [pays, setPays] = useState(choix.pays ?? PAYS_PAR_DEFAUT);
   const horsSfl = useHorsDeLaSfl();
-  const vues = horsSfl ? VUES.filter((v) => v !== "autres") : VUES;
+  const lg = useXpLigue();
+  const vitrine = !!lg?.vitrine && lg.vitrine === player.name;
+  const afrique = useAfriqueCarte(player.name);
+  // Les XP S qui restent (lib/sfl/xp-s.ts) : les miennes seulement (null pour le profil d'un autre).
+  const soldeS = useSoldeXpS(player.name);
+  // Les Packs (PACK AFRIQUE 2027) : quand le pack est ouvert, ou pour qui en a déjà, ou pour la vitrine (un aperçu).
+  const avecPacks = packOuvert() || afrique.length > 0 || vitrine;
+  const vues = VUES.filter((v) => (v !== "autres" || !horsSfl) && (v !== "packs" || avecPacks));
   const [vueChoisie, setVue] = useState<Vue>(() => vueVoulue ?? vueDeLAdresse() ?? "passe");
-  const vue: Vue = horsSfl && vueChoisie === "autres" ? "passe" : vueChoisie;
+  const vue: Vue = vues.includes(vueChoisie) ? vueChoisie : "passe";
   // Des missions à signer (connues un instant après l'ouverture) : on s'ouvre sur elles, tant qu'on n'a rien touché.
   const vueTouchee = useRef(!!vueVoulue || !!vueDeLAdresse());
   useEffect(() => {
@@ -398,6 +600,14 @@ export function ModePasse({
     const regler = () => setTaille(tailleCarte());
     window.addEventListener("resize", regler);
     return () => window.removeEventListener("resize", regler);
+  }, []);
+  // La place que la grille laisse à la carte (la rangée du milieu), mesurée : la carte s'y tient.
+  const [place, setPlace] = useState(0);
+  const mesurerPlace = useCallback((el: HTMLDivElement | null) => {
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => setPlace(Math.round(e.contentRect.height)));
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   // L'ouverture : le noir part de la tuile et prend l'écran.
@@ -437,20 +647,32 @@ export function ModePasse({
     const touche = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !plonge) sortir();
       else if (vue !== "passe") return;
-      else if (e.key === "ArrowLeft") setChoisi((n) => Math.max(1, n - 1));
-      else if (e.key === "ArrowRight") setChoisi((n) => Math.min(PALIERS_PASSE, n + 1));
+      else {
+        const vers = toucheRoute(e.key, choisiRef.current, PALIERS_PASSE);
+        if (vers === null || (e.target as HTMLElement | null)?.closest?.("input, textarea")) return;
+        e.preventDefault();
+        routeTouchee.current = true;
+        setChoisi(vers);
+      }
     };
     window.addEventListener("keydown", touche);
     return () => window.removeEventListener("keydown", touche);
   }, [sortir, plonge, vue, PALIERS_PASSE]);
 
+
   const p = piste[Math.min(choisi, PALIERS_PASSE) - 1] ?? piste[0];
+  // Un palier qu'on n'a pas : la carte le porte en aperçu, et le dit.
+  const etatChoisi = p && b ? etatDe(p.n, b.passe.palier, palierMax) : "gagne";
+  const apercu = etatChoisi === "verrou" || etatChoisi === "prochain";
   const habillage = useMemo(() => (p ? essai(porte, p, pays) : porte), [porte, p, pays]);
   if (!pret || !b || !p) return null;
+  const tailleVue = tailleDansLaPlace(taille, place);
 
   // Tirer vers le bas, depuis le haut ou le bas de l'écran (la carte, elle, tourne au doigt).
   const tirer = {
     onPointerDown: (e: React.PointerEvent) => {
+      // Au doigt seulement, et jamais depuis la route (elle glisse) : à l'ordinateur, Échap ou la croix.
+      if (e.pointerType === "mouse" || (e.target as HTMLElement).closest(".mp-route")) return;
       tire.current = { y: e.clientY, id: e.pointerId };
     },
     onPointerUp: (e: React.PointerEvent) => {
@@ -469,7 +691,9 @@ export function ModePasse({
       role="dialog"
       aria-modal
       aria-label="Passe Bola"
-      className={cn("mode-passe dark", `fiche--${p.rang}`, (monte || reduit) && "mode-passe--monte", sortie && "mode-passe--sortie")}
+      // Le ton du palier choisi colore la lumière et les boutons ; les Packs restent en noir et blanc
+      // (ni or ni rose selon le palier qu'on regardait : leurs seules couleurs sont celles des nations).
+      className={cn("mode-passe dark", `fiche--${vue === "packs" ? "B" : p.rang}`, (monte || reduit) && "mode-passe--monte", sortie && "mode-passe--sortie")}
     >
       <div aria-hidden className="mp-ciel" />
       <div aria-hidden className="mp-projecteur" />
@@ -477,29 +701,63 @@ export function ModePasse({
 
       <header className="mp-hud mp-entre" style={{ "--i": 1 } as React.CSSProperties} {...tirer}>
         <div className="flex flex-col gap-1">
-          <span className="mono-label text-white/50">{`Passe Bola · ${b.saisonPasse.nom}`}</span>
+          <span className="mono-label text-white/50">
+            {`Passe Bola · ${b.saisonPasse.nom}`}
+            {vitrine && <span className="mp-vitrine">vitrine</span>}
+          </span>
           <span className="flex items-baseline gap-1.5">
             <span className="tabular-nums" style={{ fontFamily: ANTON, fontSize: 54, lineHeight: 0.85 }}>
-              {b.passe.palier}
+              {Math.max(b.palier, b.passe.palier)}
             </span>
             <span className="font-mono text-[13px] font-bold text-white/45">/ {PALIERS_PASSE}</span>
           </span>
+          {/* L'XP de la saison du Passe, quand elle n'est pas déjà celle du compteur (jusqu'au 8/11, c'est la même). */}
+          {b.saison !== b.total && <span className="mono-label tabular-nums text-white/55">{`${b.saisonPasse.nom} · ${xp(b.saison)}`}</span>}
         </div>
-        <div className="flex items-start gap-2.5">
-          <span className={cn("mp-niveau", `fiche--${r?.rang ?? "B"}`)} aria-label={`Niveau XP ${b.niveau}`}>
-            <span className="mono-label text-white/50">Niv.</span>
-            <span className="tabular-nums" style={{ fontFamily: ANTON, fontSize: 22, lineHeight: 1 }}>
-              {b.niveau}
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex items-start gap-2.5">
+            <span className={cn("mp-niveau", `fiche--${r?.rang ?? "B"}`)} aria-label={`Niveau XP ${b.niveau}`}>
+              <span className="mono-label text-white/50">Niv.</span>
+              <span className="tabular-nums" style={{ fontFamily: ANTON, fontSize: 22, lineHeight: 1 }}>
+                {b.niveau}
+              </span>
+              {r && r.xp > 0 && <span className="mp-palier__rang">{r.rang}</span>}
             </span>
-            {r && r.xp > 0 && <span className="mp-palier__rang">{r.rang}</span>}
-          </span>
-          <button type="button" onClick={sortir} aria-label="Quitter la passe" className="mp-rond">
-            <X className="size-4" strokeWidth={2.4} />
-          </button>
+            <button type="button" onClick={sortir} aria-label="Quitter la passe" className="mp-rond">
+              <X className="size-4" strokeWidth={2.4} />
+            </button>
+          </div>
+          {/* Les XP S qui restent (lib/sfl/xp-s.ts) : leur propre bouton, vers les Packs. Au bout de la barre
+              du compteur, la pastille se lisait comme son curseur (contrôle visuel du 02/11). */}
+          {soldeS != null &&
+            !vitrine &&
+            (avecPacks ? (
+              <button
+                type="button"
+                className="mp-solde"
+                aria-label={`Packs, ${libelleXpS(soldeS)}`}
+                onClick={() => {
+                  if (vue !== "packs") navigator.vibrate?.(6);
+                  vueTouchee.current = true;
+                  setVue("packs");
+                }}
+              >
+                <MontantXpS n={soldeS} />
+              </button>
+            ) : (
+              <span className="mp-solde">
+                <MontantXpS n={soldeS} />
+              </span>
+            ))}
         </div>
       </header>
 
-      <nav className="mp-vues mp-entre" style={{ "--i": 1 } as React.CSSProperties} aria-label={horsSfl ? "Passe, missions" : "Passe, missions, les autres"}>
+      {/* Une ligne, toujours : l'XP gagnée et le niveau. */}
+      <div className="mp-compteur mp-entre" style={{ "--i": 1 } as React.CSSProperties}>
+        <CompteurXp b={b} className="text-white/70" />
+      </div>
+
+      <nav className={cn("mp-vues mp-entre", vues.length > 3 && "mp-vues--quatre")} style={{ "--i": 1 } as React.CSSProperties} aria-label={vues.map((v) => NOM_VUE[v]).join(", ")}>
         {vues.map((v) => (
           <button
             key={v}
@@ -520,10 +778,15 @@ export function ModePasse({
 
       {vue === "passe" ? (
         <>
-          <div className="mp-carte">
+          <div ref={mesurerPlace} className={cn("mp-carte", apercu && "mp-carte--apercu")}>
+            {apercu && (
+              <span className="mp-apercu mono-label">
+                <Lock className="size-2.5" strokeWidth={2.8} /> Aperçu
+              </span>
+            )}
             <Card3D
               cacheKey={`mode-passe-${p.n}-${player.name}-${p.habille?.finition === "couleurs" ? pays : ""}`}
-              size={taille}
+              size={tailleVue}
               apercu
               render={(s) => <PlayerCard player={player} size={s} habillage={habillage} />}
             />
@@ -548,13 +811,23 @@ export function ModePasse({
               avance={b.passe.bloquee ? 0 : b.passe.versPalier / Math.max(1, b.passe.coutPalier)}
               palierMax={palierMax}
               choisi={choisi}
-              onChoisir={setChoisi}
+              onChoisir={(n) => {
+                routeTouchee.current = true;
+                setChoisi(n);
+              }}
+              reduit={reduit}
             />
           </div>
         </>
       ) : (
         <div key={vue} className="mp-defile overflow-y-auto mp-entre" style={{ "--i": 2 } as React.CSSProperties}>
-          {vue === "missions" ? <VueMissions b={b} saison={saison} nom={player.name} /> : <VueAutres />}
+          {vue === "missions" ? (
+            <VueMissions b={b} saison={saison} nom={player.name} />
+          ) : vue === "packs" ? (
+            <VuePacks player={player} vitrine={vitrine} />
+          ) : (
+            <VueAutres />
+          )}
         </div>
       )}
 
@@ -562,7 +835,7 @@ export function ModePasse({
 
       {plonge && (
         <Plongee
-          carte={<PlayerCard player={player} size={taille} habillage={porte} />}
+          carte={<PlayerCard player={player} size={tailleVue} habillage={porte} />}
           photo={photo}
           theme={p.n === 19 ? "ombre" : "transformation"}
           onFin={() => setPlonge(false)}

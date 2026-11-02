@@ -41,6 +41,8 @@ import { MotifRecrueSvg } from "@/components/sfl/motifs-recrues";
 import { estMotifOffert } from "@/components/sfl/skins-offerts";
 import { estMotifRecrue } from "@/components/sfl/skins-recrues";
 import { estMotifPasse } from "@/components/sfl/skins-passe";
+import { MotifAfriqueSvg } from "@/components/sfl/afrique/motifs-afrique";
+import { estMotifAfrique } from "@/components/sfl/afrique/registre";
 
 const W = 1024;
 const H = 1656;
@@ -181,6 +183,7 @@ export function MotifCarte({
   if (estMotifPasse(motif)) return <MotifPasseSvg motif={motif} graine={graine} dos={!!centre} />;
   if (estMotifOffert(motif)) return <MotifOffertSvg motif={motif} dos={!!centre} />;
   if (estMotifRecrue(motif)) return <MotifRecrueSvg motif={motif} dos={!!centre} nom={nom} />;
+  if (estMotifAfrique(motif)) return <MotifAfriqueSvg motif={motif} graine={graine} dos={!!centre} nom={nom} />;
 
   if (motif.type === "rayons") {
     const { cx, cy } = centre ?? motif;

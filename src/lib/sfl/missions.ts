@@ -48,7 +48,7 @@ import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { ovr, type Player } from "./engine";
 import type { MatchEntry, Saison, SaisonArchivee } from "./saisie/types";
 import { passeDe, type BilanPasse, type Epreuve, type PaliersAtteints } from "./passe";
-import { saisonPasseA, saisonPasseDeLigne, SAISONS_PASSE, type SaisonPasse } from "./saisons-passe";
+import { derniersJours, saisonPasseA, saisonPasseDeLigne, saisonsPasseOuvertes, type SaisonPasse } from "./saisons-passe";
 import type { CreneauArbitre } from "./missions-arbitre";
 
 /* ------------------------------- Le barème ------------------------------- */
@@ -128,6 +128,9 @@ export const FELICITATIONS_DONNEES_JOURNEE = 10;
 
 /* ------------------------------- Les types ------------------------------- */
 
+/** Un titre de la journée que la réussite d'une mission suppose (xp-s.ts : une seule fois les XP S). */
+export type TitreCouvert = "mvp" | "impact" | "def";
+
 export interface Mission {
   creneau: Creneau;
   genre: Genre;
@@ -136,6 +139,12 @@ export interface Mission {
   /** Tiens-le : ses buts et passes D, au plus. Record : tes points, à dépasser. */
   seuil?: number;
   xp: number;
+  /**
+   * Le titre qu'elle exige, s'il y en a un (aucune mission du dimanche
+   * aujourd'hui ; la mission perso « MVP » d'un joueur Bola) : réussie, ses
+   * XP S remplacent celles du titre, jamais les deux (xp-s.ts).
+   */
+  couvre?: TitreCouvert;
 }
 
 export interface Duel {
@@ -617,6 +626,8 @@ export interface LigneXp {
   saison: number;
   j: number;
   date: string;
+  /** Le jour ISO (AAAA-MM-JJ), quand on le connaît : il l'emporte sur `date` (saisons-passe.ts, jourDeLigne). */
+  jour?: string;
   quoi: string;
   xp: number;
   /**
@@ -631,6 +642,8 @@ export interface LigneXp {
     reussie: boolean;
     perso?: string;
     troisieme?: true;
+    /** Le titre que la mission exige (Mission.couvre, MissionPerso.couvre). */
+    couvre?: TitreCouvert;
   };
   /** Les trois missions du même dimanche réussies. */
   parfait?: boolean;
@@ -648,6 +661,19 @@ export interface LigneXp {
   bola?: true;
   /** Un badge de palier franchi (lib/sfl/defis.ts) : sa prime de défi. */
   defi?: true;
+  /**
+   * Le Flair d'une journée (pronos.ts, lignesPronos) : ses choix durs justes
+   * (SUJETS_DURS, jamais sur soi). L'XP n'en dépend pas ; les XP S, si
+   * (xp-s.ts : 2 chacun, 4 au plus par journée).
+   */
+  flairDurs?: number;
+  /**
+   * Un Flair de saison juste (pronos.ts) : son sujet, et `tot` s'il compte
+   * pour les XP S : posé ou changé pour la dernière fois avant le début de la
+   * troisième journée jouée de la saison (flairSaisonTot : il n'a plus bougé
+   * après la J2), et pas sur soi. L'XP n'en dépend pas.
+   */
+  flairSaison?: { sujet: string; tot: boolean };
 }
 
 export interface BilanXp {
@@ -742,7 +768,7 @@ export function journalXp(
         for (const mi of liste) {
           if (reponseDe(reponses, d, nom, mi)?.reponse !== "acceptee") continue;
           const v = verdictFinal(juger(mi, nom, d, sa.lue, votes), mi);
-          const mission = { creneau: mi.creneau, rang: rangDe(mi) };
+          const mission = { creneau: mi.creneau, rang: rangDe(mi), ...(mi.couvre ? { couvre: mi.couvre } : {}) };
           if (v.etat === "ratee")
             de(nom).lignes.push({
               saison: sa.numero,
@@ -820,7 +846,8 @@ export function bilanDe(
 ): BilanXp {
   const x = journal.get(joueur) ?? { lignes: [], reussies: 0 };
   const saisonPasse = saisonVoulue ?? saisonPasseA(maintenant);
-  const lignesSaison = x.lignes.filter((l) => saisonPasseDeLigne(l, maintenant) === saisonPasse);
+  const repli = derniersJours(x.lignes, maintenant);
+  const lignesSaison = x.lignes.filter((l) => saisonPasseDeLigne(l, maintenant, repli) === saisonPasse);
   // Les risques font baisser l'XP ; jamais sous zéro.
   const total = Math.max(0, x.lignes.reduce((a, l) => a + l.xp, 0));
   const saison = Math.max(0, lignesSaison.reduce((a, l) => a + l.xp, 0));
@@ -914,7 +941,11 @@ export function paliersDe(
   epreuves?: readonly Epreuve[]
 ): PaliersAtteints {
   const out: Record<string, number> = {};
-  for (const s of SAISONS_PASSE) {
+  // Une saison du Passe qui n'a pas commencé n'a aucun palier, quelles que
+  // soient les lignes (une journée saisie d'avance, une date mal lue) : la
+  // Saison Givre s'ouvre le 9/11 pour tous, et rien ne la débloque avant,
+  // ni ici ni dans ce que le serveur garde (xp-serveur.server.ts).
+  for (const s of saisonsPasseOuvertes(maintenant)) {
     const p = bilanDe(journal, joueur, maintenant, epreuves, s).palier;
     if (p > 0) out[s.id] = p;
   }

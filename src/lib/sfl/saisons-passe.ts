@@ -79,11 +79,13 @@ export function saisonsPasseOuvertes(t: Date): readonly SaisonPasse[] {
 const deux = (n: number) => String(n).padStart(2, "0");
 
 /**
- * Le jour d'une ligne d'XP, « AAAA-MM-JJ » : sa date (« 1 nov. »,
- * « 22 oct. · 19h30 ») prise dans l'année qui la met au plus près de `ref`
- * sans la pousser à plus d'un mois après lui. null si elle n'a pas de date.
+ * Le jour d'une ligne d'XP, « AAAA-MM-JJ » : son jour ISO s'il le porte
+ * (`jour`), sinon sa date (« 1 nov. », « 22 oct. · 19h30 ») prise dans
+ * l'année qui la met au plus près de `ref` sans la pousser à plus d'un mois
+ * après lui. null si elle n'a pas de date.
  */
-export function jourDeLigne(l: Pick<LigneXp, "date">, ref: Date): string | null {
+export function jourDeLigne(l: Pick<LigneXp, "date" | "jour">, ref: Date): string | null {
+  if (l.jour && /^\d{4}-\d{2}-\d{2}$/.test(l.jour)) return l.jour;
   const jm = jourMoisDuLibelle(l.date ?? "");
   if (!jm) return null;
   const [a, m] = jourParis(ref).split("-").map(Number);
@@ -91,8 +93,30 @@ export function jourDeLigne(l: Pick<LigneXp, "date">, ref: Date): string | null 
   return `${annee}-${deux(jm.mois)}-${deux(jm.jour)}`;
 }
 
-/** La saison du Passe où une ligne d'XP compte : celle de son jour, sinon celle de `ref`. */
-export function saisonPasseDeLigne(l: Pick<LigneXp, "date">, ref: Date): SaisonPasse {
+/**
+ * La saison du Passe où une ligne d'XP compte : celle de son jour. Une ligne
+ * sans date ne change plus de saison avec l'heure (01/11/2026 : le 9/11, des
+ * félicitations et le Flair « de la saison » auraient quitté la Saison 1 et
+ * offert de l'XP à Givre dès le premier jour) : elle va à la saison du Passe
+ * du dernier jour daté de SA saison SFL (`repli`), sinon à la première.
+ */
+export function saisonPasseDeLigne(
+  l: Pick<LigneXp, "date" | "jour" | "saison">,
+  ref: Date,
+  repli?: (saisonSfl: number) => string | null
+): SaisonPasse {
   const jour = jourDeLigne(l, ref);
-  return jour ? saisonPasseDuJour(jour) : saisonPasseA(ref);
+  if (jour) return saisonPasseDuJour(jour);
+  const r = repli?.(l.saison);
+  return r ? saisonPasseDuJour(r) : SAISONS_PASSE[0];
+}
+
+/** Le dernier jour daté de chaque saison SFL, dans des lignes d'XP : le repli des lignes sans date. */
+export function derniersJours(lignes: readonly Pick<LigneXp, "date" | "jour" | "saison">[], ref: Date): (saisonSfl: number) => string | null {
+  const dernier = new Map<number, string>();
+  for (const l of lignes) {
+    const j = jourDeLigne(l, ref);
+    if (j && j > (dernier.get(l.saison) ?? "")) dernier.set(l.saison, j);
+  }
+  return (s) => dernier.get(s) ?? null;
 }

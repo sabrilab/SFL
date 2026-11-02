@@ -282,11 +282,17 @@ alter table public.profiles add column if not exists habillage text
 -- (couleurs:dz, couleurs:gb-eng) ; puis, depuis le 24/10, les signes choisis
 -- (/sceau+nom-grave, ou /-). Les skins offerts aussi (onyx, verre, pepite,
 -- palestine : finitions-offertes.ts), et ceux des recrues (recruteur,
--- filigrane, fondateur : skins-recrues.ts, 27/10). Refaite à chaque migration :
--- idempotente.
+-- filigrane, fondateur : skins-recrues.ts, 27/10). Puis, le 01/11/2026, les
+-- 9 skins et les 3 signes de la Saison Givre (bois-brule … jarl ; lisere-fer,
+-- runes, nom-runes : sans eux, porter un skin Givre était refusé ici dès le
+-- 9/11) et ceux du PACK AFRIQUE 2027, par un motif (afrique-sn, afrique-ke… :
+-- lib/sfl/pack-afrique.ts) : ajouter une nation ne demande aucune migration.
+-- La liste de l'app se dérive des matières (finitions-carte.ts, FINITIONS) ;
+-- tools/givre-check.ts vérifie chacune contre cette expression. Refaite à
+-- chaque migration : idempotente.
 alter table public.profiles drop constraint if exists profiles_habillage_check;
 alter table public.profiles add constraint profiles_habillage_check
-  check (habillage is null or habillage ~ '^(auto|-|nuit|chrome|animee|onyx|verre|pepite|palestine|recruteur|filigrane|fondateur|givre|carbone|marbre|neon|aurore|ki|meteorite|couleurs(:[a-z]{2}(-[a-z]{3})?)?)/(auto|-|argentique|gravure|marbre)(/(-|(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave)(\+(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave))*))?$');
+  check (habillage is null or habillage ~ '^(auto|-|nuit|chrome|animee|onyx|verre|pepite|palestine|recruteur|filigrane|fondateur|givre|carbone|marbre|neon|aurore|ki|meteorite|bois-brule|fer|pierre|nuit-polaire|frimas|damas|aurore-polaire|tempete|jarl|afrique-[a-z]{2}|couleurs(:[a-z]{2}(-[a-z]{3})?)?)/(auto|-|argentique|gravure|marbre)(/(-|(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave|lisere-fer|runes|nom-runes)(\+(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave|lisere-fer|runes|nom-runes))*))?$');
 
 -- La ville du joueur sur la Map (lib/sfl/villes.ts, 22/10) : le nom de sa
 -- commune et son CENTRE, tel que le donne le géocodeur — jamais sa position.
@@ -2035,6 +2041,14 @@ begin
     if old.saisi_le is not null and (select auth.uid()) is not null
        and (new.jour, new.heure) is distinct from (old.jour, old.heure) then
       raise exception 'match déjà joué' using errcode = 'P0001';
+    end if;
+    -- Avant sa feuille, il ne se redate pas dans le passé (02/11/2026, contrôle
+    -- adverse des XP S : créé pour dans un mois, redaté en septembre, puis
+    -- saisi). La même journée de marge qu'à la naissance (match_naissance_gardee).
+    if old.saisi_le is null and (select auth.uid()) is not null
+       and (new.jour, new.heure) is distinct from (old.jour, old.heure)
+       and public.coup_d_envoi(new.jour, new.heure) < now() - interval '24 hours' then
+      raise exception 'match déjà passé' using errcode = 'P0001';
     end if;
     if (new.score_clairs, new.score_fonces) is distinct from (old.score_clairs, old.score_fonces)
        and old.saisi_le is not null and old.saisi_le < now() - interval '24 hours' then
@@ -6257,6 +6271,14 @@ begin
   -- Un match né après le 28/10/2026 passe par la confirmation des joueurs.
   new.feuille_version := 0;
   new.confirmation_requise := true;
+  -- Ni dans le passé (02/11/2026, contrôle adverse des XP S) : l'app ne
+  -- propose que des dates à venir (ouvrir-match.tsx) ; des comptes d'accord
+  -- montaient en novembre des matchs datés de juillet, chacun dans une
+  -- semaine passée. Une journée de marge : un match du jour ouvert en
+  -- retard, l'heure d'un téléphone.
+  if public.coup_d_envoi(new.jour, new.heure) < now() - interval '24 hours' then
+    raise exception 'match déjà passé' using errcode = 'P0001';
+  end if;
   return new;
 end;
 $$;
@@ -6747,6 +6769,10 @@ as $$
            -- Un match saisi avant le 28/10/2026 compte sans calcul.
            'etat', case when m.confirmation_requise then public.etat_feuille(m.id) else 'compte' end,
            'requise', m.confirmation_requise,
+           -- La première saisie de la feuille, à l'heure du serveur (02/11/2026) : les
+           -- XP S d'un match Bola se comptent à sa semaine (lib/sfl/xp-s.ts), pas à
+           -- celle du jour déclaré, que l'organisateur choisit.
+           'saisiLe', m.saisi_le,
            'joueurs', (
              select coalesce(jsonb_agg(jsonb_build_object(
                       'id', j.player_id, 'name', p.name, 'equipe', j.equipe, 'buts', j.buts, 'passes', j.passes,
@@ -6916,6 +6942,7 @@ as $$
 declare
   v_nom text := public.mon_nom();
   v_le  timestamptz := now();
+  v_num integer;
 begin
   if not public.est_membre() or v_nom is null then
     raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
@@ -6923,6 +6950,12 @@ begin
   if p_j < 0 or p_sujet !~ '^((match|ecart|duel|mvp|buteur|passeur):[0-9]{1,2}|buteur|pepite|passeur)$'
      or (p_j = 0 and p_sujet not in ('pepite', 'buteur', 'passeur')) then
     raise exception 'Prono inconnu.' using errcode = '22023';
+  end if;
+  -- La saison en cours seulement (02/11/2026, contrôle adverse) : on posait
+  -- encore le Flair de saison d'une saison close, ses vainqueurs connus.
+  select coalesce((s.data ->> 'numero')::integer, 0) into v_num from public.saison s where s.id = 1;
+  if found and p_saison is distinct from v_num then
+    raise exception 'Saison close.' using errcode = '22023';
   end if;
   if nullif(btrim(p_choix), '') is null then
     delete from public.pronos where saison = p_saison and j = p_j and sujet = p_sujet and joueur = v_nom;
@@ -8592,3 +8625,219 @@ grant execute on function public.sceller_feuille(int, text, text) to authenticat
 -- le joueur seul (RLS « mise à jour de soi »), comme nouveautes_vues.
 alter table public.profiles add column if not exists cartons_vus text[] not null default '{}';
 grant update (cartons_vus) on public.profiles to authenticated;
+
+-- ─────────────── Les paliers du Passe gardés par le serveur (01/11/2026) ───────────────
+-- Ilyes, 01/11 : des paliers déverrouillés au téléphone, verrouillés à
+-- l'ordinateur. Rien n'était stocké : chaque appareil recalculait l'XP de
+-- toute la ligue avec ce qu'il avait chargé. Désormais le serveur calcule
+-- (/api/xp/bilan, lib/sfl/xp-serveur.server.ts : le même journal que le
+-- téléphone, lib/sfl/xp-calcul.ts) et garde ici le palier atteint par chacun,
+-- saison du Passe par saison. Un palier ne redescend jamais (greatest) : un
+-- contrat raté ou une feuille corrigée ne referme rien. L'app affiche le plus
+-- haut entre son calcul et celui-ci (lib/sfl/xp-acquis.ts). Le compte
+-- vitrine n'y est jamais écrit : son XP fictive vit sur son seul téléphone.
+-- Les membres lisent ; personne n'écrit depuis l'app.
+create table if not exists public.passe_acquis (
+  joueur       uuid        not null references public.profiles (id) on delete cascade,
+  saison_passe text        not null check (saison_passe ~ '^[a-z0-9-]{1,24}$'),
+  palier       int         not null check (palier between 1 and 100),
+  xp_saison    int         not null default 0 check (xp_saison >= 0),
+  calcule_le   timestamptz not null default now(),
+  primary key (joueur, saison_passe)
+);
+alter table public.passe_acquis enable row level security;
+revoke all on public.passe_acquis from anon, authenticated;
+grant select on public.passe_acquis to authenticated;
+drop policy if exists "passe_acquis: les membres lisent" on public.passe_acquis;
+create policy "passe_acquis: les membres lisent"
+  on public.passe_acquis for select to authenticated
+  using ((select public.est_membre()));
+
+-- Poser les paliers calculés par le serveur : [{ joueur, saison_passe, palier, xp_saison }].
+-- Un palier ne monte que par greatest() ; une ligne invalide est ignorée.
+-- Rend le nombre de lignes écrites. Clé secrète seulement (la route).
+create or replace function public.poser_paliers_acquis(p_lignes jsonb)
+returns int
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  n int;
+begin
+  if p_lignes is null or jsonb_typeof(p_lignes) <> 'array' then
+    raise exception 'Demande invalide.' using errcode = 'P0001';
+  end if;
+  with lues as (
+    select l.joueur, l.saison_passe, l.palier, greatest(0, coalesce(l.xp_saison, 0)) as xp_saison
+      from jsonb_to_recordset(p_lignes) as l (joueur uuid, saison_passe text, palier int, xp_saison int)
+     where l.joueur is not null
+       and l.saison_passe ~ '^[a-z0-9-]{1,24}$'
+       and l.palier between 1 and 100
+       and exists (select 1 from public.profiles p where p.id = l.joueur)
+  ),
+  ecrites as (
+    insert into public.passe_acquis as a (joueur, saison_passe, palier, xp_saison, calcule_le)
+    select joueur, saison_passe, max(palier), max(xp_saison), now() from lues group by joueur, saison_passe
+    on conflict (joueur, saison_passe) do update
+      set palier = greatest(a.palier, excluded.palier),
+          xp_saison = excluded.xp_saison,
+          calcule_le = now()
+    returning 1
+  )
+  select count(*) into n from ecrites;
+  return n;
+end;
+$$;
+revoke execute on function public.poser_paliers_acquis(jsonb) from public, anon, authenticated;
+grant execute on function public.poser_paliers_acquis(jsonb) to service_role;
+
+-- ─────────────── Les achats en XP : le PACK AFRIQUE 2027 (01/11/2026) ───────────────
+-- Ilyes, 01/11 : un pack « achetable en XP », jamais gagné par les missions ni
+-- par le Passe (lib/sfl/pack-afrique.ts). Un achat = une ligne : ce qu'il a
+-- coûté (xp, dans sa monnaie), ce qu'il a donné (obtenu : le code de la
+-- nation, la finition afrique-xx), son numéro de série dans l'édition
+-- (n° 0042, imprimé au dos). Le solde à dépenser n'est stocké nulle part :
+-- ce qui est gagné à vie, recalculé par le serveur (xp-serveur.server.ts),
+-- moins la somme des prix payés ici dans la même monnaie. Le Niveau XP et le
+-- Passe ne lisent jamais cette table : dépenser ne les fait pas baisser.
+-- Seule la route /api/boutique-xp (clé secrète) écrit, par ouvrir_pack_xp ;
+-- la ligue voit ce que chacun a obtenu (sa carte le porte), jamais ce qu'il
+-- a payé ni dans quelle monnaie. Jamais de Ballons (achetés en euros) ici.
+--
+-- Les XP S (02/11/2026, lib/sfl/xp-s.ts) : la seconde monnaie, plus rare,
+-- gagnée par la SFL Time, les missions de rang S, les titres, le Flair et le
+-- MVP Bola. Ilyes : le PACK AFRIQUE 2027 se paie en XP S (40 le tirage), et
+-- plus jamais en XP normales ; les packs rares à venir aussi. La colonne
+-- monnaie (« xp » ou « xp-s ») dit dans quoi chaque ligne a été payée : un
+-- seul verrou par joueur, une seule clé d'idempotence (joueur, cle), un seul
+-- numéro de série par nation, quelle que soit la monnaie. Additif : une base
+-- qui a déjà des lignes les garde en « xp » (le défaut).
+create table if not exists public.achats_xp (
+  id       bigint generated always as identity primary key,
+  joueur   uuid        not null references public.profiles (id) on delete cascade,
+  article  text        not null check (article ~ '^pack-[a-z0-9-]{1,40}$'),
+  obtenu   text        not null check (obtenu ~ '^[a-z]{2}$'),
+  monnaie  text        not null default 'xp',
+  xp       int         not null check (xp between 1 and 100000),
+  serie    int         not null check (serie >= 1),
+  cle      uuid        not null,
+  le       timestamptz not null default now(),
+  constraint achats_xp_une_fois unique (joueur, cle),
+  constraint achats_xp_sans_doublon unique (joueur, article, obtenu),
+  constraint achats_xp_serie unique (article, obtenu, serie)
+);
+alter table public.achats_xp add column if not exists monnaie text not null default 'xp';
+alter table public.achats_xp drop constraint if exists achats_xp_monnaie;
+alter table public.achats_xp add constraint achats_xp_monnaie check (monnaie in ('xp', 'xp-s'));
+-- Le PACK AFRIQUE 2027 ne se vend plus qu'en XP S : une route mal réglée ne
+-- peut pas le vendre en XP normales. « not valid » : la règle vaut pour toute
+-- ligne neuve ; une ligne déjà payée en XP (une base d'essai) reste un achat
+-- honoré, et la migration ne bute pas sur elle.
+alter table public.achats_xp drop constraint if exists achats_xp_afrique_en_xps;
+alter table public.achats_xp add constraint achats_xp_afrique_en_xps
+  check (article <> 'pack-afrique-2027' or monnaie = 'xp-s') not valid;
+comment on column public.achats_xp.xp is 'Le prix payé, dans la monnaie de la ligne (monnaie : xp ou xp-s).';
+comment on column public.achats_xp.monnaie is 'La monnaie du prix : xp (XP normales) ou xp-s (XP S, lib/sfl/xp-s.ts).';
+create index if not exists achats_xp_joueur on public.achats_xp (joueur);
+alter table public.achats_xp enable row level security;
+revoke all on public.achats_xp from anon, authenticated;
+grant select (id, joueur, article, obtenu, serie, le) on public.achats_xp to authenticated;
+drop policy if exists "achats_xp: les membres lisent" on public.achats_xp;
+create policy "achats_xp: les membres lisent"
+  on public.achats_xp for select to authenticated
+  using ((select public.est_membre()));
+
+-- Mes achats, avec leur prix et sa monnaie : le solde de l'écran, monnaie par
+-- monnaie. Le type de retour a gagné la monnaie (02/11/2026) : la fonction se
+-- refait (drop puis create) à chaque passage.
+drop function if exists public.mes_achats_xp();
+create function public.mes_achats_xp()
+returns table (article text, obtenu text, monnaie text, xp int, serie int, le timestamptz)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select a.article, a.obtenu, a.monnaie, a.xp, a.serie, a.le
+    from public.achats_xp a
+   where a.joueur = (select auth.uid())
+   order by a.le;
+$$;
+revoke execute on function public.mes_achats_xp() from public, anon;
+grant execute on function public.mes_achats_xp() to authenticated;
+
+-- Ouvrir un pack : débite et tire au sort ici, d'un seul tenant.
+--   · p_monnaie : ce qui le paie, « xp » ou « xp-s » (le PACK AFRIQUE 2027 :
+--     xp-s, achats_xp_afrique_en_xps) ;
+--   · p_gagne : ce qui est gagné à vie dans cette monnaie, calculé par la
+--     route (jamais par le téléphone) ;
+--   · p_prix, p_choix : le prix et les nations en jeu (validées), tels que les
+--     tient lib/sfl/pack-afrique.ts (la route les passe : une seule liste) ;
+--   · p_cle : tirée par le téléphone à l'ouverture de la confirmation ; le
+--     même appel rejoué (réseau coupé, double toucher, app fermée en pleine
+--     ouverture) rend le même tirage, sans débiter deux fois ; rejouée pour
+--     un autre article ou une autre monnaie, elle est refusée.
+-- Le solde : p_gagne moins les prix payés dans la même monnaie ; une monnaie
+-- ne touche jamais l'autre. Un joueur à la fois, toutes monnaies (verrou
+-- consultatif) ; le numéro de série sous un verrou par nation. Refuse : « XP
+-- S insuffisantes. » (ou « XP insuffisante. ») avec le solde réel en détail,
+-- pack complet, demande invalide. L'ancienne signature, sans la monnaie,
+-- disparaît (02/11/2026).
+drop function if exists public.ouvrir_pack_xp(uuid, text, int, int, text[], uuid);
+create or replace function public.ouvrir_pack_xp(
+  p_joueur uuid, p_article text, p_monnaie text, p_prix int, p_gagne int, p_choix text[], p_cle uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  deja    public.achats_xp;
+  depense int;
+  tire    text;
+  num     int;
+begin
+  if p_joueur is null or p_cle is null or p_prix is null or p_prix < 1 or p_gagne is null or p_gagne < 0
+     or p_monnaie is null or p_monnaie not in ('xp', 'xp-s')
+     or p_article is null or p_article !~ '^pack-[a-z0-9-]{1,40}$'
+     or coalesce(cardinality(p_choix), 0) = 0
+     or exists (select 1 from unnest(p_choix) c where c is null or c !~ '^[a-z]{2}$') then
+    raise exception 'Demande invalide.' using errcode = 'P0001';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('achats_xp:' || p_joueur::text, 0));
+  select * into deja from public.achats_xp a where a.joueur = p_joueur and a.cle = p_cle;
+  if found then
+    if deja.article <> p_article or deja.monnaie <> p_monnaie then
+      raise exception 'Demande invalide.' using errcode = 'P0001';
+    end if;
+    select coalesce(sum(a.xp), 0) into depense from public.achats_xp a where a.joueur = p_joueur and a.monnaie = p_monnaie;
+    return jsonb_build_object('obtenu', deja.obtenu, 'serie', deja.serie, 'xp', deja.xp, 'monnaie', deja.monnaie,
+                              'solde', greatest(0, p_gagne - depense), 'deja', true);
+  end if;
+  select c into tire
+    from unnest(p_choix) c
+   where not exists (select 1 from public.achats_xp a
+                      where a.joueur = p_joueur and a.article = p_article and a.obtenu = c)
+   order by random()
+   limit 1;
+  if tire is null then
+    raise exception 'Pack complet.' using errcode = 'P0001';
+  end if;
+  select coalesce(sum(a.xp), 0) into depense from public.achats_xp a where a.joueur = p_joueur and a.monnaie = p_monnaie;
+  if p_gagne - depense < p_prix then
+    raise exception '%', case p_monnaie when 'xp-s' then 'XP S insuffisantes.' else 'XP insuffisante.' end
+      using errcode = 'P0001', detail = greatest(0, p_gagne - depense)::text;
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('achats_xp_serie:' || p_article || ':' || tire, 0));
+  select coalesce(max(a.serie), 0) + 1 into num
+    from public.achats_xp a where a.article = p_article and a.obtenu = tire;
+  insert into public.achats_xp (joueur, article, obtenu, monnaie, xp, serie, cle)
+  values (p_joueur, p_article, tire, p_monnaie, p_prix, num, p_cle);
+  return jsonb_build_object('obtenu', tire, 'serie', num, 'xp', p_prix, 'monnaie', p_monnaie,
+                            'solde', p_gagne - depense - p_prix, 'deja', false);
+end;
+$$;
+revoke execute on function public.ouvrir_pack_xp(uuid, text, text, int, int, text[], uuid) from public, anon, authenticated;
+grant execute on function public.ouvrir_pack_xp(uuid, text, text, int, int, text[], uuid) to service_role;

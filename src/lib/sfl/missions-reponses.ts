@@ -46,6 +46,17 @@ export function reponsesEnMemoire(): Reponse[] {
   return cache;
 }
 
+let chargees = false;
+
+/**
+ * Les réponses de la base sont-elles là ? Sans elles, l'XP calculée sur cet
+ * appareil est incomplète (l'épreuve I ferait tomber le Passe à 4/16) : l'app
+ * montre alors le dernier bilan du serveur (lib/sfl/xp-acquis.ts).
+ */
+export function reponsesChargees(): boolean {
+  return chargees;
+}
+
 /** Charge les réponses que la base nous montre (et, dans un aperçu, celles du téléphone). */
 export async function chargerReponses(depuisLaBase: boolean): Promise<void> {
   let lignes: Reponse[] = [];
@@ -59,6 +70,7 @@ export async function chargerReponses(depuisLaBase: boolean): Promise<void> {
   }
   const apercu = lireApercu();
   cache = [...lignes.filter((l) => !apercu.some((a) => memeMission(a, l))), ...apercu];
+  if (depuisLaBase) chargees = true;
   emit();
 }
 

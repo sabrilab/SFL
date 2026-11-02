@@ -18,6 +18,7 @@
 // fondateur (ces trois-là hors production), h1, h2, h3, s0, s0-mvp,
 // s0-impact, s0-def) montre d'abord cette carte en 3D, à tourner ; `&dos=1`
 // la pose sur son dos. `?seul=h1,h2` ne montre que ces cartes-là.
+// En production, réservé aux admins (sinon une page vide).
 
 import { Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
@@ -30,6 +31,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { cartesDeCarriere } from "@/lib/sfl/carriere";
 import { rankPlayers } from "@/lib/sfl/engine";
+import { useSession } from "@/hooks/use-session";
 
 // Les trois cartes des recrues (un faux « N° 097 / 500 ») : hors production
 // seulement, elles ne se montrent ni ne se capturent en ligne sans être gagnées.
@@ -193,6 +195,11 @@ function Atelier() {
 }
 
 export default function DesignCartes() {
+  const session = useSession();
+  // En production, l'atelier n'est qu'aux admins (01/11/2026 : il montrait la
+  // Saison Givre à qui connaissait l'adresse, avant son ouverture à tous le
+  // 9/11). Une page de travail : on n'y porte rien.
+  if (PRODUCTION && !(session?.server && session.admin)) return null;
   return (
     <Suspense>
       <Atelier />

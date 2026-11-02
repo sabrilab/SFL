@@ -72,6 +72,13 @@ export interface MatchBola {
   etat?: EtatResultat | null;
   /** Le match passe par la confirmation (faux : saisi avant le 28/10). */
   requise?: boolean;
+  /**
+   * La première saisie de sa feuille, à l'heure du serveur (matchs.saisi_le :
+   * match_feuille_gardee la pose, personne d'autre) ; absente d'une base pas
+   * migrée. Les XP S d'un match Bola se comptent à la semaine de cette saisie
+   * (xp-s.ts) : un match antidaté ne retombe pas dans une semaine passée.
+   */
+  saisiLe?: string | null;
 }
 
 /** Le quorum des règles : 8 présents, un 4 contre 4. */

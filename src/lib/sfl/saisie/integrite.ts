@@ -28,6 +28,11 @@
 //   I11 une date que l'app ne lit pas (« 08/11 ») : ni vote, ni révélation,
 //       ni fin des matchs (02/11/2026 ; la base refuse aussi,
 //       public.dates_illisibles)
+//   I12 une ligne jouée dont la SFL Time n'est pas celle de sa journée
+//       (02/11/2026) : sa victoire (3 points ou 2) et ses XP S en dépendent.
+//       Une alerte seulement, qui ne bloque ni l'écriture ni la publication :
+//       rien ne se réécrit seul dans le passé, l'admin décide, ligne par ligne
+//       ou en recochant la SFL Time de la journée (mutations.ts, updateJournee)
 //
 // Pur.
 
@@ -51,7 +56,9 @@ export type Ecart =
   | { r: "I8"; j: number }
   | { r: "I9"; j: number; joueur: string }
   | { r: "I10" }
-  | { r: "I11"; j: number; date: string };
+  | { r: "I11"; j: number; date: string }
+  /** `sflTime` : celle de la ligne (vrai : en trop ; faux : elle manque). */
+  | { r: "I12"; j: number; joueur: string; sflTime: boolean };
 
 export type Regle = Ecart["r"];
 
@@ -68,6 +75,7 @@ export function cleEcart(e: Ecart): string {
     case "I1":
     case "I2":
     case "I9":
+    case "I12":
       return `${e.r}|${e.j}|${cle(e.joueur)}`;
     case "I3":
     case "I7":
@@ -113,6 +121,8 @@ export function libelleEcart(e: Ecart): string {
       return "Vue figée";
     case "I11":
       return `${e.date} · date illisible`;
+    case "I12":
+      return `${e.joueur} · SFL Time ${e.sflTime ? "en trop" : "manquante"}`;
   }
 }
 
@@ -154,6 +164,16 @@ export function verifierFeuille(s: Saison, j: number, terrainsMax = TERRAINS_MAX
       if (e.vitrine || (e.statut !== "Présent" && !e.extraTime) || !suspendus.has(cle(e.player)) || signales.has(cle(e.player))) continue;
       signales.add(cle(e.player));
       out.push({ r: "I9", j, joueur: e.player });
+    }
+  }
+
+  // I12 : une ligne jouée qui ne suit pas la SFL Time de sa journée.
+  if (meta) {
+    const signales = new Set<string>();
+    for (const e of lignes) {
+      if (!joue(e) || !!e.sflTime === !!meta.sflTime || signales.has(cle(e.player))) continue;
+      signales.add(cle(e.player));
+      out.push({ r: "I12", j, joueur: e.player, sflTime: !!e.sflTime });
     }
   }
 
