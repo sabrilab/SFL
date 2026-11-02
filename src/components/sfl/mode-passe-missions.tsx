@@ -14,7 +14,10 @@
 //     lib/sfl/pronos.ts : il suit leurs réglages) ;
 //   · le journal : d'où vient chaque XP, pertes en rouge ; une ligne qui a
 //     aussi rapporté des XP S (lib/sfl/xp-s.ts) porte la pastille à droite
-//     de son XP (« +130 ▣S 10 ») : pas de liste à part.
+//     de son XP, dans une colonne fixe (« +130 ▣S 10 ») : pas de liste à
+//     part ; « Dimanche joué » dit d'où elles viennent, dessous, en petit
+//     (« SFL Time · MVP »). Les vingt lignes les plus récentes, puis une ligne par saison
+//     pour le reste (« S0 · Saison 0 · +2 650 ▣S 59 ») : rien ne s'y perd.
 // Un joueur Bola (hors de la SFL) n'a ni les missions du dimanche ni ce qui
 // ne s'y gagne (jouer le dimanche, contrat, défi, vote, trois sur trois) :
 // il garde le reste et son journal (28/10/2026). À leur place, ses missions
@@ -36,7 +39,7 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { useHorsSfl } from "@/hooks/use-hors-sfl";
 import { useMissions, useXpS } from "@/hooks/use-missions";
 import { MontantXpS } from "@/components/sfl/xp-s";
-import { rattachementXp, xpSParLigne } from "@/lib/sfl/xp-s";
+import { cumulsDuJournal, rattachementXp, sourcesParLigne, xpSParLigne } from "@/lib/sfl/xp-s";
 import {
   FELICITATIONS_DONNEES_JOURNEE,
   PRIME,
@@ -256,29 +259,57 @@ function Sources({ b }: { b: BilanXp }) {
   );
 }
 
+/** Les lignes du journal montrées une à une ; au-delà, un cumul par saison. */
+const LIGNES_JOURNAL = 20;
+
 function Journal({ b, saison, nom }: { b: BilanXp; saison: number; nom: string }) {
   const s = useXpS(nom);
   const xpS = useMemo(() => xpSParLigne(s?.lignes ?? []), [s?.lignes]);
+  const sources = useMemo(() => sourcesParLigne(s?.lignes ?? []), [s?.lignes]);
+  const cumuls = useMemo(() => cumulsDuJournal(b.lignes, LIGNES_JOURNAL, xpS), [b.lignes, xpS]);
   if (b.lignes.length === 0) return null;
+  const montrees = b.lignes.slice(0, LIGNES_JOURNAL);
+  // Une colonne d'XP S de largeur fixe dès qu'une ligne en porte : l'XP reste alignée d'une ligne à l'autre.
+  const colonne = montrees.some((l) => xpS.get(rattachementXp(l) ?? "")) || cumuls.some((c) => c.xps > 0);
+  const xpSDe = (n: number | undefined) =>
+    colonne ? (
+      <span className="flex w-[46px] shrink-0 justify-end">{n ? <MontantXpS n={n} className="font-mono text-[13px] font-bold text-white" /> : null}</span>
+    ) : null;
   return (
     <section className="flex flex-col" aria-labelledby="titre-journal-xp">
       <h2 id="titre-journal-xp" className="titre-lettrage px-5 pb-2 text-[26px]">
         Journal
       </h2>
-      {b.lignes.slice(0, 20).map((l, i) => {
-        // Les XP S de la ligne (SFL Time et titres avec « Dimanche joué », la mission, le Flair…).
-        const s = xpS.get(rattachementXp(l) ?? "");
+      {montrees.map((l, i) => {
+        // Les XP S de la ligne (SFL Time et titres avec « Dimanche joué », la mission, le Flair…), et d'où elles viennent quand le libellé ne le dit pas.
+        const cle = rattachementXp(l) ?? "";
+        const d = sources.get(cle);
         return (
           <div key={`${l.saison}-${l.j}-${l.quoi}-${i}`} className="flex items-center gap-3 border-t border-white/8 px-5 py-3">
             <span className={cn("shrink-0 whitespace-nowrap font-mono text-[11px] text-white/45", l.bola ? "w-[60px]" : "w-[44px]")}>
               {l.bola ? l.date.split(" · ")[0] : l.saison === saison ? `J${l.j}` : `S${l.saison} J${l.j}`}
             </span>
-            <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{l.quoi}</span>
+            {/* Les sources sous le libellé, en petit : sur une ligne, « SFL Time · MVP » se coupait à 390 px. */}
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-[15px] font-semibold">{l.quoi}</span>
+              {d && <span className="truncate font-mono text-[11px] font-bold text-white/50">{d}</span>}
+            </span>
             <span className={cn("font-mono text-[13px] font-bold tabular-nums", l.xp < 0 && "text-[#ff9b9d]")}>{signe(l.xp)}</span>
-            {s ? <MontantXpS n={s} className="font-mono text-[13px] font-bold text-white" /> : null}
+            {xpSDe(xpS.get(cle))}
           </div>
         );
       })}
+      {/* Plus loin, une ligne par saison : rien ne se perd, le stock d'XP S d'une saison passée compris. */}
+      {cumuls.map((c) => (
+        <div key={`cumul-${c.saison}`} className="flex items-center gap-3 border-t border-white/8 px-5 py-3">
+          <span className="w-[44px] shrink-0 whitespace-nowrap font-mono text-[11px] text-white/45">
+            {c.saison !== saison ? `S${c.saison}` : c.de === c.a ? `J${c.de}` : `J${c.de}–${c.a}`}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-white/70">{`Saison ${c.saison}`}</span>
+          <span className={cn("font-mono text-[13px] font-bold tabular-nums", c.xp < 0 && "text-[#ff9b9d]")}>{signe(c.xp)}</span>
+          {xpSDe(c.xps)}
+        </div>
+      ))}
     </section>
   );
 }

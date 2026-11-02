@@ -442,9 +442,18 @@ export const XpLigueContext = createContext<XpLigue | null>(null);
  */
 export function useXpLigueCalcule(): XpLigue | null {
   const isClient = useIsClient();
-  const maintenant = useMaintenant();
+  const tic = useMaintenant();
   const reponses = useReponses();
-  const { allPlayers, vitrine, bola, bolaCarte } = useSeason();
+  const { allPlayers, vitrine, bola, bolaCarte, revelation } = useSeason();
+  // L'heure du calcul : la minute de l'horloge, et l'instant où la vue de la ligue change (la
+  // révélation de 19 h, un minuit : le SeasonProvider s'y règle). Contrôle visuel du 02/11 : l'app
+  // ouverte à 19 h, la journée revenait tout de suite mais ses XP S (et le Flair, les missions)
+  // attendaient le tic suivant de l'horloge, jusqu'à une minute plus tard, et s'annonçaient à part.
+  const maintenant = useMemo(() => {
+    void revelation;
+    const t = new Date();
+    return t.getTime() - tic.getTime() < 1000 ? tic : t;
+  }, [tic, revelation]);
   const { toutes: felicitations } = useFelicitations();
   const pronos = useListePronos();
   const { saison, jugee, votes } = useSaisonJugee(maintenant);

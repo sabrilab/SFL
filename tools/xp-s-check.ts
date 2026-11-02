@@ -7,12 +7,17 @@
 //   2 · les sources : une mission S réussie 10, ratée 0, de rang A ou B 0 ;
 //   3 · le Flair : « qui gagne », buteur et passeur d'un match 0, un dur 2,
 //       le meilleur du jour 2, trois durs 4, un choix sur soi 0, la tribune
-//       au même plafond ; le Flair de saison figé après la J2, hors plafond ;
+//       au même plafond ; le Flair de saison figé après la J2 (une journée
+//       jouée sans équipes comptée), hors plafond ;
 //   4 · les titres faibles (une voix) 0, à deux voix 5 ;
 //   5 · Bola : deux matchs le même jour, MVP, Triplé et Triple caviar : 13
-//       sur la semaine ; un match sans confirmation 0 ;
+//       sur la semaine ; un match sans confirmation 0 ; la semaine de la
+//       saisie de la feuille, pas du jour déclaré ; des matchs antidatés
+//       saisis des mois après 0 ; sans heure de saisie 0 ;
 //   6 · les doublons : une mission qui couvre le MVP, une même clé ;
 //   7 · les plafonds : jamais plus de 13, la SFL Time retirée la dernière ;
+//       un seul plafond par semaine pour un joueur qui a des matchs Bola (le
+//       Flair d'un dimanche et un match Bola, un filleul entré le jour même) ;
 //   8 · la révélation : 19 h, 19 h 40, sans fin des matchs, la J4 à minuit,
 //       les XP S d'une journée suivent journeesComptees ;
 //   9 · l'XP normale ne bouge pas d'un point (empreinte d'avant les XP S) ;
@@ -21,8 +26,13 @@
 //       révélation) ;
 //   11 · le solde : gagné moins dépensé, jamais sous zéro ;
 //   12 · la mission perso « MVP » couvre le MVP ;
-//   13 · l'annonce (une fois, d'où elles viennent) et la pastille (noir et
-//       blanc, le nombre lu « 59 XP S »), posée là où l'écran l'attend.
+//   13 · l'annonce (une fois, d'où elles viennent, le palier sur sa ligne,
+//       jamais sur une cérémonie) et la pastille (le jeton lisible à la
+//       taille du texte, l'insigne entier en grand, noir et blanc, le nombre
+//       lu « 59 XP S »), posée là où l'écran l'attend : son bouton dans
+//       l'en-tête du Passe, la colonne et les sources du journal, ses cumuls
+//       par saison, le refus du serveur dans les Packs ; l'heure du calcul
+//       qui suit la révélation.
 //   npx tsx tools/xp-s-check.ts
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -46,6 +56,7 @@ import { bilanServeurDe, CALCUL_RECENT_MS, xpServeur, xpServeurRecent } from "..
 import {
   annonceXpS,
   bilanXpS,
+  cumulsDuJournal,
   FEUILLE_BOLA_JOURS,
   journalXpS,
   lignesXpSBola,
@@ -53,6 +64,7 @@ import {
   plafonner,
   rattachementXp,
   semaineXpSBola,
+  sourcesParLigne,
   totalXpS,
   XP_S,
   xpSParLigne,
@@ -585,12 +597,24 @@ void (async () => {
       "un Flair de saison : la clôture de sa saison"
     );
 
-    // La pastille : le symbole Bola et la lettre S, de la couleur du texte (aucune couleur à elle : ni or ni rang).
+    // La pastille, au fil du texte : le jeton (la balle agrandie, le S évidé), de la couleur du texte ;
+    // aucune couleur à elle, ni or ni rang (le masque n'est que du noir et du blanc de découpe).
+    const sansMasque = (h: string) => h.replace(/<mask[\s\S]*?<\/mask>/g, "");
     const pastille = renderToStaticMarkup(createElement(PastilleS));
     assert.ok(pastille.startsWith("<svg") && pastille.includes('aria-hidden="true"'), "décorative");
-    assert.ok(pastille.includes(">S</text>"), "la lettre S dans la balle");
+    assert.ok(pastille.includes(">S</text>"), "la lettre S");
+    assert.match(pastille, /<mask id="(pastille-s[a-zA-Z0-9]+)">[\s\S]*<\/mask><circle[^>]*fill="currentColor"[^>]*mask="url\(#\1\)"/, "le S évidé dans le disque : il se lit à 12 px");
     assert.ok(!/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|gold|var\(--r-/i.test(pastille), "noir et blanc : aucune couleur à elle (ni or ni couleur de rang)");
-    assert.deepEqual([...pastille.matchAll(/(fill|stroke)="([^"]*)"/g)].map((x) => x[2]), ["currentColor", "currentColor"], "la couleur du texte, seulement");
+    assert.deepEqual([...sansMasque(pastille).matchAll(/(fill|stroke)="([^"]*)"/g)].map((x) => x[2]), ["currentColor"], "la couleur du texte, seulement");
+    assert.match(pastille, /font-size:76/, "un S de 76 % de la pastille (le S logé dans la balle en faisait 20 %)");
+    // En grand (le prix d'un pack) : l'insigne entier, le symbole Bola et la lettre dans la balle.
+    const lune = renderToStaticMarkup(createElement(PastilleS, { lune: true }));
+    assert.ok(lune.includes(">S</text>") && !lune.includes("<mask"));
+    assert.deepEqual([...lune.matchAll(/(fill|stroke)="([^"]*)"/g)].map((x) => x[2]), ["currentColor", "currentColor"]);
+    // Deux pastilles sur une page : deux masques, deux identifiants.
+    const deux = renderToStaticMarkup(createElement("div", null, createElement(PastilleS), createElement(PastilleS)));
+    const ids = [...deux.matchAll(/<mask id="([^"]+)"/g)].map((x) => x[1]);
+    assert.equal(new Set(ids).size, 2, "un masque par pastille");
     // Les espaces insécables de « 59 XP S » (xpSFr), lus comme des espaces.
     const sp = (h: string) => h.replace(/\u00a0|&nbsp;/g, " ");
     const m = sp(renderToStaticMarkup(createElement(MontantXpS, { n: 59 })));
@@ -599,16 +623,35 @@ void (async () => {
     const manque = sp(renderToStaticMarkup(createElement(MontantXpS, { n: 35, sur: 40 })));
     assert.match(manque, /aria-label="35 XP S sur 40"/);
     assert.match(manque.replace(/<svg[\s\S]*?<\/svg>/, ""), />35 \/ 40</, "« ▣S 35 / 40 »");
-    // Le compteur du Passe : la ligne d'XP intacte, les XP S au bout de la barre (un bouton vers les Packs).
+    // Le compteur du Passe : la ligne d'XP et la barre seules (la pastille au bout de la barre se lisait comme son curseur).
     const b = { total: 1630, niveau: 6, dansLeNiveau: 130, pourLeSuivant: 600 };
-    const sans = sp(renderToStaticMarkup(createElement(CompteurXp, { b })));
-    const avec = sp(renderToStaticMarkup(createElement(CompteurXp, { b, xpS: 59, onXpS: () => {} })));
-    const ligne = (h: string) => /<span class="mono-label tabular-nums leading-snug">(?:<span[^>]*>[^<]*<\/span>)?[^<]*<\/span>/.exec(h)?.[0];
-    assert.equal(ligne(avec), ligne(sans), "la ligne d'XP ne change pas");
-    assert.match(avec, /<button[^>]*aria-label="Packs, 59 XP S"/);
-    assert.ok(!/XP S/.test(sans), "sans XP S, rien de plus");
+    const compteur = sp(renderToStaticMarkup(createElement(CompteurXp, { b })));
+    assert.ok(!/XP S|<svg|<button/.test(compteur), "le compteur ne porte plus les XP S");
 
-    // Où l'écran les pose : Ma carte (la tuile et l'annonce), le Passe (le compteur), le journal, les Packs.
+    // Le journal : d'où viennent les XP S d'un « Dimanche joué » ; au-delà de 20 lignes, un cumul par saison.
+    {
+      const ilyesS = rb.journalS.get("Ilyes")!;
+      const sources = sourcesParLigne(ilyesS);
+      const jx = rb.journal.get("Ilyes")!.lignes;
+      const dimanche = jx.find((l) => l.quoi === "Dimanche joué" && sources.has(rattachementXp(l) ?? ""))!;
+      const desS = ilyesS.filter((l) => l.rattache === rattachementXp(dimanche));
+      assert.ok(desS.length > 0 && desS.every((l) => l.source === "titre" || l.source === "sfl-time"));
+      assert.equal(sources.get(rattachementXp(dimanche)!), [...new Set(desS.map((l) => (l.source === "sfl-time" ? "SFL Time" : l.quoi)))].join(" · "), "« Dimanche joué · SFL Time · MVP »");
+      assert.ok(![...sources.keys()].some((k) => k.startsWith("mission:") || k.startsWith("flair")), "une mission, un Flair se nomment déjà");
+      const L = (cle: string, source: LigneXpS["source"], quoi: string, titre?: LigneXpS["titre"]): LigneXpS => ({ saison: 1, j: 5, date: "", quoi, xps: 5, source, cle, rattache: "dimanche:1:5", ...(titre ? { titre } : {}) });
+      assert.equal(sourcesParLigne([L("a", "titre", "Défensive", "def"), L("b", "sfl-time", "SFL Time"), L("c", "titre", "MVP", "mvp")]).get("dimanche:1:5"), "SFL Time · MVP · Défensive", "dans l'ordre : SFL Time, MVP, Impact, Défensive");
+      // Les lignes de la saison 0 au-delà des 20 : leurs XP S se retrouvent dans le cumul (rien ne se perd).
+      const bil = bilanDe(rb.journal, "Ilyes", MAINTENANT);
+      const parLigne = xpSParLigne(ilyesS);
+      const cumuls = cumulsDuJournal(bil.lignes, 20, parLigne);
+      const vues = bil.lignes.slice(0, 20).reduce((a, l) => a + (parLigne.get(rattachementXp(l) ?? "") ?? 0), 0);
+      assert.equal(vues + cumuls.reduce((a, c) => a + c.xps, 0), total(rb.journalS, "Ilyes"), "les XP S montrées et cumulées font le total");
+      assert.equal(bil.lignes.slice(0, 20).reduce((a, l) => a + l.xp, 0) + cumuls.reduce((a, c) => a + c.xp, 0), bil.lignes.reduce((a, l) => a + l.xp, 0), "l'XP aussi");
+      assert.ok(cumuls.some((c) => c.saison === 0 && c.xps > 0), "la saison 0 a son cumul, son stock d'XP S compris");
+      assert.deepEqual(cumulsDuJournal(bil.lignes, bil.lignes.length, parLigne), [], "tout montré : aucun cumul");
+    }
+
+    // Où l'écran les pose : Ma carte (la tuile et l'annonce), le Passe (son bouton), le journal, les Packs.
     const lire = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
     const tuile = lire("components/sfl/ma-carte/rubriques.tsx");
     assert.match(tuile, /useSoldeXpS\(player\.name\)/, "Ma carte : les XP S qui restent");
@@ -616,12 +659,25 @@ void (async () => {
     assert.ok(!/à dépenser/.test(tuile.replace(/\/\/.*$|\{\/\*[\s\S]*?\*\/\}/gm, "")), "plus de « à dépenser » en XP normales");
     assert.match(tuile, /annonceXpS\(nom, lignes, vu, new Date\(\)\)/, "l'annonce à la révélation");
     assert.match(tuile, /const lignes = s\?\.complet \? s\.lignes : null;/, "seulement sur un calcul complet");
-    assert.match(lire("components/sfl/mode-passe.tsx"), /xpS=\{vitrine \? null : soldeS\}/, "l'en-tête du Passe");
-    assert.match(lire("components/sfl/mode-passe-missions.tsx"), /xpS\.get\(rattachementXp\(l\)/, "le journal porte la pastille à droite de l'XP");
+    assert.match(tuile, /\{p && <span>\{`Passe Bola · Palier \$\{n\} · \$\{p\.nom\}`\}<\/span>\}/, "le palier sur sa propre ligne, avec « Passe Bola »");
+    assert.match(tuile, /if \(ceremonie\) return;[\s\S]*if \(ceremonieOuverte\(\)\) return;/, "rien par-dessus une cérémonie ouverte (Nouvelle carte)");
+    assert.match(lire("components/sfl/nouvelle-carte.tsx"), /poserCeremonie\(ouverte\)/, "la cérémonie se signale");
+    const passe = lire("components/sfl/mode-passe.tsx");
+    assert.match(passe, /className="mp-solde"\s+aria-label=\{`Packs, \$\{libelleXpS\(soldeS\)\}`\}/, "l'en-tête du Passe : un bouton à lui, vers les Packs");
+    assert.match(lire("components/sfl/mode-passe.css"), /button\.mp-solde::before \{\s*content: "";\s*position: absolute;\s*inset: -6px -4px;/, "44 px au doigt (32 + 2 × 6)");
+    const journal = lire("components/sfl/mode-passe-missions.tsx");
+    assert.match(journal, /<span className="flex w-\[46px\] shrink-0 justify-end">/, "une colonne d'XP S de largeur fixe");
+    assert.match(journal, /cumulsDuJournal\(b\.lignes, LIGNES_JOURNAL, xpS\)/);
+    const packs = lire("components/sfl/mode-passe-packs.tsx");
+    assert.match(packs, /setRefus\([^;]*\);\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*void rafraichirAchatsXp\(nom\);/, "refusé : les achats se relisent");
+    assert.match(packs, /\{refus && typeof refus !== "string" \? \([\s\S]*?<MontantXpS n=\{refus\.solde\} sur=\{PACK_AFRIQUE\.prix\} \/>[\s\S]*?\) : \(\s*solde != null && <ApresAchat/, "refusé, le solde du serveur à la place de celui du téléphone");
+    assert.match(packs, /etat\.t !== "manque" && <MontantXpS n=\{solde\}/, "le solde ne se répète pas sous le bouton éteint");
+    // L'heure du calcul suit la vue de la ligue (la révélation) : la journée et ses XP S arrivent ensemble.
+    assert.match(lire("hooks/use-missions.ts"), /const maintenant = useMemo\(\(\) => \{\s*void revelation;/, "l'XP se recalcule à la révélation, pas au tic suivant");
   }
 
   console.log(
-    `xp-s-check : barème (J1 en SFL Time, Ilyes 59 en S0), sources, Flair (durs, sur soi, tribune, saison figée après la J2), titres faibles, Bola (13 par semaine), doublons, plafonds, révélation (19 h, 19 h 40, sans fin des matchs, J4 à minuit), XP inchangée, serveur = téléphone, solde, annonce et pastille — ok`
+    `xp-s-check : barème (J1 en SFL Time, Ilyes 59 en S0), sources, Flair (durs, sur soi, tribune, saison figée après la J2), titres faibles, Bola (13 par semaine de saisie, antidatés 0), doublons, plafonds (commun pour un joueur Bola), révélation (19 h, 19 h 40, sans fin des matchs, J4 à minuit), XP inchangée, serveur = téléphone, solde, annonce, pastille, journal et Packs — ok`
   );
 })().catch((e) => {
   console.error(e);

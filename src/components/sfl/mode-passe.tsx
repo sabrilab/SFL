@@ -52,6 +52,7 @@ import { PlayerCard } from "@/components/sfl/player-card";
 import { Plongee } from "@/components/sfl/plongee-carte";
 import { COULEURS_PAYS, PAYS_PAR_DEFAUT } from "@/components/sfl/skins-passe";
 import { CompteurXp } from "@/components/sfl/compteur-xp";
+import { libelleXpS, MontantXpS } from "@/components/sfl/xp-s";
 import { VuePacks } from "@/components/sfl/mode-passe-packs";
 import { useSoldeXpS } from "@/hooks/use-achats-xp";
 import { finitionsDe, useAfriqueCarte, useChoixHabillage, useHabillage, usePaliers } from "@/hooks/use-habillage";
@@ -713,36 +714,47 @@ export function ModePasse({
           {/* L'XP de la saison du Passe, quand elle n'est pas déjà celle du compteur (jusqu'au 8/11, c'est la même). */}
           {b.saison !== b.total && <span className="mono-label tabular-nums text-white/55">{`${b.saisonPasse.nom} · ${xp(b.saison)}`}</span>}
         </div>
-        <div className="flex items-start gap-2.5">
-          <span className={cn("mp-niveau", `fiche--${r?.rang ?? "B"}`)} aria-label={`Niveau XP ${b.niveau}`}>
-            <span className="mono-label text-white/50">Niv.</span>
-            <span className="tabular-nums" style={{ fontFamily: ANTON, fontSize: 22, lineHeight: 1 }}>
-              {b.niveau}
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex items-start gap-2.5">
+            <span className={cn("mp-niveau", `fiche--${r?.rang ?? "B"}`)} aria-label={`Niveau XP ${b.niveau}`}>
+              <span className="mono-label text-white/50">Niv.</span>
+              <span className="tabular-nums" style={{ fontFamily: ANTON, fontSize: 22, lineHeight: 1 }}>
+                {b.niveau}
+              </span>
+              {r && r.xp > 0 && <span className="mp-palier__rang">{r.rang}</span>}
             </span>
-            {r && r.xp > 0 && <span className="mp-palier__rang">{r.rang}</span>}
-          </span>
-          <button type="button" onClick={sortir} aria-label="Quitter la passe" className="mp-rond">
-            <X className="size-4" strokeWidth={2.4} />
-          </button>
-        </div>
-      </header>
-
-      {/* Une ligne, toujours : l'XP gagnée et le niveau ; au bout de la barre, les XP S qui restent (un toucher : les Packs). */}
-      <div className="mp-compteur mp-entre" style={{ "--i": 1 } as React.CSSProperties}>
-        <CompteurXp
-          b={b}
-          className="text-white/70"
-          xpS={vitrine ? null : soldeS}
-          onXpS={
-            avecPacks
-              ? () => {
+            <button type="button" onClick={sortir} aria-label="Quitter la passe" className="mp-rond">
+              <X className="size-4" strokeWidth={2.4} />
+            </button>
+          </div>
+          {/* Les XP S qui restent (lib/sfl/xp-s.ts) : leur propre bouton, vers les Packs. Au bout de la barre
+              du compteur, la pastille se lisait comme son curseur (contrôle visuel du 02/11). */}
+          {soldeS != null &&
+            !vitrine &&
+            (avecPacks ? (
+              <button
+                type="button"
+                className="mp-solde"
+                aria-label={`Packs, ${libelleXpS(soldeS)}`}
+                onClick={() => {
                   if (vue !== "packs") navigator.vibrate?.(6);
                   vueTouchee.current = true;
                   setVue("packs");
-                }
-              : undefined
-          }
-        />
+                }}
+              >
+                <MontantXpS n={soldeS} />
+              </button>
+            ) : (
+              <span className="mp-solde">
+                <MontantXpS n={soldeS} />
+              </span>
+            ))}
+        </div>
+      </header>
+
+      {/* Une ligne, toujours : l'XP gagnée et le niveau. */}
+      <div className="mp-compteur mp-entre" style={{ "--i": 1 } as React.CSSProperties}>
+        <CompteurXp b={b} className="text-white/70" />
       </div>
 
       <nav className={cn("mp-vues mp-entre", vues.length > 3 && "mp-vues--quatre")} style={{ "--i": 1 } as React.CSSProperties} aria-label={vues.map((v) => NOM_VUE[v]).join(", ")}>

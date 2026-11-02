@@ -144,6 +144,57 @@ export function xpSParLigne(lignes: readonly LigneXpS[]): Map<string, number> {
   return out;
 }
 
+/**
+ * D'où viennent les XP S d'une ligne du journal d'XP, quand son libellé ne
+ * le dit pas : « Dimanche joué » porte la SFL Time et les titres de sa
+ * journée, « Match Bola » le MVP du match (contrôle visuel du 02/11 : on
+ * lisait qu'un dimanche joué rapporte 10 XP S). Une mission, un Flair se
+ * nomment déjà : rien à ajouter. rattachementXp → « SFL Time · MVP ».
+ */
+export function sourcesParLigne(lignes: readonly LigneXpS[]): Map<string, string> {
+  const par = new Map<string, Set<string>>();
+  for (const l of lignes) {
+    if (!l.rattache.startsWith("dimanche:") && !l.rattache.startsWith("bola-match:")) continue;
+    (par.get(l.rattache) ?? par.set(l.rattache, new Set()).get(l.rattache)!).add(sourceCourte(l));
+  }
+  return new Map([...par].map(([k, v]) => [k, [...v].sort((a, b) => ORDRE_SOURCES.indexOf(a) - ORDRE_SOURCES.indexOf(b)).join(" · ")]));
+}
+
+/** Une saison du journal d'XP au-delà des lignes montrées : ses journées, son XP, ses XP S. */
+export interface CumulJournal {
+  saison: number;
+  /** La première et la dernière journée cumulées. */
+  de: number;
+  a: number;
+  xp: number;
+  xps: number;
+}
+
+/**
+ * Le journal « Gagner de l'XP » montre les `montrees` lignes les plus
+ * récentes ; le reste se cumule saison par saison, pour que rien ne s'y perde
+ * (contrôle visuel du 02/11 : coupé à 20 lignes, le stock rétroactif de la
+ * saison 0 disparaissait). `lignes` : du plus récent au plus ancien
+ * (bilanDe) ; `xpS` : xpSParLigne. Les cumuls, de la saison la plus récente
+ * à la plus ancienne.
+ */
+export function cumulsDuJournal(
+  lignes: readonly Pick<LigneXp, "saison" | "j" | "date" | "quoi" | "xp" | "mission" | "bola" | "flairDurs" | "flairSaison">[],
+  montrees: number,
+  xpS: ReadonlyMap<string, number>
+): CumulJournal[] {
+  const par = new Map<number, CumulJournal>();
+  for (const l of lignes.slice(montrees)) {
+    const c = par.get(l.saison) ?? { saison: l.saison, de: l.j, a: l.j, xp: 0, xps: 0 };
+    c.de = Math.min(c.de, l.j);
+    c.a = Math.max(c.a, l.j);
+    c.xp += l.xp;
+    c.xps += xpS.get(rattachementXp(l) ?? "") ?? 0;
+    par.set(l.saison, c);
+  }
+  return [...par.values()].sort((a, b) => b.saison - a.saison);
+}
+
 const joue = (e: MatchEntry) => e.statut === "Présent" && !e.extraTime;
 
 /** L'ordre de retrait au plafond : le premier retiré d'abord (la SFL Time en dernier). */

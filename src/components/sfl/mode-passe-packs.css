@@ -240,6 +240,14 @@
   font-size: 26px;
   line-height: 1;
 }
+/* Le prix, en grand (l'insigne entier) : ce qu'on paie se lit d'abord ; le solde vient dessous, en retrait. */
+.pk-confirmer__prix {
+  margin-top: -2px;
+  font-family: var(--font-anton), Anton, sans-serif;
+  font-size: 34px;
+  line-height: 1;
+  color: #fff;
+}
 /* La 3D garde de la place autour de sa carte (pour tourner) : la carte se rapproche
    de son nom, au lieu d'en être séparée par un vide. */
 .pk-detail__carte {

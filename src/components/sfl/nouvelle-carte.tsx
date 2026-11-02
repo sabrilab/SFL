@@ -34,6 +34,7 @@ import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useSession } from "@/hooks/use-session";
 import { useMomentAnnonce } from "@/hooks/use-moment-annonce";
+import { poserCeremonie } from "@/hooks/use-ceremonie";
 import { sonRevelation } from "@/lib/sfl/son";
 import type { BoostCardData } from "@/lib/sfl/engine";
 
@@ -109,6 +110,11 @@ export function NouvellesCartes() {
   const [queue, setQueue] = useState<BoostCardData[] | null>(null);
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
+
+  // Ouverte, la cérémonie tient les annonces de Ma carte (palier, XP S) jusqu'à sa fermeture (use-ceremonie.ts).
+  const ouverte = !!bilan || !!queue?.length;
+  useEffect(() => poserCeremonie(ouverte), [ouverte]);
+  useEffect(() => () => poserCeremonie(false), []);
 
   useEffect(() => {
     // Pas de session : on est sur l'écran de connexion, pas de cérémonie.

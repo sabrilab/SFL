@@ -91,6 +91,8 @@ export function PageJournee() {
   const [preparer, setPreparer] = useState(false);
   const [quandOu, setQuandOu] = useState<number | null | false>(false);
   const [ligne, setLigne] = useState<number | null>(null);
+  /** La partie de la fiche à montrer d'abord (une alerte SFL Time : les honneurs). */
+  const [versLigne, setVersLigne] = useState<"honneurs" | null>(null);
   const [publier, setPublier] = useState(false);
   const [remettre, setRemettre] = useState(false);
   const [enDirect, setEnDirect] = useState(false);
@@ -326,7 +328,10 @@ export function PageJournee() {
                 courant={matchCourant}
                 onCourant={setMatchCourant}
                 onPlus={(equipe) => setAjouterA(equipe)}
-                onCarte={setLigne}
+                onCarte={(i, vers) => {
+                  setVersLigne(vers ?? null);
+                  setLigne(i);
+                }}
                 // Pas de match de plus une fois le coup d'envoi passé : c'est ainsi
                 // qu'étaient nés les matchs 5 et 6 de la J3, déjà jouée (28/10).
                 onAjouterMatch={etat === "brouillon" || etat === "en-ligne" ? ajouterUnMatch : undefined}
@@ -521,11 +526,13 @@ export function PageJournee() {
           <FeuilleLigne
             saison={saison}
             index={ligneOuverte && ligneOuverte.j === j ? ligne : null}
+            vers={versLigne}
             equipes={equipes}
             mvpAuto={mvpAutomatique(saison, j)}
             places={places}
             onClose={() => {
               setLigne(null);
+              setVersLigne(null);
               if (retourFeuille) {
                 setRetourFeuille(false);
                 setConsulter(true);

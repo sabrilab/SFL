@@ -47,6 +47,7 @@ import { useSoldeXpS } from "@/hooks/use-achats-xp";
 import { MontantXpS, PastilleS } from "@/components/sfl/xp-s";
 import { annonceXpS, type VuXpS } from "@/lib/sfl/xp-s";
 import { haptique } from "@/lib/sfl/haptique";
+import { ceremonieOuverte, useCeremonieOuverte } from "@/hooks/use-ceremonie";
 import type { BilanXp } from "@/lib/sfl/missions";
 import { palierAAnnoncer } from "@/lib/sfl/xp-acquis";
 import { cn } from "@/lib/utils";
@@ -563,8 +564,11 @@ const CLE_XPS_VU = "sfl-xps-vu";
  * de l'appareil complet et posé (quatre secondes sans bouger : les réponses
  * aux missions arrivent un instant après l'ouverture). La première fois,
  * rien : le stock d'avant se lit sur la tuile. Un palier qui s'ouvre au même
- * moment passe dans la même annonce, en description, avec l'haptique du
- * palier. Aucun nombre ne s'anime.
+ * moment passe dans la même annonce, sur sa propre ligne (« Passe Bola ·
+ * Palier 14 · Animée », sous les sources : le nom du palier ne se lit pas
+ * comme une source), avec l'haptique du palier. Aucun nombre ne s'anime.
+ * Une cérémonie plein écran ouverte (Nouvelle carte, les divisions) tient
+ * l'annonce jusqu'à sa fermeture (use-ceremonie.ts).
  */
 const POSE_MS = 4000;
 
@@ -572,8 +576,12 @@ function useAnnonces(b: BilanXp | null, s: XpSAffichees | null, nom: string) {
   const sp = b?.saisonPasse;
   const palier = b ? Math.max(b.palier, b.passe.palier) : 0;
   const lignes = s?.complet ? s.lignes : null;
+  const ceremonie = useCeremonieOuverte();
   useEffect(() => {
+    if (ceremonie) return;
     const id = window.setTimeout(() => {
+      // Ouverte pendant l'attente : l'effet reprend à sa fermeture.
+      if (ceremonieOuverte()) return;
       let n: number | null = null;
       if (sp && palier > 0) {
         let vus: Record<string, number> = {};
@@ -606,7 +614,14 @@ function useAnnonces(b: BilanXp | null, s: XpSAffichees | null, nom: string) {
       if (annonce) {
         if (p) haptique.sceau();
         else haptique.choix();
-        const description = [...annonce.sources, ...(p ? [`Palier ${n} · ${p.nom}`] : [])].join(" · ");
+        // D'où elles viennent ; le palier, s'il s'ouvre en même temps, sur sa propre ligne.
+        const description =
+          annonce.sources.length || p ? (
+            <span className="flex flex-col">
+              {annonce.sources.length > 0 && <span>{annonce.sources.join(" · ")}</span>}
+              {p && <span>{`Passe Bola · Palier ${n} · ${p.nom}`}</span>}
+            </span>
+          ) : null;
         toast(
           <span className="inline-flex items-center gap-1.5 tabular-nums">
             <span className="sr-only">{`+${xpSFr(annonce.plus)}`}</span>
@@ -622,7 +637,7 @@ function useAnnonces(b: BilanXp | null, s: XpSAffichees | null, nom: string) {
       toast(`Palier ${n} · ${p.nom}`, { description: `Passe Bola · ${sp.nom}` });
     }, POSE_MS);
     return () => window.clearTimeout(id);
-  }, [sp, palier, lignes, nom]);
+  }, [sp, palier, lignes, nom, ceremonie]);
 }
 
 /* ----------------------------- La page enfant ----------------------------- */

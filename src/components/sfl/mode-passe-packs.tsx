@@ -13,9 +13,14 @@
 //     solde d'XP S (la pastille, components/sfl/xp-s.tsx), les nations en
 //     vignettes (la carte du joueur dans la nation s'il l'a, scellée sinon),
 //     et le bouton « Ouvrir · ▣S 40 » (« ▣S 35 / 40 », éteint, s'il en
-//     manque ; « 12/12 » une fois complet) ;
-//   · la confirmation : la piste scellée, dans un seul sens ; la clé de
-//     l'ouverture est tirée là et gardée jusqu'au résultat (boutique-xp.ts) ;
+//     manque : le solde ne s'écrit alors qu'une fois ; « 12/12 » une fois
+//     complet) ;
+//   · la confirmation : le prix en grand (l'insigne entier), dessous, en
+//     retrait, le solde et ce qu'il deviendra (« ▣S 63 → 23 »), puis la piste
+//     scellée, dans un seul sens ; la clé de l'ouverture est tirée là et
+//     gardée jusqu'au résultat (boutique-xp.ts). Si le serveur refuse faute
+//     d'XP S, son solde (« ▣S 30 / 40 ») prend la place de celui du
+//     téléphone, et les achats se relisent (un tirage payé ailleurs) ;
 //   · la cérémonie (pack-opening.tsx, CeremoniePack) : l'étui respire, on le
 //     touche, il se déchire ; la carte DU JOUEUR arrive dans la nation tirée,
 //     se retourne une fois pour montrer son dos (le motif, le numéro de
@@ -56,6 +61,7 @@ import { etatOuverture, nationsMontrees, NATIONS, numeroSerieNation, PACK_AFRIQU
 import { memeNom } from "@/lib/sfl/xp-acquis";
 import { cn } from "@/lib/utils";
 import { libelleXpS, MontantXpS } from "@/components/sfl/xp-s";
+import { nombreFr } from "@/lib/sfl/compteur-xp";
 import "./mode-passe-packs.css";
 
 const nationDe = (n: CodeNation) => NATIONS.find((x) => x.id === n)!;
@@ -223,6 +229,22 @@ function haloDe(nation: CodeNation): string {
   return `rgba(${(v >> 16) & 255},${(v >> 8) & 255},${v & 255},.34)`;
 }
 
+/* --------------------------- Le solde, puis --------------------------- */
+
+/** « ▣S 63 → 23 » : le solde, puis ce qu'il en restera après le tirage ; en retrait sous le prix. */
+function ApresAchat({ solde, prix }: { solde: number; prix: number }) {
+  const apres = Math.max(0, solde - prix);
+  return (
+    <span className="mono-label inline-flex items-center gap-[0.45em] text-white/45" role="img" aria-label={`${libelleXpS(solde)}, puis ${libelleXpS(apres)}`}>
+      <MontantXpS n={solde} />
+      <span aria-hidden>→</span>
+      <span aria-hidden className="tabular-nums">
+        {nombreFr(apres)}
+      </span>
+    </span>
+  );
+}
+
 /* ------------------------------- La vue ------------------------------- */
 
 type Tirage = { nation: CodeNation; serie: number; apercu?: boolean };
@@ -320,6 +342,9 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
     const r = await ouvrirPackAfrique(nom, c);
     if (!r.ok) {
       setRefus(r.code === 402 && r.solde != null ? { solde: r.solde } : r.raison);
+      // Le serveur fait foi : son solde remplace celui du téléphone sur la confirmation, et ce
+      // qui l'expliquerait (un tirage payé sur un autre téléphone) se relit tout de suite.
+      void rafraichirAchatsXp(nom);
       void rafraichirBilanServeur(true);
       return "dite" as const;
     }
@@ -408,7 +433,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
             </span>
             <span className="font-mono text-[13px] font-bold text-white/45 tabular-nums">/ {nations.length}</span>
           </span>
-          {solde != null && !vitrine && <MontantXpS n={solde} className="mono-label text-white/55" />}
+          {solde != null && !vitrine && etat.t !== "manque" && <MontantXpS n={solde} className="mono-label text-white/55" />}
           {etat.t === "complet" ? null : <div className="pk-fiche__action">{bouton}</div>}
         </div>
       </section>
@@ -479,16 +504,16 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
                   </button>
                   <EtuiAfrique largeur={132} respire={!reduit} />
                   <span className="pk-confirmer__nom titre-lettrage">{PACK_AFRIQUE.nom}</span>
-                  {/* Le prix, puis ce qui reste : « ▣S 40 · ▣S 59 ». */}
-                  <span className="mono-label inline-flex items-center gap-[0.45em] text-white/60">
-                    <MontantXpS n={PACK_AFRIQUE.prix} />
-                    {solde != null && (
-                      <>
-                        <span aria-hidden>·</span>
-                        <MontantXpS n={solde} />
-                      </>
-                    )}
-                  </span>
+                  {/* Le prix, en grand ; dessous, en retrait, le solde et ce qu'il deviendra (« ▣S 63 → 23 »).
+                      Refusé (402), le solde du serveur sur le prix, à la place : jamais deux soldes à la fois. */}
+                  <MontantXpS n={PACK_AFRIQUE.prix} lune className="pk-confirmer__prix" />
+                  {refus && typeof refus !== "string" ? (
+                    <span className="mono-label text-white/80" role="status">
+                      <MontantXpS n={refus.solde} sur={PACK_AFRIQUE.prix} />
+                    </span>
+                  ) : (
+                    solde != null && <ApresAchat solde={solde} prix={PACK_AFRIQUE.prix} />
+                  )}
                   <ReponseScellee
                     mine={null}
                     seul={{ r: "present", libelle: "Glisser pour ouvrir" }}
@@ -498,9 +523,9 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
                     onScellee={() => setCeremonie(true)}
                     className="w-full max-w-[20rem]"
                   />
-                  {refus && (
+                  {typeof refus === "string" && (
                     <span className="mono-label tabular-nums text-white/70" role="status">
-                      {typeof refus === "string" ? refus : <MontantXpS n={refus.solde} sur={PACK_AFRIQUE.prix} />}
+                      {refus}
                     </span>
                   )}
                 </div>
