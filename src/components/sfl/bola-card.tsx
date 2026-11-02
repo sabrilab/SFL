@@ -78,6 +78,13 @@
 // (skins-arbitre.ts) ou le skin qu'il porte : sa satisfaction à la place de la note, ses chiffres
 // (matchs arbitrés, notes reçues…) à la place des six stats.
 //
+// La carte d'un entraîneur de Bola Team (`edition="entraineur"`,
+// `entraineur` ; étude du 02/11, carte-entraineur.tsx) garde elle aussi toute
+// la disposition, dans la matière de son métier (le tableau de la causerie,
+// le carnet, le survêtement ; skins-entraineur.ts) : sa note à lui, et ses six
+// caractéristiques (res, pro, eff, coh, jeu, ten ; lib/sfl/entraineur.ts) à la
+// place des six stats. Le calcul des stats d'un joueur n'y est pour rien.
+//
 // Mêmes calques que la carte éditoriale (`data-card-part` body / player /
 // stats) : la 3D de card-3d.tsx mesure la carte et la prend telle quelle,
 // avec sa parallaxe — le portrait flotte au-dessus du papier, le texte
@@ -106,9 +113,10 @@ import { MotifCarte } from "@/components/sfl/motif-carte";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
 import { abrege, estGardien } from "@/lib/sfl/gardien";
+import type { FaceEntraineur } from "@/lib/sfl/entraineur";
 import { ligneDEmission, type EmissionCarte } from "@/lib/sfl/epoques";
 
-export type BolaEdition = "base" | "rare" | "mvp" | "impact" | "def" | "arbitre";
+export type BolaEdition = "base" | "rare" | "mvp" | "impact" | "def" | "arbitre" | "entraineur";
 
 /**
  * La carte d'un arbitre (carte-arbitre.tsx) : sa satisfaction à la place de
@@ -328,6 +336,7 @@ export function BolaCard({
   habillage: habillageDemande,
   epoque,
   arbitre,
+  entraineur,
 }: {
   name: string;
   /** Le nom montré sur la carte, s'il diffère du nom de saison (voir lib/sfl/identites). */
@@ -353,16 +362,25 @@ export function BolaCard({
   epoque?: EmissionCarte | null;
   /** La carte d'un arbitre : sa satisfaction et ses chiffres (avec l'édition « arbitre »). */
   arbitre?: FaceArbitre;
+  /** La carte d'un entraîneur de Bola Team : sa note et ses six caractéristiques (avec l'édition « entraineur »). */
+  entraineur?: FaceEntraineur;
 }) {
   // 254 px de large à taille 1, comme les autres cartes de l'app.
   const largeur = 254 * size;
   const u = (n: number) => n * size * (254 / W);
   const palier = palierCarte(largeur);
-  // L'arbitre a sa matière à lui (ou le skin de tenue qu'il porte), sans époque.
-  const p = edition === "arbitre" ? MATIERES[arbitre?.finition ?? "arbitre"] : matiereDe(edition, habillageDemande, epoque?.saison);
-  const note = arbitre ? arbitre.note : overall;
+  // L'arbitre a sa matière à lui (ou le skin de tenue qu'il porte), sans époque ; l'entraîneur aussi.
+  const p =
+    edition === "arbitre"
+      ? MATIERES[arbitre?.finition ?? "arbitre"]
+      : edition === "entraineur"
+        ? MATIERES[entraineur?.finition ?? "entraineur"]
+        : matiereDe(edition, habillageDemande, epoque?.saison);
+  // Une carte qui n'est pas celle d'un joueur : sa note et ses chiffres à elle.
+  const autre = arbitre ?? entraineur;
+  const note = autre ? autre.note : overall;
   // Un gardien (poste G) : les mêmes six cases, sous des stats de gardien (lib/sfl/gardien.ts).
-  const gardien = !arbitre && estGardien(position);
+  const gardien = !autre && estGardien(position);
   // Une carte d'époque est restée telle qu'elle a été émise : sans habillage ni badge.
   const era = p.epoque;
   const habillage = era ? undefined : habillageDemande;
@@ -476,8 +494,8 @@ export function BolaCard({
   // Le haut à droite du portrait : le numéro de maillot ; sinon le poste, en grand format seulement.
   // Une carte d'époque : le poste, ou rien sous l'emblème d'une carte Boost.
   // Le badge n'est plus dans le coin : il est dans sa bulle, sur la bande.
-  // Un arbitre n'a ni numéro ni poste : son étiquette le dit déjà.
-  const marque = arbitre
+  // Un arbitre n'a ni numéro ni poste : son étiquette le dit déjà ; un entraîneur non plus.
+  const marque = autre
     ? null
     : era
       ? era.embleme || !complete
@@ -897,7 +915,9 @@ export function BolaCard({
                 ...(era && { color: era.libelle }),
               }}
             >
-              {complete ? `${username ? `${username} · ` : ""}${gardien ? "gardien" : position.toLowerCase()}` : position.toUpperCase()}
+              {complete
+                ? `${username ? `${username} · ` : ""}${gardien ? "gardien" : position.toLowerCase()}`
+                : (entraineur?.court ?? position).toUpperCase()}
             </div>
           </>
         )}
@@ -917,7 +937,7 @@ export function BolaCard({
                 columnGap: u(16),
               }}
             >
-              {(arbitre?.stats ?? STAT_KEYS.map((k) => [k, stats[k]] as const)).map(([k, valeur]) => {
+              {(autre?.stats ?? STAT_KEYS.map((k) => [k, stats[k]] as const)).map(([k, valeur]) => {
                 const actif = highlightStats?.includes(k as StatKey);
                 const libelle = gardien ? abrege(k as StatKey, true) : k;
                 return (

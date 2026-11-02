@@ -31,7 +31,8 @@
 // Et la rosace guillochée du dos (RosaceBola), comme sur un billet. Les
 // motifs des skins du Passe Bola sont dans motifs-passe.tsx, ceux des skins
 // offerts (la pépite, la palestine) dans motifs-offerts.tsx, ceux des recrues
-// (recruteur, filigrane, fondateur) dans motifs-recrues.tsx.
+// (recruteur, filigrane, fondateur) dans motifs-recrues.tsx, ceux de la carte
+// d'entraîneur (tableau, carnet, survêtement ; étude) dans motifs-entraineur.tsx.
 
 import { Fragment, useId } from "react";
 import type { Motif } from "@/components/sfl/finitions-carte";
@@ -43,6 +44,8 @@ import { estMotifRecrue } from "@/components/sfl/skins-recrues";
 import { estMotifPasse } from "@/components/sfl/skins-passe";
 import { MotifAfriqueSvg } from "@/components/sfl/afrique/motifs-afrique";
 import { estMotifAfrique } from "@/components/sfl/afrique/registre";
+import { MotifEntraineurSvg } from "@/components/sfl/motifs-entraineur";
+import { estMotifEntraineur } from "@/components/sfl/skins-entraineur";
 
 const W = 1024;
 const H = 1656;
@@ -184,6 +187,7 @@ export function MotifCarte({
   if (estMotifOffert(motif)) return <MotifOffertSvg motif={motif} dos={!!centre} />;
   if (estMotifRecrue(motif)) return <MotifRecrueSvg motif={motif} dos={!!centre} nom={nom} />;
   if (estMotifAfrique(motif)) return <MotifAfriqueSvg motif={motif} graine={graine} dos={!!centre} nom={nom} />;
+  if (estMotifEntraineur(motif)) return <MotifEntraineurSvg motif={motif} graine={graine} dos={!!centre} />;
 
   if (motif.type === "rayons") {
     const { cx, cy } = centre ?? motif;
