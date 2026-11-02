@@ -5,12 +5,15 @@
 //
 // Le serveur calcule le journal de toute la ligue, garde le palier atteint
 // par chacun (passe_acquis, par poser_paliers_acquis : il ne redescend
-// jamais), puis rend le bilan de l'appelant. La route agit avec la clé
-// secrète : elle exige une session de membre validé.
+// jamais), puis rend le bilan de l'appelant, ses XP S gagnées comprises
+// (xpS, lib/sfl/xp-s.ts). La route agit avec la clé secrète : elle exige une
+// session de membre validé. Le même joueur qui rappelle dans les secondes
+// qui suivent reprend le calcul en cours ou le précédent (xpServeurRecent) :
+// un appel répété ne recalcule pas toute la ligue.
 
 import { NextRequest, NextResponse } from "next/server";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
-import { bilanServeurDe, paliersAGarder, xpServeur } from "@/lib/sfl/xp-serveur.server";
+import { bilanServeurDe, paliersAGarder, xpServeurRecent, type XpServeur } from "@/lib/sfl/xp-serveur.server";
 
 export const maxDuration = 30;
 
@@ -24,9 +27,9 @@ export async function POST(req: NextRequest) {
   if (!p?.valide || !p.name) return NextResponse.json({ error: "Réservé aux joueurs de la ligue." }, { status: 403 });
   const jeton = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
   const maintenant = new Date();
-  let x: Awaited<ReturnType<typeof xpServeur>>;
+  let x: XpServeur;
   try {
-    x = await xpServeur(sb, { id: moi.id, nom: p.name, jeton }, maintenant);
+    x = await xpServeurRecent(sb, { id: moi.id, nom: p.name, jeton }, maintenant);
   } catch {
     return NextResponse.json({ error: "Réessaie." }, { status: 503 });
   }

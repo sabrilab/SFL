@@ -84,7 +84,7 @@ for (const quand of ["2026-11-01T12:00:00Z", "2027-06-01T12:00:00Z", "2027-12-15
   const apres = new Date("2026-11-16T12:00:00Z");
   assert.equal(paliersDe(davance, "Ilyes", avant).givre, undefined, "aucun palier Givre le 2/11");
   assert.ok((paliersDe(davance, "Ilyes", apres).givre ?? 0) > 0, "le palier Givre compte une fois la saison ouverte");
-  const xs: XpServeur = { journal: davance, bola: false, effectif: new Set(["Ilyes"]), idDeNom: new Map([["Ilyes", "u-ilyes"]]) };
+  const xs: XpServeur = { journal: davance, journalS: new Map(), bola: false, effectif: new Set(["Ilyes"]), idDeNom: new Map([["Ilyes", "u-ilyes"]]) };
   assert.ok(!paliersAGarder(xs, "Ilyes", avant).some((l) => l.saison_passe === "givre"), "le serveur ne garde rien de Givre avant le 9/11");
   assert.equal(bilanServeurDe(xs, "Ilyes", avant).saisons.givre, undefined, "le bilan du serveur ne montre pas Givre avant le 9/11");
   assert.ok(paliersAGarder(xs, "Ilyes", apres).some((l) => l.saison_passe === "givre" && l.palier > 0));

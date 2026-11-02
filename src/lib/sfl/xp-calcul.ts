@@ -11,6 +11,10 @@
 // n'y entre jamais (avecVitrineXp reste dans le hook, sur le seul téléphone
 // de Sabri).
 //
+// Les XP S (xp-s.ts, 02/11/2026) se tirent du même calcul :
+// journalCompletAvecS rend le journal d'XP, inchangé, et celui des XP S, lu
+// sur la même saison jugée et sur ce journal.
+//
 // Pur : ni React ni réseau.
 
 import type { CarteBola } from "./carte-bola";
@@ -20,6 +24,7 @@ import { ajouterDefis } from "./defis";
 import { ajouterPronos, type Prono } from "./pronos";
 import { ajouterRecrues, type MaRecrue, type RecruesJoueur } from "./recrues";
 import type { Saison } from "./saisie/types";
+import { journalXpS, type JournalXpS } from "./xp-s";
 
 export type JournalXp = Map<string, { lignes: LigneXp[]; reussies: number }>;
 
@@ -54,4 +59,10 @@ export function journalComplet(e: EntreesXp): JournalXp {
     ajouterBola(journal, e.bolaCarte.nom, lignesXpBola(e.bolaCarte.valides, faites, e.jugee, e.maintenant));
   }
   return journal;
+}
+
+/** Le journal d'XP (journalComplet, inchangé) et celui des XP S, d'un seul calcul : le serveur et le téléphone. */
+export function journalCompletAvecS(e: EntreesXp): { journal: JournalXp; journalS: JournalXpS } {
+  const journal = journalComplet(e);
+  return { journal, journalS: journalXpS(e, journal) };
 }

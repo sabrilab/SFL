@@ -76,6 +76,21 @@ export const NOM_ECART: Record<Ecart, string> = { serre: "Serré", net: "Net", l
 export const DETAIL_ECART: Record<Ecart, string> = { serre: "0-1 but", net: "2-3 buts", large: "4 et +" };
 export const ecartDe = (d: number): Ecart => (Math.abs(d) <= 1 ? "serre" : Math.abs(d) <= 3 ? "net" : "large");
 
+/**
+ * Les sujets durs du Flair (Ilyes, 02/11/2026), les seuls qui donnent des XP
+ * S (xp-s.ts) : le MVP d'un match, son duel, son écart en bande, et le
+ * buteur, le passeur et le meilleur du jour. Ni « qui gagne », ni le buteur
+ * ou le passeur d'un match (un sur trois passe au favori).
+ */
+export const SUJETS_DURS_MATCH: readonly GenreMatch[] = ["mvp", "duel", "ecart"];
+export const SUJETS_DURS_JOUR: readonly (typeof SUJETS_JOUR)[number][] = ["buteur", "passeur", "pepite"];
+
+/** Un sujet dur (SUJETS_DURS_MATCH, SUJETS_DURS_JOUR) ? */
+export function estDur(sujet: string): boolean {
+  const [genre, n] = lireSujet(sujet);
+  return n == null ? (SUJETS_DURS_JOUR as readonly string[]).includes(genre) : (SUJETS_DURS_MATCH as readonly string[]).includes(genre);
+}
+
 /** Le genre et le match d'un sujet : `mvp:1` → ["mvp", 1] ; un sujet du jour → [sujet, null]. */
 export function lireSujet(sujet: string): [string, number | null] {
   const i = sujet.indexOf(":");
@@ -88,6 +103,13 @@ export const PRIME_SAISON_PAS = 40;
 
 /** La prime d'un prono de saison posé après `jouees` journées jouées : 300, 260, 220… jamais sous 60. */
 export const primeSaison = (jouees: number) => Math.max(PRIME_SAISON_MIN, PRIME_SAISON_MAX - PRIME_SAISON_PAS * jouees);
+
+/**
+ * La prime d'un Flair de saison qui compte encore pour les XP S (xp-s.ts) :
+ * posé ou changé pour la dernière fois avant le troisième coup d'envoi, il
+ * n'a plus bougé après la J2. Plus tard, on prendrait le leader évident.
+ */
+export const PRIME_SAISON_TOT = primeSaison(2);
 
 export const SUJETS_SAISON: SujetSaison[] = ["pepite", "buteur", "passeur"];
 export const TITRE_SAISON: Record<SujetSaison, string> = {
@@ -337,16 +359,18 @@ export function lignesPronos(
     const p = pronosDeJournee(lue, numero, j, reference);
     if (!p || !p.joue || (!close && maintenant.getTime() < p.finDuJour.getTime())) continue;
     const res = resultatsDeJournee(p, lue.entries);
-    const parJoueur = new Map<string, { justes: number; total: number; xp: number }>();
+    const parJoueur = new Map<string, { justes: number; total: number; xp: number; durs: number }>();
     for (const x of miens.filter((r) => r.j === j)) {
       const retenu = pronoRetenu(miens, p, x.joueur, x.sujet);
       const etat = etatDe(retenu, res);
       if (etat === "attente") continue;
-      const b = parJoueur.get(x.joueur) ?? { justes: 0, total: 0, xp: 0 };
+      const b = parJoueur.get(x.joueur) ?? { justes: 0, total: 0, xp: 0, durs: 0 };
       b.total++;
       if (etat === "juste") {
         b.justes++;
         b.xp += xpSujet(x.sujet);
+        // Les XP S (xp-s.ts) : un sujet dur, jamais un choix sur soi (son titre ou sa mission le paie déjà).
+        if (estDur(x.sujet) && x.choix !== x.joueur) b.durs++;
       }
       parJoueur.set(x.joueur, b);
     }
@@ -354,7 +378,7 @@ export function lignesPronos(
       if (!b.justes) continue;
       out.push({
         joueur,
-        ligne: { saison: numero, j, date: p.date, quoi: `Flair, ${b.justes} sur ${b.total}`, xp: Math.min(b.xp, plafondDe(p, joueur)) },
+        ligne: { saison: numero, j, date: p.date, quoi: `Flair, ${b.justes} sur ${b.total}`, xp: Math.min(b.xp, plafondDe(p, joueur)), flairDurs: b.durs },
       });
     }
   }
@@ -364,6 +388,7 @@ export function lignesPronos(
     for (const x of miens.filter((r) => r.j === J_SAISON)) {
       const sujet = x.sujet as SujetSaison;
       if (!res.get(sujet)?.includes(x.choix)) continue;
+      const prime = primeAu(lue, numero, new Date(x.le), reference);
       out.push({
         joueur: x.joueur,
         ligne: {
@@ -371,7 +396,9 @@ export function lignesPronos(
           j: derniere?.j ?? 0,
           date: derniere?.date ?? "",
           quoi: `Flair de la saison : ${TITRE_SAISON[sujet] ?? sujet}`,
-          xp: primeAu(lue, numero, new Date(x.le), reference),
+          xp: prime,
+          // Les XP S (xp-s.ts) : seulement un choix qui n'a plus bougé après la J2, et jamais sur soi.
+          flairSaison: { sujet, tot: prime >= PRIME_SAISON_TOT && x.choix !== x.joueur },
         },
       });
     }

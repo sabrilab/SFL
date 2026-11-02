@@ -128,6 +128,9 @@ export const FELICITATIONS_DONNEES_JOURNEE = 10;
 
 /* ------------------------------- Les types ------------------------------- */
 
+/** Un titre de la journée que la réussite d'une mission suppose (xp-s.ts : une seule fois les XP S). */
+export type TitreCouvert = "mvp" | "impact" | "def";
+
 export interface Mission {
   creneau: Creneau;
   genre: Genre;
@@ -136,6 +139,12 @@ export interface Mission {
   /** Tiens-le : ses buts et passes D, au plus. Record : tes points, à dépasser. */
   seuil?: number;
   xp: number;
+  /**
+   * Le titre qu'elle exige, s'il y en a un (aucune mission du dimanche
+   * aujourd'hui ; la mission perso « MVP » d'un joueur Bola) : réussie, ses
+   * XP S remplacent celles du titre, jamais les deux (xp-s.ts).
+   */
+  couvre?: TitreCouvert;
 }
 
 export interface Duel {
@@ -623,6 +632,8 @@ export interface LigneXp {
     reussie: boolean;
     perso?: string;
     troisieme?: true;
+    /** Le titre que la mission exige (Mission.couvre, MissionPerso.couvre). */
+    couvre?: TitreCouvert;
   };
   /** Les trois missions du même dimanche réussies. */
   parfait?: boolean;
@@ -640,6 +651,19 @@ export interface LigneXp {
   bola?: true;
   /** Un badge de palier franchi (lib/sfl/defis.ts) : sa prime de défi. */
   defi?: true;
+  /**
+   * Le Flair d'une journée (pronos.ts, lignesPronos) : ses choix durs justes
+   * (SUJETS_DURS, jamais sur soi). L'XP n'en dépend pas ; les XP S, si
+   * (xp-s.ts : 2 chacun, 4 au plus par journée).
+   */
+  flairDurs?: number;
+  /**
+   * Un Flair de saison juste (pronos.ts) : son sujet, et `tot` s'il compte
+   * pour les XP S : posé ou changé pour la dernière fois avant le troisième
+   * coup d'envoi de la saison (sa prime encore à 220 au moins : il n'a plus
+   * bougé après la J2), et pas sur soi. L'XP n'en dépend pas.
+   */
+  flairSaison?: { sujet: string; tot: boolean };
 }
 
 export interface BilanXp {
@@ -734,7 +758,7 @@ export function journalXp(
         for (const mi of liste) {
           if (reponseDe(reponses, d, nom, mi)?.reponse !== "acceptee") continue;
           const v = verdictFinal(juger(mi, nom, d, sa.lue, votes), mi);
-          const mission = { creneau: mi.creneau, rang: rangDe(mi) };
+          const mission = { creneau: mi.creneau, rang: rangDe(mi), ...(mi.couvre ? { couvre: mi.couvre } : {}) };
           if (v.etat === "ratee")
             de(nom).lignes.push({
               saison: sa.numero,

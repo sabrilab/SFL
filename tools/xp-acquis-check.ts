@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { bilanDe } from "../src/lib/sfl/missions";
 import { journalComplet } from "../src/lib/sfl/xp-calcul";
-import { bilanAffiche, cartesAvecServeur, palierAAnnoncer, paliersAuPlusHaut, parNom } from "../src/lib/sfl/xp-acquis";
+import { bilanAffiche, cartesAvecServeur, palierAAnnoncer, paliersAuPlusHaut, parNom, xpSAffiche } from "../src/lib/sfl/xp-acquis";
 import { bilanServeurDe, paliersAGarder, type XpServeur } from "../src/lib/sfl/xp-serveur.server";
 import { reponsesDemoXp, saisonDemoXp } from "./xp-demo";
 
@@ -28,7 +28,7 @@ assert.deepEqual(paliersAuPlusHaut({ s1: 14 }, { s1: 13 }), { s1: 14 });
 assert.deepEqual(paliersAuPlusHaut({ s1: 4 }, undefined), { s1: 4 });
 
 // 2 · Un calcul incomplet, avec le dernier bilan du serveur : on montre le serveur, jamais le 4/16.
-const xs: XpServeur = { journal: avec, bola: false, effectif: new Set(["Ilyes", "Kader"]), idDeNom: new Map([["Ilyes", "u-ilyes"], ["Kader", "u-kader"], ["Sabri", "u-sabri"]]) };
+const xs: XpServeur = { journal: avec, journalS: new Map(), bola: false, effectif: new Set(["Ilyes", "Kader"]), idDeNom: new Map([["Ilyes", "u-ilyes"], ["Kader", "u-kader"], ["Sabri", "u-sabri"]]) };
 const serveur = bilanServeurDe(xs, "Ilyes", maintenant);
 assert.equal(serveur.total, juste.total);
 assert.equal(serveur.saisons.s1.palier, juste.palier);
@@ -83,11 +83,23 @@ assert.ok(!/compte-vitrine|avecVitrineXp/.test(source.replace(/^\/\/.*$/gm, ""))
 // 3c · Un compte écrit autrement que l'effectif (« ilyes » pour Ilyes) : le serveur compte son XP sous
 //      le nom de l'effectif, comme son téléphone ; avant, 0 XP côté serveur et le pack refusé.
 {
-  const xc: XpServeur = { journal: avec, bola: false, effectif: new Set(["Ilyes", "Kader"]), idDeNom: new Map([["ilyes", "u-ilyes"], ["Kader", "u-kader"]]), nom: "Ilyes" };
+  const xc: XpServeur = { journal: avec, journalS: new Map(), bola: false, effectif: new Set(["Ilyes", "Kader"]), idDeNom: new Map([["ilyes", "u-ilyes"], ["Kader", "u-kader"]]), nom: "Ilyes" };
   const b = bilanServeurDe(xc, "ilyes", maintenant);
   assert.equal(b.total, juste.total, "le total du serveur est celui du téléphone");
   assert.equal(b.nom, "Ilyes", "le bilan porte le nom de l'effectif");
   assert.ok(paliersAGarder(xc, "ilyes", maintenant).some((l) => l.joueur === "u-ilyes" && l.saison_passe === "s1" && l.palier === juste.palier), "son palier se garde");
+}
+
+// 3d · Les XP S affichées (xp-s.ts) : un calcul incomplet ne montre jamais moins que le dernier
+//      bilan du serveur ; complet, il garde le sien (une feuille corrigée peut en retirer).
+{
+  const b = { ...serveur, xpS: 59 };
+  assert.equal(xpSAffiche(20, { complet: false, serveur: b }), 59, "incomplet : au plus haut avec le serveur");
+  assert.equal(xpSAffiche(70, { complet: false, serveur: b }), 70);
+  assert.equal(xpSAffiche(20, { complet: true, serveur: b }), 20, "complet : le calcul de l'appareil");
+  assert.equal(xpSAffiche(20, { complet: false, serveur: { ...serveur, xpS: undefined } }), 20, "un bilan gardé d'avant les XP S ne compte pas");
+  assert.equal(xpSAffiche(20, { complet: false, serveur: null }), 20);
+  assert.equal(serveur.xpS, 0, "le bilan du serveur porte ses XP S (aucune ici : le journal S est vide)");
 }
 
 // 4 · Un palier qui s'ouvre s'annonce une fois.

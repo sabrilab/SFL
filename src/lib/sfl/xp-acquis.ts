@@ -17,6 +17,8 @@ export interface BilanGarde {
   nom: string;
   total: number;
   saisons: Record<string, { xp: number; palier: number }>;
+  /** Les XP S gagnées (xp-s.ts) ; absent d'un bilan gardé avant elles. */
+  xpS?: number;
   calculeLe: string;
 }
 
@@ -92,6 +94,17 @@ export function bilanAffiche(b: BilanXp, opts: { complet: boolean; serveur?: Bil
   if (palier === b.palier && total === b.total && saison === b.saison) return b;
   const niveau = niveauDe(total);
   return { ...b, total, saison, niveau, dansLeNiveau: total - debutNiveau(niveau), pourLeSuivant: 100 * niveau, palier };
+}
+
+/**
+ * Les XP S gagnées que l'écran montre. `complet` : l'appareil a tout ce qu'il
+ * faut (bilanAffiche) ; sinon, prises au plus haut avec le dernier bilan du
+ * serveur, qui fait foi : un calcul incomplet ne montre jamais moins.
+ */
+export function xpSAffiche(local: number, opts: { complet: boolean; serveur?: BilanGarde | null }): number {
+  const serveur = opts.serveur && opts.serveur.nom ? opts.serveur : null;
+  if (opts.complet || !serveur || typeof serveur.xpS !== "number") return local;
+  return Math.max(local, serveur.xpS);
 }
 
 /** Le palier qui vient de s'ouvrir, s'il faut l'annoncer : plus haut que le dernier vu sur ce téléphone. */

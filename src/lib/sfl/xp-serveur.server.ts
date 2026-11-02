@@ -14,6 +14,14 @@
 //   · il rend le bilan de l'appelant, que l'app garde en cache.
 // Le compte vitrine n'y entre jamais (son XP fictive vit sur son téléphone).
 //
+// Les XP S (xp-s.ts, 02/11/2026) sortent du même calcul (journalCompletAvecS) :
+// le bilan porte les XP S gagnées (xpS), que la route du Pack Afrique 2027
+// passe à ouvrir_pack_xp ; le téléphone ne fait que les afficher.
+//
+// Chaque appel lit et recalcule toute la ligue : xpServeurRecent garde le
+// calcul de chacun une quinzaine de secondes dans l'instance (un seul calcul
+// pour des appels simultanés, et pas un de plus pour un bouton tapé en rafale).
+//
 // Serveur seulement : la clé secrète (serveur-ligue.server.ts).
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -25,7 +33,8 @@ import type { Prono } from "./pronos";
 import type { MaRecrue, RecruesJoueur } from "./recrues";
 import { saisonsPasseOuvertes } from "./saisons-passe";
 import { lireSaisonServeur, toutesLesLignes } from "./saison-serveur.server";
-import { journalComplet, type JournalXp } from "./xp-calcul";
+import { journalCompletAvecS, type JournalXp } from "./xp-calcul";
+import { totalXpS, type JournalXpS } from "./xp-s";
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://tpfusliksgxcvfrodchk.supabase.co";
 // La clé « publishable » de l'app, avec le même repli que lib/supabase.ts et
@@ -58,11 +67,15 @@ export interface BilanServeur {
   pourLeSuivant: number;
   /** Par saison du Passe : l'XP de la saison et le palier atteint (au moins celui gardé). */
   saisons: Record<string, { xp: number; palier: number }>;
+  /** Les XP S gagnées, à vie (xp-s.ts) : ce que la route du pack passe à ouvrir_pack_xp. */
+  xpS: number;
   calculeLe: string;
 }
 
 export interface XpServeur {
   journal: JournalXp;
+  /** Les XP S de chacun (xp-s.ts), du même calcul que le journal. */
+  journalS: JournalXpS;
   /** Le joueur qui appelle, en joueur Bola (hors de la SFL) : son passe suit EPREUVES_BOLA. */
   bola: boolean;
   /** Les noms de la saison (l'effectif) : ceux dont le palier se garde. */
@@ -136,7 +149,7 @@ export async function xpServeur(sb: SupabaseClient, appelant: { id: string; nom:
   const bola = !effectif.has(nom);
   const mesMatchs = matchs.error ? [] : ((matchs.data ?? []) as MatchBola[]);
   const bolaCarte = mesMatchs.length ? carteBola(compterMatchs(mesMatchs), appelant.id, nom, null) : null;
-  const journal = journalComplet({
+  const { journal, journalS } = journalCompletAvecS({
     jugee: lue.saison,
     reponses,
     votes: lue.votes,
@@ -147,7 +160,34 @@ export async function xpServeur(sb: SupabaseClient, appelant: { id: string; nom:
     bolaCarte,
     maintenant,
   });
-  return { journal, bola, effectif, idDeNom, nom };
+  return { journal, journalS, bola, effectif, idDeNom, nom };
+}
+
+/** Combien de temps un calcul de la ligue resservit au même appelant, dans la même instance. */
+export const CALCUL_RECENT_MS = 15_000;
+const recents = new Map<string, { le: number; x: Promise<XpServeur> }>();
+
+/**
+ * xpServeur, gardé : le même appelant qui rappelle dans les CALCUL_RECENT_MS
+ * (un bouton tapé en rafale, deux onglets, une boucle) reprend le calcul en
+ * cours ou celui d'il y a quelques secondes, au lieu de relire et recalculer
+ * toute la ligue. Par appelant (ses recrues et ses matchs Bola sont à lui),
+ * dans la mémoire de l'instance ; un calcul en échec ne se garde pas. Rien
+ * n'en dépend pour la justesse : ouvrir_pack_xp débite toujours d'un seul
+ * tenant, sur ses propres achats.
+ */
+export function xpServeurRecent(sb: SupabaseClient, appelant: { id: string; nom: string; jeton: string }, maintenant = new Date()): Promise<XpServeur> {
+  const t = maintenant.getTime();
+  for (const [k, r] of recents) if (t - r.le >= CALCUL_RECENT_MS || r.le > t) recents.delete(k);
+  const cle = `${appelant.id}|${appelant.nom}`;
+  const deja = recents.get(cle);
+  if (deja) return deja.x;
+  const x = xpServeur(sb, appelant, maintenant);
+  recents.set(cle, { le: t, x });
+  x.catch(() => {
+    if (recents.get(cle)?.x === x) recents.delete(cle);
+  });
+  return x;
 }
 
 /** Les paliers à garder : un par joueur de l'effectif (et l'appelant) et par saison du Passe atteinte. */
@@ -192,6 +232,7 @@ export function bilanServeurDe(x: XpServeur, appelant: string, maintenant: Date,
     dansLeNiveau: b.dansLeNiveau,
     pourLeSuivant: b.pourLeSuivant,
     saisons,
+    xpS: totalXpS(x.journalS.get(nom) ?? []),
     calculeLe: maintenant.toISOString(),
   };
 }
