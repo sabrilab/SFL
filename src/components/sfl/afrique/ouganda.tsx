@@ -20,7 +20,7 @@
 // qui touche aux usages funéraires de l'étoffe.
 
 import type { PropsMotifNation, SkinNation } from "./types";
-import { alea, BANDE, CENTRE_DOS, f, H, W } from "./outils";
+import { alea, BANDE, CENTRE_DOS, f, H, PORTRAIT, W } from "./outils";
 
 type Pt = [number, number];
 
@@ -39,6 +39,44 @@ const TERRE = { haut: "#9b5532", milieu: "#83432a", bas: "#62311c" };
 const IVOIRE = "244,232,208";
 const OCRE = "196,128,70";
 const FUMEE = "34,20,14";
+
+
+function rectArrondi(x: number, y: number, l: number, h: number, r: number): string {
+  return `M${f(x + r)} ${f(y)}H${f(x + l - r)}A${f(r)} ${f(r)} 0 0 1 ${f(x + l)} ${f(y + r)}V${f(y + h - r)}A${f(r)} ${f(r)} 0 0 1 ${f(x + l - r)} ${f(y + h)}H${f(x + r)}A${f(r)} ${f(r)} 0 0 1 ${f(x)} ${f(y + h - r)}V${f(y + r)}A${f(r)} ${f(r)} 0 0 1 ${f(x + r)} ${f(y)}Z`;
+}
+
+/** Des points réguliers sur un rectangle arrondi, avec leur tangente, à partir du milieu du haut. */
+function surLePourtour(x: number, y: number, l: number, h: number, r: number, pas: number): { p: Pt; t: Pt }[] {
+  const lh = l - 2 * r;
+  const lv = h - 2 * r;
+  const q = (Math.PI / 2) * r;
+  const total = 2 * lh + 2 * lv + 4 * q;
+  const n = Math.max(4, Math.round(total / pas));
+  const out: { p: Pt; t: Pt }[] = [];
+  const coin = (cx: number, cy: number, a0: number, s: number) => {
+    const a = a0 + s / r;
+    return { p: [cx + r * Math.cos(a), cy + r * Math.sin(a)] as Pt, t: [-Math.sin(a), Math.cos(a)] as Pt };
+  };
+  for (let i = 0; i < n; i++) {
+    let s = ((i * total) / n + lh / 2) % total;
+    if (s < lh) { out.push({ p: [x + r + s, y], t: [1, 0] }); continue; }
+    s -= lh;
+    if (s < q) { out.push(coin(x + l - r, y + r, -Math.PI / 2, s)); continue; }
+    s -= q;
+    if (s < lv) { out.push({ p: [x + l, y + r + s], t: [0, 1] }); continue; }
+    s -= lv;
+    if (s < q) { out.push(coin(x + l - r, y + h - r, 0, s)); continue; }
+    s -= q;
+    if (s < lh) { out.push({ p: [x + l - r - s, y + h], t: [-1, 0] }); continue; }
+    s -= lh;
+    if (s < q) { out.push(coin(x + r, y + h - r, Math.PI / 2, s)); continue; }
+    s -= q;
+    if (s < lv) { out.push({ p: [x, y + h - r - s], t: [0, -1] }); continue; }
+    s -= lv;
+    out.push(coin(x + r, y + r, Math.PI, s));
+  }
+  return out;
+}
 
 /* -------------------------------- Les stries -------------------------------- */
 
@@ -140,6 +178,50 @@ function couture(seed: number, y0: number): { bord: string; piece: string; point
   return { bord, piece, points, ombres, fibres };
 }
 
+
+/* -------------------------------- L'ourlet -------------------------------- */
+
+/**
+ * L'ourlet : une bande d'écorce plus sombre, rabattue sur le bord et cousue
+ * en surjet de fibre claire, comme on borde une étoffe. À la face, il entoure
+ * le portrait ; au dos, il fait le tour de la carte.
+ */
+const OURLET = {
+  face: { ext: 9, int: PORTRAIT.x - 1, bas: BANDE - 9, rIn: 52 },
+  dos: { ext: 9, int: 42, bas: H - 9, rIn: 52 },
+};
+function ourlet(seed: number, dos: boolean): { bande: string; bords: string; points: string; ombres: string } {
+  const rnd = alea(seed ^ 0x0a1e7);
+  const o = dos ? OURLET.dos : OURLET.face;
+  const rOut = 92 - o.ext;
+  const exter = rectArrondi(o.ext, o.ext, W - 2 * o.ext, o.bas - o.ext, rOut);
+  const inter = dos
+    ? rectArrondi(o.int, o.int, W - 2 * o.int, H - 2 * o.int, o.rIn)
+    : rectArrondi(PORTRAIT.x - 1, PORTRAIT.y - 1, PORTRAIT.c + 2, PORTRAIT.c + 2, o.rIn);
+  const m = (o.ext + o.int) / 2;
+  const basInt = dos ? H - o.int : PORTRAIT.y + PORTRAIT.c + 1;
+  const basM = (o.bas + basInt) / 2;
+  const rM = (rOut + o.rIn) / 2;
+  const demi = (o.int - o.ext) / 2;
+  let points = "";
+  let ombres = "";
+  for (const { p, t } of surLePourtour(m, m, W - 2 * m, basM - m, rM, dos ? 26 : 23)) {
+    // À la face, le bas de l'ourlet est la couture des deux pièces : on n'y coud pas deux fois.
+    if (!dos && p[1] > basM - rM * 0.6) continue;
+    // La normale, vers l'intérieur de la carte.
+    const nx = -t[1];
+    const ny = t[0];
+    const pe = 5 + rnd() * 5;
+    const l = demi * (0.86 + rnd() * 0.3);
+    const j = (rnd() - 0.5) * 3;
+    const a: Pt = [p[0] - nx * l - t[0] * pe + t[0] * j, p[1] - ny * l - t[1] * pe + t[1] * j];
+    const b: Pt = [p[0] + nx * l + t[0] * pe + t[0] * j, p[1] + ny * l + t[1] * pe + t[1] * j];
+    points += `M${f(a[0])} ${f(a[1])}L${f(b[0])} ${f(b[1])}`;
+    ombres += `M${f(a[0] + 1.2)} ${f(a[1] + 2)}L${f(b[0] + 1.2)} ${f(b[1] + 2)}`;
+  }
+  return { bande: exter + inter, bords: exter + inter, points, ombres };
+}
+
 /* -------------------------------- La vannerie -------------------------------- */
 
 /**
@@ -168,8 +250,17 @@ function vannerie(): { nature: string; fumee: string; ocre: string; sillons: str
       const t = `M${f(cx + Math.cos(a - d) * (rm - h * 0.4))} ${f(cy + Math.sin(a - d) * (rm - h * 0.4))}L${f(cx + Math.cos(a + d) * (rm + h * 0.4))} ${f(cy + Math.sin(a + d) * (rm + h * 0.4))}`;
       const u = (((a / (Math.PI * 2)) * bandes + i * 0.11) % 1 + 1) % 1;
       if (i === rangs - 1 || i === 0) ocre += t;
-      else if (u < 0.36) fumee += t;
-      else nature += t;
+      else if (i <= 3) {
+        // Les rangs du dedans : les bandes teintes tournent en spirale.
+        if (u < 0.36) fumee += t;
+        else nature += t;
+      } else {
+        // Les rangs du dehors : des dents, qui s'affinent vers le bord.
+        const v = (((a / (Math.PI * 2)) * 24) % 1 + 1) % 1;
+        const larg = (7 - i) / 3 * 0.62;
+        if (Math.abs(v - 0.5) < larg / 2) fumee += t;
+        else nature += t;
+      }
     }
     const rr = r0 + i * h;
     sillons += `M${f(cx - rr)} ${f(cy)}a${f(rr)} ${f(rr)} 0 1 0 ${f(2 * rr)} 0a${f(rr)} ${f(rr)} 0 1 0 ${f(-2 * rr)} 0`;
@@ -187,6 +278,8 @@ function Ecorce({ cote, m, graine, id }: PropsMotifNation) {
   const yCouture = dos ? 1352 : BANDE - 16;
   const co = memo(`co:${graine}:${yCouture}`, () => couture(graine, yCouture));
   const v = memo("vannerie", vannerie);
+  const ou = memo(`ou:${graine}:${dos ? 1 : 0}`, () => ourlet(graine, dos));
+  const haut = dos ? memo(`ch:${graine}`, () => couture(graine ^ 0x7091, H - 292)) : null;
   return (
     <>
       <defs>
@@ -222,6 +315,24 @@ function Ecorce({ cote, m, graine, id }: PropsMotifNation) {
       <path d={co.ombres} fill="none" stroke="rgba(30,10,4,0.5)" strokeWidth={4} strokeLinecap="round" />
       <path d={co.points} fill="none" stroke={`rgba(${IVOIRE},0.72)`} strokeWidth={2.5} strokeLinecap="round" />
       <path d={co.points} fill="none" stroke="rgba(255,250,236,0.5)" strokeWidth={1} strokeLinecap="round" transform="translate(-0.6 -0.8)" />
+
+      {haut && (
+        <g transform={`translate(0 ${H}) scale(1 -1)`}>
+          {/* Au dos, une troisième pièce en haut, cousue de même */}
+          <path d={haut.piece} fill={`url(#ep-${id})`} />
+          <path d={haut.bord} fill="none" stroke="rgba(30,10,4,0.4)" strokeWidth={5} transform="translate(0 3)" />
+          <path d={haut.bord} fill="none" stroke={`rgba(${OCRE},0.5)`} strokeWidth={1.6} />
+          <path d={haut.fibres} fill="none" stroke={`rgba(${OCRE},0.45)`} strokeWidth={0.9} />
+          <path d={haut.ombres} fill="none" stroke="rgba(30,10,4,0.5)" strokeWidth={4} strokeLinecap="round" />
+          <path d={haut.points} fill="none" stroke={`rgba(${IVOIRE},0.72)`} strokeWidth={2.5} strokeLinecap="round" />
+        </g>
+      )}
+
+      {/* L'ourlet rabattu, cousu en surjet de fibre claire */}
+      <path d={ou.bande} fill="rgba(36,14,6,0.34)" fillRule="evenodd" />
+      <path d={ou.bords} fill="none" stroke={`rgba(${OCRE},0.42)`} strokeWidth={1.4} />
+      <path d={ou.ombres} fill="none" stroke="rgba(20,8,2,0.55)" strokeWidth={3.6} strokeLinecap="round" />
+      <path d={ou.points} fill="none" stroke={`rgba(${IVOIRE},0.78)`} strokeWidth={2.4} strokeLinecap="round" />
 
       {dos && (
         <>

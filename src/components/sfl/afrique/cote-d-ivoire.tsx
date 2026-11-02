@@ -374,8 +374,8 @@ function face(graine: number) {
 function Coton({ id, pas }: { id: string; pas: number }) {
   return (
     <pattern id={id} width={pas} height={pas} patternUnits="userSpaceOnUse">
-      <path d={`M0 ${pas / 2}H${pas}`} stroke={LAVIS} strokeOpacity={0.07} strokeWidth={1.2} />
-      <path d={`M${pas / 2} 0V${pas}`} stroke={LAVIS} strokeOpacity={0.05} strokeWidth={1} />
+      <path d={`M0 ${pas / 2}H${pas}`} stroke={LAVIS} strokeOpacity={0.035} strokeWidth={1.2} />
+      <path d={`M${pas / 2} 0V${pas}`} stroke={LAVIS} strokeOpacity={0.025} strokeWidth={1} />
     </pattern>
   );
 }
@@ -420,11 +420,12 @@ function Korhogo({ cote, m, graine, id }: PropsMotifNation) {
   }
   const cercle = (r: number) => {
     const pts: Pt[] = [];
-    for (let k = 0; k <= 36; k++) {
-      const a = (k / 36) * Math.PI * 2;
+    // Le pinceau suit le rond en petites reprises : un cercle qui tremble, sans facettes.
+    for (let k = 0; k <= 96; k++) {
+      const a = (k / 96) * Math.PI * 2;
       pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
     }
-    return ligne(pts, rnd, 2.2);
+    return ligne(pts, rnd, 1.3);
   };
   const bx0 = LB / 2 + 8;
   const bx1 = W - LB / 2 - 8;

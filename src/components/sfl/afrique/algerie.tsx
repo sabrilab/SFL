@@ -195,6 +195,11 @@ function Medaillon({ c, r, id }: { c: Pt; r: number; id: string }) {
 
 interface Fibule {
   anneau: string;
+  /** Les filets du serti : le bord du métal (sombre), puis sa lumière. */
+  filets: string;
+  lumieres: string;
+  /** Le glacis de l'émail : un trait de lumière au bord de chaque alvéole. */
+  glacis: string;
   alveoles: string;
   jaunes: string;
   grenetis: string;
@@ -214,7 +219,8 @@ function fibule(): Fibule {
   const anneau = rond(cx, cy, r1) + rond(cx, cy, r0);
   let alveoles = "";
   let jaunes = "";
-  const n = 48;
+  let glacis = "";
+  const n = 64;
   const pos = (a: number, r: number): Pt => [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
   const centres = Array.from({ length: 8 }, (_, i) => -Math.PI / 2 + (i * Math.PI) / 4);
   const pres = (a: number) => centres.some((c) => Math.abs(Math.atan2(Math.sin(a - c), Math.cos(a - c))) < 0.15);
@@ -232,10 +238,13 @@ function fibule(): Fibule {
     const [c1x, c1y] = pos(a0 + e, ro - 4);
     const [c2x, c2y] = pos(a1 - e, ro - 4);
     alveoles += `M${f(ax)} ${f(ay)}Q${f(c1x)} ${f(c1y)} ${f(px)} ${f(py)}Q${f(c2x)} ${f(c2y)} ${f(bx)} ${f(by)}Z`;
+    const [gx, gy] = pos(a0 + 0.02, ri + 6);
+    const [hx, hy] = pos(am - 0.004, ro - 10);
+    glacis += `M${f(gx)} ${f(gy)}L${f(hx)} ${f(hy)}`;
     // Le petit triangle jaune entre deux écailles, la pointe vers l'intérieur.
-    const [ux, uy] = pos(a1 - 0.03, ro + 2);
-    const [vx, vy] = pos(a1 + 0.03, ro + 2);
-    const [wx, wy] = pos(a1, ro - 18);
+    const [ux, uy] = pos(a1 - 0.022, ro + 2);
+    const [vx, vy] = pos(a1 + 0.022, ro + 2);
+    const [wx, wy] = pos(a1, ro - 13);
     if (!pres(a1)) jaunes += `M${f(ux)} ${f(uy)}L${f(vx)} ${f(vy)}L${f(wx)} ${f(wy)}Z`;
   }
   let grenetis = "";
@@ -246,8 +255,13 @@ function fibule(): Fibule {
     }
   }
   const rm = (r0 + r1) / 2;
+  const filets = rond(cx, cy, r0 + 1) + rond(cx, cy, r1 - 1) + rond(cx, cy, r0 + 12) + rond(cx, cy, r1 - 12);
+  const lumieres = rond(cx, cy, r0 + 3) + rond(cx, cy, r1 - 3);
   return {
     anneau,
+    filets,
+    lumieres,
+    glacis,
     alveoles,
     jaunes,
     grenetis,
@@ -364,10 +378,11 @@ function AitYenni({ cote, m, graine, id }: PropsMotifNation) {
   const defs = (
     <defs>
       <linearGradient id={`ya-${id}`} x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stopColor="#f6f6f5" />
-        <stop offset="0.45" stopColor="#a9acaf" />
-        <stop offset="0.7" stopColor="#e2e3e4" />
-        <stop offset="1" stopColor="#80838a" />
+        <stop offset="0" stopColor="#fbfbfa" />
+        <stop offset="0.28" stopColor="#9a9ea3" />
+        <stop offset="0.5" stopColor="#f1f1f0" />
+        <stop offset="0.74" stopColor="#868a90" />
+        <stop offset="1" stopColor="#d9dadb" />
       </linearGradient>
       <linearGradient id={`yv-${id}`} x1="0" y1="0" x2="1" y2="1">
         <stop offset="0" stopColor={VERT.clair} />
@@ -420,7 +435,7 @@ function AitYenni({ cote, m, graine, id }: PropsMotifNation) {
             <rect x={0} y={BANDE} width={W} height={H - BANDE} fill={`url(#yf-${id})`} />
           </mask>
         </defs>
-        <g mask={`url(#ym-${id})`}>{ksarDe(k, 0.34)}</g>
+        <g mask={`url(#ym-${id})`}>{ksarDe(k, 0.17)}</g>
         {peint(fr, 2.2)}
         {fr.coins.map((c, i) => (
           <Medaillon key={i} c={c} r={19} id={id} />
@@ -443,7 +458,7 @@ function AitYenni({ cote, m, graine, id }: PropsMotifNation) {
           <rect x={106} y={1294} width={W - 212} height={222} />
         </clipPath>
       </defs>
-      <g clipPath={`url(#yk-${id})`}>{ksarDe(k, 0.9)}</g>
+      <g clipPath={`url(#yk-${id})`}>{ksarDe(k, 0.78)}</g>
       {peint(fr, 2.6)}
       {fr.coins.map((c, i) => (
         <Medaillon key={i} c={c} r={30} id={id} />
@@ -451,8 +466,12 @@ function AitYenni({ cote, m, graine, id }: PropsMotifNation) {
       {/* La fibule */}
       <path d={fb.anneau} fill="rgba(46,36,30,0.25)" fillRule="evenodd" transform="translate(2 3.5)" />
       <path d={fb.anneau} fill={`url(#ya-${id})`} fillRule="evenodd" stroke="#7d8084" strokeWidth={1.4} />
+      <path d={fb.filets} fill="none" stroke="#6c6f74" strokeWidth={1.6} />
+      <path d={fb.lumieres} fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth={1.1} />
       <path d={fb.alveoles} fill={`url(#yv-${id})`} stroke="#d9dadb" strokeWidth={2.2} strokeLinejoin="round" />
-      <path d={fb.jaunes} fill={JAUNE.clair} stroke={JAUNE.fonce} strokeWidth={0.8} />
+      <path d={fb.alveoles} fill="none" stroke="rgba(70,74,78,0.55)" strokeWidth={0.8} strokeLinejoin="round" />
+      <path d={fb.glacis} fill="none" stroke="rgba(255,255,255,0.42)" strokeWidth={2} strokeLinecap="round" />
+      <path d={fb.jaunes} fill={JAUNE.clair} stroke={JAUNE.fonce} strokeWidth={0.6} />
       <path d={fb.grenetis} fill="#e9eaeb" stroke="#7d8084" strokeWidth={0.8} />
       {fb.rosaces.map((c, i) => (
         <Medaillon key={`r${i}`} c={c} r={36} id={id} />
@@ -496,6 +515,7 @@ const aitYenni: SkinNation = {
     lueur: "rgba(255,255,255,0.9)",
     rayures: 0.05,
     micro: 0.04,
+    dos: { micro: 0.016 },
     reflet: 0.3,
     coins: 0.55,
     etiquette: { fond: "transparent", bord: `rgba(${BRUN},0.5)`, texte: `rgba(${BRUN},0.8)` },

@@ -19,8 +19,8 @@
 //     du joueur : une étoffe par carte ; la lisière rayée d'une bande
 //     d'aso-oke de chaque côté ; autour de la lune, une rosace en relief,
 //     comme les zayyana des façades hausa de Zaria : un bourrelet d'enduit,
-//     des nœuds entrelacés (dagi) et une couronne de pinacles (zankwaye),
-//     ton sur ton dans l'indigo.
+//     ses arêtes de poisson et des nœuds entrelacés (dagi), ton sur ton
+//     dans l'indigo.
 // Ce qu'on évite : les motifs d'adire nommés d'après une divinité (Olokun,
 // entre autres) et toute figure ; les antiquités (Nok, Ifé) ; le rouge vif
 // de l'alaari (ni rouge laqué) : le bois de camwood, une terre, le remplace
@@ -282,7 +282,6 @@ function etoffe(seed: number): Etoffe {
 
 interface Rosace {
   bourrelets: string;
-  pinacles: string;
   dagi: string;
   incises: string;
   cerne: string;
@@ -292,8 +291,8 @@ interface Rosace {
 /**
  * La rosace en relief autour de la lune : deux bourrelets d'enduit, entre eux
  * des incisions en arêtes de poisson ; huit nœuds dagi (deux boucles qui
- * s'entrelacent) sur la bande, et seize pinacles effilés, les zankwaye d'un
- * faîte de façade, posés en couronne. Autour, l'étoffe s'arrête sur un double
+ * s'entrelacent) sur la bande. (Les pinacles zankwaye d'un faîte, dont aucune
+ * source ne décrit la forme, sont laissés de côté.) Autour, l'étoffe s'arrête sur un double
  * cerne peint et son semis de points, comme le médaillon d'un adire.
  */
 function rosace(): Rosace {
@@ -309,18 +308,6 @@ function rosace(): Rosace {
     const d = 0.03;
     const p = (r: number, a: number) => `${f(cx + Math.cos(a) * r)} ${f(cy + Math.sin(a) * r)}`;
     incises += `M${p(R_IN + 8, t - d)}L${p(rm - 2, t)}M${p(R_OUT - 8, t - d)}L${p(rm + 2, t)}`;
-  }
-  let pinacles = "";
-  for (let k = 0; k < 16; k++) {
-    const t = (k / 16) * Math.PI * 2 - Math.PI / 2 + Math.PI / 16;
-    const long = k % 2 ? 30 : 56;
-    const base = k % 2 ? 12 : 17;
-    const ux = Math.cos(t), uy = Math.sin(t), vx = -uy, vy = ux;
-    const r0 = R_OUT + 3;
-    const bx = cx + ux * r0, by = cy + uy * r0;
-    const pt = (u: number, v: number) => `${f(bx + ux * u + vx * v)} ${f(by + uy * u + vy * v)}`;
-    // Un pinacle : une base qui s'évase sur le bourrelet, des flancs bombés, une tête ronde.
-    pinacles += `M${pt(-4, base + 4)}Q${pt(2, base)} ${pt(long * 0.3, base * 0.78)}Q${pt(long * 0.72, base * 0.6)} ${pt(long - 7, 6.5)}A7 7 0 0 0 ${pt(long - 7, -6.5)}Q${pt(long * 0.72, -base * 0.6)} ${pt(long * 0.3, -base * 0.78)}Q${pt(2, -base)} ${pt(-4, -base - 4)}Z`;
   }
   let dagi = "";
   for (let k = 0; k < 8; k++) {
@@ -349,7 +336,7 @@ function rosace(): Rosace {
     const t = (k / ns) * Math.PI * 2;
     semis += grain(cx + Math.cos(t) * (R_CERNE + 6.5), cy + Math.sin(t) * (R_CERNE + 6.5), 2.3);
   }
-  return { bourrelets, pinacles, dagi, incises, cerne, semis };
+  return { bourrelets, dagi, incises, cerne, semis };
 }
 
 /* ------------------------------ La bordure (face) ------------------------------ */
@@ -490,7 +477,7 @@ function Adire({ cote, m, graine, id }: PropsMotifNation) {
           </mask>
           <pattern id={`ap-${id}`} width={LARGEUR_ASO} height={40} patternUnits="userSpaceOnUse" x={(W - LARGEUR_ASO * 9) / 2} y={0}>
             {BANDE_ASO.map((r, i) => (
-              <rect key={i} x={r.x} y={0} width={r.l} height={40} fill={ton(r.c, 0.24)} />
+              <rect key={i} x={r.x} y={0} width={r.l} height={40} fill={ton(r.c, 0.15)} />
             ))}
             {/* La couture entre deux bandes, ses points */}
             <rect x={0} y={0} width={1.4} height={40} fill="rgba(0,0,0,0.5)" />
@@ -579,11 +566,10 @@ function Adire({ cote, m, graine, id }: PropsMotifNation) {
       </g>
       <path d={r.semis} fill={`rgba(${RESERVE},0.38)`} />
 
-      {/* La rosace de Zaria, ton sur ton : les arêtes de poisson, les bourrelets, les pinacles, les nœuds */}
+      {/* La rosace de Zaria, ton sur ton : les arêtes de poisson, les bourrelets, les nœuds */}
       <path d={r.incises} stroke="rgba(0,0,0,0.65)" strokeWidth={3} strokeLinecap="round" />
       <path d={r.incises} stroke={`rgba(${RESERVE},0.22)`} strokeWidth={1.3} strokeLinecap="round" transform="translate(-0.9 -1.1)" />
       {relief(r.bourrelets, 9, "b")}
-      {relief(r.pinacles, 2, "p", true)}
       <path d={r.dagi} fill="none" stroke={INDIGO.milieu} strokeWidth={11} strokeLinejoin="round" />
       {relief(r.dagi, 4.4, "d")}
     </>
@@ -618,6 +604,7 @@ const adire: SkinNation = {
     lueur: "rgba(208,218,232,0.08)",
     rayures: 0.04,
     micro: 0.05,
+    dos: { micro: 0.022 },
     reflet: 0.14,
     coins: 0.6,
     etiquette: { fond: "#0b0f1b", bord: `rgba(${KAOLIN},0.45)`, texte: `rgba(${KAOLIN},0.92)` },
