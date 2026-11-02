@@ -240,6 +240,12 @@
   font-size: 26px;
   line-height: 1;
 }
+/* La 3D garde de la place autour de sa carte (pour tourner) : la carte se rapproche
+   de son nom, au lieu d'en être séparée par un vide. */
+.pk-detail__carte {
+  display: block;
+  margin-block: -30px -26px;
+}
 .pk-detail__nom {
   font-size: 34px;
   line-height: 0.95;
