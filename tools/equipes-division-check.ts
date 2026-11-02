@@ -185,7 +185,9 @@ assert.equal(lignes4.find((e) => e.player === "Kenza")?.team, null, "sur la feui
 const match = computeJournees(posee).find((x) => x.j === 4)!.matches![0];
 assert.deepEqual([match.teamA.name, match.teamB.name], [c4.teams[0].name, c4.teams[1].name]);
 const neuve = poserEquipes(coupee, 4, c4.teams, "1 nov.");
-assert.deepEqual(neuve.journees.at(-1), { j: 4, date: "1 nov.", sflTime: true, mvpAuto: true, matchsDuJour: [{ equipes: ["Noirs 1", "Blancs 1"] }] });
+// Une journée neuve démarre sans SFL Time, même après une journée qui l'avait (Ilyes, 02/11/2026 : l'admin la coche).
+assert.deepEqual(neuve.journees.at(-1), { j: 4, date: "1 nov.", sflTime: false, mvpAuto: true, matchsDuJour: [{ equipes: ["Noirs 1", "Blancs 1"] }] });
+assert.ok(neuve.entries.filter((e) => e.j === 4).every((e) => e.sflTime === false), "ses lignes neuves suivent la journée");
 // Un match garde l'heure, le lieu et le terrain que l'admin lui avait donnés.
 const reglee: Saison = {
   ...feuille,

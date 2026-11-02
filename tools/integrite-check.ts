@@ -3,7 +3,7 @@
 //   npx tsx tools/integrite-check.ts
 import assert from "node:assert/strict";
 import { bloquantsEcriture, bloquantsPublication, cleEcart, nouveauxEcarts, verifierFeuille, type Ecart } from "../src/lib/sfl/saisie/integrite";
-import { ajouterMatch, matchsDeclares, newEntry, preparerJournee, retirerMatchVide } from "../src/lib/sfl/saisie/mutations";
+import { addEntry, ajouterMatch, ligneNeuve, matchsDeclares, newEntry, poserEquipes, preparerJournee, retirerMatchVide, sflTimeDeLaJournee, updateJournee } from "../src/lib/sfl/saisie/mutations";
 import { choixDEquipe } from "../src/lib/sfl/saisie/equipes";
 import { computeJournees } from "../src/lib/sfl/saisie/engine";
 import type { MatchEntry, Saison } from "../src/lib/sfl/saisie/types";
@@ -86,4 +86,51 @@ assert.deepEqual(regles(refus), ["I1", "I1", "I2"], "les doublons et Sabri sont 
 assert.equal(computeJournees(incident).find((x) => x.j === 3)!.matches!.length, 4, "et le moteur n'invente plus de Match 5");
 assert.ok(regles(bloquantsPublication(incident, 3)).includes("I3"));
 
-console.log("integrite-check : I0 à I8, la J3 de l'incident refusée, + Match N vide, une journée par dimanche — ok");
+// I11 · la SFL Time ligne par ligne (Ilyes, 02/11/2026) : la journée fait référence.
+const enSfl: Saison = {
+  ...base,
+  journees: base.journees.map((m) => (m.j === 4 ? { ...m, sflTime: true } : m)),
+  entries: base.entries.map((e) => ({ ...e, sflTime: true })),
+};
+assert.deepEqual(verifierFeuille(enSfl, 4), [], "une journée en SFL Time dont toutes les lignes la portent est saine");
+assert.equal(sflTimeDeLaJournee(enSfl, 4), true);
+assert.equal(sflTimeDeLaJournee(enSfl, 3), false);
+assert.equal(sflTimeDeLaJournee(enSfl, 9), false, "une journée inconnue : pas de SFL Time");
+// Un joueur ajouté prend la SFL Time de sa journée (il ne perd plus 1 point de victoire ni ses 10 XP S).
+const ajoute = addEntry(enSfl, ligneNeuve(enSfl, 4, "Sami2", "Noirs 1"));
+assert.equal(ajoute.entries.at(-1)!.sflTime, true, "ligne neuve sur une journée en SFL Time");
+assert.deepEqual(verifierFeuille(ajoute, 4), [], "et la feuille reste saine");
+assert.equal(ligneNeuve(base, 4, "Sami2", null).sflTime, false, "hors SFL Time : faux");
+// Une ligne qui s'en écarte : alerte I11, dans les deux sens, une fois par joueur, jamais bloquante.
+const manque: Saison = { ...enSfl, entries: enSfl.entries.map((e) => (e.player === "Ilyes" ? { ...e, sflTime: false } : e)) };
+assert.deepEqual(verifierFeuille(manque, 4), [{ r: "I11", j: 4, joueur: "Ilyes", sflTime: false }]);
+const enTrop: Saison = { ...base, entries: base.entries.map((e) => (e.player === "Anis" ? { ...e, sflTime: true } : e)) };
+assert.deepEqual(verifierFeuille(enTrop, 4), [{ r: "I11", j: 4, joueur: "Anis", sflTime: true }]);
+assert.deepEqual(bloquantsEcriture(nouveauxEcarts(enSfl, manque)), [], "I11 ne bloque pas l'écriture");
+assert.ok(!bloquantsPublication(manque, 4).some((e) => e.r === "I11"), "ni la publication");
+// Une ligne absente ou Xtratime n'est pas comptée : seule une ligne jouée compte la victoire.
+const absent: Saison = { ...enSfl, entries: [...enSfl.entries, L(4, "Sami3", null, { statut: "Absent justifié", sflTime: false }), L(4, "Ilyes", "Blancs 2", { extraTime: true, sflTime: false })] };
+assert.deepEqual(verifierFeuille(absent, 4), []);
+// Rien ne se réécrit seul : corriger la date d'une journée incohérente ne touche à aucune ligne.
+const redatee = updateJournee(manque, 4, { date: "2 nov.", sflTime: true });
+assert.deepEqual(redatee.entries, manque.entries, "la SFL Time inchangée : les lignes restent ce qu'elles sont");
+// Cocher ou décocher la SFL Time de la journée : toutes ses lignes suivent, les autres journées non.
+const autre: Saison = { ...base, entries: [...base.entries, L(3, "Ilyes", null, { sflTime: false, result: "Victoire" })] };
+const cochee = updateJournee(autre, 4, { sflTime: true });
+assert.ok(cochee.entries.filter((e) => e.j === 4).every((e) => e.sflTime === true));
+assert.equal(cochee.entries.find((e) => e.j === 3)!.sflTime, false, "la J3 n'a pas bougé");
+assert.deepEqual(verifierFeuille(cochee, 4), []);
+assert.ok(updateJournee(cochee, 4, { sflTime: false }).entries.filter((e) => e.j === 4).every((e) => e.sflTime === false));
+// Une journée neuve démarre sans SFL Time, même après une journée qui l'avait (l'admin la coche).
+const apresSfl = preparerJournee(enSfl, "9 nov.");
+assert.equal(apresSfl.saison.journees.find((m) => m.j === apresSfl.j)!.sflTime, false);
+const poseeApres = poserEquipes({ ...enSfl, journees: enSfl.journees.map((m) => ({ ...m, sflTime: true })) }, 5, [{ name: "Noirs 1", players: ["Ilyes", "Anis"] }, { name: "Blancs 1", players: ["Badis", "Sami"] }], "9 nov.");
+assert.equal(poseeApres.journees.find((m) => m.j === 5)!.sflTime, false, "poserEquipes : la journée née n'hérite pas");
+assert.ok(poseeApres.entries.filter((e) => e.j === 5).every((e) => e.sflTime === false), "ses lignes non plus");
+// Poser les équipes sur une journée en SFL Time : les lignes neuves la prennent, une ligne déjà là garde la sienne.
+const surSfl = poserEquipes({ ...manque, entries: manque.entries.filter((e) => e.player !== "Sami") }, 4, [{ name: "Noirs 1", players: ["Ilyes", "Anis"] }, { name: "Blancs 1", players: ["Badis", "Sami"] }]);
+assert.equal(surSfl.entries.find((e) => e.j === 4 && e.player === "Sami")!.sflTime, true, "Sami, neuf : la SFL Time de la journée");
+assert.equal(surSfl.entries.find((e) => e.j === 4 && e.player === "Ilyes")!.sflTime, false, "Ilyes garde sa ligne (I11 la signale)");
+assert.ok(verifierFeuille(surSfl, 4).some((e) => e.r === "I11" && e.joueur === "Ilyes"));
+
+console.log("integrite-check : I0 à I8, I11 (la SFL Time ligne par ligne), la J3 de l'incident refusée, + Match N vide, une journée par dimanche — ok");

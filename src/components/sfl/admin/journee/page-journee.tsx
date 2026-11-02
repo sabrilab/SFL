@@ -55,7 +55,7 @@ import { etatJournee, gesteDuMoment, prochaineJournee } from "@/lib/sfl/saisie/e
 import { libelleFinDuVote, libelleRevelation } from "@/lib/sfl/revelation";
 import { verifierFeuille } from "@/lib/sfl/saisie/integrite";
 import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
-import { addEntry, ajouterMatch, matchsDeclares, memeDate, newEntry, poserEquipes, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
+import { addEntry, ajouterMatch, ligneNeuve, matchsDeclares, memeDate, poserEquipes, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
 import { equipesDesVenus, joueursPoses } from "@/lib/sfl/saisie/venus-sur-la-feuille";
 import { saisieStore } from "@/lib/sfl/saisie/store";
 import type { MatchDuJour } from "@/lib/sfl/saisie/types";
@@ -170,12 +170,12 @@ export function PageJournee() {
 
   function ajouter(nom: string, equipe: string | null) {
     if (j == null) return;
-    if (faire((s) => addEntry(s, newEntry(j, nom, equipe)), `${nom} sur la J${j}`)) haptique.ajout();
+    if (faire((s) => addEntry(s, ligneNeuve(s, j, nom, equipe)), `${nom} sur la J${j}`)) haptique.ajout();
   }
 
   function placerSansPlace(nom: string) {
     if (j == null) return;
-    faire((s) => addEntry(s, newEntry(j, nom, null)), `${nom} sur la J${j}`);
+    faire((s) => addEntry(s, ligneNeuve(s, j, nom, null)), `${nom} sur la J${j}`);
     const i = saisieStore.load().entries.findIndex((e) => e.j === j && e.player === nom && !e.extraTime);
     if (i >= 0) setLigne(i);
   }

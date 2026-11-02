@@ -37,8 +37,8 @@ import {
   addEntry,
   ajouterMatch,
   deleteEntryAt,
+  ligneNeuve,
   matchsDeclares,
-  newEntry,
   updateEntryAt,
 } from "@/lib/sfl/saisie/mutations";
 import { choixDEquipe } from "@/lib/sfl/saisie/equipes";
@@ -340,7 +340,7 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
   const libres = rosterNames.filter((n) => !deja.has(n.trim().toLowerCase()));
 
   function ajouterLigne(nom: string) {
-    commit(addEntry(saison, { ...newEntry(j, nom, null), sflTime: false }), `Ligne ajoutée — ${nom}`);
+    commit(addEntry(saison, ligneNeuve(saison, j, nom, null)), `Ligne ajoutée — ${nom}`);
   }
 
   function ajouterUnMatch() {
