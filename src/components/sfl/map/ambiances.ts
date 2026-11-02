@@ -47,10 +47,12 @@
 import type { Map as PlanMap } from "maplibre-gl";
 import { chaleur, contoursDesZones, FONDU_PAS, voilesEnFondu, type Zone } from "@/lib/sfl/zones";
 
-export type Ambiance = "jour" | "aube" | "classique" | "territoire" | "nuit" | "encre" | "brume" | "rouge" | "braise" | "nuit-brume" | "nuit-braise" | "nuit-encre";
+export type Ambiance =
+  | "jour" | "aube" | "classique" | "territoire" | "nuit" | "encre" | "brume" | "rouge" | "braise" | "nuit-brume" | "nuit-braise" | "nuit-encre"
+  | "bulle" | "nuit-chaleur" | "trace" | "sticker" | "nuit-pelouse" | "gravure";
 /** Les essais montrés dans l'aperçu (l'encre reste par l'adresse). */
 export const AMBIANCES: Ambiance[] = ["jour", "aube", "nuit-encre", "brume", "rouge", "braise", "nuit-brume", "nuit-braise", "nuit", "territoire", "classique"];
-export const TOUTES_AMBIANCES: Ambiance[] = [...AMBIANCES, "encre"];
+export const TOUTES_AMBIANCES: Ambiance[] = [...AMBIANCES, "encre", "bulle", "nuit-chaleur", "trace", "sticker", "nuit-pelouse", "gravure"];
 /** Les ambiances sur le plan noir. */
 export const estNuit = (a: Ambiance) => a.startsWith("nuit");
 
@@ -215,7 +217,59 @@ const TABLEAU: Palette = {
   halo: "#0a0a0b",
 };
 
-const PALETTES: Record<Ambiance, Palette> = { jour: JOUR, aube: AUBE, classique: SNAP, territoire: SNAP, nuit: NUIT, encre: ENCRE, brume: SNAP, rouge: SNAP, braise: SNAP, "nuit-brume": NUIT, "nuit-braise": NUIT, "nuit-encre": TABLEAU };
+/* Les plans des styles 12 à 17 (02/11 au soir, Sabri : « inspire-toi de la
+   carte de Snap, d'Uber, de Zenly […] une surcouche qui la rend plus belle et
+   plus dynamique »). Chaque style d'interface à l'essai a son plan
+   (styles-ui.css pour la surcouche animée, app/map/page.tsx pour le lien). */
+const BULLE: Palette = {
+  terre: "#eaf6f0", quartier: "#e3f2ea", parc: "#b9ecc4", bois: "#a6e3b4", terrain: "#8fdc9f",
+  eau: "#a6def2", eauBord: "#8dd2ec", rue: "#ffffff", rueBord: "#d3e7dc", grande: "#ffe1ef", grandeBord: "#f3bfd8",
+  bati: "#dff0e6", volume: "#ffffff", rail: "#cfe0d6", ombre: "rgba(60, 96, 84, 0.42)",
+  texte: "#4c6a5e", texteRues: "#6b8479", texteEau: "#3a8db3", halo: "#ffffff",
+};
+const CHALEUR: Palette = {
+  terre: "#16111b", quartier: "#1a1420", parc: "#1d2820", bois: "#1a251d", terrain: "#2a4630",
+  eau: "#0f141c", eauBord: "#131a24", rue: "#2b2432", rueBord: "#1f1925", grande: "#47313f", grandeBord: "#2d212c",
+  bati: "#211a27", volume: "#2a2231", rail: "#2a2330", ombre: "rgba(0, 0, 0, 0.6)",
+  texte: "#9a8fa3", texteRues: "#786d80", texteEau: "#6c7a8c", halo: "#120e16",
+};
+const TRACE: Palette = {
+  terre: "#f2f2f1", quartier: "#eeeeed", parc: "#e0e6de", bois: "#dbe1d9", terrain: "#cdd7ca",
+  eau: "#d8dde2", eauBord: "#ccd2d8", rue: "#ffffff", rueBord: "#dedede", grande: "#ffffff", grandeBord: "#c4c4c4",
+  bati: "#e5e5e4", volume: "#fafafa", rail: "#cfcfcf", ombre: "rgba(0, 0, 0, 0.32)",
+  texte: "#666666", texteRues: "#8a8a8a", texteEau: "#7a8590", halo: "#ffffff",
+};
+const STICKER: Palette = {
+  terre: "#fff6e5", quartier: "#fff0d9", parc: "#b8f0a8", bois: "#a2e692", terrain: "#7fdc72",
+  eau: "#97dcff", eauBord: "#76cdf6", rue: "#ffffff", rueBord: "#efdbbe", grande: "#ffd6ec", grandeBord: "#f1a8ce",
+  bati: "#ffe8ca", volume: "#fff9ee", rail: "#e8d4b8", ombre: "rgba(120, 80, 40, 0.38)",
+  texte: "#6b5a48", texteRues: "#8a7660", texteEau: "#2f8fc0", halo: "#ffffff",
+};
+const PELOUSE: Palette = {
+  terre: "#2d6a3b", quartier: "#2a6337", parc: "#377a45", bois: "#317140", terrain: "#4a9858",
+  eau: "#20493a", eauBord: "#1c4233", rue: "#4f8d5a", rueBord: "#275a32", grande: "#6fae78", grandeBord: "#285c33",
+  bati: "#285b34", volume: "#3a7746", rail: "#3c7547", ombre: "rgba(0, 20, 5, 0.5)",
+  texte: "#e8f3e6", texteRues: "#cfe6cc", texteEau: "#bfe0d0", halo: "#1b4626",
+};
+const GRAVURE: Palette = {
+  terre: "#f6f1e6", quartier: "#f2ecdf", parc: "#e5e8d5", bois: "#dee2cc", terrain: "#cdd8bd",
+  eau: "#e3e5e2", eauBord: "#c7cac2", rue: "#fffdf7", rueBord: "#cdc4b2", grande: "#fffdf7", grandeBord: "#8c8270",
+  bati: "#ebe4d5", volume: "#fbf8f0", rail: "#b7ae9e", ombre: "rgba(60, 50, 35, 0.4)",
+  texte: "#3d372e", texteRues: "#6f6656", texteEau: "#6f7670", halo: "#fbf8f0",
+};
+
+const PALETTES: Record<Ambiance, Palette> = { jour: JOUR, aube: AUBE, classique: SNAP, territoire: SNAP, nuit: NUIT, encre: ENCRE, brume: SNAP, rouge: SNAP, braise: SNAP, "nuit-brume": NUIT, "nuit-braise": NUIT, "nuit-encre": TABLEAU,
+  bulle: BULLE, "nuit-chaleur": CHALEUR, trace: TRACE, sticker: STICKER, "nuit-pelouse": PELOUSE, gravure: GRAVURE };
+
+/** Les halos de chaleur des styles 12 à 17, façon Snap Map, sans or, bleu ni rouge (réservés aux cartes). */
+const HALOS: Partial<Record<Ambiance, unknown[]>> = {
+  bulle: ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,214,234,0.25)", 0.55, "rgba(255,190,222,0.42)", 0.85, "rgba(190,240,200,0.55)", 1, "rgba(255,255,255,0.7)"],
+  "nuit-chaleur": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(224,179,203,0)", 0.15, "rgba(224,179,203,0.16)", 0.45, "rgba(224,179,203,0.42)", 0.75, "rgba(169,203,169,0.6)", 1, "rgba(255,250,235,0.78)"],
+  trace: ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(0,0,0,0)", 0.3, "rgba(0,0,0,0.03)", 1, "rgba(0,0,0,0.08)"],
+  sticker: ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(255,255,255,0.35)", 0.6, "rgba(255,214,236,0.5)", 1, "rgba(255,255,255,0.8)"],
+  "nuit-pelouse": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.2, "rgba(240,255,236,0.08)", 0.6, "rgba(240,255,236,0.2)", 1, "rgba(250,255,248,0.4)"],
+  gravure: ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(61,55,46,0)", 0.2, "rgba(61,55,46,0.04)", 0.6, "rgba(61,55,46,0.1)", 1, "rgba(61,55,46,0.2)"],
+};
 
 /** La couleur de frontière des essais « rouge » et « braise ». */
 const FRONTIERE: Partial<Record<Ambiance, string>> = { rouge: "#E3262E", braise: "#FF6A1A", "nuit-braise": "#FF6A1A", "nuit-encre": "#FF6A1A" };
@@ -464,11 +518,12 @@ export function teinterZones(map: PlanMap, ambiance: Ambiance, satellite: boolea
   set(
     "zones-chaleur",
     "heatmap-color",
-    ambiance === "encre"
+    HALOS[ambiance] ??
+    (ambiance === "encre"
       ? ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(10,11,13,0)", 0.15, "rgba(10,11,13,0.04)", 0.5, "rgba(10,11,13,0.1)", 1, "rgba(10,11,13,0.22)"]
       : nuit
         ? ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.15, "rgba(255,255,255,0.06)", 0.5, "rgba(246,247,242,0.2)", 1, "rgba(246,247,242,0.42)"]
-        : ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.15, "rgba(255,255,253,0.18)", 0.5, "rgba(255,255,253,0.38)", 1, "rgba(255,255,253,0.6)"]
+        : ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(255,255,255,0)", 0.15, "rgba(255,255,253,0.18)", 0.5, "rgba(255,255,253,0.38)", 1, "rgba(255,255,253,0.6)"])
   );
   for (const id of ["zones-trait", "zones-lisere", "zones-attente", "zones-lueur"]) set(id, "line-opacity", 0);
   // La frontière (« rouge », « braise ») : un trait franc sur une lueur

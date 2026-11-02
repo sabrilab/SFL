@@ -1,8 +1,9 @@
 "use client";
 
 // Styles d'interface à l'essai (Sabri, 02/11/2026 ; app/styles-ui.css) ;
-// 7 à 11 : variations de l'Affiche, le style qu'il a retenu.
-// Sur l'aperçu seulement, jamais en production : ?style=1…11 pose
+// 7 à 11 : variations de l'Affiche, le style qu'il a retenu ; 12 à 17
+// (styles-ui-2.css) : six autres, chacun avec son plan et sa surcouche.
+// Sur l'aperçu seulement, jamais en production : ?style=1…17 pose
 // html[data-style] et le garde sur ce téléphone (bola-style-ui), ?style=0
 // revient au style d'origine. Une pastille en haut à gauche dit le style
 // affiché ; la toucher passe au suivant. Chaque style choisit son thème
@@ -12,8 +13,8 @@ import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 
 const CLE = "bola-style-ui";
-export const STYLES_UI = ["Origine", "Galet", "Or", "Vestiaire", "Pelouse", "Velours", "Affiche", "Affiche nuit", "Riso", "Billet", "Pop", "Brutal"] as const;
-const SOMBRES = new Set([3, 5, 7]);
+export const STYLES_UI = ["Origine", "Galet", "Or", "Vestiaire", "Pelouse", "Velours", "Affiche", "Affiche nuit", "Riso", "Billet", "Pop", "Brutal", "Bulle", "Chaleur", "Trace", "Sticker", "Pelouse", "Gravure"] as const;
+const SOMBRES = new Set([3, 5, 7, 13, 16]);
 /** La famille Affiche (6 à 11) partage ses règles, réglées par des variables (styles-ui.css). */
 const AFFICHE = 6;
 
@@ -47,7 +48,7 @@ export function EssaiStyleUi() {
     const html = document.documentElement;
     if (style) html.dataset.style = String(style);
     else delete html.dataset.style;
-    if (style >= AFFICHE) html.dataset.famille = "affiche";
+    if (style >= AFFICHE && style <= 11) html.dataset.famille = "affiche";
     else delete html.dataset.famille;
     if (style) setTheme(SOMBRES.has(style) ? "dark" : "light");
   }, [style, setTheme]);

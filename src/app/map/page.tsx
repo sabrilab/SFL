@@ -226,12 +226,22 @@ const teinteFantome = (): TeinteFantome =>
  * /?ambiance=rouge|braise|nuit-brume|nuit-braise|territoire|nuit|encre|classique.
  */
 const ESSAIS = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
+const PLAN_DU_STYLE: Record<number, Ambiance> = { 12: "bulle", 13: "nuit-chaleur", 14: "trace", 15: "sticker", 16: "nuit-pelouse", 17: "gravure" };
 const ambianceDeLAdresse = (): Ambiance => {
   // Le jour (02/11, Sabri : « le côté dark […] ça fait fuir un peu ») ; la
   // production le prend à la fusion, après son accord.
   if (!ESSAIS) return "jour";
-  const a = new URLSearchParams(window.location.search).get("ambiance");
-  return TOUTES_AMBIANCES.includes(a as Ambiance) ? (a as Ambiance) : "jour";
+  const q = new URLSearchParams(window.location.search);
+  const a = q.get("ambiance");
+  if (TOUTES_AMBIANCES.includes(a as Ambiance)) return a as Ambiance;
+  // Les styles d'interface 12 à 17 (style-ui/essai.tsx) ont chacun leur plan.
+  let style = Number(q.get("style"));
+  if (!q.has("style")) {
+    try {
+      style = Number(localStorage.getItem("bola-style-ui") ?? 0);
+    } catch {}
+  }
+  return PLAN_DU_STYLE[style] ?? "jour";
 };
 /** Dans un aperçu, /?zones=demo ajoute une zone qui vient de s'ouvrir (Lens) et une zone fermée (Paris), pour voir le récit. */
 const zonesDemo = () => ESSAIS && new URLSearchParams(window.location.search).get("zones") === "demo";
