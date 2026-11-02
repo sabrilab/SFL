@@ -12,9 +12,9 @@
 // Le dimanche des missions, c'est la dernière journée qui a des équipes :
 //   · ses équipes faites, les missions existent ; chacun accepte ou passe
 //     jusqu'au coup d'envoi (table missions_reponses) ;
-//   · la feuille remplie, le verdict tombe ; il devient définitif à minuit,
-//     quand le vote Impact et Défensive se ferme (les titres comptent dans les
-//     points du jour).
+//   · le verdict tombe à la révélation (revelation.ts : 19 h dès la J5,
+//     minuit jusqu'à la J4), quand les titres Impact et Défensive entrent
+//     (ils comptent dans les points du jour).
 //
 // Les trois créneaux :
 //   · le contrat, contre ton rival. Sur chaque terrain, les duels se forment
@@ -40,13 +40,15 @@
 // Pur : ni React ni réseau. Les réponses et les votes arrivent en paramètres.
 
 import { computeJournees, computeStandings, entryPP } from "./saisie/engine";
+import { anneeProche, dateDeParis } from "./convocation-temps";
+import { revelation, verdictDeJournee } from "./revelation";
 import { journeeJouee } from "./saisie/mutations";
 import { isHidden } from "./hidden";
 import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { ovr, type Player } from "./engine";
 import type { MatchEntry, Saison, SaisonArchivee } from "./saisie/types";
 import { passeDe, type BilanPasse, type Epreuve, type PaliersAtteints } from "./passe";
-import { saisonPasseA, saisonPasseDeLigne, SAISONS_PASSE, type SaisonPasse } from "./saisons-passe";
+import { derniersJours, saisonPasseA, saisonPasseDeLigne, saisonsPasseOuvertes, type SaisonPasse } from "./saisons-passe";
 import type { CreneauArbitre } from "./missions-arbitre";
 
 /* ------------------------------- Le barème ------------------------------- */
@@ -126,6 +128,9 @@ export const FELICITATIONS_DONNEES_JOURNEE = 10;
 
 /* ------------------------------- Les types ------------------------------- */
 
+/** Un titre de la journée que la réussite d'une mission suppose (xp-s.ts : une seule fois les XP S). */
+export type TitreCouvert = "mvp" | "impact" | "def";
+
 export interface Mission {
   creneau: Creneau;
   genre: Genre;
@@ -134,6 +139,12 @@ export interface Mission {
   /** Tiens-le : ses buts et passes D, au plus. Record : tes points, à dépasser. */
   seuil?: number;
   xp: number;
+  /**
+   * Le titre qu'elle exige, s'il y en a un (aucune mission du dimanche
+   * aujourd'hui ; la mission perso « MVP » d'un joueur Bola) : réussie, ses
+   * XP S remplacent celles du titre, jamais les deux (xp-s.ts).
+   */
+  couvre?: TitreCouvert;
 }
 
 export interface Duel {
@@ -156,8 +167,14 @@ export interface DimancheMissions {
   date: string;
   heure: string;
   coupEnvoi: Date;
-  /** Minuit à Paris, le soir du match : le verdict devient définitif. */
+  /**
+   * Le verdict définitif : la révélation (revelation.ts : 19 h dès la J5 ;
+   * minuit jusqu'à la J4, ou tant que la fin des matchs est inconnue). C'est
+   * la PHASE ; l'écran dit `verdict`.
+   */
   finDuJour: Date;
+  /** L'heure du verdict, à l'écran : « à 19 h », « à minuit », « ce soir » (la fin des matchs encore inconnue). */
+  verdict: string;
   /** La feuille porte des résultats. */
   joue: boolean;
   /** Le vote Impact et Défensive a lieu ce jour-là (journée au MVP calculé). */
@@ -213,6 +230,10 @@ export type SaisonLue = Pick<Saison, "journees" | "entries" | "roster"> & Partia
 
 /* --------------------------------- L'heure --------------------------------- */
 
+// dateDeParis et anneeProche vivent dans convocation-temps.ts (02/11/2026) ;
+// réexportée ici pour les appelants d'avant.
+export { dateDeParis };
+
 const HEURE_PAR_DEFAUT = "13h00";
 const MOIS = ["jan", "fev", "mar", "avr", "mai", "juin", "juil", "aou", "sep", "oct", "nov", "dec"];
 
@@ -228,45 +249,10 @@ function jourMois(libelle: string): { jour: number; mois: number } | null {
   return mois < 0 ? null : { jour: Number(m[1]), mois: mois + 1 };
 }
 
-/** De combien Paris est en avance sur l'heure universelle à cet instant, en ms. */
-function avanceParis(utc: number): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Europe/Paris",
-    hourCycle: "h23",
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-    hour: "numeric",
-    minute: "numeric",
-  }).formatToParts(new Date(utc));
-  const v = (t: string) => Number(parts.find((p) => p.type === t)?.value);
-  return Date.UTC(v("year"), v("month") - 1, v("day"), v("hour"), v("minute")) - Math.floor(utc / 60000) * 60000;
-}
-
-/** L'instant d'une heure de Paris (le jour peut déborder : 32 octobre = 1er novembre). */
-export function dateDeParis(annee: number, mois: number, jour: number, heure = 0, minute = 0): Date {
-  const naif = Date.UTC(annee, mois - 1, jour, heure, minute);
-  let t = naif - avanceParis(naif);
-  const corrige = naif - avanceParis(t);
-  if (corrige !== t) t = corrige;
-  return new Date(t);
-}
-
 /** « 13h00 », « 18h30 », « 13:30 » → heures et minutes. */
 function lireHeure(h: string): [number, number] {
   const m = h.match(/(\d{1,2})\s*[h:]\s*(\d{2})?/i);
   return m ? [Number(m[1]), Number(m[2] ?? 0)] : [13, 0];
-}
-
-/** L'année d'un « 25 oct. » : la plus proche de la date de référence. */
-function anneeProche(jour: number, mois: number, reference: Date): number {
-  const a = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric" }).format(reference));
-  return [a - 1, a, a + 1].reduce((best, y) =>
-    Math.abs(dateDeParis(y, mois, jour, 12).getTime() - reference.getTime()) <
-    Math.abs(dateDeParis(best, mois, jour, 12).getTime() - reference.getTime())
-      ? y
-      : best
-  );
 }
 
 /** L'heure de la journée : la sienne, sinon celle de la convocation du même jour (ses matchs peuvent avoir la leur). */
@@ -334,7 +320,9 @@ export function defiDuDimanche(j: number): "gagnez" | "deux-passes" | "record" {
  */
 /**
  * Les heures d'une journée qui a ses équipes : son premier coup d'envoi et
- * minuit le soir du match, à Paris ; null sans équipes. Des matchs à des
+ * sa fin (finDuJour) : la révélation (revelation.ts : 19 h dès la J5 ;
+ * minuit jusqu'à la J4, ou tant que la fin des matchs est inconnue), à
+ * Paris ; null sans équipes. Des matchs à des
  * heures différentes : tout ferme au premier coup d'envoi (« passe devant »
  * se joue sur tous les matchs ; à 15h, on connaîtrait déjà le match de 13h).
  * Les missions d'arbitre s'en servent aussi (missions-arbitre.ts).
@@ -349,10 +337,15 @@ export function heuresDeJournee(s: SaisonLue, j: number, reference: Date) {
   const [h, min] = lireHeure(heure);
   const annee = jm ? anneeProche(jm.jour, jm.mois, reference) : 2026;
   const coupEnvoi = jm ? dateDeParis(annee, jm.mois, jm.jour, h, min) : new Date(0);
-  const finDuJour = jm ? dateDeParis(annee, jm.mois, jm.jour + 1) : new Date(0);
+  const finDuJour = jm
+    ? (revelation(meta, (s as Partial<Saison>).numero ?? 0, reference) ?? dateDeParis(annee, jm.mois, jm.jour + 1))
+    : new Date(0);
   /** Le mardi à minuit : deux jours pour noter l'arbitre. */
   const finDesNotes = jm ? dateDeParis(annee, jm.mois, jm.jour + 3) : new Date(0);
-  return { meta, journee, heure, coupEnvoi, finDuJour, finDesNotes };
+  // À l'écran, l'heure que dit la frise (« à 19 h ») : finDuJour vaut minuit
+  // tant que la fin des matchs est inconnue, mais le verdict tombera plus tôt.
+  const verdict = verdictDeJournee(s as Pick<Saison, "numero" | "journees">, j, reference);
+  return { meta, journee, heure, coupEnvoi, finDuJour, finDesNotes, verdict };
 }
 
 export function missionsDeJournee(
@@ -364,7 +357,7 @@ export function missionsDeJournee(
 ): DimancheMissions | null {
   const heures = heuresDeJournee(s, j, reference);
   if (!heures) return null;
-  const { meta, journee, heure, coupEnvoi, finDuJour } = heures;
+  const { meta, journee, heure, coupEnvoi, finDuJour, verdict } = heures;
 
   const avant = pointsAvant(s, j);
   const notes = new Map<string, number>(
@@ -457,6 +450,7 @@ export function missionsDeJournee(
     heure,
     coupEnvoi,
     finDuJour,
+    verdict,
     joue: journeeJouee(s, j),
     vote: !!journee.mvpAuto,
     avant,
@@ -485,7 +479,7 @@ export const prenom = (n: string) => n.split(" ")[0];
 
 /**
  * Le verdict d'une mission, sur la feuille telle qu'elle est. Tant que la
- * journée n'est pas finie (minuit), il peut encore bouger : les titres du
+ * journée n'est pas finie (la révélation), il peut encore bouger : les titres du
  * vote comptent dans les points du jour.
  */
 export function juger(
@@ -557,7 +551,7 @@ export function juger(
 }
 
 /**
- * Le verdict une fois la journée finie. Le vote se ferme à minuit : pas voté,
+ * Le verdict une fois la journée finie (la révélation). Pas voté avant la fin du vote,
  * c'est raté. Le reste se lit sur la feuille : tant qu'il y manque une ligne,
  * la mission attend, sans prime ni perte, et se juge dès que l'admin la remplit.
  */
@@ -632,6 +626,8 @@ export interface LigneXp {
   saison: number;
   j: number;
   date: string;
+  /** Le jour ISO (AAAA-MM-JJ), quand on le connaît : il l'emporte sur `date` (saisons-passe.ts, jourDeLigne). */
+  jour?: string;
   quoi: string;
   xp: number;
   /**
@@ -646,6 +642,8 @@ export interface LigneXp {
     reussie: boolean;
     perso?: string;
     troisieme?: true;
+    /** Le titre que la mission exige (Mission.couvre, MissionPerso.couvre). */
+    couvre?: TitreCouvert;
   };
   /** Les trois missions du même dimanche réussies. */
   parfait?: boolean;
@@ -663,6 +661,19 @@ export interface LigneXp {
   bola?: true;
   /** Un badge de palier franchi (lib/sfl/defis.ts) : sa prime de défi. */
   defi?: true;
+  /**
+   * Le Flair d'une journée (pronos.ts, lignesPronos) : ses choix durs justes
+   * (SUJETS_DURS, jamais sur soi). L'XP n'en dépend pas ; les XP S, si
+   * (xp-s.ts : 2 chacun, 4 au plus par journée).
+   */
+  flairDurs?: number;
+  /**
+   * Un Flair de saison juste (pronos.ts) : son sujet, et `tot` s'il compte
+   * pour les XP S : posé ou changé pour la dernière fois avant le début de la
+   * troisième journée jouée de la saison (flairSaisonTot : il n'a plus bougé
+   * après la J2), et pas sur soi. L'XP n'en dépend pas.
+   */
+  flairSaison?: { sujet: string; tot: boolean };
 }
 
 export interface BilanXp {
@@ -757,7 +768,7 @@ export function journalXp(
         for (const mi of liste) {
           if (reponseDe(reponses, d, nom, mi)?.reponse !== "acceptee") continue;
           const v = verdictFinal(juger(mi, nom, d, sa.lue, votes), mi);
-          const mission = { creneau: mi.creneau, rang: rangDe(mi) };
+          const mission = { creneau: mi.creneau, rang: rangDe(mi), ...(mi.couvre ? { couvre: mi.couvre } : {}) };
           if (v.etat === "ratee")
             de(nom).lignes.push({
               saison: sa.numero,
@@ -835,7 +846,8 @@ export function bilanDe(
 ): BilanXp {
   const x = journal.get(joueur) ?? { lignes: [], reussies: 0 };
   const saisonPasse = saisonVoulue ?? saisonPasseA(maintenant);
-  const lignesSaison = x.lignes.filter((l) => saisonPasseDeLigne(l, maintenant) === saisonPasse);
+  const repli = derniersJours(x.lignes, maintenant);
+  const lignesSaison = x.lignes.filter((l) => saisonPasseDeLigne(l, maintenant, repli) === saisonPasse);
   // Les risques font baisser l'XP ; jamais sous zéro.
   const total = Math.max(0, x.lignes.reduce((a, l) => a + l.xp, 0));
   const saison = Math.max(0, lignesSaison.reduce((a, l) => a + l.xp, 0));
@@ -929,7 +941,11 @@ export function paliersDe(
   epreuves?: readonly Epreuve[]
 ): PaliersAtteints {
   const out: Record<string, number> = {};
-  for (const s of SAISONS_PASSE) {
+  // Une saison du Passe qui n'a pas commencé n'a aucun palier, quelles que
+  // soient les lignes (une journée saisie d'avance, une date mal lue) : la
+  // Saison Givre s'ouvre le 9/11 pour tous, et rien ne la débloque avant,
+  // ni ici ni dans ce que le serveur garde (xp-serveur.server.ts).
+  for (const s of saisonsPasseOuvertes(maintenant)) {
     const p = bilanDe(journal, joueur, maintenant, epreuves, s).palier;
     if (p > 0) out[s.id] = p;
   }

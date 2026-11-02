@@ -282,11 +282,17 @@ alter table public.profiles add column if not exists habillage text
 -- (couleurs:dz, couleurs:gb-eng) ; puis, depuis le 24/10, les signes choisis
 -- (/sceau+nom-grave, ou /-). Les skins offerts aussi (onyx, verre, pepite,
 -- palestine : finitions-offertes.ts), et ceux des recrues (recruteur,
--- filigrane, fondateur : skins-recrues.ts, 27/10). Refaite à chaque migration :
--- idempotente.
+-- filigrane, fondateur : skins-recrues.ts, 27/10). Puis, le 01/11/2026, les
+-- 9 skins et les 3 signes de la Saison Givre (bois-brule … jarl ; lisere-fer,
+-- runes, nom-runes : sans eux, porter un skin Givre était refusé ici dès le
+-- 9/11) et ceux du PACK AFRIQUE 2027, par un motif (afrique-sn, afrique-ke… :
+-- lib/sfl/pack-afrique.ts) : ajouter une nation ne demande aucune migration.
+-- La liste de l'app se dérive des matières (finitions-carte.ts, FINITIONS) ;
+-- tools/givre-check.ts vérifie chacune contre cette expression. Refaite à
+-- chaque migration : idempotente.
 alter table public.profiles drop constraint if exists profiles_habillage_check;
 alter table public.profiles add constraint profiles_habillage_check
-  check (habillage is null or habillage ~ '^(auto|-|nuit|chrome|animee|onyx|verre|pepite|palestine|recruteur|filigrane|fondateur|givre|carbone|marbre|neon|aurore|ki|meteorite|couleurs(:[a-z]{2}(-[a-z]{3})?)?)/(auto|-|argentique|gravure|marbre)(/(-|(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave)(\+(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave))*))?$');
+  check (habillage is null or habillage ~ '^(auto|-|nuit|chrome|animee|onyx|verre|pepite|palestine|recruteur|filigrane|fondateur|givre|carbone|marbre|neon|aurore|ki|meteorite|bois-brule|fer|pierre|nuit-polaire|frimas|damas|aurore-polaire|tempete|jarl|afrique-[a-z]{2}|couleurs(:[a-z]{2}(-[a-z]{3})?)?)/(auto|-|argentique|gravure|marbre)(/(-|(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave|lisere-fer|runes|nom-runes)(\+(lisere-argent|lisere-platine|sceau|puce-noire|nom-grave|lisere-fer|runes|nom-runes))*))?$');
 
 -- La ville du joueur sur la Map (lib/sfl/villes.ts, 22/10) : le nom de sa
 -- commune et son CENTRE, tel que le donne le géocodeur — jamais sa position.
@@ -507,13 +513,44 @@ as $$
 $$;
 grant execute on function public.sans_brouillons(jsonb) to authenticated;
 
+-- Les journées à la date illisible (I11, 02/11/2026) : une date que la base
+-- ne lit pas (« 08/11 ») n'a ni vote ni révélation. Seulement une journée
+-- nouvelle ou dont la date change. En plpgsql : date_de_journee est définie
+-- plus bas, résolue à l'exécution.
+create or replace function public.dates_illisibles(p_nouveau jsonb, p_ancien jsonb)
+returns text[]
+language plpgsql
+stable
+set search_path = ''
+as $$
+begin
+  -- Un banc réduit sans date_de_journee (tools/sql/brouillon-check.sql) : rien à lire.
+  if to_regprocedure('public.date_de_journee(text,timestamptz)') is null then
+    return '{}'::text[];
+  end if;
+  return coalesce((
+    select array_agg('I11 J' || (m ->> 'j') || ' ' || coalesce(m ->> 'date', '') order by m ->> 'j')
+      from jsonb_array_elements(
+             case when jsonb_typeof(p_nouveau -> 'journees') = 'array' then p_nouveau -> 'journees' else '[]'::jsonb end) m
+     where public.date_de_journee(m ->> 'date', now()) is null
+       and not exists (
+         select 1 from jsonb_array_elements(
+                  case when jsonb_typeof(p_ancien -> 'journees') = 'array' then p_ancien -> 'journees' else '[]'::jsonb end) o
+          where o ->> 'j' = m ->> 'j' and (o ->> 'date') is not distinct from (m ->> 'date'))
+  ), '{}'::text[]);
+end;
+$$;
+revoke execute on function public.dates_illisibles(jsonb, jsonb) from public, anon, authenticated;
+
 -- Une feuille saine. Ne regarde que les journées dont les lignes changent, et
 -- n'y refuse que ce qui EMPIRE : un joueur une fois de plus en double, un
 -- membre qui ne joue pas une fois de plus — la J3 se répare ligne à ligne.
 -- Renvoie les défauts (vide = saine), au format « I1 J4 Ilyes » :
 --   I0 une ligne du compte vitrine · I1 un joueur deux fois (sa ligne
 --   Xtratime à part) · I2 un membre qui ne joue pas · I6 deux journées pour
---   une même date (seulement si ça empire).
+--   une même date (seulement si ça empire) · I10 une vue figée (02/11/2026 :
+--   une vue figée ne se publie pas) · I11 une date illisible (02/11/2026,
+--   dates_illisibles).
 create or replace function public.feuille_saine(p_nouveau jsonb, p_ancien jsonb)
 returns text[]
 language sql
@@ -579,9 +616,16 @@ as $$
   i6 as (  -- une seule journée par date (n'empire jamais)
     select 'I6 ' || dn.date as d from dn left join da using (date)
      where dn.c > 1 and dn.c > coalesce(da.c, 0)
+  ),
+  i10 as (  -- une vue figée (revelation.ts) ne se publie pas : ses résultats en attente sont effacés
+    select 'I10 vue figée' as d where p_nouveau ? 'figee'
+  ),
+  i11 as (  -- une date que la base ne lit pas : ni vote ni révélation
+    select unnest(public.dates_illisibles(p_nouveau, p_ancien)) as d
   )
   select coalesce(array_agg(d order by d), '{}'::text[])
-    from (select d from i0 union all select d from i1 union all select d from i2 union all select d from i6) x;
+    from (select d from i0 union all select d from i1 union all select d from i2 union all select d from i6
+          union all select d from i10 union all select d from i11) x;
 $$;
 revoke execute on function public.feuille_saine(jsonb, jsonb) from public, anon;
 grant execute on function public.feuille_saine(jsonb, jsonb) to authenticated;
@@ -611,6 +655,8 @@ declare
   ancien   jsonb;
   nouvelle bigint;
   defauts  text[];
+  tenues   text[];
+  fins     jsonb;
 begin
   if not public.is_league_admin() then
     raise exception 'Réservé à l''admin.' using errcode = '42501';
@@ -625,6 +671,18 @@ begin
     raise exception 'Feuille refusée : %', array_to_string(defauts, ' · ')
       using errcode = 'P0001', hint = 'feuille-saine', detail = array_to_string(defauts, '|');
   end if;
+  -- La feuille de match tenue par un joueur (01/11/2026, feuilles_direct plus
+  -- bas) : l'admin ne change pas les chiffres d'un match dont la feuille est
+  -- tenue, ni, en écrasant une base plus neuve, ceux d'une feuille scellée
+  -- depuis sa dernière synchro. Même avec « Écraser ». La fonction n'existe
+  -- qu'une fois ce fichier joué jusqu'au bout : avant, rien à garder.
+  if to_regprocedure('public.feuilles_ecrasees(jsonb,jsonb,bigint,boolean)') is not null then
+    tenues := public.feuilles_ecrasees(p_data, coalesce(ancien, '{}'::jsonb), p_base, p_forcer);
+    if cardinality(tenues) > 0 then
+      raise exception 'Feuille de match tenue : %', array_to_string(tenues, ' · ')
+        using errcode = 'P0001', hint = 'feuille-tenue', detail = array_to_string(tenues, '|');
+    end if;
+  end if;
   nouvelle := greatest((extract(epoch from clock_timestamp()) * 1000)::bigint, coalesce(courante, 0) + 1);
   perform set_config('sfl.publication_saison', 'oui', true);
   insert into public.saison (id, data, version, seed, updated_at)
@@ -635,7 +693,14 @@ begin
         seed = excluded.seed,
         updated_at = excluded.updated_at;
   perform set_config('sfl.publication_saison', '', true);
-  return jsonb_build_object('ok', true, 'version', nouvelle);
+  -- La fin des matchs de chaque journée, telle que la base l'a gardée
+  -- (saison_fin_des_matchs) : l'appareil de l'admin l'adopte (sync.ts),
+  -- sinon, à version égale, il garderait la sienne toute la soirée.
+  select coalesce(jsonb_object_agg(m ->> 'j', m -> 'finDesMatchs'), '{}'::jsonb) into fins
+    from public.saison s,
+         jsonb_array_elements(case when jsonb_typeof(s.data -> 'journees') = 'array' then s.data -> 'journees' else '[]'::jsonb end) m
+   where s.id = 1 and coalesce(m ->> 'j', '') <> '';
+  return jsonb_build_object('ok', true, 'version', nouvelle, 'fins', fins);
 end;
 $$;
 
@@ -1977,6 +2042,14 @@ begin
        and (new.jour, new.heure) is distinct from (old.jour, old.heure) then
       raise exception 'match déjà joué' using errcode = 'P0001';
     end if;
+    -- Avant sa feuille, il ne se redate pas dans le passé (02/11/2026, contrôle
+    -- adverse des XP S : créé pour dans un mois, redaté en septembre, puis
+    -- saisi). La même journée de marge qu'à la naissance (match_naissance_gardee).
+    if old.saisi_le is null and (select auth.uid()) is not null
+       and (new.jour, new.heure) is distinct from (old.jour, old.heure)
+       and public.coup_d_envoi(new.jour, new.heure) < now() - interval '24 hours' then
+      raise exception 'match déjà passé' using errcode = 'P0001';
+    end if;
     if (new.score_clairs, new.score_fonces) is distinct from (old.score_clairs, old.score_fonces)
        and old.saisi_le is not null and old.saisi_le < now() - interval '24 hours' then
       raise exception 'feuille close' using errcode = 'P0001';
@@ -3199,11 +3272,12 @@ $$;
 -- de son match (contrôlé par l'app, qui connaît les équipes). Le plus voté de
 -- chaque match prend la carte ; à égalité, tous les ex æquo.
 --
--- Règle : on vote le jour du match, jusqu'à minuit heure de Paris. La base le
--- garde aussi : `jour` doit être aujourd'hui à Paris, à l'écriture comme à la
--- modification — passé minuit, plus rien ne s'écrit pour ce jour-là. (Que ce
--- jour soit bien celui de la journée, c'est l'app qui le vérifie : la date de
--- la journée vit dans le document de saison.)
+-- Règle : on vote le jour du match, jusqu'à la fin du vote (02/11/2026 :
+-- 18 h, une heure au moins après la dernière feuille, minuit au plus tard ;
+-- minuit jusqu'à la J4). La base le garde aussi : `jour` doit être aujourd'hui
+-- à Paris, et public.vote_ouvert(saison, j) vrai — le jour de la journée lu
+-- dans le document de saison, et l'heure de sa fin du vote (fin_du_vote), à
+-- l'écriture comme à la modification.
 create table if not exists public.votes_figures (
   saison     integer not null,
   j          integer not null,
@@ -3241,6 +3315,326 @@ create policy "votes_figures: la ligue lit"
   to authenticated
   using ((select public.est_membre()));
 
+-- ══ L'heure du vote, la fin des matchs (Sabri, 01/11 et 02/11/2026) ══
+-- « Il faut voter avant 18h. Comme ça, à 19h, on a tous les points de la
+-- journée qui sont entrés. » Puis : « une heure de vote minimum, jamais après
+-- minuit ». La J4 (01/11) et avant gardent minuit. Même calcul que finDuVote
+-- (src/lib/sfl/revelation.ts, REGLES_REVELATION) : changer les deux ensemble.
+-- Les corps qui lisent le document sont en plpgsql : date_de_journee,
+-- entier_sur et instant_sur sont définies plus bas, et ne sont résolues qu'à
+-- l'exécution.
+--
+-- La fin des matchs (F, JourneeMeta.finDesMatchs) suit la DERNIÈRE feuille
+-- du jour (relecture du 02/11) : posée quand la journée devient terminée le
+-- jour même ; retirée si elle est rouverte AVANT sa révélation (un match
+-- ajouté, un résultat effacé), puis reposée à la nouvelle dernière feuille —
+-- le vote dure ainsi au moins une heure après elle. Après la révélation, rien
+-- ne la déplace : une correction se voit tout de suite, la journée reste
+-- comptée. La base la garde à part (public.fins_des_matchs, que personne ne
+-- lit ni n'écrit hors d'ici) : une journée mise à la corbeille puis remise,
+-- ou une clôture annulée, retrouve la sienne.
+
+-- Le nouveau régime : dès la J5 de la saison 1 (REGLES_REVELATION.depuis).
+create or replace function public.nouveau_regime(p_saison int, p_j int)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(p_saison > 1 or (p_saison = 1 and p_j >= 5), false);
+$$;
+revoke execute on function public.nouveau_regime(int, int) from public, anon, authenticated;
+
+-- La fin du vote d'une journée du nouveau régime dont on connaît F, et sa
+-- révélation : min(minuit, max(18 h, F + 1 h)), puis min(minuit, fin du
+-- vote + 1 h). FIN_DU_VOTE, VOTE_APRES_FEUILLE_MS et REVELATION.
+create or replace function public.fin_du_vote_de(p_jour date, p_fin timestamptz)
+returns timestamptz
+language sql
+immutable
+set search_path = ''
+as $$
+  select least(((p_jour + 1)::timestamp at time zone 'Europe/Paris'),
+               greatest((p_jour + time '18:00') at time zone 'Europe/Paris', p_fin + interval '1 hour'));
+$$;
+revoke execute on function public.fin_du_vote_de(date, timestamptz) from public, anon, authenticated;
+
+create or replace function public.revelation_de(p_jour date, p_fin timestamptz)
+returns timestamptz
+language sql
+immutable
+set search_path = ''
+as $$
+  select least(((p_jour + 1)::timestamp at time zone 'Europe/Paris'), public.fin_du_vote_de(p_jour, p_fin) + interval '1 hour');
+$$;
+revoke execute on function public.revelation_de(date, timestamptz) from public, anon, authenticated;
+
+-- Le miroir de journeeTerminee (src/lib/sfl/saisie/engine.ts) : un résultat,
+-- un but ou une passe saisi, et chaque équipe présente avec son résultat.
+create or replace function public.journee_terminee(p_data jsonb, p_j int)
+returns boolean
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  l jsonb := case when jsonb_typeof(p_data -> 'entries') = 'array' then p_data -> 'entries' else '[]'::jsonb end;
+begin
+  if not exists (
+    select 1 from jsonb_array_elements(l) e
+     where e ->> 'j' = p_j::text
+       and (coalesce(e ->> 'result', '') <> ''
+            or coalesce(public.entier_sur(e ->> 'buts'), 0) > 0
+            or coalesce(public.entier_sur(e ->> 'passes'), 0) > 0)
+  ) then
+    return false;
+  end if;
+  return not exists (
+    select 1 from jsonb_array_elements(l) e
+     where e ->> 'j' = p_j::text and e ->> 'statut' = 'Présent'
+       and lower(coalesce(e ->> 'extraTime', 'false')) not in ('true', '1')
+       and coalesce(e ->> 'team', '') <> ''
+     group by e ->> 'team'
+    having not bool_or(coalesce(e ->> 'result', '') <> '')
+  );
+end;
+$$;
+revoke execute on function public.journee_terminee(jsonb, int) from public, anon, authenticated;
+
+-- La fin du vote d'une journée de la saison en cours : minuit jusqu'à la J4 ;
+-- dès la J5, min(minuit, max(18 h, fin des matchs + 1 h)), et minuit tant que
+-- la fin des matchs est inconnue. null : pas de journée publiée et datée.
+-- `p_ref` fixe l'année du libellé (« 8 nov. ») ; fin_du_vote prend now().
+create or replace function public.fin_du_vote_a(p_saison int, p_j int, p_ref timestamptz)
+returns timestamptz
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  doc    jsonb;
+  meta   jsonb;
+  jour   date;
+  minuit timestamptz;
+  fin    timestamptz;
+begin
+  select s.data into doc from public.saison s where s.id = 1;
+  if doc is null or coalesce(public.entier_sur(doc ->> 'numero'), 0) <> p_saison then
+    return null;
+  end if;
+  select m into meta
+    from jsonb_array_elements(case when jsonb_typeof(doc -> 'journees') = 'array' then doc -> 'journees' else '[]'::jsonb end) m
+   where m ->> 'j' = p_j::text
+   limit 1;
+  if meta is null or public.est_brouillon(meta) then
+    return null;
+  end if;
+  jour := public.date_de_journee(meta ->> 'date', p_ref);
+  if jour is null then
+    return null;
+  end if;
+  minuit := (jour + 1)::timestamp at time zone 'Europe/Paris';
+  if not public.nouveau_regime(p_saison, p_j) then
+    return minuit;
+  end if;
+  fin := public.instant_sur(meta ->> 'finDesMatchs');
+  if fin is null then
+    return minuit;                                                    -- pas finie : la butée
+  end if;
+  return public.fin_du_vote_de(jour, fin);
+end;
+$$;
+revoke execute on function public.fin_du_vote_a(int, int, timestamptz) from public, anon, authenticated;
+
+-- Pour la ligue seulement (relecture du 02/11) : un compte qui n'en est pas
+-- (en attente, refusé) ne lit pas plus l'heure du vote que la saison. Sans
+-- session (le serveur, l'éditeur SQL), la réponse est donnée.
+create or replace function public.fin_du_vote(p_saison int, p_j int)
+returns timestamptz
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when (select auth.uid()) is null or (select public.est_membre())
+              then public.fin_du_vote_a(p_saison, p_j, now()) end;
+$$;
+revoke execute on function public.fin_du_vote(int, int) from public, anon;
+grant execute on function public.fin_du_vote(int, int) to authenticated;
+
+-- Le vote d'une journée est-il ouvert à cet instant ? Le jour même (Paris),
+-- avant la fin du vote. vote_ouvert : maintenant (les politiques de votes_figures).
+create or replace function public.vote_ouvert_a(p_saison int, p_j int, p_maintenant timestamptz)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  fin timestamptz := public.fin_du_vote_a(p_saison, p_j, p_maintenant);
+begin
+  if fin is null or p_maintenant >= fin then
+    return false;
+  end if;
+  return (p_maintenant at time zone 'Europe/Paris')::date = ((fin - interval '1 microsecond') at time zone 'Europe/Paris')::date;
+end;
+$$;
+revoke execute on function public.vote_ouvert_a(int, int, timestamptz) from public, anon, authenticated;
+
+create or replace function public.vote_ouvert(p_saison int, p_j int)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select ((select auth.uid()) is null or (select public.est_membre()))
+     and public.vote_ouvert_a(p_saison, p_j, now());
+$$;
+revoke execute on function public.vote_ouvert(int, int) from public, anon;
+grant execute on function public.vote_ouvert(int, int) to authenticated;
+
+-- La fin des matchs que la base a posée, une ligne par journée. Réservée au
+-- déclencheur : RLS sans politique, aucun droit pour les joueurs.
+create table if not exists public.fins_des_matchs (
+  saison  int         not null,
+  j       int         not null,
+  jour    date        not null,
+  fin     timestamptz not null,
+  pose_le timestamptz not null default now(),
+  primary key (saison, j)
+);
+alter table public.fins_des_matchs enable row level security;
+revoke all on public.fins_des_matchs from public, anon, authenticated;
+
+-- Le tampon de la fin des matchs (JourneeMeta.finDesMatchs), journée par
+-- journée du nouveau régime (la J4 et avant : rien ne change) :
+--   · gardé (public.fins_des_matchs) pour la même journée, à la même date :
+--     la valeur gardée est réécrite dans le document, au format de l'app
+--     (« 2026-11-08T14:10:00.000Z »), quoi que l'écriture ait porté ;
+--   · rouverte avant sa révélation (plus terminée) : retiré, et oublié ;
+--     une feuille rouverte puis scellée de nouveau avant la révélation : F
+--     prend l'heure de ce sceau (c'est la dernière feuille) ;
+--   · terminée le jour même, sans tampon : posé. Une valeur venue de l'app
+--     est gardée si elle est à 5 min de l'heure du serveur ; sinon c'est
+--     l'heure du serveur ;
+--   · sinon : aucun (une valeur sans fondement est retirée).
+-- Joue pour publier_saison (l'admin : insert … on conflict, donc deux fois ;
+-- le premier passage pose, le second relit) comme pour sceller_feuille (un
+-- joueur scelle la feuille de son match).
+create or replace function public.saison_fin_des_matchs()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  js         jsonb := new.data -> 'journees';
+  numero     int := coalesce(public.entier_sur(new.data ->> 'numero'), 0);
+  m          jsonb;
+  i          int;
+  nj         int;
+  jour       date;
+  garde_jour date;
+  garde_fin  timestamptz;
+  tampon     timestamptz;
+  propose    timestamptz;
+  ecrit      text;
+  change     boolean := false;
+  aujourdhui date := (now() at time zone 'Europe/Paris')::date;
+begin
+  if jsonb_typeof(js) is distinct from 'array' then
+    return new;
+  end if;
+  for i in 0 .. jsonb_array_length(js) - 1 loop
+    m := js -> i;
+    nj := public.entier_sur(m ->> 'j');
+    continue when nj is null or not public.nouveau_regime(numero, nj);
+    tampon := null;
+    if not public.est_brouillon(m) then
+      jour := public.date_de_journee(m ->> 'date', now());
+      garde_jour := null;
+      garde_fin := null;
+      select f.jour, f.fin into garde_jour, garde_fin from public.fins_des_matchs f where f.saison = numero and f.j = nj;
+      if garde_fin is not null and garde_jour is not distinct from jour then
+        if now() < public.revelation_de(jour, garde_fin) and not public.journee_terminee(new.data, nj) then
+          delete from public.fins_des_matchs f where f.saison = numero and f.j = nj;   -- rouverte avant la révélation
+        else
+          tampon := garde_fin;
+          -- Une feuille rouverte (feuille_admin) puis scellée de nouveau avant la
+          -- révélation : c'est elle, la dernière feuille, et F la suit
+          -- (sceller_feuille le dit par sfl.feuille_scellee). Une feuille scellée
+          -- trop tôt (0-0 au coup d'envoi) ne fixe plus la fin du vote.
+          if coalesce(current_setting('sfl.feuille_scellee', true), '') = nj::text
+             and now() > garde_fin and now() < public.revelation_de(jour, garde_fin) then
+            update public.fins_des_matchs f set fin = now(), pose_le = now() where f.saison = numero and f.j = nj;
+            tampon := now();
+          end if;
+        end if;
+      end if;
+      if tampon is null and jour = aujourdhui and public.journee_terminee(new.data, nj) then
+        propose := public.instant_sur(m ->> 'finDesMatchs');
+        tampon := case when propose is not null and abs(extract(epoch from propose - now())) <= 300 then propose else now() end;
+        insert into public.fins_des_matchs as f (saison, j, jour, fin)
+        values (numero, nj, jour, tampon)
+        on conflict (saison, j) do update
+          set jour = excluded.jour, fin = excluded.fin, pose_le = now();
+      end if;
+    end if;
+    ecrit := case when tampon is not null then to_char(tampon at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') end;
+    if ecrit is not null and (m ->> 'finDesMatchs') is distinct from ecrit then
+      js := jsonb_set(js, array[i::text, 'finDesMatchs'], to_jsonb(ecrit));
+      change := true;
+    elsif ecrit is null and m ? 'finDesMatchs' then
+      js := jsonb_set(js, array[i::text], m - 'finDesMatchs');
+      change := true;
+    end if;
+  end loop;
+  if change then
+    new.data := jsonb_set(new.data, '{journees}', js);
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.saison_fin_des_matchs() from public, anon, authenticated;
+drop trigger if exists saison_fin_des_matchs on public.saison;
+create trigger saison_fin_des_matchs before insert or update of data on public.saison
+  for each row execute function public.saison_fin_des_matchs();
+
+-- Une base où un tampon a déjà été posé dans le document (une version
+-- d'avant cette table, ou l'app seule) le retrouve ici. Rien n'est écrit dans
+-- public.saison ; sans document, rien.
+do $$
+declare
+  doc jsonb;
+  m   jsonb;
+  n   int;
+  nj  int;
+  f   timestamptz;
+begin
+  select s.data into doc from public.saison s where s.id = 1;
+  if doc is null or jsonb_typeof(doc -> 'journees') is distinct from 'array' then
+    return;
+  end if;
+  n := case when coalesce(doc ->> 'numero', '') ~ '^\s*\d{1,9}\s*$' then btrim(doc ->> 'numero')::int else 0 end;
+  for m in select x from jsonb_array_elements(doc -> 'journees') x loop
+    continue when coalesce(m ->> 'finDesMatchs', '') !~ '^\d{4}-\d{2}-\d{2}' or coalesce(m ->> 'j', '') !~ '^\s*\d{1,9}\s*$';
+    nj := btrim(m ->> 'j')::int;
+    continue when not public.nouveau_regime(n, nj);
+    begin
+      f := (m ->> 'finDesMatchs')::timestamptz;
+    exception when others then
+      continue;
+    end;
+    insert into public.fins_des_matchs (saison, j, jour, fin)
+    values (n, nj, (f at time zone 'Europe/Paris')::date, f)
+    on conflict (saison, j) do nothing;
+  end loop;
+end;
+$$;
+
 drop policy if exists "votes_figures: je vote aujourd'hui" on public.votes_figures;
 create policy "votes_figures: je vote aujourd'hui"
   on public.votes_figures for insert
@@ -3250,17 +3644,23 @@ create policy "votes_figures: je vote aujourd'hui"
     and votant_id = (select auth.uid())
     and votant = (select public.mon_nom())
     and jour = (now() at time zone 'Europe/Paris')::date
+    and public.vote_ouvert(saison, j)
   );
 
 drop policy if exists "votes_figures: je change d'avis aujourd'hui" on public.votes_figures;
 create policy "votes_figures: je change d'avis aujourd'hui"
   on public.votes_figures for update
   to authenticated
-  using (votant_id = (select auth.uid()) and jour = (now() at time zone 'Europe/Paris')::date)
+  using (
+    votant_id = (select auth.uid())
+    and jour = (now() at time zone 'Europe/Paris')::date
+    and public.vote_ouvert(saison, j)
+  )
   with check (
     votant_id = (select auth.uid())
     and votant = (select public.mon_nom())
     and jour = (now() at time zone 'Europe/Paris')::date
+    and public.vote_ouvert(saison, j)
   );
 
 grant select, insert, update on public.votes_figures to authenticated;
@@ -5871,6 +6271,14 @@ begin
   -- Un match né après le 28/10/2026 passe par la confirmation des joueurs.
   new.feuille_version := 0;
   new.confirmation_requise := true;
+  -- Ni dans le passé (02/11/2026, contrôle adverse des XP S) : l'app ne
+  -- propose que des dates à venir (ouvrir-match.tsx) ; des comptes d'accord
+  -- montaient en novembre des matchs datés de juillet, chacun dans une
+  -- semaine passée. Une journée de marge : un match du jour ouvert en
+  -- retard, l'heure d'un téléphone.
+  if public.coup_d_envoi(new.jour, new.heure) < now() - interval '24 hours' then
+    raise exception 'match déjà passé' using errcode = 'P0001';
+  end if;
   return new;
 end;
 $$;
@@ -6361,6 +6769,10 @@ as $$
            -- Un match saisi avant le 28/10/2026 compte sans calcul.
            'etat', case when m.confirmation_requise then public.etat_feuille(m.id) else 'compte' end,
            'requise', m.confirmation_requise,
+           -- La première saisie de la feuille, à l'heure du serveur (02/11/2026) : les
+           -- XP S d'un match Bola se comptent à sa semaine (lib/sfl/xp-s.ts), pas à
+           -- celle du jour déclaré, que l'organisateur choisit.
+           'saisiLe', m.saisi_le,
            'joueurs', (
              select coalesce(jsonb_agg(jsonb_build_object(
                       'id', j.player_id, 'name', p.name, 'equipe', j.equipe, 'buts', j.buts, 'passes', j.passes,
@@ -6530,6 +6942,7 @@ as $$
 declare
   v_nom text := public.mon_nom();
   v_le  timestamptz := now();
+  v_num integer;
 begin
   if not public.est_membre() or v_nom is null then
     raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
@@ -6537,6 +6950,12 @@ begin
   if p_j < 0 or p_sujet !~ '^((match|ecart|duel|mvp|buteur|passeur):[0-9]{1,2}|buteur|pepite|passeur)$'
      or (p_j = 0 and p_sujet not in ('pepite', 'buteur', 'passeur')) then
     raise exception 'Prono inconnu.' using errcode = '22023';
+  end if;
+  -- La saison en cours seulement (02/11/2026, contrôle adverse) : on posait
+  -- encore le Flair de saison d'une saison close, ses vainqueurs connus.
+  select coalesce((s.data ->> 'numero')::integer, 0) into v_num from public.saison s where s.id = 1;
+  if found and p_saison is distinct from v_num then
+    raise exception 'Saison close.' using errcode = '22023';
   end if;
   if nullif(btrim(p_choix), '') is null then
     delete from public.pronos where saison = p_saison and j = p_j and sujet = p_sujet and joueur = v_nom;
@@ -7439,3 +7858,986 @@ exception
   when others then raise warning 'affiches : bucket non créé (%)', sqlerrm;
 end;
 $$;
+
+-- ─────────── La feuille de match tenue par un joueur (01/11/2026) ───────────
+-- Sabri, 01/11 (jour de la J4) : « chaque joueur de l'application présent
+-- dans un match [peut] prendre les stats lui-même de son match et uniquement
+-- de son match […] à partir du moment où il y en a un qui a pris les stats,
+-- on prend avec son téléphone », pour que les quatre matchs du dimanche se
+-- prennent en direct et que le soir même on vote et on voie les classements.
+--
+-- Une feuille par match (saison, journée, Noirs N, Blancs N) d'une journée
+-- SFL publiée, le jour même. Le premier joueur du match qui la prend la
+-- tient : le verrou, c'est la clé primaire (deux téléphones en même temps,
+-- une seule insertion passe, l'autre lit le nom de celui qui l'a). Il compte
+-- buts, passes, arrêts, interceptions et buts contre son camp des deux
+-- équipes ; toute la ligue suit en lecture, en temps réel. « Fin du match »
+-- la scelle : le résultat et les chiffres entrent dans la saison tout de
+-- suite (sceller_feuille), en n'écrivant que les lignes de ce match, par
+-- la même voie que les publications de l'admin (version, historique,
+-- signal). Il peut passer la main à un joueur du match ; l'admin la reprend,
+-- la libère ou la rouvre. Ni la feuille ni une publication de l'admin
+-- n'écrasent l'autre (feuilles_ecrasees, appelée par publier_saison).
+-- La même règle côté app : lib/sfl/feuille-direct.ts. Mode Bola : rien.
+create table if not exists public.feuilles_direct (
+  saison      int  not null,
+  j           int  not null,
+  noirs       text not null,
+  blancs      text not null,
+  -- Celui qui tient la feuille ; null : libérée par l'admin, à reprendre.
+  preneur     uuid references public.profiles(id) on delete set null,
+  preneur_nom text,
+  pris_le     timestamptz,
+  -- Le coup d'envoi : la première prise (le chrono part de là).
+  debut       timestamptz not null default now(),
+  -- Scellée : la saison porte ses chiffres depuis la version `version`.
+  fin         timestamptz,
+  scelle_par  uuid references public.profiles(id) on delete set null,
+  version     bigint,
+  -- { « Ilyes » : { buts, passes, arrets, interceptions, csc } } ; absent = 0.
+  compteurs   jsonb not null default '{}'::jsonb,
+  -- Les gestes, dans l'ordre : { le, gestes : [{ joueur, quoi, d }] }.
+  journal     jsonb not null default '[]'::jsonb,
+  maj_le      timestamptz not null default now(),
+  primary key (saison, j, noirs, blancs)
+);
+create index if not exists feuilles_direct_preneur on public.feuilles_direct (preneur);
+create index if not exists feuilles_direct_scelle_par on public.feuilles_direct (scelle_par);
+
+alter table public.feuilles_direct enable row level security;
+drop policy if exists "feuilles_direct: lecture ligue" on public.feuilles_direct;
+create policy "feuilles_direct: lecture ligue"
+  on public.feuilles_direct for select
+  to authenticated
+  using ((select public.est_membre()));
+-- Personne n'écrit la table : seulement les fonctions ci-dessous.
+revoke insert, update, delete, truncate on public.feuilles_direct from anon, authenticated;
+grant select on public.feuilles_direct to authenticated;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.feuilles_direct;
+exception
+  when duplicate_object then null;
+  when undefined_object then null;
+end;
+$$;
+
+-- Les lignes d'un match dans un document de saison : ses deux camps, les
+-- présents et les Xtratime, jamais une ligne vitrine (comme le moteur,
+-- saisie/engine.ts). `i` : la place de la ligne dans entries (1, 2…).
+create or replace function public.lignes_du_match(p_data jsonb, p_j int, p_noirs text, p_blancs text)
+returns table (i bigint, e jsonb, joueur text, camp text, extra boolean)
+language sql
+immutable
+set search_path = ''
+as $$
+  select t.i, t.e, t.e ->> 'player', t.e ->> 'team',
+         lower(coalesce(t.e ->> 'extraTime', 'false')) in ('true', '1')
+    from jsonb_array_elements(
+           case when jsonb_typeof(p_data -> 'entries') = 'array' then p_data -> 'entries' else '[]'::jsonb end
+         ) with ordinality t(e, i)
+   where t.e ->> 'j' = p_j::text
+     and t.e ->> 'team' in (p_noirs, p_blancs)
+     and (t.e ->> 'statut' = 'Présent' or lower(coalesce(t.e ->> 'extraTime', 'false')) in ('true', '1'))
+     and lower(coalesce(t.e ->> 'vitrine', 'false')) not in ('true', '1');
+$$;
+revoke execute on function public.lignes_du_match(jsonb, int, text, text) from public, anon, authenticated;
+
+-- Ce que la feuille d'un match écrit, ligne à ligne (buts, passes, arrêts,
+-- interceptions, résultat, buts d'équipe) : de quoi voir si une publication
+-- y touche. Une ligne encore à zéro n'y est pas, si bien qu'un remplaçant
+-- ajouté en plein match ne change rien.
+create or replace function public.chiffres_du_match(p_data jsonb, p_j int, p_noirs text, p_blancs text)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(x order by x::text), '[]'::jsonb)
+    from (
+      select jsonb_build_array(
+               l.joueur, l.camp,
+               coalesce(public.entier_sur(l.e ->> 'buts'), 0),
+               coalesce(public.entier_sur(l.e ->> 'passes'), 0),
+               coalesce(public.entier_sur(l.e ->> 'arrets'), 0),
+               coalesce(public.entier_sur(l.e ->> 'interceptions'), 0),
+               l.e ->> 'result',
+               coalesce(public.entier_sur(l.e ->> 'teamScoreBonus'), 0)
+             ) as x
+        from public.lignes_du_match(p_data, p_j, p_noirs, p_blancs) l
+    ) y
+   where (x ->> 2)::int <> 0 or (x ->> 3)::int <> 0 or (x ->> 4)::int <> 0 or (x ->> 5)::int <> 0
+      or x ->> 6 is not null or (x ->> 7)::int <> 0;
+$$;
+revoke execute on function public.chiffres_du_match(jsonb, int, text, text) from public, anon, authenticated;
+
+-- Les feuilles qu'une publication écraserait : celles qu'un joueur tient
+-- encore, et, quand l'admin écrase une base plus neuve que la sienne, celles
+-- scellées depuis (leur version est au-delà de sa base). Vide : rien à
+-- garder. Format « J4 · Noirs 1 – Blancs 1 · Ilyes ».
+create or replace function public.feuilles_ecrasees(p_nouveau jsonb, p_ancien jsonb, p_base bigint, p_forcer boolean)
+returns text[]
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(array_agg(format('J%s · %s – %s · %s', f.j, f.noirs, f.blancs, coalesce(f.preneur_nom, 'libre'))
+                            order by f.j, f.noirs), '{}'::text[])
+    from public.feuilles_direct f
+   where (select public.est_membre())
+     and f.saison = coalesce(public.entier_sur(p_ancien ->> 'numero'), 0)
+     and (f.fin is null or (coalesce(p_forcer, false) and f.version > coalesce(p_base, 0)))
+     and public.chiffres_du_match(p_nouveau, f.j, f.noirs, f.blancs)
+         is distinct from public.chiffres_du_match(p_ancien, f.j, f.noirs, f.blancs);
+$$;
+revoke execute on function public.feuilles_ecrasees(jsonb, jsonb, bigint, boolean) from public, anon;
+-- publier_saison est security invoker : l'admin l'appelle avec son rôle.
+grant execute on function public.feuilles_ecrasees(jsonb, jsonb, bigint, boolean) to authenticated;
+
+-- Les compteurs de départ d'une feuille : ce que la saison porte déjà pour
+-- ce match (l'admin a pu compter avant qu'un joueur ne prenne la feuille).
+create or replace function public.compteurs_du_document(p_data jsonb, p_j int, p_noirs text, p_blancs text)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(jsonb_object_agg(x.joueur, x.c), '{}'::jsonb)
+    from (
+      select l.joueur, jsonb_strip_nulls(jsonb_build_object(
+               'buts', nullif(coalesce(public.entier_sur(l.e ->> 'buts'), 0), 0),
+               'passes', nullif(coalesce(public.entier_sur(l.e ->> 'passes'), 0), 0),
+               'arrets', nullif(coalesce(public.entier_sur(l.e ->> 'arrets'), 0), 0),
+               'interceptions', nullif(coalesce(public.entier_sur(l.e ->> 'interceptions'), 0), 0))) as c
+        from public.lignes_du_match(p_data, p_j, p_noirs, p_blancs) l
+    ) x
+   where x.c <> '{}'::jsonb;
+$$;
+revoke execute on function public.compteurs_du_document(jsonb, int, text, text) from public, anon, authenticated;
+
+-- La feuille d'un match peut-elle encore s'écrire, quel que soit le jour ?
+-- null : oui ; sinon le motif.
+--   journee · la journée n'existe pas ;  brouillon · pas (ou plus) publiée ;
+--   match · ces deux camps ne forment pas un match de la journée.
+-- Une journée remise en brouillon (avant son coup d'envoi, brouillon.ts) gèle
+-- sa feuille : rien de la composition préparée ne doit passer par une
+-- feuille que toute la ligue lit (relecture du 01/11).
+create or replace function public.feuille_hors_jeu(p_data jsonb, p_j int, p_noirs text, p_blancs text)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  meta jsonb;
+  declares jsonb;
+begin
+  select m into meta
+    from jsonb_array_elements(
+           case when jsonb_typeof(p_data -> 'journees') = 'array' then p_data -> 'journees' else '[]'::jsonb end) m
+   where m ->> 'j' = p_j::text
+   limit 1;
+  if meta is null then
+    return 'journee';
+  end if;
+  if public.est_brouillon(meta) then
+    return 'brouillon';
+  end if;
+  declares := case when jsonb_typeof(meta -> 'matchsDuJour') = 'array' then meta -> 'matchsDuJour' else '[]'::jsonb end;
+  if jsonb_array_length(declares) > 0 then
+    if not exists (
+      select 1 from jsonb_array_elements(declares) m
+       where m -> 'equipes' ->> 0 = p_noirs and m -> 'equipes' ->> 1 = p_blancs
+    ) then
+      return 'match';
+    end if;
+  elsif not (p_noirs ~ '^Noirs \d+$' and p_blancs = 'Blancs ' || substring(p_noirs from '\d+$')) then
+    return 'match';
+  end if;
+  return null;
+end;
+$$;
+revoke execute on function public.feuille_hors_jeu(jsonb, int, text, text) from public, anon, authenticated;
+
+-- `p_nom` joue-t-il ce match (une ligne de présent ou d'Xtratime) ?
+create or replace function public.joue_le_match(p_data jsonb, p_j int, p_noirs text, p_blancs text, p_nom text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select p_nom is not null and exists (
+    select 1 from public.lignes_du_match(p_data, p_j, p_noirs, p_blancs) l
+     where lower(btrim(l.joueur)) = lower(btrim(p_nom))
+  );
+$$;
+revoke execute on function public.joue_le_match(jsonb, int, text, text, text) from public, anon, authenticated;
+
+-- Peut-on prendre la feuille de ce match ? null : oui ; sinon le motif.
+--   journee, brouillon, match · feuille_hors_jeu ;
+--   pas-du-jour · elle ne se joue pas aujourd'hui (heure de Paris ; sa nuit,
+--     jusqu'à 1 h, compte encore) ;
+--   pas-ton-match · `p_nom` ne joue pas ce match ;
+--   terminee · le match a déjà son résultat.
+-- « pas-ton-match » passe AVANT « terminee » : prendre_feuille laisse
+-- reprendre une feuille rouverte (match terminé) à un joueur du match, et à
+-- lui seul (relecture du 01/11 : rouverte puis libérée, n'importe quel
+-- membre la prenait).
+create or replace function public.droit_feuille(p_data jsonb, p_j int, p_noirs text, p_blancs text, p_nom text, p_maintenant timestamptz)
+returns text
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  meta jsonb;
+  jour date;
+  refus text;
+begin
+  refus := public.feuille_hors_jeu(p_data, p_j, p_noirs, p_blancs);
+  if refus is not null then
+    return refus;
+  end if;
+  select m into meta
+    from jsonb_array_elements(p_data -> 'journees') m
+   where m ->> 'j' = p_j::text
+   limit 1;
+  -- Le jour même, ou sa nuit jusqu'à 1 h : un match tardif qui déborde se
+  -- prend encore (02/11/2026, NUIT_MS de convocation-temps.ts).
+  jour := public.date_de_journee(meta ->> 'date', p_maintenant);
+  if jour is distinct from (p_maintenant at time zone 'Europe/Paris')::date
+     and jour is distinct from ((p_maintenant - interval '1 hour') at time zone 'Europe/Paris')::date then
+    return 'pas-du-jour';
+  end if;
+  if not public.joue_le_match(p_data, p_j, p_noirs, p_blancs, p_nom) then
+    return 'pas-ton-match';
+  end if;
+  if exists (
+    select 1 from public.lignes_du_match(p_data, p_j, p_noirs, p_blancs) l
+     where not l.extra and coalesce(l.e ->> 'result', '') <> ''
+  ) then
+    return 'terminee';
+  end if;
+  return null;
+end;
+$$;
+revoke execute on function public.droit_feuille(jsonb, int, text, text, text, timestamptz) from public, anon, authenticated;
+
+-- Le document de saison avec les chiffres d'une feuille posés sur les lignes
+-- de ce match, et seulement elles (la même règle que appliquerFeuille,
+-- lib/sfl/feuille-direct.ts) :
+--   · buts et passes sur chaque ligne du match ; arrêts et interceptions sur
+--     les lignes des présents (une ligne Xtratime n'en compte pas) ;
+--   · le score de chaque camp : ses buts, ses buts d'équipe (teamScoreBonus)
+--     et les buts contre son camp de l'adversaire, que porte la première
+--     ligne de joueur du camp qui en profite ;
+--   · le résultat (Victoire, Nul, Défaite) sur chaque présent des deux
+--     camps, comme « Fin du match » dans l'admin (finDuMatch) ;
+--   · le MVP, sur une journée au MVP calculé : la meilleure note de match
+--     (saisie/mvp.ts, noteDeMatch), tous les ex æquo, personne à zéro.
+create or replace function public.appliquer_feuille(p_data jsonb, p_j int, p_noirs text, p_blancs text, p_compteurs jsonb)
+returns jsonb
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  entrees jsonb := case when jsonb_typeof(p_data -> 'entries') = 'array' then p_data -> 'entries' else '[]'::jsonb end;
+  comptes jsonb := case when jsonb_typeof(p_compteurs) = 'object' then p_compteurs else '{}'::jsonb end;
+  meta    jsonb;
+  auto    boolean;
+  l       record;
+  c       jsonb;
+  ligne   jsonb;
+  sn int := 0;
+  sb int := 0;
+  csc_n int := 0;
+  csc_b int := 0;
+  rn text;
+  rb text;
+  premier_n bigint;
+  premier_b bigint;
+  neuves  jsonb := '{}'::jsonb;
+  note    int;
+  note_max int := 0;
+  notes   jsonb := '{}'::jsonb;
+  k       text;
+  sortie  jsonb;
+begin
+  select m into meta
+    from jsonb_array_elements(
+           case when jsonb_typeof(p_data -> 'journees') = 'array' then p_data -> 'journees' else '[]'::jsonb end) m
+   where m ->> 'j' = p_j::text
+   limit 1;
+  auto := lower(coalesce(meta ->> 'mvpAuto', 'false')) in ('true', '1');
+
+  -- 1 · Les scores.
+  for l in select * from public.lignes_du_match(p_data, p_j, p_noirs, p_blancs) loop
+    c := coalesce(comptes -> l.joueur, '{}'::jsonb);
+    if l.camp = p_noirs then
+      sn := sn + coalesce(public.entier_sur(c ->> 'buts'), 0) + coalesce(public.entier_sur(l.e ->> 'teamScoreBonus'), 0);
+      csc_n := csc_n + coalesce(public.entier_sur(c ->> 'csc'), 0);
+      if not l.extra and premier_n is null then premier_n := l.i; end if;
+    else
+      sb := sb + coalesce(public.entier_sur(c ->> 'buts'), 0) + coalesce(public.entier_sur(l.e ->> 'teamScoreBonus'), 0);
+      csc_b := csc_b + coalesce(public.entier_sur(c ->> 'csc'), 0);
+      if not l.extra and premier_b is null then premier_b := l.i; end if;
+    end if;
+  end loop;
+  sn := sn + csc_b;
+  sb := sb + csc_n;
+  rn := case when sn > sb then 'Victoire' when sn < sb then 'Défaite' else 'Nul' end;
+  rb := case rn when 'Victoire' then 'Défaite' when 'Défaite' then 'Victoire' else 'Nul' end;
+
+  -- 2 · Les lignes du match, réécrites.
+  for l in select * from public.lignes_du_match(p_data, p_j, p_noirs, p_blancs) loop
+    c := coalesce(comptes -> l.joueur, '{}'::jsonb);
+    ligne := l.e || jsonb_build_object(
+      'buts', greatest(coalesce(public.entier_sur(c ->> 'buts'), 0), 0),
+      'passes', greatest(coalesce(public.entier_sur(c ->> 'passes'), 0), 0));
+    if not l.extra then
+      ligne := ligne || jsonb_build_object(
+        'arrets', greatest(coalesce(public.entier_sur(c ->> 'arrets'), 0), 0),
+        'interceptions', greatest(coalesce(public.entier_sur(c ->> 'interceptions'), 0), 0),
+        'result', case when l.camp = p_noirs then rn else rb end);
+    end if;
+    if l.i = premier_n and csc_b > 0 then
+      ligne := ligne || jsonb_build_object('teamScoreBonus', coalesce(public.entier_sur(l.e ->> 'teamScoreBonus'), 0) + csc_b);
+    elsif l.i = premier_b and csc_n > 0 then
+      ligne := ligne || jsonb_build_object('teamScoreBonus', coalesce(public.entier_sur(l.e ->> 'teamScoreBonus'), 0) + csc_n);
+    end if;
+    neuves := neuves || jsonb_build_object(l.i::text, ligne);
+  end loop;
+
+  -- 3 · Le MVP du match, sur une journée au MVP calculé.
+  if auto then
+    for k, ligne in select * from jsonb_each(neuves) loop
+      if lower(coalesce(ligne ->> 'extraTime', 'false')) in ('true', '1') or btrim(coalesce(ligne ->> 'player', '')) ~* '^X\d+$' then
+        note := 0;
+      else
+        note := coalesce(public.entier_sur(ligne ->> 'buts'), 0) + coalesce(public.entier_sur(ligne ->> 'passes'), 0)
+              + case when lower(coalesce(ligne ->> 'cleanSheet', 'false')) in ('true', '1') then 3 else 0 end
+              + coalesce(public.entier_sur(ligne ->> 'arrets'), 0) / 2
+              + coalesce(public.entier_sur(ligne ->> 'interceptions'), 0) / 2
+              + case ligne ->> 'result'
+                  when 'Victoire' then case when lower(coalesce(ligne ->> 'sflTime', 'false')) in ('true', '1') then 3 else 2 end
+                  when 'Nul' then 1
+                  else 0
+                end;
+      end if;
+      notes := notes || jsonb_build_object(k, note);
+      note_max := greatest(note_max, note);
+    end loop;
+    for k, ligne in select * from jsonb_each(neuves) loop
+      neuves := neuves || jsonb_build_object(k, ligne || jsonb_build_object('mvp', note_max > 0 and (notes ->> k)::int = note_max));
+    end loop;
+  end if;
+
+  select coalesce(jsonb_agg(coalesce(neuves -> t.i::text, t.e) order by t.i), '[]'::jsonb)
+    into sortie
+    from jsonb_array_elements(entrees) with ordinality t(e, i);
+  return sortie;
+end;
+$$;
+revoke execute on function public.appliquer_feuille(jsonb, int, text, text, jsonb) from public, anon, authenticated;
+
+-- Prendre la feuille de son match. Le premier qui la prend la tient ; un
+-- second appel au même instant attend le premier, puis lit son nom. Une
+-- feuille libérée par l'admin se reprend ; la sienne se reprend sans rien
+-- changer. Renvoie { ok, feuille, refus }.
+create or replace function public.prendre_feuille(p_j int, p_noirs text, p_blancs text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  moi   uuid := auth.uid();
+  nom   text;
+  doc   jsonb;
+  n     int;
+  refus text;
+  existe boolean;
+  f     public.feuilles_direct;
+begin
+  select p.name into nom from public.profiles p where p.id = moi and p.valide;
+  if nom is null then
+    raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
+  end if;
+  -- La saison, verrouillée en partage : une publication de l'admin en cours
+  -- (publier_saison la tient « for update ») passe d'abord, et la prise lit
+  -- ce qu'elle a écrit — la fin du match qu'il vient de poser refuse la
+  -- prise, au lieu d'ouvrir une feuille qui l'écraserait au sceau. Deux
+  -- prises au même instant ne s'attendent pas pour autant.
+  select s.data into doc from public.saison s where s.id = 1 for share;
+  n := coalesce(public.entier_sur(doc ->> 'numero'), 0);
+  -- Une feuille déjà là : la sienne, une libérée, ou celle d'un autre.
+  select * into f from public.feuilles_direct d
+   where d.saison = n and d.j = p_j and d.noirs = p_noirs and d.blancs = p_blancs;
+  existe := found;
+  if existe and f.preneur = moi and f.fin is null then
+    return jsonb_build_object('ok', true, 'feuille', to_jsonb(f));
+  end if;
+  refus := public.droit_feuille(doc, p_j, p_noirs, p_blancs, nom, now());
+  -- Une feuille rouverte par l'admin se reprend, même si la saison porte
+  -- déjà le résultat du match — par un joueur du match seulement :
+  -- droit_feuille ne répond « terminee » qu'une fois « pas-ton-match » passé.
+  if refus is not null and not (existe and f.fin is null and refus = 'terminee') then
+    return jsonb_build_object('ok', false, 'refus', refus, 'feuille', case when existe then to_jsonb(f) end);
+  end if;
+  insert into public.feuilles_direct (saison, j, noirs, blancs, preneur, preneur_nom, pris_le, compteurs)
+  values (n, p_j, p_noirs, p_blancs, moi, nom, now(), public.compteurs_du_document(doc, p_j, p_noirs, p_blancs))
+  on conflict (saison, j, noirs, blancs) do nothing
+  returning * into f;
+  if found then
+    return jsonb_build_object('ok', true, 'feuille', to_jsonb(f));
+  end if;
+  update public.feuilles_direct d
+     set preneur = moi, preneur_nom = nom, pris_le = now(), maj_le = now()
+   where d.saison = n and d.j = p_j and d.noirs = p_noirs and d.blancs = p_blancs
+     and d.preneur is null and d.fin is null
+  returning * into f;
+  if found then
+    return jsonb_build_object('ok', true, 'feuille', to_jsonb(f));
+  end if;
+  select * into f from public.feuilles_direct d
+   where d.saison = n and d.j = p_j and d.noirs = p_noirs and d.blancs = p_blancs;
+  return jsonb_build_object(
+    'ok', f.preneur = moi and f.fin is null,
+    'refus', case when f.fin is not null then 'scellee' when f.preneur = moi then null else 'tenue' end,
+    'feuille', to_jsonb(f));
+end;
+$$;
+revoke execute on function public.prendre_feuille(int, text, text) from public, anon;
+grant execute on function public.prendre_feuille(int, text, text) to authenticated;
+
+-- Compter : un ou quelques gestes d'un coup (un but et sa passe), +1 ou −1,
+-- sur des joueurs du match, par celui qui tient la feuille seulement, avant
+-- la fin. Un compteur reste entre 0 et 99. p_gestes : [{ joueur, quoi, d }],
+-- quoi ∈ buts, passes, arrets, interceptions, csc.
+-- Relecture du 01/11 : un compte en attente ne lit rien par les refus (la
+-- feuille n'est qu'aux membres, comme sa lecture) ; une journée remise en
+-- brouillon gèle sa feuille ; un joueur sorti du match par l'admin ne
+-- compte plus (l'admin, lui, compte la feuille qu'il a reprise) ; le
+-- journal garde ses 500 derniers gestes.
+create or replace function public.compter_feuille(p_j int, p_noirs text, p_blancs text, p_gestes jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  moi uuid := auth.uid();
+  nom text;
+  doc jsonb;
+  n   int;
+  f   public.feuilles_direct;
+  g   jsonb;
+  c   jsonb;
+  joueurs text[];
+  quoi text;
+  d   int;
+  v   int;
+  refus text;
+  faits jsonb := '[]'::jsonb;
+begin
+  select p.name into nom from public.profiles p where p.id = moi and p.valide;
+  if nom is null then
+    raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
+  end if;
+  select s.data into doc from public.saison s where s.id = 1;
+  n := coalesce(public.entier_sur(doc ->> 'numero'), 0);
+  select * into f from public.feuilles_direct x
+   where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs
+   for update;
+  if not found then
+    return jsonb_build_object('ok', false, 'refus', 'sans-feuille');
+  end if;
+  if f.fin is not null then
+    return jsonb_build_object('ok', false, 'refus', 'scellee', 'feuille', to_jsonb(f));
+  end if;
+  if f.preneur is distinct from moi then
+    return jsonb_build_object('ok', false, 'refus', 'pas-preneur', 'feuille', to_jsonb(f));
+  end if;
+  refus := public.feuille_hors_jeu(doc, p_j, p_noirs, p_blancs);
+  if refus is null and not public.joue_le_match(doc, p_j, p_noirs, p_blancs, nom) and not public.is_league_admin() then
+    refus := 'pas-ton-match';
+  end if;
+  if refus is not null then
+    return jsonb_build_object('ok', false, 'refus', refus, 'feuille', to_jsonb(f));
+  end if;
+  if jsonb_typeof(p_gestes) is distinct from 'array' or jsonb_array_length(p_gestes) not between 1 and 4 then
+    return jsonb_build_object('ok', false, 'refus', 'geste', 'feuille', to_jsonb(f));
+  end if;
+  select coalesce(array_agg(l.joueur), '{}'::text[]) into joueurs
+    from public.lignes_du_match(doc, p_j, p_noirs, p_blancs) l;
+  c := f.compteurs;
+  for g in select * from jsonb_array_elements(p_gestes) loop
+    quoi := g ->> 'quoi';
+    d := public.entier_sur(g ->> 'd');
+    if quoi is null or quoi not in ('buts', 'passes', 'arrets', 'interceptions', 'csc')
+       or d is null or d not in (-1, 1)
+       or (g ->> 'joueur') is null or not ((g ->> 'joueur') = any (joueurs)) then
+      return jsonb_build_object('ok', false, 'refus', 'geste', 'feuille', to_jsonb(f));
+    end if;
+    v := coalesce(public.entier_sur(c -> (g ->> 'joueur') ->> quoi), 0);
+    if v + d between 0 and 99 then
+      c := jsonb_set(c, array[g ->> 'joueur'], coalesce(c -> (g ->> 'joueur'), '{}'::jsonb) || jsonb_build_object(quoi, v + d));
+      faits := faits || jsonb_build_object('joueur', g ->> 'joueur', 'quoi', quoi, 'd', d);
+    end if;
+  end loop;
+  if jsonb_array_length(faits) > 0 then
+    update public.feuilles_direct x
+       set compteurs = c,
+           journal = (
+             select coalesce(jsonb_agg(e order by i), '[]'::jsonb)
+               from jsonb_array_elements(x.journal || jsonb_build_array(jsonb_build_object('le', now(), 'gestes', faits)))
+                    with ordinality t(e, i)
+              where i > jsonb_array_length(x.journal) + 1 - 500),
+           maj_le = now()
+     where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs
+    returning * into f;
+  end if;
+  return jsonb_build_object('ok', true, 'feuille', to_jsonb(f));
+end;
+$$;
+revoke execute on function public.compter_feuille(int, text, text, jsonb) from public, anon;
+grant execute on function public.compter_feuille(int, text, text, jsonb) to authenticated;
+
+-- Passer la main : celui qui tient la feuille la donne à un joueur du match
+-- qui a son compte (sinon : « sans-compte »). Un membre seulement, sur une
+-- journée publiée (relecture du 01/11, comme compter_feuille) ; un preneur
+-- que l'admin a sorti du match peut encore la donner à un joueur du match.
+create or replace function public.passer_feuille(p_j int, p_noirs text, p_blancs text, p_a text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  moi uuid := auth.uid();
+  doc jsonb;
+  n   int;
+  f   public.feuilles_direct;
+  qui public.profiles;
+  refus text;
+begin
+  if not public.est_membre() then
+    raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
+  end if;
+  select s.data into doc from public.saison s where s.id = 1;
+  n := coalesce(public.entier_sur(doc ->> 'numero'), 0);
+  select * into f from public.feuilles_direct x
+   where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs
+   for update;
+  if not found then
+    return jsonb_build_object('ok', false, 'refus', 'sans-feuille');
+  end if;
+  if f.fin is not null then
+    return jsonb_build_object('ok', false, 'refus', 'scellee', 'feuille', to_jsonb(f));
+  end if;
+  if f.preneur is distinct from moi then
+    return jsonb_build_object('ok', false, 'refus', 'pas-preneur', 'feuille', to_jsonb(f));
+  end if;
+  refus := public.feuille_hors_jeu(doc, p_j, p_noirs, p_blancs);
+  if refus is not null then
+    return jsonb_build_object('ok', false, 'refus', refus, 'feuille', to_jsonb(f));
+  end if;
+  if not public.joue_le_match(doc, p_j, p_noirs, p_blancs, p_a) then
+    return jsonb_build_object('ok', false, 'refus', 'pas-ton-match', 'feuille', to_jsonb(f));
+  end if;
+  select p.* into qui from public.profiles p
+   where lower(btrim(p.name)) = lower(btrim(p_a)) and p.valide
+   limit 1;
+  if qui.id is null then
+    return jsonb_build_object('ok', false, 'refus', 'sans-compte', 'feuille', to_jsonb(f));
+  end if;
+  update public.feuilles_direct x
+     set preneur = qui.id, preneur_nom = qui.name, pris_le = now(), maj_le = now()
+   where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs
+  returning * into f;
+  return jsonb_build_object('ok', true, 'feuille', to_jsonb(f));
+end;
+$$;
+revoke execute on function public.passer_feuille(int, text, text, text) from public, anon;
+grant execute on function public.passer_feuille(int, text, text, text) to authenticated;
+
+-- L'admin : « reprendre » (il la tient ; une feuille que personne n'a prise
+-- naît à son nom), « liberer » (personne ne la tient, un joueur du match la
+-- reprend), « rouvrir » (une feuille scellée repart des chiffres que porte
+-- la saison, corrections de l'admin comprises). Reprendre et rouvrir
+-- copient des chiffres de la saison dans une feuille que toute la ligue lit :
+-- jamais sur une journée en brouillon, ni pour deux camps qui ne forment pas
+-- un match de la journée (relecture du 01/11). Libérer, toujours.
+create or replace function public.feuille_admin(p_j int, p_noirs text, p_blancs text, p_geste text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  moi uuid := auth.uid();
+  nom text;
+  doc jsonb;
+  n   int;
+  f   public.feuilles_direct;
+  refus text;
+begin
+  if not public.is_league_admin() then
+    raise exception 'Réservé à l''admin.' using errcode = '42501';
+  end if;
+  select p.name into nom from public.profiles p where p.id = moi;
+  select s.data into doc from public.saison s where s.id = 1;
+  n := coalesce(public.entier_sur(doc ->> 'numero'), 0);
+  if p_geste in ('reprendre', 'rouvrir') then
+    refus := public.feuille_hors_jeu(doc, p_j, p_noirs, p_blancs);
+    if refus is not null then
+      select * into f from public.feuilles_direct x
+       where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs;
+      return jsonb_build_object('ok', false, 'refus', refus, 'feuille', case when f.saison is not null then to_jsonb(f) end);
+    end if;
+  end if;
+  if p_geste = 'reprendre' then
+    insert into public.feuilles_direct (saison, j, noirs, blancs, preneur, preneur_nom, pris_le, compteurs)
+    values (n, p_j, p_noirs, p_blancs, moi, nom, now(), public.compteurs_du_document(doc, p_j, p_noirs, p_blancs))
+    on conflict (saison, j, noirs, blancs) do update
+      set preneur = excluded.preneur, preneur_nom = excluded.preneur_nom, pris_le = now(), maj_le = now()
+      where public.feuilles_direct.fin is null
+    returning * into f;
+  elsif p_geste = 'liberer' then
+    update public.feuilles_direct x
+       set preneur = null, preneur_nom = null, maj_le = now()
+     where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs and x.fin is null
+    returning * into f;
+  elsif p_geste = 'rouvrir' then
+    update public.feuilles_direct x
+       set fin = null, scelle_par = null, version = null, maj_le = now(),
+           compteurs = public.compteurs_du_document(doc, p_j, p_noirs, p_blancs)
+     where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs and x.fin is not null
+    returning * into f;
+  else
+    return jsonb_build_object('ok', false, 'refus', 'geste');
+  end if;
+  if f.saison is null then
+    select * into f from public.feuilles_direct x
+     where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs;
+    return jsonb_build_object('ok', false, 'refus', case when f.fin is not null then 'scellee' else 'sans-feuille' end,
+                              'feuille', case when f.saison is not null then to_jsonb(f) end);
+  end if;
+  return jsonb_build_object('ok', true, 'feuille', to_jsonb(f));
+end;
+$$;
+revoke execute on function public.feuille_admin(int, text, text, text) from public, anon;
+grant execute on function public.feuille_admin(int, text, text, text) to authenticated;
+
+-- « Fin du match » : la feuille se scelle et ses chiffres entrent dans la
+-- saison, par celui qui la tient (ou l'admin). Le document est relu sous
+-- verrou et seules les lignes du match changent (appliquer_feuille) ; la
+-- version avance comme pour une publication de l'admin, si bien que
+-- l'historique garde l'état d'avant (saison_garde_trace, avec le joueur pour
+-- auteur), que les téléphones relisent la saison (saison_signal) et qu'un
+-- appareil d'admin resté sur l'ancienne version doit reprendre la base.
+-- Un joueur ne scelle que la feuille d'un match qu'il joue encore, sur une
+-- journée publiée ; l'admin scelle toute feuille ouverte (relecture du 01/11).
+create or replace function public.sceller_feuille(p_j int, p_noirs text, p_blancs text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  moi      uuid := auth.uid();
+  nom      text;
+  admin    boolean := public.is_league_admin();
+  doc      jsonb;
+  neuf     jsonb;
+  courante bigint;
+  nouvelle bigint;
+  n        int;
+  defauts  text[];
+  refus    text;
+  f        public.feuilles_direct;
+begin
+  select p.name into nom from public.profiles p where p.id = moi and p.valide;
+  if nom is null then
+    raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
+  end if;
+  select s.data, s.version into doc, courante from public.saison s where s.id = 1 for update;
+  if doc is null then
+    return jsonb_build_object('ok', false, 'refus', 'sans-saison');
+  end if;
+  n := coalesce(public.entier_sur(doc ->> 'numero'), 0);
+  select * into f from public.feuilles_direct x
+   where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs
+   for update;
+  if not found then
+    return jsonb_build_object('ok', false, 'refus', 'sans-feuille');
+  end if;
+  if f.fin is not null then
+    return jsonb_build_object('ok', false, 'refus', 'scellee', 'feuille', to_jsonb(f));
+  end if;
+  if f.preneur is distinct from moi and not admin then
+    return jsonb_build_object('ok', false, 'refus', 'pas-preneur', 'feuille', to_jsonb(f));
+  end if;
+  if not admin then
+    refus := public.feuille_hors_jeu(doc, p_j, p_noirs, p_blancs);
+    if refus is null and not public.joue_le_match(doc, p_j, p_noirs, p_blancs, nom) then
+      refus := 'pas-ton-match';
+    end if;
+    if refus is not null then
+      return jsonb_build_object('ok', false, 'refus', refus, 'feuille', to_jsonb(f));
+    end if;
+  end if;
+  neuf := doc || jsonb_build_object('entries', public.appliquer_feuille(doc, p_j, p_noirs, p_blancs, f.compteurs));
+  defauts := public.feuille_saine(neuf, doc);
+  if cardinality(defauts) > 0 then
+    raise exception 'Feuille refusée : %', array_to_string(defauts, ' · ')
+      using errcode = 'P0001', hint = 'feuille-saine', detail = array_to_string(defauts, '|');
+  end if;
+  nouvelle := greatest((extract(epoch from clock_timestamp()) * 1000)::bigint, coalesce(courante, 0) + 1);
+  perform set_config('sfl.publication_saison', 'oui', true);
+  -- La journée dont une feuille se scelle : la fin des matchs suit le dernier
+  -- sceau, même d'une feuille rouverte (saison_fin_des_matchs).
+  perform set_config('sfl.feuille_scellee', p_j::text, true);
+  update public.saison s set data = neuf, version = nouvelle, updated_at = now() where s.id = 1;
+  perform set_config('sfl.feuille_scellee', '', true);
+  perform set_config('sfl.publication_saison', '', true);
+  update public.feuilles_direct x
+     set fin = now(), scelle_par = moi, version = nouvelle, maj_le = now()
+   where x.saison = n and x.j = p_j and x.noirs = p_noirs and x.blancs = p_blancs
+  returning * into f;
+  return jsonb_build_object('ok', true, 'version', nouvelle, 'feuille', to_jsonb(f));
+end;
+$$;
+revoke execute on function public.sceller_feuille(int, text, text) from public, anon;
+grant execute on function public.sceller_feuille(int, text, text) to authenticated;
+
+-- ─────────────────────── Les cartons de la SFL (01/11/2026) ───────────────────────
+-- Sabri, 01/11 : « à chaque fois que je vais mettre un retard à quelqu'un
+-- […] cette personne-là reçoit un carton […] une animation qu'il reçoit dès
+-- qu'il ouvre l'appli […] au bout de 3 cartons jaunes […] un carton rouge
+-- [qui] lui bloque la prochaine journée ». Rien n'est stocké des cartons
+-- eux-mêmes : ils se lisent dans les retards de la saison (lib/sfl/cartons.ts,
+-- dès la J4 de la saison 1). La base ne garde que ceux que le joueur a déjà
+-- vus, pour ne pas lui rejouer l'animation sur un autre téléphone. Posé par
+-- le joueur seul (RLS « mise à jour de soi »), comme nouveautes_vues.
+alter table public.profiles add column if not exists cartons_vus text[] not null default '{}';
+grant update (cartons_vus) on public.profiles to authenticated;
+
+-- ─────────────── Les paliers du Passe gardés par le serveur (01/11/2026) ───────────────
+-- Ilyes, 01/11 : des paliers déverrouillés au téléphone, verrouillés à
+-- l'ordinateur. Rien n'était stocké : chaque appareil recalculait l'XP de
+-- toute la ligue avec ce qu'il avait chargé. Désormais le serveur calcule
+-- (/api/xp/bilan, lib/sfl/xp-serveur.server.ts : le même journal que le
+-- téléphone, lib/sfl/xp-calcul.ts) et garde ici le palier atteint par chacun,
+-- saison du Passe par saison. Un palier ne redescend jamais (greatest) : un
+-- contrat raté ou une feuille corrigée ne referme rien. L'app affiche le plus
+-- haut entre son calcul et celui-ci (lib/sfl/xp-acquis.ts). Le compte
+-- vitrine n'y est jamais écrit : son XP fictive vit sur son seul téléphone.
+-- Les membres lisent ; personne n'écrit depuis l'app.
+create table if not exists public.passe_acquis (
+  joueur       uuid        not null references public.profiles (id) on delete cascade,
+  saison_passe text        not null check (saison_passe ~ '^[a-z0-9-]{1,24}$'),
+  palier       int         not null check (palier between 1 and 100),
+  xp_saison    int         not null default 0 check (xp_saison >= 0),
+  calcule_le   timestamptz not null default now(),
+  primary key (joueur, saison_passe)
+);
+alter table public.passe_acquis enable row level security;
+revoke all on public.passe_acquis from anon, authenticated;
+grant select on public.passe_acquis to authenticated;
+drop policy if exists "passe_acquis: les membres lisent" on public.passe_acquis;
+create policy "passe_acquis: les membres lisent"
+  on public.passe_acquis for select to authenticated
+  using ((select public.est_membre()));
+
+-- Poser les paliers calculés par le serveur : [{ joueur, saison_passe, palier, xp_saison }].
+-- Un palier ne monte que par greatest() ; une ligne invalide est ignorée.
+-- Rend le nombre de lignes écrites. Clé secrète seulement (la route).
+create or replace function public.poser_paliers_acquis(p_lignes jsonb)
+returns int
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  n int;
+begin
+  if p_lignes is null or jsonb_typeof(p_lignes) <> 'array' then
+    raise exception 'Demande invalide.' using errcode = 'P0001';
+  end if;
+  with lues as (
+    select l.joueur, l.saison_passe, l.palier, greatest(0, coalesce(l.xp_saison, 0)) as xp_saison
+      from jsonb_to_recordset(p_lignes) as l (joueur uuid, saison_passe text, palier int, xp_saison int)
+     where l.joueur is not null
+       and l.saison_passe ~ '^[a-z0-9-]{1,24}$'
+       and l.palier between 1 and 100
+       and exists (select 1 from public.profiles p where p.id = l.joueur)
+  ),
+  ecrites as (
+    insert into public.passe_acquis as a (joueur, saison_passe, palier, xp_saison, calcule_le)
+    select joueur, saison_passe, max(palier), max(xp_saison), now() from lues group by joueur, saison_passe
+    on conflict (joueur, saison_passe) do update
+      set palier = greatest(a.palier, excluded.palier),
+          xp_saison = excluded.xp_saison,
+          calcule_le = now()
+    returning 1
+  )
+  select count(*) into n from ecrites;
+  return n;
+end;
+$$;
+revoke execute on function public.poser_paliers_acquis(jsonb) from public, anon, authenticated;
+grant execute on function public.poser_paliers_acquis(jsonb) to service_role;
+
+-- ─────────────── Les achats en XP : le PACK AFRIQUE 2027 (01/11/2026) ───────────────
+-- Ilyes, 01/11 : un pack « achetable en XP », jamais gagné par les missions ni
+-- par le Passe (lib/sfl/pack-afrique.ts). Un achat = une ligne : ce qu'il a
+-- coûté (xp, dans sa monnaie), ce qu'il a donné (obtenu : le code de la
+-- nation, la finition afrique-xx), son numéro de série dans l'édition
+-- (n° 0042, imprimé au dos). Le solde à dépenser n'est stocké nulle part :
+-- ce qui est gagné à vie, recalculé par le serveur (xp-serveur.server.ts),
+-- moins la somme des prix payés ici dans la même monnaie. Le Niveau XP et le
+-- Passe ne lisent jamais cette table : dépenser ne les fait pas baisser.
+-- Seule la route /api/boutique-xp (clé secrète) écrit, par ouvrir_pack_xp ;
+-- la ligue voit ce que chacun a obtenu (sa carte le porte), jamais ce qu'il
+-- a payé ni dans quelle monnaie. Jamais de Ballons (achetés en euros) ici.
+--
+-- Les XP S (02/11/2026, lib/sfl/xp-s.ts) : la seconde monnaie, plus rare,
+-- gagnée par la SFL Time, les missions de rang S, les titres, le Flair et le
+-- MVP Bola. Ilyes : le PACK AFRIQUE 2027 se paie en XP S (40 le tirage), et
+-- plus jamais en XP normales ; les packs rares à venir aussi. La colonne
+-- monnaie (« xp » ou « xp-s ») dit dans quoi chaque ligne a été payée : un
+-- seul verrou par joueur, une seule clé d'idempotence (joueur, cle), un seul
+-- numéro de série par nation, quelle que soit la monnaie. Additif : une base
+-- qui a déjà des lignes les garde en « xp » (le défaut).
+create table if not exists public.achats_xp (
+  id       bigint generated always as identity primary key,
+  joueur   uuid        not null references public.profiles (id) on delete cascade,
+  article  text        not null check (article ~ '^pack-[a-z0-9-]{1,40}$'),
+  obtenu   text        not null check (obtenu ~ '^[a-z]{2}$'),
+  monnaie  text        not null default 'xp',
+  xp       int         not null check (xp between 1 and 100000),
+  serie    int         not null check (serie >= 1),
+  cle      uuid        not null,
+  le       timestamptz not null default now(),
+  constraint achats_xp_une_fois unique (joueur, cle),
+  constraint achats_xp_sans_doublon unique (joueur, article, obtenu),
+  constraint achats_xp_serie unique (article, obtenu, serie)
+);
+alter table public.achats_xp add column if not exists monnaie text not null default 'xp';
+alter table public.achats_xp drop constraint if exists achats_xp_monnaie;
+alter table public.achats_xp add constraint achats_xp_monnaie check (monnaie in ('xp', 'xp-s'));
+-- Le PACK AFRIQUE 2027 ne se vend plus qu'en XP S : une route mal réglée ne
+-- peut pas le vendre en XP normales. « not valid » : la règle vaut pour toute
+-- ligne neuve ; une ligne déjà payée en XP (une base d'essai) reste un achat
+-- honoré, et la migration ne bute pas sur elle.
+alter table public.achats_xp drop constraint if exists achats_xp_afrique_en_xps;
+alter table public.achats_xp add constraint achats_xp_afrique_en_xps
+  check (article <> 'pack-afrique-2027' or monnaie = 'xp-s') not valid;
+comment on column public.achats_xp.xp is 'Le prix payé, dans la monnaie de la ligne (monnaie : xp ou xp-s).';
+comment on column public.achats_xp.monnaie is 'La monnaie du prix : xp (XP normales) ou xp-s (XP S, lib/sfl/xp-s.ts).';
+create index if not exists achats_xp_joueur on public.achats_xp (joueur);
+alter table public.achats_xp enable row level security;
+revoke all on public.achats_xp from anon, authenticated;
+grant select (id, joueur, article, obtenu, serie, le) on public.achats_xp to authenticated;
+drop policy if exists "achats_xp: les membres lisent" on public.achats_xp;
+create policy "achats_xp: les membres lisent"
+  on public.achats_xp for select to authenticated
+  using ((select public.est_membre()));
+
+-- Mes achats, avec leur prix et sa monnaie : le solde de l'écran, monnaie par
+-- monnaie. Le type de retour a gagné la monnaie (02/11/2026) : la fonction se
+-- refait (drop puis create) à chaque passage.
+drop function if exists public.mes_achats_xp();
+create function public.mes_achats_xp()
+returns table (article text, obtenu text, monnaie text, xp int, serie int, le timestamptz)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select a.article, a.obtenu, a.monnaie, a.xp, a.serie, a.le
+    from public.achats_xp a
+   where a.joueur = (select auth.uid())
+   order by a.le;
+$$;
+revoke execute on function public.mes_achats_xp() from public, anon;
+grant execute on function public.mes_achats_xp() to authenticated;
+
+-- Ouvrir un pack : débite et tire au sort ici, d'un seul tenant.
+--   · p_monnaie : ce qui le paie, « xp » ou « xp-s » (le PACK AFRIQUE 2027 :
+--     xp-s, achats_xp_afrique_en_xps) ;
+--   · p_gagne : ce qui est gagné à vie dans cette monnaie, calculé par la
+--     route (jamais par le téléphone) ;
+--   · p_prix, p_choix : le prix et les nations en jeu (validées), tels que les
+--     tient lib/sfl/pack-afrique.ts (la route les passe : une seule liste) ;
+--   · p_cle : tirée par le téléphone à l'ouverture de la confirmation ; le
+--     même appel rejoué (réseau coupé, double toucher, app fermée en pleine
+--     ouverture) rend le même tirage, sans débiter deux fois ; rejouée pour
+--     un autre article ou une autre monnaie, elle est refusée.
+-- Le solde : p_gagne moins les prix payés dans la même monnaie ; une monnaie
+-- ne touche jamais l'autre. Un joueur à la fois, toutes monnaies (verrou
+-- consultatif) ; le numéro de série sous un verrou par nation. Refuse : « XP
+-- S insuffisantes. » (ou « XP insuffisante. ») avec le solde réel en détail,
+-- pack complet, demande invalide. L'ancienne signature, sans la monnaie,
+-- disparaît (02/11/2026).
+drop function if exists public.ouvrir_pack_xp(uuid, text, int, int, text[], uuid);
+create or replace function public.ouvrir_pack_xp(
+  p_joueur uuid, p_article text, p_monnaie text, p_prix int, p_gagne int, p_choix text[], p_cle uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  deja    public.achats_xp;
+  depense int;
+  tire    text;
+  num     int;
+begin
+  if p_joueur is null or p_cle is null or p_prix is null or p_prix < 1 or p_gagne is null or p_gagne < 0
+     or p_monnaie is null or p_monnaie not in ('xp', 'xp-s')
+     or p_article is null or p_article !~ '^pack-[a-z0-9-]{1,40}$'
+     or coalesce(cardinality(p_choix), 0) = 0
+     or exists (select 1 from unnest(p_choix) c where c is null or c !~ '^[a-z]{2}$') then
+    raise exception 'Demande invalide.' using errcode = 'P0001';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('achats_xp:' || p_joueur::text, 0));
+  select * into deja from public.achats_xp a where a.joueur = p_joueur and a.cle = p_cle;
+  if found then
+    if deja.article <> p_article or deja.monnaie <> p_monnaie then
+      raise exception 'Demande invalide.' using errcode = 'P0001';
+    end if;
+    select coalesce(sum(a.xp), 0) into depense from public.achats_xp a where a.joueur = p_joueur and a.monnaie = p_monnaie;
+    return jsonb_build_object('obtenu', deja.obtenu, 'serie', deja.serie, 'xp', deja.xp, 'monnaie', deja.monnaie,
+                              'solde', greatest(0, p_gagne - depense), 'deja', true);
+  end if;
+  select c into tire
+    from unnest(p_choix) c
+   where not exists (select 1 from public.achats_xp a
+                      where a.joueur = p_joueur and a.article = p_article and a.obtenu = c)
+   order by random()
+   limit 1;
+  if tire is null then
+    raise exception 'Pack complet.' using errcode = 'P0001';
+  end if;
+  select coalesce(sum(a.xp), 0) into depense from public.achats_xp a where a.joueur = p_joueur and a.monnaie = p_monnaie;
+  if p_gagne - depense < p_prix then
+    raise exception '%', case p_monnaie when 'xp-s' then 'XP S insuffisantes.' else 'XP insuffisante.' end
+      using errcode = 'P0001', detail = greatest(0, p_gagne - depense)::text;
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('achats_xp_serie:' || p_article || ':' || tire, 0));
+  select coalesce(max(a.serie), 0) + 1 into num
+    from public.achats_xp a where a.article = p_article and a.obtenu = tire;
+  insert into public.achats_xp (joueur, article, obtenu, monnaie, xp, serie, cle)
+  values (p_joueur, p_article, tire, p_monnaie, p_prix, num, p_cle);
+  return jsonb_build_object('obtenu', tire, 'serie', num, 'xp', p_prix, 'monnaie', p_monnaie,
+                            'solde', p_gagne - depense - p_prix, 'deja', false);
+end;
+$$;
+revoke execute on function public.ouvrir_pack_xp(uuid, text, text, int, int, text[], uuid) from public, anon, authenticated;
+grant execute on function public.ouvrir_pack_xp(uuid, text, text, int, int, text[], uuid) to service_role;

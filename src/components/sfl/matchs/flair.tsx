@@ -24,7 +24,7 @@
 // sur une page (Ma carte → Le Flair), pour qui ne joue pas : le blessé, le
 // remplaçant, la tribune, dont le plafond monte (PLAFOND_TRIBUNE).
 // Tout ferme au premier coup d'envoi de la journée ; le verdict tombe avec la
-// feuille remplie, définitif à minuit. Les règles et l'XP ne changent pas
+// feuille remplie, définitif à la révélation (19 h ; minuit jusqu'à la J4). Les règles et l'XP ne changent pas
 // (lib/sfl/pronos.ts) : l'XP va au Niveau XP et au passe, jamais aux points
 // Pépite. Le Flair ne vit que sur la journée en cours (usePronosJournee) :
 // une feuille d'une autre journée n'en a pas.
@@ -418,7 +418,7 @@ function EnTete({ mp, id, titre, sujets }: { mp: MesPronos; id: string; titre: s
           <FermeDans fin={mp.p.coupEnvoi} />
         ) : juge ? (
           <span className={cn("mono-label shrink-0", gagne ? "text-[#9fe0a8]" : "text-white/55")}>
-            {mp.phase === "en-jeu" ? "Verdict à minuit · " : ""}+{gagne} XP
+            {mp.phase === "en-jeu" ? `Verdict ${mp.p.verdict} · ` : ""}+{gagne} XP
           </span>
         ) : (
           <span className="mono-label flex shrink-0 items-center gap-2 text-white/80">
@@ -443,7 +443,7 @@ function Pied({ mp }: { mp: MesPronos }) {
   return (
     <p className="mono-label text-white/45">
       {`Toute la journée · ${mp.plafond} XP au plus${tribune ? " depuis la tribune" : ""} · `}
-      {mp.phase === "ouvert" ? "ferme au premier coup d'envoi" : "définitif à minuit"}
+      {mp.phase === "ouvert" ? "ferme au premier coup d'envoi" : `définitif ${mp.p.verdict}`}
     </p>
   );
 }

@@ -8,6 +8,9 @@ import { labelDateFr, prochainDimanche } from "../convocation-temps";
 import { equipesDuMatch, equipesDuMatchSuivant } from "./equipes";
 import { dejaSurLaFeuille, jouable } from "./effectif";
 import { resteUnBrouillon } from "./brouillon";
+import { revelationAttendue } from "../revelation";
+import { maintenant } from "../horloge";
+import { suspendusPour } from "../cartons";
 import { numeroSaison, type MatchDuJour, type SaisonArchivee, type Terrain } from "./types";
 import type {
   Convocation,
@@ -130,14 +133,36 @@ export function newEntry(j: number, player: string, team: string | null): MatchE
 }
 
 /**
+ * La SFL Time d'une journée : celle que prend toute ligne qui y entre (Ilyes,
+ * 02/11/2026 : « un joueur ajouté prend le SFL time de sa journée »). La
+ * victoire en dépend (3 points au lieu de 2) et les XP S aussi (xp-s.ts) :
+ * un joueur ajouté tard sur une journée en SFL Time ne perd plus ni l'un ni
+ * l'autre. La journée fait référence ; une ligne qui s'en écarte est signalée
+ * (integrite.ts, I12), jamais réécrite seule.
+ */
+export function sflTimeDeLaJournee(saison: Pick<Saison, "journees">, j: number): boolean {
+  return !!saison.journees.find((m) => m.j === j)?.sflTime;
+}
+
+/** Une ligne neuve sur la journée j : présent, rien de noté, la SFL Time de sa journée. */
+export function ligneNeuve(saison: Pick<Saison, "journees">, j: number, player: string, team: string | null): MatchEntry {
+  return { ...newEntry(j, player, team), sflTime: sflTimeDeLaJournee(saison, j) };
+}
+
+/**
  * Le dimanche de la journée qu'on crée, en libellé court (« 1 nov. ») :
  * aujourd'hui si l'on est dimanche à Paris, sinon le prochain. Avant, une
  * journée préparée le vendredi portait la date du vendredi : son vote
  * s'ouvrait et se fermait ce jour-là, et la convocation ne la retrouvait pas.
+ * Avec la saison : un dimanche qui a déjà sa journée cède la place au
+ * suivant (le soir de la J5, « Préparer la J6 » visait encore le jour même,
+ * et rouvrait la J5).
  */
-export function dimancheDeJournee(maintenant = new Date()): string {
+export function dimancheDeJournee(maintenant = new Date(), saison?: Pick<Saison, "journees">): string {
   const jour = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Paris", weekday: "short" }).format(maintenant);
-  return libelleCourt(labelDateFr(jour === "Sun" ? maintenant : prochainDimanche(maintenant)));
+  const ceDimanche = libelleCourt(labelDateFr(jour === "Sun" ? maintenant : prochainDimanche(maintenant)));
+  if (jour !== "Sun" || !saison || !journeeDeLaDate(saison, ceDimanche)) return ceDimanche;
+  return libelleCourt(labelDateFr(prochainDimanche(maintenant)));
 }
 
 /** Les deux journées ont-elles la même date ? « 1 nov. » et « 1 novembre », sans casse. */
@@ -154,10 +179,13 @@ export function journeeDeLaDate(saison: Pick<Saison, "journees">, date: string) 
 /**
  * Prépare la journée d'un dimanche (« Préparer la J5 ») : celle de cette date
  * si elle existe déjà — une seule journée par dimanche (integrite.ts, I6) —,
- * sinon la suivante, `max(j) + 1`, avec l'heure, le terrain et le SFL Time
- * de la précédente. `brouillon` : elle naît cachée aux joueurs, le temps de
- * la préparer (saisie/brouillon.ts). Remplace addJournee, qui créait une
- * journée de plus à chaque appel, même pour un dimanche qui avait la sienne.
+ * sinon la suivante, `max(j) + 1`, avec l'heure et le terrain de la
+ * précédente. Jamais sa SFL Time (Ilyes, 02/11/2026) : une journée neuve
+ * démarre sans, l'admin la coche ; héritée, un oubli donnait la victoire à 3
+ * points et 10 XP S à chaque présent, dimanche après dimanche.
+ * `brouillon` : elle naît cachée aux joueurs, le temps de la préparer
+ * (saisie/brouillon.ts). Remplace addJournee, qui créait une journée de plus
+ * à chaque appel, même pour un dimanche qui avait la sienne.
  */
 export function preparerJournee(
   saison: Saison,
@@ -177,7 +205,7 @@ export function preparerJournee(
         {
           j,
           date: quand,
-          sflTime: avant?.sflTime ?? false,
+          sflTime: false,
           mvpAuto: true,
           ...(avant?.heure ? { heure: avant.heure } : {}),
           ...(avant?.terrainId != null ? { terrainId: avant.terrainId } : {}),
@@ -272,14 +300,25 @@ export function retirerMatchVide(saison: Saison, j: number, equipes: [string, st
   return { ...saison, journees: saison.journees.map((m) => (m.j === j ? { ...m, matchsDuJour: declares } : m)) };
 }
 
+/**
+ * Change la date, l'heure, le terrain ou la SFL Time d'une journée. Quand
+ * l'admin coche ou décoche la SFL Time (la valeur change), toutes les lignes
+ * du jour la suivent : c'est elle qui compte la victoire et les XP S, et une
+ * journée cochée dont les lignes restaient à faux ne donnait rien. Le reste
+ * (une date corrigée, une heure) ne touche à aucune ligne, même incohérente :
+ * l'alerte I12 la montre, l'admin décide (02/11/2026).
+ */
 export function updateJournee(
   saison: Saison,
   j: number,
   patch: Partial<{ date: string; sflTime: boolean; heure: string; terrainId: number | undefined }>
 ): Saison {
+  const avant = saison.journees.find((m) => m.j === j);
+  const bascule = avant != null && patch.sflTime != null && !!patch.sflTime !== !!avant.sflTime;
   return {
     ...saison,
     journees: saison.journees.map((m) => (m.j === j ? { ...m, ...patch } : m)),
+    ...(bascule ? { entries: saison.entries.map((e) => (e.j === j ? { ...e, sflTime: !!patch.sflTime } : e)) } : {}),
   };
 }
 
@@ -423,8 +462,9 @@ export function libelleCourt(dateLabel: string): string {
  * Un joueur déjà sur la feuille garde sa ligne (et ce qui y est noté) et
  * prend son équipe ; les autres y entrent. Qui est sur la feuille sans être
  * dans les équipes y reste, sans équipe. La journée n'existe pas encore :
- * elle naît, datée du dimanche de la convocation, et reprend de la
- * précédente le SFL Time et le terrain.
+ * elle naît, datée du dimanche de la convocation, avec le terrain de la
+ * précédente et sans SFL Time (l'admin la coche, comme preparerJournee).
+ * Une ligne neuve prend la SFL Time de sa journée (sflTimeDeLaJournee).
  */
 export function poserEquipes(
   saison: Saison,
@@ -435,13 +475,15 @@ export function poserEquipes(
 ): Saison {
   // Chaque nom une seule fois (sa première place), jamais un membre qui ne
   // joue pas : une composition qui porte un joueur deux fois ne le fait plus
-  // entrer deux fois sur la feuille (30/10).
+  // entrer deux fois sur la feuille (30/10). Ni un suspendu (carton rouge,
+  // cartons.ts, 01/11).
   const vus = new Set<string>();
+  const suspendus = suspendusPour(saison, j);
   const teams = teamsBrutes.map((t) => ({
     ...t,
     players: t.players.filter((nom) => {
       const cle = nom.trim().toLowerCase();
-      if (!jouable(nom) || vus.has(cle)) return false;
+      if (!jouable(nom) || vus.has(cle) || suspendus.has(cle)) return false;
       vus.add(cle);
       return true;
     }),
@@ -455,8 +497,8 @@ export function poserEquipes(
         ...s.journees,
         {
           j,
-          date: date ?? dimancheDeJournee(),
-          sflTime: avant?.sflTime ?? false,
+          date: date ?? dimancheDeJournee(new Date(), s),
+          sflTime: false,
           mvpAuto: true,
           ...(avant?.terrainId != null ? { terrainId: avant.terrainId } : {}),
           ...(opts.brouillon ? { brouillon: { depuis: opts.brouillon.le.toISOString(), par: opts.brouillon.par } } : {}),
@@ -465,15 +507,14 @@ export function poserEquipes(
     };
   }
   const lignes = s.entries.filter((e) => e.j === j);
-  // Une ligne neuve compte la victoire comme les autres lignes du jour, sinon comme la journée.
-  const sflTime = lignes[0]?.sflTime ?? s.journees.find((m) => m.j === j)?.sflTime ?? false;
   const prises = new Set<MatchEntry>();
   const posees: MatchEntry[] = [];
   for (const t of teams) {
     for (const nom of t.players) {
       const ligne = lignes.find((e) => e.player === nom && !prises.has(e) && !e.extraTime);
       if (ligne) prises.add(ligne);
-      posees.push(ligne ? { ...ligne, team: t.name } : { ...newEntry(j, nom, t.name), sflTime });
+      // Une ligne déjà là garde la sienne (I12 la signale si elle s'écarte) ; une neuve prend celle de la journée.
+      posees.push(ligne ? { ...ligne, team: t.name } : ligneNeuve(s, j, nom, t.name));
     }
   }
   const reste = lignes.filter((e) => !prises.has(e)).map((e) => ({ ...e, team: null }));
@@ -588,6 +629,8 @@ export function cloturerSaison(
   // Jamais tant qu'une journée attend en brouillon (30/10) : elle partirait
   // en archive sans que la ligue l'ait jamais vue.
   if (resteUnBrouillon(saison)) return saison;
+  // Ni avant la dernière révélation (revelation.ts) : l'archive y perdrait ses titres votés.
+  if (revelationAttendue(saison, maintenant()) != null) return saison;
   const numero = numeroSaison(saison);
   const faibles = titres ? [...titres.faibles] : [];
   const archive: SaisonArchivee = {

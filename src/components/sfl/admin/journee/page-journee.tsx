@@ -17,6 +17,9 @@
 // points décomposés, alertes), la Saisie (le direct de toujours), les Votes,
 // les Points d'un joueur et la Grille. Les « Je viens » de la convocation
 // se posent sur les terrains d'un geste (venus-sur-la-feuille.ts).
+// La feuille en direct d'un match tenue par un de ses joueurs (01/11/2026,
+// components/sfl/direct) se voit sur son terrain : qui la tient, son score ;
+// la toucher l'ouvre, pour la reprendre, la libérer ou la rouvrir.
 // Tout le reste de la ligue est derrière ≡ (Ligue), rien n'est perdu.
 //
 // Aucune phrase d'aide : la pastille, le pointillé et le libellé de chaque
@@ -38,6 +41,10 @@ import { DetailPoints } from "@/components/sfl/admin/detail-points";
 import { CarteDe, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { usePresence } from "@/hooks/use-presence";
 import { useSaisieAdmin } from "@/hooks/use-saisie-admin";
+import { useFeuillesDirect } from "@/hooks/use-feuilles-direct";
+import { useMaintenant } from "@/hooks/use-missions";
+import { FeuilleDuMatch } from "@/components/sfl/direct/feuille-du-match";
+import { scoreDeLaFeuille } from "@/lib/sfl/feuille-direct";
 import { isAdmin } from "@/lib/sfl/admin";
 import { TERRAINS_MAX } from "@/lib/sfl/equipes-division";
 import { haptique } from "@/lib/sfl/haptique";
@@ -46,9 +53,10 @@ import { computeJournees } from "@/lib/sfl/saisie/engine";
 import { choixDEquipe } from "@/lib/sfl/saisie/equipes";
 import { placementsDeLaJournee } from "@/lib/sfl/saisie/effectif";
 import { etatJournee, gesteDuMoment, prochaineJournee } from "@/lib/sfl/saisie/etat-journee";
+import { aLHeure, libelleFinDuVote, libelleRevelation } from "@/lib/sfl/revelation";
 import { verifierFeuille } from "@/lib/sfl/saisie/integrite";
 import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
-import { addEntry, ajouterMatch, matchsDeclares, memeDate, newEntry, poserEquipes, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
+import { addEntry, ajouterMatch, ligneNeuve, matchsDeclares, memeDate, poserEquipes, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
 import { equipesDesVenus, joueursPoses } from "@/lib/sfl/saisie/venus-sur-la-feuille";
 import { saisieStore } from "@/lib/sfl/saisie/store";
 import type { MatchDuJour } from "@/lib/sfl/saisie/types";
@@ -63,6 +71,7 @@ import { FeuillePreparer } from "./feuille-preparer";
 import { compteursEnMots, FeuillePublier, FeuilleRemettre } from "./feuille-publier";
 import { FeuilleQuandOu } from "./feuille-quand-ou";
 import { Etiquette, Feuille, Pastille, PastilleEtat, Segmente } from "./ui";
+import { leverSuspension, suspendusPour } from "@/lib/sfl/cartons";
 
 const heureDe = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null);
 
@@ -70,9 +79,11 @@ export function PageJournee() {
   const { me } = useMyPlayer();
   const admin = useSaisieAdmin();
   const { saison, faire, commit, supprimer, undo, redo, history, future, isClient } = admin;
-  const { journees: vuesLigue } = useSeason();
+  const { journees: vuesLigue, divisions } = useSeason();
   const presence = usePresence();
-  const [maintenant] = useState(() => new Date());
+  // L'heure du serveur, à la minute (horloge.ts) : 18 h, 19 h et la journée
+  // bloquée se voient sans rouvrir la page.
+  const maintenant = useMaintenant();
 
   const [choix, setChoix] = useState<number | null | undefined>(undefined);
   const j = choix === undefined ? prochaineJournee(saison, maintenant) : choix;
@@ -83,9 +94,11 @@ export function PageJournee() {
   const [preparer, setPreparer] = useState(false);
   const [quandOu, setQuandOu] = useState<number | null | false>(false);
   const [ligne, setLigne] = useState<number | null>(null);
+  /** La partie de la fiche à montrer d'abord (une alerte SFL Time : les honneurs). */
+  const [versLigne, setVersLigne] = useState<"honneurs" | null>(null);
   const [publier, setPublier] = useState(false);
   const [remettre, setRemettre] = useState(false);
-  const [direct, setDirect] = useState(false);
+  const [enDirect, setEnDirect] = useState(false);
   const [convocation, setConvocation] = useState(false);
   const [arbitre, setArbitre] = useState<number | null>(null);
   const [synchro, setSynchro] = useState(false);
@@ -96,6 +109,7 @@ export function PageJournee() {
   const [retourFeuille, setRetourFeuille] = useState(false);
   const [ajouterA, setAjouterA] = useState<string | null | false>(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [feuilleOuverte, setFeuilleOuverte] = useState<number | null>(null);
 
   const declares = useMemo<MatchDuJour[]>(() => (j != null && meta ? matchsDeclares(saison, j) : []), [saison, j, meta]);
   const matchs = useMemo(() => (j != null ? matchsVus(saison, j, declares) : []), [saison, j, declares]);
@@ -106,7 +120,11 @@ export function PageJournee() {
     const noms = [...new Set(saison.entries.filter((e) => e.j === j && e.team).map((e) => e.team as string))];
     return choixDEquipe(computeJournees(saison).find((x) => x.j === j), noms, declares);
   }, [saison, j, declares]);
-  const etat = j != null && meta ? etatJournee(saison, j, maintenant) : "brouillon";
+  // Les feuilles en direct tenues par les joueurs (01/11/2026) : une feuille
+  // prise, c'est le coup d'envoi, la journée en ligne passe « en direct ».
+  const direct = useFeuillesDirect(j ?? null);
+  const etatSaisi = j != null && meta ? etatJournee(saison, j, maintenant) : "brouillon";
+  const etat = etatSaisi === "en-ligne" && direct.feuilles.size > 0 ? "en-direct" : etatSaisi;
   const geste = gesteDuMoment(saison, meta ? j : null, maintenant);
   const par = me ?? "admin";
   // La convocation n'est celle de la journée ouverte que si c'est son dimanche :
@@ -119,8 +137,8 @@ export function PageJournee() {
 
   // Les « Je viens » de ce dimanche qui ne sont pas encore sur les terrains, posés d'un geste.
   const proposition = useMemo(
-    () => (j != null && convocationDuJour ? equipesDesVenus(saison, j, presence.ordreDesVenus, presence.teams) : null),
-    [saison, j, convocationDuJour, presence.ordreDesVenus, presence.teams]
+    () => (j != null && convocationDuJour ? equipesDesVenus(saison, j, presence.ordreDesVenus, presence.teams, divisions) : null),
+    [saison, j, convocationDuJour, presence.ordreDesVenus, presence.teams, divisions]
   );
 
   // Hors des camps : les lignes sans équipe (remplaçants), puis les « Je viens » pas encore sur la feuille.
@@ -157,12 +175,12 @@ export function PageJournee() {
 
   function ajouter(nom: string, equipe: string | null) {
     if (j == null) return;
-    if (faire((s) => addEntry(s, newEntry(j, nom, equipe)), `${nom} sur la J${j}`)) haptique.ajout();
+    if (faire((s) => addEntry(s, ligneNeuve(s, j, nom, equipe)), `${nom} sur la J${j}`)) haptique.ajout();
   }
 
   function placerSansPlace(nom: string) {
     if (j == null) return;
-    faire((s) => addEntry(s, newEntry(j, nom, null)), `${nom} sur la J${j}`);
+    faire((s) => addEntry(s, ligneNeuve(s, j, nom, null)), `${nom} sur la J${j}`);
     const i = saisieStore.load().entries.findIndex((e) => e.j === j && e.player === nom && !e.extraTime);
     if (i >= 0) setLigne(i);
   }
@@ -200,7 +218,8 @@ export function PageJournee() {
       <div ref={frise} className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="tablist" aria-label="Journées">
         {triees.map((m) => {
           const actif = m.j === j;
-          const defaut = verifierFeuille(saison, m.j).some((e) => e.r !== "I5" || estBrouillon(m));
+          // « ! » : un défaut de la feuille, ou une journée bloquée (une équipe sans résultat, la nuit passée).
+          const defaut = verifierFeuille(saison, m.j).some((e) => e.r !== "I5" || estBrouillon(m)) || etatJournee(saison, m.j, maintenant) === "bloquee";
           return (
             <button
               key={m.j}
@@ -252,7 +271,20 @@ export function PageJournee() {
           )}
         >
           <div className="flex items-center justify-between gap-2">
-            <PastilleEtat etat={etat} suffixe={etat === "brouillon" && meta.publiee ? `en ligne à ${heureDe(meta.publiee.le)}` : etat === "en-ligne" ? heureDe(meta.publiee?.le) : null} />
+            <PastilleEtat
+              etat={etat}
+              suffixe={
+                etat === "brouillon" && meta.publiee
+                  ? `en ligne à ${heureDe(meta.publiee.le)}`
+                  : etat === "en-ligne"
+                    ? heureDe(meta.publiee?.le)
+                    : etat === "vote"
+                      ? libelleFinDuVote(saison, meta.j, maintenant)
+                      : etat === "attente"
+                        ? libelleRevelation(saison, meta.j, maintenant)
+                        : null
+              }
+            />
             <Segmente
               taille="sm"
               label="Vue"
@@ -300,7 +332,10 @@ export function PageJournee() {
                 courant={matchCourant}
                 onCourant={setMatchCourant}
                 onPlus={(equipe) => setAjouterA(equipe)}
-                onCarte={setLigne}
+                onCarte={(i, vers) => {
+                  setVersLigne(vers ?? null);
+                  setLigne(i);
+                }}
                 // Pas de match de plus une fois le coup d'envoi passé : c'est ainsi
                 // qu'étaient nés les matchs 5 et 6 de la J3, déjà jouée (28/10).
                 onAjouterMatch={etat === "brouillon" || etat === "en-ligne" ? ajouterUnMatch : undefined}
@@ -308,9 +343,17 @@ export function PageJournee() {
                 onArbitre={(n) => setArbitre(n)}
                 arbitre={(n) => declares[n - 1]?.arbitre ?? null}
                 ecarts={ecarts}
-                direct={etat === "en-direct" || etat === "terminee"}
+                direct={etat !== "brouillon" && etat !== "en-ligne"}
                 heureJournee={meta.heure}
                 lieu={(m) => terrainDe(m.lieuId ?? meta.terrainId)}
+                feuille={(n) => {
+                  const m = declares[n - 1];
+                  const f = m ? direct.feuilleDe(m.equipes) : null;
+                  return m && f
+                    ? { libelle: `Feuille · ${f.preneur_nom ?? "libre"}`, ouverte: !f.fin, score: scoreDeLaFeuille(saison, j, m.equipes, f.compteurs) }
+                    : null;
+                }}
+                onFeuille={setFeuilleOuverte}
               />
               {matchs.length > 0 && matchs.every((m) => !m.noirs.length && !m.blancs.length) === false && (
                 <p className="mono-label text-encre-3">{compteursEnMots(saison, j)}</p>
@@ -360,7 +403,7 @@ export function PageJournee() {
                 <Etiquette>Outils</Etiquette>
                 <div className="flex flex-wrap gap-1.5">
                   <Pastille onClick={() => setConsulter(true)}>Feuille{ecarts.length ? ` · ${ecarts.length} !` : ""}</Pastille>
-                  <Pastille onClick={() => setDirect(true)}>Saisie</Pastille>
+                  <Pastille onClick={() => setEnDirect(true)}>Saisie</Pastille>
                   <Pastille onClick={() => setVotes(true)}>Votes</Pastille>
                   <Pastille onClick={() => setPoints(true)}>Points</Pastille>
                   <Link href="/admin/tableau?onglet=grille" className="mono-label inline-flex h-9 shrink-0 items-center rounded-full bg-secondary px-3.5 text-encre-2">
@@ -397,6 +440,14 @@ export function PageJournee() {
             <button type="button" onClick={() => setPublier(true)} className="bouton-principal h-12 text-lecture font-semibold">
               Publier pour tout le monde
             </button>
+          ) : geste.t === "revelation" ? (
+            <span className="mono-label flex h-12 items-center justify-center gap-2 rounded-full bg-foreground text-background">
+              ◐ Révélation {aLHeure(geste.heure)}
+            </span>
+          ) : geste.t === "bloquee" ? (
+            <button type="button" onClick={() => setEnDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">
+              {geste.equipes.join(" · ")} sans résultat
+            </button>
           ) : geste.t === "en-ligne" ? (
             <div className="flex items-center gap-2">
               <span className="mono-label flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-foreground text-background">
@@ -407,7 +458,7 @@ export function PageJournee() {
               </button>
             </div>
           ) : (
-            <button type="button" onClick={() => setDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">
+            <button type="button" onClick={() => setEnDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">
               Direct · Match {geste.match}
               {geste.heure ? ` · ${geste.heure}` : ""}
             </button>
@@ -479,11 +530,13 @@ export function PageJournee() {
           <FeuilleLigne
             saison={saison}
             index={ligneOuverte && ligneOuverte.j === j ? ligne : null}
+            vers={versLigne}
             equipes={equipes}
             mvpAuto={mvpAutomatique(saison, j)}
             places={places}
             onClose={() => {
               setLigne(null);
+              setVersLigne(null);
               if (retourFeuille) {
                 setRetourFeuille(false);
                 setConsulter(true);
@@ -515,7 +568,19 @@ export function PageJournee() {
           />
           <FeuillePublier key={`pub-${publier}`} open={publier} onOpenChange={setPublier} saison={saison} j={j} par={par} faire={faire} />
           <FeuilleRemettre key={`rem-${remettre}`} open={remettre} onOpenChange={setRemettre} saison={saison} j={j} par={par} faire={faire} />
-          <FeuilleDirect open={direct} onOpenChange={setDirect} saison={saison} j={j} matchs={matchs} commit={commit} faire={faire} />
+          <FeuilleDirect open={enDirect} onOpenChange={setEnDirect} saison={saison} j={j} matchs={matchs} commit={commit} faire={faire} direct={direct} />
+          {feuilleOuverte != null && declares[feuilleOuverte - 1] && (
+            <FeuilleDuMatch
+              open
+              onOpenChange={(o) => !o && setFeuilleOuverte(null)}
+              saison={saison}
+              j={j}
+              equipes={declares[feuilleOuverte - 1].equipes}
+              label={`Match ${feuilleOuverte}`}
+              direct={direct}
+              mode="admin"
+            />
+          )}
           <FeuilleArbitre
             open={arbitre != null}
             onOpenChange={(o) => !o && setArbitre(null)}
@@ -533,6 +598,16 @@ export function PageJournee() {
             titre={ajouterA ? `${ajouterA.replace(/ (\d+)$/, " · Match $1")}` : `Ajouter à la J${j}`}
             places={places}
             viens={viens}
+            suspendus={suspendusPour(saison, j)}
+            onLever={(nom) =>
+              setConfirmation({
+                titre: `Lever la suspension de ${nom} pour la J${j} ?`,
+                action: "Lever",
+                faire: () => {
+                  if (faire((s) => leverSuspension(s, nom, j, par, new Date()), `Suspension de ${nom} levée`)) haptique.sceau();
+                },
+              })
+            }
             onChoisir={(nom) => ajouter(nom, ajouterA || null)}
           />
         </>

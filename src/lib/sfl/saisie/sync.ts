@@ -22,13 +22,16 @@
 
 import { supabase } from "@/lib/supabase";
 import { getSession } from "@/lib/sfl/auth/session";
-import { adoptSaison, CURRENT_SEED_VERSION } from "./store";
+import { adoptSaison, CURRENT_SEED_VERSION, localStorageStore } from "./store";
 import type { Saison } from "./types";
 import { sansVitrine } from "../compte-vitrine";
+import { avecFinsDeLaBase } from "../revelation";
 
 // Même canal d'événement que SeasonProvider (littéral pour éviter le cycle
 // d'imports : season-provider importe store, qui importe ce module).
 const SAISIE_EVENT = "sfl-saisie";
+/** Émis quand la base a pris la saison (publier_saison). */
+export const SAISON_PUBLIEE_EVENT = "sfl-saison-publiee";
 const VERSION_KEY = "sfl-saison-remote-version";
 
 // Une sauvegarde qui n'a pas atteint la base laisse une marque. Sans elle,
@@ -156,7 +159,7 @@ export type Resultat = { ok: true } | { ok: false; raison: string; conflit?: tru
 const PUBLIQUE = "Cet appareil n'a que la saison des joueurs, sans les brouillons. Reprends la base avant d'écrire.";
 
 const CONFLIT =
-  "Un autre admin a publié depuis ta dernière synchro. Reprends la base pour repartir de sa version, ou écrase-la avec la tienne.";
+  "La base a changé depuis ta dernière synchro (un autre admin, ou la feuille d'un match scellée par un joueur). Reprends la base pour repartir de sa version, ou écrase-la avec la tienne.";
 
 /** Date de la dernière publication réussie, pour l'afficher à l'admin. */
 const PUBLIE_KEY = "sfl-saison-publiee-le";
@@ -240,13 +243,41 @@ async function publierMaintenant(saison: Saison, forcer: boolean): Promise<Resul
     // « Écraser » n'y peut rien, c'est voulu.
     if (error?.hint === "feuille-saine")
       return { ok: false, raison: "Feuille refusée par la base.", feuille: (error.details ?? "").split("|").filter(Boolean) };
+    // Les chiffres d'un match dont la feuille est tenue par un joueur, ou
+    // scellée depuis ta synchro (01/11/2026, public.feuilles_ecrasees) : la
+    // base les garde, même en écrasant. « Reprendre la base » repart de sa
+    // version ; la feuille, elle, se reprend ou se libère depuis son match.
+    if (error?.hint === "feuille-tenue")
+      return { ok: false, raison: "Feuille de match tenue par un joueur.", feuille: (error.details ?? "").split("|").filter(Boolean) };
     if (error) return { ok: false, raison: motif(error.message) };
-    const r = data as { ok: boolean; version: number };
+    const r = data as { ok: boolean; version: number; fins?: Record<string, string | null> };
     if (!r.ok) return { ok: false, raison: CONFLIT, conflit: true };
     retenir(r.version);
+    if (r.fins) adopterFins(r.fins);
+    // Le bilan d'XP du serveur se refait (hooks/use-bilan-serveur.ts) : une journée publiée ouvre des paliers.
+    window.dispatchEvent(new Event(SAISON_PUBLIEE_EVENT));
     return { ok: true };
   } catch (e) {
     return { ok: false, raison: e instanceof Error ? e.message : "Base injoignable." };
+  }
+}
+
+/**
+ * La fin des matchs gardée par la base (02/11/2026, saison_fin_des_matchs) :
+ * l'appareil de l'admin la reprend, journée par journée, à la place de
+ * l'heure de son téléphone. Sans elle, à version égale, il n'adoptait jamais
+ * la valeur de la base et calculait toute la soirée ses propres 18 h et
+ * 19 h. Rien ne repart en base : c'est déjà sa valeur.
+ */
+function adopterFins(fins: Record<string, string | null>) {
+  try {
+    const local = localStorageStore.load();
+    const neuf = avecFinsDeLaBase(local, fins);
+    if (neuf === local) return;
+    localStorageStore.save(neuf);
+    window.dispatchEvent(new Event(SAISIE_EVENT));
+  } catch {
+    /* hors navigateur, stockage indisponible */
   }
 }
 
@@ -453,6 +484,25 @@ export async function diagnostic(): Promise<Etape[]> {
       ok: false,
       detail: e instanceof Error ? e.message : "Lecture impossible.",
     });
+  }
+
+  // L'heure du vote et la fin des matchs (02/11/2026, revelation.ts) : sans
+  // elles en base, le vote reste ouvert jusqu'à minuit côté base et la J5
+  // retombe sur minuit. La fonction existe dès que le schéma est passé.
+  try {
+    const { error } = await supabase().rpc("fin_du_vote", { p_saison: 0, p_j: 0 });
+    const absente = error?.code === "PGRST202" || error?.code === "42883";
+    etapes.push({
+      titre: "Heure du vote en base",
+      ok: !error,
+      detail: !error
+        ? "18 h et 19 h tenues par la base."
+        : absente
+          ? "La base n'a pas encore l'heure du vote : il faut appliquer le schéma (Réglages → Installation Supabase)."
+          : error.message,
+    });
+  } catch (e) {
+    etapes.push({ titre: "Heure du vote en base", ok: false, detail: e instanceof Error ? e.message : "Lecture impossible." });
   }
 
   return etapes;

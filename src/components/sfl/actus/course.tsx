@@ -83,7 +83,10 @@ import { usePresence } from "@/hooks/use-presence";
 import { ReponseScellee } from "@/components/sfl/reponse-scellee";
 import { MeteoMatch } from "@/components/sfl/meteo-match";
 import { dateIsoDuLibelle, joursJusquA } from "@/lib/sfl/meteo";
-import { voteOuvert } from "@/lib/sfl/convocation-temps";
+import { estLeJourOuSaNuit } from "@/lib/sfl/convocation-temps";
+import { journeeComptee, verdictDeJournee } from "@/lib/sfl/revelation";
+import { journeeTerminee } from "@/lib/sfl/saisie/engine";
+import { useMaintenant } from "@/hooks/use-missions";
 import { annonceEnCours, J_DECOUPAGE, nomDivision, type Division } from "@/lib/sfl/divisions";
 import { METAL, PastilleDivision, parDivision, useDecoupageClassement } from "@/components/sfl/metal-division";
 import { divisionsDeLaJournee } from "@/lib/sfl/equipes-division";
@@ -101,6 +104,7 @@ import { legendes, saisonsPalmares, type SaisonPalmares } from "@/lib/sfl/palmar
 import { cn } from "@/lib/utils";
 import { ANTON } from "./ecran";
 import { VoteDuJour } from "./fil";
+import { DivisionsApres } from "./divisions-apres";
 import { CouvertureRubrique, RubriqueActu, RubriqueBesoin, RubriqueEnjeux, RubriqueRival, RubriqueToi } from "./pelouse";
 import { couverturesDuDimanche, sources, type Couverture } from "@/lib/sfl/couvertures";
 import { ContratALaUne } from "./contrat-a-la-une";
@@ -110,6 +114,7 @@ import type { Video } from "@/lib/sfl/videos";
 import { VueClassements, VueMatchs } from "./vues";
 import { ChoixEpoque, useEpoques, type ChoixDEpoque, type Epoque, type Vue } from "./epoques";
 import { CarteSaison, categoriesLegendes, Compteurs, LeMur } from "./wall-of-fame";
+import { Suspendu } from "@/components/sfl/cartons/mes-cartons";
 
 /** Les scènes d'un dimanche qui font bouger la course. */
 const SCENES: Actu["type"][] = ["titres", "mvp", "chiffre", "podium-jour", "duo", "montent", "badge", "badges", "equipe"];
@@ -583,14 +588,14 @@ function Ticker({
 
 /** La convocation du prochain dimanche, dans le fil : qui vient, et ta réponse d'un geste. */
 function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; className?: string }) {
-  const { saison } = useSeason();
+  const { saison, divisions } = useSeason();
   const { me } = useMyPlayer();
   // Un joueur Bola (hors de la saison) n'est pas convoqué.
   const bola = useJoueurBola();
   const [maintenant] = useState(() => new Date());
   const derniere = p.journee === J_DECOUPAGE && annonceEnCours(saison, maintenant);
   // Dès la J4, la division où l'on joue ce dimanche-là.
-  const etat = useMemo(() => divisionsDeLaJournee(saison, p.journee), [saison, p.journee]);
+  const etat = useMemo(() => divisionsDeLaJournee(saison, p.journee, divisions), [saison, p.journee, divisions]);
   const division = etat && !isHidden(me) ? (etat.actuelle.get(me) ?? 3) : null;
   // La météo de mon match : son lieu (celui de la ligue qui porte ce nom, sinon le terrain habituel).
   const [aujourdhui] = useState(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date()));
@@ -635,32 +640,52 @@ function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; clas
       </div>
       {p.presents.length > 0 && <QuiVient noms={p.presents} size={FORMAT_CARTE.petite * 1.2} />}
       {/* Ta réponse, d'un glissé jusqu'au bout : elle se scelle (reponse-scellee.tsx). */}
-      <ReponseScellee
-        taille="sm"
-        mine={p.mine}
-        ouvert={p.reponsesOuvertes}
-        libelles={{ absent: "Je passe" }}
-        onRepondre={p.answer}
-      />
+      {p.suspendu ? (
+        <Suspendu j={p.suspendu.j} taille="sm" />
+      ) : (
+        <ReponseScellee
+          taille="sm"
+          mine={p.mine}
+          ouvert={p.reponsesOuvertes}
+          libelles={{ absent: "Je passe" }}
+          onRepondre={p.answer}
+        />
+      )}
     </section>
   );
 }
 
-/** Le dimanche en direct : le jour du match, la feuille se remplit sous tes yeux (la base pousse chaque saisie). */
+/**
+ * Le dimanche du jour : la feuille se remplit sous tes yeux (la base pousse
+ * chaque saisie), lue sur le direct (journeesDirect), jusqu'à ce que la
+ * journée compte (revelation.ts). Le point rouge et « En direct » tant qu'un
+ * match se joue ; les matchs finis, l'heure de la révélation (« J5 · 19 h »).
+ * Le jour passé (et sa nuit, jusqu'à 1 h), plus rien : une journée bloquée
+ * se règle dans l'admin, pas dans le fil.
+ */
 function EnDirect({ ouvrir, sauf }: { ouvrir: (j: number) => void; sauf?: number }) {
-  const { journees } = useSeason();
-  const [maintenant] = useState(() => new Date());
-  const live = journees.find((j) => (j.matches?.length ?? 0) > 0 && voteOuvert(j.date, maintenant));
+  const { journeesDirect: journees, saisonLue } = useSeason();
+  const maintenant = useMaintenant();
+  const live = journees.find(
+    (j) => (j.matches?.length ?? 0) > 0 && estLeJourOuSaNuit(j.date, maintenant) && !journeeComptee(saisonLue, j.j, maintenant)
+  );
   // Le dimanche en tête du fil a déjà son terrain, qui se remplit de même.
   if (!live || live.j === sauf) return null;
+  const joue = journeeJouee(saisonLue, live.j);
+  const fini = joue && journeeTerminee(saisonLue, live.j);
+  const verdict = verdictDeJournee(saisonLue, live.j, maintenant);
   return (
     <section className="flex flex-col gap-3 px-5 md:px-0">
       <span className="flex items-center gap-2">
-        <span className="relative flex size-2.5">
-          <span className="absolute inset-0 animate-ping rounded-full bg-red-500 opacity-70 motion-reduce:animate-none" />
-          <span className="relative size-2.5 rounded-full bg-red-500" />
+        {joue && !fini && (
+          <span className="relative flex size-2.5">
+            <span className="absolute inset-0 animate-ping rounded-full bg-red-500 opacity-70 motion-reduce:animate-none" />
+            <span className="relative size-2.5 rounded-full bg-red-500" />
+          </span>
+        )}
+        <span className="mono-label text-encre-2">
+          {!joue ? `Aujourd'hui · J${live.j}` : fini ? `J${live.j} · ${verdict.replace(/^à /, "")}` : `En direct · J${live.j}`}
         </span>
-        <span className="mono-label text-encre-2">En direct · J{live.j}</span>
       </span>
       <CarteJournee journee={live} onOuvrir={() => ouvrir(live.j)} />
     </section>
@@ -990,6 +1015,8 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
         <>
           {/* Le soir du match, le vote est dans son dimanche, juste après la feuille. */}
           {recapDabord && <VoteDuJour me={me} />}
+          {/* Le vote fini, la révélation : les divisions après la journée (revelation.ts). */}
+          <DivisionsApres j={une.j} me={me} />
           <RubriqueToi j={dernier} date={une.journee?.date ?? ""} />
           {/* Mon Flair de ce dimanche, jugé (Sabri, 30/10). */}
           <RubriqueFlair j={une.j} />
@@ -1042,7 +1069,8 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
         <>
           <RailJournees etapes={etapes} deplier={deplier} />
           {/* Le jour du match, la feuille qui se remplit, avant tout le reste. */}
-          <EnDirect ouvrir={(j) => router.push(`/ligue/journee?j=${j}`)} sauf={recapDabord ? une?.j : undefined} />
+          {/* Son lien mène à la feuille en direct (la Map), pas au récap, qui attend la révélation. */}
+          <EnDirect ouvrir={() => router.push("/map")} sauf={recapDabord ? une?.j : undefined} />
           {recapDabord ? (
             <>
               {leDernier}

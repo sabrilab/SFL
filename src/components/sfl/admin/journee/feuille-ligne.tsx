@@ -9,7 +9,7 @@
 // SFL Time, clean sheet, MVP (auto quand la journée le calcule), Impact,
 // Défensive, retard, arrêts, interceptions, Xtratime, bonus, mention.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MiniCarte, FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { carteNeutre } from "@/components/sfl/qui-vient";
 import { useSeason } from "@/components/sfl/season-provider";
@@ -21,12 +21,27 @@ import type { MatchEntry, MatchResult, PlayerStatutSaisie, Saison } from "@/lib/
 import { haptique } from "@/lib/sfl/haptique";
 import { cn } from "@/lib/utils";
 import { Etiquette, Feuille, Pas, Pastille, Segmente } from "./ui";
+import { cartonsDe, REGLES_CARTONS, suspendusPour } from "@/lib/sfl/cartons";
+import { annoncerCartonsApresEnvoi } from "@/lib/sfl/cartons-annonce";
 
 const STATUTS: PlayerStatutSaisie[] = ["Présent", "Absent justifié", "Absence injustifiée", "Blessure", "Suspendu"];
 const RESULTATS: (MatchResult | null)[] = [null, "Victoire", "Nul", "Défaite"];
 const MENTIONS = ["", "Extra time", "Coach", "Gardien"];
 
-function Bascule({ libelle, on, onChange, verrou }: { libelle: string; on: boolean; onChange: (v: boolean) => void; verrou?: string }) {
+function Bascule({
+  libelle,
+  on,
+  onChange,
+  verrou,
+  signalee,
+}: {
+  libelle: string;
+  on: boolean;
+  onChange: (v: boolean) => void;
+  verrou?: string;
+  /** L'alerte qui a ouvert la fiche porte sur elle : un anneau, en noir et blanc. */
+  signalee?: boolean;
+}) {
   return (
     <button
       type="button"
@@ -38,7 +53,8 @@ function Bascule({ libelle, on, onChange, verrou }: { libelle: string; on: boole
       }}
       className={cn(
         "flex h-11 items-center justify-center gap-1.5 rounded-full px-4 text-ligne font-semibold transition-colors disabled:opacity-60",
-        on ? "bg-foreground text-background" : "bg-secondary text-encre-2"
+        on ? "bg-foreground text-background" : "bg-secondary text-encre-2",
+        signalee && "ring-2 ring-foreground ring-offset-2 ring-offset-background"
       )}
     >
       {libelle}
@@ -50,6 +66,7 @@ function Bascule({ libelle, on, onChange, verrou }: { libelle: string; on: boole
 export function FeuilleLigne({
   saison,
   index,
+  vers,
   equipes,
   mvpAuto,
   places,
@@ -59,6 +76,8 @@ export function FeuilleLigne({
 }: {
   saison: Saison;
   index: number | null;
+  /** Ouverte depuis une alerte SFL Time : posée sur ses honneurs, la bascule marquée. */
+  vers?: "honneurs" | null;
   equipes: EquipeDuJour[];
   mvpAuto: boolean;
   places: ReadonlyMap<string, string>;
@@ -70,6 +89,14 @@ export function FeuilleLigne({
   const [remplacer, setRemplacer] = useState(false);
   const e = index != null ? saison.entries[index] : undefined;
   const open = !!e;
+  // Ouverte depuis une alerte SFL Time : les honneurs d'abord, sous le pli au téléphone (contrôle visuel du 02/11).
+  const honneurs = useRef<HTMLElement>(null);
+  const surHonneurs = open && vers === "honneurs";
+  useEffect(() => {
+    if (!surHonneurs) return;
+    const id = window.setTimeout(() => honneurs.current?.scrollIntoView({ block: "center", behavior: "smooth" }), 320);
+    return () => window.clearTimeout(id);
+  }, [surHonneurs, index]);
   if (!e || index == null)
     return <Feuille open={false} onOpenChange={() => onClose()} titre="">{null}</Feuille>;
 
@@ -81,6 +108,10 @@ export function FeuilleLigne({
     }, `${label} — ${e.player}`);
   const present = e.statut === "Présent";
   const sienne = equipes.find((t) => t.nom === e.team);
+  // Le carton que vaut ce retard : « 2/3 », « 3/3 · rouge ».
+  const cartons = e.retard ? cartonsDe(saison, e.player).cartons.filter((c) => c.j === e.j) : [];
+  const jaune = cartons.find((c) => c.couleur === "jaune");
+  const carton = jaune ? `${jaune.rang}/${REGLES_CARTONS.jaunesPourUnRouge}${cartons.some((c) => c.couleur === "rouge") ? " · rouge" : ""}` : null;
 
   return (
     <>
@@ -171,15 +202,23 @@ export function FeuilleLigne({
           </div>
         </section>
 
-        <section className="flex flex-col gap-2">
+        <section ref={honneurs} className="flex scroll-mt-4 flex-col gap-2">
           <Etiquette>Honneurs</Etiquette>
           <div className="flex flex-wrap gap-1.5">
             <Bascule libelle="MVP" on={e.mvp} verrou={mvpAuto ? "auto" : undefined} onChange={(v) => patch({ mvp: v }, "MVP")} />
             <Bascule libelle="Impact" on={e.impact} onChange={(v) => patch({ impact: v }, "Impact")} />
             <Bascule libelle="Défensive" on={e.def} onChange={(v) => patch({ def: v }, "Défensive")} />
             <Bascule libelle="CS" on={e.cleanSheet} onChange={(v) => patch({ cleanSheet: v }, "Clean sheet")} />
-            <Bascule libelle="SFL Time" on={e.sflTime} onChange={(v) => patch({ sflTime: v }, "SFL Time")} />
-            <Bascule libelle="Retard" on={e.retard} onChange={(v) => patch({ retard: v }, "Retard")} />
+            <Bascule libelle="SFL Time" on={e.sflTime} signalee={surHonneurs} onChange={(v) => patch({ sflTime: v }, "SFL Time")} />
+            <Bascule
+              libelle="Retard"
+              on={e.retard}
+              verrou={carton ?? undefined}
+              onChange={(v) => {
+                // Un retard dès la J4 est un carton (lib/sfl/cartons.ts) : sa notification part avec la saison.
+                if (patch({ retard: v }, "Retard") && v) annoncerCartonsApresEnvoi();
+              }}
+            />
             <Bascule libelle="Extra" on={!!e.extraTime} onChange={(v) => patch({ extraTime: v || undefined }, "Xtratime")} />
           </div>
         </section>
@@ -202,6 +241,7 @@ export function FeuilleLigne({
         saison={saison}
         titre={`Remplacer ${e.player}`}
         places={places}
+        suspendus={suspendusPour(saison, e.j)}
         onChoisir={(nom) =>
           faire((s) => {
             const i = s.entries.findIndex((x, k) => k === index && x.player === e.player);

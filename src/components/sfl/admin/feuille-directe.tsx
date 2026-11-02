@@ -14,6 +14,9 @@
 //
 // Chaque match se joue les Noirs contre les Blancs (saisie/equipes.ts) : un
 // jour à plusieurs matchs, on choisit le match, puis le camp qu'on suit.
+//
+// Un camp dont la feuille est tenue par un joueur (01/11/2026, `verrous`) :
+// ses compteurs se lisent ici sans se toucher — c'est sa feuille qui compte.
 
 import { useMemo, useState } from "react";
 import { ChevronDown, Minus, Plus } from "lucide-react";
@@ -46,11 +49,13 @@ function Stepper({
   onSet,
   label,
   icone,
+  verrouille = false,
 }: {
   value: number;
   onSet: (n: number) => void;
   label: string;
   icone: string;
+  verrouille?: boolean;
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
@@ -61,7 +66,7 @@ function Stepper({
         <button
           onClick={() => onSet(Math.max(0, value - 1))}
           aria-label={`${label} moins`}
-          disabled={value === 0}
+          disabled={value === 0 || verrouille}
           className="bouton-discret flex size-7 shrink-0 items-center justify-center disabled:opacity-25"
         >
           <Minus className="size-3.5" />
@@ -77,7 +82,8 @@ function Stepper({
         <button
           onClick={() => onSet(Math.min(99, value + 1))}
           aria-label={`${label} plus`}
-          className="bouton-principal flex size-7 shrink-0 items-center justify-center"
+          disabled={verrouille}
+          className="bouton-principal flex size-7 shrink-0 items-center justify-center disabled:opacity-25"
         >
           <Plus className="size-3.5" />
         </button>
@@ -96,7 +102,18 @@ interface Props {
  * qui porte déjà la journée et un tableau d'affichage par match : ni le choix
  * de la journée ni un second tableau.
  */
-export function FeuilleDirecte({ saison, commit, jInitial, embarque = false }: Props & { jInitial?: number; embarque?: boolean }) {
+export function FeuilleDirecte({
+  saison,
+  commit,
+  jInitial,
+  embarque = false,
+  verrous,
+}: Props & {
+  jInitial?: number;
+  embarque?: boolean;
+  /** Les camps dont la feuille est tenue par un joueur, et son nom. */
+  verrous?: ReadonlyMap<string, string>;
+}) {
   const journees = useMemo(() => [...saison.journees].sort((a, b) => b.j - a.j), [saison.journees]);
   // La journée du jour ou la prochaine ; jamais d'office la dernière jouée.
   const [j, setJ] = useState<number>(() => jInitial ?? prochaineJournee(saison, new Date()) ?? journees[0]?.j ?? 1);
@@ -126,6 +143,7 @@ export function FeuilleDirecte({ saison, commit, jInitial, embarque = false }: P
   const onglets = nbMatchs > 1 && active?.match != null ? equipes.filter((x) => x.match === active.match) : equipes;
 
   const visibles = rows.filter((x) => (teamActive ? x.e.team === teamActive : !x.e.team));
+  const tenuePar = teamActive ? (verrous?.get(teamActive) ?? null) : null;
 
   const butsDe = (t: string) =>
     rows.filter((x) => x.e.team === t).reduce((s, x) => s + x.e.buts + (x.e.teamScoreBonus ?? 0), 0);
@@ -230,6 +248,8 @@ export function FeuilleDirecte({ saison, commit, jInitial, embarque = false }: P
         </div>
       )}
 
+      {tenuePar && <p className="mono-label text-center text-encre-3">◉ Feuille · {tenuePar}</p>}
+
       {/* Les joueurs */}
       {visibles.length === 0 ? (
         <div className="glass rounded-[22px] px-6 py-10 text-center text-corps text-encre-3">
@@ -271,6 +291,7 @@ export function FeuilleDirecte({ saison, commit, jInitial, embarque = false }: P
                       label={c.label}
                       icone={c.icone}
                       value={(e[c.key] as number | undefined) ?? 0}
+                      verrouille={!!tenuePar}
                       onSet={(n) =>
                         set(index, { [c.key]: n } as Partial<MatchEntry>, `${c.label} — ${e.player}`)
                       }

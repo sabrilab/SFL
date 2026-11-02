@@ -91,7 +91,7 @@ export function DosCarte({
   const era = p.epoque;
   const habillage = era ? undefined : habillageDemande;
   const ligne = era ? ligneDEmission(emission ?? { saison: era.saison, le: null, n: null, sur: null }) : null;
-  const { serie, numero } = ligne ? { serie: ligne.date, numero: ligne.numero } : serieDe(nom, p.nom === "fondateur" ? habillage : undefined);
+  const { serie, numero } = ligne ? { serie: ligne.date, numero: ligne.numero } : serieDe(nom, p.nom === "fondateur" || p.nom.startsWith("afrique-") ? habillage : undefined);
   const sLune = LUNE / BOITE_SYMBOLE.c;
   const lisere = lisereDe(habillage);
   const cran = habillage?.cran ?? 0;
@@ -99,6 +99,12 @@ export function DosCarte({
   const runes = !!habillage?.signes?.includes("runes");
   const nomRunes = !!nom && !!habillage?.signes?.includes("nom-runes");
   const sLogo = LOGOTYPE.h / BOITE_LOGOTYPE.h;
+  // Un skin de nation (PACK AFRIQUE 2027) : son motif descend parfois jusqu'à la
+  // ligne de série (le pagne tissé du Sénégal, les coutures de l'Ouganda), où son
+  // numéro se perdait (02/11). La série garde un halo de son papier, comme le
+  // numéro d'un billet dans sa réserve.
+  const nation = p.nom.startsWith("afrique-");
+  const haloSerie = nation ? [2, 5, 10, 18].map((r) => `0 0 ${u(r)}px ${p.fond}`).join(", ") : undefined;
 
   return (
     <div
@@ -287,7 +293,8 @@ export function DosCarte({
           letterSpacing: u(0.5),
           fontWeight: 500,
           lineHeight: 1,
-          color: era ? era.libelle : encre(0.75),
+          color: era ? era.libelle : encre(nation ? 0.92 : 0.75),
+          textShadow: haloSerie,
         }}
       >
         <span>{serie}</span>

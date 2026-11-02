@@ -12,7 +12,8 @@
 //     13h) : Noirs, nul ou Blancs pour chaque match, le meilleur buteur et le
 //     meilleur du jour (le plus de points Pépite, titres du vote compris).
 //     Sur ton propre match, tu ne peux soutenir que ton camp. Le verdict est
-//     définitif à minuit, quand le vote Impact et Défensive se ferme ;
+//     définitif à la révélation (revelation.ts : 19 h dès la J5, minuit
+//     jusqu'à la J4), quand les titres Impact et Défensive entrent ;
 //     Sabri, 31/10 : « pour chaque match qui se joue dans une journée SFL, on
 //     puisse déterminer avec le flair le meilleur buteur, le meilleur passeur
 //     et le MVP du match », « le meilleur passeur du jour », « des choix en
@@ -36,6 +37,7 @@
 //
 // Pur : ni React ni réseau. Les pronos arrivent en paramètres (pronos-store.ts).
 
+import { heureDuJour } from "./convocation-temps";
 import { isHidden } from "./hidden";
 import { missionsDeJournee, type DimancheMissions, type LigneXp } from "./missions";
 import { entryPP } from "./saisie/engine";
@@ -75,6 +77,21 @@ export const NOM_ECART: Record<Ecart, string> = { serre: "Serré", net: "Net", l
 export const DETAIL_ECART: Record<Ecart, string> = { serre: "0-1 but", net: "2-3 buts", large: "4 et +" };
 export const ecartDe = (d: number): Ecart => (Math.abs(d) <= 1 ? "serre" : Math.abs(d) <= 3 ? "net" : "large");
 
+/**
+ * Les sujets durs du Flair (Ilyes, 02/11/2026), les seuls qui donnent des XP
+ * S (xp-s.ts) : le MVP d'un match, son duel, son écart en bande, et le
+ * buteur, le passeur et le meilleur du jour. Ni « qui gagne », ni le buteur
+ * ou le passeur d'un match (un sur trois passe au favori).
+ */
+export const SUJETS_DURS_MATCH: readonly GenreMatch[] = ["mvp", "duel", "ecart"];
+export const SUJETS_DURS_JOUR: readonly (typeof SUJETS_JOUR)[number][] = ["buteur", "passeur", "pepite"];
+
+/** Un sujet dur (SUJETS_DURS_MATCH, SUJETS_DURS_JOUR) ? */
+export function estDur(sujet: string): boolean {
+  const [genre, n] = lireSujet(sujet);
+  return n == null ? (SUJETS_DURS_JOUR as readonly string[]).includes(genre) : (SUJETS_DURS_MATCH as readonly string[]).includes(genre);
+}
+
 /** Le genre et le match d'un sujet : `mvp:1` → ["mvp", 1] ; un sujet du jour → [sujet, null]. */
 export function lireSujet(sujet: string): [string, number | null] {
   const i = sujet.indexOf(":");
@@ -87,6 +104,15 @@ export const PRIME_SAISON_PAS = 40;
 
 /** La prime d'un prono de saison posé après `jouees` journées jouées : 300, 260, 220… jamais sous 60. */
 export const primeSaison = (jouees: number) => Math.max(PRIME_SAISON_MIN, PRIME_SAISON_MAX - PRIME_SAISON_PAS * jouees);
+
+/**
+ * Un Flair de saison compte pour les XP S (xp-s.ts) s'il a été posé ou
+ * changé pour la dernière fois avant le début de la troisième journée jouée
+ * de sa saison (flairSaisonTot) : il n'a plus bougé après la J2. Plus tard,
+ * on prendrait le leader évident. Sur une saison dont toutes les journées
+ * ont leurs équipes, c'est une prime encore à primeSaison(2), 220.
+ */
+export const JOURNEES_FLAIR_SAISON_TOT = 2;
 
 export const SUJETS_SAISON: SujetSaison[] = ["pepite", "buteur", "passeur"];
 export const TITRE_SAISON: Record<SujetSaison, string> = {
@@ -128,6 +154,8 @@ export interface JourneePronos {
   date: string;
   coupEnvoi: Date;
   finDuJour: Date;
+  /** « à 19 h », « à minuit », « ce soir » (missions.ts, heuresDeJournee). */
+  verdict: string;
   joue: boolean;
   matchs: MatchProno[];
   /** Tous les joueurs de la feuille, masqués exclus. */
@@ -165,6 +193,7 @@ export function pronosDeJournee(
     date: d.date,
     coupEnvoi: d.coupEnvoi,
     finDuJour: d.finDuJour,
+    verdict: d.verdict,
     joue: d.joue,
     matchs,
     joueurs: matchs.flatMap((m) => [...m.noirs, ...m.blancs]),
@@ -300,6 +329,28 @@ export function primeAu(s: Pick<Saison, "journees" | "entries" | "roster">, nume
   return primeSaison(coupsDEnvoi(s, numero, reference).filter((d) => d.getTime() <= le.getTime()).length);
 }
 
+/**
+ * Le début de chaque journée jouée, dans l'ordre : son coup d'envoi si elle a
+ * ses équipes, sinon le début de son jour (minuit, Paris). coupsDEnvoi, qui
+ * fait la prime, ne voit pas une journée jouée sans équipes (la J2 de la
+ * saison 0) : le seuil des XP S, lui, la compte (contrôle adverse du 02/11).
+ */
+function debutsDesJournees(s: Pick<Saison, "journees" | "entries" | "roster">, numero: number, reference: Date): Date[] {
+  return s.journees
+    .filter((m) => journeeJouee(s as Saison, m.j))
+    .map((m) => missionsDeJournee(s, numero, m.j, reference)?.coupEnvoi ?? heureDuJour(m.date, reference, 0))
+    .filter((d): d is Date => !!d && d.getTime() > 0);
+}
+
+/**
+ * Un Flair de saison posé à cet instant compte-t-il pour les XP S ? Avant le
+ * début de la troisième journée jouée (JOURNEES_FLAIR_SAISON_TOT + 1) :
+ * jamais plus de deux journées jouées au moment du dernier changement.
+ */
+export function flairSaisonTot(s: Pick<Saison, "journees" | "entries" | "roster">, numero: number, le: Date, reference: Date): boolean {
+  return debutsDesJournees(s, numero, reference).filter((d) => d.getTime() <= le.getTime()).length <= JOURNEES_FLAIR_SAISON_TOT;
+}
+
 /** Les premiers de la saison sur chaque sujet. */
 export function resultatsDeSaison(s: Saison): Map<SujetSaison, string[]> {
   // La règle du classement (rangs.ts) : journées jouées, masqués retirés.
@@ -336,16 +387,18 @@ export function lignesPronos(
     const p = pronosDeJournee(lue, numero, j, reference);
     if (!p || !p.joue || (!close && maintenant.getTime() < p.finDuJour.getTime())) continue;
     const res = resultatsDeJournee(p, lue.entries);
-    const parJoueur = new Map<string, { justes: number; total: number; xp: number }>();
+    const parJoueur = new Map<string, { justes: number; total: number; xp: number; durs: number }>();
     for (const x of miens.filter((r) => r.j === j)) {
       const retenu = pronoRetenu(miens, p, x.joueur, x.sujet);
       const etat = etatDe(retenu, res);
       if (etat === "attente") continue;
-      const b = parJoueur.get(x.joueur) ?? { justes: 0, total: 0, xp: 0 };
+      const b = parJoueur.get(x.joueur) ?? { justes: 0, total: 0, xp: 0, durs: 0 };
       b.total++;
       if (etat === "juste") {
         b.justes++;
         b.xp += xpSujet(x.sujet);
+        // Les XP S (xp-s.ts) : un sujet dur, jamais un choix sur soi (son titre ou sa mission le paie déjà).
+        if (estDur(x.sujet) && x.choix !== x.joueur) b.durs++;
       }
       parJoueur.set(x.joueur, b);
     }
@@ -353,7 +406,7 @@ export function lignesPronos(
       if (!b.justes) continue;
       out.push({
         joueur,
-        ligne: { saison: numero, j, date: p.date, quoi: `Flair, ${b.justes} sur ${b.total}`, xp: Math.min(b.xp, plafondDe(p, joueur)) },
+        ligne: { saison: numero, j, date: p.date, quoi: `Flair, ${b.justes} sur ${b.total}`, xp: Math.min(b.xp, plafondDe(p, joueur)), flairDurs: b.durs },
       });
     }
   }
@@ -363,6 +416,7 @@ export function lignesPronos(
     for (const x of miens.filter((r) => r.j === J_SAISON)) {
       const sujet = x.sujet as SujetSaison;
       if (!res.get(sujet)?.includes(x.choix)) continue;
+      const prime = primeAu(lue, numero, new Date(x.le), reference);
       out.push({
         joueur: x.joueur,
         ligne: {
@@ -370,7 +424,9 @@ export function lignesPronos(
           j: derniere?.j ?? 0,
           date: derniere?.date ?? "",
           quoi: `Flair de la saison : ${TITRE_SAISON[sujet] ?? sujet}`,
-          xp: primeAu(lue, numero, new Date(x.le), reference),
+          xp: prime,
+          // Les XP S (xp-s.ts) : seulement un choix qui n'a plus bougé après la J2, et jamais sur soi.
+          flairSaison: { sujet, tot: flairSaisonTot(lue, numero, new Date(x.le), reference) && x.choix !== x.joueur },
         },
       });
     }
@@ -462,7 +518,7 @@ export function ajouterPronos(
 // apparaître dans Ma carte » ; « sur les récaps, il y ait le résultat du
 // flair ») : ce qu'il a choisi, s'il a vu juste, l'XP. Les mêmes règles que
 // lignesPronos : posé avant le coup d'envoi, plafond par journée, acquis à
-// minuit (ou à la clôture).
+// la révélation (ou à la clôture).
 
 export type PhaseFlair = "ouvert" | "en-jeu" | "fini";
 
@@ -491,6 +547,10 @@ export interface FlairDeJournee {
   xp: number;
   /** Son plafond : celui de la feuille, ou de la tribune. */
   plafond: number;
+  /** Le verdict définitif : la révélation de la journée (revelation.ts : 19 h dès la J5, minuit avant). */
+  finDuJour: Date;
+  /** Son heure à l'écran : « à 19 h », « à minuit », « ce soir ». */
+  verdict: string;
 }
 
 /** L'ordre de lecture : chaque match, sujet par sujet, puis la journée. */
@@ -563,6 +623,8 @@ export function flairsDuJoueur(
       juges: choix.filter((c) => c.etat === "juste" || c.etat === "faux").length,
       xp: Math.min(plafondDe(p, joueur), justes.reduce((a, c) => a + c.xp, 0)),
       plafond: plafondDe(p, joueur),
+      finDuJour: p.finDuJour,
+      verdict: p.verdict,
     });
   }
   return out;

@@ -1,0 +1,178 @@
+/* Le carton de l'arbitre (components/sfl/cartons/carton-recu.tsx, 01/11/2026).
+   Un vrai carton de PVC : 5 × 7, les coins à peine arrondis, une tranche
+   d'un trait (il fait moins d'un millimètre), le satiné d'un plastique lisse
+   et un reflet qui passe quand il se lève. Les deux seules couleurs de l'app
+   hors du noir et blanc (Sabri, 01/11), à côté de la braise du « Il manque N ».
+
+   Contrôle du 01/11 au soir : le premier jet tirait sur l'or (un dégradé
+   jusqu'à l'ocre, une tranche épaisse, un halo jaune) — l'or est aux cartes
+   MVP, le rouge laqué à l'Impact. Ici, une couleur pleine d'arbitre, à peine
+   éclairée d'en haut ; aucun halo ; le geste monte d'un coup de bras, sans
+   rebond d'échelle, puis le carton est tenu, immobile (aucun tremblement).
+   « Réduire les animations » : la règle globale (globals.css) ramène chaque
+   animation à son dernier état ; ici, rien n'est même déclaré. */
+
+.carton-scene {
+  perspective: 900px;
+  perspective-origin: 50% 70%;
+}
+
+/* Le bras qui tient le carton : la perspective passe jusqu'au carton. */
+.carton-tenu {
+  transform-style: preserve-3d;
+}
+
+.carton {
+  /* Jaune et rouge d'arbitre, pleins : jamais l'or des MVP, jamais le rouge laqué des Impact. */
+  --carton: #ffd31a;
+  --carton-haut: #ffe14d;
+  --carton-bas: #f5c400;
+  --carton-tranche: #d9a900;
+  --carton-encre: rgba(0, 0, 0, 0.3);
+  position: relative;
+  width: min(54vw, 214px);
+  aspect-ratio: 5 / 7;
+  border-radius: 10px;
+  overflow: hidden;
+  background:
+    /* le satiné : la lumière d'en haut, large et douce */
+    radial-gradient(120% 70% at 22% 0%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0) 60%),
+    /* le plastique, d'une seule couleur */
+    linear-gradient(176deg, var(--carton-haut) 0%, var(--carton) 38%, var(--carton) 78%, var(--carton-bas) 100%);
+  box-shadow:
+    /* le bord du PVC, où la lumière accroche */
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.14),
+    /* la tranche : un trait */
+    0 1px 0 0 var(--carton-tranche),
+    /* tenu en l'air, devant soi */
+    0 30px 60px -26px rgba(0, 0, 0, 0.9),
+    0 10px 22px -12px rgba(0, 0, 0, 0.55);
+}
+
+.carton--rouge {
+  --carton: #e0201c;
+  --carton-haut: #ec3a30;
+  --carton-bas: #cc1a17;
+  --carton-tranche: #a31311;
+  --carton-encre: rgba(0, 0, 0, 0.32);
+}
+
+/* Le reflet qui traverse le plastique quand il se lève (hors champ au repos). */
+.carton::before {
+  content: "";
+  position: absolute;
+  inset: -20% -60%;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.55) 49%, rgba(255, 255, 255, 0.14) 53%, transparent 60%);
+  transform: translateX(-70%);
+}
+
+/* Le grain du PVC, à peine. */
+.carton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0.1;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='120' height='120' filter='url(%23g)'/></svg>");
+}
+
+/* Le sigle, imprimé petit au pied, comme la marque d'un vrai carton. */
+.carton__sigle {
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  translate: -50% 0;
+  display: flex;
+  color: var(--carton-encre);
+}
+
+/* Le voile se pose, puis le geste de l'arbitre : le carton sort d'en bas,
+   monte d'un coup de bras, dépasse à peine, se pose, bras tendu, et ne bouge
+   plus. Seulement si le téléphone accepte le mouvement : sinon, le carton
+   est là, posé, et rien ne bouge. */
+@media (prefers-reduced-motion: no-preference) {
+  .carton-voile {
+    animation: carton-voile 0.28s ease-out both;
+  }
+
+  .carton--brandi {
+    animation: carton-brandi 0.9s cubic-bezier(0.2, 0.85, 0.25, 1) 0.16s both;
+  }
+
+  .carton--brandi::before {
+    animation: carton-reflet 0.85s cubic-bezier(0.3, 0, 0.2, 1) 0.6s both;
+  }
+
+  .carton-texte {
+    animation: carton-texte 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.8s both;
+  }
+
+  .carton-bouton {
+    animation: carton-texte 0.4s ease-out 1.05s both;
+  }
+}
+
+@keyframes carton-voile {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes carton-brandi {
+  0% {
+    transform: translate3d(-14%, 150%, 0) rotateZ(-26deg) rotateX(50deg) rotateY(-20deg);
+  }
+  46% {
+    transform: translate3d(1%, -4%, 0) rotateZ(2.5deg) rotateX(-7deg) rotateY(5deg);
+  }
+  72% {
+    transform: translate3d(0, 0.8%, 0) rotateZ(-4.2deg) rotateX(1.5deg) rotateY(-1deg);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotateZ(-3deg) rotateX(0) rotateY(0);
+  }
+}
+
+@keyframes carton-reflet {
+  from {
+    transform: translateX(-70%);
+  }
+  to {
+    transform: translateX(70%);
+  }
+}
+
+@keyframes carton-texte {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Le compteur : trois petits cartons, pleins jusqu'au rang. */
+.carton-mini {
+  display: inline-block;
+  width: 12px;
+  height: 17px;
+  border-radius: 2px;
+  /* Vide : un contour à l'encre du texte, sombre comme clair. */
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, currentColor 30%, transparent);
+}
+.carton-mini--jaune {
+  background: linear-gradient(176deg, #ffe14d, #ffd31a 45%, #f5c400);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 0 0 0.5px rgba(0, 0, 0, 0.14);
+}
+.carton-mini--rouge {
+  background: linear-gradient(176deg, #ec3a30, #e0201c 45%, #cc1a17);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 0 0 0.5px rgba(0, 0, 0, 0.14);
+}

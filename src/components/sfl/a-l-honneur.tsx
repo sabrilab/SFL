@@ -17,7 +17,8 @@
 //   · ils ont décroché    : une vitrine par joueur, la carte et son badge qui
 //     flotte à côté, la lumière du métal au sol ;
 //   · l'équipe type       : les cinq sur la pelouse, le meilleur du jour au
-//     centre en carte moyenne ;
+//     centre en carte moyenne ; une carte à titre y porte ses puces, or MVP,
+//     rouge Impact, bleu Défensive (02/11/2026, puces-titres.tsx) ;
 //   · le duo              : les deux cartes, la trajectoire du ballon ;
 //   · ils montent         : des marches, plus haute est la remontée ;
 //   · dans la surface     : devant le but, le badge en verre au-dessus de
@@ -38,10 +39,12 @@ import { AuVestiaireRond } from "@/components/sfl/au-vestiaire";
 import { Badge3D, Objet3D, OBJET_PALIER } from "@/components/sfl/badge-3d";
 import { EMBLEMES } from "@/components/sfl/emblemes";
 import { MiniCarte } from "@/components/sfl/mini-carte";
+import { PucesTitres } from "@/components/sfl/puces-titres";
+import { useTitresDuJour } from "@/hooks/use-titres-du-jour";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { honneurDe } from "@/lib/sfl/a-l-honneur";
-import type { Player } from "@/lib/sfl/engine";
+import type { BoostType, Player } from "@/lib/sfl/engine";
 import { metal, NOM_METAL, TROPHEES, type TropheeId } from "@/lib/sfl/trophees";
 import type { PieceLigue } from "@/lib/sfl/vestiaire";
 import { cn } from "@/lib/utils";
@@ -256,13 +259,14 @@ function Pelouse({ surface = false, haut = "72%" }: { surface?: boolean; haut?: 
  * entier. `marge` : ce que son nom peut déborder de la carte ; `echelle` : la
  * réduction de sa rangée (le nom garde sa taille).
  */
-function Joueur({ p, size, moi, detail, chiffre, dessus, marge = 21, echelle = 1 }: { p: Player; size: number; moi: boolean; detail: string; chiffre?: string; dessus?: ReactNode; marge?: number; echelle?: number }) {
+function Joueur({ p, size, moi, detail, chiffre, dessus, marge = 21, echelle = 1, titres }: { p: Player; size: number; moi: boolean; detail: string; chiffre?: string; dessus?: ReactNode; marge?: number; echelle?: number; titres?: BoostType[] }) {
   return (
     <div className="flex flex-col items-center" style={{ width: W(size * echelle) + marge }}>
       {dessus}
       <div className={cn("relative flex rounded-[6px]", moi && "ring-2 ring-primary ring-offset-2 ring-offset-transparent")}>
         <Ombre largeur={W(size * echelle)} />
         <MiniCarte player={p} size={size * echelle} detail={detail} />
+        {titres && <PucesTitres titres={titres} />}
       </div>
       <span
         className={cn("titre-lettrage mt-[var(--fib-8)] w-full text-center leading-[1.05] tracking-[-0.02em] break-words", moi ? "text-primary" : "text-contraste")}
@@ -582,6 +586,7 @@ function Vitrine({ d, p }: { d: { nom: string; id: TropheeId; palier: number }; 
  */
 function EquipeType({ j, equipe, moi }: { j: number; equipe: { nom: string; pp: number; p: Player }[]; moi: string }) {
   const [cadre, largeur] = useLargeur();
+  const titresDe = useTitresDuJour(j);
   const meilleur = equipe.reduce((a, b) => (b.pp > a.pp ? b : a));
   const autres = equipe.filter((e) => e !== meilleur);
   const fond = autres.slice(0, 2);
@@ -590,7 +595,7 @@ function EquipeType({ j, equipe, moi }: { j: number; equipe: { nom: string; pp: 
   // (4 px de marge), et toutes rapetissent si la scène est plus étroite.
   const echelle = ajuster(largeur, 2 * W(PETITE) + W(MOYENNE), 3 * 4 + 2 * 8);
   const joueur = (e: { nom: string; pp: number; p: Player }, size: number, marge?: number) => (
-    <Joueur key={e.nom} p={e.p} size={size} moi={e.nom === moi} detail={`Équipe type · J${j} · ${e.pp} pts`} chiffre={`+${e.pp} pts`} marge={marge} echelle={marge ? echelle : 1} />
+    <Joueur key={e.nom} p={e.p} size={size} moi={e.nom === moi} detail={`Équipe type · J${j} · ${e.pp} pts`} chiffre={`+${e.pp} pts`} marge={marge} echelle={marge ? echelle : 1} titres={titresDe(e.nom)} />
   );
   return (
     <section>

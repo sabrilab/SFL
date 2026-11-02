@@ -37,8 +37,8 @@ import {
   addEntry,
   ajouterMatch,
   deleteEntryAt,
+  ligneNeuve,
   matchsDeclares,
-  newEntry,
   updateEntryAt,
 } from "@/lib/sfl/saisie/mutations";
 import { choixDEquipe } from "@/lib/sfl/saisie/equipes";
@@ -49,6 +49,7 @@ import { TERRAINS_MAX } from "@/lib/sfl/equipes-division";
 import { ChoisirJoueurs } from "@/components/sfl/admin/choisir-joueurs";
 import { PointMaillot } from "@/components/sfl/point-maillot";
 import type { MatchEntry, Saison } from "@/lib/sfl/saisie/types";
+import { suspendusPour } from "@/lib/sfl/cartons";
 
 /* ------------------------------- colonnes -------------------------------- */
 
@@ -339,7 +340,7 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
   const libres = rosterNames.filter((n) => !deja.has(n.trim().toLowerCase()));
 
   function ajouterLigne(nom: string) {
-    commit(addEntry(saison, { ...newEntry(j, nom, null), sflTime: false }), `Ligne ajoutée — ${nom}`);
+    commit(addEntry(saison, ligneNeuve(saison, j, nom, null)), `Ligne ajoutée — ${nom}`);
   }
 
   function ajouterUnMatch() {
@@ -395,6 +396,7 @@ export function GrilleSaisie({ saison, commit, supprimerLigne }: Props) {
         saison={saison}
         titre={`Ajouter à la J${j}`}
         places={places}
+        suspendus={suspendusPour(saison, j)}
         onChoisir={ajouterLigne}
       />
 

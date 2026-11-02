@@ -19,14 +19,30 @@
 //   I6  deux journées pour une même date
 //   I7  un camp aux résultats différents, ou incohérent avec son adversaire
 //   I8  une écriture qui fait disparaître un brouillon sans « Jeter »
+//   I9  un joueur suspendu (carton rouge, cartons.ts) sur la journée de sa
+//       suspension — bloque seulement une ligne NOUVELLE : noter le retard
+//       qui fait le rouge ne bloque pas une J5 déjà composée, qui garde son
+//       défaut à corriger avant d'être publiée
+//   I10 une vue figée (revelation.ts, figer) : ses journées en attente de la
+//       révélation n'ont plus leurs résultats, l'écrire les effacerait
+//   I11 une date que l'app ne lit pas (« 08/11 ») : ni vote, ni révélation,
+//       ni fin des matchs (02/11/2026 ; la base refuse aussi,
+//       public.dates_illisibles)
+//   I12 une ligne jouée dont la SFL Time n'est pas celle de sa journée
+//       (02/11/2026) : sa victoire (3 points ou 2) et ses XP S en dépendent.
+//       Une alerte seulement, qui ne bloque ni l'écriture ni la publication :
+//       rien ne se réécrit seul dans le passé, l'admin décide, ligne par ligne
+//       ou en recochant la SFL Time de la journée (mutations.ts, updateJournee)
 //
 // Pur.
 
 import { TERRAINS_MAX } from "../equipes-division";
 import { isArbitre, neJouePas } from "../hidden";
+import { suspendusPour } from "../cartons";
 import { estBrouillon } from "./brouillon";
 import type { MatchDuJour, MatchEntry, Saison } from "./types";
 import { libelleCourt } from "./mutations";
+import { jourMoisDuLibelle } from "../convocation-temps";
 
 export type Ecart =
   | { r: "I0"; j: number; joueur: string }
@@ -37,12 +53,17 @@ export type Ecart =
   | { r: "I5"; j: number; match: number }
   | { r: "I6"; date: string; js: number[] }
   | { r: "I7"; j: number; equipe: string }
-  | { r: "I8"; j: number };
+  | { r: "I8"; j: number }
+  | { r: "I9"; j: number; joueur: string }
+  | { r: "I10" }
+  | { r: "I11"; j: number; date: string }
+  /** `sflTime` : celle de la ligne (vrai : en trop ; faux : elle manque). */
+  | { r: "I12"; j: number; joueur: string; sflTime: boolean };
 
 export type Regle = Ecart["r"];
 
-export const BLOQUE_L_ECRITURE: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I6", "I8"]);
-export const BLOQUE_LA_PUBLICATION: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7"]);
+export const BLOQUE_L_ECRITURE: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I6", "I8", "I9", "I10", "I11"]);
+export const BLOQUE_LA_PUBLICATION: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I9", "I11"]);
 
 const cle = (n: string) => n.trim().toLowerCase();
 const dateCle = (d: string) => libelleCourt(d).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
@@ -53,6 +74,8 @@ export function cleEcart(e: Ecart): string {
     case "I0":
     case "I1":
     case "I2":
+    case "I9":
+    case "I12":
       return `${e.r}|${e.j}|${cle(e.joueur)}`;
     case "I3":
     case "I7":
@@ -64,6 +87,10 @@ export function cleEcart(e: Ecart): string {
       return `I6|${dateCle(e.date)}`;
     case "I8":
       return `I8|${e.j}`;
+    case "I10":
+      return "I10";
+    case "I11":
+      return `I11|${e.j}|${e.date}`;
   }
 }
 
@@ -88,6 +115,14 @@ export function libelleEcart(e: Ecart): string {
       return `${e.equipe} · résultats`;
     case "I8":
       return `J${e.j} · brouillon perdu`;
+    case "I9":
+      return `${e.joueur} · suspendu`;
+    case "I10":
+      return "Vue figée";
+    case "I11":
+      return `${e.date} · date illisible`;
+    case "I12":
+      return `${e.joueur} · SFL Time ${e.sflTime ? "en trop" : "manquante"}`;
   }
 }
 
@@ -121,6 +156,27 @@ export function verifierFeuille(s: Saison, j: number, terrainsMax = TERRAINS_MAX
     if (n === 2) out.push({ r: "I1", j, joueur: e.player });
   }
 
+  // I9 : un suspendu (carton rouge) sur la journée de sa suspension.
+  const suspendus = suspendusPour(s, j);
+  if (suspendus.size) {
+    const signales = new Set<string>();
+    for (const e of lignes) {
+      if (e.vitrine || (e.statut !== "Présent" && !e.extraTime) || !suspendus.has(cle(e.player)) || signales.has(cle(e.player))) continue;
+      signales.add(cle(e.player));
+      out.push({ r: "I9", j, joueur: e.player });
+    }
+  }
+
+  // I12 : une ligne jouée qui ne suit pas la SFL Time de sa journée.
+  if (meta) {
+    const signales = new Set<string>();
+    for (const e of lignes) {
+      if (!joue(e) || !!e.sflTime === !!meta.sflTime || signales.has(cle(e.player))) continue;
+      signales.add(cle(e.player));
+      out.push({ r: "I12", j, joueur: e.player, sflTime: !!e.sflTime });
+    }
+  }
+
   // I3, I4, I5
   const ms = declares(s, j);
   const occupees = new Map<string, number>();
@@ -138,6 +194,9 @@ export function verifierFeuille(s: Saison, j: number, terrainsMax = TERRAINS_MAX
     parHeure.set(h, n);
     if (h && n > terrainsMax && !out.some((x) => x.r === "I5" && x.j === j && x.match === i + 1)) out.push({ r: "I5", j, match: i + 1 });
   });
+
+  // I11 : une date que l'app ne lit pas.
+  if (meta && !jourMoisDuLibelle(meta.date)) out.push({ r: "I11", j, date: meta.date });
 
   // I6
   if (meta) {
@@ -175,7 +234,15 @@ export function ecartsDeLaSaison(s: Saison): Ecart[] {
  */
 export function nouveauxEcarts(avant: Saison, apres: Saison, opts: { jeter?: number } = {}): Ecart[] {
   const vieux = new Set(ecartsDeLaSaison(avant).map(cleEcart));
-  const out = ecartsDeLaSaison(apres).filter((e) => !vieux.has(cleEcart(e)));
+  // Un suspendu n'est un écart nouveau que s'il entre sur la feuille : le
+  // retard qui fait le rouge ne bloque pas une journée déjà composée.
+  const lignesDe = (s: Saison, j: number, nom: string) =>
+    s.entries.filter((e) => e.j === j && cle(e.player) === cle(nom) && (e.statut === "Présent" || e.extraTime)).length;
+  const out = ecartsDeLaSaison(apres).filter(
+    (e) => !vieux.has(cleEcart(e)) && (e.r !== "I9" || lignesDe(apres, e.j, e.joueur) > lignesDe(avant, e.j, e.joueur))
+  );
+  // Une vue figée n'est qu'une lecture (revelation.ts) : jamais un document à écrire.
+  if (apres.figee) out.push({ r: "I10" });
   // Une nouvelle saison (clôture) vide les journées par nature.
   if ((apres.numero ?? 0) === (avant.numero ?? 0)) {
     for (const m of avant.journees) {

@@ -23,7 +23,7 @@
 // Pur : ni React ni réseau.
 
 import { placeDe } from "./recrues";
-import { rangDe, XP_DIMANCHE, type LigneXp, type Rang } from "./missions";
+import { rangDe, XP_DIMANCHE, type LigneXp, type Rang, type TitreCouvert } from "./missions";
 import type { MatchValide } from "./carte-bola";
 import type { Saison } from "./saisie/types";
 import { heureMin } from "./ligue-vierge";
@@ -39,6 +39,12 @@ export interface MissionPerso {
   xp: number;
   /** Ce qu'il faut atteindre dans un match, ou dans la semaine. */
   objectif: number;
+  /**
+   * Le titre qu'elle exige (Mission.couvre) : « MVP » le suppose. Elle est de
+   * rang A à 120 XP, sans XP S, mais le rang suit la prime : à 130, elle et le
+   * MVP Bola du même match ne donneraient leurs XP S qu'une fois (xp-s.ts).
+   */
+  couvre?: TitreCouvert;
 }
 
 /** L'XP d'un match Bola validé : celle d'un dimanche joué de la SFL (choix par défaut, 28/10). */
@@ -65,6 +71,7 @@ export const MISSIONS_PERSO: readonly MissionPerso[] = [
     phrase: "Sois MVP d'un match.",
     xp: 120,
     objectif: 1,
+    couvre: "mvp",
   },
   {
     genre: "regulier",
@@ -283,6 +290,7 @@ export function lignesXpBola(
           reussie: true,
           perso: f.genre,
           ...(f.troisieme ? { troisieme: true as const } : {}),
+          ...(m.couvre ? { couvre: m.couvre } : {}),
         },
         horsRang: true,
         bola: true,

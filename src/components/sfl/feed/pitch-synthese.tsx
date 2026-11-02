@@ -10,12 +10,18 @@
 // Rien ne se chevauche (Sabri, 23/10) : trois joueurs au plus par rangée, et
 // d'une rangée à la suivante, de quoi poser une carte, son nom et sa pastille
 // sans que la carte de devant ne cache la pastille de derrière.
+// Dans chaque mode, une carte à titre porte ses puces sur son coin, or MVP,
+// rouge Impact, bleu Défensive (Ilyes, 02/11/2026, puces-titres.tsx), lues
+// au seul point de lecture (hooks/use-titres-du-jour.ts) : rien tant que le
+// titre n'est pas attribué, rien sur une carte d'extra time.
 
 import { useState } from "react";
 import { ovr, type Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
 import { CarteDe } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
+import { PucesTitres } from "@/components/sfl/puces-titres";
+import { useTitresDuJour } from "@/hooks/use-titres-du-jour";
 
 export interface PitchLine {
   name: string;
@@ -24,6 +30,8 @@ export interface PitchLine {
   mvp?: boolean;
   impact?: boolean;
   def?: boolean;
+  /** Venu en extra time : sa carte ne porte pas de puce (ses titres sont sur celle de son match). */
+  extraTime?: boolean;
 }
 
 type Mode = "type" | "buts" | "passes" | "titres";
@@ -71,30 +79,35 @@ export function PitchSynthese({
   participants: number;
 }) {
   const [mode, setMode] = useState<Mode>("type");
+  // Les titres du jour une fois attribués (le seul point de lecture) : les
+  // puces de chaque carte, quel que soit le mode, et le mode « Titres ».
+  const titresDuJour = useTitresDuJour(journee);
 
   // Sélection des joueurs à poser sur la pelouse, selon le mode.
-  const picked: { name: string; badge: string; hot?: boolean }[] = (() => {
+  const picked: { name: string; badge: string; hot?: boolean; extraTime?: boolean }[] = (() => {
     switch (mode) {
       case "buts":
         return [...lines]
           .filter((l) => l.buts > 0)
           .sort((a, b) => b.buts - a.buts)
           .slice(0, 5)
-          .map((l, i) => ({ name: l.name, badge: `${l.buts} B`, hot: i === 0 }));
+          .map((l, i) => ({ name: l.name, badge: `${l.buts} B`, hot: i === 0, extraTime: l.extraTime }));
       case "passes":
         return [...lines]
           .filter((l) => l.passes > 0)
           .sort((a, b) => b.passes - a.passes)
           .slice(0, 5)
-          .map((l, i) => ({ name: l.name, badge: `${l.passes} P`, hot: i === 0 }));
+          .map((l, i) => ({ name: l.name, badge: `${l.passes} P`, hot: i === 0, extraTime: l.extraTime }));
       case "titres":
         return lines
-          .filter((l) => l.mvp || l.impact || l.def)
+          .filter((l) => !l.extraTime)
+          .map((l) => ({ l, t: titresDuJour(l.name) }))
+          .filter(({ t }) => t.length > 0)
           .slice(0, 5)
-          .map((l) => ({
+          .map(({ l, t }) => ({
             name: l.name,
-            badge: l.mvp ? "MVP" : l.impact ? "IMPACT" : "DÉF",
-            hot: !!l.mvp,
+            badge: t[0] === "mvp" ? "MVP" : t[0] === "impact" ? "IMPACT" : "DÉF",
+            hot: t[0] === "mvp",
           }));
       default:
         return [...lines]
@@ -102,15 +115,16 @@ export function PitchSynthese({
           .slice(0, 5)
           .map((l) => {
             const p = byName.get(l.name);
-            return { name: l.name, badge: p ? `${ovr(p.stats)}` : "—" };
+            return { name: l.name, badge: p ? `${ovr(p.stats)}` : "—", extraTime: l.extraTime };
           });
     }
   })();
 
+
   // Placement par poste (l'attaque près du rond central, le gardien devant
   // sa surface), puis répartition horizontale : une rangée de plus de trois
   // se dédouble, une rangée vide disparaît.
-  const parPoste: { name: string; badge: string; hot?: boolean }[][] = [[], [], []];
+  const parPoste: typeof picked[] = [[], [], []];
   for (const pl of picked) {
     const p = byName.get(pl.name);
     parPoste[p ? pitchRow(p.poste) : 0].push(pl);
@@ -167,7 +181,10 @@ export function PitchSynthese({
                 left: `${LARGEURS[rowPlayers.length][i]}%`,
               }}
             >
-              <Avatar name={pl.name} size={pl.hot ? 38 : 34} />
+              <div className="relative flex">
+                <Avatar name={pl.name} size={pl.hot ? 38 : 34} />
+                <PucesTitres titres={pl.extraTime ? [] : titresDuJour(pl.name)} />
+              </div>
               <span className="max-w-[74px] truncate text-[11px] font-bold"><Nom n={pl.name} /></span>
               <span
                 className={cn(

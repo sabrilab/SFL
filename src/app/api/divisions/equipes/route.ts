@@ -49,6 +49,7 @@ import { isHidden } from "@/lib/sfl/hidden";
 import { joueursDeLaFeuille } from "@/lib/sfl/presence-feuille";
 import type { ConvocationTeam } from "@/lib/sfl/saisie/types";
 import { lireSaisonServeur } from "@/lib/sfl/saison-serveur.server";
+import { sansSuspendus } from "@/lib/sfl/cartons";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -94,8 +95,12 @@ async function ajuster(sb: SupabaseClient, peutComposer: boolean): Promise<{ sta
   const saison = lue?.saison;
   if (!saison) return { statut: "sans-divisions" };
   const j = journeeDeConvocation(saison, conv.date_label);
-  const etat = divisionsDeLaJournee(saison, j);
+  // La vue figée (revelation.ts) : si la journée d'avant n'est pas encore
+  // révélée, ses divisions sont périmées — on compose quand même, et la
+  // réponse le dit (`perimee`).
+  const etat = divisionsDeLaJournee(saison, j, lue?.divisions ?? null);
   if (!etat) return { statut: "sans-divisions" };
+  const perimee = etat.perimee ? { perimee: true } : {};
   const feuille = joueursDeLaFeuille(saison, j);
   if (feuille.equipes) return { statut: "feuille-de-l-admin" };
 
@@ -117,7 +122,9 @@ async function ajuster(sb: SupabaseClient, peutComposer: boolean): Promise<{ sta
     return nom;
   };
   const presents = ((lignes ?? []) as unknown[]).map(nomDe).filter((n): n is string => !!n && effectif.has(n));
-  const venus = ordreDArrivee(presents, feuille.noms, (n) => quand.get(n)).filter((n) => !isHidden(n));
+  // Ni un masqué, ni un suspendu (carton rouge, lib/sfl/cartons.ts) : la
+  // composition ne lui donne pas de place.
+  const venus = sansSuspendus(saison, j, ordreDArrivee(presents, feuille.noms, (n) => quand.get(n)).filter((n) => !isHidden(n)));
 
   // Des équipes sur plus de terrains que l'Hippodrome n'en a (la J4, avant
   // le plafond) : le cron les refait. Un téléphone n'y touche pas.
@@ -130,12 +137,12 @@ async function ajuster(sb: SupabaseClient, peutComposer: boolean): Promise<{ sta
     const { data: ecrites, error } = await (conv.teams ? ecrire : ecrire.is("teams", null)).select("id");
     if (error) return { statut: "erreur" };
     // Quelqu'un est passé avant (un autre appel, l'admin) : ses équipes restent.
-    return ecrites?.length ? { statut: "composees", equipes: teams.length } : { statut: "a-jour" };
+    return ecrites?.length ? { statut: "composees", equipes: teams.length, ...perimee } : { statut: "a-jour", ...perimee };
   }
   const teams = completer(saison, conv.teams, venus, etat);
   if (!teams) return { statut: "a-jour", equipes: conv.teams.length };
   const { error } = await sb.from("convocations").update({ teams }).eq("id", conv.id);
-  return error ? { statut: "erreur" } : { statut: "ajustees", equipes: teams.length };
+  return error ? { statut: "erreur" } : { statut: "ajustees", equipes: teams.length, ...perimee };
 }
 
 /** Le cron du vendredi. */

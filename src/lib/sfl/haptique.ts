@@ -49,4 +49,6 @@ export const haptique = {
   refus: () => vibrer([20, 40, 20]),
   /** Publier, remettre en brouillon, clôturer. */
   sceau: () => vibrer([12, 60, 24]),
+  /** Le carton brandi (cartons/carton-recu.tsx) : le coup de sifflet, puis le bras qui se lève. */
+  carton: () => vibrer([18, 70, 18, 70, 48]),
 };

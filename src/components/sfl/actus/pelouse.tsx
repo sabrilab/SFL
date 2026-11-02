@@ -32,6 +32,12 @@
 // de son nom compris, et le cadre la compte (Place.coiffe). Le ballon qui
 // file passe derrière ceux qui sont devant lui, et ses trajets évitent les
 // noms.
+//
+// Sur les rubriques d'un dimanche joué, une carte à titre porte ses puces
+// sur son coin haut gauche, or MVP, rouge Impact, bleu Défensive (Ilyes,
+// 02/11/2026, puces-titres.tsx), une fois le titre attribué : la rubrique
+// dit sa journée (JourneeRubrique), chaque carte y lit ses titres. Les
+// rubriques de ce qui vient (enjeux, rival, besoin) n'en portent pas.
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { MessageCircle } from "lucide-react";
@@ -49,12 +55,15 @@ import type { Enjeu, Voisins } from "@/lib/sfl/actus-toi";
 import { exploitsDe } from "@/lib/sfl/exploits";
 import { entryPP } from "@/lib/sfl/saisie/engine";
 import { rangPepiteApres } from "@/lib/sfl/rangs";
+import { nomDivision } from "@/lib/sfl/divisions";
 import { journeeJouee } from "@/lib/sfl/saisie/mutations";
 import { projeter, trace, vue } from "@/lib/sfl/terrain-vu";
 import { metal, NOM_METAL, TROPHEES } from "@/lib/sfl/trophees";
 import { sources, type Couverture } from "@/lib/sfl/couvertures";
 import { preparerPiece, type PieceLigue } from "@/lib/sfl/vestiaire";
 import { cn } from "@/lib/utils";
+import { PucesTitres } from "@/components/sfl/puces-titres";
+import { useTitresDuJour } from "@/hooks/use-titres-du-jour";
 import { ANTON } from "./ecran";
 import { Bravo } from "./bravo";
 import { pl, useJoueurs } from "./cinematiques";
@@ -105,6 +114,12 @@ function useAvancee(f: (p: number) => void) {
  */
 export const CouvertureRubrique = createContext<Couverture | null>(null);
 
+/**
+ * Le dimanche joué que montre la rubrique : ses cartes y portent les puces
+ * de leurs titres. Absent (ce qui se joue dimanche, le rival) : aucune puce.
+ */
+const JourneeRubrique = createContext<number | null>(null);
+
 /* ------------------------------ Les éléments ------------------------------ */
 
 /** Une carte debout sur le terrain, en (u, v) ; d est le moment où elle se lève. */
@@ -124,8 +139,6 @@ export interface Place {
   coiffe?: number;
   /** Une carte à titre (MVP or, Impact rouge, Défensive bleu), de la journée `journee`. */
   distinction?: BoostType;
-  /** Ses titres, en étiquette centrée sur le haut de la carte (« MVP·DÉF »). */
-  titres?: string;
   journee?: number;
 }
 
@@ -137,6 +150,7 @@ const dessus = (taille: number, h: number) => hauteur(taille) + 4 + h / 2;
 function Debout({ p }: { p: Place }) {
   const joueur = useJoueurs()(p.nom);
   const id = useIdentites();
+  const titres = useTitresDuJour(useContext(JourneeRubrique))(p.nom);
   const { x, y, k } = projeter(p.u, p.v, 0, VUE);
   const taille = p.taille ?? T.petite;
   if (!joueur) return null;
@@ -148,11 +162,7 @@ function Debout({ p }: { p: Place }) {
               la place d'une ligne de texte, qui éloignait la carte de son nom. */}
           <div className="relative flex">
             <MiniCarte player={joueur} size={taille} vertical distinction={p.distinction} journee={p.distinction ? p.journee : undefined} />
-            {p.titres && (
-              <span className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white px-[5px] py-[1.5px] font-mono text-[9px] leading-[1.2] font-bold whitespace-nowrap text-black shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
-                {p.titres}
-              </span>
-            )}
+            <PucesTitres titres={titres} echelle={k} />
             {p.badge && (
               <span className="absolute top-0 right-0 translate-x-[45%] -translate-y-[35%] rounded-full bg-white px-[5px] py-[1.5px] font-mono text-[9.5px] leading-[1.2] font-bold whitespace-nowrap text-black tabular-nums shadow-[0_2px_6px_rgba(0,0,0,0.35)]">
                 {p.badge}
@@ -582,10 +592,14 @@ function rang(noms: string[], v: number, ecart: number, taille: number, d0: numb
   return noms.map((nom, i) => ({ nom, u: MILIEU + (i - (noms.length - 1) / 2) * ecart, v, taille, d: tour(i, d0), moi: nom === moi }));
 }
 
-/** Ton dimanche : ta carte à côté du but, tes buts au fond du filet, tes chiffres autour. */
+/**
+ * Ton dimanche : ta carte à côté du but, tes buts au fond du filet, tes
+ * chiffres autour ; ta place au Pépite d'Or, et ta division quand la
+ * journée la change (« D3 → D2 », à la révélation : revelation.ts).
+ */
 export function RubriqueToi({ j, date, className }: { j: number; date: string; className?: string }) {
   const { player, me } = useMyPlayer();
-  const { saison, evolution } = useSeason();
+  const { saison, evolution, divisions } = useSeason();
   const lignes = saison.entries.filter((e) => e.j === j && e.player === me);
   const joue = lignes.some((e) => e.statut === "Présent" && !e.extraTime);
   const delta = useMemo(() => {
@@ -600,19 +614,24 @@ export function RubriqueToi({ j, date, className }: { j: number; date: string; c
   const buts = lignes.reduce((t, e) => t + e.buts, 0);
   const passes = lignes.reduce((t, e) => t + e.passes, 0);
   const pp = lignes.reduce((t, e) => t + entryPP(e), 0);
+  const mouvement = divisions?.journees.find((x) => x.j === j)?.mouvements.find((m) => m.nom === me);
+  const place = delta > 0 ? `▲ ${delta} au Pépite d'Or` : delta < 0 ? `▼ ${-delta} au Pépite d'Or` : "Même place au Pépite d'Or";
+  const division = mouvement && mouvement.de !== mouvement.vers ? ` · ${nomDivision(mouvement.de)} → ${nomDivision(mouvement.vers)}` : "";
   return (
-    <Scene
-      className={className}
-      sur={`J${j} · ${date}`}
-      titre="Ton dimanche"
-      places={[{ nom: me, ...A_COTE_DU_BUT, taille: T.vedette, d: 0.15, moi: true }]}
-      jusqua={225}
-      texte={delta > 0 ? `▲ ${delta} au Pépite d'Or` : delta < 0 ? `▼ ${-delta} au Pépite d'Or` : "Même place au Pépite d'Or"}
-      partage={{ titre: "Mon dimanche", j, lignes: [{ n: me, v: `${buts} buts · ${passes} passes · +${pp} pts` }] }}
-      action={<BoutonStoryDimanche j={j} date={date} buts={buts} passes={passes} points={pp} delta={delta} />}
-    >
-      <SesChiffres buts={buts} passes={passes} pp={pp} />
-    </Scene>
+    <JourneeRubrique.Provider value={j}>
+      <Scene
+        className={className}
+        sur={`J${j} · ${date}`}
+        titre="Ton dimanche"
+        places={[{ nom: me, ...A_COTE_DU_BUT, taille: T.vedette, d: 0.15, moi: true }]}
+        jusqua={225}
+        texte={`${place}${division}`}
+        partage={{ titre: "Mon dimanche", j, lignes: [{ n: me, v: `${buts} buts · ${passes} passes · +${pp} pts` }] }}
+        action={<BoutonStoryDimanche j={j} date={date} buts={buts} passes={passes} points={pp} delta={delta} />}
+      >
+        <SesChiffres buts={buts} passes={passes} pp={pp} />
+      </Scene>
+    </JourneeRubrique.Provider>
   );
 }
 
@@ -713,8 +732,16 @@ export function RubriqueBesoin({ v }: { v: Voisins }) {
   );
 }
 
-/** Les rubriques d'un dimanche joué, posées sur le terrain. Bravo félicite leurs joueurs. */
+/** Les rubriques d'un dimanche joué, posées sur le terrain. Bravo félicite leurs joueurs ; leurs cartes portent les puces de leurs titres. */
 export function RubriqueActu({ a }: { a: Actu }) {
+  return (
+    <JourneeRubrique.Provider value={a.j}>
+      <RubriqueDuDimanche a={a} />
+    </JourneeRubrique.Provider>
+  );
+}
+
+function RubriqueDuDimanche({ a }: { a: Actu }) {
   const id = useIdentites();
   const { saison } = useSeason();
   const sur = (quoi: string) => `J${a.j} · ${quoi}`;
@@ -894,8 +921,6 @@ export function RubriqueActu({ a }: { a: Actu }) {
 /* ------------------------------ Les cartes à titre ------------------------------ */
 
 const NOM_TITRE: Record<BoostType, string> = { mvp: "MVP", impact: "Impact", def: "Défensive" };
-/** Sur le coin de la carte : ses titres, en capitales courtes. */
-const COIN_TITRE: Record<BoostType, string> = { mvp: "MVP", impact: "IMP", def: "DÉF" };
 
 /** « Jouneid », « Jouneid et Zakary », « Abdel, Bilal et Faycal ». */
 function enLigne(noms: string[]): string {
@@ -909,7 +934,8 @@ type Felicitable = { action: ReactNode; exploits: string[] };
  * des joueurs « soient mises à jour dans l'interface, pour que ce soit aussi
  * gratifiant ») : ses MVP, ses Joueurs Impact et ses Défensives, ex æquo
  * compris, chacun dans la couleur de son plus beau titre (or, rouge, bleu),
- * ses autres titres sur le coin. La hiérarchie des cartes : les MVP au fond,
+ * tous ses titres en puces sur le coin, comme sur chaque terrain (02/11 :
+ * elles remplacent l'étiquette « MVP·DÉF », qu'elles chevauchaient). La hiérarchie des cartes : les MVP au fond,
  * au milieu du but, en moyenne ; les autres en petite. Seul, l'homme du
  * match se tient à côté du but, en grand. Sept cartes au plus sur le
  * terrain ; la ligne du bas les nomme tous.
@@ -926,7 +952,6 @@ function RubriqueTitres({ a, bravo }: { a: Extract<Actu, { type: "titres" }>; br
     ? `${enLigne(mvp.map((n) => n.split(" ")[0]))}, ${mvp.length > 1 ? "MVP ex æquo" : "MVP"}`
     : `${enLigne(lignes[0].noms.map((n) => n.split(" ")[0]))}, ${NOM_TITRE[lignes[0].type]}`;
   const texte = lignes.map((l) => `${NOM_TITRE[l.type]} : ${l.noms.join(", ")}${l.noms.length > 1 ? " (ex æquo)" : ""}`).join(" · ");
-  const coin = (x: Titre) => x.types.map((y) => COIN_TITRE[y]).join("·");
   const sur = `J${a.j} · ${a.match}${a.score ? ` · ${a.score}` : ""}`;
   const partage = { titre: `Les cartes du ${a.match.toLowerCase()}`, j: a.j, lignes: t.map((x) => ({ n: x.nom, v: x.types.map((y) => NOM_TITRE[y]).join(" · ") })) };
 
@@ -938,7 +963,7 @@ function RubriqueTitres({ a, bravo }: { a: Extract<Actu, { type: "titres" }>; br
         {...bravo}
         sur={sur}
         titre={titre}
-        places={[{ nom: x.nom, ...A_COTE_DU_BUT, taille: T.vedette, d: 0.15, distinction: x.types[0], journee: a.j, titres: coin(x) }]}
+        places={[{ nom: x.nom, ...A_COTE_DU_BUT, taille: T.vedette, d: 0.15, distinction: x.types[0], journee: a.j }]}
         jusqua={200}
         texte={texte}
         partage={partage}
@@ -965,13 +990,11 @@ function RubriqueTitres({ a, bravo }: { a: Extract<Actu, { type: "titres" }>; br
       taille: taille(fondOrdre[i]),
       distinction: fondOrdre[i].types[0],
       journee: a.j,
-      titres: coin(fondOrdre[i]),
     })),
     ...rang(devant.map((x) => x.nom), 190, devant.length > 3 ? 74 : devant.length > 2 ? 90 : 120, T.petite, 0.32).map((p, i) => ({
       ...p,
       distinction: devant[i].types[0],
       journee: a.j,
-      titres: coin(devant[i]),
     })),
   ];
   return (

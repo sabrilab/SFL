@@ -26,6 +26,12 @@
 // Elle part seule, sans titre : sur iPhone, un titre arrive à l'app choisie
 // comme un texte à part, avant l'image, et Snap s'y perdait.
 //
+// Une carte à titre porte ses puces sur son coin (Ilyes, 02/11/2026) : dorée
+// pour le MVP, rouge pour l'Impact, bleue pour la Défensive, une fois le
+// titre attribué (puces-titres.tsx, hooks/use-titres-du-jour.ts) ; dans
+// l'image partagée aussi. La convocation, qui n'a pas encore de match, n'en
+// a jamais.
+//
 // Sous le terrain de la journée en cours, Le Flair de ce match : qui gagne, le
 // meilleur et le buteur du jour (matchs/flair.tsx).
 //
@@ -48,13 +54,15 @@ import {
   monTerrain,
   type TerrainFeuille,
 } from "@/lib/sfl/feuille";
-import { ovr, type Player } from "@/lib/sfl/engine";
+import { ovr, type BoostType, type Player } from "@/lib/sfl/engine";
 import type { Camp } from "@/lib/sfl/maillots";
 import { cn } from "@/lib/utils";
 import { projeter, TERRAIN } from "@/lib/sfl/terrain-vu";
 import { SolTerrain } from "@/components/sfl/matchs/sol-terrain";
 import { Nom } from "@/components/sfl/nom";
 import { FlairDuMatch } from "@/components/sfl/matchs/flair";
+import { PucesTitres } from "@/components/sfl/puces-titres";
+import { useTitresDuJour } from "@/hooks/use-titres-du-jour";
 
 export interface EnTeteFeuille {
   /** « J8 · Sunday Five League ». */
@@ -176,7 +184,13 @@ interface Pose {
   x: number;
   /** En px depuis la ligne médiane. */
   y: number;
+  /** Ses titres du match, une fois attribués : ses puces. */
+  titres: BoostType[];
 }
+
+/** Les titres d'un joueur sur ce terrain ; rien sans titres connus. */
+type TitresDe = (nom: string) => BoostType[];
+const SANS_TITRE: TitresDe = () => [];
 
 /** Le cadre du terrain, dans l'app comme dans l'image. */
 export const CADRE_H = 540;
@@ -202,7 +216,7 @@ export const ecart = (profondeur: number, chezMoi: boolean) =>
         : 1.36;
 
 /** Les joueurs d'un terrain, posés : `bas` joue en bas, devant. */
-function poser(t: TerrainFeuille, basEstA: boolean): Pose[] {
+function poser(t: TerrainFeuille, basEstA: boolean, titresDe: TitresDe = SANS_TITRE): Pose[] {
   const [bas, haut] = basEstA ? [t.a, t.b] : [t.b, t.a];
   const out: Pose[] = [];
   for (const [eq, chezMoi] of [
@@ -220,6 +234,8 @@ function poser(t: TerrainFeuille, basEstA: boolean): Pose[] {
         encre: eq.encre,
         x: 50 + (largeur - 50) * ecart(profondeur, chezMoi),
         y: (chezMoi ? 1 : -1) * depuisMediane(profondeur),
+        // Une carte d'extra time (même dans sa propre équipe) ne double pas ses puces.
+        titres: eq.extraTime?.[i] ? [] : titresDe(nom),
       });
     });
   }
@@ -234,6 +250,7 @@ export function FeuilleDeMatch({
   entete,
   j = null,
   avantFlair = null,
+  sousTerrain,
 }: {
   terrains: TerrainFeuille[];
   moi: string;
@@ -242,11 +259,24 @@ export function FeuilleDeMatch({
   j?: number | null;
   /** Ce qui passe entre les terrains et Le Flair (la page du lieu : le compte à rebours et la journée en étapes). */
   avantFlair?: ReactNode;
+  /** Sous le terrain qu'on regarde : sa feuille en direct (components/sfl/direct, 01/11/2026). */
+  sousTerrain?: (t: TerrainFeuille) => ReactNode;
 }) {
   const { allPlayers } = useSeason();
   const parNom = useMemo(
     () => new Map(allPlayers.map((p) => [p.name, p])),
     [allPlayers],
+  );
+  // Les titres de chaque terrain, lus dans la vue de la ligue : seul un
+  // match de la journée (ses deux équipes connues) en porte.
+  const titresDuJour = useTitresDuJour(j);
+  const titresDuTerrain = useMemo(
+    () =>
+      terrains.map((x): TitresDe => {
+        const eq = x.equipes;
+        return eq ? (nom) => titresDuJour(nom, eq) : SANS_TITRE;
+      }),
+    [terrains, titresDuJour],
   );
   const [choix, setChoix] = useState(() => monTerrain(terrains, moi));
   const t = terrains[Math.min(choix, terrains.length - 1)];
@@ -274,12 +304,18 @@ export function FeuilleDeMatch({
   // Une image par match du jour, chaque terrain tel qu'on le voit dans l'app.
   const sujets = useMemo(
     () =>
-      terrains.map((x) => ({
+      terrains.map((x, i) => ({
         terrain: x,
         basEstA: !x.b.joueurs.includes(moi),
         label: terrains.length > 1 ? x.label : null,
+        // Dans la clé de l'image : un titre qui tombe la fait reprendre.
+        titres: Object.fromEntries(
+          [...x.a.joueurs, ...x.b.joueurs]
+            .map((nom) => [nom, titresDuTerrain[i](nom)] as const)
+            .filter(([, t]) => t.length > 0),
+        ),
       })),
-    [terrains, moi],
+    [terrains, moi, titresDuTerrain],
   );
   const image = useImage(sujets, entete, parNom);
   const [fiche, setFiche] = useState<{
@@ -329,13 +365,13 @@ export function FeuilleDeMatch({
         onScroll={suivre}
         className="-mx-4 flex snap-x snap-mandatory gap-0 overflow-x-auto [scrollbar-width:none]"
       >
-        {terrains.map((x) => {
+        {terrains.map((x, i) => {
           const basA = !x.b.joueurs.includes(moi);
           const [bas, haut] = basA ? [x.a, x.b] : [x.b, x.a];
           return (
             <div key={x.label} className="w-full shrink-0 snap-center px-4">
               <TerrainVu
-                poses={poser(x, basA)}
+                poses={poser(x, basA, titresDuTerrain[i])}
                 haut={haut}
                 bas={bas}
                 moi={moi}
@@ -358,6 +394,8 @@ export function FeuilleDeMatch({
           );
         })}
       </div>
+
+      {sousTerrain?.(t)}
 
       {avantFlair && <div className="mt-2 flex flex-col gap-5">{avantFlair}</div>}
 
@@ -458,7 +496,7 @@ function TerrainVu({
               }}
             >
               {/* Ma carte, cerclée d'un vrai cadre. */}
-              <div className={cn("flex rounded-[15px]", p.nom === moi && "bg-[#0a0b0d] p-[3px] dark:bg-white")}>
+              <div className={cn("relative flex rounded-[15px]", p.nom === moi && "bg-[#0a0b0d] p-[3px] dark:bg-white")}>
                 <div className={cn("flex rounded-[12px]", p.nom === moi && "bg-white p-[2px] dark:bg-[#1b1d21]")}>
                   <Pastille
                     player={player}
@@ -469,6 +507,7 @@ function TerrainVu({
                     onChoisir={onChoisir && ((pl) => onChoisir(p, pl))}
                   />
                 </div>
+                <PucesTitres titres={p.titres} echelle={k} />
               </div>
               <span
                 className="whitespace-nowrap rounded-full px-[7px] py-[2px] text-legende shadow-[inset_0_0_0_1px_rgba(128,128,128,0.45)]"
@@ -628,6 +667,8 @@ interface SujetImage {
   basEstA: boolean;
   /** « Match 2 » quand il y en a plusieurs. */
   label: string | null;
+  /** Les titres de ce match, par nom (ceux qui en ont) : leurs puces. */
+  titres: Record<string, BoostType[]>;
 }
 
 /**
@@ -854,7 +895,7 @@ function ImageFeuille({
             transformOrigin: "0 0",
           }}
         >
-          <TerrainVu poses={poser(t, basEstA)} haut={haut} bas={bas} parNom={parNom} />
+          <TerrainVu poses={poser(t, basEstA, (nom) => sujet.titres[nom] ?? [])} haut={haut} bas={bas} parNom={parNom} />
         </div>
       </div>
 

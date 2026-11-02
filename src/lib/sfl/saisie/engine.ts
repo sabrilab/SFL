@@ -95,10 +95,9 @@ export function journeeJouee(saison: Pick<Saison, "entries">, j: number): boolea
 
 /**
  * Une journée est terminée quand chaque équipe de sa feuille a son résultat
- * (comme feuilleRemplie, équipe par équipe). Le premier but saisi en direct
- * rend la journée « jouée » — les classements suivent le direct —, mais les
- * divisions ne se recoupent, et le dimanche suivant ne s'annonce, qu'une fois
- * la feuille finie : sinon les joueurs changeaient de division en plein match.
+ * (comme feuilleRemplie, équipe par équipe). C'est la fin des matchs que la
+ * base tamponne (public.saison_fin_des_matchs) ; ce qui compte au classement
+ * et aux divisions, c'est la vue figée qui le décide (revelation.ts).
  */
 export function journeeTerminee(saison: Pick<Saison, "entries">, j: number): boolean {
   if (!journeeJouee(saison, j)) return false;

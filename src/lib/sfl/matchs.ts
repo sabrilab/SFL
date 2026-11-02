@@ -606,6 +606,7 @@ export function direErreur(e: unknown): string {
   if (/duplicate|already exists|23505/i.test(msg)) return "Ce joueur est déjà dans le match.";
   if (/feuille close/i.test(msg)) return "La feuille est close : 24 h sont passées.";
   if (/déjà joué/i.test(msg)) return "Ce match est déjà joué : sa feuille est faite.";
+  if (/déjà passé/i.test(msg)) return "Cette date est passée.";
   if (/pas commencé/i.test(msg)) return "La feuille s'ouvre au coup d'envoi.";
   if (/feuille réservée/i.test(msg)) return "Seul l'organisateur tient la feuille.";
   if (/row-level security|42501/i.test(msg)) return "Ce match ne t'est pas ouvert.";

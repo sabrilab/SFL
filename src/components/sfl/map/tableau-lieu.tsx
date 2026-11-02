@@ -18,6 +18,7 @@
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { maintenantMs } from "@/lib/sfl/horloge";
 
 const ANTON = "var(--font-anton), Anton, sans-serif";
 const VERT = "#84D68C";
@@ -26,7 +27,8 @@ const SEMAINE = 7 * 24 * 3600_000;
 function useMaintenant(): number | null {
   const [t, setT] = useState<number | null>(null);
   useEffect(() => {
-    const f = () => setT(Date.now());
+    // L'heure du serveur (horloge.ts), comme la frise et le vote.
+    const f = () => setT(maintenantMs());
     const a = window.setTimeout(f, 0);
     const b = window.setInterval(f, 60_000);
     return () => {

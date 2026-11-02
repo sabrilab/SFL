@@ -10,7 +10,8 @@
 //   · le défi du dimanche et la ligue : la carte de chacun de ceux qui s'y
 //     sont engagés, équipe par équipe quand le défi se gagne à plusieurs ;
 //   · après le coup d'envoi, « En jeu » ; le verdict se pose à mesure que la
-//     feuille se remplit, définitif à minuit : accompli, échec (la carte
+//     feuille se remplit, définitif à la révélation (19 h ; minuit jusqu'à
+//     la J4) : accompli, échec (la carte
 //     s'éteint), annulé.
 // La base montre à la ligue les missions acceptées, jamais un « passer »
 // (missions_reponses, schema.sql). Rien ne s'affiche tant que personne n'a
@@ -78,7 +79,7 @@ function Moment({ lg }: { lg: Ligue }) {
       </span>
     );
   return (
-    <span className="mono-label shrink-0 text-encre-3">{lg.phase === "en-jeu" ? "Verdict à minuit" : "Verdict"}</span>
+    <span className="mono-label shrink-0 text-encre-3">{lg.phase === "en-jeu" ? `Verdict ${lg.d.verdict}` : "Verdict"}</span>
   );
 }
 

@@ -8,6 +8,13 @@
 // match de plus (30/10/2026). Un segment porte « ! » quand son match a un
 // défaut ; le défaut se lit au-dessus du terrain, en pastille inversée
 // « ! ADIL ×2 » (barré, on le lisait comme déjà réglé).
+// La feuille en direct d'un match tenue par un joueur (01/11/2026) se lit
+// sur sa pastille, « ◉ Feuille · Ilyes » puis « ✓ Feuille · Ilyes » ; la
+// toucher l'ouvre. Pendant qu'elle est tenue, le score est le sien.
+// Une carte à titre porte ses puces (or MVP, rouge Impact, bleu Défensive,
+// 02/11/2026) telles que la ligue les voit : lues dans la vue de la ligue
+// (hooks/use-titres-du-jour.ts), pas dans la saison qu'on édite ici, pour
+// ne rien montrer avant que le titre soit attribué.
 
 import { useMemo } from "react";
 import { TerrainPlaces, type Occupant } from "@/components/sfl/matchs/terrain-places";
@@ -17,12 +24,14 @@ import { computeJournees } from "@/lib/sfl/saisie/engine";
 import { libelleEcart, type Ecart } from "@/lib/sfl/saisie/integrite";
 import type { MatchDuJour, Saison } from "@/lib/sfl/saisie/types";
 import { Etiquette, Pastille, Segmente } from "./ui";
+import { useTitresDuJour } from "@/hooks/use-titres-du-jour";
+import type { BoostType } from "@/lib/sfl/engine";
 
 export interface MatchVu {
   n: number;
   m: MatchDuJour;
-  noirs: { i: number; nom: string }[];
-  blancs: { i: number; nom: string }[];
+  noirs: { i: number; nom: string; extraTime?: boolean }[];
+  blancs: { i: number; nom: string; extraTime?: boolean }[];
   score: [number, number];
 }
 
@@ -37,14 +46,17 @@ export function matchsVus(saison: Saison, j: number, declares: MatchDuJour[]): M
   return declares.map((m, k) => ({
     n: k + 1,
     m,
-    noirs: lignes.filter((x) => x.e.team === m.equipes[0]).map((x) => ({ i: x.i, nom: x.e.player })),
-    blancs: lignes.filter((x) => x.e.team === m.equipes[1]).map((x) => ({ i: x.i, nom: x.e.player })),
+    noirs: lignes.filter((x) => x.e.team === m.equipes[0]).map((x) => ({ i: x.i, nom: x.e.player, ...(x.e.extraTime ? { extraTime: true } : {}) })),
+    blancs: lignes.filter((x) => x.e.team === m.equipes[1]).map((x) => ({ i: x.i, nom: x.e.player, ...(x.e.extraTime ? { extraTime: true } : {}) })),
     score: [scores.get(m.equipes[0]) ?? 0, scores.get(m.equipes[1]) ?? 0],
   }));
 }
 
 /** Les cartes sur le terrain : les Blancs aux places de devant, les Noirs à celles du fond. */
-function occupantsDe(mv: MatchVu): { places: number; occupants: Occupant[] } {
+function occupantsDe(
+  mv: MatchVu,
+  titresDe: (nom: string, equipes: readonly [string, string]) => BoostType[],
+): { places: number; occupants: Occupant[] } {
   const cote = Math.max(5, mv.noirs.length, mv.blancs.length);
   const places = cote * 2;
   const dispo = placerTerrain(places).places;
@@ -52,10 +64,10 @@ function occupantsDe(mv: MatchVu): { places: number; occupants: Occupant[] } {
   const fond = dispo.filter((p) => !p.chezMoi).map((p) => p.i);
   const occupants: Occupant[] = [];
   mv.blancs.forEach((x, k) => {
-    if (devant[k] != null) occupants[devant[k]] = { cle: String(x.i), nom: x.nom };
+    if (devant[k] != null) occupants[devant[k]] = { cle: String(x.i), nom: x.nom, titres: x.extraTime ? [] : titresDe(x.nom, mv.m.equipes) };
   });
   mv.noirs.forEach((x, k) => {
-    if (fond[k] != null) occupants[fond[k]] = { cle: String(x.i), nom: x.nom };
+    if (fond[k] != null) occupants[fond[k]] = { cle: String(x.i), nom: x.nom, titres: x.extraTime ? [] : titresDe(x.nom, mv.m.equipes) };
   });
   return { places, occupants };
 }
@@ -76,6 +88,8 @@ export function BlocMatchs({
   direct,
   heureJournee,
   lieu,
+  feuille,
+  onFeuille,
 }: {
   saison: Saison;
   j: number;
@@ -84,8 +98,8 @@ export function BlocMatchs({
   onCourant: (n: number) => void;
   /** Toucher un « + » : le camp de ce match (le nom de l'équipe). */
   onPlus?: (equipe: string) => void;
-  /** Toucher une carte : l'index de sa ligne. */
-  onCarte?: (index: number) => void;
+  /** Toucher une carte : l'index de sa ligne ; `vers` : la partie de sa fiche à montrer d'abord (une alerte SFL Time : les honneurs). */
+  onCarte?: (index: number, vers?: "honneurs") => void;
   onAjouterMatch?: () => void;
   onReglerMatch?: (n: number) => void;
   onArbitre?: (n: number) => void;
@@ -95,16 +109,29 @@ export function BlocMatchs({
   direct?: boolean;
   heureJournee?: string;
   lieu?: (m: MatchDuJour) => string | null;
+  /** La feuille en direct du match n (tenue par un joueur), et son score tant qu'elle est ouverte. */
+  feuille?: (n: number) => { libelle: string; ouverte: boolean; score: [number, number] } | null;
+  onFeuille?: (n: number) => void;
 }) {
   const mv = matchs.find((x) => x.n === courant) ?? matchs[0];
-  const { places, occupants } = useMemo(() => (mv ? occupantsDe(mv) : { places: 10, occupants: [] }), [mv]);
-  const defautDe = (n: number) => ecarts.some((e) => ("match" in e && e.match === n) || ("equipe" in e && matchs[n - 1]?.m.equipes.includes(e.equipe)));
+  const titresDe = useTitresDuJour(j);
+  const { places, occupants } = useMemo(() => (mv ? occupantsDe(mv, titresDe) : { places: 10, occupants: [] }), [mv, titresDe]);
+  // L'index de la ligne d'un joueur de la journée, et le match où il joue (son camp) : une alerte
+  // sur un joueur marque SON match (02/11 : « Moussa · SFL Time manquante » sous M1, Moussa en M2).
+  const ligneDe = (nom: string) => saison.entries.findIndex((x) => x.j === j && x.player.toLowerCase() === nom.toLowerCase());
+  const matchDe = (nom: string) => {
+    const e = saison.entries[ligneDe(nom)];
+    return e?.team ? (matchs.find((x) => x.m.equipes.includes(e.team!))?.n ?? null) : null;
+  };
+  const defautDe = (n: number) =>
+    ecarts.some((e) => ("match" in e && e.match === n) || ("equipe" in e && matchs[n - 1]?.m.equipes.includes(e.equipe)) || ("joueur" in e && matchDe(e.joueur) === n));
   const options = [
     ...matchs.map((x) => ({ id: x.n, libelle: `M${x.n}`, marque: defautDe(x.n) })),
     ...(onAjouterMatch ? [{ id: -1, libelle: `+ M${matchs.length + 1}`, pointille: true }] : []),
   ];
-  const parLigne = new Map(saison.entries.map((e, i) => [i, e]));
-  const barres = ecarts.filter((e) => e.r === "I1" || e.r === "I2" || e.r === "I3" || e.r === "I4" || e.r === "I5" || e.r === "I7");
+  const barres = ecarts.filter((e) => e.r === "I1" || e.r === "I2" || e.r === "I3" || e.r === "I4" || e.r === "I5" || e.r === "I7" || e.r === "I9" || e.r === "I12");
+  const tenue = mv ? (feuille?.(mv.n) ?? null) : null;
+  const score = tenue?.ouverte ? tenue.score : mv?.score;
 
   return (
     <section className="flex flex-col gap-3">
@@ -126,12 +153,19 @@ export function BlocMatchs({
         <div className="flex flex-wrap gap-1.5">
           {barres.map((e) => {
             const nom = "joueur" in e ? e.joueur : null;
-            const i = nom ? [...parLigne].find(([, x]) => x.j === j && x.player.toLowerCase() === nom.toLowerCase())?.[0] : undefined;
+            const i = nom ? ligneDe(nom) : -1;
+            const n = nom ? matchDe(nom) : null;
             return (
               <button
                 key={libelleEcart(e)}
                 type="button"
-                onClick={() => (i != null ? onCarte?.(i) : "match" in e ? onCourant(e.match) : undefined)}
+                onClick={() => {
+                  // Sur un joueur : son match, puis sa fiche (ouverte sur les honneurs pour la SFL Time).
+                  if (i >= 0) {
+                    if (n != null && n !== courant) onCourant(n);
+                    onCarte?.(i, e.r === "I12" ? "honneurs" : undefined);
+                  } else if ("match" in e) onCourant(e.match);
+                }}
                 className="mono-label inline-flex items-center gap-1.5 rounded-full bg-foreground px-3 py-1.5 text-background"
               >
                 <span aria-hidden>!</span>
@@ -154,12 +188,18 @@ export function BlocMatchs({
                 {arbitre?.(mv.n) ? `Arbitre · ${arbitre(mv.n)}` : "+ Arbitre"}
               </Pastille>
             )}
+            {tenue && (
+              <Pastille onClick={() => onFeuille?.(mv.n)} actif>
+                <span aria-hidden>{tenue.ouverte ? "◉" : "✓"}</span>
+                {tenue.libelle}
+              </Pastille>
+            )}
           </div>
-          {direct && (
+          {(direct || tenue?.ouverte) && score && (
             <div className="flex items-center justify-center gap-4">
               <PastilleMaillot camp="Noirs" />
               <span className="font-display text-affiche leading-none tabular-nums">
-                {mv.score[0]} – {mv.score[1]}
+                {score[0]} – {score[1]}
               </span>
               <PastilleMaillot camp="Blancs" />
             </div>

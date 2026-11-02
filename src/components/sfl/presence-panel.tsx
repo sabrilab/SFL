@@ -16,6 +16,10 @@
 //
 // La vue admin reste discrète (Sabri, 30/10) : repliée sur une ligne, les
 // trois chiffres seuls ; on la déplie pour voir qui manque et relancer.
+//
+// Un joueur suspendu pour cette journée (carton rouge, lib/sfl/cartons.ts,
+// 01/11) ne répond pas : à la place du glissé, « Suspendu · J5 » et son
+// carton rouge.
 
 import { useMemo, useState } from "react";
 import { Check, ChevronDown, Copy, Radio, X } from "lucide-react";
@@ -31,19 +35,20 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { useJoueurBola } from "@/components/sfl/player-provider";
 import { divisionsDeLaJournee, terrainsDesEquipes } from "@/lib/sfl/equipes-division";
 import { cn } from "@/lib/utils";
+import { Suspendu } from "@/components/sfl/cartons/mes-cartons";
 
 export function PresencePanel({ compact = false }: { compact?: boolean }) {
   const session = useSession();
   const admin = !!session?.admin;
   const p = usePresence();
-  const { saison } = useSeason();
+  const { saison, divisions } = useSeason();
   const bola = useJoueurBola();
   const [vueAdmin, setVueAdmin] = useState(false);
   // Dès la J4, chaque équipe dit sa division : « Noirs · Match 2 · D1 ».
   const divisionDe = useMemo(() => {
-    const etat = p.teams?.length ? divisionsDeLaJournee(saison, p.journee) : null;
-    return new Map(etat && p.teams ? terrainsDesEquipes(p.teams, etat).flatMap(({ divisions, equipes }) => equipes.map((e) => [e.name, divisions] as const)) : []);
-  }, [saison, p.journee, p.teams]);
+    const etat = p.teams?.length ? divisionsDeLaJournee(saison, p.journee, divisions) : null;
+    return new Map(etat && p.teams ? terrainsDesEquipes(p.teams, etat).flatMap(({ divisions: ds, equipes }) => equipes.map((e) => [e.name, ds] as const)) : []);
+  }, [saison, p.journee, p.teams, divisions]);
 
   function copyRelances() {
     const list = p.sansReponse.join(", ");
@@ -74,7 +79,7 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
             {ligneDuRendezVous(p.rendezVous)}
           </p>
         </div>
-        {p.mine && !bola && (
+        {p.mine && !bola && !p.suspendu && (
           <span
             className={cn(
               "flex size-9 shrink-0 items-center justify-center rounded-full",
@@ -92,7 +97,9 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
 
       {/* Les deux boutons, jusqu'à vendredi minuit ; une fois la réponse
           donnée, elle est scellée. */}
-      {bola ? null : p.reponsesOuvertes ? (
+      {bola ? null : p.suspendu ? (
+        <Suspendu j={p.suspendu.j} className="mt-4" />
+      ) : p.reponsesOuvertes ? (
         <>
           <ReponseScellee className="mt-4" mine={p.mine} onRepondre={p.answer} />
           {!p.mine && (

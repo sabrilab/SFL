@@ -17,6 +17,13 @@
 // `brute` la même sans les votes ; `document` le document tel qu'il est
 // stocké — le serveur ne l'écrit jamais.
 //
+// Depuis le 02/11/2026, `saison` et `brute` sont FIGÉES jusqu'à la
+// révélation (revelation.ts, figer), comme la vue du SeasonProvider, pour
+// le même instant : une journée jouée en direct n'y compte qu'à 19 h.
+// `direct` est la saison publiée sans figer (la feuille, les retards, les
+// cartons), `divisions` le découpage de `saison`, `comptees` les journées
+// qui comptent.
+//
 // Les journées en brouillon (30/10/2026, saisie/brouillon.ts) : `saison` et
 // `brute` ne les ont pas. Aucune annonce, aucune mission, aucun calcul ne
 // part d'une feuille que la ligue ne voit pas. C'est la SEULE lecture de la
@@ -29,6 +36,8 @@ import { deriveSeason } from "./saisie/engine";
 import { numeroSaison, type RosterEntry, type Saison } from "./saisie/types";
 import { sansBrouillons } from "./saisie/brouillon";
 import { appliquerVotes, titresFaibles, type VoteFigure } from "./votes";
+import { figer, journeesComptees, prochaineTransition } from "./revelation";
+import { etatDivisions, type EtatDivisions } from "./divisions";
 
 /** Toutes les lignes d'une requête, page par page (la base en rend 1 000 au plus d'un coup). */
 export async function toutesLesLignes<T>(
@@ -86,10 +95,17 @@ export function saisonAvecVotes(brute: Saison, votes: VoteFigure[], maintenant: 
 }
 
 export interface SaisonServeur {
-  /** La saison à lire : publiée (sans brouillons), votes appliqués. */
+  /** La saison à lire : publiée (sans brouillons), votes appliqués, figée jusqu'à la révélation. */
   saison: Saison;
-  /** La saison publiée, sans les votes. */
+  /** La saison publiée, sans les votes, figée de même. */
   brute: Saison;
+  /** La saison publiée telle qu'elle se joue (sans brouillons, sans figer) : le direct. */
+  direct: Saison;
+  /** Les divisions de `saison` : le même découpage que les téléphones. */
+  divisions: EtatDivisions | null;
+  /** Les journées qui comptent à cet instant, et la prochaine heure où la vue peut changer. */
+  comptees: Set<number>;
+  prochaine: Date | null;
   /** Le document stocké, brouillons compris : à ne lire qu'en connaissance de cause. */
   document: Saison;
   votes: VoteFigure[];
@@ -107,9 +123,20 @@ export async function lireSaisonServeur(sb: SupabaseClient, maintenant = new Dat
   const ligne = doc as { data?: Saison; updated_at?: string | null } | null;
   const document = ligne?.data;
   if (!document) return null;
-  const brute = sansBrouillons(document);
-  const [votes] = await Promise.all([votesDeLaSaison(sb, numeroSaison(brute)), chargerArbitresServeur(sb)]);
-  return { saison: saisonAvecVotes(brute, votes, maintenant), brute, document, votes, updatedAt: ligne?.updated_at ?? null };
+  const direct = sansBrouillons(document);
+  const [votes] = await Promise.all([votesDeLaSaison(sb, numeroSaison(direct)), chargerArbitresServeur(sb)]);
+  const saison = figer(saisonAvecVotes(direct, votes, maintenant), maintenant);
+  return {
+    saison,
+    brute: figer(direct, maintenant),
+    direct,
+    divisions: etatDivisions(saison),
+    comptees: journeesComptees(direct, maintenant),
+    prochaine: prochaineTransition(direct, maintenant),
+    document,
+    votes,
+    updatedAt: ligne?.updated_at ?? null,
+  };
 }
 
 /**

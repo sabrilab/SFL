@@ -9,6 +9,8 @@ import { SEED_ENTRIES, SEED_JOURNEES, SEED_ROSTER } from "./seed";
 import { appliquerMvpAuto } from "./mvp";
 import { sansVitrine } from "../compte-vitrine";
 import { bloquantsEcriture, nouveauxEcarts, type Ecart } from "./integrite";
+import { tenirFinDesMatchs } from "../revelation";
+import { maintenant } from "../horloge";
 import type { Saison } from "./types";
 
 const STORAGE_KEY = "sfl-saisie-v1";
@@ -175,7 +177,12 @@ export const saisieStore: SaisieStoreSur = {
   load: () => localStorageStore.load(),
   save(input, opts = {}) {
     // Les lignes du compte vitrine ne vivent que sur son écran (compte-vitrine.ts).
-    const saison = appliquerMvpAuto(sansVitrine(input));
+    // La fin des matchs du jour (revelation.ts, tenirFinDesMatchs) : posée à
+    // la dernière feuille, retirée d'une journée rouverte avant sa révélation ;
+    // la base la garde ou la corrige, et publier_saison rend la sienne
+    // (sync.ts). Une vue figée (input.figee) est refusée plus bas
+    // (integrite.ts, I10).
+    const saison = tenirFinDesMatchs(appliquerMvpAuto(sansVitrine(input)), maintenant());
     // Une feuille saine (30/10, après les matchs 5 et 6 de la J3) : un doublon,
     // un membre qui ne joue pas, une deuxième journée pour un dimanche ou un
     // brouillon effacé par une saison filtrée ne s'écrivent pas.

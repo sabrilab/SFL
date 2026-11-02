@@ -4,7 +4,9 @@
 //     viens ? » (motif « convocation ») ;
 //   · les résultats d'une journée, une fois sa feuille remplie, chacun le
 //     sien — « J3 · Tu es le MVP », « J3 · Victoire 4 – 2 »… (motif
-//     « resultats »).
+//     « resultats ») ; dès la J5, à la révélation (revelation.ts), avec sa
+//     division (« Tu montes en D2. »). Avant, la route répond fini: false et
+//     `apres` : l'heure de la révélation, où le téléphone rappelle.
 //
 // Qui l'appelle : n'importe quel joueur de la ligue, sans le savoir — l'app
 // la sonne à l'ouverture (lib/sfl/ligue-annonce.ts), comme les divisions et
@@ -34,6 +36,9 @@ import {
 } from "@/lib/sfl/annonces-ligue";
 import type { MotifNotif } from "@/lib/sfl/motifs-notif";
 import type { Notif } from "@/lib/sfl/push";
+import { suspenduPour } from "@/lib/sfl/cartons";
+import { revelation, revelationAttendue } from "@/lib/sfl/revelation";
+import { numeroSaison } from "@/lib/sfl/saisie/types";
 
 export const maxDuration = 30;
 
@@ -103,7 +108,12 @@ export async function POST(req: NextRequest) {
   const convocation = convocationAAnnoncer(saison, (convocations?.[0] as ConvocationOuverte | undefined) ?? null, maintenant);
   const publieLe = ligne?.updated_at ? new Date(ligne.updated_at).getTime() : maintenant.getTime();
   const resultats = resultatsAAnnoncer(saison, publieLe, maintenant);
-  if (!convocation && !resultats) return NextResponse.json({ envoyes: 0, fini: true });
+  // Une révélation attendue aujourd'hui (revelation.ts) : rien n'est fini, rappeler à l'heure dite.
+  const attendue = lue ? revelationAttendue(lue.direct, maintenant) : null;
+  const metaAttendue = attendue != null ? lue!.direct.journees.find((m) => m.j === attendue) : undefined;
+  const rev = metaAttendue ? revelation(metaAttendue, numeroSaison(lue!.direct), maintenant) : null;
+  const enAttente = rev && rev.getTime() > maintenant.getTime() ? { fini: false, apres: rev.toISOString() } : attendue != null ? { fini: false } : null;
+  if (!convocation && !resultats) return NextResponse.json({ envoyes: 0, ...(enAttente ?? { fini: true }) });
 
   const cle = cleVapid();
   if (!cle) return NextResponse.json({ envoyes: 0, fini: true });
@@ -131,7 +141,9 @@ export async function POST(req: NextRequest) {
   let envoyes = 0;
   let fini = true;
   if (convocation) {
-    const r = await annoncer(sb, cle, convocation.cle, idDe, "convocation", `convocation:${convocations![0].id}`, () => ({
+    // Un suspendu (carton rouge, lib/sfl/cartons.ts) n'est pas convoqué : « Tu viens ? » ne lui part pas.
+    const convoques = new Map([...idDe].filter(([nom]) => !suspenduPour(saison, nom, convocation.j)));
+    const r = await annoncer(sb, cle, convocation.cle, convoques, "convocation", `convocation:${convocations![0].id}`, () => ({
       titre: couper(convocation.titre, 60),
       texte: couper(convocation.texte, 180),
       url: "/",
@@ -142,11 +154,12 @@ export async function POST(req: NextRequest) {
   }
   if (resultats) {
     const r = await annoncer(sb, cle, resultats.cle, idDe, "resultats", resultats.cle, (joueur) => {
-      const { titre, texte } = texteResultats(saison, resultats.j, joueur);
+      // Les titres votés et la division : la vue figée votes posés (lue.saison), révélée.
+      const { titre, texte } = texteResultats(lue?.saison ?? saison, resultats.j, joueur, lue?.divisions);
       return { titre: couper(titre, 60), texte: couper(texte, 180), url: "/ligue", tag: resultats.cle };
     });
     envoyes += r.envoyes;
     fini &&= r.fini;
   }
-  return NextResponse.json({ envoyes, fini });
+  return NextResponse.json({ envoyes, ...(enAttente && fini ? enAttente : { fini }) });
 }

@@ -107,7 +107,7 @@ function EtatJournee({ f }: { f: FlairDeJournee }) {
     );
   return (
     <span className={cn("mono-label shrink-0", f.xp ? "text-[#9fe0a8]" : "text-white/55")}>
-      {f.phase === "en-jeu" ? "Verdict à minuit · " : ""}+{f.xp} XP
+      {f.phase === "en-jeu" ? `Verdict ${f.verdict} · ` : ""}+{f.xp} XP
     </span>
   );
 }

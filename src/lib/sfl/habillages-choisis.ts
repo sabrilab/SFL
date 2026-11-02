@@ -8,7 +8,8 @@
 // l'id d'une récompense (nuit, chrome, animee, onyx, et les skins du Passe
 // Bola : givre, carbone, marbre, neon, aurore, ki, meteorite, et « Tes
 // couleurs » avec son pays, couleurs:dz ; ceux des recrues : recruteur,
-// filigrane, fondateur). Le traitement de la photo
+// filigrane, fondateur ; ceux de la Saison Givre ; ceux du PACK AFRIQUE 2027,
+// afrique-sn…). Le traitement de la photo
 // (argentique, gravure, marbre) n'est plus dans la passe depuis le 24/10
 // (Sabri : « Tu peux tirer tout ce qui est carte argentique ») : il reste
 // lisible, la carte ne le porte plus.
@@ -21,7 +22,7 @@
 // chacun (use-habillage.ts), et un choix qui n'est pas débloqué ne se porte
 // pas.
 
-import type { Finition, Signe, Traitement } from "@/components/sfl/finitions-carte";
+import { FINITIONS as FINITIONS_CARTE, SIGNES_JOUEUR, type Finition, type Signe, type Traitement } from "@/components/sfl/finitions-carte";
 import { estPaysCouleurs } from "@/components/sfl/skins-passe";
 import { supabase } from "@/lib/supabase";
 
@@ -37,30 +38,10 @@ export interface ChoixHabillage {
   signes: Signe[];
 }
 
-const SIGNES: readonly Signe[] = ["lisere-argent", "lisere-platine", "sceau", "puce-noire", "nom-grave"];
-
-const FINITIONS: readonly string[] = [
-  "auto",
-  "-",
-  "nuit",
-  "chrome",
-  "animee",
-  "onyx",
-  "verre",
-  "pepite",
-  "palestine",
-  "recruteur",
-  "filigrane",
-  "fondateur",
-  "givre",
-  "carbone",
-  "marbre",
-  "couleurs",
-  "neon",
-  "aurore",
-  "ki",
-  "meteorite",
-];
+// Les listes se dérivent des matières (finitions-carte.ts) : un skin ajouté
+// (Saison Givre, PACK AFRIQUE 2027) se relit sans rien écrire ici.
+const SIGNES: readonly Signe[] = SIGNES_JOUEUR;
+const FINITIONS: readonly string[] = ["auto", "-", ...FINITIONS_CARTE];
 const TRAITEMENTS: readonly string[] = ["auto", "-", "argentique", "gravure", "marbre"];
 
 /** Le choix tel qu'il est enregistré ; rien ou illisible = « auto » des deux côtés. */

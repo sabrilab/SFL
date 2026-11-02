@@ -137,6 +137,18 @@ const etat4 = divisionsDeLaJournee(coupee, 4)!;
 assert.equal(etat4.phase, "divisions");
 assert.equal(divisionsDeLaJournee(coupee, 3), null, "la J3 se joue sans divisions");
 assert.equal(divisionsDeLaJournee({ ...coupee, numero: 2 }, 4), null, "une autre saison");
+// `pour` : la journée que les divisions font jouer ; plus loin, elles sont périmées.
+assert.equal(etat4.pour, 4);
+assert.equal(etat4.perimee, undefined);
+assert.equal(divisionsDeLaJournee(coupee, 5)?.perimee, true, "la J5 avant la révélation de la J4 : divisions en attente");
+{
+  const j4 = deux(4, ["Ana", "Chris", "Eli", "Gaby", "Inès"], ["Bilal", "Dina", "Fodé", "Hugo", "Jade"]);
+  const posee = { ...coupee, journees: [...coupee.journees, { j: 4, date: "1 nov.", sflTime: true }], entries: [...coupee.entries, ...j4.map((e) => ({ ...e, result: null, buts: 0, passes: 0 }))] };
+  assert.equal(divisionsDeLaJournee(posee, 4)?.pour, 4, "feuille posée (ou vue figée) : la J4 garde ses divisions");
+  const jouee = { ...posee, entries: [...coupee.entries, ...j4] };
+  assert.equal(divisionsDeLaJournee(jouee, 4), null, "la J4 comptée : ses divisions sont passées");
+  assert.equal(divisionsDeLaJournee(jouee, 5)?.pour, 5);
+}
 
 // En divisions : les dix classés tiennent dans les 30 places de la D1 : un
 // seul terrain, un seul match, les Noirs contre les Blancs.
@@ -173,7 +185,9 @@ assert.equal(lignes4.find((e) => e.player === "Kenza")?.team, null, "sur la feui
 const match = computeJournees(posee).find((x) => x.j === 4)!.matches![0];
 assert.deepEqual([match.teamA.name, match.teamB.name], [c4.teams[0].name, c4.teams[1].name]);
 const neuve = poserEquipes(coupee, 4, c4.teams, "1 nov.");
-assert.deepEqual(neuve.journees.at(-1), { j: 4, date: "1 nov.", sflTime: true, mvpAuto: true, matchsDuJour: [{ equipes: ["Noirs 1", "Blancs 1"] }] });
+// Une journée neuve démarre sans SFL Time, même après une journée qui l'avait (Ilyes, 02/11/2026 : l'admin la coche).
+assert.deepEqual(neuve.journees.at(-1), { j: 4, date: "1 nov.", sflTime: false, mvpAuto: true, matchsDuJour: [{ equipes: ["Noirs 1", "Blancs 1"] }] });
+assert.ok(neuve.entries.filter((e) => e.j === 4).every((e) => e.sflTime === false), "ses lignes neuves suivent la journée");
 // Un match garde l'heure, le lieu et le terrain que l'admin lui avait donnés.
 const reglee: Saison = {
   ...feuille,
@@ -267,6 +281,7 @@ assert.ok(repartir(venusEnDivisions(25, 24, 24), 3).terrains.length === 3);
       actuelle: new Map(noms.map((nom, i) => [nom, ((i % 3) + 1) as Division])),
       decoupage: {} as EtatDivisions["decoupage"],
       journees: [],
+      pour: 4,
     };
     const saisonN: Saison = {
       ...saison,

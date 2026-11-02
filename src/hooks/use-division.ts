@@ -6,16 +6,15 @@
 // l'effectif de la saison n'en a pas, et un joueur Bola (hors de la SFL) ne
 // lit aucune division de la SFL (28/10/2026 : sa carte disait « D3 »).
 
-import { useMemo } from "react";
 import { useJoueurBola } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
-import { etatDivisions, type Division } from "@/lib/sfl/divisions";
+import type { Division } from "@/lib/sfl/divisions";
 import { isHidden } from "@/lib/sfl/hidden";
 
 export function useDivision(nom: string | null | undefined): Division | null {
-  const { saison, vitrine } = useSeason();
+  // Les divisions de la vue figée (revelation.ts) : celles des points affichés.
+  const { saison, vitrine, divisions: etat } = useSeason();
   const bola = useJoueurBola();
-  const etat = useMemo(() => etatDivisions(saison), [saison]);
   if (!nom || etat?.phase !== "divisions") return null;
   // Le compte vitrine (compte-vitrine.ts), masqué, se voit en D1 sur son écran.
   if (vitrine && nom === vitrine.nom) return 1;

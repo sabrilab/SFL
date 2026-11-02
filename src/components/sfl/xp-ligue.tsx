@@ -7,14 +7,40 @@
 // change qu'avec un rang, un palier ou un cran, pas avec l'horloge des
 // missions, qui recalcule tout chaque minute.
 
+//
+// Depuis le 01/11 (Ilyes : des paliers ouverts au téléphone, fermés à
+// l'ordinateur), le palier de chacun est pris au plus haut avec celui que le
+// serveur a gardé (passe_acquis, /api/xp/bilan ; lib/sfl/xp-acquis.ts).
+
 import { useMemo, type ReactNode } from "react";
-import { CartesXpContext, lireCartesXp } from "@/hooks/use-habillage";
+import { useAchatsLigue, useSuiviAchatsXp } from "@/hooks/use-achats-xp";
+import { useSuiviBilanServeur, usePaliersGardes } from "@/hooks/use-bilan-serveur";
+import { CartesXpContext, empreinte, lireCartesXp } from "@/hooks/use-habillage";
 import { useXpLigueCalcule, XpLigueContext } from "@/hooks/use-missions";
+import { nationsMontrees } from "@/lib/sfl/pack-afrique";
+import { cartesAvecServeur } from "@/lib/sfl/xp-acquis";
 
 export function XpLigueProvider({ children }: { children: ReactNode }) {
   const xp = useXpLigueCalcule();
+  useSuiviBilanServeur();
+  useSuiviAchatsXp();
+  const gardes = usePaliersGardes();
+  const achats = useAchatsLigue();
+  const vitrine = xp?.vitrine ?? null;
   const surLesCartes = xp?.surLesCartes ?? null;
-  const cartes = useMemo(() => (surLesCartes === null ? null : lireCartesXp(surLesCartes)), [surLesCartes]);
+  const cartes = useMemo(() => {
+    if (surLesCartes === null) return null;
+    const c = lireCartesXp(surLesCartes);
+    // Le compte vitrine voit le PACK AFRIQUE 2027 plein, sur son seul téléphone (un aperçu, jamais écrit).
+    const nations: Record<string, readonly (readonly [string, number])[]> = vitrine
+      ? { ...achats, [vitrine]: nationsMontrees().map((n) => [n, 0] as const) }
+      : achats;
+    if (!Object.keys(gardes).length && !Object.keys(nations).length) return c;
+    // Un joueur absent du calcul de cet appareil (un joueur Bola) y entre aussi :
+    // son skin de nation et ses paliers gardés se voient chez tout le monde.
+    const parJoueur = cartesAvecServeur(c.parJoueur, gardes, nations, () => ({ rang: null, paliers: {}, cran: 0, recrues: 0, fondateur: null }));
+    return { parJoueur, revision: `${c.revision}.${empreinte(JSON.stringify([gardes, nations]))}` };
+  }, [surLesCartes, gardes, achats, vitrine]);
   return (
     <XpLigueContext.Provider value={xp}>
       <CartesXpContext.Provider value={cartes}>{children}</CartesXpContext.Provider>

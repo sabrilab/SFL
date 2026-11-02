@@ -48,11 +48,16 @@ export function prochaineJournee(s: Pick<Saison, "journees" | "entries">): numbe
   return (jouees.at(-1) ?? 0) + 1;
 }
 
-/** Les journées où chacun a joué (un dimanche à plusieurs matchs compte une fois). */
-export function journeesParJoueur(entries: MatchEntry[]): Map<string, Set<number>> {
+/**
+ * Les journées où chacun a joué (un dimanche à plusieurs matchs compte une
+ * fois). `jouees` : seulement ces journées (celles que compte la vue,
+ * journeesJouees) — une feuille posée, ou figée jusqu'à la révélation, ne
+ * compte pas.
+ */
+export function journeesParJoueur(entries: MatchEntry[], jouees?: ReadonlySet<number>): Map<string, Set<number>> {
   const m = new Map<string, Set<number>>();
   for (const e of entries) {
-    if (!joue(e)) continue;
+    if (!joue(e) || (jouees && !jouees.has(e.j))) continue;
     let s = m.get(e.player);
     if (!s) m.set(e.player, (s = new Set()));
     s.add(e.j);
