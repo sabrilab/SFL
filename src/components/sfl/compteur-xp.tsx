@@ -9,7 +9,7 @@
 // pas ici (02/11 : la ligne passait sur deux lignes et la carte, sur un
 // téléphone bas, sous les onglets).
 
-import { ligneCompteur, partDuNiveau } from "@/lib/sfl/compteur-xp";
+import { partiesCompteur, partDuNiveau } from "@/lib/sfl/compteur-xp";
 import type { BilanXp } from "@/lib/sfl/missions";
 import { cn } from "@/lib/utils";
 
@@ -23,9 +23,14 @@ export function CompteurXp({
   /** La classe de la barre (celle du mode Passe, ou celle de la tuile). */
   barre?: string;
 }) {
+  const { xp, suite } = partiesCompteur(b);
   return (
     <span className={cn("flex min-w-0 flex-col gap-1.5", className)}>
-      <span className="mono-label tabular-nums leading-snug">{ligneCompteur(b)}</span>
+      {/* L'XP gagnée en blanc plein : c'est elle qu'on vient lire (Ilyes, 01/11). */}
+      <span className="mono-label tabular-nums leading-snug">
+        <span className="text-white">{xp}</span>
+        {suite}
+      </span>
       <span className={barre} aria-hidden>
         <span style={{ width: `${partDuNiveau(b) * 100}%` }} />
       </span>

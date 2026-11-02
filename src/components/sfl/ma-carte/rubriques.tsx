@@ -296,9 +296,11 @@ export function RubriquesMaCarte() {
           {r && r.xp > 0 && <span className="tuile__etiquette font-mono text-[12px] font-bold">rang {r.rang}</span>}
         </span>
         <span className="flex flex-col gap-1">
-          <span className="font-mono text-[11px] font-bold tabular-nums text-foreground/70">
-            {xpFr(b.total)}
-            {soldeXp != null && soldeXp !== b.total ? ` · ${nombreFr(soldeXp)} à dépenser` : ""}
+          {/* L'XP gagnée, nette (c'est elle qu'Ilyes cherchait) ; ce qui reste à dépenser, dessous et en
+              retrait (sur une ligne, « · 430 à dépenser » se cassait en deux dans la tuile). */}
+          <span className="flex flex-col font-mono text-[11px] font-bold tabular-nums leading-tight">
+            <span className="text-foreground">{xpFr(b.total)}</span>
+            {soldeXp != null && soldeXp !== b.total && <span className="text-foreground/55">{nombreFr(soldeXp)} à dépenser</span>}
           </span>
           <span className="tuile__barre" aria-hidden>
             <span style={{ width: `${partDuNiveau(b) * 100}%` }} />

@@ -3,7 +3,7 @@
 // 7 (et non 360) ; les bornes 0, 100, 2 100 ; les espaces insécables.
 //   npx tsx tools/compteur-xp-check.ts
 import assert from "node:assert/strict";
-import { ligneCompteur, partDuNiveau, resteAvantNiveau, xpFr } from "../src/lib/sfl/compteur-xp";
+import { ligneCompteur, partiesCompteur, partDuNiveau, resteAvantNiveau, xpFr } from "../src/lib/sfl/compteur-xp";
 import { debutNiveau, niveauDe } from "../src/lib/sfl/missions";
 
 const compte = (total: number) => {
@@ -20,6 +20,9 @@ assert.equal(lu(ligneCompteur(compte(99))), "99 XP · niveau 1 · 1 XP avant le 
 assert.equal(lu(ligneCompteur(compte(100))), "100 XP · niveau 2 · 200 XP avant le niveau 3");
 assert.equal(lu(ligneCompteur(compte(2100))), "2 100 XP · niveau 7 · 700 XP avant le niveau 8");
 assert.equal(resteAvantNiveau(compte(2099)), 1);
+// L'écran met l'XP en avant (compteur-xp.tsx) : les deux temps redonnent la ligne.
+assert.equal(lu(partiesCompteur(compte(1630)).xp), "1 630 XP");
+assert.equal(partiesCompteur(compte(1840)).xp + partiesCompteur(compte(1840)).suite, ligneCompteur(compte(1840)));
 assert.equal(partDuNiveau(compte(1630)), 130 / 600);
 assert.equal(partDuNiveau(compte(0)), 0);
 // Les espaces ne se cassent pas : entre le nombre et XP, et dans le nombre.

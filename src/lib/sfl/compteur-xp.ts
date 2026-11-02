@@ -21,9 +21,18 @@ type Compte = Pick<BilanXp, "total" | "niveau" | "dansLeNiveau" | "pourLeSuivant
 /** Ce qui reste avant le niveau suivant. */
 export const resteAvantNiveau = (b: Compte) => Math.max(0, b.pourLeSuivant - b.dansLeNiveau);
 
+/**
+ * La ligne du compteur, en deux temps : l'XP gagnée (ce qu'on vient lire
+ * d'un coup d'œil, l'écran la met en avant), puis le niveau et ce qui reste.
+ */
+export function partiesCompteur(b: Compte): { xp: string; suite: string } {
+  return { xp: xpFr(b.total), suite: ` · niveau ${b.niveau} · ${xpFr(resteAvantNiveau(b))} avant le niveau ${b.niveau + 1}` };
+}
+
 /** La ligne du compteur. */
 export function ligneCompteur(b: Compte): string {
-  return `${xpFr(b.total)} · niveau ${b.niveau} · ${xpFr(resteAvantNiveau(b))} avant le niveau ${b.niveau + 1}`;
+  const { xp, suite } = partiesCompteur(b);
+  return xp + suite;
 }
 
 /** La part du niveau déjà faite, de 0 à 1. */
