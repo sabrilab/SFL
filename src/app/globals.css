@@ -6,6 +6,7 @@
 @import "./tokens.css";
 @import "./boutons.css";
 @import "./scelle.css";
+@import "./styles-ui.css";
 
 @custom-variant dark (&:is(.dark *));
 

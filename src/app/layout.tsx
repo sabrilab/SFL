@@ -12,6 +12,7 @@ import { MemoireNavigation } from "@/components/layout/memoire-navigation";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { MiseAJour } from "@/components/pwa/mise-a-jour";
 import { CouleurTheme } from "@/components/pwa/couleur-theme";
+import { EssaiStyleUi } from "@/components/sfl/style-ui/essai";
 import { GuideInstallation } from "@/components/pwa/guide-installation";
 import { ViewportLock } from "@/components/pwa/viewport-lock";
 import { PlayerProvider } from "@/components/sfl/player-provider";
@@ -105,6 +106,7 @@ export default function RootLayout({
             téléphone (bola-theme). */}
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem storageKey="bola-theme" disableTransitionOnChange>
           <CouleurTheme />
+          <EssaiStyleUi />
           <SeasonProvider>
             <PlayerProvider>
             <XpLigueProvider>

@@ -1,0 +1,136 @@
+/* ═══════════════════ Six styles d'interface, à l'essai ═══════════════════
+   Sabri, 02/11/2026 : « les mêmes écrans, en gardant l'UX, mais tu changes
+   l'UI, l'interface, et tu changes de style », passés au crible de la
+   mignonitude, du nombre d'or et du design émotionnel. Rien n'est publié :
+   l'essai ne vit que sur l'aperçu (components/sfl/style-ui/essai.tsx pose
+   html[data-style="1…6"] depuis ?style=N, gardé dans bola-style-ui).
+
+   Ce qui change : la surface (fond, cartes, encre), les arrondis, les
+   ombres, les boutons, la barre d'onglets, les titres. Ce qui ne change
+   jamais : les cartes de joueur, les écussons, les trophées, la Map
+   elle-même (le plan et ses stickers), et la braise réservée au manque.
+
+   1 Galet     — la mignonitude : crème, tout est rond et dodu, ombres
+                 douces, boutons qui s'enfoncent (ombre portée sous la pilule).
+   2 Or        — le nombre d'or : papier et encre, filets d'un trait, arrondis
+                 de la suite 5 · 8 · 13 · 21 · 34, aucune ombre.
+   3 Vestiaire — l'émotion du soir : noir chaud, une lumière de projecteur
+                 tombe du haut, surfaces de cuir sombre.
+   4 Pelouse   — la charte en grand : le sauge devient le fond, l'encre vert
+                 profond, le mauve pour ce qui est à faire.
+   5 Velours   — la nuit douce : prune profonde, verre teinté de mauve,
+                 très arrondi.
+   6 Affiche   — le sticker : papier blanc, contours noirs de 2 px, ombres
+                 franches décalées, titres en Anton capitales.
+
+   Chaque bloc pose ses jetons sur :root, sur .dark et sur .surfaces-jour
+   (le tiroir de la Map), pour gagner sur le thème clair/sombre. Toutes les
+   couleurs de thème restent en hexadécimal (postcss-repli-opacite.cjs en
+   tire les canaux --x-rgb). */
+
+/* ─── 1 · Galet ─── */
+:root[data-style="1"], :root[data-style="1"].dark, :root[data-style="1"] .surfaces-jour {
+  --background: #fbf5ec; --foreground: #2a2420; --card: #ffffff; --card-foreground: #2a2420;
+  --popover: #ffffff; --popover-foreground: #2a2420; --primary: #2a2420; --primary-foreground: #fbf5ec;
+  --secondary: #f1e8dc; --secondary-foreground: #2a2420; --muted: #f1e8dc; --muted-foreground: #8b8076;
+  --accent: #efe5d8; --accent-foreground: #2a2420; --border: #eadfd1; --input: #eadfd1; --ring: #2a2420;
+  --vert: #bfe2bf; --mauve: #f3c6db; --contraste: #2a2420; --radius: 1.4rem; color-scheme: light;
+}
+/* ─── 2 · Or ─── */
+:root[data-style="2"], :root[data-style="2"].dark, :root[data-style="2"] .surfaces-jour {
+  --background: #f6f5f0; --foreground: #0b0b0b; --card: #fbfaf6; --card-foreground: #0b0b0b;
+  --popover: #fbfaf6; --popover-foreground: #0b0b0b; --primary: #0b0b0b; --primary-foreground: #f6f5f0;
+  --secondary: #ecebe5; --secondary-foreground: #0b0b0b; --muted: #ecebe5; --muted-foreground: #77766f;
+  --accent: #ecebe5; --accent-foreground: #0b0b0b; --border: #d9d8d0; --input: #d9d8d0; --ring: #0b0b0b;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #0b0b0b; --radius: 0.8125rem; color-scheme: light;
+}
+/* ─── 3 · Vestiaire ─── */
+:root[data-style="3"], :root[data-style="3"].dark, :root[data-style="3"] .surfaces-jour {
+  --background: #15110e; --foreground: #f6ede3; --card: #201a16; --card-foreground: #f6ede3;
+  --popover: #241d18; --popover-foreground: #f6ede3; --primary: #f6ede3; --primary-foreground: #15110e;
+  --secondary: #2c241e; --secondary-foreground: #f6ede3; --muted: #201a16; --muted-foreground: #a39484;
+  --accent: #2c241e; --accent-foreground: #f6ede3; --border: #352c25; --input: #352c25; --ring: #f6ede3;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #ffffff; --radius: 1.1rem; color-scheme: dark;
+}
+/* ─── 4 · Pelouse ─── */
+:root[data-style="4"], :root[data-style="4"].dark, :root[data-style="4"] .surfaces-jour {
+  --background: #dde9da; --foreground: #0f2414; --card: #f3f8f1; --card-foreground: #0f2414;
+  --popover: #f3f8f1; --popover-foreground: #0f2414; --primary: #0f2414; --primary-foreground: #eef5ec;
+  --secondary: #cfdfcb; --secondary-foreground: #0f2414; --muted: #cfdfcb; --muted-foreground: #587060;
+  --accent: #cfdfcb; --accent-foreground: #0f2414; --border: #c2d5be; --input: #c2d5be; --ring: #0f2414;
+  --vert: #9fc79f; --mauve: #e6bfd3; --contraste: #0f2414; --radius: 1.25rem; color-scheme: light;
+}
+/* ─── 5 · Velours ─── */
+:root[data-style="5"], :root[data-style="5"].dark, :root[data-style="5"] .surfaces-jour {
+  --background: #160f19; --foreground: #f7edf3; --card: #231928; --card-foreground: #f7edf3;
+  --popover: #2a1f30; --popover-foreground: #f7edf3; --primary: #f3d7e6; --primary-foreground: #160f19;
+  --secondary: #2f2335; --secondary-foreground: #f7edf3; --muted: #231928; --muted-foreground: #a8939f;
+  --accent: #2f2335; --accent-foreground: #f7edf3; --border: #3a2c41; --input: #3a2c41; --ring: #f3d7e6;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #ffffff; --radius: 1.6rem; color-scheme: dark;
+}
+/* ─── 6 · Affiche ─── */
+:root[data-style="6"], :root[data-style="6"].dark, :root[data-style="6"] .surfaces-jour {
+  --background: #fffcf4; --foreground: #000000; --card: #ffffff; --card-foreground: #000000;
+  --popover: #ffffff; --popover-foreground: #000000; --primary: #000000; --primary-foreground: #fffcf4;
+  --secondary: #f3efe4; --secondary-foreground: #000000; --muted: #f3efe4; --muted-foreground: #5c5a54;
+  --accent: #f3efe4; --accent-foreground: #000000; --border: #000000; --input: #000000; --ring: #000000;
+  --vert: #a9cba9; --mauve: #e0b3cb; --contraste: #000000; --radius: 0.875rem; color-scheme: light;
+}
+
+/* ─── Le fond de page : les orbes du thème d'origine s'effacent ─── */
+:root[data-style] .orbs { display: none; }
+:root[data-style] body { background: var(--background); }
+:root[data-style="3"] body {
+  background: radial-gradient(120% 55% at 50% -12%, rgba(255, 228, 190, 0.2), transparent 62%), var(--background);
+}
+:root[data-style="5"] body {
+  background: radial-gradient(90% 50% at 85% -5%, rgba(224, 179, 203, 0.2), transparent 60%),
+    radial-gradient(80% 45% at 0% 100%, rgba(169, 203, 169, 0.1), transparent 60%), var(--background);
+}
+
+/* ─── La barre d'onglets ─── */
+:root[data-style="1"] .liquid-tabbar { --tabbar-verre: rgba(255, 255, 255, 0.92); --tabbar-plein: #2a2420; --tabbar-liseret: rgba(255,255,255,0.9); color: #2a2420; box-shadow: 0 10px 30px rgba(120, 90, 60, 0.16) !important; }
+:root[data-style="2"] .liquid-tabbar { --tabbar-verre: #fbfaf6; --tabbar-plein: #0b0b0b; color: #0b0b0b; box-shadow: none !important; outline: 1px solid #0b0b0b; border-radius: 21px !important; }
+:root[data-style="3"] .liquid-tabbar { --tabbar-verre: rgba(32, 26, 22, 0.88); --tabbar-plein: #f6ede3; }
+:root[data-style="4"] .liquid-tabbar { --tabbar-verre: rgba(243, 248, 241, 0.9); --tabbar-plein: #0f2414; color: #0f2414; }
+:root[data-style="5"] .liquid-tabbar { --tabbar-verre: rgba(42, 31, 48, 0.82); --tabbar-plein: #f3d7e6; }
+:root[data-style="6"] .liquid-tabbar { --tabbar-verre: #ffffff; --tabbar-plein: #000000; color: #000; border: 2px solid #000; box-shadow: 4px 4px 0 #000 !important; border-radius: 16px !important; }
+
+/* ─── Les boutons ─── */
+:root[data-style="1"] :is(.bouton-principal, .bouton-encre, .bouton-givre) { box-shadow: 0 4px 0 rgba(42, 36, 32, 0.16), 0 10px 22px rgba(120, 90, 60, 0.12) !important; border-radius: 999px; }
+:root[data-style="1"] :is(.bouton-principal, .bouton-encre, .bouton-givre):active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(42, 36, 32, 0.16) !important; }
+:root[data-style="2"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre) { background: transparent !important; color: #0b0b0b !important; box-shadow: none !important; border: 1px solid #0b0b0b !important; border-radius: 13px !important; }
+:root[data-style="2"] .bouton-principal { background: #0b0b0b !important; color: #f6f5f0 !important; }
+:root[data-style="3"] .bouton-principal { background: linear-gradient(180deg, #fff5e8, #e9dccb) !important; color: #15110e !important; }
+:root[data-style="4"] :is(.bouton-principal, .bouton-encre) { background: #0f2414 !important; color: #eef5ec !important; box-shadow: none !important; }
+:root[data-style="5"] .bouton-principal { background: linear-gradient(180deg, #f8e4ef, #e0b3cb) !important; color: #160f19 !important; box-shadow: 0 8px 24px rgba(224, 179, 203, 0.25) !important; }
+:root[data-style="6"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre) { border: 2px solid #000 !important; box-shadow: 3px 3px 0 #000 !important; border-radius: 14px !important; color: #000 !important; background: #fff !important; }
+:root[data-style="6"] .bouton-principal { background: #e0b3cb !important; }
+:root[data-style="6"] :is(.bouton-principal, .bouton-secondaire, .bouton-encre, .bouton-givre):active { transform: translate(3px, 3px); box-shadow: 0 0 0 #000 !important; }
+
+/* ─── Les tuiles et le tiroir de la Map ─── */
+:root[data-style="1"] .tuile-match { border-radius: 32px !important; }
+:root[data-style="1"] .tiroir-map { border-radius: 40px !important; box-shadow: 0 16px 40px rgba(120, 90, 60, 0.18) !important; }
+:root[data-style="2"] .tuile-match { border-radius: 13px !important; box-shadow: 0 0 0 1px #0b0b0b !important; }
+:root[data-style="2"] .tiroir-map { border-radius: 21px !important; box-shadow: none !important; outline: 1px solid #0b0b0b; }
+:root[data-style="3"] .tiroir-map { box-shadow: 0 -10px 40px rgba(255, 228, 190, 0.08), 0 20px 40px rgba(0,0,0,0.5) !important; }
+:root[data-style="5"] .tuile-match { border-radius: 30px !important; }
+:root[data-style="5"] .tiroir-map { border-radius: 38px !important; }
+:root[data-style="6"] .tuile-match { border-radius: 16px !important; border: 2px solid #000; box-shadow: 4px 4px 0 #000 !important; }
+:root[data-style="6"] .tiroir-map { border-radius: 20px !important; border: 2px solid #000; box-shadow: 5px 5px 0 #000 !important; }
+
+/* ─── Les titres ─── */
+:root[data-style="1"] :is(h1, h2) { letter-spacing: -0.02em; font-weight: 900; }
+:root[data-style="2"] :is(h1, h2, h3) { font-weight: 700; letter-spacing: -0.01em; }
+:root[data-style="6"] :is(h1, h2) { font-family: var(--font-anton), var(--font-inter), sans-serif; font-weight: 400; text-transform: uppercase; letter-spacing: 0.01em; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-style] :is(.bouton-principal, .bouton-encre, .bouton-givre, .bouton-secondaire):active { transform: none; }
+}
+
+/* ─── Les tuiles et blocs de l'app (repérés par leur arrondi d'origine) ─── */
+:root[data-style="1"] :is(section, a, div)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { border-radius: 32px; }
+:root[data-style="2"] :is(section, a, div)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { border-radius: 13px; }
+:root[data-style="5"] :is(section, a, div)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { border-radius: 30px; }
+:root[data-style="6"] :is(section, a)[class*="rounded-[2"]:not(.tuile-match):not([class*="carte"]) { border-radius: 16px; border: 2px solid #000; box-shadow: 4px 4px 0 #000; }
+:root[data-style="6"] :is(section, a)[class*="rounded-[2"] :is(h2, h3) { font-family: var(--font-anton), var(--font-inter), sans-serif; font-weight: 400; text-transform: uppercase; }

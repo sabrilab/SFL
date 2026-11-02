@@ -1,0 +1,66 @@
+"use client";
+
+// Six styles d'interface à l'essai (Sabri, 02/11/2026 ; app/styles-ui.css).
+// Sur l'aperçu seulement, jamais en production : ?style=1…6 pose
+// html[data-style] et le garde sur ce téléphone (bola-style-ui), ?style=0
+// revient au style d'origine. Une pastille en haut à gauche dit le style
+// affiché ; la toucher passe au suivant. Chaque style choisit son thème
+// (clair ou sombre), parce que ses couleurs ont été faites pour lui.
+
+import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
+
+const CLE = "bola-style-ui";
+export const STYLES_UI = ["Origine", "Galet", "Or", "Vestiaire", "Pelouse", "Velours", "Affiche"] as const;
+const SOMBRES = new Set([3, 5]);
+
+function lire(): number {
+  try {
+    const q = new URLSearchParams(window.location.search).get("style");
+    if (q != null) {
+      const n = Number(q);
+      if (n >= 0 && n < STYLES_UI.length) {
+        localStorage.setItem(CLE, String(n));
+        return n;
+      }
+    }
+    const n = Number(localStorage.getItem(CLE) ?? 0);
+    return n >= 0 && n < STYLES_UI.length ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function EssaiStyleUi() {
+  const [style, setStyle] = useState(0);
+  const { setTheme } = useTheme();
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lu après l'hydratation : le serveur ne connaît ni l'adresse ni le téléphone.
+    setStyle(lire());
+  }, []);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    if (style) html.dataset.style = String(style);
+    else delete html.dataset.style;
+    if (style) setTheme(SOMBRES.has(style) ? "dark" : "light");
+  }, [style, setTheme]);
+
+  if (process.env.NEXT_PUBLIC_BOLA_ENV === "production" || !style) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        const n = (style % (STYLES_UI.length - 1)) + 1;
+        try {
+          localStorage.setItem(CLE, String(n));
+        } catch {}
+        setStyle(n);
+      }}
+      className="fixed top-[calc(env(safe-area-inset-top,0px)+4px)] left-1/2 z-[9999] -translate-x-1/2 rounded-full bg-foreground px-3 py-1 text-[11px] font-bold tracking-[0.6px] text-background uppercase opacity-80"
+    >
+      Style {style} · {STYLES_UI[style]}
+    </button>
+  );
+}
