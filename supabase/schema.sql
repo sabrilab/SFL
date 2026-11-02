@@ -8493,19 +8493,30 @@ grant execute on function public.poser_paliers_acquis(jsonb) to service_role;
 -- ─────────────── Les achats en XP : le PACK AFRIQUE 2027 (01/11/2026) ───────────────
 -- Ilyes, 01/11 : un pack « achetable en XP », jamais gagné par les missions ni
 -- par le Passe (lib/sfl/pack-afrique.ts). Un achat = une ligne : ce qu'il a
--- coûté (xp), ce qu'il a donné (obtenu : le code de la nation, la finition
--- afrique-xx), son numéro de série dans l'édition (n° 0042, imprimé au dos).
--- Le solde à dépenser n'est stocké nulle part : l'XP gagnée à vie, recalculée
--- par le serveur (xp-serveur.server.ts), moins la somme des xp ici. Le Niveau
--- XP et le Passe ne lisent jamais cette table : dépenser ne les fait pas
--- baisser. Seule la route /api/boutique-xp (clé secrète) écrit, par
--- ouvrir_pack_xp ; la ligue voit ce que chacun a obtenu (sa carte le porte),
--- jamais ce qu'il a payé. Jamais de Ballons (achetés en euros) ici.
+-- coûté (xp, dans sa monnaie), ce qu'il a donné (obtenu : le code de la
+-- nation, la finition afrique-xx), son numéro de série dans l'édition
+-- (n° 0042, imprimé au dos). Le solde à dépenser n'est stocké nulle part :
+-- ce qui est gagné à vie, recalculé par le serveur (xp-serveur.server.ts),
+-- moins la somme des prix payés ici dans la même monnaie. Le Niveau XP et le
+-- Passe ne lisent jamais cette table : dépenser ne les fait pas baisser.
+-- Seule la route /api/boutique-xp (clé secrète) écrit, par ouvrir_pack_xp ;
+-- la ligue voit ce que chacun a obtenu (sa carte le porte), jamais ce qu'il
+-- a payé ni dans quelle monnaie. Jamais de Ballons (achetés en euros) ici.
+--
+-- Les XP S (02/11/2026, lib/sfl/xp-s.ts) : la seconde monnaie, plus rare,
+-- gagnée par la SFL Time, les missions de rang S, les titres, le Flair et le
+-- MVP Bola. Ilyes : le PACK AFRIQUE 2027 se paie en XP S (40 le tirage), et
+-- plus jamais en XP normales ; les packs rares à venir aussi. La colonne
+-- monnaie (« xp » ou « xp-s ») dit dans quoi chaque ligne a été payée : un
+-- seul verrou par joueur, une seule clé d'idempotence (joueur, cle), un seul
+-- numéro de série par nation, quelle que soit la monnaie. Additif : une base
+-- qui a déjà des lignes les garde en « xp » (le défaut).
 create table if not exists public.achats_xp (
   id       bigint generated always as identity primary key,
   joueur   uuid        not null references public.profiles (id) on delete cascade,
   article  text        not null check (article ~ '^pack-[a-z0-9-]{1,40}$'),
   obtenu   text        not null check (obtenu ~ '^[a-z]{2}$'),
+  monnaie  text        not null default 'xp',
   xp       int         not null check (xp between 1 and 100000),
   serie    int         not null check (serie >= 1),
   cle      uuid        not null,
@@ -8514,6 +8525,18 @@ create table if not exists public.achats_xp (
   constraint achats_xp_sans_doublon unique (joueur, article, obtenu),
   constraint achats_xp_serie unique (article, obtenu, serie)
 );
+alter table public.achats_xp add column if not exists monnaie text not null default 'xp';
+alter table public.achats_xp drop constraint if exists achats_xp_monnaie;
+alter table public.achats_xp add constraint achats_xp_monnaie check (monnaie in ('xp', 'xp-s'));
+-- Le PACK AFRIQUE 2027 ne se vend plus qu'en XP S : une route mal réglée ne
+-- peut pas le vendre en XP normales. « not valid » : la règle vaut pour toute
+-- ligne neuve ; une ligne déjà payée en XP (une base d'essai) reste un achat
+-- honoré, et la migration ne bute pas sur elle.
+alter table public.achats_xp drop constraint if exists achats_xp_afrique_en_xps;
+alter table public.achats_xp add constraint achats_xp_afrique_en_xps
+  check (article <> 'pack-afrique-2027' or monnaie = 'xp-s') not valid;
+comment on column public.achats_xp.xp is 'Le prix payé, dans la monnaie de la ligne (monnaie : xp ou xp-s).';
+comment on column public.achats_xp.monnaie is 'La monnaie du prix : xp (XP normales) ou xp-s (XP S, lib/sfl/xp-s.ts).';
 create index if not exists achats_xp_joueur on public.achats_xp (joueur);
 alter table public.achats_xp enable row level security;
 revoke all on public.achats_xp from anon, authenticated;
@@ -8523,15 +8546,18 @@ create policy "achats_xp: les membres lisent"
   on public.achats_xp for select to authenticated
   using ((select public.est_membre()));
 
--- Mes achats, avec leur prix : le solde de l'écran.
-create or replace function public.mes_achats_xp()
-returns table (article text, obtenu text, xp int, serie int, le timestamptz)
+-- Mes achats, avec leur prix et sa monnaie : le solde de l'écran, monnaie par
+-- monnaie. Le type de retour a gagné la monnaie (02/11/2026) : la fonction se
+-- refait (drop puis create) à chaque passage.
+drop function if exists public.mes_achats_xp();
+create function public.mes_achats_xp()
+returns table (article text, obtenu text, monnaie text, xp int, serie int, le timestamptz)
 language sql
 security definer
 set search_path = ''
 stable
 as $$
-  select a.article, a.obtenu, a.xp, a.serie, a.le
+  select a.article, a.obtenu, a.monnaie, a.xp, a.serie, a.le
     from public.achats_xp a
    where a.joueur = (select auth.uid())
    order by a.le;
@@ -8540,16 +8566,25 @@ revoke execute on function public.mes_achats_xp() from public, anon;
 grant execute on function public.mes_achats_xp() to authenticated;
 
 -- Ouvrir un pack : débite et tire au sort ici, d'un seul tenant.
---   · p_gagne : l'XP gagnée à vie, calculée par la route (jamais par le téléphone) ;
+--   · p_monnaie : ce qui le paie, « xp » ou « xp-s » (le PACK AFRIQUE 2027 :
+--     xp-s, achats_xp_afrique_en_xps) ;
+--   · p_gagne : ce qui est gagné à vie dans cette monnaie, calculé par la
+--     route (jamais par le téléphone) ;
 --   · p_prix, p_choix : le prix et les nations en jeu (validées), tels que les
 --     tient lib/sfl/pack-afrique.ts (la route les passe : une seule liste) ;
 --   · p_cle : tirée par le téléphone à l'ouverture de la confirmation ; le
 --     même appel rejoué (réseau coupé, double toucher, app fermée en pleine
---     ouverture) rend le même tirage, sans débiter deux fois.
--- Un joueur à la fois (verrou consultatif) ; le numéro de série sous un
--- verrou par nation. Refuse : XP insuffisante, pack complet, demande invalide.
+--     ouverture) rend le même tirage, sans débiter deux fois ; rejouée pour
+--     un autre article ou une autre monnaie, elle est refusée.
+-- Le solde : p_gagne moins les prix payés dans la même monnaie ; une monnaie
+-- ne touche jamais l'autre. Un joueur à la fois, toutes monnaies (verrou
+-- consultatif) ; le numéro de série sous un verrou par nation. Refuse : « XP
+-- S insuffisantes. » (ou « XP insuffisante. ») avec le solde réel en détail,
+-- pack complet, demande invalide. L'ancienne signature, sans la monnaie,
+-- disparaît (02/11/2026).
+drop function if exists public.ouvrir_pack_xp(uuid, text, int, int, text[], uuid);
 create or replace function public.ouvrir_pack_xp(
-  p_joueur uuid, p_article text, p_prix int, p_gagne int, p_choix text[], p_cle uuid
+  p_joueur uuid, p_article text, p_monnaie text, p_prix int, p_gagne int, p_choix text[], p_cle uuid
 )
 returns jsonb
 language plpgsql
@@ -8563,6 +8598,7 @@ declare
   num     int;
 begin
   if p_joueur is null or p_cle is null or p_prix is null or p_prix < 1 or p_gagne is null or p_gagne < 0
+     or p_monnaie is null or p_monnaie not in ('xp', 'xp-s')
      or p_article is null or p_article !~ '^pack-[a-z0-9-]{1,40}$'
      or coalesce(cardinality(p_choix), 0) = 0
      or exists (select 1 from unnest(p_choix) c where c is null or c !~ '^[a-z]{2}$') then
@@ -8571,8 +8607,11 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('achats_xp:' || p_joueur::text, 0));
   select * into deja from public.achats_xp a where a.joueur = p_joueur and a.cle = p_cle;
   if found then
-    select coalesce(sum(a.xp), 0) into depense from public.achats_xp a where a.joueur = p_joueur;
-    return jsonb_build_object('obtenu', deja.obtenu, 'serie', deja.serie, 'xp', deja.xp,
+    if deja.article <> p_article or deja.monnaie <> p_monnaie then
+      raise exception 'Demande invalide.' using errcode = 'P0001';
+    end if;
+    select coalesce(sum(a.xp), 0) into depense from public.achats_xp a where a.joueur = p_joueur and a.monnaie = p_monnaie;
+    return jsonb_build_object('obtenu', deja.obtenu, 'serie', deja.serie, 'xp', deja.xp, 'monnaie', deja.monnaie,
                               'solde', greatest(0, p_gagne - depense), 'deja', true);
   end if;
   select c into tire
@@ -8584,18 +8623,19 @@ begin
   if tire is null then
     raise exception 'Pack complet.' using errcode = 'P0001';
   end if;
-  select coalesce(sum(a.xp), 0) into depense from public.achats_xp a where a.joueur = p_joueur;
+  select coalesce(sum(a.xp), 0) into depense from public.achats_xp a where a.joueur = p_joueur and a.monnaie = p_monnaie;
   if p_gagne - depense < p_prix then
-    raise exception 'XP insuffisante.' using errcode = 'P0001', detail = greatest(0, p_gagne - depense)::text;
+    raise exception '%', case p_monnaie when 'xp-s' then 'XP S insuffisantes.' else 'XP insuffisante.' end
+      using errcode = 'P0001', detail = greatest(0, p_gagne - depense)::text;
   end if;
   perform pg_advisory_xact_lock(hashtextextended('achats_xp_serie:' || p_article || ':' || tire, 0));
   select coalesce(max(a.serie), 0) + 1 into num
     from public.achats_xp a where a.article = p_article and a.obtenu = tire;
-  insert into public.achats_xp (joueur, article, obtenu, xp, serie, cle)
-  values (p_joueur, p_article, tire, p_prix, num, p_cle);
-  return jsonb_build_object('obtenu', tire, 'serie', num, 'xp', p_prix,
+  insert into public.achats_xp (joueur, article, obtenu, monnaie, xp, serie, cle)
+  values (p_joueur, p_article, tire, p_monnaie, p_prix, num, p_cle);
+  return jsonb_build_object('obtenu', tire, 'serie', num, 'xp', p_prix, 'monnaie', p_monnaie,
                             'solde', p_gagne - depense - p_prix, 'deja', false);
 end;
 $$;
-revoke execute on function public.ouvrir_pack_xp(uuid, text, int, int, text[], uuid) from public, anon, authenticated;
-grant execute on function public.ouvrir_pack_xp(uuid, text, int, int, text[], uuid) to service_role;
+revoke execute on function public.ouvrir_pack_xp(uuid, text, text, int, int, text[], uuid) from public, anon, authenticated;
+grant execute on function public.ouvrir_pack_xp(uuid, text, text, int, int, text[], uuid) to service_role;

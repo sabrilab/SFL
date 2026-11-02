@@ -1,7 +1,10 @@
 // Le PACK AFRIQUE 2027 : la seule liste (Ilyes, 01/11/2026 : « je peux très
 // bien faire un pack Afrique 2027 […] design-moi quelque chose de
-// magnifique »). Un pack qui ne s'achète qu'en XP, jamais gagné par les
-// missions ni par le Passe ; dépenser ne fait jamais baisser le Niveau XP.
+// magnifique »). Un pack payé en XP S (xp-s.ts : la seconde monnaie, plus
+// rare ; Ilyes, 02/11/2026 : 40 XP S le tirage, et plus jamais en XP
+// normales), jamais gagné par les missions ni par le Passe ; dépenser ne
+// fait jamais baisser le Niveau XP. Les packs rares à venir se paient aussi
+// en XP S.
 //
 // Le nom affiché est « PACK AFRIQUE 2027 ». Le nom du tournoi, son sigle, son
 // trophée, sa mascotte et ses logos appartiennent à la CAF : aucun ne
@@ -45,12 +48,17 @@ export const NATIONS = [
 
 export type CodeNation = (typeof NATIONS)[number]["id"];
 
+/** Les monnaies de la boutique (achats_xp.monnaie) : les XP normales, les XP S. */
+export type Monnaie = "xp" | "xp-s";
+
 export const PACK_AFRIQUE = {
   article: "pack-afrique-2027",
   nom: "PACK AFRIQUE 2027",
-  /** Le prix d'une ouverture, en XP. À VALIDER (Q1) : 1 200, ou 1 000 si le stock mesuré est faible. */
-  prix: 1200,
-  /** Ce qui se dépense. À VALIDER (Q1) : toute l'XP gagnée à vie (« a-vie »), ou celle gagnée depuis le lancement. */
+  /** Ce qui le paie : les XP S (Ilyes, 02/11/2026). La base refuse toute ligne neuve du pack dans une autre monnaie. */
+  monnaie: "xp-s" as Monnaie,
+  /** Le prix d'un tirage, en XP S (Ilyes, 02/11/2026 : 40 ; 13 au plus par journée, personne en moins de 4 journées). */
+  prix: 40,
+  /** Ce qui se dépense : toutes les XP S gagnées à vie (toute l'histoire compte, Q1). */
   solde: "a-vie" as "a-vie" | "depuis-lancement",
   /** Le jour du lancement, si solde = « depuis-lancement » (AAAA-MM-JJ, heure de Paris). */
   lancement: null as string | null,
@@ -93,7 +101,7 @@ export type EtatOuverture =
   | { t: "complet"; sur: number }
   | { t: "ferme" };
 
-/** Ce que dit le bouton du pack : ouvrir, l'XP qui manque, complet, ou fermé. */
+/** Ce que dit le bouton du pack : ouvrir, les XP S qui manquent (le solde sur le prix), complet, ou fermé. */
 export function etatOuverture(solde: number, obtenus: readonly string[], prix = PACK_AFRIQUE.prix): EtatOuverture {
   const enJeu = nationsEnJeu();
   if (!enJeu.length) return { t: "ferme" };

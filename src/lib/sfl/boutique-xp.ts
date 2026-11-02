@@ -1,18 +1,20 @@
 "use client";
 
-// Ouvrir le PACK AFRIQUE 2027 depuis l'app (la route : app/api/boutique-xp).
+// Ouvrir le PACK AFRIQUE 2027 depuis l'app (la route : app/api/boutique-xp),
+// payé en XP S (lib/sfl/xp-s.ts) : le prix et la monnaie viennent du serveur.
 // La clé de l'ouverture (un UUID) est tirée quand la confirmation s'ouvre, et
 // gardée sur le téléphone jusqu'à ce que le résultat soit vu : si l'app se
 // ferme en pleine ouverture, on rejoue la même clé au retour, et le serveur
 // rend le même tirage sans débiter deux fois.
 
-import { PACK_AFRIQUE } from "@/lib/sfl/pack-afrique";
+import { PACK_AFRIQUE, type Monnaie } from "@/lib/sfl/pack-afrique";
 import { supabase } from "@/lib/supabase";
 
 const CLE = "sfl-pack-afrique-cle";
 
 export type IssueOuverture =
-  | { ok: true; obtenu: string; serie: number; xp: number; solde: number; deja: boolean }
+  /** xp : le prix payé, dans sa monnaie (les XP S pour le pack) ; solde : ce qui reste, dans la même. */
+  | { ok: true; obtenu: string; serie: number; xp: number; monnaie: Monnaie; solde: number; deja: boolean }
   | { ok: false; raison: string; solde?: number | null; code: number };
 
 /** La clé en cours pour ce joueur, ou une nouvelle, gardée. */
@@ -59,8 +61,17 @@ export async function ouvrirPackAfrique(nom: string, cle: string): Promise<Issue
       body: JSON.stringify({ article: PACK_AFRIQUE.article, cle }),
     });
     const corps = (await r.json().catch(() => ({}))) as Record<string, unknown>;
-    if (r.ok) return { ok: true, obtenu: String(corps.obtenu), serie: Number(corps.serie), xp: Number(corps.xp), solde: Number(corps.solde), deja: !!corps.deja };
-    // Un refus net : la clé ne sert plus (l'XP manque, le pack est complet).
+    if (r.ok)
+      return {
+        ok: true,
+        obtenu: String(corps.obtenu),
+        serie: Number(corps.serie),
+        xp: Number(corps.xp),
+        monnaie: corps.monnaie === "xp" ? "xp" : corps.monnaie === "xp-s" ? "xp-s" : PACK_AFRIQUE.monnaie,
+        solde: Number(corps.solde),
+        deja: !!corps.deja,
+      };
+    // Un refus net : la clé ne sert plus (les XP S manquent, le pack est complet).
     if (r.status === 402 || r.status === 409 || r.status === 403 || r.status === 400) oublierOuverture();
     return { ok: false, raison: String(corps.error ?? "Réessaie."), solde: (corps.solde as number | null | undefined) ?? null, code: r.status };
   } catch {

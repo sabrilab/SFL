@@ -3,15 +3,17 @@
 // L'onglet « Packs » du mode Passe : le PACK AFRIQUE 2027 (lib/sfl/
 // pack-afrique.ts). Ilyes, 01/11/2026 : « ces packs achetables en XP, c'est
 // très cool » ; « design-moi quelque chose de magnifique […] inspiré de chaque
-// culture, de chaque pays africain ». Un pack qui ne s'achète qu'en XP, jamais
-// gagné par les missions ni par le Passe ; dépenser ne fait jamais baisser le
+// culture, de chaque pays africain ». Un pack payé en XP S, la seconde
+// monnaie (lib/sfl/xp-s.ts ; Ilyes, 02/11/2026 : 40 le tirage), jamais gagné
+// par les missions ni par le Passe ; dépenser ne fait jamais baisser le
 // Niveau XP. Le nom du tournoi, son trophée, sa mascotte et ses logos
 // appartiennent à la CAF : rien ne s'en écrit ni ne s'en dessine ici.
 //   · la fiche : l'étui, dessiné en code (noir guilloché, coins de repère,
-//     microtexte, la frise des motifs des nations), le compte « 4/12 », les
-//     nations en vignettes (la carte du joueur dans la nation s'il l'a,
-//     scellée sinon), et le bouton « Ouvrir · 1 200 XP » (« 860 / 1 200 »,
-//     éteint, s'il manque de l'XP ; « 12/12 » une fois complet) ;
+//     microtexte, la frise des motifs des nations), le compte « 4/12 », le
+//     solde d'XP S (la pastille, components/sfl/xp-s.tsx), les nations en
+//     vignettes (la carte du joueur dans la nation s'il l'a, scellée sinon),
+//     et le bouton « Ouvrir · ▣S 40 » (« ▣S 35 / 40 », éteint, s'il en
+//     manque ; « 12/12 » une fois complet) ;
 //   · la confirmation : la piste scellée, dans un seul sens ; la clé de
 //     l'ouverture est tirée là et gardée jusqu'au résultat (boutique-xp.ts) ;
 //   · la cérémonie (pack-opening.tsx, CeremoniePack) : l'étui respire, on le
@@ -41,19 +43,19 @@ import { CeremoniePack, type Revelation } from "@/components/sfl/pack-opening";
 import { Mini } from "@/components/sfl/passe-bola";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { ReponseScellee } from "@/components/sfl/reponse-scellee";
-import { poserAchat, rafraichirAchatsXp, useSoldeXp } from "@/hooks/use-achats-xp";
+import { poserAchat, rafraichirAchatsXp, useSoldeXpS } from "@/hooks/use-achats-xp";
 import { rafraichirBilanServeur } from "@/hooks/use-bilan-serveur";
 import { useAfriqueCarte, useChoixHabillage, useHabillage } from "@/hooks/use-habillage";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSession } from "@/hooks/use-session";
 import { logActivity } from "@/lib/sfl/activity";
 import { cleOuverture, oublierOuverture, ouvertureEnSuspens, ouvrirPackAfrique } from "@/lib/sfl/boutique-xp";
-import { nombreFr } from "@/lib/sfl/compteur-xp";
 import type { Player } from "@/lib/sfl/engine";
 import { choisirHabillage } from "@/lib/sfl/habillages-choisis";
-import { etatOuverture, nationsMontrees, NATIONS, numeroSerieNation, PACK_AFRIQUE, type CodeNation } from "@/lib/sfl/pack-afrique";
+import { etatOuverture, nationsMontrees, NATIONS, numeroSerieNation, PACK_AFRIQUE, type CodeNation, type Monnaie } from "@/lib/sfl/pack-afrique";
 import { memeNom } from "@/lib/sfl/xp-acquis";
 import { cn } from "@/lib/utils";
+import { libelleXpS, MontantXpS } from "@/components/sfl/xp-s";
 import "./mode-passe-packs.css";
 
 const nationDe = (n: CodeNation) => NATIONS.find((x) => x.id === n)!;
@@ -224,15 +226,16 @@ function haloDe(nation: CodeNation): string {
 /* ------------------------------- La vue ------------------------------- */
 
 type Tirage = { nation: CodeNation; serie: number; apercu?: boolean };
-/** Un achat payé dont la cérémonie n'est pas finie. */
-type APoser = { nation: CodeNation; serie: number; xp: number };
+/** Un achat payé dont la cérémonie n'est pas finie (xp : son prix, dans sa monnaie). */
+type APoser = { nation: CodeNation; serie: number; xp: number; monnaie: Monnaie };
 
 export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean }) {
   const nom = player.name;
   const reduit = useMediaQuery("(prefers-reduced-motion: reduce)");
   const large = useMediaQuery("(min-width: 900px)");
   const afrique = useAfriqueCarte(nom);
-  const solde = useSoldeXp(nom);
+  // Les XP S qui restent (le pack se paie en XP S) : le même chiffre que Ma carte et l'en-tête du Passe.
+  const solde = useSoldeXpS(nom);
   const porte = useHabillage(nom);
   const choix = useChoixHabillage(nom);
   const nations = nationsMontrees();
@@ -247,7 +250,8 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
   const [tirage, setTirage] = useState<Tirage | null>(null);
   const [ceremonie, setCeremonie] = useState(false);
   const [detail, setDetail] = useState<CodeNation | null>(null);
-  const [refus, setRefus] = useState<string | null>(null);
+  /** Le refus du serveur : le vrai solde d'XP S sur le prix (402), ou ce qu'il a dit. */
+  const [refus, setRefus] = useState<{ solde: number } | string | null>(null);
   /** La carte est posée (la fin du retournement) : « Porter », « Plus tard » se montrent. */
   const [posee, setPosee] = useState(false);
   const cle = useRef<string | null>(null);
@@ -260,7 +264,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
     const t = aPoser.current;
     aPoser.current = null;
     if (!t) return;
-    poserAchat(nom, { article: PACK_AFRIQUE.article, obtenu: t.nation, xp: t.xp, serie: t.serie, le: new Date().toISOString() });
+    poserAchat(nom, { article: PACK_AFRIQUE.article, obtenu: t.nation, monnaie: t.monnaie, xp: t.xp, serie: t.serie, le: new Date().toISOString() });
   }, [nom]);
   useEffect(() => () => poser(), [poser]);
   const surPosee = useCallback(() => setPosee(true), []);
@@ -278,7 +282,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
     let fini = false;
     void ouvrirPackAfrique(nom, enSuspens).then((r) => {
       if (fini || !r.ok) return;
-      aPoser.current = { nation: r.obtenu as CodeNation, serie: r.serie, xp: r.xp };
+      aPoser.current = { nation: r.obtenu as CodeNation, serie: r.serie, xp: r.xp, monnaie: r.monnaie };
       setPosee(false);
       setTirage({ nation: r.obtenu as CodeNation, serie: r.serie });
       setCeremonie(true);
@@ -315,11 +319,11 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
     const c = cle.current ?? cleOuverture(nom);
     const r = await ouvrirPackAfrique(nom, c);
     if (!r.ok) {
-      setRefus(r.code === 402 && r.solde != null ? `${nombreFr(r.solde)} / ${nombreFr(PACK_AFRIQUE.prix)}` : r.raison);
+      setRefus(r.code === 402 && r.solde != null ? { solde: r.solde } : r.raison);
       void rafraichirBilanServeur(true);
       return "dite" as const;
     }
-    aPoser.current = { nation: r.obtenu as CodeNation, serie: r.serie, xp: r.xp };
+    aPoser.current = { nation: r.obtenu as CodeNation, serie: r.serie, xp: r.xp, monnaie: r.monnaie };
     logActivity("pack", {
       meta: { article: PACK_AFRIQUE.article, obtenu: r.obtenu },
     });
@@ -376,14 +380,14 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
         Aperçu de l&apos;ouverture
       </button>
     ) : etat.t === "ouvrir" ? (
-      <button type="button" className="mp-bouton" onClick={ouvrirConfirmation}>
-        Ouvrir · {nombreFr(etat.prix)} XP
+      <button type="button" className="mp-bouton" onClick={ouvrirConfirmation} aria-label={`Ouvrir, ${libelleXpS(etat.prix)}`}>
+        <span className="inline-flex items-baseline gap-[0.35em]" aria-hidden>
+          Ouvrir · <MontantXpS n={etat.prix} />
+        </span>
       </button>
     ) : etat.t === "manque" ? (
-      <button type="button" className="mp-bouton mp-bouton--creux" disabled aria-label={`Il te faut ${nombreFr(etat.prix)} XP`}>
-        <span className="tabular-nums">
-          {nombreFr(etat.solde)} / {nombreFr(etat.prix)} XP
-        </span>
+      <button type="button" className="mp-bouton mp-bouton--creux" disabled aria-label={libelleXpS(etat.solde, etat.prix)}>
+        <MontantXpS n={etat.solde} sur={etat.prix} />
       </button>
     ) : null;
 
@@ -396,7 +400,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
       <section className="pk-fiche" aria-label={PACK_AFRIQUE.nom}>
         <EtuiAfrique largeur={large ? 210 : 168} />
         <div className="pk-fiche__dit">
-          <span className="mono-label text-white/50">{vitrine ? "Vitrine" : "Payé en XP"}</span>
+          <span className="mono-label text-white/50">{vitrine ? "Vitrine" : "Payé en XP S"}</span>
           <h2 className="pk-fiche__nom titre-lettrage">{PACK_AFRIQUE.nom}</h2>
           <span className="pk-fiche__compte">
             <span className="tabular-nums" style={{ fontFamily: ANTON, fontSize: 40, lineHeight: 0.9 }}>
@@ -404,7 +408,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
             </span>
             <span className="font-mono text-[13px] font-bold text-white/45 tabular-nums">/ {nations.length}</span>
           </span>
-          {solde != null && !vitrine && <span className="mono-label tabular-nums text-white/55">{nombreFr(solde)} XP à dépenser</span>}
+          {solde != null && !vitrine && <MontantXpS n={solde} className="mono-label text-white/55" />}
           {etat.t === "complet" ? null : <div className="pk-fiche__action">{bouton}</div>}
         </div>
       </section>
@@ -475,9 +479,15 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
                   </button>
                   <EtuiAfrique largeur={132} respire={!reduit} />
                   <span className="pk-confirmer__nom titre-lettrage">{PACK_AFRIQUE.nom}</span>
-                  <span className="mono-label tabular-nums text-white/60">
-                    {nombreFr(PACK_AFRIQUE.prix)} XP
-                    {solde != null ? ` · ${nombreFr(solde)} à dépenser` : ""}
+                  {/* Le prix, puis ce qui reste : « ▣S 40 · ▣S 59 ». */}
+                  <span className="mono-label inline-flex items-baseline gap-[0.45em] text-white/60">
+                    <MontantXpS n={PACK_AFRIQUE.prix} />
+                    {solde != null && (
+                      <>
+                        <span aria-hidden>·</span>
+                        <MontantXpS n={solde} />
+                      </>
+                    )}
                   </span>
                   <ReponseScellee
                     mine={null}
@@ -490,7 +500,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
                   />
                   {refus && (
                     <span className="mono-label tabular-nums text-white/70" role="status">
-                      {refus}
+                      {typeof refus === "string" ? refus : <MontantXpS n={refus.solde} sur={PACK_AFRIQUE.prix} />}
                     </span>
                   )}
                 </div>

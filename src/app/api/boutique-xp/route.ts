@@ -1,22 +1,28 @@
-// Ouvrir le PACK AFRIQUE 2027 (lib/sfl/pack-afrique.ts) : payé en XP, jamais
-// en Ballons ni en euros, jamais gagné par les missions ni par le Passe.
+// Ouvrir le PACK AFRIQUE 2027 (lib/sfl/pack-afrique.ts) : payé en XP S (la
+// seconde monnaie, lib/sfl/xp-s.ts ; Ilyes, 02/11/2026 : 40 le tirage, plus
+// jamais en XP normales), jamais en Ballons ni en euros, jamais gagné par
+// les missions ni par le Passe.
 //
 // POST { article, cle } :
 //   1. une session de membre validé ; le nom vient de profiles ;
 //   2. le compte vitrine n'achète rien (403) : son XP est fictive ;
-//   3. l'XP gagnée à vie est recalculée ici (lib/sfl/xp-serveur.server.ts,
-//      le même journal que le téléphone), jamais lue sur le téléphone ;
-//   4. ouvrir_pack_xp (supabase/schema.sql) débite et tire au sort côté
-//      serveur, d'un seul tenant, parmi les nations validées qui manquent ;
-//      la même clé rejouée rend le même tirage sans second débit ;
-//   5. rend { obtenu, serie, solde, deja } ; un refus : 402 « XP
-//      insuffisante. » avec le solde réel, 409 « Pack complet. ».
+//   3. les XP S gagnées à vie sont recalculées ici (lib/sfl/xp-serveur.server.ts,
+//      le même calcul que le téléphone), jamais lues sur le téléphone ; le
+//      même joueur qui rappelle dans les secondes qui suivent reprend le
+//      calcul en cours ou le précédent (xpServeurRecent) ;
+//   4. ouvrir_pack_xp (supabase/schema.sql) débite dans la monnaie du pack et
+//      tire au sort côté serveur, d'un seul tenant, parmi les nations
+//      validées qui manquent ; la même clé rejouée rend le même tirage sans
+//      second débit ;
+//   5. rend { obtenu, serie, xp, monnaie, solde, deja } (xp : le prix payé,
+//      dans sa monnaie) ; un refus : 402 « XP S insuffisantes. » avec le
+//      solde réel, 409 « Pack complet. ».
 
 import { NextRequest, NextResponse } from "next/server";
 import { COMPTES_VITRINE } from "@/lib/sfl/compte-vitrine";
 import { nationsEnJeu, PACK_AFRIQUE } from "@/lib/sfl/pack-afrique";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
-import { bilanServeurDe, xpServeur } from "@/lib/sfl/xp-serveur.server";
+import { bilanServeurDe, xpServeurRecent } from "@/lib/sfl/xp-serveur.server";
 
 export const maxDuration = 30;
 
@@ -41,9 +47,9 @@ export async function POST(req: NextRequest) {
   const maintenant = new Date();
   let gagnee: number;
   try {
-    const x = await xpServeur(sb, { id: moi.id, nom: p.name, jeton }, maintenant);
-    // Un entier, jamais négatif : p_gagne est un int (une XP fractionnaire ferait échouer l'appel).
-    gagnee = Math.max(0, Math.floor(bilanServeurDe(x, p.name, maintenant).total));
+    const x = await xpServeurRecent(sb, { id: moi.id, nom: p.name, jeton }, maintenant);
+    // Les XP S gagnées : un entier, jamais négatif (p_gagne est un int).
+    gagnee = Math.max(0, Math.floor(bilanServeurDe(x, p.name, maintenant).xpS));
   } catch {
     return NextResponse.json({ error: "Réessaie." }, { status: 503 });
   }
@@ -51,19 +57,20 @@ export async function POST(req: NextRequest) {
   const { data, error } = await sb.rpc("ouvrir_pack_xp", {
     p_joueur: moi.id,
     p_article: PACK_AFRIQUE.article,
+    p_monnaie: PACK_AFRIQUE.monnaie,
     p_prix: PACK_AFRIQUE.prix,
     p_gagne: gagnee,
     p_choix: choix,
     p_cle: corps.cle,
   });
   if (error) {
-    if (error.message.includes("XP insuffisante")) {
+    if (error.message.includes("insuffisante")) {
       const solde = Number(error.details ?? NaN);
-      return NextResponse.json({ error: "XP insuffisante.", solde: Number.isFinite(solde) ? solde : null, gagnee }, { status: 402 });
+      return NextResponse.json({ error: "XP S insuffisantes.", solde: Number.isFinite(solde) ? solde : null, gagnee }, { status: 402 });
     }
     if (error.message.includes("Pack complet")) return NextResponse.json({ error: "Pack complet." }, { status: 409 });
     return NextResponse.json({ error: "Réessaie." }, { status: 500 });
   }
-  const r = data as { obtenu: string; serie: number; xp: number; solde: number; deja: boolean };
-  return NextResponse.json({ obtenu: r.obtenu, serie: r.serie, xp: r.xp, solde: Math.max(0, r.solde), deja: r.deja, gagnee });
+  const r = data as { obtenu: string; serie: number; xp: number; monnaie: string; solde: number; deja: boolean };
+  return NextResponse.json({ obtenu: r.obtenu, serie: r.serie, xp: r.xp, monnaie: r.monnaie, solde: Math.max(0, r.solde), deja: r.deja, gagnee });
 }

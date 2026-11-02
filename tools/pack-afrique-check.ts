@@ -30,6 +30,7 @@ import {
   type CodeNation,
   type NationPack,
 } from "../src/lib/sfl/pack-afrique";
+import { XP_S } from "../src/lib/sfl/xp-s";
 
 // La liste, lue comme n'importe quelle liste future (une nation peut être à dessiner, dessinée ou validée).
 const NATIONS: readonly NationPack[] = LISTE;
@@ -62,16 +63,23 @@ assert.equal(soldeXp(-5, 0), 0);
 assert.equal(numeroSerieNation(42), "n° 0042");
 assert.equal(numeroSerieNation(12345), "n° 12345");
 assert.ok(PACK_AFRIQUE.prix >= 1 && Number.isInteger(PACK_AFRIQUE.prix));
+// Payé en XP S, 40 le tirage (Ilyes, 02/11/2026) : plus jamais en XP normales. Personne ne
+// rassemble 40 XP S en moins de 4 journées (13 au plus par journée : 3 × 13 = 39).
+assert.equal(PACK_AFRIQUE.monnaie, "xp-s");
+assert.equal(PACK_AFRIQUE.prix, 40);
+assert.ok(3 * XP_S.journee < PACK_AFRIQUE.prix && 4 * XP_S.journee >= PACK_AFRIQUE.prix);
 
-// L'état du bouton : fermé tant que rien n'est validé ; sinon ouvrir, manque, complet.
+// L'état du bouton, sur le solde d'XP S : fermé tant que rien n'est validé ; sinon ouvrir, manque (35 / 40), complet.
 {
   const enJeu = nationsEnJeu();
   if (!enJeu.length) assert.deepEqual(etatOuverture(99999, []), { t: "ferme" });
   else {
     assert.deepEqual(etatOuverture(PACK_AFRIQUE.prix, []), { t: "ouvrir", prix: PACK_AFRIQUE.prix });
-    assert.deepEqual(etatOuverture(860, []), { t: "manque", solde: 860, prix: PACK_AFRIQUE.prix });
+    assert.deepEqual(etatOuverture(35, []), { t: "manque", solde: 35, prix: 40 });
     assert.equal(etatOuverture(99999, enJeu).t, "complet");
   }
+  // Le même bouton, pack ouvert ou non : la règle se lit sur un prix et un solde.
+  assert.deepEqual(etatOuverture(35, [], 40).t, enJeu.length ? "manque" : "ferme");
 }
 
 // 2 · Ce qui ne s'écrit nulle part.
@@ -94,6 +102,8 @@ const ecrans = [
   "../src/components/sfl/dos-carte.tsx",
   "../src/components/sfl/finitions-carte.ts",
   "../src/components/sfl/compteur-xp.tsx",
+  "../src/lib/sfl/xp-s.ts",
+  "../src/components/sfl/xp-s.tsx",
   ...readdirSync(new URL("../src/components/sfl/afrique/", import.meta.url)).map((x) => `../src/components/sfl/afrique/${x}`),
 ];
 for (const f of ecrans) {

@@ -1,8 +1,9 @@
 // La boutique en XP (PACK AFRIQUE 2027), relue en adversaire le 02/11/2026 :
 // ce que le navigateur ne peut pas choisir, et ce que rien ne fait baisser.
 //   1. la route ne lit du navigateur que l'article et la clé : le joueur
-//      (sa session), le prix, les nations en jeu et l'XP gagnée viennent du
-//      serveur ; le compte vitrine et un compte non validé n'achètent rien ;
+//      (sa session), le prix, la monnaie (les XP S depuis le 02/11/2026), les
+//      nations en jeu et les XP S gagnées viennent du serveur ; le compte
+//      vitrine et un compte non validé n'achètent rien ;
 //   2. le Niveau XP et le Passe ne lisent jamais les achats : dépenser ne les
 //      fait pas baisser ;
 //   3. le serveur lit les recrues et les matchs Bola avec la même clé
@@ -29,10 +30,14 @@ const sansCommentaires = (code: string) => code.replace(/\/\*[\s\S]*?\*\//g, "")
   const appel = /rpc\("ouvrir_pack_xp",\s*\{([\s\S]*?)\}\)/.exec(route)?.[1] ?? "";
   assert.match(appel, /p_joueur:\s*moi\.id\b/, "le joueur est celui de la session");
   assert.match(appel, /p_prix:\s*PACK_AFRIQUE\.prix\b/, "le prix est celui du serveur");
+  assert.match(appel, /p_monnaie:\s*PACK_AFRIQUE\.monnaie\b/, "la monnaie est celle du pack, côté serveur");
   assert.match(appel, /p_choix:\s*choix\b/, "les nations en jeu viennent du serveur");
   assert.match(route, /const choix = nationsEnJeu\(\);/);
-  assert.match(appel, /p_gagne:\s*gagnee\b/, "l'XP gagnée est recalculée");
-  assert.match(route, /xpServeur\(sb, \{ id: moi\.id, nom: p\.name, jeton \}/, "recalculée pour le joueur de la session, par son nom en base");
+  assert.match(appel, /p_gagne:\s*gagnee\b/, "ce qui est gagné est recalculé");
+  assert.match(route, /xpServeurRecent\(sb, \{ id: moi\.id, nom: p\.name, jeton \}/, "recalculé pour le joueur de la session, par son nom en base");
+  assert.match(route, /gagnee = Math\.max\(0, Math\.floor\(bilanServeurDe\(x, p\.name, maintenant\)\.xpS\)\)/, "le pack se paie en XP S : ce sont elles que la route passe");
+  assert.match(route, /"XP S insuffisantes\."/, "le refus dit « XP S insuffisantes. »");
+  assert.match(route, /status: 402/);
   assert.match(route, /COMPTES_VITRINE/, "le compte vitrine n'achète rien");
   assert.match(route, /!p\?\.valide/, "un compte non validé n'achète rien");
   assert.match(route, /appelant\(sb, req\)/, "la session est vérifiée par le serveur d'authentification");
@@ -52,11 +57,17 @@ for (const f of ["lib/sfl/missions.ts", "lib/sfl/xp-calcul.ts", "lib/sfl/xp-acqu
   assert.equal(repli(lire("lib/sfl/xp-serveur.server.ts")), app, "le serveur d'XP retombe sur la même clé");
 }
 
-// 4 · Le solde part du total que l'écran montre (useXp), pas d'un bilan vieux de 10 minutes.
+// 4 · Le solde part du total que l'écran montre (useXp), pas d'un bilan vieux de 10 minutes ; celui des
+//     XP S part des XP S que l'écran montre (useXpS), moins les seules XP S dépensées. Les Packs le lisent.
 {
   const hook = sansCommentaires(lire("hooks/use-achats-xp.ts"));
-  assert.match(hook, /soldeXp\(b\.total,/, "le solde part du total affiché");
+  assert.match(hook, /soldeXp\(b\.total, depenseEn\(achats, "xp"\)\)/, "le solde d'XP part du total affiché, moins l'XP dépensée");
+  assert.match(hook, /soldeXp\(s\.gagne, depenseEn\(achats, "xp-s"\)\)/, "le solde d'XP S part des XP S affichées, moins les XP S dépensées");
   assert.ok(!/useBilanServeur/.test(hook), "le solde ne lit plus le bilan du serveur seul");
+  const packs = sansCommentaires(lire("components/sfl/mode-passe-packs.tsx"));
+  assert.match(packs, /useSoldeXpS\(nom\)/, "les Packs comptent en XP S");
+  assert.ok(!/useSoldeXp\(/.test(packs), "jamais le solde d'XP normales");
+  assert.match(packs, /monnaie: t\.monnaie/, "l'achat posé garde sa monnaie");
 }
 
 // 5 · Les pages : tout est lu, et une erreur ne rend jamais une liste coupée pour complète.

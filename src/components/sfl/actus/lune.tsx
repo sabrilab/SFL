@@ -15,8 +15,9 @@ const f = (n: number) => Math.round(n * 100) / 100;
 
 // Le symbole dans sa boîte de 112,373 (finitions-carte.ts, dos-carte.tsx) : le disque
 // est centré en (73,186 ; 159,672), la balle en (86,45 ; 181,133), de rayon 34,725.
+// Repris tel quel par la pastille des XP S (components/sfl/xp-s.tsx).
 const S_LUNE = 84 / 112.373;
-const LUNE = {
+export const LUNE = {
   transform: `translate(${f(50 - 73.186 * S_LUNE)} ${f(50 - 159.672 * S_LUNE)}) scale(${f(S_LUNE)})`,
   balle: {
     x: f(50 + (86.45 - 73.186) * S_LUNE),
