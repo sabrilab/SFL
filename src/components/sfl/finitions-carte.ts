@@ -81,12 +81,14 @@ import {
 import { MATIERES_OFFERTES, type FinitionOfferte, type MotifOffert } from "@/components/sfl/skins-offerts";
 import { MATIERE_ARBITRE, MATIERES_ARBITRE, type FinitionArbitre, type MotifArbitre } from "@/components/sfl/skins-arbitre";
 import { MATIERES_RECRUES, numeroFondateur, type FinitionRecrue, type MotifRecrue } from "@/components/sfl/skins-recrues";
+import { MATIERES_AFRIQUE } from "@/components/sfl/afrique/registre";
+import type { FinitionAfrique, MotifAfrique } from "@/components/sfl/afrique/types";
 
 /** L'édition d'une carte : la carte de saison, ou une carte à titre. */
 export type EditionCarte = "base" | "mvp" | "impact" | "def";
 
 /** Les finitions de la passe, ou offertes : elles habillent la carte de saison. */
-export type Finition = "nuit" | "chrome" | "animee" | "onyx" | "verre" | FinitionPasse | FinitionOfferte | FinitionRecrue;
+export type Finition = "nuit" | "chrome" | "animee" | "onyx" | "verre" | FinitionPasse | FinitionOfferte | FinitionRecrue | FinitionAfrique;
 
 /** Le traitement de la photo, sans IA. */
 export type Traitement = "argentique" | "gravure" | "marbre";
@@ -151,7 +153,8 @@ export type Motif =
   | MotifPasse
   | MotifOffert
   | MotifRecrue
-  | MotifArbitre;
+  | MotifArbitre
+  | MotifAfrique;
 
 /**
  * Ce qu'une carte d'époque reprend des visuels de son temps, sur la
@@ -717,6 +720,8 @@ export const MATIERES: Record<NomMatiere, Matiere> = {
   ...MATIERES_OFFERTES,
   ...MATIERES_RECRUES,
   ...MATIERES_ARBITRE,
+  // Le PACK AFRIQUE 2027 (components/sfl/afrique/registre.ts).
+  ...MATIERES_AFRIQUE,
   couleurs: matiereCouleurs(PAYS_PAR_DEFAUT),
 };
 
