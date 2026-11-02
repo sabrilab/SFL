@@ -2000,6 +2000,14 @@ begin
        and (new.jour, new.heure) is distinct from (old.jour, old.heure) then
       raise exception 'match déjà joué' using errcode = 'P0001';
     end if;
+    -- Avant sa feuille, il ne se redate pas dans le passé (02/11/2026, contrôle
+    -- adverse des XP S : créé pour dans un mois, redaté en septembre, puis
+    -- saisi). La même journée de marge qu'à la naissance (match_naissance_gardee).
+    if old.saisi_le is null and (select auth.uid()) is not null
+       and (new.jour, new.heure) is distinct from (old.jour, old.heure)
+       and public.coup_d_envoi(new.jour, new.heure) < now() - interval '24 hours' then
+      raise exception 'match déjà passé' using errcode = 'P0001';
+    end if;
     if (new.score_clairs, new.score_fonces) is distinct from (old.score_clairs, old.score_fonces)
        and old.saisi_le is not null and old.saisi_le < now() - interval '24 hours' then
       raise exception 'feuille close' using errcode = 'P0001';
@@ -6098,6 +6106,14 @@ begin
   -- Un match né après le 28/10/2026 passe par la confirmation des joueurs.
   new.feuille_version := 0;
   new.confirmation_requise := true;
+  -- Ni dans le passé (02/11/2026, contrôle adverse des XP S) : l'app ne
+  -- propose que des dates à venir (ouvrir-match.tsx) ; des comptes d'accord
+  -- montaient en novembre des matchs datés de juillet, chacun dans une
+  -- semaine passée. Une journée de marge : un match du jour ouvert en
+  -- retard, l'heure d'un téléphone.
+  if public.coup_d_envoi(new.jour, new.heure) < now() - interval '24 hours' then
+    raise exception 'match déjà passé' using errcode = 'P0001';
+  end if;
   return new;
 end;
 $$;
@@ -6588,6 +6604,10 @@ as $$
            -- Un match saisi avant le 28/10/2026 compte sans calcul.
            'etat', case when m.confirmation_requise then public.etat_feuille(m.id) else 'compte' end,
            'requise', m.confirmation_requise,
+           -- La première saisie de la feuille, à l'heure du serveur (02/11/2026) : les
+           -- XP S d'un match Bola se comptent à sa semaine (lib/sfl/xp-s.ts), pas à
+           -- celle du jour déclaré, que l'organisateur choisit.
+           'saisiLe', m.saisi_le,
            'joueurs', (
              select coalesce(jsonb_agg(jsonb_build_object(
                       'id', j.player_id, 'name', p.name, 'equipe', j.equipe, 'buts', j.buts, 'passes', j.passes,
@@ -6757,6 +6777,7 @@ as $$
 declare
   v_nom text := public.mon_nom();
   v_le  timestamptz := now();
+  v_num integer;
 begin
   if not public.est_membre() or v_nom is null then
     raise exception 'Réservé aux joueurs de la ligue.' using errcode = '42501';
@@ -6764,6 +6785,12 @@ begin
   if p_j < 0 or p_sujet !~ '^((match|ecart|duel|mvp|buteur|passeur):[0-9]{1,2}|buteur|pepite|passeur)$'
      or (p_j = 0 and p_sujet not in ('pepite', 'buteur', 'passeur')) then
     raise exception 'Prono inconnu.' using errcode = '22023';
+  end if;
+  -- La saison en cours seulement (02/11/2026, contrôle adverse) : on posait
+  -- encore le Flair de saison d'une saison close, ses vainqueurs connus.
+  select coalesce((s.data ->> 'numero')::integer, 0) into v_num from public.saison s where s.id = 1;
+  if found and p_saison is distinct from v_num then
+    raise exception 'Saison close.' using errcode = '22023';
   end if;
   if nullif(btrim(p_choix), '') is null then
     delete from public.pronos where saison = p_saison and j = p_j and sujet = p_sujet and joueur = v_nom;

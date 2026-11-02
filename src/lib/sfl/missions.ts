@@ -659,9 +659,9 @@ export interface LigneXp {
   flairDurs?: number;
   /**
    * Un Flair de saison juste (pronos.ts) : son sujet, et `tot` s'il compte
-   * pour les XP S : posé ou changé pour la dernière fois avant le troisième
-   * coup d'envoi de la saison (sa prime encore à 220 au moins : il n'a plus
-   * bougé après la J2), et pas sur soi. L'XP n'en dépend pas.
+   * pour les XP S : posé ou changé pour la dernière fois avant le début de la
+   * troisième journée jouée de la saison (flairSaisonTot : il n'a plus bougé
+   * après la J2), et pas sur soi. L'XP n'en dépend pas.
    */
   flairSaison?: { sujet: string; tot: boolean };
 }

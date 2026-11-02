@@ -15,10 +15,20 @@
 //   · Bola (un joueur hors de la SFL) : le MVP d'un match validé et ses
 //     missions perso de rang S, seulement sur les matchs à confirmation
 //     (requise), 13 au plus par semaine (du lundi au dimanche, semaineDe).
+//     La semaine est celle où la feuille a été saisie (saisiLe, l'heure du
+//     serveur), pas le jour que l'organisateur a déclaré : des matchs
+//     antidatés retombaient chacun dans une semaine passée, 13 par semaine
+//     d'un coup (contrôle adverse du 02/11 : 39 XP S, 78 avec six matchs).
+//     Une feuille saisie plus de sept jours après son match, ou sans heure de
+//     saisie, ne donne rien (l'app ne la propose que sept jours).
 // Une journée rapporte au plus 13 XP S, toutes sources confondues : ce qui
 // dépasse se retire dans cet ordre, le Flair, la Défensive, l'Impact, les
 // missions, le MVP, la SFL Time en dernier (le joueur venu ce jour-là voit
-// toujours sa ligne). Le Flair de saison n'entre dans aucun plafond.
+// toujours sa ligne). Pour un joueur qui a des matchs Bola, la semaine tient
+// lieu de journée, toutes ses sources ensemble : ses matchs Bola et ses
+// journées de la SFL de la même semaine (son Flair, sa journée le jour de son
+// entrée) n'ont qu'un plafond de 13 (contrôle du 02/11 : 17, puis 26 dans un
+// seul dimanche). Le Flair de saison n'entre dans aucun plafond.
 //
 // Toute l'histoire compte (calcul rétroactif) : les archives puis la saison
 // en cours. Une journée ne donne rien tant qu'elle n'est pas révélée : la vue
@@ -35,11 +45,12 @@
 //
 // Pur : ni React ni réseau.
 
-import { estLeJour, minuitDuSoir } from "./convocation-temps";
+import { estLeJour, heureDuJour, minuitDuSoir } from "./convocation-temps";
 import type { MatchValide } from "./carte-bola";
 import { isHidden } from "./hidden";
+import type { MatchBola } from "./ligue-vierge";
 import type { LigneXp, TitreCouvert } from "./missions";
-import { instantParis, MISSIONS_PERSO, missionsPerso, rangPerso, semaineDe, type MissionFaite } from "./missions-perso";
+import { aujourdhuiParis, instantParis, MISSIONS_PERSO, missionsPerso, rangPerso, semaineDe, type MissionFaite } from "./missions-perso";
 import { soldeXp } from "./pack-afrique";
 import { placeDe } from "./recrues";
 import { journeeComptee, nouveauRegime, revelation } from "./revelation";
@@ -85,10 +96,13 @@ export interface LigneXpS {
   couvre?: TitreCouvert;
   /** Le match Bola de la ligne. */
   match?: number;
+  /** La semaine (son lundi, ISO) dont le plafond compte une ligne Bola : celle où sa feuille a été saisie. */
+  semaine?: string;
   /**
    * Quand elle est tombée (ISO) : la révélation de sa journée (minuit
-   * jusqu'à la J4), la clôture de sa saison pour un Flair de saison, le coup
-   * d'envoi d'un match Bola. L'annonce ne dit que ce qui vient de tomber.
+   * jusqu'à la J4), la clôture de sa saison pour un Flair de saison, la
+   * saisie de la feuille d'un match Bola (au plus tôt son coup d'envoi).
+   * L'annonce ne dit que ce qui vient de tomber.
    */
   le?: string;
   /**
@@ -206,10 +220,41 @@ const missionS = (l: LigneXp) =>
   !!l.mission && l.mission.rang === "S" && l.mission.reussie && (l.mission.creneau === "contrat" || l.mission.creneau === "defi" || l.mission.creneau === "ligue");
 
 /**
+ * Une feuille Bola saisie plus de FEUILLE_BOLA_JOURS jours (de calendrier, à
+ * Paris) après le jour de son match ne donne pas d'XP S : l'app ne propose
+ * la feuille que les sept derniers jours (matchs.ts, listerMesDerniers).
+ */
+export const FEUILLE_BOLA_JOURS = 7;
+
+/** Le jour de Paris (ISO) d'un instant ISO ; null s'il ne se lit pas. */
+function jourParis(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? null : aujourdhuiParis(new Date(t));
+}
+
+/** Les jours de calendrier de a à b (ISO), b après a : positif. */
+const joursDe = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+
+/**
+ * La semaine (son lundi, ISO) dont le plafond compte les XP S d'un match
+ * Bola : celle où sa feuille a été saisie la première fois (saisiLe, l'heure
+ * du serveur), jamais plus tôt que le jour du match. null : il n'en donne
+ * pas (pas d'heure de saisie, une base pas migrée ; ou une feuille saisie
+ * plus de FEUILLE_BOLA_JOURS jours après le match).
+ */
+export function semaineXpSBola(m: Pick<MatchBola, "jour" | "saisiLe">): string | null {
+  const saisi = jourParis(m.saisiLe);
+  if (!saisi || joursDe(m.jour, saisi) > FEUILLE_BOLA_JOURS) return null;
+  return semaineDe(saisi > m.jour ? saisi : m.jour);
+}
+
+/**
  * Les XP S d'un joueur Bola, semaine par semaine : le MVP de chaque match à
  * confirmation validé (ex æquo compris), et ses missions perso de rang S
- * réussies sur un tel match ; 13 au plus par semaine. Un match à venir ne
- * compte pas (comme lignesXpBola). `faites` : missionsPerso(valides).faites.
+ * réussies sur un tel match ; 13 au plus par semaine, la semaine de la
+ * saisie de la feuille (semaineXpSBola). Un match à venir ne compte pas
+ * (comme lignesXpBola). `faites` : missionsPerso(valides).faites.
  */
 export function lignesXpSBola(
   nom: string,
@@ -220,11 +265,19 @@ export function lignesXpSBola(
   placer: (jour: string) => { saison: number; j: number } = () => ({ saison: 0, j: 0 })
 ): LigneXpS[] {
   const parId = new Map(valides.map((v) => [v.m.id, v]));
-  const aConfirmation = (id: number) => !!parId.get(id)?.m.requise;
   const passe = (jour: string, heure: string) => instantParis(jour, heure).getTime() <= maintenant.getTime();
+  /** Ce qu'un match donne : sa semaine et l'instant où ses XP S tombent (la saisie, au plus tôt le coup d'envoi) ; null s'il ne donne rien. */
+  const compte = (v: MatchValide | undefined) => {
+    if (!v || !v.m.requise || !passe(v.m.jour, v.m.heure)) return null;
+    const semaine = semaineXpSBola(v.m);
+    if (!semaine) return null;
+    const t = Math.max(instantParis(v.m.jour, v.m.heure).getTime(), Date.parse(v.m.saisiLe!));
+    return { semaine, t, le: new Date(t).toISOString() };
+  };
   const brut: (LigneXpS & { t: number })[] = [];
   for (const v of valides) {
-    if (!v.ligne.mvp || !v.m.requise || !passe(v.m.jour, v.m.heure)) continue;
+    const c = v.ligne.mvp ? compte(v) : null;
+    if (!c) continue;
     brut.push({
       ...placer(v.m.jour),
       date: v.libelle,
@@ -235,13 +288,15 @@ export function lignesXpSBola(
       cle: `bola:mvp:${v.m.id}:${nom}`,
       titre: "mvp",
       match: v.m.id,
+      semaine: c.semaine,
       rattache: `bola-match:${v.libelle}`,
-      le: instantParis(v.m.jour, v.m.heure).toISOString(),
-      t: instantParis(v.m.jour, v.m.heure).getTime(),
+      le: c.le,
+      t: c.t,
     });
   }
   for (const f of faites) {
-    if (rangPerso({ xp: f.xp }) !== "S" || !aConfirmation(f.matchId) || !passe(f.jour, f.heure)) continue;
+    const c = rangPerso({ xp: f.xp }) === "S" ? compte(parId.get(f.matchId)) : null;
+    if (!c) continue;
     const m = MISSIONS_PERSO.find((x) => x.genre === f.genre);
     const quoi = `Mission ${m?.code ?? f.genre}`;
     brut.push({
@@ -255,9 +310,10 @@ export function lignesXpSBola(
       cle: `bola:mission:${f.genre}:${f.semaine}:${nom}`,
       ...(m?.couvre ? { couvre: m.couvre } : {}),
       match: f.matchId,
+      semaine: c.semaine,
       rattache: `bola-mission:${f.libelle}:${quoi}`,
-      le: instantParis(f.jour, f.heure).toISOString(),
-      t: instantParis(f.jour, f.heure).getTime(),
+      le: c.le,
+      t: c.t,
     });
   }
   // Dans l'ordre du temps (le plafond retire d'abord la dernière venue), la mission après le MVP de son match.
@@ -267,7 +323,7 @@ export function lignesXpSBola(
   const parSemaine = new Map<string, LigneXpS[]>();
   for (const { t, ...l } of uniques) {
     void t;
-    const w = semaineDe(l.jour!);
+    const w = l.semaine!;
     (parSemaine.get(w) ?? parSemaine.set(w, []).get(w)!).push(l);
   }
   const out: LigneXpS[] = [];
@@ -297,8 +353,8 @@ export function journalXpS(e: EntreesXpS, journal: ReadonlyMap<string, { lignes:
     (dans.get(k) ?? dans.set(k, []).get(k)!).push(l);
   };
 
-  // Les journées qui donnent leurs XP S, saison par saison, et quand elles sont tombées.
-  const ouvertes = new Map<string, { date: string; le?: string }>();
+  // Les journées qui donnent leurs XP S, saison par saison, quand elles sont tombées et leur jour (ISO, Paris).
+  const ouvertes = new Map<string, { date: string; le?: string; jour?: string }>();
   const clotures = new Map<number, string>();
   for (const sa of saisonsDe(e.jugee, t)) {
     if (sa.close) clotures.set(sa.numero, sa.reference.toISOString());
@@ -307,7 +363,8 @@ export function journalXpS(e: EntreesXpS, journal: ReadonlyMap<string, { lignes:
       if (!journeeDonneXpS(sa.lue, sa.numero, m.j, t, sa.close)) continue;
       const fin = revelation(m, sa.numero, sa.reference) ?? minuitDuSoir(m.date, sa.reference);
       const le = fin ? fin.toISOString() : undefined;
-      ouvertes.set(`${sa.numero}|${m.j}`, { date: m.date, ...(le ? { le } : {}) });
+      const midi = heureDuJour(m.date, sa.reference, 12);
+      ouvertes.set(`${sa.numero}|${m.j}`, { date: m.date, ...(le ? { le } : {}), ...(midi ? { jour: aujourdhuiParis(midi) } : {}) });
       for (const x of sa.lue.entries) {
         if (x.j !== m.j || !joue(x) || isHidden(x.player)) continue;
         const base = { saison: sa.numero, j: m.j, date: m.date, rattache: `dimanche:${sa.numero}:${m.j}`, ...(le ? { le } : {}) };
@@ -365,11 +422,41 @@ export function journalXpS(e: EntreesXpS, journal: ReadonlyMap<string, { lignes:
     const joueur = k.slice(k.indexOf("|", k.indexOf("|") + 1) + 1);
     ajouter(joueur, plafonner(sansTitresCouverts(lignes, () => true), XP_S.journee));
   }
-  for (const [joueur, lignes] of horsPlafond) ajouter(joueur, lignes);
   if (e.bolaCarte?.valides.length && !isHidden(e.bolaCarte.nom)) {
+    const nom = e.bolaCarte.nom;
     const { faites } = missionsPerso(e.bolaCarte.valides, t);
     const placer = (jour: string) => placeDe(e.jugee, midiDuJour(jour), t);
-    ajouter(e.bolaCarte.nom, lignesXpSBola(e.bolaCarte.nom, e.bolaCarte.valides, faites, t, placer).filter((l) => !vues.has(l.cle)));
+    const bola = lignesXpSBola(nom, e.bolaCarte.valides, faites, t, placer).filter((l) => !vues.has(l.cle));
+    if (bola.length) {
+      const semaineSfl = (l: LigneXpS) => {
+        const jour = ouvertes.get(`${l.saison}|${l.j}`)?.jour;
+        return jour ? semaineDe(jour) : null;
+      };
+      out.set(nom, plafondCommun(out.get(nom) ?? [], bola, semaineSfl));
+    }
+  }
+  for (const [joueur, lignes] of horsPlafond) ajouter(joueur, lignes);
+  return out;
+}
+
+/**
+ * Un joueur qui a des matchs Bola : un seul plafond par semaine (du lundi au
+ * dimanche), toutes ses sources ensemble. Ses journées de la SFL d'une
+ * semaine où il a des lignes Bola (le Flair d'un joueur hors de la SFL, la
+ * journée d'un filleul le jour de son entrée) et ces lignes Bola ne font que
+ * 13 à elles toutes, retirées dans l'ordre du plafond (rangDeRetrait, la
+ * dernière venue d'abord). Les autres semaines gardent le plafond de leur
+ * journée. `sfl` : ses lignes de journées, déjà ramenées à 13 chacune ;
+ * `bola` : ses lignes Bola, déjà à 13 par semaine.
+ */
+export function plafondCommun(sfl: readonly LigneXpS[], bola: readonly LigneXpS[], semaineSfl: (l: LigneXpS) => string | null): LigneXpS[] {
+  const semaines = [...new Set(bola.map((l) => l.semaine!))];
+  const dans = (l: LigneXpS, w: string) => semaineSfl(l) === w;
+  const out = sfl.filter((l) => !semaines.some((w) => dans(l, w)));
+  const quand = (l: LigneXpS) => (l.le ? Date.parse(l.le) : 0) || 0;
+  for (const w of semaines) {
+    const ensemble = [...sfl.filter((l) => dans(l, w)), ...bola.filter((l) => l.semaine === w)].sort((a, b) => quand(a) - quand(b));
+    out.push(...plafonner(ensemble, XP_S.semaineBola));
   }
   return out;
 }

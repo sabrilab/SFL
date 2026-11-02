@@ -89,7 +89,9 @@ export function flairParesseux(s: Pick<Saison, "journees" | "entries" | "roster"
  * Les Flairs de saison de la saison 0 (jugés à sa clôture), selon les coups
  * d'envoi déjà passés (primeAu : la J2 de la saison 0 n'a pas d'équipes, elle
  * n'en a pas) : avant le premier (prime 300), après le deuxième (220), après
- * le troisième (180), et sur soi.
+ * le troisième (180), et sur soi. Le deuxième coup d'envoi est celui de la
+ * J3 : la troisième journée jouée, la J2 sans équipes comptée (pronos.ts,
+ * flairSaisonTot) ; un choix posé après lui ne donne plus d'XP S.
  */
 export function flairsDeSaisonS0(s0: SaisonArchivee): Prono[] {
   const ref = new Date(s0.cloturee);

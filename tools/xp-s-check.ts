@@ -33,8 +33,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { libelleMatch, type MatchValide } from "../src/lib/sfl/carte-bola";
 import type { LigneComptee, MatchCompte } from "../src/lib/sfl/ligue-vierge";
 import { bilanDe, type LigneXp } from "../src/lib/sfl/missions";
-import { MISSIONS_PERSO, missionsPerso, semaineDe, type MissionFaite } from "../src/lib/sfl/missions-perso";
-import { pronosDeJournee, type Prono } from "../src/lib/sfl/pronos";
+import { instantParis, MISSIONS_PERSO, missionsPerso, semaineDe, type MissionFaite } from "../src/lib/sfl/missions-perso";
+import { flairSaisonTot, primeAu, pronosDeJournee, type Prono } from "../src/lib/sfl/pronos";
 import { figer, journeesComptees } from "../src/lib/sfl/revelation";
 import { saisonAvecVotes } from "../src/lib/sfl/saison-serveur.server";
 import { computeJournees, deriveSeason } from "../src/lib/sfl/saisie/engine";
@@ -43,7 +43,22 @@ import type { JourneeMeta, MatchEntry, Saison } from "../src/lib/sfl/saisie/type
 import { appliquerVotes, titresFaibles, type VoteFigure } from "../src/lib/sfl/votes";
 import { journalComplet, journalCompletAvecS, type EntreesXp, type JournalXp } from "../src/lib/sfl/xp-calcul";
 import { bilanServeurDe, CALCUL_RECENT_MS, xpServeur, xpServeurRecent } from "../src/lib/sfl/xp-serveur.server";
-import { annonceXpS, bilanXpS, journalXpS, lignesXpSBola, plafonner, rattachementXp, totalXpS, XP_S, xpSParLigne, type JournalXpS, type LigneXpS } from "../src/lib/sfl/xp-s";
+import {
+  annonceXpS,
+  bilanXpS,
+  FEUILLE_BOLA_JOURS,
+  journalXpS,
+  lignesXpSBola,
+  plafondCommun,
+  plafonner,
+  rattachementXp,
+  semaineXpSBola,
+  totalXpS,
+  XP_S,
+  xpSParLigne,
+  type JournalXpS,
+  type LigneXpS,
+} from "../src/lib/sfl/xp-s";
 import { MontantXpS, PastilleS } from "../src/components/sfl/xp-s";
 import { CompteurXp } from "../src/components/sfl/compteur-xp";
 import { entreesDuBanc, MAINTENANT } from "./xp-s-donnees";
@@ -161,13 +176,24 @@ const rb = journalCompletAvecS(banc);
   assert.ok(jx.get("Smail")!.lignes.some((l) => l.quoi.startsWith("Flair") && l.flairDurs === 0), "le choix sur soi rapporte de l'XP, pas d'XP S");
 }
 {
-  // Le Flair de saison (la saison 0 du banc, close) : posé avant le premier coup d'envoi ou juste après
-  // le deuxième, juste : 10 ; après le troisième : 0 ; sur soi : 0.
+  // Le Flair de saison (la saison 0 du banc, close) : posé avant le premier coup d'envoi, juste : 10 ;
+  // posé après le début de la troisième journée jouée : 0 ; sur soi : 0. La J2 de la saison 0 s'est
+  // jouée sans équipes : elle compte (contrôle adverse du 02/11, le seuil glissait d'une journée).
   const fs = (n: string) => (rb.journalS.get(n) ?? []).filter((l) => l.source === "flair-saison");
-  assert.deepEqual(fs("Kader").map((l) => l.xps), [10, 10], "Kader : buteur (avant la J1) et Pépite d'Or (après la 2e journée jouée) : 10 chacun");
+  assert.deepEqual(fs("Kader").map((l) => l.xps), [10], "Kader : buteur (avant la J1) 10 ; Pépite d'Or posée après le coup d'envoi de la J3, la troisième journée jouée : 0");
   assert.deepEqual(fs("Smail").map((l) => l.xps), [10]);
   assert.deepEqual(fs("Ilies").map((l) => l.xps), [], "posé après le troisième coup d'envoi : 0");
   assert.deepEqual(fs("Ilyes").map((l) => l.xps), [], "sur soi : 0");
+  // L'XP, elle, garde sa prime (primeAu ne voit que les journées avec équipes) : 220 pour la Pépite de Kader.
+  assert.equal(rb.journal.get("Kader")!.lignes.find((l) => l.flairSaison?.sujet === "pepite")!.xp, 220, "la prime d'XP ne bouge pas");
+  // Le seuil, journée par journée, sur la saison 0 (J1 avec équipes, J2 sans, J3 avec) :
+  const ref0 = new Date("2026-08-31T12:00:00Z");
+  const debut = (j: number) => pronosDeJournee(s0, 0, j, ref0)?.coupEnvoi ?? null;
+  assert.equal(debut(2), null, "la J2 de la saison 0 n'a pas d'équipes");
+  const j3 = debut(3)!.getTime();
+  assert.ok(flairSaisonTot(s0, 0, new Date(j3 - 3600_000), ref0), "posé entre la J2 et la J3 : il compte (deux journées jouées)");
+  assert.ok(!flairSaisonTot(s0, 0, new Date(j3 + 60_000), ref0), "posé après le coup d'envoi de la J3 : non (la J2 sans équipes compte)");
+  assert.equal(primeAu(s0, 0, new Date(j3 + 60_000), ref0), 220, "alors que la prime d'XP ne compte que deux coups d'envoi");
   // Hors plafond de la journée : la dernière journée de la saison (J8) déjà à 13, le Flair de saison s'y ajoute.
   const ARCH: Saison = { ...SOLO, numero: 1, archives: [{ numero: 0, nom: "Saison 0", cloturee: "2026-08-31T12:00:00.000Z", journees: SOLO.journees, roster: SOLO.roster, entries: SOLO.entries.map((e) => (e.player === "Ana" ? { ...e, mvp: true, sflTime: true } : e)) }], journees: [], entries: [] };
   const j = journalXpS({ jugee: ARCH, bolaCarte: null, maintenant: LOIN }, journalDe({
@@ -211,9 +237,16 @@ const rb = journalCompletAvecS(banc);
 
 /* ------------------------------- 5 · Bola ------------------------------- */
 let idMatch = 0;
-function matchBola(jour: string, heure: string, moi: { buts?: number; passes?: number; mvp?: boolean }, requise = true): MatchValide {
+/** Un match Bola validé ; sa feuille saisie deux heures après le coup d'envoi (saisiLe), sauf indication. */
+function matchBola(
+  jour: string,
+  heure: string,
+  moi: { buts?: number; passes?: number; mvp?: boolean },
+  requise = true,
+  saisiLe: string | null = new Date(instantParis(jour, heure).getTime() + 2 * 3600_000).toISOString()
+): MatchValide {
   const l: LigneComptee = { id: "u-bola", name: "Bolaman", equipe: "clairs", buts: moi.buts ?? 0, passes: moi.passes ?? 0, mvp: !!moi.mvp, classe: true, points: 0, resultat: "V" };
-  const m: MatchCompte = { id: ++idMatch, jour, heure, genre: "match", scoreClairs: 3, scoreFonces: 1, joueurs: [l], etat: "compte", requise, valide: true, mvps: moi.mvp ? ["u-bola"] : [] };
+  const m: MatchCompte = { id: ++idMatch, jour, heure, genre: "match", scoreClairs: 3, scoreFonces: 1, joueurs: [l], etat: "compte", requise, valide: true, mvps: moi.mvp ? ["u-bola"] : [], ...(saisiLe ? { saisiLe } : {}) };
   return { m, ligne: l, libelle: libelleMatch(m) };
 }
 {
@@ -233,9 +266,34 @@ function matchBola(jour: string, heure: string, moi: { buts?: number; passes?: n
   // Un match à venir ne compte pas.
   const avant = journalXpS({ jugee: s0, bolaCarte, maintenant: new Date("2026-10-25T12:00:00+01:00") }, new Map());
   assert.equal(total(avant, "Bolaman"), 13, "le match de 16 h n'a pas encore eu lieu : le premier seul (MVP et Triplé, 20 au plafond 13)");
-  for (const l of j.get("Bolaman")!) assert.equal(semaineDe(l.jour!), "2026-10-19");
+  for (const l of j.get("Bolaman")!) assert.ok(semaineDe(l.jour!) === "2026-10-19" && l.semaine === "2026-10-19");
   // Par le calcul complet (le journal d'XP Bola, xp-calcul.ts) : le même résultat.
   assert.equal(total(xpsDe({ jugee: s0, bolaCarte: { nom: "Bolaman", valides } as never }), "Bolaman"), 13);
+}
+{
+  // Contrôle adverse du 02/11 : des matchs antidatés, un par semaine de l'été, montés le même jour
+  // (huit comptes d'accord, la feuille saisie aussitôt) : 78 XP S d'un coup avant. La semaine du
+  // plafond est celle de la saisie (l'heure du serveur), et une feuille saisie plus de sept jours
+  // après son match ne donne rien : 0.
+  const saisi = "2026-11-02T10:00:00.000Z";
+  const ete = ["2026-07-05", "2026-07-12", "2026-07-19", "2026-07-26", "2026-08-02", "2026-08-09"].map((d) => matchBola(d, "10:00", { buts: 3, passes: 3, mvp: true }, true, saisi));
+  const bolaDe = (valides: MatchValide[], t = LOIN) => journalXpS({ jugee: s0, bolaCarte: { nom: "Bolaman", valides }, maintenant: t }, new Map());
+  assert.equal(total(bolaDe(ete), "Bolaman"), 0, "six matchs antidatés de l'été, saisis le 2 novembre : 0 (78 avant)");
+  // Antidatés de moins d'une semaine (le 25 et le 27 octobre, deux semaines), saisis le même jour : un seul plafond, celui de la semaine de la saisie.
+  const proches = [matchBola("2026-10-25", "10:00", { buts: 3, mvp: true }, true, "2026-10-27T18:00:00Z"), matchBola("2026-10-27", "10:00", { passes: 3, mvp: true }, true, "2026-10-27T18:00:00Z")];
+  const p = bolaDe(proches);
+  assert.equal(total(p, "Bolaman"), 13, "deux semaines déclarées, saisies le même jour : 13, pas 26");
+  assert.ok(p.get("Bolaman")!.every((l) => l.semaine === "2026-10-26"), "la semaine de la saisie");
+  assert.equal(p.get("Bolaman")!.find((l) => l.match === proches[0].m.id)!.le, "2026-10-27T18:00:00.000Z", "elles tombent à la saisie, pas au coup d'envoi déclaré");
+  // Sans heure de saisie (une base où match_bola_json ne la rend pas encore) : rien.
+  assert.equal(total(bolaDe([matchBola("2026-10-25", "10:00", { buts: 3, mvp: true }, true, null)]), "Bolaman"), 0, "sans saisiLe : 0");
+  // La fenêtre de l'app (sept jours, listerMesDerniers) : saisie le septième jour, elle compte ; le huitième, non.
+  assert.equal(semaineXpSBola({ jour: "2026-10-25", saisiLe: "2026-11-01T20:00:00Z" }), "2026-10-26");
+  assert.equal(semaineXpSBola({ jour: "2026-10-25", saisiLe: "2026-11-02T10:00:00Z" }), null);
+  // Le dimanche soir saisi le lundi : la semaine du lundi ; saisie le jour même : sa semaine.
+  assert.equal(semaineXpSBola({ jour: "2026-10-25", saisiLe: "2026-10-26T08:00:00Z" }), "2026-10-26");
+  assert.equal(semaineXpSBola({ jour: "2026-10-25", saisiLe: "2026-10-25T21:00:00Z" }), "2026-10-19");
+  assert.equal(FEUILLE_BOLA_JOURS, 7);
 }
 
 /* ------------------------------- 6 · Les doublons ------------------------------- */
@@ -259,7 +317,7 @@ function matchBola(jour: string, heure: string, moi: { buts?: number; passes?: n
     const parJournee = new Map<string, number>();
     for (const l of lignes) {
       if (l.source === "flair-saison") continue;
-      const k = l.source === "bola" ? `w${semaineDe(l.jour!)}` : `${l.saison}|${l.j}`;
+      const k = l.source === "bola" ? `w${l.semaine}` : `${l.saison}|${l.j}`;
       parJournee.set(k, (parJournee.get(k) ?? 0) + l.xps);
     }
     for (const [k, v] of parJournee) assert.ok(v <= XP_S.journee, `${n} ${k} : ${v} > 13`);
@@ -270,6 +328,39 @@ function matchBola(jour: string, heure: string, moi: { buts?: number; passes?: n
   const ana = j.get("Ana")!;
   assert.equal(totalXpS(ana), 13);
   assert.deepEqual(ana.map((l) => [l.source, l.titre ?? null, l.xps]), [["sfl-time", null, 10], ["titre", "mvp", 3]], "retirés dans l'ordre : Flair, Défensive, Impact, mission, puis le MVP ; la SFL Time la dernière");
+  // Un joueur qui a des matchs Bola : un seul plafond par semaine, ses journées de la SFL et ses matchs
+  // Bola ensemble (contrôle adverse du 02/11 : 17 puis 26 dans un seul dimanche).
+  {
+    // Hors de la SFL, il remplit le Flair de la J3 (trois durs justes) et joue un match Bola le même dimanche (MVP et Triplé).
+    const s1: Saison = { numero: 1, journees: [meta(3, "25 oct.", { mvpAuto: false })], roster: [{ name: "Cid", poste: null, profil: "Actif", base: null }], entries: [ligne(3, "Cid", { buts: 1 })], convocations: [] };
+    const v = matchBola("2026-10-25", "10:00", { buts: 3, mvp: true });
+    const flairJ3: LigneXp = { saison: 1, j: 3, date: "25 oct.", quoi: "Flair, 3 sur 5", xp: 60, flairDurs: 3 };
+    const zed = journalXpS({ jugee: s1, bolaCarte: { nom: "Bolaman", valides: [v] }, maintenant: LOIN }, journalDe({ Bolaman: [flairJ3] })).get("Bolaman")!;
+    assert.equal(totalXpS(zed), 13, "Flair 4 et Bola 13 le même dimanche : 13, pas 17");
+    assert.deepEqual(zed.map((l) => [l.source, l.quoi, l.xps]), [["bola", "MVP", 10], ["bola", "Mission Triplé", 3]], "le Flair part d'abord, puis la mission");
+    // Un filleul qui entre en SFL le jour même : son match Bola de 10 h, puis la journée (SFL Time et MVP) : 13, pas 26.
+    const s2: Saison = {
+      numero: 1,
+      journees: [meta(1, "25 oct.", { sflTime: true, mvpAuto: false })],
+      roster: ["Ana", "Bea"].map((name) => ({ name, poste: null, profil: "Actif", base: null })),
+      entries: [ligne(1, "Ana", { sflTime: true, mvp: true, buts: 2 }), ligne(1, "Bea", { sflTime: true, result: "Défaite" })],
+      convocations: [],
+    };
+    const r2 = journalXpS({ jugee: s2, bolaCarte: { nom: "Ana", valides: [matchBola("2026-10-25", "10:00", { buts: 3, mvp: true })] }, maintenant: LOIN }, new Map());
+    const ana = r2.get("Ana")!;
+    assert.equal(totalXpS(ana), 13, "le filleul entré le jour même : 13, pas 26");
+    assert.deepEqual(ana.filter((l) => l.source === "sfl-time").map((l) => l.xps), [10], "sa SFL Time reste entière, retirée la dernière");
+    assert.equal(total(r2, "Bea"), 10, "les autres joueurs de la journée n'y sont pour rien");
+    // Le même par le calcul complet (le journal d'XP Bola en plus) : 13.
+    assert.equal(total(xpsDe({ jugee: s2, bolaCarte: { nom: "Ana", valides: [matchBola("2026-10-25", "10:00", { buts: 3, mvp: true })] } as never }), "Ana"), 13);
+    // Une semaine sans match Bola garde le plafond de sa journée : le match Bola de la semaine d'après n'y touche pas.
+    const r3 = journalXpS({ jugee: s2, bolaCarte: { nom: "Ana", valides: [matchBola("2026-10-28", "19:00", { buts: 3, mvp: true })] }, maintenant: LOIN }, new Map());
+    assert.equal(total(r3, "Ana"), 26, "deux semaines : 13 et 13");
+    // plafondCommun seul : les lignes d'une autre semaine passent telles quelles.
+    const L = (source: LigneXpS["source"], xps: number, cle: string, extra: Partial<LigneXpS> = {}): LigneXpS => ({ saison: 1, j: 1, date: "", quoi: cle, xps, source, cle, rattache: cle, ...extra });
+    const commun = plafondCommun([L("titre", 10, "t", { titre: "mvp" }), L("titre", 10, "u", { j: 2, titre: "mvp" })], [L("bola", 10, "b", { titre: "mvp", semaine: "W1" })], (l) => (l.j === 1 ? "W1" : "W2"));
+    assert.deepEqual(commun.map((l) => [l.cle, l.xps]), [["u", 10], ["t", 10], ["b", 3]]);
+  }
   // plafonner seul : à rang égal, la dernière ligne venue part d'abord ; une ligne réduite garde son reste.
   const L = (source: LigneXpS["source"], xps: number, cle: string): LigneXpS => ({ saison: 0, j: 1, date: "", quoi: cle, xps, source, cle, rattache: cle });
   assert.deepEqual(plafonner([L("mission", 10, "a"), L("mission", 10, "b")], 13).map((l) => [l.cle, l.xps]), [["a", 10], ["b", 3]]);

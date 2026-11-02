@@ -37,6 +37,7 @@
 //
 // Pur : ni React ni réseau. Les pronos arrivent en paramètres (pronos-store.ts).
 
+import { heureDuJour } from "./convocation-temps";
 import { isHidden } from "./hidden";
 import { missionsDeJournee, type DimancheMissions, type LigneXp } from "./missions";
 import { entryPP } from "./saisie/engine";
@@ -105,11 +106,13 @@ export const PRIME_SAISON_PAS = 40;
 export const primeSaison = (jouees: number) => Math.max(PRIME_SAISON_MIN, PRIME_SAISON_MAX - PRIME_SAISON_PAS * jouees);
 
 /**
- * La prime d'un Flair de saison qui compte encore pour les XP S (xp-s.ts) :
- * posé ou changé pour la dernière fois avant le troisième coup d'envoi, il
- * n'a plus bougé après la J2. Plus tard, on prendrait le leader évident.
+ * Un Flair de saison compte pour les XP S (xp-s.ts) s'il a été posé ou
+ * changé pour la dernière fois avant le début de la troisième journée jouée
+ * de sa saison (flairSaisonTot) : il n'a plus bougé après la J2. Plus tard,
+ * on prendrait le leader évident. Sur une saison dont toutes les journées
+ * ont leurs équipes, c'est une prime encore à primeSaison(2), 220.
  */
-export const PRIME_SAISON_TOT = primeSaison(2);
+export const JOURNEES_FLAIR_SAISON_TOT = 2;
 
 export const SUJETS_SAISON: SujetSaison[] = ["pepite", "buteur", "passeur"];
 export const TITRE_SAISON: Record<SujetSaison, string> = {
@@ -323,6 +326,28 @@ export function primeAu(s: Pick<Saison, "journees" | "entries" | "roster">, nume
   return primeSaison(coupsDEnvoi(s, numero, reference).filter((d) => d.getTime() <= le.getTime()).length);
 }
 
+/**
+ * Le début de chaque journée jouée, dans l'ordre : son coup d'envoi si elle a
+ * ses équipes, sinon le début de son jour (minuit, Paris). coupsDEnvoi, qui
+ * fait la prime, ne voit pas une journée jouée sans équipes (la J2 de la
+ * saison 0) : le seuil des XP S, lui, la compte (contrôle adverse du 02/11).
+ */
+function debutsDesJournees(s: Pick<Saison, "journees" | "entries" | "roster">, numero: number, reference: Date): Date[] {
+  return s.journees
+    .filter((m) => journeeJouee(s as Saison, m.j))
+    .map((m) => missionsDeJournee(s, numero, m.j, reference)?.coupEnvoi ?? heureDuJour(m.date, reference, 0))
+    .filter((d): d is Date => !!d && d.getTime() > 0);
+}
+
+/**
+ * Un Flair de saison posé à cet instant compte-t-il pour les XP S ? Avant le
+ * début de la troisième journée jouée (JOURNEES_FLAIR_SAISON_TOT + 1) :
+ * jamais plus de deux journées jouées au moment du dernier changement.
+ */
+export function flairSaisonTot(s: Pick<Saison, "journees" | "entries" | "roster">, numero: number, le: Date, reference: Date): boolean {
+  return debutsDesJournees(s, numero, reference).filter((d) => d.getTime() <= le.getTime()).length <= JOURNEES_FLAIR_SAISON_TOT;
+}
+
 /** Les premiers de la saison sur chaque sujet. */
 export function resultatsDeSaison(s: Saison): Map<SujetSaison, string[]> {
   // La règle du classement (rangs.ts) : journées jouées, masqués retirés.
@@ -398,7 +423,7 @@ export function lignesPronos(
           quoi: `Flair de la saison : ${TITRE_SAISON[sujet] ?? sujet}`,
           xp: prime,
           // Les XP S (xp-s.ts) : seulement un choix qui n'a plus bougé après la J2, et jamais sur soi.
-          flairSaison: { sujet, tot: prime >= PRIME_SAISON_TOT && x.choix !== x.joueur },
+          flairSaison: { sujet, tot: flairSaisonTot(lue, numero, new Date(x.le), reference) && x.choix !== x.joueur },
         },
       });
     }
