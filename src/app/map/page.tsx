@@ -145,7 +145,7 @@ import { ContratsSur } from "@/components/sfl/map/contrats-sur";
 import { cleVille, type ContratPlan, type VillePlan } from "@/components/sfl/map/joueurs";
 import { useMaintenant, useMissionsDeLaLigue } from "@/hooks/use-missions";
 import { etatRevelation, finDuVote, libelleFinDuVote, libelleRevelation, nouveauRegime } from "@/lib/sfl/revelation";
-import { TOUTES_AMBIANCES, type Ambiance } from "@/components/sfl/map/ambiances";
+import { estNuit, TOUTES_AMBIANCES, type Ambiance } from "@/components/sfl/map/ambiances";
 import { calculerZones, dansContour, numeroZone, type Foyer, type VilleZone, type Zone } from "@/lib/sfl/zones";
 import { maVille, villeOuLigue } from "@/lib/sfl/villes";
 import { garderPosition, positionGardee } from "@/lib/sfl/activation";
@@ -187,6 +187,7 @@ import {
   type Remplissage,
   type StickerPlan,
 } from "@/components/sfl/map/stade";
+import { idAdminLigue } from "@/lib/sfl/admin-ligue";
 import { VueTerrain } from "@/components/sfl/map/vue-terrain";
 import { FriseDimanche, Rebours, SerieDimanches, type Etape } from "@/components/sfl/map/tableau-lieu";
 import { IconeTerrain, PucesFormat } from "@/components/sfl/map/format-terrains";
@@ -226,9 +227,11 @@ const teinteFantome = (): TeinteFantome =>
  */
 const ESSAIS = process.env.NEXT_PUBLIC_BOLA_ENV !== "production";
 const ambianceDeLAdresse = (): Ambiance => {
-  if (!ESSAIS) return "nuit-encre";
+  // Le jour (02/11, Sabri : « le côté dark […] ça fait fuir un peu ») ; la
+  // production le prend à la fusion, après son accord.
+  if (!ESSAIS) return "jour";
   const a = new URLSearchParams(window.location.search).get("ambiance");
-  return TOUTES_AMBIANCES.includes(a as Ambiance) ? (a as Ambiance) : "nuit-encre";
+  return TOUTES_AMBIANCES.includes(a as Ambiance) ? (a as Ambiance) : "jour";
 };
 /** Dans un aperçu, /?zones=demo ajoute une zone qui vient de s'ouvrir (Lens) et une zone fermée (Paris), pour voir le récit. */
 const zonesDemo = () => ESSAIS && new URLSearchParams(window.location.search).get("zones") === "demo";
@@ -386,6 +389,9 @@ interface MatchMap {
   ligue: LigueMatch;
   /** Une journée jouée en plusieurs lieux : ses matchs dans celui-ci (0 = Match 1). */
   matchsIci?: number[];
+  /** Un dimanche de la SFL montré à un joueur Bola (Sabri, 02/11 : « oui, avec
+   *  un lien pour rejoindre ») : on le voit, on n'y répond pas. */
+  vitrine?: boolean;
 }
 
 /** « 13h00 », « 13:30 » → 13 ; 13 à défaut. */
@@ -532,7 +538,23 @@ export default function MapPage() {
   // La ligue sur la Map, et tous ses dimanches joués (la page d'un lieu les
   // remonte : « les matchs précédents », Sabri 31/10).
   const { liste: ligue, jouees: ligueJouees } = useMemo<{ liste: MatchMap[]; jouees: MatchMap[] }>(() => {
-    if (sansSfl) return { liste: [], jouees: [] };
+    // Un joueur Bola (02/11, Sabri : « oui, avec un lien pour rejoindre ») :
+    // les dimanches à venir en vitrine, sans les joués, sans y répondre ;
+    // le geste du tiroir devient « Rejoindre la ligue ».
+    if (sansSfl) {
+      const r = dimanches();
+      return {
+        liste: r.liste
+          .filter((m) => !m.joue)
+          .map((m) => {
+            const { etat, texte } = etatLigue(false, m.presents.length);
+            return { ...m, vitrine: true, dedans: false, convoquee: false, etat, etatTexte: texte };
+          }),
+        jouees: [],
+      };
+    }
+    return dimanches();
+    function dimanches(): { liste: MatchMap[]; jouees: MatchMap[] } {
     const passee = (m: JourneeMeta) => {
       if (journeeJouee(saison, m.j)) return true;
       const e = ecartJours(m.date, aujourdhui);
@@ -617,6 +639,7 @@ export default function MapPage() {
       ...recente,
     ];
     return { liste, jouees };
+    }
   }, [sansSfl, saison, matchsDe, player.name, aujourdhui, heure, p.heure, p.lieu, p.jour, p.mine, p.effectif, p.presents]);
   // Les habitués : ceux du dernier dimanche joué (la fiche d'une journée pas encore composée).
   const habitues = useMemo(() => {
@@ -1145,9 +1168,15 @@ export default function MapPage() {
     return () => window.removeEventListener("pointerdown", noter, { capture: true });
   }, []);
   const geste = useCallback((g: string, meta?: Record<string, string | number | boolean>) => logActivity("map", { path: "/", meta: { geste: g, ...meta } }), []);
+  // Rejoindre la SFL depuis un dimanche en vitrine (02/11) : l'entrée se fait
+  // quand l'admin pose le nom dans l'effectif ; le joueur lui écrit, en privé.
+  const rejoindreLigue = (depuis: string) => {
+    geste("rejoindre-sfl", { depuis });
+    void idAdminLigue().then((id) => window.location.assign(id ? `/messages/${id}` : "/messages"));
+  };
   // Le match du dimanche, convocation ouverte : on y répond depuis la Map.
   // Un suspendu (carton rouge, lib/sfl/cartons.ts) ne répond pas « Je viens » : sa convocation le dit.
-  const repondreIci = !!choisi && !choisi.joue && !choisi.partie && !choisi.team && (!!choisi.convoquee || choisi.cle === "convocation") && p.reponsesOuvertes && !p.suspendu;
+  const repondreIci = !!choisi && !choisi.vitrine && !choisi.joue && !choisi.partie && !choisi.team && (!!choisi.convoquee || choisi.cle === "convocation") && p.reponsesOuvertes && !p.suspendu;
 
   // Les joueurs, ville par ville, du mieux noté au moins bien noté : ceux de
   // la SFL et les comptes de Bola, pour tout le monde (Sabri, 02/11/2026 :
@@ -1181,7 +1210,7 @@ export default function MapPage() {
   // Les zones Bola (lib/sfl/zones.ts) : là où l'on joue, et d'où viennent
   // ceux qui y jouent. La ligue ouvre la première ; chaque match ouvert ou
   // défi d'équipe loin de tout en ouvre une nouvelle.
-  const ambiance = useSyncExternalStore(rienAEcouter, ambianceDeLAdresse, (): Ambiance => "nuit-encre");
+  const ambiance = useSyncExternalStore(rienAEcouter, ambianceDeLAdresse, (): Ambiance => "jour");
   // Midi, aujourd'hui à Paris : l'âge des zones (une zone de moins de trois jours est nouvelle).
   const maintenant = aujourdhui ? Date.parse(`${aujourdhui}T12:00:00`) : 0;
   const demoZones = useZonesDemo();
@@ -1225,6 +1254,8 @@ export default function MapPage() {
     });
   }, [foyers, villesZones, dimanches, maintenant, chezMoi]);
   const zones = ambiance === "classique" ? AUCUNE_ZONE : toutesZones;
+  // Un plan clair : la barre et le tiroir passent au clair dessus (02/11).
+  const planDeJour = !estNuit(ambiance);
   const [zoneOuverte, setZoneOuverte] = useState<string | null>(null);
   const zoneVue = zones.find((z) => z.id === zoneOuverte) ?? null;
   /** La zone d'un point : ouverte, sinon celle qu'un match là-bas ouvrirait (son numéro à venir). */
@@ -1482,7 +1513,7 @@ export default function MapPage() {
             }}
             onBulle={ouvrirDiscussion}
             villes={enContrats || calques.joueurs ? villesVues : AUCUNE_VILLE}
-            margeBas={cran === 0 ? 250 : 450}
+            margeBas={cran === 0 ? 250 : 490}
             onVille={ouvrirVille}
             onJoueur={toucherJoueur}
             viser={viser}
@@ -1505,7 +1536,7 @@ export default function MapPage() {
         {/* Voile en haut : la barre d'état et le lettrage restent lisibles.
             Tout ce qui est posé sur le plan passe au-dessus des calques de
             Leaflet (z-index 400 et plus). */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-44 bg-gradient-to-b from-[rgba(8,9,11,0.42)] to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] h-44 bg-gradient-to-b from-[rgba(8,9,11,0.16)] to-transparent" />
 
         {/* En haut (02/11, map/tiroir-map.tsx) : UNE barre, où l'on regarde
             (la commune, qui suit le zoom) et ce qu'il s'y passe, qui ouvre la
@@ -1513,7 +1544,7 @@ export default function MapPage() {
             calques, les raccourcis, l'admin). Dessous, les calques en
             pastilles, qu'on voit et qu'on change d'un toucher. Sur
             ordinateur, en colonne à gauche avec le tiroir. */}
-        <div data-traverse className="absolute inset-x-0 z-[520] flex flex-col gap-2.5 px-3 lg:right-auto lg:left-4 lg:w-[400px] lg:px-0" style={{ top: `calc(${haut} + 2px)` }}>
+        <div data-traverse className={cn("absolute inset-x-0 z-[520] flex flex-col gap-2.5 px-3 lg:right-auto lg:left-4 lg:w-[400px] lg:px-0", planDeJour && "surfaces-jour")} style={{ top: `calc(${haut} + 2px)` }}>
           <BarreMap
             titre={commune}
             resume={resume}
@@ -1620,6 +1651,7 @@ export default function MapPage() {
           <InvitationsEquipe invitations={invitationsEquipe} moi={moi} />
           <Invitations invitations={invitations} onOuvrir={(p) => choisirSticker(`m${p.id}`)} />
           <TiroirMap
+            className={planDeJour && fond !== "satellite" ? "surfaces-jour" : undefined}
             cran={cran}
             onCran={changerCran}
             titre={titreTiroir}
@@ -1639,7 +1671,7 @@ export default function MapPage() {
                 ref={carrousel}
                 onScroll={suivreCarrousel}
                 data-traverse
-                className="flex w-full snap-x snap-mandatory gap-2.5 overflow-x-auto px-[max(1rem,calc(50%-124px))] pt-2 pb-2 [scrollbar-width:none]"
+                className="flex w-full snap-x snap-mandatory gap-2.5 overflow-x-auto px-[max(1rem,calc(50%-132px))] pt-2.5 pb-3 [scrollbar-width:none]"
               >
                 {affiches.map((m, i) => (
                   <div key={m.cle} data-cle={m.cle} className="map-monte shrink-0 snap-center" style={{ ["--i" as string]: i + 1 }}>
@@ -1685,7 +1717,15 @@ export default function MapPage() {
             }
             action={
               <div className="flex items-center gap-2">
-                {repondreIci && !surCarte && p.mine !== "present" ? (
+                {choisi?.vitrine && !surCarte ? (
+                  <button
+                    type="button"
+                    onClick={() => rejoindreLigue("tiroir")}
+                    className="flex h-[54px] min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-foreground px-5 text-[16px] font-bold tracking-[-0.2px] text-background active:scale-[0.98]"
+                  >
+                    <SigleLigue ligue="sfl" hauteur={13} className="text-background" /> Rejoindre la ligue
+                  </button>
+                ) : repondreIci && !surCarte && p.mine !== "present" ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -1886,7 +1926,7 @@ export default function MapPage() {
                   />
                 ) : choisi?.team ? (
                   <FicheTeam t={choisi.team} />
-                ) : choisi?.j != null && !choisi.convoquee ? (
+                ) : choisi?.vitrine || (choisi?.j != null && !choisi.convoquee) ? (
                   <Presents m={choisi} habitues={habitues} />
                 ) : (
                   <PresencePanel />
@@ -1951,6 +1991,15 @@ export default function MapPage() {
                 </button>
               ) : choisi.terrain ? (
                 <>
+                  {choisi.vitrine && (
+                    <button
+                      type="button"
+                      onClick={() => rejoindreLigue("lieu")}
+                      className="bouton-encre pointer-events-auto flex h-12 items-center gap-2 px-6 text-[15px] font-semibold"
+                    >
+                      Rejoindre la ligue
+                    </button>
+                  )}
                   {repondreIci && (
                     <span className="flex h-12 items-center gap-1.5 rounded-full px-4 text-[14px] font-semibold" style={{ background: ENCRE, color: BLANC }}>
                       <Check className="size-4" strokeWidth={3} /> Tu viens
@@ -2164,7 +2213,7 @@ const AmbianceDuPlan = createContext<Ambiance>("classique");
 /** Le vrai terrain dessiné : noir au tableau de bord, crème sinon. */
 function TerrainDessine(props: { lat: number; lng: number; titre?: string; className?: string }) {
   const a = useContext(AmbianceDuPlan);
-  return <VueTerrain {...props} ambiance={a === "nuit-encre" ? "nuit-encre" : "classique"} />;
+  return <VueTerrain {...props} ambiance={a} />;
 }
 
 /** La carte du match joué, en retrait : plus petite, en gris. */
@@ -2377,16 +2426,14 @@ function TuileMatch({
 }) {
   const joue = !!m.joue;
   const manque = m.etat.genre === "manque";
+  const complet = m.etat.genre === "complet";
   const reste = compteARebours(dans);
   const jour = reste && reste.toLowerCase() !== m.quand.titre.toLowerCase() ? `${m.quand.titre} · ${reste}` : m.quand.titre;
   const lieu = m.terrain ? lieuDuTerrain({ nom: m.terrain.nom, commune: m.terrain.commune ?? "" }) : (m.partie?.lieu ?? m.team?.defi.lieu ?? "Lieu à venir");
-  const qui = m.partie
-    ? `${m.partie.visibilite === "prive" ? "Privé" : "Public"} · ${m.partie.organisateur}`
-    : m.team
-      ? `${m.team.de.nom} – ${m.team.a.nom}`
-      : m.j != null
-        ? `Journée ${m.j}`
-        : null;
+  // Les places d'un match ouvert par un joueur, en encoches (jamais pour la
+  // ligue, sans plafond) : les vides en braise, ce qu'il manque.
+  const places = joue || !m.partie ? 0 : Math.min(m.effectif, 14);
+  const venus = Math.min(m.presents.length, places);
   return (
     <div className="relative">
       <button
@@ -2395,29 +2442,58 @@ function TuileMatch({
         aria-pressed={choisi}
         aria-label={`${m.quand.titre} ${m.heure}, ${lieu}, ${joue ? "joué" : m.etatTexte}${nonLus ? `, ${nonLus} message${nonLus > 1 ? "s" : ""} pas lu${nonLus > 1 ? "s" : ""}` : ""}`}
         className={cn(
-          "flex h-[150px] w-[248px] flex-col rounded-[22px] p-3.5 text-left transition-[box-shadow,transform] active:scale-[0.98]",
-          choisi ? "bg-foreground/[0.09] shadow-[inset_0_0_0_2px_var(--foreground)]" : "bg-foreground/[0.05] shadow-[inset_0_0_0_1px_rgb(var(--foreground-rgb)/0.08)]",
-          joue && "opacity-70"
+          "tuile-match relative block h-[184px] w-[264px] overflow-hidden rounded-[24px] text-left text-white transition-[transform,box-shadow] duration-300 active:scale-[0.98]",
+          choisi ? "shadow-[0_0_0_2.5px_var(--background),0_0_0_5px_var(--foreground)]" : "shadow-[0_6px_18px_rgba(0,0,0,0.22)]"
         )}
+        style={{ background: ENCRE }}
       >
-        <span className="flex items-center justify-between gap-2">
-          <span className="truncate text-[11.5px] font-bold tracking-[0.6px] text-encre-3 uppercase">{joue ? "Joué" : jour}</span>
-          <span className="flex shrink-0 items-center gap-1.5 text-[12px] font-semibold text-encre-2 tabular-nums">
+        {/* Le terrain, vu d'un toit voisin (map/vue-terrain.tsx) : l'image
+            d'abord, comme une annonce ; un dégradé pour lire dessus. */}
+        {m.terrain ? (
+          <TerrainDessine lat={m.terrain.lat} lng={m.terrain.lng} className={cn("absolute inset-0 h-full w-full scale-[1.04]", joue && "grayscale")} />
+        ) : (
+          <div
+            className={cn("absolute top-[38%] left-1/2 size-[120px] -translate-x-1/2 -translate-y-1/2", joue && "saturate-0")}
+            dangerouslySetInnerHTML={{ __html: stadeSvg(m.quand.moment, { fond: false, ligue: m.ligue }) }}
+          />
+        )}
+        <span aria-hidden className="absolute inset-0 bg-gradient-to-b from-[rgba(4,5,7,0.35)] via-[rgba(4,5,7,0.05)] to-[rgba(4,5,7,0.92)]" />
+        <span className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-2.5">
+          <span className="truncate rounded-full bg-[rgba(10,11,13,0.55)] px-2.5 py-[5px] text-[11px] leading-none font-bold tracking-[0.6px] uppercase backdrop-blur-md">
+            {joue ? "Joué" : jour}
+          </span>
+          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-[rgba(10,11,13,0.55)] px-2.5 py-[5px] text-[11.5px] leading-none font-semibold tabular-nums backdrop-blur-md">
             {loin}
-            <SigleLigue ligue={m.ligue} hauteur={10} className="text-foreground/70" />
+            <SigleLigue ligue={m.ligue} hauteur={9} className="text-white" />
           </span>
         </span>
-        <span className="mt-1 font-display text-[30px] leading-[1] tracking-[0.2px] uppercase">{heureCourte(m.heure)}</span>
-        <span className="mt-1 truncate text-[14.5px] leading-tight font-semibold tracking-[-0.2px]">{lieu}</span>
-        <span className="mt-auto flex items-center gap-2 pt-1.5">
-          {m.presents.length > 0 && <Visages noms={m.presents.slice(0, 3)} />}
-          <span
-            className={cn("truncate text-[12.5px] font-semibold", !manque && "text-encre-2")}
-            style={manque && !joue ? { color: BRAISE } : undefined}
-          >
-            {joue ? "Le récap" : m.etat.genre === "inscrits" && m.presents.length > 3 ? `+${m.presents.length - 3} · ${m.etatTexte}` : m.etatTexte}
+        <span className="absolute inset-x-0 bottom-0 flex flex-col px-3.5 pb-3">
+          <span className="flex items-end justify-between gap-2">
+            <span className="min-w-0">
+              <span className="block font-display text-[34px] leading-[0.95] tracking-[0.3px] uppercase">{heureCourte(m.heure)}</span>
+              <span className="mt-1 block truncate text-[14px] leading-tight font-semibold tracking-[-0.2px] text-white/90">{lieu}</span>
+            </span>
+            {m.presents.length > 0 && <Visages noms={m.presents.slice(0, 3)} clair />}
           </span>
-          {qui && !m.presents.length && <span className="truncate text-[12px] text-encre-3">{qui}</span>}
+          <span className="mt-1.5 flex items-center gap-2">
+            <span
+              className={cn("truncate text-[12.5px] font-semibold", !(manque && !joue) && "text-white/70")}
+              style={manque && !joue ? { color: BRAISE } : undefined}
+            >
+              {joue ? "Le récap" : m.etat.genre === "inscrits" && m.presents.length > 3 ? `${m.etatTexte} · +${m.presents.length - 3}` : m.etatTexte}
+            </span>
+            {places > 0 && (
+              <span aria-hidden className="ml-auto flex w-[92px] shrink-0 gap-[3px]">
+                {Array.from({ length: places }, (_, i) => (
+                  <span
+                    key={i}
+                    className="h-[4px] flex-1 rounded-full"
+                    style={i < venus ? { background: "rgba(255,255,255,0.92)" } : { background: complet ? "rgba(255,255,255,0.2)" : `color-mix(in srgb, ${BRAISE} 35%, transparent)` }}
+                  />
+                ))}
+              </span>
+            )}
+          </span>
         </span>
       </button>
       {nonLus > 0 && (
@@ -2464,8 +2540,8 @@ function TuilePropose({
       aria-pressed={choisie}
       aria-label={`Ouvrir un match${moment ? ` ${titre.toLowerCase()} ${moment.heure.replace(":", "h")}` : ""}, ${ou}${noms.length ? `, ${noms.length} joueurs libres` : ""}`}
       className={cn(
-        "flex h-[150px] w-[248px] flex-col rounded-[22px] p-3.5 text-left transition-[box-shadow,transform] active:scale-[0.98]",
-        choisie && "shadow-[inset_0_0_0_2px_#0a0b0d]"
+        "flex h-[184px] w-[264px] flex-col rounded-[24px] p-4 text-left transition-[box-shadow,transform] duration-300 active:scale-[0.98]",
+        choisie ? "shadow-[0_0_0_2.5px_var(--background),0_0_0_5px_var(--foreground)]" : "shadow-[0_6px_18px_rgba(0,0,0,0.22)]"
       )}
       style={{ background: MAUVE, color: ENCRE }}
     >
@@ -2477,7 +2553,7 @@ function TuilePropose({
         <span aria-hidden className="grid size-[30px] shrink-0 place-items-center rounded-full" style={{ background: ENCRE, color: MAUVE }}>
           <Plus className="size-4" strokeWidth={3} />
         </span>
-        <span className="font-display text-[30px] leading-[1] tracking-[0.2px] uppercase">{moment ? heureCourte(moment.heure.replace(":", "h")) : "Quand tu veux"}</span>
+        <span className="font-display text-[34px] leading-[0.95] tracking-[0.3px] uppercase">{moment ? heureCourte(moment.heure.replace(":", "h")) : "Quand tu veux"}</span>
       </span>
       <span className="mt-1 truncate text-[14.5px] leading-tight font-semibold tracking-[-0.2px]">{ou}</span>
       <span className="mt-auto flex items-center gap-2 pt-1.5">

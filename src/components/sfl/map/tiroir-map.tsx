@@ -120,7 +120,9 @@ export function TiroirMap({
   matchs,
   plus,
   action,
+  className,
 }: {
+  className?: string;
   cran: Cran;
   onCran: (c: Cran) => void;
   titre: string;
@@ -165,7 +167,7 @@ export function TiroirMap({
   return (
     <section
       aria-label={titre}
-      className={cn("tiroir-map pointer-events-auto mx-2 flex flex-col overflow-hidden rounded-[30px] lg:mx-0", SURFACE)}
+      className={cn("tiroir-map pointer-events-auto mx-2 flex flex-col overflow-hidden rounded-[30px] lg:mx-0", SURFACE, className)}
       data-cran={cran}
     >
       <div
@@ -213,7 +215,7 @@ export function TiroirMap({
         aria-hidden={cran !== 2}
       >
         <div className="min-h-0 overflow-hidden">
-          <div className="max-h-[38dvh] overflow-y-auto overscroll-contain [scrollbar-width:none]">{plus}</div>
+          <div className="max-h-[max(9rem,calc(100dvh-600px))] overflow-y-auto overscroll-contain [scrollbar-width:none]">{plus}</div>
         </div>
       </div>
       <div className="shrink-0 px-3 pt-2 pb-3">{action}</div>

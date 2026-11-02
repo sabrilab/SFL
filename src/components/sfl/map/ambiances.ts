@@ -32,6 +32,13 @@
 //     volumes noirs, les noms à peine ; la braise seule luit, à la frontière
 //     de la zone et sur le trajet jusqu'au match.
 //
+//   · « jour » et « aube » (02/11, Sabri : « le côté dark […] ça fait fuir
+//     un peu ») : le plan revient à la lumière. « jour » prend la charte
+//     (parcs et terrains au vert sauge, grands axes au mauve, eau bleu
+//     ciel, sol crème) ; « aube » est le plan clair et neutre d'une app de
+//     plans, les grands axes en jaune pâle. Les zones y gardent le voile
+//     gris clair du dehors.
+//
 // « classique » : le plan d'avant, sans zones. Seul l'essai « rouge »
 // prend une couleur réservée (Impact), pour que Sabri tranche.
 // Les zones en attente (des joueurs, pas encore de match) sont en
@@ -40,9 +47,9 @@
 import type { Map as PlanMap } from "maplibre-gl";
 import { chaleur, contoursDesZones, FONDU_PAS, voilesEnFondu, type Zone } from "@/lib/sfl/zones";
 
-export type Ambiance = "classique" | "territoire" | "nuit" | "encre" | "brume" | "rouge" | "braise" | "nuit-brume" | "nuit-braise" | "nuit-encre";
+export type Ambiance = "jour" | "aube" | "classique" | "territoire" | "nuit" | "encre" | "brume" | "rouge" | "braise" | "nuit-brume" | "nuit-braise" | "nuit-encre";
 /** Les essais montrés dans l'aperçu (l'encre reste par l'adresse). */
-export const AMBIANCES: Ambiance[] = ["nuit-encre", "brume", "rouge", "braise", "nuit-brume", "nuit-braise", "nuit", "territoire", "classique"];
+export const AMBIANCES: Ambiance[] = ["jour", "aube", "nuit-encre", "brume", "rouge", "braise", "nuit-brume", "nuit-braise", "nuit", "territoire", "classique"];
 export const TOUTES_AMBIANCES: Ambiance[] = [...AMBIANCES, "encre"];
 /** Les ambiances sur le plan noir. */
 export const estNuit = (a: Ambiance) => a.startsWith("nuit");
@@ -89,6 +96,52 @@ const SNAP: Palette = {
   texte: "#6b6d72",
   texteRues: "#6d6a64",
   texteEau: "#3d8fbf",
+  halo: "#ffffff",
+};
+
+/** Le jour de la charte : sauge, mauve, crème, bleu ciel (02/11). */
+const JOUR: Palette = {
+  terre: "#f5f2ea",
+  quartier: "#f0ece2",
+  parc: "#d3e7cc",
+  bois: "#c3dfba",
+  terrain: "#a9cba9",
+  eau: "#b7dcef",
+  eauBord: "#a3d0e8",
+  rue: "#ffffff",
+  rueBord: "#e6dfd3",
+  grande: "#f6dbe8",
+  grandeBord: "#e0b3cb",
+  bati: "#ebe6dc",
+  volume: "#fbf8f3",
+  rail: "#d9d2c6",
+  ombre: "rgba(92, 84, 70, 0.45)",
+  texte: "#55575c",
+  texteRues: "#7a776f",
+  texteEau: "#3f87b0",
+  halo: "#ffffff",
+};
+
+/** L'aube : le plan clair et neutre d'une app de plans (02/11). */
+const AUBE: Palette = {
+  terre: "#f4f4f1",
+  quartier: "#efefeb",
+  parc: "#d7ebcf",
+  bois: "#cde4c4",
+  terrain: "#b9dcae",
+  eau: "#aed6f1",
+  eauBord: "#9ccbea",
+  rue: "#ffffff",
+  rueBord: "#dedcd6",
+  grande: "#ffe9b0",
+  grandeBord: "#ecd08a",
+  bati: "#e9e8e4",
+  volume: "#f9f9f7",
+  rail: "#d4d2cc",
+  ombre: "rgba(60, 60, 60, 0.35)",
+  texte: "#4b4d52",
+  texteRues: "#6f7075",
+  texteEau: "#3a82b5",
   halo: "#ffffff",
 };
 
@@ -162,7 +215,7 @@ const TABLEAU: Palette = {
   halo: "#0a0a0b",
 };
 
-const PALETTES: Record<Ambiance, Palette> = { classique: SNAP, territoire: SNAP, nuit: NUIT, encre: ENCRE, brume: SNAP, rouge: SNAP, braise: SNAP, "nuit-brume": NUIT, "nuit-braise": NUIT, "nuit-encre": TABLEAU };
+const PALETTES: Record<Ambiance, Palette> = { jour: JOUR, aube: AUBE, classique: SNAP, territoire: SNAP, nuit: NUIT, encre: ENCRE, brume: SNAP, rouge: SNAP, braise: SNAP, "nuit-brume": NUIT, "nuit-braise": NUIT, "nuit-encre": TABLEAU };
 
 /** La couleur de frontière des essais « rouge » et « braise ». */
 const FRONTIERE: Partial<Record<Ambiance, string>> = { rouge: "#E3262E", braise: "#FF6A1A", "nuit-braise": "#FF6A1A", "nuit-encre": "#FF6A1A" };
