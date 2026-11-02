@@ -4,7 +4,9 @@
 //   · lundi           → la conversation s'ouvre (« dispo ce dimanche ? ») ;
 //   · vendredi minuit → elle expire ; sans réponse = non-participation ;
 //   · vendredi 19h    → les équipes composées deviennent visibles ;
-//   · dimanche        → on joue.
+//   · dimanche        → on joue ;
+//   · dimanche 18 h   → le vote ferme · 19 h : la révélation (points,
+//     classement, divisions), dès la J5 de la saison 1 (revelation.ts).
 //
 // Ce module est PUR et isomorphe : pas de "use client", pas d'horloge à lui.
 // Chaque fonction reçoit l'instant à évaluer — c'est l'appelant qui décide
@@ -99,11 +101,9 @@ export function labelDateFr(date: Date): string {
 
 /* ------------------------------- Le vote ------------------------------- */
 
-// Règle de la ligue : on vote le jour du match, et seulement ce jour-là.
-// Le vote s'ouvre le dimanche de la journée et se ferme à minuit, heure de
-// Paris. Qui n'a pas voté le soir même ne vote plus.
-
-export const REGLE_VOTE = "Le vote s'ouvre le jour du match et se ferme à minuit. Pas voté le soir même : c'est fini.";
+// On vote le jour du match, et seulement ce jour-là. L'heure de fermeture
+// (18 h, une heure au moins après la dernière feuille, minuit au plus tard ;
+// minuit jusqu'à la J4) et la révélation sont dans revelation.ts.
 
 const MOIS_COURTS = ["jan", "fev", "mar", "avr", "mai", "juin", "juil", "aou", "sep", "oct", "nov", "dec"];
 
@@ -119,8 +119,12 @@ export function jourMoisDuLibelle(libelle: string): { jour: number; mois: number
   return mois < 0 ? null : { jour: Number(m[1]), mois: mois + 1 };
 }
 
-/** Le vote d'une journée est-il ouvert à cet instant ? Seulement le jour même, jusqu'à minuit (Paris). */
-export function voteOuvert(libelleJournee: string, maintenant: Date): boolean {
+/**
+ * L'instant est-il le jour de la journée, à Paris ? (Le jour seul, l'année
+ * n'est pas lue.) C'était `voteOuvert` jusqu'au 02/11/2026 : l'heure de
+ * fermeture du vote se lit maintenant dans revelation.ts (voteOuvertA).
+ */
+export function estLeJour(libelleJournee: string, maintenant: Date): boolean {
   const jm = jourMoisDuLibelle(libelleJournee);
   if (!jm) return false;
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -130,4 +134,53 @@ export function voteOuvert(libelleJournee: string, maintenant: Date): boolean {
   }).formatToParts(maintenant);
   const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
   return get("day") === jm.jour && get("month") === jm.mois;
+}
+
+/* ------------------------------ Les heures ------------------------------ */
+
+/** De combien Paris est en avance sur l'heure universelle à cet instant, en ms. */
+function avanceParis(utc: number): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Paris",
+    hourCycle: "h23",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+  }).formatToParts(new Date(utc));
+  const v = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  return Date.UTC(v("year"), v("month") - 1, v("day"), v("hour"), v("minute")) - Math.floor(utc / 60000) * 60000;
+}
+
+/** L'instant d'une heure de Paris (le jour peut déborder : 32 octobre = 1er novembre). */
+export function dateDeParis(annee: number, mois: number, jour: number, heure = 0, minute = 0): Date {
+  const naif = Date.UTC(annee, mois - 1, jour, heure, minute);
+  let t = naif - avanceParis(naif);
+  const corrige = naif - avanceParis(t);
+  if (corrige !== t) t = corrige;
+  return new Date(t);
+}
+
+/** L'année d'un « 25 oct. » : la plus proche de la date de référence. */
+export function anneeProche(jour: number, mois: number, reference: Date): number {
+  const a = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric" }).format(reference));
+  return [a - 1, a, a + 1].reduce((best, y) =>
+    Math.abs(dateDeParis(y, mois, jour, 12).getTime() - reference.getTime()) <
+    Math.abs(dateDeParis(best, mois, jour, 12).getTime() - reference.getTime())
+      ? y
+      : best
+  );
+}
+
+/** Une heure de Paris le jour d'une journée (« 1 nov. », 18 h) ; null si le libellé ne porte pas de date. */
+export function heureDuJour(libelleJournee: string, reference: Date, heure: number, minute = 0): Date | null {
+  const jm = jourMoisDuLibelle(libelleJournee);
+  if (!jm) return null;
+  return dateDeParis(anneeProche(jm.jour, jm.mois, reference), jm.mois, jm.jour, heure, minute);
+}
+
+/** Minuit le soir d'une journée (le lendemain à 0 h, Paris) ; null si le libellé ne porte pas de date. */
+export function minuitDuSoir(libelleJournee: string, reference: Date): Date | null {
+  return heureDuJour(libelleJournee, reference, 24);
 }

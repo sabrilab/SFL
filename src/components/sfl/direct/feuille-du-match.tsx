@@ -6,16 +6,20 @@
 // prend avec son téléphone »). Lib : lib/sfl/feuille-direct.ts ; base :
 // public.feuilles_direct (supabase/schema.sql).
 //
-// En haut, le tableau d'affichage (● NOIRS 3 – 1 BLANCS ○) et la minute de
-// jeu, depuis la prise de la feuille ; dessous, qui la tient. Puis les deux
-// camps côte à côte, chaque joueur avec sa carte, ses buts et ses passes.
+// En haut, la minute de jeu (depuis la prise de la feuille) et qui la tient.
+// Puis le tableau d'affichage posé sur les deux camps (○ NOIRS 3 – 1 BLANCS ○,
+// chaque moitié au-dessus de sa colonne), et les deux camps côte à côte :
+// chaque joueur avec sa carte et ses chiffres non nuls (« 2B · 1P · 3ARR »).
+// Contrôle du 01/11 au soir, d'une main au bord du terrain : les cinq joueurs
+// de chaque camp tiennent sans défiler, même sur un iPhone SE (375 × 667).
 //   · Celui qui tient la feuille touche un joueur : BUT, PASSE, ARRÊT,
-//     INTERC., CONTRE SON CAMP, au pouce, avec un − pour corriger. Un but
+//     INTERC., CONTRE SON CAMP, au pouce, avec un − pour corriger. Un « + »
+//     ramène aussitôt au match (le geste suivant n'attend pas) ; un but
 //     enchaîne sur sa passe (un coéquipier, ou « Sans passe ») : un seul
 //     geste, que ↶ défait d'un coup. En bas, sous le pouce, le dernier geste
 //     et « Fin du match · 3 – 1 », un glissé scellé comme « Je viens » : la
 //     feuille se scelle, le résultat et les chiffres entrent dans la saison.
-//     Il peut passer la main à un joueur du match.
+//     Il peut passer la main à un joueur du match (en haut : c'est rare).
 //   · Les autres (le reste du match, toute la ligue) la suivent en lecture,
 //     en temps réel.
 //   · L'admin (la page Journée) la reprend, la libère, ou la rouvre une fois
@@ -42,6 +46,7 @@ import {
   pileDuJournal,
   scoreDeLaFeuille,
   type Compteur,
+  type Compteurs,
   type Equipes,
   type FeuilleDirect,
   type Geste,
@@ -91,6 +96,60 @@ export function TableauDAffichage({ score, grand = true }: { score: [number, num
     </div>
   );
 }
+
+/**
+ * Le tableau d'affichage de la feuille, posé sur ses deux colonnes : la
+ * moitié des Noirs au-dessus des Noirs, celle des Blancs au-dessus des
+ * Blancs (la même grille). Il dit le score et quel camp est quelle colonne.
+ */
+function TableauDesCamps({ score }: { score: [number, number] }) {
+  return (
+    <div className="relative grid grid-cols-2 gap-2">
+      <div className="flex min-w-0 items-center justify-between gap-2 pr-3.5">
+        <PastilleMaillot camp="Noirs" />
+        <span className="font-display text-[40px] leading-none tabular-nums" aria-label={`Noirs ${score[0]}`}>
+          {score[0]}
+        </span>
+      </div>
+      <div className="flex min-w-0 items-center justify-between gap-2 pl-3.5">
+        <span className="font-display text-[40px] leading-none tabular-nums" aria-label={`Blancs ${score[1]}`}>
+          {score[1]}
+        </span>
+        <PastilleMaillot camp="Blancs" />
+      </div>
+      <span aria-hidden className="font-display absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-titre-g leading-none text-encre-3">
+        –
+      </span>
+    </div>
+  );
+}
+
+/** Les chiffres d'une ligne, les seuls non nuls : les buts et les passes à l'encre, le reste en retrait. */
+const JETONS: { quoi: Compteur; court: string; fort: boolean }[] = [
+  { quoi: "buts", court: "B", fort: true },
+  { quoi: "passes", court: "P", fort: true },
+  { quoi: "arrets", court: "ARR", fort: false },
+  { quoi: "interceptions", court: "INT", fort: false },
+  { quoi: "csc", court: "CSC", fort: false },
+];
+
+function Jetons({ c, nom }: { c: Compteurs; nom: string }) {
+  const jetons = JETONS.map((x) => ({ ...x, n: compte(c, nom, x.quoi) })).filter((x) => x.n > 0);
+  if (!jetons.length) return null;
+  return (
+    <span className="mono-label flex min-w-0 gap-1.5 overflow-hidden whitespace-nowrap tabular-nums">
+      {jetons.map((x) => (
+        <span key={x.quoi} className={x.fort ? "text-encre" : "text-encre-3"}>
+          {x.n}
+          {x.court}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** La carte d'une ligne de la feuille : 36 px, la ligne en fait de 48 à 68. */
+const CARTE_LIGNE = 36 / 254;
 
 const LIGNES: { quoi: Compteur; libelle: string }[] = [
   { quoi: "buts", libelle: "But" },
@@ -222,8 +281,28 @@ export function FeuilleDuMatch({
             Rouvrir la feuille
           </button>
         )}
+        {mode === "admin" && tenir && (
+          <button type="button" disabled={envoi} onClick={() => void adminGeste("liberer")} className="bouton-discret h-11 text-ligne font-semibold">
+            Libérer la feuille
+          </button>
+        )}
       </>
     );
+
+  // Sous le titre : la minute, et qui tient la feuille ; à qui la tient,
+  // « Passer la main » (rare : en haut, loin du pouce qui compte).
+  const enTete = feuille ? (
+    <div className="flex w-full min-w-0 items-center gap-2.5">
+      <PastilleDirect feuille={feuille} />
+      {tenir ? (
+        <button type="button" onClick={() => setPasser(true)} className="bouton-discret mono-label -my-2 ml-auto h-11 shrink-0 px-2">
+          Passer la main
+        </button>
+      ) : (
+        <span className="mono-label min-w-0 truncate text-encre-3">Feuille · {feuille.preneur_nom ?? "libre"}</span>
+      )}
+    </div>
+  ) : null;
 
   return (
     <Feuille
@@ -236,41 +315,18 @@ export function FeuilleDuMatch({
         onOpenChange(o);
       }}
       titre={label}
-      etat={feuille ? <PastilleDirect feuille={feuille} /> : null}
+      etat={enTete}
       haute
+      serre
       bas={bas}
     >
-      <TableauDAffichage score={score} />
-
-      <div className="flex items-center justify-between gap-2">
-        <span className="mono-label truncate text-encre-3">
-          {feuille?.preneur_nom ? `Feuille · ${feuille.preneur_nom}` : feuille ? "Feuille · libre" : "Feuille · personne"}
-        </span>
-        {tenir && (
-          <button type="button" onClick={() => setPasser(true)} className="bouton-discret mono-label h-9 shrink-0 px-3">
-            Passer la main
-          </button>
-        )}
-        {mode === "admin" && tenir && (
-          <button type="button" disabled={envoi} onClick={() => void adminGeste("liberer")} className="bouton-discret mono-label h-9 shrink-0 px-3">
-            Libérer
-          </button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        {camps.map(({ cle, camp, noms }) => (
-          <section key={cle} className="flex min-w-0 flex-col gap-1.5" aria-label={camp}>
-            <PastilleMaillot camp={camp} className="self-start" />
-            {noms.map((nom) => {
-              const b = compte(c, nom, "buts");
-              const p = compte(c, nom, "passes");
-              const def = [
-                compte(c, nom, "arrets") ? `ARR ${compte(c, nom, "arrets")}` : null,
-                compte(c, nom, "interceptions") ? `INT ${compte(c, nom, "interceptions")}` : null,
-                compte(c, nom, "csc") ? `CSC ${compte(c, nom, "csc")}` : null,
-              ].filter(Boolean);
-              return (
+      {/* Les lignes prennent la place qu'il y a (48 à 68 px) : du pouce, sans défiler. */}
+      <div className="flex flex-1 flex-col gap-2.5">
+        <TableauDesCamps score={score} />
+        <div className="grid flex-1 grid-cols-2 gap-2">
+          {camps.map(({ cle, camp, noms }) => (
+            <section key={cle} className="flex min-w-0 flex-col gap-1.5" aria-label={camp}>
+              {noms.map((nom) => (
                 <button
                   key={nom}
                   type="button"
@@ -280,23 +336,20 @@ export function FeuilleDuMatch({
                     setJoueur({ nom, camp: cle });
                   }}
                   className={cn(
-                    "flex min-h-[60px] min-w-0 items-center gap-2 rounded-[18px] bg-card px-2 py-1.5 text-left",
+                    "flex max-h-17 min-h-12 min-w-0 flex-1 items-center gap-2 rounded-[16px] bg-card py-1 pr-2 pl-1.5 text-left",
                     tenir && "transition-transform active:scale-[0.97]"
                   )}
                 >
-                  <CarteDe name={nom} size={FORMAT_CARTE.petite * 0.82} inerte />
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-corps font-semibold">{prenom(nom)}</span>
-                    <span className="mono-label text-encre-2 tabular-nums">
-                      {b} · {p}
-                    </span>
-                    {def.length > 0 && <span className="mono-label truncate text-micro text-encre-3">{def.join(" · ")}</span>}
+                  <CarteDe name={nom} size={CARTE_LIGNE} inerte />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate text-lecture leading-tight font-semibold">{prenom(nom)}</span>
+                    <Jetons c={c} nom={nom} />
                   </span>
                 </button>
-              );
-            })}
-          </section>
-        ))}
+              ))}
+            </section>
+          ))}
+        </div>
       </div>
 
       {!tenir && dernier && feuille && (
@@ -338,7 +391,11 @@ export function FeuilleDuMatch({
                         setPasseDe(joueur);
                         return;
                       }
-                      void geste([{ joueur: joueur.nom, quoi, d: 1 }]);
+                      // Compté : retour au match, le geste suivant n'attend pas
+                      // (le − reste ici : on corrige, on vérifie).
+                      const nom = joueur.nom;
+                      setJoueur(null);
+                      void geste([{ joueur: nom, quoi, d: 1 }]);
                     }}
                     className="bouton-principal grid size-14 shrink-0 place-items-center"
                   >

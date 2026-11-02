@@ -30,8 +30,9 @@ export async function POST(req: NextRequest) {
   if (!(profil as { valide?: boolean } | null)?.valide) return NextResponse.json({ error: "Réservé à la ligue." }, { status: 403 });
 
   const lue = await lireSaisonServeur(sb).catch(() => null);
-  // La saison publiée, sans les votes : les retards tels que la ligue les voit.
-  const saison = lue?.brute;
+  // Le direct (la saison publiée, sans figer) : le carton se donne sur place.
+  // Le −1 du retard, lui, entre au classement à la révélation (revelation.ts).
+  const saison = lue?.direct;
   if (!saison) return NextResponse.json({ envoyes: 0, fini: true });
   const cartons = [...cartonsDeLaSaison(saison).values()].flatMap((c) => c.cartons);
   if (!cartons.length) return NextResponse.json({ envoyes: 0, fini: true });

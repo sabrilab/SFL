@@ -14,7 +14,8 @@
 // Les élus des votes (Impact, Défensive) partent avec l'archive : ils ne sont
 // jamais écrits dans le document, et les votes d'une saison close ne se
 // rechargent plus. La clôture attend donc que les votes soient chargés et que
-// le dernier vote soit fermé (minuit, heure de Paris).
+// la dernière journée soit révélée (revelation.ts : 19 h dès la J5, minuit
+// jusqu'à la J4).
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -28,8 +29,8 @@ import { cloturerSaison, restaurationPossible, restaurerSaison } from "@/lib/sfl
 import { estBrouillon } from "@/lib/sfl/saisie/brouillon";
 import { numeroSaison, type Saison } from "@/lib/sfl/saisie/types";
 import { deriveSeason } from "@/lib/sfl/saisie/engine";
-import { appliquerVotes, journeeAvecVote, titresFaibles, votesCharges } from "@/lib/sfl/votes";
-import { voteOuvert } from "@/lib/sfl/convocation-temps";
+import { appliquerVotes, titresFaibles, votesCharges } from "@/lib/sfl/votes";
+import { libelleRevelation, revelationAttendue } from "@/lib/sfl/revelation";
 import { useVotes } from "@/hooks/use-votes";
 
 function dateCourte(iso: string) {
@@ -64,7 +65,10 @@ export function Saisons({
     return {
       entries: appliquerVotes(saison, brut.journees, votes, maintenant).entries,
       faibles: titresFaibles(saison, brut.journees, votes, maintenant),
-      voteEnCours: brut.journees.some((jn) => journeeAvecVote(jn) && voteOuvert(jn.date, maintenant)),
+      attente: (() => {
+        const j = revelationAttendue(saison, maintenant);
+        return j == null ? null : `Révélation de la J${j} à ${libelleRevelation(saison, j, maintenant)}`;
+      })(),
     };
   }, [ouvert, saison, votes]);
   const brouillon = saison.journees.find(estBrouillon);
@@ -72,9 +76,7 @@ export function Saisons({
     ? `J${brouillon.j} en brouillon`
     : !charges
       ? "Les votes ne sont pas encore chargés."
-      : titres?.voteEnCours
-        ? "Le vote du dernier dimanche est ouvert jusqu'à minuit."
-        : null;
+      : (titres?.attente ?? null);
 
   return (
     <div className="overflow-hidden rounded-3xl bg-card">

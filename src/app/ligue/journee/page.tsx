@@ -123,7 +123,8 @@ function Ligue({ saisonClose }: { saisonClose?: { numero: number; nom: string } 
   }, [saisonArchive]);
   const jDemandee = Number(params.get("j"));
   const [selectedJ, setSelectedJ] = useState<number | null>(Number.isInteger(jDemandee) && jDemandee > 0 ? jDemandee : null);
-  const currentJ = selectedJ ?? latestJ;
+  // Une journée qui attend sa révélation (revelation.ts) n'a pas encore de récap : la dernière comptée.
+  const currentJ = selectedJ != null && !saison.figee?.caches.includes(selectedJ) ? selectedJ : latestJ;
   const [opening, setOpening] = useState<number | null>(null);
 
   const openJournee = (j: number) => {

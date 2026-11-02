@@ -23,6 +23,8 @@
 //       suspension — bloque seulement une ligne NOUVELLE : noter le retard
 //       qui fait le rouge ne bloque pas une J5 déjà composée, qui garde son
 //       défaut à corriger avant d'être publiée
+//   I10 une vue figée (revelation.ts, figer) : ses journées en attente de la
+//       révélation n'ont plus leurs résultats, l'écrire les effacerait
 //
 // Pur.
 
@@ -43,11 +45,12 @@ export type Ecart =
   | { r: "I6"; date: string; js: number[] }
   | { r: "I7"; j: number; equipe: string }
   | { r: "I8"; j: number }
-  | { r: "I9"; j: number; joueur: string };
+  | { r: "I9"; j: number; joueur: string }
+  | { r: "I10" };
 
 export type Regle = Ecart["r"];
 
-export const BLOQUE_L_ECRITURE: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I6", "I8", "I9"]);
+export const BLOQUE_L_ECRITURE: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I6", "I8", "I9", "I10"]);
 export const BLOQUE_LA_PUBLICATION: ReadonlySet<Regle> = new Set(["I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I9"]);
 
 const cle = (n: string) => n.trim().toLowerCase();
@@ -71,6 +74,8 @@ export function cleEcart(e: Ecart): string {
       return `I6|${dateCle(e.date)}`;
     case "I8":
       return `I8|${e.j}`;
+    case "I10":
+      return "I10";
   }
 }
 
@@ -97,6 +102,8 @@ export function libelleEcart(e: Ecart): string {
       return `J${e.j} · brouillon perdu`;
     case "I9":
       return `${e.joueur} · suspendu`;
+    case "I10":
+      return "Vue figée";
   }
 }
 
@@ -202,6 +209,8 @@ export function nouveauxEcarts(avant: Saison, apres: Saison, opts: { jeter?: num
   const out = ecartsDeLaSaison(apres).filter(
     (e) => !vieux.has(cleEcart(e)) && (e.r !== "I9" || lignesDe(apres, e.j, e.joueur) > lignesDe(avant, e.j, e.joueur))
   );
+  // Une vue figée n'est qu'une lecture (revelation.ts) : jamais un document à écrire.
+  if (apres.figee) out.push({ r: "I10" });
   // Une nouvelle saison (clôture) vide les journées par nature.
   if ((apres.numero ?? 0) === (avant.numero ?? 0)) {
     for (const m of avant.journees) {

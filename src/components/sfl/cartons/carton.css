@@ -1,9 +1,16 @@
 /* Le carton de l'arbitre (components/sfl/cartons/carton-recu.tsx, 01/11/2026).
-   Un vrai carton de PVC : 5 × 7, les coins à peine arrondis, une tranche, la
-   brillance d'un plastique lisse, un reflet qui passe quand il se lève. Les
-   deux seules couleurs de l'app hors du noir et blanc (Sabri, 01/11), à côté
-   de la braise du « Il manque N ». « Réduire les animations » : la règle
-   globale (globals.css) ramène chaque animation à son dernier état. */
+   Un vrai carton de PVC : 5 × 7, les coins à peine arrondis, une tranche
+   d'un trait (il fait moins d'un millimètre), le satiné d'un plastique lisse
+   et un reflet qui passe quand il se lève. Les deux seules couleurs de l'app
+   hors du noir et blanc (Sabri, 01/11), à côté de la braise du « Il manque N ».
+
+   Contrôle du 01/11 au soir : le premier jet tirait sur l'or (un dégradé
+   jusqu'à l'ocre, une tranche épaisse, un halo jaune) — l'or est aux cartes
+   MVP, le rouge laqué à l'Impact. Ici, une couleur pleine d'arbitre, à peine
+   éclairée d'en haut ; aucun halo ; le geste monte d'un coup de bras, sans
+   rebond d'échelle, puis le carton est tenu, immobile (aucun tremblement).
+   « Réduire les animations » : la règle globale (globals.css) ramène chaque
+   animation à son dernier état ; ici, rien n'est même déclaré. */
 
 .carton-scene {
   perspective: 900px;
@@ -16,35 +23,39 @@
 }
 
 .carton {
-  --carton: #f5c518;
-  --carton-clair: #ffe066;
-  --carton-sombre: #c79a00;
-  --carton-lueur: rgba(245, 197, 24, 0.42);
+  /* Jaune et rouge d'arbitre, pleins : jamais l'or des MVP, jamais le rouge laqué des Impact. */
+  --carton: #ffd31a;
+  --carton-haut: #ffe14d;
+  --carton-bas: #f5c400;
+  --carton-tranche: #d9a900;
+  --carton-encre: rgba(0, 0, 0, 0.3);
   position: relative;
   width: min(54vw, 214px);
   aspect-ratio: 5 / 7;
-  border-radius: 7px;
+  border-radius: 10px;
   overflow: hidden;
   background:
-    /* la lumière d'en haut à gauche */
-    radial-gradient(130% 85% at 18% 8%, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 58%),
-    /* le plastique */
-    linear-gradient(165deg, var(--carton-clair) 0%, var(--carton) 42%, var(--carton) 68%, var(--carton-sombre) 100%);
+    /* le satiné : la lumière d'en haut, large et douce */
+    radial-gradient(120% 70% at 22% 0%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0) 60%),
+    /* le plastique, d'une seule couleur */
+    linear-gradient(176deg, var(--carton-haut) 0%, var(--carton) 38%, var(--carton) 78%, var(--carton-bas) 100%);
   box-shadow:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.7),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.16),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.1),
-    /* la tranche du PVC */
-    1px 2.5px 0 0 var(--carton-sombre),
-    0 34px 70px -22px rgba(0, 0, 0, 0.85),
-    0 0 90px -18px var(--carton-lueur);
+    /* le bord du PVC, où la lumière accroche */
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.14),
+    /* la tranche : un trait */
+    0 1px 0 0 var(--carton-tranche),
+    /* tenu en l'air, devant soi */
+    0 30px 60px -26px rgba(0, 0, 0, 0.9),
+    0 10px 22px -12px rgba(0, 0, 0, 0.55);
 }
 
 .carton--rouge {
-  --carton: #d7261e;
-  --carton-clair: #f2564a;
-  --carton-sombre: #9c1510;
-  --carton-lueur: rgba(215, 38, 30, 0.45);
+  --carton: #e0201c;
+  --carton-haut: #ec3a30;
+  --carton-bas: #cc1a17;
+  --carton-tranche: #a31311;
+  --carton-encre: rgba(0, 0, 0, 0.32);
 }
 
 /* Le reflet qui traverse le plastique quand il se lève (hors champ au repos). */
@@ -53,7 +64,7 @@
   position: absolute;
   inset: -20% -60%;
   pointer-events: none;
-  background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.72) 49%, rgba(255, 255, 255, 0.18) 53%, transparent 60%);
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.55) 49%, rgba(255, 255, 255, 0.14) 53%, transparent 60%);
   transform: translateX(-70%);
 }
 
@@ -63,64 +74,68 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  opacity: 0.13;
+  opacity: 0.1;
   mix-blend-mode: soft-light;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='120' height='120' filter='url(%23g)'/></svg>");
 }
 
-/* Le sigle, en creux dans le plastique. */
+/* Le sigle, imprimé petit au pied, comme la marque d'un vrai carton. */
 .carton__sigle {
   position: absolute;
   left: 50%;
-  bottom: 9%;
+  bottom: 8%;
   translate: -50% 0;
-  font-weight: 800;
-  font-size: 11px;
-  letter-spacing: 0.32em;
-  color: rgba(0, 0, 0, 0.16);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+  display: flex;
+  color: var(--carton-encre);
 }
 
-/* Le geste de l'arbitre : le carton sort d'en bas, monte d'un coup de bras,
-   dépasse un peu, se pose, bras tendu. Seulement si le téléphone accepte le
-   mouvement : sinon, le carton est là, posé, et rien ne bouge. */
+/* Le voile se pose, puis le geste de l'arbitre : le carton sort d'en bas,
+   monte d'un coup de bras, dépasse à peine, se pose, bras tendu, et ne bouge
+   plus. Seulement si le téléphone accepte le mouvement : sinon, le carton
+   est là, posé, et rien ne bouge. */
 @media (prefers-reduced-motion: no-preference) {
+  .carton-voile {
+    animation: carton-voile 0.28s ease-out both;
+  }
+
   .carton--brandi {
-    animation: carton-brandi 1.05s cubic-bezier(0.18, 0.9, 0.22, 1) both;
+    animation: carton-brandi 0.9s cubic-bezier(0.2, 0.85, 0.25, 1) 0.16s both;
   }
 
   .carton--brandi::before {
-    animation: carton-reflet 0.9s cubic-bezier(0.3, 0, 0.2, 1) 0.45s both;
-  }
-
-  .carton-tenu {
-    animation: carton-tenu 3.4s ease-in-out 1.1s infinite;
+    animation: carton-reflet 0.85s cubic-bezier(0.3, 0, 0.2, 1) 0.6s both;
   }
 
   .carton-texte {
-    animation: carton-texte 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.75s both;
+    animation: carton-texte 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.8s both;
   }
 
   .carton-bouton {
-    animation: carton-texte 0.4s ease-out 1s both;
+    animation: carton-texte 0.4s ease-out 1.05s both;
+  }
+}
+
+@keyframes carton-voile {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
 @keyframes carton-brandi {
   0% {
-    transform: translate3d(-10%, 150%, 0) rotateZ(-30deg) rotateX(52deg) rotateY(-24deg) scale(0.8);
+    transform: translate3d(-14%, 150%, 0) rotateZ(-26deg) rotateX(50deg) rotateY(-20deg);
   }
-  36% {
-    transform: translate3d(2%, -8%, 0) rotateZ(6deg) rotateX(-12deg) rotateY(9deg) scale(1.06);
+  46% {
+    transform: translate3d(1%, -4%, 0) rotateZ(2.5deg) rotateX(-7deg) rotateY(5deg);
   }
-  57% {
-    transform: translate3d(0, 2.5%, 0) rotateZ(-5deg) rotateX(5deg) rotateY(-3deg) scale(0.99);
-  }
-  77% {
-    transform: translate3d(0, -1%, 0) rotateZ(-1.5deg) rotateX(-1.5deg) rotateY(1deg) scale(1.005);
+  72% {
+    transform: translate3d(0, 0.8%, 0) rotateZ(-4.2deg) rotateX(1.5deg) rotateY(-1deg);
   }
   100% {
-    transform: translate3d(0, 0, 0) rotateZ(-3deg) rotateX(0) rotateY(0) scale(1);
+    transform: translate3d(0, 0, 0) rotateZ(-3deg) rotateX(0) rotateY(0);
   }
 }
 
@@ -130,16 +145,6 @@
   }
   to {
     transform: translateX(70%);
-  }
-}
-
-@keyframes carton-tenu {
-  0%,
-  100% {
-    transform: rotateZ(0deg) translateY(0);
-  }
-  50% {
-    transform: rotateZ(1.6deg) translateY(-0.8%);
   }
 }
 
@@ -164,10 +169,10 @@
   box-shadow: inset 0 0 0 1.5px color-mix(in oklab, currentColor 30%, transparent);
 }
 .carton-mini--jaune {
-  background: linear-gradient(165deg, #ffe066, #f5c518 60%, #c79a00);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  background: linear-gradient(176deg, #ffe14d, #ffd31a 45%, #f5c400);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 0 0 0.5px rgba(0, 0, 0, 0.14);
 }
 .carton-mini--rouge {
-  background: linear-gradient(165deg, #f2564a, #d7261e 60%, #9c1510);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  background: linear-gradient(176deg, #ec3a30, #e0201c 45%, #cc1a17);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 0 0 0.5px rgba(0, 0, 0, 0.14);
 }

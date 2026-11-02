@@ -81,6 +81,28 @@ assert.deepEqual(sansSuspendus(s6, 7, ["Ilyes", "Théo", "Badis"]), ["Ilyes", "B
 const s8 = { ...s6, entries: [...s6.entries, L(8, "Théo", "Noirs 1", { retard: true })] };
 assert.deepEqual([cartonsDe(s8, "Théo").serie, cartonsDe(s8, "Théo").cartons.at(-1)?.id], [1, "s1-j8-jaune"]);
 
+// Relecture du 01/11 : des retards espacés (J4, J6, J9) font aussi le rouge,
+// au troisième, et la journée suspendue est celle qui suit le troisième ; un
+// nom écrit autrement d'une journée à l'autre reste le même joueur.
+const espaces: Saison = {
+  ...base,
+  journees: [...base.journees, J(9, "20 déc."), J(10, "27 déc.")],
+  entries: [
+    ...base.entries.filter((e) => e.player !== "Théo"),
+    L(4, "Théo", "Noirs 1", { retard: true }),
+    L(6, "théo ", "Noirs 1", { retard: true }),
+    L(9, "Théo", "Blancs 1", { retard: true }),
+  ],
+};
+assert.deepEqual(cartonsDe(espaces, "Théo").cartons.map((c) => [c.id, c.rang, c.suspenduPour]), [
+  ["s1-j4-jaune", 1, undefined],
+  ["s1-j6-jaune", 2, undefined],
+  ["s1-j9-jaune", 3, undefined],
+  ["s1-j9-rouge", 3, 10],
+]);
+assert.equal(suspenduPour(espaces, "Théo", 7), false, "pas de suspension avant le troisième");
+assert.equal(suspenduPour(espaces, "Théo", 10), true);
+
 // 4 · Les cartons pas encore vus, dans l'ordre.
 assert.deepEqual(cartonsAMontrer(t6.cartons, new Set(["s1-j4-jaune", "s1-j5-jaune"])).map((c) => c.id), ["s1-j6-jaune", "s1-j6-rouge"]);
 

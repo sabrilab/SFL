@@ -20,6 +20,7 @@
 // bleu (cartes Impact et Défensive), l'or reste aux badges.
 
 import Link from "next/link";
+import { heureLisible } from "@/lib/sfl/revelation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ANTON } from "@/components/sfl/actus/ecran";
@@ -476,7 +477,7 @@ export function RubriquesMaCarte() {
                 <span style={{ ...NOMBRE, fontSize: 38 }} className="tabular-nums">
                   +{derniere.xp}
                 </span>
-                <span className="mono-label text-[9px] text-foreground/45">{derniere.phase === "en-jeu" ? "XP · verdict à minuit" : "XP"}</span>
+                <span className="mono-label text-[9px] text-foreground/45">{derniere.phase === "en-jeu" ? `XP · verdict à ${heureLisible(derniere.finDuJour)}` : "XP"}</span>
               </span>
               {derniere.juges > 0 && (
                 <span className="flex flex-col gap-1">

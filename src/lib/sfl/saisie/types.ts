@@ -81,6 +81,14 @@ export interface JourneeMeta {
   brouillon?: { depuis: string; par: string };
   /** Sa dernière publication (« En ligne · 18:42 »), gardée si on la remet en brouillon. */
   publiee?: { le: string; par: string };
+  /**
+   * La fin des matchs (ISO) : l'instant où la dernière feuille du jour a été
+   * remplie (02/11/2026, revelation.ts). Posé par la base
+   * (public.saison_fin_des_matchs), jamais déplacé ; l'app le propose, la
+   * base le garde s'il est à 5 min de son heure. Il fixe la fin du vote et
+   * la révélation des journées du nouveau régime (dès la J5 de la saison 1).
+   */
+  finDesMatchs?: string;
 }
 
 /**
@@ -191,6 +199,13 @@ export interface Saison {
   titresFaibles?: string[];
   /** Les terrains de la ligue, posés sur la Map. */
   terrains?: Terrain[];
+  /**
+   * Seulement sur une vue figée (revelation.ts, figer) : les journées jouées
+   * dont les points attendent la révélation, remises en feuille posée. Une
+   * saison qui porte ce champ ne s'écrit jamais (saisieStore.save, et
+   * public.feuille_saine en base).
+   */
+  figee?: { a: string; caches: number[] };
   /**
    * Les suspensions de carton rouge que l'admin a levées (01/11/2026,
    * lib/sfl/cartons.ts) : le joueur peut jouer la journée `j`. Les cartons

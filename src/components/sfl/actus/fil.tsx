@@ -16,7 +16,8 @@ import { VoteFigures } from "@/components/sfl/vote-figures";
 import { useIdentites } from "@/hooks/use-identites";
 import { useIsClient } from "@/hooks/use-is-client";
 import { buteursDe, type Actu } from "@/lib/sfl/actus";
-import { voteOuvert } from "@/lib/sfl/convocation-temps";
+import { voteOuvertA } from "@/lib/sfl/revelation";
+import { dernierBilan, nomDivision } from "@/lib/sfl/divisions";
 import { rankPlayers } from "@/lib/sfl/engine";
 import { isHidden } from "@/lib/sfl/hidden";
 import { MAILLOTS } from "@/lib/sfl/maillots";
@@ -422,8 +423,12 @@ export function PublicationActu({ a, saison, enCours, onClassements }: { a: Actu
 /** Ton dimanche : la première publication du fil, si tu as joué le dernier. */
 export function TonDimanche({ j, date }: { j: number; date: string }) {
   const { player, me } = useMyPlayer();
-  const { saison, evolution } = useSeason();
+  const { saison, evolution, divisions } = useSeason();
   const lignes = saison.entries.filter((e) => e.j === j && e.player === me);
+  // Révélée, la journée dit aussi ta division : « D3 → D2 ».
+  const bilan = dernierBilan(divisions);
+  const mouvement = bilan?.j === j ? bilan.parNom.get(me) : undefined;
+  const division = mouvement && mouvement.de !== mouvement.vers ? `${nomDivision(mouvement.de)} → ${nomDivision(mouvement.vers)}` : null;
   const joue = lignes.some((e) => e.statut === "Présent" && !e.extraTime);
   const delta = useMemo(() => {
     const avant = Math.max(0, ...saison.journees.map((m) => m.j).filter((x) => x < j && journeeJouee(saison, x)));
@@ -445,7 +450,7 @@ export function TonDimanche({ j, date }: { j: number; date: string }) {
       ratio={9 / 16}
       media={<CineToi p={player} j={j} buts={buts} passes={passes} pp={pp} delta={delta} reel />}
       titre="Ton dimanche"
-      texte={[buts > 0 && `${buts} ${pl(buts, "but", "buts")}`, passes > 0 && `${passes} ${pl(passes, "passe", "passes")}`, `+${pp} pts`, delta > 0 ? `▲ ${delta} au Pépite d'Or` : delta < 0 ? `▼ ${-delta} au Pépite d'Or` : null].filter(Boolean).join(" · ")}
+      texte={[buts > 0 && `${buts} ${pl(buts, "but", "buts")}`, passes > 0 && `${passes} ${pl(passes, "passe", "passes")}`, `+${pp} pts`, delta > 0 ? `▲ ${delta} au Pépite d'Or` : delta < 0 ? `▼ ${-delta} au Pépite d'Or` : null, division].filter(Boolean).join(" · ")}
       partage={{ titre: "Mon dimanche", j, lignes: [{ n: me, v: `${buts} buts · ${passes} passes · +${pp} pts` }] }}
     />
   );
@@ -455,15 +460,16 @@ export function TonDimanche({ j, date }: { j: number; date: string }) {
 
 export function VoteDuJour({ me }: { me: string }) {
   const isClient = useIsClient();
-  const { journees } = useSeason();
-  // Se relit chaque minute : à minuit, la section disparaît d'elle-même.
+  // Le direct : la feuille remplie ouvre le vote bien avant la révélation.
+  const { journeesDirect: journees, saisonLue } = useSeason();
+  // Se relit chaque minute : à la fin du vote, la section disparaît d'elle-même.
   const [maintenant, setMaintenant] = useState(() => new Date());
   useEffect(() => {
     const id = window.setInterval(() => setMaintenant(new Date()), 60_000);
     return () => window.clearInterval(id);
   }, []);
   if (!isClient) return null;
-  const ouvertes = journees.filter((j) => journeeAvecVote(j) && voteOuvert(j.date, maintenant));
+  const ouvertes = journees.filter((j) => journeeAvecVote(j) && voteOuvertA(saisonLue, j.j, maintenant));
   return (
     <>
       {ouvertes.map((j) => (

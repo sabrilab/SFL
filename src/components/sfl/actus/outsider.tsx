@@ -20,8 +20,9 @@
 //   · le chapitre d'avant, son verdict au tampon : tenu, tombé, accompli ;
 //   · les autres rangs B de la D1, en petites cartes.
 // Le dimanche se joue : le tampon de la D1 se pose dès que la feuille le
-// donne. À minuit, le chapitre se ferme (le rang A se juge avec l'XP des
-// missions, comptée à minuit) et le suivant s'ouvre sur l'outsider du
+// donne. À la révélation (19 h ; minuit jusqu'à la J4), le chapitre se ferme
+// (le rang A se juge avec l'XP des missions, comptée à la révélation) et le
+// suivant s'ouvre sur l'outsider du
 // dimanche d'après : le même tant qu'il tient, rang B et en D1.
 // La veille, la notification « J4 · La journée de Miken »
 // (/api/outsider/annoncer) ouvre la rubrique : /profil/xp?vue=autres#outsider.
@@ -31,6 +32,7 @@
 // (mode-passe-autres.tsx), en une colonne (`colonne`).
 
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { heureLisible } from "@/lib/sfl/revelation";
 import { useRouter } from "next/navigation";
 import { MessageCircle } from "lucide-react";
 import { ciblesDe, contratsSignes } from "@/components/sfl/map/contrats-map";
@@ -61,7 +63,7 @@ const chapitreDe = (j: number) => j - REGLES_DIVISIONS.depuis + 1;
 /** Ce qu'il doit garder dimanche pour tenir la D1 : son avance sur la D2, ou ses 30 places tant que la D2 est vide. */
 const marge = (o: Outsider) => (o.avance != null ? `${pts(o.avance)} d'avance` : `Dans les ${REGLES_DIVISIONS.taille}`);
 
-/** Le dimanche de l'outsider : celui qui se joue, jusqu'à minuit ; sinon le prochain. */
+/** Le dimanche de l'outsider : celui qui se joue, jusqu'à la révélation ; sinon le prochain. */
 function dimancheDeLOutsider(lg: MissionsDeLaLigue | null, derniere: number): number {
   if (lg && lg.phase === "en-jeu" && lg.d.j >= REGLES_DIVISIONS.depuis && lg.d.j >= derniere) return lg.d.j;
   return derniere + 1;
@@ -76,7 +78,7 @@ function Moment({ lg, j }: { lg: MissionsDeLaLigue | null; j: number }) {
         <Pouls bat /> En jeu
       </span>
     );
-  return <span className="mono-label shrink-0 text-encre-3">Verdict à minuit</span>;
+  return <span className="mono-label shrink-0 text-encre-3">Verdict à {heureLisible(lg.d.finDuJour)}</span>;
 }
 
 /** Ce que dit un chapitre fermé, à la troisième personne ou à toi. */

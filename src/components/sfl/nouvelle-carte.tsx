@@ -16,9 +16,18 @@
 // l'ouverture ou au retour dans l'app (useMomentAnnonce), jamais dans
 // l'admin, et une carte déjà vue ne revient pas quand sa note bouge pendant
 // qu'on saisit le match : elle est reconnue à son titre et à sa date.
+//
+// La révélation du dimanche (02/11/2026, revelation.ts) : avant les cartes,
+// ta division passe de l'ancienne à la nouvelle, sur son métal — « Tu montes
+// en D2 », « Tu descends en D3 », « Tu restes en D1 ». Une fois par joueur,
+// par journée et par appareil ; seulement une journée comptée (votes
+// chargés), jamais dans l'admin.
 
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { PastilleDivision } from "@/components/sfl/metal-division";
+import { dernierBilan, phraseBilan, type Division, type EtatDivisions } from "@/lib/sfl/divisions";
+import { isHidden } from "@/lib/sfl/hidden";
 import { BoostCard, BOOST_LABELS } from "@/components/sfl/boost-card";
 import { Card3D } from "@/components/sfl/card-3d";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -41,18 +50,61 @@ const titreDate = (cle: string) => cle.split("|").slice(0, 2).join("|");
 
 const vuKey = (me: string) => `sfl-cartes-vues-${me}`;
 
+/** Le bilan des divisions d'une journée, vu sur cet appareil (sur le modèle de divisions-annonce.ts). */
+const bilanKey = (saison: number, j: number, me: string) => `sfl-bilan-divisions-s${saison}-j${j}-${me}`;
+function bilanVu(cle: string): boolean {
+  try {
+    return localStorage.getItem(cle) !== null;
+  } catch {
+    return true;
+  }
+}
+function noterBilanVu(cle: string) {
+  try {
+    localStorage.setItem(cle, String(Date.now()));
+  } catch {
+    /* stockage interdit : rien à retenir */
+  }
+}
+
+interface BilanAMontrer {
+  cle: string;
+  j: number;
+  de: Division;
+  vers: Division;
+  phrase: string;
+}
+
+/** Le bilan de la dernière journée comptée pour moi, s'il n'est pas encore vu ; null sinon. */
+function bilanAMontrer(etat: EtatDivisions | null, comptees: Set<number>, numero: number, me: string): BilanAMontrer | null {
+  if (!etat || isHidden(me)) return null;
+  const b = dernierBilan(etat);
+  if (!b || !comptees.has(b.j)) return null;
+  const m = b.parNom.get(me);
+  const phrase = phraseBilan(etat, b, me);
+  if (!m || !phrase) return null;
+  const cle = bilanKey(numero, b.j, me);
+  return bilanVu(cle) ? null : { cle, j: b.j, de: m.de, vers: m.vers, phrase };
+}
+
 export function NouvellesCartes() {
   const { me } = useMyPlayer();
-  const { boostCards } = useSeason();
+  const { boostCards, divisions, revelation, saison } = useSeason();
   const connecte = !!useSession();
+  const calme = useReducedMotion();
   const moment = useMomentAnnonce();
   const traite = useRef("");
   // Les cartes du moment, lues par l'effet sans le relancer : une saisie en
   // direct ne doit ni ouvrir la cérémonie, ni annuler celle qui s'apprête.
   const cartes = useRef(boostCards);
+  const ligue = useRef({ divisions, comptees: revelation.comptees, numero: saison.numero ?? 0 });
   useEffect(() => {
     cartes.current = boostCards;
-  }, [boostCards]);
+    ligue.current = { divisions, comptees: revelation.comptees, numero: saison.numero ?? 0 };
+  }, [boostCards, divisions, revelation.comptees, saison.numero]);
+  /** Le premier temps de la cérémonie : ta division, avant tes cartes. */
+  const [bilan, setBilan] = useState<BilanAMontrer | null>(null);
+  const [arrivee, setArrivee] = useState(false);
 
   const [queue, setQueue] = useState<BoostCardData[] | null>(null);
   const [index, setIndex] = useState(0);
@@ -65,37 +117,91 @@ export function NouvellesCartes() {
     const cle = `${moment}|${me}`;
     if (moment === 0 || cle === traite.current) return;
     traite.current = cle;
+    const division = bilanAMontrer(ligue.current.divisions, ligue.current.comptees, ligue.current.numero, me);
     const mine = cartes.current.filter((c) => c.player === me);
     const keys = mine.map(carteKey);
     const raw = localStorage.getItem(vuKey(me));
 
     // Première visite de ce joueur : tout l'historique est « vu », en silence.
+    let fresh: BoostCardData[] = [];
     if (raw === null) {
       localStorage.setItem(vuKey(me), JSON.stringify(keys));
-      return;
+    } else {
+      let seen: string[];
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        // Un stockage abîmé ne doit pas faire tomber l'écran : sans tableau,
+        // on repart d'une liste vide plutôt que de laisser `new Set` échouer.
+        seen = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        seen = [];
+      }
+      const seenSet = new Set(seen.map(titreDate));
+      fresh = mine.filter((c) => !seenSet.has(titreDate(carteKey(c))));
     }
-
-    let seen: string[];
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      // Un stockage abîmé ne doit pas faire tomber l'écran : sans tableau,
-      // on repart d'une liste vide plutôt que de laisser `new Set` échouer.
-      seen = Array.isArray(parsed) ? parsed : [];
-    } catch {
-      seen = [];
-    }
-    const seenSet = new Set(seen.map(titreDate));
-    const fresh = mine.filter((c) => !seenSet.has(titreDate(carteKey(c))));
-    if (fresh.length === 0) return;
+    if (fresh.length === 0 && !division) return;
 
     // Un temps de respiration après le splash d'ouverture, puis la cérémonie.
     const timer = setTimeout(() => {
-      setQueue(fresh);
+      setBilan(division);
+      setArrivee(false);
+      setQueue(fresh.length ? fresh : null);
       setIndex(0);
       setRevealed(false);
     }, 1400);
     return () => clearTimeout(timer);
   }, [connecte, me, moment]);
+
+  // La division arrive d'abord, sur son ancien métal, puis passe au nouveau.
+  useEffect(() => {
+    if (!bilan) return;
+    const id = window.setTimeout(() => setArrivee(true), calme ? 0 : 900);
+    return () => window.clearTimeout(id);
+  }, [bilan, calme]);
+
+  if (bilan) {
+    const fermer = () => {
+      noterBilanVu(bilan.cle);
+      setBilan(null);
+    };
+    const affichee = arrivee ? bilan.vers : bilan.de;
+    return (
+      <AnimatePresence>
+        <motion.div
+          key="bilan-divisions"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="dark fixed inset-0 z-[60] flex flex-col items-center justify-center overflow-hidden bg-black/92 px-6 text-foreground backdrop-blur-sm"
+        >
+          <button type="button" onClick={fermer} className="flex flex-col items-center gap-6" aria-label="Continuer">
+            <span className="rounded-full bg-white/10 px-4 py-1.5 text-[11px] font-black tracking-[0.3em] text-white uppercase">
+              Les divisions · J{bilan.j}
+            </span>
+            <AnimatePresence mode="wait">
+              <motion.span
+                key={affichee}
+                initial={calme ? false : { scale: 0.6, opacity: 0, rotateX: -70 }}
+                animate={{ scale: 1, opacity: 1, rotateX: 0 }}
+                exit={calme ? { opacity: 0 } : { scale: 0.8, opacity: 0, rotateX: 70 }}
+                transition={{ duration: calme ? 0 : 0.45, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <PastilleDivision x={affichee} className="h-[88px] min-w-[128px] rounded-[22px] px-5 text-[56px]" />
+              </motion.span>
+            </AnimatePresence>
+            <motion.span
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: arrivee ? 1 : 0, y: arrivee ? 0 : 8 }}
+              transition={{ duration: calme ? 0 : 0.35 }}
+              className="max-w-[300px] text-center text-[17px] font-bold text-white"
+            >
+              {bilan.phrase}.
+            </motion.span>
+          </button>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
 
   if (!queue || queue.length === 0) return null;
   const current = queue[index];

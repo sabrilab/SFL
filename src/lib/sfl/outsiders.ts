@@ -48,7 +48,7 @@ import {
   type Reponse,
 } from "./missions";
 import { computeJournees, deriveSeason, entryPP } from "./saisie/engine";
-import { journeeJouee, journeeTerminee } from "./saisie/mutations";
+import { journeeJouee } from "./saisie/mutations";
 import { numeroSaison, type Saison } from "./saisie/types";
 import { classables, standingsJusqua } from "./rangs";
 import { appliquerVotes, type VoteFigure } from "./votes";
@@ -213,8 +213,9 @@ export const TEXTE_NOTIFICATION: "recit" | "chiffres" = "recit";
 /** Le dimanche dont l'outsider s'annonce : celui d'après la dernière journée jouée, dans l'arc. */
 export function dimancheAAnnoncer(saison: Saison): number | null {
   if (numeroSaison(saison) !== REGLES_DIVISIONS.saison) return null;
-  // Après la dernière feuille FINIE : un but saisi en direct ne fait pas sauter au dimanche suivant.
-  const j = Math.max(0, ...saison.journees.map((m) => m.j).filter((x) => journeeTerminee(saison, x))) + 1;
+  // Après la dernière journée COMPTÉE de la vue figée (revelation.ts) : un
+  // but saisi en direct n'y entre qu'à la révélation, comme les divisions.
+  const j = Math.max(0, ...saison.journees.map((m) => m.j).filter((x) => journeeJouee(saison, x))) + 1;
   return j >= REGLES_DIVISIONS.depuis ? j : null;
 }
 

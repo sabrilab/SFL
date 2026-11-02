@@ -184,5 +184,74 @@ select pg_temp.vrai('T12 il est noté', (select cartons_vus = '{s1-j4-jaune}' fr
 select pg_temp.vrai('T12 pas chez un autre', pg_temp.ecrire_en('Théo', $$update public.profiles set cartons_vus = '{x}' where name = 'Badis'$$) = '0');
 select pg_temp.vrai('T12 ni ses autres colonnes', pg_temp.ecrire_en('Théo', $$update public.profiles set is_admin = true where id = auth.uid()$$) like 'refus%');
 
+-- ═══ Relecture adverse du 01/11 ═══
+-- 13 · Un compte en attente (inscription libre, pas encore accepté) ne lit
+-- pas la feuille par les refus des fonctions (sa lecture est aux membres).
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('d0000000-0000-0000-0000-000000000011', 'attente@test.local', '{"name":"Attente","username":"@attente"}');
+select pg_temp.vrai('T13 le compte attend', (select not valide from public.profiles where name = 'Attente' and id::text like 'd0000000-%'));
+select pg_temp.vrai('T13 prendre', pg_temp.en('Attente', $$public.prendre_feuille(4, 'Noirs 1', 'Blancs 1')$$) ? 'erreur');
+select pg_temp.vrai('T13 compter', (select r ? 'erreur' and not r ? 'feuille'
+  from (select pg_temp.en('Attente', $$public.compter_feuille(4, 'Noirs 1', 'Blancs 1', '[{"joueur":"Ilyes","quoi":"buts","d":1}]')$$) as r) x));
+select pg_temp.vrai('T13 passer', (select r ? 'erreur' and not r ? 'feuille'
+  from (select pg_temp.en('Attente', $$public.passer_feuille(4, 'Noirs 1', 'Blancs 1', 'Ilyes')$$) as r) x));
+select pg_temp.vrai('T13 sceller', (select r ? 'erreur' and not r ? 'feuille'
+  from (select pg_temp.en('Attente', $$public.sceller_feuille(4, 'Noirs 1', 'Blancs 1')$$) as r) x));
+
+-- 14 · La feuille rouverte (T11) puis libérée : ni un joueur d'un autre
+-- match, ni l'admin qui ne joue pas ne la prennent ; un joueur du match, oui.
+select pg_temp.vrai('T14 l''admin libère la feuille rouverte', (pg_temp.en('Ilyes', $$public.feuille_admin(4, 'Noirs 1', 'Blancs 1', 'liberer')$$) ->> 'ok') = 'true');
+select pg_temp.vrai('T14 un joueur d''un autre match', pg_temp.en('Kader', $$public.prendre_feuille(4, 'Noirs 1', 'Blancs 1')$$) ->> 'refus' = 'pas-ton-match');
+select pg_temp.vrai('T14 l''admin qui ne joue pas', pg_temp.en('Sabri', $$public.prendre_feuille(4, 'Noirs 1', 'Blancs 1')$$) ->> 'refus' = 'pas-ton-match');
+select pg_temp.vrai('T14 personne ne la tient', (select preneur is null from public.feuilles_direct where j = 4 and noirs = 'Noirs 1'));
+select pg_temp.vrai('T14 Badis, du match, la reprend', (pg_temp.en('Badis', $$public.prendre_feuille(4, 'Noirs 1', 'Blancs 1')$$) -> 'feuille' ->> 'preneur_nom') = 'Badis');
+
+-- 15 · L'admin sort Badis du match 1 (sa ligne passe aux Noirs 2) : il ne
+-- compte ni ne scelle plus la feuille qu'il tient ; il la passe à Théo.
+update public.saison s set data = jsonb_set(s.data, '{entries}', (
+  select jsonb_agg(case when e ->> 'j' = '4' and e ->> 'player' = 'Badis' then e || '{"team":"Noirs 2"}'::jsonb else e end order by i)
+    from jsonb_array_elements(s.data -> 'entries') with ordinality t(e, i))) where s.id = 1;
+select pg_temp.vrai('T15 Badis ne compte plus', pg_temp.en('Badis', $$public.compter_feuille(4, 'Noirs 1', 'Blancs 1', '[{"joueur":"Ilyes","quoi":"buts","d":1}]')$$) ->> 'refus' = 'pas-ton-match');
+select pg_temp.vrai('T15 ni ne scelle', pg_temp.en('Badis', $$public.sceller_feuille(4, 'Noirs 1', 'Blancs 1')$$) ->> 'refus' = 'pas-ton-match');
+select pg_temp.vrai('T15 il passe la main à Théo', (pg_temp.en('Badis', $$public.passer_feuille(4, 'Noirs 1', 'Blancs 1', 'Théo')$$) -> 'feuille' ->> 'preneur_nom') = 'Théo');
+
+-- 16 · La J4 remise en brouillon, Zinedine placé dans la composition qui se
+-- prépare : la feuille gèle, et rien n'y laisse deviner la composition.
+update public.saison s set data = jsonb_set(s.data, '{journees,1,brouillon}', '{"depuis":"x","par":"Ilyes"}')
+    || jsonb_build_object('entries', s.data -> 'entries'
+         || '[{"j":4,"player":"Zinedine","team":"Blancs 1","statut":"Présent","result":null,"buts":0,"passes":0,"retard":false}]'::jsonb)
+ where s.id = 1;
+select pg_temp.vrai('T16 compter Zinedine', pg_temp.en('Théo', $$public.compter_feuille(4, 'Noirs 1', 'Blancs 1', '[{"joueur":"Zinedine","quoi":"buts","d":1}]')$$) ->> 'refus' = 'brouillon');
+select pg_temp.vrai('T16 le même refus pour un inconnu', pg_temp.en('Théo', $$public.compter_feuille(4, 'Noirs 1', 'Blancs 1', '[{"joueur":"Personne","quoi":"buts","d":1}]')$$) ->> 'refus' = 'brouillon');
+select pg_temp.vrai('T16 passer', pg_temp.en('Théo', $$public.passer_feuille(4, 'Noirs 1', 'Blancs 1', 'Zinedine')$$) ->> 'refus' = 'brouillon');
+select pg_temp.vrai('T16 sceller', pg_temp.en('Théo', $$public.sceller_feuille(4, 'Noirs 1', 'Blancs 1')$$) ->> 'refus' = 'brouillon');
+select pg_temp.vrai('T16 l''admin ne la reprend pas', pg_temp.en('Ilyes', $$public.feuille_admin(4, 'Noirs 1', 'Blancs 1', 'reprendre')$$) ->> 'refus' = 'brouillon');
+select pg_temp.vrai('T16 ni ne rouvre le match 2', pg_temp.en('Ilyes', $$public.feuille_admin(4, 'Noirs 2', 'Blancs 2', 'rouvrir')$$) ->> 'refus' = 'brouillon');
+select pg_temp.vrai('T16 la ligue n''y lit pas Zinedine', (select position('Zinedine' in f::text) = 0 from public.feuilles_direct f where f.j = 4 and f.noirs = 'Noirs 1'));
+select pg_temp.vrai('T16 l''admin libère', (pg_temp.en('Ilyes', $$public.feuille_admin(4, 'Noirs 1', 'Blancs 1', 'liberer')$$) ->> 'ok') = 'true');
+select pg_temp.vrai('T16 personne ne la prend', pg_temp.en('Théo', $$public.prendre_feuille(4, 'Noirs 1', 'Blancs 1')$$) ->> 'refus' = 'brouillon');
+update public.saison s set data = (s.data #- '{journees,1,brouillon}') || jsonb_build_object('entries', (
+  select jsonb_agg(e order by i) from jsonb_array_elements(s.data -> 'entries') with ordinality t(e, i) where e ->> 'player' <> 'Zinedine')) where s.id = 1;
+
+-- 17 · Le journal garde ses 500 derniers gestes.
+select pg_temp.vrai('T17 Théo reprend la feuille', (pg_temp.en('Théo', $$public.prendre_feuille(4, 'Noirs 1', 'Blancs 1')$$) -> 'feuille' ->> 'preneur_nom') = 'Théo');
+update public.feuilles_direct set journal = (
+  select jsonb_agg(jsonb_build_object('le', now(), 'n', k, 'gestes', '[{"joueur":"Ilyes","quoi":"arrets","d":1}]'::jsonb) order by k)
+    from generate_series(1, 499) k) where j = 4 and noirs = 'Noirs 1';
+select pg_temp.vrai('T17 le 500e geste', (pg_temp.en('Théo', $$public.compter_feuille(4, 'Noirs 1', 'Blancs 1', '[{"joueur":"Ilyes","quoi":"passes","d":1}]')$$) ->> 'ok') = 'true');
+select pg_temp.vrai('T17 le 501e', (pg_temp.en('Théo', $$public.compter_feuille(4, 'Noirs 1', 'Blancs 1', '[{"joueur":"Ilyes","quoi":"passes","d":-1}]')$$) ->> 'ok') = 'true');
+select pg_temp.vrai('T17 500 gestes, le plus ancien sorti', (select jsonb_array_length(journal) = 500 and journal -> 0 ->> 'n' = '2'
+  and journal -> 499 -> 'gestes' -> 0 ->> 'd' = '-1' from public.feuilles_direct where j = 4 and noirs = 'Noirs 1'));
+
+-- 18 · Un geste sans joueur est refusé (il cassait la fonction).
+select pg_temp.vrai('T18 un geste sans joueur', pg_temp.en('Théo', $$public.compter_feuille(4, 'Noirs 1', 'Blancs 1', '[{"quoi":"buts","d":1}]')$$) ->> 'refus' = 'geste');
+
+-- 19 · L'admin ne crée pas de feuille pour deux camps qui ne jouent pas
+-- ensemble ; il compte la feuille qu'il a reprise, même sans jouer.
+select pg_temp.vrai('T19 deux camps inversés', pg_temp.en('Ilyes', $$public.feuille_admin(4, 'Blancs 1', 'Noirs 1', 'reprendre')$$) ->> 'refus' = 'match');
+select pg_temp.vrai('T19 rien de créé', not exists (select 1 from public.feuilles_direct where noirs = 'Blancs 1'));
+select pg_temp.vrai('T19 Sabri reprend', (pg_temp.en('Sabri', $$public.feuille_admin(4, 'Noirs 1', 'Blancs 1', 'reprendre')$$) -> 'feuille' ->> 'preneur_nom') = 'Sabri');
+select pg_temp.vrai('T19 et compte', (pg_temp.en('Sabri', $$public.compter_feuille(4, 'Noirs 1', 'Blancs 1', '[{"joueur":"Ilyes","quoi":"passes","d":1}]')$$) ->> 'ok') = 'true');
+
 select 'feuille-direct-check : tout est ok' as bilan;
 rollback;

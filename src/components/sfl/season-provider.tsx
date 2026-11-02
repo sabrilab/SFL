@@ -14,10 +14,11 @@ import { saisieStore, seedSaison } from "@/lib/sfl/saisie/store";
 import { sansBrouillons } from "@/lib/sfl/saisie/brouillon";
 import { startSaisonSync } from "@/lib/sfl/saisie/sync";
 import type { Saison } from "@/lib/sfl/saisie/types";
-import type { Player } from "@/lib/sfl/engine";
+import type { Journee, Player } from "@/lib/sfl/engine";
 import { isHidden, publicOnly } from "@/lib/sfl/hidden";
-import { appliquerVotes, titresFaibles } from "@/lib/sfl/votes";
-import { voteOuvert } from "@/lib/sfl/convocation-temps";
+import { appliquerVotes, titresFaibles, votesCharges } from "@/lib/sfl/votes";
+import { figer, journeesComptees, prochaineTransition, voteOuvertA } from "@/lib/sfl/revelation";
+import { etatDivisions, type EtatDivisions } from "@/lib/sfl/divisions";
 import { amorcerDemo, ARBITRES_EVENT, arbitresRevision } from "@/lib/sfl/arbitres";
 import { useSuiviVotes, useVotes } from "@/hooks/use-votes";
 import { useSession } from "@/hooks/use-session";
@@ -46,6 +47,11 @@ interface SeasonValue extends DerivedSeason {
    * Ma carte, les flèches ▲/▼, les divisions, les badges et les missions
    * comptaient d'autres points que le classement (Ilyes, 7e au lieu de 6e).
    * Ne jamais l'écrire : une écriture part de saisieStore.load().
+   *
+   * Depuis le 02/11/2026, elle est FIGÉE jusqu'à la révélation
+   * (revelation.ts, figer) : une journée du nouveau régime jouée en direct
+   * n'y compte qu'à 19 h (la fin du vote + 1 h). Le direct, c'est `saisonLue`
+   * et `journeesDirect`.
    */
   saison: Saison;
   /**
@@ -56,6 +62,16 @@ interface SeasonValue extends DerivedSeason {
    * saisieStore.load() (sinon elle effacerait le brouillon — integrite.ts, I8).
    */
   saisonLue: Saison;
+  /**
+   * Les journées du direct (computeJournees(saisonLue)) : la feuille en
+   * cours, le score « En direct », le vote. `journees`, lui, est celui de la
+   * vue figée.
+   */
+  journeesDirect: Journee[];
+  /** Les divisions de la vue figée : un seul découpage, tiré des mêmes points que `players`. */
+  divisions: EtatDivisions | null;
+  /** Les journées qui comptent, et la prochaine heure où la vue peut changer (fin du vote, révélation, minuit). */
+  revelation: { comptees: Set<number>; prochaine: Date | null };
   /** Même objet que `saison` (ancien nom, gardé pour les appelants). */
   saisonTitree?: Saison;
   /**
@@ -185,38 +201,75 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     // Ce que voit la ligue : jamais une journée en brouillon (brouillon.ts).
     return avecVitrine(sansBrouillons(isClient ? saisieStore.load() : seedSaison()), vitrine);
   }, [isClient, version, vitrine]);
-  // Les votes Impact / Défensive : leurs élus sont posés sur les lignes une
-  // fois le vote fermé (minuit, heure de Paris). L'horloge avance toutes les
-  // cinq minutes pour que la fermeture se voie sans recharger.
+  // Les votes Impact / Défensive : leurs élus sont posés sur les lignes à la
+  // révélation (revelation.ts : 19 h dès la J5, minuit jusqu'à la J4).
   useSuiviVotes(saison.numero ?? 0);
   const votes = useVotes();
+  // Les votes doivent être là avant la révélation : sans eux, la journée
+  // serait coupée sans ses titres, puis recoupée une seconde plus tard.
+  const votesPrets = !session?.server || votesCharges();
+  // L'horloge : un minuteur réglé sur la prochaine fin de vote, révélation ou
+  // minuit (borné entre 1 s et 5 min), et un recalcul au retour au premier
+  // plan. 19 h se voit à 19 h, pas à 19 h 04.
   const [horloge, setHorloge] = useState(0);
   useEffect(() => {
-    const id = window.setInterval(() => setHorloge((h) => h + 1), 5 * 60 * 1000);
-    return () => window.clearInterval(id);
-  }, []);
-  // Ce que l'horloge change vraiment : quelles journées ont leur vote ouvert
-  // (appliquerVotes et titresFaibles ne lisent l'heure que par voteOuvert).
-  // Sans cette clé, chaque tic de cinq minutes refaisait une saison neuve, et
-  // avec elle tout ce que les écrans rangent à partir d'elle (courbes, rangs,
-  // divisions) — depuis que `saison` est la saison des votes (27/10).
-  const votesOuverts = useMemo(() => {
+    let id = 0;
+    const armer = () => {
+      window.clearTimeout(id);
+      const maintenant = Date.now();
+      const prochaine = prochaineTransition(saison, new Date(maintenant));
+      const attente = prochaine ? prochaine.getTime() - maintenant + 250 : 5 * 60_000;
+      id = window.setTimeout(() => {
+        setHorloge((h) => h + 1);
+        armer();
+      }, Math.min(5 * 60_000, Math.max(1000, attente)));
+    };
+    const auPremierPlan = () => {
+      if (document.visibilityState === "visible") {
+        setHorloge((h) => h + 1);
+        armer();
+      }
+    };
+    armer();
+    document.addEventListener("visibilitychange", auPremierPlan);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener("visibilitychange", auPremierPlan);
+    };
+  }, [saison]);
+  // Ce que l'horloge change vraiment : quelles journées comptent, et
+  // lesquelles ont leur vote ouvert (appliquerVotes, titresFaibles et figer
+  // ne lisent l'heure que par là). Sans cette clé, chaque tic refaisait une
+  // saison neuve, et avec elle tout ce que les écrans rangent à partir d'elle
+  // (courbes, rangs, divisions).
+  const etatDesJournees = useMemo(() => {
     void horloge;
     const maintenant = new Date();
-    return saison.journees
-      .filter((m) => voteOuvert(m.date, maintenant))
+    const comptees = [...journeesComptees(saison, maintenant, { votesPrets })].sort((a, b) => a - b).join(",");
+    const ouverts = saison.journees
+      .filter((m) => voteOuvertA(saison, m.j, maintenant))
       .map((m) => m.j)
       .join(",");
-  }, [saison, horloge]);
+    return `${comptees}|${ouverts}`;
+  }, [saison, horloge, votesPrets]);
   const derived = useMemo(() => {
-    void votesOuverts;
+    void etatDesJournees;
     const brut = deriveSeason(saison);
     const maintenant = new Date();
     const vote = appliquerVotes(saison, brut.journees, votes, maintenant);
     // Un titre élu à une seule voix ne fait pas monter la note (saisie/evolution.ts).
+    // Il ne porte que sur les journées comptées (titresTombes, comme les élus).
     const faibles = titresFaibles(saison, brut.journees, votes, maintenant);
-    return { ...(vote === saison && !faibles.size ? brut : deriveSeason(vote, faibles)), saisonTitree: vote, faibles };
-  }, [saison, votes, votesOuverts]);
+    // La vue figée : ce que la ligue voit jusqu'à la révélation (revelation.ts).
+    const vue = figer(vote, maintenant, { votesPrets });
+    return {
+      ...(vue === saison && !faibles.size ? brut : deriveSeason(vue, faibles)),
+      saisonTitree: vue,
+      faibles,
+      journeesDirect: brut.journees,
+      revelation: { comptees: journeesComptees(saison, maintenant, { votesPrets }), prochaine: prochaineTransition(saison, maintenant) },
+    };
+  }, [saison, votes, etatDesJournees, votesPrets]);
   const nom = useMemo(() => nomBola(session, derived.players), [session, derived.players]);
   const poste = usePosteBola(nom);
   // Mes matchs Bola validés font ma carte (carte-bola.ts) : elle part de 75
@@ -249,6 +302,8 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     const faibles = cleFaibles ? cleFaibles.split("|") : [];
     return { ...titree, ...(faibles.length ? { titresFaibles: faibles } : {}) };
   }, [titree, cleFaibles, arbitres]);
+  // Un seul découpage par vue : points et divisions viennent du même objet.
+  const divisions = useMemo(() => etatDivisions(vue), [vue]);
   useEffect(
     () => amorcerDemo(saison.numero ?? 0, derived.journees, new Set(saison.entries.filter((e) => e.result).map((e) => e.j))),
     [saison.numero, saison.entries, derived.journees]
@@ -257,7 +312,7 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   // aucun classement, aucune recherche, aucun duel ne peut les faire remonter.
   const value = useMemo<SeasonValue>(() => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { saisonTitree, faibles, ...derives } = derived;
+    const { saisonTitree, faibles, journeesDirect, revelation, ...derives } = derived;
     return {
       ...derives,
       players: publicOnly(derives.players),
@@ -270,10 +325,13 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
       saison: vue,
       saisonTitree: vue,
       saisonLue: saison,
+      journeesDirect,
+      divisions,
+      revelation,
       arbitres,
       vitrine,
     };
-  }, [derived, bola, bolaCarte, vue, saison, arbitres, vitrine]);
+  }, [derived, bola, bolaCarte, vue, saison, arbitres, vitrine, divisions]);
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
 }
@@ -303,6 +361,7 @@ export function useSaisonClose(): boolean {
  */
 export function SaisonArchiveProvider({ saison, children }: { saison: Saison; children: React.ReactNode }) {
   const value = useMemo<SeasonValue>(() => {
+    // Une saison close compte toutes ses journées : rien n'y est figé.
     const derived = deriveSeason(saison);
     return {
       ...derived,
@@ -313,6 +372,9 @@ export function SaisonArchiveProvider({ saison, children }: { saison: Saison; ch
       bolaCarte: null,
       saison,
       saisonLue: saison,
+      journeesDirect: derived.journees,
+      divisions: etatDivisions(saison),
+      revelation: { comptees: new Set(saison.journees.map((m) => m.j)), prochaine: null },
     };
   }, [saison]);
   return (

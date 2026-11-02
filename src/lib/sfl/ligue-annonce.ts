@@ -5,7 +5,9 @@
 // joueur. L'app de chacun la sonne à l'ouverture, comme l'annonce des
 // divisions : au plus toutes les 20 minutes par téléphone, et plus du tout
 // pendant une heure quand le serveur répond que tout le monde est prévenu
-// (une feuille remplie peut arriver à tout moment du dimanche).
+// (une feuille remplie peut arriver à tout moment du dimanche). Quand une
+// révélation est attendue (revelation.ts), le serveur dit `apres` : le
+// téléphone se tait jusque-là et rappelle à l'heure dite.
 
 import { supabase } from "@/lib/supabase";
 
@@ -38,8 +40,10 @@ export async function annoncerLigue(): Promise<void> {
       headers: { Authorization: `Bearer ${jeton}` },
       keepalive: true,
     });
-    const corps = (await r.json().catch(() => ({}))) as { fini?: boolean };
-    if (corps.fini) noter(REPOS);
+    const corps = (await r.json().catch(() => ({}))) as { fini?: boolean; apres?: string };
+    const apres = corps.apres ? Date.parse(corps.apres) : NaN;
+    if (!Number.isNaN(apres) && apres > Date.now()) noter(apres - Date.now() + 30_000);
+    else if (corps.fini) noter(REPOS);
   } catch {
     /* une annonce perdue ne bloque rien : le prochain téléphone sonnera */
   }

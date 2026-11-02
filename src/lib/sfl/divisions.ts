@@ -11,8 +11,9 @@
 //     en D3. À égalité de points, même division : les ex æquo de la 30e
 //     place entrent tous en D1. Qui n'a pas encore joué de la saison entre
 //     en D3, la division ouverte ;
-//   · dès la J4, chaque dimanche joué refait les divisions de la même façon,
-//     sur le Pépite d'Or de la saison à ce soir-là. Pas de plage ni de seuil
+//   · dès la J4, chaque dimanche refait les divisions de la même façon, sur
+//     le Pépite d'Or de la saison à ce soir-là — à la révélation du dimanche
+//     dès la J5 (revelation.ts : points et divisions ensemble, à 19 h). Pas de plage ni de seuil
 //     (Sabri, 24/10 : « il n'y a pas réellement de règle de montée ou de
 //     descente, si ce n'est le nombre de points pépites à la fin des
 //     matchs ») : tes points du dimanche et ceux de tes voisins au classement
@@ -21,7 +22,10 @@
 //     passer.
 //
 // Rien n'est stocké : tout se relit dans les feuilles de la saison, comme les
-// classements, si bien qu'une feuille corrigée corrige les divisions. Le
+// classements, si bien qu'une feuille corrigée corrige les divisions. La
+// saison à donner est la vue figée (useSeason().divisions, lue.divisions) :
+// le découpage coupe sur les journées qu'elle compte, celles-là mêmes qui
+// font ses points — un joueur de D2 n'a jamais plus de points qu'un D1. Le
 // réglage est ici et nulle part ailleurs.
 //
 // L'annonce, jusqu'au soir de la J3 (bas du fichier) : quand elle court, son
@@ -36,11 +40,11 @@
 
 import { rankPlayers, type RankedPlayer } from "./engine";
 import { isHidden } from "./hidden";
-import { jourMoisDuLibelle, voteOuvert } from "./convocation-temps";
+import { estLeJour, jourMoisDuLibelle } from "./convocation-temps";
 import { heureMin } from "./ligue-vierge";
 import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { computeJournees, entryPP } from "./saisie/engine";
-import { journeeJouee, journeeTerminee } from "./saisie/mutations";
+import { journeeJouee } from "./saisie/mutations";
 import { numeroSaison, type Saison } from "./saisie/types";
 import { classables, standingsJusqua } from "./rangs";
 
@@ -152,28 +156,36 @@ export interface EtatDivisions {
   decoupage: Decoupage;
   /** Les dimanches joués en divisions, dans l'ordre, avec qui monte et qui descend. */
   journees: { j: number; mouvements: Mouvement[] }[];
+  /** La journée que ces divisions font jouer : la dernière comptée + 1. */
+  pour: number;
+  /** Posé par divisionsDeLaJournee pour une journée plus loin que `pour` : la précédente n'est pas encore révélée. */
+  perimee?: true;
 }
 
 /** La saison des divisions ; null pour une saison qui n'en a pas (la saison 0). */
 export function etatDivisions(saison: Saison): EtatDivisions | null {
   if (numeroSaison(saison) !== REGLES_DIVISIONS.saison) return null;
-  // Le découpage suit les feuilles FINIES (journeeTerminee) : le premier but
-  // saisi en direct ne fait changer personne de division en plein match.
-  if (!journeeTerminee(saison, J_DECOUPAGE)) {
+  // Le découpage coupe sur les journées que compte la vue (journeeJouee sur
+  // la vue figée, revelation.ts) : celles qui font ses points. Le premier
+  // but saisi en direct n'y entre qu'à la révélation, et une journée révélée
+  // puis rouverte reste d'accord avec les points.
+  const comptees = [...new Set(saison.journees.map((m) => m.j))].filter((j) => journeeJouee(saison, j)).sort((a, b) => a - b);
+  const pour = (comptees.at(-1) ?? 0) + 1;
+  if (!journeeJouee(saison, J_DECOUPAGE)) {
     const decoupage = decouper(saison);
     return {
       phase: "annonce",
       actuelle: new Map([...decoupage.parNom].map(([n, p]) => [n, p.division])),
       decoupage,
       journees: [],
+      pour,
     };
   }
-  // Chaque dimanche joué recoupe le Pépite d'Or : le dernier fait les divisions du suivant.
-  const terminees = [...new Set(saison.journees.map((m) => m.j))].filter((j) => journeeTerminee(saison, j)).sort((a, b) => a - b);
-  const decoupage = decouper(saison, terminees.at(-1));
+  // Chaque dimanche compté recoupe le Pépite d'Or : le dernier fait les divisions du suivant.
+  const decoupage = decouper(saison, comptees.at(-1));
   const actuelle = new Map<string, Division>([...decoupage.parNom].map(([n, p]) => [n, p.division]));
   const journees: EtatDivisions["journees"] = [];
-  const jouees = terminees.filter((j) => j >= REGLES_DIVISIONS.depuis);
+  const jouees = comptees.filter((j) => j >= REGLES_DIVISIONS.depuis);
   let avant = jouees.length ? decouper(saison, jouees[0] - 1) : decoupage;
   for (const j of jouees) {
     const apres = decouper(saison, j);
@@ -197,7 +209,7 @@ export function etatDivisions(saison: Saison): EtatDivisions | null {
     journees.push({ j, mouvements });
     avant = apres;
   }
-  return { phase: "divisions", actuelle, decoupage, journees };
+  return { phase: "divisions", actuelle, decoupage, journees, pour };
 }
 
 /** La division d'un joueur pour le prochain dimanche (D3 pour qui n'a jamais joué). */
@@ -310,7 +322,7 @@ export type EditionAnnonce = "avant" | "jour";
 export function editionAnnonce(saison: Saison, maintenant: Date): EditionAnnonce | null {
   if (!annonceEnCours(saison, maintenant)) return null;
   const j3 = saison.journees.find((m) => m.j === J_DECOUPAGE);
-  return j3 && voteOuvert(j3.date, maintenant) ? "jour" : "avant";
+  return j3 && estLeJour(j3.date, maintenant) ? "jour" : "avant";
 }
 
 /** La ligue est coupée, la J4 pas encore jouée : les divisions de la J4 s'affichent. */

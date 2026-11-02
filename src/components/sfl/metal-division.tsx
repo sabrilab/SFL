@@ -8,13 +8,15 @@
 // (classements.tsx) les montrent aussi, avec les mêmes métaux et les mêmes
 // places : chaque division compte depuis 1.
 //
-// Le découpage est celui de la rubrique, celui du moteur (etatDivisions) :
-// la projection de ce soir avant la J3 jouée, puis les divisions du prochain
-// dimanche. Une saison sans divisions (la saison 0) n'en montre pas.
+// Le découpage est celui de la rubrique, celui du moteur (etatDivisions) sur
+// la vue figée du SeasonProvider (useSeason().divisions) : la projection de
+// ce soir avant la J3 jouée, puis les divisions du prochain dimanche, qui ne
+// bougent qu'à la révélation (revelation.ts). Une saison sans divisions (la
+// saison 0) n'en montre pas.
 
 import { useMemo } from "react";
 import { useSeason } from "@/components/sfl/season-provider";
-import { etatDivisions, nomDivision, type Decoupage, type Division } from "@/lib/sfl/divisions";
+import { nomDivision, type Decoupage, type Division } from "@/lib/sfl/divisions";
 import { cn } from "@/lib/utils";
 
 const ANTON = "var(--font-anton), Anton, sans-serif";
@@ -77,11 +79,11 @@ export function PlaceMetal({ x, rang, className }: { x: Division; rang: number; 
 
 /** Le découpage en divisions du classement Pépite d'Or de la saison lue ; null sans divisions. */
 export function useDecoupageClassement(): Decoupage | null {
-  const { saison } = useSeason();
+  const { divisions } = useSeason();
   return useMemo(() => {
-    const d = etatDivisions(saison)?.decoupage;
+    const d = divisions?.decoupage;
     return d && d.classes > 0 ? d : null;
-  }, [saison]);
+  }, [divisions]);
 }
 
 /**

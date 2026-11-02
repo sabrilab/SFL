@@ -108,6 +108,7 @@ import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
 import { usePresence } from "@/hooks/use-presence";
 import { joueursDeLaFeuille } from "@/lib/sfl/presence-feuille";
 import { annonceEnCours, J_DECOUPAGE, nomDivision, REGLES_DIVISIONS } from "@/lib/sfl/divisions";
+import { divisionsDeLaJournee } from "@/lib/sfl/equipes-division";
 import { useDivision } from "@/hooks/use-division";
 import { useSession } from "@/hooks/use-session";
 import { saisieStore } from "@/lib/sfl/saisie/store";
@@ -117,7 +118,6 @@ import {
   definirTerrainParDefaut,
   deplacerTerrain,
   journeeJouee,
-  journeeTerminee,
   placerJourneeSurNouveauTerrain,
   placerMatchDuJourSurNouveauLieu,
   reglerMatchDuJour,
@@ -144,7 +144,8 @@ import { CollectionPile } from "@/components/sfl/map/collection-pile";
 import { ciblesDuDimanche, contratsSignes, foyerDesCibles, villesDesCibles } from "@/components/sfl/map/contrats-map";
 import { ContratsSur } from "@/components/sfl/map/contrats-sur";
 import { cleVille, type ContratPlan, type VillePlan } from "@/components/sfl/map/joueurs";
-import { useMissionsDeLaLigue } from "@/hooks/use-missions";
+import { useMaintenant, useMissionsDeLaLigue } from "@/hooks/use-missions";
+import { finDuVote, libelleFinDuVote, libelleRevelation } from "@/lib/sfl/revelation";
 import { TOUTES_AMBIANCES, type Ambiance } from "@/components/sfl/map/ambiances";
 import { calculerZones, dansContour, numeroZone, type Foyer, type VilleZone, type Zone } from "@/lib/sfl/zones";
 import { maVille, villeOuLigue } from "@/lib/sfl/villes";
@@ -440,7 +441,10 @@ function etatDe(dedans: boolean, manque: number): { etat: EtatSticker; texte: st
 
 export default function MapPage() {
   // La Map écrit la saison (terrains, horaires) : elle part du document stocké.
-  const { saisonLue: saison, journees, players } = useSeason();
+  // Le direct (la feuille du jour, son score) : saisonLue et journeesDirect ;
+  // le classement et les divisions : la vue figée (revelation.ts).
+  const { saisonLue: saison, saison: vueFigee, divisions, journeesDirect: journees, players, revelation } = useSeason();
+  const instant = useMaintenant();
   const session = useSession();
   const admin = !!session?.admin;
   const p = usePresence();
@@ -456,10 +460,11 @@ export default function MapPage() {
   // dès la J4, la fiche d'un dimanche à venir dit ta division.
   const sansDivisions = !!aujourdhui && annonceEnCours(saison, new Date(`${aujourdhui}T12:00:00Z`));
   const maDivision = useDivision(me);
+  // Une seule vue pour les divisions : la vue figée (revelation.ts), celle des points affichés.
   const surtitreDeLigue = (j: number | null | undefined) =>
     j === J_DECOUPAGE && sansDivisions
       ? "Dernier dimanche sans divisions"
-      : j != null && j >= REGLES_DIVISIONS.depuis && maDivision && !journeeTerminee(saison, j)
+      : j != null && j >= REGLES_DIVISIONS.depuis && maDivision && divisionsDeLaJournee(vueFigee, j, divisions)
         ? `Tu joues en ${nomDivision(maDivision)}`
         : null; // le sigle SFL dit déjà la ligue : plus de « Sunday Five League »
 
@@ -1334,15 +1339,20 @@ export default function MapPage() {
     if (!choisi || choisi.ligue !== "sfl") return [];
     const joue = !!choisi.joue;
     const convocation = joue || !!choisi.convoquee || choisi.cle === "convocation" || choisi.presents.length > 0;
-    const votesClos = joue && (ecartJours(choisi.dateLabel, aujourdhui) ?? 0) < 0;
+    // La fin du vote et la révélation, à leur heure réelle (revelation.ts) : 18 h et 19 h, minuit jusqu'à la J4.
+    const meta = choisi.j != null ? saison.journees.find((m) => m.j === choisi.j) : undefined;
+    const fin = meta ? finDuVote(meta, saison.numero ?? 0, instant) : null;
+    const votesClos = joue && (fin ? instant.getTime() >= fin.getTime() : (ecartJours(choisi.dateLabel, aujourdhui) ?? 0) < 0);
+    const j = choisi.j;
     return [
       { nom: "Convocation", sous: convocation && !joue && p.presents.length ? `${p.presents.length} je viens` : "le lundi", faite: convocation },
       { nom: "Les équipes", sous: "vendredi 19 h", faite: joue || feuille.length > 0 },
       { nom: "Coup d'envoi", sous: choisi.heure, faite: joue || enDirect },
       { nom: "Feuille de match", sous: "buts, passes, MVP", faite: joue },
-      { nom: "Les votes", sous: "jusqu'à minuit", faite: votesClos },
+      { nom: "Les votes", sous: j != null ? `jusqu'à ${libelleFinDuVote(saison, j, instant)}` : "jusqu'à minuit", faite: votesClos },
+      ...(j != null && divisions ? [{ nom: "Les divisions", sous: libelleRevelation(saison, j, instant), faite: revelation.comptees.has(j) }] : []),
     ];
-  }, [choisi, aujourdhui, feuille.length, p.presents.length, enDirect]);
+  }, [choisi, aujourdhui, feuille.length, p.presents.length, enDirect, saison, instant, divisions, revelation.comptees]);
   // Le tableau de bord du match (31/10) : le grand chiffre, puis la journée en étapes.
   // Avec une feuille, il passe entre les terrains et Le Flair (Sabri, 31/10 : « met-la avant le Flair »).
   const tableauDeBord = choisi && (!choisi.joue || etapesDuChoisi.length > 0) ? (
