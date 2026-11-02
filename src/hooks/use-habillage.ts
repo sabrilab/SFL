@@ -29,6 +29,7 @@ import {
 import { finitionsOffertes } from "@/lib/sfl/finitions-offertes";
 import { finitionsRecrues } from "@/components/sfl/skins-recrues";
 import type { Rang } from "@/lib/sfl/missions";
+import { maintenantMs } from "@/lib/sfl/horloge";
 import { debloquesDe, type PaliersAtteints } from "@/lib/sfl/passe";
 import { saisonsPasseOuvertes } from "@/lib/sfl/saisons-passe";
 
@@ -122,10 +123,12 @@ export function finitionsDe(
   recrues = 0,
   fondateur: number | null = null,
   afrique: readonly (readonly [string, number])[] = AUCUNE_NATION,
-  maintenant: Date = new Date()
+  maintenant: Date = new Date(maintenantMs())
 ): Finition[] {
   // Les saisons du Passe commencées seulement : un palier d'une saison à venir
-  // (Givre avant le 9/11), d'où qu'il vienne, n'habille aucune carte.
+  // (Givre avant le 9/11), d'où qu'il vienne, n'habille aucune carte. À
+  // l'heure du serveur (horloge.ts), comme les paliers eux-mêmes (use-missions.ts) :
+  // un téléphone qui retarde ne cache pas Givre, un téléphone qui avance ne l'ouvre pas.
   const passe = debloquesDe(paliers, saisonsPasseOuvertes(maintenant)).finitions.filter((f): f is Finition => f in MATIERES);
   const nations = afrique.map(([n]) => `afrique-${n}`).filter((f): f is Finition => f in MATIERES);
   const autres = [...finitionsOffertes(nom), ...finitionsRecrues(recrues, fondateur), ...nations];
@@ -142,7 +145,7 @@ export function useHabillage(nom: string): HabillageCarte {
     const paliers = x?.paliers ?? AUCUN;
     const fondateur = x?.fondateur ?? null;
     const afrique = x?.afrique ?? AUCUNE_NATION;
-    const maintenant = new Date();
+    const maintenant = new Date(maintenantMs());
     const finitions = finitionsDe(nom, paliers, x?.recrues ?? 0, fondateur, afrique, maintenant);
     // « Tes couleurs » se porte avec son pays.
     const voulue = choix.finition === "couleurs" && !choix.pays ? "-" : choix.finition;

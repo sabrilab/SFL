@@ -46,6 +46,7 @@ import { useSoldeXpS } from "@/hooks/use-achats-xp";
 import { MontantXpS, PastilleS } from "@/components/sfl/xp-s";
 import { annonceXpS, type VuXpS } from "@/lib/sfl/xp-s";
 import { haptique } from "@/lib/sfl/haptique";
+import { maintenantMs } from "@/lib/sfl/horloge";
 import { ceremonieOuverte, useCeremonieOuverte } from "@/hooks/use-ceremonie";
 import type { BilanXp } from "@/lib/sfl/missions";
 import { palierAAnnoncer } from "@/lib/sfl/xp-acquis";
@@ -602,7 +603,7 @@ function useAnnonces(b: BilanXp | null, s: XpSAffichees | null, nom: string) {
           brut = localStorage.getItem(CLE_XPS_VU);
           vu = JSON.parse(brut ?? "null") as VuXpS | null;
         } catch {}
-        const r = annonceXpS(nom, lignes, vu, new Date());
+        const r = annonceXpS(nom, lignes, vu, new Date(maintenantMs()));
         annonce = r.annonce;
         const garde = JSON.stringify(r.vu);
         if (garde !== brut)

@@ -657,7 +657,7 @@ void (async () => {
     assert.match(tuile, /useSoldeXpS\(player\.name\)/, "Ma carte : les XP S qui restent");
     assert.match(tuile, /<MontantXpS n=\{soldeS\} \/>/, "« 1 630 XP · ▣S 59 »");
     assert.ok(!/à dépenser/.test(tuile.replace(/\/\/.*$|\{\/\*[\s\S]*?\*\/\}/gm, "")), "plus de « à dépenser » en XP normales");
-    assert.match(tuile, /annonceXpS\(nom, lignes, vu, new Date\(\)\)/, "l'annonce à la révélation");
+    assert.match(tuile, /annonceXpS\(nom, lignes, vu, new Date\(maintenantMs\(\)\)\)/, "l'annonce à la révélation, ses 48 h à l'heure du serveur");
     assert.match(tuile, /const lignes = s\?\.complet \? s\.lignes : null;/, "seulement sur un calcul complet");
     assert.match(tuile, /\{p && <span>\{`Passe Bola · Palier \$\{n\} · \$\{p\.nom\}`\}<\/span>\}/, "le palier sur sa propre ligne, avec « Passe Bola »");
     assert.match(tuile, /if \(ceremonie\) return;[\s\S]*if \(ceremonieOuverte\(\)\) return;/, "rien par-dessus une cérémonie ouverte (Nouvelle carte)");

@@ -104,8 +104,10 @@ const ecrans = [
   "../src/components/sfl/compteur-xp.tsx",
   "../src/lib/sfl/xp-s.ts",
   "../src/components/sfl/xp-s.tsx",
-  // Ses seuls fichiers .ts et .tsx : un sous-dossier (afrique/totems/, à venir) ne se lit pas comme un fichier.
-  ...readdirSync(new URL("../src/components/sfl/afrique/", import.meta.url))
+  // Tous ses fichiers .ts et .tsx, sous-dossiers compris : afrique/totems/ (à venir) se contrôle
+  // comme le reste. Un dossier ne se lit pas comme un fichier, et il ne doit pas non plus rendre
+  // le contrôle aveugle à ce qu'il contient.
+  ...readdirSync(new URL("../src/components/sfl/afrique/", import.meta.url), { recursive: true, encoding: "utf8" })
     .filter((x) => /\.tsx?$/.test(x))
     .map((x) => `../src/components/sfl/afrique/${x}`),
 ];

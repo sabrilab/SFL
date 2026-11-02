@@ -7,7 +7,10 @@
 //   3. une ligne d'XP sans date ne change pas de saison entre le 1/11 et le 10/11 ;
 //   4. le jour ISO d'une ligne ne dépend pas de l'heure du calcul ;
 //   5. rien n'ouvre Givre avant le 9/11 (relecture du 02/11) : ni une ligne
-//      datée d'avance, ni le serveur, ni un palier gardé par erreur.
+//      datée d'avance, ni le serveur, ni un palier gardé par erreur ;
+//   6. à l'heure du serveur (horloge.ts, mise en ligne du 02/11) : la carte et
+//      Personnaliser ouvrent Givre à minuit à Paris pour tout le monde, que le
+//      téléphone retarde ou qu'il avance.
 //   npx tsx tools/givre-check.ts
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -16,6 +19,7 @@ import { ecrireChoixHabillage, lireChoixHabillage } from "../src/lib/sfl/habilla
 import type { LigneXp } from "../src/lib/sfl/missions";
 import { bilanDe, paliersDe } from "../src/lib/sfl/missions";
 import { finitionsDe } from "../src/hooks/use-habillage";
+import { decalageHorloge, noterHeureServeur } from "../src/lib/sfl/horloge";
 import { bilanServeurDe, paliersAGarder, type XpServeur } from "../src/lib/sfl/xp-serveur.server";
 import { PASSE_GIVRE, PASSE_SAISON_1 } from "../src/lib/sfl/passe";
 import { NATIONS } from "../src/lib/sfl/pack-afrique";
@@ -95,5 +99,31 @@ for (const quand of ["2026-11-01T12:00:00Z", "2027-06-01T12:00:00Z", "2027-12-15
   assert.ok(portables.length > 0, "les skins de la Saison 1 restent");
   const ouverte = finitionsDe("Ilyes", { s1: 16, givre: 12 }, 0, null, [], new Date("2026-11-10T12:00:00Z"));
   assert.ok(givreSkins.every((f) => (ouverte as string[]).includes(f)), "les skins Givre gagnés se portent dès le 9/11");
+}
+
+// 6 · À l'heure du serveur (horloge.ts) : le 9/11 à 00 h 05, un téléphone qui retarde de 10 min porte
+//     déjà les skins Givre gagnés ; la veille à 23 h 30, un téléphone qui avance d'une heure ne les porte
+//     pas. La carte (useHabillage), le choix par défaut de finitionsDe et Personnaliser lisent cette heure.
+{
+  const givreSkins = PASSE_GIVRE.flatMap((p) => (p.habille?.finition ? [p.habille.finition] : []));
+  const portes = () => finitionsDe("Ilyes", { s1: 16, givre: 12 }) as string[];
+  const avant = Date.now;
+  try {
+    const minuit5 = new Date("2026-11-08T23:05:00Z").getTime();
+    Date.now = () => minuit5 - 10 * 60_000;
+    noterHeureServeur(minuit5, Date.now() - 100, Date.now() + 100);
+    assert.ok(givreSkins.every((f) => portes().includes(f)), "00 h 05 le 9/11 : Givre se porte, même sur un téléphone qui retarde");
+    const veille = new Date("2026-11-08T22:30:00Z").getTime();
+    Date.now = () => veille + 3600_000;
+    noterHeureServeur(veille, Date.now() - 100, Date.now() + 100);
+    assert.ok(!givreSkins.some((f) => portes().includes(f)), "23 h 30 le 8/11 : un téléphone qui avance n'ouvre pas Givre");
+  } finally {
+    Date.now = avant;
+    noterHeureServeur(Date.now(), Date.now(), Date.now());
+  }
+  assert.equal(decalageHorloge(), 0);
+  const lire = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
+  assert.match(lire("hooks/use-habillage.ts"), /const maintenant = new Date\(maintenantMs\(\)\);/, "la carte : l'heure du serveur");
+  assert.match(lire("components/sfl/personnaliser-carte.tsx"), /saisonsPasseOuvertes\(new Date\(maintenantMs\(\)\)\)/, "Personnaliser : la même heure");
 }
 console.log("givre : ok");

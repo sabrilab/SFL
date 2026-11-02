@@ -36,6 +36,7 @@ import type { Player } from "@/lib/sfl/engine";
 import { CLASSEMENTS } from "@/lib/sfl/fin-de-saison";
 import { SKINS_OFFERTS } from "@/lib/sfl/finitions-offertes";
 import { choisirHabillage } from "@/lib/sfl/habillages-choisis";
+import { maintenantMs } from "@/lib/sfl/horloge";
 import type { PaliersAtteints, PalierPasse } from "@/lib/sfl/passe";
 import { saisonsPasseOuvertes, type SaisonPasse } from "@/lib/sfl/saisons-passe";
 import { NOM_METAL, TROPHEES, metal } from "@/lib/sfl/trophees";
@@ -53,10 +54,11 @@ interface Recompense {
 /**
  * Les récompenses du Passe à montrer : celles de la saison en cours, gagnées
  * ou non, et celles des saisons finies qu'il a gagnées ; une saison qui n'a
- * pas commencé ne se montre pas (saisons-passe.ts).
+ * pas commencé ne se montre pas (saisons-passe.ts), à l'heure du serveur
+ * (horloge.ts), comme les paliers et la carte (use-habillage.ts).
  */
 function recompenses(paliers: PaliersAtteints, genre: PalierPasse["genre"]): Recompense[] {
-  const ouvertes = saisonsPasseOuvertes(new Date());
+  const ouvertes = saisonsPasseOuvertes(new Date(maintenantMs()));
   const courante = ouvertes[ouvertes.length - 1];
   return [...ouvertes]
     .reverse()
