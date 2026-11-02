@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
-import { useSeason } from "@/components/sfl/season-provider";
+import { useJoueursDeLaMap } from "@/hooks/use-joueurs-de-la-map";
 import { cleVille, type VillePlan } from "@/components/sfl/map/joueurs";
 import { useCommunes } from "@/hooks/use-communes";
 import { maVille, poserMaVille, type VilleJoueur } from "@/lib/sfl/villes";
@@ -136,7 +136,7 @@ export function CatalogueJoueurs({
   /** Ouvert par la notification « Mets ta ville » : la recherche de ta ville d'emblée. */
   chercherVille?: boolean;
 }) {
-  const { players } = useSeason();
+  const players = useJoueursDeLaMap();
   const parNom = useMemo(() => new Map(players.map((p) => [p.name, p])), [players]);
   const ordre = useMemo(() => [...villes].sort((a, b) => b.joueurs.length - a.joueurs.length || a.ville.localeCompare(b.ville)), [villes]);
   const total = villes.reduce((s, v) => s + v.joueurs.length, 0);
