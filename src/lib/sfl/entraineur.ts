@@ -125,6 +125,13 @@ export interface RencontreEntraineur {
   attendu: number;
   /** L'Indice de Force de l'équipe a-t-il 5 matchs classés derrière lui ? */
   indiceCale: boolean;
+  /**
+   * Son propre check-in (il ne fait jamais un présent). Absent, la rencontre
+   * ne lui est pas comptée, sauf le 5 contre 4 et le forfait : il était
+   * l'entraîneur inscrit, et ne pas venir les jours d'équipe incomplète ne doit
+   * rien effacer. Par défaut, présent.
+   */
+  entraineurPresent?: boolean;
   presents: PresentEntraineur[];
   /** Inscrits sur la feuille, venus après le décompte ou pas venus, sans excuse. */
   absentsInscrits: number;
@@ -256,7 +263,10 @@ export function evoluerEntraineur(
   const faits: FaitEntraineur[] = [];
   const majs: MiseAJourEntraineur[] = [];
   let reserve = 0;
-  const comptees = rencontres.filter((r) => r.classee || r.forfait).sort((a, b) => a.le.localeCompare(b.le) || a.id.localeCompare(b.id));
+  const absent = (r: RencontreEntraineur) => r.entraineurPresent === false;
+  const comptees = rencontres
+    .filter((r) => r.forfait || (r.classee && (!absent(r) || r.presents.length === 4)))
+    .sort((a, b) => a.le.localeCompare(b.le) || a.id.localeCompare(b.id));
   const serie = new Map<string, number>();
   // PRO : les crans de chaque joueur dans chaque rencontre de la fenêtre (rencontre → joueur → crans).
   const cransDe = new Map<string, Map<string, number>>();
@@ -328,6 +338,9 @@ export function evoluerEntraineur(
     if (r.forfait) {
       verser("EFF", B.forfait, "forfait", r.id);
       for (const n of serie.keys()) serie.set(n, 0);
+    } else if (absent(r)) {
+      // Il n'est pas venu : seul le 5 contre 4 lui revient.
+      verser("EFF", B.cinqContreQuatre, "5 contre 4", r.id);
     } else {
       // RES : le résultat moins l'attendu, une fois l'Indice calé.
       if (r.indiceCale) {

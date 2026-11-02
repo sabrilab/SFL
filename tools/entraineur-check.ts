@@ -7,7 +7,8 @@
 //      l'autre, l'autre le perd (somme nulle) ; battre plus faible ne rapporte
 //      presque rien ;
 //   3. une dette bloque : après un forfait (−3), trois matchs au complet ne
-//      font rien monter ; un forfait ne touche que l'effectif ;
+//      font rien monter ; un forfait ne touche que l'effectif ; absent, rien ne
+//      compte pour lui, sauf le 5 contre 4 et le forfait ;
 //   4. PRO : sept joueurs ne gagnent pas au nombre sur cinq ; un joueur ne
 //      verse pas plus de 3 crans ; ceux qui partent de plus bas comptent double ;
 //   5. JEU : le même cinq de départ à chaque match, rien ; un vrai partage, 2 crans ;
@@ -107,6 +108,16 @@ const match = (o: Partial<RencontreEntraineur> = {}): RencontreEntraineur => ({
   // Un 5 contre 4 : −1 ; un retard ou un inscrit absent : rien.
   const ev2 = evoluerEntraineur([match({ presents: NOMS.slice(0, 4).map((x) => present(x)) }), match({ absentsInscrits: 1 }), match({ presents: NOMS.slice(0, 5).map((x, i) => present(x, { aLHeure: i > 0 })) })]);
   assert.deepEqual(ev2.faits.filter((f) => f.cle === "EFF").map((f) => f.crans), [-1]);
+}
+
+// 3 bis · Absent, rien ne compte pour lui, sauf le 5 contre 4 et le forfait.
+{
+  const ev = evoluerEntraineur([
+    match({ entraineurPresent: false, pour: 6, contre: 0, attendu: 0.2 }),
+    match({ entraineurPresent: false, presents: NOMS.slice(0, 4).map((x) => present(x)) }),
+  ]);
+  assert.equal(ev.rencontres, 1);
+  assert.deepEqual(ev.faits.map((f) => [f.cle, f.crans]), [["EFF", -1]]);
 }
 
 // 4 · PRO : pas d'avantage au nombre, 3 crans au plus par joueur, le double pour ceux d'en bas.
