@@ -20,7 +20,8 @@
 // que l'invitation tombe (« Adil · 71 h »).
 // Une carte à titre (le terrain de l'admin, une journée de ligue) porte ses
 // puces sur son coin, or MVP, rouge Impact, bleu Défensive (puces-titres.tsx) ;
-// les matchs Bola n'en donnent pas.
+// un match Bola, la seule dorée de son ou ses MVP, une fois le match validé
+// (Ilyes, 02/11/2026 : la fiche du match, usePucesBola).
 
 import { useMemo } from "react";
 import { Plus, X } from "lucide-react";
@@ -40,8 +41,8 @@ export interface Occupant {
   enAttente?: boolean;
   /** Le temps qui lui reste pour répondre (« 71 h »), à côté de son prénom. */
   reste?: string;
-  /** Ses titres du match, une fois attribués (SFL seulement) : ses puces. */
-  titres?: BoostType[];
+  /** Ses titres du match, une fois attribués : ses puces (Bola : le MVP d'un match validé, rien d'autre). */
+  titres?: readonly BoostType[];
 }
 
 const BLANC = { fond: "#f4f3ef", encre: "#0a0b0d" };

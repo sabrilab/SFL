@@ -17,6 +17,10 @@
 // Le coup d'envoi passé, l'organisateur tient la feuille (feuille-bola.tsx)
 // et tout le monde voit le score et le ou les MVP, puis où en est la
 // confirmation du résultat par les joueurs (28/10, bilan-resultat.tsx).
+// Une fois le match validé, son ou ses MVP portent la puce dorée sur le
+// terrain (Ilyes, 02/11/2026) : le MVP tel que la ligue le compte
+// (usePucesBola, lib/sfl/puces-titres.ts), lu seulement quand la base dit
+// « compte » ; rien avant, ni en attente, ni contesté.
 // Ceux du match (organisateur, inscrits, invités) ont en haut la porte de sa
 // discussion (22/10, matchs/discussion-match.tsx), avec ce qu'ils n'ont pas lu.
 
@@ -48,7 +52,8 @@ import {
 } from "@/lib/sfl/matchs";
 import { coupDEnvoiPasse, feuilleOuverte, mvpsDuMatch } from "@/lib/sfl/ligue-vierge";
 import { FeuilleBola } from "@/components/sfl/matchs/feuille-bola";
-import { BilanResultat } from "@/components/sfl/matchs/bilan-resultat";
+import { BilanResultat, useBilan } from "@/components/sfl/matchs/bilan-resultat";
+import { usePucesBola } from "@/hooks/use-puces-bola";
 import { cn } from "@/lib/utils";
 
 export function FichePartie({
@@ -81,6 +86,9 @@ export function FichePartie({
   const corrigeable = feuilleOuverte(partie.saisiLe);
   const presents = partie.joueurs.filter((j) => j.equipe === "clairs" || j.equipe === "fonces");
   const mvps = saisi ? mvpsDuMatch(presents) : [];
+  // L'état de la confirmation, lu une fois pour le bilan et pour les puces.
+  const bilan = useBilan(saisi ? partie.id : 0, organise);
+  const titresDe = usePucesBola(partie.id, saisi && bilan?.etat === "compte", bilan ? `${bilan.version}·${bilan.etat}` : null);
 
   // L'organisateur invite depuis le terrain : la liste des joueurs, et ceux libres à cette heure-là.
   const [choisir, setChoisir] = useState(false);
@@ -105,7 +113,7 @@ export function FichePartie({
     ...(orga ? [orga] : []),
     ...venus.filter((j) => j !== orga),
     ...attendus.filter((j) => j !== orga),
-  ].map((j) => ({ cle: j.id, nom: j.name, enAttente: j.statut === "invite" }));
+  ].map((j) => ({ cle: j.id, nom: j.name, enAttente: j.statut === "invite", titres: titresDe(j.id) }));
   const moiNom = moiLa?.name;
 
   // Ai-je déjà dit « Pas dispo » à ce match ? Alors c'est scellé.
@@ -228,7 +236,7 @@ export function FichePartie({
               <QuiVient className="justify-center" noms={presents.filter((j) => mvps.includes(j.id)).map((j) => j.name)} />
             </div>
           )}
-          <BilanResultat matchId={partie.id} organise={organise} className="mt-5 border-t border-contraste/[0.06] pt-4" />
+          <BilanResultat matchId={partie.id} organise={organise} bilan={bilan} className="mt-5 border-t border-contraste/[0.06] pt-4" />
         </div>
       )}
 

@@ -27,6 +27,11 @@
 // entier, même répondu (en lecture) ; l'organisateur voit les réponses dans sa
 // feuille, que ?feuille=id ouvre (la notification d'un « infirme »).
 //
+// Les cartes des MVP d'un match portent la puce dorée (Ilyes, 02/11/2026,
+// lib/sfl/puces-titres.ts, titresBola) une fois le match validé : le critère
+// de la carte MVP Bola ; un match amical, en attente ou contesté garde ses
+// cartes de MVP désignés, sans puce.
+//
 // Sur tablette et ordinateur (dès 768 px), la largeur des Actus
 // (.gabarit-ligue) et deux colonnes au nombre d'or : le classement dans la
 // grande, qui reste à l'écran s'il y tient (useCollant), les derniers matchs
@@ -60,6 +65,8 @@ import { BilanResultat } from "@/components/sfl/matchs/bilan-resultat";
 import { ouvrirResultat } from "@/components/sfl/invitation-carte";
 import { libelleEtat } from "@/lib/sfl/confirmation-resultat";
 import { Nom } from "@/components/sfl/nom";
+import { PucesTitres } from "@/components/sfl/puces-titres";
+import { titresBola } from "@/lib/sfl/puces-titres";
 import { EnteteLigue } from "@/components/sfl/choix-ligue";
 import { useSession } from "@/hooks/use-session";
 import { useCollant } from "@/hooks/use-collant";
@@ -249,7 +256,10 @@ function MatchJoue({ m, bilan = false }: { m: MatchCompte; bilan?: boolean }) {
           <div className="flex flex-wrap justify-center gap-3">
             {mvps.map((j) => (
               <div key={j.id} className="flex flex-col items-center gap-1">
-                <Carte name={j.name} size={format.moyenne} detail={`MVP · ${j.buts} but${j.buts > 1 ? "s" : ""}, ${j.passes} passe${j.passes > 1 ? "s" : ""}`} />
+                <div className="relative flex">
+                  <Carte name={j.name} size={format.moyenne} detail={`MVP · ${j.buts} but${j.buts > 1 ? "s" : ""}, ${j.passes} passe${j.passes > 1 ? "s" : ""}`} />
+                  <PucesTitres titres={titresBola(m, j.id)} />
+                </div>
                 <span className="text-corps font-semibold"><Nom n={j.name} /></span>
                 <span className="mono-label text-encre-3">
                   {j.buts} B · {j.passes} P

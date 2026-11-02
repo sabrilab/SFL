@@ -29,10 +29,26 @@
 //   · le compte vitrine (compte-vitrine.ts) a ses titres sur son seul écran,
 //     donc ses puces, partout où sa carte se pose (Sabri : « tout, tout,
 //     tout ») ; ses lignes sont sans équipe, aucun match ne le montre.
+//
+// LE MODE BOLA (Ilyes, 02/11/2026 : « mets aussi les MVP avec une puce dorée
+// dans le mode de jeu Bola ») : un seul titre, le MVP que l'app désigne
+// (ligue-vierge.ts, mvpsDuMatch) ; ni vote, ni Impact, ni Défensive, donc la
+// seule puce dorée, jamais rouge ni bleue. Elle se pose quand le MVP est
+// officiellement attribué, au critère même de la carte MVP Bola
+// (carte-bola.ts, mesMatchsValides puis cartesMvpBola) : le match compté par
+// compterMatchs est `valide` (pas d'exhibition, au moins QUORUM = 8 joueurs
+// sur la feuille que lit la ligue, et l'état « compte » de la confirmation
+// des résultats, ou aucun état pour un match saisi avant le 28/10) et la
+// ligne du joueur y porte `mvp`. Jamais sur un match à venir, en cours, en
+// attente, contesté ou qui ne compte pas, même si le MVP y est déjà désigné ;
+// ex æquo, chacun sa puce. Les lignes sont celles de ligue_vierge()
+// (match_bola_json), jamais la feuille brute de la fiche : la ligue en écarte
+// les joueurs qui n'ont rien accepté, et le MVP peut en changer.
 
 import type { BoostType } from "./engine";
 import { jourMoisDuLibelle } from "./convocation-temps";
 import type { MatchEntry } from "./saisie/types";
+import type { MatchCompte } from "./ligue-vierge";
 
 /** L'ordre des puces sur une carte. */
 export const ORDRE_TITRES: readonly BoostType[] = ["mvp", "impact", "def"];
@@ -126,4 +142,24 @@ export function titresAttribues(
   if (comptees?.has(j)) return true;
   const meta = journees.find((m) => m.j === j);
   return !meta || !leJourMeme(meta.date, t);
+}
+
+/* --------------------------------- Le mode Bola --------------------------------- */
+
+/** La seule puce d'un match Bola. */
+const MVP_SEUL: readonly BoostType[] = ["mvp"];
+const AUCUNE: readonly BoostType[] = [];
+
+/**
+ * Les puces d'un joueur (son id) dans un match Bola compté (compterMatchs) :
+ * la dorée s'il en est MVP et que le match est validé, sinon rien. Sans
+ * match (pas encore lu, pas vu par la ligue), rien.
+ */
+export function titresBola(m: Pick<MatchCompte, "valide" | "joueurs"> | null | undefined, id: string): readonly BoostType[] {
+  return m?.valide && m.joueurs.some((j) => j.id === id && j.mvp) ? MVP_SEUL : AUCUNE;
+}
+
+/** Les puces de tout un match Bola : id → ["mvp"]. Un match non validé n'en a aucune. */
+export function pucesBola(m: Pick<MatchCompte, "valide" | "joueurs"> | null | undefined): Map<string, readonly BoostType[]> {
+  return new Map(m?.valide ? m.joueurs.filter((j) => j.mvp).map((j) => [j.id, MVP_SEUL] as const) : []);
 }
