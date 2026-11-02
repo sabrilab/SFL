@@ -370,3 +370,57 @@ export function bilanXpS(journalS: JournalXpS, nom: string, depense = 0): BilanX
   const gagne = totalXpS(lignes);
   return { gagne, solde: soldeXp(gagne, depense), lignes };
 }
+
+/* ------------------------------ L'annonce ------------------------------ */
+
+/** Ce que ce téléphone a déjà montré des XP S d'un joueur (sfl-xps-vu) : le plus haut total, les clés vues. */
+export interface VuXpS {
+  nom: string;
+  total: number;
+  cles: string[];
+}
+
+/** Le nom court d'une source, pour l'annonce : « MVP », « Flair »… */
+export function sourceCourte(l: Pick<LigneXpS, "source" | "quoi" | "titre">): string {
+  switch (l.source) {
+    case "sfl-time":
+      return "SFL Time";
+    case "titre":
+      return l.quoi;
+    case "mission":
+      return "Mission";
+    case "flair":
+      return "Flair";
+    case "flair-saison":
+      return "Flair de saison";
+    case "bola":
+      return l.titre === "mvp" ? "MVP" : "Mission";
+  }
+}
+
+const ORDRE_SOURCES = ["SFL Time", "MVP", "Impact", "Défensive", "Mission", "Flair", "Flair de saison"];
+
+/**
+ * Les XP S à annoncer, une fois par téléphone (Ma carte, à la révélation) :
+ * ce que le total gagné dépasse le plus haut déjà vu, et d'où viennent les
+ * lignes neuves (« MVP · Flair »). Rien la première fois (le stock d'avant se
+ * lit sur la tuile), ni pour un autre joueur, ni quand le total n'a pas
+ * dépassé ce qu'on a déjà vu (une feuille corrigée qui retire puis rend).
+ * Rend aussi ce qu'il faut garder.
+ */
+export function annonceXpS(
+  nom: string,
+  gagne: number,
+  lignes: readonly LigneXpS[],
+  vu: VuXpS | null
+): { annonce: { plus: number; sources: string[] } | null; vu: VuXpS } {
+  const cles = lignes.map((l) => l.cle);
+  if (!vu || vu.nom !== nom) return { annonce: null, vu: { nom, total: gagne, cles } };
+  const garde = { nom, total: Math.max(vu.total, gagne), cles: [...new Set([...vu.cles, ...cles])] };
+  const plus = gagne - vu.total;
+  if (plus <= 0) return { annonce: null, vu: garde };
+  const vues = new Set(vu.cles);
+  const sources = [...new Set(lignes.filter((l) => !vues.has(l.cle)).map(sourceCourte))].sort((a, b) => ORDRE_SOURCES.indexOf(a) - ORDRE_SOURCES.indexOf(b));
+  return { annonce: { plus, sources }, vu: garde };
+}
+

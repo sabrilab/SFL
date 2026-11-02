@@ -381,7 +381,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
       </button>
     ) : etat.t === "ouvrir" ? (
       <button type="button" className="mp-bouton" onClick={ouvrirConfirmation} aria-label={`Ouvrir, ${libelleXpS(etat.prix)}`}>
-        <span className="inline-flex items-baseline gap-[0.35em]" aria-hidden>
+        <span className="inline-flex items-center gap-[0.35em]" aria-hidden>
           Ouvrir · <MontantXpS n={etat.prix} />
         </span>
       </button>
@@ -480,7 +480,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
                   <EtuiAfrique largeur={132} respire={!reduit} />
                   <span className="pk-confirmer__nom titre-lettrage">{PACK_AFRIQUE.nom}</span>
                   {/* Le prix, puis ce qui reste : « ▣S 40 · ▣S 59 ». */}
-                  <span className="mono-label inline-flex items-baseline gap-[0.45em] text-white/60">
+                  <span className="mono-label inline-flex items-center gap-[0.45em] text-white/60">
                     <MontantXpS n={PACK_AFRIQUE.prix} />
                     {solde != null && (
                       <>

@@ -16,12 +16,19 @@
 //   8 · la révélation : 19 h, 19 h 40, sans fin des matchs, la J4 à minuit,
 //       les XP S d'une journée suivent journeesComptees ;
 //   9 · l'XP normale ne bouge pas d'un point (empreinte d'avant les XP S) ;
-//   10 · le serveur et le téléphone : le même total ;
+//   10 · le serveur et le téléphone : le même total ; la garde contre les
+//       appels répétés (un calcul pour une rafale, neuf après 15 s ou une
+//       révélation) ;
 //   11 · le solde : gagné moins dépensé, jamais sous zéro ;
-//   12 · la mission perso « MVP » couvre le MVP.
+//   12 · la mission perso « MVP » couvre le MVP ;
+//   13 · l'annonce (une fois, d'où elles viennent) et la pastille (noir et
+//       blanc, le nombre lu « 59 XP S »), posée là où l'écran l'attend.
 //   npx tsx tools/xp-s-check.ts
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { libelleMatch, type MatchValide } from "../src/lib/sfl/carte-bola";
 import type { LigneComptee, MatchCompte } from "../src/lib/sfl/ligue-vierge";
@@ -35,8 +42,10 @@ import { seedSaison } from "../src/lib/sfl/saisie/store";
 import type { JourneeMeta, MatchEntry, Saison } from "../src/lib/sfl/saisie/types";
 import { appliquerVotes, titresFaibles, type VoteFigure } from "../src/lib/sfl/votes";
 import { journalComplet, journalCompletAvecS, type EntreesXp, type JournalXp } from "../src/lib/sfl/xp-calcul";
-import { bilanServeurDe, xpServeur } from "../src/lib/sfl/xp-serveur.server";
-import { bilanXpS, journalXpS, lignesXpSBola, plafonner, rattachementXp, totalXpS, XP_S, xpSParLigne, type JournalXpS, type LigneXpS } from "../src/lib/sfl/xp-s";
+import { bilanServeurDe, CALCUL_RECENT_MS, xpServeur, xpServeurRecent } from "../src/lib/sfl/xp-serveur.server";
+import { annonceXpS, bilanXpS, journalXpS, lignesXpSBola, plafonner, rattachementXp, totalXpS, XP_S, xpSParLigne, type JournalXpS, type LigneXpS } from "../src/lib/sfl/xp-s";
+import { MontantXpS, PastilleS } from "../src/components/sfl/xp-s";
+import { CompteurXp } from "../src/components/sfl/compteur-xp";
 import { entreesDuBanc, MAINTENANT } from "./xp-s-donnees";
 
 const LOIN = new Date("2026-11-02T12:00:00Z");
@@ -349,9 +358,10 @@ const xpsJ = (publiee: Saison, t: Date, j: number, nom = "Ana", porte = vueServe
 
 /* ------------------------------- 10 · Le serveur et le téléphone ------------------------------- */
 /** Une base en mémoire pour lireSaisonServeur et xpServeur (aucun réseau : le jeton vide n'ouvre aucun client). */
-function base(doc: Saison, tables: Record<string, Record<string, unknown>[]>): SupabaseClient {
+function base(doc: Saison, tables: Record<string, Record<string, unknown>[]>, lectures = { saison: 0 }): SupabaseClient {
   const lignes = (table: string): Record<string, unknown>[] => (table === "saison" ? [{ id: 1, data: doc, updated_at: "2026-11-08T14:10:00Z" }] : (tables[table] ?? []));
   const requete = (table: string) => {
+    if (table === "saison") lectures.saison++;
     const filtres: [string, unknown][] = [];
     const lues = () => lignes(table).filter((r) => filtres.every(([c, v]) => r[c] === v));
     const q: Record<string, unknown> = {};
@@ -395,6 +405,32 @@ void (async () => {
     }
   }
 
+  {
+    // La garde contre les appels répétés (xpServeurRecent) : un seul calcul pour des appels simultanés
+    // et pour la rafale qui suit ; un nouveau après 15 s, ou dès qu'une révélation est passée.
+    const publiee = saisonR({ fin: hiver("2026-11-08 17:40").toISOString() });
+    const lectures = { saison: 0 };
+    const sb = base(publiee, { profiles: [{ id: "g-1", name: "Ana" }] }, lectures);
+    const qui = { id: "g-1", nom: "Ana", jeton: "" };
+    const t0 = hiver("2026-11-08 19:00");
+    const [a, b] = await Promise.all([xpServeurRecent(sb, qui, t0), xpServeurRecent(sb, qui, t0)]);
+    assert.equal(a, b, "deux appels simultanés : le même calcul");
+    assert.equal(lectures.saison, 1, "une seule lecture de la ligue");
+    await xpServeurRecent(sb, qui, new Date(t0.getTime() + 5_000));
+    assert.equal(lectures.saison, 1, "rappelé 5 s plus tard : le calcul d'avant");
+    await xpServeurRecent(sb, { ...qui, id: "g-2", nom: "Bea" }, new Date(t0.getTime() + 5_000));
+    assert.equal(lectures.saison, 2, "un autre joueur : son propre calcul");
+    await xpServeurRecent(sb, qui, new Date(t0.getTime() + CALCUL_RECENT_MS));
+    assert.equal(lectures.saison, 3, "15 s plus tard : un calcul neuf");
+    // 19 h 39 puis 19 h 41 : la révélation de 19 h 40 est passée entre les deux, le calcul gardé ne sert plus.
+    const avant = await xpServeurRecent(sb, qui, hiver("2026-11-08 19:39"));
+    assert.equal(bilanServeurDe(avant, "Ana", hiver("2026-11-08 19:39")).xpS, 10, "à 19 h 39 : le MVP de la J4 seul");
+    const n = lectures.saison;
+    const apres = await xpServeurRecent(sb, qui, new Date(hiver("2026-11-08 19:40").getTime() + 1_000));
+    assert.equal(lectures.saison, n + 1, "la révélation passée : un calcul neuf");
+    assert.equal(bilanServeurDe(apres, "Ana", hiver("2026-11-08 19:40")).xpS, 23, "et les XP S de la J5 y sont (10 + 13)");
+  }
+
   /* ------------------------------- 11 · Le solde ------------------------------- */
   // Gagné moins dépensé, jamais sous zéro : un achat n'est jamais repris (le prix et la monnaie du
   // pack : tools/pack-afrique-check.ts ; la dépense d'un seul tenant : tools/sql/achats-xp-check.sql).
@@ -425,8 +461,58 @@ void (async () => {
     assert.equal(portees, total(rb.journalS, "Ilyes"), "chaque XP S d'Ilyes est portée par une ligne de son journal d'XP");
   }
 
+  /* ------------------------------- 13 · L'annonce et la pastille ------------------------------- */
+  {
+    const L = (cle: string, source: LigneXpS["source"], quoi: string, xps: number, titre?: LigneXpS["titre"]): LigneXpS => ({ saison: 1, j: 5, date: "8 nov.", quoi, xps, source, cle, rattache: cle, ...(titre ? { titre } : {}) });
+    const avant = [L("sfl-time:1:4:Ana", "sfl-time", "SFL Time", 10)];
+    const premier = annonceXpS("Ana", 10, avant, null);
+    assert.equal(premier.annonce, null, "la première fois : rien, le stock se lit sur la tuile");
+    const apres = [...avant, L("flair:1:5:Ana", "flair", "Flair", 4), L("titre:mvp:1:5:Ana", "titre", "MVP", 9, "mvp")];
+    const r = annonceXpS("Ana", 23, apres, premier.vu);
+    assert.deepEqual(r.annonce, { plus: 13, sources: ["MVP", "Flair"] }, "+13 : MVP · Flair (les lignes neuves seules)");
+    assert.equal(annonceXpS("Ana", 23, apres, r.vu).annonce, null, "une seule fois");
+    assert.equal(annonceXpS("Ana", 18, apres, r.vu).annonce, null, "une feuille corrigée qui retire : rien");
+    assert.equal(annonceXpS("Ana", 20, apres, annonceXpS("Ana", 18, apres, r.vu).vu).annonce, null, "ni quand elle rend ce qu'on avait déjà vu");
+    assert.equal(annonceXpS("Bea", 23, apres, r.vu).annonce, null, "un autre joueur sur ce téléphone : il repart de zéro");
+    const bola = annonceXpS("Ana", 33, [...apres, { ...L("bola:mvp:7:Ana", "bola", "MVP", 10, "mvp"), source: "bola" }], r.vu);
+    assert.deepEqual(bola.annonce?.sources, ["MVP"]);
+
+    // La pastille : le symbole Bola et la lettre S, de la couleur du texte (aucune couleur à elle : ni or ni rang).
+    const pastille = renderToStaticMarkup(createElement(PastilleS));
+    assert.ok(pastille.startsWith("<svg") && pastille.includes('aria-hidden="true"'), "décorative");
+    assert.ok(pastille.includes(">S</text>"), "la lettre S dans la balle");
+    assert.ok(!/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|gold|var\(--r-/i.test(pastille), "noir et blanc : aucune couleur à elle (ni or ni couleur de rang)");
+    assert.deepEqual([...pastille.matchAll(/(fill|stroke)="([^"]*)"/g)].map((x) => x[2]), ["currentColor", "currentColor"], "la couleur du texte, seulement");
+    // Les espaces insécables de « 59 XP S » (xpSFr), lus comme des espaces.
+    const sp = (h: string) => h.replace(/\u00a0|&nbsp;/g, " ");
+    const m = sp(renderToStaticMarkup(createElement(MontantXpS, { n: 59 })));
+    assert.match(m, /aria-label="59 XP S"/, "le lecteur d'écran lit « 59 XP S »");
+    assert.match(m.replace(/<svg[\s\S]*?<\/svg>/, ""), />59</);
+    const manque = sp(renderToStaticMarkup(createElement(MontantXpS, { n: 35, sur: 40 })));
+    assert.match(manque, /aria-label="35 XP S sur 40"/);
+    assert.match(manque.replace(/<svg[\s\S]*?<\/svg>/, ""), />35 \/ 40</, "« ▣S 35 / 40 »");
+    // Le compteur du Passe : la ligne d'XP intacte, les XP S au bout de la barre (un bouton vers les Packs).
+    const b = { total: 1630, niveau: 6, dansLeNiveau: 130, pourLeSuivant: 600 };
+    const sans = sp(renderToStaticMarkup(createElement(CompteurXp, { b })));
+    const avec = sp(renderToStaticMarkup(createElement(CompteurXp, { b, xpS: 59, onXpS: () => {} })));
+    const ligne = (h: string) => /<span class="mono-label tabular-nums leading-snug">(?:<span[^>]*>[^<]*<\/span>)?[^<]*<\/span>/.exec(h)?.[0];
+    assert.equal(ligne(avec), ligne(sans), "la ligne d'XP ne change pas");
+    assert.match(avec, /<button[^>]*aria-label="Packs, 59 XP S"/);
+    assert.ok(!/XP S/.test(sans), "sans XP S, rien de plus");
+
+    // Où l'écran les pose : Ma carte (la tuile et l'annonce), le Passe (le compteur), le journal, les Packs.
+    const lire = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
+    const tuile = lire("components/sfl/ma-carte/rubriques.tsx");
+    assert.match(tuile, /useSoldeXpS\(player\.name\)/, "Ma carte : les XP S qui restent");
+    assert.match(tuile, /<MontantXpS n=\{soldeS\} \/>/, "« 1 630 XP · ▣S 59 »");
+    assert.ok(!/à dépenser/.test(tuile.replace(/\/\/.*$|\{\/\*[\s\S]*?\*\/\}/gm, "")), "plus de « à dépenser » en XP normales");
+    assert.match(tuile, /annonceXpS\(nom, gagne, lignes, vu\)/, "l'annonce à la révélation");
+    assert.match(lire("components/sfl/mode-passe.tsx"), /xpS=\{vitrine \? null : soldeS\}/, "l'en-tête du Passe");
+    assert.match(lire("components/sfl/mode-passe-missions.tsx"), /xpS\.get\(rattachementXp\(l\)/, "le journal porte la pastille à droite de l'XP");
+  }
+
   console.log(
-    `xp-s-check : barème (J1 en SFL Time, Ilyes 59 en S0), sources, Flair (durs, sur soi, tribune, saison figée après la J2), titres faibles, Bola (13 par semaine), doublons, plafonds, révélation (19 h, 19 h 40, sans fin des matchs, J4 à minuit), XP inchangée, serveur = téléphone, solde — ok`
+    `xp-s-check : barème (J1 en SFL Time, Ilyes 59 en S0), sources, Flair (durs, sur soi, tribune, saison figée après la J2), titres faibles, Bola (13 par semaine), doublons, plafonds, révélation (19 h, 19 h 40, sans fin des matchs, J4 à minuit), XP inchangée, serveur = téléphone, solde, annonce et pastille — ok`
   );
 })().catch((e) => {
   console.error(e);

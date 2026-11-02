@@ -53,6 +53,7 @@ import { Plongee } from "@/components/sfl/plongee-carte";
 import { COULEURS_PAYS, PAYS_PAR_DEFAUT } from "@/components/sfl/skins-passe";
 import { CompteurXp } from "@/components/sfl/compteur-xp";
 import { VuePacks } from "@/components/sfl/mode-passe-packs";
+import { useSoldeXpS } from "@/hooks/use-achats-xp";
 import { finitionsDe, useAfriqueCarte, useChoixHabillage, useHabillage, usePaliers } from "@/hooks/use-habillage";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -566,6 +567,8 @@ export function ModePasse({
   const lg = useXpLigue();
   const vitrine = !!lg?.vitrine && lg.vitrine === player.name;
   const afrique = useAfriqueCarte(player.name);
+  // Les XP S qui restent (lib/sfl/xp-s.ts) : les miennes seulement (null pour le profil d'un autre).
+  const soldeS = useSoldeXpS(player.name);
   // Les Packs (PACK AFRIQUE 2027) : quand le pack est ouvert, ou pour qui en a déjà, ou pour la vitrine (un aperçu).
   const avecPacks = packOuvert() || afrique.length > 0 || vitrine;
   const vues = VUES.filter((v) => (v !== "autres" || !horsSfl) && (v !== "packs" || avecPacks));
@@ -724,9 +727,22 @@ export function ModePasse({
         </div>
       </header>
 
-      {/* Une ligne, toujours : l'XP gagnée et le niveau. Ce qui reste à dépenser se lit dans les Packs. */}
+      {/* Une ligne, toujours : l'XP gagnée et le niveau ; au bout de la barre, les XP S qui restent (un toucher : les Packs). */}
       <div className="mp-compteur mp-entre" style={{ "--i": 1 } as React.CSSProperties}>
-        <CompteurXp b={b} className="text-white/70" />
+        <CompteurXp
+          b={b}
+          className="text-white/70"
+          xpS={vitrine ? null : soldeS}
+          onXpS={
+            avecPacks
+              ? () => {
+                  if (vue !== "packs") navigator.vibrate?.(6);
+                  vueTouchee.current = true;
+                  setVue("packs");
+                }
+              : undefined
+          }
+        />
       </div>
 
       <nav className={cn("mp-vues mp-entre", vues.length > 3 && "mp-vues--quatre")} style={{ "--i": 1 } as React.CSSProperties} aria-label={vues.map((v) => NOM_VUE[v]).join(", ")}>

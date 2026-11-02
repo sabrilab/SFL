@@ -16,6 +16,9 @@ export const nombreFr = (n: number) => Math.round(n).toLocaleString("fr-FR");
 /** « 1 630 XP », l'espace avant XP insécable. */
 export const xpFr = (n: number) => `${nombreFr(n)} XP`;
 
+/** « 59 XP S » (lib/sfl/xp-s.ts) : ce que lit le lecteur d'écran derrière la pastille. */
+export const xpSFr = (n: number) => `${nombreFr(n)} XP S`;
+
 type Compte = Pick<BilanXp, "total" | "niveau" | "dansLeNiveau" | "pourLeSuivant">;
 
 /** Ce qui reste avant le niveau suivant. */

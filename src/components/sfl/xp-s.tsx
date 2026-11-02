@@ -10,13 +10,13 @@
 
 import { LUNE } from "@/components/sfl/actus/lune";
 import { LOGO_BOLA } from "@/components/sfl/finitions-carte";
-import { nombreFr } from "@/lib/sfl/compteur-xp";
+import { nombreFr, xpSFr } from "@/lib/sfl/compteur-xp";
 import { cn } from "@/lib/utils";
 
-/** La pastille seule, à la hauteur du texte (1,15 em) ; décorative : le nombre porte le libellé. */
+/** La pastille seule, un peu plus haute que le texte (1,2 em) ; décorative : le nombre porte le libellé. */
 export function PastilleS({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 100 100" aria-hidden className={cn("inline-block h-[1.15em] w-[1.15em] shrink-0 align-[-0.2em]", className)}>
+    <svg viewBox="0 0 100 100" aria-hidden className={cn("inline-block h-[1.2em] w-[1.2em] shrink-0 align-[-0.25em]", className)}>
       <path d={LOGO_BOLA.symbole} transform={LUNE.transform} fill="currentColor" />
       <text
         x={LUNE.balle.x}
@@ -24,7 +24,7 @@ export function PastilleS({ className }: { className?: string }) {
         dy="0.36em"
         textAnchor="middle"
         fill="currentColor"
-        style={{ fontFamily: "var(--font-anton), Anton, sans-serif", fontSize: 40 }}
+        style={{ fontFamily: "var(--font-anton), Anton, sans-serif", fontSize: 46 }}
       >
         S
       </text>
@@ -33,12 +33,12 @@ export function PastilleS({ className }: { className?: string }) {
 }
 
 /** « 59 XP S » : ce que lit le lecteur d'écran ; « 35 XP S sur 40 » avec un prix. */
-export const libelleXpS = (n: number, sur?: number) => `${nombreFr(n)} XP S${sur != null ? ` sur ${nombreFr(sur)}` : ""}`;
+export const libelleXpS = (n: number, sur?: number) => `${xpSFr(n)}${sur != null ? ` sur ${nombreFr(sur)}` : ""}`;
 
 /** La pastille et le nombre (« ▣S 59 ») ; avec `sur`, ce qui manque (« ▣S 35 / 40 »). */
 export function MontantXpS({ n, sur, className }: { n: number; sur?: number; className?: string }) {
   return (
-    <span className={cn("inline-flex items-baseline gap-[0.3em] whitespace-nowrap tabular-nums", className)} aria-label={libelleXpS(n, sur)} role="img">
+    <span className={cn("inline-flex items-center gap-[0.3em] whitespace-nowrap tabular-nums", className)} aria-label={libelleXpS(n, sur)} role="img">
       <PastilleS />
       <span aria-hidden>
         {nombreFr(n)}

@@ -3,7 +3,7 @@
 // 7 (et non 360) ; les bornes 0, 100, 2 100 ; les espaces insécables.
 //   npx tsx tools/compteur-xp-check.ts
 import assert from "node:assert/strict";
-import { ligneCompteur, partiesCompteur, partDuNiveau, resteAvantNiveau, xpFr } from "../src/lib/sfl/compteur-xp";
+import { ligneCompteur, partiesCompteur, partDuNiveau, resteAvantNiveau, xpFr, xpSFr } from "../src/lib/sfl/compteur-xp";
 import { debutNiveau, niveauDe } from "../src/lib/sfl/missions";
 
 const compte = (total: number) => {
@@ -28,4 +28,8 @@ assert.equal(partDuNiveau(compte(0)), 0);
 // Les espaces ne se cassent pas : entre le nombre et XP, et dans le nombre.
 assert.ok(xpFr(1630).includes(" XP"));
 assert.ok(!/ /.test(ligneCompteur(compte(1630)).replace(/ · /g, "").replace(/ avant le /g, "")), "seules les séparations « · » et « avant le » sont des espaces sécables");
+// Les XP S (lib/sfl/xp-s.ts) : « 59 XP S », sans espace sécable, ce que lit le lecteur d'écran derrière la pastille.
+assert.equal(lu(xpSFr(59)), "59 XP S");
+assert.equal(lu(xpSFr(1240)), "1 240 XP S");
+assert.ok(!/ /.test(xpSFr(1240)), "« 1 240 XP S » ne se casse pas");
 console.log("compteur-xp : ok");

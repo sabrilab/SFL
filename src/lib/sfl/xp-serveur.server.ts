@@ -90,6 +90,8 @@ export interface XpServeur {
    * ignoré par l'app (relecture du 02/11/2026).
    */
   nom?: string;
+  /** La prochaine heure où la vue de la ligue peut changer (une révélation, un minuit) : un calcul gardé s'y périme. */
+  prochaine?: Date | null;
 }
 
 /** Le nom du journal pour ce nom de compte : celui de l'appelant s'il s'agit de lui, sinon tel quel. */
@@ -160,33 +162,40 @@ export async function xpServeur(sb: SupabaseClient, appelant: { id: string; nom:
     bolaCarte,
     maintenant,
   });
-  return { journal, journalS, bola, effectif, idDeNom, nom };
+  return { journal, journalS, bola, effectif, idDeNom, nom, prochaine: lue.prochaine };
 }
 
 /** Combien de temps un calcul de la ligue resservit au même appelant, dans la même instance. */
 export const CALCUL_RECENT_MS = 15_000;
-const recents = new Map<string, { le: number; x: Promise<XpServeur> }>();
+const recents = new Map<string, { le: number; x: Promise<XpServeur>; prochaine?: number }>();
 
 /**
  * xpServeur, gardé : le même appelant qui rappelle dans les CALCUL_RECENT_MS
  * (un bouton tapé en rafale, deux onglets, une boucle) reprend le calcul en
  * cours ou celui d'il y a quelques secondes, au lieu de relire et recalculer
  * toute la ligue. Par appelant (ses recrues et ses matchs Bola sont à lui),
- * dans la mémoire de l'instance ; un calcul en échec ne se garde pas. Rien
- * n'en dépend pour la justesse : ouvrir_pack_xp débite toujours d'un seul
- * tenant, sur ses propres achats.
+ * dans la mémoire de l'instance ; un calcul en échec ne se garde pas, ni
+ * celui qu'une révélation a dépassé (prochaine) : à 19 h, les XP S de la
+ * journée comptent tout de suite. Rien n'en dépend pour la justesse :
+ * ouvrir_pack_xp débite toujours d'un seul tenant, sur ses propres achats.
  */
 export function xpServeurRecent(sb: SupabaseClient, appelant: { id: string; nom: string; jeton: string }, maintenant = new Date()): Promise<XpServeur> {
   const t = maintenant.getTime();
-  for (const [k, r] of recents) if (t - r.le >= CALCUL_RECENT_MS || r.le > t) recents.delete(k);
+  for (const [k, r] of recents) if (t - r.le >= CALCUL_RECENT_MS || r.le > t || (r.prochaine != null && r.prochaine <= t)) recents.delete(k);
   const cle = `${appelant.id}|${appelant.nom}`;
   const deja = recents.get(cle);
   if (deja) return deja.x;
   const x = xpServeur(sb, appelant, maintenant);
-  recents.set(cle, { le: t, x });
-  x.catch(() => {
-    if (recents.get(cle)?.x === x) recents.delete(cle);
-  });
+  const entree: { le: number; x: Promise<XpServeur>; prochaine?: number } = { le: t, x };
+  recents.set(cle, entree);
+  x.then(
+    (v) => {
+      if (v.prochaine) entree.prochaine = v.prochaine.getTime();
+    },
+    () => {
+      if (recents.get(cle) === entree) recents.delete(cle);
+    }
+  );
   return x;
 }
 

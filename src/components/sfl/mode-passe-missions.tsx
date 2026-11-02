@@ -12,7 +12,9 @@
 //   · ce qui rapporte de l'XP, ligne par ligne, avec ce que j'en ai tiré
 //     cette saison (le barème vient des constantes de lib/sfl/missions.ts et
 //     lib/sfl/pronos.ts : il suit leurs réglages) ;
-//   · le journal : d'où vient chaque XP, pertes en rouge.
+//   · le journal : d'où vient chaque XP, pertes en rouge ; une ligne qui a
+//     aussi rapporté des XP S (lib/sfl/xp-s.ts) porte la pastille à droite
+//     de son XP (« +130 ▣S 10 ») : pas de liste à part.
 // Un joueur Bola (hors de la SFL) n'a ni les missions du dimanche ni ce qui
 // ne s'y gagne (jouer le dimanche, contrat, défi, vote, trois sur trois) :
 // il garde le reste et son journal (28/10/2026). À leur place, ses missions
@@ -22,6 +24,7 @@
 // Sous les missions, pour tout le monde, les défis (defis.tsx) : le prochain
 // badge de chaque famille, toujours là, même sans feuille (30/10).
 
+import { useMemo } from "react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { MissionsBola } from "@/components/sfl/actus/missions";
 import { MissionsPerso } from "@/components/sfl/missions-perso";
@@ -31,7 +34,9 @@ import { MISSIONS_PERSO, XP_MATCH_BOLA } from "@/lib/sfl/missions-perso";
 import { useJoueurBola } from "@/components/sfl/player-provider";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useHorsSfl } from "@/hooks/use-hors-sfl";
-import { useMissions } from "@/hooks/use-missions";
+import { useMissions, useXpS } from "@/hooks/use-missions";
+import { MontantXpS } from "@/components/sfl/xp-s";
+import { rattachementXp, xpSParLigne } from "@/lib/sfl/xp-s";
 import {
   FELICITATIONS_DONNEES_JOURNEE,
   PRIME,
@@ -251,22 +256,29 @@ function Sources({ b }: { b: BilanXp }) {
   );
 }
 
-function Journal({ b, saison }: { b: BilanXp; saison: number }) {
+function Journal({ b, saison, nom }: { b: BilanXp; saison: number; nom: string }) {
+  const s = useXpS(nom);
+  const xpS = useMemo(() => xpSParLigne(s?.lignes ?? []), [s?.lignes]);
   if (b.lignes.length === 0) return null;
   return (
     <section className="flex flex-col" aria-labelledby="titre-journal-xp">
       <h2 id="titre-journal-xp" className="titre-lettrage px-5 pb-2 text-[26px]">
         Journal
       </h2>
-      {b.lignes.slice(0, 20).map((l, i) => (
-        <div key={`${l.saison}-${l.j}-${l.quoi}-${i}`} className="flex items-center gap-3 border-t border-white/8 px-5 py-3">
-          <span className={cn("shrink-0 whitespace-nowrap font-mono text-[11px] text-white/45", l.bola ? "w-[60px]" : "w-[44px]")}>
-            {l.bola ? l.date.split(" · ")[0] : l.saison === saison ? `J${l.j}` : `S${l.saison} J${l.j}`}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{l.quoi}</span>
-          <span className={cn("font-mono text-[13px] font-bold tabular-nums", l.xp < 0 && "text-[#ff9b9d]")}>{signe(l.xp)}</span>
-        </div>
-      ))}
+      {b.lignes.slice(0, 20).map((l, i) => {
+        // Les XP S de la ligne (SFL Time et titres avec « Dimanche joué », la mission, le Flair…).
+        const s = xpS.get(rattachementXp(l) ?? "");
+        return (
+          <div key={`${l.saison}-${l.j}-${l.quoi}-${i}`} className="flex items-center gap-3 border-t border-white/8 px-5 py-3">
+            <span className={cn("shrink-0 whitespace-nowrap font-mono text-[11px] text-white/45", l.bola ? "w-[60px]" : "w-[44px]")}>
+              {l.bola ? l.date.split(" · ")[0] : l.saison === saison ? `J${l.j}` : `S${l.saison} J${l.j}`}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{l.quoi}</span>
+            <span className={cn("font-mono text-[13px] font-bold tabular-nums", l.xp < 0 && "text-[#ff9b9d]")}>{signe(l.xp)}</span>
+            {s ? <MontantXpS n={s} className="font-mono text-[13px] font-bold text-white" /> : null}
+          </div>
+        );
+      })}
     </section>
   );
 }
@@ -280,7 +292,7 @@ export function VueMissions({ b, saison, nom }: { b: BilanXp; saison: number; no
       {horsSfl ? <MissionsPerso /> : mm ? <MissionsBola /> : <Attente />}
       <Defis nom={nom} />
       <Sources b={b} />
-      <Journal b={b} saison={saison} />
+      <Journal b={b} saison={saison} nom={nom} />
     </div>
   );
 }
