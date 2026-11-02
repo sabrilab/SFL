@@ -154,6 +154,7 @@
   gap: 6px;
   -webkit-tap-highlight-color: transparent;
 }
+/* Sa taille est posée par la vue (64 × 103 au téléphone, 84 × 136 à l'ordinateur). */
 .pk-nation__carte {
   position: relative;
   display: block;
@@ -170,11 +171,13 @@
 .pk-nation--scellee .pk-nation__carte {
   background: #0b0b0d;
 }
+/* Scellée : un éclat de la nation, voilé, dans ses couleurs (en gris, les nations au
+   papier sombre — Kenya, Ouganda, Tanzanie — n'étaient plus qu'un carré noir). */
 .pk-tesselle--scellee {
   position: absolute;
-  inset: 22px 10px auto;
-  filter: grayscale(1);
-  opacity: 0.45;
+  inset: 21% 15% auto;
+  filter: saturate(0.55);
+  opacity: 0.5;
 }
 .pk-nation__cadenas {
   position: absolute;
@@ -185,14 +188,15 @@
   place-items: center;
   color: rgb(255 255 255 / 0.7);
 }
+/* Le nom en entier, sur deux lignes s'il le faut (« Afrique du Sud » au téléphone). */
 .pk-nation__nom {
   max-width: 100%;
-  overflow: hidden;
   font-size: 11px;
   font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  text-wrap: balance;
   color: rgb(255 255 255 / 0.78);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .pk-nation--scellee .pk-nation__nom {
   color: rgb(255 255 255 / 0.45);
@@ -251,6 +255,7 @@
   flex-direction: column;
   gap: 4px;
   max-width: 21rem;
+  margin-top: 10px;
 }
 .pk-detail__sources ul {
   display: flex;
@@ -270,15 +275,37 @@
   margin-top: 6px;
 }
 
-/* La carte qui se retourne une fois : deux demi-tours, le dos entre les deux. */
+/* La carte qui se retourne une fois : deux demi-tours, le dos entre les deux.
+   Sa place est celle de la 3D posée, dès le début (la légende et les boutons
+   ne bougent plus), et la 3D, montée dessous sans se voir, se capture pendant
+   le retournement : quand la carte se pose, elle prend le relais sans vide. */
 .pk-retourne {
-  display: block;
+  display: grid;
+  place-items: center;
   perspective: 1200px;
 }
+.pk-retourne > * {
+  grid-area: 1 / 1;
+}
+.pk-retourne__3d--cache {
+  opacity: 0;
+  pointer-events: none;
+}
 .pk-retourne__carte {
+  position: relative;
+  z-index: 1;
   display: block;
-  width: 100%;
-  height: 100%;
+}
+/* « Porter », « Plus tard » : quand la carte est posée. */
+.pk-apres-rangee {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  transition: opacity 0.3s ease-out;
+}
+.pk-apres-rangee--attend {
+  opacity: 0;
+  pointer-events: none;
 }
 /* Posés hors du mode : les boutons gardent son blanc. */
 .pk-voile .mp-bouton:not(.mp-bouton--creux),

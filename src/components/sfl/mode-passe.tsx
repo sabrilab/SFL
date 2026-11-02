@@ -43,7 +43,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Check, ChevronLeft, ChevronRight, Lock, X } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
-import { Card3D } from "@/components/sfl/card-3d";
+import { Card3D, REMPLISSAGE_3D } from "@/components/sfl/card-3d";
 import { useHorsDeLaSfl, useMissionsASigner, VueMissions } from "@/components/sfl/mode-passe-missions";
 import { VueAutres } from "@/components/sfl/mode-passe-autres";
 import type { Finition } from "@/components/sfl/finitions-carte";
@@ -53,7 +53,6 @@ import { Plongee } from "@/components/sfl/plongee-carte";
 import { COULEURS_PAYS, PAYS_PAR_DEFAUT } from "@/components/sfl/skins-passe";
 import { CompteurXp } from "@/components/sfl/compteur-xp";
 import { VuePacks } from "@/components/sfl/mode-passe-packs";
-import { useSoldeXp } from "@/hooks/use-achats-xp";
 import { finitionsDe, useAfriqueCarte, useChoixHabillage, useHabillage, usePaliers } from "@/hooks/use-habillage";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -104,6 +103,23 @@ const TIRER = 110;
 function tailleCarte(): number {
   if (typeof window === "undefined") return 1;
   return Math.max(0.74, Math.min(1.3, (window.innerHeight - 512) / 330));
+}
+
+/** La hauteur de la carte posée dans sa 3D, à la taille 1 (Card3D : 72 % de son cadre). */
+const HAUTEUR_POSEE = ((254 * 1656) / 1024) * REMPLISSAGE_3D;
+/** Ce que la carte laisse libre dans sa place : la puce « Aperçu » au-dessus, un souffle dessous. */
+const MARGE_CARTE = 24;
+/** Jamais plus petite (un téléphone bas, 375 × 667) ; jamais sur les onglets ni sur le palier. */
+const TAILLE_MIN = 0.5;
+
+/**
+ * La taille qui tient dans la place de la carte (la rangée que lui laisse la
+ * grille du mode, mesurée) : sur un téléphone bas, la carte passait sous les
+ * onglets et sous l'annonce de la saison (02/11, 375 × 667).
+ */
+function tailleDansLaPlace(taille: number, place: number): number {
+  if (place <= 0) return taille;
+  return Math.max(TAILLE_MIN, Math.min(taille, (place - MARGE_CARTE) / HAUTEUR_POSEE));
 }
 
 /** /profil/xp?vue=missions (la notification des Missions Bola) ouvre les Missions ; ?vue=autres, Les autres (celle de l'outsider). */
@@ -550,7 +566,6 @@ export function ModePasse({
   const lg = useXpLigue();
   const vitrine = !!lg?.vitrine && lg.vitrine === player.name;
   const afrique = useAfriqueCarte(player.name);
-  const solde = useSoldeXp(player.name);
   // Les Packs (PACK AFRIQUE 2027) : quand le pack est ouvert, ou pour qui en a déjà, ou pour la vitrine (un aperçu).
   const avecPacks = packOuvert() || afrique.length > 0 || vitrine;
   const vues = VUES.filter((v) => (v !== "autres" || !horsSfl) && (v !== "packs" || avecPacks));
@@ -581,6 +596,14 @@ export function ModePasse({
     const regler = () => setTaille(tailleCarte());
     window.addEventListener("resize", regler);
     return () => window.removeEventListener("resize", regler);
+  }, []);
+  // La place que la grille laisse à la carte (la rangée du milieu), mesurée : la carte s'y tient.
+  const [place, setPlace] = useState(0);
+  const mesurerPlace = useCallback((el: HTMLDivElement | null) => {
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => setPlace(Math.round(e.contentRect.height)));
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   // L'ouverture : le noir part de la tuile et prend l'écran.
@@ -639,6 +662,7 @@ export function ModePasse({
   const apercu = etatChoisi === "verrou" || etatChoisi === "prochain";
   const habillage = useMemo(() => (p ? essai(porte, p, pays) : porte), [porte, p, pays]);
   if (!pret || !b || !p) return null;
+  const tailleVue = tailleDansLaPlace(taille, place);
 
   // Tirer vers le bas, depuis le haut ou le bas de l'écran (la carte, elle, tourne au doigt).
   const tirer = {
@@ -663,7 +687,9 @@ export function ModePasse({
       role="dialog"
       aria-modal
       aria-label="Passe Bola"
-      className={cn("mode-passe dark", `fiche--${p.rang}`, (monte || reduit) && "mode-passe--monte", sortie && "mode-passe--sortie")}
+      // Le ton du palier choisi colore la lumière et les boutons ; les Packs restent en noir et blanc
+      // (ni or ni rose selon le palier qu'on regardait : leurs seules couleurs sont celles des nations).
+      className={cn("mode-passe dark", `fiche--${vue === "packs" ? "B" : p.rang}`, (monte || reduit) && "mode-passe--monte", sortie && "mode-passe--sortie")}
     >
       <div aria-hidden className="mp-ciel" />
       <div aria-hidden className="mp-projecteur" />
@@ -681,7 +707,8 @@ export function ModePasse({
             </span>
             <span className="font-mono text-[13px] font-bold text-white/45">/ {PALIERS_PASSE}</span>
           </span>
-          <span className="mono-label tabular-nums text-white/55">{`${b.saisonPasse.nom} · ${xp(b.saison)}`}</span>
+          {/* L'XP de la saison du Passe, quand elle n'est pas déjà celle du compteur (jusqu'au 8/11, c'est la même). */}
+          {b.saison !== b.total && <span className="mono-label tabular-nums text-white/55">{`${b.saisonPasse.nom} · ${xp(b.saison)}`}</span>}
         </div>
         <div className="flex items-start gap-2.5">
           <span className={cn("mp-niveau", `fiche--${r?.rang ?? "B"}`)} aria-label={`Niveau XP ${b.niveau}`}>
@@ -697,16 +724,9 @@ export function ModePasse({
         </div>
       </header>
 
+      {/* Une ligne, toujours : l'XP gagnée et le niveau. Ce qui reste à dépenser se lit dans les Packs. */}
       <div className="mp-compteur mp-entre" style={{ "--i": 1 } as React.CSSProperties}>
-        <CompteurXp
-          b={b}
-          solde={vitrine ? null : solde}
-          onSolde={avecPacks ? () => {
-            vueTouchee.current = true;
-            setVue("packs");
-          } : undefined}
-          className="text-white/70"
-        />
+        <CompteurXp b={b} className="text-white/70" />
       </div>
 
       <nav className={cn("mp-vues mp-entre", vues.length > 3 && "mp-vues--quatre")} style={{ "--i": 1 } as React.CSSProperties} aria-label={vues.map((v) => NOM_VUE[v]).join(", ")}>
@@ -730,7 +750,7 @@ export function ModePasse({
 
       {vue === "passe" ? (
         <>
-          <div className={cn("mp-carte", apercu && "mp-carte--apercu")}>
+          <div ref={mesurerPlace} className={cn("mp-carte", apercu && "mp-carte--apercu")}>
             {apercu && (
               <span className="mp-apercu mono-label">
                 <Lock className="size-2.5" strokeWidth={2.8} /> Aperçu
@@ -738,7 +758,7 @@ export function ModePasse({
             )}
             <Card3D
               cacheKey={`mode-passe-${p.n}-${player.name}-${p.habille?.finition === "couleurs" ? pays : ""}`}
-              size={taille}
+              size={tailleVue}
               apercu
               render={(s) => <PlayerCard player={player} size={s} habillage={habillage} />}
             />
@@ -787,7 +807,7 @@ export function ModePasse({
 
       {plonge && (
         <Plongee
-          carte={<PlayerCard player={player} size={taille} habillage={porte} />}
+          carte={<PlayerCard player={player} size={tailleVue} habillage={porte} />}
           photo={photo}
           theme={p.n === 19 ? "ombre" : "transformation"}
           onFin={() => setPlonge(false)}

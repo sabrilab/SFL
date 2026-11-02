@@ -28,7 +28,7 @@ import { COULEURS_PAYS, PAYS_PAR_DEFAUT } from "@/components/sfl/skins-passe";
 import { useChoixBadge } from "@/hooks/use-badge-carte";
 import { finitionsDe, useAfriqueCarte, useChoixHabillage, useHabillage, usePaliers, useRecruesCarte } from "@/hooks/use-habillage";
 import { SKINS_AFRIQUE } from "@/components/sfl/afrique/registre";
-import { NATIONS, nationsMontrees, numeroSerieNation, PACK_AFRIQUE, packOuvert } from "@/lib/sfl/pack-afrique";
+import { NATIONS, nationsMontrees, numeroSerieNation, packOuvert } from "@/lib/sfl/pack-afrique";
 import { FINITIONS_RECRUES, SKINS_RECRUES, type FinitionRecrue } from "@/components/sfl/skins-recrues";
 import { badgesGagnes, cleBadge, type BadgeCarte } from "@/lib/sfl/badge-carte";
 import { choisirBadge } from "@/lib/sfl/badges-choisis";
@@ -284,7 +284,8 @@ export function PersonnaliserCarte({ player, tuile }: { player: Player; /** En t
                         vignette={vignette({ finition: f, serieNation: obtenu?.[1] || undefined })}
                         titre={`${skin.nom} · ${nation.nom}`}
                         quoi={skin.quoi}
-                        comment={obtenu ? (obtenu[1] ? `Pack Afrique 2027 · ${numeroSerieNation(obtenu[1])}` : "Pack Afrique 2027") : `Pack Afrique 2027 · ${PACK_AFRIQUE.prix.toLocaleString("fr-FR")} XP`}
+                        // Pas de prix sur une nation qu'on n'a pas : le pack se tire au hasard, une nation ne s'achète pas.
+                        comment={obtenu?.[1] ? `Pack Afrique 2027 · ${numeroSerieNation(obtenu[1])}` : "Pack Afrique 2027"}
                       />
                     );
                   })}

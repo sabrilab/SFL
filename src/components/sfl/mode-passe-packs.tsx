@@ -26,14 +26,14 @@
 // le pack plein et rejoue la cérémonie en aperçu, sans rien écrire.
 // Aucun texte d'aide : les chiffres, les états et le geste suffisent.
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { Lock, X } from "lucide-react";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { ApercuNation, habillageNation } from "@/components/sfl/afrique/apercu";
 import { SKINS_AFRIQUE } from "@/components/sfl/afrique/registre";
-import { Card3D } from "@/components/sfl/card-3d";
+import { Card3D, REMPLISSAGE_3D } from "@/components/sfl/card-3d";
 import { DosCarte } from "@/components/sfl/dos-carte";
 import { matiereDe, MATIERES, type Finition, type HabillageCarte } from "@/components/sfl/finitions-carte";
 import { RosaceBola } from "@/components/sfl/motif-carte";
@@ -140,50 +140,77 @@ export function EtuiAfrique({ largeur = 188, respire = false }: { largeur?: numb
 
 /* --------------------------- La révélation --------------------------- */
 
+/** La 3D de la cérémonie, et sa place : le cadre de Card3D à cette taille (la carte posée y tient à 72 %). */
+const TAILLE_3D = 0.95;
+const CADRE_3D = { l: 254 * TAILLE_3D, h: ((254 * 1656) / 1024) * TAILLE_3D };
+/** La carte à plat de la cérémonie : exactement la carte que la 3D pose. */
+const TAILLE_PLATE = TAILLE_3D * REMPLISSAGE_3D;
+
+type Etape = "face" | "vers-dos" | "dos" | "vers-face" | "retour" | "pose";
+const SUITE = { face: "vers-dos", "vers-dos": "dos", dos: "vers-face", "vers-face": "retour", retour: "pose" } as const;
+const DUREE = { face: 1300, "vers-dos": 260, dos: 1700, "vers-face": 260, retour: 900 } as const;
+
 /**
  * La carte du joueur arrive dans la nation tirée, se retourne une fois pour
  * montrer son dos (le motif, le numéro de série), puis se pose en 3D.
  * « Réduire les animations » : posée tout de suite.
+ * La place est celle de la 3D dès le début : la légende et les boutons ne
+ * sautent plus quand la 3D arrive (02/11 : 55 px à l'ordinateur, 40 au
+ * téléphone). La 3D est montée dès le début, sous la carte à plat et sans se
+ * voir : elle se capture pendant le retournement et prend le relais à la même
+ * place, sans le vide d'avant.
  */
-function RevelationNation({ nation, player, autour, reduit }: { nation: CodeNation; player: Player; autour: HabillageCarte; reduit: boolean }) {
+function RevelationNation({
+  nation,
+  player,
+  autour,
+  reduit,
+  onPosee,
+}: {
+  nation: CodeNation;
+  player: Player;
+  autour: HabillageCarte;
+  reduit: boolean;
+  onPosee: () => void;
+}) {
   // face → (demi-tour) → dos → (demi-tour) → face → la 3D, posée.
-  const [etape, setEtape] = useState<"face" | "vers-dos" | "dos" | "vers-face" | "retour" | "pose">(reduit ? "pose" : "face");
+  const [etape, setEtape] = useState<Etape>(reduit ? "pose" : "face");
   const habillage = {
     ...habillageNation(nation, autour),
     serieNation: autour.serieNation,
   };
   useEffect(() => {
-    if (etape === "pose") return;
-    const suite = { face: "vers-dos", "vers-dos": "dos", dos: "vers-face", "vers-face": "retour", retour: "pose" } as const;
-    const duree = { face: 1300, "vers-dos": 260, dos: 1700, "vers-face": 260, retour: 900 }[etape];
-    const id = window.setTimeout(() => setEtape(suite[etape]), duree);
+    if (etape === "pose") {
+      onPosee();
+      return;
+    }
+    const id = window.setTimeout(() => setEtape(SUITE[etape]), DUREE[etape]);
     return () => window.clearTimeout(id);
-  }, [etape]);
-  if (etape === "pose") return <ApercuNation nation={nation} player={player} vue="3d" taille={0.95} autour={habillage} />;
-  // La carte à plat, à la taille où la 3D la pose (Card3D réduit un peu sa carte).
-  const taille = TAILLE_PLATE;
+  }, [etape, onPosee]);
+  const pose = etape === "pose";
   const dos = etape === "dos" || etape === "vers-face";
   const tourne = etape === "vers-dos" || etape === "vers-face";
-  const w = 254 * taille;
   return (
-    <span className="pk-retourne" style={{ width: w, height: (w * 1656) / 1024 }}>
-      <motion.span
-        className="pk-retourne__carte"
-        animate={{ rotateY: tourne ? 90 : 0, scale: etape === "retour" ? 1.04 : 1 }}
-        transition={{ duration: tourne ? 0.26 : 0.32, ease: tourne ? [0.55, 0, 1, 0.45] : [0, 0.55, 0.45, 1] }}
-      >
-        {dos ? (
-          <DosCarte matiere={matiereDe("base", habillage)} nom={player.name} size={taille} habillage={habillage} />
-        ) : (
-          <PlayerCard player={player} size={taille} habillage={habillage} />
-        )}
-      </motion.span>
+    <span className="pk-retourne" style={{ width: CADRE_3D.l, height: CADRE_3D.h }}>
+      <span className={cn("pk-retourne__3d", !pose && "pk-retourne__3d--cache")} aria-hidden={!pose || undefined}>
+        <ApercuNation nation={nation} player={player} vue="3d" taille={TAILLE_3D} autour={habillage} />
+      </span>
+      {!pose && (
+        <motion.span
+          className="pk-retourne__carte"
+          animate={{ rotateY: tourne ? 90 : 0, scale: etape === "retour" ? 1.04 : 1 }}
+          transition={{ duration: tourne ? 0.26 : 0.32, ease: tourne ? [0.55, 0, 1, 0.45] : [0, 0.55, 0.45, 1] }}
+        >
+          {dos ? (
+            <DosCarte matiere={matiereDe("base", habillage)} nom={player.name} size={TAILLE_PLATE} habillage={habillage} />
+          ) : (
+            <PlayerCard player={player} size={TAILLE_PLATE} habillage={habillage} />
+          )}
+        </motion.span>
+      )}
     </span>
   );
 }
-
-/** La carte à plat de la cérémonie : la largeur que Card3D donne à sa carte à la taille 0,95. */
-const TAILLE_PLATE = 0.68;
 
 /** Le halo d'une nation : sa couleur vive, à faible opacité (jamais d'or ni de couleur de rareté). */
 function haloDe(nation: CodeNation): string {
@@ -197,6 +224,8 @@ function haloDe(nation: CodeNation): string {
 /* ------------------------------- La vue ------------------------------- */
 
 type Tirage = { nation: CodeNation; serie: number; apercu?: boolean };
+/** Un achat payé dont la cérémonie n'est pas finie. */
+type APoser = { nation: CodeNation; serie: number; xp: number };
 
 export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean }) {
   const nom = player.name;
@@ -219,7 +248,22 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
   const [ceremonie, setCeremonie] = useState(false);
   const [detail, setDetail] = useState<CodeNation | null>(null);
   const [refus, setRefus] = useState<string | null>(null);
+  /** La carte est posée (la fin du retournement) : « Porter », « Plus tard » se montrent. */
+  const [posee, setPosee] = useState(false);
   const cle = useRef<string | null>(null);
+  // L'achat payé ne se pose dans l'app (la grille, le compte, le solde) qu'à la fin de la
+  // cérémonie : derrière la confirmation qui s'efface, la nation tirée se lisait dans la grille
+  // avant que l'étui ne soit déchiré (02/11). Si la vue s'en va avant (le mode fermé en pleine
+  // cérémonie), il se pose quand même.
+  const aPoser = useRef<APoser | null>(null);
+  const poser = useCallback(() => {
+    const t = aPoser.current;
+    aPoser.current = null;
+    if (!t) return;
+    poserAchat(nom, { article: PACK_AFRIQUE.article, obtenu: t.nation, xp: t.xp, serie: t.serie, le: new Date().toISOString() });
+  }, [nom]);
+  useEffect(() => () => poser(), [poser]);
+  const surPosee = useCallback(() => setPosee(true), []);
   const autour: HabillageCarte = {
     cran: porte.cran,
     rang: porte.rang,
@@ -234,13 +278,8 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
     let fini = false;
     void ouvrirPackAfrique(nom, enSuspens).then((r) => {
       if (fini || !r.ok) return;
-      poserAchat(nom, {
-        article: PACK_AFRIQUE.article,
-        obtenu: r.obtenu,
-        xp: r.xp,
-        serie: r.serie,
-        le: new Date().toISOString(),
-      });
+      aPoser.current = { nation: r.obtenu as CodeNation, serie: r.serie, xp: r.xp };
+      setPosee(false);
       setTirage({ nation: r.obtenu as CodeNation, serie: r.serie });
       setCeremonie(true);
     });
@@ -254,6 +293,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
     if (vitrine) {
       // L'aperçu de la vitrine : une nation au hasard, sans appel au serveur.
       const n = nations[Math.floor(Math.random() * nations.length)];
+      setPosee(false);
       setTirage({ nation: n, serie: 0, apercu: true });
       setCeremonie(true);
       return;
@@ -265,6 +305,8 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
   };
 
   const fermerConfirmation = () => {
+    // Payé, mais fermé avant la cérémonie : c'est « Plus tard ».
+    if (aPoser.current) return finir(false);
     setConfirmer(false);
     oublierOuverture();
   };
@@ -277,26 +319,23 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
       void rafraichirBilanServeur(true);
       return "dite" as const;
     }
-    poserAchat(nom, {
-      article: PACK_AFRIQUE.article,
-      obtenu: r.obtenu,
-      xp: r.xp,
-      serie: r.serie,
-      le: new Date().toISOString(),
-    });
+    aPoser.current = { nation: r.obtenu as CodeNation, serie: r.serie, xp: r.xp };
     logActivity("pack", {
       meta: { article: PACK_AFRIQUE.article, obtenu: r.obtenu },
     });
+    setPosee(false);
     setTirage({ nation: r.obtenu as CodeNation, serie: r.serie });
     return "ok" as const;
   };
 
-  const finir = (porter: boolean) => {
+  function finir(porter: boolean) {
     const t = tirage;
     setCeremonie(false);
     setConfirmer(false);
     setTirage(null);
+    setPosee(false);
     oublierOuverture();
+    poser();
     if (t && !t.apercu) {
       void rafraichirAchatsXp(nom);
       if (porter)
@@ -305,7 +344,31 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
           finition: `afrique-${t.nation}` as Finition,
         });
     }
-  };
+  }
+
+  // Échap ferme ce qui est posé sur les Packs (la confirmation, une nation en grand, la carte
+  // posée de la cérémonie), jamais tout le mode Passe dessous (02/11 : Échap sur la confirmation
+  // renvoyait sur Ma carte). La cérémonie en cours, elle, ne s'interrompt pas.
+  const echap = useRef<() => void>(() => {});
+  useEffect(() => {
+    echap.current = () => {
+      if (ceremonie) {
+        if (posee) finir(false);
+      } else if (detail) setDetail(null);
+      else if (confirmer) fermerConfirmation();
+    };
+  });
+  const dessus = confirmer || ceremonie || !!detail;
+  useEffect(() => {
+    if (!dessus) return;
+    const surTouche = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      echap.current();
+    };
+    window.addEventListener("keydown", surTouche, true);
+    return () => window.removeEventListener("keydown", surTouche, true);
+  }, [dessus]);
 
   const bouton =
     etat.t === "apercu" ? (
@@ -325,6 +388,8 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
     ) : null;
 
   const mienne = (n: CodeNation) => afrique.find(([x]) => x === n);
+  // Les nations : plus grandes à l'ordinateur (six colonnes, beaucoup de place).
+  const mini = large ? { l: 84, h: 136 } : { l: 64, h: 103 };
 
   return (
     <div className="pk">
@@ -357,7 +422,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
                 onClick={() => m && setDetail(n)}
                 aria-label={m ? `${nationDe(n).nom}, ${skin.nom}` : `${nationDe(n).nom}, scellée`}
               >
-                <span className="pk-nation__carte">
+                <span className="pk-nation__carte" style={{ width: mini.l, height: mini.h }}>
                   {m ? (
                     <Mini
                       player={player}
@@ -366,8 +431,8 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
                         ...habillageNation(n),
                         serieNation: m[1] || undefined,
                       }}
-                      l={64}
-                      h={103}
+                      l={mini.l}
+                      h={mini.h}
                     />
                   ) : (
                     <>
@@ -389,20 +454,23 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
       {/* Posés sur tout l'écran (hors du défilement du mode, qui les couperait). */}
       {createPortal(
         <>
-          {/* La confirmation : la piste scellée, dans un seul sens. */}
+          {/* La confirmation : la piste scellée, dans un seul sens. Son voile reste sous la
+              cérémonie (le Passe ne se montre pas entre les deux) ; ce qu'il porte s'efface. */}
           <AnimatePresence>
-            {confirmer && !ceremonie && (
+            {confirmer && (
               <motion.div
                 className="pk-voile"
-                role="dialog"
-                aria-modal
-                aria-label={`Ouvrir le ${PACK_AFRIQUE.nom}`}
+                role={ceremonie ? undefined : "dialog"}
+                aria-modal={ceremonie ? undefined : true}
+                aria-hidden={ceremonie || undefined}
+                aria-label={ceremonie ? undefined : `Ouvrir le ${PACK_AFRIQUE.nom}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
+                {!ceremonie && (
                 <div className="pk-confirmer">
-                  <button type="button" onClick={fermerConfirmation} aria-label="Fermer" className="mp-rond pk-confirmer__fermer">
+                  <button type="button" onClick={fermerConfirmation} aria-label="Fermer" className="mp-rond pk-confirmer__fermer" autoFocus>
                     <X className="size-4" strokeWidth={2.4} />
                   </button>
                   <EtuiAfrique largeur={132} respire={!reduit} />
@@ -426,6 +494,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
                     </span>
                   )}
                 </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -453,6 +522,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
                           serieNation: tirage.serie || undefined,
                         }}
                         reduit={reduit}
+                        onPosee={surPosee}
                       />
                     ),
                     legende: (
@@ -461,7 +531,8 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
                           {nationDe(tirage.nation).nom} · {SKINS_AFRIQUE[tirage.nation].nom}
                           {tirage.serie ? ` · ${numeroSerieNation(tirage.serie)}` : " · aperçu"}
                         </span>
-                        <span className="flex gap-2 pt-3">
+                        {/* Quand la carte est posée : pas de « Porter » pendant qu'elle se retourne. */}
+                        <span className={cn("pk-apres-rangee", !posee && "pk-apres-rangee--attend")} inert={!posee}>
                           <button type="button" className="mp-bouton pk-apres" onClick={() => finir(true)}>
                             {tirage.apercu ? "Fermer" : "Porter"}
                           </button>
@@ -536,7 +607,7 @@ function DetailNation({
   const n = nationDe(nation);
   return (
     <div className="pk-detail">
-      <button type="button" onClick={onFermer} aria-label="Fermer" className="mp-rond pk-confirmer__fermer">
+      <button type="button" onClick={onFermer} aria-label="Fermer" className="mp-rond pk-confirmer__fermer" autoFocus>
         <X className="size-4" strokeWidth={2.4} />
       </button>
       <span className="pk-detail__carte">
@@ -554,6 +625,10 @@ function DetailNation({
       </span>
       <h3 className="pk-detail__nom titre-lettrage">{skin.nom}</h3>
       <p className="pk-detail__quoi">{skin.quoi}</p>
+      {/* Porter avant l'inspiration : sur un téléphone bas, le bouton était sous la liste des sources. */}
+      <button type="button" className={cn("mp-bouton", portee && "mp-bouton--creux")} onClick={() => onPorter(!portee)}>
+        {portee ? "Retirer" : "Porter"}
+      </button>
       <div className="pk-detail__sources">
         <span className="mono-label text-white/40">Inspiration</span>
         <ul>
@@ -570,9 +645,6 @@ function DetailNation({
           ))}
         </ul>
       </div>
-      <button type="button" className={cn("mp-bouton", portee && "mp-bouton--creux")} onClick={() => onPorter(!portee)}>
-        {portee ? "Retirer" : "Porter"}
-      </button>
     </div>
   );
 }
