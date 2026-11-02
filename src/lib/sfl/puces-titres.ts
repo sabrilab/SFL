@@ -12,9 +12,12 @@
 //
 // « Une fois que c'est attribué » : on lit les lignes de la saison que
 // l'écran montre (useSeason().saison, où les votes fermés sont posés,
-// appliquerVotes), jamais le document brut ni la feuille en direct. Une
-// journée encore au vote, ou figée jusqu'à sa révélation, n'a donc aucun
-// titre sur ses lignes, et aucune puce : ce fichier n'a pas d'heure à lui.
+// appliquerVotes), jamais le document brut ni la feuille en direct. Mais
+// cette vue porte déjà le MVP automatique le jour même (appliquerMvpAuto,
+// posé à chaque sauvegarde, dès le premier but saisi) : sans garde, la puce
+// dorée bougeait pendant le direct et le vote (contrôle du 02/11). D'où
+// titresAttribues : rien le jour du match, sauf une journée que la ligue
+// compte déjà (la révélation, quand la vue de la saison la donne).
 //
 // Les règles :
 //   · ex æquo : chaque élu a sa ligne à vrai, donc sa puce ;
@@ -23,9 +26,12 @@
 //     titres sont ceux de son match à lui ;
 //   · les équipes du match, quand on les donne, gardent les titres à ce
 //     match-là (un nom écrit deux fois un même dimanche ne les mélange pas) ;
-//   · une ligne du compte vitrine ne compte jamais.
+//   · le compte vitrine (compte-vitrine.ts) a ses titres sur son seul écran,
+//     donc ses puces, partout où sa carte se pose (Sabri : « tout, tout,
+//     tout ») ; ses lignes sont sans équipe, aucun match ne le montre.
 
 import type { BoostType } from "./engine";
+import { jourMoisDuLibelle } from "./convocation-temps";
 import type { MatchEntry } from "./saisie/types";
 
 /** L'ordre des puces sur une carte. */
@@ -42,13 +48,12 @@ export function titresDeLigne(l: { mvp?: boolean; impact?: boolean; def?: boolea
   return ORDRE_TITRES.filter((t) => !!l[t]);
 }
 
-/** Les lignes d'une journée qui peuvent porter un titre : ni extra time, ni vitrine. */
+/** Les lignes d'une journée qui peuvent porter un titre : pas d'extra time. */
 function lignesTitrables(entries: readonly MatchEntry[], j: number, equipes?: readonly [string, string]): MatchEntry[] {
   return entries.filter(
     (e) =>
       e.j === j &&
       !e.extraTime &&
-      !e.vitrine &&
       // Une journée « à plat » (sans équipes) n'a qu'un match : toutes ses lignes en sont.
       (!equipes || e.team == null || e.team === equipes[0] || e.team === equipes[1]),
   );
@@ -90,4 +95,35 @@ export function titresDuJour(
     parNom.set(cle, deja);
   }
   return new Map([...parNom].map(([nom, s]) => [nom, ORDRE_TITRES.filter((t) => s.has(t))]));
+}
+
+/** L'instant tombe-t-il le jour de ce libellé (« 8 nov. »), à Paris ? L'année n'est pas lue. */
+export function leJourMeme(libelle: string, t: Date): boolean {
+  const jm = jourMoisDuLibelle(libelle);
+  if (!jm) return false;
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", day: "numeric", month: "numeric" }).formatToParts(t);
+  const v = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return v("day") === jm.jour && v("month") === jm.mois;
+}
+
+/**
+ * Les titres de la journée `j` sont-ils attribués à l'instant `t` ? Pas le
+ * jour du match : le MVP automatique s'y recalcule à chaque but, et le vote
+ * Impact / Défensive court jusqu'au soir. Ils tombent à minuit (Paris), ou
+ * plus tôt si la ligue compte déjà la journée (`comptees` : la révélation de
+ * 19 h, revelation.ts, quand la vue de la saison la donne). Une journée sans
+ * date lisible est attribuée telle que la vue la montre.
+ *
+ * C'est l'ancien régime de titresTombes (revelation.ts) : à la fusion de la
+ * révélation, `titresTombes(saison, j, t)` peut le remplacer tel quel.
+ */
+export function titresAttribues(
+  journees: readonly { j: number; date: string }[],
+  j: number,
+  t: Date,
+  comptees?: ReadonlySet<number>,
+): boolean {
+  if (comptees?.has(j)) return true;
+  const meta = journees.find((m) => m.j === j);
+  return !meta || !leJourMeme(meta.date, t);
 }

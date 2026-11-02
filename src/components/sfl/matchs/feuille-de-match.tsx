@@ -234,7 +234,8 @@ function poser(t: TerrainFeuille, basEstA: boolean, titresDe: TitresDe = SANS_TI
         encre: eq.encre,
         x: 50 + (largeur - 50) * ecart(profondeur, chezMoi),
         y: (chezMoi ? 1 : -1) * depuisMediane(profondeur),
-        titres: titresDe(nom),
+        // Une carte d'extra time (même dans sa propre équipe) ne double pas ses puces.
+        titres: eq.extraTime?.[i] ? [] : titresDe(nom),
       });
     });
   }

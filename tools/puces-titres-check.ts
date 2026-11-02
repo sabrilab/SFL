@@ -2,14 +2,16 @@
 // pour le MVP, rouge pour l'Impact, bleue pour la Défensive (Ilyes,
 // 02/11/2026), de la J1 à la J4 et pour toute journée à venir. Une puce
 // n'apparaît qu'une fois le titre attribué : elle se lit dans la saison où
-// les votes fermés sont posés (appliquerVotes), jamais pendant le vote.
+// les votes fermés sont posés (appliquerVotes), et jamais le jour du match
+// (titresAttribues), où le MVP automatique est déjà sur les lignes.
 //   npx tsx tools/puces-titres-check.ts
 import assert from "node:assert/strict";
 import { computeJournees } from "../src/lib/sfl/saisie/engine";
 import { seedSaison } from "../src/lib/sfl/saisie/store";
 import type { MatchEntry } from "../src/lib/sfl/saisie/types";
-import { titresDeLigne, titresDuJoueur, titresDuJour } from "../src/lib/sfl/puces-titres";
+import { titresAttribues, titresDeLigne, titresDuJoueur, titresDuJour } from "../src/lib/sfl/puces-titres";
 import { appliquerVotes, type VoteFigure } from "../src/lib/sfl/votes";
+import { appliquerMvpAuto } from "../src/lib/sfl/saisie/mvp";
 
 const ligne = (j: number, player: string, team: string | null, t: Partial<MatchEntry> = {}): MatchEntry => ({
   j,
@@ -35,7 +37,7 @@ const journees = computeJournees(brute);
 for (const j of [1, 2, 3, 4]) {
   const jour = journees.find((x) => x.j === j)!;
   assert.ok(jour, `la J${j} existe`);
-  const lignes = brute.entries.filter((e) => e.j === j && !e.extraTime && !e.vitrine);
+  const lignes = brute.entries.filter((e) => e.j === j && !e.extraTime);
   // Chaque titre écrit sur une ligne a sa puce, sur la carte de ce match-là.
   for (const m of jour.matches ?? []) {
     const equipes = [m.teamA.name, m.teamB.name] as const;
@@ -77,8 +79,8 @@ const cas: MatchEntry[] = [
   // Venu en extra time dans le match 1 (ses titres sont ceux du match 2).
   ligne(9, "Elias", "Noirs 1", { extraTime: true }),
   ligne(9, "Farid", "Blancs 2"),
-  // Une ligne du compte vitrine ne porte jamais rien.
-  ligne(9, "Vitrine", "Blancs 2", { mvp: true, vitrine: true }),
+  // Le compte vitrine, sur son seul écran : ses titres, donc ses puces.
+  ligne(9, "Vitrine", null, { mvp: true, impact: true, def: true, vitrine: true }),
   // Un nom écrit avec des espaces et une capitale de trop.
   ligne(9, "  Ghali ", "Blancs 2", { impact: true }),
   // La J10 jouée, pas encore attribuée : aucun titre sur ses lignes.
@@ -92,14 +94,15 @@ assert.deepEqual(titresDuJoueur(cas, 9, "Driss", M1), [], "sans titre, sans puce
 assert.deepEqual(titresDuJoueur(cas, 9, "Elias", M2), ["mvp", "impact", "def"], "trois titres, dans l'ordre");
 assert.deepEqual(titresDuJoueur(cas, 9, "Elias", M1), [], "en extra time dans un autre match : rien");
 assert.deepEqual(titresDuJoueur(cas, 9, "Adil", M2), [], "le mauvais match : rien");
-assert.deepEqual(titresDuJoueur(cas, 9, "Vitrine", M2), [], "la vitrine : rien");
+assert.deepEqual(titresDuJoueur(cas, 9, "Vitrine"), ["mvp", "impact", "def"], "la vitrine : tout, partout où sa carte se pose");
 assert.deepEqual(titresDuJoueur(cas, 9, "ghali", M2), ["impact"], "un nom écrit autrement");
 assert.deepEqual(titresDuJoueur(cas, 9, "Personne", M1), [], "une ligne absente : rien");
 assert.deepEqual(titresDuJoueur(cas, 11, "Adil"), [], "une journée sans lignes : rien");
 assert.equal(titresDuJour(cas, 10).size, 0, "une journée pas encore attribuée : aucune puce");
-// Le terrain entier du match 1 : les deux MVP, l'Impact, et personne d'autre.
+// Le terrain entier du match 1 : les deux MVP, l'Impact, et personne d'autre
+// (la vitrine, sans équipe, suit sa carte où qu'elle se pose).
 assert.deepEqual(
-  [...titresDuJour(cas, 9, M1)].sort(),
+  [...titresDuJour(cas, 9, M1)].filter(([n]) => n !== "vitrine").sort(),
   [
     ["adil", ["mvp", "def"]],
     ["bilal", ["mvp"]],
@@ -136,5 +139,36 @@ assert.deepEqual(titresDuJoueur(avecVote.entries, J, "Bilal", equipes), []);
 // Une vue figée jusqu'à la révélation remet à zéro les lignes du jour : plus aucune puce.
 const figee = apres.entries.map((e) => (e.j === J ? { ...e, mvp: false, impact: false, def: false } : e));
 assert.equal(titresDuJour(figee, J).size, 0, "vue figée avant la révélation : aucune puce");
+
+/* ---------- Le jour du match : le MVP automatique est posé, mais rien n'est attribué ---------- */
+
+// Une J9 jouée aujourd'hui (8 nov.), MVP calculé, une feuille saisie en direct.
+const jour9 = { j: 9, date: "8 nov.", sflTime: true, mvpAuto: true };
+const direct = appliquerMvpAuto({
+  ...brute,
+  journees: [...brute.journees, jour9],
+  entries: [
+    ...brute.entries,
+    ligne(9, "Adil", "Noirs 1", { result: null, buts: 2 }),
+    ligne(9, "Bilal", "Blancs 1", { result: null, buts: 1 }),
+  ],
+});
+// Le MVP automatique est bien sur la ligne de la vue dès le premier but…
+assert.equal(direct.entries.find((e) => e.j === 9 && e.player === "Adil")?.mvp, true, "MVP auto posé en direct");
+const midi = new Date("2026-11-08T12:00:00Z"); // 13 h à Paris : le direct
+const soir = new Date("2026-11-08T22:30:00Z"); // 23 h 30 à Paris : le vote encore ouvert
+const lendemain = new Date("2026-11-08T23:00:00Z"); // minuit à Paris : le vote fermé
+// … mais pas de puce le jour même, ni en direct ni pendant le vote.
+assert.equal(titresAttribues(direct.journees, 9, midi), false, "en direct : pas de puce");
+assert.equal(titresAttribues(direct.journees, 9, soir), false, "MVP auto + vote ouvert : pas de puce");
+// Minuit à Paris : la puce dorée tombe.
+assert.equal(titresAttribues(direct.journees, 9, lendemain), true, "vote fermé : les puces tombent");
+// La révélation (19 h, revelation.ts) : une journée que la ligue compte a ses puces, le jour même.
+assert.equal(titresAttribues(direct.journees, 9, soir, new Set([9])), true, "journée révélée : les puces");
+assert.equal(titresAttribues(direct.journees, 9, soir, new Set([8])), false, "une autre journée révélée : rien");
+// Les journées passées, la J1 à la J4 : attribuées.
+for (const j of [1, 2, 3, 4]) assert.equal(titresAttribues(brute.journees, j, midi), true, `J${j} attribuée`);
+// Une journée sans date lisible : la vue telle quelle.
+assert.equal(titresAttribues([{ j: 1, date: "" }], 1, midi), true);
 
 console.log("puces-titres-check : ok");

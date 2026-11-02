@@ -30,8 +30,8 @@ import type { BoostType } from "@/lib/sfl/engine";
 export interface MatchVu {
   n: number;
   m: MatchDuJour;
-  noirs: { i: number; nom: string }[];
-  blancs: { i: number; nom: string }[];
+  noirs: { i: number; nom: string; extraTime?: boolean }[];
+  blancs: { i: number; nom: string; extraTime?: boolean }[];
   score: [number, number];
 }
 
@@ -46,8 +46,8 @@ export function matchsVus(saison: Saison, j: number, declares: MatchDuJour[]): M
   return declares.map((m, k) => ({
     n: k + 1,
     m,
-    noirs: lignes.filter((x) => x.e.team === m.equipes[0]).map((x) => ({ i: x.i, nom: x.e.player })),
-    blancs: lignes.filter((x) => x.e.team === m.equipes[1]).map((x) => ({ i: x.i, nom: x.e.player })),
+    noirs: lignes.filter((x) => x.e.team === m.equipes[0]).map((x) => ({ i: x.i, nom: x.e.player, ...(x.e.extraTime ? { extraTime: true } : {}) })),
+    blancs: lignes.filter((x) => x.e.team === m.equipes[1]).map((x) => ({ i: x.i, nom: x.e.player, ...(x.e.extraTime ? { extraTime: true } : {}) })),
     score: [scores.get(m.equipes[0]) ?? 0, scores.get(m.equipes[1]) ?? 0],
   }));
 }
@@ -64,10 +64,10 @@ function occupantsDe(
   const fond = dispo.filter((p) => !p.chezMoi).map((p) => p.i);
   const occupants: Occupant[] = [];
   mv.blancs.forEach((x, k) => {
-    if (devant[k] != null) occupants[devant[k]] = { cle: String(x.i), nom: x.nom, titres: titresDe(x.nom, mv.m.equipes) };
+    if (devant[k] != null) occupants[devant[k]] = { cle: String(x.i), nom: x.nom, titres: x.extraTime ? [] : titresDe(x.nom, mv.m.equipes) };
   });
   mv.noirs.forEach((x, k) => {
-    if (fond[k] != null) occupants[fond[k]] = { cle: String(x.i), nom: x.nom, titres: titresDe(x.nom, mv.m.equipes) };
+    if (fond[k] != null) occupants[fond[k]] = { cle: String(x.i), nom: x.nom, titres: x.extraTime ? [] : titresDe(x.nom, mv.m.equipes) };
   });
   return { places, occupants };
 }

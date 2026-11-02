@@ -6,29 +6,86 @@
 // l'admin, pelouse des Actus, synthèse du récap, équipe type).
 //
 // La saison lue est useSeason().saison : celle que voit la ligue, où les
-// votes fermés sont posés (appliquerVotes), sans brouillon ni feuille en
-// direct. Sous un SaisonArchiveProvider, c'est l'archive. Quand cette vue
-// sera figée jusqu'à la révélation (lib/sfl/revelation.ts, à partir de la
-// J5, titres révélés à 19 h), les lignes d'une journée pas encore révélée
-// n'y porteront plus de titre, et les puces suivront sans rien changer ici.
-// Si un garde-fou explicite devient nécessaire, c'est ICI qu'il se branche :
-// `lignes` vide tant que titresTombes(saison, j, maintenant) est faux (ou que
-// etatRevelation(...) n'est pas « revelee »).
+// votes fermés sont posés (appliquerVotes), sans brouillon. Sous un
+// SaisonArchiveProvider, c'est l'archive : tout y est attribué.
+//
+// Le garde du jour même (titresAttribues) : cette vue porte le MVP
+// automatique dès le premier but saisi, donc aucune puce le jour du match,
+// ni en direct ni pendant le vote ; elles tombent à minuit (Paris). Une seule
+// horloge pour toute l'app, qui ne réveille les écrans qu'au changement de
+// jour.
+//
+// LA RÉVÉLATION (autre chantier, lib/sfl/revelation.ts) : quand la vue de la
+// saison donne `revelation.comptees` (SeasonProvider figé jusqu'à 19 h), une
+// journée comptée a ses puces dès la révélation, sans rien changer ici ; la
+// vue figée, elle, n'a aucun titre avant. Pour s'en remettre entièrement à
+// revelation.ts, c'est la ligne `attribue` ci-dessous qu'on remplace par
+// `titresTombes(saison, j, maintenant)` (ou etatRevelation(...) === "revelee").
 
-import { useCallback, useMemo } from "react";
-import { useSeason } from "@/components/sfl/season-provider";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useSaisonClose, useSeason } from "@/components/sfl/season-provider";
 import type { BoostType } from "@/lib/sfl/engine";
-import { titresDuJoueur } from "@/lib/sfl/puces-titres";
+import { titresAttribues, titresDuJoueur } from "@/lib/sfl/puces-titres";
 
 const AUCUN: BoostType[] = [];
 
+/* ------------------- L'horloge du jour, une pour toute l'app ------------------- */
+
+const cleDuJour = (t: Date) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "numeric", day: "numeric" }).format(t);
+
+let jour = "";
+const abonnes = new Set<() => void>();
+let minuteur = 0;
+
+function relire() {
+  const k = cleDuJour(new Date());
+  if (k === jour) return;
+  jour = k;
+  abonnes.forEach((f) => f());
+}
+
+function abonner(f: () => void) {
+  abonnes.add(f);
+  if (abonnes.size === 1) {
+    minuteur = window.setInterval(relire, 60_000);
+    document.addEventListener("visibilitychange", relire);
+  }
+  return () => {
+    abonnes.delete(f);
+    if (!abonnes.size) {
+      window.clearInterval(minuteur);
+      document.removeEventListener("visibilitychange", relire);
+    }
+  };
+}
+
+function lireJour() {
+  if (!jour) jour = cleDuJour(new Date());
+  return jour;
+}
+
+/* ------------------------------------------------------------------------------- */
+
 /**
  * `(nom, equipes?) => titres` pour la journée `j` ; sans journée (une
- * convocation, un match à venir), aucun titre.
+ * convocation, un match à venir), ou pas encore attribuée, aucun titre.
  */
 export function useTitresDuJour(j: number | null | undefined): (nom: string, equipes?: readonly [string, string]) => BoostType[] {
-  const { saison } = useSeason();
-  const lignes = useMemo(() => (j == null ? [] : saison.entries.filter((e) => e.j === j)), [saison.entries, j]);
+  const vue = useSeason();
+  const { saison } = vue;
+  const close = useSaisonClose();
+  const leJour = useSyncExternalStore(abonner, lireJour, lireJour);
+  // Les journées que la ligue compte déjà, quand la vue de la saison les donne (la révélation).
+  const comptees = (vue as { revelation?: { comptees?: ReadonlySet<number> } }).revelation?.comptees;
+  const attribue = useMemo(() => {
+    void leJour; // se relit au changement de jour
+    return j != null && (close || titresAttribues(saison.journees, j, new Date(), comptees));
+  }, [saison.journees, j, comptees, close, leJour]);
+  const lignes = useMemo(
+    () => (j == null || !attribue ? [] : saison.entries.filter((e) => e.j === j)),
+    [saison.entries, j, attribue],
+  );
   return useCallback(
     (nom: string, equipes?: readonly [string, string]) => {
       if (j == null || !lignes.length) return AUCUN;
