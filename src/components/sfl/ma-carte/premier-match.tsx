@@ -14,44 +14,16 @@
 // Ni or, ni bleu, ni rouge : réservés aux cartes MVP, Défensive, Impact.
 
 import Link from "next/link";
-import { useMemo } from "react";
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
-import { useJoueursDeLaMap } from "@/hooks/use-joueurs-de-la-map";
-import { useVillesRevision } from "@/hooks/use-villes";
-import { usePhotoRevision } from "@/hooks/use-player-photo";
-import { maVille, villeOuLigue } from "@/lib/sfl/villes";
+import { useJoueursProches } from "@/hooks/use-joueurs-proches";
 import { photoPerso, photoMiniature } from "@/lib/sfl/photos";
 import { nomAffiche } from "@/lib/sfl/identites";
 
 const MAUVE = "#e0b3cb";
 const ENCRE = "#0a0b0d";
 
-/** Distance en km entre deux points (haversine). */
-function km(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
-  const r = Math.PI / 180;
-  const d = Math.sin(((b.lat - a.lat) * r) / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(((b.lng - a.lng) * r) / 2) ** 2;
-  return 12742 * Math.asin(Math.sqrt(d));
-}
-
 export function PremierMatch({ moi }: { moi: string }) {
-  const joueurs = useJoueursDeLaMap();
-  const revVilles = useVillesRevision();
-  const revPhotos = usePhotoRevision();
-  const proches = useMemo(() => {
-    void revVilles;
-    void revPhotos;
-    const ici = maVille(moi) ?? villeOuLigue(moi);
-    if (!ici) return [];
-    return joueurs
-      .filter((p) => p.name !== moi)
-      .map((p) => {
-        const v = villeOuLigue(p.name);
-        return v ? { p, d: km(ici, v) } : null;
-      })
-      .filter((x) => x !== null)
-      .sort((a, b) => a.d - b.d || (photoPerso(b.p.name) ? 1 : 0) - (photoPerso(a.p.name) ? 1 : 0))
-      .slice(0, 12);
-  }, [joueurs, moi, revVilles, revPhotos]);
+  const proches = useJoueursProches(moi);
   const pres = proches.filter((x) => x.d <= 25).length;
   const visages = proches.filter((x) => photoPerso(x.p.name)).slice(0, 4);
 

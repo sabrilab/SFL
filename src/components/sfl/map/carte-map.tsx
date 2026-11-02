@@ -611,8 +611,8 @@ export function CarteMap({
     };
     map.getContainer().addEventListener("error", secours, true);
     carte.current = map;
-    // Captures en développement : viser une ville à la main.
-    if (process.env.NODE_ENV === "development") (window as unknown as { __bolaMap?: PlanMap }).__bolaMap = map;
+    // Captures en développement et sur les aperçus : viser une ville à la main.
+    if (process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_BOLA_ENV !== "production") (window as unknown as { __bolaMap?: PlanMap }).__bolaMap = map;
     const entreesAuMontage = entrees.current;
     return () => {
       debrancher();
