@@ -1681,6 +1681,7 @@ export default function MapPage() {
                       loin={toi && m.terrain ? distanceCourte(kmEntre(toi, m.terrain)) : null}
                       dans={m.joue ? null : ecartJours(m.dateLabel, aujourdhui)}
                       nonLus={m.partie ? (apercus.get(m.partie.id)?.nonLus ?? 0) : 0}
+                      affiche={afficheDu(m)}
                       onToucher={() => (m.cle !== choisi?.cle || surCarte ? setChoix(m.cle) : ouvrirFiche())}
                     />
                   </div>
@@ -2414,6 +2415,7 @@ function TuileMatch({
   loin,
   dans,
   nonLus = 0,
+  affiche,
   onToucher,
 }: {
   m: MatchMap;
@@ -2422,6 +2424,8 @@ function TuileMatch({
   /** Les jours avant le match (null : joué ou date illisible). */
   dans: number | null;
   nonLus?: number;
+  /** Son affiche (les deux meilleures notes, lib/sfl/affiche.ts), à la place du terrain. */
+  affiche?: Affiche | null;
   onToucher: () => void;
 }) {
   const joue = !!m.joue;
@@ -2448,8 +2452,12 @@ function TuileMatch({
         style={{ background: ENCRE }}
       >
         {/* Le terrain, vu d'un toit voisin (map/vue-terrain.tsx) : l'image
-            d'abord, comme une annonce ; un dégradé pour lire dessus. */}
-        {m.terrain ? (
+            d'abord, comme une annonce ; un dégradé pour lire dessus. Un
+            match qui a son affiche la montre (Sabri, 02/11). */}
+        {affiche ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={affiche.image} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-[50%_28%]" draggable={false} />
+        ) : m.terrain ? (
           <TerrainDessine lat={m.terrain.lat} lng={m.terrain.lng} className={cn("absolute inset-0 h-full w-full scale-[1.04]", joue && "grayscale")} />
         ) : (
           <div
