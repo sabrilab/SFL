@@ -10,7 +10,7 @@
 // cartes, chacune sur son objet en relief (Tuile). La toucher ouvre sa
 // page, enfant de Ma carte (lib/nav.ts) : /profil/saison, /profil/xp,
 // /profil/evolution, /profil/badges, /profil/cartes. Chaque page reprend tel
-// quel le bloc qui était dans Ma carte (ma-saison.tsx, niveau-xp.tsx,
+// quel le bloc qui était dans Ma carte (ma-saison.tsx, le mode Passe,
 // carriere-joueur.tsx, vitrine.tsx), sous le retour de toute l'app
 // (bouton-retour.tsx), qui ramène à Ma carte là où on l'avait laissée.
 //
@@ -20,7 +20,8 @@
 // bleu (cartes Impact et Défensive), l'or reste aux badges.
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { ANTON } from "@/components/sfl/actus/ecran";
 import { BoutonRetour } from "@/components/layout/bouton-retour";
 import { useMyPlayer } from "@/components/sfl/player-provider";
@@ -40,6 +41,11 @@ import { saisonsBolaDe } from "@/lib/sfl/carte-bola";
 import { actionsDuJour, dimanchesDe, ficheJoueur, resultatDuJour } from "@/lib/sfl/fiche-joueur";
 import { ordinal } from "@/lib/sfl/fin-de-saison";
 import { metal, NOM_METAL, prochain, vitrine } from "@/lib/sfl/trophees";
+import { ligneCompteur, nombreFr, partDuNiveau, xpFr } from "@/lib/sfl/compteur-xp";
+import { useSoldeXp } from "@/hooks/use-achats-xp";
+import { haptique } from "@/lib/sfl/haptique";
+import type { BilanXp } from "@/lib/sfl/missions";
+import { palierAAnnoncer } from "@/lib/sfl/xp-acquis";
 import { cn } from "@/lib/utils";
 import "./rubriques.css";
 
@@ -190,6 +196,8 @@ export function RubriquesMaCarte() {
   const b = useXp(player.name);
   const r = useRangXp(player.name);
   const aSigner = useMissionsASigner();
+  const soldeXp = useSoldeXp(player.name);
+  useAnnoncePalier(b);
   const flair = useMonFlair();
   const blesse = useEstBlesse(player.name);
   const identite = useIdentites();
@@ -274,13 +282,22 @@ export function RubriquesMaCarte() {
           setPasse(true);
         }}
         nom="Niveau XP"
-        label={`Niveau XP ${b.niveau}${r && r.xp > 0 ? `, rang ${r.rang}` : ""}. Passe Bola : palier ${b.passe.palier} sur ${PALIERS_PASSE}`}
+        label={`Niveau XP ${b.niveau}${r && r.xp > 0 ? `, rang ${r.rang}` : ""}, ${ligneCompteur(b)}. Passe Bola : palier ${b.passe.palier} sur ${PALIERS_PASSE}`}
       >
         <span className="flex items-baseline gap-2">
           <span style={{ ...NOMBRE, fontSize: 52 }} className="tabular-nums">
             {b.niveau}
           </span>
           {r && r.xp > 0 && <span className="tuile__etiquette font-mono text-[12px] font-bold">rang {r.rang}</span>}
+        </span>
+        <span className="flex flex-col gap-1">
+          <span className="font-mono text-[11px] font-bold tabular-nums text-foreground/70">
+            {xpFr(b.total)}
+            {soldeXp != null && soldeXp !== b.total ? ` · ${nombreFr(soldeXp)} à dépenser` : ""}
+          </span>
+          <span className="tuile__barre" aria-hidden>
+            <span style={{ width: `${partDuNiveau(b) * 100}%` }} />
+          </span>
         </span>
         <span className="mt-auto flex flex-col gap-1.5">
           <span className="flex gap-[2px]" aria-hidden>
@@ -511,6 +528,36 @@ export function RubriquesMaCarte() {
       {passe && <ModePasse player={player} saison={numero} onSortie={() => setPasse(false)} />}
     </nav>
   );
+}
+
+/* ------------------------- Un palier qui s'ouvre ------------------------- */
+
+const CLE_VU = "sfl-passe-vu";
+
+/**
+ * Un palier qui s'ouvre se dit, une fois par téléphone (Ilyes, 01/11 : « je
+ * sais même pas comment je les ai déverrouillés ») : « Palier 13 · Animée »,
+ * avec l'haptique. D'où vient l'XP, la liste « Gagner de l'XP » le dit.
+ */
+function useAnnoncePalier(b: BilanXp | null) {
+  const sp = b?.saisonPasse;
+  const palier = b ? Math.max(b.palier, b.passe.palier) : 0;
+  useEffect(() => {
+    if (!sp || palier <= 0) return;
+    let vus: Record<string, number> = {};
+    try {
+      vus = JSON.parse(localStorage.getItem(CLE_VU) ?? "{}") as Record<string, number>;
+    } catch {}
+    const n = palierAAnnoncer(palier, vus[sp.id] ?? null);
+    if (n === null) return;
+    try {
+      localStorage.setItem(CLE_VU, JSON.stringify({ ...vus, [sp.id]: n }));
+    } catch {}
+    const p = sp.paliers[n - 1];
+    if (!p) return;
+    haptique.sceau();
+    toast(`Palier ${n} · ${p.nom}`, { description: `Passe Bola · ${sp.nom}` });
+  }, [sp, palier]);
 }
 
 /* ----------------------------- La page enfant ----------------------------- */

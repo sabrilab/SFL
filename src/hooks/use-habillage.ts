@@ -39,14 +39,25 @@ export interface CartesXp {
    * Passe (saisons-passe.ts), le cran du cadre, ses recrues actives et son
    * numéro de Fondateur.
    */
-  parJoueur: Map<string, { rang: Rang | null; paliers: PaliersAtteints; cran: number; recrues: number; fondateur: number | null }>;
+  parJoueur: Map<
+    string,
+    {
+      rang: Rang | null;
+      paliers: PaliersAtteints;
+      cran: number;
+      recrues: number;
+      fondateur: number | null;
+      /** Les skins du PACK AFRIQUE 2027 obtenus (achats_xp) : [nation, numéro de série][]. */
+      afrique?: readonly (readonly [string, number])[];
+    }
+  >;
   /** Change avec l'un d'eux : la 3D recapture. */
   revision: string;
 }
 
 export const CartesXpContext = createContext<CartesXp | null>(null);
 
-function empreinte(texte: string): string {
+export function empreinte(texte: string): string {
   let h = 5381;
   for (let i = 0; i < texte.length; i++) h = ((h << 5) + h + texte.charCodeAt(i)) | 0;
   return (h >>> 0).toString(36);
@@ -94,13 +105,27 @@ export function useRecruesCarte(nom: string): { recrues: number; fondateur: numb
   return { recrues: x?.recrues ?? 0, fondateur: x?.fondateur ?? null };
 }
 
+/** Les skins de nation qu'un joueur a obtenus (PACK AFRIQUE 2027), tels que CartesXp les porte. */
+export function useAfriqueCarte(nom: string): readonly (readonly [string, number])[] {
+  return useContext(CartesXpContext)?.parJoueur.get(nom)?.afrique ?? AUCUNE_NATION;
+}
+const AUCUNE_NATION: readonly (readonly [string, number])[] = [];
+
 /**
  * Les skins d'un joueur : ceux que son palier a débloqués, ceux qui lui sont
- * offerts, puis ceux de ses recrues.
+ * offerts, ceux de ses recrues, puis ceux qu'il a obtenus avec son XP (PACK
+ * AFRIQUE 2027 : les missions et le Passe n'y touchent jamais).
  */
-export function finitionsDe(nom: string, paliers: PaliersAtteints, recrues = 0, fondateur: number | null = null): Finition[] {
+export function finitionsDe(
+  nom: string,
+  paliers: PaliersAtteints,
+  recrues = 0,
+  fondateur: number | null = null,
+  afrique: readonly (readonly [string, number])[] = AUCUNE_NATION
+): Finition[] {
   const passe = debloquesDe(paliers, SAISONS_PASSE).finitions.filter((f): f is Finition => f in MATIERES);
-  const autres = [...finitionsOffertes(nom), ...finitionsRecrues(recrues, fondateur)];
+  const nations = afrique.map(([n]) => `afrique-${n}`).filter((f): f is Finition => f in MATIERES);
+  const autres = [...finitionsOffertes(nom), ...finitionsRecrues(recrues, fondateur), ...nations];
   return [...passe, ...autres.filter((f, i) => !passe.includes(f) && autres.indexOf(f) === i)];
 }
 
@@ -113,7 +138,8 @@ export function useHabillage(nom: string): HabillageCarte {
     const x = cartes.parJoueur.get(nom);
     const paliers = x?.paliers ?? AUCUN;
     const fondateur = x?.fondateur ?? null;
-    const finitions = finitionsDe(nom, paliers, x?.recrues ?? 0, fondateur);
+    const afrique = x?.afrique ?? AUCUNE_NATION;
+    const finitions = finitionsDe(nom, paliers, x?.recrues ?? 0, fondateur, afrique);
     // « Tes couleurs » se porte avec son pays.
     const voulue = choix.finition === "couleurs" && !choix.pays ? "-" : choix.finition;
     const finition = voulue !== "auto" && voulue !== "-" && finitions.includes(voulue) ? voulue : undefined;
@@ -127,6 +153,8 @@ export function useHabillage(nom: string): HabillageCarte {
       rang: x?.rang ?? undefined,
       // La carte Fondateur porte son numéro (la ligne de série, bola-card.tsx).
       fondateur: finition === "fondateur" && fondateur ? fondateur : undefined,
+      // Un skin de nation porte son numéro de série au dos (dos-carte.tsx, serieDe).
+      serieNation: finition?.startsWith("afrique-") ? afrique.find(([n]) => `afrique-${n}` === finition)?.[1] : undefined,
     };
   }, [cartes, nom, choix]);
 }

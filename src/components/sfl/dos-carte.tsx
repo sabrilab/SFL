@@ -91,7 +91,7 @@ export function DosCarte({
   const era = p.epoque;
   const habillage = era ? undefined : habillageDemande;
   const ligne = era ? ligneDEmission(emission ?? { saison: era.saison, le: null, n: null, sur: null }) : null;
-  const { serie, numero } = ligne ? { serie: ligne.date, numero: ligne.numero } : serieDe(nom, p.nom === "fondateur" ? habillage : undefined);
+  const { serie, numero } = ligne ? { serie: ligne.date, numero: ligne.numero } : serieDe(nom, p.nom === "fondateur" || p.nom.startsWith("afrique-") ? habillage : undefined);
   const sLune = LUNE / BOITE_SYMBOLE.c;
   const lisere = lisereDe(habillage);
   const cran = habillage?.cran ?? 0;

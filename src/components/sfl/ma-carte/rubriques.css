@@ -83,6 +83,25 @@
   background: rgb(var(--t));
   box-shadow: 0 0 10px rgb(var(--t) / 0.6);
 }
+/* La barre fine du niveau XP, sous le compteur (compteur-xp.tsx). */
+.tuile__barre {
+  position: relative;
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(var(--t) / 0.25);
+}
+.tuile__barre > span {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  border-radius: 2px;
+  background: var(--t-sombre);
+}
+.dark .tuile__barre > span {
+  background: rgb(var(--t));
+}
 .tuile__courbe {
   color: var(--t-sombre);
 }

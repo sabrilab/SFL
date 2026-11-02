@@ -19,6 +19,7 @@ const jour = (t0: number, decalage: number) => libelleCourt(labelDateFr(new Date
 export const DECALAGES = [-84, -77, -70, -63, -56, -49, -42, -35, -28, -21, -14, -7];
 
 export function saisonDemoXp(maintenant: number, sc: string): Saison {
+  void sc; // le scénario ne change que les réponses (reponsesDemoXp)
   // Les dimanches à midi (UTC) : le passage à l'heure d'hiver ne décale pas leur date.
   const t0 = new Date(maintenant).setUTCHours(12, 0, 0, 0);
   let s: Saison = { ...seedSaison(), numero: 1, journees: [], entries: [], convocations: [] };

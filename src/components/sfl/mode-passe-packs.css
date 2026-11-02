@@ -1,0 +1,293 @@
+/*
+ * L'onglet Packs du mode Passe (mode-passe-packs.tsx) : le PACK AFRIQUE 2027.
+ * Noir et blanc comme le mode ; les seules couleurs sont celles des nations,
+ * dans leurs motifs. Ni or, ni bleu, ni rouge.
+ */
+.pk {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  width: 100%;
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: 22px 20px calc(env(safe-area-inset-bottom, 0px) + 28px);
+}
+@media (min-width: 900px) {
+  .pk {
+    max-width: 52rem;
+    padding-top: 30px;
+  }
+}
+
+/* La fiche : l'étui à gauche, ce qu'il dit à droite. */
+.pk-fiche {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.pk-fiche__dit {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+.pk-fiche__nom {
+  font-size: clamp(22px, 6.4vw, 34px);
+  line-height: 0.95;
+}
+.pk-fiche__compte {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.pk-fiche__action {
+  margin-top: 6px;
+}
+.pk-fiche__action .mp-bouton {
+  padding-inline: 20px;
+  white-space: nowrap;
+}
+.pk-fiche__action .mp-bouton:disabled {
+  opacity: 0.6;
+}
+
+/* L'étui : un objet, le noir guilloché, la frise des nations. */
+.pk-etui {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  border-radius: calc(var(--pk-l) * 0.06);
+  background:
+    radial-gradient(120% 70% at 30% 18%, rgb(255 255 255 / 0.09), transparent 60%),
+    linear-gradient(160deg, #1b1b1e 0%, #0b0b0d 55%, #050506 100%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    0 24px 60px -24px rgb(0 0 0 / 0.9),
+    0 0 0 0.5px rgb(0 0 0 / 0.6);
+}
+.pk-etui::after {
+  /* Le reflet qui passe sur le noir. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 38%, rgb(255 255 255 / 0.07) 48%, transparent 58%);
+}
+.pk-etui__guilloche {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.pk-etui__micro {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 3.6px;
+  letter-spacing: 0.9px;
+  fill: rgb(255 255 255 / 0.4);
+}
+.pk-etui__titre {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--pk-l) * 0.015);
+  padding-top: calc(var(--pk-l) * 0.36);
+  text-align: center;
+}
+.pk-etui__titre .mono-label {
+  font-size: max(8px, calc(var(--pk-l) * 0.05));
+}
+.pk-etui__nom {
+  font-size: calc(var(--pk-l) * 0.17);
+  line-height: 0.9;
+  color: #f4f5f2;
+}
+.pk-etui__annee {
+  font-size: calc(var(--pk-l) * 0.14);
+  line-height: 0.9;
+  letter-spacing: 0.04em;
+  color: rgb(244 245 242 / 0.8);
+}
+.pk-etui__frise {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: calc(var(--pk-l) * 0.012);
+  margin: 0 calc(var(--pk-l) * 0.075) calc(var(--pk-l) * 0.12);
+}
+.pk-tesselle {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.2);
+}
+.pk-tesselle > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Les nations : la carte du joueur dans la nation, ou scellée. */
+.pk-nations {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px 10px;
+}
+@media (min-width: 900px) {
+  .pk-nations {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 22px 16px;
+  }
+}
+.pk-nation {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  -webkit-tap-highlight-color: transparent;
+}
+.pk-nation__carte {
+  position: relative;
+  display: block;
+  width: 64px;
+  height: 103px;
+  overflow: hidden;
+  border-radius: 7px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16);
+  transition: transform 0.2s ease;
+}
+.pk-nation--a-toi:active .pk-nation__carte {
+  transform: scale(0.96);
+}
+.pk-nation--scellee .pk-nation__carte {
+  background: #0b0b0d;
+}
+.pk-tesselle--scellee {
+  position: absolute;
+  inset: 22px 10px auto;
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+.pk-nation__cadenas {
+  position: absolute;
+  right: 0;
+  bottom: 9px;
+  left: 0;
+  display: grid;
+  place-items: center;
+  color: rgb(255 255 255 / 0.7);
+}
+.pk-nation__nom {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgb(255 255 255 / 0.78);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pk-nation--scellee .pk-nation__nom {
+  color: rgb(255 255 255 / 0.45);
+}
+.pk-nation__skin {
+  margin-top: -4px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10px;
+  color: rgb(255 255 255 / 0.45);
+}
+
+/* La confirmation et la nation en grand : posées sur le mode. */
+.pk-voile {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+  padding: 24px 20px calc(env(safe-area-inset-bottom, 0px) + 24px);
+  overflow-y: auto;
+  background: radial-gradient(90% 60% at 50% 40%, rgb(255 255 255 / 0.06), transparent 70%), rgb(5 5 8 / 0.97);
+}
+.pk-confirmer,
+.pk-detail {
+  position: relative;
+  display: flex;
+  width: 100%;
+  max-width: 24rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+.pk-confirmer__fermer {
+  position: absolute;
+  top: -6px;
+  right: 0;
+}
+.pk-confirmer__nom {
+  margin-top: 8px;
+  font-size: 26px;
+  line-height: 1;
+}
+.pk-detail__nom {
+  font-size: 34px;
+  line-height: 0.95;
+}
+.pk-detail__quoi {
+  max-width: 21rem;
+  font-size: 14px;
+  line-height: 1.4;
+  color: rgb(244 245 242 / 0.75);
+}
+.pk-detail__sources {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 21rem;
+}
+.pk-detail__sources ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgb(244 245 242 / 0.5);
+}
+.pk-detail__sources a {
+  text-decoration: underline;
+  text-decoration-color: rgb(255 255 255 / 0.25);
+  text-underline-offset: 2px;
+}
+.pk-detail .mp-bouton {
+  max-width: 16rem;
+  margin-top: 6px;
+}
+
+/* La carte qui se retourne une fois : deux demi-tours, le dos entre les deux. */
+.pk-retourne {
+  display: block;
+  perspective: 1200px;
+}
+.pk-retourne__carte {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* Posés hors du mode : les boutons gardent son blanc. */
+.pk-voile .mp-bouton:not(.mp-bouton--creux),
+.pk-apres:not(.mp-bouton--creux) {
+  color: #0b0a14;
+  background: #f4f5f2;
+  box-shadow: 0 10px 30px -12px rgb(255 255 255 / 0.5);
+}
+.pk-apres {
+  min-width: 8.5rem;
+  padding-inline: 18px;
+}
