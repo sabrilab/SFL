@@ -507,6 +507,35 @@ as $$
 $$;
 grant execute on function public.sans_brouillons(jsonb) to authenticated;
 
+-- Les journées à la date illisible (I11, 02/11/2026) : une date que la base
+-- ne lit pas (« 08/11 ») n'a ni vote ni révélation. Seulement une journée
+-- nouvelle ou dont la date change. En plpgsql : date_de_journee est définie
+-- plus bas, résolue à l'exécution.
+create or replace function public.dates_illisibles(p_nouveau jsonb, p_ancien jsonb)
+returns text[]
+language plpgsql
+stable
+set search_path = ''
+as $$
+begin
+  -- Un banc réduit sans date_de_journee (tools/sql/brouillon-check.sql) : rien à lire.
+  if to_regprocedure('public.date_de_journee(text,timestamptz)') is null then
+    return '{}'::text[];
+  end if;
+  return coalesce((
+    select array_agg('I11 J' || (m ->> 'j') || ' ' || coalesce(m ->> 'date', '') order by m ->> 'j')
+      from jsonb_array_elements(
+             case when jsonb_typeof(p_nouveau -> 'journees') = 'array' then p_nouveau -> 'journees' else '[]'::jsonb end) m
+     where public.date_de_journee(m ->> 'date', now()) is null
+       and not exists (
+         select 1 from jsonb_array_elements(
+                  case when jsonb_typeof(p_ancien -> 'journees') = 'array' then p_ancien -> 'journees' else '[]'::jsonb end) o
+          where o ->> 'j' = m ->> 'j' and (o ->> 'date') is not distinct from (m ->> 'date'))
+  ), '{}'::text[]);
+end;
+$$;
+revoke execute on function public.dates_illisibles(jsonb, jsonb) from public, anon, authenticated;
+
 -- Une feuille saine. Ne regarde que les journées dont les lignes changent, et
 -- n'y refuse que ce qui EMPIRE : un joueur une fois de plus en double, un
 -- membre qui ne joue pas une fois de plus — la J3 se répare ligne à ligne.
@@ -514,7 +543,8 @@ grant execute on function public.sans_brouillons(jsonb) to authenticated;
 --   I0 une ligne du compte vitrine · I1 un joueur deux fois (sa ligne
 --   Xtratime à part) · I2 un membre qui ne joue pas · I6 deux journées pour
 --   une même date (seulement si ça empire) · I10 une vue figée (02/11/2026 :
---   une vue figée ne se publie pas).
+--   une vue figée ne se publie pas) · I11 une date illisible (02/11/2026,
+--   dates_illisibles).
 create or replace function public.feuille_saine(p_nouveau jsonb, p_ancien jsonb)
 returns text[]
 language sql
@@ -583,9 +613,13 @@ as $$
   ),
   i10 as (  -- une vue figée (revelation.ts) ne se publie pas : ses résultats en attente sont effacés
     select 'I10 vue figée' as d where p_nouveau ? 'figee'
+  ),
+  i11 as (  -- une date que la base ne lit pas : ni vote ni révélation
+    select unnest(public.dates_illisibles(p_nouveau, p_ancien)) as d
   )
   select coalesce(array_agg(d order by d), '{}'::text[])
-    from (select d from i0 union all select d from i1 union all select d from i2 union all select d from i6 union all select d from i10) x;
+    from (select d from i0 union all select d from i1 union all select d from i2 union all select d from i6
+          union all select d from i10 union all select d from i11) x;
 $$;
 revoke execute on function public.feuille_saine(jsonb, jsonb) from public, anon;
 grant execute on function public.feuille_saine(jsonb, jsonb) to authenticated;
@@ -616,6 +650,7 @@ declare
   nouvelle bigint;
   defauts  text[];
   tenues   text[];
+  fins     jsonb;
 begin
   if not public.is_league_admin() then
     raise exception 'Réservé à l''admin.' using errcode = '42501';
@@ -652,7 +687,14 @@ begin
         seed = excluded.seed,
         updated_at = excluded.updated_at;
   perform set_config('sfl.publication_saison', '', true);
-  return jsonb_build_object('ok', true, 'version', nouvelle);
+  -- La fin des matchs de chaque journée, telle que la base l'a gardée
+  -- (saison_fin_des_matchs) : l'appareil de l'admin l'adopte (sync.ts),
+  -- sinon, à version égale, il garderait la sienne toute la soirée.
+  select coalesce(jsonb_object_agg(m ->> 'j', m -> 'finDesMatchs'), '{}'::jsonb) into fins
+    from public.saison s,
+         jsonb_array_elements(case when jsonb_typeof(s.data -> 'journees') = 'array' then s.data -> 'journees' else '[]'::jsonb end) m
+   where s.id = 1 and coalesce(m ->> 'j', '') <> '';
+  return jsonb_build_object('ok', true, 'version', nouvelle, 'fins', fins);
 end;
 $$;
 
@@ -3264,8 +3306,54 @@ create policy "votes_figures: la ligue lit"
 -- journée qui sont entrés. » Puis : « une heure de vote minimum, jamais après
 -- minuit ». La J4 (01/11) et avant gardent minuit. Même calcul que finDuVote
 -- (src/lib/sfl/revelation.ts, REGLES_REVELATION) : changer les deux ensemble.
--- Les corps sont en plpgsql : date_de_journee, entier_sur et instant_sur
--- sont définies plus bas, et ne sont résolues qu'à l'exécution.
+-- Les corps qui lisent le document sont en plpgsql : date_de_journee,
+-- entier_sur et instant_sur sont définies plus bas, et ne sont résolues qu'à
+-- l'exécution.
+--
+-- La fin des matchs (F, JourneeMeta.finDesMatchs) suit la DERNIÈRE feuille
+-- du jour (relecture du 02/11) : posée quand la journée devient terminée le
+-- jour même ; retirée si elle est rouverte AVANT sa révélation (un match
+-- ajouté, un résultat effacé), puis reposée à la nouvelle dernière feuille —
+-- le vote dure ainsi au moins une heure après elle. Après la révélation, rien
+-- ne la déplace : une correction se voit tout de suite, la journée reste
+-- comptée. La base la garde à part (public.fins_des_matchs, que personne ne
+-- lit ni n'écrit hors d'ici) : une journée mise à la corbeille puis remise,
+-- ou une clôture annulée, retrouve la sienne.
+
+-- Le nouveau régime : dès la J5 de la saison 1 (REGLES_REVELATION.depuis).
+create or replace function public.nouveau_regime(p_saison int, p_j int)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce(p_saison > 1 or (p_saison = 1 and p_j >= 5), false);
+$$;
+revoke execute on function public.nouveau_regime(int, int) from public, anon, authenticated;
+
+-- La fin du vote d'une journée du nouveau régime dont on connaît F, et sa
+-- révélation : min(minuit, max(18 h, F + 1 h)), puis min(minuit, fin du
+-- vote + 1 h). FIN_DU_VOTE, VOTE_APRES_FEUILLE_MS et REVELATION.
+create or replace function public.fin_du_vote_de(p_jour date, p_fin timestamptz)
+returns timestamptz
+language sql
+immutable
+set search_path = ''
+as $$
+  select least(((p_jour + 1)::timestamp at time zone 'Europe/Paris'),
+               greatest((p_jour + time '18:00') at time zone 'Europe/Paris', p_fin + interval '1 hour'));
+$$;
+revoke execute on function public.fin_du_vote_de(date, timestamptz) from public, anon, authenticated;
+
+create or replace function public.revelation_de(p_jour date, p_fin timestamptz)
+returns timestamptz
+language sql
+immutable
+set search_path = ''
+as $$
+  select least(((p_jour + 1)::timestamp at time zone 'Europe/Paris'), public.fin_du_vote_de(p_jour, p_fin) + interval '1 hour');
+$$;
+revoke execute on function public.revelation_de(date, timestamptz) from public, anon, authenticated;
 
 -- Le miroir de journeeTerminee (src/lib/sfl/saisie/engine.ts) : un résultat,
 -- un but ou une passe saisi, et chaque équipe présente avec son résultat.
@@ -3333,20 +3421,21 @@ begin
     return null;
   end if;
   minuit := (jour + 1)::timestamp at time zone 'Europe/Paris';
-  -- REGLES_REVELATION.depuis : la J5 de la saison 1.
-  if p_saison < 1 or (p_saison = 1 and p_j < 5) then
+  if not public.nouveau_regime(p_saison, p_j) then
     return minuit;
   end if;
   fin := public.instant_sur(meta ->> 'finDesMatchs');
   if fin is null then
     return minuit;                                                    -- pas finie : la butée
   end if;
-  return least(minuit, greatest((jour + time '18:00') at time zone 'Europe/Paris',   -- FIN_DU_VOTE
-                                fin + interval '1 hour'));                           -- VOTE_APRES_FEUILLE_MS
+  return public.fin_du_vote_de(jour, fin);
 end;
 $$;
 revoke execute on function public.fin_du_vote_a(int, int, timestamptz) from public, anon, authenticated;
 
+-- Pour la ligue seulement (relecture du 02/11) : un compte qui n'en est pas
+-- (en attente, refusé) ne lit pas plus l'heure du vote que la saison. Sans
+-- session (le serveur, l'éditeur SQL), la réponse est donnée.
 create or replace function public.fin_du_vote(p_saison int, p_j int)
 returns timestamptz
 language sql
@@ -3354,7 +3443,8 @@ stable
 security definer
 set search_path = ''
 as $$
-  select public.fin_du_vote_a(p_saison, p_j, now());
+  select case when (select auth.uid()) is null or (select public.est_membre())
+              then public.fin_du_vote_a(p_saison, p_j, now()) end;
 $$;
 revoke execute on function public.fin_du_vote(int, int) from public, anon;
 grant execute on function public.fin_du_vote(int, int) to authenticated;
@@ -3386,19 +3476,40 @@ stable
 security definer
 set search_path = ''
 as $$
-  select public.vote_ouvert_a(p_saison, p_j, now());
+  select ((select auth.uid()) is null or (select public.est_membre()))
+     and public.vote_ouvert_a(p_saison, p_j, now());
 $$;
 revoke execute on function public.vote_ouvert(int, int) from public, anon;
 grant execute on function public.vote_ouvert(int, int) to authenticated;
 
--- Le tampon de la fin des matchs (JourneeMeta.finDesMatchs) : posé une fois
--- par la base, le jour même, quand la dernière feuille est remplie ; jamais
--- déplacé. La valeur déjà en base l'emporte. Une valeur venue de l'app est
--- gardée si elle est à 5 min de l'heure du serveur ; sinon c'est l'heure du
--- serveur. Personne d'autre ne le pose : une valeur sans fondement est
--- retirée. Joue pour publier_saison (l'admin : insert … on conflict, donc
--- deux fois, et c'est l'ancienne ligne qui décide à la seconde) comme pour
--- sceller_feuille (un joueur scelle la feuille de son match).
+-- La fin des matchs que la base a posée, une ligne par journée. Réservée au
+-- déclencheur : RLS sans politique, aucun droit pour les joueurs.
+create table if not exists public.fins_des_matchs (
+  saison  int         not null,
+  j       int         not null,
+  jour    date        not null,
+  fin     timestamptz not null,
+  pose_le timestamptz not null default now(),
+  primary key (saison, j)
+);
+alter table public.fins_des_matchs enable row level security;
+revoke all on public.fins_des_matchs from public, anon, authenticated;
+
+-- Le tampon de la fin des matchs (JourneeMeta.finDesMatchs), journée par
+-- journée du nouveau régime (la J4 et avant : rien ne change) :
+--   · gardé (public.fins_des_matchs) pour la même journée, à la même date :
+--     la valeur gardée est réécrite dans le document, au format de l'app
+--     (« 2026-11-08T14:10:00.000Z »), quoi que l'écriture ait porté ;
+--   · rouverte avant sa révélation (plus terminée) : retiré, et oublié ;
+--     une feuille rouverte puis scellée de nouveau avant la révélation : F
+--     prend l'heure de ce sceau (c'est la dernière feuille) ;
+--   · terminée le jour même, sans tampon : posé. Une valeur venue de l'app
+--     est gardée si elle est à 5 min de l'heure du serveur ; sinon c'est
+--     l'heure du serveur ;
+--   · sinon : aucun (une valeur sans fondement est retirée).
+-- Joue pour publier_saison (l'admin : insert … on conflict, donc deux fois ;
+-- le premier passage pose, le second relit) comme pour sceller_feuille (un
+-- joueur scelle la feuille de son match).
 create or replace function public.saison_fin_des_matchs()
 returns trigger
 language plpgsql
@@ -3407,40 +3518,62 @@ set search_path = ''
 as $$
 declare
   js         jsonb := new.data -> 'journees';
-  avant      jsonb := case when tg_op = 'UPDATE' then old.data -> 'journees' end;
+  numero     int := coalesce(public.entier_sur(new.data ->> 'numero'), 0);
   m          jsonb;
   i          int;
-  tampon     text;
+  nj         int;
+  jour       date;
+  garde_jour date;
+  garde_fin  timestamptz;
+  tampon     timestamptz;
   propose    timestamptz;
+  ecrit      text;
   change     boolean := false;
   aujourdhui date := (now() at time zone 'Europe/Paris')::date;
 begin
   if jsonb_typeof(js) is distinct from 'array' then
     return new;
   end if;
-  if jsonb_typeof(avant) is distinct from 'array' then
-    avant := '[]'::jsonb;
-  end if;
   for i in 0 .. jsonb_array_length(js) - 1 loop
     m := js -> i;
+    nj := public.entier_sur(m ->> 'j');
+    continue when nj is null or not public.nouveau_regime(numero, nj);
     tampon := null;
-    select o ->> 'finDesMatchs' into tampon
-      from jsonb_array_elements(avant) o
-     where o ->> 'j' = m ->> 'j' and coalesce(o ->> 'finDesMatchs', '') <> ''
-     limit 1;
-    if tampon is null and not public.est_brouillon(m)
-       and public.date_de_journee(m ->> 'date', now()) = aujourdhui
-       and public.journee_terminee(new.data, public.entier_sur(m ->> 'j')) then
-      propose := public.instant_sur(m ->> 'finDesMatchs');
-      tampon := case
-                  when propose is not null and abs(extract(epoch from propose - now())) <= 300 then m ->> 'finDesMatchs'
-                  else to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
-                end;
+    if not public.est_brouillon(m) then
+      jour := public.date_de_journee(m ->> 'date', now());
+      garde_jour := null;
+      garde_fin := null;
+      select f.jour, f.fin into garde_jour, garde_fin from public.fins_des_matchs f where f.saison = numero and f.j = nj;
+      if garde_fin is not null and garde_jour is not distinct from jour then
+        if now() < public.revelation_de(jour, garde_fin) and not public.journee_terminee(new.data, nj) then
+          delete from public.fins_des_matchs f where f.saison = numero and f.j = nj;   -- rouverte avant la révélation
+        else
+          tampon := garde_fin;
+          -- Une feuille rouverte (feuille_admin) puis scellée de nouveau avant la
+          -- révélation : c'est elle, la dernière feuille, et F la suit
+          -- (sceller_feuille le dit par sfl.feuille_scellee). Une feuille scellée
+          -- trop tôt (0-0 au coup d'envoi) ne fixe plus la fin du vote.
+          if coalesce(current_setting('sfl.feuille_scellee', true), '') = nj::text
+             and now() > garde_fin and now() < public.revelation_de(jour, garde_fin) then
+            update public.fins_des_matchs f set fin = now(), pose_le = now() where f.saison = numero and f.j = nj;
+            tampon := now();
+          end if;
+        end if;
+      end if;
+      if tampon is null and jour = aujourdhui and public.journee_terminee(new.data, nj) then
+        propose := public.instant_sur(m ->> 'finDesMatchs');
+        tampon := case when propose is not null and abs(extract(epoch from propose - now())) <= 300 then propose else now() end;
+        insert into public.fins_des_matchs as f (saison, j, jour, fin)
+        values (numero, nj, jour, tampon)
+        on conflict (saison, j) do update
+          set jour = excluded.jour, fin = excluded.fin, pose_le = now();
+      end if;
     end if;
-    if tampon is not null and (m ->> 'finDesMatchs') is distinct from tampon then
-      js := jsonb_set(js, array[i::text, 'finDesMatchs'], to_jsonb(tampon));
+    ecrit := case when tampon is not null then to_char(tampon at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') end;
+    if ecrit is not null and (m ->> 'finDesMatchs') is distinct from ecrit then
+      js := jsonb_set(js, array[i::text, 'finDesMatchs'], to_jsonb(ecrit));
       change := true;
-    elsif tampon is null and m ? 'finDesMatchs' then
+    elsif ecrit is null and m ? 'finDesMatchs' then
       js := jsonb_set(js, array[i::text], m - 'finDesMatchs');
       change := true;
     end if;
@@ -3455,6 +3588,38 @@ revoke execute on function public.saison_fin_des_matchs() from public, anon, aut
 drop trigger if exists saison_fin_des_matchs on public.saison;
 create trigger saison_fin_des_matchs before insert or update of data on public.saison
   for each row execute function public.saison_fin_des_matchs();
+
+-- Une base où un tampon a déjà été posé dans le document (une version
+-- d'avant cette table, ou l'app seule) le retrouve ici. Rien n'est écrit dans
+-- public.saison ; sans document, rien.
+do $$
+declare
+  doc jsonb;
+  m   jsonb;
+  n   int;
+  nj  int;
+  f   timestamptz;
+begin
+  select s.data into doc from public.saison s where s.id = 1;
+  if doc is null or jsonb_typeof(doc -> 'journees') is distinct from 'array' then
+    return;
+  end if;
+  n := case when coalesce(doc ->> 'numero', '') ~ '^\s*\d{1,9}\s*$' then btrim(doc ->> 'numero')::int else 0 end;
+  for m in select x from jsonb_array_elements(doc -> 'journees') x loop
+    continue when coalesce(m ->> 'finDesMatchs', '') !~ '^\d{4}-\d{2}-\d{2}' or coalesce(m ->> 'j', '') !~ '^\s*\d{1,9}\s*$';
+    nj := btrim(m ->> 'j')::int;
+    continue when not public.nouveau_regime(n, nj);
+    begin
+      f := (m ->> 'finDesMatchs')::timestamptz;
+    exception when others then
+      continue;
+    end;
+    insert into public.fins_des_matchs (saison, j, jour, fin)
+    values (n, nj, (f at time zone 'Europe/Paris')::date, f)
+    on conflict (saison, j) do nothing;
+  end loop;
+end;
+$$;
 
 drop policy if exists "votes_figures: je vote aujourd'hui" on public.votes_figures;
 create policy "votes_figures: je vote aujourd'hui"
@@ -7879,7 +8044,8 @@ revoke execute on function public.joue_le_match(jsonb, int, text, text, text) fr
 
 -- Peut-on prendre la feuille de ce match ? null : oui ; sinon le motif.
 --   journee, brouillon, match · feuille_hors_jeu ;
---   pas-du-jour · elle ne se joue pas aujourd'hui (heure de Paris) ;
+--   pas-du-jour · elle ne se joue pas aujourd'hui (heure de Paris ; sa nuit,
+--     jusqu'à 1 h, compte encore) ;
 --   pas-ton-match · `p_nom` ne joue pas ce match ;
 --   terminee · le match a déjà son résultat.
 -- « pas-ton-match » passe AVANT « terminee » : prendre_feuille laisse
@@ -7894,6 +8060,7 @@ set search_path = ''
 as $$
 declare
   meta jsonb;
+  jour date;
   refus text;
 begin
   refus := public.feuille_hors_jeu(p_data, p_j, p_noirs, p_blancs);
@@ -7904,7 +8071,11 @@ begin
     from jsonb_array_elements(p_data -> 'journees') m
    where m ->> 'j' = p_j::text
    limit 1;
-  if public.date_de_journee(meta ->> 'date', p_maintenant) is distinct from (p_maintenant at time zone 'Europe/Paris')::date then
+  -- Le jour même, ou sa nuit jusqu'à 1 h : un match tardif qui déborde se
+  -- prend encore (02/11/2026, NUIT_MS de convocation-temps.ts).
+  jour := public.date_de_journee(meta ->> 'date', p_maintenant);
+  if jour is distinct from (p_maintenant at time zone 'Europe/Paris')::date
+     and jour is distinct from ((p_maintenant - interval '1 hour') at time zone 'Europe/Paris')::date then
     return 'pas-du-jour';
   end if;
   if not public.joue_le_match(p_data, p_j, p_noirs, p_blancs, p_nom) then
@@ -8394,7 +8565,11 @@ begin
   end if;
   nouvelle := greatest((extract(epoch from clock_timestamp()) * 1000)::bigint, coalesce(courante, 0) + 1);
   perform set_config('sfl.publication_saison', 'oui', true);
+  -- La journée dont une feuille se scelle : la fin des matchs suit le dernier
+  -- sceau, même d'une feuille rouverte (saison_fin_des_matchs).
+  perform set_config('sfl.feuille_scellee', p_j::text, true);
   update public.saison s set data = neuf, version = nouvelle, updated_at = now() where s.id = 1;
+  perform set_config('sfl.feuille_scellee', '', true);
   perform set_config('sfl.publication_saison', '', true);
   update public.feuilles_direct x
      set fin = now(), scelle_par = moi, version = nouvelle, maj_le = now()
