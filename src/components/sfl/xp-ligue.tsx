@@ -18,7 +18,7 @@ import { useSuiviBilanServeur, usePaliersGardes } from "@/hooks/use-bilan-serveu
 import { CartesXpContext, empreinte, lireCartesXp } from "@/hooks/use-habillage";
 import { useXpLigueCalcule, XpLigueContext } from "@/hooks/use-missions";
 import { nationsMontrees } from "@/lib/sfl/pack-afrique";
-import { paliersAuPlusHaut } from "@/lib/sfl/xp-acquis";
+import { cartesAvecServeur } from "@/lib/sfl/xp-acquis";
 
 export function XpLigueProvider({ children }: { children: ReactNode }) {
   const xp = useXpLigueCalcule();
@@ -36,11 +36,9 @@ export function XpLigueProvider({ children }: { children: ReactNode }) {
       ? { ...achats, [vitrine]: nationsMontrees().map((n) => [n, 0] as const) }
       : achats;
     if (!Object.keys(gardes).length && !Object.keys(nations).length) return c;
-    const parJoueur = new Map(c.parJoueur);
-    for (const nom of new Set([...Object.keys(gardes), ...Object.keys(nations)])) {
-      const x = parJoueur.get(nom);
-      if (x) parJoueur.set(nom, { ...x, paliers: paliersAuPlusHaut(x.paliers, gardes[nom]), afrique: nations[nom] });
-    }
+    // Un joueur absent du calcul de cet appareil (un joueur Bola) y entre aussi :
+    // son skin de nation et ses paliers gardés se voient chez tout le monde.
+    const parJoueur = cartesAvecServeur(c.parJoueur, gardes, nations, () => ({ rang: null, paliers: {}, cran: 0, recrues: 0, fondateur: null }));
     return { parJoueur, revision: `${c.revision}.${empreinte(JSON.stringify([gardes, nations]))}` };
   }, [surLesCartes, gardes, achats, vitrine]);
   return (

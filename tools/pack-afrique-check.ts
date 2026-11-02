@@ -11,7 +11,7 @@
 //     le rouge laqué (Impact).
 //   npx tsx tools/pack-afrique-check.ts
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MotifAfriqueSvg } from "../src/components/sfl/afrique/motifs-afrique";
@@ -82,8 +82,21 @@ for (const n of NATIONS) {
   textes.push([`${n.id}.nom`, n.nom], [`${n.id}.skin`, s.nom], [`${n.id}.quoi`, s.quoi], [`${n.id}.titre`, s.matiere.titre]);
   for (const src of s.sources) textes.push([`${n.id}.source`, src.titre]);
 }
-// Les textes de l'écran du pack et de la cérémonie, sans les commentaires.
-for (const f of ["../src/components/sfl/mode-passe-packs.tsx", "../src/lib/sfl/pack-afrique.ts", "../src/app/api/boutique-xp/route.ts"]) {
+// Les textes de l'écran du pack et de la cérémonie, sans les commentaires ; depuis la relecture du
+// 02/11/2026, aussi ceux de chaque skin, de la cérémonie, de Personnaliser, du dos et du compteur.
+const ecrans = [
+  "../src/components/sfl/mode-passe-packs.tsx",
+  "../src/lib/sfl/pack-afrique.ts",
+  "../src/app/api/boutique-xp/route.ts",
+  "../src/components/sfl/pack-opening.tsx",
+  "../src/components/sfl/personnaliser-carte.tsx",
+  "../src/components/sfl/mode-passe.tsx",
+  "../src/components/sfl/dos-carte.tsx",
+  "../src/components/sfl/finitions-carte.ts",
+  "../src/components/sfl/compteur-xp.tsx",
+  ...readdirSync(new URL("../src/components/sfl/afrique/", import.meta.url)).map((x) => `../src/components/sfl/afrique/${x}`),
+];
+for (const f of ecrans) {
   const code = readFileSync(new URL(f, import.meta.url), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^\s*\/\/.*$/gm, "")

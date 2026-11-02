@@ -268,8 +268,13 @@ export function RubriquesMaCarte() {
   if (b) {
     const piste = b.saisonPasse.paliers;
     const PALIERS_PASSE = piste.length;
-    const fini = b.passe.palier >= PALIERS_PASSE;
-    const suivant = piste[Math.min(PALIERS_PASSE, b.passe.palier + 1) - 1];
+    // Le palier que le mode Passe montre : au moins celui que le serveur a
+    // gardé (b.palier, lib/sfl/xp-acquis.ts). La tuile lisait le seul calcul de
+    // l'appareil (b.passe.palier) : « Passe 4/16 » ici, 13/16 dans le Passe
+    // (relecture du 02/11/2026).
+    const palier = Math.max(b.palier, b.passe.palier);
+    const fini = palier >= PALIERS_PASSE;
+    const suivant = piste[Math.min(PALIERS_PASSE, palier + 1) - 1];
     tuiles.push(
       <Tuile
         key="xp"
@@ -282,7 +287,7 @@ export function RubriquesMaCarte() {
           setPasse(true);
         }}
         nom="Niveau XP"
-        label={`Niveau XP ${b.niveau}${r && r.xp > 0 ? `, rang ${r.rang}` : ""}, ${ligneCompteur(b)}. Passe Bola : palier ${b.passe.palier} sur ${PALIERS_PASSE}`}
+        label={`Niveau XP ${b.niveau}${r && r.xp > 0 ? `, rang ${r.rang}` : ""}, ${ligneCompteur(b)}. Passe Bola : palier ${palier} sur ${PALIERS_PASSE}`}
       >
         <span className="flex items-baseline gap-2">
           <span style={{ ...NOMBRE, fontSize: 52 }} className="tabular-nums">
@@ -302,7 +307,7 @@ export function RubriquesMaCarte() {
         <span className="mt-auto flex flex-col gap-1.5">
           <span className="flex gap-[2px]" aria-hidden>
             {Array.from({ length: PALIERS_PASSE }, (_, i) => (
-              <span key={i} className={cn("h-[5px] flex-1 rounded-full", i < b.passe.palier ? "tuile__plein" : "tuile__trait")} />
+              <span key={i} className={cn("h-[5px] flex-1 rounded-full", i < palier ? "tuile__plein" : "tuile__trait")} />
             ))}
           </span>
           <span className="truncate text-[12px] font-semibold">
@@ -310,7 +315,7 @@ export function RubriquesMaCarte() {
               ? `${aSigner} mission${aSigner > 1 ? "s" : ""} à signer`
               : fini
                 ? "Passe complet"
-                : `Passe ${b.passe.palier}/${PALIERS_PASSE} · ${suivant.nom}`}
+                : `Passe ${palier}/${PALIERS_PASSE} · ${suivant.nom}`}
           </span>
         </span>
       </Tuile>

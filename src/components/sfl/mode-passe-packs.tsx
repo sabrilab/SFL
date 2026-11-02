@@ -45,12 +45,14 @@ import { poserAchat, rafraichirAchatsXp, useSoldeXp } from "@/hooks/use-achats-x
 import { rafraichirBilanServeur } from "@/hooks/use-bilan-serveur";
 import { useAfriqueCarte, useChoixHabillage, useHabillage } from "@/hooks/use-habillage";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useSession } from "@/hooks/use-session";
 import { logActivity } from "@/lib/sfl/activity";
 import { cleOuverture, oublierOuverture, ouvertureEnSuspens, ouvrirPackAfrique } from "@/lib/sfl/boutique-xp";
 import { nombreFr } from "@/lib/sfl/compteur-xp";
 import type { Player } from "@/lib/sfl/engine";
 import { choisirHabillage } from "@/lib/sfl/habillages-choisis";
 import { etatOuverture, nationsMontrees, NATIONS, numeroSerieNation, PACK_AFRIQUE, type CodeNation } from "@/lib/sfl/pack-afrique";
+import { memeNom } from "@/lib/sfl/xp-acquis";
 import { cn } from "@/lib/utils";
 import "./mode-passe-packs.css";
 
@@ -206,7 +208,12 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
   const choix = useChoixHabillage(nom);
   const nations = nationsMontrees();
   const obtenus = useMemo(() => afrique.map(([n]) => n), [afrique]);
-  const etat = vitrine ? ({ t: "apercu" } as const) : etatOuverture(solde ?? 0, obtenus);
+  // On n'ouvre que pour soi : la route débite toujours le compte de la session. Un admin qui a
+  // basculé sur le profil d'un autre joueur (player-provider) voit son pack, sans bouton
+  // (relecture du 02/11/2026 : l'achat partait sur l'admin, l'écran le montrait chez l'autre).
+  const session = useSession();
+  const aMoi = !!session?.server && memeNom(session.name, nom);
+  const etat = vitrine ? ({ t: "apercu" } as const) : aMoi ? etatOuverture(solde ?? 0, obtenus) : ({ t: "ferme" } as const);
   const [confirmer, setConfirmer] = useState(false);
   const [tirage, setTirage] = useState<Tirage | null>(null);
   const [ceremonie, setCeremonie] = useState(false);
@@ -221,7 +228,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
 
   // Une ouverture partie et pas vue (l'app fermée en plein geste) : on la rejoue, même clé, même tirage.
   useEffect(() => {
-    if (vitrine) return;
+    if (vitrine || !aMoi) return;
     const enSuspens = ouvertureEnSuspens(nom);
     if (!enSuspens) return;
     let fini = false;
@@ -240,7 +247,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
     return () => {
       fini = true;
     };
-  }, [nom, vitrine]);
+  }, [nom, vitrine, aMoi]);
 
   const ouvrirConfirmation = () => {
     setRefus(null);
@@ -251,6 +258,7 @@ export function VuePacks({ player, vitrine }: { player: Player; vitrine: boolean
       setCeremonie(true);
       return;
     }
+    if (!aMoi) return;
     cle.current = cleOuverture(nom);
     navigator.vibrate?.(8);
     setConfirmer(true);

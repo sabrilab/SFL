@@ -5,16 +5,18 @@
 //     série, jamais ce qu'elle a coûté) : la carte de chacun porte ses skins
 //     de nation, chez tout le monde (use-habillage.ts, finitionsDe) ;
 //   · les miens, avec leur prix (mes_achats_xp) : le solde à dépenser.
-// Relus à l'ouverture, au retour sur l'app et après un achat ; gardés sur le
-// téléphone pour un affichage immédiat. Le solde = l'XP gagnée à vie selon le
-// serveur (use-bilan-serveur.ts ; à défaut, le calcul de l'appareil) moins
-// l'XP dépensée. Le Niveau XP et le Passe ne lisent jamais ces achats.
+// Relus à l'ouverture, au retour sur l'app et après un achat, page par page
+// (lib/sfl/pages.ts) ; gardés sur le téléphone pour un affichage immédiat.
+// Pour moi, mes_achats_xp fait foi. Le solde = le total d'XP que l'écran
+// montre (useXp) moins l'XP dépensée ; le serveur, lui, recalcule tout à
+// l'achat. Le Niveau XP et le Passe ne lisent jamais ces achats.
 
 import { useEffect, useSyncExternalStore } from "react";
-import { useBilanServeur } from "@/hooks/use-bilan-serveur";
 import { useXp } from "@/hooks/use-missions";
 import { useSession } from "@/hooks/use-session";
 import { soldeXp } from "@/lib/sfl/pack-afrique";
+import { PAGE, toutesLesPages } from "@/lib/sfl/pages";
+import { memeNom } from "@/lib/sfl/xp-acquis";
 import { supabase } from "@/lib/supabase";
 
 export interface AchatXp {
@@ -66,17 +68,25 @@ export function useAchatsLigue(): AchatsLigue {
 /** Mes achats, avec leur prix (null tant qu'ils ne sont pas lus, ou s'ils sont d'un autre compte). */
 export function useMesAchatsXp(nom: string | null | undefined): AchatXp[] | null {
   const m = useSyncExternalStore(abonner, instantaneMiens, () => null);
-  return m && nom && m.nom === nom ? m.achats : null;
+  return m && nom && memeNom(m.nom, nom) ? m.achats : null;
 }
 
-/** L'XP qui reste à dépenser ; null tant que mes achats ne sont pas lus. */
+/**
+ * L'XP qui reste à dépenser ; null tant que mes achats ne sont pas lus. Elle
+ * part du total que l'écran montre (useXp : le calcul de l'appareil, pris au
+ * plus haut avec le dernier bilan du serveur quand il est incomplet) : sans
+ * achat, « à dépenser » ne s'écrit pas ; avec, c'est ce total moins l'XP
+ * dépensée. Avant (relecture du 02/11/2026), il partait du dernier bilan du
+ * serveur (jusqu'à 10 minutes d'âge) : « 1 630 XP · 1 580 à dépenser » sans
+ * rien avoir acheté, et un chiffre différent d'un appareil à l'autre. Le
+ * serveur décide toujours seul (ouvrir_pack_xp) et rend le vrai solde s'il
+ * refuse.
+ */
 export function useSoldeXp(nom: string | null | undefined): number | null {
   const achats = useMesAchatsXp(nom);
-  const serveur = useBilanServeur(nom);
   const b = useXp(nom ?? undefined);
   if (!achats || !b) return null;
-  const gagnee = serveur?.total ?? b.total;
-  return soldeXp(gagnee, achats.reduce((a, x) => a + x.xp, 0));
+  return soldeXp(b.total, achats.reduce((a, x) => a + x.xp, 0));
 }
 
 let enVol: Promise<void> | null = null;
@@ -87,15 +97,28 @@ export function rafraichirAchatsXp(nom: string): Promise<void> {
   enVol = (async () => {
     try {
       const sb = supabase();
+      // Toute la ligue, page par page (lib/sfl/pages.ts : la base en rend 1 000 au plus).
       const [toute, mes] = await Promise.all([
-        sb.from("achats_xp").select("article, obtenu, serie, profiles(name)"),
+        toutesLesPages<{ obtenu: string; serie: number; profiles: { name: string } | { name: string }[] | null }>((debut) =>
+          sb
+            .from("achats_xp")
+            .select("id, obtenu, serie, profiles(name)")
+            .order("id")
+            .range(debut, debut + PAGE - 1)
+        ),
         sb.rpc("mes_achats_xp"),
       ]);
-      if (!toute.error && toute.data) {
+      if (!toute.error) {
         const out: Record<string, [string, number][]> = {};
-        for (const l of toute.data as unknown as { obtenu: string; serie: number; profiles: { name: string } | { name: string }[] | null }[]) {
+        for (const l of toute.lu) {
           const p = Array.isArray(l.profiles) ? l.profiles[0] : l.profiles;
           if (p?.name) (out[p.name] ??= []).push([l.obtenu, l.serie]);
+        }
+        // Les miens font foi pour moi (mes_achats_xp) : ce que j'ai payé se porte, quoi que dise la liste de la ligue.
+        if (!mes.error) {
+          const a = (mes.data ?? []) as AchatXp[];
+          if (a.length) out[nom] = a.map((x) => [x.obtenu, x.serie]);
+          else delete out[nom];
         }
         if (JSON.stringify(out) !== JSON.stringify(instantaneLigue())) {
           ligue = out;

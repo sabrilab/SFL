@@ -42,7 +42,8 @@ export async function POST(req: NextRequest) {
   let gagnee: number;
   try {
     const x = await xpServeur(sb, { id: moi.id, nom: p.name, jeton }, maintenant);
-    gagnee = bilanServeurDe(x, p.name, maintenant).total;
+    // Un entier, jamais négatif : p_gagne est un int (une XP fractionnaire ferait échouer l'appel).
+    gagnee = Math.max(0, Math.floor(bilanServeurDe(x, p.name, maintenant).total));
   } catch {
     return NextResponse.json({ error: "Réessaie." }, { status: 503 });
   }

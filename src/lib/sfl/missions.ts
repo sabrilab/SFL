@@ -46,7 +46,7 @@ import { matchsDeJournee, premierCoupDEnvoi } from "./matchs-du-jour";
 import { ovr, type Player } from "./engine";
 import type { MatchEntry, Saison, SaisonArchivee } from "./saisie/types";
 import { passeDe, type BilanPasse, type Epreuve, type PaliersAtteints } from "./passe";
-import { derniersJours, saisonPasseA, saisonPasseDeLigne, SAISONS_PASSE, type SaisonPasse } from "./saisons-passe";
+import { derniersJours, saisonPasseA, saisonPasseDeLigne, saisonsPasseOuvertes, type SaisonPasse } from "./saisons-passe";
 import type { CreneauArbitre } from "./missions-arbitre";
 
 /* ------------------------------- Le barème ------------------------------- */
@@ -932,7 +932,11 @@ export function paliersDe(
   epreuves?: readonly Epreuve[]
 ): PaliersAtteints {
   const out: Record<string, number> = {};
-  for (const s of SAISONS_PASSE) {
+  // Une saison du Passe qui n'a pas commencé n'a aucun palier, quelles que
+  // soient les lignes (une journée saisie d'avance, une date mal lue) : la
+  // Saison Givre s'ouvre le 9/11 pour tous, et rien ne la débloque avant,
+  // ni ici ni dans ce que le serveur garde (xp-serveur.server.ts).
+  for (const s of saisonsPasseOuvertes(maintenant)) {
     const p = bilanDe(journal, joueur, maintenant, epreuves, s).palier;
     if (p > 0) out[s.id] = p;
   }

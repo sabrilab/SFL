@@ -10,7 +10,8 @@ import { useEffect, useSyncExternalStore } from "react";
 import { useSession } from "@/hooks/use-session";
 import { SAISON_PUBLIEE_EVENT } from "@/lib/sfl/saisie/sync";
 import type { PaliersAtteints } from "@/lib/sfl/passe";
-import type { BilanGarde } from "@/lib/sfl/xp-acquis";
+import { PAGE, toutesLesPages } from "@/lib/sfl/pages";
+import { memeNom, type BilanGarde } from "@/lib/sfl/xp-acquis";
 import { supabase } from "@/lib/supabase";
 
 const CLE_BILAN = "sfl-xp-bilan";
@@ -58,7 +59,7 @@ function instantaneAcquis(): Record<string, PaliersAtteints> {
 /** Le dernier bilan du serveur pour ce joueur (null s'il n'y en a pas, ou s'il est d'un autre compte). */
 export function useBilanServeur(nom: string | null | undefined): BilanGarde | null {
   const b = useSyncExternalStore(abonner, instantaneBilan, () => null);
-  return b && nom && b.nom === nom ? b : null;
+  return b && nom && memeNom(b.nom, nom) ? b : null;
 }
 
 /** Les paliers gardés par le serveur, joueur par joueur (passe_acquis). */
@@ -66,12 +67,20 @@ export function usePaliersGardes(): Record<string, PaliersAtteints> {
   return useSyncExternalStore(abonner, instantaneAcquis, () => AUCUN);
 }
 
-/** Relit les paliers gardés de toute la ligue (les membres la lisent). */
+/** Relit les paliers gardés de toute la ligue (les membres la lisent), page par page (lib/sfl/pages.ts). */
 async function relireAcquis(): Promise<void> {
-  const { data, error } = await supabase().from("passe_acquis").select("saison_passe, palier, profiles(name)");
-  if (error || !data) return;
+  const sb = supabase();
+  const { lu, error } = await toutesLesPages<{ saison_passe: string; palier: number; profiles: { name: string } | { name: string }[] | null }>((debut) =>
+    sb
+      .from("passe_acquis")
+      .select("saison_passe, palier, profiles(name)")
+      .order("joueur")
+      .order("saison_passe")
+      .range(debut, debut + PAGE - 1)
+  );
+  if (error) return;
   const out: Record<string, Record<string, number>> = {};
-  for (const l of data as unknown as { saison_passe: string; palier: number; profiles: { name: string } | { name: string }[] | null }[]) {
+  for (const l of lu) {
     const p = Array.isArray(l.profiles) ? l.profiles[0] : l.profiles;
     if (!p?.name) continue;
     (out[p.name] ??= {})[l.saison_passe] = l.palier;

@@ -5,14 +5,18 @@
 //      contrainte profiles_habillage_check de supabase/schema.sql ;
 //   2. la bascule : le 8/11 à 23:59 à Paris, la Saison 1 ; le 9/11 à 00:00, Givre ;
 //   3. une ligne d'XP sans date ne change pas de saison entre le 1/11 et le 10/11 ;
-//   4. le jour ISO d'une ligne ne dépend pas de l'heure du calcul.
+//   4. le jour ISO d'une ligne ne dépend pas de l'heure du calcul ;
+//   5. rien n'ouvre Givre avant le 9/11 (relecture du 02/11) : ni une ligne
+//      datée d'avance, ni le serveur, ni un palier gardé par erreur.
 //   npx tsx tools/givre-check.ts
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { FINITIONS, SIGNES_JOUEUR } from "../src/components/sfl/finitions-carte";
 import { ecrireChoixHabillage, lireChoixHabillage } from "../src/lib/sfl/habillages-choisis";
 import type { LigneXp } from "../src/lib/sfl/missions";
-import { bilanDe } from "../src/lib/sfl/missions";
+import { bilanDe, paliersDe } from "../src/lib/sfl/missions";
+import { finitionsDe } from "../src/hooks/use-habillage";
+import { bilanServeurDe, paliersAGarder, type XpServeur } from "../src/lib/sfl/xp-serveur.server";
 import { PASSE_GIVRE, PASSE_SAISON_1 } from "../src/lib/sfl/passe";
 import { NATIONS } from "../src/lib/sfl/pack-afrique";
 import { jourDeLigne, saisonPasseA, saisonPasseDeLigne, saisonsPasseOuvertes } from "../src/lib/sfl/saisons-passe";
@@ -70,4 +74,26 @@ for (const quand of ["2026-11-01T12:00:00Z", "2026-11-08T23:30:00Z", "2026-11-10
 // 4 · Le jour ISO l'emporte sur le libellé, quelle que soit l'heure du calcul.
 for (const quand of ["2026-11-01T12:00:00Z", "2027-06-01T12:00:00Z", "2027-12-15T12:00:00Z"])
   assert.equal(jourDeLigne({ date: "1 nov.", jour: "2026-11-01" }, new Date(quand)), "2026-11-01");
+
+// 5 · Relecture adverse (02/11/2026) : rien n'ouvre Givre avant le 9/11, pas même une ligne datée
+//     d'avance (une journée du 15/11 saisie trop tôt) : ni le palier de l'appareil, ni ce que le
+//     serveur garde (passe_acquis, ratchet sans retour), ni le bilan qu'il rend, ni un skin porté.
+{
+  const davance = new Map([["Ilyes", { lignes: [L({ j: 9, date: "15 nov.", quoi: "Dimanche joué", xp: 2000 })], reussies: 0 }]]);
+  const avant = new Date("2026-11-02T12:00:00Z");
+  const apres = new Date("2026-11-16T12:00:00Z");
+  assert.equal(paliersDe(davance, "Ilyes", avant).givre, undefined, "aucun palier Givre le 2/11");
+  assert.ok((paliersDe(davance, "Ilyes", apres).givre ?? 0) > 0, "le palier Givre compte une fois la saison ouverte");
+  const xs: XpServeur = { journal: davance, bola: false, effectif: new Set(["Ilyes"]), idDeNom: new Map([["Ilyes", "u-ilyes"]]) };
+  assert.ok(!paliersAGarder(xs, "Ilyes", avant).some((l) => l.saison_passe === "givre"), "le serveur ne garde rien de Givre avant le 9/11");
+  assert.equal(bilanServeurDe(xs, "Ilyes", avant).saisons.givre, undefined, "le bilan du serveur ne montre pas Givre avant le 9/11");
+  assert.ok(paliersAGarder(xs, "Ilyes", apres).some((l) => l.saison_passe === "givre" && l.palier > 0));
+  // Même un palier Givre gardé par erreur ne s'enfile pas avant le 9/11.
+  const givreSkins = PASSE_GIVRE.flatMap((p) => (p.habille?.finition ? [p.habille.finition] : []));
+  const portables = finitionsDe("Ilyes", { s1: 16, givre: 12 }, 0, null, [], avant);
+  assert.ok(!givreSkins.some((f) => (portables as string[]).includes(f)), "aucun skin Givre portable le 2/11");
+  assert.ok(portables.length > 0, "les skins de la Saison 1 restent");
+  const ouverte = finitionsDe("Ilyes", { s1: 16, givre: 12 }, 0, null, [], new Date("2026-11-10T12:00:00Z"));
+  assert.ok(givreSkins.every((f) => (ouverte as string[]).includes(f)), "les skins Givre gagnés se portent dès le 9/11");
+}
 console.log("givre : ok");

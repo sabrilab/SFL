@@ -30,7 +30,7 @@ import { finitionsOffertes } from "@/lib/sfl/finitions-offertes";
 import { finitionsRecrues } from "@/components/sfl/skins-recrues";
 import type { Rang } from "@/lib/sfl/missions";
 import { debloquesDe, type PaliersAtteints } from "@/lib/sfl/passe";
-import { SAISONS_PASSE } from "@/lib/sfl/saisons-passe";
+import { saisonsPasseOuvertes } from "@/lib/sfl/saisons-passe";
 
 /** Ce que l'XP pose sur les cartes de la ligue (XpLigueProvider, xp-ligue.tsx). */
 export interface CartesXp {
@@ -121,9 +121,12 @@ export function finitionsDe(
   paliers: PaliersAtteints,
   recrues = 0,
   fondateur: number | null = null,
-  afrique: readonly (readonly [string, number])[] = AUCUNE_NATION
+  afrique: readonly (readonly [string, number])[] = AUCUNE_NATION,
+  maintenant: Date = new Date()
 ): Finition[] {
-  const passe = debloquesDe(paliers, SAISONS_PASSE).finitions.filter((f): f is Finition => f in MATIERES);
+  // Les saisons du Passe commencées seulement : un palier d'une saison à venir
+  // (Givre avant le 9/11), d'où qu'il vienne, n'habille aucune carte.
+  const passe = debloquesDe(paliers, saisonsPasseOuvertes(maintenant)).finitions.filter((f): f is Finition => f in MATIERES);
   const nations = afrique.map(([n]) => `afrique-${n}`).filter((f): f is Finition => f in MATIERES);
   const autres = [...finitionsOffertes(nom), ...finitionsRecrues(recrues, fondateur), ...nations];
   return [...passe, ...autres.filter((f, i) => !passe.includes(f) && autres.indexOf(f) === i)];
@@ -139,11 +142,12 @@ export function useHabillage(nom: string): HabillageCarte {
     const paliers = x?.paliers ?? AUCUN;
     const fondateur = x?.fondateur ?? null;
     const afrique = x?.afrique ?? AUCUNE_NATION;
-    const finitions = finitionsDe(nom, paliers, x?.recrues ?? 0, fondateur, afrique);
+    const maintenant = new Date();
+    const finitions = finitionsDe(nom, paliers, x?.recrues ?? 0, fondateur, afrique, maintenant);
     // « Tes couleurs » se porte avec son pays.
     const voulue = choix.finition === "couleurs" && !choix.pays ? "-" : choix.finition;
     const finition = voulue !== "auto" && voulue !== "-" && finitions.includes(voulue) ? voulue : undefined;
-    const ouverts = debloquesDe(paliers, SAISONS_PASSE).signes;
+    const ouverts = debloquesDe(paliers, saisonsPasseOuvertes(maintenant)).signes;
     const cran = Math.min(4, x?.cran ?? 0) as HabillageCarte["cran"];
     return {
       finition,

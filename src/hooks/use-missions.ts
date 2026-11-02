@@ -58,7 +58,7 @@ import {
   reponsesEnMemoire,
 } from "@/lib/sfl/missions-reponses";
 import { publicationEnAttente } from "@/lib/sfl/saisie/sync";
-import { bilanAffiche } from "@/lib/sfl/xp-acquis";
+import { bilanAffiche, parNom } from "@/lib/sfl/xp-acquis";
 import { useBilanServeur, usePaliersGardes } from "@/hooks/use-bilan-serveur";
 import type { RecruesJoueur } from "@/lib/sfl/recrues";
 import { journalComplet } from "@/lib/sfl/xp-calcul";
@@ -480,7 +480,7 @@ export function useXp(nom?: string): BilanXp | null {
   const session = useSession();
   const qui = nom ?? me;
   const serveur = useBilanServeur(qui === me ? qui : null);
-  const garde = usePaliersGardes()[qui ?? ""];
+  const garde = parNom(usePaliersGardes(), qui);
   // Mes réponses aux missions arrivent un instant après l'ouverture : useReponses suit leur chargement.
   useReponses();
   const complet = !!session?.server && reponsesChargees() && !publicationEnAttente();
