@@ -81,7 +81,7 @@ import {
 import { MATIERES_OFFERTES, type FinitionOfferte, type MotifOffert } from "@/components/sfl/skins-offerts";
 import { MATIERE_ARBITRE, MATIERES_ARBITRE, type FinitionArbitre, type MotifArbitre } from "@/components/sfl/skins-arbitre";
 import { MATIERES_RECRUES, numeroFondateur, type FinitionRecrue, type MotifRecrue } from "@/components/sfl/skins-recrues";
-import { MATIERE_ENTRAINEUR, MATIERES_ENTRAINEUR, type FinitionEntraineur, type MotifEntraineur } from "@/components/sfl/skins-entraineur";
+import { MATIERE_ENTRAINEUR, MATIERES_ENTRAINEUR, type FinitionEntraineur, type MotifEntraineur, type TraitEntraineur } from "@/components/sfl/skins-entraineur";
 import { MATIERES_AFRIQUE } from "@/components/sfl/afrique/registre";
 import { NATIONS, numeroSerieNation } from "@/lib/sfl/pack-afrique";
 import type { FinitionAfrique, MotifAfrique } from "@/components/sfl/afrique/types";
@@ -250,6 +250,8 @@ export interface Matiere {
    * dessine lui-même la lune et le logotype.
    */
   dos?: Partial<Pick<Matiere, "encre" | "sombre" | "papier" | "micro" | "reflet" | "rebord">> & { logo?: false };
+  /** La carte d'entraîneur (étude, skins-entraineur.ts) : l'écusson de son équipe, l'étiquette en tirets, le portrait sans photo. */
+  entraineur?: TraitEntraineur;
 }
 
 const PHI = (1 + Math.sqrt(5)) / 2;

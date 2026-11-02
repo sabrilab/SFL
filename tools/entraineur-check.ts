@@ -1,169 +1,256 @@
-// La carte d'entraîneur de Bola Team (étude du 02/11/2026, branche coach-etude) :
-//   1. rien ne descend : chaque mise à jour garde ou monte chaque caractéristique ;
-//      tout reste entre 75 (le départ) et 99 (le plafond) ; la note est
-//      l'arrondi supérieur de la moyenne des six ;
-//   2. RES : rien avant que l'Indice de Force soit calé ; un demi-point
-//      d'avance sur l'attendu vaut un cran ; ce qu'un entraîneur prend à
-//      l'autre, l'autre le perd (somme nulle) ; battre plus faible ne rapporte
-//      presque rien ;
-//   3. une dette bloque : après un forfait (−3), trois matchs au complet ne
-//      font rien monter ; un forfait ne touche que l'effectif ; absent, rien ne
-//      compte pour lui, sauf le 5 contre 4 et le forfait ;
-//   4. PRO : sept joueurs ne gagnent pas au nombre sur cinq ; un joueur ne
-//      verse pas plus de 3 crans ; ceux qui partent de plus bas comptent double ;
-//   5. JEU : le même cinq de départ à chaque match, rien ; un vrai partage, 2 crans ;
-//   6. COH : un départ −1, une exclusion −2 ; TEN : les paliers de la note fair-play ;
-//   7. la saison inventée de Lucien donne la carte des captures ;
-//   8. les matières de la carte : ni or, ni bleu, ni rouge, ni la braise, et
-//      aucune n'entre dans les finitions qu'un joueur peut porter.
+// La carte d'entraîneur de Bola Team (étude du 02/11/2026, branche coach-etude,
+// seconde version : les défauts des deux relectures adverses, vérifiés fermés) :
+//   1. rien ne descend ; tout reste entre 75 et 99 ; la note est l'arrondi
+//      supérieur de la moyenne des six ;
+//   2. un entraîneur dans la moyenne reste à 75, même après 200 rencontres ; le
+//      hasard ne paie presque rien (res, 64 rencontres sans effet), un vrai
+//      effet paie (D5, D8) ;
+//   3. le score du championnat à la fermeture : une défaite que son capitaine
+//      ne saisit pas compte quand même ; un litige non tranché et le forfait de
+//      l'adversaire, non (D1, D2) ;
+//   4. prés : 3 présents ou moins, c'est un forfait, annoncé ou pas ; un inscrit
+//      absent compte, même excusé après coup ; « présent sans check-in », c'est
+//      un retard (D6, D9) ;
+//   5. tour : n'aligner que les forts ne paie pas ; le membre fantôme bloque ;
+//      les absences annoncées comptent pour une sur deux au plus (D3, D15) ;
+//   6. coh : une exclusion vaut un départ ; la dissolution et l'abonnement fini
+//      ne comptent pas (D10, D11) ;
+//   7. fair : contre l'habitude de celui qui note, quelle que soit la ligue ;
+//      −2 par sanction d'un joueur, −4 pour la sienne (D10, D14) ;
+//   8. rec : une recrue qui joue et reste ; celle qui part ou ne joue pas, non ;
+//   9. le journal ne dit jamais l'attendu en chiffres (D12) ; Champion à 40 %
+//      des rencontres dirigées (D14) ;
+//  10. les deux saisons de Lucien donnent la carte des captures ;
+//  11. les matières : ni or, ni bleu, ni rouge, ni la braise ; aucune n'entre
+//      dans les finitions d'un joueur.
 //   npx tsx tools/entraineur-check.ts
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   CLES_ENTRAINEUR,
+  championDe,
   evoluerEntraineur,
+  NORMES_DEPART,
   noteEntraineur,
-  type PresentEntraineur,
+  rencontreComptee,
+  type CarriereEntraineur,
+  type CleEntraineur,
+  type LigneEffectif,
+  type MembreEntraineur,
   type RencontreEntraineur,
 } from "../src/lib/sfl/entraineur";
-import { ARRIVEE_DEMO, JOUEURS_DEMO, MOUVEMENTS_DEMO, RENCONTRES_DEMO } from "../src/lib/sfl/entraineur-demo";
+import { CARRIERE_DEMO } from "../src/lib/sfl/entraineur-demo";
+import type { MatchTeam } from "../src/lib/sfl/championnat-team";
 import { FINITIONS, MATIERES } from "../src/components/sfl/finitions-carte";
 import { MATIERES_ENTRAINEUR } from "../src/components/sfl/skins-entraineur";
 
-const NOMS = ["A", "B", "C", "D", "E", "F", "G"];
-const present = (nom: string, o: Partial<PresentEntraineur> = {}): PresentEntraineur => ({ nom, aLHeure: true, titulaire: true, buts: 0, passes: 0, ...o });
+function mulberry32(a: number) {
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const IDS = ["a", "b", "c", "d", "e", "f", "g"];
+const jour = (k: number) => new Date(Date.UTC(2026, 10, 7) + k * 86_400_000).toISOString().slice(0, 10);
+const ligne = (id: string, o: Partial<LigneEffectif> = {}): LigneEffectif => ({ id, inscrit: true, indisponible: false, venu: "heure", ...o });
+const membres = (n = 7): MembreEntraineur[] => IDS.slice(0, n).map((id) => ({ id, nom: id.toUpperCase(), arrivee: "2026-10-01" }));
 let n = 0;
-const match = (o: Partial<RencontreEntraineur> = {}): RencontreEntraineur => ({
-  id: `m${++n}`,
-  le: `2026-11-${String(1 + (n % 28)).padStart(2, "0")}T${String(n).padStart(4, "0")}`,
-  classee: true,
+/** Une rencontre « dans la moyenne » : une semaine après l'autre, cinq inscrits venus à l'heure sur sept. */
+const match = (k: number, o: Partial<RencontreEntraineur> = {}): RencontreEntraineur => ({
+  id: `m${String(++n).padStart(4, "0")}`,
+  le: jour(k * 7),
   forfait: false,
   pour: 2,
   contre: 2,
   attendu: 0.5,
-  indiceCale: true,
-  presents: NOMS.slice(0, 5).map((x) => present(x)),
-  absentsInscrits: 0,
-  fairPlay: 4,
-  sanctions: 0,
-  litigeFautif: false,
+  effectif: IDS.map((id, i) => ligne(id, i < 5 ? {} : { inscrit: false })),
+  fairPlay: { note: 4.2, habitude: 4.2 },
+  sanctions: { joueurs: 0, entraineur: 0 },
   ...o,
 });
+const carriere = (rencontres: RencontreEntraineur[], m = membres()): CarriereEntraineur => ({ arrivee: "2026-10-15", rencontres, membres: m });
+/** Des normes où la rencontre ci-dessus est exactement dans la moyenne. */
+const NORMES = { ...NORMES_DEPART, presence: 1, tour: 1, departsParJour: 0, recrues: 0.5 };
+const gain = (ev: ReturnType<typeof evoluerEntraineur>, k: CleEntraineur) => ev.officielles[k] - 75;
+const moy = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
 
 // 1 · Rien ne descend, tout reste entre 75 et 99, la note est l'arrondi supérieur de la moyenne.
 {
-  let x = 7;
-  const rnd = () => ((x = (x * 1103515245 + 12345) % 2147483648), x / 2147483648);
-  const rencontres = Array.from({ length: 160 }, () =>
-    match({
+  const rnd = mulberry32(7);
+  const rs = Array.from({ length: 160 }, (_, k) =>
+    match(k, {
       pour: Math.floor(rnd() * 7),
       contre: Math.floor(rnd() * 7),
-      attendu: 0.15 + rnd() * 0.7,
-      forfait: rnd() < 0.05,
-      presents: NOMS.slice(0, 4 + Math.floor(rnd() * 4)).map((nom) =>
-        present(nom, { aLHeure: rnd() > 0.1, titulaire: rnd() > 0.3, buts: Math.floor(rnd() * 3), passes: Math.floor(rnd() * 2) })
-      ),
-      fairPlay: rnd() < 0.1 ? null : 1 + rnd() * 4,
-      sanctions: rnd() < 0.05 ? 1 : 0,
-      litigeFautif: rnd() < 0.03,
+      attendu: rnd() < 0.2 ? null : 0.15 + rnd() * 0.7,
+      forfait: rnd() < 0.04,
+      effectif: IDS.map((id) => ligne(id, { inscrit: rnd() > 0.2, indisponible: rnd() < 0.1, venu: rnd() < 0.12 ? null : rnd() < 0.1 ? "retard" : "heure" })),
+      fairPlay: rnd() < 0.1 ? null : { note: 1 + Math.floor(rnd() * 5), habitude: 3.6 + rnd() },
+      sanctions: { joueurs: rnd() < 0.05 ? 1 : 0, entraineur: rnd() < 0.01 ? 1 : 0 },
     })
   );
-  const ev = evoluerEntraineur(rencontres, [{ le: "2026-11-10", nom: "B", quoi: "exclusion" }], { noteJoueur: (nom) => 70 + NOMS.indexOf(nom) * 3 });
+  const m = membres();
+  m[1].depart = { le: jour(40), motif: "exclusion" };
+  m.push({ id: "h", nom: "H", arrivee: jour(45) });
+  const ev = evoluerEntraineur(carriere(rs, m));
   const suite = [...ev.majs].reverse();
-  assert.equal(suite.length, 40);
+  assert.ok(suite.length >= 30, "une mise à jour toutes les 4 rencontres, une par mois au plus");
+  const mois = suite.map((x) => x.apres.slice(0, 7));
+  assert.equal(new Set(mois).size, mois.length, "jamais deux mises à jour le même mois");
   let avant = ev.depart;
-  for (const m of suite) {
+  for (const x of suite) {
     for (const k of CLES_ENTRAINEUR) {
-      assert.ok(m.stats[k] >= avant[k], `${k} descend après ${m.apres}`);
-      assert.ok(m.stats[k] >= 75 && m.stats[k] <= 99, `${k} hors de 75–99`);
+      assert.ok(x.stats[k] >= avant[k], `${k} descend après ${x.apres}`);
+      assert.ok(x.stats[k] >= 75 && x.stats[k] <= 99, `${k} hors de 75–99`);
     }
-    avant = m.stats;
+    avant = x.stats;
   }
-  assert.equal(noteEntraineur({ RES: 80, PRO: 81, EFF: 80, COH: 80, JEU: 80, TEN: 80 }), 81);
-  assert.equal(noteEntraineur({ RES: 75, PRO: 75, EFF: 75, COH: 75, JEU: 75, TEN: 75 }), 75);
+  assert.equal(noteEntraineur({ RES: 80, PRES: 81, TOUR: 80, COH: 80, FAIR: 80, REC: 80 }), 81);
+  assert.equal(noteEntraineur({ RES: 75, PRES: 75, TOUR: 75, COH: 75, FAIR: 75, REC: 75 }), 75);
 }
 
-// 2 · RES : l'Indice calé d'abord ; un demi-point, un cran ; la somme nulle ; battre plus faible ne paie pas.
+// 2 · Dans la moyenne, il reste à 75, quel que soit le nombre de rencontres (D5).
 {
-  const res = (rs: RencontreEntraineur[]) => evoluerEntraineur(rs).faits.filter((f) => f.cle === "RES").reduce((t, f) => t + f.crans, 0);
-  assert.equal(res([match({ pour: 5, contre: 0, attendu: 0.2, indiceCale: false })]), 0);
-  assert.equal(res([match({ pour: 5, contre: 0, attendu: 0.2 })]), 1); // +0,80 : un cran, 0,30 en réserve
-  assert.equal(res([match({ pour: 5, contre: 0, attendu: 0.2 }), match({ pour: 3, contre: 1, attendu: 0.8 })]), 2); // +0,20 : 0,30 + 0,20 en réserve, un cran de plus
-  assert.equal(res([match({ pour: 5, contre: 0, attendu: 0.2 }), match({ pour: 0, contre: 3, attendu: 0.6 }), match({ pour: 3, contre: 0, attendu: 0.5 })]), 1); // la défaite (−0,60) est une dette que la victoire suivante rembourse
-  // L'adversaire du même match : son attendu est 1 − E, son résultat 1 − S.
-  const a = evoluerEntraineur([match({ pour: 4, contre: 2, attendu: 0.36 })]);
-  const b = evoluerEntraineur([match({ pour: 2, contre: 4, attendu: 0.64 })]);
-  assert.ok(Math.abs(a.reserveRes + 0.5 * a.faits.filter((f) => f.cle === "RES").length + b.reserveRes) < 1e-9, "somme nulle");
-  // Dix victoires contre bien plus faible (attendu 0,95) : au plus un cran.
-  assert.ok(res(Array.from({ length: 10 }, () => match({ pour: 6, contre: 1, attendu: 0.95 }))) <= 1);
+  const ev = evoluerEntraineur(carriere(Array.from({ length: 200 }, (_, k) => match(k))), { normes: NORMES });
+  assert.deepEqual(ev.officielles, { RES: 75, PRES: 75, TOUR: 75, COH: 75, FAIR: 75, REC: 75 });
+  assert.equal(ev.rencontres, 200);
+  // Le hasard ne paie presque rien ; un vrai effet paie (D8). res seul, 64 rencontres, 400 carrières.
+  const rnd = mulberry32(2026);
+  const res = (d: number) =>
+    moy(
+      Array.from({ length: 400 }, () => {
+        const rs = Array.from({ length: 64 }, (_, k) => {
+          const e = 0.3 + rnd() * 0.4;
+          const u = rnd();
+          const s = u < e - 0.1 + d ? 1 : u < e + 0.1 + d ? 0.5 : 0;
+          return match(k, { attendu: e, pour: s === 1 ? 3 : s ? 2 : 1, contre: 2 });
+        });
+        return gain(evoluerEntraineur(carriere(rs), { normes: NORMES }), "RES");
+      })
+    );
+  const sansEffet = res(0);
+  const bon = res(0.08);
+  assert.ok(sansEffet < 1.2, `res sans effet : +${sansEffet.toFixed(2)} en 64 rencontres`);
+  assert.ok(bon > sansEffet + 1.5, `res d'un bon entraîneur (+${bon.toFixed(2)}) contre le hasard (+${sansEffet.toFixed(2)})`);
+  // Ce que la chance a donné se rembourse avant le prochain cran : deux victoires « contre plus fort », deux défaites « contre plus faible ».
+  const yoyo = evoluerEntraineur(carriere(Array.from({ length: 8 }, (_, k) => match(k, { attendu: k % 2 ? 0.75 : 0.25, pour: k % 2 ? 0 : 3, contre: 1 }))), { normes: NORMES });
+  assert.equal(gain(yoyo, "RES"), 0);
 }
 
-// 3 · Une dette bloque, un forfait ne touche que l'effectif.
+// 3 · Le score du championnat à la fermeture de la feuille (D1, D2).
 {
-  const ev = evoluerEntraineur([match({ forfait: true }), match(), match(), match()]);
-  assert.equal(ev.officielles.EFF, 75);
-  assert.equal(ev.jauges.EFF.crans, 0);
-  const seul = evoluerEntraineur([match({ forfait: true })]);
-  assert.deepEqual(new Set(seul.faits.map((f) => f.cle)), new Set(["EFF"]));
-  // Un 5 contre 4 : −1 ; un retard ou un inscrit absent : rien.
-  const ev2 = evoluerEntraineur([match({ presents: NOMS.slice(0, 4).map((x) => present(x)) }), match({ absentsInscrits: 1 }), match({ presents: NOMS.slice(0, 5).map((x, i) => present(x, { aLHeure: i > 0 })) })]);
-  assert.deepEqual(ev2.faits.filter((f) => f.cle === "EFF").map((f) => f.crans), [-1]);
+  const base: MatchTeam = { id: 1, de: 10, a: 20, jour: "2026-11-14", heure: "20:00", lieu: "", statut: "accepte", forfaitDe: null, saisies: [], buteurs: [] };
+  // Son capitaine (équipe 10) ne saisit pas la défaite : l'adversaire saisit seul, ça compte quand même.
+  const seule = { ...base, saisies: [{ equipe: 20, pour: 4, contre: 1, le: "2026-11-14T21:00:00Z" }] };
+  assert.deepEqual(rencontreComptee(seule, 10), { pour: 1, contre: 4, forfait: false });
+  // Et l'adversaire n'efface pas sa victoire en se taisant.
+  const gagnee = { ...base, saisies: [{ equipe: 10, pour: 3, contre: 0, le: "2026-11-14T21:00:00Z" }] };
+  assert.deepEqual(rencontreComptee(gagnee, 10), { pour: 3, contre: 0, forfait: false });
+  // Un litige à la fermeture : ni pour l'un ni pour l'autre, en attendant la revue.
+  const litige = { ...base, saisies: [{ equipe: 10, pour: 3, contre: 0, le: "2026-11-14T21:00:00Z" }, { equipe: 20, pour: 1, contre: 3, le: "2026-11-14T21:05:00Z" }] };
+  assert.equal(rencontreComptee(litige, 10), null);
+  // Le forfait de l'adversaire ne dit rien de lui ; le sien compte.
+  assert.equal(rencontreComptee({ ...base, statut: "forfait", forfaitDe: 20 }, 10), null);
+  assert.deepEqual(rencontreComptee({ ...base, statut: "forfait", forfaitDe: 10 }, 10), { pour: 0, contre: 3, forfait: true });
 }
 
-// 3 bis · Absent, rien ne compte pour lui, sauf le 5 contre 4 et le forfait.
+// 4 · prés (D6, D9).
 {
-  const ev = evoluerEntraineur([
-    match({ entraineurPresent: false, pour: 6, contre: 0, attendu: 0.2 }),
-    match({ entraineurPresent: false, presents: NOMS.slice(0, 4).map((x) => present(x)) }),
-  ]);
-  assert.equal(ev.rencontres, 1);
-  assert.deepEqual(ev.faits.map((f) => [f.cle, f.crans]), [["EFF", -1]]);
+  const pres = (r: Partial<RencontreEntraineur>) => evoluerEntraineur(carriere([match(0, r)]), { normes: NORMES }).journal.find((f) => f.cle === "PRES")!.texte;
+  // Personne n'est venu et rien n'a été annoncé : un forfait.
+  assert.equal(pres({ effectif: IDS.map((id) => ligne(id, { venu: null })) }), "forfait");
+  assert.equal(pres({ effectif: IDS.map((id, i) => ligne(id, { venu: i < 3 ? "heure" : null })) }), "forfait");
+  assert.equal(pres({ effectif: IDS.map((id, i) => ligne(id, { venu: i < 4 ? "heure" : null })) }), "5 contre 4");
+  // Six venus à l'heure, un inscrit absent (excusé après H-2 ou non) : pas « au complet ».
+  assert.equal(pres({ effectif: IDS.map((id, i) => ligne(id, { venu: i < 6 ? "heure" : null })) }), "1 inscrit absent");
+  // Marqué « présent, arrivé en retard » sans check-in : un retard.
+  assert.equal(pres({ effectif: IDS.map((id, i) => ligne(id, { venu: i ? "heure" : "retard" })) }), "1 retard");
+  // Un forfait coûte plus que tout le reste : 4 forfaits contre 4 rencontres au complet.
+  const f = evoluerEntraineur(carriere([...Array.from({ length: 8 }, (_, k) => match(k, { forfait: k < 4 }))]), { normes: { ...NORMES, presence: 0 } });
+  assert.equal(gain(f, "PRES"), 0);
 }
 
-// 4 · PRO : pas d'avantage au nombre, 3 crans au plus par joueur, le double pour ceux d'en bas.
+// 5 · tour : tout l'effectif, pas seulement les présents (D3, D15).
 {
-  const pro = (noms: string[], buts: number, notes?: (nom: string) => number) =>
-    evoluerEntraineur(Array.from({ length: 4 }, () => match({ presents: noms.map((x) => present(x, { buts, aLHeure: false })) })), [], { noteJoueur: notes }).faits.find((f) => f.cle === "PRO")?.crans ?? 0;
-  assert.equal(pro(NOMS.slice(0, 5), 1), pro(NOMS, 1));
-  assert.equal(pro(NOMS.slice(0, 5), 1), 3); // 4 buts chacun, plafonnés à 3
-  assert.equal(pro(NOMS.slice(0, 5), 5), 3); // 20 buts chacun : toujours 3
-  const bas = pro(NOMS.slice(0, 4), 1, (nom) => (nom === "A" || nom === "B" ? 70 : 80));
-  assert.equal(bas, Math.floor((3 * 2 * 2 + 3 * 2) / 4)); // les deux d'en bas comptent double
+  const tour = (lignes: (k: number) => LigneEffectif[]) =>
+    gain(evoluerEntraineur(carriere(Array.from({ length: 24 }, (_, k) => match(k, { effectif: lignes(k) }))), { normes: { ...NORMES, tour: 0.5 } }), "TOUR");
+  // F et G jamais sur la feuille, les cinq mêmes à chaque rencontre : rien.
+  assert.equal(tour(() => IDS.map((id, i) => ligne(id, i < 5 ? {} : { inscrit: false }))), 0);
+  // Tout le monde inscrit et venu : tour monte.
+  assert.ok(tour(() => IDS.map((id) => ligne(id))) >= 2);
+  // F inscrit mais ne vient jamais (le fantôme) : rien.
+  assert.equal(tour(() => IDS.map((id, i) => ligne(id, i === 5 ? { venu: null } : {}))), 0);
+  // F annonce son absence à chaque fois : la moitié seulement est neutre, il reste le moins servi.
+  assert.equal(tour(() => IDS.map((id, i) => ligne(id, i === 5 ? { inscrit: false, indisponible: true } : {}))), 0);
+  // F annonce une absence sur deux et joue l'autre : comme s'il jouait tout.
+  assert.ok(tour((k) => IDS.map((id, i) => ligne(id, i === 5 && k % 2 ? { inscrit: false, indisponible: true } : {}))) >= 2);
 }
 
-// 5 · JEU : le même cinq, rien ; tourner, 2 crans.
+// 6 · coh : une exclusion vaut un départ ; dissolution et abonnement fini ne comptent pas (D10, D11).
 {
-  const jeu = (titulaires: (i: number) => string[]) =>
-    evoluerEntraineur(Array.from({ length: 4 }, (_, i) => match({ presents: NOMS.map((x) => present(x, { titulaire: titulaires(i).includes(x) })) }))).faits.find((f) => f.cle === "JEU")?.crans ?? 0;
-  assert.equal(jeu(() => NOMS.slice(0, 5)), 0);
-  assert.equal(jeu((i) => NOMS.map((_, k) => NOMS[(k + i * 2) % 7]).slice(0, 5)), 2);
+  const coh = (motif: NonNullable<MembreEntraineur["depart"]>["motif"]) => {
+    const m = membres();
+    m[2].depart = { le: jour(10), motif };
+    return evoluerEntraineur(carriere(Array.from({ length: 4 }, (_, k) => match(k)), m)).compteurs.COH.avance;
+  };
+  const rien = evoluerEntraineur(carriere(Array.from({ length: 4 }, (_, k) => match(k)))).compteurs.COH.avance;
+  assert.ok(Math.abs(coh("exclusion") - coh("depart")) < 0.01, "une exclusion pèse comme un départ");
+  // Un départ : un départ de plus que la moyenne (à peine plus, ses jours en moins dans l'attendu).
+  assert.ok(Math.abs(rien - coh("depart") - 1) < 0.05, "un départ, un départ de moins que la moyenne");
+  for (const motif of ["dissolution", "inactivite", "changement-de-place"] as const) assert.ok(coh(motif) > coh("depart") + 0.9, `${motif} ne compte pas`);
 }
 
-// 6 · COH : départ −1, exclusion −2 ; TEN : les paliers.
+// 7 · fair : contre l'habitude de celui qui note (D10), les sanctions (D14).
 {
-  const coh = (m: { le: string; nom: string; quoi: "depart" | "exclusion" }[]) =>
-    evoluerEntraineur(Array.from({ length: 4 }, () => match({ le: "2026-12-01" })), m, { arrivee: "2026-11-01" }).faits.find((f) => f.cle === "COH")?.crans ?? 0;
-  assert.equal(coh([]), 2);
-  assert.equal(coh([{ le: "2026-11-15", nom: "A", quoi: "depart" }]), 1);
-  assert.equal(coh([{ le: "2026-11-15", nom: "A", quoi: "exclusion" }]), 0);
-  assert.equal(coh([{ le: "2026-10-15", nom: "A", quoi: "exclusion" }]), 2); // avant son arrivée : rien
-  const ten = (fp: number | null, o: Partial<RencontreEntraineur> = {}) =>
-    evoluerEntraineur([match({ fairPlay: fp, ...o })]).faits.filter((f) => f.cle === "TEN").reduce((t, f) => t + f.crans, 0);
-  assert.deepEqual([ten(5), ten(4.5), ten(4), ten(3), ten(2), ten(null)], [1, 1, 0, -1, -2, 0]);
-  assert.equal(ten(5, { sanctions: 1, litigeFautif: true }), -3);
+  const fair = (note: number, habitude: number, s = { joueurs: 0, entraineur: 0 }) =>
+    gain(evoluerEntraineur(carriere(Array.from({ length: 16 }, (_, k) => match(k, { fairPlay: { note, habitude }, sanctions: s }))), { normes: NORMES }), "FAIR");
+  // Une ligue qui note large ou serré : noté comme d'habitude, rien.
+  assert.equal(fair(4.0, 4.0), 0);
+  assert.equal(fair(4.8, 4.8), 0);
+  // Salué au-dessus de l'habitude : fair monte.
+  assert.ok(fair(4.8, 4.2) >= 2);
+  const s = (r: Partial<RencontreEntraineur>) => evoluerEntraineur(carriere([match(0, r)]), { normes: NORMES }).compteurs.FAIR.avance;
+  assert.equal(s({ sanctions: { joueurs: 1, entraineur: 0 } }), -2);
+  assert.equal(s({ sanctions: { joueurs: 0, entraineur: 1 } }), -4);
 }
 
-// 7 · La saison de Lucien : la carte des captures.
+// 8 · rec : la recrue qui joue et reste.
 {
-  const ev = evoluerEntraineur(RENCONTRES_DEMO, MOUVEMENTS_DEMO, { noteJoueur: (nom) => JOUEURS_DEMO[nom] ?? 75, arrivee: ARRIVEE_DEMO });
-  assert.deepEqual(ev.officielles, { RES: 76, PRO: 80, EFF: 79, COH: 77, JEU: 77, TEN: 78 });
-  assert.equal(noteEntraineur(ev.officielles), 78);
-  assert.equal(ev.majs.length, 3);
+  const rec = (depart?: string, joue = true) => {
+    const m = [...membres(6), { id: "g", nom: "Gaby", arrivee: "2026-11-01", depart: depart ? { le: depart, motif: "depart" as const } : undefined }];
+    const rs = Array.from({ length: 16 }, (_, k) => match(k, { effectif: IDS.map((id) => ligne(id, id === "g" ? (joue ? {} : { inscrit: false }) : {})) }));
+    return evoluerEntraineur(carriere(rs, m), { normes: NORMES }).journal.find((f) => f.cle === "REC")!.texte;
+  };
+  assert.equal(rec(), "Gaby s'est installé");
+  assert.equal(rec("2026-12-10"), "Gaby n'a pas pris sa place");
+  assert.equal(rec(undefined, false), "Gaby n'a pas pris sa place");
 }
 
-// 8 · Les matières : ni or, ni bleu, ni rouge, ni la braise ; aucune n'entre dans les finitions d'un joueur.
+// 9 · Le journal en mots (D12) ; Champion à 40 % des rencontres dirigées (D14).
 {
-  const source = readFileSync(new URL("../src/components/sfl/skins-entraineur.ts", import.meta.url), "utf8") + readFileSync(new URL("../src/components/sfl/motifs-entraineur.tsx", import.meta.url), "utf8");
+  const ev = evoluerEntraineur(CARRIERE_DEMO);
+  for (const f of ev.journal.filter((x) => x.cle === "RES")) assert.ok(!/\d/.test(f.texte), `l'attendu ne sort pas : « ${f.texte} »`);
+  assert.equal(championDe(6, 16), false);
+  assert.equal(championDe(7, 16), true);
+}
+
+// 10 · Les deux saisons de Lucien : la carte des captures.
+{
+  const ev = evoluerEntraineur(CARRIERE_DEMO);
+  assert.deepEqual(ev.officielles, { RES: 77, PRES: 79, TOUR: 75, COH: 75, FAIR: 77, REC: 75 });
+  assert.equal(noteEntraineur(ev.officielles), 77);
+  assert.equal(ev.rencontres, 24);
+  assert.equal(ev.majs.length, 6);
+  assert.deepEqual(ev.exploits, ["bb-21"]);
+}
+
+// 11 · Les matières : ni or, ni bleu, ni rouge, ni la braise ; aucune n'entre dans les finitions d'un joueur.
+{
+  const source = ["skins-entraineur.ts", "motifs-entraineur.tsx", "ecusson-entraineur.tsx"]
+    .map((f) => readFileSync(new URL(`../src/components/sfl/${f}`, import.meta.url), "utf8"))
+    .join("\n");
   const teinte = (hex: string) => {
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
     const max = Math.max(r, g, b);
@@ -179,6 +266,7 @@ const match = (o: Partial<RencontreEntraineur> = {}): RencontreEntraineur => ({
     assert.ok(!(h >= 30 && h <= 60), `${hex} : de l'or`);
     assert.ok(!(h >= 195 && h <= 250), `${hex} : du bleu`);
     assert.ok(!(h >= 345 || h <= 15), `${hex} : du rouge`);
+    assert.ok(!(h >= 280 && h <= 340), `${hex} : le mauve du rang A, le néon, l'aurore`);
   }
   for (const nom of [...Object.keys(MATIERES_ENTRAINEUR), "entraineur"]) {
     assert.ok(nom in MATIERES, `${nom} manque dans MATIERES`);

@@ -169,6 +169,7 @@ export function MotifCarte({
   centre,
   eclats = true,
   nom,
+  noteCentree,
 }: {
   motif: Motif & { clair: string; fonce: string };
   /** Les étoiles : le ciel propre à chaque joueur. */
@@ -179,6 +180,8 @@ export function MotifCarte({
   eclats?: boolean;
   /** Le nom du joueur (le filigrane l'écrit dans le papier). */
   nom?: string;
+  /** La note est-elle centrée (la carte réduite) ? Le rond central de la carte d'entraîneur la suit. */
+  noteCentree?: boolean;
 }) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");
   const style: React.CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%" };
@@ -187,7 +190,7 @@ export function MotifCarte({
   if (estMotifOffert(motif)) return <MotifOffertSvg motif={motif} dos={!!centre} />;
   if (estMotifRecrue(motif)) return <MotifRecrueSvg motif={motif} dos={!!centre} nom={nom} />;
   if (estMotifAfrique(motif)) return <MotifAfriqueSvg motif={motif} graine={graine} dos={!!centre} nom={nom} />;
-  if (estMotifEntraineur(motif)) return <MotifEntraineurSvg motif={motif} graine={graine} dos={!!centre} />;
+  if (estMotifEntraineur(motif)) return <MotifEntraineurSvg motif={motif} graine={graine} dos={!!centre} noteCentree={noteCentree} />;
 
   if (motif.type === "rayons") {
     const { cx, cy } = centre ?? motif;

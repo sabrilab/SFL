@@ -1,76 +1,108 @@
-// Une saison inventée pour la carte d'entraîneur (étude du 02/11/2026,
+// Deux saisons inventées pour la carte d'entraîneur (étude du 02/11/2026,
 // branche coach-etude) : Lucien, entraîneur de Bois-Blancs FC (une équipe
-// de la démonstration du championnat, equipes-demo.ts), sept joueurs, douze
-// rencontres de la saison 1 (novembre 2026 à février 2027). Ni la base, ni
-// un vrai joueur : des noms et des faits plausibles, pour voir ce que donne
-// le modèle (lib/sfl/entraineur.ts) et en tirer les chiffres de la carte.
+// de la démonstration du championnat, equipes-demo.ts), sept joueurs, 24
+// rencontres, de novembre 2026 à mai 2027. Ni la base, ni un vrai joueur :
+// des faits plausibles, pour voir ce que donne le modèle
+// (lib/sfl/entraineur.ts) et en tirer les chiffres de la carte.
 //
-// Ce qu'il s'y passe : l'Indice de Force se cale sur les cinq premiers
-// matchs ; ensuite l'équipe gagne un peu plus que prévu, avec deux contre-
-// performances. Un 5 contre 4 en janvier, quelques retards, un forfait
-// évité de justesse. Samir part le 20 décembre, Nassim arrive. Lucien fait
-// tourner son cinq de départ, moins en décembre. Une note fair-play de 3,
-// le soir d'une défaite.
+// Ce qu'il s'y passe :
+//   · saison 1 : l'équipe vient presque toujours au complet ; Lucien laisse
+//     Samir sur le banc en décembre, et Samir s'en va le 20 ; un 5 contre 4
+//     le 9 janvier ; Ryad, la recrue d'octobre, s'installe ; Nassim arrive
+//     fin décembre ;
+//   · saison 2 : tout le monde joue sa part, l'équipe vient au complet, à
+//     l'heure, prend un peu plus que sa force ne le promettait (l'Indice,
+//     lui, a monté), et les capitaines adverses saluent son fair-play.
 
-import type { MouvementEffectif, PresentEntraineur, RencontreEntraineur } from "@/lib/sfl/entraineur";
+import { PALETTE } from "@/lib/sfl/blason";
+import type { CarriereEntraineur, EquipeEntraineur, LigneEffectif, MembreEntraineur, RencontreEntraineur } from "@/lib/sfl/entraineur";
 
-/** Les joueurs et la note de leur carte au début de la saison. */
-export const JOUEURS_DEMO: Record<string, number> = {
-  Yanis: 84,
-  Bilal: 81,
-  Théo: 79,
-  Medhi: 78,
-  Kevin: 76,
-  Ryad: 75,
-  Samir: 74,
-  Nassim: 75,
-};
+const couleur = (id: string) => PALETTE.find((c) => c.id === id)!.hex;
 
-type Ligne = [nom: string, titulaire: 0 | 1, buts: number, passes: number, distinction?: PresentEntraineur["distinction"]];
+/** Les joueurs, dans l'ordre des lignes ci-dessous. */
+export const MEMBRES_DEMO: MembreEntraineur[] = [
+  { id: "bb-yanis", nom: "Yanis", arrivee: "2026-10-12" },
+  { id: "bb-bilal", nom: "Bilal", arrivee: "2026-10-12" },
+  { id: "bb-theo", nom: "Théo", arrivee: "2026-10-14" },
+  { id: "bb-medhi", nom: "Medhi", arrivee: "2026-10-15" },
+  { id: "bb-kevin", nom: "Kevin", arrivee: "2026-10-18" },
+  { id: "bb-ryad", nom: "Ryad", arrivee: "2026-10-28" },
+  { id: "bb-samir", nom: "Samir", arrivee: "2026-10-20", depart: { le: "2026-12-20", motif: "depart" } },
+  { id: "bb-nassim", nom: "Nassim", arrivee: "2026-12-27" },
+];
 
-const venus = (lignes: Ligne[], retard: string[] = []): PresentEntraineur[] =>
-  lignes.map(([nom, t, buts, passes, distinction]) => ({ nom, titulaire: !!t, buts, passes, aLHeure: !retard.includes(nom), ...(distinction && { distinction }) }));
+/**
+ * Une ligne par joueur, dans l'ordre de MEMBRES_DEMO : h inscrit et à
+ * l'heure, r inscrit et en retard, a inscrit et absent, i absence annoncée,
+ * n disponible mais pas inscrit, - pas (ou pas encore) dans l'effectif.
+ */
+const lignes = (codes: string): LigneEffectif[] =>
+  [...codes].flatMap((c, i) =>
+    c === "-" ? [] : [{ id: MEMBRES_DEMO[i].id, inscrit: "hra".includes(c), indisponible: c === "i", venu: c === "h" ? "heure" : c === "r" ? "retard" : null }]
+  );
 
+let n = 0;
 const r = (
-  n: number,
   le: string,
   [pour, contre]: [number, number],
-  attendu: number,
-  presents: PresentEntraineur[],
+  attendu: number | null,
+  codes: string,
+  fairPlay: [number, number] | null,
   autres: Partial<RencontreEntraineur> = {}
 ): RencontreEntraineur => ({
-  id: `bb-${n}`,
+  id: `bb-${++n}`,
   le,
-  classee: true,
   forfait: false,
   pour,
   contre,
   attendu,
-  indiceCale: n > 5,
-  presents,
-  absentsInscrits: 0,
-  fairPlay: 5,
-  sanctions: 0,
-  litigeFautif: false,
+  effectif: lignes(codes),
+  fairPlay: fairPlay && { note: fairPlay[0], habitude: fairPlay[1] },
+  sanctions: { joueurs: 0, entraineur: 0 },
   ...autres,
 });
 
+//                                              Y B T M K R S N
 export const RENCONTRES_DEMO: RencontreEntraineur[] = [
-  r(1, "2026-11-07", [4, 3], 0.55, venus([["Yanis", 1, 2, 0, "MJ"], ["Bilal", 1, 1, 1], ["Théo", 1, 0, 1], ["Medhi", 1, 0, 0, "MD"], ["Kevin", 1, 1, 0], ["Ryad", 0, 0, 1], ["Samir", 0, 0, 0]])),
-  r(2, "2026-11-14", [2, 2], 0.48, venus([["Yanis", 1, 1, 0], ["Bilal", 0, 0, 1], ["Théo", 1, 0, 0], ["Medhi", 1, 0, 0], ["Kevin", 0, 0, 0], ["Ryad", 1, 1, 0, "MD"], ["Samir", 1, 0, 0]], ["Kevin"]), { fairPlay: 4.1 }),
-  r(3, "2026-11-21", [5, 2], 0.6, venus([["Yanis", 0, 1, 1], ["Bilal", 1, 2, 0, "MJ"], ["Théo", 1, 1, 1], ["Medhi", 0, 0, 0], ["Kevin", 1, 0, 1], ["Ryad", 1, 1, 0], ["Samir", 1, 0, 1, "MD"]])),
-  r(4, "2026-11-28", [3, 4], 0.52, venus([["Yanis", 1, 2, 0], ["Bilal", 1, 0, 1], ["Théo", 0, 0, 0], ["Medhi", 1, 0, 0, "MD"], ["Kevin", 1, 1, 0], ["Ryad", 1, 0, 1]]), { fairPlay: 4.4 }),
-  r(5, "2026-12-05", [6, 4], 0.45, venus([["Yanis", 1, 3, 1, "MJ"], ["Bilal", 1, 1, 2], ["Théo", 1, 1, 0], ["Medhi", 1, 0, 1], ["Kevin", 1, 1, 0, "MD"], ["Ryad", 0, 0, 0], ["Samir", 0, 0, 0]])),
-  r(6, "2026-12-12", [3, 1], 0.58, venus([["Yanis", 1, 1, 1], ["Bilal", 1, 1, 0], ["Théo", 1, 0, 1, "MD"], ["Medhi", 1, 0, 0], ["Kevin", 1, 1, 0, "MJ"], ["Ryad", 0, 0, 0], ["Samir", 0, 0, 0]], ["Ryad"])),
-  r(7, "2026-12-19", [4, 4], 0.4, venus([["Yanis", 1, 2, 0], ["Bilal", 1, 1, 1, "MJ"], ["Théo", 1, 1, 1], ["Medhi", 1, 0, 0, "MD"], ["Kevin", 1, 0, 1], ["Ryad", 0, 0, 0]]), { fairPlay: 4.2 }),
-  r(8, "2027-01-09", [2, 3], 0.62, venus([["Yanis", 1, 1, 0], ["Bilal", 1, 1, 0], ["Théo", 1, 0, 1, "MD"], ["Medhi", 1, 0, 0]]), { absentsInscrits: 1, fairPlay: 3.1 }),
-  r(9, "2027-01-16", [5, 3], 0.35, venus([["Yanis", 0, 1, 1], ["Bilal", 1, 2, 0, "MJ"], ["Théo", 1, 1, 1], ["Medhi", 1, 0, 1], ["Kevin", 1, 1, 0, "MD"], ["Ryad", 1, 0, 1], ["Nassim", 0, 0, 0]])),
-  r(10, "2027-01-23", [6, 2], 0.55, venus([["Yanis", 1, 2, 1, "MJ"], ["Bilal", 0, 1, 1], ["Théo", 1, 0, 1], ["Medhi", 1, 0, 0, "MD"], ["Kevin", 0, 1, 0], ["Ryad", 1, 1, 0], ["Nassim", 1, 1, 0]])),
-  r(11, "2027-02-06", [3, 3], 0.3, venus([["Yanis", 1, 1, 1], ["Bilal", 1, 1, 0], ["Théo", 0, 0, 1], ["Medhi", 1, 0, 0, "MD"], ["Kevin", 1, 1, 0, "MJ"], ["Ryad", 0, 0, 0], ["Nassim", 1, 0, 1]]), { fairPlay: 4.6 }),
-  r(12, "2027-02-13", [4, 2], 0.5, venus([["Yanis", 1, 1, 1], ["Bilal", 1, 1, 0], ["Théo", 1, 1, 1, "MJ"], ["Medhi", 0, 0, 0], ["Kevin", 1, 0, 1], ["Ryad", 0, 1, 0, "MD"], ["Nassim", 1, 0, 0]])),
+  // Saison 1 : l'Indice se cale sur les six premiers matchs.
+  r("2026-11-07", [4, 3], null, "hhhhhhh-", [4.6, 4.1]),
+  r("2026-11-14", [2, 2], null, "hhhhrhi-", [4.3, 4.2]),
+  r("2026-11-21", [5, 2], null, "hhhihhh-", [4.8, 4.3]),
+  r("2026-11-28", [3, 4], null, "hhhhhhn-", [4.4, 4.4]),
+  r("2026-12-05", [6, 4], null, "hhhhhnn-", [4.5, 4.2]),
+  r("2026-12-12", [3, 1], 0.58, "hhhhhrn-", [4.4, 4.2]),
+  r("2026-12-19", [4, 4], 0.4, "hhhhhni-", [4.2, 4.3]),
+  // Kevin, inscrit, ne vient pas : 5 contre 4, le 3-3 devient 2-3.
+  r("2027-01-09", [2, 3], 0.62, "hhhhai-i", [3.4, 4.0]),
+  r("2027-01-16", [5, 3], 0.35, "hhhhhh-h", [4.7, 4.2]),
+  r("2027-01-23", [6, 2], 0.55, "hhhhrh-h", [4.6, 4.3]),
+  r("2027-02-06", [3, 3], 0.3, "hhhhhh-h", [4.9, 4.4]),
+  r("2027-02-13", [4, 2], 0.5, "hhhihh-h", [4.5, 4.1]),
+  // Saison 2 : l'Indice a monté, l'équipe est souvent donnée gagnante.
+  r("2027-03-06", [5, 2], 0.6, "hhhhhh-h", [4.8, 4.2]),
+  r("2027-03-13", [3, 3], 0.57, "hhnhhh-h", [4.6, 4.4]),
+  r("2027-03-20", [4, 1], 0.62, "hhhhhh-h", [4.9, 4.3]),
+  r("2027-03-27", [2, 1], 0.52, "nhhhhh-h", [4.5, 4.0]),
+  r("2027-04-03", [3, 3], 0.64, "hhhhhh-h", [4.7, 4.1]),
+  r("2027-04-10", [1, 2], 0.66, "hhhhrh-h", [4.2, 4.2]),
+  r("2027-04-17", [2, 2], 0.48, "hhhnhh-h", [4.8, 4.4]),
+  r("2027-04-24", [5, 5], 0.45, "hhhrhh-h", [4.6, 4.1]),
+  r("2027-05-08", [3, 1], 0.28, "hhhhhh-h", [4.9, 4.5]),
+  r("2027-05-15", [4, 3], 0.61, "hhihhh-h", [4.7, 4.2]),
+  r("2027-05-22", [3, 3], 0.63, "hhhhhh-h", [4.8, 4.3]),
+  r("2027-05-29", [2, 2], 0.59, "hhhhha-h", [4.5, 4.2]),
 ];
 
-export const MOUVEMENTS_DEMO: MouvementEffectif[] = [{ le: "2026-12-20", nom: "Samir", quoi: "depart" }];
+/** Lucien a signé comme entraîneur de Bois-Blancs FC le 24 octobre 2026. */
+export const CARRIERE_DEMO: CarriereEntraineur = {
+  arrivee: "2026-10-24",
+  rencontres: RENCONTRES_DEMO,
+  membres: MEMBRES_DEMO,
+};
 
-/** Le jour où Lucien a signé comme entraîneur de Bois-Blancs FC. */
-export const ARRIVEE_DEMO = "2026-11-01";
+/** Bois-Blancs FC, son écusson de la démonstration (equipes-demo.ts) : ovale, coupé, blanc et vert forêt, ses initiales. */
+export const EQUIPE_DEMO: EquipeEntraineur = {
+  initiales: "BB",
+  fond: "blanc",
+  blason: { forme: "ovale", motif: "coupe", couleurs: [couleur("blanc"), couleur("foret"), couleur("foret")], embleme: "initiales" },
+};

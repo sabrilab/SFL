@@ -4,19 +4,20 @@
 // motif-carte.tsx comme les autres : du SVG dans le repère de la carte
 // (1024 × 1656), étiré sur toute la carte, sans image, sans flou ni filtre
 // (la capture de la 3D le prend tel quel).
-//   · tableau-craie : le schéma de la mi-temps à la craie, sur la face (le
-//     terrain de five, nos ronds, leurs croix, la passe, la course, le
-//     tir), et les passes de brosse mal effacées ; au dos, le rond central
+//   · tableau-craie : sur la face, le schéma de la mi-temps à la craie dans
+//     le portrait (le terrain de five, nos ronds, leurs croix, la passe, la
+//     course, le tir : il se lit quand il n'y a pas de photo), et, photo ou
+//     pas, le rond central derrière la note, la ligne médiane de part et
+//     d'autre, et les passes de brosse mal effacées ; au dos, le rond central
 //     autour de la lune (le ballon posé pour le coup d'envoi). Chaque trait
 //     est fait de quelques brins de craie interrompus, tirés de la graine :
 //     le même tableau pour un entraîneur, un autre pour le suivant ;
-//   · carnet-carreaux : les petits carreaux de 5 mm, la spirale (ses trous
-//     et son fil) et la ligne de prédécoupe, en haut, face et dos ;
+//   · carnet-carreaux : les petits carreaux de 5 mm et la ligne de
+//     prédécoupe en haut, face et dos (plus de spirale peinte) ;
 //   · survetement-maille : la maille en V du tissu, gravée ton sur ton, et
-//     le liseré cousu le long des deux bords, face et dos ; au dos, la
-//     glissière qui descend du col, son curseur et sa tirette.
+//     un seul liseré qui fait le tour de la carte en suivant ses coins.
 
-import { Fragment, useId } from "react";
+import { useId } from "react";
 import type { MotifEntraineur } from "@/components/sfl/skins-entraineur";
 
 const W = 1024;
@@ -165,20 +166,39 @@ const croix = (x: number, y: number, c = 19): Trait[] => [
 /**
  * La moitié de terrain qu'on attaque, dans la fenêtre du portrait (41 à
  * 983) : la ligne de but en haut, sous l'étiquette, la ligne médiane en bas,
- * au-dessus de la puce. Rien ne descend sur la bande du nom et de la note.
+ * au-dessus de la puce. Le rond central n'y est pas : il est dessiné autour
+ * de la note (ROND), où on le voit aussi avec une photo.
  */
-const DEMI = { x0: 120, x1: 904, but: 168, mediane: 836, zone: 190, rond: 130 } as const;
+const DEMI = { x0: 120, x1: 904, but: 168, mediane: 836, zone: 190 } as const;
 
 function demiTerrain(): Trait[] {
-  const { x0, x1, but, mediane, zone, rond: r } = DEMI;
+  const { x0, x1, but, mediane, zone } = DEMI;
   const cx = W / 2;
   const f2 = 0.6;
   return [
     { pts: [[x0, mediane], [x0, but], [x1, but], [x1, mediane]], force: f2 },
     { pts: [[x0, mediane], [x1, mediane]], force: f2 },
     { pts: arc(cx, but, zone, 0, 180), force: f2 },
-    { pts: arc(cx, mediane, r, 180, 360), force: f2 },
     { pts: [[cx - 58, but], [cx - 58, but - 34], [cx + 58, but - 34], [cx + 58, but]], force: 0.5 },
+  ];
+}
+
+/**
+ * Le rond central derrière la note (la carte complète : la note est à
+ * gauche de la bande, de 1101 à ~1450 ; la colonne du nom et des chiffres
+ * commence à 622) : la note posée au centre du terrain, comme la lune au dos.
+ * La ligne médiane de part et d'autre, sans entrer dans la colonne des chiffres.
+ */
+const ROND = { cx: 318, cy: 1322, r: 196, gauche: 44, droite: 596 } as const;
+/** La carte réduite centre sa note sur toute la largeur : le rond la suit. */
+const ROND_CENTRE = { cx: 512, cy: 1300, r: 206, gauche: 44, droite: 980 } as const;
+
+function rondCentral(centree = false): Trait[] {
+  const { cx, cy, r, gauche, droite } = centree ? ROND_CENTRE : ROND;
+  return [
+    { pts: arc(cx, cy, r, -96, 250), force: 0.55 },
+    { pts: [[gauche, cy], [cx - r - 14, cy]], force: 0.5 },
+    { pts: [[cx + r + 14, cy], [droite, cy]], force: 0.5 },
   ];
 }
 
@@ -228,9 +248,10 @@ function Brosse({ m, dos, rnd }: { m: Couleurs; dos: boolean; rnd: () => number 
         { d: "M10 1490 Q520 1380 1014 1560", l: 140, o: 0.12 },
       ]
     : [
-        { d: "M10 1240 Q520 1390 1014 1170", l: 130, o: 0.12 },
-        { d: "M380 1606 Q700 1506 1014 1526", l: 70, o: 0.1 },
-        { d: "M20 120 Q500 20 1004 250", l: 110, o: 0.1 },
+        // Sous la note, à gauche de la bande : là où la photo ne cache rien et où il n'y a pas de chiffres.
+        { d: "M6 1186 Q300 1120 640 1210", l: 120, o: 0.2 },
+        { d: "M6 1560 Q300 1500 600 1585", l: 80, o: 0.18 },
+        { d: "M20 120 Q500 20 1004 250", l: 110, o: 0.14 },
       ];
   const traits = passes.flatMap((p) => passeBrosse(p.d, p.l, p.o, rnd));
   return (
@@ -242,7 +263,7 @@ function Brosse({ m, dos, rnd }: { m: Couleurs; dos: boolean; rnd: () => number 
   );
 }
 
-function Tableau({ m, graine, dos }: { m: Couleurs; graine: number; dos: boolean }) {
+function Tableau({ m, graine, dos, noteCentree }: { m: Couleurs; graine: number; dos: boolean; noteCentree?: boolean }) {
   const rnd = alea(graine ^ 0x6c1b3a57);
   // Au dos, la lune est le ballon posé au centre : le rond central autour de sa rosace, la ligne médiane de part et d'autre, les quatre coins.
   const traits: Trait[] = dos
@@ -255,7 +276,7 @@ function Tableau({ m, graine, dos }: { m: Couleurs; graine: number; dos: boolean
         { pts: arc(54, 1602, 46, 270, 360), force: 0.6 },
         { pts: arc(970, 1602, 46, 180, 270), force: 0.6 },
       ]
-    : [...demiTerrain(), ...schema()];
+    : [...demiTerrain(), ...schema(), ...rondCentral(noteCentree)];
   const traces = traits.map((t) => tracer(t, rnd));
   return (
     <>
@@ -272,40 +293,19 @@ function Tableau({ m, graine, dos }: { m: Couleurs; graine: number; dos: boolean
 /** Les petits carreaux : 5 mm, soit 81 dans le repère (la carte fait 63 mm de large). */
 const CARREAU = 81;
 
+/** La page : ses carreaux, et la ligne de prédécoupe en haut (plus de spirale peinte : la 3D ne la suivait pas). */
 function Carnet({ motif, id, dos }: { motif: Extract<MotifEntraineur, { type: "carnet-carreaux" }> & Couleurs; id: string; dos: boolean }) {
-  // La spirale : ses trous dans la marge du haut, son fil qui passe par-dessus le bord ; la prédécoupe dessous.
-  const haut = dos ? 66 : 22;
-  const trou = dos ? { l: 22, h: 30 } : { l: 15, h: 19 };
-  const pas = dos ? 54 : 48;
-  const n = Math.floor((W - 260) / pas) + 1;
-  const debut = (W - (n - 1) * pas) / 2;
-  const trous = Array.from({ length: n }, (_, i) => debut + i * pas);
-  const decoupe = dos ? 112 : 36;
+  const decoupe = dos ? 64 : 30;
   return (
     <>
       <defs>
         <pattern id={`car-${id}`} width={CARREAU} height={CARREAU} patternUnits="userSpaceOnUse" x={W / 2} y={decoupe + 6}>
           <path d={`M0 0H${CARREAU}M0 0V${CARREAU}`} fill="none" stroke={motif.grille} strokeWidth={2} />
         </pattern>
-        <linearGradient id={`fil-${id}`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#6d7176" />
-          <stop offset="0.45" stopColor="#ffffff" />
-          <stop offset="1" stopColor={motif.spirale} />
-        </linearGradient>
       </defs>
       <rect x={0} y={decoupe + 6} width={W} height={H - decoupe - 6} fill={`url(#car-${id})`} />
       {/* La prédécoupe : une ligne de petits trous, comme celle qui détache la page. */}
       <line x1={0} y1={decoupe} x2={W} y2={decoupe} stroke={motif.fonce} strokeWidth={2.2} strokeDasharray="3 7" opacity={0.55} />
-      {trous.map((x) => (
-        <g key={x}>
-          {/* Le trou, son bord éclairé en bas. */}
-          <rect x={x - trou.l / 2} y={haut - trou.h / 2} width={trou.l} height={trou.h} rx={trou.l / 2} fill="rgba(20,20,24,0.62)" />
-          <rect x={x - trou.l / 2} y={haut - trou.h / 2 + 2} width={trou.l} height={trou.h} rx={trou.l / 2} fill="none" stroke={motif.clair} strokeWidth={1.4} />
-          {/* Le fil : du trou jusqu'au bord, en biais, son ombre sur la page. */}
-          <path d={`M${x - 2} ${haut + 2}L${x + trou.l * 0.55} ${-6}`} stroke="rgba(0,0,0,0.22)" strokeWidth={trou.l * 0.5} strokeLinecap="round" transform="translate(3 3)" />
-          <path d={`M${x - 2} ${haut + 2}L${x + trou.l * 0.55} ${-6}`} stroke={`url(#fil-${id})`} strokeWidth={trou.l * 0.42} strokeLinecap="round" />
-        </g>
-      ))}
     </>
   );
 }
@@ -315,51 +315,20 @@ function Carnet({ motif, id, dos }: { motif: Extract<MotifEntraineur, { type: "c
 /** La maille : une colonne de V par 14, un rang par 10, gravée (l'arête décalée de 2). */
 const MAILLE = { l: 14, h: 10 } as const;
 
-/**
- * La fermeture du dos : la glissière qui descend du col jusqu'au-dessus de la
- * rosace, ses dents en quinconce, le curseur et sa tirette.
- */
-function Glissiere({ couleur, id }: { couleur: string; id: string }) {
-  const cx = W / 2;
-  const fin = 300;
-  const dents = Array.from({ length: Math.floor(fin / 9) }, (_, i) => 4 + i * 9);
-  return (
-    <>
-      <defs>
-        <linearGradient id={`cur-${id}`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#8e8790" />
-          <stop offset="0.45" stopColor={couleur} />
-          <stop offset="1" stopColor="#6f6871" />
-        </linearGradient>
-      </defs>
-      <rect x={cx - 24} y={0} width={48} height={fin + 8} fill="rgba(0,0,0,0.2)" />
-      {dents.map((y) => (
-        <Fragment key={y}>
-          <rect x={cx - 12} y={y + 1.5} width={12} height={5.5} rx={2} fill="rgba(0,0,0,0.35)" transform="translate(1.5 0)" />
-          <rect x={cx - 12} y={y} width={12} height={5.5} rx={2} fill={couleur} opacity={0.9} />
-          <rect x={cx} y={y + 6} width={12} height={5.5} rx={2} fill="rgba(0,0,0,0.35)" transform="translate(1.5 0)" />
-          <rect x={cx} y={y + 4.5} width={12} height={5.5} rx={2} fill={couleur} opacity={0.9} />
-        </Fragment>
-      ))}
-      {/* Le curseur, puis la tirette qui pend. */}
-      <path d={`M${cx - 21} ${fin - 6}L${cx + 21} ${fin - 6}L${cx + 15} ${fin + 46}L${cx - 15} ${fin + 46}Z`} fill="rgba(0,0,0,0.4)" transform="translate(3 3)" />
-      <path d={`M${cx - 21} ${fin - 6}L${cx + 21} ${fin - 6}L${cx + 15} ${fin + 46}L${cx - 15} ${fin + 46}Z`} fill={`url(#cur-${id})`} />
-      <rect x={cx - 9} y={fin + 34} width={18} height={50} rx={9} fill="rgba(0,0,0,0.4)" transform="translate(3 3)" />
-      <rect x={cx - 9} y={fin + 34} width={18} height={50} rx={9} fill={`url(#cur-${id})`} />
-      <rect x={cx - 3.5} y={fin + 56} width={7} height={18} rx={3.5} fill="rgba(0,0,0,0.45)" />
-    </>
-  );
-}
+/** Le rayon des coins de la carte (finitions-carte.ts, RAYON_CARTE = 1024 ÷ φ⁵). */
+const RAYON = 1024 / ((1 + Math.sqrt(5)) / 2) ** 5;
 
-function Survetement({ motif, id, dos }: { motif: Extract<MotifEntraineur, { type: "survetement-maille" }> & Couleurs; id: string; dos: boolean }) {
+/**
+ * La maille, et un seul liseré qui fait le tour de la carte à 9 du bord, en
+ * suivant ses coins (il n'est plus coupé par l'arrondi) : un passepoil, son
+ * ombre, et rien d'autre. Il passe hors de la ligne de série (rentrée de 57,
+ * bas à 1640) et des repères du portrait.
+ */
+function Survetement({ motif, id }: { motif: Extract<MotifEntraineur, { type: "survetement-maille" }> & Couleurs; id: string }) {
   const v = `M0 1L${MAILLE.l / 2} ${MAILLE.h - 1}L${MAILLE.l} 1`;
-  // Le liseré : une bande et un filet, le long des deux bords ; la couture en points juste à côté.
-  // Tout tient dans la marge de 41 : la note, le nom et les stats s'arrêtent à 41 du bord.
-  const bandes = [
-    { x: 5, l: 12 },
-    { x: 21, l: 3.5 },
-  ];
-  const cote = (x: number, l: number) => [x, W - x - l];
+  const retrait = 9;
+  const epaisseur = 6;
+  const bord = { x: retrait, y: retrait, w: W - retrait * 2, h: H - retrait * 2, r: RAYON - retrait };
   return (
     <>
       <defs>
@@ -372,34 +341,34 @@ function Survetement({ motif, id, dos }: { motif: Extract<MotifEntraineur, { typ
       </defs>
       <rect width={W} height={H} fill={`url(#mai-o-${id})`} />
       <rect width={W} height={H} fill={`url(#mai-c-${id})`} />
-      {bandes.flatMap((b) =>
-        cote(b.x, b.l).map((x) => (
-          <Fragment key={`${b.x}-${x}`}>
-            <rect x={x + 1.5} y={0} width={b.l} height={H} fill="rgba(0,0,0,0.35)" />
-            <rect x={x} y={0} width={b.l} height={H} fill={motif.lisere} />
-          </Fragment>
-        ))
-      )}
-      {[30, W - 30].map((x) => (
-        <line key={x} x1={x} y1={0} x2={x} y2={H} stroke={motif.lisere} strokeWidth={1.6} strokeDasharray="7 6" opacity={0.55} />
-      ))}
-      {dos && <Glissiere couleur={motif.lisere} id={id} />}
+      <rect {...{ x: bord.x + 1.5, y: bord.y + 2, width: bord.w, height: bord.h, rx: bord.r }} fill="none" stroke="rgba(0,0,0,0.38)" strokeWidth={epaisseur} />
+      <rect {...{ x: bord.x, y: bord.y, width: bord.w, height: bord.h, rx: bord.r }} fill="none" stroke={motif.lisere} strokeWidth={epaisseur} />
     </>
   );
 }
 
-export function MotifEntraineurSvg({ motif, graine = 1, dos = false }: { motif: MotifEntraineur & Couleurs; graine?: number; dos?: boolean }) {
+export function MotifEntraineurSvg({
+  motif,
+  graine = 1,
+  dos = false,
+  noteCentree,
+}: {
+  motif: MotifEntraineur & Couleurs;
+  graine?: number;
+  dos?: boolean;
+  noteCentree?: boolean;
+}) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");
   const style: React.CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%" };
   const m = { clair: motif.clair, fonce: motif.fonce };
   return (
     <svg aria-hidden viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={style}>
       {motif.type === "tableau-craie" ? (
-        <Tableau m={m} graine={graine} dos={dos} />
+        <Tableau m={m} graine={graine} dos={dos} noteCentree={noteCentree} />
       ) : motif.type === "carnet-carreaux" ? (
         <Carnet motif={motif} id={id} dos={dos} />
       ) : (
-        <Survetement motif={motif} id={id} dos={dos} />
+        <Survetement motif={motif} id={id} />
       )}
     </svg>
   );

@@ -81,9 +81,11 @@
 // La carte d'un entraîneur de Bola Team (`edition="entraineur"`,
 // `entraineur` ; étude du 02/11, carte-entraineur.tsx) garde elle aussi toute
 // la disposition, dans la matière de son métier (le tableau de la causerie,
-// le carnet, le survêtement ; skins-entraineur.ts) : sa note à lui, et ses six
-// caractéristiques (res, pro, eff, coh, jeu, ten ; lib/sfl/entraineur.ts) à la
-// place des six stats. Le calcul des stats d'un joueur n'y est pour rien.
+// le carnet, le survêtement ; skins-entraineur.ts) : sa note à lui, ses six
+// caractéristiques (res, prés, tour, coh, fair, rec ; lib/sfl/entraineur.ts)
+// à la place des six stats, ses rencontres dirigées à la place du poste, et
+// l'écusson de son équipe à la place du numéro, aussi dans la pastille
+// (ecusson-entraineur.tsx). Le calcul des stats d'un joueur n'y est pour rien.
 //
 // Mêmes calques que la carte éditoriale (`data-card-part` body / player /
 // stats) : la 3D de card-3d.tsx mesure la carte et la prend telle quelle,
@@ -110,6 +112,7 @@ import { Cartons, Crans, filtrePhoto, InsigneRang, Lisere, Sceau, Sifflet, Voile
 import { GRADES, type FinitionArbitre, type GradeArbitre } from "@/components/sfl/skins-arbitre";
 import { BordEpoque, EmblemeEpoque, LosangeBallon, SigleSfl, SigleSouligne } from "@/components/sfl/marques-carte";
 import { MotifCarte } from "@/components/sfl/motif-carte";
+import { EcussonEntraineur } from "@/components/sfl/ecusson-entraineur";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
 import { abrege, estGardien } from "@/lib/sfl/gardien";
@@ -176,7 +179,10 @@ const SIGLE_H = 46;
 /** Une couleur « #rrggbb » à l'opacité voulue. */
 const opaque = (hex: string, a: number) => `${hex}${Math.round(a * 255).toString(16).padStart(2, "0")}`;
 
-/** Le portrait : la photo du joueur, ou à défaut son initiale en filigrane sur les rayures. */
+/**
+ * Le portrait : la photo du joueur, ou à défaut son initiale en filigrane sur
+ * les rayures (un entraîneur : l'écusson de son équipe, ou rien, le motif s'y lit).
+ */
 function Portrait({
   photo,
   nom,
@@ -188,9 +194,12 @@ function Portrait({
   cote,
   traitement,
   u,
+  filigrane,
 }: {
   photo?: string | null;
   nom: string;
+  /** Sans photo, à la place de l'initiale ; null : rien. */
+  filigrane?: React.ReactNode | null;
   /** Resserré sur le visage (cartes petites). */
   resserre: boolean;
   encre: string;
@@ -238,6 +247,8 @@ function Portrait({
             filter: filtrePhoto(traitement),
           }}
         />
+      ) : filigrane !== undefined ? (
+        filigrane && <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>{filigrane}</div>
       ) : (
         <div
           style={{
@@ -389,6 +400,15 @@ export function BolaCard({
   const { serie, numero: numeroSerie } = serieDe(name, p.nom === "fondateur" ? habillage : undefined);
   const emission = p.epoque ? ligneDEmission(epoque ?? { saison: p.epoque.saison, le: null, n: null, sur: null }) : null;
   const nomUp = (affiche ?? name).toUpperCase();
+  // La carte d'entraîneur : l'écusson de son équipe dans le trait de sa matière, l'étiquette en tirets à la craie.
+  const trait = entraineur ? p.entraineur : undefined;
+  const equipe = trait ? entraineur?.equipe : undefined;
+  const ecusson = (hauteur: number, halo?: string) =>
+    equipe && trait ? <EcussonEntraineur equipe={equipe} encre={p.encre} trait={trait.ecusson} hauteur={hauteur} halo={halo} /> : null;
+  // Sans photo : l'écusson en grand (carnet, survêtement), ou le portrait vide où se lit le motif (tableau).
+  const filigrane = trait ? (trait.filigrane && equipe ? ecusson(largeur * 0.5, undefined) : null) : undefined;
+  const ecussonEnGrand = !photo && !!trait?.filigrane && !!equipe;
+  const halo = p.sombre ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)";
 
   // La pastille : un carré, le visage, la note dans un onglet.
   if (palier === "pastille") {
@@ -428,8 +448,26 @@ export function BolaCard({
             cote={largeur * 0.86}
             traitement={habillage?.traitement}
             u={u}
+            filigrane={trait ? (trait.filigrane && equipe ? ecusson(largeur * 0.46) : null) : undefined}
           />
+          {/* L'entraîneur : l'écusson de son équipe en haut à droite, là où un joueur n'a rien. */}
+          {equipe && !ecussonEnGrand && (
+            <span style={{ position: "absolute", right: "6%", top: "6%", display: "flex" }}>{ecusson(largeur * 0.34, halo)}</span>
+          )}
         </div>
+        {/* Le bord de la pastille en tirets de craie. */}
+        {trait?.tirets && (
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: "2.5%",
+              borderRadius: "22%",
+              border: `${Math.max(1, largeur / 48)}px dashed ${encre(0.75)}`,
+              pointerEvents: "none",
+            }}
+          />
+        )}
         <div
           data-card-part="stats"
           style={{
@@ -517,6 +555,7 @@ export function BolaCard({
     cote: u(PORTRAIT.c),
     traitement: habillage?.traitement,
     u,
+    filigrane,
   };
   // L'habillage porté (habillage-carte.tsx).
   const signes = habillage?.signes ?? [];
@@ -530,7 +569,6 @@ export function BolaCard({
   const sifflet = complete && signes.includes("sifflet");
   const cartons = complete && signes.includes("cartons");
   const tailleMarque = !era && numero != null ? (complete ? 164 : compacte ? 225 : 287) : 80;
-  const halo = p.sombre ? "rgba(8,9,11,0.55)" : "rgba(255,255,255,0.7)";
   // La gravure en creux : l'ombre en haut à gauche, la lumière en bas à droite.
   const gravure = p.gravure
     ? `drop-shadow(-${u(2)}px -${u(2)}px 0 ${p.gravure.ombre}) drop-shadow(${u(2)}px ${u(3)}px 0 ${p.gravure.lumiere})`
@@ -577,7 +615,7 @@ export function BolaCard({
       }}
     >
       {/* La matière : le motif gravé ton sur ton (or, rouge, cobalt, nuit) */}
-      {p.motif && <MotifCarte motif={p.motif} graine={seed} eclats={false} nom={affiche ?? name} />}
+      {p.motif && <MotifCarte motif={p.motif} graine={seed} eclats={false} nom={affiche ?? name} noteCentree={reduite} />}
       {/* Le papier : microtexte gravé et lignes de scan */}
       <div
         aria-hidden
@@ -717,6 +755,12 @@ export function BolaCard({
               {marque}
             </div>
           )}
+          {/* L'entraîneur : l'écusson de son équipe à la place du numéro (sauf s'il est déjà en grand, sans photo) */}
+          {equipe && !ecussonEnGrand && (
+            <span style={{ position: "absolute", right: u(complete ? 58 : 46), top: u(complete ? 50 : 36), display: "flex" }}>
+              {ecusson(u(complete ? 150 : compacte ? 220 : 270), photo ? halo : undefined)}
+            </span>
+          )}
           {era?.embleme && complete && (
             <span className="absolute flex" style={{ right: u(46), top: u(40) }}>
               <EmblemeEpoque cote={u(124)} epoque={era} />
@@ -762,7 +806,7 @@ export function BolaCard({
                     display: "flex",
                     alignItems: "center",
                     background: p.etiquette.fond,
-                    border: `${u(2)}px solid ${p.etiquette.bord}`,
+                    border: trait?.tirets ? `${u(3)}px dashed ${p.etiquette.bord}` : `${u(2)}px solid ${p.etiquette.bord}`,
                     ...mono(26, 2.5, 1, 700),
                     color: p.etiquette.texte,
                   }}
@@ -916,7 +960,7 @@ export function BolaCard({
               }}
             >
               {complete
-                ? `${username ? `${username} · ` : ""}${gardien ? "gardien" : position.toLowerCase()}`
+                ? `${username ? `${username} · ` : ""}${entraineur?.detail ?? (gardien ? "gardien" : position.toLowerCase())}`
                 : (entraineur?.court ?? position).toUpperCase()}
             </div>
           </>
