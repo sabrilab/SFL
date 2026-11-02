@@ -83,7 +83,8 @@ import { usePresence } from "@/hooks/use-presence";
 import { ReponseScellee } from "@/components/sfl/reponse-scellee";
 import { MeteoMatch } from "@/components/sfl/meteo-match";
 import { dateIsoDuLibelle, joursJusquA } from "@/lib/sfl/meteo";
-import { voteOuvert } from "@/lib/sfl/convocation-temps";
+import { estLeJour } from "@/lib/sfl/convocation-temps";
+import { journeeComptee } from "@/lib/sfl/revelation";
 import { annonceEnCours, J_DECOUPAGE, nomDivision, type Division } from "@/lib/sfl/divisions";
 import { METAL, PastilleDivision, parDivision, useDecoupageClassement } from "@/components/sfl/metal-division";
 import { divisionsDeLaJournee } from "@/lib/sfl/equipes-division";
@@ -584,14 +585,14 @@ function Ticker({
 
 /** La convocation du prochain dimanche, dans le fil : qui vient, et ta réponse d'un geste. */
 function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; className?: string }) {
-  const { saison } = useSeason();
+  const { saison, divisions } = useSeason();
   const { me } = useMyPlayer();
   // Un joueur Bola (hors de la saison) n'est pas convoqué.
   const bola = useJoueurBola();
   const [maintenant] = useState(() => new Date());
   const derniere = p.journee === J_DECOUPAGE && annonceEnCours(saison, maintenant);
   // Dès la J4, la division où l'on joue ce dimanche-là.
-  const etat = useMemo(() => divisionsDeLaJournee(saison, p.journee), [saison, p.journee]);
+  const etat = useMemo(() => divisionsDeLaJournee(saison, p.journee, divisions), [saison, p.journee, divisions]);
   const division = etat && !isHidden(me) ? (etat.actuelle.get(me) ?? 3) : null;
   // La météo de mon match : son lieu (celui de la ligue qui porte ce nom, sinon le terrain habituel).
   const [aujourdhui] = useState(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date()));
@@ -651,11 +652,19 @@ function Convocation({ p, className }: { p: ReturnType<typeof usePresence>; clas
   );
 }
 
-/** Le dimanche en direct : le jour du match, la feuille se remplit sous tes yeux (la base pousse chaque saisie). */
+/**
+ * Le dimanche en direct : le jour du match, la feuille se remplit sous tes
+ * yeux (la base pousse chaque saisie). Lue sur le direct (journeesDirect),
+ * elle reste là tant que la journée jouée ne compte pas (revelation.ts).
+ */
 function EnDirect({ ouvrir, sauf }: { ouvrir: (j: number) => void; sauf?: number }) {
-  const { journees } = useSeason();
+  const { journeesDirect: journees, saisonLue } = useSeason();
   const [maintenant] = useState(() => new Date());
-  const live = journees.find((j) => (j.matches?.length ?? 0) > 0 && voteOuvert(j.date, maintenant));
+  const live = journees.find(
+    (j) =>
+      (j.matches?.length ?? 0) > 0 &&
+      (estLeJour(j.date, maintenant) || (journeeJouee(saisonLue, j.j) && !journeeComptee(saisonLue, j.j, maintenant)))
+  );
   // Le dimanche en tête du fil a déjà son terrain, qui se remplit de même.
   if (!live || live.j === sauf) return null;
   return (
@@ -1047,7 +1056,8 @@ function EpoqueEnCours({ epoques, vue, onVue, classement, exploit }: PropsEpoque
         <>
           <RailJournees etapes={etapes} deplier={deplier} />
           {/* Le jour du match, la feuille qui se remplit, avant tout le reste. */}
-          <EnDirect ouvrir={(j) => router.push(`/ligue/journee?j=${j}`)} sauf={recapDabord ? une?.j : undefined} />
+          {/* Son lien mène à la feuille en direct (la Map), pas au récap, qui attend la révélation. */}
+          <EnDirect ouvrir={() => router.push("/map")} sauf={recapDabord ? une?.j : undefined} />
           {recapDabord ? (
             <>
               {leDernier}

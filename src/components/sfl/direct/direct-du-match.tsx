@@ -8,8 +8,9 @@
 //     Ilyes », et la feuille s'ouvre en lecture pour toute la ligue ; la
 //     mienne s'ouvre pour compter ;
 //   · scellée : le score final, et la feuille en lecture ; pour un joueur
-//     du match, « Voter » tant que le vote du jour est ouvert (jusqu'à minuit :
-//     il s'ouvre dès que la feuille du match est remplie, votes.ts).
+//     du match, « Voter » tant que le vote du jour est ouvert (jusqu'à la fin
+//     du vote, revelation.ts : il s'ouvre dès que la feuille du match est
+//     remplie, votes.ts).
 // Rien pour un match qui n'a pas de feuille et que je ne joue pas.
 
 import { useState } from "react";
@@ -19,7 +20,7 @@ import { useSeason } from "@/components/sfl/season-provider";
 import { useMyPlayer } from "@/components/sfl/player-provider";
 import { useFeuillesDirect, type FeuillesDirect } from "@/hooks/use-feuilles-direct";
 import { droitDePrendre, etatDeLaFeuille, joueursDuMatch, MOTS_DU_REFUS, peutPrendre, scoreDeLaFeuille, type Equipes } from "@/lib/sfl/feuille-direct";
-import { voteOuvert } from "@/lib/sfl/convocation-temps";
+import { voteOuvertA } from "@/lib/sfl/revelation";
 import { journeeAvecVote } from "@/lib/sfl/votes";
 import { haptique } from "@/lib/sfl/haptique";
 import { cn } from "@/lib/utils";
@@ -37,7 +38,7 @@ export function DirectDuMatch({
   /** Les feuilles de la journée, quand la page les suit déjà (un seul abonnement). */
   direct?: FeuillesDirect;
 }) {
-  const { saisonLue, journees } = useSeason();
+  const { saisonLue, journeesDirect: journees } = useSeason();
   const { me } = useMyPlayer();
   const lues = useFeuillesDirect(deLaPage ? null : j);
   const direct = deLaPage ?? lues;
@@ -86,7 +87,7 @@ export function DirectDuMatch({
   // Le vote du soir, pour qui a joué ce match.
   const jn = journees.find((x) => x.j === j);
   const { noirs, blancs } = joueursDuMatch(saisonLue, j, equipes);
-  const voter = etat === "scellee" && !!jn && journeeAvecVote(jn) && voteOuvert(jn.date, new Date()) && [...noirs, ...blancs].includes(me);
+  const voter = etat === "scellee" && !!jn && journeeAvecVote(jn) && voteOuvertA(saisonLue, j, new Date()) && [...noirs, ...blancs].includes(me);
   return (
     <>
       <div className="glass flex flex-col gap-3 rounded-[22px] px-4 py-3.5">

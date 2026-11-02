@@ -95,8 +95,12 @@ async function ajuster(sb: SupabaseClient, peutComposer: boolean): Promise<{ sta
   const saison = lue?.saison;
   if (!saison) return { statut: "sans-divisions" };
   const j = journeeDeConvocation(saison, conv.date_label);
-  const etat = divisionsDeLaJournee(saison, j);
+  // La vue figée (revelation.ts) : si la journée d'avant n'est pas encore
+  // révélée, ses divisions sont périmées — on compose quand même, et la
+  // réponse le dit (`perimee`).
+  const etat = divisionsDeLaJournee(saison, j, lue?.divisions ?? null);
   if (!etat) return { statut: "sans-divisions" };
+  const perimee = etat.perimee ? { perimee: true } : {};
   const feuille = joueursDeLaFeuille(saison, j);
   if (feuille.equipes) return { statut: "feuille-de-l-admin" };
 
@@ -133,12 +137,12 @@ async function ajuster(sb: SupabaseClient, peutComposer: boolean): Promise<{ sta
     const { data: ecrites, error } = await (conv.teams ? ecrire : ecrire.is("teams", null)).select("id");
     if (error) return { statut: "erreur" };
     // Quelqu'un est passé avant (un autre appel, l'admin) : ses équipes restent.
-    return ecrites?.length ? { statut: "composees", equipes: teams.length } : { statut: "a-jour" };
+    return ecrites?.length ? { statut: "composees", equipes: teams.length, ...perimee } : { statut: "a-jour", ...perimee };
   }
   const teams = completer(saison, conv.teams, venus, etat);
   if (!teams) return { statut: "a-jour", equipes: conv.teams.length };
   const { error } = await sb.from("convocations").update({ teams }).eq("id", conv.id);
-  return error ? { statut: "erreur" } : { statut: "ajustees", equipes: teams.length };
+  return error ? { statut: "erreur" } : { statut: "ajustees", equipes: teams.length, ...perimee };
 }
 
 /** Le cron du vendredi. */

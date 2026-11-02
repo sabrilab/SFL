@@ -18,6 +18,10 @@ export const ETATS: Record<EtatJournee, { signe: string; libelle: string }> = {
   "en-ligne": { signe: "●", libelle: "En ligne" },
   "en-direct": { signe: "◉", libelle: "En direct" },
   terminee: { signe: "✓", libelle: "Terminée" },
+  vote: { signe: "◉", libelle: "Vote" },
+  attente: { signe: "◐", libelle: "Révélation" },
+  revelee: { signe: "✓", libelle: "Révélée" },
+  bloquee: { signe: "!", libelle: "Bloquée" },
 };
 
 /** `○ BROUILLON`, `● EN LIGNE · 18:42`, `◉ EN DIRECT`, `✓ TERMINÉE`. */

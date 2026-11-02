@@ -12,7 +12,8 @@
 //     13h) : Noirs, nul ou Blancs pour chaque match, le meilleur buteur et le
 //     meilleur du jour (le plus de points Pépite, titres du vote compris).
 //     Sur ton propre match, tu ne peux soutenir que ton camp. Le verdict est
-//     définitif à minuit, quand le vote Impact et Défensive se ferme ;
+//     définitif à la révélation (revelation.ts : 19 h dès la J5, minuit
+//     jusqu'à la J4), quand les titres Impact et Défensive entrent ;
 //     Sabri, 31/10 : « pour chaque match qui se joue dans une journée SFL, on
 //     puisse déterminer avec le flair le meilleur buteur, le meilleur passeur
 //     et le MVP du match », « le meilleur passeur du jour », « des choix en
@@ -462,7 +463,7 @@ export function ajouterPronos(
 // apparaître dans Ma carte » ; « sur les récaps, il y ait le résultat du
 // flair ») : ce qu'il a choisi, s'il a vu juste, l'XP. Les mêmes règles que
 // lignesPronos : posé avant le coup d'envoi, plafond par journée, acquis à
-// minuit (ou à la clôture).
+// la révélation (ou à la clôture).
 
 export type PhaseFlair = "ouvert" | "en-jeu" | "fini";
 

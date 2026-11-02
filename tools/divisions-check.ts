@@ -197,6 +197,22 @@ assert.equal(e4.journees[0].mouvements.find((m) => m.nom === "Chris")?.rang, 24)
 const saut = etatDivisions({ ...apresJ4, entries: apresJ4.entries.map((e) => (e.j === 4 && e.player === "Hugo" ? pts(4, "Hugo", 25) : e)) })!;
 assert.equal(saut.journees[0].mouvements.find((m) => m.nom === "Hugo")?.vers, 1);
 assert.equal(etatDivisions({ ...base, numero: 0 }), null);
+// `pour` : la journée que les divisions font jouer (la dernière comptée + 1).
+assert.equal(e3.pour, 4);
+assert.equal(e4.pour, 5);
+// Le découpage coupe sur les journées jouées de la vue (revelation.ts), pas
+// sur les feuilles finies : une J4 rouverte (un match sans résultat) reste
+// coupée, d'accord avec les points du classement.
+{
+  const rouverte: Saison = {
+    ...apresJ4,
+    entries: [...apresJ4.entries, { ...pts(4, "Haut 01", 0), team: "Noirs 2", result: null }, { ...pts(4, "Haut 02", 0), team: "Blancs 2", result: null }],
+  };
+  const er = etatDivisions(rouverte)!;
+  assert.equal(er.pour, 5);
+  assert.equal(er.journees.at(-1)?.j, 4, "la J4 jouée, même rouverte, recoupe");
+  assert.equal(er.actuelle.get("Chris"), 1);
+}
 
 // Le bilan du dimanche, joueur par joueur.
 assert.equal(dernierBilan(e3), null, "avant la J4 jouée, pas de bilan");

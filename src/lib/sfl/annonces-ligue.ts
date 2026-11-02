@@ -14,9 +14,11 @@
 //     le prochain match, où l'on répond (Je viens, Pas dispo).
 //   · Les résultats : quand la feuille de la journée a tous ses résultats,
 //     que l'admin n'y a plus touché depuis CALME, et au plus tôt 90 minutes
-//     après le coup d'envoi ; jusqu'au surlendemain. Chacun reçoit le sien :
-//     le MVP « J3 · Tu es le MVP », un joueur du jour son score, les autres
-//     les MVP. Toucher ouvre les Actus.
+//     après le coup d'envoi ; jusqu'au surlendemain. Dès la J5, au plus tôt
+//     à la révélation (revelation.ts) : la saison lue est la vue figée, où la
+//     journée n'est jouée qu'à 19 h. Chacun reçoit le sien : le MVP « J3 · Tu
+//     es le MVP », un joueur du jour son score, les autres les MVP ; et sa
+//     division (« Tu montes en D2. »). Toucher ouvre les Actus.
 // Jamais la nuit : de 22 h (22 h 30 pour les résultats) à 9 h, l'annonce
 // attend le matin.
 //
@@ -30,10 +32,12 @@ import { computeJournees } from "./saisie/engine";
 import { appliquerMvpAuto } from "./saisie/mvp";
 import { journeeJouee, terrainDeJournee } from "./saisie/mutations";
 import { numeroSaison, type JourneeMeta, type Saison } from "./saisie/types";
+import { dernierBilan, nomDivision, type EtatDivisions } from "./divisions";
+import { nouveauRegime } from "./revelation";
 
 /** La feuille ne bouge plus depuis ce temps-là : l'admin a fini de la remplir. */
 export const CALME = 30 * 60_000;
-/** Les résultats partent au plus tôt ce temps après le coup d'envoi. */
+/** Les résultats partent au plus tôt ce temps après le coup d'envoi (jusqu'à la J4 ; dès la J5, la révélation). */
 const APRES_COUP_D_ENVOI = 90;
 /** L'heure de la ligue quand la journée ne dit pas la sienne (Sabri, 24/10). */
 const HEURE_LIGUE = "12h30";
@@ -141,7 +145,7 @@ export function resultatsAAnnoncer(saison: Saison, publieLe: number, maintenant:
   const aujourdhui = Date.UTC(ici.annee, ici.mois - 1, ici.jour);
   const ecart = Math.round((aujourdhui - jour) / (24 * 3600_000));
   if (ecart < 0 || ecart > 2) return null;
-  if (ecart === 0 && ici.minutes < minutes(meta.heure ?? HEURE_LIGUE) + APRES_COUP_D_ENVOI) return null;
+  if (ecart === 0 && !nouveauRegime(numeroSaison(saison), meta.j) && ici.minutes < minutes(meta.heure ?? HEURE_LIGUE) + APRES_COUP_D_ENVOI) return null;
   return { cle: `resultats-s${numeroSaison(saison)}-j${meta.j}`, j: meta.j };
 }
 
@@ -152,8 +156,32 @@ function etListe(noms: string[]): string {
   return noms.length <= 1 ? (noms[0] ?? "") : `${noms.slice(0, -1).join(", ")} et ${noms.at(-1)}`;
 }
 
-/** Le texte des résultats d'une journée pour un joueur (son nom de saison). */
-export function texteResultats(saison: Saison, j: number, joueur: string): { titre: string; texte: string } {
+/** « Tu montes en D2. », « Tu descends en D3. », « Tu restes en D1. » : la division que la journée lui donne. */
+function phraseDivision(divisions: EtatDivisions | null | undefined, j: number, joueur: string): string | null {
+  const bilan = dernierBilan(divisions ?? null);
+  const m = bilan?.j === j ? bilan.parNom.get(joueur) : undefined;
+  if (!m || isHidden(joueur)) return null;
+  const verbe = m.vers < m.de ? "montes" : m.vers > m.de ? "descends" : "restes";
+  return `Tu ${verbe} en ${nomDivision(m.vers)}.`;
+}
+
+/** Le texte, et la phrase de division au bout s'il reste la place (180 signes, lib/sfl/push.ts). */
+function avecDivision(r: { titre: string; texte: string }, division: string | null): { titre: string; texte: string } {
+  if (!division) return r;
+  const texte = [r.texte, division].filter(Boolean).join(" ");
+  return texte.length <= 180 ? { ...r, texte } : r;
+}
+
+/**
+ * Le texte des résultats d'une journée pour un joueur (son nom de saison).
+ * `divisions` : celles de la même vue (lue.divisions) ; la phrase de
+ * division s'ajoute au bout quand la journée vient de les recouper.
+ */
+export function texteResultats(saison: Saison, j: number, joueur: string, divisions?: EtatDivisions | null): { titre: string; texte: string } {
+  return avecDivision(texteSansDivision(saison, j, joueur), phraseDivision(divisions, j, joueur));
+}
+
+function texteSansDivision(saison: Saison, j: number, joueur: string): { titre: string; texte: string } {
   const s = appliquerMvpAuto(saison);
   // Jamais un joueur masqué (Sabri, un arbitre, une place X) dans un texte envoyé à la ligue.
   const mvps = [...new Set(s.entries.filter((e) => e.j === j && e.mvp && !isHidden(e.player)).map((e) => e.player))];

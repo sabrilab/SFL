@@ -17,7 +17,7 @@ import { Crown, Vote } from "lucide-react";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useVotes } from "@/hooks/use-votes";
 import { useSession } from "@/hooks/use-session";
-import { voteOuvert } from "@/lib/sfl/convocation-temps";
+import { etatRevelation, libelleFinDuVote, libelleRevelation, voteOuvertA } from "@/lib/sfl/revelation";
 import { CATEGORIES_VOTE, LIBELLES_VOTE, bilanJournee, journeeAvecVote, type Decompte } from "@/lib/sfl/votes";
 import { Nom } from "@/components/sfl/nom";
 import { cn } from "@/lib/utils";
@@ -65,7 +65,8 @@ function Colonne({ titre, d }: { titre: string; d: Decompte }) {
 
 /** `j` : la journée ouverte d'abord (la page de la journée) ; sinon la dernière avec vote. */
 export function ResultatsVotes({ j }: { j?: number } = {}) {
-  const { saison, journees } = useSeason();
+  // Le direct : l'admin voit les scores et les votes avant la révélation.
+  const { saisonLue: saison, journeesDirect: journees } = useSeason();
   const votes = useVotes();
   const session = useSession();
   const numero = saison.numero ?? 0;
@@ -80,7 +81,16 @@ export function ResultatsVotes({ j }: { j?: number } = {}) {
   if (!jn || !bilan) {
     return <p className="px-1 text-corps text-muted-foreground">Aucune journée avec vote pour l&apos;instant.</p>;
   }
-  const ouvert = voteOuvert(jn.date, new Date());
+  const t = new Date();
+  const ouvert = voteOuvertA(saison, jn.j, t);
+  const etat = etatRevelation(saison, jn.j, t);
+  const pastille = ouvert
+    ? `Ouvert jusqu'à ${libelleFinDuVote(saison, jn.j, t)}`
+    : etat === "revelee"
+      ? "Révélé"
+      : etat === "bloquee"
+        ? "Bloqué"
+        : `Fermé · ${libelleRevelation(saison, jn.j, t)}`;
 
   return (
     <div className="flex flex-col gap-3">
@@ -115,7 +125,7 @@ export function ResultatsVotes({ j }: { j?: number } = {}) {
               ouvert ? "bg-primary/12 text-primary" : "bg-foreground/[0.08] text-encre-2"
             )}
           >
-            {ouvert ? "Ouvert jusqu'à minuit" : "Fermé"}
+            {pastille}
           </span>
         </div>
         <div className="mt-3 flex items-baseline gap-2">

@@ -36,6 +36,7 @@ import { seedSaison } from "../src/lib/sfl/saisie/store";
 import type { MatchEntry, Saison } from "../src/lib/sfl/saisie/types";
 import { appliquerVotes, titresFaibles, votesDuJour, type VoteFigure } from "../src/lib/sfl/votes";
 import { saisonAvecVotes } from "../src/lib/sfl/saison-serveur.server";
+import { figer } from "../src/lib/sfl/revelation";
 
 const seed = seedSaison();
 const J = 3;
@@ -204,14 +205,19 @@ for (const nom of NOMS) {
 /* ----------------------------- Les invariants ----------------------------- */
 // Une place X ne prend jamais le MVP.
 assert.equal(noteDeMatch(ligne(J, "X2", { result: "Victoire", buts: 5 })), 0);
-// Le premier but saisi en direct rend la journée jouée, pas terminée.
-const enDirect: Saison = { ...vue, entries: vue.entries.map((e) => (e.j === 4 && e.player === NOMS[4] ? { ...e, buts: 1 } : e)) };
-assert.ok(journeeJouee(enDirect, 4) && !journeeTerminee(enDirect, 4));
-assert.deepEqual(
-  [...etatDivisions(enDirect)!.actuelle],
-  [...etat.actuelle],
-  "un but saisi en direct ne recoupe pas les divisions"
-);
+// Un but saisi en direct (dès la J5, revelation.ts) : sur la vue figée, ni
+// un point ni une division ne bouge avant la révélation.
+const j5: Saison = {
+  ...vue,
+  journees: vue.journees.map((m) => (m.j === 4 ? { ...m, j: 5, date: "8 nov." } : m)),
+  entries: vue.entries.map((e) => (e.j === 4 ? { ...e, j: 5 } : e)),
+};
+const enDirect: Saison = { ...j5, entries: j5.entries.map((e) => (e.j === 5 && e.player === NOMS[4] ? { ...e, buts: 1 } : e)) };
+assert.ok(journeeJouee(enDirect, 5) && !journeeTerminee(enDirect, 5));
+const figee = figer(enDirect, new Date("2026-11-08T14:00:00Z"));
+const pts = (s: Saison) => deriveSeason(s).players.map((p) => `${p.name}:${p.pp}`);
+assert.deepEqual(pts(figee), pts(j5), "un but en direct ne change aucun point");
+assert.deepEqual([...etatDivisions(figee)!.actuelle], [...etat.actuelle], "un but en direct ne change aucune division");
 // La clôture garde les titres votés et leurs points.
 const close = cloturerSaison(vue, "Saison 1", { entries: titree.entries, faibles });
 const archive = close.archives!.at(-1)!;

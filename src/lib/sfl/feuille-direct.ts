@@ -3,7 +3,8 @@
 // prendre les stats lui-même de son match et uniquement de son match […]
 // à partir du moment où il y en a un qui a pris les stats, on prend avec son
 // téléphone »). Pour que les quatre matchs d'un dimanche se prennent en
-// direct, et que le soir même on vote et on voie les classements.
+// direct. Les chiffres entrent dans la feuille ; le classement bouge à la
+// révélation (revelation.ts : 19 h dès la J5).
 //
 // La vérité vit en base (supabase/schema.sql, public.feuilles_direct) :
 //   · une feuille par match d'une journée SFL publiée, le jour même ; le
@@ -16,8 +17,9 @@
 //     libère ou la rouvre ;
 //   · « Fin du match » la scelle : le résultat et les chiffres entrent dans
 //     la saison tout de suite, sur les seules lignes de ce match
-//     (sceller_feuille) : les classements bougent, le MVP se calcule et le
-//     vote du match s'ouvre (votes.ts, feuilleRemplie), jusqu'à minuit.
+//     (sceller_feuille) : le MVP se calcule et le vote du match s'ouvre
+//     (votes.ts, feuilleRemplie), jusqu'à la fin du vote ; le classement,
+//     lui, bouge à la révélation (revelation.ts).
 //
 // Ce module, pur, dit la même chose côté app : qui peut prendre la feuille
 // (droitDePrendre, le miroir de public.droit_feuille), le score en direct,
@@ -27,7 +29,7 @@
 // tools/sql/feuille-direct-check.sql). Mode Bola : rien de tout ça.
 
 import type { Journee } from "./engine";
-import { voteOuvert } from "./convocation-temps";
+import { estLeJour } from "./convocation-temps";
 import { estBrouillon } from "./saisie/brouillon";
 import type { MatchEntry, Saison } from "./saisie/types";
 import { numeroSaison } from "./saisie/types";
@@ -269,7 +271,8 @@ export function droitDePrendre(
     const n = equipes[0].match(/^Noirs (\d+)$/)?.[1];
     if (!n || equipes[1] !== `Blancs ${n}`) return "match";
   }
-  if (!voteOuvert(meta.date, maintenant)) return "pas-du-jour";
+  // Le jour même, pas « vote ouvert » : un match tardif se prend encore après 18 h (public.droit_feuille).
+  if (!estLeJour(meta.date, maintenant)) return "pas-du-jour";
   const lignes = lignesDuMatch(saison, j, equipes);
   if (!moi || !lignes.some((l) => memeNom(l.e.player, moi))) return "pas-ton-match";
   if (lignes.some((l) => !l.extra && !!l.e.result)) return "terminee";

@@ -21,9 +21,7 @@ import { cleVapid } from "@/lib/server/web-push";
 import { appelant, serveur } from "@/lib/sfl/serveur-ligue.server";
 import { exploitsDeLaSaison, lireCle, type Exploit } from "@/lib/sfl/exploits";
 import type { Saison } from "@/lib/sfl/saisie/types";
-import { deriveSeason } from "@/lib/sfl/saisie/engine";
-import { appliquerVotes, type VoteFigure } from "@/lib/sfl/votes";
-import { lireSaisonServeur, votesDeLaSaison } from "@/lib/sfl/saison-serveur.server";
+import { lireSaisonServeur } from "@/lib/sfl/saison-serveur.server";
 
 export const maxDuration = 30;
 
@@ -73,22 +71,15 @@ export async function POST(req: NextRequest) {
   const tous = (profils ?? []) as Profil[];
   const lui = tous.find((p) => p.id === moi.id);
   if (!lui?.valide) return NextResponse.json({ error: "Compte pas encore accepté." }, { status: 403 });
-  const saison: Saison | undefined = lue?.brute;
+  // La vue figée, votes posés (revelation.ts) : un exploit n'existe qu'à la révélation, comme dans le fil.
+  const saison: Saison | undefined = lue?.saison;
   if (!saison?.journees) return NextResponse.json({ error: "Saison introuvable." }, { status: 503 });
 
   // Les exploits de la saison de la base, avec les noms que la ligue voit,
-  // et les élus des votes fermés (Impact, Défensive) posés comme dans l'app.
+  // et les élus des votes (Impact, Défensive) posés comme dans l'app.
   const parNom = new Map(tous.filter((p) => p.valide).map((p) => [p.name, p]));
   const affiche = (n: string) => parNom.get(n)?.nom_affiche ?? n;
-  // Tous les votes, page par page : `.limit(5000)` était plafonné à 1 000 par la base.
-  let votes: VoteFigure[];
-  try {
-    votes = await votesDeLaSaison(sb, saison.numero ?? 0);
-  } catch {
-    return NextResponse.json({ error: "Votes illisibles, réessaie." }, { status: 503 });
-  }
-  const titree = appliquerVotes(saison, deriveSeason(saison).journees, votes, new Date());
-  const exploits = new Map<string, Exploit>(exploitsDeLaSaison(titree, affiche).map((e) => [e.cle, e]));
+  const exploits = new Map<string, Exploit>(exploitsDeLaSaison(saison, affiche).map((e) => [e.cle, e]));
 
   const lignes = demandes
     .map((c) => exploits.get(c))

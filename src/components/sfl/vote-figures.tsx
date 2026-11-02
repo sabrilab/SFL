@@ -2,7 +2,10 @@
 
 // Le vote du jour : Joueur Impact et meilleur défenseur, pour un adversaire
 // de son match. On touche la carte de celui qu'on choisit ; on peut changer
-// d'avis jusqu'à minuit. Les voix restent cachées tant que le vote est
+// d'avis jusqu'à la fin du vote (revelation.ts : 18 h, une heure au moins
+// après la dernière feuille ; minuit jusqu'à la J4). Le vote se lit sur le
+// direct (useSeason().saisonLue) : sur la vue figée, la feuille n'est remplie
+// qu'à la révélation. Les voix restent cachées tant que le vote est
 // ouvert — seul le nombre de votants s'affiche — pour ne pas suivre la foule.
 // Tant que la feuille de son match n'est pas remplie, le vote est là mais
 // grisé, sans rien de touchable (feuilleRemplie, lib/sfl/votes.ts).
@@ -17,7 +20,6 @@ import { useVotes } from "@/hooks/use-votes";
 import { useSession } from "@/hooks/use-session";
 import { claimVoteReward } from "@/lib/sfl/ballons";
 import { logActivity } from "@/lib/sfl/activity";
-import { REGLE_VOTE } from "@/lib/sfl/convocation-temps";
 import { findPlayerMatch, type Journee } from "@/lib/sfl/engine";
 import {
   CATEGORIES_VOTE,
@@ -32,10 +34,13 @@ import { cn } from "@/lib/utils";
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
 import { Nom } from "@/components/sfl/nom";
 import { isHidden } from "@/lib/sfl/hidden";
-import { voteOuvert } from "@/lib/sfl/convocation-temps";
+import { libelleFinDuVote, voteOuvertA } from "@/lib/sfl/revelation";
+import { useMaintenant } from "@/hooks/use-missions";
 
 export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
-  const { saison, allPlayers } = useSeason();
+  const { saisonLue: saison, allPlayers } = useSeason();
+  const maintenant = useMaintenant();
+  const jusqua = libelleFinDuVote(saison, journee.j, maintenant);
   const session = useSession();
   const votes = useVotes();
   const [envoi, setEnvoi] = useState<CategorieVote | null>(null);
@@ -47,10 +52,10 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
 
   async function choisir(cat: CategorieVote, candidat: string) {
     if (!place || !ouvert || envoi) return;
-    // L'écran a pu rester ouvert après minuit : le vote est fermé, la base
-    // l'accepterait quand même (elle ne connaît que le jour d'envoi).
-    if (!voteOuvert(journee.date, new Date())) {
-      toast.error("Le vote est fermé depuis minuit.");
+    // L'écran a pu rester ouvert après la fin du vote : la base refuserait aussi.
+    const t = new Date();
+    if (!voteOuvertA(saison, journee.j, t)) {
+      toast.error(`Le vote est fermé depuis ${libelleFinDuVote(saison, journee.j, t)}.`);
       return;
     }
     setEnvoi(cat);
@@ -71,11 +76,11 @@ export function VoteFigures({ journee, me }: { journee: Journee; me: string }) {
       {place && !ouvert ? (
         <p className="rounded-2xl bg-foreground/[0.06] px-3.5 py-2.5 text-[12.5px] font-medium text-foreground/55">
           <span className="font-bold">Vote fermé</span>
-          {` · Il s'ouvre quand la feuille du ${place.match.label} est remplie, jusqu'à minuit.`}
+          {` · Il s'ouvre quand la feuille du ${place.match.label} est remplie, jusqu'à ${jusqua}.`}
         </p>
       ) : (
         <p className="rounded-2xl bg-primary/10 px-3.5 py-2.5 text-[12.5px] font-medium text-primary">
-          <span className="font-bold">Vote ouvert jusqu&apos;à minuit</span> · {REGLE_VOTE}
+          <span className="font-bold">Vote ouvert jusqu&apos;à {jusqua}</span>
         </p>
       )}
 

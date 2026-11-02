@@ -182,7 +182,7 @@ function cartesDe(
 /** Les épreuves du passe de ce joueur : celles d'un joueur Bola pour moi si je joue en Bola, sinon celles de la SFL. */
 const epreuvesDe = (nom: string, bola: string | null): readonly Epreuve[] | undefined => (bola && nom === bola ? EPREUVES_BOLA : undefined);
 
-/** L'heure, à la minute : le coup d'envoi et minuit se voient sans recharger. */
+/** L'heure, à la minute : le coup d'envoi et la révélation se voient sans recharger. */
 export function useMaintenant(): Date {
   const [t, setT] = useState(() => Date.now());
   useEffect(() => {
@@ -198,7 +198,7 @@ export function useMaintenant(): Date {
  * record) : tirées sur la saison brute, elles ne visaient pas les joueurs du
  * classement affiché, et le journal d'XP, qui les retire sur la saison jugée,
  * pouvait rejeter un contrat montré réussi (27/10). Le provider pose déjà les
- * votes (useSeason().saison) ; ceci les rejuge à la minute, pour minuit.
+ * votes (useSeason().saison, la vue figée) ; ceci les rejuge à la minute, pour la révélation.
  */
 export function useSaisonJugee(maintenant: Date) {
   const { saison, journees } = useSeason();
@@ -207,7 +207,7 @@ export function useSaisonJugee(maintenant: Date) {
   return { saison, jugee, votes };
 }
 
-/** Avant le coup d'envoi, jusqu'à minuit, puis fini. */
+/** Avant le coup d'envoi, jusqu'à la révélation (finDuJour), puis fini. */
 function phaseDe(d: DimancheMissions, maintenant: Date): Phase {
   const t = maintenant.getTime();
   return t < d.coupEnvoi.getTime() ? "ouvert" : t < d.finDuJour.getTime() ? "en-jeu" : "fini";
@@ -248,7 +248,7 @@ export interface MesMissions {
   /** Les missions d'un autre joueur, montrées dans un aperçu quand on n'est pas sur la feuille. */
   apercu: boolean;
   lignes: LigneMission[];
-  /** Avant le coup d'envoi, jusqu'à minuit, puis fini. */
+  /** Avant le coup d'envoi, jusqu'à la révélation, puis fini. */
   phase: Phase;
   /** Ceux qui ont signé un contrat contre toi, ton rival d'abord. */
   contreMoi: string[];

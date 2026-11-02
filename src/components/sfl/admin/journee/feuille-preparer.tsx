@@ -17,6 +17,7 @@ import { ajouterMatch, journeeDeLaDate, libelleCourt, memeDate, poserEquipes, pr
 import { equipesDesVenus, joueursPoses } from "@/lib/sfl/saisie/venus-sur-la-feuille";
 import type { ConvocationTeam, Saison } from "@/lib/sfl/saisie/types";
 import { haptique } from "@/lib/sfl/haptique";
+import { useSeason } from "@/components/sfl/season-provider";
 import { Etiquette, Feuille, Pastille, PastilleEtat } from "./ui";
 
 const HEURES = ["10h00", "11h00", "12h30", "13h00", "14h00", "15h00"];
@@ -58,6 +59,7 @@ export function FeuillePreparer({
   onOuverte: (j: number) => void;
 }) {
   const dimanches = useMemo(() => dimanchesAVenir(), []);
+  const { divisions } = useSeason();
   const avant = [...saison.journees].sort((a, b) => b.j - a.j)[0];
   // Le premier dimanche encore libre : toucher « J10 + » prépare la J10, pas la J9 déjà posée.
   const [date, setDate] = useState(() => dimanches.find((d) => !journeeDeLaDate(saison, d)) ?? dimanches[0]);
@@ -69,8 +71,8 @@ export function FeuillePreparer({
   // Les « Je viens » ne valent que pour le dimanche de leur convocation.
   const duDimanche = memeDate(convocation.jour.replace(/^\D+/, ""), date);
   const proposees = useMemo(
-    () => (duDimanche ? equipesDesVenus(saison, j, convocation.venus, equipesConvocation) : null),
-    [duDimanche, saison, j, convocation.venus, equipesConvocation]
+    () => (duDimanche ? equipesDesVenus(saison, j, convocation.venus, equipesConvocation, divisions) : null),
+    [duDimanche, saison, j, convocation.venus, equipesConvocation, divisions]
   );
   const [avecVenus, setAvecVenus] = useState(true);
   const poses = joueursPoses(proposees);

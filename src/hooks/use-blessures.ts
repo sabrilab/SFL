@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useSaisonClose, useSeason } from "@/components/sfl/season-provider";
 import { useSession } from "@/hooks/use-session";
-import { bilanJournees, blessesEnCours, journeesParJoueur, type BilanJournees, type Blessure } from "@/lib/sfl/blessures";
+import { bilanJournees, blessesEnCours, journeesJouees, journeesParJoueur, type BilanJournees, type Blessure } from "@/lib/sfl/blessures";
 import { APERCU_BLESSURES, blessuresEnMemoire, BLESSURES_EVENT, chargerBlessures } from "@/lib/sfl/blessures-store";
 import { supabase } from "@/lib/supabase";
 
@@ -75,7 +75,7 @@ export function useJourneesDuClassement(): { journees: Map<string, number>; bles
     // L'admin peut aussi l'avoir mis « Blessure » dans l'effectif.
     for (const r of saison.roster) if (r.profil === "Blessure") blesses.add(r.name);
     return {
-      journees: new Map([...journeesParJoueur(saison.entries)].map(([n, s]) => [n, s.size])),
+      journees: new Map([...journeesParJoueur(saison.entries, new Set(journeesJouees(saison)))].map(([n, s]) => [n, s.size])),
       blesses,
     };
   }, [saison, liste]);

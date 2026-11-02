@@ -28,7 +28,7 @@ import { Nom } from "@/components/sfl/nom";
 import { useSeason } from "@/components/sfl/season-provider";
 import { useIdentites } from "@/hooks/use-identites";
 import { ovr } from "@/lib/sfl/engine";
-import { divisionDe, etatDivisions } from "@/lib/sfl/divisions";
+import { divisionDe } from "@/lib/sfl/divisions";
 import { chercherTolerant } from "@/lib/sfl/recherche-tolerante";
 import { effectifJouable } from "@/lib/sfl/saisie/effectif";
 import { haptique } from "@/lib/sfl/haptique";
@@ -69,7 +69,7 @@ export function ChoisirJoueurs({
   /** Toucher un suspendu : lever sa suspension (l'appelant confirme). */
   onLever?: (nom: string) => void;
 }) {
-  const { saison: lue, allPlayers } = useSeason();
+  const { allPlayers, divisions: etatLu } = useSeason();
   const ids = useIdentites();
   const [q, setQ] = useState("");
   const [filtre, setFiltre] = useState<Filtre>("tous");
@@ -86,9 +86,9 @@ export function ChoisirJoueurs({
 
   const parNom = useMemo(() => new Map(allPlayers.map((p) => [p.name.toLowerCase(), p])), [allPlayers]);
   const divisions = useMemo(() => {
-    const etat = etatDivisions(lue);
+    const etat = etatLu;
     return (nom: string) => (etat ? divisionDe(etat, nom) : null);
-  }, [lue]);
+  }, [etatLu]);
 
   const joueurs = useMemo(
     () =>

@@ -46,5 +46,37 @@ for (const f of tous) {
   if (/duplicateEntryAt|ajouterEquipe\(/.test(f.texte)) fautes.push(`${f.chemin} : Dupliquer / Ajouter une équipe sont retirés`);
 }
 
+// 6 · Les divisions se coupent sur la vue figée (revelation.ts, 02/11/2026) :
+// jamais sur le direct, ni sur le document stocké.
+for (const f of tous) {
+  for (const m of f.texte.matchAll(/(?:etatDivisions|decouper|divisionsDeLaJournee)\(([^)]*)\)/g)) {
+    if (/saisonLue|\.direct\b|\.document\b|saisieStore\.load\(\)/.test(m[1])) fautes.push(`${f.chemin} coupe les divisions sur le direct : ${m[0]}`);
+  }
+}
+// 7 · Le direct (saisonLue, journeesDirect, lue.direct) ne se lit qu'où il le faut :
+// la feuille, le score, le vote, l'arbitre, les cartons, la présence, l'admin.
+const LECTEURS_DU_DIRECT = new Set([
+  "app/api/cartons/annoncer/route.ts",
+  "app/api/ligue/annoncer/route.ts",
+  "app/map/page.tsx",
+  "components/sfl/actus/course.tsx",
+  "components/sfl/actus/fil.tsx",
+  "components/sfl/admin/resultats-votes.tsx",
+  "components/sfl/cartons/mes-cartons.tsx",
+  "components/sfl/direct/direct-du-match.tsx",
+  "components/sfl/feed/arbitre-du-match.tsx",
+  "components/sfl/invitation-carte.tsx",
+  "components/sfl/season-provider.tsx",
+  "components/sfl/vitrine.tsx", // une variable à lui, pas le direct
+  "components/sfl/vote-figures.tsx",
+  "hooks/use-feuilles-direct.ts",
+  "hooks/use-presence.ts",
+  "lib/sfl/revelation.ts", // ses commentaires
+  "lib/sfl/saison-serveur.server.ts",
+]);
+for (const f of tous) {
+  if (/\bsaisonLue\b|\bjourneesDirect\b|\blue\??!?\.direct\b/.test(f.texte) && !LECTEURS_DU_DIRECT.has(f.chemin)) fautes.push(`${f.chemin} lit le direct : la ligue lit la vue figée (useSeason().saison)`);
+}
+
 assert.deepEqual(fautes, [], fautes.join("\n"));
-console.log(`lecteurs-check : ${tous.length} fichiers, une seule lecture de la saison, sélecteurs par effectifJouable, aucune écriture depuis la saison lue — ok`);
+console.log(`lecteurs-check : ${tous.length} fichiers, une seule lecture de la saison, sélecteurs par effectifJouable, aucune écriture depuis la saison lue, divisions et direct à leur place — ok`);

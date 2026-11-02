@@ -69,7 +69,9 @@ export function EquipesParDivision({
 
   /** « N équipes sur T terrains, X joueurs sans équipe : continuer ? », et ce qui suit. */
   function demander(r: Resume, suite: string, action: string, faire: () => void) {
-    const detail = [suite, r.auDela ? `C'est plus que les ${TERRAINS_MAX} terrains prévus.` : null].filter(Boolean).join(" ");
+    // La journée d'avant pas encore révélée (revelation.ts) : les divisions changeront à sa révélation.
+    const attente = etat.perimee ? `Divisions de la J${etat.pour} en attente.` : null;
+    const detail = [attente, suite, r.auDela ? `C'est plus que les ${TERRAINS_MAX} terrains prévus.` : null].filter(Boolean).join(" ");
     setConfirmation({ titre: questionDeComposition(r), detail, action, faire });
   }
 
@@ -92,6 +94,7 @@ export function EquipesParDivision({
           {venus.length} confirmé{venus.length > 1 ? "s" : ""}
         </span>
       </div>
+      {etat.perimee && <p className="mono-label text-braise">Divisions · J{etat.pour} en attente</p>}
       <p className="mono-label text-encre-3">
         {surLaFeuille
           ? "Sur la feuille de la journée"

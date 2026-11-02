@@ -52,6 +52,7 @@ import { computeJournees } from "@/lib/sfl/saisie/engine";
 import { choixDEquipe } from "@/lib/sfl/saisie/equipes";
 import { placementsDeLaJournee } from "@/lib/sfl/saisie/effectif";
 import { etatJournee, gesteDuMoment, prochaineJournee } from "@/lib/sfl/saisie/etat-journee";
+import { libelleFinDuVote, libelleRevelation } from "@/lib/sfl/revelation";
 import { verifierFeuille } from "@/lib/sfl/saisie/integrite";
 import { mvpAutomatique } from "@/lib/sfl/saisie/mvp";
 import { addEntry, ajouterMatch, matchsDeclares, memeDate, newEntry, poserEquipes, retirerMatchVide } from "@/lib/sfl/saisie/mutations";
@@ -77,7 +78,7 @@ export function PageJournee() {
   const { me } = useMyPlayer();
   const admin = useSaisieAdmin();
   const { saison, faire, commit, supprimer, undo, redo, history, future, isClient } = admin;
-  const { journees: vuesLigue } = useSeason();
+  const { journees: vuesLigue, divisions } = useSeason();
   const presence = usePresence();
   const [maintenant] = useState(() => new Date());
 
@@ -131,8 +132,8 @@ export function PageJournee() {
 
   // Les « Je viens » de ce dimanche qui ne sont pas encore sur les terrains, posés d'un geste.
   const proposition = useMemo(
-    () => (j != null && convocationDuJour ? equipesDesVenus(saison, j, presence.ordreDesVenus, presence.teams) : null),
-    [saison, j, convocationDuJour, presence.ordreDesVenus, presence.teams]
+    () => (j != null && convocationDuJour ? equipesDesVenus(saison, j, presence.ordreDesVenus, presence.teams, divisions) : null),
+    [saison, j, convocationDuJour, presence.ordreDesVenus, presence.teams, divisions]
   );
 
   // Hors des camps : les lignes sans équipe (remplaçants), puis les « Je viens » pas encore sur la feuille.
@@ -264,7 +265,20 @@ export function PageJournee() {
           )}
         >
           <div className="flex items-center justify-between gap-2">
-            <PastilleEtat etat={etat} suffixe={etat === "brouillon" && meta.publiee ? `en ligne à ${heureDe(meta.publiee.le)}` : etat === "en-ligne" ? heureDe(meta.publiee?.le) : null} />
+            <PastilleEtat
+              etat={etat}
+              suffixe={
+                etat === "brouillon" && meta.publiee
+                  ? `en ligne à ${heureDe(meta.publiee.le)}`
+                  : etat === "en-ligne"
+                    ? heureDe(meta.publiee?.le)
+                    : etat === "vote"
+                      ? libelleFinDuVote(saison, meta.j, maintenant)
+                      : etat === "attente"
+                        ? libelleRevelation(saison, meta.j, maintenant)
+                        : null
+              }
+            />
             <Segmente
               taille="sm"
               label="Vue"
@@ -320,7 +334,7 @@ export function PageJournee() {
                 onArbitre={(n) => setArbitre(n)}
                 arbitre={(n) => declares[n - 1]?.arbitre ?? null}
                 ecarts={ecarts}
-                direct={etat === "en-direct" || etat === "terminee"}
+                direct={etat !== "brouillon" && etat !== "en-ligne"}
                 heureJournee={meta.heure}
                 lieu={(m) => terrainDe(m.lieuId ?? meta.terrainId)}
                 feuille={(n) => {
@@ -416,6 +430,14 @@ export function PageJournee() {
           ) : geste.t === "publier" ? (
             <button type="button" onClick={() => setPublier(true)} className="bouton-principal h-12 text-lecture font-semibold">
               Publier pour tout le monde
+            </button>
+          ) : geste.t === "revelation" ? (
+            <span className="mono-label flex h-12 items-center justify-center gap-2 rounded-full bg-foreground text-background">
+              ◐ Révélation à {geste.heure}
+            </span>
+          ) : geste.t === "bloquee" ? (
+            <button type="button" onClick={() => setEnDirect(true)} className="bouton-principal h-12 text-lecture font-semibold">
+              {geste.equipes.join(" · ")} sans résultat
             </button>
           ) : geste.t === "en-ligne" ? (
             <div className="flex items-center gap-2">

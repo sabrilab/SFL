@@ -5,24 +5,33 @@
 //   brouillon  — seule l'organisation la voit ;
 //   en-ligne   — publiée, pas encore commencée ;
 //   en-direct  — le coup d'envoi est passé, ou un but est déjà noté ;
-//   terminee   — chaque camp a son résultat (journeeTerminee).
+//   terminee   — chaque camp a son résultat (journeeTerminee) ; jusqu'à la J4.
+// Dès la J5 (revelation.ts), après les matchs :
+//   vote       — les feuilles finies, le vote ouvert (jusqu'à 18 h) ;
+//   attente    — le vote fermé, la révélation à venir (19 h) ;
+//   revelee    — la journée compte : points et divisions sont entrés ;
+//   bloquee    — le jour passé, une équipe est restée sans résultat.
 //
 // Le geste du moment : il y en a toujours un, et un seul, en bas de l'écran.
 //
 // Pur.
 
 import { journeeJouee, journeeTerminee } from "./engine";
+import { etatRevelation, libelleRevelation, nouveauRegime } from "../revelation";
 import { coupDEnvoi, dateDeJournee, estBrouillon } from "./brouillon";
 import { bloquantsPublication, type Ecart } from "./integrite";
 import { dimancheDeJournee, matchsDeclares } from "./mutations";
-import type { Saison } from "./types";
+import { numeroSaison, type Saison } from "./types";
 
-export type EtatJournee = "brouillon" | "en-ligne" | "en-direct" | "terminee";
+export type EtatJournee = "brouillon" | "en-ligne" | "en-direct" | "terminee" | "vote" | "attente" | "revelee" | "bloquee";
 
 export function etatJournee(s: Saison, j: number, maintenant: Date): EtatJournee {
   const meta = s.journees.find((m) => m.j === j);
   if (!meta || estBrouillon(meta)) return "brouillon";
-  if (journeeTerminee(s, j)) return "terminee";
+  if (nouveauRegime(numeroSaison(s), j)) {
+    const r = etatRevelation(s, j, maintenant);
+    if (r !== "a-venir" && r !== "en-direct") return r;
+  } else if (journeeTerminee(s, j)) return "terminee";
   if (journeeJouee(s, j)) return "en-direct";
   const envoi = coupDEnvoi(meta, maintenant);
   if (envoi && envoi.getTime() <= maintenant.getTime()) return "en-direct";
@@ -72,6 +81,8 @@ export type Geste =
   | { t: "publier"; j: number }
   | { t: "en-ligne"; j: number; le?: string }
   | { t: "direct"; j: number; match: number; heure?: string }
+  | { t: "revelation"; j: number; heure: string }
+  | { t: "bloquee"; j: number; equipes: string[] }
   | { t: "apres"; j: number; suivante: { j: number; date: string } };
 
 /** Le geste du moment pour la journée ouverte (`j`, ou null : aucune à venir). */
@@ -84,7 +95,9 @@ export function gesteDuMoment(s: Saison, j: number | null, maintenant: Date): Ge
     const ecarts = bloquantsPublication(s, j);
     return ecarts.length ? { t: "corriger", j, ecarts } : { t: "publier", j };
   }
-  if (etat === "terminee") return { t: "apres", j, suivante: journeeAPreparer(s, maintenant) };
+  if (etat === "terminee" || etat === "revelee") return { t: "apres", j, suivante: journeeAPreparer(s, maintenant) };
+  if (etat === "vote" || etat === "attente") return { t: "revelation", j, heure: libelleRevelation(s, j, maintenant) };
+  if (etat === "bloquee") return { t: "bloquee", j, equipes: equipesSansResultat(s, j) };
   const ajd = aujourdhui(maintenant);
   if (etat === "en-direct" || jourDe(meta.date, maintenant) === ajd) {
     // Le premier match qui n'a pas encore son résultat.
@@ -94,6 +107,16 @@ export function gesteDuMoment(s: Saison, j: number | null, maintenant: Date): Ge
     return { t: "direct", j, match: n + 1, heure: ms[n]?.heure ?? meta.heure };
   }
   return { t: "en-ligne", j, le: meta.publiee?.le };
+}
+
+/** Les équipes de la feuille sans résultat (« Noirs 2 ») : ce qui bloque la révélation. */
+export function equipesSansResultat(s: Saison, j: number): string[] {
+  const equipes = new Map<string, boolean>();
+  for (const e of s.entries) {
+    if (e.j !== j || e.statut !== "Présent" || e.extraTime || !e.team) continue;
+    equipes.set(e.team, (equipes.get(e.team) ?? false) || !!e.result);
+  }
+  return [...equipes].filter(([, ok]) => !ok).map(([nom]) => nom);
 }
 
 /** Les compteurs d'une journée, en mots : « 2 MATCHS · 20 JOUEURS · 2 REMPLAÇANTS ». */

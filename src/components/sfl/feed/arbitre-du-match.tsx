@@ -25,7 +25,8 @@ const NOTES = [1, 2, 3, 4, 5] as const;
 
 export function ArbitresDuMatch({ j }: { j: number }) {
   const relue = useSaisonClose();
-  const { saison } = useSeason();
+  // Le direct : l'arbitre se note dès le résultat saisi, pas à la révélation.
+  const { saisonLue: saison } = useSeason();
   const { me } = useMyPlayer();
   const arbitres = useArbitres();
   const identite = useIdentites();

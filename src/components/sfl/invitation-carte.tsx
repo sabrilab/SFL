@@ -257,7 +257,7 @@ function cartonsDApercu(nom: string): Carton[] {
 export function InvitationCarte() {
   const session = useSession();
   const { player } = useMyPlayer();
-  const { saison, players } = useSeason();
+  const { saison, saisonLue, players } = useSeason();
   const suivis = useSuivis();
   const id = useIdentites();
   const [forcee] = useState(apercu);
@@ -292,14 +292,14 @@ export function InvitationCarte() {
     [nom, saison, players, suivis]
   );
   // La décision se prend hors du rendu, sur la saison du moment.
-  const ligue = useRef({ saison, players });
+  const ligue = useRef({ saison, saisonLue, players });
   // Un joueur Bola, hors de la SFL : ni l'annonce des divisions, ni les
   // joueurs de la SFL à suivre (porte-sfl.tsx).
   const horsSfl = useHorsSfl();
   const bola = useJoueurBola();
   const horsSflRef = useRef(false);
   useEffect(() => {
-    ligue.current = { saison, players };
+    ligue.current = { saison, saisonLue, players };
     horsSflRef.current = horsSfl || bola;
   });
 
@@ -347,7 +347,7 @@ export function InvitationCarte() {
       if (identiteConfirmee(nom) === false) return;
       if (parLien.current) return;
       // Un carton pas encore vu, avant tout : il se brandit dès l'ouverture.
-      const recus = await cartonsAMontrerA(nom, cartonsDe(ligue.current.saison, nom).cartons).catch(() => [] as Carton[]);
+      const recus = await cartonsAMontrerA(nom, cartonsDe(ligue.current.saisonLue, nom).cartons).catch(() => [] as Carton[]);
       if (annule || parLien.current) return;
       if (recus.length > 0) {
         setCartons(recus);

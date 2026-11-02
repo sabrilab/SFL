@@ -52,7 +52,7 @@ import { heureMin } from "./ligue-vierge";
 import { journeeDuJour } from "./presence-feuille";
 import { computeJournees, computeStandings, entryPP } from "./saisie/engine";
 import { equipesDuMatch } from "./saisie/equipes";
-import { journeeJouee, journeeTerminee, saisonDepuisArchive } from "./saisie/mutations";
+import { journeeJouee, saisonDepuisArchive } from "./saisie/mutations";
 import type { ConvocationTeam, Saison } from "./saisie/types";
 
 /**
@@ -578,9 +578,14 @@ export function journeeDeConvocation(saison: Saison, dateLabel: string): number 
   return journeeDuJour(saison, dateLabel) ?? Math.max(0, ...saison.journees.map((m) => m.j)) + 1;
 }
 
-/** Les divisions de la journée `j`, si elle se joue en divisions et pas encore jouée ; sinon null. */
-export function divisionsDeLaJournee(saison: Saison, j: number): EtatDivisions | null {
-  const etat = etatDivisions(saison);
-  // Jusqu'à la feuille finie : le premier but saisi en direct n'efface pas les divisions du dimanche.
-  return etat?.phase === "divisions" && j >= REGLES_DIVISIONS.depuis && !journeeTerminee(saison, j) ? etat : null;
+/**
+ * Les divisions de la journée `j`, si elle se joue en divisions et ne compte
+ * pas encore ; sinon null. La saison à donner est la vue figée
+ * (useSeason().saison, lue.saison) : jusqu'à la révélation, une journée en
+ * direct garde ses divisions. Plus loin que la prochaine journée (`pour`) :
+ * les mêmes, marquées `perimee` (la précédente n'est pas encore révélée).
+ */
+export function divisionsDeLaJournee(saison: Saison, j: number, etat: EtatDivisions | null = etatDivisions(saison)): EtatDivisions | null {
+  if (etat?.phase !== "divisions" || j < REGLES_DIVISIONS.depuis || j < etat.pour) return null;
+  return j === etat.pour ? etat : { ...etat, perimee: true };
 }

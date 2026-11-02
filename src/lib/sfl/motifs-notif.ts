@@ -85,8 +85,8 @@ export const MOTIFS_NOTIF = {
   outsider: { famille: "ligue", label: "La journée de l'outsider", effet: null },
   // La convocation du dimanche, le lundi matin, à toute la ligue (lib/sfl/annonces-ligue.ts).
   convocation: { famille: "ligue", label: "La convocation du dimanche", effet: "a répondu à la convocation" },
-  // Les résultats et les MVP d'une journée, une fois la feuille remplie (lib/sfl/annonces-ligue.ts).
-  resultats: { famille: "ligue", label: "Les résultats de la journée", effet: null },
+  // Les résultats, les MVP et les divisions d'une journée, à sa révélation (lib/sfl/annonces-ligue.ts, revelation.ts).
+  resultats: { famille: "ligue", label: "Les résultats et les divisions de la journée", effet: null },
   // « J4 en ligne » : l'admin publie une journée préparée en brouillon (30/10, saisie/brouillon.ts).
   publication: { famille: "ligue", label: "La journée en ligne", effet: null },
   // Un carton jaune (un retard) ou rouge (le troisième), au seul joueur qui le reçoit (01/11, lib/sfl/cartons.ts).

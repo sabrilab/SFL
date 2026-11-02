@@ -8,6 +8,7 @@ import { labelDateFr, prochainDimanche } from "../convocation-temps";
 import { equipesDuMatch, equipesDuMatchSuivant } from "./equipes";
 import { dejaSurLaFeuille, jouable } from "./effectif";
 import { resteUnBrouillon } from "./brouillon";
+import { revelationAttendue } from "../revelation";
 import { suspendusPour } from "../cartons";
 import { numeroSaison, type MatchDuJour, type SaisonArchivee, type Terrain } from "./types";
 import type {
@@ -591,6 +592,8 @@ export function cloturerSaison(
   // Jamais tant qu'une journée attend en brouillon (30/10) : elle partirait
   // en archive sans que la ligue l'ait jamais vue.
   if (resteUnBrouillon(saison)) return saison;
+  // Ni avant la dernière révélation (revelation.ts) : l'archive y perdrait ses titres votés.
+  if (revelationAttendue(saison, new Date()) != null) return saison;
   const numero = numeroSaison(saison);
   const faibles = titres ? [...titres.faibles] : [];
   const archive: SaisonArchivee = {

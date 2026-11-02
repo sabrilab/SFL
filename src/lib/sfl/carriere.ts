@@ -24,7 +24,7 @@
 // seule voix, qui ne font pas monter la note : la même que le reste de l'app.
 
 import { ovr, type BoostCardData, type Player } from "./engine";
-import { computeBoostCards, computeJournees, computeStandings, evolutionDe } from "./saisie/engine";
+import { computeBoostCards, computeJournees, computeStandings, evolutionDe, saisonJouee } from "./saisie/engine";
 import { journeeJouee, saisonDepuisArchive } from "./saisie/mutations";
 import type { Evolution } from "./saisie/evolution";
 import type { Saison } from "./saisie/types";
@@ -66,7 +66,8 @@ export function cartesDeCarriere(saison: Saison, nom: string, evolution?: Evolut
   return toutesLesSaisons(saison)
     .flatMap(({ s, nom: nomSaison, enCours }) => {
       const ev = enCours && evolution ? evolution : evolutionDe(s);
-      const player = computeStandings(s, ev).find((p) => p.name === nom);
+      // Les journées jouées seulement : une feuille posée (ou figée jusqu'à la révélation) ne compte pas.
+      const player = computeStandings(saisonJouee(s), ev).find((p) => p.name === nom);
       if (!player || player.matchs === 0) return [];
       const speciales = computeBoostCards(s, ev)
         .filter((c) => c.player === nom)

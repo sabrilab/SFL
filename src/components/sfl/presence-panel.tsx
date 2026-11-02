@@ -41,14 +41,14 @@ export function PresencePanel({ compact = false }: { compact?: boolean }) {
   const session = useSession();
   const admin = !!session?.admin;
   const p = usePresence();
-  const { saison } = useSeason();
+  const { saison, divisions } = useSeason();
   const bola = useJoueurBola();
   const [vueAdmin, setVueAdmin] = useState(false);
   // Dès la J4, chaque équipe dit sa division : « Noirs · Match 2 · D1 ».
   const divisionDe = useMemo(() => {
-    const etat = p.teams?.length ? divisionsDeLaJournee(saison, p.journee) : null;
-    return new Map(etat && p.teams ? terrainsDesEquipes(p.teams, etat).flatMap(({ divisions, equipes }) => equipes.map((e) => [e.name, divisions] as const)) : []);
-  }, [saison, p.journee, p.teams]);
+    const etat = p.teams?.length ? divisionsDeLaJournee(saison, p.journee, divisions) : null;
+    return new Map(etat && p.teams ? terrainsDesEquipes(p.teams, etat).flatMap(({ divisions: ds, equipes }) => equipes.map((e) => [e.name, ds] as const)) : []);
+  }, [saison, p.journee, p.teams, divisions]);
 
   function copyRelances() {
     const list = p.sansReponse.join(", ");

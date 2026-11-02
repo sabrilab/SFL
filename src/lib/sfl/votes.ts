@@ -18,16 +18,21 @@
 //   · on vote pour un adversaire de son match, jamais un coéquipier ;
 //   · un vote par joueur, par journée et par titre ; on peut changer d'avis
 //     tant que le vote est ouvert ;
-//   · ouvert le jour du match, fermé à minuit heure de Paris (voteOuvert) —
-//     la base refuse aussi toute écriture qui n'est pas du jour même ;
+//   · ouvert le jour du match, jusqu'à la fin du vote (revelation.ts,
+//     voteOuvertA) : 18 h, une heure au moins après la dernière feuille,
+//     minuit au plus tard (minuit jusqu'à la J4). La base refuse aussi toute
+//     écriture hors de ce créneau (public.vote_ouvert) ;
 //   · et seulement une fois la feuille de son match remplie (feuilleRemplie).
 //     Sabri, 25/10 : « ces votes-là [doivent être] ouverts à partir du moment
 //     où les feuilles de match ont été remplies […] tu peux le mettre en
-//     grisé, et ça va jusqu'à minuit dimanche ». Avant, le vote s'affiche
+//     grisé, et ça va jusqu'à minuit dimanche » (18 h depuis la J5, Sabri,
+//     01/11). Avant, le vote s'affiche
 //     grisé ; chaque match s'ouvre avec sa propre feuille (Match 1 et
 //     Match 2 ne finissent pas à la même heure) ;
-//   · à la fermeture, le plus voté de chaque match prend la carte ; à
-//     égalité, tous les ex æquo. Personne si personne n'a voté.
+//   · à la révélation (19 h ; minuit jusqu'à la J4), le plus voté de chaque
+//     match prend la carte ; à égalité, tous les ex æquo. Personne si
+//     personne n'a voté. Entre la fin du vote et la révélation, personne ne
+//     voit les élus (titresTombes).
 //
 // Les élus sont posés sur les lignes de la saison au moment de la dériver
 // (appliquerVotes, appelé par le SeasonProvider) : rien n'est réécrit dans
@@ -35,7 +40,8 @@
 
 import type { Journee, JourneeMatch } from "./engine";
 import type { Saison } from "./saisie/types";
-import { jourMoisDuLibelle, voteOuvert } from "./convocation-temps";
+import { jourMoisDuLibelle } from "./convocation-temps";
+import { titresTombes } from "./revelation";
 import { supabase } from "@/lib/supabase";
 import { isPlaceExtraTime } from "./hidden";
 import { cleTitre, VOIX_MIN } from "./saisie/evolution";
@@ -65,7 +71,7 @@ export interface VoteFigure {
  *
  * `j` : la journée décomptée. Si AUCUN de ses votes datés n'est du jour de son
  * libellé, c'est la date de la journée qui a été corrigée après le vote (un
- * vote ne s'envoie que le jour affiché, convocation-temps.voteOuvert) : on les
+ * vote ne s'envoie que le jour affiché, revelation.voteOuvertA) : on les
  * garde tous, plutôt que d'effacer d'un coup les titres élus du dimanche.
  */
 export function votesDuJour(votes: VoteFigure[], libelleJournee: string, j?: number): VoteFigure[] {
@@ -139,7 +145,7 @@ export async function voter(v: VoteFigure): Promise<void> {
   const { error } = await supabase()
     .from("votes_figures")
     .upsert({ ...v, jour: aujourdhuiParis() }, { onConflict: "saison,j,categorie,votant" });
-  if (error) throw new Error("Vote refusé : il ne s'ouvre que le jour du match, jusqu'à minuit.");
+  if (error) throw new Error("Vote refusé : il est fermé.");
   // Mis à jour tout de suite, sans attendre le temps réel.
   cache = [
     ...cache.filter((x) => !(x.saison === v.saison && x.j === v.j && x.categorie === v.categorie && x.votant === v.votant)),
@@ -208,7 +214,7 @@ export function feuilleRemplie(saison: Pick<Saison, "entries">, j: number, match
 /* ------------------------------ Les élus -------------------------------- */
 
 /**
- * Pose les élus des votes fermés sur les lignes de la saison (Impact,
+ * Pose les élus des votes tombés (titresTombes) sur les lignes de la saison (Impact,
  * Défensive), journée par journée, match par match — comme appliquerMvpAuto
  * pour le MVP. Une journée sans aucune voix valable pour un titre garde ce que
  * l'admin a saisi. Même référence renvoyée si rien ne change.
@@ -219,7 +225,7 @@ export function appliquerVotes(saison: Saison, journees: Journee[], votes: VoteF
   // j → titre → élus (par nom), seulement pour les votes fermés.
   const elus = new Map<number, Map<CategorieVote, Set<string>>>();
   for (const jn of journees) {
-    if (!journeeAvecVote(jn) || voteOuvert(jn.date, maintenant)) continue;
+    if (!journeeAvecVote(jn) || !titresTombes(saison, jn.j, maintenant)) continue;
     for (const cat of CATEGORIES_VOTE) {
       if (!votes.some((v) => v.saison === numero && v.j === jn.j && v.categorie === cat)) continue;
       const set = new Set<string>();
@@ -257,7 +263,7 @@ export function titresFaibles(saison: Saison, journees: Journee[], votes: VoteFi
   const faibles = new Set<string>();
   const numero = saison.numero ?? 0;
   for (const jn of journees) {
-    if (!journeeAvecVote(jn) || voteOuvert(jn.date, maintenant)) continue;
+    if (!journeeAvecVote(jn) || !titresTombes(saison, jn.j, maintenant)) continue;
     for (const cat of CATEGORIES_VOTE) {
       for (const m of jn.matches ?? []) {
         const d = decompterMatch(votesDuJour(votes, jn.date, jn.j), numero, jn.j, m, cat);

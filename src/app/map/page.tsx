@@ -108,6 +108,7 @@ import { SAISIE_EVENT, useSeason } from "@/components/sfl/season-provider";
 import { usePresence } from "@/hooks/use-presence";
 import { joueursDeLaFeuille } from "@/lib/sfl/presence-feuille";
 import { annonceEnCours, J_DECOUPAGE, nomDivision, REGLES_DIVISIONS } from "@/lib/sfl/divisions";
+import { divisionsDeLaJournee } from "@/lib/sfl/equipes-division";
 import { useDivision } from "@/hooks/use-division";
 import { useSession } from "@/hooks/use-session";
 import { saisieStore } from "@/lib/sfl/saisie/store";
@@ -117,7 +118,6 @@ import {
   definirTerrainParDefaut,
   deplacerTerrain,
   journeeJouee,
-  journeeTerminee,
   placerJourneeSurNouveauTerrain,
   placerMatchDuJourSurNouveauLieu,
   reglerMatchDuJour,
@@ -440,7 +440,9 @@ function etatDe(dedans: boolean, manque: number): { etat: EtatSticker; texte: st
 
 export default function MapPage() {
   // La Map écrit la saison (terrains, horaires) : elle part du document stocké.
-  const { saisonLue: saison, journees, players } = useSeason();
+  // Le direct (la feuille du jour, son score) : saisonLue et journeesDirect ;
+  // le classement et les divisions : la vue figée (revelation.ts).
+  const { saisonLue: saison, saison: vueFigee, divisions, journeesDirect: journees, players } = useSeason();
   const session = useSession();
   const admin = !!session?.admin;
   const p = usePresence();
@@ -456,10 +458,11 @@ export default function MapPage() {
   // dès la J4, la fiche d'un dimanche à venir dit ta division.
   const sansDivisions = !!aujourdhui && annonceEnCours(saison, new Date(`${aujourdhui}T12:00:00Z`));
   const maDivision = useDivision(me);
+  // Une seule vue pour les divisions : la vue figée (revelation.ts), celle des points affichés.
   const surtitreDeLigue = (j: number | null | undefined) =>
     j === J_DECOUPAGE && sansDivisions
       ? "Dernier dimanche sans divisions"
-      : j != null && j >= REGLES_DIVISIONS.depuis && maDivision && !journeeTerminee(saison, j)
+      : j != null && j >= REGLES_DIVISIONS.depuis && maDivision && divisionsDeLaJournee(vueFigee, j, divisions)
         ? `Tu joues en ${nomDivision(maDivision)}`
         : null; // le sigle SFL dit déjà la ligue : plus de « Sunday Five League »
 

@@ -13,7 +13,8 @@
 // voir fin-de-saison.ts.
 
 import { journeeJouee, saisonDepuisArchive } from "./saisie/mutations";
-import type { Saison } from "./saisie/types";
+import { numeroSaison, type Saison } from "./saisie/types";
+import { nouveauRegime } from "./revelation";
 import { estVitrine } from "./compte-vitrine";
 
 export type TropheeId =
@@ -105,7 +106,9 @@ function datePassee(label: string, maintenant: Date): boolean {
 function compter(s: Saison, nom: string, c: Compteurs, maintenant?: Date) {
   const passee = (j: number) => {
     if (journeeJouee(s, j)) return true;
-    if (!maintenant) return false;
+    // Dès la J5 (revelation.ts), la vue figée décide : une journée compte à
+    // sa révélation, pas à 18 h.
+    if (!maintenant || nouveauRegime(numeroSaison(s), j) || s.figee?.caches.includes(j)) return false;
     const meta = s.journees.find((m) => m.j === j);
     return !!meta && datePassee(meta.date, maintenant);
   };

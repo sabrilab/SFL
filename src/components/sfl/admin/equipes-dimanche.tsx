@@ -40,10 +40,10 @@ export function EquipesDimanche({
   libellePoser?: (j: number) => string;
 }) {
   const presence = usePresence();
-  const { saison, allPlayers } = useSeason();
+  const { saison, allPlayers, divisions } = useSeason();
   const [draft, setDraft] = useState<BalancedTeam[] | null>(null);
   const [saving, setSaving] = useState(false);
-  const etat = useMemo(() => divisionsDeLaJournee(saison, presence.journee), [saison, presence.journee]);
+  const etat = useMemo(() => divisionsDeLaJournee(saison, presence.journee, divisions), [saison, presence.journee, divisions]);
 
   // Réservé à l'admin — le hook ne donne saveTeams qu'à lui.
   if (!presence.saveTeams) return null;
