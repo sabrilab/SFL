@@ -6,15 +6,18 @@
 //
 // La carte Bola elle-même (bola-card.tsx, édition « entraineur ») : sa photo
 // du studio comme tout le monde, l'étiquette ENTRAÎNEUR, son nom, son pseudo
-// et ses rencontres dirigées, l'écusson de son équipe à la place du numéro
-// (et dans la pastille), et à la place de la note de joueur sa note
-// d'entraîneur, à la place des six stats ses trois caractéristiques
-// (lib/sfl/entraineur.ts). Sa carte de joueur ne change pas : c'est une
-// seconde carte, comme celle d'un arbitre. Ni badge, ni habillage de joueur.
+// et son équipe (« lucien · mons academy », comme « yanis · mc » : sous la
+// note, trois chiffres et pas un de plus ; ses rencontres dirigées vont sur
+// la fiche), l'écusson de son équipe à la place du numéro (et dans la
+// pastille), et à la place de la note de joueur sa note d'entraîneur, à la
+// place des six stats ses trois caractéristiques (lib/sfl/entraineur.ts). Sa
+// carte de joueur ne change pas : c'est une seconde carte, comme celle d'un
+// arbitre. Ni badge, ni habillage de joueur.
 //
-// Rien ne la branche encore aux données : l'Indice de Force (calculé par le
-// serveur depuis les résultats), la feuille d'avant-match et les présents au
-// décompte restent à créer ; les départs, eux, sont déjà en base.
+// Rien ne la branche encore aux données : la feuille d'avant-match par noms
+// (la force des deux feuilles, les joueurs actifs), le 5 contre 4 dans la
+// feuille de score et la revue des litiges restent à créer ; les forfaits et
+// les départs, eux, sont déjà en base.
 
 import { BolaCard } from "./bola-card";
 import type { FinitionEntraineur } from "@/components/sfl/skins-entraineur";
@@ -28,7 +31,6 @@ export function CarteEntraineur({
   equipe,
   photo,
   stats,
-  rencontres,
   finition,
   size = 1,
 }: {
@@ -39,8 +41,6 @@ export function CarteEntraineur({
   photo?: string | null;
   /** Ses trois caractéristiques officielles (75 partout au départ). */
   stats: StatsEntraineur;
-  /** Ses rencontres dirigées, sous son nom. */
-  rencontres: number;
   finition?: FinitionEntraineur | null;
   size?: number;
 }) {
@@ -54,7 +54,7 @@ export function CarteEntraineur({
       stats={ZERO}
       size={size}
       photo={photo}
-      entraineur={faceEntraineur(stats, { finition, rencontres, equipe })}
+      entraineur={faceEntraineur(stats, { finition, equipe })}
     />
   );
 }

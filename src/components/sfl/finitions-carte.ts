@@ -208,6 +208,12 @@ export interface Matiere {
   /** Forces : rayures du portrait vide, microtexte, reflet, repères d'angle. */
   rayures: number;
   micro: number;
+  /**
+   * Les lignes de scan du papier (l'encre, 0,022 par défaut). 0 : aucune ; la
+   * carte d'entraîneur n'en a pas (sur une matière sombre à l'encre claire,
+   * elles se lisaient comme un écran).
+   */
+  trame?: number;
   reflet: number;
   coins: number;
   etiquette: { fond: string; bord: string; texte: string };
@@ -249,8 +255,8 @@ export interface Matiere {
    * drapeau au dos, la carte de saison devant). `logo: false` : le motif
    * dessine lui-même la lune et le logotype.
    */
-  dos?: Partial<Pick<Matiere, "encre" | "sombre" | "papier" | "micro" | "reflet" | "rebord">> & { logo?: false };
-  /** La carte d'entraîneur (étude, skins-entraineur.ts) : l'écusson de son équipe, l'étiquette, le bord de la pastille, l'élastique du carnet, le portrait sans photo. */
+  dos?: Partial<Pick<Matiere, "encre" | "sombre" | "papier" | "micro" | "reflet" | "rebord" | "trame">> & { logo?: false };
+  /** La carte d'entraîneur (étude, skins-entraineur.ts) : l'écusson de son équipe, l'étiquette, le portrait sans photo. */
   entraineur?: TraitEntraineur;
 }
 
