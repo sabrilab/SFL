@@ -5917,8 +5917,10 @@ create table if not exists public.parrainages (
   parrain     uuid references public.profiles(id) on delete set null,
   code        text,
   -- 'lien' : son lien ouvert ; 'code' : son code tapé à l'inscription ;
-  -- 'equipe' : le lien d'une équipe (le parrain est celui qui l'a créé).
-  canal       text not null check (canal in ('lien', 'code', 'equipe')),
+  -- 'equipe' : le lien d'une équipe (le parrain est celui qui l'a créé) ;
+  -- 'site' : venu seul par getbola.app, sans parrain (02/11/2026) : il entre
+  -- aussitôt dans Bola, comme un filleul, et la SFL lui reste fermée.
+  canal       text not null check (canal in ('lien', 'code', 'equipe', 'site')),
   equipe_id   bigint references public.equipes(id) on delete set null,
   -- Le parrain jouait en SFL ce jour-là : Bola Team offert (team_offerts).
   parrain_sfl boolean not null default false,
@@ -5926,6 +5928,10 @@ create table if not exists public.parrainages (
   constraint parrainages_pas_soi check (parrain is null or parrain <> filleul)
 );
 create index if not exists parrainages_parrain on public.parrainages (parrain);
+-- Une base née avant le 02/11/2026 n'a pas encore le canal 'site'.
+alter table public.parrainages drop constraint if exists parrainages_canal_check;
+alter table public.parrainages add constraint parrainages_canal_check
+  check (canal in ('lien', 'code', 'equipe', 'site'));
 
 create table if not exists public.parrainage_visites (
   id          bigint generated always as identity primary key,

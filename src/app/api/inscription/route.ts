@@ -26,6 +26,10 @@
 // en SFL. Un code inconnu ou coupé ne bloque rien : le compte naît en
 // attente, comme sans lien.
 //
+// Venu seul, par getbola.app (02/11/2026, ENTREE_DIRECTE) : il entre aussi
+// aussitôt dans Bola, noté sans parrain (canal « site ») ; c'est ce qui lui
+// ferme la SFL (hors_sfl). Un code illisible fait de même.
+//
 // GET ?pseudo=… dit seulement si un pseudo est libre (pour l'écran).
 
 import { NextRequest, NextResponse } from "next/server";
@@ -34,6 +38,7 @@ import { idsParEmail } from "@/lib/sfl/contacts";
 import { joueurSfl, noterFilleul, parrainDuCode } from "@/lib/sfl/parrainage.server";
 import {
   capitaliser,
+  ENTREE_DIRECTE,
   erreurInscription,
   erreurPseudo,
   nettoyerNom,
@@ -142,7 +147,7 @@ export async function POST(req: NextRequest) {
   }
 
   const parrain = !lien && corps.parrain ? await parrainDuCode(sb, corps.parrain) : null;
-  const entre = !!lien || !!parrain;
+  const entre = !!lien || !!parrain || ENTREE_DIRECTE;
 
   const name = nomDeLigue(f.prenom, f.nom, pris.noms);
 
@@ -185,6 +190,7 @@ export async function POST(req: NextRequest) {
     maillot: f.maillot,
     pied: f.pied,
     poste: f.poste,
+    ...(f.sexe ? { sexe: f.sexe } : {}),
   });
   if (errProfil || errFiche) {
     await sb.auth.admin.deleteUser(id).catch(() => {});
@@ -199,7 +205,9 @@ export async function POST(req: NextRequest) {
     const capitaine = lien?.cree_par ? { id: lien.cree_par, code: null, sfl: await joueurSfl(sb, lien.cree_par) } : null;
     const { error: errParrainage } = lien
       ? await noterFilleul(sb, id, capitaine, "equipe", lien.equipe_id)
-      : await noterFilleul(sb, id, parrain, corps.canal === "code" ? "code" : "lien");
+      : parrain
+        ? await noterFilleul(sb, id, parrain, corps.canal === "code" ? "code" : "lien")
+        : await noterFilleul(sb, id, null, "site");
     if (errParrainage) {
       await sb.auth.admin.deleteUser(id).catch(() => {});
       return NextResponse.json({ error: "Création du compte impossible pour l'instant." }, { status: 500 });

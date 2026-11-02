@@ -66,8 +66,24 @@ export interface Inscription {
   maillot: Maillot;
   pied: Pied;
   poste: Poste;
+  /** Demandé à l'inscription depuis le 02/11/2026 ; absent d'un vieux formulaire. */
+  sexe?: Sexe;
   motDePasse: string;
 }
+
+/**
+ * Venu seul (sans parrain ni lien d'équipe), le compte entre aussitôt dans
+ * Bola, comme un filleul, la SFL fermée (Sabri, 02/11/2026 : « que la
+ * création du compte soit la plus fluide possible depuis getbola.app »).
+ * false : il naît en attente de l'admin, comme avant.
+ */
+export const ENTREE_DIRECTE = true;
+
+/**
+ * Les quatre photos en pied (face, droite, gauche, dos) à l'inscription.
+ * false depuis le 02/11/2026 : elles sortent du parcours.
+ */
+export const ANGLES_A_L_INSCRIPTION = false;
 
 /** Un pseudo est aussi l'identifiant de connexion : court, sans accent ni espace. */
 export function normaliserPseudo(brut: string): string {
@@ -153,6 +169,7 @@ export function erreurInscription(
   if (!MAILLOTS.includes(f.maillot)) return "Choisis ta taille de maillot.";
   if (!PIEDS.includes(f.pied)) return "Choisis ton pied fort.";
   if (!POSTES.some((p) => p.id === f.poste)) return "Choisis ton poste.";
+  if (f.sexe !== undefined && !SEXES.includes(f.sexe)) return "Homme ou femme ?";
   if (!sansMotDePasse && (f.motDePasse ?? "").length < BORNES.motDePasse) return `Mot de passe : ${BORNES.motDePasse} caractères au moins.`;
   return null;
 }

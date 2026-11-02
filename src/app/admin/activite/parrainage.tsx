@@ -132,7 +132,7 @@ export function ParrainageStats() {
           .order("id")
           .range(debut, debut + PAGE - 1)
       ),
-      toutLire<{ filleul: string; parrain: string | null; canal: Lien["canal"]; parrain_sfl: boolean; created_at: string }>(
+      toutLire<{ filleul: string; parrain: string | null; canal: Lien["canal"] | "site"; parrain_sfl: boolean; created_at: string }>(
         (debut) =>
           sb
             .from("parrainages")
@@ -156,13 +156,14 @@ export function ParrainageStats() {
     setErreur(null);
     setD({
       comptes: profils.lu.map((p) => ({ id: p.id, name: p.name, at: p.created_at ? new Date(p.created_at).getTime() : null })),
-      liens: liens.lu.map((l) => ({
+      // Venus seuls par getbola.app (canal « site ») : des comptes, pas des filleuls.
+      liens: liens.lu.flatMap((l) => (l.canal === "site" ? [] : [{
         filleul: l.filleul,
         parrain: l.parrain,
         canal: l.canal,
         sfl: l.parrain_sfl,
         at: new Date(l.created_at).getTime(),
-      })),
+      }])),
       codes: codes.lu,
       ouverts: ouverts.count ?? 0,
       commences: commences.count ?? 0,

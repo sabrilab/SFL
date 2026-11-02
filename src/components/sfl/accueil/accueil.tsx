@@ -57,7 +57,7 @@ import { useEtatAccueil } from "@/hooks/use-accueil";
 import { useIdentites } from "@/hooks/use-identites";
 import { useSession } from "@/hooks/use-session";
 import { useVueVisible } from "@/hooks/use-vue-visible";
-import { accueilDejaFait, accueilFaitIci, noterAccueilFait, poserEtatAccueil } from "@/lib/sfl/accueil";
+import { accueilDejaFait, accueilFaitIci, arriveParInscription, noterAccueilFait, poserEtatAccueil } from "@/lib/sfl/accueil";
 import { idDe } from "@/lib/sfl/comptes";
 import { AGE_ACCORD_PARENT } from "@/lib/sfl/confidentialite";
 import { accordDonne, rafraichirAccord } from "@/lib/sfl/consentement";
@@ -223,7 +223,8 @@ async function lirePlan(
   if (premiere) {
     // La carte : au premier accueil ; ensuite, l'invitation de l'ouverture la repropose.
     if (photoPerso(nom) === null && !enPause("carte", nom)) etapes.push("carte");
-    if (etapes.length > 0) etapes.unshift("bonjour");
+    // Venu tout droit de /inscription : il sort de son parcours, pas de bienvenue.
+    if (etapes.length > 0 && !arriveParInscription(nom)) etapes.unshift("bonjour");
     if (etapes.length > 0) etapes.push("revelation");
     if (notifs === "inactives" && !enPause("notifs", nom)) etapes.push("notifs");
     const { saison, players } = ligue();

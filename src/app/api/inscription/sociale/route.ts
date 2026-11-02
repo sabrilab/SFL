@@ -28,6 +28,7 @@ import { idsParEmail } from "@/lib/sfl/contacts";
 import { noterFilleul, parrainDuCode } from "@/lib/sfl/parrainage.server";
 import {
   capitaliser,
+  ENTREE_DIRECTE,
   erreurInscription,
   nettoyerNom,
   nomDeLigue,
@@ -106,6 +107,7 @@ export async function POST(req: NextRequest) {
     maillot: corps.maillot as Inscription["maillot"],
     pied: corps.pied as Inscription["pied"],
     poste: corps.poste as Inscription["poste"],
+    ...(corps.sexe ? { sexe: corps.sexe } : {}),
     motDePasse: "",
   };
   const erreur = erreurInscription(f, new Date(), { sansMotDePasse: true });
@@ -129,6 +131,8 @@ export async function POST(req: NextRequest) {
 
   const name = nomDeLigue(f.prenom, f.nom, pris.noms);
   const parrain = corps.parrain ? await parrainDuCode(sb, corps.parrain) : null;
+  // Venu seul (getbola.app) : il entre aussi, noté sans parrain (ENTREE_DIRECTE).
+  const entre = !!parrain || ENTREE_DIRECTE;
 
   // Le pseudo passe par garde_pseudo (base) : pseudo_a_choisir étant encore
   // vrai, ce premier choix ne compte pas, et il date le prochain changement.
@@ -141,7 +145,7 @@ export async function POST(req: NextRequest) {
       pseudo_a_choisir: false,
       // Tout vient d'être tapé : l'accueil ne redemande pas « C'est bien toi ? ».
       identite_le: new Date().toISOString(),
-      ...(parrain ? { valide: true } : {}),
+      ...(entre ? { valide: true } : {}),
     })
     .eq("id", user.id);
   if (errProfil) {
@@ -165,12 +169,13 @@ export async function POST(req: NextRequest) {
     maillot: f.maillot,
     pied: f.pied,
     poste: f.poste,
+    ...(f.sexe ? { sexe: f.sexe } : {}),
   });
   if (errFiche) {
     // On remet le compte en provisoire : le joueur peut réessayer.
     await sb
       .from("profiles")
-      .update({ pseudo_a_choisir: true, ...(parrain ? { valide: false } : {}) })
+      .update({ pseudo_a_choisir: true, ...(entre ? { valide: false } : {}) })
       .eq("id", user.id);
     return NextResponse.json({ error: "Création du compte impossible pour l'instant." }, { status: 500 });
   }
@@ -178,13 +183,15 @@ export async function POST(req: NextRequest) {
   // Validé d'office, il doit être noté filleul, ce qui le garde en mode Bola
   // (hors_sfl) : sinon on remet le compte en provisoire, comme pour la fiche
   // (28/10/2026).
-  if (parrain) {
-    const { error: errParrainage } = await noterFilleul(sb, user.id, parrain, corps.canal === "code" ? "code" : "lien");
+  if (entre) {
+    const { error: errParrainage } = parrain
+      ? await noterFilleul(sb, user.id, parrain, corps.canal === "code" ? "code" : "lien")
+      : await noterFilleul(sb, user.id, null, "site");
     if (errParrainage) {
       await sb.from("profiles").update({ pseudo_a_choisir: true, valide: false }).eq("id", user.id);
       return NextResponse.json({ error: "Création du compte impossible pour l'instant." }, { status: 500 });
     }
   }
 
-  return NextResponse.json({ ok: true, pseudo: f.pseudo, name, entre: !!parrain });
+  return NextResponse.json({ ok: true, pseudo: f.pseudo, name, entre });
 }
