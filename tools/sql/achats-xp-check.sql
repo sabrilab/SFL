@@ -110,4 +110,55 @@ end $$;
 select pg_temp.vrai('11 tirage uniforme', (select bool_and(n between 60 and 140) from (select count(*) n from public.achats_xp where obtenu in ('sn','ci','ng') group by obtenu) x), (select string_agg(obtenu || '=' || n, ' ') from (select obtenu, count(*) n from public.achats_xp where obtenu in ('sn','ci','ng') group by obtenu) x));
 select pg_temp.vrai('11 séries sans trou', (select bool_and(m = n) from (select obtenu, max(serie) m, count(*) n from public.achats_xp group by obtenu) x));
 
+-- Relecture adverse (02/11/2026) : ce que le banc ne disait pas encore.
+-- L'appel tel que la route le fait, avec le DÉTAIL de l'erreur (le solde réel), par identifiant de compte.
+create function pg_temp.ouvrir_id(uid uuid, prix int, gagne int, choix text[], cle text) returns jsonb language plpgsql as $$
+declare r jsonb; m text; d text;
+begin
+  set local role service_role;
+  r := public.ouvrir_pack_xp(uid, 'pack-afrique-2027', prix, gagne, choix, cle::uuid);
+  reset role;
+  return r;
+exception when others then
+  get stacked diagnostics m = message_text, d = pg_exception_detail;
+  reset role;
+  return jsonb_build_object('erreur', m, 'detail', d);
+end; $$;
+create function pg_temp.id(qui text) returns uuid language sql as $$
+  select id from public.profiles where name = qui and id::text like 'e0000000-%'
+$$;
+
+-- 12 · Acheter avec la clé d'un autre : la clé est à chacun. Kader rejoue la clé d'Ilyes : un achat
+--      à lui, débité à lui, jamais le tirage d'Ilyes ; la ligne d'Ilyes ne bouge pas.
+insert into r values ('12', pg_temp.ouvrir_id(pg_temp.id('KaderXp'), 1200, 2400, array['ke'], '10000000-0000-0000-0000-000000000002'));
+select pg_temp.vrai('12 clé d''un autre : un achat à soi', (select v ->> 'obtenu' from r where k = '12') = 'ke' and (select (v ->> 'deja')::boolean from r where k = '12') = false and (select (v ->> 'solde')::int from r where k = '12') = 0, (select v::text from r where k = '12'));
+select pg_temp.vrai('12 la ligne d''Ilyes ne bouge pas', (select count(*) from public.achats_xp where cle = '10000000-0000-0000-0000-000000000002' and joueur = pg_temp.id('IlyesXp')) = 1 and (select obtenu from public.achats_xp where cle = '10000000-0000-0000-0000-000000000002' and joueur = pg_temp.id('IlyesXp')) = (select v ->> 'obtenu' from r where k = '2'));
+select pg_temp.vrai('12 Kader a payé deux packs, pas plus', (select sum(xp) from public.achats_xp where joueur = pg_temp.id('KaderXp')) = 2400);
+
+-- 13 · L'XP gagnée retombe sous ce qui est déjà dépensé (un contrat raté, une feuille corrigée) :
+--      refus, le solde dit 0 (jamais négatif), rien n'est écrit, aucun achat n'est repris.
+insert into r values ('13', pg_temp.ouvrir_id(pg_temp.id('IlyesXp'), 1200, 1000, array['ke','ug','tz','ma','sn'], '10000000-0000-0000-0000-000000000013'));
+select pg_temp.vrai('13 XP retombée : refus, solde 0', (select v ->> 'erreur' from r where k = '13') = 'XP insuffisante.' and (select v ->> 'detail' from r where k = '13') = '0', (select v::text from r where k = '13'));
+select pg_temp.vrai('13 rien d''écrit, rien de repris', (select count(*) from public.achats_xp where joueur = pg_temp.id('IlyesXp')) = 4);
+-- Le solde rendu au refus est le vrai : 5 000 gagnés − 4 800 dépensés = 200.
+insert into r values ('13b', pg_temp.ouvrir_id(pg_temp.id('IlyesXp'), 1200, 5000, array['sn'], '10000000-0000-0000-0000-000000000014'));
+select pg_temp.vrai('13 le solde du refus est le vrai', (select v ->> 'detail' from r where k = '13b') = '200', (select v::text from r where k = '13b'));
+
+-- 14 · Un joueur ne lit ni la clé ni le prix des autres, et ne change rien à ses achats.
+select pg_temp.vrai('14 joueur : pas de clé', pg_temp.en('KaderXp', 'select count(cle)::text from public.achats_xp') like 'refus%');
+select pg_temp.vrai('14 joueur : pas de changement', pg_temp.en('KaderXp', $q$update public.achats_xp set obtenu = 'sn' where joueur = auth.uid() returning 'écrit'$q$) like 'refus%');
+select pg_temp.vrai('14 joueur : pas d''effacement de son achat', pg_temp.en('KaderXp', $q$delete from public.achats_xp where joueur = auth.uid() returning 'effacé'$q$) like 'refus%');
+
+-- 15 · Mes achats : les miens seulement, avec leur prix.
+select pg_temp.vrai('15 mes achats, rien d''autre', pg_temp.en('KaderXp', $q$select string_agg(obtenu || ':' || xp, ',' order by obtenu) from public.mes_achats_xp()$q$) = 'ke:1200,ma:1200');
+select pg_temp.vrai('15 anonyme : ni ouvrir ni lire', not has_function_privilege('anon', 'public.ouvrir_pack_xp(uuid, text, int, int, text[], uuid)', 'execute') and not has_function_privilege('authenticated', 'public.ouvrir_pack_xp(uuid, text, int, int, text[], uuid)', 'execute') and not has_function_privilege('anon', 'public.mes_achats_xp()', 'execute'));
+
+-- 16 · Un compte inconnu, un prix hors bornes : refus, rien d'écrit.
+select pg_temp.vrai('16 compte inconnu : refus', pg_temp.ouvrir_id('e0000000-0000-0000-0000-0000000000ff', 1200, 9999, array['sn'], '10000000-0000-0000-0000-000000000016') ? 'erreur');
+select pg_temp.vrai('16 prix hors bornes : refus', pg_temp.ouvrir_id(pg_temp.id('KaderXp'), 100001, 999999, array['sn'], '10000000-0000-0000-0000-000000000017') ? 'erreur');
+select pg_temp.vrai('16 rien d''écrit', (select count(*) from public.achats_xp where cle in ('10000000-0000-0000-0000-000000000016', '10000000-0000-0000-0000-000000000017')) = 0);
+
+-- 17 · Une ligne d'achat porte toujours le débit ET la nation : ni pack sans débit, ni débit sans pack.
+select pg_temp.vrai('17 débit et nation, toujours ensemble', (select bool_and(xp >= 1 and obtenu ~ '^[a-z]{2}$' and serie >= 1) from public.achats_xp));
+
 rollback;

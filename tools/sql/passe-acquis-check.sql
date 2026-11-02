@@ -61,4 +61,13 @@ select pg_temp.vrai('6 membre lit', pg_temp.en('KaderXp', 'select count(*)::text
 update public.profiles set valide = false where name = 'NaimXp' and id::text like 'e0000000-%';
 select pg_temp.vrai('6 non validé : rien', pg_temp.en('NaimXp', 'select count(*)::text from public.passe_acquis') = '0');
 select pg_temp.vrai('6 anonyme : rien', has_table_privilege('anon', 'public.passe_acquis', 'select') = false);
+-- Relecture adverse (02/11/2026).
+-- 7 · Deux lignes pour le même joueur et la même saison dans un appel : la plus haute, une seule écriture.
+select pg_temp.vrai('7 doublons : le plus haut', pg_temp.poser('[{"joueur":"e0000000-0000-0000-0000-00000000000b","saison_passe":"s1","palier":15,"xp_saison":1800},{"joueur":"e0000000-0000-0000-0000-00000000000b","saison_passe":"s1","palier":16,"xp_saison":1900}]') = '1' and pg_temp.palier('KaderXp', 's1') = 16);
+-- 8 · Une XP de saison négative ne s'écrit jamais telle quelle.
+select pg_temp.vrai('8 posée', pg_temp.poser('[{"joueur":"e0000000-0000-0000-0000-00000000000b","saison_passe":"givre","palier":1,"xp_saison":-50}]') = '1');
+select pg_temp.vrai('8 XP de saison jamais négative', (select a.xp_saison from public.passe_acquis a where a.joueur = 'e0000000-0000-0000-0000-00000000000b' and a.saison_passe = 'givre') = 0);
+-- 9 · Ni l'anonyme ni un joueur n'appellent la fonction ; un joueur n'efface pas un palier gardé.
+select pg_temp.vrai('9 droits de la fonction', not has_function_privilege('anon', 'public.poser_paliers_acquis(jsonb)', 'execute') and not has_function_privilege('authenticated', 'public.poser_paliers_acquis(jsonb)', 'execute'));
+select pg_temp.vrai('9 joueur : pas d''effacement', pg_temp.en('KaderXp', $q$delete from public.passe_acquis where joueur = auth.uid() returning 'effacé'$q$) like 'refus%' and pg_temp.palier('KaderXp', 's1') = 16);
 rollback;
