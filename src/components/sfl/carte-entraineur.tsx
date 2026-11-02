@@ -8,12 +8,13 @@
 // du studio comme tout le monde, l'étiquette ENTRAÎNEUR, son nom, son pseudo
 // et ses rencontres dirigées, l'écusson de son équipe à la place du numéro
 // (et dans la pastille), et à la place de la note de joueur sa note
-// d'entraîneur, à la place des six stats ses six caractéristiques
+// d'entraîneur, à la place des six stats ses trois caractéristiques
 // (lib/sfl/entraineur.ts). Sa carte de joueur ne change pas : c'est une
 // seconde carte, comme celle d'un arbitre. Ni badge, ni habillage de joueur.
 //
-// Rien ne la branche encore aux données : ses faits (feuille de match,
-// check-in, note fair-play, Indice de Force, motif des départs) restent à créer.
+// Rien ne la branche encore aux données : l'Indice de Force (calculé par le
+// serveur depuis les résultats), la feuille d'avant-match et les présents au
+// décompte restent à créer ; les départs, eux, sont déjà en base.
 
 import { BolaCard } from "./bola-card";
 import type { FinitionEntraineur } from "@/components/sfl/skins-entraineur";
@@ -36,7 +37,7 @@ export function CarteEntraineur({
   /** Son équipe : son écusson est sur la carte. */
   equipe: EquipeEntraineur;
   photo?: string | null;
-  /** Ses six caractéristiques officielles (75 partout au départ). */
+  /** Ses trois caractéristiques officielles (75 partout au départ). */
   stats: StatsEntraineur;
   /** Ses rencontres dirigées, sous son nom. */
   rencontres: number;

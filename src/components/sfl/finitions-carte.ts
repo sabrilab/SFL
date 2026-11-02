@@ -250,7 +250,7 @@ export interface Matiere {
    * dessine lui-même la lune et le logotype.
    */
   dos?: Partial<Pick<Matiere, "encre" | "sombre" | "papier" | "micro" | "reflet" | "rebord">> & { logo?: false };
-  /** La carte d'entraîneur (étude, skins-entraineur.ts) : l'écusson de son équipe, l'étiquette en tirets, le portrait sans photo. */
+  /** La carte d'entraîneur (étude, skins-entraineur.ts) : l'écusson de son équipe, l'étiquette, le bord de la pastille, l'élastique du carnet, le portrait sans photo. */
   entraineur?: TraitEntraineur;
 }
 

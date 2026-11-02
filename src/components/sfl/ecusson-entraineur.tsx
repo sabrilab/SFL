@@ -11,9 +11,11 @@
 // de la carte, dans le trait de la matière :
 //   · craie (le tableau) : le contour en trois brins interrompus, le motif
 //     hachuré, l'emblème plein ;
-//   · encre (le carnet) : le contour au stylo, le motif hachuré ;
-//   · fil (le survêtement) : brodé, le motif en aplat de fil, une piqûre le
-//     long du contour.
+//   · fil (le banc) : brodé, le motif en aplat de fil, une piqûre le long du
+//     contour ;
+//   · dorure (le carnet) : doré à chaud en ivoire dans le cuir, le motif en
+//     hachures fines, l'ensemble un peu enfoncé (une ombre portée dans le
+//     creux).
 // Sous 30 px, le trait se simplifie (un contour plein) pour rester net. Rien
 // n'est importé : la forme et l'emblème sont ceux du blason (lib/sfl/blason.ts).
 
@@ -23,7 +25,7 @@ import { DESSINS } from "@/components/sfl/equipe/emblemes";
 import { blasonParDefaut } from "@/lib/sfl/blason";
 import type { EquipeEntraineur } from "@/lib/sfl/entraineur";
 
-export type TraitEcusson = "craie" | "encre" | "fil";
+export type TraitEcusson = "craie" | "fil" | "dorure";
 
 const ANTON = "var(--font-anton), Anton, sans-serif";
 
@@ -62,16 +64,19 @@ export function EcussonEntraineur({
   const n = equipe.initiales.length;
   const dessin = b.embleme === "initiales" ? null : DESSINS[b.embleme];
   // Le contour : plus épais en petit, pour rester lisible.
-  const epaisseur = petit ? 7 : trait === "fil" ? 4.6 : 4.4;
+  const epaisseur = petit ? 7 : trait === "fil" ? 5.2 : 4.4;
+  // En grand, le fil se voit : le passé plat (des points serrés en biais) ; la dorure brille un peu.
+  const satin = trait === "fil" && hauteur >= 70;
+  const plein = satin ? `url(#${id}-s)` : trait === "dorure" && !petit ? `url(#${id}-d)` : ink(0.95);
   const embleme = dessin ? (
-    <path d={dessin.d} fillRule="evenodd" fill={ink(0.95)} />
+    <path d={dessin.d} fillRule="evenodd" fill={plein} />
   ) : (
     <text
       x="50"
       y={56}
       textAnchor="middle"
       dominantBaseline="central"
-      fill={ink(0.95)}
+      fill={plein}
       style={{ fontFamily: ANTON, letterSpacing: "0.01em" }}
       fontSize={n >= 3 ? 38 : n === 2 ? 46 : 54}
     >
@@ -88,12 +93,32 @@ export function EcussonEntraineur({
         <pattern id={`${id}-h`} width={petit ? 9 : 6} height={petit ? 9 : 6} patternUnits="userSpaceOnUse" patternTransform="rotate(-38)">
           <line x1="0" y1="0" x2="0" y2={petit ? 9 : 6} stroke={ink(trait === "craie" ? 0.62 : 0.7)} strokeWidth={petit ? 3 : trait === "craie" ? 1.6 : 1.2} />
         </pattern>
+        {/* Le passé plat : le fil plein, et la lumière qui accroche un point sur trois. */}
+        <pattern id={`${id}-s`} width={2.4} height={2.4} patternUnits="userSpaceOnUse" patternTransform="rotate(52)">
+          <rect width={2.4} height={2.4} fill={ink(0.95)} />
+          <line x1="0" y1="0" x2="0" y2="2.4" stroke="rgba(0,0,0,0.22)" strokeWidth={0.7} />
+        </pattern>
+        <pattern id={`${id}-m`} width={2.4} height={2.4} patternUnits="userSpaceOnUse" patternTransform="rotate(-38)">
+          <rect width={2.4} height={2.4} fill={ink(0.34)} />
+          <line x1="0" y1="0" x2="0" y2="2.4" stroke="rgba(0,0,0,0.18)" strokeWidth={0.7} />
+        </pattern>
+        {/* La feuille de la dorure : un ivoire qui prend la lumière en biais. */}
+        <linearGradient id={`${id}-d`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={ink(1)} />
+          <stop offset="0.45" stopColor={ink(0.8)} />
+          <stop offset="0.6" stopColor={ink(1)} />
+          <stop offset="1" stopColor={ink(0.78)} />
+        </linearGradient>
       </defs>
       {halo && <path d={forme} fill="none" stroke={halo} strokeWidth={epaisseur + 7} strokeLinejoin="round" />}
       {halo && <path d={forme} fill={halo} opacity={0.5} />}
+      {/* La dorure à chaud enfonce un peu le cuir : une ombre dans le creux, en bas à droite. */}
+      {trait === "dorure" && <path d={forme} transform="translate(1.6 2.2)" fill="none" stroke="rgba(0,0,0,0.7)" strokeWidth={epaisseur + 1.5} strokeLinejoin="round" />}
+      {/* La broderie est en relief : son ombre portée sur le tissu. */}
+      {trait === "fil" && !petit && <path d={forme} transform="translate(1.8 2.6)" fill="rgba(0,0,0,0.42)" />}
       {/* Le motif, dans la forme. */}
       <g clipPath={`url(#${id}-f)`}>
-        <DessinMotif motif={b.motif} couleur={trait === "fil" && !petit ? ink(0.3) : `url(#${id}-h)`} w={100} h={106} />
+        <DessinMotif motif={b.motif} couleur={satin ? `url(#${id}-m)` : trait === "fil" && !petit ? ink(0.3) : `url(#${id}-h)`} w={100} h={106} />
       </g>
       {/* Le contour. */}
       {trait === "craie" && !petit ? (
@@ -114,7 +139,7 @@ export function EcussonEntraineur({
           ))}
         </>
       ) : (
-        <path d={forme} fill="none" stroke={ink(0.95)} strokeWidth={epaisseur} strokeLinejoin="round" />
+        <path d={forme} fill="none" stroke={trait === "dorure" && !petit ? `url(#${id}-d)` : ink(0.95)} strokeWidth={epaisseur} strokeLinejoin="round" />
       )}
       {/* La piqûre de la broderie, juste dedans. */}
       {trait === "fil" && !petit && (

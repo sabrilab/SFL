@@ -32,7 +32,7 @@
 // motifs des skins du Passe Bola sont dans motifs-passe.tsx, ceux des skins
 // offerts (la pépite, la palestine) dans motifs-offerts.tsx, ceux des recrues
 // (recruteur, filigrane, fondateur) dans motifs-recrues.tsx, ceux de la carte
-// d'entraîneur (tableau, carnet, survêtement ; étude) dans motifs-entraineur.tsx.
+// d'entraîneur (tableau, banc, carnet ; étude) dans motifs-entraineur.tsx.
 
 import { Fragment, useId } from "react";
 import type { Motif } from "@/components/sfl/finitions-carte";
@@ -170,6 +170,7 @@ export function MotifCarte({
   eclats = true,
   nom,
   noteCentree,
+  epaisseur,
 }: {
   motif: Motif & { clair: string; fonce: string };
   /** Les étoiles : le ciel propre à chaque joueur. */
@@ -182,6 +183,8 @@ export function MotifCarte({
   nom?: string;
   /** La note est-elle centrée (la carte réduite) ? Le rond central de la carte d'entraîneur la suit. */
   noteCentree?: boolean;
+  /** En petit, les traits de la carte d'entraîneur s'épaississent pour rester lisibles. */
+  epaisseur?: number;
 }) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, "");
   const style: React.CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%" };
@@ -190,7 +193,7 @@ export function MotifCarte({
   if (estMotifOffert(motif)) return <MotifOffertSvg motif={motif} dos={!!centre} />;
   if (estMotifRecrue(motif)) return <MotifRecrueSvg motif={motif} dos={!!centre} nom={nom} />;
   if (estMotifAfrique(motif)) return <MotifAfriqueSvg motif={motif} graine={graine} dos={!!centre} nom={nom} />;
-  if (estMotifEntraineur(motif)) return <MotifEntraineurSvg motif={motif} graine={graine} dos={!!centre} noteCentree={noteCentree} />;
+  if (estMotifEntraineur(motif)) return <MotifEntraineurSvg motif={motif} graine={graine} dos={!!centre} noteCentree={noteCentree} epaisseur={epaisseur} />;
 
   if (motif.type === "rayons") {
     const { cx, cy } = centre ?? motif;
