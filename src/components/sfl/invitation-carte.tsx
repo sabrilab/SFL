@@ -101,6 +101,7 @@ import { AnnonceArbitre, annonceArbitreVue } from "@/components/sfl/annonce-arbi
 import { AnnonceDivisions } from "@/components/sfl/annonce-divisions";
 import { Card3D } from "@/components/sfl/card-3d";
 import { FluxCarteOfficielle } from "@/components/sfl/carte-officielle";
+import { accueilDuJour } from "@/lib/sfl/accueil";
 import { InvitationCharte, charteAProposer } from "@/components/sfl/invitation-charte";
 import { InvitationVille } from "@/components/sfl/invitation-ville";
 import { InvitationPremierMatch } from "@/components/sfl/invitation-premier-match";
@@ -381,7 +382,7 @@ export function InvitationCarte() {
         return;
       }
       // Puis la charte : sans elle, pas de carte dans les vidéos ni les visuels.
-      if (charteAProposer(nom) && !enPause("charte", nom)) {
+      if (charteAProposer(nom) && !enPause("charte", nom) && !accueilDuJour(nom)) {
         setVisible("charte");
         return;
       }

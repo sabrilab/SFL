@@ -51,6 +51,15 @@ const TABS = [
 
 const surMap = (pathname: string) => pathname === "/" || pathname === "/map";
 
+/**
+ * Les parcours plein écran ouverts à tous (la création du compte, le lien
+ * d'un parrain ou d'une équipe, l'accueil de l'admin, la politique) : pas de
+ * barre. Sur iPhone, leur page est dessinée dans #app-scroll, que WebKit
+ * place sous la barre quel que soit son z-index : la barre couvrait le
+ * bouton « Continuer » de l'inscription (Sabri, 02/11/2026).
+ */
+const SANS_BARRE = ["/inscription", "/bienvenue", "/equipe/", "/p/", "/confidentialite"];
+
 export function BottomNav() {
   const pathname = usePathname();
   const onglet = ongletActif(pathname);
@@ -82,6 +91,7 @@ export function BottomNav() {
   // L'admin est un outil (30/10/2026) : son geste du moment occupe le bas de
   // l'écran, sous le pouce ; le retour en haut à gauche ramène à l'app.
   if (pathname.startsWith("/admin")) return null;
+  if (SANS_BARRE.some((r) => pathname.startsWith(r))) return null;
 
   return (
     <div
