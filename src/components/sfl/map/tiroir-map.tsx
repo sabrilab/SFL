@@ -94,7 +94,7 @@ export function PuceFiltre({
       }}
       className={cn(
         "flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-semibold tracking-[-0.1px] transition-[transform,background-color,color] active:scale-[0.96]",
-        actif ? "bg-foreground text-background shadow-[0_4px_12px_rgba(0,0,0,0.25)]" : SURFACE
+        actif ? "bg-foreground text-background shadow-[0_4px_12px_rgba(0,0,0,0.25)] ring-[1.5px] ring-white/35" : SURFACE
       )}
     >
       <span aria-hidden className="flex [&_svg]:size-4">
