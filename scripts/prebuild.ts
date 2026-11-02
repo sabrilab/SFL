@@ -14,9 +14,19 @@
 // vaut un déploiement bloqué avec la marche à suivre qu'une app livrée où
 // quelqu'un reste dehors.
 //
-// La migration n'échoue JAMAIS le build : sans SUPABASE_DB_URL ou sans accès
-// réseau, elle se contente de le dire et laisse le déploiement continuer —
-// la page d'installation garde le copier-coller en repli.
+// La migration (étape 2) dépend de l'environnement Vercel (VERCEL_ENV) :
+//   · aperçu (preview, development) : la base n'est JAMAIS touchée, même si
+//     une variable de connexion y était donnée un jour — un simple push sur
+//     une branche ne doit pas mettre à jour la base de la ligue ;
+//   · production : une migration qui échoue (ou une base introuvable) ARRÊTE
+//     le build. Vercel garde alors la version en ligne, l'ancienne app sur
+//     l'ancien schéma, au lieu de servir la nouvelle app sur un schéma qui
+//     n'a pas suivi (fonctions, tables, politiques manquantes). Le schéma est
+//     rejoué en une transaction : un échec (par exemple un interblocage sous
+//     charge) n'applique rien, il suffit de relancer le déploiement ;
+//   · hors Vercel (build local) : comme avant, la migration se contente de
+//     dire ce qu'elle a fait et le build continue — la page d'installation
+//     garde le copier-coller en repli.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { migrateSchema } from "../src/lib/server/migrate";
@@ -50,15 +60,36 @@ writeFileSync(
   ].join("\n")
 );
 
-// 2 · Migration automatique.
-migrateSchema(sql)
-  .then((r) => {
-    const label = {
-      applied: "schéma appliqué ✓",
-      "up-to-date": "schéma déjà à jour ✓",
-      "not-configured": "SUPABASE_DB_URL absente — migration sautée (copier-coller en repli)",
-      error: `migration impossible (${r.message}) — le build continue`,
-    }[r.status];
-    console.log(`[migrate] ${label}`);
-  })
-  .catch((e) => console.log(`[migrate] imprévu (${e}) — le build continue`));
+// 2 · Migration automatique (voir l'en-tête : aperçu, production, hors Vercel).
+const environnement = process.env.VERCEL_ENV;
+const production = environnement === "production";
+
+function arreterLeBuild(raison: string): never {
+  console.error(`[migrate] PRODUCTION : ${raison}`);
+  console.error(
+    "[migrate] Build arrêté : la version en ligne reste en place, rien n'a été appliqué. Relancer le déploiement (ou coller supabase/schema.sql dans l'éditeur SQL), puis passer supabase/verifications/2026-11-mise-en-ligne.sql."
+  );
+  process.exit(1);
+}
+
+if (environnement && !production) {
+  console.log(`[migrate] aperçu (${environnement}) : la base n'est jamais touchée — migration sautée`);
+} else {
+  migrateSchema(sql)
+    .then((r) => {
+      const label = {
+        applied: "schéma appliqué ✓",
+        "up-to-date": "schéma déjà à jour ✓",
+        "not-configured": "SUPABASE_DB_URL absente — migration sautée (copier-coller en repli)",
+        error: `migration impossible (${r.message})`,
+      }[r.status];
+      console.log(`[migrate] ${label}`);
+      if (production && (r.status === "error" || r.status === "not-configured")) {
+        arreterLeBuild(r.status === "error" ? "le schéma n'a pas pu être appliqué" : "aucune connexion à la base");
+      }
+    })
+    .catch((e) => {
+      console.log(`[migrate] imprévu (${e})`);
+      if (production) arreterLeBuild("erreur imprévue pendant la migration");
+    });
+}
