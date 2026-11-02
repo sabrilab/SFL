@@ -15,25 +15,12 @@
 import { FORMAT_CARTE, MiniCarte } from "@/components/sfl/mini-carte";
 import { PucesTitres } from "@/components/sfl/puces-titres";
 import { useSeason } from "@/components/sfl/season-provider";
-import type { BoostType, Player } from "@/lib/sfl/engine";
+import type { BoostType } from "@/lib/sfl/engine";
+import { carteNeutre } from "@/lib/sfl/carte-neutre";
 import { cn } from "@/lib/utils";
 import { Nom } from "@/components/sfl/nom";
 
-export function carteNeutre(name: string): Player {
-  return {
-    name,
-    poste: "—",
-    pp: 0,
-    matchs: 0,
-    buts: 0,
-    passes: 0,
-    statut: "Actif",
-    stats: { VIT: 75, TIR: 75, PAS: 75, DRI: 75, DEF: 75, PHY: 75 },
-    mvp: 0,
-    impact: 0,
-    def: 0,
-  };
-}
+export { carteNeutre };
 
 export function QuiVient({
   noms,

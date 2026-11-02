@@ -57,6 +57,7 @@ import { useProfilsOuverts } from "@/hooks/use-suivis";
 import { Card3D, prechaufferCarte } from "./card-3d";
 import { Card3DEnGrand } from "./carte-en-grand";
 import { useMyPlayer } from "./player-provider";
+import { useJoueursDeLaMap } from "@/hooks/use-joueurs-de-la-map";
 import { useSeason } from "./season-provider";
 import { BoutonSuivre, ReseauJoueur } from "./suivre";
 import { BoutonEcrire } from "./messages/bouton-ecrire";
@@ -215,7 +216,9 @@ export function FeuilleProfil({ nom, onRetour }: { nom: string; onRetour?: () =>
   // Un joueur masqué qu'on a le droit d'ouvrir se range parmi les autres, sur son seul profil.
   const ouverts = useMemo(() => [...players, ...relies.filter((p) => p.name === nom)], [players, relies, nom]);
   const rangs = useMemo(() => new Map(rankPlayers(ouverts).map((p) => [p.name, p.rank])), [ouverts]);
-  const player = ouverts.find((p) => p.name === nom);
+  // Un compte de Bola hors saison (la Map le montre) : sa carte de Bola.
+  const bola = useJoueursDeLaMap();
+  const player = ouverts.find((p) => p.name === nom) ?? bola.find((p) => p.name === nom);
   return (
     <SheetContent
       side="bottom"
