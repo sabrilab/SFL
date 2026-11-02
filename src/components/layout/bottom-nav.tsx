@@ -27,6 +27,11 @@
 // ailleurs, le verre suit le mode de l'app : fumé et encre blanche en
 // sombre, clair et encre noire en clair (23/10) — exactement le
 // `toolbarColorScheme` de l'onglet Jouer dans l'app.
+//
+// Relifting du 02/11/2026 (inspirations de Sabri) : la lentille de l'onglet
+// choisi devient une pilule pleine (blanche en sombre, noire en clair), son
+// icône et son libellé côte à côte à l'encre inverse ; les autres onglets ne
+// gardent que l'icône (le libellé reste lu par VoiceOver).
 
 import { useEffect } from "react";
 import Link from "next/link";
@@ -117,13 +122,14 @@ export function BottomNav() {
                 } else retrouverOnglet(href);
               }}
               className="liquid-tabbar__onglet"
-              style={{ color: encre }}
+              // L'onglet choisi est plein, à l'encre inverse (relifting du 02/11).
+              style={{ color: choisi ? (clair ? "#ffffff" : "#0a0b0d") : encre }}
             >
               <span className="relative flex">
                 <Icon plein={choisi} />
                 {href === "/" && surOngletMap > 0 && <Pastille n={surOngletMap} clair={clair} />}
               </span>
-              <span className="liquid-tabbar__libelle" style={{ fontWeight: choisi ? 600 : 500 }}>
+              <span className={choisi ? "liquid-tabbar__libelle" : "sr-only"} style={{ fontWeight: 650 }}>
                 {label}
               </span>
             </Link>
@@ -138,7 +144,7 @@ export function BottomNav() {
         className="liquid-tabbar liquid-tabbar--rond"
         data-clair={clair ? "" : undefined}
         data-choisi={vestiaire ? "" : undefined}
-        style={{ color: encre }}
+        style={{ color: vestiaire ? (clair ? "#ffffff" : "#0a0b0d") : encre }}
       >
         <span className="relative">
           <VestiaireIcon plein={vestiaire} />
