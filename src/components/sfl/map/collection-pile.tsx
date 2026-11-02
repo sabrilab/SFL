@@ -20,7 +20,7 @@ import { createPortal } from "react-dom";
 import { GalleryHorizontal, LayoutGrid, MapPin, X } from "lucide-react";
 import { PlayerCard } from "@/components/sfl/player-card";
 import { FORMAT_CARTE } from "@/components/sfl/mini-carte";
-import { useSeason } from "@/components/sfl/season-provider";
+import { useJoueursDeLaMap } from "@/hooks/use-joueurs-de-la-map";
 import type { VillePlan } from "@/components/sfl/map/joueurs";
 import type { Player } from "@/lib/sfl/engine";
 import { cn } from "@/lib/utils";
@@ -59,7 +59,7 @@ export function CollectionPile({
   /** Le temps qu'un profil est ouvert par-dessus : cachée, sans perdre sa place. */
   masquee?: boolean;
 }) {
-  const { players } = useSeason();
+  const players = useJoueursDeLaMap();
   const parNom = useMemo(() => new Map(players.map((p) => [p.name, p])), [players]);
   const tous = useMemo(
     () =>
