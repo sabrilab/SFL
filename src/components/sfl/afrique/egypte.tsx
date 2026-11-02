@@ -14,16 +14,24 @@
 //     entre deux traverses ; dans la bande du bas, à peine, un treillis de
 //     losanges en lamelles ;
 //   · le dos : le châle entier. Une bordure de dents et de chevrons, un champ
-//     de losanges dont chaque cœur est plein, et autour de la lune un soleil
-//     de triangles, comme on en brode au telli ; sous le logotype, une
-//     lisière rayée tissée à la main ; tout en lamelles, chacune posée sur le
-//     filet, qui prennent le reflet quand la carte tourne.
+//     de losanges dont chaque cœur est plein, coupé large autour du totem, le
+//     faucon en lamelles (totems/egypte.tsx), posé à gauche sur sa pierre ; la
+//     lune devant son regard (LUNE_EG), cernée, à distance, d'une couronne de
+//     seize losanges pleins, sans rais (plus de soleil de triangles : avec un
+//     faucon, un disque rayonnant serait celui d'un dieu ; la couronne est à
+//     valider par Ilyes) ; sous le logotype, une lisière rayée
+//     tissée à la main ; tout en lamelles, chacune posée sur le filet, qui
+//     prennent le reflet quand la carte tourne ;
+//   · le filet : ses mailles ont du jeu (le tulle se tend inégal), et le noir
+//     se moire d'un reflet plus doux là où l'étoffe a été roulée.
 // Ce qu'on évite : toute image pharaonique (hiéroglyphes, pyramides, Sphinx,
-// ankh, œil d'Horus), toute calligraphie, et les figures (personnages,
-// animaux, objets) qu'on trouve aussi sur le telli ; l'or, le laiton.
+// ankh, œil d'Horus dessiné comme signe, disque sur une tête), toute
+// calligraphie, et les figures (personnages, animaux autres que le totem,
+// objets) qu'on trouve aussi sur le telli ; l'or, le laiton.
 
 import type { PropsMotifNation, SkinNation } from "./types";
-import { alea, BANDE, CENTRE_DOS, f, H, W } from "./outils";
+import { alea, BANDE, f, H, W } from "./outils";
+import { DECALE_EG, LUNE_EG, POSE_DOS_EG, SILHOUETTE_EG } from "./totems/egypte";
 
 type Pt = [number, number];
 
@@ -80,7 +88,9 @@ const LISIERE = { y0: 1330, y1: 1500 };
 
 /** Le châle du dos : toutes les formes, en une fonction « ici, du métal ? ». */
 function chale(seed: number) {
-  const { cx, cy } = CENTRE_DOS;
+  const { cx, cy } = LUNE_EG;
+  // Le cercle de la lune, à l'échelle de LUNE_EG (pour une lune de 300).
+  const K = LUNE_EG.d / 300;
   const dedans = (x: number, y: number): boolean => {
     // La bordure : un rang de dents tournées vers l'intérieur, puis un filet.
     const dg = x, dd = W - x, dh = y, db = H - 70 - y;
@@ -100,17 +110,17 @@ function chale(seed: number) {
       const l = Math.abs(x - ox) / 40 + Math.abs(y - oy) / 40;
       return l < 0.62 || (l > 0.84 && l < 1.08);
     }
-    // Le soleil autour de la lune : un rang, puis des rais en triangles.
+    // Autour de la lune : le filet nu, puis une couronne de seize losanges pleins, sans rais
+    // (un faucon devant un disque rayonnant, ce serait une image de dieu : à valider par Ilyes).
     const r = Math.hypot(x - cx, y - cy);
-    if (r < 470) {
-      if (r > 336 && r < 346) return true;
-      if (r >= 352 && r < 460 && y < 1150) {
-        const a = Math.atan2(y - cy, x - cx);
-        const k = fr((a / (Math.PI * 2)) * 32 + 0.5);
-        const long = Math.round((a / (Math.PI * 2)) * 32 + 0.5) % 2 === 0 ? 108 : 64;
-        return Math.abs(k - 0.5) * 2 < 1 - (r - 352) / long;
-      }
-      return false;
+    if (r < 560 * K) {
+      // La couronne : seize losanges pleins, carrés sur la pointe, détachés par le filet nu de la lune et du champ.
+      if (r < 350 * K || r > 450 * K) return false;
+      const a = Math.atan2(y - cy, x - cx);
+      const t = (((a / (Math.PI * 2)) * 16) % 1 + 1) % 1;
+      const u = (Math.abs(t - 0.5) * ((2 * Math.PI * 400 * K) / 16)) / (50 * K);
+      const v = Math.abs(r - 400 * K) / (50 * K);
+      return u + v < 1;
     }
     // Le champ : un treillis de losanges, un cœur plein dans chacun.
     if (x > CHAMP.x0 && x < CHAMP.x1 && y > CHAMP.y0 && y < CHAMP.y1) {
@@ -256,6 +266,16 @@ function Telli({ cote, m, graine, id }: PropsMotifNation) {
         <pattern id={`ef-${id}`} width={9} height={12} patternUnits="userSpaceOnUse">
           <path d="M0 0L4.5 6L0 12M9 0L4.5 6L9 12" fill="none" stroke={m.clair} strokeWidth={0.9} />
         </pattern>
+        {/* Le tulle tendu inégal : une seconde maille, à peine tournée, qui moire la première. */}
+        <pattern id={`ew-${id}`} width={9} height={12} patternUnits="userSpaceOnUse" patternTransform={`rotate(${f(1.6 + (graine % 7) * 0.12)} ${W / 2} ${H / 2})`}>
+          <path d="M0 0L4.5 6L0 12M9 0L4.5 6L9 12" fill="none" stroke={m.clair} strokeWidth={0.7} />
+        </pattern>
+        {/* Le reflet doux là où l'étoffe a été roulée pour aplatir les lamelles. */}
+        <linearGradient id={`er-${id}`} gradientUnits="userSpaceOnUse" x1={0} y1={0} x2={0} y2={H}>
+          {[0, 0.18, 0.3, 0.5, 0.62, 0.8, 1].map((o, i) => (
+            <stop key={o} offset={o} stopColor="#e6e8ee" stopOpacity={[0, 0.035, 0, 0.03, 0, 0.04, 0][i]} />
+          ))}
+        </linearGradient>
         {/* L'argent : des bandes plus ou moins claires en biais, le scintillement des lamelles */}
         <linearGradient id={`eg-${id}`} gradientUnits="userSpaceOnUse" x1={0} y1={0} x2={W} y2={H}>
           {[0, 0.12, 0.22, 0.33, 0.45, 0.56, 0.68, 0.79, 0.9, 1].map((o, i) => (
@@ -264,6 +284,8 @@ function Telli({ cote, m, graine, id }: PropsMotifNation) {
         </linearGradient>
       </defs>
       <rect width={W} height={H} fill={`url(#ef-${id})`} />
+      <rect width={W} height={H} fill={`url(#ew-${id})`} opacity={0.55} />
+      <rect width={W} height={H} fill={`url(#er-${id})`} />
     </>
   );
   const metal = (l: { corps: string; arete: string }, force: number) => (
@@ -320,7 +342,17 @@ function Telli({ cote, m, graine, id }: PropsMotifNation) {
           fill={r.c === "l" ? `rgba(${LIN},0.2)` : r.c === "b" ? `rgba(${BOIS_CLAIR},0.4)` : `rgba(${ARGENT},0.3)`}
         />
       ))}
-      {metal(ch, 0.92)}
+      {/* Le châle, coupé large autour du faucon (le totem, totems/egypte.tsx) et de sa pierre. */}
+      <defs>
+        <mask id={`ek-${id}`} maskUnits="userSpaceOnUse" x={0} y={0} width={W} height={H}>
+          <rect width={W} height={H} fill="#fff" />
+          <g transform={`translate(${POSE_DOS_EG.x} ${POSE_DOS_EG.y}) scale(${POSE_DOS_EG.echelle}) ${DECALE_EG}`} fill="#000" stroke="#000" strokeWidth={56} strokeLinejoin="round">
+            <path d={SILHOUETTE_EG.d} />
+            <path d={SILHOUETTE_EG.pierre} />
+          </g>
+        </mask>
+      </defs>
+      <g mask={`url(#ek-${id})`}>{metal(ch, 0.92)}</g>
     </>
   );
 }
@@ -364,6 +396,7 @@ const telli: SkinNation = {
     vive: "#c9ccd2",
     tranche: { couleur: "#1a1a1d", metal: 0.45, rugosite: 0.4 },
     holo: { force: 0.38, teinte: [0.96, 0.97, 1] },
+    dos: { micro: 0.018 },
   },
   Motif: Telli,
 };

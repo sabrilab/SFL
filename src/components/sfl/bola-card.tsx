@@ -84,6 +84,7 @@
 // au-dessus du portrait. `data-matiere` et `data-nom` lui disent quel dos
 // dessiner, `data-emission` ce qu'une carte d'époque y écrit.
 
+import { useId } from "react";
 import { BulleBadge } from "@/components/sfl/insigne-carte";
 import {
   graine,
@@ -103,6 +104,8 @@ import { Cartons, Crans, filtrePhoto, InsigneRang, Lisere, Sceau, Sifflet, Voile
 import { GRADES, type FinitionArbitre, type GradeArbitre } from "@/components/sfl/skins-arbitre";
 import { BordEpoque, EmblemeEpoque, LosangeBallon, SigleSfl, SigleSouligne } from "@/components/sfl/marques-carte";
 import { MotifCarte } from "@/components/sfl/motif-carte";
+import { estMotifAfrique } from "@/components/sfl/afrique/registre";
+import { TotemPortrait } from "@/components/sfl/afrique/totem";
 import type { BadgeCarte } from "@/lib/sfl/badge-carte";
 import { STAT_KEYS, type StatKey, type Stats } from "@/lib/sfl/engine";
 import { abrege, estGardien } from "@/lib/sfl/gardien";
@@ -368,6 +371,7 @@ export function BolaCard({
   const habillage = era ? undefined : habillageDemande;
   const encre = (a: number) => `rgba(${p.encre},${a})`;
   const seed = graine(name);
+  const idTotem = useId().replace(/[^a-zA-Z0-9]/g, "");
   const { serie, numero: numeroSerie } = serieDe(name, p.nom === "fondateur" ? habillage : undefined);
   const emission = p.epoque ? ligneDEmission(epoque ?? { saison: p.epoque.saison, le: null, n: null, sur: null }) : null;
   const nomUp = (affiche ?? name).toUpperCase();
@@ -675,6 +679,11 @@ export function BolaCard({
                     : "linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 20%)",
               }}
             />
+          )}
+          {/* Le totem d'une nation du Pack Afrique, gaufré dans un coin bas du portrait (afrique/totem.tsx) ;
+              le sceau et les cartons, tamponnés dans ce même coin, passent avant lui */}
+          {complete && !sceau && !cartons && p.motif && estMotifAfrique(p.motif) && (
+            <TotemPortrait nation={p.motif.nation} graine={seed} photo={!!photo} id={idTotem} />
           )}
           {marque && (
             <div

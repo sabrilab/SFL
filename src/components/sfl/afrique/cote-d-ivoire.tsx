@@ -13,20 +13,26 @@
 //   · la face : autour du portrait, une bordure peinte à la main entre deux
 //     traits, des échelles de hachures et des points ; sous le portrait, les
 //     bandes cousues et des champs de hachures, à peine ;
-//   · le dos : la toile entière. La grille des bandes, chaque case peinte
-//     d'une géométrie (hachures, croisillons, carrés emboîtés, points,
+//   · le dos : la toile entière. Le grand champ, où marche le totem, l'éléphant
+//     peint (totems/cote-d-ivoire.tsx), sur une bande peinte (SOL_CI) ; au-dessus
+//     de son dos, la lune dans un cercle de coton nu, cerné de deux traits et
+//     d'un rang de points (LUNE_CI) ; sous le logotype, un rang de cases, chacune
+//     peinte d'une géométrie (hachures, croisillons, carrés emboîtés, points,
 //     damiers, losanges), tirée de la graine et d'un tracé qui tremble un peu
 //     (une toile par joueur) ; sur les deux bords, des bandes baoulé et leurs
-//     barres d'ikat rompues ; au centre, la lune dans un cercle de coton nu,
-//     cerné de deux traits et d'un rang de points.
-// Ce qu'on évite : toutes les figures de la toile (animaux, personnages,
-// masques), souvent liées au poro, la société d'initiation ; les rayures en
+//     barres d'ikat rompues ;
+//   · le coton, partout : chaque bande a son ton (un écheveau n'est jamais
+//     tout à fait le même), les coutures en léger relief, les flammes du fil
+//     filé à la main, et la boue un peu passée là où la toile a servi.
+// Ce qu'on évite : les figures de la toile (personnages, masques, et tout
+// animal autre que le totem), souvent liées au poro, la société d'initiation ; les rayures en
 // zigzag du fila, que les sources lient au léopard ; les soleils et les
 // étoiles, liés à la création ; les couleurs du drapeau. Rien que des
 // bordures et des champs géométriques.
 
 import type { PropsMotifNation, SkinNation } from "./types";
-import { alea, BANDE, CENTRE_DOS, f, H, LOGOTYPE_DOS, W } from "./outils";
+import { alea, BANDE, f, H, LOGOTYPE_DOS, W } from "./outils";
+import { LUNE_CI, SOL_CI } from "./totems/cote-d-ivoire";
 
 type Pt = [number, number];
 
@@ -218,6 +224,10 @@ interface Toile extends Peinture {
   reserves: string;
   ikat: string;
   bordure: Peinture;
+  /** Le grand champ, peint plus léger : l'éléphant y marche. */
+  champ: Peinture;
+  /** La bande peinte sous ses pieds. */
+  sol: Peinture;
 }
 
 /** Le pourtour d'un rectangle arrondi, en points (les coins en six reprises du pinceau). */
@@ -279,14 +289,16 @@ function bordure(x0: number, y0: number, x1: number, y1: number, ep: number, pas
   for (const [x, y] of [[x0 + c, y0 + c], [x1 - c, y0 + c], [x1 - c, y1 - c], [x0 + c, y1 - c]] as Pt[]) p.plein += point(x, y, 5.5, rnd);
 }
 
-/** Les rangs de la grille du dos (le médaillon au centre, le bandeau du logotype sous lui). */
-const GRILLE = { haut: 90, champ: 334, bandeau: 1146, bas: LOGOTYPE_DOS.cy + 76, fin: H - 90 };
+/** Les rangs de la grille du dos : le grand champ de l'éléphant et de la lune, le bandeau du logotype, un rang de cases. */
+const GRILLE = { champ: 90, bandeau: 1146, bas: LOGOTYPE_DOS.cy + 76, fin: H - 90 };
+/** Le cercle de coton nu autour de la lune (366 pour une lune de 300, à l'échelle de LUNE_CI). */
+const R_LUNE = Math.round((366 * LUNE_CI.d) / 300);
 
 /** La toile du dos : les bandes et leurs coutures, la bordure, la grille peinte, les bandes baoulé des bords. */
 function toile(graine: number): Toile {
   return memo(`dos-${graine}`, () => {
     const rnd = alea(graine ^ 0x6b6f);
-    const t: Toile = { ...vide(), coutures: "", points: "", reserves: "", ikat: "", bordure: vide() };
+    const t: Toile = { ...vide(), coutures: "", points: "", reserves: "", ikat: "", bordure: vide(), champ: vide(), sol: vide() };
     // Les coutures des bandes, au fil brun, à points réguliers.
     for (let k = 1; k < BANDES; k++) {
       const x = k * LB;
@@ -312,7 +324,7 @@ function toile(graine: number): Toile {
     const bx0 = LB / 2 + 8;
     const bx1 = W - LB / 2 - 8;
     bordure(bx0, 34, bx1, H - 34, 44, 46, 46, rnd, t.bordure);
-    // La grille peinte : un rang de trois cases en haut, le grand champ du médaillon, le bandeau, un rang en bas.
+    // La grille peinte : le grand champ, le bandeau, un rang de trois cases en bas.
     const gx0 = bx0 + 56;
     const gx1 = bx1 - 56;
     const n = 3;
@@ -324,21 +336,24 @@ function toile(graine: number): Toile {
     }
     let k = 0;
     const cadre = (x: number, y: number, l: number, h: number) => ligne([[x, y], [x + l, y], [x + l, y + h], [x, y + h], [x, y]], rnd, 2.6);
-    for (const [y, h] of [[GRILLE.haut, GRILLE.champ - GRILLE.haut], [GRILLE.bas, GRILLE.fin - GRILLE.bas]] as Pt[])
+    for (const [y, h] of [[GRILLE.bas, GRILLE.fin - GRILLE.bas]] as Pt[])
       for (let c = 0; c < n; c++) {
         const x = gx0 + c * lc;
         t.appuye += cadre(x, y, lc, h);
         CASES[ordre[k++ % ordre.length]](x + 4, y + 4, x + lc - 4, y + h - 4, rnd, t);
       }
-    // Le grand champ : hachuré en quatre quartiers qui se répondent ; le médaillon s'y pose.
+    // Le grand champ : hachuré en quatre quartiers qui se répondent autour de la lune ; l'éléphant y marche.
     const y0 = GRILLE.champ;
     const y1 = GRILLE.bandeau;
     const mx = (gx0 + gx1) / 2;
-    const my = CENTRE_DOS.cy;
+    const my = LUNE_CI.cy;
     t.appuye += cadre(gx0, y0, gx1 - gx0, y1 - y0);
-    t.lavis += `M${gx0 + 8} ${y0 + 8}H${gx1 - 8}V${y1 - 8}H${gx0 + 8}Z`;
-    t.fin += hachures(gx0 + 12, y0 + 12, mx - 3, my - 3, -Math.PI / 4, 12, rnd) + hachures(mx + 3, y0 + 12, gx1 - 12, my - 3, Math.PI / 4, 12, rnd);
-    t.fin += hachures(gx0 + 12, my + 3, mx - 3, y1 - 12, Math.PI / 4, 12, rnd) + hachures(mx + 3, my + 3, gx1 - 12, y1 - 12, -Math.PI / 4, 12, rnd);
+    t.champ.lavis += `M${gx0 + 8} ${y0 + 8}H${gx1 - 8}V${y1 - 8}H${gx0 + 8}Z`;
+    t.champ.fin += hachures(gx0 + 12, y0 + 12, mx - 3, my - 3, -Math.PI / 4, 13, rnd) + hachures(mx + 3, y0 + 12, gx1 - 12, my - 3, Math.PI / 4, 13, rnd);
+    t.champ.fin += hachures(gx0 + 12, my + 3, mx - 3, SOL_CI.y - 8, Math.PI / 4, 13, rnd) + hachures(mx + 3, my + 3, gx1 - 12, SOL_CI.y - 8, -Math.PI / 4, 13, rnd);
+    // Le sol : un trait appuyé, et dessous, jusqu'au cadre, une échelle de traits courts.
+    t.sol.appuye += ligne([[gx0, SOL_CI.y], [mx, SOL_CI.y + (rnd() - 0.5) * 3], [gx1, SOL_CI.y]], rnd, 2.4);
+    for (let x = gx0 + 9; x < gx1 - 4; x += 9) t.sol.fin += trait(x, SOL_CI.y + 6, x - 3, y1 - 6, rnd, 1.2);
     return t;
   });
 }
@@ -380,6 +395,97 @@ function Coton({ id, pas }: { id: string; pas: number }) {
   );
 }
 
+/* --------------------------------- Le coton -------------------------------- */
+
+interface Filature {
+  /** Le ton de chaque bande (un écheveau n'est jamais tout à fait le même). */
+  tons: number[];
+  /** Les flammes du fil filé main : des grosseurs, plus sombres ou plus claires. */
+  flammes: string;
+  claires: string;
+  /** Le relief des coutures : la lèvre de lumière, à côté du fil. */
+  levres: string;
+  /** La boue passée : quelques plages où la toile a servi (le dos seulement). */
+  usures: [number, number, number][];
+}
+
+/** Le coton d'une carte : stable pour une même graine. */
+function fil(graine: number, face: boolean): Filature {
+  return memo(`fil-${face ? "f" : "d"}-${graine}`, () => {
+    const rnd = alea(graine ^ 0x636f74);
+    const tons = Array.from({ length: BANDES }, () => rnd());
+    let flammes = "";
+    let claires = "";
+    const y0 = face ? BANDE : 0;
+    const n = face ? 90 : 240;
+    for (let i = 0; i < n; i++) {
+      const x = rnd() * W;
+      const y = y0 + rnd() * (H - y0);
+      const l = 6 + rnd() * 22;
+      const d = `M${f(x)} ${f(y)}h${f(l)}`;
+      if (rnd() < 0.62) flammes += d;
+      else claires += d;
+    }
+    let levres = "";
+    for (let k = 1; k < BANDES; k++) levres += `M${f(k * LB - 2.2)} ${y0}V${H}`;
+    const usures: [number, number, number][] = face
+      ? []
+      : [
+          [150 + rnd() * 120, 1300 + rnd() * 220, 150 + rnd() * 60],
+          [740 + rnd() * 140, 120 + rnd() * 200, 140 + rnd() * 60],
+          [260 + rnd() * 500, 930 + rnd() * 120, 110 + rnd() * 50],
+        ];
+    return { tons, flammes, claires, levres, usures };
+  });
+}
+
+/** Le fond de coton : le grain de chaîne et de trame, le ton des bandes, les flammes, le relief des coutures. */
+function Fil({ f: fl, m, id }: { f: Filature; m: { clair: string; fonce: string }; id: string }) {
+  return (
+    <>
+      <defs>
+        <Coton id={`kh-c-${id}`} pas={5} />
+        <linearGradient id={`kh-b-${id}`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor={LAVIS} stopOpacity={0.07} />
+          <stop offset="0.12" stopColor={LAVIS} stopOpacity={0} />
+          <stop offset="0.88" stopColor={LAVIS} stopOpacity={0} />
+          <stop offset="1" stopColor={LAVIS} stopOpacity={0.08} />
+        </linearGradient>
+      </defs>
+      {fl.tons.map((t, k) => (
+        <rect key={k} x={k * LB} y={0} width={LB} height={H} fill={LAVIS} opacity={0.012 + t * 0.04} />
+      ))}
+      {/* Chaque bande se bombe un peu entre ses deux coutures. */}
+      {fl.tons.map((_, k) => (
+        <rect key={`b${k}`} x={k * LB} y={0} width={LB} height={H} fill={`url(#kh-b-${id})`} />
+      ))}
+      <rect width={W} height={H} fill={`url(#kh-c-${id})`} />
+      <path d={fl.flammes} stroke={LAVIS} strokeWidth={1.5} opacity={0.16} strokeLinecap="round" />
+      <path d={fl.claires} stroke="#fffaf0" strokeWidth={1.6} opacity={0.55} strokeLinecap="round" />
+      <path d={fl.levres} stroke={m.clair} strokeWidth={1.4} />
+    </>
+  );
+}
+
+/** La boue passée : des plages où le coton remonte sous la peinture. */
+function Usure({ f: fl, id }: { f: Filature; id: string }) {
+  if (!fl.usures.length) return null;
+  return (
+    <>
+      <defs>
+        <radialGradient id={`kh-u-${id}`}>
+          <stop offset="0" stopColor={ECRU} stopOpacity={0.42} />
+          <stop offset="0.6" stopColor={ECRU} stopOpacity={0.16} />
+          <stop offset="1" stopColor={ECRU} stopOpacity={0} />
+        </radialGradient>
+      </defs>
+      {fl.usures.map(([x, y, r], k) => (
+        <ellipse key={k} cx={x} cy={y} rx={r} ry={r * 0.7} fill={`url(#kh-u-${id})`} />
+      ))}
+    </>
+  );
+}
+
 function Peint({ p, force = 1 }: { p: Peinture; force?: number }) {
   return (
     <g strokeLinecap="round" fill="none">
@@ -397,10 +503,7 @@ function Korhogo({ cote, m, graine, id }: PropsMotifNation) {
     const fc = face(graine);
     return (
       <>
-        <defs>
-          <Coton id={`kh-c-${id}`} pas={5} />
-        </defs>
-        <rect width={W} height={H} fill={`url(#kh-c-${id})`} />
+        <Fil f={fil(graine, true)} m={m} id={id} />
         <path d={fc.coutures} stroke={m.fonce} strokeWidth={2.2} />
         <path d={fc.points} stroke={FIL} strokeWidth={1.6} opacity={0.5} strokeLinecap="round" />
         <Peint p={fc.champs} force={0.13} />
@@ -410,13 +513,15 @@ function Korhogo({ cote, m, graine, id }: PropsMotifNation) {
   }
 
   const t = toile(graine);
-  const { cx, cy } = CENTRE_DOS;
+  const { cx, cy } = LUNE_CI;
   const rnd = alea(graine ^ 0x6c75);
   const bandeau = { y: GRILLE.bandeau, h: GRILLE.bas - GRILLE.bandeau };
+  const fl = fil(graine, false);
   let rond = "";
-  for (let k = 0; k < 72; k++) {
-    const a = (k / 72) * Math.PI * 2;
-    rond += point(cx + 344 * Math.cos(a), cy + 344 * Math.sin(a), 3.6, rnd);
+  const nr = Math.round((72 * R_LUNE) / 366);
+  for (let k = 0; k < nr; k++) {
+    const a = (k / nr) * Math.PI * 2;
+    rond += point(cx + (R_LUNE - 22) * Math.cos(a), cy + (R_LUNE - 22) * Math.sin(a), 3.6, rnd);
   }
   const cercle = (r: number) => {
     const pts: Pt[] = [];
@@ -431,15 +536,15 @@ function Korhogo({ cote, m, graine, id }: PropsMotifNation) {
   const bx1 = W - LB / 2 - 8;
   return (
     <>
-      <defs>
-        <Coton id={`kh-c-${id}`} pas={5} />
-      </defs>
-      <rect width={W} height={H} fill={`url(#kh-c-${id})`} />
+      <Fil f={fl} m={m} id={id} />
       <path d={t.coutures} stroke={m.fonce} strokeWidth={2.4} />
       <path d={t.points} stroke={FIL} strokeWidth={1.8} opacity={0.6} strokeLinecap="round" />
       <path d={t.ikat} stroke={BOUE} strokeWidth={2.6} opacity={0.78} />
       <Peint p={t.bordure} />
+      <Peint p={t.champ} force={0.5} />
+      <Peint p={t.sol} />
       <Peint p={t} />
+      <Usure f={fl} id={id} />
       {/* Le bandeau du logotype : le coton nu entre deux traits. */}
       <path
         d={trait(bx0 + 56, bandeau.y + 12, bx1 - 56, bandeau.y + 12, rnd, 2.4) + trait(bx0 + 56, bandeau.y + bandeau.h - 12, bx1 - 56, bandeau.y + bandeau.h - 12, rnd, 2.4)}
@@ -449,11 +554,11 @@ function Korhogo({ cote, m, graine, id }: PropsMotifNation) {
         strokeLinecap="round"
       />
       {/* Le cercle de coton nu autour de la lune : deux traits peints, un rang de points. */}
-      <circle cx={cx} cy={cy} r={366} fill={ECRU} />
-      <circle cx={cx} cy={cy} r={366} fill={`url(#kh-c-${id})`} />
+      <circle cx={cx} cy={cy} r={R_LUNE} fill={ECRU} />
+      <circle cx={cx} cy={cy} r={R_LUNE} fill={`url(#kh-c-${id})`} />
       <g fill="none" stroke={BOUE} strokeLinecap="round">
-        <path d={cercle(366)} strokeWidth={4.6} />
-        <path d={cercle(356)} strokeWidth={2} opacity={0.8} />
+        <path d={cercle(R_LUNE)} strokeWidth={4.6} />
+        <path d={cercle(R_LUNE - 10)} strokeWidth={2} opacity={0.8} />
       </g>
       <path d={rond} fill={BOUE} opacity={0.6} />
     </>

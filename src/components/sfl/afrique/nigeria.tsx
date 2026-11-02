@@ -16,8 +16,11 @@
 //   · le dos : l'étoffe entière, une grille de carrés réservés à l'amidon,
 //     chacun une géométrie simple (carrés emboîtés, semis de points, croix,
 //     échelle, chevrons, cercles peignés, losange, damier), tirée de la graine
-//     du joueur : une étoffe par carte ; la lisière rayée d'une bande
-//     d'aso-oke de chaque côté ; autour de la lune, une rosace en relief,
+//     du joueur : une étoffe par carte ; l'aigle (le totem, totems/nigeria.tsx)
+//     y freine, et les cases qu'il touche restent unies (entières ou rien,
+//     jamais un motif coupé par ses ailes) ; la lisière rayée d'une bande
+//     d'aso-oke de chaque côté ; autour de la lune, en haut à gauche sous son
+//     regard (LUNE_NG), une rosace en relief,
 //     comme les zayyana des façades hausa de Zaria : un bourrelet d'enduit,
 //     ses arêtes de poisson et des nœuds entrelacés (dagi), ton sur ton
 //     dans l'indigo.
@@ -27,7 +30,8 @@
 // à peine ; aucune silhouette de mosquée.
 
 import type { PropsMotifNation, SkinNation } from "./types";
-import { alea, BANDE, CENTRE_DOS, f, H, W } from "./outils";
+import { alea, BANDE, f, H, W } from "./outils";
+import { DECALE_NG, LUNE_NG, POSE_DOS_NG, SILHOUETTE_NG, sousAigleNG } from "./totems/nigeria";
 
 type Pt = [number, number];
 
@@ -199,10 +203,12 @@ function craquelures(zones: [number, number, number, number][], rnd: () => numbe
 
 /* ------------------------------- L'étoffe (dos) ------------------------------- */
 
-// La rosace : le bourrelet intérieur, l'extérieur, le cerne du médaillon.
-const R_IN = 334;
-const R_OUT = 392;
-const R_CERNE = 410;
+// La rosace : le bourrelet intérieur, l'extérieur, le cerne du médaillon (pour une lune
+// de 300 ; K les met à l'échelle de la lune, en haut à gauche sous le regard de l'aigle, LUNE_NG).
+const K = LUNE_NG.d / 300;
+const R_IN = 334 * K;
+const R_OUT = 392 * K;
+const R_CERNE = 410 * K;
 
 const MARGE = 60;
 const HAUT_GRILLE = { y0: 60, y1: 1128, rangs: 6 };
@@ -220,10 +226,16 @@ interface Etoffe {
 
 /** La part d'une case que le médaillon laisse voir. */
 function dehors(x: number, y: number, l: number, h: number): number {
-  const { cx, cy } = CENTRE_DOS;
+  const { cx, cy } = LUNE_NG;
   let n = 0;
   for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) if (Math.hypot(x + ((i + 0.5) * l) / 8 - cx, y + ((j + 0.5) * h) / 8 - cy) > R_CERNE + 30) n++;
   return n / 64;
+}
+
+/** Une case que l'aigle (le totem) touche : laissée unie, entière ou rien (jamais un motif coupé par ses ailes). */
+function sousAigle(x: number, y: number, l: number, h: number): boolean {
+  for (let i = 0; i <= 6; i++) for (let j = 0; j <= 6; j++) if (sousAigleNG(x + (i * l) / 6, y + (j * h) / 6, 14)) return true;
+  return false;
 }
 
 /** Le dos : la grille de cases, ses doubles traits et le semis de points entre eux. */
@@ -248,8 +260,8 @@ function etoffe(seed: number): Etoffe {
     while (g === gauche || g === dessus);
     choix.push(g);
     const c = peindre(g, x, y, cl, ch, rnd);
-    // Une case que le médaillon couvre presque : laissée unie (le tirage reste le même).
-    if (dehors(x, y, cl, ch) < 0.62) return;
+    // Une case que le médaillon couvre presque, ou que l'aigle touche : laissée unie (le tirage reste le même).
+    if (dehors(x, y, cl, ch) < 0.62 || sousAigle(x, y, cl, ch)) return;
     trait += c.trait;
     plein += c.plein;
     grains += c.grains;
@@ -296,18 +308,18 @@ interface Rosace {
  * cerne peint et son semis de points, comme le médaillon d'un adire.
  */
 function rosace(): Rosace {
-  const { cx, cy } = CENTRE_DOS;
-  const anneau = (r: number) => `M${f(cx - r)} ${f(cy)}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
+  const { cx, cy } = LUNE_NG;
+  const anneau = (r: number) => `M${f(cx - r)} ${f(cy)}a${f(r)} ${f(r)} 0 1 0 ${f(2 * r)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-2 * r)} 0`;
   const bourrelets = anneau(R_IN) + anneau(R_OUT);
   // Les arêtes de poisson : deux rangs d'incisions penchées en sens contraire.
   let incises = "";
-  const n = 120;
+  const n = Math.round(120 * K);
   const rm = (R_IN + R_OUT) / 2;
   for (let k = 0; k < n; k++) {
     const t = (k / n) * Math.PI * 2;
     const d = 0.03;
     const p = (r: number, a: number) => `${f(cx + Math.cos(a) * r)} ${f(cy + Math.sin(a) * r)}`;
-    incises += `M${p(R_IN + 8, t - d)}L${p(rm - 2, t)}M${p(R_OUT - 8, t - d)}L${p(rm + 2, t)}`;
+    incises += `M${p(R_IN + 8 * K, t - d)}L${p(rm - 2, t)}M${p(R_OUT - 8 * K, t - d)}L${p(rm + 2, t)}`;
   }
   let dagi = "";
   for (let k = 0; k < 8; k++) {
@@ -317,19 +329,19 @@ function rosace(): Rosace {
     for (let i = 0; i < 4; i++) {
       const a = t + (i * Math.PI) / 2;
       const ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux;
-      const p = (u: number, v: number) => `${f(rx + ux * u + vx * v)} ${f(ry + uy * u + vy * v)}`;
+      const p = (u: number, v: number) => `${f(rx + (ux * u + vx * v) * K)} ${f(ry + (uy * u + vy * v) * K)}`;
       dagi += `M${p(4, 5)}C${p(14, 13)} ${p(27, 12)} ${p(27, 0)}C${p(27, -12)} ${p(14, -13)} ${p(4, -5)}`;
     }
-    const s = 16;
+    const s = 16 * K;
     const lo: Pt[] = [0, 1, 2, 3].map((i) => {
       const a = t + Math.PI / 4 + (i * Math.PI) / 2;
       return [rx + Math.cos(a) * s * Math.SQRT2, ry + Math.sin(a) * s * Math.SQRT2];
     });
     dagi += `M${lo.map((q) => `${f(q[0])} ${f(q[1])}`).join("L")}Z`;
-    dagi += grain(rx, ry, 3.6);
+    dagi += grain(rx, ry, 3.6 * K);
   }
   const rnd = alea(0x2a51a);
-  const cerne = main(cercle(cx, cy, R_CERNE, 150), rnd, 1.4, true) + main(cercle(cx, cy, R_CERNE + 13, 150), rnd, 1.4, true);
+  const cerne = main(cercle(cx, cy, R_CERNE, 120), rnd, 1.4, true) + main(cercle(cx, cy, R_CERNE + 13, 120), rnd, 1.4, true);
   let semis = "";
   const ns = Math.round((2 * Math.PI * (R_CERNE + 6.5)) / 17);
   for (let k = 0; k < ns; k++) {
@@ -457,6 +469,54 @@ const LARGEUR_ASO = 113.8;
 
 /* --------------------------------- Le motif --------------------------------- */
 
+/**
+ * La teinture : une étoffe plongée bain après bain ne prend jamais l'indigo
+ * tout à fait égal (des nuages plus clairs, d'autres plus profonds), puis on
+ * la bat au maillet jusqu'au lustre ; et le fil filé main a ses grosseurs.
+ * Stable pour une même graine.
+ */
+function Teinture({ graine, id, face }: { graine: number; id: string; face: boolean }) {
+  const t = memo(`teinture:${face ? "f" : "d"}:${graine}`, () => {
+    const rnd = alea(graine ^ 0x7e1a7);
+    const y0 = face ? BANDE : 0;
+    const nuages = Array.from({ length: face ? 3 : 7 }, (_, i) => ({
+      x: rnd() * W,
+      y: y0 + rnd() * (H - y0),
+      r: 120 + rnd() * 200,
+      clair: i % 2 === 0,
+    }));
+    let fils = "";
+    for (let i = 0, n = face ? 70 : 180; i < n; i++) fils += `M${f(rnd() * W)} ${f(y0 + rnd() * (H - y0))}h${f(5 + rnd() * 18)}`;
+    return { nuages, fils };
+  });
+  return (
+    <>
+      <defs>
+        <radialGradient id={`tc-${id}`}>
+          <stop offset="0" stopColor="#33416a" stopOpacity={0.3} />
+          <stop offset="1" stopColor="#33416a" stopOpacity={0} />
+        </radialGradient>
+        <radialGradient id={`tf-${id}`}>
+          <stop offset="0" stopColor="#03050b" stopOpacity={0.42} />
+          <stop offset="1" stopColor="#03050b" stopOpacity={0} />
+        </radialGradient>
+        <linearGradient id={`tl-${id}`} gradientUnits="userSpaceOnUse" x1={0} y1={0} x2={W} y2={H}>
+          <stop offset="0.28" stopColor="#b8c6ea" stopOpacity={0} />
+          <stop offset="0.4" stopColor="#b8c6ea" stopOpacity={0.07} />
+          <stop offset="0.47" stopColor="#b8c6ea" stopOpacity={0.02} />
+          <stop offset="0.55" stopColor="#b8c6ea" stopOpacity={0.06} />
+          <stop offset="0.68" stopColor="#b8c6ea" stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      {t.nuages.map((n, i) => (
+        <ellipse key={i} cx={f(n.x)} cy={f(n.y)} rx={f(n.r)} ry={f(n.r * 0.72)} fill={`url(#${n.clair ? "tc" : "tf"}-${id})`} />
+      ))}
+      <rect width={W} height={H} fill={`url(#tl-${id})`} />
+      <path d={t.fils} stroke={`rgba(${RESERVE},0.07)`} strokeWidth={1.4} strokeLinecap="round" />
+    </>
+  );
+}
+
 function Adire({ cote, m, graine, id }: PropsMotifNation) {
   const dos = cote === "dos";
   const ton = (c: "s" | "k" | "w", force: number) =>
@@ -484,7 +544,8 @@ function Adire({ cote, m, graine, id }: PropsMotifNation) {
             <path d="M-2 6L3 12M-2 26L3 32" stroke={`rgba(${SANYAN},0.14)`} strokeWidth={1.2} />
           </pattern>
         </defs>
-        {/* Le fil de l'étoffe teinte, à peine */}
+        {/* Le fil de l'étoffe teinte, à peine ; la teinture inégale, le lustre du battage */}
+        <Teinture graine={graine} id={id} face />
         <rect width={W} height={H} fill={`url(#tr-${id})`} />
         <defs>
           <pattern id={`tr-${id}`} width={6} height={6} patternUnits="userSpaceOnUse">
@@ -508,7 +569,7 @@ function Adire({ cote, m, graine, id }: PropsMotifNation) {
 
   const e = memo(`etoffe:${graine}`, () => etoffe(graine));
   const r = memo("rosace", rosace);
-  const { cx, cy } = CENTRE_DOS;
+  const { cx, cy } = LUNE_NG;
   const relief = (d: string, w: number, cle: string, plein = false) => (
     <g key={cle} strokeLinecap="round" strokeLinejoin="round">
       <path d={d} fill={plein ? "rgba(0,0,0,0.55)" : "none"} stroke="rgba(0,0,0,0.6)" strokeWidth={w + 2} transform="translate(2 3)" />
@@ -522,6 +583,10 @@ function Adire({ cote, m, graine, id }: PropsMotifNation) {
         <mask id={`am-${id}`}>
           <rect width={W} height={H} fill="#fff" />
           <circle cx={cx} cy={cy} r={R_CERNE + 30} fill="#000" />
+          {/* L'aigle (le totem) : l'étoffe s'arrête un peu avant lui. */}
+          <g transform={`translate(${POSE_DOS_NG.x} ${POSE_DOS_NG.y}) scale(${POSE_DOS_NG.echelle}) ${DECALE_NG}`} fill="#000" stroke="#000" strokeWidth={34} strokeLinejoin="round">
+            <path d={SILHOUETTE_NG} />
+          </g>
         </mask>
         <clipPath id={`ac-${id}`}>
           <path d={e.plein} />
@@ -536,7 +601,8 @@ function Adire({ cote, m, graine, id }: PropsMotifNation) {
         </pattern>
       </defs>
 
-      {/* Le fil de l'étoffe */}
+      {/* Le fil de l'étoffe, la teinture inégale des bains, le lustre du battage */}
+      <Teinture graine={graine} id={id} face={false} />
       <rect width={W} height={H} fill={`url(#tr-${id})`} />
 
       {/* Les lisières : une bande d'aso-oke de chaque côté */}
@@ -569,9 +635,9 @@ function Adire({ cote, m, graine, id }: PropsMotifNation) {
       {/* La rosace de Zaria, ton sur ton : les arêtes de poisson, les bourrelets, les nœuds */}
       <path d={r.incises} stroke="rgba(0,0,0,0.65)" strokeWidth={3} strokeLinecap="round" />
       <path d={r.incises} stroke={`rgba(${RESERVE},0.22)`} strokeWidth={1.3} strokeLinecap="round" transform="translate(-0.9 -1.1)" />
-      {relief(r.bourrelets, 9, "b")}
-      <path d={r.dagi} fill="none" stroke={INDIGO.milieu} strokeWidth={11} strokeLinejoin="round" />
-      {relief(r.dagi, 4.4, "d")}
+      {relief(r.bourrelets, 9 * K, "b")}
+      <path d={r.dagi} fill="none" stroke={INDIGO.milieu} strokeWidth={11 * K} strokeLinejoin="round" />
+      {relief(r.dagi, 4.4 * K, "d")}
     </>
   );
 }

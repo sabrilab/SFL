@@ -15,12 +15,28 @@
 //   · le dos : la même étoffe ; autour de la lune, une vannerie spiralée de
 //     l'Ouganda, ses rangs de spires enroulées de fibre, où les fibres teintes
 //     en noir de fumée tournent d'un rang à l'autre ; plus bas, une seconde
-//     couture.
+//     couture ;
+//   · le totem (totems/ouganda.tsx, 02/11/2026) : la grue royale couronnée,
+//     cousue en pièces rapportées, debout à gauche ; la lune et sa vannerie
+//     (six rangs, serrés sur la lune) montent en haut à droite, devant son bec
+//     (LUNE_OUGANDA) ; une couture passe sous ses pieds et devient le sol : le
+//     logotype est sur la pièce du milieu, entre elle et la couture du bas ;
+//   · l'écorce va plus loin : des paquets de rainures fines là où le maillet
+//     a battu à plat, et des jours, où l'écorce plus mince s'ouvre en un
+//     réseau lâche de fibres ; tirés de la graine.
 // Ce qu'on évite : les tombeaux royaux de Kasubi et les regalia, et tout ce
 // qui touche aux usages funéraires de l'étoffe.
 
 import type { PropsMotifNation, SkinNation } from "./types";
-import { alea, BANDE, CENTRE_DOS, f, H, PORTRAIT, W } from "./outils";
+import { alea, BANDE, f, H, PORTRAIT, W } from "./outils";
+import { LUNE_OUGANDA } from "./totems/ouganda";
+
+/** La lune et la vannerie au dos : montées en haut à droite, devant le bec de la grue (totems/ouganda.tsx). */
+const CENTRE_DOS = { cx: LUNE_OUGANDA.cx, cy: LUNE_OUGANDA.cy } as const;
+/** Au dos, la couture du sol : sous les pieds de la grue (totems/ouganda.tsx, pose.dos : y −4 + 958 × 1,2). */
+const SOL_OUGANDA = 1146;
+/** L'échelle de la vannerie : la lune passe de 300 à LUNE_OUGANDA.d. */
+const K = LUNE_OUGANDA.d / 300;
 
 type Pt = [number, number];
 
@@ -90,6 +106,9 @@ function stries(seed: number): {
   sombres: string;
   fines: string;
   nuees: { x: number; y: number; rx: number; ry: number; a: number; clair: boolean }[];
+  frappes: string;
+  trame: string;
+  jours: { x: number; y: number; rx: number; ry: number }[];
 } {
   const rnd = alea(seed ^ 0x0b0a5c1e);
   let claires = "";
@@ -130,7 +149,39 @@ function stries(seed: number): {
       clair: rnd() < 0.45,
     });
   }
-  return { claires, sombres, fines, nuees };
+  // Les frappes du maillet rainuré : des paquets de quatre ou cinq rainures
+  // fines et parallèles, un peu de biais, là où l'écorce a été battue à plat.
+  let frappes = "";
+  for (let i = 0; i < 70; i++) {
+    const x0 = rnd() * W;
+    const y0 = rnd() * H;
+    const a = (rnd() - 0.5) * 0.24;
+    const l = 30 + rnd() * 70;
+    const n = 4 + Math.floor(rnd() * 2);
+    for (let k = 0; k < n; k++) {
+      const yy = y0 + k * 2.3;
+      frappes += `M${f(x0)} ${f(yy)}L${f(x0 + Math.cos(a) * l)} ${f(yy + Math.sin(a) * l)}`;
+    }
+  }
+  // Les jours : là où l'écorce est la plus mince, ses fibres s'écartent en
+  // un réseau lâche où passe la lumière.
+  const jours: { x: number; y: number; rx: number; ry: number }[] = [];
+  let trame = "";
+  for (let i = 0; i < 7; i++) {
+    const j = { x: 60 + rnd() * (W - 120), y: 60 + rnd() * (H - 120), rx: 26 + rnd() * 40, ry: 8 + rnd() * 12 };
+    jours.push(j);
+    for (let k = 0; k < 26; k++) {
+      const u = (rnd() - 0.5) * 2;
+      const v = (rnd() - 0.5) * 2;
+      if (u * u + v * v > 1) continue;
+      const x = j.x + u * j.rx;
+      const y = j.y + v * j.ry;
+      const a = (rnd() < 0.5 ? -1 : 1) * (0.15 + rnd() * 0.35);
+      const l = 8 + rnd() * 16;
+      trame += `M${f(x - (Math.cos(a) * l) / 2)} ${f(y - (Math.sin(a) * l) / 2)}L${f(x + (Math.cos(a) * l) / 2)} ${f(y + (Math.sin(a) * l) / 2)}`;
+    }
+  }
+  return { claires, sombres, fines, nuees, frappes, trame, jours };
 }
 
 /* -------------------------------- La couture -------------------------------- */
@@ -232,9 +283,10 @@ function ourlet(seed: number, dos: boolean): { bande: string; bords: string; poi
  */
 function vannerie(): { nature: string; fumee: string; ocre: string; sillons: string } {
   const { cx, cy } = CENTRE_DOS;
-  const r0 = 334;
-  const rangs = 8;
-  const h = 11.5;
+  // Au dos de la grue, la vannerie serre la lune de plus près, en six rangs.
+  const r0 = 326 * K;
+  const rangs = 6;
+  const h = 11.5 * K;
   const bandes = 12;
   let nature = "";
   let fumee = "";
@@ -242,11 +294,11 @@ function vannerie(): { nature: string; fumee: string; ocre: string; sillons: str
   let sillons = "";
   for (let i = 0; i < rangs; i++) {
     const rm = r0 + i * h + h / 2;
-    const n = Math.round((2 * Math.PI * rm) / 4.6);
+    const n = Math.round((2 * Math.PI * rm) / (4.6 * K));
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2;
       // Un tour de fibre : légèrement penché, comme la fibre qui s'enroule.
-      const d = 0.7 / rm;
+      const d = (0.7 * K) / rm;
       const t = `M${f(cx + Math.cos(a - d) * (rm - h * 0.4))} ${f(cy + Math.sin(a - d) * (rm - h * 0.4))}L${f(cx + Math.cos(a + d) * (rm + h * 0.4))} ${f(cy + Math.sin(a + d) * (rm + h * 0.4))}`;
       const u = (((a / (Math.PI * 2)) * bandes + i * 0.11) % 1 + 1) % 1;
       if (i === rangs - 1 || i === 0) ocre += t;
@@ -279,7 +331,8 @@ function Ecorce({ cote, m, graine, id }: PropsMotifNation) {
   const co = memo(`co:${graine}:${yCouture}`, () => couture(graine, yCouture));
   const v = memo("vannerie", vannerie);
   const ou = memo(`ou:${graine}:${dos ? 1 : 0}`, () => ourlet(graine, dos));
-  const haut = dos ? memo(`ch:${graine}`, () => couture(graine ^ 0x7091, H - 292)) : null;
+  // Au dos, une seconde couture sous les pieds de la grue (totems/ouganda.tsx) : elle devient le sol.
+  const sol = dos ? memo(`ch:${graine}`, () => couture(graine ^ 0x7091, SOL_OUGANDA)) : null;
   return (
     <>
       <defs>
@@ -301,7 +354,13 @@ function Ecorce({ cote, m, graine, id }: PropsMotifNation) {
       {st.nuees.map((n, i) => (
         <ellipse key={i} cx={f(n.x)} cy={f(n.y)} rx={f(n.rx)} ry={f(n.ry)} fill={`url(#${n.clair ? "en" : "es"}-${id})`} opacity={f(n.a * 100) / 100} />
       ))}
-      {/* Les stries du maillet rainuré */}
+      {/* Les jours : l'écorce plus mince, son réseau lâche de fibres */}
+      {st.jours.map((j, i) => (
+        <ellipse key={`j${i}`} cx={f(j.x)} cy={f(j.y)} rx={f(j.rx)} ry={f(j.ry)} fill={`url(#en-${id})`} opacity={0.22} />
+      ))}
+      <path d={st.trame} fill="none" stroke={`rgba(${IVOIRE},0.13)`} strokeWidth={0.8} />
+      {/* Les frappes du maillet rainuré, puis ses stries */}
+      <path d={st.frappes} fill="none" stroke={m.fonce} strokeWidth={0.8} opacity={0.75} />
       <path d={st.fines} fill="none" stroke={m.fonce} strokeWidth={0.9} opacity={0.7} />
       <path d={st.sombres} fill="none" stroke={m.fonce} strokeWidth={1.6} />
       <path d={st.claires} fill="none" stroke={m.clair} strokeWidth={1.1} />
@@ -316,15 +375,15 @@ function Ecorce({ cote, m, graine, id }: PropsMotifNation) {
       <path d={co.points} fill="none" stroke={`rgba(${IVOIRE},0.72)`} strokeWidth={2.5} strokeLinecap="round" />
       <path d={co.points} fill="none" stroke="rgba(255,250,236,0.5)" strokeWidth={1} strokeLinecap="round" transform="translate(-0.6 -0.8)" />
 
-      {haut && (
-        <g transform={`translate(0 ${H}) scale(1 -1)`}>
-          {/* Au dos, une troisième pièce en haut, cousue de même */}
-          <path d={haut.piece} fill={`url(#ep-${id})`} />
-          <path d={haut.bord} fill="none" stroke="rgba(30,10,4,0.4)" strokeWidth={5} transform="translate(0 3)" />
-          <path d={haut.bord} fill="none" stroke={`rgba(${OCRE},0.5)`} strokeWidth={1.6} />
-          <path d={haut.fibres} fill="none" stroke={`rgba(${OCRE},0.45)`} strokeWidth={0.9} />
-          <path d={haut.ombres} fill="none" stroke="rgba(30,10,4,0.5)" strokeWidth={4} strokeLinecap="round" />
-          <path d={haut.points} fill="none" stroke={`rgba(${IVOIRE},0.72)`} strokeWidth={2.5} strokeLinecap="round" />
+      {sol && (
+        <g>
+          {/* Au dos, la couture du sol, sous les pieds de la grue : la pièce du dessous, un peu plus sombre */}
+          <path d={sol.piece} fill={`url(#ep-${id})`} />
+          <path d={sol.bord} fill="none" stroke="rgba(30,10,4,0.4)" strokeWidth={5} transform="translate(0 3)" />
+          <path d={sol.bord} fill="none" stroke={`rgba(${OCRE},0.5)`} strokeWidth={1.6} />
+          <path d={sol.fibres} fill="none" stroke={`rgba(${OCRE},0.45)`} strokeWidth={0.9} />
+          <path d={sol.ombres} fill="none" stroke="rgba(30,10,4,0.5)" strokeWidth={4} strokeLinecap="round" />
+          <path d={sol.points} fill="none" stroke={`rgba(${IVOIRE},0.72)`} strokeWidth={2.5} strokeLinecap="round" />
         </g>
       )}
 
@@ -337,11 +396,11 @@ function Ecorce({ cote, m, graine, id }: PropsMotifNation) {
       {dos && (
         <>
           {/* La vannerie spiralée, autour de la lune */}
-          <circle cx={CENTRE_DOS.cx} cy={CENTRE_DOS.cy} r={334 + 8 * 11.5 + 4} fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth={8} />
-          <path d={v.nature} stroke={`rgba(${IVOIRE},0.62)`} strokeWidth={2.4} strokeLinecap="round" />
-          <path d={v.fumee} stroke={`rgba(${FUMEE},0.92)`} strokeWidth={2.4} strokeLinecap="round" />
-          <path d={v.ocre} stroke={`rgba(${OCRE},0.85)`} strokeWidth={2.4} strokeLinecap="round" />
-          <path d={v.sillons} fill="none" stroke="rgba(0,0,0,0.42)" strokeWidth={1.4} />
+          <circle cx={CENTRE_DOS.cx} cy={CENTRE_DOS.cy} r={(326 + 6 * 11.5 + 4) * K} fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth={8 * K} />
+          <path d={v.nature} stroke={`rgba(${IVOIRE},0.62)`} strokeWidth={2.4 * K + 0.3} strokeLinecap="round" />
+          <path d={v.fumee} stroke={`rgba(${FUMEE},0.92)`} strokeWidth={2.4 * K + 0.3} strokeLinecap="round" />
+          <path d={v.ocre} stroke={`rgba(${OCRE},0.85)`} strokeWidth={2.4 * K + 0.3} strokeLinecap="round" />
+          <path d={v.sillons} fill="none" stroke="rgba(0,0,0,0.42)" strokeWidth={1.2} />
         </>
       )}
     </>

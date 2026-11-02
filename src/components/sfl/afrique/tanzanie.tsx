@@ -15,12 +15,26 @@
 //     peine sur la bande du bas ;
 //   · le dos : le mji en grand, un médaillon de lobes autour de la lune, et le
 //     jina sous le logotype, qui porte le nom du joueur. Jamais un proverbe :
-//     on n'invente pas un dicton swahili.
+//     on n'invente pas un dicton swahili ;
+//   · le totem (totems/tanzanie.tsx, 02/11/2026) : la girafe masaï peinte à la
+//     manière tingatinga, le cou tendu vers la lune ; la lune et son médaillon
+//     montent en haut à droite, au bout de son museau (LUNE_TANZANIE) ; au
+//     dos, le microtexte se fait discret (0,02) ;
+//   · le coton a vécu : les flammes du fil, la teinture passée par endroits,
+//     l'ombre d'un second passage sous chaque point du mji, et, au dos, les
+//     plis du pliage en quatre puis en huit (la face reste calme) ; tirés de
+//     la graine.
 // Ce qu'on évite : les animaux de la tingatinga, un proverbe inventé ou mal
 // traduit, le laiton (l'or reste aux cartes MVP).
 
 import type { PropsMotifNation, SkinNation } from "./types";
-import { CENTRE_DOS, f, H, W } from "./outils";
+import { alea, f, H, W } from "./outils";
+import { LUNE_TANZANIE } from "./totems/tanzanie";
+
+/** La lune et le médaillon au dos : montés en haut à droite, au bout du museau de la girafe (totems/tanzanie.tsx). */
+const CENTRE_DOS = { cx: LUNE_TANZANIE.cx, cy: LUNE_TANZANIE.cy } as const;
+/** L'échelle du médaillon : la lune passe de 300 à LUNE_TANZANIE.d. */
+const K = LUNE_TANZANIE.d / 300;
 
 type Pt = [number, number];
 
@@ -166,7 +180,7 @@ const PAS_MJI = 34;
 function medaillon(): { longs: string; pointilles: string; courts: string; coeurs: string } {
   const { cx, cy } = CENTRE_DOS;
   const n = 20;
-  const r0 = 338;
+  const r0 = 338 * K;
   let longs = "";
   let pointilles = "";
   let courts = "";
@@ -182,20 +196,54 @@ function medaillon(): { longs: string; pointilles: string; courts: string; coeur
   };
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 - Math.PI / 2;
-    longs += petale(a, r0, 426, 33);
-    pointilles += petale(a, r0 + 16, 407, 18);
+    longs += petale(a, r0, 426 * K, 33 * K);
+    pointilles += petale(a, r0 + 16 * K, 407 * K, 18 * K);
     const a2 = a + Math.PI / n;
-    courts += petale(a2, r0 + 4, 392, 18);
-    const [hx, hy] = P(404, a2);
-    coeurs += `M${f(hx - 4.2)} ${f(hy)}a4.2 4.2 0 1 0 8.4 0a4.2 4.2 0 1 0 -8.4 0`;
+    courts += petale(a2, r0 + 4 * K, 392 * K, 18 * K);
+    const [hx, hy] = P(404 * K, a2);
+    const rc = 4.2 * K + 0.6;
+    coeurs += `M${f(hx - rc)} ${f(hy)}a${f(rc)} ${f(rc)} 0 1 0 ${f(2 * rc)} 0a${f(rc)} ${f(rc)} 0 1 0 ${f(-2 * rc)} 0`;
   }
   return { longs, pointilles, courts, coeurs };
 }
 
+/* --------------------------------- Le coton --------------------------------- */
+
+/**
+ * Le coton d'un kanga qu'on a porté et plié : les flammes du fil (des bouts
+ * de trame plus épais), les plis du pliage en quatre puis en huit, un peu
+ * gondolés, et la teinture passée par endroits. Tiré de la graine : chaque
+ * étoffe a été pliée et portée à sa façon.
+ */
+function coton(seed: number): { flammes: string; plis: string; passe: { x: number; y: number; rx: number; ry: number; a: number }[] } {
+  const rnd = alea(seed ^ 0x6b616e67);
+  let flammes = "";
+  for (let i = 0; i < 420; i++) {
+    const x = rnd() * W;
+    const y = rnd() * H;
+    const l = 6 + rnd() * 22;
+    flammes += `M${f(x)} ${f(y)}h${f(l)}`;
+  }
+  const pli = (vertical: boolean, c: number) => {
+    let d = "";
+    const L = vertical ? H : W;
+    for (let t = -10, k = 0; t <= L + 10; t += 60, k++) {
+      const o = c + (rnd() - 0.5) * 3;
+      d += vertical ? `${k ? "L" : "M"}${f(o)} ${t}` : `${k ? "L" : "M"}${t} ${f(o)}`;
+    }
+    return d;
+  };
+  const plis = pli(true, W / 2 + (rnd() - 0.5) * 16) + pli(false, H / 2 + (rnd() - 0.5) * 20) + pli(false, H / 4 + (rnd() - 0.5) * 20) + pli(false, (3 * H) / 4 + (rnd() - 0.5) * 20);
+  const passe: { x: number; y: number; rx: number; ry: number; a: number }[] = [];
+  for (let i = 0; i < 7; i++) passe.push({ x: rnd() * W, y: rnd() * H, rx: 90 + rnd() * 200, ry: 50 + rnd() * 120, a: 0.035 + rnd() * 0.04 });
+  return { flammes, plis, passe };
+}
+
 /* --------------------------------- Le motif --------------------------------- */
 
-function Kanga({ cote, m, nom, id }: PropsMotifNation) {
+function Kanga({ cote, m, nom, graine, id }: PropsMotifNation) {
   const dos = cote === "dos";
+  const co = memo(`coton:${graine}`, () => coton(graine));
   const p = memo("pindo", pindo);
   const md = memo("medaillon", medaillon);
   const jina = dos && nom ? nom.toLocaleUpperCase("fr-FR") : null;
@@ -204,6 +252,9 @@ function Kanga({ cote, m, nom, id }: PropsMotifNation) {
     <>
       <defs>
         <pattern id={`mji-${id}`} width={PAS_MJI} height={PAS_MJI} patternUnits="userSpaceOnUse" x={W / 2} y={0}>
+          {/* L'impression : le point crème, et l'ombre d'un second passage un peu décalé */}
+          <circle cx={PAS_MJI / 4 + 0.9} cy={PAS_MJI / 4 + 1} r={dos ? 2.4 : 2} fill="rgba(0,0,0,0.22)" />
+          <circle cx={(PAS_MJI * 3) / 4 + 0.9} cy={(PAS_MJI * 3) / 4 + 1} r={dos ? 2.4 : 2} fill="rgba(0,0,0,0.22)" />
           <circle cx={PAS_MJI / 4} cy={PAS_MJI / 4} r={dos ? 2.4 : 2} fill={m.clair} />
           <circle cx={(PAS_MJI * 3) / 4} cy={(PAS_MJI * 3) / 4} r={dos ? 2.4 : 2} fill={m.clair} />
           <circle cx={(PAS_MJI * 3) / 4} cy={PAS_MJI / 4} r={1.1} fill={m.fonce} />
@@ -218,6 +269,10 @@ function Kanga({ cote, m, nom, id }: PropsMotifNation) {
         <mask id={`mm-${id}`}>
           <rect width={W} height={H} fill={`url(#mf-${id})`} />
         </mask>
+        <radialGradient id={`kp-${id}`}>
+          <stop offset="0" stopColor="#ffffff" stopOpacity={1} />
+          <stop offset="1" stopColor="#ffffff" stopOpacity={0} />
+        </radialGradient>
         <radialGradient id={`clou-${id}`} cx="0.38" cy="0.34" r="0.75">
           <stop offset="0" stopColor="#8e9792" />
           <stop offset="0.45" stopColor="#3a413d" />
@@ -225,8 +280,23 @@ function Kanga({ cote, m, nom, id }: PropsMotifNation) {
         </radialGradient>
       </defs>
 
+      {/* Le coton : la teinture passée par endroits, les flammes du fil */}
+      {co.passe.map((e, i) => (
+        <ellipse key={`p${i}`} cx={f(e.x)} cy={f(e.y)} rx={f(e.rx)} ry={f(e.ry)} fill={`url(#kp-${id})`} opacity={f(e.a * 100) / 100} />
+      ))}
+      <path d={co.flammes} fill="none" stroke="rgba(255,255,255,0.045)" strokeWidth={1.6} strokeLinecap="round" />
+
       {/* Le mji : le semis de points (sur la face, à peine sous le portrait) */}
       <rect width={W} height={H} fill={`url(#mji-${id})`} mask={`url(#mm-${id})`} />
+
+      {/* Les plis du pliage, au dos : un pli creux, sa lèvre claire (la face reste calme) */}
+      {dos && (
+        <>
+          <path d={co.plis} fill="none" stroke="rgba(255,255,255,0.035)" strokeWidth={16} />
+          <path d={co.plis} fill="none" stroke="rgba(0,0,0,0.2)" strokeWidth={1.3} />
+          <path d={co.plis} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={1} transform="translate(1.6 1.6)" />
+        </>
+      )}
 
       {dos && (
         <>
@@ -236,8 +306,8 @@ function Kanga({ cote, m, nom, id }: PropsMotifNation) {
           <path d={md.pointilles} fill="none" stroke={`rgba(${CREME},0.9)`} strokeWidth={3} {...pointille} />
           <path d={md.courts} fill={NOIR} stroke={`rgba(${CREME},0.55)`} strokeWidth={1.4} />
           <path d={md.coeurs} fill={`rgba(${CREME},0.8)`} />
-          <circle cx={CENTRE_DOS.cx} cy={CENTRE_DOS.cy} r={332} fill="none" stroke={NOIR} strokeWidth={6} />
-          <circle cx={CENTRE_DOS.cx} cy={CENTRE_DOS.cy} r={324} fill="none" stroke={`rgba(${CREME},0.75)`} strokeWidth={3.4} {...pointille} />
+          <circle cx={CENTRE_DOS.cx} cy={CENTRE_DOS.cy} r={332 * K} fill="none" stroke={NOIR} strokeWidth={6 * K + 1} />
+          <circle cx={CENTRE_DOS.cx} cy={CENTRE_DOS.cy} r={324 * K} fill="none" stroke={`rgba(${CREME},0.75)`} strokeWidth={3.4 * K + 0.6} {...pointille} />
 
           {/* Le jina : le nom du joueur dans son cartouche */}
           {jina && (
@@ -314,6 +384,8 @@ const kanga: SkinNation = {
     voile: "rgba(4,14,9,0.82)",
     onglet: { fond: "#f4ecd6", encre: "#0a0e0b" },
     vive: SIENNE,
+    // Au dos, le microtexte s'écrit par-dessus la girafe et le vert du mji : à peine.
+    dos: { micro: 0.02 },
     tranche: { couleur: "#141a16", metal: 0.55, rugosite: 0.38 },
     holo: { force: 0.24, teinte: [0.86, 1, 0.9] },
   },

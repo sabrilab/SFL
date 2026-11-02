@@ -21,12 +21,20 @@
 //     rayures de trame ocre et verte, quelques fils d'argent (les tisserands
 //     d'aujourd'hui y passent du lurex) ; au centre, la lune dans un cercle
 //     de toile nue, cousu.
+//   · le totem (totems/senegal.tsx, 02/11/2026) : le lion assis, tissé en
+//     flottés, sur un panneau de toile nue cousu au point de surjet sur le
+//     pagne (PANNEAU_SENEGAL) ; la lune monte en haut à gauche dans son
+//     cercle cousu (LUNE_SENEGAL) ; le coton filé main s'use (flammes de fil
+//     épais, fils tirés, bourre, plis pris dans la lumière, de la graine) ;
+//     à la face, les aplats du liseré gardent les passes du pinceau, et le
+//     lion est brodé au point avant dans le coin du portrait.
 // Ce qu'on évite : toute figure du sous-verre (portraits, sujets religieux,
 // scènes), Gorée, l'étoile et les bandes du drapeau. Pas de motif « à
 // signification » inventé : rien que la géométrie du tissage.
 
 import type { PropsMotifNation, SkinNation } from "./types";
-import { alea, BANDE, CENTRE_DOS, f, H, LOGOTYPE_DOS, PORTRAIT, W } from "./outils";
+import { alea, BANDE, f, H, LOGOTYPE_DOS, PORTRAIT, W } from "./outils";
+import { LUNE_SENEGAL, PANNEAU_SENEGAL } from "./totems/senegal";
 
 type Pt = [number, number];
 
@@ -324,6 +332,9 @@ function Manjak({ cote, m, graine, id }: PropsMotifNation) {
       <>
         <defs>
           <Trame id={`mj-t-${id}`} pas={6} force={0.045} />
+          <clipPath id={`mj-c-${id}`}>
+            <path d={l.ocre + l.vert} />
+          </clipPath>
           <clipPath id={`mj-b-${id}`}>
             <rect x={0} y={BANDE} width={W} height={H - BANDE} />
           </clipPath>
@@ -353,6 +364,10 @@ function Manjak({ cote, m, graine, id }: PropsMotifNation) {
           <path d={l.ocre} fill={OCRE} />
           <path d={l.vert} fill={VERT} />
         </g>
+        {/* Les aplats du sous-verre, peints au pinceau : les passes plus claires, la peinture plus mince par endroits. */}
+        <g clipPath={`url(#mj-c-${id})`}>
+          <path d={pinceau(graine)} fill="none" stroke="#fff" strokeOpacity={0.16} strokeWidth={2.2} strokeLinecap="round" />
+        </g>
         <path d={l.noeuds} fill={NOIR} />
         <path d={rectArrondi(FRISE.ext, FRISE.ext, W - 2 * FRISE.ext, FRISE.bas - FRISE.ext, 92 - FRISE.ext)} fill="none" stroke={NOIR} strokeWidth={3} />
         <path d={l.fond} fill={`url(#mj-v-${id})`} fillRule="evenodd" />
@@ -361,40 +376,137 @@ function Manjak({ cote, m, graine, id }: PropsMotifNation) {
   }
 
   const p = pagne(graine, 0, H, "dos");
-  const { cx, cy } = CENTRE_DOS;
+  const u = usure(graine);
+  const { cx, cy } = LUNE_SENEGAL;
+  const P = PANNEAU_SENEGAL;
+  // Le cercle cousu, serré autour de la lune (elle est descendue près du regard du lion).
+  const rl = LUNE_SENEGAL.d / 2 + 26;
   const bandeau = { y: LOGOTYPE_DOS.cy - 70, h: 140 };
   let pointsRond = "";
-  for (let k = 0; k < 120; k++) {
-    const a = (k / 120) * Math.PI * 2;
-    const r1 = 352;
-    const r2 = 364;
-    pointsRond += `M${f(cx + r1 * Math.cos(a))} ${f(cy + r1 * Math.sin(a))}L${f(cx + r2 * Math.cos(a + 0.012))} ${f(cy + r2 * Math.sin(a + 0.012))}`;
+  for (let k = 0; k < 90; k++) {
+    const a = (k / 90) * Math.PI * 2;
+    pointsRond += `M${f(cx + rl * Math.cos(a))} ${f(cy + rl * Math.sin(a))}L${f(cx + (rl + 12) * Math.cos(a + 0.016))} ${f(cy + (rl + 12) * Math.sin(a + 0.016))}`;
   }
   return (
     <>
       <defs>
         <Trame id={`mj-t-${id}`} pas={6} force={0.05} />
+        <linearGradient id={`mj-p-${id}`} x1="0" y1="0" x2="1" y2="0.35">
+          <stop offset="0" stopColor="#fff" stopOpacity={0} />
+          <stop offset="0.22" stopColor="#fff" stopOpacity={0.05} />
+          <stop offset="0.3" stopColor="#000" stopOpacity={0.18} />
+          <stop offset="0.62" stopColor="#fff" stopOpacity={0.04} />
+          <stop offset="0.7" stopColor="#000" stopOpacity={0.14} />
+          <stop offset="1" stopColor="#fff" stopOpacity={0.03} />
+        </linearGradient>
       </defs>
       {p.fonds.map((b) => (
         <rect key={b.x} x={b.x} y={0} width={LB} height={H} fill={b.c} />
       ))}
       <rect width={W} height={H} fill={`url(#mj-t-${id})`} />
       <Fils p={p} largeur={4.4} />
+      {/* L'usure du coton filé main : des flammes de fil plus épais, des fils tirés, une bourre. */}
+      <path d={u.flammes} stroke={ECRU} strokeWidth={5.6} strokeLinecap="round" opacity={0.3} />
+      <path d={u.tires} stroke={ECRU} strokeWidth={1} fill="none" opacity={0.28} />
+      <path d={u.bourre} stroke={ECRU} strokeWidth={2.4} strokeLinecap="round" opacity={0.5} />
       <path d={p.coutures} stroke="#000" strokeWidth={4} opacity={0.7} />
       <path d={p.points} stroke={ECRU} strokeWidth={2} opacity={0.75} strokeLinecap="round" />
+      {/* Les plis du pagne, pris dans la lumière. */}
+      <rect width={W} height={H} fill={`url(#mj-p-${id})`} />
+      {/* Le panneau de toile nue où le lion est tissé, rapporté et cousu au point de surjet. */}
+      <path d={rectArrondi(P.x - 10, P.y - 10, P.l + 20, P.h + 20, P.r + 10)} fill="#000" opacity={0.4} />
+      <path d={rectArrondi(P.x, P.y, P.l, P.h, P.r)} fill="#141412" />
+      <path d={rectArrondi(P.x, P.y, P.l, P.h, P.r)} fill={`url(#mj-t-${id})`} />
+      <path d={surjet(P)} stroke={ECRU} strokeWidth={2.2} strokeLinecap="round" opacity={0.85} />
+      <path d={rectArrondi(P.x + 16, P.y + 16, P.l - 32, P.h - 32, P.r - 12)} fill="none" stroke={OCRE} strokeWidth={3} strokeDasharray="9 2.5" opacity={0.75} />
       {/* Le bandeau du logotype : la toile nue, entre deux rangs de jours. */}
       <rect x={0} y={bandeau.y} width={W} height={bandeau.h} fill="#141412" />
       <rect x={0} y={bandeau.y} width={W} height={bandeau.h} fill={`url(#mj-t-${id})`} />
       <path d={`M0 ${bandeau.y}H${W}M0 ${bandeau.y + bandeau.h}H${W}`} stroke={ECRU} strokeWidth={2.4} opacity={0.6} />
       <path d={`M0 ${bandeau.y + 8}H${W}M0 ${bandeau.y + bandeau.h - 8}H${W}`} stroke={OCRE} strokeWidth={3} strokeDasharray="9 2.5" opacity={0.8} />
-      {/* Le cercle de toile nue autour de la lune, cousu au point de surjet. */}
-      <circle cx={cx} cy={cy} r={364} fill="#000" opacity={0.35} />
-      <circle cx={cx} cy={cy} r={352} fill="#141412" />
-      <circle cx={cx} cy={cy} r={352} fill={`url(#mj-t-${id})`} />
-      <path d={pointsRond} stroke={ECRU} strokeWidth={2.2} strokeLinecap="round" opacity={0.85} />
-      <circle cx={cx} cy={cy} r={376} fill="none" stroke={OCRE} strokeWidth={3} strokeDasharray="9 2.5" opacity={0.8} />
+      {/* Le cercle cousu autour de la lune. */}
+      <path d={pointsRond} stroke={ECRU} strokeWidth={2.2} strokeLinecap="round" opacity={0.7} />
+      <circle cx={cx} cy={cy} r={rl + 16} fill="none" stroke={OCRE} strokeWidth={3} strokeDasharray="9 2.5" opacity={0.7} />
     </>
   );
+}
+
+/** Les passes du pinceau dans les aplats du liseré (la graine) : de courts traits, couchés le long du bord. */
+function pinceau(graine: number): string {
+  return memo(`pinceau-${graine}`, () => {
+    const rnd = alea(graine ^ 0x7069);
+    let d = "";
+    for (let i = 0; i < 160; i++) {
+      const c = Math.floor(rnd() * 4);
+      const t = 40 + rnd() * (c % 2 ? BANDE - 80 : W - 80);
+      const p = 18 + rnd() * 14;
+      const l = 6 + rnd() * 12;
+      if (c === 0) d += `M${f(t)} ${f(p)}h${f(l)}`;
+      else if (c === 2) d += `M${f(t)} ${f(BANDE - 9 - p + 9)}h${f(l)}`;
+      else d += `M${f(c === 1 ? W - p : p)} ${f(t)}v${f(l)}`;
+    }
+    return d;
+  });
+}
+
+/** Le point de surjet autour d'un panneau : de petits points obliques qui chevauchent le bord. */
+function surjet(P: { x: number; y: number; l: number; h: number; r: number }): string {
+  return memo(`surjet-${P.x}-${P.y}`, () => {
+    let d = "";
+    const pas = 13;
+    const point = (x: number, y: number, nx: number, ny: number) => {
+      d += `M${f(x - nx * 6 - ny * 3)} ${f(y - ny * 6 + nx * 3)}L${f(x + nx * 6 + ny * 3)} ${f(y + ny * 6 - nx * 3)}`;
+    };
+    for (let x = P.x + P.r; x < P.x + P.l - P.r; x += pas) {
+      point(x, P.y, 0, -1);
+      point(x, P.y + P.h, 0, 1);
+    }
+    for (let y = P.y + P.r; y < P.y + P.h - P.r; y += pas) {
+      point(P.x, y, -1, 0);
+      point(P.x + P.l, y, 1, 0);
+    }
+    const coins: [number, number, number][] = [
+      [P.x + P.r, P.y + P.r, Math.PI],
+      [P.x + P.l - P.r, P.y + P.r, -Math.PI / 2],
+      [P.x + P.l - P.r, P.y + P.h - P.r, 0],
+      [P.x + P.r, P.y + P.h - P.r, Math.PI / 2],
+    ];
+    for (const [cx, cy, a0] of coins) {
+      for (let a = 0; a < Math.PI / 2; a += pas / P.r) {
+        const b = a0 + a;
+        point(cx + P.r * Math.cos(b), cy + P.r * Math.sin(b), Math.cos(b), Math.sin(b));
+      }
+    }
+    return d;
+  });
+}
+
+/** L'usure du coton filé main (la graine) : flammes de fil épais, fils tirés, bourre. */
+function usure(graine: number): { flammes: string; tires: string; bourre: string } {
+  return memo(`usure-${graine}`, () => {
+    const rnd = alea(graine ^ 0x7573);
+    let flammes = "";
+    let tires = "";
+    let bourre = "";
+    for (let i = 0; i < 46; i++) {
+      const x = rnd() * W;
+      const y = Math.round((rnd() * H) / PR) * PR;
+      const l = 4 + rnd() * 7;
+      flammes += `M${f(x)} ${f(y)}h${f(l)}`;
+    }
+    for (let i = 0; i < 9; i++) {
+      const x = Math.floor(rnd() * BANDES) * LB + 14 + rnd() * (LB - 28);
+      const y = rnd() * H * 0.8;
+      const l = 120 + rnd() * 260;
+      tires += `M${f(x)} ${f(y)}q${f((rnd() - 0.5) * 10)} ${f(l / 2)} ${f((rnd() - 0.5) * 6)} ${f(l)}`;
+    }
+    for (let i = 0; i < 40; i++) {
+      const x = rnd() * W;
+      const y = rnd() * H;
+      bourre += `M${f(x)} ${f(y)}l${f((rnd() - 0.5) * 6)} ${f((rnd() - 0.5) * 6)}`;
+    }
+    return { flammes, tires, bourre };
+  });
 }
 
 const senegal: SkinNation = {
